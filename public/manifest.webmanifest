@@ -1,0 +1,35 @@
+{
+  "name": "JET POS",
+  "short_name": "JET POS",
+  "description": "POPSTAR point of sale app",
+  "start_url": "./pos",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "fullscreen"],
+  "background_color": "#07111f",
+  "theme_color": "#0f1c2e",
+  "orientation": "landscape",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "./pos-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Open POS",
+      "short_name": "POS",
+      "url": "./pos",
+      "icons": [
+        {
+          "src": "./pos-icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 96" width="380" height="96">
+  <defs>
+    <linearGradient id="badge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#29b3ef"/>
+      <stop offset="1" stop-color="#1173a8"/>
+    </linearGradient>
+    <linearGradient id="erp" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1a9bdc"/>
+      <stop offset="1" stop-color="#1585c0"/>
+    </linearGradient>
+    <linearGradient id="trail" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#6fdb67"/>
+      <stop offset="1" stop-color="#3fa03a"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ตรา: เครื่องบินเจ็ทพุ่งขึ้น + แท่งกราฟโต -->
+  <rect x="6" y="12" width="72" height="72" rx="20" fill="url(#badge)"/>
+  <rect x="6" y="12" width="72" height="72" rx="20" fill="none" stroke="#ffffff" stroke-opacity=".18" stroke-width="1.5"/>
+
+  <!-- แท่งกราฟ (ขึ้นเรื่อยๆ) -->
+  <rect x="19" y="58" width="7" height="14" rx="2.5" fill="#fff" opacity=".38"/>
+  <rect x="30" y="50" width="7" height="22" rx="2.5" fill="#fff" opacity=".5"/>
+  <rect x="41" y="41" width="7" height="31" rx="2.5" fill="#fff" opacity=".62"/>
+
+  <!-- เส้นควันเขียวพุ่งตาม -->
+  <path d="M16 74 Q34 68 48 46" fill="none" stroke="url(#trail)" stroke-width="4.5" stroke-linecap="round"/>
+
+  <!-- เครื่องบินกระดาษ -->
+  <path d="M68 22 L28 40 L45 45 Z" fill="#ffffff"/>
+  <path d="M68 22 L45 45 L47 58 L53 48 Z" fill="#dcf1fc"/>
+  <path d="M68 22 L45 45 L53 48 Z" fill="#b8e4fa"/>
+
+  <!-- ชื่อ -->
+  <text x="94" y="56" font-family="'Inter','Noto Sans Thai','Segoe UI',sans-serif" font-weight="900" font-size="42" letter-spacing="-1" fill="#123952">JET</text>
+  <rect x="177" y="26" width="7" height="32" rx="3.5" transform="rotate(18 180.5 42)" fill="url(#trail)"/>
+  <text x="196" y="56" font-family="'Inter','Noto Sans Thai','Segoe UI',sans-serif" font-weight="900" font-size="42" letter-spacing="-1" fill="url(#erp)">ERP</text>
+  <text x="95" y="80" font-family="'Inter','Noto Sans Thai','Segoe UI',sans-serif" font-weight="700" font-size="11.5" letter-spacing="5.2" fill="#7fa1bd">ERP OPERATIONS</text>
+</svg>
