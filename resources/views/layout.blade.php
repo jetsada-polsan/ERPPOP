@@ -170,18 +170,21 @@
         :root {
             /* rail 64px + subpanel 236px - adminlte ใช้ var นี้คำนวณ margin ของ main */
             --erp-rail-w: 68px;
-            --erp-subnav-w: 160px;
+            --erp-subnav-w: 176px;
             --lte-sidebar-width: calc(var(--erp-rail-w) + var(--erp-subnav-w));
-            --erp-border: #e3ecf3;
-            --erp-ink: #29465b;
-            --erp-bg: #eef4f9;
+            --erp-border: #dbe7ef;
+            --erp-ink: #1d3b52;
+            --erp-bg: #f3f7fb;
             --fa-blue: #1a9bdc;
             --fa-blue-deep: #1585c0;
-            --fa-blue-dark: #4a7fa5;
-            --fa-green: #52b74c;
-            --fa-green-deep: #3fa03a;
-            --accent-btn: linear-gradient(135deg, #29b3ef, #1585c0);
-            --accent-btn-hover: linear-gradient(135deg, #45c3f7, #1a9bdc);
+            --fa-blue-dark: #315f80;
+            --fa-green: #20a67a;
+            --fa-green-deep: #168a65;
+            --erp-surface: #ffffff;
+            --erp-soft: #f7fbfe;
+            --erp-shadow: 0 12px 34px rgba(29, 59, 82, .08);
+            --accent-btn: linear-gradient(135deg, #1a9bdc, #20a67a);
+            --accent-btn-hover: linear-gradient(135deg, #2bb0ea, #2bbf8e);
         }
         html[data-theme="navy"] { --erp-border:#dce5ef; --erp-ink:#243b53; --erp-bg:#eef2f7; --fa-blue:#315b86; --fa-blue-deep:#244768; --fa-blue-dark:#3f5f7d; --fa-green:#4e9b72; --fa-green-deep:#397b58; --accent-btn:linear-gradient(135deg,#416f9c,#244768); --accent-btn-hover:linear-gradient(135deg,#527fad,#315b86); }
         html[data-theme="emerald"] { --erp-border:#d8ebe3; --erp-ink:#28483c; --erp-bg:#eef7f3; --fa-blue:#23966c; --fa-blue-deep:#187653; --fa-blue-dark:#397563; --fa-green:#65a30d; --fa-green-deep:#4d7c0f; --accent-btn:linear-gradient(135deg,#34b986,#187653); --accent-btn-hover:linear-gradient(135deg,#49c99a,#23966c); }
@@ -190,7 +193,10 @@
 
         body {
             font-family: 'Leelawadee UI', 'Noto Sans Thai', Tahoma, 'Segoe UI', sans-serif;
-            background: var(--erp-bg);
+            background:
+                linear-gradient(135deg, rgba(26,155,220,.08), transparent 30%),
+                linear-gradient(315deg, rgba(32,166,122,.08), transparent 30%),
+                var(--erp-bg);
             color: var(--erp-ink);
             font-size: 14px;
             -webkit-font-smoothing: antialiased;
@@ -198,21 +204,23 @@
             text-rendering: optimizeLegibility;
         }
 
-        .app-wrapper { background: var(--erp-bg); }
+        .app-wrapper { background: transparent; }
 
         /* ── Header ───────────────────────────── */
         .app-header {
             border-bottom: 1px solid var(--erp-border);
-            min-height: 56px;
-            background: #fff !important;
-            box-shadow: 0 1px 3px rgba(15,23,42,.06);
+            min-height: 58px;
+            background: rgba(255,255,255,.92) !important;
+            box-shadow: 0 8px 28px rgba(29,59,82,.08);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
         }
 
         /* ── Sidebar 2 ชั้นแบบ FlowAccount: rail ไอคอน + แผงเมนูย่อย ── */
         .app-sidebar {
             width: var(--lte-sidebar-width);
             min-width: var(--lte-sidebar-width);
-            background: #fff !important;
+            background: var(--erp-surface) !important;
             border-right: none;
             display: flex !important;
             flex-direction: row;
@@ -222,12 +230,12 @@
         .fa-rail {
             width: var(--erp-rail-w);
             flex: 0 0 var(--erp-rail-w);
-            background: linear-gradient(180deg, var(--fa-blue), var(--fa-blue-deep));
+            background: linear-gradient(180deg, #116c9f 0%, #168caa 55%, #177456 100%);
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 10px 0;
-            gap: 5px;
+            padding: 12px 0;
+            gap: 6px;
             height: 100vh;
             /* ต้อง visible ไม่งั้น tooltip ชื่อเมนูที่ยื่นออกขวาถูกตัดทิ้ง */
             overflow: visible;
@@ -235,12 +243,12 @@
 
         .fa-rail-logo {
             width: 44px; height: 44px;
-            border-radius: 13px;
+            border-radius: 14px;
             display: grid; place-items: center;
             margin-bottom: 10px;
             overflow: hidden;
             flex: 0 0 44px;
-            box-shadow: 0 4px 12px rgba(0,40,80,.22);
+            box-shadow: 0 10px 24px rgba(0,40,80,.22);
             transition: transform .15s;
         }
         .fa-rail-logo:hover { transform: scale(1.06); }
@@ -248,9 +256,9 @@
         .fa-rail-logo span { font-weight: 900; color: var(--fa-blue-deep); font-size: 15px; background: #fff; width: 44px; height: 44px; display: grid; place-items: center; }
 
         .fa-rail-btn {
-            width: 60px;
+            width: 58px;
             min-height: 54px;
-            border: 0; border-radius: 12px;
+            border: 0; border-radius: 14px;
             background: transparent;
             color: rgba(255,255,255,.85);
             display: flex;
@@ -275,7 +283,7 @@
             text-overflow: ellipsis;
         }
         .fa-rail-btn:hover { background: rgba(255,255,255,.16); color: #fff; }
-        .fa-rail-btn.active { background: #fff; color: var(--fa-blue-deep); box-shadow: 0 4px 12px rgba(0,40,80,.18); }
+        .fa-rail-btn.active { background: #fff; color: #126b9b; box-shadow: 0 10px 22px rgba(0,40,80,.22); }
 
         /* tooltip ชื่อโมดูลเต็มตอน hover (ยื่นออกขวาของ rail) */
         .fa-rail-btn::after {
@@ -302,12 +310,12 @@
         .fa-subnav {
             width: var(--erp-subnav-w);
             flex: 0 0 var(--erp-subnav-w);
-            background: #fff;
+            background: linear-gradient(180deg, #fff, #f8fbfd);
             border-right: 1px solid var(--erp-border);
             height: 100vh;
             overflow-y: auto;
             scrollbar-width: thin;
-            padding: 10px 9px 16px;
+            padding: 12px 10px 18px;
             position: relative;
         }
         html.subnav-collapsed .fa-subnav { display: none; }
@@ -319,31 +327,31 @@
 
         .fa-subnav-title {
             font-size: 15px;
-            font-weight: 700;
-            color: var(--fa-blue-dark);
+            font-weight: 900;
+            color: #1b557a;
             letter-spacing: -.01em;
-            padding: 3px 7px 7px;
+            padding: 4px 8px 8px;
         }
 
         .fa-subnav-link {
             display: flex; align-items: center; gap: 10px;
-            padding: 6px 7px;
-            border-radius: 7px;
-            color: #52708a;
+            padding: 7px 8px;
+            border-radius: 9px;
+            color: #526f84;
             font-size: 13px;
             line-height: 1.25;
-            font-weight: 600;
+            font-weight: 700;
             text-decoration: none;
             margin-bottom: 1px;
-            transition: background .12s, color .12s;
+            transition: background .12s, color .12s, transform .12s;
         }
         .fa-subnav-link i { font-size: 13px; color: #7fa1bd; width: 16px; text-align: center; }
-        .fa-subnav-link:hover { background: #eef7fd; color: var(--fa-blue-deep); }
+        .fa-subnav-link:hover { background: #edf7fc; color: var(--fa-blue-deep); transform: translateX(1px); }
         .fa-subnav-link:hover i { color: var(--fa-blue); }
         .fa-subnav-link.active {
-            background: #e3f3fc;
+            background: linear-gradient(90deg, #e1f4fc, #f0fbf6);
             color: var(--fa-blue-deep);
-            box-shadow: inset 3px 0 0 var(--fa-blue);
+            box-shadow: inset 3px 0 0 var(--fa-blue), 0 6px 16px rgba(26,155,220,.08);
         }
         .fa-subnav-link.active i { color: var(--fa-blue); }
 
@@ -368,7 +376,7 @@
 
         .app-main { margin-left: 0; }
 
-        .app-content { padding: 20px 22px; }
+        .app-content { padding: 22px 24px; }
 
         /* ── Page header ──────────────────────── */
         .page-title-icon {
@@ -376,9 +384,9 @@
             height: 36px;
             display: inline-grid;
             place-items: center;
-            border-radius: 9px;
-            background: linear-gradient(135deg, #e0f2fe, #bae6fd);
-            color: #0284c7;
+            border-radius: 11px;
+            background: linear-gradient(135deg, #e1f4fc, #e2f7ef);
+            color: #1685bc;
             margin-right: 10px;
             font-size: 16px;
         }
@@ -430,40 +438,40 @@
 
         .profile-avatar {
             width: 34px; height: 34px;
-            border-radius: 50%;
+            border-radius: 11px;
             display: grid; place-items: center;
-            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            background: linear-gradient(135deg, #1a9bdc, #20a67a);
             color: #fff; font-weight: 700; font-size: 13px;
         }
 
         /* ── Cards ────────────────────────────── */
         .content-card {
             background: #fff;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--erp-border);
             border-radius: 12px;
-            box-shadow: 0 1px 3px rgba(15,23,42,.06), 0 4px 16px rgba(15,23,42,.04);
+            box-shadow: var(--erp-shadow);
         }
 
         /* ── Forms ────────────────────────────── */
         .form-control, .form-select {
-            border-radius: 8px;
+            border-radius: 9px;
             min-height: 34px;
             padding: 5px 10px;
             font-size: 13.5px;
-            border-color: #e2e8f0;
-            background: #fafbfc;
+            border-color: #d8e5ed;
+            background: #fbfdff;
             color: #0f172a;
             transition: border-color .15s, box-shadow .15s;
         }
 
         .form-control:focus, .form-select:focus {
-            border-color: #10b981;
-            box-shadow: 0 0 0 3px rgba(16,185,129,.12);
+            border-color: #1a9bdc;
+            box-shadow: 0 0 0 3px rgba(26,155,220,.12);
             background: #fff;
         }
 
         /* ── Buttons ──────────────────────────── */
-        .btn { border-radius: 8px; font-weight: 600; font-size: 13.5px; }
+        .btn { border-radius: 9px; font-weight: 700; font-size: 13.5px; }
 
         .btn-primary {
             background: var(--accent-btn, linear-gradient(135deg, #0ea5e9, #0284c7));
@@ -477,11 +485,11 @@
 
         /* ปุ่มสร้าง/บันทึกหลัก - เขียวสดแบบ FlowAccount */
         .btn-success {
-            background: linear-gradient(180deg, #5fc558, #46ad3f);
-            border-color: #3fa03a;
-            box-shadow: 0 2px 8px rgba(70,173,63,.3);
+            background: linear-gradient(135deg, #28b983, #179263);
+            border-color: #179263;
+            box-shadow: 0 8px 18px rgba(23,146,99,.24);
         }
-        .btn-success:hover { background: linear-gradient(180deg, #6fd167, #52b74c); border-color: #46ad3f; }
+        .btn-success:hover { background: linear-gradient(135deg, #34c891, #20a67a); border-color: #20a67a; }
 
         .btn-warning {
             background: linear-gradient(135deg, #f59e0b, #d97706);
@@ -704,8 +712,16 @@
         .app-content { padding:14px 16px; }
 
         .content-card,
-        .card { border-radius:var(--ui-card-radius); box-shadow:0 3px 12px rgba(15,51,74,.055); }
-        .card-header { padding:9px 12px; }
+        .card {
+            border-color:#dbe7ef;
+            border-radius:var(--ui-card-radius);
+            box-shadow:0 10px 26px rgba(29,59,82,.07);
+        }
+        .card-header {
+            padding:9px 12px;
+            background:linear-gradient(180deg,#fff,#f8fbfd);
+            border-bottom-color:#e4edf4;
+        }
         .card-body { padding:12px; }
 
         h1,.h1 { font-size:24px; }
@@ -729,13 +745,20 @@
         .input-group > :not(:first-child) { border-top-left-radius:0; border-bottom-left-radius:0; }
         .input-group > :not(:last-child) { border-top-right-radius:0; border-bottom-right-radius:0; }
 
-        .table { margin-bottom:0; font-size:var(--ui-font-md); }
-        .table > thead > tr > th { padding:7px 9px; color:#405b6e; font-size:var(--ui-font-sm); font-weight:800; line-height:1.2; vertical-align:middle; white-space:nowrap; }
-        .table > tbody > tr > td { padding:7px 9px; line-height:1.3; vertical-align:middle; }
+        .table { margin-bottom:0; font-size:var(--ui-font-md); border-color:#e5edf3; }
+        .table-responsive {
+            border-radius:10px;
+            border:1px solid #e1ebf2;
+            background:#fff;
+        }
+        .table > thead > tr > th { padding:8px 9px; color:#fff; font-size:var(--ui-font-sm); font-weight:900; line-height:1.2; vertical-align:middle; white-space:nowrap; }
+        .table > tbody > tr > td { padding:8px 9px; line-height:1.3; vertical-align:middle; }
+        .table > tbody > tr:nth-child(even) > td { background:#fbfdff; }
+        .table > tbody > tr:hover > td { background:#eef8fd; }
         .table-sm > thead > tr > th,.table-sm > tbody > tr > td { padding:5px 7px; }
-        .badge { padding:4px 6px; border-radius:5px; font-size:var(--ui-font-xs); line-height:1; }
+        .badge { padding:4px 7px; border-radius:6px; font-size:var(--ui-font-xs); line-height:1; }
 
-        .alert { padding:8px 10px; border-radius:var(--ui-radius); font-size:var(--ui-font-md); }
+        .alert { padding:9px 11px; border-radius:10px; font-size:var(--ui-font-md); border:1px solid rgba(148,163,184,.2); }
         .pagination { --bs-pagination-padding-x:.6rem; --bs-pagination-padding-y:.28rem; --bs-pagination-font-size:11px; }
         .dropdown-menu { padding:5px; border-radius:8px; font-size:var(--ui-font-md); }
         .dropdown-item { padding:6px 8px; border-radius:5px; }
