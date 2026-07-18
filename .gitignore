@@ -15,6 +15,7 @@
 /.vscode
 /.zed
 /auth.json
+/deploy/env.local
 /node_modules
 /public/build
 /public/downloads
