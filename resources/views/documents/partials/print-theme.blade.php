@@ -63,14 +63,15 @@
         .page,
         .print-sheet {
             width: 210mm;
-            min-height: 285mm;
+            min-height: 297mm;
             margin: 18px auto !important;
-            padding: 28mm 20mm 14mm !important;
+            padding: 24mm 16mm 12mm !important;
             background: #fff !important;
             color: var(--doc-ink) !important;
             position: relative;
             box-shadow: 0 18px 55px rgba(8,32,51,.10) !important;
             border-radius: 0 !important;
+            overflow: hidden !important;
         }
 
         .sheet::before,
@@ -302,6 +303,120 @@
             border-top: 0 !important;
         }
 
+        @media screen {
+            html,
+            body {
+                min-height: 100%;
+            }
+
+            body:not(.layout-fixed) {
+                padding: 0 16px 24px !important;
+                overflow-x: auto !important;
+            }
+
+            body:not(.layout-fixed) .toolbar,
+            body:not(.layout-fixed) .no-print {
+                max-width: min(210mm, calc(100vw - 32px)) !important;
+                margin: 14px auto 8px !important;
+            }
+
+            body:not(.layout-fixed) .sheet,
+            body:not(.layout-fixed) .page,
+            body:not(.layout-fixed) .print-sheet {
+                width: min(210mm, calc(100vw - 32px)) !important;
+                min-height: auto !important;
+                margin: 8px auto 18px !important;
+            }
+        }
+
+        @media screen and (min-width: 980px) and (max-height: 980px) {
+            body:not(.layout-fixed) .toolbar,
+            body:not(.layout-fixed) .no-print {
+                min-width: 210mm;
+                zoom: .86;
+            }
+
+            body:not(.layout-fixed) .sheet,
+            body:not(.layout-fixed) .page,
+            body:not(.layout-fixed) .print-sheet {
+                width: 210mm !important;
+                min-height: 297mm !important;
+                zoom: .72;
+            }
+        }
+
+        @media screen and (min-width: 980px) and (max-height: 860px) {
+            body:not(.layout-fixed) .sheet,
+            body:not(.layout-fixed) .page,
+            body:not(.layout-fixed) .print-sheet {
+                zoom: .64;
+            }
+        }
+
+        @media screen and (max-width: 760px) {
+            body:not(.layout-fixed) { padding: 0 8px 18px !important; }
+            body:not(.layout-fixed) .toolbar,
+            body:not(.layout-fixed) .no-print {
+                width: calc(100vw - 16px) !important;
+                max-width: calc(100vw - 16px) !important;
+                overflow-x: auto !important;
+                justify-content: flex-start !important;
+            }
+
+            body:not(.layout-fixed) .toolbar a,
+            body:not(.layout-fixed) .toolbar button,
+            body:not(.layout-fixed) .no-print a,
+            body:not(.layout-fixed) .no-print button {
+                min-height: 38px !important;
+                padding: 0 14px !important;
+                font-size: 13px !important;
+                white-space: nowrap !important;
+            }
+
+            body:not(.layout-fixed) .sheet,
+            body:not(.layout-fixed) .page,
+            body:not(.layout-fixed) .print-sheet {
+                width: calc(100vw - 16px) !important;
+                padding: 16mm 7mm 10mm !important;
+                overflow-x: hidden !important;
+            }
+
+            body:not(.layout-fixed) .head,
+            body:not(.layout-fixed) .doc-head,
+            body:not(.layout-fixed) .doc-header,
+            body:not(.layout-fixed) .bill-head,
+            body:not(.layout-fixed) .meta-grid,
+            body:not(.layout-fixed) .parties,
+            body:not(.layout-fixed) .info-row,
+            body:not(.layout-fixed) .totals,
+            body:not(.layout-fixed) .totals-block,
+            body:not(.layout-fixed) .qc-row,
+            body:not(.layout-fixed) .signs,
+            body:not(.layout-fixed) .signatures,
+            body:not(.layout-fixed) .sign-row,
+            body:not(.layout-fixed) .bill-sign {
+                display: block !important;
+            }
+
+            body:not(.layout-fixed) .doc-title,
+            body:not(.layout-fixed) .doc-title-block {
+                text-align: left !important;
+                padding-right: 0 !important;
+                margin-top: 12px !important;
+            }
+
+            body:not(.layout-fixed) .box,
+            body:not(.layout-fixed) .party-block,
+            body:not(.layout-fixed) .info-box,
+            body:not(.layout-fixed) .bill-customer,
+            body:not(.layout-fixed) .sum,
+            body:not(.layout-fixed) .totals-table {
+                width: 100% !important;
+                min-width: 0 !important;
+                margin-top: 10px !important;
+            }
+        }
+
         @media print {
             body { background: #fff !important; }
             .toolbar,
@@ -311,8 +426,10 @@
             .print-sheet {
                 margin: 0 !important;
                 width: auto !important;
-                min-height: auto !important;
+                min-height: 297mm !important;
                 box-shadow: none !important;
                 padding: 14mm 13mm !important;
+                overflow: visible !important;
+                zoom: 1 !important;
             }
         }
