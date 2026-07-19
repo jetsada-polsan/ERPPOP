@@ -38,18 +38,28 @@ return new class extends Migration
         }
 
         // --- สร้างสาขาใหม่ ---
-        $charoensiLoc = DB::table('warehouse_locations')->where('name', 'ตลาดเจริญศรี')->value('id');
-        $surinLoc = DB::table('warehouse_locations')->where('name', 'สุรินทร์')->value('id');
-
-        // location ใหม่สำหรับอำนาจเจริญ (ยังไม่มีสต๊อก) ใต้คลังหน้าร้าน
         $shopWarehouse = DB::table('warehouses')->where('code', 'SHOP')->value('id')
             ?? DB::table('warehouses')->value('id');
-        $amnatLoc = DB::table('warehouse_locations')->where('name', 'อำนาจเจริญ')->value('id');
-        if (! $amnatLoc) {
-            $amnatLoc = DB::table('warehouse_locations')->insertGetId([
-                'warehouse_id' => $shopWarehouse, 'code' => 'AMNAT', 'name' => 'อำนาจเจริญ',
+        if (! $shopWarehouse) {
+            $shopWarehouse = DB::table('warehouses')->insertGetId([
+                'branch_id' => null,
+                'code' => 'SHOP',
+                'name' => 'คลังหน้าร้าน',
             ]);
         }
+
+        $location = function (string $name, string $code) use ($shopWarehouse): int {
+            return DB::table('warehouse_locations')->where('name', $name)->value('id')
+                ?? DB::table('warehouse_locations')->insertGetId([
+                    'warehouse_id' => $shopWarehouse,
+                    'code' => $code,
+                    'name' => $name,
+                ]);
+        };
+
+        $charoensiLoc = $location('ตลาดเจริญศรี', 'CHAROENSI');
+        $surinLoc = $location('สุรินทร์', 'SURIN');
+        $amnatLoc = $location('อำนาจเจริญ', 'AMNAT');
 
         $newBranches = [
             ['0004', 'สาขาเจริญศรี-1', $charoensiLoc],
