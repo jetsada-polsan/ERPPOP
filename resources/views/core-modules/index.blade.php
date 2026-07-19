@@ -1,526 +1,245 @@
 @extends('layout')
 
-@section('title', 'เอกสารระบบหลัก')
-@section('page-title', 'เอกสารระบบหลัก')
-@section('page-subtitle', 'Scope แกน ERP/POS รอบแรก: สินค้า ขาย POS โอนของ ซื้อ และรายงาน')
+@section('title', 'คู่มือ PopStar 4M')
+@section('page-title', 'คู่มือ PopStar 4M')
+@section('page-subtitle', 'ระบบงาน คน เงิน สินค้า และการบริหารของ PopStar Shop')
 
 @push('head')
 <style>
-    .doc-shell {
-        display: grid;
-        gap: 14px;
+    [x-cloak] { display: none !important; }
+
+    .manual-shell { display: grid; gap: 14px; color: #1d3b52; }
+    .manual-panel { background: #fff; border: 1px solid #dbe7ef; border-radius: 8px; }
+    .manual-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; padding: 18px 20px; border-top: 4px solid #1599d3; }
+    .manual-eyebrow { color: #0f766e; font-size: 11px; font-weight: 900; text-transform: uppercase; }
+    .manual-title { margin: 3px 0 5px; color: #15364d; font-size: 24px; font-weight: 900; line-height: 1.2; }
+    .manual-lead { margin: 0; max-width: 860px; color: #647b8c; font-size: 13px; line-height: 1.55; }
+    .manual-actions { display: flex; gap: 8px; flex: 0 0 auto; }
+    .manual-icon-button { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid #cbdbe5; border-radius: 7px; background: #fff; color: #315f80; }
+    .manual-icon-button:hover { color: #1599d3; border-color: #1599d3; }
+
+    .manual-toolbar { display: grid; grid-template-columns: minmax(240px, 1fr) auto; gap: 12px; padding: 12px; }
+    .manual-search { position: relative; }
+    .manual-search i { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: #7890a1; }
+    .manual-search input { width: 100%; height: 40px; padding: 0 12px 0 38px; border: 1px solid #cbdbe5; border-radius: 7px; color: #15364d; background: #fff; }
+    .manual-search input:focus { outline: 2px solid rgba(21, 153, 211, .16); border-color: #1599d3; }
+    .manual-segments { display: flex; gap: 4px; padding: 3px; border: 1px solid #dbe7ef; border-radius: 7px; background: #f5f8fa; }
+    .manual-segment { min-width: 100px; height: 32px; padding: 0 12px; border: 0; border-radius: 5px; background: transparent; color: #5d7485; font-size: 12px; font-weight: 900; }
+    .manual-segment.active { color: #fff; background: #315f80; }
+
+    .pillar-summary { display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 12px; align-items: start; padding: 16px 18px 12px; border-bottom: 1px solid #edf2f5; }
+    .pillar-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 7px; font-size: 19px; }
+    .tone-teal { color: #0f766e; background: #ccfbf1; }
+    .tone-red { color: #b4232c; background: #fee2e2; }
+    .tone-blue { color: #146ca4; background: #e2f3fc; }
+    .tone-amber { color: #9a6700; background: #fef3c7; }
+    .pillar-name { margin: 0 0 3px; color: #15364d; font-size: 17px; font-weight: 900; }
+    .pillar-copy { margin: 0; color: #647b8c; font-size: 13px; line-height: 1.5; }
+
+    .manual-table-wrap { overflow-x: auto; }
+    .manual-table { width: 100%; min-width: 760px; border-collapse: collapse; }
+    .manual-table th { padding: 9px 12px; color: #5d7485; background: #f7fafc; border-bottom: 1px solid #dbe7ef; font-size: 11px; font-weight: 900; text-transform: uppercase; }
+    .manual-table td { padding: 10px 12px; color: #425f73; border-bottom: 1px solid #edf2f5; font-size: 12px; vertical-align: middle; }
+    .manual-table tbody tr:last-child td { border-bottom: 0; }
+    .manual-table strong { color: #15364d; font-size: 13px; }
+    .program-link, .program-locked { width: 32px; height: 32px; display: inline-grid; place-items: center; border-radius: 6px; }
+    .program-link { color: #1585c0; background: #e8f5fb; }
+    .program-link:hover { color: #fff; background: #1585c0; }
+    .program-locked { color: #91a3af; background: #f0f3f5; }
+
+    .manual-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #dbe7ef; }
+    .manual-section-head h2 { margin: 0; color: #15364d; font-size: 16px; font-weight: 900; }
+    .manual-section-head span { color: #7890a1; font-size: 12px; }
+    .flow-tabs { display: flex; gap: 6px; padding: 10px 12px; overflow-x: auto; border-bottom: 1px solid #edf2f5; }
+    .flow-tab { flex: 0 0 auto; height: 34px; padding: 0 12px; border: 1px solid #dbe7ef; border-radius: 6px; color: #5d7485; background: #fff; font-size: 12px; font-weight: 800; }
+    .flow-tab.active { color: #fff; border-color: #1599d3; background: #1599d3; }
+    .flow-content { padding: 16px 18px 18px; }
+    .flow-meta { display: grid; grid-template-columns: minmax(180px, .45fr) 1fr; gap: 12px; margin-bottom: 14px; }
+    .flow-meta div { padding: 10px 12px; border-left: 3px solid #1599d3; background: #f6fafc; }
+    .flow-meta small { display: block; color: #7890a1; font-size: 10px; font-weight: 900; text-transform: uppercase; }
+    .flow-meta strong { color: #274b63; font-size: 12px; }
+    .flow-steps { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+    .flow-step { position: relative; min-height: 112px; padding: 11px; border: 1px solid #dbe7ef; border-radius: 7px; background: #fff; }
+    .flow-step:not(:last-child)::after { content: '\F285'; position: absolute; right: -12px; top: 42px; z-index: 2; color: #1599d3; font-family: bootstrap-icons; font-size: 14px; }
+    .flow-number { display: block; color: #1599d3; font-size: 10px; font-weight: 900; }
+    .flow-step strong { display: block; margin: 4px 0; color: #15364d; font-size: 12px; }
+    .flow-step p { margin: 0; color: #6d8291; font-size: 11px; line-height: 1.4; }
+    .flow-step a { color: inherit; text-decoration: none; }
+
+    .manual-two-col { display: grid; grid-template-columns: 1.05fr .95fr; gap: 14px; }
+    .gap-list { display: grid; }
+    .gap-row { display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: 12px; padding: 12px 16px; border-bottom: 1px solid #edf2f5; }
+    .gap-row:last-child { border-bottom: 0; }
+    .gap-status { align-self: start; padding: 4px 7px; border-radius: 5px; text-align: center; font-size: 10px; font-weight: 900; }
+    .gap-critical { color: #a61b27; background: #fee2e2; }
+    .gap-control { color: #8a5a00; background: #fef3c7; }
+    .gap-growth { color: #146c43; background: #d1fae5; }
+    .gap-row h3 { margin: 0 0 3px; color: #274b63; font-size: 13px; font-weight: 900; }
+    .gap-row p { margin: 0; color: #6d8291; font-size: 11px; line-height: 1.45; }
+    .routine-row { padding: 12px 16px; border-bottom: 1px solid #edf2f5; }
+    .routine-row:last-child { border-bottom: 0; }
+    .routine-meta { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+    .routine-meta strong { color: #15364d; font-size: 12px; }
+    .routine-meta span { color: #7890a1; font-size: 11px; }
+    .routine-items { margin: 0; padding-left: 18px; color: #526d7f; font-size: 11px; line-height: 1.65; }
+
+    @media (max-width: 1100px) {
+        .flow-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .flow-step:nth-child(3)::after { display: none; }
+        .manual-two-col { grid-template-columns: 1fr; }
     }
-
-    .doc-hero {
-        background: #fff;
-        border: 1px solid #e4e9f2;
-        border-radius: 8px;
-        padding: 22px;
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 18px;
-        align-items: center;
+    @media (max-width: 720px) {
+        .manual-header { flex-direction: column; padding: 15px; }
+        .manual-title { font-size: 20px; }
+        .manual-toolbar { grid-template-columns: 1fr; }
+        .manual-segments { overflow-x: auto; }
+        .manual-segment { min-width: 84px; }
+        .flow-meta { grid-template-columns: 1fr; }
+        .flow-steps { grid-template-columns: 1fr; }
+        .flow-step { min-height: 0; }
+        .flow-step::after { display: none !important; }
+        .gap-row { grid-template-columns: 74px minmax(0, 1fr); padding: 11px 12px; }
     }
-
-    .doc-eyebrow {
-        color: #0f766e;
-        font-size: 12px;
-        font-weight: 900;
-        letter-spacing: .04em;
-        text-transform: uppercase;
-    }
-
-    .doc-title {
-        color: #111827;
-        font-size: 30px;
-        font-weight: 900;
-        line-height: 1.15;
-        margin: 5px 0 8px;
-    }
-
-    .doc-lead {
-        color: #475569;
-        font-size: 15px;
-        max-width: 820px;
-        margin: 0;
-    }
-
-    .doc-badge-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(120px, 1fr));
-        gap: 8px;
-        min-width: 270px;
-    }
-
-    .doc-badge {
-        border: 1px solid #e4e9f2;
-        border-radius: 8px;
-        padding: 10px;
-        background: #fafcff;
-    }
-
-    .doc-badge strong {
-        display: block;
-        color: #0f172a;
-        font-size: 20px;
-        line-height: 1;
-    }
-
-    .doc-badge span {
-        color: #64748b;
-        font-size: 12px;
-        font-weight: 700;
-    }
-
-    .module-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 12px;
-    }
-
-    .module-card,
-    .phase-card,
-    .flow-panel,
-    .scope-panel {
-        background: #fff;
-        border: 1px solid #e4e9f2;
-        border-radius: 8px;
-    }
-
-    .module-card {
-        padding: 16px;
-        display: grid;
-        grid-template-rows: auto auto 1fr auto;
-        gap: 10px;
-        min-height: 258px;
-    }
-
-    .module-head {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-
-    .module-icon {
-        width: 36px;
-        height: 36px;
-        border-radius: 8px;
-        display: grid;
-        place-items: center;
-        font-size: 17px;
-        flex: 0 0 36px;
-    }
-
-    .tone-teal { background: #ccfbf1; color: #0f766e; }
-    .tone-orange { background: #fff2df; color: #f97316; }
-    .tone-cyan { background: #e4fbff; color: #0891b2; }
-    .tone-amber { background: #fef3c7; color: #b45309; }
-    .tone-blue { background: #e8f1ff; color: #2563eb; }
-    .tone-red { background: #fee2e2; color: #dc2626; }
-
-    .module-title {
-        font-size: 17px;
-        font-weight: 900;
-        color: #0f172a;
-        margin: 0;
-    }
-
-    .module-summary {
-        color: #64748b;
-        font-size: 13px;
-        line-height: 1.45;
-        margin: 0;
-    }
-
-    .clean-list {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-        display: grid;
-        gap: 7px;
-    }
-
-    .clean-list li {
-        display: flex;
-        gap: 8px;
-        align-items: flex-start;
-        color: #334155;
-        font-size: 13px;
-        line-height: 1.35;
-    }
-
-    .clean-list i {
-        color: #0f9aaa;
-        margin-top: 2px;
-    }
-
-    .section-title {
-        font-size: 20px;
-        font-weight: 900;
-        color: #0f172a;
-        margin: 6px 0 10px;
-    }
-
-    .phase-grid {
-        display: grid;
-        grid-template-columns: repeat(6, minmax(0, 1fr));
-        gap: 10px;
-    }
-
-    .phase-card {
-        padding: 13px;
-        min-height: 150px;
-    }
-
-    .phase-no {
-        width: 30px;
-        height: 30px;
-        border-radius: 7px;
-        display: grid;
-        place-items: center;
-        background: #0f9aaa;
-        color: #fff;
-        font-weight: 900;
-        font-size: 13px;
-        margin-bottom: 9px;
-    }
-
-    .phase-title {
-        font-size: 14px;
-        font-weight: 900;
-        color: #111827;
-        margin: 0 0 7px;
-        line-height: 1.25;
-    }
-
-    .phase-note {
-        color: #64748b;
-        font-size: 12px;
-        line-height: 1.42;
-    }
-
-    .two-col {
-        display: grid;
-        grid-template-columns: 1.15fr .85fr;
-        gap: 14px;
-    }
-
-    .flow-panel,
-    .scope-panel {
-        padding: 18px;
-    }
-
-    .flow-row {
-        display: grid;
-        grid-template-columns: 150px 1fr;
-        gap: 12px;
-        padding: 10px 0;
-        border-bottom: 1px solid #edf1f7;
-    }
-
-    .flow-row:last-child {
-        border-bottom: 0;
-    }
-
-    .flow-label {
-        color: #0f172a;
-        font-weight: 900;
-        font-size: 13px;
-    }
-
-    .flow-text {
-        color: #475569;
-        font-size: 13px;
-        line-height: 1.45;
-    }
-
-    .scope-list {
-        columns: 2;
-        column-gap: 24px;
-        margin: 0;
-        padding-left: 18px;
-        color: #475569;
-        font-size: 13px;
-        line-height: 1.75;
-    }
-
-    .module-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        padding-top: 2px;
-    }
-
-    .module-action {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        border: 1px solid #dbe4ef;
-        border-radius: 7px;
-        padding: 7px 10px;
-        color: #0f172a;
-        background: #fff;
-        text-decoration: none;
-        font-size: 12px;
-        font-weight: 800;
-    }
-
-    .module-action:hover {
-        color: #0f766e;
-        border-color: #0f9aaa;
-        background: #f3ffff;
-    }
-
-    .legacy-code-strip {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 5px;
-        padding-top: 2px;
-    }
-
-    .legacy-code-strip-title {
-        flex: 0 0 100%;
-        color: #64748b;
-        font-size: 11px;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: .03em;
-    }
-
-    .legacy-code-mini {
-        border: 1px solid #dbe4ef;
-        border-radius: 7px;
-        background: #f8fafc;
-        color: #0f172a;
-        padding: 4px 7px;
-        font-size: 11px;
-        font-weight: 900;
-        line-height: 1;
-        text-decoration: none;
-    }
-
-    .legacy-code-mini:hover {
-        border-color: #0f9aaa;
-        color: #0f766e;
-        background: #eefcfc;
-    }
-
-    @media (max-width: 1199.98px) {
-        .module-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .phase-grid {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-        }
-
-        .two-col {
-            grid-template-columns: 1fr;
-        }
-    }
-
-    @media (max-width: 767.98px) {
-        .doc-hero {
-            grid-template-columns: 1fr;
-            padding: 16px;
-        }
-
-        .doc-title {
-            font-size: 24px;
-        }
-
-        .doc-badge-grid,
-        .module-grid,
-        .phase-grid {
-            grid-template-columns: 1fr;
-            min-width: 0;
-        }
-
-        .flow-row {
-            grid-template-columns: 1fr;
-            gap: 4px;
-        }
-
-        .scope-list {
-            columns: 1;
-        }
+    @media print {
+        .app-header, .app-sidebar, .manual-toolbar, .manual-actions, .flow-tabs { display: none !important; }
+        .app-main { margin: 0 !important; }
+        .app-content { padding: 0 !important; }
+        .manual-shell { gap: 8px; }
+        .manual-panel { break-inside: avoid; }
+        [x-cloak] { display: block !important; }
     }
 </style>
 @endpush
 
 @section('content')
 @php
-    $modules = [
-        [
-            'title' => 'สินค้า / สต็อก',
-            'icon' => 'bi-box-seam-fill',
-            'tone' => 'tone-teal',
-            'summary' => 'ฐานข้อมูลสินค้าและยอดคงเหลือแยกสาขา คลัง และตำแหน่งเก็บ',
-            'items' => ['สินค้า, หมวดหมู่, หน่วยนับ, บาร์โค้ด', 'ราคาขายและต้นทุน', 'ยอดคงเหลือและ stock movement', 'ปรับปรุงสต็อกและตรวจนับสินค้า'],
-            'actions' => [['สินค้า', 'products.index'], ['ตรวจนับ', 'stock-adjustments.index'], ['รายงานสต็อก', 'reports.index', ['category' => 'inventory', 'report' => 'stock_balance']]],
-        ],
-        [
-            'title' => 'ขายสินค้า',
-            'icon' => 'bi-receipt-cutoff',
-            'tone' => 'tone-orange',
-            'summary' => 'เอกสารขายหลังบ้าน รองรับขายสด ขายเชื่อ รับคืน และลดหนี้',
-            'items' => ['ใบเสนอราคาและใบจองสินค้า', 'ใบขายสดและใบขายเชื่อ', 'ใบส่งของและใบกำกับภาษี', 'รับชำระเงินและลูกหนี้'],
-            'actions' => [['ใบจอง', 'bookings.index'], ['ขายสด', 'cash-sales.index'], ['รับคืน', 'sale-returns.index']],
-        ],
-        [
-            'title' => 'POS หน้าร้าน',
-            'icon' => 'bi-cart-check-fill',
-            'tone' => 'tone-cyan',
-            'summary' => 'ขายหน้าร้านแบบเร็ว สแกนบาร์โค้ด รับชำระหลายช่องทาง และปิดรอบ',
-            'items' => ['เปิด/ปิดรอบแคชเชียร์', 'สแกนสินค้าและพิมพ์ใบเสร็จ', 'เงินสด โอน QR บัตร', 'คืนสินค้า ยกเลิกบิล และ audit log'],
-            'actions' => [['POS', 'pos-import.page'], ['POS Tools', 'bplus.pos-workbench'], ['รายงาน POS', 'reports.index', ['category' => 'pos', 'report' => 'pos_receipts']]],
-        ],
-        [
-            'title' => 'โอนสินค้า',
-            'icon' => 'bi-arrow-left-right',
-            'tone' => 'tone-amber',
-            'summary' => 'โอนสินค้าระหว่างคลังหรือสาขา พร้อมสถานะสินค้าระหว่างทาง',
-            'items' => ['ใบขอโอนสินค้า', 'ใบโอนสินค้าออก', 'ใบรับโอนสินค้า', 'ติดตามสถานะระหว่างทาง'],
-            'actions' => [['โอนสินค้า', 'stock-transfers.index'], ['รายงานโอน', 'reports.index', ['category' => 'transfer', 'report' => 'stock_transfers']]],
-        ],
-        [
-            'title' => 'ซื้อสินค้า',
-            'icon' => 'bi-basket-fill',
-            'tone' => 'tone-blue',
-            'summary' => 'จัดซื้อ รับสินค้าเข้า เพิ่มสต็อก และตั้งเจ้าหนี้เมื่อซื้อเชื่อ',
-            'items' => ['ใบขอซื้อและใบสั่งซื้อ', 'ใบรับสินค้า', 'ซื้อสดและซื้อเชื่อ', 'คืนสินค้าให้ผู้ขาย'],
-            'actions' => [['ซื้อสินค้า', 'purchases.index'], ['ผู้ขาย', 'suppliers.index'], ['รายงานซื้อ', 'reports.index', ['category' => 'purchasing', 'report' => 'purchase_documents']]],
-        ],
-        [
-            'title' => 'รายงานหลัก',
-            'icon' => 'bi-clipboard-data-fill',
-            'tone' => 'tone-red',
-            'summary' => 'รายงานที่ใช้คุมยอดขาย สต็อก POS ซื้อ และโอนสินค้าในรอบแรก',
-            'items' => ['สต็อกคงเหลือและสินค้าเคลื่อนไหว', 'ยอดขายรายวัน สาขา พนักงาน', 'สรุปแคชเชียร์และบิล POS', 'ซื้อ โอนสินค้า และกำไรขั้นต้น'],
-            'actions' => [['รายงานทั้งหมด', 'reports.index'], ['กำไรขั้นต้น', 'reports.index', ['category' => 'sales', 'report' => 'gross_margin']], ['แดชบอร์ด', 'dashboard']],
-        ],
-    ];
+    $routeAccess = function (string $routeName): bool {
+        if (! \Illuminate\Support\Facades\Route::has($routeName)) {
+            return false;
+        }
 
-    $legacyCoreKeys = ['products-stock', 'sales', 'pos', 'transfer', 'purchase', 'reports'];
-    foreach ($modules as $index => &$module) {
-        $module['legacy_codes'] = \App\Support\LegacyDocumentModules::codesForCore($legacyCoreKeys[$index] ?? '');
-    }
-    unset($module);
+        $permission = \App\Support\RoutePermissions::resolve($routeName);
 
-    $phases = [
-        ['ฐานสินค้าและคลัง', 'สินค้า บาร์โค้ด ราคา คลัง ตำแหน่งเก็บ ยอดคงเหลือ และสมุดเคลื่อนไหว'],
-        ['POS ขายหน้าร้าน', 'เปิดรอบ ขาย รับเงิน พิมพ์ใบเสร็จ คืนสินค้า ยกเลิกบิล และรายงาน POS'],
-        ['ขายหลังบ้าน', 'ลูกค้า ใบเสนอราคา ใบจอง ใบขายสด/เชื่อ รับคืน ลดหนี้ และรับชำระ'],
-        ['โอนสินค้า', 'ใบขอโอน โอนออก รับโอน สต็อกระหว่างทาง และรายงานโอน'],
-        ['ซื้อสินค้า', 'ผู้ขาย ขอซื้อ สั่งซื้อ รับสินค้า ซื้อสด/เชื่อ และคืนสินค้าให้ผู้ขาย'],
-        ['รายงาน/ตรวจสอบ', 'รายงานหลัก Audit log และตรวจความถูกต้องก่อนขยายโมดูลบัญชี'],
-    ];
+        return $permission === null || (auth()->user() && auth()->user()->hasPermission($permission));
+    };
 @endphp
 
-<div class="doc-shell">
-    <section class="doc-hero">
+<div class="manual-shell" x-data="{ pillar: 'man', flow: 'pos', query: '' }">
+    <section class="manual-panel manual-header">
         <div>
-            <div class="doc-eyebrow">ERP/POS Core Scope</div>
-            <h2 class="doc-title">ทำแกนหลักให้แน่นก่อน แล้วค่อยต่อบัญชีเต็มระบบ</h2>
-            <p class="doc-lead">
-                หน้าเอกสารนี้สรุปสิ่งที่ต้องทำก่อนสำหรับระบบขายสินค้าแบบหลายสาขา:
-                สินค้า, สต็อก, ขาย, POS, โอนสินค้า, ซื้อสินค้า และรายงานที่ใช้ตรวจงานประจำวัน
-            </p>
+            <div class="manual-eyebrow">PopStar 4M ERP Handbook</div>
+            <h1 class="manual-title">คู่มือการทำงาน ERP แบบครบวงจร</h1>
+            <p class="manual-lead">จุดอ้างอิงกลางสำหรับงานขาย ซื้อ คลัง ผลิต การเงิน บัญชี และการบริหาร แบ่งระบบตาม MAN, MONEY, MATERIAL และ MANAGEMENT พร้อมเส้นทางข้อมูลและรายการที่ยังต้องพัฒนา</p>
         </div>
-        <div class="doc-badge-grid">
-            <div class="doc-badge"><strong>6</strong><span>โมดูลหลัก</span></div>
-            <div class="doc-badge"><strong>6</strong><span>Phase งาน</span></div>
-            <div class="doc-badge"><strong>POS</strong><span>ขายหน้าร้าน</span></div>
-            <div class="doc-badge"><strong>Stock</strong><span>คุมสินค้า</span></div>
+        <div class="manual-actions">
+            <button type="button" class="manual-icon-button" title="พิมพ์คู่มือ" aria-label="พิมพ์คู่มือ" onclick="window.print()"><i class="bi bi-printer"></i></button>
         </div>
     </section>
 
-    <section>
-        <h3 class="section-title">Module หลัก</h3>
-        <div class="module-grid">
-            @foreach($modules as $module)
-                <article class="module-card">
-                    <div class="module-head">
-                        <span class="module-icon {{ $module['tone'] }}"><i class="bi {{ $module['icon'] }}"></i></span>
-                        <h4 class="module-title">{{ $module['title'] }}</h4>
-                    </div>
-                    <p class="module-summary">{{ $module['summary'] }}</p>
-                    <ul class="clean-list">
-                        @foreach($module['items'] as $item)
-                            <li><i class="bi bi-check2-circle"></i><span>{{ $item }}</span></li>
-                        @endforeach
-                    </ul>
-                    @if(! empty($module['legacy_codes']))
-                        <div class="legacy-code-strip">
-                            <span class="legacy-code-strip-title">BPlus document codes</span>
-                            @foreach(array_slice($module['legacy_codes'], 0, 18) as $code)
-                                <a class="legacy-code-mini" href="{{ route('documents.browser', ['legacy_type' => $code, 'year' => now()->subMonth()->year, 'month' => now()->subMonth()->month]) }}">{{ $code }}</a>
-                            @endforeach
-                            @if(count($module['legacy_codes']) > 18)
-                                <a class="legacy-code-mini" href="{{ route('documents.browser', ['q' => $module['legacy_codes'][0] ?? '', 'year' => now()->subMonth()->year, 'month' => now()->subMonth()->month]) }}">+{{ count($module['legacy_codes']) - 18 }}</a>
-                            @endif
-                        </div>
-                    @endif
-                    <div class="module-actions">
-                        @foreach($module['actions'] as $action)
-                            <a class="module-action" href="{{ route($action[1], $action[2] ?? []) }}">
-                                <i class="bi bi-box-arrow-up-right"></i>{{ $action[0] }}
-                            </a>
-                        @endforeach
-                    </div>
-                </article>
+    <section class="manual-panel manual-toolbar">
+        <label class="manual-search">
+            <i class="bi bi-search"></i>
+            <input type="search" x-model="query" placeholder="ค้นหาโปรแกรม ข้อมูลเข้า หรือผลลัพธ์">
+        </label>
+        <div class="manual-segments" role="tablist" aria-label="หมวด 4M">
+            @foreach ($pillars as $pillar)
+                <button type="button" class="manual-segment" :class="pillar === '{{ $pillar['key'] }}' && 'active'" @click="pillar = '{{ $pillar['key'] }}'">{{ $pillar['label'] }}</button>
             @endforeach
         </div>
     </section>
 
-    <section>
-        <h3 class="section-title">ลำดับทำงานที่แนะนำ</h3>
-        <div class="phase-grid">
-            @foreach($phases as $phase)
-                <article class="phase-card">
-                    <div class="phase-no">{{ $loop->iteration }}</div>
-                    <h4 class="phase-title">{{ $phase[0] }}</h4>
-                    <div class="phase-note">{{ $phase[1] }}</div>
-                </article>
+    @foreach ($pillars as $pillar)
+        <section class="manual-panel" x-show="pillar === '{{ $pillar['key'] }}'" x-cloak>
+            <div class="pillar-summary">
+                <div class="pillar-icon tone-{{ $pillar['tone'] }}"><i class="bi {{ $pillar['icon'] }}"></i></div>
+                <div>
+                    <h2 class="pillar-name">{{ $pillar['label'] }} · {{ $pillar['title'] }}</h2>
+                    <p class="pillar-copy">{{ $pillar['summary'] }}</p>
+                </div>
+            </div>
+            <div class="manual-table-wrap">
+                <table class="manual-table">
+                    <thead><tr><th>โปรแกรม</th><th>รับข้อมูลจาก</th><th>ส่งผลไป</th><th class="text-center">เปิด</th></tr></thead>
+                    <tbody>
+                    @foreach ($pillar['programs'] as $program)
+                        <tr x-show="!query || $el.textContent.toLowerCase().includes(query.toLowerCase())">
+                            <td><strong>{{ $program[0] }}</strong></td>
+                            <td>{{ $program[2] }}</td>
+                            <td>{{ $program[3] }}</td>
+                            <td class="text-center">
+                                @if ($routeAccess($program[1]))
+                                    <a class="program-link" href="{{ route($program[1]) }}" title="เปิด {{ $program[0] }}"><i class="bi bi-arrow-up-right"></i></a>
+                                @else
+                                    <span class="program-locked" title="ไม่มีสิทธิ์หรือยังไม่มีเส้นทาง"><i class="bi bi-lock"></i></span>
+                                @endif
+                            </td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    @endforeach
+
+    <section class="manual-panel">
+        <div class="manual-section-head">
+            <h2><i class="bi bi-bezier2 me-2"></i>เส้นทางข้อมูลของแต่ละวงจร</h2>
+            <span>{{ count($workflows) }} วงจรหลัก</span>
+        </div>
+        <div class="flow-tabs" role="tablist">
+            @foreach ($workflows as $workflow)
+                <button type="button" class="flow-tab" :class="flow === '{{ $workflow['key'] }}' && 'active'" @click="flow = '{{ $workflow['key'] }}'">{{ $workflow['label'] }}</button>
             @endforeach
         </div>
+        @foreach ($workflows as $workflow)
+            <div class="flow-content" x-show="flow === '{{ $workflow['key'] }}'" x-cloak>
+                <div class="flow-meta">
+                    <div><small>ผู้รับผิดชอบ</small><strong>{{ $workflow['owner'] }}</strong></div>
+                    <div><small>ผลลัพธ์ที่ต้องได้</small><strong>{{ $workflow['goal'] }}</strong></div>
+                </div>
+                <div class="flow-steps">
+                    @foreach ($workflow['steps'] as $index => $step)
+                        <article class="flow-step">
+                            @if ($routeAccess($step[1]))<a href="{{ route($step[1]) }}">@endif
+                                <span class="flow-number">STEP {{ $index + 1 }}</span>
+                                <strong>{{ $step[0] }}</strong>
+                                <p>{{ $step[2] }}</p>
+                            @if ($routeAccess($step[1]))</a>@endif
+                        </article>
+                    @endforeach
+                </div>
+            </div>
+        @endforeach
     </section>
 
-    <section class="two-col">
-        <div class="flow-panel">
-            <h3 class="section-title mt-0">Flow สำคัญ</h3>
-            <div class="flow-row">
-                <div class="flow-label">ขายหลังบ้าน</div>
-                <div class="flow-text">ใบเสนอราคา -> ใบจองสินค้า -> ใบขาย/ใบส่งของ/ใบกำกับภาษี -> รับชำระเงิน</div>
+    <div class="manual-two-col">
+        <section class="manual-panel">
+            <div class="manual-section-head">
+                <h2><i class="bi bi-exclamation-diamond me-2"></i>สิ่งที่ระบบยังขาด</h2>
+                <span>จัดลำดับตามความเสี่ยง</span>
             </div>
-            <div class="flow-row">
-                <div class="flow-label">POS</div>
-                <div class="flow-text">เปิดรอบแคชเชียร์ -> สแกนสินค้า -> รับเงิน -> พิมพ์ใบเสร็จ -> ตัดสต็อก -> ปิดรอบ</div>
+            <div class="gap-list">
+                @foreach ($gaps as $gap)
+                    <article class="gap-row">
+                        <span class="gap-status gap-{{ $gap['level'] }}">{{ $gap['status'] }}</span>
+                        <div><h3>{{ $gap['title'] }}</h3><p>{{ $gap['detail'] }}</p></div>
+                    </article>
+                @endforeach
             </div>
-            <div class="flow-row">
-                <div class="flow-label">โอนสินค้า</div>
-                <div class="flow-text">ใบขอโอน -> ใบจัดส่งโอน -> ลดสต็อกต้นทาง -> สินค้าระหว่างทาง -> ใบรับโอน -> เพิ่มสต็อกปลายทาง</div>
-            </div>
-            <div class="flow-row">
-                <div class="flow-label">ซื้อสินค้า</div>
-                <div class="flow-text">ใบขอซื้อ -> ใบสั่งซื้อ -> ใบรับสินค้า -> เพิ่มสต็อก -> ตั้งเจ้าหนี้หรือจ่ายเงิน</div>
-            </div>
-        </div>
+        </section>
 
-        <div class="scope-panel">
-            <h3 class="section-title mt-0">ยังไม่ต้องทำรอบแรก</h3>
-            <ul class="scope-list">
-                <li>บัญชีแยกประเภทเต็มระบบ</li>
-                <li>ปิดงบการเงิน</li>
-                <li>ทรัพย์สินถาวร</li>
-                <li>เงินเดือน</li>
-                <li>ผลิต/BOM ขั้นสูง</li>
-                <li>BI ขั้นสูง</li>
-                <li>E-commerce sync</li>
-                <li>สมาชิก/แต้มแบบละเอียด</li>
-                <li>โปรโมชันซับซ้อน</li>
-            </ul>
-        </div>
-    </section>
+        <section class="manual-panel">
+            <div class="manual-section-head">
+                <h2><i class="bi bi-calendar-check me-2"></i>รอบควบคุมงาน</h2>
+                <span>รายการตรวจประจำรอบ</span>
+            </div>
+            @foreach ($routines as $routine)
+                <article class="routine-row">
+                    <div class="routine-meta"><strong>{{ $routine['period'] }}</strong><span>{{ $routine['owner'] }}</span></div>
+                    <ul class="routine-items">@foreach ($routine['items'] as $item)<li>{{ $item }}</li>@endforeach</ul>
+                </article>
+            @endforeach
+        </section>
+    </div>
 </div>
 @endsection

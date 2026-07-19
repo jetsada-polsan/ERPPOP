@@ -6,7 +6,7 @@
             'items' => [
                 ['label' => 'ภาพรวมกิจการ', 'route' => 'dashboard', 'pattern' => 'dashboard', 'icon' => 'bi-bar-chart-line-fill', 'tone' => 'blue'],
                 ['label' => 'รวมเมนูการทำงาน', 'route' => 'features.index', 'pattern' => 'features.*', 'icon' => 'bi-grid-1x2-fill', 'tone' => 'red'],
-                ['label' => 'คู่มือขั้นตอนงาน', 'route' => 'core-modules.index', 'pattern' => 'core-modules.*', 'icon' => 'bi-journal-text', 'tone' => 'amber'],
+                ['label' => 'คู่มือ PopStar 4M', 'route' => 'core-modules.index', 'pattern' => 'core-modules.*', 'icon' => 'bi-journal-text', 'tone' => 'amber'],
             ],
         ],
         [
@@ -852,7 +852,7 @@
                     </li>
                     <li class="nav-item d-none d-lg-block">
                         <a href="{{ route('core-modules.index') }}" class="btn btn-light border rounded-pill px-3">
-                            <i class="bi bi-book me-2"></i>คู่มือ
+                            <i class="bi bi-book me-2"></i>คู่มือ 4M
                         </a>
                     </li>
                     <li class="nav-item">

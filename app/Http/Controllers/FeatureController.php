@@ -52,7 +52,7 @@ class FeatureController extends Controller
                 'accent' => '#dc2626',
                 'summary' => 'ราคาขาย ตารางราคา นาทีทอง คูปอง ส่วนลด ของแถม และแคมเปญสะสม',
                 'items' => [
-                    ['name' => 'ราคาขายทั่วไป / ตารางราคาขาย', 'status' => 'ready', 'route' => ['promotions.index', []], 'note' => 'มีทะเบียนโปรโมชั่นตั้งต้นแล้ว ยังไม่คำนวณใน POS จริง'],
+                    ['name' => 'ราคาขายทั่วไป / ตารางราคาขาย', 'status' => 'ready', 'route' => ['promotions.index', []], 'note' => 'POS คำนวณโปรโมชั่นแล้ว ขั้นถัดไปคือให้ Server ตรวจยืนยันราคาและส่วนลดทุกบิล'],
                     ['name' => 'ราคานาทีทอง / ป้ายราคา', 'status' => 'ready', 'route' => ['promotions.index', []]],
                     ['name' => 'ส่วนลดต่อรายการ / ท้ายบิล', 'status' => 'ready', 'route' => ['promotions.index', []]],
                     ['name' => 'แคมเปญซื้อครบ / ซื้อคละ / ลดและแถม', 'status' => 'ready', 'route' => ['promotions.index', []]],
@@ -79,7 +79,7 @@ class FeatureController extends Controller
                 'accent' => '#0891b2',
                 'summary' => 'สินค้า คลัง แหล่งเก็บ ตรวจนับ โอนย้าย เบิก คืน ตัดชำรุด และ WMS',
                 'items' => [
-                    ['name' => 'สินค้า หน่วยนับ บาร์โค้ด เครื่องชั่ง', 'status' => 'ready', 'route' => ['products.index', []], 'note' => 'เพิ่ม/แก้ไขสินค้า หน่วยนับ และบาร์โค้ดได้แล้ว ส่วนเครื่องชั่งยังไม่มี'],
+                    ['name' => 'สินค้า หน่วยนับ บาร์โค้ด เครื่องชั่ง', 'status' => 'ready', 'route' => ['products.index', []], 'note' => 'รองรับหน่วย บาร์โค้ด PLU สินค้าชั่ง และตารางราคาแล้ว'],
                     ['name' => 'สินค้าคงเหลือ', 'status' => 'ready', 'route' => ['reports.index', ['category' => 'inventory', 'report' => 'stock_balance']]],
                     ['name' => 'สมุดคลังสินค้า / เคลื่อนไหวสินค้า', 'status' => 'ready', 'route' => ['reports.index', ['category' => 'inventory', 'report' => 'stock_movements']]],
                     ['name' => 'ตรวจนับ / โอนย้ายสต็อก', 'status' => 'ready', 'route' => ['stock-transfers.index', []]],
@@ -124,7 +124,7 @@ class FeatureController extends Controller
                 'items' => [
                     ['name' => 'สูตรแปรรูป / สูตรช่วยการบันทึก', 'status' => 'ready', 'route' => ['production.index', []]],
                     ['name' => 'ขอผลิต / รับสินค้าจากการผลิต', 'status' => 'ready', 'route' => ['production.index', []]],
-                    ['name' => 'แปรรูปสินค้า / ตัดวัตถุดิบ', 'status' => 'ready', 'route' => ['production.index', []], 'note' => 'มีเอกสารตั้งต้นแล้ว ยังไม่ตัดสต็อกอัตโนมัติ'],
+                    ['name' => 'แปรรูปสินค้า / ตัดวัตถุดิบ', 'status' => 'ready', 'route' => ['production.index', []], 'note' => 'เบิกวัตถุดิบด้วยเอกสาร DR และรับผลผลิตด้วย IP; ยังต้องเพิ่มการเทียบสูตรกับใช้จริงอัตโนมัติ'],
                 ],
             ],
             [

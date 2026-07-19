@@ -21,6 +21,7 @@ use App\Http\Controllers\LineIntegrationController;
 use App\Http\Controllers\LegacyReportController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\MemberPointController;
+use App\Http\Controllers\ManualController;
 use App\Http\Controllers\ProductionController;
 use App\Http\Controllers\PromotionController;
 use App\Http\Controllers\SaleReturnController;
@@ -116,7 +117,7 @@ Route::prefix('wh')->name('wh.')->group(function () {
 });
 
 Route::get('/features', [FeatureController::class, 'index'])->name('features.index');
-Route::get('/core-modules', fn () => view('core-modules.index'))->name('core-modules.index');
+Route::get('/core-modules', [ManualController::class, 'index'])->name('core-modules.index');
 Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
 Route::get('/legacy-reports', [LegacyReportController::class, 'index'])->name('legacy-reports.index');
 
