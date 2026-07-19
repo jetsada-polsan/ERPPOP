@@ -14,12 +14,17 @@ use App\Models\ProductDepartment;
 use App\Models\ProductPrice;
 use App\Models\ProductSupplier;
 use App\Models\ProductUnit;
+use App\Models\RecallCase;
+use App\Models\RecallContact;
 use App\Models\StockLot;
+use App\Models\StockLotQualityCheck;
+use App\Models\StockMovement;
 use App\Models\Supplier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class ProductController extends Controller
@@ -229,11 +234,99 @@ class ProductController extends Controller
         abort_unless($stockLot->product_id === $product->id, 404);
         $stockLot->load([
             'warehouseLocation.warehouse', 'sourceDocument.documentType', 'qualityUpdatedBy',
+            'qualityChecks.checkedBy', 'recallCases.contacts.customer', 'recallCases.contacts.branch',
+            'recallCases.contacts.document',
             'movements' => fn ($query) => $query->with(['document.documentType', 'document.branch'])
                 ->orderBy('movement_date')->orderBy('id'),
         ]);
 
         return view('products.lot-trace', compact('product', 'stockLot'));
+    }
+
+    public function storeLotQualityCheck(Request $request, Product $product, StockLot $stockLot): RedirectResponse
+    {
+        abort_unless($stockLot->product_id === $product->id, 404);
+        $data = $request->validate([
+            'result' => ['required', 'in:pass,hold,fail'],
+            'note' => ['nullable', 'string', 'max:2000'],
+            'evidence' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+        ]);
+        $path = $request->file('evidence')?->store('quality-evidence/'.$stockLot->id);
+        DB::transaction(function () use ($data, $path, $stockLot): void {
+            StockLotQualityCheck::create([
+                'stock_lot_id' => $stockLot->id, 'result' => $data['result'],
+                'note' => $data['note'] ?? null, 'evidence_path' => $path,
+                'checked_by' => auth()->id(), 'checked_at' => now(),
+            ]);
+            $status = match ($data['result']) {
+                'pass' => 'available', 'fail' => 'quarantine', default => 'hold',
+            };
+            $stockLot->update([
+                'quality_status' => $status,
+                'quality_reason' => $data['result'] === 'pass' ? null : ($data['note'] ?? 'รอตรวจสอบ'),
+                'quality_updated_by' => auth()->id(), 'quality_updated_at' => now(),
+            ]);
+        });
+
+        return back()->with('success', 'บันทึกผลตรวจคุณภาพ Lot แล้ว');
+    }
+
+    public function openRecall(Request $request, Product $product, StockLot $stockLot): RedirectResponse
+    {
+        abort_unless($stockLot->product_id === $product->id, 404);
+        $data = $request->validate([
+            'severity' => ['required', 'in:low,medium,high,critical'],
+            'reason' => ['required', 'string', 'max:2000'],
+        ]);
+        DB::transaction(function () use ($data, $stockLot): void {
+            if (RecallCase::where('stock_lot_id', $stockLot->id)->where('status', 'open')->exists()) {
+                throw ValidationException::withMessages(['reason' => 'Lot นี้มี Recall ที่ยังเปิดอยู่แล้ว']);
+            }
+            $case = RecallCase::create([
+                'case_no' => 'RC-'.now()->format('Ymd-His').'-'.$stockLot->id,
+                'stock_lot_id' => $stockLot->id, 'severity' => $data['severity'],
+                'status' => 'open', 'reason' => $data['reason'],
+                'opened_by' => auth()->id(), 'opened_at' => now(),
+            ]);
+            $lotIds = collect([$stockLot->id]);
+            do {
+                $children = StockLot::whereIn('source_lot_id', $lotIds)->whereNotIn('id', $lotIds)->pluck('id')
+                    ->merge(DB::table('stock_lot_lineages')->whereIn('input_lot_id', $lotIds)->pluck('output_lot_id'));
+                $before = $lotIds->count();
+                $lotIds = $lotIds->merge($children)->unique()->values();
+            } while ($lotIds->count() > $before);
+            $movements = StockMovement::with('document')
+                ->whereIn('stock_lot_id', $lotIds)->whereIn('movement_type', ['out', 'transform_out'])
+                ->whereNotNull('document_id')->get()->groupBy('document_id');
+            foreach ($movements as $documentId => $rows) {
+                $document = $rows->first()->document;
+                RecallContact::create([
+                    'recall_case_id' => $case->id, 'document_id' => $documentId,
+                    'customer_id' => $document?->customer_id, 'branch_id' => $document?->branch_id,
+                    'qty' => $rows->sum('qty'), 'contact_status' => 'pending',
+                ]);
+            }
+            StockLot::whereIn('id', $lotIds)->update([
+                'quality_status' => 'recalled', 'quality_reason' => $data['reason'],
+                'quality_updated_by' => auth()->id(), 'quality_updated_at' => now(),
+            ]);
+        });
+
+        return back()->with('success', 'เปิดเคส Recall และสร้างรายการติดต่อลูกค้าแล้ว');
+    }
+
+    public function updateRecallContact(Request $request, RecallContact $recallContact): RedirectResponse
+    {
+        $data = $request->validate([
+            'contact_status' => ['required', 'in:pending,contacted,returned,unreachable,closed'],
+            'contact_note' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $recallContact->update([
+            ...$data, 'contacted_by' => auth()->id(),
+            'contacted_at' => $data['contact_status'] === 'pending' ? null : now(),
+        ]);
+
+        return back()->with('success', 'อัปเดตผลติดต่อลูกค้าแล้ว');
     }
 
     public function addBarcode(Request $request, Product $product): RedirectResponse

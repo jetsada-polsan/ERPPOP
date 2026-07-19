@@ -31,6 +31,8 @@ class RoutePermissions
         'customers.' => 'sales.manage',
         'billing-notes.' => 'sales.manage',
         'credit-debit-notes.' => 'sales.manage',
+        'credit-debit-notes.approve' => 'finance.note.approve',
+        'credit-debit-notes.reject' => 'finance.note.approve',
         'quotations.' => 'sales.manage',
 
         // คลังสินค้า / ผลิต
@@ -42,8 +44,12 @@ class RoutePermissions
         'stock-transfers.' => 'stock.manage',
         'stock-transfers.request' => 'stock.request', // พนักงานสาขาขอโอน (longest-prefix)
         'stock-adjustments.' => 'stock.manage',
+        'stock-adjustments.approve' => 'stock.adjust.approve',
+        'stock-adjustments.reject' => 'stock.adjust.approve',
         'stock-counts.' => 'stock.manage',
         'stock-issues.' => 'stock.manage',
+        'stock-issues.approve' => 'stock.damage.approve',
+        'stock-issues.reject' => 'stock.damage.approve',
         'stock-transforms.' => 'stock.manage',
         'production.' => 'stock.manage',
         'warehouse-locations.' => 'stock.manage',
@@ -73,6 +79,9 @@ class RoutePermissions
 
         // ข้อมูลตั้งต้น / ราคา / โปรโมชั่น
         'products.' => 'masterdata.manage',
+        'products.lots.quality-checks' => 'inventory.quality.manage',
+        'products.lots.recalls' => 'inventory.quality.manage',
+        'products.recall-contacts' => 'inventory.quality.manage',
         'product-units.' => 'masterdata.manage',
         'price-tables.' => 'masterdata.manage',
         'scale-prices.' => 'masterdata.manage',
@@ -90,6 +99,13 @@ class RoutePermissions
         'legacy-reports.' => 'reports.view',
         'core-modules.' => 'reports.view',
         'features.' => 'reports.view',
+        'management-controls.' => 'management.view',
+        'management-controls.cost-centers' => 'budget.manage',
+        'management-controls.budgets' => 'budget.manage',
+        'management-controls.purchase-plans' => 'purchasing.manage',
+        'management-controls.attendance' => 'payroll.manage',
+        'management-controls.payroll' => 'payroll.manage',
+        'management-controls.ecommerce' => 'ecommerce.sync',
 
         // ระบบ
         'users.' => 'users.manage',

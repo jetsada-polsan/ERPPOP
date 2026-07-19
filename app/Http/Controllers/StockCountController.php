@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
+use App\Models\ProductBarcode;
 use App\Models\StockCount;
 use App\Models\StockCountItem;
 use App\Models\WarehouseLocation;
@@ -67,7 +68,7 @@ class StockCountController extends Controller
                 'products.id as product_id',
             ]);
 
-        $barcodes = \App\Models\ProductBarcode::whereIn('product_id', $items->pluck('product_id'))
+        $barcodes = ProductBarcode::whereIn('product_id', $items->pluck('product_id'))
             ->where('is_active', true)->get(['product_id', 'barcode', 'unit_factor'])
             ->groupBy('product_id');
 
@@ -112,7 +113,8 @@ class StockCountController extends Controller
     {
         abort_unless($stockCount->isEditable(), 422, 'ใบนี้ส่งตรวจแล้ว');
         abort_if($stockCount->items()->whereNotNull('counted_qty')->doesntExist(), 422, 'ยังไม่มีรายการนับจริง');
-        $stockCount->update(['status'=>'review', 'submitted_by'=>$request->user()?->id, 'submitted_at'=>now()]);
+        $stockCount->update(['status' => 'review', 'submitted_by' => $request->user()?->id, 'submitted_at' => now()]);
+
         return back()->with('success', 'ส่งใบตรวจนับให้หัวหน้าตรวจสอบแล้ว ยังไม่กระทบสต็อกจริง');
     }
 
@@ -200,7 +202,7 @@ class StockCountController extends Controller
     // Post differences as a stock adjustment document
     public function post(Request $request, StockCount $stockCount, StockCountService $service): RedirectResponse
     {
-        $allowed = $request->user()?->roles()->whereIn('code', ['GM','BRANCH_MGR','IT_MGR'])->exists();
+        $allowed = $request->user()?->roles()->whereIn('code', ['GM', 'BRANCH_MGR', 'IT_MGR'])->exists();
         abort_unless($allowed, 403, 'เฉพาะ Manager/Admin เท่านั้นที่ยืนยันปรับสต็อกได้');
         abort_unless($stockCount->status === 'review', 422, 'ต้องส่งตรวจสอบก่อนยืนยันปรับสต็อก');
         try {
@@ -209,14 +211,12 @@ class StockCountController extends Controller
             return back()->withErrors(['post' => $e->getMessage()]);
         }
 
-        $stockCount->update(['confirmed_by'=>$request->user()?->id, 'confirmed_at'=>now()]);
-
         if ($document === null) {
             return redirect()->route('stock-counts.show', $stockCount)
                 ->with('success', 'ปิดใบตรวจนับแล้ว — ยอดนับตรงกับระบบทั้งหมด ไม่มีรายการต้องปรับ');
         }
 
         return redirect()->route('stock-adjustments.show', $document->id)
-            ->with('success', "ปรับปรุงสต๊อกจากใบตรวจนับแล้ว เอกสาร {$document->doc_number}");
+            ->with('success', "สร้างใบปรับสต๊อก {$document->doc_number} แล้ว ต้องให้ผู้อนุมัติอีกคนตรวจและอนุมัติก่อนกระทบสต๊อกจริง");
     }
 }

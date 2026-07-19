@@ -4,12 +4,13 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
 class ErpBackup extends Command
 {
-    protected $signature = 'erp:backup {--keep-days=30 : Number of days to retain local backups}';
+    protected $signature = 'erp:backup {--keep-days=30 : Number of days to retain local backups} {--disk= : Optional offsite filesystem disk}';
 
     protected $description = 'Create a compressed database backup with SHA-256 checksum';
 
@@ -42,6 +43,13 @@ class ErpBackup extends Command
             File::put($compressed.'.sha256', hash_file('sha256', $compressed).'  '.basename($compressed).PHP_EOL);
             chmod($compressed, 0600);
             chmod($compressed.'.sha256', 0600);
+            $disk = $this->option('disk') ?: env('ERP_BACKUP_OFFSITE_DISK');
+            if ($disk) {
+                $target = 'erp-backups/'.now()->format('Y/m').'/'.basename($compressed);
+                Storage::disk($disk)->put($target, File::get($compressed));
+                Storage::disk($disk)->put($target.'.sha256', File::get($compressed.'.sha256'));
+                $this->info("ส่งสำเนานอกเครื่องไป disk {$disk}: {$target}");
+            }
             $this->prune($directory, max(1, (int) $this->option('keep-days')));
             $this->info('สำรองฐานข้อมูลสำเร็จ: '.$compressed);
 

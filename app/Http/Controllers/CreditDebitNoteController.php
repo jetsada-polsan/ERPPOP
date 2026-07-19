@@ -7,9 +7,11 @@ use App\Models\Customer;
 use App\Models\CustomerOpenItem;
 use App\Models\Document;
 use App\Services\Sales\CreditDebitNoteService;
+use App\Support\ThaiBaht;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use RuntimeException;
 
@@ -49,7 +51,7 @@ class CreditDebitNoteController extends Controller
         $isCredit = $note->documentType->code === 'CREDIT_NOTE';
 
         // ราคารวม VAT: ถอดฐานภาษี
-        $vatRate = (float) (\Illuminate\Support\Facades\DB::table('vat_rates')
+        $vatRate = (float) (DB::table('vat_rates')
             ->where('effective_from', '<=', $note->doc_date->toDateString())
             ->where(fn ($w) => $w->whereNull('effective_to')->orWhere('effective_to', '>=', $note->doc_date->toDateString()))
             ->orderByDesc('effective_from')->value('rate_percent') ?? 7.0);
@@ -64,7 +66,7 @@ class CreditDebitNoteController extends Controller
             'baseAmount' => $base,
             'vatAmount' => round($total - $base, 2),
             'total' => $total,
-            'totalText' => \App\Support\ThaiBaht::text($total),
+            'totalText' => ThaiBaht::text($total),
         ]);
     }
 
@@ -107,6 +109,27 @@ class CreditDebitNoteController extends Controller
         $label = $data['type'] === 'credit' ? 'ใบลดหนี้' : 'ใบเพิ่มหนี้';
 
         return redirect()->route('credit-debit-notes.index', ['type' => $data['type']])
-            ->with('success', "บันทึก{$label} {$document->doc_number} แล้ว");
+            ->with('success', $data['type'] === 'credit' ? "ส่ง{$label} {$document->doc_number} รออนุมัติแล้ว" : "บันทึก{$label} {$document->doc_number} แล้ว");
+    }
+
+    public function approve(Document $note, CreditDebitNoteService $service): RedirectResponse
+    {
+        try {
+            $service->approveCredit($note);
+        } catch (RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+
+        return back()->with('success', 'อนุมัติใบลดหนี้และปรับลูกหนี้/GL แล้ว');
+    }
+
+    public function reject(Request $request, Document $note): RedirectResponse
+    {
+        abort_unless($note->status === 'pending_approval', 422);
+        abort_if($note->created_by === auth()->id(), 403, 'ผู้สร้างไม่สามารถปฏิเสธรายการตนเอง');
+        $data = $request->validate(['reason' => ['required', 'string', 'max:500']]);
+        $note->update(['status' => 'rejected', 'remark' => trim($note->remark.' | ไม่อนุมัติ: '.$data['reason'])]);
+
+        return back()->with('success', 'ปฏิเสธใบลดหนี้แล้ว');
     }
 }

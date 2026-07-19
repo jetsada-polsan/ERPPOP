@@ -40,6 +40,7 @@ class MonthlyAccountingController extends Controller
             'period' => $period, 'branchId' => $branchId, 'expenses' => $expenses, 'statements' => $statements,
             'branches' => Branch::orderBy('code')->get(), 'bankAccounts' => BankAccount::orderBy('bank_name')->get(),
             'expenseAccounts' => ChartOfAccount::where('account_type', 'expense')->orderBy('code')->get(),
+            'costCenters' => DB::table('cost_centers')->where('is_active', true)->orderBy('code')->get(),
             'suppliers' => Supplier::where('is_active', true)->orderBy('name_th')->get(['id', 'name_th', 'tax_id', 'tax_branch']),
             'exportRuns' => AccountingExportRun::where('period', $period)->when($branchId, fn ($q) => $q->where('branch_id', $branchId))->orderByDesc('exported_at')->limit(10)->get(),
             'stats' => [
@@ -54,7 +55,7 @@ class MonthlyAccountingController extends Controller
     public function storeExpense(Request $request, BranchExpenseService $service): RedirectResponse
     {
         $data = $request->validate([
-            'branch_id' => ['required', 'integer', 'exists:branches,id'], 'expense_account_id' => ['required', 'integer', 'exists:chart_of_accounts,id'],
+            'branch_id' => ['required', 'integer', 'exists:branches,id'], 'cost_center_id' => ['nullable', 'integer', 'exists:cost_centers,id'], 'expense_account_id' => ['required', 'integer', 'exists:chart_of_accounts,id'],
             'expense_date' => ['required', 'date'], 'supplier_id' => ['nullable', 'integer', 'exists:suppliers,id'],
             'supplier_name' => ['required', 'string', 'max:200'], 'supplier_tax_id' => ['nullable', 'digits:13'], 'tax_branch' => ['nullable', 'string', 'max:20'],
             'tax_invoice_no' => ['nullable', 'string', 'max:80'], 'tax_invoice_date' => ['nullable', 'date'], 'description' => ['required', 'string', 'max:2000'],
@@ -155,6 +156,33 @@ class MonthlyAccountingController extends Controller
         $bankStatement->update(['reconciled' => abs($difference) <= 0.01]);
 
         return back()->with('success', abs($difference) <= 0.01 ? 'ยอด Statement ตรงกับหลักฐานแล้ว' : 'บันทึกแล้ว แต่ยอดยังมีผลต่าง '.number_format($difference, 2).' บาท');
+    }
+
+    public function autoReconcile(Request $request): RedirectResponse
+    {
+        $data = $request->validate(['period' => ['required', 'date_format:Y-m'], 'branch_id' => ['nullable', 'exists:branches,id']]);
+        $from = Carbon::createFromFormat('Y-m', $data['period'])->startOfMonth();
+        $to = $from->copy()->endOfMonth();
+        $statements = BankStatement::with('bankAccount')->whereBetween('statement_date', [$from, $to])
+            ->where('reconciled', false)->when(! empty($data['branch_id']), fn ($q) => $q->whereHas('bankAccount', fn ($b) => $b->where('branch_id', $data['branch_id'])))->get();
+        $matched = 0;
+        foreach ($statements as $statement) {
+            $amount = (float) $statement->amount;
+            $expense = $amount < 0 ? BranchExpense::where('bank_account_id', $statement->bank_account_id)
+                ->whereDate('expense_date', $statement->statement_date)->whereRaw('abs(total_amount - withholding_amount - ?) <= 0.01', [abs($amount)])->first() : null;
+            if (! $expense) {
+                continue;
+            }
+            BankReconciliation::updateOrCreate(['bank_statement_id' => $statement->id], [
+                'branch_id' => $expense->branch_id, 'match_type' => 'expense', 'reference' => $expense->document?->doc_number,
+                'expected_amount' => abs($amount), 'difference_amount' => 0, 'status' => 'matched',
+                'note' => 'จับคู่อัตโนมัติจากวันที่ บัญชีธนาคาร และยอดสุทธิ', 'checked_by' => auth()->id(), 'checked_at' => now(),
+            ]);
+            $statement->update(['reconciled' => true]);
+            $matched++;
+        }
+
+        return back()->with('success', "จับคู่ Statement อัตโนมัติ {$matched} รายการ รายการที่ไม่ชัดเจนยังคงรอตรวจด้วยคน");
     }
 
     public function export(Request $request, MonthlyAccountingExportService $service): BinaryFileResponse

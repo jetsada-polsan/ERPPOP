@@ -42,6 +42,9 @@ class SearchController extends Controller
         $products = Product::query()
             ->with(['baseUnit:id,name,qty_per_base_unit', 'barcodes' => fn ($query) => $query
                 ->where('is_active', true)->orderBy('id')])
+            ->when($request->boolean('include_lots'), fn ($query) => $query->with(['stockLots' => fn ($lots) => $lots
+                ->whereHas('movements', fn ($movement) => $movement->whereIn('movement_type', ['out', 'transfer_out']))
+                ->orderByDesc('received_date')->limit(50)]))
             ->where('is_active', true)
             ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
                 ->where('sku_code', 'ilike', "%{$q}%")
@@ -64,6 +67,11 @@ class SearchController extends Controller
                 'shelf_life_days' => $product->shelf_life_days,
                 'unit_name' => $product->baseUnit?->displayLabel() ?? '-',
                 'barcode' => $product->barcodes->first()?->barcode,
+                'lots' => $request->boolean('include_lots') ? $product->stockLots->map(fn ($lot) => [
+                    'id' => $lot->id, 'lot_number' => $lot->lot_number,
+                    'expiry_date' => $lot->expiry_date?->toDateString(),
+                    'remaining_qty' => (float) $lot->remaining_qty,
+                ])->values() : [],
             ]);
 
         return response()->json($products);

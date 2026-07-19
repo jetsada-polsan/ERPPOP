@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'document_id', 'branch_id', 'expense_account_id', 'expense_date', 'supplier_name', 'supplier_tax_id',
+    'document_id', 'branch_id', 'cost_center_id', 'expense_account_id', 'expense_date', 'supplier_name', 'supplier_tax_id',
     'tax_branch', 'tax_invoice_no', 'tax_invoice_date', 'description', 'base_amount', 'vat_amount',
     'withholding_rate', 'withholding_amount', 'withholding_form', 'total_amount', 'payment_method',
     'bank_account_id', 'payment_reference', 'evidence_path', 'created_by',

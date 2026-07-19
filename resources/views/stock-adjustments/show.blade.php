@@ -21,7 +21,15 @@
                 <div class="text-muted small mt-1">หมายเหตุ: {{ $adjustment->remark }}</div>
                 @endif
             </div>
-            <span class="badge text-bg-success fs-6 px-3 py-2">ปรับปรุงสำเร็จ</span>
+            <div class="d-flex gap-2 align-items-center">
+                <span class="badge {{ $adjustment->status === 'active' ? 'text-bg-success' : ($adjustment->status === 'rejected' ? 'text-bg-danger' : 'text-bg-warning') }} fs-6 px-3 py-2">
+                    {{ ['active' => 'ปรับปรุงสำเร็จ', 'pending_approval' => 'รออนุมัติ', 'rejected' => 'ไม่อนุมัติ'][$adjustment->status] ?? $adjustment->status }}
+                </span>
+                @if($adjustment->status === 'pending_approval' && auth()->user()->hasPermission('stock.adjust.approve') && $adjustment->created_by !== auth()->id())
+                    <form method="post" action="{{ route('stock-adjustments.approve', $adjustment) }}">@csrf<button class="btn btn-success"><i class="bi bi-check2-circle me-1"></i>อนุมัติและปรับยอด</button></form>
+                    <form method="post" action="{{ route('stock-adjustments.reject', $adjustment) }}" class="d-flex gap-1">@csrf<input name="reason" required class="form-control form-control-sm" placeholder="เหตุผลไม่อนุมัติ"><button class="btn btn-outline-danger">ปฏิเสธ</button></form>
+                @endif
+            </div>
         </div>
     </div>
 
@@ -32,7 +40,7 @@
                 <thead>
                     <tr>
                         <th>รหัส</th><th>ชื่อสินค้า</th><th>คลัง</th>
-                        <th class="text-end">ผลต่าง</th>
+                        <th class="text-end">ยอดระบบ</th><th class="text-end">ยอดนับ</th><th class="text-end">ผลต่าง</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -41,6 +49,8 @@
                         <td>{{ $item->product->sku_code }}</td>
                         <td>{{ $item->product->name_th }}</td>
                         <td>{{ $item->warehouseLocation->name }}</td>
+                        <td class="text-end">{{ number_format($item->system_qty, 2) }}</td>
+                        <td class="text-end">{{ number_format($item->counted_qty, 2) }}</td>
                         <td class="text-end fw-semibold {{ $item->qty > 0 ? 'text-success' : 'text-danger' }}">
                             {{ $item->qty > 0 ? '+' : '' }}{{ number_format($item->qty, 2) }}
                         </td>

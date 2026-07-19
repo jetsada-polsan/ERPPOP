@@ -67,10 +67,11 @@ class StockAdjustmentService
                 'branch_id' => $data['branch_id'],
                 'doc_number' => $this->numbers->next('STOCK_ADJUSTMENT', $data['branch_id']),
                 'doc_date' => now()->toDateString(),
-                'status' => 'active',
+                'status' => 'pending_approval',
                 'total_items' => $diffs->count(),
                 'total_amount' => 0,
                 'remark' => $data['remark'] ?? null,
+                'created_by' => auth()->id(),
             ]);
 
             $stockDocument = StockDocument::create([
@@ -87,25 +88,63 @@ class StockAdjustmentService
                     'product_id' => $diff['product_id'],
                     'warehouse_location_id' => $locationId,
                     'qty' => $diff['diff'],
+                    'system_qty' => $diff['system_qty'],
+                    'counted_qty' => $diff['counted_qty'],
                 ]);
-
-                StockMovement::create([
-                    'product_id' => $diff['product_id'],
-                    'warehouse_location_id' => $locationId,
-                    'document_id' => $document->id,
-                    'movement_type' => 'adjust',
-                    'qty' => $diff['diff'],
-                    'movement_date' => now()->toDateString(),
-                ]);
-
-                $balance = StockBalance::firstOrCreate(
-                    ['product_id' => $diff['product_id'], 'warehouse_location_id' => $locationId],
-                    ['on_hand_qty' => 0, 'reserved_qty' => 0]
-                );
-                $balance->update(['on_hand_qty' => $diff['counted_qty']]);
             }
 
             return $document->fresh();
+        });
+    }
+
+    public function approve(Document $document): Document
+    {
+        if ($document->status !== 'pending_approval') {
+            throw new RuntimeException('เอกสารนี้ไม่ได้อยู่ในสถานะรออนุมัติ');
+        }
+        if ($document->created_by && $document->created_by === auth()->id()) {
+            throw new RuntimeException('ผู้สร้างใบปรับสต๊อกไม่สามารถอนุมัติรายการของตนเอง');
+        }
+
+        return DB::transaction(function () use ($document) {
+            $locked = Document::whereKey($document->id)->lockForUpdate()->firstOrFail();
+            if ($locked->status !== 'pending_approval') {
+                throw new RuntimeException('เอกสารนี้ถูกดำเนินการไปแล้ว');
+            }
+            $locked->load('stockDocument.items');
+            foreach ($locked->stockDocument->items as $item) {
+                $balance = StockBalance::where('product_id', $item->product_id)
+                    ->where('warehouse_location_id', $item->warehouse_location_id)
+                    ->lockForUpdate()->first();
+                $current = (float) ($balance?->on_hand_qty ?? 0);
+                if (abs($current - (float) $item->system_qty) > 0.0001) {
+                    throw new RuntimeException('ยอดสต๊อกเปลี่ยนหลังส่งอนุมัติ กรุณายกเลิกและตรวจนับใหม่');
+                }
+                $balance ??= StockBalance::create([
+                    'product_id' => $item->product_id,
+                    'warehouse_location_id' => $item->warehouse_location_id,
+                    'on_hand_qty' => 0,
+                    'reserved_qty' => 0,
+                ]);
+                StockMovement::create([
+                    'product_id' => $item->product_id,
+                    'warehouse_location_id' => $item->warehouse_location_id,
+                    'document_id' => $locked->id,
+                    'movement_type' => 'adjust',
+                    'qty' => $item->qty,
+                    'movement_date' => now()->toDateString(),
+                ]);
+                $balance->update(['on_hand_qty' => $item->counted_qty]);
+            }
+            $locked->update([
+                'status' => 'active',
+                'remark' => trim(($locked->remark ? $locked->remark.' | ' : '').'อนุมัติโดย '.auth()->user()?->name),
+            ]);
+            DB::table('stock_counts')->where('posted_document_id', $locked->id)->update([
+                'status' => 'posted', 'confirmed_by' => auth()->id(), 'confirmed_at' => now(), 'updated_at' => now(),
+            ]);
+
+            return $locked->fresh();
         });
     }
 }

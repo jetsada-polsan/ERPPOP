@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\Document;
+use App\Models\StockCount;
 use App\Models\WarehouseLocation;
 use App\Services\Inventory\StockAdjustmentService;
 use Illuminate\Http\RedirectResponse;
@@ -48,7 +50,7 @@ class StockAdjustmentController extends Controller
         }
 
         return redirect()->route('stock-adjustments.show', $document)
-            ->with('success', "บันทึกใบปรับปรุงสต็อก {$document->doc_number} แล้ว");
+            ->with('success', "ส่งใบปรับปรุงสต็อก {$document->doc_number} รออนุมัติแล้ว");
     }
 
     public function show(Document $stockAdjustment): View
@@ -56,5 +58,42 @@ class StockAdjustmentController extends Controller
         $stockAdjustment->load(['branch', 'stockDocument.items.product', 'stockDocument.items.warehouseLocation']);
 
         return view('stock-adjustments.show', ['adjustment' => $stockAdjustment]);
+    }
+
+    public function approve(Document $stockAdjustment, StockAdjustmentService $service): RedirectResponse
+    {
+        try {
+            $service->approve($stockAdjustment);
+        } catch (RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+        AuditLog::create([
+            'user_id' => auth()->id(), 'branch_id' => $stockAdjustment->branch_id,
+            'action' => 'approve', 'table_name' => 'documents', 'record_id' => $stockAdjustment->id,
+            'old_values' => ['status' => 'pending_approval'], 'new_values' => ['status' => 'active'],
+        ]);
+
+        return back()->with('success', 'อนุมัติและปรับยอดสต๊อกแล้ว');
+    }
+
+    public function reject(Request $request, Document $stockAdjustment): RedirectResponse
+    {
+        abort_unless($stockAdjustment->status === 'pending_approval', 422);
+        $data = $request->validate(['reason' => ['required', 'string', 'max:500']]);
+        abort_if($stockAdjustment->created_by === auth()->id(), 403, 'ผู้สร้างไม่สามารถปฏิเสธรายการตนเอง');
+        $stockAdjustment->update([
+            'status' => 'rejected',
+            'remark' => trim(($stockAdjustment->remark ? $stockAdjustment->remark.' | ' : '').'ไม่อนุมัติ: '.$data['reason']),
+        ]);
+        StockCount::where('posted_document_id', $stockAdjustment->id)->update([
+            'status' => 'review', 'posted_document_id' => null, 'confirmed_by' => null, 'confirmed_at' => null,
+        ]);
+        AuditLog::create([
+            'user_id' => auth()->id(), 'branch_id' => $stockAdjustment->branch_id,
+            'action' => 'reject', 'table_name' => 'documents', 'record_id' => $stockAdjustment->id,
+            'old_values' => ['status' => 'pending_approval'], 'new_values' => ['status' => 'rejected', 'reason' => $data['reason']],
+        ]);
+
+        return back()->with('success', 'ปฏิเสธใบปรับสต๊อกแล้ว');
     }
 }

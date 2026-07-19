@@ -39,6 +39,7 @@ class LineIntegrationController extends Controller
             'name' => ['required', 'string', 'max:150'],
             'channel_type' => ['required', 'string', 'max:40'],
             'target_name' => ['nullable', 'string', 'max:150'],
+            'target_id' => ['nullable', 'string', 'max:150'],
             'token' => ['nullable', 'string', 'max:2000'],
             'notify_sales' => ['nullable', 'boolean'],
             'notify_qr_payment' => ['nullable', 'boolean'],

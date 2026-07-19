@@ -7,6 +7,7 @@
                 ['label' => 'ภาพรวมกิจการ', 'route' => 'dashboard', 'pattern' => 'dashboard', 'icon' => 'bi-bar-chart-line-fill', 'tone' => 'blue'],
                 ['label' => 'รวมเมนูการทำงาน', 'route' => 'features.index', 'pattern' => 'features.*', 'icon' => 'bi-grid-1x2-fill', 'tone' => 'red'],
                 ['label' => 'คู่มือ PopStar 4M', 'route' => 'core-modules.index', 'pattern' => 'core-modules.*', 'icon' => 'bi-journal-text', 'tone' => 'amber'],
+                ['label' => 'ศูนย์ควบคุมบริหาร', 'route' => 'management-controls.index', 'pattern' => 'management-controls.*', 'icon' => 'bi-speedometer2', 'tone' => 'teal'],
             ],
         ],
         [

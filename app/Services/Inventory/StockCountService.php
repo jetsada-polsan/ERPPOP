@@ -105,7 +105,7 @@ class StockCountService
             ])->values()->all(),
         ]);
 
-        $count->update(['status' => 'posted', 'posted_document_id' => $document->id]);
+        $count->update(['status' => 'pending_adjustment', 'posted_document_id' => $document->id]);
 
         return $document;
     }

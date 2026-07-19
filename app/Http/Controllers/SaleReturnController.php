@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
-use App\Models\Customer;
 use App\Models\Document;
 use App\Services\Sales\SaleReturnService;
 use Illuminate\Http\RedirectResponse;
@@ -43,6 +42,8 @@ class SaleReturnController extends Controller
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'items.*.qty' => ['required', 'numeric', 'min:0.0001'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'items.*.source_stock_lot_id' => ['nullable', 'integer', 'exists:stock_lots,id'],
+            'items.*.return_disposition' => ['required', 'in:quarantine,available,damage'],
         ]);
 
         try {

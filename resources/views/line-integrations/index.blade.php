@@ -11,7 +11,8 @@
         <div class="col-md-2"><label class="form-label small text-muted">รหัส</label><input name="code" required class="form-control"></div>
         <div class="col-md-3"><label class="form-label small text-muted">ชื่อ</label><input name="name" required class="form-control"></div>
         <div class="col-md-2"><label class="form-label small text-muted">ประเภท</label><select name="channel_type" class="form-select"><option value="messaging_api">Messaging API</option><option value="webhook">Webhook</option><option value="legacy_notify">Legacy Notify</option></select></div>
-        <div class="col-md-3"><label class="form-label small text-muted">กลุ่ม/ผู้รับ</label><input name="target_name" class="form-control"></div>
+        <div class="col-md-2"><label class="form-label small text-muted">ชื่อกลุ่ม/ผู้รับ</label><input name="target_name" class="form-control"></div>
+        <div class="col-md-3"><label class="form-label small text-muted">LINE Target ID</label><input name="target_id" class="form-control" placeholder="U... หรือ C..."></div>
         <div class="col-md-2 d-flex align-items-end"><button class="btn btn-primary w-100">เพิ่ม</button></div>
         <div class="col-12"><textarea name="token" rows="2" class="form-control" placeholder="Channel access token / webhook secret / note"></textarea></div>
         <div class="col-12 d-flex flex-wrap gap-3">
@@ -34,7 +35,7 @@
                     <td class="fw-semibold">{{ $item->code }}</td>
                     <td>{{ $item->name }}</td>
                     <td>{{ $item->channel_type }}</td>
-                    <td>{{ $item->target_name ?? '-' }}</td>
+                    <td>{{ $item->target_name ?? '-' }}<div class="small text-muted">{{ $item->target_id ? \Illuminate\Support\Str::mask($item->target_id, '*', 4) : 'ยังไม่มี Target ID' }}</div></td>
                     <td class="small">
                         @if($item->notify_sales) <span class="badge text-bg-primary">ขาย</span> @endif
                         @if($item->notify_qr_payment) <span class="badge text-bg-info">QR</span> @endif

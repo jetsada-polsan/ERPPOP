@@ -82,4 +82,25 @@ class StockIssueController extends Controller
 
         return view('stock-issues.show', ['document' => $stockIssue]);
     }
+
+    public function approve(Document $stockIssue, StockIssueService $service): RedirectResponse
+    {
+        try {
+            $service->approveDamage($stockIssue);
+        } catch (RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+
+        return back()->with('success', 'อนุมัติและตัดสินค้าชำรุดออกจากสต๊อกแล้ว');
+    }
+
+    public function reject(Request $request, Document $stockIssue): RedirectResponse
+    {
+        abort_unless($stockIssue->status === 'pending_approval', 422);
+        abort_if($stockIssue->created_by === auth()->id(), 403, 'ผู้สร้างไม่สามารถปฏิเสธรายการตนเอง');
+        $data = $request->validate(['reason' => ['required', 'string', 'max:500']]);
+        $stockIssue->update(['status' => 'rejected', 'remark' => trim(($stockIssue->remark ? $stockIssue->remark.' | ' : '').'ไม่อนุมัติ: '.$data['reason'])]);
+
+        return back()->with('success', 'ปฏิเสธใบตัดชำรุดแล้ว');
+    }
 }

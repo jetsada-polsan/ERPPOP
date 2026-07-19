@@ -56,6 +56,7 @@ class StockIssueService
         }
 
         $isReturn = $data['type'] === 'requisition_return';
+        $isDamage = $data['type'] === 'damage';
         $documentType = DocumentType::where('code', $typeCode)->firstOrFail();
 
         $remarkParts = [];
@@ -66,7 +67,7 @@ class StockIssueService
             $remarkParts[] = $data['remark'];
         }
 
-        return DB::transaction(function () use ($data, $branch, $locationId, $isReturn, $documentType, $typeCode, $remarkParts) {
+        return DB::transaction(function () use ($data, $branch, $locationId, $isReturn, $isDamage, $documentType, $typeCode, $remarkParts) {
             $items = collect($data['items']);
 
             $document = Document::create([
@@ -75,10 +76,11 @@ class StockIssueService
                 'doc_number' => $this->numbers->next($typeCode, $branch->id),
                 'doc_date' => now()->toDateString(),
                 'reference' => $data['reference'] ?? null,
-                'status' => 'active',
+                'status' => $isDamage ? 'pending_approval' : 'active',
                 'total_items' => $items->count(),
                 'total_amount' => 0,
                 'remark' => $remarkParts !== [] ? implode(' | ', $remarkParts) : null,
+                'created_by' => auth()->id(),
             ]);
 
             $stockDocument = StockDocument::create([
@@ -97,7 +99,9 @@ class StockIssueService
                     'qty' => $item['qty'],
                 ]);
 
-                if ($isReturn) {
+                if ($isDamage) {
+                    continue;
+                } elseif ($isReturn) {
                     $this->fifo->receive((int) $item['product_id'], (int) $locationId, (float) $item['qty'], $document->id, 'in');
                 } else {
                     $this->fifo->issue(
@@ -110,6 +114,28 @@ class StockIssueService
             }
 
             return $document->fresh();
+        });
+    }
+
+    public function approveDamage(Document $document): Document
+    {
+        if ($document->created_by && $document->created_by === auth()->id()) {
+            throw new RuntimeException('ผู้สร้างใบตัดชำรุดไม่สามารถอนุมัติรายการของตนเอง');
+        }
+
+        return DB::transaction(function () use ($document): Document {
+            $locked = Document::whereKey($document->id)->lockForUpdate()->firstOrFail();
+            $locked->load(['documentType', 'stockDocument.items']);
+            if ($locked->documentType->code !== 'STOCK_DAMAGE' || $locked->status !== 'pending_approval') {
+                throw new RuntimeException('เอกสารนี้ไม่ใช่ใบตัดชำรุดที่รออนุมัติ');
+            }
+            foreach ($locked->stockDocument->items as $item) {
+                $this->fifo->issue((int) $item->product_id, (int) $item->warehouse_location_id, (float) $item->qty,
+                    $locked->id, 'out', allowExpired: true, allowRestricted: true);
+            }
+            $locked->update(['status' => 'active']);
+
+            return $locked->fresh();
         });
     }
 }

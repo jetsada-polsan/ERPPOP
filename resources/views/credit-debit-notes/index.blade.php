@@ -23,7 +23,7 @@
     <div class="content-card overflow-hidden">
         <div class="table-responsive">
             <table class="table table-sm align-middle mb-0">
-                <thead><tr><th>เลขที่</th><th>วันที่</th><th>ลูกค้า</th><th>อ้างอิงใบขายเชื่อ</th><th>เหตุผล</th><th class="text-end">จำนวนเงิน</th><th></th></tr></thead>
+                <thead><tr><th>เลขที่</th><th>วันที่</th><th>ลูกค้า</th><th>อ้างอิงใบขายเชื่อ</th><th>เหตุผล</th><th>สถานะ</th><th class="text-end">จำนวนเงิน</th><th></th></tr></thead>
                 <tbody>
                 @forelse($notes as $note)
                     <tr>
@@ -32,11 +32,12 @@
                         <td>{{ $note->customer->name_th }}</td>
                         <td class="small">{{ $note->reference ?? '-' }}</td>
                         <td class="small text-muted">{{ $note->remark }}</td>
+                        <td><span class="badge {{ $note->status === 'active' ? 'text-bg-success' : 'text-bg-warning' }}">{{ $note->status === 'pending_approval' ? 'รออนุมัติ' : $note->status }}</span></td>
                         <td class="text-end fw-semibold">{{ $type === 'credit' ? '-' : '+' }}{{ number_format($note->total_amount, 2) }}</td>
-                        <td class="text-end"><a href="{{ route('credit-debit-notes.print', $note) }}" target="_blank" class="btn btn-sm btn-light border"><i class="bi bi-printer me-1"></i>พิมพ์</a></td>
+                        <td class="text-end">@if($note->status === 'active')<a href="{{ route('credit-debit-notes.print', $note) }}" target="_blank" class="btn btn-sm btn-light border"><i class="bi bi-printer me-1"></i>พิมพ์</a>@elseif(auth()->user()?->hasPermission('finance.note.approve'))<form method="post" action="{{ route('credit-debit-notes.approve',$note) }}" class="d-inline">@csrf<button class="btn btn-sm btn-success">อนุมัติ</button></form><form method="post" action="{{ route('credit-debit-notes.reject',$note) }}" class="d-inline">@csrf<input type="hidden" name="reason" value="ข้อมูลไม่ผ่านการตรวจ"><button class="btn btn-sm btn-outline-danger">ไม่อนุมัติ</button></form>@endif</td>
                     </tr>
                 @empty
-                    <tr><td colspan="7" class="text-center text-muted py-5">ยังไม่มี{{ $type === 'credit' ? 'ใบลดหนี้' : 'ใบเพิ่มหนี้' }}</td></tr>
+                    <tr><td colspan="8" class="text-center text-muted py-5">ยังไม่มี{{ $type === 'credit' ? 'ใบลดหนี้' : 'ใบเพิ่มหนี้' }}</td></tr>
                 @endforelse
                 </tbody>
             </table>

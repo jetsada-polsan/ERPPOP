@@ -130,7 +130,7 @@ function docEntryPage(config) {
         partyQuery: '',
         partyId: '',
         partyResults: [],
-        items: [{ product_id: '', productQuery: '', qty: 1, unit_price: 0, lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, results: [] }],
+        items: [{ product_id: '', productQuery: '', qty: 1, unit_price: 0, lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [], results: [] }],
         openModal() { this.modalOpen = true; },
         closeModal() { this.modalOpen = false; },
         async searchParty() {
@@ -144,12 +144,12 @@ function docEntryPage(config) {
             this.partyQuery = `${party.code} - ${party.name_th}`;
             this.partyResults = [];
         },
-        addItem() { this.items.push({ product_id: '', productQuery: '', qty: 1, unit_price: 0, lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, results: [] }); },
+        addItem() { this.items.push({ product_id: '', productQuery: '', qty: 1, unit_price: 0, lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [], results: [] }); },
         removeItem(index) { this.items.splice(index, 1); },
         async searchProducts(index) {
             const query = this.items[index].productQuery;
             if (query.length < 1) { this.items[index].results = []; this.items[index].product_id = ''; return; }
-            const response = await fetch(`{{ route('search.products') }}?q=${encodeURIComponent(query)}`);
+            const response = await fetch(`{{ route('search.products') }}?q=${encodeURIComponent(query)}&include_lots=${this.config.returnLots ? 1 : 0}`);
             this.items[index].results = await response.json();
         },
         selectProduct(index, product) {
@@ -158,6 +158,7 @@ function docEntryPage(config) {
             this.items[index].unit_price = Number(product.default_price || 0);
             this.items[index].tracks_expiry = Boolean(product.tracks_expiry);
             this.items[index].shelf_life_days = product.shelf_life_days;
+            this.items[index].lots = product.lots || [];
             this.items[index].results = [];
         },
         calculateExpiry(index) {

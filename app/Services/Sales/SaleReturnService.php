@@ -9,6 +9,8 @@ use App\Models\DocumentType;
 use App\Models\Product;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
+use App\Models\StockLot;
+use App\Models\StockMovement;
 use App\Services\Accounting\GlPostingService;
 use App\Services\Inventory\FifoStockService;
 use Illuminate\Support\Facades\DB;
@@ -76,12 +78,27 @@ class SaleReturnService
 
             $seq = 1;
             foreach ($items as $item) {
+                $sourceLot = ! empty($item['source_stock_lot_id'])
+                    ? StockLot::findOrFail($item['source_stock_lot_id']) : null;
+                if ($sourceLot && (int) $sourceLot->product_id !== (int) $item['product_id']) {
+                    throw new RuntimeException('Lot ต้นทางไม่ตรงกับสินค้าที่รับคืน');
+                }
+                if ($sourceLot && $openItem) {
+                    $soldFromLot = (float) StockMovement::where('document_id', $openItem->document_id)
+                        ->where('product_id', $item['product_id'])->where('stock_lot_id', $sourceLot->id)
+                        ->sum('qty');
+                    if ((float) $item['qty'] > $soldFromLot + 0.0001) {
+                        throw new RuntimeException('จำนวนรับคืนเกินจำนวนที่ขายจาก Lot ต้นทาง');
+                    }
+                }
                 $unitCost = (float) ($originalCosts->get((int) $item['product_id'])?->unit_cost
                     ?? $currentCosts[(int) $item['product_id']] ?? 0);
                 StockDocumentItem::create([
                     'stock_document_id' => $stockDocument->id,
                     'seq' => $seq++,
                     'product_id' => $item['product_id'],
+                    'source_stock_lot_id' => $sourceLot?->id,
+                    'return_disposition' => $item['return_disposition'] ?? 'quarantine',
                     'warehouse_location_id' => $branch->default_warehouse_location_id,
                     'qty' => $item['qty'],
                     'unit_price' => $item['unit_price'],
@@ -89,7 +106,7 @@ class SaleReturnService
                     'cost_amount' => round((float) $item['qty'] * $unitCost, 4),
                 ]);
 
-                $this->fifo->receive(
+                $returnedLot = $this->fifo->receive(
                     (int) $item['product_id'],
                     (int) $branch->default_warehouse_location_id,
                     (float) $item['qty'],
@@ -97,6 +114,20 @@ class SaleReturnService
                     'return_in',
                     unitCost: $unitCost,
                 );
+                $disposition = $item['return_disposition'] ?? 'quarantine';
+                $returnedLot->update([
+                    'source_lot_id' => $sourceLot?->id,
+                    'lot_number' => $sourceLot
+                        ? $sourceLot->lot_number.'-RET-'.$document->id
+                        : $returnedLot->lot_number,
+                    'manufacture_date' => $sourceLot?->manufacture_date,
+                    'expiry_date' => $sourceLot?->expiry_date,
+                    'quality_status' => $disposition === 'available' ? 'available' : 'quarantine',
+                    'quality_reason' => $disposition === 'available'
+                        ? null : ($disposition === 'damage' ? 'สินค้ารับคืนรอตัดของเสีย' : 'สินค้ารับคืนรอตรวจคุณภาพ'),
+                    'quality_updated_by' => auth()->id(),
+                    'quality_updated_at' => now(),
+                ]);
             }
 
             if ($openItem !== null) {

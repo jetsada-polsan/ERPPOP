@@ -17,6 +17,7 @@ use App\Services\Inventory\StockTransformService;
 use App\Services\Purchasing\PurchaseService;
 use App\Services\Sales\CashSaleService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -138,6 +139,9 @@ class InventoryCostFlowTest extends TestCase
         $this->assertSame(110.0, (float) $output->fresh()->average_cost);
         $this->assertSame(200.0, (float) $batch->selling_unit_price);
         $this->assertEqualsWithDelta(76.9159, (float) $batch->estimated_profit_per_unit, 0.0001);
+        $outputLotId = $output->stockLots()->value('id');
+        $this->assertSame(2, DB::table('stock_lot_lineages')->where('output_lot_id', $outputLotId)->count());
+        $this->assertSame(8.0, (float) DB::table('stock_lot_lineages')->where('output_lot_id', $outputLotId)->sum('input_qty'));
 
         app(StockTransformService::class)->addPackages($batch, [0.5, 1.25]);
         $packages = $batch->packages()->get();

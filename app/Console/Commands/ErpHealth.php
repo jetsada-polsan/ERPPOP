@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\AlertDispatchService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -13,7 +14,7 @@ class ErpHealth extends Command
 
     protected $description = 'Check ERP database, migrations, queue failures, storage, and backup freshness';
 
-    public function handle(): int
+    public function handle(AlertDispatchService $alerts): int
     {
         $checks = [];
         try {
@@ -46,6 +47,25 @@ class ErpHealth extends Command
         $checks[] = ['Queue', $failedJobs === 0 ? 'ผ่าน' : 'เตือน', "งานล้มเหลว {$failedJobs} รายการ"];
 
         $this->table(['รายการ', 'ผล', 'รายละเอียด'], $checks);
+        if (Schema::hasTable('monitor_events')) {
+            foreach ($checks as [$code, $status, $detail]) {
+                if ($status === 'ผ่าน') {
+                    DB::table('monitor_events')->where('check_code', $code)->where('status', 'open')
+                        ->update(['status' => 'resolved', 'resolved_at' => now(), 'updated_at' => now()]);
+
+                    continue;
+                }
+                $exists = DB::table('monitor_events')->where('check_code', $code)->where('status', 'open')->exists();
+                if (! $exists) {
+                    DB::table('monitor_events')->insert([
+                        'check_code' => $code, 'severity' => $status === 'ไม่ผ่าน' ? 'critical' : 'warning',
+                        'status' => 'open', 'message' => $detail, 'detected_at' => now(),
+                        'created_at' => now(), 'updated_at' => now(),
+                    ]);
+                    $alerts->send("POPSTAR ERP ALERT\n{$code}: {$detail}");
+                }
+            }
+        }
 
         return collect($checks)->contains(fn (array $row) => $row[1] === 'ไม่ผ่าน')
             ? self::FAILURE

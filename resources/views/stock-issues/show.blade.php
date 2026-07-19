@@ -21,11 +21,17 @@
                 <div class="text-muted small mt-1">หมายเหตุ: {{ $document->remark }}</div>
                 @endif
             </div>
-            <span class="badge {{ $document->documentType->code === 'STOCK_REQUISITION_RETURN' ? 'text-bg-success' : 'text-bg-warning' }} fs-6 px-3 py-2">
-                {{ $document->documentType->code === 'STOCK_REQUISITION_RETURN' ? 'รับเข้าสต๊อกแล้ว' : 'ตัดสต๊อกแล้ว' }}
+            <span class="badge {{ $document->status === 'pending_approval' ? 'text-bg-secondary' : ($document->documentType->code === 'STOCK_REQUISITION_RETURN' ? 'text-bg-success' : 'text-bg-warning') }} fs-6 px-3 py-2">
+                {{ $document->status === 'pending_approval' ? 'รออนุมัติ ยังไม่ตัดสต๊อก' : ($document->documentType->code === 'STOCK_REQUISITION_RETURN' ? 'รับเข้าสต๊อกแล้ว' : 'ตัดสต๊อกแล้ว') }}
             </span>
         </div>
     </div>
+    @if($document->status === 'pending_approval' && auth()->user()?->hasPermission('stock.damage.approve'))
+    <div class="content-card p-3 mb-4 d-flex gap-2">
+        <form method="post" action="{{ route('stock-issues.approve', $document) }}">@csrf<button class="btn btn-success">อนุมัติและตัดสต๊อก</button></form>
+        <form method="post" action="{{ route('stock-issues.reject', $document) }}" class="d-flex gap-2 flex-grow-1">@csrf<input name="reason" required class="form-control" placeholder="เหตุผลไม่อนุมัติ"><button class="btn btn-outline-danger">ไม่อนุมัติ</button></form>
+    </div>
+    @endif
 
     <div class="content-card p-4">
         <h3 class="h6 fw-bold mb-3">รายการสินค้า</h3>

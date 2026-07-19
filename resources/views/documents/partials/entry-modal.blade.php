@@ -165,6 +165,19 @@
                                                 <span x-show="item.tracks_expiry" class="badge text-bg-warning">ต้องระบุวันหมดอายุ</span>
                                             </div>
                                             @endif
+                                            @if($showReturnLotFields ?? false)
+                                            <div x-show="item.product_id" class="d-flex gap-1 align-items-center flex-wrap mt-1">
+                                                <select :name="`items[${index}][source_stock_lot_id]`" x-model="item.source_stock_lot_id" class="doc-input" style="max-width:210px">
+                                                    <option value="">ไม่พบ/ไม่อ้าง Lot เดิม</option>
+                                                    <template x-for="lot in item.lots" :key="lot.id"><option :value="lot.id" x-text="lot.lot_number + ' · คงเหลือ ' + lot.remaining_qty"></option></template>
+                                                </select>
+                                                <select :name="`items[${index}][return_disposition]`" x-model="item.return_disposition" class="doc-input" style="max-width:160px">
+                                                    <option value="quarantine">รับเข้ากักกัน</option>
+                                                    <option value="available">ตรวจแล้วขายต่อได้</option>
+                                                    <option value="damage">ตัดเป็นของเสีย</option>
+                                                </select>
+                                            </div>
+                                            @endif
                                         </td>
                                         <td><input type="number" step="0.0001" min="0.0001" :name="`items[${index}][qty]`" x-model.number="item.qty" required class="doc-input text-end"></td>
                                         <td><input type="number" step="0.01" min="0" :name="`items[${index}][unit_price]`" x-model.number="item.unit_price" required class="doc-input text-end" title="ราคาตามใบซื้อ ระบบจะแยก VAT และต้นทุนบัญชีให้อัตโนมัติ"></td>

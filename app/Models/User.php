@@ -60,6 +60,9 @@ class User extends Authenticatable
     // ขาย/ยกเลิกบิลหน้าร้าน ต้องเป็นแคชเชียร์/ผู้อนุมัติตัวจริง แม้แต่ GM ก็ทำแทนไม่ได้
     private const NON_BYPASS_PERMISSIONS = [
         'pos.sell', 'pos.void', 'pos.discount.override', 'pos.sell_below_cost', 'purchasing.approve',
+        'stock.adjust.approve', 'inventory.quality.manage', 'inventory.cost.close',
+        'stock.damage.approve', 'finance.note.approve',
+        'management.view', 'budget.manage', 'payroll.manage', 'ecommerce.sync', 'monitoring.manage',
     ];
 
     public function hasPermission(string $code): bool

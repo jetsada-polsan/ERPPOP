@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
 #[Fillable([
-    'code', 'name', 'channel_type', 'target_name', 'token', 'notify_sales',
+    'code', 'name', 'channel_type', 'target_name', 'target_id', 'token', 'notify_sales',
     'notify_qr_payment', 'notify_void_bill', 'notify_stock_alert', 'is_active',
 ])]
 class LineIntegration extends Model

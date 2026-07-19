@@ -2,10 +2,12 @@
 
 namespace App\Services\Sales;
 
+use App\Models\AppSetting;
 use App\Models\CustomerLedger;
 use App\Models\CustomerOpenItem;
 use App\Models\Document;
 use App\Models\DocumentType;
+use App\Services\Accounting\GlPostingService;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -20,7 +22,7 @@ class CreditDebitNoteService
 
     public function __construct(
         private readonly DocumentNumberGenerator $numbers,
-        private readonly \App\Services\Accounting\GlPostingService $glPosting,
+        private readonly GlPostingService $glPosting,
     ) {}
 
     /**
@@ -69,11 +71,16 @@ class CreditDebitNoteService
                 'doc_date' => now()->toDateString(),
                 'customer_id' => $data['customer_id'],
                 'reference' => $openItem?->document->doc_number,
-                'status' => 'active',
+                'status' => $isCredit ? 'pending_approval' : 'active',
                 'total_items' => 1,
                 'total_amount' => $amount,
                 'remark' => $data['reason'],
+                'created_by' => auth()->id(),
             ]);
+
+            if ($isCredit) {
+                return $document->fresh();
+            }
 
             $lastBalance = (float) (CustomerLedger::where('customer_id', $data['customer_id'])
                 ->latest('id')->value('balance_after') ?? 0);
@@ -103,7 +110,7 @@ class CreditDebitNoteService
                     'gross_amount' => $amount,
                     'net_amount' => $amount,
                     'balance_amount' => $amount,
-                    'due_date' => now()->addDays((int) (\App\Models\AppSetting::get('default_credit_days') ?: self::DEFAULT_CREDIT_DAYS))->toDateString(),
+                    'due_date' => now()->addDays((int) (AppSetting::get('default_credit_days') ?: self::DEFAULT_CREDIT_DAYS))->toDateString(),
                     'status' => CustomerOpenItem::STATUS_OPEN,
                 ]);
 
@@ -122,6 +129,41 @@ class CreditDebitNoteService
                 : $this->glPosting->postDebitNote($document);
 
             return $document->fresh();
+        });
+    }
+
+    public function approveCredit(Document $document): Document
+    {
+        if ($document->created_by && $document->created_by === auth()->id()) {
+            throw new RuntimeException('ผู้สร้างใบลดหนี้ไม่สามารถอนุมัติรายการของตนเอง');
+        }
+
+        return DB::transaction(function () use ($document): Document {
+            $locked = Document::whereKey($document->id)->lockForUpdate()->firstOrFail();
+            $locked->load('documentType');
+            if ($locked->documentType->code !== 'CREDIT_NOTE' || $locked->status !== 'pending_approval') {
+                throw new RuntimeException('เอกสารนี้ไม่ใช่ใบลดหนี้ที่รออนุมัติ');
+            }
+            $sourceDocumentId = Document::where('doc_number', $locked->reference)->value('id');
+            $openItem = CustomerOpenItem::where('customer_id', $locked->customer_id)->where('document_id', $sourceDocumentId)->lockForUpdate()->first();
+            if (! $openItem || (float) $locked->total_amount > (float) $openItem->balance_amount + 0.01) {
+                throw new RuntimeException('ยอดค้างของเอกสารต้นทางเปลี่ยนไป กรุณาตรวจใบลดหนี้ใหม่');
+            }
+            $amount = (float) $locked->total_amount;
+            $newBalance = round((float) $openItem->balance_amount - $amount, 2);
+            $openItem->update([
+                'net_amount' => round((float) $openItem->net_amount - $amount, 2), 'balance_amount' => $newBalance,
+                'status' => $newBalance <= 0.01 ? CustomerOpenItem::STATUS_PAID : CustomerOpenItem::STATUS_PARTIAL,
+            ]);
+            $lastBalance = (float) (CustomerLedger::where('customer_id', $locked->customer_id)->latest('id')->value('balance_after') ?? 0);
+            CustomerLedger::create([
+                'customer_id' => $locked->customer_id, 'document_id' => $locked->id, 'entry_type' => 'credit',
+                'amount' => $amount, 'balance_after' => round($lastBalance - $amount, 2), 'entry_date' => now()->toDateString(),
+            ]);
+            $this->glPosting->postCreditNote($locked);
+            $locked->update(['status' => 'active']);
+
+            return $locked->fresh();
         });
     }
 }

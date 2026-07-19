@@ -25,6 +25,7 @@ use App\Http\Controllers\FlashSaleController;
 use App\Http\Controllers\GlJournalController;
 use App\Http\Controllers\LegacyReportController;
 use App\Http\Controllers\LineIntegrationController;
+use App\Http\Controllers\ManagementControlController;
 use App\Http\Controllers\ManualController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\MemberPointController;
@@ -91,6 +92,15 @@ Route::prefix('organizational-units')->name('organizational-units.')->group(func
 });
 
 Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+Route::prefix('management-controls')->name('management-controls.')->group(function () {
+    Route::get('/', [ManagementControlController::class, 'index'])->name('index');
+    Route::post('/cost-centers', [ManagementControlController::class, 'storeCostCenter'])->name('cost-centers.store');
+    Route::post('/budgets', [ManagementControlController::class, 'storeBudget'])->name('budgets.store');
+    Route::post('/purchase-plans/generate', [ManagementControlController::class, 'generatePurchasePlan'])->name('purchase-plans.generate');
+    Route::post('/attendance', [ManagementControlController::class, 'storeAttendance'])->name('attendance.store');
+    Route::post('/payroll/generate', [ManagementControlController::class, 'generatePayroll'])->name('payroll.generate');
+    Route::post('/ecommerce/orders', [ManagementControlController::class, 'importEcommerceOrder'])->name('ecommerce.orders.store');
+});
 
 // กระดิ่งแจ้งเตือน header: รายการตามภาระหน้าที่ของผู้ใช้ (ทุกคนที่ล็อกอินเรียกได้
 // ตัวกรองสิทธิ์อยู่ใน NotificationService)
@@ -177,6 +187,8 @@ Route::prefix('credit-debit-notes')->name('credit-debit-notes.')->group(function
     Route::get('/', [CreditDebitNoteController::class, 'index'])->name('index');
     Route::post('/', [CreditDebitNoteController::class, 'store'])->name('store');
     Route::get('/customers/{customer}/open-items', [CreditDebitNoteController::class, 'openItems'])->name('open-items');
+    Route::post('/{note}/approve', [CreditDebitNoteController::class, 'approve'])->name('approve');
+    Route::post('/{note}/reject', [CreditDebitNoteController::class, 'reject'])->name('reject');
     Route::get('/{note}/print', [CreditDebitNoteController::class, 'print'])->name('print');
 });
 
@@ -235,6 +247,9 @@ Route::prefix('products')->name('products.')->group(function () {
     Route::put('/{product}', [ProductController::class, 'update'])->name('update');
     Route::get('/{product}/lots/{stockLot}/trace', [ProductController::class, 'lotTrace'])->name('lots.trace');
     Route::put('/{product}/lots/{stockLot}/quality', [ProductController::class, 'updateLotQuality'])->name('lots.quality');
+    Route::post('/{product}/lots/{stockLot}/quality-checks', [ProductController::class, 'storeLotQualityCheck'])->name('lots.quality-checks.store');
+    Route::post('/{product}/lots/{stockLot}/recalls', [ProductController::class, 'openRecall'])->name('lots.recalls.store');
+    Route::put('/recall-contacts/{recallContact}', [ProductController::class, 'updateRecallContact'])->name('recall-contacts.update');
     Route::post('/{product}/barcodes', [ProductController::class, 'addBarcode'])->name('barcodes.store');
     Route::put('/{product}/barcodes/{productBarcode}', [ProductController::class, 'updateBarcode'])->name('barcodes.update');
     Route::post('/{product}/prices', [ProductController::class, 'upsertPrice'])->name('prices.upsert');
@@ -259,6 +274,8 @@ Route::prefix('stock-adjustments')->name('stock-adjustments.')->group(function (
     Route::get('/', [StockAdjustmentController::class, 'index'])->name('index');
     Route::post('/', [StockAdjustmentController::class, 'store'])->name('store');
     Route::get('/{stockAdjustment}', [StockAdjustmentController::class, 'show'])->name('show');
+    Route::post('/{stockAdjustment}/approve', [StockAdjustmentController::class, 'approve'])->name('approve');
+    Route::post('/{stockAdjustment}/reject', [StockAdjustmentController::class, 'reject'])->name('reject');
 });
 
 // Stock issues (งานคลังสินค้าตามคู่มือ BPlus บทที่ 5): ใบเบิก (DR ตัดสต๊อก),
@@ -267,6 +284,8 @@ Route::prefix('stock-issues')->name('stock-issues.')->group(function () {
     Route::get('/', [StockIssueController::class, 'index'])->name('index');
     Route::post('/', [StockIssueController::class, 'store'])->name('store');
     Route::get('/{stockIssue}', [StockIssueController::class, 'show'])->name('show');
+    Route::post('/{stockIssue}/approve', [StockIssueController::class, 'approve'])->name('approve');
+    Route::post('/{stockIssue}/reject', [StockIssueController::class, 'reject'])->name('reject');
 });
 
 // Stock transforms (ใบแปรรูปสินค้า DT): consume raw materials, receive outputs
@@ -377,6 +396,7 @@ Route::prefix('monthly-accounting')->name('monthly-accounting.')->group(function
     Route::post('/expenses', [MonthlyAccountingController::class, 'storeExpense'])->name('expenses.store');
     Route::post('/statements/import', [MonthlyAccountingController::class, 'importStatement'])->name('statements.import');
     Route::post('/statements/{bankStatement}/reconcile', [MonthlyAccountingController::class, 'reconcile'])->name('statements.reconcile');
+    Route::post('/statements/auto-reconcile', [MonthlyAccountingController::class, 'autoReconcile'])->name('statements.auto-reconcile');
     Route::post('/export', [MonthlyAccountingController::class, 'export'])->name('export');
     Route::get('/exports/{run}', [MonthlyAccountingController::class, 'downloadRun'])->name('exports.download');
 });

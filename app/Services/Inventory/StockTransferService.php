@@ -168,11 +168,17 @@ class StockTransferService
             );
             foreach ($allocations as $allocation) {
                 $sourceLot = $allocation['lot'];
-                $this->fifo->receive(
+                $receivedLot = $this->fifo->receive(
                     (int) $item->product_id, $toLocationId, (float) $allocation['qty'],
                     $document->id, 'transfer_in', $sourceLot->lot_number,
-                    now()->toDateString(), $sourceLot->expiry_date?->toDateString(), (float) $sourceLot->unit_cost
+                    now()->toDateString(), $sourceLot->expiry_date?->toDateString(), (float) $sourceLot->unit_cost,
+                    $sourceLot->manufacture_date?->toDateString()
                 );
+                $receivedLot->update([
+                    'source_lot_id' => $sourceLot->id,
+                    'quality_status' => $sourceLot->quality_status,
+                    'quality_reason' => $sourceLot->quality_reason,
+                ]);
             }
         }
     }

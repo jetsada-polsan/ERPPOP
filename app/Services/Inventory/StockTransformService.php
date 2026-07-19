@@ -101,6 +101,7 @@ class StockTransformService
             ]);
 
             $seq = 1;
+            $sourceAllocations = collect();
             foreach ($raw as $item) {
                 StockDocumentItem::create([
                     'stock_document_id' => $stockDocument->id, 'seq' => $seq++,
@@ -108,7 +109,9 @@ class StockTransformService
                     'qty' => -(float) $item['qty'], 'unit_price' => $item['unit_cost'],
                     'unit_cost' => $item['unit_cost'], 'cost_amount' => $item['cost_amount'],
                 ]);
-                $this->fifo->issue((int) $item['product_id'], (int) $locationId, (float) $item['qty'], $document->id, 'transform_out');
+                $sourceAllocations = $sourceAllocations->concat(
+                    $this->fifo->issue((int) $item['product_id'], (int) $locationId, (float) $item['qty'], $document->id, 'transform_out')
+                );
             }
 
             foreach ($outputs as $item) {
@@ -121,7 +124,14 @@ class StockTransformService
                     'qty' => $qty, 'unit_price' => $unitCost, 'unit_cost' => $unitCost, 'cost_amount' => $allocated,
                 ]);
                 $this->costing->recordManufacturedReceipt((int) $item['product_id'], $qty, $unitCost);
-                $this->fifo->receive((int) $item['product_id'], (int) $locationId, $qty, $document->id, 'transform_in', receivedDate: now()->toDateString(), unitCost: $unitCost);
+                $outputLot = $this->fifo->receive((int) $item['product_id'], (int) $locationId, $qty, $document->id, 'transform_in', receivedDate: now()->toDateString(), unitCost: $unitCost);
+                foreach ($sourceAllocations as $allocation) {
+                    DB::table('stock_lot_lineages')->insert([
+                        'output_lot_id' => $outputLot->id, 'input_lot_id' => $allocation['lot']->id,
+                        'input_qty' => round((float) $allocation['qty'] * (float) $item['percent'] / 100, 4),
+                        'document_id' => $document->id, 'created_at' => now(), 'updated_at' => now(),
+                    ]);
+                }
             }
 
             if ($batchMode) {
