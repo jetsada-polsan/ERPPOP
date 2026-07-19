@@ -60,6 +60,11 @@ class Document extends Model
         return $this->hasOne(StockDocument::class);
     }
 
+    public function productionBatch(): HasOne
+    {
+        return $this->hasOne(ProductionBatch::class);
+    }
+
     public function saleBooking(): HasOne
     {
         return $this->hasOne(SaleBooking::class);

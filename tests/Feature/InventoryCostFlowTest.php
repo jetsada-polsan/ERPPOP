@@ -5,12 +5,14 @@ namespace Tests\Feature;
 use App\Models\Branch;
 use App\Models\DocumentType;
 use App\Models\Product;
+use App\Models\ProductBarcode;
 use App\Models\ProductUnit;
 use App\Models\StockDocumentItem;
 use App\Models\Supplier;
 use App\Models\Warehouse;
 use App\Models\WarehouseLocation;
 use App\Services\Inventory\CostingService;
+use App\Services\Inventory\StockTransformService;
 use App\Services\Purchasing\PurchaseService;
 use App\Services\Sales\CashSaleService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -95,11 +97,59 @@ class InventoryCostFlowTest extends TestCase
         $this->assertSame(107.0, (float) $product->fresh()->average_cost);
     }
 
+    public function test_weighed_set_allocates_all_actual_input_cost_to_actual_output_weight(): void
+    {
+        [$branch, $supplier, $meatA, $meatB] = $this->masters();
+        $purchases = app(PurchaseService::class);
+        $purchases->create([
+            'supplier_id' => $supplier->id, 'branch_id' => $branch->id,
+            'is_credit' => false, 'prices_include_vat' => true, 'claim_input_vat' => true,
+            'items' => [
+                ['product_id' => $meatA->id, 'qty' => 10, 'unit_price' => 107],
+                ['product_id' => $meatB->id, 'qty' => 10, 'unit_price' => 50],
+            ],
+        ]);
+        $output = Product::create([
+            'sku_code' => 'SET-1', 'name_th' => 'ชุดหมูกระทะ', 'base_unit_id' => $meatA->base_unit_id,
+            'default_price' => 200, 'average_cost' => 0, 'is_vat' => true, 'is_active' => true,
+            'negative_stock_policy' => 'block',
+        ]);
+        ProductBarcode::create([
+            'product_id' => $output->id, 'barcode' => '800999', 'unit_id' => $output->base_unit_id,
+            'unit_factor' => 1, 'price' => 200, 'is_active' => true,
+        ]);
+
+        $document = app(StockTransformService::class)->create([
+            'branch_id' => $branch->id, 'batch_mode' => true, 'input_weight_qty' => 8,
+            'raw_items' => [
+                ['product_id' => $meatA->id, 'qty' => 3],
+                ['product_id' => $meatB->id, 'qty' => 5],
+            ],
+            'output_items' => [['product_id' => $output->id, 'qty' => 5, 'percent' => 100]],
+        ]);
+
+        $batch = $document->productionBatch;
+        $this->assertSame(550.0, (float) $batch->total_input_cost);
+        $this->assertSame(110.0, (float) $batch->output_unit_cost);
+        $this->assertSame(3.0, (float) $batch->loss_weight_qty);
+        $this->assertSame(62.5, (float) $batch->yield_percent);
+        $this->assertSame(110.0, (float) $output->fresh()->average_cost);
+        $this->assertSame(200.0, (float) $batch->selling_unit_price);
+        $this->assertEqualsWithDelta(76.9159, (float) $batch->estimated_profit_per_unit, 0.0001);
+
+        app(StockTransformService::class)->addPackages($batch, [0.5, 1.25]);
+        $packages = $batch->packages()->get();
+        $this->assertCount(2, $packages);
+        $this->assertSame(100.0, (float) $packages[0]->total_price);
+        $this->assertMatchesRegularExpression('/^800999[0-9]{7}$/', $packages[0]->barcode);
+    }
+
     /** @return array{Branch,Supplier,Product,Product} */
     private function masters(): array
     {
         DocumentType::create(['code' => 'PURCHASE', 'name_th' => 'ใบซื้อ', 'stock_effect' => 'in']);
         DocumentType::create(['code' => 'CASH_SALE', 'name_th' => 'ใบขายสด', 'stock_effect' => 'out']);
+        DocumentType::firstOrCreate(['code' => 'STOCK_TRANSFORM'], ['name_th' => 'ใบแปรรูป']);
         $branch = Branch::create(['code' => 'HQ', 'name_th' => 'สำนักงานใหญ่', 'is_active' => true]);
         $warehouse = Warehouse::create(['branch_id' => $branch->id, 'code' => 'WH-HQ', 'name' => 'คลังหลัก']);
         $location = WarehouseLocation::create(['warehouse_id' => $warehouse->id, 'code' => 'MAIN', 'name' => 'พื้นที่หลัก']);

@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Branch;
 use App\Models\Customer;
 use App\Models\Product;
+use App\Models\Salesman;
 use App\Models\StockBalance;
 use App\Models\Supplier;
 use Illuminate\Http\JsonResponse;
@@ -51,12 +53,13 @@ class SearchController extends Controller
             ->orderByRaw('case when sku_code = ? then 0 when sku_code ilike ? then 1 else 2 end', [$q, $q.'%'])
             ->orderBy('name_th')
             ->limit(20)
-            ->get(['id', 'sku_code', 'name_th', 'base_unit_id', 'default_price', 'tracks_expiry'])
+            ->get(['id', 'sku_code', 'name_th', 'base_unit_id', 'default_price', 'average_cost', 'tracks_expiry'])
             ->map(fn (Product $product) => [
                 'id' => $product->id,
                 'sku_code' => $product->sku_code,
                 'name_th' => $product->name_th,
                 'default_price' => (float) ($product->default_price ?? 0),
+                'average_cost' => (float) ($product->average_cost ?? 0),
                 'tracks_expiry' => $product->tracks_expiry,
                 'unit_name' => $product->baseUnit?->displayLabel() ?? '-',
                 'barcode' => $product->barcodes->first()?->barcode,
@@ -86,7 +89,7 @@ class SearchController extends Controller
     {
         $q = trim((string) $request->query('q', ''));
 
-        $salesmen = \App\Models\Salesman::where('is_active', true)
+        $salesmen = Salesman::where('is_active', true)
             ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
                 ->where('code', 'ilike', "%{$q}%")
                 ->orWhere('name', 'ilike', "%{$q}%")
@@ -102,7 +105,7 @@ class SearchController extends Controller
     {
         $q = trim((string) $request->query('q', ''));
 
-        $branches = \App\Models\Branch::where('is_active', true)
+        $branches = Branch::where('is_active', true)
             ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
                 ->where('code', 'ilike', "%{$q}%")
                 ->orWhere('name_th', 'ilike', "%{$q}%")

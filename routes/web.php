@@ -1,63 +1,65 @@
 <?php
 
-use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AccountingPeriodController;
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\BillingNoteController;
-use App\Http\Controllers\PriceTableController;
-use App\Http\Controllers\PosController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\BplusOperationController;
 use App\Http\Controllers\CashSaleController;
+use App\Http\Controllers\ChartOfAccountController;
 use App\Http\Controllers\ChequeController;
 use App\Http\Controllers\CreditDebitNoteController;
-use App\Http\Controllers\ChartOfAccountController;
 use App\Http\Controllers\CustomerController;
-use App\Http\Controllers\EcommerceChannelController;
-use App\Http\Controllers\EmployeeController;
-use App\Http\Controllers\OrganizationalUnitController;
-use App\Http\Controllers\FlashSaleController;
-use App\Http\Controllers\GlJournalController;
-use App\Http\Controllers\LineIntegrationController;
-use App\Http\Controllers\LegacyReportController;
-use App\Http\Controllers\MemberController;
-use App\Http\Controllers\MemberPointController;
-use App\Http\Controllers\ManualController;
-use App\Http\Controllers\MonthlyAccountingController;
-use App\Http\Controllers\ProductionController;
-use App\Http\Controllers\PromotionController;
-use App\Http\Controllers\SaleReturnController;
-use App\Http\Controllers\ScalePriceController;
-use App\Http\Controllers\SalesmanController;
-use App\Http\Controllers\WarehouseLocationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryNoteController;
-use App\Http\Controllers\DocumentBrowserController;
-use App\Http\Controllers\DocumentBookController;
 use App\Http\Controllers\DiscountCardController;
-use App\Http\Controllers\UserController;
+use App\Http\Controllers\DocumentBookController;
+use App\Http\Controllers\DocumentBrowserController;
+use App\Http\Controllers\EcommerceChannelController;
+use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\FeatureController;
 use App\Http\Controllers\FinancialStatementController;
 use App\Http\Controllers\FixedAssetController;
+use App\Http\Controllers\FlashSaleController;
+use App\Http\Controllers\GlJournalController;
+use App\Http\Controllers\LegacyReportController;
+use App\Http\Controllers\LineIntegrationController;
+use App\Http\Controllers\ManualController;
+use App\Http\Controllers\MemberController;
+use App\Http\Controllers\MemberPointController;
+use App\Http\Controllers\MonthlyAccountingController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\OrganizationalUnitController;
 use App\Http\Controllers\PaymentController;
-use App\Http\Controllers\PriceTagController;
+use App\Http\Controllers\PosController;
 use App\Http\Controllers\PosImportController;
+use App\Http\Controllers\PriceTableController;
+use App\Http\Controllers\PriceTagController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductionController;
 use App\Http\Controllers\ProductUnitController;
+use App\Http\Controllers\PromotionController;
 use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\QtyPromotionController;
 use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SaleController;
+use App\Http\Controllers\SaleReturnController;
+use App\Http\Controllers\SalesmanController;
+use App\Http\Controllers\ScalePriceController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\StockAdjustmentController;
 use App\Http\Controllers\StockCountController;
 use App\Http\Controllers\StockIssueController;
-use App\Http\Controllers\StockTransformController;
 use App\Http\Controllers\StockTransferController;
+use App\Http\Controllers\StockTransformController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SystemSettingController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\WarehouseLocationController;
+use App\Http\Controllers\WarehouseMobileController;
 use Illuminate\Support\Facades\Route;
 
 // Auth: ทุก route ถูกคุมโดย ErpAuthorize middleware (ดู bootstrap/app.php +
@@ -68,6 +70,7 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::get('/download/pos', function () {
     $installer = public_path('downloads/POPSTAR-POS-Setup.exe');
     abort_unless(is_file($installer), 404);
+
     return response()->download($installer, 'POPSTAR-POS-Setup.exe', [
         'Content-Type' => 'application/vnd.microsoft.portable-executable',
         'Cache-Control' => 'no-cache, must-revalidate',
@@ -91,7 +94,7 @@ Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard
 
 // กระดิ่งแจ้งเตือน header: รายการตามภาระหน้าที่ของผู้ใช้ (ทุกคนที่ล็อกอินเรียกได้
 // ตัวกรองสิทธิ์อยู่ใน NotificationService)
-Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])->name('notifications.index');
+Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
 
 // POS: full-screen selling interface, separate layout from ERP backend.
 Route::prefix('pos')->name('pos.')->group(function () {
@@ -108,14 +111,14 @@ Route::prefix('pos')->name('pos.')->group(function () {
 });
 // คลังมือถือ: หน้าเดียวสำหรับมือถือ/PDA — รับเข้า (ใบซื้อ/รับตาม PO) + เช็คสต๊อก
 Route::prefix('wh')->name('wh.')->group(function () {
-    Route::get('/', [\App\Http\Controllers\WarehouseMobileController::class, 'index'])->name('index');
-    Route::get('/lookup', [\App\Http\Controllers\WarehouseMobileController::class, 'lookup'])->name('lookup');
-    Route::get('/products/{product}', [\App\Http\Controllers\WarehouseMobileController::class, 'productDetail'])->name('products.detail');
-    Route::get('/stock', [\App\Http\Controllers\WarehouseMobileController::class, 'stock'])->name('stock');
-    Route::post('/receive', [\App\Http\Controllers\WarehouseMobileController::class, 'receiveStore'])->name('receive');
-    Route::get('/purchase-orders', [\App\Http\Controllers\WarehouseMobileController::class, 'purchaseOrders'])->name('purchase-orders');
-    Route::get('/purchase-orders/{purchaseOrder}', [\App\Http\Controllers\WarehouseMobileController::class, 'purchaseOrderDetail'])->name('purchase-orders.detail');
-    Route::post('/purchase-orders/{purchaseOrder}/receive', [\App\Http\Controllers\WarehouseMobileController::class, 'purchaseOrderReceive'])->name('purchase-orders.receive');
+    Route::get('/', [WarehouseMobileController::class, 'index'])->name('index');
+    Route::get('/lookup', [WarehouseMobileController::class, 'lookup'])->name('lookup');
+    Route::get('/products/{product}', [WarehouseMobileController::class, 'productDetail'])->name('products.detail');
+    Route::get('/stock', [WarehouseMobileController::class, 'stock'])->name('stock');
+    Route::post('/receive', [WarehouseMobileController::class, 'receiveStore'])->name('receive');
+    Route::get('/purchase-orders', [WarehouseMobileController::class, 'purchaseOrders'])->name('purchase-orders');
+    Route::get('/purchase-orders/{purchaseOrder}', [WarehouseMobileController::class, 'purchaseOrderDetail'])->name('purchase-orders.detail');
+    Route::post('/purchase-orders/{purchaseOrder}/receive', [WarehouseMobileController::class, 'purchaseOrderReceive'])->name('purchase-orders.receive');
 });
 
 Route::get('/features', [FeatureController::class, 'index'])->name('features.index');
@@ -269,6 +272,8 @@ Route::prefix('stock-issues')->name('stock-issues.')->group(function () {
 Route::prefix('stock-transforms')->name('stock-transforms.')->group(function () {
     Route::get('/', [StockTransformController::class, 'index'])->name('index');
     Route::post('/', [StockTransformController::class, 'store'])->name('store');
+    Route::post('/{stockTransform}/packages', [StockTransformController::class, 'addPackages'])->name('packages.store');
+    Route::get('/{stockTransform}/labels', [StockTransformController::class, 'labels'])->name('labels');
     Route::get('/{stockTransform}', [StockTransformController::class, 'show'])->name('show');
 });
 

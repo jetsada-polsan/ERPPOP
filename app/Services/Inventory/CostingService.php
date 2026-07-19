@@ -44,6 +44,23 @@ class CostingService
         ]);
     }
 
+    public function recordManufacturedReceipt(int $productId, float $qty, float $unitCost): void
+    {
+        if ($qty <= 0) {
+            return;
+        }
+        $product = Product::whereKey($productId)->lockForUpdate()->first();
+        if (! $product) {
+            return;
+        }
+        $onHand = (float) StockBalance::where('product_id', $productId)->sum('on_hand_qty');
+        $oldCost = (float) $product->average_cost;
+        $newCost = $onHand <= 0
+            ? $unitCost
+            : (($onHand * $oldCost) + ($qty * $unitCost)) / ($onHand + $qty);
+        $product->update(['average_cost' => round($newCost, 4)]);
+    }
+
     public function purchaseUnitCost(Product $product, float $enteredPrice, bool $pricesIncludeVat, bool $claimInputVat, float $vatRate): float
     {
         if (! $product->is_vat || $vatRate <= 0) {

@@ -1,8 +1,8 @@
 @extends('layout')
 
 @section('title', 'แปรรูปสินค้า - POPSTAR ERP')
-@section('page-title', 'ใบแปรรูปสินค้า (DT)')
-@section('page-subtitle', 'ตัดวัตถุดิบออกจากสต๊อก รับผลผลิตเข้าสต๊อก พร้อมปันต้นทุนตาม %')
+@section('page-title', 'จัดเซ็ต / แปรรูปแบบชั่งจริง')
+@section('page-subtitle', 'ตัดวัตถุดิบจริง รับน้ำหนักผลผลิตจริง และล็อกต้นทุนต่อกิโลกรัม')
 
 @section('content')
 <div x-data="transformPage()" x-cloak>
@@ -15,18 +15,18 @@
 
     <div class="list-toolbar">
         <div class="list-toolbar-left">
-            <h2 class="h5 fw-bold mb-0">ใบแปรรูปสินค้า</h2>
+            <h2 class="h5 fw-bold mb-0">Batch จัดเซ็ตและแปรรูป</h2>
             @include('partials.search-bar', ['q' => $q, 'placeholder' => 'ค้นหาเลขที่เอกสาร'])
         </div>
         <button type="button" class="btn btn-primary rounded-pill px-4" @click="modalOpen = true">
-            <i class="bi bi-plus-lg me-1"></i> สร้างใบแปรรูป
+            <i class="bi bi-plus-lg me-1"></i> จัดเซ็ตแบบชั่งจริง
         </button>
     </div>
 
     <div class="content-card p-4">
         <div class="table-responsive">
             <table class="table align-middle">
-                <thead><tr><th>เลขที่</th><th>วันที่</th><th>สาขา</th><th>หมายเหตุ</th><th class="text-end">มูลค่าวัตถุดิบ</th><th></th></tr></thead>
+                <thead><tr><th>เลขที่</th><th>วันที่</th><th>สาขา</th><th>หมายเหตุ</th><th class="text-end">Yield</th><th class="text-end">ทุน/กก.</th><th class="text-end">มูลค่าวัตถุดิบ</th><th></th></tr></thead>
                 <tbody>
                     @forelse($documents as $doc)
                         <tr>
@@ -34,11 +34,13 @@
                             <td>{{ $doc->doc_date->thaiDate() }}</td>
                             <td>{{ $doc->branch->name_th }}</td>
                             <td class="small text-muted">{{ $doc->remark ?? '-' }}</td>
+                            <td class="text-end">{{ $doc->productionBatch ? number_format($doc->productionBatch->yield_percent,2).'%' : '-' }}</td>
+                            <td class="text-end">{{ $doc->productionBatch ? number_format($doc->productionBatch->output_unit_cost,2) : '-' }}</td>
                             <td class="text-end">{{ number_format($doc->total_amount, 2) }}</td>
                             <td class="text-end"><a href="{{ route('stock-transforms.show', $doc) }}" class="btn btn-sm btn-light border">ดู</a></td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="py-5 text-center text-muted">ยังไม่มีใบแปรรูปสินค้า</td></tr>
+                        <tr><td colspan="8" class="py-5 text-center text-muted">ยังไม่มีใบแปรรูปสินค้า</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -51,14 +53,15 @@
         <div class="booking-modal" @click.outside="modalOpen = false" x-transition>
             <div class="modal-header border-0 px-4 pt-4 pb-2">
                 <div>
-                    <h3 class="h4 fw-bold mb-1">สร้างใบแปรรูปสินค้า</h3>
-                    <div class="text-muted small">วัตถุดิบจะถูกตัดสต๊อก ผลผลิตรับเข้าสต๊อกพร้อมต้นทุนปันตาม % (ไม่กรอก % = เฉลี่ยเท่ากัน)</div>
+                    <h3 class="h4 fw-bold mb-1">จัดเซ็ตแบบชั่งจริง</h3>
+                    <div class="text-muted small">กรอกน้ำหนักที่หยิบใช้และน้ำหนักสินค้าสำเร็จ ระบบใช้ต้นทุนเฉลี่ยและ Lot ให้อัตโนมัติ</div>
                 </div>
                 <button type="button" class="btn btn-light rounded-circle" @click="modalOpen = false"><i class="bi bi-x-lg"></i></button>
             </div>
 
             <form method="post" action="{{ route('stock-transforms.store') }}" @submit="onSubmit">
                 @csrf
+                <input type="hidden" name="batch_mode" value="1">
                 <div class="modal-body px-4 pb-4">
                     <div class="row g-3 mb-4">
                         <div class="col-lg-4">
@@ -84,6 +87,16 @@
                         </div>
                     </div>
 
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <label class="form-label text-muted small">น้ำหนักวัตถุดิบรวมจริง (กก.)</label>
+                            <input type="number" step="0.0001" min="0.0001" name="input_weight_qty" x-model.number="inputWeight" class="form-control text-end" required>
+                        </div>
+                        <div class="col-md-8 d-flex align-items-end">
+                            <div class="alert alert-light border py-2 px-3 mb-0 w-100 small">ส่วนต่างระหว่างน้ำหนักเข้าและผลผลิตจะถูกบันทึกเป็น Yield/สูญเสีย และต้นทุนทั้งหมดจะอยู่ในผลผลิตจริง</div>
+                        </div>
+                    </div>
+
                     {{-- วัตถุดิบ --}}
                     <div class="d-flex align-items-center justify-content-between mb-2">
                         <h4 class="h6 fw-bold mb-0 text-danger"><i class="bi bi-box-arrow-up me-1"></i>วัตถุดิบ (ตัดออกจากสต๊อก)</h4>
@@ -91,7 +104,7 @@
                     </div>
                     <div class="table-responsive booking-items-table mb-2">
                         <table class="table align-middle">
-                            <thead><tr><th style="min-width:280px">สินค้า</th><th class="text-end" style="width:110px">จำนวน</th><th class="text-end" style="width:130px">ทุน/หน่วย</th><th class="text-end" style="width:120px">รวม</th><th style="width:44px"></th></tr></thead>
+                            <thead><tr><th style="min-width:280px">สินค้า</th><th class="text-end" style="width:110px">ใช้จริง</th><th class="text-end" style="width:130px">ทุนเฉลี่ย</th><th class="text-end" style="width:120px">ต้นทุนรวม</th><th style="width:44px"></th></tr></thead>
                             <tbody>
                                 <template x-for="(item, index) in rawItems" :key="'r' + index">
                                     <tr>
@@ -106,25 +119,24 @@
                                                 </template>
                                             </div>
                                         </td>
-                                        <td><input type="number" step="0.0001" min="0.0001" :name="`raw_items[${index}][qty]`" x-model.number="item.qty" required class="form-control text-end"></td>
-                                        <td><input type="number" step="0.01" min="0" :name="`raw_items[${index}][unit_price]`" x-model.number="item.unit_price" required class="form-control text-end"></td>
-                                        <td class="text-end fw-semibold" x-text="money(item.qty * item.unit_price)"></td>
-                                        <td class="text-end"><button type="button" class="btn btn-sm btn-light text-danger" @click="rawItems.splice(index, 1)" x-show="rawItems.length > 1"><i class="bi bi-trash"></i></button></td>
+                                        <td><input type="number" step="0.0001" min="0.0001" :name="`raw_items[${index}][qty]`" x-model.number="item.qty" @input="syncInputWeight()" required class="form-control text-end"></td>
+                                        <td class="text-end" x-text="money(item.average_cost)"></td>
+                                        <td class="text-end fw-semibold" x-text="money(item.qty * item.average_cost)"></td>
+                                        <td class="text-end"><button type="button" class="btn btn-sm btn-light text-danger" @click="rawItems.splice(index, 1); syncInputWeight()" x-show="rawItems.length > 1"><i class="bi bi-trash"></i></button></td>
                                     </tr>
                                 </template>
                             </tbody>
                         </table>
                     </div>
-                    <div class="text-end mb-4 small">มูลค่าวัตถุดิบรวม: <strong class="text-danger" x-text="money(rawTotal)"></strong> บาท</div>
+                    <div class="text-end mb-4 small">ต้นทุนวัตถุดิบรวม: <strong class="text-danger" x-text="money(rawTotal)"></strong> บาท</div>
 
                     {{-- ผลผลิต --}}
                     <div class="d-flex align-items-center justify-content-between mb-2">
                         <h4 class="h6 fw-bold mb-0 text-success"><i class="bi bi-box-arrow-in-down me-1"></i>ผลผลิต (รับเข้าสต๊อก)</h4>
-                        <button type="button" class="btn btn-sm btn-light border" @click="addOutput()"><i class="bi bi-plus-lg me-1"></i> เพิ่มผลผลิต</button>
                     </div>
                     <div class="table-responsive booking-items-table">
                         <table class="table align-middle">
-                            <thead><tr><th style="min-width:280px">สินค้า</th><th class="text-end" style="width:110px">จำนวน</th><th class="text-end" style="width:110px">%ปันทุน</th><th class="text-end" style="width:130px">ทุนที่ได้/หน่วย</th><th style="width:44px"></th></tr></thead>
+                            <thead><tr><th style="min-width:280px">สินค้าชุดสำเร็จ</th><th class="text-end" style="width:150px">น้ำหนักชั่งได้ (กก.)</th><th class="text-end" style="width:150px">ต้นทุน/กก.</th><th class="text-end" style="width:130px">Yield</th></tr></thead>
                             <tbody>
                                 <template x-for="(item, index) in outputItems" :key="'o' + index">
                                     <tr>
@@ -139,10 +151,9 @@
                                                 </template>
                                             </div>
                                         </td>
-                                        <td><input type="number" step="0.0001" min="0.0001" :name="`output_items[${index}][qty]`" x-model.number="item.qty" required class="form-control text-end"></td>
-                                        <td><input type="number" step="0.01" min="0" max="100" :name="`output_items[${index}][percent]`" x-model.number="item.percent" class="form-control text-end" placeholder="อัตโนมัติ"></td>
+                                        <td><input type="number" step="0.0001" min="0.0001" :name="`output_items[${index}][qty]`" x-model.number="item.qty" required class="form-control text-end"><input type="hidden" :name="`output_items[${index}][percent]`" value="100"></td>
                                         <td class="text-end fw-semibold text-success" x-text="outputUnitCost(item)"></td>
-                                        <td class="text-end"><button type="button" class="btn btn-sm btn-light text-danger" @click="outputItems.splice(index, 1)" x-show="outputItems.length > 1"><i class="bi bi-trash"></i></button></td>
+                                        <td class="text-end fw-semibold" x-text="yieldPercent(item)"></td>
                                     </tr>
                                 </template>
                             </tbody>
@@ -152,7 +163,7 @@
 
                 <div class="modal-footer border-0 px-4 pb-4 pt-0">
                     <button type="button" class="btn btn-light border px-4" @click="modalOpen = false">ยกเลิก</button>
-                    <button type="submit" class="btn btn-primary px-4"><i class="bi bi-check2-circle me-1"></i> บันทึกใบแปรรูป</button>
+                    <button type="submit" class="btn btn-primary px-4"><i class="bi bi-check2-circle me-1"></i> ตัดวัตถุดิบและรับชุดสำเร็จ</button>
                 </div>
             </form>
         </div>
@@ -178,24 +189,26 @@
     function transformPage() {
         return {
             modalOpen: false,
-            rawItems: [{ product_id: '', productQuery: '', qty: 1, unit_price: 0, results: [] }],
+            rawItems: [{ product_id: '', productQuery: '', qty: 1, average_cost: 0, results: [] }],
             outputItems: [{ product_id: '', productQuery: '', qty: 1, percent: null, results: [] }],
+            inputWeight: 1,
 
-            addRaw() { this.rawItems.push({ product_id: '', productQuery: '', qty: 1, unit_price: 0, results: [] }); },
-            addOutput() { this.outputItems.push({ product_id: '', productQuery: '', qty: 1, percent: null, results: [] }); },
+            addRaw() { this.rawItems.push({ product_id: '', productQuery: '', qty: 1, average_cost: 0, results: [] }); this.syncInputWeight(); },
+            syncInputWeight() { this.inputWeight = Math.round(this.rawItems.reduce((s, i) => s + (Number(i.qty) || 0), 0) * 10000) / 10000; },
 
             get rawTotal() {
-                return this.rawItems.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.unit_price) || 0), 0);
+                return this.rawItems.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.average_cost) || 0), 0);
             },
 
             outputUnitCost(item) {
                 const qty = Number(item.qty) || 0;
                 if (qty <= 0 || this.rawTotal <= 0) return '-';
-                const filled = this.outputItems.filter(i => i.percent !== null && i.percent !== '');
-                const pct = (item.percent !== null && item.percent !== '')
-                    ? Number(item.percent)
-                    : (filled.length === 0 ? 100 / this.outputItems.length : 0);
-                return this.money(this.rawTotal * pct / 100 / qty);
+                return this.money(this.rawTotal / qty);
+            },
+
+            yieldPercent(item) {
+                const output = Number(item.qty) || 0;
+                return this.inputWeight > 0 ? this.money(output * 100 / this.inputWeight) + '%' : '-';
             },
 
             money(v) { return Number(v || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
@@ -210,9 +223,7 @@
                 item.product_id = product.id;
                 item.productQuery = `${product.sku_code} - ${product.name_th}`;
                 item.results = [];
-                if ('unit_price' in item && !item.unit_price) {
-                    item.unit_price = Number(product.default_price) || 0;
-                }
+                item.average_cost = Number(product.average_cost) || 0;
             },
 
             onSubmit(event) {
