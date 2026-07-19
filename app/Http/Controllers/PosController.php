@@ -24,6 +24,7 @@ use App\Models\StockDocument;
 use App\Models\StockMovement;
 use App\Services\Sales\CashSaleService;
 use App\Services\Sales\MemberPointService;
+use App\Services\Sales\PosPaymentValidator;
 use App\Services\Accounting\GlPostingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -430,8 +431,12 @@ class PosController extends Controller
         return response()->json(['success' => true, 'shift' => $this->shiftPayload($shift->fresh())]);
     }
 
-    public function checkout(Request $request, CashSaleService $service, MemberPointService $points): JsonResponse
-    {
+    public function checkout(
+        Request $request,
+        CashSaleService $service,
+        MemberPointService $points,
+        PosPaymentValidator $paymentValidator,
+    ): JsonResponse {
         $data = $request->validate([
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
             'customer_id' => ['nullable', 'integer', 'exists:customers,id'],
@@ -465,21 +470,10 @@ class PosController extends Controller
             return response()->json(['success' => false, 'message' => 'บัญชีนี้ยังไม่ได้กำหนดรหัสพนักงานขาย ติดต่อผู้ดูแลระบบ'], 422);
         }
 
-        if (in_array($data['method'], ['transfer', 'mixed'], true) && ! ($data['payment_confirmed'] ?? false)) {
-            return response()->json(['success' => false, 'message' => 'กรุณาตรวจเงินเข้าก่อนออกบิล'], 422);
-        }
-
-        // จ่ายผสม (เงินสด+โอน): ยอดสองส่วนต้องมีทั้งคู่ และรวมกันเท่ายอดบิลพอดี
-        if ($data['method'] === 'mixed') {
-            $cashPart = round((float) ($data['cash_amount'] ?? 0), 2);
-            $transferPart = round((float) ($data['transfer_amount'] ?? 0), 2);
-            $itemsTotal = round(collect($data['items'])->sum(fn ($item) => (float) $item['qty'] * (float) $item['unit_price']), 2);
-            if ($cashPart < 0.01 || $transferPart < 0.01) {
-                return response()->json(['success' => false, 'message' => 'จ่ายผสมต้องระบุทั้งยอดเงินสดและยอดโอน'], 422);
-            }
-            if (abs($cashPart + $transferPart - $itemsTotal) > 0.01) {
-                return response()->json(['success' => false, 'message' => 'ยอดเงินสด+โอนต้องเท่ากับยอดบิล'], 422);
-            }
+        try {
+            $paymentValidator->validate($data);
+        } catch (RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
 
         $shift = PosShift::where('id', $data['shift_id'])
@@ -489,10 +483,6 @@ class PosController extends Controller
             ->first();
         if (! $shift) {
             return response()->json(['success' => false, 'message' => 'กรุณาเปิดกะแคชเชียร์ก่อนขาย'], 422);
-        }
-
-        if ($data['method'] === 'cash' && (float) ($data['cash_received'] ?? 0) < 0.01) {
-            return response()->json(['success' => false, 'message' => 'กรุณาระบุเงินสดที่รับมา'], 422);
         }
 
         $discountCard = null;
@@ -556,7 +546,16 @@ class PosController extends Controller
         }
 
         try {
-            [$document, $receipt] = DB::transaction(function () use ($service, $data, $remarkParts, $shift) {
+            [$document, $receipt, $earnedPoints] = DB::transaction(function () use (
+                $service,
+                $data,
+                $remarkParts,
+                $shift,
+                $discountCard,
+                $member,
+                $points,
+                $redeemPoints,
+            ) {
                 $document = $service->create([
                     'branch_id' => $data['branch_id'],
                     'customer_id' => $data['customer_id'] ?? null,
@@ -567,17 +566,18 @@ class PosController extends Controller
 
                 $receipt = $this->recordPosReceipt($shift, $this->nextPosReceiptNo($shift), $data, $document->id);
 
-                return [$document, $receipt];
+                if ($discountCard) {
+                    $lockedCard = DiscountCard::whereKey($discountCard->id)->lockForUpdate()->first();
+                    if (! $lockedCard || ! $lockedCard->isValidAt(now())) {
+                        throw new RuntimeException('บัตรส่วนลดหมดอายุหรือใช้ครบจำนวนแล้ว กรุณานำบัตรออกแล้วลองใหม่');
+                    }
+                    $lockedCard->increment('used_count');
+                }
+
+                $earnedPoints = $member ? $points->settle($member, $document, $redeemPoints) : 0.0;
+
+                return [$document, $receipt, $earnedPoints];
             });
-
-            if ($discountCard) {
-                $discountCard->increment('used_count');
-            }
-
-            $earnedPoints = 0.0;
-            if ($member) {
-                $earnedPoints = $points->settle($member, $document, $redeemPoints);
-            }
 
             return response()->json([
                 'success' => true,

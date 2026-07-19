@@ -7,6 +7,7 @@ use App\Models\Member;
 use App\Models\MemberPointRule;
 use App\Models\MemberPointTransaction;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 /**
  * Converts POS bills to member points (แต้มทอง) and points back to baht
@@ -55,7 +56,16 @@ class MemberPointService
     public function settle(Member $member, Document $document, float $redeemPoints): float
     {
         return DB::transaction(function () use ($member, $document, $redeemPoints) {
+            $member = Member::whereKey($member->getKey())->lockForUpdate()->first();
+            if (! $member) {
+                throw new RuntimeException('ไม่พบสมาชิก กรุณาเลือกสมาชิกใหม่');
+            }
+
             if ($redeemPoints > 0) {
+                if ((float) $member->points + 0.0001 < $redeemPoints) {
+                    throw new RuntimeException('แต้มสะสมไม่พอ กรุณาตรวจสอบยอดแต้มอีกครั้ง');
+                }
+
                 $member->decrement('points', $redeemPoints);
                 MemberPointTransaction::create([
                     'member_id' => $member->id,
