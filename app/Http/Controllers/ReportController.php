@@ -614,10 +614,12 @@ class ReportController extends Controller
                 ['label' => 'สินค้า', 'key' => 'name_th'],
                 ['label' => 'Lot', 'key' => 'lot_number'],
                 ['label' => 'คลัง/ที่เก็บ', 'key' => 'location_name'],
+                ['label' => 'วันผลิต', 'key' => 'manufacture_date'],
                 ['label' => 'วันหมดอายุ', 'key' => 'expiry_date'],
                 ['label' => 'เหลือ (วัน)', 'key' => 'days_left', 'type' => 'number', 'class' => 'text-end'],
                 ['label' => 'คงเหลือ', 'key' => 'remaining_qty', 'type' => 'number', 'class' => 'text-end'],
                 ['label' => 'สถานะ', 'key' => 'status', 'type' => 'badge'],
+                ['label' => 'ส่วนลดระบายแนะนำ', 'key' => 'clearance_suggestion'],
             ], $this->expiringStock($filters)),
 
             'stock_movements' => $this->tableResult('เคลื่อนไหวสินค้า', [
@@ -1883,23 +1885,31 @@ class ReportController extends Controller
 
         return $query->orderByRaw('CASE WHEN sl.expiry_date IS NULL THEN 0 ELSE 1 END')
             ->orderBy('sl.expiry_date')
-            ->selectRaw("p.sku_code, p.name_th, sl.lot_number, concat(w.name, ' / ', coalesce(wl.name, wl.code)) as location_name, sl.expiry_date, sl.remaining_qty, p.expiry_warning_days")
+            ->selectRaw("p.sku_code, p.name_th, sl.lot_number, concat(w.name, ' / ', coalesce(wl.name, wl.code)) as location_name, sl.manufacture_date, sl.expiry_date, sl.remaining_qty, sl.quality_status, p.expiry_warning_days, p.clearance_warning_days, p.clearance_discount_percent, p.default_price")
             ->get()
             ->map(function ($lot) {
                 if (! $lot->expiry_date) {
                     $lot->days_left = null;
                     $lot->status = 'ไม่ระบุวันหมดอายุ';
+                    $lot->clearance_suggestion = '-';
 
                     return $lot;
                 }
                 $lot->days_left = today()->diffInDays(Carbon::parse($lot->expiry_date), false);
-                $lot->status = $lot->days_left < 0
+                $qualityLabels = ['hold' => 'พักตรวจ', 'quarantine' => 'กักกัน', 'recalled' => 'เรียกคืน'];
+                $lot->status = $qualityLabels[$lot->quality_status] ?? ($lot->days_left < 0
                     ? 'หมดอายุแล้ว'
-                    : ($lot->days_left <= (int) $lot->expiry_warning_days ? 'ใกล้หมดอายุ' : 'ปกติ');
+                    : ($lot->days_left <= (int) $lot->expiry_warning_days ? 'ใกล้หมดอายุ' : 'ปกติ'));
+                $lot->clearance_suggestion = $lot->days_left >= 0
+                    && $lot->days_left <= (int) $lot->clearance_warning_days
+                    && (float) $lot->clearance_discount_percent > 0
+                    ? number_format((float) $lot->clearance_discount_percent, 2).'% → '.number_format((float) $lot->default_price * (100 - (float) $lot->clearance_discount_percent) / 100, 2).' บาท'
+                    : '-';
 
                 return $lot;
             })
-            ->filter(fn ($lot) => $lot->days_left === null || $lot->days_left <= (int) $lot->expiry_warning_days)
+            ->filter(fn ($lot) => $lot->quality_status !== 'available'
+                || $lot->days_left === null || $lot->days_left <= (int) $lot->expiry_warning_days)
             ->take($filters['per_page'])
             ->values();
     }

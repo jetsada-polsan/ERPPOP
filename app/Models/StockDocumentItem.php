@@ -42,6 +42,8 @@ class StockDocumentItem extends Model
             'unit_cost' => 'decimal:4',
             'cost_amount' => 'decimal:4',
             'vat_amount' => 'decimal:4',
+            'manufacture_date' => 'date',
+            'expire_date' => 'date',
         ];
     }
 }

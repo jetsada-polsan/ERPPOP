@@ -14,6 +14,7 @@ use App\Services\Accounting\GlPostingService;
 use App\Services\Inventory\CostingService;
 use App\Services\Inventory\FifoStockService;
 use App\Services\Sales\DocumentNumberGenerator;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -58,13 +59,23 @@ class PurchaseService
         return DB::transaction(function () use ($data, $branch, $documentType, $isCredit, $pricesIncludeVat, $claimInputVat) {
             $items = collect($data['items']);
             $products = Product::whereIn('id', $items->pluck('product_id'))->get()->keyBy('id');
-            $expiryByProduct = $products->pluck('tracks_expiry', 'id');
-            foreach ($items as $item) {
-                if (($expiryByProduct[$item['product_id']] ?? false)
-                    && array_key_exists('expiry_date', $item) && empty($item['expiry_date'])) {
+            $items = $items->map(function (array $item) use ($products): array {
+                $product = $products->get((int) $item['product_id']);
+                if ($product?->tracks_expiry && empty($item['expiry_date'])
+                    && ! empty($item['manufacture_date']) && $product->shelf_life_days) {
+                    $item['expiry_date'] = Carbon::parse($item['manufacture_date'])
+                        ->addDays((int) $product->shelf_life_days)->toDateString();
+                }
+                if ($product?->tracks_expiry && empty($item['expiry_date'])) {
                     throw new RuntimeException('สินค้าที่ควบคุมวันหมดอายุต้องระบุวันหมดอายุตอนรับเข้า');
                 }
-            }
+                if (! empty($item['manufacture_date']) && ! empty($item['expiry_date'])
+                    && Carbon::parse($item['expiry_date'])->lt(Carbon::parse($item['manufacture_date']))) {
+                    throw new RuntimeException('วันหมดอายุต้องไม่ก่อนวันผลิต');
+                }
+
+                return $item;
+            });
             $vatRate = (float) (DB::table('vat_rates')
                 ->where('effective_from', '<=', now()->toDateString())
                 ->where(fn ($q) => $q->whereNull('effective_to')->orWhere('effective_to', '>=', now()->toDateString()))
@@ -128,6 +139,9 @@ class PurchaseService
                     'unit_cost' => $item['_unit_cost'],
                     'cost_amount' => $item['_cost_amount'],
                     'vat_amount' => $item['_vat_amount'],
+                    'lot_no' => $item['lot_number'] ?? null,
+                    'manufacture_date' => $item['manufacture_date'] ?? null,
+                    'expire_date' => $item['expiry_date'] ?? null,
                 ]);
 
                 // อัปเดตต้นทุนเฉลี่ย "ก่อน" เพิ่มสต๊อก (ใช้ยอดคงเหลือก่อนรับถัวเฉลี่ย)
@@ -137,7 +151,7 @@ class PurchaseService
                     (int) $item['product_id'], (int) $branch->default_warehouse_location_id,
                     (float) $item['qty'], $document->id, 'in',
                     $item['lot_number'] ?? null, now()->toDateString(), $item['expiry_date'] ?? null,
-                    (float) $item['_unit_cost']
+                    (float) $item['_unit_cost'], $item['manufacture_date'] ?? null
                 );
 
                 ProductSupplier::updateOrCreate(

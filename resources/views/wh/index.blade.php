@@ -189,6 +189,9 @@
                     <label>เลขลอต (ถ้ามี)
                         <input x-model="lot" autocomplete="off">
                     </label>
+                    <label>วันผลิต
+                        <input x-model="manufacture" @change="calculateExpiry()" type="date">
+                    </label>
                     <label>วันหมดอายุ <b class="req" x-show="cur?.tracks_expiry">*</b>
                         <input x-model="expiry" type="date">
                     </label>
@@ -288,6 +291,11 @@
                                     <div class="dt" style="color:var(--ink-soft);font-size:12px" x-text="line.sku_code"></div>
                                 </div>
                                 <span class="prog" x-text="fmtQty(line.scanned) + ' / ' + fmtQty(line.qty)"></span>
+                                <div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px">
+                                    <input x-model="line.lot_number" placeholder="Lot">
+                                    <input x-model="line.manufacture_date" @change="calculatePoExpiry(line)" type="date" title="วันผลิต">
+                                    <input x-model="line.expiry_date" type="date" title="วันหมดอายุ">
+                                </div>
                             </div>
                         </template>
                     </div>
@@ -384,7 +392,7 @@ function whApp() {
         branches: @json($branches->map(fn ($b) => ['id' => $b->id, 'name_th' => $b->name_th])),
 
         scanCode: '', scanError: '', q: '', suggests: [],
-        cur: null, curOnHand: null, qty: 1, price: 0, lot: '', expiry: '',
+        cur: null, curOnHand: null, qty: 1, price: 0, lot: '', manufacture: '', expiry: '',
         cart: [], supplier: null, supQ: '', supSuggests: [], isCredit: true, remark: '',
         submitting: false, submitError: '', doneDoc: null,
 
@@ -444,7 +452,7 @@ function whApp() {
                 this.curOnHand = res.on_hand;
                 this.qty = 1;
                 this.price = res.product.default_cost * res.product.unit_factor;
-                this.lot = ''; this.expiry = '';
+                this.lot = ''; this.manufacture = ''; this.expiry = '';
             }
         },
         async searchProducts() {
@@ -456,6 +464,12 @@ function whApp() {
         // ---- รับเข้าอิสระ ----
         clearCur() { this.cur = null; this.curOnHand = null; this.focusScan(); },
         baseQty() { return (+this.qty || 0) * (this.cur?.unit_factor || 1); },
+        calculateExpiry() {
+            if (!this.manufacture || !this.cur?.shelf_life_days) return;
+            const expiry = new Date(this.manufacture + 'T00:00:00');
+            expiry.setDate(expiry.getDate() + Number(this.cur.shelf_life_days));
+            this.expiry = expiry.toISOString().slice(0, 10);
+        },
         canAdd() {
             return this.cur && (+this.qty > 0) && (+this.price >= 0) && (!this.cur.tracks_expiry || this.expiry);
         },
@@ -471,7 +485,7 @@ function whApp() {
                 base_qty: this.baseQty(),             // จำนวนหน่วยฐาน (ส่งเข้าระบบ)
                 price: +this.price,                   // ราคา/หน่วยที่สแกน
                 base_price: (+this.price) / factor,   // ราคา/หน่วยฐาน (ส่งเข้าระบบ)
-                lot: this.lot.trim(), expiry: this.expiry,
+                lot: this.lot.trim(), manufacture: this.manufacture, expiry: this.expiry,
             });
             this.clearCur();
         },
@@ -497,6 +511,7 @@ function whApp() {
                             qty: it.base_qty,
                             unit_price: it.base_price,
                             lot_number: it.lot || null,
+                            manufacture_date: it.manufacture || null,
                             expiry_date: it.expiry || null,
                         })),
                     }),
@@ -518,7 +533,7 @@ function whApp() {
         async openPo(id) {
             try {
                 const po = await jfetch(`{{ route('wh.purchase-orders') }}/${id}`);
-                po.items = po.items.map(i => ({ ...i, scanned: 0 }));
+                po.items = po.items.map(i => ({ ...i, scanned: 0, lot_number: '', manufacture_date: '', expiry_date: '' }));
                 this.poCur = po; this.submitError = '';
                 this.$nextTick(() => this.focusScan());
             } catch (e) { this.scanError = e.message; }
@@ -530,12 +545,30 @@ function whApp() {
             line.scanned += (product.unit_factor || 1);
         },
         poAllScanned() { return !!this.poCur && this.poCur.items.every(i => i.scanned >= i.qty); },
+        calculatePoExpiry(line) {
+            if (!line.manufacture_date || !line.shelf_life_days) return;
+            const expiry = new Date(line.manufacture_date + 'T00:00:00');
+            expiry.setDate(expiry.getDate() + Number(line.shelf_life_days));
+            line.expiry_date = expiry.toISOString().slice(0, 10);
+        },
         async receivePo() {
             if (!this.poCur) return;
+            if (this.poCur.items.some(i => i.tracks_expiry && !i.expiry_date && !(i.manufacture_date && i.shelf_life_days))) {
+                this.submitError = 'สินค้าที่ควบคุมอายุต้องระบุวันหมดอายุ หรือวันผลิตของสินค้าที่ตั้งอายุไว้';
+                return;
+            }
             if (!this.poAllScanned() && !confirm('ยังยิงเช็คของไม่ครบทุกบรรทัด — ระบบจะรับของ "ทั้งใบ" ตามจำนวนใน PO ยืนยันไหม?')) return;
             this.submitting = true; this.submitError = '';
             try {
-                const res = await jfetch(`{{ route('wh.purchase-orders') }}/${this.poCur.id}/receive`, { method: 'POST' });
+                const res = await jfetch(`{{ route('wh.purchase-orders') }}/${this.poCur.id}/receive`, {
+                    method: 'POST',
+                    body: JSON.stringify({ items: this.poCur.items.map(i => ({
+                        product_id: i.product_id,
+                        lot_number: i.lot_number || null,
+                        manufacture_date: i.manufacture_date || null,
+                        expiry_date: i.expiry_date || null,
+                    })) }),
+                });
                 this.doneDoc = { title: 'รับของตาม PO แล้ว', doc_number: res.doc_number,
                                  detail: 'ใบสั่งซื้อ ' + res.po_number + ' → ออกใบซื้อเข้าสต๊อกแล้ว' };
                 this.poCur = null; this.loadPos();

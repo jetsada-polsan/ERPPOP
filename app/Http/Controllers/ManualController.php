@@ -70,6 +70,7 @@ class ManualController extends Controller
                     ['ตรวจนับสินค้า', 'stock-counts.index', 'ยอดระบบและยอดนับจริง', 'ผลต่างและใบปรับยอด'],
                     ['ขอซื้อ/สั่งซื้อ', 'purchase-orders.index', 'ความต้องการ สต็อกต่ำ และผู้ขาย', 'PO และงานรับสินค้า'],
                     ['รับสินค้าเข้า', 'purchases.index', 'PO/ใบส่งของผู้ขาย', 'Stock lot ต้นทุน AP และ VAT'],
+                    ['คุณภาพและ Trace Lot', 'products.index', 'Hold กักกัน เรียกคืน วันผลิต และหมดอายุ', 'ระงับการขายและค้นเอกสารปลายทางย้อนหลัง'],
                     ['ผลิตและแปรรูป', 'production.index', 'สูตร วัตถุดิบ และใบสั่งผลิต', 'ตัดวัตถุดิบและรับสินค้าสำเร็จรูป'],
                     ['จัดเซ็ตแบบชั่งจริง', 'stock-transforms.index', 'วัตถุดิบที่ใช้จริง น้ำหนักผลผลิต และ PLU', 'Batch Yield ต้นทุน/กก. และป้ายถุงขาย'],
                 ],
@@ -130,6 +131,7 @@ class ManualController extends Controller
                     ['ขอซื้อ/อนุมัติ', 'purchase-orders.index', 'ระบุรายการ จำนวน เหตุผล และวงเงิน'],
                     ['สั่งซื้อ', 'purchase-orders.index', 'ยืนยันผู้ขาย ราคา วันส่ง และเงื่อนไข'],
                     ['รับสินค้า', 'purchases.index', 'รับตาม PO สร้าง Lot ต้นทุน สต็อก และ AP'],
+                    ['ตรวจคุณภาพ Lot', 'products.index', 'พักตรวจ/กักกัน/เรียกคืนพร้อมเหตุผลและ Audit Log'],
                     ['ตรวจเอกสาร', 'suppliers.index', 'เทียบ PO ใบรับ และใบกำกับผู้ขาย'],
                     ['ชำระ AP', 'suppliers.index', 'จ่ายเงิน ตัดหนี้ และลง GL/ธนาคาร'],
                 ],
@@ -146,6 +148,7 @@ class ManualController extends Controller
                     ['ปรับยอด', 'stock-adjustments.index', 'ลงผลต่างพร้อมเหตุผลและ audit trail'],
                     ['คุมหมดอายุ', 'products.index', 'เปิดควบคุม Lot กำหนดวันเตือน และเลือกห้ามหรืออนุญาต Lot หมดอายุรายสินค้า'],
                     ['ตรวจ FEFO', 'reports.index', 'ดู Lot หมดอายุ/ใกล้หมดอายุจากกระดิ่งและรายงาน แล้วระบายหรือตัดชำรุด'],
+                    ['Trace/Recall', 'products.index', 'เปิด Lot เพื่อตรวจเส้นทางเอกสารและระงับ Lot ที่มีปัญหา'],
                 ],
             ],
             [
@@ -202,11 +205,11 @@ class ManualController extends Controller
     private function gaps(): array
     {
         return [
-            ['level' => 'critical', 'status' => 'กำลังทำ', 'title' => 'ราคา โปรโมชั่น และหน่วยขายต้องยืนยันฝั่ง Server', 'detail' => 'checkout ยังต้องรับรายละเอียดราคา/ส่วนลด/หน่วยบาร์โค้ด แล้วคำนวณซ้ำฝั่ง Server เพื่อกันแก้ราคาและให้การตัดสต็อกหลายหน่วยถูกต้อง'],
-            ['level' => 'critical', 'status' => 'ต้องเพิ่ม', 'title' => 'Integration tests ธุรกรรมครบวงจร', 'detail' => 'มี unit tests เริ่มต้นแล้ว แต่ต้องทดสอบ POS -> Stock -> VAT -> GL -> Member และ rollback ด้วยฐานข้อมูลจริง'],
-            ['level' => 'control', 'status' => 'บางส่วน', 'title' => 'Approval เชื่อมเอกสารจริง', 'detail' => 'มีทะเบียนคำขออนุมัติ แต่ยังต้องบังคับสถานะอนุมัติก่อน PO ส่วนลด ปรับยอด และวงเงินในแต่ละเอกสาร'],
+            ['level' => 'critical', 'status' => 'พร้อมใช้', 'title' => 'ราคา โปรโมชั่น และส่วนลด POS ยืนยันฝั่ง Server', 'detail' => 'checkout คำนวณราคาหลัก โปรโมชั่น บัตร ส่วนลด แต้ม และราคาต่ำกว่าทุนซ้ำฝั่ง Server พร้อมสิทธิ์ผู้อนุมัติ'],
+            ['level' => 'critical', 'status' => 'มีชุดหลัก', 'title' => 'Integration tests ธุรกรรมครบวงจร', 'detail' => 'ทดสอบซื้อ ต้นทุน VAT ขาย Stock FEFO กักกัน Batch และ rollback บนฐานข้อมูลทดสอบแล้ว ต้องขยายต่อเมื่อเพิ่มโมดูล'],
+            ['level' => 'control', 'status' => 'บางส่วน', 'title' => 'Approval เชื่อมเอกสารจริง', 'detail' => 'PO แยกสิทธิ์และห้ามผู้ขออนุมัติตนเอง ส่วนลด POS/ขายต่ำกว่าทุนแยกสิทธิ์แล้ว; ปรับยอดและวงเงินยังต้องต่อ workflow อนุมัติเฉพาะ'],
             ['level' => 'control', 'status' => 'บางส่วน', 'title' => 'Audit log ครอบคลุมทุกการแก้ไขสำคัญ', 'detail' => 'มี audit สำหรับ POS บางเหตุการณ์แล้ว แต่ master data การเงิน สิทธิ์ และการเปลี่ยนราคายังต้องครอบคลุมเพิ่ม'],
-            ['level' => 'control', 'status' => 'ต้องทำ', 'title' => 'Backup, restore drill และ disaster recovery', 'detail' => 'ต้องกำหนด backup ฐานข้อมูล/ไฟล์ รอบเก็บรักษา การเข้ารหัส และทดสอบกู้คืนเป็นรอบ'],
+            ['level' => 'control', 'status' => 'มีเครื่องมือ', 'title' => 'Backup, restore drill และ disaster recovery', 'detail' => 'มี erp:backup พร้อม checksum/retention และ erp:health ตรวจอายุไฟล์ ต้องตั้ง cron ส่งสำเนาออกนอกเครื่องและทดสอบกู้คืนเป็นรอบ'],
             ['level' => 'growth', 'status' => 'ทะเบียนแล้ว', 'title' => 'E-Commerce sync อัตโนมัติ', 'detail' => 'มีแฟ้มช่องทาง Lazada Shopee LINE MyShop และ TikTok Shop แต่ยังไม่มี order/stock sync จริง'],
             ['level' => 'growth', 'status' => 'ยังไม่มี', 'title' => 'Payroll และเวลาเข้างาน', 'detail' => 'มีแฟ้มพนักงานและโครงสร้างองค์กร แต่เงินเดือน ภาษี ประกันสังคม และ attendance ยังไม่อยู่ในระบบ'],
             ['level' => 'growth', 'status' => 'ยังไม่มี', 'title' => 'งบประมาณและศูนย์ต้นทุน', 'detail' => 'ยังไม่มี Budget, Cost Center และการเทียบงบประมาณกับยอดจริงสำหรับควบคุมค่าใช้จ่ายตามหน่วยงาน'],

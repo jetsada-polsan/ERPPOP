@@ -54,6 +54,9 @@
                     <label>สต๊อกสูงสุด<input type="number" step="0.0001" min="0" name="maximum_stock" value="{{ $product->maximum_stock }}"></label>
                     <label class="wide">หมายเหตุ<textarea name="note" rows="3">{{ $product->note }}</textarea></label>
                     <label>เตือนก่อนหมดอายุ (วัน)<input type="number" min="0" max="3650" name="expiry_warning_days" value="{{ $product->expiry_warning_days }}"></label>
+                    <label>อายุสินค้านับจากวันผลิต (วัน)<input type="number" min="1" max="36500" name="shelf_life_days" value="{{ $product->shelf_life_days }}"></label>
+                    <label>เริ่มแนะนำระบายก่อนหมดอายุ (วัน)<input type="number" min="0" max="3650" name="clearance_warning_days" value="{{ $product->clearance_warning_days }}"></label>
+                    <label>ส่วนลดระบายที่แนะนำ (%)<input type="number" step="0.01" min="0" max="100" name="clearance_discount_percent" value="{{ $product->clearance_discount_percent }}"></label>
                     <label>เมื่อ Lot หมดอายุ<select name="expiry_sale_policy"><option value="block" @selected($product->expiry_sale_policy==='block')>ห้ามขาย/ห้ามใช้</option><option value="allow" @selected($product->expiry_sale_policy==='allow')>เตือนแต่อนุญาต</option></select></label>
                     <div class="compact-checks wide"><label><input type="checkbox" name="is_active" value="1" @checked($product->is_active)> ใช้งาน</label><label><input type="checkbox" name="is_vat" value="1" @checked($product->is_vat)> คิด VAT</label><label><input type="checkbox" name="tracks_expiry" value="1" @checked($product->tracks_expiry)> ควบคุม Lot/หมดอายุ</label></div>
                     <div class="compact-save wide"><button><i class="bi bi-check-lg"></i> บันทึก</button></div>
@@ -481,7 +484,7 @@
             </div>
             <div class="table-responsive">
                 <table class="table table-sm align-middle">
-                    <thead><tr><th>เลข Lot</th><th>คลัง</th><th>วันที่รับ</th><th>วันหมดอายุ</th><th class="text-end">คงเหลือ</th><th>สถานะ</th></tr></thead>
+                    <thead><tr><th>เลข Lot</th><th>คลัง</th><th>วันที่รับ</th><th>วันผลิต</th><th>วันหมดอายุ</th><th class="text-end">คงเหลือ</th><th>คุณภาพ/หมดอายุ</th><th>จัดการ</th></tr></thead>
                     <tbody>
                     @forelse($product->stockLots as $lot)
                         @php
@@ -491,17 +494,35 @@
                             <td class="fw-semibold">{{ $lot->lot_number }}</td>
                             <td>{{ $lot->warehouseLocation?->warehouse?->name_th ?? $lot->warehouseLocation?->code ?? '-' }}</td>
                             <td>{{ $lot->received_date?->format('d/m/Y') }}</td>
+                            <td>{{ $lot->manufacture_date?->format('d/m/Y') ?? '-' }}</td>
                             <td>{{ $lot->expiry_date?->format('d/m/Y') ?? '-' }}</td>
                             <td class="text-end">{{ number_format($lot->remaining_qty, 4) }}</td>
                             <td>
-                                @if($daysLeft === null)<span class="badge text-bg-light border">ไม่ระบุ</span>
+                                @if($lot->quality_status === 'hold')<span class="badge text-bg-warning">พักตรวจ</span>
+                                @elseif($lot->quality_status === 'quarantine')<span class="badge text-bg-danger">กักกัน</span>
+                                @elseif($lot->quality_status === 'recalled')<span class="badge text-bg-dark">เรียกคืน</span>
+                                @elseif($daysLeft === null)<span class="badge text-bg-light border">ไม่ระบุ</span>
                                 @elseif($daysLeft < 0)<span class="badge text-bg-danger">หมดอายุแล้ว</span>
                                 @elseif($daysLeft <= $product->expiry_warning_days)<span class="badge text-bg-warning">เหลือ {{ $daysLeft }} วัน</span>
                                 @else<span class="badge text-bg-success">ปกติ</span>@endif
+                                @if($lot->quality_reason)<div class="small text-muted mt-1">{{ $lot->quality_reason }}</div>@endif
+                            </td>
+                            <td style="min-width:280px">
+                                <a href="{{ route('products.lots.trace', [$product, $lot]) }}" class="btn btn-sm btn-outline-primary mb-1"><i class="bi bi-diagram-3"></i> Trace</a>
+                                <form method="post" action="{{ route('products.lots.quality', [$product, $lot]) }}" class="d-flex gap-1">@csrf @method('PUT')
+                                    <select name="quality_status" class="form-select form-select-sm" aria-label="สถานะคุณภาพ Lot">
+                                        <option value="available" @selected($lot->quality_status === 'available')>พร้อมใช้</option>
+                                        <option value="hold" @selected($lot->quality_status === 'hold')>พักตรวจ</option>
+                                        <option value="quarantine" @selected($lot->quality_status === 'quarantine')>กักกัน</option>
+                                        <option value="recalled" @selected($lot->quality_status === 'recalled')>เรียกคืน</option>
+                                    </select>
+                                    <input name="quality_reason" value="{{ $lot->quality_reason }}" class="form-control form-control-sm" placeholder="เหตุผล">
+                                    <button class="btn btn-sm btn-primary" title="บันทึกสถานะ"><i class="bi bi-check-lg"></i></button>
+                                </form>
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="text-center text-muted py-3">ยังไม่มี Lot คงเหลือ</td></tr>
+                        <tr><td colspan="8" class="text-center text-muted py-3">ยังไม่มี Lot คงเหลือ</td></tr>
                     @endforelse
                     </tbody>
                 </table>
@@ -596,6 +617,18 @@
                             <div class="col-md-3">
                                 <label class="form-label text-muted small">เตือนก่อนหมดอายุ (วัน)</label>
                                 <input type="number" min="0" max="3650" name="expiry_warning_days" value="{{ $product->expiry_warning_days }}" class="form-control">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-muted small">อายุสินค้านับจากวันผลิต (วัน)</label>
+                                <input type="number" min="1" max="36500" name="shelf_life_days" value="{{ $product->shelf_life_days }}" class="form-control">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-muted small">เริ่มระบายก่อนหมดอายุ (วัน)</label>
+                                <input type="number" min="0" max="3650" name="clearance_warning_days" value="{{ $product->clearance_warning_days }}" class="form-control">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-muted small">ส่วนลดระบายแนะนำ (%)</label>
+                                <input type="number" step="0.01" min="0" max="100" name="clearance_discount_percent" value="{{ $product->clearance_discount_percent }}" class="form-control">
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label text-muted small">เมื่อ Lot หมดอายุ</label>

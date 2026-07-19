@@ -3,7 +3,7 @@
 @section('page-title', 'ใบขอซื้อ / ใบสั่งซื้อ ' . $purchaseOrder->doc_number)
 @section('page-subtitle', $purchaseOrder->statusLabel())
 @section('content')
-<div x-data="{ orderOpen: false }">
+<div x-data="{ orderOpen: false, receiveOpen: false }">
     <a href="{{ route('purchase-orders.index') }}" class="text-decoration-none small d-inline-block mb-3"><i class="bi bi-arrow-left me-1"></i>กลับรายการ</a>
 
     {{-- แถบสถานะ workflow --}}
@@ -23,11 +23,15 @@
 
             <div class="ms-auto d-flex gap-2">
                 @if($purchaseOrder->status === 'requested')
+                    @if(auth()->user()->hasPermission('purchasing.approve') && $purchaseOrder->requested_by !== auth()->id())
                     <form method="post" action="{{ route('purchase-orders.approve', $purchaseOrder) }}" onsubmit="return confirm('อนุมัติใบขอซื้อนี้?')">@csrf<button class="btn btn-info text-white"><i class="bi bi-check2-circle me-1"></i>อนุมัติ</button></form>
+                    @else
+                    <span class="badge text-bg-light border align-self-center">รอผู้อนุมัติคนอื่น</span>
+                    @endif
                 @elseif($purchaseOrder->status === 'approved')
                     <button type="button" class="btn btn-primary" @click="orderOpen = true"><i class="bi bi-cart-check me-1"></i>ยืนยันสั่งซื้อ</button>
                 @elseif($purchaseOrder->status === 'ordered')
-                    <form method="post" action="{{ route('purchase-orders.receive', $purchaseOrder) }}" onsubmit="return confirm('รับของเข้าคลัง? จะสร้างใบซื้อจริง ตัดสต๊อกและตั้งหนี้ทันที')">@csrf<button class="btn btn-success"><i class="bi bi-box-arrow-in-down me-1"></i>รับของเข้าคลัง</button></form>
+                    <button type="button" class="btn btn-success" @click="receiveOpen = true"><i class="bi bi-box-arrow-in-down me-1"></i>รับของเข้าคลัง</button>
                 @endif
                 @if(!in_array($purchaseOrder->status, ['received', 'cancelled']))
                     <form method="post" action="{{ route('purchase-orders.cancel', $purchaseOrder) }}" onsubmit="return confirm('ยกเลิกใบขอซื้อนี้?')">@csrf<button class="btn btn-light border text-danger">ยกเลิก</button></form>
@@ -113,6 +117,40 @@
                 <div class="d-flex justify-content-end gap-2 px-4 pb-4">
                     <button type="button" class="btn btn-light border px-4" @click="orderOpen = false">ยกเลิก</button>
                     <button type="submit" class="btn btn-primary px-5"><i class="bi bi-cart-check me-1"></i>ยืนยันสั่งซื้อ</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="po-backdrop" x-show="receiveOpen" x-cloak x-transition.opacity @keydown.escape.window="receiveOpen = false">
+        <div class="po-modal" @click.outside="receiveOpen = false" x-transition>
+            <div class="d-flex justify-content-between align-items-center px-4 pt-4 pb-2">
+                <h3 class="h5 fw-bold mb-0">รับสินค้าเข้าคลัง</h3>
+                <button type="button" class="btn btn-light rounded-circle" @click="receiveOpen = false"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <form method="post" action="{{ route('purchase-orders.receive', $purchaseOrder) }}">
+                @csrf
+                <div class="px-4 pb-3">
+                    <p class="small text-muted">ระบุ Lot และวันของสินค้าที่ควบคุมอายุ ระบบจะคำนวณวันหมดอายุให้อัตโนมัติเมื่อสินค้าได้ตั้งอายุไว้</p>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead><tr><th>สินค้า</th><th>Lot</th><th>วันผลิต</th><th>วันหมดอายุ</th></tr></thead>
+                            <tbody>
+                            @foreach($purchaseOrder->items as $item)
+                                <tr>
+                                    <td class="small">{{ $item->product->sku_code }}<br>{{ $item->product->name_th }} @if($item->product->tracks_expiry)<span class="badge text-bg-warning">คุมอายุ</span>@endif</td>
+                                    <td><input name="lots[{{ $item->id }}][lot_number]" class="form-control form-control-sm"></td>
+                                    <td><input type="date" name="lots[{{ $item->id }}][manufacture_date]" class="form-control form-control-sm"></td>
+                                    <td><input type="date" name="lots[{{ $item->id }}][expiry_date]" class="form-control form-control-sm" @required($item->product->tracks_expiry && !$item->product->shelf_life_days)></td>
+                                </tr>
+                            @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-end gap-2 px-4 pb-4">
+                    <button type="button" class="btn btn-light border" @click="receiveOpen = false">ยกเลิก</button>
+                    <button class="btn btn-success" onclick="return confirm('ยืนยันรับสินค้าเข้าคลังและสร้างเจ้าหนี้?')"><i class="bi bi-check2-circle me-1"></i>ยืนยันรับสินค้า</button>
                 </div>
             </form>
         </div>

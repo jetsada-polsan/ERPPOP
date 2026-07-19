@@ -120,6 +120,7 @@ class WarehouseMobileController extends Controller
             'items.*.qty' => ['required', 'numeric', 'gt:0'],
             'items.*.unit_price' => ['required', 'numeric', 'gte:0'],
             'items.*.lot_number' => ['nullable', 'string', 'max:64'],
+            'items.*.manufacture_date' => ['nullable', 'date'],
             'items.*.expiry_date' => ['nullable', 'date'],
         ]);
 
@@ -138,6 +139,7 @@ class WarehouseMobileController extends Controller
                     'qty' => (float) $item['qty'],
                     'unit_price' => (float) $item['unit_price'],
                     'lot_number' => $item['lot_number'] ?? null,
+                    'manufacture_date' => $item['manufacture_date'] ?? null,
                     'expiry_date' => $item['expiry_date'] ?? null,
                 ], $data['items']),
             ]);
@@ -183,7 +185,7 @@ class WarehouseMobileController extends Controller
     public function purchaseOrderDetail(PurchaseOrder $purchaseOrder): JsonResponse
     {
         $this->guardPoBranch($purchaseOrder);
-        $purchaseOrder->load(['supplier:id,name_th', 'items.product:id,sku_code,name_th']);
+        $purchaseOrder->load(['supplier:id,name_th', 'items.product:id,sku_code,name_th,tracks_expiry,shelf_life_days']);
 
         return response()->json([
             'id' => $purchaseOrder->id,
@@ -197,18 +199,27 @@ class WarehouseMobileController extends Controller
                 'name_th' => $i->product?->name_th,
                 'qty' => (float) $i->qty,
                 'unit_price' => (float) $i->unit_price,
+                'tracks_expiry' => (bool) $i->product?->tracks_expiry,
+                'shelf_life_days' => $i->product?->shelf_life_days,
             ]),
         ]);
     }
 
     /** รับของทั้งใบตาม PO (logic เดียวกับ PurchaseOrderController::receive แต่ตอบ JSON) */
-    public function purchaseOrderReceive(PurchaseOrder $purchaseOrder, PurchaseService $service): JsonResponse
+    public function purchaseOrderReceive(Request $request, PurchaseOrder $purchaseOrder, PurchaseService $service): JsonResponse
     {
         $this->guardPoBranch($purchaseOrder);
         if ($purchaseOrder->status !== 'ordered') {
             return response()->json(['message' => 'ต้องสั่งซื้อก่อนรับของ'], 422);
         }
-        $purchaseOrder->loadMissing('items');
+        $purchaseOrder->loadMissing('items.product');
+        $received = collect($request->validate([
+            'items' => ['nullable', 'array'],
+            'items.*.product_id' => ['required', 'integer'],
+            'items.*.lot_number' => ['nullable', 'string', 'max:80'],
+            'items.*.manufacture_date' => ['nullable', 'date'],
+            'items.*.expiry_date' => ['nullable', 'date'],
+        ])['items'] ?? [])->keyBy('product_id');
 
         try {
             $document = $service->create([
@@ -220,6 +231,9 @@ class WarehouseMobileController extends Controller
                     'product_id' => $i->product_id,
                     'qty' => (float) $i->qty,
                     'unit_price' => (float) $i->unit_price,
+                    'lot_number' => $received->get($i->product_id)['lot_number'] ?? null,
+                    'manufacture_date' => $received->get($i->product_id)['manufacture_date'] ?? null,
+                    'expiry_date' => $received->get($i->product_id)['expiry_date'] ?? null,
                 ])->all(),
             ]);
         } catch (RuntimeException $e) {
@@ -251,6 +265,7 @@ class WarehouseMobileController extends Controller
             'sku_code' => $product->sku_code,
             'name_th' => $product->name_th,
             'tracks_expiry' => (bool) $product->tracks_expiry,
+            'shelf_life_days' => $product->shelf_life_days,
             'unit_label' => $unitLabel ?: $product->baseUnit?->displayLabel() ?: 'หน่วย',
             'unit_factor' => $factor,
             'base_unit_label' => $product->baseUnit?->displayLabel() ?: 'หน่วย',

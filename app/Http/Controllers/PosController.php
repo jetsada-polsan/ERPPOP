@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AppSetting;
 use App\Models\Branch;
 use App\Models\DiscountCard;
 use App\Models\Document;
@@ -12,9 +13,11 @@ use App\Models\PosReceipt;
 use App\Models\PosReceiptItem;
 use App\Models\PosShift;
 use App\Models\PosTerminal;
+use App\Models\PriceTable;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\ProductPrice;
+use App\Models\ProductUnit;
 use App\Models\Promotion;
 use App\Models\QrPaymentConfig;
 use App\Models\QtyPromotion;
@@ -22,10 +25,11 @@ use App\Models\Salesman;
 use App\Models\StockBalance;
 use App\Models\StockDocument;
 use App\Models\StockMovement;
+use App\Services\Accounting\GlPostingService;
 use App\Services\Sales\CashSaleService;
 use App\Services\Sales\MemberPointService;
 use App\Services\Sales\PosPaymentValidator;
-use App\Services\Accounting\GlPostingService;
+use App\Services\Sales\PosPricingGuard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -58,12 +62,12 @@ class PosController extends Controller
 
         // ข้อมูลออกใบกำกับภาษีอย่างย่อ (มาตรา 86/6): ชื่อ+เลขภาษีผู้ขาย + อัตรา VAT
         $company = [
-            'name' => \App\Models\AppSetting::company('name_th'),
-            'tax_id' => \App\Models\AppSetting::company('tax_id'),
-            'address' => \App\Models\AppSetting::company('address'),
-            'phone' => \App\Models\AppSetting::company('phone'),
+            'name' => AppSetting::company('name_th'),
+            'tax_id' => AppSetting::company('tax_id'),
+            'address' => AppSetting::company('address'),
+            'phone' => AppSetting::company('phone'),
         ];
-        $vatRate = (float) (\Illuminate\Support\Facades\DB::table('vat_rates')
+        $vatRate = (float) (DB::table('vat_rates')
             ->where('effective_from', '<=', now()->toDateString())
             ->where(fn ($w) => $w->whereNull('effective_to')->orWhere('effective_to', '>=', now()->toDateString()))
             ->orderByDesc('effective_from')->value('rate_percent') ?? 7.0);
@@ -154,7 +158,7 @@ class PosController extends Controller
         // สาขาที่ตารางตัวเองมีสินค้าไม่ครบ (ดอนกลาง/วาริน/ปลาดุก) จะได้ราคาจากตารางหลัก
         // ไม่ตกไป 1.00 บาท. ป้ายเครื่องชั่ง = ราคาขายปลีกตารางนี้เช่นกัน.
         $branch = $branchId ? Branch::find($branchId) : null;
-        $defaultTableId = \App\Models\PriceTable::where('is_default', true)->value('id');
+        $defaultTableId = PriceTable::where('is_default', true)->value('id');
         // ราคาปกติกลางใช้ร่วมกันทุก POS ทุกสาขา ราคาที่ต่างตามสาขาต้องทำผ่าน
         // โปรโมชั่น/นาทีทองที่มีช่วงเวลาเท่านั้น เพื่อไม่ให้ราคาปกติแต่ละสาขาสับสนกัน.
         $branchTableId = null;
@@ -185,7 +189,7 @@ class PosController extends Controller
                 ->groupBy('product_id');
 
         // ตัวคูณหน่วย (id -> qty_per_base_unit) ใช้เลือก "ราคาหน่วยฐาน" เมื่อไม่มีราคา unit_id=null
-        $unitFactors = \App\Models\ProductUnit::pluck('qty_per_base_unit', 'id');
+        $unitFactors = ProductUnit::pluck('qty_per_base_unit', 'id');
 
         $products = $products->map(function ($p) use ($priceRows, $q, $exact, $branchTableId, $defaultTableId, $unitFactors) {
             $matchedBarcode = $exact && $q !== ''
@@ -436,6 +440,7 @@ class PosController extends Controller
         CashSaleService $service,
         MemberPointService $points,
         PosPaymentValidator $paymentValidator,
+        PosPricingGuard $pricingGuard,
     ): JsonResponse {
         $data = $request->validate([
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
@@ -452,6 +457,7 @@ class PosController extends Controller
             'cash_amount' => ['nullable', 'numeric', 'min:0'],
             'transfer_amount' => ['nullable', 'numeric', 'min:0'],
             'discount_amount' => ['nullable', 'numeric', 'min:0'],
+            'manual_discount_amount' => ['nullable', 'numeric', 'min:0'],
             'discount_card_code' => ['nullable', 'string', 'max:30'],
             'vat_amount' => ['nullable', 'numeric', 'min:0'],
             'vat_mode' => ['nullable', 'string', 'in:included,excluded'],
@@ -459,6 +465,7 @@ class PosController extends Controller
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'items.*.qty' => ['required', 'numeric', 'min:0.0001'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'items.*.barcode' => ['nullable', 'string', 'max:50'],
             'allow_negative_stock' => ['nullable', 'boolean'],
         ]);
 
@@ -471,6 +478,8 @@ class PosController extends Controller
         }
 
         try {
+            $pricingGuard->validate($data, auth()->user());
+            $data['items'] = $pricingGuard->normalizeItems($data['items']);
             $paymentValidator->validate($data);
         } catch (RuntimeException $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
@@ -503,7 +512,7 @@ class PosController extends Controller
                 return response()->json(['success' => false, 'message' => 'ต้องเลือกสมาชิกก่อนจึงจะแลกแต้มได้'], 422);
             }
             if ((float) $member->points < $redeemPoints) {
-                return response()->json(['success' => false, 'message' => 'แต้มสะสมไม่พอ (คงเหลือ ' . number_format((float) $member->points, 2) . ' แต้ม)'], 422);
+                return response()->json(['success' => false, 'message' => 'แต้มสะสมไม่พอ (คงเหลือ '.number_format((float) $member->points, 2).' แต้ม)'], 422);
             }
             if ($points->pointValueBaht() <= 0) {
                 return response()->json(['success' => false, 'message' => 'ระบบยังไม่เปิดให้แลกแต้มเป็นส่วนลด'], 422);
@@ -517,32 +526,32 @@ class PosController extends Controller
             'mixed' => 'เงินสด+โอน',
             default => 'เช็ค',
         };
-        $remarkParts = ['POS: ' . $methodText];
+        $remarkParts = ['POS: '.$methodText];
         if ($data['method'] === 'mixed') {
-            $remarkParts[] = 'เงินสด: ' . number_format((float) ($data['cash_amount'] ?? 0), 2)
-                . ' | โอน: ' . number_format((float) ($data['transfer_amount'] ?? 0), 2);
+            $remarkParts[] = 'เงินสด: '.number_format((float) ($data['cash_amount'] ?? 0), 2)
+                .' | โอน: '.number_format((float) ($data['transfer_amount'] ?? 0), 2);
         }
         if (in_array($data['method'], ['transfer', 'mixed'], true)) {
             $remarkParts[] = 'ตรวจเงินเข้าแล้ว';
         }
         if (! empty($data['payment_ref'])) {
-            $remarkParts[] = 'อ้างอิง: ' . $data['payment_ref'];
+            $remarkParts[] = 'อ้างอิง: '.$data['payment_ref'];
         }
         if (! empty($data['discount_amount'])) {
-            $remarkParts[] = 'ส่วนลด: ' . number_format((float) $data['discount_amount'], 2);
+            $remarkParts[] = 'ส่วนลด: '.number_format((float) $data['discount_amount'], 2);
         }
         if ($discountCard) {
-            $remarkParts[] = 'บัตรส่วนลด: ' . $discountCard->card_code;
+            $remarkParts[] = 'บัตรส่วนลด: '.$discountCard->card_code;
         }
         if ($member) {
-            $remarkParts[] = 'สมาชิก: ' . $member->member_code;
+            $remarkParts[] = 'สมาชิก: '.$member->member_code;
         }
         if ($redeemPoints > 0) {
-            $remarkParts[] = 'แลกแต้ม: ' . number_format($redeemPoints, 2);
+            $remarkParts[] = 'แลกแต้ม: '.number_format($redeemPoints, 2);
         }
         if (! empty($data['vat_amount'])) {
             $vatMode = ($data['vat_mode'] ?? 'included') === 'excluded' ? 'แยก VAT' : 'รวม VAT';
-            $remarkParts[] = $vatMode . ': ' . number_format((float) $data['vat_amount'], 2);
+            $remarkParts[] = $vatMode.': '.number_format((float) $data['vat_amount'], 2);
         }
 
         try {
@@ -674,7 +683,7 @@ class PosController extends Controller
                         $document->forceFill([
                             'status' => 'cancelled',
                             'cancelled_at' => now(),
-                            'remark' => trim(($document->remark ? $document->remark . ' | ' : '') . 'POS void: ' . $data['reason']),
+                            'remark' => trim(($document->remark ? $document->remark.' | ' : '').'POS void: '.$data['reason']),
                         ])->save();
 
                         $this->restoreStockForVoidedDocument($document);
@@ -736,8 +745,8 @@ class PosController extends Controller
         $branch = Branch::findOrFail($branchId);
 
         return PosTerminal::firstOrCreate(
-            ['code' => 'WEB-' . $branch->code],
-            ['branch_id' => $branchId, 'name' => 'JET POS ' . $branch->code]
+            ['code' => 'WEB-'.$branch->code],
+            ['branch_id' => $branchId, 'name' => 'JET POS '.$branch->code]
         );
     }
 
@@ -745,22 +754,22 @@ class PosController extends Controller
     {
         $branchCode = Branch::find($branchId)?->code ?? sprintf('%04d', $branchId);
 
-        return 'SHIFT-' . $branchCode . '-' . now()->format('Ymd-His');
+        return 'SHIFT-'.$branchCode.'-'.now()->format('Ymd-His');
     }
 
     private function nextPosReceiptNo(PosShift $shift): string
     {
         $rawBranchCode = $shift->branch?->code ?? Branch::find($shift->branch_id)?->code ?? sprintf('%04d', $shift->branch_id);
         $branchCode = substr(preg_replace('/[^A-Za-z0-9]/', '', (string) $rawBranchCode) ?: sprintf('%04d', $shift->branch_id), 0, 8);
-        $prefix = 'CS' . $branchCode . now()->format('Ymd');
+        $prefix = 'CS'.$branchCode.now()->format('Ymd');
         $lastReceiptNo = PosReceipt::where('pos_terminal_id', $shift->pos_terminal_id)
-            ->where('receipt_no', 'like', $prefix . '%')
+            ->where('receipt_no', 'like', $prefix.'%')
             ->orderByDesc('receipt_no')
             ->lockForUpdate()
             ->value('receipt_no');
         $sequence = $lastReceiptNo ? ((int) substr($lastReceiptNo, -3)) + 1 : 1;
 
-        return $prefix . sprintf('%03d', $sequence);
+        return $prefix.sprintf('%03d', $sequence);
     }
 
     private function recordPosReceipt(PosShift $shift, string $receiptNo, array $data, int $documentId): PosReceipt

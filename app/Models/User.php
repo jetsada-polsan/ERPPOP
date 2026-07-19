@@ -7,6 +7,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -19,7 +20,7 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
-    public function branch(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);
     }
@@ -34,7 +35,7 @@ class User extends Authenticatable
         return $this->branch_id;
     }
 
-    public function salesman(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function salesman(): BelongsTo
     {
         return $this->belongsTo(Salesman::class);
     }
@@ -57,7 +58,9 @@ class User extends Authenticatable
 
     // สิทธิ์ที่ superadmin bypass ห้ามแตะ - ต้องถือจริงเท่านั้น (ควบคุมภายใน POS):
     // ขาย/ยกเลิกบิลหน้าร้าน ต้องเป็นแคชเชียร์/ผู้อนุมัติตัวจริง แม้แต่ GM ก็ทำแทนไม่ได้
-    private const NON_BYPASS_PERMISSIONS = ['pos.sell', 'pos.void'];
+    private const NON_BYPASS_PERMISSIONS = [
+        'pos.sell', 'pos.void', 'pos.discount.override', 'pos.sell_below_cost', 'purchasing.approve',
+    ];
 
     public function hasPermission(string $code): bool
     {

@@ -51,6 +51,7 @@ class RoutePermissions
         // จัดซื้อ
         'purchases.' => 'purchasing.manage',
         'purchase-orders.' => 'purchasing.manage',
+        'purchase-orders.approve' => 'purchasing.approve',
         'suppliers.' => 'purchasing.manage',
         'bplus.purchase-planning' => 'purchasing.manage',
 

@@ -45,6 +45,7 @@ class PurchaseController extends Controller
             'items.*.qty' => ['required', 'numeric', 'min:0.0001'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'items.*.lot_number' => ['nullable', 'string', 'max:80'],
+            'items.*.manufacture_date' => ['nullable', 'date'],
             'items.*.expiry_date' => ['nullable', 'date'],
         ]);
         $data['is_credit'] = $request->boolean('is_credit', true);

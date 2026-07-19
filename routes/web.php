@@ -233,6 +233,8 @@ Route::prefix('products')->name('products.')->group(function () {
     Route::post('/', [ProductController::class, 'store'])->name('store');
     Route::get('/{product}', [ProductController::class, 'show'])->name('show');
     Route::put('/{product}', [ProductController::class, 'update'])->name('update');
+    Route::get('/{product}/lots/{stockLot}/trace', [ProductController::class, 'lotTrace'])->name('lots.trace');
+    Route::put('/{product}/lots/{stockLot}/quality', [ProductController::class, 'updateLotQuality'])->name('lots.quality');
     Route::post('/{product}/barcodes', [ProductController::class, 'addBarcode'])->name('barcodes.store');
     Route::put('/{product}/barcodes/{productBarcode}', [ProductController::class, 'updateBarcode'])->name('barcodes.update');
     Route::post('/{product}/prices', [ProductController::class, 'upsertPrice'])->name('prices.upsert');

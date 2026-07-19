@@ -3238,6 +3238,7 @@ function posApp() {
                     product_id: line.item.id,
                     qty: line.qty,
                     unit_price: this.roundMoney(payableLine / line.qty),
+                    barcode: line.item.matched_barcode || null,
                 };
             });
         },
@@ -3293,6 +3294,7 @@ function posApp() {
                 cash_received: this.method === 'cash' ? this.received : null,
                 change_amount: this.method === 'cash' ? this.cashChangeAmount : null,
                 discount_amount: this.totalDiscount,
+                manual_discount_amount: this.roundMoney(this.itemDiscountTotal + this.billDiscountAmount),
                 discount_card_code: this.appliedCard?.card_code || null,
                 vat_amount: this.vatAmount,
                 vat_mode: this.vatMode,

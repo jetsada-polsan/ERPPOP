@@ -101,13 +101,14 @@ class DashboardController extends Controller
             ->when($branchId, fn ($query) => $query->where('w.branch_id', $branchId))
             ->where('p.tracks_expiry', true)->where('sl.remaining_qty', '>', 0)
             ->orderByRaw('CASE WHEN sl.expiry_date IS NULL THEN 0 ELSE 1 END')->orderBy('sl.expiry_date')
-            ->get(['p.sku_code', 'p.name_th', 'sl.lot_number', 'sl.expiry_date', 'sl.remaining_qty', 'p.expiry_warning_days'])
+            ->get(['p.sku_code', 'p.name_th', 'sl.lot_number', 'sl.expiry_date', 'sl.remaining_qty', 'sl.quality_status', 'p.expiry_warning_days'])
             ->map(function ($lot) {
                 $lot->days_left = $lot->expiry_date ? today()->diffInDays(Carbon::parse($lot->expiry_date), false) : null;
 
                 return $lot;
             })
-            ->filter(fn ($lot) => $lot->days_left === null || $lot->days_left <= (int) $lot->expiry_warning_days)
+            ->filter(fn ($lot) => $lot->quality_status !== 'available'
+                || $lot->days_left === null || $lot->days_left <= (int) $lot->expiry_warning_days)
             ->take(20)->values();
 
         $pendingBatches = DB::table('import_batches')

@@ -130,7 +130,7 @@ function docEntryPage(config) {
         partyQuery: '',
         partyId: '',
         partyResults: [],
-        items: [{ product_id: '', productQuery: '', qty: 1, unit_price: 0, lot_number: '', expiry_date: '', tracks_expiry: false, results: [] }],
+        items: [{ product_id: '', productQuery: '', qty: 1, unit_price: 0, lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, results: [] }],
         openModal() { this.modalOpen = true; },
         closeModal() { this.modalOpen = false; },
         async searchParty() {
@@ -144,7 +144,7 @@ function docEntryPage(config) {
             this.partyQuery = `${party.code} - ${party.name_th}`;
             this.partyResults = [];
         },
-        addItem() { this.items.push({ product_id: '', productQuery: '', qty: 1, unit_price: 0, lot_number: '', expiry_date: '', tracks_expiry: false, results: [] }); },
+        addItem() { this.items.push({ product_id: '', productQuery: '', qty: 1, unit_price: 0, lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, results: [] }); },
         removeItem(index) { this.items.splice(index, 1); },
         async searchProducts(index) {
             const query = this.items[index].productQuery;
@@ -157,7 +157,15 @@ function docEntryPage(config) {
             this.items[index].productQuery = `${product.sku_code} - ${product.name_th}`;
             this.items[index].unit_price = Number(product.default_price || 0);
             this.items[index].tracks_expiry = Boolean(product.tracks_expiry);
+            this.items[index].shelf_life_days = product.shelf_life_days;
             this.items[index].results = [];
+        },
+        calculateExpiry(index) {
+            const item = this.items[index];
+            if (!item.manufacture_date || !item.shelf_life_days) return;
+            const expiry = new Date(item.manufacture_date + 'T00:00:00');
+            expiry.setDate(expiry.getDate() + Number(item.shelf_life_days));
+            item.expiry_date = expiry.toISOString().slice(0, 10);
         },
         get totalQty() { return this.items.reduce((sum, item) => sum + (Number(item.qty) || 0), 0); },
         get totalAmount() { return this.items.reduce((sum, item) => sum + (Number(item.qty) || 0) * (Number(item.unit_price) || 0), 0); },

@@ -11,7 +11,7 @@ use RuntimeException;
 
 class FifoStockService
 {
-    public function receive(int $productId, int $locationId, float $qty, ?int $documentId, string $movementType = 'in', ?string $lotNumber = null, ?string $receivedDate = null, ?string $expiryDate = null, float $unitCost = 0): StockLot
+    public function receive(int $productId, int $locationId, float $qty, ?int $documentId, string $movementType = 'in', ?string $lotNumber = null, ?string $receivedDate = null, ?string $expiryDate = null, float $unitCost = 0, ?string $manufactureDate = null): StockLot
     {
         $date = $receivedDate ?: now()->toDateString();
         $lot = StockLot::create([
@@ -20,6 +20,7 @@ class FifoStockService
             'source_document_id' => $documentId,
             'lot_number' => $lotNumber ?: ($documentId ? 'DOC-'.$documentId : 'LOT-'.now()->format('YmdHis')),
             'received_date' => $date,
+            'manufacture_date' => $manufactureDate,
             'expiry_date' => $expiryDate,
             'initial_qty' => $qty,
             'remaining_qty' => $qty,
@@ -33,7 +34,7 @@ class FifoStockService
     }
 
     /** @return Collection<int, array{lot:StockLot,qty:float}> */
-    public function issue(int $productId, int $locationId, float $qty, ?int $documentId, string $movementType = 'out', ?string $movementDate = null, bool $allowNegative = false, bool $allowExpired = false): Collection
+    public function issue(int $productId, int $locationId, float $qty, ?int $documentId, string $movementType = 'out', ?string $movementDate = null, bool $allowNegative = false, bool $allowExpired = false, bool $allowRestricted = false): Collection
     {
         $balance = $this->balance($productId, $locationId);
         $available = (float) $balance->on_hand_qty;
@@ -50,10 +51,25 @@ class FifoStockService
         $lotsQuery = StockLot::where('product_id', $productId)
             ->where('warehouse_location_id', $locationId)
             ->where('remaining_qty', '>', 0);
+        if (! $allowRestricted) {
+            $lotsQuery->where('quality_status', 'available');
+            $usable = (float) (clone $lotsQuery)->sum('remaining_qty');
+            $restricted = (float) StockLot::where('product_id', $productId)
+                ->where('warehouse_location_id', $locationId)
+                ->where('remaining_qty', '>', 0)->where('quality_status', '!=', 'available')
+                ->sum('remaining_qty');
+            if ($restricted > 0.0001 && $qty > $usable + 0.0001) {
+                throw new RuntimeException('สต๊อกที่ใช้ได้ไม่พอ เนื่องจากมี Lot ถูกพักตรวจ กักกัน หรือเรียกคืน');
+            }
+        }
         if ($blockExpired) {
             $lotsQuery->where(fn ($query) => $query->whereNull('expiry_date')->orWhereDate('expiry_date', '>=', now()->toDateString()));
             $sellable = (float) (clone $lotsQuery)->sum('remaining_qty');
-            if (! $allowNegative && $qty > $sellable + 0.0001) {
+            $expired = (float) StockLot::where('product_id', $productId)
+                ->where('warehouse_location_id', $locationId)
+                ->where('remaining_qty', '>', 0)->whereDate('expiry_date', '<', now()->toDateString())
+                ->sum('remaining_qty');
+            if ($expired > 0.0001 && $qty > $sellable + 0.0001) {
                 throw new RuntimeException('สต๊อกที่ขายได้ไม่พอ เนื่องจากมี Lot หมดอายุถูกระงับ กรุณาตัดเป็นสินค้าชำรุด');
             }
         }

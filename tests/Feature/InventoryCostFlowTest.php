@@ -171,6 +171,55 @@ class InventoryCostFlowTest extends TestCase
         $fifo->issue($product->id, $locationId, 5, null);
     }
 
+    public function test_quality_hold_blocks_normal_issue_but_allows_damage_clearance(): void
+    {
+        [$branch, $supplier, $product] = $this->masters();
+        $fifo = app(FifoStockService::class);
+        $locationId = (int) $branch->default_warehouse_location_id;
+        $lot = $fifo->receive($product->id, $locationId, 4, null);
+        $lot->update(['quality_status' => 'quarantine', 'quality_reason' => 'รอตรวจจุลินทรีย์']);
+
+        try {
+            $fifo->issue($product->id, $locationId, 1, null);
+            $this->fail('A quarantined lot must not be issued normally.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('Lot ถูกพักตรวจ กักกัน หรือเรียกคืน', $exception->getMessage());
+        }
+
+        $allocation = $fifo->issue(
+            $product->id, $locationId, 1, null,
+            allowExpired: true, allowRestricted: true
+        );
+        $this->assertSame($lot->id, $allocation->first()['lot']->id);
+        $this->assertSame(3.0, (float) $lot->fresh()->remaining_qty);
+    }
+
+    public function test_purchase_derives_expiry_from_manufacture_date_and_shelf_life(): void
+    {
+        [$branch, $supplier, $product] = $this->masters();
+        $product->update(['tracks_expiry' => true, 'shelf_life_days' => 30]);
+
+        $document = app(PurchaseService::class)->create([
+            'supplier_id' => $supplier->id,
+            'branch_id' => $branch->id,
+            'is_credit' => false,
+            'items' => [[
+                'product_id' => $product->id,
+                'qty' => 2,
+                'unit_price' => 100,
+                'lot_number' => 'MFG-001',
+                'manufacture_date' => '2026-07-01',
+            ]],
+        ]);
+
+        $line = $document->stockDocument->items->first();
+        $lot = $product->stockLots()->first();
+        $this->assertSame('2026-07-31', $line->expire_date->toDateString());
+        $this->assertSame('2026-07-01', $line->manufacture_date->toDateString());
+        $this->assertSame('2026-07-31', $lot->expiry_date->toDateString());
+        $this->assertSame('2026-07-01', $lot->manufacture_date->toDateString());
+    }
+
     /** @return array{Branch,Supplier,Product,Product} */
     private function masters(): array
     {

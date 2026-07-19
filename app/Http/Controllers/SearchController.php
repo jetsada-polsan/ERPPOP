@@ -53,7 +53,7 @@ class SearchController extends Controller
             ->orderByRaw('case when sku_code = ? then 0 when sku_code ilike ? then 1 else 2 end', [$q, $q.'%'])
             ->orderBy('name_th')
             ->limit(20)
-            ->get(['id', 'sku_code', 'name_th', 'base_unit_id', 'default_price', 'average_cost', 'tracks_expiry'])
+            ->get(['id', 'sku_code', 'name_th', 'base_unit_id', 'default_price', 'average_cost', 'tracks_expiry', 'shelf_life_days'])
             ->map(fn (Product $product) => [
                 'id' => $product->id,
                 'sku_code' => $product->sku_code,
@@ -61,6 +61,7 @@ class SearchController extends Controller
                 'default_price' => (float) ($product->default_price ?? 0),
                 'average_cost' => (float) ($product->average_cost ?? 0),
                 'tracks_expiry' => $product->tracks_expiry,
+                'shelf_life_days' => $product->shelf_life_days,
                 'unit_name' => $product->baseUnit?->displayLabel() ?? '-',
                 'barcode' => $product->barcodes->first()?->barcode,
             ]);

@@ -189,6 +189,18 @@
                                 <input type="number" min="0" max="3650" name="expiry_warning_days" value="30" class="form-control">
                             </div>
                             <div class="col-md-3">
+                                <label class="form-label text-muted small">อายุสินค้านับจากวันผลิต (วัน)</label>
+                                <input type="number" min="1" max="36500" name="shelf_life_days" class="form-control">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-muted small">เริ่มระบายก่อนหมดอายุ (วัน)</label>
+                                <input type="number" min="0" max="3650" name="clearance_warning_days" value="7" class="form-control">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-muted small">ส่วนลดระบายแนะนำ (%)</label>
+                                <input type="number" step="0.01" min="0" max="100" name="clearance_discount_percent" value="0" class="form-control">
+                            </div>
+                            <div class="col-md-3">
                                 <label class="form-label text-muted small">เมื่อ Lot หมดอายุ</label>
                                 <select name="expiry_sale_policy" class="form-select" required>
                                     <option value="block">ห้ามขาย/ห้ามใช้</option>

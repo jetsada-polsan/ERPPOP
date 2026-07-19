@@ -110,6 +110,7 @@ class PurchaseOrderController extends Controller
     public function approve(PurchaseOrder $purchaseOrder): RedirectResponse
     {
         abort_unless($purchaseOrder->status === 'requested', 422, 'สถานะไม่ถูกต้อง');
+        abort_if($purchaseOrder->requested_by === Auth::id(), 403, 'ผู้ขอซื้อไม่สามารถอนุมัติรายการของตนเอง');
         $purchaseOrder->update(['status' => 'approved', 'approved_by' => Auth::id(), 'approved_at' => now()]);
 
         return back()->with('success', "อนุมัติใบขอซื้อ {$purchaseOrder->doc_number} แล้ว");
@@ -148,10 +149,16 @@ class PurchaseOrderController extends Controller
     }
 
     // รับของ -> สร้างใบซื้อจริง (ตัดสต๊อก+ตั้งหนี้+GL) ผ่าน PurchaseService
-    public function receive(PurchaseOrder $purchaseOrder, PurchaseService $service): RedirectResponse
+    public function receive(Request $request, PurchaseOrder $purchaseOrder, PurchaseService $service): RedirectResponse
     {
         abort_unless($purchaseOrder->status === 'ordered', 422, 'ต้องสั่งซื้อก่อนรับของ');
-        $purchaseOrder->loadMissing('items');
+        $purchaseOrder->loadMissing('items.product');
+        $lots = $request->validate([
+            'lots' => ['nullable', 'array'],
+            'lots.*.lot_number' => ['nullable', 'string', 'max:80'],
+            'lots.*.manufacture_date' => ['nullable', 'date'],
+            'lots.*.expiry_date' => ['nullable', 'date'],
+        ])['lots'] ?? [];
 
         try {
             $document = $service->create([
@@ -163,6 +170,9 @@ class PurchaseOrderController extends Controller
                     'product_id' => $i->product_id,
                     'qty' => (float) $i->qty,
                     'unit_price' => (float) $i->unit_price,
+                    'lot_number' => $lots[$i->id]['lot_number'] ?? null,
+                    'manufacture_date' => $lots[$i->id]['manufacture_date'] ?? null,
+                    'expiry_date' => $lots[$i->id]['expiry_date'] ?? null,
                 ])->all(),
             ]);
         } catch (RuntimeException $e) {

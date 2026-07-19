@@ -29,6 +29,11 @@ class StockMovement extends Model
         return $this->belongsTo(StockLot::class);
     }
 
+    public function document(): BelongsTo
+    {
+        return $this->belongsTo(Document::class);
+    }
+
     protected function casts(): array
     {
         return [

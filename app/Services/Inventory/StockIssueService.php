@@ -102,7 +102,9 @@ class StockIssueService
                 } else {
                     $this->fifo->issue(
                         (int) $item['product_id'], (int) $locationId, (float) $item['qty'],
-                        $document->id, 'out', allowExpired: $data['type'] === 'damage'
+                        $document->id, 'out',
+                        allowExpired: $data['type'] === 'damage',
+                        allowRestricted: $data['type'] === 'damage'
                     );
                 }
             }

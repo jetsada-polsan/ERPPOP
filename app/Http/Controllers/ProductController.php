@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\PriceChange;
 use App\Models\PriceTable;
@@ -13,6 +14,7 @@ use App\Models\ProductDepartment;
 use App\Models\ProductPrice;
 use App\Models\ProductSupplier;
 use App\Models\ProductUnit;
+use App\Models\StockLot;
 use App\Models\Supplier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -190,6 +192,50 @@ class ProductController extends Controller
         return redirect()->route('products.show', ['product' => $product, 'popup' => $request->boolean('popup') ? 1 : null])->with('success', 'บันทึกข้อมูลสินค้าแล้ว');
     }
 
+    public function updateLotQuality(Request $request, Product $product, StockLot $stockLot): RedirectResponse
+    {
+        abort_unless($stockLot->product_id === $product->id, 404);
+        $data = $request->validate([
+            'quality_status' => ['required', 'in:available,hold,quarantine,recalled'],
+            'quality_reason' => ['nullable', 'string', 'max:2000'],
+        ]);
+        if ($data['quality_status'] !== 'available' && blank($data['quality_reason'] ?? null)) {
+            return back()->withErrors(['quality_reason' => 'ต้องระบุเหตุผลเมื่อพักตรวจ กักกัน หรือเรียกคืน Lot']);
+        }
+
+        DB::transaction(function () use ($data, $stockLot): void {
+            $old = $stockLot->only(['quality_status', 'quality_reason', 'quality_updated_by', 'quality_updated_at']);
+            $stockLot->update([
+                ...$data,
+                'quality_reason' => filled($data['quality_reason'] ?? null) ? $data['quality_reason'] : null,
+                'quality_updated_by' => auth()->id(),
+                'quality_updated_at' => now(),
+            ]);
+            AuditLog::create([
+                'user_id' => auth()->id(),
+                'action' => 'lot_quality',
+                'table_name' => 'stock_lots',
+                'record_id' => $stockLot->id,
+                'old_values' => $old,
+                'new_values' => $stockLot->fresh()->only(['quality_status', 'quality_reason', 'quality_updated_by', 'quality_updated_at']),
+            ]);
+        });
+
+        return back()->with('success', "อัปเดตสถานะ Lot {$stockLot->lot_number} แล้ว");
+    }
+
+    public function lotTrace(Product $product, StockLot $stockLot): View
+    {
+        abort_unless($stockLot->product_id === $product->id, 404);
+        $stockLot->load([
+            'warehouseLocation.warehouse', 'sourceDocument.documentType', 'qualityUpdatedBy',
+            'movements' => fn ($query) => $query->with(['document.documentType', 'document.branch'])
+                ->orderBy('movement_date')->orderBy('id'),
+        ]);
+
+        return view('products.lot-trace', compact('product', 'stockLot'));
+    }
+
     public function addBarcode(Request $request, Product $product): RedirectResponse
     {
         $data = $request->validate([
@@ -317,7 +363,10 @@ class ProductController extends Controller
             'is_active' => ['nullable', 'boolean'],
             'is_vat' => ['nullable', 'boolean'],
             'tracks_expiry' => ['nullable', 'boolean'],
+            'shelf_life_days' => ['nullable', 'integer', 'min:1', 'max:36500'],
             'expiry_warning_days' => ['nullable', 'integer', 'min:0', 'max:3650'],
+            'clearance_warning_days' => ['nullable', 'integer', 'min:0', 'max:3650'],
+            'clearance_discount_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'expiry_sale_policy' => ['nullable', 'in:block,allow'],
             'negative_stock_policy' => ['required', 'in:block,allow'],
             'reorder_point' => ['nullable', 'numeric', 'min:0'],
@@ -328,6 +377,8 @@ class ProductController extends Controller
         $data['is_vat'] = $request->boolean('is_vat');
         $data['tracks_expiry'] = $request->boolean('tracks_expiry');
         $data['expiry_warning_days'] = $data['expiry_warning_days'] ?? 30;
+        $data['clearance_warning_days'] = $data['clearance_warning_days'] ?? 7;
+        $data['clearance_discount_percent'] = $data['clearance_discount_percent'] ?? 0;
         $data['expiry_sale_policy'] = $data['expiry_sale_policy'] ?? 'block';
 
         return $data;

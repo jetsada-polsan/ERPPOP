@@ -160,6 +160,7 @@
                                             @if($showLotFields)
                                             <div x-show="item.product_id" class="d-flex gap-1 align-items-center flex-wrap mt-1">
                                                 <input type="text" :name="`items[${index}][lot_number]`" x-model="item.lot_number" class="doc-input" style="max-width:130px" placeholder="เลข Lot">
+                                                <input type="date" :name="`items[${index}][manufacture_date]`" x-model="item.manufacture_date" @change="calculateExpiry(index)" class="doc-input" style="max-width:150px" title="วันผลิต">
                                                 <input type="date" :name="`items[${index}][expiry_date]`" x-model="item.expiry_date" class="doc-input" style="max-width:150px" :required="item.tracks_expiry" :title="item.tracks_expiry ? 'ต้องระบุวันหมดอายุ' : 'วันหมดอายุ (ถ้ามี)'">
                                                 <span x-show="item.tracks_expiry" class="badge text-bg-warning">ต้องระบุวันหมดอายุ</span>
                                             </div>
