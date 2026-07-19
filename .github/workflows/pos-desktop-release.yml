@@ -26,15 +26,11 @@ jobs:
           cache-dependency-path: apps/pos-desktop/pnpm-lock.yaml
       - uses: dtolnay/rust-toolchain@stable
       - name: Set version and updater public key
-        shell: pwsh
         env:
           VERSION: ${{ inputs.version }}
           UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
-        run: |
-          $config = Get-Content apps/pos-desktop/src-tauri/tauri.conf.json -Raw
-          $config = $config.Replace('"version": "1.0.0"', '"version": "' + $env:VERSION + '"')
-          $config = $config.Replace('__TAURI_UPDATER_PUBLIC_KEY__', $env:UPDATER_PUBLIC_KEY)
-          Set-Content apps/pos-desktop/src-tauri/tauri.conf.json $config
+        run: node scripts/configure-release.mjs
+        working-directory: apps/pos-desktop
       - run: pnpm install --frozen-lockfile
         working-directory: apps/pos-desktop
       - name: Build signed installers
@@ -50,4 +46,3 @@ jobs:
             apps/pos-desktop/src-tauri/target/release/bundle/nsis/*
             apps/pos-desktop/src-tauri/target/release/bundle/msi/*
           if-no-files-found: error
-
