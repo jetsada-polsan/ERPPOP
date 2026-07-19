@@ -13,6 +13,8 @@
             <p>
                 @if($pendingBatches->isNotEmpty())
                     พบ POS batch รอตรวจสอบ {{ $pendingBatches->count() }} รายการ ควรยืนยันข้อมูลก่อนปิดยอด
+                @elseif($expiryAlerts->isNotEmpty())
+                    พบ Lot ใกล้หมดอายุหรือข้อมูลวันหมดอายุไม่ครบ {{ $expiryAlerts->count() }} รายการ ควรจัดการก่อนขาย
                 @elseif($lowStock->isNotEmpty())
                     พบสินค้าใกล้หมดหรือติดลบ {{ $lowStock->count() }} รายการ ควรวางแผนเติมสต๊อก
                 @else
@@ -23,7 +25,7 @@
         <div class="ai-signal-grid">
             <div><span>ยอดขาย</span><strong>฿{{ number_format($summary->total_sales, 2) }}</strong></div>
             <div><span>ใบเสร็จ POS</span><strong>{{ number_format($summary->receipt_count) }}</strong></div>
-            <div><span>แจ้งเตือน</span><strong>{{ number_format($pendingBatches->count() + $lowStock->count()) }}</strong></div>
+            <div><span>แจ้งเตือน</span><strong>{{ number_format($pendingBatches->count() + $lowStock->count() + $expiryAlerts->count()) }}</strong></div>
         </div>
         <div class="ai-grid-lines"></div>
     </section>
@@ -69,6 +71,16 @@
                 </div>
                 <a href="{{ route('pos-import.page') }}" class="btn btn-sm btn-warning rounded-pill px-3">ไปที่ POS Import</a>
             </div>
+        </div>
+    @endif
+
+    @if($expiryAlerts->isNotEmpty())
+        <div class="alert alert-danger border-0 mb-4 d-flex align-items-center justify-content-between gap-3 flex-wrap">
+            <div>
+                <div class="fw-bold"><i class="bi bi-calendar-x-fill me-2"></i>Lot ต้องจัดการ {{ $expiryAlerts->count() }} รายการ</div>
+                <div class="small">รวม Lot หมดอายุ ใกล้ถึงวันที่เตือน และ Lot ที่ยังไม่ได้ระบุวันหมดอายุ</div>
+            </div>
+            <a href="{{ route('reports.index', ['category' => 'inventory', 'report' => 'expiring_stock']) }}" class="btn btn-sm btn-danger">เปิดรายงาน Lot</a>
         </div>
     @endif
 

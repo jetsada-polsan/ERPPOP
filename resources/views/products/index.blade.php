@@ -184,7 +184,18 @@
                                     <label class="form-check-label" for="newProductExpiry">ควบคุม Lot และวันหมดอายุ</label>
                                 </div>
                             </div>
-                            <div class="col-md-6 d-flex align-items-end">
+                            <div class="col-md-3">
+                                <label class="form-label text-muted small">เตือนก่อนหมดอายุ (วัน)</label>
+                                <input type="number" min="0" max="3650" name="expiry_warning_days" value="30" class="form-control">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-muted small">เมื่อ Lot หมดอายุ</label>
+                                <select name="expiry_sale_policy" class="form-select" required>
+                                    <option value="block">ห้ามขาย/ห้ามใช้</option>
+                                    <option value="allow">เตือนแต่อนุญาต</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 d-flex align-items-center">
                                 <div class="form-check">
                                     <input type="checkbox" name="is_active" value="1" checked class="form-check-input" id="newProductActive">
                                     <label class="form-check-label" for="newProductActive">ใช้งาน</label>

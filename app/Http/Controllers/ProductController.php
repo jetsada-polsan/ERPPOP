@@ -317,6 +317,8 @@ class ProductController extends Controller
             'is_active' => ['nullable', 'boolean'],
             'is_vat' => ['nullable', 'boolean'],
             'tracks_expiry' => ['nullable', 'boolean'],
+            'expiry_warning_days' => ['nullable', 'integer', 'min:0', 'max:3650'],
+            'expiry_sale_policy' => ['nullable', 'in:block,allow'],
             'negative_stock_policy' => ['required', 'in:block,allow'],
             'reorder_point' => ['nullable', 'numeric', 'min:0'],
             'minimum_stock' => ['nullable', 'numeric', 'min:0'],
@@ -325,6 +327,8 @@ class ProductController extends Controller
         $data['is_active'] = $request->boolean('is_active', true);
         $data['is_vat'] = $request->boolean('is_vat');
         $data['tracks_expiry'] = $request->boolean('tracks_expiry');
+        $data['expiry_warning_days'] = $data['expiry_warning_days'] ?? 30;
+        $data['expiry_sale_policy'] = $data['expiry_sale_policy'] ?? 'block';
 
         return $data;
     }

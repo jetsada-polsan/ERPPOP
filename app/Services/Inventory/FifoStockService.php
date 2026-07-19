@@ -2,6 +2,7 @@
 
 namespace App\Services\Inventory;
 
+use App\Models\Product;
 use App\Models\StockBalance;
 use App\Models\StockLot;
 use App\Models\StockMovement;
@@ -32,7 +33,7 @@ class FifoStockService
     }
 
     /** @return Collection<int, array{lot:StockLot,qty:float}> */
-    public function issue(int $productId, int $locationId, float $qty, ?int $documentId, string $movementType = 'out', ?string $movementDate = null, bool $allowNegative = false): Collection
+    public function issue(int $productId, int $locationId, float $qty, ?int $documentId, string $movementType = 'out', ?string $movementDate = null, bool $allowNegative = false, bool $allowExpired = false): Collection
     {
         $balance = $this->balance($productId, $locationId);
         $available = (float) $balance->on_hand_qty;
@@ -41,15 +42,33 @@ class FifoStockService
         }
 
         $this->ensureOpeningLot($productId, $locationId, max(0, $available));
+        $product = Product::find($productId);
+        $blockExpired = (bool) $product?->tracks_expiry
+            && ($product->expiry_sale_policy ?? 'block') === 'block'
+            && ! $allowExpired;
+
+        $lotsQuery = StockLot::where('product_id', $productId)
+            ->where('warehouse_location_id', $locationId)
+            ->where('remaining_qty', '>', 0);
+        if ($blockExpired) {
+            $lotsQuery->where(fn ($query) => $query->whereNull('expiry_date')->orWhereDate('expiry_date', '>=', now()->toDateString()));
+            $sellable = (float) (clone $lotsQuery)->sum('remaining_qty');
+            if (! $allowNegative && $qty > $sellable + 0.0001) {
+                throw new RuntimeException('สต๊อกที่ขายได้ไม่พอ เนื่องจากมี Lot หมดอายุถูกระงับ กรุณาตัดเป็นสินค้าชำรุด');
+            }
+        }
+
         $remaining = $qty;
         $allocations = collect();
-        $lots = StockLot::where('product_id', $productId)
-            ->where('warehouse_location_id', $locationId)
-            ->where('remaining_qty', '>', 0)
-            ->orderBy('received_date')->orderBy('id')->lockForUpdate()->get();
+        if ($product?->tracks_expiry) {
+            $lotsQuery->orderByRaw('CASE WHEN expiry_date IS NULL THEN 1 ELSE 0 END')->orderBy('expiry_date');
+        }
+        $lots = $lotsQuery->orderBy('received_date')->orderBy('id')->lockForUpdate()->get();
 
         foreach ($lots as $lot) {
-            if ($remaining <= 0.0001) break;
+            if ($remaining <= 0.0001) {
+                break;
+            }
             $take = min($remaining, (float) $lot->remaining_qty);
             $lot->decrement('remaining_qty', $take);
             $this->movement($productId, $locationId, $documentId, $lot->id, $movementType, $take, $movementDate ?: now()->toDateString());

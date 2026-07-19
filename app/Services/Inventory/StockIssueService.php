@@ -100,7 +100,10 @@ class StockIssueService
                 if ($isReturn) {
                     $this->fifo->receive((int) $item['product_id'], (int) $locationId, (float) $item['qty'], $document->id, 'in');
                 } else {
-                    $this->fifo->issue((int) $item['product_id'], (int) $locationId, (float) $item['qty'], $document->id, 'out');
+                    $this->fifo->issue(
+                        (int) $item['product_id'], (int) $locationId, (float) $item['qty'],
+                        $document->id, 'out', allowExpired: $data['type'] === 'damage'
+                    );
                 }
             }
 

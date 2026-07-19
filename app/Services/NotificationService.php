@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -30,6 +31,30 @@ class NotificationService
             $this->push($items, 'bi-box-arrow-in-down', '#059669', 'ใบสั่งซื้อรอรับของเข้าคลัง',
                 DB::table('purchase_orders')->where('status', 'ordered')->count(),
                 route('purchase-orders.index', ['status' => 'ordered']));
+
+            $expiryLots = DB::table('stock_lots as sl')
+                ->join('products as p', 'p.id', '=', 'sl.product_id')
+                ->where('p.tracks_expiry', true)->where('sl.remaining_qty', '>', 0)
+                ->whereNotNull('sl.expiry_date')
+                ->whereDate('sl.expiry_date', '<=', now()->addDays(3650)->toDateString())
+                ->get(['sl.expiry_date', 'p.expiry_warning_days']);
+            $expiredCount = $expiryLots->filter(fn ($lot) => Carbon::parse($lot->expiry_date)->isBefore(today()))->count();
+            $expiringCount = $expiryLots->filter(function ($lot) {
+                $daysLeft = today()->diffInDays(Carbon::parse($lot->expiry_date), false);
+
+                return $daysLeft >= 0 && $daysLeft <= (int) $lot->expiry_warning_days;
+            })->count();
+            $missingExpiryCount = DB::table('stock_lots as sl')
+                ->join('products as p', 'p.id', '=', 'sl.product_id')
+                ->where('p.tracks_expiry', true)->where('sl.remaining_qty', '>', 0)
+                ->whereNull('sl.expiry_date')->count();
+
+            $this->push($items, 'bi-calendar-x-fill', '#dc2626', 'Lot หมดอายุแล้ว', $expiredCount,
+                route('reports.index', ['category' => 'inventory', 'report' => 'expiring_stock']));
+            $this->push($items, 'bi-hourglass-split', '#d97706', 'Lot ใกล้หมดอายุ', $expiringCount,
+                route('reports.index', ['category' => 'inventory', 'report' => 'expiring_stock']));
+            $this->push($items, 'bi-calendar2-x', '#7c3aed', 'Lot ไม่มีวันหมดอายุ', $missingExpiryCount,
+                route('reports.index', ['category' => 'inventory', 'report' => 'expiring_stock']));
         }
 
         // จัดซื้อ: ใบขอซื้อรออนุมัติ

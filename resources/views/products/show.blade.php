@@ -53,6 +53,8 @@
                     <label>สต๊อกต่ำสุด<input type="number" step="0.0001" min="0" name="minimum_stock" value="{{ $product->minimum_stock }}"></label>
                     <label>สต๊อกสูงสุด<input type="number" step="0.0001" min="0" name="maximum_stock" value="{{ $product->maximum_stock }}"></label>
                     <label class="wide">หมายเหตุ<textarea name="note" rows="3">{{ $product->note }}</textarea></label>
+                    <label>เตือนก่อนหมดอายุ (วัน)<input type="number" min="0" max="3650" name="expiry_warning_days" value="{{ $product->expiry_warning_days }}"></label>
+                    <label>เมื่อ Lot หมดอายุ<select name="expiry_sale_policy"><option value="block" @selected($product->expiry_sale_policy==='block')>ห้ามขาย/ห้ามใช้</option><option value="allow" @selected($product->expiry_sale_policy==='allow')>เตือนแต่อนุญาต</option></select></label>
                     <div class="compact-checks wide"><label><input type="checkbox" name="is_active" value="1" @checked($product->is_active)> ใช้งาน</label><label><input type="checkbox" name="is_vat" value="1" @checked($product->is_vat)> คิด VAT</label><label><input type="checkbox" name="tracks_expiry" value="1" @checked($product->tracks_expiry)> ควบคุม Lot/หมดอายุ</label></div>
                     <div class="compact-save wide"><button><i class="bi bi-check-lg"></i> บันทึก</button></div>
                 </form>
@@ -434,6 +436,10 @@
                     <span class="badge text-bg-light border">จุดสั่งซื้อ {{ $product->reorder_point !== null ? number_format((float)$product->reorder_point, 4) : '-' }}</span>
                     <span class="badge text-bg-light border">ต่ำสุด {{ $product->minimum_stock !== null ? number_format((float)$product->minimum_stock, 4) : '-' }}</span>
                     <span class="badge text-bg-light border">สูงสุด {{ $product->maximum_stock !== null ? number_format((float)$product->maximum_stock, 4) : '-' }}</span>
+                    @if($product->tracks_expiry)
+                        <span class="badge text-bg-warning">เตือนหมดอายุล่วงหน้า {{ $product->expiry_warning_days }} วัน</span>
+                        <span class="badge {{ $product->expiry_sale_policy === 'block' ? 'text-bg-danger' : 'text-bg-light border' }}">{{ $product->expiry_sale_policy === 'block' ? 'ห้ามใช้ Lot หมดอายุ' : 'เตือนแต่อนุญาต Lot หมดอายุ' }}</span>
+                    @endif
                 </div>
             </div>
             <div class="table-responsive mb-3">
@@ -471,7 +477,7 @@
         <div class="content-card p-4 mb-4">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h3 class="h6 fw-bold mb-0">Lot และวันหมดอายุ</h3>
-                <span class="badge text-bg-info">FIFO ตาม Lot</span>
+                <span class="badge text-bg-info">FEFO: หมดอายุก่อนออกก่อน</span>
             </div>
             <div class="table-responsive">
                 <table class="table table-sm align-middle">
@@ -490,7 +496,7 @@
                             <td>
                                 @if($daysLeft === null)<span class="badge text-bg-light border">ไม่ระบุ</span>
                                 @elseif($daysLeft < 0)<span class="badge text-bg-danger">หมดอายุแล้ว</span>
-                                @elseif($daysLeft <= 30)<span class="badge text-bg-warning">เหลือ {{ $daysLeft }} วัน</span>
+                                @elseif($daysLeft <= $product->expiry_warning_days)<span class="badge text-bg-warning">เหลือ {{ $daysLeft }} วัน</span>
                                 @else<span class="badge text-bg-success">ปกติ</span>@endif
                             </td>
                         </tr>
@@ -587,7 +593,18 @@
                                     <label class="form-check-label" for="editProductExpiry">ควบคุม Lot และวันหมดอายุ</label>
                                 </div>
                             </div>
-                            <div class="col-md-6 d-flex align-items-end">
+                            <div class="col-md-3">
+                                <label class="form-label text-muted small">เตือนก่อนหมดอายุ (วัน)</label>
+                                <input type="number" min="0" max="3650" name="expiry_warning_days" value="{{ $product->expiry_warning_days }}" class="form-control">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-muted small">เมื่อ Lot หมดอายุ</label>
+                                <select name="expiry_sale_policy" class="form-select" required>
+                                    <option value="block" @selected($product->expiry_sale_policy === 'block')>ห้ามขาย/ห้ามใช้</option>
+                                    <option value="allow" @selected($product->expiry_sale_policy === 'allow')>เตือนแต่อนุญาต</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 d-flex align-items-center">
                                 <div class="form-check">
                                     <input type="checkbox" name="is_active" value="1" @checked($product->is_active) class="form-check-input" id="editProductActive">
                                     <label class="form-check-label" for="editProductActive">ใช้งาน</label>

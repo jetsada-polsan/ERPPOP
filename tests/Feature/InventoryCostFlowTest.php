@@ -12,10 +12,12 @@ use App\Models\Supplier;
 use App\Models\Warehouse;
 use App\Models\WarehouseLocation;
 use App\Services\Inventory\CostingService;
+use App\Services\Inventory\FifoStockService;
 use App\Services\Inventory\StockTransformService;
 use App\Services\Purchasing\PurchaseService;
 use App\Services\Sales\CashSaleService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use RuntimeException;
 use Tests\TestCase;
 
 class InventoryCostFlowTest extends TestCase
@@ -142,6 +144,31 @@ class InventoryCostFlowTest extends TestCase
         $this->assertCount(2, $packages);
         $this->assertSame(100.0, (float) $packages[0]->total_price);
         $this->assertMatchesRegularExpression('/^800999[0-9]{7}$/', $packages[0]->barcode);
+    }
+
+    public function test_expiry_control_uses_fefo_and_blocks_expired_lots(): void
+    {
+        [$branch, $supplier, $product] = $this->masters();
+        $product->update([
+            'tracks_expiry' => true,
+            'expiry_warning_days' => 7,
+            'expiry_sale_policy' => 'block',
+        ]);
+        $locationId = (int) $branch->default_warehouse_location_id;
+        $fifo = app(FifoStockService::class);
+        $expired = $fifo->receive($product->id, $locationId, 2, null, expiryDate: today()->subDay()->toDateString());
+        $later = $fifo->receive($product->id, $locationId, 3, null, expiryDate: today()->addDays(20)->toDateString());
+        $earlier = $fifo->receive($product->id, $locationId, 3, null, expiryDate: today()->addDays(5)->toDateString());
+
+        $allocation = $fifo->issue($product->id, $locationId, 2, null);
+        $this->assertSame($earlier->id, $allocation->first()['lot']->id);
+        $this->assertSame(1.0, (float) $earlier->fresh()->remaining_qty);
+        $this->assertSame(3.0, (float) $later->fresh()->remaining_qty);
+        $this->assertSame(2.0, (float) $expired->fresh()->remaining_qty);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Lot หมดอายุถูกระงับ');
+        $fifo->issue($product->id, $locationId, 5, null);
     }
 
     /** @return array{Branch,Supplier,Product,Product} */

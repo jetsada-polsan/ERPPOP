@@ -186,6 +186,7 @@ class ReportController extends Controller
                     'stock_balance' => 'สินค้าคงเหลือ',
                     'stock_by_branch' => 'สต็อกตามสาขา',
                     'stock_alerts' => 'สต็อกต่ำ / ติดลบ',
+                    'expiring_stock' => 'Lot ใกล้หมดอายุ / หมดอายุ',
                     'stock_movements' => 'เคลื่อนไหวสินค้า',
                 ],
             ],
@@ -607,6 +608,17 @@ class ReportController extends Controller
                 ['label' => 'คลัง/ที่เก็บ', 'key' => 'location_name'],
                 ['label' => 'คงเหลือ', 'key' => 'on_hand_qty', 'type' => 'number', 'class' => 'text-end'],
             ], $this->stockAlerts($filters)),
+
+            'expiring_stock' => $this->tableResult('Lot ใกล้หมดอายุ / หมดอายุ', [
+                ['label' => 'รหัส', 'key' => 'sku_code'],
+                ['label' => 'สินค้า', 'key' => 'name_th'],
+                ['label' => 'Lot', 'key' => 'lot_number'],
+                ['label' => 'คลัง/ที่เก็บ', 'key' => 'location_name'],
+                ['label' => 'วันหมดอายุ', 'key' => 'expiry_date'],
+                ['label' => 'เหลือ (วัน)', 'key' => 'days_left', 'type' => 'number', 'class' => 'text-end'],
+                ['label' => 'คงเหลือ', 'key' => 'remaining_qty', 'type' => 'number', 'class' => 'text-end'],
+                ['label' => 'สถานะ', 'key' => 'status', 'type' => 'badge'],
+            ], $this->expiringStock($filters)),
 
             'stock_movements' => $this->tableResult('เคลื่อนไหวสินค้า', [
                 ['label' => 'วันที่', 'key' => 'movement_date'],
@@ -1854,6 +1866,42 @@ class ReportController extends Controller
     private function stockAlerts(array $filters): Collection
     {
         return $this->stockBalance($filters)->sortBy('on_hand_qty')->values();
+    }
+
+    private function expiringStock(array $filters): Collection
+    {
+        $query = DB::table('stock_lots as sl')
+            ->join('products as p', 'p.id', '=', 'sl.product_id')
+            ->join('warehouse_locations as wl', 'wl.id', '=', 'sl.warehouse_location_id')
+            ->join('warehouses as w', 'w.id', '=', 'wl.warehouse_id')
+            ->leftJoin('branches as b', 'b.id', '=', DB::raw($this->branchByLocationSub('sl.warehouse_location_id')))
+            ->where('p.tracks_expiry', true)
+            ->where('sl.remaining_qty', '>', 0);
+
+        $this->applyBranch($query, $filters, 'b.id');
+        $this->applySearch($query, $filters, ['p.sku_code', 'p.name_th', 'sl.lot_number', 'wl.name']);
+
+        return $query->orderByRaw('CASE WHEN sl.expiry_date IS NULL THEN 0 ELSE 1 END')
+            ->orderBy('sl.expiry_date')
+            ->selectRaw("p.sku_code, p.name_th, sl.lot_number, concat(w.name, ' / ', coalesce(wl.name, wl.code)) as location_name, sl.expiry_date, sl.remaining_qty, p.expiry_warning_days")
+            ->get()
+            ->map(function ($lot) {
+                if (! $lot->expiry_date) {
+                    $lot->days_left = null;
+                    $lot->status = 'ไม่ระบุวันหมดอายุ';
+
+                    return $lot;
+                }
+                $lot->days_left = today()->diffInDays(Carbon::parse($lot->expiry_date), false);
+                $lot->status = $lot->days_left < 0
+                    ? 'หมดอายุแล้ว'
+                    : ($lot->days_left <= (int) $lot->expiry_warning_days ? 'ใกล้หมดอายุ' : 'ปกติ');
+
+                return $lot;
+            })
+            ->filter(fn ($lot) => $lot->days_left === null || $lot->days_left <= (int) $lot->expiry_warning_days)
+            ->take($filters['per_page'])
+            ->values();
     }
 
     private function stockMovements(Carbon $from, Carbon $to, array $filters): Collection

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Branch;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +17,7 @@ class DashboardController extends Controller
         // Branch-scoped visibility: users bound to a branch (แคชเชียร์/พนักงานสาขา)
         // เห็นเฉพาะยอดขายสาขาตัวเอง; ส่วนกลาง/ผู้บริหาร (branch_id = null) เห็นทุกสาขา.
         $branchId = auth()->user()?->branchScopeId();
-        $scopeBranchName = $branchId ? \App\Models\Branch::whereKey($branchId)->value('name_th') : null;
+        $scopeBranchName = $branchId ? Branch::whereKey($branchId)->value('name_th') : null;
 
         // pos_receipts ผูกสาขาผ่าน pos_terminals.branch_id
         $receiptBranchScope = fn ($query, string $receiptAlias) => $query
@@ -46,7 +47,7 @@ class DashboardController extends Controller
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()])
             ->groupBy('dt.code', 'dt.name_th')
             ->orderByDesc(DB::raw('sum(d.total_amount)'))
-            ->selectRaw("dt.code as doc_code, coalesce(dt.name_th, dt.code) as doc_name, count(*) as bill_count, coalesce(sum(d.total_amount), 0) as amount")
+            ->selectRaw('dt.code as doc_code, coalesce(dt.name_th, dt.code) as doc_name, count(*) as bill_count, coalesce(sum(d.total_amount), 0) as amount')
             ->limit(3)
             ->get();
 
@@ -93,6 +94,22 @@ class DashboardController extends Controller
             ->limit(20)
             ->get();
 
+        $expiryAlerts = DB::table('stock_lots as sl')
+            ->join('products as p', 'p.id', '=', 'sl.product_id')
+            ->join('warehouse_locations as wl', 'wl.id', '=', 'sl.warehouse_location_id')
+            ->join('warehouses as w', 'w.id', '=', 'wl.warehouse_id')
+            ->when($branchId, fn ($query) => $query->where('w.branch_id', $branchId))
+            ->where('p.tracks_expiry', true)->where('sl.remaining_qty', '>', 0)
+            ->orderByRaw('CASE WHEN sl.expiry_date IS NULL THEN 0 ELSE 1 END')->orderBy('sl.expiry_date')
+            ->get(['p.sku_code', 'p.name_th', 'sl.lot_number', 'sl.expiry_date', 'sl.remaining_qty', 'p.expiry_warning_days'])
+            ->map(function ($lot) {
+                $lot->days_left = $lot->expiry_date ? today()->diffInDays(Carbon::parse($lot->expiry_date), false) : null;
+
+                return $lot;
+            })
+            ->filter(fn ($lot) => $lot->days_left === null || $lot->days_left <= (int) $lot->expiry_warning_days)
+            ->take(20)->values();
+
         $pendingBatches = DB::table('import_batches')
             ->whereIn('status', ['has_error', 'parsed', 'validated'])
             ->orderByDesc('sale_date')
@@ -112,6 +129,7 @@ class DashboardController extends Controller
             'dailySales' => $dailySales,
             'topProducts' => $topProducts,
             'lowStock' => $lowStock,
+            'expiryAlerts' => $expiryAlerts,
             'pendingBatches' => $pendingBatches,
         ]);
     }

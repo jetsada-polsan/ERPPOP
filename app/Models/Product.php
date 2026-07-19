@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 #[Fillable([
     'sku_code', 'name_th', 'name_en', 'note', 'product_category_id', 'product_department_id',
     'product_brand_id', 'base_unit_id', 'default_price', 'average_cost', 'last_purchase_cost',
-    'last_purchase_cost_at', 'is_vat', 'tracks_expiry', 'is_active',
+    'last_purchase_cost_at', 'is_vat', 'tracks_expiry', 'expiry_warning_days', 'expiry_sale_policy', 'is_active',
     'negative_stock_policy', 'reorder_point', 'minimum_stock', 'maximum_stock',
 ])]
 class Product extends Model
@@ -74,6 +74,7 @@ class Product extends Model
             'is_active' => 'boolean',
             'is_vat' => 'boolean',
             'tracks_expiry' => 'boolean',
+            'expiry_warning_days' => 'integer',
             'default_price' => 'decimal:4',
             'average_cost' => 'decimal:4',
             'last_purchase_cost' => 'decimal:4',
