@@ -49,6 +49,7 @@ class ManualController extends Controller
                     ['ซื้อ/เจ้าหนี้', 'purchases.index', 'ผู้ขาย สินค้า และเงื่อนไขเครดิต', 'สต็อก AP ภาษีซื้อ และ GL'],
                     ['เงินสด ธนาคาร เช็ค', 'bplus.finance', 'รายการรับจ่ายและเอกสารอ้างอิง', 'กระแสเงินสดและยอดคงเหลือ'],
                     ['GL และงบการเงิน', 'chart-of-accounts.index', 'รายการบัญชีจากทุกวงจร', 'งบทดลอง งบกำไรขาดทุน งบดุล'],
+                    ['งวดบัญชี', 'accounting-periods.index', 'ช่วงวันที่และขอบเขตสาขา', 'ล็อกเอกสารย้อนหลังและหลักฐานผู้ปิดงวด'],
                     ['ภาษี', 'bplus.tax', 'ภาษีซื้อ/ขายและเอกสารภาษี', 'รายงาน VAT และยอดยื่นภาษี'],
                     ['ทรัพย์สินถาวร', 'fixed-assets.index', 'ข้อมูลทรัพย์สินและอายุใช้งาน', 'ค่าเสื่อมและมูลค่าคงเหลือ'],
                 ],
@@ -164,7 +165,7 @@ class ManualController extends Controller
                     ['กระทบธนาคาร', 'bank-accounts.index', 'เทียบ statement เช็ค QR และเงินโอน'],
                     ['ตรวจภาษี', 'bplus.tax', 'เทียบ VAT ซื้อ/ขายกับเอกสารภาษี'],
                     ['ตรวจคงค้าง', 'reports.index', 'AR AP เช็คค้าง สต็อกติดลบ และเอกสารไม่ลง GL'],
-                    ['ออกรายงาน', 'financial-statements.index', 'งบทดลอง กำไรขาดทุน งบดุล และกระแสเงินสด'],
+                    ['ปิดงวด', 'accounting-periods.index', 'ล็อก Document และ GL พร้อม Audit Log'],
                 ],
             ],
             [
@@ -197,14 +198,14 @@ class ManualController extends Controller
     private function gaps(): array
     {
         return [
-            ['level' => 'critical', 'status' => 'กำลังทำ', 'title' => 'ราคาและโปรโมชั่นต้องยืนยันฝั่ง Server', 'detail' => 'หน้า POS คำนวณได้แล้ว แต่ checkout ยังต้องมี pricing authority กลางเพื่อกัน client ส่งราคาผิดหรือถูกแก้ค่า'],
-            ['level' => 'critical', 'status' => 'ต้องทำ', 'title' => 'Accounting period และการปิดงวด', 'detail' => 'ยังไม่มีการล็อกวันที่ย้อนหลัง ปิดงวด และ workflow เปิดงวดใหม่อย่างเป็นทางการ'],
+            ['level' => 'critical', 'status' => 'กำลังทำ', 'title' => 'ราคา โปรโมชั่น และหน่วยขายต้องยืนยันฝั่ง Server', 'detail' => 'checkout ยังต้องรับรายละเอียดราคา/ส่วนลด/หน่วยบาร์โค้ด แล้วคำนวณซ้ำฝั่ง Server เพื่อกันแก้ราคาและให้การตัดสต็อกหลายหน่วยถูกต้อง'],
             ['level' => 'critical', 'status' => 'ต้องเพิ่ม', 'title' => 'Integration tests ธุรกรรมครบวงจร', 'detail' => 'มี unit tests เริ่มต้นแล้ว แต่ต้องทดสอบ POS -> Stock -> VAT -> GL -> Member และ rollback ด้วยฐานข้อมูลจริง'],
             ['level' => 'control', 'status' => 'บางส่วน', 'title' => 'Approval เชื่อมเอกสารจริง', 'detail' => 'มีทะเบียนคำขออนุมัติ แต่ยังต้องบังคับสถานะอนุมัติก่อน PO ส่วนลด ปรับยอด และวงเงินในแต่ละเอกสาร'],
             ['level' => 'control', 'status' => 'บางส่วน', 'title' => 'Audit log ครอบคลุมทุกการแก้ไขสำคัญ', 'detail' => 'มี audit สำหรับ POS บางเหตุการณ์แล้ว แต่ master data การเงิน สิทธิ์ และการเปลี่ยนราคายังต้องครอบคลุมเพิ่ม'],
             ['level' => 'control', 'status' => 'ต้องทำ', 'title' => 'Backup, restore drill และ disaster recovery', 'detail' => 'ต้องกำหนด backup ฐานข้อมูล/ไฟล์ รอบเก็บรักษา การเข้ารหัส และทดสอบกู้คืนเป็นรอบ'],
             ['level' => 'growth', 'status' => 'ทะเบียนแล้ว', 'title' => 'E-Commerce sync อัตโนมัติ', 'detail' => 'มีแฟ้มช่องทาง Lazada Shopee LINE MyShop และ TikTok Shop แต่ยังไม่มี order/stock sync จริง'],
             ['level' => 'growth', 'status' => 'ยังไม่มี', 'title' => 'Payroll และเวลาเข้างาน', 'detail' => 'มีแฟ้มพนักงานและโครงสร้างองค์กร แต่เงินเดือน ภาษี ประกันสังคม และ attendance ยังไม่อยู่ในระบบ'],
+            ['level' => 'growth', 'status' => 'ยังไม่มี', 'title' => 'งบประมาณและศูนย์ต้นทุน', 'detail' => 'ยังไม่มี Budget, Cost Center และการเทียบงบประมาณกับยอดจริงสำหรับควบคุมค่าใช้จ่ายตามหน่วยงาน'],
         ];
     }
 

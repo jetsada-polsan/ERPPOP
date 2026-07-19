@@ -48,6 +48,7 @@
             'displayLabel' => 'การเงิน / บัญชี',
             'items' => [
                 ['label' => 'ผังบัญชี / บันทึกบัญชี', 'route' => 'chart-of-accounts.index', 'pattern' => 'chart-of-accounts.*', 'extraPattern' => 'gl-journals.*', 'icon' => 'bi-calculator-fill', 'tone' => 'red'],
+                ['label' => 'งวดบัญชี / ปิดงวด', 'route' => 'accounting-periods.index', 'pattern' => 'accounting-periods.*', 'icon' => 'bi-calendar2-lock', 'tone' => 'amber'],
                 ['label' => 'งบการเงิน', 'route' => 'financial-statements.index', 'pattern' => 'financial-statements.*', 'icon' => 'bi-graph-up', 'tone' => 'blue'],
                 ['label' => 'ทะเบียนทรัพย์สิน', 'route' => 'fixed-assets.index', 'pattern' => 'fixed-assets.*', 'icon' => 'bi-buildings', 'tone' => 'brown'],
                 ['label' => 'เงินสด / ภาษี', 'route' => 'bplus.finance', 'pattern' => 'bplus.finance', 'extraPattern' => 'bplus.tax', 'icon' => 'bi-journal-richtext', 'tone' => 'amber'],

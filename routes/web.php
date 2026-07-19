@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AccountingPeriodController;
 use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\BillingNoteController;
 use App\Http\Controllers\PriceTableController;
@@ -354,6 +355,13 @@ Route::prefix('bank-accounts')->name('bank-accounts.')->group(function () {
     Route::get('/', [BankAccountController::class, 'index'])->name('index');
     Route::post('/', [BankAccountController::class, 'store'])->name('store');
     Route::put('/{bankAccount}', [BankAccountController::class, 'update'])->name('update');
+});
+
+Route::prefix('accounting-periods')->name('accounting-periods.')->group(function () {
+    Route::get('/', [AccountingPeriodController::class, 'index'])->name('index');
+    Route::post('/', [AccountingPeriodController::class, 'store'])->name('store');
+    Route::post('/{accountingPeriod}/close', [AccountingPeriodController::class, 'close'])->name('close');
+    Route::post('/{accountingPeriod}/reopen', [AccountingPeriodController::class, 'reopen'])->name('reopen');
 });
 
 Route::prefix('members')->name('members.')->group(function () {
