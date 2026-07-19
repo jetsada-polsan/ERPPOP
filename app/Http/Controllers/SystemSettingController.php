@@ -9,6 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class SystemSettingController extends Controller
@@ -53,7 +54,64 @@ class SystemSettingController extends Controller
             'posDevices' => PosDevice::with(['user:id,name,username', 'branch:id,code,name_th'])->latest()->limit(20)->get(),
             'menuOrder' => $this->menuOrder(),
             'erpTheme' => AppSetting::get('erp_theme', 'ocean'),
+            'posRelease' => $this->currentPosRelease(),
         ]);
+    }
+
+    public function publishPosRelease(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'pos_version' => ['required', 'regex:/^\d+\.\d+\.\d+$/'],
+            'pos_installer' => ['required', 'file', 'max:204800'],
+            'pos_signature' => ['required', 'string', 'max:2000'],
+            'pos_release_notes' => ['nullable', 'string', 'max:2000'],
+            'pos_mandatory' => ['nullable', 'boolean'],
+        ], [
+            'pos_version.regex' => 'เวอร์ชันต้องอยู่ในรูป 1.2.3',
+            'pos_installer.max' => 'ไฟล์ติดตั้งต้องไม่เกิน 200 MB',
+        ]);
+
+        $extension = strtolower($request->file('pos_installer')->getClientOriginalExtension());
+        abort_unless(in_array($extension, ['exe', 'msi', 'zip'], true), 422, 'รองรับไฟล์ exe, msi หรือ zip เท่านั้น');
+
+        $directory = storage_path('app/pos-releases');
+        File::ensureDirectoryExists($directory);
+        $filename = 'POPSTAR-POS-'.$data['pos_version'].'.'.$extension;
+        $request->file('pos_installer')->move($directory, $filename);
+
+        $manifest = [
+            'version' => $data['pos_version'],
+            'notes' => trim((string) ($data['pos_release_notes'] ?? '')),
+            'pub_date' => now()->toIso8601String(),
+            'platforms' => [
+                'windows-x86_64' => [
+                    'signature' => trim($data['pos_signature']),
+                    'url' => url('/download/pos/releases/'.$filename),
+                ],
+            ],
+            'mandatory' => $request->boolean('pos_mandatory'),
+            'sha256' => hash_file('sha256', $directory.'/'.$filename),
+        ];
+
+        $temporary = $directory.'/latest-'.Str::random(8).'.json';
+        File::put($temporary, json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        File::move($temporary, $directory.'/latest.json');
+
+        return redirect()->route('settings.index')->with('success', 'เผยแพร่ POPSTAR POS รุ่น '.$data['pos_version'].' แล้ว เครื่องสาขาจะตรวจพบอัตโนมัติ');
+    }
+
+    private function currentPosRelease(): ?array
+    {
+        $path = storage_path('app/pos-releases/latest.json');
+        if (! is_file($path)) {
+            return null;
+        }
+
+        try {
+            return json_decode(file_get_contents($path), true, flags: JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
     }
 
     public function issuePosToken(Request $request): RedirectResponse

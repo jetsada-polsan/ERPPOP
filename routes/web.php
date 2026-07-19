@@ -34,6 +34,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrganizationalUnitController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PosController;
+use App\Http\Controllers\PosReleaseController;
 use App\Http\Controllers\PosImportController;
 use App\Http\Controllers\PriceTableController;
 use App\Http\Controllers\PriceTagController;
@@ -69,6 +70,13 @@ Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.attempt');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::get('/download/pos', function () {
+    $manifestPath = storage_path('app/pos-releases/latest.json');
+    $manifest = is_file($manifestPath) ? json_decode(file_get_contents($manifestPath), true) : null;
+    $releaseUrl = data_get($manifest, 'platforms.windows-x86_64.url');
+    if ($releaseUrl) {
+        return redirect()->away($releaseUrl);
+    }
+
     $installer = public_path('downloads/POPSTAR-POS-Setup.exe');
     abort_unless(is_file($installer), 404);
 
@@ -77,6 +85,8 @@ Route::get('/download/pos', function () {
         'Cache-Control' => 'no-cache, must-revalidate',
     ]);
 })->name('pos.download');
+Route::get('/download/pos/latest.json', [PosReleaseController::class, 'latest'])->name('pos.release.latest');
+Route::get('/download/pos/releases/{filename}', [PosReleaseController::class, 'download'])->name('pos.release.download');
 Route::get('/password/change', [AuthController::class, 'showChangePassword'])->name('password.change');
 Route::post('/password/change', [AuthController::class, 'updatePassword'])->name('password.update');
 
@@ -521,6 +531,7 @@ Route::prefix('settings')->name('settings.')->group(function () {
     Route::post('/', [SystemSettingController::class, 'update'])->name('update');
     Route::post('/pos-token', [SystemSettingController::class, 'issuePosToken'])->name('pos-token.issue');
     Route::post('/pos-token/rotate', [SystemSettingController::class, 'rotatePosToken'])->name('pos-token.rotate');
+    Route::post('/pos-release', [SystemSettingController::class, 'publishPosRelease'])->name('pos-release.publish');
 });
 
 Route::prefix('line-integrations')->name('line-integrations.')->group(function () {

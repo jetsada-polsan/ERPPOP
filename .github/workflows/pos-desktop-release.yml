@@ -1,0 +1,53 @@
+name: Build POPSTAR POS
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version in 1.2.3 format
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/pos-desktop/pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Set version and updater public key
+        shell: pwsh
+        env:
+          VERSION: ${{ inputs.version }}
+          UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
+        run: |
+          $config = Get-Content apps/pos-desktop/src-tauri/tauri.conf.json -Raw
+          $config = $config.Replace('"version": "1.0.0"', '"version": "' + $env:VERSION + '"')
+          $config = $config.Replace('__TAURI_UPDATER_PUBLIC_KEY__', $env:UPDATER_PUBLIC_KEY)
+          Set-Content apps/pos-desktop/src-tauri/tauri.conf.json $config
+      - run: pnpm install --frozen-lockfile
+        working-directory: apps/pos-desktop
+      - name: Build signed installers
+        run: pnpm tauri build
+        working-directory: apps/pos-desktop
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: POPSTAR-POS-${{ inputs.version }}
+          path: |
+            apps/pos-desktop/src-tauri/target/release/bundle/nsis/*
+            apps/pos-desktop/src-tauri/target/release/bundle/msi/*
+          if-no-files-found: error
+

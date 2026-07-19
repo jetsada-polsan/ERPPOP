@@ -15,7 +15,11 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class ErpAuthorize
 {
-    private const PUBLIC_ROUTES = ['login', 'login.attempt', 'logout', 'pos.download'];
+    private const PUBLIC_ROUTES = [
+        'login', 'login.attempt', 'logout', 'pos.download',
+        'pos.release.latest', 'pos.release.download',
+    ];
+
     private const PASSWORD_CHANGE_ROUTES = ['password.change', 'password.update'];
 
     public function handle(Request $request, Closure $next): Response

@@ -1,0 +1,23 @@
+[package]
+name = "popstar-pos"
+version = "1.0.0"
+description = "POPSTAR offline-first point of sale"
+authors = ["Pop Star Future Trading Co., Ltd."]
+edition = "2021"
+
+[lib]
+name = "popstar_pos_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = [] }
+tauri-plugin-http = "2"
+tauri-plugin-sql = { version = "2", features = ["sqlite"] }
+tauri-plugin-updater = "2"
+keyring = { version = "3", features = ["windows-native"] }
+

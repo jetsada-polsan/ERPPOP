@@ -5,7 +5,7 @@
 @section('content')
 
 <form method="post" action="{{ route('settings.update') }}" enctype="multipart/form-data"
-      x-data="{ tab: @js(session('pos_token') ? 'pos-download' : 'func'), choice: @js($currentLogo ?? '__none__'), theme: @js($erpTheme), copied: false, menuOrder: @js($menuOrder), moveMenu(i, d) { const n=i+d; if(n<0 || n>=this.menuOrder.length) return; const a=[...this.menuOrder]; [a[i],a[n]]=[a[n],a[i]]; this.menuOrder=a; } }">
+      x-data="{ tab: @js(session('pos_token') || $errors->has('pos_version') || $errors->has('pos_installer') ? 'pos-download' : 'func'), choice: @js($currentLogo ?? '__none__'), theme: @js($erpTheme), copied: false, menuOrder: @js($menuOrder), moveMenu(i, d) { const n=i+d; if(n<0 || n>=this.menuOrder.length) return; const a=[...this.menuOrder]; [a[i],a[n]]=[a[n],a[i]]; this.menuOrder=a; } }">
     @csrf
     <input type="hidden" name="menu_order" :value="JSON.stringify(menuOrder)">
 
@@ -235,12 +235,49 @@
                 <div class="set-card pos-download-card">
                     <div class="pos-download-mark"><i class="bi bi-windows"></i></div>
                     <div class="pos-download-copy">
-                        <div class="set-title">JET POS สำหรับเครื่องแคชเชียร์</div>
-                        <div class="set-desc">โปรแกรมติดตั้ง Windows รุ่น 0.2.1 · Vue + Tauri · เก็บข้อมูล Local SQLite และ Sync ขึ้น Host</div>
+                        <div class="set-title">POPSTAR POS สำหรับเครื่องแคชเชียร์</div>
+                        <div class="set-desc">Vue + Tauri · Local SQLite · ขายออฟไลน์และส่งบิลขึ้น ERP อัตโนมัติ{{ $posRelease ? ' · รุ่นล่าสุด '.$posRelease['version'] : '' }}</div>
                     </div>
                     <a href="{{ route('pos.download') }}" class="btn btn-primary btn-lg pos-download-btn">
                         <i class="bi bi-download me-1"></i> ดาวน์โหลด/อัปเดต POS
                     </a>
+                </div>
+
+                <div class="set-card">
+                    <div class="set-title pt-2">เผยแพร่โปรแกรม POS รุ่นใหม่</div>
+                    <div class="set-desc mb-3">อัปโหลดไฟล์ที่สร้างและเซ็นจาก GitHub Actions เครื่องแคชเชียร์จะตรวจพบและอัปเดตเองเมื่อเปิดโปรแกรม</div>
+                    @if($posRelease)
+                        <div class="alert alert-success py-2">
+                            รุ่นปัจจุบัน <strong>{{ $posRelease['version'] }}</strong> · เผยแพร่ {{ \Illuminate\Support\Carbon::parse($posRelease['pub_date'])->diffForHumans() }}
+                            · SHA-256 <code>{{ substr($posRelease['sha256'] ?? '', 0, 16) }}...</code>
+                        </div>
+                    @endif
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-2">
+                            <label class="form-label">เวอร์ชัน</label>
+                            <input name="pos_version" class="form-control" placeholder="1.0.1">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">ไฟล์อัปเดต Windows</label>
+                            <input name="pos_installer" type="file" class="form-control" accept=".exe,.msi,.zip">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">ลายเซ็น Tauri</label>
+                            <input name="pos_signature" class="form-control font-monospace" placeholder="ข้อความจากไฟล์ .sig">
+                        </div>
+                        <div class="col-md-2 d-grid">
+                            <button type="submit" formaction="{{ route('settings.pos-release.publish') }}" formnovalidate class="btn btn-success">
+                                <i class="bi bi-cloud-arrow-up me-1"></i> เผยแพร่
+                            </button>
+                        </div>
+                        <div class="col-md-10">
+                            <label class="form-label">รายละเอียดรุ่น</label>
+                            <input name="pos_release_notes" class="form-control" placeholder="สรุปสิ่งที่แก้ไขในรุ่นนี้">
+                        </div>
+                        <div class="col-md-2">
+                            <div class="form-check pb-2"><input name="pos_mandatory" value="1" type="checkbox" class="form-check-input" id="pos-mandatory"><label for="pos-mandatory" class="form-check-label">บังคับอัปเดต</label></div>
+                        </div>
+                    </div>
                 </div>
 
                 @if(session('pos_token'))

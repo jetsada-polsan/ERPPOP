@@ -1,0 +1,19 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Permissions required by the POPSTAR cashier window",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "http:default",
+    { "identifier": "http:allow-fetch", "allow": [{ "url": "http://27.254.143.219/**" }, { "url": "https://27.254.143.219/**" }] },
+    "sql:default",
+    "sql:allow-execute",
+    "sql:allow-select",
+    "sql:allow-load",
+    "sql:allow-close",
+    "updater:default",
+    "updater:allow-check",
+    "updater:allow-download-and-install"
+  ]
+}

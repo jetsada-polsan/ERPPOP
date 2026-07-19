@@ -1,0 +1,40 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "POPSTAR POS",
+  "version": "1.0.0",
+  "identifier": "th.co.popstar.pos",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [{
+      "title": "POPSTAR POS",
+      "width": 1440,
+      "height": 900,
+      "minWidth": 920,
+      "minHeight": 650,
+      "fullscreen": false,
+      "resizable": true
+    }],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: data:; connect-src ipc: http://ipc.localhost http://27.254.143.219 https://27.254.143.219"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "createUpdaterArtifacts": true,
+    "windows": { "nsis": { "installMode": "perMachine" } }
+  },
+  "plugins": {
+    "sql": { "preload": ["sqlite:popstar-pos.db"] },
+    "updater": {
+      "endpoints": ["http://27.254.143.219/download/pos/latest.json"],
+      "pubkey": "__TAURI_UPDATER_PUBLIC_KEY__",
+      "dangerousInsecureTransportProtocol": true
+    }
+  }
+}
