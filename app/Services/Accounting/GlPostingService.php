@@ -85,6 +85,34 @@ class GlPostingService
         return $rate !== null ? (float) $rate : 7.0;
     }
 
+    /** @return array{subtotal:float,vat:float,total:float} */
+    private function salesBreakdown(Document $document): array
+    {
+        $document->loadMissing('stockDocument.items.product');
+        $rate = $this->vatRate();
+        $subtotal = 0.0;
+        $vat = 0.0;
+
+        foreach ($document->stockDocument?->items ?? [] as $item) {
+            $gross = abs((float) $item->qty * (float) $item->unit_price);
+            if ($item->product?->is_vat && $rate > 0) {
+                $base = round($gross * 100 / (100 + $rate), 4);
+                $lineVat = round($gross - $base, 4);
+                $subtotal += $base;
+                $vat += $lineVat;
+                $item->update(['vat_amount' => $lineVat]);
+            } else {
+                $subtotal += $gross;
+                $item->update(['vat_amount' => 0]);
+            }
+        }
+
+        $total = round($subtotal + $vat, 2);
+        $subtotal = round($subtotal, 2);
+
+        return ['subtotal' => $subtotal, 'vat' => round($total - $subtotal, 2), 'total' => $total];
+    }
+
     private function role(string $role): ?ChartOfAccount
     {
         return ChartOfAccount::where('default_role', $role)->first();
@@ -100,6 +128,9 @@ class GlPostingService
     {
         $resolved = [];
         foreach ($lines as $line) {
+            if (($line['debit'] ?? 0) == 0.0 && ($line['credit'] ?? 0) == 0.0) {
+                continue;
+            }
             $account = $this->role($line['role']);
             if (! $account) {
                 return; // ผังบัญชียังไม่ครบ - ข้ามทั้งเอกสารเพื่อไม่ให้ GL ไม่ดุล
@@ -159,12 +190,13 @@ class GlPostingService
     // ขายเชื่อ: Dr ลูกหนี้ / Cr รายได้ + ภาษีขาย (ราคารวม VAT) + ต้นทุนขาย
     public function postCreditSale(Document $document): void
     {
+        $amounts = $this->salesBreakdown($document);
         $total = (float) $document->total_amount;
-        $base = round($total * 100 / (100 + $this->vatRate()), 2);
+        $document->update(['subtotal_amount' => $amounts['subtotal'], 'vat_amount' => $amounts['vat']]);
         $this->postDocument($document, [
             ['role' => ChartOfAccount::ROLE_AR, 'debit' => $total],
-            ['role' => ChartOfAccount::ROLE_SALES_REVENUE, 'credit' => $base],
-            ['role' => ChartOfAccount::ROLE_VAT_OUTPUT, 'credit' => round($total - $base, 2)],
+            ['role' => ChartOfAccount::ROLE_SALES_REVENUE, 'credit' => $amounts['subtotal']],
+            ['role' => ChartOfAccount::ROLE_VAT_OUTPUT, 'credit' => $amounts['vat']],
         ], 'ขายเชื่อ '.$document->doc_number);
         $this->appendCogs($document, $document->doc_number);
     }
@@ -172,12 +204,13 @@ class GlPostingService
     // ขายสด: Dr เงินสด / Cr รายได้ + ภาษีขาย + ต้นทุนขาย
     public function postCashSale(Document $document): void
     {
+        $amounts = $this->salesBreakdown($document);
         $total = (float) $document->total_amount;
-        $base = round($total * 100 / (100 + $this->vatRate()), 2);
+        $document->update(['subtotal_amount' => $amounts['subtotal'], 'vat_amount' => $amounts['vat']]);
         $this->postDocument($document, [
             ['role' => ChartOfAccount::ROLE_CASH, 'debit' => $total],
-            ['role' => ChartOfAccount::ROLE_SALES_REVENUE, 'credit' => $base],
-            ['role' => ChartOfAccount::ROLE_VAT_OUTPUT, 'credit' => round($total - $base, 2)],
+            ['role' => ChartOfAccount::ROLE_SALES_REVENUE, 'credit' => $amounts['subtotal']],
+            ['role' => ChartOfAccount::ROLE_VAT_OUTPUT, 'credit' => $amounts['vat']],
         ], 'ขายสด '.$document->doc_number);
         $this->appendCogs($document, $document->doc_number);
     }
@@ -215,10 +248,11 @@ class GlPostingService
     public function postPurchase(Document $document, bool $isCredit = true): void
     {
         $total = (float) $document->total_amount;
-        $base = round($total * 100 / (100 + $this->vatRate()), 2);
+        $base = (float) ($document->subtotal_amount ?? $total);
+        $vat = (float) ($document->vat_amount ?? 0);
         $this->postDocument($document, [
             ['role' => ChartOfAccount::ROLE_INVENTORY, 'debit' => $base],
-            ['role' => ChartOfAccount::ROLE_VAT_INPUT, 'debit' => round($total - $base, 2)],
+            ['role' => ChartOfAccount::ROLE_VAT_INPUT, 'debit' => $vat],
             ['role' => $isCredit ? ChartOfAccount::ROLE_AP : ChartOfAccount::ROLE_CASH, 'credit' => $total],
         ], 'ซื้อสินค้า '.$document->doc_number);
     }

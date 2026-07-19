@@ -71,6 +71,7 @@
         'partyLabel' => 'ซัพพลายเออร์',
         'partyRequired' => true,
         'showCreditType' => true,
+        'showPurchaseTaxMode' => true,
         'showLotFields' => true,
         'itemTitle' => 'รายการรับสินค้า',
         'submitLabel' => 'บันทึกใบซื้อ',

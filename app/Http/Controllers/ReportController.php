@@ -1237,20 +1237,13 @@ class ReportController extends Controller
 
     private function grossMargin(Carbon $from, Carbon $to, array $filters): Collection
     {
-        $costRows = DB::table('stock_document_items as sdi')
-            ->join('stock_documents as sd', 'sd.id', '=', 'sdi.stock_document_id')
-            ->join('documents as d', 'd.id', '=', 'sd.document_id')
-            ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
-            ->where('dt.code', 'PURCHASE')
-            ->where('sdi.unit_price', '>', 0)
-            ->groupBy('sdi.product_id')
-            ->selectRaw('sdi.product_id, sum(sdi.qty * sdi.unit_price) / nullif(sum(sdi.qty), 0) as avg_cost')
-            ->pluck('avg_cost', 'product_id');
-
+        // POS ที่สร้างจากหน้าขายมี CASH_SALE document อยู่แล้ว จึงไม่รวมซ้ำที่นี่
+        // ส่วน POS import รุ่นเก่าที่ไม่มี document ยังใช้ average_cost ปัจจุบันเป็นค่าประมาณแยกต่างหาก
         $posQuery = DB::table('pos_receipt_items as i')
             ->join('pos_receipts as r', 'r.id', '=', 'i.pos_receipt_id')
             ->join('pos_terminals as t', 't.id', '=', 'r.pos_terminal_id')
             ->join('products as p', 'p.id', '=', 'i.product_id')
+            ->whereNull('r.document_id')
             ->whereBetween('r.receipt_date', [$from, $to]);
 
         $this->applyBranch($posQuery, $filters, 't.branch_id');
@@ -1258,7 +1251,7 @@ class ReportController extends Controller
 
         $posRows = $posQuery
             ->groupBy('p.id', 'p.sku_code', 'p.name_th')
-            ->selectRaw('p.id as product_id, p.sku_code, p.name_th, sum(i.qty) as qty, sum(i.net_amount) as sales_amount')
+            ->selectRaw('p.id as product_id, p.sku_code, p.name_th, sum(i.qty) as qty, sum(i.net_amount - i.vat_amount) as sales_amount, sum(i.qty * p.average_cost) as cost_amount')
             ->get();
 
         $docQuery = DB::table('stock_document_items as sdi')
@@ -1274,18 +1267,17 @@ class ReportController extends Controller
 
         $docRows = $docQuery
             ->groupBy('p.id', 'p.sku_code', 'p.name_th')
-            ->selectRaw('p.id as product_id, p.sku_code, p.name_th, sum(sdi.qty) as qty, sum(sdi.qty * sdi.unit_price) as sales_amount')
+            ->selectRaw('p.id as product_id, p.sku_code, p.name_th, sum(sdi.qty) as qty, sum((sdi.qty * sdi.unit_price) - sdi.vat_amount) as sales_amount, sum(coalesce(sdi.cost_amount, sdi.qty * p.average_cost)) as cost_amount')
             ->get();
 
         return $posRows
             ->concat($docRows)
             ->groupBy('product_id')
-            ->map(function (Collection $rows) use ($costRows) {
+            ->map(function (Collection $rows) {
                 $first = $rows->first();
                 $qty = (float) $rows->sum('qty');
                 $salesAmount = (float) $rows->sum('sales_amount');
-                $avgCost = (float) ($costRows[$first->product_id] ?? 0);
-                $costAmount = $qty * $avgCost;
+                $costAmount = (float) $rows->sum('cost_amount');
 
                 return (object) [
                     'sku_code' => $first->sku_code,

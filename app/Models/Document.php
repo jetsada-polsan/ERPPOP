@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 #[Fillable([
     'document_type_id', 'document_book_id', 'branch_id', 'doc_number', 'doc_date', 'salesman_id', 'sales_area_id',
     'customer_id', 'supplier_id', 'reference', 'status', 'total_items', 'total_amount',
+    'subtotal_amount', 'vat_amount', 'prices_include_vat', 'claim_input_vat',
     'remark', 'created_by',
 ])]
 class Document extends Model
@@ -79,6 +80,10 @@ class Document extends Model
         return [
             'doc_date' => 'date',
             'total_amount' => 'decimal:4',
+            'subtotal_amount' => 'decimal:4',
+            'vat_amount' => 'decimal:4',
+            'prices_include_vat' => 'boolean',
+            'claim_input_vat' => 'boolean',
             'cancelled_at' => 'datetime',
         ];
     }

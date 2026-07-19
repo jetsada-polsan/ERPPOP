@@ -2,13 +2,17 @@
 
 namespace App\Services\Sales;
 
+use App\Models\AppSetting;
 use App\Models\CustomerOpenItem;
 use App\Models\Document;
+use App\Models\DocumentBook;
 use App\Models\DocumentType;
+use App\Models\Product;
 use App\Models\SaleBooking;
 use App\Models\StockBalance;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
+use App\Services\Accounting\GlPostingService;
 use App\Services\Inventory\FifoStockService;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -27,14 +31,14 @@ class CreditSaleService
 
     public function __construct(
         private readonly DocumentNumberGenerator $numbers,
-        private readonly \App\Services\Accounting\GlPostingService $glPosting,
+        private readonly GlPostingService $glPosting,
         private readonly FifoStockService $fifo,
     ) {}
 
-    public function convertBookingToCreditSale(SaleBooking $booking, ?\App\Models\DocumentBook $book = null): Document
+    public function convertBookingToCreditSale(SaleBooking $booking, ?DocumentBook $book = null): Document
     {
         $documentType = DocumentType::where('code', DocumentType::CREDIT_SALE)->firstOrFail();
-        $book ??= \App\Models\DocumentBook::defaultFor(DocumentType::CREDIT_SALE);
+        $book ??= DocumentBook::defaultFor(DocumentType::CREDIT_SALE);
 
         return DB::transaction(function () use ($booking, $documentType, $book) {
             $lockedBooking = SaleBooking::whereKey($booking->id)->lockForUpdate()->firstOrFail();
@@ -76,7 +80,9 @@ class CreditSaleService
             ]);
 
             $seq = 1;
+            $products = Product::whereIn('id', $sourceItems->pluck('product_id')->unique())->get()->keyBy('id');
             foreach ($sourceItems as $item) {
+                $unitCost = (float) ($products->get((int) $item->product_id)?->average_cost ?? 0);
                 StockDocumentItem::create([
                     'stock_document_id' => $stockDocument->id,
                     'seq' => $seq++,
@@ -84,6 +90,8 @@ class CreditSaleService
                     'warehouse_location_id' => $item->warehouse_location_id,
                     'qty' => $item->qty,
                     'unit_price' => $item->unit_price,
+                    'unit_cost' => $unitCost,
+                    'cost_amount' => round((float) $item->qty * $unitCost, 4),
                 ]);
 
                 $balance = StockBalance::firstOrCreate(
@@ -101,7 +109,7 @@ class CreditSaleService
                 'gross_amount' => $totalAmount,
                 'net_amount' => $totalAmount,
                 'balance_amount' => $totalAmount,
-                'due_date' => now()->addDays((int) (\App\Models\AppSetting::get('default_credit_days') ?: self::DEFAULT_CREDIT_DAYS))->toDateString(),
+                'due_date' => now()->addDays((int) (AppSetting::get('default_credit_days') ?: self::DEFAULT_CREDIT_DAYS))->toDateString(),
                 'status' => CustomerOpenItem::STATUS_OPEN,
             ]);
 

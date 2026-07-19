@@ -6,10 +6,11 @@ use App\Models\Branch;
 use App\Models\CustomerOpenItem;
 use App\Models\Document;
 use App\Models\DocumentType;
-use App\Models\StockBalance;
+use App\Models\Product;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
-use App\Models\StockMovement;
+use App\Services\Accounting\GlPostingService;
+use App\Services\Inventory\FifoStockService;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -22,7 +23,8 @@ class SaleReturnService
 {
     public function __construct(
         private readonly DocumentNumberGenerator $numbers,
-        private readonly \App\Services\Accounting\GlPostingService $glPosting,
+        private readonly GlPostingService $glPosting,
+        private readonly FifoStockService $fifo,
     ) {}
 
     /**
@@ -49,6 +51,10 @@ class SaleReturnService
         return DB::transaction(function () use ($data, $branch, $documentType, $openItem) {
             $items = collect($data['items']);
             $totalAmount = $items->sum(fn ($i) => $i['qty'] * $i['unit_price']);
+            $originalCosts = $openItem?->document?->stockDocument?->items
+                ?->keyBy('product_id') ?? collect();
+            $currentCosts = Product::whereIn('id', $items->pluck('product_id'))
+                ->pluck('average_cost', 'id');
 
             $document = Document::create([
                 'document_type_id' => $documentType->id,
@@ -70,6 +76,8 @@ class SaleReturnService
 
             $seq = 1;
             foreach ($items as $item) {
+                $unitCost = (float) ($originalCosts->get((int) $item['product_id'])?->unit_cost
+                    ?? $currentCosts[(int) $item['product_id']] ?? 0);
                 StockDocumentItem::create([
                     'stock_document_id' => $stockDocument->id,
                     'seq' => $seq++,
@@ -77,22 +85,18 @@ class SaleReturnService
                     'warehouse_location_id' => $branch->default_warehouse_location_id,
                     'qty' => $item['qty'],
                     'unit_price' => $item['unit_price'],
+                    'unit_cost' => $unitCost,
+                    'cost_amount' => round((float) $item['qty'] * $unitCost, 4),
                 ]);
 
-                StockMovement::create([
-                    'product_id' => $item['product_id'],
-                    'warehouse_location_id' => $branch->default_warehouse_location_id,
-                    'document_id' => $document->id,
-                    'movement_type' => 'in',
-                    'qty' => $item['qty'],
-                    'movement_date' => now()->toDateString(),
-                ]);
-
-                $balance = StockBalance::firstOrCreate(
-                    ['product_id' => $item['product_id'], 'warehouse_location_id' => $branch->default_warehouse_location_id],
-                    ['on_hand_qty' => 0, 'reserved_qty' => 0]
+                $this->fifo->receive(
+                    (int) $item['product_id'],
+                    (int) $branch->default_warehouse_location_id,
+                    (float) $item['qty'],
+                    $document->id,
+                    'return_in',
+                    unitCost: $unitCost,
                 );
-                $balance->increment('on_hand_qty', (float) $item['qty']);
             }
 
             if ($openItem !== null) {

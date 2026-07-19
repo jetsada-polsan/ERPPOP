@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
+use App\Models\PriceChange;
 use App\Models\PriceTable;
 use App\Models\Product;
 use App\Models\ProductBarcode;
@@ -10,9 +11,10 @@ use App\Models\ProductBrand;
 use App\Models\ProductCategory;
 use App\Models\ProductDepartment;
 use App\Models\ProductPrice;
-use App\Models\ProductUnit;
 use App\Models\ProductSupplier;
+use App\Models\ProductUnit;
 use App\Models\Supplier;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -98,6 +100,10 @@ class ProductController extends Controller
             ->groupBy('price_table_id');
 
         $defaultPriceTable = PriceTable::where('is_default', true)->first();
+        $currentVatRate = (float) (DB::table('vat_rates')
+            ->where('effective_from', '<=', now()->toDateString())
+            ->where(fn ($query) => $query->whereNull('effective_to')->orWhere('effective_to', '>=', now()->toDateString()))
+            ->orderByDesc('effective_from')->value('rate_percent') ?? 7);
 
         // เลข PLU เครื่องชั่งถัดไป (รันต่อจากรหัสสูงสุดในช่วง 800xxx +1) — DB-agnostic
         $maxScalePlu = ProductBarcode::where('barcode', 'like', '800%')
@@ -125,13 +131,14 @@ class ProductController extends Controller
             'productPrices' => $productPrices,
             'branchesByTable' => $branchesByTable,
             'defaultPriceTable' => $defaultPriceTable,
+            'currentVatRate' => $currentVatRate,
             'nextScalePlu' => $nextScalePlu,
             'suppliers' => Supplier::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name_th']),
         ]);
     }
 
     // Upsert price from product show page
-    public function upsertPrice(Request $request, Product $product): \Illuminate\Http\JsonResponse|RedirectResponse
+    public function upsertPrice(Request $request, Product $product): JsonResponse|RedirectResponse
     {
         $data = $request->validate([
             'price_table_id' => ['required', 'integer', 'exists:price_tables,id'],
@@ -140,18 +147,29 @@ class ProductController extends Controller
             'cost_price' => ['nullable', 'numeric', 'min:0'],
         ]);
 
+        $identity = [
+            'product_id' => $product->id,
+            'price_table_id' => $data['price_table_id'],
+            'unit_id' => $data['unit_id'] ?? null,
+        ];
+        $oldPrice = ProductPrice::where($identity)->value('price');
         $pp = ProductPrice::updateOrCreate(
-            [
-                'product_id' => $product->id,
-                'price_table_id' => $data['price_table_id'],
-                'unit_id' => $data['unit_id'] ?? null,
-            ],
+            $identity,
             [
                 'price' => $data['price'],
                 'cost_price' => $data['cost_price'] ?? 0,
                 'is_active' => true,
             ]
         );
+        if ($oldPrice === null || round((float) $oldPrice, 4) !== round((float) $data['price'], 4)) {
+            PriceChange::create([
+                'product_id' => $product->id,
+                'old_price' => $oldPrice,
+                'new_price' => $data['price'],
+                'effective_date' => now()->toDateString(),
+                'changed_by' => auth()->id(),
+            ]);
+        }
 
         if ($request->boolean('compact_form')) {
             return redirect()->route('products.show', [
@@ -214,7 +232,9 @@ class ProductController extends Controller
         while ($sequence <= 999999999) {
             $body = '299'.str_pad((string) $sequence, 9, '0', STR_PAD_LEFT);
             $barcode = $body.$this->ean13CheckDigit($body);
-            if (! ProductBarcode::where('barcode', $barcode)->exists()) return $barcode;
+            if (! ProductBarcode::where('barcode', $barcode)->exists()) {
+                return $barcode;
+            }
             $sequence++;
         }
 
@@ -263,11 +283,14 @@ class ProductController extends Controller
             'note' => ['nullable', 'string', 'max:1000'],
         ]);
         $primary = $request->boolean('is_primary');
-        if ($primary) $product->suppliers()->update(['is_primary' => false]);
+        if ($primary) {
+            $product->suppliers()->update(['is_primary' => false]);
+        }
         ProductSupplier::updateOrCreate(
             ['product_id' => $product->id, 'supplier_id' => $data['supplier_id']],
             [...$data, 'is_primary' => $primary],
         );
+
         return back()->with('success', 'บันทึกผู้จำหน่ายของสินค้าแล้ว');
     }
 
@@ -275,6 +298,7 @@ class ProductController extends Controller
     {
         abort_unless($productSupplier->product_id === $product->id, 404);
         $productSupplier->delete();
+
         return back()->with('success', 'นำผู้จำหน่ายออกจากแฟ้มสินค้าแล้ว');
     }
 

@@ -3,16 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
+use App\Models\FlashSale;
+use App\Models\PriceChange;
+use App\Models\PriceTable;
 use App\Models\Product;
 use App\Models\ProductPrice;
 use App\Models\ProductUnit;
-use App\Models\PriceTable;
-use App\Models\FlashSale;
 use App\Models\Promotion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class PriceTableController extends Controller
@@ -128,12 +128,14 @@ class PriceTableController extends Controller
             'min_qty' => ['nullable', 'numeric', 'min:0.0001'],
         ]);
 
+        $identity = [
+            'product_id' => $data['product_id'],
+            'price_table_id' => $priceTable->id,
+            'unit_id' => $data['unit_id'] ?? null,
+        ];
+        $oldPrice = ProductPrice::where($identity)->value('price');
         $pp = ProductPrice::updateOrCreate(
-            [
-                'product_id' => $data['product_id'],
-                'price_table_id' => $priceTable->id,
-                'unit_id' => $data['unit_id'] ?? null,
-            ],
+            $identity,
             [
                 'price' => $data['price'],
                 'cost_price' => $data['cost_price'] ?? 0,
@@ -141,6 +143,15 @@ class PriceTableController extends Controller
                 'is_active' => true,
             ]
         );
+        if ($oldPrice === null || round((float) $oldPrice, 4) !== round((float) $data['price'], 4)) {
+            PriceChange::create([
+                'product_id' => $data['product_id'],
+                'old_price' => $oldPrice,
+                'new_price' => $data['price'],
+                'effective_date' => now()->toDateString(),
+                'changed_by' => auth()->id(),
+            ]);
+        }
 
         return response()->json(['success' => true, 'id' => $pp->id]);
     }

@@ -37,6 +37,8 @@ class PurchaseController extends Controller
             'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
             'is_credit' => ['nullable', 'boolean'],
+            'prices_include_vat' => ['nullable', 'boolean'],
+            'claim_input_vat' => ['nullable', 'boolean'],
             'remark' => ['nullable', 'string', 'max:1000'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
@@ -46,6 +48,8 @@ class PurchaseController extends Controller
             'items.*.expiry_date' => ['nullable', 'date'],
         ]);
         $data['is_credit'] = $request->boolean('is_credit', true);
+        $data['prices_include_vat'] = $request->boolean('prices_include_vat', true);
+        $data['claim_input_vat'] = $request->boolean('claim_input_vat');
 
         try {
             $document = $service->create($data);

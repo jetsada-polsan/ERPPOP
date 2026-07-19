@@ -9,8 +9,10 @@ use App\Models\Product;
 use App\Models\ProductSupplier;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
-use App\Services\Inventory\FifoStockService;
 use App\Models\SupplierLedger;
+use App\Services\Accounting\GlPostingService;
+use App\Services\Inventory\CostingService;
+use App\Services\Inventory\FifoStockService;
 use App\Services\Sales\DocumentNumberGenerator;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -27,13 +29,13 @@ class PurchaseService
 {
     public function __construct(
         private readonly DocumentNumberGenerator $numbers,
-        private readonly \App\Services\Accounting\GlPostingService $glPosting,
-        private readonly \App\Services\Inventory\CostingService $costing,
+        private readonly GlPostingService $glPosting,
+        private readonly CostingService $costing,
         private readonly FifoStockService $fifo,
     ) {}
 
     /**
-     * @param  array{supplier_id:int, branch_id:int, is_credit:bool, remark:?string, items: array<int, array{product_id:int, qty:float, unit_price:float}>}  $data
+     * @param  array{supplier_id:int, branch_id:int, is_credit:bool, prices_include_vat?:bool, claim_input_vat?:bool, remark:?string, items: array<int, array{product_id:int, qty:float, unit_price:float}>}  $data
      */
     public function create(array $data): Document
     {
@@ -47,22 +49,50 @@ class PurchaseService
         }
 
         $isCredit = (bool) ($data['is_credit'] ?? true);
+        $pricesIncludeVat = (bool) ($data['prices_include_vat'] ?? true);
+        $claimInputVat = (bool) ($data['claim_input_vat'] ?? false);
         // Cash vs credit purchase share the same document_type (PURCHASE); the
         // distinction only affects whether a supplier_ledger debt entry is opened.
         $documentType = DocumentType::where('code', 'PURCHASE')->firstOrFail();
 
-        return DB::transaction(function () use ($data, $branch, $documentType, $isCredit) {
+        return DB::transaction(function () use ($data, $branch, $documentType, $isCredit, $pricesIncludeVat, $claimInputVat) {
             $items = collect($data['items']);
-            $expiryByProduct = Product::whereIn('id', $items->pluck('product_id'))
-                ->pluck('tracks_expiry', 'id');
+            $products = Product::whereIn('id', $items->pluck('product_id'))->get()->keyBy('id');
+            $expiryByProduct = $products->pluck('tracks_expiry', 'id');
             foreach ($items as $item) {
                 if (($expiryByProduct[$item['product_id']] ?? false)
                     && array_key_exists('expiry_date', $item) && empty($item['expiry_date'])) {
                     throw new RuntimeException('สินค้าที่ควบคุมวันหมดอายุต้องระบุวันหมดอายุตอนรับเข้า');
                 }
             }
-            $totalQty = $items->sum('qty');
-            $totalAmount = $items->sum(fn ($i) => $i['qty'] * $i['unit_price']);
+            $vatRate = (float) (DB::table('vat_rates')
+                ->where('effective_from', '<=', now()->toDateString())
+                ->where(fn ($q) => $q->whereNull('effective_to')->orWhere('effective_to', '>=', now()->toDateString()))
+                ->orderByDesc('effective_from')->value('rate_percent') ?? 7);
+            $calculated = $items->map(function (array $item) use ($products, $pricesIncludeVat, $claimInputVat, $vatRate): array {
+                $product = $products->get((int) $item['product_id']);
+                $qty = (float) $item['qty'];
+                $enteredPrice = (float) $item['unit_price'];
+                $unitCost = $this->costing->purchaseUnitCost($product, $enteredPrice, $pricesIncludeVat, $claimInputVat, $vatRate);
+                $costAmount = round($qty * $unitCost, 4);
+                $vatAmount = $product->is_vat && $claimInputVat
+                    ? round($pricesIncludeVat ? ($qty * $enteredPrice) - $costAmount : $costAmount * $vatRate / 100, 4)
+                    : 0.0;
+                $invoiceAmount = $product->is_vat && ! $pricesIncludeVat
+                    ? round($qty * $enteredPrice * (100 + $vatRate) / 100, 4)
+                    : round($qty * $enteredPrice, 4);
+
+                return $item + [
+                    '_unit_cost' => $unitCost,
+                    '_cost_amount' => $costAmount,
+                    '_vat_amount' => $vatAmount,
+                    '_invoice_amount' => $invoiceAmount,
+                ];
+            });
+            $totalQty = $calculated->sum('qty');
+            $subtotalAmount = round($calculated->sum('_cost_amount'), 4);
+            $totalAmount = round($calculated->sum('_invoice_amount'), 4);
+            $vatAmount = $claimInputVat ? round($totalAmount - $subtotalAmount, 4) : 0.0;
 
             $document = Document::create([
                 'document_type_id' => $documentType->id,
@@ -73,6 +103,10 @@ class PurchaseService
                 'status' => 'active',
                 'total_items' => $items->count(),
                 'total_amount' => $totalAmount,
+                'subtotal_amount' => $subtotalAmount,
+                'vat_amount' => $vatAmount,
+                'prices_include_vat' => $pricesIncludeVat,
+                'claim_input_vat' => $claimInputVat,
                 'remark' => $data['remark'] ?? null,
             ]);
 
@@ -83,7 +117,7 @@ class PurchaseService
             ]);
 
             $seq = 1;
-            foreach ($items as $item) {
+            foreach ($calculated as $item) {
                 StockDocumentItem::create([
                     'stock_document_id' => $stockDocument->id,
                     'seq' => $seq++,
@@ -91,16 +125,19 @@ class PurchaseService
                     'warehouse_location_id' => $branch->default_warehouse_location_id,
                     'qty' => $item['qty'],
                     'unit_price' => $item['unit_price'],
+                    'unit_cost' => $item['_unit_cost'],
+                    'cost_amount' => $item['_cost_amount'],
+                    'vat_amount' => $item['_vat_amount'],
                 ]);
 
                 // อัปเดตต้นทุนเฉลี่ย "ก่อน" เพิ่มสต๊อก (ใช้ยอดคงเหลือก่อนรับถัวเฉลี่ย)
-                $this->costing->recordPurchase($item['product_id'], (float) $item['qty'], (float) $item['unit_price']);
+                $this->costing->recordPurchase($item['product_id'], (float) $item['qty'], (float) $item['_unit_cost']);
 
                 $this->fifo->receive(
                     (int) $item['product_id'], (int) $branch->default_warehouse_location_id,
                     (float) $item['qty'], $document->id, 'in',
                     $item['lot_number'] ?? null, now()->toDateString(), $item['expiry_date'] ?? null,
-                    (float) $item['unit_price']
+                    (float) $item['_unit_cost']
                 );
 
                 ProductSupplier::updateOrCreate(

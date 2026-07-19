@@ -5,9 +5,10 @@ namespace App\Services\Sales;
 use App\Models\Branch;
 use App\Models\Document;
 use App\Models\DocumentType;
+use App\Models\Product;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
-use App\Models\Product;
+use App\Services\Accounting\GlPostingService;
 use App\Services\Inventory\FifoStockService;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -21,7 +22,7 @@ class CashSaleService
 {
     public function __construct(
         private readonly DocumentNumberGenerator $numbers,
-        private readonly \App\Services\Accounting\GlPostingService $glPosting,
+        private readonly GlPostingService $glPosting,
         private readonly FifoStockService $fifo,
     ) {}
 
@@ -64,9 +65,10 @@ class CashSaleService
             ]);
 
             $seq = 1;
-            $policies = Product::whereIn('id', $items->pluck('product_id')->unique())
-                ->pluck('negative_stock_policy', 'id');
+            $products = Product::whereIn('id', $items->pluck('product_id')->unique())->get()->keyBy('id');
+            $policies = $products->pluck('negative_stock_policy', 'id');
             foreach ($items as $item) {
+                $unitCost = (float) ($products->get((int) $item['product_id'])?->average_cost ?? 0);
                 StockDocumentItem::create([
                     'stock_document_id' => $stockDocument->id,
                     'seq' => $seq++,
@@ -74,6 +76,8 @@ class CashSaleService
                     'warehouse_location_id' => $branch->default_warehouse_location_id,
                     'qty' => $item['qty'],
                     'unit_price' => $item['unit_price'],
+                    'unit_cost' => $unitCost,
+                    'cost_amount' => round((float) $item['qty'] * $unitCost, 4),
                 ]);
 
                 $this->fifo->issue(

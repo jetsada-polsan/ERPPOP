@@ -6,6 +6,7 @@
     $showSalesman = $showSalesman ?? false;
     $showCreditType = $showCreditType ?? false;
     $showLotFields = $showLotFields ?? false;
+    $showPurchaseTaxMode = $showPurchaseTaxMode ?? false;
     $submitClass = $submitClass ?? 'doc-btn-primary';
 @endphp
 
@@ -46,6 +47,24 @@
                                     <select name="is_credit" class="doc-select">
                                         <option value="1">ซื้อเชื่อ</option>
                                         <option value="0">ซื้อสด</option>
+                                    </select>
+                                </div>
+                            @endif
+
+                            @if($showPurchaseTaxMode)
+                                <div class="doc-field" style="grid-column: span 4;">
+                                    <label>ราคาซื้อที่กรอก</label>
+                                    <select name="prices_include_vat" class="doc-select">
+                                        <option value="1">รวม VAT แล้ว</option>
+                                        <option value="0">ยังไม่รวม VAT</option>
+                                    </select>
+                                </div>
+                                <div class="doc-field" style="grid-column: span 4;">
+                                    <label>สิทธิ์ภาษีซื้อ</label>
+                                    <select name="claim_input_vat" class="doc-select" required>
+                                        <option value="" selected disabled>เลือกตามเอกสารที่ได้รับ</option>
+                                        <option value="1">มีใบกำกับภาษี ใช้ภาษีซื้อ</option>
+                                        <option value="0">ไม่มีสิทธิ์ขอคืน รวม VAT เป็นต้นทุน</option>
                                     </select>
                                 </div>
                             @endif
@@ -147,7 +166,7 @@
                                             @endif
                                         </td>
                                         <td><input type="number" step="0.0001" min="0.0001" :name="`items[${index}][qty]`" x-model.number="item.qty" required class="doc-input text-end"></td>
-                                        <td><input type="number" step="0.01" min="0" :name="`items[${index}][unit_price]`" x-model.number="item.unit_price" required class="doc-input text-end"></td>
+                                        <td><input type="number" step="0.01" min="0" :name="`items[${index}][unit_price]`" x-model.number="item.unit_price" required class="doc-input text-end" title="ราคาตามใบซื้อ ระบบจะแยก VAT และต้นทุนบัญชีให้อัตโนมัติ"></td>
                                         <td class="doc-line-total">฿<span x-text="money(item.qty * item.unit_price)"></span></td>
                                         <td class="del">
                                             <button type="button" class="doc-delete" @click="removeItem(index)" x-show="items.length > 1">

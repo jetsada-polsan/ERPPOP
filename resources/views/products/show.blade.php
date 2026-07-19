@@ -123,6 +123,17 @@
             </div>
         </div>
 
+        @php
+            $salePriceExVat = $product->is_vat ? ((float) $defaultPosPrice * 100 / (100 + $currentVatRate)) : (float) $defaultPosPrice;
+            $estimatedProfit = $salePriceExVat - (float) $product->average_cost;
+        @endphp
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-lg-3"><div class="content-card p-3 h-100"><div class="text-muted small">ราคาขายปัจจุบัน</div><div class="fs-5 fw-bold text-success">฿{{ number_format((float)$defaultPosPrice, 2) }}</div><div class="small text-muted">ตามตารางราคาหลัก</div></div></div>
+            <div class="col-6 col-lg-3"><div class="content-card p-3 h-100"><div class="text-muted small">ต้นทุนรับเข้าล่าสุด</div><div class="fs-5 fw-bold">฿{{ number_format((float)$product->last_purchase_cost, 2) }}</div><div class="small text-muted">ไม่รวม VAT ที่ขอคืนได้</div></div></div>
+            <div class="col-6 col-lg-3"><div class="content-card p-3 h-100"><div class="text-muted small">ต้นทุนเฉลี่ยเคลื่อนไหว</div><div class="fs-5 fw-bold">฿{{ number_format((float)$product->average_cost, 2) }}</div><div class="small text-muted">ล็อกเป็นต้นทุนเมื่อขาย</div></div></div>
+            <div class="col-6 col-lg-3"><div class="content-card p-3 h-100"><div class="text-muted small">กำไรขั้นต้นประมาณ/หน่วย</div><div class="fs-5 fw-bold {{ $estimatedProfit >= 0 ? 'text-primary' : 'text-danger' }}">฿{{ number_format($estimatedProfit, 2) }}</div><div class="small text-muted">ยอดขายหลัง VAT ลบต้นทุนเฉลี่ย</div></div></div>
+        </div>
+
 
         {{-- ═══ Price Tables Section ═══════════════════════════════════ --}}
         <div class="content-card p-4 mb-4" x-data="priceTableSection()">
@@ -151,7 +162,7 @@
                             <th>ตารางราคา</th>
                             <th>หน่วย</th>
                             <th class="text-end">ราคาขาย</th>
-                            <th class="text-end">ทุน</th>
+                            <th class="text-end">ทุนอ้างอิง</th>
                             <th class="text-end">GP%</th>
                             <th>สาขาที่ใช้</th>
                             <th></th>

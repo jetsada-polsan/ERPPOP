@@ -18,6 +18,10 @@
                     {{ $purchase->branch->name_th }} &middot;
                     ซัพพลายเออร์: {{ $purchase->supplier->name_th }} ({{ $purchase->supplier->code }})
                 </div>
+                <div class="text-muted small mt-1">
+                    ราคาที่กรอก: {{ $purchase->prices_include_vat ? 'รวม VAT' : 'ยังไม่รวม VAT' }}
+                    &middot; ภาษีซื้อ: {{ $purchase->claim_input_vat ? 'ใช้สิทธิ์ภาษีซื้อ' : 'รวมเป็นต้นทุน' }}
+                </div>
                 @if($purchase->remark)
                 <div class="text-muted small mt-1">หมายเหตุ: {{ $purchase->remark }}</div>
                 @endif
@@ -36,7 +40,9 @@
                             <tr>
                                 <th>รหัส</th><th>ชื่อสินค้า</th>
                                 <th class="text-end">จำนวน</th>
-                                <th class="text-end">ราคา/หน่วย</th>
+                                <th class="text-end">ราคาตามบิล</th>
+                                <th class="text-end">ต้นทุนบัญชี/หน่วย</th>
+                                <th class="text-end">VAT</th>
                                 <th class="text-end">รวม</th>
                             </tr>
                         </thead>
@@ -47,13 +53,15 @@
                                 <td>{{ $item->product->name_th }}</td>
                                 <td class="text-end">{{ number_format($item->qty, 2) }}</td>
                                 <td class="text-end">{{ number_format($item->unit_price, 2) }}</td>
-                                <td class="text-end">{{ number_format($item->qty * $item->unit_price, 2) }}</td>
+                                <td class="text-end">{{ number_format($item->unit_cost, 2) }}</td>
+                                <td class="text-end">{{ number_format($item->vat_amount, 2) }}</td>
+                                <td class="text-end">{{ number_format($item->cost_amount + $item->vat_amount, 2) }}</td>
                             </tr>
                             @endforeach
                         </tbody>
                         <tfoot>
                             <tr class="fw-bold border-top">
-                                <td colspan="4" class="text-end py-2">รวมทั้งสิ้น</td>
+                                <td colspan="6" class="text-end py-2">ก่อน VAT {{ number_format($purchase->subtotal_amount, 2) }} + VAT {{ number_format($purchase->vat_amount, 2) }} = รวมทั้งสิ้น</td>
                                 <td class="text-end">{{ number_format($purchase->total_amount, 2) }}</td>
                             </tr>
                         </tfoot>

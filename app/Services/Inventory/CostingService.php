@@ -22,7 +22,7 @@ class CostingService
             return;
         }
 
-        $product = Product::find($productId);
+        $product = Product::whereKey($productId)->lockForUpdate()->first();
         if (! $product) {
             return;
         }
@@ -37,7 +37,24 @@ class CostingService
             $newCost = ($onHand * $oldCost + $qty * $unitCost) / ($onHand + $qty);
         }
 
-        $product->update(['average_cost' => round($newCost, 4)]);
+        $product->update([
+            'average_cost' => round($newCost, 4),
+            'last_purchase_cost' => round($unitCost, 4),
+            'last_purchase_cost_at' => now(),
+        ]);
+    }
+
+    public function purchaseUnitCost(Product $product, float $enteredPrice, bool $pricesIncludeVat, bool $claimInputVat, float $vatRate): float
+    {
+        if (! $product->is_vat || $vatRate <= 0) {
+            return round($enteredPrice, 4);
+        }
+
+        if ($pricesIncludeVat) {
+            return round($claimInputVat ? $enteredPrice * 100 / (100 + $vatRate) : $enteredPrice, 4);
+        }
+
+        return round($claimInputVat ? $enteredPrice : $enteredPrice * (100 + $vatRate) / 100, 4);
     }
 
     // ต้นทุนขายรวมของเอกสาร = ผลรวม (จำนวน x ต้นทุนเฉลี่ย) ของทุกรายการในเอกสาร
@@ -52,7 +69,9 @@ class CostingService
         foreach ($document->stockDocument->items as $item) {
             // qty อาจติดลบ (แปรรูป) - COGS ขายใช้ค่าสัมบูรณ์เฉพาะขาออก
             $qty = abs((float) $item->qty);
-            $total += $qty * (float) ($item->product->average_cost ?? 0);
+            $total += $item->cost_amount !== null
+                ? abs((float) $item->cost_amount)
+                : $qty * (float) ($item->unit_cost ?? $item->product->average_cost ?? 0);
         }
 
         return round($total, 2);
