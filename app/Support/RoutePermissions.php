@@ -57,6 +57,7 @@ class RoutePermissions
         // การเงิน / บัญชี
         'chart-of-accounts.' => 'finance.manage',
         'accounting-periods.' => 'finance.manage',
+        'monthly-accounting.' => 'finance.manage',
         'gl-journals.' => 'finance.manage',
         'financial-statements.' => 'finance.manage',
         'fixed-assets.' => 'finance.manage',

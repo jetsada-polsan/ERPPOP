@@ -6,6 +6,9 @@ use App\Models\ChartOfAccount;
 use App\Models\Document;
 use App\Models\GlJournal;
 use App\Models\PaymentDocument;
+use App\Services\Inventory\CostingService;
+use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 /**
  * Posts double-entry GL journal lines (gl_journals, legacy: TRANPAYJ) for a
@@ -74,7 +77,7 @@ class GlPostingService
     // อัตรา VAT ปัจจุบัน (ไม่มี = 7%)
     private function vatRate(): float
     {
-        $rate = \Illuminate\Support\Facades\DB::table('vat_rates')
+        $rate = DB::table('vat_rates')
             ->where('effective_from', '<=', now()->toDateString())
             ->where(fn ($w) => $w->whereNull('effective_to')->orWhere('effective_to', '>=', now()->toDateString()))
             ->orderByDesc('effective_from')->value('rate_percent');
@@ -126,7 +129,7 @@ class GlPostingService
     // แนบเข้าไปในเอกสารเดิม โดยไม่ล้าง (append) รายการที่ post ไว้ก่อน
     private function appendCogs(Document $document, string $remark, bool $reverse = false): void
     {
-        $cogs = app(\App\Services\Inventory\CostingService::class)->cogsForDocument($document);
+        $cogs = app(CostingService::class)->cogsForDocument($document);
         if ($cogs <= 0) {
             return;
         }
@@ -218,6 +221,45 @@ class GlPostingService
             ['role' => ChartOfAccount::ROLE_VAT_INPUT, 'debit' => round($total - $base, 2)],
             ['role' => $isCredit ? ChartOfAccount::ROLE_AP : ChartOfAccount::ROLE_CASH, 'credit' => $total],
         ], 'ซื้อสินค้า '.$document->doc_number);
+    }
+
+    public function postExpense(
+        Document $document,
+        int $expenseAccountId,
+        float $baseAmount,
+        float $vatAmount,
+        float $withholdingAmount,
+        string $paymentMethod,
+    ): void {
+        $expenseAccount = ChartOfAccount::whereKey($expenseAccountId)->where('account_type', 'expense')->first();
+        $paymentAccount = $this->role($paymentMethod === 'cash' ? ChartOfAccount::ROLE_CASH : ChartOfAccount::ROLE_BANK);
+        $vatAccount = $vatAmount > 0 ? $this->role(ChartOfAccount::ROLE_VAT_INPUT) : null;
+        $withholdingAccount = $withholdingAmount > 0 ? $this->role(ChartOfAccount::ROLE_WHT_PAYABLE) : null;
+
+        if (! $expenseAccount || ! $paymentAccount || ($vatAmount > 0 && ! $vatAccount) || ($withholdingAmount > 0 && ! $withholdingAccount)) {
+            throw new RuntimeException('ผังบัญชีสำหรับค่าใช้จ่าย ภาษีซื้อ ธนาคาร หรือภาษีหัก ณ ที่จ่ายยังตั้งค่าไม่ครบ');
+        }
+
+        $paidAmount = round($baseAmount + $vatAmount - $withholdingAmount, 2);
+        $lines = [[$expenseAccount->id, $baseAmount, 0]];
+        if ($vatAmount > 0) {
+            $lines[] = [$vatAccount->id, $vatAmount, 0];
+        }
+        $lines[] = [$paymentAccount->id, 0, $paidAmount];
+        if ($withholdingAmount > 0) {
+            $lines[] = [$withholdingAccount->id, 0, $withholdingAmount];
+        }
+
+        foreach ($lines as [$accountId, $debit, $credit]) {
+            GlJournal::create([
+                'document_id' => $document->id,
+                'account_id' => $accountId,
+                'debit' => round($debit, 2),
+                'credit' => round($credit, 2),
+                'remark' => 'ค่าใช้จ่าย '.$document->doc_number,
+                'entry_date' => $document->doc_date->toDateString(),
+            ]);
+        }
     }
 
     // รับคืนสินค้า: Dr รับคืน + ภาษีขาย(กลับ) / Cr ลูกหนี้ (ขายเชื่อ) หรือเงินสด

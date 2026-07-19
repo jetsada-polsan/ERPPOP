@@ -2,9 +2,13 @@
 
 namespace App\Services\Sales;
 
+use App\Models\BillingNote;
 use App\Models\Branch;
 use App\Models\Document;
 use App\Models\DocumentBook;
+use App\Models\PurchaseOrder;
+use App\Models\Quotation;
+use App\Models\StockCount;
 
 /**
  * Generates a human-readable doc_number per document type + branch + day, e.g.
@@ -32,6 +36,7 @@ class DocumentNumberGenerator
         'PAYMENT_VOUCHER' => 'PV',
         'RECEIPT' => 'RR',
         'QUOTATION' => 'QT',
+        'EXPENSE' => 'EV',
     ];
 
     // เลขที่ตามสมุดเอกสาร (BPlus): ใช้ prefix ของเล่ม + นับเฉพาะเอกสารในเล่มนั้น
@@ -70,7 +75,7 @@ class DocumentNumberGenerator
         $branchCode = Branch::whereKey($branchId)->value('code') ?? (string) $branchId;
         $today = now()->format('Ymd');
 
-        $countToday = \App\Models\StockCount::where('branch_id', $branchId)
+        $countToday = StockCount::where('branch_id', $branchId)
             ->whereDate('created_at', now())
             ->count();
 
@@ -83,7 +88,7 @@ class DocumentNumberGenerator
         $branchCode = Branch::whereKey($branchId)->value('code') ?? (string) $branchId;
         $today = now()->format('Ymd');
 
-        $countToday = \App\Models\BillingNote::where('branch_id', $branchId)
+        $countToday = BillingNote::where('branch_id', $branchId)
             ->whereDate('created_at', now())
             ->count();
 
@@ -96,7 +101,7 @@ class DocumentNumberGenerator
         $branchCode = Branch::whereKey($branchId)->value('code') ?? (string) $branchId;
         $today = now()->format('Ymd');
 
-        $countToday = \App\Models\PurchaseOrder::where('branch_id', $branchId)
+        $countToday = PurchaseOrder::where('branch_id', $branchId)
             ->whereDate('created_at', now())
             ->count();
 
@@ -109,7 +114,7 @@ class DocumentNumberGenerator
         $branchCode = Branch::whereKey($branchId)->value('code') ?? (string) $branchId;
         $today = now()->format('Ymd');
 
-        $countToday = \App\Models\Quotation::where('branch_id', $branchId)
+        $countToday = Quotation::where('branch_id', $branchId)
             ->whereDate('created_at', now())
             ->count();
 

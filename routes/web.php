@@ -23,6 +23,7 @@ use App\Http\Controllers\LegacyReportController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\MemberPointController;
 use App\Http\Controllers\ManualController;
+use App\Http\Controllers\MonthlyAccountingController;
 use App\Http\Controllers\ProductionController;
 use App\Http\Controllers\PromotionController;
 use App\Http\Controllers\SaleReturnController;
@@ -362,6 +363,15 @@ Route::prefix('accounting-periods')->name('accounting-periods.')->group(function
     Route::post('/', [AccountingPeriodController::class, 'store'])->name('store');
     Route::post('/{accountingPeriod}/close', [AccountingPeriodController::class, 'close'])->name('close');
     Route::post('/{accountingPeriod}/reopen', [AccountingPeriodController::class, 'reopen'])->name('reopen');
+});
+
+Route::prefix('monthly-accounting')->name('monthly-accounting.')->group(function () {
+    Route::get('/', [MonthlyAccountingController::class, 'index'])->name('index');
+    Route::post('/expenses', [MonthlyAccountingController::class, 'storeExpense'])->name('expenses.store');
+    Route::post('/statements/import', [MonthlyAccountingController::class, 'importStatement'])->name('statements.import');
+    Route::post('/statements/{bankStatement}/reconcile', [MonthlyAccountingController::class, 'reconcile'])->name('statements.reconcile');
+    Route::post('/export', [MonthlyAccountingController::class, 'export'])->name('export');
+    Route::get('/exports/{run}', [MonthlyAccountingController::class, 'downloadRun'])->name('exports.download');
 });
 
 Route::prefix('members')->name('members.')->group(function () {

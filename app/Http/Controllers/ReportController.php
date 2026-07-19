@@ -873,6 +873,7 @@ class ReportController extends Controller
             ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')
             ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN'])
             ->whereNull('d.cancelled_at')
+            ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('pos_receipts as linked_pos')->whereColumn('linked_pos.document_id', 'd.id'))
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
         $this->applyBranch($docQuery, $filters, 'd.branch_id');
         $this->applySearch($docQuery, $filters, ['d.doc_number', 'c.name_th']);
@@ -900,7 +901,7 @@ class ReportController extends Controller
         $posQuery = DB::table('pos_receipts as r')
             ->join('pos_terminals as t', 't.id', '=', 'r.pos_terminal_id')
             ->whereBetween('r.receipt_date', [$from, $to])
-            ->where('r.status', '!=', 'cancelled');
+            ->where('r.status', 'completed');
         $this->applyBranch($posQuery, $filters, 't.branch_id');
         $this->applySearch($posQuery, $filters, ['r.receipt_no']);
 
@@ -1009,7 +1010,7 @@ class ReportController extends Controller
 
         $docRows = $docQuery
             ->groupBy('d.doc_date', 'dt.code')
-            ->selectRaw("d.doc_date as sale_date, dt.code as channel, count(*) as bill_count, sum(d.total_amount) as amount")
+            ->selectRaw('d.doc_date as sale_date, dt.code as channel, count(*) as bill_count, sum(d.total_amount) as amount')
             ->get();
 
         return $posRows
@@ -1167,6 +1168,7 @@ class ReportController extends Controller
             $selects[] = "coalesce(u.name, 'ไม่ระบุคนขาย') as seller_name";
             $groups[] = DB::raw("coalesce(u.name, 'ไม่ระบุคนขาย')");
         }
+
         return $query
             ->groupBy(...$groups)
             ->selectRaw(implode(",\n", $selects))
@@ -1204,6 +1206,7 @@ class ReportController extends Controller
             $selects[] = "coalesce(s.name, 'ไม่ระบุคนขาย') as seller_name";
             $groups[] = DB::raw("coalesce(s.name, 'ไม่ระบุคนขาย')");
         }
+
         return $query
             ->groupBy(...$groups)
             ->selectRaw(implode(",\n", $selects))
@@ -1635,7 +1638,7 @@ class ReportController extends Controller
         if (! $summary) {
             return $query
                 ->orderByDesc('d.doc_date')
-                ->selectRaw("d.doc_date, d.doc_number, p.sku_code, p.name_th, sdi.qty as sold_qty, sdi.unit_price, p.average_cost as avg_cost, (p.average_cost - sdi.unit_price) * sdi.qty as loss_amount")
+                ->selectRaw('d.doc_date, d.doc_number, p.sku_code, p.name_th, sdi.qty as sold_qty, sdi.unit_price, p.average_cost as avg_cost, (p.average_cost - sdi.unit_price) * sdi.qty as loss_amount')
                 ->limit($filters['per_page'])
                 ->get();
         }
@@ -1969,7 +1972,7 @@ class ReportController extends Controller
 
         return $query
             ->orderByDesc('r.receipt_date')
-            ->selectRaw("r.receipt_no, r.receipt_date, coalesce(t.name, t.code) as terminal_name, r.status, r.net_sales")
+            ->selectRaw('r.receipt_no, r.receipt_date, coalesce(t.name, t.code) as terminal_name, r.status, r.net_sales')
             ->limit($filters['per_page'])
             ->get();
     }
@@ -1985,7 +1988,7 @@ class ReportController extends Controller
         return $query
             ->groupBy('t.id', 't.code', 't.name')
             ->orderByDesc(DB::raw('sum(r.net_sales)'))
-            ->selectRaw("coalesce(t.name, t.code) as terminal_name, count(*) as receipt_count, sum(r.net_sales) as amount")
+            ->selectRaw('coalesce(t.name, t.code) as terminal_name, count(*) as receipt_count, sum(r.net_sales) as amount')
             ->limit($filters['per_page'])
             ->get();
     }
