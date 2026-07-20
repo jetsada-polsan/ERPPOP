@@ -39,7 +39,7 @@
             <div class="col-md-3"><select name="account_id" required class="form-select">@foreach($accounts as $a)<option value="{{ $a->id }}">{{ $a->code }} {{ $a->name_th }}</option>@endforeach</select></div>
             <div class="col-md-2"><input type="number" step="0.01" min="0" name="budget_amount" required class="form-control" placeholder="วงเงิน"></div><div class="col-md-2"><button class="btn btn-primary">บันทึก Budget</button></div>
         </form>
-        <table class="table table-sm"><thead><tr><th>เลข Budget</th><th>Cost Center</th><th class="text-end">วงเงินรวม</th><th>สถานะ</th></tr></thead><tbody>@foreach($budgets as $b)<tr><td>{{ $b->budget_no }}</td><td>{{ $b->cost_center_name }}</td><td class="text-end">{{ number_format($b->total_amount,2) }}</td><td>{{ $b->status }}</td></tr>@endforeach</tbody></table>
+        <table class="table table-sm"><thead><tr><th>เลข Budget</th><th>Cost Center</th><th class="text-end">วงเงินรวม</th><th>สถานะ</th><th></th></tr></thead><tbody>@foreach($budgets as $b)<tr><td>{{ $b->budget_no }}</td><td>{{ $b->cost_center_name }}</td><td class="text-end">{{ number_format($b->total_amount,2) }}</td><td><span class="badge {{ $b->status==='approved'?'text-bg-success':'text-bg-warning' }}">{{ $b->status==='approved'?'อนุมัติแล้ว':'ร่าง' }}</span></td><td class="text-end"><a href="{{ route('management-controls.budgets.show',$b->id) }}" class="btn btn-sm btn-light border">เทียบงบ vs จริง</a></td></tr>@endforeach</tbody></table>
     </section>
 
     @endif
@@ -52,7 +52,7 @@
             <div class="col-md-2"><input type="number" step="0.25" min="0" name="overtime_hours" class="form-control" placeholder="OT ชั่วโมง"></div><div class="col-md-2"><button class="btn btn-primary">บันทึกเวลา</button></div>
         </form>
         <form method="post" action="{{ route('management-controls.payroll.generate') }}" class="d-flex gap-2 mb-3">@csrf<input type="month" name="period" value="{{ $period }}" class="form-control" style="max-width:190px"><button class="btn btn-danger">คำนวณ Payroll</button></form>
-        <table class="table table-sm"><thead><tr><th>งวด</th><th class="text-end">รายได้รวม</th><th class="text-end">หักรวม</th><th class="text-end">สุทธิ</th><th>สถานะ</th></tr></thead><tbody>@foreach($payrollRuns as $p)<tr><td>{{ $p->period }}</td><td class="text-end">{{ number_format($p->gross_amount,2) }}</td><td class="text-end">{{ number_format($p->deduction_amount,2) }}</td><td class="text-end fw-bold">{{ number_format($p->net_amount,2) }}</td><td>{{ $p->status }}</td></tr>@endforeach</tbody></table>
+        <table class="table table-sm"><thead><tr><th>งวด</th><th class="text-end">รายได้รวม</th><th class="text-end">หักรวม</th><th class="text-end">สุทธิ</th><th>สถานะ</th><th></th></tr></thead><tbody>@foreach($payrollRuns as $p)<tr><td>{{ $p->period }}</td><td class="text-end">{{ number_format($p->gross_amount,2) }}</td><td class="text-end">{{ number_format($p->deduction_amount,2) }}</td><td class="text-end fw-bold">{{ number_format($p->net_amount,2) }}</td><td><span class="badge {{ ['draft'=>'text-bg-warning','approved'=>'text-bg-info','paid'=>'text-bg-success'][$p->status]??'text-bg-secondary' }}">{{ ['draft'=>'ร่าง','approved'=>'อนุมัติแล้ว','paid'=>'จ่ายแล้ว'][$p->status]??$p->status }}</span></td><td class="text-end"><a href="{{ route('management-controls.payroll.show',$p->id) }}" class="btn btn-sm btn-light border">ตรวจ/อนุมัติ</a></td></tr>@endforeach</tbody></table>
     </section>
 
     @endif

@@ -116,7 +116,16 @@ Route::prefix('management-controls')->name('management-controls.')->group(functi
     Route::post('/purchase-plans/generate', [ManagementControlController::class, 'generatePurchasePlan'])->name('purchase-plans.generate');
     Route::post('/attendance', [ManagementControlController::class, 'storeAttendance'])->name('attendance.store');
     Route::post('/payroll/generate', [ManagementControlController::class, 'generatePayroll'])->name('payroll.generate');
+    // Payroll approve/pay workflow: edit WHT (draft) -> approve (payroll.approve) -> pay -> payslip
+    Route::get('/payroll/{run}', [ManagementControlController::class, 'showPayrollRun'])->name('payroll.show');
+    Route::post('/payroll/{run}/items', [ManagementControlController::class, 'updatePayrollItems'])->name('payroll.items');
+    Route::post('/payroll/{run}/approve', [ManagementControlController::class, 'approvePayroll'])->name('payroll.approve');
+    Route::post('/payroll/{run}/pay', [ManagementControlController::class, 'markPayrollPaid'])->name('payroll.pay');
+    Route::get('/payroll/items/{item}/payslip', [ManagementControlController::class, 'payslip'])->name('payroll.payslip');
     Route::post('/ecommerce/orders', [ManagementControlController::class, 'importEcommerceOrder'])->name('ecommerce.orders.store');
+    // Budget variance + approve
+    Route::get('/budgets/{budget}', [ManagementControlController::class, 'showBudget'])->name('budgets.show');
+    Route::post('/budgets/{budget}/approve', [ManagementControlController::class, 'approveBudget'])->name('budgets.approve');
 });
 
 // กระดิ่งแจ้งเตือน header: รายการตามภาระหน้าที่ของผู้ใช้ (ทุกคนที่ล็อกอินเรียกได้

@@ -259,12 +259,12 @@ class ManualController extends Controller
         return [
             ['level' => 'critical', 'status' => 'พร้อมใช้', 'title' => 'ราคา โปรโมชั่น และส่วนลด POS ยืนยันฝั่ง Server', 'detail' => 'checkout คำนวณราคาหลัก โปรโมชั่น บัตร ส่วนลด แต้ม และราคาต่ำกว่าทุนซ้ำฝั่ง Server พร้อมสิทธิ์ผู้อนุมัติ'],
             ['level' => 'critical', 'status' => 'มีชุดหลัก', 'title' => 'Integration tests ธุรกรรมครบวงจร', 'detail' => 'ทดสอบซื้อ ต้นทุน VAT ขาย Stock FEFO กักกัน Batch และ rollback บนฐานข้อมูลทดสอบแล้ว ต้องขยายต่อเมื่อเพิ่มโมดูล'],
-            ['level' => 'control', 'status' => 'บางส่วน', 'title' => 'Approval เชื่อมเอกสารจริง', 'detail' => 'PO แยกสิทธิ์และห้ามผู้ขออนุมัติตนเอง ส่วนลด POS/ขายต่ำกว่าทุนแยกสิทธิ์แล้ว; ปรับยอดและวงเงินยังต้องต่อ workflow อนุมัติเฉพาะ'],
+            ['level' => 'control', 'status' => 'พร้อมใช้', 'title' => 'Approval เชื่อมเอกสารจริง', 'detail' => 'PO ปรับยอดสต๊อก วงเงินเครดิตลูกค้า Payroll และงบประมาณ แยกสิทธิ์ผู้อนุมัติและห้ามผู้ขออนุมัติตนเองครบ ส่วนลด POS/ขายต่ำกว่าทุนแยกสิทธิ์แล้ว'],
             ['level' => 'control', 'status' => 'พร้อมใช้', 'title' => 'Security, MFA และ Audit การเข้าสู่ระบบ', 'detail' => 'มี MFA แบบ TOTP, login throttling, session regeneration, encrypted secret และศูนย์ตรวจสถานะ; ยังต้องเปิด MFA ให้ผู้ใช้สำคัญทุกคน'],
             ['level' => 'control', 'status' => 'พร้อมใช้', 'title' => 'Backup, restore drill และ disaster recovery', 'detail' => 'มี backup/checksum/retention, ศูนย์ตรวจจากหน้าเว็บ, health gate ก่อนปิดงวด และ restore verification; production ต้องตั้ง offsite disk และ scheduler'],
             ['level' => 'growth', 'status' => 'ทะเบียนแล้ว', 'title' => 'E-Commerce sync อัตโนมัติ', 'detail' => 'มีแฟ้มช่องทาง Lazada Shopee LINE MyShop และ TikTok Shop แต่ยังไม่มี order/stock sync จริง'],
-            ['level' => 'growth', 'status' => 'ยังไม่มี', 'title' => 'Payroll และเวลาเข้างาน', 'detail' => 'มีแฟ้มพนักงานและโครงสร้างองค์กร แต่เงินเดือน ภาษี ประกันสังคม และ attendance ยังไม่อยู่ในระบบ'],
-            ['level' => 'growth', 'status' => 'ยังไม่มี', 'title' => 'งบประมาณและศูนย์ต้นทุน', 'detail' => 'ยังไม่มี Budget, Cost Center และการเทียบงบประมาณกับยอดจริงสำหรับควบคุมค่าใช้จ่ายตามหน่วยงาน'],
+            ['level' => 'growth', 'status' => 'พร้อมใช้', 'title' => 'Payroll และเวลาเข้างาน', 'detail' => 'บันทึกเวลาเข้างาน คำนวณเงินเดือน OT ขาดงาน ประกันสังคม กรอกภาษีหัก ณ ที่จ่าย อนุมัติ จ่าย และพิมพ์สลิปได้ครบวงจร (ผู้จัดทำอนุมัติเองไม่ได้)'],
+            ['level' => 'growth', 'status' => 'พร้อมใช้', 'title' => 'งบประมาณและศูนย์ต้นทุน', 'detail' => 'ตั้ง Cost Center และงบประมาณรายเดือน/บัญชี อนุมัติงบ และดูรายงานเทียบงบ vs ค่าใช้จ่ายจริง (variance) ต่อ Cost Center ได้'],
         ];
     }
 
