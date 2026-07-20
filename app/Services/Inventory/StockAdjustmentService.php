@@ -4,10 +4,10 @@ namespace App\Services\Inventory;
 
 use App\Models\Document;
 use App\Models\DocumentType;
+use App\Models\Product;
 use App\Models\StockBalance;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
-use App\Models\StockMovement;
 use App\Services\Sales\DocumentNumberGenerator;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -23,6 +23,7 @@ class StockAdjustmentService
 {
     public function __construct(
         private readonly DocumentNumberGenerator $numbers,
+        private readonly FifoStockService $fifo,
     ) {}
 
     /**
@@ -120,21 +121,27 @@ class StockAdjustmentService
                 if (abs($current - (float) $item->system_qty) > 0.0001) {
                     throw new RuntimeException('ยอดสต๊อกเปลี่ยนหลังส่งอนุมัติ กรุณายกเลิกและตรวจนับใหม่');
                 }
-                $balance ??= StockBalance::create([
-                    'product_id' => $item->product_id,
-                    'warehouse_location_id' => $item->warehouse_location_id,
-                    'on_hand_qty' => 0,
-                    'reserved_qty' => 0,
-                ]);
-                StockMovement::create([
-                    'product_id' => $item->product_id,
-                    'warehouse_location_id' => $item->warehouse_location_id,
-                    'document_id' => $locked->id,
-                    'movement_type' => 'adjust',
-                    'qty' => $item->qty,
-                    'movement_date' => now()->toDateString(),
-                ]);
-                $balance->update(['on_hand_qty' => $item->counted_qty]);
+
+                $productId = (int) $item->product_id;
+                $warehouseLocationId = (int) $item->warehouse_location_id;
+                $diff = (float) $item->qty;
+                if ($diff > 0.0001) {
+                    // เจอของเกิน: สร้าง Lot ใหม่รองรับจำนวนที่เพิ่ม ไม่งั้น stock_lots จะไม่ตรงกับ
+                    // stock_balances และมูลค่าสต๊อกปลายงวดจะขาดหายไป (ใช้ average_cost ปัจจุบันประมาณ
+                    // ต้นทุน เพราะของเกินไม่มี Lot ต้นทางจริงให้อ้างอิง)
+                    $unitCost = (float) (Product::find($productId)?->average_cost ?? 0);
+                    $this->fifo->receive(
+                        $productId, $warehouseLocationId, $diff,
+                        $locked->id, 'adjust', unitCost: $unitCost,
+                    );
+                } elseif ($diff < -0.0001) {
+                    // ของขาด/เสียหาย: ตัด Lot จริงตาม FIFO เพื่อให้ stock_lots สะท้อนของที่หายไปจริง
+                    // (ไม่ทำแบบเดิมที่แก้ stock_balances ตรงๆ โดยไม่แตะ stock_lots เลย)
+                    $this->fifo->issue(
+                        $productId, $warehouseLocationId, abs($diff),
+                        $locked->id, 'adjust', allowNegative: true,
+                    );
+                }
             }
             $locked->update([
                 'status' => 'active',

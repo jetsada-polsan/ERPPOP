@@ -13,6 +13,7 @@ use App\Models\StockBalance;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
 use App\Services\Accounting\GlPostingService;
+use App\Services\Inventory\CostingService;
 use App\Services\Inventory\FifoStockService;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -33,6 +34,7 @@ class CreditSaleService
         private readonly DocumentNumberGenerator $numbers,
         private readonly GlPostingService $glPosting,
         private readonly FifoStockService $fifo,
+        private readonly CostingService $costing,
     ) {}
 
     public function convertBookingToCreditSale(SaleBooking $booking, ?DocumentBook $book = null): Document
@@ -82,24 +84,29 @@ class CreditSaleService
             $seq = 1;
             $products = Product::whereIn('id', $sourceItems->pluck('product_id')->unique())->get()->keyBy('id');
             foreach ($sourceItems as $item) {
-                $unitCost = (float) ($products->get((int) $item->product_id)?->average_cost ?? 0);
+                $productId = (int) $item->product_id;
+                $qty = (float) $item->qty;
+                $fallbackCost = (float) ($products->get($productId)?->average_cost ?? 0);
+
+                $balance = StockBalance::firstOrCreate(
+                    ['product_id' => $productId, 'warehouse_location_id' => $item->warehouse_location_id],
+                    ['on_hand_qty' => 0, 'reserved_qty' => 0]
+                );
+                // ตัด FIFO lot จริงก่อน แล้วคิดต้นทุนขายจาก Lot ที่ถูกตัดจริง (ดู CashSaleService)
+                $allocations = $this->fifo->issue($productId, (int) $item->warehouse_location_id, $qty, $saleDocument->id);
+                $unitCost = $this->costing->unitCostFromAllocations($allocations, $qty, $fallbackCost);
+                $balance->decrement('reserved_qty', $qty);
+
                 StockDocumentItem::create([
                     'stock_document_id' => $stockDocument->id,
                     'seq' => $seq++,
-                    'product_id' => $item->product_id,
+                    'product_id' => $productId,
                     'warehouse_location_id' => $item->warehouse_location_id,
-                    'qty' => $item->qty,
+                    'qty' => $qty,
                     'unit_price' => $item->unit_price,
                     'unit_cost' => $unitCost,
-                    'cost_amount' => round((float) $item->qty * $unitCost, 4),
+                    'cost_amount' => round($qty * $unitCost, 4),
                 ]);
-
-                $balance = StockBalance::firstOrCreate(
-                    ['product_id' => $item->product_id, 'warehouse_location_id' => $item->warehouse_location_id],
-                    ['on_hand_qty' => 0, 'reserved_qty' => 0]
-                );
-                $this->fifo->issue((int) $item->product_id, (int) $item->warehouse_location_id, (float) $item->qty, $saleDocument->id);
-                $balance->decrement('reserved_qty', (float) $item->qty);
             }
 
             CustomerOpenItem::create([
