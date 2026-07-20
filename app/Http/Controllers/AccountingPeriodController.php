@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AccountingPeriod;
 use App\Models\AuditLog;
 use App\Models\Branch;
+use App\Services\Accounting\AccountingCloseReadinessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,10 +14,13 @@ use Illuminate\View\View;
 
 class AccountingPeriodController extends Controller
 {
-    public function index(): View
+    public function index(AccountingCloseReadinessService $readiness): View
     {
+        $periods = AccountingPeriod::with(['branch', 'closedBy'])->orderByDesc('starts_on')->get();
+
         return view('accounting-periods.index', [
-            'periods' => AccountingPeriod::with(['branch', 'closedBy'])->orderByDesc('starts_on')->get(),
+            'periods' => $periods,
+            'readiness' => $periods->where('status', 'open')->mapWithKeys(fn ($period) => [$period->id => $readiness->checks($period)]),
             'branches' => Branch::orderBy('code')->get(['id', 'code', 'name_th']),
         ]);
     }
@@ -48,15 +52,17 @@ class AccountingPeriodController extends Controller
         return redirect()->route('accounting-periods.index')->with('success', 'สร้างงวดบัญชีแล้ว');
     }
 
-    public function close(Request $request, AccountingPeriod $accountingPeriod): RedirectResponse
+    public function close(Request $request, AccountingPeriod $accountingPeriod, AccountingCloseReadinessService $readiness): RedirectResponse
     {
         $data = $request->validate(['note' => ['nullable', 'string', 'max:1000']]);
 
-        DB::transaction(function () use ($accountingPeriod, $data) {
+        DB::transaction(function () use ($accountingPeriod, $data, $readiness) {
             $period = AccountingPeriod::whereKey($accountingPeriod->id)->lockForUpdate()->firstOrFail();
             if ($period->isClosed()) {
                 return;
             }
+
+            $readiness->assertReady($period);
 
             $oldValues = $period->only(['status', 'note', 'closed_by', 'closed_at']);
             $period->update([

@@ -31,11 +31,12 @@ use App\Http\Controllers\MemberController;
 use App\Http\Controllers\MemberPointController;
 use App\Http\Controllers\MonthlyAccountingController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\OperationsController;
 use App\Http\Controllers\OrganizationalUnitController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PosController;
-use App\Http\Controllers\PosReleaseController;
 use App\Http\Controllers\PosImportController;
+use App\Http\Controllers\PosReleaseController;
 use App\Http\Controllers\PriceTableController;
 use App\Http\Controllers\PriceTagController;
 use App\Http\Controllers\ProductController;
@@ -59,6 +60,7 @@ use App\Http\Controllers\StockTransferController;
 use App\Http\Controllers\StockTransformController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SystemSettingController;
+use App\Http\Controllers\TaxComplianceController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WarehouseLocationController;
 use App\Http\Controllers\WarehouseMobileController;
@@ -68,6 +70,8 @@ use Illuminate\Support\Facades\Route;
 // App\Support\RoutePermissions สำหรับ mapping เมนู -> สิทธิ์)
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.attempt');
+Route::get('/mfa/challenge', [AuthController::class, 'showMfaChallenge'])->name('mfa.challenge');
+Route::post('/mfa/challenge', [AuthController::class, 'verifyMfaChallenge'])->name('mfa.verify');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::get('/download/pos', function () {
     $manifestPath = storage_path('app/pos-releases/latest.json');
@@ -89,6 +93,9 @@ Route::get('/download/pos/latest.json', [PosReleaseController::class, 'latest'])
 Route::get('/download/pos/releases/{filename}', [PosReleaseController::class, 'download'])->name('pos.release.download');
 Route::get('/password/change', [AuthController::class, 'showChangePassword'])->name('password.change');
 Route::post('/password/change', [AuthController::class, 'updatePassword'])->name('password.update');
+Route::get('/security/mfa', [AuthController::class, 'showMfaSetup'])->name('mfa.setup');
+Route::post('/security/mfa', [AuthController::class, 'enableMfa'])->name('mfa.enable');
+Route::delete('/security/mfa', [AuthController::class, 'disableMfa'])->name('mfa.disable');
 
 Route::get('/', fn () => redirect()->route('dashboard'));
 Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
@@ -409,6 +416,23 @@ Route::prefix('monthly-accounting')->name('monthly-accounting.')->group(function
     Route::post('/statements/auto-reconcile', [MonthlyAccountingController::class, 'autoReconcile'])->name('statements.auto-reconcile');
     Route::post('/export', [MonthlyAccountingController::class, 'export'])->name('export');
     Route::get('/exports/{run}', [MonthlyAccountingController::class, 'downloadRun'])->name('exports.download');
+});
+
+Route::prefix('tax-compliance')->name('tax-compliance.')->group(function () {
+    Route::get('/', [TaxComplianceController::class, 'index'])->name('index');
+    Route::post('/filings', [TaxComplianceController::class, 'prepare'])->name('filings.prepare');
+    Route::post('/filings/{run}/review', [TaxComplianceController::class, 'review'])->name('filings.review');
+    Route::post('/filings/{run}/submit', [TaxComplianceController::class, 'submit'])->name('filings.submit');
+    Route::get('/filings/{run}/download', [TaxComplianceController::class, 'download'])->name('filings.download');
+    Route::post('/etax', [TaxComplianceController::class, 'prepareEtax'])->name('etax.prepare');
+    Route::post('/etax/{etaxDocument}/status', [TaxComplianceController::class, 'updateEtax'])->name('etax.status');
+});
+
+Route::prefix('operations')->name('operations.')->group(function () {
+    Route::get('/', [OperationsController::class, 'index'])->name('index');
+    Route::post('/backup', [OperationsController::class, 'backup'])->name('backup');
+    Route::post('/restore-verify', [OperationsController::class, 'verifyRestore'])->name('restore-verify');
+    Route::post('/users/{user}/mfa-reset', [OperationsController::class, 'resetMfa'])->name('mfa-reset');
 });
 
 Route::prefix('members')->name('members.')->group(function () {

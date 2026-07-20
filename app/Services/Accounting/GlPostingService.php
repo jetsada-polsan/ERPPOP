@@ -15,10 +15,8 @@ use RuntimeException;
  * payment_document. The schema only journals payments (not sales/purchases/
  * stock - there's no account linkage on those tables), so this is intentionally
  * narrow: receipt = debit cash, credit AR; payment voucher = debit AP, credit
- * cash. Silently does nothing if the relevant default_role accounts haven't
- * been configured yet in chart_of_accounts - payments still work without GL
- * lines, the accountant just won't see them in the general journal until the
- * accounts are set up.
+ * cash. Missing account mappings are fatal so an operational document can never
+ * be committed without its required accounting entry.
  */
 class GlPostingService
 {
@@ -27,7 +25,7 @@ class GlPostingService
         $cashAccount = ChartOfAccount::where('default_role', ChartOfAccount::ROLE_CASH)->first();
         $arAccount = ChartOfAccount::where('default_role', ChartOfAccount::ROLE_AR)->first();
         if (! $cashAccount || ! $arAccount) {
-            return;
+            throw new RuntimeException('ผังบัญชีเงินสดหรือลูกหนี้ยังไม่ครบ ไม่สามารถรับชำระโดยไม่ลง GL ได้');
         }
 
         GlJournal::create([
@@ -53,7 +51,7 @@ class GlPostingService
         $cashAccount = ChartOfAccount::where('default_role', ChartOfAccount::ROLE_CASH)->first();
         $apAccount = ChartOfAccount::where('default_role', ChartOfAccount::ROLE_AP)->first();
         if (! $cashAccount || ! $apAccount) {
-            return;
+            throw new RuntimeException('ผังบัญชีเงินสดหรือเจ้าหนี้ยังไม่ครบ ไม่สามารถจ่ายชำระโดยไม่ลง GL ได้');
         }
 
         GlJournal::create([
@@ -133,7 +131,7 @@ class GlPostingService
             }
             $account = $this->role($line['role']);
             if (! $account) {
-                return; // ผังบัญชียังไม่ครบ - ข้ามทั้งเอกสารเพื่อไม่ให้ GL ไม่ดุล
+                throw new RuntimeException("ยังไม่ได้ผูกบัญชีเริ่มต้น [{$line['role']}] ไม่สามารถบันทึกเอกสารโดยไม่ลง GL ได้");
             }
             $resolved[] = [$account->id, round($line['debit'] ?? 0, 2), round($line['credit'] ?? 0, 2)];
         }
@@ -168,7 +166,7 @@ class GlPostingService
         $cogsAccount = $this->role(ChartOfAccount::ROLE_COGS);
         $inventoryAccount = $this->role(ChartOfAccount::ROLE_INVENTORY);
         if (! $cogsAccount || ! $inventoryAccount) {
-            return;
+            throw new RuntimeException('ผังบัญชีต้นทุนขายหรือสินค้าคงเหลือยังไม่ครบ ไม่สามารถลงต้นทุนขายได้');
         }
 
         // ขาย: Dr COGS / Cr Inventory | รับคืน: Dr Inventory / Cr COGS (สินค้ากลับเข้าคลัง)

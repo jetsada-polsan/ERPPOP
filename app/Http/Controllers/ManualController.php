@@ -11,9 +11,61 @@ class ManualController extends Controller
         return view('core-modules.index', [
             'pillars' => $this->pillars(),
             'workflows' => $this->workflows(),
+            'controlManuals' => $this->controlManuals(),
             'gaps' => $this->gaps(),
             'routines' => $this->routines(),
         ]);
+    }
+
+    private function controlManuals(): array
+    {
+        return [
+            [
+                'key' => 'accounting', 'title' => '1. บัญชีอัตโนมัติและการปิดงวด', 'route' => 'accounting-periods.index',
+                'owner' => 'บัญชีเป็นผู้จัดทำ หัวหน้าบัญชีเป็นผู้ปิดงวด',
+                'purpose' => 'ให้เอกสารขาย ซื้อ รับจ่าย คืนสินค้า ค่าใช้จ่าย VAT และต้นทุนลง GL แบบเดบิตเท่ากับเครดิต และห้ามแก้ย้อนหลังหลังปิดงวด',
+                'setup' => ['ตั้ง default role ในผังบัญชีให้ครบ Cash, Bank, AR, AP, Inventory, VAT Input/Output, Revenue, COGS, Expense และ WHT', 'สร้างงวดบัญชีรายเดือนโดยเลือกทั้งบริษัทหรือเฉพาะสาขา', 'ตรวจว่าวันที่เอกสารและสาขาถูกต้องก่อนเริ่มบันทึกจริง'],
+                'steps' => ['บันทึกเอกสารต้นทางตามปกติ ระบบสร้าง GL ใน transaction เดียวกัน', 'เปิดสมุดรายวัน ตรวจเลขเอกสาร บัญชี เดบิต เครดิต และต้นทุนขาย', 'สิ้นเดือนเปิดงวดบัญชี ดู Pre-close checklist 5 รายการ', 'แก้เอกสารไม่ลง GL, Statement ค้าง, ภาษีขาดข้อมูล และ Backup จนทุกข้อเป็นสีเขียว', 'หัวหน้าบัญชีระบุหมายเหตุแล้วกดปิดงวด เอกสารและ GL ในช่วงนั้นจะถูกล็อก'],
+                'controls' => ['ห้ามโพสต์ GL บางบรรทัดเมื่อบัญชี default role ไม่ครบ', 'ผู้สังเกตการณ์ Document และ GL ปฏิเสธ create/update/delete ในงวดปิด', 'การเปิดงวดใหม่และปิดงวดถูกเก็บ Audit Log'],
+                'outputs' => ['สมุดรายวันทั่วไป', 'งบทดลอง กำไรขาดทุน และงบดุล', 'หลักฐานผู้ปิดงวด วันเวลา และ checklist'],
+            ],
+            [
+                'key' => 'tax', 'title' => '2. ภาษีไทยและ E-Tax', 'route' => 'tax-compliance.index',
+                'owner' => 'บัญชีภาษีจัดทำ ผู้ตรวจคนที่สองทบทวน ผู้มีอำนาจยื่นจริง',
+                'purpose' => 'รวมข้อมูล ภ.พ.30 ภ.ง.ด.3 ภ.ง.ด.53 และเตรียม E-Tax package โดยมีหลักฐานการตรวจและเลขอ้างอิงจากระบบภายนอก',
+                'setup' => ['กรอกชื่อบริษัท เลขผู้เสียภาษี ที่อยู่ และสาขาภาษีในตั้งค่าระบบ', 'กำหนดสินค้าใดมี VAT และตรวจใบกำกับซื้อทุกใบ', 'เลือกผู้ให้บริการ E-Tax ที่ได้รับอนุมัติและเตรียม certificate/บัญชีผู้ใช้นอก ERP'],
+                'steps' => ['เลือกเดือนและสาขาแล้วจัดทำ PP30/PND3/PND53', 'ดาวน์โหลด CSV ตรวจยอดกับ GL และเอกสารภาษี', 'ให้ผู้ใช้อีกคนกดตรวจผ่าน ระบบไม่ยอมให้ผู้จัดทำตรวจงานตัวเอง', 'ยื่นผ่านระบบกรมสรรพากรหรือสำนักงานบัญชี แล้วนำเลขอ้างอิงกลับมาบันทึก', 'สำหรับ E-Tax ให้สร้าง provider package ส่งผู้ให้บริการ แล้วบันทึกสถานะ sent/accepted/rejected รายใบ'],
+                'controls' => ['ไฟล์ทุกชุดมี SHA-256 ป้องกันไฟล์เปลี่ยนหลังตรวจ', 'E-Tax ใช้ UUID ไม่ซ้ำและเก็บ payload hash', 'ERP ไม่อ้างว่าส่งกรมสรรพากรสำเร็จจนกว่าจะมีผลตอบรับจากผู้ให้บริการ'],
+                'outputs' => ['CSV working paper รายแบบ', 'ทะเบียนการจัดทำ ตรวจ และยื่นภาษี', 'ทะเบียน E-Tax พร้อม UUID, hash และผลตอบรับ'],
+            ],
+            [
+                'key' => 'backup', 'title' => '3. Backup และการกู้คืน', 'route' => 'operations.index',
+                'owner' => 'IT ดูแลทุกวัน ผู้บริหารตรวจผลอย่างน้อยรายเดือน',
+                'purpose' => 'มีฐานข้อมูลสำรองที่ตรวจความสมบูรณ์ได้ เก็บย้อนหลัง และทดสอบกู้คืนโดยไม่เสี่ยงเขียนทับ Production',
+                'setup' => ['ให้ Scheduler ของ Laravel ทำงานทุกนาที', 'กำหนด ERP_BACKUP_OFFSITE_DISK เพื่อส่งสำเนาออกนอกเครื่อง', 'กำหนด ERP_RESTORE_DATABASE เป็นฐานทดสอบแยกก่อนทดสอบ restore จริง'],
+                'steps' => ['ระบบ Backup อัตโนมัติทุกวัน 02:15 หรือกด Backup ตอนนี้', 'ตรวจไฟล์ .gz และ .sha256 ในศูนย์ Backup', 'กดตรวจ Restore เพื่อทดสอบ checksum และการคลายไฟล์', 'ทุกเดือนให้ IT restore ลงฐานทดสอบแล้วเปิดตรวจข้อมูลสำคัญ', 'หาก Backup เกิน 26 ชั่วโมง Health monitor แจ้งเตือนและห้ามปิดงวด'],
+                'controls' => ['ไฟล์สิทธิ์ 0600 และเก็บย้อนหลัง 30 วัน', 'ไม่เปิดปุ่ม restore ทับ Production จากหน้าเว็บ', 'บันทึกผู้สั่ง เวลา ผลลัพธ์ และ Audit Log'],
+                'outputs' => ['ไฟล์ฐานข้อมูลบีบอัด', 'SHA-256 checksum', 'Operation run และผล Restore drill'],
+            ],
+            [
+                'key' => 'security', 'title' => '4. Security, MFA และ Audit', 'route' => 'operations.index',
+                'owner' => 'ผู้ดูแลระบบกำหนดสิทธิ์ เจ้าของบัญชีดูแลรหัสผ่านและ MFA',
+                'purpose' => 'ลดความเสี่ยงรหัสผ่านรั่ว จำกัดสิทธิ์ตามหน้าที่และสาขา และตรวจย้อนหลังว่าใครทำอะไรเมื่อใด',
+                'setup' => ['ปิดบัญชีพนักงานที่ออกทันทีและห้ามใช้บัญชีร่วมกัน', 'กำหนด Role ตามหน้าที่ แยกผู้จัดทำ ผู้อนุมัติ และผู้ตรวจ', 'เปิด MFA ให้ผู้ดูแลระบบ ผู้บริหาร การเงิน และบัญชีทุกคน'],
+                'steps' => ['ผู้ใช้เปิดศูนย์ Backup/Security แล้วเลือกเปิด MFA ของฉัน', 'เพิ่ม Setup key ใน Google/Microsoft Authenticator แบบ Time based', 'กรอกรหัสผ่านและรหัส 6 หลักเพื่อเปิดใช้งาน', 'ครั้งต่อไปหลังรหัสผ่าน ระบบถามรหัส 6 หลักอีกขั้น', 'ผู้ดูแลตรวจเปอร์เซ็นต์ MFA รหัสผ่านเกิน 180 วัน Session และ Audit เป็นประจำ'],
+                'controls' => ['Login จำกัด 5 ครั้งต่อนาทีต่อ username และ IP', 'Session regenerate หลัง login/MFA และ password change', 'MFA secret เข้ารหัสด้วย APP_KEY และไม่แสดงใน API/Model serialization'],
+                'outputs' => ['สถานะ MFA รายผู้ใช้', 'Login/MFA Audit พร้อม IP และ user agent', 'รายการ Session และเหตุการณ์ Monitor'],
+            ],
+            [
+                'key' => 'reconcile', 'title' => '5. Statement, สลิป และการกระทบยอด', 'route' => 'monthly-accounting.index',
+                'owner' => 'พนักงานการเงินตรวจ ผู้จัดการการเงินติดตามรายการค้าง',
+                'purpose' => 'เทียบเงินเข้าจาก POS/ลูกหนี้และเงินออกค่าใช้จ่ายกับ Statement ให้ครบก่อนส่งสำนักงานบัญชีหรือปิดงวด',
+                'setup' => ['สร้างบัญชีธนาคารและผูกสาขาให้ถูกต้อง', 'รายการโอน/QR ต้องใช้ method และ bank account ที่ตรงกัน', 'CSV Statement ต้องมี date, description, amount, balance โดยเงินเข้าเป็นบวก เงินออกเป็นลบ'],
+                'steps' => ['เลือกเดือนและสาขา นำเข้า Statement CSV', 'กดจับคู่อัตโนมัติ ระบบตรวจวันที่ บัญชี ยอด และรายการที่ยังไม่เคยใช้', 'เงินออกจับคู่ Branch Expense ส่วนเงินเข้าจับคู่ Payment Line หรือ POS transfer/QR', 'รายการไม่ชัดเจนให้เปิดตรวจ แนบสลิป ระบุประเภท ยอดอ้างอิง และเลขอ้างอิง', 'แก้ยอดต่างจนสถานะ matched ครบ จึงสร้าง ZIP ส่งสำนักงานบัญชีและปิดงวดได้'],
+                'controls' => ['source_type/source_id ไม่ซ้ำ ป้องกันธุรกรรมเดียวจับคู่หลาย Statement', 'ผลต่างเกิน 0.01 บาทเป็น mismatch', 'การจับคู่อัตโนมัติให้ confidence 100 เฉพาะวันที่ บัญชีและยอดตรงทั้งหมด'],
+                'outputs' => ['ทะเบียน Bank Reconciliation', 'สลิปและหลักฐานราย Statement', 'CSV กระทบยอดในชุดสำนักงานบัญชี'],
+            ],
+        ];
     }
 
     private function pillars(): array
@@ -208,8 +260,8 @@ class ManualController extends Controller
             ['level' => 'critical', 'status' => 'พร้อมใช้', 'title' => 'ราคา โปรโมชั่น และส่วนลด POS ยืนยันฝั่ง Server', 'detail' => 'checkout คำนวณราคาหลัก โปรโมชั่น บัตร ส่วนลด แต้ม และราคาต่ำกว่าทุนซ้ำฝั่ง Server พร้อมสิทธิ์ผู้อนุมัติ'],
             ['level' => 'critical', 'status' => 'มีชุดหลัก', 'title' => 'Integration tests ธุรกรรมครบวงจร', 'detail' => 'ทดสอบซื้อ ต้นทุน VAT ขาย Stock FEFO กักกัน Batch และ rollback บนฐานข้อมูลทดสอบแล้ว ต้องขยายต่อเมื่อเพิ่มโมดูล'],
             ['level' => 'control', 'status' => 'บางส่วน', 'title' => 'Approval เชื่อมเอกสารจริง', 'detail' => 'PO แยกสิทธิ์และห้ามผู้ขออนุมัติตนเอง ส่วนลด POS/ขายต่ำกว่าทุนแยกสิทธิ์แล้ว; ปรับยอดและวงเงินยังต้องต่อ workflow อนุมัติเฉพาะ'],
-            ['level' => 'control', 'status' => 'บางส่วน', 'title' => 'Audit log ครอบคลุมทุกการแก้ไขสำคัญ', 'detail' => 'มี audit สำหรับ POS บางเหตุการณ์แล้ว แต่ master data การเงิน สิทธิ์ และการเปลี่ยนราคายังต้องครอบคลุมเพิ่ม'],
-            ['level' => 'control', 'status' => 'มีเครื่องมือ', 'title' => 'Backup, restore drill และ disaster recovery', 'detail' => 'มี erp:backup พร้อม checksum/retention และ erp:health ตรวจอายุไฟล์ ต้องตั้ง cron ส่งสำเนาออกนอกเครื่องและทดสอบกู้คืนเป็นรอบ'],
+            ['level' => 'control', 'status' => 'พร้อมใช้', 'title' => 'Security, MFA และ Audit การเข้าสู่ระบบ', 'detail' => 'มี MFA แบบ TOTP, login throttling, session regeneration, encrypted secret และศูนย์ตรวจสถานะ; ยังต้องเปิด MFA ให้ผู้ใช้สำคัญทุกคน'],
+            ['level' => 'control', 'status' => 'พร้อมใช้', 'title' => 'Backup, restore drill และ disaster recovery', 'detail' => 'มี backup/checksum/retention, ศูนย์ตรวจจากหน้าเว็บ, health gate ก่อนปิดงวด และ restore verification; production ต้องตั้ง offsite disk และ scheduler'],
             ['level' => 'growth', 'status' => 'ทะเบียนแล้ว', 'title' => 'E-Commerce sync อัตโนมัติ', 'detail' => 'มีแฟ้มช่องทาง Lazada Shopee LINE MyShop และ TikTok Shop แต่ยังไม่มี order/stock sync จริง'],
             ['level' => 'growth', 'status' => 'ยังไม่มี', 'title' => 'Payroll และเวลาเข้างาน', 'detail' => 'มีแฟ้มพนักงานและโครงสร้างองค์กร แต่เงินเดือน ภาษี ประกันสังคม และ attendance ยังไม่อยู่ในระบบ'],
             ['level' => 'growth', 'status' => 'ยังไม่มี', 'title' => 'งบประมาณและศูนย์ต้นทุน', 'detail' => 'ยังไม่มี Budget, Cost Center และการเทียบงบประมาณกับยอดจริงสำหรับควบคุมค่าใช้จ่ายตามหน่วยงาน'],

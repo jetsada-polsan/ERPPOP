@@ -82,6 +82,15 @@
     .routine-meta strong { color: #15364d; font-size: 12px; }
     .routine-meta span { color: #7890a1; font-size: 11px; }
     .routine-items { margin: 0; padding-left: 18px; color: #526d7f; font-size: 11px; line-height: 1.65; }
+    .control-manuals { display: grid; gap: 10px; padding: 12px; }
+    .control-manual { border: 1px solid #dbe7ef; border-radius: 7px; overflow: hidden; }
+    .control-title { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 11px 13px; border: 0; background: #f7fafc; color: #15364d; text-align: left; font-size: 13px; font-weight: 900; }
+    .control-body { padding: 14px; }
+    .control-owner { padding: 9px 11px; border-left: 3px solid #1599d3; background: #f4fafe; color: #526d7f; font-size: 11px; }
+    .control-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin-top: 12px; }
+    .control-block h3 { margin: 0 0 6px; color: #274b63; font-size: 12px; font-weight: 900; }
+    .control-block ol,.control-block ul { margin: 0; padding-left: 18px; color: #5e7585; font-size: 11px; line-height: 1.65; }
+    .control-purpose { margin: 9px 0 0; color: #526d7f; font-size: 12px; line-height: 1.5; }
 
     @media (max-width: 1100px) {
         .flow-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -99,6 +108,7 @@
         .flow-step { min-height: 0; }
         .flow-step::after { display: none !important; }
         .gap-row { grid-template-columns: 74px minmax(0, 1fr); padding: 11px 12px; }
+        .control-grid { grid-template-columns: 1fr; }
     }
     @media print {
         .app-header, .app-sidebar, .manual-toolbar, .manual-actions, .flow-tabs { display: none !important; }
@@ -210,6 +220,21 @@
                 </div>
             </div>
         @endforeach
+    </section>
+
+    <section class="manual-panel">
+        <div class="manual-section-head"><h2><i class="bi bi-shield-check me-2"></i>คู่มือควบคุมระบบ 1-5 แบบละเอียด</h2><span>ตั้งค่า → ปฏิบัติ → ตรวจสอบ → ผลลัพธ์</span></div>
+        <div class="control-manuals" x-data="{openControl:'accounting'}">
+            @foreach($controlManuals as $manual)
+                <article class="control-manual">
+                    <button type="button" class="control-title" @click="openControl=openControl==='{{ $manual['key'] }}'?'':'{{ $manual['key'] }}'"><span>{{ $manual['title'] }}</span><i class="bi" :class="openControl==='{{ $manual['key'] }}'?'bi-chevron-up':'bi-chevron-down'"></i></button>
+                    <div class="control-body" x-show="openControl==='{{ $manual['key'] }}'" x-cloak>
+                        <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap"><div class="flex-grow-1"><div class="control-owner"><strong>ผู้รับผิดชอบ:</strong> {{ $manual['owner'] }}</div><p class="control-purpose"><strong>วัตถุประสงค์:</strong> {{ $manual['purpose'] }}</p></div>@if($routeAccess($manual['route']))<a class="btn btn-sm btn-outline-primary" href="{{ route($manual['route']) }}"><i class="bi bi-box-arrow-up-right me-1"></i>เปิดโปรแกรม</a>@endif</div>
+                        <div class="control-grid"><div class="control-block"><h3>เตรียมระบบก่อนใช้</h3><ol>@foreach($manual['setup'] as $item)<li>{{ $item }}</li>@endforeach</ol></div><div class="control-block"><h3>ขั้นตอนปฏิบัติงาน</h3><ol>@foreach($manual['steps'] as $item)<li>{{ $item }}</li>@endforeach</ol></div><div class="control-block"><h3>จุดควบคุม</h3><ul>@foreach($manual['controls'] as $item)<li>{{ $item }}</li>@endforeach</ul></div><div class="control-block"><h3>ผลลัพธ์และหลักฐาน</h3><ul>@foreach($manual['outputs'] as $item)<li>{{ $item }}</li>@endforeach</ul></div></div>
+                    </div>
+                </article>
+            @endforeach
+        </div>
     </section>
 
     <div class="manual-two-col">

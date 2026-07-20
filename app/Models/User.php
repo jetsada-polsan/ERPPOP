@@ -13,8 +13,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['branch_id', 'salesman_id', 'username', 'name', 'email', 'phone', 'position', 'password', 'is_active', 'must_change_password'])]
-#[Hidden(['password', 'remember_token'])]
+#[Fillable(['branch_id', 'salesman_id', 'username', 'name', 'email', 'phone', 'position', 'password', 'is_active', 'must_change_password', 'mfa_secret', 'mfa_enabled_at', 'password_changed_at'])]
+#[Hidden(['password', 'remember_token', 'mfa_secret'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -105,6 +105,9 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
             'must_change_password' => 'boolean',
+            'mfa_secret' => 'encrypted',
+            'mfa_enabled_at' => 'datetime',
+            'password_changed_at' => 'datetime',
         ];
     }
 }

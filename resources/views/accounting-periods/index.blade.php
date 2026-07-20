@@ -29,6 +29,9 @@
     .period-action.close-action:hover { color: #fff; border-color: #b4232c; background: #b4232c; }
     .period-action.open-action:hover { color: #fff; border-color: #0f766e; background: #0f766e; }
     .period-empty { padding: 36px 20px; color: #7890a1; text-align: center; }
+    .close-checks { min-width: 230px; display: grid; gap: 3px; }
+    .close-check { display: flex; gap: 6px; align-items: center; font-size: 10px; }
+    .close-check.pass { color: #146c43; } .close-check.block { color: #a61b27; }
     .period-modal-backdrop { position: fixed; inset: 0; z-index: 2000; display: grid; place-items: center; padding: 18px; background: rgba(22, 47, 65, .42); }
     .period-modal { width: min(480px, 100%); padding: 20px; border-radius: 8px; background: #fff; box-shadow: 0 24px 70px rgba(22, 47, 65, .24); }
     .period-modal h2 { margin: 0 0 5px; color: #183c54; font-size: 17px; font-weight: 900; }
@@ -82,7 +85,7 @@
             <div class="period-empty"><i class="bi bi-calendar2-week fs-3 d-block mb-2"></i>ยังไม่มีงวดบัญชี</div>
         @else
             <table class="period-table">
-                <thead><tr><th>งวด</th><th>ขอบเขต</th><th>ช่วงวันที่</th><th>สถานะ</th><th>ผู้ปิดงวด</th><th>หมายเหตุ</th><th></th></tr></thead>
+                <thead><tr><th>งวด</th><th>ขอบเขต</th><th>ช่วงวันที่</th><th>สถานะ</th><th>Pre-close checklist</th><th>ผู้ปิดงวด</th><th>หมายเหตุ</th><th></th></tr></thead>
                 <tbody>
                 @foreach ($periods as $period)
                     <tr>
@@ -90,13 +93,15 @@
                         <td>{{ $period->branch ? $period->branch->code.' · '.$period->branch->name_th : 'ทั้งบริษัท' }}</td>
                         <td>{{ $period->starts_on->thaiDate() }} - {{ $period->ends_on->thaiDate() }}</td>
                         <td><span class="period-status period-{{ $period->status }}"><i class="bi bi-{{ $period->isClosed() ? 'lock-fill' : 'unlock' }}"></i>{{ $period->isClosed() ? 'ปิดงวด' : 'เปิดงวด' }}</span></td>
+                        <td>@if($period->isClosed())<span class="text-muted small">ตรวจผ่านและล็อกแล้ว</span>@else @php($checks=$readiness[$period->id]??[])<div class="close-checks">@foreach($checks as $check)<div class="close-check {{ $check['status'] }}" title="{{ $check['detail'] }}"><i class="bi bi-{{ $check['status']==='pass'?'check-circle-fill':'x-circle-fill' }}"></i><span>{{ $check['label'] }}: {{ $check['detail'] }}</span></div>@endforeach</div>@endif</td>
                         <td>{{ $period->closedBy?->name ?? '-' }}@if ($period->closed_at)<div class="text-muted" style="font-size:10px">{{ $period->closed_at->thaiDate(true) }}</div>@endif</td>
                         <td>{{ $period->note ?: '-' }}</td>
                         <td class="text-end">
                             @if ($period->isClosed())
                                 <form method="post" action="{{ route('accounting-periods.reopen', $period) }}" class="d-inline" onsubmit="return confirm('เปิดงวดนี้อีกครั้งหรือไม่? เอกสารย้อนหลังจะกลับมาแก้ไขได้')">@csrf<button class="period-action open-action" title="เปิดงวด"><i class="bi bi-unlock"></i></button></form>
                             @else
-                                <button type="button" class="period-action close-action" title="ปิดงวด" @click="closeId={{ $period->id }};closeName={{ Js::from($period->name) }};closeAction={{ Js::from(route('accounting-periods.close', $period)) }}"><i class="bi bi-lock"></i></button>
+                                @php($blocked=collect($readiness[$period->id]??[])->contains('status','block'))
+                                <button type="button" class="period-action close-action" title="{{ $blocked?'ต้องแก้รายการใน checklist ให้ผ่านก่อน':'ปิดงวด' }}" @disabled($blocked) @click="closeId={{ $period->id }};closeName={{ Js::from($period->name) }};closeAction={{ Js::from(route('accounting-periods.close', $period)) }}"><i class="bi bi-lock"></i></button>
                             @endif
                         </td>
                     </tr>

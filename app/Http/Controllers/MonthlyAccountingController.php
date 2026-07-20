@@ -168,21 +168,60 @@ class MonthlyAccountingController extends Controller
         $matched = 0;
         foreach ($statements as $statement) {
             $amount = (float) $statement->amount;
-            $expense = $amount < 0 ? BranchExpense::where('bank_account_id', $statement->bank_account_id)
-                ->whereDate('expense_date', $statement->statement_date)->whereRaw('abs(total_amount - withholding_amount - ?) <= 0.01', [abs($amount)])->first() : null;
-            if (! $expense) {
+            $match = $amount < 0
+                ? $this->expenseMatch($statement, abs($amount))
+                : $this->incomeMatch($statement, $amount);
+            if (! $match) {
                 continue;
             }
             BankReconciliation::updateOrCreate(['bank_statement_id' => $statement->id], [
-                'branch_id' => $expense->branch_id, 'match_type' => 'expense', 'reference' => $expense->document?->doc_number,
+                'branch_id' => $match['branch_id'], 'match_type' => $match['match_type'], 'reference' => $match['reference'],
                 'expected_amount' => abs($amount), 'difference_amount' => 0, 'status' => 'matched',
-                'note' => 'จับคู่อัตโนมัติจากวันที่ บัญชีธนาคาร และยอดสุทธิ', 'checked_by' => auth()->id(), 'checked_at' => now(),
+                'source_type' => $match['source_type'], 'source_id' => $match['source_id'], 'match_confidence' => $match['confidence'],
+                'note' => 'จับคู่อัตโนมัติจากวันที่ บัญชีธนาคาร ยอด และแหล่งอ้างอิงที่ยังไม่ถูกใช้', 'checked_by' => auth()->id(), 'checked_at' => now(),
             ]);
             $statement->update(['reconciled' => true]);
             $matched++;
         }
 
         return back()->with('success', "จับคู่ Statement อัตโนมัติ {$matched} รายการ รายการที่ไม่ชัดเจนยังคงรอตรวจด้วยคน");
+    }
+
+    private function expenseMatch(BankStatement $statement, float $amount): ?array
+    {
+        $expense = BranchExpense::where('bank_account_id', $statement->bank_account_id)
+            ->whereDate('expense_date', $statement->statement_date)
+            ->whereRaw('abs(total_amount - withholding_amount - ?) <= 0.01', [$amount])
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('bank_reconciliations as br')
+                ->where('br.source_type', 'branch_expense')->whereColumn('br.source_id', 'branch_expenses.id'))
+            ->first();
+
+        return $expense ? [
+            'branch_id' => $expense->branch_id, 'match_type' => 'expense', 'reference' => $expense->document?->doc_number,
+            'source_type' => 'branch_expense', 'source_id' => $expense->id, 'confidence' => 100,
+        ] : null;
+    }
+
+    private function incomeMatch(BankStatement $statement, float $amount): ?array
+    {
+        $payment = DB::table('payment_lines as pl')->join('payment_documents as pd', 'pd.id', '=', 'pl.payment_document_id')
+            ->join('documents as d', 'd.id', '=', 'pd.document_id')
+            ->where('pl.bank_account_id', $statement->bank_account_id)->whereDate('d.doc_date', $statement->statement_date)
+            ->whereIn('pl.method', ['transfer', 'qr', 'bank'])->whereRaw('abs(pl.amount - ?) <= 0.01', [$amount])
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('bank_reconciliations as br')->where('br.source_type', 'payment_line')->whereColumn('br.source_id', 'pl.id'))
+            ->first(['pl.id', 'pd.branch_id', 'd.doc_number']);
+        if ($payment) {
+            return ['branch_id' => $payment->branch_id, 'match_type' => 'payment', 'reference' => $payment->doc_number, 'source_type' => 'payment_line', 'source_id' => $payment->id, 'confidence' => 100];
+        }
+
+        $pos = DB::table('pos_payments as pp')->join('pos_receipts as pr', 'pr.id', '=', 'pp.pos_receipt_id')
+            ->join('pos_terminals as pt', 'pt.id', '=', 'pr.pos_terminal_id')
+            ->whereDate('pr.receipt_date', $statement->statement_date)->whereIn('pp.method', ['transfer', 'qr', 'bank'])
+            ->whereRaw('abs(pp.amount - ?) <= 0.01', [$amount])->where('pr.status', 'completed')
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('bank_reconciliations as br')->where('br.source_type', 'pos_payment')->whereColumn('br.source_id', 'pp.id'))
+            ->first(['pp.id', 'pt.branch_id', 'pr.receipt_no']);
+
+        return $pos ? ['branch_id' => $pos->branch_id, 'match_type' => 'pos_transfer', 'reference' => $pos->receipt_no, 'source_type' => 'pos_payment', 'source_id' => $pos->id, 'confidence' => 100] : null;
     }
 
     public function export(Request $request, MonthlyAccountingExportService $service): BinaryFileResponse

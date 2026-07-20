@@ -51,6 +51,7 @@
                 ['label' => 'ผังบัญชี / บันทึกบัญชี', 'route' => 'chart-of-accounts.index', 'pattern' => 'chart-of-accounts.*', 'extraPattern' => 'gl-journals.*', 'icon' => 'bi-calculator-fill', 'tone' => 'red'],
                 ['label' => 'งวดบัญชี / ปิดงวด', 'route' => 'accounting-periods.index', 'pattern' => 'accounting-periods.*', 'icon' => 'bi-calendar2-lock', 'tone' => 'amber'],
                 ['label' => 'ปิดบัญชีรายเดือน', 'route' => 'monthly-accounting.index', 'pattern' => 'monthly-accounting.*', 'icon' => 'bi-file-earmark-zip-fill', 'tone' => 'teal'],
+                ['label' => 'ภาษีไทย / E-Tax', 'route' => 'tax-compliance.index', 'pattern' => 'tax-compliance.*', 'icon' => 'bi-receipt', 'tone' => 'orange'],
                 ['label' => 'งบการเงิน', 'route' => 'financial-statements.index', 'pattern' => 'financial-statements.*', 'icon' => 'bi-graph-up', 'tone' => 'blue'],
                 ['label' => 'ทะเบียนทรัพย์สิน', 'route' => 'fixed-assets.index', 'pattern' => 'fixed-assets.*', 'icon' => 'bi-buildings', 'tone' => 'brown'],
                 ['label' => 'เงินสด / ภาษี', 'route' => 'bplus.finance', 'pattern' => 'bplus.finance', 'extraPattern' => 'bplus.tax', 'icon' => 'bi-journal-richtext', 'tone' => 'amber'],
@@ -104,6 +105,7 @@
             'displayLabel' => 'ตั้งค่าระบบ',
             'items' => [
                 ['label' => 'ตั้งค่าระบบ', 'route' => 'settings.index', 'pattern' => 'settings.*', 'icon' => 'bi-gear-fill', 'tone' => 'slate'],
+                ['label' => 'Backup / Security', 'route' => 'operations.index', 'pattern' => 'operations.*', 'icon' => 'bi-shield-lock-fill', 'tone' => 'red'],
                 ['label' => 'สมุดเอกสาร', 'route' => 'document-books.index', 'pattern' => 'document-books.*', 'icon' => 'bi-journals', 'tone' => 'indigo'],
                 ['label' => 'ผู้ใช้และสิทธิ์', 'route' => 'users.index', 'pattern' => 'users.*', 'icon' => 'bi-people-fill', 'tone' => 'indigo'],
                 ['label' => 'แฟ้มพนักงาน', 'route' => 'employees.index', 'pattern' => 'employees.*', 'icon' => 'bi-person-vcard-fill', 'tone' => 'teal'],

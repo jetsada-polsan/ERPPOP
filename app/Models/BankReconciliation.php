@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['bank_statement_id', 'branch_id', 'match_type', 'reference', 'expected_amount', 'difference_amount', 'status', 'slip_path', 'note', 'checked_by', 'checked_at'])]
+#[Fillable(['bank_statement_id', 'branch_id', 'match_type', 'reference', 'expected_amount', 'difference_amount', 'status', 'slip_path', 'note', 'checked_by', 'checked_at', 'source_type', 'source_id', 'match_confidence'])]
 class BankReconciliation extends Model
 {
     public function statement(): BelongsTo

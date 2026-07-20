@@ -17,6 +17,7 @@ class ManualControllerTest extends TestCase
         $this->assertSame(['man', 'money', 'material', 'management'], array_column($pillars, 'key'));
         $this->assertCount(8, $workflows);
         $this->assertGreaterThanOrEqual(8, count($view->getData()['gaps']));
+        $this->assertCount(5, $view->getData()['controlManuals']);
     }
 
     public function test_every_program_and_workflow_step_points_to_a_real_route(): void
