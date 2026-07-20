@@ -25,7 +25,8 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "msi"],
+    "targets": ["nsis"],
+    "icon": ["icons/icon.ico", "icons/icon.png"],
     "createUpdaterArtifacts": true,
     "windows": { "nsis": { "installMode": "perMachine" } }
   },

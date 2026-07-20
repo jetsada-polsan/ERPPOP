@@ -25,6 +25,9 @@ jobs:
           cache: pnpm
           cache-dependency-path: apps/pos-desktop/pnpm-lock.yaml
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/pos-desktop/src-tauri
       - name: Set version and updater public key
         env:
           VERSION: ${{ inputs.version }}
@@ -44,5 +47,4 @@ jobs:
           name: POPSTAR-POS-${{ inputs.version }}
           path: |
             apps/pos-desktop/src-tauri/target/release/bundle/nsis/*
-            apps/pos-desktop/src-tauri/target/release/bundle/msi/*
           if-no-files-found: error
