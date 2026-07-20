@@ -369,6 +369,9 @@ Route::prefix('customers')->name('customers.')->group(function () {
     Route::post('/{customer}/addresses', [CustomerController::class, 'addAddress'])->name('addresses.store');
     Route::post('/{customer}/contacts', [CustomerController::class, 'addContact'])->name('contacts.store');
     Route::post('/{customer}/payments', [PaymentController::class, 'storeCustomerPayment'])->name('payments.store');
+    // เปลี่ยนวงเงินเครดิตต้องอนุมัติ (finance.credit.approve) - ผู้ขอกดเองไม่ได้
+    Route::post('/{customer}/credit-limit/approve', [CustomerController::class, 'approveCreditLimit'])->name('credit-limit.approve');
+    Route::post('/{customer}/credit-limit/reject', [CustomerController::class, 'rejectCreditLimit'])->name('credit-limit.reject');
 });
 
 // Supplier master data (ซัพพลายเออร์): editable here; ledgerEntries shows their

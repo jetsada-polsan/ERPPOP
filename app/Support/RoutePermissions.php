@@ -29,6 +29,8 @@ class RoutePermissions
         'document-books.' => 'settings.manage',
         'pos-import.' => 'sales.manage',
         'customers.' => 'sales.manage',
+        'customers.credit-limit.approve' => 'finance.credit.approve',
+        'customers.credit-limit.reject' => 'finance.credit.approve',
         'billing-notes.' => 'sales.manage',
         'credit-debit-notes.' => 'sales.manage',
         'credit-debit-notes.approve' => 'finance.note.approve',
