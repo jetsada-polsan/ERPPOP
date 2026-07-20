@@ -326,15 +326,20 @@ class ManagementControlController extends Controller
             ->where('bl.budget_id', $budget)->orderBy('bl.month')->orderBy('a.code')
             ->get(['bl.*', 'a.code as account_code', 'a.name_th as account_name']);
 
-        $actuals = DB::table('branch_expenses')
+        // จับคู่ค่าใช้จ่ายจริง (branch_expenses) กับบรรทัดงบตาม เดือน+บัญชี — จัดกลุ่มใน PHP
+        // เพื่อไม่ผูกกับ SQL เฉพาะฐานข้อมูล (เช่น extract() ของ Postgres)
+        $actuals = [];
+        DB::table('branch_expenses')
             ->where('cost_center_id', $row->cost_center_id)
-            ->whereRaw('extract(year from expense_date) = ?', [$row->fiscal_year])
-            ->selectRaw('extract(month from expense_date)::int as m, expense_account_id, sum(total_amount) as spent')
-            ->groupBy('m', 'expense_account_id')->get()
-            ->keyBy(fn ($r) => $r->m.'-'.$r->expense_account_id);
+            ->whereBetween('expense_date', [$row->fiscal_year.'-01-01', $row->fiscal_year.'-12-31'])
+            ->get(['expense_date', 'expense_account_id', 'total_amount'])
+            ->each(function ($r) use (&$actuals) {
+                $key = Carbon::parse($r->expense_date)->month.'-'.$r->expense_account_id;
+                $actuals[$key] = ($actuals[$key] ?? 0) + (float) $r->total_amount;
+            });
 
         $lines = $lines->map(function ($line) use ($actuals) {
-            $spent = (float) ($actuals[$line->month.'-'.$line->account_id]->spent ?? 0);
+            $spent = (float) ($actuals[$line->month.'-'.$line->account_id] ?? 0);
             $line->spent = $spent;
             $line->variance = (float) $line->budget_amount - $spent;
 
