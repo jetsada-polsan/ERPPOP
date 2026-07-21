@@ -31,14 +31,22 @@ class ScaleBarcodeService
      */
     public function decode(string $barcode): ?array
     {
-        if (preg_match('/^(80[01][0-9]{3})([0-9]{6})([0-9])$/', trim($barcode), $matches) !== 1) {
-            return null;
-        }
-        if ((int) $matches[3] !== $this->checkDigit($matches[1].$matches[2])) {
-            return null;
+        $barcode = trim($barcode);
+
+        // 13 หลัก: PLU(6) + ราคารวมสตางค์(6) + check digit — ต้องตรวจ check digit
+        // เพราะ 800-839 เป็นรหัสประเทศ EAN ของอิตาลีด้วย
+        if (preg_match('/^(80[01][0-9]{3})([0-9]{6})([0-9])$/', $barcode, $matches) === 1) {
+            return (int) $matches[3] === $this->checkDigit($matches[1].$matches[2])
+                ? ['plu' => $matches[1], 'price' => (int) $matches[2] / 100]
+                : null;
         }
 
-        return ['plu' => $matches[1], 'price' => (int) $matches[2] / 100];
+        // 12 หลัก: PLU(6) + ราคารวมสตางค์(5) + หลักท้ายไม่ใช้ (เครื่องชั่งบางรุ่น)
+        if (preg_match('/^(80[01][0-9]{3})([0-9]{5})[0-9]$/', $barcode, $matches) === 1) {
+            return ['plu' => $matches[1], 'price' => (int) $matches[2] / 100];
+        }
+
+        return null;
     }
 
     public function svg(string $barcode, int $height = 42): string

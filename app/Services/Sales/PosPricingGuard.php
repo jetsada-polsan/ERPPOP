@@ -35,8 +35,21 @@ class PosPricingGuard
      */
     public function resolveScaleLines(array $items, int $branchId): array
     {
-        return collect($items)->map(function (array $item) use ($branchId): array {
-            $scale = $this->scaleBarcodes->decode((string) ($item['barcode'] ?? ''));
+        $scanned = collect($items)->pluck('barcode')->filter()->unique();
+        $registered = $scanned->isEmpty()
+            ? collect()
+            : ProductBarcode::whereIn('barcode', $scanned)->where('is_active', true)->pluck('barcode')->flip();
+
+        return collect($items)->map(function (array $item) use ($branchId, $registered): array {
+            $code = (string) ($item['barcode'] ?? '');
+
+            // บาร์โค้ดที่ลงทะเบียนไว้จริงเป็นบาร์โค้ดสินค้าปกติเสมอ — กันสินค้านำเข้าที่ขึ้นต้น
+            // 800/801 (รหัสประเทศอิตาลี) ถูกตีความเป็นป้ายชั่งแล้วคิดเงินผิด
+            if ($code === '' || $registered->has($code)) {
+                return $item;
+            }
+
+            $scale = $this->scaleBarcodes->decode($code);
             if ($scale === null) {
                 return $item;
             }
