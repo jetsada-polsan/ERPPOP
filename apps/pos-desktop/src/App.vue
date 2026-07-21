@@ -55,9 +55,35 @@ function addProduct(product: Product, barcode?: string) {
   nextTick(() => scanner.value?.focus())
 }
 
+// ป้ายเครื่องชั่ง: PLU 6 หลัก + ราคารวม 6 หลัก (สตางค์) + check digit ของ EAN-13
+function decodeScaleLabel(code: string): { plu: string; price: number } | null {
+  const matched = /^(80[01]\d{3})(\d{6})(\d)$/.exec(code)
+  if (!matched) return null
+  const body = matched[1] + matched[2]
+  let sum = 0
+  for (let i = 0; i < body.length; i++) sum += Number(body[i]) * (i % 2 === 0 ? 1 : 3)
+  if ((10 - (sum % 10)) % 10 !== Number(matched[3])) return null
+  return { plu: matched[1], price: Number(matched[2]) / 100 }
+}
+
 function scan() {
   const code = search.value.trim()
   if (!code) return
+
+  const scale = decodeScaleLabel(code)
+  if (scale) {
+    const weighed = products.value.find((p) => p.sku_code === scale.plu || p.barcodes?.some((b) => b.barcode === scale.plu))
+    if (!weighed) return flash(`ไม่พบสินค้าชั่งรหัส ${scale.plu}`)
+    const perUnit = Number(weighed.pos_price)
+    if (!(perUnit > 0)) return flash(`สินค้าชั่ง ${scale.plu} ยังไม่ได้ตั้งราคาต่อหน่วย`)
+    // ป้ายหนึ่งใบ = ถุงจริงหนึ่งถุง จึงแยกบรรทัดเสมอ ไม่รวมยอดกับถุงก่อนหน้า
+    // (server จะถอดบาร์โค้ดและคำนวณน้ำหนักซ้ำอีกครั้งจากราคาต่อหน่วยของตัวเอง)
+    cart.value.push({ ...weighed, qty: Number((scale.price / perUnit).toFixed(4)), scannedBarcode: code })
+    search.value = ''
+    nextTick(() => scanner.value?.focus())
+    return
+  }
+
   const product = products.value.find((p) => p.sku_code === code || p.barcodes?.some((b) => b.barcode === code))
   if (product) addProduct(product, product.barcodes?.find((b) => b.barcode === code)?.barcode)
   else flash(`ไม่พบรหัส ${code}`)

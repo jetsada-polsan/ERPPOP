@@ -22,6 +22,25 @@ class ScaleBarcodeService
         return $body.$this->checkDigit($body);
     }
 
+    /**
+     * Read a price-embedded scale label back: 6-digit PLU + 6-digit total price
+     * in satang + EAN-13 check digit. Returns null when the code is not a valid
+     * scale label, so callers can fall through to a normal barcode lookup.
+     *
+     * @return array{plu: string, price: float}|null
+     */
+    public function decode(string $barcode): ?array
+    {
+        if (preg_match('/^(80[01][0-9]{3})([0-9]{6})([0-9])$/', trim($barcode), $matches) !== 1) {
+            return null;
+        }
+        if ((int) $matches[3] !== $this->checkDigit($matches[1].$matches[2])) {
+            return null;
+        }
+
+        return ['plu' => $matches[1], 'price' => (int) $matches[2] / 100];
+    }
+
     public function svg(string $barcode, int $height = 42): string
     {
         if (preg_match('/^[0-9]{13}$/', $barcode) !== 1) {
