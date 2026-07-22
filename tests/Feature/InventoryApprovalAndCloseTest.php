@@ -15,7 +15,9 @@ use App\Services\Inventory\FifoStockService;
 use App\Services\Inventory\InventoryCostCloseService;
 use App\Services\Inventory\StockAdjustmentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
 class InventoryApprovalAndCloseTest extends TestCase
@@ -44,7 +46,7 @@ class InventoryApprovalAndCloseTest extends TestCase
         app(StockAdjustmentService::class)->approve($document);
         $this->assertSame('active', $document->fresh()->status);
         $this->assertSame(7.0, (float) StockBalance::first()->on_hand_qty);
-        $this->assertDatabaseHas('stock_movements', ['document_id' => $document->id, 'movement_type' => 'adjust']);
+        $this->assertDatabaseHas('stock_movements', ['document_id' => $document->id, 'movement_type' => 'adjust_out']);
     }
 
     public function test_shrinkage_adjustment_depletes_stock_lots_not_just_stock_balances(): void
@@ -69,6 +71,32 @@ class InventoryApprovalAndCloseTest extends TestCase
         $this->assertSame(6.0, (float) StockBalance::first()->on_hand_qty);
         $lotSum = (float) DB::table('stock_lots')->where('product_id', $product->id)->sum('remaining_qty');
         $this->assertSame(6.0, $lotSum);
+    }
+
+    public function test_cost_close_counts_shrinkage_as_an_issue_and_reduces_lot_value(): void
+    {
+        $this->travelTo('2026-08-10 10:00:00');
+        [$branch, $location, $product] = $this->masters();
+        app(FifoStockService::class)->receive($product->id, $location->id, 10, null, receivedDate: '2026-08-01', unitCost: 10);
+        DocumentType::create(['code' => 'STOCK_ADJUSTMENT', 'name_th' => 'ใบปรับสต๊อก']);
+        $creator = User::factory()->create(['username' => 'close-counter']);
+        $approver = User::factory()->create(['username' => 'close-approver']);
+
+        $this->actingAs($creator);
+        $document = app(StockAdjustmentService::class)->create([
+            'branch_id' => $branch->id, 'warehouse_location_id' => $location->id,
+            'remark' => 'shrink before close', 'items' => [['product_id' => $product->id, 'counted_qty' => 6]],
+        ]);
+        $this->actingAs($approver);
+        app(StockAdjustmentService::class)->approve($document);
+
+        $this->travelTo('2026-09-01 10:00:00');
+        app(InventoryCostCloseService::class)->close('2026-08');
+        $close = InventoryCostClose::where('period', '2026-08')->where('product_id', $product->id)->firstOrFail();
+
+        $this->assertSame(4.0, (float) $close->issued_qty);
+        $this->assertSame(6.0, (float) $close->ending_qty);
+        $this->assertSame(60.0, (float) $close->ending_value);
     }
 
     public function test_found_extra_adjustment_creates_a_costed_lot_not_a_silent_balance_bump(): void
@@ -99,6 +127,33 @@ class InventoryApprovalAndCloseTest extends TestCase
         $this->assertSame(12.0, (float) $foundLotCost);
     }
 
+    public function test_opening_adjustment_applies_explicit_cost_only_when_approved(): void
+    {
+        [$branch, $location, $product] = $this->masters();
+        $product->update(['average_cost' => 5]);
+        DocumentType::create(['code' => 'STOCK_ADJUSTMENT', 'name_th' => 'ใบปรับสต๊อก']);
+        $creator = User::factory()->create(['username' => 'opening-maker']);
+        $approver = User::factory()->create(['username' => 'opening-checker']);
+
+        $this->actingAs($creator);
+        $document = app(StockAdjustmentService::class)->create([
+            'branch_id' => $branch->id, 'warehouse_location_id' => $location->id,
+            'remark' => 'opening stock',
+            'items' => [['product_id' => $product->id, 'counted_qty' => 10, 'unit_cost' => 27.5]],
+        ]);
+
+        $this->assertSame(5.0, (float) $product->fresh()->average_cost);
+        $this->assertDatabaseMissing('stock_lots', ['source_document_id' => $document->id]);
+
+        $this->actingAs($approver);
+        app(StockAdjustmentService::class)->approve($document);
+
+        $this->assertSame(27.5, (float) $product->fresh()->average_cost);
+        $this->assertDatabaseHas('stock_lots', [
+            'source_document_id' => $document->id, 'remaining_qty' => 10, 'unit_cost' => 27.5,
+        ]);
+    }
+
     public function test_cost_close_uses_movements_up_to_period_end_only(): void
     {
         [, $location, $product] = $this->masters();
@@ -115,6 +170,38 @@ class InventoryApprovalAndCloseTest extends TestCase
         $this->assertSame(2.0, (float) $close->issued_qty);
         $this->assertSame(6.0, (float) $close->ending_qty);
         $this->assertSame(90.0, (float) $close->ending_value);
+    }
+
+    public function test_opening_import_rejects_warehouses_with_movement_history(): void
+    {
+        [$branch, $location, $product] = $this->masters();
+        app(FifoStockService::class)->receive($product->id, $location->id, 1, null, unitCost: 10);
+        $path = tempnam(sys_get_temp_dir(), 'opening-stock-');
+        File::put($path, "sku,name,cost,สำนักงานใหญ่({$branch->code})\n{$product->sku_code},สินค้า,10,5\n");
+
+        try {
+            $exit = Artisan::call('stock:import-opening', ['csv' => $path, '--dry-run' => true]);
+            $this->assertSame(1, $exit);
+            $this->assertStringContainsString('พบประวัติการเคลื่อนไหว', Artisan::output());
+        } finally {
+            File::delete($path);
+        }
+    }
+
+    public function test_opening_import_dry_run_rejects_invalid_numeric_cells(): void
+    {
+        [$branch, , $product] = $this->masters();
+        $path = tempnam(sys_get_temp_dir(), 'opening-stock-');
+        File::put($path, "sku,name,cost,สำนักงานใหญ่({$branch->code})\n{$product->sku_code},สินค้า,10,not-a-number\n");
+
+        try {
+            $exit = Artisan::call('stock:import-opening', ['csv' => $path, '--dry-run' => true]);
+            $this->assertSame(1, $exit);
+            $this->assertStringContainsString('ไม่ใช่ตัวเลข', Artisan::output());
+            $this->assertDatabaseCount('documents', 0);
+        } finally {
+            File::delete($path);
+        }
     }
 
     private function masters(): array

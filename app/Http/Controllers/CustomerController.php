@@ -68,7 +68,7 @@ class CustomerController extends Controller
         unset($data['credit_limit']);
         $message = 'บันทึกข้อมูลลูกค้าแล้ว';
 
-        if ($requestedLimit !== null && bccomp((string) $requestedLimit, (string) $customer->credit_limit, 2) !== 0) {
+        if ($requestedLimit !== null && round((float) $requestedLimit, 2) !== round((float) $customer->credit_limit, 2)) {
             $data['pending_credit_limit'] = $requestedLimit;
             $data['credit_limit_requested_by'] = $request->user()->id;
             $data['credit_limit_requested_at'] = now();

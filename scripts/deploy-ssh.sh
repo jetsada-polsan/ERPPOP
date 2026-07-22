@@ -36,16 +36,11 @@ rsync -az --delete \
   --exclude='auth.json' \
   --exclude='vendor/' \
   --exclude='node_modules/' \
+  --exclude='bootstrap/cache/' \
   --exclude='public/build/' \
   --exclude='public/downloads/' \
   --exclude='public/storage' \
-  --exclude='storage/_bak/' \
-  --exclude='storage/deploy-backups/' \
-  --exclude='storage/framework/.config/' \
-  --exclude='storage/framework/cache/data/*' \
-  --exclude='storage/framework/sessions/*' \
-  --exclude='storage/framework/views/*' \
-  --exclude='storage/logs/*' \
+  --exclude='storage/' \
   ./ "${SSH_USER}@${SSH_HOST}:${REMOTE_PATH}/"
 
 ssh -p "$SSH_PORT" "${SSH_USER}@${SSH_HOST}" \

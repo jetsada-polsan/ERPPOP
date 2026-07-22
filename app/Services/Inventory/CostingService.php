@@ -5,6 +5,7 @@ namespace App\Services\Inventory;
 use App\Models\Document;
 use App\Models\Product;
 use App\Models\StockBalance;
+use App\Models\StockLot;
 use Illuminate\Support\Collection;
 
 /**
@@ -70,7 +71,7 @@ class CostingService
      * ส่วนที่ตัดไม่ได้จาก Lot จริง (อนุญาตสต๊อกติดลบ) ใช้ average_cost ปัจจุบันแทน
      * เพราะไม่มี Lot จริงรองรับให้อ้างอิง
      *
-     * @param  Collection<int, array{lot: \App\Models\StockLot, qty: float}>  $allocations
+     * @param  Collection<int, array{lot: StockLot, qty: float}>  $allocations
      */
     public function unitCostFromAllocations(Collection $allocations, float $requestedQty, float $fallbackUnitCost): float
     {

@@ -16,8 +16,8 @@ use RuntimeException;
  * Reconciles physical stock counts against the system's on_hand_qty
  * (ตรวจนับสต็อก). Only items whose counted qty differs from the system qty
  * produce a line; the diff is signed (+found extra / -shortage) and recorded as
- * a single 'adjust' stock_movement per item, matching the movement_type already
- * reserved for this in stock_movements' design (see schema.sql comment).
+ * adjust_in or adjust_out so historical inventory valuation can distinguish
+ * receipts from issues.
  */
 class StockAdjustmentService
 {
@@ -27,7 +27,7 @@ class StockAdjustmentService
     ) {}
 
     /**
-     * @param  array{branch_id:int, warehouse_location_id:int, remark:?string, items: array<int, array{product_id:int, counted_qty:float}>}  $data
+     * @param  array{branch_id:int, warehouse_location_id:int, remark:?string, items: array<int, array{product_id:int, counted_qty:float, unit_cost?:float}>}  $data
      */
     public function create(array $data): Document
     {
@@ -51,6 +51,7 @@ class StockAdjustmentService
                     'system_qty' => $systemQty,
                     'counted_qty' => $countedQty,
                     'diff' => round($countedQty - $systemQty, 4),
+                    'unit_cost' => isset($item['unit_cost']) ? round((float) $item['unit_cost'], 4) : null,
                 ];
             })
             ->filter(fn ($i) => abs($i['diff']) > 0.0001)
@@ -91,6 +92,7 @@ class StockAdjustmentService
                     'qty' => $diff['diff'],
                     'system_qty' => $diff['system_qty'],
                     'counted_qty' => $diff['counted_qty'],
+                    'unit_cost' => $diff['unit_cost'],
                 ]);
             }
 
@@ -129,17 +131,26 @@ class StockAdjustmentService
                     // เจอของเกิน: สร้าง Lot ใหม่รองรับจำนวนที่เพิ่ม ไม่งั้น stock_lots จะไม่ตรงกับ
                     // stock_balances และมูลค่าสต๊อกปลายงวดจะขาดหายไป (ใช้ average_cost ปัจจุบันประมาณ
                     // ต้นทุน เพราะของเกินไม่มี Lot ต้นทางจริงให้อ้างอิง)
-                    $unitCost = (float) (Product::find($productId)?->average_cost ?? 0);
+                    $product = Product::find($productId);
+                    $explicitCost = (float) ($item->unit_cost ?? 0);
+                    $unitCost = $explicitCost > 0 ? $explicitCost : (float) ($product?->average_cost ?? 0);
                     $this->fifo->receive(
                         $productId, $warehouseLocationId, $diff,
-                        $locked->id, 'adjust', unitCost: $unitCost,
+                        $locked->id, 'adjust_in', unitCost: $unitCost,
                     );
+                    if ($explicitCost > 0) {
+                        $product?->update([
+                            'average_cost' => $explicitCost,
+                            'last_purchase_cost' => $explicitCost,
+                            'last_purchase_cost_at' => now(),
+                        ]);
+                    }
                 } elseif ($diff < -0.0001) {
                     // ของขาด/เสียหาย: ตัด Lot จริงตาม FIFO เพื่อให้ stock_lots สะท้อนของที่หายไปจริง
                     // (ไม่ทำแบบเดิมที่แก้ stock_balances ตรงๆ โดยไม่แตะ stock_lots เลย)
                     $this->fifo->issue(
                         $productId, $warehouseLocationId, abs($diff),
-                        $locked->id, 'adjust', allowNegative: true,
+                        $locked->id, 'adjust_out', allowNegative: true,
                     );
                 }
             }
