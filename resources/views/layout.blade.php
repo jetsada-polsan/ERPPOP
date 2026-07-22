@@ -41,7 +41,7 @@
                 ['label' => 'ใบขอซื้อ / ใบสั่งซื้อ', 'route' => 'purchase-orders.index', 'pattern' => 'purchase-orders.*', 'icon' => 'bi-cart-plus-fill', 'tone' => 'orange'],
                 ['label' => 'รับสินค้าเข้าจากผู้ขาย', 'route' => 'purchases.index', 'pattern' => 'purchases.*', 'icon' => 'bi-basket-fill', 'tone' => 'amber'],
                 ['label' => 'คลังมือถือ (สแกน)', 'route' => 'wh.index', 'pattern' => 'wh.*', 'icon' => 'bi-phone-fill', 'tone' => 'cyan'],
-                ['label' => 'แผนจัดซื้อ', 'route' => 'bplus.purchase-planning', 'pattern' => 'bplus.purchase-planning', 'icon' => 'bi-clipboard2-check-fill', 'tone' => 'teal'],
+                ['label' => 'เติมเต็ม / แผนจัดซื้อ', 'route' => 'bplus.purchase-planning', 'pattern' => 'bplus.purchase-planning', 'icon' => 'bi-clipboard2-check-fill', 'tone' => 'teal'],
             ],
         ],
         [
