@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Branch;
+use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\InventoryCostClose;
 use App\Models\Product;
@@ -170,6 +171,41 @@ class InventoryApprovalAndCloseTest extends TestCase
         $this->assertSame(2.0, (float) $close->issued_qty);
         $this->assertSame(6.0, (float) $close->ending_qty);
         $this->assertSame(90.0, (float) $close->ending_value);
+    }
+
+    public function test_void_restores_the_original_fifo_lot_and_period_cost(): void
+    {
+        $this->travelTo('2026-08-10 10:00:00');
+        [$branch, $location, $product] = $this->masters();
+        $type = DocumentType::create(['code' => 'CASH_SALE', 'name_th' => 'ขายสด']);
+        $document = Document::create([
+            'document_type_id' => $type->id,
+            'branch_id' => $branch->id,
+            'doc_number' => 'CS-VOID-1',
+            'doc_date' => '2026-08-10',
+        ]);
+        $fifo = app(FifoStockService::class);
+        $lot = $fifo->receive($product->id, $location->id, 10, null, receivedDate: '2026-08-01', unitCost: 15);
+        $fifo->issue($product->id, $location->id, 4, $document->id, movementDate: '2026-08-10');
+
+        $fifo->restoreDocumentIssues($document->id, movementDate: '2026-08-10');
+
+        $this->assertSame(10.0, (float) $lot->fresh()->remaining_qty);
+        $this->assertSame(10.0, (float) StockBalance::first()->on_hand_qty);
+        $this->assertDatabaseHas('stock_movements', [
+            'document_id' => $document->id,
+            'stock_lot_id' => $lot->id,
+            'movement_type' => 'void_in',
+            'qty' => 4,
+        ]);
+
+        $this->travelTo('2026-09-01 10:00:00');
+        app(InventoryCostCloseService::class)->close('2026-08');
+        $close = InventoryCostClose::where('period', '2026-08')->where('product_id', $product->id)->firstOrFail();
+        $this->assertSame(14.0, (float) $close->received_qty);
+        $this->assertSame(4.0, (float) $close->issued_qty);
+        $this->assertSame(10.0, (float) $close->ending_qty);
+        $this->assertSame(150.0, (float) $close->ending_value);
     }
 
     public function test_opening_import_rejects_warehouses_with_movement_history(): void

@@ -17,7 +17,7 @@ class EmployeeController extends Controller
         $department = trim((string) $request->query('department'));
         $branchId = $request->integer('branch_id') ?: null;
 
-        $employees = Employee::with(['branch:id,code,name_th','user:id,username'])
+        $employees = Employee::with(['branch:id,code,name_th', 'user:id,username'])
             ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
                 ->where('employee_code', 'ilike', "%{$q}%")
                 ->orWhere('full_name', 'ilike', "%{$q}%")
@@ -30,7 +30,7 @@ class EmployeeController extends Controller
         return view('employees.index', [
             'employees' => $employees,
             'departments' => Employee::whereNotNull('department')->where('department', '<>', '')->distinct()->orderBy('department')->pluck('department'),
-            'branches' => Branch::orderBy('code')->get(['id','code','name_th']),
+            'branches' => Branch::orderBy('code')->get(['id', 'code', 'name_th']),
             'summary' => [
                 'total' => Employee::count(),
                 'linked_branch' => Employee::whereNotNull('branch_id')->count(),
@@ -73,6 +73,8 @@ class EmployeeController extends Controller
         $data['social_security_enabled'] = $request->boolean('social_security_enabled', true);
 
         $employee = DB::transaction(function () use ($data) {
+            // Serialize code generation so concurrent submissions cannot choose the same EMP number.
+            DB::table('employees')->orderBy('id')->lockForUpdate()->get(['id']);
             $data['employee_code'] = $this->nextEmployeeCode();
 
             return Employee::create($data);
@@ -85,11 +87,14 @@ class EmployeeController extends Controller
     // เลขพนักงานรันอัตโนมัติ EMP#### ต่อจากเลขสูงสุดที่มีอยู่เสมอ (ห้าม user กรอกเอง)
     private function nextEmployeeCode(): string
     {
-        $max = DB::table('employees')
-            ->selectRaw("MAX(CAST(regexp_replace(employee_code, '\\D', '', 'g') AS INTEGER)) as max_num")
-            ->where('employee_code', '~', '^EMP[0-9]+$')
-            ->value('max_num');
+        $max = DB::table('employees')->where('employee_code', 'like', 'EMP%')
+            ->pluck('employee_code')
+            ->reduce(function (int $max, string $code): int {
+                return preg_match('/^EMP(\d+)$/', $code, $matches)
+                    ? max($max, (int) $matches[1])
+                    : $max;
+            }, 0);
 
-        return 'EMP'.str_pad((string) ((int) $max + 1), 4, '0', STR_PAD_LEFT);
+        return 'EMP'.str_pad((string) ($max + 1), 4, '0', STR_PAD_LEFT);
     }
 }

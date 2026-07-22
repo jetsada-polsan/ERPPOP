@@ -50,7 +50,7 @@
 {{-- โมดัลเพิ่มพนักงานใหม่ --}}
 <div class="booking-modal-backdrop" x-show="addOpen" x-transition.opacity @keydown.escape.window="addOpen = false" @click.self="addOpen = false">
     <div class="booking-modal" style="width:min(820px,100%)" @click.outside="addOpen = false"
-        x-data="{ deptChoice: '' }">
+        x-data="{ deptChoice: @js(old('department', '')) }">
         <div class="modal-header border-0 px-4 pt-4 pb-2">
             <div>
                 <h3 class="h5 fw-bold mb-1">เพิ่มพนักงานใหม่</h3>
@@ -118,9 +118,9 @@
                     <select name="department" class="form-select" x-model="deptChoice">
                         <option value="">-- ไม่ระบุ --</option>
                         @foreach($departments as $item)
-                            <option value="{{ $item }}">{{ $item }}</option>
+                            <option value="{{ $item }}" @selected(old('department') === $item)>{{ $item }}</option>
                         @endforeach
-                        <option value="__other__">-- แผนกใหม่ (พิมพ์เอง) --</option>
+                        <option value="__other__" @selected(old('department') === '__other__')>-- แผนกใหม่ (พิมพ์เอง) --</option>
                     </select>
                 </div>
                 <div class="col-md-4">

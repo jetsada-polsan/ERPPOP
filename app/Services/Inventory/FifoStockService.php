@@ -104,6 +104,38 @@ class FifoStockService
         return $allocations;
     }
 
+    public function restoreDocumentIssues(int $documentId, string $movementType = 'void_in', ?string $movementDate = null): void
+    {
+        $issues = StockMovement::query()
+            ->where('document_id', $documentId)
+            ->whereIn('movement_type', ['out', 'transfer_out', 'transform_out', 'adjust_out'])
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($issues as $issue) {
+            $qty = (float) $issue->qty;
+            if ($issue->stock_lot_id) {
+                $lot = StockLot::whereKey($issue->stock_lot_id)->lockForUpdate()->first();
+                if (! $lot) {
+                    throw new RuntimeException('ไม่พบ Lot ต้นทางของเอกสาร กรุณาตรวจสอบสต๊อกก่อนยกเลิก');
+                }
+                $lot->increment('remaining_qty', $qty);
+            }
+
+            $this->balance($issue->product_id, $issue->warehouse_location_id)->increment('on_hand_qty', $qty);
+            $this->movement(
+                $issue->product_id,
+                $issue->warehouse_location_id,
+                $documentId,
+                $issue->stock_lot_id,
+                $movementType,
+                $qty,
+                $movementDate ?: now()->toDateString(),
+            );
+        }
+    }
+
     private function ensureOpeningLot(int $productId, int $locationId, float $balanceQty): void
     {
         $lotQty = (float) StockLot::where('product_id', $productId)

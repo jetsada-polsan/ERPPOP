@@ -24,8 +24,8 @@ use App\Models\QtyPromotion;
 use App\Models\Salesman;
 use App\Models\StockBalance;
 use App\Models\StockDocument;
-use App\Models\StockMovement;
 use App\Services\Accounting\GlPostingService;
+use App\Services\Inventory\FifoStockService;
 use App\Services\Sales\CashSaleService;
 use App\Services\Sales\MemberPointService;
 use App\Services\Sales\PosPaymentValidator;
@@ -855,38 +855,11 @@ class PosController extends Controller
 
     private function restoreStockForVoidedDocument(Document $document): void
     {
-        $stockDocument = StockDocument::with('items')->where('document_id', $document->id)->first();
-        if (! $stockDocument) {
+        if (! StockDocument::where('document_id', $document->id)->exists()) {
             return;
         }
 
-        foreach ($stockDocument->items as $item) {
-            $qty = (float) $item->qty;
-            if ($qty <= 0) {
-                continue;
-            }
-
-            $balance = StockBalance::firstOrCreate(
-                [
-                    'product_id' => $item->product_id,
-                    'warehouse_location_id' => $item->warehouse_location_id,
-                ],
-                [
-                    'on_hand_qty' => 0,
-                    'reserved_qty' => 0,
-                ]
-            );
-            $balance->increment('on_hand_qty', $qty);
-
-            StockMovement::create([
-                'product_id' => $item->product_id,
-                'warehouse_location_id' => $item->warehouse_location_id,
-                'document_id' => $document->id,
-                'movement_type' => 'void_in',
-                'qty' => $qty,
-                'movement_date' => now()->toDateString(),
-            ]);
-        }
+        app(FifoStockService::class)->restoreDocumentIssues($document->id, 'void_in');
     }
 
     private function calculateShiftTotals(PosShift $shift): array

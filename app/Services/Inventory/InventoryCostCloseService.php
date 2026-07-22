@@ -36,7 +36,7 @@ class InventoryCostCloseService
                 $ending = $this->lotBalances($ids->all(), $to->toDateString());
                 foreach ($products as $product) {
                     $rows = $movements->get($product->id, collect());
-                    $received = (float) $rows->whereIn('movement_type', ['in', 'transfer_in', 'return_in', 'transform_in', 'adjust_in'])->sum('qty');
+                    $received = (float) $rows->whereIn('movement_type', ['in', 'transfer_in', 'return_in', 'transform_in', 'adjust_in', 'void_in'])->sum('qty');
                     $issued = (float) $rows->whereIn('movement_type', ['out', 'transfer_out', 'transform_out', 'adjust_out'])->sum('qty');
                     $endingRow = $ending->get($product->id);
                     $endingQty = (float) ($endingRow?->qty ?? 0);
@@ -75,9 +75,10 @@ class InventoryCostCloseService
     private function lotBalances(array $productIds, string $to)
     {
         $issued = "coalesce((select sum(sm.qty) from stock_movements sm where sm.stock_lot_id = stock_lots.id and sm.movement_type in ('out','transfer_out','transform_out','adjust_out') and sm.movement_date <= ?),0)";
+        $voided = "coalesce((select sum(sm.qty) from stock_movements sm where sm.stock_lot_id = stock_lots.id and sm.movement_type = 'void_in' and sm.movement_date <= ?),0)";
 
         return DB::table('stock_lots')->whereIn('product_id', $productIds)->whereDate('received_date', '<=', $to)
-            ->selectRaw("product_id, sum(initial_qty - {$issued}) as qty, sum((initial_qty - {$issued}) * unit_cost) as value", [$to, $to])
+            ->selectRaw("product_id, sum(initial_qty - {$issued} + {$voided}) as qty, sum((initial_qty - {$issued} + {$voided}) * unit_cost) as value", [$to, $to, $to, $to])
             ->groupBy('product_id')->get()->keyBy('product_id');
     }
 }
