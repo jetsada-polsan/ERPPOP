@@ -91,6 +91,18 @@
     .control-block h3 { margin: 0 0 6px; color: #274b63; font-size: 12px; font-weight: 900; }
     .control-block ol,.control-block ul { margin: 0; padding-left: 18px; color: #5e7585; font-size: 11px; line-height: 1.65; }
     .control-purpose { margin: 9px 0 0; color: #526d7f; font-size: 12px; line-height: 1.5; }
+    .benchmark-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; padding: 12px; border-bottom: 1px solid #edf2f5; }
+    .benchmark-summary div { padding: 10px 12px; border: 1px solid #dbe7ef; border-radius: 7px; background: #f8fbfd; }
+    .benchmark-summary span { display: block; color: #7890a1; font-size: 10px; font-weight: 800; }
+    .benchmark-summary strong { display: block; margin-top: 2px; color: #15364d; font-size: 18px; }
+    .benchmark-status { display: inline-block; min-width: 64px; padding: 4px 6px; border-radius: 5px; text-align: center; font-size: 10px; font-weight: 900; }
+    .benchmark-ready { color: #047857; background: #d1fae5; }
+    .benchmark-partial { color: #9a6700; background: #fef3c7; }
+    .benchmark-planned { color: #a61b27; background: #fee2e2; }
+    .source-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; padding: 12px; }
+    .source-item { display: grid; grid-template-columns: minmax(0,1fr) 32px; gap: 8px; align-items: center; padding: 10px 11px; border: 1px solid #dbe7ef; border-radius: 7px; }
+    .source-item strong { display: block; color: #274b63; font-size: 12px; }
+    .source-item span { display: block; margin-top: 2px; color: #6d8291; font-size: 10px; line-height: 1.4; }
 
     @media (max-width: 1100px) {
         .flow-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -109,6 +121,7 @@
         .flow-step::after { display: none !important; }
         .gap-row { grid-template-columns: 74px minmax(0, 1fr); padding: 11px 12px; }
         .control-grid { grid-template-columns: 1fr; }
+        .benchmark-summary, .source-list { grid-template-columns: 1fr; }
     }
     @media print {
         .app-header, .app-sidebar, .manual-toolbar, .manual-actions, .flow-tabs { display: none !important; }
@@ -220,6 +233,58 @@
                 </div>
             </div>
         @endforeach
+    </section>
+
+    <section class="manual-panel">
+        <div class="manual-section-head">
+            <h2><i class="bi bi-clipboard-data me-2"></i>มาตรฐาน ERP ที่ใช้ในประเทศไทย</h2>
+            <span>ตรวจข้อมูลล่าสุด 22 ก.ค. 2569</span>
+        </div>
+        @php
+            $benchmarkReady = collect($thaiErpStandards)->where('tone', 'ready')->count();
+            $benchmarkPartial = collect($thaiErpStandards)->where('tone', 'partial')->count();
+            $benchmarkPlanned = collect($thaiErpStandards)->where('tone', 'planned')->count();
+        @endphp
+        <div class="benchmark-summary">
+            <div><span>พร้อมใช้ใน POPSTAR</span><strong>{{ $benchmarkReady }}</strong></div>
+            <div><span>มีแล้วแต่ต้องต่อให้ครบ</span><strong>{{ $benchmarkPartial }}</strong></div>
+            <div><span>อยู่ในแผนพัฒนา</span><strong>{{ $benchmarkPlanned }}</strong></div>
+        </div>
+        <div class="manual-table-wrap">
+            <table class="manual-table" style="min-width:1080px">
+                <thead><tr><th>หมวด</th><th>ความสามารถมาตรฐาน</th><th>เกณฑ์ใช้งาน</th><th>สถานะ</th><th>งานถัดไป</th><th class="text-center">เปิด</th></tr></thead>
+                <tbody>
+                @foreach($thaiErpStandards as $standard)
+                    <tr x-show="!query || $el.textContent.toLowerCase().includes(query.toLowerCase())">
+                        <td>{{ $standard['group'] }}</td>
+                        <td><strong>{{ $standard['capability'] }}</strong></td>
+                        <td>{{ $standard['benchmark'] }}</td>
+                        <td><span class="benchmark-status benchmark-{{ $standard['tone'] }}">{{ $standard['status'] }}</span></td>
+                        <td>{{ $standard['next'] }}</td>
+                        <td class="text-center">
+                            @if($standard['route'] && $routeAccess($standard['route']))
+                                <a class="program-link" href="{{ route($standard['route']) }}" title="เปิดโปรแกรม"><i class="bi bi-arrow-up-right"></i></a>
+                            @else
+                                <span class="program-locked" title="ยังไม่มีโปรแกรมหรือไม่มีสิทธิ์"><i class="bi bi-dash-lg"></i></span>
+                            @endif
+                        </td>
+                    </tr>
+                @endforeach
+                </tbody>
+            </table>
+        </div>
+        <div class="manual-section-head border-top">
+            <h2><i class="bi bi-journal-check me-2"></i>แหล่งอ้างอิงทางการ</h2>
+            <span>ใช้วิเคราะห์แนวทาง ไม่คัดลอกซอฟต์แวร์หรือหน้าจอ</span>
+        </div>
+        <div class="source-list">
+            @foreach($thaiErpSources as $source)
+                <article class="source-item">
+                    <div><strong>{{ $source['name'] }}</strong><span>{{ $source['scope'] }}</span></div>
+                    <a class="program-link" href="{{ $source['url'] }}" target="_blank" rel="noopener noreferrer" title="เปิดแหล่งอ้างอิง"><i class="bi bi-box-arrow-up-right"></i></a>
+                </article>
+            @endforeach
+        </div>
     </section>
 
     <section class="manual-panel">

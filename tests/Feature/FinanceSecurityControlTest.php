@@ -105,7 +105,10 @@ class FinanceSecurityControlTest extends TestCase
         $this->get('/operations')->assertOk()->assertSee('ศูนย์ Backup และ Security');
         $this->get('/tax-compliance')->assertOk()->assertSee('ศูนย์ภาษีไทยและ E-Tax');
         $this->get('/accounting-periods')->assertOk()->assertSee('งวดบัญชีและการปิดงวด');
-        $this->get('/core-modules')->assertOk()->assertSee('คู่มือควบคุมระบบ 1-5 แบบละเอียด');
+        $this->get('/core-modules')->assertOk()
+            ->assertSee('คู่มือควบคุมระบบ 1-5 แบบละเอียด')
+            ->assertSee('มาตรฐาน ERP ที่ใช้ในประเทศไทย')
+            ->assertSee('DBD e-Filing/XBRL');
         $this->get('/security/mfa')->assertOk()->assertSee('Setup key');
     }
 

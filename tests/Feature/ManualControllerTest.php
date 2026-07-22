@@ -18,6 +18,8 @@ class ManualControllerTest extends TestCase
         $this->assertCount(8, $workflows);
         $this->assertGreaterThanOrEqual(8, count($view->getData()['gaps']));
         $this->assertCount(5, $view->getData()['controlManuals']);
+        $this->assertGreaterThanOrEqual(25, count($view->getData()['thaiErpStandards']));
+        $this->assertGreaterThanOrEqual(7, count($view->getData()['thaiErpSources']));
     }
 
     public function test_every_program_and_workflow_step_points_to_a_real_route(): void
@@ -31,6 +33,12 @@ class ManualControllerTest extends TestCase
 
         foreach ($data['workflows'] as $workflow) {
             array_push($routeNames, ...array_column($workflow['steps'], 1));
+        }
+
+        foreach ($data['thaiErpStandards'] as $standard) {
+            if ($standard['route']) {
+                $routeNames[] = $standard['route'];
+            }
         }
 
         foreach (array_unique($routeNames) as $routeName) {

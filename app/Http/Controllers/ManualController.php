@@ -14,7 +14,60 @@ class ManualController extends Controller
             'controlManuals' => $this->controlManuals(),
             'gaps' => $this->gaps(),
             'routines' => $this->routines(),
+            'thaiErpStandards' => $this->thaiErpStandards(),
+            'thaiErpSources' => $this->thaiErpSources(),
         ]);
+    }
+
+    private function thaiErpStandards(): array
+    {
+        return [
+            ['group' => 'ขายและ POS', 'capability' => 'ขายปลีก/ขายส่ง หลายราคา หลายหน่วย และบาร์โค้ด', 'benchmark' => 'มาตรฐานพื้นฐานของ ERP/POS ไทยสำหรับร้านหลายรูปแบบ', 'status' => 'พร้อมใช้', 'tone' => 'ready', 'route' => 'pos.index', 'next' => 'ทดสอบราคาจริงและหน่วยบรรจุของสินค้าทุกกลุ่ม'],
+            ['group' => 'ขายและ POS', 'capability' => 'สมาชิก แต้ม โปรโมชั่น คูปอง และสิทธิ์ส่วนลด', 'benchmark' => 'ควบคุมแคมเปญและประวัติลูกค้าจากหน้าร้าน', 'status' => 'พร้อมใช้', 'tone' => 'ready', 'route' => 'members.index', 'next' => 'เพิ่ม segmentation และวัดกำไรสุทธิรายแคมเปญ'],
+            ['group' => 'ขายและ POS', 'capability' => 'เครื่องชั่ง PLU/บาร์โค้ดน้ำหนักและราคาฝังในฉลาก', 'benchmark' => 'รองรับร้านของสดและฮาร์ดแวร์หน้าร้าน', 'status' => 'พร้อมใช้', 'tone' => 'ready', 'route' => 'scale-prices.index', 'next' => 'ทำรายการรุ่นเครื่องชั่งและรูปแบบบาร์โค้ดที่ผ่านการทดสอบ'],
+            ['group' => 'ขายและ POS', 'capability' => 'ขายออฟไลน์และซิงก์กลับเมื่ออินเทอร์เน็ตมา', 'benchmark' => 'POS สาขาต้องขายต่อได้เมื่อเครือข่ายขัดข้อง', 'status' => 'มีชุดหลัก', 'tone' => 'partial', 'route' => 'pos-import.page', 'next' => 'ทดสอบ conflict, idempotency และ recovery บน POS Windows จริง'],
+            ['group' => 'ขายและ POS', 'capability' => 'ร้านอาหาร โต๊ะ ครัว แยก/รวมบิล และตัวเลือกวิธีปรุง', 'benchmark' => 'ความสามารถเฉพาะ Restaurant POS ที่พบในตลาดไทย', 'status' => 'ยังไม่ทำ', 'tone' => 'planned', 'route' => null, 'next' => 'ทำเฉพาะเมื่อ PopStar เปิดธุรกิจร้านอาหารเต็มรูปแบบ'],
+
+            ['group' => 'สินค้าและคลัง', 'capability' => 'หลายคลัง หลายตำแหน่ง หลายสาขา และสินค้าระหว่างทาง', 'benchmark' => 'เห็นตำแหน่งและสถานะสินค้าแยกแต่ละสาขา', 'status' => 'พร้อมใช้', 'tone' => 'ready', 'route' => 'warehouse-locations.index', 'next' => 'กำหนด location จริงและผู้รับผิดชอบทุกคลัง'],
+            ['group' => 'สินค้าและคลัง', 'capability' => 'Lot/Serial/วันหมดอายุ FEFO กักกัน และเรียกคืน', 'benchmark' => 'จำเป็นกับอาหาร ยา และสินค้าที่ต้องสอบย้อนกลับ', 'status' => 'พร้อมใช้', 'tone' => 'ready', 'route' => 'products.index', 'next' => 'บังคับกรอก Lot/วันหมดอายุในกลุ่มสินค้าควบคุม'],
+            ['group' => 'สินค้าและคลัง', 'capability' => 'ตรวจนับด้วยมือถือ ปรับยอดแบบ Maker-Checker และ Audit', 'benchmark' => 'ลดการแก้สต๊อกโดยไม่มีหลักฐาน', 'status' => 'พร้อมใช้', 'tone' => 'ready', 'route' => 'stock-counts.index', 'next' => 'กำหนดรอบนับ ABC และ tolerance รายกลุ่ม'],
+            ['group' => 'สินค้าและคลัง', 'capability' => 'FIFO/FEFO ต้นทุนล่าสุด ต้นทุนเฉลี่ย และปิดต้นทุนรายงวด', 'benchmark' => 'ต้นทุนขายและมูลค่าสินค้าต้องย้อนตรวจถึง Lot ได้', 'status' => 'พร้อมใช้', 'tone' => 'ready', 'route' => 'reports.index', 'next' => 'กระทบยอด GL Inventory กับ Stock Valuation ทุกเดือน'],
+            ['group' => 'สินค้าและคลัง', 'capability' => 'เติมเต็มสินค้าอัตโนมัติ Min/Max/Reorder และเสนอซื้อ', 'benchmark' => 'ลดของขาดและของค้างด้วยข้อเสนอจากยอดคงเหลือ', 'status' => 'มีชุดหลัก', 'tone' => 'partial', 'route' => 'bplus.purchase-planning', 'next' => 'เพิ่ม lead time, safety stock และยอดขายฤดูกาล'],
+
+            ['group' => 'จัดซื้อและเจ้าหนี้', 'capability' => 'PR/PO อนุมัติ รับของบางส่วน และติดตามของค้างส่ง', 'benchmark' => 'วงจรจัดซื้อต้องแยกผู้ขอ ผู้อนุมัติ และผู้รับของ', 'status' => 'พร้อมใช้', 'tone' => 'ready', 'route' => 'purchase-orders.index', 'next' => 'เพิ่ม Supplier quotation comparison แบบหลายเจ้า'],
+            ['group' => 'จัดซื้อและเจ้าหนี้', 'capability' => 'Three-way match ระหว่าง PO ใบรับของ และใบกำกับผู้ขาย', 'benchmark' => 'ป้องกันจ่ายเกินจำนวน ราคา หรือของที่ยังไม่รับ', 'status' => 'มีชุดหลัก', 'tone' => 'partial', 'route' => 'purchases.index', 'next' => 'ทำหน้าข้อยกเว้นพร้อม tolerance และผู้อนุมัติ'],
+            ['group' => 'จัดซื้อและเจ้าหนี้', 'capability' => 'AP Aging กำหนดชำระ เช็ค/โอน และภาษีหัก ณ ที่จ่าย', 'benchmark' => 'วางแผนเงินจ่ายและออกหลักฐานภาษีครบ', 'status' => 'พร้อมใช้', 'tone' => 'ready', 'route' => 'suppliers.index', 'next' => 'เพิ่ม payment proposal ตามวันครบกำหนดและกระแสเงินสด'],
+
+            ['group' => 'ผลิตและแปรรูป', 'capability' => 'BOM/สูตรผลิต ตัดวัตถุดิบ รับผลผลิต Yield และของเสีย', 'benchmark' => 'คำนวณต้นทุนจริงจากวัตถุดิบและน้ำหนักผลผลิต', 'status' => 'พร้อมใช้', 'tone' => 'ready', 'route' => 'production.index', 'next' => 'เพิ่ม version สูตรและวันเริ่มมีผล'],
+            ['group' => 'ผลิตและแปรรูป', 'capability' => 'ชุดสินค้า/แกะ-ประกอบ/แบ่งบรรจุ พร้อมป้ายเครื่องชั่ง', 'benchmark' => 'รองรับชุดหมูกระทะและของสดที่แปรรูปหลายรายการ', 'status' => 'พร้อมใช้', 'tone' => 'ready', 'route' => 'stock-transforms.index', 'next' => 'บันทึกแรงงานและค่าโสหุ้ยต่อ Batch'],
+            ['group' => 'ผลิตและแปรรูป', 'capability' => 'วางแผนกำลังผลิต MRP และ Capacity', 'benchmark' => 'โรงงานขนาดกลางต้องคำนวณวัตถุดิบและกำลังเครื่อง/คนล่วงหน้า', 'status' => 'ยังไม่ทำ', 'tone' => 'planned', 'route' => null, 'next' => 'เริ่มจาก demand plan และ material requirement ตามสูตร'],
+
+            ['group' => 'บัญชีและภาษีไทย', 'capability' => 'GL อัตโนมัติ งบทดลอง P&L งบดุล กระแสเงินสด และล็อกงวด', 'benchmark' => 'รายการต้นทางต้องไหลถึงงบและย้อนกลับหาเอกสารได้', 'status' => 'พร้อมใช้', 'tone' => 'ready', 'route' => 'financial-statements.index', 'next' => 'เพิ่มมิติรายสาขา Cost Center และงบเปรียบเทียบ'],
+            ['group' => 'บัญชีและภาษีไทย', 'capability' => 'VAT ซื้อ/ขาย ภ.พ.30 และ ภ.ง.ด.3/53 พร้อม Working paper', 'benchmark' => 'ส่งสำนักงานบัญชีและตรวจผู้จัดทำ/ผู้ตรวจได้', 'status' => 'พร้อมใช้', 'tone' => 'ready', 'route' => 'tax-compliance.index', 'next' => 'เพิ่ม format กลาง ภ.ง.ด.1 และตรวจตามเวอร์ชันกรมสรรพากร'],
+            ['group' => 'บัญชีและภาษีไทย', 'capability' => 'e-Tax Invoice/e-Receipt XML ลายมือชื่อ/ประทับเวลา และผลตอบรับ', 'benchmark' => 'ข้อมูลอิเล็กทรอนิกส์ต้องผ่าน e-Standard และติดตามสถานะนำส่ง', 'status' => 'มี Package', 'tone' => 'partial', 'route' => 'tax-compliance.index', 'next' => 'เลือก Service Provider/CA แล้วทดสอบ XML จริงใน sandbox'],
+            ['group' => 'บัญชีและภาษีไทย', 'capability' => 'DBD e-Filing/XBRL และ mapping ผังบัญชีไป Taxonomy', 'benchmark' => 'ลดการกรอกงบซ้ำและเตรียมข้อมูลตามรูปแบบ DBD', 'status' => 'ยังไม่ทำ', 'tone' => 'planned', 'route' => null, 'next' => 'ทำ Taxonomy mapping และ export Excel/XBRL ที่สำนักงานบัญชีตรวจได้'],
+            ['group' => 'บัญชีและภาษีไทย', 'capability' => 'OCR เอกสารซื้อ/ค่าใช้จ่ายและตรวจข้อมูลซ้ำ', 'benchmark' => 'ลดเวลาคีย์ใบกำกับและแนบภาพกับรายการบัญชี', 'status' => 'ยังไม่ทำ', 'tone' => 'planned', 'route' => null, 'next' => 'เริ่ม OCR เลขภาษี เลขที่ วันที่ ยอดก่อน VAT และ VAT'],
+
+            ['group' => 'คนและเงินเดือน', 'capability' => 'แฟ้มพนักงาน เวลา OT ขาดลา เงินเดือน ประกันสังคม ภาษี และสลิป', 'benchmark' => 'Payroll ต้องแยกผู้จัดทำ/อนุมัติและลงบัญชีได้', 'status' => 'พร้อมใช้', 'tone' => 'ready', 'route' => 'management-controls.index', 'next' => 'เพิ่ม leave workflow และไฟล์จ่ายธนาคารตามธนาคารที่ใช้จริง'],
+            ['group' => 'คนและเงินเดือน', 'capability' => 'Recruitment, Onboarding, ประเมินผล และ Training', 'benchmark' => 'ความสามารถ HRM สำหรับองค์กรที่ขยายจำนวนพนักงาน', 'status' => 'ยังไม่ทำ', 'tone' => 'planned', 'route' => null, 'next' => 'เริ่ม onboarding checklist และเอกสารพนักงานหมดอายุ'],
+
+            ['group' => 'บริหารและเชื่อมต่อ', 'capability' => 'Dashboard/BI กำไร สาขา สินค้า Cash flow และ Drill-down', 'benchmark' => 'ผู้บริหารต้องเปิดจากตัวเลขสรุปถึงเอกสารต้นทาง', 'status' => 'มีชุดหลัก', 'tone' => 'partial', 'route' => 'dashboard', 'next' => 'เพิ่ม KPI เป้าหมาย เทียบช่วง และ EBITDA/financial ratios'],
+            ['group' => 'บริหารและเชื่อมต่อ', 'capability' => 'API, Webhook และ E-Commerce order/stock sync', 'benchmark' => 'เชื่อม Marketplace และระบบภายนอกโดยไม่คีย์ซ้ำ', 'status' => 'มีทะเบียน', 'tone' => 'partial', 'route' => 'ecommerce-channels.index', 'next' => 'ทำ connector จริงทีละช่องทางพร้อม retry และ reconciliation'],
+            ['group' => 'บริหารและเชื่อมต่อ', 'capability' => 'MFA, RBAC, Branch scope, Audit log, Backup และ Restore drill', 'benchmark' => 'ควบคุมสิทธิ์และความต่อเนื่องทางธุรกิจ', 'status' => 'พร้อมใช้', 'tone' => 'ready', 'route' => 'operations.index', 'next' => 'เปิด MFA ผู้ใช้สำคัญและตั้ง offsite backup production'],
+        ];
+    }
+
+    private function thaiErpSources(): array
+    {
+        return [
+            ['name' => 'SeniorSoft ProMaxx', 'scope' => 'POS, คลัง, หลายหน่วย, ชุดสินค้า, Lot/Serial และหลายสาขา', 'url' => 'https://www.seniorsoft.co.th/th/product-seniorsoft/software-package/item/230-seniorsoft-promaxx.html'],
+            ['name' => 'Business Plus ERP/POS', 'scope' => 'บัญชีบริหาร, ค้าปลีก/ค้าส่ง, Payroll, BI และความสามารถเฉพาะร้านอาหาร', 'url' => 'https://www.businessplus.co.th/Files/2023/MK/MK01-18.pdf'],
+            ['name' => 'PEAK Accounting', 'scope' => 'เอกสารขาย, บัญชี, สต๊อก, งบการเงิน, API และ Payroll', 'url' => 'https://www.peakaccount.com/feature-accounting-program'],
+            ['name' => 'FlowAccount Payroll', 'scope' => 'เงินเดือน ประกันสังคม ภาษี สลิป และการลงบัญชีอัตโนมัติ', 'url' => 'https://flowaccount.com/payroll'],
+            ['name' => 'กรมสรรพากร e-Tax', 'scope' => 'e-Standard, XML, ใบรับรองอิเล็กทรอนิกส์ และช่องทางนำส่ง', 'url' => 'https://etax.rd.go.th/'],
+            ['name' => 'กรมสรรพากร Format WHT', 'scope' => 'รูปแบบกลาง ภ.ง.ด.1/2/3/53 สำหรับนำส่งข้อมูล', 'url' => 'https://www.rd.go.th/54910.html'],
+            ['name' => 'DBD e-Filing', 'scope' => 'Taxonomy, XBRL in Excel และรูปแบบงบการเงินอิเล็กทรอนิกส์', 'url' => 'https://efiling.dbd.go.th/efiling-documents/01_ManualFN.pdf'],
+        ];
     }
 
     private function controlManuals(): array
