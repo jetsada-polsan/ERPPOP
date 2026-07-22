@@ -114,7 +114,7 @@ class PosController extends Controller
     // auto-adds gift lines and set discounts from this list.
     public function promotions(Request $request): JsonResponse
     {
-        $branchId = (int) $request->query('branch_id', 0);
+        $branchId = $this->enforcedBranchId((int) $request->query('branch_id', 0));
 
         $promotions = QtyPromotion::with('freeProduct:id,sku_code,name_th')
             ->runningToday()
@@ -150,7 +150,7 @@ class PosController extends Controller
     {
         $q = trim((string) $request->query('q', ''));
         $categoryId = $request->query('category_id');
-        $branchId = (int) $request->query('branch_id', 0);
+        $branchId = $this->enforcedBranchId((int) $request->query('branch_id', 0));
         $exact = $request->boolean('exact');
         $all = $request->boolean('all'); // POS desktop ดึงแคตตาล็อกทั้งหมดเก็บ offline
 
@@ -358,7 +358,9 @@ class PosController extends Controller
             'cashier_id' => ['nullable', 'integer', 'exists:salesmen,id'],
         ]);
 
-        $shift = $this->findOpenShift((int) $data['branch_id'], isset($data['cashier_id']) ? (int) $data['cashier_id'] : null);
+        $branchId = $this->enforcedBranchId((int) $data['branch_id']);
+        $cashierId = $this->enforcedCashierId(isset($data['cashier_id']) ? (int) $data['cashier_id'] : null);
+        $shift = $this->findOpenShift($branchId, $cashierId);
 
         return response()->json(['shift' => $shift ? $this->shiftPayload($shift) : null]);
     }
@@ -412,6 +414,11 @@ class PosController extends Controller
         $shift = PosShift::where('id', $data['shift_id'])->where('status', 'open')->first();
         if (! $shift) {
             return response()->json(['success' => false, 'message' => 'ไม่พบกะที่เปิดอยู่'], 422);
+        }
+        $branchId = $this->enforcedBranchId((int) $shift->branch_id);
+        $cashierId = $this->enforcedCashierId((int) $shift->cashier_id);
+        if ($branchId !== (int) $shift->branch_id || $cashierId !== (int) $shift->cashier_id) {
+            return response()->json(['success' => false, 'message' => 'ปิดกะได้เฉพาะกะของตนเองในสาขานี้'], 403);
         }
 
         $totals = $this->calculateShiftTotals($shift);

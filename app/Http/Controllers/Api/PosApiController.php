@@ -4,10 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\PosController;
-use App\Models\PosDevice;
+use App\Models\AppSetting;
 use App\Models\PosReceipt;
+use App\Models\Salesman;
 use App\Services\Sales\SaleReturnService;
-use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -43,10 +43,10 @@ class PosApiController extends Controller
             'device_user' => $user?->name,
             // หัวบิลใบกำกับภาษีอย่างย่อ (มาตรา 86/6) — desktop แคชไว้พิมพ์ใบเสร็จได้แม้ออฟไลน์
             'company' => [
-                'name' => \App\Models\AppSetting::company('name_th'),
-                'tax_id' => \App\Models\AppSetting::company('tax_id'),
-                'address' => \App\Models\AppSetting::company('address'),
-                'phone' => \App\Models\AppSetting::company('phone'),
+                'name' => AppSetting::company('name_th'),
+                'tax_id' => AppSetting::company('tax_id'),
+                'address' => AppSetting::company('address'),
+                'phone' => AppSetting::company('phone'),
             ],
             'vat_rate' => (float) (DB::table('vat_rates')
                 ->where('effective_from', '<=', now()->toDateString())
@@ -60,7 +60,7 @@ class PosApiController extends Controller
         $device = $request->attributes->get('pos_device');
         $branchId = $device?->branch_id ?: $request->user()?->branch_id;
 
-        $cashiers = \App\Models\Salesman::query()
+        $cashiers = Salesman::query()
             ->where('is_active', true)
             ->when($branchId, fn ($query) => $query->where(fn ($w) => $w
                 ->whereNull('branch_id')
@@ -80,7 +80,7 @@ class PosApiController extends Controller
 
         $device = $request->attributes->get('pos_device');
         $branchId = $device?->branch_id ?: $request->user()?->branch_id;
-        $cashier = \App\Models\Salesman::query()
+        $cashier = Salesman::query()
             ->where('code', $data['code'])
             ->where('is_active', true)
             ->when($branchId, fn ($query) => $query->where(fn ($w) => $w
@@ -115,56 +115,93 @@ class PosApiController extends Controller
         if ($key === '') {
             return response()->json(['success' => false, 'message' => 'ต้องส่ง Idempotency-Key'], 400);
         }
-
-        // เคยประมวลผลบิลนี้แล้ว → คืน response เดิมเป๊ะ (idempotent replay)
-        $existing = DB::table('pos_api_idempotency')->where('idempotency_key', $key)->first();
-        if ($existing) {
-            return response()->json(json_decode($existing->response_body, true), $existing->status_code);
+        if (strlen($key) > 120 || preg_match('/^[A-Za-z0-9._:-]+$/', $key) !== 1) {
+            return response()->json(['success' => false, 'message' => 'Idempotency-Key ไม่ถูกต้อง'], 400);
         }
 
-        // POS Desktop เตือนและให้แคชเชียร์ยืนยันขายเกินสต๊อกที่หน้าจอแล้ว
-        // อนุญาตให้ยอดคลังติดลบเพื่อเก็บบิลไว้กระทบยอดภายหลัง
+        $device = $request->attributes->get('pos_device');
+        if (! $device) {
+            return response()->json(['success' => false, 'message' => 'ไม่พบอุปกรณ์ POS'], 401);
+        }
+
         $request->merge(['allow_negative_stock' => true]);
+        $requestHash = $this->payloadHash($request->all());
 
-        /** @var JsonResponse $response */
-        $response = app()->call([app(PosController::class), 'checkout'], ['request' => $request]);
-
-        if ($response->getStatusCode() >= 400) {
-            Log::warning('POS desktop checkout rejected', [
+        return DB::transaction(function () use ($request, $key, $device, $requestHash) {
+            // จอง key ใน transaction เดียวกับการสร้างบิล คำขอที่แข่งกันจะรอและ replay ผลเดิม
+            $inserted = DB::table('pos_api_idempotency')->insertOrIgnore([
                 'idempotency_key' => $key,
-                'device_id' => $request->attributes->get('pos_device')?->id,
-                'status' => $response->getStatusCode(),
-                'response' => json_decode($response->getContent(), true),
-                'branch_id' => $request->input('branch_id'),
-                'cashier_id' => $request->input('cashier_id'),
-                'shift_id' => $request->input('shift_id'),
-                'items' => $request->input('items'),
+                'pos_device_id' => $device->id,
+                'endpoint' => 'checkout',
+                'request_hash' => $requestHash,
+                'state' => 'processing',
+                'status_code' => 102,
+                'response_body' => '{}',
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
-        }
 
-        // เก็บผลไว้เฉพาะบิลที่สำเร็จ (2xx) — ข้อผิดพลาด validation ให้ client แก้แล้วส่งใหม่ได้
-        if ($response->getStatusCode() < 300) {
-            $device = $request->attributes->get('pos_device');
-            try {
-                DB::table('pos_api_idempotency')->insert([
-                    'idempotency_key' => $key,
-                    'pos_device_id' => $device?->id,
-                    'endpoint' => 'checkout',
-                    'status_code' => $response->getStatusCode(),
-                    'response_body' => $response->getContent(),
-                    'created_at' => now(),
-                ]);
-            } catch (QueryException $e) {
-                // แข่งกันเขียน key เดียวกัน (double-tap) → คืนตัวที่บันทึกสำเร็จก่อนหน้า
-                $winner = DB::table('pos_api_idempotency')->where('idempotency_key', $key)->first();
-                if ($winner) {
-                    return response()->json(json_decode($winner->response_body, true), $winner->status_code);
+            if (! $inserted) {
+                $existing = DB::table('pos_api_idempotency')
+                    ->where('idempotency_key', $key)->lockForUpdate()->first();
+                if (! $existing || (int) $existing->pos_device_id !== (int) $device->id) {
+                    return response()->json(['success' => false, 'message' => 'คีย์บิลนี้เป็นของ POS อีกเครื่อง'], 409);
                 }
-                throw $e;
+                if ($existing->request_hash && ! hash_equals($existing->request_hash, $requestHash)) {
+                    return response()->json(['success' => false, 'message' => 'คีย์บิลเดิมถูกใช้กับข้อมูลคนละชุด กรุณาตรวจบิลค้าง'], 409);
+                }
+                if (($existing->state ?? 'completed') === 'completed') {
+                    return response()->json(json_decode($existing->response_body, true), (int) $existing->status_code);
+                }
+
+                return response()->json(['success' => false, 'message' => 'บิลนี้กำลังประมวลผล ให้ระบบส่งซ้ำอีกครั้ง'], 409);
             }
+
+            /** @var JsonResponse $response */
+            $response = app()->call([app(PosController::class), 'checkout'], ['request' => $request]);
+
+            if ($response->getStatusCode() >= 400) {
+                DB::table('pos_api_idempotency')->where('idempotency_key', $key)->delete();
+                Log::warning('POS desktop checkout rejected', [
+                    'idempotency_key' => $key,
+                    'device_id' => $device->id,
+                    'status' => $response->getStatusCode(),
+                    'response' => json_decode($response->getContent(), true),
+                    'branch_id' => $request->input('branch_id'),
+                    'cashier_id' => $request->input('cashier_id'),
+                    'shift_id' => $request->input('shift_id'),
+                    'items' => $request->input('items'),
+                ]);
+
+                return $response;
+            }
+
+            DB::table('pos_api_idempotency')->where('idempotency_key', $key)->update([
+                'state' => 'completed',
+                'status_code' => $response->getStatusCode(),
+                'response_body' => $response->getContent(),
+                'updated_at' => now(),
+            ]);
+
+            return $response;
+        }, 3);
+    }
+
+    private function payloadHash(array $payload): string
+    {
+        return hash('sha256', json_encode($this->canonicalize($payload), JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR));
+    }
+
+    private function canonicalize(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+        if (! array_is_list($value)) {
+            ksort($value);
         }
 
-        return $response;
+        return array_map(fn ($item) => $this->canonicalize($item), $value);
     }
 
     public function voidReceipt(Request $request): JsonResponse
@@ -305,7 +342,7 @@ class PosApiController extends Controller
                     'branch_id' => (int) $branchId,
                     'customer_id' => null,
                     'customer_open_item_id' => null,
-                    'remark' => trim('POS return ' . $receipt->receipt_no . ': ' . $data['reason']),
+                    'remark' => trim('POS return '.$receipt->receipt_no.': '.$data['reason']),
                     'items' => array_map(fn ($item) => [
                         'product_id' => $item['product_id'],
                         'qty' => $item['qty'],

@@ -16,6 +16,7 @@ class RoutePermissions
         'pos.' => 'pos.use',
         'pos.checkout' => 'pos.sell',
         'pos.shift.open' => 'pos.sell',
+        'pos.shift.close' => 'pos.sell',
         'pos.receipts.void' => 'pos.void',
         'bplus.pos-preparation' => 'pos.use',
         'bplus.pos-workbench' => 'pos.use',
