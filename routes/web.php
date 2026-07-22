@@ -47,6 +47,7 @@ use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\QtyPromotionController;
 use App\Http\Controllers\QuotationController;
+use App\Http\Controllers\ReceiptTemplateController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\SaleReturnController;
@@ -568,6 +569,8 @@ Route::prefix('qty-promotions')->name('qty-promotions.')->group(function () {
 Route::prefix('settings')->name('settings.')->group(function () {
     Route::get('/', [SystemSettingController::class, 'index'])->name('index');
     Route::post('/', [SystemSettingController::class, 'update'])->name('update');
+    Route::get('/receipt-template', [ReceiptTemplateController::class, 'edit'])->name('receipt-template.edit');
+    Route::post('/receipt-template', [ReceiptTemplateController::class, 'update'])->name('receipt-template.update');
     Route::post('/pos-token', [SystemSettingController::class, 'issuePosToken'])->name('pos-token.issue');
     Route::post('/pos-token/rotate', [SystemSettingController::class, 'rotatePosToken'])->name('pos-token.rotate');
     Route::post('/pos-release', [SystemSettingController::class, 'publishPosRelease'])->name('pos-release.publish');

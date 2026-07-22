@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Http\Controllers\Api\PosApiController;
 use App\Http\Controllers\PosController;
+use App\Models\AppSetting;
 use App\Models\Branch;
 use App\Models\PosDevice;
 use App\Models\PosShift;
@@ -17,6 +18,24 @@ use Tests\TestCase;
 class PosTransactionSafetyTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_desktop_ping_includes_the_saved_receipt_template(): void
+    {
+        [$device] = $this->device('PING');
+        AppSetting::set('pos_receipt_template', json_encode([
+            'paper_width' => 58,
+            'blocks' => [['id' => 'custom-ping', 'type' => 'custom', 'text' => 'สาขาทดสอบ']],
+        ], JSON_UNESCAPED_UNICODE));
+        $request = Request::create('/api/pos/ping', 'GET');
+        $request->attributes->set('pos_device', $device);
+        $request->setUserResolver(fn () => $device->user);
+
+        $data = app(PosApiController::class)->ping($request)->getData(true);
+
+        $this->assertSame(58, $data['receipt_template']['paper_width']);
+        $this->assertSame('สาขาทดสอบ', $data['receipt_template']['blocks'][0]['text']);
+        $this->assertContains('items', array_column($data['receipt_template']['blocks'], 'type'));
+    }
 
     public function test_desktop_checkout_replays_one_completed_result_for_the_same_key(): void
     {

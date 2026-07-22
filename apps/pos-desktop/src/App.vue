@@ -6,7 +6,23 @@ import { isTauri } from '@tauri-apps/api/core'
 import { api, connect, setServerUrl } from './lib/api'
 import { enqueue, loadProducts, loadProfile, loadSession, markQueue, queueItems, replaceProducts, saveProfile, saveSession } from './lib/db'
 import { syncCheckoutQueue } from './lib/sync'
-import type { CartLine, Cashier, DeviceProfile, PaymentMethod, Product, QueueItem, Shift } from './lib/types'
+import type { CartLine, Cashier, DeviceProfile, PaymentMethod, Product, QueueItem, ReceiptBlock, ReceiptTemplate, Shift } from './lib/types'
+
+const DEFAULT_RECEIPT_TEMPLATE: ReceiptTemplate = {
+  paper_width: 80,
+  blocks: [
+    { id: 'logo', type: 'logo', align: 'center', size: 'medium', bold: false },
+    { id: 'company', type: 'company', align: 'center', size: 'small', bold: false },
+    { id: 'title', type: 'title', align: 'center', size: 'medium', bold: true },
+    { id: 'meta', type: 'meta', align: 'left', size: 'small', bold: false },
+    { id: 'divider', type: 'divider', align: 'left', size: 'small', bold: false },
+    { id: 'items', type: 'items', align: 'left', size: 'small', bold: false, show_sku: false, show_unit_price: true },
+    { id: 'tax-summary', type: 'tax-summary', align: 'left', size: 'small', bold: false },
+    { id: 'totals', type: 'totals', align: 'left', size: 'large', bold: true },
+    { id: 'payment', type: 'payment', align: 'left', size: 'small', bold: false },
+    { id: 'footer', type: 'footer', align: 'center', size: 'small', bold: false, text: 'ขอบคุณที่ใช้บริการ' },
+  ],
+}
 
 const profile = ref<DeviceProfile | null>(null)
 const products = ref<Product[]>([])
@@ -42,11 +58,18 @@ const subtotal = computed(() => cart.value.reduce((sum, line) => sum + Number(li
 const totalQty = computed(() => cart.value.reduce((sum, line) => sum + Number(line.qty), 0))
 const vat = computed(() => subtotal.value * ((profile.value?.vatRate || 7) / (100 + (profile.value?.vatRate || 7))))
 const change = computed(() => Math.max(0, cashReceived.value - subtotal.value))
+const receiptTemplate = computed(() => profile.value?.receiptTemplate?.blocks?.length ? profile.value.receiptTemplate : DEFAULT_RECEIPT_TEMPLATE)
+const receiptVat = computed(() => {
+  const rate = profile.value?.vatRate || 7
+  return (lastReceipt.value?.total || 0) * rate / (100 + rate)
+})
 
 function money(value: number) { return new Intl.NumberFormat('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value) }
 function printLastReceipt() { window.print() }
 function flash(message: string) { notice.value = message; window.setTimeout(() => { notice.value = '' }, 3500) }
 function showError(value: unknown) { error.value = value instanceof Error ? value.message : String(value); window.setTimeout(() => { error.value = '' }, 6000) }
+function receiptBlockClasses(block: ReceiptBlock) { return [`align-${block.align}`, `size-${block.size}`, { 'is-bold': block.bold }] }
+function paymentName(method: PaymentMethod) { return ({ cash: 'เงินสด', transfer: 'โอน/QR', credit_card: 'บัตรเครดิต', cheque: 'เช็ค', mixed: 'เงินสด+โอน' })[method] }
 
 function addProduct(product: Product, barcode?: string) {
   const existing = cart.value.find((line) => line.id === product.id && line.scannedBarcode === barcode)
@@ -109,6 +132,18 @@ async function syncAll() {
   if (!profile.value || !navigator.onLine) return
   syncing.value = true
   try {
+    const serverProfile = await api.ping()
+    profile.value = {
+      ...profile.value,
+      deviceName: serverProfile.device?.name || profile.value.deviceName,
+      terminalCode: serverProfile.device?.terminal_code || profile.value.terminalCode,
+      branchId: serverProfile.branch_id || profile.value.branchId,
+      branchName: serverProfile.branch_name || profile.value.branchName,
+      vatRate: Number(serverProfile.vat_rate || profile.value.vatRate),
+      company: serverProfile.company || profile.value.company,
+      receiptTemplate: serverProfile.receipt_template || profile.value.receiptTemplate,
+    }
+    await saveProfile(profile.value)
     const fresh = await api.products(profile.value.branchId)
     products.value = fresh
     await replaceProducts(fresh)
@@ -383,16 +418,35 @@ onUnmounted(() => {
       </form>
     </div>
 
-    <section v-if="lastReceipt" class="print-receipt">
-      <h1>{{ profile?.company.name || 'POPSTAR SHOP' }}</h1>
-      <p>{{ profile?.company.address }}<br>เลขประจำตัวผู้เสียภาษี {{ profile?.company.tax_id || '-' }}</p>
-      <h2>{{ lastReceipt.provisional ? 'ใบรับรายการชั่วคราว' : 'ใบเสร็จรับเงิน/ใบกำกับภาษีอย่างย่อ' }}</h2>
-      <div class="print-meta"><span>เลขที่ {{ lastReceipt.no }}</span><span>{{ lastReceipt.printedAt }}</span><span>{{ profile?.branchName }} / {{ cashier?.name }}</span></div>
-      <table><tbody><tr v-for="line in lastReceipt.items" :key="line.id"><td>{{ line.name_th }}<small>{{ line.qty }} x {{ money(line.pos_price) }}</small></td><td>{{ money(line.qty * line.pos_price) }}</td></tr></tbody></table>
-      <div class="print-total"><span>รวมสุทธิ</span><strong>{{ money(lastReceipt.total) }} บาท</strong></div>
-      <p>ชำระโดย {{ ({cash:'เงินสด',transfer:'โอน/QR',credit_card:'บัตรเครดิต',cheque:'เช็ค',mixed:'เงินสด+โอน'} as any)[lastReceipt.method] }}<br><span v-if="lastReceipt.method === 'cash'">รับเงิน {{ money(lastReceipt.paid) }} · เงินทอน {{ money(lastReceipt.change) }}</span></p>
-      <p v-if="lastReceipt.provisional" class="provisional-note">รายการนี้รอส่งขึ้น ERP เอกสารภาษีฉบับจริงจะออกเมื่อเชื่อมต่อสำเร็จ</p>
-      <p>ขอบคุณที่ใช้บริการ</p>
+    <section v-if="lastReceipt" class="print-receipt" :class="receiptTemplate.paper_width === 58 ? 'paper-58' : 'paper-80'">
+      <div v-for="block in receiptTemplate.blocks" :key="block.id" class="print-block" :class="[receiptBlockClasses(block), `type-${block.type}`]">
+        <template v-if="block.type === 'logo'">
+          <img v-if="profile?.company.logo_url" class="print-logo" :src="profile.company.logo_url" alt="">
+          <strong v-else class="print-brand">POPSTAR</strong>
+        </template>
+        <template v-else-if="block.type === 'company'">
+          <strong>{{ profile?.company.name || 'POPSTAR SHOP' }}</strong>
+          <span>{{ profile?.company.address }}</span>
+          <span>เลขประจำตัวผู้เสียภาษี {{ profile?.company.tax_id || '-' }}</span>
+          <span v-if="profile?.company.phone">โทร {{ profile.company.phone }}</span>
+        </template>
+        <template v-else-if="block.type === 'title'">
+          {{ lastReceipt.provisional ? 'ใบรับรายการชั่วคราว' : 'ใบเสร็จรับเงิน/ใบกำกับภาษีอย่างย่อ' }}
+        </template>
+        <template v-else-if="block.type === 'meta'">
+          <div class="print-meta"><span><b>เลขที่</b><em>{{ lastReceipt.no }}</em></span><span><b>วันที่</b><em>{{ lastReceipt.printedAt }}</em></span><span><b>สาขา</b><em>{{ profile?.branchName }}</em></span><span><b>แคชเชียร์</b><em>{{ cashier?.name }}</em></span></div>
+        </template>
+        <div v-else-if="block.type === 'divider'" class="print-divider"></div>
+        <table v-else-if="block.type === 'items'" class="print-items">
+          <thead><tr><th>รายการ</th><th>จำนวน</th><th>รวม</th></tr></thead>
+          <tbody><tr v-for="line in lastReceipt.items" :key="`${block.id}-${line.id}-${line.scannedBarcode || ''}`"><td><span v-if="block.show_sku">{{ line.sku_code }} </span>{{ line.name_th }}<small v-if="block.show_unit_price">{{ money(line.pos_price) }} / หน่วย</small></td><td>{{ line.qty }}</td><td>{{ money(line.qty * line.pos_price) }}</td></tr></tbody>
+        </table>
+        <div v-else-if="block.type === 'tax-summary'" class="print-row"><span>มูลค่าก่อนภาษี / VAT {{ profile?.vatRate || 7 }}%</span><b>{{ money(lastReceipt.total - receiptVat) }} / {{ money(receiptVat) }}</b></div>
+        <div v-else-if="block.type === 'totals'" class="print-row print-total"><span>รวมสุทธิ</span><strong>{{ money(lastReceipt.total) }} บาท</strong></div>
+        <div v-else-if="block.type === 'payment'" class="print-payment"><span>ชำระโดย {{ paymentName(lastReceipt.method) }}</span><span v-if="lastReceipt.method === 'cash'">รับเงิน {{ money(lastReceipt.paid) }} · เงินทอน {{ money(lastReceipt.change) }}</span></div>
+        <template v-else-if="block.type === 'custom' || block.type === 'footer'">{{ block.text }}</template>
+      </div>
+      <div v-if="lastReceipt.provisional" class="provisional-note">รายการนี้รอส่งขึ้น ERP เอกสารภาษีฉบับจริงจะออกเมื่อเชื่อมต่อสำเร็จ</div>
     </section>
   </main>
 </template>

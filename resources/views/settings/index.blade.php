@@ -28,6 +28,7 @@
             <button type="button" class="set-nav-link" :class="tab === 'accounting' && 'active'" @click="tab = 'accounting'">บันทึกบัญชี</button>
 
             <div class="set-nav-group mt-3"><i class="bi bi-pc-display"></i> โปรแกรมหน้าร้าน</div>
+            <a href="{{ route('settings.receipt-template.edit') }}" class="set-nav-link text-decoration-none">ออกแบบใบเสร็จ POS</a>
             <button type="button" class="set-nav-link" :class="tab === 'pos-download' && 'active'" @click="tab = 'pos-download'">เปิด Vue POS</button>
         </div>
 

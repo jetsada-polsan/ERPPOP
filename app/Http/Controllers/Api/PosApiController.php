@@ -8,6 +8,7 @@ use App\Models\AppSetting;
 use App\Models\PosReceipt;
 use App\Models\Salesman;
 use App\Services\Sales\SaleReturnService;
+use App\Support\PosReceiptTemplate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -47,7 +48,9 @@ class PosApiController extends Controller
                 'tax_id' => AppSetting::company('tax_id'),
                 'address' => AppSetting::company('address'),
                 'phone' => AppSetting::company('phone'),
+                'logo_url' => AppSetting::logoUrl(),
             ],
+            'receipt_template' => PosReceiptTemplate::get(),
             'vat_rate' => (float) (DB::table('vat_rates')
                 ->where('effective_from', '<=', now()->toDateString())
                 ->where(fn ($w) => $w->whereNull('effective_to')->orWhere('effective_to', '>=', now()->toDateString()))

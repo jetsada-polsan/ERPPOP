@@ -40,6 +40,7 @@ export async function connect(serverUrl: string, deviceToken: string): Promise<D
     branchName: result.branch_name || '',
     vatRate: Number(result.vat_rate || 7),
     company: result.company || {},
+    receiptTemplate: result.receipt_template,
   }
 }
 

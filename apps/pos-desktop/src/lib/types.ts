@@ -5,7 +5,24 @@ export interface DeviceProfile {
   branchId: number
   branchName: string
   vatRate: number
-  company: { name?: string; tax_id?: string; address?: string; phone?: string }
+  company: { name?: string; tax_id?: string; address?: string; phone?: string; logo_url?: string }
+  receiptTemplate?: ReceiptTemplate
+}
+
+export interface ReceiptBlock {
+  id: string
+  type: 'logo' | 'company' | 'title' | 'meta' | 'divider' | 'items' | 'tax-summary' | 'totals' | 'payment' | 'custom' | 'footer'
+  align: 'left' | 'center' | 'right'
+  size: 'small' | 'medium' | 'large'
+  bold: boolean
+  text?: string
+  show_sku?: boolean
+  show_unit_price?: boolean
+}
+
+export interface ReceiptTemplate {
+  paper_width: 58 | 80
+  blocks: ReceiptBlock[]
 }
 
 export interface Cashier { id: number; code: string; name: string; branch_id?: number }

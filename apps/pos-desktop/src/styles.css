@@ -256,18 +256,38 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 }
 
 @media print {
+  @page { margin: 3mm; }
   body { min-width: 0; overflow: visible; background: #fff; }
   .app-shell > *:not(.print-receipt) { display: none !important; }
   .app-shell { display: block; height: auto; overflow: visible; }
-  .print-receipt { display: block; width: 72mm; margin: 0 auto; color: #000; font-family: Tahoma, sans-serif; font-size: 10pt; }
-  .print-receipt h1 { margin: 0 0 3mm; text-align: center; font-size: 15pt; }
-  .print-receipt h2 { padding: 2mm 0; border-top: 1px dashed #000; border-bottom: 1px dashed #000; text-align: center; font-size: 11pt; }
-  .print-receipt p { text-align: center; line-height: 1.5; }
-  .print-meta { display: flex; flex-direction: column; font-size: 9pt; }
-  .print-receipt table { width: 100%; margin: 3mm 0; border-collapse: collapse; }
-  .print-receipt td { padding: 1.5mm 0; border-bottom: 1px dotted #888; vertical-align: top; }
-  .print-receipt td:last-child { text-align: right; white-space: nowrap; }
-  .print-receipt small { display: block; }
-  .print-total { display: flex; justify-content: space-between; padding-top: 2mm; border-top: 1px solid #000; font-size: 12pt; }
-  .provisional-note { padding: 2mm; border: 1px solid #000; }
+  .print-receipt { display: block; margin: 0 auto; color: #000; font-family: Tahoma, "Leelawadee UI", sans-serif; }
+  .print-receipt.paper-58 { width: 52mm; }
+  .print-receipt.paper-80 { width: 72mm; }
+  .print-block { margin: 1.3mm 0; line-height: 1.35; break-inside: avoid; }
+  .print-block.align-left { text-align: left; }
+  .print-block.align-center { text-align: center; }
+  .print-block.align-right { text-align: right; }
+  .print-block.size-small { font-size: 8.5pt; }
+  .print-block.size-medium { font-size: 10.5pt; }
+  .print-block.size-large { font-size: 13pt; }
+  .print-block.is-bold { font-weight: 700; }
+  .print-block.type-company, .print-block.type-payment { display: flex; flex-direction: column; }
+  .print-block.type-title { padding: 1.5mm 0; border-top: 1px dashed #000; border-bottom: 1px dashed #000; }
+  .print-logo { display: block; max-width: 28mm; max-height: 16mm; margin: 0 auto; object-fit: contain; }
+  .print-brand { color: #000; font-size: 15pt; }
+  .print-meta { display: grid; gap: .6mm; }
+  .print-meta span { display: flex; justify-content: space-between; gap: 2mm; }
+  .print-meta b { font-weight: 400; }
+  .print-meta em { font-style: normal; text-align: right; }
+  .print-divider { height: 1px; border-top: 1px dashed #000; }
+  .print-items { width: 100%; border-collapse: collapse; font-size: inherit; text-align: left; }
+  .print-items th { padding: 1mm 0; border-top: 1px solid #000; border-bottom: 1px solid #000; }
+  .print-items td { padding: 1mm 0; border-bottom: 1px dotted #888; vertical-align: top; }
+  .print-items th:nth-child(n+2), .print-items td:nth-child(n+2) { text-align: right; white-space: nowrap; }
+  .print-items small { display: block; font-size: .85em; font-weight: 400; }
+  .print-row { display: flex; justify-content: space-between; gap: 2mm; }
+  .print-row b, .print-row strong { white-space: nowrap; }
+  .print-total { padding-top: 1.5mm; border-top: 1px solid #000; }
+  .print-payment { display: flex; flex-direction: column; }
+  .provisional-note { margin-top: 2mm; padding: 2mm; border: 1px solid #000; text-align: center; font-size: 8pt; }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "popstar-pos"
-version = "1.1.0"
+version = "1.2.0"
 description = "POPSTAR offline-first point of sale"
 authors = ["Pop Star Future Trading Co., Ltd."]
 edition = "2021"
