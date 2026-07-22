@@ -66,9 +66,9 @@ class EmployeeController extends Controller
             'remark' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $data['department'] = $data['department'] === '__other__'
+        $data['department'] = ($data['department'] ?? null) === '__other__'
             ? trim((string) ($data['department_other'] ?? ''))
-            : ($data['department'] ?: null);
+            : (($data['department'] ?? null) ?: null);
         unset($data['department_other']);
         $data['social_security_enabled'] = $request->boolean('social_security_enabled', true);
 
@@ -84,17 +84,17 @@ class EmployeeController extends Controller
             ->with('success', "เพิ่มพนักงาน {$employee->employee_code} - {$employee->full_name} แล้ว");
     }
 
-    // เลขพนักงานรันอัตโนมัติ EMP#### ต่อจากเลขสูงสุดที่มีอยู่เสมอ (ห้าม user กรอกเอง)
+    // เลขพนักงานใหม่ใช้ชุด POP001, POP002, ... แยกจากรหัส EMP เดิมที่นำเข้ามา
     private function nextEmployeeCode(): string
     {
-        $max = DB::table('employees')->where('employee_code', 'like', 'EMP%')
+        $max = DB::table('employees')->where('employee_code', 'like', 'POP%')
             ->pluck('employee_code')
             ->reduce(function (int $max, string $code): int {
-                return preg_match('/^EMP(\d+)$/', $code, $matches)
+                return preg_match('/^POP(\d+)$/', $code, $matches)
                     ? max($max, (int) $matches[1])
                     : $max;
             }, 0);
 
-        return 'EMP'.str_pad((string) ($max + 1), 4, '0', STR_PAD_LEFT);
+        return 'POP'.str_pad((string) ($max + 1), 3, '0', STR_PAD_LEFT);
     }
 }

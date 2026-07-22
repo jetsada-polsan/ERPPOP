@@ -26,11 +26,20 @@ class EmployeeCreationTest extends TestCase
 
         $response->assertRedirect(route('employees.index'));
         $this->assertDatabaseHas('employees', [
-            'employee_code' => 'EMP0108',
+            'employee_code' => 'POP001',
             'full_name' => 'พนักงานใหม่',
             'department' => 'ควบคุมคุณภาพ',
             'monthly_salary' => 18000,
             'social_security_enabled' => true,
+        ]);
+
+        $this->post(route('employees.store'), [
+            'full_name' => 'พนักงานคนถัดไป',
+            'status' => 'Active',
+        ])->assertRedirect(route('employees.index'));
+        $this->assertDatabaseHas('employees', [
+            'employee_code' => 'POP002',
+            'full_name' => 'พนักงานคนถัดไป',
         ]);
     }
 }

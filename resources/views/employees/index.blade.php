@@ -54,7 +54,7 @@
         <div class="modal-header border-0 px-4 pt-4 pb-2">
             <div>
                 <h3 class="h5 fw-bold mb-1">เพิ่มพนักงานใหม่</h3>
-                <div class="text-muted small">รหัสพนักงาน (EMP####) รันเลขให้อัตโนมัติ ไม่ต้องกรอกเอง</div>
+                <div class="text-muted small">รหัสพนักงาน (POP001, POP002, ...) รันเลขให้อัตโนมัติ ไม่ต้องกรอกเอง</div>
             </div>
             <button type="button" class="btn btn-light rounded-circle" @click="addOpen = false"><i class="bi bi-x-lg"></i></button>
         </div>
