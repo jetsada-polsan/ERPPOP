@@ -46,6 +46,7 @@
         @if($note->customer->tax_id)<div class="small text-muted">เลขผู้เสียภาษี: {{ $note->customer->tax_id }}</div>@endif
     </div>
 
+    <div class="table-responsive">
     <table class="table bill-table">
         <thead>
             <tr>
@@ -76,6 +77,7 @@
             </tr>
         </tfoot>
     </table>
+    </div>
 
     @if($note->note)<div class="small text-muted mt-2">หมายเหตุ: {{ $note->note }}</div>@endif
 

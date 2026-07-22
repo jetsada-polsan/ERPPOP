@@ -17,7 +17,7 @@
             align-items: center;
             justify-content: center;
             padding: 22px;
-            font-family: "Segoe UI", Tahoma, sans-serif;
+            font-family: 'Leelawadee UI', 'Noto Sans Thai', Tahoma, 'Segoe UI', sans-serif;
             color: #0f172a;
             background:
                 radial-gradient(circle at 12% 18%, rgba(20,184,166,.18), transparent 30%),

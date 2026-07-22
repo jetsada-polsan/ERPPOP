@@ -225,7 +225,7 @@
     }
     .user-form .role-chip input:checked + span::before{content:"\2713 ";font-weight:800}
     .user-form .role-chip input:focus-visible + span{box-shadow:0 0 0 3px rgba(26,155,220,.28)}
-    .user-list-table{font-family:'Leelawadee UI','Noto Sans Thai',Tahoma,'Segoe UI',sans-serif;font-size:13px}
+    .user-list-table{font-family:var(--erp-font-family);font-size:13px}
     .user-list-table td{font-weight:400;letter-spacing:0;line-height:1.35}
     .user-list-table td.fw-semibold{font-weight:700!important}
     .user-list-table .badge{font-family:inherit;font-size:11px;font-weight:700}

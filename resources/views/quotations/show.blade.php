@@ -47,6 +47,7 @@
         @if($quotation->salesman)<div class="small text-muted">พนักงานขาย: {{ $quotation->salesman->name }}</div>@endif
     </div>
 
+    <div class="table-responsive">
     <table class="table mt-2">
         <thead><tr><th style="width:50px">ลำดับ</th><th>รหัส</th><th>รายการ</th><th>หน่วย</th><th class="text-end">จำนวน</th><th class="text-end">ราคา/หน่วย</th><th class="text-end">จำนวนเงิน</th></tr></thead>
         <tbody>
@@ -64,6 +65,7 @@
         </tbody>
         <tfoot><tr class="fw-bold"><td colspan="6" class="text-end">รวมทั้งสิ้น ({{ \App\Models\AppSetting::get('doc_price_includes_vat', '1') === '1' ? 'ราคานี้รวม VAT แล้ว' : 'ราคานี้ยังไม่รวม VAT' }})</td><td class="text-end fs-5 text-success">฿{{ number_format($quotation->total_amount, 2) }}</td></tr></tfoot>
     </table>
+    </div>
 
     @if($quotation->note)<div class="small text-muted mt-2">หมายเหตุ: {{ $quotation->note }}</div>@endif
     @if($docNote = \App\Models\AppSetting::get('doc_footer_note'))<div class="small text-muted mt-1">{{ $docNote }}</div>@endif

@@ -39,7 +39,7 @@
         html, body { height: 100%; overflow: hidden; }
 
         body {
-            font-family: 'Segoe UI', 'Tahoma', sans-serif;
+            font-family: 'Leelawadee UI', 'Noto Sans Thai', Tahoma, 'Segoe UI', sans-serif;
             background:
                 radial-gradient(circle at 72% 10%, rgba(14,165,233,.16), transparent 28%),
                 linear-gradient(135deg, #07111f 0%, #0f1c2e 48%, #07111f 100%);

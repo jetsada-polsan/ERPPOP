@@ -5,7 +5,7 @@
     <title>พิมพ์ป้ายราคา - {{ $template->name }}</title>
     <style>
         * { box-sizing: border-box; }
-        body { font-family: 'Segoe UI', 'Tahoma', sans-serif; margin: 0; padding: 10mm; background: #eee; }
+        body { font-family: 'Leelawadee UI', 'Noto Sans Thai', Tahoma, 'Segoe UI', sans-serif; margin: 0; padding: 10mm; background: #eee; }
         .toolbar { margin-bottom: 10mm; }
         .toolbar button {
             padding: 10px 18px; border: none; border-radius: 8px; background: #0f172a; color: #fff;
