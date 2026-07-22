@@ -250,6 +250,11 @@
 
 @push('head')
 <style>
+    /* หน้านี้ยังไม่เคยใช้ booking-modal มาก่อน - layout.blade.php มีแค่สีพื้นหลัง/เงา
+       ต้องประกาศ position:fixed เองที่นี่ (ตามแบบที่ stock-transforms/bookings ทำไว้) */
+    .booking-modal-backdrop { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .booking-modal { max-height: calc(100vh - 48px); overflow: auto; background: #fff; border-radius: 18px; box-shadow: 0 24px 80px rgba(15,23,42,.24); }
+
     .recipe-modal-icon {
         width: 42px; height: 42px; flex: 0 0 42px; display: grid; place-items: center;
         border-radius: 12px; font-size: 19px; color: #fff;
