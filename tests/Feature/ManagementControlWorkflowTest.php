@@ -176,6 +176,28 @@ class ManagementControlWorkflowTest extends TestCase
         $this->assertSame($gm->id, $run->paid_by);
     }
 
+    public function test_approved_payroll_cannot_be_regenerated_back_to_draft(): void
+    {
+        $hr = $this->userWith(['payroll.manage'], 'regen-hr');
+        $gm = $this->userWith(['payroll.approve'], 'regen-gm');
+        $this->actingAs($hr);
+        $this->employee();
+        $this->controller()->generatePayroll($this->request($hr, ['period' => '2026-07']));
+        $run = DB::table('payroll_runs')->where('period', '2026-07')->first();
+        $itemIds = DB::table('payroll_items')->where('payroll_run_id', $run->id)->pluck('id')->all();
+
+        $this->actingAs($gm);
+        $this->controller()->approvePayroll($this->request($gm), $run->id);
+        $this->actingAs($hr);
+        $code = $this->abortCode(fn () => $this->controller()->generatePayroll(
+            $this->request($hr, ['period' => '2026-07'])
+        ));
+
+        $this->assertSame(422, $code);
+        $this->assertSame('approved', DB::table('payroll_runs')->where('id', $run->id)->value('status'));
+        $this->assertSame($itemIds, DB::table('payroll_items')->where('payroll_run_id', $run->id)->pluck('id')->all());
+    }
+
     public function test_payslip_renders_for_authorized_user(): void
     {
         $hr = $this->userWith(['payroll.manage'], 'hr');
@@ -269,5 +291,24 @@ class ManagementControlWorkflowTest extends TestCase
         $row = DB::table('budgets')->where('id', $budget)->first();
         $this->assertSame('approved', $row->status);
         $this->assertSame($gm->id, $row->approved_by);
+    }
+
+    public function test_approved_budget_lines_cannot_be_changed(): void
+    {
+        $acc = $this->userWith(['budget.manage'], 'locked-budget-acc');
+        $gm = $this->userWith(['budget.approve'], 'locked-budget-gm');
+        $this->actingAs($acc);
+        [, $costCenterId, $budget, $accountId] = $this->budgetWithLine($acc, 10000);
+
+        $this->actingAs($gm);
+        $this->controller()->approveBudget($this->request($gm), $budget);
+        $this->actingAs($acc);
+        $code = $this->abortCode(fn () => $this->controller()->storeBudget($this->request($acc, [
+            'fiscal_year' => '2026', 'cost_center_id' => $costCenterId, 'month' => 7,
+            'account_id' => $accountId, 'budget_amount' => 99999,
+        ])));
+
+        $this->assertSame(422, $code);
+        $this->assertSame(10000.0, (float) DB::table('budget_lines')->where('budget_id', $budget)->value('budget_amount'));
     }
 }

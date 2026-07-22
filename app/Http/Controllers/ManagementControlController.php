@@ -75,7 +75,8 @@ class ManagementControlController extends Controller
             'budget_amount' => ['required', 'numeric', 'min:0'], 'note' => ['nullable', 'string', 'max:500'],
         ]);
         DB::transaction(function () use ($data): void {
-            $budget = DB::table('budgets')->where('fiscal_year', $data['fiscal_year'])->where('cost_center_id', $data['cost_center_id'])->first();
+            $budget = DB::table('budgets')->where('fiscal_year', $data['fiscal_year'])
+                ->where('cost_center_id', $data['cost_center_id'])->lockForUpdate()->first();
             if (! $budget) {
                 $id = DB::table('budgets')->insertGetId([
                     'budget_no' => 'BG-'.$data['fiscal_year'].'-'.$data['cost_center_id'], 'fiscal_year' => $data['fiscal_year'],
@@ -83,6 +84,7 @@ class ManagementControlController extends Controller
                     'created_at' => now(), 'updated_at' => now(),
                 ]);
             } else {
+                abort_unless($budget->status === 'draft', 422, 'งบประมาณที่อนุมัติแล้วแก้ไขไม่ได้');
                 $id = $budget->id;
             }
             DB::table('budget_lines')->updateOrInsert(
@@ -138,10 +140,19 @@ class ManagementControlController extends Controller
         $period = $request->validate(['period' => ['required', 'date_format:Y-m']])['period'];
         [$from, $to] = $this->period($period);
         DB::transaction(function () use ($period, $from, $to): void {
-            $runId = DB::table('payroll_runs')->updateOrInsert(
-                ['period' => $period], ['status' => 'draft', 'created_by' => auth()->id(), 'updated_at' => now(), 'created_at' => now()],
-            );
-            $run = DB::table('payroll_runs')->where('period', $period)->first();
+            $run = DB::table('payroll_runs')->where('period', $period)->lockForUpdate()->first();
+            if ($run) {
+                abort_unless($run->status === 'draft', 422, 'Payroll ที่อนุมัติหรือจ่ายแล้วคำนวณใหม่ไม่ได้');
+                DB::table('payroll_runs')->where('id', $run->id)->update([
+                    'created_by' => auth()->id(), 'updated_at' => now(),
+                ]);
+            } else {
+                $runId = DB::table('payroll_runs')->insertGetId([
+                    'period' => $period, 'status' => 'draft', 'created_by' => auth()->id(),
+                    'created_at' => now(), 'updated_at' => now(),
+                ]);
+                $run = DB::table('payroll_runs')->where('id', $runId)->first();
+            }
             DB::table('payroll_items')->where('payroll_run_id', $run->id)->delete();
             foreach (DB::table('employees')->whereRaw('lower(status) = ?', ['active'])->get() as $employee) {
                 $salary = (float) ($employee->monthly_salary ?: $employee->wage_amount ?: 0);
@@ -231,10 +242,6 @@ class ManagementControlController extends Controller
     public function updatePayrollItems(Request $request, int $run): RedirectResponse
     {
         abort_unless($request->user()?->hasPermission('payroll.manage'), 403);
-        $payrollRun = DB::table('payroll_runs')->where('id', $run)->first();
-        abort_if($payrollRun === null, 404);
-        abort_unless($payrollRun->status === 'draft', 422, 'อนุมัติแล้วแก้ไขไม่ได้');
-
         $data = $request->validate([
             'items' => ['required', 'array', 'min:1'],
             'items.*.id' => ['required', 'integer'],
@@ -243,6 +250,10 @@ class ManagementControlController extends Controller
         ]);
 
         DB::transaction(function () use ($data, $run): void {
+            $payrollRun = DB::table('payroll_runs')->where('id', $run)->lockForUpdate()->first();
+            abort_if($payrollRun === null, 404);
+            abort_unless($payrollRun->status === 'draft', 422, 'อนุมัติแล้วแก้ไขไม่ได้');
+
             foreach ($data['items'] as $row) {
                 $item = DB::table('payroll_items')->where('id', $row['id'])->where('payroll_run_id', $run)->first();
                 if (! $item) {
@@ -270,16 +281,20 @@ class ManagementControlController extends Controller
     public function approvePayroll(Request $request, int $run): RedirectResponse
     {
         abort_unless($request->user()?->hasPermission('payroll.approve'), 403);
-        $payrollRun = DB::table('payroll_runs')->where('id', $run)->first();
-        abort_if($payrollRun === null, 404);
-        abort_unless($payrollRun->status === 'draft', 422, 'สถานะไม่ถูกต้อง (ต้องเป็น draft)');
-        abort_if($payrollRun->created_by === $request->user()->id, 403, 'ผู้จัดทำไม่สามารถอนุมัติงวดของตนเอง');
-        abort_if(DB::table('payroll_items')->where('payroll_run_id', $run)->doesntExist(), 422, 'ไม่มีรายการพนักงานในงวดนี้');
+        $payrollRun = DB::transaction(function () use ($request, $run) {
+            $row = DB::table('payroll_runs')->where('id', $run)->lockForUpdate()->first();
+            abort_if($row === null, 404);
+            abort_unless($row->status === 'draft', 422, 'สถานะไม่ถูกต้อง (ต้องเป็น draft)');
+            abort_if($row->created_by === $request->user()->id, 403, 'ผู้จัดทำไม่สามารถอนุมัติงวดของตนเอง');
+            abort_if(DB::table('payroll_items')->where('payroll_run_id', $run)->doesntExist(), 422, 'ไม่มีรายการพนักงานในงวดนี้');
 
-        DB::table('payroll_runs')->where('id', $run)->update([
-            'status' => 'approved', 'approved_by' => $request->user()->id, 'approved_at' => now(), 'updated_at' => now(),
-        ]);
-        $this->audit('approve', 'payroll_runs', $run, ['status' => 'draft'], ['status' => 'approved']);
+            DB::table('payroll_runs')->where('id', $run)->update([
+                'status' => 'approved', 'approved_by' => $request->user()->id, 'approved_at' => now(), 'updated_at' => now(),
+            ]);
+            $this->audit('approve', 'payroll_runs', $run, ['status' => 'draft'], ['status' => 'approved']);
+
+            return $row;
+        });
 
         return back()->with('success', 'อนุมัติ Payroll งวด '.$payrollRun->period.' แล้ว');
     }
@@ -287,14 +302,18 @@ class ManagementControlController extends Controller
     public function markPayrollPaid(Request $request, int $run): RedirectResponse
     {
         abort_unless($request->user()?->hasPermission('payroll.approve'), 403);
-        $payrollRun = DB::table('payroll_runs')->where('id', $run)->first();
-        abort_if($payrollRun === null, 404);
-        abort_unless($payrollRun->status === 'approved', 422, 'ต้องอนุมัติก่อนจ่าย');
+        $payrollRun = DB::transaction(function () use ($request, $run) {
+            $row = DB::table('payroll_runs')->where('id', $run)->lockForUpdate()->first();
+            abort_if($row === null, 404);
+            abort_unless($row->status === 'approved', 422, 'ต้องอนุมัติก่อนจ่าย');
 
-        DB::table('payroll_runs')->where('id', $run)->update([
-            'status' => 'paid', 'paid_by' => $request->user()->id, 'paid_at' => now(), 'updated_at' => now(),
-        ]);
-        $this->audit('pay', 'payroll_runs', $run, ['status' => 'approved'], ['status' => 'paid']);
+            DB::table('payroll_runs')->where('id', $run)->update([
+                'status' => 'paid', 'paid_by' => $request->user()->id, 'paid_at' => now(), 'updated_at' => now(),
+            ]);
+            $this->audit('pay', 'payroll_runs', $run, ['status' => 'approved'], ['status' => 'paid']);
+
+            return $row;
+        });
 
         return back()->with('success', 'บันทึกจ่ายเงินเดือนงวด '.$payrollRun->period.' แล้ว');
     }
@@ -356,15 +375,19 @@ class ManagementControlController extends Controller
     public function approveBudget(Request $request, int $budget): RedirectResponse
     {
         abort_unless($request->user()?->hasPermission('budget.approve'), 403);
-        $row = DB::table('budgets')->where('id', $budget)->first();
-        abort_if($row === null, 404);
-        abort_unless($row->status === 'draft', 422, 'สถานะไม่ถูกต้อง (ต้องเป็น draft)');
-        abort_if($row->created_by === $request->user()->id, 403, 'ผู้จัดทำไม่สามารถอนุมัติงบของตนเอง');
+        $row = DB::transaction(function () use ($request, $budget) {
+            $locked = DB::table('budgets')->where('id', $budget)->lockForUpdate()->first();
+            abort_if($locked === null, 404);
+            abort_unless($locked->status === 'draft', 422, 'สถานะไม่ถูกต้อง (ต้องเป็น draft)');
+            abort_if($locked->created_by === $request->user()->id, 403, 'ผู้จัดทำไม่สามารถอนุมัติงบของตนเอง');
 
-        DB::table('budgets')->where('id', $budget)->update([
-            'status' => 'approved', 'approved_by' => $request->user()->id, 'approved_at' => now(), 'updated_at' => now(),
-        ]);
-        $this->audit('approve', 'budgets', $budget, ['status' => 'draft'], ['status' => 'approved']);
+            DB::table('budgets')->where('id', $budget)->update([
+                'status' => 'approved', 'approved_by' => $request->user()->id, 'approved_at' => now(), 'updated_at' => now(),
+            ]);
+            $this->audit('approve', 'budgets', $budget, ['status' => 'draft'], ['status' => 'approved']);
+
+            return $locked;
+        });
 
         return back()->with('success', 'อนุมัติงบประมาณ '.$row->budget_no.' แล้ว');
     }

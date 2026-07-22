@@ -8,6 +8,7 @@ use App\Models\ProductionOrder;
 use App\Models\ProductionRecipe;
 use App\Models\ProductionRecipeItem;
 use App\Models\WarehouseLocation;
+use App\Services\Inventory\ProductionReceiptService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -126,7 +127,7 @@ class ProductionController extends Controller
     }
 
     // ใบรับสินค้าจากการผลิต (IP): รับผลผลิตเข้าสต๊อกจากใบสั่งผลิต
-    public function receiveOrder(Request $request, ProductionOrder $order, \App\Services\Inventory\ProductionReceiptService $service): RedirectResponse
+    public function receiveOrder(Request $request, ProductionOrder $order, ProductionReceiptService $service): RedirectResponse
     {
         $data = $request->validate([
             'qty' => ['required', 'numeric', 'min:0.0001'],

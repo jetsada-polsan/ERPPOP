@@ -199,13 +199,20 @@
                 </table>
             </div>
 
-            <div class="recipe-add-panel" x-data="{ query: '', productId: '', open: false,
-                get results() {
-                    if (this.query.length < 1) return [];
-                    const q = this.query.toLowerCase();
-                    return (window.__RECIPE_PRODUCTS__ || [])
-                        .filter(p => p.id !== {{ (int) $recipe->finished_product_id }} && (p.sku_code + ' ' + p.name_th).toLowerCase().includes(q))
-                        .slice(0, 8);
+            <div class="recipe-add-panel" x-data="{ query: '', productId: '', open: false, results: [], timer: null,
+                search() {
+                    this.productId = '';
+                    clearTimeout(this.timer);
+                    const q = this.query.trim();
+                    if (!q) { this.results = []; this.open = false; return; }
+                    this.timer = setTimeout(async () => {
+                        try {
+                            const response = await fetch(`{{ route('search.products') }}?q=${encodeURIComponent(q)}`);
+                            const products = response.ok ? await response.json() : [];
+                            this.results = products.filter(p => Number(p.id) !== {{ (int) $recipe->finished_product_id }}).slice(0, 8);
+                            this.open = true;
+                        } catch (_) { this.results = []; this.open = false; }
+                    }, 200);
                 },
                 pick(p) { this.productId = p.id; this.query = p.sku_code + ' - ' + p.name_th; this.open = false; }
             }">
@@ -215,7 +222,7 @@
                     <div class="col-12 col-md-6 position-relative">
                         <label class="form-label small text-muted">วัตถุดิบ</label>
                         <input type="hidden" name="product_id" x-model="productId">
-                        <input type="text" x-model="query" @input="open = true" @focus="open = query.length > 0"
+                        <input type="text" x-model="query" @input="search()" @focus="open = results.length > 0"
                             placeholder="ค้นหารหัส/ชื่อสินค้า" class="form-control form-control-sm" autocomplete="off" required>
                         <div class="typeahead-list" x-show="open && results.length" @click.outside="open = false" x-transition>
                             <template x-for="p in results" :key="p.id">
@@ -243,9 +250,6 @@
 @endforeach
 </div>
 
-<script>
-    window.__RECIPE_PRODUCTS__ = @json($products->map(fn ($p) => ['id' => $p->id, 'sku_code' => $p->sku_code, 'name_th' => $p->name_th]));
-</script>
 @endsection
 
 @push('head')

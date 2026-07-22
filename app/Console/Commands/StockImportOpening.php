@@ -6,11 +6,14 @@ use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\Document;
 use App\Models\Product;
+use App\Models\StockMovement;
+use App\Models\User;
 use App\Models\WarehouseLocation;
 use App\Services\Inventory\StockAdjustmentService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Auth;
-use RuntimeException;
+use Illuminate\Support\Facades\DB;
+use Throwable;
 
 /**
  * Loads opening stock from opening_stock_template.csv (รหัสสินค้า, ชื่อสินค้า,
@@ -29,7 +32,9 @@ class StockImportOpening extends Command
         {csv : path to the filled opening_stock_template.csv}
         {--dry-run : validate and preview only, write nothing}
         {--created-by= : user id recorded as the document creator}
-        {--approve= : user id to approve as; omit to leave documents pending_approval for manual review}';
+        {--approve= : user id to approve as; omit to leave documents pending_approval for manual review}
+        {--skip-unmatched : explicitly allow product codes that do not exist to be skipped}
+        {--allow-existing-stock : explicitly allow import into a warehouse that already has stock movement history}';
 
     protected $description = 'นำเข้าสต๊อกตั้งต้นจาก CSV ผ่าน Stock Adjustment flow (ทีละคลัง/สาขา)';
 
@@ -57,6 +62,7 @@ class StockImportOpening extends Command
             $label = trim((string) $header[$i]);
             if (! preg_match('/\(([^()]+)\)\s*$/u', $label, $m)) {
                 $this->warn("ข้ามคอลัมน์ \"{$label}\" (ไม่พบรหัสในวงเล็บท้ายชื่อคอลัมน์)");
+
                 continue;
             }
             $code = trim($m[1]);
@@ -103,9 +109,17 @@ class StockImportOpening extends Command
             return self::FAILURE;
         }
 
+        $locationIds = collect($locationColumns)->pluck('warehouse_location_id')->unique();
+        if (! $this->option('allow-existing-stock') && StockMovement::whereIn('warehouse_location_id', $locationIds)->exists()) {
+            $this->error('พบประวัติการเคลื่อนไหวในคลังปลายทาง คำสั่ง opening stock จะไม่ทำงานซ้ำ ใช้ --allow-existing-stock เฉพาะเมื่อผู้ตรวจสอบยืนยันแล้ว');
+
+            return self::FAILURE;
+        }
+
         $itemsByColumn = array_fill_keys(array_keys($locationColumns), []);
-        $costUpdates = [];
         $unmatchedCodes = [];
+        $validationErrors = [];
+        $seenCodes = [];
         $rowNum = 1;
         while (($row = fgetcsv($handle)) !== false) {
             $rowNum++;
@@ -117,20 +131,54 @@ class StockImportOpening extends Command
             $product = Product::where('sku_code', $skuCode)->first();
             if (! $product) {
                 $unmatchedCodes[] = "{$skuCode} (แถว {$rowNum})";
+
                 continue;
             }
 
-            $unitCost = $this->parseNumber($row[2] ?? null);
-            if ($unitCost !== null && $unitCost > 0) {
-                $costUpdates[$product->id] = round($unitCost, 4);
+            if (isset($seenCodes[$skuCode])) {
+                $validationErrors[] = "รหัสสินค้า {$skuCode} ซ้ำที่แถว {$seenCodes[$skuCode]} และ {$rowNum}";
+
+                continue;
+            }
+            $seenCodes[$skuCode] = $rowNum;
+
+            $rawCost = trim((string) ($row[2] ?? ''));
+            $unitCost = $this->parseNumber($rawCost);
+            if ($rawCost !== '' && $unitCost === null) {
+                $validationErrors[] = "ต้นทุนของ {$skuCode} แถว {$rowNum} ไม่ใช่ตัวเลข";
+
+                continue;
             }
 
+            $quantities = [];
             foreach ($locationColumns as $colIndex => $meta) {
-                $qty = $this->parseNumber($row[$colIndex] ?? null);
-                if ($qty === null || $qty <= 0) {
+                $rawQty = trim((string) ($row[$colIndex] ?? ''));
+                $qty = $this->parseNumber($rawQty);
+                if ($rawQty !== '' && $qty === null) {
+                    $validationErrors[] = "จำนวน {$skuCode} คอลัมน์ {$meta['label']} แถว {$rowNum} ไม่ใช่ตัวเลข";
+
                     continue;
                 }
-                $itemsByColumn[$colIndex][] = ['product_id' => $product->id, 'counted_qty' => $qty];
+                if ($qty !== null && $qty < 0) {
+                    $validationErrors[] = "จำนวน {$skuCode} คอลัมน์ {$meta['label']} แถว {$rowNum} ติดลบ";
+
+                    continue;
+                }
+                if ($qty !== null && $qty > 0) {
+                    $quantities[$colIndex] = $qty;
+                }
+            }
+            if ($quantities !== [] && ($unitCost === null || $unitCost <= 0)) {
+                $validationErrors[] = "สินค้า {$skuCode} แถว {$rowNum} มีจำนวนเปิดสต๊อกแต่ไม่มีต้นทุนต่อหน่วยที่มากกว่า 0";
+
+                continue;
+            }
+            foreach ($quantities as $colIndex => $qty) {
+                $itemsByColumn[$colIndex][] = [
+                    'product_id' => $product->id,
+                    'counted_qty' => $qty,
+                    'unit_cost' => round((float) $unitCost, 4),
+                ];
             }
         }
         fclose($handle);
@@ -140,11 +188,21 @@ class StockImportOpening extends Command
             ->map(fn ($meta, $i) => [$meta['label'], $meta['branch_id'], $meta['warehouse_location_id'], count($itemsByColumn[$i])])
             ->values()->all());
 
-        $this->info('ต้นทุน/หน่วยที่จะอัปเดต average_cost: '.count($costUpdates).' สินค้า');
-
         if ($unmatchedCodes !== []) {
             $this->warn(count($unmatchedCodes).' รหัสสินค้าไม่พบในระบบ (ข้ามทั้งต้นทุนและจำนวน): '.implode(', ', array_slice($unmatchedCodes, 0, 20))
                 .(count($unmatchedCodes) > 20 ? ' ...' : ''));
+            if (! $this->option('skip-unmatched')) {
+                $validationErrors[] = 'พบรหัสสินค้าที่ไม่มีในระบบ ใช้ --skip-unmatched เฉพาะเมื่อยืนยันว่าต้องการข้ามจริง';
+            }
+        }
+
+        if ($validationErrors !== []) {
+            foreach (array_slice($validationErrors, 0, 30) as $error) {
+                $this->error($error);
+            }
+            $this->error('ยกเลิกการนำเข้า: กรุณาแก้ไฟล์แล้วรัน --dry-run ใหม่');
+
+            return self::FAILURE;
         }
 
         if ($this->option('dry-run')) {
@@ -153,56 +211,56 @@ class StockImportOpening extends Command
             return self::SUCCESS;
         }
 
-        foreach ($costUpdates as $productId => $unitCost) {
-            Product::whereKey($productId)->update([
-                'average_cost' => $unitCost,
-                'last_purchase_cost' => $unitCost,
-                'last_purchase_cost_at' => now(),
-            ]);
-        }
-
         $createdBy = $this->option('created-by') ? (int) $this->option('created-by') : null;
         $approveAs = $this->option('approve') ? (int) $this->option('approve') : null;
+        if (! $createdBy || ! User::whereKey($createdBy)->exists()) {
+            $this->error('ต้องระบุ --created-by เป็น user id ที่มีอยู่จริง เพื่อเก็บผู้จัดทำเอกสาร');
+
+            return self::FAILURE;
+        }
+        if ($approveAs && (! User::whereKey($approveAs)->exists() || $approveAs === $createdBy)) {
+            $this->error('--approve ต้องเป็น user id ที่มีอยู่จริงและเป็นคนละคนกับ --created-by');
+
+            return self::FAILURE;
+        }
 
         $results = [];
-        foreach ($locationColumns as $colIndex => $meta) {
-            $items = $itemsByColumn[$colIndex];
-            if ($items === []) {
-                $results[] = [$meta['label'], '-', 'ข้าม (ไม่มีจำนวนนับ)'];
-                continue;
-            }
+        try {
+            DB::transaction(function () use ($locationColumns, $itemsByColumn, $createdBy, $approveAs, $service, &$results): void {
+                foreach ($locationColumns as $colIndex => $meta) {
+                    $items = $itemsByColumn[$colIndex];
+                    if ($items === []) {
+                        $results[] = [$meta['label'], '-', 'ข้าม (ไม่มีจำนวนนับ)'];
 
-            try {
-                if ($createdBy) {
+                        continue;
+                    }
+
                     Auth::onceUsingId($createdBy);
-                }
-                $document = $service->create([
-                    'branch_id' => $meta['branch_id'],
-                    'warehouse_location_id' => $meta['warehouse_location_id'],
-                    'remark' => 'นำเข้าสต๊อกตั้งต้น (opening stock import)',
-                    'items' => $items,
-                ]);
-            } catch (RuntimeException $e) {
-                $results[] = [$meta['label'], '-', 'สร้างเอกสารไม่สำเร็จ: '.$e->getMessage()];
-                continue;
-            }
-
-            $status = 'รออนุมัติ ('.$document->doc_number.')';
-            if ($approveAs) {
-                try {
-                    Auth::onceUsingId($approveAs);
-                    $service->approve($document);
-                    AuditLog::create([
-                        'user_id' => $approveAs, 'branch_id' => $document->branch_id,
-                        'action' => 'approve', 'table_name' => 'documents', 'record_id' => $document->id,
-                        'old_values' => ['status' => 'pending_approval'], 'new_values' => ['status' => 'active'],
+                    $document = $service->create([
+                        'branch_id' => $meta['branch_id'],
+                        'warehouse_location_id' => $meta['warehouse_location_id'],
+                        'remark' => 'นำเข้าสต๊อกตั้งต้น (opening stock import)',
+                        'items' => $items,
                     ]);
-                    $status = 'อนุมัติแล้ว ('.$document->doc_number.')';
-                } catch (RuntimeException $e) {
-                    $status = 'สร้างแล้วแต่อนุมัติไม่สำเร็จ ('.$document->doc_number.'): '.$e->getMessage();
+
+                    $status = 'รออนุมัติ ('.$document->doc_number.')';
+                    if ($approveAs) {
+                        Auth::onceUsingId($approveAs);
+                        $service->approve($document);
+                        AuditLog::create([
+                            'user_id' => $approveAs, 'branch_id' => $document->branch_id,
+                            'action' => 'approve', 'table_name' => 'documents', 'record_id' => $document->id,
+                            'old_values' => ['status' => 'pending_approval'], 'new_values' => ['status' => 'active'],
+                        ]);
+                        $status = 'อนุมัติแล้ว ('.$document->doc_number.')';
+                    }
+                    $results[] = [$meta['label'], (string) $document->total_items, $status];
                 }
-            }
-            $results[] = [$meta['label'], (string) $document->total_items, $status];
+            });
+        } catch (Throwable $exception) {
+            $this->error('นำเข้าไม่สำเร็จและ rollback ทั้งไฟล์: '.$exception->getMessage());
+
+            return self::FAILURE;
         }
 
         $this->table(['คลังปลายทาง', 'รายการ', 'สถานะ'], $results);
