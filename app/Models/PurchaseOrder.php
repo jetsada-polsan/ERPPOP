@@ -18,6 +18,7 @@ class PurchaseOrder extends Model
         'requested' => 'ขอซื้อ (รออนุมัติ)',
         'approved' => 'อนุมัติแล้ว',
         'ordered' => 'สั่งซื้อแล้ว',
+        'partially_received' => 'รับของบางส่วน',
         'received' => 'รับของแล้ว',
         'cancelled' => 'ยกเลิก',
     ];
@@ -50,6 +51,11 @@ class PurchaseOrder extends Model
     public function receivedDocument(): BelongsTo
     {
         return $this->belongsTo(Document::class, 'received_document_id');
+    }
+
+    public function receipts(): HasMany
+    {
+        return $this->hasMany(PurchaseOrderReceipt::class);
     }
 
     public function statusLabel(): string

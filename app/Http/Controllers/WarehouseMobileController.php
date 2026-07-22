@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\ProductBarcode;
 use App\Models\PurchaseOrder;
 use App\Models\StockBalance;
+use App\Services\Purchasing\PurchaseOrderReceivingService;
 use App\Services\Purchasing\PurchaseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -164,7 +165,7 @@ class WarehouseMobileController extends Controller
         $pos = PurchaseOrder::query()
             ->with('supplier:id,name_th')
             ->withCount('items')
-            ->where('status', 'ordered')
+            ->whereIn('status', ['ordered', 'partially_received'])
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->orderByDesc('id')
             ->limit(50)
@@ -195,9 +196,12 @@ class WarehouseMobileController extends Controller
             'status' => $purchaseOrder->status,
             'items' => $purchaseOrder->items->map(fn ($i) => [
                 'product_id' => $i->product_id,
+                'purchase_order_item_id' => $i->id,
                 'sku_code' => $i->product?->sku_code,
                 'name_th' => $i->product?->name_th,
                 'qty' => (float) $i->qty,
+                'received_qty' => (float) $i->received_qty,
+                'outstanding_qty' => max(0, (float) $i->qty - (float) $i->received_qty),
                 'unit_price' => (float) $i->unit_price,
                 'tracks_expiry' => (bool) $i->product?->tracks_expiry,
                 'shelf_life_days' => $i->product?->shelf_life_days,
@@ -205,42 +209,39 @@ class WarehouseMobileController extends Controller
         ]);
     }
 
-    /** รับของทั้งใบตาม PO (logic เดียวกับ PurchaseOrderController::receive แต่ตอบ JSON) */
-    public function purchaseOrderReceive(Request $request, PurchaseOrder $purchaseOrder, PurchaseService $service): JsonResponse
+    /** รับของตามยอดค้าง PO ผ่าน service กลางเดียวกับหน้า ERP */
+    public function purchaseOrderReceive(Request $request, PurchaseOrder $purchaseOrder, PurchaseOrderReceivingService $receiving): JsonResponse
     {
         $this->guardPoBranch($purchaseOrder);
-        if ($purchaseOrder->status !== 'ordered') {
+        if (! in_array($purchaseOrder->status, ['ordered', 'partially_received'], true)) {
             return response()->json(['message' => 'ต้องสั่งซื้อก่อนรับของ'], 422);
         }
         $purchaseOrder->loadMissing('items.product');
         $received = collect($request->validate([
             'items' => ['nullable', 'array'],
+            'items.*.purchase_order_item_id' => ['nullable', 'integer'],
             'items.*.product_id' => ['required', 'integer'],
+            'items.*.qty' => ['nullable', 'numeric', 'min:0'],
             'items.*.lot_number' => ['nullable', 'string', 'max:80'],
             'items.*.manufacture_date' => ['nullable', 'date'],
             'items.*.expiry_date' => ['nullable', 'date'],
-        ])['items'] ?? [])->keyBy('product_id');
+        ])['items'] ?? []);
+
+        $quantities = [];
+        $lots = [];
+        foreach ($purchaseOrder->items as $item) {
+            $payload = $received->first(fn ($row) => (int) ($row['purchase_order_item_id'] ?? 0) === $item->id)
+                ?? $received->first(fn ($row) => (int) $row['product_id'] === $item->product_id);
+            $outstanding = max(0, (float) $item->qty - (float) $item->received_qty);
+            $quantities[$item->id] = $payload ? (float) ($payload['qty'] ?? $outstanding) : 0;
+            $lots[$item->id] = $payload ?? [];
+        }
 
         try {
-            $document = $service->create([
-                'supplier_id' => $purchaseOrder->supplier_id,
-                'branch_id' => $purchaseOrder->branch_id,
-                'is_credit' => $purchaseOrder->is_credit,
-                'remark' => 'รับของตามใบสั่งซื้อ '.$purchaseOrder->doc_number.' (คลังมือถือ)',
-                'items' => $purchaseOrder->items->map(fn ($i) => [
-                    'product_id' => $i->product_id,
-                    'qty' => (float) $i->qty,
-                    'unit_price' => (float) $i->unit_price,
-                    'lot_number' => $received->get($i->product_id)['lot_number'] ?? null,
-                    'manufacture_date' => $received->get($i->product_id)['manufacture_date'] ?? null,
-                    'expiry_date' => $received->get($i->product_id)['expiry_date'] ?? null,
-                ])->all(),
-            ]);
+            $document = $receiving->receive($purchaseOrder, $quantities, $lots, auth()->id(), '(คลังมือถือ)');
         } catch (RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
-
-        $purchaseOrder->update(['status' => 'received', 'received_document_id' => $document->id]);
 
         return response()->json([
             'ok' => true,

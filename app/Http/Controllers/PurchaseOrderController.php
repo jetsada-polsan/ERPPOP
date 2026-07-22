@@ -4,9 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use App\Models\PurchaseOrder;
-use App\Models\PurchaseOrderItem;
 use App\Models\Supplier;
-use App\Services\Purchasing\PurchaseService;
+use App\Services\Purchasing\PurchaseOrderReceivingService;
 use App\Services\Sales\DocumentNumberGenerator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -93,7 +92,7 @@ class PurchaseOrderController extends Controller
 
     public function show(PurchaseOrder $purchaseOrder): View
     {
-        $purchaseOrder->load(['supplier', 'branch', 'requester', 'approver', 'receivedDocument', 'items.product.baseUnit']);
+        $purchaseOrder->load(['supplier', 'branch', 'requester', 'approver', 'receivedDocument', 'receipts.document', 'receipts.receiver', 'items.product.baseUnit']);
         $suppliers = Supplier::where('is_active', true)->orderBy('code')->limit(500)->get(['id', 'code', 'name_th']);
 
         return view('purchase-orders.show', compact('purchaseOrder', 'suppliers'));
@@ -149,37 +148,25 @@ class PurchaseOrderController extends Controller
     }
 
     // รับของ -> สร้างใบซื้อจริง (ตัดสต๊อก+ตั้งหนี้+GL) ผ่าน PurchaseService
-    public function receive(Request $request, PurchaseOrder $purchaseOrder, PurchaseService $service): RedirectResponse
+    public function receive(Request $request, PurchaseOrder $purchaseOrder, PurchaseOrderReceivingService $receiving): RedirectResponse
     {
-        abort_unless($purchaseOrder->status === 'ordered', 422, 'ต้องสั่งซื้อก่อนรับของ');
+        abort_unless(in_array($purchaseOrder->status, ['ordered', 'partially_received'], true), 422, 'ต้องสั่งซื้อก่อนรับของ');
         $purchaseOrder->loadMissing('items.product');
-        $lots = $request->validate([
+        $data = $request->validate([
+            'receive_qty' => ['required', 'array'],
+            'receive_qty.*' => ['nullable', 'numeric', 'min:0'],
             'lots' => ['nullable', 'array'],
             'lots.*.lot_number' => ['nullable', 'string', 'max:80'],
             'lots.*.manufacture_date' => ['nullable', 'date'],
             'lots.*.expiry_date' => ['nullable', 'date'],
-        ])['lots'] ?? [];
+        ]);
+        $lots = $data['lots'] ?? [];
 
         try {
-            $document = $service->create([
-                'supplier_id' => $purchaseOrder->supplier_id,
-                'branch_id' => $purchaseOrder->branch_id,
-                'is_credit' => $purchaseOrder->is_credit,
-                'remark' => 'รับของตามใบสั่งซื้อ '.$purchaseOrder->doc_number,
-                'items' => $purchaseOrder->items->map(fn ($i) => [
-                    'product_id' => $i->product_id,
-                    'qty' => (float) $i->qty,
-                    'unit_price' => (float) $i->unit_price,
-                    'lot_number' => $lots[$i->id]['lot_number'] ?? null,
-                    'manufacture_date' => $lots[$i->id]['manufacture_date'] ?? null,
-                    'expiry_date' => $lots[$i->id]['expiry_date'] ?? null,
-                ])->all(),
-            ]);
+            $document = $receiving->receive($purchaseOrder, $data['receive_qty'], $lots, Auth::id());
         } catch (RuntimeException $e) {
             return back()->withErrors(['receive' => $e->getMessage()]);
         }
-
-        $purchaseOrder->update(['status' => 'received', 'received_document_id' => $document->id]);
 
         return redirect()->route('purchases.show', $document)
             ->with('success', "รับของตามใบสั่งซื้อ {$purchaseOrder->doc_number} แล้ว → ใบซื้อ {$document->doc_number}");
@@ -187,7 +174,7 @@ class PurchaseOrderController extends Controller
 
     public function cancel(PurchaseOrder $purchaseOrder): RedirectResponse
     {
-        abort_if(in_array($purchaseOrder->status, ['received', 'cancelled'], true), 422, 'ยกเลิกไม่ได้');
+        abort_if(in_array($purchaseOrder->status, ['partially_received', 'received', 'cancelled'], true), 422, 'ยกเลิกไม่ได้หลังเริ่มรับสินค้าแล้ว');
         $purchaseOrder->update(['status' => 'cancelled']);
 
         return back()->with('success', "ยกเลิกใบขอซื้อ {$purchaseOrder->doc_number} แล้ว");

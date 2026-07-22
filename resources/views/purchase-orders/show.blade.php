@@ -11,7 +11,8 @@
         <div class="d-flex flex-wrap align-items-center gap-2">
             @foreach(['requested' => 'ขอซื้อ', 'approved' => 'อนุมัติ', 'ordered' => 'สั่งซื้อ', 'received' => 'รับของ'] as $st => $label)
                 @php($states = ['requested', 'approved', 'ordered', 'received'])
-                @php($curIdx = array_search($purchaseOrder->status, $states))
+                @php($workflowStatus = $purchaseOrder->status === 'partially_received' ? 'ordered' : $purchaseOrder->status)
+                @php($curIdx = array_search($workflowStatus, $states))
                 @php($thisIdx = array_search($st, $states))
                 @php($done = $curIdx !== false && $thisIdx <= $curIdx)
                 <span class="badge rounded-pill px-3 py-2 {{ $done ? 'text-bg-success' : 'text-bg-light border' }}">
@@ -19,6 +20,7 @@
                 </span>
                 @if(!$loop->last)<i class="bi bi-chevron-right text-muted"></i>@endif
             @endforeach
+            @if($purchaseOrder->status === 'partially_received')<span class="badge text-bg-warning ms-2">รับของบางส่วน</span>@endif
             @if($purchaseOrder->status === 'cancelled')<span class="badge text-bg-danger ms-2">ยกเลิกแล้ว</span>@endif
 
             <div class="ms-auto d-flex gap-2">
@@ -30,17 +32,14 @@
                     @endif
                 @elseif($purchaseOrder->status === 'approved')
                     <button type="button" class="btn btn-primary" @click="orderOpen = true"><i class="bi bi-cart-check me-1"></i>ยืนยันสั่งซื้อ</button>
-                @elseif($purchaseOrder->status === 'ordered')
-                    <button type="button" class="btn btn-success" @click="receiveOpen = true"><i class="bi bi-box-arrow-in-down me-1"></i>รับของเข้าคลัง</button>
+                @elseif(in_array($purchaseOrder->status, ['ordered', 'partially_received']))
+                    <button type="button" class="btn btn-success" @click="receiveOpen = true"><i class="bi bi-box-arrow-in-down me-1"></i>{{ $purchaseOrder->status === 'partially_received' ? 'รับของรอบถัดไป' : 'รับของเข้าคลัง' }}</button>
                 @endif
-                @if(!in_array($purchaseOrder->status, ['received', 'cancelled']))
+                @if(!in_array($purchaseOrder->status, ['partially_received', 'received', 'cancelled']))
                     <form method="post" action="{{ route('purchase-orders.cancel', $purchaseOrder) }}" onsubmit="return confirm('ยกเลิกใบขอซื้อนี้?')">@csrf<button class="btn btn-light border text-danger">ยกเลิก</button></form>
                 @endif
-                @if(in_array($purchaseOrder->status, ['ordered', 'received']))
+                @if(in_array($purchaseOrder->status, ['ordered', 'partially_received', 'received']))
                     <a href="{{ route('purchase-orders.print', $purchaseOrder) }}" target="_blank" class="btn btn-primary"><i class="bi bi-printer me-1"></i>พิมพ์ใบสั่งซื้อ (A4)</a>
-                @endif
-                @if($purchaseOrder->receivedDocument)
-                    <a href="{{ route('purchases.show', $purchaseOrder->received_document_id) }}" class="btn btn-outline-success"><i class="bi bi-receipt me-1"></i>ดูใบซื้อ {{ $purchaseOrder->receivedDocument->doc_number }}</a>
                 @endif
             </div>
         </div>
@@ -62,7 +61,7 @@
 
     <div class="content-card overflow-hidden">
         <table class="table table-sm align-middle mb-0">
-            <thead><tr><th>รหัส</th><th>สินค้า</th><th>หน่วย</th><th class="text-end">จำนวน</th><th class="text-end">ราคา/หน่วย</th><th class="text-end">รวม</th></tr></thead>
+            <thead><tr><th>รหัส</th><th>สินค้า</th><th>หน่วย</th><th class="text-end">สั่ง</th><th class="text-end">รับแล้ว</th><th class="text-end">ค้างรับ</th><th class="text-end">ราคา/หน่วย</th><th class="text-end">รวม</th></tr></thead>
             <tbody>
                 @foreach($purchaseOrder->items as $item)
                 <tr>
@@ -70,14 +69,31 @@
                     <td>{{ $item->product->name_th }}</td>
                     <td class="text-muted">{{ $item->product->baseUnit?->cleanName() ?? '-' }}</td>
                     <td class="text-end">{{ number_format($item->qty, 2) }}</td>
+                    <td class="text-end text-success">{{ number_format($item->received_qty, 2) }}</td>
+                    <td class="text-end {{ (float)$item->received_qty < (float)$item->qty ? 'text-warning fw-semibold' : 'text-muted' }}">{{ number_format(max(0, (float)$item->qty - (float)$item->received_qty), 2) }}</td>
                     <td class="text-end">{{ $item->unit_price > 0 ? number_format($item->unit_price, 2) : '-' }}</td>
                     <td class="text-end fw-semibold">{{ $item->unit_price > 0 ? number_format($item->qty * $item->unit_price, 2) : '-' }}</td>
                 </tr>
                 @endforeach
             </tbody>
-            <tfoot><tr class="fw-bold"><td colspan="5" class="text-end">รวมทั้งสิ้น</td><td class="text-end">{{ number_format($purchaseOrder->total_amount, 2) }}</td></tr></tfoot>
+            <tfoot><tr class="fw-bold"><td colspan="7" class="text-end">รวมทั้งสิ้น</td><td class="text-end">{{ number_format($purchaseOrder->total_amount, 2) }}</td></tr></tfoot>
         </table>
     </div>
+
+    @if($purchaseOrder->receipts->isNotEmpty())
+    <div class="content-card overflow-hidden mt-3">
+        <div class="px-3 py-2 border-bottom fw-bold small">ประวัติรับสินค้าตาม PO</div>
+        <table class="table table-sm align-middle mb-0">
+            <thead><tr><th>รอบ</th><th>ใบซื้อ</th><th>วันที่รับ</th><th>ผู้รับ</th><th class="text-end">มูลค่า</th><th></th></tr></thead>
+            <tbody>@foreach($purchaseOrder->receipts as $receipt)<tr>
+                <td>{{ $loop->iteration }}</td><td class="fw-semibold">{{ $receipt->document->doc_number }}</td>
+                <td>{{ $receipt->received_at->thaiDate(true) }}</td><td>{{ $receipt->receiver?->name ?? '-' }}</td>
+                <td class="text-end">{{ number_format($receipt->document->total_amount, 2) }}</td>
+                <td class="text-end"><a class="btn btn-sm btn-outline-success" href="{{ route('purchases.show', $receipt->document) }}"><i class="bi bi-box-arrow-up-right"></i></a></td>
+            </tr>@endforeach</tbody>
+        </table>
+    </div>
+    @endif
 
     {{-- Order modal: ระบุซัพพลายเออร์ + ราคา --}}
     <div class="po-backdrop" x-show="orderOpen" x-cloak x-transition.opacity @keydown.escape.window="orderOpen = false">
@@ -134,15 +150,20 @@
                     <p class="small text-muted">ระบุ Lot และวันของสินค้าที่ควบคุมอายุ ระบบจะคำนวณวันหมดอายุให้อัตโนมัติเมื่อสินค้าได้ตั้งอายุไว้</p>
                     <div class="table-responsive">
                         <table class="table table-sm align-middle">
-                            <thead><tr><th>สินค้า</th><th>Lot</th><th>วันผลิต</th><th>วันหมดอายุ</th></tr></thead>
+                            <thead><tr><th>สินค้า</th><th style="width:100px">ค้างรับ</th><th style="width:120px">รับครั้งนี้</th><th>Lot</th><th>วันผลิต</th><th>วันหมดอายุ</th></tr></thead>
                             <tbody>
                             @foreach($purchaseOrder->items as $item)
+                                @php($outstanding = max(0, (float)$item->qty - (float)$item->received_qty))
+                                @if($outstanding > 0.0001)
                                 <tr>
                                     <td class="small">{{ $item->product->sku_code }}<br>{{ $item->product->name_th }} @if($item->product->tracks_expiry)<span class="badge text-bg-warning">คุมอายุ</span>@endif</td>
+                                    <td class="text-end">{{ number_format($outstanding, 2) }}</td>
+                                    <td><input type="number" step="0.0001" min="0" max="{{ $outstanding }}" name="receive_qty[{{ $item->id }}]" value="{{ $outstanding }}" class="form-control form-control-sm text-end"></td>
                                     <td><input name="lots[{{ $item->id }}][lot_number]" class="form-control form-control-sm"></td>
                                     <td><input type="date" name="lots[{{ $item->id }}][manufacture_date]" class="form-control form-control-sm"></td>
-                                    <td><input type="date" name="lots[{{ $item->id }}][expiry_date]" class="form-control form-control-sm" @required($item->product->tracks_expiry && !$item->product->shelf_life_days)></td>
+                                    <td><input type="date" name="lots[{{ $item->id }}][expiry_date]" class="form-control form-control-sm"></td>
                                 </tr>
+                                @endif
                             @endforeach
                             </tbody>
                         </table>

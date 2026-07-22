@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['purchase_order_id', 'product_id', 'qty', 'unit_price', 'note'])]
+#[Fillable(['purchase_order_id', 'product_id', 'qty', 'received_qty', 'unit_price', 'note'])]
 class PurchaseOrderItem extends Model
 {
     public $timestamps = false;
@@ -23,6 +23,6 @@ class PurchaseOrderItem extends Model
 
     protected function casts(): array
     {
-        return ['qty' => 'decimal:4', 'unit_price' => 'decimal:4'];
+        return ['qty' => 'decimal:4', 'received_qty' => 'decimal:4', 'unit_price' => 'decimal:4'];
     }
 }

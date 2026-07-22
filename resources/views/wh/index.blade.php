@@ -254,7 +254,7 @@
             <template x-if="!poCur">
                 <div>
                     <div class="polist">
-                        <div class="empty" x-show="!poLoading && !poList.length">ไม่มีใบสั่งซื้อค้างรับของ (สถานะ "สั่งซื้อแล้ว")</div>
+                        <div class="empty" x-show="!poLoading && !poList.length">ไม่มีใบสั่งซื้อค้างรับของ</div>
                         <div class="empty" x-show="poLoading">กำลังโหลด…</div>
                         <template x-for="po in poList" :key="po.id">
                             <button class="po" @click="openPo(po.id)">
@@ -285,12 +285,12 @@
                     <p class="err" x-show="poScanError" x-text="poScanError"></p>
                     <div class="card">
                         <template x-for="line in poCur.items" :key="line.product_id">
-                            <div class="poline" :class="{ done: line.scanned >= line.qty, over: line.scanned > line.qty }">
+                            <div class="poline" :class="{ done: line.scanned >= line.outstanding_qty, over: line.scanned > line.outstanding_qty }">
                                 <div>
                                     <div class="nm" style="font-weight:700;font-size:13.5px" x-text="line.name_th"></div>
                                     <div class="dt" style="color:var(--ink-soft);font-size:12px" x-text="line.sku_code"></div>
                                 </div>
-                                <span class="prog" x-text="fmtQty(line.scanned) + ' / ' + fmtQty(line.qty)"></span>
+                                <span class="prog" x-text="fmtQty(line.scanned) + ' / ค้าง ' + fmtQty(line.outstanding_qty)"></span>
                                 <div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px">
                                     <input x-model="line.lot_number" placeholder="Lot">
                                     <input x-model="line.manufacture_date" @change="calculatePoExpiry(line)" type="date" title="วันผลิต">
@@ -299,10 +299,10 @@
                             </div>
                         </template>
                     </div>
-                    <p class="hint" style="margin:0 4px 10px">ยิงเช็คของให้ครบทุกบรรทัด แล้วกดรับของ — ระบบจะออกใบซื้อตามจำนวนใน PO ทั้งใบ</p>
+                    <p class="hint" style="margin:0 4px 10px">ยิงสินค้าที่ได้รับจริง ระบบจะออกใบซื้อเฉพาะจำนวนที่สแกน และเก็บยอดที่เหลือไว้รับรอบถัดไป</p>
                     <p class="err" x-show="submitError" x-text="submitError"></p>
                     <button class="btn primary" style="width:100%" :disabled="submitting" @click="receivePo()">
-                        <span x-text="submitting ? 'กำลังรับของ…' : (poAllScanned() ? 'รับของทั้งใบ ✓' : 'รับของทั้งใบ (ยังยิงไม่ครบ)')"></span>
+                        <span x-text="submitting ? 'กำลังรับของ…' : (poAllScanned() ? 'รับครบยอดค้าง ✓' : 'รับของตามจำนวนที่สแกน')"></span>
                     </button>
                 </div>
             </template>
@@ -533,7 +533,7 @@ function whApp() {
         async openPo(id) {
             try {
                 const po = await jfetch(`{{ route('wh.purchase-orders') }}/${id}`);
-                po.items = po.items.map(i => ({ ...i, scanned: 0, lot_number: '', manufacture_date: '', expiry_date: '' }));
+                po.items = po.items.filter(i => +i.outstanding_qty > 0).map(i => ({ ...i, scanned: 0, lot_number: '', manufacture_date: '', expiry_date: '' }));
                 this.poCur = po; this.submitError = '';
                 this.$nextTick(() => this.focusScan());
             } catch (e) { this.scanError = e.message; }
@@ -541,10 +541,15 @@ function whApp() {
         tickPoLine(product) {
             const line = this.poCur?.items.find(i => i.product_id === product.id);
             if (!line) { this.poScanError = 'สินค้านี้ไม่อยู่ในใบสั่งซื้อ: ' + product.name_th; return; }
+            const addQty = product.unit_factor || 1;
+            if (line.scanned + addQty > line.outstanding_qty + 0.0001) {
+                this.poScanError = 'จำนวนเกินยอดค้างรับของ ' + product.name_th;
+                return;
+            }
             this.poScanError = '';
-            line.scanned += (product.unit_factor || 1);
+            line.scanned += addQty;
         },
-        poAllScanned() { return !!this.poCur && this.poCur.items.every(i => i.scanned >= i.qty); },
+        poAllScanned() { return !!this.poCur && this.poCur.items.every(i => i.scanned >= i.outstanding_qty); },
         calculatePoExpiry(line) {
             if (!line.manufacture_date || !line.shelf_life_days) return;
             const expiry = new Date(line.manufacture_date + 'T00:00:00');
@@ -553,17 +558,23 @@ function whApp() {
         },
         async receivePo() {
             if (!this.poCur) return;
-            if (this.poCur.items.some(i => i.tracks_expiry && !i.expiry_date && !(i.manufacture_date && i.shelf_life_days))) {
+            if (!this.poCur.items.some(i => i.scanned > 0)) {
+                this.submitError = 'กรุณาสแกนสินค้าที่รับจริงอย่างน้อย 1 รายการ';
+                return;
+            }
+            if (this.poCur.items.some(i => i.scanned > 0 && i.tracks_expiry && !i.expiry_date && !(i.manufacture_date && i.shelf_life_days))) {
                 this.submitError = 'สินค้าที่ควบคุมอายุต้องระบุวันหมดอายุ หรือวันผลิตของสินค้าที่ตั้งอายุไว้';
                 return;
             }
-            if (!this.poAllScanned() && !confirm('ยังยิงเช็คของไม่ครบทุกบรรทัด — ระบบจะรับของ "ทั้งใบ" ตามจำนวนใน PO ยืนยันไหม?')) return;
+            if (!this.poAllScanned() && !confirm('รับของบางส่วนตามจำนวนที่สแกน และเก็บยอดค้างไว้รับรอบถัดไป ใช่หรือไม่?')) return;
             this.submitting = true; this.submitError = '';
             try {
                 const res = await jfetch(`{{ route('wh.purchase-orders') }}/${this.poCur.id}/receive`, {
                     method: 'POST',
                     body: JSON.stringify({ items: this.poCur.items.map(i => ({
+                        purchase_order_item_id: i.purchase_order_item_id,
                         product_id: i.product_id,
+                        qty: i.scanned,
                         lot_number: i.lot_number || null,
                         manufacture_date: i.manufacture_date || null,
                         expiry_date: i.expiry_date || null,
