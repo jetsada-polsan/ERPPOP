@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use App\Models\Employee;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class EmployeeController extends Controller
@@ -36,5 +38,58 @@ class EmployeeController extends Controller
                 'unassigned' => Employee::whereNull('branch_id')->count(),
             ],
         ]);
+    }
+
+    public function store(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'full_name' => ['required', 'string', 'max:200'],
+            'nickname' => ['nullable', 'string', 'max:100'],
+            'gender' => ['nullable', 'string', 'max:20'],
+            'phone' => ['nullable', 'string', 'max:40'],
+            'alt_phone' => ['nullable', 'string', 'max:100'],
+            'national_id' => ['nullable', 'string', 'max:30'],
+            'nationality' => ['nullable', 'string', 'max:50'],
+            'birth_date_raw' => ['nullable', 'date'],
+            'address' => ['nullable', 'string', 'max:2000'],
+            'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
+            'department' => ['nullable', 'string', 'max:150'],
+            'department_other' => ['nullable', 'string', 'max:150'],
+            'position' => ['nullable', 'string', 'max:150'],
+            'employment_type' => ['nullable', 'string', 'max:100'],
+            'wage_type' => ['nullable', 'string', 'max:50'],
+            'wage_amount' => ['nullable', 'numeric', 'min:0'],
+            'monthly_salary' => ['nullable', 'numeric', 'min:0'],
+            'social_security_enabled' => ['nullable', 'boolean'],
+            'start_date_raw' => ['nullable', 'date'],
+            'status' => ['required', 'string', 'max:30'],
+            'remark' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $data['department'] = $data['department'] === '__other__'
+            ? trim((string) ($data['department_other'] ?? ''))
+            : ($data['department'] ?: null);
+        unset($data['department_other']);
+        $data['social_security_enabled'] = $request->boolean('social_security_enabled', true);
+
+        $employee = DB::transaction(function () use ($data) {
+            $data['employee_code'] = $this->nextEmployeeCode();
+
+            return Employee::create($data);
+        });
+
+        return redirect()->route('employees.index')
+            ->with('success', "เพิ่มพนักงาน {$employee->employee_code} - {$employee->full_name} แล้ว");
+    }
+
+    // เลขพนักงานรันอัตโนมัติ EMP#### ต่อจากเลขสูงสุดที่มีอยู่เสมอ (ห้าม user กรอกเอง)
+    private function nextEmployeeCode(): string
+    {
+        $max = DB::table('employees')
+            ->selectRaw("MAX(CAST(regexp_replace(employee_code, '\\D', '', 'g') AS INTEGER)) as max_num")
+            ->where('employee_code', '~', '^EMP[0-9]+$')
+            ->value('max_num');
+
+        return 'EMP'.str_pad((string) ((int) $max + 1), 4, '0', STR_PAD_LEFT);
     }
 }

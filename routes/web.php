@@ -99,6 +99,7 @@ Route::delete('/security/mfa', [AuthController::class, 'disableMfa'])->name('mfa
 
 Route::get('/', fn () => redirect()->route('dashboard'));
 Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
+Route::post('/employees', [EmployeeController::class, 'store'])->name('employees.store');
 Route::prefix('organizational-units')->name('organizational-units.')->group(function () {
     Route::get('/', [OrganizationalUnitController::class, 'index'])->name('index');
     Route::post('/', [OrganizationalUnitController::class, 'store'])->name('store');
