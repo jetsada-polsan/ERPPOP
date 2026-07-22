@@ -3,6 +3,7 @@
 namespace App\Services\Inventory;
 
 use App\Models\InventoryCostClose;
+use App\Models\InventoryCostClosePeriod;
 use App\Models\Product;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +19,12 @@ class InventoryCostCloseService
             throw new RuntimeException('ยังไม่สามารถปิดต้นทุนงวดที่ยังไม่สิ้นสุด');
         }
 
-        return DB::transaction(function () use ($period, $from, $to, $userId): int {
+        $periodRow = InventoryCostClosePeriod::firstOrCreate(['period' => $period], ['status' => 'open']);
+        if ($periodRow->isClosed()) {
+            throw new RuntimeException('งวดนี้ปิดต้นทุนไปแล้ว ต้องเปิดงวดก่อน (--reopen) ถึงจะปิดซ้ำได้');
+        }
+
+        return DB::transaction(function () use ($period, $from, $to, $userId, $periodRow): int {
             $count = 0;
             Product::where('is_active', true)->orderBy('id')->chunkById(500, function ($products) use ($period, $from, $to, $userId, &$count): void {
                 $ids = $products->pluck('id');
@@ -50,8 +56,20 @@ class InventoryCostCloseService
                 }
             });
 
+            $periodRow->update(['status' => 'closed', 'closed_by' => $userId, 'closed_at' => now()]);
+
             return $count;
         });
+    }
+
+    public function reopen(string $period): void
+    {
+        $periodRow = InventoryCostClosePeriod::where('period', $period)->first();
+        if (! $periodRow || ! $periodRow->isClosed()) {
+            throw new RuntimeException('งวดนี้ยังไม่ได้ปิดต้นทุน');
+        }
+
+        $periodRow->update(['status' => 'open', 'closed_by' => null, 'closed_at' => null]);
     }
 
     private function lotBalances(array $productIds, string $to)
