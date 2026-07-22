@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { AlertTriangle, Banknote, CheckCircle2, Cloud, CloudOff, LogOut, Minus, PackageSearch, Plus, Printer, RefreshCw, Search, Settings, ShoppingCart, Trash2, UserRound, Wifi, X } from 'lucide-vue-next'
+import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, Cloud, CloudOff, CreditCard, FileText, LogOut, Minus, PackageSearch, Plus, Printer, QrCode, ReceiptText, RefreshCw, ScanLine, Search, Settings, ShoppingCart, Trash2, UserRound, Wifi, X } from 'lucide-vue-next'
 import { check } from '@tauri-apps/plugin-updater'
 import { isTauri } from '@tauri-apps/api/core'
 import { api, connect, setServerUrl } from './lib/api'
@@ -39,6 +39,7 @@ const filteredProducts = computed(() => {
   return products.value.filter((p) => p.sku_code.toLowerCase().includes(q) || p.name_th.toLocaleLowerCase('th').includes(q) || p.barcodes?.some((b) => b.barcode.includes(q))).slice(0, 80)
 })
 const subtotal = computed(() => cart.value.reduce((sum, line) => sum + Number(line.pos_price) * line.qty, 0))
+const totalQty = computed(() => cart.value.reduce((sum, line) => sum + Number(line.qty), 0))
 const vat = computed(() => subtotal.value * ((profile.value?.vatRate || 7) / (100 + (profile.value?.vatRate || 7))))
 const change = computed(() => Math.max(0, cashReceived.value - subtotal.value))
 
@@ -259,15 +260,37 @@ async function start() {
 
 function networkUp() { online.value = true; void syncAll() }
 function networkDown() { online.value = false }
-onMounted(() => { window.addEventListener('online', networkUp); window.addEventListener('offline', networkDown); void start() })
-onUnmounted(() => { window.removeEventListener('online', networkUp); window.removeEventListener('offline', networkDown) })
+function handleShortcut(event: KeyboardEvent) {
+  if (event.key === 'F10' && !modal.value && cart.value.length) {
+    event.preventDefault()
+    openPayment()
+  }
+  if (event.key === 'Escape' && modal.value && !(modal.value === 'settings' && !profile.value)) {
+    modal.value = null
+    nextTick(() => scanner.value?.focus())
+  }
+}
+onMounted(() => {
+  window.addEventListener('online', networkUp)
+  window.addEventListener('offline', networkDown)
+  window.addEventListener('keydown', handleShortcut)
+  void start()
+})
+onUnmounted(() => {
+  window.removeEventListener('online', networkUp)
+  window.removeEventListener('offline', networkDown)
+  window.removeEventListener('keydown', handleShortcut)
+})
 </script>
 
 <template>
   <main class="app-shell">
     <header class="topbar">
-      <div class="brand"><span class="brand-star">★</span><div><strong>POPSTAR</strong><small>POINT OF SALE</small></div></div>
-      <div class="terminal"><strong>{{ profile?.branchName || 'ยังไม่ได้ตั้งค่าเครื่อง' }}</strong><span>{{ profile?.terminalCode || 'POS' }} · {{ cashier?.name || 'ยังไม่เข้าแคชเชียร์' }}</span></div>
+      <div class="brand"><span class="brand-mark">P</span><div><strong>POPSTAR</strong><small>POINT OF SALE</small></div></div>
+      <div class="terminal-context">
+        <div><span>สาขา / เครื่อง</span><strong>{{ profile?.branchName || 'ยังไม่ได้ตั้งค่าเครื่อง' }}</strong><small>{{ profile?.terminalCode || 'POS' }}</small></div>
+        <div><span>กะขาย</span><strong>{{ shift?.shift_no || 'ยังไม่เปิดกะ' }}</strong><small>{{ cashier?.name || 'ยังไม่เข้าแคชเชียร์' }}</small></div>
+      </div>
       <div class="top-actions">
         <button class="status" :class="online ? 'online' : 'offline'" @click="syncAll"><Wifi v-if="online"/><CloudOff v-else/><span>{{ online ? (syncing ? 'กำลังซิงก์' : 'ออนไลน์') : 'ออฟไลน์' }}</span></button>
         <button class="icon-button" title="ซิงก์ข้อมูล" @click="syncAll"><RefreshCw :class="{ spin: syncing }"/></button>
@@ -279,35 +302,40 @@ onUnmounted(() => { window.removeEventListener('online', networkUp); window.remo
 
     <section class="workspace">
       <div class="catalog">
+        <div class="section-heading">
+          <div><span>รายการสินค้า</span><strong>เลือกหรือสแกนเพื่อขาย</strong></div>
+          <div class="catalog-count"><b>{{ products.length }}</b><span>สินค้าในเครื่อง</span></div>
+        </div>
         <div class="search-row">
-          <Search/>
+          <span class="scan-icon"><ScanLine/></span>
           <input ref="scanner" v-model="search" autofocus placeholder="สแกนบาร์โค้ด หรือค้นหาชื่อสินค้า" @keyup.enter="scan" />
-          <span>{{ filteredProducts.length }} รายการ</span>
+          <span class="search-state"><Search/>{{ filteredProducts.length }} รายการ</span>
         </div>
         <div v-if="products.length" class="product-grid">
           <button v-for="product in filteredProducts" :key="product.id" class="product-tile" @click="addProduct(product)">
-            <div class="product-code">{{ product.sku_code }} <span v-if="product.is_promotion || product.is_flash_sale">โปร</span></div>
+            <div class="product-code"><span>{{ product.sku_code }}</span><em v-if="product.is_promotion || product.is_flash_sale">ราคาพิเศษ</em></div>
             <strong>{{ product.name_th }}</strong>
-            <div class="product-bottom"><span>คงเหลือ {{ product.stock_qty == null ? '-' : product.stock_qty }}</span><b>฿{{ money(product.pos_price) }}</b></div>
+            <div class="product-bottom"><span :class="{ low: product.stock_qty != null && product.stock_qty <= 5 }"><i></i>คงเหลือ {{ product.stock_qty == null ? '-' : product.stock_qty }}</span><b>฿{{ money(product.pos_price) }}</b></div>
           </button>
         </div>
         <div v-else class="empty-state"><PackageSearch/><strong>ยังไม่มีข้อมูลสินค้าในเครื่อง</strong><span>ตั้งค่าเครื่องและเชื่อมต่ออินเทอร์เน็ตเพื่อดาวน์โหลดสินค้า</span></div>
       </div>
 
       <aside class="cart-panel">
-        <div class="cart-title"><div><ShoppingCart/><strong>รายการขาย</strong></div><span>{{ cart.length }} รายการ</span></div>
+        <div class="cart-title"><div><span class="cart-icon"><ReceiptText/></span><span><small>บิลปัจจุบัน</small><strong>รายการขาย</strong></span></div><span>{{ cart.length }} รายการ · {{ totalQty }} ชิ้น</span></div>
         <div class="cart-lines">
           <div v-for="(line, index) in cart" :key="`${line.id}-${line.scannedBarcode || ''}`" class="cart-line">
+            <span class="line-seq">{{ index + 1 }}</span>
             <div class="line-info"><strong>{{ line.name_th }}</strong><span>{{ line.sku_code }} · ฿{{ money(line.pos_price) }}</span></div>
             <div class="qty-control"><button title="ลดจำนวน" @click="line.qty <= 1 ? cart.splice(index, 1) : line.qty--"><Minus/></button><input v-model.number="line.qty" type="number" min="0.001" step="1"><button title="เพิ่มจำนวน" @click="line.qty++"><Plus/></button></div>
             <b>฿{{ money(line.pos_price * line.qty) }}</b>
             <button class="delete" title="ลบรายการ" @click="cart.splice(index, 1)"><Trash2/></button>
           </div>
-          <div v-if="!cart.length" class="cart-empty"><ShoppingCart/><span>สแกนสินค้าเพื่อเริ่มขาย</span></div>
+          <div v-if="!cart.length" class="cart-empty"><span><ShoppingCart/></span><strong>ยังไม่มีรายการขาย</strong><small>สแกนสินค้าเพื่อเริ่มบิล</small></div>
         </div>
         <div class="totals"><div><span>ยอดก่อนภาษี</span><b>฿{{ money(subtotal - vat) }}</b></div><div><span>VAT {{ profile?.vatRate || 7 }}%</span><b>฿{{ money(vat) }}</b></div><div class="grand"><span>ยอดสุทธิ</span><b>฿{{ money(subtotal) }}</b></div></div>
-        <button class="pay-button" :disabled="!cart.length || busy" @click="openPayment"><Banknote/> ชำระเงิน <span>F10</span></button>
-        <div class="queue-bar" :class="{ warning: pendingCount }"><Cloud/><span>{{ pendingCount ? `รอส่งขึ้น ERP ${pendingCount} บิล` : 'บิลทั้งหมดส่งขึ้น ERP แล้ว' }}</span></div>
+        <button class="pay-button" :disabled="!cart.length || busy" @click="openPayment"><Banknote/><span><small>รับชำระ</small><strong>ชำระเงิน</strong></span><ChevronRight/></button>
+        <div class="queue-bar" :class="{ warning: pendingCount }"><Cloud v-if="pendingCount"/><CheckCircle2 v-else/><span>{{ pendingCount ? `รอส่งขึ้น ERP ${pendingCount} บิล` : 'บิลทั้งหมดส่งขึ้น ERP แล้ว' }}</span></div>
       </aside>
     </section>
 
@@ -342,13 +370,16 @@ onUnmounted(() => { window.removeEventListener('online', networkUp); window.remo
       </form>
 
       <form v-else-if="modal === 'payment'" class="modal payment-modal" @submit.prevent="checkout">
-        <div class="modal-head"><div><Banknote/><span><strong>รับชำระเงิน</strong><small>{{ cart.length }} รายการ</small></span></div><button type="button" @click="modal = null"><X/></button></div>
+        <div class="modal-head"><div><Banknote/><span><strong>รับชำระเงิน</strong><small>{{ cart.length }} รายการ · {{ totalQty }} ชิ้น</small></span></div><button type="button" @click="modal = null"><X/></button></div>
         <div class="payment-total"><span>ยอดที่ต้องชำระ</span><strong>฿{{ money(subtotal) }}</strong></div>
-        <div class="payment-methods"><button v-for="method in (['cash','transfer','credit_card','cheque'] as PaymentMethod[])" :key="method" type="button" :class="{ active: paymentMethod === method }" @click="paymentMethod = method">{{ ({cash:'เงินสด',transfer:'โอน/QR',credit_card:'บัตรเครดิต',cheque:'เช็ค'} as any)[method] }}</button></div>
-        <label v-if="paymentMethod === 'cash'">รับเงินสด<input v-model.number="cashReceived" type="number" min="0" step="0.01" autofocus></label>
-        <label v-else>เลขอ้างอิงการชำระ<input v-model="paymentRef" required autofocus></label>
+        <div class="payment-methods"><button v-for="method in (['cash','transfer','credit_card','cheque'] as PaymentMethod[])" :key="method" type="button" :class="{ active: paymentMethod === method }" @click="paymentMethod = method"><Banknote v-if="method === 'cash'"/><QrCode v-else-if="method === 'transfer'"/><CreditCard v-else-if="method === 'credit_card'"/><FileText v-else/>{{ ({cash:'เงินสด',transfer:'โอน/QR',credit_card:'บัตรเครดิต',cheque:'เช็ค'} as any)[method] }}</button></div>
+        <template v-if="paymentMethod === 'cash'">
+          <label class="payment-field">รับเงินสด<input v-model.number="cashReceived" type="number" min="0" step="0.01" autofocus></label>
+          <div class="tender-grid"><button type="button" @click="cashReceived = subtotal">รับพอดี</button><button type="button" @click="cashReceived = 100">100</button><button type="button" @click="cashReceived = 500">500</button><button type="button" @click="cashReceived = 1000">1,000</button></div>
+        </template>
+        <label v-else class="payment-field">เลขอ้างอิงการชำระ<input v-model="paymentRef" required autofocus></label>
         <div v-if="paymentMethod === 'cash'" class="change"><span>เงินทอน</span><strong>฿{{ money(change) }}</strong></div>
-        <button class="primary pay-confirm" :disabled="busy">{{ online ? 'ยืนยันและออกบิล' : 'ยืนยันบิลออฟไลน์' }}</button>
+        <button class="primary pay-confirm" :disabled="busy"><CheckCircle2/>{{ online ? 'ยืนยันและออกบิล' : 'ยืนยันบิลออฟไลน์' }}</button>
       </form>
     </div>
 
