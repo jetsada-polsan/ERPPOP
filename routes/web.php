@@ -457,6 +457,8 @@ Route::prefix('production')->name('production.')->group(function () {
     Route::get('/', [ProductionController::class, 'index'])->name('index');
     Route::post('/recipes', [ProductionController::class, 'storeRecipe'])->name('recipes.store');
     Route::put('/recipes/{recipe}', [ProductionController::class, 'updateRecipe'])->name('recipes.update');
+    Route::post('/recipes/{recipe}/items', [ProductionController::class, 'storeRecipeItem'])->name('recipes.items.store');
+    Route::delete('/recipes/items/{recipeItem}', [ProductionController::class, 'destroyRecipeItem'])->name('recipes.items.destroy');
     Route::post('/orders', [ProductionController::class, 'storeOrder'])->name('orders.store');
     Route::put('/orders/{order}', [ProductionController::class, 'updateOrder'])->name('orders.update');
     Route::post('/orders/{order}/receive', [ProductionController::class, 'receiveOrder'])->name('orders.receive');

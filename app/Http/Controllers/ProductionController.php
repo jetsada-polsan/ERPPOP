@@ -6,6 +6,7 @@ use App\Models\Branch;
 use App\Models\Product;
 use App\Models\ProductionOrder;
 use App\Models\ProductionRecipe;
+use App\Models\ProductionRecipeItem;
 use App\Models\WarehouseLocation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,7 +16,7 @@ class ProductionController extends Controller
 {
     public function index(): View
     {
-        $recipes = ProductionRecipe::with('finishedProduct')->withCount('items')->orderBy('code')->paginate(25, ['*'], 'recipes_page');
+        $recipes = ProductionRecipe::with(['finishedProduct', 'items.product'])->withCount('items')->orderBy('code')->paginate(25, ['*'], 'recipes_page');
         $orders = ProductionOrder::with(['recipe', 'finishedProduct', 'branch', 'warehouseLocation'])->orderByDesc('doc_date')->paginate(25, ['*'], 'orders_page');
         $products = Product::where('is_active', true)->orderBy('sku_code')->limit(300)->get();
         $branches = Branch::where('is_active', true)->orderBy('code')->get();
@@ -54,6 +55,34 @@ class ProductionController extends Controller
         $recipe->update($data);
 
         return redirect()->route('production.index')->with('success', 'บันทึกสูตรผลิตแล้ว');
+    }
+
+    // เพิ่มรายการวัตถุดิบในสูตร (BOM): สูตร 1 -> วัตถุดิบหลายรายการ
+    public function storeRecipeItem(Request $request, ProductionRecipe $recipe): RedirectResponse
+    {
+        $data = $request->validate([
+            'product_id' => ['required', 'integer', 'exists:products,id'],
+            'qty' => ['required', 'numeric', 'min:0.0001'],
+            'scrap_policy' => ['nullable', 'string', 'max:30'],
+        ]);
+        if ((int) $data['product_id'] === $recipe->finished_product_id) {
+            return back()->withErrors(['product_id' => 'วัตถุดิบต้องไม่ใช่สินค้าสำเร็จรูปตัวเดียวกับสูตร'])->withFragment('recipe-'.$recipe->id);
+        }
+        $recipe->items()->create([
+            'product_id' => $data['product_id'],
+            'qty' => $data['qty'],
+            'scrap_policy' => $data['scrap_policy'] ?? null,
+        ]);
+
+        return redirect()->route('production.index')->with('success', "เพิ่มวัตถุดิบในสูตร {$recipe->code} แล้ว")->withFragment('recipe-'.$recipe->id);
+    }
+
+    public function destroyRecipeItem(ProductionRecipeItem $recipeItem): RedirectResponse
+    {
+        $recipeId = $recipeItem->production_recipe_id;
+        $recipeItem->delete();
+
+        return redirect()->route('production.index')->with('success', 'ลบรายการวัตถุดิบแล้ว')->withFragment('recipe-'.$recipeId);
     }
 
     public function storeOrder(Request $request): RedirectResponse

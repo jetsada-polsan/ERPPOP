@@ -3,6 +3,7 @@
 @section('page-title', 'การผลิต')
 @section('page-subtitle', 'สูตรผลิต ใบสั่งผลิต และสถานะงานผลิต')
 @section('content')
+<div x-data="{ openRecipe: null }" x-init="const m = location.hash.match(/^#recipe-(\d+)/); if (m) openRecipe = parseInt(m[1])" x-cloak>
 <div class="row g-3 mb-3">
     <div class="col-12 col-xl-5">
         <div class="content-card p-4 h-100">
@@ -72,7 +73,7 @@
             <h2 class="h5 fw-bold mb-3">สูตรผลิต</h2>
             <div class="table-responsive">
                 <table class="table align-middle">
-                    <thead><tr><th>รหัส</th><th>สูตร</th><th>สินค้า</th><th class="text-end">จำนวนที่ได้</th><th>สถานะ</th></tr></thead>
+                    <thead><tr><th>รหัส</th><th>สูตร</th><th>สินค้า</th><th class="text-end">จำนวนที่ได้</th><th>สถานะ</th><th>วัตถุดิบ</th></tr></thead>
                     <tbody>
                     @forelse($recipes as $recipe)
                         <tr>
@@ -81,9 +82,10 @@
                             <td>{{ $recipe->finishedProduct?->sku_code }}</td>
                             <td class="text-end">{{ number_format((float) $recipe->output_qty, 4) }}</td>
                             <td><span class="badge {{ $recipe->is_active ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $recipe->is_active ? 'ใช้งาน' : 'ปิด' }}</span></td>
+                            <td><button type="button" class="btn btn-sm btn-light border" @click="openRecipe = {{ $recipe->id }}"><i class="bi bi-list-check me-1"></i>{{ $recipe->items_count }} รายการ</button></td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="text-center text-muted py-5">ยังไม่มีสูตรผลิต</td></tr>
+                        <tr><td colspan="6" class="text-center text-muted py-5">ยังไม่มีสูตรผลิต</td></tr>
                     @endforelse
                     </tbody>
                 </table>
@@ -129,5 +131,69 @@
             {{ $orders->links() }}
         </div>
     </div>
+</div>
+
+{{-- โมดัลรายการวัตถุดิบต่อสูตร (BOM) --}}
+@foreach($recipes as $recipe)
+<div class="booking-modal-backdrop" x-show="openRecipe === {{ $recipe->id }}" x-transition.opacity @keydown.escape.window="openRecipe = null" @click.self="openRecipe = null">
+    <div class="booking-modal" style="width:min(640px,100%)" @click.outside="openRecipe = null">
+        <div class="modal-header border-0 px-4 pt-4 pb-2">
+            <div>
+                <h3 class="h5 fw-bold mb-1">วัตถุดิบในสูตร {{ $recipe->code }}</h3>
+                <div class="text-muted small">ผลิต {{ $recipe->finishedProduct?->sku_code }} - {{ $recipe->finishedProduct?->name_th }} ได้ {{ number_format((float) $recipe->output_qty, 4) }} หน่วย/รอบ</div>
+            </div>
+            <button type="button" class="btn btn-light rounded-circle" @click="openRecipe = null"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body px-4 pb-4">
+            <div class="table-responsive mb-3">
+                <table class="table table-sm align-middle">
+                    <thead><tr><th>วัตถุดิบ</th><th class="text-end">จำนวน/รอบ</th><th>เงื่อนไขของเสีย</th><th style="width:44px"></th></tr></thead>
+                    <tbody>
+                    @forelse($recipe->items as $item)
+                        <tr>
+                            <td>{{ $item->product?->sku_code }} - {{ $item->product?->name_th }}</td>
+                            <td class="text-end">{{ number_format((float) $item->qty, 4) }}</td>
+                            <td class="small text-muted">{{ $item->scrap_policy ?: '-' }}</td>
+                            <td class="text-end">
+                                <form method="post" action="{{ route('production.recipes.items.destroy', $item) }}" onsubmit="return confirm('ลบวัตถุดิบนี้ออกจากสูตร?')">
+                                    @csrf @method('DELETE')
+                                    <button class="btn btn-sm btn-light text-danger"><i class="bi bi-trash"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="4" class="text-center text-muted py-4">ยังไม่มีวัตถุดิบในสูตรนี้</td></tr>
+                    @endforelse
+                    </tbody>
+                </table>
+            </div>
+            <form method="post" action="{{ route('production.recipes.items.store', $recipe) }}" class="row g-2 align-items-end">
+                @csrf
+                <div class="col-12 col-md-6">
+                    <label class="form-label small text-muted">วัตถุดิบ</label>
+                    <select name="product_id" required class="form-select form-select-sm">
+                        <option value="">-- เลือกสินค้า --</option>
+                        @foreach($products as $product)
+                            @if($product->id !== $recipe->finished_product_id)
+                            <option value="{{ $product->id }}">{{ $product->sku_code }} - {{ $product->name_th }}</option>
+                            @endif
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label small text-muted">จำนวน/รอบ</label>
+                    <input type="number" step="0.0001" min="0.0001" name="qty" required class="form-control form-control-sm">
+                </div>
+                <div class="col-6 col-md-3">
+                    <button class="btn btn-sm btn-primary w-100"><i class="bi bi-plus-lg"></i> เพิ่ม</button>
+                </div>
+                <div class="col-12">
+                    <input type="text" name="scrap_policy" class="form-control form-control-sm" placeholder="เงื่อนไขของเสีย (ไม่บังคับ) เช่น หัก 5%">
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endforeach
 </div>
 @endsection
