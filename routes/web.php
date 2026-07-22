@@ -591,6 +591,7 @@ Route::prefix('bplus')->name('bplus.')->group(function () {
     Route::get('/pos-workbench', [BplusOperationController::class, 'posWorkbench'])->name('pos-workbench');
     Route::get('/purchase-planning', [BplusOperationController::class, 'purchasePlanning'])->name('purchase-planning');
     Route::post('/purchase-planning', [BplusOperationController::class, 'storePurchasePlan'])->name('purchase-planning.store');
+    Route::post('/purchase-planning/generate-requisitions', [BplusOperationController::class, 'generatePurchaseRequisitions'])->name('purchase-planning.generate-requisitions');
     Route::get('/approvals', [BplusOperationController::class, 'approvals'])->name('approvals');
     Route::post('/approvals', [BplusOperationController::class, 'storeApproval'])->name('approvals.store');
     Route::get('/finance', [BplusOperationController::class, 'finance'])->name('finance');

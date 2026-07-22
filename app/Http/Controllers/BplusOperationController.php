@@ -10,11 +10,15 @@ use App\Models\PosPreparationJob;
 use App\Models\PosReceipt;
 use App\Models\PosTerminal;
 use App\Models\Product;
+use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderItem;
 use App\Models\PurchasePlan;
 use App\Models\QrPaymentConfig;
 use App\Models\ShowPriceDevice;
 use App\Models\Supplier;
 use App\Models\VatRate;
+use App\Services\Purchasing\ReplenishmentService;
+use App\Services\Sales\DocumentNumberGenerator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -82,22 +86,66 @@ class BplusOperationController extends Controller
         ]);
     }
 
-    public function purchasePlanning(): View
+    public function purchasePlanning(Request $request, ReplenishmentService $replenishment): View
     {
-        $lowStock = DB::table('stock_balances as sb')
-            ->join('products as p', 'p.id', '=', 'sb.product_id')
-            ->join('warehouse_locations as wl', 'wl.id', '=', 'sb.warehouse_location_id')
-            ->select('p.id', 'p.sku_code', 'p.name_th', 'wl.name as location_name', 'sb.on_hand_qty')
-            ->orderBy('sb.on_hand_qty')
-            ->limit(20)
-            ->get();
+        $lockedBranchId = auth()->user()?->branchScopeId();
+        $branchId = $lockedBranchId ?: ($request->integer('branch_id') ?: Branch::orderBy('id')->value('id'));
+        $salesDays = max(7, min(365, $request->integer('sales_days', 30)));
+        $safetyDays = max(0, min(90, $request->integer('safety_days', 7)));
 
         return view('bplus-ops.purchase-planning', [
             'plans' => PurchasePlan::with(['product', 'supplier'])->latest()->paginate(30),
             'products' => Product::where('is_active', true)->orderBy('sku_code')->limit(300)->get(),
             'suppliers' => Supplier::orderBy('code')->limit(200)->get(),
-            'lowStock' => $lowStock,
+            'branches' => Branch::query()->when($lockedBranchId, fn ($query) => $query->whereKey($lockedBranchId))->orderBy('code')->get(['id', 'code', 'name_th']),
+            'branchId' => $branchId,
+            'salesDays' => $salesDays,
+            'safetyDays' => $safetyDays,
+            'suggestions' => $branchId ? $replenishment->suggestions($branchId, $salesDays, $safetyDays) : collect(),
         ]);
+    }
+
+    public function generatePurchaseRequisitions(Request $request, DocumentNumberGenerator $numbers): RedirectResponse
+    {
+        $data = $request->validate([
+            'branch_id' => ['required', 'integer', 'exists:branches,id'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
+            'items.*.supplier_id' => ['nullable', 'integer', 'exists:suppliers,id'],
+            'items.*.qty' => ['required', 'numeric', 'min:0.0001'],
+            'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
+        ]);
+        $lockedBranchId = auth()->user()?->branchScopeId();
+        abort_if($lockedBranchId && $lockedBranchId !== (int) $data['branch_id'], 403, 'สร้างใบขอซื้อได้เฉพาะสาขาของตนเอง');
+
+        $orders = DB::transaction(function () use ($data, $numbers) {
+            return collect($data['items'])->groupBy(fn ($item) => (string) ($item['supplier_id'] ?? 'none'))
+                ->map(function ($items) use ($data, $numbers) {
+                    $supplierId = $items->first()['supplier_id'] ?? null;
+                    $order = PurchaseOrder::create([
+                        'doc_number' => $numbers->nextPurchaseOrder($data['branch_id']),
+                        'branch_id' => $data['branch_id'], 'supplier_id' => $supplierId,
+                        'doc_date' => now()->toDateString(), 'status' => 'requested',
+                        'requested_by' => auth()->id(), 'note' => 'สร้างจากคำแนะนำเติมเต็มสินค้า',
+                    ]);
+                    $total = 0;
+                    foreach ($items as $item) {
+                        $price = (float) ($item['unit_price'] ?? 0);
+                        PurchaseOrderItem::create([
+                            'purchase_order_id' => $order->id, 'product_id' => $item['product_id'],
+                            'qty' => $item['qty'], 'unit_price' => $price,
+                            'note' => 'Replenishment suggestion',
+                        ]);
+                        $total += (float) $item['qty'] * $price;
+                    }
+                    $order->update(['total_amount' => round($total, 2)]);
+
+                    return $order;
+                });
+        });
+
+        return redirect()->route('purchase-orders.index')
+            ->with('success', 'สร้างใบขอซื้อจากแผนเติมเต็ม '.$orders->count().' ใบแล้ว กรุณาตรวจและส่งอนุมัติ');
     }
 
     public function storePurchasePlan(Request $request): RedirectResponse
