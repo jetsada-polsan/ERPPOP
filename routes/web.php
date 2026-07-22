@@ -116,7 +116,16 @@ Route::prefix('management-controls')->name('management-controls.')->group(functi
     Route::post('/purchase-plans/generate', [ManagementControlController::class, 'generatePurchasePlan'])->name('purchase-plans.generate');
     Route::post('/attendance', [ManagementControlController::class, 'storeAttendance'])->name('attendance.store');
     Route::post('/payroll/generate', [ManagementControlController::class, 'generatePayroll'])->name('payroll.generate');
+    // Payroll approve/pay workflow: edit WHT (draft) -> approve (payroll.approve) -> pay -> payslip
+    Route::get('/payroll/{run}', [ManagementControlController::class, 'showPayrollRun'])->name('payroll.show');
+    Route::post('/payroll/{run}/items', [ManagementControlController::class, 'updatePayrollItems'])->name('payroll.items');
+    Route::post('/payroll/{run}/approve', [ManagementControlController::class, 'approvePayroll'])->name('payroll.approve');
+    Route::post('/payroll/{run}/pay', [ManagementControlController::class, 'markPayrollPaid'])->name('payroll.pay');
+    Route::get('/payroll/items/{item}/payslip', [ManagementControlController::class, 'payslip'])->name('payroll.payslip');
     Route::post('/ecommerce/orders', [ManagementControlController::class, 'importEcommerceOrder'])->name('ecommerce.orders.store');
+    // Budget variance + approve
+    Route::get('/budgets/{budget}', [ManagementControlController::class, 'showBudget'])->name('budgets.show');
+    Route::post('/budgets/{budget}/approve', [ManagementControlController::class, 'approveBudget'])->name('budgets.approve');
 });
 
 // กระดิ่งแจ้งเตือน header: รายการตามภาระหน้าที่ของผู้ใช้ (ทุกคนที่ล็อกอินเรียกได้
@@ -369,6 +378,9 @@ Route::prefix('customers')->name('customers.')->group(function () {
     Route::post('/{customer}/addresses', [CustomerController::class, 'addAddress'])->name('addresses.store');
     Route::post('/{customer}/contacts', [CustomerController::class, 'addContact'])->name('contacts.store');
     Route::post('/{customer}/payments', [PaymentController::class, 'storeCustomerPayment'])->name('payments.store');
+    // เปลี่ยนวงเงินเครดิตต้องอนุมัติ (finance.credit.approve) - ผู้ขอกดเองไม่ได้
+    Route::post('/{customer}/credit-limit/approve', [CustomerController::class, 'approveCreditLimit'])->name('credit-limit.approve');
+    Route::post('/{customer}/credit-limit/reject', [CustomerController::class, 'rejectCreditLimit'])->name('credit-limit.reject');
 });
 
 // Supplier master data (ซัพพลายเออร์): editable here; ledgerEntries shows their
@@ -445,6 +457,8 @@ Route::prefix('production')->name('production.')->group(function () {
     Route::get('/', [ProductionController::class, 'index'])->name('index');
     Route::post('/recipes', [ProductionController::class, 'storeRecipe'])->name('recipes.store');
     Route::put('/recipes/{recipe}', [ProductionController::class, 'updateRecipe'])->name('recipes.update');
+    Route::post('/recipes/{recipe}/items', [ProductionController::class, 'storeRecipeItem'])->name('recipes.items.store');
+    Route::delete('/recipes/items/{recipeItem}', [ProductionController::class, 'destroyRecipeItem'])->name('recipes.items.destroy');
     Route::post('/orders', [ProductionController::class, 'storeOrder'])->name('orders.store');
     Route::put('/orders/{order}', [ProductionController::class, 'updateOrder'])->name('orders.update');
     Route::post('/orders/{order}/receive', [ProductionController::class, 'receiveOrder'])->name('orders.receive');

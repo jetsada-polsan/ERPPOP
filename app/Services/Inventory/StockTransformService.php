@@ -62,13 +62,10 @@ class StockTransformService
             throw new RuntimeException('สินค้าผลผลิตต้องไม่ซ้ำกับวัตถุดิบใน Batch เดียวกัน');
         }
 
-        $raw = $raw->map(function (array $item) use ($products): array {
-            $unitCost = (float) $products->get((int) $item['product_id'])->average_cost;
-
-            return $item + ['unit_cost' => $unitCost, 'cost_amount' => round((float) $item['qty'] * $unitCost, 4)];
-        });
-        $rawTotal = round($raw->sum('cost_amount'), 4);
-        if ($rawTotal <= 0) {
+        // ประเมินต้นทุนเบื้องต้นด้วย average_cost เพื่อกันเคสไม่มีต้นทุนเลยก่อนเปิด transaction
+        // ต้นทุนจริงที่บันทึกจะคำนวณจาก Lot ที่ FIFO ตัดจริงตอนอยู่ใน transaction ด้านล่าง
+        $rawEstimate = round($raw->sum(fn (array $item) => (float) $item['qty'] * (float) $products->get((int) $item['product_id'])->average_cost), 4);
+        if ($rawEstimate <= 0) {
             throw new RuntimeException('วัตถุดิบยังไม่มีต้นทุนเฉลี่ย กรุณารับสินค้าและตรวจต้นทุนก่อนจัดเซ็ต');
         }
 
@@ -82,7 +79,9 @@ class StockTransformService
 
         $documentType = DocumentType::where('code', 'STOCK_TRANSFORM')->firstOrFail();
 
-        return DB::transaction(function () use ($data, $branch, $locationId, $raw, $outputs, $rawTotal, $documentType, $batchMode, $products) {
+        return DB::transaction(function () use ($data, $branch, $locationId, $raw, $outputs, $rawEstimate, $documentType, $batchMode, $products) {
+            // สร้างหัวเอกสารก่อนด้วยยอดประมาณ (average_cost) เพื่อให้มี document_id ผูก movement การตัด
+            // วัตถุดิบได้ตั้งแต่ต้น แล้วค่อยแก้ total_amount ให้ตรงต้นทุนจริงหลังตัด FIFO lot เสร็จ
             $document = Document::create([
                 'document_type_id' => $documentType->id,
                 'branch_id' => $branch->id,
@@ -90,7 +89,7 @@ class StockTransformService
                 'doc_date' => now()->toDateString(),
                 'status' => 'active',
                 'total_items' => $raw->count() + $outputs->count(),
-                'total_amount' => $rawTotal,
+                'total_amount' => $rawEstimate,
                 'remark' => $data['remark'] ?? null,
             ]);
 
@@ -100,19 +99,33 @@ class StockTransformService
                 'total_items' => $raw->count() + $outputs->count(),
             ]);
 
+            // ตัด FIFO lot วัตถุดิบจริงก่อน แล้วคิดต้นทุนจาก Lot ที่ถูกตัดจริง (ไม่ใช่ต้นทุนเฉลี่ย)
+            // เพื่อให้ต้นทุนที่ปันส่วนไปยังผลผลิตตรงกับมูลค่าวัตถุดิบที่หายไปจริงจาก stock_lots
             $seq = 1;
             $sourceAllocations = collect();
-            foreach ($raw as $item) {
+            $raw = $raw->map(function (array $item) use ($locationId, $document, $products, &$sourceAllocations, $stockDocument, &$seq) {
+                $productId = (int) $item['product_id'];
+                $qty = (float) $item['qty'];
+                $fallbackCost = (float) $products->get($productId)->average_cost;
+                $allocations = $this->fifo->issue($productId, (int) $locationId, $qty, $document->id, 'transform_out');
+                $sourceAllocations = $sourceAllocations->concat($allocations);
+                $unitCost = $this->costing->unitCostFromAllocations($allocations, $qty, $fallbackCost);
+                $costAmount = round($qty * $unitCost, 4);
+
                 StockDocumentItem::create([
                     'stock_document_id' => $stockDocument->id, 'seq' => $seq++,
-                    'product_id' => $item['product_id'], 'warehouse_location_id' => $locationId,
-                    'qty' => -(float) $item['qty'], 'unit_price' => $item['unit_cost'],
-                    'unit_cost' => $item['unit_cost'], 'cost_amount' => $item['cost_amount'],
+                    'product_id' => $productId, 'warehouse_location_id' => $locationId,
+                    'qty' => -$qty, 'unit_price' => $unitCost,
+                    'unit_cost' => $unitCost, 'cost_amount' => $costAmount,
                 ]);
-                $sourceAllocations = $sourceAllocations->concat(
-                    $this->fifo->issue((int) $item['product_id'], (int) $locationId, (float) $item['qty'], $document->id, 'transform_out')
-                );
+
+                return $item + ['unit_cost' => $unitCost, 'cost_amount' => $costAmount];
+            });
+            $rawTotal = round($raw->sum('cost_amount'), 4);
+            if ($rawTotal <= 0) {
+                throw new RuntimeException('วัตถุดิบยังไม่มีต้นทุนเฉลี่ย กรุณารับสินค้าและตรวจต้นทุนก่อนจัดเซ็ต');
             }
+            $document->update(['total_amount' => $rawTotal]);
 
             foreach ($outputs as $item) {
                 $qty = (float) $item['qty'];

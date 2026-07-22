@@ -11,12 +11,81 @@ use App\Models\ProductPrice;
 use App\Models\Promotion;
 use App\Models\QtyPromotion;
 use App\Models\User;
+use App\Services\Inventory\ScaleBarcodeService;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 class PosPricingGuard
 {
-    public function __construct(private readonly MemberPointService $points) {}
+    public function __construct(
+        private readonly MemberPointService $points,
+        private readonly ScaleBarcodeService $scaleBarcodes,
+    ) {}
+
+    /**
+     * Turn scanned scale labels into normal priced lines before any other check.
+     *
+     * A weighed label carries the total price for that one bag, so its barcode is
+     * different on every bag and can never be pre-registered in product_barcodes.
+     * The server therefore decodes the label itself and derives the weight from
+     * its own per-unit price — the client's qty is never trusted.
+     *
+     * @param  array<int,array<string,mixed>>  $items
+     * @return array<int,array<string,mixed>>
+     */
+    public function resolveScaleLines(array $items, int $branchId): array
+    {
+        $scanned = collect($items)->pluck('barcode')->filter()->unique();
+        $registered = $scanned->isEmpty()
+            ? collect()
+            : ProductBarcode::whereIn('barcode', $scanned)->where('is_active', true)->pluck('barcode')->flip();
+
+        return collect($items)->map(function (array $item) use ($branchId, $registered): array {
+            $code = (string) ($item['barcode'] ?? '');
+
+            // บาร์โค้ดที่ลงทะเบียนไว้จริงเป็นบาร์โค้ดสินค้าปกติเสมอ — กันสินค้านำเข้าที่ขึ้นต้น
+            // 800/801 (รหัสประเทศอิตาลี) ถูกตีความเป็นป้ายชั่งแล้วคิดเงินผิด
+            if ($code === '' || $registered->has($code)) {
+                return $item;
+            }
+
+            $scale = $this->scaleBarcodes->decode($code);
+            if ($scale === null) {
+                return $item;
+            }
+
+            $product = Product::where('is_active', true)
+                ->where(fn ($query) => $query
+                    ->where('sku_code', $scale['plu'])
+                    ->orWhereHas('barcodes', fn ($barcode) => $barcode
+                        ->where('barcode', $scale['plu'])->where('is_active', true)))
+                ->first();
+            if (! $product) {
+                throw new RuntimeException('ไม่พบสินค้าสำหรับรหัสชั่ง '.$scale['plu'].' กรุณาตรวจแฟ้มสินค้า');
+            }
+            if ((int) $product->id !== (int) $item['product_id']) {
+                throw new RuntimeException('ป้ายชั่งไม่ตรงกับสินค้าที่เลือก กรุณาสแกนใหม่');
+            }
+            if ($scale['price'] <= 0) {
+                throw new RuntimeException('ป้ายชั่งไม่มีราคา กรุณาชั่งและพิมพ์ป้ายใหม่');
+            }
+
+            $perUnit = $this->campaignPrice(
+                (int) $product->id,
+                $this->basePrices([(int) $product->id])[(int) $product->id] ?? 0.0,
+                $branchId,
+            );
+            if ($perUnit <= 0) {
+                throw new RuntimeException('สินค้าชั่ง '.$scale['plu'].' ยังไม่ได้ตั้งราคาขายต่อหน่วย');
+            }
+
+            $item['qty'] = round($scale['price'] / $perUnit, 4);
+            $item['unit_price'] = $perUnit;
+            unset($item['barcode']);
+
+            return $item;
+        })->all();
+    }
 
     /**
      * Recalculate the payable total from server-owned masters. Client prices are

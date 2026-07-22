@@ -4,8 +4,10 @@ namespace App\Providers;
 
 use App\Models\Document;
 use App\Models\GlJournal;
+use App\Models\StockMovement;
 use App\Observers\DocumentObserver;
 use App\Observers\GlJournalObserver;
+use App\Observers\StockMovementObserver;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\ServiceProvider;
@@ -27,6 +29,7 @@ class AppServiceProvider extends ServiceProvider
     {
         Document::observe(DocumentObserver::class);
         GlJournal::observe(GlJournalObserver::class);
+        StockMovement::observe(StockMovementObserver::class);
 
         Carbon::setLocale('th');
 

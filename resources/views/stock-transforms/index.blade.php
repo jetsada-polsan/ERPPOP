@@ -62,7 +62,21 @@
             <form method="post" action="{{ route('stock-transforms.store') }}" @submit="onSubmit">
                 @csrf
                 <input type="hidden" name="batch_mode" value="1">
+                <input type="hidden" name="production_recipe_id" x-model="selectedRecipeId">
                 <div class="modal-body px-4 pb-4">
+                    @if($recipes->isNotEmpty())
+                    <div class="row g-3 mb-3">
+                        <div class="col-lg-8">
+                            <label class="form-label text-muted small">โหลดจากสูตร (ไม่บังคับ - จะเติมวัตถุดิบ+ผลผลิตให้อัตโนมัติ ปรับจำนวนได้ทีหลัง)</label>
+                            <select class="form-select" x-model="selectedRecipeId" @change="loadRecipe(selectedRecipeId)">
+                                <option value="">-- กรอกเองแบบเดิม --</option>
+                                @foreach($recipes as $recipe)
+                                    <option value="{{ $recipe['id'] }}">{{ $recipe['label'] }} (ได้ {{ number_format($recipe['output_qty'], 4) }} หน่วย/รอบ)</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                    @endif
                     <div class="row g-3 mb-4">
                         <div class="col-lg-4">
                             <label class="form-label text-muted small">สาขา</label>
@@ -151,7 +165,7 @@
                                                 </template>
                                             </div>
                                         </td>
-                                        <td><input type="number" step="0.0001" min="0.0001" :name="`output_items[${index}][qty]`" x-model.number="item.qty" required class="form-control text-end"><input type="hidden" :name="`output_items[${index}][percent]`" value="100"></td>
+                                        <td><input type="number" step="0.0001" min="0.0001" :name="`output_items[${index}][qty]`" x-model.number="item.qty" @input="rescaleFromRecipe()" required class="form-control text-end"><input type="hidden" :name="`output_items[${index}][percent]`" value="100"></td>
                                         <td class="text-end fw-semibold text-success" x-text="outputUnitCost(item)"></td>
                                         <td class="text-end fw-semibold" x-text="yieldPercent(item)"></td>
                                     </tr>
@@ -192,9 +206,39 @@
             rawItems: [{ product_id: '', productQuery: '', qty: 1, average_cost: 0, results: [] }],
             outputItems: [{ product_id: '', productQuery: '', qty: 1, percent: null, results: [] }],
             inputWeight: 1,
+            recipes: @json($recipes),
+            selectedRecipeId: '',
+            selectedRecipe: null,
 
             addRaw() { this.rawItems.push({ product_id: '', productQuery: '', qty: 1, average_cost: 0, results: [] }); this.syncInputWeight(); },
             syncInputWeight() { this.inputWeight = Math.round(this.rawItems.reduce((s, i) => s + (Number(i.qty) || 0), 0) * 10000) / 10000; },
+
+            loadRecipe(recipeId) {
+                if (!recipeId) { this.selectedRecipeId = ''; this.selectedRecipe = null; return; }
+                const recipe = this.recipes.find(r => String(r.id) === String(recipeId));
+                if (!recipe) return;
+                this.selectedRecipeId = recipe.id;
+                this.selectedRecipe = recipe;
+                this.rawItems = recipe.items.map(i => ({
+                    product_id: i.product_id, productQuery: i.label, qty: i.qty, average_cost: i.average_cost, results: [],
+                }));
+                this.outputItems = [{
+                    product_id: recipe.finished_product_id, productQuery: recipe.finished_product_label,
+                    qty: recipe.output_qty, percent: 100, results: [],
+                }];
+                this.syncInputWeight();
+            },
+
+            // ปรับสัดส่วนวัตถุดิบอัตโนมัติเมื่อแก้จำนวนผลผลิตที่ต้องการ (เทียบกับสูตรที่โหลดไว้)
+            rescaleFromRecipe() {
+                if (!this.selectedRecipe || !this.selectedRecipe.output_qty) return;
+                const ratio = (Number(this.outputItems[0]?.qty) || 0) / this.selectedRecipe.output_qty;
+                this.rawItems = this.selectedRecipe.items.map(i => ({
+                    product_id: i.product_id, productQuery: i.label,
+                    qty: Math.round(i.qty * ratio * 10000) / 10000, average_cost: i.average_cost, results: [],
+                }));
+                this.syncInputWeight();
+            },
 
             get rawTotal() {
                 return this.rawItems.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.average_cost) || 0), 0);

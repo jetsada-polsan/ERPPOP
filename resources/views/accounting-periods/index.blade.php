@@ -18,7 +18,9 @@
     .period-field label { display: block; margin-bottom: 5px; color: #5f7788; font-size: 11px; font-weight: 800; }
     .period-field input, .period-field select { width: 100%; height: 38px; padding: 0 10px; border: 1px solid #cbdbe5; border-radius: 6px; color: #274b63; background: #fff; font-size: 12px; }
     .period-table { width: 100%; min-width: 880px; border-collapse: collapse; }
-    .period-table th { padding: 10px 13px; color: #61798a; background: #f6f9fb; border-bottom: 1px solid #dbe7ef; font-size: 11px; font-weight: 900; }
+    .period-table th { padding: 10px 13px; color: #fff; background: linear-gradient(180deg, #2ba7e4, #1b8ecb); border-bottom: 0; font-size: 11px; font-weight: 900; }
+    .period-table th:first-child { border-top-left-radius: 6px; }
+    .period-table th:last-child { border-top-right-radius: 6px; }
     .period-table td { padding: 11px 13px; color: #425f73; border-bottom: 1px solid #edf2f5; font-size: 12px; vertical-align: middle; }
     .period-table tr:last-child td { border-bottom: 0; }
     .period-table strong { color: #183c54; }
@@ -80,7 +82,7 @@
         </form>
     </section>
 
-    <section class="period-panel" style="overflow-x:auto">
+    <section class="period-panel table-responsive">
         @if ($periods->isEmpty())
             <div class="period-empty"><i class="bi bi-calendar2-week fs-3 d-block mb-2"></i>ยังไม่มีงวดบัญชี</div>
         @else

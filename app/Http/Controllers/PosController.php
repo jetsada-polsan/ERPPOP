@@ -478,6 +478,8 @@ class PosController extends Controller
         }
 
         try {
+            // ป้ายชั่งฝังราคารวมไว้ในบาร์โค้ด ต้องถอดเป็นน้ำหนัก+ราคาต่อหน่วยฝั่ง server ก่อนตรวจราคา
+            $data['items'] = $pricingGuard->resolveScaleLines($data['items'], (int) $data['branch_id']);
             $pricingGuard->validate($data, auth()->user());
             $data['items'] = $pricingGuard->normalizeItems($data['items']);
             $paymentValidator->validate($data);

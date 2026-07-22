@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use App\Models\Document;
+use App\Models\ProductionRecipe;
 use App\Models\WarehouseLocation;
 use App\Services\Inventory\ScaleBarcodeService;
 use App\Services\Inventory\StockTransformService;
@@ -25,10 +26,30 @@ class StockTransformController extends Controller
             ->paginate(50)
             ->withQueryString();
 
+        $recipes = ProductionRecipe::where('is_active', true)
+            ->with(['finishedProduct:id,sku_code,name_th', 'items.product:id,sku_code,name_th,average_cost'])
+            ->orderBy('code')->get()
+            ->map(fn (ProductionRecipe $recipe) => [
+                'id' => $recipe->id,
+                'label' => $recipe->code.' - '.$recipe->name,
+                'output_qty' => (float) $recipe->output_qty,
+                'finished_product_id' => $recipe->finished_product_id,
+                'finished_product_label' => $recipe->finishedProduct
+                    ? $recipe->finishedProduct->sku_code.' - '.$recipe->finishedProduct->name_th
+                    : '',
+                'items' => $recipe->items->map(fn ($item) => [
+                    'product_id' => $item->product_id,
+                    'qty' => (float) $item->qty,
+                    'label' => $item->product ? $item->product->sku_code.' - '.$item->product->name_th : '',
+                    'average_cost' => (float) ($item->product?->average_cost ?? 0),
+                ])->values(),
+            ])->values();
+
         return view('stock-transforms.index', [
             'documents' => $documents,
             'branches' => Branch::orderBy('code')->get(['id', 'code', 'name_th']),
             'locations' => WarehouseLocation::orderBy('code')->get(['id', 'code', 'name']),
+            'recipes' => $recipes,
             'q' => $q,
         ]);
     }

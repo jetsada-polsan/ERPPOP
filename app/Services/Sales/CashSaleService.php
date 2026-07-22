@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
 use App\Services\Accounting\GlPostingService;
+use App\Services\Inventory\CostingService;
 use App\Services\Inventory\FifoStockService;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -24,6 +25,7 @@ class CashSaleService
         private readonly DocumentNumberGenerator $numbers,
         private readonly GlPostingService $glPosting,
         private readonly FifoStockService $fifo,
+        private readonly CostingService $costing,
     ) {}
 
     /**
@@ -68,26 +70,32 @@ class CashSaleService
             $products = Product::whereIn('id', $items->pluck('product_id')->unique())->get()->keyBy('id');
             $policies = $products->pluck('negative_stock_policy', 'id');
             foreach ($items as $item) {
-                $unitCost = (float) ($products->get((int) $item['product_id'])?->average_cost ?? 0);
+                $productId = (int) $item['product_id'];
+                $qty = (float) $item['qty'];
+                $fallbackCost = (float) ($products->get($productId)?->average_cost ?? 0);
+
+                // ตัด FIFO lot จริงก่อน แล้วคิดต้นทุนขายจาก Lot ที่ถูกตัดจริง (ไม่ใช่ต้นทุนเฉลี่ย)
+                // เพื่อให้ COGS ตรงกับมูลค่าสต๊อกปลายงวดที่ InventoryCostCloseService คำนวณจาก stock_lots
+                $allocations = $this->fifo->issue(
+                    $productId,
+                    (int) $branch->default_warehouse_location_id,
+                    $qty,
+                    $document->id,
+                    allowNegative: (bool) ($data['allow_negative_stock'] ?? false)
+                        && ($policies[$productId] ?? 'allow') === 'allow',
+                );
+                $unitCost = $this->costing->unitCostFromAllocations($allocations, $qty, $fallbackCost);
+
                 StockDocumentItem::create([
                     'stock_document_id' => $stockDocument->id,
                     'seq' => $seq++,
-                    'product_id' => $item['product_id'],
+                    'product_id' => $productId,
                     'warehouse_location_id' => $branch->default_warehouse_location_id,
-                    'qty' => $item['qty'],
+                    'qty' => $qty,
                     'unit_price' => $item['unit_price'],
                     'unit_cost' => $unitCost,
-                    'cost_amount' => round((float) $item['qty'] * $unitCost, 4),
+                    'cost_amount' => round($qty * $unitCost, 4),
                 ]);
-
-                $this->fifo->issue(
-                    (int) $item['product_id'],
-                    (int) $branch->default_warehouse_location_id,
-                    (float) $item['qty'],
-                    $document->id,
-                    allowNegative: (bool) ($data['allow_negative_stock'] ?? false)
-                        && ($policies[(int) $item['product_id']] ?? 'allow') === 'allow',
-                );
             }
 
             $this->glPosting->postCashSale($document);

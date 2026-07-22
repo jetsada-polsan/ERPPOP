@@ -5,6 +5,7 @@ namespace App\Services\Inventory;
 use App\Models\Document;
 use App\Models\Product;
 use App\Models\StockBalance;
+use Illuminate\Support\Collection;
 
 /**
  * ต้นทุนเฉลี่ยถ่วงน้ำหนัก (moving weighted average) ต่อสินค้า.
@@ -59,6 +60,29 @@ class CostingService
             ? $unitCost
             : (($onHand * $oldCost) + ($qty * $unitCost)) / ($onHand + $qty);
         $product->update(['average_cost' => round($newCost, 4)]);
+    }
+
+    /**
+     * ต้นทุนต่อหน่วยของ "รายการที่ตัดออกจริงครั้งนี้" คำนวณจากมูลค่า Lot ที่ FIFO
+     * ตัดจริง (allocations ที่ FifoStockService::issue() คืนมา) ไม่ใช่ต้นทุนเฉลี่ยสะสม
+     * ของสินค้า ทำให้ COGS ตรงกับมูลค่า Lot ที่หายไปจริง สอดคล้องกับการตีมูลค่าสต๊อก
+     * ปลายงวดของ InventoryCostCloseService (ก็อิง stock_lots เช่นกัน)
+     * ส่วนที่ตัดไม่ได้จาก Lot จริง (อนุญาตสต๊อกติดลบ) ใช้ average_cost ปัจจุบันแทน
+     * เพราะไม่มี Lot จริงรองรับให้อ้างอิง
+     *
+     * @param  Collection<int, array{lot: \App\Models\StockLot, qty: float}>  $allocations
+     */
+    public function unitCostFromAllocations(Collection $allocations, float $requestedQty, float $fallbackUnitCost): float
+    {
+        if ($requestedQty <= 0) {
+            return 0.0;
+        }
+
+        $allocatedQty = (float) $allocations->sum('qty');
+        $allocatedValue = (float) $allocations->sum(fn ($a) => (float) $a['qty'] * (float) $a['lot']->unit_cost);
+        $shortQty = max(0.0, $requestedQty - $allocatedQty);
+
+        return round(($allocatedValue + $shortQty * $fallbackUnitCost) / $requestedQty, 4);
     }
 
     public function purchaseUnitCost(Product $product, float $enteredPrice, bool $pricesIncludeVat, bool $claimInputVat, float $vatRate): float

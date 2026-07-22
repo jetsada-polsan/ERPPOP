@@ -41,6 +41,33 @@
                     </div>
                 </div>
             </div>
+
+            @if($customer->credit_limit_requested_by)
+            <div class="alert alert-warning d-flex align-items-center justify-content-between flex-wrap gap-3 mt-3 mb-0">
+                <div>
+                    <i class="bi bi-hourglass-split me-1"></i>
+                    <strong>คำขอเปลี่ยนวงเงินเครดิตรออนุมัติ:</strong>
+                    {{ number_format($customer->credit_limit, 2) }} &rarr;
+                    <span class="fw-bold">{{ number_format($customer->pending_credit_limit, 2) }} บาท</span>
+                    <span class="text-muted small ms-2">ขอโดย {{ $customer->creditLimitRequester?->name ?? '-' }} · {{ $customer->credit_limit_requested_at?->thaiDate(true) }}</span>
+                </div>
+                @if(auth()->user()->hasPermission('finance.credit.approve') && $customer->credit_limit_requested_by !== auth()->id())
+                <div class="d-flex gap-2 align-items-center">
+                    <form method="post" action="{{ route('customers.credit-limit.approve', $customer) }}">
+                        @csrf
+                        <button class="btn btn-success btn-sm"><i class="bi bi-check2-circle me-1"></i>อนุมัติวงเงิน</button>
+                    </form>
+                    <form method="post" action="{{ route('customers.credit-limit.reject', $customer) }}" class="d-flex gap-1">
+                        @csrf
+                        <input name="reason" required class="form-control form-control-sm" placeholder="เหตุผลไม่อนุมัติ" style="max-width:200px">
+                        <button class="btn btn-outline-danger btn-sm">ปฏิเสธ</button>
+                    </form>
+                </div>
+                @elseif($customer->credit_limit_requested_by === auth()->id())
+                <span class="badge text-bg-light border">รอผู้มีสิทธิ์คนอื่นอนุมัติ</span>
+                @endif
+            </div>
+            @endif
         </div>
 
         <div class="row g-4">

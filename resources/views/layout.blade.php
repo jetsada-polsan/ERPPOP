@@ -173,6 +173,8 @@
            THEME - FlowAccount-style light (single)
            ════════════════════════════════════════ */
         :root {
+            /* ฟอนต์เดียวทั้งระบบ (ใช้แทนการ hardcode font-family กระจายไปทีละหน้า) */
+            --erp-font-family: 'Leelawadee UI', 'Noto Sans Thai', Tahoma, 'Segoe UI', sans-serif;
             /* rail 64px + subpanel 236px - adminlte ใช้ var นี้คำนวณ margin ของ main */
             --erp-rail-w: 68px;
             --erp-subnav-w: 176px;
@@ -197,7 +199,7 @@
         html.subnav-collapsed { --lte-sidebar-width: var(--erp-rail-w); }
 
         body {
-            font-family: 'Leelawadee UI', 'Noto Sans Thai', Tahoma, 'Segoe UI', sans-serif;
+            font-family: var(--erp-font-family);
             background:
                 linear-gradient(135deg, rgba(26,155,220,.08), transparent 30%),
                 linear-gradient(315deg, rgba(32,166,122,.08), transparent 30%),
@@ -606,6 +608,36 @@
             .app-header h1 { font-size: 18px; }
             .app-content { padding: 14px; }
             .fa-collapse-btn { display: none; }
+
+            /* จอมือถือ/แท็บเล็ต: sidebar เป็น off-canvas เลื่อนเข้า-ออกแทนการเบียดเนื้อหา
+               ต้อง !important เพราะ AdminLTE เติม body.sidebar-collapse อัตโนมัติต่ำกว่า breakpoint
+               ของมันเอง แล้วดัน margin-left ลบความกว้าง sidebar ทับ (specificity สูงกว่า .app-sidebar เฉยๆ) */
+            .app-sidebar {
+                position: fixed !important;
+                top: 0; left: 0;
+                margin-left: 0 !important;
+                min-width: var(--lte-sidebar-width) !important;
+                max-width: var(--lte-sidebar-width) !important;
+                z-index: 1200;
+                height: 100dvh;
+                transform: translateX(-100%);
+                transition: transform .22s ease;
+                box-shadow: 0 20px 60px rgba(15,23,42,.35);
+            }
+            html.mobile-sidebar-open .app-sidebar { transform: translateX(0); }
+            /* subnav ต้องโชว์เต็มเสมอในโหมด off-canvas ไม่ว่าจะเคยพับไว้ตอนใช้จอใหญ่หรือไม่ */
+            .fa-subnav { display: block !important; }
+            .fa-rail, .fa-subnav { height: 100dvh; }
+        }
+
+        .mobile-sidebar-backdrop { display: none; }
+        @media (max-width: 991.98px) {
+            html.mobile-sidebar-open .mobile-sidebar-backdrop {
+                display: block;
+                position: fixed; inset: 0;
+                background: rgba(15,23,42,.45);
+                z-index: 1150;
+            }
         }
 
         /* ── POPSTAR popup system ───────────────────── */
@@ -806,7 +838,7 @@
         body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .table td { padding:4px 6px!important; border-right:1px solid #d7e0e6; border-bottom-color:#d7e0e6!important; background:#fff!important; font-size:11px!important; }
 
         @media(max-width:991.98px){.app-content{padding:10px}.btn:not(.rounded-circle){min-height:34px}.form-control,.form-select,.input-group-text{min-height:34px}}
-        @media print { .app-content{padding:0}.content-card,.card{box-shadow:none} }
+        @media print { .app-content{padding:0}.content-card,.card{box-shadow:none}.table-responsive{overflow:visible!important} }
     </style>
 </head>
 <body class="layout-fixed sidebar-expand-lg {{ request()->boolean('popup') ? 'erp-popup-page' : '' }} {{ request()->routeIs(['bookings.*','cash-sales.*','sales.*','purchases.*','purchase-orders.*','sale-returns.*','credit-debit-notes.*','stock-issues.*','stock-transfers.*','stock-transforms.*','stock-adjustments.*','stock-counts.*']) ? 'erp-classic-document-page' : '' }}">
@@ -815,7 +847,8 @@
             <div class="container-fluid px-4">
                 <ul class="navbar-nav align-items-center">
                     <li class="nav-item">
-                        <a class="nav-link fs-4" data-lte-toggle="sidebar" href="#" role="button" aria-label="Toggle sidebar">
+                        <a class="nav-link fs-4" href="#" role="button" aria-label="Toggle sidebar"
+                            onclick="event.preventDefault(); document.documentElement.classList.toggle('mobile-sidebar-open')">
                             <i class="bi bi-list"></i>
                         </a>
                     </li>
@@ -964,6 +997,9 @@
                 @endforeach
             </div>
         </aside>
+
+        {{-- เลื่อนแตะเพื่อปิด sidebar บนจอมือถือ (แสดงเฉพาะตอน sidebar เปิดอยู่) --}}
+        <div class="mobile-sidebar-backdrop" onclick="document.documentElement.classList.remove('mobile-sidebar-open')"></div>
 
         {{-- ปุ่มพับ/กางแผงเมนูย่อย --}}
         <button type="button" class="fa-collapse-btn no-print" title="พับ/กางเมนู"

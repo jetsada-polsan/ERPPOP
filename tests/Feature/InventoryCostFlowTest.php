@@ -54,6 +54,40 @@ class InventoryCostFlowTest extends TestCase
         $this->assertSame(0.0, (float) $lines[1]->vat_amount);
     }
 
+    public function test_sale_cogs_uses_true_fifo_lot_cost_not_blended_average_when_lots_differ(): void
+    {
+        // สินค้าไม่คิด VAT เพื่อให้ unit_cost = unit_price ตรงเป๊ะ ไม่ปนภาษี
+        [$branch, $supplier, , $product] = $this->masters();
+        $purchases = app(PurchaseService::class);
+        // lot A: 10 หน่วย @ 10 บาท
+        $purchases->create([
+            'supplier_id' => $supplier->id, 'branch_id' => $branch->id,
+            'is_credit' => false, 'items' => [['product_id' => $product->id, 'qty' => 10, 'unit_price' => 10]],
+        ]);
+        // lot B: 10 หน่วย @ 20 บาท -> average_cost ถัวเฉลี่ยเป็น 15
+        $purchases->create([
+            'supplier_id' => $supplier->id, 'branch_id' => $branch->id,
+            'is_credit' => false, 'items' => [['product_id' => $product->id, 'qty' => 10, 'unit_price' => 20]],
+        ]);
+        $this->assertSame(15.0, (float) $product->fresh()->average_cost);
+
+        // ขาย 10 หน่วย -> FIFO ต้องตัด lot A ทั้งหมด (ต้นทุนจริง = 10x10 = 100) ไม่ใช่ 10x15=150 ตาม average
+        $sale = app(CashSaleService::class)->create([
+            'branch_id' => $branch->id, 'customer_id' => null,
+            'items' => [['product_id' => $product->id, 'qty' => 10, 'unit_price' => 50]],
+        ]);
+        $saleLine = $sale->stockDocument()->first()->items()->first();
+        $this->assertSame(10.0, (float) $saleLine->unit_cost);
+        $this->assertSame(100.0, (float) $saleLine->cost_amount);
+
+        // มูลค่าสต๊อกคงเหลือ (lot B ทั้งก้อน 10x20=200) ต้องกระทบยอดกับบัญชีได้พอดี:
+        // ยอดซื้อรวม(300) - COGS ที่บันทึกจริง(100) = 200 ตรงกับมูลค่า Lot ที่เหลือจริงเป๊ะ
+        $lotValue = (float) DB::table('stock_lots')->where('product_id', $product->id)
+            ->selectRaw('sum(remaining_qty * unit_cost) as v')->value('v');
+        $this->assertSame(200.0, $lotValue);
+        $this->assertSame(300.0 - (float) $saleLine->cost_amount, $lotValue);
+    }
+
     public function test_sale_cost_is_frozen_when_a_later_purchase_changes_average_cost(): void
     {
         [$branch, $supplier, $product] = $this->masters();

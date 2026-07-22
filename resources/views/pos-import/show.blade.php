@@ -43,6 +43,7 @@
     @if($errors_table = $errors->count())
     <div class="bg-white rounded-xl shadow p-5 mb-6">
         <h2 class="font-semibold mb-3 text-red-700">Errors ({{ $errors->total() }})</h2>
+        <div class="overflow-x-auto">
         <table class="w-full text-sm">
             <thead>
                 <tr class="text-left text-gray-500 border-b">
@@ -60,12 +61,14 @@
                 @endforeach
             </tbody>
         </table>
+        </div>
         <div class="mt-4">{{ $errors->links() }}</div>
     </div>
     @endif
 
     <div class="bg-white rounded-xl shadow p-5">
         <h2 class="font-semibold mb-3">ใบเสร็จ ({{ $receipts->total() }})</h2>
+        <div class="overflow-x-auto">
         <table class="w-full text-sm">
             <thead>
                 <tr class="text-left text-gray-500 border-b">
@@ -92,6 +95,7 @@
                 @endforelse
             </tbody>
         </table>
+        </div>
         <div class="mt-4">{{ $receipts->links() }}</div>
     </div>
 @endsection

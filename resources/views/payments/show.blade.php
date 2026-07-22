@@ -27,6 +27,7 @@
         <div class="col-lg-7">
             <div class="content-card p-4 mb-4">
                 <h3 class="h6 fw-bold mb-3">รายละเอียดการชำระ</h3>
+                <div class="table-responsive">
                 <table class="table align-middle">
                     <thead><tr><th>วิธีชำระ</th><th class="text-end">จำนวนเงิน</th></tr></thead>
                     <tbody>
@@ -39,11 +40,13 @@
                     </tbody>
                     <tfoot><tr class="fw-bold border-top"><td>รวมรับชำระ</td><td class="text-end">{{ number_format($payment->total_amount, 2) }}</td></tr></tfoot>
                 </table>
+                </div>
             </div>
 
             @if($payment->paymentDocument?->allocations->isNotEmpty())
             <div class="content-card p-4">
                 <h3 class="h6 fw-bold mb-3">รายการหนี้ที่ตัดชำระ</h3>
+                <div class="table-responsive">
                 <table class="table align-middle table-sm">
                     <thead><tr><th>เอกสารอ้างอิง</th><th class="text-end">ยอดตัดชำระ</th></tr></thead>
                     <tbody>
@@ -55,6 +58,7 @@
                         @endforeach
                     </tbody>
                 </table>
+                </div>
             </div>
             @endif
         </div>

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\Customer;
 use Illuminate\Http\RedirectResponse;
@@ -44,7 +45,7 @@ class CustomerController extends Controller
     public function show(Customer $customer): View
     {
         $customer->load([
-            'branch', 'addresses', 'contacts',
+            'branch', 'addresses', 'contacts', 'creditLimitRequester',
             'openItems' => fn ($q) => $q->orderByDesc('id')->limit(20),
             'openItems.document',
         ]);
@@ -62,9 +63,63 @@ class CustomerController extends Controller
     {
         $data = $this->validateCustomer($request, $customer->id);
 
+        // เปลี่ยนวงเงินเครดิตต้องรออนุมัติ - ไม่แก้ยอดจริงทันที ส่วนฟิลด์อื่นบันทึกได้เลย
+        $requestedLimit = $data['credit_limit'] ?? null;
+        unset($data['credit_limit']);
+        $message = 'บันทึกข้อมูลลูกค้าแล้ว';
+
+        if ($requestedLimit !== null && bccomp((string) $requestedLimit, (string) $customer->credit_limit, 2) !== 0) {
+            $data['pending_credit_limit'] = $requestedLimit;
+            $data['credit_limit_requested_by'] = $request->user()->id;
+            $data['credit_limit_requested_at'] = now();
+            $message = 'บันทึกข้อมูลลูกค้าแล้ว และส่งคำขอเปลี่ยนวงเงินเครดิตรออนุมัติแล้ว';
+        }
+
         $customer->update($data);
 
-        return redirect()->route('customers.show', $customer)->with('success', 'บันทึกข้อมูลลูกค้าแล้ว');
+        return redirect()->route('customers.show', $customer)->with('success', $message);
+    }
+
+    public function approveCreditLimit(Request $request, Customer $customer): RedirectResponse
+    {
+        abort_unless($customer->credit_limit_requested_by !== null, 422, 'ไม่มีคำขอเปลี่ยนวงเงินเครดิตค้างอยู่');
+        abort_if($customer->credit_limit_requested_by === $request->user()->id, 403, 'ผู้ขอไม่สามารถอนุมัติรายการของตนเอง');
+
+        $oldLimit = $customer->credit_limit;
+        $customer->update([
+            'credit_limit' => $customer->pending_credit_limit,
+            'pending_credit_limit' => null,
+            'credit_limit_requested_by' => null,
+            'credit_limit_requested_at' => null,
+        ]);
+        AuditLog::create([
+            'user_id' => $request->user()->id, 'branch_id' => $customer->branch_id,
+            'action' => 'approve', 'table_name' => 'customers', 'record_id' => $customer->id,
+            'old_values' => ['credit_limit' => $oldLimit], 'new_values' => ['credit_limit' => $customer->credit_limit],
+        ]);
+
+        return back()->with('success', 'อนุมัติวงเงินเครดิตใหม่แล้ว');
+    }
+
+    public function rejectCreditLimit(Request $request, Customer $customer): RedirectResponse
+    {
+        abort_unless($customer->credit_limit_requested_by !== null, 422, 'ไม่มีคำขอเปลี่ยนวงเงินเครดิตค้างอยู่');
+        abort_if($customer->credit_limit_requested_by === $request->user()->id, 403, 'ผู้ขอไม่สามารถปฏิเสธรายการของตนเอง');
+        $data = $request->validate(['reason' => ['required', 'string', 'max:500']]);
+
+        $rejectedLimit = $customer->pending_credit_limit;
+        $customer->update([
+            'pending_credit_limit' => null,
+            'credit_limit_requested_by' => null,
+            'credit_limit_requested_at' => null,
+        ]);
+        AuditLog::create([
+            'user_id' => $request->user()->id, 'branch_id' => $customer->branch_id,
+            'action' => 'reject', 'table_name' => 'customers', 'record_id' => $customer->id,
+            'old_values' => ['pending_credit_limit' => $rejectedLimit], 'new_values' => ['reason' => $data['reason']],
+        ]);
+
+        return back()->with('success', 'ปฏิเสธคำขอเปลี่ยนวงเงินเครดิตแล้ว');
     }
 
     public function addAddress(Request $request, Customer $customer): RedirectResponse

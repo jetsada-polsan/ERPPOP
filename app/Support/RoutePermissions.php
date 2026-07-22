@@ -29,6 +29,8 @@ class RoutePermissions
         'document-books.' => 'settings.manage',
         'pos-import.' => 'sales.manage',
         'customers.' => 'sales.manage',
+        'customers.credit-limit.approve' => 'finance.credit.approve',
+        'customers.credit-limit.reject' => 'finance.credit.approve',
         'billing-notes.' => 'sales.manage',
         'credit-debit-notes.' => 'sales.manage',
         'credit-debit-notes.approve' => 'finance.note.approve',
@@ -103,9 +105,12 @@ class RoutePermissions
         'management-controls.' => 'management.view',
         'management-controls.cost-centers' => 'budget.manage',
         'management-controls.budgets' => 'budget.manage',
+        'management-controls.budgets.approve' => 'budget.approve',
         'management-controls.purchase-plans' => 'purchasing.manage',
         'management-controls.attendance' => 'payroll.manage',
         'management-controls.payroll' => 'payroll.manage',
+        'management-controls.payroll.approve' => 'payroll.approve',
+        'management-controls.payroll.pay' => 'payroll.approve',
         'management-controls.ecommerce' => 'ecommerce.sync',
 
         // ระบบ

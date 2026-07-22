@@ -55,12 +55,49 @@ function addProduct(product: Product, barcode?: string) {
   nextTick(() => scanner.value?.focus())
 }
 
+// ป้ายเครื่องชั่ง: PLU 6 หลัก + ราคารวม (สตางค์) — ตรงกับ SCALE_BARCODE_RULES ของ POS เว็บ
+// 13 หลักต้องตรวจ check digit เพราะ 800-839 เป็นรหัสประเทศ EAN ของอิตาลีด้วย
+function decodeScaleLabel(code: string): { plu: string; price: number } | null {
+  const long = /^(80[01]\d{3})(\d{6})(\d)$/.exec(code)
+  if (long) {
+    const body = long[1] + long[2]
+    let sum = 0
+    for (let i = 0; i < body.length; i++) sum += Number(body[i]) * (i % 2 === 0 ? 1 : 3)
+    if ((10 - (sum % 10)) % 10 !== Number(long[3])) return null
+    return { plu: long[1], price: Number(long[2]) / 100 }
+  }
+  const short = /^(80[01]\d{3})(\d{5})\d$/.exec(code)
+  if (short) return { plu: short[1], price: Number(short[2]) / 100 }
+  return null
+}
+
 function scan() {
   const code = search.value.trim()
   if (!code) return
-  const product = products.value.find((p) => p.sku_code === code || p.barcodes?.some((b) => b.barcode === code))
-  if (product) addProduct(product, product.barcodes?.find((b) => b.barcode === code)?.barcode)
-  else flash(`ไม่พบรหัส ${code}`)
+
+  // หาสินค้าจากรหัส/บาร์โค้ดที่ลงทะเบียนไว้ก่อนเสมอ แล้วค่อยตีความเป็นป้ายชั่ง
+  // (กันสินค้านำเข้าที่ขึ้นต้น 800/801 ถูกอ่านเป็นป้ายชั่งแล้วคิดเงินผิด)
+  const known = products.value.find((p) => p.sku_code === code || p.barcodes?.some((b) => b.barcode === code))
+  if (known) {
+    addProduct(known, known.barcodes?.find((b) => b.barcode === code)?.barcode)
+    return
+  }
+
+  const scale = decodeScaleLabel(code)
+  if (scale) {
+    const weighed = products.value.find((p) => p.sku_code === scale.plu || p.barcodes?.some((b) => b.barcode === scale.plu))
+    if (!weighed) return flash(`ไม่พบสินค้าชั่งรหัส ${scale.plu}`)
+    const perUnit = Number(weighed.pos_price)
+    if (!(perUnit > 0)) return flash(`สินค้าชั่ง ${scale.plu} ยังไม่ได้ตั้งราคาต่อหน่วย`)
+    // ป้ายหนึ่งใบ = ถุงจริงหนึ่งถุง จึงแยกบรรทัดเสมอ ไม่รวมยอดกับถุงก่อนหน้า
+    // (server จะถอดบาร์โค้ดและคำนวณน้ำหนักซ้ำอีกครั้งจากราคาต่อหน่วยของตัวเอง)
+    cart.value.push({ ...weighed, qty: Number((scale.price / perUnit).toFixed(4)), scannedBarcode: code })
+    search.value = ''
+    nextTick(() => scanner.value?.focus())
+    return
+  }
+
+  flash(`ไม่พบรหัส ${code}`)
 }
 
 async function refreshQueue() {

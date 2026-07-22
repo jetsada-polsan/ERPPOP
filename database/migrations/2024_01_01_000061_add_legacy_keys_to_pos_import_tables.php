@@ -12,7 +12,13 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement('ALTER TABLE import_batches ALTER COLUMN file_hash DROP NOT NULL');
+        // Postgres (prod) uses the exact raw ALTER; other drivers (sqlite in tests)
+        // relax NOT NULL through the schema builder since they reject that raw syntax.
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement('ALTER TABLE import_batches ALTER COLUMN file_hash DROP NOT NULL');
+        } else {
+            Schema::table('import_batches', fn (Blueprint $table) => $table->string('file_hash', 64)->nullable()->change());
+        }
 
         Schema::table('import_batches', function (Blueprint $table) {
             $table->string('source_system', 20)->default('mssql_pos')->after('pos_terminal_id');
@@ -57,6 +63,10 @@ return new class extends Migration
             $table->dropColumn('source_system');
         });
 
-        DB::statement('ALTER TABLE import_batches ALTER COLUMN file_hash SET NOT NULL');
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement('ALTER TABLE import_batches ALTER COLUMN file_hash SET NOT NULL');
+        } else {
+            Schema::table('import_batches', fn (Blueprint $table) => $table->string('file_hash', 64)->nullable(false)->change());
+        }
     }
 };

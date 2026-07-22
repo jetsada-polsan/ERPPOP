@@ -55,7 +55,7 @@ class ManagementControlController extends Controller
                 ->orderByDesc('o.ordered_at')->limit(100)->get(['o.*', 'c.name as channel_name']) : collect(),
             'purchasePlans' => $canPurchase ? PurchasePlan::with(['product', 'supplier'])->orderByDesc('id')->limit(100)->get() : collect(),
             'monitorEvents' => $canMonitor ? DB::table('monitor_events')->orderByDesc('detected_at')->limit(100)->get() : collect(),
-            'accounts' => $canBudget ? DB::table('chart_of_accounts')->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name_th']) : collect(),
+            'accounts' => $canBudget ? DB::table('chart_of_accounts')->orderBy('code')->get(['id', 'code', 'name_th']) : collect(),
         ]);
     }
 
@@ -207,6 +207,175 @@ class ManagementControlController extends Controller
         });
 
         return back()->with('success', 'นำเข้าคำสั่งซื้อออนไลน์แล้ว');
+    }
+
+    // ===== Payroll approve/pay workflow =====
+
+    public function showPayrollRun(Request $request, int $run): View
+    {
+        abort_unless($request->user()?->hasPermission('payroll.manage'), 403);
+        $payrollRun = DB::table('payroll_runs')->where('id', $run)->first();
+        abort_if($payrollRun === null, 404);
+        $items = DB::table('payroll_items as pi')->join('employees as e', 'e.id', '=', 'pi.employee_id')
+            ->where('pi.payroll_run_id', $run)->orderBy('e.full_name')
+            ->get(['pi.*', 'e.employee_code', 'e.full_name', 'e.social_security_enabled']);
+
+        return view('management-controls.payroll-show', [
+            'run' => $payrollRun,
+            'items' => $items,
+            'canApprove' => $request->user()?->hasPermission('payroll.approve'),
+        ]);
+    }
+
+    // แก้ภาษีหัก ณ ที่จ่าย และรายการหักอื่นรายคน แล้วคำนวณสุทธิใหม่ (เฉพาะ draft)
+    public function updatePayrollItems(Request $request, int $run): RedirectResponse
+    {
+        abort_unless($request->user()?->hasPermission('payroll.manage'), 403);
+        $payrollRun = DB::table('payroll_runs')->where('id', $run)->first();
+        abort_if($payrollRun === null, 404);
+        abort_unless($payrollRun->status === 'draft', 422, 'อนุมัติแล้วแก้ไขไม่ได้');
+
+        $data = $request->validate([
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.id' => ['required', 'integer'],
+            'items.*.withholding_tax' => ['nullable', 'numeric', 'min:0'],
+            'items.*.other_deduction' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        DB::transaction(function () use ($data, $run): void {
+            foreach ($data['items'] as $row) {
+                $item = DB::table('payroll_items')->where('id', $row['id'])->where('payroll_run_id', $run)->first();
+                if (! $item) {
+                    continue;
+                }
+                $wht = round((float) ($row['withholding_tax'] ?? 0), 2);
+                $other = round((float) ($row['other_deduction'] ?? 0), 2);
+                $net = round((float) $item->base_salary + (float) $item->overtime_amount
+                    - (float) $item->absence_deduction - (float) $item->social_security - $wht - $other, 2);
+                DB::table('payroll_items')->where('id', $item->id)->update([
+                    'withholding_tax' => $wht, 'other_deduction' => $other, 'net_amount' => $net,
+                ]);
+            }
+            $totals = DB::table('payroll_items')->where('payroll_run_id', $run)
+                ->selectRaw('sum(base_salary+overtime_amount) gross, sum(absence_deduction+social_security+withholding_tax+other_deduction) deduction, sum(net_amount) net')->first();
+            DB::table('payroll_runs')->where('id', $run)->update([
+                'gross_amount' => $totals->gross, 'deduction_amount' => $totals->deduction,
+                'net_amount' => $totals->net, 'updated_at' => now(),
+            ]);
+        });
+
+        return back()->with('success', 'บันทึกภาษีและรายการหักแล้ว คำนวณยอดสุทธิใหม่เรียบร้อย');
+    }
+
+    public function approvePayroll(Request $request, int $run): RedirectResponse
+    {
+        abort_unless($request->user()?->hasPermission('payroll.approve'), 403);
+        $payrollRun = DB::table('payroll_runs')->where('id', $run)->first();
+        abort_if($payrollRun === null, 404);
+        abort_unless($payrollRun->status === 'draft', 422, 'สถานะไม่ถูกต้อง (ต้องเป็น draft)');
+        abort_if($payrollRun->created_by === $request->user()->id, 403, 'ผู้จัดทำไม่สามารถอนุมัติงวดของตนเอง');
+        abort_if(DB::table('payroll_items')->where('payroll_run_id', $run)->doesntExist(), 422, 'ไม่มีรายการพนักงานในงวดนี้');
+
+        DB::table('payroll_runs')->where('id', $run)->update([
+            'status' => 'approved', 'approved_by' => $request->user()->id, 'approved_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->audit('approve', 'payroll_runs', $run, ['status' => 'draft'], ['status' => 'approved']);
+
+        return back()->with('success', 'อนุมัติ Payroll งวด '.$payrollRun->period.' แล้ว');
+    }
+
+    public function markPayrollPaid(Request $request, int $run): RedirectResponse
+    {
+        abort_unless($request->user()?->hasPermission('payroll.approve'), 403);
+        $payrollRun = DB::table('payroll_runs')->where('id', $run)->first();
+        abort_if($payrollRun === null, 404);
+        abort_unless($payrollRun->status === 'approved', 422, 'ต้องอนุมัติก่อนจ่าย');
+
+        DB::table('payroll_runs')->where('id', $run)->update([
+            'status' => 'paid', 'paid_by' => $request->user()->id, 'paid_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->audit('pay', 'payroll_runs', $run, ['status' => 'approved'], ['status' => 'paid']);
+
+        return back()->with('success', 'บันทึกจ่ายเงินเดือนงวด '.$payrollRun->period.' แล้ว');
+    }
+
+    // สลิปเงินเดือนพิมพ์ A4 รายคน
+    public function payslip(Request $request, int $item): View
+    {
+        abort_unless($request->user()?->hasPermission('payroll.manage'), 403);
+        $row = DB::table('payroll_items as pi')->join('payroll_runs as r', 'r.id', '=', 'pi.payroll_run_id')
+            ->join('employees as e', 'e.id', '=', 'pi.employee_id')
+            ->where('pi.id', $item)
+            ->first(['pi.*', 'r.period', 'r.status as run_status', 'e.employee_code', 'e.full_name', 'e.position', 'e.department']);
+        abort_if($row === null, 404);
+
+        return view('management-controls.payslip', ['slip' => $row]);
+    }
+
+    // ===== Budget approve + variance =====
+
+    public function showBudget(Request $request, int $budget): View
+    {
+        abort_unless($request->user()?->hasPermission('budget.manage'), 403);
+        $row = DB::table('budgets as b')->join('cost_centers as c', 'c.id', '=', 'b.cost_center_id')
+            ->where('b.id', $budget)->first(['b.*', 'c.name as cost_center_name', 'c.branch_id as cost_center_branch_id']);
+        abort_if($row === null, 404);
+
+        // เทียบงบ vs จ่ายจริง: budget_lines ต่อ (เดือน+บัญชี) เทียบ branch_expenses ของ cost center เดียวกัน
+        $lines = DB::table('budget_lines as bl')->join('chart_of_accounts as a', 'a.id', '=', 'bl.account_id')
+            ->where('bl.budget_id', $budget)->orderBy('bl.month')->orderBy('a.code')
+            ->get(['bl.*', 'a.code as account_code', 'a.name_th as account_name']);
+
+        // จับคู่ค่าใช้จ่ายจริง (branch_expenses) กับบรรทัดงบตาม เดือน+บัญชี — จัดกลุ่มใน PHP
+        // เพื่อไม่ผูกกับ SQL เฉพาะฐานข้อมูล (เช่น extract() ของ Postgres)
+        $actuals = [];
+        DB::table('branch_expenses')
+            ->where('cost_center_id', $row->cost_center_id)
+            ->whereBetween('expense_date', [$row->fiscal_year.'-01-01', $row->fiscal_year.'-12-31'])
+            ->get(['expense_date', 'expense_account_id', 'total_amount'])
+            ->each(function ($r) use (&$actuals) {
+                $key = Carbon::parse($r->expense_date)->month.'-'.$r->expense_account_id;
+                $actuals[$key] = ($actuals[$key] ?? 0) + (float) $r->total_amount;
+            });
+
+        $lines = $lines->map(function ($line) use ($actuals) {
+            $spent = (float) ($actuals[$line->month.'-'.$line->account_id] ?? 0);
+            $line->spent = $spent;
+            $line->variance = (float) $line->budget_amount - $spent;
+
+            return $line;
+        });
+
+        return view('management-controls.budget-show', [
+            'budget' => $row,
+            'lines' => $lines,
+            'canApprove' => $request->user()?->hasPermission('budget.approve'),
+        ]);
+    }
+
+    public function approveBudget(Request $request, int $budget): RedirectResponse
+    {
+        abort_unless($request->user()?->hasPermission('budget.approve'), 403);
+        $row = DB::table('budgets')->where('id', $budget)->first();
+        abort_if($row === null, 404);
+        abort_unless($row->status === 'draft', 422, 'สถานะไม่ถูกต้อง (ต้องเป็น draft)');
+        abort_if($row->created_by === $request->user()->id, 403, 'ผู้จัดทำไม่สามารถอนุมัติงบของตนเอง');
+
+        DB::table('budgets')->where('id', $budget)->update([
+            'status' => 'approved', 'approved_by' => $request->user()->id, 'approved_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->audit('approve', 'budgets', $budget, ['status' => 'draft'], ['status' => 'approved']);
+
+        return back()->with('success', 'อนุมัติงบประมาณ '.$row->budget_no.' แล้ว');
+    }
+
+    private function audit(string $action, string $table, int $recordId, array $old, array $new): void
+    {
+        DB::table('audit_logs')->insert([
+            'user_id' => auth()->id(), 'action' => $action, 'table_name' => $table, 'record_id' => $recordId,
+            'old_values' => json_encode($old), 'new_values' => json_encode($new),
+            'created_at' => now(),
+        ]);
     }
 
     private function period(string $period): array

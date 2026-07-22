@@ -34,6 +34,7 @@
     </div>
 
     @if($sheet === 'trial_balance')
+        <div class="table-responsive">
         <table class="table table-sm align-middle">
             <thead><tr><th>รหัส</th><th>ชื่อบัญชี</th><th>ประเภท</th><th class="text-end">เดบิต</th><th class="text-end">เครดิต</th></tr></thead>
             <tbody>
@@ -62,8 +63,10 @@
                 </tr>
             </tfoot>
         </table>
+        </div>
 
     @elseif($sheet === 'income_statement')
+        <div class="table-responsive">
         <table class="table table-sm align-middle" style="max-width:640px;margin:0 auto">
             <tr class="table-light"><td colspan="2" class="fw-bold">รายได้</td></tr>
             @forelse($revenue as $acc)
@@ -86,10 +89,12 @@
                 <td class="text-end {{ $netProfit >= 0 ? 'text-success' : 'text-danger' }}">{{ number_format($netProfit, 2) }}</td>
             </tr>
         </table>
+        </div>
 
     @else
         <div class="row g-4">
             <div class="col-md-6">
+                <div class="table-responsive">
                 <table class="table table-sm align-middle">
                     <tr class="table-light"><td colspan="2" class="fw-bold">สินทรัพย์</td></tr>
                     @foreach($assets as $acc)
@@ -97,8 +102,10 @@
                     @endforeach
                     <tr class="fw-bold border-top border-2"><td>รวมสินทรัพย์</td><td class="text-end">{{ number_format($totalAssets, 2) }}</td></tr>
                 </table>
+                </div>
             </div>
             <div class="col-md-6">
+                <div class="table-responsive">
                 <table class="table table-sm align-middle">
                     <tr class="table-light"><td colspan="2" class="fw-bold">หนี้สิน</td></tr>
                     @foreach($liabilities as $acc)
@@ -115,6 +122,7 @@
 
                     <tr class="fw-bold border-top border-2"><td>รวมหนี้สินและส่วนของเจ้าของ</td><td class="text-end">{{ number_format($totalLiabilities + $totalEquity, 2) }}</td></tr>
                 </table>
+                </div>
             </div>
         </div>
         <div class="text-center mt-2 small {{ $balanced ? 'text-success' : 'text-danger' }}">
