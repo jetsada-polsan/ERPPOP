@@ -17,7 +17,8 @@ class ErpBackup extends Command
     public function handle(): int
     {
         $directory = storage_path('app/backups');
-        File::ensureDirectoryExists($directory, 0700);
+        File::ensureDirectoryExists($directory, 0750);
+        $this->securePath($directory, 0750);
         $driver = config('database.default');
         $stamp = now()->format('Ymd-His');
         $raw = "{$directory}/erp-db-{$stamp}.sql";
@@ -41,8 +42,8 @@ class ErpBackup extends Command
             File::put($compressed, gzencode(File::get($raw), 9));
             File::delete($raw);
             File::put($compressed.'.sha256', hash_file('sha256', $compressed).'  '.basename($compressed).PHP_EOL);
-            chmod($compressed, 0600);
-            chmod($compressed.'.sha256', 0600);
+            $this->securePath($compressed);
+            $this->securePath($compressed.'.sha256');
             $disk = $this->option('disk') ?: env('ERP_BACKUP_OFFSITE_DISK');
             if ($disk) {
                 $target = 'erp-backups/'.now()->format('Y/m').'/'.basename($compressed);
@@ -92,5 +93,14 @@ class ErpBackup extends Command
                 File::delete($file);
             }
         }
+    }
+
+    private function securePath(string $path, int $mode = 0640): void
+    {
+        $group = (string) config('operations.backup_group');
+        if ($group !== '') {
+            @chgrp($path, $group);
+        }
+        @chmod($path, $mode);
     }
 }

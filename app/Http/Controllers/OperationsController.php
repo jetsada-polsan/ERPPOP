@@ -12,15 +12,17 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
+use Throwable;
 
 class OperationsController extends Controller
 {
     public function index(): View
     {
-        $backups = collect(glob(storage_path('app/backups/erp-db-*.gz')) ?: [])->sortByDesc(fn ($file) => filemtime($file))->take(20)->map(fn ($file) => [
-            'name' => basename($file), 'size' => filesize($file), 'created_at' => filemtime($file),
-            'checksum' => is_file($file.'.sha256') ? strtok(trim(File::get($file.'.sha256')), " \t") : null,
-        ])->values();
+        $backups = collect(glob(storage_path('app/backups/erp-db-*.gz')) ?: [])
+            ->sortByDesc(fn ($file) => filemtime($file))
+            ->take(20)
+            ->map(fn ($file) => $this->backupMetadata($file))
+            ->values();
         $users = User::where('is_active', true)->count();
         $mfaUsers = User::where('is_active', true)->whereNotNull('mfa_enabled_at')->count();
 
@@ -73,5 +75,33 @@ class OperationsController extends Controller
         AuditLog::create(['user_id' => auth()->id(), 'branch_id' => auth()->user()?->branch_id, 'action' => $auditAction, 'table_name' => 'operation_runs', 'record_id' => $run->id, 'new_values' => ['status' => $status]]);
 
         return back()->with($exit === 0 ? 'success' : 'error', $exit === 0 ? $output : 'ดำเนินการไม่สำเร็จ: '.$output);
+    }
+
+    private function backupMetadata(string $file): array
+    {
+        $checksumFile = $file.'.sha256';
+        $checksum = null;
+        $checksumStatus = 'missing';
+
+        if (is_file($checksumFile)) {
+            if (! is_readable($checksumFile)) {
+                $checksumStatus = 'unreadable';
+            } else {
+                try {
+                    $checksum = strtok(trim(File::get($checksumFile)), " \t") ?: null;
+                    $checksumStatus = $checksum ? 'ready' : 'invalid';
+                } catch (Throwable) {
+                    $checksumStatus = 'unreadable';
+                }
+            }
+        }
+
+        return [
+            'name' => basename($file),
+            'size' => filesize($file),
+            'created_at' => filemtime($file),
+            'checksum' => $checksum,
+            'checksum_status' => $checksumStatus,
+        ];
     }
 }

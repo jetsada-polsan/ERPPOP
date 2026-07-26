@@ -21,6 +21,7 @@ use App\Services\Security\TotpService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -110,6 +111,34 @@ class FinanceSecurityControlTest extends TestCase
             ->assertSee('มาตรฐาน ERP ที่ใช้ในประเทศไทย')
             ->assertSee('DBD e-Filing/XBRL');
         $this->get('/security/mfa')->assertOk()->assertSee('Setup key');
+    }
+
+    public function test_operations_page_stays_available_when_a_backup_checksum_is_unreadable(): void
+    {
+        $user = User::factory()->create(['username' => 'backup-admin', 'is_active' => true, 'must_change_password' => false]);
+        $role = Role::create(['code' => 'BACKUP_ADMIN', 'name' => 'Backup Admin']);
+        $permission = Permission::firstOrCreate(['code' => 'settings.manage'], ['name' => 'settings.manage']);
+        $role->permissions()->attach($permission->id);
+        $user->roles()->attach($role->id);
+
+        $directory = storage_path('app/backups');
+        File::ensureDirectoryExists($directory);
+        $backup = $directory.'/erp-db-29991231-235959.sql.gz';
+        $checksum = $backup.'.sha256';
+        File::put($backup, gzencode(str_repeat('backup-data', 50)));
+        File::put($checksum, hash_file('sha256', $backup).'  '.basename($backup).PHP_EOL);
+        chmod($checksum, 0000);
+
+        try {
+            $this->actingAs($user)
+                ->get('/operations')
+                ->assertOk()
+                ->assertSee('erp-db-29991231-235959.sql.gz')
+                ->assertSee('อ่าน checksum ไม่ได้');
+        } finally {
+            chmod($checksum, 0640);
+            File::delete([$backup, $checksum]);
+        }
     }
 
     private function totpCode(string $secret, int $timestamp): string

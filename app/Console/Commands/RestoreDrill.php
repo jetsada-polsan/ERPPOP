@@ -20,8 +20,18 @@ class RestoreDrill extends Command
 
             return self::FAILURE;
         }
+        if (! is_readable($file)) {
+            $this->error('ไม่มีสิทธิ์อ่านไฟล์ backup กรุณาให้ผู้ดูแลตรวจสิทธิ์ไฟล์');
+
+            return self::FAILURE;
+        }
         $checksumFile = $file.'.sha256';
         if (is_file($checksumFile)) {
+            if (! is_readable($checksumFile)) {
+                $this->error('ไม่มีสิทธิ์อ่านไฟล์ checksum กรุณาให้ผู้ดูแลตรวจสิทธิ์ไฟล์');
+
+                return self::FAILURE;
+            }
             $expected = strtok(trim(file_get_contents($checksumFile)), " \t");
             if (! hash_equals($expected, hash_file('sha256', $file))) {
                 $this->error('Checksum ไม่ตรง ไฟล์ backup เสียหาย');
