@@ -84,9 +84,9 @@ class Document extends Model
     {
         return [
             'doc_date' => 'date',
-            'total_amount' => 'decimal:4',
-            'subtotal_amount' => 'decimal:4',
-            'vat_amount' => 'decimal:4',
+            'total_amount' => 'decimal:8',
+            'subtotal_amount' => 'decimal:8',
+            'vat_amount' => 'decimal:8',
             'prices_include_vat' => 'boolean',
             'claim_input_vat' => 'boolean',
             'cancelled_at' => 'datetime',

@@ -8,8 +8,8 @@
 <style>
     [x-cloak] { display: none !important; }
 
-    .manual-shell { display: grid; gap: 14px; color: #1d3b52; }
-    .manual-panel { background: #fff; border: 1px solid #dbe7ef; border-radius: 8px; }
+    .manual-shell { display: grid; gap: 14px; min-width: 0; color: #1d3b52; }
+    .manual-panel { min-width: 0; overflow: hidden; background: #fff; border: 1px solid #dbe7ef; border-radius: 8px; }
     .manual-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; padding: 18px 20px; border-top: 4px solid #1599d3; }
     .manual-eyebrow { color: #0f766e; font-size: 11px; font-weight: 900; text-transform: uppercase; }
     .manual-title { margin: 3px 0 5px; color: #15364d; font-size: 24px; font-weight: 900; line-height: 1.2; }
@@ -65,6 +65,15 @@
     .flow-step strong { display: block; margin: 4px 0; color: #15364d; font-size: 12px; }
     .flow-step p { margin: 0; color: #6d8291; font-size: 11px; line-height: 1.4; }
     .flow-step a { color: inherit; text-decoration: none; }
+    .formula-policy { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); border-bottom: 1px solid #dbe7ef; background: #f7fafc; }
+    .formula-policy div { padding: 11px 13px; border-right: 1px solid #e4edf2; }
+    .formula-policy div:last-child { border-right: 0; }
+    .formula-policy span,.formula-policy strong { display: block; }
+    .formula-policy span { color: #7890a1; font-size: 10px; }
+    .formula-policy strong { margin-top: 2px; color: #234b64; font-size: 12px; }
+    .formula-table { min-width: 1180px; }
+    .formula-table code { color: #0b6b61; background: #eaf8f5; font-size: 11px; white-space: normal; }
+    .formula-table small { display: block; margin-top: 4px; color: #6e8392; line-height: 1.45; }
 
     .manual-two-col { display: grid; grid-template-columns: 1.05fr .95fr; gap: 14px; }
     .gap-list { display: grid; }
@@ -153,6 +162,7 @@
         .manual-toolbar { grid-template-columns: 1fr; }
         .manual-segments { overflow-x: auto; }
         .manual-segment { min-width: 84px; }
+        .formula-policy { grid-template-columns: 1fr 1fr; }
         .flow-meta { grid-template-columns: 1fr; }
         .flow-steps { grid-template-columns: 1fr; }
         .flow-step { min-height: 0; }
@@ -307,6 +317,34 @@
                 </div>
             </div>
         @endforeach
+    </section>
+
+    <section class="manual-panel" id="inventory-formulas">
+        <div class="manual-section-head">
+            <h2><i class="bi bi-calculator me-2"></i>สูตรตัดสต๊อก ต้นทุน และกำไรที่ระบบใช้</h2>
+            <span>ตรวจสอบย้อนกลับได้ถึงเอกสารและ Lot</span>
+        </div>
+        <div class="formula-policy">
+            <div><span>ปริมาณ / ต้นทุนต่อหน่วย</span><strong>เก็บ 8 ตำแหน่ง</strong></div>
+            <div><span>ยอดเอกสารภายใน</span><strong>เก็บ 4-8 ตำแหน่ง</strong></div>
+            <div><span>ยอดชำระ / แสดงผล</span><strong>ปัด Half-up 2 ตำแหน่ง</strong></div>
+            <div><span>เกณฑ์ความคลาดเคลื่อน</span><strong>ไม่เกิน 0.00001%</strong></div>
+        </div>
+        <div class="manual-table-wrap">
+            <table class="manual-table formula-table">
+                <thead><tr><th>รายการ</th><th>สูตรและตัวอย่าง</th><th>ผลต่อ Stock</th><th>วิธีกระทบยอด</th></tr></thead>
+                <tbody>
+                @foreach($calculationFormulas as $formula)
+                    <tr>
+                        <td><strong>{{ $formula['title'] }}</strong></td>
+                        <td><code>{{ $formula['formula'] }}</code><small>{{ $formula['example'] }}</small></td>
+                        <td>{{ $formula['stock'] }}</td>
+                        <td>{{ $formula['check'] }}</td>
+                    </tr>
+                @endforeach
+                </tbody>
+            </table>
+        </div>
     </section>
 
     <section class="manual-panel">

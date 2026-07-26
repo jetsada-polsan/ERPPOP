@@ -43,13 +43,13 @@ class StockDocumentItem extends Model
     protected function casts(): array
     {
         return [
-            'qty' => 'decimal:4',
-            'system_qty' => 'decimal:4',
-            'counted_qty' => 'decimal:4',
-            'unit_price' => 'decimal:4',
-            'unit_cost' => 'decimal:4',
-            'cost_amount' => 'decimal:4',
-            'vat_amount' => 'decimal:4',
+            'qty' => 'decimal:8',
+            'system_qty' => 'decimal:8',
+            'counted_qty' => 'decimal:8',
+            'unit_price' => 'decimal:8',
+            'unit_cost' => 'decimal:8',
+            'cost_amount' => 'decimal:8',
+            'vat_amount' => 'decimal:8',
             'manufacture_date' => 'date',
             'expire_date' => 'date',
         ];

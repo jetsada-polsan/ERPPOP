@@ -79,13 +79,13 @@ class Product extends Model
             'shelf_life_days' => 'integer',
             'clearance_warning_days' => 'integer',
             'clearance_discount_percent' => 'decimal:2',
-            'default_price' => 'decimal:4',
-            'average_cost' => 'decimal:4',
-            'last_purchase_cost' => 'decimal:4',
+            'default_price' => 'decimal:8',
+            'average_cost' => 'decimal:8',
+            'last_purchase_cost' => 'decimal:8',
             'last_purchase_cost_at' => 'datetime',
-            'reorder_point' => 'decimal:4',
-            'minimum_stock' => 'decimal:4',
-            'maximum_stock' => 'decimal:4',
+            'reorder_point' => 'decimal:8',
+            'minimum_stock' => 'decimal:8',
+            'maximum_stock' => 'decimal:8',
         ];
     }
 }

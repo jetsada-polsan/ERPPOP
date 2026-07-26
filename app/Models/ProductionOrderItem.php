@@ -22,8 +22,8 @@ class ProductionOrderItem extends Model
     protected function casts(): array
     {
         return [
-            'planned_qty' => 'decimal:4',
-            'used_qty' => 'decimal:4',
+            'planned_qty' => 'decimal:8',
+            'used_qty' => 'decimal:8',
         ];
     }
 }

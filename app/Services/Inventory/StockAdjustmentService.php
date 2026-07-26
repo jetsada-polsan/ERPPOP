@@ -9,6 +9,7 @@ use App\Models\StockBalance;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
 use App\Services\Sales\DocumentNumberGenerator;
+use App\Support\DecimalMath;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -43,18 +44,18 @@ class StockAdjustmentService
 
         $diffs = collect($data['items'])
             ->map(function ($item) use ($systemQtyByProduct) {
-                $systemQty = (float) ($systemQtyByProduct[$item['product_id']] ?? 0);
-                $countedQty = (float) $item['counted_qty'];
+                $systemQty = $systemQtyByProduct[$item['product_id']] ?? 0;
+                $countedQty = $item['counted_qty'];
 
                 return [
                     'product_id' => $item['product_id'],
                     'system_qty' => $systemQty,
                     'counted_qty' => $countedQty,
-                    'diff' => round($countedQty - $systemQty, 4),
-                    'unit_cost' => isset($item['unit_cost']) ? round((float) $item['unit_cost'], 4) : null,
+                    'diff' => DecimalMath::subtract($countedQty, $systemQty, DecimalMath::QUANTITY_SCALE),
+                    'unit_cost' => isset($item['unit_cost']) ? DecimalMath::round($item['unit_cost'], DecimalMath::COST_SCALE) : null,
                 ];
             })
-            ->filter(fn ($i) => abs($i['diff']) > 0.0001)
+            ->filter(fn ($i) => DecimalMath::compare($i['diff'], 0) !== 0)
             ->values();
 
         if ($diffs->isEmpty()) {
@@ -78,7 +79,7 @@ class StockAdjustmentService
 
             $stockDocument = StockDocument::create([
                 'document_id' => $document->id,
-                'total_qty' => $diffs->sum(fn ($i) => abs($i['diff'])),
+                'total_qty' => DecimalMath::sum($diffs->map(fn ($i) => DecimalMath::absoluteDifference($i['diff'], 0)), DecimalMath::QUANTITY_SCALE),
                 'total_items' => $diffs->count(),
             ]);
 
@@ -119,37 +120,37 @@ class StockAdjustmentService
                 $balance = StockBalance::where('product_id', $item->product_id)
                     ->where('warehouse_location_id', $item->warehouse_location_id)
                     ->lockForUpdate()->first();
-                $current = (float) ($balance?->on_hand_qty ?? 0);
-                if (abs($current - (float) $item->system_qty) > 0.0001) {
+                $current = $balance?->on_hand_qty ?? 0;
+                if (DecimalMath::compare($current, $item->system_qty) !== 0) {
                     throw new RuntimeException('ยอดสต๊อกเปลี่ยนหลังส่งอนุมัติ กรุณายกเลิกและตรวจนับใหม่');
                 }
 
                 $productId = (int) $item->product_id;
                 $warehouseLocationId = (int) $item->warehouse_location_id;
-                $diff = (float) $item->qty;
-                if ($diff > 0.0001) {
+                $diff = $item->qty;
+                if (DecimalMath::compare($diff, 0) > 0) {
                     // เจอของเกิน: สร้าง Lot ใหม่รองรับจำนวนที่เพิ่ม ไม่งั้น stock_lots จะไม่ตรงกับ
                     // stock_balances และมูลค่าสต๊อกปลายงวดจะขาดหายไป (ใช้ average_cost ปัจจุบันประมาณ
                     // ต้นทุน เพราะของเกินไม่มี Lot ต้นทางจริงให้อ้างอิง)
                     $product = Product::find($productId);
-                    $explicitCost = (float) ($item->unit_cost ?? 0);
-                    $unitCost = $explicitCost > 0 ? $explicitCost : (float) ($product?->average_cost ?? 0);
+                    $explicitCost = $item->unit_cost ?? 0;
+                    $unitCost = DecimalMath::compare($explicitCost, 0) > 0 ? $explicitCost : ($product?->average_cost ?? 0);
                     $this->fifo->receive(
                         $productId, $warehouseLocationId, $diff,
                         $locked->id, 'adjust_in', unitCost: $unitCost,
                     );
-                    if ($explicitCost > 0) {
+                    if (DecimalMath::compare($explicitCost, 0) > 0) {
                         $product?->update([
                             'average_cost' => $explicitCost,
                             'last_purchase_cost' => $explicitCost,
                             'last_purchase_cost_at' => now(),
                         ]);
                     }
-                } elseif ($diff < -0.0001) {
+                } elseif (DecimalMath::compare($diff, 0) < 0) {
                     // ของขาด/เสียหาย: ตัด Lot จริงตาม FIFO เพื่อให้ stock_lots สะท้อนของที่หายไปจริง
                     // (ไม่ทำแบบเดิมที่แก้ stock_balances ตรงๆ โดยไม่แตะ stock_lots เลย)
                     $this->fifo->issue(
-                        $productId, $warehouseLocationId, abs($diff),
+                        $productId, $warehouseLocationId, DecimalMath::absoluteDifference($diff, 0),
                         $locked->id, 'adjust_out', allowNegative: true,
                     );
                 }

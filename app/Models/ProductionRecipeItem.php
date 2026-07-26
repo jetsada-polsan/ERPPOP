@@ -21,6 +21,6 @@ class ProductionRecipeItem extends Model
 
     protected function casts(): array
     {
-        return ['qty' => 'decimal:4'];
+        return ['qty' => 'decimal:8'];
     }
 }

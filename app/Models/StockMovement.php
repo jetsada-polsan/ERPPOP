@@ -37,7 +37,7 @@ class StockMovement extends Model
     protected function casts(): array
     {
         return [
-            'qty' => 'decimal:4',
+            'qty' => 'decimal:8',
             'movement_date' => 'date',
         ];
     }

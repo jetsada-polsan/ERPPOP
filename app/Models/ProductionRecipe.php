@@ -28,7 +28,7 @@ class ProductionRecipe extends Model
     protected function casts(): array
     {
         return [
-            'output_qty' => 'decimal:4',
+            'output_qty' => 'decimal:8',
             'is_active' => 'boolean',
         ];
     }

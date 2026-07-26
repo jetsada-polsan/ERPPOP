@@ -29,6 +29,7 @@ use App\Http\Controllers\ManagementControlController;
 use App\Http\Controllers\ManualController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\MemberPointController;
+use App\Http\Controllers\ModuleControlController;
 use App\Http\Controllers\MonthlyAccountingController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OperationsController;
@@ -569,6 +570,10 @@ Route::prefix('qty-promotions')->name('qty-promotions.')->group(function () {
 Route::prefix('settings')->name('settings.')->group(function () {
     Route::get('/', [SystemSettingController::class, 'index'])->name('index');
     Route::post('/', [SystemSettingController::class, 'update'])->name('update');
+    Route::get('/module-controls', [ModuleControlController::class, 'index'])->name('module-controls');
+    Route::post('/module-controls/taxonomies/{type}', [ModuleControlController::class, 'storeTaxonomy'])->name('module-controls.taxonomies.store');
+    Route::put('/module-controls/taxonomies/{type}/{id}', [ModuleControlController::class, 'updateTaxonomy'])->name('module-controls.taxonomies.update');
+    Route::delete('/module-controls/taxonomies/{type}/{id}', [ModuleControlController::class, 'destroyTaxonomy'])->name('module-controls.taxonomies.destroy');
     Route::get('/receipt-template', [ReceiptTemplateController::class, 'edit'])->name('receipt-template.edit');
     Route::post('/receipt-template', [ReceiptTemplateController::class, 'update'])->name('receipt-template.update');
     Route::post('/pos-token', [SystemSettingController::class, 'issuePosToken'])->name('pos-token.issue');

@@ -6,6 +6,7 @@ use App\Models\Document;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseOrderReceipt;
+use App\Support\DecimalMath;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -28,12 +29,12 @@ class PurchaseOrderReceivingService
             $items = PurchaseOrderItem::where('purchase_order_id', $locked->id)
                 ->with('product')->orderBy('id')->lockForUpdate()->get();
             $receiving = $items->map(function ($item) use ($quantities, $lots) {
-                $qty = (float) ($quantities[$item->id] ?? 0);
-                $outstanding = round((float) $item->qty - (float) $item->received_qty, 4);
-                if ($qty > $outstanding + 0.0001) {
+                $qty = DecimalMath::round($quantities[$item->id] ?? 0, DecimalMath::QUANTITY_SCALE);
+                $outstanding = DecimalMath::subtract($item->qty, $item->received_qty, DecimalMath::QUANTITY_SCALE);
+                if (DecimalMath::compare($qty, $outstanding) > 0) {
                     throw new RuntimeException("รับ {$item->product->name_th} เกินยอดค้างรับ");
                 }
-                if ($qty <= 0.0001) {
+                if (DecimalMath::compare($qty, 0) <= 0) {
                     return null;
                 }
 
@@ -41,7 +42,7 @@ class PurchaseOrderReceivingService
                     'purchase_order_item_id' => $item->id,
                     'product_id' => $item->product_id,
                     'qty' => $qty,
-                    'unit_price' => (float) $item->unit_price,
+                    'unit_price' => $item->unit_price,
                     'lot_number' => $lots[$item->id]['lot_number'] ?? null,
                     'manufacture_date' => $lots[$item->id]['manufacture_date'] ?? null,
                     'expiry_date' => $lots[$item->id]['expiry_date'] ?? null,

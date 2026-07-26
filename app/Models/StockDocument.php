@@ -29,6 +29,6 @@ class StockDocument extends Model
 
     protected function casts(): array
     {
-        return ['total_qty' => 'decimal:4'];
+        return ['total_qty' => 'decimal:8'];
     }
 }

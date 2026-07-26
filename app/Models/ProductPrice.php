@@ -14,9 +14,9 @@ class ProductPrice extends Model
     protected function casts(): array
     {
         return [
-            'price' => 'decimal:4',
-            'cost_price' => 'decimal:4',
-            'min_qty' => 'decimal:4',
+            'price' => 'decimal:8',
+            'cost_price' => 'decimal:8',
+            'min_qty' => 'decimal:8',
             'is_active' => 'boolean',
         ];
     }

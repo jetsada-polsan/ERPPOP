@@ -13,6 +13,7 @@ use App\Models\StockLot;
 use App\Models\StockMovement;
 use App\Services\Accounting\GlPostingService;
 use App\Services\Inventory\FifoStockService;
+use App\Support\DecimalMath;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -52,7 +53,9 @@ class SaleReturnService
 
         return DB::transaction(function () use ($data, $branch, $documentType, $openItem) {
             $items = collect($data['items']);
-            $totalAmount = $items->sum(fn ($i) => $i['qty'] * $i['unit_price']);
+            $totalAmount = DecimalMath::sum(
+                $items->map(fn ($item) => DecimalMath::multiply($item['qty'], $item['unit_price'])),
+            );
             $originalCosts = $openItem?->document?->stockDocument?->items
                 ?->keyBy('product_id') ?? collect();
             $currentCosts = Product::whereIn('id', $items->pluck('product_id'))
@@ -72,7 +75,7 @@ class SaleReturnService
 
             $stockDocument = StockDocument::create([
                 'document_id' => $document->id,
-                'total_qty' => $items->sum('qty'),
+                'total_qty' => DecimalMath::sum($items->pluck('qty'), DecimalMath::QUANTITY_SCALE),
                 'total_items' => $items->count(),
             ]);
 
@@ -87,7 +90,7 @@ class SaleReturnService
                     $soldFromLot = (float) StockMovement::where('document_id', $openItem->document_id)
                         ->where('product_id', $item['product_id'])->where('stock_lot_id', $sourceLot->id)
                         ->sum('qty');
-                    if ((float) $item['qty'] > $soldFromLot + 0.0001) {
+                    if (DecimalMath::compare($item['qty'], $soldFromLot) > 0) {
                         throw new RuntimeException('จำนวนรับคืนเกินจำนวนที่ขายจาก Lot ต้นทาง');
                     }
                 }
@@ -103,7 +106,7 @@ class SaleReturnService
                     'qty' => $item['qty'],
                     'unit_price' => $item['unit_price'],
                     'unit_cost' => $unitCost,
-                    'cost_amount' => round((float) $item['qty'] * $unitCost, 4),
+                    'cost_amount' => DecimalMath::multiply($item['qty'], $unitCost),
                 ]);
 
                 $returnedLot = $this->fifo->receive(
@@ -131,11 +134,15 @@ class SaleReturnService
             }
 
             if ($openItem !== null) {
-                $reduction = min((float) $totalAmount, (float) $openItem->balance_amount);
-                $newBalance = round((float) $openItem->balance_amount - $reduction, 4);
+                $reduction = DecimalMath::compare($totalAmount, $openItem->balance_amount) <= 0
+                    ? $totalAmount
+                    : $openItem->balance_amount;
+                $newBalance = DecimalMath::subtract($openItem->balance_amount, $reduction);
                 $openItem->update([
                     'balance_amount' => $newBalance,
-                    'status' => $newBalance <= 0.01 ? CustomerOpenItem::STATUS_PAID : CustomerOpenItem::STATUS_PARTIAL,
+                    'status' => DecimalMath::compare($newBalance, '0.01') <= 0
+                        ? CustomerOpenItem::STATUS_PAID
+                        : CustomerOpenItem::STATUS_PARTIAL,
                 ]);
             }
 

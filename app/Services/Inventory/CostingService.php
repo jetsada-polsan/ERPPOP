@@ -6,11 +6,12 @@ use App\Models\Document;
 use App\Models\Product;
 use App\Models\StockBalance;
 use App\Models\StockLot;
+use App\Support\DecimalMath;
 use Illuminate\Support\Collection;
 
 /**
- * ต้นทุนเฉลี่ยถ่วงน้ำหนัก (moving weighted average) ต่อสินค้า.
- * รับซื้อ -> อัปเดต average_cost; ขาย -> คิดต้นทุนขาย = จำนวน x average_cost.
+ * Moving weighted average for product analysis and actual FIFO/FEFO lot cost
+ * for posted COGS and inventory valuation.
  */
 class CostingService
 {
@@ -18,9 +19,9 @@ class CostingService
      * อัปเดตต้นทุนเฉลี่ยเมื่อรับสินค้าเข้า (เรียกก่อน increment สต๊อกจริง เพื่อใช้
      * ยอดคงเหลือ "ก่อนรับ" ในการถัวเฉลี่ย)
      */
-    public function recordPurchase(int $productId, float $qty, float $unitCost): void
+    public function recordPurchase(int $productId, int|float|string $qty, int|float|string $unitCost): void
     {
-        if ($qty <= 0) {
+        if (DecimalMath::compare($qty, 0) <= 0) {
             return;
         }
 
@@ -29,38 +30,49 @@ class CostingService
             return;
         }
 
-        $onHand = (float) StockBalance::where('product_id', $productId)->sum('on_hand_qty');
-        $oldCost = (float) $product->average_cost;
+        $onHand = StockBalance::where('product_id', $productId)->sum('on_hand_qty');
+        $oldCost = $product->average_cost;
 
         // ของเดิมติดลบ/ศูนย์ = ใช้ราคาซื้อล่าสุดเป็นต้นทุน
-        if ($onHand <= 0) {
-            $newCost = $unitCost > 0 ? $unitCost : $oldCost;
+        if (DecimalMath::compare($onHand, 0) <= 0) {
+            $newCost = DecimalMath::compare($unitCost, 0) > 0 ? $unitCost : $oldCost;
         } else {
-            $newCost = ($onHand * $oldCost + $qty * $unitCost) / ($onHand + $qty);
+            $oldValue = DecimalMath::multiply($onHand, $oldCost);
+            $receivedValue = DecimalMath::multiply($qty, $unitCost);
+            $newCost = DecimalMath::divide(
+                DecimalMath::add($oldValue, $receivedValue),
+                DecimalMath::add($onHand, $qty),
+            );
         }
 
         $product->update([
-            'average_cost' => round($newCost, 4),
-            'last_purchase_cost' => round($unitCost, 4),
+            'average_cost' => DecimalMath::round($newCost, DecimalMath::COST_SCALE),
+            'last_purchase_cost' => DecimalMath::round($unitCost, DecimalMath::COST_SCALE),
             'last_purchase_cost_at' => now(),
         ]);
     }
 
-    public function recordManufacturedReceipt(int $productId, float $qty, float $unitCost): void
+    public function recordManufacturedReceipt(int $productId, int|float|string $qty, int|float|string $unitCost): void
     {
-        if ($qty <= 0) {
+        if (DecimalMath::compare($qty, 0) <= 0) {
             return;
         }
         $product = Product::whereKey($productId)->lockForUpdate()->first();
         if (! $product) {
             return;
         }
-        $onHand = (float) StockBalance::where('product_id', $productId)->sum('on_hand_qty');
-        $oldCost = (float) $product->average_cost;
-        $newCost = $onHand <= 0
+        $onHand = StockBalance::where('product_id', $productId)->sum('on_hand_qty');
+        $oldCost = $product->average_cost;
+        $newCost = DecimalMath::compare($onHand, 0) <= 0
             ? $unitCost
-            : (($onHand * $oldCost) + ($qty * $unitCost)) / ($onHand + $qty);
-        $product->update(['average_cost' => round($newCost, 4)]);
+            : DecimalMath::divide(
+                DecimalMath::add(
+                    DecimalMath::multiply($onHand, $oldCost),
+                    DecimalMath::multiply($qty, $unitCost),
+                ),
+                DecimalMath::add($onHand, $qty),
+            );
+        $product->update(['average_cost' => DecimalMath::round($newCost, DecimalMath::COST_SCALE)]);
     }
 
     /**
@@ -71,32 +83,49 @@ class CostingService
      * ส่วนที่ตัดไม่ได้จาก Lot จริง (อนุญาตสต๊อกติดลบ) ใช้ average_cost ปัจจุบันแทน
      * เพราะไม่มี Lot จริงรองรับให้อ้างอิง
      *
-     * @param  Collection<int, array{lot: StockLot, qty: float}>  $allocations
+     * @param  Collection<int, array{lot: StockLot, qty: int|float|string}>  $allocations
      */
-    public function unitCostFromAllocations(Collection $allocations, float $requestedQty, float $fallbackUnitCost): float
+    public function unitCostFromAllocations(Collection $allocations, int|float|string $requestedQty, int|float|string $fallbackUnitCost): string
     {
-        if ($requestedQty <= 0) {
-            return 0.0;
+        if (DecimalMath::compare($requestedQty, 0) <= 0) {
+            return DecimalMath::round(0, DecimalMath::COST_SCALE);
         }
 
-        $allocatedQty = (float) $allocations->sum('qty');
-        $allocatedValue = (float) $allocations->sum(fn ($a) => (float) $a['qty'] * (float) $a['lot']->unit_cost);
-        $shortQty = max(0.0, $requestedQty - $allocatedQty);
+        $allocatedQty = DecimalMath::sum($allocations->pluck('qty'));
+        $allocatedValue = DecimalMath::sum($allocations->map(
+            fn ($allocation) => DecimalMath::multiply($allocation['qty'], $allocation['lot']->unit_cost)
+        ));
+        $shortQty = DecimalMath::compare($requestedQty, $allocatedQty) > 0
+            ? DecimalMath::subtract($requestedQty, $allocatedQty)
+            : '0';
 
-        return round(($allocatedValue + $shortQty * $fallbackUnitCost) / $requestedQty, 4);
+        return DecimalMath::divide(
+            DecimalMath::add($allocatedValue, DecimalMath::multiply($shortQty, $fallbackUnitCost)),
+            $requestedQty,
+        );
     }
 
-    public function purchaseUnitCost(Product $product, float $enteredPrice, bool $pricesIncludeVat, bool $claimInputVat, float $vatRate): float
+    public function purchaseUnitCost(Product $product, int|float|string $enteredPrice, bool $pricesIncludeVat, bool $claimInputVat, int|float|string $vatRate): string
     {
-        if (! $product->is_vat || $vatRate <= 0) {
-            return round($enteredPrice, 4);
+        if (! $product->is_vat || DecimalMath::compare($vatRate, 0) <= 0) {
+            return DecimalMath::round($enteredPrice, DecimalMath::COST_SCALE);
         }
 
         if ($pricesIncludeVat) {
-            return round($claimInputVat ? $enteredPrice * 100 / (100 + $vatRate) : $enteredPrice, 4);
+            return DecimalMath::round(
+                $claimInputVat
+                    ? DecimalMath::divide(DecimalMath::multiply($enteredPrice, 100), DecimalMath::add(100, $vatRate))
+                    : $enteredPrice,
+                DecimalMath::COST_SCALE,
+            );
         }
 
-        return round($claimInputVat ? $enteredPrice : $enteredPrice * (100 + $vatRate) / 100, 4);
+        return DecimalMath::round(
+            $claimInputVat
+                ? $enteredPrice
+                : DecimalMath::divide(DecimalMath::multiply($enteredPrice, DecimalMath::add(100, $vatRate)), 100),
+            DecimalMath::COST_SCALE,
+        );
     }
 
     // ต้นทุนขายรวมของเอกสาร = ผลรวม (จำนวน x ต้นทุนเฉลี่ย) ของทุกรายการในเอกสาร
@@ -107,15 +136,14 @@ class CostingService
             return 0.0;
         }
 
-        $total = 0.0;
+        $values = [];
         foreach ($document->stockDocument->items as $item) {
-            // qty อาจติดลบ (แปรรูป) - COGS ขายใช้ค่าสัมบูรณ์เฉพาะขาออก
-            $qty = abs((float) $item->qty);
-            $total += $item->cost_amount !== null
-                ? abs((float) $item->cost_amount)
-                : $qty * (float) ($item->unit_cost ?? $item->product->average_cost ?? 0);
+            $qty = DecimalMath::of($item->qty)->abs();
+            $values[] = $item->cost_amount !== null
+                ? DecimalMath::of($item->cost_amount)->abs()
+                : $qty->multipliedBy(DecimalMath::of($item->unit_cost ?? $item->product->average_cost ?? 0));
         }
 
-        return round($total, 2);
+        return (float) DecimalMath::sum($values, DecimalMath::DISPLAY_MONEY_SCALE);
     }
 }

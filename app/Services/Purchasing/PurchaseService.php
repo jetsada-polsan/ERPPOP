@@ -14,6 +14,7 @@ use App\Services\Accounting\GlPostingService;
 use App\Services\Inventory\CostingService;
 use App\Services\Inventory\FifoStockService;
 use App\Services\Sales\DocumentNumberGenerator;
+use App\Support\DecimalMath;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -82,16 +83,21 @@ class PurchaseService
                 ->orderByDesc('effective_from')->value('rate_percent') ?? 7);
             $calculated = $items->map(function (array $item) use ($products, $pricesIncludeVat, $claimInputVat, $vatRate): array {
                 $product = $products->get((int) $item['product_id']);
-                $qty = (float) $item['qty'];
-                $enteredPrice = (float) $item['unit_price'];
+                $qty = $item['qty'];
+                $enteredPrice = $item['unit_price'];
                 $unitCost = $this->costing->purchaseUnitCost($product, $enteredPrice, $pricesIncludeVat, $claimInputVat, $vatRate);
-                $costAmount = round($qty * $unitCost, 4);
+                $costAmount = DecimalMath::multiply($qty, $unitCost);
                 $vatAmount = $product->is_vat && $claimInputVat
-                    ? round($pricesIncludeVat ? ($qty * $enteredPrice) - $costAmount : $costAmount * $vatRate / 100, 4)
-                    : 0.0;
+                    ? ($pricesIncludeVat
+                        ? DecimalMath::subtract(DecimalMath::multiply($qty, $enteredPrice), $costAmount)
+                        : DecimalMath::divide(DecimalMath::multiply($costAmount, $vatRate), 100))
+                    : '0.00000000';
                 $invoiceAmount = $product->is_vat && ! $pricesIncludeVat
-                    ? round($qty * $enteredPrice * (100 + $vatRate) / 100, 4)
-                    : round($qty * $enteredPrice, 4);
+                    ? DecimalMath::divide(
+                        DecimalMath::multiply(DecimalMath::multiply($qty, $enteredPrice), DecimalMath::add(100, $vatRate)),
+                        100,
+                    )
+                    : DecimalMath::multiply($qty, $enteredPrice);
 
                 return $item + [
                     '_unit_cost' => $unitCost,
@@ -100,10 +106,12 @@ class PurchaseService
                     '_invoice_amount' => $invoiceAmount,
                 ];
             });
-            $totalQty = $calculated->sum('qty');
-            $subtotalAmount = round($calculated->sum('_cost_amount'), 4);
-            $totalAmount = round($calculated->sum('_invoice_amount'), 4);
-            $vatAmount = $claimInputVat ? round($totalAmount - $subtotalAmount, 4) : 0.0;
+            $totalQty = DecimalMath::sum($calculated->pluck('qty'), DecimalMath::QUANTITY_SCALE);
+            $subtotalAmount = DecimalMath::sum($calculated->pluck('_cost_amount'));
+            $totalAmount = DecimalMath::sum($calculated->pluck('_invoice_amount'));
+            $vatAmount = $claimInputVat
+                ? DecimalMath::subtract($totalAmount, $subtotalAmount)
+                : '0.00000000';
 
             $document = Document::create([
                 'document_type_id' => $documentType->id,
@@ -145,7 +153,7 @@ class PurchaseService
                 ]);
 
                 // อัปเดตต้นทุนเฉลี่ย "ก่อน" เพิ่มสต๊อก (ใช้ยอดคงเหลือก่อนรับถัวเฉลี่ย)
-                $this->costing->recordPurchase($item['product_id'], (float) $item['qty'], (float) $item['_unit_cost']);
+                $this->costing->recordPurchase($item['product_id'], $item['qty'], $item['_unit_cost']);
 
                 $this->fifo->receive(
                     (int) $item['product_id'], (int) $branch->default_warehouse_location_id,
@@ -161,16 +169,16 @@ class PurchaseService
             }
 
             if ($isCredit) {
-                $previousBalance = (float) (SupplierLedger::where('supplier_id', $data['supplier_id'])
+                $previousBalance = SupplierLedger::where('supplier_id', $data['supplier_id'])
                     ->orderByDesc('id')
-                    ->value('balance_after') ?? 0);
+                    ->value('balance_after') ?? 0;
 
                 SupplierLedger::create([
                     'supplier_id' => $data['supplier_id'],
                     'document_id' => $document->id,
                     'entry_type' => 'credit',
                     'amount' => $totalAmount,
-                    'balance_after' => $previousBalance + $totalAmount,
+                    'balance_after' => DecimalMath::add($previousBalance, $totalAmount),
                     'entry_date' => now()->toDateString(),
                 ]);
             }

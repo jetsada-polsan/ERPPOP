@@ -20,9 +20,9 @@ class StockLot extends Model
             'received_date' => 'date',
             'manufacture_date' => 'date',
             'expiry_date' => 'date',
-            'initial_qty' => 'decimal:4',
-            'remaining_qty' => 'decimal:4',
-            'unit_cost' => 'decimal:4',
+            'initial_qty' => 'decimal:8',
+            'remaining_qty' => 'decimal:8',
+            'unit_cost' => 'decimal:8',
             'quality_updated_at' => 'datetime',
         ];
     }

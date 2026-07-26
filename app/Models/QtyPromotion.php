@@ -50,14 +50,14 @@ class QtyPromotion extends Model
 
         $value = rtrim(rtrim(number_format((float) $this->discount_value, 2), '0'), '.');
 
-        return 'ซื้อ ' . $min . ' ลด ' . $value . ($this->discount_type === 'percent' ? '%' : ' บาท');
+        return 'ซื้อ '.$min.' ลด '.$value.($this->discount_type === 'percent' ? '%' : ' บาท');
     }
 
     protected function casts(): array
     {
         return [
-            'min_qty' => 'decimal:4',
-            'free_qty' => 'decimal:4',
+            'min_qty' => 'decimal:8',
+            'free_qty' => 'decimal:8',
             'discount_value' => 'decimal:4',
             'starts_date' => 'date',
             'ends_date' => 'date',

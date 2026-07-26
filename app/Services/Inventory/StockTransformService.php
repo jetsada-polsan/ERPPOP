@@ -13,6 +13,7 @@ use App\Models\ProductPrice;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
 use App\Services\Sales\DocumentNumberGenerator;
+use App\Support\DecimalMath;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -64,8 +65,10 @@ class StockTransformService
 
         // ประเมินต้นทุนเบื้องต้นด้วย average_cost เพื่อกันเคสไม่มีต้นทุนเลยก่อนเปิด transaction
         // ต้นทุนจริงที่บันทึกจะคำนวณจาก Lot ที่ FIFO ตัดจริงตอนอยู่ใน transaction ด้านล่าง
-        $rawEstimate = round($raw->sum(fn (array $item) => (float) $item['qty'] * (float) $products->get((int) $item['product_id'])->average_cost), 4);
-        if ($rawEstimate <= 0) {
+        $rawEstimate = DecimalMath::sum($raw->map(
+            fn (array $item) => DecimalMath::multiply($item['qty'], $products->get((int) $item['product_id'])->average_cost)
+        ));
+        if (DecimalMath::compare($rawEstimate, 0) <= 0) {
             throw new RuntimeException('วัตถุดิบยังไม่มีต้นทุนเฉลี่ย กรุณารับสินค้าและตรวจต้นทุนก่อนจัดเซ็ต');
         }
 
@@ -95,7 +98,11 @@ class StockTransformService
 
             $stockDocument = StockDocument::create([
                 'document_id' => $document->id,
-                'total_qty' => $raw->sum('qty') + $outputs->sum('qty'),
+                'total_qty' => DecimalMath::add(
+                    DecimalMath::sum($raw->pluck('qty'), DecimalMath::QUANTITY_SCALE),
+                    DecimalMath::sum($outputs->pluck('qty'), DecimalMath::QUANTITY_SCALE),
+                    DecimalMath::QUANTITY_SCALE,
+                ),
                 'total_items' => $raw->count() + $outputs->count(),
             ]);
 
@@ -105,32 +112,32 @@ class StockTransformService
             $sourceAllocations = collect();
             $raw = $raw->map(function (array $item) use ($locationId, $document, $products, &$sourceAllocations, $stockDocument, &$seq) {
                 $productId = (int) $item['product_id'];
-                $qty = (float) $item['qty'];
-                $fallbackCost = (float) $products->get($productId)->average_cost;
+                $qty = DecimalMath::round($item['qty'], DecimalMath::QUANTITY_SCALE);
+                $fallbackCost = $products->get($productId)->average_cost;
                 $allocations = $this->fifo->issue($productId, (int) $locationId, $qty, $document->id, 'transform_out');
                 $sourceAllocations = $sourceAllocations->concat($allocations);
                 $unitCost = $this->costing->unitCostFromAllocations($allocations, $qty, $fallbackCost);
-                $costAmount = round($qty * $unitCost, 4);
+                $costAmount = DecimalMath::multiply($qty, $unitCost);
 
                 StockDocumentItem::create([
                     'stock_document_id' => $stockDocument->id, 'seq' => $seq++,
                     'product_id' => $productId, 'warehouse_location_id' => $locationId,
-                    'qty' => -$qty, 'unit_price' => $unitCost,
+                    'qty' => DecimalMath::multiply($qty, -1, DecimalMath::QUANTITY_SCALE), 'unit_price' => $unitCost,
                     'unit_cost' => $unitCost, 'cost_amount' => $costAmount,
                 ]);
 
                 return $item + ['unit_cost' => $unitCost, 'cost_amount' => $costAmount];
             });
-            $rawTotal = round($raw->sum('cost_amount'), 4);
-            if ($rawTotal <= 0) {
+            $rawTotal = DecimalMath::sum($raw->pluck('cost_amount'));
+            if (DecimalMath::compare($rawTotal, 0) <= 0) {
                 throw new RuntimeException('วัตถุดิบยังไม่มีต้นทุนเฉลี่ย กรุณารับสินค้าและตรวจต้นทุนก่อนจัดเซ็ต');
             }
             $document->update(['total_amount' => $rawTotal]);
 
             foreach ($outputs as $item) {
-                $qty = (float) $item['qty'];
-                $allocated = round($rawTotal * (float) $item['percent'] / 100, 4);
-                $unitCost = round($allocated / $qty, 4);
+                $qty = DecimalMath::round($item['qty'], DecimalMath::QUANTITY_SCALE);
+                $allocated = DecimalMath::divide(DecimalMath::multiply($rawTotal, $item['percent']), 100);
+                $unitCost = DecimalMath::divide($allocated, $qty);
                 StockDocumentItem::create([
                     'stock_document_id' => $stockDocument->id, 'seq' => $seq++,
                     'product_id' => $item['product_id'], 'warehouse_location_id' => $locationId,
@@ -138,10 +145,14 @@ class StockTransformService
                 ]);
                 $this->costing->recordManufacturedReceipt((int) $item['product_id'], $qty, $unitCost);
                 $outputLot = $this->fifo->receive((int) $item['product_id'], (int) $locationId, $qty, $document->id, 'transform_in', receivedDate: now()->toDateString(), unitCost: $unitCost);
-                foreach ($sourceAllocations as $allocation) {
+                foreach ($sourceAllocations->groupBy(fn ($allocation) => $allocation['lot']->id) as $inputLotId => $lotAllocations) {
                     DB::table('stock_lot_lineages')->insert([
-                        'output_lot_id' => $outputLot->id, 'input_lot_id' => $allocation['lot']->id,
-                        'input_qty' => round((float) $allocation['qty'] * (float) $item['percent'] / 100, 4),
+                        'output_lot_id' => $outputLot->id, 'input_lot_id' => $inputLotId,
+                        'input_qty' => DecimalMath::divide(
+                            DecimalMath::multiply(DecimalMath::sum($lotAllocations->pluck('qty'), DecimalMath::QUANTITY_SCALE), $item['percent']),
+                            100,
+                            DecimalMath::QUANTITY_SCALE,
+                        ),
                         'document_id' => $document->id, 'created_at' => now(), 'updated_at' => now(),
                     ]);
                 }
@@ -150,30 +161,34 @@ class StockTransformService
             if ($batchMode) {
                 $output = $outputs->first();
                 $outputProduct = $products->get((int) $output['product_id']);
-                $inputWeight = (float) ($data['input_weight_qty'] ?? $raw->sum('qty'));
-                $outputWeight = (float) $output['qty'];
+                $inputWeight = DecimalMath::round($data['input_weight_qty'] ?? DecimalMath::sum($raw->pluck('qty'), DecimalMath::QUANTITY_SCALE), DecimalMath::QUANTITY_SCALE);
+                $outputWeight = DecimalMath::round($output['qty'], DecimalMath::QUANTITY_SCALE);
                 $plu = $this->scalePlu($outputProduct);
                 $sellingPrice = $this->sellingPrice($outputProduct->id);
                 $vatRate = (float) (DB::table('vat_rates')->where('effective_from', '<=', now()->toDateString())
                     ->where(fn ($query) => $query->whereNull('effective_to')->orWhere('effective_to', '>=', now()->toDateString()))
                     ->orderByDesc('effective_from')->value('rate_percent') ?? 7);
-                $netSellingPrice = $outputProduct->is_vat ? $sellingPrice * 100 / (100 + $vatRate) : $sellingPrice;
-                $outputUnitCost = round($rawTotal / $outputWeight, 4);
-                $profit = round($netSellingPrice - $outputUnitCost, 4);
+                $netSellingPrice = $outputProduct->is_vat
+                    ? DecimalMath::divide(DecimalMath::multiply($sellingPrice, 100), DecimalMath::add(100, $vatRate))
+                    : DecimalMath::round($sellingPrice, DecimalMath::COST_SCALE);
+                $outputUnitCost = DecimalMath::divide($rawTotal, $outputWeight);
+                $profit = DecimalMath::subtract($netSellingPrice, $outputUnitCost);
                 ProductionBatch::create([
                     'document_id' => $document->id,
                     'production_recipe_id' => $data['production_recipe_id'] ?? null,
                     'output_product_id' => $outputProduct->id,
                     'input_weight_qty' => $inputWeight,
                     'output_weight_qty' => $outputWeight,
-                    'loss_weight_qty' => round($inputWeight - $outputWeight, 4),
-                    'yield_percent' => $inputWeight > 0 ? round($outputWeight * 100 / $inputWeight, 4) : 0,
+                    'loss_weight_qty' => DecimalMath::subtract($inputWeight, $outputWeight, DecimalMath::QUANTITY_SCALE),
+                    'yield_percent' => DecimalMath::compare($inputWeight, 0) > 0 ? DecimalMath::divide(DecimalMath::multiply($outputWeight, 100), $inputWeight) : 0,
                     'total_input_cost' => $rawTotal,
                     'output_unit_cost' => $outputUnitCost,
                     'selling_unit_price' => $sellingPrice,
-                    'net_selling_unit_price' => round($netSellingPrice, 4),
+                    'net_selling_unit_price' => DecimalMath::round($netSellingPrice, DecimalMath::COST_SCALE),
                     'estimated_profit_per_unit' => $profit,
-                    'estimated_margin_percent' => $netSellingPrice > 0 ? round($profit * 100 / $netSellingPrice, 4) : 0,
+                    'estimated_margin_percent' => DecimalMath::compare($netSellingPrice, 0) > 0
+                        ? DecimalMath::divide(DecimalMath::multiply($profit, 100), $netSellingPrice)
+                        : 0,
                     'scale_plu' => $plu,
                     'prepared_by' => auth()->id(),
                 ]);
@@ -189,25 +204,28 @@ class StockTransformService
         if (! $batch->scale_plu) {
             throw new RuntimeException('สินค้าผลผลิตยังไม่มี PLU เครื่องชั่ง 800xxx/801xxx');
         }
-        $weights = collect($weights)->map(fn ($weight) => round((float) $weight, 4))->filter(fn ($weight) => $weight > 0);
-        $existingWeight = (float) $batch->packages()->sum('weight_qty');
-        if ($existingWeight + $weights->sum() > (float) $batch->output_weight_qty + 0.0001) {
+        $weights = collect($weights)
+            ->map(fn ($weight) => DecimalMath::round($weight, DecimalMath::QUANTITY_SCALE))
+            ->filter(fn ($weight) => DecimalMath::compare($weight, 0) > 0);
+        $existingWeight = $batch->packages()->sum('weight_qty');
+        $packageWeight = DecimalMath::sum($weights, DecimalMath::QUANTITY_SCALE);
+        if (DecimalMath::compare(DecimalMath::add($existingWeight, $packageWeight, DecimalMath::QUANTITY_SCALE), $batch->output_weight_qty) > 0) {
             throw new RuntimeException('น้ำหนักรวมของป้ายมากกว่าน้ำหนักผลผลิตจริงของ Batch');
         }
 
-        $unitPrice = (float) $batch->selling_unit_price;
-        if ($unitPrice <= 0) {
+        $unitPrice = $batch->selling_unit_price;
+        if (DecimalMath::compare($unitPrice, 0) <= 0) {
             throw new RuntimeException('สินค้าผลผลิตยังไม่ได้ตั้งราคาขายต่อกิโลกรัม');
         }
 
         DB::transaction(function () use ($batch, $weights, $unitPrice) {
             $seq = (int) $batch->packages()->max('seq');
             foreach ($weights as $weight) {
-                $total = round($weight * $unitPrice, 2);
+                $total = DecimalMath::round(DecimalMath::multiply($weight, $unitPrice), DecimalMath::DISPLAY_MONEY_SCALE);
                 ProductionBatchPackage::create([
                     'production_batch_id' => $batch->id, 'seq' => ++$seq,
                     'weight_qty' => $weight, 'unit_price' => $unitPrice, 'total_price' => $total,
-                    'barcode' => $this->barcodes->fromTotalPrice((string) $batch->scale_plu, $total),
+                    'barcode' => $this->barcodes->fromTotalPrice((string) $batch->scale_plu, (float) $total),
                 ]);
             }
         });

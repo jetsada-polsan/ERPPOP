@@ -43,11 +43,11 @@ class ProductionBatch extends Model
     protected function casts(): array
     {
         return [
-            'input_weight_qty' => 'decimal:4', 'output_weight_qty' => 'decimal:4',
-            'loss_weight_qty' => 'decimal:4', 'yield_percent' => 'decimal:4',
-            'total_input_cost' => 'decimal:4', 'output_unit_cost' => 'decimal:4',
-            'selling_unit_price' => 'decimal:4', 'net_selling_unit_price' => 'decimal:4',
-            'estimated_profit_per_unit' => 'decimal:4', 'estimated_margin_percent' => 'decimal:4',
+            'input_weight_qty' => 'decimal:8', 'output_weight_qty' => 'decimal:8',
+            'loss_weight_qty' => 'decimal:8', 'yield_percent' => 'decimal:8',
+            'total_input_cost' => 'decimal:8', 'output_unit_cost' => 'decimal:8',
+            'selling_unit_price' => 'decimal:8', 'net_selling_unit_price' => 'decimal:8',
+            'estimated_profit_per_unit' => 'decimal:8', 'estimated_margin_percent' => 'decimal:8',
         ];
     }
 }

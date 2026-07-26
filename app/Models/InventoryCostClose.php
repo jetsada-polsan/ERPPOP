@@ -17,8 +17,8 @@ class InventoryCostClose extends Model
     protected function casts(): array
     {
         return [
-            'opening_qty' => 'decimal:4', 'received_qty' => 'decimal:4', 'issued_qty' => 'decimal:4',
-            'ending_qty' => 'decimal:4', 'average_cost' => 'decimal:4', 'ending_value' => 'decimal:4',
+            'opening_qty' => 'decimal:8', 'received_qty' => 'decimal:8', 'issued_qty' => 'decimal:8',
+            'ending_qty' => 'decimal:8', 'average_cost' => 'decimal:8', 'ending_value' => 'decimal:8',
             'closed_at' => 'datetime',
         ];
     }

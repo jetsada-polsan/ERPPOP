@@ -11,6 +11,7 @@ use App\Models\StockDocumentItem;
 use App\Services\Accounting\GlPostingService;
 use App\Services\Inventory\CostingService;
 use App\Services\Inventory\FifoStockService;
+use App\Support\DecimalMath;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -46,7 +47,9 @@ class CashSaleService
 
         return DB::transaction(function () use ($data, $branch, $documentType) {
             $items = collect($data['items']);
-            $totalAmount = $items->sum(fn ($i) => $i['qty'] * $i['unit_price']);
+            $totalAmount = DecimalMath::sum($items->map(
+                fn ($item) => DecimalMath::multiply($item['qty'], $item['unit_price'])
+            ));
 
             $document = Document::create([
                 'document_type_id' => $documentType->id,
@@ -62,7 +65,7 @@ class CashSaleService
 
             $stockDocument = StockDocument::create([
                 'document_id' => $document->id,
-                'total_qty' => $items->sum('qty'),
+                'total_qty' => DecimalMath::sum($items->pluck('qty'), DecimalMath::QUANTITY_SCALE),
                 'total_items' => $items->count(),
             ]);
 
@@ -71,8 +74,8 @@ class CashSaleService
             $policies = $products->pluck('negative_stock_policy', 'id');
             foreach ($items as $item) {
                 $productId = (int) $item['product_id'];
-                $qty = (float) $item['qty'];
-                $fallbackCost = (float) ($products->get($productId)?->average_cost ?? 0);
+                $qty = DecimalMath::round($item['qty'], DecimalMath::QUANTITY_SCALE);
+                $fallbackCost = $products->get($productId)?->average_cost ?? 0;
 
                 // ตัด FIFO lot จริงก่อน แล้วคิดต้นทุนขายจาก Lot ที่ถูกตัดจริง (ไม่ใช่ต้นทุนเฉลี่ย)
                 // เพื่อให้ COGS ตรงกับมูลค่าสต๊อกปลายงวดที่ InventoryCostCloseService คำนวณจาก stock_lots
@@ -94,7 +97,7 @@ class CashSaleService
                     'qty' => $qty,
                     'unit_price' => $item['unit_price'],
                     'unit_cost' => $unitCost,
-                    'cost_amount' => round($qty * $unitCost, 4),
+                    'cost_amount' => DecimalMath::multiply($qty, $unitCost),
                 ]);
             }
 

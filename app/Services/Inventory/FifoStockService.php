@@ -6,12 +6,13 @@ use App\Models\Product;
 use App\Models\StockBalance;
 use App\Models\StockLot;
 use App\Models\StockMovement;
+use App\Support\DecimalMath;
 use Illuminate\Support\Collection;
 use RuntimeException;
 
 class FifoStockService
 {
-    public function receive(int $productId, int $locationId, float $qty, ?int $documentId, string $movementType = 'in', ?string $lotNumber = null, ?string $receivedDate = null, ?string $expiryDate = null, float $unitCost = 0, ?string $manufactureDate = null): StockLot
+    public function receive(int $productId, int $locationId, int|float|string $qty, ?int $documentId, string $movementType = 'in', ?string $lotNumber = null, ?string $receivedDate = null, ?string $expiryDate = null, int|float|string $unitCost = 0, ?string $manufactureDate = null): StockLot
     {
         $date = $receivedDate ?: now()->toDateString();
         $lot = StockLot::create([
@@ -33,16 +34,16 @@ class FifoStockService
         return $lot;
     }
 
-    /** @return Collection<int, array{lot:StockLot,qty:float}> */
-    public function issue(int $productId, int $locationId, float $qty, ?int $documentId, string $movementType = 'out', ?string $movementDate = null, bool $allowNegative = false, bool $allowExpired = false, bool $allowRestricted = false): Collection
+    /** @return Collection<int, array{lot:StockLot,qty:string}> */
+    public function issue(int $productId, int $locationId, int|float|string $qty, ?int $documentId, string $movementType = 'out', ?string $movementDate = null, bool $allowNegative = false, bool $allowExpired = false, bool $allowRestricted = false): Collection
     {
         $balance = $this->balance($productId, $locationId);
-        $available = (float) $balance->on_hand_qty;
-        if (! $allowNegative && $qty > $available + 0.0001) {
+        $available = $balance->on_hand_qty;
+        if (! $allowNegative && DecimalMath::compare($qty, $available) > 0) {
             throw new RuntimeException('สต๊อกไม่พอสำหรับการตัดสินค้า');
         }
 
-        $this->ensureOpeningLot($productId, $locationId, max(0, $available));
+        $this->ensureOpeningLot($productId, $locationId, DecimalMath::compare($available, 0) > 0 ? $available : 0);
         $product = Product::find($productId);
         $blockExpired = (bool) $product?->tracks_expiry
             && ($product->expiry_sale_policy ?? 'block') === 'block'
@@ -53,28 +54,28 @@ class FifoStockService
             ->where('remaining_qty', '>', 0);
         if (! $allowRestricted) {
             $lotsQuery->where('quality_status', 'available');
-            $usable = (float) (clone $lotsQuery)->sum('remaining_qty');
-            $restricted = (float) StockLot::where('product_id', $productId)
+            $usable = (clone $lotsQuery)->sum('remaining_qty');
+            $restricted = StockLot::where('product_id', $productId)
                 ->where('warehouse_location_id', $locationId)
                 ->where('remaining_qty', '>', 0)->where('quality_status', '!=', 'available')
                 ->sum('remaining_qty');
-            if ($restricted > 0.0001 && $qty > $usable + 0.0001) {
+            if (DecimalMath::compare($restricted, 0) > 0 && DecimalMath::compare($qty, $usable) > 0) {
                 throw new RuntimeException('สต๊อกที่ใช้ได้ไม่พอ เนื่องจากมี Lot ถูกพักตรวจ กักกัน หรือเรียกคืน');
             }
         }
         if ($blockExpired) {
             $lotsQuery->where(fn ($query) => $query->whereNull('expiry_date')->orWhereDate('expiry_date', '>=', now()->toDateString()));
-            $sellable = (float) (clone $lotsQuery)->sum('remaining_qty');
-            $expired = (float) StockLot::where('product_id', $productId)
+            $sellable = (clone $lotsQuery)->sum('remaining_qty');
+            $expired = StockLot::where('product_id', $productId)
                 ->where('warehouse_location_id', $locationId)
                 ->where('remaining_qty', '>', 0)->whereDate('expiry_date', '<', now()->toDateString())
                 ->sum('remaining_qty');
-            if ($expired > 0.0001 && $qty > $sellable + 0.0001) {
+            if (DecimalMath::compare($expired, 0) > 0 && DecimalMath::compare($qty, $sellable) > 0) {
                 throw new RuntimeException('สต๊อกที่ขายได้ไม่พอ เนื่องจากมี Lot หมดอายุถูกระงับ กรุณาตัดเป็นสินค้าชำรุด');
             }
         }
 
-        $remaining = $qty;
+        $remaining = DecimalMath::round($qty, DecimalMath::QUANTITY_SCALE);
         $allocations = collect();
         if ($product?->tracks_expiry) {
             $lotsQuery->orderByRaw('CASE WHEN expiry_date IS NULL THEN 1 ELSE 0 END')->orderBy('expiry_date');
@@ -82,17 +83,19 @@ class FifoStockService
         $lots = $lotsQuery->orderBy('received_date')->orderBy('id')->lockForUpdate()->get();
 
         foreach ($lots as $lot) {
-            if ($remaining <= 0.0001) {
+            if (DecimalMath::compare($remaining, 0) <= 0) {
                 break;
             }
-            $take = min($remaining, (float) $lot->remaining_qty);
+            $take = DecimalMath::compare($remaining, $lot->remaining_qty) <= 0
+                ? $remaining
+                : $lot->remaining_qty;
             $lot->decrement('remaining_qty', $take);
             $this->movement($productId, $locationId, $documentId, $lot->id, $movementType, $take, $movementDate ?: now()->toDateString());
             $allocations->push(['lot' => $lot, 'qty' => $take]);
-            $remaining -= $take;
+            $remaining = DecimalMath::subtract($remaining, $take, DecimalMath::QUANTITY_SCALE);
         }
 
-        if ($remaining > 0.0001) {
+        if (DecimalMath::compare($remaining, 0) > 0) {
             if (! $allowNegative) {
                 throw new RuntimeException('ยอดคงเหลือใน Lot ไม่พอ กรุณาตรวจสอบข้อมูลสต๊อก');
             }
@@ -114,7 +117,7 @@ class FifoStockService
             ->get();
 
         foreach ($issues as $issue) {
-            $qty = (float) $issue->qty;
+            $qty = $issue->qty;
             if ($issue->stock_lot_id) {
                 $lot = StockLot::whereKey($issue->stock_lot_id)->lockForUpdate()->first();
                 if (! $lot) {
@@ -136,12 +139,12 @@ class FifoStockService
         }
     }
 
-    private function ensureOpeningLot(int $productId, int $locationId, float $balanceQty): void
+    private function ensureOpeningLot(int $productId, int $locationId, int|float|string $balanceQty): void
     {
-        $lotQty = (float) StockLot::where('product_id', $productId)
+        $lotQty = StockLot::where('product_id', $productId)
             ->where('warehouse_location_id', $locationId)->sum('remaining_qty');
-        $missing = round($balanceQty - $lotQty, 4);
-        if ($missing > 0.0001) {
+        $missing = DecimalMath::subtract($balanceQty, $lotQty, DecimalMath::QUANTITY_SCALE);
+        if (DecimalMath::compare($missing, 0) > 0) {
             StockLot::create([
                 'product_id' => $productId,
                 'warehouse_location_id' => $locationId,
@@ -162,7 +165,7 @@ class FifoStockService
         );
     }
 
-    private function movement(int $productId, int $locationId, ?int $documentId, ?int $lotId, string $type, float $qty, string $date): void
+    private function movement(int $productId, int $locationId, ?int $documentId, ?int $lotId, string $type, int|float|string $qty, string $date): void
     {
         StockMovement::create([
             'product_id' => $productId,

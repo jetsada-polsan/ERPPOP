@@ -10,6 +10,7 @@ use App\Models\Product;
 use App\Models\ProductPrice;
 use App\Models\ProductUnit;
 use App\Models\Promotion;
+use App\Support\DecimalMath;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -143,7 +144,7 @@ class PriceTableController extends Controller
                 'is_active' => true,
             ]
         );
-        if ($oldPrice === null || round((float) $oldPrice, 4) !== round((float) $data['price'], 4)) {
+        if ($oldPrice === null || DecimalMath::compare($oldPrice, $data['price']) !== 0) {
             PriceChange::create([
                 'product_id' => $data['product_id'],
                 'old_price' => $oldPrice,

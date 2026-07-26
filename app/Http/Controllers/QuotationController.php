@@ -9,6 +9,7 @@ use App\Models\QuotationItem;
 use App\Models\Salesman;
 use App\Services\Sales\BookingService;
 use App\Services\Sales\DocumentNumberGenerator;
+use App\Support\DecimalMath;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -77,7 +78,7 @@ class QuotationController extends Controller
                 'note' => $data['note'] ?? null,
             ]);
 
-            $total = 0;
+            $lineTotals = [];
             foreach ($data['items'] as $item) {
                 QuotationItem::create([
                     'quotation_id' => $quotation->id,
@@ -85,9 +86,11 @@ class QuotationController extends Controller
                     'qty' => $item['qty'],
                     'unit_price' => $item['unit_price'],
                 ]);
-                $total += (float) $item['qty'] * (float) $item['unit_price'];
+                $lineTotals[] = DecimalMath::multiply($item['qty'], $item['unit_price']);
             }
-            $quotation->update(['total_amount' => round($total, 2)]);
+            $quotation->update([
+                'total_amount' => DecimalMath::round(DecimalMath::sum($lineTotals), DecimalMath::DISPLAY_MONEY_SCALE),
+            ]);
 
             return $quotation;
         });
@@ -127,6 +130,7 @@ class QuotationController extends Controller
             if ($quotation->status !== 'cancelled') {
                 $quotation->update(['status' => 'expired']);
             }
+
             return back()->withErrors(['convert' => 'ใบเสนอราคานี้หมดอายุหรือถูกยกเลิกแล้ว ไม่สามารถแปลงเป็นใบจองได้']);
         }
 

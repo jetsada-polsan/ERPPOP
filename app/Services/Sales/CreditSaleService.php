@@ -15,6 +15,7 @@ use App\Models\StockDocumentItem;
 use App\Services\Accounting\GlPostingService;
 use App\Services\Inventory\CostingService;
 use App\Services\Inventory\FifoStockService;
+use App\Support\DecimalMath;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -55,8 +56,10 @@ class CreditSaleService
                 throw new RuntimeException('ใบจองนี้ไม่มีรายการสินค้า');
             }
 
-            $totalQty = $sourceItems->sum('qty');
-            $totalAmount = $sourceItems->sum(fn ($i) => $i->qty * $i->unit_price);
+            $totalQty = DecimalMath::sum($sourceItems->pluck('qty'), DecimalMath::QUANTITY_SCALE);
+            $totalAmount = DecimalMath::sum(
+                $sourceItems->map(fn ($item) => DecimalMath::multiply($item->qty, $item->unit_price)),
+            );
 
             $saleDocument = Document::create([
                 'document_type_id' => $documentType->id,
@@ -85,8 +88,8 @@ class CreditSaleService
             $products = Product::whereIn('id', $sourceItems->pluck('product_id')->unique())->get()->keyBy('id');
             foreach ($sourceItems as $item) {
                 $productId = (int) $item->product_id;
-                $qty = (float) $item->qty;
-                $fallbackCost = (float) ($products->get($productId)?->average_cost ?? 0);
+                $qty = $item->qty;
+                $fallbackCost = $products->get($productId)?->average_cost ?? 0;
 
                 $balance = StockBalance::firstOrCreate(
                     ['product_id' => $productId, 'warehouse_location_id' => $item->warehouse_location_id],
@@ -105,7 +108,7 @@ class CreditSaleService
                     'qty' => $qty,
                     'unit_price' => $item->unit_price,
                     'unit_cost' => $unitCost,
-                    'cost_amount' => round($qty * $unitCost, 4),
+                    'cost_amount' => DecimalMath::multiply($qty, $unitCost),
                 ]);
             }
 

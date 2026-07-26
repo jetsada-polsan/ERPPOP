@@ -24,8 +24,8 @@ class StockCountItem extends Model
     protected function casts(): array
     {
         return [
-            'system_qty' => 'decimal:4',
-            'counted_qty' => 'decimal:4',
+            'system_qty' => 'decimal:8',
+            'counted_qty' => 'decimal:8',
         ];
     }
 }

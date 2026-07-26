@@ -17,8 +17,8 @@ class ProductionBatchPackage extends Model
     protected function casts(): array
     {
         return [
-            'weight_qty' => 'decimal:4', 'unit_price' => 'decimal:4',
-            'total_price' => 'decimal:4', 'printed_at' => 'datetime',
+            'weight_qty' => 'decimal:8', 'unit_price' => 'decimal:8',
+            'total_price' => 'decimal:8', 'printed_at' => 'datetime',
         ];
     }
 }

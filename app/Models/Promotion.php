@@ -22,7 +22,7 @@ class Promotion extends Model
         return [
             'starts_at' => 'date',
             'ends_at' => 'date',
-            'min_qty' => 'decimal:4',
+            'min_qty' => 'decimal:8',
             'min_amount' => 'decimal:4',
             'discount_amount' => 'decimal:4',
             'discount_percent' => 'decimal:4',

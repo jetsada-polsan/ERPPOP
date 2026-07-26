@@ -23,6 +23,10 @@ class ProductBarcode extends Model
 
     protected function casts(): array
     {
-        return ['is_active' => 'boolean'];
+        return [
+            'unit_factor' => 'decimal:8',
+            'price' => 'decimal:8',
+            'is_active' => 'boolean',
+        ];
     }
 }

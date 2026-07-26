@@ -135,7 +135,7 @@ class ProductionController extends Controller
         ], ['qty.required' => 'กรุณาระบุจำนวนที่รับเข้า']);
 
         try {
-            $document = $service->receive($order, (float) $data['qty'], $data['remark'] ?? null);
+            $document = $service->receive($order, $data['qty'], $data['remark'] ?? null);
         } catch (\RuntimeException $e) {
             return back()->withErrors(['qty' => $e->getMessage()]);
         }

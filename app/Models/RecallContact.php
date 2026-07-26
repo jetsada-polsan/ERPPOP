@@ -31,6 +31,6 @@ class RecallContact extends Model
 
     protected function casts(): array
     {
-        return ['qty' => 'decimal:4', 'contacted_at' => 'datetime'];
+        return ['qty' => 'decimal:8', 'contacted_at' => 'datetime'];
     }
 }

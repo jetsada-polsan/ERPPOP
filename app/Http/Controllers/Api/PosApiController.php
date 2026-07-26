@@ -8,6 +8,7 @@ use App\Models\AppSetting;
 use App\Models\PosReceipt;
 use App\Models\Salesman;
 use App\Services\Sales\SaleReturnService;
+use App\Support\DecimalMath;
 use App\Support\PosReceiptTemplate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -293,8 +294,8 @@ class PosApiController extends Controller
 
                 $requested = collect($data['items'])
                     ->groupBy('product_id')
-                    ->map(fn ($rows) => round($rows->sum(fn ($row) => (float) $row['qty']), 4))
-                    ->filter(fn ($qty) => $qty > 0);
+                    ->map(fn ($rows) => DecimalMath::sum($rows->pluck('qty'), DecimalMath::QUANTITY_SCALE))
+                    ->filter(fn ($qty) => DecimalMath::compare($qty, 0) > 0);
 
                 if ($requested->isEmpty()) {
                     throw new RuntimeException('ต้องมีจำนวนคืนอย่างน้อย 1 รายการ');
@@ -303,12 +304,16 @@ class PosApiController extends Controller
                 $sold = $receipt->items
                     ->groupBy('product_id')
                     ->map(function ($rows) {
-                        $qty = $rows->sum(fn ($row) => (float) $row->qty);
-                        $amount = $rows->sum(fn ($row) => (float) $row->qty * (float) $row->unit_price);
+                        $qty = DecimalMath::sum($rows->pluck('qty'), DecimalMath::QUANTITY_SCALE);
+                        $amount = DecimalMath::sum(
+                            $rows->map(fn ($row) => DecimalMath::multiply($row->qty, $row->unit_price)),
+                        );
 
                         return [
-                            'qty' => round($qty, 4),
-                            'unit_price' => $qty > 0 ? round($amount / $qty, 4) : 0,
+                            'qty' => $qty,
+                            'unit_price' => DecimalMath::compare($qty, 0) > 0
+                                ? DecimalMath::divide($amount, $qty)
+                                : 0,
                             'item_id' => $rows->first()?->id,
                         ];
                     });
@@ -328,15 +333,15 @@ class PosApiController extends Controller
                         throw new RuntimeException("สินค้า #{$productId} ไม่อยู่ในบิลนี้");
                     }
 
-                    $remaining = round((float) $line['qty'] - (float) ($returned[$productId] ?? 0), 4);
-                    if ($qty > $remaining + 0.0001) {
+                    $remaining = DecimalMath::subtract($line['qty'], $returned[$productId] ?? 0, DecimalMath::QUANTITY_SCALE);
+                    if (DecimalMath::compare($qty, $remaining) > 0) {
                         throw new RuntimeException("คืนสินค้า #{$productId} เกินจำนวนคงเหลือในบิล");
                     }
 
                     $returnItems[] = [
                         'product_id' => (int) $productId,
                         'qty' => $qty,
-                        'unit_price' => (float) $line['unit_price'],
+                        'unit_price' => $line['unit_price'],
                         'pos_receipt_item_id' => $line['item_id'],
                     ];
                 }
@@ -353,7 +358,9 @@ class PosApiController extends Controller
                     ], $returnItems),
                 ]);
 
-                $totalAmount = round(collect($returnItems)->sum(fn ($item) => $item['qty'] * $item['unit_price']), 4);
+                $totalAmount = DecimalMath::sum(
+                    collect($returnItems)->map(fn ($item) => DecimalMath::multiply($item['qty'], $item['unit_price'])),
+                );
                 $returnId = DB::table('pos_receipt_returns')->insertGetId([
                     'pos_receipt_id' => $receipt->id,
                     'pos_shift_id' => $data['shift_id'] ?? null,
@@ -376,7 +383,7 @@ class PosApiController extends Controller
                         'product_id' => $item['product_id'],
                         'qty' => $item['qty'],
                         'unit_price' => $item['unit_price'],
-                        'amount' => round($item['qty'] * $item['unit_price'], 4),
+                        'amount' => DecimalMath::multiply($item['qty'], $item['unit_price']),
                     ]);
                 }
 

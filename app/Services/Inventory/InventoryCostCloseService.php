@@ -5,6 +5,7 @@ namespace App\Services\Inventory;
 use App\Models\InventoryCostClose;
 use App\Models\InventoryCostClosePeriod;
 use App\Models\Product;
+use App\Support\DecimalMath;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -36,19 +37,21 @@ class InventoryCostCloseService
                 $ending = $this->lotBalances($ids->all(), $to->toDateString());
                 foreach ($products as $product) {
                     $rows = $movements->get($product->id, collect());
-                    $received = (float) $rows->whereIn('movement_type', ['in', 'transfer_in', 'return_in', 'transform_in', 'adjust_in', 'void_in'])->sum('qty');
-                    $issued = (float) $rows->whereIn('movement_type', ['out', 'transfer_out', 'transform_out', 'adjust_out'])->sum('qty');
+                    $received = DecimalMath::sum($rows->whereIn('movement_type', ['in', 'transfer_in', 'return_in', 'transform_in', 'adjust_in', 'void_in'])->pluck('qty'), DecimalMath::QUANTITY_SCALE);
+                    $issued = DecimalMath::sum($rows->whereIn('movement_type', ['out', 'transfer_out', 'transform_out', 'adjust_out'])->pluck('qty'), DecimalMath::QUANTITY_SCALE);
                     $endingRow = $ending->get($product->id);
-                    $endingQty = (float) ($endingRow?->qty ?? 0);
-                    $endingValue = (float) ($endingRow?->value ?? 0);
-                    $averageCost = $endingQty > 0.0001 ? $endingValue / $endingQty : (float) $product->average_cost;
+                    $endingQty = DecimalMath::round($endingRow?->qty ?? 0, DecimalMath::QUANTITY_SCALE);
+                    $endingValue = DecimalMath::round($endingRow?->value ?? 0, DecimalMath::COST_SCALE);
+                    $averageCost = DecimalMath::compare($endingQty, 0) > 0
+                        ? DecimalMath::divide($endingValue, $endingQty, DecimalMath::COST_SCALE)
+                        : $product->average_cost;
                     InventoryCostClose::updateOrCreate(
                         ['period' => $period, 'product_id' => $product->id],
                         [
-                            'opening_qty' => round((float) ($opening->get($product->id)?->qty ?? 0), 4),
+                            'opening_qty' => DecimalMath::round($opening->get($product->id)?->qty ?? 0, DecimalMath::QUANTITY_SCALE),
                             'received_qty' => $received, 'issued_qty' => $issued, 'ending_qty' => $endingQty,
-                            'average_cost' => round($averageCost, 4),
-                            'ending_value' => round($endingValue, 4),
+                            'average_cost' => DecimalMath::round($averageCost, DecimalMath::COST_SCALE),
+                            'ending_value' => $endingValue,
                             'closed_by' => $userId, 'closed_at' => now(),
                         ],
                     );

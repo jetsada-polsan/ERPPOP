@@ -60,6 +60,6 @@ class ProductUnit extends Model
 
     protected function casts(): array
     {
-        return ['qty_per_base_unit' => 'decimal:4'];
+        return ['qty_per_base_unit' => 'decimal:8'];
     }
 }

@@ -8,6 +8,7 @@ use App\Models\StockBalance;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
 use App\Services\Sales\DocumentNumberGenerator;
+use App\Support\DecimalMath;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -92,13 +93,13 @@ class StockTransferService
             throw new RuntimeException('ต้นทางและปลายทางต้องไม่ใช่คลังเดียวกัน');
         }
 
-        $items = collect($data['items'])->filter(fn ($i) => (float) $i['qty'] > 0)->values();
+        $items = collect($data['items'])->filter(fn ($i) => DecimalMath::compare($i['qty'], 0) > 0)->values();
         if ($items->isEmpty()) {
             throw new RuntimeException('ต้องมีรายการสินค้าอย่างน้อย 1 รายการ');
         }
 
         $documentType = DocumentType::where('code', 'STOCK_TRANSFER')->firstOrFail();
-        $totalQty = $items->sum('qty');
+        $totalQty = DecimalMath::sum($items->pluck('qty'), DecimalMath::QUANTITY_SCALE);
 
         $document = Document::create([
             'document_type_id' => $documentType->id,
@@ -151,10 +152,10 @@ class StockTransferService
 
         foreach ($items as $item) {
             $fromLocationId = (int) $item->warehouse_location_id;
-            $available = (float) (StockBalance::where('product_id', $item->product_id)
+            $available = StockBalance::where('product_id', $item->product_id)
                 ->where('warehouse_location_id', $fromLocationId)
-                ->value('on_hand_qty') ?? 0);
-            if ((float) $item->qty > $available + 0.0001) {
+                ->value('on_hand_qty') ?? 0;
+            if (DecimalMath::compare($item->qty, $available) > 0) {
                 throw new RuntimeException('สต็อกต้นทางไม่พอสำหรับสินค้าบางรายการ');
             }
         }
@@ -163,15 +164,15 @@ class StockTransferService
             $fromLocationId = (int) $item->warehouse_location_id;
 
             $allocations = $this->fifo->issue(
-                (int) $item->product_id, $fromLocationId, (float) $item->qty,
+                (int) $item->product_id, $fromLocationId, $item->qty,
                 $document->id, 'transfer_out'
             );
             foreach ($allocations as $allocation) {
                 $sourceLot = $allocation['lot'];
                 $receivedLot = $this->fifo->receive(
-                    (int) $item->product_id, $toLocationId, (float) $allocation['qty'],
+                    (int) $item->product_id, $toLocationId, $allocation['qty'],
                     $document->id, 'transfer_in', $sourceLot->lot_number,
-                    now()->toDateString(), $sourceLot->expiry_date?->toDateString(), (float) $sourceLot->unit_cost,
+                    now()->toDateString(), $sourceLot->expiry_date?->toDateString(), $sourceLot->unit_cost,
                     $sourceLot->manufacture_date?->toDateString()
                 );
                 $receivedLot->update([

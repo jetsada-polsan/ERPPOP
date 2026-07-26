@@ -8,6 +8,7 @@ use App\Models\StockBalance;
 use App\Models\StockCount;
 use App\Models\StockCountItem;
 use App\Services\Sales\DocumentNumberGenerator;
+use App\Support\DecimalMath;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -53,7 +54,7 @@ class StockCountService
                 ->map(fn ($b) => [
                     'stock_count_id' => $count->id,
                     'product_id' => $b->product_id,
-                    'system_qty' => (float) $b->on_hand_qty,
+                    'system_qty' => DecimalMath::round($b->on_hand_qty, DecimalMath::QUANTITY_SCALE),
                     'counted_qty' => null,
                     'note' => null,
                 ]);
@@ -87,7 +88,7 @@ class StockCountService
             throw new RuntimeException('ยังไม่มียอดนับจริงในใบนี้ กรอกหรือ import ยอดก่อนปรับปรุง');
         }
 
-        $diffItems = $counted->filter(fn ($i) => abs((float) $i->counted_qty - (float) $i->system_qty) > 0.0001);
+        $diffItems = $counted->filter(fn ($i) => DecimalMath::compare($i->counted_qty, $i->system_qty) !== 0);
 
         if ($diffItems->isEmpty()) {
             $count->update(['status' => 'posted']);
@@ -101,7 +102,7 @@ class StockCountService
             'remark' => 'ปรับปรุงจากใบตรวจนับ '.$count->doc_number.($remark ? ' | '.$remark : ''),
             'items' => $diffItems->map(fn ($i) => [
                 'product_id' => $i->product_id,
-                'counted_qty' => (float) $i->counted_qty,
+                'counted_qty' => $i->counted_qty,
             ])->values()->all(),
         ]);
 

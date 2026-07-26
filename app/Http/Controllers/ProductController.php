@@ -21,6 +21,7 @@ use App\Models\StockLotQualityCheck;
 use App\Models\StockMovement;
 use App\Models\Supplier;
 use App\Services\Inventory\ProductCostHistoryService;
+use App\Support\DecimalMath;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -170,7 +171,7 @@ class ProductController extends Controller
                 'is_active' => true,
             ]
         );
-        if ($oldPrice === null || round((float) $oldPrice, 4) !== round((float) $data['price'], 4)) {
+        if ($oldPrice === null || DecimalMath::compare($oldPrice, $data['price']) !== 0) {
             PriceChange::create([
                 'product_id' => $product->id,
                 'old_price' => $oldPrice,

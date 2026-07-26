@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderItem;
 use App\Models\Supplier;
 use App\Services\Purchasing\PurchaseOrderReceivingService;
 use App\Services\Sales\DocumentNumberGenerator;
+use App\Support\DecimalMath;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -70,18 +72,18 @@ class PurchaseOrderController extends Controller
                 'note' => $data['note'] ?? null,
             ]);
 
-            $total = 0;
+            $lineTotals = [];
             foreach ($data['items'] as $item) {
-                $price = (float) ($item['unit_price'] ?? 0);
+                $price = DecimalMath::round($item['unit_price'] ?? 0, DecimalMath::COST_SCALE);
                 PurchaseOrderItem::create([
                     'purchase_order_id' => $order->id,
                     'product_id' => $item['product_id'],
                     'qty' => $item['qty'],
                     'unit_price' => $price,
                 ]);
-                $total += (float) $item['qty'] * $price;
+                $lineTotals[] = DecimalMath::multiply($item['qty'], $price);
             }
-            $order->update(['total_amount' => round($total, 2)]);
+            $order->update(['total_amount' => DecimalMath::round(DecimalMath::sum($lineTotals), DecimalMath::DISPLAY_MONEY_SCALE)]);
 
             return $order;
         });
@@ -130,17 +132,17 @@ class PurchaseOrderController extends Controller
         ]);
 
         DB::transaction(function () use ($purchaseOrder, $data, $request) {
-            $total = 0;
+            $lineTotals = [];
             foreach ($purchaseOrder->items as $item) {
-                $price = (float) ($data['unit_price'][$item->id] ?? $item->unit_price);
+                $price = DecimalMath::round($data['unit_price'][$item->id] ?? $item->unit_price, DecimalMath::COST_SCALE);
                 $item->update(['unit_price' => $price]);
-                $total += (float) $item->qty * $price;
+                $lineTotals[] = DecimalMath::multiply($item->qty, $price);
             }
             $purchaseOrder->update([
                 'status' => 'ordered',
                 'supplier_id' => $data['supplier_id'],
                 'is_credit' => $request->boolean('is_credit', true),
-                'total_amount' => round($total, 2),
+                'total_amount' => DecimalMath::round(DecimalMath::sum($lineTotals), DecimalMath::DISPLAY_MONEY_SCALE),
             ]);
         });
 

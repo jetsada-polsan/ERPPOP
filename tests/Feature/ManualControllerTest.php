@@ -27,6 +27,7 @@ class ManualControllerTest extends TestCase
         $this->assertCount(5, $view->getData()['controlManuals']);
         $this->assertGreaterThanOrEqual(25, count($view->getData()['thaiErpStandards']));
         $this->assertGreaterThanOrEqual(7, count($view->getData()['thaiErpSources']));
+        $this->assertCount(8, $view->getData()['calculationFormulas']);
     }
 
     public function test_every_program_and_workflow_step_points_to_a_real_route(): void
@@ -89,7 +90,9 @@ class ManualControllerTest extends TestCase
             ->assertSee('PUR-07')
             ->assertSee('OPS-04')
             ->assertSee('ผลทดสอบผ่าน')
-            ->assertSee('ผลทดสอบไม่ผ่าน');
+            ->assertSee('ผลทดสอบไม่ผ่าน')
+            ->assertSee('สูตรตัดสต๊อก ต้นทุน และกำไรที่ระบบใช้')
+            ->assertSee('ไม่เกิน 0.00001%');
     }
 
     public function test_guest_is_redirected_from_manual_to_login(): void

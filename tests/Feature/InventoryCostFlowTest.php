@@ -6,6 +6,8 @@ use App\Models\Branch;
 use App\Models\DocumentType;
 use App\Models\Product;
 use App\Models\ProductBarcode;
+use App\Models\ProductionOrder;
+use App\Models\ProductionRecipe;
 use App\Models\ProductUnit;
 use App\Models\StockDocumentItem;
 use App\Models\Supplier;
@@ -15,6 +17,7 @@ use App\Services\Inventory\CostingService;
 use App\Services\Inventory\FifoStockService;
 use App\Services\Inventory\InventoryCostCloseService;
 use App\Services\Inventory\ProductCostHistoryService;
+use App\Services\Inventory\ProductionReceiptService;
 use App\Services\Inventory\StockTransformService;
 use App\Services\Purchasing\PurchaseService;
 use App\Services\Sales\CashSaleService;
@@ -322,6 +325,64 @@ class InventoryCostFlowTest extends TestCase
         $this->assertSame('2026-07-01', $line->manufacture_date->toDateString());
         $this->assertSame('2026-07-31', $lot->expiry_date->toDateString());
         $this->assertSame('2026-07-01', $lot->manufacture_date->toDateString());
+    }
+
+    public function test_production_receipt_issues_recipe_inputs_and_receives_output_at_actual_fifo_cost(): void
+    {
+        [$branch, , $rawMaterial] = $this->masters();
+        DocumentType::firstOrCreate(
+            ['code' => 'PRODUCTION_RECEIPT'],
+            ['name_th' => 'ใบรับจากการผลิต', 'affects_stock' => true],
+        );
+        $finishedProduct = Product::create([
+            'sku_code' => 'FG-001',
+            'name_th' => 'สินค้าผลิตสำเร็จ',
+            'base_unit_id' => $rawMaterial->base_unit_id,
+            'average_cost' => 0,
+            'is_active' => true,
+            'negative_stock_policy' => 'block',
+        ]);
+        $recipe = ProductionRecipe::create([
+            'code' => 'BOM-001',
+            'name' => 'สูตรทดสอบต้นทุนจริง',
+            'finished_product_id' => $finishedProduct->id,
+            'output_qty' => 2,
+            'is_active' => true,
+        ]);
+        $recipe->items()->create([
+            'product_id' => $rawMaterial->id,
+            'qty' => 3,
+        ]);
+        $order = ProductionOrder::create([
+            'doc_no' => 'MO-001',
+            'doc_date' => now()->toDateString(),
+            'production_recipe_id' => $recipe->id,
+            'finished_product_id' => $finishedProduct->id,
+            'branch_id' => $branch->id,
+            'warehouse_location_id' => $branch->default_warehouse_location_id,
+            'planned_qty' => 2,
+            'produced_qty' => 0,
+            'status' => 'planned',
+        ]);
+
+        $rawLot = app(FifoStockService::class)->receive(
+            $rawMaterial->id,
+            (int) $branch->default_warehouse_location_id,
+            10,
+            null,
+            unitCost: 12.34567891,
+        );
+        $document = app(ProductionReceiptService::class)->receive($order, 2);
+        $outputLot = $finishedProduct->stockLots()->firstOrFail();
+
+        $this->assertSame(7.0, (float) $rawLot->fresh()->remaining_qty);
+        $this->assertSame(2.0, (float) $outputLot->remaining_qty);
+        $this->assertSame(18.51851837, (float) $outputLot->unit_cost);
+        $this->assertSame(37.03703673, (float) $document->total_amount);
+        $this->assertSame(3.0, (float) DB::table('stock_lot_lineages')->where('output_lot_id', $outputLot->id)->sum('input_qty'));
+        $this->assertSame('completed', $order->fresh()->status);
+        $this->assertDatabaseHas('stock_movements', ['document_id' => $document->id, 'movement_type' => 'transform_out']);
+        $this->assertDatabaseHas('stock_movements', ['document_id' => $document->id, 'movement_type' => 'transform_in']);
     }
 
     /** @return array{Branch,Supplier,Product,Product} */

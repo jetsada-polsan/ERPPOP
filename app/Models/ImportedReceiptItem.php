@@ -40,8 +40,8 @@ class ImportedReceiptItem extends Model
     protected function casts(): array
     {
         return [
-            'qty' => 'decimal:4',
-            'unit_price' => 'decimal:4',
+            'qty' => 'decimal:8',
+            'unit_price' => 'decimal:8',
             'discount_amount' => 'decimal:4',
             'vat_amount' => 'decimal:4',
             'net_amount' => 'decimal:4',

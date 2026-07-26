@@ -42,8 +42,8 @@ class ProductionOrder extends Model
     {
         return [
             'doc_date' => 'date',
-            'planned_qty' => 'decimal:4',
-            'produced_qty' => 'decimal:4',
+            'planned_qty' => 'decimal:8',
+            'produced_qty' => 'decimal:8',
         ];
     }
 }

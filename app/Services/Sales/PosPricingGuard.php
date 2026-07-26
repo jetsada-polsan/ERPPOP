@@ -12,6 +12,7 @@ use App\Models\Promotion;
 use App\Models\QtyPromotion;
 use App\Models\User;
 use App\Services\Inventory\ScaleBarcodeService;
+use App\Support\DecimalMath;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -79,7 +80,7 @@ class PosPricingGuard
                 throw new RuntimeException('สินค้าชั่ง '.$scale['plu'].' ยังไม่ได้ตั้งราคาขายต่อหน่วย');
             }
 
-            $item['qty'] = round($scale['price'] / $perUnit, 4);
+            $item['qty'] = (float) DecimalMath::divide($scale['price'], $perUnit, DecimalMath::QUANTITY_SCALE);
             $item['unit_price'] = $perUnit;
             unset($item['barcode']);
 
@@ -130,51 +131,66 @@ class PosPricingGuard
             return ['product_id' => $productId, 'qty' => $qty, 'unit_price' => $unitPrice];
         });
 
-        $expected = round($serverLines->sum(fn ($line) => $line['qty'] * $line['unit_price']), 2);
+        $expected = DecimalMath::round(DecimalMath::sum($serverLines->map(
+            fn ($line) => DecimalMath::multiply($line['qty'], $line['unit_price'])
+        )), DecimalMath::DISPLAY_MONEY_SCALE);
         $qtyPromotionDiscount = $this->qtyPromotionDiscount($serverLines, (int) $data['branch_id']);
 
-        $manualDiscount = round((float) ($data['manual_discount_amount'] ?? 0), 2);
-        if ($manualDiscount > 0) {
+        $manualDiscount = DecimalMath::round($data['manual_discount_amount'] ?? 0, DecimalMath::DISPLAY_MONEY_SCALE);
+        if (DecimalMath::compare($manualDiscount, 0) > 0) {
             if (! $user->hasPermission('pos.discount.override')) {
                 throw new RuntimeException('ส่วนลดพิเศษต้องให้ผู้จัดการที่มีสิทธิ์อนุมัติ');
             }
-            $expected -= $manualDiscount;
+            $expected = DecimalMath::subtract($expected, $manualDiscount, DecimalMath::DISPLAY_MONEY_SCALE);
         }
 
         if (! empty($data['discount_card_code'])) {
             $card = DiscountCard::where('card_code', $data['discount_card_code'])->first();
-            $cardDiscount = $card?->computeDiscount(max(0, $expected));
+            $cardDiscount = $card?->computeDiscount(max(0, (float) $expected));
             if ($cardDiscount === null) {
                 throw new RuntimeException('บัตรส่วนลดไม่ผ่านเงื่อนไขเมื่อคำนวณจากเซิร์ฟเวอร์');
             }
-            $expected -= $cardDiscount;
+            $expected = DecimalMath::subtract($expected, $cardDiscount, DecimalMath::DISPLAY_MONEY_SCALE);
         }
 
         $redeemPoints = (float) ($data['redeem_points'] ?? 0);
         if ($redeemPoints > 0) {
-            $expected -= $redeemPoints * $this->points->pointValueBaht();
+            $expected = DecimalMath::subtract(
+                $expected,
+                DecimalMath::multiply($redeemPoints, $this->points->pointValueBaht()),
+                DecimalMath::DISPLAY_MONEY_SCALE,
+            );
         }
-        $expected -= $qtyPromotionDiscount;
+        $expected = DecimalMath::subtract($expected, $qtyPromotionDiscount, DecimalMath::DISPLAY_MONEY_SCALE);
 
-        $expected = max(0, round($expected, 2));
+        $expected = DecimalMath::compare($expected, 0) < 0 ? '0.00' : DecimalMath::round($expected, 2);
         if (($data['vat_mode'] ?? 'included') === 'excluded') {
             $vatRate = (float) (DB::table('vat_rates')->where('effective_from', '<=', now()->toDateString())
                 ->where(fn ($query) => $query->whereNull('effective_to')->orWhere('effective_to', '>=', now()->toDateString()))
                 ->orderByDesc('effective_from')->value('rate_percent') ?? 7);
-            $expected = round($expected * (1 + $vatRate / 100), 2);
+            $expected = DecimalMath::round(
+                DecimalMath::divide(DecimalMath::multiply($expected, DecimalMath::add(100, $vatRate)), 100),
+                DecimalMath::DISPLAY_MONEY_SCALE,
+            );
         }
 
-        $submitted = round($items->sum(fn ($item) => (float) $item['qty'] * (float) $item['unit_price']), 2);
-        if (abs($submitted - $expected) > 0.02) {
+        $submitted = DecimalMath::round(DecimalMath::sum($items->map(
+            fn ($item) => DecimalMath::multiply($item['qty'], $item['unit_price'])
+        )), DecimalMath::DISPLAY_MONEY_SCALE);
+        if (DecimalMath::compare(DecimalMath::absoluteDifference($submitted, $expected, 2), '0.02') > 0) {
             throw new RuntimeException('ราคาหรือส่วนลดเปลี่ยนจากข้อมูลบนเซิร์ฟเวอร์ กรุณาโหลดสินค้าใหม่แล้วคิดเงินอีกครั้ง');
         }
 
-        $cost = round($items->sum(fn ($item) => (float) $item['qty'] * (float) $products[(int) $item['product_id']]->average_cost), 2);
-        if ($manualDiscount > 0 && $submitted + 0.01 < $cost && ! $user->hasPermission('pos.sell_below_cost')) {
+        $cost = DecimalMath::round(DecimalMath::sum($items->map(
+            fn ($item) => DecimalMath::multiply($item['qty'], $products[(int) $item['product_id']]->average_cost)
+        )), DecimalMath::DISPLAY_MONEY_SCALE);
+        if (DecimalMath::compare($manualDiscount, 0) > 0
+            && DecimalMath::compare(DecimalMath::add($submitted, '0.01', 2), $cost) < 0
+            && ! $user->hasPermission('pos.sell_below_cost')) {
             throw new RuntimeException('ยอดขายต่ำกว่าทุน ต้องให้ผู้จัดการที่มีสิทธิ์อนุมัติ');
         }
 
-        return $submitted;
+        return (float) $submitted;
     }
 
     /**
@@ -199,9 +215,11 @@ class PosPricingGuard
             if ((int) $barcode->product_id !== (int) $item['product_id']) {
                 throw new RuntimeException('บาร์โค้ดไม่ตรงกับสินค้า กรุณาสแกนใหม่');
             }
-            $factor = max(0.0001, (float) $barcode->unit_factor);
-            $item['qty'] = round((float) $item['qty'] * $factor, 4);
-            $item['unit_price'] = round((float) $item['unit_price'] / $factor, 4);
+            $factor = DecimalMath::compare($barcode->unit_factor, '0.00000001') >= 0
+                ? $barcode->unit_factor
+                : '0.00000001';
+            $item['qty'] = (float) DecimalMath::multiply($item['qty'], $factor, DecimalMath::QUANTITY_SCALE);
+            $item['unit_price'] = (float) DecimalMath::divide($item['unit_price'], $factor, DecimalMath::COST_SCALE);
             unset($item['barcode']);
 
             return $item;
@@ -245,7 +263,10 @@ class PosPricingGuard
                 && ($item->flashSale->branch_id === null || (int) $item->flashSale->branch_id === $branchId))
             ->min(fn ($item) => (float) $item->flash_price);
 
-        return round(min((float) $prices->min(), $flash !== null ? (float) $flash : $basePrice), 4);
+        return (float) DecimalMath::round(
+            min((float) $prices->min(), $flash !== null ? (float) $flash : $basePrice),
+            DecimalMath::COST_SCALE,
+        );
     }
 
     private function qtyPromotionDiscount($lines, int $branchId): float

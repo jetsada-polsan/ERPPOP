@@ -5,6 +5,7 @@ namespace App\Services\Inventory;
 use App\Models\InventoryCostClose;
 use App\Models\InventoryCostClosePeriod;
 use App\Models\Product;
+use App\Support\DecimalMath;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -91,33 +92,35 @@ class ProductCostHistoryService
 
         $purchaseQty = (float) ($purchase?->qty ?? 0);
         $purchaseValue = (float) ($purchase?->value ?? 0);
-        $periodCostQty = (float) $opening['qty'] + $costReceivedQty;
-        $periodCostValue = (float) $opening['value'] + $costReceivedValue;
-        $periodAverage = $periodCostQty > 0.0001 ? $periodCostValue / $periodCostQty : 0.0;
-        $endingAverage = (float) $ending['qty'] > 0.0001
-            ? (float) $ending['value'] / (float) $ending['qty']
-            : 0.0;
+        $periodCostQty = DecimalMath::add($opening['qty'], $costReceivedQty);
+        $periodCostValue = DecimalMath::add($opening['value'], $costReceivedValue);
+        $periodAverage = DecimalMath::compare($periodCostQty, 0) > 0
+            ? DecimalMath::divide($periodCostValue, $periodCostQty)
+            : '0';
+        $endingAverage = DecimalMath::compare($ending['qty'], 0) > 0
+            ? DecimalMath::divide($ending['value'], $ending['qty'])
+            : '0';
 
         return [
             'period' => $period,
             'label' => $from->locale('th')->translatedFormat('M Y'),
             'is_current' => $period === now()->format('Y-m'),
             'status' => $periodStatus === 'closed' || $closed ? 'closed' : 'open',
-            'opening_qty' => round((float) $opening['qty'], 4),
-            'opening_value' => round((float) $opening['value'], 4),
-            'received_qty' => round($receivedQty, 4),
-            'received_value' => round($costReceivedValue, 4),
-            'issued_qty' => round($issuedQty, 4),
-            'purchase_qty' => round($purchaseQty, 4),
-            'purchase_value' => round($purchaseValue, 4),
-            'purchase_average_cost' => $purchaseQty > 0.0001 ? round($purchaseValue / $purchaseQty, 4) : null,
-            'last_purchase_cost' => $lastPurchaseCost !== null ? round((float) $lastPurchaseCost, 4) : null,
-            'period_average_cost' => round($periodAverage, 4),
-            'ending_qty' => round((float) $ending['qty'], 4),
-            'ending_value' => round((float) $ending['value'], 4),
-            'ending_average_cost' => round($endingAverage, 4),
+            'opening_qty' => (float) DecimalMath::round($opening['qty'], DecimalMath::QUANTITY_SCALE),
+            'opening_value' => (float) DecimalMath::round($opening['value'], DecimalMath::COST_SCALE),
+            'received_qty' => (float) DecimalMath::round($receivedQty, DecimalMath::QUANTITY_SCALE),
+            'received_value' => (float) DecimalMath::round($costReceivedValue, DecimalMath::COST_SCALE),
+            'issued_qty' => (float) DecimalMath::round($issuedQty, DecimalMath::QUANTITY_SCALE),
+            'purchase_qty' => (float) DecimalMath::round($purchaseQty, DecimalMath::QUANTITY_SCALE),
+            'purchase_value' => (float) DecimalMath::round($purchaseValue, DecimalMath::COST_SCALE),
+            'purchase_average_cost' => $purchaseQty > 0.00000001 ? (float) DecimalMath::divide($purchaseValue, $purchaseQty) : null,
+            'last_purchase_cost' => $lastPurchaseCost !== null ? (float) DecimalMath::round($lastPurchaseCost, DecimalMath::COST_SCALE) : null,
+            'period_average_cost' => (float) DecimalMath::round($periodAverage, DecimalMath::COST_SCALE),
+            'ending_qty' => (float) DecimalMath::round($ending['qty'], DecimalMath::QUANTITY_SCALE),
+            'ending_value' => (float) DecimalMath::round($ending['value'], DecimalMath::COST_SCALE),
+            'ending_average_cost' => (float) DecimalMath::round($endingAverage, DecimalMath::COST_SCALE),
             'moving_average_cost' => $period === now()->format('Y-m')
-                ? round((float) $product->average_cost, 4)
+                ? (float) DecimalMath::round($product->average_cost, DecimalMath::COST_SCALE)
                 : null,
         ];
     }

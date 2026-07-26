@@ -12,11 +12,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class ProductSupplier extends Model
 {
-    public function product(): BelongsTo { return $this->belongsTo(Product::class); }
-    public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class);
+    }
+
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(Supplier::class);
+    }
 
     protected function casts(): array
     {
-        return ['is_primary' => 'boolean', 'last_purchase_price' => 'decimal:4', 'minimum_order_qty' => 'decimal:4'];
+        return ['is_primary' => 'boolean', 'last_purchase_price' => 'decimal:8', 'minimum_order_qty' => 'decimal:8'];
     }
 }
