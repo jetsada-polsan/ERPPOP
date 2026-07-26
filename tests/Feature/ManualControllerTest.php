@@ -20,7 +20,7 @@ class ManualControllerTest extends TestCase
         $testSuites = $view->getData()['testSuites'];
 
         $this->assertSame(['man', 'money', 'material', 'management'], array_column($pillars, 'key'));
-        $this->assertCount(8, $workflows);
+        $this->assertCount(9, $workflows);
         $this->assertCount(13, $testSuites);
         $this->assertGreaterThanOrEqual(70, collect($testSuites)->sum(fn (array $suite) => count($suite['cases'])));
         $this->assertGreaterThanOrEqual(8, count($view->getData()['gaps']));
@@ -84,8 +84,9 @@ class ManualControllerTest extends TestCase
             ->get('/core-modules')
             ->assertOk()
             ->assertSee('คู่มือทดสอบรับมอบระบบ (UAT)')
-            ->assertSee('70 กรณี')
+            ->assertSee('71 กรณี')
             ->assertSee('POS-08')
+            ->assertSee('PUR-07')
             ->assertSee('OPS-04')
             ->assertSee('ผลทดสอบผ่าน')
             ->assertSee('ผลทดสอบไม่ผ่าน');

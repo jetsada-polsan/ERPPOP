@@ -13,6 +13,8 @@ use App\Models\Warehouse;
 use App\Models\WarehouseLocation;
 use App\Services\Inventory\CostingService;
 use App\Services\Inventory\FifoStockService;
+use App\Services\Inventory\InventoryCostCloseService;
+use App\Services\Inventory\ProductCostHistoryService;
 use App\Services\Inventory\StockTransformService;
 use App\Services\Purchasing\PurchaseService;
 use App\Services\Sales\CashSaleService;
@@ -132,6 +134,70 @@ class InventoryCostFlowTest extends TestCase
         $this->assertSame(0.0, (float) $document->vat_amount);
         $this->assertSame(535.0, (float) $document->total_amount);
         $this->assertSame(107.0, (float) $product->fresh()->average_cost);
+    }
+
+    public function test_product_master_shows_latest_receipt_and_weighted_cost_by_month(): void
+    {
+        $this->travelTo('2026-05-10 10:00:00');
+        [$branch, $supplier, , $product] = $this->masters();
+        $purchases = app(PurchaseService::class);
+        $purchases->create([
+            'supplier_id' => $supplier->id,
+            'branch_id' => $branch->id,
+            'is_credit' => false,
+            'items' => [['product_id' => $product->id, 'qty' => 10, 'unit_price' => 10]],
+        ]);
+
+        app(FifoStockService::class)->issue(
+            $product->id,
+            (int) $branch->default_warehouse_location_id,
+            4,
+            null,
+            movementDate: '2026-05-20',
+        );
+
+        $this->travelTo('2026-06-05 10:00:00');
+        $purchases->create([
+            'supplier_id' => $supplier->id,
+            'branch_id' => $branch->id,
+            'is_credit' => false,
+            'items' => [['product_id' => $product->id, 'qty' => 4, 'unit_price' => 20]],
+        ]);
+
+        $this->travelTo('2026-06-20 10:00:00');
+        $purchases->create([
+            'supplier_id' => $supplier->id,
+            'branch_id' => $branch->id,
+            'is_credit' => false,
+            'items' => [['product_id' => $product->id, 'qty' => 6, 'unit_price' => 30]],
+        ]);
+
+        $this->travelTo('2026-07-01 10:00:00');
+        app(InventoryCostCloseService::class)->close('2026-06');
+        $history = app(ProductCostHistoryService::class)
+            ->history($product->fresh(), 3)
+            ->keyBy('period');
+        $june = $history->get('2026-06');
+        $may = $history->get('2026-05');
+
+        $this->assertSame('closed', $june['status']);
+        $this->assertSame(6.0, $june['opening_qty']);
+        $this->assertSame(60.0, $june['opening_value']);
+        $this->assertSame(10.0, $june['purchase_qty']);
+        $this->assertSame(260.0, $june['purchase_value']);
+        $this->assertSame(26.0, $june['purchase_average_cost']);
+        $this->assertSame(30.0, $june['last_purchase_cost']);
+        $this->assertSame(20.0, $june['period_average_cost']);
+        $this->assertSame(16.0, $june['ending_qty']);
+        $this->assertSame(320.0, $june['ending_value']);
+        $this->assertSame(20.0, $june['ending_average_cost']);
+        $this->assertSame(10.0, $may['purchase_average_cost']);
+        $this->assertSame(10.0, $may['period_average_cost']);
+
+        $product->refresh();
+        $this->assertSame(30.0, (float) $product->last_purchase_cost);
+        $this->assertSame('2026-06-20', $product->last_purchase_cost_at->toDateString());
+        $this->assertSame(20.0, (float) $product->average_cost);
     }
 
     public function test_weighed_set_allocates_all_actual_input_cost_to_actual_output_weight(): void

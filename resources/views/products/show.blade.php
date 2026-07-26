@@ -19,6 +19,9 @@
         $allProductPrices = $productPrices->flatten(1)->sortBy(fn ($price) => ($price->priceTable?->code ?? '').'|'.($price->unit?->name ?? ''))->values();
         $defaultTablePrices = $defaultPriceTable ? $productPrices->get($defaultPriceTable->id, collect()) : collect();
         $defaultPosPrice = $defaultTablePrices->firstWhere('unit_id', null)?->price ?? $product->default_price ?? 0;
+        $currentCostPeriod = $costHistory->first();
+        $currentPeriodAverageCost = (float) ($currentCostPeriod['period_average_cost'] ?? $product->average_cost ?? 0);
+        $currentPurchaseAverageCost = $currentCostPeriod['purchase_average_cost'] ?? null;
     @endphp
 
     <div x-data="productShow()" x-cloak>
@@ -70,6 +73,12 @@
                 <table class="compact-table compact-edit-table"><thead><tr><th>บาร์โค้ด</th><th>หน่วย</th><th class="num">ตัวคูณ</th><th class="num">ราคา</th><th>สถานะ</th><th></th></tr></thead><tbody>@forelse($product->barcodes as $barcode)<tr class="{{ $barcode->is_active ? '' : 'barcode-disabled' }}"><td><input form="barcode-{{ $barcode->id }}" name="barcode" value="{{ $barcode->barcode }}" required></td><td><select form="barcode-{{ $barcode->id }}" name="unit_id" required>@foreach($units as $unit)<option value="{{ $unit->id }}" @selected($unit->id===$barcode->unit_id)>{{ $unit->displayLabel() }}</option>@endforeach</select></td><td><input form="barcode-{{ $barcode->id }}" class="num" type="number" step="0.0001" min="0.0001" name="unit_factor" value="{{ number_format((float) $barcode->unit_factor, 4, '.', '') }}" required></td><td><input form="barcode-{{ $barcode->id }}" class="num" type="number" step="0.01" min="0" name="price" value="{{ $barcode->price === null ? '' : number_format((float) $barcode->price, 2, '.', '') }}"></td><td><input form="barcode-{{ $barcode->id }}" type="hidden" name="is_active" value="0"><label class="barcode-state {{ $barcode->is_active ? 'is-on' : 'is-off' }}"><input form="barcode-{{ $barcode->id }}" type="checkbox" name="is_active" value="1" @checked($barcode->is_active)><span>{{ $barcode->is_active ? 'ใช้งาน' : 'ปิดใช้งาน' }}</span></label></td><td><form id="barcode-{{ $barcode->id }}" method="post" action="{{ route('products.barcodes.update', [$product, $barcode]) }}">@csrf @method('PUT')<input type="hidden" name="popup" value="1"><button class="compact-row-save"><i class="bi bi-check-lg"></i> บันทึก</button></form></td></tr>@empty<tr><td colspan="6">ยังไม่มีบาร์โค้ด</td></tr>@endforelse</tbody></table>
             </div>
             <div class="compact-body" x-show="compactTab==='stock'">
+                <div class="compact-cost-grid">
+                    <div><span>ทุนรับเข้าล่าสุด</span><strong>฿{{ number_format((float) $product->last_purchase_cost, 2) }}</strong><small>{{ $product->last_purchase_cost_at?->format('d/m/Y H:i') ?? 'ยังไม่เคยรับเข้า' }}</small></div>
+                    <div><span>ทุนรับเข้าเฉลี่ยเดือนนี้</span><strong>{{ $currentPurchaseAverageCost !== null ? '฿'.number_format((float) $currentPurchaseAverageCost, 2) : '-' }}</strong><small>เฉลี่ยถ่วงน้ำหนักเฉพาะใบรับซื้อ</small></div>
+                    <div><span>ทุนเฉลี่ยงวด {{ $currentCostPeriod['period'] ?? now()->format('Y-m') }}</span><strong>฿{{ number_format($currentPeriodAverageCost, 2) }}</strong><small>ต้นงวด + รับเข้าในเดือน</small></div>
+                    <div><span>ทุนคงเหลือเฉลี่ย</span><strong>฿{{ number_format((float) ($currentCostPeriod['ending_average_cost'] ?? 0), 2) }}</strong><small>มูลค่า Lot คงเหลือ ÷ จำนวน</small></div>
+                </div>
                 <div class="compact-columns"><div><h6>สต๊อกคงเหลือ</h6><table class="compact-table"><thead><tr><th>คลัง / ที่เก็บ</th><th class="num">คงเหลือ</th></tr></thead><tbody>@forelse($product->stockBalances as $stock)<tr><td>{{ $stock->warehouseLocation?->warehouse?->name_th ?? $stock->warehouseLocation?->code ?? '-' }}</td><td class="num">{{ number_format($stock->qty_on_hand,4) }}</td></tr>@empty<tr><td colspan="2">ไม่มีสต๊อกคงเหลือ</td></tr>@endforelse</tbody></table></div><div><h6>ผู้จำหน่าย</h6><table class="compact-table"><thead><tr><th>รหัส</th><th>ชื่อผู้จำหน่าย</th></tr></thead><tbody>@forelse($product->suppliers as $link)<tr><td>{{ $link->supplier?->code }}</td><td>{{ $link->supplier?->name_th }}</td></tr>@empty<tr><td colspan="2">ยังไม่กำหนดผู้จำหน่าย</td></tr>@endforelse</tbody></table></div></div>
             </div>
         </section>
@@ -130,15 +139,60 @@
 
         @php
             $salePriceExVat = $product->is_vat ? ((float) $defaultPosPrice * 100 / (100 + $currentVatRate)) : (float) $defaultPosPrice;
-            $estimatedProfit = $salePriceExVat - (float) $product->average_cost;
+            $estimatedProfit = $salePriceExVat - $currentPeriodAverageCost;
         @endphp
-        <div class="row g-3 mb-4">
-            <div class="col-6 col-lg-3"><div class="content-card p-3 h-100"><div class="text-muted small">ราคาขายปัจจุบัน</div><div class="fs-5 fw-bold text-success">฿{{ number_format((float)$defaultPosPrice, 2) }}</div><div class="small text-muted">ตามตารางราคาหลัก</div></div></div>
-            <div class="col-6 col-lg-3"><div class="content-card p-3 h-100"><div class="text-muted small">ต้นทุนรับเข้าล่าสุด</div><div class="fs-5 fw-bold">฿{{ number_format((float)$product->last_purchase_cost, 2) }}</div><div class="small text-muted">ไม่รวม VAT ที่ขอคืนได้</div></div></div>
-            <div class="col-6 col-lg-3"><div class="content-card p-3 h-100"><div class="text-muted small">ต้นทุนเฉลี่ยเคลื่อนไหว</div><div class="fs-5 fw-bold">฿{{ number_format((float)$product->average_cost, 2) }}</div><div class="small text-muted">ล็อกเป็นต้นทุนเมื่อขาย</div></div></div>
-            <div class="col-6 col-lg-3"><div class="content-card p-3 h-100"><div class="text-muted small">กำไรขั้นต้นประมาณ/หน่วย</div><div class="fs-5 fw-bold {{ $estimatedProfit >= 0 ? 'text-primary' : 'text-danger' }}">฿{{ number_format($estimatedProfit, 2) }}</div><div class="small text-muted">ยอดขายหลัง VAT ลบต้นทุนเฉลี่ย</div></div></div>
+        <div class="cost-overview-grid mb-4">
+            <div class="content-card cost-overview-item"><div class="text-muted small">ราคาขายปัจจุบัน</div><div class="fs-5 fw-bold text-success">฿{{ number_format((float)$defaultPosPrice, 2) }}</div><div class="small text-muted">ตามตารางราคาหลัก</div></div>
+            <div class="content-card cost-overview-item"><div class="text-muted small">ต้นทุนรับเข้าล่าสุด</div><div class="fs-5 fw-bold">฿{{ number_format((float)$product->last_purchase_cost, 2) }}</div><div class="small text-muted">{{ $product->last_purchase_cost_at?->format('d/m/Y H:i') ?? 'ยังไม่เคยรับเข้า' }} · ไม่รวม VAT ที่ขอคืนได้</div></div>
+            <div class="content-card cost-overview-item"><div class="text-muted small">ต้นทุนรับเข้าเฉลี่ยเดือนนี้</div><div class="fs-5 fw-bold">{{ $currentPurchaseAverageCost !== null ? '฿'.number_format((float) $currentPurchaseAverageCost, 2) : '-' }}</div><div class="small text-muted">ถ่วงน้ำหนักเฉพาะใบรับซื้อเดือน {{ $currentCostPeriod['period'] ?? now()->format('Y-m') }}</div></div>
+            <div class="content-card cost-overview-item"><div class="text-muted small">ต้นทุนเฉลี่ยงวดปัจจุบัน</div><div class="fs-5 fw-bold text-primary">฿{{ number_format($currentPeriodAverageCost, 2) }}</div><div class="small text-muted">(มูลค่าต้นงวด + รับเข้า) ÷ จำนวนรวม</div></div>
+            <div class="content-card cost-overview-item"><div class="text-muted small">กำไรขั้นต้นประมาณ/หน่วย</div><div class="fs-5 fw-bold {{ $estimatedProfit >= 0 ? 'text-primary' : 'text-danger' }}">฿{{ number_format($estimatedProfit, 2) }}</div><div class="small text-muted">ยอดขายหลัง VAT ลบต้นทุนเฉลี่ยงวด ฿{{ number_format($currentPeriodAverageCost, 2) }}</div></div>
         </div>
 
+        <div class="content-card p-4 mb-4">
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                <div>
+                    <h3 class="h6 fw-bold mb-1">บัญชีต้นทุนสินค้าแยกตามงวด</h3>
+                    <div class="text-muted small">ต้นทุนรับเข้าเฉลี่ยคิดเฉพาะใบรับซื้อ ส่วนต้นทุนเฉลี่ยงวดคิดจากมูลค่าสต๊อกต้นงวดรวมกับการรับเข้าที่เพิ่มมูลค่าสินค้า โดยไม่นับโอนระหว่างคลังซ้ำ</div>
+                </div>
+                <span class="badge text-bg-light border">ย้อนหลัง {{ $costHistory->count() }} เดือน</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle cost-history-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>งวด</th>
+                            <th>สถานะ</th>
+                            <th class="text-end">ต้นงวด</th>
+                            <th class="text-end">รับซื้อ</th>
+                            <th class="text-end">ทุนรับเข้าเฉลี่ย</th>
+                            <th class="text-end">รับเข้าทั้งหมด</th>
+                            <th class="text-end">ต้นทุนเฉลี่ยงวด</th>
+                            <th class="text-end">ปลายงวด</th>
+                            <th class="text-end">ทุนคงเหลือเฉลี่ย</th>
+                            <th class="text-end">มูลค่าปลายงวด</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($costHistory as $costPeriod)
+                            <tr class="{{ $costPeriod['is_current'] ? 'cost-current-period' : '' }}">
+                                <td><strong>{{ $costPeriod['period'] }}</strong><small>{{ $costPeriod['label'] }}</small></td>
+                                <td><span class="cost-period-status {{ $costPeriod['status'] === 'closed' ? 'is-closed' : 'is-open' }}">{{ $costPeriod['status'] === 'closed' ? 'ปิดงวดแล้ว' : 'ระหว่างงวด' }}</span></td>
+                                <td class="text-end"><strong>{{ number_format($costPeriod['opening_qty'], 2) }}</strong><small>฿{{ number_format($costPeriod['opening_value'], 2) }}</small></td>
+                                <td class="text-end"><strong>{{ number_format($costPeriod['purchase_qty'], 2) }}</strong><small>฿{{ number_format($costPeriod['purchase_value'], 2) }}</small></td>
+                                <td class="text-end fw-semibold">{{ $costPeriod['purchase_average_cost'] !== null ? '฿'.number_format($costPeriod['purchase_average_cost'], 2) : '-' }}</td>
+                                <td class="text-end">{{ number_format($costPeriod['received_qty'], 2) }}</td>
+                                <td class="text-end fw-bold text-primary">฿{{ number_format($costPeriod['period_average_cost'], 2) }}</td>
+                                <td class="text-end">{{ number_format($costPeriod['ending_qty'], 2) }}</td>
+                                <td class="text-end">฿{{ number_format($costPeriod['ending_average_cost'], 2) }}</td>
+                                <td class="text-end fw-semibold">฿{{ number_format($costPeriod['ending_value'], 2) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            <div class="cost-note"><i class="bi bi-info-circle"></i><span>ต้นทุนขายของบิลที่ขายไปแล้วจะล็อกตาม Lot FIFO จริงและไม่เปลี่ยนย้อนหลัง แม้เดือนถัดไปจะรับสินค้าในต้นทุนใหม่</span></div>
+        </div>
 
         {{-- ═══ Price Tables Section ═══════════════════════════════════ --}}
         <div class="content-card p-4 mb-4" x-data="priceTableSection()">
@@ -1451,7 +1505,113 @@
         font-weight: 900;
         text-decoration: underline;
     }
+    .cost-overview-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 10px;
+    }
+    .cost-overview-item {
+        min-width: 0;
+        padding: 13px 14px;
+    }
+    .cost-overview-item .fs-5 {
+        margin: 2px 0;
+    }
+    .cost-history-table {
+        min-width: 1120px;
+    }
+    .cost-history-table th {
+        border-bottom-width: 1px;
+        background: #edf5f9;
+        color: #3e5d71;
+        font-size: 10.5px;
+        white-space: nowrap;
+    }
+    .cost-history-table td {
+        color: #29465b;
+        font-size: 11px;
+    }
+    .cost-history-table td small {
+        display: block;
+        margin-top: 2px;
+        color: #7890a1;
+        font-size: 9.5px;
+        white-space: nowrap;
+    }
+    .cost-current-period td {
+        background: #f0f9fd;
+    }
+    .cost-period-status {
+        display: inline-block;
+        min-width: 70px;
+        padding: 3px 6px;
+        border-radius: 5px;
+        text-align: center;
+        font-size: 9.5px;
+        font-weight: 800;
+    }
+    .cost-period-status.is-open {
+        background: #e0f2fe;
+        color: #0369a1;
+    }
+    .cost-period-status.is-closed {
+        background: #d1fae5;
+        color: #047857;
+    }
+    .cost-note {
+        display: flex;
+        align-items: flex-start;
+        gap: 7px;
+        margin-top: 10px;
+        padding: 8px 10px;
+        border-left: 3px solid #1599d3;
+        background: #f4fafe;
+        color: #526d7f;
+        font-size: 10.5px;
+    }
+    .compact-cost-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 7px;
+        margin-bottom: 10px;
+    }
+    .compact-cost-grid > div {
+        min-width: 0;
+        padding: 8px 9px;
+        border: 1px solid #cdd8df;
+        background: #f9fbfc;
+    }
+    .compact-cost-grid span,
+    .compact-cost-grid strong,
+    .compact-cost-grid small {
+        display: block;
+    }
+    .compact-cost-grid span {
+        color: #60788b;
+        font-size: 9px;
+    }
+    .compact-cost-grid strong {
+        margin: 2px 0;
+        color: #15364d;
+        font-size: 15px;
+    }
+    .compact-cost-grid small {
+        color: #7890a1;
+        font-size: 8.5px;
+        line-height: 1.3;
+    }
+    @media (max-width: 1200px) {
+        .cost-overview-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
     @media (max-width: 860px) {
+        .cost-overview-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .compact-cost-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
         .legacy-product-window { max-width: none; }
         .legacy-product-detail {
             grid-template-columns: 1fr;
@@ -1477,6 +1637,11 @@
         .legacy-action-tools,
         .legacy-search-tools {
             justify-content: flex-end;
+        }
+    }
+    @media (max-width: 520px) {
+        .cost-overview-grid {
+            grid-template-columns: 1fr;
         }
     }
 </style>

@@ -20,6 +20,7 @@ use App\Models\StockLot;
 use App\Models\StockLotQualityCheck;
 use App\Models\StockMovement;
 use App\Models\Supplier;
+use App\Services\Inventory\ProductCostHistoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -82,7 +83,7 @@ class ProductController extends Controller
         return redirect()->route('products.show', $product)->with('success', "เพิ่มสินค้า {$product->sku_code} แล้ว");
     }
 
-    public function show(Product $product): View
+    public function show(Product $product, ProductCostHistoryService $costHistoryService): View
     {
         $product->load([
             'category', 'brand', 'department', 'baseUnit',
@@ -140,6 +141,7 @@ class ProductController extends Controller
             'defaultPriceTable' => $defaultPriceTable,
             'currentVatRate' => $currentVatRate,
             'nextScalePlu' => $nextScalePlu,
+            'costHistory' => $costHistoryService->history($product),
             'suppliers' => Supplier::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name_th']),
         ]);
     }
