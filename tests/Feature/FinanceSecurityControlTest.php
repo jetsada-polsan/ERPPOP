@@ -104,6 +104,12 @@ class FinanceSecurityControlTest extends TestCase
         $user->roles()->attach($role->id);
         $this->actingAs($user);
         $this->get('/operations')->assertOk()->assertSee('ศูนย์ Backup และ Security');
+        $this->get('/database-structure?table=products')
+            ->assertOk()
+            ->assertSee('โครงสร้างฐานข้อมูลทั้งระบบ')
+            ->assertSee('products')
+            ->assertSee('product_category_id')
+            ->assertSee('Foreign Key');
         $this->get('/tax-compliance')->assertOk()->assertSee('ศูนย์ภาษีไทยและ E-Tax');
         $this->get('/accounting-periods')->assertOk()->assertSee('งวดบัญชีและการปิดงวด');
         $this->get('/core-modules')->assertOk()
@@ -111,6 +117,13 @@ class FinanceSecurityControlTest extends TestCase
             ->assertSee('มาตรฐาน ERP ที่ใช้ในประเทศไทย')
             ->assertSee('DBD e-Filing/XBRL');
         $this->get('/security/mfa')->assertOk()->assertSee('Setup key');
+    }
+
+    public function test_database_structure_requires_system_settings_permission(): void
+    {
+        $user = User::factory()->create(['username' => 'ordinary-user', 'is_active' => true, 'must_change_password' => false]);
+
+        $this->actingAs($user)->get('/database-structure')->assertForbidden();
     }
 
     public function test_operations_page_stays_available_when_a_backup_checksum_is_unreadable(): void

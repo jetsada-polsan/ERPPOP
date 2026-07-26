@@ -11,6 +11,7 @@ use App\Http\Controllers\ChartOfAccountController;
 use App\Http\Controllers\ChequeController;
 use App\Http\Controllers\CreditDebitNoteController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\DatabaseStructureController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryNoteController;
 use App\Http\Controllers\DiscountCardController;
@@ -449,6 +450,7 @@ Route::prefix('operations')->name('operations.')->group(function () {
     Route::post('/restore-verify', [OperationsController::class, 'verifyRestore'])->name('restore-verify');
     Route::post('/users/{user}/mfa-reset', [OperationsController::class, 'resetMfa'])->name('mfa-reset');
 });
+Route::get('/database-structure', [DatabaseStructureController::class, 'index'])->name('database-structure.index');
 
 Route::prefix('members')->name('members.')->group(function () {
     Route::get('/', [MemberController::class, 'index'])->name('index');

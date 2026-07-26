@@ -120,6 +120,7 @@ class RoutePermissions
         'organizational-units.' => 'users.manage',
         'settings.' => 'settings.manage',
         'operations.' => 'settings.manage',
+        'database-structure.' => 'settings.manage',
         'mfa.' => null,
         'line-integrations.' => 'settings.manage',
         'ecommerce-channels.' => 'settings.manage',
