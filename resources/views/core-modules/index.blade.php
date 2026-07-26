@@ -103,11 +103,49 @@
     .source-item { display: grid; grid-template-columns: minmax(0,1fr) 32px; gap: 8px; align-items: center; padding: 10px 11px; border: 1px solid #dbe7ef; border-radius: 7px; }
     .source-item strong { display: block; color: #274b63; font-size: 12px; }
     .source-item span { display: block; margin-top: 2px; color: #6d8291; font-size: 10px; line-height: 1.4; }
+    .uat-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid #edf2f5; }
+    .uat-summary div { padding: 13px 16px; border-right: 1px solid #edf2f5; }
+    .uat-summary div:last-child { border-right: 0; }
+    .uat-summary span { display: block; color: #7890a1; font-size: 10px; font-weight: 800; }
+    .uat-summary strong { display: block; margin-top: 2px; color: #15364d; font-size: 20px; }
+    .uat-summary .pass strong { color: #047857; }
+    .uat-summary .fail strong { color: #b4232f; }
+    .uat-policy { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 12px; background: #f7fafc; border-bottom: 1px solid #edf2f5; }
+    .uat-policy div { padding: 9px 10px; border-left: 3px solid #1599d3; background: #fff; color: #526d7f; font-size: 11px; line-height: 1.45; }
+    .uat-policy strong { display: block; margin-bottom: 2px; color: #274b63; }
+    .uat-toolbar { display: grid; grid-template-columns: minmax(230px, 1fr) auto; gap: 10px; align-items: center; padding: 12px; border-bottom: 1px solid #edf2f5; }
+    .uat-tabs { display: flex; gap: 6px; padding: 10px 12px; overflow-x: auto; border-bottom: 1px solid #edf2f5; }
+    .uat-tab { border: 1px solid #cfdae3; border-radius: 6px; background: #fff; color: #526d7f; padding: 7px 10px; font-size: 11px; font-weight: 900; white-space: nowrap; }
+    .uat-tab.active { border-color: #1599d3; background: #eaf7fc; color: #0878ae; }
+    .uat-suite-head { display: flex; justify-content: space-between; gap: 14px; padding: 12px 16px; background: #f8fbfd; border-bottom: 1px solid #edf2f5; }
+    .uat-suite-head strong { display: block; color: #15364d; font-size: 13px; }
+    .uat-suite-head span { display: block; margin-top: 2px; color: #6d8291; font-size: 11px; }
+    .uat-case { display: grid; grid-template-columns: 92px minmax(210px, .7fr) minmax(420px, 1.3fr) 154px; gap: 12px; padding: 13px 16px; border-bottom: 1px solid #edf2f5; }
+    .uat-case:last-child { border-bottom: 0; }
+    .uat-case-id { color: #15364d; font-family: Consolas, monospace; font-size: 12px; font-weight: 900; }
+    .uat-risk { display: block; width: fit-content; margin-top: 5px; padding: 3px 6px; border-radius: 4px; font-size: 9px; font-weight: 900; }
+    .uat-risk-critical { color: #a61b27; background: #fee2e2; }
+    .uat-risk-control { color: #8a5a00; background: #fef3c7; }
+    .uat-case-title { color: #274b63; font-size: 12px; font-weight: 900; line-height: 1.35; }
+    .uat-prepare { margin-top: 5px; color: #6d8291; font-size: 10.5px; line-height: 1.45; }
+    .uat-steps { margin: 0; padding-left: 18px; color: #526d7f; font-size: 11px; line-height: 1.5; }
+    .uat-expected { margin-top: 7px; padding: 7px 9px; border-left: 3px solid #16a085; background: #f0faf7; color: #315f55; font-size: 10.5px; line-height: 1.45; }
+    .uat-evidence { margin-top: 5px; color: #6d8291; font-size: 10px; }
+    .uat-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; align-content: start; }
+    .uat-status { height: 30px; border: 1px solid #cfdae3; border-radius: 6px; background: #fff; color: #6d8291; font-size: 10px; font-weight: 900; }
+    .uat-status.pass.active { border-color: #059669; background: #d1fae5; color: #047857; }
+    .uat-status.fail.active { border-color: #dc3545; background: #fee2e2; color: #a61b27; }
+    .uat-status.pending.active { border-color: #64748b; background: #e2e8f0; color: #334155; }
+    .uat-open { grid-column: 1 / -1; display: flex; justify-content: center; gap: 6px; align-items: center; height: 30px; border: 1px solid #1599d3; border-radius: 6px; color: #0878ae; text-decoration: none; font-size: 10px; font-weight: 900; }
+    .uat-open:hover { background: #eaf7fc; color: #0878ae; }
 
     @media (max-width: 1100px) {
         .flow-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         .flow-step:nth-child(3)::after { display: none; }
         .manual-two-col { grid-template-columns: 1fr; }
+        .uat-case { grid-template-columns: 82px minmax(180px, .7fr) minmax(300px, 1.3fr); }
+        .uat-actions { grid-column: 2 / -1; grid-template-columns: repeat(4, minmax(90px, 1fr)); }
+        .uat-open { grid-column: auto; }
     }
     @media (max-width: 720px) {
         .manual-header { flex-direction: column; padding: 15px; }
@@ -122,14 +160,23 @@
         .gap-row { grid-template-columns: 74px minmax(0, 1fr); padding: 11px 12px; }
         .control-grid { grid-template-columns: 1fr; }
         .benchmark-summary, .source-list { grid-template-columns: 1fr; }
+        .uat-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .uat-summary div:nth-child(2) { border-right: 0; }
+        .uat-summary div:nth-child(-n+2) { border-bottom: 1px solid #edf2f5; }
+        .uat-policy { grid-template-columns: 1fr; }
+        .uat-toolbar { grid-template-columns: 1fr; }
+        .uat-case { grid-template-columns: 1fr; }
+        .uat-actions { grid-column: auto; grid-template-columns: repeat(3, 1fr); }
+        .uat-open { grid-column: 1 / -1; }
     }
     @media print {
-        .app-header, .app-sidebar, .manual-toolbar, .manual-actions, .flow-tabs { display: none !important; }
+        .app-header, .app-sidebar, .manual-toolbar, .manual-actions, .flow-tabs, .uat-toolbar, .uat-actions { display: none !important; }
         .app-main { margin: 0 !important; }
         .app-content { padding: 0 !important; }
         .manual-shell { gap: 8px; }
         .manual-panel { break-inside: avoid; }
         [x-cloak] { display: block !important; }
+        .uat-case { grid-template-columns: 70px 200px 1fr; break-inside: avoid; }
     }
 </style>
 @endpush
@@ -147,7 +194,34 @@
     };
 @endphp
 
-<div class="manual-shell" x-data="{ pillar: 'man', flow: 'pos', query: '' }">
+<div class="manual-shell" x-data="{
+    pillar: 'man',
+    flow: 'pos',
+    query: '',
+    testSuite: 'master',
+    testQuery: '',
+    testResults: {},
+    testTotal: {{ collect($testSuites)->sum(fn ($suite) => count($suite['cases'])) }},
+    init() {
+        try {
+            this.testResults = JSON.parse(localStorage.getItem('popstar-erp-uat') || '{}') || {};
+        } catch (error) {
+            this.testResults = {};
+        }
+    },
+    setTest(id, status) {
+        this.testResults = { ...this.testResults, [id]: status };
+        localStorage.setItem('popstar-erp-uat', JSON.stringify(this.testResults));
+    },
+    testCount(status) {
+        return Object.values(this.testResults).filter(value => value === status).length;
+    },
+    resetTests() {
+        if (!confirm('ล้างผลการทดสอบทั้งหมดในเครื่องนี้หรือไม่')) return;
+        this.testResults = {};
+        localStorage.removeItem('popstar-erp-uat');
+    }
+}">
     <section class="manual-panel manual-header">
         <div>
             <div class="manual-eyebrow">PopStar 4M ERP Handbook</div>
@@ -231,6 +305,70 @@
                         </article>
                     @endforeach
                 </div>
+            </div>
+        @endforeach
+    </section>
+
+    <section class="manual-panel">
+        <div class="manual-section-head">
+            <h2><i class="bi bi-clipboard-check me-2"></i>คู่มือทดสอบรับมอบระบบ (UAT)</h2>
+            <span>{{ collect($testSuites)->sum(fn ($suite) => count($suite['cases'])) }} กรณี · {{ count($testSuites) }} หมวด</span>
+        </div>
+        <div class="uat-summary">
+            <div><span>กรณีทดสอบทั้งหมด</span><strong x-text="testTotal"></strong></div>
+            <div class="pass"><span>ผ่าน</span><strong x-text="testCount('pass')">0</strong></div>
+            <div class="fail"><span>ไม่ผ่าน</span><strong x-text="testCount('fail')">0</strong></div>
+            <div><span>รอทดสอบ</span><strong x-text="testTotal - testCount('pass') - testCount('fail')"></strong></div>
+        </div>
+        <div class="uat-policy">
+            <div><strong>1. แยกข้อมูลทดสอบ</strong>ใช้สาขา คลัง ผู้ใช้ และเลขเอกสารทดสอบ ห้ามลบข้อมูลจริงเพื่อเตรียมทดสอบ</div>
+            <div><strong>2. ทดสอบทั้งผ่านและปฏิเสธ</strong>ทุกจุดควบคุมต้องลองทั้งผู้มีสิทธิ์และผู้ไม่มีสิทธิ์</div>
+            <div><strong>3. เก็บหลักฐาน</strong>จดเลขเอกสาร ภาพหน้าจอ รายงาน และผู้ทดสอบทุกกรณีสำคัญ</div>
+            <div><strong>4. เกณฑ์ขึ้นใช้งาน</strong>กรณี Critical ต้องผ่านทั้งหมด และกรณีไม่ผ่านต้องมีผู้รับผิดชอบกับวันแก้</div>
+        </div>
+        <div class="uat-toolbar">
+            <label class="manual-search">
+                <i class="bi bi-search"></i>
+                <input type="search" x-model="testQuery" placeholder="ค้นหารหัสทดสอบ ขั้นตอน หรือผลที่ต้องได้">
+            </label>
+            <button type="button" class="btn btn-sm btn-outline-secondary" @click="resetTests()"><i class="bi bi-arrow-counterclockwise me-1"></i>ล้างผลในเครื่องนี้</button>
+        </div>
+        <div class="uat-tabs" role="tablist" aria-label="หมวดทดสอบระบบ">
+            @foreach($testSuites as $suite)
+                <button type="button" class="uat-tab" :class="testSuite === '{{ $suite['key'] }}' && 'active'" @click="testSuite = '{{ $suite['key'] }}'">{{ $suite['label'] }} ({{ count($suite['cases']) }})</button>
+            @endforeach
+        </div>
+        @foreach($testSuites as $suite)
+            <div x-show="testSuite === '{{ $suite['key'] }}'" x-cloak>
+                <div class="uat-suite-head">
+                    <div><strong>{{ $suite['label'] }}</strong><span>{{ $suite['goal'] }}</span></div>
+                    <div class="text-end"><strong>ผู้รับผิดชอบ</strong><span>{{ $suite['owner'] }}</span></div>
+                </div>
+                @foreach($suite['cases'] as $case)
+                    <article class="uat-case" x-show="!testQuery || $el.textContent.toLowerCase().includes(testQuery.toLowerCase())">
+                        <div>
+                            <div class="uat-case-id">{{ $case[0] }}</div>
+                            <span class="uat-risk uat-risk-{{ $case[1] }}">{{ $case[1] === 'critical' ? 'CRITICAL' : 'CONTROL' }}</span>
+                        </div>
+                        <div>
+                            <div class="uat-case-title">{{ $case[2] }}</div>
+                            <div class="uat-prepare"><strong>เตรียม:</strong> {{ $case[4] }}</div>
+                        </div>
+                        <div>
+                            <ol class="uat-steps">@foreach($case[5] as $step)<li>{{ $step }}</li>@endforeach</ol>
+                            <div class="uat-expected"><strong>ต้องได้:</strong> {{ $case[6] }}</div>
+                            <div class="uat-evidence"><strong>หลักฐาน:</strong> {{ $case[7] }}</div>
+                        </div>
+                        <div class="uat-actions">
+                            <button type="button" class="uat-status pass" :class="testResults['{{ $case[0] }}'] === 'pass' && 'active'" @click="setTest('{{ $case[0] }}', 'pass')" title="ผลทดสอบผ่าน"><i class="bi bi-check-lg"></i> ผ่าน</button>
+                            <button type="button" class="uat-status fail" :class="testResults['{{ $case[0] }}'] === 'fail' && 'active'" @click="setTest('{{ $case[0] }}', 'fail')" title="ผลทดสอบไม่ผ่าน"><i class="bi bi-x-lg"></i> ไม่ผ่าน</button>
+                            <button type="button" class="uat-status pending" :class="(!testResults['{{ $case[0] }}'] || testResults['{{ $case[0] }}'] === 'pending') && 'active'" @click="setTest('{{ $case[0] }}', 'pending')" title="รอทดสอบ"><i class="bi bi-clock"></i> รอ</button>
+                            @if($routeAccess($case[3]))
+                                <a class="uat-open" href="{{ route($case[3]) }}"><i class="bi bi-box-arrow-up-right"></i>เปิดหน้าทดสอบ</a>
+                            @endif
+                        </div>
+                    </article>
+                @endforeach
             </div>
         @endforeach
     </section>
