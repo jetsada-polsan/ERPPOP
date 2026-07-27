@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Controllers\Api\PosApiController;
 use App\Http\Controllers\PosController;
 use App\Models\AppSetting;
+use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\PosDevice;
 use App\Models\PosHeldBill;
@@ -37,6 +38,11 @@ class PosCashierIdentityTest extends TestCase
         $this->assertTrue($response->getData(true)['success']);
         $this->assertSame($alice->id, (int) $device->fresh()->active_cashier_id);
         $this->assertNotNull($device->fresh()->cashier_verified_at);
+
+        // ต้องไล่ย้อนได้ว่าใครลงเครื่องไหนตอนไหน แม้ยังไม่มีการขาย
+        $audit = AuditLog::where('action', 'cashier_login')->sole();
+        $this->assertSame($alice->id, (int) $audit->record_id);
+        $this->assertSame($device->id, $audit->new_values['device_id']);
     }
 
     public function test_device_cannot_sell_under_another_cashier_after_pin_login(): void

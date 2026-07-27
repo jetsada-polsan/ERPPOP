@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\PosController;
 use App\Models\AppSetting;
+use App\Models\AuditLog;
 use App\Models\PosReceipt;
 use App\Models\PosTerminal;
 use App\Models\Salesman;
@@ -121,6 +122,22 @@ class PosApiController extends Controller
 
         // ผูกผลการยืนยันไว้กับเครื่อง เพื่อให้คำสั่งขายหลังจากนี้อ้างชื่อคนอื่นไม่ได้
         $device?->markCashierVerified($cashier);
+
+        // active_cashier_id ถูกเขียนทับทุกครั้งที่สลับคน จึงต้องลง audit ไว้ด้วย
+        // ไม่งั้นช่วงที่ยังไม่มีการขาย จะไล่ไม่ได้ว่าใครลงเครื่องไหนตอนไหน
+        AuditLog::create([
+            'user_id' => $request->user()?->id,
+            'branch_id' => $branchId,
+            'action' => 'cashier_login',
+            'table_name' => 'salesmen',
+            'record_id' => $cashier->id,
+            'new_values' => [
+                'cashier_code' => $cashier->code,
+                'device_id' => $device?->id,
+                'terminal_code' => $device?->terminal_code,
+                'ip' => $request->ip(),
+            ],
+        ]);
 
         return response()->json([
             'success' => true,
