@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\PosController;
 use App\Models\AppSetting;
 use App\Models\PosReceipt;
+use App\Models\PosTerminal;
 use App\Models\Salesman;
 use App\Services\Sales\SaleReturnService;
 use App\Support\DecimalMath;
@@ -31,6 +32,12 @@ class PosApiController extends Controller
         $device = $request->attributes->get('pos_device');
         $user = $request->user();
         $user?->loadMissing('branch');
+        $terminal = $device?->terminal_code
+            ? PosTerminal::where('code', $device->terminal_code)->first()
+            : null;
+        $terminal ??= PosTerminal::where('branch_id', $user?->branch_id)
+            ->orderBy('id')
+            ->first();
 
         return response()->json([
             'success' => true,
@@ -52,6 +59,16 @@ class PosApiController extends Controller
                 'logo_url' => AppSetting::logoUrl(),
             ],
             'receipt_template' => PosReceiptTemplate::get(),
+            'hardware_profile' => $terminal?->hardware_profile ?? [
+                'printer_driver' => 'browser',
+                'paper_width' => '80mm',
+                'scanner_mode' => 'keyboard',
+                'scale_mode' => 'keyboard',
+                'customer_display' => 'none',
+                'cash_drawer_enabled' => false,
+                'auto_print' => false,
+                'print_copies' => 1,
+            ],
             'vat_rate' => (float) (DB::table('vat_rates')
                 ->where('effective_from', '<=', now()->toDateString())
                 ->where(fn ($w) => $w->whereNull('effective_to')->orWhere('effective_to', '>=', now()->toDateString()))

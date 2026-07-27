@@ -184,6 +184,18 @@
                                     <label class="form-check-label" for="newProductExpiry">ควบคุม Lot และวันหมดอายุ</label>
                                 </div>
                             </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-muted small">ราคาขายสูงสุด/หน่วยฐาน</label>
+                                <input type="number" step="0.00000001" min="0" name="maximum_sale_price" class="form-control">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-muted small">กำไรขั้นต่ำ (%)</label>
+                                <input type="number" step="0.00000001" max="100" name="minimum_margin_percent" class="form-control">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-muted small">ควบคุมกำไร</label>
+                                <select name="margin_control_policy" class="form-select"><option value="warn">แจ้งเตือน</option><option value="block">บังคับขออนุมัติ</option></select>
+                            </div>
                             <div class="col-md-3">
                                 <label class="form-label text-muted small">เตือนก่อนหมดอายุ (วัน)</label>
                                 <input type="number" min="0" max="3650" name="expiry_warning_days" value="30" class="form-control">

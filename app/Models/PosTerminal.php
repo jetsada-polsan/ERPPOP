@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['branch_id', 'code', 'name'])]
+#[Fillable(['branch_id', 'code', 'name', 'hardware_profile'])]
 class PosTerminal extends Model
 {
     public $timestamps = false;
@@ -30,5 +30,10 @@ class PosTerminal extends Model
     public function logs(): HasMany
     {
         return $this->hasMany(PosLog::class);
+    }
+
+    protected function casts(): array
+    {
+        return ['hardware_profile' => 'array'];
     }
 }

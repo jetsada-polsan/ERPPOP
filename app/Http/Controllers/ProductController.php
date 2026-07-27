@@ -20,6 +20,7 @@ use App\Models\StockLot;
 use App\Models\StockLotQualityCheck;
 use App\Models\StockMovement;
 use App\Models\Supplier;
+use App\Models\SupplierPriceSchedule;
 use App\Services\Inventory\ProductCostHistoryService;
 use App\Support\DecimalMath;
 use Illuminate\Http\JsonResponse;
@@ -93,6 +94,10 @@ class ProductController extends Controller
             'stockLots' => fn ($query) => $query->with('warehouseLocation.warehouse')
                 ->where('remaining_qty', '>', 0)->orderBy('expiry_date')->orderBy('received_date'),
             'suppliers.supplier',
+            'supplierPriceSchedules' => fn ($query) => $query
+                ->with(['supplier', 'unit'])
+                ->orderByDesc('effective_from')
+                ->orderByDesc('minimum_qty'),
         ]);
 
         // Load all price tables with this product's prices + which branches use each table
@@ -444,6 +449,41 @@ class ProductController extends Controller
         return back()->with('success', 'นำผู้จำหน่ายออกจากแฟ้มสินค้าแล้ว');
     }
 
+    public function storeSupplierPrice(Request $request, Product $product): RedirectResponse
+    {
+        $data = $request->validate([
+            'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
+            'unit_id' => ['nullable', 'integer', 'exists:product_units,id'],
+            'minimum_qty' => ['required', 'numeric', 'gt:0'],
+            'unit_price' => ['required', 'numeric', 'min:0'],
+            'vat_mode' => ['required', 'in:included,excluded,exempt'],
+            'effective_from' => ['required', 'date'],
+            'effective_to' => ['nullable', 'date', 'after_or_equal:effective_from'],
+            'is_active' => ['nullable', 'boolean'],
+            'note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $product->supplierPriceSchedules()->create([
+            ...$data,
+            'is_active' => $request->boolean('is_active', true),
+        ]);
+
+        ProductSupplier::firstOrCreate(
+            ['product_id' => $product->id, 'supplier_id' => $data['supplier_id']],
+            ['last_purchase_price' => $data['unit_price']],
+        );
+
+        return back()->with('success', 'เพิ่มตารางราคาซื้อผู้จำหน่ายแล้ว');
+    }
+
+    public function removeSupplierPrice(Product $product, SupplierPriceSchedule $supplierPriceSchedule): RedirectResponse
+    {
+        abort_unless($supplierPriceSchedule->product_id === $product->id, 404);
+        $supplierPriceSchedule->delete();
+
+        return back()->with('success', 'ลบช่วงราคาซื้อแล้ว');
+    }
+
     private function validateProduct(Request $request, ?int $ignoreId = null): array
     {
         $data = $request->validate([
@@ -456,6 +496,9 @@ class ProductController extends Controller
             'product_brand_id' => ['nullable', 'integer', 'exists:product_brands,id'],
             'base_unit_id' => ['required', 'integer', 'exists:product_units,id'],
             'default_price' => ['nullable', 'numeric', 'min:0'],
+            'maximum_sale_price' => ['nullable', 'numeric', 'min:0'],
+            'minimum_margin_percent' => ['nullable', 'numeric', 'min:-1000', 'max:100'],
+            'margin_control_policy' => ['nullable', 'in:warn,block'],
             'is_active' => ['nullable', 'boolean'],
             'is_vat' => ['nullable', 'boolean'],
             'tracks_expiry' => ['nullable', 'boolean'],
@@ -476,6 +519,7 @@ class ProductController extends Controller
         $data['clearance_warning_days'] = $data['clearance_warning_days'] ?? 7;
         $data['clearance_discount_percent'] = $data['clearance_discount_percent'] ?? 0;
         $data['expiry_sale_policy'] = $data['expiry_sale_policy'] ?? 'block';
+        $data['margin_control_policy'] = $data['margin_control_policy'] ?? 'warn';
 
         return $data;
     }

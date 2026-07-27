@@ -212,6 +212,13 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .modal-head > button, .toast button { display: grid; place-items: center; border: 0; background: transparent; color: #778590; }
 .modal-head > button svg { width: 19px; }
 .modal label { display: flex; flex-direction: column; gap: 6px; margin-top: 13px; color: #52616e; font-size: 10px; font-weight: 800; }
+.modal .secondary { width: 100%; margin-top: 10px; padding: 11px; border: 1px solid #0788b5; border-radius: 6px; background: #fff; color: #0788b5; font-weight: 800; }
+.held-list { display: flex; max-height: 420px; flex-direction: column; gap: 7px; overflow: auto; }
+.held-list > button { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; border: 1px solid #d6e0e6; border-radius: 6px; background: #fff; color: #233846; text-align: left; }
+.held-list > button:hover { border-color: #0788b5; background: #eef8fb; }
+.held-list > button span { display: flex; min-width: 0; flex-direction: column; }
+.held-list > button small { margin-top: 3px; color: #72828d; }
+.held-list > button b { flex: none; color: #0788b5; }
 .modal input, .modal textarea { width: 100%; padding: 11px 12px; border: 1px solid #cad6de; border-radius: 6px; outline: 0; resize: vertical; color: var(--ink); }
 .modal input:focus, .modal textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(8, 127, 168, .1); }
 .primary { width: 100%; height: 48px; margin-top: 19px; border: 0; border-radius: 6px; background: var(--primary); color: #fff; font-weight: 850; }

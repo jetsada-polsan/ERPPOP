@@ -10,7 +10,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
     'sku_code', 'name_th', 'name_en', 'note', 'product_category_id', 'product_department_id',
-    'product_brand_id', 'base_unit_id', 'default_price', 'average_cost', 'last_purchase_cost',
+    'product_brand_id', 'base_unit_id', 'default_price', 'maximum_sale_price',
+    'minimum_margin_percent', 'margin_control_policy', 'average_cost', 'last_purchase_cost',
     'last_purchase_cost_at', 'is_vat', 'tracks_expiry', 'shelf_life_days', 'expiry_warning_days',
     'clearance_warning_days', 'clearance_discount_percent', 'expiry_sale_policy', 'is_active',
     'negative_stock_policy', 'reorder_point', 'minimum_stock', 'maximum_stock',
@@ -69,6 +70,11 @@ class Product extends Model
         return $this->hasMany(ProductSupplier::class);
     }
 
+    public function supplierPriceSchedules(): HasMany
+    {
+        return $this->hasMany(SupplierPriceSchedule::class);
+    }
+
     protected function casts(): array
     {
         return [
@@ -80,6 +86,8 @@ class Product extends Model
             'clearance_warning_days' => 'integer',
             'clearance_discount_percent' => 'decimal:2',
             'default_price' => 'decimal:8',
+            'maximum_sale_price' => 'decimal:8',
+            'minimum_margin_percent' => 'decimal:8',
             'average_cost' => 'decimal:8',
             'last_purchase_cost' => 'decimal:8',
             'last_purchase_cost_at' => 'datetime',

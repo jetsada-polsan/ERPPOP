@@ -3,7 +3,27 @@
 @section('page-title', 'ใบขอซื้อ / ใบสั่งซื้อ ' . $purchaseOrder->doc_number)
 @section('page-subtitle', $purchaseOrder->statusLabel())
 @section('content')
-<div x-data="{ orderOpen: false, receiveOpen: false }">
+<div x-data="{
+    orderOpen: false,
+    receiveOpen: false,
+    priceLoading: false,
+    async loadSupplierPrices(supplierId) {
+        if (!supplierId) return;
+        this.priceLoading = true;
+        try {
+            const response = await fetch(@js(route('purchase-orders.supplier-prices', $purchaseOrder)) + '?supplier_id=' + encodeURIComponent(supplierId));
+            const data = await response.json();
+            Object.entries(data.prices || {}).forEach(([itemId, row]) => {
+                const input = document.querySelector(`[data-po-price='${itemId}']`);
+                const hint = document.querySelector(`[data-po-price-hint='${itemId}']`);
+                if (input) input.value = row.unit_price;
+                if (hint) hint.textContent = `ราคาตาราง · ${row.vat_mode === 'included' ? 'รวม VAT' : (row.vat_mode === 'excluded' ? 'แยก VAT' : 'ยกเว้น VAT')}`;
+            });
+        } finally {
+            this.priceLoading = false;
+        }
+    }
+}">
     <a href="{{ route('purchase-orders.index') }}" class="text-decoration-none small d-inline-block mb-3"><i class="bi bi-arrow-left me-1"></i>กลับรายการ</a>
 
     {{-- แถบสถานะ workflow --}}
@@ -108,7 +128,7 @@
                     <div class="row g-3 mb-3">
                         <div class="col-md-8">
                             <label class="form-label small text-muted">ซัพพลายเออร์</label>
-                            <select name="supplier_id" required class="form-select">
+                            <select name="supplier_id" required class="form-select" @change="loadSupplierPrices($event.target.value)">
                                 <option value="">-- เลือกซัพพลายเออร์ --</option>
                                 @foreach($suppliers as $s)<option value="{{ $s->id }}" @selected($s->id === $purchaseOrder->supplier_id)>{{ $s->code }} - {{ $s->name_th }}</option>@endforeach
                             </select>
@@ -124,7 +144,7 @@
                             <tr>
                                 <td class="small">{{ $item->product->sku_code }} {{ $item->product->name_th }}</td>
                                 <td class="text-end">{{ number_format($item->qty, 2) }}</td>
-                                <td><input type="number" step="0.01" min="0" name="unit_price[{{ $item->id }}]" value="{{ $item->unit_price }}" required class="form-control form-control-sm text-end"></td>
+                                <td><input type="number" step="0.00000001" min="0" name="unit_price[{{ $item->id }}]" value="{{ $item->unit_price }}" required data-po-price="{{ $item->id }}" class="form-control form-control-sm text-end"><small class="text-success" data-po-price-hint="{{ $item->id }}"></small></td>
                             </tr>
                             @endforeach
                         </tbody>
@@ -132,7 +152,7 @@
                 </div>
                 <div class="d-flex justify-content-end gap-2 px-4 pb-4">
                     <button type="button" class="btn btn-light border px-4" @click="orderOpen = false">ยกเลิก</button>
-                    <button type="submit" class="btn btn-primary px-5"><i class="bi bi-cart-check me-1"></i>ยืนยันสั่งซื้อ</button>
+                    <button type="submit" class="btn btn-primary px-5" :disabled="priceLoading"><i class="bi bi-cart-check me-1"></i><span x-text="priceLoading ? 'กำลังอ่านราคาผู้ขาย...' : 'ยืนยันสั่งซื้อ'"></span></button>
                 </div>
             </form>
         </div>

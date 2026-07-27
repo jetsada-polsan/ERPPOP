@@ -73,6 +73,30 @@ class PosPricingGuardTest extends TestCase
         $this->assertArrayNotHasKey('barcode', $normalized[0]);
     }
 
+    public function test_server_enforces_maximum_sale_price_per_base_unit(): void
+    {
+        [$user, $branch, $product] = $this->masters();
+        $product->update(['maximum_sale_price' => 99]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('เกินราคาขายสูงสุด');
+        app(PosPricingGuard::class)->validate($this->payload($branch, $product, 100), $user);
+    }
+
+    public function test_server_enforces_minimum_margin_after_vat(): void
+    {
+        [$user, $branch, $product] = $this->masters();
+        $product->update([
+            'average_cost' => 80,
+            'minimum_margin_percent' => 20,
+            'margin_control_policy' => 'block',
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('กำไร');
+        app(PosPricingGuard::class)->validate($this->payload($branch, $product, 100), $user);
+    }
+
     /** @return array{User,Branch,Product} */
     private function masters(): array
     {

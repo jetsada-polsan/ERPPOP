@@ -8,6 +8,8 @@ use App\Models\DiscountCard;
 use App\Models\Document;
 use App\Models\FlashSaleItem;
 use App\Models\Member;
+use App\Models\PosCashMovement;
+use App\Models\PosHeldBill;
 use App\Models\PosPayment;
 use App\Models\PosReceipt;
 use App\Models\PosReceiptItem;
@@ -30,6 +32,7 @@ use App\Services\Sales\CashSaleService;
 use App\Services\Sales\MemberPointService;
 use App\Services\Sales\PosPaymentValidator;
 use App\Services\Sales\PosPricingGuard;
+use App\Support\DecimalMath;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -178,7 +181,17 @@ class PosController extends Controller
             ))
             ->orderBy('name_th')
             ->when(! $all, fn ($query) => $query->limit(100))
-            ->get(['id', 'sku_code', 'name_th', 'default_price', 'product_category_id']);
+            ->get([
+                'id',
+                'sku_code',
+                'name_th',
+                'default_price',
+                'average_cost',
+                'is_vat',
+                'minimum_margin_percent',
+                'margin_control_policy',
+                'product_category_id',
+            ]);
 
         $priceRows = $priceTableIds === []
             ? collect()
@@ -325,6 +338,41 @@ class PosController extends Controller
             return $p;
         });
 
+        $vatRate = (float) (DB::table('vat_rates')
+            ->where('effective_from', '<=', now()->toDateString())
+            ->where(fn ($query) => $query->whereNull('effective_to')->orWhere('effective_to', '>=', now()->toDateString()))
+            ->orderByDesc('effective_from')->value('rate_percent') ?? 7);
+        $products->each(function ($product) use ($vatRate) {
+            $netRevenue = DecimalMath::round($product->pos_price, DecimalMath::COST_SCALE);
+            if ($product->is_vat && $vatRate > 0) {
+                $netRevenue = DecimalMath::divide(
+                    DecimalMath::multiply($netRevenue, 100),
+                    DecimalMath::add(100, $vatRate),
+                    DecimalMath::COST_SCALE,
+                );
+            }
+            $margin = DecimalMath::compare($netRevenue, 0) > 0
+                ? DecimalMath::multiply(
+                    DecimalMath::divide(
+                        DecimalMath::subtract($netRevenue, $product->average_cost),
+                        $netRevenue,
+                        DecimalMath::COST_SCALE,
+                    ),
+                    100,
+                    DecimalMath::COST_SCALE,
+                )
+                : '-1000';
+            $product->margin_percent = (float) DecimalMath::round($margin, 4);
+            $product->margin_warning = $product->minimum_margin_percent !== null
+                && DecimalMath::compare($margin, $product->minimum_margin_percent) < 0;
+            $product->makeHidden([
+                'average_cost',
+                'is_vat',
+                'minimum_margin_percent',
+                'margin_control_policy',
+            ]);
+        });
+
         // สต๊อกคงเหลือ "ของสาขานี้" (คลังใครคลังมัน) - ดึงจากคลังเริ่มต้นของสาขา
         $locationId = $branchId ? Branch::whereKey($branchId)->value('default_warehouse_location_id') : null;
         if ($locationId) {
@@ -422,7 +470,7 @@ class PosController extends Controller
         }
 
         $totals = $this->calculateShiftTotals($shift);
-        $expectedCash = round((float) $shift->opening_cash + $totals['cash'], 2);
+        $expectedCash = $this->expectedCash($shift, $totals);
         $countedCash = round((float) $data['counted_cash'], 2);
 
         $shift->update([
@@ -439,7 +487,170 @@ class PosController extends Controller
             'closing_note' => $data['closing_note'] ?? null,
         ]);
 
-        return response()->json(['success' => true, 'shift' => $this->shiftPayload($shift->fresh())]);
+        return response()->json([
+            'success' => true,
+            'shift' => $this->shiftPayload($shift->fresh()),
+            'report_url' => route('pos.shift.z-report', $shift),
+        ]);
+    }
+
+    public function heldBills(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'branch_id' => ['required', 'integer', 'exists:branches,id'],
+            'cashier_id' => ['nullable', 'integer', 'exists:salesmen,id'],
+        ]);
+        $branchId = $this->enforcedBranchId((int) $data['branch_id']);
+
+        $bills = PosHeldBill::with(['cashier:id,code,name', 'terminal:id,code,name'])
+            ->where('branch_id', $branchId)
+            ->where('status', 'held')
+            ->orderByDesc('held_at')
+            ->orderByDesc('id')
+            ->limit(100)
+            ->get()
+            ->map(fn (PosHeldBill $bill) => [
+                ...($bill->payload ?? []),
+                'id' => $bill->id,
+                'hold_no' => $bill->hold_no,
+                'label' => $bill->note ?: $bill->hold_no,
+                'createdAt' => $bill->held_at?->toIso8601String() ?? $bill->created_at?->toIso8601String(),
+                'cashier_name' => $bill->cashier?->name,
+                'terminal_name' => $bill->terminal?->name,
+                'total_amount' => (float) $bill->total_amount,
+            ]);
+
+        return response()->json(['success' => true, 'held_bills' => $bills]);
+    }
+
+    public function holdBill(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'branch_id' => ['required', 'integer', 'exists:branches,id'],
+            'shift_id' => ['required', 'integer', 'exists:pos_shifts,id'],
+            'cashier_id' => ['required', 'integer', 'exists:salesmen,id'],
+            'customer_id' => ['nullable', 'integer', 'exists:customers,id'],
+            'label' => ['required', 'string', 'max:200'],
+            'total_amount' => ['required', 'numeric', 'min:0'],
+            'payload' => ['required', 'array'],
+            'payload.cart' => ['required', 'array', 'min:1'],
+            'payload.cart.*.id' => ['required', 'integer', 'exists:products,id'],
+            'payload.cart.*.qty' => ['required', 'numeric', 'min:0.00000001'],
+        ]);
+        $branchId = $this->enforcedBranchId((int) $data['branch_id']);
+        $cashierId = $this->enforcedCashierId((int) $data['cashier_id']);
+        $shift = PosShift::whereKey($data['shift_id'])
+            ->where('branch_id', $branchId)
+            ->where('cashier_id', $cashierId)
+            ->where('status', 'open')
+            ->first();
+        if (! $shift) {
+            return response()->json(['success' => false, 'message' => 'พักบิลได้เฉพาะกะที่กำลังเปิดของตนเอง'], 422);
+        }
+
+        $bill = DB::transaction(function () use ($data, $branchId, $cashierId, $shift) {
+            return PosHeldBill::create([
+                'hold_no' => $this->nextHoldNo($branchId),
+                'branch_id' => $branchId,
+                'pos_terminal_id' => $shift->pos_terminal_id,
+                'pos_shift_id' => $shift->id,
+                'cashier_id' => $cashierId,
+                'held_by' => auth()->id(),
+                'customer_id' => $data['customer_id'] ?? null,
+                'total_amount' => $data['total_amount'],
+                'status' => 'held',
+                'note' => trim($data['label']),
+                'payload' => $data['payload'],
+                'held_at' => now(),
+            ]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => "พักบิล {$bill->hold_no} ไว้ส่วนกลางแล้ว",
+            'held_bill_id' => $bill->id,
+        ]);
+    }
+
+    public function resumeHeldBill(Request $request, PosHeldBill $heldBill): JsonResponse
+    {
+        $branchId = $this->enforcedBranchId((int) $heldBill->branch_id);
+        if ($branchId !== (int) $heldBill->branch_id) {
+            return response()->json(['success' => false, 'message' => 'เรียกบิลพักต่างสาขาไม่ได้'], 403);
+        }
+
+        return DB::transaction(function () use ($heldBill) {
+            $bill = PosHeldBill::whereKey($heldBill->id)->lockForUpdate()->firstOrFail();
+            if ($bill->status !== 'held') {
+                return response()->json(['success' => false, 'message' => 'บิลนี้ถูกเรียกใช้หรือยกเลิกไปแล้ว'], 409);
+            }
+            $bill->update(['status' => 'resumed', 'resumed_at' => now()]);
+
+            return response()->json([
+                'success' => true,
+                'held_bill' => [
+                    ...($bill->payload ?? []),
+                    'id' => $bill->id,
+                    'hold_no' => $bill->hold_no,
+                    'label' => $bill->note,
+                ],
+            ]);
+        });
+    }
+
+    public function recordCashMovement(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'shift_id' => ['required', 'integer', 'exists:pos_shifts,id'],
+            'movement_type' => ['required', 'in:cash_in,drop,payout'],
+            'amount' => ['required', 'numeric', 'gt:0'],
+            'reference_no' => ['nullable', 'string', 'max:80'],
+            'reason' => ['required', 'string', 'max:500'],
+        ]);
+        $shift = PosShift::whereKey($data['shift_id'])->where('status', 'open')->first();
+        if (! $shift) {
+            return response()->json(['success' => false, 'message' => 'ไม่พบกะที่เปิดอยู่'], 422);
+        }
+        $branchId = $this->enforcedBranchId((int) $shift->branch_id);
+        $cashierId = $this->enforcedCashierId((int) $shift->cashier_id);
+        if ($branchId !== (int) $shift->branch_id || $cashierId !== (int) $shift->cashier_id) {
+            return response()->json(['success' => false, 'message' => 'บันทึกเงินเข้าออกได้เฉพาะกะของตนเอง'], 403);
+        }
+        if ($data['movement_type'] !== 'drop' && ! auth()->user()?->hasPermission('pos.cash.manage')) {
+            return response()->json(['success' => false, 'message' => 'เงินเพิ่มหรือเบิกจ่ายต้องให้ผู้จัดการอนุมัติ'], 403);
+        }
+
+        PosCashMovement::create([
+            ...$data,
+            'pos_shift_id' => $shift->id,
+            'created_by' => auth()->id(),
+            'approved_by' => auth()->user()?->hasPermission('pos.cash.manage') ? auth()->id() : null,
+            'approved_at' => auth()->user()?->hasPermission('pos.cash.manage') ? now() : null,
+        ]);
+        $totals = $this->calculateShiftTotals($shift);
+        $shift->update(['expected_cash' => $this->expectedCash($shift, $totals)]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $data['movement_type'] === 'drop' ? 'บันทึกนำส่งเงินแล้ว' : 'บันทึกรายการเงินสดแล้ว',
+            'shift' => $this->shiftPayload($shift->fresh()),
+        ]);
+    }
+
+    public function zReport(Request $request, PosShift $shift): View
+    {
+        $branchId = $this->enforcedBranchId((int) $shift->branch_id);
+        abort_unless($branchId === (int) $shift->branch_id || auth()->user()?->hasPermission('reports.view'), 403);
+        $shift->load([
+            'branch', 'cashier', 'terminal',
+            'cashMovements' => fn ($query) => $query->with(['creator:id,name', 'approver:id,name'])->orderBy('id'),
+        ]);
+
+        return view('pos.z-report', [
+            'shift' => $shift,
+            'totals' => $this->calculateShiftTotals($shift),
+            'cashMovements' => $this->cashMovementTotals($shift),
+        ]);
     }
 
     public function checkout(
@@ -723,7 +934,7 @@ class PosController extends Controller
                         'transfer_sales' => $totals['transfer'],
                         'card_sales' => $totals['credit_card'],
                         'cheque_sales' => $totals['cheque'],
-                        'expected_cash' => round((float) $receipt->shift->opening_cash + $totals['cash'], 2),
+                        'expected_cash' => $this->expectedCash($receipt->shift, $totals),
                         'receipt_count' => $totals['receipt_count'],
                     ]);
                 }
@@ -764,6 +975,18 @@ class PosController extends Controller
         $branchCode = Branch::find($branchId)?->code ?? sprintf('%04d', $branchId);
 
         return 'SHIFT-'.$branchCode.'-'.now()->format('Ymd-His');
+    }
+
+    private function nextHoldNo(int $branchId): string
+    {
+        $branchCode = Branch::find($branchId)?->code ?? sprintf('%04d', $branchId);
+        $prefix = 'HOLD-'.preg_replace('/[^A-Za-z0-9]/', '', $branchCode).'-'.now()->format('Ymd').'-';
+        $last = PosHeldBill::where('hold_no', 'like', $prefix.'%')
+            ->orderByDesc('hold_no')
+            ->lockForUpdate()
+            ->value('hold_no');
+
+        return $prefix.sprintf('%04d', $last ? ((int) substr($last, -4)) + 1 : 1);
     }
 
     private function nextPosReceiptNo(PosShift $shift): string
@@ -853,7 +1076,7 @@ class PosController extends Controller
             'transfer_sales' => $totals['transfer'],
             'card_sales' => $totals['credit_card'],
             'cheque_sales' => $totals['cheque'],
-            'expected_cash' => round((float) $shift->opening_cash + $totals['cash'], 2),
+            'expected_cash' => $this->expectedCash($shift, $totals),
             'receipt_count' => $totals['receipt_count'],
         ]);
 
@@ -895,9 +1118,39 @@ class PosController extends Controller
         ];
     }
 
+    private function cashMovementTotals(PosShift $shift): array
+    {
+        $rows = PosCashMovement::where('pos_shift_id', $shift->id)
+            ->selectRaw('movement_type, sum(amount) as total')
+            ->groupBy('movement_type')
+            ->pluck('total', 'movement_type');
+
+        return [
+            'cash_in' => round((float) ($rows['cash_in'] ?? 0), 2),
+            'drop' => round((float) ($rows['drop'] ?? 0), 2),
+            'payout' => round((float) ($rows['payout'] ?? 0), 2),
+        ];
+    }
+
+    private function expectedCash(PosShift $shift, ?array $sales = null): float
+    {
+        $sales ??= $this->calculateShiftTotals($shift);
+        $cash = $this->cashMovementTotals($shift);
+
+        return round(
+            (float) $shift->opening_cash
+            + $sales['cash']
+            + $cash['cash_in']
+            - $cash['drop']
+            - $cash['payout'],
+            2,
+        );
+    }
+
     private function shiftPayload(PosShift $shift): array
     {
         $shift->loadMissing(['branch', 'cashier', 'terminal']);
+        $movements = $this->cashMovementTotals($shift);
 
         return [
             'id' => $shift->id,
@@ -918,6 +1171,10 @@ class PosController extends Controller
             'counted_cash' => $shift->counted_cash !== null ? (float) $shift->counted_cash : null,
             'cash_difference' => $shift->cash_difference !== null ? (float) $shift->cash_difference : null,
             'receipt_count' => (int) $shift->receipt_count,
+            'cash_in' => $movements['cash_in'],
+            'cash_drops' => $movements['drop'],
+            'cash_payouts' => $movements['payout'],
+            'z_report_url' => route('pos.shift.z-report', $shift),
         ];
     }
 }

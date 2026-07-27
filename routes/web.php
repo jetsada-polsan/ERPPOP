@@ -11,8 +11,8 @@ use App\Http\Controllers\ChartOfAccountController;
 use App\Http\Controllers\ChequeController;
 use App\Http\Controllers\CreditDebitNoteController;
 use App\Http\Controllers\CustomerController;
-use App\Http\Controllers\DatabaseStructureController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DatabaseStructureController;
 use App\Http\Controllers\DeliveryNoteController;
 use App\Http\Controllers\DiscountCardController;
 use App\Http\Controllers\DocumentBookController;
@@ -145,6 +145,11 @@ Route::prefix('pos')->name('pos.')->group(function () {
     Route::get('/shift', [PosController::class, 'activeShift'])->name('shift.active');
     Route::post('/shift/open', [PosController::class, 'openShift'])->name('shift.open');
     Route::post('/shift/close', [PosController::class, 'closeShift'])->name('shift.close');
+    Route::post('/shift/cash-movement', [PosController::class, 'recordCashMovement'])->name('shift.cash-movement');
+    Route::get('/shifts/{shift}/z-report', [PosController::class, 'zReport'])->name('shift.z-report');
+    Route::get('/held-bills', [PosController::class, 'heldBills'])->name('held-bills.index');
+    Route::post('/held-bills', [PosController::class, 'holdBill'])->name('held-bills.store');
+    Route::post('/held-bills/{heldBill}/resume', [PosController::class, 'resumeHeldBill'])->name('held-bills.resume');
     Route::post('/receipts/{receipt}/void', [PosController::class, 'voidReceipt'])->name('receipts.void');
     Route::get('/checkout', fn () => redirect()->route('pos.index'))->name('checkout.redirect');
     Route::post('/checkout', [PosController::class, 'checkout'])->name('checkout');
@@ -256,6 +261,7 @@ Route::prefix('purchase-orders')->name('purchase-orders.')->group(function () {
     Route::get('/{purchaseOrder}', [PurchaseOrderController::class, 'show'])->name('show');
     Route::get('/{purchaseOrder}/print', [PurchaseOrderController::class, 'print'])->name('print');
     Route::post('/{purchaseOrder}/approve', [PurchaseOrderController::class, 'approve'])->name('approve');
+    Route::get('/{purchaseOrder}/supplier-prices', [PurchaseOrderController::class, 'supplierPrices'])->name('supplier-prices');
     Route::post('/{purchaseOrder}/order', [PurchaseOrderController::class, 'order'])->name('order');
     Route::post('/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])->name('receive');
     Route::post('/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->name('cancel');
@@ -285,6 +291,8 @@ Route::prefix('products')->name('products.')->group(function () {
     Route::post('/{product}/prices', [ProductController::class, 'upsertPrice'])->name('prices.upsert');
     Route::post('/{product}/suppliers', [ProductController::class, 'upsertSupplier'])->name('suppliers.upsert');
     Route::delete('/{product}/suppliers/{productSupplier}', [ProductController::class, 'removeSupplier'])->name('suppliers.destroy');
+    Route::post('/{product}/supplier-prices', [ProductController::class, 'storeSupplierPrice'])->name('supplier-prices.store');
+    Route::delete('/{product}/supplier-prices/{supplierPriceSchedule}', [ProductController::class, 'removeSupplierPrice'])->name('supplier-prices.destroy');
 });
 
 // Stock transfer (โอนย้ายสต็อก) and stock count adjustment (ตรวจนับสต็อก) - both
@@ -580,6 +588,7 @@ Route::prefix('settings')->name('settings.')->group(function () {
     Route::post('/receipt-template', [ReceiptTemplateController::class, 'update'])->name('receipt-template.update');
     Route::post('/pos-token', [SystemSettingController::class, 'issuePosToken'])->name('pos-token.issue');
     Route::post('/pos-token/rotate', [SystemSettingController::class, 'rotatePosToken'])->name('pos-token.rotate');
+    Route::post('/pos-terminal/hardware', [SystemSettingController::class, 'updatePosTerminalHardware'])->name('pos-terminal.hardware');
     Route::post('/pos-release', [SystemSettingController::class, 'publishPosRelease'])->name('pos-release.publish');
 });
 

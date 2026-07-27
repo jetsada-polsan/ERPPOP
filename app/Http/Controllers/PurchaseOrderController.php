@@ -6,9 +6,11 @@ use App\Models\Branch;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\Supplier;
+use App\Models\SupplierPriceSchedule;
 use App\Services\Purchasing\PurchaseOrderReceivingService;
 use App\Services\Sales\DocumentNumberGenerator;
 use App\Support\DecimalMath;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -115,6 +117,35 @@ class PurchaseOrderController extends Controller
         $purchaseOrder->update(['status' => 'approved', 'approved_by' => Auth::id(), 'approved_at' => now()]);
 
         return back()->with('success', "อนุมัติใบขอซื้อ {$purchaseOrder->doc_number} แล้ว");
+    }
+
+    public function supplierPrices(Request $request, PurchaseOrder $purchaseOrder): JsonResponse
+    {
+        $data = $request->validate([
+            'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
+        ]);
+        $purchaseOrder->loadMissing('items.product');
+        $prices = [];
+        foreach ($purchaseOrder->items as $item) {
+            $schedule = SupplierPriceSchedule::query()
+                ->where('product_id', $item->product_id)
+                ->where('supplier_id', $data['supplier_id'])
+                ->where(fn ($query) => $query->whereNull('unit_id')->orWhere('unit_id', $item->product->base_unit_id))
+                ->effective(now()->toDateString(), $item->qty)
+                ->orderByDesc('minimum_qty')
+                ->orderByDesc('effective_from')
+                ->first();
+            if ($schedule) {
+                $prices[$item->id] = [
+                    'unit_price' => (float) $schedule->unit_price,
+                    'vat_mode' => $schedule->vat_mode,
+                    'effective_from' => $schedule->effective_from?->toDateString(),
+                    'effective_to' => $schedule->effective_to?->toDateString(),
+                ];
+            }
+        }
+
+        return response()->json(['success' => true, 'prices' => $prices]);
     }
 
     // ยืนยันสั่งซื้อ: ต้องมีซัพพลายเออร์และราคาครบ

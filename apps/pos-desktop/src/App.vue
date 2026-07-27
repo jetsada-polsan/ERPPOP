@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, Cloud, CloudOff, CreditCard, FileText, LogOut, Minus, PackageSearch, Plus, Printer, QrCode, ReceiptText, RefreshCw, ScanLine, Search, Settings, ShoppingCart, Trash2, UserRound, Wifi, X } from 'lucide-vue-next'
+import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, Cloud, CloudOff, CreditCard, FileText, FolderOpen, LogOut, Minus, PackageSearch, PauseCircle, Plus, Printer, QrCode, ReceiptText, RefreshCw, ScanLine, Search, Settings, ShoppingCart, Trash2, UserRound, Wifi, X } from 'lucide-vue-next'
 import { check } from '@tauri-apps/plugin-updater'
 import { isTauri } from '@tauri-apps/api/core'
 import { api, connect, setServerUrl } from './lib/api'
 import { enqueue, loadProducts, loadProfile, loadSession, markQueue, queueItems, replaceProducts, saveProfile, saveSession } from './lib/db'
 import { syncCheckoutQueue } from './lib/sync'
-import type { CartLine, Cashier, DeviceProfile, PaymentMethod, Product, QueueItem, ReceiptBlock, ReceiptTemplate, Shift } from './lib/types'
+import type { CartLine, Cashier, DeviceProfile, HeldBill, PaymentMethod, Product, QueueItem, ReceiptBlock, ReceiptTemplate, Shift } from './lib/types'
 
 const DEFAULT_RECEIPT_TEMPLATE: ReceiptTemplate = {
   paper_width: 80,
@@ -37,7 +37,7 @@ const pendingCount = ref(0)
 const error = ref('')
 const notice = ref('')
 const busy = ref(false)
-const modal = ref<'cashier' | 'shift' | 'closeShift' | 'payment' | 'settings' | null>(null)
+const modal = ref<'cashier' | 'shift' | 'closeShift' | 'payment' | 'settings' | 'holdBill' | 'heldBills' | null>(null)
 const setupUrl = ref('http://27.254.143.219')
 const setupToken = ref('')
 const cashierCode = ref('')
@@ -48,6 +48,10 @@ const paymentMethod = ref<PaymentMethod>('cash')
 const cashReceived = ref(0)
 const paymentRef = ref('')
 const lastReceipt = ref<{ no: string; items: CartLine[]; total: number; method: PaymentMethod; paid: number; change: number; printedAt: string; provisional: boolean } | null>(null)
+const heldBills = ref<HeldBill[]>([])
+const holdLabel = ref('')
+const cashDropAmount = ref(0)
+const cashDropReference = ref('')
 
 const filteredProducts = computed(() => {
   const q = search.value.trim().toLocaleLowerCase('th')
@@ -142,6 +146,7 @@ async function syncAll() {
       vatRate: Number(serverProfile.vat_rate || profile.value.vatRate),
       company: serverProfile.company || profile.value.company,
       receiptTemplate: serverProfile.receipt_template || profile.value.receiptTemplate,
+      hardwareProfile: serverProfile.hardware_profile || profile.value.hardwareProfile,
     }
     await saveProfile(profile.value)
     const fresh = await api.products(profile.value.branchId)
@@ -203,6 +208,73 @@ async function closeShift() {
   } catch (e) { showError(e) } finally { busy.value = false }
 }
 
+function openHoldBill() {
+  if (!cart.value.length || !shift.value) return
+  holdLabel.value = `บิล ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}`
+  modal.value = 'holdBill'
+}
+
+async function holdBill() {
+  if (!profile.value || !cashier.value || !shift.value || !cart.value.length) return
+  busy.value = true
+  try {
+    await api.holdBill({
+      branch_id: profile.value.branchId,
+      shift_id: shift.value.id,
+      cashier_id: cashier.value.id,
+      label: holdLabel.value.trim(),
+      total_amount: subtotal.value,
+      payload: { cart: cart.value },
+    })
+    cart.value = []
+    modal.value = null
+    flash('พักบิลไว้ส่วนกลางแล้ว')
+  } catch (e) { showError(e) } finally { busy.value = false }
+}
+
+async function openHeldBills() {
+  if (!profile.value || !cashier.value || !navigator.onLine) {
+    showError('ต้องออนไลน์และเข้าแคชเชียร์ก่อนเรียกบิลส่วนกลาง')
+    return
+  }
+  busy.value = true
+  try {
+    heldBills.value = await api.heldBills(profile.value.branchId, cashier.value.id)
+    modal.value = 'heldBills'
+  } catch (e) { showError(e) } finally { busy.value = false }
+}
+
+async function resumeHeldBill(id: number) {
+  if (cart.value.length && !window.confirm('แทนที่บิลปัจจุบันด้วยบิลพักที่เลือก?')) return
+  busy.value = true
+  try {
+    const bill = await api.resumeHeldBill(id)
+    cart.value = bill.cart || []
+    heldBills.value = heldBills.value.filter((item) => item.id !== id)
+    modal.value = null
+    flash(`เรียกบิล ${bill.hold_no} แล้ว`)
+  } catch (e) { showError(e) } finally { busy.value = false }
+}
+
+async function recordCashDrop() {
+  if (!shift.value || cashDropAmount.value <= 0) return
+  busy.value = true
+  try {
+    const result = await api.cashMovement({
+      shift_id: shift.value.id,
+      movement_type: 'drop',
+      amount: cashDropAmount.value,
+      reference_no: cashDropReference.value || undefined,
+      reason: 'นำส่งเงินระหว่างกะ',
+    })
+    shift.value = result.shift
+    countedCash.value = shift.value.expected_cash
+    cashDropAmount.value = 0
+    cashDropReference.value = ''
+    flash(result.message)
+  } catch (e) { showError(e) } finally { busy.value = false }
+}
+
 function openPayment() {
   if (!cashier.value) { modal.value = 'cashier'; return }
   if (!shift.value) { modal.value = 'shift'; return }
@@ -249,6 +321,9 @@ async function checkout() {
       else flash('เก็บบิลในเครื่องแล้ว ระบบจะส่งซ้ำอัตโนมัติ')
     } else flash('ออฟไลน์: เก็บบิลในเครื่องแล้ว ระบบจะส่งเมื่ออินเทอร์เน็ตกลับมา')
     lastReceipt.value = { no: receiptNo, items: soldItems, total: soldTotal, method: paymentMethod.value, paid: cashReceived.value, change: soldChange, printedAt: new Date().toLocaleString('th-TH'), provisional }
+    if (profile.value.hardwareProfile?.auto_print) {
+      window.setTimeout(() => printLastReceipt(), 150)
+    }
   } catch (e) {
     await markQueue(id, 'failed', e instanceof Error ? e.message : String(e)).catch(() => undefined)
     showError(e)
@@ -330,6 +405,7 @@ onUnmounted(() => {
         <button class="status" :class="online ? 'online' : 'offline'" @click="syncAll"><Wifi v-if="online"/><CloudOff v-else/><span>{{ online ? (syncing ? 'กำลังซิงก์' : 'ออนไลน์') : 'ออฟไลน์' }}</span></button>
         <button class="icon-button" title="ซิงก์ข้อมูล" @click="syncAll"><RefreshCw :class="{ spin: syncing }"/></button>
         <button v-if="lastReceipt" class="icon-button" title="พิมพ์บิลล่าสุด" @click="printLastReceipt"><Printer/></button>
+        <button class="icon-button" title="เรียกบิลพักส่วนกลาง" @click="openHeldBills"><FolderOpen/></button>
         <button v-if="shift" class="icon-button" title="ปิดกะขาย" @click="countedCash = shift.expected_cash; modal = 'closeShift'"><LogOut/></button>
         <button class="icon-button" title="ตั้งค่าเครื่อง" @click="modal = 'settings'"><Settings/></button>
       </div>
@@ -348,7 +424,7 @@ onUnmounted(() => {
         </div>
         <div v-if="products.length" class="product-grid">
           <button v-for="product in filteredProducts" :key="product.id" class="product-tile" @click="addProduct(product)">
-            <div class="product-code"><span>{{ product.sku_code }}</span><em v-if="product.is_promotion || product.is_flash_sale">ราคาพิเศษ</em></div>
+            <div class="product-code"><span>{{ product.sku_code }}</span><em v-if="product.margin_warning">กำไรต่ำ</em><em v-else-if="product.is_promotion || product.is_flash_sale">ราคาพิเศษ</em></div>
             <strong>{{ product.name_th }}</strong>
             <div class="product-bottom"><span :class="{ low: product.stock_qty != null && product.stock_qty <= 5 }"><i></i>คงเหลือ {{ product.stock_qty == null ? '-' : product.stock_qty }}</span><b>฿{{ money(product.pos_price) }}</b></div>
           </button>
@@ -357,7 +433,7 @@ onUnmounted(() => {
       </div>
 
       <aside class="cart-panel">
-        <div class="cart-title"><div><span class="cart-icon"><ReceiptText/></span><span><small>บิลปัจจุบัน</small><strong>รายการขาย</strong></span></div><span>{{ cart.length }} รายการ · {{ totalQty }} ชิ้น</span></div>
+        <div class="cart-title"><div><span class="cart-icon"><ReceiptText/></span><span><small>บิลปัจจุบัน</small><strong>รายการขาย</strong></span></div><div style="display:flex;align-items:center;gap:8px"><button class="icon-button" :disabled="!cart.length || !shift" title="พักบิลส่วนกลาง" @click="openHoldBill"><PauseCircle/></button><span>{{ cart.length }} รายการ · {{ totalQty }} ชิ้น</span></div></div>
         <div class="cart-lines">
           <div v-for="(line, index) in cart" :key="`${line.id}-${line.scannedBarcode || ''}`" class="cart-line">
             <span class="line-seq">{{ index + 1 }}</span>
@@ -401,8 +477,29 @@ onUnmounted(() => {
       <form v-else-if="modal === 'closeShift'" class="modal compact" @submit.prevent="closeShift">
         <div class="modal-head"><div><LogOut/><span><strong>ปิดกะขาย</strong><small>{{ shift?.shift_no }} · {{ pendingCount ? `มี ${pendingCount} บิลรอส่ง` : 'บิลส่งครบแล้ว' }}</small></span></div><button type="button" @click="modal = null"><X/></button></div>
         <label>เงินสดที่นับได้จริง<input v-model.number="countedCash" type="number" min="0" step="0.01" autofocus required></label>
+        <label>นำส่งเงินระหว่างกะ<input v-model.number="cashDropAmount" type="number" min="0" step="0.01" placeholder="0.00"></label>
+        <label v-if="cashDropAmount > 0">เลขอ้างอิง / ซองเงิน<input v-model="cashDropReference"></label>
+        <button v-if="cashDropAmount > 0" type="button" class="secondary" :disabled="busy" @click="recordCashDrop">บันทึกนำส่งเงิน</button>
         <button class="primary" :disabled="busy || pendingCount > 0">ยืนยันปิดกะ</button>
       </form>
+
+      <form v-else-if="modal === 'holdBill'" class="modal compact" @submit.prevent="holdBill">
+        <div class="modal-head"><div><PauseCircle/><span><strong>พักบิลส่วนกลาง</strong><small>เรียกต่อได้จาก POS เครื่องอื่นในสาขา</small></span></div><button type="button" @click="modal = null"><X/></button></div>
+        <label>ชื่อบิล / โต๊ะ / ลูกค้า<input v-model="holdLabel" required autofocus maxlength="200"></label>
+        <div class="payment-total"><span>ยอดบิล</span><strong>฿{{ money(subtotal) }}</strong></div>
+        <button class="primary" :disabled="busy">ยืนยันพักบิล</button>
+      </form>
+
+      <section v-else-if="modal === 'heldBills'" class="modal">
+        <div class="modal-head"><div><FolderOpen/><span><strong>บิลพักส่วนกลาง</strong><small>{{ profile?.branchName }} · {{ heldBills.length }} บิล</small></span></div><button type="button" @click="modal = null"><X/></button></div>
+        <div class="held-list">
+          <button v-for="bill in heldBills" :key="bill.id" type="button" @click="resumeHeldBill(bill.id)">
+            <span><strong>{{ bill.label }}</strong><small>{{ bill.hold_no }} · {{ bill.cashier_name || bill.terminal_name || '-' }}</small></span>
+            <b>฿{{ money(bill.total_amount) }}</b>
+          </button>
+          <div v-if="!heldBills.length" class="empty-state" style="min-height:160px"><FolderOpen/><strong>ไม่มีบิลที่พักไว้</strong></div>
+        </div>
+      </section>
 
       <form v-else-if="modal === 'payment'" class="modal payment-modal" @submit.prevent="checkout">
         <div class="modal-head"><div><Banknote/><span><strong>รับชำระเงิน</strong><small>{{ cart.length }} รายการ · {{ totalQty }} ชิ้น</small></span></div><button type="button" @click="modal = null"><X/></button></div>

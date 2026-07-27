@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AppSetting;
 use App\Models\PosDevice;
+use App\Models\PosTerminal;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -52,6 +53,7 @@ class SystemSettingController extends Controller
             'bankCount' => DB::table('bank_accounts')->count(),
             'posUsers' => User::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'username', 'branch_id']),
             'posDevices' => PosDevice::with(['user:id,name,username', 'branch:id,code,name_th'])->latest()->limit(20)->get(),
+            'posTerminals' => PosTerminal::with('branch:id,code,name_th')->orderBy('code')->get(),
             'menuOrder' => $this->menuOrder(),
             'erpTheme' => AppSetting::get('erp_theme', 'ocean'),
             'posRelease' => $this->currentPosRelease(),
@@ -151,6 +153,34 @@ class SystemSettingController extends Controller
             'pos_token' => $token,
             'pos_device_name' => $device->name,
         ]);
+    }
+
+    public function updatePosTerminalHardware(Request $request): RedirectResponse
+    {
+        $terminalId = $request->integer('pos_terminal_id');
+        $data = $request->validate([
+            'pos_terminal_id' => ['required', 'integer', 'exists:pos_terminals,id'],
+            "hardware.{$terminalId}.printer_driver" => ['required', 'in:browser,windows,escpos_usb,escpos_network'],
+            "hardware.{$terminalId}.printer_name" => ['nullable', 'string', 'max:120'],
+            "hardware.{$terminalId}.printer_address" => ['nullable', 'string', 'max:200'],
+            "hardware.{$terminalId}.paper_width" => ['required', 'in:58mm,80mm'],
+            "hardware.{$terminalId}.scanner_mode" => ['required', 'in:keyboard,serial'],
+            "hardware.{$terminalId}.scale_mode" => ['required', 'in:none,keyboard,serial'],
+            "hardware.{$terminalId}.customer_display" => ['required', 'in:none,browser,serial,network'],
+            "hardware.{$terminalId}.print_copies" => ['required', 'integer', 'min:1', 'max:3'],
+        ]);
+        $input = data_get($data, "hardware.{$terminalId}");
+
+        PosTerminal::findOrFail($terminalId)->update([
+            'hardware_profile' => [
+                ...$input,
+                'cash_drawer_enabled' => $request->boolean("hardware.{$terminalId}.cash_drawer_enabled"),
+                'auto_print' => $request->boolean("hardware.{$terminalId}.auto_print"),
+                'updated_at' => now()->toIso8601String(),
+            ],
+        ]);
+
+        return redirect()->route('settings.index')->with('success', 'บันทึกโปรไฟล์อุปกรณ์ POS แล้ว');
     }
 
     public function update(Request $request): RedirectResponse

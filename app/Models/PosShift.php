@@ -35,6 +35,11 @@ class PosShift extends Model
         return $this->hasMany(PosReceipt::class);
     }
 
+    public function cashMovements(): HasMany
+    {
+        return $this->hasMany(PosCashMovement::class);
+    }
+
     protected function casts(): array
     {
         return [

@@ -474,7 +474,14 @@
         .product-sku {
             font-size: 10.5px; color: #93c5fd; font-weight: 800;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-            flex-shrink: 0;
+            flex-shrink: 0; display:flex; align-items:center; gap:5px;
+        }
+        .product-sku > span:first-child {
+            min-width:0; overflow:hidden; text-overflow:ellipsis;
+        }
+        .margin-warning {
+            flex:none; padding:1px 5px; border-radius:4px;
+            background:#fee2e2; color:#b91c1c; font-size:8px; font-weight:900;
         }
         .stock-badge {
             position: absolute; top: 6px; right: 6px;
@@ -1669,7 +1676,7 @@
                     <div class="product-loading" style="color:#64748b">ไม่พบสินค้า</div>
                 </template>
                 <template x-for="p in products" :key="p.id">
-                    <div class="product-card" :class="{ 'flash-sale': p.is_flash_sale }" @click="addToCart(p)">
+                    <div class="product-card" :class="{ 'flash-sale': p.is_flash_sale, 'margin-low': p.margin_warning }" @click="addToCart(p)">
                         <template x-if="p.is_flash_sale">
                             <div class="flash-badge"><i class="bi bi-lightning-charge-fill"></i> นาทีทอง</div>
                         </template>
@@ -1683,7 +1690,10 @@
                             <div class="stock-badge" :class="p.stock_qty <= 0 ? 'out' : (p.stock_qty < 10 ? 'low' : '')"
                                  x-text="p.stock_qty <= 0 ? 'หมด' : 'คงเหลือ ' + money(p.stock_qty)"></div>
                         </template>
-                        <div class="product-sku" x-text="p.sku_code"></div>
+                        <div class="product-sku">
+                            <span x-text="p.sku_code"></span>
+                            <span class="margin-warning" x-show="p.margin_warning">กำไรต่ำ</span>
+                        </div>
                         <div class="product-name" x-text="p.name_th"></div>
                         <template x-if="p.is_flash_sale || p.is_promotion">
                             <div class="product-price-orig" x-text="'฿' + money(p.original_price)"></div>
@@ -1763,6 +1773,8 @@
                 <div class="pay-row"><span>จำนวนบิล</span><span x-text="(activeShift?.receipt_count || 0) + ' บิล'"></span></div>
                 <div class="pay-row"><span>เงินตั้งต้น</span><span x-text="'฿ ' + money(activeShift?.opening_cash || 0)"></span></div>
                 <div class="pay-row"><span>เงินสดขาย</span><span x-text="'฿ ' + money(activeShift?.cash_sales || 0)"></span></div>
+                <div class="pay-row"><span>เงินเพิ่มเข้าลิ้นชัก</span><span x-text="'฿ ' + money(activeShift?.cash_in || 0)"></span></div>
+                <div class="pay-row"><span>นำส่ง / เบิกจ่าย</span><span x-text="'฿ ' + money((activeShift?.cash_drops || 0) + (activeShift?.cash_payouts || 0))"></span></div>
                 <div class="pay-row"><span>QR / โอน</span><span x-text="'฿ ' + money(activeShift?.transfer_sales || 0)"></span></div>
                 <div class="pay-row"><span>บัตร / เช็ค</span><span x-text="'฿ ' + money((activeShift?.card_sales || 0) + (activeShift?.cheque_sales || 0))"></span></div>
                 <div class="pay-total" x-text="'เงินสดควรมี ฿ ' + money(activeShift?.expected_cash || 0)"></div>
@@ -1780,6 +1792,7 @@
                 <input class="ref-input" type="text" x-model="closingNote" placeholder="ไม่บังคับ">
             </label>
             <div class="modal-actions">
+                <button class="btn-cancel" type="button" @click="recordCashDrop()"><i class="bi bi-box-arrow-up"></i> นำส่งเงิน</button>
                 <button class="btn-cancel" @click="closeShiftModalOpen = false">ยกเลิก</button>
                 <button class="btn-confirm" :disabled="shiftProcessing || !activeShift" @click="submitCloseShift()">
                     <span x-show="!shiftProcessing"><i class="bi bi-lock me-1"></i> ปิดกะ</span>
@@ -2404,10 +2417,70 @@ function posApp() {
                 this.activeShift = null;
                 this.closeShiftModalOpen = false;
                 erpPopup('success', 'ปิดกะเรียบร้อย', 'ขาด/เกิน: ฿ ' + this.money(data.shift?.cash_difference || 0));
+                if (data.report_url) {
+                    window.open(data.report_url, '_blank', 'noopener');
+                }
             } catch (e) {
                 erpPopup('error', 'เชื่อมต่อ server ไม่ได้');
             } finally {
                 this.shiftProcessing = false;
+            }
+        },
+
+        async recordCashDrop() {
+            if (!this.activeShift) return;
+            const result = await Swal.fire({
+                title: 'นำส่งเงินระหว่างกะ',
+                html: '<label style="display:block;text-align:left;margin-bottom:6px">จำนวนเงิน</label>'
+                    + '<input id="cash-drop-amount" type="number" min="0.01" step="0.01" class="swal2-input" style="margin:0 0 12px;width:100%">'
+                    + '<label style="display:block;text-align:left;margin-bottom:6px">เลขอ้างอิง / ซองเงิน</label>'
+                    + '<input id="cash-drop-ref" class="swal2-input" style="margin:0 0 12px;width:100%">'
+                    + '<label style="display:block;text-align:left;margin-bottom:6px">เหตุผล</label>'
+                    + '<input id="cash-drop-reason" class="swal2-input" value="นำส่งเงินระหว่างกะ" style="margin:0;width:100%">',
+                showCancelButton: true,
+                confirmButtonText: 'บันทึกนำส่ง',
+                cancelButtonText: 'ยกเลิก',
+                background: '#1e293b',
+                color: '#f1f5f9',
+                preConfirm: () => {
+                    const amount = Number(document.getElementById('cash-drop-amount')?.value || 0);
+                    const reason = document.getElementById('cash-drop-reason')?.value?.trim() || '';
+                    if (amount <= 0 || !reason) {
+                        Swal.showValidationMessage('กรุณาระบุจำนวนเงินและเหตุผล');
+                        return false;
+                    }
+                    return {
+                        amount,
+                        reason,
+                        reference_no: document.getElementById('cash-drop-ref')?.value?.trim() || null,
+                    };
+                },
+            });
+            if (!result.isConfirmed) return;
+
+            try {
+                const res = await fetch('{{ route('pos.shift.cash-movement') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                    },
+                    body: JSON.stringify({
+                        shift_id: this.activeShift.id,
+                        movement_type: 'drop',
+                        ...result.value,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    erpPopup('error', data.message || 'บันทึกนำส่งเงินไม่ได้');
+                    return;
+                }
+                this.activeShift = data.shift;
+                this.countedCash = Number(data.shift.expected_cash) || 0;
+                erpToast('success', data.message, { timer: 1600 });
+            } catch (e) {
+                erpPopup('error', 'เชื่อมต่อ server ไม่ได้');
             }
         },
 
@@ -2824,20 +2897,26 @@ function posApp() {
             }
         },
 
-        loadHeldBills() {
+        async loadHeldBills() {
+            if (!this.branchId) return;
             try {
-                this.heldBills = JSON.parse(localStorage.getItem('popstar_pos_held_bills') || '[]');
+                const qs = new URLSearchParams({ branch_id: this.branchId });
+                if (this.cashierId) qs.set('cashier_id', this.cashierId);
+                const res = await fetch(`{{ route('pos.held-bills.index') }}?${qs.toString()}`);
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.message || 'โหลดบิลพักไม่ได้');
+                this.heldBills = data.held_bills || [];
             } catch (e) {
                 this.heldBills = [];
             }
         },
 
-        saveHeldBills() {
-            localStorage.setItem('popstar_pos_held_bills', JSON.stringify(this.heldBills));
-        },
-
         async holdBill() {
             if (this.cart.length === 0) return;
+            if (!this.activeShift) {
+                erpPopup('warning', 'กรุณาเปิดกะก่อนพักบิล');
+                return;
+            }
 
             const defaultName = this.customerName || 'บิล ' + new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
             const result = await Swal.fire({
@@ -2854,10 +2933,7 @@ function posApp() {
 
             if (!result.isConfirmed) return;
 
-            this.heldBills.unshift({
-                id: Date.now(),
-                label: (result.value || defaultName).trim(),
-                createdAt: new Date().toISOString(),
+            const payload = {
                 cart: JSON.parse(JSON.stringify(this.cart)),
                 customerQuery: this.customerQuery,
                 customerId: this.customerId,
@@ -2868,15 +2944,39 @@ function posApp() {
                 billDiscountType: this.billDiscountType,
                 vatMode: this.vatMode,
                 appliedCard: this.appliedCard ? JSON.parse(JSON.stringify(this.appliedCard)) : null,
-            });
-            this.saveHeldBills();
-            this.resetCart();
-
-            erpToast('success', 'พักบิลไว้ในเครื่องนี้แล้ว', { timer: 1600 });
+            };
+            try {
+                const res = await fetch('{{ route('pos.held-bills.store') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                    },
+                    body: JSON.stringify({
+                        branch_id: this.branchId,
+                        shift_id: this.activeShift.id,
+                        cashier_id: this.cashierId,
+                        customer_id: this.customerId || null,
+                        label: (result.value || defaultName).trim(),
+                        total_amount: this.totalAmount,
+                        payload,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    erpPopup('error', data.message || 'พักบิลไม่ได้');
+                    return;
+                }
+                this.resetCart();
+                await this.loadHeldBills();
+                erpToast('success', data.message || 'พักบิลไว้ส่วนกลางแล้ว', { timer: 1800 });
+            } catch (e) {
+                erpPopup('error', 'เชื่อมต่อ server ไม่ได้ บิลยังอยู่หน้าจอนี้และยังไม่ถูกลบ');
+            }
         },
 
         async recallBill() {
-            this.loadHeldBills();
+            await this.loadHeldBills();
 
             if (this.heldBills.length === 0) {
                 erpToast('info', 'ยังไม่มีบิลที่พักไว้', { timer: 1500 });
@@ -2918,8 +3018,29 @@ function posApp() {
             }
 
             const billId = Number(result.value);
-            const bill = this.heldBills.find((item) => Number(item.id) === billId);
-            if (!bill) return;
+            const selectedBill = this.heldBills.find((item) => Number(item.id) === billId);
+            if (!selectedBill) return;
+
+            let bill;
+            try {
+                const res = await fetch(`{{ url('/pos/held-bills') }}/${billId}/resume`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                    },
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    erpPopup('error', data.message || 'เรียกบิลพักไม่ได้');
+                    await this.loadHeldBills();
+                    return;
+                }
+                bill = data.held_bill;
+            } catch (e) {
+                erpPopup('error', 'เชื่อมต่อ server ไม่ได้');
+                return;
+            }
 
             this.cart = JSON.parse(JSON.stringify(bill.cart));
             this.selectedCartIdx = this.cart.length ? this.cart.length - 1 : null;
@@ -2934,7 +3055,7 @@ function posApp() {
             this.vatMode = bill.vatMode || 'included';
             this.appliedCard = bill.appliedCard || null;
             this.heldBills = this.heldBills.filter((item) => Number(item.id) !== billId);
-            this.saveHeldBills();
+            erpToast('success', `เรียกบิล ${bill.hold_no || ''} แล้ว`, { timer: 1400 });
         },
 
         editBill() {

@@ -51,6 +51,9 @@
                     <label>ยี่ห้อ<select name="product_brand_id"><option value="">ไม่กำหนด</option>@foreach($brands as $item)<option value="{{ $item->id }}" @selected($item->id===$product->product_brand_id)>{{ $item->name_th }}</option>@endforeach</select></label>
                     <label>หน่วยหลัก<select name="base_unit_id" required>@foreach($units as $item)<option value="{{ $item->id }}" @selected($item->id===$product->base_unit_id)>{{ $item->displayLabel() }}</option>@endforeach</select></label>
                     <label>ราคาขายเริ่มต้น<input type="number" step="0.01" min="0" name="default_price" value="{{ $product->default_price }}"></label>
+                    <label>ราคาขายสูงสุด/หน่วยฐาน<input type="number" step="0.0001" min="0" name="maximum_sale_price" value="{{ $product->maximum_sale_price }}"></label>
+                    <label>กำไรขั้นต่ำ (%)<input type="number" step="0.0001" max="100" name="minimum_margin_percent" value="{{ $product->minimum_margin_percent }}"></label>
+                    <label>ควบคุมกำไร<select name="margin_control_policy"><option value="warn" @selected($product->margin_control_policy==='warn')>แจ้งเตือน</option><option value="block" @selected($product->margin_control_policy==='block')>ห้ามขายจนกว่าผู้จัดการอนุมัติ</option></select></label>
                     <label>ขายเมื่อสต๊อกไม่พอ<select name="negative_stock_policy"><option value="allow" @selected($product->negative_stock_policy==='allow')>เตือนแล้วอนุญาต</option><option value="block" @selected($product->negative_stock_policy==='block')>ห้ามขายเกินสต๊อก</option></select></label>
                     <label>จุดสั่งซื้อ<input type="number" step="0.0001" min="0" name="reorder_point" value="{{ $product->reorder_point }}"></label>
                     <label>สต๊อกต่ำสุด<input type="number" step="0.0001" min="0" name="minimum_stock" value="{{ $product->minimum_stock }}"></label>
@@ -493,6 +496,8 @@
                     <span class="badge text-bg-light border">จุดสั่งซื้อ {{ $product->reorder_point !== null ? number_format((float)$product->reorder_point, 4) : '-' }}</span>
                     <span class="badge text-bg-light border">ต่ำสุด {{ $product->minimum_stock !== null ? number_format((float)$product->minimum_stock, 4) : '-' }}</span>
                     <span class="badge text-bg-light border">สูงสุด {{ $product->maximum_stock !== null ? number_format((float)$product->maximum_stock, 4) : '-' }}</span>
+                    @if($product->maximum_sale_price !== null)<span class="badge text-bg-danger">ราคาขายไม่เกิน {{ number_format((float)$product->maximum_sale_price, 2) }}/หน่วยฐาน</span>@endif
+                    @if($product->minimum_margin_percent !== null)<span class="badge {{ $product->margin_control_policy === 'block' ? 'text-bg-danger' : 'text-bg-warning' }}">กำไรขั้นต่ำ {{ number_format((float)$product->minimum_margin_percent, 2) }}%</span>@endif
                     @if($product->tracks_expiry)
                         <span class="badge text-bg-warning">เตือนหมดอายุล่วงหน้า {{ $product->expiry_warning_days }} วัน</span>
                         <span class="badge {{ $product->expiry_sale_policy === 'block' ? 'text-bg-danger' : 'text-bg-light border' }}">{{ $product->expiry_sale_policy === 'block' ? 'ห้ามใช้ Lot หมดอายุ' : 'เตือนแต่อนุญาต Lot หมดอายุ' }}</span>
@@ -527,6 +532,45 @@
                 <div class="col-md-1"><label class="form-label small text-muted">Lead day</label><input type="number" min="0" name="lead_time_days" class="form-control form-control-sm"></div>
                 <div class="col-md-2"><label class="form-label small text-muted">หมายเหตุ</label><input name="note" class="form-control form-control-sm"></div>
                 <div class="col-md-1"><div class="form-check mb-2"><input type="checkbox" name="is_primary" value="1" class="form-check-input" id="supplierPrimary"><label class="form-check-label small" for="supplierPrimary">หลัก</label></div><button class="btn btn-sm btn-primary w-100">บันทึก</button></div>
+            </form>
+
+            <hr class="my-4">
+            <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <h4 class="h6 fw-bold mb-1">ตารางราคาซื้อตามผู้จำหน่าย</h4>
+                    <div class="text-muted small">เลือกใช้ตามผู้ขาย หน่วย จำนวนขั้นต่ำ และวันที่เอกสาร รองรับราคารวม VAT แยก VAT และสินค้ายกเว้น VAT</div>
+                </div>
+            </div>
+            <div class="table-responsive mb-3">
+                <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>ผู้จำหน่าย</th><th>หน่วย</th><th class="text-end">ขั้นต่ำ</th><th class="text-end">ราคา</th><th>VAT</th><th>ช่วงใช้ราคา</th><th>สถานะ</th><th></th></tr></thead>
+                    <tbody>
+                    @forelse($product->supplierPriceSchedules as $schedule)
+                        <tr>
+                            <td>{{ $schedule->supplier?->code }} - {{ $schedule->supplier?->name_th }}</td>
+                            <td>{{ $schedule->unit?->displayLabel() ?? $product->baseUnit?->displayLabel() ?? 'หน่วยฐาน' }}</td>
+                            <td class="text-end">{{ number_format((float)$schedule->minimum_qty, 4) }}</td>
+                            <td class="text-end fw-semibold">{{ number_format((float)$schedule->unit_price, 4) }}</td>
+                            <td>{{ ['included' => 'รวม VAT', 'excluded' => 'แยก VAT', 'exempt' => 'ยกเว้น VAT'][$schedule->vat_mode] ?? $schedule->vat_mode }}</td>
+                            <td>{{ $schedule->effective_from?->format('d/m/Y') }} - {{ $schedule->effective_to?->format('d/m/Y') ?? 'ไม่สิ้นสุด' }}</td>
+                            <td><span class="badge {{ $schedule->is_active ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $schedule->is_active ? 'ใช้งาน' : 'ปิด' }}</span></td>
+                            <td class="text-end"><form method="post" action="{{ route('products.supplier-prices.destroy', [$product, $schedule]) }}" onsubmit="return confirm('ลบช่วงราคาซื้อนี้?')">@csrf @method('DELETE')<button class="btn btn-sm btn-light text-danger border" title="ลบช่วงราคา"><i class="bi bi-trash"></i></button></form></td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="8" class="text-center text-muted py-3">ยังไม่มีตารางราคาซื้อตามช่วงเวลา</td></tr>
+                    @endforelse
+                    </tbody>
+                </table>
+            </div>
+            <form method="post" action="{{ route('products.supplier-prices.store', $product) }}" class="row g-2 align-items-end">@csrf
+                <div class="col-md-3"><label class="form-label small text-muted">ผู้จำหน่าย</label><select name="supplier_id" required class="form-select form-select-sm"><option value="">-- เลือก --</option>@foreach($suppliers as $supplier)<option value="{{ $supplier->id }}">{{ $supplier->code }} - {{ $supplier->name_th }}</option>@endforeach</select></div>
+                <div class="col-md-2"><label class="form-label small text-muted">หน่วย</label><select name="unit_id" class="form-select form-select-sm"><option value="">หน่วยฐาน</option>@foreach($units as $unit)<option value="{{ $unit->id }}">{{ $unit->displayLabel() }}</option>@endforeach</select></div>
+                <div class="col-md-1"><label class="form-label small text-muted">ขั้นต่ำ</label><input type="number" step="0.00000001" min="0.00000001" name="minimum_qty" value="1" required class="form-control form-control-sm"></div>
+                <div class="col-md-1"><label class="form-label small text-muted">ราคา</label><input type="number" step="0.00000001" min="0" name="unit_price" required class="form-control form-control-sm"></div>
+                <div class="col-md-2"><label class="form-label small text-muted">VAT</label><select name="vat_mode" class="form-select form-select-sm"><option value="included">รวม VAT</option><option value="excluded">แยก VAT</option><option value="exempt">ยกเว้น VAT</option></select></div>
+                <div class="col-md-1"><label class="form-label small text-muted">เริ่มใช้</label><input type="date" name="effective_from" value="{{ now()->toDateString() }}" required class="form-control form-control-sm"></div>
+                <div class="col-md-1"><label class="form-label small text-muted">สิ้นสุด</label><input type="date" name="effective_to" class="form-control form-control-sm"></div>
+                <div class="col-md-1"><input type="hidden" name="is_active" value="1"><button class="btn btn-sm btn-primary w-100"><i class="bi bi-plus-lg"></i> เพิ่ม</button></div>
             </form>
         </div>
 
@@ -667,6 +711,21 @@
                                     <input type="checkbox" name="tracks_expiry" value="1" @checked($product->tracks_expiry) class="form-check-input" id="editProductExpiry">
                                     <label class="form-check-label" for="editProductExpiry">ควบคุม Lot และวันหมดอายุ</label>
                                 </div>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-muted small">ราคาขายสูงสุด/หน่วยฐาน</label>
+                                <input type="number" step="0.00000001" min="0" name="maximum_sale_price" value="{{ $product->maximum_sale_price }}" class="form-control">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-muted small">กำไรขั้นต่ำ (%)</label>
+                                <input type="number" step="0.00000001" max="100" name="minimum_margin_percent" value="{{ $product->minimum_margin_percent }}" class="form-control">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-muted small">การควบคุมกำไร</label>
+                                <select name="margin_control_policy" class="form-select">
+                                    <option value="warn" @selected($product->margin_control_policy === 'warn')>แจ้งเตือน</option>
+                                    <option value="block" @selected($product->margin_control_policy === 'block')>บังคับขออนุมัติ</option>
+                                </select>
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label text-muted small">เตือนก่อนหมดอายุ (วัน)</label>

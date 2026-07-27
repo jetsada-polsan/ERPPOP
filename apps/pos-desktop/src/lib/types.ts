@@ -7,6 +7,20 @@ export interface DeviceProfile {
   vatRate: number
   company: { name?: string; tax_id?: string; address?: string; phone?: string; logo_url?: string }
   receiptTemplate?: ReceiptTemplate
+  hardwareProfile?: HardwareProfile
+}
+
+export interface HardwareProfile {
+  printer_driver: 'browser' | 'windows' | 'escpos_usb' | 'escpos_network'
+  printer_name?: string
+  printer_address?: string
+  paper_width: '58mm' | '80mm'
+  scanner_mode: 'keyboard' | 'serial'
+  scale_mode: 'none' | 'keyboard' | 'serial'
+  customer_display: 'none' | 'browser' | 'serial' | 'network'
+  cash_drawer_enabled: boolean
+  auto_print: boolean
+  print_copies: number
 }
 
 export interface ReceiptBlock {
@@ -51,10 +65,22 @@ export interface Product {
   stock_qty?: number | null
   is_promotion?: boolean
   is_flash_sale?: boolean
+  margin_percent?: number
+  margin_warning?: boolean
   barcodes: Barcode[]
 }
 
 export interface CartLine extends Product { qty: number; scannedBarcode?: string }
+export interface HeldBill {
+  id: number
+  hold_no: string
+  label: string
+  createdAt: string
+  cashier_name?: string
+  terminal_name?: string
+  total_amount: number
+  cart: CartLine[]
+}
 export type PaymentMethod = 'cash' | 'transfer' | 'credit_card' | 'cheque' | 'mixed'
 
 export interface CheckoutPayload {

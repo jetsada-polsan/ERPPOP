@@ -359,6 +359,49 @@
                         </table>
                     </div>
                 </div>
+
+                <div class="set-card">
+                    <div class="set-title pt-2">โปรไฟล์อุปกรณ์หน้าร้าน</div>
+                    <div class="set-desc mb-3">กำหนดแยกแต่ละเครื่อง แอป POS จะรับค่าชุดนี้จากเซิร์ฟเวอร์เมื่อต่อออนไลน์</div>
+                    @forelse($posTerminals as $terminal)
+                        @php
+                            $hardware = array_merge([
+                                'printer_driver' => 'browser',
+                                'printer_name' => '',
+                                'printer_address' => '',
+                                'paper_width' => '80mm',
+                                'scanner_mode' => 'keyboard',
+                                'scale_mode' => 'keyboard',
+                                'customer_display' => 'none',
+                                'cash_drawer_enabled' => false,
+                                'auto_print' => false,
+                                'print_copies' => 1,
+                            ], $terminal->hardware_profile ?? []);
+                        @endphp
+                        <div class="border rounded-2 p-3 mb-3">
+                            <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+                                <div><strong>{{ $terminal->code }} · {{ $terminal->name }}</strong><div class="small text-muted">{{ $terminal->branch?->code }} {{ $terminal->branch?->name_th }}</div></div>
+                                <button type="submit" name="pos_terminal_id" value="{{ $terminal->id }}" formaction="{{ route('settings.pos-terminal.hardware') }}" formnovalidate class="btn btn-primary btn-sm"><i class="bi bi-check-lg me-1"></i>บันทึกเครื่องนี้</button>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-md-2"><label class="form-label small">ไดรเวอร์เครื่องพิมพ์</label><select name="hardware[{{ $terminal->id }}][printer_driver]" class="form-select form-select-sm"><option value="browser" @selected($hardware['printer_driver']==='browser')>พิมพ์ผ่านระบบ</option><option value="windows" @selected($hardware['printer_driver']==='windows')>Windows Printer</option><option value="escpos_usb" @selected($hardware['printer_driver']==='escpos_usb')>ESC/POS USB</option><option value="escpos_network" @selected($hardware['printer_driver']==='escpos_network')>ESC/POS Network</option></select></div>
+                                <div class="col-md-2"><label class="form-label small">ชื่อเครื่องพิมพ์</label><input name="hardware[{{ $terminal->id }}][printer_name]" value="{{ $hardware['printer_name'] }}" class="form-control form-control-sm" placeholder="เช่น POS-80"></div>
+                                <div class="col-md-2"><label class="form-label small">IP / Port / USB</label><input name="hardware[{{ $terminal->id }}][printer_address]" value="{{ $hardware['printer_address'] }}" class="form-control form-control-sm" placeholder="192.168.1.20:9100"></div>
+                                <div class="col-md-1"><label class="form-label small">กระดาษ</label><select name="hardware[{{ $terminal->id }}][paper_width]" class="form-select form-select-sm"><option value="80mm" @selected($hardware['paper_width']==='80mm')>80 มม.</option><option value="58mm" @selected($hardware['paper_width']==='58mm')>58 มม.</option></select></div>
+                                <div class="col-md-1"><label class="form-label small">เครื่องสแกน</label><select name="hardware[{{ $terminal->id }}][scanner_mode]" class="form-select form-select-sm"><option value="keyboard" @selected($hardware['scanner_mode']==='keyboard')>Keyboard</option><option value="serial" @selected($hardware['scanner_mode']==='serial')>Serial</option></select></div>
+                                <div class="col-md-1"><label class="form-label small">เครื่องชั่ง</label><select name="hardware[{{ $terminal->id }}][scale_mode]" class="form-select form-select-sm"><option value="none" @selected($hardware['scale_mode']==='none')>ไม่ใช้</option><option value="keyboard" @selected($hardware['scale_mode']==='keyboard')>Barcode</option><option value="serial" @selected($hardware['scale_mode']==='serial')>Serial</option></select></div>
+                                <div class="col-md-1"><label class="form-label small">จอลูกค้า</label><select name="hardware[{{ $terminal->id }}][customer_display]" class="form-select form-select-sm"><option value="none" @selected($hardware['customer_display']==='none')>ไม่ใช้</option><option value="browser" @selected($hardware['customer_display']==='browser')>หน้าจอ 2</option><option value="serial" @selected($hardware['customer_display']==='serial')>Serial</option><option value="network" @selected($hardware['customer_display']==='network')>Network</option></select></div>
+                                <div class="col-md-1"><label class="form-label small">จำนวนสำเนา</label><input type="number" min="1" max="3" name="hardware[{{ $terminal->id }}][print_copies]" value="{{ $hardware['print_copies'] }}" class="form-control form-control-sm"></div>
+                                <div class="col-md-1 d-flex flex-column justify-content-end gap-1">
+                                    <label class="form-check small mb-0"><input type="checkbox" name="hardware[{{ $terminal->id }}][cash_drawer_enabled]" value="1" @checked($hardware['cash_drawer_enabled']) class="form-check-input"> ลิ้นชักเงิน</label>
+                                    <label class="form-check small mb-0"><input type="checkbox" name="hardware[{{ $terminal->id }}][auto_print]" value="1" @checked($hardware['auto_print']) class="form-check-input"> พิมพ์อัตโนมัติ</label>
+                                </div>
+                            </div>
+                        </div>
+                    @empty
+                        <div class="text-muted small py-3">ยังไม่มีเครื่อง POS ระบบจะสร้างเครื่องเว็บเมื่อเปิดกะครั้งแรก</div>
+                    @endforelse
+                </div>
             </div>
         </div>
     </div>

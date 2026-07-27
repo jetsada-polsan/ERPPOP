@@ -111,7 +111,7 @@ class PosPricingGuard
             throw new RuntimeException('พบบาร์โค้ดที่ปิดใช้งานหรือไม่มีในแฟ้มสินค้า กรุณาสแกนใหม่');
         }
         $defaultTableId = PriceTable::where('is_default', true)->value('id');
-        $serverLines = $items->map(function ($item) use ($prices, $data, $barcodes, $defaultTableId) {
+        $serverLines = $items->map(function ($item) use ($prices, $data, $barcodes, $defaultTableId, $products) {
             $productId = (int) $item['product_id'];
             $qty = (float) $item['qty'];
             $barcode = filled($item['barcode'] ?? null) ? $barcodes->get($item['barcode']) : null;
@@ -127,8 +127,24 @@ class PosPricingGuard
                     ->where('is_active', true)->value('price') ?? $basePrice);
             }
             $unitPrice = $this->campaignPrice($productId, $basePrice, (int) $data['branch_id']);
+            $factor = $barcode && DecimalMath::compare($barcode->unit_factor, '0.00000001') >= 0
+                ? $barcode->unit_factor
+                : 1;
+            $baseUnitPrice = DecimalMath::divide($unitPrice, $factor, DecimalMath::COST_SCALE);
+            $maximum = $products[$productId]->maximum_sale_price;
+            if ($maximum !== null && DecimalMath::compare($baseUnitPrice, $maximum) > 0) {
+                throw new RuntimeException(
+                    "ราคา {$products[$productId]->name_th} เกินราคาขายสูงสุดที่กำหนด "
+                    .number_format((float) $maximum, 2).' บาทต่อหน่วยฐาน'
+                );
+            }
 
-            return ['product_id' => $productId, 'qty' => $qty, 'unit_price' => $unitPrice];
+            return [
+                'product_id' => $productId,
+                'qty' => $qty,
+                'unit_price' => $unitPrice,
+                'unit_factor' => (float) $factor,
+            ];
         });
 
         $expected = DecimalMath::round(DecimalMath::sum($serverLines->map(
@@ -188,6 +204,46 @@ class PosPricingGuard
             && DecimalMath::compare(DecimalMath::add($submitted, '0.01', 2), $cost) < 0
             && ! $user->hasPermission('pos.sell_below_cost')) {
             throw new RuntimeException('ยอดขายต่ำกว่าทุน ต้องให้ผู้จัดการที่มีสิทธิ์อนุมัติ');
+        }
+
+        $vatRate = (float) (DB::table('vat_rates')->where('effective_from', '<=', now()->toDateString())
+            ->where(fn ($query) => $query->whereNull('effective_to')->orWhere('effective_to', '>=', now()->toDateString()))
+            ->orderByDesc('effective_from')->value('rate_percent') ?? 7);
+        foreach ($items->values() as $index => $item) {
+            $product = $products[(int) $item['product_id']];
+            if ($product->minimum_margin_percent === null || $product->margin_control_policy !== 'block') {
+                continue;
+            }
+            $factor = $serverLines->values()[$index]['unit_factor'] ?? 1;
+            $netUnitRevenue = DecimalMath::divide($item['unit_price'], $factor, DecimalMath::COST_SCALE);
+            if ($product->is_vat && $vatRate > 0) {
+                $netUnitRevenue = DecimalMath::divide(
+                    DecimalMath::multiply($netUnitRevenue, 100),
+                    DecimalMath::add(100, $vatRate),
+                    DecimalMath::COST_SCALE,
+                );
+            }
+            if (DecimalMath::compare($netUnitRevenue, 0) <= 0) {
+                $marginPercent = '-1000';
+            } else {
+                $marginPercent = DecimalMath::multiply(
+                    DecimalMath::divide(
+                        DecimalMath::subtract($netUnitRevenue, $product->average_cost),
+                        $netUnitRevenue,
+                        DecimalMath::COST_SCALE,
+                    ),
+                    100,
+                    DecimalMath::COST_SCALE,
+                );
+            }
+            if (DecimalMath::compare($marginPercent, $product->minimum_margin_percent) < 0
+                && ! $user->hasPermission('pos.sell_below_cost')) {
+                throw new RuntimeException(
+                    "กำไร {$product->name_th} ต่ำกว่าเกณฑ์ "
+                    .number_format((float) $product->minimum_margin_percent, 2)
+                    .'% ต้องให้ผู้จัดการอนุมัติ'
+                );
+            }
         }
 
         return (float) $submitted;
