@@ -106,10 +106,9 @@ class PosController extends Controller
             return self::requiresCashierPin() ? null : $this->validatedCashierId($requested);
         }
 
-        // POS บนเว็บ: user ที่ผูกรหัสพนักงานไว้ ขายได้ในชื่อตัวเองเท่านั้น
-        $own = auth()->user()?->salesman_id;
-
-        return $own ? (int) $own : $this->validatedCashierId($requested);
+        // POS บนเว็บ: user ที่ผูกรหัสพนักงานไว้ ขายได้ในชื่อตัวเองเท่านั้น และรหัสนั้น
+        // ต้องยังใช้งานอยู่ ไม่งั้นคนที่ถูกปิดการใช้งานแล้วยังขายต่อได้
+        return $this->validatedCashierId(auth()->user()?->salesman_id ?: $requested);
     }
 
     /** รหัสพนักงานที่ client ส่งมาใช้ได้จริงไหม (ยังใช้งานอยู่ + อยู่สาขาที่ตัวเองมีสิทธิ์) */

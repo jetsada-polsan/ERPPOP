@@ -114,6 +114,18 @@ class PosCashierIdentityTest extends TestCase
         $this->assertSame(422, app(PosController::class)->holdBill($request)->getStatusCode());
     }
 
+    public function test_user_whose_salesman_was_disabled_can_no_longer_sell(): void
+    {
+        [$branch, $alice, $user, $aliceShift] = $this->branchWithCashier('LEFT', 'ALICE');
+        $alice->update(['is_active' => false]);
+        $this->actingAs($user);
+
+        $request = Request::create('/pos/held-bills', 'POST', $this->holdPayload($branch, $aliceShift, $alice));
+        $this->app->instance('request', $request);
+
+        $this->assertSame(422, app(PosController::class)->holdBill($request)->getStatusCode());
+    }
+
     /** @return array{Branch,Salesman,User,PosShift} */
     private function branchWithCashier(string $code, string $cashierCode): array
     {
