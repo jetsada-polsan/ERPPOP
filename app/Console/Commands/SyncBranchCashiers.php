@@ -21,11 +21,10 @@ class SyncBranchCashiers extends Command
 
     public function handle(): int
     {
+        // หารหัสสาขาก่อนเสมอ: รหัสอย่าง "0004" ถ้าแปลงเป็นเลขไปจับ id จะได้คนละสาขา
         $key = (string) $this->argument('branch');
-        $branch = Branch::query()
-            ->where('code', $key)
-            ->orWhere('id', ctype_digit($key) ? (int) $key : 0)
-            ->first();
+        $branch = Branch::where('code', $key)->first()
+            ?? (ctype_digit($key) ? Branch::find((int) $key) : null);
 
         if (! $branch) {
             $this->error('ไม่พบสาขา');

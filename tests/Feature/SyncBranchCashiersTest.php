@@ -41,6 +41,19 @@ class SyncBranchCashiersTest extends TestCase
         $this->assertSame('ชื่อเดิมที่แก้ไว้', Salesman::where('code', 'E-010')->value('name'));
     }
 
+    public function test_a_numeric_branch_code_never_resolves_to_another_branch_id(): void
+    {
+        $other = Branch::create(['code' => 'OTHER', 'name_th' => 'สาขาอื่น', 'is_active' => true]);
+        $target = Branch::create(['code' => (string) $other->id, 'name_th' => 'สาขาเป้าหมาย', 'is_active' => true]);
+        $this->employee($target, 'E-030', 'คนของสาขาเป้าหมาย', 'แคชเชียร์', 'Active');
+        $this->employee($other, 'E-031', 'คนของสาขาอื่น', 'แคชเชียร์', 'Active');
+
+        $this->artisan('pos:sync-cashiers', ['branch' => (string) $other->id])->assertSuccessful();
+
+        $this->assertSame(1, Salesman::where('branch_id', $target->id)->count());
+        $this->assertSame(0, Salesman::where('branch_id', $other->id)->count());
+    }
+
     public function test_dry_run_writes_nothing(): void
     {
         $branch = Branch::create(['code' => 'DRY', 'name_th' => 'สาขาลองดู', 'is_active' => true]);
