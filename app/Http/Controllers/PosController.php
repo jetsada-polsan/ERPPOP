@@ -92,25 +92,50 @@ class PosController extends Controller
 
     private function enforcedCashierId(?int $requested): ?int
     {
-        if (request()->attributes->get('pos_device')) {
-            if (! $requested) {
-                return null;
+        $device = request()->attributes->get('pos_device');
+        if ($device) {
+            // ยืนยัน PIN บนเครื่องนี้แล้ว = ขายได้ในชื่อคนนั้นคนเดียว ส่ง cashier_id
+            // ของคนอื่นมาไม่ผ่าน แม้จะอยู่สาขาเดียวกันก็ตาม
+            $verified = $device->verifiedCashierId();
+            if ($verified !== null) {
+                return ($requested === null || $requested === $verified) ? $verified : null;
             }
 
-            $cashier = Salesman::whereKey($requested)->where('is_active', true)->first();
-            if (! $cashier) {
-                return null;
-            }
-
-            $branchId = $this->enforcedBranchId(null);
-            if ($cashier->branch_id && $branchId && (int) $cashier->branch_id !== (int) $branchId) {
-                return null;
-            }
-
-            return (int) $cashier->id;
+            // ยังไม่ยืนยัน: โหมดเข้มบังคับให้ใส่ PIN ก่อน, โหมดปกติยอมให้ขายต่อได้
+            // เพื่อไม่ให้เครื่องที่เปิดค้างข้ามคืนถูกตัดกลางกะตอนอัปเดต
+            return self::requiresCashierPin() ? null : $this->validatedCashierId($requested);
         }
 
-        return auth()->user()?->salesman_id ?: $requested;
+        // POS บนเว็บ: user ที่ผูกรหัสพนักงานไว้ ขายได้ในชื่อตัวเองเท่านั้น
+        $own = auth()->user()?->salesman_id;
+
+        return $own ? (int) $own : $this->validatedCashierId($requested);
+    }
+
+    /** รหัสพนักงานที่ client ส่งมาใช้ได้จริงไหม (ยังใช้งานอยู่ + อยู่สาขาที่ตัวเองมีสิทธิ์) */
+    private function validatedCashierId(?int $requested): ?int
+    {
+        if (! $requested) {
+            return null;
+        }
+
+        $cashier = Salesman::whereKey($requested)->where('is_active', true)->first();
+        if (! $cashier) {
+            return null;
+        }
+
+        $branchId = $this->enforcedBranchId(null);
+        if ($cashier->branch_id && $branchId && (int) $cashier->branch_id !== (int) $branchId) {
+            return null;
+        }
+
+        return (int) $cashier->id;
+    }
+
+    /** เปิดที่ตั้งค่า pos_require_cashier_pin เมื่อตั้ง PIN ให้แคชเชียร์ครบทุกคนแล้ว */
+    public static function requiresCashierPin(): bool
+    {
+        return AppSetting::get('pos_require_cashier_pin') === '1';
     }
 
     // Active buy-N campaigns (ซื้อครบแถม/ลด) for this branch; the POS cart

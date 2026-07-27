@@ -119,6 +119,9 @@ class PosApiController extends Controller
             return response()->json(['success' => false, 'message' => 'PIN ไม่ถูกต้อง'], 422);
         }
 
+        // ผูกผลการยืนยันไว้กับเครื่อง เพื่อให้คำสั่งขายหลังจากนี้อ้างชื่อคนอื่นไม่ได้
+        $device?->markCashierVerified($cashier);
+
         return response()->json([
             'success' => true,
             'cashier' => [
