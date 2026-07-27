@@ -39,7 +39,8 @@ jobs:
       - name: Upload release
         run: >-
           rsync -az --delete
-          --exclude=.git/ --exclude=.env --exclude=.env.* --exclude=vendor/
+          --exclude=.git/ --exclude=.claude/ --exclude=.codex/
+          --exclude=.env --exclude=.env.* --exclude=vendor/
           --exclude=node_modules/ --exclude=storage/ --exclude=bootstrap/cache/
           --exclude=database/database.sqlite
           ./ "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ vars.APP_DIR }}/"
