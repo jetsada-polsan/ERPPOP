@@ -73,3 +73,43 @@ export async function markQueue(id: string, status: QueueItem['status'], error?:
     [status, error || null, receiptNo || null, status, id],
   )
 }
+
+export type LocalDbHealth = {
+  integrity: string
+  products: number
+  pending: number
+  failed: number
+  synced: number
+  lastProductSyncAt: string | null
+  sizeBytes: number
+}
+
+export async function localDbHealth(): Promise<LocalDbHealth> {
+  const conn = await connection()
+  const integrityRows = await conn.select<Array<{ integrity_check: string }>>('PRAGMA integrity_check')
+  const counts = await conn.select<Array<{ status: string; count: number }>>(
+    'SELECT status, COUNT(*) AS count FROM checkout_queue GROUP BY status',
+  )
+  const productSync = await conn.select<Array<{ synced_at: string | null }>>(
+    'SELECT MAX(synced_at) AS synced_at FROM products',
+  )
+  const pageCount = await conn.select<Array<{ page_count: number }>>('PRAGMA page_count')
+  const pageSize = await conn.select<Array<{ page_size: number }>>('PRAGMA page_size')
+  const countBy = (status: string) => Number(counts.find((row) => row.status === status)?.count || 0)
+
+  return {
+    integrity: integrityRows[0]?.integrity_check || 'unknown',
+    products: Number((await conn.select<Array<{ count: number }>>('SELECT COUNT(*) AS count FROM products'))[0]?.count || 0),
+    pending: countBy('pending') + countBy('syncing'),
+    failed: countBy('failed'),
+    synced: countBy('synced'),
+    lastProductSyncAt: productSync[0]?.synced_at || null,
+    sizeBytes: Number(pageCount[0]?.page_count || 0) * Number(pageSize[0]?.page_size || 0),
+  }
+}
+
+export async function closeLocalDb() {
+  if (!db) return
+  await db.close()
+  db = null
+}

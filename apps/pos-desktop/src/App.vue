@@ -2,9 +2,9 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, Cloud, CloudOff, CreditCard, FileText, FolderOpen, LogOut, Minus, PackageSearch, PauseCircle, Plus, Printer, QrCode, ReceiptText, RefreshCw, ScanLine, Search, Settings, ShoppingCart, Trash2, UserRound, Wifi, X } from 'lucide-vue-next'
 import { check } from '@tauri-apps/plugin-updater'
-import { isTauri } from '@tauri-apps/api/core'
+import { invoke, isTauri } from '@tauri-apps/api/core'
 import { api, connect, setServerUrl } from './lib/api'
-import { enqueue, loadProducts, loadProfile, loadSession, markQueue, queueItems, replaceProducts, saveProfile, saveSession } from './lib/db'
+import { closeLocalDb, enqueue, loadProducts, loadProfile, loadSession, localDbHealth, markQueue, queueItems, replaceProducts, saveProfile, saveSession, type LocalDbHealth } from './lib/db'
 import { syncCheckoutQueue } from './lib/sync'
 import type { CartLine, Cashier, DeviceProfile, HeldBill, PaymentMethod, Product, QueueItem, ReceiptBlock, ReceiptTemplate, Shift } from './lib/types'
 
@@ -54,6 +54,10 @@ const heldBills = ref<HeldBill[]>([])
 const holdLabel = ref('')
 const cashDropAmount = ref(0)
 const cashDropReference = ref('')
+const localHealth = ref<LocalDbHealth | null>(null)
+const localHealthBusy = ref(false)
+const localBackupBusy = ref(false)
+const localRestoreBusy = ref(false)
 
 const filteredProducts = computed(() => {
   const q = search.value.trim().toLocaleLowerCase('th')
@@ -161,6 +165,60 @@ async function syncAll() {
     online.value = false
     showError(e)
   } finally { syncing.value = false }
+}
+
+async function openSettings() {
+  modal.value = 'settings'
+  await inspectLocalDb()
+}
+
+async function inspectLocalDb() {
+  if (!isTauri()) {
+    localHealth.value = null
+    return
+  }
+  localHealthBusy.value = true
+  try {
+    localHealth.value = await localDbHealth()
+  } catch (e) {
+    showError(`ตรวจ SQLite ไม่สำเร็จ: ${e instanceof Error ? e.message : String(e)}`)
+  } finally {
+    localHealthBusy.value = false
+  }
+}
+
+async function backupLocalDb() {
+  if (!isTauri()) return showError('ฟังก์ชัน Backup POS ใช้ได้ในโปรแกรม Windows เท่านั้น')
+  localBackupBusy.value = true
+  try {
+    await closeLocalDb()
+    const path = await invoke<string>('backup_local_database')
+    flash(`สำรองข้อมูล POS แล้ว: ${path}`)
+    await inspectLocalDb()
+  } catch (e) {
+    showError(`สำรองข้อมูลไม่สำเร็จ: ${e instanceof Error ? e.message : String(e)}`)
+  } finally {
+    localBackupBusy.value = false
+  }
+}
+
+async function restoreLocalDb() {
+  if (!isTauri()) return showError('ฟังก์ชัน Restore POS ใช้ได้ในโปรแกรม Windows เท่านั้น')
+  if ((localHealth.value?.pending || 0) > 0 || (localHealth.value?.failed || 0) > 0) {
+    return showError('ยังมีบิลรอส่งหรือส่งไม่สำเร็จ ห้าม Restore จนกว่าจะตรวจสอบคิวให้เรียบร้อย')
+  }
+  if (!window.confirm('ระบบจะสำรองฐานปัจจุบันเป็น pre-restore แล้วกู้คืน Backup ล่าสุด จากนั้นจะเปิด POS ใหม่ ยืนยันหรือไม่?')) return
+  localRestoreBusy.value = true
+  try {
+    await closeLocalDb()
+    const latest = await invoke<string>('restore_latest_database')
+    flash(`กู้คืนจาก Backup แล้ว: ${latest}`)
+    window.setTimeout(() => window.location.reload(), 700)
+  } catch (e) {
+    showError(`กู้คืนข้อมูลไม่สำเร็จ: ${e instanceof Error ? e.message : String(e)}`)
+  } finally {
+    localRestoreBusy.value = false
+  }
 }
 
 async function configure() {
@@ -387,7 +445,7 @@ async function start() {
   cashier.value = saved.cashier
   shift.value = saved.shift?.status === 'open' ? saved.shift : null
   await refreshQueue()
-  if (!profile.value) { modal.value = 'settings'; return }
+  if (!profile.value) { modal.value = 'settings'; await inspectLocalDb(); return }
   setServerUrl(profile.value.serverUrl)
   modal.value = cashier.value && shift.value ? null : 'cashier'
   void syncAll()
@@ -435,7 +493,7 @@ onUnmounted(() => {
         <button v-if="lastReceipt" class="icon-button" title="พิมพ์บิลล่าสุด" @click="printLastReceipt"><Printer/></button>
         <button class="icon-button" title="เรียกบิลพักส่วนกลาง" @click="openHeldBills"><FolderOpen/></button>
         <button v-if="shift" class="icon-button" title="ปิดกะขาย" @click="countedCash = shift.expected_cash; modal = 'closeShift'"><LogOut/></button>
-        <button class="icon-button" title="ตั้งค่าเครื่อง" @click="modal = 'settings'"><Settings/></button>
+        <button class="icon-button" title="ตั้งค่าเครื่อง" @click="openSettings"><Settings/></button>
       </div>
     </header>
 
@@ -487,6 +545,19 @@ onUnmounted(() => {
         <label>ที่อยู่เซิร์ฟเวอร์<input v-model="setupUrl" required placeholder="https://erp.example.com"></label>
         <label>Device Token<textarea v-model="setupToken" required rows="3" placeholder="วาง Token จาก ERP > ตั้งค่า > ดาวน์โหลด POS"></textarea></label>
         <button class="primary" :disabled="busy">{{ busy ? 'กำลังตรวจสอบ...' : 'เชื่อมต่อเครื่อง' }}</button>
+        <div class="local-diagnostics">
+          <div class="diagnostic-head"><span><strong>สุขภาพ POS Local</strong><small>ตรวจ SQLite และคิวบิลในเครื่องนี้</small></span><button type="button" class="icon-button" title="ตรวจใหม่" :disabled="localHealthBusy" @click="inspectLocalDb"><RefreshCw :class="{ spin: localHealthBusy }"/></button></div>
+          <div v-if="localHealth" class="diagnostic-grid">
+            <div><span>SQLite</span><strong :class="localHealth.integrity === 'ok' ? 'ok' : 'bad'">{{ localHealth.integrity === 'ok' ? 'ปกติ' : localHealth.integrity }}</strong></div>
+            <div><span>สินค้าในเครื่อง</span><strong>{{ localHealth.products }}</strong></div>
+            <div><span>บิลรอส่ง</span><strong :class="localHealth.pending ? 'bad' : 'ok'">{{ localHealth.pending }}</strong></div>
+            <div><span>บิลล้มเหลว</span><strong :class="localHealth.failed ? 'bad' : 'ok'">{{ localHealth.failed }}</strong></div>
+          </div>
+          <p v-if="localHealth" class="diagnostic-meta">ซิงก์สินค้าล่าสุด: {{ localHealth.lastProductSyncAt ? new Date(localHealth.lastProductSyncAt).toLocaleString('th-TH') : 'ยังไม่เคยซิงก์' }} · SQLite {{ (localHealth.sizeBytes / 1024).toFixed(1) }} KB</p>
+          <p v-else class="diagnostic-meta">กดตรวจใหม่เพื่ออ่านสถานะ SQLite</p>
+          <div class="diagnostic-actions"><button type="button" class="secondary" :disabled="localBackupBusy" @click="backupLocalDb">{{ localBackupBusy ? 'กำลังสำรอง...' : 'สำรอง SQLite' }}</button><button type="button" class="secondary danger-action" :disabled="localRestoreBusy || !localHealth || localHealth.pending > 0 || localHealth.failed > 0" @click="restoreLocalDb">{{ localRestoreBusy ? 'กำลังกู้คืน...' : 'กู้คืน Backup ล่าสุด' }}</button></div>
+          <small class="diagnostic-note">Restore จะสร้างไฟล์ pre-restore ก่อนเสมอ และล็อกเมื่อมีบิลค้าง/ล้มเหลว</small>
+        </div>
       </form>
 
       <form v-else-if="modal === 'cashier'" class="modal compact" @submit.prevent="loginCashier">
