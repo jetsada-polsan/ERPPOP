@@ -13,6 +13,8 @@
 
 Device Token เก็บด้วย Windows Credential Manager ผ่าน Rust `keyring` ไม่ถูกเขียนลง SQLite
 
+รายละเอียดตารางและคอลัมน์ของ SQLite ดูที่ [`docs/POS-LOCAL-SQLITE-STRUCTURE.md`](../../docs/POS-LOCAL-SQLITE-STRUCTURE.md)
+
 ## พัฒนา
 
 ```bash
@@ -31,4 +33,3 @@ pnpm tauri dev
 5. POS ตรวจ `latest.json` ตอนเปิดและติดตั้งรุ่นใหม่อัตโนมัติ ลายเซ็นป้องกันไฟล์ถูกสับเปลี่ยนระหว่างทาง
 
 ห้ามใช้ private signing key บนเซิร์ฟเวอร์หรือเครื่องแคชเชียร์ ให้เก็บใน GitHub Actions Secrets เท่านั้น
-
