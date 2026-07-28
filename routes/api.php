@@ -10,6 +10,7 @@ Route::prefix('pos')->middleware('pos.device')->name('api.pos.')->group(function
     Route::get('/ping', [PosApiController::class, 'ping'])->name('ping');
     Route::get('/cashiers', [PosApiController::class, 'cashiers'])->name('cashiers');
     Route::post('/cashier/login', [PosApiController::class, 'cashierLogin'])->name('cashier.login');
+    Route::post('/cashier/pin', [PosApiController::class, 'changeCashierPin'])->name('cashier.pin');
     Route::get('/products', [PosController::class, 'products'])->name('products');
     Route::get('/promotions', [PosController::class, 'promotions'])->name('promotions');
     Route::get('/members', [PosController::class, 'members'])->name('members');

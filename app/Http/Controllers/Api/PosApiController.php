@@ -121,7 +121,10 @@ class PosApiController extends Controller
         }
 
         // ผูกผลการยืนยันไว้กับเครื่อง เพื่อให้คำสั่งขายหลังจากนี้อ้างชื่อคนอื่นไม่ได้
-        $device?->markCashierVerified($cashier);
+        // PIN ที่แอดมินตั้งให้ยังไม่ผูก เพราะคนอื่นก็รู้ค่า ใช้ยืนยันว่าเป็นเจ้าตัวไม่ได้
+        if (! $cashier->must_change_pin) {
+            $device?->markCashierVerified($cashier);
+        }
 
         // active_cashier_id ถูกเขียนทับทุกครั้งที่สลับคน จึงต้องลง audit ไว้ด้วย
         // ไม่งั้นช่วงที่ยังไม่มีการขาย จะไล่ไม่ได้ว่าใครลงเครื่องไหนตอนไหน
@@ -141,6 +144,7 @@ class PosApiController extends Controller
 
         return response()->json([
             'success' => true,
+            'must_change_pin' => (bool) $cashier->must_change_pin,
             'cashier' => [
                 'id' => $cashier->id,
                 'code' => $cashier->code,
@@ -148,6 +152,48 @@ class PosApiController extends Controller
                 'branch_id' => $cashier->branch_id,
             ],
         ]);
+    }
+
+    /** เจ้าตัวเปลี่ยน PIN ของตัวเองด้วย PIN ปัจจุบัน — ไม่ต้องผ่านแอดมิน */
+    public function changeCashierPin(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'code' => ['required', 'string', 'max:40'],
+            'current_pin' => ['required', 'string', 'min:4', 'max:20'],
+            'new_pin' => ['required', 'string', 'regex:/^\d{4,20}$/', 'different:current_pin'],
+        ]);
+
+        $device = $request->attributes->get('pos_device');
+        $branchId = $device?->branch_id ?: $request->user()?->branch_id;
+        $cashier = Salesman::query()
+            ->where('code', $data['code'])
+            ->where('is_active', true)
+            ->when($branchId, fn ($query) => $query->where(fn ($w) => $w
+                ->whereNull('branch_id')
+                ->orWhere('branch_id', $branchId)))
+            ->first();
+
+        if (! $cashier || ! $cashier->pos_pin_hash || ! Hash::check($data['current_pin'], $cashier->pos_pin_hash)) {
+            return response()->json(['success' => false, 'message' => 'รหัสแคชเชียร์หรือ PIN ปัจจุบันไม่ถูกต้อง'], 422);
+        }
+
+        $cashier->setPin($data['new_pin'], false);
+        $device?->markCashierVerified($cashier);
+
+        AuditLog::create([
+            'user_id' => $request->user()?->id,
+            'branch_id' => $branchId,
+            'action' => 'cashier_pin_set',
+            'table_name' => 'salesmen',
+            'record_id' => $cashier->id,
+            'new_values' => [
+                'cashier_code' => $cashier->code,
+                'device_id' => $device?->id,
+                'ip' => $request->ip(),
+            ],
+        ]);
+
+        return response()->json(['success' => true, 'message' => 'เปลี่ยน PIN เรียบร้อย']);
     }
 
     public function checkout(Request $request): JsonResponse

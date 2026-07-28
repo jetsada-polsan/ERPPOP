@@ -37,11 +37,13 @@ const pendingCount = ref(0)
 const error = ref('')
 const notice = ref('')
 const busy = ref(false)
-const modal = ref<'cashier' | 'shift' | 'closeShift' | 'payment' | 'settings' | 'holdBill' | 'heldBills' | null>(null)
+const modal = ref<'cashier' | 'changePin' | 'shift' | 'closeShift' | 'payment' | 'settings' | 'holdBill' | 'heldBills' | null>(null)
 const setupUrl = ref('http://27.254.143.219')
 const setupToken = ref('')
 const cashierCode = ref('')
 const cashierPin = ref('')
+const newPin = ref('')
+const confirmPin = ref('')
 const openingCash = ref(0)
 const countedCash = ref(0)
 const paymentMethod = ref<PaymentMethod>('cash')
@@ -176,12 +178,36 @@ async function loginCashier() {
   busy.value = true
   try {
     const result = await api.cashierLogin(cashierCode.value.trim(), cashierPin.value)
-    cashier.value = result.cashier
-    shift.value = await api.activeShift(profile.value!.branchId, cashier.value.id)
-    await saveSession(cashier.value, shift.value)
-    modal.value = shift.value ? null : 'shift'
-    cashierPin.value = ''
+    // PIN ที่แอดมินตั้งให้ยังไม่ถือว่าเป็นความลับ ต้องเปลี่ยนก่อนจึงจะเริ่มขายได้
+    if (result.must_change_pin) {
+      modal.value = 'changePin'
+      return
+    }
+    await startCashierSession(result.cashier)
   } catch (e) { showError(e) } finally { busy.value = false }
+}
+
+async function changePin() {
+  if (newPin.value !== confirmPin.value) { showError('PIN ใหม่ทั้งสองช่องไม่ตรงกัน'); return }
+  if (newPin.value === cashierPin.value) { showError('PIN ใหม่ต้องไม่ซ้ำกับ PIN เดิม'); return }
+  busy.value = true
+  try {
+    const code = cashierCode.value.trim()
+    await api.changeCashierPin(code, cashierPin.value, newPin.value)
+    const result = await api.cashierLogin(code, newPin.value)
+    newPin.value = ''
+    confirmPin.value = ''
+    await startCashierSession(result.cashier)
+    flash('เปลี่ยน PIN เรียบร้อย')
+  } catch (e) { showError(e) } finally { busy.value = false }
+}
+
+async function startCashierSession(next: Cashier) {
+  cashier.value = next
+  shift.value = await api.activeShift(profile.value!.branchId, next.id)
+  await saveSession(cashier.value, shift.value)
+  modal.value = shift.value ? null : 'shift'
+  cashierPin.value = ''
 }
 
 async function openShift() {
@@ -375,7 +401,9 @@ function handleShortcut(event: KeyboardEvent) {
     event.preventDefault()
     openPayment()
   }
-  if (event.key === 'Escape' && modal.value && !(modal.value === 'settings' && !profile.value)) {
+  // ตั้งค่าครั้งแรกกับตั้ง PIN ใหม่ กด Escape ข้ามไม่ได้ ต้องทำให้จบก่อน
+  const locked = modal.value === 'changePin' || (modal.value === 'settings' && !profile.value)
+  if (event.key === 'Escape' && modal.value && !locked) {
     modal.value = null
     nextTick(() => scanner.value?.focus())
   }
@@ -466,6 +494,13 @@ onUnmounted(() => {
         <label>รหัสพนักงาน<input v-model="cashierCode" required autofocus autocomplete="username"></label>
         <label>PIN<input v-model="cashierPin" required type="password" inputmode="numeric" minlength="4" autocomplete="current-password"></label>
         <button class="primary" :disabled="busy">เข้าใช้งาน</button>
+      </form>
+
+      <form v-else-if="modal === 'changePin'" class="modal compact" @submit.prevent="changePin">
+        <div class="modal-head"><div><UserRound/><span><strong>ตั้ง PIN ของคุณเอง</strong><small>PIN ที่ได้รับมาเป็นค่าเริ่มต้น ต้องเปลี่ยนก่อนเริ่มขาย</small></span></div></div>
+        <label>PIN ใหม่<input v-model="newPin" required type="password" inputmode="numeric" pattern="\d{4,20}" minlength="4" maxlength="20" autofocus autocomplete="new-password"></label>
+        <label>ยืนยัน PIN ใหม่<input v-model="confirmPin" required type="password" inputmode="numeric" pattern="\d{4,20}" minlength="4" maxlength="20" autocomplete="new-password"></label>
+        <button class="primary" :disabled="busy">{{ busy ? 'กำลังบันทึก...' : 'บันทึก PIN แล้วเริ่มงาน' }}</button>
       </form>
 
       <form v-else-if="modal === 'shift'" class="modal compact" @submit.prevent="openShift">
