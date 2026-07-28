@@ -12,6 +12,7 @@ fi
 : "${SSH_USER:=root}"
 : "${SSH_HOST:=27.254.143.219}"
 : "${SSH_PORT:=22}"
+: "${SSH_IDENTITY_FILE:=${HOME}/.ssh/id_ed25519_erppop}"
 : "${REMOTE_PATH:=/var/www/jeterp}"
 : "${RUN_COMPOSER_INSTALL:=0}"
 : "${RUN_NPM_BUILD:=0}"
@@ -28,8 +29,15 @@ fi
 
 echo "Deploying $(git rev-parse --short HEAD) to ${SSH_USER}@${SSH_HOST}:${REMOTE_PATH}"
 
+SSH_OPTIONS=(-p "$SSH_PORT")
+RSYNC_RSH="ssh -p ${SSH_PORT}"
+if [[ -f "$SSH_IDENTITY_FILE" ]]; then
+  SSH_OPTIONS+=(-i "$SSH_IDENTITY_FILE" -o IdentitiesOnly=yes)
+  RSYNC_RSH+=" -i ${SSH_IDENTITY_FILE} -o IdentitiesOnly=yes"
+fi
+
 rsync -az --delete \
-  -e "ssh -p ${SSH_PORT}" \
+  -e "$RSYNC_RSH" \
   --exclude='.git/' \
   --exclude='.env' \
   --exclude='.env.*' \
@@ -43,7 +51,7 @@ rsync -az --delete \
   --exclude='storage/' \
   ./ "${SSH_USER}@${SSH_HOST}:${REMOTE_PATH}/"
 
-ssh -p "$SSH_PORT" "${SSH_USER}@${SSH_HOST}" \
+ssh "${SSH_OPTIONS[@]}" "${SSH_USER}@${SSH_HOST}" \
   "cd '${REMOTE_PATH}' \
   && if [ '${RUN_COMPOSER_INSTALL}' = '1' ]; then composer install --no-dev --optimize-autoloader; fi \
   && if [ '${RUN_NPM_BUILD}' = '1' ]; then npm ci && npm run build; fi \
