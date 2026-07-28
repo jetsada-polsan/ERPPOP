@@ -53,7 +53,13 @@ class SearchController extends Controller
                     ->where('is_active', true)
                     ->where('barcode', 'ilike', "%{$q}%"))
             ))
-            ->orderByRaw('case when sku_code = ? then 0 when sku_code ilike ? then 1 else 2 end', [$q, $q.'%'])
+            ->when(
+                $q !== '',
+                fn ($query) => $query->orderByRaw(
+                    'case when lower(sku_code) = ? then 0 when lower(sku_code) like ? then 1 else 2 end',
+                    [mb_strtolower($q), mb_strtolower($q).'%'],
+                ),
+            )
             ->orderBy('name_th')
             ->limit(20)
             ->get(['id', 'sku_code', 'name_th', 'base_unit_id', 'default_price', 'average_cost', 'tracks_expiry', 'shelf_life_days'])

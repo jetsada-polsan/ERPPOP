@@ -170,6 +170,10 @@ class BookingController extends Controller
 
     private function legacyBookingsReady(): bool
     {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return false;
+        }
+
         foreach (['dbo__docinfo', 'dbo__doctype', 'dbo__transtkh', 'dbo__aroe', 'dbo__arfile'] as $table) {
             $exists = DB::selectOne('select to_regclass(?) as r', ['legacy.'.$table])->r ?? null;
             if ($exists === null) {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Document;
+use App\Models\DocumentBook;
 use App\Models\DocumentType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -34,12 +35,19 @@ class DocumentBrowserController extends Controller
     public function index(Request $request): View
     {
         // ต้นไม้: ประเภท -> ปี -> เดือน พร้อมจำนวนใบ (query เดียว)
+        $sqlite = DB::connection()->getDriverName() === 'sqlite';
+        $yearExpression = $sqlite
+            ? "CAST(strftime('%Y', doc_date) AS INTEGER)"
+            : 'EXTRACT(YEAR FROM doc_date)::int';
+        $monthExpression = $sqlite
+            ? "CAST(strftime('%m', doc_date) AS INTEGER)"
+            : 'EXTRACT(MONTH FROM doc_date)::int';
         $treeRows = Document::selectRaw(
-            'document_type_id,
-             EXTRACT(YEAR FROM doc_date)::int AS y,
-             EXTRACT(MONTH FROM doc_date)::int AS m,
-             COUNT(*) AS c'
-        )->groupBy('document_type_id', 'y', 'm')->get();
+            "document_type_id,
+             {$yearExpression} AS y,
+             {$monthExpression} AS m,
+             COUNT(*) AS c"
+        )->groupByRaw("document_type_id, {$yearExpression}, {$monthExpression}")->get();
 
         $tree = [];
         foreach ($treeRows as $row) {
@@ -74,8 +82,8 @@ class DocumentBrowserController extends Controller
             ->when($bookId, fn ($query) => $query->where('document_book_id', $bookId))
             ->when($typeCode, fn ($query) => $query->whereHas('documentType', fn ($t) => $t->where('code', $typeCode)))
             ->when($day, fn ($query) => $query->whereDate('doc_date', $day))
-            ->when(! $day && $year, fn ($query) => $query->whereRaw('EXTRACT(YEAR FROM doc_date) = ?', [$year]))
-            ->when(! $day && $year && $month, fn ($query) => $query->whereRaw('EXTRACT(MONTH FROM doc_date) = ?', [$month]))
+            ->when(! $day && $year, fn ($query) => $query->whereYear('doc_date', $year))
+            ->when(! $day && $year && $month, fn ($query) => $query->whereMonth('doc_date', $month))
             ->when(! $day && ! $year && $from, fn ($query) => $query->whereDate('doc_date', '>=', $from))
             ->when(! $day && ! $year && $to, fn ($query) => $query->whereDate('doc_date', '<=', $to))
             ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
@@ -95,7 +103,7 @@ class DocumentBrowserController extends Controller
             ->paginate(50)->withQueryString();
 
         // เล่มเอกสาร (มากกว่า 1 เล่มต่อประเภท) สำหรับกรองในทะเบียน
-        $booksByType = \App\Models\DocumentBook::where('is_active', true)
+        $booksByType = DocumentBook::where('is_active', true)
             ->orderByDesc('is_default')->orderBy('code')->get()->groupBy('document_type_id');
 
         $legacyDocuments = null;
@@ -174,6 +182,10 @@ class DocumentBrowserController extends Controller
 
     private function legacyDocumentsReady(): bool
     {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return false;
+        }
+
         foreach (['dbo__docinfo', 'dbo__doctype', 'dbo__transtkh', 'dbo__aroe', 'dbo__arfile'] as $table) {
             $exists = DB::selectOne('select to_regclass(?) as r', ['legacy.'.$table])->r ?? null;
             if ($exists === null) {
