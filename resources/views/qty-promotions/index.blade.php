@@ -1,7 +1,7 @@
 @extends('layout')
 @section('title', 'แคมเปญซื้อครบ - POPSTAR ERP')
 @section('page-title', 'แคมเปญซื้อครบ')
-@section('page-subtitle', 'ซื้อจำนวนครบได้ของแถม (เช่น ซื้อ 1 แถม 1) หรือได้ส่วนลด (เช่น ซื้อ 2 ลด 50%)')
+@section('page-subtitle', 'ซื้อครบได้ของแถม ลดราคา หรือกำหนดราคารวมเป็นชุด เช่น 3 ชิ้น 100 บาท')
 @section('content')
 <div class="content-card p-4 mb-3" x-data="{ type: 'free_item' }">
     <h2 class="h5 fw-bold mb-3">สร้างแคมเปญ</h2>
@@ -14,6 +14,7 @@
             <select name="promo_type" x-model="type" class="form-select">
                 <option value="free_item">ซื้อครบได้ของแถม</option>
                 <option value="discount">ซื้อครบได้ส่วนลด</option>
+                <option value="bundle_price">ซื้อครบได้ราคารวมชุด</option>
             </select>
         </div>
         <div class="col-md-3">
@@ -63,6 +64,14 @@
                 </div>
             </div>
         </div>
+        <div class="col-md-5" x-show="type === 'bundle_price'" x-cloak>
+            <label class="form-label small text-muted">ราคาสุทธิของชุดที่ซื้อครบ</label>
+            <div class="input-group">
+                <input type="number" step="0.01" min="0" name="bundle_price" class="form-control" placeholder="เช่น 100">
+                <span class="input-group-text">บาท / ชุด</span>
+            </div>
+            <div class="form-text">เช่น ซื้อครบ 3 ชิ้น ราคา 100 บาท ส่วนที่เกินคิดราคาปกติ</div>
+        </div>
 
         <div class="col-md-2"><label class="form-label small text-muted">วันที่เริ่ม</label><input type="date" name="starts_date" class="form-control"></div>
         <div class="col-md-2"><label class="form-label small text-muted">วันที่สิ้นสุด</label><input type="date" name="ends_date" class="form-control"></div>
@@ -83,7 +92,7 @@
                     <td class="fw-semibold">{{ $promo->code }}</td>
                     <td>{{ $promo->name }}</td>
                     <td class="small">{{ $promo->product?->sku_code }} {{ $promo->product?->name_th }}</td>
-                    <td><span class="badge {{ $promo->promo_type === 'free_item' ? 'text-bg-success' : 'text-bg-warning' }}">{{ $promo->label() }}</span></td>
+                    <td><span class="badge {{ $promo->promo_type === 'free_item' ? 'text-bg-success' : ($promo->promo_type === 'bundle_price' ? 'text-bg-primary' : 'text-bg-warning') }}">{{ $promo->label() }}</span></td>
                     <td class="small">{{ $promo->freeProduct ? $promo->freeProduct->sku_code.' '.$promo->freeProduct->name_th : '-' }}</td>
                     <td class="small">{{ $promo->branch?->name_th ?? 'ทุกสาขา' }}</td>
                     <td class="small">{{ $promo->starts_date?->thaiDate() ?? 'ไม่กำหนด' }} - {{ $promo->ends_date?->thaiDate() ?? 'ไม่กำหนด' }}</td>

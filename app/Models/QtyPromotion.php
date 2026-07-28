@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'code', 'name', 'promo_type', 'product_id', 'min_qty', 'free_product_id',
-    'free_qty', 'discount_type', 'discount_value', 'branch_id',
+    'free_qty', 'discount_type', 'discount_value', 'bundle_price', 'branch_id',
     'starts_date', 'ends_date', 'note', 'is_active',
 ])]
 class QtyPromotion extends Model
@@ -50,6 +50,12 @@ class QtyPromotion extends Model
 
         $value = rtrim(rtrim(number_format((float) $this->discount_value, 2), '0'), '.');
 
+        if ($this->promo_type === 'bundle_price') {
+            $value = rtrim(rtrim(number_format((float) $this->bundle_price, 2), '0'), '.');
+
+            return "ซื้อ {$min} ชิ้น {$value} บาท";
+        }
+
         return 'ซื้อ '.$min.' ลด '.$value.($this->discount_type === 'percent' ? '%' : ' บาท');
     }
 
@@ -59,6 +65,7 @@ class QtyPromotion extends Model
             'min_qty' => 'decimal:8',
             'free_qty' => 'decimal:8',
             'discount_value' => 'decimal:4',
+            'bundle_price' => 'decimal:4',
             'starts_date' => 'date',
             'ends_date' => 'date',
             'is_active' => 'boolean',

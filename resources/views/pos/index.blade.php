@@ -3105,13 +3105,17 @@ function posApp() {
         get promoDiscountTotal() {
             let total = 0;
             for (const promo of this.promotions) {
-                if (promo.promo_type !== 'discount') continue;
+                if (promo.promo_type !== 'discount' && promo.promo_type !== 'bundle_price') continue;
                 const lines = this.cart.filter(i => !i.is_free_gift && i.id === promo.product_id);
                 if (lines.length === 0) continue;
                 const qty = lines.reduce((s, i) => s + (Number(i.qty) || 0), 0);
                 const sets = Math.floor(qty / Number(promo.min_qty || 1));
                 if (sets <= 0) continue;
                 const unitPrice = Number(lines[0].unit_price) || 0;
+                if (promo.promo_type === 'bundle_price') {
+                    total += Math.max(0, sets * (Number(promo.min_qty) * Number(trigger.unit_price) - Number(promo.bundle_price)));
+                    continue;
+                }
                 total += promo.discount_type === 'percent'
                     ? sets * Number(promo.min_qty) * unitPrice * Number(promo.discount_value) / 100
                     : sets * Number(promo.discount_value);
@@ -3124,6 +3128,7 @@ function posApp() {
             if (!promo) return '';
             const min = Number(promo.min_qty);
             if (promo.promo_type === 'free_item') return 'ซื้อ ' + min + ' แถม ' + Number(promo.free_qty);
+            if (promo.promo_type === 'bundle_price') return 'ซื้อ ' + min + ' ชิ้น ' + this.money(promo.bundle_price);
             return 'ซื้อ ' + min + ' ลด ' + Number(promo.discount_value) + (promo.discount_type === 'percent' ? '%' : '฿');
         },
 

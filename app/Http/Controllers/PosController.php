@@ -147,7 +147,7 @@ class PosController extends Controller
             ->runningToday()
             ->where(fn ($w) => $w->whereNull('branch_id')->orWhere('branch_id', $branchId))
             ->get(['id', 'code', 'name', 'promo_type', 'product_id', 'min_qty',
-                'free_product_id', 'free_qty', 'discount_type', 'discount_value']);
+                'free_product_id', 'free_qty', 'discount_type', 'discount_value', 'bundle_price']);
 
         return response()->json($promotions);
     }

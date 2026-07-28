@@ -47,13 +47,14 @@ class QtyPromotionController extends Controller
         $data = $request->validate([
             'code' => ['required', 'string', 'max:30', 'unique:qty_promotions,code,'.($ignoreId ?? 'NULL').',id'],
             'name' => ['required', 'string', 'max:150'],
-            'promo_type' => ['required', 'string', 'in:free_item,discount'],
+            'promo_type' => ['required', 'string', 'in:free_item,discount,bundle_price'],
             'product_id' => ['required', 'integer', 'exists:products,id'],
             'min_qty' => ['required', 'numeric', 'min:0.0001'],
             'free_product_id' => ['nullable', 'required_if:promo_type,free_item', 'integer', 'exists:products,id'],
             'free_qty' => ['nullable', 'required_if:promo_type,free_item', 'numeric', 'min:0.0001'],
             'discount_type' => ['nullable', 'required_if:promo_type,discount', 'string', 'in:percent,baht'],
             'discount_value' => $discountValueRules,
+            'bundle_price' => ['nullable', 'required_if:promo_type,bundle_price', 'numeric', 'min:0'],
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
             'starts_date' => ['nullable', 'date'],
             'ends_date' => ['nullable', 'date', 'after_or_equal:starts_date'],
@@ -68,6 +69,14 @@ class QtyPromotionController extends Controller
         } else {
             $data['free_product_id'] = null;
             $data['free_qty'] = null;
+        }
+
+        if ($data['promo_type'] !== 'discount') {
+            $data['discount_type'] = null;
+            $data['discount_value'] = null;
+        }
+        if ($data['promo_type'] !== 'bundle_price') {
+            $data['bundle_price'] = null;
         }
 
         return $data;

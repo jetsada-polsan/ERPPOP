@@ -343,6 +343,10 @@ class PosPricingGuard
                 $discount += $promotion->discount_type === 'percent'
                     ? $sets * (float) $promotion->min_qty * (float) $trigger['unit_price'] * (float) $promotion->discount_value / 100
                     : $sets * (float) $promotion->discount_value;
+            } elseif ($promotion->promo_type === 'bundle_price') {
+                $normalSetTotal = $sets * (float) $promotion->min_qty * (float) $trigger['unit_price'];
+                $bundleSetTotal = $sets * (float) $promotion->bundle_price;
+                $discount += max(0, $normalSetTotal - $bundleSetTotal);
             } elseif ($promotion->promo_type === 'free_item') {
                 $gift = $lines->firstWhere('product_id', (int) $promotion->free_product_id);
                 if ($gift) {
