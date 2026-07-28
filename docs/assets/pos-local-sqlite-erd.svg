@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title desc">
+  <title id="title">POPSTAR POS Local SQLite ERD</title>
+  <desc id="desc">Entity relationship diagram showing three SQLite tables, primary keys and the logical JSON relationship between checkout_queue and products.</desc>
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#102a43" flood-opacity=".15"/></filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#2f80ed"/></marker>
+    <style>
+      .title { font-family: 'Sukhumvit Set', sans-serif; font-size: 34px; font-weight: 700; fill: #17324d; }
+      .subtitle { font-family: 'Sukhumvit Set', sans-serif; font-size: 18px; font-weight: 400; fill: #5f7182; }
+      .table-title { font-family: 'Sukhumvit Set', sans-serif; font-size: 23px; font-weight: 700; fill: #fff; }
+      .table-subtitle { font-family: 'Sukhumvit Set', sans-serif; font-size: 14px; font-weight: 400; fill: #dcefff; }
+      .col { font-family: 'Sukhumvit Set', sans-serif; font-size: 17px; font-weight: 600; fill: #17324d; }
+      .type { font-family: 'Sukhumvit Set', sans-serif; font-size: 15px; font-weight: 400; fill: #607587; }
+      .desc { font-family: 'Sukhumvit Set', sans-serif; font-size: 14px; font-weight: 400; fill: #536b7e; }
+      .badge { font-family: 'Sukhumvit Set', sans-serif; font-size: 12px; font-weight: 700; fill: #fff; }
+      .note { font-family: 'Sukhumvit Set', sans-serif; font-size: 17px; font-weight: 400; fill: #435b6f; }
+      .small { font-family: 'Sukhumvit Set', sans-serif; font-size: 14px; font-weight: 400; fill: #607587; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1000" fill="#f4f8fb"/>
+  <rect x="44" y="34" width="1512" height="932" rx="18" fill="#fff"/>
+  <text x="84" y="94" class="title">POPSTAR POS Local SQLite</text>
+  <text x="84" y="126" class="subtitle">ERD: 3 ตาราง / 13 คอลัมน์ · PK = Primary Key · FK = Foreign Key</text>
+
+  <!-- app_state -->
+  <g filter="url(#shadow)">
+    <rect x="90" y="220" width="410" height="250" rx="12" fill="#fff"/>
+    <rect x="90" y="220" width="410" height="76" rx="12" fill="#246b8f"/>
+    <rect x="90" y="276" width="410" height="20" fill="#246b8f"/>
+    <text x="116" y="251" class="table-title">app_state</text>
+    <text x="116" y="278" class="table-subtitle">ค่าตั้งค่าเครื่อง / Session · 2 คอลัมน์</text>
+    <line x1="90" y1="351" x2="500" y2="351" stroke="#e2eaf0"/>
+    <rect x="112" y="313" width="34" height="23" rx="5" fill="#d99022"/><text x="129" y="330" text-anchor="middle" class="badge">PK</text>
+    <text x="162" y="330" class="col">key</text><text x="365" y="330" class="type">TEXT</text>
+    <text x="116" y="383" class="col">value</text><text x="365" y="383" class="type">TEXT · JSON</text>
+    <text x="116" y="429" class="desc">profile, session</text>
+    <text x="116" y="452" class="desc">เก็บการตั้งค่าและกะที่เปิดอยู่</text>
+  </g>
+
+  <!-- products -->
+  <g filter="url(#shadow)">
+    <rect x="595" y="180" width="470" height="330" rx="12" fill="#fff"/>
+    <rect x="595" y="180" width="470" height="76" rx="12" fill="#17804c"/>
+    <rect x="595" y="236" width="470" height="20" fill="#17804c"/>
+    <text x="621" y="211" class="table-title">products</text>
+    <text x="621" y="238" class="table-subtitle">Catalog สินค้าซิงก์จาก ERP · 3 คอลัมน์</text>
+    <line x1="595" y1="311" x2="1065" y2="311" stroke="#e2eaf0"/>
+    <rect x="617" y="273" width="34" height="23" rx="5" fill="#d99022"/><text x="634" y="290" text-anchor="middle" class="badge">PK</text>
+    <text x="667" y="290" class="col">id</text><text x="910" y="290" class="type">INTEGER</text>
+    <text x="621" y="343" class="col">data</text><text x="910" y="343" class="type">TEXT · JSON</text>
+    <text x="621" y="396" class="col">synced_at</text><text x="910" y="396" class="type">TEXT · ISO 8601</text>
+    <text x="621" y="446" class="desc">สินค้า, ราคา, โปรโมชั่น, บาร์โค้ด, สต๊อกสาขา</text>
+    <text x="621" y="469" class="desc">ข้อมูลนี้เป็นสำเนาสำหรับขาย Offline</text>
+  </g>
+
+  <!-- checkout_queue -->
+  <g filter="url(#shadow)">
+    <rect x="1090" y="180" width="410" height="510" rx="12" fill="#fff"/>
+    <rect x="1090" y="180" width="410" height="76" rx="12" fill="#a65d2c"/>
+    <rect x="1090" y="236" width="410" height="20" fill="#a65d2c"/>
+    <text x="1116" y="211" class="table-title">checkout_queue</text>
+    <text x="1116" y="238" class="table-subtitle">คิวบิลส่ง ERP · 8 คอลัมน์</text>
+    <line x1="1090" y1="311" x2="1500" y2="311" stroke="#e2eaf0"/>
+    <rect x="1112" y="273" width="34" height="23" rx="5" fill="#d99022"/><text x="1129" y="290" text-anchor="middle" class="badge">PK</text>
+    <text x="1162" y="290" class="col">id</text><text x="1360" y="290" class="type">TEXT</text>
+    <rect x="1112" y="326" width="34" height="23" rx="5" fill="#4b8fd8"/><text x="1129" y="343" text-anchor="middle" class="badge">JSON</text>
+    <text x="1162" y="343" class="col">payload</text><text x="1360" y="343" class="type">TEXT</text>
+    <text x="1116" y="396" class="col">status</text><text x="1360" y="396" class="type">TEXT</text>
+    <text x="1116" y="432" class="col">attempts</text><text x="1360" y="432" class="type">INTEGER</text>
+    <text x="1116" y="468" class="col">error</text><text x="1360" y="468" class="type">TEXT · nullable</text>
+    <text x="1116" y="504" class="col">receipt_no</text><text x="1360" y="504" class="type">TEXT · nullable</text>
+    <text x="1116" y="540" class="col">created_at</text><text x="1360" y="540" class="type">TEXT</text>
+    <text x="1116" y="576" class="col">synced_at</text><text x="1360" y="576" class="type">TEXT · nullable</text>
+    <text x="1116" y="629" class="desc">pending → syncing → synced</text>
+    <text x="1116" y="652" class="desc">failed → ส่งใหม่ได้</text>
+  </g>
+
+  <!-- logical relationship -->
+  <path d="M1090 337 C1010 337 1010 343 1065 343" fill="none" stroke="#2f80ed" stroke-width="3" stroke-dasharray="9 7" marker-end="url(#arrow)"/>
+  <rect x="842" y="310" width="220" height="61" rx="9" fill="#e9f3ff" stroke="#b6d6fa"/>
+  <text x="952" y="335" text-anchor="middle" class="small">Logical reference only</text>
+  <text x="952" y="357" text-anchor="middle" class="small">payload.product_id → products.id</text>
+
+  <!-- no FK note -->
+  <rect x="90" y="575" width="975" height="115" rx="12" fill="#fff8e8" stroke="#f0d48c"/>
+  <text x="120" y="613" class="note">ไม่มี Foreign Key จริงใน SQLite POS</text>
+  <text x="120" y="642" class="small">เพราะ POS ทำงาน Offline และเก็บรายละเอียดบิลใน JSON</text>
+  <text x="120" y="666" class="small">ERP Server จะตรวจ product_id, ราคา, สต๊อก และสิทธิ์อีกครั้งตอนรับบิล</text>
+
+  <!-- legend -->
+  <rect x="90" y="770" width="1410" height="130" rx="12" fill="#f7fafc" stroke="#dce7ee"/>
+  <text x="120" y="810" class="col">คำอธิบาย</text>
+  <rect x="120" y="833" width="36" height="24" rx="5" fill="#d99022"/><text x="138" y="850" text-anchor="middle" class="badge">PK</text><text x="170" y="851" class="small">Primary Key: ระบุแถวไม่ซ้ำกัน</text>
+  <rect x="460" y="833" width="48" height="24" rx="5" fill="#4b8fd8"/><text x="484" y="850" text-anchor="middle" class="badge">JSON</text><text x="522" y="851" class="small">ข้อมูลหลายฟิลด์ที่เก็บรวมใน TEXT</text>
+  <line x1="850" y1="845" x2="930" y2="845" stroke="#2f80ed" stroke-width="3" stroke-dasharray="9 7"/><text x="950" y="851" class="small">ความสัมพันธ์เชิงตรรกะ ไม่ใช่ FK จริง</text>
+</svg>

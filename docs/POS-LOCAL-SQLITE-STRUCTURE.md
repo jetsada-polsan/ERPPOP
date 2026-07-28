@@ -12,6 +12,10 @@
 
 ## ตารางทั้งหมด
 
+![POPSTAR POS Local SQLite ERD](assets/pos-local-sqlite-erd.png)
+
+ไฟล์ภาพต้นฉบับแบบขยายได้: [`pos-local-sqlite-erd.svg`](assets/pos-local-sqlite-erd.svg)
+
 ### 1. `app_state` — ค่าการตั้งค่าและ Session ของเครื่อง
 
 | คอลัมน์ | ชนิด | กติกา | เก็บข้อมูลอะไร |
