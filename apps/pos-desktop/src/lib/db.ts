@@ -1,5 +1,5 @@
 import Database from '@tauri-apps/plugin-sql'
-import type { Cashier, DeviceProfile, Product, QueueItem, Shift } from './types'
+import type { Cashier, DeviceProfile, LocalSaleHistory, Product, QueueItem, Shift } from './types'
 
 let db: Database | null = null
 
@@ -12,6 +12,13 @@ async function connection() {
     id TEXT PRIMARY KEY, payload TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0,
     error TEXT, receipt_no TEXT, created_at TEXT NOT NULL, synced_at TEXT
   )`)
+  await db.execute(`CREATE TABLE IF NOT EXISTS pos_sale_history (
+    id TEXT PRIMARY KEY, receipt_no TEXT NOT NULL, status TEXT NOT NULL,
+    total REAL NOT NULL, method TEXT NOT NULL, paid REAL NOT NULL DEFAULT 0,
+    change_amount REAL NOT NULL DEFAULT 0, items TEXT NOT NULL, printed_at TEXT NOT NULL,
+    error TEXT, synced_at TEXT
+  )`)
+  await db.execute("DELETE FROM pos_sale_history WHERE printed_at < datetime('now', '-90 days')")
   return db
 }
 
@@ -72,6 +79,40 @@ export async function markQueue(id: string, status: QueueItem['status'], error?:
     `UPDATE checkout_queue SET status = ?, attempts = attempts + 1, error = ?, receipt_no = ?, synced_at = CASE WHEN ? = 'synced' THEN datetime('now') ELSE synced_at END WHERE id = ?`,
     [status, error || null, receiptNo || null, status, id],
   )
+  await conn.execute(
+    `UPDATE pos_sale_history SET status = ?, error = ?, receipt_no = COALESCE(?, receipt_no), synced_at = CASE WHEN ? = 'synced' THEN datetime('now') ELSE synced_at END WHERE id = ?`,
+    [status, error || null, receiptNo || null, status, id],
+  )
+}
+
+export async function saveSaleHistory(sale: LocalSaleHistory) {
+  const conn = await connection()
+  await conn.execute(
+    `INSERT OR REPLACE INTO pos_sale_history (id, receipt_no, status, total, method, paid, change_amount, items, printed_at, error, synced_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [sale.id, sale.receiptNo, sale.status, sale.total, sale.method, sale.paid, sale.change, JSON.stringify(sale.items), sale.printedAt, sale.error || null, sale.syncedAt || null],
+  )
+}
+
+export async function saleHistory(days = 90): Promise<LocalSaleHistory[]> {
+  const conn = await connection()
+  const rows = await conn.select<Array<any>>(
+    `SELECT * FROM pos_sale_history WHERE datetime(printed_at) >= datetime('now', ?) ORDER BY printed_at DESC`,
+    [`-${Math.max(1, Math.min(days, 90))} days`],
+  )
+  return rows.map((row) => ({
+    id: row.id,
+    receiptNo: row.receipt_no,
+    status: row.status,
+    total: Number(row.total),
+    method: row.method,
+    paid: Number(row.paid),
+    change: Number(row.change_amount),
+    items: JSON.parse(row.items),
+    printedAt: row.printed_at,
+    syncedAt: row.synced_at || undefined,
+    error: row.error || undefined,
+  }))
 }
 
 export type LocalDbHealth = {

@@ -107,3 +107,17 @@ export interface QueueItem {
   receiptNo?: string
   createdAt: string
 }
+
+export interface LocalSaleHistory {
+  id: string
+  receiptNo: string
+  status: 'pending' | 'syncing' | 'synced' | 'failed'
+  total: number
+  method: PaymentMethod
+  paid: number
+  change: number
+  items: CartLine[]
+  printedAt: string
+  syncedAt?: string
+  error?: string
+}

@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, Cloud, CloudOff, CreditCard, FileText, FolderOpen, LogOut, Minus, PackageSearch, PauseCircle, Plus, Printer, QrCode, ReceiptText, RefreshCw, ScanLine, Search, Settings, ShoppingCart, Trash2, UserRound, Wifi, X } from 'lucide-vue-next'
+import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, Cloud, CloudOff, CreditCard, FileText, FolderOpen, History, LogOut, Minus, PackageSearch, PauseCircle, Plus, Printer, QrCode, ReceiptText, RefreshCw, ScanLine, Search, Settings, ShoppingCart, Trash2, UserRound, Wifi, X } from 'lucide-vue-next'
 import { check } from '@tauri-apps/plugin-updater'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { api, connect, setServerUrl } from './lib/api'
-import { closeLocalDb, enqueue, loadProducts, loadProfile, loadSession, localDbHealth, markQueue, queueItems, replaceProducts, saveProfile, saveSession, type LocalDbHealth } from './lib/db'
+import { closeLocalDb, enqueue, loadProducts, loadProfile, loadSession, localDbHealth, markQueue, queueItems, replaceProducts, saleHistory, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth } from './lib/db'
 import { syncCheckoutQueue } from './lib/sync'
-import type { CartLine, Cashier, DeviceProfile, HeldBill, PaymentMethod, Product, QueueItem, ReceiptBlock, ReceiptTemplate, Shift } from './lib/types'
+import type { CartLine, Cashier, DeviceProfile, HeldBill, LocalSaleHistory, PaymentMethod, Product, QueueItem, ReceiptBlock, ReceiptTemplate, Shift } from './lib/types'
 
 const DEFAULT_RECEIPT_TEMPLATE: ReceiptTemplate = {
   paper_width: 80,
@@ -37,7 +37,7 @@ const pendingCount = ref(0)
 const error = ref('')
 const notice = ref('')
 const busy = ref(false)
-const modal = ref<'cashier' | 'changePin' | 'shift' | 'closeShift' | 'payment' | 'settings' | 'holdBill' | 'heldBills' | null>(null)
+const modal = ref<'cashier' | 'changePin' | 'shift' | 'closeShift' | 'payment' | 'settings' | 'holdBill' | 'heldBills' | 'history' | null>(null)
 const setupUrl = ref('http://27.254.143.219')
 const setupToken = ref('')
 const cashierCode = ref('')
@@ -58,6 +58,9 @@ const localHealth = ref<LocalDbHealth | null>(null)
 const localHealthBusy = ref(false)
 const localBackupBusy = ref(false)
 const localRestoreBusy = ref(false)
+const saleHistoryRows = ref<LocalSaleHistory[]>([])
+const historyDays = ref(90)
+const selectedHistory = ref<LocalSaleHistory | null>(null)
 
 const filteredProducts = computed(() => {
   const q = search.value.trim().toLocaleLowerCase('th')
@@ -80,6 +83,19 @@ function flash(message: string) { notice.value = message; window.setTimeout(() =
 function showError(value: unknown) { error.value = value instanceof Error ? value.message : String(value); window.setTimeout(() => { error.value = '' }, 6000) }
 function receiptBlockClasses(block: ReceiptBlock) { return [`align-${block.align}`, `size-${block.size}`, { 'is-bold': block.bold }] }
 function paymentName(method: PaymentMethod) { return ({ cash: 'เงินสด', transfer: 'โอน/QR', credit_card: 'บัตรเครดิต', cheque: 'เช็ค', mixed: 'เงินสด+โอน' })[method] }
+function historyStatus(status: LocalSaleHistory['status']) { return ({ pending: 'รอส่ง', syncing: 'กำลังส่ง', synced: 'ส่งแล้ว', failed: 'ส่งไม่สำเร็จ' })[status] }
+function historyReceipt(sale: LocalSaleHistory) {
+  lastReceipt.value = { no: sale.receiptNo, items: sale.items, total: sale.total, method: sale.method, paid: sale.paid, change: sale.change, printedAt: new Date(sale.printedAt).toLocaleString('th-TH'), provisional: sale.status !== 'synced' }
+  selectedHistory.value = sale
+}
+async function openHistory() {
+  try {
+    saleHistoryRows.value = await saleHistory(historyDays.value)
+    selectedHistory.value = null
+    modal.value = 'history'
+  } catch (e) { showError(e) }
+}
+async function refreshHistory() { saleHistoryRows.value = await saleHistory(historyDays.value) }
 
 function addProduct(product: Product, barcode?: string) {
   const existing = cart.value.find((line) => line.id === product.id && line.scannedBarcode === barcode)
@@ -389,6 +405,7 @@ async function checkout() {
   busy.value = true
   try {
     await enqueue(queueItem)
+    await saveSaleHistory({ id, receiptNo: id.split(':').pop()!.slice(0, 8).toUpperCase(), status: 'pending', total: soldTotal, method: paymentMethod.value, paid: cashReceived.value, change: soldChange, items: soldItems, printedAt: new Date().toISOString() })
     cart.value = []
     modal.value = null
     await refreshQueue()
@@ -490,6 +507,7 @@ onUnmounted(() => {
       <div class="top-actions">
         <button class="status" :class="online ? 'online' : 'offline'" @click="syncAll"><Wifi v-if="online"/><CloudOff v-else/><span>{{ online ? (syncing ? 'กำลังซิงก์' : 'ออนไลน์') : 'ออฟไลน์' }}</span></button>
         <button class="icon-button" title="ซิงก์ข้อมูล" @click="syncAll"><RefreshCw :class="{ spin: syncing }"/></button>
+        <button class="icon-button" title="ประวัติการขายย้อนหลัง" @click="openHistory"><History/></button>
         <button v-if="lastReceipt" class="icon-button" title="พิมพ์บิลล่าสุด" @click="printLastReceipt"><Printer/></button>
         <button class="icon-button" title="เรียกบิลพักส่วนกลาง" @click="openHeldBills"><FolderOpen/></button>
         <button v-if="shift" class="icon-button" title="ปิดกะขาย" @click="countedCash = shift.expected_cash; modal = 'closeShift'"><LogOut/></button>
@@ -604,6 +622,27 @@ onUnmounted(() => {
             <b>฿{{ money(bill.total_amount) }}</b>
           </button>
           <div v-if="!heldBills.length" class="empty-state" style="min-height:160px"><FolderOpen/><strong>ไม่มีบิลที่พักไว้</strong></div>
+        </div>
+      </section>
+
+      <section v-else-if="modal === 'history'" class="modal history-modal">
+        <div class="modal-head"><div><History/><span><strong>ประวัติการขาย</strong><small>ข้อมูลในเครื่อง POS ย้อนหลังได้สูงสุด 90 วัน</small></span></div><button type="button" @click="modal = null"><X/></button></div>
+        <div class="history-toolbar">
+          <label>ช่วงเวลา<select v-model.number="historyDays" @change="refreshHistory"><option :value="30">30 วัน</option><option :value="60">60 วัน</option><option :value="90">90 วัน</option></select></label>
+          <button type="button" class="secondary history-refresh" @click="refreshHistory"><RefreshCw/>รีเฟรช</button>
+        </div>
+        <div class="history-list">
+          <button v-for="sale in saleHistoryRows" :key="sale.id" type="button" class="history-row" @click="historyReceipt(sale)">
+            <span><strong>{{ sale.receiptNo }}</strong><small>{{ new Date(sale.printedAt).toLocaleString('th-TH') }} · {{ sale.items.length }} รายการ · {{ paymentName(sale.method) }}</small></span>
+            <span class="history-amount"><b>฿{{ money(sale.total) }}</b><em :class="`history-${sale.status}`">{{ historyStatus(sale.status) }}</em></span>
+          </button>
+          <div v-if="!saleHistoryRows.length" class="empty-state history-empty"><History/><strong>ยังไม่มีประวัติในช่วงเวลานี้</strong><span>บิลที่ชำระแล้วจะถูกเก็บไว้ในเครื่องอัตโนมัติ</span></div>
+        </div>
+        <div v-if="selectedHistory" class="history-detail">
+          <div class="history-detail-head"><strong>{{ selectedHistory.receiptNo }}</strong><button type="button" class="secondary" @click="printLastReceipt"><Printer/>พิมพ์ซ้ำ</button></div>
+          <div v-for="line in selectedHistory.items" :key="`${selectedHistory.id}-${line.id}-${line.scannedBarcode || ''}`" class="history-item"><span>{{ line.name_th }} × {{ line.qty }}</span><b>฿{{ money(line.qty * line.pos_price) }}</b></div>
+          <div class="history-detail-total"><span>ยอดสุทธิ</span><strong>฿{{ money(selectedHistory.total) }}</strong></div>
+          <small v-if="selectedHistory.status !== 'synced'" class="history-warning">บิลนี้ยังไม่ยืนยันเลขที่จาก ERP จะแสดงเป็นรายการชั่วคราวจนกว่าจะซิงก์สำเร็จ</small>
         </div>
       </section>
 
