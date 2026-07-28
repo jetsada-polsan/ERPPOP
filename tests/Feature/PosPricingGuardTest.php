@@ -9,6 +9,7 @@ use App\Models\ProductBarcode;
 use App\Models\ProductPrice;
 use App\Models\ProductUnit;
 use App\Models\Promotion;
+use App\Models\QtyPromotion;
 use App\Models\User;
 use App\Services\Sales\PosPricingGuard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -39,6 +40,26 @@ class PosPricingGuardTest extends TestCase
         ]);
 
         $this->assertSame(90.0, app(PosPricingGuard::class)->validate($this->payload($branch, $product, 90), $user));
+    }
+
+    public function test_server_calculates_bundle_price_for_complete_sets_and_regular_price_for_remainder(): void
+    {
+        [$user, $branch, $product] = $this->masters();
+        $product->update(['default_price' => 50]);
+        ProductPrice::where('product_id', $product->id)->update(['price' => 50]);
+        $promotion = QtyPromotion::create([
+            'code' => 'BUNDLE3', 'name' => '3 ชิ้น 100 บาท', 'promo_type' => 'bundle_price',
+            'product_id' => $product->id, 'min_qty' => 3, 'bundle_price' => 100,
+            'is_active' => true,
+        ]);
+
+        $this->assertSame('ซื้อ 3 ชิ้น 100 บาท', $promotion->label());
+
+        // 7 ชิ้น = 2 ชุด x 100 + 1 ชิ้น x 50 = 250 บาท
+        $payload = $this->payload($branch, $product, 250 / 7);
+        $payload['items'][0]['qty'] = 7;
+
+        $this->assertSame(250.0, app(PosPricingGuard::class)->validate($payload, $user));
     }
 
     public function test_manual_discount_requires_a_real_override_permission(): void
