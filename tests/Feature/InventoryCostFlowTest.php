@@ -6,11 +6,15 @@ use App\Models\Branch;
 use App\Models\DocumentType;
 use App\Models\Product;
 use App\Models\ProductBarcode;
+use App\Models\PriceTable;
+use App\Models\ProductPrice;
 use App\Models\ProductionOrder;
 use App\Models\ProductionRecipe;
 use App\Models\ProductUnit;
 use App\Models\StockDocumentItem;
 use App\Models\Supplier;
+use App\Models\QtyPromotion;
+use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseLocation;
 use App\Services\Inventory\CostingService;
@@ -21,6 +25,7 @@ use App\Services\Inventory\ProductionReceiptService;
 use App\Services\Inventory\StockTransformService;
 use App\Services\Purchasing\PurchaseService;
 use App\Services\Sales\CashSaleService;
+use App\Services\Sales\PosPricingGuard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -91,6 +96,49 @@ class InventoryCostFlowTest extends TestCase
             ->selectRaw('sum(remaining_qty * unit_cost) as v')->value('v');
         $this->assertSame(200.0, $lotValue);
         $this->assertSame(300.0 - (float) $saleLine->cost_amount, $lotValue);
+    }
+
+    public function test_bundle_promotion_keeps_fifo_cost_and_records_the_true_profit(): void
+    {
+        [$branch, $supplier, , $product] = $this->masters();
+        $user = User::factory()->create(['username' => 'bundle_uat_'.uniqid()]);
+        $table = PriceTable::create([
+            'code' => 'RETAIL', 'name' => 'ราคาปลีก', 'is_default' => true, 'is_active' => true,
+        ]);
+        ProductPrice::create([
+            'product_id' => $product->id, 'price_table_id' => $table->id,
+            'price' => 50, 'is_active' => true,
+        ]);
+        QtyPromotion::create([
+            'code' => 'BUNDLE-UAT', 'name' => '3 ชิ้น 100 บาท', 'promo_type' => 'bundle_price',
+            'product_id' => $product->id, 'min_qty' => 3, 'bundle_price' => 100,
+            'is_active' => true,
+        ]);
+
+        // รับเข้าทุน 20 บาทต่อชิ้น จำนวน 10 ชิ้น
+        app(PurchaseService::class)->create([
+            'supplier_id' => $supplier->id, 'branch_id' => $branch->id,
+            'is_credit' => false, 'items' => [['product_id' => $product->id, 'qty' => 10, 'unit_price' => 20]],
+        ]);
+
+        // 7 ชิ้น: 2 ชุด x 100 + 1 ชิ้น x 50 = รายได้ 250 บาท
+        $saleUnitPrice = 250 / 7;
+        $payload = [
+            'branch_id' => $branch->id, 'vat_mode' => 'included',
+            'items' => [['product_id' => $product->id, 'qty' => 7, 'unit_price' => $saleUnitPrice]],
+        ];
+        $this->assertSame(250.0, app(PosPricingGuard::class)->validate($payload, $user));
+
+        $sale = app(CashSaleService::class)->create([
+            'branch_id' => $branch->id, 'customer_id' => null,
+            'items' => $payload['items'],
+        ]);
+        $saleLine = $sale->stockDocument()->first()->items()->first();
+
+        $this->assertSame(250.0, (float) $sale->total_amount);
+        $this->assertSame(20.0, (float) $saleLine->unit_cost);
+        $this->assertSame(140.0, (float) $saleLine->cost_amount);
+        $this->assertSame(110.0, (float) $sale->total_amount - (float) $saleLine->cost_amount);
     }
 
     public function test_sale_cost_is_frozen_when_a_later_purchase_changes_average_cost(): void
