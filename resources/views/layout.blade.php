@@ -839,6 +839,56 @@
         body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .table td { padding:4px 6px!important; border-right:1px solid #d7e0e6; border-bottom-color:#d7e0e6!important; background:#fff!important; font-size:11px!important; }
 
         @media(max-width:991.98px){.app-content{padding:10px}.btn:not(.rounded-circle){min-height:34px}.form-control,.form-select,.input-group-text{min-height:34px}}
+
+        /* ERP web responsive tiers: fixed readable sizes for small, standard and large monitors. */
+        @media (min-width: 1366px) and (min-height: 720px) {
+            :root {
+                --ui-font-xs: 12px;
+                --ui-font-sm: 13px;
+                --ui-font-md: 14px;
+                --ui-font-lg: 17px;
+                --ui-font-xl: 22px;
+                --ui-control-h: 38px;
+                --ui-space: 14px;
+            }
+            .app-content { padding: 18px 22px; }
+            .app-header { min-height: 58px; }
+            .app-header h1 { font-size: var(--ui-font-xl); }
+            .page-title-icon { width: 36px; height: 36px; font-size: 16px; }
+            .card-header { padding: 11px 14px; }
+            .card-body { padding: 14px; }
+            .table > thead > tr > th { padding: 10px 11px; }
+            .table > tbody > tr > td { padding: 10px 11px; }
+            .pagination { --bs-pagination-font-size: 13px; }
+            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) { font-size: 13px!important; }
+            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) :is(.form-control,.form-select) { font-size: 13px!important; min-height: 34px!important; }
+            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .btn:not(.rounded-circle) { font-size: 13px!important; min-height: 34px!important; }
+            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .table th { font-size: 12px!important; padding: 7px 8px!important; }
+            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .table td { font-size: 12px!important; padding: 6px 8px!important; }
+        }
+
+        @media (min-width: 1600px) and (min-height: 820px) {
+            :root {
+                --ui-font-xs: 13px;
+                --ui-font-sm: 14px;
+                --ui-font-md: 15px;
+                --ui-font-lg: 18px;
+                --ui-font-xl: 24px;
+                --ui-control-h: 42px;
+                --ui-space: 16px;
+            }
+            .app-content { padding: 22px 28px; }
+            .app-header { min-height: 62px; }
+            .card-header { padding: 13px 16px; }
+            .card-body { padding: 16px; }
+            .table > thead > tr > th { padding: 11px 13px; }
+            .table > tbody > tr > td { padding: 11px 13px; }
+            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) { font-size: 14px!important; }
+            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) :is(.form-control,.form-select) { font-size: 14px!important; }
+            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .table th,
+            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .table td { font-size: 13px!important; }
+        }
+
         @media print { .app-content{padding:0}.content-card,.card{box-shadow:none}.table-responsive{overflow:visible!important} }
     </style>
 </head>
