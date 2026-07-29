@@ -2397,6 +2397,40 @@
     .qr-box canvas, .qr-box img { width: 148px !important; height: 148px !important; }
     .qr-amount { font-size: 22px; }
 }
+
+/* Fixed responsive tiers shared with the desktop POS. */
+@media (min-width: 1366px) and (min-height: 720px) {
+    body { font-size: 15px; }
+    .pos-wrap { grid-template-rows: 56px 1fr 62px; }
+    .pos-topbar { padding: 0 14px; gap: 10px; }
+    .pos-logo { font-size: 24px; min-width: 142px; }
+    .topbar-select, .topbar-locked, .topbar-btn { font-size: 13px; }
+    .pos-body { grid-template-columns: minmax(680px, 40vw) 1fr; gap: 8px; padding: 8px; }
+    .cart-item-name { font-size: 15px; }
+    .cart-item-sku { font-size: 12px; }
+    .cart-item-price { font-size: 19px; }
+    .cart-list-head { font-size: 12px; }
+    .product-grid { grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 7px; padding: 8px; }
+    .product-card { min-height: 60px; height: 60px; grid-template-columns: 72px minmax(0, 1fr) auto; gap: 10px; padding: 6px 10px; }
+    .product-card .product-sku { font-size: 11px; }
+    .product-card .product-name { font-size: 13px; line-height: 1.3; }
+    .product-card .product-price { font-size: 16px; }
+    .total-row.muted span, .total-row.muted .val { font-size: 12px; }
+    .total-row.grand { font-size: 15px; }
+    .total-row.grand .val { font-size: 27px; }
+    .action-btn { min-height: 48px; font-size: 13px; }
+    .action-btn i { font-size: 19px; }
+}
+
+@media (min-width: 1600px) and (min-height: 820px) {
+    .pos-body { grid-template-columns: minmax(760px, 38vw) 1fr; }
+    .product-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+    .product-card { min-height: 66px; height: 66px; grid-template-columns: 82px minmax(0, 1fr) auto; }
+    .product-card .product-name { font-size: 14px; }
+    .product-card .product-price { font-size: 17px; }
+    .cart-item-name { font-size: 16px; }
+    .cart-item-price { font-size: 21px; }
+}
 </style>
 
 <script src="{{ asset('vendor/qrcodejs/qrcode.min.js') }}"></script>
