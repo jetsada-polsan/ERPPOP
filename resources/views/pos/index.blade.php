@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="th" data-theme="navy">
+<html lang="th" data-theme="popstar">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="theme-color" content="#0f1c2e">
+    <meta name="theme-color" content="#bd2836">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="JET POS">
@@ -22,28 +22,26 @@
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         :root {
-            --pos-bg: #07111f;
-            --pos-panel: #111c2e;
-            --pos-panel-2: #18263b;
-            --pos-card: #203149;
-            --pos-card-2: #263b57;
-            --pos-border: rgba(148,163,184,.18);
-            --pos-text: #f1f5f9;
-            --pos-muted: #a7b4c8;
+            --pos-bg: #eef2f5;
+            --pos-panel: #ffffff;
+            --pos-panel-2: #f7f9fb;
+            --pos-card: #ffffff;
+            --pos-card-2: #fff5f6;
+            --pos-border: #d8e0e7;
+            --pos-text: #162331;
+            --pos-muted: #667585;
             --pos-green: #10b981;
-            --pos-blue: #0ea5e9;
-            --pos-red: #ef4444;
+            --pos-blue: #bd2836;
+            --pos-red: #bd2836;
             --pos-amber: #f59e0b;
-            --pos-cyan: #22d3ee;
+            --pos-cyan: #bd2836;
         }
 
         html, body { height: 100%; overflow: hidden; }
 
         body {
             font-family: 'Leelawadee UI', 'Noto Sans Thai', Tahoma, 'Segoe UI', sans-serif;
-            background:
-                radial-gradient(circle at 72% 10%, rgba(14,165,233,.16), transparent 28%),
-                linear-gradient(135deg, #07111f 0%, #0f1c2e 48%, #07111f 100%);
+            background: #eef2f5;
             color: var(--pos-text);
             font-size: 14px;
         }
@@ -1184,9 +1182,27 @@
         .action-btn.qr { background: linear-gradient(135deg,#06b6d4,#0284c7); }
         .action-btn.edit { background: linear-gradient(135deg,#f59e0b,#d97706); }
         .action-btn.pay {
-            background: linear-gradient(135deg,#10b981,#047857);
-            box-shadow: 0 14px 28px rgba(16,185,129,.26);
+            background: linear-gradient(135deg,#bd2836,#9f1f2b);
+            box-shadow: 0 14px 28px rgba(189,40,54,.24);
         }
+
+        /* Shared POPSTAR skin: web POS follows the Windows POS visual language. */
+        .pos-wrap { background: #eef2f5; }
+        .pos-topbar { background: #fff; border-bottom-color: #d8e0e7; box-shadow: 0 2px 8px rgba(29,47,61,.06); }
+        .pos-logo { color: #bd2836; }
+        .pos-logo span { background: none; -webkit-text-fill-color: #bd2836; color: #bd2836; }
+        .pos-cart, .pos-products { background: #fff; border-color: #d8e0e7; box-shadow: 0 8px 24px rgba(28,48,62,.07); }
+        .pos-cart-header, .pos-search-bar, .pos-categories { background: #fff; border-color: #d8e0e7; }
+        .cart-item.active { background: #fff5f6; box-shadow: inset 4px 0 0 #bd2836, 0 8px 18px rgba(189,40,54,.10); }
+        .cart-line-no { background: #fce7e9; color: #9f1f2b; }
+        .cart-item-price, .total-row.grand .val, .product-price { color: #bd2836; }
+        .qty-btn:hover, .cat-pill:hover { background: #fff5f6; color: #9f1f2b; border-color: #e6aab1; }
+        .cat-pill.active { background: linear-gradient(135deg,#bd2836,#9f1f2b); box-shadow: 0 10px 24px rgba(189,40,54,.20); }
+        .product-card:hover { border-color: #d67b84; background: #fff5f6; box-shadow: 0 12px 26px rgba(189,40,54,.12); }
+        .product-sku { color: #9f1f2b; }
+        .pos-actionbar { background: #fff; border-color: #d8e0e7; }
+        .action-btn.qr { background: linear-gradient(135deg,#bd2836,#9f1f2b); }
+        .action-btn.clear { background: linear-gradient(135deg,#a92130,#7f1722); }
 
         @media print {
             body * { visibility: hidden !important; }
