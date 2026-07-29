@@ -134,8 +134,8 @@
                                 <tr>
                                     <th class="row-no">#</th>
                                     <th>สินค้า</th>
-                                    <th class="qty text-end">จำนวน</th>
-                                    <th class="price text-end">ต่อหน่วย</th>
+                                    <th class="qty text-end">จำนวน/น้ำหนัก</th>
+                                    <th class="price text-end">ราคา/หน่วย</th>
                                     <th class="sum text-end">จำนวนเงิน</th>
                                     <th class="del"></th>
                                 </tr>
@@ -152,7 +152,12 @@
                                                 <template x-for="product in item.results" :key="product.id">
                                                     <button type="button" class="doc-option" @click="selectProduct(index, product)">
                                                         <span class="doc-code" x-text="product.sku_code"></span>
-                                                        <span x-text="product.name_th"></span>
+                                                        <span>
+                                                            <span x-text="product.name_th"></span>
+                                                            <small x-show="product.is_scale" class="d-block text-success fw-bold">
+                                                                ชั่ง <span x-text="product.unit_name || 'หน่วยฐาน'"></span><span x-show="product.scale_plu"> · PLU <span x-text="product.scale_plu"></span></span>
+                                                            </small>
+                                                        </span>
                                                         <strong class="text-success" x-text="'฿' + money(product.default_price)"></strong>
                                                     </button>
                                                 </template>
@@ -179,8 +184,12 @@
                                             </div>
                                             @endif
                                         </td>
-                                        <td><input type="number" step="0.0001" min="0.0001" :name="`items[${index}][qty]`" x-model.number="item.qty" required class="doc-input text-end"></td>
-                                        <td><input type="number" step="0.01" min="0" :name="`items[${index}][unit_price]`" x-model.number="item.unit_price" required class="doc-input text-end" title="ราคาตามใบซื้อ ระบบจะแยก VAT และต้นทุนบัญชีให้อัตโนมัติ"></td>
+                                        <td>
+                                            <input type="number" step="0.0001" min="0.0001" :name="`items[${index}][qty]`" x-model.number="item.qty" required class="doc-input text-end" :title="item.is_scale ? 'น้ำหนักจริง เช่น 2.3500 กก.' : 'จำนวนสินค้า'"><small x-show="item.is_scale" class="d-block text-end text-success fw-bold" x-text="item.unit_name || 'หน่วยฐาน'"></small>
+                                        </td>
+                                        <td>
+                                            <input type="number" step="0.01" min="0" :name="`items[${index}][unit_price]`" x-model.number="item.unit_price" required class="doc-input text-end" :title="item.is_scale ? 'ราคาขายต่อ ' + (item.unit_name || 'หน่วยฐาน') : 'ราคาต่อหน่วย'"><small x-show="item.is_scale" class="d-block text-end text-success fw-bold">/หน่วยชั่ง</small>
+                                        </td>
                                         <td class="doc-line-total">฿<span x-text="money(item.qty * item.unit_price)"></span></td>
                                         <td class="del">
                                             <button type="button" class="doc-delete" @click="removeItem(index)" x-show="items.length > 1">

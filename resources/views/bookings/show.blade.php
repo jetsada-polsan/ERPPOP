@@ -95,14 +95,15 @@ $isConverted = $booking->status === 'converted_to_sale';
     <h3 class="h6 fw-bold mb-3">รายการสินค้า</h3>
     <div class="table-responsive">
         <table class="table align-middle">
-            <thead><tr><th>รหัส</th><th>ชื่อสินค้า</th><th class="text-end">จำนวน</th><th class="text-end">ราคา/หน่วย</th><th class="text-end">รวม</th></tr></thead>
+            <thead><tr><th>รหัส</th><th>ชื่อสินค้า</th><th class="text-end">จำนวน/น้ำหนัก</th><th class="text-end">ราคา/หน่วย</th><th class="text-end">รวม</th></tr></thead>
             <tbody>
                 @foreach($booking->document->stockDocument->items as $item)
+                @php($isScale = $item->product->barcodes->contains(fn ($barcode) => preg_match('/^80[01][0-9]{3}$/', (string) $barcode->barcode) === 1) || preg_match('/ชั่ง|ซั่ง/u', (string) $item->product->name_th) === 1)
                 <tr>
                     <td class="fw-semibold text-primary">{{ $item->product->sku_code }}</td>
-                    <td>{{ $item->product->name_th }}</td>
-                    <td class="text-end">{{ number_format($item->qty, 2) }}</td>
-                    <td class="text-end">{{ number_format($item->unit_price, 2) }}</td>
+                    <td>{{ $item->product->name_th }} @if($isScale)<span class="badge text-bg-success ms-1">ชั่ง</span>@endif</td>
+                    <td class="text-end">{{ number_format($item->qty, $isScale ? 4 : 2) }} @if($isScale)<small class="text-success fw-bold">{{ $item->product->baseUnit?->cleanName() ?? 'หน่วยฐาน' }}</small>@endif</td>
+                    <td class="text-end">{{ number_format($item->unit_price, 2) }} @if($isScale)<small class="text-success fw-bold">/หน่วย</small>@endif</td>
                     <td class="text-end fw-semibold">{{ number_format($item->qty * $item->unit_price, 2) }}</td>
                 </tr>
                 @endforeach

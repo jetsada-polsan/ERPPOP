@@ -130,7 +130,7 @@ function docEntryPage(config) {
         partyQuery: '',
         partyId: '',
         partyResults: [],
-        items: [{ product_id: '', productQuery: '', qty: 1, unit_price: 0, lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [], results: [] }],
+        items: [{ product_id: '', productQuery: '', qty: 1, unit_price: 0, unit_name: '', is_scale: false, scale_plu: '', lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [], results: [] }],
         openModal() { this.modalOpen = true; },
         closeModal() { this.modalOpen = false; },
         async searchParty() {
@@ -144,7 +144,7 @@ function docEntryPage(config) {
             this.partyQuery = `${party.code} - ${party.name_th}`;
             this.partyResults = [];
         },
-        addItem() { this.items.push({ product_id: '', productQuery: '', qty: 1, unit_price: 0, lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [], results: [] }); },
+        addItem() { this.items.push({ product_id: '', productQuery: '', qty: 1, unit_price: 0, unit_name: '', is_scale: false, scale_plu: '', lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [], results: [] }); },
         removeItem(index) { this.items.splice(index, 1); },
         async searchProducts(index) {
             const query = this.items[index].productQuery;
@@ -156,6 +156,9 @@ function docEntryPage(config) {
             this.items[index].product_id = product.id;
             this.items[index].productQuery = `${product.sku_code} - ${product.name_th}`;
             this.items[index].unit_price = Number(product.default_price || 0);
+            this.items[index].unit_name = product.unit_name || 'หน่วยฐาน';
+            this.items[index].is_scale = Boolean(product.is_scale);
+            this.items[index].scale_plu = product.scale_plu || '';
             this.items[index].tracks_expiry = Boolean(product.tracks_expiry);
             this.items[index].shelf_life_days = product.shelf_life_days;
             this.items[index].lots = product.lots || [];

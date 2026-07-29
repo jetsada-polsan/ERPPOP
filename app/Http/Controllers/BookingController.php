@@ -104,7 +104,7 @@ class BookingController extends Controller
     {
         $booking->load([
             'document.customer', 'document.branch', 'document.salesman',
-            'document.stockDocument.items.product', 'confirmedDocument',
+            'document.stockDocument.items.product.baseUnit', 'document.stockDocument.items.product.barcodes', 'confirmedDocument',
         ]);
 
         $creditSaleBooks = DocumentBook::withCount('documents')

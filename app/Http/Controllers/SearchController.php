@@ -73,6 +73,11 @@ class SearchController extends Controller
                 'shelf_life_days' => $product->shelf_life_days,
                 'unit_name' => $product->baseUnit?->displayLabel() ?? '-',
                 'barcode' => $product->barcodes->first()?->barcode,
+                'scale_plu' => $product->barcodes
+                    ->first(fn ($barcode) => preg_match('/^80[01][0-9]{3}$/', (string) $barcode->barcode) === 1)
+                    ?->barcode,
+                'is_scale' => $product->barcodes->contains(fn ($barcode) => preg_match('/^80[01][0-9]{3}$/', (string) $barcode->barcode) === 1)
+                    || preg_match('/ชั่ง|ซั่ง/u', (string) $product->name_th) === 1,
                 'lots' => $request->boolean('include_lots') ? $product->stockLots->map(fn ($lot) => [
                     'id' => $lot->id, 'lot_number' => $lot->lot_number,
                     'expiry_date' => $lot->expiry_date?->toDateString(),
