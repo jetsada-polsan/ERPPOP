@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, Cloud, CloudOff, CreditCard, FileText, FolderOpen, History, LogOut, Minus, PackageSearch, PauseCircle, Plus, Printer, QrCode, ReceiptText, RefreshCw, ScanLine, Search, Settings, ShoppingCart, Trash2, UserRound, Wifi, X } from 'lucide-vue-next'
+import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, CircleHelp, Cloud, CloudOff, CreditCard, FileText, FolderOpen, History, LogOut, Minus, PackageSearch, PauseCircle, Plus, Printer, QrCode, ReceiptText, RefreshCw, ScanLine, Search, Settings, ShoppingCart, Trash2, UserRound, Wifi, X } from 'lucide-vue-next'
 import { check } from '@tauri-apps/plugin-updater'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { api, connect, setServerUrl } from './lib/api'
@@ -37,7 +37,7 @@ const pendingCount = ref(0)
 const error = ref('')
 const notice = ref('')
 const busy = ref(false)
-const modal = ref<'cashier' | 'changePin' | 'shift' | 'closeShift' | 'payment' | 'settings' | 'holdBill' | 'heldBills' | 'history' | null>(null)
+const modal = ref<'cashier' | 'changePin' | 'shift' | 'closeShift' | 'payment' | 'settings' | 'holdBill' | 'heldBills' | 'history' | 'guide' | null>(null)
 const setupUrl = ref('http://27.254.143.219')
 const setupToken = ref('')
 const cashierCode = ref('')
@@ -61,6 +61,7 @@ const localRestoreBusy = ref(false)
 const saleHistoryRows = ref<LocalSaleHistory[]>([])
 const historyDays = ref(90)
 const selectedHistory = ref<LocalSaleHistory | null>(null)
+let syncTimer: number | null = null
 
 const filteredProducts = computed(() => {
   const q = search.value.trim().toLocaleLowerCase('th')
@@ -155,7 +156,7 @@ async function refreshQueue() {
 }
 
 async function syncAll() {
-  if (!profile.value || !navigator.onLine) return
+  if (!profile.value || !navigator.onLine || syncing.value) return
   syncing.value = true
   try {
     const serverProfile = await api.ping()
@@ -187,6 +188,8 @@ async function openSettings() {
   modal.value = 'settings'
   await inspectLocalDb()
 }
+
+function openGuide() { modal.value = 'guide' }
 
 async function inspectLocalDb() {
   if (!isTauri()) {
@@ -492,12 +495,14 @@ onMounted(() => {
   window.addEventListener('online', networkUp)
   window.addEventListener('offline', networkDown)
   window.addEventListener('keydown', handleShortcut)
+  syncTimer = window.setInterval(() => { if (profile.value && navigator.onLine) void syncAll() }, 30000)
   void start()
 })
 onUnmounted(() => {
   window.removeEventListener('online', networkUp)
   window.removeEventListener('offline', networkDown)
   window.removeEventListener('keydown', handleShortcut)
+  if (syncTimer !== null) window.clearInterval(syncTimer)
 })
 </script>
 
@@ -512,6 +517,7 @@ onUnmounted(() => {
       <div class="top-actions">
         <button class="status" :class="online ? 'online' : 'offline'" @click="syncAll"><Wifi v-if="online"/><CloudOff v-else/><span>{{ online ? (syncing ? 'กำลังซิงก์' : 'ออนไลน์') : 'ออฟไลน์' }}</span></button>
         <button class="icon-button" title="ซิงก์ข้อมูล" @click="syncAll"><RefreshCw :class="{ spin: syncing }"/></button>
+        <button class="icon-button" title="คู่มือการใช้งาน POS" @click="openGuide"><CircleHelp/></button>
         <button class="icon-button" title="ประวัติการขายย้อนหลัง" @click="openHistory"><History/></button>
         <button v-if="lastReceipt" class="icon-button" title="พิมพ์บิลล่าสุด" @click="printLastReceipt"><Printer/></button>
         <button class="icon-button" title="เรียกบิลพักส่วนกลาง" @click="openHeldBills"><FolderOpen/></button>
@@ -563,10 +569,25 @@ onUnmounted(() => {
     <transition name="toast"><div v-if="error" class="toast error"><AlertTriangle/>{{ error }}<button @click="error = ''"><X/></button></div></transition>
 
     <div v-if="modal" class="modal-backdrop">
+      <section v-if="modal === 'guide'" class="modal guide-modal">
+        <div class="modal-head"><div><CircleHelp/><span><strong>คู่มือ POPSTAR POS</strong><small>ขั้นตอนใช้งานและแก้ปัญหาเบื้องต้น</small></span></div><button type="button" @click="modal = null"><X/></button></div>
+        <div class="guide-grid">
+          <article><b>เริ่มขาย</b><span>ตั้งค่าเครื่องครั้งแรก → เข้าแคชเชียร์ → เปิดกะ → สแกนสินค้า → รับชำระ</span></article>
+          <article><b>เน็ตหลุด</b><span>ขายต่อได้ตามปกติ บิลจะเก็บในเครื่องและส่งขึ้น ERP อัตโนมัติเมื่อออนไลน์</span></article>
+          <article><b>บิลค้าง</b><span>กดไอคอนซิงก์ ระบบจะส่งซ้ำด้วยเลขอ้างอิงเดิม ไม่สร้างบิลซ้ำ</span></article>
+          <article><b>ดูบิลย้อนหลัง</b><span>กดไอคอนประวัติ เลือก 30, 60 หรือ 90 วัน แล้วเลือกบิลเพื่อดูหรือพิมพ์ซ้ำ</span></article>
+          <article><b>แก้ปัญหา SQLite</b><span>เข้า ตั้งค่าเครื่อง → สุขภาพ POS Local → ตรวจใหม่ หรือสำรองข้อมูลก่อนให้ IT ช่วย</span></article>
+          <article><b>เปลี่ยนเครื่อง</b><span>ติดตั้งรุ่นล่าสุด วาง Device Token ของเครื่องใหม่ แล้วดาวน์โหลดสินค้าและราคาจาก ERP</span></article>
+        </div>
+        <div class="guide-footer"><strong>หลักสำคัญ:</strong> ERP เป็นผู้ตรวจราคา ตัดสต๊อก และออกเลขบิลจริง ส่วน POS ทำหน้าที่ขายต่อเนื่องและเก็บคิวเมื่อออฟไลน์</div>
+        <button type="button" class="primary" @click="modal = null">เข้าใจแล้ว</button>
+      </section>
       <form v-if="modal === 'settings'" class="modal" @submit.prevent="configure">
         <div class="modal-head"><div><Settings/><span><strong>ตั้งค่าเครื่อง POS</strong><small>เชื่อมเครื่องนี้กับ ERP เพียงครั้งแรก</small></span></div><button v-if="profile" type="button" @click="modal = null"><X/></button></div>
         <label>ที่อยู่เซิร์ฟเวอร์<input v-model="setupUrl" required placeholder="https://erp.example.com"></label>
+        <small class="setup-hint">ใช้ URL เดิมของ ERP ทุกเครื่อง แนะนำ HTTPS เมื่อใช้งานจริง</small>
         <label>Device Token<textarea v-model="setupToken" required rows="3" placeholder="วาง Token จาก ERP > ตั้งค่า > ดาวน์โหลด POS"></textarea></label>
+        <small class="setup-hint">Token ใช้ผูกเครื่องกับสาขา ไม่ควรนำไปใส่ใน GitHub หรือส่งต่อให้พนักงาน</small>
         <button class="primary" :disabled="busy">{{ busy ? 'กำลังตรวจสอบ...' : 'เชื่อมต่อเครื่อง' }}</button>
         <div class="local-diagnostics">
           <div class="diagnostic-head"><span><strong>สุขภาพ POS Local</strong><small>ตรวจ SQLite และคิวบิลในเครื่องนี้</small></span><button type="button" class="icon-button" title="ตรวจใหม่" :disabled="localHealthBusy" @click="inspectLocalDb"><RefreshCw :class="{ spin: localHealthBusy }"/></button></div>
