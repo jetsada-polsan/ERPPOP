@@ -79,6 +79,8 @@
         .visual::before { width: 240px; height: 240px; right: -105px; top: -90px; }
         .visual::after { width: 170px; height: 170px; left: -90px; bottom: -70px; border-color: rgba(19,168,120,.55); }
         .visual-top, .visual-bottom { position: relative; z-index: 1; }
+        .visual-logo-frame { display: inline-flex; align-items: center; padding: 9px 14px; border-radius: 12px; background: rgba(255,255,255,.96); box-shadow: 0 10px 28px rgba(0,0,0,.18); }
+        .visual-logo { display: block; width: 214px; height: auto; }
         .visual-mark {
             width: 64px; height: 64px; padding: 8px;
             display: grid; place-items: center;
@@ -87,7 +89,7 @@
             box-shadow: 0 8px 20px rgba(0,0,0,.16);
         }
         .visual-mark img { max-width: 100%; max-height: 100%; object-fit: contain; }
-        .visual-kicker { margin-top: 34px; color: #8fe3c5; font-size: 12px; font-weight: 900; letter-spacing: .08em; }
+        .visual-kicker { margin-top: 24px; color: #8fe3c5; font-size: 12px; font-weight: 900; letter-spacing: .08em; }
         .visual h2 { max-width: 300px; margin-top: 10px; font-size: 31px; line-height: 1.3; font-weight: 850; letter-spacing: 0; }
         .visual-copy { max-width: 295px; margin-top: 16px; color: rgba(255,255,255,.72); font-size: 14px; line-height: 1.7; }
         .visual-rule { width: 58px; height: 4px; margin-top: 28px; border-radius: 2px; background: var(--brand); }
@@ -231,14 +233,14 @@
     <section class="visual" aria-label="ข้อมูลระบบ">
         <div class="visual-top">
             @if($companyLogo)
-                <span class="visual-mark"><img src="{{ $companyLogo }}" alt=""></span>
+                <span class="visual-logo-frame"><img class="visual-logo" src="{{ asset('images/logo-jet-erp.svg') }}" alt="JET ERP"></span>
             @endif
-            <div class="visual-kicker">POPSTAR 4M ERP</div>
+            <div class="visual-kicker">JETVIEW FOR POPSTAR</div>
             <h2>ระบบงานของคุณ<br>เริ่มต้นที่นี่</h2>
             <p class="visual-copy">ศูนย์กลางการขาย สต๊อก การเงิน และข้อมูลสาขา สำหรับการทำงานที่เป็นระบบเดียวกัน</p>
             <div class="visual-rule"></div>
         </div>
-        <div class="visual-bottom"><i class="bi bi-shield-check"></i><span>ระบบที่ออกแบบเพื่อการทำงานของ POPSTAR</span></div>
+        <div class="visual-bottom"><i class="bi bi-shield-check"></i><span>ระบบบริหารจัดการของ POPSTAR</span></div>
     </section>
 
     <section class="form-pane">
@@ -247,7 +249,7 @@
             <span class="brand-logo"><img src="{{ $companyLogo }}" alt=""></span>
         @endif
         <span class="brand-copy">
-            <span class="brand-kicker">POPSTAR 4M ERP</span>
+            <span class="brand-kicker">JETVIEW FOR POPSTAR</span>
             <span class="brand-name">{{ $companyTh }}</span>
         </span>
     </div>
