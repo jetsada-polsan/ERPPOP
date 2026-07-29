@@ -9,8 +9,8 @@ Commit ที่ตรวจ: `0f6cd1f`
 แล้ว ระบบที่ deploy อยู่ตอบสนองได้ตามปกติ ฐานข้อมูล migration, storage, backup
 และ queue อยู่ในสถานะผ่าน
 
-การรับรองทั้งระบบยังไม่ควรปิดสมบูรณ์ เพราะ POS Desktop ยังไม่มี Vitest test case
-และยังไม่ได้ compile Rust/Tauri บน Windows ที่มี toolchain จริง รวมถึงอุปกรณ์
+การรับรองทั้งระบบยังไม่ควรปิดสมบูรณ์ เพราะยังไม่ได้ compile Rust/Tauri บน Windows
+ที่มี toolchain จริง รวมถึงอุปกรณ์
 Printer, cash drawer, scanner และเครื่องชั่งยังต้องทดสอบกับรุ่นใช้งานจริง
 
 ## ผลตรวจที่รันจริง
@@ -24,7 +24,7 @@ Printer, cash drawer, scanner และเครื่องชั่งยั�
 | Web POS / Vue production build | ผ่าน | Vite build สร้าง `pos-web` asset |
 | POS Desktop typecheck | ผ่าน | `vue-tsc --noEmit` ผ่านใน `pnpm run build` |
 | POS Desktop web build | ผ่าน | Vite build, 1,569 modules transformed |
-| POS Desktop Vitest | ยังไม่ผ่านการรับรอง | ไม่พบไฟล์ `*.test.*` หรือ `*.spec.*` |
+| POS Desktop Vitest UAT | ผ่าน | 2 test files, 8 tests ผ่าน |
 | Rust/Tauri compile | ยังไม่ได้ตรวจ | เครื่องตรวจไม่มี `cargo` และ `rustc` |
 | Production database/migration | ผ่าน | `php artisan erp:health` |
 | Production backup | ผ่าน | health report พบ backup ล่าสุดประมาณ 10.7 ชั่วโมง |
@@ -40,24 +40,27 @@ Printer, cash drawer, scanner และเครื่องชั่งยั�
 stock transfer/count/approval, accounting period, monthly accounting, finance
 security, MFA/PIN, route integrity และการ sync สาขา/แคชเชียร์
 
+ชุด Desktop UAT ครอบคลุม pricing contract ของ bundle price, ส่วนลดเป็นบาท,
+ส่วนลดเปอร์เซ็นต์, VAT รวม, ของแถมฟรี, payload checkout และ sync queue ที่ส่งซ้ำ,
+หยุดเมื่อ offline และป้องกัน sync loop ซ้อนกัน
+
 ระบบมีคู่มือ UAT ในหน้า `core-modules` จำนวน 75 กรณีทดสอบ โดยมีกรณีสำคัญ เช่น
 POS-01 ถึง POS-11, PUR-01 ถึง PUR-07, STK-01 ถึง STK-07, SAL, ACC, HR, SEC,
 INT และ OPS-01 ถึง OPS-04
 
 ## รายการที่ต้องทำก่อนรับรอง Production เต็มรูปแบบ
 
-1. เพิ่ม Vitest สำหรับ SQLite queue, sync retry, backup/restore และ pricing contract
-2. รัน `cargo check` และ Tauri build บน Windows หรือ GitHub Actions
-3. ทำ Hardware UAT กับเครื่องพิมพ์, ลิ้นชักเงินสด, barcode scanner, scale และ customer display
-4. ทำ UAT แบบ login จริงตามคู่มือ 75 กรณี และแนบเลขบิล/ภาพ/รายงานเป็นหลักฐาน
-5. ทดสอบไฟดับ/เปิดเครื่องใหม่และ restore SQLite บนเครื่อง POS Windows จริง
-6. ตั้ง backup offsite และทดสอบ restore drill ตามรอบที่กำหนด
+1. รัน `cargo check` และ Tauri build บน Windows หรือ GitHub Actions
+2. ทำ Hardware UAT กับเครื่องพิมพ์, ลิ้นชักเงินสด, barcode scanner, scale และ customer display
+3. ทำ UAT แบบ login จริงตามคู่มือ 75 กรณี และแนบเลขบิล/ภาพ/รายงานเป็นหลักฐาน
+4. ทดสอบไฟดับ/เปิดเครื่องใหม่และ restore SQLite บนเครื่อง POS Windows จริง
+5. ตั้ง backup offsite และทดสอบ restore drill ตามรอบที่กำหนด
 
 ## ข้อสรุป
 
-สถานะปัจจุบัน: **ผ่านสำหรับ backend และ Web POS production, ผ่านสำหรับ Desktop
-frontend build, ยังไม่ผ่านการรับรองเต็มระบบสำหรับ native/hardware UAT**
+สถานะปัจจุบัน: **ผ่านสำหรับ backend, Web POS production และ Desktop frontend/UAT
+logic, ยังไม่ผ่านการรับรองเต็มระบบสำหรับ native/hardware UAT**
 
 ไม่พบ regression จากชุด automated tests ที่มีอยู่ใน repository ณ วันที่ตรวจ
-แต่การไม่มี Desktop Vitest และยังไม่ได้ compile Rust เป็นความเสี่ยงที่ต้องปิดก่อน
+แต่การยังไม่ได้ compile Rust และทดสอบอุปกรณ์จริงเป็นความเสี่ยงที่ต้องปิดก่อน
 แจกจ่ายไฟล์ติดตั้ง POS รุ่น production ให้ทุกสาขา

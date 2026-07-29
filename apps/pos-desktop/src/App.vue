@@ -5,6 +5,7 @@ import { check } from '@tauri-apps/plugin-updater'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { api, connect, setServerUrl } from './lib/api'
 import { closeLocalDb, enqueue, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceProducts, replacePromotions, saleHistory, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth } from './lib/db'
+import { priceCart } from './lib/pricing'
 import { syncCheckoutQueue } from './lib/sync'
 import type { CartLine, Cashier, DeviceProfile, HeldBill, LocalSaleHistory, LocalStorageStatus, PaymentMethod, Product, QtyPromotion, QueueItem, ReceiptBlock, ReceiptTemplate, Shift } from './lib/types'
 
@@ -71,9 +72,10 @@ const filteredProducts = computed(() => {
   return products.value.filter((p) => p.sku_code.toLowerCase().includes(q) || p.name_th.toLocaleLowerCase('th').includes(q) || p.barcodes?.some((b) => b.barcode.includes(q))).slice(0, 80)
 })
 const storageReady = computed(() => !isTauri() || storageStatus.value?.location === 'd-drive')
-const subtotal = computed(() => cart.value.reduce((sum, line) => sum + Number(line.pos_price) * line.qty, 0))
+const pricing = computed(() => priceCart(cart.value, promotions.value, profile.value?.vatRate || 7))
+const subtotal = computed(() => pricing.value.total)
 const totalQty = computed(() => cart.value.reduce((sum, line) => sum + Number(line.qty), 0))
-const vat = computed(() => subtotal.value * ((profile.value?.vatRate || 7) / (100 + (profile.value?.vatRate || 7))))
+const vat = computed(() => pricing.value.vat)
 const change = computed(() => Math.max(0, cashReceived.value - subtotal.value))
 const receiptTemplate = computed(() => profile.value?.receiptTemplate?.blocks?.length ? profile.value.receiptTemplate : DEFAULT_RECEIPT_TEMPLATE)
 const receiptVat = computed(() => {
@@ -408,7 +410,7 @@ async function checkout() {
     cash_received: paymentMethod.value === 'cash' ? cashReceived.value : undefined,
     change_amount: paymentMethod.value === 'cash' ? change.value : undefined,
     vat_mode: 'included' as const,
-    items: cart.value.map((line) => ({ product_id: line.id, qty: line.qty, unit_price: Number(line.pos_price), barcode: line.scannedBarcode })),
+    items: pricing.value.items,
   }
   const queueItem: QueueItem = { id, payload, status: 'pending', attempts: 0, createdAt: new Date().toISOString() }
   busy.value = true
