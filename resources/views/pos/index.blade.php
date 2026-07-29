@@ -2626,6 +2626,7 @@ function posApp() {
         // Vue owns the live cart presentation; Alpine remains the API/payment boundary during migration.
         publishVueState() {
             const state = {
+                canSell: this.canSell,
                 cart: this.cart,
                 promotions: this.promotions,
                 billDiscountValue: this.billDiscountValue,

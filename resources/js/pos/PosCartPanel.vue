@@ -26,6 +26,7 @@ type Promotion = {
 };
 
 type PosState = {
+    canSell: boolean;
     cart: CartItem[];
     promotions: Promotion[];
     billDiscountValue: number;
@@ -44,6 +45,7 @@ type PosState = {
 }
 
 const emptyState = (): PosState => ({
+    canSell: false,
     cart: [],
     promotions: [],
     billDiscountValue: 0,
@@ -230,7 +232,7 @@ onUnmounted(() => window.removeEventListener('pos-vue-state', syncState));
                 <div class="total-row grand"><span>ยอดสุทธิ</span><span class="val">฿{{ money(total) }}</span></div>
             </div>
         </div>
-        <button class="vue-cart-actions" type="button" :disabled="!state.cart.length" @click="action('open-payment')"><i class="bi bi-cash-coin"></i> คิดเงิน / ชำระเงิน</button>
+        <button v-if="state.canSell" class="vue-cart-actions" type="button" :disabled="!state.cart.length" @click="action('open-payment')"><i class="bi bi-cash-coin"></i> คิดเงิน / ชำระเงิน</button>
     </section>
 </template>
 
