@@ -10,7 +10,7 @@
 @endpush
 
 @section('content')
-<div class="ma-shell" x-data="{ tab: 'expenses', reconcileId: null }" x-cloak>
+<div class="ma-shell" x-data="{ tab: 'expenses', reconcileId: null, accountModalOpen: false, accountEditingId: null, accountCode: '', accountNameTh: '', accountNameEn: '', accountFormAction: '{{ route('chart-of-accounts.store') }}', openAccountCreate() { this.accountEditingId = null; this.accountCode = ''; this.accountNameTh = ''; this.accountNameEn = ''; this.accountFormAction = '{{ route('chart-of-accounts.store') }}'; this.accountModalOpen = true; }, openAccountEdit(id, code, nameTh, nameEn) { this.accountEditingId = id; this.accountCode = code; this.accountNameTh = nameTh; this.accountNameEn = nameEn || ''; this.accountFormAction = '{{ url('/chart-of-accounts') }}/' + id; this.accountModalOpen = true; } }" x-cloak>
     @if($errors->any())<div class="alert alert-danger mb-0"><i class="bi bi-exclamation-triangle me-2"></i>{{ $errors->first() }}</div>@endif
     @if(session('success'))<div class="alert alert-success mb-0"><i class="bi bi-check-circle me-2"></i>{{ session('success') }}</div>@endif
 
@@ -51,7 +51,7 @@
             <form method="post" action="{{ route('monthly-accounting.expenses.store') }}" enctype="multipart/form-data" class="expense-form">@csrf
                 <div class="ma-field"><label>วันที่ค่าใช้จ่าย</label><input type="date" name="expense_date" value="{{ old('expense_date', now()->toDateString()) }}" required></div>
                 <div class="ma-field"><label>สาขา</label><select name="branch_id" required><option value="">เลือกสาขา</option>@foreach($branches as $branch)<option value="{{ $branch->id }}" @selected(old('branch_id',$branchId)==$branch->id)>{{ $branch->code }} · {{ $branch->name_th }}</option>@endforeach</select></div>
-                <div class="ma-field span-2"><label>บัญชีค่าใช้จ่าย</label><select name="expense_account_id" required><option value="">เลือกบัญชี</option>@foreach($expenseAccounts as $account)<option value="{{ $account->id }}">{{ $account->code }} · {{ $account->name_th }}</option>@endforeach</select></div>
+                <div class="ma-field span-2"><label>บัญชีค่าใช้จ่าย</label><div class="d-flex gap-2"><select name="expense_account_id" required style="flex:1"><option value="">เลือกบัญชี</option>@foreach($expenseAccounts as $account)<option value="{{ $account->id }}">{{ $account->code }} · {{ $account->name_th }}</option>@endforeach</select><button type="button" class="btn btn-outline-primary btn-sm text-nowrap" @click="openAccountCreate()" title="เพิ่มบัญชีค่าใช้จ่าย"><i class="bi bi-plus-lg me-1"></i>เพิ่ม/แก้ไข</button></div></div>
                 <div class="ma-field span-2"><label>Cost Center</label><select name="cost_center_id"><option value="">ไม่ระบุ</option>@foreach($costCenters as $center)<option value="{{ $center->id }}">{{ $center->code }} · {{ $center->name }}</option>@endforeach</select></div>
                 <div class="ma-field span-2"><label>ผู้ขาย/ผู้รับเงิน</label><input name="supplier_name" list="supplier-list" value="{{ old('supplier_name') }}" required style="width:100%"><datalist id="supplier-list">@foreach($suppliers as $supplier)<option value="{{ $supplier->name_th }}">{{ $supplier->tax_id }}</option>@endforeach</datalist></div>
                 <div class="ma-field"><label>เลขผู้เสียภาษี 13 หลัก</label><input name="supplier_tax_id" value="{{ old('supplier_tax_id') }}"></div>
@@ -93,5 +93,33 @@
             <div class="ma-table-wrap mt-3"><table class="ma-table"><thead><tr><th>เวลาส่งออก</th><th>เดือน</th><th>ไฟล์</th><th>SHA-256</th><th>ขนาด</th><th></th></tr></thead><tbody>@forelse($exportRuns as $run)<tr><td>{{ $run->exported_at->thaiDate(true) }}</td><td>{{ $run->period }}</td><td>{{ basename($run->file_name) }}</td><td><code>{{ substr($run->file_hash,0,16) }}…</code></td><td>{{ number_format($run->file_size/1024,1) }} KB</td><td><a class="btn btn-sm btn-light border" href="{{ route('monthly-accounting.exports.download',$run) }}"><i class="bi bi-download"></i></a></td></tr>@empty<tr><td colspan="6" class="text-center text-muted py-4">ยังไม่เคยส่งออกเดือนนี้</td></tr>@endforelse</tbody></table></div>
         </div>
     </section>
+
+    <div class="account-modal-backdrop" x-show="accountModalOpen" x-transition.opacity @keydown.escape.window="accountModalOpen = false">
+        <div class="account-modal" @click.outside="accountModalOpen = false" x-transition>
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div><h2 class="h5 fw-bold mb-1" x-text="accountEditingId ? 'แก้ไขบัญชีค่าใช้จ่าย' : 'เพิ่มบัญชีค่าใช้จ่าย'"></h2><p class="text-muted small mb-0">เพิ่มหรือแก้ไขแล้วกลับมาบันทึกค่าใช้จ่ายต่อได้ทันที</p></div>
+                <button type="button" class="btn btn-light rounded-circle" @click="accountModalOpen = false"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <form method="post" :action="accountFormAction">
+                @csrf
+                <template x-if="accountEditingId"><input type="hidden" name="_method" value="PUT"></template>
+                <input type="hidden" name="account_type" value="expense">
+                <input type="hidden" name="return_to" value="{{ request()->getRequestUri() }}">
+                <div class="row g-3">
+                    <div class="col-5"><label class="form-label small text-muted">รหัสบัญชี</label><input name="code" x-model="accountCode" class="form-control" required placeholder="เช่น 510101"></div>
+                    <div class="col-7"><label class="form-label small text-muted">ชื่อบัญชีภาษาไทย</label><input name="name_th" x-model="accountNameTh" class="form-control" required placeholder="เช่น ค่าไฟฟ้า"></div>
+                    <div class="col-12"><label class="form-label small text-muted">ชื่อบัญชีภาษาอังกฤษ (ถ้ามี)</label><input name="name_en" x-model="accountNameEn" class="form-control" placeholder="Electricity expense"></div>
+                </div>
+                <div class="account-list mt-4"><div class="small fw-bold text-muted mb-2">บัญชีค่าใช้จ่ายที่มีอยู่</div>@forelse($expenseAccounts as $account)<div class="account-list-row"><span><strong>{{ $account->code }}</strong> · {{ $account->name_th }}</span><button type="button" class="btn btn-sm btn-light border" @click="openAccountEdit(@js($account->id), @js($account->code), @js($account->name_th), @js($account->name_en ?? ''))">แก้ไข</button></div>@empty<div class="small text-muted">ยังไม่มีบัญชีค่าใช้จ่าย</div>@endforelse</div>
+                <div class="d-flex justify-content-end gap-2 mt-4"><button type="button" class="btn btn-light border" @click="accountModalOpen = false">ยกเลิก</button><button type="submit" class="btn btn-primary"><i class="bi bi-check2 me-1"></i>บันทึกบัญชี</button></div>
+            </form>
+        </div>
+    </div>
 </div>
 @endsection
+
+@push('head')
+<style>
+    .account-modal-backdrop{position:fixed;inset:0;z-index:2050;background:rgba(15,23,42,.42);display:flex;align-items:center;justify-content:center;padding:18px}.account-modal{width:min(700px,100%);max-height:calc(100vh - 36px);overflow:auto;background:#fff;border-radius:10px;padding:22px;box-shadow:0 24px 80px rgba(15,23,42,.24)}.account-list{border-top:1px solid #e6edf2;padding-top:12px}.account-list-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #edf2f5;color:#425f73;font-size:12px}.account-list-row:last-child{border-bottom:0}
+</style>
+@endpush

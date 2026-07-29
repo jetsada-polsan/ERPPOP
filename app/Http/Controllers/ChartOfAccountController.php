@@ -44,7 +44,7 @@ class ChartOfAccountController extends Controller
             ChartOfAccount::create($data);
         });
 
-        return redirect()->route('chart-of-accounts.index')->with('success', "เพิ่มผังบัญชี {$data['code']} แล้ว");
+        return $this->redirectAfterSave($request, "เพิ่มผังบัญชี {$data['code']} แล้ว");
     }
 
     public function update(Request $request, ChartOfAccount $chartOfAccount): RedirectResponse
@@ -56,7 +56,7 @@ class ChartOfAccountController extends Controller
             $chartOfAccount->update($data);
         });
 
-        return redirect()->route('chart-of-accounts.index')->with('success', 'บันทึกผังบัญชีแล้ว');
+        return $this->redirectAfterSave($request, 'บันทึกผังบัญชีแล้ว');
     }
 
     public function import(Request $request, ChartOfAccountImportService $importer): RedirectResponse
@@ -107,5 +107,18 @@ class ChartOfAccountController extends Controller
         $data['default_role'] = $data['default_role'] ?: null;
 
         return $data;
+    }
+
+    private function redirectAfterSave(Request $request, string $message): RedirectResponse
+    {
+        $returnTo = (string) $request->input('return_to', '');
+
+        // Inline master-data forms may return to their originating workflow,
+        // but never allow an external redirect to be supplied by the browser.
+        if (str_starts_with($returnTo, '/') && !str_starts_with($returnTo, '//')) {
+            return redirect($returnTo)->with('success', $message);
+        }
+
+        return redirect()->route('chart-of-accounts.index')->with('success', $message);
     }
 }
