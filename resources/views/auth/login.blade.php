@@ -4,8 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex, nofollow">
-    <meta name="theme-color" content="#f4f7fb" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#080f18" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#eef2f5">
     @php($faviconUrl = asset('images/logo-jet-erp-mark.svg').'?v='.filemtime(public_path('images/logo-jet-erp-mark.svg')))
     @php($companyTh = \App\Models\AppSetting::company('name_th'))
     @php($companyLogo = \App\Models\AppSetting::logoUrl())
@@ -16,40 +15,19 @@
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     <style>
         :root {
-            color-scheme: light dark;
-            --bg: #f4f7fb;
+            color-scheme: light;
+            --bg: #eef2f5;
             --card: #ffffff;
-            --card-line: rgba(17, 45, 71, .09);
-            --ink: #0f2439;
-            --ink-2: #55708a;
-            --ink-3: #8ba3b8;
-            --input-bg: #f7fafc;
-            --input-line: #e2eaf2;
-            --brand: #1a9bdc;
-            --brand-ink: #0e7fbb;
-            --shadow: 0 1px 2px rgba(12, 38, 61, .04), 0 10px 24px -10px rgba(12, 38, 61, .16), 0 40px 60px -40px rgba(12, 38, 61, .28);
-            --glow-1: rgba(64, 178, 245, .30);
-            --glow-2: rgba(32, 190, 150, .22);
-            --glow-3: rgba(126, 130, 245, .18);
-            --font: 'Leelawadee UI', 'Noto Sans Thai', 'Sukhumvit Set', 'Segoe UI', Tahoma, sans-serif;
-        }
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg: #080f18;
-                --card: rgba(20, 31, 45, .72);
-                --card-line: rgba(255, 255, 255, .09);
-                --ink: #eaf2f9;
-                --ink-2: #93a9be;
-                --ink-3: #6b8299;
-                --input-bg: rgba(255, 255, 255, .04);
-                --input-line: rgba(255, 255, 255, .11);
-                --brand: #3fb4ec;
-                --brand-ink: #2aa3e0;
-                --shadow: 0 20px 60px -20px rgba(0, 0, 0, .8);
-                --glow-1: rgba(34, 132, 200, .38);
-                --glow-2: rgba(22, 140, 110, .26);
-                --glow-3: rgba(86, 92, 200, .24);
-            }
+            --card-line: #dce3e9;
+            --ink: #172635;
+            --ink-2: #5e7180;
+            --ink-3: #8a9aa6;
+            --input-bg: #f8fafb;
+            --input-line: #d4dee5;
+            --brand: #bd2836;
+            --brand-ink: #284f73;
+            --shadow: 0 22px 50px rgba(25, 47, 64, .13), 0 2px 8px rgba(25, 47, 64, .06);
+            --font: 'Noto Sans Thai', 'Leelawadee UI', 'Segoe UI', Tahoma, sans-serif;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -64,55 +42,38 @@
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
         }
-        /* แสงพื้นหลังแบบ mesh — วางเป็นชั้นคงที่ ไม่ scroll ตามเนื้อหา */
-        body::before {
-            content: "";
-            position: fixed; inset: 0; z-index: 0;
-            background:
-                radial-gradient(46% 38% at 16% 12%, var(--glow-1), transparent 68%),
-                radial-gradient(42% 40% at 86% 22%, var(--glow-3), transparent 66%),
-                radial-gradient(52% 44% at 72% 92%, var(--glow-2), transparent 70%);
-            pointer-events: none;
-        }
-        /* noise กัน gradient เป็นวงแถบบนจอใหญ่ */
-        body::after {
-            content: "";
-            position: fixed; inset: 0; z-index: 0;
-            opacity: .35;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
-            pointer-events: none;
-        }
-
         .card {
             position: relative;
             z-index: 1;
-            width: min(430px, 100%);
-            padding: 40px 38px 32px;
+            width: min(460px, 100%);
+            padding: 46px 42px 32px;
             border: 1px solid var(--card-line);
-            border-radius: 22px;
+            border-radius: 16px;
             background: var(--card);
             box-shadow: var(--shadow);
-            backdrop-filter: blur(24px) saturate(140%);
-            -webkit-backdrop-filter: blur(24px) saturate(140%);
+            overflow: hidden;
             animation: rise .5s cubic-bezier(.22, 1, .36, 1) both;
         }
+        .card::before { content: ""; position: absolute; inset: 0 0 auto; height: 5px; background: var(--brand); }
         @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
 
-        .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
+        .brand { display: flex; align-items: center; gap: 14px; margin-bottom: 34px; }
         .brand-logo {
             display: grid; place-items: center;
-            width: 46px; height: 46px; padding: 6px;
-            border-radius: 13px;
+            width: 58px; height: 58px; padding: 7px;
+            border-radius: 12px;
             background: #fff;
             box-shadow: 0 2px 8px rgba(10, 30, 50, .14), 0 0 0 1px rgba(10, 30, 50, .05);
         }
         .brand-logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .brand-copy { display: flex; flex-direction: column; gap: 2px; }
+        .brand-kicker { color: var(--brand); font-size: 11px; font-weight: 900; letter-spacing: .04em; line-height: 1.2; }
         .brand-name { font-size: 13px; font-weight: 700; line-height: 1.4; color: var(--ink-2); }
 
-        h1 { font-size: 30px; font-weight: 800; letter-spacing: -.03em; line-height: 1.2; }
-        .sub { margin-top: 9px; color: var(--ink-2); font-size: 13.5px; line-height: 1.6; }
+        h1 { font-size: 29px; font-weight: 850; letter-spacing: 0; line-height: 1.25; }
+        .sub { margin-top: 10px; color: var(--ink-2); font-size: 14px; line-height: 1.65; }
 
-        form { margin-top: 28px; }
+        form { margin-top: 30px; }
         label { display: block; font-size: 12px; font-weight: 700; color: var(--ink-2); margin-bottom: 8px; }
         .field { position: relative; margin-bottom: 16px; }
         .field > i.lead {
@@ -122,10 +83,10 @@
         }
         .field:focus-within > i.lead { color: var(--brand); }
         input[type=text], input[type=password] {
-            width: 100%; height: 52px;
+            width: 100%; height: 54px;
             padding: 0 48px 0 43px;
             border: 1px solid var(--input-line);
-            border-radius: 14px;
+            border-radius: 10px;
             font-size: 15px; font-family: inherit;
             color: var(--ink);
             background: var(--input-bg);
@@ -163,12 +124,12 @@
         button[type=submit] {
             width: 100%; height: 52px;
             display: flex; align-items: center; justify-content: center; gap: 9px;
-            border: none; border-radius: 14px;
+            border: none; border-radius: 10px;
             background: var(--brand-ink);
             color: #fff;
             font-size: 15px; font-weight: 800; font-family: inherit;
             cursor: pointer;
-            box-shadow: 0 6px 18px -6px color-mix(in srgb, var(--brand-ink) 75%, transparent);
+            box-shadow: 0 6px 16px rgba(40, 79, 115, .22);
             transition: filter .16s, transform .07s, box-shadow .16s;
         }
         button[type=submit]:hover { filter: brightness(1.09); box-shadow: 0 10px 24px -7px color-mix(in srgb, var(--brand-ink) 80%, transparent); }
@@ -222,7 +183,10 @@
         @if($companyLogo)
             <span class="brand-logo"><img src="{{ $companyLogo }}" alt=""></span>
         @endif
-        <span class="brand-name">{{ $companyTh }}</span>
+        <span class="brand-copy">
+            <span class="brand-kicker">POPSTAR 4M ERP</span>
+            <span class="brand-name">{{ $companyTh }}</span>
+        </span>
     </div>
 
     <h1>เข้าสู่ระบบ</h1>
