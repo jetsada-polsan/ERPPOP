@@ -69,6 +69,7 @@ const filteredProducts = computed(() => {
   if (!q) return products.value.slice(0, 80)
   return products.value.filter((p) => p.sku_code.toLowerCase().includes(q) || p.name_th.toLocaleLowerCase('th').includes(q) || p.barcodes?.some((b) => b.barcode.includes(q))).slice(0, 80)
 })
+const storageReady = computed(() => !isTauri() || storageStatus.value?.location === 'd-drive')
 const subtotal = computed(() => cart.value.reduce((sum, line) => sum + Number(line.pos_price) * line.qty, 0))
 const totalQty = computed(() => cart.value.reduce((sum, line) => sum + Number(line.qty), 0))
 const vat = computed(() => subtotal.value * ((profile.value?.vatRate || 7) / (100 + (profile.value?.vatRate || 7))))
@@ -380,6 +381,7 @@ async function recordCashDrop() {
 }
 
 function openPayment() {
+  if (!storageReady.value) { showError('ยังไม่สามารถรับชำระได้: ต้องเตรียมฐานข้อมูลบนไดรฟ์ D: ให้พร้อมก่อน'); return }
   if (!cashier.value) { modal.value = 'cashier'; return }
   if (!shift.value) { modal.value = 'shift'; return }
   cashReceived.value = subtotal.value
@@ -567,7 +569,7 @@ onUnmounted(() => {
           <div v-if="!cart.length" class="cart-empty"><span><ShoppingCart/></span><strong>ยังไม่มีรายการขาย</strong><small>สแกนสินค้าเพื่อเริ่มบิล</small></div>
         </div>
         <div class="totals"><div><span>ยอดก่อนภาษี</span><b>฿{{ money(subtotal - vat) }}</b></div><div><span>VAT {{ profile?.vatRate || 7 }}%</span><b>฿{{ money(vat) }}</b></div><div class="grand"><span>ยอดสุทธิ</span><b>฿{{ money(subtotal) }}</b></div></div>
-        <button class="pay-button" :disabled="!cart.length || busy" @click="openPayment"><Banknote/><span><small>รับชำระ</small><strong>ชำระเงิน</strong></span><ChevronRight/></button>
+        <button class="pay-button" :disabled="!cart.length || busy || !storageReady" @click="openPayment"><Banknote/><span><small>{{ storageReady ? 'รับชำระ' : 'รอพื้นที่ข้อมูล' }}</small><strong>{{ storageReady ? 'ชำระเงิน' : 'เตรียมไดรฟ์ D:' }}</strong></span><ChevronRight/></button>
         <div class="queue-bar" :class="{ warning: pendingCount }"><Cloud v-if="pendingCount"/><CheckCircle2 v-else/><span>{{ pendingCount ? `รอส่งขึ้น ERP ${pendingCount} บิล` : 'บิลทั้งหมดส่งขึ้น ERP แล้ว' }}</span></div>
       </aside>
     </section>
