@@ -190,7 +190,7 @@ class SystemSettingController extends Controller
             'credit_days' => ['required', 'integer', 'min:0', 'max:365'],
             'footer_note' => ['nullable', 'string', 'max:500'],
             'menu_order' => ['nullable', 'string', 'max:2000'],
-            'erp_theme' => ['required', 'in:ocean,navy,emerald,slate'],
+            'erp_theme' => ['required', 'in:ocean,navy,emerald,slate,clear'],
         ], [
             'company_name_th.required' => 'กรุณาระบุชื่อบริษัท',
             'logo_file.image' => 'ไฟล์โลโก้ต้องเป็นรูปภาพ (png/jpg/webp/svg)',

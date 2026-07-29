@@ -149,7 +149,7 @@
     $faviconUrl = asset('images/logo-jet-erp-mark.svg').'?v='.filemtime(public_path('images/logo-jet-erp-mark.svg'));
     $companyName = \App\Models\AppSetting::company('name_th') ?: 'กิจการของคุณ';
     $companyLogo = \App\Models\AppSetting::logoUrl();
-    $erpTheme = in_array(\App\Models\AppSetting::get('erp_theme', 'ocean'), ['ocean', 'navy', 'emerald', 'slate'], true)
+    $erpTheme = in_array(\App\Models\AppSetting::get('erp_theme', 'ocean'), ['ocean', 'navy', 'emerald', 'slate', 'clear'], true)
         ? \App\Models\AppSetting::get('erp_theme', 'ocean') : 'ocean';
 @endphp
 <!DOCTYPE html>
@@ -197,6 +197,17 @@
         html[data-theme="navy"] { --erp-border:#dce5ef; --erp-ink:#243b53; --erp-bg:#eef2f7; --fa-blue:#315b86; --fa-blue-deep:#244768; --fa-blue-dark:#3f5f7d; --fa-green:#4e9b72; --fa-green-deep:#397b58; --accent-btn:linear-gradient(135deg,#416f9c,#244768); --accent-btn-hover:linear-gradient(135deg,#527fad,#315b86); }
         html[data-theme="emerald"] { --erp-border:#d8ebe3; --erp-ink:#28483c; --erp-bg:#eef7f3; --fa-blue:#23966c; --fa-blue-deep:#187653; --fa-blue-dark:#397563; --fa-green:#65a30d; --fa-green-deep:#4d7c0f; --accent-btn:linear-gradient(135deg,#34b986,#187653); --accent-btn-hover:linear-gradient(135deg,#49c99a,#23966c); }
         html[data-theme="slate"] { --erp-border:#e1e5e9; --erp-ink:#374151; --erp-bg:#f1f3f5; --fa-blue:#64748b; --fa-blue-deep:#475569; --fa-blue-dark:#596579; --fa-green:#4f8b72; --fa-green-deep:#3c6f59; --accent-btn:linear-gradient(135deg,#7b8798,#475569); --accent-btn-hover:linear-gradient(135deg,#909aaa,#64748b); }
+        html[data-theme="clear"] {
+            --erp-font-family:'Noto Sans Thai','Segoe UI','Leelawadee UI',Tahoma,sans-serif;
+            --erp-border:#d7dde5; --erp-ink:#1f2937; --erp-bg:#f4f6f8;
+            --fa-blue:#2563eb; --fa-blue-deep:#1d4ed8; --fa-blue-dark:#334155;
+            --fa-green:#0f766e; --fa-green-deep:#115e59;
+            --erp-surface:#fff; --erp-soft:#f8fafc;
+            --erp-shadow:0 8px 22px rgba(31,41,55,.07);
+            --accent-btn:linear-gradient(135deg,#2563eb,#0f766e);
+            --accent-btn-hover:linear-gradient(135deg,#1d4ed8,#115e59);
+        }
+        html[data-theme="clear"] body { background:var(--erp-bg); }
         html.subnav-collapsed { --lte-sidebar-width: var(--erp-rail-w); }
 
         body {

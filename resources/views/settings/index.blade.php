@@ -106,6 +106,7 @@
                             'navy' => ['กรมท่า', '#315b86', '#244768', '#eef2f7'],
                             'emerald' => ['เขียวมรกต', '#23966c', '#187653', '#eef7f3'],
                             'slate' => ['เทาสเลต', '#64748b', '#475569', '#f1f3f5'],
+                            'clear' => ['อ่านง่าย', '#2563eb', '#0f766e', '#f4f6f8'],
                         ] as $key => [$label, $primary, $deep, $bg])
                             <label class="theme-choice" :class="theme === '{{ $key }}' && 'active'">
                                 <input type="radio" name="erp_theme" value="{{ $key }}" x-model="theme">
