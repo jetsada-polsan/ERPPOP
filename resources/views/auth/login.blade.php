@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex, nofollow">
-    <meta name="theme-color" content="#eef2f5">
+    <meta name="theme-color" content="#edf7fb">
     @php($faviconUrl = asset('images/logo-jet-erp-mark.svg').'?v='.filemtime(public_path('images/logo-jet-erp-mark.svg')))
     @php($companyTh = \App\Models\AppSetting::company('name_th'))
     @php($companyLogo = \App\Models\AppSetting::logoUrl())
@@ -16,17 +16,17 @@
     <style>
         :root {
             color-scheme: light;
-            --bg: #eef2f5;
+            --bg: #edf7fb;
             --card: #ffffff;
-            --card-line: #dce3e9;
-            --ink: #172635;
-            --ink-2: #5e7180;
-            --ink-3: #8a9aa6;
-            --input-bg: #f8fafb;
-            --input-line: #d4dee5;
-            --brand: #bd2836;
-            --brand-ink: #284f73;
-            --shadow: 0 22px 50px rgba(25, 47, 64, .13), 0 2px 8px rgba(25, 47, 64, .06);
+            --card-line: #d8e8ee;
+            --ink: #163449;
+            --ink-2: #5b7382;
+            --ink-3: #8ba2ae;
+            --input-bg: #f7fbfc;
+            --input-line: #d2e2e8;
+            --brand: #13a878;
+            --brand-ink: #168fc2;
+            --shadow: 0 22px 50px rgba(20, 90, 122, .14), 0 2px 8px rgba(20, 90, 122, .06);
             --font: 'Noto Sans Thai', 'Leelawadee UI', 'Segoe UI', Tahoma, sans-serif;
         }
 
@@ -77,7 +77,7 @@
             pointer-events: none;
         }
         .visual::before { width: 240px; height: 240px; right: -105px; top: -90px; }
-        .visual::after { width: 170px; height: 170px; left: -90px; bottom: -70px; border-color: rgba(189,40,54,.55); }
+        .visual::after { width: 170px; height: 170px; left: -90px; bottom: -70px; border-color: rgba(19,168,120,.55); }
         .visual-top, .visual-bottom { position: relative; z-index: 1; }
         .visual-mark {
             width: 64px; height: 64px; padding: 8px;
@@ -87,12 +87,12 @@
             box-shadow: 0 8px 20px rgba(0,0,0,.16);
         }
         .visual-mark img { max-width: 100%; max-height: 100%; object-fit: contain; }
-        .visual-kicker { margin-top: 34px; color: #f3a5ad; font-size: 12px; font-weight: 900; letter-spacing: .08em; }
+        .visual-kicker { margin-top: 34px; color: #8fe3c5; font-size: 12px; font-weight: 900; letter-spacing: .08em; }
         .visual h2 { max-width: 300px; margin-top: 10px; font-size: 31px; line-height: 1.3; font-weight: 850; letter-spacing: 0; }
         .visual-copy { max-width: 295px; margin-top: 16px; color: rgba(255,255,255,.72); font-size: 14px; line-height: 1.7; }
         .visual-rule { width: 58px; height: 4px; margin-top: 28px; border-radius: 2px; background: var(--brand); }
         .visual-bottom { display: flex; align-items: center; gap: 10px; color: rgba(255,255,255,.68); font-size: 12px; }
-        .visual-bottom i { color: #f3a5ad; font-size: 16px; }
+        .visual-bottom i { color: #8fe3c5; font-size: 16px; }
 
         .form-pane { padding: 46px 54px 32px; }
 
