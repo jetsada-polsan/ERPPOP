@@ -405,7 +405,12 @@ async function checkout() {
   busy.value = true
   try {
     await enqueue(queueItem)
-    await saveSaleHistory({ id, receiptNo: id.split(':').pop()!.slice(0, 8).toUpperCase(), status: 'pending', total: soldTotal, method: paymentMethod.value, paid: cashReceived.value, change: soldChange, items: soldItems, printedAt: new Date().toISOString() })
+    // Queue เป็นข้อมูลหลักของการขาย ประวัติในเครื่องเป็นข้อมูลเสริมที่ห้ามทำให้บิลถูกมาร์ค failed
+    try {
+      await saveSaleHistory({ id, receiptNo: id.split(':').pop()!.slice(0, 8).toUpperCase(), status: 'pending', total: soldTotal, method: paymentMethod.value, paid: cashReceived.value, change: soldChange, items: soldItems, printedAt: new Date().toISOString() })
+    } catch (historyError) {
+      console.warn('บันทึกประวัติ POS ไม่สำเร็จ แต่บิลยังอยู่ในคิวซิงก์', historyError)
+    }
     cart.value = []
     modal.value = null
     await refreshQueue()
