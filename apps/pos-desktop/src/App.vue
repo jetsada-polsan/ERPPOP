@@ -4,9 +4,9 @@ import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, CircleHelp, Cloud,
 import { check } from '@tauri-apps/plugin-updater'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { api, connect, setServerUrl } from './lib/api'
-import { closeLocalDb, enqueue, loadProducts, loadProfile, loadSession, localDbHealth, markQueue, queueItems, replaceProducts, saleHistory, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth } from './lib/db'
+import { closeLocalDb, enqueue, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceProducts, replacePromotions, saleHistory, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth } from './lib/db'
 import { syncCheckoutQueue } from './lib/sync'
-import type { CartLine, Cashier, DeviceProfile, HeldBill, LocalSaleHistory, LocalStorageStatus, PaymentMethod, Product, QueueItem, ReceiptBlock, ReceiptTemplate, Shift } from './lib/types'
+import type { CartLine, Cashier, DeviceProfile, HeldBill, LocalSaleHistory, LocalStorageStatus, PaymentMethod, Product, QtyPromotion, QueueItem, ReceiptBlock, ReceiptTemplate, Shift } from './lib/types'
 
 const DEFAULT_RECEIPT_TEMPLATE: ReceiptTemplate = {
   paper_width: 80,
@@ -26,6 +26,7 @@ const DEFAULT_RECEIPT_TEMPLATE: ReceiptTemplate = {
 
 const profile = ref<DeviceProfile | null>(null)
 const products = ref<Product[]>([])
+const promotions = ref<QtyPromotion[]>([])
 const cart = ref<CartLine[]>([])
 const cashier = ref<Cashier | null>(null)
 const shift = ref<Shift | null>(null)
@@ -174,9 +175,11 @@ async function syncAll() {
       hardwareProfile: serverProfile.hardware_profile || profile.value.hardwareProfile,
     }
     await saveProfile(profile.value)
-    const fresh = await api.products(profile.value.branchId)
+    const [fresh, freshPromotions] = await Promise.all([api.products(profile.value.branchId), api.promotions(profile.value.branchId)])
     products.value = fresh
+    promotions.value = freshPromotions
     await replaceProducts(fresh)
+    await replacePromotions(freshPromotions)
     await syncCheckoutQueue(refreshQueue)
     await refreshQueue()
     online.value = true
@@ -475,6 +478,7 @@ async function start() {
   }
   profile.value = await loadProfile()
   products.value = await loadProducts()
+  promotions.value = await loadPromotions()
   const saved = await loadSession()
   cashier.value = saved.cashier
   shift.value = saved.shift?.status === 'open' ? saved.shift : null

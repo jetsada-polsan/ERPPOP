@@ -1,5 +1,5 @@
 import Database from '@tauri-apps/plugin-sql'
-import type { Cashier, DeviceProfile, LocalSaleHistory, Product, QueueItem, Shift } from './types'
+import type { Cashier, DeviceProfile, LocalSaleHistory, Product, QtyPromotion, QueueItem, Shift } from './types'
 
 let db: Database | null = null
 
@@ -8,6 +8,7 @@ async function connection() {
   db = await Database.load('sqlite:popstar-pos.db')
   await db.execute(`CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)`)
   await db.execute(`CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY, data TEXT NOT NULL, synced_at TEXT NOT NULL)`)
+  await db.execute(`CREATE TABLE IF NOT EXISTS promotions (id INTEGER PRIMARY KEY, data TEXT NOT NULL, synced_at TEXT NOT NULL)`)
   await db.execute(`CREATE TABLE IF NOT EXISTS checkout_queue (
     id TEXT PRIMARY KEY, payload TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0,
     error TEXT, receipt_no TEXT, created_at TEXT NOT NULL, synced_at TEXT
@@ -58,6 +59,21 @@ export async function replaceProducts(products: Product[]) {
 export async function loadProducts(): Promise<Product[]> {
   const conn = await connection()
   const rows = await conn.select<Array<{ data: string }>>('SELECT data FROM products ORDER BY id')
+  return rows.map((row) => JSON.parse(row.data))
+}
+
+export async function replacePromotions(promotions: QtyPromotion[]) {
+  const conn = await connection()
+  const syncedAt = new Date().toISOString()
+  await conn.execute('DELETE FROM promotions')
+  for (const promotion of promotions) {
+    await conn.execute('INSERT INTO promotions (id, data, synced_at) VALUES (?, ?, ?)', [promotion.id, JSON.stringify(promotion), syncedAt])
+  }
+}
+
+export async function loadPromotions(): Promise<QtyPromotion[]> {
+  const conn = await connection()
+  const rows = await conn.select<Array<{ data: string }>>('SELECT data FROM promotions ORDER BY id')
   return rows.map((row) => JSON.parse(row.data))
 }
 

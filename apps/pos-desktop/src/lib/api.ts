@@ -1,6 +1,6 @@
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http'
 import { invoke } from '@tauri-apps/api/core'
-import type { Cashier, CheckoutPayload, DeviceProfile, HeldBill, Product, Shift } from './types'
+import type { Cashier, CheckoutPayload, DeviceProfile, HeldBill, Product, QtyPromotion, Shift } from './types'
 
 let baseUrl = ''
 
@@ -51,6 +51,7 @@ export const api = {
   cashierLogin: (code: string, pin: string) => request<{ cashier: Cashier; must_change_pin: boolean }>('/cashier/login', { method: 'POST', body: JSON.stringify({ code, pin }) }),
   changeCashierPin: (code: string, currentPin: string, newPin: string) => request<{ message: string }>('/cashier/pin', { method: 'POST', body: JSON.stringify({ code, current_pin: currentPin, new_pin: newPin }) }),
   products: (branchId: number) => request<Product[]>(`/products?all=1&branch_id=${branchId}`),
+  promotions: (branchId: number) => request<QtyPromotion[]>(`/promotions?branch_id=${branchId}`),
   activeShift: async (branchId: number, cashierId: number) => (await request<{ shift: Shift | null }>(`/shift?branch_id=${branchId}&cashier_id=${cashierId}`)).shift,
   openShift: async (branchId: number, cashierId: number, openingCash: number) => (await request<{ shift: Shift }>('/shift/open', { method: 'POST', body: JSON.stringify({ branch_id: branchId, cashier_id: cashierId, opening_cash: openingCash }) })).shift,
   closeShift: async (shiftId: number, countedCash: number) => (await request<{ shift: Shift }>('/shift/close', { method: 'POST', body: JSON.stringify({ shift_id: shiftId, counted_cash: countedCash }) })).shift,

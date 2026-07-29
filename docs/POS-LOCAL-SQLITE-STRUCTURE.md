@@ -4,8 +4,8 @@
 
 ## สรุป
 
-- จำนวนตารางที่แอปสร้างและใช้งาน: **4 ตาราง**
-- จำนวนคอลัมน์รวม: **24 คอลัมน์**
+- จำนวนตารางที่แอปสร้างและใช้งาน: **5 ตาราง**
+- จำนวนคอลัมน์รวม: **27 คอลัมน์**
 - ฐานข้อมูลนี้เป็นฐานข้อมูลประจำเครื่อง POS ไม่ใช่ฐานข้อมูล ERP ส่วนกลาง
 - ไม่มีรหัสผ่าน Device Token อยู่ใน SQLite เพราะเก็บใน Windows Credential Manager
 - ยังไม่มีการเก็บต้นทุนหรือบัญชีใน SQLite; ERP Server เป็นผู้ตรวจราคา ตัดสต๊อก และลงบัญชี
@@ -58,7 +58,17 @@
 
 เมื่อซิงก์ใหม่ แอปจะลบ Catalog เดิมแล้วเขียนชุดล่าสุดลงตารางนี้ แต่ไม่ลบ `checkout_queue`
 
-### 3. `checkout_queue` — คิวบิลขายที่รอส่ง ERP
+### 3. `promotions` — โปรโมชั่นซื้อครบที่ซิงก์จาก ERP
+
+| คอลัมน์ | ชนิด | กติกา | เก็บข้อมูลอะไร |
+|---|---|---|---|
+| `id` | `INTEGER` | `PRIMARY KEY` | รหัสโปรโมชั่นจาก ERP |
+| `data` | `TEXT` | `NOT NULL` | JSON ประเภทโปรโมชั่น เงื่อนไข และสินค้าแถม |
+| `synced_at` | `TEXT` | `NOT NULL` | วันเวลาที่ซิงก์ล่าสุด |
+
+POS ใช้ข้อมูลนี้เป็น Catalog Offline เท่านั้น ส่วน Laravel จะคำนวณและยืนยันราคาจริงอีกครั้งตอน checkout
+
+### 4. `checkout_queue` — คิวบิลขายที่รอส่ง ERP
 
 | คอลัมน์ | ชนิด | ค่าเริ่มต้น/กติกา | เก็บข้อมูลอะไร |
 |---|---|---|---|
@@ -80,7 +90,7 @@ pending -> syncing -> synced
 
 การเปิด POS ใหม่จะอ่านคิวทุกสถานะที่ยังไม่ใช่ `synced` แล้วส่งต่ออีกครั้ง โดยใช้ `id` เดิม จึงไม่สร้างบิลซ้ำที่ ERP
 
-### 4. `pos_sale_history` — ประวัติใบเสร็จย้อนหลังในเครื่อง POS
+### 5. `pos_sale_history` — ประวัติใบเสร็จย้อนหลังในเครื่อง POS
 
 ตารางนี้สร้างขึ้นเพื่อให้แคชเชียร์เปิดดูใบเสร็จย้อนหลังได้แม้อินเทอร์เน็ตล่ม โดยเก็บประวัติสูงสุด 90 วันและลบรายการที่เก่ากว่าโดยอัตโนมัติเมื่อเปิดฐานข้อมูล
 
@@ -110,6 +120,9 @@ app_state
 products
   └── id       -> อ้างถึง product_id ใน checkout_queue.payload
 
+promotions
+  └── data     -> เงื่อนไขโปรโมชั่นสำหรับแสดง/ทำงาน Offline
+
 checkout_queue
   └── payload  -> รายการขาย, จำนวน, ราคา, บาร์โค้ด, วิธีชำระเงิน
 
@@ -126,6 +139,7 @@ PRAGMA integrity_check;
 SELECT name FROM sqlite_master WHERE type = 'table';
 PRAGMA table_info(app_state);
 PRAGMA table_info(products);
+PRAGMA table_info(promotions);
 PRAGMA table_info(checkout_queue);
 PRAGMA table_info(pos_sale_history);
 SELECT status, COUNT(*) FROM checkout_queue GROUP BY status;

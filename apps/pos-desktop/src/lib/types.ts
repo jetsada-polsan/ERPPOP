@@ -70,6 +70,21 @@ export interface Product {
   barcodes: Barcode[]
 }
 
+export interface QtyPromotion {
+  id: number
+  code: string
+  name: string
+  promo_type: 'free_item' | 'discount' | 'bundle_price'
+  product_id: number
+  min_qty: number
+  free_product_id?: number | null
+  free_qty?: number | null
+  discount_type?: 'percent' | 'baht' | null
+  discount_value?: number | null
+  bundle_price?: number | null
+  free_product?: Pick<Product, 'id' | 'sku_code' | 'name_th'> | null
+}
+
 export interface CartLine extends Product { qty: number; scannedBarcode?: string }
 export interface HeldBill {
   id: number
