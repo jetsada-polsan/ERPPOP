@@ -3113,7 +3113,7 @@ function posApp() {
                 if (sets <= 0) continue;
                 const unitPrice = Number(lines[0].unit_price) || 0;
                 if (promo.promo_type === 'bundle_price') {
-                    total += Math.max(0, sets * (Number(promo.min_qty) * Number(trigger.unit_price) - Number(promo.bundle_price)));
+                    total += Math.max(0, sets * (Number(promo.min_qty) * unitPrice - Number(promo.bundle_price)));
                     continue;
                 }
                 total += promo.discount_type === 'percent'

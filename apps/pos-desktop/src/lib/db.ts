@@ -18,7 +18,9 @@ async function connection() {
     change_amount REAL NOT NULL DEFAULT 0, items TEXT NOT NULL, printed_at TEXT NOT NULL,
     error TEXT, synced_at TEXT
   )`)
-  await db.execute("DELETE FROM pos_sale_history WHERE printed_at < datetime('now', '-90 days')")
+  // ลบเฉพาะบิลที่ส่งขึ้นเซิร์ฟเวอร์แล้ว บิลที่ยังค้างต้องเก็บไว้ให้เห็นจนกว่าจะส่งสำเร็จ
+  // และต้องเทียบผ่าน datetime() เพราะ printed_at เก็บเป็น ISO-8601 (มี T กับ Z) เทียบสตริงตรงๆ ไม่ตรงรูปแบบกัน
+  await db.execute("DELETE FROM pos_sale_history WHERE status = 'synced' AND datetime(printed_at) < datetime('now', '-90 days')")
   return db
 }
 
