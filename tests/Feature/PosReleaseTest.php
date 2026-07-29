@@ -40,7 +40,7 @@ class PosReleaseTest extends TestCase
 
         $response = $this->get('/download/pos/latest.json')
             ->assertOk()
-            ->assertJsonPath('version', '1.2.3');
+            ->assertJsonPath('version', '1.4.1');
 
         $this->assertStringContainsString('no-cache', (string) $response->headers->get('Cache-Control'));
     }
