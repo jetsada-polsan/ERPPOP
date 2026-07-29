@@ -3,225 +3,350 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#12395a">
     @php($faviconUrl = asset('images/logo-jet-erp-mark.svg').'?v='.filemtime(public_path('images/logo-jet-erp-mark.svg')))
+    @php($companyTh = \App\Models\AppSetting::company('name_th'))
+    @php($companyEn = \App\Models\AppSetting::company('name_en'))
+    @php($companyLogo = \App\Models\AppSetting::logoUrl())
     <link rel="icon" href="{{ $faviconUrl }}">
     <link rel="shortcut icon" href="{{ $faviconUrl }}">
     <link rel="apple-touch-icon" href="{{ $faviconUrl }}">
     <title>เข้าสู่ระบบ - JET ERP</title>
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     <style>
+        /* สีชุดเดียวกับ layout.blade.php เพื่อให้หน้า login ต่อเนื่องกับหน้าจอที่ผู้ใช้เข้าไปเจอ */
+        :root {
+            --ink: #1d3b52;
+            --ink-soft: #5b7488;
+            --line: #dbe7ef;
+            --blue: #1a9bdc;
+            --blue-deep: #1585c0;
+            --navy: #12395a;
+            --navy-deep: #0d2c47;
+            --accent: linear-gradient(135deg, #1a9bdc, #20a67a);
+            --font: 'Leelawadee UI', 'Noto Sans Thai', Tahoma, 'Segoe UI', sans-serif;
+        }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             min-height: 100vh;
-            font-family: 'Leelawadee UI', 'Noto Sans Thai', Tahoma, 'Segoe UI', sans-serif;
-            color: #173247;
-            background:
-                linear-gradient(120deg, rgba(20, 96, 141, .09), transparent 32%),
-                linear-gradient(300deg, rgba(49, 151, 107, .12), transparent 34%),
-                #f3f7fb;
+            font-family: var(--font);
+            color: var(--ink);
+            background: #eef3f8;
             padding: 24px;
             display: grid;
             place-items: center;
+            -webkit-font-smoothing: antialiased;
         }
-        .login-shell {
-            width: min(1080px, 100%);
-            min-height: 640px;
+        .shell {
+            width: min(960px, 100%);
             display: grid;
-            grid-template-columns: minmax(0, 1.05fr) 430px;
+            grid-template-columns: minmax(0, 1fr) 400px;
             overflow: hidden;
-            border: 1px solid #dbe7ef;
-            border-radius: 22px;
+            border: 1px solid var(--line);
+            border-radius: 16px;
             background: #fff;
-            box-shadow: 0 24px 70px rgba(25, 58, 84, .15);
+            box-shadow: 0 18px 50px rgba(20, 48, 71, .12);
         }
-        .login-story {
+
+        /* ── ฝั่งซ้าย: บอกว่านี่คือระบบของใคร และครอบคลุมงานอะไร ── */
+        .panel {
             position: relative;
-            padding: 46px;
+            padding: 44px 40px;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            background:
-                linear-gradient(135deg, rgba(8, 80, 127, .92), rgba(20, 125, 140, .86)),
-                #0e5c89;
+            gap: 28px;
+            background: linear-gradient(158deg, var(--navy), var(--navy-deep));
             color: #fff;
             overflow: hidden;
         }
-        .login-story::before {
+        .panel-body { display: flex; flex-direction: column; gap: 22px; }
+        /* ลายเส้นบางๆ แทนกราฟหลอก ให้พื้นหลังไม่ตายแต่ไม่แย่งความสนใจ */
+        .panel::after {
             content: "";
             position: absolute;
-            inset: 20px;
-            border: 1px solid rgba(255,255,255,.16);
-            border-radius: 18px;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
+            background-size: 44px 44px;
+            mask-image: radial-gradient(circle at 78% 12%, #000, transparent 72%);
+            -webkit-mask-image: radial-gradient(circle at 78% 12%, #000, transparent 72%);
             pointer-events: none;
         }
-        .login-story::after {
-            content: "";
-            position: absolute;
-            width: 420px;
-            height: 420px;
-            right: -170px;
-            bottom: -190px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(255,255,255,.2), rgba(255,255,255,0) 66%);
-            pointer-events: none;
-        }
-        .story-brand,
-        .story-content,
-        .story-dashboard,
-        .story-foot { position: relative; z-index: 1; }
-        .story-brand { display: flex; align-items: center; gap: 12px; font-size: 22px; font-weight: 900; }
-        .story-brand img { width: 46px; height: 46px; padding: 6px; border-radius: 14px; background: rgba(255,255,255,.96); box-shadow: 0 10px 28px rgba(0,0,0,.18); }
-        .story-kicker { color: #bff3ff; font-size: 11px; font-weight: 900; letter-spacing: .14em; }
-        .story-title { max-width: 560px; margin: 12px 0 12px; font-size: 40px; line-height: 1.12; font-weight: 900; letter-spacing: 0; }
-        .story-copy { max-width: 510px; color: #d9f0f7; font-size: 14px; line-height: 1.75; }
-        .story-dashboard {
+        .panel > * { position: relative; z-index: 1; }
+        .org { display: flex; align-items: center; gap: 14px; }
+        .org-logo {
+            flex: 0 0 auto;
             display: grid;
-            grid-template-columns: 1.1fr .9fr;
-            gap: 12px;
-            margin-top: 28px;
-        }
-        .signal-card {
-            min-height: 124px;
-            border: 1px solid rgba(255,255,255,.16);
-            border-radius: 14px;
-            background: rgba(255,255,255,.11);
-            padding: 16px;
-            backdrop-filter: blur(10px);
-        }
-        .signal-card span { display: block; color: #bde9f3; font-size: 11px; font-weight: 800; margin-bottom: 8px; }
-        .signal-card strong { display: block; font-size: 25px; line-height: 1.1; }
-        .signal-card small { display: block; margin-top: 10px; color: #d8f4f8; font-size: 12px; }
-        .signal-bars { height: 58px; display: flex; align-items: end; gap: 6px; margin-top: 16px; }
-        .signal-bars i { flex: 1; border-radius: 5px 5px 0 0; background: linear-gradient(#ffffff, #95f0d0); opacity: .86; }
-        .story-foot { color: #c6eef7; font-size: 12px; }
-        .login-card {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            padding: 48px 42px 38px;
+            place-items: center;
+            width: 58px;
+            height: 58px;
+            padding: 7px;
+            border-radius: 12px;
             background: #fff;
         }
-        .brand { text-align: center; margin-bottom: 10px; }
-        .brand img { max-height: 54px; max-width: 190px; object-fit: contain; }
-        .brand-text { font-size: 30px; font-weight: 900; color: #153349; letter-spacing: 0; }
-        .subtitle { text-align: center; color: #63798a; font-size: 13px; line-height: 1.55; margin-bottom: 26px; }
-        label:not(.remember) { display: block; font-size: 12.5px; font-weight: 800; color: #3c5668; margin: 14px 0 6px; }
-        .field { position: relative; }
-        .field i { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: #7f99ad; font-size: 15px; }
-        input[type=text], input[type=password] {
-            width: 100%;
-            min-height: 44px;
-            padding: 11px 13px 11px 40px;
-            border: 1px solid #d7e4ed;
-            border-radius: 12px;
-            font-size: 14px;
-            font-family: inherit;
-            color: #173247;
-            outline: none;
-            background: #fbfdff;
-            transition: border-color .15s, box-shadow .15s, background .15s;
+        .org-logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .org-name { font-size: 16px; font-weight: 800; line-height: 1.35; }
+        .org-name small { display: block; margin-top: 3px; color: #9fc4dd; font-size: 11px; font-weight: 600; letter-spacing: .04em; }
+        /* text-wrap: balance ช่วยเกลี่ยบรรทัด — สำคัญกับภาษาไทยที่ไม่มีเว้นวรรคระหว่างคำ
+           เบราว์เซอร์จึงตัดกลางคำได้ถ้าปล่อยให้บรรทัดยาวเกินไป */
+        .panel-lead {
+            font-size: 13.5px;
+            line-height: 1.75;
+            color: #cfe3f1;
+            max-width: 34ch;
+            text-wrap: balance;
         }
-        input:focus { border-color: #1a9bdc; box-shadow: 0 0 0 4px rgba(26,155,220,.12); background: #fff; }
-        .remember { display: flex; align-items: center; gap: 8px; margin: 15px 0 20px; font-size: 13px; color: #536b7d; }
-        .remember input { width: 16px; height: 16px; accent-color: #1a9bdc; }
-        button {
-            width: 100%;
-            min-height: 46px;
-            padding: 12px;
-            border: none;
-            border-radius: 12px;
-            background: linear-gradient(135deg, #1a9bdc, #20a67a);
-            color: #fff;
-            font-size: 15px;
-            font-weight: 900;
-            font-family: inherit;
-            cursor: pointer;
-            box-shadow: 0 12px 24px rgba(26,155,220,.26);
-            transition: transform .15s, box-shadow .15s;
-        }
-        button:hover { transform: translateY(-1px); box-shadow: 0 15px 30px rgba(26,155,220,.32); }
-        .error {
+        .modules { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+        .modules div { display: flex; align-items: center; gap: 9px; font-size: 13px; color: #e2eef7; }
+        .modules i { color: #6fc6f0; font-size: 15px; }
+        .panel-foot {
+            padding-top: 24px;
+            border-top: 1px solid rgba(255,255,255,.13);
             display: flex;
             align-items: center;
-            gap: 8px;
-            background: #fff5f5;
-            border: 1px solid #fecaca;
-            color: #b91c1c;
-            border-radius: 12px;
-            padding: 11px 13px;
-            font-size: 13px;
-            margin-bottom: 8px;
+            gap: 9px;
+            color: #9fc4dd;
+            font-size: 11.5px;
         }
-        .foot { text-align: center; color: #8aa1b2; font-size: 11.5px; margin-top: 24px; }
-        @media (max-width: 880px) {
-            body { padding: 14px; align-items: start; }
-            .login-shell { grid-template-columns: 1fr; max-width: 480px; min-height: auto; }
-            .login-story { min-height: 260px; padding: 28px; }
-            .login-story::before { inset: 12px; }
-            .story-title { font-size: 28px; }
-            .story-copy, .story-dashboard, .story-foot { display: none; }
-            .login-card { padding: 34px 28px; }
+        .panel-foot i { font-size: 13px; }
+
+        /* ── ฝั่งขวา: ฟอร์ม ── */
+        .card { display: flex; flex-direction: column; justify-content: center; padding: 48px 40px; }
+        h1 { font-size: 23px; font-weight: 800; letter-spacing: -.01em; }
+        .card-sub { margin-top: 6px; color: var(--ink-soft); font-size: 13px; line-height: 1.6; }
+        form { margin-top: 26px; }
+        label { display: block; font-size: 12.5px; font-weight: 700; color: #3c5668; margin-bottom: 6px; }
+        .field { position: relative; margin-bottom: 16px; }
+        .field > i {
+            position: absolute; left: 13px; top: 37px;
+            color: #90a8ba; font-size: 15px; pointer-events: none;
+        }
+        input[type=text], input[type=password] {
+            width: 100%;
+            min-height: 46px;
+            padding: 12px 14px 12px 40px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            font-size: 14.5px;
+            font-family: inherit;
+            color: var(--ink);
+            background: #fbfdff;
+            outline: none;
+            transition: border-color .15s, box-shadow .15s, background .15s;
+        }
+        input::placeholder { color: #a8bccc; }
+        input:focus {
+            border-color: var(--blue);
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(26,155,220,.15);
+        }
+        .toggle {
+            position: absolute; right: 6px; top: 30px;
+            width: 34px; height: 34px;
+            display: grid; place-items: center;
+            border: none; border-radius: 8px;
+            background: none; color: #8ba3b6;
+            font-size: 15px; cursor: pointer;
+        }
+        .toggle:hover { color: var(--blue-deep); background: #eef6fc; }
+        .toggle:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+        .hint {
+            display: none;
+            margin-top: 7px;
+            color: #a16207;
+            font-size: 12px;
+        }
+        .hint.show { display: flex; align-items: center; gap: 6px; }
+        .remember {
+            display: flex; align-items: center; gap: 8px;
+            margin: 2px 0 22px;
+            font-size: 13px; font-weight: 400; color: #52697b;
+            cursor: pointer;
+        }
+        .remember input { width: 16px; height: 16px; accent-color: var(--blue); cursor: pointer; }
+        button[type=submit] {
+            width: 100%;
+            min-height: 46px;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            border: none;
+            border-radius: 10px;
+            background: var(--accent);
+            color: #fff;
+            font-size: 15px;
+            font-weight: 800;
+            font-family: inherit;
+            cursor: pointer;
+            transition: filter .15s, opacity .15s;
+        }
+        button[type=submit]:hover { filter: brightness(1.06); }
+        button[type=submit]:focus-visible { outline: 2px solid var(--blue-deep); outline-offset: 2px; }
+        button[type=submit][disabled] { opacity: .72; cursor: progress; }
+        .spin { display: none; animation: spin .7s linear infinite; }
+        button[disabled] .spin { display: inline-block; }
+        button[disabled] .label-idle, button[disabled] > i:not(.spin) { display: none; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .error {
+            display: flex; align-items: flex-start; gap: 9px;
+            margin-bottom: 20px;
+            padding: 12px 14px;
+            border: 1px solid #f6c9c9;
+            border-left: 3px solid #dc2626;
+            border-radius: 10px;
+            background: #fef5f5;
+            color: #a91d1d;
+            font-size: 13px;
+            line-height: 1.55;
+        }
+        .error i { margin-top: 1px; font-size: 14px; }
+        .card-foot {
+            margin-top: 26px;
+            padding-top: 18px;
+            border-top: 1px solid #eef3f7;
+            color: #8aa1b2;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        @media (max-width: 860px) {
+            body { padding: 0; place-items: stretch; background: #fff; }
+            .shell {
+                width: 100%;
+                grid-template-columns: 1fr;
+                /* แถบแบรนด์สูงเท่าเนื้อหา ที่เหลือยกให้ฟอร์ม ไม่งั้น grid แบ่งครึ่งจอ
+                   แล้วเหลือพื้นที่น้ำเงินว่างๆ ครึ่งหน้า */
+                grid-template-rows: auto 1fr;
+                border: none; border-radius: 0; box-shadow: none;
+            }
+            .panel { padding: 22px 24px; justify-content: flex-start; }
+            .panel-body, .panel-foot { display: none; }
+            .org-logo { width: 48px; height: 48px; }
+            .org-name { font-size: 15px; }
+            .card { padding: 30px 24px 40px; justify-content: flex-start; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            * { animation: none !important; transition: none !important; }
         }
     </style>
 </head>
 <body>
-<main class="login-shell">
-    <section class="login-story">
-        <div class="story-brand"><img src="{{ asset('images/logo-jet-erp-mark.svg') }}" alt="JET ERP"> JET ERP</div>
-        <div class="story-content">
-            <div class="story-kicker">BUSINESS OPERATING SYSTEM</div>
-            <h1 class="story-title">ควบคุมยอดขาย สต็อก และงานหน้าร้านจากจุดเดียว</h1>
-            <p class="story-copy">ระบบ ERP/POS สำหรับทีมขาย คลังสินค้า จัดซื้อ และการเงิน เชื่อมข้อมูลทุกสาขาให้ตัดสินใจได้เร็วขึ้นทุกวัน</p>
-            <div class="story-dashboard">
-                <div class="signal-card">
-                    <span>POS TODAY</span>
-                    <strong>พร้อมขาย</strong>
-                    <small>รองรับงานหน้าร้านและการนำเข้ายอดขาย</small>
-                </div>
-                <div class="signal-card">
-                    <span>STOCK CONTROL</span>
-                    <strong>Real-time</strong>
-                    <div class="signal-bars" aria-hidden="true"><i style="height:36%"></i><i style="height:54%"></i><i style="height:44%"></i><i style="height:72%"></i><i style="height:63%"></i><i style="height:88%"></i></div>
-                </div>
+<main class="shell">
+    <section class="panel">
+        <div class="org">
+            @if($companyLogo)
+                <span class="org-logo"><img src="{{ $companyLogo }}" alt=""></span>
+            @endif
+            <span class="org-name">
+                {{ $companyTh }}
+                @if($companyEn)<small>{{ $companyEn }}</small>@endif
+            </span>
+        </div>
+
+        <div class="panel-body">
+            <p class="panel-lead">ระบบบริหารจัดการภายใน เชื่อมข้อมูลทุกสาขาไว้บนฐานข้อมูลเดียว</p>
+
+            <div class="modules">
+                <div><i class="bi bi-shop"></i> ขายและหน้าร้าน</div>
+                <div><i class="bi bi-boxes"></i> สต็อกและคลังสินค้า</div>
+                <div><i class="bi bi-cart-check"></i> จัดซื้อและเจ้าหนี้</div>
+                <div><i class="bi bi-calculator"></i> บัญชีและภาษี</div>
             </div>
         </div>
-        <div class="story-foot">JET ERP · Built for POPSTAR operations</div>
-    </section>
-    <form class="login-card" method="post" action="{{ route('login.attempt') }}">
-        @csrf
-        <div class="brand">
-            @if($logo = \App\Models\AppSetting::logoUrl())
-                <img src="{{ $logo }}" alt="logo">
-            @else
-                <div class="brand-text">{{ \App\Models\AppSetting::company('name_th') }}</div>
-            @endif
+
+        <div class="panel-foot">
+            <i class="bi bi-shield-lock"></i>
+            <span>ระบบภายในองค์กร · การเข้าใช้งานทุกครั้งถูกบันทึกไว้</span>
         </div>
-        <div class="subtitle">เข้าสู่ระบบบริหารจัดการสำหรับ {{ \App\Models\AppSetting::company('name_th') }}</div>
+    </section>
+
+    <div class="card">
+        <h1>เข้าสู่ระบบ</h1>
+        <p class="card-sub">กรอกบัญชีผู้ใช้ที่ได้รับจากผู้ดูแลระบบเพื่อเริ่มใช้งาน</p>
 
         @if($errors->any())
-            <div class="error"><i class="bi bi-exclamation-triangle-fill"></i>{{ $errors->first() }}</div>
+            <div class="error" role="alert" aria-live="assertive" style="margin-top:22px;margin-bottom:0">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <span>{{ $errors->first() }}</span>
+            </div>
         @endif
 
-        <label for="username">ชื่อผู้ใช้ / อีเมล / เบอร์โทร</label>
-        <div class="field">
-            <i class="bi bi-person-fill"></i>
-            <input type="text" id="username" name="username" value="{{ old('username') }}" required autofocus autocomplete="username">
-        </div>
+        <form method="post" action="{{ route('login.attempt') }}" id="loginForm">
+            @csrf
 
-        <label for="password">รหัสผ่าน</label>
-        <div class="field">
-            <i class="bi bi-lock-fill"></i>
-            <input type="password" id="password" name="password" required autocomplete="current-password">
-        </div>
+            <div class="field">
+                <label for="username">ชื่อผู้ใช้ อีเมล หรือเบอร์โทร</label>
+                <i class="bi bi-person"></i>
+                <input type="text" id="username" name="username" value="{{ old('username') }}"
+                       placeholder="เช่น somchai หรือ 0812345678"
+                       required autofocus autocomplete="username" spellcheck="false">
+            </div>
 
-        <label class="remember">
-            <input type="checkbox" name="remember" value="1"> จดจำการเข้าสู่ระบบในเครื่องนี้
-        </label>
+            <div class="field">
+                <label for="password">รหัสผ่าน</label>
+                <i class="bi bi-lock"></i>
+                <input type="password" id="password" name="password"
+                       placeholder="รหัสผ่านของคุณ"
+                       required autocomplete="current-password">
+                <button type="button" class="toggle" id="pwToggle"
+                        aria-label="แสดงรหัสผ่าน" aria-pressed="false" tabindex="0">
+                    <i class="bi bi-eye" id="pwIcon"></i>
+                </button>
+                <div class="hint" id="capsHint">
+                    <i class="bi bi-capslock"></i> เปิด Caps Lock อยู่
+                </div>
+            </div>
 
-        <button type="submit"><i class="bi bi-box-arrow-in-right"></i> เข้าสู่ระบบ</button>
+            <label class="remember">
+                <input type="checkbox" name="remember" value="1"> จดจำการเข้าสู่ระบบในเครื่องนี้
+            </label>
 
-        <div class="foot">ลืมรหัสผ่านติดต่อผู้ดูแลระบบ</div>
-    </form>
+            <button type="submit" id="submitBtn">
+                <i class="bi bi-box-arrow-in-right"></i>
+                <i class="bi bi-arrow-repeat spin"></i>
+                <span class="label-idle">เข้าสู่ระบบ</span>
+                <span class="label-busy" hidden>กำลังตรวจสอบ…</span>
+            </button>
+        </form>
+
+        <p class="card-foot">ลืมรหัสผ่าน หรือยังไม่มีบัญชี ติดต่อผู้ดูแลระบบ</p>
+    </div>
 </main>
+
+<script>
+    (function () {
+        var password = document.getElementById('password');
+        var toggle = document.getElementById('pwToggle');
+        var icon = document.getElementById('pwIcon');
+        var caps = document.getElementById('capsHint');
+        var form = document.getElementById('loginForm');
+        var button = document.getElementById('submitBtn');
+
+        toggle.addEventListener('click', function () {
+            var shown = password.type === 'text';
+            password.type = shown ? 'password' : 'text';
+            icon.className = shown ? 'bi bi-eye' : 'bi bi-eye-slash';
+            toggle.setAttribute('aria-pressed', String(!shown));
+            toggle.setAttribute('aria-label', shown ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน');
+            password.focus();
+        });
+
+        // เตือน Caps Lock เพราะเป็นสาเหตุอันดับต้นๆ ที่รหัสผ่านถูกต้องแต่เข้าไม่ได้
+        function checkCaps(event) {
+            if (typeof event.getModifierState !== 'function') return;
+            caps.classList.toggle('show', event.getModifierState('CapsLock'));
+        }
+        password.addEventListener('keydown', checkCaps);
+        password.addEventListener('keyup', checkCaps);
+        password.addEventListener('blur', function () { caps.classList.remove('show'); });
+
+        // กันกดซ้ำระหว่างรอเซิร์ฟเวอร์ตอบ
+        form.addEventListener('submit', function () {
+            button.disabled = true;
+            button.querySelector('.label-busy').hidden = false;
+        });
+    })();
+</script>
 </body>
 </html>
