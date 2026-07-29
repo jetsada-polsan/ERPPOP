@@ -45,17 +45,56 @@
         .card {
             position: relative;
             z-index: 1;
-            width: min(460px, 100%);
-            padding: 46px 42px 32px;
+            width: min(980px, 100%);
+            min-height: 590px;
             border: 1px solid var(--card-line);
             border-radius: 16px;
             background: var(--card);
             box-shadow: var(--shadow);
+            display: grid;
+            grid-template-columns: minmax(330px, .9fr) minmax(420px, 1.1fr);
             overflow: hidden;
             animation: rise .5s cubic-bezier(.22, 1, .36, 1) both;
         }
-        .card::before { content: ""; position: absolute; inset: 0 0 auto; height: 5px; background: var(--brand); }
         @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+
+        .visual {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 44px 42px 38px;
+            background: var(--brand-ink);
+            color: #fff;
+            overflow: hidden;
+        }
+        .visual::before,
+        .visual::after {
+            content: "";
+            position: absolute;
+            border: 1px solid rgba(255,255,255,.14);
+            transform: rotate(45deg);
+            pointer-events: none;
+        }
+        .visual::before { width: 240px; height: 240px; right: -105px; top: -90px; }
+        .visual::after { width: 170px; height: 170px; left: -90px; bottom: -70px; border-color: rgba(189,40,54,.55); }
+        .visual-top, .visual-bottom { position: relative; z-index: 1; }
+        .visual-mark {
+            width: 64px; height: 64px; padding: 8px;
+            display: grid; place-items: center;
+            border-radius: 12px;
+            background: #fff;
+            box-shadow: 0 8px 20px rgba(0,0,0,.16);
+        }
+        .visual-mark img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .visual-kicker { margin-top: 34px; color: #f3a5ad; font-size: 12px; font-weight: 900; letter-spacing: .08em; }
+        .visual h2 { max-width: 300px; margin-top: 10px; font-size: 31px; line-height: 1.3; font-weight: 850; letter-spacing: 0; }
+        .visual-copy { max-width: 295px; margin-top: 16px; color: rgba(255,255,255,.72); font-size: 14px; line-height: 1.7; }
+        .visual-rule { width: 58px; height: 4px; margin-top: 28px; border-radius: 2px; background: var(--brand); }
+        .visual-bottom { display: flex; align-items: center; gap: 10px; color: rgba(255,255,255,.68); font-size: 12px; }
+        .visual-bottom i { color: #f3a5ad; font-size: 16px; }
+
+        .form-pane { padding: 46px 54px 32px; }
 
         .brand { display: flex; align-items: center; gap: 14px; margin-bottom: 34px; }
         .brand-logo {
@@ -164,13 +203,23 @@
             body { padding: 0; place-items: stretch; }
             .card {
                 width: 100%; min-height: 100%;
-                display: flex; flex-direction: column; justify-content: center;
-                padding: 40px 24px;
+                display: block;
                 border: none; border-radius: 0;
                 box-shadow: none; backdrop-filter: none;
                 background: var(--bg);
             }
+            .visual { display: none; }
+            .form-pane { min-height: 100%; padding: 40px 24px; display: flex; flex-direction: column; justify-content: center; }
             h1 { font-size: 27px; }
+        }
+        @media (min-width: 461px) and (max-width: 760px) {
+            .card { grid-template-columns: 1fr; min-height: auto; }
+            .visual { min-height: 250px; padding: 30px 34px; }
+            .visual-kicker { margin-top: 20px; }
+            .visual h2 { font-size: 26px; }
+            .visual-copy { margin-top: 8px; }
+            .visual-bottom { margin-top: 26px; }
+            .form-pane { padding: 38px 34px 30px; }
         }
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after { animation: none !important; transition: none !important; }
@@ -179,6 +228,20 @@
 </head>
 <body>
 <main class="card">
+    <section class="visual" aria-label="ข้อมูลระบบ">
+        <div class="visual-top">
+            @if($companyLogo)
+                <span class="visual-mark"><img src="{{ $companyLogo }}" alt=""></span>
+            @endif
+            <div class="visual-kicker">POPSTAR 4M ERP</div>
+            <h2>ระบบงานของคุณ<br>เริ่มต้นที่นี่</h2>
+            <p class="visual-copy">ศูนย์กลางการขาย สต๊อก การเงิน และข้อมูลสาขา สำหรับการทำงานที่เป็นระบบเดียวกัน</p>
+            <div class="visual-rule"></div>
+        </div>
+        <div class="visual-bottom"><i class="bi bi-shield-check"></i><span>ระบบที่ออกแบบเพื่อการทำงานของ POPSTAR</span></div>
+    </section>
+
+    <section class="form-pane">
     <div class="brand">
         @if($companyLogo)
             <span class="brand-logo"><img src="{{ $companyLogo }}" alt=""></span>
@@ -238,6 +301,7 @@
         <span><i class="bi bi-shield-lock"></i> การเข้าใช้งานถูกบันทึกไว้</span>
         <span>ลืมรหัสผ่าน ติดต่อผู้ดูแลระบบ</span>
     </div>
+    </section>
 </main>
 
 <script>
