@@ -35,7 +35,12 @@ class PosCashierIdentityTest extends TestCase
 
         $response = app(PosApiController::class)->cashierLogin($request);
 
-        $this->assertTrue($response->getData(true)['success']);
+        $payload = $response->getData(true);
+        $this->assertTrue($payload['success']);
+        $this->assertSame(120000, $payload['offline_credential']['iterations']);
+        $this->assertNotEmpty($payload['offline_credential']['salt']);
+        $this->assertNotEmpty($payload['offline_credential']['verifier']);
+        $this->assertNotEmpty($payload['offline_credential']['expires_at']);
         $this->assertSame($alice->id, (int) $device->fresh()->active_cashier_id);
         $this->assertNotNull($device->fresh()->cashier_verified_at);
 

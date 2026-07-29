@@ -39,7 +39,20 @@ export interface ReceiptTemplate {
   blocks: ReceiptBlock[]
 }
 
-export interface Cashier { id: number; code: string; name: string; branch_id?: number }
+export interface OfflineCredential {
+  salt: string
+  verifier: string
+  iterations: number
+  expires_at: string
+}
+
+export interface Cashier {
+  id: number
+  code: string
+  name: string
+  branch_id?: number
+  offline_credential?: OfflineCredential
+}
 export interface Shift {
   id: number
   shift_no: string

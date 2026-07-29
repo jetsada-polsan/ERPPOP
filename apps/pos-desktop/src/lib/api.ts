@@ -48,7 +48,7 @@ export async function connect(serverUrl: string, deviceToken: string): Promise<D
 export const api = {
   ping: () => request<any>('/ping'),
   cashiers: async () => (await request<{ cashiers: Cashier[] }>('/cashiers')).cashiers,
-  cashierLogin: (code: string, pin: string) => request<{ cashier: Cashier; must_change_pin: boolean }>('/cashier/login', { method: 'POST', body: JSON.stringify({ code, pin }) }),
+  cashierLogin: (code: string, pin: string) => request<{ cashier: Cashier; must_change_pin: boolean; offline_credential?: Cashier['offline_credential'] }>('/cashier/login', { method: 'POST', body: JSON.stringify({ code, pin }) }),
   changeCashierPin: (code: string, currentPin: string, newPin: string) => request<{ message: string }>('/cashier/pin', { method: 'POST', body: JSON.stringify({ code, current_pin: currentPin, new_pin: newPin }) }),
   products: (branchId: number) => request<Product[]>(`/products?all=1&branch_id=${branchId}`),
   promotions: (branchId: number) => request<QtyPromotion[]>(`/promotions?branch_id=${branchId}`),

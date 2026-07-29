@@ -4,7 +4,8 @@ import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, CircleHelp, Cloud,
 import { check } from '@tauri-apps/plugin-updater'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { api, connect, setServerUrl } from './lib/api'
-import { closeLocalDb, enqueue, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceProducts, replacePromotions, saleHistory, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth } from './lib/db'
+import { closeLocalDb, enqueue, loadOfflineCashier, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceOfflineCashiers, replaceProducts, replacePromotions, saleHistory, saveOfflineCredential, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth } from './lib/db'
+import { verifyOfflinePin } from './lib/offline-auth'
 import { priceCart } from './lib/pricing'
 import { syncCheckoutQueue } from './lib/sync'
 import type { CartLine, Cashier, DeviceProfile, HeldBill, LocalSaleHistory, LocalStorageStatus, PaymentMethod, Product, QtyPromotion, QueueItem, ReceiptBlock, ReceiptTemplate, Shift } from './lib/types'
@@ -177,11 +178,12 @@ async function syncAll() {
       hardwareProfile: serverProfile.hardware_profile || profile.value.hardwareProfile,
     }
     await saveProfile(profile.value)
-    const [fresh, freshPromotions] = await Promise.all([api.products(profile.value.branchId), api.promotions(profile.value.branchId)])
+    const [fresh, freshPromotions, freshCashiers] = await Promise.all([api.products(profile.value.branchId), api.promotions(profile.value.branchId), api.cashiers()])
     products.value = fresh
     promotions.value = freshPromotions
     await replaceProducts(fresh)
     await replacePromotions(freshPromotions)
+    await replaceOfflineCashiers(freshCashiers)
     await syncCheckoutQueue(refreshQueue)
     await refreshQueue()
     online.value = true
@@ -261,13 +263,26 @@ async function configure() {
 async function loginCashier() {
   busy.value = true
   try {
-    const result = await api.cashierLogin(cashierCode.value.trim(), cashierPin.value)
+    const code = cashierCode.value.trim()
+    if (!navigator.onLine) {
+      const cached = await loadOfflineCashier(code)
+      if (!cached?.offline_credential || !(await verifyOfflinePin(cashierPin.value, cached.offline_credential))) {
+        throw new Error('ออฟไลน์: ไม่พบแคชเชียร์หรือ PIN หมดอายุ ต้องเชื่อมต่ออินเทอร์เน็ตเพื่อล็อกอินใหม่')
+      }
+      await startCashierSession(cached)
+      flash('เข้าแคชเชียร์แบบออฟไลน์แล้ว')
+      return
+    }
+
+    const result = await api.cashierLogin(code, cashierPin.value)
+    const authenticatedCashier: Cashier = { ...result.cashier, offline_credential: result.offline_credential }
+    if (!result.must_change_pin) await saveOfflineCredential(authenticatedCashier)
     // PIN ที่แอดมินตั้งให้ยังไม่ถือว่าเป็นความลับ ต้องเปลี่ยนก่อนจึงจะเริ่มขายได้
     if (result.must_change_pin) {
       modal.value = 'changePin'
       return
     }
-    await startCashierSession(result.cashier)
+    await startCashierSession(authenticatedCashier)
   } catch (e) { showError(e) } finally { busy.value = false }
 }
 
@@ -279,16 +294,22 @@ async function changePin() {
     const code = cashierCode.value.trim()
     await api.changeCashierPin(code, cashierPin.value, newPin.value)
     const result = await api.cashierLogin(code, newPin.value)
+    const authenticatedCashier: Cashier = { ...result.cashier, offline_credential: result.offline_credential }
+    await saveOfflineCredential(authenticatedCashier)
     newPin.value = ''
     confirmPin.value = ''
-    await startCashierSession(result.cashier)
+    await startCashierSession(authenticatedCashier)
     flash('เปลี่ยน PIN เรียบร้อย')
   } catch (e) { showError(e) } finally { busy.value = false }
 }
 
 async function startCashierSession(next: Cashier) {
   cashier.value = next
-  shift.value = await api.activeShift(profile.value!.branchId, next.id)
+  if (navigator.onLine) {
+    shift.value = await api.activeShift(profile.value!.branchId, next.id)
+  } else {
+    shift.value = (await loadSession()).shift
+  }
   await saveSession(cashier.value, shift.value)
   modal.value = shift.value ? null : 'shift'
   cashierPin.value = ''

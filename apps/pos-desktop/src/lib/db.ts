@@ -9,6 +9,10 @@ async function connection() {
   await db.execute(`CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)`)
   await db.execute(`CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY, data TEXT NOT NULL, synced_at TEXT NOT NULL)`)
   await db.execute(`CREATE TABLE IF NOT EXISTS promotions (id INTEGER PRIMARY KEY, data TEXT NOT NULL, synced_at TEXT NOT NULL)`)
+  await db.execute(`CREATE TABLE IF NOT EXISTS offline_cashiers (
+    id INTEGER PRIMARY KEY, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL, branch_id INTEGER,
+    credential TEXT, active INTEGER NOT NULL DEFAULT 1, synced_at TEXT NOT NULL
+  )`)
   await db.execute(`CREATE TABLE IF NOT EXISTS checkout_queue (
     id TEXT PRIMARY KEY, payload TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0,
     error TEXT, receipt_no TEXT, created_at TEXT NOT NULL, synced_at TEXT
@@ -45,6 +49,44 @@ export async function loadSession(): Promise<{ cashier: Cashier | null; shift: S
   const conn = await connection()
   const rows = await conn.select<Array<{ value: string }>>('SELECT value FROM app_state WHERE key = ?', ['session'])
   return rows[0] ? JSON.parse(rows[0].value) : { cashier: null, shift: null }
+}
+
+/** Cache public cashier data; credential is only written after a successful online PIN check. */
+export async function replaceOfflineCashiers(cashiers: Cashier[]) {
+  const conn = await connection()
+  const syncedAt = new Date().toISOString()
+  await conn.execute('UPDATE offline_cashiers SET active = 0, synced_at = ?', [syncedAt])
+  for (const cashier of cashiers) {
+    await conn.execute(
+      `INSERT INTO offline_cashiers (id, code, name, branch_id, credential, active, synced_at)
+       VALUES (?, ?, ?, ?, NULL, 1, ?)
+       ON CONFLICT(id) DO UPDATE SET code = excluded.code, name = excluded.name,
+       branch_id = excluded.branch_id, active = 1, synced_at = excluded.synced_at`,
+      [cashier.id, cashier.code, cashier.name, cashier.branch_id || null, syncedAt],
+    )
+  }
+}
+
+export async function saveOfflineCredential(cashier: Cashier) {
+  if (!cashier.offline_credential) return
+  const conn = await connection()
+  await conn.execute('UPDATE offline_cashiers SET credential = ?, active = 1 WHERE id = ?', [JSON.stringify(cashier.offline_credential), cashier.id])
+}
+
+export async function loadOfflineCashier(code: string): Promise<Cashier | null> {
+  const conn = await connection()
+  const rows = await conn.select<Array<any>>(
+    'SELECT id, code, name, branch_id, credential FROM offline_cashiers WHERE code = ? AND active = 1 LIMIT 1',
+    [code],
+  )
+  if (!rows[0]) return null
+  return {
+    id: Number(rows[0].id),
+    code: rows[0].code,
+    name: rows[0].name,
+    branch_id: rows[0].branch_id == null ? undefined : Number(rows[0].branch_id),
+    offline_credential: rows[0].credential ? JSON.parse(rows[0].credential) : undefined,
+  }
 }
 
 export async function replaceProducts(products: Product[]) {

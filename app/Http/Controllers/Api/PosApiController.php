@@ -7,6 +7,7 @@ use App\Http\Controllers\PosController;
 use App\Models\AppSetting;
 use App\Models\AuditLog;
 use App\Models\PosReceipt;
+use App\Models\PosDevice;
 use App\Models\PosTerminal;
 use App\Models\Salesman;
 use App\Services\Sales\SaleReturnService;
@@ -145,6 +146,7 @@ class PosApiController extends Controller
         return response()->json([
             'success' => true,
             'must_change_pin' => (bool) $cashier->must_change_pin,
+            'offline_credential' => $this->offlineCredential($cashier, $data['pin'], $device),
             'cashier' => [
                 'id' => $cashier->id,
                 'code' => $cashier->code,
@@ -152,6 +154,30 @@ class PosApiController extends Controller
                 'branch_id' => $cashier->branch_id,
             ],
         ]);
+    }
+
+    /**
+     * Credential สำหรับตรวจ PIN บนเครื่อง POS ตอนออฟไลน์
+     * สร้างหลังจาก PIN ผ่าน Hash::check แล้วเท่านั้น และผูกกับ device/cashier
+     * จึงไม่ต้องส่ง pos_pin_hash หรือรหัสผ่านจริงลงไปที่เครื่อง
+     */
+    private function offlineCredential(Salesman $cashier, string $pin, ?PosDevice $device): array
+    {
+        $iterations = 120000;
+        $salt = hash_hmac(
+            'sha256',
+            'pos-offline:'.$device?->id.':'.$cashier->id,
+            (string) config('app.key'),
+            true,
+        );
+        $verifier = hash_pbkdf2('sha256', $pin, $salt, $iterations, 32, true);
+
+        return [
+            'salt' => base64_encode($salt),
+            'verifier' => base64_encode($verifier),
+            'iterations' => $iterations,
+            'expires_at' => now()->addDays(7)->toIso8601String(),
+        ];
     }
 
     /** เจ้าตัวเปลี่ยน PIN ของตัวเองด้วย PIN ปัจจุบัน — ไม่ต้องผ่านแอดมิน */
