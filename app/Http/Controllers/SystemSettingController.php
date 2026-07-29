@@ -6,6 +6,7 @@ use App\Models\AppSetting;
 use App\Models\PosDevice;
 use App\Models\PosTerminal;
 use App\Models\User;
+use App\Support\PosReleaseManifest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -104,16 +105,7 @@ class SystemSettingController extends Controller
 
     private function currentPosRelease(): ?array
     {
-        $path = storage_path('app/pos-releases/latest.json');
-        if (! is_file($path)) {
-            return null;
-        }
-
-        try {
-            return json_decode(file_get_contents($path), true, flags: JSON_THROW_ON_ERROR);
-        } catch (\JsonException) {
-            return null;
-        }
+        return app(PosReleaseManifest::class)->current();
     }
 
     public function issuePosToken(Request $request): RedirectResponse

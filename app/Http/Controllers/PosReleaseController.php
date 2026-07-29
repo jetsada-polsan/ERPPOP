@@ -3,16 +3,17 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use App\Support\PosReleaseManifest;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class PosReleaseController extends Controller
 {
     public function latest(): JsonResponse
     {
-        $path = storage_path('app/pos-releases/latest.json');
-        abort_unless(is_file($path), 404, 'ยังไม่มี POS รุ่นอัปเดต');
+        $manifest = app(PosReleaseManifest::class)->current();
+        abort_unless(is_array($manifest), 404, 'ยังไม่มี POS รุ่นอัปเดต');
 
-        return response()->json(json_decode(file_get_contents($path), true, flags: JSON_THROW_ON_ERROR))
+        return response()->json($manifest)
             ->header('Cache-Control', 'no-cache, must-revalidate');
     }
 

@@ -37,6 +37,7 @@ use App\Http\Controllers\OperationsController;
 use App\Http\Controllers\OrganizationalUnitController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PosController;
+use App\Support\PosReleaseManifest;
 use App\Http\Controllers\PosImportController;
 use App\Http\Controllers\PosReleaseController;
 use App\Http\Controllers\PriceTableController;
@@ -77,8 +78,7 @@ Route::get('/mfa/challenge', [AuthController::class, 'showMfaChallenge'])->name(
 Route::post('/mfa/challenge', [AuthController::class, 'verifyMfaChallenge'])->name('mfa.verify');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::get('/download/pos', function () {
-    $manifestPath = storage_path('app/pos-releases/latest.json');
-    $manifest = is_file($manifestPath) ? json_decode(file_get_contents($manifestPath), true) : null;
+    $manifest = app(PosReleaseManifest::class)->current();
     $releaseUrl = data_get($manifest, 'platforms.windows-x86_64.url');
     if ($releaseUrl) {
         return redirect()->away($releaseUrl);
