@@ -17,6 +17,7 @@
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     <script src="{{ asset('vendor/sweetalert2/sweetalert2.all.min.js') }}"></script>
     <script defer src="{{ asset('vendor/alpinejs/alpine.min.js') }}"></script>
+    @vite('resources/js/pos-web.ts')
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1655,7 +1656,7 @@
         }
     </style>
 </head>
-<body class="{{ $canSell ? 'sales-mode' : 'view-only' }}" x-data="posApp()" x-init="init()">
+<body class="{{ $canSell ? 'sales-mode' : 'view-only' }}" x-data="posApp()" x-init="init()" x-effect="publishVueState()">
 <div class="pos-wrap">
 
     {{-- TOP BAR --}}
@@ -1804,7 +1805,10 @@
                 </div>
             </div>
 
-            <div class="pos-cart-items" x-ref="cartItems">
+            <div id="pos-vue-cart-panel"></div>
+
+            {{-- Legacy Alpine cart is retained as a rollback path while Vue owns the live cart UI. --}}
+            <div class="pos-cart-items" x-ref="cartItems" x-show="false" style="display:none !important">
                 <template x-if="cart.length === 0">
                     <div class="cart-empty">
                         <i class="bi bi-bag"></i>
@@ -1879,7 +1883,7 @@
                 </template>
             </div>
 
-            <div class="pos-cart-footer">
+            <div class="pos-cart-footer" x-show="false" style="display:none !important">
                 <div class="discount-card-row">
                     <template x-if="!appliedCard">
                         <div class="discount-card-input">
@@ -2615,7 +2619,61 @@ function posApp() {
                 this.installPrompt = null;
                 this.canInstall = false;
             });
+            window.addEventListener('pos-vue-action', (event) => this.handleVueAction(event.detail || {}));
             this.registerServiceWorker();
+        },
+
+        // Vue owns the live cart presentation; Alpine remains the API/payment boundary during migration.
+        publishVueState() {
+            const state = {
+                cart: this.cart,
+                promotions: this.promotions,
+                billDiscountValue: this.billDiscountValue,
+                billDiscountType: this.billDiscountType,
+                vatMode: this.vatMode,
+                vatRate: this.vatRate,
+                appliedCard: this.appliedCard,
+                redeemPoints: this.redeemPoints,
+                pointValueBaht: this.pointValueBaht,
+                memberPoints: this.member?.points || 0,
+            };
+            window.__POS_VUE_STATE__ = JSON.parse(JSON.stringify(state));
+            window.dispatchEvent(new CustomEvent('pos-vue-state', { detail: window.__POS_VUE_STATE__ }));
+        },
+
+        handleVueAction(action) {
+            const index = Number(action.index);
+            if (action.type === 'remove-item') {
+                this.removeItem(index);
+                return;
+            }
+            if (action.type === 'change-qty') {
+                this.changeQty(index, Number(action.delta) || 0);
+                return;
+            }
+            if (action.type === 'set-item-field' && this.cart[index]) {
+                const field = String(action.field || '');
+                if (!['qty', 'unit_price', 'discount_value', 'discount_type'].includes(field)) return;
+                this.cart[index][field] = field === 'discount_type'
+                    ? action.value
+                    : Number(action.value) || 0;
+                if (field === 'qty') {
+                    this.cart[index].qty = Math.max(0.001, this.cart[index].qty);
+                    this.applyQtyPromotions();
+                }
+                return;
+            }
+            if (action.type === 'set-field') {
+                const field = String(action.field || '');
+                if (!['billDiscountValue', 'billDiscountType', 'vatMode'].includes(field)) return;
+                this[field] = ['billDiscountType', 'vatMode'].includes(field)
+                    ? action.value
+                    : Number(action.value) || 0;
+                return;
+            }
+            if (action.type === 'open-payment') {
+                this.openPayment();
+            }
         },
 
         tickClock() {
