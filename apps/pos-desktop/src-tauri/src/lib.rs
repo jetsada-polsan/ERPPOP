@@ -1,7 +1,10 @@
 use keyring::Entry;
 use std::fs;
 use std::path::PathBuf;
+#[cfg(windows)]
+use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
+use serde::Serialize;
 use tauri::Manager;
 
 const KEYRING_SERVICE: &str = "th.co.popstar.pos";
@@ -24,17 +27,83 @@ fn read_device_token() -> Result<String, String> {
 }
 
 fn database_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    Ok(app.path().app_data_dir().map_err(|error| error.to_string())?.join("popstar-pos.db"))
+    Ok(app.path().app_config_dir().map_err(|error| error.to_string())?.join("popstar-pos.db"))
 }
 
 fn backup_directory(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    let directory = app.path().app_data_dir().map_err(|error| error.to_string())?.join("backups");
+    let directory = app.path().app_config_dir().map_err(|error| error.to_string())?.join("backups");
     fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
     Ok(directory)
 }
 
 fn stamp() -> Result<u128, String> {
     Ok(SystemTime::now().duration_since(UNIX_EPOCH).map_err(|error| error.to_string())?.as_millis())
+}
+
+#[derive(Serialize)]
+struct StorageStatus {
+    location: String,
+    database_path: String,
+    warning: Option<String>,
+}
+
+fn d_drive_path() -> PathBuf {
+    PathBuf::from(r"D:\POPSTAR-POS\data")
+}
+
+#[cfg(windows)]
+fn is_directory_link(path: &PathBuf) -> bool {
+    fs::symlink_metadata(path).map(|metadata| metadata.file_type().is_symlink()).unwrap_or(false)
+}
+
+#[cfg(not(windows))]
+fn is_directory_link(_path: &PathBuf) -> bool { false }
+
+#[cfg(windows)]
+fn create_directory_junction(link: &PathBuf, target: &PathBuf) -> Result<(), String> {
+    let command = format!("mklink /J \"{}\" \"{}\"", link.display(), target.display());
+    let output = Command::new("cmd").args(["/C", &command]).output().map_err(|error| error.to_string())?;
+    if output.status.success() { Ok(()) } else { Err(String::from_utf8_lossy(&output.stderr).trim().to_string()) }
+}
+
+#[cfg(not(windows))]
+fn create_directory_junction(_link: &PathBuf, _target: &PathBuf) -> Result<(), String> { Ok(()) }
+
+#[tauri::command]
+fn prepare_local_storage(app: tauri::AppHandle) -> Result<StorageStatus, String> {
+    let app_config = app.path().app_config_dir().map_err(|error| error.to_string())?;
+    let database = app_config.join("popstar-pos.db");
+
+    #[cfg(not(windows))]
+    return Ok(StorageStatus { location: "app-config".to_string(), database_path: database.to_string_lossy().to_string(), warning: None });
+
+    #[cfg(windows)]
+    {
+        let target_root = d_drive_path();
+        if !PathBuf::from(r"D:\").is_dir() {
+            return Ok(StorageStatus { location: "c-fallback".to_string(), database_path: database.to_string_lossy().to_string(), warning: Some("ไม่พบไดรฟ์ D: ฐานข้อมูลยังอยู่ที่ C: และควรติดตั้งไดรฟ์ข้อมูลก่อนเริ่มขาย".to_string()) });
+        }
+        fs::create_dir_all(&target_root).map_err(|error| format!("สร้างโฟลเดอร์ข้อมูล D: ไม่ได้: {}", error))?;
+        if is_directory_link(&app_config) {
+            return Ok(StorageStatus { location: "d-drive".to_string(), database_path: target_root.join("popstar-pos.db").to_string_lossy().to_string(), warning: None });
+        }
+
+        let target_database = target_root.join("popstar-pos.db");
+        if !target_database.is_file() {
+            let app_data_database = app.path().app_data_dir().map_err(|error| error.to_string())?.join("popstar-pos.db");
+            let legacy = [app_config.join("popstar-pos.db"), app_data_database];
+            if let Some(source) = legacy.iter().find(|path| path.is_file()) {
+                fs::copy(source, &target_database).map_err(|error| format!("ย้ายฐานข้อมูลเดิมไป D: ไม่ได้: {}", error))?;
+            }
+        }
+
+        if app_config.exists() {
+            let legacy_dir = app_config.with_file_name(format!("th.co.popstar.pos.c-backup-{}", stamp()?));
+            fs::rename(&app_config, &legacy_dir).map_err(|error| format!("เก็บโฟลเดอร์ฐานข้อมูลเดิมไว้ไม่ได้: {}", error))?;
+        }
+        create_directory_junction(&app_config, &target_root)?;
+        Ok(StorageStatus { location: "d-drive".to_string(), database_path: target_database.to_string_lossy().to_string(), warning: None })
+    }
 }
 
 #[tauri::command]
@@ -73,7 +142,7 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_sql::Builder::default().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![save_device_token, read_device_token, backup_local_database, restore_latest_database])
+        .invoke_handler(tauri::generate_handler![save_device_token, read_device_token, prepare_local_storage, backup_local_database, restore_latest_database])
         .run(tauri::generate_context!())
         .expect("failed to run POPSTAR POS");
 }

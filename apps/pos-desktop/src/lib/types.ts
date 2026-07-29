@@ -121,3 +121,9 @@ export interface LocalSaleHistory {
   syncedAt?: string
   error?: string
 }
+
+export interface LocalStorageStatus {
+  location: 'd-drive' | 'c-fallback' | 'app-config'
+  database_path: string
+  warning?: string
+}

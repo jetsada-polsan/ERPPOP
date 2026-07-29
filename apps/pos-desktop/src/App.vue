@@ -6,7 +6,7 @@ import { invoke, isTauri } from '@tauri-apps/api/core'
 import { api, connect, setServerUrl } from './lib/api'
 import { closeLocalDb, enqueue, loadProducts, loadProfile, loadSession, localDbHealth, markQueue, queueItems, replaceProducts, saleHistory, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth } from './lib/db'
 import { syncCheckoutQueue } from './lib/sync'
-import type { CartLine, Cashier, DeviceProfile, HeldBill, LocalSaleHistory, PaymentMethod, Product, QueueItem, ReceiptBlock, ReceiptTemplate, Shift } from './lib/types'
+import type { CartLine, Cashier, DeviceProfile, HeldBill, LocalSaleHistory, LocalStorageStatus, PaymentMethod, Product, QueueItem, ReceiptBlock, ReceiptTemplate, Shift } from './lib/types'
 
 const DEFAULT_RECEIPT_TEMPLATE: ReceiptTemplate = {
   paper_width: 80,
@@ -61,6 +61,7 @@ const localRestoreBusy = ref(false)
 const saleHistoryRows = ref<LocalSaleHistory[]>([])
 const historyDays = ref(90)
 const selectedHistory = ref<LocalSaleHistory | null>(null)
+const storageStatus = ref<LocalStorageStatus | null>(null)
 let syncTimer: number | null = null
 
 const filteredProducts = computed(() => {
@@ -464,6 +465,12 @@ async function start() {
     ]
     return
   }
+  try {
+    storageStatus.value = await invoke<LocalStorageStatus>('prepare_local_storage')
+  } catch (e) {
+    showError(`เตรียมพื้นที่เก็บข้อมูล POS ไม่สำเร็จ: ${e instanceof Error ? e.message : String(e)}`)
+    return
+  }
   profile.value = await loadProfile()
   products.value = await loadProducts()
   const saved = await loadSession()
@@ -591,6 +598,8 @@ onUnmounted(() => {
         <button class="primary" :disabled="busy">{{ busy ? 'กำลังตรวจสอบ...' : 'เชื่อมต่อเครื่อง' }}</button>
         <div class="local-diagnostics">
           <div class="diagnostic-head"><span><strong>สุขภาพ POS Local</strong><small>ตรวจ SQLite และคิวบิลในเครื่องนี้</small></span><button type="button" class="icon-button" title="ตรวจใหม่" :disabled="localHealthBusy" @click="inspectLocalDb"><RefreshCw :class="{ spin: localHealthBusy }"/></button></div>
+          <div v-if="storageStatus" class="storage-status" :class="storageStatus.location === 'd-drive' ? 'storage-ok' : 'storage-warning'"><strong>{{ storageStatus.location === 'd-drive' ? 'ข้อมูลอยู่ไดรฟ์ D:' : 'ข้อมูลยังอยู่ไดรฟ์ C:' }}</strong><small>{{ storageStatus.database_path }}</small></div>
+          <p v-if="storageStatus?.warning" class="diagnostic-warning">{{ storageStatus.warning }}</p>
           <div v-if="localHealth" class="diagnostic-grid">
             <div><span>SQLite</span><strong :class="localHealth.integrity === 'ok' ? 'ok' : 'bad'">{{ localHealth.integrity === 'ok' ? 'ปกติ' : localHealth.integrity }}</strong></div>
             <div><span>สินค้าในเครื่อง</span><strong>{{ localHealth.products }}</strong></div>

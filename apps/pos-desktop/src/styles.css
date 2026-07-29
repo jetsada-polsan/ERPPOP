@@ -212,6 +212,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .diagnostic-meta { margin: 8px 0; }
 .diagnostic-actions { justify-content: flex-start; }
 .diagnostic-note { display: block; margin-top: 7px; }
+.storage-status { display: flex; flex-direction: column; gap: 3px; margin-top: 9px; padding: 8px 10px; border-left: 4px solid #6b7d88; border-radius: 4px; background: #f1f5f7; color: #50616e; }
+.storage-status small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #71818c; font-size: 9px; }
+.storage-ok { border-left-color: var(--green); background: #edf8f2; color: var(--green); }
+.storage-warning { border-left-color: var(--amber); background: #fff7e4; color: #8d620b; }
+.diagnostic-warning { margin: 8px 0 0; color: #9a660d; font-size: 10px; line-height: 1.45; }
 @media (max-width: 620px) { .diagnostic-grid { grid-template-columns: repeat(2, 1fr); } }
 .queue-bar svg { width: 13px; }
 
