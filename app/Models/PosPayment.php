@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['pos_receipt_id', 'method', 'amount', 'cash_received', 'change_amount', 'card_no', 'cheque_no'])]
+#[Fillable(['pos_receipt_id', 'method', 'payment_reference', 'amount', 'cash_received', 'change_amount', 'card_no', 'cheque_no'])]
 class PosPayment extends Model
 {
     public $timestamps = false;

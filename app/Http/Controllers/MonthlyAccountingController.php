@@ -36,6 +36,29 @@ class MonthlyAccountingController extends Controller
             ->when($branchId, fn ($q) => $q->whereHas('bankAccount', fn ($b) => $b->where('branch_id', $branchId)))
             ->orderByDesc('statement_date')->limit(100)->get();
 
+        $posBase = DB::table('pos_receipts as pr')
+            ->join('pos_terminals as pt', 'pt.id', '=', 'pr.pos_terminal_id')
+            ->whereBetween('pr.receipt_date', [$from, $to])
+            ->where('pr.status', 'completed')
+            ->when($branchId, fn ($q) => $q->where('pt.branch_id', $branchId));
+        $posPayments = DB::table('pos_payments as pp')
+            ->join('pos_receipts as pr', 'pr.id', '=', 'pp.pos_receipt_id')
+            ->join('pos_terminals as pt', 'pt.id', '=', 'pr.pos_terminal_id')
+            ->leftJoin('bank_reconciliations as br', function ($join) {
+                $join->on('br.source_id', '=', 'pp.id')->where('br.source_type', '=', 'pos_payment');
+            })
+            ->whereBetween('pr.receipt_date', [$from, $to])->where('pr.status', 'completed')
+            ->when($branchId, fn ($q) => $q->where('pt.branch_id', $branchId))
+            ->get(['pp.id', 'pp.method', 'pp.amount', 'pp.payment_reference', 'pr.receipt_no', 'pr.receipt_date', 'pt.branch_id', 'br.status as reconciliation_status']);
+        $posMethodTotals = $posPayments->groupBy('method')->map(fn ($rows) => [
+            'count' => $rows->count(), 'amount' => (float) $rows->sum('amount'),
+        ]);
+        $posTransferRows = $posPayments->filter(fn ($row) => in_array($row->method, ['transfer', 'qr', 'bank'], true));
+        $posUnmatchedTransfers = $posTransferRows->filter(fn ($row) => $row->reconciliation_status !== 'matched');
+        $posSales = $posBase->selectRaw('count(*) as receipt_count, coalesce(sum(pr.net_sales), 0) as net_sales, coalesce(sum(pr.vat_amount), 0) as vat_sales')->first();
+        $statementIncome = $statements->filter(fn ($s) => (float) $s->amount > 0);
+        $matchedStatementIncome = $statementIncome->filter(fn ($s) => $s->reconciliation?->status === 'matched');
+
         return view('monthly-accounting.index', [
             'period' => $period, 'branchId' => $branchId, 'expenses' => $expenses, 'statements' => $statements,
             'branches' => Branch::orderBy('code')->get(), 'bankAccounts' => BankAccount::orderBy('bank_name')->get(),
@@ -43,6 +66,14 @@ class MonthlyAccountingController extends Controller
             'costCenters' => DB::table('cost_centers')->where('is_active', true)->orderBy('code')->get(),
             'suppliers' => Supplier::where('is_active', true)->orderBy('name_th')->get(['id', 'name_th', 'tax_id', 'tax_branch']),
             'exportRuns' => AccountingExportRun::where('period', $period)->when($branchId, fn ($q) => $q->where('branch_id', $branchId))->orderByDesc('exported_at')->limit(10)->get(),
+            'posControl' => [
+                'receipt_count' => (int) ($posSales->receipt_count ?? 0), 'net_sales' => (float) ($posSales->net_sales ?? 0),
+                'vat_sales' => (float) ($posSales->vat_sales ?? 0), 'methods' => $posMethodTotals,
+                'transfer_unmatched_count' => $posUnmatchedTransfers->count(), 'transfer_unmatched_amount' => (float) $posUnmatchedTransfers->sum('amount'),
+                'statement_income_count' => $statementIncome->count(), 'statement_income_amount' => (float) $statementIncome->sum('amount'),
+                'matched_statement_income_amount' => (float) $matchedStatementIncome->sum(fn ($s) => (float) $s->amount),
+                'unmatched_transfers' => $posUnmatchedTransfers->sortByDesc('receipt_date')->take(30)->values(),
+            ],
             'stats' => [
                 'expense_total' => (float) BranchExpense::whereBetween('expense_date', [$from, $to])->when($branchId, fn ($q) => $q->where('branch_id', $branchId))->sum('total_amount'),
                 'withholding_total' => (float) BranchExpense::whereBetween('expense_date', [$from, $to])->when($branchId, fn ($q) => $q->where('branch_id', $branchId))->sum('withholding_amount'),

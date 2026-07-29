@@ -1080,12 +1080,14 @@ class PosController extends Controller
             PosPayment::create([
                 'pos_receipt_id' => $receipt->id,
                 'method' => 'transfer',
+                'payment_reference' => $data['payment_ref'] ?? null,
                 'amount' => $transferPart,
             ]);
         } else {
             PosPayment::create([
                 'pos_receipt_id' => $receipt->id,
                 'method' => $data['method'],
+                'payment_reference' => $data['payment_ref'] ?? null,
                 'amount' => $net,
                 'cash_received' => $data['method'] === 'cash' ? ($data['cash_received'] ?? $net) : null,
                 'change_amount' => $data['method'] === 'cash' ? ($data['change_amount'] ?? 0) : null,

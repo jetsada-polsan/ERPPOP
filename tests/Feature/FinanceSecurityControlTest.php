@@ -95,6 +95,21 @@ class FinanceSecurityControlTest extends TestCase
         $this->assertDatabaseHas('bank_reconciliations', ['bank_statement_id' => $statement->id, 'source_type' => 'pos_payment', 'source_id' => $payment->id, 'status' => 'matched']);
     }
 
+    public function test_monthly_accounting_control_center_shows_unmatched_pos_transfer_reference(): void
+    {
+        $branch = Branch::create(['code' => 'HQ', 'name_th' => 'สำนักงานใหญ่', 'is_active' => true]);
+        $terminal = PosTerminal::create(['branch_id' => $branch->id, 'code' => 'POS01', 'name' => 'POS 1']);
+        $receipt = PosReceipt::create(['pos_terminal_id' => $terminal->id, 'receipt_no' => 'R-REF-001', 'receipt_date' => '2026-07-15 10:00:00', 'net_sales' => 125, 'status' => 'completed']);
+        PosPayment::create(['pos_receipt_id' => $receipt->id, 'method' => 'transfer', 'payment_reference' => 'REF-7788', 'amount' => 125]);
+        $user = User::factory()->create(['username' => 'finance-control-user', 'is_active' => true, 'must_change_password' => false]);
+        $role = Role::create(['code' => 'FINANCE_CONTROL', 'name' => 'Finance Control']);
+        $permission = Permission::firstOrCreate(['code' => 'finance.manage'], ['name' => 'finance.manage']);
+        $role->permissions()->attach($permission->id);
+        $user->roles()->attach($role->id);
+        $this->actingAs($user)->get('/monthly-accounting?period=2026-07&branch_id='.$branch->id)
+            ->assertOk()->assertSee('R-REF-001')->assertSee('REF-7788')->assertSee('รอจับคู่ Statement/สลิป');
+    }
+
     public function test_control_center_pages_render_for_authorized_user(): void
     {
         $user = User::factory()->create(['username' => 'control-user', 'is_active' => true, 'must_change_password' => false]);

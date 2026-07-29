@@ -27,6 +27,18 @@
         <div class="ma-stat"><span>ยังไม่ตรง/ยังไม่ตรวจ</span><strong style="color:{{ $stats['unreconciled_count'] ? '#a61b27':'#146c43' }}">{{ number_format($stats['unreconciled_count']) }} รายการ</strong></div>
     </section>
 
+    <section class="ma-panel ma-section">
+        <div class="ma-head"><h2><i class="bi bi-shield-check me-1"></i>กระทบยอด POS กับ Statement</h2><span class="text-muted small">เฉพาะใบเสร็จที่ชำระสำเร็จและยังไม่ถูกยกเลิก</span></div>
+        <div class="ma-note mb-3">ฝ่ายการเงินตรวจตามลำดับ: ใบเสร็จ POS → ช่องทางชำระเงิน → เลขอ้างอิงโอน/QR → Statement → แนบสลิปเมื่อพบรายการจริง หากยอดไม่ตรง ระบบจะไม่ถือว่าผ่านและไม่ให้สร้างชุดส่งสำนักงานบัญชี</div>
+        <div class="row g-2 mb-3">
+            <div class="col-md-3"><div class="ma-note"><strong>ใบเสร็จ POS</strong><br>{{ number_format($posControl['receipt_count']) }} ใบ · ฿{{ number_format($posControl['net_sales'],2) }}<br><span class="text-muted">VAT ขาย ฿{{ number_format($posControl['vat_sales'],2) }}</span></div></div>
+            <div class="col-md-3"><div class="ma-note"><strong>โอน / QR</strong><br>฿{{ number_format((float)($posControl['methods']['transfer']['amount'] ?? 0) + (float)($posControl['methods']['qr']['amount'] ?? 0) + (float)($posControl['methods']['bank']['amount'] ?? 0),2) }}<br><span class="text-muted">ยังไม่จับคู่ {{ number_format($posControl['transfer_unmatched_count']) }} รายการ</span></div></div>
+            <div class="col-md-3"><div class="ma-note"><strong>เงินเข้า Statement</strong><br>{{ number_format($posControl['statement_income_count']) }} รายการ · ฿{{ number_format($posControl['statement_income_amount'],2) }}<br><span class="text-muted">จับคู่แล้ว ฿{{ number_format($posControl['matched_statement_income_amount'],2) }}</span></div></div>
+            <div class="col-md-3"><div class="ma-note" style="border-left:4px solid {{ $posControl['transfer_unmatched_count'] ? '#dc3545':'#198754' }}"><strong>รายการต้องตรวจ</strong><br><span style="color:{{ $posControl['transfer_unmatched_count'] ? '#b42318':'#146c43' }}">{{ number_format($posControl['transfer_unmatched_count']) }} ใบ · ฿{{ number_format($posControl['transfer_unmatched_amount'],2) }}</span><br><span class="text-muted">เปิดแท็บ Statement เพื่อตรวจ/แนบสลิป</span></div></div>
+        </div>
+        <div class="ma-table-wrap"><table class="ma-table"><thead><tr><th>วันที่/เวลา</th><th>ใบเสร็จ POS</th><th>ช่องทาง</th><th>เลขอ้างอิงจาก POS</th><th class="text-end">ยอดโอน</th><th>ผลตรวจ</th></tr></thead><tbody>@forelse($posControl['unmatched_transfers'] as $row)<tr><td>{{ \Carbon\Carbon::parse($row->receipt_date)->format('d/m/Y H:i') }}</td><td>{{ $row->receipt_no }}</td><td>{{ ['transfer'=>'โอน','qr'=>'QR','bank'=>'ธนาคาร'][$row->method] ?? $row->method }}</td><td>{{ $row->payment_reference ?: '-' }}</td><td class="text-end fw-bold">{{ number_format((float)$row->amount,2) }}</td><td><span class="status-pill status-pending">รอจับคู่ Statement/สลิป</span></td></tr>@empty<tr><td colspan="6" class="text-center text-success py-3"><i class="bi bi-check-circle me-1"></i>ไม่พบรายการโอน POS ที่ค้างตรวจ</td></tr>@endforelse</tbody></table></div>
+    </section>
+
     <section class="ma-panel">
         <div class="ma-tabs">
             <button class="ma-tab" :class="tab==='expenses'&&'active'" @click="tab='expenses'" type="button"><i class="bi bi-receipt me-1"></i>ค่าใช้จ่ายสาขา</button>
