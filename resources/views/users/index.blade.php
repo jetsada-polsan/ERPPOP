@@ -5,6 +5,26 @@
 @section('content')
 <div x-data="userPage()" x-cloak>
 
+    <div class="content-card p-3 mb-3">
+        <form method="get" class="d-flex align-items-end gap-2 flex-wrap">
+            <div style="min-width:min(360px,100%)">
+                <label class="form-label small text-muted mb-1">ค้นหาผู้ใช้</label>
+                <input name="q" value="{{ $q }}" class="form-control" placeholder="รหัสพนักงาน / ชื่อ / ตำแหน่ง / โทรศัพท์">
+            </div>
+            <div style="min-width:190px">
+                <label class="form-label small text-muted mb-1">สถานะ</label>
+                <select name="status" class="form-select">
+                    <option value="">ทุกสถานะ</option>
+                    <option value="active" @selected($status === 'active')>เปิดใช้งาน</option>
+                    <option value="inactive" @selected($status === 'inactive')>ปิดใช้งาน</option>
+                    <option value="must_change" @selected($status === 'must_change')>รอเปลี่ยนรหัสผ่าน</option>
+                </select>
+            </div>
+            <button class="btn btn-primary"><i class="bi bi-search me-1"></i>ค้นหา</button>
+            <a href="{{ route('users.index') }}" class="btn btn-light border">ล้าง</a>
+        </form>
+    </div>
+
     <div class="content-card p-4 mb-3">
         <div class="d-flex align-items-center gap-3 mb-3">
             <span class="uf-head-icon"><i class="bi" :class="editId ? 'bi-pencil-square' : 'bi-person-plus'"></i></span>
@@ -155,11 +175,20 @@
                             @endforeach
                         </td>
                         <td class="small text-muted">{{ $user->last_login_at?->thaiDate(true) ?? 'ยังไม่เคย' }}</td>
-                        <td><span class="badge {{ $user->is_active ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $user->is_active ? 'ใช้งาน' : 'ปิด' }}</span></td>
+                        <td>
+                            <span class="badge {{ $user->is_active ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $user->is_active ? 'ใช้งาน' : 'ปิด' }}</span>
+                            @if($user->must_change_password)
+                                <span class="badge text-bg-warning mt-1">ต้องเปลี่ยนรหัส</span>
+                            @endif
+                        </td>
                         <td class="text-end">
                             <button type="button" class="btn btn-sm btn-light border"
                                 @click="editUser({{ json_encode(['id' => $user->id, 'username' => $user->username, 'name' => $user->name, 'email' => $user->email, 'phone' => $user->phone, 'position' => $user->position, 'branch_id' => $user->branch_id, 'salesman_id' => $user->salesman_id, 'role_ids' => $user->roles->pluck('id'), 'is_active' => $user->is_active]) }})">
-                                แก้ไข
+                                <i class="bi bi-pencil me-1"></i>แก้ไข
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-warning"
+                                @click="openReset({{ $user->id }}, @js($user->username), @js($user->name))">
+                                <i class="bi bi-key me-1"></i>รีเซ็ตรหัส
                             </button>
                         </td>
                     </tr>
@@ -170,6 +199,26 @@
             </table>
         </div>
         {{ $users->links() }}
+    </div>
+
+    <div class="user-reset-backdrop" x-show="resetOpen" x-transition.opacity @keydown.escape.window="resetOpen = false">
+        <div class="user-reset-modal" @click.outside="resetOpen = false" x-transition>
+            <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+                <div>
+                    <h3 class="h5 fw-bold mb-1">ยืนยันรีเซ็ตรหัสผ่าน</h3>
+                    <div class="text-muted small"><strong x-text="resetUsername"></strong> · <span x-text="resetName"></span></div>
+                </div>
+                <button type="button" class="btn btn-light rounded-circle" @click="resetOpen = false" aria-label="ปิด"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="alert alert-warning">
+                รหัสชั่วคราวใหม่คือ <strong>12345678</strong> และผู้ใช้ต้องตั้งรหัสใหม่ทันทีเมื่อเข้าสู่ระบบ
+            </div>
+            <form method="post" :action="resetAction" class="d-flex justify-content-end gap-2">
+                @csrf
+                <button type="button" class="btn btn-light border" @click="resetOpen = false">ยกเลิก</button>
+                <button class="btn btn-warning"><i class="bi bi-key-fill me-1"></i>ยืนยันรีเซ็ต</button>
+            </form>
+        </div>
     </div>
 
     <div class="content-card p-4">
@@ -229,6 +278,8 @@
     .user-list-table td{font-weight:400;letter-spacing:0;line-height:1.35}
     .user-list-table td.fw-semibold{font-weight:700!important}
     .user-list-table .badge{font-family:inherit;font-size:11px;font-weight:700}
+    .user-reset-backdrop{position:fixed;inset:0;z-index:2100;background:rgba(15,23,42,.46);display:flex;align-items:center;justify-content:center;padding:20px}
+    .user-reset-modal{width:min(520px,100%);background:#fff;border-radius:8px;padding:24px;box-shadow:0 24px 80px rgba(15,23,42,.25)}
 </style>@endpush
 
 @push('scripts')
@@ -236,6 +287,7 @@
 function userPage() {
     return {
         editId: null, editUsername: '', roleError: false,
+        resetOpen: false, resetId: null, resetUsername: '', resetName: '',
         form: { username: '', name: '', email: '', phone: '', position: '', branch_id: '', salesman_id: '', role_ids: [], is_active: true },
 
         editUser(user) {
@@ -261,6 +313,15 @@ function userPage() {
             this.editUsername = '';
             this.roleError = false;
             this.form = { username: '', name: '', email: '', phone: '', position: '', branch_id: '', salesman_id: '', role_ids: [], is_active: true };
+        },
+        openReset(id, username, name) {
+            this.resetId = id;
+            this.resetUsername = username;
+            this.resetName = name || '';
+            this.resetOpen = true;
+        },
+        get resetAction() {
+            return `{{ url('users') }}/${this.resetId}/reset-password`;
         },
     };
 }

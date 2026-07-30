@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 
@@ -19,14 +21,28 @@ class UserController extends Controller
         return Password::min(8)->letters()->mixedCase()->numbers();
     }
 
-    public function index(): View
+    public function index(Request $request): View
     {
-        $users = User::with(['branch', 'salesman', 'roles'])->orderBy('username')->paginate(50);
+        $q = trim((string) $request->query('q', ''));
+        $status = trim((string) $request->query('status', ''));
+        $users = User::with(['branch', 'salesman', 'roles'])
+            ->when($q !== '', fn ($query) => $query->where(fn ($where) => $where
+                ->whereLike('username', "%{$q}%")
+                ->orWhereLike('name', "%{$q}%")
+                ->orWhereLike('phone', "%{$q}%")
+                ->orWhereLike('position', "%{$q}%")
+            ))
+            ->when($status === 'active', fn ($query) => $query->where('is_active', true))
+            ->when($status === 'inactive', fn ($query) => $query->where('is_active', false))
+            ->when($status === 'must_change', fn ($query) => $query->where('must_change_password', true))
+            ->orderBy('username')
+            ->paginate(50)
+            ->withQueryString();
         $branches = Branch::orderBy('code')->get(['id', 'code', 'name_th']);
         $roles = Role::with('permissions')->orderBy('id')->get();
         $salesmen = \App\Models\Salesman::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
 
-        return view('users.index', compact('users', 'branches', 'roles', 'salesmen'));
+        return view('users.index', compact('users', 'branches', 'roles', 'salesmen', 'q', 'status'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -63,12 +79,24 @@ class UserController extends Controller
             'must_change_password' => true,
         ]);
         $user->roles()->sync($data['role_ids']);
+        $this->audit('user_create', $user, [], [
+            'username' => $user->username,
+            'role_ids' => $data['role_ids'],
+            'must_change_password' => true,
+        ]);
 
         return redirect()->route('users.index')->with('success', "เพิ่มผู้ใช้ {$user->username} แล้ว");
     }
 
     public function update(Request $request, User $user): RedirectResponse
     {
+        $oldValues = [
+            'name' => $user->name,
+            'branch_id' => $user->branch_id,
+            'salesman_id' => $user->salesman_id,
+            'is_active' => $user->is_active,
+            'role_ids' => $user->roles()->pluck('roles.id')->all(),
+        ];
         $data = $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'email' => ['nullable', 'email', 'max:150', 'unique:users,email,'.$user->id],
@@ -101,7 +129,48 @@ class UserController extends Controller
         }
         $user->save();
         $user->roles()->sync($data['role_ids']);
+        $this->audit('user_update', $user, $oldValues, [
+            'name' => $user->name,
+            'branch_id' => $user->branch_id,
+            'salesman_id' => $user->salesman_id,
+            'is_active' => $user->is_active,
+            'role_ids' => $data['role_ids'],
+            'password_changed' => ! empty($data['password']),
+        ]);
 
         return redirect()->route('users.index')->with('success', 'บันทึกข้อมูลผู้ใช้แล้ว');
+    }
+
+    public function resetPassword(User $user): RedirectResponse
+    {
+        DB::transaction(function () use ($user) {
+            $user->forceFill([
+                'password' => '12345678',
+                'must_change_password' => true,
+                'password_changed_at' => null,
+                'remember_token' => null,
+            ])->save();
+
+            $this->audit('user_password_reset', $user, [], [
+                'username' => $user->username,
+                'must_change_password' => true,
+            ]);
+        });
+
+        return redirect()->route('users.index')
+            ->with('success', "รีเซ็ตรหัสผ่าน {$user->username} เป็น 12345678 แล้ว และบังคับเปลี่ยนเมื่อเข้าใช้ครั้งแรก");
+    }
+
+    private function audit(string $action, User $target, array $oldValues, array $newValues): void
+    {
+        AuditLog::create([
+            'user_id' => auth()->id(),
+            'branch_id' => auth()->user()?->branch_id,
+            'action' => $action,
+            'table_name' => 'users',
+            'record_id' => $target->id,
+            'old_values' => $oldValues,
+            'new_values' => $newValues,
+        ]);
     }
 }
