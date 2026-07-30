@@ -17,8 +17,31 @@ class ManualController extends Controller
             'routines' => $this->routines(),
             'thaiErpStandards' => $this->thaiErpStandards(),
             'thaiErpSources' => $this->thaiErpSources(),
+            'bplusBackCoverage' => $this->bplusBackCoverage(),
             'calculationFormulas' => $this->calculationFormulas(),
         ]);
+    }
+
+    private function bplusBackCoverage(): array
+    {
+        return [
+            ['group' => 'ตั้งค่าหลัก', 'flow' => 'บริษัท → สาขา → คลัง/ที่เก็บ → เล่มเอกสาร → ภาษี → ผังบัญชี', 'documents' => 'Master data และเลขที่เอกสาร', 'impact' => 'เป็นต้นทางของทุกโมดูล', 'status' => 'มีชุดหลัก', 'tone' => 'partial', 'route' => 'settings.index', 'next' => 'ใช้ตัวช่วยตรวจความครบก่อนเปิดสาขา'],
+            ['group' => 'จัดซื้อ', 'flow' => 'ขอซื้อ → สอบราคา → PO → รับสินค้า → ตั้งหนี้ → จ่ายเงิน', 'documents' => 'PR, quotation, PO, receipt, AP voucher, payment', 'impact' => 'Stock + AP + VAT ซื้อ + GL', 'status' => 'มีชุดหลัก', 'tone' => 'partial', 'route' => 'purchase-orders.index', 'next' => 'เติม PR/สอบราคาและ three-way match'],
+            ['group' => 'ขายหลังบ้าน', 'flow' => 'ใบเสนอราคา/ใบจอง → จัดสินค้า → ใบขายสด/เชื่อ → รับชำระ/วางบิล → คืน/ลดหนี้', 'documents' => 'Quotation, reservation, sale, invoice, receipt, credit note', 'impact' => 'Stock + AR/เงินสด + VAT ขาย + GL', 'status' => 'มีชุดหลัก', 'tone' => 'partial', 'route' => 'reservations.index', 'next' => 'เติมค้างส่ง ค้างชำระ และตรวจเครดิต'],
+            ['group' => 'POS', 'flow' => 'เปิดกะ → ขาย → ชำระ → พิมพ์ใบเสร็จ → ปิดกะ → Sync ERP', 'documents' => 'POS receipt, payment, shift close, sync queue', 'impact' => 'Stock + เงินสด/ธนาคาร + รายได้ + COGS', 'status' => 'มีชุดหลัก', 'tone' => 'partial', 'route' => 'pos.index', 'next' => 'UAT Windows จริง: offline, ไฟดับ, retry และ duplicate'],
+            ['group' => 'คลัง', 'flow' => 'รับเข้า/เบิก/โอน/คืน/ปรับ → ตรวจนับ → อนุมัติผลต่าง', 'documents' => 'Stock movement, transfer, count, adjustment', 'impact' => 'จำนวนและมูลค่า Stock พร้อม audit', 'status' => 'พร้อมใช้', 'tone' => 'ready', 'route' => 'stock-counts.index', 'next' => 'บังคับ freeze และ maker-checker ทุกคลัง'],
+            ['group' => 'ต้นทุน', 'flow' => 'รับ Lot → FIFO/FEFO → ตัดขาย/คืน → ปิดต้นทุนรายงวด', 'documents' => 'Lot, valuation, COGS, period close', 'impact' => 'COGS + กำไร + Inventory GL', 'status' => 'พร้อมใช้', 'tone' => 'ready', 'route' => 'products.index', 'next' => 'เพิ่มรายงานต้นทุนผิดปกติก่อนปิดงวด'],
+            ['group' => 'ผลิต/แปรรูป', 'flow' => 'สูตร/BOM → ตัดวัตถุดิบ → รับผลผลิต → บันทึก Yield/สูญเสีย → ป้ายชั่ง', 'documents' => 'Production/transform batch และ label', 'impact' => 'วัตถุดิบออก + ผลผลิตเข้า + ต้นทุน Batch', 'status' => 'พร้อมใช้', 'tone' => 'ready', 'route' => 'stock-transforms.index', 'next' => 'เพิ่ม version สูตรและค่าแรง/โสหุ้ย'],
+            ['group' => 'ลูกหนี้', 'flow' => 'ขายเชื่อ → วางบิล → เตรียมรับชำระ → รับเงิน/เช็ค → กระทบยอด', 'documents' => 'AR invoice, billing, receipt batch, cheque', 'impact' => 'AR + เงินสด/ธนาคาร + GL', 'status' => 'มีชุดหลัก', 'tone' => 'partial', 'route' => 'customers.index', 'next' => 'เติม aging, เช็คเด้ง และใบเพิ่ม/ลดหนี้อิสระ'],
+            ['group' => 'เจ้าหนี้', 'flow' => 'ใบรับของ/ค่าใช้จ่าย → AP voucher → ขออนุมัติจ่าย → จ่ายเงิน', 'documents' => 'AP voucher, payment request, WHT', 'impact' => 'AP + เงินสด/ธนาคาร + VAT/WHT + GL', 'status' => 'มีชุดหลัก', 'tone' => 'partial', 'route' => 'suppliers.index', 'next' => 'แยกสินค้ากับค่าใช้จ่ายและเพิ่ม payment approval'],
+            ['group' => 'เงินสด/ธนาคาร', 'flow' => 'รับ/จ่าย → ฝาก/ถอน/โอน → Statement → Reconcile → ปิดวัน', 'documents' => 'Cashbook, bank transfer, statement, reconciliation', 'impact' => 'ยอดเงินและรายการค้างตรวจ', 'status' => 'มีชุดหลัก', 'tone' => 'partial', 'route' => 'monthly-accounting.index', 'next' => 'เพิ่มเอกสารฝาก/ถอน/โอนและ exception queue'],
+            ['group' => 'ค่าใช้จ่าย', 'flow' => 'บันทึกค่าใช้จ่าย → แนบหลักฐาน → ระบุสาขา/รถ/โครงการ → อนุมัติ → ลง GL', 'documents' => 'Expense voucher, receipt image, WHT', 'impact' => 'Expense + VAT/WHT + GL ตามมิติ', 'status' => 'พร้อมใช้', 'tone' => 'ready', 'route' => 'expenses.index', 'next' => 'ใช้ vehicle, asset และ project เป็น dimension มาตรฐาน'],
+            ['group' => 'ทรัพย์สิน', 'flow' => 'ซื้อ/รับเข้า → ทะเบียน → ค่าเสื่อม → ซ่อม → ขาย/ตัดจำหน่าย', 'documents' => 'Asset register, depreciation, disposal', 'impact' => 'FA + ค่าเสื่อม + GL', 'status' => 'มีชุดหลัก', 'tone' => 'partial', 'route' => 'fixed-assets.index', 'next' => 'ผูกใบซื้อและประวัติซ่อมกับทะเบียน'],
+            ['group' => 'บัญชี/ภาษี', 'flow' => 'เอกสารต้นทาง → Journal → ตรวจเดบิต=เครดิต → ปิดงวด → ภาษี/งบ', 'documents' => 'GL journal, VAT, WHT, tax working paper, statements', 'impact' => 'GL, P&L, balance sheet, tax filing', 'status' => 'มีชุดหลัก', 'tone' => 'partial', 'route' => 'financial-statements.index', 'next' => 'เพิ่ม source trace, period lock และ format สำนักงานบัญชี'],
+            ['group' => 'รายงาน', 'flow' => 'กรองช่วงเวลา/สาขา/เอกสาร → สรุป → drill-down → export → ตรวจรับ', 'documents' => 'Operational, financial, tax and audit reports', 'impact' => 'ตัวเลขต้องย้อนกลับหาเอกสารต้นทางได้', 'status' => 'มีชุดหลัก', 'tone' => 'partial', 'route' => 'reports.index', 'next' => 'เพิ่ม saved views และรายงานค้างส่ง/ค้างจ่าย'],
+            ['group' => 'สิทธิ/อนุมัติ', 'flow' => 'ผู้สร้าง → ผู้ตรวจ → ผู้อนุมัติ → ยืนยัน → ยกเลิก/กลับรายการ', 'documents' => 'Approval history และ audit log', 'impact' => 'ป้องกันแก้/อนุมัติเองและแก้ย้อนหลัง', 'status' => 'มีชุดหลัก', 'tone' => 'partial', 'route' => 'users.index', 'next' => 'ทำ matrix ตามสาขา ประเภทเอกสาร และวงเงิน'],
+            ['group' => 'นำเข้า/สำรอง', 'flow' => 'ไฟล์/ฐานข้อมูลเก่า → staging → validate → preview → import → checksum/backup', 'documents' => 'Import batch, error log, backup/restore record', 'impact' => 'ไม่เขียนฐานข้อมูลเก่าระหว่างตรวจ และกู้คืนได้', 'status' => 'มีชุดหลัก', 'tone' => 'partial', 'route' => 'database-structure.index', 'next' => 'ทำ restore drill และรายงานผลตรวจทุก batch'],
+        ];
     }
 
     private function calculationFormulas(): array

@@ -112,6 +112,7 @@
     .source-item { display: grid; grid-template-columns: minmax(0,1fr) 32px; gap: 8px; align-items: center; padding: 10px 11px; border: 1px solid #dbe7ef; border-radius: 7px; }
     .source-item strong { display: block; color: #274b63; font-size: 12px; }
     .source-item span { display: block; margin-top: 2px; color: #6d8291; font-size: 10px; line-height: 1.4; }
+    .coverage-note { margin: 12px; padding: 11px 13px; border-left: 3px solid #b4232c; background: #fff5f5; color: #6b4b50; font-size: 11px; line-height: 1.55; }
     .uat-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid #edf2f5; }
     .uat-summary div { padding: 13px 16px; border-right: 1px solid #edf2f5; }
     .uat-summary div:last-child { border-right: 0; }
@@ -460,6 +461,38 @@
                     <a class="program-link" href="{{ $source['url'] }}" target="_blank" rel="noopener noreferrer" title="เปิดแหล่งอ้างอิง"><i class="bi bi-box-arrow-up-right"></i></a>
                 </article>
             @endforeach
+        </div>
+    </section>
+
+    <section class="manual-panel" id="bplusback-coverage">
+        <div class="manual-section-head">
+            <h2><i class="bi bi-arrow-repeat me-2"></i>BplusBack → PopStar 4M: แผนผังความสามารถครบวงจร</h2>
+            <span>{{ count($bplusBackCoverage) }} flow ที่ต้องตรวจ</span>
+        </div>
+        <div class="coverage-note"><strong>หลักการของ PopStar:</strong> ใช้แนวคิดจาก BplusBack แต่ให้เอกสารทุกใบมีสถานะ, ผู้รับผิดชอบ, ผลกระทบ และลิงก์ต้นทาง/ปลายทางชัดเจน ยืนยันแล้วแก้ตรง ๆ ไม่ได้ ต้องกลับรายการ พร้อมเก็บ audit log และไม่แก้ฐานข้อมูล Bplus เดิม</div>
+        <div class="manual-table-wrap">
+            <table class="manual-table" style="min-width:1260px">
+                <thead><tr><th>หมวด</th><th>Flow การทำงาน</th><th>เอกสาร</th><th>ผลกระทบ</th><th>สถานะ</th><th>งานต่อ</th><th class="text-center">เปิด</th></tr></thead>
+                <tbody>
+                @foreach($bplusBackCoverage as $coverage)
+                    <tr x-show="!query || $el.textContent.toLowerCase().includes(query.toLowerCase())">
+                        <td><strong>{{ $coverage['group'] }}</strong></td>
+                        <td>{{ $coverage['flow'] }}</td>
+                        <td>{{ $coverage['documents'] }}</td>
+                        <td>{{ $coverage['impact'] }}</td>
+                        <td><span class="benchmark-status benchmark-{{ $coverage['tone'] }}">{{ $coverage['status'] }}</span></td>
+                        <td>{{ $coverage['next'] }}</td>
+                        <td class="text-center">
+                            @if($coverage['route'] && $routeAccess($coverage['route']))
+                                <a class="program-link" href="{{ route($coverage['route']) }}" title="เปิดโปรแกรม"><i class="bi bi-arrow-up-right"></i></a>
+                            @else
+                                <span class="program-locked" title="ยังไม่มีโปรแกรมหรือไม่มีสิทธิ์"><i class="bi bi-dash-lg"></i></span>
+                            @endif
+                        </td>
+                    </tr>
+                @endforeach
+                </tbody>
+            </table>
         </div>
     </section>
 
