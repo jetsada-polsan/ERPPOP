@@ -11,3 +11,4 @@ Artisan::command('inspire', function () {
 Schedule::command('erp:backup --keep-days=30')->dailyAt('02:15')->withoutOverlapping();
 Schedule::command('erp:health')->hourly()->withoutOverlapping();
 Schedule::command('erp:restore-drill')->monthlyOn(1, '04:30')->withoutOverlapping();
+Schedule::command('erp:archive-inactive-customers --months=6 --apply')->monthlyOn(1, '03:15')->withoutOverlapping();
