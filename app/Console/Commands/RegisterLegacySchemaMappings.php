@@ -17,8 +17,12 @@ class RegisterLegacySchemaMappings extends Command
     private const CORE_MAPPING = [
         'BRANCH' => 'branches', 'WAREHOUSE' => 'warehouses', 'WARELOCATION' => 'warehouse_locations',
         'DOCTYPE' => 'document_types', 'DOCINFO' => 'documents', 'SALESMAN' => 'salesmen',
-        'ARFILE' => 'customers', 'ARCONTACT' => 'customer_contacts', 'SKUMASTER' => 'products',
+        'ARFILE' => 'customers', 'ARADDRESS' => 'customer_addresses', 'ARCONTACT' => 'customer_contacts',
+        'APFILE' => 'suppliers', 'APADDRESS' => 'supplier_addresses',
+        'ICCAT' => 'product_categories', 'ICDEPT' => 'product_departments', 'BRAND' => 'product_brands',
+        'SKUMASTER' => 'products',
         'GOODSMMASTER' => 'product_barcodes', 'GOODSMASTER' => 'product_barcodes', 'UOFQTY' => 'product_units',
+        'ARPRICETAB' => 'price_tables', 'ARPLU' => 'product_prices',
         'TRANSTKH' => 'stock_documents', 'TRANSTKD' => 'stock_document_items', 'SKUMOVE' => 'stock_movements',
         'AROE' => 'customer_open_items', 'ARDETAIL' => 'customer_ledger', 'ACCOUNTCHART' => 'chart_of_accounts',
         'TRANPAYJ' => 'gl_journals', 'CASHBOOK' => 'cash_books', 'BANKACCOUNT' => 'bank_accounts',
