@@ -41,7 +41,7 @@
     <div class="line"><span>เลขกะ</span><strong>{{ $shift->shift_no }}</strong></div>
     <div class="line"><span>สาขา</span><strong>{{ $shift->branch?->code }} {{ $shift->branch?->name_th }}</strong></div>
     <div class="line"><span>เครื่อง</span><strong>{{ $shift->terminal?->code ?? '-' }}</strong></div>
-    <div class="line"><span>แคชเชียร์</span><strong>{{ $shift->cashier?->code }} {{ $shift->cashier?->name }}</strong></div>
+    <div class="line"><span>แคชเชียร์</span><strong>{{ $shift->cashierUser?->name ?? $shift->cashier?->name ?? '-' }} @if($shift->cashier?->code)<small>({{ $shift->cashier->code }})</small>@endif</strong></div>
     <div class="line"><span>เปิดกะ</span><strong>{{ $shift->opened_at?->format('d/m/Y H:i:s') }}</strong></div>
     <div class="line"><span>ปิดกะ</span><strong>{{ $shift->closed_at?->format('d/m/Y H:i:s') ?? 'ยังไม่ปิด' }}</strong></div>
 

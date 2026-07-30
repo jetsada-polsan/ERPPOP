@@ -84,12 +84,21 @@ class PosApiController extends Controller
         $branchId = $device?->branch_id ?: $request->user()?->branch_id;
 
         $cashiers = Salesman::query()
+            ->with('user:id,name,username')
             ->where('is_active', true)
             ->when($branchId, fn ($query) => $query->where(fn ($w) => $w
                 ->whereNull('branch_id')
                 ->orWhere('branch_id', $branchId)))
             ->orderBy('code')
-            ->get(['id', 'code', 'name', 'branch_id']);
+            ->get(['id', 'code', 'name', 'branch_id', 'user_id'])
+            ->map(fn (Salesman $cashier) => [
+                'id' => $cashier->id,
+                'code' => $cashier->code,
+                'name' => $cashier->name,
+                'branch_id' => $cashier->branch_id,
+                'user_id' => $cashier->user_id,
+                'user_name' => $cashier->user?->name,
+            ]);
 
         return response()->json(['success' => true, 'cashiers' => $cashiers]);
     }
@@ -152,6 +161,8 @@ class PosApiController extends Controller
                 'code' => $cashier->code,
                 'name' => $cashier->name,
                 'branch_id' => $cashier->branch_id,
+                'user_id' => $cashier->user_id,
+                'user_name' => $cashier->user?->name,
             ],
         ]);
     }

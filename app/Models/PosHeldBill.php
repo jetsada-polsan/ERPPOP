@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'hold_no', 'branch_id', 'pos_terminal_id', 'pos_shift_id', 'cashier_id', 'held_by',
+    'hold_no', 'branch_id', 'pos_terminal_id', 'pos_shift_id', 'cashier_id', 'cashier_user_id', 'held_by',
     'customer_id', 'total_amount', 'status', 'note', 'payload', 'held_at', 'resumed_at',
 ])]
 class PosHeldBill extends Model
@@ -30,6 +30,11 @@ class PosHeldBill extends Model
     public function cashier(): BelongsTo
     {
         return $this->belongsTo(Salesman::class, 'cashier_id');
+    }
+
+    public function cashierUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cashier_user_id');
     }
 
     public function heldBy(): BelongsTo

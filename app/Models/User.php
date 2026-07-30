@@ -41,6 +41,12 @@ class User extends Authenticatable
         return $this->belongsTo(Salesman::class);
     }
 
+    /** POS profile kept for legacy/offline compatibility; identity remains this user. */
+    public function posCashierProfile(): HasOne
+    {
+        return $this->hasOne(Salesman::class, 'user_id');
+    }
+
     public function salesArea(): BelongsTo
     {
         return $this->belongsTo(SalesArea::class);

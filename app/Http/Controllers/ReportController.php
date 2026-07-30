@@ -1068,16 +1068,16 @@ class ReportController extends Controller
 
         $docQuery = DB::table('documents as d')
             ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
-            ->leftJoin('salesmen as s', 's.id', '=', 'd.salesman_id')
+            ->leftJoin('users as u', 'u.id', '=', 'd.sales_user_id')
             ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE'])
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
 
         $this->applyBranch($docQuery, $filters, 'd.branch_id');
-        $this->applySearch($docQuery, $filters, ['d.doc_number', 's.name']);
+        $this->applySearch($docQuery, $filters, ['d.doc_number', 'u.name']);
 
         $docRows = $docQuery
-            ->groupBy('s.id', 's.name', 'dt.code')
-            ->selectRaw("coalesce(s.name, 'ไม่ระบุพนักงานขาย') as staff_name, dt.code as channel, count(*) as bill_count, sum(d.total_amount) as amount")
+            ->groupBy('u.id', 'u.name', 'dt.code')
+            ->selectRaw("coalesce(u.name, 'ไม่ระบุผู้เปิดใบขาย') as staff_name, dt.code as channel, count(*) as bill_count, sum(d.total_amount) as amount")
             ->get();
 
         return $posRows
@@ -1197,12 +1197,12 @@ class ReportController extends Controller
             ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
             ->join('products as p', 'p.id', '=', 'sdi.product_id')
             ->leftJoin('product_categories as pc', 'pc.id', '=', 'p.product_category_id')
-            ->leftJoin('salesmen as s', 's.id', '=', 'd.salesman_id')
+            ->leftJoin('users as u', 'u.id', '=', 'd.sales_user_id')
             ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN'])
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
 
         $this->applyBranch($query, $filters, 'd.branch_id');
-        $this->applySearch($query, $filters, ['d.doc_number', 'p.sku_code', 'p.name_th', 'pc.name_th', 's.name']);
+        $this->applySearch($query, $filters, ['d.doc_number', 'p.sku_code', 'p.name_th', 'pc.name_th', 'u.name']);
 
         $selects = [
             "'เอกสาร' as channel",
@@ -1217,8 +1217,8 @@ class ReportController extends Controller
             $groups[] = DB::raw("coalesce(pc.name_th, 'ไม่ระบุหมวดสินค้า')");
         }
         if (in_array('seller', $dimensions, true)) {
-            $selects[] = "coalesce(s.name, 'ไม่ระบุคนขาย') as seller_name";
-            $groups[] = DB::raw("coalesce(s.name, 'ไม่ระบุคนขาย')");
+            $selects[] = "coalesce(u.name, 'ไม่ระบุผู้ขายหลังบ้าน') as seller_name";
+            $groups[] = DB::raw("coalesce(u.name, 'ไม่ระบุผู้ขายหลังบ้าน')");
         }
 
         return $query

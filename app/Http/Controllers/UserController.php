@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\Role;
 use App\Models\SalesArea;
+use App\Models\Salesman;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -83,6 +84,7 @@ class UserController extends Controller
             'must_change_password' => true,
         ]);
         $user->roles()->sync($data['role_ids']);
+        $this->syncPosProfile($user, $user->salesman_id);
         $this->audit('user_create', $user, [], [
             'username' => $user->username,
             'role_ids' => $data['role_ids'],
@@ -136,6 +138,7 @@ class UserController extends Controller
         }
         $user->save();
         $user->roles()->sync($data['role_ids']);
+        $this->syncPosProfile($user, $user->salesman_id);
         $this->audit('user_update', $user, $oldValues, [
             'name' => $user->name,
             'branch_id' => $user->branch_id,
@@ -180,5 +183,13 @@ class UserController extends Controller
             'old_values' => $oldValues,
             'new_values' => $newValues,
         ]);
+    }
+
+    private function syncPosProfile(User $user, ?int $salesmanId): void
+    {
+        Salesman::where('user_id', $user->id)->update(['user_id' => null]);
+        if ($salesmanId) {
+            Salesman::whereKey($salesmanId)->update(['user_id' => $user->id]);
+        }
     }
 }

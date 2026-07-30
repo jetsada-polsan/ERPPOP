@@ -16,7 +16,7 @@ class PosDevice extends Model
     protected $fillable = [
         'name', 'user_id', 'branch_id', 'terminal_code',
         'token_hash', 'token_encrypted', 'last_seen_at', 'last_ip', 'revoked_at',
-        'active_cashier_id', 'cashier_verified_at',
+        'active_cashier_id', 'active_cashier_user_id', 'cashier_verified_at',
     ];
 
     protected $casts = [
@@ -43,6 +43,11 @@ class PosDevice extends Model
         return $this->belongsTo(Salesman::class, 'active_cashier_id');
     }
 
+    public function activeCashierUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'active_cashier_user_id');
+    }
+
     public function isActive(): bool
     {
         return $this->revoked_at === null;
@@ -53,6 +58,7 @@ class PosDevice extends Model
     {
         $this->forceFill([
             'active_cashier_id' => $cashier->id,
+            'active_cashier_user_id' => $cashier->user_id,
             'cashier_verified_at' => now(),
         ])->saveQuietly();
     }

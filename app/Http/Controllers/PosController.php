@@ -464,6 +464,7 @@ class PosController extends Controller
             'branch_id' => $data['branch_id'],
             'pos_terminal_id' => $terminal->id,
             'cashier_id' => $data['cashier_id'],
+            'cashier_user_id' => $this->cashierUserId($data['cashier_id']),
             'shift_no' => $this->nextShiftNo((int) $data['branch_id']),
             'opened_at' => now(),
             'opening_cash' => $data['opening_cash'],
@@ -526,7 +527,7 @@ class PosController extends Controller
         ]);
         $branchId = $this->enforcedBranchId((int) $data['branch_id']);
 
-        $bills = PosHeldBill::with(['cashier:id,code,name', 'terminal:id,code,name'])
+        $bills = PosHeldBill::with(['cashier:id,code,name', 'cashierUser:id,name,username', 'terminal:id,code,name'])
             ->where('branch_id', $branchId)
             ->where('status', 'held')
             ->orderByDesc('held_at')
@@ -539,7 +540,7 @@ class PosController extends Controller
                 'hold_no' => $bill->hold_no,
                 'label' => $bill->note ?: $bill->hold_no,
                 'createdAt' => $bill->held_at?->toIso8601String() ?? $bill->created_at?->toIso8601String(),
-                'cashier_name' => $bill->cashier?->name,
+                'cashier_name' => $bill->cashierUser?->name ?? $bill->cashier?->name,
                 'terminal_name' => $bill->terminal?->name,
                 'total_amount' => (float) $bill->total_amount,
             ]);
@@ -579,6 +580,7 @@ class PosController extends Controller
                 'pos_terminal_id' => $shift->pos_terminal_id,
                 'pos_shift_id' => $shift->id,
                 'cashier_id' => $cashierId,
+                'cashier_user_id' => $shift->cashier_user_id ?: $this->cashierUserId($cashierId),
                 'held_by' => auth()->id(),
                 'customer_id' => $data['customer_id'] ?? null,
                 'total_amount' => $data['total_amount'],
@@ -666,7 +668,7 @@ class PosController extends Controller
         $branchId = $this->enforcedBranchId((int) $shift->branch_id);
         abort_unless($branchId === (int) $shift->branch_id || auth()->user()?->hasPermission('reports.view'), 403);
         $shift->load([
-            'branch', 'cashier', 'terminal',
+            'branch', 'cashier', 'cashierUser', 'terminal',
             'cashMovements' => fn ($query) => $query->with(['creator:id,name', 'approver:id,name'])->orderBy('id'),
         ]);
 
@@ -1042,7 +1044,7 @@ class PosController extends Controller
             'document_id' => $documentId,
             'receipt_no' => $receiptNo,
             'receipt_date' => now(),
-            'cashier_id' => auth()->id(),
+            'cashier_id' => $shift->cashier_user_id ?: auth()->id(),
             'cashier_salesman_id' => $data['cashier_id'],
             'member_id' => $data['member_id'] ?? null,
             'gross_sales' => $gross,
@@ -1175,7 +1177,7 @@ class PosController extends Controller
 
     private function shiftPayload(PosShift $shift): array
     {
-        $shift->loadMissing(['branch', 'cashier', 'terminal']);
+        $shift->loadMissing(['branch', 'cashier', 'cashierUser', 'terminal']);
         $movements = $this->cashMovementTotals($shift);
 
         return [
@@ -1186,6 +1188,8 @@ class PosController extends Controller
             'branch_name' => $shift->branch?->name_th,
             'cashier_id' => $shift->cashier_id,
             'cashier_name' => $shift->cashier?->name,
+            'cashier_user_id' => $shift->cashier_user_id,
+            'cashier_user_name' => $shift->cashierUser?->name,
             'opened_at' => $shift->opened_at?->format('Y-m-d H:i:s'),
             'closed_at' => $shift->closed_at?->format('Y-m-d H:i:s'),
             'opening_cash' => (float) $shift->opening_cash,
@@ -1202,5 +1206,12 @@ class PosController extends Controller
             'cash_payouts' => $movements['payout'],
             'z_report_url' => route('pos.shift.z-report', $shift),
         ];
+    }
+
+    private function cashierUserId(?int $cashierId): ?int
+    {
+        return $cashierId
+            ? (Salesman::whereKey($cashierId)->value('user_id') ?: auth()->id())
+            : auth()->id();
     }
 }

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
-    'branch_id', 'pos_terminal_id', 'cashier_id', 'shift_no', 'opened_at', 'closed_at',
+    'branch_id', 'pos_terminal_id', 'cashier_id', 'cashier_user_id', 'shift_no', 'opened_at', 'closed_at',
     'opening_cash', 'cash_sales', 'transfer_sales', 'card_sales', 'cheque_sales',
     'expected_cash', 'counted_cash', 'cash_difference', 'receipt_count', 'status',
     'opening_note', 'closing_note',
@@ -28,6 +28,11 @@ class PosShift extends Model
     public function cashier(): BelongsTo
     {
         return $this->belongsTo(Salesman::class, 'cashier_id');
+    }
+
+    public function cashierUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cashier_user_id');
     }
 
     public function receipts(): HasMany
