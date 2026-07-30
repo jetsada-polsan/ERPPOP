@@ -1,12 +1,12 @@
 @extends('layout')
 @section('title', 'พนักงานขาย - POPSTAR ERP')
-@section('page-title', 'พนักงานขาย')
-@section('page-subtitle', 'ทะเบียนพนักงาน/นักขาย สำหรับอ้างอิงในเอกสารขาย')
+@section('page-title', 'สายการขายและ POS เดิม')
+@section('page-subtitle', 'สายการขายผูกกับบัญชีผู้ใช้โดยตรง ส่วนแฟ้มพนักงานเดิมใช้รองรับ POS และประวัติเก่า')
 @section('content')
     <div x-data="salesmanPage()" x-cloak>
         <div class="list-toolbar">
             <div class="list-toolbar-left">
-                <h2 class="h5 fw-bold mb-0">รายการพนักงานขาย</h2>
+                <h2 class="h5 fw-bold mb-0">แฟ้มอ้างอิง POS เดิม</h2>
                 @include('partials.search-bar', ['q' => $q, 'placeholder' => 'ค้นหารหัส / ชื่อ'])
             </div>
             <div class="d-flex gap-2">
@@ -43,22 +43,28 @@
             <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
                 <div>
                     <h2 class="h5 fw-bold mb-1">สายการขาย / เล่มใบจอง</h2>
-                    <div class="text-muted small">รหัส B/BK จาก Business Plus แต่ละสายมีเลขเอกสารแยก และกำหนดพนักงานขายหลักได้</div>
+                    <div class="text-muted small">รหัส B/BK จาก Business Plus แต่ละสายมีเลขเอกสารแยก ผู้ดูแลมาจากบัญชีผู้ใช้ที่ผูกกับสายนี้</div>
                 </div>
             </div>
             <div class="table-responsive">
                 <table class="table align-middle">
-                    <thead><tr><th>รหัส/เล่ม</th><th>ชื่อสายการขาย</th><th>ใช้กับสาขา</th><th>พนักงานขายหลัก</th><th>สถานะ</th><th></th></tr></thead>
+                    <thead><tr><th>รหัส/เล่ม</th><th>ชื่อสายการขาย</th><th>ใช้กับสาขา</th><th>บัญชีผู้ใช้ในสาย</th><th>สถานะ</th><th></th></tr></thead>
                     <tbody>
                     @forelse($salesAreas as $area)
                         <tr>
                             <td class="fw-semibold">{{ $area->code }}</td>
                             <td>{{ $area->name }}</td>
                             <td>{{ $area->branch?->name_th ?? 'ใช้ได้หลายสาขา' }}</td>
-                            <td>{{ $area->defaultSalesman ? $area->defaultSalesman->code.' - '.$area->defaultSalesman->name : '-' }}</td>
+                            <td>
+                                @forelse($area->users as $user)
+                                    <span class="badge text-bg-light border">{{ $user->username }} - {{ $user->name }}</span>
+                                @empty
+                                    <span class="text-muted">ยังไม่ผูกผู้ใช้</span>
+                                @endforelse
+                            </td>
                             <td><span class="badge {{ $area->is_active ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $area->is_active ? 'ใช้งาน' : 'ปิด' }}</span></td>
                             <td class="text-end"><button type="button" class="btn btn-sm btn-light border"
-                                @click="openAreaEdit(@js($area->id), @js($area->code), @js($area->name), @js($area->branch_id), @js($area->default_salesman_id), @js($area->is_active))">แก้ไข</button></td>
+                                @click="openAreaEdit(@js($area->id), @js($area->code), @js($area->name), @js($area->branch_id), @js($area->is_active))">แก้ไข</button></td>
                         </tr>
                     @empty
                         <tr><td colspan="6" class="py-4 text-center text-muted">ยังไม่มีสายการขาย</td></tr>
@@ -101,7 +107,7 @@
         <div class="booking-modal-backdrop" x-show="areaModalOpen" x-transition.opacity @keydown.escape.window="areaModalOpen = false">
             <div class="booking-modal" style="width:min(620px,100%)" @click.outside="areaModalOpen = false" x-transition>
                 <div class="modal-header border-0 px-4 pt-4 pb-2">
-                    <div><h3 class="h5 fw-bold mb-1" x-text="areaEditingId ? 'แก้ไขสายการขาย' : 'เพิ่มสายการขาย'"></h3><div class="text-muted small">ระบบสร้างเล่มใบจองรหัสเดียวกัน และเติมพนักงานขายหลักให้อัตโนมัติ</div></div>
+                    <div><h3 class="h5 fw-bold mb-1" x-text="areaEditingId ? 'แก้ไขสายการขาย' : 'เพิ่มสายการขาย'"></h3><div class="text-muted small">ระบบสร้างเล่มใบจองรหัสเดียวกัน ผู้ดูแลกำหนดจากหน้าผู้ใช้</div></div>
                     <button type="button" class="btn btn-light rounded-circle" @click="areaModalOpen=false"><i class="bi bi-x-lg"></i></button>
                 </div>
                 <form method="post" :action="areaFormAction">
@@ -112,7 +118,6 @@
                             <div class="col-md-4"><label class="form-label small text-muted">รหัสสาย/รหัสเล่ม</label><input name="code" x-model="areaCode" class="form-control" required placeholder="เช่น B20"></div>
                             <div class="col-md-8"><label class="form-label small text-muted">ชื่อสายการขาย</label><input name="name" x-model="areaName" class="form-control" required placeholder="เช่น กันทรารมย์-ราษี-ยโส"></div>
                             <div class="col-md-6"><label class="form-label small text-muted">จำกัดสาขา (ถ้ามี)</label><select name="branch_id" x-model="areaBranchId" class="form-select"><option value="">ใช้ได้หลายสาขา</option>@foreach($branches as $branch)<option value="{{ $branch->id }}">{{ $branch->code }} - {{ $branch->name_th }}</option>@endforeach</select></div>
-                            <div class="col-md-6"><label class="form-label small text-muted">พนักงานขายหลัก</label><select name="default_salesman_id" x-model="areaSalesmanId" class="form-select"><option value="">ไม่ระบุ</option>@foreach($activeSalesmen as $salesman)<option value="{{ $salesman->id }}">{{ $salesman->code }} - {{ $salesman->name }}</option>@endforeach</select></div>
                             <div class="col-12"><label class="form-check"><input type="checkbox" name="is_active" value="1" x-model="areaIsActive" class="form-check-input"><span class="form-check-label">เปิดใช้งานในใบจองและรายงาน</span></label></div>
                         </div>
                     </div>
@@ -128,11 +133,11 @@
 function salesmanPage() {
     return {
         modalOpen: false, editingId: null, code: '', name: '', branchId: '', isActive: true,
-        areaModalOpen: false, areaEditingId: null, areaCode: '', areaName: '', areaBranchId: '', areaSalesmanId: '', areaIsActive: true,
+        areaModalOpen: false, areaEditingId: null, areaCode: '', areaName: '', areaBranchId: '', areaIsActive: true,
         openCreate() { this.editingId=null; this.code=''; this.name=''; this.branchId=''; this.isActive=true; this.modalOpen=true; },
         openEdit(id,code,name,branchId,isActive) { this.editingId=id; this.code=code; this.name=name; this.branchId=branchId||''; this.isActive=isActive; this.modalOpen=true; },
-        openAreaCreate() { this.areaEditingId=null; this.areaCode=''; this.areaName=''; this.areaBranchId=''; this.areaSalesmanId=''; this.areaIsActive=true; this.areaModalOpen=true; },
-        openAreaEdit(id,code,name,branchId,salesmanId,isActive) { this.areaEditingId=id; this.areaCode=code; this.areaName=name; this.areaBranchId=branchId||''; this.areaSalesmanId=salesmanId||''; this.areaIsActive=isActive; this.areaModalOpen=true; },
+        openAreaCreate() { this.areaEditingId=null; this.areaCode=''; this.areaName=''; this.areaBranchId=''; this.areaIsActive=true; this.areaModalOpen=true; },
+        openAreaEdit(id,code,name,branchId,isActive) { this.areaEditingId=id; this.areaCode=code; this.areaName=name; this.areaBranchId=branchId||''; this.areaIsActive=isActive; this.areaModalOpen=true; },
         get formAction() { return this.editingId ? `{{ url('salesmen') }}/${this.editingId}` : `{{ route('salesmen.store') }}`; },
         get areaFormAction() { return this.areaEditingId ? `{{ url('sales-areas') }}/${this.areaEditingId}` : `{{ route('sales-areas.store') }}`; },
     };

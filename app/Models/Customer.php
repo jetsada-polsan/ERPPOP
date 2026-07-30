@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['code', 'name_th', 'name_en', 'tax_id', 'tax_branch', 'branch_id', 'credit_limit', 'is_active', 'pending_credit_limit', 'credit_limit_requested_by', 'credit_limit_requested_at'])]
+#[Fillable(['code', 'name_th', 'name_en', 'tax_id', 'tax_branch', 'branch_id', 'sales_user_id', 'sales_area_id', 'credit_limit', 'is_active', 'pending_credit_limit', 'credit_limit_requested_by', 'credit_limit_requested_at'])]
 class Customer extends Model
 {
     use SoftDeletes;
@@ -16,6 +16,16 @@ class Customer extends Model
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    public function salesUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'sales_user_id');
+    }
+
+    public function salesArea(): BelongsTo
+    {
+        return $this->belongsTo(SalesArea::class);
     }
 
     public function creditLimitRequester(): BelongsTo

@@ -21,7 +21,7 @@
                 <table class="table align-middle">
                     <thead>
                         <tr>
-                            <th>รหัส</th><th>ชื่อลูกค้า</th><th>สาขา</th>
+                            <th>รหัส</th><th>ชื่อลูกค้า</th><th>สาขา</th><th>ผู้ดูแล</th><th>สายการขาย</th>
                             <th class="text-end">วงเงินเครดิต</th><th class="text-end">ค้างชำระ</th><th>สถานะ</th><th></th>
                         </tr>
                     </thead>
@@ -31,6 +31,8 @@
                                 <td class="fw-semibold">{{ $customer->code }}</td>
                                 <td>{{ $customer->name_th }}</td>
                                 <td>{{ $customer->branch?->name_th ?? '-' }}</td>
+                                <td>{{ $customer->salesUser?->name ?? '-' }}<div class="text-muted small">{{ $customer->salesUser?->username }}</div></td>
+                                <td>{{ $customer->salesArea ? $customer->salesArea->code.' - '.$customer->salesArea->name : '-' }}</td>
                                 <td class="text-end">{{ number_format($customer->credit_limit, 2) }}</td>
                                 <td class="text-end {{ ($customer->outstanding_balance ?? 0) > 0 ? 'text-danger fw-semibold' : '' }}">
                                     {{ number_format($customer->outstanding_balance ?? 0, 2) }}
@@ -46,7 +48,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="py-5 text-center text-muted">ไม่พบลูกค้า</td>
+                                <td colspan="9" class="py-5 text-center text-muted">ไม่พบลูกค้า</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -98,6 +100,30 @@
                                 <label class="form-label text-muted small">วงเงินเครดิต</label>
                                 <input type="number" step="0.01" min="0" name="credit_limit" value="0" class="form-control">
                             </div>
+                            @if(auth()->user()->hasPermission('sales.assign'))
+                                <div class="col-md-6">
+                                    <label class="form-label text-muted small">ผู้ดูแลลูกค้า</label>
+                                    <select name="sales_user_id" x-model="salesUserId" @change="syncAreaFromUser()" class="form-select">
+                                        <option value="">-- ยังไม่ระบุ --</option>
+                                        @foreach($salesUsers as $salesUser)
+                                            <option value="{{ $salesUser->id }}">{{ $salesUser->username }} - {{ $salesUser->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-muted small">สายการขาย / สายส่ง</label>
+                                    <select name="sales_area_id" x-model="salesAreaId" class="form-select">
+                                        <option value="">-- ใช้สายประจำของผู้ดูแล --</option>
+                                        @foreach($salesAreas as $area)
+                                            <option value="{{ $area->id }}">{{ $area->code }} - {{ $area->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            @else
+                                <div class="col-12">
+                                    <div class="alert alert-info py-2 mb-0 small">ระบบจะผูกคุณเป็นผู้ดูแล และใช้สายการขายประจำของคุณอัตโนมัติ</div>
+                                </div>
+                            @endif
                             <div class="col-md-6 d-flex align-items-end">
                                 <div class="form-check">
                                     <input type="checkbox" name="is_active" value="1" checked class="form-check-input" id="newCustomerActive">
@@ -131,7 +157,19 @@
 @push('scripts')
 <script>
     function customerPage() {
-        return { modalOpen: false };
+        return {
+            modalOpen: false,
+            salesUserId: '',
+            salesAreaId: '',
+            users: @js($salesUsers->map(fn ($user) => [
+                'id' => (string) $user->id,
+                'sales_area_id' => $user->sales_area_id ? (string) $user->sales_area_id : '',
+            ])->values()),
+            syncAreaFromUser() {
+                const selected = this.users.find(user => user.id === String(this.salesUserId));
+                if (selected?.sales_area_id) this.salesAreaId = selected.sales_area_id;
+            },
+        };
     }
 </script>
 @endpush

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
-    'document_type_id', 'document_book_id', 'branch_id', 'doc_number', 'doc_date', 'salesman_id', 'sales_area_id',
+    'document_type_id', 'document_book_id', 'branch_id', 'doc_number', 'doc_date', 'salesman_id', 'sales_user_id', 'sales_area_id',
     'customer_id', 'supplier_id', 'reference', 'status', 'total_items', 'total_amount',
     'subtotal_amount', 'vat_amount', 'prices_include_vat', 'claim_input_vat',
     'remark', 'created_by',
@@ -33,6 +33,11 @@ class Document extends Model
     public function salesman(): BelongsTo
     {
         return $this->belongsTo(Salesman::class);
+    }
+
+    public function salesUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'sales_user_id');
     }
 
     public function customer(): BelongsTo

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'customer_id', 'document_id', 'salesman_id', 'gross_amount', 'vat_amount', 'discount_amount',
+    'customer_id', 'document_id', 'salesman_id', 'sales_user_id', 'gross_amount', 'vat_amount', 'discount_amount',
     'net_amount', 'paid_amount', 'balance_amount', 'gps_lat', 'gps_lng', 'due_date', 'status',
 ])]
 class CustomerOpenItem extends Model
@@ -33,6 +33,11 @@ class CustomerOpenItem extends Model
     public function salesman(): BelongsTo
     {
         return $this->belongsTo(Salesman::class);
+    }
+
+    public function salesUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'sales_user_id');
     }
 
     protected function casts(): array

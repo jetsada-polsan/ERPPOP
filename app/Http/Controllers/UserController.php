@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\Role;
+use App\Models\SalesArea;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,7 +26,7 @@ class UserController extends Controller
     {
         $q = trim((string) $request->query('q', ''));
         $status = trim((string) $request->query('status', ''));
-        $users = User::with(['branch', 'salesman', 'roles'])
+        $users = User::with(['branch', 'salesman', 'salesArea', 'roles'])
             ->when($q !== '', fn ($query) => $query->where(fn ($where) => $where
                 ->whereLike('username', "%{$q}%")
                 ->orWhereLike('name', "%{$q}%")
@@ -41,8 +42,9 @@ class UserController extends Controller
         $branches = Branch::orderBy('code')->get(['id', 'code', 'name_th']);
         $roles = Role::with('permissions')->orderBy('id')->get();
         $salesmen = \App\Models\Salesman::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
+        $salesAreas = SalesArea::where('area_type', 'route')->where('is_active', true)->orderBy('code')->get();
 
-        return view('users.index', compact('users', 'branches', 'roles', 'salesmen', 'q', 'status'));
+        return view('users.index', compact('users', 'branches', 'roles', 'salesmen', 'salesAreas', 'q', 'status'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -55,6 +57,7 @@ class UserController extends Controller
             'position' => ['nullable', 'string', 'max:100'],
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
             'salesman_id' => ['nullable', 'integer', 'exists:salesmen,id'],
+            'sales_area_id' => ['nullable', 'integer', 'exists:sales_areas,id'],
             'role_ids' => ['required', 'array', 'min:1'],
             'role_ids.*' => ['integer', 'exists:roles,id'],
             'password' => ['required', 'confirmed', $this->passwordRule()],
@@ -74,6 +77,7 @@ class UserController extends Controller
             'position' => $data['position'] ?? null,
             'branch_id' => $data['branch_id'] ?? null,
             'salesman_id' => $data['salesman_id'] ?? null,
+            'sales_area_id' => $data['sales_area_id'] ?? null,
             'password' => $data['password'],
             'is_active' => true,
             'must_change_password' => true,
@@ -94,6 +98,7 @@ class UserController extends Controller
             'name' => $user->name,
             'branch_id' => $user->branch_id,
             'salesman_id' => $user->salesman_id,
+            'sales_area_id' => $user->sales_area_id,
             'is_active' => $user->is_active,
             'role_ids' => $user->roles()->pluck('roles.id')->all(),
         ];
@@ -104,6 +109,7 @@ class UserController extends Controller
             'position' => ['nullable', 'string', 'max:100'],
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
             'salesman_id' => ['nullable', 'integer', 'exists:salesmen,id'],
+            'sales_area_id' => ['nullable', 'integer', 'exists:sales_areas,id'],
             'role_ids' => ['required', 'array', 'min:1'],
             'role_ids.*' => ['integer', 'exists:roles,id'],
             'password' => ['nullable', 'confirmed', $this->passwordRule()],
@@ -121,6 +127,7 @@ class UserController extends Controller
             'position' => $data['position'] ?? null,
             'branch_id' => $data['branch_id'] ?? null,
             'salesman_id' => $data['salesman_id'] ?? null,
+            'sales_area_id' => $data['sales_area_id'] ?? null,
             'is_active' => $request->boolean('is_active', true),
         ]);
         if (! empty($data['password'])) {
@@ -133,6 +140,7 @@ class UserController extends Controller
             'name' => $user->name,
             'branch_id' => $user->branch_id,
             'salesman_id' => $user->salesman_id,
+            'sales_area_id' => $user->sales_area_id,
             'is_active' => $user->is_active,
             'role_ids' => $data['role_ids'],
             'password_changed' => ! empty($data['password']),

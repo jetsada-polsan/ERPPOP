@@ -93,11 +93,23 @@
                     </div>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label small text-muted">รหัสพนักงานขาย/แคชเชียร์ <span class="text-danger">(POS ขายในชื่อนี้)</span></label>
+                    <label class="form-label small text-muted">สายการขาย / สายส่งประจำ <span class="text-danger">(ใบจองดึงอัตโนมัติ)</span></label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-signpost-split"></i></span>
+                        <select name="sales_area_id" x-model="form.sales_area_id" class="form-select">
+                            <option value="">-- ไม่ระบุสาย --</option>
+                            @foreach($salesAreas as $area)
+                                <option value="{{ $area->id }}">{{ $area->code }} - {{ $area->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small text-muted">โปรไฟล์แคชเชียร์ POS <span class="text-muted">(เฉพาะระบบหน้าร้านเดิม)</span></label>
                     <div class="input-group">
                         <span class="input-group-text"><i class="bi bi-person-vcard"></i></span>
                         <select name="salesman_id" x-model="form.salesman_id" class="form-select">
-                            <option value="">-- ไม่ใช่คนขาย (ขาย POS ไม่ได้) --</option>
+                            <option value="">-- ไม่ใช้ POS --</option>
                             @foreach($salesmen as $s)
                                 <option value="{{ $s->id }}">{{ $s->code }} - {{ $s->name }}</option>
                             @endforeach
@@ -161,7 +173,7 @@
         <h2 class="h5 fw-bold mb-3"><i class="bi bi-people-fill me-2" style="color:var(--fa-blue)"></i>รายชื่อผู้ใช้</h2>
         <div class="table-responsive">
             <table class="table align-middle user-list-table">
-                <thead><tr><th>ผู้ใช้</th><th>ชื่อ-นามสกุล</th><th>ตำแหน่ง</th><th>สาขา</th><th>บทบาท</th><th>เข้าใช้ล่าสุด</th><th>สถานะ</th><th></th></tr></thead>
+                <thead><tr><th>ผู้ใช้</th><th>ชื่อ-นามสกุล</th><th>ตำแหน่ง</th><th>สาขา</th><th>สายการขาย</th><th>บทบาท</th><th>เข้าใช้ล่าสุด</th><th>สถานะ</th><th></th></tr></thead>
                 <tbody>
                 @forelse($users as $user)
                     <tr>
@@ -169,6 +181,7 @@
                         <td>{{ $user->name }}<div class="text-muted small">{{ $user->phone }}</div></td>
                         <td class="small">{{ $user->position ?? '-' }}</td>
                         <td class="small">{{ $user->branch?->name_th ?? 'ส่วนกลาง' }}</td>
+                        <td class="small">{{ $user->salesArea ? $user->salesArea->code.' - '.$user->salesArea->name : '-' }}</td>
                         <td>
                             @foreach($user->roles as $role)
                                 <span class="badge text-bg-primary">{{ $role->name }}</span>
@@ -183,7 +196,7 @@
                         </td>
                         <td class="text-end">
                             <button type="button" class="btn btn-sm btn-light border"
-                                @click="editUser({{ json_encode(['id' => $user->id, 'username' => $user->username, 'name' => $user->name, 'email' => $user->email, 'phone' => $user->phone, 'position' => $user->position, 'branch_id' => $user->branch_id, 'salesman_id' => $user->salesman_id, 'role_ids' => $user->roles->pluck('id'), 'is_active' => $user->is_active]) }})">
+                                @click="editUser({{ json_encode(['id' => $user->id, 'username' => $user->username, 'name' => $user->name, 'email' => $user->email, 'phone' => $user->phone, 'position' => $user->position, 'branch_id' => $user->branch_id, 'salesman_id' => $user->salesman_id, 'sales_area_id' => $user->sales_area_id, 'role_ids' => $user->roles->pluck('id'), 'is_active' => $user->is_active]) }})">
                                 <i class="bi bi-pencil me-1"></i>แก้ไข
                             </button>
                             <button type="button" class="btn btn-sm btn-outline-warning"
@@ -193,7 +206,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="8" class="text-center text-muted py-5">ยังไม่มีผู้ใช้ — เพิ่มคนแรกด้านบน</td></tr>
+                    <tr><td colspan="9" class="text-center text-muted py-5">ยังไม่มีผู้ใช้ — เพิ่มคนแรกด้านบน</td></tr>
                 @endforelse
                 </tbody>
             </table>
@@ -288,7 +301,7 @@ function userPage() {
     return {
         editId: null, editUsername: '', roleError: false,
         resetOpen: false, resetId: null, resetUsername: '', resetName: '',
-        form: { username: '', name: '', email: '', phone: '', position: '', branch_id: '', salesman_id: '', role_ids: [], is_active: true },
+        form: { username: '', name: '', email: '', phone: '', position: '', branch_id: '', salesman_id: '', sales_area_id: '', role_ids: [], is_active: true },
 
         editUser(user) {
             this.editId = user.id;
@@ -301,6 +314,7 @@ function userPage() {
                 position: user.position || '',
                 branch_id: user.branch_id || '',
                 salesman_id: user.salesman_id || '',
+                sales_area_id: user.sales_area_id || '',
                 role_ids: user.role_ids || [],
                 is_active: !!user.is_active,
             };
@@ -312,7 +326,7 @@ function userPage() {
             this.editId = null;
             this.editUsername = '';
             this.roleError = false;
-            this.form = { username: '', name: '', email: '', phone: '', position: '', branch_id: '', salesman_id: '', role_ids: [], is_active: true };
+            this.form = { username: '', name: '', email: '', phone: '', position: '', branch_id: '', salesman_id: '', sales_area_id: '', role_ids: [], is_active: true };
         },
         openReset(id, username, name) {
             this.resetId = id;

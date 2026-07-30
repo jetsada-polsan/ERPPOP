@@ -16,7 +16,9 @@
                     <h2 class="h4 fw-bold mb-1">{{ $customer->code }} - {{ $customer->name_th }}</h2>
                     <div class="text-muted small">
                         สาขา: {{ $customer->branch?->name_th ?? '-' }} &middot;
-                        วงเงินเครดิต: {{ number_format($customer->credit_limit, 2) }} บาท
+                        วงเงินเครดิต: {{ number_format($customer->credit_limit, 2) }} บาท &middot;
+                        ผู้ดูแล: {{ $customer->salesUser?->name ?? 'ยังไม่ระบุ' }} &middot;
+                        สาย: {{ $customer->salesArea?->code ?? 'ยังไม่ระบุ' }}
                     </div>
                 </div>
                 <div class="d-flex align-items-center gap-2">
@@ -166,6 +168,34 @@
                                 <label class="form-label text-muted small">วงเงินเครดิต</label>
                                 <input type="number" step="0.01" min="0" name="credit_limit" value="{{ $customer->credit_limit }}" class="form-control">
                             </div>
+                            @if(auth()->user()->hasPermission('sales.assign'))
+                                <div class="col-md-6">
+                                    <label class="form-label text-muted small">ผู้ดูแลลูกค้า</label>
+                                    <select name="sales_user_id" x-model="salesUserId" @change="syncAreaFromUser()" class="form-select">
+                                        <option value="">-- ยังไม่ระบุ --</option>
+                                        @foreach($salesUsers as $salesUser)
+                                            <option value="{{ $salesUser->id }}">{{ $salesUser->username }} - {{ $salesUser->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-muted small">สายการขาย / สายส่ง</label>
+                                    <select name="sales_area_id" x-model="salesAreaId" class="form-select">
+                                        <option value="">-- ยังไม่ระบุ --</option>
+                                        @foreach($salesAreas as $area)
+                                            <option value="{{ $area->id }}">{{ $area->code }} - {{ $area->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            @else
+                                <div class="col-12">
+                                    <div class="alert alert-light border py-2 mb-0 small">
+                                        ผู้ดูแล: <strong>{{ $customer->salesUser?->name ?? 'ยังไม่ระบุ' }}</strong>
+                                        &middot; สาย: <strong>{{ $customer->salesArea?->code ?? 'ยังไม่ระบุ' }}</strong>
+                                        (หัวหน้าฝ่ายขายเป็นผู้โอนความรับผิดชอบ)
+                                    </div>
+                                </div>
+                            @endif
                             <div class="col-md-6 d-flex align-items-end">
                                 <div class="form-check">
                                     <input type="checkbox" name="is_active" value="1" @checked($customer->is_active) class="form-check-input" id="editCustomerActive">
@@ -319,7 +349,22 @@
 @push('scripts')
 <script>
     function customerShow() {
-        return { editOpen: false, addressOpen: false, contactOpen: false, paymentOpen: false };
+        return {
+            editOpen: false,
+            addressOpen: false,
+            contactOpen: false,
+            paymentOpen: false,
+            salesUserId: @js((string) ($customer->sales_user_id ?? '')),
+            salesAreaId: @js((string) ($customer->sales_area_id ?? '')),
+            users: @js($salesUsers->map(fn ($user) => [
+                'id' => (string) $user->id,
+                'sales_area_id' => $user->sales_area_id ? (string) $user->sales_area_id : '',
+            ])->values()),
+            syncAreaFromUser() {
+                const selected = this.users.find(user => user.id === String(this.salesUserId));
+                if (selected?.sales_area_id) this.salesAreaId = selected.sales_area_id;
+            },
+        };
     }
 </script>
 @endpush

@@ -130,9 +130,10 @@ function docEntryPage(config) {
         partyQuery: '',
         partyId: '',
         partyResults: [],
-        branchId: '',
-        salesAreaId: '',
-        salesmanId: '',
+        branchId: config.defaultBranchId ? String(config.defaultBranchId) : '',
+        salesAreaId: config.defaultSalesAreaId ? String(config.defaultSalesAreaId) : '',
+        salesUserId: config.defaultSalesUserId ? String(config.defaultSalesUserId) : '',
+        salesUserName: config.defaultSalesUserName || '',
         items: [{ product_id: '', productQuery: '', qty: 1, unit_price: 0, unit_name: '', is_scale: false, scale_plu: '', lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [], results: [] }],
         openModal() {
             this.modalOpen = true;
@@ -141,6 +142,9 @@ function docEntryPage(config) {
                     const branch = this.$root.querySelector('.doc-modal [name="branch_id"]');
                     this.branchId = branch?.value || '';
                 }
+                if (!this.salesAreaId && this.config.defaultSalesAreaId) this.salesAreaId = String(this.config.defaultSalesAreaId);
+                if (!this.salesUserId && this.config.defaultSalesUserId) this.salesUserId = String(this.config.defaultSalesUserId);
+                if (!this.salesUserName) this.salesUserName = this.config.defaultSalesUserName || '';
                 this.onBranchChanged();
             });
         },
@@ -154,6 +158,13 @@ function docEntryPage(config) {
         selectParty(party) {
             this.partyId = party.id;
             this.partyQuery = `${party.code} - ${party.name_th}`;
+            this.salesUserId = party.sales_user_id
+                ? String(party.sales_user_id)
+                : String(this.config.defaultSalesUserId || '');
+            this.salesUserName = party.sales_user_name || this.config.defaultSalesUserName || '';
+            this.salesAreaId = party.sales_area_id
+                ? String(party.sales_area_id)
+                : String(this.config.defaultSalesAreaId || '');
             this.partyResults = [];
         },
         onBranchChanged() {
@@ -167,7 +178,6 @@ function docEntryPage(config) {
             const area = (this.config.salesAreas || []).find(item => String(item.id) === String(this.salesAreaId));
             if (!area) return;
             if (area.branch_id) this.branchId = String(area.branch_id);
-            if (area.default_salesman_id) this.salesmanId = String(area.default_salesman_id);
         },
         addItem() { this.items.push({ product_id: '', productQuery: '', qty: 1, unit_price: 0, unit_name: '', is_scale: false, scale_plu: '', lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [], results: [] }); },
         removeItem(index) { this.items.splice(index, 1); },

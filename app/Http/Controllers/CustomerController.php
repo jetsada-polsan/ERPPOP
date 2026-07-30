@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\Customer;
+use App\Models\SalesArea;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -16,7 +18,7 @@ class CustomerController extends Controller
         $q = trim((string) $request->query('q', ''));
 
         $customers = Customer::query()
-            ->with('branch')
+            ->with(['branch', 'salesUser', 'salesArea'])
             ->withSum(['openItems as outstanding_balance' => fn ($query) => $query->whereIn('status', ['open', 'partial'])], 'balance_amount')
             ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
                 ->where('code', 'ilike', "%{$q}%")
@@ -30,12 +32,14 @@ class CustomerController extends Controller
             'customers' => $customers,
             'q' => $q,
             'branches' => Branch::orderBy('code')->get(),
+            'salesUsers' => $this->salesUsers(),
+            'salesAreas' => $this->salesAreas(),
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
-        $data = $this->validateCustomer($request);
+        $data = $this->applySalesAssignment($request, $this->validateCustomer($request));
 
         $customer = Customer::create($data);
 
@@ -45,7 +49,7 @@ class CustomerController extends Controller
     public function show(Customer $customer): View
     {
         $customer->load([
-            'branch', 'addresses', 'contacts', 'creditLimitRequester',
+            'branch', 'salesUser', 'salesArea', 'addresses', 'contacts', 'creditLimitRequester',
             'openItems' => fn ($q) => $q->orderByDesc('id')->limit(20),
             'openItems.document',
         ]);
@@ -55,13 +59,15 @@ class CustomerController extends Controller
         return view('customers.show', [
             'customer' => $customer,
             'branches' => Branch::orderBy('code')->get(),
+            'salesUsers' => $this->salesUsers(),
+            'salesAreas' => $this->salesAreas(),
             'outstandingBalance' => $outstandingBalance,
         ]);
     }
 
     public function update(Request $request, Customer $customer): RedirectResponse
     {
-        $data = $this->validateCustomer($request, $customer->id);
+        $data = $this->applySalesAssignment($request, $this->validateCustomer($request, $customer->id), $customer);
 
         // เปลี่ยนวงเงินเครดิตต้องรออนุมัติ - ไม่แก้ยอดจริงทันที ส่วนฟิลด์อื่นบันทึกได้เลย
         $requestedLimit = $data['credit_limit'] ?? null;
@@ -157,11 +163,50 @@ class CustomerController extends Controller
             'tax_id' => ['nullable', 'string', 'max:20'],
             'tax_branch' => ['nullable', 'string', 'max:10'],
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
+            'sales_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'sales_area_id' => ['nullable', 'integer', 'exists:sales_areas,id'],
             'credit_limit' => ['nullable', 'numeric', 'min:0'],
             'is_active' => ['nullable', 'boolean'],
         ]);
         $data['is_active'] = $request->boolean('is_active', true);
 
         return $data;
+    }
+
+    private function applySalesAssignment(Request $request, array $data, ?Customer $customer = null): array
+    {
+        $user = $request->user();
+        if (! $user->hasPermission('sales.assign')) {
+            if ($customer) {
+                unset($data['sales_user_id'], $data['sales_area_id']);
+            } else {
+                $data['sales_user_id'] = $user->id;
+                $data['sales_area_id'] = $user->sales_area_id;
+            }
+
+            return $data;
+        }
+
+        $data['sales_user_id'] = $data['sales_user_id'] ?? null;
+        $data['sales_area_id'] = $data['sales_area_id'] ?? null;
+        if ($data['sales_user_id'] && ! $data['sales_area_id']) {
+            $data['sales_area_id'] = User::find($data['sales_user_id'])?->sales_area_id;
+        }
+
+        return $data;
+    }
+
+    private function salesUsers()
+    {
+        return User::where('is_active', true)
+            ->whereHas('roles.permissions', fn ($query) => $query->where('code', 'sales.manage'))
+            ->with('salesArea:id,code,name')
+            ->orderBy('username')
+            ->get(['id', 'username', 'name', 'sales_area_id']);
+    }
+
+    private function salesAreas()
+    {
+        return SalesArea::where('area_type', 'route')->where('is_active', true)->orderBy('code')->get();
     }
 }

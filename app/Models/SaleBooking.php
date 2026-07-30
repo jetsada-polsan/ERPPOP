@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['document_id', 'salesman_id', 'sales_area_id', 'status', 'confirmed_at', 'confirmed_document_id'])]
+#[Fillable(['document_id', 'salesman_id', 'sales_user_id', 'sales_area_id', 'status', 'confirmed_at', 'confirmed_document_id'])]
 class SaleBooking extends Model
 {
     public $timestamps = false;
@@ -25,6 +25,11 @@ class SaleBooking extends Model
     public function salesman(): BelongsTo
     {
         return $this->belongsTo(Salesman::class);
+    }
+
+    public function salesUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'sales_user_id');
     }
 
     public function salesArea(): BelongsTo

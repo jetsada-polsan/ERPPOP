@@ -23,6 +23,7 @@ class SearchController extends Controller
         $q = trim((string) $request->query('q', ''));
 
         $customers = Customer::query()
+            ->with(['salesUser:id,username,name', 'salesArea:id,code,name'])
             ->where('is_active', true)
             ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
                 ->where('code', 'ilike', "%{$q}%")
@@ -30,7 +31,18 @@ class SearchController extends Controller
             ))
             ->orderBy('name_th')
             ->limit(20)
-            ->get(['id', 'code', 'name_th', 'credit_limit']);
+            ->get(['id', 'code', 'name_th', 'credit_limit', 'sales_user_id', 'sales_area_id'])
+            ->map(fn (Customer $customer) => [
+                'id' => $customer->id,
+                'code' => $customer->code,
+                'name_th' => $customer->name_th,
+                'credit_limit' => (float) $customer->credit_limit,
+                'sales_user_id' => $customer->sales_user_id,
+                'sales_user_name' => $customer->salesUser?->name,
+                'sales_area_id' => $customer->sales_area_id,
+                'sales_area_code' => $customer->salesArea?->code,
+                'sales_area_name' => $customer->salesArea?->name,
+            ]);
 
         return response()->json($customers);
     }

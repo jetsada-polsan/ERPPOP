@@ -25,13 +25,12 @@ class SalesmanController extends Controller
             ->withQueryString();
 
         $branches = Branch::orderBy('code')->get();
-        $activeSalesmen = Salesman::where('is_active', true)->orderBy('code')->get();
-        $salesAreas = SalesArea::with(['branch', 'defaultSalesman', 'documentBook'])
+        $salesAreas = SalesArea::with(['branch', 'documentBook', 'users:id,username,name,sales_area_id'])
             ->where('area_type', 'route')
             ->orderBy('code')
             ->get();
 
-        return view('salesmen.index', compact('salesmen', 'activeSalesmen', 'salesAreas', 'branches', 'q'));
+        return view('salesmen.index', compact('salesmen', 'salesAreas', 'branches', 'q'));
     }
 
     public function store(Request $request): RedirectResponse

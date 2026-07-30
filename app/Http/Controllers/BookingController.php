@@ -6,7 +6,7 @@ use App\Models\Branch;
 use App\Models\DocumentBook;
 use App\Models\SaleBooking;
 use App\Models\SalesArea;
-use App\Models\Salesman;
+use App\Models\User;
 use App\Services\Sales\BookingService;
 use App\Services\Sales\CreditSaleService;
 use Illuminate\Http\RedirectResponse;
@@ -24,13 +24,13 @@ class BookingController extends Controller
         $bookId = $request->integer('book') ?: null;
         $branchId = $request->integer('branch_id') ?: null;
         $salesAreaId = $request->integer('sales_area_id') ?: null;
-        $salesmanId = $request->integer('salesman_id') ?: null;
+        $salesUserId = $request->integer('sales_user_id') ?: null;
         $legacyType = trim((string) $request->query('legacy_type', ''));
 
-        $bookings = SaleBooking::with(['document.customer', 'document.branch', 'document.salesman', 'document.salesArea', 'document.documentBook'])
+        $bookings = SaleBooking::with(['document.customer', 'document.branch', 'document.salesUser', 'document.salesArea', 'document.documentBook'])
             ->when($status !== '', fn ($query) => $query->where('status', $status))
             ->when($salesAreaId, fn ($query) => $query->where('sales_area_id', $salesAreaId))
-            ->when($salesmanId, fn ($query) => $query->where('salesman_id', $salesmanId))
+            ->when($salesUserId, fn ($query) => $query->where('sales_user_id', $salesUserId))
             ->when($branchId, fn ($query) => $query->whereHas('document', fn ($d) => $d->where('branch_id', $branchId)))
             ->when($bookId, fn ($query) => $query->whereHas('document', fn ($d) => $d->where('document_book_id', $bookId)))
             ->when($q !== '', fn ($query) => $query->whereHas('document', fn ($d) => $d
@@ -68,7 +68,11 @@ class BookingController extends Controller
         }
 
         $branches = Branch::orderBy('code')->get();
-        $salesmen = Salesman::where('is_active', true)->orderBy('name')->get();
+        $salesUsers = User::where('is_active', true)
+            ->whereHas('roles.permissions', fn ($query) => $query->where('code', 'sales.manage'))
+            ->with('salesArea:id,code,name')
+            ->orderBy('username')
+            ->get(['id', 'username', 'name', 'sales_area_id']);
         $salesAreas = SalesArea::with(['branch', 'defaultSalesman', 'documentBook'])
             ->where('is_active', true)
             ->where('area_type', 'route')
@@ -80,10 +84,17 @@ class BookingController extends Controller
             ->orderByDesc('is_default')
             ->orderBy('code')
             ->get();
+        $currentUser = $request->user()->loadMissing('salesArea');
+        $bookingDefaults = [
+            'branch_id' => $currentUser->branch_id,
+            'sales_user_id' => $currentUser->id,
+            'sales_user_name' => $currentUser->name,
+            'sales_area_id' => $currentUser->sales_area_id,
+        ];
 
         return view('bookings.index', compact(
-            'bookings', 'legacyBookings', 'legacyTypes', 'branches', 'salesmen', 'salesAreas',
-            'documentBooks', 'q', 'status', 'bookId', 'branchId', 'salesAreaId', 'salesmanId', 'legacyType', 'counts'
+            'bookings', 'legacyBookings', 'legacyTypes', 'branches', 'salesUsers', 'salesAreas',
+            'documentBooks', 'bookingDefaults', 'q', 'status', 'bookId', 'branchId', 'salesAreaId', 'salesUserId', 'legacyType', 'counts'
         ));
     }
 
@@ -98,7 +109,6 @@ class BookingController extends Controller
             'customer_id' => ['required', 'integer', 'exists:customers,id'],
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
             'sales_area_id' => ['nullable', 'integer', 'exists:sales_areas,id'],
-            'salesman_id' => ['nullable', 'integer', 'exists:salesmen,id'],
             'remark' => ['nullable', 'string', 'max:1000'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
@@ -106,13 +116,33 @@ class BookingController extends Controller
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
         ]);
 
+        $user = $request->user()->loadMissing('salesArea');
+        $customer = \App\Models\Customer::findOrFail($data['customer_id']);
+        $canAssign = $user->hasPermission('sales.assign');
+
+        if ($customer->sales_user_id && (int) $customer->sales_user_id !== (int) $user->id && ! $canAssign) {
+            return back()->withInput()->with('error', 'ลูกค้ารายนี้มีผู้ดูแลคนอื่น กรุณาให้หัวหน้าฝ่ายขายโอนผู้ดูแลก่อน');
+        }
+
+        $data['sales_user_id'] = $canAssign && $customer->sales_user_id
+            ? $customer->sales_user_id
+            : $user->id;
+        $data['salesman_id'] = $user->salesman_id;
+        $data['sales_area_id'] = $customer->sales_area_id
+            ?? $user->sales_area_id
+            ?? ($data['sales_area_id'] ?? null);
+        $data['claim_customer_owner'] = $customer->sales_user_id === null || $customer->sales_area_id === null;
+
         if (! empty($data['sales_area_id'])) {
-            $area = SalesArea::where('is_active', true)->findOrFail($data['sales_area_id']);
+            $area = SalesArea::where('is_active', true)->where('area_type', 'route')->findOrFail($data['sales_area_id']);
             if ($area->branch_id && (int) $area->branch_id !== (int) $data['branch_id']) {
                 return back()->withInput()->with('error', 'สาขาในใบจองไม่ตรงกับสาขาที่ผูกไว้ในสายการขาย');
             }
-            $data['salesman_id'] ??= $area->default_salesman_id;
             $data['document_book_id'] = $area->document_book_id;
+        }
+
+        if ($user->branch_id && (int) $user->branch_id !== (int) $data['branch_id'] && ! $canAssign) {
+            return back()->withInput()->with('error', 'ผู้ใช้นี้สร้างใบจองได้เฉพาะสาขาประจำของตนเอง');
         }
 
         try {
@@ -128,7 +158,7 @@ class BookingController extends Controller
     public function show(SaleBooking $booking): View
     {
         $booking->load([
-            'document.customer', 'document.branch', 'document.salesman', 'document.salesArea',
+            'document.customer', 'document.branch', 'document.salesUser', 'document.salesArea',
             'document.stockDocument.items.product.baseUnit', 'document.stockDocument.items.product.barcodes', 'confirmedDocument',
         ]);
 

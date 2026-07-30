@@ -85,13 +85,12 @@
                                 </div>
                                 @endif
                                 <div class="doc-field" style="grid-column: span 4;">
-                                    <label>พนักงานขาย</label>
-                                    <select name="salesman_id" class="doc-select" x-model="salesmanId">
-                                        <option value="">ไม่ระบุ</option>
-                                        @foreach($salesmen as $salesman)
-                                            <option value="{{ $salesman->id }}">{{ $salesman->code }} - {{ $salesman->name }}</option>
-                                        @endforeach
-                                    </select>
+                                    <label>ผู้ดูแลลูกค้า / ผู้เปิดใบจอง</label>
+                                    <input type="hidden" name="sales_user_id" x-model="salesUserId">
+                                    <div class="doc-input d-flex align-items-center gap-2 bg-light">
+                                        <i class="bi bi-person-check text-success"></i>
+                                        <strong x-text="salesUserName || 'ระบบจะใช้ผู้ที่ล็อกอิน'"></strong>
+                                    </div>
                                 </div>
                             @endif
 

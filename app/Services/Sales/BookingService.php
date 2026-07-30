@@ -6,6 +6,7 @@ use App\Models\Branch;
 use App\Models\Document;
 use App\Models\DocumentBook;
 use App\Models\DocumentType;
+use App\Models\Customer;
 use App\Models\SaleBooking;
 use App\Models\StockBalance;
 use App\Models\StockDocument;
@@ -26,7 +27,7 @@ class BookingService
     ) {}
 
     /**
-     * @param  array{customer_id:int, branch_id:int, sales_area_id?:?int, salesman_id:?int, document_book_id?:?int, remark:?string, items: array<int, array{product_id:int, qty:float, unit_price:float}>}  $data
+     * @param  array{customer_id:int, branch_id:int, sales_area_id?:?int, sales_user_id:?int, salesman_id:?int, document_book_id?:?int, claim_customer_owner?:bool, remark:?string, items: array<int, array{product_id:int, qty:float, unit_price:float}>}  $data
      */
     public function create(array $data): Document
     {
@@ -52,6 +53,14 @@ class BookingService
             $totalQty = $items->sum('qty');
             $totalAmount = $items->sum(fn ($i) => $i['qty'] * $i['unit_price']);
 
+            if (! empty($data['claim_customer_owner'])) {
+                $customer = Customer::whereKey($data['customer_id'])->lockForUpdate()->firstOrFail();
+                $customer->fill([
+                    'sales_user_id' => $customer->sales_user_id ?? ($data['sales_user_id'] ?? null),
+                    'sales_area_id' => $customer->sales_area_id ?? ($data['sales_area_id'] ?? null),
+                ])->save();
+            }
+
             $document = Document::create([
                 'document_type_id' => $documentType->id,
                 'document_book_id' => $documentBook?->id,
@@ -61,6 +70,7 @@ class BookingService
                     : $this->numbers->next(DocumentType::BOOKING, $branch->id),
                 'doc_date' => now()->toDateString(),
                 'salesman_id' => $data['salesman_id'] ?? null,
+                'sales_user_id' => $data['sales_user_id'] ?? null,
                 'sales_area_id' => $data['sales_area_id'] ?? null,
                 'customer_id' => $data['customer_id'],
                 'status' => 'active',
@@ -72,6 +82,7 @@ class BookingService
             SaleBooking::create([
                 'document_id' => $document->id,
                 'salesman_id' => $data['salesman_id'] ?? null,
+                'sales_user_id' => $data['sales_user_id'] ?? null,
                 'sales_area_id' => $data['sales_area_id'] ?? null,
                 'status' => SaleBooking::STATUS_PENDING,
             ]);

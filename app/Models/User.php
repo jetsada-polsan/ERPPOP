@@ -10,10 +10,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['branch_id', 'salesman_id', 'username', 'name', 'email', 'phone', 'position', 'password', 'is_active', 'must_change_password', 'mfa_secret', 'mfa_enabled_at', 'password_changed_at'])]
+#[Fillable(['branch_id', 'salesman_id', 'sales_area_id', 'username', 'name', 'email', 'phone', 'position', 'password', 'is_active', 'must_change_password', 'mfa_secret', 'mfa_enabled_at', 'password_changed_at'])]
 #[Hidden(['password', 'remember_token', 'mfa_secret'])]
 class User extends Authenticatable
 {
@@ -38,6 +39,21 @@ class User extends Authenticatable
     public function salesman(): BelongsTo
     {
         return $this->belongsTo(Salesman::class);
+    }
+
+    public function salesArea(): BelongsTo
+    {
+        return $this->belongsTo(SalesArea::class);
+    }
+
+    public function employee(): HasOne
+    {
+        return $this->hasOne(Employee::class);
+    }
+
+    public function managedCustomers(): HasMany
+    {
+        return $this->hasMany(Customer::class, 'sales_user_id');
     }
 
     public function roles(): BelongsToMany
