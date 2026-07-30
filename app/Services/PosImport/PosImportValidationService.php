@@ -64,6 +64,10 @@ class PosImportValidationService
         // Posted receipts are immutable import history. Keep them out of a
         // re-validation pass so a later retry cannot insert a duplicate POS bill.
         if ($receipt->posted_pos_receipt_id !== null || $receipt->status === ImportedReceipt::STATUS_POSTED) {
+            if ($receipt->posted_pos_receipt_id !== null && $receipt->status !== ImportedReceipt::STATUS_POSTED) {
+                $receipt->update(['status' => ImportedReceipt::STATUS_POSTED]);
+            }
+
             return;
         }
 
