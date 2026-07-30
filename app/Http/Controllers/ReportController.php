@@ -262,6 +262,18 @@ class ReportController extends Controller
                     'pending_work' => 'งานค้างต้องตาม',
                 ],
             ],
+            'custom' => [
+                'title' => 'รายงานต้นแบบ PopStar เดิม',
+                'icon' => 'bi-stars',
+                'reports' => [
+                    'legacy_daily_pos' => 'ตัวอย่างเดิม: ยอดขายรายวัน POS (p_reportZ)',
+                    'legacy_daily_summary' => 'ตัวอย่างเดิม: สรุป POS + หลังบ้าน (p_daily_sales_summary)',
+                    'legacy_salesman' => 'ตัวอย่างเดิม: ยอดขายตามพนักงาน (p_sale-BI6)',
+                    'legacy_sales_profit' => 'ตัวอย่างเดิม: วิเคราะห์กำไรตามสินค้า (p_sales_profit)',
+                    'legacy_reorder' => 'ตัวอย่างเดิม: เติมเต็ม/แผนสต๊อก (p_planstock)',
+                    'legacy_sales_return' => 'ตัวอย่างเดิม: ขาย-รับคืนตามเอกสาร',
+                ],
+            ],
         ];
     }
 
@@ -271,6 +283,52 @@ class ReportController extends Controller
         $toEnd = $to->copy()->endOfDay();
 
         return match ($report) {
+            'legacy_daily_pos' => $this->tableResult('ตัวอย่างเดิม: ยอดขายรายวัน POS', [
+                ['label' => 'วันที่', 'key' => 'sale_date'],
+                ['label' => 'ช่องทาง', 'key' => 'channel', 'type' => 'badge'],
+                ['label' => 'บิล', 'key' => 'bill_count', 'type' => 'number', 'class' => 'text-end'],
+                ['label' => 'ยอดขาย', 'key' => 'amount', 'type' => 'money', 'class' => 'text-end'],
+            ], $this->dailySales($fromStart, $toEnd, $filters)->filter(fn ($row) => $row->channel === 'POS')->values()),
+
+            'legacy_daily_summary' => $this->tableResult('ตัวอย่างเดิม: สรุป POS + หลังบ้าน', [
+                ['label' => 'วันที่', 'key' => 'sale_date'],
+                ['label' => 'ช่องทาง', 'key' => 'channel', 'type' => 'badge'],
+                ['label' => 'บิล', 'key' => 'bill_count', 'type' => 'number', 'class' => 'text-end'],
+                ['label' => 'ยอดขาย', 'key' => 'amount', 'type' => 'money', 'class' => 'text-end'],
+            ], $this->dailySales($fromStart, $toEnd, $filters)),
+
+            'legacy_salesman' => $this->tableResult('ตัวอย่างเดิม: ยอดขายตามพนักงาน', [
+                ['label' => 'พนักงาน', 'key' => 'staff_name'],
+                ['label' => 'ช่องทาง', 'key' => 'channel', 'type' => 'badge'],
+                ['label' => 'บิล', 'key' => 'bill_count', 'type' => 'number', 'class' => 'text-end'],
+                ['label' => 'ยอดขาย', 'key' => 'amount', 'type' => 'money', 'class' => 'text-end'],
+            ], $this->salesByStaff($fromStart, $toEnd, $filters)),
+
+            'legacy_sales_profit' => $this->tableResult('ตัวอย่างเดิม: วิเคราะห์กำไรตามสินค้า', [
+                ['label' => 'รหัส', 'key' => 'sku_code'],
+                ['label' => 'สินค้า', 'key' => 'name_th'],
+                ['label' => 'จำนวนขาย', 'key' => 'qty', 'type' => 'number', 'class' => 'text-end'],
+                ['label' => 'ยอดขาย', 'key' => 'sales_amount', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'ต้นทุน', 'key' => 'cost_amount', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'กำไรขั้นต้น', 'key' => 'gross_profit', 'type' => 'money', 'class' => 'text-end'],
+            ], $this->grossMargin($fromStart, $toEnd, $filters)),
+
+            'legacy_reorder' => $this->tableResult('ตัวอย่างเดิม: เติมเต็ม/แผนสต๊อก', [
+                ['label' => 'รหัส', 'key' => 'sku_code'],
+                ['label' => 'สินค้า', 'key' => 'name_th'],
+                ['label' => 'ตำแหน่ง', 'key' => 'location_name'],
+                ['label' => 'คงเหลือ', 'key' => 'on_hand_qty', 'type' => 'number', 'class' => 'text-end'],
+                ['label' => 'จองแล้ว', 'key' => 'reserved_qty', 'type' => 'number', 'class' => 'text-end'],
+            ], $this->stockAlerts($filters)),
+
+            'legacy_sales_return' => $this->tableResult('ตัวอย่างเดิม: ขาย-รับคืนตามเอกสาร', [
+                ['label' => 'วันที่', 'key' => 'doc_date'],
+                ['label' => 'เลขที่', 'key' => 'doc_number'],
+                ['label' => 'ประเภท', 'key' => 'document_type', 'type' => 'badge'],
+                ['label' => 'ลูกค้า', 'key' => 'customer_name'],
+                ['label' => 'ยอดเงิน', 'key' => 'total_amount', 'type' => 'money', 'class' => 'text-end'],
+            ], $this->salesReturnsByDocument($from, $to, $filters)),
+
             'vat_sales' => $this->tableResult('รายงานภาษีขาย', [
                 ['label' => 'วันที่ใบกำกับ', 'key' => 'doc_date'],
                 ['label' => 'เลขที่ใบกำกับภาษี', 'key' => 'doc_number'],
