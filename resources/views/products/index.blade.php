@@ -13,6 +13,7 @@
                     <div class="input-group">
                         <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
                         <input type="text" name="q" value="{{ $q }}" class="form-control" placeholder="รหัสหรือชื่อสินค้า" autocomplete="off" @input.debounce.450ms="$refs.filterForm.requestSubmit()">
+                        <input type="hidden" name="status" value="{{ $status }}">
                     </div>
                 </div>
                 <div class="product-filter-field">
@@ -41,6 +42,12 @@
                     <i class="bi bi-plus-lg me-1"></i> เพิ่มสินค้า
                 </button>
             </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+            @foreach([['key' => 'all', 'label' => 'สินค้าทั้งหมด', 'tone' => 'primary', 'icon' => 'bi-boxes'], ['key' => 'active', 'label' => 'กำลังใช้งาน', 'tone' => 'success', 'icon' => 'bi-box-seam'], ['key' => 'inactive', 'label' => 'ไม่ใช้งาน / พักไว้', 'tone' => 'secondary', 'icon' => 'bi-box']] as $summary)
+                <div class="col-md-4"><a href="{{ route('products.index', array_filter(['q' => $q, 'category_id' => $categoryId, 'product_type' => $productType, 'status' => $summary['key'] === 'all' ? null : $summary['key']])) }}" class="status-summary {{ $status === $summary['key'] ? 'is-selected' : '' }}"><span class="status-summary-icon text-{{ $summary['tone'] }}"><i class="bi {{ $summary['icon'] }}"></i></span><span><small>{{ $summary['label'] }}</small><strong>{{ number_format($counts[$summary['key']]) }}</strong></span></a></div>
+            @endforeach
         </div>
 
         <div class="scale-plu-summary mb-3">
@@ -241,6 +248,11 @@
 
 @push('head')
 <style>
+    .status-summary { display:flex; align-items:center; gap:12px; height:72px; padding:12px 16px; background:#fff; border:1px solid #e5e7eb; border-radius:14px; color:inherit; text-decoration:none; transition:.15s ease; }
+    .status-summary:hover, .status-summary.is-selected { border-color:#93c5fd; box-shadow:0 6px 18px rgba(30,64,175,.10); transform:translateY(-1px); }
+    .status-summary-icon { width:38px; height:38px; display:grid; place-items:center; border-radius:11px; background:#f1f5f9; font-size:19px; }
+    .status-summary small { display:block; color:#64748b; font-size:12px; }
+    .status-summary strong { display:block; color:#172b4d; font-size:21px; line-height:1.1; }
     [x-cloak] { display: none !important; }
     .booking-modal-backdrop {
         position: fixed; inset: 0; z-index: 2000;

@@ -37,13 +37,22 @@ class ProductController extends Controller
         $q = trim((string) $request->query('q', ''));
         $categoryId = $request->integer('category_id') ?: null;
         $productType = trim((string) $request->query('product_type', ''));
+        $status = in_array($request->query('status'), ['active', 'inactive'], true)
+            ? (string) $request->query('status')
+            : 'all';
+        $productScope = Product::query()->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
+            ->where('sku_code', 'ilike', "%{$q}%")
+            ->orWhere('name_th', 'ilike', "%{$q}%")
+        ));
+        $counts = [
+            'all' => (clone $productScope)->count(),
+            'active' => (clone $productScope)->where('is_active', true)->count(),
+            'inactive' => (clone $productScope)->where('is_active', false)->count(),
+        ];
 
-        $products = Product::query()
+        $products = (clone $productScope)
             ->with(['category', 'brand', 'baseUnit'])
-            ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
-                ->where('sku_code', 'ilike', "%{$q}%")
-                ->orWhere('name_th', 'ilike', "%{$q}%")
-            ))
+            ->when($status !== 'all', fn ($query) => $query->where('is_active', $status === 'active'))
             ->when($categoryId, fn ($query) => $query->where('product_category_id', $categoryId))
             ->when($productType === 'scale', fn ($query) => $query->whereHas('barcodes', fn ($b) => $b
                 ->where('is_active', true)
@@ -65,6 +74,8 @@ class ProductController extends Controller
             'q' => $q,
             'categoryId' => $categoryId,
             'productType' => $productType,
+            'status' => $status,
+            'counts' => $counts,
             'maxScalePlu' => $maxScalePlu ? str_pad((string) $maxScalePlu, 6, '0', STR_PAD_LEFT) : '-',
             'nextScalePlu' => $nextScalePlu,
             'categories' => ProductCategory::orderBy('name_th')->get(),

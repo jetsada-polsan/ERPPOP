@@ -16,14 +16,24 @@ class CustomerController extends Controller
     public function index(Request $request): View
     {
         $q = trim((string) $request->query('q', ''));
+        $status = in_array($request->query('status'), ['active', 'inactive'], true)
+            ? (string) $request->query('status')
+            : 'all';
 
-        $customers = Customer::query()
+        $customerScope = Customer::query()->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
+            ->where('code', 'ilike', "%{$q}%")
+            ->orWhere('name_th', 'ilike', "%{$q}%")
+        ));
+        $counts = [
+            'all' => (clone $customerScope)->count(),
+            'active' => (clone $customerScope)->where('is_active', true)->count(),
+            'inactive' => (clone $customerScope)->where('is_active', false)->count(),
+        ];
+
+        $customers = (clone $customerScope)
             ->with(['branch', 'salesUser', 'salesArea'])
             ->withSum(['openItems as outstanding_balance' => fn ($query) => $query->whereIn('status', ['open', 'partial'])], 'balance_amount')
-            ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
-                ->where('code', 'ilike', "%{$q}%")
-                ->orWhere('name_th', 'ilike', "%{$q}%")
-            ))
+            ->when($status !== 'all', fn ($query) => $query->where('is_active', $status === 'active'))
             ->orderBy('name_th')
             ->paginate(30)
             ->withQueryString();
@@ -31,6 +41,8 @@ class CustomerController extends Controller
         return view('customers.index', [
             'customers' => $customers,
             'q' => $q,
+            'status' => $status,
+            'counts' => $counts,
             'branches' => Branch::orderBy('code')->get(),
             'salesUsers' => $this->salesUsers(),
             'salesAreas' => $this->salesAreas(),

@@ -14,12 +14,21 @@ class SupplierController extends Controller
     public function index(Request $request): View
     {
         $q = trim((string) $request->query('q', ''));
+        $status = in_array($request->query('status'), ['active', 'inactive'], true)
+            ? (string) $request->query('status')
+            : 'all';
+        $supplierScope = Supplier::query()->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
+            ->where('code', 'ilike', "%{$q}%")
+            ->orWhere('name_th', 'ilike', "%{$q}%")
+        ));
+        $counts = [
+            'all' => (clone $supplierScope)->count(),
+            'active' => (clone $supplierScope)->where('is_active', true)->count(),
+            'inactive' => (clone $supplierScope)->where('is_active', false)->count(),
+        ];
 
-        $suppliers = Supplier::query()
-            ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
-                ->where('code', 'ilike', "%{$q}%")
-                ->orWhere('name_th', 'ilike', "%{$q}%")
-            ))
+        $suppliers = (clone $supplierScope)
+            ->when($status !== 'all', fn ($query) => $query->where('is_active', $status === 'active'))
             ->orderBy('name_th')
             ->paginate(30)
             ->withQueryString();
@@ -31,7 +40,7 @@ class SupplierController extends Controller
             ->unique('supplier_id')
             ->pluck('balance_after', 'supplier_id');
 
-        return view('suppliers.index', compact('suppliers', 'q', 'balances'));
+        return view('suppliers.index', compact('suppliers', 'q', 'status', 'counts', 'balances'));
     }
 
     public function store(Request $request): RedirectResponse

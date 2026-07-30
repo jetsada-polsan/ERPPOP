@@ -7,13 +7,29 @@
 @section('content')
     <div x-data="customerPage()" x-cloak>
         <div class="d-flex flex-column flex-md-row justify-content-between gap-3 mb-4">
-            <form method="get" class="d-flex gap-2" style="max-width: 420px;">
+            <form method="get" class="d-flex gap-2" style="max-width: 520px;">
                 <input type="text" name="q" value="{{ $q }}" class="form-control" placeholder="ค้นหารหัส/ชื่อลูกค้า">
+                <input type="hidden" name="status" value="{{ $status }}">
                 <button class="btn btn-light border"><i class="bi bi-search"></i></button>
             </form>
             <button type="button" class="btn btn-primary rounded-pill px-4" @click="modalOpen = true">
                 <i class="bi bi-plus-lg me-1"></i> เพิ่มลูกค้า
             </button>
+        </div>
+
+        <div class="row g-3 mb-4">
+            @foreach([
+                ['key' => 'all', 'label' => 'ลูกค้าทั้งหมด', 'tone' => 'primary', 'icon' => 'bi-people-fill'],
+                ['key' => 'active', 'label' => 'กำลังใช้งาน', 'tone' => 'success', 'icon' => 'bi-person-check-fill'],
+                ['key' => 'inactive', 'label' => 'ไม่ใช้งาน / พักไว้', 'tone' => 'secondary', 'icon' => 'bi-person-dash-fill'],
+            ] as $summary)
+                <div class="col-md-4">
+                    <a href="{{ route('customers.index', array_filter(['q' => $q, 'status' => $summary['key'] === 'all' ? null : $summary['key']])) }}" class="status-summary {{ $status === $summary['key'] ? 'is-selected' : '' }}">
+                        <span class="status-summary-icon text-{{ $summary['tone'] }}"><i class="bi {{ $summary['icon'] }}"></i></span>
+                        <span><small>{{ $summary['label'] }}</small><strong>{{ number_format($counts[$summary['key']]) }}</strong></span>
+                    </a>
+                </div>
+            @endforeach
         </div>
 
         <div class="content-card p-4">
@@ -144,6 +160,11 @@
 
 @push('head')
 <style>
+    .status-summary { display:flex; align-items:center; gap:12px; height:78px; padding:14px 18px; background:#fff; border:1px solid #e5e7eb; border-radius:14px; color:inherit; text-decoration:none; transition:.15s ease; }
+    .status-summary:hover, .status-summary.is-selected { border-color:#93c5fd; box-shadow:0 6px 18px rgba(30,64,175,.10); transform:translateY(-1px); }
+    .status-summary-icon { width:40px; height:40px; display:grid; place-items:center; border-radius:12px; background:#f1f5f9; font-size:20px; }
+    .status-summary small { display:block; color:#64748b; font-size:12px; }
+    .status-summary strong { display:block; color:#172b4d; font-size:22px; line-height:1.1; }
     [x-cloak] { display: none !important; }
     .booking-modal-backdrop {
         position: fixed; inset: 0; z-index: 2000;
