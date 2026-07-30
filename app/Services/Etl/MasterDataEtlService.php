@@ -26,16 +26,24 @@ class MasterDataEtlService
     ) {}
 
     /** @return array<string, int> counts per step, for reporting */
-    public function run(bool $skipStockSnapshot = false): array
+    public function run(bool $skipStockSnapshot = false, bool $productsOnly = false): array
     {
         $counts = [];
-        $counts['branches'] = $this->syncBranches();
         $counts['product_categories'] = $this->syncProductCategories();
         $counts['product_departments'] = $this->syncProductDepartments();
         $counts['product_brands'] = $this->syncProductBrands();
         $counts['product_units'] = $this->syncProductUnits();
         $counts['products'] = $this->syncProducts();
         $counts['product_barcodes'] = $this->syncProductBarcodes();
+
+        if ($productsOnly) {
+            return array_intersect_key($counts, array_flip([
+                'product_categories', 'product_departments', 'product_brands',
+                'product_units', 'products', 'product_barcodes',
+            ]));
+        }
+
+        $counts['branches'] = $this->syncBranches();
         $counts['warehouses'] = $this->syncWarehouses();
         $counts['warehouse_locations'] = $this->syncWarehouseLocations();
         $counts['branch_default_locations'] = $this->syncBranchDefaultLocations();
