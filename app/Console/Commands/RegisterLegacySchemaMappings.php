@@ -25,24 +25,36 @@ class RegisterLegacySchemaMappings extends Command
         'BANKFILE' => 'bank_accounts', 'MEMBER' => 'members',
     ];
 
+    /** Physical/archive tables are never copied into the normalized ERP schema. */
+    private const EXCLUDED_TECHNICAL = [
+        'BPLUSCURRENTUSER', 'BPLUSDELETELOG', 'BPLUSINTLDATA', 'BPLUSLICENSE',
+        'BPLUSSYNC', 'BPLUSVERSION', 'AUTOREPORTD', 'AUTOREPORTH', 'AUTORUNCODE',
+        'AUTOUPDARPRB', 'BYDATANAME', 'CREDITS',
+    ];
+
     public function handle(LegacyMirrorSourceService $source): int
     {
         $newTables = collect(Schema::getTables())->pluck('name')->filter(fn (string $name): bool => $name !== 'migrations')->all();
         $newByLower = array_fill_keys(array_map('strtolower', $newTables), true);
-        $summary = ['mapped' => 0, 'needs_review' => 0];
+        $summary = ['mapped' => 0, 'needs_review' => 0, 'excluded' => 0];
 
         foreach ($source->tables() as $table) {
             $legacy = strtoupper($table['name']);
             $legacyColumns = $source->columns($table['schema'], $table['name']);
+            $excluded = in_array($legacy, self::EXCLUDED_TECHNICAL, true)
+                || preg_match('/^[CDHLPS]\d{6}$/', $legacy) === 1;
             $target = self::CORE_MAPPING[$legacy] ?? (isset($newByLower[strtolower($legacy)]) ? strtolower($legacy) : null);
+            if ($excluded) {
+                $target = null;
+            }
             $targetColumns = $target !== null && in_array($target, $newTables, true) ? Schema::getColumnListing($target) : [];
             $shared = count(array_intersect(
                 array_map(fn (array $column): string => strtoupper($column['name']), $legacyColumns),
                 array_map('strtoupper', $targetColumns),
             ));
-            $status = $target === null ? 'needs_review' : 'mapped';
-            $type = $target === null ? 'unmapped' : (isset(self::CORE_MAPPING[$legacy]) ? 'normalized' : 'exact');
-            $module = $this->moduleFor($legacy, $target);
+            $status = $excluded ? 'excluded' : ($target === null ? 'needs_review' : 'mapped');
+            $type = $excluded ? 'excluded' : ($target === null ? 'unmapped' : (isset(self::CORE_MAPPING[$legacy]) ? 'normalized' : 'exact'));
+            $module = $excluded ? 'archive' : $this->moduleFor($legacy, $target);
 
             LegacyTableMapping::updateOrCreate(
                 ['legacy_database' => (string) config('mssql_source.database'), 'legacy_schema' => $table['schema'], 'legacy_table' => $legacy],
@@ -54,13 +66,13 @@ class RegisterLegacySchemaMappings extends Command
                     'legacy_column_count' => count($legacyColumns),
                     'target_column_count' => count($targetColumns),
                     'shared_column_count' => $shared,
-                    'notes' => $target === null ? 'ต้องกำหนด mapping และกฎนำเข้าก่อน migrate ข้อมูลจริง' : 'ยังต้องตรวจ key, business meaning และ posting rule ก่อน import',
+                    'notes' => $excluded ? 'ตารางเทคนิคหรือ physical monthly table ไม่สร้างซ้ำใน ERP ใหม่; เก็บเฉพาะต้นฉบับ/ประวัติเมื่อจำเป็น' : ($target === null ? 'ต้องกำหนด mapping และกฎนำเข้าก่อน migrate ข้อมูลจริง' : 'ยังต้องตรวจ key, business meaning และ posting rule ก่อน import'),
                 ],
             );
-            $summary[$status]++;
+            $summary[$status] = ($summary[$status] ?? 0) + 1;
         }
 
-        $this->info("registered={$summary['mapped']} mapped, {$summary['needs_review']} needs_review");
+        $this->info("registered={$summary['mapped']} mapped, {$summary['needs_review']} needs_review, {$summary['excluded']} excluded");
 
         return self::SUCCESS;
     }

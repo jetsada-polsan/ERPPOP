@@ -107,6 +107,7 @@
                 ['label' => 'ตั้งค่าระบบ', 'route' => 'settings.index', 'pattern' => 'settings.*', 'icon' => 'bi-gear-fill', 'tone' => 'slate'],
                 ['label' => 'Backup / Security', 'route' => 'operations.index', 'pattern' => 'operations.*', 'icon' => 'bi-shield-lock-fill', 'tone' => 'red'],
                 ['label' => 'โครงสร้างฐานข้อมูล', 'route' => 'database-structure.index', 'pattern' => 'database-structure.*', 'icon' => 'bi-database-fill-gear', 'tone' => 'cyan'],
+                ['label' => 'Mapping Bplus → ERP', 'route' => 'legacy-mappings.index', 'pattern' => 'legacy-mappings.*', 'icon' => 'bi-arrow-left-right', 'tone' => 'amber'],
                 ['label' => 'สมุดเอกสาร', 'route' => 'document-books.index', 'pattern' => 'document-books.*', 'icon' => 'bi-journals', 'tone' => 'indigo'],
                 ['label' => 'ผู้ใช้และสิทธิ์', 'route' => 'users.index', 'pattern' => 'users.*', 'icon' => 'bi-people-fill', 'tone' => 'indigo'],
                 ['label' => 'แฟ้มพนักงาน', 'route' => 'employees.index', 'pattern' => 'employees.*', 'icon' => 'bi-person-vcard-fill', 'tone' => 'teal'],

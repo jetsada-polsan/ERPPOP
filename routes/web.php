@@ -25,6 +25,7 @@ use App\Http\Controllers\FixedAssetController;
 use App\Http\Controllers\FlashSaleController;
 use App\Http\Controllers\GlJournalController;
 use App\Http\Controllers\LegacyReportController;
+use App\Http\Controllers\LegacyTableMappingController;
 use App\Http\Controllers\LineIntegrationController;
 use App\Http\Controllers\ManagementControlController;
 use App\Http\Controllers\ManualController;
@@ -464,6 +465,7 @@ Route::prefix('operations')->name('operations.')->group(function () {
     Route::post('/users/{user}/mfa-reset', [OperationsController::class, 'resetMfa'])->name('mfa-reset');
 });
 Route::get('/database-structure', [DatabaseStructureController::class, 'index'])->name('database-structure.index');
+Route::get('/legacy-mappings', [LegacyTableMappingController::class, 'index'])->name('legacy-mappings.index');
 
 Route::prefix('members')->name('members.')->group(function () {
     Route::get('/', [MemberController::class, 'index'])->name('index');
