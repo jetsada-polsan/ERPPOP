@@ -61,6 +61,12 @@ class PosImportValidationService
 
     private function validateReceipt(ImportBatch $batch, ImportedReceipt $receipt, bool $hasWarehouse, $productsBySku): void
     {
+        // Posted receipts are immutable import history. Keep them out of a
+        // re-validation pass so a later retry cannot insert a duplicate POS bill.
+        if ($receipt->posted_pos_receipt_id !== null || $receipt->status === ImportedReceipt::STATUS_POSTED) {
+            return;
+        }
+
         // Empty void/cancelled transactions (no items, no amount) carry no business
         // value to post - exclude them from the pipeline instead of flagging errors.
         if ($receipt->item_count === 0 && (float) $receipt->net_amount === 0.0 && $receipt->items->isEmpty()) {
