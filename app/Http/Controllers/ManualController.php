@@ -18,8 +18,21 @@ class ManualController extends Controller
             'thaiErpStandards' => $this->thaiErpStandards(),
             'thaiErpSources' => $this->thaiErpSources(),
             'bplusBackCoverage' => $this->bplusBackCoverage(),
+            'blueprintControls' => $this->blueprintControls(),
             'calculationFormulas' => $this->calculationFormulas(),
         ]);
+    }
+
+    private function blueprintControls(): array
+    {
+        return [
+            ['key' => 'ledger', 'title' => 'Ledger First', 'rule' => 'สต๊อก เงิน ลูกหนี้ เจ้าหนี้ และ GL ต้องเกิดจาก ledger/รายการเคลื่อนไหว ไม่แก้ยอดคงเหลือโดยตรง', 'check' => 'ยอดคงเหลือต้อง rebuild จากรายการต้นทางได้ และมีรายงานผลต่างเมื่อ snapshot ไม่ตรง'],
+            ['key' => 'immutable', 'title' => 'Posted Immutable', 'rule' => 'เอกสารที่ POSTED แล้วห้ามแก้ทับหรือลบ ใช้ยกเลิก reverse หรือใบลด/เพิ่มหนี้แทน', 'check' => 'มีเลขเอกสารอ้างอิง เหตุผล ผู้ทำรายการ และ audit trail ทุกครั้ง'],
+            ['key' => 'lifecycle', 'title' => 'Document Lifecycle', 'rule' => 'เอกสารต้องเดินสถานะ Draft → Submitted → Approved → Posted → Closed/Voided และอ้างอิงเอกสารต้นทาง', 'check' => 'ใบจอง ใบขายเชื่อ ใบส่งของ POS และรับชำระตรวจย้อนกลับถึงต้นทางได้'],
+            ['key' => 'scope', 'title' => 'Branch/Warehouse Scope', 'rule' => 'ทุกธุรกรรมระบุบริษัท สาขา คลัง และตำแหน่งจัดเก็บตามความจำเป็น', 'check' => 'ผู้ใช้เห็นและทำรายการได้เฉพาะขอบเขตสิทธิ์ของตน พร้อมรายงานแยกสาขา'],
+            ['key' => 'offline', 'title' => 'Offline POS Idempotency', 'rule' => 'POS ใช้ local UUID และ outbox ส่งซ้ำได้โดยไม่สร้างบิลซ้ำ พร้อมเก็บสถานะ retry/error', 'check' => 'ไฟดับ เน็ตหลุด หรือกด sync ซ้ำต้องได้ผลลัพธ์เดิมและตรวจสอบได้'],
+            ['key' => 'precision', 'title' => 'Precision & Reconciliation', 'rule' => 'ยอดเงินใช้ decimal ที่กำหนดชัดเจน ต้นทุนขายอ้างอิง Lot จริง และผลรวมต้องกระทบยอดกับ GL', 'check' => 'รายงานยอดขาย ต้นทุน กำไร ภาษี และสต๊อกมีผลต่างพร้อมสาเหตุ'],
+        ];
     }
 
     private function bplusBackCoverage(): array

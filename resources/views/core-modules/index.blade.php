@@ -348,6 +348,28 @@
         </div>
     </section>
 
+    <section class="manual-panel" id="blueprint-controls">
+        <div class="manual-section-head">
+            <h2><i class="bi bi-diagram-3 me-2"></i>BPLUS Rebuild Blueprint: กติกาหลักของระบบใหม่</h2>
+            <span>{{ count($blueprintControls) }} control ที่ห้ามหลุด</span>
+        </div>
+        <div class="coverage-note"><strong>วิธีใช้:</strong> กติกาชุดนี้เป็น Definition of Done ของทุกโมดูล ไม่ใช่แค่เอกสาร POS ถ้าข้อใดตรวจไม่ผ่าน ให้หยุดการ post และเปิดรายการแก้ไขก่อนปิดงวด</div>
+        <div class="manual-table-wrap">
+            <table class="manual-table" style="min-width:1080px">
+                <thead><tr><th>Control</th><th>กติกา</th><th>วิธีตรวจรับ</th></tr></thead>
+                <tbody>
+                @foreach($blueprintControls as $control)
+                    <tr x-show="!query || $el.textContent.toLowerCase().includes(query.toLowerCase())">
+                        <td><strong>{{ $control['title'] }}</strong></td>
+                        <td>{{ $control['rule'] }}</td>
+                        <td>{{ $control['check'] }}</td>
+                    </tr>
+                @endforeach
+                </tbody>
+            </table>
+        </div>
+    </section>
+
     <section class="manual-panel">
         <div class="manual-section-head">
             <h2><i class="bi bi-clipboard-check me-2"></i>คู่มือทดสอบรับมอบระบบ (UAT)</h2>
