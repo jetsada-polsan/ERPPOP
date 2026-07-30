@@ -30,7 +30,8 @@ class StockTransformService
     /**
      * @param array{
      *   branch_id:int, warehouse_location_id:?int, remark:?string, batch_mode?:bool,
-     *   production_recipe_id?:?int, input_weight_qty?:?float,
+     *   production_recipe_id?:?int, input_weight_qty?:?float, loss_reason_code?:?string,
+     *   expected_loss_percent?:?float, loss_note?:?string,
      *   raw_items:array<int,array{product_id:int,qty:float}>,
      *   output_items:array<int,array{product_id:int,qty:float,percent:?float}>
      * } $data
@@ -51,7 +52,13 @@ class StockTransformService
         $outputs = collect($data['output_items']);
         $batchMode = (bool) ($data['batch_mode'] ?? false);
         if ($batchMode && $outputs->count() !== 1) {
-            throw new RuntimeException('งานจัดเซ็ตแบบชั่งจริงต้องมีสินค้าผลผลิต 1 รายการ');
+            throw new RuntimeException('งานแปรรูปแบบชั่งจริงต้องมีสินค้าผลผลิต 1 รายการ');
+        }
+        if ($batchMode && isset($data['input_weight_qty'])) {
+            $rawWeight = DecimalMath::sum($raw->pluck('qty'), DecimalMath::QUANTITY_SCALE);
+            if (DecimalMath::compare(DecimalMath::absoluteDifference($rawWeight, $data['input_weight_qty']), '0.0001') > 0) {
+                throw new RuntimeException('น้ำหนักวัตถุดิบรวมต้องตรงกับผลรวมจำนวนวัตถุดิบที่ใช้จริง');
+            }
         }
 
         $productIds = $raw->pluck('product_id')->merge($outputs->pluck('product_id'))->unique();
@@ -69,7 +76,7 @@ class StockTransformService
             fn (array $item) => DecimalMath::multiply($item['qty'], $products->get((int) $item['product_id'])->average_cost)
         ));
         if (DecimalMath::compare($rawEstimate, 0) <= 0) {
-            throw new RuntimeException('วัตถุดิบยังไม่มีต้นทุนเฉลี่ย กรุณารับสินค้าและตรวจต้นทุนก่อนจัดเซ็ต');
+            throw new RuntimeException('วัตถุดิบยังไม่มีต้นทุนเฉลี่ย กรุณารับสินค้าและตรวจต้นทุนก่อนแปรรูป');
         }
 
         $percents = $outputs->pluck('percent')->filter(fn ($percent) => $percent !== null && $percent !== '');
@@ -130,7 +137,7 @@ class StockTransformService
             });
             $rawTotal = DecimalMath::sum($raw->pluck('cost_amount'));
             if (DecimalMath::compare($rawTotal, 0) <= 0) {
-                throw new RuntimeException('วัตถุดิบยังไม่มีต้นทุนเฉลี่ย กรุณารับสินค้าและตรวจต้นทุนก่อนจัดเซ็ต');
+                throw new RuntimeException('วัตถุดิบยังไม่มีต้นทุนเฉลี่ย กรุณารับสินค้าและตรวจต้นทุนก่อนแปรรูป');
             }
             $document->update(['total_amount' => $rawTotal]);
 
@@ -163,6 +170,25 @@ class StockTransformService
                 $outputProduct = $products->get((int) $output['product_id']);
                 $inputWeight = DecimalMath::round($data['input_weight_qty'] ?? DecimalMath::sum($raw->pluck('qty'), DecimalMath::QUANTITY_SCALE), DecimalMath::QUANTITY_SCALE);
                 $outputWeight = DecimalMath::round($output['qty'], DecimalMath::QUANTITY_SCALE);
+                if (DecimalMath::compare($outputWeight, $inputWeight) > 0) {
+                    throw new RuntimeException('น้ำหนักผลผลิตจริงต้องไม่มากกว่าน้ำหนักวัตถุดิบรวม');
+                }
+                $lossWeight = DecimalMath::subtract($inputWeight, $outputWeight, DecimalMath::QUANTITY_SCALE);
+                $expectedLossPercent = DecimalMath::round($data['expected_loss_percent'] ?? 0, 4);
+                $expectedLossWeight = DecimalMath::divide(
+                    DecimalMath::multiply($inputWeight, $expectedLossPercent, DecimalMath::QUANTITY_SCALE),
+                    100,
+                    DecimalMath::QUANTITY_SCALE,
+                );
+                $abnormalLossWeight = DecimalMath::compare($lossWeight, $expectedLossWeight) > 0
+                    ? DecimalMath::subtract($lossWeight, $expectedLossWeight, DecimalMath::QUANTITY_SCALE)
+                    : 0;
+                $lossCost = DecimalMath::compare($inputWeight, 0) > 0
+                    ? DecimalMath::divide(DecimalMath::multiply($rawTotal, $lossWeight), $inputWeight)
+                    : 0;
+                $abnormalLossCost = DecimalMath::compare($inputWeight, 0) > 0
+                    ? DecimalMath::divide(DecimalMath::multiply($rawTotal, $abnormalLossWeight), $inputWeight)
+                    : 0;
                 $plu = $this->scalePlu($outputProduct);
                 $sellingPrice = $this->sellingPrice($outputProduct->id);
                 $vatRate = (float) (DB::table('vat_rates')->where('effective_from', '<=', now()->toDateString())
@@ -179,7 +205,15 @@ class StockTransformService
                     'output_product_id' => $outputProduct->id,
                     'input_weight_qty' => $inputWeight,
                     'output_weight_qty' => $outputWeight,
-                    'loss_weight_qty' => DecimalMath::subtract($inputWeight, $outputWeight, DecimalMath::QUANTITY_SCALE),
+                    'loss_weight_qty' => $lossWeight,
+                    'loss_reason_code' => DecimalMath::compare($lossWeight, 0) > 0
+                        ? ($data['loss_reason_code'] ?? 'weight_variance')
+                        : null,
+                    'expected_loss_percent' => $expectedLossPercent,
+                    'loss_cost_amount' => $lossCost,
+                    'abnormal_loss_qty' => $abnormalLossWeight,
+                    'abnormal_loss_cost_amount' => $abnormalLossCost,
+                    'loss_note' => $data['loss_note'] ?? null,
                     'yield_percent' => DecimalMath::compare($inputWeight, 0) > 0 ? DecimalMath::divide(DecimalMath::multiply($outputWeight, 100), $inputWeight) : 0,
                     'total_input_cost' => $rawTotal,
                     'output_unit_cost' => $outputUnitCost,

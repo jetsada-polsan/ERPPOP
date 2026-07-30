@@ -1,8 +1,8 @@
 @extends('layout')
 
 @section('title', 'แปรรูปสินค้า - POPSTAR ERP')
-@section('page-title', 'จัดเซ็ต / แปรรูปแบบชั่งจริง')
-@section('page-subtitle', 'ตัดวัตถุดิบจริง รับน้ำหนักผลผลิตจริง และล็อกต้นทุนต่อกิโลกรัม')
+@section('page-title', 'แปรรูปสินค้า / บันทึกสูญเสีย')
+@section('page-subtitle', 'ตัดวัตถุดิบ รับผลผลิตจริง วัด Yield และแยกส่วนสูญเสียผิดปกติ')
 
 @section('content')
 <div x-data="transformPage()" x-cloak>
@@ -15,32 +15,33 @@
 
     <div class="list-toolbar">
         <div class="list-toolbar-left">
-            <h2 class="h5 fw-bold mb-0">Batch จัดเซ็ตและแปรรูป</h2>
+            <h2 class="h5 fw-bold mb-0">รายการแปรรูปและสูญเสีย</h2>
             @include('partials.search-bar', ['q' => $q, 'placeholder' => 'ค้นหาเลขที่เอกสาร'])
         </div>
         <button type="button" class="btn btn-primary rounded-pill px-4" @click="modalOpen = true">
-            <i class="bi bi-plus-lg me-1"></i> จัดเซ็ตแบบชั่งจริง
+            <i class="bi bi-plus-lg me-1"></i> บันทึกการแปรรูป
         </button>
     </div>
 
     <div class="content-card p-4">
         <div class="table-responsive">
             <table class="table align-middle">
-                <thead><tr><th>เลขที่</th><th>วันที่</th><th>สาขา</th><th>หมายเหตุ</th><th class="text-end">Yield</th><th class="text-end">ทุน/กก.</th><th class="text-end">มูลค่าวัตถุดิบ</th><th></th></tr></thead>
+                <thead><tr><th>เลขที่</th><th>วันที่</th><th>สาขา</th><th>สาเหตุสูญเสีย</th><th class="text-end">สูญเสีย</th><th class="text-end">ผิดปกติ</th><th class="text-end">Yield</th><th class="text-end">ทุน/กก.</th><th></th></tr></thead>
                 <tbody>
                     @forelse($documents as $doc)
                         <tr>
                             <td class="fw-semibold">{{ $doc->doc_number }}</td>
                             <td>{{ $doc->doc_date->thaiDate() }}</td>
                             <td>{{ $doc->branch->name_th }}</td>
-                            <td class="small text-muted">{{ $doc->remark ?? '-' }}</td>
+                            <td class="small text-muted">{{ $doc->productionBatch ? ($lossReasons[$doc->productionBatch->loss_reason_code] ?? '-') : '-' }}</td>
+                            <td class="text-end">{{ $doc->productionBatch ? number_format($doc->productionBatch->loss_weight_qty,3) : '-' }}</td>
+                            <td class="text-end {{ $doc->productionBatch?->abnormal_loss_qty > 0 ? 'text-danger fw-semibold' : '' }}">{{ $doc->productionBatch ? number_format($doc->productionBatch->abnormal_loss_qty,3) : '-' }}</td>
                             <td class="text-end">{{ $doc->productionBatch ? number_format($doc->productionBatch->yield_percent,2).'%' : '-' }}</td>
                             <td class="text-end">{{ $doc->productionBatch ? number_format($doc->productionBatch->output_unit_cost,2) : '-' }}</td>
-                            <td class="text-end">{{ number_format($doc->total_amount, 2) }}</td>
                             <td class="text-end"><a href="{{ route('stock-transforms.show', $doc) }}" class="btn btn-sm btn-light border">ดู</a></td>
                         </tr>
                     @empty
-                        <tr><td colspan="8" class="py-5 text-center text-muted">ยังไม่มีใบแปรรูปสินค้า</td></tr>
+                        <tr><td colspan="9" class="py-5 text-center text-muted">ยังไม่มีรายการแปรรูปสินค้า</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -53,8 +54,8 @@
         <div class="booking-modal" @click.outside="modalOpen = false" x-transition>
             <div class="modal-header border-0 px-4 pt-4 pb-2">
                 <div>
-                    <h3 class="h4 fw-bold mb-1">จัดเซ็ตแบบชั่งจริง</h3>
-                    <div class="text-muted small">กรอกน้ำหนักที่หยิบใช้และน้ำหนักสินค้าสำเร็จ ระบบใช้ต้นทุนเฉลี่ยและ Lot ให้อัตโนมัติ</div>
+                    <h3 class="h4 fw-bold mb-1">บันทึกการแปรรูปสินค้า</h3>
+                    <div class="text-muted small">กรอกวัตถุดิบและผลผลิตจริง ระบบตัด FIFO Lot คำนวณ Yield ต้นทุน และส่วนสูญเสีย</div>
                 </div>
                 <button type="button" class="btn btn-light rounded-circle" @click="modalOpen = false"><i class="bi bi-x-lg"></i></button>
             </div>
@@ -104,10 +105,35 @@
                     <div class="row g-3 mb-4">
                         <div class="col-md-4">
                             <label class="form-label text-muted small">น้ำหนักวัตถุดิบรวมจริง (กก.)</label>
-                            <input type="number" step="0.0001" min="0.0001" name="input_weight_qty" x-model.number="inputWeight" class="form-control text-end" required>
+                            <input type="number" step="0.0001" min="0.0001" name="input_weight_qty" x-model.number="inputWeight" class="form-control text-end" readonly required>
                         </div>
                         <div class="col-md-8 d-flex align-items-end">
-                            <div class="alert alert-light border py-2 px-3 mb-0 w-100 small">ส่วนต่างระหว่างน้ำหนักเข้าและผลผลิตจะถูกบันทึกเป็น Yield/สูญเสีย และต้นทุนทั้งหมดจะอยู่ในผลผลิตจริง</div>
+                            <div class="alert alert-light border py-2 px-3 mb-0 w-100 small">ส่วนต่างระหว่างน้ำหนักเข้าและผลผลิตคือตัวสูญเสีย ต้นทุนสูญเสียจะถูกดูดซับในต้นทุนผลผลิตจริงเพื่อให้มูลค่าสต๊อกไม่หาย</div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-4 loss-panel">
+                        <div class="col-md-4">
+                            <label class="form-label text-muted small">สาเหตุสูญเสีย</label>
+                            <select name="loss_reason_code" class="form-select">
+                                @foreach($lossReasons as $code => $label)<option value="{{ $code }}">{{ $label }}</option>@endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label text-muted small">เกณฑ์สูญเสียปกติ (%)</label>
+                            <input type="number" name="expected_loss_percent" min="0" max="100" step="0.0001" x-model.number="expectedLossPercent" class="form-control text-end">
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label text-muted small">รายละเอียด/ผู้รับผิดชอบ</label>
+                            <input type="text" name="loss_note" maxlength="500" class="form-control" placeholder="เช่น ตัดแต่งมัน 0.8 กก. ตามมาตรฐาน">
+                        </div>
+                        <div class="col-12">
+                            <div class="loss-summary">
+                                <span>สูญเสียจริง <strong x-text="weight(lossWeight)"></strong> กก.</span>
+                                <span>เกณฑ์ปกติ <strong x-text="weight(expectedLossWeight)"></strong> กก.</span>
+                                <span :class="abnormalLossWeight > 0 ? 'text-danger' : 'text-success'">ผิดปกติ <strong x-text="weight(abnormalLossWeight)"></strong> กก.</span>
+                                <span>มูลค่าสูญเสียประมาณ <strong x-text="money(lossCost)"></strong> บาท</span>
+                            </div>
                         </div>
                     </div>
 
@@ -150,7 +176,7 @@
                     </div>
                     <div class="table-responsive booking-items-table">
                         <table class="table align-middle">
-                            <thead><tr><th style="min-width:280px">สินค้าชุดสำเร็จ</th><th class="text-end" style="width:150px">น้ำหนักชั่งได้ (กก.)</th><th class="text-end" style="width:150px">ต้นทุน/กก.</th><th class="text-end" style="width:130px">Yield</th></tr></thead>
+                            <thead><tr><th style="min-width:280px">สินค้าผลผลิต</th><th class="text-end" style="width:150px">น้ำหนักชั่งได้ (กก.)</th><th class="text-end" style="width:150px">ต้นทุน/กก.</th><th class="text-end" style="width:130px">Yield</th></tr></thead>
                             <tbody>
                                 <template x-for="(item, index) in outputItems" :key="'o' + index">
                                     <tr>
@@ -165,7 +191,7 @@
                                                 </template>
                                             </div>
                                         </td>
-                                        <td><input type="number" step="0.0001" min="0.0001" :name="`output_items[${index}][qty]`" x-model.number="item.qty" @input="rescaleFromRecipe()" required class="form-control text-end"><input type="hidden" :name="`output_items[${index}][percent]`" value="100"></td>
+                                        <td><input type="number" step="0.0001" min="0.0001" :name="`output_items[${index}][qty]`" x-model.number="item.qty" required class="form-control text-end"><input type="hidden" :name="`output_items[${index}][percent]`" value="100"></td>
                                         <td class="text-end fw-semibold text-success" x-text="outputUnitCost(item)"></td>
                                         <td class="text-end fw-semibold" x-text="yieldPercent(item)"></td>
                                     </tr>
@@ -177,7 +203,7 @@
 
                 <div class="modal-footer border-0 px-4 pb-4 pt-0">
                     <button type="button" class="btn btn-light border px-4" @click="modalOpen = false">ยกเลิก</button>
-                    <button type="submit" class="btn btn-primary px-4"><i class="bi bi-check2-circle me-1"></i> ตัดวัตถุดิบและรับชุดสำเร็จ</button>
+                    <button type="submit" class="btn btn-primary px-4"><i class="bi bi-check2-circle me-1"></i> บันทึกแปรรูปและสูญเสีย</button>
                 </div>
             </form>
         </div>
@@ -195,6 +221,8 @@
     .typeahead-list { position: absolute; z-index: 2050; left: 0; right: 0; top: calc(100% + 4px); max-height: 260px; overflow: auto; background: #fff; border: 1px solid #dbe1ea; border-radius: 12px; box-shadow: 0 14px 36px rgba(15,23,42,.14); padding: 6px; }
     .typeahead-item { width: 100%; border: 0; background: transparent; border-radius: 9px; padding: 9px 10px; display: flex; align-items: center; gap: 10px; text-align: left; }
     .typeahead-item:hover { background: #f2f6ff; }
+    .loss-panel{padding:14px;border:1px solid #f3c7c7;border-radius:8px;background:#fffafa}
+    .loss-summary{display:flex;gap:18px;flex-wrap:wrap;padding:10px 12px;border-radius:6px;background:#fff;color:#526579;font-size:13px}
 </style>
 @endpush
 
@@ -206,6 +234,7 @@
             rawItems: [{ product_id: '', productQuery: '', qty: 1, average_cost: 0, results: [] }],
             outputItems: [{ product_id: '', productQuery: '', qty: 1, percent: null, results: [] }],
             inputWeight: 1,
+            expectedLossPercent: 0,
             recipes: @json($recipes),
             selectedRecipeId: '',
             selectedRecipe: null,
@@ -229,20 +258,14 @@
                 this.syncInputWeight();
             },
 
-            // ปรับสัดส่วนวัตถุดิบอัตโนมัติเมื่อแก้จำนวนผลผลิตที่ต้องการ (เทียบกับสูตรที่โหลดไว้)
-            rescaleFromRecipe() {
-                if (!this.selectedRecipe || !this.selectedRecipe.output_qty) return;
-                const ratio = (Number(this.outputItems[0]?.qty) || 0) / this.selectedRecipe.output_qty;
-                this.rawItems = this.selectedRecipe.items.map(i => ({
-                    product_id: i.product_id, productQuery: i.label,
-                    qty: Math.round(i.qty * ratio * 10000) / 10000, average_cost: i.average_cost, results: [],
-                }));
-                this.syncInputWeight();
-            },
-
             get rawTotal() {
                 return this.rawItems.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.average_cost) || 0), 0);
             },
+            get outputWeight() { return Number(this.outputItems[0]?.qty) || 0; },
+            get lossWeight() { return Math.max(0, this.inputWeight - this.outputWeight); },
+            get expectedLossWeight() { return Math.max(0, this.inputWeight * (Number(this.expectedLossPercent) || 0) / 100); },
+            get abnormalLossWeight() { return Math.max(0, this.lossWeight - this.expectedLossWeight); },
+            get lossCost() { return this.inputWeight > 0 ? this.rawTotal * this.lossWeight / this.inputWeight : 0; },
 
             outputUnitCost(item) {
                 const qty = Number(item.qty) || 0;
@@ -256,6 +279,7 @@
             },
 
             money(v) { return Number(v || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+            weight(v) { return Number(v || 0).toLocaleString('th-TH', { minimumFractionDigits: 3, maximumFractionDigits: 4 }); },
 
             async searchProducts(item) {
                 if (item.productQuery.length < 1) { item.results = []; item.product_id = ''; return; }
@@ -274,6 +298,9 @@
                 if (this.rawItems.some(i => !i.product_id) || this.outputItems.some(i => !i.product_id)) {
                     event.preventDefault();
                     Swal.fire({ icon: 'warning', title: 'กรุณาเลือกสินค้าให้ครบทุกแถว' });
+                } else if (this.outputWeight > this.inputWeight) {
+                    event.preventDefault();
+                    Swal.fire({ icon: 'warning', title: 'น้ำหนักผลผลิตมากกว่าวัตถุดิบ', text: 'กรุณาตรวจน้ำหนักที่ชั่งจริงก่อนบันทึก' });
                 }
             },
         };

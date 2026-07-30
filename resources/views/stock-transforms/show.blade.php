@@ -1,7 +1,7 @@
 @extends('layout')
 
 @section('title', "ใบแปรรูป {$document->doc_number} - POPSTAR ERP")
-@section('page-title', 'ใบแปรรูปสินค้า')
+@section('page-title', 'แปรรูปสินค้า / บันทึกสูญเสีย')
 @section('page-subtitle', $document->doc_number)
 
 @section('content')
@@ -26,11 +26,22 @@
     <div class="row g-3 mb-4">
         <div class="col-6 col-lg-3"><div class="content-card p-3 h-100"><div class="text-muted small">น้ำหนักวัตถุดิบ</div><div class="fs-5 fw-bold">{{ number_format($batch->input_weight_qty, 3) }} กก.</div></div></div>
         <div class="col-6 col-lg-3"><div class="content-card p-3 h-100"><div class="text-muted small">ผลผลิตจริง</div><div class="fs-5 fw-bold text-success">{{ number_format($batch->output_weight_qty, 3) }} กก.</div></div></div>
-        <div class="col-6 col-lg-3"><div class="content-card p-3 h-100"><div class="text-muted small">สูญเสีย / ส่วนต่าง</div><div class="fs-5 fw-bold {{ $batch->loss_weight_qty > 0 ? 'text-danger' : 'text-primary' }}">{{ number_format($batch->loss_weight_qty, 3) }} กก.</div><div class="small text-muted">Yield {{ number_format($batch->yield_percent, 2) }}%</div></div></div>
+        <div class="col-6 col-lg-3"><div class="content-card p-3 h-100"><div class="text-muted small">สูญเสียจริง</div><div class="fs-5 fw-bold {{ $batch->loss_weight_qty > 0 ? 'text-danger' : 'text-primary' }}">{{ number_format($batch->loss_weight_qty, 3) }} กก.</div><div class="small text-muted">Yield {{ number_format($batch->yield_percent, 2) }}%</div></div></div>
         <div class="col-6 col-lg-3"><div class="content-card p-3 h-100"><div class="text-muted small">ต้นทุนผลผลิต</div><div class="fs-5 fw-bold">฿{{ number_format($batch->output_unit_cost, 2) }}/กก.</div><div class="small text-muted">รวม ฿{{ number_format($batch->total_input_cost, 2) }}</div></div></div>
     </div>
+    <div class="content-card p-3 mb-4">
+        <div class="row g-3">
+            <div class="col-md-3"><div class="text-muted small">สาเหตุสูญเสีย</div><strong>{{ $lossReasons[$batch->loss_reason_code] ?? 'ไม่ระบุ' }}</strong></div>
+            <div class="col-md-2"><div class="text-muted small">เกณฑ์ปกติ</div><strong>{{ number_format($batch->expected_loss_percent, 2) }}%</strong></div>
+            <div class="col-md-2"><div class="text-muted small">สูญเสียผิดปกติ</div><strong class="{{ $batch->abnormal_loss_qty > 0 ? 'text-danger' : 'text-success' }}">{{ number_format($batch->abnormal_loss_qty, 3) }} กก.</strong></div>
+            <div class="col-md-2"><div class="text-muted small">มูลค่าสูญเสีย</div><strong>฿{{ number_format($batch->loss_cost_amount, 2) }}</strong></div>
+            <div class="col-md-3"><div class="text-muted small">มูลค่าสูญเสียผิดปกติ</div><strong class="{{ $batch->abnormal_loss_cost_amount > 0 ? 'text-danger' : '' }}">฿{{ number_format($batch->abnormal_loss_cost_amount, 2) }}</strong></div>
+            @if($batch->loss_note)<div class="col-12"><div class="text-muted small">รายละเอียด</div><strong>{{ $batch->loss_note }}</strong></div>@endif
+        </div>
+        <div class="small text-muted mt-2">ต้นทุนสูญเสียถูกดูดซับในต้นทุนผลผลิต เพื่อให้มูลค่าวัตถุดิบที่ตัดออกกระทบยอดกับผลผลิตที่รับเข้าได้ครบ</div>
+    </div>
     <div class="content-card p-3 mb-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
-        <div><div class="text-muted small">ราคาขาย ณ วันจัดเซ็ต</div><strong>฿{{ number_format($batch->selling_unit_price,2) }}/กก.</strong> <span class="small text-muted">(ก่อน VAT ฿{{ number_format($batch->net_selling_unit_price,2) }})</span></div>
+        <div><div class="text-muted small">ราคาขาย ณ วันแปรรูป</div><strong>฿{{ number_format($batch->selling_unit_price,2) }}/กก.</strong> <span class="small text-muted">(ก่อน VAT ฿{{ number_format($batch->net_selling_unit_price,2) }})</span></div>
         <div class="text-end"><div class="text-muted small">กำไรขั้นต้นประมาณ</div><strong class="{{ $batch->estimated_profit_per_unit >= 0 ? 'text-primary' : 'text-danger' }}">฿{{ number_format($batch->estimated_profit_per_unit,2) }}/กก. &middot; {{ number_format($batch->estimated_margin_percent,2) }}%</strong></div>
     </div>
 

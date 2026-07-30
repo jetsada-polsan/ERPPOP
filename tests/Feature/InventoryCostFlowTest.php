@@ -275,6 +275,8 @@ class InventoryCostFlowTest extends TestCase
 
         $document = app(StockTransformService::class)->create([
             'branch_id' => $branch->id, 'batch_mode' => true, 'input_weight_qty' => 8,
+            'loss_reason_code' => 'trim', 'expected_loss_percent' => 20,
+            'loss_note' => 'ตัดแต่งตามมาตรฐาน UAT',
             'raw_items' => [
                 ['product_id' => $meatA->id, 'qty' => 3],
                 ['product_id' => $meatB->id, 'qty' => 5],
@@ -286,6 +288,10 @@ class InventoryCostFlowTest extends TestCase
         $this->assertSame(550.0, (float) $batch->total_input_cost);
         $this->assertSame(110.0, (float) $batch->output_unit_cost);
         $this->assertSame(3.0, (float) $batch->loss_weight_qty);
+        $this->assertSame('trim', $batch->loss_reason_code);
+        $this->assertSame(206.25, (float) $batch->loss_cost_amount);
+        $this->assertSame(1.4, (float) $batch->abnormal_loss_qty);
+        $this->assertSame(96.25, (float) $batch->abnormal_loss_cost_amount);
         $this->assertSame(62.5, (float) $batch->yield_percent);
         $this->assertSame(110.0, (float) $output->fresh()->average_cost);
         $this->assertSame(200.0, (float) $batch->selling_unit_price);
@@ -299,6 +305,36 @@ class InventoryCostFlowTest extends TestCase
         $this->assertCount(2, $packages);
         $this->assertSame(100.0, (float) $packages[0]->total_price);
         $this->assertMatchesRegularExpression('/^800999[0-9]{7}$/', $packages[0]->barcode);
+    }
+
+    public function test_transform_rejects_output_weight_above_input_and_rolls_stock_back(): void
+    {
+        [$branch, $supplier, $rawProduct] = $this->masters();
+        app(PurchaseService::class)->create([
+            'supplier_id' => $supplier->id, 'branch_id' => $branch->id,
+            'is_credit' => false,
+            'items' => [['product_id' => $rawProduct->id, 'qty' => 10, 'unit_price' => 100]],
+        ]);
+        $output = Product::create([
+            'sku_code' => 'OUTPUT-GUARD', 'name_th' => 'ผลผลิตทดสอบ',
+            'base_unit_id' => $rawProduct->base_unit_id, 'average_cost' => 0,
+            'is_vat' => false, 'is_active' => true, 'negative_stock_policy' => 'block',
+        ]);
+        $before = (float) $rawProduct->stockBalances()->sum('on_hand_qty');
+
+        try {
+            app(StockTransformService::class)->create([
+                'branch_id' => $branch->id, 'batch_mode' => true, 'input_weight_qty' => 5,
+                'raw_items' => [['product_id' => $rawProduct->id, 'qty' => 5]],
+                'output_items' => [['product_id' => $output->id, 'qty' => 6, 'percent' => 100]],
+            ]);
+            $this->fail('ระบบต้องปฏิเสธผลผลิตที่หนักกว่าวัตถุดิบ');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('ต้องไม่มากกว่า', $e->getMessage());
+        }
+
+        $this->assertSame($before, (float) $rawProduct->stockBalances()->sum('on_hand_qty'));
+        $this->assertSame(0.0, (float) $output->stockBalances()->sum('on_hand_qty'));
     }
 
     public function test_expiry_control_uses_fefo_and_blocks_expired_lots(): void

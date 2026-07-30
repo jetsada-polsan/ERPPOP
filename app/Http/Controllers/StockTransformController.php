@@ -15,6 +15,17 @@ use RuntimeException;
 
 class StockTransformController extends Controller
 {
+    private const LOSS_REASONS = [
+        'trim' => 'ตัดแต่ง / เศษวัตถุดิบ',
+        'cooking' => 'น้ำหนักหายจากปรุง / ละลาย',
+        'drip' => 'น้ำหยด / ละลายน้ำแข็ง',
+        'spill' => 'หก / ตกหล่น',
+        'quality_reject' => 'คัดทิ้งจากคุณภาพ',
+        'weight_variance' => 'ส่วนต่างจากการชั่ง',
+        'other' => 'อื่น ๆ',
+        'unclassified' => 'ข้อมูลเดิมยังไม่จำแนก',
+    ];
+
     public function index(Request $request): View
     {
         $q = trim((string) $request->query('q', ''));
@@ -50,6 +61,7 @@ class StockTransformController extends Controller
             'branches' => Branch::orderBy('code')->get(['id', 'code', 'name_th']),
             'locations' => WarehouseLocation::orderBy('code')->get(['id', 'code', 'name']),
             'recipes' => $recipes,
+            'lossReasons' => self::LOSS_REASONS,
             'q' => $q,
         ]);
     }
@@ -63,6 +75,9 @@ class StockTransformController extends Controller
             'batch_mode' => ['nullable', 'boolean'],
             'production_recipe_id' => ['nullable', 'integer', 'exists:production_recipes,id'],
             'input_weight_qty' => ['nullable', 'numeric', 'min:0.0001'],
+            'loss_reason_code' => ['nullable', 'in:trim,cooking,drip,spill,quality_reject,weight_variance,other'],
+            'expected_loss_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'loss_note' => ['nullable', 'string', 'max:500'],
             'raw_items' => ['required', 'array', 'min:1'],
             'raw_items.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'raw_items.*.qty' => ['required', 'numeric', 'min:0.0001'],
@@ -80,7 +95,7 @@ class StockTransformController extends Controller
         }
 
         return redirect()->route('stock-transforms.show', $document)
-            ->with('success', "บันทึกใบแปรรูปสินค้า {$document->doc_number} แล้ว");
+            ->with('success', "บันทึกการแปรรูปและข้อมูลสูญเสีย {$document->doc_number} แล้ว");
     }
 
     public function show(Document $stockTransform): View
@@ -90,7 +105,10 @@ class StockTransformController extends Controller
             'productionBatch.outputProduct', 'productionBatch.packages',
         ]);
 
-        return view('stock-transforms.show', ['document' => $stockTransform]);
+        return view('stock-transforms.show', [
+            'document' => $stockTransform,
+            'lossReasons' => self::LOSS_REASONS,
+        ]);
     }
 
     public function addPackages(Request $request, Document $stockTransform, StockTransformService $service): RedirectResponse
