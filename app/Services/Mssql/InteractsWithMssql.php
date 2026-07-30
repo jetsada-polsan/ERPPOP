@@ -29,12 +29,17 @@ trait InteractsWithMssql
         $driver = config('mssql_source.driver', 'SQL Server');
         $trusted = filter_var(config('mssql_source.trusted'), FILTER_VALIDATE_BOOL);
 
-        $dsn = "odbc:Driver={".$driver."};Server={$host};Database={$database};";
-        if ($port) {
-            $dsn .= "Port={$port};";
-        }
-        if (strcasecmp((string) $driver, 'FreeTDS') === 0) {
-            $dsn .= 'TDS_Version='.config('mssql_source.tds_version', '7.4').';';
+        if (strcasecmp((string) $driver, 'dblib') === 0) {
+            $server = $port ? "{$host}:{$port}" : $host;
+            $dsn = "dblib:host={$server};dbname={$database}";
+        } else {
+            $dsn = "odbc:Driver={".$driver."};Server={$host};Database={$database};";
+            if ($port) {
+                $dsn .= "Port={$port};";
+            }
+            if (strcasecmp((string) $driver, 'FreeTDS') === 0) {
+                $dsn .= 'TDS_Version='.config('mssql_source.tds_version', '7.4').';';
+            }
         }
         if ($trusted) {
             $dsn .= 'Trusted_Connection=Yes;';
