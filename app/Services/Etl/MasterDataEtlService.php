@@ -26,7 +26,7 @@ class MasterDataEtlService
     ) {}
 
     /** @return array<string, int> counts per step, for reporting */
-    public function run(): array
+    public function run(bool $skipStockSnapshot = false): array
     {
         $counts = [];
         $counts['branches'] = $this->syncBranches();
@@ -39,7 +39,7 @@ class MasterDataEtlService
         $counts['warehouses'] = $this->syncWarehouses();
         $counts['warehouse_locations'] = $this->syncWarehouseLocations();
         $counts['branch_default_locations'] = $this->syncBranchDefaultLocations();
-        $counts['stock_balances'] = $this->syncStockBalances();
+        $counts['stock_balances'] = $skipStockSnapshot ? 0 : $this->syncStockBalances();
         $counts['customers'] = $this->syncCustomers();
         $counts['customer_addresses'] = $this->syncCustomerAddresses();
         $counts['customer_contacts'] = $this->syncCustomerContacts();
