@@ -16,7 +16,9 @@ use App\Models\Product;
  */
 class PosImportValidationService
 {
-    private const AMOUNT_TOLERANCE = 0.01;
+    // BPlus stores the customer charge rounded to the nearest baht/half-baht,
+    // while line amounts retain satang precision.
+    private const AMOUNT_TOLERANCE = 0.50;
 
     public function validate(ImportBatch $batch): ImportBatch
     {
@@ -119,12 +121,19 @@ class PosImportValidationService
         if ($receipt->payments->isNotEmpty() && abs($paymentsTotal - $headerNet) > self::AMOUNT_TOLERANCE) {
             $receiptErrors[] = $this->logError($batch, $receipt, ImportError::PAYMENT_NOT_MATCH,
                 "Header net_amount ({$headerNet}) does not match sum of payments ({$paymentsTotal}).");
-        } elseif ($receipt->payments->isEmpty() && $headerNet > 0) {
+        } elseif ($receipt->payments->isEmpty() && $headerNet > 0 && ! $this->isLegacyUnpaidSnapshot($receipt)) {
             $receiptErrors[] = $this->logError($batch, $receipt, ImportError::PAYMENT_NOT_MATCH,
                 "Receipt has a net amount of {$headerNet} but no payment lines.");
         }
 
         $receipt->update(['status' => $receiptErrors === [] ? ImportedReceipt::STATUS_VALID : ImportedReceipt::STATUS_ERROR]);
+    }
+
+    private function isLegacyUnpaidSnapshot(ImportedReceipt $receipt): bool
+    {
+        // Some completed BPlus POS snapshots have PSH_STATUS=2 and no PSP rows.
+        // Keep the sale in ERP with an empty payment allocation for finance review.
+        return (string) data_get($receipt->raw_data, 'PSH_STATUS') === '2';
     }
 
     private function logError(ImportBatch $batch, ImportedReceipt $receipt, string $type, string $message, ?int $lineNo = null): ImportError
