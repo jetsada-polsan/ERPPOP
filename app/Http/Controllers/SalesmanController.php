@@ -26,8 +26,10 @@ class SalesmanController extends Controller
 
         $branches = Branch::orderBy('code')->get();
         $activeSalesmen = Salesman::where('is_active', true)->orderBy('code')->get();
-        $salesAreas = SalesArea::with(['branch', 'defaultSalesman'])
-            ->orderBy('area_type')->orderBy('code')->get();
+        $salesAreas = SalesArea::with(['branch', 'defaultSalesman', 'documentBook'])
+            ->where('area_type', 'route')
+            ->orderBy('code')
+            ->get();
 
         return view('salesmen.index', compact('salesmen', 'activeSalesmen', 'salesAreas', 'branches', 'q'));
     }

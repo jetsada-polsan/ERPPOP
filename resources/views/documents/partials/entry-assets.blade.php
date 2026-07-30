@@ -158,13 +158,7 @@ function docEntryPage(config) {
         },
         onBranchChanged() {
             const areas = this.config.salesAreas || [];
-            const area = areas.find(item =>
-                item.area_type === 'branch' && String(item.branch_id || '') === String(this.branchId || '')
-            );
-            if (area) {
-                this.salesAreaId = String(area.id);
-                if (area.default_salesman_id) this.salesmanId = String(area.default_salesman_id);
-            } else if (this.salesAreaId) {
+            if (this.salesAreaId) {
                 const selected = areas.find(item => String(item.id) === String(this.salesAreaId));
                 if (selected?.branch_id && String(selected.branch_id) !== String(this.branchId)) this.salesAreaId = '';
             }

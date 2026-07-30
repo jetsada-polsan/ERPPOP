@@ -73,12 +73,12 @@
                             @if($showSalesman)
                                 @if($showSalesArea)
                                 <div class="doc-field" style="grid-column: span 4;">
-                                    <label>สาขา / สายการขาย / สายขนส่ง</label>
+                                    <label>สายการขาย / เล่มใบจอง</label>
                                     <select name="sales_area_id" class="doc-select" x-model="salesAreaId" @change="onSalesAreaChanged()">
                                         <option value="">ไม่ระบุ</option>
                                         @foreach($salesAreas as $area)
                                             <option value="{{ $area->id }}">
-                                                {{ $area->area_type === 'branch' ? 'สาขา' : 'สาย' }} · {{ $area->code }} - {{ $area->name }}
+                                                {{ $area->code }} - {{ $area->name }}
                                             </option>
                                         @endforeach
                                     </select>

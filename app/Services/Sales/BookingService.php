@@ -4,6 +4,7 @@ namespace App\Services\Sales;
 
 use App\Models\Branch;
 use App\Models\Document;
+use App\Models\DocumentBook;
 use App\Models\DocumentType;
 use App\Models\SaleBooking;
 use App\Models\StockBalance;
@@ -25,7 +26,7 @@ class BookingService
     ) {}
 
     /**
-     * @param  array{customer_id:int, branch_id:int, sales_area_id?:?int, salesman_id:?int, remark:?string, items: array<int, array{product_id:int, qty:float, unit_price:float}>}  $data
+     * @param  array{customer_id:int, branch_id:int, sales_area_id?:?int, salesman_id:?int, document_book_id?:?int, remark:?string, items: array<int, array{product_id:int, qty:float, unit_price:float}>}  $data
      */
     public function create(array $data): Document
     {
@@ -39,16 +40,25 @@ class BookingService
         }
 
         $documentType = DocumentType::where('code', DocumentType::BOOKING)->firstOrFail();
+        $documentBook = null;
+        if (! empty($data['document_book_id'])) {
+            $documentBook = DocumentBook::where('document_type_id', $documentType->id)
+                ->where('is_active', true)
+                ->findOrFail($data['document_book_id']);
+        }
 
-        return DB::transaction(function () use ($data, $branch, $documentType) {
+        return DB::transaction(function () use ($data, $branch, $documentType, $documentBook) {
             $items = collect($data['items']);
             $totalQty = $items->sum('qty');
             $totalAmount = $items->sum(fn ($i) => $i['qty'] * $i['unit_price']);
 
             $document = Document::create([
                 'document_type_id' => $documentType->id,
+                'document_book_id' => $documentBook?->id,
                 'branch_id' => $branch->id,
-                'doc_number' => $this->numbers->next(DocumentType::BOOKING, $branch->id),
+                'doc_number' => $documentBook
+                    ? $this->numbers->nextInBook($documentBook, $branch->id)
+                    : $this->numbers->next(DocumentType::BOOKING, $branch->id),
                 'doc_date' => now()->toDateString(),
                 'salesman_id' => $data['salesman_id'] ?? null,
                 'sales_area_id' => $data['sales_area_id'] ?? null,

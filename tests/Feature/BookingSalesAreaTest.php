@@ -20,6 +20,39 @@ class BookingSalesAreaTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_business_plus_route_uses_its_own_booking_book_and_default_salesperson(): void
+    {
+        [$branch, $customer, $product] = $this->masters('BP');
+        $route = SalesArea::with(['documentBook', 'defaultSalesman'])
+            ->where('code', 'B11')
+            ->firstOrFail();
+
+        $response = $this->withoutMiddleware(ErpAuthorize::class)
+            ->actingAs(User::factory()->create(['username' => 'booking_bplus_route_uat']))
+            ->post(route('bookings.store'), [
+                'customer_id' => $customer->id,
+                'branch_id' => $branch->id,
+                'sales_area_id' => $route->id,
+                'items' => [[
+                    'product_id' => $product->id,
+                    'qty' => 3,
+                    'unit_price' => 90,
+                ]],
+            ]);
+
+        $response->assertRedirect();
+        $this->assertNotNull($route->documentBook);
+        $this->assertSame('12', $route->defaultSalesman?->code);
+        $this->assertDatabaseHas('documents', [
+            'branch_id' => $branch->id,
+            'sales_area_id' => $route->id,
+            'salesman_id' => $route->default_salesman_id,
+            'document_book_id' => $route->document_book_id,
+            'doc_number' => 'B11'.$branch->code.now()->format('Ymd').'001',
+            'total_amount' => 270,
+        ]);
+    }
+
     public function test_booking_uses_the_salesperson_linked_to_the_selected_route(): void
     {
         [$branch, $customer, $product] = $this->masters('A');

@@ -69,8 +69,11 @@ class BookingController extends Controller
 
         $branches = Branch::orderBy('code')->get();
         $salesmen = Salesman::where('is_active', true)->orderBy('name')->get();
-        $salesAreas = SalesArea::with(['branch', 'defaultSalesman'])
-            ->where('is_active', true)->orderBy('area_type')->orderBy('code')->get();
+        $salesAreas = SalesArea::with(['branch', 'defaultSalesman', 'documentBook'])
+            ->where('is_active', true)
+            ->where('area_type', 'route')
+            ->orderBy('code')
+            ->get();
         $documentBooks = DocumentBook::whereHas('documentType', fn ($query) => $query->whereIn('code', ['BOOKING', 'CREDIT_SALE']))
             ->where('is_active', true)
             ->orderBy('document_type_id')
@@ -109,6 +112,7 @@ class BookingController extends Controller
                 return back()->withInput()->with('error', 'สาขาในใบจองไม่ตรงกับสาขาที่ผูกไว้ในสายการขาย');
             }
             $data['salesman_id'] ??= $area->default_salesman_id;
+            $data['document_book_id'] = $area->document_book_id;
         }
 
         try {
