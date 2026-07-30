@@ -4,6 +4,7 @@
     $partyRequired = $partyRequired ?? true;
     $showParty = $partyType !== 'none';
     $showSalesman = $showSalesman ?? false;
+    $showSalesArea = $showSalesArea ?? false;
     $showCreditType = $showCreditType ?? false;
     $showLotFields = $showLotFields ?? false;
     $showPurchaseTaxMode = $showPurchaseTaxMode ?? false;
@@ -34,7 +35,7 @@
                         <div class="doc-fields">
                             <div class="doc-field" style="grid-column: span 4;">
                                 <label><span class="required">*</span> สาขา / คลัง</label>
-                                <select name="branch_id" required class="doc-select">
+                                <select name="branch_id" required class="doc-select" x-model="branchId" @change="onBranchChanged()">
                                     @foreach($branches as $branch)
                                         <option value="{{ $branch->id }}">{{ $branch->code }} - {{ $branch->name_th }}</option>
                                     @endforeach
@@ -70,9 +71,22 @@
                             @endif
 
                             @if($showSalesman)
+                                @if($showSalesArea)
+                                <div class="doc-field" style="grid-column: span 4;">
+                                    <label>สาขา / สายการขาย / สายขนส่ง</label>
+                                    <select name="sales_area_id" class="doc-select" x-model="salesAreaId" @change="onSalesAreaChanged()">
+                                        <option value="">ไม่ระบุ</option>
+                                        @foreach($salesAreas as $area)
+                                            <option value="{{ $area->id }}">
+                                                {{ $area->area_type === 'branch' ? 'สาขา' : 'สาย' }} · {{ $area->code }} - {{ $area->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                @endif
                                 <div class="doc-field" style="grid-column: span 4;">
                                     <label>พนักงานขาย</label>
-                                    <select name="salesman_id" class="doc-select">
+                                    <select name="salesman_id" class="doc-select" x-model="salesmanId">
                                         <option value="">ไม่ระบุ</option>
                                         @foreach($salesmen as $salesman)
                                             <option value="{{ $salesman->id }}">{{ $salesman->code }} - {{ $salesman->name }}</option>

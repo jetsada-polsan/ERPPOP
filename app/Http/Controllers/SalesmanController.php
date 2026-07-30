@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use App\Models\Salesman;
+use App\Models\SalesArea;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -24,8 +25,11 @@ class SalesmanController extends Controller
             ->withQueryString();
 
         $branches = Branch::orderBy('code')->get();
+        $activeSalesmen = Salesman::where('is_active', true)->orderBy('code')->get();
+        $salesAreas = SalesArea::with(['branch', 'defaultSalesman'])
+            ->orderBy('area_type')->orderBy('code')->get();
 
-        return view('salesmen.index', compact('salesmen', 'branches', 'q'));
+        return view('salesmen.index', compact('salesmen', 'activeSalesmen', 'salesAreas', 'branches', 'q'));
     }
 
     public function store(Request $request): RedirectResponse

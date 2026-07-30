@@ -70,6 +70,7 @@ class CreditSaleService
                     : $this->numbers->next(DocumentType::CREDIT_SALE, $bookingDocument->branch_id),
                 'doc_date' => now()->toDateString(),
                 'salesman_id' => $bookingDocument->salesman_id,
+                'sales_area_id' => $bookingDocument->sales_area_id,
                 'customer_id' => $bookingDocument->customer_id,
                 'reference' => $bookingDocument->doc_number,
                 'status' => 'active',

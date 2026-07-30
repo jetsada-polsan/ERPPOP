@@ -46,6 +46,7 @@ $isConverted = $booking->status === 'converted_to_sale';
             <div class="text-muted small">
                 {{ $booking->document->doc_date->thaiDate() }} &middot;
                 {{ $booking->document->branch->name_th }}
+                @if($booking->document->salesArea) &middot; {{ $booking->document->salesArea->name }}@endif
                 @if($booking->document->salesman) &middot; {{ $booking->document->salesman->name }}@endif
             </div>
             <div class="fw-semibold mt-1">{{ $booking->document->customer->name_th }}

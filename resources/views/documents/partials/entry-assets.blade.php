@@ -130,8 +130,20 @@ function docEntryPage(config) {
         partyQuery: '',
         partyId: '',
         partyResults: [],
+        branchId: '',
+        salesAreaId: '',
+        salesmanId: '',
         items: [{ product_id: '', productQuery: '', qty: 1, unit_price: 0, unit_name: '', is_scale: false, scale_plu: '', lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [], results: [] }],
-        openModal() { this.modalOpen = true; },
+        openModal() {
+            this.modalOpen = true;
+            this.$nextTick(() => {
+                if (!this.branchId) {
+                    const branch = this.$root.querySelector('.doc-modal [name="branch_id"]');
+                    this.branchId = branch?.value || '';
+                }
+                this.onBranchChanged();
+            });
+        },
         closeModal() { this.modalOpen = false; },
         async searchParty() {
             if (this.partyQuery.length < 1) { this.partyResults = []; this.partyId = ''; return; }
@@ -143,6 +155,25 @@ function docEntryPage(config) {
             this.partyId = party.id;
             this.partyQuery = `${party.code} - ${party.name_th}`;
             this.partyResults = [];
+        },
+        onBranchChanged() {
+            const areas = this.config.salesAreas || [];
+            const area = areas.find(item =>
+                item.area_type === 'branch' && String(item.branch_id || '') === String(this.branchId || '')
+            );
+            if (area) {
+                this.salesAreaId = String(area.id);
+                if (area.default_salesman_id) this.salesmanId = String(area.default_salesman_id);
+            } else if (this.salesAreaId) {
+                const selected = areas.find(item => String(item.id) === String(this.salesAreaId));
+                if (selected?.branch_id && String(selected.branch_id) !== String(this.branchId)) this.salesAreaId = '';
+            }
+        },
+        onSalesAreaChanged() {
+            const area = (this.config.salesAreas || []).find(item => String(item.id) === String(this.salesAreaId));
+            if (!area) return;
+            if (area.branch_id) this.branchId = String(area.branch_id);
+            if (area.default_salesman_id) this.salesmanId = String(area.default_salesman_id);
         },
         addItem() { this.items.push({ product_id: '', productQuery: '', qty: 1, unit_price: 0, unit_name: '', is_scale: false, scale_plu: '', lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [], results: [] }); },
         removeItem(index) { this.items.splice(index, 1); },

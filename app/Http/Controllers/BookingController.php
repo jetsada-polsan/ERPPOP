@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Branch;
 use App\Models\DocumentBook;
 use App\Models\SaleBooking;
+use App\Models\SalesArea;
 use App\Models\Salesman;
 use App\Services\Sales\BookingService;
 use App\Services\Sales\CreditSaleService;
@@ -21,10 +22,16 @@ class BookingController extends Controller
         $q = trim((string) $request->query('q', ''));
         $status = $request->query('status', '');
         $bookId = $request->integer('book') ?: null;
+        $branchId = $request->integer('branch_id') ?: null;
+        $salesAreaId = $request->integer('sales_area_id') ?: null;
+        $salesmanId = $request->integer('salesman_id') ?: null;
         $legacyType = trim((string) $request->query('legacy_type', ''));
 
-        $bookings = SaleBooking::with(['document.customer', 'document.branch', 'document.documentBook'])
+        $bookings = SaleBooking::with(['document.customer', 'document.branch', 'document.salesman', 'document.salesArea', 'document.documentBook'])
             ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->when($salesAreaId, fn ($query) => $query->where('sales_area_id', $salesAreaId))
+            ->when($salesmanId, fn ($query) => $query->where('salesman_id', $salesmanId))
+            ->when($branchId, fn ($query) => $query->whereHas('document', fn ($d) => $d->where('branch_id', $branchId)))
             ->when($bookId, fn ($query) => $query->whereHas('document', fn ($d) => $d->where('document_book_id', $bookId)))
             ->when($q !== '', fn ($query) => $query->whereHas('document', fn ($d) => $d
                 ->where('doc_number', 'ilike', "%{$q}%")
@@ -62,6 +69,8 @@ class BookingController extends Controller
 
         $branches = Branch::orderBy('code')->get();
         $salesmen = Salesman::where('is_active', true)->orderBy('name')->get();
+        $salesAreas = SalesArea::with(['branch', 'defaultSalesman'])
+            ->where('is_active', true)->orderBy('area_type')->orderBy('code')->get();
         $documentBooks = DocumentBook::whereHas('documentType', fn ($query) => $query->whereIn('code', ['BOOKING', 'CREDIT_SALE']))
             ->where('is_active', true)
             ->orderBy('document_type_id')
@@ -69,7 +78,10 @@ class BookingController extends Controller
             ->orderBy('code')
             ->get();
 
-        return view('bookings.index', compact('bookings', 'legacyBookings', 'legacyTypes', 'branches', 'salesmen', 'documentBooks', 'q', 'status', 'bookId', 'legacyType', 'counts'));
+        return view('bookings.index', compact(
+            'bookings', 'legacyBookings', 'legacyTypes', 'branches', 'salesmen', 'salesAreas',
+            'documentBooks', 'q', 'status', 'bookId', 'branchId', 'salesAreaId', 'salesmanId', 'legacyType', 'counts'
+        ));
     }
 
     public function create(): RedirectResponse
@@ -82,6 +94,7 @@ class BookingController extends Controller
         $data = $request->validate([
             'customer_id' => ['required', 'integer', 'exists:customers,id'],
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
+            'sales_area_id' => ['nullable', 'integer', 'exists:sales_areas,id'],
             'salesman_id' => ['nullable', 'integer', 'exists:salesmen,id'],
             'remark' => ['nullable', 'string', 'max:1000'],
             'items' => ['required', 'array', 'min:1'],
@@ -89,6 +102,14 @@ class BookingController extends Controller
             'items.*.qty' => ['required', 'numeric', 'min:0.0001'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
         ]);
+
+        if (! empty($data['sales_area_id'])) {
+            $area = SalesArea::where('is_active', true)->findOrFail($data['sales_area_id']);
+            if ($area->branch_id && (int) $area->branch_id !== (int) $data['branch_id']) {
+                return back()->withInput()->with('error', 'สาขาในใบจองไม่ตรงกับสาขาที่ผูกไว้ในสายการขาย');
+            }
+            $data['salesman_id'] ??= $area->default_salesman_id;
+        }
 
         try {
             $document = $service->create($data);
@@ -103,7 +124,7 @@ class BookingController extends Controller
     public function show(SaleBooking $booking): View
     {
         $booking->load([
-            'document.customer', 'document.branch', 'document.salesman',
+            'document.customer', 'document.branch', 'document.salesman', 'document.salesArea',
             'document.stockDocument.items.product.baseUnit', 'document.stockDocument.items.product.barcodes', 'confirmedDocument',
         ]);
 

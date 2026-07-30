@@ -25,7 +25,7 @@ class BookingService
     ) {}
 
     /**
-     * @param  array{customer_id:int, branch_id:int, salesman_id:?int, remark:?string, items: array<int, array{product_id:int, qty:float, unit_price:float}>}  $data
+     * @param  array{customer_id:int, branch_id:int, sales_area_id?:?int, salesman_id:?int, remark:?string, items: array<int, array{product_id:int, qty:float, unit_price:float}>}  $data
      */
     public function create(array $data): Document
     {
@@ -51,6 +51,7 @@ class BookingService
                 'doc_number' => $this->numbers->next(DocumentType::BOOKING, $branch->id),
                 'doc_date' => now()->toDateString(),
                 'salesman_id' => $data['salesman_id'] ?? null,
+                'sales_area_id' => $data['sales_area_id'] ?? null,
                 'customer_id' => $data['customer_id'],
                 'status' => 'active',
                 'total_items' => $items->count(),
@@ -61,6 +62,7 @@ class BookingService
             SaleBooking::create([
                 'document_id' => $document->id,
                 'salesman_id' => $data['salesman_id'] ?? null,
+                'sales_area_id' => $data['sales_area_id'] ?? null,
                 'status' => SaleBooking::STATUS_PENDING,
             ]);
 

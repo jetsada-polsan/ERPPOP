@@ -27,6 +27,11 @@ class SaleBooking extends Model
         return $this->belongsTo(Salesman::class);
     }
 
+    public function salesArea(): BelongsTo
+    {
+        return $this->belongsTo(SalesArea::class);
+    }
+
     public function confirmedDocument(): BelongsTo
     {
         return $this->belongsTo(Document::class, 'confirmed_document_id');

@@ -99,6 +99,7 @@ class RoutePermissions
         'qty-promotions.' => 'masterdata.manage',
         'members.' => 'masterdata.manage',
         'salesmen.' => 'masterdata.manage',
+        'sales-areas.' => 'masterdata.manage',
 
         // รายงาน
         'reports.' => 'reports.view',

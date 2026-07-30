@@ -18,7 +18,17 @@
 @endphp
 
 @section('content')
-<div x-data="docEntryPage({ partyType: 'customer', partyLabel: 'ลูกค้า', partyRequired: true })" x-cloak>
+<div x-data="docEntryPage({
+    partyType: 'customer',
+    partyLabel: 'ลูกค้า',
+    partyRequired: true,
+    salesAreas: @js($salesAreas->map(fn ($area) => [
+        'id' => $area->id,
+        'area_type' => $area->area_type,
+        'branch_id' => $area->branch_id,
+        'default_salesman_id' => $area->default_salesman_id,
+    ])->values()),
+})" x-cloak>
     <div class="doc-shell">
         <div class="doc-tabs">
             <span class="doc-tab active">ใบจอง / ขายเชื่อ</span>
@@ -41,15 +51,15 @@
         </div>
 
         <div class="d-flex gap-2 mb-3 flex-wrap">
-            <a href="{{ route('bookings.index', ['q' => $q, 'book' => $bookId, 'legacy_type' => $legacyType]) }}"
+            <a href="{{ route('bookings.index', ['q' => $q, 'book' => $bookId, 'branch_id' => $branchId, 'sales_area_id' => $salesAreaId, 'salesman_id' => $salesmanId, 'legacy_type' => $legacyType]) }}"
                class="btn btn-sm {{ $status === '' ? 'btn-dark' : 'btn-light border' }} rounded-pill px-3">
                 ทั้งหมด <span class="badge text-bg-secondary ms-1">{{ number_format($counts['all']) }}</span>
             </a>
-            <a href="{{ route('bookings.index', ['q' => $q, 'status' => 'pending', 'book' => $bookId, 'legacy_type' => $legacyType]) }}"
+            <a href="{{ route('bookings.index', ['q' => $q, 'status' => 'pending', 'book' => $bookId, 'branch_id' => $branchId, 'sales_area_id' => $salesAreaId, 'salesman_id' => $salesmanId, 'legacy_type' => $legacyType]) }}"
                class="btn btn-sm {{ $status === 'pending' ? 'btn-warning' : 'btn-light border' }} rounded-pill px-3">
                 รอดำเนินการ <span class="badge text-bg-warning ms-1">{{ number_format($counts['pending']) }}</span>
             </a>
-            <a href="{{ route('bookings.index', ['q' => $q, 'status' => 'converted_to_sale', 'book' => $bookId]) }}"
+            <a href="{{ route('bookings.index', ['q' => $q, 'status' => 'converted_to_sale', 'book' => $bookId, 'branch_id' => $branchId, 'sales_area_id' => $salesAreaId, 'salesman_id' => $salesmanId]) }}"
                class="btn btn-sm {{ $status === 'converted_to_sale' ? 'btn-success' : 'btn-light border' }} rounded-pill px-3">
                 แปลงเป็นใบขายแล้ว <span class="badge text-bg-success ms-1">{{ number_format($counts['converted_to_sale']) }}</span>
             </a>
@@ -66,6 +76,33 @@
                     <option value="">ทุกเล่ม</option>
                     @foreach($documentBooks as $book)
                         <option value="{{ $book->id }}" @selected($bookId === $book->id)>{{ $book->code }} - {{ $book->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="filter-field">
+                <label>สาขา</label>
+                <select name="branch_id" class="form-select form-select-sm">
+                    <option value="">ทุกสาขา</option>
+                    @foreach($branches as $branch)
+                        <option value="{{ $branch->id }}" @selected($branchId === $branch->id)>{{ $branch->code }} - {{ $branch->name_th }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="filter-field">
+                <label>เขต/สายการขาย</label>
+                <select name="sales_area_id" class="form-select form-select-sm">
+                    <option value="">ทุกสาย</option>
+                    @foreach($salesAreas as $area)
+                        <option value="{{ $area->id }}" @selected($salesAreaId === $area->id)>{{ $area->code }} - {{ $area->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="filter-field">
+                <label>พนักงานขาย</label>
+                <select name="salesman_id" class="form-select form-select-sm">
+                    <option value="">ทุกคน</option>
+                    @foreach($salesmen as $salesman)
+                        <option value="{{ $salesman->id }}" @selected($salesmanId === $salesman->id)>{{ $salesman->code }} - {{ $salesman->name }}</option>
                     @endforeach
                 </select>
             </div>
@@ -95,6 +132,7 @@
                             <th>วันที่</th>
                             <th>สาขา</th>
                             <th>ลูกค้า</th>
+                            <th>เขต/สาย</th>
                             <th>พนักงาน</th>
                             <th class="text-end">ยอดรวม</th>
                             <th>สถานะ</th>
@@ -108,6 +146,7 @@
                                 <td class="text-nowrap">{{ $booking->document->doc_date->thaiDate() }}</td>
                                 <td class="text-muted small">{{ $booking->document->branch->name_th }}</td>
                                 <td>{{ $booking->document->customer->name_th }}</td>
+                                <td class="text-muted small">{{ $booking->document->salesArea?->name ?? '-' }}</td>
                                 <td class="text-muted small">{{ $booking->document->salesman?->name ?? '-' }}</td>
                                 <td class="text-end fw-semibold">{{ number_format($booking->document->total_amount, 2) }}</td>
                                 <td>
@@ -120,7 +159,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="8" class="doc-empty">ยังไม่มีใบจอง</td></tr>
+                            <tr><td colspan="9" class="doc-empty">ยังไม่มีใบจอง</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -192,10 +231,12 @@
         'action' => route('bookings.store'),
         'branches' => $branches,
         'salesmen' => $salesmen,
+        'salesAreas' => $salesAreas,
         'partyType' => 'customer',
         'partyLabel' => 'ลูกค้า',
         'partyRequired' => true,
         'showSalesman' => true,
+        'showSalesArea' => true,
         'itemTitle' => 'รายการจอง',
         'submitLabel' => 'บันทึกใบจอง',
         'remarkPlaceholder' => 'เงื่อนไขส่งของ / หมายเหตุการจอง',

@@ -55,6 +55,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\SaleReturnController;
 use App\Http\Controllers\SalesmanController;
+use App\Http\Controllers\SalesAreaController;
 use App\Http\Controllers\ScalePriceController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\StockAdjustmentController;
@@ -411,6 +412,10 @@ Route::prefix('salesmen')->name('salesmen.')->group(function () {
     Route::get('/', [SalesmanController::class, 'index'])->name('index');
     Route::post('/', [SalesmanController::class, 'store'])->name('store');
     Route::put('/{salesman}', [SalesmanController::class, 'update'])->name('update');
+});
+Route::prefix('sales-areas')->name('sales-areas.')->group(function () {
+    Route::post('/', [SalesAreaController::class, 'store'])->name('store');
+    Route::put('/{salesArea}', [SalesAreaController::class, 'update'])->name('update');
 });
 
 Route::prefix('warehouse-locations')->name('warehouse-locations.')->group(function () {
