@@ -5,6 +5,7 @@ namespace App\Services\PosImport;
 use App\Models\ImportBatch;
 use App\Models\ImportedReceipt;
 use App\Models\PosReceipt;
+use App\Models\Salesman;
 use App\Models\WarehouseLocation;
 use App\Services\Inventory\FifoStockService;
 use Illuminate\Support\Facades\DB;
@@ -66,10 +67,16 @@ class PosImportPostingService
 
     private function postReceipt(ImportedReceipt $receipt, WarehouseLocation $warehouseLocation, bool $applyStock): void
     {
+        $salesman = $receipt->cashier_code
+            ? Salesman::where('code', $receipt->cashier_code)->first()
+            : null;
+
         $posReceipt = PosReceipt::create([
             'pos_terminal_id' => $receipt->batch->pos_terminal_id,
             'receipt_no' => $receipt->receipt_no,
             'receipt_date' => $receipt->receipt_date->setTimeFromTimeString((string) ($receipt->receipt_time ?? '00:00:00')),
+            'cashier_id' => $salesman?->user_id,
+            'cashier_salesman_id' => $salesman?->id,
             'member_id' => null, // member master data not loaded yet; member_code kept in imported_receipts for later backfill
             'gross_sales' => $receipt->gross_amount,
             'discount_amount' => $receipt->discount_amount,

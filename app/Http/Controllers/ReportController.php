@@ -1114,14 +1114,15 @@ class ReportController extends Controller
         $posQuery = DB::table('pos_receipts as r')
             ->join('pos_terminals as t', 't.id', '=', 'r.pos_terminal_id')
             ->leftJoin('users as u', 'u.id', '=', 'r.cashier_id')
+            ->leftJoin('salesmen as sm', 'sm.id', '=', 'r.cashier_salesman_id')
             ->whereBetween('r.receipt_date', [$from, $to]);
 
         $this->applyBranch($posQuery, $filters, 't.branch_id');
-        $this->applySearch($posQuery, $filters, ['r.receipt_no', 'u.name', 't.code', 't.name']);
+        $this->applySearch($posQuery, $filters, ['r.receipt_no', 'u.name', 'sm.name', 't.code', 't.name']);
 
         $posRows = $posQuery
-            ->groupBy('u.id', 'u.name')
-            ->selectRaw("coalesce(u.name, 'ไม่ระบุแคชเชียร์') as staff_name, 'POS' as channel, count(*) as bill_count, sum(r.net_sales) as amount")
+            ->groupBy('u.id', 'u.name', 'sm.id', 'sm.name')
+            ->selectRaw("coalesce(u.name, sm.name, 'ขายเอง') as staff_name, 'POS' as channel, count(*) as bill_count, sum(r.net_sales) as amount")
             ->get();
 
         $docQuery = DB::table('documents as d')
@@ -1135,7 +1136,7 @@ class ReportController extends Controller
 
         $docRows = $docQuery
             ->groupBy('u.id', 'u.name', 'dt.code')
-            ->selectRaw("coalesce(u.name, 'ไม่ระบุผู้เปิดใบขาย') as staff_name, dt.code as channel, count(*) as bill_count, sum(d.total_amount) as amount")
+            ->selectRaw("coalesce(u.name, 'ขายเอง') as staff_name, dt.code as channel, count(*) as bill_count, sum(d.total_amount) as amount")
             ->get();
 
         return $posRows
