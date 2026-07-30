@@ -370,6 +370,29 @@
         </div>
     </section>
 
+    <section class="manual-panel" id="blueprint-roadmap">
+        <div class="manual-section-head">
+            <h2><i class="bi bi-list-check me-2"></i>ลำดับสร้างระบบตาม BplusBack Blueprint</h2>
+            <span>Phase 0–8</span>
+        </div>
+        <div class="manual-table-wrap">
+            <table class="manual-table" style="min-width:1100px">
+                <thead><tr><th>ระยะ</th><th>ขอบเขต</th><th>รายละเอียด</th><th>เกณฑ์จบ</th><th>สถานะ</th></tr></thead>
+                <tbody>
+                @foreach($blueprintRoadmap as $roadmap)
+                    <tr x-show="!query || $el.textContent.toLowerCase().includes(query.toLowerCase())">
+                        <td><strong>{{ $roadmap['phase'] }}</strong><br>{{ $roadmap['title'] }}</td>
+                        <td>{{ $roadmap['scope'] }}</td>
+                        <td>ทำตาม flow ใน Blueprint และผูกกับเอกสาร/ledger ที่เกี่ยวข้อง</td>
+                        <td>{{ $roadmap['exit'] }}</td>
+                        <td><span class="benchmark-status benchmark-{{ $roadmap['tone'] }}">{{ $roadmap['status'] }}</span></td>
+                    </tr>
+                @endforeach
+                </tbody>
+            </table>
+        </div>
+    </section>
+
     <section class="manual-panel">
         <div class="manual-section-head">
             <h2><i class="bi bi-clipboard-check me-2"></i>คู่มือทดสอบรับมอบระบบ (UAT)</h2>

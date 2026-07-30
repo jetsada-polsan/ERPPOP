@@ -19,8 +19,24 @@ class ManualController extends Controller
             'thaiErpSources' => $this->thaiErpSources(),
             'bplusBackCoverage' => $this->bplusBackCoverage(),
             'blueprintControls' => $this->blueprintControls(),
+            'blueprintRoadmap' => $this->blueprintRoadmap(),
             'calculationFormulas' => $this->calculationFormulas(),
         ]);
+    }
+
+    private function blueprintRoadmap(): array
+    {
+        return [
+            ['phase' => 'Phase 0', 'title' => 'Discovery & Traceability', 'scope' => 'Mapping เอกสาร Bplus, field/data dictionary, กฎ VAT/WHT และยอดตั้งต้น', 'exit' => 'เจ้าของงานและบัญชีลงชื่อรับรอง mapping', 'status' => 'กำลังตรวจ', 'tone' => 'partial'],
+            ['phase' => 'Phase 1', 'title' => 'Foundation', 'scope' => 'บริษัท สาขา คลัง ผู้ใช้ RBAC เลขเอกสาร งวดบัญชี และ audit', 'exit' => 'สิทธิ์และเลขเอกสารไม่ชนกัน', 'status' => 'มีชุดหลัก', 'tone' => 'partial'],
+            ['phase' => 'Phase 2', 'title' => 'Product & Inventory Core', 'scope' => 'สินค้า barcode หน่วยนับ lot/expiry ledger โอน ปรับ และตรวจนับ', 'exit' => 'rebuild จำนวนและมูลค่าจาก ledger ได้', 'status' => 'พร้อมใช้บางส่วน', 'tone' => 'partial'],
+            ['phase' => 'Phase 3', 'title' => 'Procurement + AP', 'scope' => 'PR/PO/รับสินค้า ตั้งหนี้ เจ้าหนี้ VAT/WHT และจ่ายเงิน', 'exit' => 'P2P และ posting ผ่าน end-to-end', 'status' => 'มีชุดหลัก', 'tone' => 'partial'],
+            ['phase' => 'Phase 4', 'title' => 'Sales + AR', 'scope' => 'เสนอราคา ใบจอง ขายสด ขายเชื่อ ส่งของ รับเงิน คืน และลูกหนี้', 'exit' => 'O2C และ posting ผ่าน end-to-end', 'status' => 'มีชุดหลัก', 'tone' => 'partial'],
+            ['phase' => 'Phase 5', 'title' => 'POS Offline', 'scope' => 'catalog ราคา promotion SQLite outbox hardware shift และ sync', 'exit' => 'offline/restart/retry แล้วไม่เกิดบิลซ้ำ', 'status' => 'กำลังทดสอบ Windows', 'tone' => 'partial'],
+            ['phase' => 'Phase 6', 'title' => 'Accounting & Closing', 'scope' => 'ผังบัญชี posting profile GL ธนาคาร กระทบยอด ปิดงวด และงบ', 'exit' => 'subledger ตรง trial balance', 'status' => 'มีชุดหลัก', 'tone' => 'partial'],
+            ['phase' => 'Phase 7', 'title' => 'Reporting & Parallel Run', 'scope' => 'dashboard migration rehearsal เทียบ Bplus/new ERP และ cut-over', 'exit' => 'control totals ผ่านและผู้ใช้ sign-off', 'status' => 'กำลังเตรียม', 'tone' => 'partial'],
+            ['phase' => 'Phase 8', 'title' => 'Extensions', 'scope' => 'ทรัพย์สิน เงินเดือน OCR portal AI และ forecasting', 'exit' => 'เปิดใช้ตามลำดับความคุ้มค่า', 'status' => 'วางแผน', 'tone' => 'planned'],
+        ];
     }
 
     private function blueprintControls(): array
