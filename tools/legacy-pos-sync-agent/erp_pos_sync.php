@@ -68,6 +68,8 @@ if ($summaryOnly) {
                 WHEN '00050' THEN 'PS5'
                 ELSE LEFT(CAST(h.PSH_NO AS VARCHAR(50)), 5)
             END AS pos_group,
+            br.BR_CODE AS branch_code,
+            h.PSH_POS AS legacy_branch_key,
             COUNT(*) AS receipt_count,
             SUM(ISNULL(h.PSH_B4_TDSC, 0)) AS before_discount,
             SUM(ISNULL(h.PSH_DSC_PCNTV, 0) + ISNULL(h.PSH_DSC_BAHTV, 0) + ISNULL(h.PSH_CPN_PCNTV, 0)
@@ -77,11 +79,12 @@ if ($summaryOnly) {
             SUM(ISNULL(h.PSH_N_SV, 0) + ISNULL(h.PSH_N_NV, 0)) AS net_amount,
             SUM(ISNULL(h.PSH_CHARGE, 0)) AS charge_amount
         FROM H{$tableSuffix} h
+        LEFT JOIN BRANCH br ON br.BR_KEY = h.PSH_POS
         WHERE h.PSH_TYPE = 1
           AND ISNULL(h.PSH_STATUS, 0) = 0
           AND CAST(h.PSH_DATE AS DATE) = ?
           AND LEFT(CAST(h.PSH_NO AS VARCHAR(50)), 5) IN ('00010','00020','00030','00040','00050')
-        GROUP BY LEFT(CAST(h.PSH_NO AS VARCHAR(50)), 5)
+        GROUP BY LEFT(CAST(h.PSH_NO AS VARCHAR(50)), 5), br.BR_CODE, h.PSH_POS
         ORDER BY pos_group
     ", [$saleDate]);
     @odbc_close($conn);
