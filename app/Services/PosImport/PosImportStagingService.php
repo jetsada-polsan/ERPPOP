@@ -126,12 +126,7 @@ class PosImportStagingService
     {
         $seq = 1;
         foreach ($rows as $row) {
-            $netAmount = (float) ($row['PSD_N_AMT'] ?? 0);
-            // BPlus leaves PSD_N_AMT at zero for some completed POS/repack rows;
-            // PSD_G_SELL is the persisted line selling amount in that case.
-            if (abs($netAmount) < 0.000001 && (float) ($row['PSD_G_SELL'] ?? 0) !== 0.0) {
-                $netAmount = (float) $row['PSD_G_SELL'];
-            }
+            $netAmount = PosImportLineNormalizer::amount($row);
 
             ImportedReceiptItem::create([
                 'batch_id' => $batch->id,

@@ -86,7 +86,7 @@ class PosImportPostingService
         ]);
 
         $itemRows = [];
-        foreach ($receipt->items as $item) {
+        foreach ($receipt->items->filter(fn ($item) => PosImportLineNormalizer::isPostingLine($item->raw_data ?? [])) as $item) {
             $itemRows[] = [
                 'pos_receipt_id' => $posReceipt->id,
                 'seq' => $item->line_no,

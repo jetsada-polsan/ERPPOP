@@ -5,6 +5,7 @@ namespace App\Services\PosImport;
 use App\Models\ImportBatch;
 use App\Models\ImportError;
 use App\Models\ImportedReceipt;
+use App\Models\ProductBarcode;
 use App\Models\PosTerminal;
 use App\Models\Product;
 
@@ -35,17 +36,34 @@ class PosImportValidationService
         $batch->errors()->delete();
 
         $batch->receipts()->with(['items', 'payments'])->chunk(50, function ($receipts) use ($batch, $hasWarehouse) {
-            $skuCodes = $receipts
-                ->flatMap(fn ($receipt) => $receipt->items->pluck('sku_code'))
+            $postingItems = $receipts
+                ->flatMap(fn ($receipt) => $receipt->items)
+                ->filter(fn ($item) => PosImportLineNormalizer::isPostingLine($item->raw_data ?? []));
+
+            $skuCodes = $postingItems
+                ->pluck('sku_code')
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+            $barcodeValues = $postingItems
+                ->flatMap(fn ($item) => [$item->barcode, $item->product_code, $item->sku_code])
                 ->filter()
                 ->unique()
                 ->values()
                 ->all();
 
             $productsBySku = Product::whereIn('sku_code', $skuCodes)->get()->keyBy('sku_code');
+            $productsByBarcode = ProductBarcode::whereIn('barcode', $barcodeValues)
+                ->where('is_active', true)
+                ->with('product')
+                ->get()
+                ->filter(fn (ProductBarcode $barcode) => $barcode->product !== null && $barcode->product->is_active)
+                ->mapWithKeys(fn (ProductBarcode $barcode) => [$barcode->barcode => $barcode->product]);
 
             foreach ($receipts as $receipt) {
-                $this->validateReceipt($batch, $receipt, $hasWarehouse, $productsBySku);
+                $this->validateReceipt($batch, $receipt, $hasWarehouse, $productsBySku, $productsByBarcode);
             }
         });
 
@@ -59,7 +77,7 @@ class PosImportValidationService
         return $batch->fresh();
     }
 
-    private function validateReceipt(ImportBatch $batch, ImportedReceipt $receipt, bool $hasWarehouse, $productsBySku): void
+    private function validateReceipt(ImportBatch $batch, ImportedReceipt $receipt, bool $hasWarehouse, $productsBySku, $productsByBarcode): void
     {
         // Posted receipts are immutable import history. Keep them out of a
         // re-validation pass so a later retry cannot insert a duplicate POS bill.
@@ -101,12 +119,28 @@ class PosImportValidationService
         }
 
         // 3. Every line item maps to a known product.
+        $postingItems = $receipt->items->filter(fn ($item) => PosImportLineNormalizer::isPostingLine($item->raw_data ?? []));
         foreach ($receipt->items as $item) {
+            if (! PosImportLineNormalizer::isPostingLine($item->raw_data ?? [])) {
+                $item->update(['product_id' => null, 'mapping_status' => 'ignored', 'net_amount' => 0]);
+
+                continue;
+            }
+
+            $normalisedAmount = PosImportLineNormalizer::amount($item->raw_data ?? []);
             $product = $item->sku_code !== null ? $productsBySku->get($item->sku_code) : null;
+            $product ??= collect([$item->barcode, $item->product_code, $item->sku_code])
+                ->filter()
+                ->map(fn ($code) => $productsByBarcode->get($code))
+                ->first();
 
             if ($product) {
-                if ($item->product_id !== $product->id || $item->mapping_status !== 'mapped') {
-                    $item->update(['product_id' => $product->id, 'mapping_status' => 'mapped']);
+                if ($item->product_id !== $product->id || $item->mapping_status !== 'mapped' || (float) $item->net_amount !== $normalisedAmount) {
+                    $item->update([
+                        'product_id' => $product->id,
+                        'mapping_status' => 'mapped',
+                        'net_amount' => $normalisedAmount,
+                    ]);
                 }
             } else {
                 $item->update(['mapping_status' => 'not_found']);
@@ -119,9 +153,9 @@ class PosImportValidationService
         }
 
         // 4. Header net_amount matches the sum of line items.
-        $itemsTotal = round((float) $receipt->items->sum('net_amount'), 2);
+        $itemsTotal = round((float) $postingItems->sum(fn ($item) => PosImportLineNormalizer::amount($item->raw_data ?? [])), 2);
         $headerNet = round((float) $receipt->net_amount, 2);
-        if ($receipt->items->isNotEmpty() && abs($itemsTotal - $headerNet) > self::AMOUNT_TOLERANCE) {
+        if ($postingItems->isNotEmpty() && abs($itemsTotal - $headerNet) > self::AMOUNT_TOLERANCE) {
             $receiptErrors[] = $this->logError($batch, $receipt, ImportError::AMOUNT_NOT_MATCH,
                 "Header net_amount ({$headerNet}) does not match sum of item net_amount ({$itemsTotal}).");
         }
