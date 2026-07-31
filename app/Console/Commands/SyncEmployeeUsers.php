@@ -13,15 +13,15 @@ class SyncEmployeeUsers extends Command
 {
     protected $signature = 'erp:sync-employee-users
         {--dry-run : แสดงรายการอย่างเดียว ไม่เขียนข้อมูล}
-        {--role=HR : บทบาทเริ่มต้นสำหรับพนักงานที่ยังไม่มี mapping เฉพาะฝ่าย}';
+        {--role= : กำหนดบทบาทเริ่มต้นเองสำหรับพนักงานที่ยังไม่มี mapping เฉพาะฝ่าย}';
 
     protected $description = 'สร้างบัญชี ERP จากทะเบียนพนักงานที่มีรหัส โดยไม่ทับบัญชีเดิม';
 
     public function handle(): int
     {
         $roleCode = strtoupper(trim((string) $this->option('role')));
-        $roleId = Role::where('code', $roleCode)->value('id');
-        if (! $roleId) {
+        $roleId = $roleCode === '' ? null : Role::where('code', $roleCode)->value('id');
+        if ($roleCode !== '' && ! $roleId) {
             $this->error("ไม่พบบทบาท {$roleCode}");
 
             return self::FAILURE;
@@ -48,9 +48,9 @@ class SyncEmployeeUsers extends Command
                 continue;
             }
 
-            $mappedRole = $this->roleFor($employee, $roleCode);
-            $mappedRoleId = Role::where('code', $mappedRole)->value('id') ?: $roleId;
-            $rows[] = [$employee->employee_code, $employee->full_name, "สร้าง {$mappedRole}"];
+            $mappedRole = $this->roleFor($employee) ?: $roleCode;
+            $mappedRoleId = $mappedRole === '' ? null : (Role::where('code', $mappedRole)->value('id') ?: $roleId);
+            $rows[] = [$employee->employee_code, $employee->full_name, $mappedRoleId ? "สร้าง {$mappedRole}" : 'สร้าง - รอผู้ดูแลกำหนดสิทธิ์'];
             $created++;
 
             if ($this->option('dry-run')) {
@@ -68,7 +68,9 @@ class SyncEmployeeUsers extends Command
                     'is_active' => true,
                     'must_change_password' => true,
                 ]);
-                $user->roles()->sync([$mappedRoleId]);
+                if ($mappedRoleId) {
+                    $user->roles()->sync([$mappedRoleId]);
+                }
                 $employee->update(['user_id' => $user->id]);
             });
         }
@@ -83,7 +85,7 @@ class SyncEmployeeUsers extends Command
         return self::SUCCESS;
     }
 
-    private function roleFor(Employee $employee, string $fallback): string
+    private function roleFor(Employee $employee): ?string
     {
         $text = Str::lower(($employee->department ?? '').' '.($employee->position ?? ''));
 
@@ -93,7 +95,7 @@ class SyncEmployeeUsers extends Command
             Str::contains($text, ['คลัง', 'สต๊อก', 'warehouse']) => 'WAREHOUSE',
             Str::contains($text, ['ขาย', 'sales']) => 'SALES',
             Str::contains($text, ['การตลาด', 'marketing']) => 'MARKETING',
-            default => $fallback,
+            default => null,
         };
     }
 }
