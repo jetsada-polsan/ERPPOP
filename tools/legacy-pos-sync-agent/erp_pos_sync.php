@@ -8,7 +8,7 @@ declare(strict_types=1);
 
 $config = require __DIR__ . '/erp_pos_sync.config.php';
 $isCli = PHP_SAPI === 'cli';
-$options = $isCli ? getopt('', ['pos:', 'date:', 'dry-run', 'summary', 'backoffice-summary']) : $_GET;
+$options = $isCli ? getopt('', ['pos:', 'date:', 'dry-run', 'summary', 'backoffice-summary', 'product-names']) : $_GET;
 if (! $isCli) {
     $provided = (string) ($_SERVER['HTTP_X_LEGACY_AGENT_KEY'] ?? '');
     if (! hash_equals((string) $config['agent_access_key'], $provided)) {
@@ -21,15 +21,18 @@ $posCode = (string) ($options['pos'] ?? '');
 $saleDate = (string) ($options['date'] ?? '');
 $summaryOnly = isset($options['summary']) || (! $isCli && ($options['summary'] ?? '') === '1');
 $backofficeSummary = isset($options['backoffice-summary']) || (! $isCli && ($options['backoffice_summary'] ?? '') === '1');
-if ((! $summaryOnly && ! $backofficeSummary && !preg_match('/^\d{4}$/', $posCode)) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $saleDate)) {
+$productNames = isset($options['product-names']) || (! $isCli && ($options['product_names'] ?? '') === '1');
+if ((! $summaryOnly && ! $backofficeSummary && ! $productNames && !preg_match('/^\d{4}$/', $posCode)) || (! $productNames && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $saleDate))) {
     fwrite(STDERR, "Usage: php erp_pos_sync.php --pos=0005 --date=YYYY-MM-DD [--dry-run] | --summary --date=YYYY-MM-DD\n");
     exit(2);
 }
 
 $tableSuffix = str_replace('-', '', substr($saleDate, 0, 7));
-foreach (['H'.$tableSuffix, 'D'.$tableSuffix, 'P'.$tableSuffix] as $table) {
-    if (!preg_match('/^[HDP]20\d{4}$/', $table)) {
-        throw new RuntimeException('Unsafe monthly table name.');
+if (! $productNames) {
+    foreach (['H'.$tableSuffix, 'D'.$tableSuffix, 'P'.$tableSuffix] as $table) {
+        if (!preg_match('/^[HDP]20\d{4}$/', $table)) {
+            throw new RuntimeException('Unsafe monthly table name.');
+        }
     }
 }
 
@@ -54,6 +57,13 @@ function utf8(mixed $value): mixed {
     if (!is_string($value) || $value === '' || mb_check_encoding($value, 'UTF-8')) return $value;
     $converted = @iconv('CP874', 'UTF-8//IGNORE', $value);
     return $converted === false ? $value : $converted;
+}
+
+if ($productNames) {
+    $rows = fetchAll($conn, 'SELECT SKU_CODE, SKU_NAME FROM SKUMASTER WHERE SKU_CODE IS NOT NULL ORDER BY SKU_KEY');
+    @odbc_close($conn);
+    echo json_encode(['source' => 'legacy_product_master', 'rows' => $rows], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR).PHP_EOL;
+    exit(0);
 }
 
 // This mirrors the legacy POS daily-sales report: active POS receipts only.
