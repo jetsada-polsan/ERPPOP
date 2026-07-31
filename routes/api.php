@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\PosApiController;
+use App\Http\Controllers\Api\LegacyPosSyncController;
 use App\Http\Controllers\PosController;
 use Illuminate\Support\Facades\Route;
 
@@ -25,3 +26,5 @@ Route::prefix('pos')->middleware('pos.device')->name('api.pos.')->group(function
     Route::post('/receipt/void', [PosApiController::class, 'voidReceipt'])->name('receipt.void');
     Route::post('/receipt/return', [PosApiController::class, 'returnReceipt'])->name('receipt.return');
 });
+
+Route::post('/legacy-pos/sync', [LegacyPosSyncController::class, 'store'])->name('api.legacy-pos.sync');

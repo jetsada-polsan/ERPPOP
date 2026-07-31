@@ -80,6 +80,52 @@ class PosImportStagingService
         return $batch->fresh();
     }
 
+    /**
+     * Stage rows pushed by the office-side, read-only MSSQL sync agent.
+     * The payload has the same resolved portable codes as MssqlPosSourceService.
+     * Nothing in this method posts a sale or writes back to MSSQL.
+     *
+     * @param array<int, array<string, mixed>> $receipts
+     * @param array<int, array<string, mixed>> $items
+     * @param array<int, array<string, mixed>> $payments
+     * @param array<int, string> $paymentTypeNames
+     */
+    public function stagePayload(string $posCode, Carbon $saleDate, array $receipts, array $items, array $payments, array $paymentTypeNames = []): ImportBatch
+    {
+        $batch = ImportBatch::firstOrCreate(
+            ['pos_code' => $posCode, 'sale_date' => $saleDate->toDateString()],
+            ['source_system' => 'office_mssql_agent', 'status' => ImportBatch::STATUS_UPLOADED, 'uploaded_at' => now()]
+        );
+
+        $wasPosted = in_array($batch->status, [ImportBatch::STATUS_POSTED, ImportBatch::STATUS_POSTED_WITH_ERRORS], true);
+        $itemsByPsh = $this->groupBy($items, 'PSD_PSH');
+        $paymentsByPsh = $this->groupBy($payments, 'PSP_PSH');
+        $alreadyStaged = ImportedReceipt::where('batch_id', $batch->id)->pluck('legacy_psh_key')->all();
+        $newCount = 0;
+
+        DB::transaction(function () use ($receipts, $itemsByPsh, $paymentsByPsh, $paymentTypeNames, $batch, $posCode, $alreadyStaged, &$newCount) {
+            foreach ($receipts as $row) {
+                $pshKey = (int) ($row['PSH_KEY'] ?? 0);
+                if ($pshKey <= 0 || in_array($pshKey, $alreadyStaged, true)) {
+                    continue;
+                }
+
+                $receipt = $this->stageReceipt($batch, $posCode, $row);
+                $this->stageItems($batch, $receipt, $itemsByPsh[$pshKey] ?? []);
+                $this->stagePayments($batch, $receipt, $paymentsByPsh[$pshKey] ?? [], $paymentTypeNames);
+                $newCount++;
+            }
+        });
+
+        $update = ['record_count' => $batch->receipts()->count()];
+        if (! $wasPosted || $newCount > 0) {
+            $update['status'] = ImportBatch::STATUS_PARSED;
+        }
+        $batch->update($update);
+
+        return $batch->fresh();
+    }
+
     /** @return array<int, array<int, array<string, mixed>>> */
     private function groupBy(array $rows, string $key): array
     {
