@@ -8,7 +8,7 @@ declare(strict_types=1);
 
 $config = require __DIR__ . '/erp_pos_sync.config.php';
 $isCli = PHP_SAPI === 'cli';
-$options = $isCli ? getopt('', ['pos:', 'date:', 'dry-run', 'summary']) : $_GET;
+$options = $isCli ? getopt('', ['pos:', 'date:', 'dry-run', 'summary', 'backoffice-summary']) : $_GET;
 if (! $isCli) {
     $provided = (string) ($_SERVER['HTTP_X_LEGACY_AGENT_KEY'] ?? '');
     if (! hash_equals((string) $config['agent_access_key'], $provided)) {
@@ -20,7 +20,8 @@ if (! $isCli) {
 $posCode = (string) ($options['pos'] ?? '');
 $saleDate = (string) ($options['date'] ?? '');
 $summaryOnly = isset($options['summary']) || (! $isCli && ($options['summary'] ?? '') === '1');
-if ((! $summaryOnly && !preg_match('/^\d{4}$/', $posCode)) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $saleDate)) {
+$backofficeSummary = isset($options['backoffice-summary']) || (! $isCli && ($options['backoffice_summary'] ?? '') === '1');
+if ((! $summaryOnly && ! $backofficeSummary && !preg_match('/^\d{4}$/', $posCode)) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $saleDate)) {
     fwrite(STDERR, "Usage: php erp_pos_sync.php --pos=0005 --date=YYYY-MM-DD [--dry-run] | --summary --date=YYYY-MM-DD\n");
     exit(2);
 }
@@ -89,6 +90,30 @@ if ($summaryOnly) {
     ", [$saleDate]);
     @odbc_close($conn);
     echo json_encode(['sale_date' => $saleDate, 'source' => 'legacy_pos_daily_sales', 'rows' => $summaryRows], JSON_UNESCAPED_UNICODE).PHP_EOL;
+    exit(0);
+}
+
+if ($backofficeSummary) {
+    $documents = fetchAll($conn, "
+        SELECT dt.DT_DOCCODE AS doc_code, dt.DT_PROPERTIES AS doc_properties,
+            COUNT(*) AS document_count, SUM(ISNULL(di.DI_AMOUNT, 0)) AS amount
+        FROM DOCINFO di
+        JOIN DOCTYPE dt ON dt.DT_KEY = di.DI_DT
+        WHERE di.DI_ACTIVE = 0
+          AND CAST(di.DI_DATE AS DATE) = ?
+          AND (dt.DT_DOCCODE IN ('DS', 'DSN') OR dt.DT_PROPERTIES = 207)
+        GROUP BY dt.DT_DOCCODE, dt.DT_PROPERTIES
+        ORDER BY dt.DT_DOCCODE
+    ", [$saleDate]);
+    @odbc_close($conn);
+    $payload = ['sale_date' => $saleDate, 'documents' => $documents];
+    $body = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+    $timestamp = (string) time();
+    $signature = hash_hmac('sha256', $timestamp.'.'.$body, $config['shared_secret']);
+    $context = stream_context_create(['http' => ['method' => 'POST', 'header' => "Content-Type: application/json\r\nX-Legacy-Sync-Timestamp: {$timestamp}\r\nX-Legacy-Sync-Signature: {$signature}\r\n", 'content' => $body, 'timeout' => 120, 'ignore_errors' => true]]);
+    $response = file_get_contents(rtrim($config['erp_url'], '/').'/api/legacy-backoffice/summary', false, $context);
+    if ($response === false) throw new RuntimeException('ERP endpoint did not respond.');
+    echo $response.PHP_EOL;
     exit(0);
 }
 

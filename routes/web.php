@@ -25,6 +25,7 @@ use App\Http\Controllers\FixedAssetController;
 use App\Http\Controllers\FlashSaleController;
 use App\Http\Controllers\GlJournalController;
 use App\Http\Controllers\LegacyReportController;
+use App\Http\Controllers\LegacyBackofficeSalesController;
 use App\Http\Controllers\LegacyTableMappingController;
 use App\Http\Controllers\LineIntegrationController;
 use App\Http\Controllers\ManagementControlController;
@@ -172,6 +173,7 @@ Route::get('/features', [FeatureController::class, 'index'])->name('features.ind
 Route::get('/core-modules', [ManualController::class, 'index'])->name('core-modules.index');
 Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
 Route::get('/legacy-reports', [LegacyReportController::class, 'index'])->name('legacy-reports.index');
+Route::get('/legacy-backoffice-sales', [LegacyBackofficeSalesController::class, 'index'])->name('legacy-backoffice-sales.index');
 
 // Typeahead search (Alpine.js pickers on the booking/sale/purchase forms).
 Route::get('/search/customers', [SearchController::class, 'customers'])->name('search.customers');
