@@ -40,9 +40,9 @@
         </div>
     </div>
 
-    @if($errors_table = $errors->count())
+    @if($errorsTableCount = $importErrors->count())
     <div class="bg-white rounded-xl shadow p-5 mb-6">
-        <h2 class="font-semibold mb-3 text-red-700">Errors ({{ $errors->total() }})</h2>
+        <h2 class="font-semibold mb-3 text-red-700">Errors ({{ $importErrors->total() }})</h2>
         <div class="overflow-x-auto">
         <table class="w-full text-sm">
             <thead>
@@ -51,7 +51,7 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach($errors as $e)
+                @foreach($importErrors as $e)
                 <tr class="border-b last:border-0">
                     <td class="py-2">{{ $e->receipt_no }}</td>
                     <td>{{ $e->line_no }}</td>
@@ -62,7 +62,7 @@
             </tbody>
         </table>
         </div>
-        <div class="mt-4">{{ $errors->links() }}</div>
+        <div class="mt-4">{{ $importErrors->links() }}</div>
     </div>
     @endif
 

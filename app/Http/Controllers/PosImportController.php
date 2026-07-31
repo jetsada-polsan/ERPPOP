@@ -50,7 +50,8 @@ class PosImportController extends Controller
         return view('pos-import.show', [
             'batch' => $batch,
             'receipts' => $batch->receipts()->withCount('items', 'payments')->orderBy('receipt_no')->paginate(100),
-            'errors' => $batch->errors()->orderByDesc('id')->paginate(100),
+            // Do not shadow Laravel's shared $errors validation MessageBag.
+            'importErrors' => $batch->errors()->orderByDesc('id')->paginate(100),
         ]);
     }
 
