@@ -89,9 +89,9 @@ class FixedAssetController extends Controller
     public function runDepreciation(Request $request, DepreciationService $service): RedirectResponse
     {
         $data = $request->validate(['period' => ['required', 'date_format:Y-m']]);
-        $result = $service->runForPeriod(Carbon::createFromFormat('Y-m', $data['period'])->startOfMonth());
+        $result = $service->runForPeriod(Carbon::createFromFormat('!Y-m', $data['period'])->startOfMonth());
 
-        $period = Carbon::createFromFormat('Y-m', $data['period']);
+        $period = Carbon::createFromFormat('!Y-m', $data['period']);
         $msg = "คิดค่าเสื่อมงวด {$period->thaiDate()}: {$result['posted']} รายการ รวม ".number_format($result['amount'], 2)." บาท";
         if ($result['skipped'] > 0) {
             $msg .= " (ข้าม {$result['skipped']} รายการ — คิดไปแล้ว/ครบแล้ว)";

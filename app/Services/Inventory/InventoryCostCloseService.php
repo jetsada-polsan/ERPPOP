@@ -14,7 +14,7 @@ class InventoryCostCloseService
 {
     public function close(string $period, ?int $userId = null): int
     {
-        $from = Carbon::createFromFormat('Y-m', $period)->startOfMonth();
+        $from = Carbon::createFromFormat('!Y-m', $period)->startOfMonth();
         $to = $from->copy()->endOfMonth();
         if ($to->isFuture()) {
             throw new RuntimeException('ยังไม่สามารถปิดต้นทุนงวดที่ยังไม่สิ้นสุด');

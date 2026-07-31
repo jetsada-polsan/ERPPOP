@@ -21,7 +21,7 @@ class MonthlyAccountingExportService
             throw new RuntimeException('Server ยังไม่ได้เปิด PHP Zip extension');
         }
 
-        $from = Carbon::createFromFormat('Y-m', $period)->startOfMonth();
+        $from = Carbon::createFromFormat('!Y-m', $period)->startOfMonth();
         $to = $from->copy()->endOfMonth();
         $scope = fn ($query, string $column) => $branchId ? $query->where($column, $branchId) : $query;
 

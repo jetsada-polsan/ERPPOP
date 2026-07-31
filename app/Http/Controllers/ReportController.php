@@ -1060,33 +1060,16 @@ class ReportController extends Controller
 
     private function dailySales(Carbon $from, Carbon $to, array $filters): Collection
     {
-        $posQuery = DB::table('pos_receipts as r')
-            ->join('pos_terminals as t', 't.id', '=', 'r.pos_terminal_id')
-            ->whereBetween('r.receipt_date', [$from, $to]);
+        $query = DB::table('sales_postings')
+            ->whereBetween('sale_date', [$from->toDateString(), $to->toDateString()]);
 
-        $this->applyBranch($posQuery, $filters, 't.branch_id');
-        $this->applySearch($posQuery, $filters, ['r.receipt_no', 't.code', 't.name']);
+        $this->applyBranch($query, $filters, 'branch_id');
+        $this->applySearch($query, $filters, ['sale_number', 'channel']);
 
-        $posRows = $posQuery
-            ->groupBy(DB::raw('date(r.receipt_date)'))
-            ->selectRaw("date(r.receipt_date) as sale_date, 'POS' as channel, count(*) as bill_count, sum(r.net_sales) as amount")
-            ->get();
-
-        $docQuery = DB::table('documents as d')
-            ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
-            ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE'])
-            ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
-
-        $this->applyBranch($docQuery, $filters, 'd.branch_id');
-        $this->applySearch($docQuery, $filters, ['d.doc_number']);
-
-        $docRows = $docQuery
-            ->groupBy('d.doc_date', 'dt.code')
-            ->selectRaw('d.doc_date as sale_date, dt.code as channel, count(*) as bill_count, sum(d.total_amount) as amount')
-            ->get();
-
-        return $posRows
-            ->concat($docRows)
+        return $query
+            ->groupBy('sale_date', 'channel')
+            ->selectRaw('sale_date, channel, count(*) as bill_count, sum(net_sales) as amount')
+            ->get()
             ->sortByDesc('sale_date')
             ->take($filters['per_page'])
             ->values();

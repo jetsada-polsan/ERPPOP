@@ -46,7 +46,7 @@ class ProductCostHistoryService
         ?InventoryCostClose $closed = null,
         ?string $periodStatus = null,
     ): array {
-        $from = Carbon::createFromFormat('Y-m', $period)->startOfMonth();
+        $from = Carbon::createFromFormat('!Y-m', $period)->startOfMonth();
         $periodEnd = $from->copy()->endOfMonth();
         $effectiveTo = $periodEnd->isFuture() ? now()->endOfDay() : $periodEnd;
         $opening = $this->lotBalanceAt((int) $product->id, $from->copy()->subDay());

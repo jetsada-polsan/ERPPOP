@@ -133,7 +133,7 @@ class TaxComplianceService
     private function range(string $period): array
     {
         try {
-            $from = Carbon::createFromFormat('Y-m', $period)->startOfMonth();
+            $from = Carbon::createFromFormat('!Y-m', $period)->startOfMonth();
         } catch (\Throwable) {
             throw new RuntimeException('เดือนภาษีไม่ถูกต้อง');
         }

@@ -403,7 +403,7 @@ class ManagementControlController extends Controller
 
     private function period(string $period): array
     {
-        $from = Carbon::createFromFormat('Y-m', $period)->startOfMonth();
+        $from = Carbon::createFromFormat('!Y-m', $period)->startOfMonth();
 
         return [$from->toDateString(), $from->copy()->endOfMonth()->toDateString()];
     }

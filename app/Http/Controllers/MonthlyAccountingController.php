@@ -27,7 +27,7 @@ class MonthlyAccountingController extends Controller
     {
         $period = preg_match('/^\d{4}-\d{2}$/', (string) $request->query('period')) ? $request->query('period') : now()->format('Y-m');
         $branchId = $request->integer('branch_id') ?: null;
-        $from = Carbon::createFromFormat('Y-m', $period)->startOfMonth();
+        $from = Carbon::createFromFormat('!Y-m', $period)->startOfMonth();
         $to = $from->copy()->endOfMonth();
 
         $expenses = BranchExpense::with(['branch', 'expenseAccount', 'document'])->whereBetween('expense_date', [$from, $to])
@@ -192,7 +192,7 @@ class MonthlyAccountingController extends Controller
     public function autoReconcile(Request $request): RedirectResponse
     {
         $data = $request->validate(['period' => ['required', 'date_format:Y-m'], 'branch_id' => ['nullable', 'exists:branches,id']]);
-        $from = Carbon::createFromFormat('Y-m', $data['period'])->startOfMonth();
+        $from = Carbon::createFromFormat('!Y-m', $data['period'])->startOfMonth();
         $to = $from->copy()->endOfMonth();
         $statements = BankStatement::with('bankAccount')->whereBetween('statement_date', [$from, $to])
             ->where('reconciled', false)->when(! empty($data['branch_id']), fn ($q) => $q->whereHas('bankAccount', fn ($b) => $b->where('branch_id', $data['branch_id'])))->get();
@@ -258,7 +258,7 @@ class MonthlyAccountingController extends Controller
     public function export(Request $request, MonthlyAccountingExportService $service): BinaryFileResponse
     {
         $data = $request->validate(['period' => ['required', 'date_format:Y-m'], 'branch_id' => ['nullable', 'exists:branches,id']]);
-        $from = Carbon::createFromFormat('Y-m', $data['period'])->startOfMonth();
+        $from = Carbon::createFromFormat('!Y-m', $data['period'])->startOfMonth();
         $to = $from->copy()->endOfMonth();
         $hasUnreconciled = BankStatement::whereBetween('statement_date', [$from, $to])
             ->when(! empty($data['branch_id']), fn ($q) => $q->whereHas('bankAccount', fn ($b) => $b->where('branch_id', $data['branch_id'])))

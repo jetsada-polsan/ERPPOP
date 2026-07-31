@@ -173,6 +173,25 @@ class InventoryApprovalAndCloseTest extends TestCase
         $this->assertSame(90.0, (float) $close->ending_value);
     }
 
+    /**
+     * "2026-06" ต้องหมายถึงมิถุนายนเสมอ ไม่ว่าจะสั่งปิดวันไหนของเดือน
+     * ถ้า parse ด้วย 'Y-m' เฉยๆ วันที่ของวันนี้จะติดมาด้วย พอสั่งวันที่ 31
+     * เดือนที่มี 30 วันจะล้นไปเดือนถัดไป กลายเป็นปิดผิดงวดโดยไม่มีใครรู้
+     */
+    public function test_period_string_is_not_shifted_by_the_day_the_close_is_run(): void
+    {
+        $this->travelTo('2026-07-31 09:00:00');
+        [, $location, $product] = $this->masters();
+        $fifo = app(FifoStockService::class);
+        $fifo->receive($product->id, $location->id, 4, null, receivedDate: '2026-06-10', unitCost: 25);
+
+        app(InventoryCostCloseService::class)->close('2026-06');
+
+        $close = InventoryCostClose::where('period', '2026-06')->where('product_id', $product->id)->firstOrFail();
+        $this->assertSame(4.0, (float) $close->received_qty);
+        $this->assertSame(4.0, (float) $close->ending_qty);
+    }
+
     public function test_void_restores_the_original_fifo_lot_and_period_cost(): void
     {
         $this->travelTo('2026-08-10 10:00:00');
