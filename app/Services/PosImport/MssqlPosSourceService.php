@@ -54,6 +54,8 @@ class MssqlPosSourceService
                 JOIN BRANCH br ON br.BR_KEY = h.PSH_POS
                 WHERE br.BR_CODE = :pos_code
                   AND CAST(h.PSH_DATE AS DATE) = :sale_date
+                  AND h.PSH_TYPE = 1
+                  AND ISNULL(h.PSH_STATUS, 0) = 0
                 ORDER BY h.PSH_KEY";
 
         return $this->fetchAll($sql, [
@@ -165,6 +167,8 @@ class MssqlPosSourceService
                 $where[] = 'CAST(h.PSH_DATE AS DATE) <= ?';
                 $params[] = $to->toDateString();
             }
+            $where[] = 'h.PSH_TYPE = 1';
+            $where[] = 'ISNULL(h.PSH_STATUS, 0) = 0';
             if ($posCodes !== []) {
                 $where[] = 'br.BR_CODE IN ('.implode(',', array_fill(0, count($posCodes), '?')).')';
                 array_push($params, ...array_values($posCodes));

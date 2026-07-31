@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 // Office-side agent: SELECT-only access to BPlus MSSQL, then HTTPS push to ERP.
 // Run: php erp_pos_sync.php --pos=0005 --date=2026-07-30
+// Audit only: php erp_pos_sync.php --summary --date=2026-07-30
 
 $config = require __DIR__ . '/erp_pos_sync.config.php';
 $isCli = PHP_SAPI === 'cli';
-$options = $isCli ? getopt('', ['pos:', 'date:', 'dry-run']) : $_GET;
+$options = $isCli ? getopt('', ['pos:', 'date:', 'dry-run', 'summary']) : $_GET;
 if (! $isCli) {
     $provided = (string) ($_SERVER['HTTP_X_LEGACY_AGENT_KEY'] ?? '');
     if (! hash_equals((string) $config['agent_access_key'], $provided)) {
@@ -18,8 +19,9 @@ if (! $isCli) {
 }
 $posCode = (string) ($options['pos'] ?? '');
 $saleDate = (string) ($options['date'] ?? '');
-if (!preg_match('/^\d{4}$/', $posCode) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $saleDate)) {
-    fwrite(STDERR, "Usage: php erp_pos_sync.php --pos=0005 --date=YYYY-MM-DD [--dry-run]\n");
+$summaryOnly = isset($options['summary']) || (! $isCli && ($options['summary'] ?? '') === '1');
+if ((! $summaryOnly && !preg_match('/^\d{4}$/', $posCode)) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $saleDate)) {
+    fwrite(STDERR, "Usage: php erp_pos_sync.php --pos=0005 --date=YYYY-MM-DD [--dry-run] | --summary --date=YYYY-MM-DD\n");
     exit(2);
 }
 
@@ -53,7 +55,47 @@ function utf8(mixed $value): mixed {
     return $converted === false ? $value : $converted;
 }
 
-$headers = fetchAll($conn, "SELECT h.* FROM H{$tableSuffix} h JOIN BRANCH br ON br.BR_KEY=h.PSH_POS WHERE br.BR_CODE=? AND CAST(h.PSH_DATE AS DATE)=? ORDER BY h.PSH_KEY", [$posCode, $saleDate]);
+// This mirrors the legacy POS daily-sales report: active POS receipts only.
+// It is deliberately SELECT-only and returns no individual customer data.
+if ($summaryOnly) {
+    $summaryRows = fetchAll($conn, "
+        SELECT
+            CASE LEFT(CAST(h.PSH_NO AS VARCHAR(50)), 5)
+                WHEN '00010' THEN 'PS1'
+                WHEN '00020' THEN 'PS2'
+                WHEN '00030' THEN 'PS3'
+                WHEN '00040' THEN 'PS4'
+                WHEN '00050' THEN 'PS5'
+                ELSE LEFT(CAST(h.PSH_NO AS VARCHAR(50)), 5)
+            END AS pos_group,
+            COUNT(*) AS receipt_count,
+            SUM(ISNULL(h.PSH_B4_TDSC, 0)) AS before_discount,
+            SUM(ISNULL(h.PSH_DSC_PCNTV, 0) + ISNULL(h.PSH_DSC_BAHTV, 0) + ISNULL(h.PSH_CPN_PCNTV, 0)
+              + ISNULL(h.PSH_CPN_BAHTV, 0) + ISNULL(h.PSH_TCK_BAHTV, 0) + ISNULL(h.PSH_MBP_BAHTV, 0)) AS discount_amount,
+            SUM(ISNULL(h.PSH_N_SV, 0) + ISNULL(h.PSH_N_NV, 0) + ISNULL(h.PSH_N_VAT, 0)) AS gross_amount,
+            SUM(ISNULL(h.PSH_N_VAT, 0)) AS vat_amount,
+            SUM(ISNULL(h.PSH_N_SV, 0) + ISNULL(h.PSH_N_NV, 0)) AS net_amount,
+            SUM(ISNULL(h.PSH_CHARGE, 0)) AS charge_amount
+        FROM H{$tableSuffix} h
+        WHERE h.PSH_TYPE = 1
+          AND ISNULL(h.PSH_STATUS, 0) = 0
+          AND CAST(h.PSH_DATE AS DATE) = ?
+          AND LEFT(CAST(h.PSH_NO AS VARCHAR(50)), 5) IN ('00010','00020','00030','00040','00050')
+        GROUP BY LEFT(CAST(h.PSH_NO AS VARCHAR(50)), 5)
+        ORDER BY pos_group
+    ", [$saleDate]);
+    @odbc_close($conn);
+    echo json_encode(['sale_date' => $saleDate, 'source' => 'legacy_pos_daily_sales', 'rows' => $summaryRows], JSON_UNESCAPED_UNICODE).PHP_EOL;
+    exit(0);
+}
+
+$headers = fetchAll($conn, "SELECT h.* FROM H{$tableSuffix} h
+    JOIN BRANCH br ON br.BR_KEY=h.PSH_POS
+    WHERE br.BR_CODE=?
+      AND CAST(h.PSH_DATE AS DATE)=?
+      AND h.PSH_TYPE=1
+      AND ISNULL(h.PSH_STATUS, 0)=0
+    ORDER BY h.PSH_KEY", [$posCode, $saleDate]);
 $keys = array_map(fn(array $row) => (int) $row['PSH_KEY'], $headers);
 $items = $payments = [];
 if ($keys !== []) {
