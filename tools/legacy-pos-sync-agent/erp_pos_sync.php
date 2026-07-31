@@ -6,7 +6,16 @@ declare(strict_types=1);
 // Run: php erp_pos_sync.php --pos=0005 --date=2026-07-30
 
 $config = require __DIR__ . '/erp_pos_sync.config.php';
-$options = getopt('', ['pos:', 'date:', 'dry-run']);
+$isCli = PHP_SAPI === 'cli';
+$options = $isCli ? getopt('', ['pos:', 'date:', 'dry-run']) : $_GET;
+if (! $isCli) {
+    $provided = (string) ($_SERVER['HTTP_X_LEGACY_AGENT_KEY'] ?? '');
+    if (! hash_equals((string) $config['agent_access_key'], $provided)) {
+        http_response_code(403);
+        exit('Forbidden');
+    }
+    header('Content-Type: application/json; charset=utf-8');
+}
 $posCode = (string) ($options['pos'] ?? '');
 $saleDate = (string) ($options['date'] ?? '');
 if (!preg_match('/^\d{4}$/', $posCode) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $saleDate)) {
@@ -57,7 +66,7 @@ foreach (fetchAll($conn, 'SELECT PMT_KEY, PMT_NAME FROM PAYMENTTYPE') as $row) $
 @odbc_close($conn);
 
 $payload = ['pos_code' => $posCode, 'sale_date' => $saleDate, 'receipts' => $headers, 'items' => $items, 'payments' => $payments, 'payment_type_names' => $types];
-if (isset($options['dry-run'])) {
+if (isset($options['dry-run']) || (! $isCli && ($options['dry_run'] ?? '') === '1')) {
     echo json_encode(['receipts' => count($headers), 'items' => count($items), 'payments' => count($payments)], JSON_UNESCAPED_UNICODE).PHP_EOL;
     exit(0);
 }

@@ -6,4 +6,5 @@ return [
     'odbc_password' => 'set-on-office-server',
     'erp_url' => 'http://27.254.143.219',
     'shared_secret' => 'set-the-same-secret-as-LEGACY_POS_SYNC_SECRET',
+    'agent_access_key' => 'separate-key-for-manual-agent-trigger',
 ];
