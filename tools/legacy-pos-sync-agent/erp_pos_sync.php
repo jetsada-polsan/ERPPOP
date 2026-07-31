@@ -105,8 +105,16 @@ if ($backofficeSummary) {
         GROUP BY dt.DT_DOCCODE, dt.DT_PROPERTIES
         ORDER BY dt.DT_DOCCODE
     ", [$saleDate]);
+    $total = fetchAll($conn, "
+        SELECT COUNT(*) AS document_count, SUM(ISNULL(di.DI_AMOUNT, 0)) AS amount
+        FROM DOCINFO di
+        JOIN DOCTYPE dt ON dt.DT_KEY = di.DI_DT
+        WHERE di.DI_ACTIVE = 0
+          AND CAST(di.DI_DATE AS DATE) = ?
+          AND (dt.DT_DOCCODE IN ('DS', 'DSN') OR dt.DT_PROPERTIES = 207)
+    ", [$saleDate])[0] ?? ['document_count' => 0, 'amount' => 0];
     @odbc_close($conn);
-    $payload = ['sale_date' => $saleDate, 'documents' => $documents];
+    $payload = ['sale_date' => $saleDate, 'documents' => $documents, 'total' => $total];
     $body = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
     $timestamp = (string) time();
     $signature = hash_hmac('sha256', $timestamp.'.'.$body, $config['shared_secret']);

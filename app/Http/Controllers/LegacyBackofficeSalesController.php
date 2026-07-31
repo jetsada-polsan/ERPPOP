@@ -25,8 +25,8 @@ class LegacyBackofficeSalesController extends Controller
             'creditAmount' => $ds->sum('amount'),
             'reservationCount' => $reserved->sum('document_count'),
             'reservationAmount' => $reserved->sum('amount'),
-            'uniqueCount' => $rows->sum('document_count'),
-            'uniqueAmount' => $rows->sum('amount'),
+            'uniqueCount' => (float) data_get($data, 'total.document_count', 0),
+            'uniqueAmount' => (float) data_get($data, 'total.amount', 0),
         ]);
     }
 }

@@ -27,11 +27,15 @@ class LegacyBackofficeSummaryController extends Controller
             'documents.*.doc_properties' => ['nullable'],
             'documents.*.document_count' => ['required', 'numeric'],
             'documents.*.amount' => ['required', 'numeric'],
+            'total' => ['required', 'array'],
+            'total.document_count' => ['required', 'numeric'],
+            'total.amount' => ['required', 'numeric'],
         ]);
 
         AppSetting::set('legacy_backoffice_summary_'.date('Y-m-d', strtotime($data['sale_date'])), json_encode([
             'sale_date' => $data['sale_date'],
             'documents' => $data['documents'],
+            'total' => $data['total'],
             'synced_at' => now()->toIso8601String(),
         ], JSON_UNESCAPED_UNICODE));
 
