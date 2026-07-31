@@ -89,6 +89,18 @@ class PosImportValidationService
             return;
         }
 
+        // The legacy POS daily-sales report includes only completed sales
+        // (PSH_TYPE=1, PSH_STATUS=0). Keep any old staged cancel/close snapshot
+        // out of a future post, even when a previous import included it.
+        $legacyType = data_get($receipt->raw_data, 'PSH_TYPE');
+        $legacyStatus = data_get($receipt->raw_data, 'PSH_STATUS');
+        if (($legacyType !== null && (string) $legacyType !== '1')
+            || ($legacyStatus !== null && (string) $legacyStatus !== '0')) {
+            $receipt->update(['status' => 'voided']);
+
+            return;
+        }
+
         // Empty void/cancelled transactions (no items, no amount) carry no business
         // value to post - exclude them from the pipeline instead of flagging errors.
         if ($receipt->item_count === 0 && (float) $receipt->net_amount === 0.0 && $receipt->items->isEmpty()) {
