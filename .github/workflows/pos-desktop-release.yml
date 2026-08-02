@@ -7,6 +7,15 @@ on:
         description: Version in 1.2.3 format
         required: true
         type: string
+      notes:
+        description: Release notes shown to cashiers
+        required: true
+        type: string
+      mandatory:
+        description: Require this update before selling
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -48,3 +57,58 @@ jobs:
           path: |
             apps/pos-desktop/src-tauri/target/release/bundle/nsis/*
           if-no-files-found: error
+
+      - name: Prepare signed update package
+        shell: pwsh
+        env:
+          VERSION: ${{ inputs.version }}
+          NOTES: ${{ inputs.notes }}
+          MANDATORY: ${{ inputs.mandatory }}
+          APP_URL: http://27.254.143.219
+        run: |
+          $bundle = 'apps/pos-desktop/src-tauri/target/release/bundle/nsis'
+          $installer = Get-ChildItem -Path $bundle -Filter '*.exe' | Select-Object -First 1
+          $signature = Get-ChildItem -Path $bundle -Filter '*.exe.sig' | Select-Object -First 1
+          if ($null -eq $installer -or $null -eq $signature) { throw 'Missing signed Windows installer or .sig file' }
+
+          New-Item -ItemType Directory -Force -Path release | Out-Null
+          $name = "POPSTAR-POS-$env:VERSION.exe"
+          Copy-Item $installer.FullName "release/$name"
+          $signatureText = (Get-Content $signature.FullName -Raw).Trim()
+          $manifest = @{
+            version = $env:VERSION
+            notes = $env:NOTES
+            pub_date = [DateTime]::UtcNow.ToString('o')
+            platforms = @{ 'windows-x86_64' = @{ signature = $signatureText; url = "$env:APP_URL/download/pos/releases/$name" } }
+            mandatory = [System.Convert]::ToBoolean($env:MANDATORY)
+            sha256 = (Get-FileHash "release/$name" -Algorithm SHA256).Hash.ToLowerInvariant()
+          }
+          $manifest | ConvertTo-Json -Depth 5 | Set-Content -Path release/latest.json -Encoding utf8
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: POPSTAR-POS-release-${{ inputs.version }}
+          path: release/
+          if-no-files-found: error
+
+  publish:
+    needs: windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: POPSTAR-POS-release-${{ inputs.version }}
+          path: release
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+      - run: ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+      - name: Publish signed POS update to ERP
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          APP_DIR: ${{ vars.APP_DIR }}
+        run: |
+          scp release/POPSTAR-POS-${{ inputs.version }}.exe "$DEPLOY_USER@$DEPLOY_HOST:$APP_DIR/storage/app/pos-releases/"
+          scp release/latest.json "$DEPLOY_USER@$DEPLOY_HOST:$APP_DIR/storage/app/pos-releases/latest.next.json"
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "set -eu; cd '$APP_DIR'; chown www-data:www-data storage/app/pos-releases/POPSTAR-POS-${{ inputs.version }}.exe storage/app/pos-releases/latest.next.json; mv storage/app/pos-releases/latest.next.json storage/app/pos-releases/latest.json"

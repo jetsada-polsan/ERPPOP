@@ -248,7 +248,7 @@
 
                 <div class="set-card">
                     <div class="set-title pt-2">เผยแพร่โปรแกรม POS รุ่นใหม่</div>
-                    <div class="set-desc mb-3">อัปโหลดไฟล์ที่สร้างและเซ็นจาก GitHub Actions เครื่องแคชเชียร์จะตรวจพบและอัปเดตเองเมื่อเปิดโปรแกรม</div>
+                    <div class="set-desc mb-3">เมื่อ GitHub Actions สร้างรุ่นใหม่สำเร็จ ระบบจะเผยแพร่ไฟล์ที่เซ็นแล้วอัตโนมัติ เครื่องแคชเชียร์จะตรวจพบเมื่อเปิดโปรแกรม ฟอร์มนี้เก็บไว้ใช้เฉพาะกรณีฉุกเฉิน</div>
                     @if($posRelease)
                         <div class="alert alert-success py-2">
                             รุ่นปัจจุบัน <strong>{{ $posRelease['version'] }}</strong> · เผยแพร่ {{ \Illuminate\Support\Carbon::parse($posRelease['pub_date'])->diffForHumans() }}
