@@ -171,8 +171,8 @@
                     <table class="table align-middle">
                         <thead>
                             <tr>
-                                <th>รหัส</th>
                                 <th>สินค้า</th>
+                                <th>รหัส</th>
                                 <th class="text-end">จำนวน</th>
                                 <th class="text-end">ยอดขาย</th>
                             </tr>
@@ -180,8 +180,8 @@
                         <tbody>
                             @forelse($topProducts as $p)
                                 <tr>
-                                    <td class="fw-semibold">{{ $p->sku_code }}</td>
-                                    <td>{{ $p->name_th }}</td>
+                                    <td class="product-name">{{ $p->name_th }}</td>
+                                    <td class="product-sku">{{ $p->sku_code }}</td>
                                     <td class="text-end">{{ number_format($p->total_qty, 0) }}</td>
                                     <td class="text-end fw-semibold">{{ number_format($p->total_amount, 2) }}</td>
                                 </tr>
@@ -204,8 +204,8 @@
                     <table class="table align-middle">
                         <thead>
                             <tr>
-                                <th>รหัส</th>
                                 <th>สินค้า</th>
+                                <th>รหัส</th>
                                 <th>ที่เก็บ</th>
                                 <th class="text-end">คงเหลือ</th>
                             </tr>
@@ -213,8 +213,8 @@
                         <tbody>
                             @forelse($lowStock as $s)
                                 <tr class="{{ $s->on_hand_qty < 0 ? 'table-danger' : '' }}">
-                                    <td class="fw-semibold">{{ $s->sku_code }}</td>
-                                    <td>{{ $s->name_th }}</td>
+                                    <td class="product-name">{{ $s->name_th }}</td>
+                                    <td class="product-sku">{{ $s->sku_code }}</td>
                                     <td>{{ $s->location_name }}</td>
                                     <td class="text-end fw-semibold">{{ number_format($s->on_hand_qty, 0) }}</td>
                                 </tr>
@@ -395,6 +395,8 @@
     }
 
     .table td { border-bottom-color: #f1f5f9; }
+    .product-name { color:#172b43; font-weight:750; min-width:230px; }
+    .product-sku { color:#6b7c90; font-size:12px; font-variant-numeric:tabular-nums; white-space:nowrap; }
 
     @media (max-width: 991.98px) {
         .executive-hero{grid-template-columns:auto minmax(0,1fr)}

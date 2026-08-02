@@ -11,7 +11,7 @@ class RepairProductNamesFromLegacy extends Command
         {file : JSON exported by the approved legacy product-name agent}
         {--dry-run : Report changes without writing them}';
 
-    protected $description = 'Repair mojibake product names in ERP from a SELECT-only BPlus product-master export.';
+    protected $description = 'Repair missing or mojibake product names from a SELECT-only BPlus product-master export.';
 
     public function handle(): int
     {
@@ -45,16 +45,29 @@ class RepairProductNamesFromLegacy extends Command
             });
 
         $changed = 0;
+        $missingName = 0;
+        $mojibake = 0;
         $unmatched = 0;
-        DB::table('products')->select('id', 'sku_code', 'name_th')->orderBy('id')->eachById(function (object $product) use ($namesBySku, &$changed, &$unmatched): void {
-            $current = (string) $product->name_th;
-            if (! str_contains($current, 'เธ')) {
+        $invalidSourceName = 0;
+
+        DB::table('products')->select('id', 'sku_code', 'name_th')->orderBy('id')->eachById(function (object $product) use ($namesBySku, &$changed, &$missingName, &$mojibake, &$unmatched, &$invalidSourceName): void {
+            $sku = trim((string) $product->sku_code);
+            $current = trim((string) $product->name_th);
+            $isMojibake = str_contains($current, 'เธ');
+            $isMissingName = $current === '' || $current === $sku;
+
+            if (! $isMojibake && ! $isMissingName) {
                 return;
             }
 
-            $sourceName = $namesBySku->get(trim((string) $product->sku_code));
-            if (! is_string($sourceName) || $sourceName === '') {
+            $sourceName = trim((string) $namesBySku->get($sku, ''));
+            if ($sourceName === '') {
                 $unmatched++;
+
+                return;
+            }
+            if ($sourceName === $sku) {
+                $invalidSourceName++;
 
                 return;
             }
@@ -63,6 +76,8 @@ class RepairProductNamesFromLegacy extends Command
             }
 
             $changed++;
+            $missingName += $isMissingName ? 1 : 0;
+            $mojibake += $isMojibake ? 1 : 0;
             if (! $this->option('dry-run')) {
                 DB::table('products')->where('id', $product->id)->update([
                     'name_th' => $sourceName,
@@ -72,8 +87,14 @@ class RepairProductNamesFromLegacy extends Command
         });
 
         $this->info(($this->option('dry-run') ? 'Would repair' : 'Repaired')." {$changed} product names.");
+        if ($changed > 0) {
+            $this->line("- {$missingName} missing/duplicate SKU names; {$mojibake} mojibake names.");
+        }
         if ($unmatched > 0) {
-            $this->warn("{$unmatched} mojibake products did not match a legacy SKU and were not changed.");
+            $this->warn("{$unmatched} products did not match a legacy SKU and were not changed.");
+        }
+        if ($invalidSourceName > 0) {
+            $this->warn("{$invalidSourceName} legacy rows had no usable product name and were not changed.");
         }
 
         return self::SUCCESS;
