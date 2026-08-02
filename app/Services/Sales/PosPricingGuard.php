@@ -21,6 +21,7 @@ class PosPricingGuard
     public function __construct(
         private readonly MemberPointService $points,
         private readonly ScaleBarcodeService $scaleBarcodes,
+        private readonly PosPriceScheduleService $priceSchedules,
     ) {}
 
     /**
@@ -73,7 +74,7 @@ class PosPricingGuard
 
             $perUnit = $this->campaignPrice(
                 (int) $product->id,
-                $this->basePrices([(int) $product->id])[(int) $product->id] ?? 0.0,
+                $this->basePrices([(int) $product->id], $branchId)[(int) $product->id] ?? 0.0,
                 $branchId,
             );
             if ($perUnit <= 0) {
@@ -103,7 +104,7 @@ class PosPricingGuard
             throw new RuntimeException('พบสินค้าที่ปิดใช้งานหรือไม่มีในแฟ้มสินค้า กรุณาโหลดข้อมูลสินค้าใหม่');
         }
 
-        $prices = $this->basePrices($products->keys()->all());
+        $prices = $this->basePrices($products->keys()->all(), (int) $data['branch_id']);
         $barcodeValues = $items->pluck('barcode')->filter()->unique();
         $barcodes = ProductBarcode::whereIn('barcode', $barcodeValues)->where('is_active', true)
             ->get()->keyBy('barcode');
@@ -111,7 +112,10 @@ class PosPricingGuard
             throw new RuntimeException('พบบาร์โค้ดที่ปิดใช้งานหรือไม่มีในแฟ้มสินค้า กรุณาสแกนใหม่');
         }
         $defaultTableId = PriceTable::where('is_default', true)->value('id');
-        $serverLines = $items->map(function ($item) use ($prices, $data, $barcodes, $defaultTableId, $products) {
+        $scheduledUnitPrices = $this->priceSchedules
+            ->active($products->keys()->all(), (int) $data['branch_id'], now())
+            ->keyBy(fn ($schedule) => $schedule->product_id.':'.($schedule->unit_id ?? 'base'));
+        $serverLines = $items->map(function ($item) use ($prices, $data, $barcodes, $defaultTableId, $products, $scheduledUnitPrices) {
             $productId = (int) $item['product_id'];
             $qty = (float) $item['qty'];
             $barcode = filled($item['barcode'] ?? null) ? $barcodes->get($item['barcode']) : null;
@@ -125,6 +129,12 @@ class PosPricingGuard
                 $basePrice = (float) (ProductPrice::where('product_id', $productId)
                     ->where('price_table_id', $defaultTableId)->where('unit_id', $barcode->unit_id)
                     ->where('is_active', true)->value('price') ?? $basePrice);
+            }
+            if ($barcode) {
+                $unitSchedule = $scheduledUnitPrices->get($productId.':'.$barcode->unit_id);
+                if ($unitSchedule) {
+                    $basePrice = (float) $unitSchedule->price;
+                }
             }
             $unitPrice = $this->campaignPrice($productId, $basePrice, (int) $data['branch_id']);
             $factor = $barcode && DecimalMath::compare($barcode->unit_factor, '0.00000001') >= 0
@@ -283,7 +293,7 @@ class PosPricingGuard
     }
 
     /** @param array<int,int> $productIds @return array<int,float> */
-    private function basePrices(array $productIds): array
+    private function basePrices(array $productIds, int $branchId): array
     {
         $products = Product::whereIn('id', $productIds)->get(['id', 'default_price'])->keyBy('id');
         $tableId = PriceTable::where('is_default', true)->value('id');
@@ -291,10 +301,18 @@ class PosPricingGuard
             ->whereIn('product_id', $productIds)->where('is_active', true)
             ->orderByRaw('CASE WHEN unit_id IS NULL THEN 0 ELSE 1 END')->get()->groupBy('product_id') : collect();
 
-        return collect($productIds)->mapWithKeys(function ($id) use ($products, $rows) {
+        $basePrices = collect($productIds)->mapWithKeys(function ($id) use ($products, $rows) {
             $row = $rows->get($id)?->first();
 
             return [$id => (float) ($row?->price ?? $products[$id]?->default_price ?? 0)];
+        });
+        $overrides = $this->priceSchedules->active($productIds, $branchId, now())
+            ->keyBy(fn ($schedule) => $schedule->product_id.':'.($schedule->unit_id ?? 'base'));
+
+        return $basePrices->mapWithKeys(function ($price, $productId) use ($overrides) {
+            $schedule = $overrides->get($productId.':base');
+
+            return [$productId => (float) ($schedule?->price ?? $price)];
         })->all();
     }
 

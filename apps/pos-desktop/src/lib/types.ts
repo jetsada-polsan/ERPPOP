@@ -74,6 +74,8 @@ export interface Product {
   sku_code: string
   name_th: string
   pos_price: number
+  base_pos_price?: number
+  scheduled_prices?: ScheduledPrice[]
   normal_price?: number
   stock_qty?: number | null
   is_promotion?: boolean
@@ -81,6 +83,14 @@ export interface Product {
   margin_percent?: number
   margin_warning?: boolean
   barcodes: Barcode[]
+}
+
+export interface ScheduledPrice {
+  id: number
+  unit_id?: number | null
+  price: number
+  effective_from: string
+  effective_to?: string | null
 }
 
 export interface QtyPromotion {

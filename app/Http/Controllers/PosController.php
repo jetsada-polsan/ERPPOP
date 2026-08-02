@@ -32,6 +32,7 @@ use App\Services\Sales\CashSaleService;
 use App\Services\Sales\MemberPointService;
 use App\Services\Sales\PosPaymentValidator;
 use App\Services\Sales\PosPricingGuard;
+use App\Services\Sales\PosPriceScheduleService;
 use App\Support\DecimalMath;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -173,8 +174,9 @@ class PosController extends Controller
         return response()->json($members);
     }
 
-    public function products(Request $request): JsonResponse
+    public function products(Request $request, ?PosPriceScheduleService $priceSchedules = null): JsonResponse
     {
+        $priceSchedules ??= app(PosPriceScheduleService::class);
         $q = trim((string) $request->query('q', ''));
         $categoryId = $request->query('category_id');
         $branchId = $this->enforcedBranchId((int) $request->query('branch_id', 0));
@@ -289,6 +291,37 @@ class PosController extends Controller
                 ];
             }
 
+            $p->normal_price = (float) $p->pos_price;
+
+            return $p;
+        });
+
+        // Normal prices stay in the price table. A POS schedule is an approved
+        // time-bound override and is sent to the device in advance so it can
+        // activate at the exact time even while the device is offline.
+        $catalogSchedules = $priceSchedules->catalog($products->pluck('id')->all(), $branchId, now())
+            ->groupBy('product_id');
+        $activeSchedules = $priceSchedules->active($products->pluck('id')->all(), $branchId, now())
+            ->keyBy(fn ($schedule) => $schedule->product_id.':'.($schedule->unit_id ?? 'base'));
+
+        $products = $products->map(function ($p) use ($catalogSchedules, $activeSchedules) {
+            $p->base_pos_price = (float) $p->pos_price;
+            $barcodeUnitId = $p->matched_barcode['unit_id'] ?? null;
+            $schedule = $barcodeUnitId
+                ? $activeSchedules->get($p->id.':'.$barcodeUnitId)
+                : null;
+            $schedule ??= $activeSchedules->get($p->id.':base');
+            if ($schedule) {
+                $p->pos_price = (float) $schedule->price;
+                $p->price_source = 'scheduled_price';
+            }
+            $p->scheduled_prices = $catalogSchedules->get($p->id, collect())->map(fn ($row) => [
+                'id' => $row->id,
+                'unit_id' => $row->unit_id,
+                'price' => (float) $row->price,
+                'effective_from' => $row->effective_from->toIso8601String(),
+                'effective_to' => $row->effective_to?->toIso8601String(),
+            ])->values();
             $p->normal_price = (float) $p->pos_price;
 
             return $p;

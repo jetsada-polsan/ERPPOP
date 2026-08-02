@@ -6,6 +6,7 @@ import { invoke, isTauri } from '@tauri-apps/api/core'
 import { api, connect, setServerUrl } from './lib/api'
 import { closeLocalDb, enqueue, loadOfflineCashier, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceOfflineCashiers, replaceProducts, replacePromotions, saleHistory, saveOfflineCredential, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth } from './lib/db'
 import { verifyOfflinePin } from './lib/offline-auth'
+import { productAtSaleTime } from './lib/catalog'
 import { priceCart } from './lib/pricing'
 import { syncCheckoutQueue } from './lib/sync'
 import type { CartLine, Cashier, DeviceProfile, HeldBill, LocalSaleHistory, LocalStorageStatus, PaymentMethod, Product, QtyPromotion, QueueItem, ReceiptBlock, ReceiptTemplate, Shift } from './lib/types'
@@ -66,11 +67,14 @@ const historyDays = ref(90)
 const selectedHistory = ref<LocalSaleHistory | null>(null)
 const storageStatus = ref<LocalStorageStatus | null>(null)
 let syncTimer: number | null = null
+const catalogClock = ref(Date.now())
 
 const filteredProducts = computed(() => {
+  catalogClock.value
   const q = search.value.trim().toLocaleLowerCase('th')
-  if (!q) return products.value.slice(0, 80)
-  return products.value.filter((p) => p.sku_code.toLowerCase().includes(q) || p.name_th.toLocaleLowerCase('th').includes(q) || p.barcodes?.some((b) => b.barcode.includes(q))).slice(0, 80)
+  const live = products.value.map((product) => productAtSaleTime(product, new Date()))
+  if (!q) return live.slice(0, 80)
+  return live.filter((p) => p.sku_code.toLowerCase().includes(q) || p.name_th.toLocaleLowerCase('th').includes(q) || p.barcodes?.some((b) => b.barcode.includes(q))).slice(0, 80)
 })
 const storageReady = computed(() => !isTauri() || storageStatus.value?.location === 'd-drive')
 const pricing = computed(() => priceCart(cart.value, promotions.value, profile.value?.vatRate || 7))
@@ -112,6 +116,14 @@ function addProduct(product: Product, barcode?: string) {
   nextTick(() => scanner.value?.focus())
 }
 
+function repriceCartForCurrentSchedule() {
+  const now = new Date()
+  cart.value = cart.value.map((line) => {
+    const master = products.value.find((product) => product.id === line.id)
+    return master ? { ...line, ...productAtSaleTime(master, now, line.scannedBarcode), qty: line.qty, scannedBarcode: line.scannedBarcode } : line
+  })
+}
+
 // ป้ายเครื่องชั่ง: PLU 6 หลัก + ราคารวม (สตางค์) — ตรงกับ SCALE_BARCODE_RULES ของ POS เว็บ
 // 13 หลักต้องตรวจ check digit เพราะ 800-839 เป็นรหัสประเทศ EAN ของอิตาลีด้วย
 function decodeScaleLabel(code: string): { plu: string; price: number } | null {
@@ -134,7 +146,8 @@ function scan() {
 
   // หาสินค้าจากรหัส/บาร์โค้ดที่ลงทะเบียนไว้ก่อนเสมอ แล้วค่อยตีความเป็นป้ายชั่ง
   // (กันสินค้านำเข้าที่ขึ้นต้น 800/801 ถูกอ่านเป็นป้ายชั่งแล้วคิดเงินผิด)
-  const known = products.value.find((p) => p.sku_code === code || p.barcodes?.some((b) => b.barcode === code))
+  const knownMaster = products.value.find((p) => p.sku_code === code || p.barcodes?.some((b) => b.barcode === code))
+  const known = knownMaster ? productAtSaleTime(knownMaster, new Date(), code) : undefined
   if (known) {
     addProduct(known, known.barcodes?.find((b) => b.barcode === code)?.barcode)
     return
@@ -142,7 +155,8 @@ function scan() {
 
   const scale = decodeScaleLabel(code)
   if (scale) {
-    const weighed = products.value.find((p) => p.sku_code === scale.plu || p.barcodes?.some((b) => b.barcode === scale.plu))
+    const weighedMaster = products.value.find((p) => p.sku_code === scale.plu || p.barcodes?.some((b) => b.barcode === scale.plu))
+    const weighed = weighedMaster ? productAtSaleTime(weighedMaster, new Date(), scale.plu) : undefined
     if (!weighed) return flash(`ไม่พบสินค้าชั่งรหัส ${scale.plu}`)
     const perUnit = Number(weighed.pos_price)
     if (!(perUnit > 0)) return flash(`สินค้าชั่ง ${scale.plu} ยังไม่ได้ตั้งราคาต่อหน่วย`)
@@ -410,12 +424,14 @@ function openPayment() {
   if (!storageReady.value) { showError('ยังไม่สามารถรับชำระได้: ต้องเตรียมฐานข้อมูลบนไดรฟ์ D: ให้พร้อมก่อน'); return }
   if (!cashier.value) { modal.value = 'cashier'; return }
   if (!shift.value) { modal.value = 'shift'; return }
+  repriceCartForCurrentSchedule()
   cashReceived.value = subtotal.value
   modal.value = 'payment'
 }
 
 async function checkout() {
   if (!profile.value || !cashier.value || !shift.value || !cart.value.length) return
+  repriceCartForCurrentSchedule()
   if (paymentMethod.value === 'cash' && cashReceived.value < subtotal.value) { showError('ยอดเงินสดที่รับไม่ครบ'); return }
   const id = `${profile.value.terminalCode || 'POS'}:SALE:${crypto.randomUUID()}`
   const soldItems = cart.value.map((line) => ({ ...line }))
@@ -531,7 +547,11 @@ onMounted(() => {
   window.addEventListener('online', networkUp)
   window.addEventListener('offline', networkDown)
   window.addEventListener('keydown', handleShortcut)
-  syncTimer = window.setInterval(() => { if (profile.value && navigator.onLine) void syncAll() }, 30000)
+  syncTimer = window.setInterval(() => {
+    catalogClock.value = Date.now()
+    repriceCartForCurrentSchedule()
+    if (profile.value && navigator.onLine) void syncAll()
+  }, 30000)
   void start()
 })
 onUnmounted(() => {

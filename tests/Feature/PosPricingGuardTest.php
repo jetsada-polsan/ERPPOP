@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\ProductBarcode;
 use App\Models\ProductPrice;
 use App\Models\ProductUnit;
+use App\Models\PosPriceSchedule;
 use App\Models\Promotion;
 use App\Models\QtyPromotion;
 use App\Models\User;
@@ -60,6 +61,28 @@ class PosPricingGuardTest extends TestCase
         $payload['items'][0]['qty'] = 7;
 
         $this->assertSame(250.0, app(PosPricingGuard::class)->validate($payload, $user));
+    }
+
+    public function test_server_uses_only_a_published_price_schedule_inside_its_time_window(): void
+    {
+        [$user, $branch, $product] = $this->masters();
+        $startsAt = now()->addHour();
+        PosPriceSchedule::create([
+            'product_id' => $product->id,
+            'branch_id' => $branch->id,
+            'price' => 80,
+            'effective_from' => $startsAt,
+            'effective_to' => $startsAt->copy()->addHour(),
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        $this->assertSame(100.0, app(PosPricingGuard::class)->validate($this->payload($branch, $product, 100), $user));
+
+        $this->travelTo($startsAt->copy()->addMinute());
+        $this->assertSame(80.0, app(PosPricingGuard::class)->validate($this->payload($branch, $product, 80), $user));
+
+        $this->travelBack();
     }
 
     public function test_manual_discount_requires_a_real_override_permission(): void
