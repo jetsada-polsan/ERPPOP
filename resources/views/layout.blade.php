@@ -15,6 +15,7 @@
             'displayLabel' => 'ขาย / เอกสาร',
             'items' => [
                 ['label' => 'เปิด POS ขาย', 'route' => 'pos.index', 'pattern' => 'pos.index', 'icon' => 'bi-display', 'tone' => 'cyan', 'target' => '_blank'],
+                ['label' => 'ศูนย์ควบคุม POS', 'route' => 'pos.control', 'pattern' => 'pos.control', 'icon' => 'bi-cash-coin', 'tone' => 'red'],
                 ['label' => 'เอกสารย้อนหลัง', 'route' => 'documents.browser', 'pattern' => 'documents.browser', 'icon' => 'bi-archive-fill', 'tone' => 'indigo'],
                 ['label' => 'นำเข้าข้อมูล POS', 'route' => 'pos-import.page', 'pattern' => 'pos-import.*', 'icon' => 'bi-cart-check-fill', 'tone' => 'cyan'],
                 ['label' => 'เครื่องมือ POS', 'route' => 'bplus.pos-workbench', 'pattern' => 'bplus.pos-workbench', 'icon' => 'bi-window-stack', 'tone' => 'blue'],

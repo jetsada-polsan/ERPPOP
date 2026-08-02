@@ -6,14 +6,18 @@ use App\Http\Controllers\Api\PosApiController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Models\Branch;
+use App\Models\Permission;
 use App\Models\PosDevice;
 use App\Models\PosHeldBill;
+use App\Models\PosPayment;
+use App\Models\PosReceipt;
 use App\Models\PosShift;
 use App\Models\PosTerminal;
 use App\Models\Product;
 use App\Models\ProductUnit;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
+use App\Models\Role;
 use App\Models\Salesman;
 use App\Models\Supplier;
 use App\Models\SupplierPriceSchedule;
@@ -25,6 +29,35 @@ use Tests\TestCase;
 class PosRetailControlTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_pos_control_center_shows_shift_and_unmatched_qr_payment(): void
+    {
+        $branch = Branch::create(['code' => 'B01', 'name_th' => 'สาขาทดสอบ', 'is_active' => true]);
+        $terminal = PosTerminal::create(['branch_id' => $branch->id, 'code' => 'POS-B01', 'name' => 'POS สาขาทดสอบ']);
+        $shift = PosShift::create([
+            'branch_id' => $branch->id, 'pos_terminal_id' => $terminal->id, 'shift_no' => 'SHIFT-CONTROL-01',
+            'opened_at' => '2026-08-02 08:00:00', 'opening_cash' => 500, 'expected_cash' => 750,
+            'receipt_count' => 1, 'status' => 'open',
+        ]);
+        $receipt = PosReceipt::create([
+            'pos_terminal_id' => $terminal->id, 'pos_shift_id' => $shift->id, 'receipt_no' => 'POS-CONTROL-001',
+            'receipt_date' => '2026-08-02 09:00:00', 'net_sales' => 250, 'status' => 'completed',
+        ]);
+        PosPayment::create(['pos_receipt_id' => $receipt->id, 'method' => 'qr', 'payment_reference' => 'QR-CONTROL-01', 'amount' => 250]);
+
+        $user = User::factory()->create(['username' => 'pos-control-user', 'is_active' => true, 'must_change_password' => false]);
+        $role = Role::create(['code' => 'POS_CONTROL', 'name' => 'POS Control']);
+        $permission = Permission::firstOrCreate(['code' => 'reports.view'], ['name' => 'reports.view']);
+        $role->permissions()->attach($permission->id);
+        $user->roles()->attach($role->id);
+
+        $this->actingAs($user)->get('/pos/control?date=2026-08-02')
+            ->assertOk()
+            ->assertSee('ศูนย์ควบคุม POS')
+            ->assertSee('SHIFT-CONTROL-01')
+            ->assertSee('POS-CONTROL-001')
+            ->assertSee('QR-CONTROL-01');
+    }
 
     public function test_held_bill_is_shared_by_branch_and_can_only_be_resumed_once(): void
     {

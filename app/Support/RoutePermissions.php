@@ -14,6 +14,7 @@ class RoutePermissions
         // POS + งานหน้าร้าน: เห็นหน้า POS = pos.use (แคชเชียร์/ผจก.สาขา/ผู้บริหาร)
         // แต่เปิดกะ+คิดเงิน = pos.sell (แคชเชียร์เท่านั้น) - longest prefix ชนะ
         'pos.' => 'pos.use',
+        'pos.control' => 'reports.view',
         'pos.checkout' => 'pos.sell',
         'pos.shift.open' => 'pos.sell',
         'pos.shift.close' => 'pos.sell',

@@ -712,6 +712,75 @@ class PosController extends Controller
         ]);
     }
 
+    /**
+     * One place for a manager or finance user to close the daily POS loop:
+     * shifts -> cash differences -> payment channels -> bank reconciliation.
+     */
+    public function control(Request $request): View
+    {
+        abort_unless(auth()->user()?->hasPermission('reports.view'), 403);
+
+        $data = $request->validate([
+            'date' => ['nullable', 'date'],
+            'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
+        ]);
+        $date = \Carbon\Carbon::parse($data['date'] ?? now())->toDateString();
+        $branchId = isset($data['branch_id']) ? (int) $data['branch_id'] : null;
+        $branches = Branch::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name_th']);
+
+        $shiftQuery = PosShift::query()
+            ->with(['branch:id,code,name_th', 'terminal:id,code,name', 'cashier:id,code,name'])
+            ->whereDate('opened_at', $date)
+            ->when($branchId, fn ($query) => $query->where('branch_id', $branchId));
+        $shifts = $shiftQuery->orderByDesc('opened_at')->get();
+
+        $receiptQuery = PosReceipt::query()
+            ->join('pos_terminals as t', 't.id', '=', 'pos_receipts.pos_terminal_id')
+            ->whereDate('pos_receipts.receipt_date', $date)
+            ->where('pos_receipts.status', 'completed')
+            ->when($branchId, fn ($query) => $query->where('t.branch_id', $branchId));
+        $receiptStats = (clone $receiptQuery)->selectRaw(
+            'count(*) as bill_count, coalesce(sum(pos_receipts.net_sales), 0) as net_sales, coalesce(avg(pos_receipts.net_sales), 0) as average_bill'
+        )->first();
+
+        $paymentTotals = DB::table('pos_payments as p')
+            ->join('pos_receipts as r', 'r.id', '=', 'p.pos_receipt_id')
+            ->join('pos_terminals as t', 't.id', '=', 'r.pos_terminal_id')
+            ->whereDate('r.receipt_date', $date)
+            ->where('r.status', 'completed')
+            ->when($branchId, fn ($query) => $query->where('t.branch_id', $branchId))
+            ->groupBy('p.method')
+            ->selectRaw('p.method, coalesce(sum(p.amount), 0) as amount')
+            ->pluck('amount', 'method');
+
+        $unmatchedTransfers = DB::table('pos_payments as p')
+            ->join('pos_receipts as r', 'r.id', '=', 'p.pos_receipt_id')
+            ->join('pos_terminals as t', 't.id', '=', 'r.pos_terminal_id')
+            ->join('branches as b', 'b.id', '=', 't.branch_id')
+            ->whereDate('r.receipt_date', $date)
+            ->where('r.status', 'completed')
+            ->whereIn('p.method', ['transfer', 'qr', 'bank'])
+            ->when($branchId, fn ($query) => $query->where('t.branch_id', $branchId))
+            ->whereNotExists(fn ($query) => $query->selectRaw('1')
+                ->from('bank_reconciliations as br')
+                ->whereColumn('br.source_id', 'p.id')
+                ->where('br.source_type', 'pos_payment')
+                ->where('br.status', 'matched'))
+            ->orderBy('r.receipt_date')
+            ->limit(100)
+            ->get(['r.receipt_no', 'r.receipt_date', 'b.code as branch_code', 'b.name_th as branch_name', 'p.method', 'p.payment_reference', 'p.amount']);
+
+        return view('pos.control', [
+            'date' => $date,
+            'branchId' => $branchId,
+            'branches' => $branches,
+            'shifts' => $shifts,
+            'receiptStats' => $receiptStats,
+            'paymentTotals' => $paymentTotals,
+            'unmatchedTransfers' => $unmatchedTransfers,
+        ]);
+    }
+
     public function checkout(
         Request $request,
         CashSaleService $service,
