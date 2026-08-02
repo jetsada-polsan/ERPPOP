@@ -110,6 +110,16 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .search-state { flex: none; display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 10px; }
 .search-state svg { width: 13px; }
 
+.quick-sell { flex: none; display: flex; align-items: center; gap: 12px; min-height: 56px; margin-top: 9px; padding: 7px 10px; border: 1px solid #f0d0d4; border-radius: 7px; background: #fff8f8; }
+.quick-sell > div:first-child { width: 112px; flex: none; display: flex; flex-direction: column; gap: 2px; }
+.quick-sell strong { color: var(--primary-strong); font-size: 11px; }
+.quick-sell small { color: #7d6d71; font-size: 9px; }
+.quick-sell-list { min-width: 0; display: flex; flex: 1; gap: 6px; overflow-x: auto; }
+.quick-sell-list button { width: 130px; min-width: 130px; height: 40px; padding: 5px 8px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; border: 1px solid #e5cbd0; border-radius: 5px; background: #fff; color: var(--ink); text-align: left; }
+.quick-sell-list button:hover { border-color: var(--primary); background: #fff4f5; }
+.quick-sell-list span { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; font-weight: 700; }
+.quick-sell-list b { color: var(--primary); font-size: 11px; }
+
 .product-grid {
   min-height: 0;
   margin-top: 12px;
@@ -160,6 +170,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .cart-title small { color: #8995a0; font-size: 9px; font-weight: 750; }
 .cart-title strong { font-size: 15px; }
 .cart-title > span { color: #657482; font-size: 10px; white-space: nowrap; }
+.shift-pulse { flex: none; display: grid; grid-template-columns: repeat(3, 1fr); min-height: 58px; border-bottom: 1px solid #e1e7eb; background: #fcf7f8; }
+.shift-pulse span { min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 8px 12px; border-right: 1px solid #eadde0; }
+.shift-pulse span:last-child { border-right: 0; }
+.shift-pulse small { overflow: hidden; color: #7d7074; font-size: 9px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.shift-pulse strong { overflow: hidden; color: var(--ink); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .cart-icon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 6px; background: #edf3f6; color: #465966; }
 .cart-icon svg { width: 19px; }
 
@@ -294,6 +309,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .payment-methods button:hover { border-color: #86bcd0; color: var(--primary); }
 .payment-methods button.active { border-color: var(--primary); background: #e8f5f9; color: var(--primary-strong); box-shadow: inset 0 0 0 1px var(--primary); }
 .payment-field input { height: 50px; font-size: 19px; font-weight: 800; text-align: right; }
+.tender-grid button:disabled { cursor: not-allowed; opacity: .45; }
 .tender-grid { display: grid; grid-template-columns: 1.35fr repeat(3, 1fr); gap: 6px; margin-top: 8px; }
 .tender-grid button { height: 38px; border: 1px solid #cbd7df; border-radius: 5px; background: #f6f8f9; color: #465865; font-size: 11px; font-weight: 800; }
 .tender-grid button:hover { border-color: #87b9ca; background: #edf6f8; color: var(--primary-strong); }
@@ -385,12 +401,16 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
   .topbar { height: 58px; }
   .section-heading { display: none; }
   .search-row { height: 44px; }
+  .quick-sell { display: none; }
   .product-grid { grid-auto-rows: 98px; }
   .product-tile { height: 98px; padding: 8px; }
   .product-tile > strong { margin-top: 1px; font-size: 10.5px; }
   .product-code { min-height: 16px; }
   .product-bottom span { display: none; }
   .cart-title { height: 48px; }
+  .shift-pulse { min-height: 43px; }
+  .shift-pulse span { padding: 5px 9px; }
+  .shift-pulse strong { font-size: 11px; }
   .cart-line { min-height: 50px; }
   .totals > div:not(.grand) { display: none; }
   .totals .grand { margin: 0; padding: 0; border: 0; }
@@ -413,6 +433,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
   .section-heading strong { font-size: 17px; }
   .search-row { height: 64px; padding: 0 15px; }
   .search-row input { font-size: 17px; }
+  .quick-sell { min-height: 62px; }
   .product-grid { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); grid-auto-rows: 150px; gap: 11px; }
   .product-tile { height: 150px; padding: 14px; }
   .product-code { font-size: 11px; }

@@ -63,6 +63,7 @@ const localHealthBusy = ref(false)
 const localBackupBusy = ref(false)
 const localRestoreBusy = ref(false)
 const saleHistoryRows = ref<LocalSaleHistory[]>([])
+const recentSales = ref<LocalSaleHistory[]>([])
 const historyDays = ref(90)
 const selectedHistory = ref<LocalSaleHistory | null>(null)
 const storageStatus = ref<LocalStorageStatus | null>(null)
@@ -82,6 +83,25 @@ const subtotal = computed(() => pricing.value.total)
 const totalQty = computed(() => cart.value.reduce((sum, line) => sum + Number(line.qty), 0))
 const vat = computed(() => pricing.value.vat)
 const change = computed(() => Math.max(0, cashReceived.value - subtotal.value))
+const todayLocalSales = computed(() => {
+  const today = new Date().toLocaleDateString('en-CA')
+  return recentSales.value.filter((sale) => sale.status !== 'failed' && new Date(sale.printedAt).toLocaleDateString('en-CA') === today)
+})
+const todayLocalTotal = computed(() => todayLocalSales.value.reduce((sum, sale) => sum + sale.total, 0))
+const todayLocalAverage = computed(() => todayLocalSales.value.length ? todayLocalTotal.value / todayLocalSales.value.length : 0)
+const quickProducts = computed(() => {
+  const sold = new Map<number, number>()
+  for (const sale of recentSales.value) {
+    if (sale.status === 'failed') continue
+    for (const item of sale.items) sold.set(item.id, (sold.get(item.id) || 0) + Number(item.qty || 0))
+  }
+  return [...sold.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([id]) => products.value.find((product) => product.id === id))
+    .filter((product): product is Product => Boolean(product))
+    .slice(0, 8)
+    .map((product) => productAtSaleTime(product, new Date()))
+})
 const receiptTemplate = computed(() => profile.value?.receiptTemplate?.blocks?.length ? profile.value.receiptTemplate : DEFAULT_RECEIPT_TEMPLATE)
 const receiptVat = computed(() => {
   const rate = profile.value?.vatRate || 7
@@ -107,6 +127,7 @@ async function openHistory() {
   } catch (e) { showError(e) }
 }
 async function refreshHistory() { saleHistoryRows.value = await saleHistory(historyDays.value) }
+async function refreshLocalSales() { recentSales.value = await saleHistory(30) }
 
 function addProduct(product: Product, barcode?: string) {
   const existing = cart.value.find((line) => line.id === product.id && line.scannedBarcode === barcode)
@@ -429,6 +450,10 @@ function openPayment() {
   modal.value = 'payment'
 }
 
+function setQuickCash(amount: number | 'exact') {
+  cashReceived.value = amount === 'exact' ? subtotal.value : amount
+}
+
 async function checkout() {
   if (!profile.value || !cashier.value || !shift.value || !cart.value.length) return
   repriceCartForCurrentSchedule()
@@ -456,6 +481,7 @@ async function checkout() {
     // Queue เป็นข้อมูลหลักของการขาย ประวัติในเครื่องเป็นข้อมูลเสริมที่ห้ามทำให้บิลถูกมาร์ค failed
     try {
       await saveSaleHistory({ id, receiptNo: id.split(':').pop()!.slice(0, 8).toUpperCase(), status: 'pending', total: soldTotal, method: paymentMethod.value, paid: cashReceived.value, change: soldChange, items: soldItems, printedAt: new Date().toISOString() })
+      await refreshLocalSales()
     } catch (historyError) {
       console.warn('บันทึกประวัติ POS ไม่สำเร็จ แต่บิลยังอยู่ในคิวซิงก์', historyError)
     }
@@ -518,6 +544,7 @@ async function start() {
   profile.value = await loadProfile()
   products.value = await loadProducts()
   promotions.value = await loadPromotions()
+  await refreshLocalSales()
   const saved = await loadSession()
   cashier.value = saved.cashier
   shift.value = saved.shift?.status === 'open' ? saved.shift : null
@@ -532,6 +559,10 @@ async function start() {
 function networkUp() { online.value = true; void syncAll() }
 function networkDown() { online.value = false }
 function handleShortcut(event: KeyboardEvent) {
+  if (event.key === 'F8' && !modal.value) {
+    event.preventDefault()
+    scanner.value?.focus()
+  }
   if (event.key === 'F10' && !modal.value && cart.value.length) {
     event.preventDefault()
     openPayment()
@@ -591,8 +622,16 @@ onUnmounted(() => {
         <div class="search-row">
           <span class="scan-icon"><ScanLine/></span>
           <input ref="scanner" v-model="search" autofocus placeholder="สแกนบาร์โค้ด หรือค้นหาชื่อสินค้า" @keyup.enter="scan" />
-          <span class="search-state"><Search/>{{ filteredProducts.length }} รายการ</span>
+          <span class="search-state"><Search/>{{ filteredProducts.length }} รายการ · F8</span>
         </div>
+        <section v-if="!search && quickProducts.length" class="quick-sell">
+          <div><strong>ขายบ่อยบนเครื่องนี้</strong><small>อิงจาก 30 วันล่าสุด</small></div>
+          <div class="quick-sell-list">
+            <button v-for="product in quickProducts" :key="`quick-${product.id}`" type="button" @click="addProduct(product)">
+              <span>{{ product.name_th }}</span><b>฿{{ money(product.pos_price) }}</b>
+            </button>
+          </div>
+        </section>
         <div v-if="products.length" class="product-grid">
           <button v-for="product in filteredProducts" :key="product.id" class="product-tile" @click="addProduct(product)">
             <div class="product-code"><span>{{ product.sku_code }}</span><em v-if="product.margin_warning">กำไรต่ำ</em><em v-else-if="product.is_promotion || product.is_flash_sale">ราคาพิเศษ</em></div>
@@ -605,6 +644,11 @@ onUnmounted(() => {
 
       <aside class="cart-panel">
         <div class="cart-title"><div><span class="cart-icon"><ReceiptText/></span><span><small>บิลปัจจุบัน</small><strong>รายการขาย</strong></span></div><div style="display:flex;align-items:center;gap:8px"><button class="icon-button" :disabled="!cart.length || !shift" title="พักบิลส่วนกลาง" @click="openHoldBill"><PauseCircle/></button><span>{{ cart.length }} รายการ · {{ totalQty }} ชิ้น</span></div></div>
+        <div class="shift-pulse">
+          <span><small>บิลวันนี้บนเครื่อง</small><strong>{{ todayLocalSales.length }} บิล</strong></span>
+          <span><small>ยอดขาย</small><strong>฿{{ money(todayLocalTotal) }}</strong></span>
+          <span><small>เฉลี่ย/บิล</small><strong>฿{{ money(todayLocalAverage) }}</strong></span>
+        </div>
         <div class="cart-lines">
           <div v-for="(line, index) in cart" :key="`${line.id}-${line.scannedBarcode || ''}`" class="cart-line">
             <span class="line-seq">{{ index + 1 }}</span>
@@ -736,7 +780,7 @@ onUnmounted(() => {
         <div class="payment-methods"><button v-for="method in (['cash','transfer','credit_card','cheque'] as PaymentMethod[])" :key="method" type="button" :class="{ active: paymentMethod === method }" @click="paymentMethod = method"><Banknote v-if="method === 'cash'"/><QrCode v-else-if="method === 'transfer'"/><CreditCard v-else-if="method === 'credit_card'"/><FileText v-else/>{{ ({cash:'เงินสด',transfer:'โอน/QR',credit_card:'บัตรเครดิต',cheque:'เช็ค'} as any)[method] }}</button></div>
         <template v-if="paymentMethod === 'cash'">
           <label class="payment-field">รับเงินสด<input v-model.number="cashReceived" type="number" min="0" step="0.01" autofocus></label>
-          <div class="tender-grid"><button type="button" @click="cashReceived = subtotal">รับพอดี</button><button type="button" @click="cashReceived = 100">100</button><button type="button" @click="cashReceived = 500">500</button><button type="button" @click="cashReceived = 1000">1,000</button></div>
+          <div class="tender-grid"><button type="button" @click="setQuickCash('exact')">รับพอดี</button><button type="button" :disabled="subtotal > 100" @click="setQuickCash(100)">100</button><button type="button" :disabled="subtotal > 500" @click="setQuickCash(500)">500</button><button type="button" :disabled="subtotal > 1000" @click="setQuickCash(1000)">1,000</button></div>
         </template>
         <label v-else class="payment-field">เลขอ้างอิงการชำระ<input v-model="paymentRef" required autofocus></label>
         <div v-if="paymentMethod === 'cash'" class="change"><span>เงินทอน</span><strong>฿{{ money(change) }}</strong></div>
