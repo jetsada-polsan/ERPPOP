@@ -24,11 +24,26 @@ class DashboardController extends Controller
             ->join('pos_terminals as _bt', '_bt.id', '=', "{$receiptAlias}.pos_terminal_id")
             ->where('_bt.branch_id', $branchId);
 
-        $summary = DB::table('pos_receipts')
-            ->when($branchId, fn ($q) => $receiptBranchScope($q, 'pos_receipts'))
-            ->whereBetween('receipt_date', [$from->startOfDay(), $to->copy()->endOfDay()])
-            ->selectRaw('count(*) as receipt_count, coalesce(sum(net_sales),0) as total_sales, coalesce(sum(gross_sales),0) as total_gross, coalesce(sum(discount_amount),0) as total_discount')
+        // Dashboard ผู้บริหารอ่าน ledger กลาง: POS และขายหลังบ้านอยู่คนละตาราง
+        // ได้ แต่หนึ่งการขายปรากฏครั้งเดียวใน sales_postings.
+        $salesSummary = fn (Carbon $rangeFrom, Carbon $rangeTo) => DB::table('sales_postings')
+            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            ->whereBetween('sale_date', [$rangeFrom->toDateString(), $rangeTo->toDateString()])
+            ->selectRaw('count(*) as receipt_count, coalesce(sum(net_sales),0) as total_sales, coalesce(sum(gross_sales),0) as total_gross, coalesce(sum(discount_amount),0) as total_discount, coalesce(sum(cogs_amount),0) as total_cogs, coalesce(sum(gross_profit),0) as gross_profit')
             ->first();
+        $summary = $salesSummary($from, $to);
+        $periodDays = $from->diffInDays($to) + 1;
+        $previous = $salesSummary($from->copy()->subDays($periodDays), $from->copy()->subDay());
+        $summary->previous_sales = (float) $previous->total_sales;
+        $summary->sales_change_percent = (float) $previous->total_sales === 0.0
+            ? null
+            : round((((float) $summary->total_sales - (float) $previous->total_sales) / (float) $previous->total_sales) * 100, 1);
+        $summary->average_bill = (float) $summary->receipt_count > 0
+            ? round((float) $summary->total_sales / (int) $summary->receipt_count, 2)
+            : 0;
+        $summary->gross_margin_percent = (float) $summary->total_sales > 0
+            ? round((float) $summary->gross_profit / (float) $summary->total_sales * 100, 1)
+            : null;
 
         $posTerminalSummary = DB::table('pos_receipts as r')
             ->join('pos_terminals as t', 't.id', '=', 'r.pos_terminal_id')
@@ -40,14 +55,12 @@ class DashboardController extends Controller
             ->limit(3)
             ->get();
 
-        $salesDocumentSummary = DB::table('documents as d')
-            ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
-            ->when($branchId, fn ($q) => $q->where('d.branch_id', $branchId))
-            ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE'])
-            ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()])
-            ->groupBy('dt.code', 'dt.name_th')
-            ->orderByDesc(DB::raw('sum(d.total_amount)'))
-            ->selectRaw('dt.code as doc_code, coalesce(dt.name_th, dt.code) as doc_name, count(*) as bill_count, coalesce(sum(d.total_amount), 0) as amount')
+        $salesDocumentSummary = DB::table('sales_postings')
+            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            ->whereBetween('sale_date', [$from->toDateString(), $to->toDateString()])
+            ->groupBy('channel')
+            ->orderByDesc(DB::raw('sum(net_sales)'))
+            ->selectRaw("channel as doc_code, case channel when 'POS' then 'POS' when 'CASH_SALE' then 'ขายสดหลังบ้าน' when 'CREDIT_SALE' then 'ขายเชื่อ' else channel end as doc_name, count(*) as bill_count, coalesce(sum(net_sales), 0) as amount")
             ->limit(3)
             ->get();
 
@@ -57,23 +70,29 @@ class DashboardController extends Controller
             ->whereBetween('r.receipt_date', [$from->startOfDay(), $to->copy()->endOfDay()])
             ->sum('i.qty');
 
-        $byBranch = DB::table('pos_receipts as r')
-            ->join('pos_terminals as t', 't.id', '=', 'r.pos_terminal_id')
-            ->join('branches as b', 'b.id', '=', 't.branch_id')
+        $byBranch = DB::table('sales_postings as s')
+            ->join('branches as b', 'b.id', '=', 's.branch_id')
             ->when($branchId, fn ($q) => $q->where('b.id', $branchId))
-            ->whereBetween('r.receipt_date', [$from->startOfDay(), $to->copy()->endOfDay()])
+            ->whereBetween('s.sale_date', [$from->toDateString(), $to->toDateString()])
             ->groupBy('b.id', 'b.code', 'b.name_th')
-            ->orderByDesc(DB::raw('sum(r.net_sales)'))
-            ->select('b.code', 'b.name_th', DB::raw('count(*) as receipt_count'), DB::raw('sum(r.net_sales) as total_sales'))
+            ->orderByDesc(DB::raw('sum(s.net_sales)'))
+            ->select('b.code', 'b.name_th', DB::raw('count(*) as receipt_count'), DB::raw('sum(s.net_sales) as total_sales'))
             ->get();
 
-        $dailySales = DB::table('pos_receipts')
-            ->when($branchId, fn ($q) => $receiptBranchScope($q, 'pos_receipts'))
-            ->whereBetween('receipt_date', [$from->startOfDay(), $to->copy()->endOfDay()])
-            ->selectRaw('date(receipt_date) as sale_date, sum(net_sales) as total_sales, count(*) as receipt_count')
-            ->groupBy(DB::raw('date(receipt_date)'))
+        $dailySales = DB::table('sales_postings')
+            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            ->whereBetween('sale_date', [$from->toDateString(), $to->toDateString()])
+            ->selectRaw('sale_date, sum(net_sales) as total_sales, count(*) as receipt_count')
+            ->groupBy('sale_date')
             ->orderBy('sale_date')
             ->get();
+
+        $receivables = DB::table('customer_open_items as oi')
+            ->join('documents as d', 'd.id', '=', 'oi.document_id')
+            ->when($branchId, fn ($q) => $q->where('d.branch_id', $branchId))
+            ->whereIn('oi.status', ['open', 'partial'])
+            ->selectRaw('count(*) as open_count, coalesce(sum(oi.balance_amount), 0) as open_amount, coalesce(sum(case when oi.due_date < current_date then oi.balance_amount else 0 end), 0) as overdue_amount')
+            ->first();
 
         $topProducts = DB::table('pos_receipt_items as i')
             ->join('pos_receipts as r', 'r.id', '=', 'i.pos_receipt_id')
@@ -128,6 +147,7 @@ class DashboardController extends Controller
             'itemCount' => $itemCount,
             'byBranch' => $byBranch,
             'dailySales' => $dailySales,
+            'receivables' => $receivables,
             'topProducts' => $topProducts,
             'lowStock' => $lowStock,
             'expiryAlerts' => $expiryAlerts,

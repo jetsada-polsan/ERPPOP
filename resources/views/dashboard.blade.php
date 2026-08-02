@@ -5,11 +5,11 @@
 @section('page-subtitle', 'AI Business Pulse · ยอดขาย POS สต็อก และสัญญาณที่ต้องติดตาม')
 
 @section('content')
-    <section class="ai-command-hero mb-3">
-        <div class="ai-orb"><i class="bi bi-stars"></i></div>
-        <div class="ai-command-copy">
-            <div class="ai-kicker"><span></span> JET AI BUSINESS PULSE</div>
-            <h2>ภาพรวมกิจการแบบเรียลไทม์</h2>
+    <section class="executive-hero mb-3">
+        <div class="executive-mark"><i class="bi bi-bar-chart-line-fill"></i></div>
+        <div class="executive-copy">
+            <div class="executive-kicker"><span></span> POPSTAR EXECUTIVE BOARD</div>
+            <h2>ภาพรวมเพื่อการตัดสินใจ</h2>
             <p>
                 @if($pendingBatches->isNotEmpty())
                     พบ POS batch รอตรวจสอบ {{ $pendingBatches->count() }} รายการ ควรยืนยันข้อมูลก่อนปิดยอด
@@ -22,12 +22,11 @@
                 @endif
             </p>
         </div>
-        <div class="ai-signal-grid">
+        <div class="executive-signal-grid">
             <div><span>ยอดขาย</span><strong>฿{{ number_format($summary->total_sales, 2) }}</strong></div>
-            <div><span>ใบเสร็จ POS</span><strong>{{ number_format($summary->receipt_count) }}</strong></div>
+            <div><span>รายการขาย</span><strong>{{ number_format($summary->receipt_count) }}</strong></div>
             <div><span>แจ้งเตือน</span><strong>{{ number_format($pendingBatches->count() + $lowStock->count() + $expiryAlerts->count()) }}</strong></div>
         </div>
-        <div class="ai-grid-lines"></div>
     </section>
 
     <form method="get" class="dashboard-filter mb-3">
@@ -86,72 +85,46 @@
 
     <div class="row g-3 mb-3">
         <div class="col-md-6 col-xl-3">
-            <a href="{{ route('reports.index', ['category' => 'sales', 'report' => 'daily_sales', 'from' => $from, 'to' => $to]) }}" class="metric-card metric-card-green metric-link">
-                <div class="metric-icon metric-icon-green"><i class="bi bi-cash-coin"></i></div>
+            <a href="{{ route('reports.index', ['category' => 'sales', 'report' => 'daily_sales', 'from' => $from, 'to' => $to]) }}" class="metric-card metric-card-sales metric-link">
+                <div class="metric-icon metric-icon-sales"><i class="bi bi-cash-coin"></i></div>
                 <div class="metric-label">ยอดขายสุทธิ</div>
-                <div class="metric-value text-success">฿{{ number_format($summary->total_sales, 2) }}</div>
+                <div class="metric-value">฿{{ number_format($summary->total_sales, 2) }}</div>
                 <div class="metric-mini-list">
-                    @forelse($salesDocumentSummary as $doc)
-                        <div class="metric-mini-row">
-                            <span>{{ $doc->doc_name }}</span>
-                            <strong>{{ number_format($doc->bill_count) }} บิล · ฿{{ number_format($doc->amount, 2) }}</strong>
-                        </div>
-                    @empty
-                        <div class="metric-mini-row muted"><span>เอกสารขาย</span><strong>0 บิล · ฿0.00</strong></div>
-                    @endforelse
+                    <div class="metric-mini-row"><span>เทียบช่วงก่อน</span><strong class="{{ $summary->sales_change_percent !== null && $summary->sales_change_percent < 0 ? 'text-danger' : 'text-success' }}">{{ $summary->sales_change_percent === null ? '-' : ($summary->sales_change_percent > 0 ? '+' : '').$summary->sales_change_percent.'%' }}</strong></div>
+                    <div class="metric-mini-row"><span>เฉลี่ยต่อบิล</span><strong>฿{{ number_format($summary->average_bill, 2) }}</strong></div>
                 </div>
             </a>
         </div>
         <div class="col-md-6 col-xl-3">
-            <a href="{{ route('reports.index', ['category' => 'pos', 'report' => 'pos_by_terminal', 'from' => $from, 'to' => $to]) }}" class="metric-card metric-card-blue metric-link">
-                <div class="metric-icon metric-icon-blue"><i class="bi bi-cart-check"></i></div>
-                <div class="metric-label">POS ในช่วงนี้</div>
-                <div class="metric-value">{{ number_format($summary->receipt_count) }}</div>
-                <div class="metric-unit">ใบเสร็จ</div>
+            <a href="{{ route('reports.index', ['category' => 'sales', 'report' => 'gross_margin', 'from' => $from, 'to' => $to]) }}" class="metric-card metric-card-profit metric-link">
+                <div class="metric-icon metric-icon-profit"><i class="bi bi-graph-up-arrow"></i></div>
+                <div class="metric-label">กำไรขั้นต้นที่คำนวณได้</div>
+                <div class="metric-value">฿{{ number_format($summary->gross_profit, 2) }}</div>
                 <div class="metric-mini-list">
-                    @forelse($posTerminalSummary as $pos)
-                        <div class="metric-mini-row">
-                            <span>POS {{ $pos->pos_code }}</span>
-                            <strong>{{ number_format($pos->bill_count) }} บิล · ฿{{ number_format($pos->amount, 2) }}</strong>
-                        </div>
-                    @empty
-                        <div class="metric-mini-row muted"><span>POS 12345</span><strong>0 บิล · ฿0.00</strong></div>
-                    @endforelse
+                    <div class="metric-mini-row"><span>ต้นทุนที่ผูกเอกสารแล้ว</span><strong>฿{{ number_format($summary->total_cogs, 2) }}</strong></div>
+                    <div class="metric-mini-row"><span>Gross margin</span><strong>{{ $summary->gross_margin_percent === null ? '-' : number_format($summary->gross_margin_percent, 1).'%' }}</strong></div>
                 </div>
             </a>
         </div>
         <div class="col-md-6 col-xl-3">
-            <a href="{{ route('reports.index', ['category' => 'sales', 'report' => 'top_products', 'from' => $from, 'to' => $to]) }}" class="metric-card metric-card-amber metric-link">
-                <div class="metric-icon metric-icon-amber"><i class="bi bi-box-seam"></i></div>
-                <div class="metric-label">จำนวนสินค้าที่ขาย</div>
-                <div class="metric-value">{{ number_format($itemCount, 0) }}</div>
-                <div class="metric-unit">ชิ้น</div>
+            <a href="{{ route('reports.index', ['category' => 'finance', 'report' => 'ar_aging', 'from' => $from, 'to' => $to]) }}" class="metric-card metric-card-ar metric-link">
+                <div class="metric-icon metric-icon-ar"><i class="bi bi-person-vcard"></i></div>
+                <div class="metric-label">ลูกหนี้คงค้าง</div>
+                <div class="metric-value">฿{{ number_format($receivables->open_amount, 2) }}</div>
                 <div class="metric-mini-list">
-                    @forelse($topProducts->take(2) as $p)
-                        <div class="metric-mini-row">
-                            <span>{{ $p->sku_code }}</span>
-                            <strong>{{ number_format($p->total_qty, 0) }} ชิ้น</strong>
-                        </div>
-                    @empty
-                        <div class="metric-mini-row muted"><span>สินค้าขายดี</span><strong>0 ชิ้น</strong></div>
-                    @endforelse
+                    <div class="metric-mini-row"><span>เอกสารค้าง</span><strong>{{ number_format($receivables->open_count) }} รายการ</strong></div>
+                    <div class="metric-mini-row"><span>เกินกำหนดชำระ</span><strong class="{{ $receivables->overdue_amount > 0 ? 'text-danger' : '' }}">฿{{ number_format($receivables->overdue_amount, 2) }}</strong></div>
                 </div>
             </a>
         </div>
         <div class="col-md-6 col-xl-3">
-            <a href="{{ route('reports.index', ['category' => 'pos', 'report' => 'pos_receipts', 'from' => $from, 'to' => $to]) }}" class="metric-card metric-card-rose metric-link">
-                <div class="metric-icon metric-icon-rose"><i class="bi bi-tags"></i></div>
-                <div class="metric-label">ส่วนลดรวม</div>
-                <div class="metric-value text-danger">฿{{ number_format($summary->total_discount, 2) }}</div>
+            <a href="{{ route('reports.index', ['category' => 'pos', 'report' => 'pos_by_terminal', 'from' => $from, 'to' => $to]) }}" class="metric-card metric-card-pos metric-link">
+                <div class="metric-icon metric-icon-pos"><i class="bi bi-display"></i></div>
+                <div class="metric-label">ยอดขาย POS</div>
+                <div class="metric-value">{{ number_format($posTerminalSummary->sum('amount'), 2) }} ฿</div>
                 <div class="metric-mini-list">
-                    <div class="metric-mini-row">
-                        <span>ยอดก่อนลด</span>
-                        <strong>฿{{ number_format($summary->total_gross, 2) }}</strong>
-                    </div>
-                    <div class="metric-mini-row">
-                        <span>ใบเสร็จ POS</span>
-                        <strong>{{ number_format($summary->receipt_count) }} บิล</strong>
-                    </div>
+                    <div class="metric-mini-row"><span>ส่วนลด POS</span><strong>฿{{ number_format($summary->total_discount, 2) }}</strong></div>
+                    <div class="metric-mini-row"><span>รายการค้างตรวจ</span><strong class="{{ $pendingBatches->isNotEmpty() ? 'text-danger' : 'text-success' }}">{{ $pendingBatches->count() }}</strong></div>
                 </div>
             </a>
         </div>
@@ -259,28 +232,16 @@
 @push('head')
 <script src="{{ asset('vendor/chartjs/chart.umd.js') }}"></script>
 <style>
-    .ai-command-hero {
-        position:relative; min-height:112px; display:grid; grid-template-columns:auto minmax(0,1fr) auto;
-        align-items:center; gap:15px; overflow:hidden; padding:16px 18px;
-        border:1px solid rgba(56,189,248,.32); border-radius:14px;
-        background:
-            radial-gradient(circle at 82% 20%,rgba(34,211,238,.2),transparent 28%),
-            radial-gradient(circle at 12% 110%,rgba(99,102,241,.3),transparent 36%),
-            linear-gradient(120deg,#071525,#0b2540 52%,#073448);
-        box-shadow:0 12px 34px rgba(2,21,38,.18); color:#e8f8ff;
-    }
-    .ai-command-hero>*:not(.ai-grid-lines){position:relative;z-index:2}
-    .ai-grid-lines { position:absolute; inset:0; opacity:.13; background-image:linear-gradient(rgba(125,211,252,.5) 1px,transparent 1px),linear-gradient(90deg,rgba(125,211,252,.5) 1px,transparent 1px); background-size:28px 28px; mask-image:linear-gradient(90deg,transparent,#000 25%,#000); }
-    .ai-orb { width:54px;height:54px;display:grid;place-items:center;border:1px solid rgba(103,232,249,.5);border-radius:16px;background:linear-gradient(145deg,rgba(14,165,233,.25),rgba(99,102,241,.2));box-shadow:inset 0 0 22px rgba(34,211,238,.15),0 0 24px rgba(34,211,238,.12);font-size:23px;color:#67e8f9; }
-    .ai-kicker { display:flex;align-items:center;gap:7px;color:#67e8f9;font-size:9px;font-weight:900;letter-spacing:.15em; }
-    .ai-kicker span { width:6px;height:6px;border-radius:50%;background:#34d399;box-shadow:0 0 10px #34d399;animation:aiPulse 1.8s infinite; }
-    .ai-command-copy h2 { margin:3px 0 2px;color:#fff;font-size:18px;font-weight:800; }
-    .ai-command-copy p { margin:0;max-width:680px;color:#a9c9d9;font-size:11px; }
-    .ai-signal-grid { display:grid;grid-template-columns:repeat(3,minmax(90px,1fr));gap:7px; }
-    .ai-signal-grid div { min-width:94px;padding:9px 10px;border:1px solid rgba(125,211,252,.2);border-radius:8px;background:rgba(255,255,255,.055);backdrop-filter:blur(8px); }
-    .ai-signal-grid span { display:block;color:#8db5c9;font-size:9px;margin-bottom:2px; }
-    .ai-signal-grid strong { display:block;color:#f0fbff;font-size:13px;white-space:nowrap; }
-    @keyframes aiPulse{50%{opacity:.38;transform:scale(.75)}}
+    .executive-hero { min-height:108px; display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:18px; padding:16px 18px; background:#fff; border:1px solid #dce4ed; border-top:3px solid #1e3a5f; border-radius:8px; box-shadow:0 6px 20px rgba(15,23,42,.06); }
+    .executive-mark { width:46px; height:46px; display:grid; place-items:center; color:#fff; background:#1e3a5f; border-radius:7px; font-size:20px; }
+    .executive-kicker { display:flex; align-items:center; gap:7px; color:#62748a; font-size:10px; font-weight:800; letter-spacing:.12em; }
+    .executive-kicker span { width:7px; height:7px; border-radius:50%; background:#159f78; }
+    .executive-copy h2 { margin:3px 0 3px; color:#172b43; font-size:19px; font-weight:850; }
+    .executive-copy p { margin:0; max-width:720px; color:#63748a; font-size:12px; }
+    .executive-signal-grid { display:grid; grid-template-columns:repeat(3,minmax(102px,1fr)); gap:8px; }
+    .executive-signal-grid div { min-width:104px; padding:8px 10px; border-left:1px solid #e5ebf1; }
+    .executive-signal-grid span { display:block; color:#76869a; font-size:10px; margin-bottom:2px; }
+    .executive-signal-grid strong { display:block; color:#172b43; font-size:13px; white-space:nowrap; font-variant-numeric:tabular-nums; }
 
     .dashboard-filter {
         display: flex;
@@ -357,10 +318,11 @@
         overflow: hidden;
     }
 
-    .metric-card-green  { background: linear-gradient(145deg,#ffffff,#effcf6); box-shadow:inset 0 3px 0 #34d399,0 5px 18px rgba(16,185,129,.07); }
-    .metric-card-blue   { background: linear-gradient(145deg,#ffffff,#eff8ff); box-shadow:inset 0 3px 0 #38bdf8,0 5px 18px rgba(59,130,246,.07); }
-    .metric-card-amber  { background: linear-gradient(145deg,#ffffff,#fffbeb); box-shadow:inset 0 3px 0 #fbbf24,0 5px 18px rgba(245,158,11,.07); }
-    .metric-card-rose   { background: linear-gradient(145deg,#ffffff,#fff1f2); box-shadow:inset 0 3px 0 #fb7185,0 5px 18px rgba(244,63,94,.07); }
+    .metric-card { background:#fff; box-shadow:0 4px 16px rgba(15,23,42,.045); }
+    .metric-card-sales { border-top:3px solid #159f78; }
+    .metric-card-profit { border-top:3px solid #2676a9; }
+    .metric-card-ar { border-top:3px solid #ca8a04; }
+    .metric-card-pos { border-top:3px solid #d5343f; }
 
     .metric-link {
         display: block;
@@ -374,10 +336,7 @@
         transform: translateY(-3px);
     }
 
-    .metric-link.metric-card-green:hover  { box-shadow: 0 12px 32px rgba(16,185,129,.2); }
-    .metric-link.metric-card-blue:hover   { box-shadow: 0 12px 32px rgba(59,130,246,.2); }
-    .metric-link.metric-card-amber:hover  { box-shadow: 0 12px 32px rgba(245,158,11,.2); }
-    .metric-link.metric-card-rose:hover   { box-shadow: 0 12px 32px rgba(244,63,94,.2); }
+    .metric-link:hover { box-shadow:0 12px 28px rgba(15,23,42,.12); }
 
     .metric-icon {
         width: 36px; height: 36px;
@@ -387,10 +346,10 @@
         margin-bottom: 9px;
     }
 
-    .metric-icon-green { background: #10b981; color: #fff; box-shadow: 0 4px 12px rgba(16,185,129,.35); }
-    .metric-icon-blue  { background: #3b82f6; color: #fff; box-shadow: 0 4px 12px rgba(59,130,246,.35); }
-    .metric-icon-amber { background: #f59e0b; color: #fff; box-shadow: 0 4px 12px rgba(245,158,11,.35); }
-    .metric-icon-rose  { background: #f43f5e; color: #fff; box-shadow: 0 4px 12px rgba(244,63,94,.35); }
+    .metric-icon-sales { background:#e7f6f0; color:#13795b; }
+    .metric-icon-profit { background:#e9f2f9; color:#20618d; }
+    .metric-icon-ar { background:#fff6db; color:#966b06; }
+    .metric-icon-pos { background:#fff0f0; color:#c32d38; }
 
     .metric-label { color: #64748b; font-weight: 600; font-size: 13px; margin-bottom: 6px; }
 
@@ -438,8 +397,8 @@
     .table td { border-bottom-color: #f1f5f9; }
 
     @media (max-width: 991.98px) {
-        .ai-command-hero{grid-template-columns:auto minmax(0,1fr)}
-        .ai-signal-grid{grid-column:1/-1;width:100%}
+        .executive-hero{grid-template-columns:auto minmax(0,1fr)}
+        .executive-signal-grid{grid-column:1/-1;width:100%}
         .dashboard-filter {
             flex-wrap: wrap;
         }
@@ -464,7 +423,7 @@
     }
 
     @media (max-width: 575.98px) {
-        .ai-command-hero{grid-template-columns:1fr}.ai-orb{display:none}.ai-signal-grid{grid-template-columns:1fr 1fr}.ai-signal-grid div:last-child{grid-column:1/-1}
+        .executive-hero{grid-template-columns:1fr}.executive-mark{display:none}.executive-signal-grid{grid-template-columns:1fr 1fr}.executive-signal-grid div:last-child{grid-column:1/-1}
         .filter-fields {
             grid-template-columns: 1fr;
         }
