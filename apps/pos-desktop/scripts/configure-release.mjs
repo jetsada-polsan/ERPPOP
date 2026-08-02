@@ -23,8 +23,9 @@ await writeFile(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`)
 
 const cargoPath = 'src-tauri/Cargo.toml'
 const cargo = await readFile(cargoPath, 'utf8')
-const updatedCargo = cargo.replace(/^(version\s*=\s*")[^"]+("\s*)$/m, `$1${version}$2`)
-if (updatedCargo === cargo) {
-  throw new Error('Unable to update the package version in src-tauri/Cargo.toml')
+// Keep the replacement tolerant of both LF and CRLF used by GitHub Windows runners.
+if (!/^version\s*=\s*"[^"]+"/m.test(cargo)) {
+  throw new Error('Unable to find the package version in src-tauri/Cargo.toml')
 }
+const updatedCargo = cargo.replace(/^version\s*=\s*"[^"]+"/m, `version = "${version}"`)
 await writeFile(cargoPath, updatedCargo)
