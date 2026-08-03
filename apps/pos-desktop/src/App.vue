@@ -80,6 +80,12 @@ const filteredProducts = computed(() => {
   return live.filter((p) => p.sku_code.toLowerCase().includes(q) || p.name_th.toLocaleLowerCase('th').includes(q) || p.barcodes?.some((b) => b.barcode.includes(q))).slice(0, 80)
 })
 const storageReady = computed(() => !isTauri() || storageStatus.value?.location === 'd-drive')
+const connectionLabel = computed(() => {
+  if (!profile.value) return 'ยังไม่เชื่อม ERP'
+  if (syncing.value) return 'กำลังซิงก์'
+  return online.value ? 'ออนไลน์' : 'เชื่อม ERP ไม่ได้'
+})
+const connectionClass = computed(() => profile.value && online.value ? 'online' : 'offline')
 const pricing = computed(() => priceCart(cart.value, promotions.value, profile.value?.vatRate || 7))
 const subtotal = computed(() => pricing.value.total)
 const totalQty = computed(() => cart.value.reduce((sum, line) => sum + Number(line.qty), 0))
@@ -653,7 +659,7 @@ onUnmounted(() => {
         <div><span>กะขาย</span><strong>{{ shift?.shift_no || 'ยังไม่เปิดกะ' }}</strong><small>{{ cashier?.name || 'ยังไม่เข้าแคชเชียร์' }}</small></div>
       </div>
       <div class="top-actions">
-        <button class="status" :class="online ? 'online' : 'offline'" @click="syncAll"><Wifi v-if="online"/><CloudOff v-else/><span>{{ online ? (syncing ? 'กำลังซิงก์' : 'ออนไลน์') : 'ออฟไลน์' }}</span></button>
+        <button class="status" :class="connectionClass" :title="catalogSyncError || 'ตรวจการเชื่อมต่อ ERP และซิงก์ข้อมูล'" @click="syncAll"><Wifi v-if="profile && online"/><CloudOff v-else/><span>{{ connectionLabel }}</span></button>
         <button class="icon-button" title="ซิงก์ข้อมูล" @click="syncAll"><RefreshCw :class="{ spin: syncing }"/></button>
         <button class="icon-button" title="คู่มือการใช้งาน POS" @click="openGuide"><CircleHelp/></button>
         <button class="icon-button" title="ประวัติการขายย้อนหลัง" @click="openHistory"><History/></button>
