@@ -28,6 +28,9 @@ class CustomerController extends Controller
             'all' => (clone $customerScope)->count(),
             'active' => (clone $customerScope)->where('is_active', true)->count(),
             'inactive' => (clone $customerScope)->where('is_active', false)->count(),
+            // Legacy ARFILE has some rows without AR_NAME. Those were historically
+            // imported as name = code; surface them clearly for master-data cleanup.
+            'missing_name' => (clone $customerScope)->whereRaw('trim(name_th) = trim(code)')->count(),
         ];
 
         $customers = (clone $customerScope)

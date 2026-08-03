@@ -32,6 +32,16 @@
             @endforeach
         </div>
 
+        @if($counts['missing_name'] > 0)
+            <div class="alert alert-warning border-0 d-flex align-items-center justify-content-between gap-3 mb-4" role="alert">
+                <div>
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    พบลูกค้า <strong>{{ number_format($counts['missing_name']) }} ราย</strong> ที่ไม่มีชื่อในข้อมูลเดิม ระบบจะแสดงสถานะให้แก้ไขแทนการแสดงรหัสซ้ำเป็นชื่อลูกค้า
+                </div>
+                <span class="badge text-bg-warning text-nowrap">รอตรวจชื่อ</span>
+            </div>
+        @endif
+
         <div class="content-card p-4">
             <div class="table-responsive">
                 <table class="table align-middle">
@@ -43,9 +53,17 @@
                     </thead>
                     <tbody>
                         @forelse($customers as $customer)
+                            @php($needsName = trim((string) $customer->name_th) === trim((string) $customer->code))
                             <tr>
                                 <td class="fw-semibold">{{ $customer->code }}</td>
-                                <td>{{ $customer->name_th }}</td>
+                                <td>
+                                    @if($needsName)
+                                        <span class="text-danger fw-semibold"><i class="bi bi-exclamation-circle me-1"></i>ยังไม่ระบุชื่อลูกค้า</span>
+                                        <div class="small text-muted">ไม่มีชื่อในแฟ้มลูกค้าเดิม</div>
+                                    @else
+                                        {{ $customer->name_th }}
+                                    @endif
+                                </td>
                                 <td>{{ $customer->branch?->name_th ?? '-' }}</td>
                                 <td>{{ $customer->salesUser?->name ?? '-' }}<div class="text-muted small">{{ $customer->salesUser?->username }}</div></td>
                                 <td>{{ $customer->salesArea ? $customer->salesArea->code.' - '.$customer->salesArea->name : '-' }}</td>
@@ -59,7 +77,7 @@
                                     </span>
                                 </td>
                                 <td class="text-end">
-                                    <a href="{{ route('customers.show', $customer) }}" class="btn btn-sm btn-light border">ดู</a>
+                                    <a href="{{ route('customers.show', $customer) }}" class="btn btn-sm {{ $needsName ? 'btn-warning' : 'btn-light border' }}">{{ $needsName ? 'แก้ไขชื่อ' : 'ดู' }}</a>
                                 </td>
                             </tr>
                         @empty
