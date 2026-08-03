@@ -28,6 +28,8 @@ Device Token เก็บด้วย Windows Credential Manager ผ่าน Ru
 
 รายละเอียดตารางและคอลัมน์ของ SQLite ดูที่ [`docs/POS-LOCAL-SQLITE-STRUCTURE.md`](../../docs/POS-LOCAL-SQLITE-STRUCTURE.md)
 
+ก่อนเปิดใช้งานเครื่องจริง ให้ทำตาม [`docs/POS-GO-LIVE-UAT.md`](../../docs/POS-GO-LIVE-UAT.md) และบันทึกผลแยกตามสาขา/เครื่อง POS
+
 ## พัฒนา
 
 ```bash
