@@ -2,6 +2,8 @@ use keyring::Entry;
 use std::fs;
 use std::path::PathBuf;
 #[cfg(windows)]
+use std::os::windows::process::CommandExt;
+#[cfg(windows)]
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 use serde::Serialize;
@@ -62,7 +64,12 @@ fn is_directory_link(_path: &PathBuf) -> bool { false }
 #[cfg(windows)]
 fn create_directory_junction(link: &PathBuf, target: &PathBuf) -> Result<(), String> {
     let command = format!("mklink /J \"{}\" \"{}\"", link.display(), target.display());
-    let output = Command::new("cmd").args(["/C", &command]).output().map_err(|error| error.to_string())?;
+    // mklink มีเฉพาะ cmd แต่ห้ามให้ console ดำเด้งขึ้นบนหน้าร้าน
+    let output = Command::new("cmd")
+        .args(["/C", &command])
+        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .output()
+        .map_err(|error| error.to_string())?;
     if output.status.success() { Ok(()) } else { Err(String::from_utf8_lossy(&output.stderr).trim().to_string()) }
 }
 
