@@ -30,7 +30,10 @@
     "targets": ["nsis"],
     "icon": ["icons/icon.ico", "icons/icon.png"],
     "createUpdaterArtifacts": true,
-    "windows": { "nsis": { "installMode": "perMachine" } }
+    "windows": {
+      "webviewInstallMode": { "type": "embedBootstrapper", "silent": true },
+      "nsis": { "installMode": "currentUser" }
+    }
   },
   "plugins": {
     "sql": {},

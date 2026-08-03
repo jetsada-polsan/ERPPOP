@@ -41,10 +41,11 @@ pnpm tauri dev
 
 ## สร้างและปล่อยรุ่น Windows
 
-1. สร้าง Tauri signing key ตามเอกสาร Tauri และเก็บ GitHub Secrets: `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, `TAURI_UPDATER_PUBLIC_KEY`
-2. รัน GitHub Actions `Build POPSTAR POS` พร้อมเวอร์ชัน เช่น `1.0.1`
-3. ดาวน์โหลด artifact แล้วใช้ไฟล์ `*.nsis.zip` และข้อความใน `*.nsis.zip.sig`
-4. ที่ `ERP > ตั้งค่า > โปรแกรมหน้าร้าน` อัปโหลด zip, เวอร์ชัน และลายเซ็น
-5. POS ตรวจ `latest.json` ตอนเปิดและติดตั้งรุ่นใหม่อัตโนมัติ ลายเซ็นป้องกันไฟล์ถูกสับเปลี่ยนระหว่างทาง
+1. ตัวติดตั้ง Windows ใช้โหมด `currentUser` จึงไม่ต้องกด Run as Administrator และจะติดตั้งเฉพาะบัญชี Windows ที่กำลังใช้งาน
+2. สร้าง Tauri signing key ตามเอกสาร Tauri และเก็บ GitHub Secrets: `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, `TAURI_UPDATER_PUBLIC_KEY`
+3. รัน GitHub Actions `Build POPSTAR POS` พร้อมเวอร์ชัน เช่น `1.0.1`
+4. ดาวน์โหลด artifact แล้วใช้ไฟล์ `*.nsis.zip` และข้อความใน `*.nsis.zip.sig`
+5. ที่ `ERP > ตั้งค่า > โปรแกรมหน้าร้าน` อัปโหลด zip, เวอร์ชัน และลายเซ็น
+6. POS ตรวจ `latest.json` ตอนเปิดและติดตั้งรุ่นใหม่อัตโนมัติ ลายเซ็นป้องกันไฟล์ถูกสับเปลี่ยนระหว่างทาง
 
 ห้ามใช้ private signing key บนเซิร์ฟเวอร์หรือเครื่องแคชเชียร์ ให้เก็บใน GitHub Actions Secrets เท่านั้น
