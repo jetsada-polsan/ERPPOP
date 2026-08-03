@@ -85,7 +85,7 @@ class ManualControllerTest extends TestCase
             ->get('/core-modules')
             ->assertOk()
             ->assertSee('คู่มือทดสอบรับมอบระบบ (UAT)')
-            ->assertSee('75 กรณี')
+            ->assertSee('73 กรณี')
             ->assertSee('POS-11')
             ->assertSee('PUR-07')
             ->assertSee('OPS-04')

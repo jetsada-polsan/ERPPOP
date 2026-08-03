@@ -130,13 +130,6 @@ class DashboardController extends Controller
                 || $lot->days_left === null || $lot->days_left <= (int) $lot->expiry_warning_days)
             ->take(20)->values();
 
-        $pendingBatches = DB::table('import_batches')
-            ->whereIn('status', ['has_error', 'parsed', 'validated'])
-            ->orderByDesc('sale_date')
-            ->select('id', 'pos_code', 'sale_date', 'status', 'record_count')
-            ->limit(20)
-            ->get();
-
         return view('dashboard', [
             'from' => $from->toDateString(),
             'to' => $to->toDateString(),
@@ -151,7 +144,6 @@ class DashboardController extends Controller
             'topProducts' => $topProducts,
             'lowStock' => $lowStock,
             'expiryAlerts' => $expiryAlerts,
-            'pendingBatches' => $pendingBatches,
         ]);
     }
 }

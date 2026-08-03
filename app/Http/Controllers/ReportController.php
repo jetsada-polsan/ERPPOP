@@ -254,9 +254,6 @@ class ReportController extends Controller
                 'title' => 'ตรวจสอบระบบ',
                 'icon' => 'bi-shield-check',
                 'reports' => [
-                    'import_batches' => 'Import / Sync status',
-                    'import_errors' => 'Import errors',
-                    'import_error_summary' => 'สรุป Import errors',
                     'void_bill_history' => 'ประวัติลบบิล / ยกเลิกบิลย้อนหลัง',
                     'deleted_bill_audit' => 'ตรวจสอบเอกสารที่ถูกยกเลิก',
                     'pending_work' => 'งานค้างต้องตาม',
@@ -829,28 +826,6 @@ class ReportController extends Controller
                 ['label' => 'เครดิต', 'key' => 'credit', 'type' => 'money', 'class' => 'text-end'],
                 ['label' => 'หมายเหตุ', 'key' => 'remark'],
             ], $this->glJournals($from, $to, $filters)),
-
-            'import_batches' => $this->tableResult('Import / Sync status', [
-                ['label' => 'POS', 'key' => 'pos_code'],
-                ['label' => 'วันที่ขาย', 'key' => 'sale_date'],
-                ['label' => 'สถานะ', 'key' => 'status', 'type' => 'badge'],
-                ['label' => 'จำนวน', 'key' => 'record_count', 'type' => 'number', 'class' => 'text-end'],
-            ], $this->importBatches($from, $to, $filters)),
-
-            'import_errors' => $this->tableResult('Import errors', [
-                ['label' => 'วันที่', 'key' => 'created_at'],
-                ['label' => 'ใบเสร็จ', 'key' => 'receipt_no'],
-                ['label' => 'ประเภท', 'key' => 'error_type', 'type' => 'badge'],
-                ['label' => 'รายละเอียด', 'key' => 'error_message'],
-            ], $this->importErrors($fromStart, $toEnd, $filters)),
-
-            'import_error_summary' => $this->tableResult('สรุป Import errors', [
-                ['label' => 'ประเภท', 'key' => 'error_type', 'type' => 'badge'],
-                ['label' => 'จำนวน Error', 'key' => 'error_count', 'type' => 'number', 'class' => 'text-end'],
-                ['label' => 'จำนวนบิล', 'key' => 'receipt_count', 'type' => 'number', 'class' => 'text-end'],
-                ['label' => 'ครั้งแรก', 'key' => 'first_seen'],
-                ['label' => 'ล่าสุด', 'key' => 'last_seen'],
-            ], $this->importErrorSummary($fromStart, $toEnd, $filters)),
 
             'void_bill_history' => $this->tableResult('ประวัติลบบิล / ยกเลิกบิลย้อนหลัง', [
                 ['label' => 'วันที่', 'key' => 'cancelled_at'],
@@ -2319,49 +2294,6 @@ class ReportController extends Controller
             ->get();
     }
 
-    private function importBatches(Carbon $from, Carbon $to, array $filters): Collection
-    {
-        $query = DB::table('import_batches')
-            ->whereBetween('sale_date', [$from->toDateString(), $to->toDateString()]);
-
-        $this->applySearch($query, $filters, ['pos_code', 'status', 'source_zip_name', 'source_cds_name']);
-
-        return $query
-            ->orderByDesc('sale_date')
-            ->select('pos_code', 'sale_date', 'status', 'record_count')
-            ->limit($filters['per_page'])
-            ->get();
-    }
-
-    private function importErrors(Carbon $from, Carbon $to, array $filters): Collection
-    {
-        $query = DB::table('import_errors')
-            ->whereBetween('created_at', [$from, $to]);
-
-        $this->applySearch($query, $filters, ['receipt_no', 'error_type', 'error_message']);
-
-        return $query
-            ->orderByDesc('created_at')
-            ->select('created_at', 'receipt_no', 'error_type', 'error_message')
-            ->limit($filters['per_page'])
-            ->get();
-    }
-
-    private function importErrorSummary(Carbon $from, Carbon $to, array $filters): Collection
-    {
-        $query = DB::table('import_errors')
-            ->whereBetween('created_at', [$from, $to]);
-
-        $this->applySearch($query, $filters, ['receipt_no', 'error_type', 'error_message']);
-
-        return $query
-            ->groupBy('error_type')
-            ->orderByDesc(DB::raw('count(*)'))
-            ->selectRaw('error_type, count(*) as error_count, count(distinct receipt_no) as receipt_count, min(created_at) as first_seen, max(created_at) as last_seen')
-            ->limit($filters['per_page'])
-            ->get();
-    }
-
     private function voidBillHistory(Carbon $from, Carbon $to, array $filters): Collection
     {
         $docQuery = DB::table('documents as d')
@@ -2440,8 +2372,6 @@ class ReportController extends Controller
         return [
             'ใบจองรอแปลงขาย' => DB::table('sale_bookings')->where('status', 'pending')->count(),
             'ลูกหนี้ค้างชำระ' => DB::table('customer_open_items')->whereIn('status', ['open', 'partial'])->whereDate('due_date', '<', now()->toDateString())->count(),
-            'POS import รอจัดการ' => DB::table('import_batches')->whereIn('status', ['uploaded', 'parsed', 'has_error', 'validated', 'confirmed'])->count(),
-            'Import errors' => DB::table('import_errors')->count(),
         ];
     }
 }

@@ -24,11 +24,11 @@ class FeatureController extends Controller
                 'accent' => '#0f766e',
                 'summary' => 'เตรียมข้อมูล POS, รวมยอดขาย, ตรวจแฟ้ม, ลบข้อมูล และ sync กับสำนักงานใหญ่',
                 'items' => [
-                    ['name' => 'รวบรวมยอดขายรายวัน / รายเดือน', 'status' => 'ready', 'route' => ['pos-import.page', []]],
+                    ['name' => 'ศูนย์ควบคุมยอดขาย POS', 'status' => 'ready', 'route' => ['pos.control', []], 'note' => 'ตรวจยอดบิลใหม่ กะขาย และยอดชำระเงินจาก POS Desktop'],
                     ['name' => 'ตรวจสอบยอดขายรายวัน W / ใบกำกับภาษีอย่างย่อ X', 'status' => 'ready', 'route' => ['reports.index', ['category' => 'pos', 'report' => 'pos_receipts']]],
                     ['name' => 'เตรียมข้อมูลสำหรับเครื่อง POS P', 'status' => 'ready', 'route' => ['bplus.pos-preparation', []], 'note' => 'ส่งสินค้า ราคา แคมเปญ และสมาชิกไปเครื่องขาย'],
                     ['name' => 'ลบข้อมูล POS / POS Online / Member Online', 'status' => 'ready', 'route' => ['bplus.pos-preparation', []], 'note' => 'ล้างข้อมูลตามช่วงวันที่และเครื่อง POS'],
-                    ['name' => 'สถานะรับส่งข้อมูล / แฟ้มยอดขาย', 'status' => 'ready', 'route' => ['reports.index', ['category' => 'audit', 'report' => 'import_batches']]],
+                    ['name' => 'สถานะซิงก์และกะขาย POS', 'status' => 'ready', 'route' => ['pos.control', []]],
                 ],
             ],
             [
@@ -246,7 +246,7 @@ class FeatureController extends Controller
                     ['name' => 'Dynamic QR / Static QR / EDC', 'status' => 'ready', 'route' => ['bplus.qr-payments', []]],
                     ['name' => 'Show Price / Check Price / Queue Buster', 'status' => 'ready', 'route' => ['bplus.show-price', []]],
                     ['name' => 'E-Commerce / Franchise Retail', 'status' => 'ready', 'route' => ['ecommerce-channels.index', []], 'note' => 'ลงทะเบียนช่องทาง Lazada, Shopee, LINE MyShop, TikTok Shop ได้แล้ว'],
-                    ['name' => 'API / Import-Export', 'status' => 'ready', 'route' => ['reports.index', ['category' => 'audit', 'report' => 'import_batches']]],
+                    ['name' => 'API / การเชื่อมต่อ', 'status' => 'ready', 'route' => ['ecommerce-channels.index', []]],
                 ],
             ],
         ];

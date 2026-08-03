@@ -103,6 +103,6 @@ class RouteIntegrityTest extends TestCase
             }
         }
 
-        $this->assertGreaterThanOrEqual(140, $checked);
+        $this->assertGreaterThanOrEqual(139, $checked);
     }
 }

@@ -1,8 +1,7 @@
 <?php
 
-// Read-only connection info for the legacy BPlus MSSQL server. Used only by
-// App\Services\PosImport\MssqlPosSourceService via raw PDO (odbc driver) -
-// not a Laravel database connection, since no native sqlsrv extension is installed.
+// Read-only connection info for legacy master-data verification tools.
+// Historical POS sales are intentionally not imported into this ERP.
 
 return [
     'host' => env('MSSQL_SOURCE_HOST'),

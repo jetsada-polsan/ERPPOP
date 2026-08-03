@@ -11,9 +11,7 @@
             <div class="executive-kicker"><span></span> POPSTAR EXECUTIVE BOARD</div>
             <h2>ภาพรวมเพื่อการตัดสินใจ</h2>
             <p>
-                @if($pendingBatches->isNotEmpty())
-                    พบ POS batch รอตรวจสอบ {{ $pendingBatches->count() }} รายการ ควรยืนยันข้อมูลก่อนปิดยอด
-                @elseif($expiryAlerts->isNotEmpty())
+                @if($expiryAlerts->isNotEmpty())
                     พบ Lot ใกล้หมดอายุหรือข้อมูลวันหมดอายุไม่ครบ {{ $expiryAlerts->count() }} รายการ ควรจัดการก่อนขาย
                 @elseif($lowStock->isNotEmpty())
                     พบสินค้าใกล้หมดหรือติดลบ {{ $lowStock->count() }} รายการ ควรวางแผนเติมสต๊อก
@@ -25,7 +23,7 @@
         <div class="executive-signal-grid">
             <div><span>ยอดขาย</span><strong>฿{{ number_format($summary->total_sales, 2) }}</strong></div>
             <div><span>รายการขาย</span><strong>{{ number_format($summary->receipt_count) }}</strong></div>
-            <div><span>แจ้งเตือน</span><strong>{{ number_format($pendingBatches->count() + $lowStock->count() + $expiryAlerts->count()) }}</strong></div>
+            <div><span>แจ้งเตือน</span><strong>{{ number_format($lowStock->count() + $expiryAlerts->count()) }}</strong></div>
         </div>
     </section>
 
@@ -58,18 +56,6 @@
              style="background:#e3f3fc;color:#1585c0">
             <i class="bi bi-shop"></i>
             <span class="small fw-semibold">แสดงข้อมูลเฉพาะสาขาของคุณ: {{ $scopeBranchName }}</span>
-        </div>
-    @endif
-
-    @if($pendingBatches->isNotEmpty())
-        <div class="alert alert-warning border-0 rounded-4 shadow-sm mb-4">
-            <div class="d-flex align-items-center justify-content-between gap-3">
-                <div>
-                    <div class="fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i>มี POS batch รอตรวจสอบ {{ $pendingBatches->count() }} รายการ</div>
-                    <div class="small">ควรตรวจสอบและยืนยันก่อนปิดยอดประจำวัน</div>
-                </div>
-                <a href="{{ route('pos-import.page') }}" class="btn btn-sm btn-warning rounded-pill px-3">ไปที่ POS Import</a>
-            </div>
         </div>
     @endif
 
@@ -124,7 +110,7 @@
                 <div class="metric-value">{{ number_format($posTerminalSummary->sum('amount'), 2) }} ฿</div>
                 <div class="metric-mini-list">
                     <div class="metric-mini-row"><span>ส่วนลด POS</span><strong>฿{{ number_format($summary->total_discount, 2) }}</strong></div>
-                    <div class="metric-mini-row"><span>รายการค้างตรวจ</span><strong class="{{ $pendingBatches->isNotEmpty() ? 'text-danger' : 'text-success' }}">{{ $pendingBatches->count() }}</strong></div>
+                    <div class="metric-mini-row"><span>สถานะซิงก์ POS</span><strong class="text-success">พร้อมใช้งาน</strong></div>
                 </div>
             </a>
         </div>

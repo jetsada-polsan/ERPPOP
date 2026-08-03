@@ -40,7 +40,6 @@ use App\Http\Controllers\OrganizationalUnitController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PosController;
 use App\Support\PosReleaseManifest;
-use App\Http\Controllers\PosImportController;
 use App\Http\Controllers\PosReleaseController;
 use App\Http\Controllers\PriceTableController;
 use App\Http\Controllers\PriceTagController;
@@ -634,25 +633,4 @@ Route::prefix('bplus')->name('bplus.')->group(function () {
     Route::delete('/qr-payments/{qrPaymentConfig}', [BplusOperationController::class, 'destroyQrPayment'])->name('qr-payments.destroy');
     Route::get('/show-price', [BplusOperationController::class, 'showPrice'])->name('show-price');
     Route::post('/show-price', [BplusOperationController::class, 'storeShowPrice'])->name('show-price.store');
-});
-
-// POS Import module: review/confirm/post pipeline for batches synced from MSSQL
-// via `php artisan pos-import:sync` (or the "sync now" form on the index page).
-// Auth enforced globally by App\Http\Middleware\ErpAuthorize (see bootstrap/app.php):
-// guests -> /login, permissions per module via App\Support\RoutePermissions.
-Route::prefix('pos-import')->name('pos-import.')->group(function () {
-    // JSON API (read-only) - kept for scripting/automation.
-    Route::get('/batches', [PosImportController::class, 'index'])->name('batches.index');
-    Route::get('/batches/{batch}', [PosImportController::class, 'show'])->name('batches.show');
-
-    // Form actions (redirect back to the batch page with a flash message).
-    Route::post('/upload', [PosImportController::class, 'upload'])->name('upload');
-    Route::post('/sync', [PosImportController::class, 'sync'])->name('sync');
-    Route::post('/batches/{batch}/revalidate', [PosImportController::class, 'revalidate'])->name('batches.revalidate');
-    Route::post('/batches/{batch}/confirm', [PosImportController::class, 'confirm'])->name('batches.confirm');
-    Route::post('/batches/{batch}/post', [PosImportController::class, 'post'])->name('batches.post');
-
-    // Web pages - registered last so they don't shadow the /batches paths above.
-    Route::get('/', [PosImportController::class, 'page'])->name('page');
-    Route::get('/{batch}', [PosImportController::class, 'pageShow'])->name('batches.page-show');
 });

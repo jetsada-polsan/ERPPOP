@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\Api\PosApiController;
-use App\Http\Controllers\Api\LegacyPosSyncController;
 use App\Http\Controllers\Api\LegacyBackofficeSummaryController;
 use App\Http\Controllers\PosController;
 use Illuminate\Support\Facades\Route;
@@ -28,5 +27,4 @@ Route::prefix('pos')->middleware('pos.device')->name('api.pos.')->group(function
     Route::post('/receipt/return', [PosApiController::class, 'returnReceipt'])->name('receipt.return');
 });
 
-Route::post('/legacy-pos/sync', [LegacyPosSyncController::class, 'store'])->name('api.legacy-pos.sync');
 Route::post('/legacy-backoffice/summary', [LegacyBackofficeSummaryController::class, 'store'])->name('api.legacy-backoffice.summary');
