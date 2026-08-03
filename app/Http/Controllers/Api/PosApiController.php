@@ -52,6 +52,7 @@ class PosApiController extends Controller
             'branch_id' => $user?->branch_id,
             'branch_name' => $user?->branch?->name_th,
             'device_user' => $user?->name,
+            'cashier_login_mode' => AppSetting::get('pos_passwordless_login') === '1' ? 'selection' : 'pin',
             // หัวบิลใบกำกับภาษีอย่างย่อ (มาตรา 86/6) — desktop แคชไว้พิมพ์ใบเสร็จได้แม้ออฟไลน์
             'company' => [
                 'name' => AppSetting::company('name_th'),
@@ -109,11 +110,23 @@ class PosApiController extends Controller
             // code ยังรับได้เพื่อรองรับ POS รุ่นเก่า แต่ desktop รุ่นใหม่ใช้ PIN อย่างเดียว
             'code' => ['nullable', 'string', 'max:40'],
             'cashier_id' => ['nullable', 'integer'],
-            'pin' => ['required', 'string', 'regex:/^\d{4,20}$/'],
+            'pin' => ['nullable', 'string', 'regex:/^\d{4,20}$/'],
         ]);
 
         $device = $request->attributes->get('pos_device');
         $branchId = $device?->branch_id ?: $request->user()?->branch_id;
+        $passwordless = AppSetting::get('pos_passwordless_login') === '1';
+        if ($passwordless && isset($data['cashier_id']) && blank($data['pin'] ?? null)) {
+            $cashier = $this->cashierCandidates($branchId)->find($data['cashier_id']);
+            if (! $cashier) {
+                return response()->json(['success' => false, 'message' => 'ไม่พบพนักงานในสาขานี้'], 422);
+            }
+
+            return $this->authenticatedCashierResponse($request, $cashier, $device, $branchId, null);
+        }
+        if (blank($data['pin'] ?? null)) {
+            return response()->json(['success' => false, 'message' => 'กรุณาระบุ PIN'], 422);
+        }
         $matches = $this->cashierCandidates($branchId, $data['code'] ?? null)
             ->whereNotNull('pos_pin_hash')
             ->get()
@@ -138,6 +151,11 @@ class PosApiController extends Controller
             return response()->json(['success' => false, 'message' => 'กรุณาเลือกชื่อพนักงานใหม่'], 422);
         }
 
+        return $this->authenticatedCashierResponse($request, $cashier, $device, $branchId, $data['pin']);
+    }
+
+    private function authenticatedCashierResponse(Request $request, Salesman $cashier, ?PosDevice $device, ?int $branchId, ?string $pin): JsonResponse
+    {
         // ผูกผลการยืนยันไว้กับเครื่อง เพื่อให้คำสั่งขายหลังจากนี้อ้างชื่อคนอื่นไม่ได้
         // PIN ที่แอดมินตั้งให้ยังไม่ผูก เพราะคนอื่นก็รู้ค่า ใช้ยืนยันว่าเป็นเจ้าตัวไม่ได้
         if (! $cashier->must_change_pin) {
@@ -163,7 +181,7 @@ class PosApiController extends Controller
         return response()->json([
             'success' => true,
             'must_change_pin' => (bool) $cashier->must_change_pin,
-            'offline_credential' => $this->offlineCredential($cashier, $data['pin'], $device),
+            'offline_credential' => $pin ? $this->offlineCredential($cashier, $pin, $device) : null,
             'cashier' => $this->cashierPayload($cashier),
         ]);
     }

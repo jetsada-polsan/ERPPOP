@@ -96,6 +96,19 @@ export async function loadOfflineCashiersByPin(pin: string, branchId?: number): 
   return matches
 }
 
+export async function loadOfflineCashiers(branchId?: number): Promise<Cashier[]> {
+  const conn = await connection()
+  const rows = await conn.select<Array<any>>(
+    `SELECT id, code, name, branch_id FROM offline_cashiers
+     WHERE active = 1 AND (branch_id IS NULL OR branch_id = ?) ORDER BY name, code`,
+    [branchId || null],
+  )
+  return rows.map((row) => ({
+    id: Number(row.id), code: row.code, name: row.name,
+    branch_id: row.branch_id == null ? undefined : Number(row.branch_id),
+  }))
+}
+
 export async function replaceProducts(products: Product[]) {
   const conn = await connection()
   const syncedAt = new Date().toISOString()

@@ -39,6 +39,7 @@ export async function connect(serverUrl: string, deviceToken: string): Promise<D
     branchId: result.branch_id,
     branchName: result.branch_name || '',
     vatRate: Number(result.vat_rate || 7),
+    cashierLoginMode: result.cashier_login_mode === 'selection' ? 'selection' : 'pin',
     company: result.company || {},
     receiptTemplate: result.receipt_template,
     hardwareProfile: result.hardware_profile,

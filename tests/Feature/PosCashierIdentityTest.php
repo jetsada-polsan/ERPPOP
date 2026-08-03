@@ -65,6 +65,26 @@ class PosCashierIdentityTest extends TestCase
         $this->assertSame($alice->code, $response->getData(true)['cashier']['code']);
     }
 
+    public function test_passwordless_mode_still_limits_cashier_selection_to_the_device_branch(): void
+    {
+        AppSetting::set('pos_passwordless_login', '1');
+        [$branch, $alice] = $this->branchWithCashier('NOPIN', 'ALICE');
+        $otherBranch = Branch::create(['code' => 'OTHER', 'name_th' => 'สาขาอื่น', 'is_active' => true]);
+        $otherCashier = Salesman::create(['branch_id' => $otherBranch->id, 'code' => 'OTHER-1', 'name' => 'คนอื่น', 'is_active' => true]);
+        $device = $this->device($branch, $alice);
+
+        $request = Request::create('/api/pos/cashier/login', 'POST', ['cashier_id' => $alice->id]);
+        $request->attributes->set('pos_device', $device);
+        $response = app(PosApiController::class)->cashierLogin($request);
+
+        $this->assertTrue($response->getData(true)['success']);
+        $this->assertSame($alice->id, (int) $device->fresh()->active_cashier_id);
+
+        $otherRequest = Request::create('/api/pos/cashier/login', 'POST', ['cashier_id' => $otherCashier->id]);
+        $otherRequest->attributes->set('pos_device', $device);
+        $this->assertSame(422, app(PosApiController::class)->cashierLogin($otherRequest)->getStatusCode());
+    }
+
     public function test_shared_pin_requires_cashier_selection_and_then_binds_the_selected_cashier(): void
     {
         [$branch, $alice] = $this->branchWithCashier('DUPPIN', 'ALICE');

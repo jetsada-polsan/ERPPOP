@@ -4,7 +4,7 @@ import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, CircleHelp, Cloud,
 import { check } from '@tauri-apps/plugin-updater'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { api, connect, setServerUrl } from './lib/api'
-import { closeLocalDb, enqueue, loadOfflineCashiersByPin, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceOfflineCashiers, replaceProducts, replacePromotions, saleHistory, saveOfflineCredential, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth } from './lib/db'
+import { closeLocalDb, enqueue, loadOfflineCashiers, loadOfflineCashiersByPin, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceOfflineCashiers, replaceProducts, replacePromotions, saleHistory, saveOfflineCredential, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth } from './lib/db'
 import { productAtSaleTime } from './lib/catalog'
 import { priceCart } from './lib/pricing'
 import { syncCheckoutQueue } from './lib/sync'
@@ -209,6 +209,7 @@ async function syncAll() {
       branchId: serverProfile.branch_id || profile.value.branchId,
       branchName: serverProfile.branch_name || profile.value.branchName,
       vatRate: Number(serverProfile.vat_rate || profile.value.vatRate),
+      cashierLoginMode: serverProfile.cashier_login_mode === 'selection' ? 'selection' : 'pin',
       company: serverProfile.company || profile.value.company,
       receiptTemplate: serverProfile.receipt_template || profile.value.receiptTemplate,
       hardwareProfile: serverProfile.hardware_profile || profile.value.hardwareProfile,
@@ -299,6 +300,15 @@ async function configure() {
 async function loginCashier() {
   busy.value = true
   try {
+    if (profile.value?.cashierLoginMode === 'selection') {
+      cashierChoices.value = navigator.onLine
+        ? await api.cashiers()
+        : await loadOfflineCashiers(profile.value.branchId)
+      if (!cashierChoices.value.length) throw new Error('ไม่พบรายชื่อพนักงานในเครื่องนี้ กรุณาเชื่อมต่ออินเทอร์เน็ตเพื่อซิงก์ข้อมูล')
+      offlineSelection.value = !navigator.onLine
+      modal.value = 'selectCashier'
+      return
+    }
     if (!navigator.onLine) {
       const matches = await loadOfflineCashiersByPin(cashierPin.value, profile.value?.branchId)
       if (!matches.length) {
@@ -343,7 +353,7 @@ async function selectCashier(next: Cashier) {
       flash('เข้าแคชเชียร์แบบออฟไลน์แล้ว')
       return
     }
-    const result = await api.cashierLogin(cashierPin.value, next.id)
+    const result = await api.cashierLogin(profile.value?.cashierLoginMode === 'selection' ? '' : cashierPin.value, next.id)
     if (!result.cashier) throw new Error('ไม่พบข้อมูลแคชเชียร์')
     const authenticatedCashier: Cashier = { ...result.cashier, offline_credential: result.offline_credential }
     if (result.must_change_pin) {
@@ -746,9 +756,15 @@ onUnmounted(() => {
 
       <form v-else-if="modal === 'cashier'" class="modal compact" @submit.prevent="loginCashier">
         <div class="modal-head"><div><UserRound/><span><strong>เข้าใช้งานแคชเชียร์</strong><small>{{ profile?.branchName }}</small></span></div></div>
-        <label>PIN ของพนักงาน<input v-model="cashierPin" required autofocus type="password" inputmode="numeric" pattern="\d{4,20}" minlength="4" maxlength="20" autocomplete="current-password"></label>
-        <small class="setup-hint">เครื่องนี้ผูกสาขา {{ profile?.branchName }} แล้ว ระบบจะระบุผู้ใช้จาก PIN โดยอัตโนมัติ</small>
-        <button class="primary" :disabled="busy">เข้าใช้งาน</button>
+        <template v-if="profile?.cashierLoginMode === 'selection'">
+          <small class="setup-hint">เครื่องนี้ผูกสาขา {{ profile?.branchName }} แล้ว เลือกชื่อผู้ปฏิบัติงานเพื่อเริ่มขาย</small>
+          <button class="primary" :disabled="busy">เลือกชื่อพนักงาน</button>
+        </template>
+        <template v-else>
+          <label>PIN ของพนักงาน<input v-model="cashierPin" required autofocus type="password" inputmode="numeric" pattern="\d{4,20}" minlength="4" maxlength="20" autocomplete="current-password"></label>
+          <small class="setup-hint">เครื่องนี้ผูกสาขา {{ profile?.branchName }} แล้ว ระบบจะระบุผู้ใช้จาก PIN โดยอัตโนมัติ</small>
+          <button class="primary" :disabled="busy">เข้าใช้งาน</button>
+        </template>
       </form>
 
       <section v-else-if="modal === 'selectCashier'" class="modal compact">

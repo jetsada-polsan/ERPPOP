@@ -5,6 +5,7 @@ export interface DeviceProfile {
   branchId: number
   branchName: string
   vatRate: number
+  cashierLoginMode?: 'pin' | 'selection'
   company: { name?: string; tax_id?: string; address?: string; phone?: string; logo_url?: string }
   receiptTemplate?: ReceiptTemplate
   hardwareProfile?: HardwareProfile
