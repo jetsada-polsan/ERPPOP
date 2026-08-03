@@ -36,6 +36,7 @@ const search = ref('')
 const scanner = ref<HTMLInputElement | null>(null)
 const online = ref(navigator.onLine)
 const syncing = ref(false)
+const catalogSyncError = ref('')
 const pendingCount = ref(0)
 const error = ref('')
 const notice = ref('')
@@ -223,9 +224,11 @@ async function syncAll() {
     await replaceOfflineCashiers(freshCashiers)
     await syncCheckoutQueue(refreshQueue)
     await refreshQueue()
+    catalogSyncError.value = ''
     online.value = true
   } catch (e) {
     online.value = false
+    catalogSyncError.value = e instanceof Error ? e.message : String(e)
     showError(e)
   } finally { syncing.value = false }
 }
@@ -687,7 +690,7 @@ onUnmounted(() => {
             <div class="product-bottom"><span :class="{ low: product.stock_qty != null && product.stock_qty <= 5 }"><i></i>คงเหลือ {{ product.stock_qty == null ? '-' : product.stock_qty }}</span><b>฿{{ money(product.pos_price) }}</b></div>
           </button>
         </div>
-        <div v-else class="empty-state"><PackageSearch/><strong>ยังไม่มีข้อมูลสินค้าในเครื่อง</strong><span>ตั้งค่าเครื่องและเชื่อมต่ออินเทอร์เน็ตเพื่อดาวน์โหลดสินค้า</span></div>
+        <div v-else class="empty-state"><PackageSearch/><strong>ยังไม่มีข้อมูลสินค้าในเครื่อง</strong><span>{{ catalogSyncError || 'ตั้งค่าเครื่องและเชื่อมต่ออินเทอร์เน็ตเพื่อดาวน์โหลดสินค้า' }}</span><button type="button" class="empty-action" :disabled="syncing" @click="syncAll"><RefreshCw :class="{ spin: syncing }"/>{{ syncing ? 'กำลังโหลดสินค้า...' : 'โหลดสินค้าใหม่' }}</button></div>
       </div>
 
       <aside class="cart-panel">
