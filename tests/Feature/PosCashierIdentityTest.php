@@ -65,7 +65,7 @@ class PosCashierIdentityTest extends TestCase
         $this->assertSame($alice->code, $response->getData(true)['cashier']['code']);
     }
 
-    public function test_pin_only_login_rejects_a_duplicate_pin_in_the_same_branch(): void
+    public function test_shared_pin_requires_cashier_selection_and_then_binds_the_selected_cashier(): void
     {
         [$branch, $alice] = $this->branchWithCashier('DUPPIN', 'ALICE');
         $bob = Salesman::create([
@@ -83,10 +83,17 @@ class PosCashierIdentityTest extends TestCase
 
         $response = app(PosApiController::class)->cashierLogin($request);
 
-        $this->assertSame(422, $response->getStatusCode());
-        $this->assertStringContainsString('PIN', $response->getData(true)['message']);
+        $this->assertTrue($response->getData(true)['selection_required']);
+        $this->assertCount(2, $response->getData(true)['cashiers']);
         $this->assertSame(0, AuditLog::where('action', 'cashier_login')->count());
-        $this->assertNotSame($alice->id, $bob->id);
+
+        $selected = Request::create('/api/pos/cashier/login', 'POST', ['pin' => '482165', 'cashier_id' => $bob->id]);
+        $selected->attributes->set('pos_device', $device);
+        $selectedResponse = app(PosApiController::class)->cashierLogin($selected);
+
+        $this->assertTrue($selectedResponse->getData(true)['success']);
+        $this->assertSame($bob->id, (int) $selectedResponse->getData(true)['cashier']['id']);
+        $this->assertSame($bob->id, (int) $device->fresh()->active_cashier_id);
     }
 
     public function test_device_cannot_sell_under_another_cashier_after_pin_login(): void

@@ -75,7 +75,7 @@ export async function saveOfflineCredential(cashier: Cashier) {
 }
 
 /** หาเจ้าของ PIN ที่เคยยืนยันออนไลน์บนเครื่องนี้แล้ว โดยจำกัดคนของสาขาเครื่อง POS */
-export async function loadOfflineCashierByPin(pin: string, branchId?: number): Promise<Cashier | null> {
+export async function loadOfflineCashiersByPin(pin: string, branchId?: number): Promise<Cashier[]> {
   const conn = await connection()
   const rows = await conn.select<Array<any>>(
     `SELECT id, code, name, branch_id, credential FROM offline_cashiers
@@ -93,8 +93,7 @@ export async function loadOfflineCashierByPin(pin: string, branchId?: number): P
       })
     }
   }
-  if (matches.length > 1) throw new Error('PIN นี้ซ้ำในข้อมูลเครื่อง กรุณาเชื่อมต่ออินเทอร์เน็ตเพื่อให้ผู้ดูแลตั้ง PIN ใหม่')
-  return matches[0] || null
+  return matches
 }
 
 export async function replaceProducts(products: Product[]) {

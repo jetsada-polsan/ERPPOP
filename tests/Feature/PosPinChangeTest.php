@@ -108,6 +108,24 @@ class PosPinChangeTest extends TestCase
         $this->assertNull($second->fresh()->pos_pin_hash);
     }
 
+    public function test_shared_pin_command_sets_a_temporary_pin_for_active_cashiers(): void
+    {
+        [$first] = $this->cashierWithDevice('SHARED');
+        $second = Salesman::create([
+            'branch_id' => $first->branch_id,
+            'code' => 'C-SHARED-2',
+            'name' => 'แคชเชียร์ ร่วม',
+            'is_active' => true,
+        ]);
+
+        $this->artisan('pos:shared-pin', ['pin' => '1234', '--branch' => 'SHARED'])
+            ->assertSuccessful();
+
+        $this->assertTrue(Hash::check('1234', $first->fresh()->pos_pin_hash));
+        $this->assertTrue(Hash::check('1234', $second->fresh()->pos_pin_hash));
+        $this->assertFalse($first->fresh()->must_change_pin);
+    }
+
     /** @return array{Salesman,PosDevice} */
     private function cashierWithDevice(string $code): array
     {

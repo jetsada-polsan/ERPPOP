@@ -4,8 +4,7 @@ import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, CircleHelp, Cloud,
 import { check } from '@tauri-apps/plugin-updater'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { api, connect, setServerUrl } from './lib/api'
-import { closeLocalDb, enqueue, loadOfflineCashierByPin, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceOfflineCashiers, replaceProducts, replacePromotions, saleHistory, saveOfflineCredential, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth } from './lib/db'
-import { verifyOfflinePin } from './lib/offline-auth'
+import { closeLocalDb, enqueue, loadOfflineCashiersByPin, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceOfflineCashiers, replaceProducts, replacePromotions, saleHistory, saveOfflineCredential, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth } from './lib/db'
 import { productAtSaleTime } from './lib/catalog'
 import { priceCart } from './lib/pricing'
 import { syncCheckoutQueue } from './lib/sync'
@@ -41,11 +40,13 @@ const pendingCount = ref(0)
 const error = ref('')
 const notice = ref('')
 const busy = ref(false)
-const modal = ref<'cashier' | 'changePin' | 'shift' | 'closeShift' | 'payment' | 'settings' | 'holdBill' | 'heldBills' | 'history' | 'guide' | null>(null)
+const modal = ref<'cashier' | 'selectCashier' | 'changePin' | 'shift' | 'closeShift' | 'payment' | 'settings' | 'holdBill' | 'heldBills' | 'history' | 'guide' | null>(null)
 const setupUrl = ref('http://27.254.143.219')
 const setupToken = ref('')
 const cashierPin = ref('')
 const pendingCashier = ref<Cashier | null>(null)
+const cashierChoices = ref<Cashier[]>([])
+const offlineSelection = ref(false)
 const newPin = ref('')
 const confirmPin = ref('')
 const openingCash = ref(0)
@@ -299,16 +300,29 @@ async function loginCashier() {
   busy.value = true
   try {
     if (!navigator.onLine) {
-      const cached = await loadOfflineCashierByPin(cashierPin.value, profile.value?.branchId)
-      if (!cached?.offline_credential || !(await verifyOfflinePin(cashierPin.value, cached.offline_credential))) {
+      const matches = await loadOfflineCashiersByPin(cashierPin.value, profile.value?.branchId)
+      if (!matches.length) {
         throw new Error('ออฟไลน์: ไม่พบแคชเชียร์หรือ PIN หมดอายุ ต้องเชื่อมต่ออินเทอร์เน็ตเพื่อล็อกอินใหม่')
       }
-      await startCashierSession(cached)
+      if (matches.length > 1) {
+        cashierChoices.value = matches
+        offlineSelection.value = true
+        modal.value = 'selectCashier'
+        return
+      }
+      await startCashierSession(matches[0])
       flash('เข้าแคชเชียร์แบบออฟไลน์แล้ว')
       return
     }
 
     const result = await api.cashierLogin(cashierPin.value)
+    if (result.selection_required) {
+      cashierChoices.value = result.cashiers || []
+      offlineSelection.value = false
+      modal.value = 'selectCashier'
+      return
+    }
+    if (!result.cashier) throw new Error('ไม่พบข้อมูลแคชเชียร์')
     const authenticatedCashier: Cashier = { ...result.cashier, offline_credential: result.offline_credential }
     if (!result.must_change_pin) await saveOfflineCredential(authenticatedCashier)
     // PIN ที่แอดมินตั้งให้ยังไม่ถือว่าเป็นความลับ ต้องเปลี่ยนก่อนจึงจะเริ่มขายได้
@@ -317,6 +331,27 @@ async function loginCashier() {
       modal.value = 'changePin'
       return
     }
+    await startCashierSession(authenticatedCashier)
+  } catch (e) { showError(e) } finally { busy.value = false }
+}
+
+async function selectCashier(next: Cashier) {
+  busy.value = true
+  try {
+    if (offlineSelection.value) {
+      await startCashierSession(next)
+      flash('เข้าแคชเชียร์แบบออฟไลน์แล้ว')
+      return
+    }
+    const result = await api.cashierLogin(cashierPin.value, next.id)
+    if (!result.cashier) throw new Error('ไม่พบข้อมูลแคชเชียร์')
+    const authenticatedCashier: Cashier = { ...result.cashier, offline_credential: result.offline_credential }
+    if (result.must_change_pin) {
+      pendingCashier.value = authenticatedCashier
+      modal.value = 'changePin'
+      return
+    }
+    await saveOfflineCredential(authenticatedCashier)
     await startCashierSession(authenticatedCashier)
   } catch (e) { showError(e) } finally { busy.value = false }
 }
@@ -330,6 +365,7 @@ async function changePin() {
     if (!code) throw new Error('ไม่พบข้อมูลแคชเชียร์ กรุณาล็อกอินใหม่')
     await api.changeCashierPin(code, cashierPin.value, newPin.value)
     const result = await api.cashierLogin(newPin.value)
+    if (!result.cashier) throw new Error('ไม่พบข้อมูลแคชเชียร์')
     const authenticatedCashier: Cashier = { ...result.cashier, offline_credential: result.offline_credential }
     await saveOfflineCredential(authenticatedCashier)
     newPin.value = ''
@@ -714,6 +750,16 @@ onUnmounted(() => {
         <small class="setup-hint">เครื่องนี้ผูกสาขา {{ profile?.branchName }} แล้ว ระบบจะระบุผู้ใช้จาก PIN โดยอัตโนมัติ</small>
         <button class="primary" :disabled="busy">เข้าใช้งาน</button>
       </form>
+
+      <section v-else-if="modal === 'selectCashier'" class="modal compact">
+        <div class="modal-head"><div><UserRound/><span><strong>เลือกชื่อพนักงาน</strong><small>PIN เริ่มต้นนี้ใช้ร่วมกัน กรุณาเลือกชื่อผู้ปฏิบัติงานจริง</small></span></div></div>
+        <div class="held-list">
+          <button v-for="choice in cashierChoices" :key="choice.id" type="button" :disabled="busy" @click="selectCashier(choice)">
+            <span><strong>{{ choice.name }}</strong><small>{{ choice.code }}</small></span><ChevronRight/>
+          </button>
+        </div>
+        <button type="button" class="secondary" :disabled="busy" @click="modal = 'cashier'">กลับไปใส่ PIN</button>
+      </section>
 
       <form v-else-if="modal === 'changePin'" class="modal compact" @submit.prevent="changePin">
         <div class="modal-head"><div><UserRound/><span><strong>ตั้ง PIN ของคุณเอง</strong><small>PIN ที่ได้รับมาเป็นค่าเริ่มต้น ต้องเปลี่ยนก่อนเริ่มขาย</small></span></div></div>

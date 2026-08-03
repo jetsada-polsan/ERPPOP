@@ -108,6 +108,7 @@ class PosApiController extends Controller
         $data = $request->validate([
             // code ยังรับได้เพื่อรองรับ POS รุ่นเก่า แต่ desktop รุ่นใหม่ใช้ PIN อย่างเดียว
             'code' => ['nullable', 'string', 'max:40'],
+            'cashier_id' => ['nullable', 'integer'],
             'pin' => ['required', 'string', 'regex:/^\d{4,20}$/'],
         ]);
 
@@ -119,11 +120,23 @@ class PosApiController extends Controller
             ->filter(fn (Salesman $candidate) => Hash::check($data['pin'], $candidate->pos_pin_hash))
             ->values();
 
-        if ($matches->count() !== 1) {
+        if ($matches->isEmpty()) {
             // ห้ามบอกว่า PIN ตรงกับใครหรือมีรหัสใดในสาขา เพื่อไม่ให้เดา credential ได้
-            return response()->json(['success' => false, 'message' => 'PIN ไม่ถูกต้อง หรือ PIN นี้ซ้ำในสาขา กรุณาให้ผู้ดูแลระบบตั้ง PIN ใหม่'], 422);
+            return response()->json(['success' => false, 'message' => 'PIN ไม่ถูกต้อง'], 422);
         }
-        $cashier = $matches->first();
+        if ($matches->count() > 1 && ! isset($data['cashier_id'])) {
+            // โหมดเริ่มต้นที่ใช้ PIN กลาง เช่น 1234: ยังต้องเลือกชื่อเพื่อเก็บ audit/ยอดขายรายคน
+            return response()->json([
+                'success' => true,
+                'selection_required' => true,
+                'cashiers' => $matches->map(fn (Salesman $candidate) => $this->cashierPayload($candidate))->values(),
+            ]);
+        }
+        $cashier = $matches->firstWhere('id', (int) ($data['cashier_id'] ?? 0));
+        $cashier ??= $matches->count() === 1 ? $matches->first() : null;
+        if (! $cashier) {
+            return response()->json(['success' => false, 'message' => 'กรุณาเลือกชื่อพนักงานใหม่'], 422);
+        }
 
         // ผูกผลการยืนยันไว้กับเครื่อง เพื่อให้คำสั่งขายหลังจากนี้อ้างชื่อคนอื่นไม่ได้
         // PIN ที่แอดมินตั้งให้ยังไม่ผูก เพราะคนอื่นก็รู้ค่า ใช้ยืนยันว่าเป็นเจ้าตัวไม่ได้
@@ -151,15 +164,20 @@ class PosApiController extends Controller
             'success' => true,
             'must_change_pin' => (bool) $cashier->must_change_pin,
             'offline_credential' => $this->offlineCredential($cashier, $data['pin'], $device),
-            'cashier' => [
-                'id' => $cashier->id,
-                'code' => $cashier->code,
-                'name' => $cashier->name,
-                'branch_id' => $cashier->branch_id,
-                'user_id' => $cashier->user_id,
-                'user_name' => $cashier->user?->name,
-            ],
+            'cashier' => $this->cashierPayload($cashier),
         ]);
+    }
+
+    private function cashierPayload(Salesman $cashier): array
+    {
+        return [
+            'id' => $cashier->id,
+            'code' => $cashier->code,
+            'name' => $cashier->name,
+            'branch_id' => $cashier->branch_id,
+            'user_id' => $cashier->user_id,
+            'user_name' => $cashier->user?->name,
+        ];
     }
 
     /** แคชเชียร์ที่มีสิทธิ์ใช้บนเครื่องนี้: คนสาขาเดียวกันและคนส่วนกลาง */
