@@ -1,4 +1,5 @@
 import Database from '@tauri-apps/plugin-sql'
+import { verifyOfflinePin } from './offline-auth'
 import type { Cashier, DeviceProfile, LocalSaleHistory, Product, QtyPromotion, QueueItem, Shift } from './types'
 
 let db: Database | null = null
@@ -73,20 +74,27 @@ export async function saveOfflineCredential(cashier: Cashier) {
   await conn.execute('UPDATE offline_cashiers SET credential = ?, active = 1 WHERE id = ?', [JSON.stringify(cashier.offline_credential), cashier.id])
 }
 
-export async function loadOfflineCashier(code: string): Promise<Cashier | null> {
+/** หาเจ้าของ PIN ที่เคยยืนยันออนไลน์บนเครื่องนี้แล้ว โดยจำกัดคนของสาขาเครื่อง POS */
+export async function loadOfflineCashierByPin(pin: string, branchId?: number): Promise<Cashier | null> {
   const conn = await connection()
   const rows = await conn.select<Array<any>>(
-    'SELECT id, code, name, branch_id, credential FROM offline_cashiers WHERE code = ? AND active = 1 LIMIT 1',
-    [code],
+    `SELECT id, code, name, branch_id, credential FROM offline_cashiers
+     WHERE active = 1 AND credential IS NOT NULL AND (branch_id IS NULL OR branch_id = ?)`,
+    [branchId || null],
   )
-  if (!rows[0]) return null
-  return {
-    id: Number(rows[0].id),
-    code: rows[0].code,
-    name: rows[0].name,
-    branch_id: rows[0].branch_id == null ? undefined : Number(rows[0].branch_id),
-    offline_credential: rows[0].credential ? JSON.parse(rows[0].credential) : undefined,
+  const matches: Cashier[] = []
+  for (const row of rows) {
+    const credential = JSON.parse(row.credential)
+    if (await verifyOfflinePin(pin, credential)) {
+      matches.push({
+        id: Number(row.id), code: row.code, name: row.name,
+        branch_id: row.branch_id == null ? undefined : Number(row.branch_id),
+        offline_credential: credential,
+      })
+    }
   }
+  if (matches.length > 1) throw new Error('PIN นี้ซ้ำในข้อมูลเครื่อง กรุณาเชื่อมต่ออินเทอร์เน็ตเพื่อให้ผู้ดูแลตั้ง PIN ใหม่')
+  return matches[0] || null
 }
 
 export async function replaceProducts(products: Product[]) {

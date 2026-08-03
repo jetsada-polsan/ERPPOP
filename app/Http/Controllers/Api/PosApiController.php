@@ -106,29 +106,24 @@ class PosApiController extends Controller
     public function cashierLogin(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'code' => ['required', 'string', 'max:40'],
-            'pin' => ['required', 'string', 'min:4', 'max:20'],
+            // code ยังรับได้เพื่อรองรับ POS รุ่นเก่า แต่ desktop รุ่นใหม่ใช้ PIN อย่างเดียว
+            'code' => ['nullable', 'string', 'max:40'],
+            'pin' => ['required', 'string', 'regex:/^\d{4,20}$/'],
         ]);
 
         $device = $request->attributes->get('pos_device');
         $branchId = $device?->branch_id ?: $request->user()?->branch_id;
-        $cashier = Salesman::query()
-            ->where('code', $data['code'])
-            ->where('is_active', true)
-            ->when($branchId, fn ($query) => $query->where(fn ($w) => $w
-                ->whereNull('branch_id')
-                ->orWhere('branch_id', $branchId)))
-            ->first();
+        $matches = $this->cashierCandidates($branchId, $data['code'] ?? null)
+            ->whereNotNull('pos_pin_hash')
+            ->get()
+            ->filter(fn (Salesman $candidate) => Hash::check($data['pin'], $candidate->pos_pin_hash))
+            ->values();
 
-        if (! $cashier) {
-            return response()->json(['success' => false, 'message' => 'ไม่พบแคชเชียร์ในสาขานี้'], 422);
+        if ($matches->count() !== 1) {
+            // ห้ามบอกว่า PIN ตรงกับใครหรือมีรหัสใดในสาขา เพื่อไม่ให้เดา credential ได้
+            return response()->json(['success' => false, 'message' => 'PIN ไม่ถูกต้อง หรือ PIN นี้ซ้ำในสาขา กรุณาให้ผู้ดูแลระบบตั้ง PIN ใหม่'], 422);
         }
-        if (! $cashier->pos_pin_hash) {
-            return response()->json(['success' => false, 'message' => 'แคชเชียร์นี้ยังไม่ได้ตั้ง PIN POS'], 422);
-        }
-        if (! Hash::check($data['pin'], $cashier->pos_pin_hash)) {
-            return response()->json(['success' => false, 'message' => 'PIN ไม่ถูกต้อง'], 422);
-        }
+        $cashier = $matches->first();
 
         // ผูกผลการยืนยันไว้กับเครื่อง เพื่อให้คำสั่งขายหลังจากนี้อ้างชื่อคนอื่นไม่ได้
         // PIN ที่แอดมินตั้งให้ยังไม่ผูก เพราะคนอื่นก็รู้ค่า ใช้ยืนยันว่าเป็นเจ้าตัวไม่ได้
@@ -167,6 +162,33 @@ class PosApiController extends Controller
         ]);
     }
 
+    /** แคชเชียร์ที่มีสิทธิ์ใช้บนเครื่องนี้: คนสาขาเดียวกันและคนส่วนกลาง */
+    private function cashierCandidates(?int $branchId, ?string $code = null)
+    {
+        return Salesman::query()
+            ->with('user:id,name,username')
+            ->where('is_active', true)
+            ->when($code, fn ($query) => $query->where('code', $code))
+            ->when($branchId, fn ($query) => $query->where(fn ($w) => $w
+                ->whereNull('branch_id')
+                ->orWhere('branch_id', $branchId)));
+    }
+
+    /** PIN ของคนส่วนกลางต้องไม่ซ้ำทุกสาขา; คนประจำสาขาห้ามซ้ำกับคนสาขาเดียวกัน/ส่วนกลาง */
+    private function pinIsAvailable(Salesman $cashier, string $pin): bool
+    {
+        $candidates = Salesman::query()
+            ->where('is_active', true)
+            ->whereNotNull('pos_pin_hash')
+            ->whereKeyNot($cashier->id)
+            ->when($cashier->branch_id, fn ($query) => $query->where(fn ($w) => $w
+                ->whereNull('branch_id')
+                ->orWhere('branch_id', $cashier->branch_id)))
+            ->get();
+
+        return ! $candidates->contains(fn (Salesman $candidate) => Hash::check($pin, $candidate->pos_pin_hash));
+    }
+
     /**
      * Credential สำหรับตรวจ PIN บนเครื่อง POS ตอนออฟไลน์
      * สร้างหลังจาก PIN ผ่าน Hash::check แล้วเท่านั้น และผูกกับ device/cashier
@@ -202,16 +224,13 @@ class PosApiController extends Controller
 
         $device = $request->attributes->get('pos_device');
         $branchId = $device?->branch_id ?: $request->user()?->branch_id;
-        $cashier = Salesman::query()
-            ->where('code', $data['code'])
-            ->where('is_active', true)
-            ->when($branchId, fn ($query) => $query->where(fn ($w) => $w
-                ->whereNull('branch_id')
-                ->orWhere('branch_id', $branchId)))
-            ->first();
+        $cashier = $this->cashierCandidates($branchId, $data['code'])->first();
 
         if (! $cashier || ! $cashier->pos_pin_hash || ! Hash::check($data['current_pin'], $cashier->pos_pin_hash)) {
             return response()->json(['success' => false, 'message' => 'รหัสแคชเชียร์หรือ PIN ปัจจุบันไม่ถูกต้อง'], 422);
+        }
+        if (! $this->pinIsAvailable($cashier, $data['new_pin'])) {
+            return response()->json(['success' => false, 'message' => 'PIN นี้ถูกใช้ในสาขาแล้ว กรุณาเลือก PIN ใหม่'], 422);
         }
 
         $cashier->setPin($data['new_pin'], false);

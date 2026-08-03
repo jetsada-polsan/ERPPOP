@@ -89,6 +89,25 @@ class PosPinChangeTest extends TestCase
         $this->assertNull($cashier->fresh()->pos_pin_hash);
     }
 
+    public function test_admin_cannot_assign_a_pin_already_used_in_the_branch(): void
+    {
+        [$first] = $this->cashierWithDevice('DUPLICATE');
+        $this->artisan('pos:pin', ['salesman' => $first->code, 'pin' => '482165', '--permanent' => true])
+            ->assertSuccessful();
+
+        $second = Salesman::create([
+            'branch_id' => $first->branch_id,
+            'code' => 'C-DUPLICATE-2',
+            'name' => 'แคชเชียร์ ซ้ำ',
+            'is_active' => true,
+        ]);
+
+        $this->artisan('pos:pin', ['salesman' => $second->code, 'pin' => '482165'])
+            ->assertFailed();
+
+        $this->assertNull($second->fresh()->pos_pin_hash);
+    }
+
     /** @return array{Salesman,PosDevice} */
     private function cashierWithDevice(string $code): array
     {

@@ -4,7 +4,7 @@ import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, CircleHelp, Cloud,
 import { check } from '@tauri-apps/plugin-updater'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { api, connect, setServerUrl } from './lib/api'
-import { closeLocalDb, enqueue, loadOfflineCashier, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceOfflineCashiers, replaceProducts, replacePromotions, saleHistory, saveOfflineCredential, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth } from './lib/db'
+import { closeLocalDb, enqueue, loadOfflineCashierByPin, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceOfflineCashiers, replaceProducts, replacePromotions, saleHistory, saveOfflineCredential, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth } from './lib/db'
 import { verifyOfflinePin } from './lib/offline-auth'
 import { productAtSaleTime } from './lib/catalog'
 import { priceCart } from './lib/pricing'
@@ -44,8 +44,8 @@ const busy = ref(false)
 const modal = ref<'cashier' | 'changePin' | 'shift' | 'closeShift' | 'payment' | 'settings' | 'holdBill' | 'heldBills' | 'history' | 'guide' | null>(null)
 const setupUrl = ref('http://27.254.143.219')
 const setupToken = ref('')
-const cashierCode = ref('')
 const cashierPin = ref('')
+const pendingCashier = ref<Cashier | null>(null)
 const newPin = ref('')
 const confirmPin = ref('')
 const openingCash = ref(0)
@@ -298,9 +298,8 @@ async function configure() {
 async function loginCashier() {
   busy.value = true
   try {
-    const code = cashierCode.value.trim()
     if (!navigator.onLine) {
-      const cached = await loadOfflineCashier(code)
+      const cached = await loadOfflineCashierByPin(cashierPin.value, profile.value?.branchId)
       if (!cached?.offline_credential || !(await verifyOfflinePin(cashierPin.value, cached.offline_credential))) {
         throw new Error('ออฟไลน์: ไม่พบแคชเชียร์หรือ PIN หมดอายุ ต้องเชื่อมต่ออินเทอร์เน็ตเพื่อล็อกอินใหม่')
       }
@@ -309,11 +308,12 @@ async function loginCashier() {
       return
     }
 
-    const result = await api.cashierLogin(code, cashierPin.value)
+    const result = await api.cashierLogin(cashierPin.value)
     const authenticatedCashier: Cashier = { ...result.cashier, offline_credential: result.offline_credential }
     if (!result.must_change_pin) await saveOfflineCredential(authenticatedCashier)
     // PIN ที่แอดมินตั้งให้ยังไม่ถือว่าเป็นความลับ ต้องเปลี่ยนก่อนจึงจะเริ่มขายได้
     if (result.must_change_pin) {
+      pendingCashier.value = authenticatedCashier
       modal.value = 'changePin'
       return
     }
@@ -326,13 +326,15 @@ async function changePin() {
   if (newPin.value === cashierPin.value) { showError('PIN ใหม่ต้องไม่ซ้ำกับ PIN เดิม'); return }
   busy.value = true
   try {
-    const code = cashierCode.value.trim()
+    const code = pendingCashier.value?.code
+    if (!code) throw new Error('ไม่พบข้อมูลแคชเชียร์ กรุณาล็อกอินใหม่')
     await api.changeCashierPin(code, cashierPin.value, newPin.value)
-    const result = await api.cashierLogin(code, newPin.value)
+    const result = await api.cashierLogin(newPin.value)
     const authenticatedCashier: Cashier = { ...result.cashier, offline_credential: result.offline_credential }
     await saveOfflineCredential(authenticatedCashier)
     newPin.value = ''
     confirmPin.value = ''
+    pendingCashier.value = null
     await startCashierSession(authenticatedCashier)
     flash('เปลี่ยน PIN เรียบร้อย')
   } catch (e) { showError(e) } finally { busy.value = false }
@@ -708,8 +710,8 @@ onUnmounted(() => {
 
       <form v-else-if="modal === 'cashier'" class="modal compact" @submit.prevent="loginCashier">
         <div class="modal-head"><div><UserRound/><span><strong>เข้าใช้งานแคชเชียร์</strong><small>{{ profile?.branchName }}</small></span></div></div>
-        <label>รหัสพนักงาน<input v-model="cashierCode" required autofocus autocomplete="username"></label>
-        <label>PIN<input v-model="cashierPin" required type="password" inputmode="numeric" minlength="4" autocomplete="current-password"></label>
+        <label>PIN ของพนักงาน<input v-model="cashierPin" required autofocus type="password" inputmode="numeric" pattern="\d{4,20}" minlength="4" maxlength="20" autocomplete="current-password"></label>
+        <small class="setup-hint">เครื่องนี้ผูกสาขา {{ profile?.branchName }} แล้ว ระบบจะระบุผู้ใช้จาก PIN โดยอัตโนมัติ</small>
         <button class="primary" :disabled="busy">เข้าใช้งาน</button>
       </form>
 

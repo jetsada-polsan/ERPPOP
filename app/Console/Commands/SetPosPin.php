@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Salesman;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Hash;
 
 class SetPosPin extends Command
 {
@@ -27,6 +28,21 @@ class SetPosPin extends Command
 
         if (! $salesman) {
             $this->error('ไม่พบพนักงานขาย/แคชเชียร์');
+            return self::FAILURE;
+        }
+
+        $conflicts = Salesman::query()
+            ->where('is_active', true)
+            ->whereNotNull('pos_pin_hash')
+            ->whereKeyNot($salesman->id)
+            ->when($salesman->branch_id, fn ($query) => $query->where(fn ($w) => $w
+                ->whereNull('branch_id')
+                ->orWhere('branch_id', $salesman->branch_id)))
+            ->get()
+            ->contains(fn (Salesman $candidate) => Hash::check($pin, $candidate->pos_pin_hash));
+
+        if ($conflicts) {
+            $this->error('PIN นี้ถูกใช้ในสาขาแล้ว กรุณาเลือก PIN ใหม่');
             return self::FAILURE;
         }
 

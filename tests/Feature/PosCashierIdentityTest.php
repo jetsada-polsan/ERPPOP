@@ -50,6 +50,45 @@ class PosCashierIdentityTest extends TestCase
         $this->assertSame($device->id, $audit->new_values['device_id']);
     }
 
+    public function test_pin_only_login_identifies_the_single_cashier_on_the_device_branch(): void
+    {
+        [$branch, $alice] = $this->branchWithCashier('PINONLY', 'ALICE');
+        $alice->forceFill(['pos_pin_hash' => Hash::make('482165')])->save();
+        $device = $this->device($branch, $alice);
+
+        $request = Request::create('/api/pos/cashier/login', 'POST', ['pin' => '482165']);
+        $request->attributes->set('pos_device', $device);
+
+        $response = app(PosApiController::class)->cashierLogin($request);
+
+        $this->assertTrue($response->getData(true)['success']);
+        $this->assertSame($alice->code, $response->getData(true)['cashier']['code']);
+    }
+
+    public function test_pin_only_login_rejects_a_duplicate_pin_in_the_same_branch(): void
+    {
+        [$branch, $alice] = $this->branchWithCashier('DUPPIN', 'ALICE');
+        $bob = Salesman::create([
+            'branch_id' => $branch->id,
+            'code' => 'BOB-DUPPIN',
+            'name' => 'แคชเชียร์ บ๊อบ',
+            'is_active' => true,
+            'pos_pin_hash' => Hash::make('482165'),
+        ]);
+        $alice->forceFill(['pos_pin_hash' => Hash::make('482165')])->save();
+        $device = $this->device($branch, $alice);
+
+        $request = Request::create('/api/pos/cashier/login', 'POST', ['pin' => '482165']);
+        $request->attributes->set('pos_device', $device);
+
+        $response = app(PosApiController::class)->cashierLogin($request);
+
+        $this->assertSame(422, $response->getStatusCode());
+        $this->assertStringContainsString('PIN', $response->getData(true)['message']);
+        $this->assertSame(0, AuditLog::where('action', 'cashier_login')->count());
+        $this->assertNotSame($alice->id, $bob->id);
+    }
+
     public function test_device_cannot_sell_under_another_cashier_after_pin_login(): void
     {
         [$branch, $alice, $user] = $this->branchWithCashier('SPOOF', 'ALICE');
