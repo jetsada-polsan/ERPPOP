@@ -296,6 +296,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .guide-grid span { margin-top: 6px; color: #5f7180; font-size: 11px; line-height: 1.55; }
 .guide-footer { margin-top: 12px; padding: 11px 12px; border-left: 4px solid var(--primary); background: #edf7fa; color: #526a76; font-size: 11px; line-height: 1.55; }
 .setup-hint { display: block; margin-top: 5px; color: #72828d; font-size: 10px; line-height: 1.45; }
+.setup-error { margin: 8px 0 0; padding: 8px 10px; border-radius: 8px; background: #fdecec; color: #a32020; font-size: 11px; line-height: 1.5; }
 .modal input, .modal textarea { width: 100%; padding: 11px 12px; border: 1px solid #cad6de; border-radius: 6px; outline: 0; resize: vertical; color: var(--ink); }
 .modal input:focus, .modal textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(8, 127, 168, .1); }
 .primary { width: 100%; height: 48px; margin-top: 19px; border: 0; border-radius: 6px; background: var(--primary); color: #fff; font-weight: 850; }

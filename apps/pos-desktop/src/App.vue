@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, CircleHelp, Cloud, CloudOff, CreditCard, FileText, FolderOpen, History, LogOut, Minus, PackageSearch, PauseCircle, Plus, Printer, QrCode, ReceiptText, RefreshCw, ScanLine, Search, Settings, ShoppingCart, Trash2, UserRound, Wifi, X } from 'lucide-vue-next'
 import { check } from '@tauri-apps/plugin-updater'
 import { invoke, isTauri } from '@tauri-apps/api/core'
-import { api, connect, setServerUrl } from './lib/api'
+import { api, connect, PosUnreachableError, setServerUrl } from './lib/api'
 import { closeLocalDb, enqueue, loadOfflineCashiers, loadOfflineCashiersByPin, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceOfflineCashiers, replaceProducts, replacePromotions, saleHistory, saveOfflineCredential, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth } from './lib/db'
 import { productAtSaleTime } from './lib/catalog'
 import { priceCart } from './lib/pricing'
@@ -26,6 +26,8 @@ const DEFAULT_RECEIPT_TEMPLATE: ReceiptTemplate = {
   ],
 }
 
+const BRANCH_NOT_LINKED = 'เครื่องนี้ยังไม่ได้ผูกสาขาใน ERP — ให้ผู้ดูแลกำหนดสาขาให้บัญชีของเครื่อง แล้วออก Token ใหม่'
+
 const profile = ref<DeviceProfile | null>(null)
 const products = ref<Product[]>([])
 const promotions = ref<QtyPromotion[]>([])
@@ -44,6 +46,7 @@ const busy = ref(false)
 const modal = ref<'cashier' | 'selectCashier' | 'changePin' | 'shift' | 'closeShift' | 'payment' | 'settings' | 'holdBill' | 'heldBills' | 'history' | 'guide' | null>(null)
 const setupUrl = ref('http://27.254.143.219')
 const setupToken = ref('')
+const setupError = ref('')   // ค้างไว้จนกว่าจะลองเชื่อมใหม่ ต่างจาก toast ที่หายใน 6 วิ
 const cashierPin = ref('')
 const pendingCashier = ref<Cashier | null>(null)
 const cashierChoices = ref<Cashier[]>([])
@@ -83,7 +86,9 @@ const storageReady = computed(() => !isTauri() || storageStatus.value?.location 
 const connectionLabel = computed(() => {
   if (!profile.value) return 'ยังไม่เชื่อม ERP'
   if (syncing.value) return 'กำลังซิงก์'
-  return online.value ? 'ออนไลน์' : 'เชื่อม ERP ไม่ได้'
+  if (!online.value) return 'เชื่อม ERP ไม่ได้'
+  // ERP ตอบ ping แล้ว แต่ดึง/บันทึกข้อมูลไม่ครบ — คนละปัญหากับเน็ตหลุด
+  return catalogSyncError.value ? 'ซิงก์ข้อมูลไม่ครบ' : 'ออนไลน์'
 })
 const connectionClass = computed(() => profile.value && online.value ? 'online' : 'offline')
 const pricing = computed(() => priceCart(cart.value, promotions.value, profile.value?.vatRate || 7))
@@ -119,7 +124,8 @@ const receiptVat = computed(() => {
 function money(value: number) { return new Intl.NumberFormat('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value) }
 function printLastReceipt() { window.print() }
 function flash(message: string) { notice.value = message; window.setTimeout(() => { notice.value = '' }, 3500) }
-function showError(value: unknown) { error.value = value instanceof Error ? value.message : String(value); window.setTimeout(() => { error.value = '' }, 6000) }
+function errorText(value: unknown) { return value instanceof Error ? value.message : String(value) }
+function showError(value: unknown) { error.value = errorText(value); window.setTimeout(() => { error.value = '' }, 6000) }
 function receiptBlockClasses(block: ReceiptBlock) { return [`align-${block.align}`, `size-${block.size}`, { 'is-bold': block.bold }] }
 function paymentName(method: PaymentMethod) { return ({ cash: 'เงินสด', transfer: 'โอน/QR', credit_card: 'บัตรเครดิต', cheque: 'เช็ค', mixed: 'เงินสด+โอน' })[method] }
 function historyStatus(status: LocalSaleHistory['status']) { return ({ pending: 'รอส่ง', syncing: 'กำลังส่ง', synced: 'ส่งแล้ว', failed: 'ส่งไม่สำเร็จ' })[status] }
@@ -208,7 +214,18 @@ async function syncAll() {
   if (!profile.value || !navigator.onLine || syncing.value) return
   syncing.value = true
   try {
-    const serverProfile = await api.ping()
+    // ขั้นที่ 1 — ping คือตัวชี้ขาดว่า "เชื่อม ERP ได้ไหม" อย่างเดียว
+    let serverProfile: any
+    try {
+      serverProfile = await api.ping()
+      online.value = true
+    } catch (e) {
+      online.value = false
+      catalogSyncError.value = errorText(e)
+      showError(e)
+      return
+    }
+
     profile.value = {
       ...profile.value,
       deviceName: serverProfile.device?.name || profile.value.deviceName,
@@ -222,20 +239,29 @@ async function syncAll() {
       hardwareProfile: serverProfile.hardware_profile || profile.value.hardwareProfile,
     }
     await saveProfile(profile.value)
-    const [fresh, freshPromotions, freshCashiers] = await Promise.all([api.products(profile.value.branchId), api.promotions(profile.value.branchId), api.cashiers()])
-    products.value = fresh
-    promotions.value = freshPromotions
-    await replaceProducts(fresh)
-    await replacePromotions(freshPromotions)
-    await replaceOfflineCashiers(freshCashiers)
-    await syncCheckoutQueue(refreshQueue)
-    await refreshQueue()
-    catalogSyncError.value = ''
-    online.value = true
-  } catch (e) {
-    online.value = false
-    catalogSyncError.value = e instanceof Error ? e.message : String(e)
-    showError(e)
+    if (!profile.value.branchId) {
+      // เปิดกะ/ดึงบิลพักต้องใช้ branch_id ถ้าไม่มีจะพังทีหลังแบบงง ๆ จึงบอกตั้งแต่ตอนนี้
+      catalogSyncError.value = BRANCH_NOT_LINKED
+      showError(BRANCH_NOT_LINKED)
+      return
+    }
+
+    // ขั้นที่ 2 — ดึงและบันทึกข้อมูลลงเครื่อง ล้มที่นี่ไม่ใช่ "เชื่อม ERP ไม่ได้"
+    try {
+      const [fresh, freshPromotions, freshCashiers] = await Promise.all([api.products(profile.value.branchId), api.promotions(profile.value.branchId), api.cashiers()])
+      products.value = fresh
+      promotions.value = freshPromotions
+      await replaceProducts(fresh)
+      await replacePromotions(freshPromotions)
+      await replaceOfflineCashiers(freshCashiers)
+      await syncCheckoutQueue(refreshQueue)
+      await refreshQueue()
+      catalogSyncError.value = ''
+    } catch (e) {
+      if (e instanceof PosUnreachableError) online.value = false
+      catalogSyncError.value = errorText(e)
+      showError(`ซิงก์ข้อมูลไม่สำเร็จ: ${errorText(e)}`)
+    }
   } finally { syncing.value = false }
 }
 
@@ -297,13 +323,22 @@ async function restoreLocalDb() {
 
 async function configure() {
   busy.value = true
+  setupError.value = ''
   try {
     const connected = await connect(setupUrl.value, setupToken.value.trim())
+    setupUrl.value = connected.serverUrl
     profile.value = connected
     await saveProfile(connected)
+    if (!connected.branchId) {
+      // ยังอยู่หน้าตั้งค่า จะได้เห็นข้อความและเรียกผู้ดูแลได้ทันที ไม่หลุดไปพังตอนเปิดกะ
+      catalogSyncError.value = BRANCH_NOT_LINKED
+      setupError.value = BRANCH_NOT_LINKED
+      showError(BRANCH_NOT_LINKED)
+      return
+    }
     modal.value = 'cashier'
     await syncAll()
-  } catch (e) { showError(e) } finally { busy.value = false }
+  } catch (e) { setupError.value = errorText(e); showError(e) } finally { busy.value = false }
 }
 
 async function loginCashier() {
@@ -741,8 +776,9 @@ onUnmounted(() => {
       </section>
       <form v-if="modal === 'settings'" class="modal" @submit.prevent="configure">
         <div class="modal-head"><div><Settings/><span><strong>ตั้งค่าเครื่อง POS</strong><small>เชื่อมเครื่องนี้กับ ERP เพียงครั้งแรก</small></span></div><button v-if="profile" type="button" @click="modal = null"><X/></button></div>
-        <label>ที่อยู่เซิร์ฟเวอร์<input v-model="setupUrl" required placeholder="https://erp.example.com"></label>
-        <small class="setup-hint">ใช้ URL เดิมของ ERP ทุกเครื่อง แนะนำ HTTPS เมื่อใช้งานจริง</small>
+        <label>ที่อยู่เซิร์ฟเวอร์<input v-model="setupUrl" required placeholder="http://27.254.143.219"></label>
+        <small class="setup-hint">ใส่ที่อยู่ตามที่ผู้ดูแลระบบแจ้งเท่านั้น (ปัจจุบันคือ http://27.254.143.219) — แอปรุ่นนี้อนุญาตให้ต่อได้เฉพาะที่อยู่นั้น ยังไม่เปิด HTTPS</small>
+        <p v-if="setupError" class="setup-error">{{ setupError }}</p>
         <label>Device Token<textarea v-model="setupToken" required rows="3" placeholder="วาง Token จาก ERP > ตั้งค่า > ดาวน์โหลด POS"></textarea></label>
         <small class="setup-hint">Token ใช้ผูกเครื่องกับสาขา ไม่ควรนำไปใส่ใน GitHub หรือส่งต่อให้พนักงาน</small>
         <button class="primary" :disabled="busy">{{ busy ? 'กำลังตรวจสอบ...' : 'เชื่อมต่อเครื่อง' }}</button>
