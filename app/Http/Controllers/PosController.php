@@ -28,6 +28,7 @@ use App\Models\StockBalance;
 use App\Models\StockDocument;
 use App\Services\Accounting\GlPostingService;
 use App\Services\Inventory\FifoStockService;
+use App\Services\Accounting\CashBookPostingService;
 use App\Services\Sales\CashSaleService;
 use App\Services\Sales\MemberPointService;
 use App\Services\Sales\PosPaymentValidator;
@@ -509,8 +510,11 @@ class PosController extends Controller
         return response()->json(['success' => true, 'shift' => $this->shiftPayload($shift)]);
     }
 
-    public function closeShift(Request $request): JsonResponse
+    public function closeShift(Request $request, ?CashBookPostingService $cashBook = null): JsonResponse
     {
+        // ปล่อยให้ resolve เองได้ เหมือน products() — เทสต์เดิมเรียก action ตรง ๆ ด้วยอาร์กิวเมนต์เดียว
+        $cashBook ??= app(CashBookPostingService::class);
+
         $data = $request->validate([
             'shift_id' => ['required', 'integer', 'exists:pos_shifts,id'],
             'counted_cash' => ['required', 'numeric', 'min:0'],
@@ -544,6 +548,9 @@ class PosController extends Controller
             'status' => 'closed',
             'closing_note' => $data['closing_note'] ?? null,
         ]);
+
+        // เงินสดของกะเข้าสมุดเงินสดตอนนี้ครั้งเดียว (idempotent ตาม shift id) — กดปิดซ้ำไม่ลงซ้ำ
+        $cashBook->postShiftClose($shift->fresh(), (float) $totals['cash'], round($countedCash - $expectedCash, 2));
 
         return response()->json([
             'success' => true,
@@ -919,6 +926,8 @@ class PosController extends Controller
                     'remark' => implode(' | ', $remarkParts),
                     'items' => $data['items'],
                     'allow_negative_stock' => (bool) ($data['allow_negative_stock'] ?? false),
+                    // เงินสดของบิลนี้เข้าสมุดเงินสดตอนปิดกะ ไม่ใช่ตอนนี้ — กันนับเงินซ้ำ
+                    'source' => 'pos',
                 ]);
 
                 $receipt = $this->recordPosReceipt($shift, $this->nextPosReceiptNo($shift), $data, $document->id);

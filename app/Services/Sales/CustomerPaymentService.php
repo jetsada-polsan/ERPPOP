@@ -8,6 +8,7 @@ use App\Models\DocumentType;
 use App\Models\PaymentAllocation;
 use App\Models\PaymentDocument;
 use App\Models\PaymentLine;
+use App\Services\Accounting\CashBookPostingService;
 use App\Services\Accounting\GlPostingService;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -24,6 +25,7 @@ class CustomerPaymentService
     public function __construct(
         private readonly DocumentNumberGenerator $numbers,
         private readonly GlPostingService $glPosting,
+        private readonly CashBookPostingService $cashBook,
     ) {}
 
     /**
@@ -117,6 +119,10 @@ class CustomerPaymentService
             }
 
             $this->glPosting->postCustomerReceipt($paymentDocument, (float) $totalAmount, $document->doc_date->toDateString(), $document->doc_number);
+
+            if ($data['method'] === 'cash') {
+                $this->cashBook->postCustomerPayment($document, (float) $totalAmount);
+            }
 
             return $document->fresh();
         });

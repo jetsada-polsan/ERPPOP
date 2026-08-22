@@ -13,6 +13,7 @@ class BranchExpenseService
     public function __construct(
         private readonly DocumentNumberGenerator $numbers,
         private readonly GlPostingService $posting,
+        private readonly CashBookPostingService $cashBook,
     ) {}
 
     public function create(array $data): BranchExpense
@@ -51,6 +52,17 @@ class BranchExpenseService
                 $withholding,
                 $data['payment_method'],
             );
+
+            if (($data['payment_method'] ?? null) === 'cash') {
+                // จ่ายจริงคือยอดหลังหักภาษี ณ ที่จ่าย เงินสดที่ออกจากลิ้นชักจึงเป็นยอดนี้
+                $this->cashBook->postExpense(
+                    $expense->id,
+                    (int) $data['branch_id'],
+                    (string) $data['expense_date'],
+                    'ค่าใช้จ่ายเงินสด '.$document->doc_number,
+                    round($total - $withholding, 2),
+                );
+            }
 
             return $expense->fresh(['document', 'branch', 'expenseAccount']);
         });

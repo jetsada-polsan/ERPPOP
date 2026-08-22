@@ -6,6 +6,8 @@ use App\Models\ApprovalRequest;
 use App\Models\BankAccount;
 use App\Models\Branch;
 use App\Models\CashBook;
+use App\Models\User;
+use App\Services\Accounting\CashBookPostingService;
 use App\Models\PosPreparationJob;
 use App\Models\PosReceipt;
 use App\Models\PosTerminal;
@@ -23,6 +25,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class BplusOperationController extends Controller
@@ -194,28 +197,52 @@ class BplusOperationController extends Controller
     public function finance(): View
     {
         return view('bplus-ops.finance', [
-            'cashBooks' => CashBook::with('branch')->orderByDesc('entry_date')->paginate(40),
+            'cashBooks' => CashBook::with('branch')->orderByDesc('entry_date')->orderByDesc('id')->paginate(40),
             'bankAccounts' => BankAccount::orderBy('bank_name')->get(),
             'branches' => Branch::orderBy('code')->get(),
+            // ผู้อนุมัติรายการปรับเงินสด = คนที่ถือสิทธิ์การเงินจริงเท่านั้น
+            'approvers' => User::where('is_active', true)
+                ->whereHas('roles.permissions', fn ($query) => $query->where('code', 'finance.manage'))
+                ->orderBy('name')
+                ->get(['id', 'name']),
         ]);
     }
 
-    public function storeCashBook(Request $request): RedirectResponse
+    /**
+     * กรอกสมุดเงินสดด้วยมือได้เฉพาะรายการ "ปรับปรุง" เท่านั้น
+     * รายการปกติ (ขาย ปิดกะ รับชำระ ค่าใช้จ่าย) ต้องมาจาก CashBookPostingService อัตโนมัติ
+     * เพื่อไม่ให้สมุดเงินสดกับยอดขายแยกกันเดิน
+     */
+    public function storeCashBook(Request $request, CashBookPostingService $cashBook): RedirectResponse
     {
+        if (! auth()->user()?->hasPermission('finance.manage')) {
+            abort(403, 'ไม่มีสิทธิ์ปรับปรุงสมุดเงินสด');
+        }
+
         $data = $request->validate([
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
             'entry_date' => ['required', 'date'],
-            'description' => ['nullable', 'string', 'max:2000'],
-            'debit' => ['nullable', 'numeric', 'min:0'],
-            'credit' => ['nullable', 'numeric', 'min:0'],
-            'balance' => ['nullable', 'numeric'],
+            'description' => ['required', 'string', 'max:2000'],
+            'cash_in' => ['nullable', 'numeric', 'min:0'],
+            'cash_out' => ['nullable', 'numeric', 'min:0'],
+            // ปรับเงินสดต้องบอกเหตุผลและใครอนุมัติเสมอ
+            'reason' => ['required', 'string', 'max:255'],
+            'approved_by' => ['required', 'integer', 'exists:users,id'],
         ]);
-        $data['debit'] = $data['debit'] ?? 0;
-        $data['credit'] = $data['credit'] ?? 0;
-        $data['balance'] = $data['balance'] ?? ($data['debit'] - $data['credit']);
-        CashBook::create($data);
 
-        return redirect()->route('bplus.finance')->with('success', 'บันทึกสมุดเงินสดแล้ว');
+        $cashBook->post([
+            'branch_id' => $data['branch_id'] ?? null,
+            'entry_date' => $data['entry_date'],
+            'description' => $data['description'],
+            'cash_in' => (float) ($data['cash_in'] ?? 0),
+            'cash_out' => (float) ($data['cash_out'] ?? 0),
+            'source_type' => CashBookPostingService::SOURCE_ADJUSTMENT,
+            'source_key' => CashBookPostingService::SOURCE_ADJUSTMENT.':'.Str::uuid()->toString(),
+            'reason' => $data['reason'],
+            'approved_by' => $data['approved_by'],
+        ]);
+
+        return redirect()->route('bplus.finance')->with('success', 'บันทึกรายการปรับปรุงสมุดเงินสดแล้ว');
     }
 
     public function tax(): View

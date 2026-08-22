@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
 use App\Services\Accounting\GlPostingService;
+use App\Services\Accounting\CashBookPostingService;
 use App\Services\Inventory\CostingService;
 use App\Services\Inventory\FifoStockService;
 use App\Support\DecimalMath;
@@ -27,6 +28,7 @@ class CashSaleService
         private readonly GlPostingService $glPosting,
         private readonly FifoStockService $fifo,
         private readonly CostingService $costing,
+        private readonly CashBookPostingService $cashBook,
     ) {}
 
     /**
@@ -102,6 +104,12 @@ class CashSaleService
             }
 
             $this->glPosting->postCashSale($document);
+
+            // บิล POS ลงสมุดเงินสดตอน "ปิดกะ" ครั้งเดียว (ตอนนั้นเงินถูกนับจริง)
+            // ถ้าลงที่นี่ด้วยจะกลายเป็นนับเงินสดซ้ำ เพราะทุกบิล POS สร้างเอกสารขายสดผูกไว้
+            if (($data['source'] ?? null) !== 'pos') {
+                $this->cashBook->postCashSale($document, (float) $document->total_amount);
+            }
 
             return $document->fresh();
         });
