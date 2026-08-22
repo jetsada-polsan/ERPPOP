@@ -49,6 +49,14 @@
 - ข้อมูล POS เก็บที่ไดรฟ์ `D:` เมื่อมีไดรฟ์ พร้อม backup, restore และ integrity check.
 - POS ต้องได้รับ Device Token ที่ผูกเครื่อง/สาขา จึงเรียก `/api/pos/ping` และซิงก์ได้.
 - API POS ใช้ `Authorization: Bearer <Device Token>`; URL มาตรฐานคือ `http://27.254.143.219`.
+- **production ไม่ได้เปิด HTTPS** (port 443 ปิดสนิท) อย่าแนะนำ `https://` ในคู่มือหรือหน้าตั้งค่า.
+- แอป POS ถูกล็อกให้ต่อได้เฉพาะ `27.254.143.219` ผ่าน Tauri http scope
+  (`src-tauri/capabilities/default.json`) และ CSP ใน `tauri.conf.json` — ถ้าย้าย host หรือ
+  เปิดโดเมนใหม่ ต้องแก้สองไฟล์นั้นแล้ว build ใหม่ ไม่ใช่แค่พิมพ์ URL ใหม่ในหน้าตั้งค่า.
+- `/api/pos/ping` คืน `branch_id` ของ **อุปกรณ์** ก่อนของ user เสมอ ให้ตรงกับ
+  `PosController::enforcedBranchId()` ที่ `/products`, `/shift`, `/checkout` ใช้จริง.
+- สถานะ "เชื่อม ERP ไม่ได้" บนหน้าจอ POS ตัดสินจากผล `ping` เท่านั้น ความล้มเหลวหลังจากนั้น
+  (โหลดสินค้า/เขียน SQLite/ส่งคิว) ขึ้นเป็น "ซิงก์ข้อมูลไม่ครบ" อย่าเอาสองอย่างนี้มารวมกันอีก.
 - ก่อนมี Token Windows อาจต่ออินเทอร์เน็ตได้ แต่ยังไม่ถือว่าเชื่อม ERP สำเร็จ.
 - POS ต้องเขียนบิลลง SQLite ก่อนพิมพ์ แล้วค่อยส่ง `checkout_queue` เมื่อออนไลน์ โดยใช้ idempotency key.
 - ข้อมูลสินค้าไม่ขึ้นบน POS หมายถึง catalog sync ล้มเหลว; ให้ดูข้อความ error และกดโหลดสินค้าใหม่.
@@ -63,17 +71,24 @@
 
 ## สถานะ commit ล่าสุดที่ต้องรู้
 
+- `5b577fc` Add shared AI project memory and handoff protocol
+- `645b916` Stop blaming the network for POS sync failures
+- `1f296c2` Write the POS catalog in one transaction
+- `4f41b05` Clean up the ERP address entered on POS setup
+- `2b1dfa9` Report the device branch from the POS ping
 - `318b17b` Clarify POS ERP connection status
-- `acf748d` Show POS catalog sync status and retry
-- `9bbb56b` Hide Windows console for POS storage setup
-- `591c350` Support device-bound passwordless POS login
-- `d24c99d` Remove legacy POS import pipeline
+
+`2b1dfa9..645b916` ยัง **ไม่ได้ deploy** — ฝั่ง ERP ต้อง deploy `PosApiController` และฝั่ง POS
+ต้อง build 1.5.0 ผ่าน GitHub Actions ถึงจะมีผลกับสาขา (รายละเอียดใน `docs/ai/task.md`)
 
 ## ตรวจและปล่อยงาน
 
 - Laravel: `php artisan test`
 - Health: `php artisan erp:health`
 - POS ที่แก้ TypeScript: `cd apps/pos-desktop && ./node_modules/.bin/vue-tsc --noEmit`
+- `pnpm test` (vitest) **รันบน Mac เครื่องนี้ไม่ได้** — rollup native module คนละ Team ID กับ node
+  ที่ยืมมา ทดสอบ logic ล้วนๆ ชั่วคราวได้ด้วย node 24 ที่ strip type เอง (import ไฟล์ `.ts` ตรงๆ
+  ได้ถ้าโมดูลนั้นไม่ import ของ Tauri) แต่ต้องหาเครื่องรัน vitest ยืนยันอีกรอบ
 - เครื่อง Mac นี้อาจ build Tauri Windows ไม่ได้; ให้ GitHub Actions เป็นตัวตรวจ installer Windows.
 - ก่อน deploy: backup, dry-run, ตรวจ migration สำหรับ PostgreSQL และเช็ก production health หลัง deploy.
 
