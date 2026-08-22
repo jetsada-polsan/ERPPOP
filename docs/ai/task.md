@@ -1,131 +1,122 @@
-# Handoff — 2026-08-23 (Claude)
+# Handoff — 2026-08-23 รอบที่ 2 (Claude)
 
 ## Commit
 
 ```
-ce81e2b Give bookings a delivery due date of their own
-2af30a4 Track payables per invoice so AP can be aged
-dc2a853 Post the cash book from the documents that move cash
-dec1c48 Apply the agreed report ownership and access policy
-b4a0523 Quarantine the legacy POS import tables
+1ec1877 Prepare the legacy database analysis
+34c1a87 Correct and complete the shared inventory script
 ```
 
-ต่อจาก `058acba` — ทำตามคำตัดสินใจ 8 ข้อของเจ้าของโครงการ 2026-08-23
+ต่อจาก `b718a18` (Codex — Add read-only legacy schema inventory script)
 
-## ทำอะไรไป (เรียงตามข้อที่สั่ง)
+## สถานะงานวิเคราะห์ฐาน BPlus: **ติดบล็อก ยังอ่านฐานไม่ได้**
 
-### 1) ใบจองครบกำหนดส่ง — `ce81e2b`
+ไม่มีเครื่อง SQL Server ที่เข้าถึงได้เลย จึงยังไม่มี schema inventory จริง
+เอกสาร `docs/ai/legacy-popstar-2021-schema-inventory.md` บอกสถานะไว้ตรง ๆ ไม่ได้เดาข้อมูล
 
-เพิ่มใน `sale_bookings`: `fulfillment_type` (pickup/delivery), `delivery_due_at`,
-`delivered_at`, `delivery_status` (pending/partial/delivered/cancelled)
-
-- ใบจองแบบ delivery **ต้องมี `delivery_due_at`** ทั้งตอนสร้างและตอนยืนยันเป็นใบขาย
-  (กันสองชั้น: validation ที่ controller + guard ใน `BookingService` และ `CreditSaleService`)
-- ใบจองแบบ pickup ไม่ต้องมี และใบจองเดิมทั้งหมดถือเป็น pickup โดยอัตโนมัติ
-- **ไม่ได้แตะ `customer_open_items.due_date`** ตามที่สั่ง เพราะเป็นกำหนดชำระเงินคนละเรื่อง
-- หน้าใบจองมีช่องเลือกวิธีรับของ + กำหนดส่ง (บังคับเฉพาะเมื่อเลือกจัดส่ง)
-
-### 2) เจ้าหนี้คงค้างและ AP aging — `2af30a4`
-
-สร้าง `supplier_open_items` คู่ขนาน `customer_open_items` ครบทุกคอลัมน์ที่สั่ง
-(`supplier_id, source_document_id, document_no, document_date, due_date, original_amount,
-paid_amount, balance_amount, status, payment_terms, cleared_at`)
-
-- เปิดยอดอัตโนมัติเมื่อยืนยัน**ใบซื้อเชื่อ** (ซื้อเงินสดไม่เปิด)
-- ลดลงอัตโนมัติเมื่อ**จ่ายชำระเจ้าหนี้** ตัดใบเก่าก่อน (FIFO ตาม due_date → document_date → id)
-- `supplier_ledger` ยังเดินต่อเหมือนเดิมในฐานะสมุดเดินบัญชี **ไม่ได้ใช้คำนวณ aging**
-- รายงาน `ap.outstanding_detail` และ `ap.aging` **ยังเป็น `planned`** ตามที่สั่ง — เปิดไม่ได้จนกว่าจะมีข้อมูลจริง
-
-### 3) สมุดเงินสด auto-posting — `dc2a853`
-
-สร้าง `CashBookPostingService` เป็นทางเดินรายการเดียวของทั้งระบบ และสร้าง `cash_books` ใหม่
-(`cash_in`, `cash_out`, `running_balance`, `source_type`, `source_id`, `source_key`,
-`pos_terminal_id`, `pos_shift_id`, `reason`, `created_by`, `approved_by`, `approved_at`, timestamps)
-
-| แหล่ง | สถานะ |
+| เครื่อง | ทำไมใช้ไม่ได้ |
 |---|---|
-| ปิดกะ POS (ยอดขายเงินสด) + เงินสดขาด/เกิน (แยกบรรทัด) | ✅ ต่อแล้ว |
-| ขายสดหลังบ้านที่รับเงินสด | ✅ ต่อแล้ว |
-| รับชำระลูกหนี้ด้วยเงินสด | ✅ ต่อแล้ว |
-| ค่าใช้จ่ายเงินสด (ยอดหลังหัก ณ ที่จ่าย) | ✅ ต่อแล้ว |
-| ปรับเงินสด (กรอกมือ) | ✅ ต้องมี `finance.manage` + เหตุผล + ผู้อนุมัติ |
-| **ถอน/ฝากเงินสดเข้าธนาคาร** | ❌ **ยังไม่ต่อ** — ระบบยังไม่มีเอกสารฝาก/ถอน/โอนภายใน ต้องสร้างก่อน |
+| Mac เครื่องนี้ | Microsoft ไม่มี SQL Server สำหรับ macOS · ไม่มี Docker/Colima/Podman · มีแต่ `tsql` ซึ่งเป็น client |
+| Linux host `27.254.143.219` | ไม่มี SQL Server, ไม่มี container runtime, **RAM 1 GB** (SQL Server ต้องการ 2 GB ขั้นต่ำ) และเป็น production ของ ERP ใหม่ |
+| `192.168.88.200` | ห้ามแตะตามข้อกำหนด |
 
-- **idempotent** ด้วย `source_key` unique — ปิดกะซ้ำ/บิลถูก retry ก็ลงแถวเดียว (มีเทสต์)
-- `running_balance` คิดตอนบันทึกโดย **ล็อกแถวล่าสุดของสาขา** กันสองรายการอ่านยอดยกมาเดียวกัน
-- **เงินสดจาก POS ลงตอนปิดกะครั้งเดียว ไม่ลงตอนขายแต่ละบิล** เพราะทุกบิล POS สร้างเอกสารขายสดผูกไว้
-  ถ้าลงทั้งสองที่จะนับเงินซ้ำ — กับดักเดียวกับที่เจอในรายงานรอบก่อน (มีเทสต์คุมทั้งสองทาง)
-- สมุดเงินสดยังเป็น `planned` จนกว่า UAT กับยอดขายและปิดกะจะผ่าน
+**ต้องการ**: เครื่อง Windows หรือ Linux ที่มี **SQL Server 2017 ขึ้นไป** (จะเป็น Developer Edition ฟรีก็ได้)
+RAM 4 GB+ ดิสก์ว่าง 10 GB+
 
-### 4) ธนาคาร/รับชำระ/ลูกหนี้ — คงสถานะ `planned` ตามสั่ง ไม่ได้แตะ ไม่ได้ import อะไรกลับ
+## สิ่งที่ทำได้แล้วโดยไม่ต้องแนบฐาน
 
-### 5) ตาราง staging POS เก่า — `b4a0523`
+### 1. เวอร์ชันที่เครื่องปลายทางต้องเป็น (ข้อที่ brief สั่งให้ตรวจก่อน attach)
 
-**ไม่ลบ** ตามสั่ง — เขียน `docs/architecture/LEGACY_POS_IMPORT_QUARANTINE.md` บันทึกว่าเลิกใช้แล้ว
-และเพิ่ม `LegacyPosImportQuarantineTest` ที่จะ**แดงทันที**ถ้ามีไฟล์ใน `app/`, `routes/`, `resources/views/`
-อ้างถึง `import_batches`, `import_files`, `import_errors`, `imported_receipts`,
-`imported_receipt_items`, `imported_payments` (migration ยกเว้น เพราะเป็นประวัติการสร้างตาราง)
+อ่าน boot page ของ MDF โดยตรง (page 9, offset `0x12000`) โดย **สตรีมแค่ 128 KB แรก
+ออกจาก ZIP ไม่ได้คลายไฟล์ 3.87 GB ลงดิสก์**
 
-### 6) สิทธิ์และสาขา — `dec1c48`
+| หัวข้อ | ค่า |
+|---|---|
+| ชื่อฐานในไฟล์ | `BPLUSERP_POPSTAR_2021` |
+| page type ที่อ่านได้ | 13 = boot page (ยืนยันว่าอ่านตำแหน่งถูก) |
+| internal version ที่เขียนล่าสุด | **869 = SQL Server 2017** |
+| internal version ตอนสร้าง | 661 = SQL Server 2008 R2 |
+| **เครื่องปลายทางต้องเป็น** | **SQL Server 2017 (major 14) ขึ้นไป** |
 
-| Role | view | export | all_branches |
-|---|---|---|---|
-| GM, IT_MGR, ACC_MGR, EXECUTIVE | ✅ | ✅ | ✅ |
-| ACC (พนักงานบัญชี) | ✅ | ✅ | ❌ ถอนออกตามสั่ง |
-| BRANCH_MGR, PURCHASING | ✅ | ✅ | ❌ |
-| MARKETING | ✅ | ❌ | ❌ (และไม่มี finance.manage) |
-| CASHIER, DELIVERY | ❌ | ❌ | ❌ |
+### 2. ZIP มีมากกว่าที่ brief ระบุ
 
-ผู้ใช้ที่ไม่มีสาขาและไม่มี `reports.all_branches` → กรองด้วยสาขาที่ไม่มีอยู่จริง ได้ผลลัพธ์ว่าง
-พร้อมข้อความบอกวิธีแก้ (มีเทสต์)
+brief พูดถึง 2 ไฟล์ แต่ในนั้นมี **12 ไฟล์ 6 ฐานข้อมูล รวม 23 GB**
+มี `BPLUSERP_POPSTAR_2021BK` (10 GB + log 2.58 GB), `POPSTAR_FOOD_TRADING_2023` (4.48 GB),
+`POPSTAR_64/65/66` ซึ่งไม่อยู่ในขอบเขตงาน
 
-> ⚠️ **เจอบั๊กของตัวเองตอนเขียนเทสต์**: เดิมผมใช้ `'0'` เป็นค่าสาขาสำหรับผู้ใช้ที่ไม่มีสาขา
-> แต่ `applyBranch()` เช็คด้วย `empty()` ซึ่งมองว่า `'0'` คือ "ไม่กรอง" → ผู้ใช้เห็นทุกสาขาแทนที่จะไม่เห็นอะไรเลย
-> เปลี่ยนเป็น `-1` แล้ว เทสต์จับได้ก่อนขึ้น production
+⚠️ **แตกทั้ง ZIP ต้องใช้ 23 GB แต่ Mac เหลือ 18 GB** — ให้แตกเฉพาะ 2 ไฟล์ที่ต้องใช้:
+`unzip <zip> "BusinessData/Data/BPLUSERP_POPSTAR_2021*"` (~3.9 GB)
 
-### 7) Owner และความถี่ — `dec1c48`
+### 3. flow ↔ ตาราง จากหลักฐานจริง
 
-ใช้ **ตำแหน่งงาน** เป็น owner ตามสั่ง (ฝ่ายขาย / คลัง / การเงิน / บัญชี / ผู้จัดการสาขา / จัดซื้อ / ผู้บริหาร)
-ผู้บริหารแก้เองได้จากทะเบียนรายงาน
+`docs/ai/legacy-popstar-2021-report-mapping.md` — สร้างจาก **SQL ของรายงานเดิม 1,502 ตัว**
+ที่มีอยู่แล้วใน `docs/ai/legacy/reportfile-index.csv` (ดึงชื่อตารางจาก FROM/JOIN)
+ไม่ใช่การเดาจากชื่อตาราง แต่**ยังไม่ได้ยืนยันกับฐานจริง**
 
-- P0 = 41 รายงาน (เปิด 31, planned 10)
-- **P1/P2 = 29 รายงาน ถูกปิดตามนโยบาย** — definition ยังอยู่ครบ เปิดกลับได้คลิกเดียว
-  ที่ปิดไปรวมถึง `gross_margin`, กลุ่ม `loss_*`, `purchase_*`, `vat_sales`, `vat_purchase`,
-  `stock_movements`, `top_products` — **ถ้าฝ่ายบัญชีต้องใช้ VAT ตอนปิดเดือน ให้เปิดกลับก่อน**
-- รวม 87 รายการ เปิดอยู่ 48
+ช่องว่างที่เห็นแล้ว:
+- ❌ **`DEPTTAB` (แผนก) และ `PRJTAB`/`MKTPLAN` (โครงการ)** โผล่ในเกือบทุก flow ของรายงานเดิม
+  แปลว่าบริษัทเคยแบ่งยอดตามสองมิตินี้จริง **ERP ใหม่ไม่มีเลย**
+- ❌ `CASHACCOUNT` — บัญชีเงินสดหลายบัญชีต่อสาขา ของใหม่มีสมุดเดียวต่อสาขา
+- ⚠️ `CHEQUEIN`/`CHEQUEBOOK` (เช็ครับ/เช็คจ่าย) ของใหม่ยุบเป็น `cheques` ตารางเดียว
+- ⚠️ `ARCAMPAIGN` ตารางเดียว ของใหม่แตกเป็น 3 ตาราง
+- ❓ รายงาน POS 15 ตัว **ไม่มี SQL ในทะเบียนเลย** ตรรกะอยู่ใน `.rpt` ทั้งหมด
+
+## สคริปต์กลาง — ใช้ไฟล์เดียวกันทั้งสองฝั่ง
+
+ตามที่เจ้าของสั่ง ใช้ **`docs/legacy-schema-inventory.sql` ของ Codex เป็นไฟล์กลางไฟล์เดียว**
+ผมลบสคริปต์เก็บข้อมูลของตัวเองทิ้ง (เดิมอยู่ที่ `tools/legacy-analysis/02_*.sql`, `03_*.sql`)
+แล้วเอาส่วนที่ขาดไปเติมในไฟล์กลางแทน จะได้ไม่มีสองชุดให้ตัวเลขไม่ตรงกัน
+
+**ตรวจความปลอดภัยแล้ว**: ไฟล์ของ Codex เป็น SELECT ล้วนจริง ไม่มี INSERT/UPDATE/DELETE/
+MERGE/ALTER/DROP/CREATE/EXEC แม้แต่คำสั่งเดียว
+
+### บั๊กที่เจอและแก้ในไฟล์กลาง (`34c1a87`)
+
+**query แรกนับจำนวนแถวผิด** — เดิมทำ `SUM(p.rows)` ผ่าน join ไป `sys.allocation_units`
+ซึ่งคืน 1–3 แถวต่อ partition (IN_ROW_DATA / LOB_DATA / ROW_OVERFLOW_DATA)
+ตารางที่มีคอลัมน์ LOB จึงถูกนับแถว **คูณสองหรือสาม** — `REPORTFILE.RPF_SQL` เป็นตัวอย่างชัด
+และ BPlus มีตารางแบบนี้เยอะ
+
+แก้เป็นอ่าน `p.rows` จาก heap/clustered index อย่างเดียวและใช้เป็น GROUP BY key
+ส่วนขนาด (`total_mb`) ยังรวมทุก allocation unit เหมือนเดิมเพราะแต่ละหน่วยกินหน้าจริง
+
+> ถ้าไม่แก้ ตัวเลข "จำนวนแถวต่อตาราง" ที่เป็นข้อเท็จจริงข้อแรกที่เจ้าของอยากให้ตรงกัน
+> จะผิดทั้งสองฝั่งเหมือนกัน — ผิดตรงกันแต่ผิดทั้งคู่
+
+### ที่เติมเข้าไป
+
+index · trigger · function · การแบ่ง business/system/archive · `DOCTYPE` ·
+ปริมาณเอกสารรายปีแยกตามชนิด · ตารางตาม flow (พร้อมบอกว่าตัวไหน `missing`) ·
+คอลัมน์ `read_only_check` ที่จะขึ้น `STOP` ถ้าฐานยังไม่ถูกล็อก read-only
+
+**trigger สำคัญที่สุดในกลุ่มที่เติม** — BPlus ซ่อนกฎ posting ไว้ใน trigger
+ถ้าอ่านแต่ตารางจะ map ผลกระทบต่อสต๊อกและบัญชีของเอกสารผิด
 
 ## ทดสอบไปแล้วแค่ไหน
 
-- `php artisan test` → **158 passed / 1,998 assertions** (เดิม 143 เพิ่ม 15 เคส)
-- **PostgreSQL**: สร้างฐานทดสอบแยก `jeterp_migcheck` บน host → `migrate` ครบทุกตัว →
-  `migrate:rollback --step=4` ผ่าน → `migrate` ใหม่ผ่าน → **drop ฐานทดสอบทิ้งแล้ว**
-  ตรวจแล้วว่าฐาน `jeterp` ยังอยู่ที่ migration [88] ไม่ถูกแตะ
-- **SQLite**: `migrate:fresh` → `rollback --step=3` → `migrate` ผ่านครบ
-- **ตรวจหน้า `settings/reports` ด้วยตาแล้ว** — layout ปกติ, ตารางแยกตามหมวด, ปุ่ม toggle ทำงานจริง
-  (กดปิดแล้วนับลดจาก 48 → 47, ขึ้นข้อความยืนยัน, เขียน audit log ถูกต้อง แล้วเปิดกลับคืน)
-- แก้ header คอลัมน์ที่เขียนว่า "ลำดับ" ทั้งที่แสดง P0/P1/P2 → เปลี่ยนเป็น "ระดับ" จากการตรวจด้วยตาครั้งนี้
+- `php artisan test` → **158 passed / 1,998 assertions** (ไม่ได้แตะโค้ดแอป รอบนี้เป็นเอกสารกับสคริปต์ SQL)
+- ตรวจสคริปต์กลางด้วย grep ว่าไม่มีคำสั่งเขียนหลงเหลือ — เจอแต่บรรทัด comment
+- **ยังไม่ได้รันสคริปต์กับฐานจริงเลยสักครั้ง** เพราะไม่มี SQL Server
 
 ## ยังไม่ทดสอบ / ความเสี่ยง
 
-- **ฝาก/ถอน/โอนเงินสดเข้าธนาคารยังไม่ต่อเข้าสมุดเงินสด** เพราะระบบยังไม่มีเอกสารประเภทนั้น
-  ต้องสร้างเอกสารก่อน แล้วค่อยต่อ — ยังไม่ครบ 6 แหล่งตามที่สั่ง
-- ยังไม่มีข้อมูลจริงให้ UAT ทั้งเจ้าหนี้และสมุดเงินสด (`supplier_open_items`, `cash_books` = 0 แถว)
-  ทั้งคู่จึงยังเป็น `planned` — เทสต์ที่เขียนเป็นเทสต์ระบบ ไม่ใช่ UAT เทียบยอดจริง
-- migration `000146` **สร้างตาราง `cash_books` ใหม่** (มีตัวกันไม่ให้รันถ้ามีข้อมูล)
-  production ตอนตรวจมี 0 แถว **ต้องตรวจซ้ำก่อน deploy**
-- การปิดรายงาน P1/P2 29 ตัวเป็นการเปลี่ยนสิ่งที่ผู้ใช้เห็น — กลับได้คลิกเดียวแต่ควรบอกผู้ใช้ก่อน
-- ยังไม่ได้ตรวจ query plan ของ `whereNotExists` ในรายงานบน PostgreSQL ที่มีข้อมูลจริงเยอะ
+- **สคริปต์กลางยังไม่เคยรันจริง** — query 12 (`DOCINFO`) ใช้ชื่อคอลัมน์ `DI_REF_TYPE` / `DI_DATE`
+  ที่อ่านมาจาก SQL ของรายงานเดิม ถ้าชื่อจริงไม่ตรงจะ error ผมใส่ query 13 เป็น fallback
+  ให้ดึงชื่อคอลัมน์จริงของ `DOCINFO` ส่งกลับมาแก้
+- การแบ่ง business/system/archive ใช้ pattern ชื่อตาราง ต้องเอาผลจริงมาตรวจว่าจัดถูกไหม
+- flow map ทั้งหมดยังเป็นสมมติฐานจากรายงาน ยังไม่ยืนยันกับฐาน
+- เพิ่มกฎใน `.gitignore` กัน `*.mdf` `*.ldf` `*.bak` `*.zip` ขึ้น GitHub แล้ว
+  (เดิมไม่มีกฎพวกนี้เลย มีแต่ `*.bak`)
 
 ## Deploy
 
-**ยังไม่ deploy** — เขียนแผนไว้ที่ `docs/ai/deploy-plan-2026-08-23.md` ครบทั้ง
-รายการ migration, ขั้นตอน backup, แผน rollback รายตัวพร้อมบอกว่าย้อนแล้วเสียอะไร
-และเรื่องผู้ใช้ MARKETING ที่จะเห็นรายงานว่างเปล่า
+ไม่เกี่ยวกับ deploy — รอบนี้ไม่มีการแก้โค้ดแอป
+งาน deploy ที่ค้างอยู่ยังเป็นชุดเดิมตาม `docs/ai/deploy-plan-2026-08-23.md`
 
 ## งานถัดไป
 
-1. ตัดสินใจเรื่อง MARKETING (กำหนดสาขา หรือให้สิทธิ์) ก่อน deploy
-2. อนุมัติ deploy → รัน migration 5 ตัว + build POS 1.5.0
-3. สร้างเอกสารฝาก/ถอน/โอนเงินสดเข้าธนาคาร แล้วต่อเข้าสมุดเงินสดให้ครบ 6 แหล่ง
-4. เมื่อมีข้อมูลจริงแล้วจึงทำ UAT ตาม `docs/ai/uat/REPORT_UAT_TEMPLATE.md` ทีละรายงาน
-   ตัวไหนผ่านค่อยเปลี่ยน status เป็น `available` แล้วเปิดในทะเบียน
+1. **เจ้าของจัดเครื่อง SQL Server 2017+ ให้** แล้วบอกมาว่าเป็นเครื่องไหน
+2. แตกเฉพาะ 2 ไฟล์ → คัดลอกไปเครื่องนั้น → รัน `tools/legacy-analysis/01_attach_readonly.sql`
+3. รัน `docs/legacy-schema-inventory.sql` แล้วส่งผลกลับมาเป็น CSV/TXT
+4. ผมเติม `legacy-popstar-2021-schema-inventory.md` ให้ครบ และยืนยัน/แก้ flow map
+5. จากนั้นค่อยเสนอ mapping กับ P0/P1/P2 ที่อิงข้อเท็จจริงจริง ๆ (ตอนนี้เสนอไว้แล้วแต่ยังอิงรายงาน)
