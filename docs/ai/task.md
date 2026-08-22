@@ -5,7 +5,7 @@
 ```
 711d133 Put the report menu under executive control
 2da5222 Catalogue the first twenty reports
-833cffd
+e9a20a5 Record the report governance handoff
 ```
 
 ต่อจาก `8a7677f` (Define ERP report discovery and UAT scope)
