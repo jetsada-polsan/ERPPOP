@@ -1,11 +1,20 @@
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http'
 import { invoke } from '@tauri-apps/api/core'
+import { normalizeServerUrl } from './server-url'
 import type { Cashier, CheckoutPayload, DeviceProfile, HeldBill, Product, QtyPromotion, Shift } from './types'
 
 let baseUrl = ''
 
+/** ยิงไม่ถึง ERP เลย (เน็ตหลุด/URL ผิด/เครื่องบล็อก) ต่างจาก ERP ตอบกลับมาว่า error */
+export class PosUnreachableError extends Error {
+  constructor(message: string, readonly cause?: unknown) {
+    super(message)
+    this.name = 'PosUnreachableError'
+  }
+}
+
 export function setServerUrl(url: string) {
-  baseUrl = url.replace(/\/$/, '')
+  baseUrl = normalizeServerUrl(url)
 }
 
 async function token(): Promise<string> {
@@ -14,26 +23,35 @@ async function token(): Promise<string> {
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const secret = await token()
-  const response = await tauriFetch(`${baseUrl}/api/pos${path}`, {
-    ...init,
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${secret}`,
-      ...init.headers,
-    },
-  })
+  const endpoint = `${baseUrl}/api/pos${path}`
+  let response: Response
+  try {
+    response = await tauriFetch(endpoint, {
+      ...init,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${secret}`,
+        ...init.headers,
+      },
+    })
+  } catch (error) {
+    // แยกให้ชัดว่า "ติดต่อ ERP ไม่ได้" เพื่อให้หน้าจอไม่ไปโทษเน็ตตอนที่ ERP ตอบ error จริง ๆ
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new PosUnreachableError(`ติดต่อ ERP ที่ ${baseUrl} ไม่ได้ (${detail})`, error)
+  }
   const data = await response.json().catch(() => ({})) as Record<string, unknown>
   if (!response.ok) throw new Error(String(data.message || `HTTP ${response.status}`))
   return data as T
 }
 
 export async function connect(serverUrl: string, deviceToken: string): Promise<DeviceProfile> {
-  setServerUrl(serverUrl)
+  const normalized = normalizeServerUrl(serverUrl)
+  setServerUrl(normalized)
   await invoke('save_device_token', { token: deviceToken })
   const result = await request<any>('/ping')
   return {
-    serverUrl: serverUrl.replace(/\/$/, ''),
+    serverUrl: normalized,
     deviceName: result.device.name,
     terminalCode: result.device.terminal_code || '',
     branchId: result.branch_id,
