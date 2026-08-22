@@ -52,20 +52,38 @@ export async function loadSession(): Promise<{ cashier: Cashier | null; shift: S
   return rows[0] ? JSON.parse(rows[0].value) : { cashier: null, shift: null }
 }
 
+/**
+ * เขียนทับทั้งตารางแบบ all-or-nothing: ถ้าพังกลางคันต้องได้ข้อมูลชุดเดิมคืน
+ * ไม่ใช่ตารางว่าง (เคยทำให้เครื่องสาขาไม่มีสินค้าเลยหลังซิงก์สะดุด)
+ * และเร็วกว่าเดิมมากเพราะ commit ครั้งเดียวแทนหนึ่ง commit ต่อหนึ่งแถว
+ */
+async function inTransaction(conn: Database, work: () => Promise<void>) {
+  await conn.execute('BEGIN')
+  try {
+    await work()
+    await conn.execute('COMMIT')
+  } catch (error) {
+    await conn.execute('ROLLBACK').catch(() => undefined)
+    throw error
+  }
+}
+
 /** Cache public cashier data; credential is only written after a successful online PIN check. */
 export async function replaceOfflineCashiers(cashiers: Cashier[]) {
   const conn = await connection()
   const syncedAt = new Date().toISOString()
-  await conn.execute('UPDATE offline_cashiers SET active = 0, synced_at = ?', [syncedAt])
-  for (const cashier of cashiers) {
-    await conn.execute(
-      `INSERT INTO offline_cashiers (id, code, name, branch_id, credential, active, synced_at)
-       VALUES (?, ?, ?, ?, NULL, 1, ?)
-       ON CONFLICT(id) DO UPDATE SET code = excluded.code, name = excluded.name,
-       branch_id = excluded.branch_id, active = 1, synced_at = excluded.synced_at`,
-      [cashier.id, cashier.code, cashier.name, cashier.branch_id || null, syncedAt],
-    )
-  }
+  await inTransaction(conn, async () => {
+    await conn.execute('UPDATE offline_cashiers SET active = 0, synced_at = ?', [syncedAt])
+    for (const cashier of cashiers) {
+      await conn.execute(
+        `INSERT INTO offline_cashiers (id, code, name, branch_id, credential, active, synced_at)
+         VALUES (?, ?, ?, ?, NULL, 1, ?)
+         ON CONFLICT(id) DO UPDATE SET code = excluded.code, name = excluded.name,
+         branch_id = excluded.branch_id, active = 1, synced_at = excluded.synced_at`,
+        [cashier.id, cashier.code, cashier.name, cashier.branch_id || null, syncedAt],
+      )
+    }
+  })
 }
 
 export async function saveOfflineCredential(cashier: Cashier) {
@@ -112,10 +130,12 @@ export async function loadOfflineCashiers(branchId?: number): Promise<Cashier[]>
 export async function replaceProducts(products: Product[]) {
   const conn = await connection()
   const syncedAt = new Date().toISOString()
-  await conn.execute('DELETE FROM products')
-  for (const product of products) {
-    await conn.execute('INSERT INTO products (id, data, synced_at) VALUES (?, ?, ?)', [product.id, JSON.stringify(product), syncedAt])
-  }
+  await inTransaction(conn, async () => {
+    await conn.execute('DELETE FROM products')
+    for (const product of products) {
+      await conn.execute('INSERT INTO products (id, data, synced_at) VALUES (?, ?, ?)', [product.id, JSON.stringify(product), syncedAt])
+    }
+  })
 }
 
 export async function loadProducts(): Promise<Product[]> {
@@ -127,10 +147,12 @@ export async function loadProducts(): Promise<Product[]> {
 export async function replacePromotions(promotions: QtyPromotion[]) {
   const conn = await connection()
   const syncedAt = new Date().toISOString()
-  await conn.execute('DELETE FROM promotions')
-  for (const promotion of promotions) {
-    await conn.execute('INSERT INTO promotions (id, data, synced_at) VALUES (?, ?, ?)', [promotion.id, JSON.stringify(promotion), syncedAt])
-  }
+  await inTransaction(conn, async () => {
+    await conn.execute('DELETE FROM promotions')
+    for (const promotion of promotions) {
+      await conn.execute('INSERT INTO promotions (id, data, synced_at) VALUES (?, ?, ?)', [promotion.id, JSON.stringify(promotion), syncedAt])
+    }
+  })
 }
 
 export async function loadPromotions(): Promise<QtyPromotion[]> {
