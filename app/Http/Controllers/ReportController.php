@@ -1183,7 +1183,9 @@ class ReportController extends Controller
             ->leftJoin('product_categories as pc', 'pc.id', '=', 'p.product_category_id')
             ->leftJoin('users as u', 'u.id', '=', 'r.cashier_id')
             ->whereBetween('r.receipt_date', [$from, $to])
-            ->where('r.status', '!=', 'cancelled');
+            // บิลที่ยกเลิกใช้สถานะ 'void' ไม่ใช่ 'cancelled' — เทียบกับ 'cancelled' อย่างเดียว
+            // ทำให้บิลที่ถูกยกเลิกยังถูกนับเป็นยอดขาย. ที่อื่นทั้งระบบใช้ 'completed'
+            ->where('r.status', 'completed');
 
         $this->applyBranch($query, $filters, 't.branch_id');
         $this->applySearch($query, $filters, ['p.sku_code', 'p.name_th', 'pc.name_th', 'u.name']);
@@ -1216,7 +1218,16 @@ class ReportController extends Controller
             ->leftJoin('product_categories as pc', 'pc.id', '=', 'p.product_category_id')
             ->leftJoin('users as u', 'u.id', '=', 'd.sales_user_id')
             ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN'])
-            ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
+            // เอกสารที่ถูกยกเลิกไม่ใช่ยอดขาย — เดิมไม่กรองสถานะเลย บิลที่ void แล้วจึงยังโผล่
+            ->where('d.status', 'active')
+            ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()])
+            // ทุกบิล POS สร้างเอกสารขายสดผูกไว้เสมอ ถ้าไม่กันออกจะถูกนับซ้ำกับฝั่ง POS
+            // กติกาเดียวกับ view `sales_postings` ซึ่งเป็นบัญชีขายฉบับจริงของระบบ
+            ->whereNotExists(fn ($sub) => $sub
+                ->select(DB::raw(1))
+                ->from('pos_receipts as pr')
+                ->whereColumn('pr.document_id', 'd.id')
+                ->where('pr.status', 'completed'));
 
         $this->applyBranch($query, $filters, 'd.branch_id');
         $this->applySearch($query, $filters, ['d.doc_number', 'p.sku_code', 'p.name_th', 'pc.name_th', 'u.name']);
@@ -1397,7 +1408,16 @@ class ReportController extends Controller
             ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')
             ->leftJoin('salesmen as s', 's.id', '=', 'd.salesman_id')
             ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN'])
-            ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
+            // เอกสารที่ถูกยกเลิกไม่ใช่ยอดขาย — เดิมไม่กรองสถานะเลย บิลที่ void แล้วจึงยังโผล่
+            ->where('d.status', 'active')
+            ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()])
+            // ทุกบิล POS สร้างเอกสารขายสดผูกไว้เสมอ ถ้าไม่กันออกจะถูกนับซ้ำกับฝั่ง POS
+            // กติกาเดียวกับ view `sales_postings` ซึ่งเป็นบัญชีขายฉบับจริงของระบบ
+            ->whereNotExists(fn ($sub) => $sub
+                ->select(DB::raw(1))
+                ->from('pos_receipts as pr')
+                ->whereColumn('pr.document_id', 'd.id')
+                ->where('pr.status', 'completed'));
 
         $this->applyBranch($query, $filters, 'd.branch_id');
         $this->applySearch($query, $filters, ['d.doc_number', 'c.code', 'c.name_th', 's.name']);
@@ -1469,7 +1489,16 @@ class ReportController extends Controller
             ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
             ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')
             ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN'])
-            ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
+            // เอกสารที่ถูกยกเลิกไม่ใช่ยอดขาย — เดิมไม่กรองสถานะเลย บิลที่ void แล้วจึงยังโผล่
+            ->where('d.status', 'active')
+            ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()])
+            // ทุกบิล POS สร้างเอกสารขายสดผูกไว้เสมอ ถ้าไม่กันออกจะถูกนับซ้ำกับฝั่ง POS
+            // กติกาเดียวกับ view `sales_postings` ซึ่งเป็นบัญชีขายฉบับจริงของระบบ
+            ->whereNotExists(fn ($sub) => $sub
+                ->select(DB::raw(1))
+                ->from('pos_receipts as pr')
+                ->whereColumn('pr.document_id', 'd.id')
+                ->where('pr.status', 'completed'));
 
         $this->applyBranch($query, $filters, 'd.branch_id');
         $this->applySearch($query, $filters, ['c.code', 'c.name_th', 'd.doc_number']);
@@ -1501,7 +1530,16 @@ class ReportController extends Controller
             ->leftJoin('salesmen as s', 's.id', '=', 'd.salesman_id')
             ->leftJoin('product_categories as pc', 'pc.id', '=', 'p.product_category_id')
             ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN'])
-            ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
+            // เอกสารที่ถูกยกเลิกไม่ใช่ยอดขาย — เดิมไม่กรองสถานะเลย บิลที่ void แล้วจึงยังโผล่
+            ->where('d.status', 'active')
+            ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()])
+            // ทุกบิล POS สร้างเอกสารขายสดผูกไว้เสมอ ถ้าไม่กันออกจะถูกนับซ้ำกับฝั่ง POS
+            // กติกาเดียวกับ view `sales_postings` ซึ่งเป็นบัญชีขายฉบับจริงของระบบ
+            ->whereNotExists(fn ($sub) => $sub
+                ->select(DB::raw(1))
+                ->from('pos_receipts as pr')
+                ->whereColumn('pr.document_id', 'd.id')
+                ->where('pr.status', 'completed'));
 
         $this->applyBranch($query, $filters, 'd.branch_id');
         $this->applySearch($query, $filters, ['d.doc_number', 'c.code', 'c.name_th', 's.name', 'p.sku_code', 'p.name_th', 'pc.name_th']);
