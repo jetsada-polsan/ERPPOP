@@ -4,7 +4,7 @@
 
 ```
 5107003 Count each sale once in the channel sales reports
-907b894
+32f6319 Audit ERP readiness against production data
 ```
 
 ต่อจาก `a1b7424` (Add Claude ERP legacy rebuild brief)
