@@ -42,6 +42,10 @@ class ErpHealth extends Command
             $latest ? number_format($backupAge, 1).' ชั่วโมงที่แล้ว' : 'ยังไม่พบไฟล์สำรอง',
         ];
 
+        // เอกสารขายที่ไม่มี GL — เคยเกิดจริงกับบิล POS 5 ใบแรก (6-12 ก.ค. 2026) ที่ขายก่อนต่อ GL
+        // ตอนนั้นไม่มีอะไรจับได้เลยจนกระทบยอดตอนตรวจสองเดือนถัดมา
+        $checks[] = $this->salesWithoutLedger();
+
         $checks[] = ['Storage', is_writable(storage_path()) ? 'ผ่าน' : 'ไม่ผ่าน', storage_path()];
         $failedJobs = Schema::hasTable('failed_jobs') ? DB::table('failed_jobs')->count() : 0;
         $checks[] = ['Queue', $failedJobs === 0 ? 'ผ่าน' : 'เตือน', "งานล้มเหลว {$failedJobs} รายการ"];
@@ -70,5 +74,43 @@ class ErpHealth extends Command
         return collect($checks)->contains(fn (array $row) => $row[1] === 'ไม่ผ่าน')
             ? self::FAILURE
             : self::SUCCESS;
+    }
+
+    /**
+     * เอกสารขายที่ยืนยันแล้วต้องมีรายการ GL เสมอ
+     *
+     * ถ้าไม่มี แปลว่ายอดขายกับบัญชีเดินคนละทาง และจะรู้ตัวก็ต่อเมื่อปิดงวดไม่ลง
+     * ตรวจทุกครั้งที่รัน erp:health จะเห็นตั้งแต่ใบแรกที่หลุด
+     *
+     * @return array{0: string, 1: string, 2: string}
+     */
+    private function salesWithoutLedger(): array
+    {
+        if (! Schema::hasTable('gl_journals') || ! Schema::hasTable('documents')) {
+            return ['ขาย-GL', 'เตือน', 'ยังไม่มีตารางที่ต้องใช้'];
+        }
+
+        try {
+            $missing = DB::table('documents as d')
+                ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
+                ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE'])
+                ->where('d.status', 'active')
+                ->whereNotExists(fn ($query) => $query->select(DB::raw(1))
+                    ->from('gl_journals as g')->whereColumn('g.document_id', 'd.id'))
+                ->selectRaw('count(*) as n, coalesce(sum(d.total_amount), 0) as amount')
+                ->first();
+        } catch (Throwable $exception) {
+            return ['ขาย-GL', 'ไม่ผ่าน', $exception->getMessage()];
+        }
+
+        $count = (int) ($missing->n ?? 0);
+
+        return [
+            'ขาย-GL',
+            $count === 0 ? 'ผ่าน' : 'ไม่ผ่าน',
+            $count === 0
+                ? 'เอกสารขายลง GL ครบ'
+                : "เอกสารขาย {$count} ใบไม่มีรายการ GL รวม ".number_format((float) ($missing->amount ?? 0), 2).' บาท',
+        ];
     }
 }
