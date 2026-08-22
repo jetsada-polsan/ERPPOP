@@ -24,6 +24,7 @@ class SupplierPaymentService
     public function __construct(
         private readonly DocumentNumberGenerator $numbers,
         private readonly GlPostingService $glPosting,
+        private readonly SupplierOpenItemService $openItems,
     ) {}
 
     /**
@@ -98,6 +99,9 @@ class SupplierPaymentService
                 'balance_after' => round($currentBalance - $amount, 4),
                 'entry_date' => now()->toDateString(),
             ]);
+
+            // ตัดใบที่ค้างเรียงใบเก่าก่อน เพื่อให้ AP aging ลดลงตามจริง ไม่ใช่แค่ยอดรวมใน ledger
+            $this->openItems->applyPayment((int) $data['supplier_id'], (float) $amount);
 
             $this->glPosting->postSupplierPayment($paymentDocument, $amount, $document->doc_date->toDateString(), $document->doc_number);
 

@@ -32,6 +32,7 @@ class PurchaseService
     public function __construct(
         private readonly DocumentNumberGenerator $numbers,
         private readonly GlPostingService $glPosting,
+        private readonly SupplierOpenItemService $openItems,
         private readonly CostingService $costing,
         private readonly FifoStockService $fifo,
     ) {}
@@ -181,6 +182,14 @@ class PurchaseService
                     'balance_after' => DecimalMath::add($previousBalance, $totalAmount),
                     'entry_date' => now()->toDateString(),
                 ]);
+
+                // ledger บอกยอดรวมต่อผู้ขาย แต่ AP aging ต้องรู้ว่าเงินก้อนไหนมาจากใบไหน
+                $this->openItems->openFromPurchase(
+                    $document,
+                    (float) $totalAmount,
+                    $data['payment_terms'] ?? null,
+                    $data['due_date'] ?? null,
+                );
             }
 
             $this->glPosting->postPurchase($document, $isCredit);
