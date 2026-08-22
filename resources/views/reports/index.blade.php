@@ -254,14 +254,24 @@
                     <a href="{{ route('legacy-reports.index') }}" class="flow-action-btn flow-action-link">
                         <i class="bi bi-database-check"></i> รายงาน BPlus เดิม
                     </a>
+                    @if($canExport)
                     <button type="button" class="flow-action-btn" onclick="exportCsv()">
                         <i class="bi bi-download"></i> ดาวน์โหลด Excel
                     </button>
+                    @endif
                     <button type="button" class="flow-action-btn" onclick="window.print()">
                         <i class="bi bi-printer"></i> พิมพ์รายงาน
                     </button>
                 </div>
             </div>
+
+            @if($branchLocked)
+                <div class="alert alert-warning no-print py-2 px-3 mb-3" style="font-size:13px">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    บัญชีนี้ยังไม่ได้สังกัดสาขา และไม่มีสิทธิ์ดูรายงานข้ามสาขา จึงยังไม่มีข้อมูลให้แสดง —
+                    ให้ผู้ดูแลระบบกำหนดสาขาให้ หรือให้สิทธิ์ <code>reports.all_branches</code>
+                </div>
+            @endif
 
             <div class="rpt-toolbar no-print mb-3">
                 <label class="rpt-report-picker">
@@ -288,8 +298,11 @@
                 <a href="{{ request()->fullUrlWithQuery(['from'=>now()->subDays(6)->toDateString(),'to'=>now()->toDateString()]) }}" class="rpt-shortcut">7 วัน</a>
                 <a href="{{ request()->fullUrlWithQuery(['from'=>now()->startOfMonth()->toDateString(),'to'=>now()->toDateString()]) }}" class="rpt-shortcut">เดือนนี้</a>
 
-                <select name="branch_id" class="rpt-select" onchange="this.form.submit()">
-                    <option value="all" @selected($filters['branch_id'] === null)>ทุกสาขา</option>
+                {{-- ไม่มีสิทธิ์ reports.all_branches = เลือกสาขาไม่ได้ ล็อกไว้ที่สาขาตัวเอง --}}
+                <select name="branch_id" class="rpt-select" onchange="this.form.submit()" @disabled(! $canSeeAllBranches)>
+                    @if($canSeeAllBranches)
+                        <option value="all" @selected($filters['branch_id'] === null)>ทุกสาขา</option>
+                    @endif
                     @foreach($branches as $b)
                         <option value="{{ $b->id }}" @selected((string) $filters['branch_id'] === (string) $b->id)>{{ $b->code }} - {{ $b->name_th }}</option>
                     @endforeach
@@ -297,7 +310,9 @@
                 <button type="submit" class="rpt-btn-filter"><i class="bi bi-funnel-fill me-1"></i>กรอง</button>
 
                 <div class="ms-auto d-flex gap-2">
-                    <button type="button" class="rpt-btn-export" onclick="exportCsv()"><i class="bi bi-download me-1"></i>CSV</button>
+                    @if($canExport)
+                        <button type="button" class="rpt-btn-export" onclick="exportCsv()"><i class="bi bi-download me-1"></i>CSV</button>
+                    @endif
                     <button type="button" class="rpt-btn-print" onclick="window.print()"><i class="bi bi-printer me-1"></i>พิมพ์</button>
                 </div>
             </div>

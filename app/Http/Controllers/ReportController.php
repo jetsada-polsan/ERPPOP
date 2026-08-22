@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ReportDefinition;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -11,7 +12,8 @@ class ReportController extends Controller
 {
     public function index(Request $request)
     {
-        $catalog = $this->catalogForUser($this->catalog());
+        $definitions = $this->definitions();
+        $catalog = $this->catalogForUser($this->catalog($definitions), $definitions);
         if (empty($catalog)) {
             abort(403, 'ไม่มีสิทธิ์ดูรายงาน');
         }
@@ -33,10 +35,15 @@ class ReportController extends Controller
         if (! in_array($perPage, [10, 25, 50, 100], true)) {
             $perPage = 25;
         }
-        // ผู้ใช้ที่สังกัดสาขา -> ดีฟอลต์กรองเฉพาะสาขาตัวเอง (คลังใครคลังมัน)
-        // เลือก 'all' เพื่อดูทุกสาขา; ผู้บริหาร/ส่วนกลาง (ไม่มีสาขา) เห็นทุกสาขาปกติ
+        // การเห็นข้ามสาขาเป็นสิทธิ์แยกต่างหาก (reports.all_branches) ไม่ใช่แค่ค่าเริ่มต้นของ filter
+        // ไม่มีสิทธิ์ = ล็อกไว้ที่สาขาตัวเองเสมอ ส่งพารามิเตอร์อะไรมาก็ไม่หลุด
+        $user = auth()->user();
+        $canSeeAllBranches = $user === null || $user->hasPermission('reports.all_branches');
         $requestedBranch = $request->input('branch_id');
-        if ($requestedBranch === null && ($userBranch = auth()->user()?->branch_id)) {
+        if (! $canSeeAllBranches) {
+            // ไม่มีสาขาและไม่มีสิทธิ์ข้ามสาขา = ยังกรองอะไรไม่ได้ ให้ผลลัพธ์ว่างแทนที่จะเผยทุกสาขา
+            $requestedBranch = $user->branch_id === null ? '0' : (string) $user->branch_id;
+        } elseif ($requestedBranch === null && ($userBranch = $user?->branch_id)) {
             $requestedBranch = (string) $userBranch;
         } elseif ($requestedBranch === 'all') {
             $requestedBranch = null;
@@ -55,18 +62,21 @@ class ReportController extends Controller
             'to' => $to->toDateString(),
             'filters' => $filters,
             'perPage' => $perPage,
+            'canSeeAllBranches' => $canSeeAllBranches,
+            'canExport' => $user === null || $user->hasPermission('reports.export'),
+            'branchLocked' => ! $canSeeAllBranches && $user?->branch_id === null,
             'branches' => DB::table('branches')->orderBy('code')->get(['id', 'code', 'name_th']),
             'result' => $this->runReport($category, $report, $from, $to, $filters),
         ]);
     }
 
-    private function catalogForUser(array $catalog): array
+    private function catalogForUser(array $catalog, Collection $definitions): array
     {
         $visible = [];
         foreach ($catalog as $category => $group) {
             $reports = [];
             foreach ($group['reports'] as $report => $label) {
-                if ($this->canSeeReport($category, $report)) {
+                if ($this->canSeeReport($category, $report, $definitions)) {
                     $reports[$report] = $label;
                 }
             }
@@ -80,7 +90,8 @@ class ReportController extends Controller
         return $visible;
     }
 
-    private function canSeeReport(string $category, string $report): bool
+    /** สิทธิ์ที่ต้องมีเพื่อ "ดู" รายงานตัวนั้น มาจากทะเบียนรายงาน ไม่ใช่ match ที่ hardcode ไว้ */
+    private function canSeeReport(string $category, string $report, Collection $definitions): bool
     {
         $user = auth()->user();
         if (! $user) {
@@ -91,187 +102,60 @@ class ReportController extends Controller
             return true;
         }
 
-        $profitReports = [
-            'gross_margin',
-            'loss_sales',
-            'loss_sales_6m',
-            'loss_sales_6m_by_type',
-            'loss_sales_6m_by_brand',
-            'loss_sales_6m_by_category',
-            'loss_sales_6m_by_supplier',
-            'loss_price_table',
-            'loss_sales_documents_summary',
-            'loss_sales_documents_detail',
-        ];
-
-        if (in_array($report, $profitReports, true)) {
-            return $user->hasPermission('finance.manage');
-        }
-
-        return match ($category) {
-            'sales', 'documents', 'pos' => $user->hasPermission('sales.manage'),
-            'management' => $user->hasPermission('finance.manage'),
-            'ar', 'payment', 'tax' => $user->hasPermission('finance.manage'),
-            'inventory', 'transfer' => $user->hasPermission('stock.manage'),
-            'purchasing' => $user->hasPermission('purchasing.manage'),
-            'audit' => $user->hasPermission('settings.manage') || $user->hasPermission('users.manage'),
-            default => $user->hasPermission('reports.view'),
-        };
+        return $user->hasPermission($definitions->get($category.'.'.$report)?->view_permission ?? 'reports.view');
     }
 
-    private function catalog(): array
+    private const CATEGORY_ICONS = [
+        'sales' => 'bi-receipt-cutoff',
+        'management' => 'bi-graph-up-arrow',
+        'ar' => 'bi-person-lines-fill',
+        'ap' => 'bi-person-badge',
+        'inventory' => 'bi-box-seam-fill',
+        'documents' => 'bi-files',
+        'booking' => 'bi-journal-bookmark',
+        'pos' => 'bi-cart-check-fill',
+        'purchasing' => 'bi-basket-fill',
+        'transfer' => 'bi-arrow-left-right',
+        'payment' => 'bi-cash-coin',
+        'cash' => 'bi-bank',
+        'tax' => 'bi-receipt',
+        'audit' => 'bi-shield-check',
+        'custom' => 'bi-stars',
+    ];
+
+    /**
+     * ทะเบียนรายงานที่เปิดใช้งานอยู่และมีหน้าจอจริง (status = available)
+     *
+     * อ่านสดทุกครั้งและส่งต่อเป็นพารามิเตอร์ ไม่เก็บไว้ใน property ของ controller —
+     * ภายใต้ worker ที่ใช้ instance ซ้ำ (Octane/เทสต์) ค่าที่ cache ไว้จะค้างข้ามคำขอ
+     * ทำให้รายงานที่เพิ่งถูกปิดยังโผล่ในเมนูอยู่
+     */
+    private function definitions(): Collection
     {
-        return [
-            'sales' => [
-                'title' => 'ขาย',
-                'icon' => 'bi-receipt-cutoff',
-                'reports' => [
-                    'daily_sales' => 'ยอดขายรายวัน',
-                    'sales_by_branch' => 'ยอดขายตามสาขา',
-                    'sales_by_staff' => 'ยอดขายตามพนักงาน/แคชเชียร์',
-                    'sales_by_category' => 'ยอดขายตามหมวดสินค้า',
-                    'sales_by_seller' => 'ยอดขายตามคนขาย',
-                    'sales_by_category_seller' => 'ยอดขายตามหมวดสินค้า / คนขาย',
-                    'top_products' => 'สินค้าขายดี',
-                    'products_by_branch' => 'สินค้าขายตามสาขา',
-                    'credit_sales' => 'ใบขายเชื่อ',
-                    'pending_bookings' => 'ใบจองค้างแปลงขาย',
-                    'sales_by_booking' => 'ยอดขายตามใบจอง',
-                    'sales_returns_by_document' => 'ใบขาย-รับคืน ตามเอกสาร',
-                    'bplus_sales_return_by_document' => 'รายงานรับจ่าย-รับคืนสินค้า ตามเอกสาร',
-                    'sale_return_by_product' => 'สรุปขาย-รับคืน ตามสินค้า',
-                    'bplus_sale_return_by_product' => 'รายงานสรุปการขาย-รับคืนตามสินค้า',
-                    'sales_summary_by_customer' => 'รายงานสรุปยอดขายตามลูกค้า',
-                    'sales_summary_12m_customer' => 'รายงานสรุปยอดขาย 12 เดือน ตามลูกหนี้',
-                    'sales_summary_12m_customer_product' => 'รายงานสรุปยอดขาย 12 เดือน ตามลูกหนี้-สินค้า',
-                    'sales_summary_12m_category' => 'รายงานสรุปยอดขาย 12 เดือน ตามหมวดสินค้า',
-                    'sales_summary_12m_salesman_product' => 'รายงานสรุปยอดขาย 12 เดือน ตามพนักงานขาย-สินค้า',
-                ],
-            ],
-            'management' => [
-                'title' => 'ผู้บริหาร',
-                'icon' => 'bi-graph-up-arrow',
-                'reports' => [
-                    'gross_margin' => 'กำไรขั้นต้นเบื้องต้น',
-                    'loss_sales' => 'สินค้าขายต่ำกว่าทุน / ขาดทุน',
-                    'loss_sales_6m' => 'รายงานแสดงสินค้าที่ขายขาดทุน 6 เดือน',
-                    'loss_sales_6m_by_type' => 'รายงานแสดงสินค้าที่ขายขาดทุน 6 เดือน ตามประเภทสินค้า',
-                    'loss_sales_6m_by_brand' => 'รายงานแสดงสินค้าที่ขายขาดทุน 6 เดือน ตามยี่ห้อสินค้า',
-                    'loss_sales_6m_by_category' => 'รายงานแสดงสินค้าที่ขายขาดทุน 6 เดือน ตามหมวดสินค้า',
-                    'loss_sales_6m_by_supplier' => 'รายงานแสดงสินค้าที่ขายขาดทุน 6 เดือน ตามผู้จำหน่ายหลัก',
-                    'loss_price_table' => 'รายงานราคาขายต่ำกว่าทุนตามตารางราคา',
-                    'loss_sales_documents_summary' => 'รายงานสรุปเอกสารขายที่ขาดทุน',
-                    'loss_sales_documents_detail' => 'รายงานรายละเอียดเอกสารขายที่ขาดทุน',
-                ],
-            ],
-            'ar' => [
-                'title' => 'ลูกหนี้',
-                'icon' => 'bi-person-lines-fill',
-                'reports' => [
-                    'ar_summary' => 'สรุปยอดลูกหนี้',
-                    'ar_summary_bplus' => 'รายงานสรุปยอดลูกหนี้',
-                    'ar_aging' => 'อายุหนี้ AR Aging',
-                    'overdue_customers' => 'ลูกหนี้เกินกำหนด',
-                    'open_items' => 'ลูกหนี้คงค้าง',
-                    'ar_detail_short' => 'รายงานรายละเอียดยอดลูกหนี้ แบบย่อ',
-                    'ar_detail_full' => 'รายงานรายละเอียดยอดลูกหนี้ แบบละเอียด',
-                    'ar_overdue_detail' => 'รายงานรายละเอียดลูกหนี้เกินกำหนดชำระ',
-                    'ar_over_credit_limit' => 'รายงานรายละเอียดลูกหนี้เกินวงเงินเครดิต',
-                ],
-            ],
-            'inventory' => [
-                'title' => 'สินค้าและสต็อก',
-                'icon' => 'bi-box-seam-fill',
-                'reports' => [
-                    'stock_balance' => 'สินค้าคงเหลือ',
-                    'stock_by_branch' => 'สต็อกตามสาขา',
-                    'stock_alerts' => 'สต็อกต่ำ / ติดลบ',
-                    'expiring_stock' => 'Lot ใกล้หมดอายุ / หมดอายุ',
-                    'stock_movements' => 'เคลื่อนไหวสินค้า',
-                ],
-            ],
-            'documents' => [
-                'title' => 'เอกสาร',
-                'icon' => 'bi-files',
-                'reports' => [
-                    'documents_summary' => 'สรุปเอกสาร',
-                    'document_list' => 'รายการเอกสารทั้งหมด',
-                    'document_items' => 'รายการสินค้าในเอกสาร',
-                    'booking_documents' => 'ใบจอง',
-                    'cash_sale_documents' => 'ใบขายสด',
-                    'credit_sale_documents' => 'ใบขายเชื่อ',
-                    'sale_return_documents' => 'ใบรับคืนสินค้า',
-                    'receipt_documents' => 'ใบเสร็จรับเงิน',
-                ],
-            ],
-            'pos' => [
-                'title' => 'POS',
-                'icon' => 'bi-cart-check-fill',
-                'reports' => [
-                    'pos_receipts' => 'ใบเสร็จ POS',
-                    'pos_by_terminal' => 'ยอดขายตามเครื่อง POS',
-                    'pos_payments' => 'รับชำระตามช่องทาง',
-                    'pos_hourly' => 'ยอดขายรายชั่วโมง',
-                    'pos_tax_discount' => 'ภาษี / ส่วนลด POS',
-                ],
-            ],
-            'purchasing' => [
-                'title' => 'ซื้อสินค้า',
-                'icon' => 'bi-basket-fill',
-                'reports' => [
-                    'purchase_documents' => 'เอกสารซื้อสินค้า',
-                    'purchase_by_supplier' => 'ยอดซื้อตามผู้ขาย',
-                    'purchase_items' => 'รับสินค้าเข้าตามสินค้า',
-                ],
-            ],
-            'transfer' => [
-                'title' => 'โอนสินค้า',
-                'icon' => 'bi-arrow-left-right',
-                'reports' => [
-                    'stock_transfers' => 'เอกสารโอนสินค้า',
-                    'transfer_items' => 'รายการสินค้าโอน',
-                    'transfer_by_location' => 'ยอดโอนตามคลังต้นทาง/ปลายทาง',
-                ],
-            ],
-            'payment' => [
-                'title' => 'รับชำระ / การเงิน',
-                'icon' => 'bi-cash-coin',
-                'reports' => [
-                    'payment_documents' => 'เอกสารรับชำระ',
-                    'payment_allocations' => 'ตัดหนี้ / จัดสรรยอด',
-                    'gl_journals' => 'GL Journal',
-                ],
-            ],
-            'tax' => [
-                'title' => 'ภาษี (ภพ.30)',
-                'icon' => 'bi-receipt',
-                'reports' => [
-                    'vat_sales' => 'รายงานภาษีขาย',
-                    'vat_purchase' => 'รายงานภาษีซื้อ',
-                ],
-            ],
-            'audit' => [
-                'title' => 'ตรวจสอบระบบ',
-                'icon' => 'bi-shield-check',
-                'reports' => [
-                    'void_bill_history' => 'ประวัติลบบิล / ยกเลิกบิลย้อนหลัง',
-                    'deleted_bill_audit' => 'ตรวจสอบเอกสารที่ถูกยกเลิก',
-                    'pending_work' => 'งานค้างต้องตาม',
-                ],
-            ],
-            'custom' => [
-                'title' => 'รายงานต้นแบบ PopStar เดิม',
-                'icon' => 'bi-stars',
-                'reports' => [
-                    'legacy_daily_pos' => 'ตัวอย่างเดิม: ยอดขายรายวัน POS (p_reportZ)',
-                    'legacy_daily_summary' => 'ตัวอย่างเดิม: สรุป POS + หลังบ้าน (p_daily_sales_summary)',
-                    'legacy_salesman' => 'ตัวอย่างเดิม: ยอดขายตามพนักงาน (p_sale-BI6)',
-                    'legacy_sales_profit' => 'ตัวอย่างเดิม: วิเคราะห์กำไรตามสินค้า (p_sales_profit)',
-                    'legacy_reorder' => 'ตัวอย่างเดิม: เติมเต็ม/แผนสต๊อก (p_planstock)',
-                    'legacy_sales_return' => 'ตัวอย่างเดิม: ขาย-รับคืนตามเอกสาร',
-                ],
-            ],
-        ];
+        return ReportDefinition::runnable()
+            ->orderBy('category')
+            ->orderBy('sort_order')
+            ->get()
+            ->keyBy('code');
+    }
+
+    /**
+     * รายการรายงานสำหรับเมนู — มาจากตาราง `report_definitions` เพื่อให้ผู้บริหาร
+     * เปิด/ปิดได้เองโดยไม่ต้องแก้โค้ด รายงานที่ถูกปิดจะหายจากเมนูแต่ definition ยังอยู่
+     */
+    private function catalog(Collection $definitions): array
+    {
+        $catalog = [];
+        foreach ($definitions as $definition) {
+            $catalog[$definition->category] ??= [
+                'title' => $definition->category_title,
+                'icon' => self::CATEGORY_ICONS[$definition->category] ?? 'bi-file-earmark-bar-graph',
+                'reports' => [],
+            ];
+            $catalog[$definition->category]['reports'][$definition->reportKey()] = $definition->name;
+        }
+
+        return $catalog;
     }
 
     private function runReport(string $category, string $report, Carbon $from, Carbon $to, array $filters): array

@@ -53,6 +53,7 @@ use App\Http\Controllers\QtyPromotionController;
 use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\ReceiptTemplateController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ReportGovernanceController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\SaleReturnController;
 use App\Http\Controllers\SalesmanController;
@@ -590,6 +591,8 @@ Route::prefix('qty-promotions')->name('qty-promotions.')->group(function () {
 Route::prefix('settings')->name('settings.')->group(function () {
     Route::get('/', [SystemSettingController::class, 'index'])->name('index');
     Route::post('/', [SystemSettingController::class, 'update'])->name('update');
+    Route::get('/reports', [ReportGovernanceController::class, 'index'])->name('reports');
+    Route::post('/reports', [ReportGovernanceController::class, 'update'])->name('reports.update');
     Route::get('/module-controls', [ModuleControlController::class, 'index'])->name('module-controls');
     Route::post('/module-controls/taxonomies/{type}', [ModuleControlController::class, 'storeTaxonomy'])->name('module-controls.taxonomies.store');
     Route::put('/module-controls/taxonomies/{type}/{id}', [ModuleControlController::class, 'updateTaxonomy'])->name('module-controls.taxonomies.update');
