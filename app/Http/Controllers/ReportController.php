@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ReportDefinition;
+use App\Support\SqlDialect;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -760,6 +761,16 @@ class ReportController extends Controller
     private function branchByLocationSub(string $locationColumn): string
     {
         return "(select min(b2.id) from branches b2 where b2.default_warehouse_location_id = {$locationColumn} and b2.is_active = true)";
+    }
+
+    private function dateMinusDays(int $days): string
+    {
+        return SqlDialect::dateMinusDays(DB::getDriverName(), $days);
+    }
+
+    private function truncateToHour(string $column): string
+    {
+        return SqlDialect::truncateToHour(DB::getDriverName(), $column);
     }
 
     private function applyBranch($query, array $filters, string $column = 'b.id')
@@ -1655,14 +1666,19 @@ class ReportController extends Controller
 
     private function arAging(): Collection
     {
+        $today = $this->dateMinusDays(0);
+        $d30 = $this->dateMinusDays(30);
+        $d60 = $this->dateMinusDays(60);
+        $d90 = $this->dateMinusDays(90);
+
         $rows = DB::table('customer_open_items')
             ->whereIn('status', ['open', 'partial'])
             ->selectRaw("
-                sum(case when due_date is null or due_date >= current_date then balance_amount else 0 end) as current_amount,
-                sum(case when due_date < current_date and due_date >= current_date - interval '30 days' then balance_amount else 0 end) as days_1_30,
-                sum(case when due_date < current_date - interval '30 days' and due_date >= current_date - interval '60 days' then balance_amount else 0 end) as days_31_60,
-                sum(case when due_date < current_date - interval '60 days' and due_date >= current_date - interval '90 days' then balance_amount else 0 end) as days_61_90,
-                sum(case when due_date < current_date - interval '90 days' then balance_amount else 0 end) as over_90
+                sum(case when due_date is null or due_date >= {$today} then balance_amount else 0 end) as current_amount,
+                sum(case when due_date < {$today} and due_date >= {$d30} then balance_amount else 0 end) as days_1_30,
+                sum(case when due_date < {$d30} and due_date >= {$d60} then balance_amount else 0 end) as days_31_60,
+                sum(case when due_date < {$d60} and due_date >= {$d90} then balance_amount else 0 end) as days_61_90,
+                sum(case when due_date < {$d90} then balance_amount else 0 end) as over_90
             ")
             ->first();
 
@@ -2012,10 +2028,12 @@ class ReportController extends Controller
         $this->applyBranch($query, $filters, 't.branch_id');
         $this->applySearch($query, $filters, ['r.receipt_no', 't.code', 't.name']);
 
+        $hour = $this->truncateToHour('r.receipt_date');
+
         return $query
-            ->groupBy(DB::raw("date_trunc('hour', r.receipt_date)"))
-            ->orderBy(DB::raw("date_trunc('hour', r.receipt_date)"))
-            ->selectRaw("to_char(date_trunc('hour', r.receipt_date), 'YYYY-MM-DD HH24:00') as sale_hour, count(*) as receipt_count, sum(r.net_sales) as amount")
+            ->groupBy(DB::raw($hour))
+            ->orderBy(DB::raw($hour))
+            ->selectRaw("{$hour} as sale_hour, count(*) as receipt_count, sum(r.net_sales) as amount")
             ->limit($filters['per_page'])
             ->get();
     }
