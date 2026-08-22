@@ -13,21 +13,43 @@ SELECT
     CAST(SERVERPROPERTY('ProductVersion') AS nvarchar(128)) AS sql_server_version,
     DATABASEPROPERTYEX(DB_NAME(), 'Status') AS database_status,
     DATABASEPROPERTYEX(DB_NAME(), 'Updateability') AS database_updateability,
+    CASE WHEN DATABASEPROPERTYEX(DB_NAME(), 'Updateability') = 'READ_ONLY'
+         THEN 'OK - database is read only'
+         ELSE 'STOP - set the database READ_ONLY before collecting anything'
+    END AS read_only_check,
     GETDATE() AS collected_at;
 
--- 1. All user tables with approximate row counts and storage size.
+-- 1. All user tables with row counts, storage size and a business/system/archive split.
+--
+--    Row count is taken from the heap or clustered index only, and is read as a
+--    GROUP BY key rather than summed. sys.allocation_units yields one row per
+--    allocation type (IN_ROW_DATA, LOB_DATA, ROW_OVERFLOW_DATA), so summing
+--    p.rows across that join multiplies the count for every table that holds a
+--    LOB column - REPORTFILE.RPF_SQL among them. The size still sums, because
+--    each allocation unit contributes real pages.
 SELECT
     s.name AS schema_name,
     t.name AS table_name,
-    SUM(CASE WHEN p.index_id IN (0, 1) THEN p.rows ELSE 0 END) AS row_count,
-    CAST(SUM(a.total_pages) * 8.0 / 1024 AS decimal(18, 2)) AS total_mb
+    p.rows AS row_count,
+    CAST(SUM(a.total_pages) * 8.0 / 1024 AS decimal(18, 2)) AS total_mb,
+    CASE
+        WHEN t.name LIKE 'BPLUS%'
+          OR t.name LIKE 'AUTO%'
+          OR t.name IN ('BYDATANAME', 'CREDITS')
+            THEN 'system'
+        -- physical monthly tables such as C260701 / D260701
+        WHEN t.name LIKE '[CDHLPS][0-9][0-9][0-9][0-9][0-9][0-9]'
+            THEN 'archive'
+        ELSE 'business'
+    END AS table_class
 FROM sys.tables t
 JOIN sys.schemas s ON s.schema_id = t.schema_id
-LEFT JOIN sys.partitions p ON p.object_id = t.object_id
+JOIN sys.indexes i ON i.object_id = t.object_id AND i.index_id IN (0, 1)
+JOIN sys.partitions p ON p.object_id = t.object_id AND p.index_id = i.index_id
 LEFT JOIN sys.allocation_units a ON a.container_id = p.partition_id
 WHERE t.is_ms_shipped = 0
-GROUP BY s.name, t.name
-ORDER BY row_count DESC, total_mb DESC, s.name, t.name;
+GROUP BY s.name, t.name, p.rows
+ORDER BY p.rows DESC, total_mb DESC, s.name, t.name;
 
 -- 2. Columns, data types, nullability, defaults and identity columns.
 SELECT
@@ -139,3 +161,124 @@ WHERE o.is_ms_shipped = 0
       OR o.name COLLATE Latin1_General_CI_AI LIKE '%POPSTAR%'
   )
 ORDER BY o.type_desc, s.name, o.name;
+
+-- 8. Indexes: shows how the legacy reports were expected to read each table.
+SELECT
+    s.name AS schema_name,
+    t.name AS table_name,
+    i.name AS index_name,
+    i.type_desc,
+    i.is_unique,
+    i.is_primary_key,
+    STUFF((
+        SELECT ', ' + c2.name
+        FROM sys.index_columns ic2
+        JOIN sys.columns c2
+          ON c2.object_id = ic2.object_id AND c2.column_id = ic2.column_id
+        WHERE ic2.object_id = i.object_id
+          AND ic2.index_id = i.index_id
+          AND ic2.is_included_column = 0
+        ORDER BY ic2.key_ordinal
+        FOR XML PATH('')), 1, 2, '') AS key_columns
+FROM sys.indexes i
+JOIN sys.tables t ON t.object_id = i.object_id
+JOIN sys.schemas s ON s.schema_id = t.schema_id
+WHERE t.is_ms_shipped = 0
+  AND i.type > 0
+ORDER BY s.name, t.name, i.name;
+
+-- 9. Triggers. BPlus keeps posting rules in triggers, so a table-only reading of
+--    the schema will map the stock and ledger effects of a document incorrectly.
+SELECT
+    s.name AS schema_name,
+    t.name AS table_name,
+    tr.name AS trigger_name,
+    tr.is_disabled,
+    tr.is_instead_of_trigger,
+    m.definition
+FROM sys.triggers tr
+JOIN sys.tables t ON t.object_id = tr.parent_id
+JOIN sys.schemas s ON s.schema_id = t.schema_id
+LEFT JOIN sys.sql_modules m ON m.object_id = tr.object_id
+ORDER BY s.name, t.name, tr.name;
+
+-- 10. Scalar, inline and table-valued functions (section 6 covers procedures only).
+SELECT
+    s.name AS schema_name,
+    o.name AS function_name,
+    o.type_desc,
+    o.create_date,
+    o.modify_date,
+    m.definition
+FROM sys.objects o
+JOIN sys.schemas s ON s.schema_id = o.schema_id
+LEFT JOIN sys.sql_modules m ON m.object_id = o.object_id
+WHERE o.is_ms_shipped = 0
+  AND o.type IN ('FN', 'IF', 'TF')
+ORDER BY o.type_desc, s.name, o.name;
+
+-- 11. Document types. Every BPlus flow is a document type inside DOCINFO, so this
+--     is the single most useful result for mapping booking, sale, return, payment
+--     and stock movement onto the new ERP.
+SELECT * FROM DOCTYPE ORDER BY 1;
+
+-- 12. Document volume per type and year: separates the flows the business really
+--     used from the ones that only ever existed as a menu.
+SELECT
+    d.DI_REF_TYPE,
+    YEAR(d.DI_DATE) AS doc_year,
+    COUNT(*) AS doc_count
+FROM DOCINFO d
+GROUP BY d.DI_REF_TYPE, YEAR(d.DI_DATE)
+ORDER BY d.DI_REF_TYPE, doc_year;
+
+-- 13. Fallback for section 12. DI_REF_TYPE and DI_DATE were read from the SQL of
+--     the legacy reports, not from the database itself. If section 12 fails on a
+--     column name, run this and send the result so the column names can be fixed.
+SELECT c.name AS column_name, ty.name AS data_type, c.max_length, c.is_nullable
+FROM sys.columns c
+JOIN sys.types ty ON ty.user_type_id = c.user_type_id
+WHERE c.object_id = OBJECT_ID('DOCINFO')
+ORDER BY c.column_id;
+
+-- 14. Tables behind each business flow. The table list comes from the FROM and
+--     JOIN clauses of the 1,502 legacy report definitions in REPORTFILE, so these
+--     are the tables the reports actually read rather than names guessed from a
+--     pattern. Anything reported as missing here is a mapping assumption to drop.
+WITH expected(flow, table_name) AS (
+    SELECT * FROM (VALUES
+        ('booking',      'DOCINFO'), ('booking',      'DOCTYPE'), ('booking', 'AROE'),
+        ('booking',      'ARCONDITION'), ('booking',  'SHIPBY'),
+        ('sales',        'SLDETAIL'), ('sales',       'TRANSTKH'), ('sales', 'TRANSTKD'),
+        ('sales',        'VATTABLE'), ('sales',       'ARDETAIL'),
+        ('sales_return', 'DOCINFO'), ('sales_return', 'TRANSTKH'),
+        ('payable',      'APFILE'), ('payable',       'APADDRESS'), ('payable', 'APCAT'),
+        ('payable',      'TRANPAYH'), ('payable',     'TRANPAYD'), ('payable', 'APPRICETAB'),
+        ('receivable',   'ARFILE'), ('receivable',    'ARDETAIL'), ('receivable', 'ARCAT'),
+        ('receivable',   'ARPAYMENT'), ('receivable', 'PAYMENTTYPE'),
+        ('cash_book',    'CASHBOOK'), ('cash_book',   'CASHACCOUNT'),
+        ('bank',         'BANKACCOUNT'), ('bank',     'BANKFILE'), ('bank', 'BANKSTATEMENT'),
+        ('bank',         'CHEQUEBOOK'), ('bank',      'CHEQUEIN'),
+        ('product',      'SKUMASTER'), ('product',    'GOODSMASTER'), ('product', 'UOFQTY'),
+        ('product',      'ICCAT'), ('product',        'ICDEPT'), ('product', 'BRAND'),
+        ('stock',        'SKUMOVE'), ('stock',        'WAREHOUSE'), ('stock', 'WARELOCATION'),
+        ('stock',        'ICCOMMIT'),
+        ('price',        'ARPRICETAB'), ('price',     'PRICECHANGE'), ('price', 'PRICETAG'),
+        ('price',        'ARPLU'), ('price',          'ARCBUY'),
+        ('promotion',    'ARCAMPAIGN'), ('promotion', 'PRMTPLAN'),
+        ('salesman',     'SALESMAN'), ('salesman',    'DEPTTAB'), ('salesman', 'PRJTAB'),
+        ('org',          'BRANCH'), ('org',           'ADDRBOOK'), ('org', 'ACCOUNTCHART'),
+        ('org',          'MISCLOOKUP'), ('org',       'MKTPLAN'),
+        ('member',       'MEMBER'), ('member',        'MBPOINT'), ('member', 'MBTYPE')
+    ) v(flow, table_name)
+)
+SELECT
+    e.flow,
+    e.table_name,
+    CASE WHEN t.object_id IS NULL THEN 'missing' ELSE 'present' END AS presence,
+    ISNULL(p.rows, 0) AS row_count
+FROM expected e
+LEFT JOIN sys.tables t ON t.name = e.table_name AND t.is_ms_shipped = 0
+LEFT JOIN sys.indexes i ON i.object_id = t.object_id AND i.index_id IN (0, 1)
+LEFT JOIN sys.partitions p ON p.object_id = t.object_id AND p.index_id = i.index_id
+ORDER BY e.flow, e.table_name;
