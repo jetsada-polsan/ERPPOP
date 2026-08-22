@@ -72,6 +72,25 @@ class SalesReportChannelOverlapTest extends TestCase
         $this->assertSame(0.0, (float) DB::table('sales_postings')->sum('net_sales'));
     }
 
+    public function test_a_receipt_imported_from_the_old_system_is_not_reported_as_a_sale(): void
+    {
+        [$user] = $this->posSaleWorth(100.0);
+
+        // บิลนำเข้าเก่าไม่มีกะและไม่มีเอกสารผูก — บน production มีแบบนี้ 16,537 ใบ
+        PosReceipt::query()->update(['is_legacy_import' => true, 'document_id' => null, 'pos_shift_id' => null]);
+        Document::query()->update(['status' => 'cancelled']);
+
+        $rows = collect($this->actingAs($user)
+            ->get('/reports?category=sales&report=sales_by_category&from=2026-08-01&to=2026-08-31&branch_id=all')
+            ->viewData('result')['rows']);
+
+        $this->assertSame(0.0, round($rows->sum(fn ($row) => (float) $row->amount), 2));
+        $this->assertSame(0.0, (float) DB::table('sales_postings')->sum('net_sales'),
+            'บิลนำเข้าเก่าต้องไม่โผล่ใน sales_postings');
+        // แต่ข้อมูลต้องยังอยู่ ไม่ได้ถูกลบ
+        $this->assertSame(1, PosReceipt::count());
+    }
+
     /** สร้างบิล POS หนึ่งใบพร้อมเอกสารขายสดที่ผูกกัน เหมือน checkout ของจริง */
     private function posSaleWorth(float $amount): array
     {

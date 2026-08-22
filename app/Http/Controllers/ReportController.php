@@ -1085,7 +1085,9 @@ class ReportController extends Controller
             ->whereBetween('r.receipt_date', [$from, $to])
             // บิลที่ยกเลิกใช้สถานะ 'void' ไม่ใช่ 'cancelled' — เทียบกับ 'cancelled' อย่างเดียว
             // ทำให้บิลที่ถูกยกเลิกยังถูกนับเป็นยอดขาย. ที่อื่นทั้งระบบใช้ 'completed'
-            ->where('r.status', 'completed');
+            ->where('r.status', 'completed')
+            // บิลนำเข้าจากระบบเก่าไม่ใช่ยอดขายของ ERP ใหม่ กติกาเดียวกับ view `sales_postings`
+            ->where('r.is_legacy_import', false);
 
         $this->applyBranch($query, $filters, 't.branch_id');
         $this->applySearch($query, $filters, ['p.sku_code', 'p.name_th', 'pc.name_th', 'u.name']);
