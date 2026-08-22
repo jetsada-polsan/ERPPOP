@@ -110,6 +110,10 @@ class BookingController extends Controller
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
             'sales_area_id' => ['nullable', 'integer', 'exists:sales_areas,id'],
             'remark' => ['nullable', 'string', 'max:1000'],
+            // ไม่ส่งมา = รับเองที่สาขา (ค่าเดิมของใบจองทั้งหมดก่อนมีฟิลด์นี้)
+            'fulfillment_type' => ['nullable', 'in:pickup,delivery'],
+            // ส่งของต้องมีกำหนดส่ง รับเองไม่ต้อง
+            'delivery_due_at' => ['nullable', 'required_if:fulfillment_type,delivery', 'date'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'items.*.qty' => ['required', 'numeric', 'min:0.0001'],

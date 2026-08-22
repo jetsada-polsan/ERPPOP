@@ -42,6 +42,25 @@
                     </template>
                 </div>
             </div>
+            <div x-data="{ fulfillment: 'pickup' }" class="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm text-gray-500 mb-1">วิธีรับสินค้า</label>
+                    <select name="fulfillment_type" x-model="fulfillment" class="w-full border rounded px-2 py-1.5 text-sm">
+                        <option value="pickup">รับเองที่สาขา</option>
+                        <option value="delivery">จัดส่ง</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-500 mb-1">
+                        กำหนดส่ง <span x-show="fulfillment === 'delivery'" class="text-red-500">*</span>
+                    </label>
+                    <input type="datetime-local" name="delivery_due_at" :required="fulfillment === 'delivery'"
+                        :disabled="fulfillment !== 'delivery'" class="w-full border rounded px-2 py-1.5 text-sm disabled:bg-gray-100">
+                    <p x-show="fulfillment === 'delivery'" class="text-xs text-gray-500 mt-1">
+                        ใบจองแบบจัดส่งต้องมีกำหนดส่ง จึงจะยืนยันเป็นใบขายได้
+                    </p>
+                </div>
+            </div>
             <div class="md:col-span-3">
                 <label class="block text-sm text-gray-500 mb-1">หมายเหตุ</label>
                 <input type="text" name="remark" class="w-full border rounded px-2 py-1.5 text-sm">

@@ -126,6 +126,10 @@ class CreditSaleService
                 'status' => CustomerOpenItem::STATUS_OPEN,
             ]);
 
+            if ($lockedBooking->isDelivery() && $lockedBooking->delivery_due_at === null) {
+                throw new RuntimeException('ใบจองแบบส่งของยังไม่ได้ระบุวันที่ต้องส่ง ยืนยันเป็นใบขายไม่ได้');
+            }
+
             $lockedBooking->update([
                 'status' => SaleBooking::STATUS_CONVERTED,
                 'confirmed_at' => now(),

@@ -35,6 +35,12 @@ class BookingService
             throw new RuntimeException('ต้องมีรายการสินค้าอย่างน้อย 1 รายการ');
         }
 
+        // ใบจองแบบส่งของต้องรู้กำหนดส่งตั้งแต่ต้น ไม่งั้นรายงานเกินกำหนดส่งไม่มีอะไรให้เทียบ
+        $data['fulfillment_type'] = $data['fulfillment_type'] ?? SaleBooking::FULFILLMENT_PICKUP;
+        if ($data['fulfillment_type'] === SaleBooking::FULFILLMENT_DELIVERY && blank($data['delivery_due_at'] ?? null)) {
+            throw new RuntimeException('ใบจองแบบส่งของต้องระบุวันและเวลาที่ต้องส่ง');
+        }
+
         $branch = Branch::findOrFail($data['branch_id']);
         if ($branch->default_warehouse_location_id === null) {
             throw new RuntimeException("สาขา {$branch->name_th} ยังไม่ได้กำหนดคลังสินค้าเริ่มต้น");
@@ -85,6 +91,9 @@ class BookingService
                 'sales_user_id' => $data['sales_user_id'] ?? null,
                 'sales_area_id' => $data['sales_area_id'] ?? null,
                 'status' => SaleBooking::STATUS_PENDING,
+                'fulfillment_type' => $data['fulfillment_type'],
+                'delivery_due_at' => $data['delivery_due_at'] ?? null,
+                'delivery_status' => SaleBooking::DELIVERY_PENDING,
             ]);
 
             $stockDocument = StockDocument::create([
