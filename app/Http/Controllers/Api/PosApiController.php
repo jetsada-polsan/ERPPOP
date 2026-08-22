@@ -34,10 +34,16 @@ class PosApiController extends Controller
         $device = $request->attributes->get('pos_device');
         $user = $request->user();
         $user?->loadMissing('branch');
+        $device?->loadMissing('branch');
+        // สาขาของ "อุปกรณ์" มาก่อนสาขาของ user เสมอ ให้ตรงกับ enforcedBranchId()
+        // ที่ /products, /shift, /checkout ใช้จริง ไม่งั้น POS ถือ branch_id คนละตัว
+        // กับที่เซิร์ฟเวอร์บังคับ แล้วไปพังตอนเปิดกะ (branch_id required)
+        $branchId = $device?->branch_id ?: $user?->branch_id;
+        $branchName = ($device?->branch_id ? $device->branch?->name_th : null) ?: $user?->branch?->name_th;
         $terminal = $device?->terminal_code
             ? PosTerminal::where('code', $device->terminal_code)->first()
             : null;
-        $terminal ??= PosTerminal::where('branch_id', $user?->branch_id)
+        $terminal ??= PosTerminal::where('branch_id', $branchId)
             ->orderBy('id')
             ->first();
 
@@ -49,8 +55,8 @@ class PosApiController extends Controller
                 'name' => $device?->name,
                 'terminal_code' => $device?->terminal_code,
             ],
-            'branch_id' => $user?->branch_id,
-            'branch_name' => $user?->branch?->name_th,
+            'branch_id' => $branchId,
+            'branch_name' => $branchName,
             'device_user' => $user?->name,
             'cashier_login_mode' => AppSetting::get('pos_passwordless_login') === '1' ? 'selection' : 'pin',
             // หัวบิลใบกำกับภาษีอย่างย่อ (มาตรา 86/6) — desktop แคชไว้พิมพ์ใบเสร็จได้แม้ออฟไลน์
