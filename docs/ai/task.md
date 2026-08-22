@@ -1,85 +1,88 @@
-# Handoff — 2026-08-22 รอบที่ 2 (Claude)
+# Handoff — 2026-08-22 รอบที่ 3 (Claude)
 
 ## Commit
 
 ```
-5107003 Count each sale once in the channel sales reports
-32f6319 Audit ERP readiness against production data
-9e52940 Inventory the BPlus report registry
+711d133 Put the report menu under executive control
+2da5222 Catalogue the first twenty reports
+833cffd
 ```
 
-ต่อจาก `a1b7424` (Add Claude ERP legacy rebuild brief)
+ต่อจาก `8a7677f` (Define ERP report discovery and UAT scope)
 
 ## ทำอะไรไป
 
-ทำงานระยะที่ 1 ตาม `docs/ai/CLAUDE_LEGACY_REBUILD_BRIEF.md` — audit ความพร้อมระบบใหม่
-ผลอยู่ใน **`docs/ai/erp-readiness-audit.md`** ตรวจจากโค้ดจริงและข้อมูล production จริง
-(SELECT อย่างเดียว ไม่แตะ MSSQL legacy เลย)
+งานระยะที่ 2A ตามหัวข้อ "Report Discovery" — ทำ **catalog ก่อน แล้วค่อยทำหน้าจอ** ตามที่สั่ง
+รอบนี้จึงยังไม่มีหน้ารายงานใหม่สักหน้า มีแต่ catalog + ระบบควบคุมรายงาน
 
-ระหว่างตรวจเจอบั๊กจริงในรายงานขายจึงแก้ให้เลยพร้อมเทสต์ (`5107003`)
+### 1. ทะเบียนรายงาน `report_definitions` + ระบบเปิด/ปิด (`711d133`)
 
-## สิ่งที่พบ — เรียงตามความเร่งด่วน
+- ย้ายรายการรายงานออกจาก array ที่ hardcode ใน `ReportController` มาเป็นตาราง
+  (`code, category, name, view_permission, owner_role, frequency, priority, status, enabled, sort_order, legacy_code, metadata`)
+- หน้า **ตั้งค่า → ทะเบียนรายงาน** (`/settings/reports`, ต้องมี `settings.manage`)
+  เปิด/ปิดรายงานได้เอง ไม่ต้องแก้โค้ด
+- **ปิด = ซ่อนจากเมนูเท่านั้น** definition ยังอยู่ ประวัติที่ผู้ใช้ดึงไปแล้วไม่ถูกแตะ
+  และไม่มีปุ่มลบรายงานในหน้านี้เลย
+- ทุกครั้งที่เปิด/ปิดเขียน `audit_logs` (`report_enabled` / `report_disabled`)
+- รายงานที่ `status != 'available'` **เปิดไม่ได้** — เป็นตัวบังคับกติกา "P0 ห้ามเปิดก่อน mapping + UAT ผ่าน"
+- แยกสิทธิ์เป็นสามใบตาม brief:
+  | สิทธิ์ | ทำอะไรได้ |
+  |---|---|
+  | `view_permission` ของแต่ละรายงาน | เห็นรายงานนั้นในเมนู |
+  | `reports.export` (ใหม่) | เห็นปุ่มดาวน์โหลด/CSV |
+  | `reports.all_branches` (ใหม่) | เลือกสาขาอื่นได้ ไม่มีสิทธิ์ = ล็อกที่สาขาตัวเองเสมอ ส่ง `branch_id=all` มาก็ไม่หลุด |
 
-### P0-1 ข้อมูล POS เก่าค้างอยู่บน production (ยังไม่ได้แตะ รอเจ้าของตัดสินใจ)
+### 2. Report Catalog (`2da5222`)
 
-`pos_receipts` มี 16,557 แถว แต่เป็นการขายจริงผ่าน ERP ใหม่แค่ **20 ใบ**
-(มี `document_id` + `pos_shift_id`) อีก **16,537 แถว** ไม่มีทั้งสองอย่าง เลขบิลเป็น format เก่า
-(`000101102901` เทียบกับของจริง `CS000720260706001`) ช่วง 1 ก.ค. – 4 ส.ค.
+`docs/ai/report-catalog.md` — 20 รายงานชุดแรก แต่ละตัวมี: ความถี่, เจ้าของ, ใช้ตัดสินใจอะไร,
+ข้อมูล/สูตรที่ต้องใช้, และระบบใหม่มีแล้วหรือยัง พร้อม `docs/ai/uat/REPORT_UAT_TEMPLATE.md`
 
-ผลคือ `sales_postings` = **4,599,908.50 บาท** แต่ `gl_journals` = **23,479.77 บาท**
-ต่างกัน ~4.58 ล้าน กระทบยอดไม่ได้ และ 16,537 แถวไม่มีต้นทุน รายงานกำไรจึงไม่มีความหมาย
+## สิ่งที่พบ — รายงาน P0 สามตัวติดที่ schema ไม่ใช่ที่ query
 
-ขัดกับนโยบายที่เขียนไว้เองใน `LEGACY_TABLE_SCOPE_POLICY.md` — commit `d24c99d` ลบ *ท่อนำเข้า*
-ไปแล้ว (เหลือโฟลเดอร์ว่าง `app/Services/PosImport/`) แต่ *ข้อมูลที่นำเข้าไปก่อนหน้า* ยังอยู่
+1. **ใบจองครบกำหนด/เกินกำหนดส่ง ทำไม่ได้เลย** — `sale_bookings` มีแค่
+   `document_id, salesman_id, sales_area_id, status, confirmed_at, confirmed_document_id`
+   **ไม่มีฟิลด์วันครบกำหนดส่ง** และ `documents` ก็ไม่มี (`due_date` มีเฉพาะใน `customer_open_items`
+   ซึ่งเป็นวันครบกำหนด*ชำระเงิน* คนละเรื่อง) ต้อง migration + ช่องกรอกในหน้าใบจองก่อน
+2. **AP aging ทำไม่ได้** — ฝั่งลูกหนี้มี `customer_open_items` (due_date/paid/balance/status ครบ)
+   แต่ฝั่งเจ้าหนี้ไม่มีตารางคู่ขนาน มีแค่ `supplier_ledger` ที่เป็นสมุดเดินบัญชี ทำ aging ต่อใบไม่ได้
+3. **สมุดเงินสดไม่มีวันตรงยอด** — `cash_books` มีโครงสร้างครบแต่มีที่เขียนเข้าที่เดียวคือฟอร์มกรอกมือ
+   ใน `BplusOperationController` ไม่มีเอกสารใดเดินรายการเข้าอัตโนมัติ
 
-**ต้องการการตัดสินใจ**: ลบ / ย้ายไป schema legacy แยก / ใส่ flag แล้วกันออกจาก `sales_postings`
-
-### P0-2 รายงานขายนับบิลซ้ำ — แก้แล้ว
-
-`sales_by_category`, `sales_by_seller`, `sales_by_category_seller` รวมสองช่องทางเองแทนที่จะ
-อ่าน `sales_postings` และขาดกฎครบสามข้อ บิล POS 100 บาทรายงานเป็น 200 บาท
-
-- ไม่กันเอกสารขายสดที่มีบิล POS ผูกอยู่ออก (ทุกบิล POS สร้างเอกสารผูกเสมอ)
-- ไม่กรอง `documents.status` เลย เอกสารที่ยกเลิกยังนับเป็นยอดขาย
-- ฝั่ง POS กรอง `!= 'cancelled'` แต่บิลยกเลิกเก็บเป็น `'void'` จึงยังนับเป็นยอดขาย
-
-### P0-3 ยังไม่มี UAT ที่พิสูจน์เอกสารไหลครบหนึ่งรอบ
-
-ขายหลังบ้านมี 5 test, ซื้อมี 1 test, รายงานมี 0 (ก่อนรอบนี้) เทียบกับ POS 36 test
-
-### P1/P2
-
-journal header ที่บังคับ Dr=Cr ไม่มี, ไม่มี PR/RFQ, ไม่มี AP aging, ไม่มีทะเบียนมัดจำ,
-รายงาน export ได้แค่ CSV ฝั่ง browser, CI ไม่ครอบ POS desktop และกัน `RouteIntegrityTest` ออก
-รายละเอียดครบใน audit
+เจอเพิ่มระหว่างตรวจ: ตาราง staging ของการนำเข้า POS เก่ายังค้างอยู่ด้วย —
+`imported_payments` **37,412 แถว**, `imported_receipts`, `import_batches` ไม่มีโค้ดอ้างถึงแล้ว
+(ต่อเนื่องจาก P0-1 ใน `erp-readiness-audit.md`)
 
 ## ทดสอบไปแล้วแค่ไหน
 
-- `php artisan test` → **137 passed / 1,898 assertions** (เดิม 134 เพิ่ม 3 จากเทสต์ใหม่)
-- `SalesReportChannelOverlapTest` 3 เคส เทียบยอดรายงานกับ `sales_postings` โดยตรง
-  ทั้งสามเคสยืนยันแล้วว่า **แดงจริงก่อนแก้** (เคสแรกได้ 200.0 แทน 100.0, เคส void ได้ 100.0 แทน 0.0)
-- `php artisan migrate:status` บน production → ครบถึง `2026_08_02_000142` ไม่มีค้าง
-- อ่านข้อมูล production ด้วย `tinker --execute` แบบ SELECT ล้วน
+- `php artisan test` → **143 passed / 1,927 assertions** (เดิม 137 เพิ่ม 6 จาก `ReportGovernanceTest`)
+- เทสต์ครอบ: ปิดรายงานแล้วหายจากเมนูแต่ definition ยังอยู่, เปิดรายงาน `planned` ไม่ได้,
+  toggle เขียน audit log, ไม่มี `reports.all_branches` แล้วขอ `branch_id=all` ก็ยังเห็นแค่สาขาตัวเอง,
+  มีสิทธิ์แล้วเห็นทุกสาขา, ปุ่ม export โผล่เฉพาะคนที่มี `reports.export`
+- `php artisan migrate` รันผ่านบนเครื่อง (SQLite/Postgres local)
 
 ## ยังไม่ทดสอบ / ความเสี่ยง
 
-- **ไม่ได้แตะข้อมูล production เลย** ทั้ง P0-1 และอย่างอื่น — รอเจ้าของสั่ง
-- **ไม่ได้แตะ MSSQL legacy** แม้แต่ `SELECT` ในรอบนี้
-- audit ตรวจจาก "โค้ด + ข้อมูลจริง" ไม่ได้ไล่กดทุกหน้าจอ โมดูลที่มีข้อมูลเป็นศูนย์
-  (ซื้อ/การเงิน/ธนาคาร/ทรัพย์สิน/ผลิต) ตัดสินจากโค้ดกับจำนวน test เท่านั้น
-- การแก้ `documentSalesSlice` เพิ่ม `whereNotExists` เข้าไป — บน PostgreSQL ที่มีข้อมูลจริงเยอะ
-  ควรดู query plan อีกที ตอนนี้ทดสอบบน SQLite ของชุดเทสต์เท่านั้น
-- งานระยะที่ 2 เริ่มแล้วบางส่วน: `docs/ai/legacy-report-catalog.md` + `docs/ai/legacy/reportfile-index.csv`
-  จาก dump ของตาราง `REPORTFILE` (1,502 รายงานจริงจาก 1,923 แถว) แต่ **ยัง mapping รายรายงานไม่ได้**
-  เพราะ 777 รายงานเก็บตรรกะไว้ในไฟล์ `.rpt` ที่ไม่ได้อยู่ใน dump และไม่มีข้อมูลว่าฝ่ายไหนใช้รายงานไหนจริง
+- ⚠️ **การล็อกสาขาเปลี่ยนพฤติกรรมของผู้ใช้เดิม** — บน production มีผู้ใช้ active ที่ไม่มีสาขา 5 คน
+  (CASHIER, DELIVERY, IT_MGR, MARKETING) ในจำนวนนี้ IT_MGR ได้ `reports.all_branches` จาก migration แล้ว
+  แต่ **MARKETING จะเห็นรายงานเป็นค่าว่าง** จนกว่าจะกำหนดสาขาหรือให้สิทธิ์ — หน้าจอขึ้นข้อความบอกวิธีแก้แล้ว
+  ควรตัดสินใจก่อน deploy ว่าจะให้สิทธิ์หรือกำหนดสาขา
+- migration seed สิทธิ์ใหม่ให้ role: GM, IT_MGR, ACC_MGR, ACC (ทั้งสองสิทธิ์),
+  BRANCH_MGR + PURCHASING (เฉพาะ export) — **ยังไม่ได้ยืนยันกับเจ้าของว่าตรงกับที่ต้องการ**
+- ยังไม่ได้เปิดหน้า `/settings/reports` ดูด้วยตาจริง (ทดสอบผ่าน HTTP test เท่านั้น ไม่ได้ดู layout)
+- ยังไม่มี Excel/PDF export ฝั่ง server — ตอนนี้ยังเป็น CSV ฝั่ง browser เหมือนเดิม (ข้อ 6 ของ
+  "สถาปัตยกรรมรายงานใหม่" ยังไม่ครบ)
+- ยังไม่ได้ทำหน้ารายงานใหม่สักหน้า ตามที่สั่งให้ทำ catalog ก่อน
 
 ## Deploy
 
-**ยังไม่ deploy** ทั้ง `5107003` และของค้างจากรอบก่อน (`2b1dfa9..645b916`)
+**ยังไม่ deploy** — ค้างสะสม 3 รอบแล้ว: `2b1dfa9..645b916` (POS), `5107003` (รายงานนับซ้ำ),
+`711d133` (ทะเบียนรายงาน) รอบนี้มี migration ใหม่ `2026_08_22_000143_create_report_definitions_table`
+ต้องรัน `php artisan migrate` บน production ด้วย
 
 ## งานถัดไป
 
-1. เจ้าของตัดสินใจเรื่อง P0-1 ก่อน เพราะทุกตัวเลขรายงานขึ้นกับข้อนี้
-2. เขียน UAT เส้นเดียวยาว: PO → รับสินค้า → ต้นทุน → ขายเชื่อ → ตัดสต๊อก → ลูกหนี้ → รับชำระ → GL → รายงาน
-3. เจ้าของเลือกรายงานที่ใช้จริงจาก `docs/ai/legacy/reportfile-index.csv` (เปิดด้วย Excel ได้)
-   แล้วส่งไฟล์ `.rpt` + ตัวอย่างผลลัพธ์พร้อมยอดจริงของรายงานที่เลือก เพื่อทำ mapping และ UAT เทียบยอด
+1. เจ้าของยืนยัน **ความถี่จริง + ชื่อเจ้าของรายงาน** ของทั้ง 20 ตัว และส่งตัวอย่างผลลัพธ์จริง
+   พร้อมช่วงวันที่/สาขา เพื่อเริ่ม UAT
+2. ตัดสินใจ 3 เรื่อง schema ข้างบน (วันครบกำหนดส่งใบจอง / supplier open items / ตัวเดินสมุดเงินสด)
+3. ตัดสินใจเรื่องข้อมูล POS เก่า 16,537 ใบ + staging 37,412 แถว เพราะรายงานยอดขายทุกตัวผิดจนกว่าจะจบเรื่องนี้
+4. เมื่อได้ 1–3 แล้วจึงทำหน้ารายงาน P0 ทีละตัว ตัวไหน UAT ผ่านค่อยเปิดในทะเบียน
