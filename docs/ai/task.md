@@ -5,6 +5,7 @@
 ```
 5107003 Count each sale once in the channel sales reports
 32f6319 Audit ERP readiness against production data
+9e52940 Inventory the BPlus report registry
 ```
 
 ต่อจาก `a1b7424` (Add Claude ERP legacy rebuild brief)
@@ -68,7 +69,9 @@ journal header ที่บังคับ Dr=Cr ไม่มี, ไม่ม�
   (ซื้อ/การเงิน/ธนาคาร/ทรัพย์สิน/ผลิต) ตัดสินจากโค้ดกับจำนวน test เท่านั้น
 - การแก้ `documentSalesSlice` เพิ่ม `whereNotExists` เข้าไป — บน PostgreSQL ที่มีข้อมูลจริงเยอะ
   ควรดู query plan อีกที ตอนนี้ทดสอบบน SQLite ของชุดเทสต์เท่านั้น
-- งานระยะที่ 2 (`legacy-report-catalog.md`) **ยังไม่ได้เริ่ม** รอไฟล์ SQL/report export
+- งานระยะที่ 2 เริ่มแล้วบางส่วน: `docs/ai/legacy-report-catalog.md` + `docs/ai/legacy/reportfile-index.csv`
+  จาก dump ของตาราง `REPORTFILE` (1,502 รายงานจริงจาก 1,923 แถว) แต่ **ยัง mapping รายรายงานไม่ได้**
+  เพราะ 777 รายงานเก็บตรรกะไว้ในไฟล์ `.rpt` ที่ไม่ได้อยู่ใน dump และไม่มีข้อมูลว่าฝ่ายไหนใช้รายงานไหนจริง
 
 ## Deploy
 
@@ -78,4 +81,5 @@ journal header ที่บังคับ Dr=Cr ไม่มี, ไม่ม�
 
 1. เจ้าของตัดสินใจเรื่อง P0-1 ก่อน เพราะทุกตัวเลขรายงานขึ้นกับข้อนี้
 2. เขียน UAT เส้นเดียวยาว: PO → รับสินค้า → ต้นทุน → ขายเชื่อ → ตัดสต๊อก → ลูกหนี้ → รับชำระ → GL → รายงาน
-3. ส่งไฟล์ SQL/report export เดิมมา เพื่อเริ่มระยะที่ 2 ทำ `docs/ai/legacy-report-catalog.md`
+3. เจ้าของเลือกรายงานที่ใช้จริงจาก `docs/ai/legacy/reportfile-index.csv` (เปิดด้วย Excel ได้)
+   แล้วส่งไฟล์ `.rpt` + ตัวอย่างผลลัพธ์พร้อมยอดจริงของรายงานที่เลือก เพื่อทำ mapping และ UAT เทียบยอด
