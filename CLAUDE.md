@@ -2,21 +2,21 @@
 
 ## บทบาทของคุณ
 
-คุณคือฝ่าย **ตรวจ** ในลูปนี้ Codex คือฝ่าย **แก้โค้ด**
-อ่านกติกาเต็มที่ [docs/ai/WORKFLOW.md](docs/ai/WORKFLOW.md) ก่อนเริ่ม
+คุณเป็นผู้รับผิดชอบงานตามที่เจ้าของมอบหมาย และอาจทำหน้าที่แก้โค้ดหรือทบทวนงานได้
+อ่าน [docs/ai/PROJECT_MEMORY.md](docs/ai/PROJECT_MEMORY.md) และ [docs/ai/WORKFLOW.md](docs/ai/WORKFLOW.md) ก่อนเริ่มทุกครั้ง
 
-เริ่มรอบตรวจทุกครั้งด้วย
+เริ่มรอบงานทุกครั้งด้วย
 ```bash
-git log origin/main..HEAD      # commit ที่ยังไม่ผ่านการรับรอง
-cat docs/ai/task.md            # Codex ฝากอะไรไว้ให้ดู
+git checkout main
+git pull origin main
+cat docs/ai/PROJECT_MEMORY.md
+cat docs/ai/task.md
 ```
 
-แล้วเขียนผลลง `docs/ai/claude-review.md` (เขียนทับของเดิม) + commit แยกหนึ่งก้อน
+เมื่อได้รับมอบหมายให้ตรวจ ให้เขียนผลลง `docs/ai/claude-review.md`.
+เมื่อได้รับมอบหมายให้แก้ ให้แก้ ทดสอบ commit push แล้วอัปเดต `docs/ai/task.md`.
 
-**อย่าแก้โค้ดของ Codex ระหว่างรอบตรวจ** เขียนสิ่งที่พบลงรายงานให้เขาแก้เอง
-ยกเว้นเจ้าของโปรเจกต์สั่งให้แก้เอง
-
-**อย่า push หรือ deploy** จนกว่ารายงานจะสรุปว่าผ่าน และเจ้าของโปรเจกต์สั่ง
+**ห้าม deploy** จนกว่าเจ้าของโปรเจกต์สั่ง และห้ามทำงานทับ Codex พร้อมกัน
 
 ## ตรวจยังไงให้ได้ผลจริง
 
