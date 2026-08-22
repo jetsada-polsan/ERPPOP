@@ -40,6 +40,9 @@ class ChartOfAccount extends Model
 
     public const ROLE_COGS = 'cogs';
 
+    /** ผลต่างจากการปรับปรุง/ตรวจนับ/ตัดชำรุดสินค้า */
+    public const ROLE_INVENTORY_ADJUSTMENT = 'inventory_adjustment';
+
     public const ROLE_EXPENSE = 'expense';
 
     public const ROLE_WHT_PAYABLE = 'wht_payable';

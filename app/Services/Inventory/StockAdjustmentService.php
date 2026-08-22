@@ -9,6 +9,7 @@ use App\Models\StockBalance;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
 use App\Services\Sales\DocumentNumberGenerator;
+use App\Services\Accounting\GlPostingService;
 use App\Support\DecimalMath;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -25,6 +26,7 @@ class StockAdjustmentService
     public function __construct(
         private readonly DocumentNumberGenerator $numbers,
         private readonly FifoStockService $fifo,
+        private readonly GlPostingService $glPosting,
     ) {}
 
     /**
@@ -116,6 +118,7 @@ class StockAdjustmentService
                 throw new RuntimeException('เอกสารนี้ถูกดำเนินการไปแล้ว');
             }
             $locked->load('stockDocument.items');
+            $valueChange = 0.0;   // บวก = ของเกิน มูลค่าสต๊อกเพิ่ม, ลบ = ของขาด
             foreach ($locked->stockDocument->items as $item) {
                 $balance = StockBalance::where('product_id', $item->product_id)
                     ->where('warehouse_location_id', $item->warehouse_location_id)
@@ -135,10 +138,11 @@ class StockAdjustmentService
                     $product = Product::find($productId);
                     $explicitCost = $item->unit_cost ?? 0;
                     $unitCost = DecimalMath::compare($explicitCost, 0) > 0 ? $explicitCost : ($product?->average_cost ?? 0);
-                    $this->fifo->receive(
+                    $lot = $this->fifo->receive(
                         $productId, $warehouseLocationId, $diff,
                         $locked->id, 'adjust_in', unitCost: $unitCost,
                     );
+                    $valueChange += (float) $diff * (float) $lot->unit_cost;
                     if (DecimalMath::compare($explicitCost, 0) > 0) {
                         $product?->update([
                             'average_cost' => $explicitCost,
@@ -149,10 +153,12 @@ class StockAdjustmentService
                 } elseif (DecimalMath::compare($diff, 0) < 0) {
                     // ของขาด/เสียหาย: ตัด Lot จริงตาม FIFO เพื่อให้ stock_lots สะท้อนของที่หายไปจริง
                     // (ไม่ทำแบบเดิมที่แก้ stock_balances ตรงๆ โดยไม่แตะ stock_lots เลย)
-                    $this->fifo->issue(
+                    // มูลค่าที่หายไปคิดจาก Lot ที่ถูกตัดจริง ไม่ใช่ต้นทุนเฉลี่ยปัจจุบัน
+                    $allocations = $this->fifo->issue(
                         $productId, $warehouseLocationId, DecimalMath::absoluteDifference($diff, 0),
                         $locked->id, 'adjust_out', allowNegative: true,
                     );
+                    $valueChange -= $this->allocatedValue($allocations);
                 }
             }
             $locked->update([
@@ -163,7 +169,18 @@ class StockAdjustmentService
                 'status' => 'posted', 'confirmed_by' => auth()->id(), 'confirmed_at' => now(), 'updated_at' => now(),
             ]);
 
+            // มูลค่าสต๊อกเปลี่ยนแล้วต้องสะท้อนในบัญชีทันที ไม่งั้นปิดงวดกระทบยอดไม่ได้
+            $this->glPosting->postInventoryAdjustment($locked, $valueChange, 'ปรับปรุงสินค้าคงเหลือ');
+
             return $locked->fresh();
         });
+    }
+
+    /** มูลค่ารวมของ Lot ที่ถูกตัดไปจริง (FIFO คืนมาเป็นคู่ lot + qty) */
+    private function allocatedValue(\Illuminate\Support\Collection $allocations): float
+    {
+        return (float) $allocations->sum(
+            fn (array $allocation) => (float) $allocation['qty'] * (float) $allocation['lot']->unit_cost
+        );
     }
 }

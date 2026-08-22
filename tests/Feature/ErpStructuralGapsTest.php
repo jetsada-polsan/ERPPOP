@@ -95,32 +95,24 @@ class ErpStructuralGapsTest extends TestCase
         );
     }
 
-    /** ช่องว่างข้อ 4 — สต๊อก/ผลิต/ค่าเสื่อม ไม่ลง GL */
-    public function test_gap_inventory_and_depreciation_movements_never_reach_the_ledger(): void
+    /** ช่องว่างข้อ 4 — ปิดไปบางส่วนแล้ว: ปรับปรุง/ตัดชำรุด ลง GL แล้ว ที่เหลือยังไม่ลง */
+    public function test_gap_only_some_inventory_movements_reach_the_ledger(): void
     {
-        $postingUsers = [];
-        foreach ($this->applicationFiles() as $file) {
-            $path = str_replace(base_path().'/', '', $file);
-            if (! str_starts_with($path, 'app/Services/')) {
-                continue;
-            }
-            if (str_contains(file_get_contents($file), 'GlPostingService')) {
-                $postingUsers[] = $path;
-            }
-        }
+        $posts = fn (string $file) => str_contains(file_get_contents(base_path($file)), 'GlPostingService');
 
-        // ไม่มี service ในกลุ่ม Inventory เลยที่ลง GL
-        $inventoryPosting = array_filter($postingUsers, fn ($p) => str_contains($p, 'Services/Inventory/'));
-        $this->assertSame([], array_values($inventoryPosting));
-        $this->assertFalse(
-            str_contains(file_get_contents(base_path('app/Services/Accounting/DepreciationService.php')), 'GlPostingService'),
-            'DepreciationService ลง GL แล้ว - ให้เปลี่ยนเทสต์นี้เป็นเทสต์จริง'
-        );
+        // ปิดแล้ว — มีเทสต์จริงที่ InventoryLedgerPostingTest
+        $this->assertTrue($posts('app/Services/Inventory/StockAdjustmentService.php'));
+        $this->assertTrue($posts('app/Services/Inventory/StockIssueService.php'));
+
+        // ยังไม่ปิด
+        $this->assertFalse($posts('app/Services/Inventory/StockTransformService.php'));
+        $this->assertFalse($posts('app/Services/Inventory/ProductionReceiptService.php'));
+        $this->assertFalse($posts('app/Services/Accounting/DepreciationService.php'));
 
         $this->markTestIncomplete(
-            'ปรับสต๊อก โอนย้าย ตรวจนับ แปรรูป รับผลิต และค่าเสื่อมราคา ไม่ลง GL เลย '.
-            'ลง GL เฉพาะซื้อ ขาย รับ/จ่ายชำระ และค่าใช้จ่าย '.
-            'ผลคือมูลค่าสินค้าคงเหลือในบัญชีจะไม่ตรงกับสต๊อกจริงทันทีที่มีการปรับปรุง'
+            'ปรับปรุงสต๊อก ตรวจนับ และตัดชำรุด ลง GL แล้ว (บัญชี 5030 ผลต่างสินค้าคงเหลือ) '.
+            'ที่ยังไม่ลง: แปรรูปสินค้า รับผลิต และค่าเสื่อมราคา '.
+            'ค่าเสื่อมยังต้องมีบัญชีค่าเสื่อมสะสมก่อน ซึ่งผังบัญชียังไม่มี'
         );
     }
 

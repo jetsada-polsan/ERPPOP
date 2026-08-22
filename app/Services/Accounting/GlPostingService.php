@@ -213,6 +213,31 @@ class GlPostingService
         $this->appendCogs($document, $document->doc_number);
     }
 
+    /**
+     * การเปลี่ยนมูลค่าสินค้าคงเหลือที่ไม่ได้มาจากการซื้อหรือขาย
+     * (ปรับปรุง ตรวจนับ ตัดชำรุด) — ของเกินเพิ่มสินค้าคงเหลือ ของขาดลดลง
+     * อีกขาลงบัญชีผลต่าง เพื่อให้มูลค่าสต๊อกในบัญชีตรงกับของจริงเสมอ
+     *
+     * @param  float  $valueChange  บวก = มูลค่าสต๊อกเพิ่ม, ลบ = ลดลง
+     */
+    public function postInventoryAdjustment(Document $document, float $valueChange, string $label): void
+    {
+        $amount = round(abs($valueChange), 2);
+        if ($amount < 0.01) {
+            return;
+        }
+
+        $this->postDocument($document, $valueChange > 0
+            ? [
+                ['role' => ChartOfAccount::ROLE_INVENTORY, 'debit' => $amount],
+                ['role' => ChartOfAccount::ROLE_INVENTORY_ADJUSTMENT, 'credit' => $amount],
+            ]
+            : [
+                ['role' => ChartOfAccount::ROLE_INVENTORY_ADJUSTMENT, 'debit' => $amount],
+                ['role' => ChartOfAccount::ROLE_INVENTORY, 'credit' => $amount],
+            ], $label.' '.$document->doc_number);
+    }
+
     public function reverseDocument(Document $document, string $remark): void
     {
         $lines = GlJournal::where('document_id', $document->id)

@@ -7,6 +7,7 @@ use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
+use App\Services\Accounting\GlPostingService;
 use App\Services\Sales\DocumentNumberGenerator;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -34,6 +35,7 @@ class StockIssueService
     public function __construct(
         private readonly DocumentNumberGenerator $numbers,
         private readonly FifoStockService $fifo,
+        private readonly GlPostingService $glPosting,
     ) {}
 
     /**
@@ -129,11 +131,18 @@ class StockIssueService
             if ($locked->documentType->code !== 'STOCK_DAMAGE' || $locked->status !== 'pending_approval') {
                 throw new RuntimeException('เอกสารนี้ไม่ใช่ใบตัดชำรุดที่รออนุมัติ');
             }
+            $writeOffValue = 0.0;
             foreach ($locked->stockDocument->items as $item) {
-                $this->fifo->issue((int) $item->product_id, (int) $item->warehouse_location_id, (float) $item->qty,
+                $allocations = $this->fifo->issue((int) $item->product_id, (int) $item->warehouse_location_id, (float) $item->qty,
                     $locked->id, 'out', allowExpired: true, allowRestricted: true);
+                $writeOffValue += (float) $allocations->sum(
+                    fn (array $allocation) => (float) $allocation['qty'] * (float) $allocation['lot']->unit_cost
+                );
             }
             $locked->update(['status' => 'active']);
+
+            // ของที่ตัดทิ้งหายจากสต๊อกจริง บัญชีต้องรู้ด้วย
+            $this->glPosting->postInventoryAdjustment($locked, -$writeOffValue, 'ตัดชำรุดสินค้า');
 
             return $locked->fresh();
         });
