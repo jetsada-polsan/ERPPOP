@@ -42,7 +42,7 @@
                             <th style="width:130px">สิทธิ์ที่ต้องมี</th>
                             <th style="width:120px">เจ้าของ</th>
                             <th style="width:90px">ความถี่</th>
-                            <th style="width:70px">ลำดับ</th>
+                            <th style="width:80px">ระดับ</th>
                             <th style="width:110px">สถานะ</th>
                             <th style="width:120px" class="text-end">แสดงในเมนู</th>
                         </tr>

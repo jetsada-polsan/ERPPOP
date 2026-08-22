@@ -112,8 +112,9 @@ class SalesReportChannelOverlapTest extends TestCase
 
         $user = User::factory()->create(['username' => 'report-overlap', 'is_active' => true, 'must_change_password' => false]);
         $role = Role::create(['code' => 'REPORT_OVL', 'name' => 'Report Viewer']);
-        // หมวด 'sales' ของหน้ารายงานต้องใช้ sales.manage ไม่ใช่ reports.view (ดู canSeeReport)
-        foreach (['reports.view', 'sales.manage'] as $code) {
+        // หมวด 'sales' ต้องใช้ sales.manage ไม่ใช่ reports.view (ดู canSeeReport)
+        // และผู้ใช้ที่ไม่ผูกสาขาต้องมี reports.all_branches ไม่งั้นถูกล็อกจนไม่เห็นข้อมูลใด ๆ
+        foreach (['reports.view', 'sales.manage', 'reports.all_branches'] as $code) {
             $role->permissions()->attach(Permission::firstOrCreate(['code' => $code], ['name' => $code])->id);
         }
         $user->roles()->attach($role->id);

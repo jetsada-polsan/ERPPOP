@@ -10,6 +10,10 @@ use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
+    /** สาขาที่ไม่มีอยู่จริง ใช้กรองให้ได้ผลลัพธ์ว่างเมื่อผู้ใช้ยังไม่ผูกสาขาและไม่มีสิทธิ์ข้ามสาขา */
+    private const NO_BRANCH_SENTINEL = '-1';
+
+
     public function index(Request $request)
     {
         $definitions = $this->definitions();
@@ -42,7 +46,8 @@ class ReportController extends Controller
         $requestedBranch = $request->input('branch_id');
         if (! $canSeeAllBranches) {
             // ไม่มีสาขาและไม่มีสิทธิ์ข้ามสาขา = ยังกรองอะไรไม่ได้ ให้ผลลัพธ์ว่างแทนที่จะเผยทุกสาขา
-            $requestedBranch = $user->branch_id === null ? '0' : (string) $user->branch_id;
+            // ใช้ -1 ไม่ใช่ 0 เพราะ applyBranch() เช็คด้วย empty() ซึ่งมองว่า '0' คือ "ไม่กรอง"
+            $requestedBranch = $user->branch_id === null ? self::NO_BRANCH_SENTINEL : (string) $user->branch_id;
         } elseif ($requestedBranch === null && ($userBranch = $user?->branch_id)) {
             $requestedBranch = (string) $userBranch;
         } elseif ($requestedBranch === 'all') {

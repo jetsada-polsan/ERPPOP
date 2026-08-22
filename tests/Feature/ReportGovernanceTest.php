@@ -106,6 +106,51 @@ class ReportGovernanceTest extends TestCase
             ->get('/reports')->assertOk()->assertViewHas('canExport', true)->assertSee('ดาวน์โหลด Excel');
     }
 
+    public function test_a_user_with_no_branch_and_no_cross_branch_right_sees_no_real_data(): void
+    {
+        $this->twoBranchesWithCreditSales();
+        $user = $this->userWith(['sales.manage']);   // ไม่ผูกสาขา และไม่มี reports.all_branches
+
+        $response = $this->actingAs($user)->get('/reports?category=sales&report=credit_sales&from=2026-08-01&to=2026-08-31&branch_id=all');
+
+        $response->assertOk();
+        $response->assertViewHas('branchLocked', true);
+        $response->assertSee('ยังไม่ได้สังกัดสาขา');
+        $this->assertEmpty($response->viewData('result')['rows']);
+    }
+
+    /** นโยบายสิทธิ์ที่เจ้าของตัดสินใจ 2026-08-23 — migration ต้อง seed ให้ตรงนี้ */
+    public function test_the_seeded_roles_match_the_agreed_access_policy(): void
+    {
+        $expected = [
+            'GM' => ['reports.export' => true, 'reports.all_branches' => true],
+            'IT_MGR' => ['reports.export' => true, 'reports.all_branches' => true],
+            'ACC_MGR' => ['reports.export' => true, 'reports.all_branches' => true],
+            'EXECUTIVE' => ['reports.export' => true, 'reports.all_branches' => true],
+            // พนักงานบัญชีส่งออกได้ แต่ดูเฉพาะสาขาตัวเอง
+            'ACC' => ['reports.export' => true, 'reports.all_branches' => false],
+            'BRANCH_MGR' => ['reports.export' => true, 'reports.all_branches' => false],
+            // หน้าร้านและพนักงานส่งของไม่มีสิทธิ์รายงานเลย
+            'CASHIER' => ['reports.view' => false, 'reports.export' => false, 'reports.all_branches' => false],
+            'DELIVERY' => ['reports.view' => false, 'reports.export' => false, 'reports.all_branches' => false],
+            // การตลาดดูรายงานได้ แต่ไม่แตะการเงินและไม่ข้ามสาขา
+            'MARKETING' => ['reports.view' => true, 'finance.manage' => false, 'reports.all_branches' => false],
+        ];
+
+        foreach ($expected as $roleCode => $permissions) {
+            $role = Role::where('code', $roleCode)->first();
+            $this->assertNotNull($role, "ไม่พบ role {$roleCode}");
+            $held = $role->permissions()->pluck('code')->all();
+            foreach ($permissions as $code => $shouldHave) {
+                $this->assertSame(
+                    $shouldHave,
+                    in_array($code, $held, true),
+                    "{$roleCode} ".($shouldHave ? 'ต้องมี' : 'ต้องไม่มี')." {$code}"
+                );
+            }
+        }
+    }
+
     private function twoBranchesWithCreditSales(): array
     {
         $own = Branch::create(['code' => 'OWN', 'name_th' => 'สาขาตัวเอง', 'is_active' => true]);
