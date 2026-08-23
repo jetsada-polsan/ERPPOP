@@ -95,14 +95,15 @@ class ErpStructuralGapsTest extends TestCase
         );
     }
 
-    /** ช่องว่างข้อ 4 — ปิดไปบางส่วนแล้ว: ปรับปรุง/ตัดชำรุด ลง GL แล้ว ที่เหลือยังไม่ลง */
+    /** ช่องว่างข้อ 4 — ปิดไปเกือบหมดแล้ว เหลือแปรรูป/ผลิต/ค่าเสื่อม */
     public function test_gap_only_some_inventory_movements_reach_the_ledger(): void
     {
         $posts = fn (string $file) => str_contains(file_get_contents(base_path($file)), 'GlPostingService');
 
-        // ปิดแล้ว — มีเทสต์จริงที่ InventoryLedgerPostingTest
+        // ปิดแล้ว — เทสต์จริงอยู่ที่ InventoryLedgerPostingTest และ BookingDeliveryAndCashTransferTest
         $this->assertTrue($posts('app/Services/Inventory/StockAdjustmentService.php'));
         $this->assertTrue($posts('app/Services/Inventory/StockIssueService.php'));
+        $this->assertTrue($posts('app/Services/Accounting/CashTransferService.php'));
 
         // ยังไม่ปิด
         $this->assertFalse($posts('app/Services/Inventory/StockTransformService.php'));
@@ -110,7 +111,7 @@ class ErpStructuralGapsTest extends TestCase
         $this->assertFalse($posts('app/Services/Accounting/DepreciationService.php'));
 
         $this->markTestIncomplete(
-            'ปรับปรุงสต๊อก ตรวจนับ และตัดชำรุด ลง GL แล้ว (บัญชี 5030 ผลต่างสินค้าคงเหลือ) '.
+            'ปรับสต๊อก ตรวจนับ ตัดชำรุด และฝาก/ถอนเงินสด ลง GL แล้ว '.
             'ที่ยังไม่ลง: แปรรูปสินค้า รับผลิต และค่าเสื่อมราคา '.
             'ค่าเสื่อมยังต้องมีบัญชีค่าเสื่อมสะสมก่อน ซึ่งผังบัญชียังไม่มี'
         );

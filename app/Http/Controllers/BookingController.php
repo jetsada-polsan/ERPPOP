@@ -8,6 +8,7 @@ use App\Models\SaleBooking;
 use App\Models\SalesArea;
 use App\Models\User;
 use App\Services\Sales\BookingService;
+use App\Services\Sales\BookingDeliveryService;
 use App\Services\Sales\CreditSaleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -225,6 +226,27 @@ class BookingController extends Controller
 
         return redirect()->route('sales.show', $saleDocument)
             ->with('success', "แปลงใบจองเป็นใบขายเชื่อ {$saleDocument->doc_number} แล้ว ตัดสต๊อกและตั้งลูกหนี้เรียบร้อย");
+    }
+
+    /** บันทึกผลการส่งของ — ส่งบางส่วน ส่งครบ หรือยกเลิกการส่ง */
+    public function recordDelivery(Request $request, SaleBooking $booking, BookingDeliveryService $service): RedirectResponse
+    {
+        $data = $request->validate([
+            'delivery_status' => ['required', 'in:partial,delivered,cancelled'],
+            'note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        try {
+            $service->record($booking, $data['delivery_status'], $data['note'] ?? null);
+        } catch (RuntimeException $e) {
+            return redirect()->route('bookings.show', $booking)->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('bookings.show', $booking)->with('success', match ($data['delivery_status']) {
+            'delivered' => 'บันทึกส่งครบแล้ว',
+            'partial' => 'บันทึกส่งบางส่วนแล้ว ใบจองยังค้างส่งอยู่',
+            default => 'ยกเลิกการส่งของใบจองนี้แล้ว',
+        });
     }
 
     private function legacyBookingsReady(): bool

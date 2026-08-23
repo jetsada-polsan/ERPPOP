@@ -238,6 +238,20 @@ class GlPostingService
             ], $label.' '.$document->doc_number);
     }
 
+    /** ย้ายเงินระหว่างลิ้นชักกับบัญชีธนาคาร ไม่ใช่รายได้หรือค่าใช้จ่าย จึงกระทบแค่สองบัญชีนี้ */
+    public function postCashTransfer(Document $document, float $amount, bool $isDeposit): void
+    {
+        $this->postDocument($document, $isDeposit
+            ? [
+                ['role' => ChartOfAccount::ROLE_BANK, 'debit' => $amount],
+                ['role' => ChartOfAccount::ROLE_CASH, 'credit' => $amount],
+            ]
+            : [
+                ['role' => ChartOfAccount::ROLE_CASH, 'debit' => $amount],
+                ['role' => ChartOfAccount::ROLE_BANK, 'credit' => $amount],
+            ], ($isDeposit ? 'ฝากเงินสดเข้าธนาคาร ' : 'ถอนเงินสดจากธนาคาร ').$document->doc_number);
+    }
+
     public function reverseDocument(Document $document, string $remark): void
     {
         $lines = GlJournal::where('document_id', $document->id)
