@@ -46,6 +46,9 @@ class RouteIntegrityTest extends TestCase
     {
         $this->actingAs(User::factory()->create(['username' => 'route_smoke_admin']));
         $this->withoutMiddleware(ErpAuthorize::class);
+        // เทสต์นี้ถามว่าหน้าเว็บพังฝั่งเซิร์ฟเวอร์ไหม ไม่ได้ถามว่า build asset แล้วหรือยัง
+        // ผูกไว้กับ manifest ของ Vite แล้ว CI ที่ไม่ได้ build จะแดงด้วยเรื่องคนละเรื่อง
+        $this->withoutVite();
 
         $routes = collect(Route::getRoutes()->getRoutes())
             ->filter(fn (RoutingRoute $route) => in_array('GET', $route->methods(), true))
