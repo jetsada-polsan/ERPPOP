@@ -26,7 +26,8 @@ class UatConcurrency extends Command
         {--users=10 : จำนวน process ที่ยิงพร้อมกัน}
         {--per-user=5 : จำนวนเอกสารต่อ process}
         {--branch= : id ของสาขาที่ใช้ทดสอบ}
-        {--type=CASH_SALE : ชนิดเอกสารที่จะขอเลขที่}
+        {--type=CASH_SALE : ชนิดเอกสารที่จะขอเลขที่ (โหมด number)}
+        {--mode=number : number = ขอเลขอย่างเดียว, sale = ขายจริงทั้งวงจร}
         {--confirm-test-database : ยืนยันว่าฐานนี้เป็นฐานทดสอบ}';
 
     protected $description = 'Concurrency UAT: prove document numbers stay unique under parallel load';
@@ -76,7 +77,9 @@ class UatConcurrency extends Command
                 return self::FAILURE;
             }
             if ($pid === 0) {
-                $this->runWorker($worker, $perUser, $type, $branchId, $resultDir);
+                $this->option('mode') === 'sale'
+                    ? $this->runSaleWorker($worker, $perUser, $branchId, $resultDir)
+                    : $this->runWorker($worker, $perUser, $type, $branchId, $resultDir);
                 exit(0);
             }
             $children[] = $pid;
@@ -112,6 +115,46 @@ class UatConcurrency extends Command
                     ]);
                     $numbers[] = $number;
                 });
+            } catch (Throwable $exception) {
+                $errors[] = [
+                    'message' => mb_substr($exception->getMessage(), 0, 200),
+                    'deadlock' => str_contains(strtolower($exception->getMessage()), 'deadlock'),
+                ];
+            }
+            $latencies[] = round((microtime(true) - $begin) * 1000, 2);
+        }
+
+        file_put_contents(
+            $resultDir.'/worker-'.$worker.'.json',
+            json_encode(compact('numbers', 'errors', 'latencies'), JSON_UNESCAPED_UNICODE),
+        );
+    }
+
+    /**
+     * ขายจริงทั้งวงจร: ตัดสต๊อก คิดต้นทุน ลง GL และเข้า sales_postings
+     * ใช้พิสูจน์ว่ายิงพร้อมกันแล้วสต๊อก ต้นทุน และบัญชีไม่เพี้ยน ไม่ใช่แค่เลขไม่ซ้ำ
+     */
+    private function runSaleWorker(int $worker, int $perUser, int $branchId, string $resultDir): void
+    {
+        DB::purge();
+        $numbers = [];
+        $errors = [];
+        $latencies = [];
+        $productIds = DB::table('products')->where('sku_code', 'like', 'UAT-%')->pluck('id')->all();
+
+        for ($index = 0; $index < $perUser; $index++) {
+            $begin = microtime(true);
+            try {
+                $document = app(\App\Services\Sales\CashSaleService::class)->create([
+                    'branch_id' => $branchId,
+                    'items' => [[
+                        'product_id' => $productIds[($worker + $index) % count($productIds)],
+                        'qty' => 1,
+                        'unit_price' => 100,
+                    ]],
+                    'allow_negative_stock' => true,
+                ]);
+                $numbers[] = $document->doc_number;
             } catch (Throwable $exception) {
                 $errors[] = [
                     'message' => mb_substr($exception->getMessage(), 0, 200),
