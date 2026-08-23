@@ -89,16 +89,22 @@ jobs:
       - name: ตรวจฐานต้นทุนก่อนกระทบยอด
         run: |
           php artisan tinker --execute="
-            printf('lots=%d balances=%d avg_cost=%s lot_cost=%s line_cost=%s'.PHP_EOL,
+            \$ids = DB::table('products')->where('sku_code','like','UAT-%')->pluck('id');
+            printf('สินค้า UAT (query builder)=%d · ที่ Eloquent มองเห็น=%d'.PHP_EOL,
+              \$ids->count(), App\Models\Product::whereIn('id', \$ids)->count());
+            printf('lots=%d (คิดต้นทุน 0 = %d) · balances=%d'.PHP_EOL,
               DB::table('stock_lots')->count(),
-              DB::table('stock_balances')->count(),
-              DB::table('products')->where('sku_code','like','UAT-%')->value('average_cost') ?? 'null',
-              DB::table('stock_lots')->value('unit_cost') ?? 'null',
-              DB::table('stock_document_items')->value('cost_amount') ?? 'null');
-            printf('lot_location=%s branch_default_location=%s item_location=%s'.PHP_EOL,
-              DB::table('stock_lots')->value('warehouse_location_id') ?? 'null',
-              DB::table('branches')->where('code','UAT')->value('default_warehouse_location_id') ?? 'null',
-              DB::table('stock_document_items')->value('warehouse_location_id') ?? 'null');
+              DB::table('stock_lots')->where('unit_cost', 0)->count(),
+              DB::table('stock_balances')->count());
+            printf('movement มี lot=%d · ไม่มี lot=%d'.PHP_EOL,
+              DB::table('stock_movements')->whereNotNull('stock_lot_id')->count(),
+              DB::table('stock_movements')->whereNull('stock_lot_id')->count());
+            printf('บรรทัดขาย=%d · ต้นทุน>0=%d · รวมต้นทุน=%s'.PHP_EOL,
+              DB::table('stock_document_items')->count(),
+              DB::table('stock_document_items')->where('cost_amount','>',0)->count(),
+              DB::table('stock_document_items')->sum('cost_amount'));
+            printf('fillable ของ StockDocumentItem มี cost_amount=%s'.PHP_EOL,
+              in_array('cost_amount', (new App\Models\StockDocumentItem)->getFillable(), true) ? 'มี' : 'ไม่มี');
           "
 
       - name: กระทบยอด stock / COGS / GL / sales_postings
