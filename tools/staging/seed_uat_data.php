@@ -56,6 +56,13 @@ DB::transaction(function () {
             'negative_stock_policy' => 'allow',
             'created_at' => now(), 'updated_at' => now(),
         ]);
+        // ต้องมี lot ไม่ใช่แค่ยอดคงเหลือ — FIFO ตัดต้นทุนจาก lot ถ้าไม่มีจะขายได้แต่ต้นทุนเป็นศูนย์
+        DB::table('stock_lots')->insert([
+            'product_id' => $productId, 'warehouse_location_id' => $locationId,
+            'lot_number' => 'UAT-LOT-'.$i, 'received_date' => now()->toDateString(),
+            'initial_qty' => 1000, 'remaining_qty' => 1000, 'unit_cost' => 30 + $i,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
         DB::table('stock_balances')->insert([
             'product_id' => $productId, 'warehouse_location_id' => $locationId,
             'on_hand_qty' => 10000, 'reserved_qty' => 0,

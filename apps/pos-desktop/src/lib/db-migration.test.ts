@@ -1,5 +1,13 @@
-import { DatabaseSync } from 'node:sqlite'
+import { createRequire } from 'node:module'
+import type { DatabaseSync as DatabaseSyncClass } from 'node:sqlite'
 import { describe, expect, it } from 'vitest'
+
+// โหลดตอนรันไทม์ เพราะ vite รุ่นที่ล็อกไว้ยังไม่รู้จัก node:sqlite
+// มันจะตัด prefix "node:" ทิ้งแล้วไปหา package ชื่อ sqlite ซึ่งไม่มีอยู่จริง
+// ส่วน import type ข้างบนถูกลบตอนคอมไพล์ vite จึงไม่เห็น
+const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite') as {
+  DatabaseSync: typeof DatabaseSyncClass
+}
 
 /**
  * อัปเดตแล้วของที่ค้างอยู่ในเครื่องต้องไม่หาย
@@ -12,7 +20,7 @@ import { describe, expect, it } from 'vitest'
 // ต่างไปจนงาน build installer ที่ล็อกไว้ด้วย --frozen-lockfile ล้ม
 
 /** ทำซ้ำสิ่งที่ connection() ใน db.ts ทำ เพื่อทดสอบได้โดยไม่ต้องมี Tauri */
-function applySchema(db: DatabaseSync) {
+function applySchema(db: DatabaseSyncClass) {
   db.exec(`CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)`)
   db.exec(`CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY, data TEXT NOT NULL, synced_at TEXT NOT NULL)`)
   db.exec(`CREATE TABLE IF NOT EXISTS promotions (id INTEGER PRIMARY KEY, data TEXT NOT NULL, synced_at TEXT NOT NULL)`)
@@ -39,7 +47,7 @@ function applySchema(db: DatabaseSync) {
 }
 
 /** โครงของรุ่นก่อนหน้า ที่ยังไม่มีตาราง product_barcodes */
-function applyPreviousSchema(db: DatabaseSync) {
+function applyPreviousSchema(db: DatabaseSyncClass) {
   db.exec(`CREATE TABLE app_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)`)
   db.exec(`CREATE TABLE products (id INTEGER PRIMARY KEY, data TEXT NOT NULL, synced_at TEXT NOT NULL)`)
   db.exec(`CREATE TABLE promotions (id INTEGER PRIMARY KEY, data TEXT NOT NULL, synced_at TEXT NOT NULL)`)

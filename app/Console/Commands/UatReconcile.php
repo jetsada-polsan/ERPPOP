@@ -71,10 +71,22 @@ class UatReconcile extends Command
             ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE'])
             ->when($branchId, fn ($q) => $q->where('d.branch_id', $branchId))
             ->sum('sdi.cost_amount');
+        // ขายแล้วต้นทุนเป็นศูนย์ไม่ใช่ "ตรงกัน" แต่แปลว่าไม่มีใครลงต้นทุนเลย
+        // เทียบศูนย์กับศูนย์แล้วผ่าน จะทำให้ระบบที่เลิกลง COGS ทั้งระบบยังผ่านเกณฑ์นี้ได้
+        $soldLines = DB::table('stock_document_items as sdi')
+            ->join('stock_documents as sd', 'sd.id', '=', 'sdi.stock_document_id')
+            ->join('documents as d', 'd.id', '=', 'sd.document_id')
+            ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
+            ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE'])
+            ->when($branchId, fn ($q) => $q->where('d.branch_id', $branchId))
+            ->count();
+        $costMissing = $soldLines > 0 && $lineCogs <= 0;
         $checks[] = [
             'ต้นทุนขาย GL = ต้นทุนบนบรรทัด',
-            abs($glCogs - $lineCogs) < 0.01,
-            sprintf('GL %s vs บรรทัด %s (ต่าง %s)', number_format($glCogs, 2), number_format($lineCogs, 2), number_format($glCogs - $lineCogs, 2)),
+            abs($glCogs - $lineCogs) < 0.01 && ! $costMissing,
+            $costMissing
+                ? sprintf('ขาย %d บรรทัดแต่ต้นทุนเป็นศูนย์ — สินค้าน่าจะไม่มี lot ให้ FIFO ตัดต้นทุน', $soldLines)
+                : sprintf('GL %s vs บรรทัด %s (ต่าง %s)', number_format($glCogs, 2), number_format($lineCogs, 2), number_format($glCogs - $lineCogs, 2)),
         ];
 
         // 5. ยอดขายใน sales_postings ต้องเท่ากับรายได้ + ภาษีขายใน GL
