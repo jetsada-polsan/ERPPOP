@@ -139,6 +139,13 @@ class PurchaseQuoteService
             'spread' => $quotes->count() > 1
                 ? round((float) $quotes->last()->total_amount - $cheapestTotal, 2)
                 : 0.0,
+            'cheapest_total' => $cheapestTotal,
+            'quoted_supplier_ids' => $quotes->pluck('supplier_id')->all(),
+            // ราคาต่อรายการของแต่ละใบ ให้ view หยิบไปแสดงตรง ๆ ไม่ต้องคำนวณเอง
+            'prices' => $quotes->mapWithKeys(fn (PurchaseQuote $quote) => [
+                $quote->id => $quote->items->keyBy('purchase_order_item_id'),
+            ]),
+            'can_quote' => ! in_array($order->status, ['ordered', 'partially_received', 'received', 'cancelled'], true),
         ];
     }
 }

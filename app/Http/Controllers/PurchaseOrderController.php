@@ -96,12 +96,13 @@ class PurchaseOrderController extends Controller
             ->with('success', "สร้างใบขอซื้อ {$order->doc_number} แล้ว");
     }
 
-    public function show(PurchaseOrder $purchaseOrder): View
+    public function show(PurchaseOrder $purchaseOrder, PurchaseQuoteService $quotes): View
     {
         $purchaseOrder->load(['supplier', 'branch', 'requester', 'approver', 'receivedDocument', 'receipts.document', 'receipts.receiver', 'items.product.baseUnit']);
         $suppliers = Supplier::where('is_active', true)->orderBy('code')->limit(500)->get(['id', 'code', 'name_th']);
+        $comparison = $quotes->comparison($purchaseOrder);
 
-        return view('purchase-orders.show', compact('purchaseOrder', 'suppliers'));
+        return view('purchase-orders.show', compact('purchaseOrder', 'suppliers', 'comparison'));
     }
 
     // ใบสั่งซื้อแบบพิมพ์ A4 หัวบริษัทครบ (ส่งให้ผู้ขาย)

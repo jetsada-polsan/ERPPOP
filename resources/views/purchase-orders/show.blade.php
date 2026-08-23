@@ -100,6 +100,126 @@
         </table>
     </div>
 
+    <div class="content-card mt-3 overflow-hidden">
+        <div class="px-3 py-2 border-bottom d-flex justify-content-between align-items-center">
+            <span class="fw-bold small"><i class="bi bi-clipboard-data me-1"></i>ใบสอบราคา — เทียบผู้ขาย</span>
+            @if($comparison['quotes']->count() > 1)
+                <span class="small text-muted">ส่วนต่างถูกสุด–แพงสุด <b>{{ number_format($comparison['spread'], 2) }}</b></span>
+            @endif
+        </div>
+
+        @if($comparison['quotes']->isEmpty())
+            <div class="p-3 text-muted small">
+                ยังไม่มีใบเสนอราคา — บันทึกราคาจากผู้ขายอย่างน้อยสองเจ้าก่อนสั่งซื้อ
+                จะได้ตอบได้ว่าทำไมถึงเลือกเจ้านั้น
+            </div>
+        @else
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>ผู้ขาย</th>
+                        @foreach($purchaseOrder->items as $item)
+                            <th class="text-end">{{ $item->product->sku_code }}</th>
+                        @endforeach
+                        <th class="text-end">รวม</th>
+                        <th class="text-end">ต่างจากถูกสุด</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach($comparison['quotes'] as $quote)
+                    @php($gap = (float) $quote->total_amount - $comparison['cheapest_total'])
+                    <tr class="{{ $quote->is_selected ? 'table-success' : '' }}">
+                        <td>
+                            <div class="fw-semibold">{{ $quote->supplier->name_th }}</div>
+                            <div class="small text-muted">
+                                @if($quote->id === $comparison['cheapest_id'])<span class="badge text-bg-success-subtle text-success">ราคาต่ำสุด</span>@endif
+                                @if($quote->reference) เลขที่ {{ $quote->reference }}@endif
+                                @if($quote->valid_until) · ยืนราคาถึง {{ $quote->valid_until->format('d/m/Y') }}@endif
+                            </div>
+                            @if($quote->is_selected && $quote->selection_reason)
+                                <div class="small text-success mt-1"><i class="bi bi-info-circle me-1"></i>{{ $quote->selection_reason }}</div>
+                            @endif
+                        </td>
+                        @foreach($purchaseOrder->items as $item)
+                            <td class="text-end">{{ number_format((float) ($comparison['prices'][$quote->id][$item->id]->unit_price ?? 0), 2) }}</td>
+                        @endforeach
+                        <td class="text-end fw-bold">{{ number_format((float) $quote->total_amount, 2) }}</td>
+                        <td class="text-end {{ $gap > 0 ? 'text-danger' : 'text-muted' }}">
+                            {{ $gap > 0 ? '+'.number_format($gap, 2) : '-' }}
+                        </td>
+                        <td class="text-end">
+                            @if($quote->is_selected)
+                                <span class="badge text-bg-success">เลือกแล้ว</span>
+                            @elseif($purchaseOrder->status === 'approved')
+                                <form method="post" action="{{ route('purchase-orders.quotes.select', $quote) }}" class="d-flex gap-1 justify-content-end">
+                                    @csrf
+                                    {{-- เลือกเจ้าที่แพงกว่าได้ แต่ต้องบอกเหตุผล ไม่งั้น service จะปฏิเสธ --}}
+                                    @if($quote->id !== $comparison['cheapest_id'])
+                                        <input type="text" name="selection_reason" required maxlength="255"
+                                               class="form-control form-control-sm" style="max-width:220px"
+                                               placeholder="เหตุผลที่ไม่เลือกราคาต่ำสุด">
+                                    @endif
+                                    <button class="btn btn-sm btn-outline-primary">เลือก</button>
+                                </form>
+                            @endif
+                        </td>
+                    </tr>
+                @endforeach
+                </tbody>
+            </table>
+        </div>
+        @endif
+
+        @if($comparison['can_quote'])
+        <form method="post" action="{{ route('purchase-orders.quotes.store', $purchaseOrder) }}" class="border-top p-3">
+            @csrf
+            <div class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small text-muted mb-1">ผู้ขาย</label>
+                    <select name="supplier_id" class="form-select form-select-sm" required>
+                        <option value="">-- เลือกผู้ขาย --</option>
+                        @foreach($suppliers as $supplier)
+                            <option value="{{ $supplier->id }}">
+                                {{ $supplier->code }} - {{ $supplier->name_th }}@if(in_array($supplier->id, $comparison['quoted_supplier_ids'])) (แก้ราคาเดิม)@endif
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small text-muted mb-1">เลขที่ใบเสนอราคา</label>
+                    <input type="text" name="reference" maxlength="100" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small text-muted mb-1">ยืนราคาถึง</label>
+                    <input type="date" name="valid_until" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label small text-muted mb-1">หมายเหตุ</label>
+                    <input type="text" name="note" maxlength="1000" class="form-control form-control-sm"
+                           placeholder="เช่น ส่งภายใน 3 วัน เครดิต 30 วัน">
+                </div>
+            </div>
+            <div class="row g-2 mt-1">
+                @foreach($purchaseOrder->items as $item)
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted mb-1">
+                            {{ $item->product->sku_code }} <span class="text-muted">× {{ number_format($item->qty, 2) }}</span>
+                        </label>
+                        <input type="number" step="0.0001" min="0" required
+                               name="unit_price[{{ $item->id }}]" class="form-control form-control-sm text-end"
+                               placeholder="ราคา/หน่วย">
+                    </div>
+                @endforeach
+            </div>
+            <div class="text-end mt-2">
+                <button class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>บันทึกใบเสนอราคา</button>
+            </div>
+        </form>
+        @endif
+    </div>
+
     @if($purchaseOrder->receipts->isNotEmpty())
     <div class="content-card overflow-hidden mt-3">
         <div class="px-3 py-2 border-bottom fw-bold small">ประวัติรับสินค้าตาม PO</div>
