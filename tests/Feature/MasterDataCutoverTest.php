@@ -1,0 +1,192 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Branch;
+use App\Models\MasterCutoverRun;
+use App\Models\Product;
+use App\Models\ProductUnit;
+use App\Services\MasterDataCutoverService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
+use RuntimeException;
+use Tests\TestCase;
+
+/**
+ * เปลี่ยนรหัสสาขาและสินค้าเป็นชุดใหม่ — บาร์โค้ดที่พิมพ์ติดสินค้าไปแล้วต้องยังสแกนได้
+ */
+class MasterDataCutoverTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_codes_are_renumbered_and_the_old_ones_kept_for_mapping(): void
+    {
+        $branch = $this->branch('LEGACY-7');
+        $product = $this->product('OLD-SKU-1');
+        $expected = collect($this->service()->planBranches())->firstWhere('id', $branch->id);
+
+        $this->service()->apply();
+
+        $branch->refresh();
+        $this->assertMatchesRegularExpression('/^B\d{3}$/', $branch->code);
+        $this->assertSame($expected['new'], $branch->code, 'ต้องได้รหัสตรงกับที่แผนบอกไว้');
+        $this->assertSame('LEGACY-7', $branch->legacy_branch_code, 'รหัสเดิมต้องเก็บไว้เทียบรายงานเก่า');
+
+        $product->refresh();
+        $this->assertSame('P000001', $product->sku_code);
+        $this->assertSame('OLD-SKU-1', $product->legacy_sku);
+    }
+
+    public function test_barcodes_are_untouched_and_still_scan_to_the_same_product(): void
+    {
+        $this->branch('LEGACY-1');
+        $product = $this->product('OLD-2');
+        DB::table('product_barcodes')->insert([
+            'product_id' => $product->id, 'barcode' => '8850001234567', 'unit_id' => $product->base_unit_id,
+            'unit_factor' => 1, 'is_active' => true,
+        ]);
+        $before = DB::table('product_barcodes')->where('barcode', '8850001234567')->first();
+
+        $this->service()->apply();
+
+        $after = DB::table('product_barcodes')->where('barcode', '8850001234567')->first();
+        $this->assertEquals($before, $after, 'แถวบาร์โค้ดต้องไม่ถูกแตะเลย');
+
+        $verified = $this->service()->verifyBarcodes(['8850001234567']);
+        $this->assertSame(1, $verified['resolved']);
+        $this->assertSame([], $verified['failed']);
+
+        $scanned = DB::table('product_barcodes')
+            ->join('products', 'products.id', '=', 'product_barcodes.product_id')
+            ->where('barcode', '8850001234567')->first(['products.sku_code', 'products.legacy_sku']);
+        $this->assertSame('P000001', $scanned->sku_code, 'สแกนแล้วต้องได้สินค้าตัวเดิมที่ถือรหัสใหม่');
+        $this->assertSame('OLD-2', $scanned->legacy_sku);
+    }
+
+    public function test_the_schema_itself_refuses_a_barcode_on_two_products(): void
+    {
+        $this->branch('LEGACY-1');
+        $first = $this->product('A-1');
+        $second = $this->product('A-2');
+
+        DB::table('product_barcodes')->insert([
+            'product_id' => $first->id, 'barcode' => '8850000000017', 'unit_id' => $first->base_unit_id,
+            'unit_factor' => 1, 'is_active' => true,
+        ]);
+
+        // ซ้ำข้ามสินค้าเกิดไม่ได้เลย ฐานกันไว้ก่อนจะถึง preflight
+        $this->expectException(QueryException::class);
+        DB::table('product_barcodes')->insert([
+            'product_id' => $second->id, 'barcode' => '8850000000017', 'unit_id' => $second->base_unit_id,
+            'unit_factor' => 1, 'is_active' => true,
+        ]);
+    }
+
+    public function test_a_bad_ean13_check_digit_is_reported_but_never_corrected(): void
+    {
+        $this->branch('LEGACY-1');
+        $product = $this->product('EAN-1');
+        DB::table('product_barcodes')->insert([
+            'product_id' => $product->id, 'barcode' => '8850000000000', 'unit_id' => $product->base_unit_id,
+            'unit_factor' => 1, 'is_active' => true,
+        ]);
+
+        $service = $this->service();
+        $this->assertFalse($service->isValidEan13('8850000000000'));
+        $this->assertTrue($service->isValidEan13('8850000000003'));
+
+        $warning = collect($service->preflight())->firstWhere('issue', 'EAN-13 check digit ไม่ถูก');
+        $this->assertNotNull($warning);
+        $this->assertSame('เตือน', $warning['level'], 'บาร์โค้ดผิดไม่ควรบล็อก cutover');
+
+        $service->apply();
+
+        $this->assertSame('8850000000000', DB::table('product_barcodes')->where('product_id', $product->id)->value('barcode'),
+            'ห้ามแก้บาร์โค้ดให้เอง ของที่พิมพ์ติดสินค้าไปแล้วเปลี่ยนตามไม่ได้');
+    }
+
+    public function test_nothing_is_written_when_preflight_blocks(): void
+    {
+        $this->branch('B001');   // รหัสใหม่ถูกใช้ไปแล้ว = ต้องหยุด
+        $product = $this->product('B-1');
+
+        try {
+            $this->service()->apply();
+        } catch (RuntimeException) {
+            // คาดไว้แล้ว
+        }
+
+        $this->assertSame('B-1', $product->fresh()->sku_code, 'รหัสต้องไม่ขยับ');
+        $this->assertSame(0, MasterCutoverRun::count());
+    }
+
+    public function test_a_new_code_that_already_exists_is_refused(): void
+    {
+        $this->branch('B001');
+
+        $problems = collect($this->service()->preflight());
+        $this->assertTrue($problems->contains(fn ($row) => $row['issue'] === 'รหัสสาขาใหม่ชนของเดิม'));
+    }
+
+    public function test_the_cutover_cannot_be_run_twice(): void
+    {
+        $this->branch('LEGACY-1');
+        $this->product('C-1');
+
+        $this->service()->apply();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('ทำ cutover');
+        $this->service()->apply();
+    }
+
+    public function test_deleted_products_still_consume_a_number_so_codes_are_never_reused(): void
+    {
+        $this->branch('LEGACY-1');
+        $first = $this->product('D-1');
+        $second = $this->product('D-2');
+        $first->delete();
+
+        $this->service()->apply();
+
+        // สินค้าที่ถูกลบยังกินเลข P000001 ไป ตัวที่เหลือจึงเป็น P000002 ไม่ใช่ P000001
+        $this->assertSame('P000002', $second->fresh()->sku_code);
+        $this->assertSame('P000001', Product::withTrashed()->find($first->id)->sku_code);
+    }
+
+    public function test_products_without_a_barcode_are_reported_as_a_warning_not_a_blocker(): void
+    {
+        $this->branch('LEGACY-1');
+        $this->product('E-1');
+
+        $problems = collect($this->service()->preflight());
+        $warning = $problems->firstWhere('issue', 'สินค้าไม่มีบาร์โค้ด');
+
+        $this->assertNotNull($warning);
+        $this->assertSame('เตือน', $warning['level'], 'ไม่มีบาร์โค้ดไม่ควรบล็อก cutover');
+        $result = $this->service()->apply();
+        $this->assertSame(1, $result['products'], 'cutover ต้องเดินต่อได้แม้สินค้าไม่มีบาร์โค้ด');
+    }
+
+    private function branch(string $code): Branch
+    {
+        return Branch::create(['code' => $code, 'name_th' => 'สาขาทดสอบ '.$code, 'is_active' => true]);
+    }
+
+    private function service(): MasterDataCutoverService
+    {
+        return app(MasterDataCutoverService::class);
+    }
+
+    private function product(string $sku): Product
+    {
+        static $sequence = 0;
+        $unit = ProductUnit::firstOrCreate(['code' => 'EA-CUT'], ['name' => 'ชิ้น', 'qty_per_base_unit' => 1]);
+
+        return Product::create([
+            'sku_code' => $sku, 'name_th' => 'สินค้า '.++$sequence, 'base_unit_id' => $unit->id,
+            'default_price' => 10, 'average_cost' => 0, 'is_vat' => false, 'is_active' => true,
+        ]);
+    }
+}
