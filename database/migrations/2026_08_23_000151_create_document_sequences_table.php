@@ -85,14 +85,26 @@ return new class extends Migration
 
         $highest = [];
         foreach ($rows as $row) {
-            // เลขลงท้ายด้วยลำดับ 3 หลัก และมีวันที่ 8 หลักอยู่ก่อนหน้า
-            if (! preg_match('/(\d{8})(\d{3,})$/', (string) $row->doc_number, $matches)) {
-                continue;
-            }
-            $key = $row->type_code.':'.$row->branch_id.'|'.$matches[1];
-            $sequence = (int) $matches[2];
-            if (($highest[$key] ?? 0) < $sequence) {
-                $highest[$key] = $sequence;
+            // ตัดจากท้าย: ลำดับคือหลักสุดท้าย วันที่คือ 8 หลักก่อนหน้า แล้วตรวจว่าเป็นวันที่จริง
+            // ห้ามใช้ regex เดาตำแหน่ง เพราะ greedy จะจับผิดเมื่อรหัสสาขามีเลข 20 อยู่ด้วย
+            $number = (string) $row->doc_number;
+            foreach ([3, 4, 5] as $sequenceLength) {
+                if (strlen($number) < $sequenceLength + 8) {
+                    continue;
+                }
+                $sequence = substr($number, -$sequenceLength);
+                $period = substr($number, -($sequenceLength + 8), 8);
+                if (! ctype_digit($sequence) || ! preg_match('/^20\d{6}$/', $period)) {
+                    continue;
+                }
+                if (! checkdate((int) substr($period, 4, 2), (int) substr($period, 6, 2), (int) substr($period, 0, 4))) {
+                    continue;
+                }
+                $key = $row->type_code.':'.$row->branch_id.'|'.$period;
+                if (($highest[$key] ?? 0) < (int) $sequence) {
+                    $highest[$key] = (int) $sequence;
+                }
+                break;
             }
         }
 
