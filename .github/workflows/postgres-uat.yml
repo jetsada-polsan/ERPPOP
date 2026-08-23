@@ -53,8 +53,11 @@ jobs:
             echo "DB_PASSWORD=jeterp"
           } >> .env
 
+      # เรียก phpunit ตรง ๆ ไม่ผ่าน artisan test เพราะ artisan test คืน exit code 1
+      # ทุกครั้งที่ส่ง --configuration มาให้ ต่อให้เทสต์ผ่านหมด งานนี้จึงแดงมาตลอด
+      # ทั้งที่ชุดเทสต์เขียว
       - name: ชุดเทสต์ทั้งหมดบน PostgreSQL
-        run: php artisan test --configuration=phpunit.pgsql.xml
+        run: ./vendor/bin/phpunit --configuration=phpunit.pgsql.xml
 
       - name: เตรียมฐานสำหรับทดสอบการยิงพร้อมกัน
         run: |
