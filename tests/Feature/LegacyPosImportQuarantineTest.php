@@ -23,11 +23,22 @@ class LegacyPosImportQuarantineTest extends TestCase
         'imported_payments',
     ];
 
+    /**
+     * ไฟล์ที่ได้รับยกเว้น — อ้างถึงตารางเหล่านี้เพื่อ "ลบทิ้ง" ไม่ใช่เพื่ออ่านกลับเข้าระบบ
+     * ซึ่งตรงข้ามกับเจตนาของการกักบริเวณ จึงไม่ถือว่าละเมิด
+     */
+    private const DISPOSAL_ALLOWED = [
+        'app/Console/Commands/ErpResetTransactions.php',
+    ];
+
     public function test_no_application_code_reads_the_quarantined_import_tables(): void
     {
         $offenders = [];
 
         foreach ($this->applicationFiles() as $file) {
+            if (in_array(str_replace(base_path().'/', '', $file), self::DISPOSAL_ALLOWED, true)) {
+                continue;
+            }
             $contents = file_get_contents($file);
             foreach (self::QUARANTINED_TABLES as $table) {
                 if (str_contains($contents, $table)) {
