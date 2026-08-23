@@ -26,13 +26,17 @@ class MasterDataCutoverService
     /**
      * แผนที่รหัสเดิม -> รหัสใหม่ โดยไม่เขียนอะไรลงฐาน
      *
+     * เรียงตามรหัสเดิม ไม่ใช่ตาม id เพราะคนที่ตรวจแผนถือรายการรหัสเก่าอยู่ในมือ
+     * เรียงตาม id แล้ว 0001 จะไปโผล่เป็น B004 ซึ่งเป็นชนิดของความสับสน
+     * ที่ทำให้คนหยิบรหัสผิดตอนตั้งค่าเครื่อง POS
+     *
      * @return array<int, array{id:int, legacy:string, new:string, name:string}>
      */
     public function planBranches(): array
     {
         $plan = [];
         $sequence = 0;
-        foreach (Branch::orderBy('id')->get() as $branch) {
+        foreach ($this->sortedByLegacyCode(Branch::all(), 'code') as $branch) {
             $plan[] = [
                 'id' => $branch->id,
                 'legacy' => (string) $branch->code,
@@ -54,7 +58,7 @@ class MasterDataCutoverService
 
         $plan = [];
         $sequence = 0;
-        foreach (Product::withTrashed()->orderBy('id')->get() as $product) {
+        foreach ($this->sortedByLegacyCode(Product::withTrashed()->get(), 'sku_code') as $product) {
             $plan[] = [
                 'id' => $product->id,
                 'legacy' => (string) $product->sku_code,
@@ -65,6 +69,26 @@ class MasterDataCutoverService
         }
 
         return $plan;
+    }
+
+    /**
+     * เรียงตามรหัสเดิมแบบธรรมชาติ ตัวที่ไม่มีรหัสไปอยู่ท้าย เรียงด้วย id เพื่อให้ผลคงที่
+     *
+     * @template TModel of \Illuminate\Database\Eloquent\Model
+     * @param  \Illuminate\Support\Collection<int, TModel>  $records
+     * @return \Illuminate\Support\Collection<int, TModel>
+     */
+    private function sortedByLegacyCode($records, string $column)
+    {
+        return $records->sortBy(function ($record) use ($column) {
+            $code = trim((string) $record->{$column});
+
+            // คีย์เดียวจบ: ตัวไม่มีรหัสไปท้าย ตัวเลขเทียบด้วยค่าไม่ใช่ตัวอักษร
+            // (ไม่งั้น '10' จะมาก่อน '9') แล้วปิดท้ายด้วย id ให้ผลคงที่เสมอ
+            return ($code === '' ? '1' : '0')
+                .preg_replace_callback('/\d+/', fn ($match) => str_pad($match[0], 12, '0', STR_PAD_LEFT), $code)
+                .'#'.str_pad((string) $record->id, 12, '0', STR_PAD_LEFT);
+        })->values();
     }
 
     /**

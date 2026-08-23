@@ -169,6 +169,20 @@ class MasterDataCutoverTest extends TestCase
         $this->assertSame(1, $result['products'], 'cutover ต้องเดินต่อได้แม้สินค้าไม่มีบาร์โค้ด');
     }
 
+    public function test_the_plan_follows_the_old_codes_so_a_human_can_check_it(): void
+    {
+        Branch::query()->delete();
+        foreach (['0003', 'HO', '0001', '0002'] as $code) {
+            $this->branch($code);
+        }
+
+        $plan = collect($this->service()->planBranches());
+
+        // เรียงตามรหัสเดิม ไม่ใช่ลำดับที่สร้าง ตัวอักษรไปท้ายสุด
+        $this->assertSame(['0001', '0002', '0003', 'HO'], $plan->pluck('legacy')->all());
+        $this->assertSame(['B001', 'B002', 'B003', 'B004'], $plan->pluck('new')->all());
+    }
+
     private function branch(string $code): Branch
     {
         return Branch::create(['code' => $code, 'name_th' => 'สาขาทดสอบ '.$code, 'is_active' => true]);
