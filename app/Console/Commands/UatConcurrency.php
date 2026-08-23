@@ -29,7 +29,8 @@ class UatConcurrency extends Command
         {--type=CASH_SALE : ชนิดเอกสารที่จะขอเลขที่ (โหมด number)}
         {--mode=number : number = ขอเลขอย่างเดียว, sale = ขายจริงทั้งวงจร}
         {--confirm-test-database : ยืนยันว่าฐานนี้เป็นฐานทดสอบ}
-        {--confirm-empty-production-database= : รันบน production ที่ล้างข้อมูลแล้ว ต้องพิมพ์ชื่อฐานให้ตรง}';
+        {--confirm-empty-production-database= : รันบน production ที่ล้างข้อมูลแล้ว ต้องพิมพ์ชื่อฐานให้ตรง}
+        {--product-prefix=UAT- : ขึ้นต้น sku_code ของสินค้าที่ใช้ทดสอบ (โหมด sale)}';
 
     protected $description = 'Concurrency UAT: prove document numbers stay unique under parallel load';
 
@@ -72,6 +73,14 @@ class UatConcurrency extends Command
         }
         if (! $this->option('confirm-test-database')) {
             $this->error('ต้องใส่ --confirm-test-database เพื่อยืนยันว่าฐานนี้เป็นฐานทดสอบ');
+
+            return self::FAILURE;
+        }
+        if ($this->option('mode') === 'sale' && $this->testProductIds() === []) {
+            $prefix = $this->option('product-prefix');
+            $this->error("โหมด sale ต้องมีสินค้าที่ sku_code ขึ้นต้นด้วย {$prefix} แต่ไม่พบเลยในฐานนี้");
+            $this->line('สร้างสินค้าสำหรับ UAT ก่อน หรือระบุ --product-prefix ให้ตรงกับที่มีอยู่');
+            $this->line('อย่าชี้ไปที่สินค้าจริง เพราะการขายจะขยับต้นทุนถัวเฉลี่ยของสินค้านั้นถาวร');
 
             return self::FAILURE;
         }
@@ -162,6 +171,22 @@ class UatConcurrency extends Command
     }
 
     /**
+     * สินค้าที่ใช้ยิงทดสอบ — จำกัดไว้ที่สินค้าของ UAT เท่านั้น
+     *
+     * การขายจะไปขยับ average_cost กับสต๊อกของสินค้าที่ถูกเลือก จึงต้องไม่เผลอ
+     * ไปหยิบสินค้าจริงมายิง ไม่งั้นต้นทุนสินค้าจริงจะเพี้ยนโดยไม่มีใครสังเกต
+     *
+     * @return array<int, int>
+     */
+    private function testProductIds(): array
+    {
+        return DB::table('products')
+            ->where('sku_code', 'like', $this->option('product-prefix').'%')
+            ->pluck('id')
+            ->all();
+    }
+
+    /**
      * ขายจริงทั้งวงจร: ตัดสต๊อก คิดต้นทุน ลง GL และเข้า sales_postings
      * ใช้พิสูจน์ว่ายิงพร้อมกันแล้วสต๊อก ต้นทุน และบัญชีไม่เพี้ยน ไม่ใช่แค่เลขไม่ซ้ำ
      */
@@ -171,7 +196,7 @@ class UatConcurrency extends Command
         $numbers = [];
         $errors = [];
         $latencies = [];
-        $productIds = DB::table('products')->where('sku_code', 'like', 'UAT-%')->pluck('id')->all();
+        $productIds = $this->testProductIds();
 
         for ($index = 0; $index < $perUser; $index++) {
             $begin = microtime(true);
