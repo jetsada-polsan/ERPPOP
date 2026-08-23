@@ -31,11 +31,14 @@ jobs:
           node-version: 22
           cache: pnpm
           cache-dependency-path: apps/pos-desktop/pnpm-lock.yaml
-      - run: pnpm install --no-frozen-lockfile
+      # CI ต้องใช้ dependency ชุดเดียวกับ Windows release เสมอ
+      - run: pnpm install --frozen-lockfile
       - name: Typecheck
         run: pnpm typecheck
       - name: Unit tests
         run: pnpm test
+      - name: Production web build
+        run: pnpm build
 
   rust:
     runs-on: windows-latest
