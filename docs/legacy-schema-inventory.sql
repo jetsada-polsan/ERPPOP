@@ -162,6 +162,46 @@ WHERE o.is_ms_shipped = 0
   )
 ORDER BY o.type_desc, s.name, o.name;
 
+-- 8. Triggers: BPlus may hide stock, accounting, and status posting rules here.
+-- Read definitions only; do not execute any trigger or stored procedure.
+SELECT
+    ts.name AS trigger_schema,
+    tr.name AS trigger_name,
+    OBJECT_SCHEMA_NAME(tr.parent_id) AS parent_schema,
+    OBJECT_NAME(tr.parent_id) AS parent_object,
+    tr.is_instead_of_trigger,
+    tr.is_disabled,
+    tr.create_date,
+    tr.modify_date,
+    m.definition
+FROM sys.triggers tr
+JOIN sys.schemas ts ON ts.schema_id = tr.schema_id
+LEFT JOIN sys.sql_modules m ON m.object_id = tr.object_id
+WHERE tr.is_ms_shipped = 0
+ORDER BY parent_schema, parent_object, trigger_name;
+
+-- 9. Locate document type and cost-method fields before sampling live data.
+-- The results identify exact source tables. Run a separate SELECT/GROUP BY only
+-- after reviewing the returned table names; do not use dynamic SQL.
+SELECT
+    s.name AS schema_name,
+    t.name AS table_name,
+    c.name AS column_name,
+    ty.name AS data_type,
+    c.max_length,
+    c.is_nullable
+FROM sys.tables t
+JOIN sys.schemas s ON s.schema_id = t.schema_id
+JOIN sys.columns c ON c.object_id = t.object_id
+JOIN sys.types ty ON ty.user_type_id = c.user_type_id
+WHERE t.is_ms_shipped = 0
+  AND (
+      c.name COLLATE Latin1_General_CI_AI IN ('DOCTYPE', 'SKU_COST_TY')
+      OR c.name COLLATE Latin1_General_CI_AI LIKE '%DOCTYPE%'
+      OR c.name COLLATE Latin1_General_CI_AI LIKE '%COST%TY%'
+  )
+ORDER BY s.name, t.name, c.column_id;
+
 -- 8. Indexes: shows how the legacy reports were expected to read each table.
 SELECT
     s.name AS schema_name,
