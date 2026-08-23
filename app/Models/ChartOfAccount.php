@@ -49,6 +49,9 @@ class ChartOfAccount extends Model
 
     public const ROLE_RETAINED_EARNINGS = 'retained_earnings';
 
+    /** บัญชีพักสำหรับยอดยกมาตอนตั้งต้นระบบ */
+    public const ROLE_OPENING_BALANCE = 'opening_balance';
+
     public const ROLES = [
         self::ROLE_CASH => 'บัญชีเงินสด/รับจ่ายเริ่มต้น',
         self::ROLE_BANK => 'บัญชีเงินฝากธนาคารเริ่มต้น',
@@ -63,6 +66,7 @@ class ChartOfAccount extends Model
         self::ROLE_EXPENSE => 'บัญชีค่าใช้จ่าย',
         self::ROLE_WHT_PAYABLE => 'บัญชีภาษีหัก ณ ที่จ่ายค้างจ่าย',
         self::ROLE_RETAINED_EARNINGS => 'บัญชีกำไรสะสม',
+        self::ROLE_OPENING_BALANCE => 'บัญชีพักยอดยกมา',
     ];
 
     public function journalEntries(): HasMany
