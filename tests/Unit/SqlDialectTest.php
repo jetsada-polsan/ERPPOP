@@ -21,6 +21,13 @@ class SqlDialectTest extends TestCase
         $this->assertSame("date('now', '-30 day')", SqlDialect::dateMinusDays('sqlite', 30));
     }
 
+    public function test_rounded_sum_matches_each_dialect(): void
+    {
+        // PostgreSQL ไม่มี round(double precision, int) — ต้อง cast ก่อน ไม่งั้น query ระเบิด
+        $this->assertSame('round(sum(debit)::numeric, 2)', SqlDialect::roundSum('pgsql', 'debit'));
+        $this->assertSame('round(sum(debit), 2)', SqlDialect::roundSum('sqlite', 'debit'));
+    }
+
     public function test_hour_truncation_matches_each_dialect(): void
     {
         $this->assertSame(

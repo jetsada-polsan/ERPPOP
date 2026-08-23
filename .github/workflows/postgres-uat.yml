@@ -1,0 +1,73 @@
+name: PostgreSQL UAT
+
+# ชุดเทสต์ปกติรันบน SQLite ซึ่งเร็วแต่มองไม่เห็นพฤติกรรมเฉพาะของ PostgreSQL
+# workflow นี้รันของเดียวกันกับ PostgreSQL จริง แล้วปิดท้ายด้วยการยิงงานพร้อมกัน
+# ซึ่งเป็นวิธีเดียวที่จับบั๊กเลขเอกสารชนกันได้ — บั๊กนั้นผ่านทุกเทสต์บน SQLite
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  postgres-uat:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: jeterp_test
+          POSTGRES_USER: jeterp
+          POSTGRES_PASSWORD: jeterp
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_pgsql, pgsql, zip, bcmath, pcntl
+          coverage: none
+
+      - run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: เตรียม .env สำหรับ CI
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          {
+            echo "APP_ENV=testing"
+            echo "DB_CONNECTION=pgsql"
+            echo "DB_HOST=127.0.0.1"
+            echo "DB_PORT=5432"
+            echo "DB_DATABASE=jeterp_test"
+            echo "DB_USERNAME=jeterp"
+            echo "DB_PASSWORD=jeterp"
+          } >> .env
+
+      - name: ชุดเทสต์ทั้งหมดบน PostgreSQL
+        run: php artisan test --configuration=phpunit.pgsql.xml
+
+      - name: เตรียมฐานสำหรับทดสอบการยิงพร้อมกัน
+        run: |
+          php artisan migrate:fresh --force
+          php artisan tinker --execute="
+            DB::table('document_types')->insertOrIgnore(['code' => 'CASH_SALE', 'name_th' => 'ใบขายสด']);
+            DB::table('branches')->insertOrIgnore(['code' => 'CI', 'name_th' => 'สาขา CI', 'is_active' => true]);
+          "
+
+      - name: ยิงพร้อมกัน 30 process — เลขเอกสารต้องไม่ซ้ำและต้องไม่มี error
+        run: |
+          BRANCH=$(php artisan tinker --execute="echo DB::table('branches')->where('code','CI')->value('id');" | tail -1 | tr -dc '0-9')
+          php artisan uat:concurrency --users=30 --per-user=5 --branch="$BRANCH" --confirm-test-database
+
+      - name: กระทบยอด stock / COGS / GL / sales_postings
+        run: php artisan uat:reconcile

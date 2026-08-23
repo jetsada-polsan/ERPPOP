@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\ChartOfAccount;
+use App\Support\SqlDialect;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -27,7 +28,9 @@ class UatReconcile extends Command
         $unbalanced = DB::table('gl_journals')
             ->selectRaw('document_id, sum(debit) as d, sum(credit) as c')
             ->groupBy('document_id')
-            ->havingRaw('round(sum(debit)::numeric, 2) <> round(sum(credit)::numeric, 2)')
+            ->havingRaw(sprintf('%s <> %s',
+                SqlDialect::roundSum(DB::getDriverName(), 'debit'),
+                SqlDialect::roundSum(DB::getDriverName(), 'credit')))
             ->count();
         $checks[] = ['GL ดุลทุกเอกสาร', $unbalanced === 0, $unbalanced.' เอกสารไม่ดุล'];
 

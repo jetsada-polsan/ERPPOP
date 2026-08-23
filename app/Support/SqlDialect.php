@@ -23,6 +23,17 @@ class SqlDialect
     }
 
     /**
+     * ปัดผลรวมทศนิยม — PostgreSQL ไม่มี round(double precision, int) ต้อง cast เป็น numeric ก่อน
+     * ส่วน SQLite ปัดได้ตรง ๆ ถ้าเขียนแบบ PG อย่างเดียวจะรันบนชุดเทสต์ไม่ได้
+     */
+    public static function roundSum(string $driver, string $expression, int $scale = 2): string
+    {
+        return $driver === 'pgsql'
+            ? "round(sum({$expression})::numeric, {$scale})"
+            : "round(sum({$expression}), {$scale})";
+    }
+
+    /**
      * ตัดเวลาให้เหลือระดับชั่วโมงแล้วคืนเป็นข้อความ 'YYYY-MM-DD HH:00'
      *
      * ใช้ค่านี้ทั้ง select, group by และ order by ได้ เพราะรูปแบบเป็นเลขศูนย์นำหน้า
