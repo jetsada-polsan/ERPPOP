@@ -49,6 +49,17 @@ class MasterDataCutover extends Command
                 collect($impact)->map(array_values(...))->all());
         }
 
+        if ($devices = $service->planPosDevices()) {
+            $this->line('เครื่อง POS — ตรวจว่าชื่อเครื่องกับสาขาปลายทางเป็นที่เดียวกันจริง:');
+            $this->table(
+                ['รหัสเดิม', 'ชื่อเครื่อง', 'รหัสใหม่', 'สาขา', 'ชื่อสาขา'],
+                collect($devices)->map(fn ($row) => [
+                    $row['legacy'], mb_substr($row['device_name'], 0, 22),
+                    $row['new'] ?? $row['action'], $row['branch'], mb_substr($row['branch_name'], 0, 22),
+                ])->all(),
+            );
+        }
+
         $this->line('ตัวอย่างสินค้า 5 รายการแรกและ 3 รายการท้าย:');
         $this->table(
             ['รหัสเดิม', 'รหัสใหม่', 'ชื่อสินค้า', 'บาร์โค้ด'],

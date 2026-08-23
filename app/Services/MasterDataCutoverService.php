@@ -39,6 +39,9 @@ class MasterDataCutoverService
      */
     public const MERGE_INTO_HQ = ['0001'];
 
+    /** เครื่องที่ใช้ทดสอบ ไม่ใช่เครื่องขายจริง — ยกเลิกตอน cutover */
+    public const TEST_TERMINAL_PREFIX = 'POS-LOCAL';
+
     /**
      * แผนที่รหัสเดิม -> รหัสใหม่ โดยไม่เขียนอะไรลงฐาน
      *
@@ -71,6 +74,52 @@ class MasterDataCutoverService
                 'new' => $new,
                 'name' => (string) $branch->name_th,
                 'action' => $action,
+            ];
+        }
+
+        return $plan;
+    }
+
+    /**
+     * แผนรันเลขเครื่อง POS ใหม่ — POS-<รหัสสาขา>-<ลำดับในสาขา>
+     *
+     * ใส่รหัสสาขาไว้ในรหัสเครื่องโดยตั้งใจ สาขาหนึ่งมีได้หลายเครื่องจึงต่อท้ายด้วยลำดับ
+     * เลขวิ่งล้วน ๆ จะอ่านไม่ออกว่าเครื่องอยู่สาขาไหน ซึ่งเป็นเหตุที่เครื่องผูกผิดสาขา
+     * มาตลอดโดยไม่มีใครเห็น — รหัสที่บอกสาขาทำให้ความผิดโผล่ออกมาเอง
+     *
+     * ตารางนี้แสดงชื่อเครื่องคู่กับชื่อสาขาปลายทาง เพื่อให้คนตรวจเห็นทันทีว่าตรงกันไหม
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function planPosDevices(): array
+    {
+        $branchByOldId = collect($this->planBranches())->keyBy('id');
+        $hqId = collect($this->planBranches())->firstWhere('new', self::HQ_CODE)['id'] ?? null;
+
+        $plan = [];
+        $sequence = [];
+        foreach (DB::table('pos_devices')->orderBy('id')->get() as $device) {
+            $isTest = str_starts_with((string) $device->terminal_code, self::TEST_TERMINAL_PREFIX);
+
+            // เครื่องที่ผูกกับสาขาที่ถูกยุบ จะย้ายไป HQ ก่อน รหัสจึงต้องอิง HQ
+            $targetId = ($branchByOldId[$device->branch_id]['new'] ?? null) === null ? $hqId : $device->branch_id;
+            $branch = $branchByOldId[$targetId] ?? null;
+
+            $newCode = null;
+            if (! $isTest && $branch) {
+                $branchCode = $branch['new'];
+                $sequence[$branchCode] = ($sequence[$branchCode] ?? 0) + 1;
+                $newCode = sprintf('POS-%s-%02d', $branchCode, $sequence[$branchCode]);
+            }
+
+            $plan[] = [
+                'id' => $device->id,
+                'legacy' => (string) $device->terminal_code,
+                'device_name' => (string) ($device->name ?? '-'),
+                'new' => $newCode,
+                'branch' => $branch['new'] ?? '(ไม่ผูกสาขา)',
+                'branch_name' => $branch['name'] ?? '-',
+                'action' => $isTest ? 'ยกเลิก (เครื่องทดสอบ)' : 'รันเลขใหม่',
             ];
         }
 
@@ -274,8 +323,11 @@ class MasterDataCutoverService
 
         $branchPlan = $this->planBranches();
         $productPlan = $this->planProducts();
+        // ต้องคำนวณให้ครบก่อนเขียนอะไรลงฐาน แผนเครื่อง POS อ่านรหัสสาขาเดิม
+        // ถ้าไปคำนวณหลังเปลี่ยนรหัสสาขาแล้ว จะได้ผลจากข้อมูลที่ขยับไปแล้ว
+        $devicePlan = $this->planPosDevices();
 
-        return DB::transaction(function () use ($branchPlan, $productPlan, $userId) {
+        return DB::transaction(function () use ($branchPlan, $productPlan, $devicePlan, $userId) {
             $barcodesBefore = DB::table('product_barcodes')->count();
 
             $hqId = collect($branchPlan)->firstWhere('new', self::HQ_CODE)['id'] ?? null;
@@ -311,6 +363,7 @@ class MasterDataCutoverService
             }
 
             $this->attachCentralWarehouseToHeadOffice($hqId);
+            $this->renumberPosDevices($devicePlan);
 
             // บาร์โค้ดต้องไม่ขยับแม้แต่แถวเดียว ถ้าขยับแปลว่ามีอะไรผูกไว้ผิด
             if (DB::table('product_barcodes')->count() !== $barcodesBefore) {
@@ -330,6 +383,27 @@ class MasterDataCutoverService
 
             return ['branches' => count($branchPlan), 'products' => count($productPlan)];
         });
+    }
+
+    /**
+     * เขียนรหัสเครื่อง POS ใหม่ และยกเลิกเครื่องทดสอบ
+     *
+     * pos_terminals ผูกกับเครื่องด้วยสตริง terminal_code จึงต้องเปลี่ยนพร้อมกัน
+     * ไม่งั้นการตั้งค่าเครื่องพิมพ์จะหลุดจากเครื่องที่มันเคยผูกอยู่
+     */
+    /** @param  array<int, array<string, mixed>>  $plan */
+    private function renumberPosDevices(array $plan): void
+    {
+        foreach ($plan as $row) {
+            if ($row['new'] === null) {
+                DB::table('pos_devices')->where('id', $row['id'])->update(['revoked_at' => now()]);
+
+                continue;
+            }
+
+            DB::table('pos_terminals')->where('code', $row['legacy'])->update(['code' => $row['new']]);
+            DB::table('pos_devices')->where('id', $row['id'])->update(['terminal_code' => $row['new']]);
+        }
     }
 
     /**

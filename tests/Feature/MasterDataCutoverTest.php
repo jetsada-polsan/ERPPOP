@@ -233,6 +233,79 @@ class MasterDataCutoverTest extends TestCase
         $this->assertSame('HQ', $hq->fresh()->code);
     }
 
+    public function test_tills_are_numbered_within_their_branch_and_test_devices_retired(): void
+    {
+        Branch::query()->delete();
+        $hq = $this->branch('HO');
+        $shop = $this->branch('0002');
+        $this->product('POS-1');
+
+        $first = $this->device('POS-0002-01', 'แคชเชียร์ 1', $shop->id);
+        $second = $this->device('POS-0002-02', 'แคชเชียร์ 2', $shop->id);
+        $atHq = $this->device('POS-HO-01', 'เครื่องสำนักงาน', $hq->id);
+        $test = $this->device('POS-LOCAL-01', 'เครื่องทดสอบ', $shop->id);
+
+        $this->service()->apply();
+
+        // สาขาเดียวกันไล่ลำดับต่อกัน ไม่ใช่เลขวิ่งข้ามสาขา
+        $this->assertSame('POS-B001-01', $this->terminalCode($first));
+        $this->assertSame('POS-B001-02', $this->terminalCode($second));
+        $this->assertSame('POS-HQ-01', $this->terminalCode($atHq));
+
+        $this->assertNotNull(DB::table('pos_devices')->where('id', $test)->value('revoked_at'),
+            'เครื่องทดสอบต้องถูกยกเลิก ไม่ให้บิลทดสอบปนกับยอดขายจริง');
+        $this->assertSame('POS-LOCAL-01', $this->terminalCode($test), 'เครื่องที่ยกเลิกไม่ต้องรันเลขใหม่');
+    }
+
+    public function test_a_till_on_the_merged_branch_is_numbered_under_hq(): void
+    {
+        Branch::query()->delete();
+        $this->branch('HO');
+        $duplicate = $this->branch('0001');
+        $this->branch('0002');
+        $this->product('POS-2');
+
+        $device = $this->device('POS-0001-01', 'เครื่องสำนักงานใหญ่', $duplicate->id);
+
+        $this->service()->apply();
+
+        $this->assertSame('POS-HQ-01', $this->terminalCode($device),
+            'สาขาถูกยุบเข้า HQ เครื่องจึงต้องได้รหัสของ HQ ไม่ใช่ค้างอยู่กับสาขาที่ปิดไปแล้ว');
+    }
+
+    public function test_the_printer_config_follows_the_till_to_its_new_code(): void
+    {
+        Branch::query()->delete();
+        $this->branch('HO');
+        $shop = $this->branch('0002');
+        $this->product('POS-3');
+        $this->device('POS-0002-01', 'แคชเชียร์', $shop->id);
+        DB::table('pos_terminals')->insert(['code' => 'POS-0002-01', 'name' => 'เครื่องพิมพ์หน้าร้าน']);
+
+        $this->service()->apply();
+
+        $this->assertSame(0, DB::table('pos_terminals')->where('code', 'POS-0002-01')->count());
+        $this->assertSame(1, DB::table('pos_terminals')->where('code', 'POS-B001-01')->count(),
+            'pos_terminals ผูกด้วยสตริง ถ้าไม่เปลี่ยนตาม ตั้งค่าเครื่องพิมพ์จะหลุดจากเครื่อง');
+    }
+
+    private function device(string $terminalCode, string $name, int $branchId): int
+    {
+        static $sequence = 0;
+        $user = \App\Models\User::factory()->create(['username' => 'pos-owner-'.++$sequence]);
+
+        return DB::table('pos_devices')->insertGetId([
+            'name' => $name, 'terminal_code' => $terminalCode, 'branch_id' => $branchId,
+            'user_id' => $user->id, 'token_hash' => hash('sha256', $terminalCode),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+    }
+
+    private function terminalCode(int $deviceId): string
+    {
+        return (string) DB::table('pos_devices')->where('id', $deviceId)->value('terminal_code');
+    }
+
     private function branch(string $code): Branch
     {
         return Branch::create(['code' => $code, 'name_th' => 'สาขาทดสอบ '.$code, 'is_active' => true]);
