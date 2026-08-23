@@ -48,6 +48,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: apps/pos-desktop/src-tauri
+      # ไม่ใส่ --locked เพราะ Cargo.lock ไม่ได้ commit ไว้ในโปรเจกต์นี้
+      # ใส่แล้ว cargo จะปฏิเสธตั้งแต่ยังไม่ทันคอมไพล์อะไรเลย
       - name: Build Rust side
-        run: cargo build --locked
+        run: cargo build
         working-directory: apps/pos-desktop/src-tauri

@@ -58,10 +58,20 @@ class RouteIntegrityTest extends TestCase
             $uri = '/'.ltrim($route->uri(), '/');
             $response = $this->get($uri);
 
+            // บอกสาเหตุไปเลย ไม่ใช่แค่ว่า 500 — เทสต์นี้รันบน CI เป็นหลัก
+            // ถ้าไม่พ่วง exception มาด้วย คนอ่านผลต้องไปไล่เดาเองว่าหน้าไหนพังเพราะอะไร
+            $because = $response->exception
+                ? sprintf(' — %s: %s @ %s:%d',
+                    $response->exception::class,
+                    mb_substr($response->exception->getMessage(), 0, 300),
+                    str_replace(base_path().'/', '', $response->exception->getFile()),
+                    $response->exception->getLine())
+                : '';
+
             $this->assertLessThan(
                 500,
                 $response->getStatusCode(),
-                "GET [{$uri}] ({$route->getName()}) returned a server error.",
+                "GET [{$uri}] ({$route->getName()}) returned a server error.{$because}",
             );
         }
     }
