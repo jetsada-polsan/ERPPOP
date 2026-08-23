@@ -67,10 +67,24 @@ jobs:
             DB::table('branches')->insertOrIgnore(['code' => 'CI', 'name_th' => 'สาขา CI', 'is_active' => true]);
           "
 
+      # โหมด number ขอเลขอย่างเดียว เอกสารที่ได้จึงเป็นใบเปล่าไม่มีรายการและไม่มี GL
+      # ซึ่งถูกต้องสำหรับการพิสูจน์ว่าเลขไม่ซ้ำ แต่ห้ามเอาไปกระทบยอดต่อ
       - name: ยิงพร้อมกัน 30 process — เลขเอกสารต้องไม่ซ้ำและต้องไม่มี error
         run: |
           BRANCH=$(php artisan tinker --execute="echo DB::table('branches')->where('code','CI')->value('id');" | tail -1 | tr -dc '0-9')
           php artisan uat:concurrency --users=30 --per-user=5 --branch="$BRANCH" --confirm-test-database
+
+      # ล้างใบเปล่าจากรอบบน แล้วสร้างชุดข้อมูลที่ขายได้จริง เพื่อให้การกระทบยอด
+      # มีของให้เทียบ ไม่ใช่เทียบศูนย์กับศูนย์แล้วผ่านไปเฉย ๆ
+      - name: เตรียมข้อมูลสำหรับขายจริงทั้งวงจร
+        run: |
+          php artisan migrate:fresh --force
+          php artisan tinker --execute='require "tools/staging/seed_uat_data.php";'
+
+      - name: ยิงพร้อมกัน 30 process — ขายจริงทั้งวงจร ตัดสต๊อกและลง GL
+        run: |
+          BRANCH=$(php artisan tinker --execute="echo DB::table('branches')->where('code','UAT')->value('id');" | tail -1 | tr -dc '0-9')
+          php artisan uat:concurrency --users=30 --per-user=5 --branch="$BRANCH" --mode=sale --confirm-test-database
 
       - name: กระทบยอด stock / COGS / GL / sales_postings
         run: php artisan uat:reconcile
