@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseQuote;
 use App\Models\PurchaseOrderItem;
 use App\Models\Supplier;
 use App\Models\SupplierPriceSchedule;
 use App\Services\Purchasing\PurchaseOrderReceivingService;
+use App\Services\Purchasing\PurchaseQuoteService;
 use App\Services\Sales\DocumentNumberGenerator;
 use App\Support\DecimalMath;
 use Illuminate\Http\JsonResponse;
@@ -146,6 +148,46 @@ class PurchaseOrderController extends Controller
         }
 
         return response()->json(['success' => true, 'prices' => $prices]);
+    }
+
+    /** บันทึกใบเสนอราคาที่ได้รับจากผู้ขายรายหนึ่ง */
+    public function storeQuote(Request $request, PurchaseOrder $purchaseOrder, PurchaseQuoteService $quotes): RedirectResponse
+    {
+        $data = $request->validate([
+            'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
+            'reference' => ['nullable', 'string', 'max:100'],
+            'valid_until' => ['nullable', 'date'],
+            'note' => ['nullable', 'string', 'max:1000'],
+            'unit_price' => ['required', 'array', 'min:1'],
+            'unit_price.*' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $lines = [];
+        foreach ($data['unit_price'] as $itemId => $price) {
+            $lines[] = ['purchase_order_item_id' => (int) $itemId, 'unit_price' => (float) $price];
+        }
+
+        try {
+            $quotes->record($purchaseOrder, (int) $data['supplier_id'], $lines, $data);
+        } catch (RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+
+        return back()->with('success', 'บันทึกใบเสนอราคาแล้ว');
+    }
+
+    /** เลือกใบเสนอราคาที่จะใช้สั่งซื้อ */
+    public function selectQuote(Request $request, PurchaseQuote $quote, PurchaseQuoteService $quotes): RedirectResponse
+    {
+        $data = $request->validate(['selection_reason' => ['nullable', 'string', 'max:255']]);
+
+        try {
+            $quotes->select($quote, $data['selection_reason'] ?? null);
+        } catch (RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+
+        return back()->with('success', 'เลือกผู้ขายจากใบเสนอราคาแล้ว ราคาถูกใส่ในใบขอซื้อให้เรียบร้อย');
     }
 
     // ยืนยันสั่งซื้อ: ต้องมีซัพพลายเออร์และราคาครบ

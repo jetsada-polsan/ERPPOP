@@ -56,6 +56,7 @@
                 ['label' => 'ทะเบียนทรัพย์สิน', 'route' => 'fixed-assets.index', 'pattern' => 'fixed-assets.*', 'icon' => 'bi-buildings', 'tone' => 'brown'],
                 ['label' => 'เงินสด / ภาษี', 'route' => 'bplus.finance', 'pattern' => 'bplus.finance', 'extraPattern' => 'bplus.tax', 'icon' => 'bi-journal-richtext', 'tone' => 'amber'],
                 ['label' => 'บัญชีธนาคาร', 'route' => 'bank-accounts.index', 'pattern' => 'bank-accounts.*', 'icon' => 'bi-bank2', 'tone' => 'blue'],
+                ['label' => 'ฝาก/ถอนเงินสด', 'route' => 'cash-transfers.index', 'pattern' => 'cash-transfers.*', 'icon' => 'bi-cash-stack', 'tone' => 'teal'],
                 ['label' => 'ทะเบียนเช็ค', 'route' => 'cheques.index', 'pattern' => 'cheques.*', 'icon' => 'bi-journal-check', 'tone' => 'teal'],
                 ['label' => 'อนุมัติเอกสาร', 'route' => 'bplus.approvals', 'pattern' => 'bplus.approvals', 'icon' => 'bi-shield-check', 'tone' => 'indigo'],
             ],

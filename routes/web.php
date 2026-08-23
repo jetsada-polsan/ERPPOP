@@ -263,6 +263,9 @@ Route::get('/sales/{sale}/print', [SaleController::class, 'print'])->name('sales
 // an AP debt (supplier_ledger). The "stock IN" counterpart to bookings/sales.
 // ใบขอซื้อ/ใบสั่งซื้อ (AP ต้นน้ำ): ขอซื้อ -> อนุมัติ -> สั่งซื้อ -> รับของ (สร้างใบซื้อจริง)
 Route::prefix('purchase-orders')->name('purchase-orders.')->group(function () {
+    // ใบสอบราคา: บันทึกราคาที่ได้จากแต่ละผู้ขาย แล้วเลือกหนึ่งใบไปสั่งซื้อ
+    Route::post('/{purchaseOrder}/quotes', [PurchaseOrderController::class, 'storeQuote'])->name('quotes.store');
+    Route::post('/quotes/{quote}/select', [PurchaseOrderController::class, 'selectQuote'])->name('quotes.select');
     Route::get('/', [PurchaseOrderController::class, 'index'])->name('index');
     Route::post('/', [PurchaseOrderController::class, 'store'])->name('store');
     Route::get('/{purchaseOrder}', [PurchaseOrderController::class, 'show'])->name('show');

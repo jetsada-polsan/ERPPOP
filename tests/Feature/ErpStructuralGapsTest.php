@@ -56,20 +56,25 @@ class ErpStructuralGapsTest extends TestCase
         );
     }
 
-    /** ช่องว่างข้อ 2 — ไม่มีใบขอซื้อ ใบสอบราคา และใบส่งของ */
-    public function test_gap_no_requisition_quotation_request_or_delivery_note_document(): void
+    /** ช่องว่างข้อ 2 — แก้คำกล่าวอ้างเดิม: ใบขอซื้อและใบสอบราคามีแล้ว เหลือใบส่งของ */
+    public function test_gap_only_the_delivery_note_document_is_still_missing(): void
     {
-        $this->seedDocumentTypes();
-        $existing = DocumentType::pluck('code')->all();
+        // ใบขอซื้อไม่ได้หายไปไหน — เป็นสถานะหนึ่งของ purchase_orders ไม่ใช่ DocumentType แยก
+        // การสรุปก่อนหน้าว่า "ไม่มีใบขอซื้อ" ผิด เพราะไปดูแต่ document_types
+        $this->assertTrue(Schema::hasColumn('purchase_orders', 'requested_by'));
+        $this->assertTrue(Schema::hasColumn('purchase_orders', 'approved_by'));
 
-        foreach (['PURCHASE_REQUISITION', 'PURCHASE_RFQ', 'DELIVERY_NOTE'] as $code) {
-            $this->assertNotContains($code, $existing, "มี {$code} แล้ว - ให้เปลี่ยนเทสต์นี้เป็นเทสต์จริง");
-        }
+        // ใบสอบราคาเพิ่มแล้วในรอบนี้
+        $this->assertTrue(Schema::hasTable('purchase_quotes'));
+        $this->assertTrue(Schema::hasTable('purchase_quote_items'));
+
+        // ที่ยังขาดจริงคือเอกสารติดตามการส่งของ
+        $this->assertNotContains('DELIVERY_NOTE', DocumentType::pluck('code')->all());
 
         $this->markTestIncomplete(
-            'ยังไม่มีใบขอซื้อและใบสอบราคาที่อ่านต่อเป็นใบสั่งซื้อได้ '.
-            'และ "ใบส่งของ" ที่มีอยู่เป็นแค่หน้าพิมพ์ของเอกสารขาย (DeliveryNoteController::show) '.
-            'ไม่ใช่เอกสารติดตามการส่ง จึงตอบไม่ได้ว่าส่งครบหรือยังและค้างส่งเท่าไร'
+            '"ใบส่งของ" ที่มีอยู่เป็นแค่หน้าพิมพ์ของเอกสารขาย (DeliveryNoteController::show) '.
+            'ไม่ใช่เอกสารติดตามการส่ง จึงตอบไม่ได้ว่าส่งครบหรือยังและค้างส่งเท่าไรในระดับเอกสารขาย '.
+            '(ใบจองตอบได้แล้วผ่าน sale_bookings.delivery_status แต่ใบขายตรงยังตอบไม่ได้)'
         );
     }
 
