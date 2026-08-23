@@ -22,6 +22,7 @@ class MasterDataCutoverTest extends TestCase
 
     public function test_codes_are_renumbered_and_the_old_ones_kept_for_mapping(): void
     {
+        $this->branch('HO');
         $branch = $this->branch('LEGACY-7');
         $product = $this->product('OLD-SKU-1');
         $expected = collect($this->service()->planBranches())->firstWhere('id', $branch->id);
@@ -40,6 +41,7 @@ class MasterDataCutoverTest extends TestCase
 
     public function test_barcodes_are_untouched_and_still_scan_to_the_same_product(): void
     {
+        $this->branch('HO');
         $this->branch('LEGACY-1');
         $product = $this->product('OLD-2');
         DB::table('product_barcodes')->insert([
@@ -66,6 +68,7 @@ class MasterDataCutoverTest extends TestCase
 
     public function test_the_schema_itself_refuses_a_barcode_on_two_products(): void
     {
+        $this->branch('HO');
         $this->branch('LEGACY-1');
         $first = $this->product('A-1');
         $second = $this->product('A-2');
@@ -85,6 +88,7 @@ class MasterDataCutoverTest extends TestCase
 
     public function test_a_bad_ean13_check_digit_is_reported_but_never_corrected(): void
     {
+        $this->branch('HO');
         $this->branch('LEGACY-1');
         $product = $this->product('EAN-1');
         DB::table('product_barcodes')->insert([
@@ -131,6 +135,7 @@ class MasterDataCutoverTest extends TestCase
 
     public function test_the_cutover_cannot_be_run_twice(): void
     {
+        $this->branch('HO');
         $this->branch('LEGACY-1');
         $this->product('C-1');
 
@@ -143,6 +148,7 @@ class MasterDataCutoverTest extends TestCase
 
     public function test_deleted_products_still_consume_a_number_so_codes_are_never_reused(): void
     {
+        $this->branch('HO');
         $this->branch('LEGACY-1');
         $first = $this->product('D-1');
         $second = $this->product('D-2');
@@ -157,6 +163,7 @@ class MasterDataCutoverTest extends TestCase
 
     public function test_products_without_a_barcode_are_reported_as_a_warning_not_a_blocker(): void
     {
+        $this->branch('HO');
         $this->branch('LEGACY-1');
         $this->product('E-1');
 
@@ -169,7 +176,7 @@ class MasterDataCutoverTest extends TestCase
         $this->assertSame(1, $result['products'], 'cutover ต้องเดินต่อได้แม้สินค้าไม่มีบาร์โค้ด');
     }
 
-    public function test_the_plan_follows_the_old_codes_so_a_human_can_check_it(): void
+    public function test_head_office_gets_hq_and_storefronts_start_at_b001(): void
     {
         Branch::query()->delete();
         foreach (['0003', 'HO', '0001', '0002'] as $code) {
@@ -178,9 +185,32 @@ class MasterDataCutoverTest extends TestCase
 
         $plan = collect($this->service()->planBranches());
 
-        // เรียงตามรหัสเดิม ไม่ใช่ลำดับที่สร้าง ตัวอักษรไปท้ายสุด
-        $this->assertSame(['0001', '0002', '0003', 'HO'], $plan->pluck('legacy')->all());
-        $this->assertSame(['B001', 'B002', 'B003', 'B004'], $plan->pluck('new')->all());
+        $this->assertSame(['0001', '0002', '0003', 'HO'], $plan->pluck('legacy')->all(), 'เรียงตามรหัสเดิม');
+        $this->assertSame('HQ', $plan->firstWhere('legacy', 'HO')['new'], 'HO คือสำนักงานใหญ่');
+        $this->assertNull($plan->firstWhere('legacy', '0001')['new'], '0001 ซ้ำกับสำนักงานใหญ่ ต้องถูกยุบ');
+
+        // หน้าร้านเริ่ม B001 โดยไม่นับสำนักงานใหญ่เข้าไปในลำดับ
+        $this->assertSame(['B001', 'B002'], $plan->whereIn('legacy', ['0002', '0003'])->pluck('new')->all());
+    }
+
+    public function test_merging_a_duplicate_head_office_moves_its_users_to_hq(): void
+    {
+        Branch::query()->delete();
+        $hq = $this->branch('HO');
+        $duplicate = $this->branch('0001');
+        $this->branch('0002');
+        $this->product('M-1');
+
+        $user = \App\Models\User::factory()->create(['username' => 'merge-probe', 'branch_id' => $duplicate->id]);
+
+        $this->service()->apply();
+
+        $this->assertSame('HQ', $hq->fresh()->code);
+        $this->assertSame($hq->id, $user->fresh()->branch_id, 'ผู้ใช้ต้องย้ายไป HQ ไม่ใช่ค้างอยู่กับสาขาที่ปิดไปแล้ว');
+
+        $duplicate->refresh();
+        $this->assertFalse((bool) $duplicate->is_active, 'สาขาซ้ำต้องถูกปิด');
+        $this->assertSame('0001', $duplicate->legacy_branch_code);
     }
 
     private function branch(string $code): Branch

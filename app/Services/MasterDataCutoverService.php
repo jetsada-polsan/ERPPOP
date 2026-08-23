@@ -23,6 +23,20 @@ class MasterDataCutoverService
     public const BRANCH_PREFIX = 'B';
     public const PRODUCT_PREFIX = 'P';
 
+    /** สำนักงานใหญ่ใช้รหัส HQ ไม่เข้าคิว B ตามเจ้าของสั่ง */
+    public const HQ_CODE = 'HQ';
+
+    /** รหัสเดิมของสำนักงานใหญ่ */
+    public const HQ_LEGACY_CODE = 'HO';
+
+    /**
+     * สาขาที่เป็นสำนักงานใหญ่ซ้ำซ้อน ให้ยุบรวมเข้า HQ
+     *
+     * ฐานมี "สำนักงานใหญ่" สองแถว (HO กับ 0001) ชี้ไปพื้นที่เก็บเดียวกัน
+     * เจ้าของยืนยันว่าเป็นที่เดียวกัน จึงเหลือแถวเดียวคือ HQ
+     */
+    public const MERGE_INTO_HQ = ['0001'];
+
     /**
      * แผนที่รหัสเดิม -> รหัสใหม่ โดยไม่เขียนอะไรลงฐาน
      *
@@ -30,22 +44,51 @@ class MasterDataCutoverService
      * เรียงตาม id แล้ว 0001 จะไปโผล่เป็น B004 ซึ่งเป็นชนิดของความสับสน
      * ที่ทำให้คนหยิบรหัสผิดตอนตั้งค่าเครื่อง POS
      *
-     * @return array<int, array{id:int, legacy:string, new:string, name:string}>
+     * สำนักงานใหญ่ได้ HQ ส่วนหน้าร้านไล่ B001 ขึ้นไป — สำนักงานใหญ่ไม่ใช่สาขาขาย
+     * ให้ปนอยู่ในลำดับเดียวกันแล้วรายงานยอดขายรายสาขาจะมีแถวที่ไม่ควรมี
+     *
+     * @return array<int, array{id:int, legacy:string, new:string, name:string, action:string}>
      */
     public function planBranches(): array
     {
         $plan = [];
         $sequence = 0;
+
         foreach ($this->sortedByLegacyCode(Branch::all(), 'code') as $branch) {
+            $legacy = (string) $branch->code;
+
+            [$new, $action] = match (true) {
+                $legacy === self::HQ_LEGACY_CODE => [self::HQ_CODE, 'สำนักงานใหญ่'],
+                in_array($legacy, self::MERGE_INTO_HQ, true) => [null, 'ยุบรวมเข้า HQ'],
+                default => [self::BRANCH_PREFIX.str_pad((string) ++$sequence, 3, '0', STR_PAD_LEFT), 'สาขาหน้าร้าน'],
+            };
+
             $plan[] = [
                 'id' => $branch->id,
-                'legacy' => (string) $branch->code,
-                'new' => self::BRANCH_PREFIX.str_pad((string) ++$sequence, 3, '0', STR_PAD_LEFT),
+                'legacy' => $legacy,
+                'new' => $new,
                 'name' => (string) $branch->name_th,
+                'action' => $action,
             ];
         }
 
         return $plan;
+    }
+
+    /** สาขาที่จะถูกยุบ พร้อมจำนวนสิ่งที่ต้องย้ายตาม */
+    public function mergeImpact(): array
+    {
+        $impact = [];
+        foreach (collect($this->planBranches())->where('action', 'ยุบรวมเข้า HQ') as $row) {
+            $impact[] = [
+                'legacy' => $row['legacy'],
+                'name' => $row['name'],
+                'users' => DB::table('users')->where('branch_id', $row['id'])->count(),
+                'pos_devices' => DB::table('pos_devices')->where('branch_id', $row['id'])->count(),
+            ];
+        }
+
+        return $impact;
     }
 
     /** @return array<int, array{id:int, legacy:string, new:string, name:string, barcodes:int}> */
@@ -124,7 +167,7 @@ class MasterDataCutoverService
         }
 
         // รหัสใหม่ต้องไม่ชนของที่มีอยู่แล้ว
-        $branchTargets = collect($this->planBranches())->pluck('new');
+        $branchTargets = collect($this->planBranches())->pluck('new')->filter();
         $collidingBranches = Branch::whereIn('code', $branchTargets)->pluck('code');
         foreach ($collidingBranches as $code) {
             $problems[] = ['level' => 'หยุด', 'issue' => 'รหัสสาขาใหม่ชนของเดิม', 'detail' => $code];
@@ -143,6 +186,14 @@ class MasterDataCutoverService
             foreach ($duplicates as $code) {
                 $problems[] = ['level' => 'หยุด', 'issue' => "รหัสเดิมซ้ำใน {$table}", 'detail' => (string) $code];
             }
+        }
+
+        if (! collect($this->planBranches())->contains('new', self::HQ_CODE)) {
+            $problems[] = [
+                'level' => 'หยุด',
+                'issue' => 'ไม่พบสำนักงานใหญ่',
+                'detail' => 'ต้องมีสาขารหัสเดิม '.self::HQ_LEGACY_CODE.' เพื่อเปลี่ยนเป็น '.self::HQ_CODE,
+            ];
         }
 
         // บาร์โค้ดที่ check digit ไม่ถูกจะสแกนไม่ติดกับเครื่องอ่านบางรุ่น
@@ -225,7 +276,25 @@ class MasterDataCutoverService
         return DB::transaction(function () use ($branchPlan, $productPlan, $userId) {
             $barcodesBefore = DB::table('product_barcodes')->count();
 
+            $hqId = collect($branchPlan)->firstWhere('new', self::HQ_CODE)['id'] ?? null;
+            if (! $hqId) {
+                throw new RuntimeException('ไม่พบสำนักงานใหญ่ในแผน');
+            }
+
             foreach ($branchPlan as $row) {
+                if ($row['new'] === null) {
+                    // ย้ายทุกอย่างที่ผูกกับสาขาซ้ำซ้อนไป HQ ก่อนปิดใช้งาน
+                    // ปิดโดยไม่ย้ายจะได้ผู้ใช้ที่ล็อกอินแล้วไม่สังกัดสาขาไหนเลย
+                    DB::table('users')->where('branch_id', $row['id'])->update(['branch_id' => $hqId]);
+                    DB::table('pos_devices')->where('branch_id', $row['id'])->update(['branch_id' => $hqId]);
+                    Branch::where('id', $row['id'])->update([
+                        'legacy_branch_code' => $row['legacy'],
+                        'is_active' => false,
+                    ]);
+
+                    continue;
+                }
+
                 Branch::where('id', $row['id'])->update([
                     'legacy_branch_code' => $row['legacy'],
                     'code' => $row['new'],
@@ -249,7 +318,7 @@ class MasterDataCutoverService
                     'scope' => $scope,
                     'mapped_count' => count($plan),
                     'first_code' => $plan[0]['new'] ?? null,
-                    'last_code' => $plan === [] ? null : end($plan)['new'],
+                    'last_code' => $plan === [] ? null : (end($plan)['new'] ?? null),
                     'applied_by' => $userId,
                     'applied_at' => now(),
                 ]);

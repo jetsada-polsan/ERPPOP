@@ -13,6 +13,7 @@ use App\Models\ProductCategory;
 use App\Models\ProductDepartment;
 use App\Models\ProductPrice;
 use App\Models\ProductSupplier;
+use App\Support\BarcodePolicy;
 use App\Models\ProductUnit;
 use App\Models\RecallCase;
 use App\Models\RecallContact;
@@ -26,6 +27,7 @@ use App\Support\DecimalMath;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -353,17 +355,27 @@ class ProductController extends Controller
         $data = $request->validate([
             'barcode_mode' => ['nullable', 'in:manual,auto_ean13'],
             'barcode' => [$request->input('barcode_mode') === 'auto_ean13' ? 'nullable' : 'required', 'string', 'max:50', 'unique:product_barcodes,barcode'],
+            'barcode_type' => ['required', Rule::in(BarcodePolicy::ALL)],
             'unit_id' => ['required', 'integer', 'exists:product_units,id'],
             'unit_factor' => ['required', 'numeric', 'min:0.0001'],
             'price' => ['nullable', 'numeric', 'min:0'],
         ]);
 
+        $auto = $request->input('barcode_mode') === 'auto_ean13';
         unset($data['barcode_mode']);
-        if ($request->input('barcode_mode') === 'auto_ean13') {
+
+        if (! $auto && ($failure = $this->barcodeRuleFailure($data['barcode_type'], $data['barcode']))) {
+            return back()->withInput()->withErrors(['barcode' => $failure]);
+        }
+
+        if ($auto) {
             DB::transaction(function () use ($product, $data): void {
                 // กันเลขชนกันกรณีผู้ใช้หลายคนกดสร้างพร้อมกัน
                 DB::statement('SELECT pg_advisory_xact_lock(299013)');
                 $data['barcode'] = $this->nextInternalEan13();
+                // เลขช่วง 299 เป็นรหัสที่ร้านตั้งเอง ไม่ใช่ของที่ได้รับจัดสรรจาก GS1
+                // จึงติดป้ายเป็นรหัสภายใน ไม่ใช่ EAN-13 มาตรฐาน
+                $data['barcode_type'] = BarcodePolicy::INTERNAL_13;
                 $product->barcodes()->create($data + ['is_active' => true]);
             });
         } else {
@@ -374,6 +386,14 @@ class ProductController extends Controller
             'product' => $product,
             'popup' => $request->boolean('popup') ? 1 : null,
         ])->with('success', 'เพิ่มบาร์โค้ดแล้ว');
+    }
+
+    /** คืนข้อความถ้าบาร์โค้ดผิดกฎของประเภทนั้น ไม่ผิดคืน null */
+    private function barcodeRuleFailure(string $type, ?string $barcode): ?string
+    {
+        $checked = app(BarcodePolicy::class)->check($type, (string) $barcode);
+
+        return $checked['ok'] ? null : implode(' · ', $checked['errors']);
     }
 
     /** สร้าง EAN-13 ภายในร้าน ช่วง 299 + running 9 หลัก + check digit */
@@ -415,12 +435,19 @@ class ProductController extends Controller
 
         $data = $request->validate([
             'barcode' => ['required', 'string', 'max:50', 'unique:product_barcodes,barcode,'.$productBarcode->id],
+            'barcode_type' => ['required', Rule::in(BarcodePolicy::ALL)],
             'unit_id' => ['required', 'integer', 'exists:product_units,id'],
             'unit_factor' => ['required', 'numeric', 'min:0.0001'],
             'price' => ['nullable', 'numeric', 'min:0'],
             'is_active' => ['required', 'boolean'],
         ]);
 
+        if ($failure = $this->barcodeRuleFailure($data['barcode_type'], $data['barcode'])) {
+            return back()->withInput()->withErrors(['barcode' => $failure]);
+        }
+
+        // บันทึกค่าที่ผู้ใช้กรอกตามนั้น ไม่แก้ให้เองแม้จะรู้ว่าควรเป็นเลขอะไร
+        // ของที่พิมพ์ติดสินค้าไปแล้วไม่ได้เปลี่ยนตามค่าในฐาน
         $productBarcode->update($data);
 
         return redirect()->route('products.show', [

@@ -37,9 +37,17 @@ class MasterDataCutover extends Command
         $this->line('');
 
         $this->table(
-            ['รหัสเดิม', 'รหัสใหม่', 'ชื่อสาขา'],
-            collect($branchPlan)->map(fn ($row) => [$row['legacy'], $row['new'], mb_substr($row['name'], 0, 34)])->all(),
+            ['รหัสเดิม', 'รหัสใหม่', 'ชื่อสาขา', 'ทำอะไร'],
+            collect($branchPlan)->map(fn ($row) => [
+                $row['legacy'], $row['new'] ?? '(ไม่มีรหัส)', mb_substr($row['name'], 0, 30), $row['action'],
+            ])->all(),
         );
+
+        if ($impact = $service->mergeImpact()) {
+            $this->warn('สาขาที่จะถูกยุบ — ของที่ผูกอยู่จะถูกย้ายไป HQ:');
+            $this->table(['รหัสเดิม', 'ชื่อ', 'ผู้ใช้', 'เครื่อง POS'],
+                collect($impact)->map(array_values(...))->all());
+        }
 
         $this->line('ตัวอย่างสินค้า 5 รายการแรกและ 3 รายการท้าย:');
         $this->table(

@@ -73,7 +73,7 @@
             </div>
             <div class="compact-body" x-show="compactTab==='barcode'">
                 <div class="compact-section-head"><strong>รหัสสินค้า / บาร์โค้ด</strong><button @click="barcodeOpen=true">+ เพิ่มรหัส</button></div>
-                <table class="compact-table compact-edit-table"><thead><tr><th>บาร์โค้ด</th><th>หน่วย</th><th class="num">ตัวคูณ</th><th class="num">ราคา</th><th>สถานะ</th><th></th></tr></thead><tbody>@forelse($product->barcodes as $barcode)<tr class="{{ $barcode->is_active ? '' : 'barcode-disabled' }}"><td><input form="barcode-{{ $barcode->id }}" name="barcode" value="{{ $barcode->barcode }}" required></td><td><select form="barcode-{{ $barcode->id }}" name="unit_id" required>@foreach($units as $unit)<option value="{{ $unit->id }}" @selected($unit->id===$barcode->unit_id)>{{ $unit->displayLabel() }}</option>@endforeach</select></td><td><input form="barcode-{{ $barcode->id }}" class="num" type="number" step="0.0001" min="0.0001" name="unit_factor" value="{{ number_format((float) $barcode->unit_factor, 4, '.', '') }}" required></td><td><input form="barcode-{{ $barcode->id }}" class="num" type="number" step="0.01" min="0" name="price" value="{{ $barcode->price === null ? '' : number_format((float) $barcode->price, 2, '.', '') }}"></td><td><input form="barcode-{{ $barcode->id }}" type="hidden" name="is_active" value="0"><label class="barcode-state {{ $barcode->is_active ? 'is-on' : 'is-off' }}"><input form="barcode-{{ $barcode->id }}" type="checkbox" name="is_active" value="1" @checked($barcode->is_active)><span>{{ $barcode->is_active ? 'ใช้งาน' : 'ปิดใช้งาน' }}</span></label></td><td><form id="barcode-{{ $barcode->id }}" method="post" action="{{ route('products.barcodes.update', [$product, $barcode]) }}">@csrf @method('PUT')<input type="hidden" name="popup" value="1"><button class="compact-row-save"><i class="bi bi-check-lg"></i> บันทึก</button></form></td></tr>@empty<tr><td colspan="6">ยังไม่มีบาร์โค้ด</td></tr>@endforelse</tbody></table>
+                <table class="compact-table compact-edit-table"><thead><tr><th>บาร์โค้ด</th><th>ประเภท</th><th>หน่วย</th><th class="num">ตัวคูณ</th><th class="num">ราคา</th><th>สถานะ</th><th></th></tr></thead><tbody>@forelse($product->barcodes as $barcode)<tr class="{{ $barcode->is_active ? '' : 'barcode-disabled' }}"><td><input form="barcode-{{ $barcode->id }}" name="barcode" value="{{ $barcode->barcode }}" required></td><td><select form="barcode-{{ $barcode->id }}" name="barcode_type" required>@foreach(\App\Support\BarcodePolicy::LABELS as $typeValue => $typeLabel)<option value="{{ $typeValue }}" @selected($typeValue===$barcode->barcode_type)>{{ $typeLabel }}</option>@endforeach</select></td><td><select form="barcode-{{ $barcode->id }}" name="unit_id" required>@foreach($units as $unit)<option value="{{ $unit->id }}" @selected($unit->id===$barcode->unit_id)>{{ $unit->displayLabel() }}</option>@endforeach</select></td><td><input form="barcode-{{ $barcode->id }}" class="num" type="number" step="0.0001" min="0.0001" name="unit_factor" value="{{ number_format((float) $barcode->unit_factor, 4, '.', '') }}" required></td><td><input form="barcode-{{ $barcode->id }}" class="num" type="number" step="0.01" min="0" name="price" value="{{ $barcode->price === null ? '' : number_format((float) $barcode->price, 2, '.', '') }}"></td><td><input form="barcode-{{ $barcode->id }}" type="hidden" name="is_active" value="0"><label class="barcode-state {{ $barcode->is_active ? 'is-on' : 'is-off' }}"><input form="barcode-{{ $barcode->id }}" type="checkbox" name="is_active" value="1" @checked($barcode->is_active)><span>{{ $barcode->is_active ? 'ใช้งาน' : 'ปิดใช้งาน' }}</span></label></td><td><form id="barcode-{{ $barcode->id }}" method="post" action="{{ route('products.barcodes.update', [$product, $barcode]) }}">@csrf @method('PUT')<input type="hidden" name="popup" value="1"><button class="compact-row-save"><i class="bi bi-check-lg"></i> บันทึก</button></form></td></tr>@empty<tr><td colspan="7">ยังไม่มีบาร์โค้ด</td></tr>@endforelse</tbody></table>
             </div>
             <div class="compact-body" x-show="compactTab==='stock'">
                 <div class="compact-cost-grid">
@@ -780,10 +780,23 @@
                     <div class="modal-body px-4 pb-4">
                         <div class="row g-3">
                             <div class="col-12">
+                                <label class="form-label text-muted small">ประเภทบาร์โค้ด</label>
+                                <select name="barcode_type" class="form-select" x-model="barcodeType">
+                                    @foreach(\App\Support\BarcodePolicy::LABELS as $value => $label)
+                                        <option value="{{ $value }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                                <div class="form-text" x-show="barcodeMode === 'auto_ean13'">
+                                    เลขที่สร้างอัตโนมัติเป็นรหัสภายในร้าน (ช่วง 299) ไม่ใช่ EAN-13 ที่ได้รับจัดสรรจาก GS1
+                                </div>
+                            </div>
+                            <div class="col-12">
                                 <label class="form-label text-muted small">บาร์โค้ด</label>
                                 <input type="text" name="barcode" class="form-control" x-ref="bcInput" x-model="barcodeValue"
                                     :required="barcodeMode === 'manual'" :readonly="barcodeMode === 'auto_ean13'"
                                     :placeholder="barcodeMode === 'auto_ean13' ? 'ระบบจะสร้างเลข EAN-13 เมื่อบันทึก' : 'ยิงหรือพิมพ์บาร์โค้ด'">
+                                <div class="small mt-2" x-show="barcodeMode === 'manual' && barcodeValue.length > 0" x-text="barcodeHint()"
+                                    :class="barcodeOk() ? 'text-success' : 'text-danger'"></div>
                                 <div class="d-grid gap-2 mt-2" style="grid-template-columns:1fr 1fr">
                                     <button type="button" class="btn btn-sm btn-primary" @click="barcodeMode='auto_ean13'; barcodeValue=''">
                                         <i class="bi bi-upc-scan me-1"></i> สร้าง EAN-13 อัตโนมัติ
@@ -1709,7 +1722,49 @@
 @push('scripts')
 <script>
     function productShow() {
-        return { editOpen: false, barcodeOpen: false, compactTab: 'detail', barcodeMode: 'auto_ean13', barcodeValue: '' };
+        return {
+            editOpen: false, barcodeOpen: false, compactTab: 'detail',
+            barcodeMode: 'auto_ean13', barcodeValue: '', barcodeType: 'INTERNAL_13',
+
+            // ตรวจให้เห็นผลทันทีตอนพิมพ์ ส่วนการตัดสินจริงอยู่ที่ฝั่งเซิร์ฟเวอร์
+            eanCheckDigit(value) {
+                if (!/^\d{12}$/.test(value)) return null;
+                let sum = 0;
+                for (let i = 0; i < 12; i++) sum += Number(value[i]) * (i % 2 === 0 ? 1 : 3);
+                return (10 - (sum % 10)) % 10;
+            },
+            barcodeOk() {
+                const value = this.barcodeValue.trim();
+                if (value === '') return false;
+                if (this.barcodeType === 'EAN13_STANDARD') {
+                    return /^\d{13}$/.test(value) && this.eanCheckDigit(value.slice(0, 12)) === Number(value[12]);
+                }
+                if (this.barcodeType === 'INTERNAL_13') return /^\d{13}$/.test(value);
+                if (this.barcodeType === 'SCALE_WEIGHT') return /^80[01]\d{3}\d{6}\d$/.test(value);
+                return true;
+            },
+            barcodeHint() {
+                const value = this.barcodeValue.trim();
+                if (this.barcodeType === 'EAN13_STANDARD') {
+                    if (!/^\d{13}$/.test(value)) return 'EAN-13 ต้องเป็นตัวเลข 13 หลักพอดี';
+                    const expected = this.eanCheckDigit(value.slice(0, 12));
+                    return expected === Number(value[12])
+                        ? 'check digit ถูกต้อง'
+                        : 'check digit ควรเป็น ' + expected;
+                }
+                if (this.barcodeType === 'INTERNAL_13') {
+                    if (!/^\d{13}$/.test(value)) return 'รหัสภายในต้องเป็นตัวเลข 13 หลักพอดี';
+                    const expected = this.eanCheckDigit(value.slice(0, 12));
+                    return expected === Number(value[12])
+                        ? 'ใช้ได้ (หลักสุดท้ายตรงสูตร EAN-13 พอดี)'
+                        : 'ใช้ได้ แต่หลักสุดท้ายไม่ตรงสูตร EAN-13 เครื่องอ่านบางรุ่นอาจไม่รับ';
+                }
+                if (this.barcodeType === 'SCALE_WEIGHT') {
+                    return /^80[01]\d{3}\d{6}\d$/.test(value) ? 'ตรงรูปแบบเครื่องชั่ง' : 'ต้องเป็น PLU 800/801 + ราคา 6 หลัก + check digit';
+                }
+                return 'รับได้ทุกรูปแบบ';
+            },
+        };
     }
 
     function priceTableSection() {

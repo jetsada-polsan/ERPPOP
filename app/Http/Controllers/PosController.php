@@ -286,6 +286,9 @@ class PosController extends Controller
             if ($matchedBarcode) {
                 $p->matched_barcode = [
                     'barcode' => $matchedBarcode->barcode,
+                    // ส่งประเภทไปด้วย เครื่อง POS ที่ทำงานออฟไลน์ต้องรู้ว่าจะปฏิบัติกับ
+                    // บาร์โค้ดนี้ยังไง โดยไม่ต้องเดาจากรูปร่างของตัวเลข
+                    'barcode_type' => $matchedBarcode->barcode_type,
                     'unit_id' => $matchedBarcode->unit_id,
                     'unit_name' => $matchedBarcode->unit?->cleanName(),
                     'unit_factor' => (float) $matchedBarcode->unit_factor,
