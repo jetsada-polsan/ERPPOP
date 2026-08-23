@@ -176,6 +176,35 @@ class BarcodePolicyTest extends TestCase
         $this->assertSame('8850000000000', $existing->fresh()->barcode);
     }
 
+    /** ข้อ 6: บิลที่ sync กลับมาต้องถูกตรวจซ้ำว่าบาร์โค้ดยังเป็นของสินค้าตัวเดิม */
+    public function test_a_queued_sale_whose_barcode_now_belongs_to_another_product_is_refused(): void
+    {
+        $sold = $this->product('SYNC-1');
+        $other = $this->product('SYNC-2');
+        $this->barcode($other, '8850000000034', BarcodePolicy::INTERNAL_13);
+
+        $controller = new \ReflectionMethod(\App\Http\Controllers\PosController::class, 'barcodeBelongsToAnotherProduct');
+        $controller->setAccessible(true);
+        $instance = app(\App\Http\Controllers\PosController::class);
+
+        // เครื่องออฟไลน์ถือแคตตาล็อกเก่า ส่งบาร์โค้ดที่ตอนนี้เป็นของสินค้าอื่นมาขาย
+        $message = $controller->invoke($instance, [
+            ['product_id' => $sold->id, 'barcode' => '8850000000034', 'barcode_type' => BarcodePolicy::INTERNAL_13],
+        ]);
+        $this->assertNotNull($message, 'ต้องจับได้ ไม่งั้นสต๊อกตัดผิดตัว');
+        $this->assertStringContainsString('sync แคตตาล็อกใหม่', $message);
+
+        // ตัวเดิมที่ตรงกันต้องผ่าน
+        $this->assertNull($controller->invoke($instance, [
+            ['product_id' => $other->id, 'barcode' => '8850000000034', 'barcode_type' => BarcodePolicy::INTERNAL_13],
+        ]));
+
+        // ป้ายเครื่องชั่งไม่ได้ลงทะเบียนเป็นบาร์โค้ด ต้องไม่ถูกตรวจข้อนี้
+        $this->assertNull($controller->invoke($instance, [
+            ['product_id' => $sold->id, 'barcode' => '800123012550', 'barcode_type' => BarcodePolicy::SCALE_WEIGHT],
+        ]));
+    }
+
     /** ผู้ใช้ที่มีสิทธิ์แก้แฟ้มสินค้าจริง */
     private function staff(string $username): \App\Models\User
     {

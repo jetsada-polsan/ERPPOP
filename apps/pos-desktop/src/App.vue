@@ -6,6 +6,7 @@ import { invoke, isTauri } from '@tauri-apps/api/core'
 import { api, connect, PosUnreachableError, setServerUrl } from './lib/api'
 import { closeLocalDb, enqueue, loadOfflineCashiers, loadOfflineCashiersByPin, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceOfflineCashiers, replaceProducts, replacePromotions, saleHistory, saveOfflineCredential, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth } from './lib/db'
 import { productAtSaleTime } from './lib/catalog'
+import { resolveScan, type BarcodeType } from './lib/barcode'
 import { priceCart } from './lib/pricing'
 import { syncCheckoutQueue } from './lib/sync'
 import type { CartLine, Cashier, DeviceProfile, HeldBill, LocalSaleHistory, LocalStorageStatus, PaymentMethod, Product, QtyPromotion, QueueItem, ReceiptBlock, ReceiptTemplate, Shift } from './lib/types'
@@ -143,10 +144,10 @@ async function openHistory() {
 async function refreshHistory() { saleHistoryRows.value = await saleHistory(historyDays.value) }
 async function refreshLocalSales() { recentSales.value = await saleHistory(30) }
 
-function addProduct(product: Product, barcode?: string) {
+function addProduct(product: Product, barcode?: string, barcodeType?: BarcodeType) {
   const existing = cart.value.find((line) => line.id === product.id && line.scannedBarcode === barcode)
   if (existing) existing.qty = Number((existing.qty + 1).toFixed(4))
-  else cart.value.push({ ...product, qty: 1, scannedBarcode: barcode })
+  else cart.value.push({ ...product, qty: 1, scannedBarcode: barcode, scannedBarcodeType: barcodeType })
   search.value = ''
   nextTick(() => scanner.value?.focus())
 }
@@ -155,55 +156,44 @@ function repriceCartForCurrentSchedule() {
   const now = new Date()
   cart.value = cart.value.map((line) => {
     const master = products.value.find((product) => product.id === line.id)
-    return master ? { ...line, ...productAtSaleTime(master, now, line.scannedBarcode), qty: line.qty, scannedBarcode: line.scannedBarcode } : line
+    return master
+      ? { ...line, ...productAtSaleTime(master, now, line.scannedBarcode), qty: line.qty, scannedBarcode: line.scannedBarcode, scannedBarcodeType: line.scannedBarcodeType }
+      : line
   })
 }
 
-// ป้ายเครื่องชั่ง: PLU 6 หลัก + ราคารวม (สตางค์) — ตรงกับ SCALE_BARCODE_RULES ของ POS เว็บ
-// 13 หลักต้องตรวจ check digit เพราะ 800-839 เป็นรหัสประเทศ EAN ของอิตาลีด้วย
-function decodeScaleLabel(code: string): { plu: string; price: number } | null {
-  const long = /^(80[01]\d{3})(\d{6})(\d)$/.exec(code)
-  if (long) {
-    const body = long[1] + long[2]
-    let sum = 0
-    for (let i = 0; i < body.length; i++) sum += Number(body[i]) * (i % 2 === 0 ? 1 : 3)
-    if ((10 - (sum % 10)) % 10 !== Number(long[3])) return null
-    return { plu: long[1], price: Number(long[2]) / 100 }
-  }
-  const short = /^(80[01]\d{3})(\d{5})\d$/.exec(code)
-  if (short) return { plu: short[1], price: Number(short[2]) / 100 }
-  return null
-}
 
 function scan() {
   const code = search.value.trim()
   if (!code) return
 
-  // หาสินค้าจากรหัส/บาร์โค้ดที่ลงทะเบียนไว้ก่อนเสมอ แล้วค่อยตีความเป็นป้ายชั่ง
-  // (กันสินค้านำเข้าที่ขึ้นต้น 800/801 ถูกอ่านเป็นป้ายชั่งแล้วคิดเงินผิด)
-  const knownMaster = products.value.find((p) => p.sku_code === code || p.barcodes?.some((b) => b.barcode === code))
-  const known = knownMaster ? productAtSaleTime(knownMaster, new Date(), code) : undefined
-  if (known) {
-    addProduct(known, known.barcodes?.find((b) => b.barcode === code)?.barcode)
+  // การตีความอยู่ใน lib/barcode.ts เพื่อให้เทสต์ได้โดยไม่ต้องยกทั้งหน้าจอขึ้นมา
+  const resolved = resolveScan(code, products.value)
+
+  if (resolved.kind === 'not-found') return flash(`ไม่พบรหัส ${code}`)
+  if (resolved.kind === 'scale-unknown') return flash(`ไม่พบสินค้าชั่งรหัส ${resolved.plu}`)
+
+  if (resolved.kind === 'exact') {
+    if (resolved.warning) flash(resolved.warning)
+    const priced = productAtSaleTime(resolved.product, new Date(), resolved.barcode)
+    addProduct(priced, resolved.barcode, resolved.barcodeType)
     return
   }
 
-  const scale = decodeScaleLabel(code)
-  if (scale) {
-    const weighedMaster = products.value.find((p) => p.sku_code === scale.plu || p.barcodes?.some((b) => b.barcode === scale.plu))
-    const weighed = weighedMaster ? productAtSaleTime(weighedMaster, new Date(), scale.plu) : undefined
-    if (!weighed) return flash(`ไม่พบสินค้าชั่งรหัส ${scale.plu}`)
-    const perUnit = Number(weighed.pos_price)
-    if (!(perUnit > 0)) return flash(`สินค้าชั่ง ${scale.plu} ยังไม่ได้ตั้งราคาต่อหน่วย`)
-    // ป้ายหนึ่งใบ = ถุงจริงหนึ่งถุง จึงแยกบรรทัดเสมอ ไม่รวมยอดกับถุงก่อนหน้า
-    // (server จะถอดบาร์โค้ดและคำนวณน้ำหนักซ้ำอีกครั้งจากราคาต่อหน่วยของตัวเอง)
-    cart.value.push({ ...weighed, qty: Number((scale.price / perUnit).toFixed(4)), scannedBarcode: code })
-    search.value = ''
-    nextTick(() => scanner.value?.focus())
-    return
-  }
+  const priced = productAtSaleTime(resolved.product, new Date(), resolved.plu)
+  const perUnit = Number(priced.pos_price)
+  if (!(perUnit > 0)) return flash(`สินค้าชั่ง ${resolved.plu} ยังไม่ได้ตั้งราคาต่อหน่วย`)
 
-  flash(`ไม่พบรหัส ${code}`)
+  // ป้ายหนึ่งใบ = ถุงจริงหนึ่งถุง จึงแยกบรรทัดเสมอ ไม่รวมยอดกับถุงก่อนหน้า
+  // (server จะถอดบาร์โค้ดและคำนวณน้ำหนักซ้ำอีกครั้งจากราคาต่อหน่วยของตัวเอง)
+  cart.value.push({
+    ...priced,
+    qty: Number((resolved.totalPrice / perUnit).toFixed(4)),
+    scannedBarcode: resolved.barcode,
+    scannedBarcodeType: resolved.barcodeType,
+  })
+  search.value = ''
+  nextTick(() => scanner.value?.focus())
 }
 
 async function refreshQueue() {

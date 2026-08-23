@@ -1,3 +1,4 @@
+import type { BarcodeType } from './barcode'
 import type { CartLine, CheckoutPayload, QtyPromotion } from './types'
 
 export type PricedLine = {
@@ -5,6 +6,7 @@ export type PricedLine = {
   qty: number
   unit_price: number
   barcode?: string
+  barcode_type?: BarcodeType
 }
 
 export type CartPricing = {
@@ -69,6 +71,9 @@ export function priceCart(cart: CartLine[], promotions: QtyPromotion[], vatRate 
     qty,
     unit_price: roundUnitPrice(Math.max(0, gross - (baseTotal ? promoDiscount * gross / baseTotal : 0)) / (qty || 1)),
     barcode: line.scannedBarcode,
+    // ส่งประเภทที่เครื่องใช้ตีความไปด้วย เซิร์ฟเวอร์จะได้ตรวจซ้ำได้ว่าเข้าใจตรงกัน
+    // ไม่ใช่มาเดาเองจากรูปร่างตัวเลขตอนรับบิลเข้า
+    barcode_type: line.scannedBarcodeType,
   }))
 
   for (const promotion of promotions) {

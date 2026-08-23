@@ -17,6 +17,8 @@ use App\Models\PosShift;
 use App\Models\PosTerminal;
 use App\Models\PriceTable;
 use App\Models\Product;
+use App\Models\ProductBarcode;
+use App\Support\BarcodePolicy;
 use App\Models\ProductCategory;
 use App\Models\ProductPrice;
 use App\Models\ProductUnit;
@@ -37,6 +39,7 @@ use App\Services\Sales\PosPriceScheduleService;
 use App\Support\DecimalMath;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use RuntimeException;
@@ -450,6 +453,32 @@ class PosController extends Controller
         return response()->json($products);
     }
 
+    /**
+     * บาร์โค้ดที่เครื่องสแกนมา ชี้ไปสินค้าคนละตัวกับที่ส่งมาขายหรือเปล่า
+     *
+     * เครื่องที่ออฟไลน์อยู่ใช้แคตตาล็อกที่ sync ไว้ ถ้าแคตตาล็อกเก่าหรือถูกแก้
+     * บาร์โค้ดอาจชี้คนละตัวกับปัจจุบัน ปล่อยผ่านแล้วสต๊อกจะตัดผิดตัว
+     * ป้ายเครื่องชั่งไม่ได้ลงทะเบียนเป็นบาร์โค้ด จึงข้ามการตรวจนี้
+     *
+     * @param  array<int, array<string, mixed>>  $items
+     */
+    private function barcodeBelongsToAnotherProduct(array $items): ?string
+    {
+        foreach ($items as $item) {
+            $barcode = trim((string) ($item['barcode'] ?? ''));
+            if ($barcode === '' || ($item['barcode_type'] ?? null) === BarcodePolicy::SCALE_WEIGHT) {
+                continue;
+            }
+
+            $ownerId = ProductBarcode::where('barcode', $barcode)->value('product_id');
+            if ($ownerId !== null && (int) $ownerId !== (int) $item['product_id']) {
+                return "บาร์โค้ด {$barcode} เป็นของสินค้ารหัสอื่นแล้ว กรุณา sync แคตตาล็อกใหม่ก่อนขาย";
+            }
+        }
+
+        return null;
+    }
+
     private function isScalePlu(?string $value): bool
     {
         return is_string($value) && preg_match('/^80[01][0-9]{3}$/', $value) === 1;
@@ -822,8 +851,13 @@ class PosController extends Controller
             'items.*.qty' => ['required', 'numeric', 'min:0.0001'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'items.*.barcode' => ['nullable', 'string', 'max:50'],
+            'items.*.barcode_type' => ['nullable', Rule::in(BarcodePolicy::ALL)],
             'allow_negative_stock' => ['nullable', 'boolean'],
         ]);
+
+        if ($mismatch = $this->barcodeBelongsToAnotherProduct($data['items'])) {
+            return response()->json(['success' => false, 'message' => $mismatch], 422);
+        }
 
         // บังคับใช้ตัวเอง: ตัดสต๊อก+ลงคนขายตามสาขา/รหัสพนักงานของ user ที่ login
         // (client ส่งค่าอะไรมาก็ override) - สต๊อกจึงตัดจากคลังสาขาตัวเองเสมอ

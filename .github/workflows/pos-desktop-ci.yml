@@ -1,0 +1,50 @@
+name: POS desktop checks
+
+# เครื่องพัฒนาบางเครื่องไม่มี node/rust ติดตั้ง เทสต์ชุดนี้จึงต้องมีที่รันที่แน่นอน
+# ไม่งั้นจะมีเทสต์ที่เขียนไว้แล้วไม่เคยถูกรันเลย ซึ่งแย่กว่าไม่มีเทสต์
+on:
+  push:
+    paths:
+      - 'apps/pos-desktop/**'
+      - '.github/workflows/pos-desktop-ci.yml'
+  pull_request:
+    paths:
+      - 'apps/pos-desktop/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/pos-desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/pos-desktop/pnpm-lock.yaml
+      - run: pnpm install --no-frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Unit tests
+        run: pnpm test
+
+  rust:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/pos-desktop/src-tauri
+      - name: Build Rust side
+        run: cargo build --locked
+        working-directory: apps/pos-desktop/src-tauri

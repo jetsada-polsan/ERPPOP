@@ -1,3 +1,5 @@
+import type { BarcodeType } from './barcode'
+
 export interface DeviceProfile {
   serverUrl: string
   deviceName: string
@@ -65,6 +67,8 @@ export interface Shift {
 
 export interface Barcode {
   barcode: string
+  /** ไม่มีค่าได้ ถ้าเครื่องยัง sync ไม่ถึงรุ่นที่ส่งฟิลด์นี้มา — ถือเป็น CUSTOM */
+  barcode_type?: BarcodeType
   unit_id?: number
   unit_factor: number
   price?: number
@@ -109,7 +113,12 @@ export interface QtyPromotion {
   free_product?: Pick<Product, 'id' | 'sku_code' | 'name_th'> | null
 }
 
-export interface CartLine extends Product { qty: number; scannedBarcode?: string }
+export interface CartLine extends Product {
+  qty: number
+  scannedBarcode?: string
+  /** ส่งขึ้นเซิร์ฟเวอร์ไปด้วย เพื่อให้ตรวจซ้ำได้ว่าตีความบาร์โค้ดตรงกัน */
+  scannedBarcodeType?: BarcodeType
+}
 export interface HeldBill {
   id: number
   hold_no: string
@@ -134,7 +143,7 @@ export interface CheckoutPayload {
   transfer_amount?: number
   change_amount?: number
   vat_mode: 'included'
-  items: Array<{ product_id: number; qty: number; unit_price: number; barcode?: string }>
+  items: Array<{ product_id: number; qty: number; unit_price: number; barcode?: string; barcode_type?: BarcodeType }>
 }
 
 export interface QueueItem {

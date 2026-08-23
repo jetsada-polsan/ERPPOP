@@ -1,4 +1,5 @@
 import Database from '@tauri-apps/plugin-sql'
+import { normalizeBarcodeType } from './barcode'
 import { verifyOfflinePin } from './offline-auth'
 import type { Cashier, DeviceProfile, LocalSaleHistory, Product, QtyPromotion, QueueItem, Shift } from './types'
 
@@ -24,6 +25,16 @@ async function connection() {
     change_amount REAL NOT NULL DEFAULT 0, items TEXT NOT NULL, printed_at TEXT NOT NULL,
     error TEXT, synced_at TEXT
   )`)
+  // ตารางบาร์โค้ดแยกออกมา เพื่อให้ค้นด้วยค่าดิบได้ตรง ๆ และเก็บประเภทไว้ใช้ตอนออฟไลน์
+  // สร้างเพิ่มอย่างเดียว ไม่แตะ checkout_queue / pos_sale_history / app_state
+  // ที่เก็บบิลค้าง ประวัติขาย และบิลพักอยู่ — อัปเดตแล้วของพวกนั้นต้องอยู่ครบ
+  await db.execute(`CREATE TABLE IF NOT EXISTS product_barcodes (
+    barcode TEXT PRIMARY KEY, product_id INTEGER NOT NULL,
+    barcode_type TEXT NOT NULL DEFAULT 'CUSTOM',
+    unit_id INTEGER, unit_factor REAL NOT NULL DEFAULT 1, price REAL, synced_at TEXT NOT NULL
+  )`)
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_product_barcodes_product ON product_barcodes (product_id)')
+
   // ลบเฉพาะบิลที่ส่งขึ้นเซิร์ฟเวอร์แล้ว บิลที่ยังค้างต้องเก็บไว้ให้เห็นจนกว่าจะส่งสำเร็จ
   // และต้องเทียบผ่าน datetime() เพราะ printed_at เก็บเป็น ISO-8601 (มี T กับ Z) เทียบสตริงตรงๆ ไม่ตรงรูปแบบกัน
   await db.execute("DELETE FROM pos_sale_history WHERE status = 'synced' AND datetime(printed_at) < datetime('now', '-90 days')")
@@ -132,8 +143,15 @@ export async function replaceProducts(products: Product[]) {
   const syncedAt = new Date().toISOString()
   await inTransaction(conn, async () => {
     await conn.execute('DELETE FROM products')
+    await conn.execute('DELETE FROM product_barcodes')
     for (const product of products) {
       await conn.execute('INSERT INTO products (id, data, synced_at) VALUES (?, ?, ?)', [product.id, JSON.stringify(product), syncedAt])
+      for (const row of product.barcodes || []) {
+        await conn.execute(
+          'INSERT OR REPLACE INTO product_barcodes (barcode, product_id, barcode_type, unit_id, unit_factor, price, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [row.barcode, product.id, normalizeBarcodeType(row.barcode_type), row.unit_id ?? null, Number(row.unit_factor || 1), row.price ?? null, syncedAt],
+        )
+      }
     }
   })
 }
@@ -142,6 +160,16 @@ export async function loadProducts(): Promise<Product[]> {
   const conn = await connection()
   const rows = await conn.select<Array<{ data: string }>>('SELECT data FROM products ORDER BY id')
   return rows.map((row) => JSON.parse(row.data))
+}
+
+/** จำนวนบาร์โค้ดแยกตามประเภท ใช้ตรวจว่าเครื่อง sync ประเภทมาครบแล้วจริง */
+export async function barcodeTypeCounts(): Promise<Record<string, number>> {
+  const conn = await connection()
+  const rows = await conn.select<Array<{ barcode_type: string; count: number }>>(
+    'SELECT barcode_type, COUNT(*) AS count FROM product_barcodes GROUP BY barcode_type',
+  )
+
+  return Object.fromEntries(rows.map((row) => [row.barcode_type, Number(row.count)]))
 }
 
 export async function replacePromotions(promotions: QtyPromotion[]) {
