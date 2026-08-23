@@ -351,22 +351,20 @@ ORDER BY e.flow, e.table_name;
 --     setting rather than a system-wide one. What each value means is NOT assumed
 --     here: the distribution plus samples is what tells us, and the new ERP must be
 --     configured to match or the margin figures can never reconcile.
+--     Only SKU_COST_TY is named here. Every other column is an assumption drawn
+--     from the legacy report SQL, and naming one that does not exist would fail
+--     the whole section for nothing.
 SELECT
     sm.SKU_COST_TY AS cost_method_code,
-    COUNT_BIG(*) AS product_count,
-    SUM(CASE WHEN sm.SKU_ACTIVE = 1 THEN 1 ELSE 0 END) AS active_count
+    COUNT_BIG(*) AS product_count
 FROM SKUMASTER sm
 GROUP BY sm.SKU_COST_TY
 ORDER BY product_count DESC;
 
 -- 17. Sample products for each costing method, to read alongside section 16.
-SELECT TOP (40)
-    sm.SKU_COST_TY AS cost_method_code,
-    sm.SKU_CODE,
-    sm.SKU_NAME,
-    sm.SKU_ACTIVE
-FROM SKUMASTER sm
-ORDER BY sm.SKU_COST_TY, sm.SKU_CODE;
+SELECT TOP (40) *
+FROM SKUMASTER
+ORDER BY SKU_COST_TY;
 
 -- 18. Where the department and project dimensions actually live.
 --     Every legacy report group referenced DEPTTAB and PRJTAB, but the new ERP has
@@ -391,6 +389,22 @@ WHERE t.is_ms_shipped = 0
 ORDER BY s.name, t.name, c.column_id;
 
 -- 19. The department and project master lists themselves.
-SELECT TOP (100) 'DEPTTAB' AS source_table, * FROM DEPTTAB ORDER BY 2;
+SELECT TOP (100) * FROM DEPTTAB;
 
-SELECT TOP (100) 'PRJTAB' AS source_table, * FROM PRJTAB ORDER BY 2;
+SELECT TOP (100) * FROM PRJTAB;
+
+-- 20. How much the department and project dimensions are really used on documents.
+--     Section 18 says where the columns are; this says whether anyone fills them in.
+--     A dimension present on every document but null everywhere is not a dimension
+--     the business uses, and the answer changes whether the new ERP needs it.
+--     READ COMMITTED only - these are counts.
+--     Column names come from the legacy report SQL and may need correcting after
+--     section 18 returns; run this last for that reason.
+SELECT
+    d.DI_REF_TYPE AS document_type,
+    COUNT_BIG(*) AS document_count,
+    SUM(CASE WHEN d.DI_DEPT IS NULL THEN 0 ELSE 1 END) AS with_department,
+    SUM(CASE WHEN d.DI_PRJ IS NULL THEN 0 ELSE 1 END) AS with_project
+FROM DOCINFO d
+GROUP BY d.DI_REF_TYPE
+ORDER BY document_count DESC;
