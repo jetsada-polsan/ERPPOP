@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AuditLog;
 use App\Models\Customer;
+use App\Models\SalesArea;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -51,6 +52,22 @@ class PruneEmptyCustomersTest extends TestCase
         $this->assertSame(1, AuditLog::where('action', 'purge')->where('record_id', $empty->id)->count());
 
         Schema::dropIfExists('customer_cleanup_probe');
+    }
+
+    public function test_sales_area_assignment_does_not_keep_an_otherwise_empty_customer(): void
+    {
+        $area = SalesArea::create(['code' => 'CLEANUP-AREA', 'name' => 'สายทดสอบ']);
+        $empty = Customer::create([
+            'code' => 'EMPTY-AREA', 'name_th' => 'EMPTY-AREA', 'sales_area_id' => $area->id, 'is_active' => true,
+        ]);
+
+        $this->artisan('erp:prune-empty-customers', [
+            '--purge' => true,
+            '--confirm-database' => DB::connection()->getDatabaseName(),
+            '--force' => true,
+        ])->assertSuccessful();
+
+        $this->assertFalse(Customer::withTrashed()->whereKey($empty->id)->exists());
     }
 
     public function test_purge_refuses_when_database_name_does_not_match(): void

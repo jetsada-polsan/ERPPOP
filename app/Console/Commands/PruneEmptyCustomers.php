@@ -50,7 +50,8 @@ class PruneEmptyCustomers extends Command
         }
 
         $this->line("ฐานข้อมูล: {$database}");
-        $this->line('เกณฑ์: ชื่อว่าง/เท่ารหัส, ไม่มีชื่อรอง/เลขภาษี/สาขา/ผู้ขาย/สายขาย/วงเงิน, ไม่มีที่อยู่หรือผู้ติดต่อที่มีค่า');
+        $this->line('เกณฑ์: ชื่อว่าง/เท่ารหัส, ไม่มีชื่อรอง/เลขภาษี/วงเงิน, ไม่มีที่อยู่หรือผู้ติดต่อที่มีค่า');
+        $this->line('สายการขาย/ผู้ดูแลไม่กันการลบตามคำสั่งเจ้าของ แต่เอกสารและรายการบัญชียังกันการลบเสมอ');
         $this->line(sprintf('พบผู้สมัครตรวจ: %s · ลบได้จริง: %s · ยังมีข้อมูลอ้างอิง: %s',
             number_format($candidates->count()), number_format(count($eligible)), number_format(count($blocked))));
 
@@ -112,9 +113,6 @@ class PruneEmptyCustomers extends Command
                 ->orWhereRaw('trim(name_th) = trim(code)'))
             ->whereRaw("trim(coalesce(name_en, '')) = ''")
             ->whereRaw("trim(coalesce(tax_id, '')) = ''")
-            ->whereNull('branch_id')
-            ->whereNull('sales_user_id')
-            ->whereNull('sales_area_id')
             ->where('credit_limit', 0)
             ->whereNull('pending_credit_limit')
             ->whereDoesntHave('addresses', fn ($query) => $query->whereRaw("trim(coalesce(address_line, '')) <> ''"))
