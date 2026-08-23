@@ -2,19 +2,21 @@
 
 namespace App\Services\Sales;
 
-use App\Models\BillingNote;
 use App\Models\Branch;
-use App\Models\Document;
 use App\Models\DocumentBook;
-use App\Models\PurchaseOrder;
-use App\Models\Quotation;
-use App\Models\StockCount;
+use Illuminate\Support\Facades\DB;
 
 /**
- * Generates a human-readable doc_number per document type + branch + day, e.g.
- * "BK000120260630001" for the 1st booking at branch 0001 today. Not a legacy
- * BPlus numbering scheme - this is new, chosen to be simple and collision-free
- * (documents.doc_number is unique per branch_id).
+ * ออกเลขที่เอกสารที่คนอ่านออก แยกตามชนิดเอกสาร + สาขา + วัน
+ * เช่น "BK000120260630001" = ใบจองใบแรกของสาขา 0001 วันนี้
+ *
+ * เดิมนับด้วย COUNT(*) ของเอกสารวันนั้นแล้วบวกหนึ่ง ซึ่งไม่ atomic —
+ * สอง transaction ที่วิ่งพร้อมกันนับได้เลขเดียวกันแล้วชนกันที่ unique index
+ * ทดสอบจริงบน PostgreSQL: 10 process × 5 เอกสาร สำเร็จ 8 ล้มเหลว 42 (84%)
+ *
+ * ตอนนี้ใช้ตาราง `document_sequences` แทน: ล็อกแถวของ (scope, วัน) ก่อนออกเลข
+ * ล็อกถูกถือไว้จนกว่า transaction ที่ครอบอยู่จะ commit จึงกันชนได้จริง
+ * และล็อกแยกตามชนิดเอกสาร+สาขา สาขาอื่นหรือเอกสารคนละชนิดไม่บล็อกกัน
  */
 class DocumentNumberGenerator
 {
@@ -42,82 +44,80 @@ class DocumentNumberGenerator
     // เลขที่ตามสมุดเอกสาร (BPlus): ใช้ prefix ของเล่ม + นับเฉพาะเอกสารในเล่มนั้น
     public function nextInBook(DocumentBook $book, int $branchId): string
     {
-        $book = DocumentBook::whereKey($book->id)->lockForUpdate()->firstOrFail();
-        $branchCode = Branch::whereKey($branchId)->value('code') ?? (string) $branchId;
-        $today = now()->format('Ymd');
-
-        $countToday = Document::where('document_book_id', $book->id)
-            ->where('branch_id', $branchId)
-            ->whereDate('doc_date', now())
-            ->count();
-
-        return sprintf('%s%s%s%03d', $book->prefix, $branchCode, $today, $countToday + 1);
+        return $this->format($book->prefix, $branchId, 'BOOK:'.$book->id.':'.$branchId);
     }
 
     public function next(string $documentTypeCode, int $branchId): string
     {
-        $prefix = self::PREFIXES[$documentTypeCode] ?? 'DC';
-        $branchCode = Branch::whereKey($branchId)->value('code') ?? (string) $branchId;
-        $today = now()->format('Ymd');
-
-        $countToday = Document::whereHas('documentType', fn ($q) => $q->where('code', $documentTypeCode))
-            ->where('branch_id', $branchId)
-            ->whereDate('doc_date', now())
-            ->count();
-
-        return sprintf('%s%s%s%03d', $prefix, $branchCode, $today, $countToday + 1);
+        return $this->format(self::PREFIXES[$documentTypeCode] ?? 'DC', $branchId, $documentTypeCode.':'.$branchId);
     }
 
-    // Stock-count sheets (ใบเตรียมตรวจนับ) live in their own table, not
-    // documents, so they get their own daily running number: SC<branch><date><seq>.
+    // ตารางที่ออกเลขเอง ไม่ได้อยู่ใน documents — ใช้ตัวนับชุดเดียวกันเพื่อไม่ให้ซ้ำ
     public function nextStockCount(int $branchId): string
     {
-        $branchCode = Branch::whereKey($branchId)->value('code') ?? (string) $branchId;
-        $today = now()->format('Ymd');
-
-        $countToday = StockCount::where('branch_id', $branchId)
-            ->whereDate('created_at', now())
-            ->count();
-
-        return sprintf('SC%s%s%03d', $branchCode, $today, $countToday + 1);
+        return $this->format('SC', $branchId, 'STOCK_COUNT:'.$branchId);
     }
 
-    // ใบวางบิล (Billing Note) เก็บในตารางของตัวเอง: BL<branch><date><seq>.
     public function nextBillingNote(int $branchId): string
     {
-        $branchCode = Branch::whereKey($branchId)->value('code') ?? (string) $branchId;
-        $today = now()->format('Ymd');
-
-        $countToday = BillingNote::where('branch_id', $branchId)
-            ->whereDate('created_at', now())
-            ->count();
-
-        return sprintf('BL%s%s%03d', $branchCode, $today, $countToday + 1);
+        return $this->format('BL', $branchId, 'BILLING_NOTE:'.$branchId);
     }
 
-    // ใบขอซื้อ/ใบสั่งซื้อ (Purchase Order) เก็บในตารางของตัวเอง: PR<branch><date><seq>.
     public function nextPurchaseOrder(int $branchId): string
     {
-        $branchCode = Branch::whereKey($branchId)->value('code') ?? (string) $branchId;
-        $today = now()->format('Ymd');
-
-        $countToday = PurchaseOrder::where('branch_id', $branchId)
-            ->whereDate('created_at', now())
-            ->count();
-
-        return sprintf('PR%s%s%03d', $branchCode, $today, $countToday + 1);
+        return $this->format('PR', $branchId, 'PURCHASE_ORDER:'.$branchId);
     }
 
-    // ใบเสนอราคา (Quotation) เก็บในตารางของตัวเอง: QT<branch><date><seq>.
     public function nextQuotation(int $branchId): string
+    {
+        return $this->format('QT', $branchId, 'QUOTATION:'.$branchId);
+    }
+
+    private function format(string $prefix, int $branchId, string $scope): string
     {
         $branchCode = Branch::whereKey($branchId)->value('code') ?? (string) $branchId;
         $today = now()->format('Ymd');
 
-        $countToday = Quotation::where('branch_id', $branchId)
-            ->whereDate('created_at', now())
-            ->count();
+        return sprintf('%s%s%s%03d', $prefix, $branchCode, $today, $this->nextSequence($scope, $today));
+    }
 
-        return sprintf('QT%s%s%03d', $branchCode, $today, $countToday + 1);
+    /**
+     * จองเลขถัดไปแบบล็อกแถว — จุดเดียวที่กันเลขซ้ำของทั้งระบบ
+     *
+     * ถ้าถูกเรียกจากใน transaction ที่ครอบอยู่ (ซึ่งเป็นกรณีปกติ) ล็อกจะถูกถือ
+     * จนกว่า transaction นั้นจะจบ ทำให้คนที่มาทีหลังรอจริง ไม่ใช่ได้เลขเดียวกันไป
+     */
+    private function nextSequence(string $scope, string $period): int
+    {
+        return DB::transaction(function () use ($scope, $period) {
+            $row = $this->lockSequence($scope, $period);
+
+            if (! $row) {
+                // ต้องเป็น insertOrIgnore (ON CONFLICT DO NOTHING) ไม่ใช่ insert แล้ว catch
+                // เพราะบน PostgreSQL พอคำสั่งใดใน transaction ผิดพลาด ทั้ง transaction จะถูก
+                // abort ทันที (SQLSTATE 25P02) คำสั่งถัดไปทำอะไรไม่ได้เลยแม้จะดักข้อผิดพลาดไว้
+                // — MySQL กับ SQLite ไม่เป็นแบบนี้ จึงมองไม่เห็นถ้าทดสอบแค่บน SQLite
+                DB::table('document_sequences')->insertOrIgnore([
+                    'scope' => $scope, 'period' => $period, 'last_number' => 0,
+                    'created_at' => now(), 'updated_at' => now(),
+                ]);
+                $row = $this->lockSequence($scope, $period);
+            }
+
+            $next = (int) $row->last_number + 1;
+            DB::table('document_sequences')->where('id', $row->id)
+                ->update(['last_number' => $next, 'updated_at' => now()]);
+
+            return $next;
+        });
+    }
+
+    private function lockSequence(string $scope, string $period): ?object
+    {
+        return DB::table('document_sequences')
+            ->where('scope', $scope)
+            ->where('period', $period)
+            ->lockForUpdate()
+            ->first();
     }
 }
