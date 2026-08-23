@@ -64,6 +64,10 @@ class ReportSmokeTest extends TestCase
             );
 
             try {
+                // แยก savepoint ให้แต่ละรายงาน — บน PostgreSQL คำสั่งเดียวที่ผิดจะทำให้
+                // ทั้ง transaction ถูก abort (25P02) รายงานที่เหลือจะพังตามกันหมด
+                // แล้วเราจะเห็นแค่ตัวแรกที่พัง ไม่รู้ว่าจริง ๆ มีกี่ตัว
+                DB::beginTransaction();
                 $response = $this->actingAs($user)->get($url);
                 if ($response->status() !== 200) {
                     // บอกสาเหตุไปเลย ไม่ใช่แค่ HTTP 500 ไม่งั้นต้องไปไล่เดาเองว่าพังเพราะอะไร
@@ -78,6 +82,8 @@ class ReportSmokeTest extends TestCase
                 }
             } catch (\Throwable $e) {
                 $failures[] = $definition->code.' -> '.get_class($e).': '.$e->getMessage();
+            } finally {
+                DB::rollBack();
             }
         }
 
