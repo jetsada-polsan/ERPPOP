@@ -23,7 +23,7 @@ class PosDeviceToken extends Command
         {--revoke= : เพิกถอนตาม device id}
         {--user= : username หรือ id ของ cashier user (คู่กับ --issue)}
         {--name= : ชื่ออุปกรณ์}
-        {--terminal= : รหัสเครื่อง เช่น POS-0002-01}';
+        {--terminal= : รหัสเครื่อง — เว้นไว้ให้ระบบจ่ายเลขถัดไปของสาขาเอง}';
 
     protected $description = 'จัดการ token อุปกรณ์สำหรับ POS desktop (Tauri)';
 
@@ -72,7 +72,7 @@ class PosDeviceToken extends Command
             'name' => (string) ($this->option('name') ?: ($user->name.' device')),
             'user_id' => $user->id,
             'branch_id' => $user->branch_id,
-            'terminal_code' => $this->option('terminal') ?: null,
+            'terminal_code' => $this->resolveTerminalCode($user),
         ]);
 
         $this->info("สร้างอุปกรณ์ #{$device->id} ({$device->name}) เรียบร้อย");
@@ -123,4 +123,30 @@ class PosDeviceToken extends Command
 
         return self::SUCCESS;
     }
+
+    /**
+     * รหัสเครื่อง: ใช้ที่ระบุมา หรือให้ระบบจ่ายเลขถัดไปของสาขาให้
+     *
+     * ปล่อยให้คนพิมพ์เองคือทางที่เครื่องหลายตัวถูกตั้งรหัสจากเลขคลัง
+     * แล้วไปผูกกับสาขาที่บังเอิญมีเลขเดียวกันแต่เป็นคนละที่
+     */
+    private function resolveTerminalCode(\App\Models\User $user): ?string
+    {
+        if ($given = $this->option('terminal')) {
+            return (string) $given;
+        }
+
+        $branch = $user->branch_id ? \App\Models\Branch::find($user->branch_id) : null;
+        if (! $branch) {
+            $this->warn('ผู้ใช้ยังไม่ได้สังกัดสาขา จึงยังจ่ายรหัสเครื่องให้ไม่ได้');
+
+            return null;
+        }
+
+        $code = \App\Support\PosTerminalCode::next($branch);
+        $this->line("จ่ายรหัสเครื่องอัตโนมัติ: {$code} (สาขา {$branch->code})");
+
+        return $code;
+    }
+
 }
