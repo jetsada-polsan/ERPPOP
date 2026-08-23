@@ -1875,7 +1875,12 @@ class ReportController extends Controller
             'department' => "coalesce(pd.name_th, 'ไม่ระบุประเภทสินค้า')",
             'brand' => "coalesce(pb.name_th, 'ไม่ระบุยี่ห้อสินค้า')",
             'category' => "coalesce(pc.name_th, 'ไม่ระบุหมวดสินค้า')",
-            'supplier' => "'ไม่ระบุผู้จำหน่ายหลัก'",
+            // ใช้ subquery ไม่ใช่ join เพราะสินค้าหนึ่งตัวอาจมีผู้จำหน่ายหลักค้างไว้หลายแถว
+            // join แล้วยอดขาย/ขาดทุนจะถูกนับซ้ำตามจำนวนแถวโดยไม่มีใครสังเกต
+            'supplier' => "coalesce((select s.name_th from product_suppliers ps
+                join suppliers s on s.id = ps.supplier_id
+                where ps.product_id = p.id and ps.is_primary = true
+                order by ps.id limit 1), 'ไม่ระบุผู้จำหน่ายหลัก')",
             default => "coalesce(pc.name_th, 'ไม่ระบุหมวดสินค้า')",
         };
 
