@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\Branch;
 use App\Models\MasterCutoverRun;
 use App\Models\Product;
+use App\Models\Warehouse;
+use App\Models\WarehouseLocation;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -308,6 +310,8 @@ class MasterDataCutoverService
                 ]);
             }
 
+            $this->attachCentralWarehouseToHeadOffice($hqId);
+
             // บาร์โค้ดต้องไม่ขยับแม้แต่แถวเดียว ถ้าขยับแปลว่ามีอะไรผูกไว้ผิด
             if (DB::table('product_barcodes')->count() !== $barcodesBefore) {
                 throw new RuntimeException('จำนวนบาร์โค้ดเปลี่ยนระหว่าง cutover — ยกเลิกทั้งหมด');
@@ -326,6 +330,26 @@ class MasterDataCutoverService
 
             return ['branches' => count($branchPlan), 'products' => count($productPlan)];
         });
+    }
+
+    /**
+     * ผูกคลังที่เก็บพื้นที่เริ่มต้นของสำนักงานใหญ่ ให้เป็นของสำนักงานใหญ่
+     *
+     * เจ้าของยืนยันว่าคลังกลางอยู่ใต้สำนักงานใหญ่ ไม่ใช่สาขาแยก แต่ warehouses.branch_id
+     * บนฐานจริงเป็น NULL ทั้งหมด ความเป็นเจ้าของจึงไม่ได้ถูกบันทึกไว้ที่ไหนเลย
+     * เขียนให้ชัดตอน cutover ดีกว่าปล่อยให้ทุกที่ต้องเดาเอาเองจากพื้นที่เริ่มต้น
+     */
+    private function attachCentralWarehouseToHeadOffice(int $hqId): void
+    {
+        $locationId = Branch::where('id', $hqId)->value('default_warehouse_location_id');
+        if (! $locationId) {
+            return;
+        }
+
+        $warehouseId = WarehouseLocation::where('id', $locationId)->value('warehouse_id');
+        if ($warehouseId) {
+            Warehouse::where('id', $warehouseId)->whereNull('branch_id')->update(['branch_id' => $hqId]);
+        }
     }
 
     /**

@@ -6,6 +6,8 @@ use App\Models\Branch;
 use App\Models\MasterCutoverRun;
 use App\Models\Product;
 use App\Models\ProductUnit;
+use App\Models\Warehouse;
+use App\Models\WarehouseLocation;
 use App\Services\MasterDataCutoverService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Database\QueryException;
@@ -211,6 +213,24 @@ class MasterDataCutoverTest extends TestCase
         $duplicate->refresh();
         $this->assertFalse((bool) $duplicate->is_active, 'สาขาซ้ำต้องถูกปิด');
         $this->assertSame('0001', $duplicate->legacy_branch_code);
+    }
+
+    public function test_the_central_warehouse_becomes_head_office_property(): void
+    {
+        Branch::query()->delete();
+        $hq = $this->branch('HO');
+        $this->branch('0002');
+        $this->product('WH-1');
+
+        $warehouse = Warehouse::create(['code' => 'WH-CENTRAL', 'name' => 'คลังกลาง']);
+        $location = WarehouseLocation::create(['warehouse_id' => $warehouse->id, 'code' => 'HQ-MAIN', 'name' => 'พื้นที่กลาง']);
+        $hq->update(['default_warehouse_location_id' => $location->id]);
+        $this->assertNull($warehouse->branch_id, 'ก่อน cutover คลังไม่ได้ผูกกับสาขาไหนเลย');
+
+        $this->service()->apply();
+
+        $this->assertSame($hq->id, $warehouse->fresh()->branch_id, 'คลังกลางต้องเป็นของสำนักงานใหญ่');
+        $this->assertSame('HQ', $hq->fresh()->code);
     }
 
     private function branch(string $code): Branch
