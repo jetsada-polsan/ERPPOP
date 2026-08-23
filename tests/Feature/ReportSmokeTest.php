@@ -6,6 +6,7 @@ use App\Models\Permission;
 use App\Models\ReportDefinition;
 use App\Models\Role;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -24,10 +25,38 @@ class ReportSmokeTest extends TestCase
 
     public function test_every_enabled_report_runs_without_error(): void
     {
+        $this->assertReportsRun(ReportDefinition::runnable()->orderBy('code')->get());
+    }
+
+    /**
+     * รายงานที่ยังปิดอยู่ ต้องรันได้ทันทีที่ถูกเปิด
+     *
+     * ผู้บริหารเปิด-ปิดรายงานได้เอง ตัวที่ปิดอยู่วันนี้อาจถูกเปิดพรุ่งนี้
+     * ถ้าทดสอบเฉพาะตัวที่เปิดอยู่ วันที่เปิดคือวันที่ผู้ใช้เจอ error แทนเรา
+     *
+     * ต้องเปิดก่อนถึงจะเรียกได้ เพราะรายงานที่ปิดจะถูกเด้งไปตัวอื่นตามการออกแบบ
+     */
+    public function test_every_available_report_runs_once_enabled(): void
+    {
+        // รายงานหลายตัวเขียนด้วย SQL ของ PostgreSQL โดยตรง (date_trunc, to_char, cast ด้วย ::)
+        // ซึ่ง SQLite ไม่รู้จัก คำถามว่า "เปิดแล้วใช้ได้ไหม" จึงตอบได้บนเครื่องจริงเท่านั้น
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('ตรวจได้เฉพาะบน PostgreSQL — ชุด postgres-uat บน CI รันข้อนี้ให้');
+        }
+
+        $disabled = ReportDefinition::where('status', 'available')->where('enabled', false)->orderBy('code')->get();
+        ReportDefinition::whereIn('id', $disabled->pluck('id'))->update(['enabled' => true]);
+
+        $this->assertReportsRun($disabled->fresh());
+    }
+
+    /** @param  \Illuminate\Support\Collection<int, ReportDefinition>  $definitions */
+    private function assertReportsRun($definitions): void
+    {
         $user = $this->omniscientUser();
         $failures = [];
 
-        foreach (ReportDefinition::runnable()->orderBy('code')->get() as $definition) {
+        foreach ($definitions as $definition) {
             $url = sprintf(
                 '/reports?category=%s&report=%s&from=2026-01-01&to=2026-12-31&branch_id=all',
                 $definition->category,
@@ -37,7 +66,10 @@ class ReportSmokeTest extends TestCase
             try {
                 $response = $this->actingAs($user)->get($url);
                 if ($response->status() !== 200) {
-                    $failures[] = $definition->code.' -> HTTP '.$response->status();
+                    // บอกสาเหตุไปเลย ไม่ใช่แค่ HTTP 500 ไม่งั้นต้องไปไล่เดาเองว่าพังเพราะอะไร
+                    $failures[] = $definition->code.' -> HTTP '.$response->status().($response->exception
+                        ? ' — '.$response->exception::class.': '.mb_substr($response->exception->getMessage(), 0, 200)
+                        : '');
                     continue;
                 }
                 // ยืนยันว่าได้รายงานที่ขอจริง ไม่ใช่ถูกเด้งไปตัวแรกของหมวดเงียบ ๆ
