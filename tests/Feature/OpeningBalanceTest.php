@@ -176,6 +176,42 @@ class OpeningBalanceTest extends TestCase
         $this->assertSame(4, OpeningBalanceRun::count());
     }
 
+    public function test_a_location_owned_only_through_the_branch_default_is_accepted(): void
+    {
+        // ฐานจริงผูกสาขากับพื้นที่เก็บทางนี้ทางเดียว warehouses.branch_id เป็น NULL หมด
+        $branch = Branch::create(['code' => 'DFT', 'name_th' => 'สาขาไม่มีคลังของตัวเอง', 'is_active' => true]);
+        $warehouse = Warehouse::create(['code' => 'WH-SHARED', 'name' => 'คลังรวม']);
+        $location = WarehouseLocation::create(['warehouse_id' => $warehouse->id, 'code' => 'SHARED-1', 'name' => 'พื้นที่รวม']);
+        $branch->update(['default_warehouse_location_id' => $location->id]);
+
+        $unit = ProductUnit::create(['code' => 'EA-DFT', 'name' => 'ชิ้น', 'qty_per_base_unit' => 1]);
+        $product = Product::create([
+            'sku_code' => 'DFT-1', 'name_th' => 'สินค้า', 'base_unit_id' => $unit->id,
+            'default_price' => 10, 'average_cost' => 0, 'is_vat' => false, 'is_active' => true,
+        ]);
+
+        $this->assertNull($warehouse->branch_id, 'คลังนี้ตั้งใจไม่ผูกสาขา');
+
+        $result = $this->service()->post('stock', $branch->id, self::AS_OF, [
+            ['sku' => $product->sku_code, 'location' => $location->code, 'qty' => 4, 'unit_cost' => 50],
+        ]);
+
+        $this->assertSame(200.0, $result['total']);
+    }
+
+    public function test_a_location_belonging_to_another_branch_is_refused(): void
+    {
+        [$branch, $location, $product] = $this->masters();
+        $other = Branch::create(['code' => 'OTH', 'name_th' => 'สาขาอื่น', 'is_active' => true]);
+
+        $checked = $this->service()->validate('stock', $other->id, [
+            ['sku' => $product->sku_code, 'location' => $location->code, 'qty' => 1, 'unit_cost' => 1],
+        ]);
+
+        $this->assertCount(1, $checked['errors']);
+        $this->assertStringContainsString('ไม่ได้เป็นของสาขานี้', $checked['errors'][0]);
+    }
+
     private function service(): OpeningBalanceService
     {
         return app(OpeningBalanceService::class);

@@ -2,6 +2,7 @@
 
 namespace App\Services\Accounting;
 
+use App\Models\Branch;
 use App\Models\ChartOfAccount;
 use App\Models\Customer;
 use App\Models\Document;
@@ -11,6 +12,7 @@ use App\Models\OpeningBalanceRun;
 use App\Models\Product;
 use App\Models\StockBalance;
 use App\Models\Supplier;
+use App\Models\Warehouse;
 use App\Models\WarehouseLocation;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -128,12 +130,7 @@ class OpeningBalanceService
             throw new RuntimeException('ไม่พบสินค้า sku='.($row['sku'] ?? '(ว่าง)'));
         }
 
-        $location = WarehouseLocation::whereHas('warehouse', fn ($query) => $query->where('branch_id', $branchId))
-            ->where('code', trim((string) ($row['location'] ?? '')))
-            ->first();
-        if (! $location) {
-            throw new RuntimeException('ไม่พบพื้นที่เก็บ code='.($row['location'] ?? '(ว่าง)').' ในสาขานี้');
-        }
+        $location = $this->resolveLocation(trim((string) ($row['location'] ?? '')), $branchId);
 
         $qty = (float) ($row['qty'] ?? 0);
         $unitCost = (float) ($row['unit_cost'] ?? 0);
@@ -152,6 +149,35 @@ class OpeningBalanceService
             'amount' => round($qty * $unitCost, 2),
             'label' => $product->sku_code,
         ];
+    }
+
+    /**
+     * หาพื้นที่เก็บจากรหัส แล้วตรวจว่าเป็นของสาขานั้นจริง
+     *
+     * ระบบนี้ผูกสาขากับพื้นที่เก็บสองทาง: warehouses.branch_id กับ
+     * branches.default_warehouse_location_id — และบนฐานจริงตอนนี้ warehouses.branch_id
+     * เป็น NULL ทั้งหมด ความเป็นเจ้าของอยู่ที่ทางหลังล้วน ๆ
+     * ถ้าเช็คทางเดียวจะยกสต๊อกเข้าไม่ได้เลยสักบรรทัด
+     */
+    private function resolveLocation(string $code, int $branchId): WarehouseLocation
+    {
+        if ($code === '') {
+            throw new RuntimeException('ต้องระบุรหัสพื้นที่เก็บ');
+        }
+
+        $location = WarehouseLocation::where('code', $code)->first();
+        if (! $location) {
+            throw new RuntimeException("ไม่พบพื้นที่เก็บ code={$code}");
+        }
+
+        $ownedByWarehouse = Warehouse::where('id', $location->warehouse_id)->where('branch_id', $branchId)->exists();
+        $isBranchDefault = Branch::where('id', $branchId)->where('default_warehouse_location_id', $location->id)->exists();
+
+        if (! $ownedByWarehouse && ! $isBranchDefault) {
+            throw new RuntimeException("พื้นที่เก็บ {$code} ไม่ได้เป็นของสาขานี้");
+        }
+
+        return $location;
     }
 
     /** @return array<string, mixed> */
