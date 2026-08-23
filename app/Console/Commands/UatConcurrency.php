@@ -28,15 +28,46 @@ class UatConcurrency extends Command
         {--branch= : id ของสาขาที่ใช้ทดสอบ}
         {--type=CASH_SALE : ชนิดเอกสารที่จะขอเลขที่ (โหมด number)}
         {--mode=number : number = ขอเลขอย่างเดียว, sale = ขายจริงทั้งวงจร}
-        {--confirm-test-database : ยืนยันว่าฐานนี้เป็นฐานทดสอบ}';
+        {--confirm-test-database : ยืนยันว่าฐานนี้เป็นฐานทดสอบ}
+        {--confirm-empty-production-database= : รันบน production ที่ล้างข้อมูลแล้ว ต้องพิมพ์ชื่อฐานให้ตรง}';
 
     protected $description = 'Concurrency UAT: prove document numbers stay unique under parallel load';
 
+    /**
+     * ยอมให้ยิงโหลดบน production ได้เฉพาะตอนที่ฐานไม่มีธุรกรรมจริงเหลืออยู่
+     *
+     * ด่านนี้มีไว้กันการยิงโหลดทับข้อมูลจริง ไม่ได้มีไว้กัน UAT บนฐานที่เพิ่งล้าง
+     * จึงเปิดทางออกที่ตรวจสอบได้ แทนที่จะให้คนไป override APP_ENV เอา
+     * ซึ่งจะปิดด่านทั้งหมดโดยไม่เหลือร่องรอย
+     */
+    private function productionRunAllowed(): bool
+    {
+        $database = DB::connection()->getDatabaseName();
+
+        if ($this->option('confirm-empty-production-database') !== $database) {
+            $this->error('ห้ามรันบน production — ถ้าฐานนี้ล้างข้อมูลแล้วและตั้งใจทำ UAT');
+            $this->line("ให้ระบุ --confirm-empty-production-database={$database}");
+
+            return false;
+        }
+
+        foreach (['documents', 'pos_receipts'] as $table) {
+            if (($rows = DB::table($table)->count()) > 0) {
+                $this->error("ห้ามรันบน production ที่ยังมีข้อมูลจริง — {$table} มี ".number_format($rows).' แถว');
+                $this->line('ล้างด้วย erp:reset-transactions ก่อน แล้วค่อยยิง UAT');
+
+                return false;
+            }
+        }
+
+        $this->warn("ยิงโหลดบน production ({$database}) ที่ล้างข้อมูลแล้ว — เอกสารที่เกิดขึ้นเป็นของ UAT ทั้งหมด");
+
+        return true;
+    }
+
     public function handle(): int
     {
-        if (app()->environment('production')) {
-            $this->error('ห้ามรันบน production');
-
+        if (app()->environment('production') && ! $this->productionRunAllowed()) {
             return self::FAILURE;
         }
         if (! $this->option('confirm-test-database')) {
