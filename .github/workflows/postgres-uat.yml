@@ -86,26 +86,5 @@ jobs:
           BRANCH=$(php artisan tinker --execute="echo DB::table('branches')->where('code','UAT')->value('id');" | tail -1 | tr -dc '0-9')
           php artisan uat:concurrency --users=30 --per-user=5 --branch="$BRANCH" --mode=sale --confirm-test-database
 
-      - name: ตรวจฐานต้นทุนก่อนกระทบยอด
-        run: |
-          php artisan tinker --execute="
-            \$ids = DB::table('products')->where('sku_code','like','UAT-%')->pluck('id');
-            printf('สินค้า UAT (query builder)=%d · ที่ Eloquent มองเห็น=%d'.PHP_EOL,
-              \$ids->count(), App\Models\Product::whereIn('id', \$ids)->count());
-            printf('lots=%d (คิดต้นทุน 0 = %d) · balances=%d'.PHP_EOL,
-              DB::table('stock_lots')->count(),
-              DB::table('stock_lots')->where('unit_cost', 0)->count(),
-              DB::table('stock_balances')->count());
-            printf('movement มี lot=%d · ไม่มี lot=%d'.PHP_EOL,
-              DB::table('stock_movements')->whereNotNull('stock_lot_id')->count(),
-              DB::table('stock_movements')->whereNull('stock_lot_id')->count());
-            printf('บรรทัดขาย=%d · ต้นทุน>0=%d · รวมต้นทุน=%s'.PHP_EOL,
-              DB::table('stock_document_items')->count(),
-              DB::table('stock_document_items')->where('cost_amount','>',0)->count(),
-              DB::table('stock_document_items')->sum('cost_amount'));
-            printf('fillable ของ StockDocumentItem มี cost_amount=%s'.PHP_EOL,
-              in_array('cost_amount', (new App\Models\StockDocumentItem)->getFillable(), true) ? 'มี' : 'ไม่มี');
-          "
-
       - name: กระทบยอด stock / COGS / GL / sales_postings
         run: php artisan uat:reconcile

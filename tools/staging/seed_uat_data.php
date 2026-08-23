@@ -56,11 +56,13 @@ DB::transaction(function () {
             'negative_stock_policy' => 'allow',
             'created_at' => now(), 'updated_at' => now(),
         ]);
-        // ต้องมี lot ไม่ใช่แค่ยอดคงเหลือ — FIFO ตัดต้นทุนจาก lot ถ้าไม่มีจะขายได้แต่ต้นทุนเป็นศูนย์
+        // ต้องมี lot ไม่ใช่แค่ยอดคงเหลือ และจำนวนต้องตรงกับ stock_balances พอดี
+        // ส่วนที่ยอดคงเหลือเกินกว่า lot ระบบจะเติม lot "OPENING" ต้นทุนศูนย์ให้เอง
+        // ลงวันที่ 1900-01-01 ซึ่งเก่าที่สุดจึงถูก FIFO ตัดก่อน แล้วต้นทุนขายจะกลายเป็นศูนย์ทั้งหมด
         DB::table('stock_lots')->insert([
             'product_id' => $productId, 'warehouse_location_id' => $locationId,
             'lot_number' => 'UAT-LOT-'.$i, 'received_date' => now()->toDateString(),
-            'initial_qty' => 1000, 'remaining_qty' => 1000, 'unit_cost' => 30 + $i,
+            'initial_qty' => 10000, 'remaining_qty' => 10000, 'unit_cost' => 30 + $i,
             'created_at' => now(), 'updated_at' => now(),
         ]);
         DB::table('stock_balances')->insert([

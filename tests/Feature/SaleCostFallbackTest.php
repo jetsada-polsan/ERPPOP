@@ -70,6 +70,37 @@ class SaleCostFallbackTest extends TestCase
         $this->assertSame(75.0, $cost, 'มี lot ต้องคิดจากต้นทุน lot จริง 25 × 3');
     }
 
+    public function test_a_balance_larger_than_its_lots_is_costed_at_nothing(): void
+    {
+        [$branch, $product, $location] = $this->fixtures(averageCost: 40);
+        // ยอดคงเหลือ 100 แต่มี lot รองรับแค่ 10 — ส่วนต่าง 90 ไม่มีต้นทุนอยู่จริง
+        DB::table('stock_balances')->insert([
+            'product_id' => $product->id, 'warehouse_location_id' => $location->id,
+            'on_hand_qty' => 100, 'reserved_qty' => 0,
+        ]);
+        DB::table('stock_lots')->insert([
+            'product_id' => $product->id, 'warehouse_location_id' => $location->id,
+            'lot_number' => 'LOT-REAL', 'received_date' => now()->toDateString(),
+            'initial_qty' => 10, 'remaining_qty' => 10, 'unit_cost' => 25,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        app(CashSaleService::class)->create([
+            'branch_id' => $branch->id,
+            'items' => [['product_id' => $product->id, 'qty' => 3, 'unit_price' => 100]],
+        ]);
+
+        // ระบบเติม lot ยกมาต้นทุนศูนย์ให้ส่วนต่าง ลงวันที่ 1900 ซึ่งเก่าที่สุด จึงถูกตัดก่อน lot จริง
+        $opening = DB::table('stock_lots')->where('lot_number', 'like', 'OPENING-%')->first();
+        $this->assertNotNull($opening, 'ยอดคงเหลือที่ไม่มี lot รองรับ ระบบจะสร้าง lot ยกมาให้เอง');
+        $this->assertSame(0.0, (float) $opening->unit_cost);
+        $this->assertSame('1900-01-01', substr((string) $opening->received_date, 0, 10));
+
+        $cost = (float) DB::table('stock_document_items')->sum('cost_amount');
+        $this->assertSame(0.0, $cost,
+            'ขายจาก lot ยกมาต้นทุนศูนย์ ต้นทุนขายจึงเป็นศูนย์ — ตั้งยอดคงเหลือโดยไม่มี lot คือกับดักนี้');
+    }
+
     /** @return array{0:Branch, 1:Product, 2:WarehouseLocation} */
     private function fixtures(float $averageCost): array
     {
