@@ -44,8 +44,17 @@ class ReportGovernanceTest extends TestCase
     public function test_a_planned_report_cannot_be_switched_on_before_uat(): void
     {
         $admin = $this->userWith(['settings.manage']);
-        $planned = ReportDefinition::where('code', 'ap.aging')->sole();
-        $this->assertSame('planned', $planned->status);
+        // สร้างรายงานที่ยังไม่มีหน้าจอขึ้นมาเอง แทนที่จะพึ่งว่ารายงานตัวใดตัวหนึ่งจะยัง planned ตลอดไป
+        $planned = ReportDefinition::create([
+            'code' => 'test.not_built_yet',
+            'category' => 'test',
+            'category_title' => 'ทดสอบ',
+            'name' => 'รายงานที่ยังไม่มีหน้าจอ',
+            'view_permission' => 'reports.view',
+            'status' => 'planned',
+            'enabled' => false,
+            'sort_order' => 999,
+        ]);
 
         $this->actingAs($admin)
             ->post('/settings/reports', ['report_id' => $planned->id, 'enabled' => 1])

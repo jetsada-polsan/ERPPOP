@@ -236,6 +236,87 @@ class ReportController extends Controller
                 ['label' => 'รวม', 'key' => 'total_amount', 'type' => 'money', 'class' => 'text-end'],
             ], $this->vatPurchase($fromStart, $toEnd, $filters)),
 
+            // ---- รายงาน P0 ----
+            'daily_by_channel' => $this->tableResult('ยอดขายรายวัน แยกช่องทาง', [
+                ['label' => 'วันที่', 'key' => 'sale_date', 'type' => 'date'],
+                ['label' => 'ช่องทาง', 'key' => 'channel_name', 'type' => 'badge'],
+                ['label' => 'บิล', 'key' => 'bill_count', 'type' => 'number', 'class' => 'text-end'],
+                ['label' => 'ยอดขาย', 'key' => 'net_sales', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'ต้นทุน', 'key' => 'cogs_amount', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'กำไรขั้นต้น', 'key' => 'gross_profit', 'type' => 'money', 'class' => 'text-end'],
+            ], $this->dailyByChannel($fromStart, $toEnd, $filters)),
+
+            'outstanding' => $this->tableResult('ใบจองคงค้างและสถานะส่งสินค้า', $this->bookingColumns(), $this->bookingsOutstanding($filters, dueOnly: false)),
+            'due' => $this->tableResult('ใบจองครบกำหนด/เกินกำหนดส่ง', $this->bookingColumns(), $this->bookingsOutstanding($filters, dueOnly: true)),
+
+            'by_branch_seller' => $this->tableResult('ใบจองตามสาขา/สายขาย/พนักงานขาย', [
+                ['label' => 'สาขา', 'key' => 'branch_name'],
+                ['label' => 'สายขาย', 'key' => 'sales_area_name'],
+                ['label' => 'พนักงานขาย', 'key' => 'salesman_name'],
+                ['label' => 'ใบจอง', 'key' => 'booking_count', 'type' => 'number', 'class' => 'text-end'],
+                ['label' => 'ค้างส่ง', 'key' => 'outstanding_count', 'type' => 'number', 'class' => 'text-end'],
+                ['label' => 'มูลค่า', 'key' => 'amount', 'type' => 'money', 'class' => 'text-end'],
+            ], $this->bookingsByBranchSeller($fromStart, $toEnd, $filters)),
+
+            'outstanding_detail' => $this->tableResult('รายละเอียดยอดเจ้าหนี้คงค้าง', [
+                ['label' => 'ผู้ขาย', 'key' => 'supplier_name'],
+                ['label' => 'เลขที่', 'key' => 'document_no'],
+                ['label' => 'วันที่', 'key' => 'document_date', 'type' => 'date'],
+                ['label' => 'ครบกำหนด', 'key' => 'due_date', 'type' => 'date'],
+                ['label' => 'เกินกำหนด (วัน)', 'key' => 'days_overdue', 'type' => 'number', 'class' => 'text-end'],
+                ['label' => 'ยอดเต็ม', 'key' => 'original_amount', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'จ่ายแล้ว', 'key' => 'paid_amount', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'คงค้าง', 'key' => 'balance_amount', 'type' => 'money', 'class' => 'text-end'],
+            ], $this->apOutstanding($filters)),
+
+            'aging' => $this->tableResult('อายุหนี้เจ้าหนี้ (AP aging)', [
+                ['label' => 'ผู้ขาย', 'key' => 'supplier_name'],
+                ['label' => 'ยังไม่ถึงกำหนด', 'key' => 'current_amount', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => '1-30 วัน', 'key' => 'days_1_30', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => '31-60 วัน', 'key' => 'days_31_60', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => '61-90 วัน', 'key' => 'days_61_90', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'เกิน 90 วัน', 'key' => 'over_90', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'รวม', 'key' => 'total_amount', 'type' => 'money', 'class' => 'text-end'],
+            ], $this->apAging($filters)),
+
+            'daily_cash_book' => $this->tableResult('สมุดเงินสดรายวัน', [
+                ['label' => 'วันที่', 'key' => 'entry_date', 'type' => 'date'],
+                ['label' => 'สาขา', 'key' => 'branch_name'],
+                ['label' => 'ที่มา', 'key' => 'source_type', 'type' => 'badge'],
+                ['label' => 'รายการ', 'key' => 'description'],
+                ['label' => 'รับ', 'key' => 'cash_in', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'จ่าย', 'key' => 'cash_out', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'คงเหลือ', 'key' => 'running_balance', 'type' => 'money', 'class' => 'text-end'],
+            ], $this->dailyCashBook($fromStart, $toEnd, $filters)),
+
+            'bank_summary' => $this->tableResult('สรุปยอดธนาคารตามบัญชี', [
+                ['label' => 'ธนาคาร', 'key' => 'bank_name'],
+                ['label' => 'เลขบัญชี', 'key' => 'account_no'],
+                ['label' => 'สาขา', 'key' => 'branch_name'],
+                ['label' => 'รายการ', 'key' => 'line_count', 'type' => 'number', 'class' => 'text-end'],
+                ['label' => 'เงินเข้า', 'key' => 'money_in', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'เงินออก', 'key' => 'money_out', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'ยังไม่กระทบยอด', 'key' => 'unreconciled_count', 'type' => 'number', 'class' => 'text-end'],
+            ], $this->bankSummary($fromStart, $toEnd, $filters)),
+
+            'bank_reconciliation' => $this->tableResult('รายการกระทบยอด statement', [
+                ['label' => 'วันที่', 'key' => 'statement_date', 'type' => 'date'],
+                ['label' => 'ธนาคาร', 'key' => 'bank_name'],
+                ['label' => 'รายการ', 'key' => 'description'],
+                ['label' => 'ยอด statement', 'key' => 'amount', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'ยอดที่คาด', 'key' => 'expected_amount', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'ผลต่าง', 'key' => 'difference_amount', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'สถานะ', 'key' => 'status', 'type' => 'badge'],
+                ['label' => 'อ้างอิง', 'key' => 'reference'],
+            ], $this->bankReconciliationLines($fromStart, $toEnd, $filters)),
+
+            'received_and_unidentified' => $this->tableResult('การรับชำระและยอดเงินรอพิสูจน์', [
+                ['label' => 'กลุ่ม', 'key' => 'bucket', 'type' => 'badge'],
+                ['label' => 'ช่องทาง', 'key' => 'method'],
+                ['label' => 'รายการ', 'key' => 'line_count', 'type' => 'number', 'class' => 'text-end'],
+                ['label' => 'ยอดเงิน', 'key' => 'amount', 'type' => 'money', 'class' => 'text-end'],
+            ], $this->receivedAndUnidentified($fromStart, $toEnd, $filters)),
+
             'daily_sales' => $this->tableResult('ยอดขายรายวัน', [
                 ['label' => 'วันที่', 'key' => 'sale_date'],
                 ['label' => 'ช่องทาง', 'key' => 'channel', 'type' => 'badge'],
@@ -744,6 +825,247 @@ class ReportController extends Controller
 
             default => $this->tableResult('ไม่พบรายงาน', [], collect()),
         };
+    }
+
+    /* ==================== รายงาน P0 ==================== */
+
+    /**
+     * ยอดขายรายวันแยกช่องทาง — อ่านจาก `sales_postings` ซึ่งเป็นบัญชีขายฉบับจริง
+     * ที่กันบิล POS กับเอกสารขายสดที่ผูกกันไม่ให้นับซ้ำอยู่แล้ว
+     */
+    private function dailyByChannel(Carbon $from, Carbon $to, array $filters): Collection
+    {
+        $query = DB::table('sales_postings as s')
+            ->leftJoin('branches as b', 'b.id', '=', 's.branch_id')
+            ->whereBetween('s.sale_date', [$from->toDateString(), $to->toDateString()]);
+        $this->applyBranch($query, $filters, 's.branch_id');
+
+        return $query
+            ->groupBy('s.sale_date', 's.channel')
+            ->orderByDesc('s.sale_date')->orderBy('s.channel')
+            ->selectRaw("s.sale_date,
+                case s.channel when 'POS' then 'POS' when 'CASH_SALE' then 'ขายสดหลังบ้าน' when 'CREDIT_SALE' then 'ขายเชื่อ' else s.channel end as channel_name,
+                count(*) as bill_count,
+                sum(s.net_sales) as net_sales,
+                sum(coalesce(s.cogs_amount, 0)) as cogs_amount,
+                sum(coalesce(s.gross_profit, 0)) as gross_profit")
+            ->limit($filters['per_page'])
+            ->get();
+    }
+
+    /** @return array<int, array<string, string>> */
+    private function bookingColumns(): array
+    {
+        return [
+            ['label' => 'เลขที่', 'key' => 'doc_number'],
+            ['label' => 'วันที่จอง', 'key' => 'doc_date', 'type' => 'date'],
+            ['label' => 'ลูกค้า', 'key' => 'customer_name'],
+            ['label' => 'สาขา', 'key' => 'branch_name'],
+            ['label' => 'กำหนดส่ง', 'key' => 'delivery_due_at'],
+            ['label' => 'เกินกำหนด (วัน)', 'key' => 'days_overdue', 'type' => 'number', 'class' => 'text-end'],
+            ['label' => 'สถานะส่ง', 'key' => 'delivery_status', 'type' => 'badge'],
+            ['label' => 'มูลค่า', 'key' => 'amount', 'type' => 'money', 'class' => 'text-end'],
+        ];
+    }
+
+    /**
+     * ใบจองที่ยังต้องตามส่ง
+     *
+     * นับเฉพาะใบที่ยืนยันเป็นใบขายแล้วและยังส่งไม่ครบ ตามที่เจ้าของกำหนด —
+     * ใบที่ยังไม่ยืนยันยังไม่ถือว่าค้างส่ง เพราะยังไม่ได้ตกลงขายจริง
+     * และเทียบ `delivery_due_at` กับเวลาปัจจุบัน ไม่ใช่ due_date ของลูกหนี้
+     */
+    private function bookingsOutstanding(array $filters, bool $dueOnly): Collection
+    {
+        $query = DB::table('sale_bookings as sb')
+            ->join('documents as d', 'd.id', '=', 'sb.document_id')
+            ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')
+            ->leftJoin('branches as b', 'b.id', '=', 'd.branch_id')
+            ->where('sb.fulfillment_type', 'delivery')
+            ->where('sb.status', 'converted_to_sale')
+            ->whereIn('sb.delivery_status', ['pending', 'partial']);
+
+        if ($dueOnly) {
+            $query->whereNotNull('sb.delivery_due_at')->where('sb.delivery_due_at', '<=', now());
+        }
+
+        $this->applyBranch($query, $filters, 'd.branch_id');
+        $this->applySearch($query, $filters, ['d.doc_number', 'c.name_th', 'b.name_th']);
+
+        return $query
+            ->orderBy('sb.delivery_due_at')
+            ->selectRaw("d.doc_number, d.doc_date,
+                coalesce(c.name_th, '-') as customer_name,
+                coalesce(b.name_th, '-') as branch_name,
+                sb.delivery_due_at,
+                sb.delivery_status,
+                d.total_amount as amount")
+            ->limit($filters['per_page'])
+            ->get()
+            ->map(function ($row) {
+                $due = $row->delivery_due_at ? Carbon::parse($row->delivery_due_at) : null;
+                $row->days_overdue = $due && $due->isPast() ? $due->diffInDays(now()) : 0;
+                $row->delivery_due_at = $due?->format('d/m/Y H:i') ?? '-';
+                $row->delivery_status = ['pending' => 'ยังไม่ส่ง', 'partial' => 'ส่งบางส่วน'][$row->delivery_status] ?? $row->delivery_status;
+
+                return $row;
+            });
+    }
+
+    private function bookingsByBranchSeller(Carbon $from, Carbon $to, array $filters): Collection
+    {
+        $query = DB::table('sale_bookings as sb')
+            ->join('documents as d', 'd.id', '=', 'sb.document_id')
+            ->leftJoin('branches as b', 'b.id', '=', 'd.branch_id')
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'sb.sales_area_id')
+            ->leftJoin('salesmen as sm', 'sm.id', '=', 'sb.salesman_id')
+            ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
+
+        $this->applyBranch($query, $filters, 'd.branch_id');
+
+        return $query
+            ->groupBy('b.name_th', 'sa.name', 'sm.name')
+            ->orderByDesc(DB::raw('sum(d.total_amount)'))
+            ->selectRaw("coalesce(b.name_th, 'ไม่ระบุสาขา') as branch_name,
+                coalesce(sa.name, 'ไม่ระบุสายขาย') as sales_area_name,
+                coalesce(sm.name, 'ไม่ระบุพนักงานขาย') as salesman_name,
+                count(*) as booking_count,
+                sum(case when sb.fulfillment_type = 'delivery' and sb.delivery_status in ('pending', 'partial') then 1 else 0 end) as outstanding_count,
+                sum(d.total_amount) as amount")
+            ->limit($filters['per_page'])
+            ->get();
+    }
+
+    /** ยอดเจ้าหนี้ค้างรายใบ — อ่านจาก supplier_open_items ไม่ใช่ supplier_ledger */
+    private function apOutstanding(array $filters): Collection
+    {
+        return DB::table('supplier_open_items as oi')
+            ->join('suppliers as s', 's.id', '=', 'oi.supplier_id')
+            ->whereIn('oi.status', ['open', 'partial'])
+            ->orderBy('oi.due_date')->orderBy('oi.document_date')
+            ->selectRaw("s.name_th as supplier_name, oi.document_no, oi.document_date, oi.due_date,
+                oi.original_amount, oi.paid_amount, oi.balance_amount")
+            ->limit($filters['per_page'])
+            ->get()
+            ->map(function ($row) {
+                $due = $row->due_date ? Carbon::parse($row->due_date) : null;
+                $row->days_overdue = $due && $due->isPast() ? $due->diffInDays(now()) : 0;
+
+                return $row;
+            });
+    }
+
+    private function apAging(array $filters): Collection
+    {
+        $today = $this->dateMinusDays(0);
+        $d30 = $this->dateMinusDays(30);
+        $d60 = $this->dateMinusDays(60);
+        $d90 = $this->dateMinusDays(90);
+
+        return DB::table('supplier_open_items as oi')
+            ->join('suppliers as s', 's.id', '=', 'oi.supplier_id')
+            ->whereIn('oi.status', ['open', 'partial'])
+            ->groupBy('s.name_th')
+            ->orderByDesc(DB::raw('sum(oi.balance_amount)'))
+            ->selectRaw("s.name_th as supplier_name,
+                sum(case when oi.due_date is null or oi.due_date >= {$today} then oi.balance_amount else 0 end) as current_amount,
+                sum(case when oi.due_date < {$today} and oi.due_date >= {$d30} then oi.balance_amount else 0 end) as days_1_30,
+                sum(case when oi.due_date < {$d30} and oi.due_date >= {$d60} then oi.balance_amount else 0 end) as days_31_60,
+                sum(case when oi.due_date < {$d60} and oi.due_date >= {$d90} then oi.balance_amount else 0 end) as days_61_90,
+                sum(case when oi.due_date < {$d90} then oi.balance_amount else 0 end) as over_90,
+                sum(oi.balance_amount) as total_amount")
+            ->limit($filters['per_page'])
+            ->get();
+    }
+
+    private function dailyCashBook(Carbon $from, Carbon $to, array $filters): Collection
+    {
+        $query = DB::table('cash_books as cb')
+            ->leftJoin('branches as b', 'b.id', '=', 'cb.branch_id')
+            ->whereBetween('cb.entry_date', [$from->toDateString(), $to->toDateString()]);
+        $this->applyBranch($query, $filters, 'cb.branch_id');
+
+        return $query
+            ->orderBy('cb.entry_date')->orderBy('cb.id')
+            ->selectRaw("cb.entry_date, coalesce(b.name_th, 'ส่วนกลาง') as branch_name,
+                cb.source_type, cb.description, cb.cash_in, cb.cash_out, cb.running_balance")
+            ->limit($filters['per_page'])
+            ->get();
+    }
+
+    private function bankSummary(Carbon $from, Carbon $to, array $filters): Collection
+    {
+        $query = DB::table('bank_accounts as ba')
+            ->leftJoin('branches as b', 'b.id', '=', 'ba.branch_id')
+            ->leftJoin('bank_statements as bs', function ($join) use ($from, $to) {
+                $join->on('bs.bank_account_id', '=', 'ba.id')
+                    ->whereBetween('bs.statement_date', [$from->toDateString(), $to->toDateString()]);
+            });
+        $this->applyBranch($query, $filters, 'ba.branch_id');
+
+        return $query
+            ->groupBy('ba.bank_name', 'ba.account_no', 'b.name_th')
+            ->orderBy('ba.bank_name')
+            ->selectRaw("ba.bank_name, ba.account_no, coalesce(b.name_th, 'ส่วนกลาง') as branch_name,
+                count(bs.id) as line_count,
+                sum(case when bs.amount > 0 then bs.amount else 0 end) as money_in,
+                sum(case when bs.amount < 0 then -bs.amount else 0 end) as money_out,
+                sum(case when bs.id is not null and bs.reconciled = false then 1 else 0 end) as unreconciled_count")
+            ->limit($filters['per_page'])
+            ->get();
+    }
+
+    private function bankReconciliationLines(Carbon $from, Carbon $to, array $filters): Collection
+    {
+        $query = DB::table('bank_statements as bs')
+            ->join('bank_accounts as ba', 'ba.id', '=', 'bs.bank_account_id')
+            ->leftJoin('bank_reconciliations as br', 'br.bank_statement_id', '=', 'bs.id')
+            ->whereBetween('bs.statement_date', [$from->toDateString(), $to->toDateString()]);
+        $this->applyBranch($query, $filters, 'ba.branch_id');
+
+        return $query
+            ->orderBy('bs.statement_date')->orderBy('bs.id')
+            ->selectRaw("bs.statement_date, ba.bank_name, bs.description, bs.amount,
+                br.expected_amount, br.difference_amount,
+                coalesce(br.status, 'ยังไม่กระทบยอด') as status,
+                coalesce(br.reference, '-') as reference")
+            ->limit($filters['per_page'])
+            ->get();
+    }
+
+    /**
+     * รับชำระและยอดรอพิสูจน์
+     *
+     * "รอพิสูจน์" = เงินที่เข้ามาแล้วแต่ยังจับคู่ไม่ได้ — โอน/QR ที่ยังไม่มีใครกระทบยอด
+     * ยอดกลุ่มนี้ยิ่งค้างนานยิ่งเสี่ยงว่าจะเป็นเงินที่หายไปหรือรับซ้ำ
+     */
+    private function receivedAndUnidentified(Carbon $from, Carbon $to, array $filters): Collection
+    {
+        $posQuery = DB::table('pos_payments as pp')
+            ->join('pos_receipts as pr', 'pr.id', '=', 'pp.pos_receipt_id')
+            ->join('pos_terminals as pt', 'pt.id', '=', 'pr.pos_terminal_id')
+            ->whereBetween('pr.receipt_date', [$from, $to])
+            ->where('pr.status', 'completed')
+            ->where('pr.is_legacy_import', false);
+        $this->applyBranch($posQuery, $filters, 'pt.branch_id');
+
+        $received = (clone $posQuery)
+            ->groupBy('pp.method')
+            ->selectRaw("'รับแล้ว' as bucket, pp.method, count(*) as line_count, sum(pp.amount) as amount")
+            ->get();
+
+        // โอน/QR ที่ยังไม่ถูกจับคู่กับ statement ใด = ยังพิสูจน์ไม่ได้ว่าเงินเข้าบัญชีจริง
+        $unidentified = (clone $posQuery)
+            ->whereIn('pp.method', ['transfer', 'qr', 'bank'])
+            ->whereNotExists(fn ($sub) => $sub->select(DB::raw(1))
+                ->from('bank_reconciliations as br')
+                ->where('br.source_type', 'pos_payment')
+                ->whereColumn('br.source_id', 'pp.id'))
+            ->groupBy('pp.method')
+            ->selectRaw("'รอพิสูจน์' as bucket, pp.method, count(*) as line_count, sum(pp.amount) as amount")
+            ->get();
+
+        return $received->concat($unidentified)->values();
     }
 
     private function tableResult(string $title, array $columns, Collection $rows): array
