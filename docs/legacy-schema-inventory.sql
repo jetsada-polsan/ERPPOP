@@ -4,6 +4,19 @@
   Run only against an isolated, copied database attached as READ_ONLY.
   This script performs SELECT queries only. It does not create, alter,
   write, or delete any object or data.
+
+  ISOLATION LEVEL - this matters for which results can be trusted:
+
+    Sections 0-11 and 15, 18   metadata only. READ UNCOMMITTED is fine.
+    Sections 12-14, 16, 17, 19 counts, amounts and business rows.
+                               READ COMMITTED only. A dirty read can return
+                               rows that are later rolled back, so a figure
+                               taken that way cannot be reconciled against
+                               anything and must never feed a UAT.
+
+  The runner defaults to READ COMMITTED and only drops to READ UNCOMMITTED
+  when asked with --dirty, which it refuses outright if the query touches any
+  table outside sys / INFORMATION_SCHEMA.
 */
 SET NOCOUNT ON;
 
@@ -18,6 +31,30 @@ SELECT
          ELSE 'STOP - set the database READ_ONLY before collecting anything'
     END AS read_only_check,
     GETDATE() AS collected_at;
+
+-- 0. Prove the login can only read before reading anything with it.
+--    An account that can write is the wrong account for this job, whatever the
+--    intent of whoever runs it.
+SELECT
+    SUSER_SNAME() AS login_name,
+    USER_NAME() AS database_user,
+    IS_SRVROLEMEMBER('sysadmin') AS is_sysadmin,
+    IS_SRVROLEMEMBER('dbcreator') AS is_dbcreator,
+    IS_ROLEMEMBER('db_owner') AS is_db_owner,
+    IS_ROLEMEMBER('db_datawriter') AS is_db_datawriter,
+    IS_ROLEMEMBER('db_datareader') AS is_db_datareader,
+    IS_ROLEMEMBER('db_ddladmin') AS is_db_ddladmin;
+
+-- 0b. Every permission the current login actually holds in this database.
+--     Read the list rather than filtering it, so nothing is missed by guessing
+--     which permission names to look for.
+SELECT
+    p.permission_name,
+    p.state_desc,
+    p.class_desc,
+    OBJECT_NAME(p.major_id) AS object_name
+FROM sys.fn_my_permissions(NULL, 'DATABASE') p
+ORDER BY p.permission_name;
 
 -- 1. All user tables with row counts, storage size and a business/system/archive split.
 --

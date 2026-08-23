@@ -12,6 +12,33 @@
 - ห้ามนำ `.mdf`, `.ldf`, backup, ข้อมูลลูกค้า หรือ credentials ขึ้น GitHub
   (`.gitignore` ของ repo กันไฟล์ `.mdf`/`.ldf` ไว้แล้ว — ดูด้านล่าง)
 
+## อ่านฐาน live ที่ 192.168.88.200 (คนละงานกับสำเนา MDF)
+
+ใช้ `mssql_readonly.php` เท่านั้น ห้ามต่อด้วยเครื่องมืออื่นที่อาจเขียนข้อมูล
+
+```bash
+# ครั้งแรกครั้งเดียว — เจ้าของรันเอง รหัสไม่ผ่านแชตและไม่ลงไฟล์
+security add-generic-password -a jetsada -s erppop-legacy-mssql -w
+
+# ยืนยันปลายทางก่อนเสมอ
+php tools/legacy-analysis/mssql_readonly.php --db=<ชื่อฐาน> \
+  "SELECT @@SERVERNAME AS server_name, DB_NAME() AS database_name"
+
+# เก็บผลทั้งชุด (READ COMMITTED เป็นค่าเริ่มต้น)
+php tools/legacy-analysis/mssql_readonly.php --file=docs/legacy-schema-inventory.sql \
+  --db=<ชื่อฐาน> --split > legacy-live-output.txt
+```
+
+### ระดับ isolation — เรื่องนี้ตัดสินว่าตัวเลขไหนเชื่อได้
+
+| ใช้อ่านอะไร | isolation | เหตุผล |
+|---|---|---|
+| schema, trigger, index, view, procedure | `--dirty` (READ UNCOMMITTED) ได้ | เป็น metadata ไม่ใช่ยอด |
+| **จำนวนเอกสาร ยอดเงิน ต้นทุน สต๊อก เจ้าหนี้ เงินสด UAT** | **ค่าเริ่มต้น (READ COMMITTED) เท่านั้น** | dirty read อ่านแถวที่อาจถูก rollback ทีหลัง เอาไปกระทบยอดไม่ได้ |
+
+ตัวรัน**ปฏิเสธเอง**ถ้าใส่ `--dirty` แล้ว query แตะตารางนอก `sys.` / `INFORMATION_SCHEMA.`
+จึงลืมไม่ได้ และค่าเริ่มต้นคือตัวที่ปลอดภัยอยู่แล้ว
+
 ## ลำดับการรัน
 
 | ลำดับ | ไฟล์ | ทำอะไร |

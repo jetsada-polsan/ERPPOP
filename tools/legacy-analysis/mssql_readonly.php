@@ -21,6 +21,10 @@
  *   php tools/legacy-analysis/mssql_readonly.php "SELECT @@SERVERNAME AS s, DB_NAME() AS d"
  *   php tools/legacy-analysis/mssql_readonly.php --file=query.sql [--db=ชื่อฐาน] [--json]
  *   php tools/legacy-analysis/mssql_readonly.php --file=query.sql --split   # แนะนำสำหรับไฟล์ยาว
+ *   php tools/legacy-analysis/mssql_readonly.php --file=schema.sql --dirty   # metadata เท่านั้น
+ *
+ * ค่าเริ่มต้นคือ READ COMMITTED เสมอ — ลืมใส่ flag แล้วยังได้ตัวเลขที่เชื่อถือได้
+ * --dirty เปลี่ยนเป็น READ UNCOMMITTED และจะถูกปฏิเสธทันทีถ้า query แตะตารางธุรกิจ
  */
 
 const KEYCHAIN_SERVICE = 'erppop-legacy-mssql';
@@ -53,8 +57,30 @@ const ALLOWED_SET = [
     '/^set\s+nocount\s+(on|off)$/i',
     '/^set\s+lock_timeout\s+\d+$/i',
     '/^set\s+deadlock_priority\s+low$/i',
-    '/^set\s+transaction\s+isolation\s+level\s+read\s+uncommitted$/i',
+    '/^set\s+transaction\s+isolation\s+level\s+read\s+(uncommitted|committed)$/i',
 ];
+
+/**
+ * READ UNCOMMITTED ใช้ได้เฉพาะกับ metadata เท่านั้น
+ *
+ * dirty read อ่านแถวที่ยังไม่ commit และอาจถูก rollback ทีหลัง ตัวเลขที่ได้จึงเอาไป
+ * กระทบยอดไม่ได้ — ห้ามใช้กับจำนวนเอกสาร ยอดเงิน ต้นทุน สต๊อก หรือ UAT ใด ๆ
+ * ตรวจโดยดูว่า query แตะตารางธุรกิจหรือไม่ ถ้าแตะจะไม่ยอมให้ใช้ uncommitted
+ */
+function assertMetadataOnly(string $sql): void
+{
+    preg_match_all('/\b(?:from|join)\s+([A-Za-z_][A-Za-z0-9_.\[\]]*)/i', stripComments($sql), $matches);
+    foreach ($matches[1] as $table) {
+        $name = strtolower(str_replace(['[', ']'], '', $table));
+        if (str_starts_with($name, 'sys.') || str_starts_with($name, 'information_schema.')) {
+            continue;
+        }
+        fail(
+            "READ UNCOMMITTED ใช้กับตารางธุรกิจไม่ได้ (พบ \"{$table}\")\n".
+            'ตัวเลขจาก dirty read เอาไปกระทบยอดไม่ได้ — ให้ตัด --dirty ออกเพื่อใช้ READ COMMITTED'
+        );
+    }
+}
 
 /** ตัด comment ออกก่อน เพื่อไม่ให้ซ่อนคำสั่งไว้ใน comment ได้ */
 function stripComments(string $sql): string
@@ -134,13 +160,27 @@ function decodeThai(mixed $value): mixed
     return $converted === false ? $value : $converted;
 }
 
-$options = getopt('', ['file:', 'db:', 'json']);
-$sql = $options['file'] ?? null
+$options = getopt('', ['file:', 'db:', 'json', 'split', 'dirty']);
+// getopt ไม่กิน argv จึงต้องหา argument ตัวแรกที่ไม่ใช่ flag เอง
+$positional = '';
+foreach (array_slice($argv, 1) as $argument) {
+    if (! str_starts_with($argument, '--')) {
+        $positional = $argument;
+        break;
+    }
+}
+$sql = isset($options['file'])
     ? (string) file_get_contents($options['file'])
-    : (string) ($argv[1] ?? '');
+    : $positional;
 $database = $options['db'] ?? DEFAULT_DATABASE;
 
 assertReadOnly($sql);
+
+// dirty read อนุญาตเฉพาะตอนอ่าน metadata และต้องขอมาเองเท่านั้น
+$dirty = isset($options['dirty']);
+if ($dirty) {
+    assertMetadataOnly($sql);
+}
 
 $pdo = new PDO(
     sprintf('dblib:host=%s:%s;dbname=%s;charset=UTF-8', HOST, PORT, $database),
@@ -149,10 +189,11 @@ $pdo = new PDO(
     [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 30],
 );
 
-// ไม่ล็อก ไม่หน่วง และยอมแพ้ก่อนเสมอถ้าชน — ระบบเดิมยังมีคนใช้งานอยู่
+// ไม่ล็อกนาน ไม่หน่วง และยอมแพ้ก่อนเสมอถ้าชน — ระบบเดิมยังมีคนใช้งานอยู่
 $pdo->exec('SET LOCK_TIMEOUT 5000');
 $pdo->exec('SET DEADLOCK_PRIORITY LOW');
-$pdo->exec('SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED');
+$pdo->exec('SET TRANSACTION ISOLATION LEVEL READ '.($dirty ? 'UNCOMMITTED' : 'COMMITTED'));
+fwrite(STDERR, 'isolation: READ '.($dirty ? 'UNCOMMITTED (metadata เท่านั้น)' : 'COMMITTED')."\n");
 
 function emit(array $rows, bool $asJson): void
 {
