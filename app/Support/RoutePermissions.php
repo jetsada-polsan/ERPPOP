@@ -74,6 +74,7 @@ class RoutePermissions
         'gl-journals.' => 'finance.manage',
         'financial-statements.' => 'finance.manage',
         'fixed-assets.' => 'finance.manage',
+        'cash-transfers.' => 'finance.manage',
         'bank-accounts.' => 'finance.manage',
         'payments.' => 'finance.manage',
         'cheques.' => 'finance.manage',

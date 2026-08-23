@@ -39,6 +39,8 @@ class DocumentNumberGenerator
         'RECEIPT' => 'RR',
         'QUOTATION' => 'QT',
         'EXPENSE' => 'EV',
+        'CASH_DEPOSIT' => 'CD',
+        'CASH_WITHDRAWAL' => 'CW',
     ];
 
     // เลขที่ตามสมุดเอกสาร (BPlus): ใช้ prefix ของเล่ม + นับเฉพาะเอกสารในเล่มนั้น

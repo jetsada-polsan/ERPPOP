@@ -8,6 +8,11 @@ $statusLabel = ['pending' => 'รอดำเนินการ', 'converted_to_
 $statusColor = ['pending' => 'text-bg-warning', 'converted_to_sale' => 'text-bg-success', 'cancelled' => 'text-bg-secondary'];
 $isPending = $booking->status === 'pending';
 $isConverted = $booking->status === 'converted_to_sale';
+$isDelivery = $booking->fulfillment_type === 'delivery';
+$deliveryLabel = ['pending' => 'ยังไม่ส่ง', 'partial' => 'ส่งบางส่วน', 'delivered' => 'ส่งครบแล้ว', 'cancelled' => 'ยกเลิกการส่ง'];
+$deliveryColor = ['pending' => 'text-bg-warning', 'partial' => 'text-bg-info', 'delivered' => 'text-bg-success', 'cancelled' => 'text-bg-secondary'];
+$deliveryDone = in_array($booking->delivery_status, ['delivered', 'cancelled'], true);
+$isOverdue = $isDelivery && ! $deliveryDone && $booking->delivery_due_at && $booking->delivery_due_at->isPast();
 @endphp
 
 @section('content')
@@ -33,11 +38,24 @@ $isConverted = $booking->status === 'converted_to_sale';
                 @endif
             </div>
         </div>
-        <div class="flow-line"></div>
-        <div class="flow-step pending">
-            <div class="flow-dot"><i class="bi bi-cash-coin"></i></div>
-            <div class="flow-label">รับชำระเงิน<div class="flow-sub text-muted">รอดำเนินการ</div></div>
-        </div>
+        @if($isDelivery)
+            <div class="flow-line {{ $booking->delivery_status === 'delivered' ? 'done' : '' }}"></div>
+            <div class="flow-step {{ $booking->delivery_status === 'delivered' ? 'done' : 'pending' }}">
+                <div class="flow-dot"><i class="bi bi-truck"></i></div>
+                <div class="flow-label">ส่งของ
+                    <div class="flow-sub {{ $isOverdue ? 'text-danger fw-semibold' : 'text-muted' }}">
+                        {{ $deliveryLabel[$booking->delivery_status] ?? $booking->delivery_status }}
+                        @if($isOverdue) &middot; เกินกำหนด @endif
+                    </div>
+                </div>
+            </div>
+        @else
+            <div class="flow-line"></div>
+            <div class="flow-step pending">
+                <div class="flow-dot"><i class="bi bi-shop"></i></div>
+                <div class="flow-label">รับเองที่สาขา<div class="flow-sub text-muted">ไม่มีการส่งของ</div></div>
+            </div>
+        @endif
     </div>
 
     <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
@@ -92,6 +110,59 @@ $isConverted = $booking->status === 'converted_to_sale';
 </div>
 
 {{-- Items --}}
+@if($isDelivery)
+<div class="content-card p-4 mb-4">
+    <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+        <div>
+            <h3 class="h6 fw-bold mb-1"><i class="bi bi-truck me-1"></i>การส่งของ</h3>
+            <div class="small text-muted">
+                กำหนดส่ง
+                <span class="{{ $isOverdue ? 'text-danger fw-semibold' : '' }}">
+                    {{ $booking->delivery_due_at?->format('d/m/Y H:i') ?? 'ไม่ได้ระบุ' }}
+                </span>
+                @if($booking->delivered_at)
+                    &middot; ส่งจริง {{ $booking->delivered_at->format('d/m/Y H:i') }}
+                @endif
+            </div>
+        </div>
+        <span class="badge {{ $deliveryColor[$booking->delivery_status] ?? 'text-bg-secondary' }} align-self-center">
+            {{ $deliveryLabel[$booking->delivery_status] ?? $booking->delivery_status }}
+        </span>
+    </div>
+
+    @if($deliveryDone)
+        <p class="text-muted small mb-0">
+            บันทึกการส่งของใบนี้ปิดแล้ว แก้ไขไม่ได้ — ถ้าบันทึกผิดต้องให้ผู้ดูแลระบบตรวจสอบจาก audit log
+        </p>
+    @else
+        <form method="post" action="{{ route('bookings.delivery', $booking) }}" class="row g-2 align-items-end">
+            @csrf
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">บันทึกผลการส่ง</label>
+                <select name="delivery_status" class="form-select form-select-sm" required>
+                    <option value="delivered">ส่งครบแล้ว</option>
+                    <option value="partial">ส่งบางส่วน</option>
+                    <option value="cancelled">ยกเลิกการส่ง</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small text-muted mb-1">หมายเหตุ</label>
+                <input type="text" name="note" maxlength="500" class="form-control form-control-sm"
+                       placeholder="เช่น ส่งโดยรถบริษัท ผู้รับเซ็นแล้ว">
+            </div>
+            <div class="col-md-3 text-end">
+                <button class="btn btn-sm btn-primary w-100">
+                    <i class="bi bi-check2-circle me-1"></i>บันทึกการส่ง
+                </button>
+            </div>
+        </form>
+        <p class="text-muted small mt-2 mb-0">
+            บันทึก "ส่งครบแล้ว" หรือ "ยกเลิกการส่ง" แล้วจะแก้ไม่ได้อีก และใบจองจะหลุดจากรายงานค้างส่งทันที
+        </p>
+    @endif
+</div>
+@endif
+
 <div class="content-card p-4">
     <h3 class="h6 fw-bold mb-3">รายการสินค้า</h3>
     <div class="table-responsive">

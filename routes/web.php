@@ -7,6 +7,7 @@ use App\Http\Controllers\BillingNoteController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\BplusOperationController;
 use App\Http\Controllers\CashSaleController;
+use App\Http\Controllers\CashTransferController;
 use App\Http\Controllers\ChartOfAccountController;
 use App\Http\Controllers\ChequeController;
 use App\Http\Controllers\CreditDebitNoteController;
@@ -427,6 +428,12 @@ Route::prefix('warehouse-locations')->name('warehouse-locations.')->group(functi
     Route::get('/', [WarehouseLocationController::class, 'index'])->name('index');
     Route::post('/', [WarehouseLocationController::class, 'store'])->name('store');
     Route::put('/{warehouseLocation}', [WarehouseLocationController::class, 'update'])->name('update');
+});
+
+// ฝาก/ถอนเงินสดกับธนาคาร — แหล่งที่หกของสมุดเงินสด
+Route::prefix('cash-transfers')->name('cash-transfers.')->group(function () {
+    Route::get('/', [CashTransferController::class, 'index'])->name('index');
+    Route::post('/', [CashTransferController::class, 'store'])->name('store');
 });
 
 Route::prefix('bank-accounts')->name('bank-accounts.')->group(function () {
