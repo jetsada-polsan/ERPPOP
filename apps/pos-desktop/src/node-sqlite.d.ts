@@ -5,6 +5,10 @@
  * และเพิ่ม dependency ไม่ได้เพราะ release build ติดตั้งด้วย --frozen-lockfile
  * จึงประกาศเท่าที่ใช้จริง แทนที่จะปิดการตรวจทั้งไฟล์ด้วย ts-ignore
  */
+declare module 'node:module' {
+  export function createRequire(path: string | URL): (id: string) => unknown
+}
+
 declare module 'node:sqlite' {
   export class DatabaseSync {
     constructor(path: string)

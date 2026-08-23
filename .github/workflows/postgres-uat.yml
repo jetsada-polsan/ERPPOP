@@ -86,5 +86,20 @@ jobs:
           BRANCH=$(php artisan tinker --execute="echo DB::table('branches')->where('code','UAT')->value('id');" | tail -1 | tr -dc '0-9')
           php artisan uat:concurrency --users=30 --per-user=5 --branch="$BRANCH" --mode=sale --confirm-test-database
 
+      - name: ตรวจฐานต้นทุนก่อนกระทบยอด
+        run: |
+          php artisan tinker --execute="
+            printf('lots=%d balances=%d avg_cost=%s lot_cost=%s line_cost=%s'.PHP_EOL,
+              DB::table('stock_lots')->count(),
+              DB::table('stock_balances')->count(),
+              DB::table('products')->where('sku_code','like','UAT-%')->value('average_cost') ?? 'null',
+              DB::table('stock_lots')->value('unit_cost') ?? 'null',
+              DB::table('stock_document_items')->value('cost_amount') ?? 'null');
+            printf('lot_location=%s branch_default_location=%s item_location=%s'.PHP_EOL,
+              DB::table('stock_lots')->value('warehouse_location_id') ?? 'null',
+              DB::table('branches')->where('code','UAT')->value('default_warehouse_location_id') ?? 'null',
+              DB::table('stock_document_items')->value('warehouse_location_id') ?? 'null');
+          "
+
       - name: กระทบยอด stock / COGS / GL / sales_postings
         run: php artisan uat:reconcile
