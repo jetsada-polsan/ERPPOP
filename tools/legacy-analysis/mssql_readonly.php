@@ -20,6 +20,7 @@
  * วิธีใช้:
  *   php tools/legacy-analysis/mssql_readonly.php "SELECT @@SERVERNAME AS s, DB_NAME() AS d"
  *   php tools/legacy-analysis/mssql_readonly.php --file=query.sql [--db=ชื่อฐาน] [--json]
+ *   php tools/legacy-analysis/mssql_readonly.php --file=query.sql --split   # แนะนำสำหรับไฟล์ยาว
  */
 
 const KEYCHAIN_SERVICE = 'erppop-legacy-mssql';
@@ -44,19 +45,37 @@ function fail(string $message): never
     exit(1);
 }
 
-/** ตรวจว่าเป็น SELECT ล้วนจริง — ตัด comment ออกก่อนเพื่อไม่ให้ซ่อนคำสั่งไว้ในนั้น */
-function assertReadOnly(string $sql): void
+/**
+ * คำสั่งตั้งค่า session ที่ยอมให้ผ่านได้ — เป็นค่าของ connection ตัวเอง ไม่แตะข้อมูล
+ * และสามอันหลังคือสิ่งที่เจ้าของกำหนดให้ตั้งทุก query อยู่แล้ว
+ */
+const ALLOWED_SET = [
+    '/^set\s+nocount\s+(on|off)$/i',
+    '/^set\s+lock_timeout\s+\d+$/i',
+    '/^set\s+deadlock_priority\s+low$/i',
+    '/^set\s+transaction\s+isolation\s+level\s+read\s+uncommitted$/i',
+];
+
+/** ตัด comment ออกก่อน เพื่อไม่ให้ซ่อนคำสั่งไว้ใน comment ได้ */
+function stripComments(string $sql): string
 {
     $stripped = preg_replace('#/\*.*?\*/#s', ' ', $sql);
     $stripped = preg_replace('#--[^\n]*#', ' ', (string) $stripped);
-    $stripped = trim((string) $stripped);
 
+    return trim((string) $stripped);
+}
+
+/**
+ * ตรวจทีละ statement ไม่ใช่ตรวจทั้งไฟล์รวดเดียว
+ * ไฟล์ inventory มีหลาย query ต่อกัน ถ้าตรวจรวมจะไม่รู้ว่าอันไหนผิด
+ */
+function assertReadOnly(string $sql): void
+{
+    $stripped = stripComments($sql);
     if ($stripped === '') {
         fail('ไม่มี SQL ให้รัน');
     }
-    if (! preg_match('/^\s*(select|with)\b/i', $stripped)) {
-        fail('อนุญาตเฉพาะ SELECT หรือ WITH เท่านั้น');
-    }
+
     foreach (FORBIDDEN as $word) {
         $pattern = str_ends_with($word, '_')
             ? '/\b'.preg_quote($word, '/').'/i'
@@ -64,6 +83,23 @@ function assertReadOnly(string $sql): void
         if (preg_match($pattern, $stripped)) {
             fail("พบคำสั่งต้องห้าม \"{$word}\" ใน SQL — ปฏิเสธก่อนส่งไปยังเซิร์ฟเวอร์");
         }
+    }
+
+    foreach (preg_split('/;\s*/', $stripped) as $statement) {
+        $statement = trim($statement);
+        if ($statement === '') {
+            continue;
+        }
+        if (preg_match('/^(select|with)\b/i', $statement)) {
+            continue;
+        }
+        foreach (ALLOWED_SET as $allowed) {
+            if (preg_match($allowed, $statement)) {
+                continue 2;
+            }
+        }
+        $preview = mb_substr(preg_replace('/\s+/', ' ', $statement), 0, 60);
+        fail("อนุญาตเฉพาะ SELECT, WITH และ SET ที่กำหนดไว้เท่านั้น — พบ: {$preview}");
     }
 }
 
@@ -118,6 +154,58 @@ $pdo->exec('SET LOCK_TIMEOUT 5000');
 $pdo->exec('SET DEADLOCK_PRIORITY LOW');
 $pdo->exec('SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED');
 
+function emit(array $rows, bool $asJson): void
+{
+    if ($rows === []) {
+        echo "(ไม่มีแถว)", PHP_EOL;
+
+        return;
+    }
+    $rows = array_map(fn (array $row) => array_map(decodeThai(...), $row), $rows);
+
+    if ($asJson) {
+        echo json_encode($rows, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT), PHP_EOL;
+
+        return;
+    }
+    echo implode("\t", array_keys($rows[0])), PHP_EOL;
+    foreach ($rows as $row) {
+        echo implode("\t", array_map(fn ($v) => $v === null ? 'NULL' : (string) $v, $row)), PHP_EOL;
+    }
+}
+
+$asJson = isset($options['json']);
+
+/*
+ * --split: รันทีละ statement
+ *
+ * ไฟล์ inventory ยาวและบาง query อ้างชื่อคอลัมน์ที่ยังเป็นข้อสันนิษฐาน
+ * ถ้ารันรวดเดียวแล้วพลาดกลางทาง จะเสียผลของ query ก่อนหน้าไปด้วย
+ * โหมดนี้จึงรันแยกและรายงานเฉพาะอันที่พลาด แล้วไปต่อ
+ */
+if (isset($options['split'])) {
+    $statements = array_values(array_filter(
+        array_map('trim', preg_split('/;\s*\n/', stripComments($sql))),
+        fn (string $statement) => $statement !== '',
+    ));
+
+    $failed = 0;
+    foreach ($statements as $index => $statement) {
+        $label = sprintf('--- [%d/%d] %s', $index + 1, count($statements),
+            mb_substr(preg_replace('/\s+/', ' ', $statement), 0, 70));
+        echo $label, PHP_EOL;
+        try {
+            emit($pdo->query($statement)->fetchAll(PDO::FETCH_ASSOC), $asJson);
+        } catch (PDOException $exception) {
+            $failed++;
+            echo 'ผิดพลาด: ', $exception->getMessage(), PHP_EOL;
+        }
+        echo PHP_EOL;
+    }
+    fwrite(STDERR, sprintf("รันทั้งหมด %d คำสั่ง ผิดพลาด %d\n", count($statements), $failed));
+    exit($failed > 0 ? 2 : 0);
+}
+
 $statement = $pdo->query($sql);
 $resultSet = 0;
 do {
@@ -125,19 +213,9 @@ do {
     if ($rows === []) {
         continue;
     }
-    $rows = array_map(fn (array $row) => array_map(decodeThai(...), $row), $rows);
-
-    if (isset($options['json'])) {
-        echo json_encode($rows, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT), PHP_EOL;
-        continue;
-    }
-
     if ($resultSet > 0) {
         echo PHP_EOL;
     }
-    echo implode("\t", array_keys($rows[0])), PHP_EOL;
-    foreach ($rows as $row) {
-        echo implode("\t", array_map(fn ($v) => $v === null ? 'NULL' : (string) $v, $row)), PHP_EOL;
-    }
+    emit($rows, $asJson);
     $resultSet++;
 } while ($statement->nextRowset());

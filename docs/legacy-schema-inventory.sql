@@ -202,7 +202,7 @@ WHERE t.is_ms_shipped = 0
   )
 ORDER BY s.name, t.name, c.column_id;
 
--- 8. Indexes: shows how the legacy reports were expected to read each table.
+-- 10. Indexes: shows how the legacy reports were expected to read each table.
 SELECT
     s.name AS schema_name,
     t.name AS table_name,
@@ -227,22 +227,7 @@ WHERE t.is_ms_shipped = 0
   AND i.type > 0
 ORDER BY s.name, t.name, i.name;
 
--- 9. Triggers. BPlus keeps posting rules in triggers, so a table-only reading of
---    the schema will map the stock and ledger effects of a document incorrectly.
-SELECT
-    s.name AS schema_name,
-    t.name AS table_name,
-    tr.name AS trigger_name,
-    tr.is_disabled,
-    tr.is_instead_of_trigger,
-    m.definition
-FROM sys.triggers tr
-JOIN sys.tables t ON t.object_id = tr.parent_id
-JOIN sys.schemas s ON s.schema_id = t.schema_id
-LEFT JOIN sys.sql_modules m ON m.object_id = tr.object_id
-ORDER BY s.name, t.name, tr.name;
-
--- 10. Scalar, inline and table-valued functions (section 6 covers procedures only).
+-- 11. Scalar, inline and table-valued functions (section 6 covers procedures only).
 SELECT
     s.name AS schema_name,
     o.name AS function_name,
@@ -257,12 +242,12 @@ WHERE o.is_ms_shipped = 0
   AND o.type IN ('FN', 'IF', 'TF')
 ORDER BY o.type_desc, s.name, o.name;
 
--- 11. Document types. Every BPlus flow is a document type inside DOCINFO, so this
+-- 12. Document types. Every BPlus flow is a document type inside DOCINFO, so this
 --     is the single most useful result for mapping booking, sale, return, payment
 --     and stock movement onto the new ERP.
 SELECT * FROM DOCTYPE ORDER BY 1;
 
--- 12. Document volume per type and year: separates the flows the business really
+-- 13. Document volume per type and year: separates the flows the business really
 --     used from the ones that only ever existed as a menu.
 SELECT
     d.DI_REF_TYPE,
@@ -272,7 +257,7 @@ FROM DOCINFO d
 GROUP BY d.DI_REF_TYPE, YEAR(d.DI_DATE)
 ORDER BY d.DI_REF_TYPE, doc_year;
 
--- 13. Fallback for section 12. DI_REF_TYPE and DI_DATE were read from the SQL of
+-- 14. Fallback for section 13. DI_REF_TYPE and DI_DATE were read from the SQL of
 --     the legacy reports, not from the database itself. If section 12 fails on a
 --     column name, run this and send the result so the column names can be fixed.
 SELECT c.name AS column_name, ty.name AS data_type, c.max_length, c.is_nullable
@@ -281,7 +266,7 @@ JOIN sys.types ty ON ty.user_type_id = c.user_type_id
 WHERE c.object_id = OBJECT_ID('DOCINFO')
 ORDER BY c.column_id;
 
--- 14. Tables behind each business flow. The table list comes from the FROM and
+-- 15. Tables behind each business flow. The table list comes from the FROM and
 --     JOIN clauses of the 1,502 legacy report definitions in REPORTFILE, so these
 --     are the tables the reports actually read rather than names guessed from a
 --     pattern. Anything reported as missing here is a mapping assumption to drop.
@@ -322,3 +307,53 @@ LEFT JOIN sys.tables t ON t.name = e.table_name AND t.is_ms_shipped = 0
 LEFT JOIN sys.indexes i ON i.object_id = t.object_id AND i.index_id IN (0, 1)
 LEFT JOIN sys.partitions p ON p.object_id = t.object_id AND p.index_id = i.index_id
 ORDER BY e.flow, e.table_name;
+
+-- 16. Costing method actually in use, per product.
+--     SKUMASTER.SKU_COST_TY decides how a product is costed. The owner's own note
+--     (สต็อกติดลบ.txt) shows it being changed with an UPDATE, so it is a per-product
+--     setting rather than a system-wide one. What each value means is NOT assumed
+--     here: the distribution plus samples is what tells us, and the new ERP must be
+--     configured to match or the margin figures can never reconcile.
+SELECT
+    sm.SKU_COST_TY AS cost_method_code,
+    COUNT_BIG(*) AS product_count,
+    SUM(CASE WHEN sm.SKU_ACTIVE = 1 THEN 1 ELSE 0 END) AS active_count
+FROM SKUMASTER sm
+GROUP BY sm.SKU_COST_TY
+ORDER BY product_count DESC;
+
+-- 17. Sample products for each costing method, to read alongside section 16.
+SELECT TOP (40)
+    sm.SKU_COST_TY AS cost_method_code,
+    sm.SKU_CODE,
+    sm.SKU_NAME,
+    sm.SKU_ACTIVE
+FROM SKUMASTER sm
+ORDER BY sm.SKU_COST_TY, sm.SKU_CODE;
+
+-- 18. Where the department and project dimensions actually live.
+--     Every legacy report group referenced DEPTTAB and PRJTAB, but the new ERP has
+--     no equivalent on any document. This lists the real columns carrying those
+--     dimensions so the decision to add them is made against fact, not a guess.
+SELECT
+    s.name AS schema_name,
+    t.name AS table_name,
+    c.name AS column_name,
+    ty.name AS data_type,
+    c.is_nullable
+FROM sys.tables t
+JOIN sys.schemas s ON s.schema_id = t.schema_id
+JOIN sys.columns c ON c.object_id = t.object_id
+JOIN sys.types ty ON ty.user_type_id = c.user_type_id
+WHERE t.is_ms_shipped = 0
+  AND (
+      c.name COLLATE Latin1_General_CI_AI LIKE '%DEPT%'
+      OR c.name COLLATE Latin1_General_CI_AI LIKE '%PRJ%'
+      OR c.name COLLATE Latin1_General_CI_AI LIKE '%PROJECT%'
+  )
+ORDER BY s.name, t.name, c.column_id;
+
+-- 19. The department and project master lists themselves.
+SELECT TOP (100) 'DEPTTAB' AS source_table, * FROM DEPTTAB ORDER BY 2;
+
+SELECT TOP (100) 'PRJTAB' AS source_table, * FROM PRJTAB ORDER BY 2;
