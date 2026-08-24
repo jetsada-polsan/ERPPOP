@@ -1736,11 +1736,6 @@
         <a href="{{ route('dashboard') }}" target="_blank" class="topbar-btn" style="margin-left:8px">
             <i class="bi bi-grid"></i> ERP
         </a>
-        @unless($canSell)
-        <a href="{{ route('pos.download') }}" class="topbar-btn pos-download-link">
-            <i class="bi bi-windows"></i> ดาวน์โหลด POS ขายจริง
-        </a>
-        @endunless
         @if($canSell)
         <button class="topbar-btn" @click="openReceiptSettings()">
             <i class="bi bi-receipt"></i> ใบเสร็จ

@@ -30,14 +30,14 @@
 
             <div class="set-nav-group mt-3"><i class="bi bi-pc-display"></i> โปรแกรมหน้าร้าน</div>
             <a href="{{ route('settings.receipt-template.edit') }}" class="set-nav-link text-decoration-none">ออกแบบใบเสร็จ POS</a>
-            <button type="button" class="set-nav-link" :class="tab === 'pos-download' && 'active'" @click="tab = 'pos-download'">เปิด Vue POS</button>
+            <button type="button" class="set-nav-link" :class="tab === 'pos-download' && 'active'" @click="tab = 'pos-download'">Python POS (ทดสอบ Windows)</button>
         </div>
 
         {{-- เนื้อหาขวา --}}
         <div class="set-main">
             <div class="d-flex align-items-center justify-content-between mb-3">
                 <h2 class="h4 fw-bold mb-0" style="color:var(--fa-blue-dark)"
-                    x-text="{ func: 'ฟังก์ชั่นเอกสาร', numbering: 'เลขรันเอกสาร', logo: 'โลโก้และตราประทับ', note: 'หมายเหตุเอกสาร', company: 'ข้อมูลกิจการ', menu: 'จัดลำดับเมนูหลัก', theme: 'ปรับธีมระบบ', payment: 'ข้อมูลการรับชำระ', accounting: 'บันทึกบัญชี', 'pos-download': 'ดาวน์โหลดโปรแกรม POS' }[tab]"></h2>
+                    x-text="{ func: 'ฟังก์ชั่นเอกสาร', numbering: 'เลขรันเอกสาร', logo: 'โลโก้และตราประทับ', note: 'หมายเหตุเอกสาร', company: 'ข้อมูลกิจการ', menu: 'จัดลำดับเมนูหลัก', theme: 'ปรับธีมระบบ', payment: 'ข้อมูลการรับชำระ', accounting: 'บันทึกบัญชี', 'pos-download': 'ตั้งค่า Python POS' }[tab]"></h2>
                 <button x-show="tab !== 'pos-download'" type="submit" class="btn btn-success px-4"><i class="bi bi-check-lg me-1"></i>บันทึกข้อมูล</button>
             </div>
 
@@ -238,14 +238,16 @@
                 <div class="set-card pos-download-card">
                     <div class="pos-download-mark"><i class="bi bi-windows"></i></div>
                     <div class="pos-download-copy">
-                        <div class="set-title">POPSTAR POS สำหรับเครื่องแคชเชียร์</div>
-                        <div class="set-desc">Vue + Tauri · Local SQLite · ขายออฟไลน์และส่งบิลขึ้น ERP อัตโนมัติ{{ $posRelease ? ' · รุ่นล่าสุด '.$posRelease['version'] : '' }}</div>
+                        <div class="set-title">POPSTAR Python POS สำหรับเครื่องแคชเชียร์</div>
+                        <div class="set-desc">Python + PySide6 · Local SQLite · รุ่น UAT แยกจาก POS เดิม · ทดสอบติดตั้ง Windows ก่อนเปิดขายจริง</div>
                     </div>
-                    <a href="{{ route('pos.download') }}" class="btn btn-primary btn-lg pos-download-btn">
-                        <i class="bi bi-download me-1"></i> ดาวน์โหลด/อัปเดต POS
+                    <a href="https://github.com/jetsada-polsan/ERPPOP/actions/workflows/pos-python-windows-uat.yml" target="_blank" rel="noopener" class="btn btn-primary btn-lg pos-download-btn">
+                        <i class="bi bi-box-arrow-up-right me-1"></i> เปิดหน้า Build Windows
                     </a>
                 </div>
 
+                {{-- เก็บกลไก Vue/Tauri รุ่นเดิมไว้ใน source เพื่อ rollback ได้ แต่ไม่แสดงใน ERP แล้ว. --}}
+                @if(false)
                 <div class="set-card">
                     <div class="set-title pt-2">เผยแพร่โปรแกรม POS รุ่นใหม่</div>
                     <div class="set-desc mb-3">เมื่อ GitHub Actions สร้างรุ่นใหม่สำเร็จ ระบบจะเผยแพร่ไฟล์ที่เซ็นแล้วอัตโนมัติ เครื่องแคชเชียร์จะตรวจพบเมื่อเปิดโปรแกรม ฟอร์มนี้เก็บไว้ใช้เฉพาะกรณีฉุกเฉิน</div>
@@ -282,12 +284,13 @@
                         </div>
                     </div>
                 </div>
+                @endif
 
                 @if(session('pos_token'))
                     <div class="set-card pos-token-result">
                         <div>
                             <div class="set-title">Token ใหม่ — {{ session('pos_device_name') }}</div>
-                            <div class="set-desc">Token แสดงครั้งเดียว คัดลอกไปวางในหน้าตั้งค่าของ Vue POS ได้เลย</div>
+                            <div class="set-desc">Token แสดงครั้งเดียว คัดลอกไปวางในหน้าตั้งค่าของ Python POS ได้เลย</div>
                         </div>
                         <div class="pos-token-copy-row">
                             <input id="new-pos-token" class="form-control font-monospace" readonly value="{{ session('pos_token') }}">
