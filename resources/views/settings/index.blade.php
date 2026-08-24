@@ -38,7 +38,8 @@
             <div class="d-flex align-items-center justify-content-between mb-3">
                 <h2 class="h4 fw-bold mb-0" style="color:var(--fa-blue-dark)"
                     x-text="{ func: 'ฟังก์ชั่นเอกสาร', numbering: 'เลขรันเอกสาร', logo: 'โลโก้และตราประทับ', note: 'หมายเหตุเอกสาร', company: 'ข้อมูลกิจการ', menu: 'จัดลำดับเมนูหลัก', theme: 'ปรับธีมระบบ', payment: 'ข้อมูลการรับชำระ', accounting: 'บันทึกบัญชี', 'pos-download': 'ตั้งค่า Python POS' }[tab]"></h2>
-                <button x-show="tab !== 'pos-download'" type="submit" class="btn btn-success px-4"><i class="bi bi-check-lg me-1"></i>บันทึกข้อมูล</button>
+                <button x-show="tab !== 'pos-download' && tab !== 'theme'" type="submit" class="btn btn-success px-4"><i class="bi bi-check-lg me-1"></i>บันทึกข้อมูล</button>
+                <button x-show="tab === 'theme'" type="submit" formaction="{{ route('settings.layout.update') }}" class="btn btn-success px-4"><i class="bi bi-check-lg me-1"></i>บันทึก Layout</button>
             </div>
 
             {{-- ฟังก์ชั่นเอกสาร --}}

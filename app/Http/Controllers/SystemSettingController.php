@@ -18,6 +18,14 @@ use Illuminate\View\View;
 
 class SystemSettingController extends Controller
 {
+    public function updateLayout(Request $request): RedirectResponse
+    {
+        $data = $request->validate(['erp_layout' => ['required', 'in:classic,odoo']]);
+        AppSetting::set('erp_layout', $data['erp_layout']);
+
+        return redirect()->route('settings.index')->with('success', 'บันทึกรูปแบบหน้าหลังบ้านแล้ว');
+    }
+
     public function index(): View
     {
         // Preset logos = every image dropped in public/images/logos

@@ -614,6 +614,7 @@ Route::prefix('qty-promotions')->name('qty-promotions.')->group(function () {
 Route::prefix('settings')->name('settings.')->group(function () {
     Route::get('/', [SystemSettingController::class, 'index'])->name('index');
     Route::post('/', [SystemSettingController::class, 'update'])->name('update');
+    Route::post('/layout', [SystemSettingController::class, 'updateLayout'])->name('layout.update');
     Route::get('/reports', [ReportGovernanceController::class, 'index'])->name('reports');
     Route::post('/reports', [ReportGovernanceController::class, 'update'])->name('reports.update');
     Route::get('/workflows', [WorkflowDefinitionController::class, 'index'])->name('workflows');
