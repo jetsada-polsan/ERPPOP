@@ -802,12 +802,12 @@
                                         <i class="bi bi-upc-scan me-1"></i> สร้าง EAN-13 อัตโนมัติ
                                     </button>
                                     <button type="button" class="btn btn-sm btn-light border"
-                                        @click="barcodeMode='manual'; barcodeValue='{{ $nextScalePlu }}'; $nextTick(() => $refs.bcInput.focus())">
-                                        <i class="bi bi-speedometer me-1"></i> PLU เครื่องชั่ง {{ $nextScalePlu }}
+                                        @click="barcodeMode='manual'; barcodeType='SCALE_PLU'; barcodeValue=''; $nextTick(() => $refs.bcInput.focus())">
+                                        <i class="bi bi-speedometer me-1"></i> กรอก PLU เครื่องชั่ง
                                     </button>
                                 </div>
                                 <button type="button" class="btn btn-sm btn-link px-0 mt-1" @click="barcodeMode='manual'; barcodeValue=''; $nextTick(() => $refs.bcInput.focus())">กรอกหรือยิงบาร์โค้ดเดิมเอง</button>
-                                <div class="form-text">EAN-13 จะรันไม่ซ้ำพร้อมคำนวณเลขตรวจสอบหลักที่ 13 หน่วยชิ้น แพ็ค และกล่องต้องสร้างแยกคนละรหัส</div>
+                                <div class="form-text">PLU เครื่องชั่งต้องตรงกับเลข 801xxx ที่ตั้งในเครื่องชั่ง ห้ามให้ระบบเดาเลขใหม่เอง; ฉลาก EAN-13 ที่เครื่องชั่งพิมพ์จะอ้างอิง PLU นี้</div>
                             </div>
                             <div class="col-6">
                                 <label class="form-label text-muted small">หน่วย</label>
@@ -1741,6 +1741,7 @@
                 }
                 if (this.barcodeType === 'INTERNAL_13') return /^\d{13}$/.test(value);
                 if (this.barcodeType === 'SCALE_WEIGHT') return /^80[01]\d{3}\d{6}\d$/.test(value);
+                if (this.barcodeType === 'SCALE_PLU') return /^801\d{3}$/.test(value);
                 return true;
             },
             barcodeHint() {
@@ -1761,6 +1762,9 @@
                 }
                 if (this.barcodeType === 'SCALE_WEIGHT') {
                     return /^80[01]\d{3}\d{6}\d$/.test(value) ? 'ตรงรูปแบบเครื่องชั่ง' : 'ต้องเป็น PLU 800/801 + ราคา 6 หลัก + check digit';
+                }
+                if (this.barcodeType === 'SCALE_PLU') {
+                    return /^801\d{3}$/.test(value) ? 'PLU เครื่องชั่งถูกต้อง: ฉลาก EAN-13 จะอ้างอิงเลขนี้' : 'ต้องเป็นเลข 801 ตามด้วย 3 หลัก เช่น 801001';
                 }
                 return 'รับได้ทุกรูปแบบ';
             },

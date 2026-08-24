@@ -22,15 +22,19 @@ class BarcodePolicy
     /** ฉลากจากเครื่องชั่ง ราคา/น้ำหนักฝังในบาร์โค้ด */
     public const SCALE_WEIGHT = 'SCALE_WEIGHT';
 
+    /** PLU 6 หลักที่ผูกสินค้าไว้ในเครื่องชั่ง เช่น 801001 */
+    public const SCALE_PLU = 'SCALE_PLU';
+
     /** ของเก่าหรือรหัสที่กำหนดเอง ไม่บังคับรูปแบบ */
     public const CUSTOM = 'CUSTOM';
 
-    public const ALL = [self::EAN13_STANDARD, self::INTERNAL_13, self::SCALE_WEIGHT, self::CUSTOM];
+    public const ALL = [self::EAN13_STANDARD, self::INTERNAL_13, self::SCALE_WEIGHT, self::SCALE_PLU, self::CUSTOM];
 
     public const LABELS = [
         self::EAN13_STANDARD => 'EAN-13 มาตรฐาน (GS1)',
         self::INTERNAL_13 => 'รหัส 13 หลักภายใน',
         self::SCALE_WEIGHT => 'บาร์โค้ดเครื่องชั่ง',
+        self::SCALE_PLU => 'PLU เครื่องชั่ง (6 หลัก)',
         self::CUSTOM => 'กำหนดเอง / ของเก่า',
     ];
 
@@ -76,6 +80,12 @@ class BarcodePolicy
             case self::SCALE_WEIGHT:
                 if (app(ScaleBarcodeService::class)->decode($barcode) === null) {
                     $errors[] = 'ไม่ตรงรูปแบบบาร์โค้ดเครื่องชั่งที่ตั้งไว้';
+                }
+                break;
+
+            case self::SCALE_PLU:
+                if (preg_match('/^801[0-9]{3}$/', $barcode) !== 1) {
+                    $errors[] = 'PLU เครื่องชั่งต้องเป็นเลข 801 ตามด้วยเลข 3 หลัก เช่น 801001';
                 }
                 break;
 
