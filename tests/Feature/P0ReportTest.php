@@ -46,18 +46,43 @@ class P0ReportTest extends TestCase
         $this->assertSame([], $failures, "รายงาน P0 ที่รันไม่ผ่าน:\n".implode("\n", $failures));
     }
 
-    public function test_the_ten_new_p0_reports_are_available_but_still_switched_off(): void
+    /**
+     * รายงานที่ตัวเลขยังไม่ถูกพิสูจน์ ต้องมาแบบปิดไว้
+     *
+     * "รันแล้วไม่ error" ไม่ใช่หลักฐานว่าตัวเลขถูก รายงานการเงินที่คำนวณผิด
+     * จะดูปกติทุกอย่างจนกว่าจะมีคนเอาไปตัดสินใจแล้วผิด ตัวที่มีเทสต์เทียบยอด
+     * อยู่ใน P0ReportFiguresTest แล้วเท่านั้นที่ควรเปิดได้
+     */
+    public function test_p0_reports_ship_switched_off_until_their_figures_are_proven(): void
     {
-        $codes = [
-            'sales.daily_by_channel', 'booking.outstanding', 'booking.due', 'booking.by_branch_seller',
-            'ap.outstanding_detail', 'ap.aging', 'cash.daily_cash_book', 'cash.bank_summary',
-            'cash.bank_reconciliation', 'payment.received_and_unidentified',
+        $unproven = [
+            'booking.outstanding', 'booking.due', 'booking.by_branch_seller',
+            'ap.outstanding_detail', 'cash.bank_summary', 'payment.received_and_unidentified',
         ];
 
-        foreach ($codes as $code) {
+        foreach ($unproven as $code) {
             $definition = ReportDefinition::where('code', $code)->sole();
             $this->assertSame('available', $definition->status, "{$code} ควรมีหน้าจอแล้ว");
-            $this->assertFalse($definition->enabled, "{$code} ต้องยังปิดอยู่จนกว่า UAT จะผ่าน");
+            $this->assertFalse($definition->enabled, "{$code} ยังไม่มีเทสต์เทียบยอด ต้องมาแบบปิดไว้");
+        }
+    }
+
+    public function test_the_proven_p0_reports_each_have_a_figures_test(): void
+    {
+        $proven = [
+            'sales.daily_by_channel' => 'sales_by_channel_matches_the_sales_ledger',
+            'ar.ar_aging' => 'receivable_ageing_puts_each_invoice_in_the_right_bucket',
+            'ap.aging' => 'payable_ageing_reports_each_supplier_separately',
+            'cash.daily_cash_book' => 'the_cash_book_shows_every_movement_with_its_running_balance',
+            'cash.bank_reconciliation' => 'bank_lines_show_which_ones_are_still_unreconciled',
+        ];
+
+        // ผูกชื่อเทสต์ไว้กับรหัสรายงาน ลบเทสต์ทิ้งแล้วข้อนี้จะพัง
+        // ไม่ใช่ปล่อยให้รายงานเปิดค้างอยู่โดยไม่มีอะไรค้ำ
+        $figures = (string) file_get_contents(base_path('tests/Feature/P0ReportFiguresTest.php'));
+        foreach ($proven as $code => $testName) {
+            $this->assertSame('available', ReportDefinition::where('code', $code)->sole()->status);
+            $this->assertStringContainsString($testName, $figures, "{$code} ต้องมีเทสต์เทียบยอดชื่อ {$testName}");
         }
     }
 
