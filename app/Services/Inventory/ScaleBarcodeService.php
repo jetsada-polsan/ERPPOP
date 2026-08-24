@@ -23,30 +23,84 @@ class ScaleBarcodeService
     }
 
     /**
-     * Read a price-embedded scale label back: 6-digit PLU + 6-digit total price
-     * in satang + EAN-13 check digit. Returns null when the code is not a valid
-     * scale label, so callers can fall through to a normal barcode lookup.
+     * ถอดป้ายเครื่องชั่งตาม profile ที่ตั้งไว้ในระบบ
      *
-     * @return array{plu: string, price: float}|null
+     * ไม่เดารูปแบบเอง — รูปแบบมาจากตาราง scale_barcode_profiles เพราะเครื่องชั่ง
+     * คนละรุ่นออกป้ายคนละแบบ และการเดาผิดแปลว่าคิดเงินผิดทันทีที่หน้าเคาน์เตอร์
+     *
+     * คืน null เมื่อไม่ตรง profile ไหนเลย ผู้เรียกจะได้ไปหาบาร์โค้ดปกติต่อ
+     *
+     * @return array{plu: string, price: float, profile: string}|null
      */
     public function decode(string $barcode): ?array
     {
         $barcode = trim($barcode);
-
-        // 13 หลัก: PLU(6) + ราคารวมสตางค์(6) + check digit — ต้องตรวจ check digit
-        // เพราะ 800-839 เป็นรหัสประเทศ EAN ของอิตาลีด้วย
-        if (preg_match('/^(80[01][0-9]{3})([0-9]{6})([0-9])$/', $barcode, $matches) === 1) {
-            return (int) $matches[3] === $this->checkDigit($matches[1].$matches[2])
-                ? ['plu' => $matches[1], 'price' => (int) $matches[2] / 100]
-                : null;
+        if ($barcode === '' || ! ctype_digit($barcode)) {
+            return null;
         }
 
-        // 12 หลัก: PLU(6) + ราคารวมสตางค์(5) + หลักท้ายไม่ใช้ (เครื่องชั่งบางรุ่น)
-        if (preg_match('/^(80[01][0-9]{3})([0-9]{5})[0-9]$/', $barcode, $matches) === 1) {
-            return ['plu' => $matches[1], 'price' => (int) $matches[2] / 100];
+        foreach ($this->profiles() as $profile) {
+            $decoded = $this->decodeWith($barcode, $profile);
+            if ($decoded !== null) {
+                return $decoded;
+            }
         }
 
         return null;
+    }
+
+    /**
+     * @param  object  $profile
+     * @return array{plu: string, price: float, profile: string}|null
+     */
+    private function decodeWith(string $barcode, $profile): ?array
+    {
+        if (strlen($barcode) !== (int) $profile->total_length) {
+            return null;
+        }
+        if (! str_starts_with($barcode, (string) $profile->prefix)) {
+            return null;
+        }
+
+        $pluLength = (int) $profile->plu_length;
+        $valueLength = (int) $profile->value_length;
+        $plu = substr($barcode, 0, $pluLength);
+        $value = substr($barcode, $pluLength, $valueLength);
+        if (! ctype_digit($plu) || ! ctype_digit($value)) {
+            return null;
+        }
+
+        // 800-839 เป็นรหัสประเทศ EAN ของอิตาลีด้วย ป้ายที่บังคับ check digit
+        // จึงเป็นตัวกันไม่ให้สินค้านำเข้าถูกอ่านเป็นป้ายชั่ง และกันการแก้ PLU บนป้าย
+        if ($profile->check_digit === 'ean13') {
+            $body = substr($barcode, 0, (int) $profile->total_length - 1);
+            if ((int) substr($barcode, -1) !== $this->checkDigit($body)) {
+                return null;
+            }
+        }
+
+        return [
+            'plu' => $plu,
+            'price' => $profile->value_type === 'price' ? (int) $value / 100 : (int) $value,
+            'profile' => (string) $profile->code,
+        ];
+    }
+
+    /**
+     * profile ที่เปิดใช้อยู่ เรียงให้ตัวที่ตรวจ check digit มาก่อน
+     *
+     * ป้ายเดียวกันอาจเข้าได้ทั้งแบบตรวจและไม่ตรวจ ถ้าให้แบบไม่ตรวจชนะ
+     * ป้ายที่ถูกแก้ตัวเลขจะผ่านไปได้ทั้งที่ควรถูกปฏิเสธ
+     *
+     * @return \Illuminate\Support\Collection<int, object>
+     */
+    private function profiles()
+    {
+        return \Illuminate\Support\Facades\DB::table('scale_barcode_profiles')
+            ->where('is_active', true)
+            ->orderByRaw("case when check_digit = 'ean13' then 0 else 1 end")
+            ->orderByDesc('total_length')
+            ->get();
     }
 
     public function svg(string $barcode, int $height = 42): string

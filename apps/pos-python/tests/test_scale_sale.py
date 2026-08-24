@@ -5,7 +5,7 @@ import unittest
 from decimal import Decimal
 from pathlib import Path
 
-from pos_python.barcode import decode_scale_label, ean13_check_digit, scale_cart_line
+from pos_python.barcode import decode_scale_label, ean13_check_digit, replace_scale_profiles, scale_cart_line
 from pos_python.database import connect
 from pos_python.services import PosService, now, pin_hash
 
@@ -22,6 +22,13 @@ class ScaleSaleUatTest(unittest.TestCase):
         self.db.execute("INSERT INTO local_cashiers (id, code, name, pin_hash, synced_at) VALUES (1, 'POP001', 'Tester', ?, ?)", (pin_hash('1234'), now()))
         self.db.execute("INSERT INTO products (id, sku, name, unit_name, updated_at) VALUES (1, '800123', 'หมูสามชั้นสไลซ์', 'กก.', ?)", (now(),))
         self.db.execute("INSERT INTO product_barcodes (barcode, product_id, barcode_type, price, synced_at) VALUES ('800123', 1, 'SCALE_WEIGHT', 200, ?)", (now(),))
+        # เครื่องต้องได้รูปแบบป้ายมาจาก ERP ก่อน ไม่ใช่เดาเองจากตัวเลข
+        replace_scale_profiles(self.db, [
+            {"code": "POPSTAR-800", "prefix": "800", "plu_length": 6, "value_length": 6,
+             "value_type": "price", "check_digit": "ean13", "total_length": 13},
+            {"code": "POPSTAR-801", "prefix": "801", "plu_length": 6, "value_length": 6,
+             "value_type": "price", "check_digit": "ean13", "total_length": 13},
+        ])
         self.db.commit()
         self.pos = PosService(self.db)
         self.shift_id = self.pos.open_shift(1, "TEST-SCALE", 1, Decimal("0"))

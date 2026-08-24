@@ -59,6 +59,22 @@ class PosApiController extends Controller
             'branch_name' => $branchName,
             'device_user' => $user?->name,
             'cashier_login_mode' => AppSetting::get('pos_passwordless_login') === '1' ? 'selection' : 'pin',
+            // กฎการอ่านป้ายเครื่องชั่งมาจากที่นี่ที่เดียว เครื่องขายไม่ต้องเดารูปแบบเอง
+            // เดิมทั้ง ERP และ POS ต่างฝังกฎของตัวเองไว้ แก้ทีต้องไล่แก้ให้ตรงกันสองที่
+            'scale_profiles' => DB::table('scale_barcode_profiles')
+                ->where('is_active', true)
+                ->orderByRaw("case when check_digit = 'ean13' then 0 else 1 end")
+                ->orderByDesc('total_length')
+                ->get(['code', 'prefix', 'plu_length', 'value_length', 'value_type', 'check_digit', 'total_length'])
+                ->map(fn ($profile) => [
+                    'code' => $profile->code,
+                    'prefix' => $profile->prefix,
+                    'plu_length' => (int) $profile->plu_length,
+                    'value_length' => (int) $profile->value_length,
+                    'value_type' => $profile->value_type,
+                    'check_digit' => $profile->check_digit,
+                    'total_length' => (int) $profile->total_length,
+                ]),
             // หัวบิลใบกำกับภาษีอย่างย่อ (มาตรา 86/6) — desktop แคชไว้พิมพ์ใบเสร็จได้แม้ออฟไลน์
             'company' => [
                 'name' => AppSetting::company('name_th'),

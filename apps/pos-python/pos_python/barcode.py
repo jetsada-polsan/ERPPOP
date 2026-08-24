@@ -20,19 +20,79 @@ class ScaleLabel:
     total_price: Decimal
 
 
-def decode_scale_label(code: str) -> ScaleLabel | None:
-    """POPSTAR scale profile: PLU 800/801 (6) + total price in satang (6) + EAN check digit."""
+def replace_scale_profiles(db: sqlite3.Connection, profiles: list[dict]) -> None:
+    """เก็บกฎที่ ERP ส่งมาทับของเดิมทั้งชุด ไม่ผสมของเก่ากับของใหม่"""
+    db.execute("DELETE FROM scale_profiles")
+    db.executemany(
+        """INSERT INTO scale_profiles
+        (code, prefix, plu_length, value_length, value_type, check_digit, total_length, synced_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))""",
+        [
+            (
+                profile["code"], profile["prefix"], int(profile["plu_length"]),
+                int(profile["value_length"]), profile["value_type"],
+                profile["check_digit"], int(profile["total_length"]),
+            )
+            for profile in profiles
+        ],
+    )
+
+
+def load_scale_profiles(db: sqlite3.Connection) -> list[sqlite3.Row]:
+    """ตัวที่ตรวจ check digit มาก่อน — ป้ายเดียวกันอาจเข้าได้ทั้งสองกฎ
+    ถ้าให้กฎที่ไม่ตรวจชนะ ป้ายที่ถูกแก้ตัวเลขจะผ่านไปได้ทั้งที่ควรถูกปฏิเสธ"""
+    return db.execute(
+        """SELECT * FROM scale_profiles
+        ORDER BY CASE WHEN check_digit = 'ean13' THEN 0 ELSE 1 END, total_length DESC"""
+    ).fetchall()
+
+
+def decode_scale_label(db: sqlite3.Connection, code: str) -> ScaleLabel | None:
+    """ถอดป้ายตาม profile ที่ ERP กำหนด ไม่เดารูปแบบเอง
+
+    เครื่องชั่งคนละรุ่นออกป้ายคนละแบบ การเดาผิดคือคิดเงินผิดที่หน้าเคาน์เตอร์ทันที
+    ไม่มี profile ที่ตรงเลยจะคืน None ให้ผู้เรียกไปหาบาร์โค้ดปกติต่อ
+    """
     scanned = code.strip()
-    if len(scanned) != 13 or not scanned.isdigit() or not (scanned.startswith("800") or scanned.startswith("801")):
+    if not scanned.isdigit():
         return None
-    if ean13_check_digit(scanned[:12]) != int(scanned[12]):
+
+    for profile in load_scale_profiles(db):
+        label = _decode_with(scanned, profile)
+        if label:
+            return label
+    return None
+
+
+def _decode_with(scanned: str, profile: sqlite3.Row) -> ScaleLabel | None:
+    if len(scanned) != profile["total_length"] or not scanned.startswith(profile["prefix"]):
         return None
-    return ScaleLabel(plu=scanned[:6], total_price=Decimal(scanned[6:12]) / Decimal("100"))
+
+    plu = scanned[: profile["plu_length"]]
+    raw_value = scanned[profile["plu_length"] : profile["plu_length"] + profile["value_length"]]
+    if not plu.isdigit() or not raw_value.isdigit():
+        return None
+
+    # 800-839 เป็นรหัสประเทศ EAN ของอิตาลีด้วย การตรวจ check digit จึงเป็นตัวกัน
+    # ไม่ให้สินค้านำเข้าถูกอ่านเป็นป้ายชั่ง และกันการแก้ PLU บนป้ายที่พิมพ์แล้ว
+    if profile["check_digit"] == "ean13":
+        body = scanned[:-1]
+        if ean13_check_digit(body) != int(scanned[-1]):
+            return None
+
+    value = Decimal(raw_value)
+    return ScaleLabel(
+        plu=plu,
+        total_price=value / Decimal("100") if profile["value_type"] == "price" else value,
+    )
 
 
 def scale_cart_line(db: sqlite3.Connection, code: str) -> CartLine:
     """Turn a one-time scale label into a priced cart line; the raw scan remains in source_barcode."""
-    label = decode_scale_label(code)
+    if not load_scale_profiles(db):
+        # แยกให้ชัดจาก "ป้ายผิด" เพราะทางแก้คนละเรื่องกันสิ้นเชิง
+        raise ValueError("เครื่องนี้ยังไม่ได้รับรูปแบบป้ายเครื่องชั่งจาก ERP — sync ก่อนขายสินค้าชั่ง")
+    label = decode_scale_label(db, code)
     if not label:
         raise ValueError("ป้ายเครื่องชั่งไม่ถูกต้อง หรือ check digit ไม่ตรง")
     product = db.execute(

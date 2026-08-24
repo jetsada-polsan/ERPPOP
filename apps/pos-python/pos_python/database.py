@@ -118,6 +118,17 @@ CREATE TABLE IF NOT EXISTS sync_logs (
     message TEXT,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS scale_profiles (
+    code TEXT PRIMARY KEY,
+    prefix TEXT NOT NULL,
+    plu_length INTEGER NOT NULL,
+    value_length INTEGER NOT NULL,
+    value_type TEXT NOT NULL,
+    check_digit TEXT NOT NULL,
+    total_length INTEGER NOT NULL,
+    synced_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS device_settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL,
