@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\ReportDefinition;
 use App\Support\SqlDialect;
+use App\Support\XlsxWriter;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\Support\Facades\DB;
 
@@ -69,14 +71,14 @@ class ReportController extends Controller
 
         // ส่งออกทั้งรายงาน ไม่ใช่เท่าที่แสดงบนจอ — per_page เป็น LIMIT ของ query
         // ถ้าใช้ค่าเดียวกับหน้าจอ คนกดออกไฟล์ภาษีขายจะได้ข้อมูลไม่ครบโดยไม่รู้ตัว
-        if ($request->input('export') === 'csv') {
+        if (in_array($request->input('export'), ['csv', 'xlsx'], true)) {
             abort_unless($user === null || $user->hasPermission('reports.export'), 403, 'ไม่มีสิทธิ์ส่งออกรายงาน');
 
-            return $this->streamCsv(
-                $category,
-                $report,
-                $this->runReport($category, $report, $from, $to, ['per_page' => self::EXPORT_ROW_CAP] + $filters),
-            );
+            $result = $this->runReport($category, $report, $from, $to, ['per_page' => self::EXPORT_ROW_CAP] + $filters);
+
+            return $request->input('export') === 'xlsx'
+                ? $this->downloadXlsx($category, $report, $result)
+                : $this->streamCsv($category, $report, $result);
         }
 
         return view('reports.index', [
@@ -107,6 +109,29 @@ class ReportController extends Controller
 
     /** เพดานแถวตอนสั่งพิมพ์ — สูงกว่าหน้าจอ แต่ไม่ถึงขั้นพิมพ์พันหน้าโดยไม่ตั้งใจ */
     private const PRINT_ROW_CAP = 2000;
+
+    /**
+     * ส่งออกเป็น .xlsx จริง ไม่ใช่ CSV เปลี่ยนนามสกุล
+     *
+     * ต่างกันตรงที่ตัวเลขมาเป็นตัวเลขให้ Excel บวกได้ทันที และวันที่เรียงได้ถูก
+     * ส่วน CSV ทุกอย่างเป็นข้อความ ใครเปิดมาก็ต้องแปลงเองก่อนใช้
+     *
+     * @param  array<string, mixed>  $result
+     */
+    private function downloadXlsx(string $category, string $report, array $result): BinaryFileResponse
+    {
+        $temporary = tempnam(sys_get_temp_dir(), 'report-').'.xlsx';
+        app(XlsxWriter::class)->write(
+            $temporary,
+            (string) ($result['title'] ?? $report),
+            $result['columns'] ?? [],
+            $result['rows'] ?? [],
+        );
+
+        return response()
+            ->download($temporary, sprintf('%s-%s-%s.xlsx', $category, $report, now()->format('Ymd-His')))
+            ->deleteFileAfterSend();
+    }
 
     /** @param  array<string, mixed>  $result */
     private function streamCsv(string $category, string $report, array $result): StreamedResponse

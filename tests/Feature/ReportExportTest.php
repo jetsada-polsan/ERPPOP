@@ -59,6 +59,31 @@ class ReportExportTest extends TestCase
             'กระดาษต้องได้มากกว่าที่หน้าจอแสดง ไม่งั้นพิมพ์ออกมาแล้วข้อมูลขาด');
     }
 
+    public function test_xlsx_export_downloads_a_real_spreadsheet(): void
+    {
+        $response = $this->actingAs($this->exporter())
+            ->get('/reports?category=sales&report=daily_sales&export=xlsx');
+
+        $response->assertOk();
+        $this->assertStringContainsString('.xlsx', $response->headers->get('content-disposition'));
+
+        // เขียนลงไฟล์แล้วเปิดเป็น zip จริง ไม่ใช่ CSV เปลี่ยนนามสกุล
+        $path = tempnam(sys_get_temp_dir(), 'dl-').'.xlsx';
+        file_put_contents($path, $response->streamedContent());
+        $zip = new \ZipArchive;
+        $this->assertTrue($zip->open($path) === true);
+        $this->assertNotFalse($zip->locateName('xl/worksheets/sheet1.xml'));
+        $zip->close();
+        unlink($path);
+    }
+
+    public function test_xlsx_export_needs_the_same_permission_as_csv(): void
+    {
+        $this->actingAs($this->userWith(['reports.view']))
+            ->get('/reports?category=sales&report=daily_sales&export=xlsx')
+            ->assertForbidden();
+    }
+
     private function exporter(): User
     {
         return $this->userWith(['reports.view', 'reports.export', 'reports.all_branches']);

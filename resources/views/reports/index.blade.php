@@ -311,6 +311,7 @@
 
                 <div class="ms-auto d-flex gap-2">
                     @if($canExport)
+                        <button type="button" class="rpt-btn-export" onclick="exportXlsx()"><i class="bi bi-file-earmark-excel me-1"></i>Excel</button>
                         <button type="button" class="rpt-btn-export" onclick="exportCsv()"><i class="bi bi-download me-1"></i>CSV</button>
                         <button type="button" class="rpt-btn-export" onclick="printA4()"><i class="bi bi-printer me-1"></i>พิมพ์ A4</button>
                     @endif
@@ -923,6 +924,10 @@ function reportUrlWith(params) {
 
 function exportCsv() {
     window.location.href = reportUrlWith({ export: 'csv' });
+}
+
+function exportXlsx() {
+    window.location.href = reportUrlWith({ export: 'xlsx' });
 }
 
 function printA4() {
