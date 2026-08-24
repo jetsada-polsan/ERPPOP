@@ -92,6 +92,7 @@
             'label' => 'รายงาน',
             'displayLabel' => 'รายงาน',
             'items' => [
+                ['label' => 'ภาพรวมผู้บริหาร', 'route' => 'executive.index', 'pattern' => 'executive.*', 'icon' => 'bi-speedometer2', 'tone' => 'teal', 'params' => []],
                 ['label' => 'ศูนย์รวมรายงาน', 'route' => 'reports.index', 'pattern' => 'reports.*', 'icon' => 'bi-clipboard-data-fill', 'tone' => 'blue', 'params' => []],
                 ['label' => 'รายงานขาย', 'route' => 'reports.index', 'pattern' => 'reports.*', 'icon' => 'bi-receipt-cutoff', 'tone' => 'teal', 'params' => ['category' => 'sales'], 'queryCategory' => 'sales'],
                 ['label' => 'รายงานซื้อ', 'route' => 'reports.index', 'pattern' => 'reports.*', 'icon' => 'bi-basket-fill', 'tone' => 'amber', 'params' => ['category' => 'purchasing'], 'queryCategory' => 'purchasing'],

@@ -85,6 +85,9 @@ class RoutePermissions
         'bplus.approvals' => 'finance.manage',
 
         // ข้อมูลตั้งต้น / ราคา / โปรโมชั่น
+        // หน้าผู้บริหารใช้สิทธิ์ดูรายงาน — คนที่ดูรายงานได้ก็ควรเห็นภาพรวมได้
+        // ส่วนการเห็นข้ามสาขายังคุมด้วย reports.all_branches แยกต่างหากในตัวหน้าเอง
+        'executive.' => 'reports.view',
         'products.' => 'masterdata.manage',
         'products.lots.quality-checks' => 'inventory.quality.manage',
         'products.lots.recalls' => 'inventory.quality.manage',

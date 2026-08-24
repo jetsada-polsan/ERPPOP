@@ -312,6 +312,7 @@
                 <div class="ms-auto d-flex gap-2">
                     @if($canExport)
                         <button type="button" class="rpt-btn-export" onclick="exportCsv()"><i class="bi bi-download me-1"></i>CSV</button>
+                        <button type="button" class="rpt-btn-export" onclick="printA4()"><i class="bi bi-printer me-1"></i>พิมพ์ A4</button>
                     @endif
                     <button type="button" class="rpt-btn-print" onclick="window.print()"><i class="bi bi-printer me-1"></i>พิมพ์</button>
                 </div>
@@ -847,8 +848,20 @@
     .report-data-table { font-size:10px; }
     .report-data-table th,.report-data-table td { padding:5px 7px!important; line-height:1.25; }
     @media(max-width:1300px){.rpt-shortcut{display:none}.rpt-report-picker span{display:none}.flow-action-btn{padding-left:7px;padding-right:7px}}
+    @page {
+        size: A4;
+        margin: 12mm 10mm 14mm;
+    }
     @media print {
         .app-sidebar, .app-header, .flow-rail, .no-print { display: none !important; }
+        /* หัวตารางต้องซ้ำทุกหน้า ไม่งั้นหน้าที่ 2 เป็นต้นไปจะเป็นตัวเลขลอย ๆ ไม่มีชื่อคอลัมน์ */
+        .report-data-table thead { display: table-header-group; }
+        .report-data-table tfoot { display: table-footer-group; }
+        .report-data-table tr { page-break-inside: avoid; break-inside: avoid; }
+        .report-data-table { width: 100%; font-size: 10.5px; }
+        .report-data-table th, .report-data-table td { padding: 3px 5px; }
+        .rpt-print-header { page-break-after: avoid; }
+        a[href]::after { content: none !important; }   /* ไม่ต้องพ่น URL ต่อท้ายลิงก์ */
         .flow-report-shell, .rpt-shell { display: block; margin: 0; }
         .content-card { border: none; box-shadow: none; }
         .rpt-print-header {
@@ -900,16 +913,25 @@ function selectReport(value) {
     form.submit();
 }
 
-function exportCsv() {
-    const rows = [...document.querySelectorAll('.report-data-table tr')].map(row =>
-        [...row.children].map(c => `"${c.innerText.replaceAll('"', '""')}"`).join(',')
-    );
-    const blob = new Blob(["\uFEFF" + rows.join("\n")], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = '{{ $selectedCategory }}-{{ $selectedReport }}.csv';
-    link.click();
-    URL.revokeObjectURL(link.href);
+// ทั้ง export และพิมพ์ยิงกลับไปที่เซิร์ฟเวอร์พร้อมเงื่อนไขเดิม
+// เพราะหน้าจอถือข้อมูลแค่ 25 แถว เอาจาก DOM จะได้ไฟล์ที่ดูครบแต่ไม่ครบ
+function reportUrlWith(params) {
+    const url = new URL(window.location.href);
+    Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+    return url.toString();
 }
+
+function exportCsv() {
+    window.location.href = reportUrlWith({ export: 'csv' });
+}
+
+function printA4() {
+    window.open(reportUrlWith({ print: 1 }), '_blank');
+}
+
+@if($printMode ?? false)
+// เปิดหน้าต่างพิมพ์ให้เลย ผู้ใช้กดปุ่มพิมพ์มาแล้วไม่ต้องกดซ้ำ
+window.addEventListener('load', () => window.print());
+@endif
 </script>
 @endpush

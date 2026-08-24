@@ -53,6 +53,7 @@ use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\QtyPromotionController;
 use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\ReceiptTemplateController;
+use App\Http\Controllers\ExecutiveDashboardController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReportGovernanceController;
 use App\Http\Controllers\SaleController;
@@ -117,6 +118,8 @@ Route::prefix('organizational-units')->name('organizational-units.')->group(func
 });
 
 Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+Route::get('/executive', [ExecutiveDashboardController::class, 'index'])->name('executive.index');
+Route::get('/executive/data', [ExecutiveDashboardController::class, 'data'])->name('executive.data');
 Route::prefix('management-controls')->name('management-controls.')->group(function () {
     Route::get('/', [ManagementControlController::class, 'index'])->name('index');
     Route::post('/cost-centers', [ManagementControlController::class, 'storeCostCenter'])->name('cost-centers.store');

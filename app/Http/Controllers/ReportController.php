@@ -7,6 +7,7 @@ use App\Support\SqlDialect;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
@@ -36,9 +37,15 @@ class ReportController extends Controller
         // ค่าเริ่มต้น = วันนี้ (งานหลักคือเช็ครายวัน) - เลือกช่วงย้อนหลังเองได้
         $to = $request->filled('to') ? Carbon::parse($request->input('to')) : now();
         $from = $request->filled('from') ? Carbon::parse($request->input('from')) : $to->copy()->startOfDay();
+        $printMode = $request->boolean('print');
         $perPage = (int) $request->input('per_page', 25);
         if (! in_array($perPage, [10, 25, 50, 100], true)) {
             $perPage = 25;
+        }
+        // หน้าจอแสดงทีละ 25 แถว แต่กระดาษต้องได้ทั้งรายงาน
+        // พิมพ์จากหน้าจอตรง ๆ จะได้แค่ที่เห็น ซึ่งดูเหมือนรายงานครบทั้งที่ไม่ครบ
+        if ($printMode) {
+            $perPage = self::PRINT_ROW_CAP;
         }
         // การเห็นข้ามสาขาเป็นสิทธิ์แยกต่างหาก (reports.all_branches) ไม่ใช่แค่ค่าเริ่มต้นของ filter
         // ไม่มีสิทธิ์ = ล็อกไว้ที่สาขาตัวเองเสมอ ส่งพารามิเตอร์อะไรมาก็ไม่หลุด
@@ -60,6 +67,18 @@ class ReportController extends Controller
             'per_page' => $perPage,
         ];
 
+        // ส่งออกทั้งรายงาน ไม่ใช่เท่าที่แสดงบนจอ — per_page เป็น LIMIT ของ query
+        // ถ้าใช้ค่าเดียวกับหน้าจอ คนกดออกไฟล์ภาษีขายจะได้ข้อมูลไม่ครบโดยไม่รู้ตัว
+        if ($request->input('export') === 'csv') {
+            abort_unless($user === null || $user->hasPermission('reports.export'), 403, 'ไม่มีสิทธิ์ส่งออกรายงาน');
+
+            return $this->streamCsv(
+                $category,
+                $report,
+                $this->runReport($category, $report, $from, $to, ['per_page' => self::EXPORT_ROW_CAP] + $filters),
+            );
+        }
+
         return view('reports.index', [
             'catalog' => $catalog,
             'selectedCategory' => $category,
@@ -68,11 +87,56 @@ class ReportController extends Controller
             'to' => $to->toDateString(),
             'filters' => $filters,
             'perPage' => $perPage,
+            'printMode' => $printMode,
+            'printRowCap' => self::PRINT_ROW_CAP,
             'canSeeAllBranches' => $canSeeAllBranches,
             'canExport' => $user === null || $user->hasPermission('reports.export'),
             'branchLocked' => ! $canSeeAllBranches && $user?->branch_id === null,
             'branches' => DB::table('branches')->orderBy('code')->get(['id', 'code', 'name_th']),
             'result' => $this->runReport($category, $report, $from, $to, $filters),
+        ]);
+    }
+
+    /**
+     * เพดานแถวตอนส่งออก
+     *
+     * ไม่ปล่อยไม่จำกัด เพราะรายงานบางตัวกวาดทั้งตารางได้ แต่ต้องสูงพอให้รายงาน
+     * ภาษีทั้งเดือนออกครบ ถ้าชนเพดานจะมีบรรทัดบอกท้ายไฟล์ ไม่ตัดเงียบ ๆ
+     */
+    private const EXPORT_ROW_CAP = 50000;
+
+    /** เพดานแถวตอนสั่งพิมพ์ — สูงกว่าหน้าจอ แต่ไม่ถึงขั้นพิมพ์พันหน้าโดยไม่ตั้งใจ */
+    private const PRINT_ROW_CAP = 2000;
+
+    /** @param  array<string, mixed>  $result */
+    private function streamCsv(string $category, string $report, array $result): StreamedResponse
+    {
+        $columns = $result['columns'] ?? [];
+        $rows = collect($result['rows'] ?? []);
+        $filename = sprintf('%s-%s-%s.csv', $category, $report, now()->format('Ymd-His'));
+
+        return response()->streamDownload(function () use ($columns, $rows, $result) {
+            $handle = fopen('php://output', 'wb');
+            fwrite($handle, "\xEF\xBB\xBF");   // BOM ให้ Excel อ่านภาษาไทยออก
+
+            fputcsv($handle, array_map(fn ($column) => $column['label'] ?? $column['key'] ?? '', $columns));
+            foreach ($rows as $row) {
+                $line = [];
+                foreach ($columns as $column) {
+                    $key = $column['key'] ?? null;
+                    $line[] = $key === null ? '' : (data_get($row, $key) ?? '');
+                }
+                fputcsv($handle, $line);
+            }
+
+            if ($rows->count() >= self::EXPORT_ROW_CAP) {
+                fputcsv($handle, ['*** ถึงเพดาน '.number_format(self::EXPORT_ROW_CAP).' แถว — ข้อมูลอาจไม่ครบ กรุณาแบ่งช่วงวันที่ ***']);
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'X-Report-Title' => rawurlencode((string) ($result['title'] ?? '')),
         ]);
     }
 
