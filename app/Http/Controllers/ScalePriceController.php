@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\PriceTable;
 use App\Models\Product;
-use App\Models\ProductBarcode;
 use App\Models\ProductPrice;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -66,7 +65,10 @@ class ScalePriceController extends Controller
         ]);
     }
 
-    /** ดึงสินค้าใด ๆ เข้ารายการชั่ง โดยผูก PLU ใหม่ช่วง 801xxx อัตโนมัติ */
+    /**
+     * PLU เครื่องชั่งเป็นรหัสลูกที่มาจากสินค้า/เครื่องชั่งเดิม จึงห้ามสร้างเลขเอง.
+     * เก็บ route ไว้เพื่อกันหน้าเก่าที่อาจส่ง form เข้ามา แต่ไม่เขียนข้อมูล.
+     */
     public function attachPlu(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -74,41 +76,8 @@ class ScalePriceController extends Controller
         ]);
         $product = Product::findOrFail($data['product_id']);
 
-        // มี PLU เครื่องชั่งอยู่แล้วหรือยัง
-        $hasPlu = $product->barcodes()
-            ->where(fn ($w) => $w->where('barcode', 'like', '800%')->orWhere('barcode', 'like', '801%'))
-            ->get()
-            ->contains(fn ($b) => preg_match('/^80[01][0-9]{3}$/', (string) $b->barcode) === 1);
-        if ($hasPlu) {
-            return redirect()->route('scale-prices.index')
-                ->with('success', "{$product->name_th} มี PLU เครื่องชั่งอยู่แล้ว");
-        }
-
-        // เก็บ 800xxx เดิมไว้ตามฉลาก/เครื่องชั่งเดิม แต่ PLU ที่สร้างใหม่
-        // เริ่มในช่วง 801xxx เพื่อแยกของใหม่และไม่ทำให้พนักงานสับสน.
-        $max = ProductBarcode::where('barcode', 'like', '801%')
-            ->pluck('barcode')
-            ->filter(fn ($b) => preg_match('/^801[0-9]{3}$/', (string) $b) === 1)
-            ->map(fn ($b) => (int) $b)
-            ->max();
-        $next = str_pad((string) (($max ?: 801000) + 1), 6, '0', STR_PAD_LEFT);
-        while ((int) $next <= 801999 && ProductBarcode::where('barcode', $next)->exists()) {
-            $next = str_pad((string) ((int) $next + 1), 6, '0', STR_PAD_LEFT);
-        }
-        if ((int) $next > 801999) {
-            return redirect()->route('scale-prices.index')
-                ->withErrors(['product_id' => 'เลข PLU เครื่องชั่งช่วง 801xxx เต็มแล้ว กรุณาติดต่อผู้ดูแลระบบ']);
-        }
-
-        $product->barcodes()->create([
-            'barcode' => $next,
-            'unit_id' => $product->base_unit_id,
-            'unit_factor' => 1,
-            'is_active' => true,
-        ]);
-
         return redirect()->route('scale-prices.index')
-            ->with('success', "เพิ่ม {$product->name_th} เข้ารายการชั่ง PLU {$next} แล้ว — อย่าลืมตั้งราคา/กก.");
+            ->withErrors(['product_id' => "{$product->name_th}: ห้ามสร้าง PLU อัตโนมัติ — ใช้รหัส 801xxx ที่ผูกในแฟ้มสินค้า/เครื่องชั่งเดิมเท่านั้น"]);
     }
 
     /** บันทึกราคา/กก. ทั้งหน้า ลงตารางหลัก (อัปเดตเฉพาะตัวที่เปลี่ยนจริง) */

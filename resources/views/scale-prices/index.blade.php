@@ -15,29 +15,11 @@
         this.loading = false;
     } }">
     <div class="content-card p-4">
-        {{-- ดึงสินค้าเข้ารายการชั่ง + ผูก PLU 800 อัตโนมัติ --}}
+        {{-- PLU เครื่องชั่งเป็นรหัสลูกจากแฟ้มสินค้าเดิม ไม่สร้างซ้ำจากหน้านี้ --}}
         <div class="mb-3 p-3 rounded" style="background:#f0fdfa;border:1px solid #99f6e4">
-            <label class="form-label fw-bold mb-1"><i class="bi bi-plus-circle me-1"></i> เพิ่มสินค้าเข้ารายการชั่ง</label>
-            <div class="text-muted small mb-2">ค้นหาสินค้าใด ๆ แล้วกดเพิ่ม — ระบบผูกรหัส PLU 800 ถัดไปให้อัตโนมัติ ไม่ต้องไปหน้าสินค้า</div>
-            <div class="position-relative" style="max-width:560px">
-                <input type="text" x-model="pq" @input.debounce.300ms="doSearch()" class="form-control"
-                       placeholder="พิมพ์รหัส / ชื่อสินค้า...">
-                <div x-show="results.length" @click.outside="results = []" x-cloak
-                     class="list-group position-absolute w-100 shadow-sm" style="z-index:30;max-height:320px;overflow:auto">
-                    <template x-for="p in results" :key="p.id">
-                        <form method="post" action="{{ route('scale-prices.attach') }}" class="m-0">
-                            @csrf
-                            <input type="hidden" name="product_id" :value="p.id">
-                            <button type="submit"
-                                    class="list-group-item list-group-item-action d-flex justify-content-between align-items-center w-100 text-start border-0">
-                                <span><span class="text-muted small me-2" x-text="p.sku_code"></span><span x-text="p.name_th"></span></span>
-                                <span class="badge text-bg-success flex-shrink-0"><i class="bi bi-plus-lg"></i> เพิ่ม</span>
-                            </button>
-                        </form>
-                    </template>
-                </div>
-                <div x-show="loading" class="form-text">กำลังค้นหา...</div>
-            </div>
+            <div class="fw-bold"><i class="bi bi-upc-scan me-1"></i> PLU เครื่องชั่งมาจากแฟ้มสินค้าเดิม</div>
+            <div class="text-muted small mt-1">รหัส `801xxx` เป็นรหัสลูกของสินค้าและเครื่องชั่ง ระบบนี้แสดงและใช้ตามที่ผูกไว้เท่านั้น ไม่สร้างเลขใหม่ ไม่รันเลขทับ และไม่แก้ฉลากเดิม</div>
+            <a href="{{ route('products.index') }}" class="btn btn-sm btn-outline-primary mt-2"><i class="bi bi-box-seam me-1"></i> ตรวจสอบ PLU ที่แฟ้มสินค้า</a>
         </div>
 
         <div class="list-toolbar mb-3">
