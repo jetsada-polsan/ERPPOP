@@ -177,34 +177,152 @@
     <script src="{{ asset('vendor/sweetalert2/sweetalert2.all.min.js') }}"></script>
     <script defer src="{{ asset('vendor/alpinejs/alpine.min.js') }}"></script>
     <style>
-        html[data-layout="odoo"] .app-header { background:#714b67!important; color:#fff; }
-        html[data-layout="odoo"] .app-header .nav-link, html[data-layout="odoo"] .app-header .btn { color:#fff; }
-        html[data-layout="odoo"] .fa-rail { background:#714b67; }
-        html[data-layout="odoo"] .fa-subnav-link.active { background:#f3edf2; color:#714b67; box-shadow:inset 3px 0 #714b67; }
-        html[data-layout="odoo"] .app-content { background:#f7f7f7; }
-        html[data-layout="odoo"] body { background:#f7f7f7; }
-        html[data-layout="odoo"] .fa-rail { background:#493047; border-right:0; }
-        html[data-layout="odoo"] .fa-rail-logo { background:#714b67; }
-        html[data-layout="odoo"] .fa-rail-btn { color:#eadfe8; }
-        html[data-layout="odoo"] .fa-rail-btn.active,
-        html[data-layout="odoo"] .fa-rail-btn:hover { background:#714b67; color:#fff; }
-        html[data-layout="odoo"] .fa-subnav { background:#fff; border-right:1px solid #e6e1e5; }
-        html[data-layout="odoo"] .fa-subnav-title { color:#493047; }
-        html[data-layout="odoo"] .fa-subnav-link { color:#5d5360; border-radius:4px; }
-        html[data-layout="odoo"] .fa-subnav-link:hover { background:#f8f3f7; color:#714b67; }
-        html[data-layout="odoo"] .app-main { background:#f7f7f7; }
-        html[data-layout="odoo"] .app-header { border-bottom:1px solid #e6e1e5; box-shadow:0 1px 3px rgba(73,48,71,.06); }
-        html[data-layout="odoo"] .app-header .page-title-icon { background:#f3edf2; color:#714b67; }
-        html[data-layout="odoo"] .app-header h1 { color:#493047; }
+        /* ══════════════════════════════════════════════════════════
+           LAYOUT: Odoo — โครงการใช้งานแบบ Odoo แต่ใช้สีแบรนด์ JET/POPSTAR
+           กติกาของบล็อกนี้: ทุกสีต้องอ้าง design token เท่านั้น ห้าม hardcode
+           เพิ่ม เพื่อให้สลับธีม (ocean/navy/emerald/slate/clear) แล้วตามไปด้วย
+           แก้เฉพาะการแสดงผล ไม่แตะ markup, route, สิทธิ์ หรือ business logic
+           ขนาดตัวอักษรและระยะห่างไม่กำหนดในนี้ ปล่อยให้ media query ของ
+           layout เดิมคุม จอ 1366/1920/Retina จึงยังขยายตามเดิมทุกประการ
+           ══════════════════════════════════════════════════════════ */
+
+        /* ── พื้นหลัง: ฟ้าอ่อน/เทาอ่อนของระบบเดิม ไม่ใช่เทา #f7f7f7 ของ Odoo ── */
+        html[data-layout="odoo"] body,
+        html[data-layout="odoo"] .app-main,
+        html[data-layout="odoo"] .app-content { background: var(--erp-bg); }
+
+        /* ── Top header: ฟ้าเข้ม JET คาดเส้น accent ฟ้าสด ── */
+        html[data-layout="odoo"] .app-header {
+            background: var(--erp-primary-dark) !important;
+            color: #fff;
+            border-bottom: 3px solid var(--erp-primary);
+            box-shadow: 0 1px 4px rgba(15, 76, 117, .22);
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+        }
+        html[data-layout="odoo"] .app-header h1 { color: #fff; }
+        html[data-layout="odoo"] .app-header .nav-link { color: #fff; }
+        html[data-layout="odoo"] .app-header .text-muted { color: rgba(255, 255, 255, .78) !important; }
+        html[data-layout="odoo"] .app-header .page-title-icon { background: rgba(255, 255, 255, .18); color: #fff; }
+        /* ปุ่มพื้นขาวในหัวต้องคงตัวหนังสือเข้มไว้ ถ้าบังคับเป็นขาวทั้งแถบ
+           ปุ่ม "คู่มือ 4M" จะกลายเป็นขาวบนขาวจนอ่านไม่ออก */
+        html[data-layout="odoo"] .app-header .btn-light { color: var(--erp-text); }
+
+        /* ── Notification panel: ลอยอยู่ในหัวแต่พื้นขาว ต้องดึงสีตัวหนังสือกลับ ── */
+        html[data-layout="odoo"] .notify-panel { color: var(--erp-text); }
+        html[data-layout="odoo"] .notify-panel .text-muted { color: var(--erp-muted) !important; }
+        html[data-layout="odoo"] .notify-item { color: var(--erp-text); }
+        html[data-layout="odoo"] .notify-item:hover { background: var(--erp-primary-soft); }
+        html[data-layout="odoo"] .notify-head { background: var(--erp-primary-soft); border-bottom-color: var(--erp-border); }
+        html[data-layout="odoo"] .notify-badge { background: var(--erp-brand-red); }
+
+        /* ── Left navigation: rail ทึบสีฟ้าเข้ม (Odoo ใช้แถบทึบ ไม่ใช้ gradient) ── */
+        html[data-layout="odoo"] .fa-rail { background: var(--erp-primary-dark); border-right: 0; }
+        html[data-layout="odoo"] .fa-rail-logo { background: var(--erp-surface); }
+        html[data-layout="odoo"] .fa-rail-btn { color: rgba(255, 255, 255, .82); }
+        html[data-layout="odoo"] .fa-rail-btn:hover { background: rgba(255, 255, 255, .15); color: #fff; }
+        html[data-layout="odoo"] .fa-rail-btn.active {
+            background: var(--erp-surface);
+            color: var(--erp-primary);
+            box-shadow: 0 6px 16px rgba(15, 76, 117, .28);
+        }
+
+        /* ── Menu groups: แผงเมนูย่อยพื้นขาว ตัวที่เลือกมีเส้น accent ฟ้า ── */
+        html[data-layout="odoo"] .fa-subnav { background: var(--erp-surface); border-right: 1px solid var(--erp-border); }
+        html[data-layout="odoo"] .fa-subnav-title { color: var(--erp-primary-dark); }
+        html[data-layout="odoo"] .fa-subnav-link { color: var(--erp-text); border-radius: 4px; }
+        html[data-layout="odoo"] .fa-subnav-link i { color: var(--erp-muted); }
+        html[data-layout="odoo"] .fa-subnav-link:hover {
+            background: var(--erp-primary-soft);
+            color: var(--erp-primary);
+            transform: none;
+        }
+        html[data-layout="odoo"] .fa-subnav-link:hover i { color: var(--erp-primary); }
+        html[data-layout="odoo"] .fa-subnav-link.active {
+            background: var(--erp-primary-soft);
+            color: var(--erp-primary-dark);
+            box-shadow: inset 3px 0 0 var(--erp-primary);
+        }
+        html[data-layout="odoo"] .fa-subnav-link.active i { color: var(--erp-primary); }
+
+        /* ── Cards: พื้นขาว ขอบฟ้าอ่อน เงาบาง มุมเหลี่ยมกว่าแบบ Odoo ── */
         html[data-layout="odoo"] .card,
         html[data-layout="odoo"] .content-card,
-        html[data-layout="odoo"] .set-card { border:1px solid #e6e1e5; border-radius:6px; box-shadow:0 1px 3px rgba(73,48,71,.08); }
-        html[data-layout="odoo"] .card-header { background:#fff; border-bottom:1px solid #e6e1e5; color:#493047; }
-        html[data-layout="odoo"] .btn-primary,
-        html[data-layout="odoo"] .btn-success { background:#714b67; border-color:#714b67; }
+        html[data-layout="odoo"] .set-card,
+        html[data-layout="odoo"] .panel-card {
+            background: var(--erp-surface);
+            border: 1px solid var(--erp-border);
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(29, 59, 82, .09);
+        }
+        html[data-layout="odoo"] .card-header {
+            background: var(--erp-surface);
+            border-bottom: 1px solid var(--erp-border);
+            color: var(--erp-primary-dark);
+        }
+        html[data-layout="odoo"] .panel-title { color: var(--erp-primary-dark); }
+
+        /* ── Dashboard KPI: สีแยกตามความหมาย ไม่ใช่แยกตามตำแหน่งการ์ด ── */
+        html[data-layout="odoo"] .metric-value { color: var(--erp-primary-dark); }
+        html[data-layout="odoo"] .metric-label { color: var(--erp-muted); }
+
+        /* ── List view: หัวตารางฟ้าอ่อน ตัวหนังสือฟ้าเข้ม ── */
+        html[data-layout="odoo"] .table thead th {
+            background: var(--erp-primary-soft);
+            color: var(--erp-primary-dark);
+            border-bottom: 2px solid var(--erp-primary);
+        }
+        html[data-layout="odoo"] .table tbody tr:hover { background: var(--erp-primary-soft); }
+
+        /* ── Form view ── */
+        html[data-layout="odoo"] .form-control:focus,
+        html[data-layout="odoo"] .form-select:focus {
+            border-color: var(--erp-primary);
+            box-shadow: 0 0 0 3px rgba(21, 133, 192, .18);
+        }
+        html[data-layout="odoo"] .nav-pills .nav-link.active { background: var(--erp-primary); color: #fff; }
+
+        /* ── ปุ่ม: ฟ้า = ทำต่อ, เขียว = ยืนยัน/สำเร็จ, แดง = ลบ/ผิดพลาด ──
+           ธีม Odoo เดิมทำ .btn-success ให้เป็นม่วงชุดเดียวกับ .btn-primary
+           ทำให้ "ยืนยัน" กับ "ทำต่อ" หน้าตาเหมือนกันจนแยกไม่ออก จึงแยกคืน */
+        html[data-layout="odoo"] .btn-primary {
+            background: var(--erp-primary-ink) !important;
+            border-color: var(--erp-primary-ink) !important;
+            color: #fff !important;
+        }
         html[data-layout="odoo"] .btn-primary:hover,
-        html[data-layout="odoo"] .btn-success:hover { background:#493047; border-color:#493047; }
-        html[data-layout="odoo"] .table thead th { background:#f3edf2; color:#493047; }
+        html[data-layout="odoo"] .btn-primary:focus {
+            background: var(--erp-primary-dark) !important;
+            border-color: var(--erp-primary-dark) !important;
+        }
+        html[data-layout="odoo"] .btn-success {
+            background: var(--erp-success-ink) !important;
+            border-color: var(--erp-success-ink) !important;
+            color: #fff !important;
+        }
+        html[data-layout="odoo"] .btn-danger {
+            background: var(--erp-danger) !important;
+            border-color: var(--erp-danger) !important;
+            color: #fff !important;
+        }
+        html[data-layout="odoo"] .btn-outline-primary { color: var(--erp-primary); border-color: var(--erp-primary); }
+        html[data-layout="odoo"] .btn-outline-primary:hover { background: var(--erp-primary-ink); color: #fff; }
+
+        /* ── สถานะ: ความหมายหนึ่งอย่าง = สีหนึ่งสี ทั้งระบบ ── */
+        html[data-layout="odoo"] .text-primary { color: var(--erp-primary) !important; }
+        html[data-layout="odoo"] .text-success { color: var(--erp-success-ink) !important; }
+        html[data-layout="odoo"] .text-danger { color: var(--erp-danger) !important; }
+        html[data-layout="odoo"] .text-warning { color: var(--erp-warning-ink) !important; }
+        html[data-layout="odoo"] .badge.bg-primary { background: var(--erp-primary) !important; }
+        html[data-layout="odoo"] .badge.bg-success { background: var(--erp-success-ink) !important; }
+        html[data-layout="odoo"] .badge.bg-danger { background: var(--erp-danger) !important; }
+        html[data-layout="odoo"] .badge.bg-warning { background: var(--erp-warning-ink) !important; color: #fff !important; }
+        html[data-layout="odoo"] .table-danger { --bs-table-bg: var(--erp-danger-soft); }
+        html[data-layout="odoo"] .table-success { --bs-table-bg: var(--erp-success-soft); }
+        html[data-layout="odoo"] .table-warning { --bs-table-bg: var(--erp-warning-soft); }
+        html[data-layout="odoo"] .alert-danger { background: var(--erp-danger-soft); border-color: var(--erp-danger); color: var(--erp-danger); }
+        html[data-layout="odoo"] .alert-success { background: var(--erp-success-soft); border-color: var(--erp-success); color: var(--erp-success-ink); }
+
         /* ════════════════════════════════════════
            THEME - FlowAccount-style light (single)
            ════════════════════════════════════════ */
@@ -228,12 +346,46 @@
             --erp-shadow: 0 12px 34px rgba(29, 59, 82, .08);
             --accent-btn: linear-gradient(135deg, #1a9bdc, #20a67a);
             --accent-btn-hover: linear-gradient(135deg, #2bb0ea, #2bbf8e);
+
+            /* ── Design tokens กลาง ─────────────────────────────────
+               ชั้น "ความหมาย" (primary/success/danger/warning) วางทับชั้น
+               "สีดิบ" (--fa-*) ที่มีอยู่เดิม ตัวไหนอ้าง --fa-* ได้ให้อ้าง
+               เพื่อให้ธีมทั้ง 5 (ocean/navy/emerald/slate/clear) ยังเปลี่ยน
+               สีได้เหมือนเดิม ส่วน --erp-bg/-surface/-border/-ink มีอยู่แล้ว
+               ด้านบนและค่าตรงตามที่กำหนดไว้ จึงไม่ประกาศซ้ำ
+               ───────────────────────────────────────────────────── */
+            --erp-primary: var(--fa-blue-deep);
+            --erp-primary-light: var(--fa-blue);
+            --erp-primary-dark: #0f4c75;
+            --erp-primary-soft: #eef4f9;
+            --erp-success: var(--fa-green-deep);
+            --erp-success-soft: #eaf7f1;
+            --erp-danger: #c62828;
+            --erp-danger-soft: #fff0f0;
+            --erp-warning: #d98b00;
+            --erp-warning-soft: #fdf4e3;
+            --erp-text: var(--erp-ink);
+            /* #6b7f8d ที่กำหนดมาได้ 3.87:1 บนพื้น --erp-bg ต่ำกว่าเกณฑ์ AA 4.5:1
+               ขยับให้เข้มขึ้นเท่าที่จำเป็นพอดี เฉดเดิม อ่านออกทุกขนาดจอ */
+            --erp-muted: #627481;
+
+            /* ── คู่ "-ink": ใช้เฉพาะตอนที่มีตัวหนังสือทับอยู่บนสีนั้น ──
+               สีแบรนด์ด้านบนคงค่าตามที่กำหนดไว้ทุกตัว ใช้เป็นพื้น ขอบ และ
+               เส้น accent ตามเดิม แต่ถ้าเอาตัวหนังสือขาวไปวางทับจะได้
+               4.08:1 (ฟ้า) และ 4.32:1 (เขียว) ซึ่งไม่ผ่าน AA จึงแยกเฉดที่
+               เข้มขึ้นนิดเดียวไว้ใช้ตอนมีตัวอักษรโดยเฉพาะ ตาเปล่าแยกไม่ออก */
+            --erp-primary-ink: #147db5;   /* ขาวบนฟ้า  4.54:1 */
+            --erp-success-ink: #158662;   /* ขาวบนเขียว 4.55:1 */
+            --erp-warning-ink: #a56a00;   /* เหลืองอ่านบนขาว 4.51:1 */
+            /* แดง POPSTAR: ใช้เฉพาะแบรนด์ แจ้งเตือน และข้อผิดพลาด */
+            --erp-brand-red: #c62828;
         }
-        html[data-theme="navy"] { --erp-border:#dce5ef; --erp-ink:#243b53; --erp-bg:#eef2f7; --fa-blue:#315b86; --fa-blue-deep:#244768; --fa-blue-dark:#3f5f7d; --fa-green:#4e9b72; --fa-green-deep:#397b58; --accent-btn:linear-gradient(135deg,#416f9c,#244768); --accent-btn-hover:linear-gradient(135deg,#527fad,#315b86); }
-        html[data-theme="emerald"] { --erp-border:#d8ebe3; --erp-ink:#28483c; --erp-bg:#eef7f3; --fa-blue:#23966c; --fa-blue-deep:#187653; --fa-blue-dark:#397563; --fa-green:#65a30d; --fa-green-deep:#4d7c0f; --accent-btn:linear-gradient(135deg,#34b986,#187653); --accent-btn-hover:linear-gradient(135deg,#49c99a,#23966c); }
-        html[data-theme="slate"] { --erp-border:#e1e5e9; --erp-ink:#374151; --erp-bg:#f1f3f5; --fa-blue:#64748b; --fa-blue-deep:#475569; --fa-blue-dark:#596579; --fa-green:#4f8b72; --fa-green-deep:#3c6f59; --accent-btn:linear-gradient(135deg,#7b8798,#475569); --accent-btn-hover:linear-gradient(135deg,#909aaa,#64748b); }
+        html[data-theme="navy"] { --erp-primary-dark:#183049; --erp-primary-soft:#eef2f7; --erp-border:#dce5ef; --erp-ink:#243b53; --erp-bg:#eef2f7; --fa-blue:#315b86; --fa-blue-deep:#244768; --fa-blue-dark:#3f5f7d; --fa-green:#4e9b72; --fa-green-deep:#397b58; --accent-btn:linear-gradient(135deg,#416f9c,#244768); --accent-btn-hover:linear-gradient(135deg,#527fad,#315b86); }
+        html[data-theme="emerald"] { --erp-primary-dark:#0f5138; --erp-primary-soft:#eaf5f0; --erp-border:#d8ebe3; --erp-ink:#28483c; --erp-bg:#eef7f3; --fa-blue:#23966c; --fa-blue-deep:#187653; --fa-blue-dark:#397563; --fa-green:#65a30d; --fa-green-deep:#4d7c0f; --accent-btn:linear-gradient(135deg,#34b986,#187653); --accent-btn-hover:linear-gradient(135deg,#49c99a,#23966c); }
+        html[data-theme="slate"] { --erp-primary-dark:#334155; --erp-primary-soft:#eef1f4; --erp-border:#e1e5e9; --erp-ink:#374151; --erp-bg:#f1f3f5; --fa-blue:#64748b; --fa-blue-deep:#475569; --fa-blue-dark:#596579; --fa-green:#4f8b72; --fa-green-deep:#3c6f59; --accent-btn:linear-gradient(135deg,#7b8798,#475569); --accent-btn-hover:linear-gradient(135deg,#909aaa,#64748b); }
         html[data-theme="clear"] {
             --erp-font-family:'Noto Sans Thai','Segoe UI','Leelawadee UI',Tahoma,sans-serif;
+            --erp-primary-dark:#1e3a8a; --erp-primary-soft:#eef2ff;
             --erp-border:#d7dde5; --erp-ink:#1f2937; --erp-bg:#f4f6f8;
             --fa-blue:#2563eb; --fa-blue-deep:#1d4ed8; --fa-blue-dark:#334155;
             --fa-green:#0f766e; --fa-green-deep:#115e59;
