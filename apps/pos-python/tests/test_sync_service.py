@@ -68,9 +68,26 @@ class SyncServiceTest(unittest.TestCase):
         api = FakeApi({"success": False, "message": "temporary server validation"})
         sync = SyncService(self.db, api)
         self.assertEqual(sync.sync_pending_sales(), {"synced": 0, "failed": 1})
-        api.response = {"success": True}
+        api.response = {"success": True, "receipt_no": "PS-HQ-000002"}
         self.assertEqual(sync.sync_pending_sales(), {"synced": 1, "failed": 0})
         self.assertEqual(self.db.execute("SELECT count(*) FROM sales").fetchone()[0], 1)
+
+    def test_syncs_an_offline_void_after_its_sale_and_uses_the_server_receipt_number(self) -> None:
+        sale_uuid = self.sale()
+        self.pos.bind_server_shift(self.shift_id, 500)
+        sale_id = self.db.execute("SELECT id FROM sales WHERE sale_uuid = ?", (sale_uuid,)).fetchone()[0]
+        self.pos.void_sale(sale_id, cashier_id=77, reason="ลูกค้าเปลี่ยนใจ")
+        api = FakeApi({"success": True, "receipt_no": "PS-HQ-000001"})
+
+        self.assertEqual(SyncService(self.db, api).sync_pending_sales(), {"synced": 2, "failed": 0})
+        self.assertEqual(api.calls[0][0], "/api/pos/checkout")
+        self.assertEqual(api.calls[1][0], "/api/pos/receipt/void")
+        self.assertEqual(api.calls[1][1]["receipt_no"], "PS-HQ-000001")
+        self.assertEqual(api.calls[1][1]["shift_id"], 500)
+        self.assertEqual(
+            self.db.execute("SELECT status FROM sync_outbox WHERE aggregate_uuid = ?", (f"{sale_uuid}:void",)).fetchone()[0],
+            "synced",
+        )
 
 
 if __name__ == "__main__":
