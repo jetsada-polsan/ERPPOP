@@ -26,14 +26,14 @@ CREATE TABLE IF NOT EXISTS product_barcodes (
     barcode TEXT PRIMARY KEY,
     product_id INTEGER NOT NULL REFERENCES products(id),
     barcode_type TEXT NOT NULL DEFAULT 'CUSTOM',
-    unit_factor REAL NOT NULL DEFAULT 1,
-    price REAL,
+    unit_factor TEXT NOT NULL DEFAULT '1',
+    price TEXT,
     synced_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS price_versions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     product_id INTEGER NOT NULL REFERENCES products(id),
-    price REAL NOT NULL,
+    price TEXT NOT NULL,
     starts_at TEXT NOT NULL,
     ends_at TEXT,
     version TEXT NOT NULL,
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS shifts (
     cashier_id INTEGER NOT NULL REFERENCES local_cashiers(id),
     opened_at TEXT NOT NULL,
     closed_at TEXT,
-    opening_cash REAL NOT NULL DEFAULT 0,
+    opening_cash TEXT NOT NULL DEFAULT '0',
     status TEXT NOT NULL CHECK(status IN ('open', 'closed'))
 );
 CREATE TABLE IF NOT EXISTS sales (
@@ -60,10 +60,10 @@ CREATE TABLE IF NOT EXISTS sales (
     shift_id INTEGER NOT NULL REFERENCES shifts(id),
     cashier_id INTEGER NOT NULL REFERENCES local_cashiers(id),
     sale_datetime TEXT NOT NULL,
-    subtotal REAL NOT NULL,
-    discount_total REAL NOT NULL DEFAULT 0,
-    vat_total REAL NOT NULL DEFAULT 0,
-    grand_total REAL NOT NULL,
+    subtotal TEXT NOT NULL,
+    discount_total TEXT NOT NULL DEFAULT '0',
+    vat_total TEXT NOT NULL DEFAULT '0',
+    grand_total TEXT NOT NULL,
     payment_status TEXT NOT NULL,
     sync_status TEXT NOT NULL DEFAULT 'pending',
     is_void INTEGER NOT NULL DEFAULT 0,
@@ -77,17 +77,17 @@ CREATE TABLE IF NOT EXISTS sale_items (
     source_barcode TEXT,
     product_name_snapshot TEXT NOT NULL,
     unit_name_snapshot TEXT NOT NULL,
-    qty REAL NOT NULL,
-    unit_price REAL NOT NULL,
-    discount REAL NOT NULL DEFAULT 0,
-    line_total REAL NOT NULL,
+    qty TEXT NOT NULL,
+    unit_price TEXT NOT NULL,
+    discount TEXT NOT NULL DEFAULT '0',
+    line_total TEXT NOT NULL,
     price_version TEXT
 );
 CREATE TABLE IF NOT EXISTS payments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sale_id INTEGER NOT NULL REFERENCES sales(id),
     method TEXT NOT NULL,
-    amount REAL NOT NULL,
+    amount TEXT NOT NULL,
     reference TEXT
 );
 CREATE TABLE IF NOT EXISTS print_jobs (
