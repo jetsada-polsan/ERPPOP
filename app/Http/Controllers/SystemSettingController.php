@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\AppSetting;
+use App\Models\Branch;
 use App\Models\PosDevice;
 use App\Models\PosTerminal;
 use App\Models\User;
 use App\Support\PosReleaseManifest;
+use App\Support\PosTerminalCode;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -53,6 +55,7 @@ class SystemSettingController extends Controller
             'bookCount' => DB::table('document_books')->where('is_active', true)->count(),
             'bankCount' => DB::table('bank_accounts')->count(),
             'posUsers' => User::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'username', 'branch_id']),
+            'posBranches' => Branch::query()->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name_th']),
             'posDevices' => PosDevice::with(['user:id,name,username', 'branch:id,code,name_th'])->latest()->limit(20)->get(),
             'posTerminals' => PosTerminal::with('branch:id,code,name_th')->orderBy('code')->get(),
             'menuOrder' => $this->menuOrder(),
@@ -142,21 +145,38 @@ class SystemSettingController extends Controller
     public function issuePosToken(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'pos_user_id' => ['required', 'integer', 'exists:users,id'],
-            'pos_device_name' => ['required', 'string', 'max:100'],
-            'pos_terminal_code' => ['nullable', 'string', 'max:40'],
+            'pos_branch_id' => ['required', 'integer', 'exists:branches,id'],
+            'pos_device_name' => ['nullable', 'string', 'max:100'],
         ]);
 
-        $user = User::findOrFail($data['pos_user_id']);
-        [$device, $token] = PosDevice::issue([
-            'name' => $data['pos_device_name'],
-            'user_id' => $user->id,
-            'branch_id' => $user->branch_id,
-            'terminal_code' => $data['pos_terminal_code'] ?? null,
-        ]);
+        [$device, $token] = DB::transaction(function () use ($data) {
+            // Lock the branch while issuing its next terminal number. Two admins cannot receive the same code.
+            $branch = Branch::query()->lockForUpdate()->findOrFail($data['pos_branch_id']);
+            $user = User::query()
+                ->where('is_active', true)
+                ->where('branch_id', $branch->id)
+                ->with('roles.permissions')
+                ->orderBy('id')
+                ->get()
+                ->first(fn (User $candidate) => $candidate->hasPermission('pos.sell'));
+
+            if (! $user) {
+                abort(422, "สาขา {$branch->code} ยังไม่มีแคชเชียร์ที่มีสิทธิ์ขาย POS จึงยังสร้างเครื่องไม่ได้");
+            }
+
+            $terminalCode = PosTerminalCode::next($branch);
+            $name = trim((string) ($data['pos_device_name'] ?? '')) ?: "Python POS {$terminalCode}";
+
+            return PosDevice::issue([
+                'name' => $name,
+                'user_id' => $user->id,
+                'branch_id' => $branch->id,
+                'terminal_code' => $terminalCode,
+            ]);
+        });
 
         return redirect()->route('settings.index')->with([
-            'success' => "สร้าง Token สำหรับ {$device->name} แล้ว กรุณาคัดลอกเก็บไว้ทันที",
+            'success' => "สร้าง {$device->name} ({$device->terminal_code}) และ Token ให้แล้ว กรุณาคัดลอกไปตั้งค่าในเครื่อง POS",
             'pos_token' => $token,
             'pos_device_name' => $device->name,
         ]);

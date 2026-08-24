@@ -315,29 +315,25 @@
                 @endif
 
                 <div class="set-card">
-                    <div class="set-title pt-2">สร้าง Token สำหรับเครื่องแคชเชียร์</div>
-                    <div class="set-desc mb-3">เลือกผู้ใช้งานประจำเครื่องแล้วกดสร้าง ระบบจะแสดง Token พร้อมปุ่มคัดลอกทันที</div>
+                    <div class="set-title pt-2">เพิ่มเครื่อง POS และสร้าง Token อัตโนมัติ</div>
+                    <div class="set-desc mb-3">เลือกสาขาเพียงอย่างเดียว ระบบหาแคชเชียร์ที่มีสิทธิ์ขายของสาขานั้น จ่ายรหัสเครื่อง และสร้าง Token ให้ทันที แคชเชียร์ยังต้องยืนยันตัวเองก่อนเปิดกะ/ขาย</div>
                     <div class="row g-3 align-items-end pb-3">
-                        <div class="col-md-4">
-                            <label class="form-label">ผู้ใช้งาน/แคชเชียร์</label>
-                            <select name="pos_user_id" class="form-select">
-                                <option value="">เลือกผู้ใช้งาน</option>
-                                @foreach($posUsers as $posUser)
-                                    <option value="{{ $posUser->id }}">{{ $posUser->name }} ({{ $posUser->username }})</option>
+                        <div class="col-md-5">
+                            <label class="form-label">สาขาที่ติดตั้ง <span class="text-danger">*</span></label>
+                            <select name="pos_branch_id" class="form-select" required>
+                                <option value="">เลือกสาขา</option>
+                                @foreach($posBranches as $branch)
+                                    <option value="{{ $branch->id }}">{{ $branch->code }} - {{ $branch->name_th }}</option>
                                 @endforeach
                             </select>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label">ชื่อเครื่อง</label>
-                            <input name="pos_device_name" class="form-control" placeholder="เช่น สาขา 0001 เครื่อง 1">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">รหัสเครื่อง POS</label>
-                            <input name="pos_terminal_code" class="form-control" placeholder="เช่น POS-0001-01">
+                        <div class="col-md-5">
+                            <label class="form-label">ชื่อเครื่อง (ไม่บังคับ)</label>
+                            <input name="pos_device_name" class="form-control" placeholder="เช่น แคชเชียร์ 1 — เว้นว่างให้ระบบตั้งชื่อเอง">
                         </div>
                         <div class="col-md-2 d-grid">
                             <button type="submit" formaction="{{ route('settings.pos-token.issue') }}" formnovalidate class="btn btn-primary">
-                                <i class="bi bi-key me-1"></i> สร้าง Token
+                                <i class="bi bi-magic me-1"></i> สร้างอัตโนมัติ
                             </button>
                         </div>
                     </div>
