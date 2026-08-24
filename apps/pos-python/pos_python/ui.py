@@ -13,24 +13,60 @@ from .order import ALL_CATEGORIES, DISCOUNT, PRICE, QTY, Order, OrderLine, categ
 from .services import PosService, money
 
 STYLE = """
-QMainWindow, QWidget { background: #f1f5f9; font-family: 'Sarabun', 'Tahoma'; font-size: 14px; }
-#orderPanel { background: #ffffff; border-right: 1px solid #dbe3ea; }
-#orderHead { background: #0f766e; color: #ffffff; padding: 12px 16px; font-weight: 700; }
-#totalBox { background: #0f172a; color: #ffffff; padding: 14px 16px; }
-#grandTotal { font-size: 30px; font-weight: 800; color: #ffffff; }
-#totalLabel, #vatLine { color: #cbd5e1; font-size: 13px; }
-QPushButton { background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; font-size: 15px; }
-QPushButton:hover { background: #f8fafc; }
-QPushButton:checked { background: #0f766e; color: #ffffff; border-color: #0f766e; }
-QPushButton#payBtn { background: #0f766e; color: #ffffff; font-size: 18px; font-weight: 700; border: 0; padding: 16px; }
-QPushButton#voidBtn { color: #b91c1c; }
+/* สีและระยะตามภาพร่างที่อนุมัติแล้ว — แดง POPSTAR #c9212d บนพื้นเทาอ่อน */
+QMainWindow, QDialog, QWidget { background: #eef2f5; color: #1d2730; font-family: 'Sarabun','Tahoma'; font-size: 14px; }
+
+#brandBar { background: #c9212d; }
+#brandName { color: #ffffff; font-size: 18px; font-weight: 800; padding: 14px 0; }
+#brandMark { color: #ffffff; border: 2px solid #ffffff; border-radius: 6px; padding: 5px 9px; font-weight: 800; }
+#brandRight { color: #ffffff; font-size: 13px; }
+
+#card { background: #ffffff; border: 1px solid #dbe2e7; border-radius: 7px; }
+#cardTitle { font-size: 19px; font-weight: 800; color: #1d2730; }
+#cardHint, #muted { color: #74808c; font-size: 13px; }
+#note { border-left: 4px solid #e38800; background: #fff4df; color: #68470d; font-size: 13px; padding: 12px; }
+
+/* เมนูซ้ายของหน้าตั้งค่า — ตัวที่เลือกอยู่มีขีดแดงหน้าเหมือนในภาพร่าง */
+#navItem { background: transparent; border: 0; border-left: 4px solid transparent; border-radius: 0;
+           text-align: left; padding: 12px 14px; color: #1d2730; font-size: 14.5px; }
+#navItem:hover { background: #f4f7f9; }
+#navItem:checked { background: #ffe9eb; color: #c9212d; border-left: 4px solid #c9212d; font-weight: 700; }
+
+QPushButton { background: #ffffff; border: 1px solid #c8d1d8; border-radius: 7px; padding: 10px 14px; font-size: 14.5px; }
+QPushButton:hover { background: #f7f9fb; }
+QPushButton:checked { background: #c9212d; color: #ffffff; border-color: #c9212d; }
+QPushButton#primary, QPushButton#payBtn { background: #c9212d; color: #ffffff; border-color: #c9212d; font-weight: 700; }
+QPushButton#payBtn { font-size: 18px; padding: 16px; }
+QPushButton#voidBtn { color: #c9212d; }
 QPushButton#tile { text-align: left; padding: 12px; background: #ffffff; }
-QPushButton#tile:hover { border-color: #0f766e; }
-QTableWidget { border: 0; }
-QHeaderView::section { background: #f8fafc; border: 0; border-bottom: 1px solid #e2e8f0; padding: 8px; font-weight: 700; }
-QLineEdit { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; font-size: 15px; }
-#statusBar { color: #475569; font-size: 12.5px; padding: 6px 16px; }
+QPushButton#tile:hover { border-color: #c9212d; }
+
+QLineEdit, QComboBox { background: #ffffff; border: 1px solid #c8d1d8; border-radius: 7px; padding: 9px 11px; font-size: 14.5px; }
+QLineEdit:focus, QComboBox:focus { border-color: #c9212d; }
+
+#orderPanel { background: #ffffff; border-right: 1px solid #dbe2e7; }
+#orderHead { background: #c9212d; color: #ffffff; padding: 12px 16px; font-weight: 700; }
+#totalBox { background: #1d2730; color: #ffffff; padding: 14px 16px; }
+#grandTotal { font-size: 30px; font-weight: 900; color: #ffffff; }
+#totalLabel, #vatLine { color: #c8d1d8; font-size: 13px; }
+
+QTableWidget { background: #ffffff; border: 0; }
+QHeaderView::section { background: #f4f7f9; border: 0; border-bottom: 1px solid #dbe2e7; padding: 8px; font-weight: 700; }
+
+/* กระดาษใบเสร็จวางบนพื้นเทาเหมือนวางบนโต๊ะ */
+#receiptBg { background: #d4dade; border-radius: 6px; }
+#receiptPaper { background: #ffffff; padding: 20px; font-family: 'Menlo','Courier New'; font-size: 12px; color: #1d2730; }
+#statusBar { color: #74808c; font-size: 12.5px; padding: 6px 16px; }
 """
+
+SECTION_HINTS = {
+    "ข้อมูลเครื่อง POS": "รหัสเครื่องและสาขาที่ผูกอยู่ ใช้ตอนส่งบิลขึ้น ERP",
+    "เครื่องพิมพ์และใบเสร็จ": "ตั้งค่าเครื่องพิมพ์และดูตัวอย่างใบเสร็จก่อนบันทึก",
+    "เครื่องชั่ง / Barcode": "รูปแบบป้ายมาจาก ERP เครื่องนี้ไม่เดารูปแบบเอง",
+    "การ Sync และ API": "สถานะคิวบิลและค่าที่ sync มาจาก ERP",
+    "สำรองและกู้คืน SQLite": "สำรองฐานข้อมูลในเครื่องและกู้คืนเมื่อจำเป็น",
+    "ประวัติการพิมพ์ / Queue": "งานพิมพ์ล่าสุดและจำนวนครั้งที่พยายามส่ง",
+}
 
 NUMPAD_KEYS = [
     ["7", "8", "9"],
@@ -142,19 +178,32 @@ def run_ui(service: PosService) -> None:
             super().__init__(parent)
             self.sample_sale_id = sample_sale_id
             self.setWindowTitle("ตั้งค่า POS")
-            self.setMinimumSize(980, 640)
+            self.setMinimumSize(1080, 700)
 
-            layout = QHBoxLayout(self)
+            outer = QVBoxLayout(self)
+            outer.setContentsMargins(0, 0, 0, 0)
+            outer.setSpacing(0)
+            outer.addWidget(self.brand_bar())
+
+            shell = QHBoxLayout()
+            shell.setContentsMargins(0, 0, 0, 0)
+            shell.setSpacing(0)
+            outer.addLayout(shell, 1)
+
             self.pages = QVBoxLayout()
+            self.pages.setContentsMargins(0, 12, 0, 12)
+            self.pages.setSpacing(2)
             menu = QWidget()
+            menu.setObjectName("card")
             menu.setLayout(self.pages)
-            menu.setFixedWidth(220)
-            layout.addWidget(menu)
+            menu.setFixedWidth(255)
+            shell.addWidget(menu)
 
             self.body = QVBoxLayout()
+            self.body.setContentsMargins(20, 18, 20, 18)
             body_host = QWidget()
             body_host.setLayout(self.body)
-            layout.addWidget(body_host, 1)
+            shell.addWidget(body_host, 1)
 
             self.sections = {
                 "ข้อมูลเครื่อง POS": self.device_section,
@@ -164,31 +213,66 @@ def run_ui(service: PosService) -> None:
                 "สำรองและกู้คืน SQLite": self.backup_section,
                 "ประวัติการพิมพ์ / Queue": self.queue_section,
             }
+            heading = QLabel("ตั้งค่า POS")
+            heading.setObjectName("cardHint")
+            heading.setContentsMargins(16, 4, 12, 8)
+            self.pages.addWidget(heading)
+
             group = QButtonGroup(self)
             for index, name in enumerate(self.sections):
                 button = QPushButton(name)
+                button.setObjectName("navItem")
                 button.setCheckable(True)
                 button.setChecked(index == 0)
                 button.clicked.connect(lambda _, value=name: self.show_section(value))
                 group.addButton(button)
                 self.pages.addWidget(button)
             self.pages.addStretch(1)
-            note = QLabel("ค่าเหล่านี้เป็นของเครื่องนี้เท่านั้น\nไม่ถูกทับด้วย sync ERP")
-            note.setStyleSheet("color:#64748b;font-size:12px;")
+            note = QLabel("การตั้งค่าอุปกรณ์เป็น local เฉพาะเครื่องนี้\nไม่ถูกทับด้วย sync ERP")
+            note.setObjectName("muted")
+            note.setContentsMargins(16, 0, 12, 8)
+            note.setWordWrap(True)
             self.pages.addWidget(note)
 
             self.show_section("ข้อมูลเครื่อง POS")
+
+        def brand_bar(self) -> QWidget:
+            bar = QWidget()
+            bar.setObjectName("brandBar")
+            layout = QHBoxLayout(bar)
+            layout.setContentsMargins(18, 0, 18, 0)
+            mark = QLabel("★")
+            mark.setObjectName("brandMark")
+            name = QLabel("POPSTAR POS")
+            name.setObjectName("brandName")
+            right = QLabel("HQ · POS-01 · ตั้งค่าเครื่องนี้")
+            right.setObjectName("brandRight")
+            layout.addWidget(mark)
+            layout.addWidget(name)
+            layout.addStretch(1)
+            layout.addWidget(right)
+            return bar
 
         def show_section(self, name: str) -> None:
             while self.body.count():
                 item = self.body.takeAt(0)
                 if item.widget():
                     item.widget().deleteLater()
+
             title = QLabel(name)
-            title.setStyleSheet("font-size:20px;font-weight:800;color:#0f172a;")
+            title.setObjectName("cardTitle")
             self.body.addWidget(title)
-            self.body.addWidget(self.sections[name]())
-            self.body.addStretch(1)
+
+            hint = QLabel(SECTION_HINTS.get(name, ""))
+            hint.setObjectName("cardHint")
+            self.body.addWidget(hint)
+
+            card = QWidget()
+            card.setObjectName("card")
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(20, 20, 20, 20)
+            card_layout.addWidget(self.sections[name]())
+            self.body.addWidget(card, 1)
 
         def device_section(self) -> QWidget:
             box = QWidget()
@@ -226,7 +310,7 @@ def run_ui(service: PosService) -> None:
             test = QPushButton("ทดสอบพิมพ์")
             test.clicked.connect(self.test_print)
             save = QPushButton("บันทึกโปรไฟล์เครื่องพิมพ์")
-            save.setObjectName("payBtn")
+            save.setObjectName("primary")
             save.clicked.connect(self.save_printer)
             actions.addWidget(test)
             actions.addWidget(save)
@@ -235,13 +319,20 @@ def run_ui(service: PosService) -> None:
 
             right = QWidget()
             preview_layout = QVBoxLayout(right)
-            preview_layout.addWidget(QLabel("ตัวอย่างก่อนพิมพ์"))
+            caption = QLabel("ตัวอย่างก่อนพิมพ์ · 80mm")
+            caption.setObjectName("cardHint")
+            preview_layout.addWidget(caption)
+
+            background = QWidget()
+            background.setObjectName("receiptBg")
+            background_layout = QVBoxLayout(background)
+            background_layout.setContentsMargins(22, 22, 22, 22)
             self.preview = QLabel()
-            self.preview.setStyleSheet(
-                "background:#ffffff;border:1px solid #cbd5e1;padding:14px;font-family:'Menlo','Courier New';font-size:12px;"
-            )
+            self.preview.setObjectName("receiptPaper")
             self.preview.setAlignment(Qt.AlignTop)
-            preview_layout.addWidget(self.preview, 1)
+            background_layout.addWidget(self.preview)
+            background_layout.addStretch(1)
+            preview_layout.addWidget(background, 1)
             outer.addWidget(right, 1)
 
             self.refresh_preview()
