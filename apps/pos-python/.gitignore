@@ -1,0 +1,6 @@
+storage/*.db
+storage/*.db-*
+storage/receipts/
+__pycache__/
+*.pyc
+.venv/

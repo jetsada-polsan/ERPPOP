@@ -1,0 +1,2 @@
+# Optional native UI. The core and automated tests only use Python standard library.
+PySide6>=6.7,<7
