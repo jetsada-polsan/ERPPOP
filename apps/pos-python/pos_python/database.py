@@ -121,6 +121,33 @@ CREATE TABLE IF NOT EXISTS device_settings (
     value TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS printer_profiles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    driver_type TEXT NOT NULL CHECK(driver_type IN ('EPSON_ESC_POS', 'STAR', 'GENERIC_ESC_POS', 'MOCK')),
+    connection_type TEXT NOT NULL CHECK(connection_type IN ('USB', 'SERIAL', 'NETWORK', 'MOCK')),
+    address TEXT,
+    paper_width_mm INTEGER NOT NULL CHECK(paper_width_mm IN (58, 80)),
+    open_drawer INTEGER NOT NULL DEFAULT 1,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS receipt_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    revision INTEGER NOT NULL,
+    paper_width_mm INTEGER NOT NULL CHECK(paper_width_mm IN (58, 80)),
+    header_text TEXT NOT NULL,
+    footer_text TEXT NOT NULL,
+    show_tax_id INTEGER NOT NULL DEFAULT 1,
+    show_cashier INTEGER NOT NULL DEFAULT 1,
+    show_barcode INTEGER NOT NULL DEFAULT 0,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(name, revision)
+);
 """
 
 
