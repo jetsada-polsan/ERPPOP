@@ -30,6 +30,7 @@ use App\Http\Controllers\LegacyBackofficeSalesController;
 use App\Http\Controllers\LegacyTableMappingController;
 use App\Http\Controllers\LineIntegrationController;
 use App\Http\Controllers\ManagementControlController;
+use App\Http\Controllers\MasterDataSetupController;
 use App\Http\Controllers\ManualController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\MemberPointController;
@@ -109,6 +110,12 @@ Route::delete('/security/mfa', [AuthController::class, 'disableMfa'])->name('mfa
 Route::get('/', fn () => redirect()->route('dashboard'));
 Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
 Route::post('/employees', [EmployeeController::class, 'store'])->name('employees.store');
+Route::prefix('master-data-setup')->name('master-data-setup.')->group(function () {
+    Route::get('/', [MasterDataSetupController::class, 'index'])->name('index');
+    Route::get('/template/{type}', [MasterDataSetupController::class, 'template'])->name('template');
+    Route::post('/preview/{type}', [MasterDataSetupController::class, 'preview'])->name('preview');
+    Route::post('/apply/{type}', [MasterDataSetupController::class, 'apply'])->name('apply');
+});
 Route::prefix('organizational-units')->name('organizational-units.')->group(function () {
     Route::get('/', [OrganizationalUnitController::class, 'index'])->name('index');
     Route::post('/', [OrganizationalUnitController::class, 'store'])->name('store');

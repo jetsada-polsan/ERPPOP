@@ -65,6 +65,7 @@
             'label' => 'ข้อมูลตั้งต้น',
             'displayLabel' => 'ข้อมูลหลัก',
             'items' => [
+                ['label' => 'ศูนย์ตั้งต้นระบบ', 'route' => 'master-data-setup.index', 'pattern' => 'master-data-setup.*', 'icon' => 'bi-file-earmark-spreadsheet-fill', 'tone' => 'blue'],
                 ['label' => 'ลูกค้า (รวมลูกหนี้)', 'route' => 'customers.index', 'pattern' => 'customers.*', 'icon' => 'bi-people-fill', 'tone' => 'indigo'],
                 ['label' => 'ผู้จำหน่าย / เจ้าหนี้', 'route' => 'suppliers.index', 'pattern' => 'suppliers.*', 'icon' => 'bi-buildings-fill', 'tone' => 'pink'],
                 ['label' => 'สมาชิก', 'route' => 'members.index', 'pattern' => 'members.*', 'icon' => 'bi-person-vcard-fill', 'tone' => 'indigo'],

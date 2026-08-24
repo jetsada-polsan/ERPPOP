@@ -102,7 +102,7 @@ class ProductSkuRecodeTest extends TestCase
             'is_vat' => false,
             'is_active' => true,
         ]);
-        // legacy_sku is audit-only and intentionally not mass assignable from UI.
+        // Preserve the legacy source code separately from the new category-led SKU.
         Product::whereKey($product->id)->update(['legacy_sku' => $legacySku]);
 
         return $product->fresh();

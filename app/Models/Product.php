@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
-    'sku_code', 'name_th', 'name_en', 'note', 'product_category_id', 'product_department_id',
+    'sku_code', 'legacy_sku', 'name_th', 'name_en', 'note', 'product_category_id', 'product_department_id',
     'product_brand_id', 'base_unit_id', 'default_price', 'maximum_sale_price',
     'minimum_margin_percent', 'margin_control_policy', 'average_cost', 'last_purchase_cost',
     'last_purchase_cost_at', 'is_vat', 'tracks_expiry', 'shelf_life_days', 'expiry_warning_days',
