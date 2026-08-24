@@ -171,6 +171,10 @@ ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("payments", "change_amount", "TEXT NOT NULL DEFAULT '0'"),
     # ราคาขายรวม VAT อยู่แล้ว ค่านี้จึงมีผลกับการแยกยอดในบิล ไม่ใช่กับยอดที่ลูกค้าจ่าย
     ("products", "is_vat", "INTEGER NOT NULL DEFAULT 1"),
+    # หมวดสินค้าใช้ทำแถบกรองบนหน้าขาย ERP ส่ง id มาให้ ส่วนชื่อเติมตอน sync
+    ("products", "category_id", "INTEGER"),
+    ("products", "category_name", "TEXT"),
+    ("products", "price", "TEXT NOT NULL DEFAULT '0'"),
     # เลขนี้มาจาก ERP หลัง sync สำเร็จ และเป็นกุญแจที่ ERP ใช้ยกเลิกบิล
     ("sales", "server_receipt_no", "TEXT"),
     ("sales", "voided_at", "TEXT"),

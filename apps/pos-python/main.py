@@ -8,6 +8,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from pos_python.database import connect
+from pos_python.barcode import replace_scale_profiles
 from pos_python.mock_printer import print_receipt
 from pos_python.services import CartLine, PosService, now, pin_hash
 from pos_python.ui import run_ui
@@ -29,10 +30,47 @@ DB_PATH = DATA_DIR / "pos-python-demo.db"
 
 
 def seed(db) -> None:
+    """ข้อมูลตั้งต้นสำหรับเครื่องที่เพิ่งติดตั้ง
+
+    เปิดโปรแกรมมาแล้วต้องมีของให้กดขายได้ทันที ไม่ใช่ตารางว่างเปล่าจนดูเหมือนพัง
+    ของจริงจะถูกทับด้วยแคตตาล็อกจาก ERP ตอน sync ครั้งแรก
+    """
     timestamp = now()
-    db.execute("INSERT OR IGNORE INTO local_cashiers (id, code, name, pin_hash, synced_at) VALUES (1, 'POP001', 'แคชเชียร์ทดสอบ', ?, ?)", (pin_hash('1234'), timestamp))
-    db.execute("INSERT OR IGNORE INTO products (id, sku, name, unit_name, updated_at) VALUES (1, 'P000001', 'สินค้าทดสอบ POPSTAR', 'ชิ้น', ?)", (timestamp,))
-    db.execute("INSERT OR IGNORE INTO product_barcodes (barcode, product_id, barcode_type, price, synced_at) VALUES ('8850000000003', 1, 'CUSTOM', 25, ?)", (timestamp,))
+    db.execute(
+        "INSERT OR IGNORE INTO local_cashiers (id, code, name, pin_hash, synced_at) VALUES (1, 'POP001', 'แคชเชียร์ทดสอบ', ?, ?)",
+        (pin_hash("1234"), timestamp),
+    )
+
+    # รูปแบบป้ายเครื่องชั่ง — ของจริงมาจาก ERP ตอน sync ค่านี้ให้เครื่องใหม่ยิงป้ายได้เลย
+    if not db.execute("SELECT 1 FROM scale_profiles LIMIT 1").fetchone():
+        replace_scale_profiles(db, [
+            {"code": "POPSTAR-800", "prefix": "800", "plu_length": 6, "value_length": 6,
+             "value_type": "price", "check_digit": "ean13", "total_length": 13},
+            {"code": "POPSTAR-801", "prefix": "801", "plu_length": 6, "value_length": 6,
+             "value_type": "price", "check_digit": "ean13", "total_length": 13},
+        ])
+
+    catalogue = [
+        (1, "800123", "หมูสามชั้นสไลซ์", "กก.", "ของสด", "189.00", 1, None, None),
+        (2, "800124", "เนื้อหมูบด", "กก.", "ของสด", "147.00", 1, None, None),
+        (3, "P001203", "น้ำจิ้มหมูกระทะ", "ขวด", "เครื่องปรุง", "45.00", 1, "8850000000003", "EAN13_STANDARD"),
+        (4, "P000775", "ผักรวมสด", "ถุง", "ของสด", "59.00", 0, "2990000000017", "INTERNAL_13"),
+        (5, "P000126", "น้ำแข็งหลอด", "ถุง", "เครื่องดื่ม", "25.00", 1, "ICE-01", "CUSTOM"),
+        (6, "P000014", "น้ำดื่มขวดเล็ก", "ขวด", "เครื่องดื่ม", "7.00", 1, "8850000000010", "EAN13_STANDARD"),
+        (7, "P000320", "กุ้งขาวแช่แข็ง", "แพ็ค", "แช่แข็ง", "239.00", 1, "2990000000024", "INTERNAL_13"),
+        (8, "P000410", "ลูกชิ้นปลาแช่แข็ง", "ถุง", "แช่แข็ง", "89.00", 1, "2990000000031", "INTERNAL_13"),
+    ]
+    for product_id, sku, name, unit, category, price, is_vat, barcode, barcode_type in catalogue:
+        db.execute(
+            """INSERT OR IGNORE INTO products (id, sku, name, unit_name, category_name, price, is_vat, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (product_id, sku, name, unit, category, price, is_vat, timestamp),
+        )
+        # PLU เครื่องชั่งลงทะเบียนเป็นบาร์โค้ดด้วย เพื่อให้ป้ายที่ถอดออกมาหาสินค้าเจอ
+        db.execute(
+            "INSERT OR IGNORE INTO product_barcodes (barcode, product_id, barcode_type, price, synced_at) VALUES (?, ?, ?, ?, ?)",
+            (barcode or sku, product_id, barcode_type or "SCALE_WEIGHT", price, timestamp),
+        )
     db.commit()
 
 
