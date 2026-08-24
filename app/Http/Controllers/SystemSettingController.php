@@ -60,6 +60,7 @@ class SystemSettingController extends Controller
             'posTerminals' => PosTerminal::with('branch:id,code,name_th')->orderBy('code')->get(),
             'menuOrder' => $this->menuOrder(),
             'erpTheme' => AppSetting::get('erp_theme', 'ocean'),
+            'erpLayout' => AppSetting::get('erp_layout', 'classic'),
             'posRelease' => $this->currentPosRelease(),
             'pythonPosInstaller' => $this->currentPythonPosInstaller(),
         ]);
@@ -242,6 +243,7 @@ class SystemSettingController extends Controller
             'footer_note' => ['nullable', 'string', 'max:500'],
             'menu_order' => ['nullable', 'string', 'max:2000'],
             'erp_theme' => ['required', 'in:ocean,navy,emerald,slate,clear'],
+            'erp_layout' => ['required', 'in:classic,odoo'],
         ], [
             'company_name_th.required' => 'กรุณาระบุชื่อบริษัท',
             'logo_file.image' => 'ไฟล์โลโก้ต้องเป็นรูปภาพ (png/jpg/webp/svg)',
@@ -276,6 +278,7 @@ class SystemSettingController extends Controller
         AppSetting::set('default_credit_days', (string) $data['credit_days']);
         AppSetting::set('doc_footer_note', $data['footer_note'] ?? '');
         AppSetting::set('erp_theme', $data['erp_theme']);
+        AppSetting::set('erp_layout', $data['erp_layout']);
         if ($request->filled('menu_order')) {
             $requestedOrder = json_decode($data['menu_order'], true);
             $allowed = $this->defaultMenuOrder();

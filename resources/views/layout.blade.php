@@ -156,9 +156,11 @@
     $companyLogo = \App\Models\AppSetting::logoUrl();
     $erpTheme = in_array(\App\Models\AppSetting::get('erp_theme', 'ocean'), ['ocean', 'navy', 'emerald', 'slate', 'clear'], true)
         ? \App\Models\AppSetting::get('erp_theme', 'ocean') : 'ocean';
+    $erpLayout = in_array(\App\Models\AppSetting::get('erp_layout', 'classic'), ['classic', 'odoo'], true)
+        ? \App\Models\AppSetting::get('erp_layout', 'classic') : 'classic';
 @endphp
 <!DOCTYPE html>
-<html lang="th" data-theme="{{ $erpTheme }}">
+<html lang="th" data-theme="{{ $erpTheme }}" data-layout="{{ $erpLayout }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -175,6 +177,11 @@
     <script src="{{ asset('vendor/sweetalert2/sweetalert2.all.min.js') }}"></script>
     <script defer src="{{ asset('vendor/alpinejs/alpine.min.js') }}"></script>
     <style>
+        html[data-layout="odoo"] .app-header { background:#714b67!important; color:#fff; }
+        html[data-layout="odoo"] .app-header .nav-link, html[data-layout="odoo"] .app-header .btn { color:#fff; }
+        html[data-layout="odoo"] .fa-rail { background:#714b67; }
+        html[data-layout="odoo"] .fa-subnav-link.active { background:#f3edf2; color:#714b67; box-shadow:inset 3px 0 #714b67; }
+        html[data-layout="odoo"] .app-content { background:#f7f7f7; }
         /* ════════════════════════════════════════
            THEME - FlowAccount-style light (single)
            ════════════════════════════════════════ */

@@ -5,7 +5,7 @@
 @section('content')
 
 <form method="post" action="{{ route('settings.update') }}" enctype="multipart/form-data"
-      x-data="{ tab: @js(session('pos_token') || $errors->has('pos_version') || $errors->has('pos_installer') ? 'pos-download' : 'func'), choice: @js($currentLogo ?? '__none__'), theme: @js($erpTheme), copied: false, menuOrder: @js($menuOrder), moveMenu(i, d) { const n=i+d; if(n<0 || n>=this.menuOrder.length) return; const a=[...this.menuOrder]; [a[i],a[n]]=[a[n],a[i]]; this.menuOrder=a; } }">
+      x-data="{ tab: @js(session('pos_token') || $errors->has('pos_version') || $errors->has('pos_installer') ? 'pos-download' : 'func'), choice: @js($currentLogo ?? '__none__'), theme: @js($erpTheme), layout: @js($erpLayout), copied: false, menuOrder: @js($menuOrder), moveMenu(i, d) { const n=i+d; if(n<0 || n>=this.menuOrder.length) return; const a=[...this.menuOrder]; [a[i],a[n]]=[a[n],a[i]]; this.menuOrder=a; } }">
     @csrf
     <input type="hidden" name="menu_order" :value="JSON.stringify(menuOrder)">
 
@@ -114,6 +114,12 @@
                                 <strong>{{ $label }}</strong>
                             </label>
                         @endforeach
+                    </div>
+                    <div class="set-title mt-4">รูปแบบหน้าหลังบ้าน</div>
+                    <div class="set-desc mb-3">เปลี่ยนเฉพาะ Layout และสี ไม่กระทบข้อมูลขาย สต๊อก บัญชี หรือสิทธิ์</div>
+                    <div class="theme-choice-grid">
+                        <label class="theme-choice" :class="layout === 'classic' && 'active'"><input type="radio" name="erp_layout" value="classic" x-model="layout"><span class="theme-preview" style="--preview-primary:#1585c0;--preview-deep:#0f4c75;--preview-bg:#eef4f9"><i></i><b></b></span><strong>แบบเดิม JET ERP</strong></label>
+                        <label class="theme-choice" :class="layout === 'odoo' && 'active'"><input type="radio" name="erp_layout" value="odoo" x-model="layout"><span class="theme-preview" style="--preview-primary:#714b67;--preview-deep:#493047;--preview-bg:#f7f7f7"><i></i><b></b></span><strong>แบบ Odoo</strong></label>
                     </div>
                 </div>
             </div>
