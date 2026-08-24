@@ -744,24 +744,24 @@
     </style>
     @stack('head')
     <style id="erp-ui-standard">
-        /* มาตรฐาน UI กลาง: compact desktop ERP สำหรับจอ 14–15 นิ้ว */
+        /* มาตรฐาน UI กลาง: อ่านได้ชัดบนจอ 13–15 นิ้ว และขยายเป็นขั้นบนจอใหญ่ */
         :root {
-            --ui-font-xs: 11px;
-            --ui-font-sm: 12px;
-            --ui-font-md: 13px;
-            --ui-font-lg: 16px;
-            --ui-font-xl: 20px;
-            --ui-control-h: 34px;
+            --ui-font-xs: 12px;
+            --ui-font-sm: 13px;
+            --ui-font-md: 14px;
+            --ui-font-lg: 17px;
+            --ui-font-xl: 22px;
+            --ui-control-h: 38px;
             --ui-radius: 7px;
             --ui-card-radius: 10px;
-            --ui-space: 12px;
+            --ui-space: 14px;
         }
         body:not(.erp-popup-page) { font-size:var(--ui-font-md); line-height:1.4; }
         .app-header { min-height:52px; }
         .app-header h1 { font-size:var(--ui-font-xl); line-height:1.2; }
         .app-header .text-muted { font-size:var(--ui-font-sm)!important; }
         .page-title-icon { width:32px; height:32px; margin-right:8px; border-radius:7px; font-size:14px; }
-        .app-content { padding:14px 16px; }
+        .app-content { padding:16px 18px; }
 
         .content-card,
         .card {
@@ -770,29 +770,29 @@
             box-shadow:0 10px 26px rgba(29,59,82,.07);
         }
         .card-header {
-            padding:9px 12px;
+            padding:10px 14px;
             background:linear-gradient(180deg,#fff,#f8fbfd);
             border-bottom-color:#e4edf4;
         }
-        .card-body { padding:12px; }
+        .card-body { padding:14px; }
 
-        h1,.h1 { font-size:24px; }
-        h2,.h2 { font-size:20px; }
-        h3,.h3 { font-size:18px; }
-        h4,.h4 { font-size:16px; }
-        h5,.h5 { font-size:15px; }
-        h6,.h6 { font-size:14px; }
+        h1,.h1 { font-size:26px; }
+        h2,.h2 { font-size:22px; }
+        h3,.h3 { font-size:19px; }
+        h4,.h4 { font-size:17px; }
+        h5,.h5 { font-size:16px; }
+        h6,.h6 { font-size:15px; }
         .small,small { font-size:var(--ui-font-sm)!important; }
 
         .btn:not(.rounded-circle) { min-height:var(--ui-control-h); padding:5px 10px; border-radius:var(--ui-radius); font-size:var(--ui-font-md); line-height:1.2; font-weight:700; }
-        .btn-sm:not(.rounded-circle) { min-height:27px; padding:3px 8px; border-radius:6px; font-size:var(--ui-font-sm); }
-        .btn-lg:not(.rounded-circle) { min-height:38px; padding:7px 14px; font-size:13px; }
+        .btn-sm:not(.rounded-circle) { min-height:30px; padding:4px 9px; border-radius:6px; font-size:var(--ui-font-sm); }
+        .btn-lg:not(.rounded-circle) { min-height:42px; padding:8px 16px; font-size:var(--ui-font-md); }
         .btn.rounded-pill { padding-left:12px!important; padding-right:12px!important; }
 
         .form-label { margin-bottom:4px; color:#536b7d; font-size:var(--ui-font-sm); font-weight:700; }
         .form-control,.form-select,.input-group-text { min-height:var(--ui-control-h); padding:5px 8px; border-radius:var(--ui-radius); border-color:#d7e2ea; font-size:var(--ui-font-md); line-height:1.2; }
         textarea.form-control { min-height:64px; }
-        .form-control-sm,.form-select-sm { min-height:28px; padding:3px 7px; font-size:var(--ui-font-sm); }
+        .form-control-sm,.form-select-sm { min-height:31px; padding:4px 8px; font-size:var(--ui-font-sm); }
         .form-check-label,.form-text { font-size:var(--ui-font-sm); }
         .input-group > :not(:first-child) { border-top-left-radius:0; border-bottom-left-radius:0; }
         .input-group > :not(:last-child) { border-top-right-radius:0; border-bottom-right-radius:0; }
@@ -803,8 +803,8 @@
             border:1px solid #e1ebf2;
             background:#fff;
         }
-        .table > thead > tr > th { padding:8px 9px; color:#fff; font-size:var(--ui-font-sm); font-weight:900; line-height:1.2; vertical-align:middle; white-space:nowrap; }
-        .table > tbody > tr > td { padding:8px 9px; line-height:1.3; vertical-align:middle; }
+        .table > thead > tr > th { padding:9px 10px; color:#fff; font-size:var(--ui-font-sm); font-weight:900; line-height:1.2; vertical-align:middle; white-space:nowrap; }
+        .table > tbody > tr > td { padding:9px 10px; line-height:1.35; vertical-align:middle; }
         .table > tbody > tr:nth-child(even) > td { background:#fbfdff; }
         .table > tbody > tr:hover > td { background:#eef8fd; }
         .table-sm > thead > tr > th,.table-sm > tbody > tr > td { padding:5px 7px; }
@@ -814,6 +814,55 @@
         .pagination { --bs-pagination-padding-x:.6rem; --bs-pagination-padding-y:.28rem; --bs-pagination-font-size:11px; }
         .dropdown-menu { padding:5px; border-radius:8px; font-size:var(--ui-font-md); }
         .dropdown-item { padding:6px 8px; border-radius:5px; }
+
+        /* จอ wide desktop: เพิ่ม readability แบบเป็นขั้น ไม่ใช้ vw จนข้อความและตารางกระโดด */
+        @media (min-width: 1600px) {
+            :root {
+                --erp-rail-w: 74px;
+                --erp-subnav-w: 202px;
+                --ui-font-xs: 12px;
+                --ui-font-sm: 14px;
+                --ui-font-md: 15px;
+                --ui-font-lg: 18px;
+                --ui-font-xl: 24px;
+                --ui-control-h: 42px;
+                --ui-space: 16px;
+            }
+            .app-content { padding:20px 24px; }
+            .card-header { padding:12px 16px; }
+            .card-body { padding:16px; }
+            .table > thead > tr > th,
+            .table > tbody > tr > td { padding:10px 12px; }
+        }
+
+        @media (min-width: 2200px) {
+            :root {
+                --erp-rail-w: 80px;
+                --erp-subnav-w: 220px;
+                --ui-font-xs: 13px;
+                --ui-font-sm: 15px;
+                --ui-font-md: 16px;
+                --ui-font-lg: 20px;
+                --ui-font-xl: 26px;
+                --ui-control-h: 46px;
+            }
+            .app-content { padding:24px 30px; }
+        }
+
+        @media (max-width: 991.98px) {
+            :root {
+                --ui-font-xs: 11px;
+                --ui-font-sm: 12px;
+                --ui-font-md: 13px;
+                --ui-font-lg: 16px;
+                --ui-font-xl: 20px;
+                --ui-control-h: 34px;
+                --ui-space: 12px;
+            }
+            .app-content { padding:14px; }
+            .card-header { padding:9px 12px; }
+            .card-body { padding:12px; }
+        }
 
         .booking-modal,.doc-modal { border-radius:10px; }
         .booking-modal .modal-header,.doc-modal .modal-header { padding:12px 14px!important; }
