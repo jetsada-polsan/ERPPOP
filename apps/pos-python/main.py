@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import traceback
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -55,7 +56,37 @@ def demo() -> None:
     print(f"บันทึกบิล {receipt_no}; pending sync={service.pending_sync_count()}; receipt={receipt}")
 
 
-if __name__ == "__main__":
+def launch_ui() -> None:
+    """Start the installed application and leave a diagnosable error if startup fails."""
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    try:
+        db = connect(DB_PATH)
+        seed(db)
+        run_ui(PosService(db))
+    except Exception as error:
+        log_path = DATA_DIR / "startup-error.log"
+        log_path.write_text(traceback.format_exc(), encoding="utf-8")
+
+        # A windowed PyInstaller build has no terminal. Surface the exact recovery path to the user.
+        try:
+            from PySide6.QtWidgets import QApplication, QMessageBox
+
+            created_app = QApplication.instance() is None
+            app = QApplication.instance() or QApplication([])
+            QMessageBox.critical(
+                None,
+                "เปิด POPSTAR POS ไม่สำเร็จ",
+                f"โปรแกรมเริ่มต้นไม่ได้: {error}\n\n"
+                f"กรุณาส่งไฟล์นี้ให้ฝ่าย IT:\n{log_path}",
+            )
+            if created_app:
+                app.quit()
+        finally:
+            raise SystemExit(1) from error
+
+
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--demo", action="store_true")
     parser.add_argument("--ui", action="store_true")
@@ -63,9 +94,10 @@ if __name__ == "__main__":
     if args.demo:
         demo()
     elif args.ui:
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-        db = connect(DB_PATH)
-        seed(db)
-        run_ui(PosService(db))
+        launch_ui()
     else:
-        parser.print_help()
+        launch_ui()
+
+
+if __name__ == "__main__":
+    main()
