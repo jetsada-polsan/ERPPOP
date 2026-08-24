@@ -49,5 +49,5 @@ def scale_cart_line(db: sqlite3.Connection, code: str) -> CartLine:
     qty = label.total_price / unit_price
     return CartLine(
         product_id=int(product["id"]), qty=qty, unit_price=unit_price,
-        barcode=label.plu, source_barcode=code.strip(), price_version="scale-label",
+        barcode=label.plu, source_barcode=code.strip(), barcode_type="SCALE_WEIGHT", price_version="scale-label",
     )

@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS price_versions (
 );
 CREATE TABLE IF NOT EXISTS shifts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id INTEGER UNIQUE,
     uuid TEXT NOT NULL UNIQUE,
     branch_id INTEGER NOT NULL,
     terminal_id TEXT NOT NULL,
@@ -75,6 +76,7 @@ CREATE TABLE IF NOT EXISTS sale_items (
     product_id INTEGER NOT NULL REFERENCES products(id),
     barcode TEXT,
     source_barcode TEXT,
+    barcode_type TEXT NOT NULL DEFAULT 'CUSTOM',
     product_name_snapshot TEXT NOT NULL,
     unit_name_snapshot TEXT NOT NULL,
     qty TEXT NOT NULL,

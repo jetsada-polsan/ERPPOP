@@ -29,6 +29,7 @@ class CartLine:
     unit_price: Decimal
     barcode: str | None = None
     source_barcode: str | None = None
+    barcode_type: str = "CUSTOM"
     discount: Decimal = Decimal("0")
     price_version: str | None = None
 
@@ -60,6 +61,10 @@ class PosService:
             WHERE b.barcode = ? AND p.active = 1""", (barcode,)
         ).fetchone()
 
+    def bind_server_shift(self, local_shift_id: int, server_shift_id: int) -> None:
+        self.db.execute("UPDATE shifts SET server_id = ? WHERE id = ?", (server_shift_id, local_shift_id))
+        self.db.commit()
+
     def checkout(self, *, document_no: str, branch_id: int, terminal_id: str, shift_id: int,
                  cashier_id: int, lines: list[CartLine], payment_method: str, paid_amount: Decimal,
                  sale_uuid: str | None = None) -> int:
@@ -89,10 +94,10 @@ class PosService:
                     raise ValueError(f"ไม่พบสินค้าที่ใช้งานได้ id={line.product_id}")
                 line_total = money(line.qty * line.unit_price - line.discount)
                 self.db.execute(
-                    """INSERT INTO sale_items (sale_id, product_id, barcode, source_barcode, product_name_snapshot,
+                    """INSERT INTO sale_items (sale_id, product_id, barcode, source_barcode, barcode_type, product_name_snapshot,
                     unit_name_snapshot, qty, unit_price, discount, line_total, price_version)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (sale_id, line.product_id, line.barcode, line.source_barcode, product["name"], product["unit_name"],
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (sale_id, line.product_id, line.barcode, line.source_barcode, line.barcode_type, product["name"], product["unit_name"],
                      str(line.qty), str(line.unit_price), str(line.discount), str(line_total), line.price_version),
                 )
             self.db.execute("INSERT INTO payments (sale_id, method, amount) VALUES (?, ?, ?)", (sale_id, payment_method, str(money(paid_amount))))
