@@ -1,0 +1,54 @@
+name: Build Python POS UAT for Windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: UAT version, e.g. 0.1.0
+        required: true
+        default: 0.1.0
+        type: string
+  push:
+    paths:
+      - apps/pos-python/**
+      - .github/workflows/pos-python-windows-uat.yml
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-package:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: apps/pos-python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: apps/pos-python/requirements-build.txt
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip -r requirements-build.txt
+      - name: Run core and scale tests
+        run: python -m unittest discover -s tests -v
+      - name: Build Windows application
+        run: >-
+          pyinstaller --noconfirm --clean --windowed
+          --name POPSTAR-Python-POS
+          --collect-all PySide6
+          main.py
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress --yes
+      - name: Build UAT installer
+        shell: pwsh
+        env:
+          UAT_VERSION: ${{ inputs.version || '0.1.0-dev' }}
+        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$env:UAT_VERSION" installer\POPSTAR-Python-POS.iss'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: POPSTAR-Python-POS-UAT-${{ inputs.version || '0.1.0-dev' }}
+          path: apps/pos-python/dist-installer/*.exe
+          if-no-files-found: error

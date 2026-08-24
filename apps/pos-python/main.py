@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -12,7 +13,18 @@ from pos_python.ui import run_ui
 
 
 ROOT = Path(__file__).parent
-DB_PATH = ROOT / "storage" / "pos-python-demo.db"
+
+
+def application_data_dir() -> Path:
+    """Keep mutable POS data outside the Windows installation directory."""
+    if os.name == "nt":
+        return Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "POPSTAR" / "PythonPOS"
+
+    return ROOT / "storage"
+
+
+DATA_DIR = application_data_dir()
+DB_PATH = DATA_DIR / "pos-python-demo.db"
 
 
 def seed(db) -> None:
@@ -24,6 +36,7 @@ def seed(db) -> None:
 
 
 def demo() -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     db = connect(DB_PATH)
     seed(db)
     service = PosService(db)
@@ -38,7 +51,7 @@ def demo() -> None:
         cashier_id=int(cashier["id"]), lines=[CartLine(1, Decimal("2"), Decimal("25"), barcode="8850000000003")],
         payment_method="cash", paid_amount=Decimal("50"),
     )
-    receipt = print_receipt(db, sale_id, ROOT / "storage" / "receipts")
+    receipt = print_receipt(db, sale_id, DATA_DIR / "receipts")
     print(f"บันทึกบิล {receipt_no}; pending sync={service.pending_sync_count()}; receipt={receipt}")
 
 
@@ -50,6 +63,7 @@ if __name__ == "__main__":
     if args.demo:
         demo()
     elif args.ui:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
         db = connect(DB_PATH)
         seed(db)
         run_ui(PosService(db))

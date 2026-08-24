@@ -27,7 +27,16 @@ python3 -m unittest discover -s tests -v
 python3 main.py --demo
 ```
 
-ไฟล์ SQLite และใบเสร็จทดลองอยู่ใต้ `storage/` ซึ่ง git ไม่เก็บ
+บน Windows ไฟล์ SQLite และใบเสร็จอยู่ที่
+`%LOCALAPPDATA%\\POPSTAR\\PythonPOS` จึงไม่ถูกทับเมื่อติดตั้งหรืออัปเดตโปรแกรมใหม่
+ส่วน macOS/Linux ใช้ `storage/` ใต้โมดูล ซึ่ง git ไม่เก็บ
+
+## ติดตั้ง Windows UAT
+
+GitHub Actions จะสร้าง `POPSTAR-Python-POS-UAT-<version>-setup.exe` เป็น artifact
+สำหรับทดสอบติดตั้งเท่านั้น ไม่อัปโหลดทับ POS Vue/Tauri และยังไม่มี auto-update
+หรือ code-signing. Windows SmartScreen อาจเตือนเพราะเป็นไฟล์ทดสอบที่ยังไม่ได้
+เซ็นลายเซ็น ต้องดาวน์โหลดจาก GitHub Actions ของ repository นี้เท่านั้น
 
 ## กติกาก่อนเชื่อม ERP จริง
 
