@@ -1,4 +1,7 @@
+import { copyFileSync, existsSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { DatabaseSync as DatabaseSyncClass } from 'node:sqlite'
 import { describe, expect, it } from 'vitest'
 
@@ -66,6 +69,53 @@ function applyPreviousSchema(db: DatabaseSyncClass) {
     error TEXT, synced_at TEXT
   )`)
 }
+
+describe('สำรองและกู้คืนแบบ WAL', () => {
+  it('VACUUM INTO เก็บรายการที่ยังอยู่ใน WAL ไปด้วย ไม่ทิ้งไว้ข้างหลัง', () => {
+    const source = join(tmpdir(), `pos-wal-${Date.now()}.db`)
+    const backup = join(tmpdir(), `pos-backup-${Date.now()}.db`)
+    const db = new DatabaseSync(source)
+    db.exec('PRAGMA journal_mode=WAL')
+    applySchema(db)
+    db.prepare('INSERT INTO checkout_queue (id, payload, status, created_at) VALUES (?, ?, ?, ?)')
+      .run('offline-sale-1', '{"total":250}', 'pending', '2026-08-24T09:00:00Z')
+
+    // ยังไม่ checkpoint — บิลนี้อยู่ใน -wal ไม่ได้อยู่ในไฟล์ .db
+    db.exec(`VACUUM INTO '${backup}'`)
+    db.close()
+
+    const restored = new DatabaseSync(backup)
+    expect(restored.prepare('SELECT COUNT(*) AS n FROM checkout_queue').get()).toEqual({ n: 1 })
+    restored.close()
+
+    for (const path of [source, backup, `${source}-wal`, `${source}-shm`]) {
+      if (existsSync(path)) rmSync(path)
+    }
+  })
+
+  it('คัดลอกเฉพาะไฟล์ .db ทิ้งบิลที่ยังอยู่ใน WAL ไว้ข้างหลัง', () => {
+    const source = join(tmpdir(), `pos-copy-${Date.now()}.db`)
+    const copy = join(tmpdir(), `pos-copy-only-${Date.now()}.db`)
+    const db = new DatabaseSync(source)
+    db.exec('PRAGMA journal_mode=WAL')
+    applySchema(db)
+    db.prepare('INSERT INTO checkout_queue (id, payload, status, created_at) VALUES (?, ?, ?, ?)')
+      .run('offline-sale-2', '{"total":900}', 'pending', '2026-08-24T09:05:00Z')
+
+    // นี่คือสิ่งที่โค้ดเดิมทำ — คัดลอก .db เฉย ๆ ระหว่างที่ยังมี -wal ค้างอยู่
+    copyFileSync(source, copy)
+    db.close()
+
+    const restored = new DatabaseSync(copy)
+    const rows = restored.prepare('SELECT COUNT(*) AS n FROM checkout_queue').get() as { n: number }
+    restored.close()
+    expect(rows.n).toBe(0)   // บิลหายไปกับ WAL ที่ไม่ได้คัดลอกมา
+
+    for (const path of [source, copy, `${source}-wal`, `${source}-shm`]) {
+      if (existsSync(path)) rmSync(path)
+    }
+  })
+})
 
 describe('อัปเกรดฐานข้อมูลในเครื่อง', () => {
   it('เพิ่มตารางบาร์โค้ดโดยไม่แตะคิวส่งบิล ประวัติขาย และบิลพัก', () => {

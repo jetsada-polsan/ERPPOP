@@ -8,6 +8,11 @@ let db: Database | null = null
 async function connection() {
   if (db) return db
   db = await Database.load('sqlite:popstar-pos.db')
+  // WAL ทนไฟดับกลางบิลได้ดีกว่า rollback journal และให้อ่านพร้อมเขียนได้
+  // synchronous=FULL แลกความเร็วเล็กน้อยกับการไม่เสียบิลล่าสุดตอนไฟดับ
+  // ซึ่งสำหรับเครื่องคิดเงินคุ้มกว่าเสมอ
+  await db.execute('PRAGMA journal_mode=WAL')
+  await db.execute('PRAGMA synchronous=FULL')
   await db.execute(`CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)`)
   await db.execute(`CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY, data TEXT NOT NULL, synced_at TEXT NOT NULL)`)
   await db.execute(`CREATE TABLE IF NOT EXISTS promotions (id INTEGER PRIMARY KEY, data TEXT NOT NULL, synced_at TEXT NOT NULL)`)
@@ -277,6 +282,18 @@ export async function localDbHealth(): Promise<LocalDbHealth> {
     lastProductSyncAt: productSync[0]?.synced_at || null,
     sizeBytes: Number(pageCount[0]?.page_count || 0) * Number(pageSize[0]?.page_size || 0),
   }
+}
+
+/**
+ * สำรองฐานข้อมูลด้วย VACUUM INTO
+ *
+ * ได้ไฟล์เดียวที่สอดคล้องกันในตัวเอง ไม่ต้องพก `-wal` กับ `-shm` ตามไปด้วย
+ * ต่างจากการคัดลอกไฟล์ .db เฉย ๆ ที่จะทิ้งรายการซึ่งยังอยู่ใน WAL ไว้ข้างหลัง
+ * — ซึ่งอาจเป็นยอดขายทั้งวันที่ขายตอนออฟไลน์
+ */
+export async function backupTo(path: string) {
+  const conn = await connection()
+  await conn.execute('VACUUM INTO ?', [path])
 }
 
 export async function closeLocalDb() {

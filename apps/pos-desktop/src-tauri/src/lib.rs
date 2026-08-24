@@ -113,6 +113,28 @@ fn prepare_local_storage(app: tauri::AppHandle) -> Result<StorageStatus, String>
     }
 }
 
+/// ลบไฟล์ข้าง ๆ ของ WAL ที่ค้างอยู่
+///
+/// SQLite เก็บรายการที่เพิ่ง commit ไว้ใน `-wal` และเปิดไฟล์ครั้งถัดไปจะเอามันมาทับ
+/// ฐานหลักเสมอ ถ้ากู้ไฟล์ .db มาแล้วปล่อย `-wal` ของเก่าไว้ SQLite จะเอาข้อมูลเก่า
+/// มาทับสิ่งที่เพิ่งกู้ กลายเป็นกู้แล้วได้ของผิดหรือไฟล์เสีย
+fn remove_wal_sidecars(database: &PathBuf) -> Result<(), String> {
+    for suffix in ["-wal", "-shm"] {
+        let sidecar = PathBuf::from(format!("{}{}", database.to_string_lossy(), suffix));
+        if sidecar.exists() {
+            fs::remove_file(&sidecar).map_err(|error| error.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+/// ที่อยู่ไฟล์สำรองไฟล์ถัดไป — ฝั่ง JS เขียนด้วย `VACUUM INTO` ซึ่งได้ไฟล์เดียวจบ
+/// ที่สอดคล้องกันเสมอ ไม่ต้องพก `-wal` ตามไปด้วย
+#[tauri::command]
+fn next_backup_path(app: tauri::AppHandle) -> Result<String, String> {
+    Ok(backup_directory(&app)?.join(format!("pos-backup-{}.db", stamp()?)).to_string_lossy().to_string())
+}
+
 #[tauri::command]
 fn backup_local_database(app: tauri::AppHandle) -> Result<String, String> {
     let source = database_path(&app)?;
@@ -140,6 +162,9 @@ fn restore_latest_database(app: tauri::AppHandle) -> Result<String, String> {
         fs::copy(&source, safety).map_err(|error| error.to_string())?;
     }
     fs::copy(&latest, &source).map_err(|error| error.to_string())?;
+    // ต้องล้างหลังคัดลอกทับ ไม่ใช่ก่อน เพราะ `-wal` ที่ค้างอยู่เป็นของฐานเดิม
+    // ปล่อยไว้ SQLite จะเอามาทับไฟล์ที่เพิ่งกู้ทันทีที่เปิดครั้งถัดไป
+    remove_wal_sidecars(&source)?;
     Ok(latest.to_string_lossy().to_string())
 }
 
@@ -149,7 +174,7 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_sql::Builder::default().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![save_device_token, read_device_token, prepare_local_storage, backup_local_database, restore_latest_database])
+        .invoke_handler(tauri::generate_handler![save_device_token, read_device_token, prepare_local_storage, backup_local_database, next_backup_path, restore_latest_database])
         .run(tauri::generate_context!())
         .expect("failed to run POPSTAR POS");
 }

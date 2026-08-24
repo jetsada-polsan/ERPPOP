@@ -4,7 +4,7 @@ import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, CircleHelp, Cloud,
 import { check } from '@tauri-apps/plugin-updater'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { api, connect, PosUnreachableError, setServerUrl } from './lib/api'
-import { closeLocalDb, enqueue, loadOfflineCashiers, loadOfflineCashiersByPin, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceOfflineCashiers, replaceProducts, replacePromotions, saleHistory, saveOfflineCredential, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth } from './lib/db'
+import { backupTo, closeLocalDb, enqueue, loadOfflineCashiers, loadOfflineCashiersByPin, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceOfflineCashiers, replaceProducts, replacePromotions, saleHistory, saveOfflineCredential, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth } from './lib/db'
 import { productAtSaleTime } from './lib/catalog'
 import { resolveScan, type BarcodeType } from './lib/barcode'
 import { priceCart } from './lib/pricing'
@@ -281,8 +281,9 @@ async function backupLocalDb() {
   if (!isTauri()) return showError('ฟังก์ชัน Backup POS ใช้ได้ในโปรแกรม Windows เท่านั้น')
   localBackupBusy.value = true
   try {
-    await closeLocalDb()
-    const path = await invoke<string>('backup_local_database')
+    // ไม่ต้องปิดฐานก่อน VACUUM INTO อ่านสถานะที่สอดคล้องกันได้ทั้งที่ยังเปิดอยู่
+    const path = await invoke<string>('next_backup_path')
+    await backupTo(path)
     flash(`สำรองข้อมูล POS แล้ว: ${path}`)
     await inspectLocalDb()
   } catch (e) {
