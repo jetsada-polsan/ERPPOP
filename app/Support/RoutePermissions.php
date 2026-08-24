@@ -89,6 +89,8 @@ class RoutePermissions
         // ส่วนการเห็นข้ามสาขายังคุมด้วย reports.all_branches แยกต่างหากในตัวหน้าเอง
         'executive.' => 'reports.view',
         'products.' => 'masterdata.manage',
+        // หน้าตัวอย่างการออกแบบ — ให้คนที่ดูแลระบบเปิดดูได้ ไม่เปิดสาธารณะ
+        'erp-mockup.' => 'settings.manage',
         'master-data-setup.' => 'masterdata.manage',
         'products.lots.quality-checks' => 'inventory.quality.manage',
         'products.lots.recalls' => 'inventory.quality.manage',

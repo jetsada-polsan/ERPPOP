@@ -55,6 +55,7 @@ use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\QtyPromotionController;
 use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\ReceiptTemplateController;
+use App\Http\Controllers\ErpMockupController;
 use App\Http\Controllers\ExecutiveDashboardController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReportGovernanceController;
@@ -111,6 +112,16 @@ Route::delete('/security/mfa', [AuthController::class, 'disableMfa'])->name('mfa
 Route::get('/', fn () => redirect()->route('dashboard'));
 Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
 Route::post('/employees', [EmployeeController::class, 'store'])->name('employees.store');
+// หน้าตัวอย่างการออกแบบระบบหลังบ้าน — ข้อมูลจำลองล้วน ไม่แตะฐานข้อมูล
+Route::prefix('erp-mockup')->name('erp-mockup.')->group(function () {
+    Route::get('/', [ErpMockupController::class, 'launcher'])->name('launcher');
+    Route::get('/dashboard', [ErpMockupController::class, 'dashboard'])->name('dashboard');
+    Route::get('/products', [ErpMockupController::class, 'products'])->name('products');
+    Route::get('/products/form', [ErpMockupController::class, 'productForm'])->name('product-form');
+    Route::get('/pos-orders', [ErpMockupController::class, 'posOrders'])->name('pos-orders');
+    Route::get('/inventory', [ErpMockupController::class, 'inventory'])->name('inventory');
+    Route::get('/purchase', [ErpMockupController::class, 'purchase'])->name('purchase');
+});
 Route::prefix('master-data-setup')->name('master-data-setup.')->group(function () {
     Route::get('/', [MasterDataSetupController::class, 'index'])->name('index');
     Route::get('/template/{type}', [MasterDataSetupController::class, 'template'])->name('template');
