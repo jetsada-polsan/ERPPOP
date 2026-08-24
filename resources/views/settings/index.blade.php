@@ -4,6 +4,21 @@
 @section('page-subtitle', 'ตั้งค่าเอกสาร ข้อมูลกิจการ ภาษี และการรับชำระ')
 @section('content')
 
+<form id="layout-form" method="post" action="{{ route('settings.layout.update') }}" class="d-none">
+    @csrf
+</form>
+
+@if(session('success'))
+    <div class="alert alert-success d-flex align-items-center gap-2" role="alert">
+        <i class="bi bi-check-circle-fill"></i><span>{{ session('success') }}</span>
+    </div>
+@endif
+@if($errors->any())
+    <div class="alert alert-danger d-flex align-items-center gap-2" role="alert">
+        <i class="bi bi-exclamation-triangle-fill"></i><span>{{ $errors->first() }}</span>
+    </div>
+@endif
+
 <form method="post" action="{{ route('settings.update') }}" enctype="multipart/form-data"
       x-data="{ tab: @js(session('pos_token') || $errors->has('pos_version') || $errors->has('pos_installer') ? 'pos-download' : 'func'), choice: @js($currentLogo ?? '__none__'), theme: @js($erpTheme), layout: @js($erpLayout), copied: false, menuOrder: @js($menuOrder), moveMenu(i, d) { const n=i+d; if(n<0 || n>=this.menuOrder.length) return; const a=[...this.menuOrder]; [a[i],a[n]]=[a[n],a[i]]; this.menuOrder=a; } }">
     @csrf
@@ -39,7 +54,7 @@
                 <h2 class="h4 fw-bold mb-0" style="color:var(--fa-blue-dark)"
                     x-text="{ func: 'ฟังก์ชั่นเอกสาร', numbering: 'เลขรันเอกสาร', logo: 'โลโก้และตราประทับ', note: 'หมายเหตุเอกสาร', company: 'ข้อมูลกิจการ', menu: 'จัดลำดับเมนูหลัก', theme: 'ปรับธีมระบบ', payment: 'ข้อมูลการรับชำระ', accounting: 'บันทึกบัญชี', 'pos-download': 'ตั้งค่า Python POS' }[tab]"></h2>
                 <button x-show="tab !== 'pos-download' && tab !== 'theme'" type="submit" class="btn btn-success px-4"><i class="bi bi-check-lg me-1"></i>บันทึกข้อมูล</button>
-                <button x-show="tab === 'theme'" type="submit" formaction="{{ route('settings.layout.update') }}" class="btn btn-success px-4"><i class="bi bi-check-lg me-1"></i>บันทึก Layout</button>
+                <button x-show="tab === 'theme'" type="submit" form="layout-form" class="btn btn-success px-4"><i class="bi bi-check-lg me-1"></i>บันทึก Layout</button>
             </div>
 
             {{-- ฟังก์ชั่นเอกสาร --}}
@@ -119,8 +134,8 @@
                     <div class="set-title mt-4">รูปแบบหน้าหลังบ้าน</div>
                     <div class="set-desc mb-3">เปลี่ยนเฉพาะ Layout และสี ไม่กระทบข้อมูลขาย สต๊อก บัญชี หรือสิทธิ์</div>
                     <div class="theme-choice-grid">
-                        <label class="theme-choice" :class="layout === 'classic' && 'active'"><input type="radio" name="erp_layout" value="classic" x-model="layout"><span class="theme-preview" style="--preview-primary:#1585c0;--preview-deep:#0f4c75;--preview-bg:#eef4f9"><i></i><b></b></span><strong>แบบเดิม JET ERP</strong></label>
-                        <label class="theme-choice" :class="layout === 'odoo' && 'active'"><input type="radio" name="erp_layout" value="odoo" x-model="layout"><span class="theme-preview" style="--preview-primary:#714b67;--preview-deep:#493047;--preview-bg:#f7f7f7"><i></i><b></b></span><strong>แบบ Odoo</strong></label>
+                        <label class="theme-choice" :class="layout === 'classic' && 'active'"><input form="layout-form" type="radio" name="erp_layout" value="classic" x-model="layout"><span class="theme-preview" style="--preview-primary:#1585c0;--preview-deep:#0f4c75;--preview-bg:#eef4f9"><i></i><b></b></span><strong>แบบเดิม JET ERP</strong></label>
+                        <label class="theme-choice" :class="layout === 'odoo' && 'active'"><input form="layout-form" type="radio" name="erp_layout" value="odoo" x-model="layout"><span class="theme-preview" style="--preview-primary:#714b67;--preview-deep:#493047;--preview-bg:#f7f7f7"><i></i><b></b></span><strong>แบบ Odoo</strong></label>
                     </div>
                 </div>
             </div>
