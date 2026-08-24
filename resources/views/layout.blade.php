@@ -746,15 +746,15 @@
     <style id="erp-ui-standard">
         /* มาตรฐาน UI กลาง: อ่านได้ชัดบนจอ 13–15 นิ้ว และขยายเป็นขั้นบนจอใหญ่ */
         :root {
-            --ui-font-xs: 12px;
-            --ui-font-sm: 13px;
-            --ui-font-md: 14px;
-            --ui-font-lg: 17px;
-            --ui-font-xl: 22px;
-            --ui-control-h: 38px;
+            --ui-font-xs: 13px;
+            --ui-font-sm: 14px;
+            --ui-font-md: 15px;
+            --ui-font-lg: 18px;
+            --ui-font-xl: 24px;
+            --ui-control-h: 40px;
             --ui-radius: 7px;
             --ui-card-radius: 10px;
-            --ui-space: 14px;
+            --ui-space: 16px;
         }
         body:not(.erp-popup-page) { font-size:var(--ui-font-md); line-height:1.4; }
         .app-header { min-height:52px; }
@@ -815,40 +815,6 @@
         .dropdown-menu { padding:5px; border-radius:8px; font-size:var(--ui-font-md); }
         .dropdown-item { padding:6px 8px; border-radius:5px; }
 
-        /* จอ wide desktop: เพิ่ม readability แบบเป็นขั้น ไม่ใช้ vw จนข้อความและตารางกระโดด */
-        @media (min-width: 1600px) {
-            :root {
-                --erp-rail-w: 74px;
-                --erp-subnav-w: 202px;
-                --ui-font-xs: 12px;
-                --ui-font-sm: 14px;
-                --ui-font-md: 15px;
-                --ui-font-lg: 18px;
-                --ui-font-xl: 24px;
-                --ui-control-h: 42px;
-                --ui-space: 16px;
-            }
-            .app-content { padding:20px 24px; }
-            .card-header { padding:12px 16px; }
-            .card-body { padding:16px; }
-            .table > thead > tr > th,
-            .table > tbody > tr > td { padding:10px 12px; }
-        }
-
-        @media (min-width: 2200px) {
-            :root {
-                --erp-rail-w: 80px;
-                --erp-subnav-w: 220px;
-                --ui-font-xs: 13px;
-                --ui-font-sm: 15px;
-                --ui-font-md: 16px;
-                --ui-font-lg: 20px;
-                --ui-font-xl: 26px;
-                --ui-control-h: 46px;
-            }
-            .app-content { padding:24px 30px; }
-        }
-
         @media (max-width: 991.98px) {
             :root {
                 --ui-font-xs: 11px;
@@ -906,50 +872,66 @@
         /* ERP web responsive tiers: fixed readable sizes for small, standard and large monitors. */
         @media (min-width: 1366px) and (min-height: 720px) {
             :root {
-                --ui-font-xs: 12px;
-                --ui-font-sm: 13px;
-                --ui-font-md: 14px;
-                --ui-font-lg: 17px;
-                --ui-font-xl: 22px;
-                --ui-control-h: 38px;
-                --ui-space: 14px;
+                --ui-font-xs: 13px;
+                --ui-font-sm: 14px;
+                --ui-font-md: 15px;
+                --ui-font-lg: 19px;
+                --ui-font-xl: 25px;
+                --ui-control-h: 42px;
+                --ui-space: 16px;
             }
-            .app-content { padding: 18px 22px; }
-            .app-header { min-height: 58px; }
+            .app-content { padding: 20px 24px; }
+            .app-header { min-height: 60px; }
             .app-header h1 { font-size: var(--ui-font-xl); }
-            .page-title-icon { width: 36px; height: 36px; font-size: 16px; }
-            .card-header { padding: 11px 14px; }
-            .card-body { padding: 14px; }
-            .table > thead > tr > th { padding: 10px 11px; }
-            .table > tbody > tr > td { padding: 10px 11px; }
-            .pagination { --bs-pagination-font-size: 13px; }
-            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) { font-size: 13px!important; }
-            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) :is(.form-control,.form-select) { font-size: 13px!important; min-height: 34px!important; }
-            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .btn:not(.rounded-circle) { font-size: 13px!important; min-height: 34px!important; }
-            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .table th { font-size: 12px!important; padding: 7px 8px!important; }
-            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .table td { font-size: 12px!important; padding: 6px 8px!important; }
+            .page-title-icon { width: 38px; height: 38px; font-size: 17px; }
+            .card-header { padding: 12px 16px; }
+            .card-body { padding: 16px; }
+            .table > thead > tr > th { padding: 11px 12px; }
+            .table > tbody > tr > td { padding: 11px 12px; }
+            .pagination { --bs-pagination-font-size: 14px; }
+            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) { font-size: 14px!important; }
+            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) :is(.form-control,.form-select) { font-size: 14px!important; min-height: 36px!important; }
+            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .btn:not(.rounded-circle) { font-size: 14px!important; min-height: 36px!important; }
+            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .table th { font-size: 13px!important; padding: 8px 9px!important; }
+            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .table td { font-size: 13px!important; padding: 7px 9px!important; }
         }
 
         @media (min-width: 1600px) and (min-height: 820px) {
             :root {
-                --ui-font-xs: 13px;
-                --ui-font-sm: 14px;
-                --ui-font-md: 15px;
-                --ui-font-lg: 18px;
-                --ui-font-xl: 24px;
-                --ui-control-h: 42px;
-                --ui-space: 16px;
+                --erp-rail-w: 74px;
+                --erp-subnav-w: 202px;
+                --ui-font-xs: 14px;
+                --ui-font-sm: 15px;
+                --ui-font-md: 17px;
+                --ui-font-lg: 21px;
+                --ui-font-xl: 27px;
+                --ui-control-h: 46px;
+                --ui-space: 18px;
             }
-            .app-content { padding: 22px 28px; }
-            .app-header { min-height: 62px; }
-            .card-header { padding: 13px 16px; }
-            .card-body { padding: 16px; }
-            .table > thead > tr > th { padding: 11px 13px; }
-            .table > tbody > tr > td { padding: 11px 13px; }
-            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) { font-size: 14px!important; }
-            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) :is(.form-control,.form-select) { font-size: 14px!important; }
+            .app-content { padding: 24px 30px; }
+            .app-header { min-height: 66px; }
+            .card-header { padding: 14px 18px; }
+            .card-body { padding: 18px; }
+            .table > thead > tr > th { padding: 12px 14px; }
+            .table > tbody > tr > td { padding: 12px 14px; }
+            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) { font-size: 15px!important; }
+            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) :is(.form-control,.form-select) { font-size: 15px!important; }
             body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .table th,
-            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .table td { font-size: 13px!important; }
+            body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .table td { font-size: 14px!important; }
+        }
+
+        @media (min-width: 2200px) {
+            :root {
+                --erp-rail-w: 80px;
+                --erp-subnav-w: 220px;
+                --ui-font-xs: 14px;
+                --ui-font-sm: 16px;
+                --ui-font-md: 18px;
+                --ui-font-lg: 22px;
+                --ui-font-xl: 29px;
+                --ui-control-h: 50px;
+            }
+            .app-content { padding: 28px 34px; }
         }
 
         @media print { .app-content{padding:0}.content-card,.card{box-shadow:none}.table-responsive{overflow:visible!important} }
