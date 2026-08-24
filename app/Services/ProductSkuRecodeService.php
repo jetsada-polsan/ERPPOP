@@ -15,7 +15,7 @@ class ProductSkuRecodeService
 
     public function __construct(private readonly ProductSkuAllocator $allocator) {}
 
-    /** @return array<int, array{id:int,old:string,legacy:string,new:?string,category:string,name:string,barcodes:int}> */
+    /** @return array<int, array{id:int,old:string,legacy:string,new:?string,category:string,name:string,barcodes:int,excluded:bool}> */
     public function plan(): array
     {
         $barcodeCounts = DB::table('product_barcodes')->selectRaw('product_id, count(*) as total')
@@ -33,8 +33,9 @@ class ProductSkuRecodeService
         foreach ($products as $product) {
             $category = trim((string) ($product->category?->code ?? ''));
             $target = null;
+            $excluded = $category === 'CC';
             try {
-                if ($category !== '' && $category !== '0' && $category !== 'CC') {
+                if ($category !== '' && $category !== '0' && ! $excluded) {
                     [$prefix, $digits] = $this->allocator->formatForCategoryCode($category);
                     $sequences[$category] = ($sequences[$category] ?? 0) + 1;
                     if ($sequences[$category] > (10 ** $digits) - 1) {
@@ -54,6 +55,9 @@ class ProductSkuRecodeService
                 'category' => $category,
                 'name' => (string) $product->name_th,
                 'barcodes' => (int) ($barcodeCounts[$product->id] ?? 0),
+                // Cancelled products must remain traceable by their current SKU,
+                // but are deliberately outside the new sellable SKU sequence.
+                'excluded' => $excluded,
             ];
         }
 
@@ -70,7 +74,7 @@ class ProductSkuRecodeService
             $problems[] = ['level' => 'หยุด', 'issue' => 'เปลี่ยนรหัสสินค้าแบบจัดประเภทไปแล้ว', 'detail' => 'ห้ามรันซ้ำเพื่อป้องกันรหัสขยับ'];
         }
 
-        $unclassified = collect($plan)->filter(fn (array $row) => $row['new'] === null);
+        $unclassified = collect($plan)->filter(fn (array $row) => $row['new'] === null && ! $row['excluded']);
         foreach ($unclassified->groupBy('category') as $category => $rows) {
             $problems[] = [
                 'level' => 'หยุด',
@@ -110,31 +114,33 @@ class ProductSkuRecodeService
             throw new RuntimeException('ยังเปลี่ยนรหัสไม่ได้: '.$blocking->pluck('issue')->unique()->implode(' · '));
         }
 
-        return DB::transaction(function () use ($plan, $userId): array {
+        $recodeRows = collect($plan)->reject(fn (array $row) => $row['excluded'])->values()->all();
+
+        return DB::transaction(function () use ($recodeRows, $userId): array {
             // sku_code unique: ย้ายทุกแถวไปชื่อชั่วคราวก่อน เพื่อให้สลับ/เรียงใหม่ได้โดยไม่ชน
-            foreach ($plan as $row) {
+            foreach ($recodeRows as $row) {
                 Product::withTrashed()->whereKey($row['id'])->update([
                     'sku_code' => '__recode_'.$row['id'],
                     'legacy_sku' => $row['legacy'],
                 ]);
             }
-            foreach ($plan as $row) {
+            foreach ($recodeRows as $row) {
                 Product::withTrashed()->whereKey($row['id'])->update(['sku_code' => $row['new']]);
             }
 
             MasterCutoverRun::create([
                 'scope' => self::SCOPE,
-                'mapped_count' => count($plan),
-                'first_code' => collect($plan)->pluck('new')->filter()->sort()->first(),
-                'last_code' => collect($plan)->pluck('new')->filter()->sort()->last(),
+                'mapped_count' => count($recodeRows),
+                'first_code' => collect($recodeRows)->pluck('new')->filter()->sort()->first(),
+                'last_code' => collect($recodeRows)->pluck('new')->filter()->sort()->last(),
                 'applied_by' => $userId,
                 'applied_at' => now(),
             ]);
 
             return [
-                'products' => count($plan),
-                'first_code' => (string) collect($plan)->pluck('new')->filter()->sort()->first(),
-                'last_code' => (string) collect($plan)->pluck('new')->filter()->sort()->last(),
+                'products' => count($recodeRows),
+                'first_code' => (string) collect($recodeRows)->pluck('new')->filter()->sort()->first(),
+                'last_code' => (string) collect($recodeRows)->pluck('new')->filter()->sort()->last(),
             ];
         });
     }

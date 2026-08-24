@@ -58,6 +58,19 @@ class ProductSkuRecodeTest extends TestCase
         $this->assertTrue($problems->where('level', 'หยุด')->isNotEmpty());
     }
 
+    public function test_cancelled_products_keep_their_existing_sku_and_do_not_block_recode(): void
+    {
+        $active = $this->product('P000010', '801098', $this->category('101'));
+        $cancelled = $this->product('P000011', '801099', $this->category('CC'));
+
+        $result = $this->service()->apply();
+
+        $this->assertSame(1, $result['products']);
+        $this->assertSame('101001', $active->fresh()->sku_code);
+        $this->assertSame('P000011', $cancelled->fresh()->sku_code);
+        $this->assertSame('801099', $cancelled->fresh()->legacy_sku);
+    }
+
     public function test_next_sku_is_allocated_per_category_and_skips_deleted_numbers(): void
     {
         $category = $this->category('101');
