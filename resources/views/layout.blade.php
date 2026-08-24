@@ -108,6 +108,7 @@
             'displayLabel' => 'ตั้งค่าระบบ',
             'items' => [
                 ['label' => 'ตั้งค่าระบบ', 'route' => 'settings.index', 'pattern' => 'settings.*', 'icon' => 'bi-gear-fill', 'tone' => 'slate'],
+                ['label' => 'ตั้งค่า Workflow เอกสาร', 'route' => 'settings.workflows', 'pattern' => 'settings.workflows*', 'icon' => 'bi-diagram-3-fill', 'tone' => 'red'],
                 ['label' => 'Backup / Security', 'route' => 'operations.index', 'pattern' => 'operations.*', 'icon' => 'bi-shield-lock-fill', 'tone' => 'red'],
                 ['label' => 'โครงสร้างฐานข้อมูล', 'route' => 'database-structure.index', 'pattern' => 'database-structure.*', 'icon' => 'bi-database-fill-gear', 'tone' => 'cyan'],
                 ['label' => 'Mapping Bplus → ERP', 'route' => 'legacy-mappings.index', 'pattern' => 'legacy-mappings.*', 'icon' => 'bi-arrow-left-right', 'tone' => 'amber'],

@@ -43,6 +43,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PosController;
 use App\Support\PosReleaseManifest;
 use App\Http\Controllers\PosReleaseController;
+use App\Http\Controllers\WorkflowDefinitionController;
 use App\Http\Controllers\PriceTableController;
 use App\Http\Controllers\PriceTagController;
 use App\Http\Controllers\ProductController;
@@ -615,6 +616,8 @@ Route::prefix('settings')->name('settings.')->group(function () {
     Route::post('/', [SystemSettingController::class, 'update'])->name('update');
     Route::get('/reports', [ReportGovernanceController::class, 'index'])->name('reports');
     Route::post('/reports', [ReportGovernanceController::class, 'update'])->name('reports.update');
+    Route::get('/workflows', [WorkflowDefinitionController::class, 'index'])->name('workflows');
+    Route::put('/workflows/{workflowDefinition}', [WorkflowDefinitionController::class, 'update'])->name('workflows.update');
     Route::get('/module-controls', [ModuleControlController::class, 'index'])->name('module-controls');
     Route::post('/module-controls/taxonomies/{type}', [ModuleControlController::class, 'storeTaxonomy'])->name('module-controls.taxonomies.store');
     Route::put('/module-controls/taxonomies/{type}/{id}', [ModuleControlController::class, 'updateTaxonomy'])->name('module-controls.taxonomies.update');
