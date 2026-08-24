@@ -30,12 +30,13 @@ class WorkflowDefinitionTest extends TestCase
         $definition = WorkflowDefinition::where('document_type_code', 'STOCK_TRANSFER')->sole();
 
         $this->actingAs($admin)->put(route('settings.workflows.update', $definition), [
-            'mode' => 'approval', 'approval_permission' => 'stock.manage', 'is_active' => 1,
+            'mode' => 'approval', 'approval_permission' => 'stock.manage', 'approver_positions' => ['ผู้จัดการสาขา'], 'is_active' => 1,
             'steps' => "ผู้ขอ\nผู้จัดการสาขา\nคลังรับโอน",
         ])->assertRedirect();
 
         $this->assertSame(['ผู้ขอ', 'ผู้จัดการสาขา', 'คลังรับโอน'], $definition->fresh()->steps);
         $this->assertSame('stock.manage', $definition->fresh()->approval_permission);
+        $this->assertSame(['ผู้จัดการสาขา'], $definition->fresh()->approver_positions);
         $this->assertDatabaseHas('audit_logs', ['action' => 'workflow.updated', 'record_id' => $definition->id]);
     }
 
