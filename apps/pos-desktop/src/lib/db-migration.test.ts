@@ -93,7 +93,7 @@ describe('สำรองและกู้คืนแบบ WAL', () => {
     }
   })
 
-  it('คัดลอกเฉพาะไฟล์ .db ทิ้งบิลที่ยังอยู่ใน WAL ไว้ข้างหลัง', () => {
+  it('คัดลอกเฉพาะไฟล์ .db ได้สำเนาที่ใช้ไม่ได้เลย', () => {
     const source = join(tmpdir(), `pos-copy-${Date.now()}.db`)
     const copy = join(tmpdir(), `pos-copy-only-${Date.now()}.db`)
     const db = new DatabaseSync(source)
@@ -106,10 +106,11 @@ describe('สำรองและกู้คืนแบบ WAL', () => {
     copyFileSync(source, copy)
     db.close()
 
+    // ไม่ใช่แค่บิลที่หาย — โครงตารางเองก็ยังอยู่ใน WAL สำเนาที่ได้จึงว่างเปล่าทั้งไฟล์
     const restored = new DatabaseSync(copy)
-    const rows = restored.prepare('SELECT COUNT(*) AS n FROM checkout_queue').get() as { n: number }
+    expect(() => restored.prepare('SELECT COUNT(*) AS n FROM checkout_queue').get())
+      .toThrowError(/no such table/)
     restored.close()
-    expect(rows.n).toBe(0)   // บิลหายไปกับ WAL ที่ไม่ได้คัดลอกมา
 
     for (const path of [source, copy, `${source}-wal`, `${source}-shm`]) {
       if (existsSync(path)) rmSync(path)
