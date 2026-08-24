@@ -15,13 +15,17 @@ Run Laravel's scheduler every minute:
 * * * * * cd /var/www/jeterp && php artisan schedule:run >/dev/null 2>&1
 ```
 
-Recommended server schedules are daily `erp:backup --disk=<offsite disk>`, hourly `erp:health`, and a monthly restore drill against an isolated database.
+Recommended server schedules are hourly `erp:health` and a monthly restore drill against an isolated database. For the production-to-Google-Drive-to-local-DR workflow use the reviewed scripts in `scripts/backup/`, not Laravel's basic local `erp:backup` command.
 
 ## Backup and restore
 
-`php artisan erp:backup` creates a compressed SQL backup and SHA-256 checksum. Set `ERP_BACKUP_OFFSITE_DISK` to copy both files to a configured remote filesystem.
+`php artisan erp:backup` creates a compressed SQL backup and SHA-256 checksum for an on-demand local safeguard. The complete nightly DR flow is documented in [BACKUP-DR-RUNBOOK.md](BACKUP-DR-RUNBOOK.md): PostgreSQL custom archive plus uploaded files, SHA-256 validation, encrypted `rclone crypt` Google Drive copy, and a local restore limited to `jeterp_dr`.
 
 `php artisan erp:restore-drill` verifies the latest local backup. Set `ERP_RESTORE_DATABASE` to a disposable database and add `--execute` to perform a full restore test. It refuses to restore over the configured application database.
+
+Do not install the backup cron examples until the manual Google Drive round-trip
+and local `jeterp_dr` restore drill have passed and are recorded in
+`docs/ai/backup-dr-uat.md`.
 
 ## Deployment
 

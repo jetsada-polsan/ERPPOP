@@ -1,0 +1,9 @@
+# Examples only. Do not install until manual production backup, encrypted Drive
+# transfer, local pull, checksum check and restore to jeterp_dr have passed.
+# Ensure both hosts use Asia/Bangkok timezone and write output to protected logs.
+
+# Production host, /etc/cron.d/jeterp-production-backup
+5 0 * * * root /usr/local/sbin/jeterp-production-backup >> /var/log/jeterp-backup/production.log 2>&1
+
+# Local company server, /etc/cron.d/jeterp-local-dr
+0 1 * * * root /usr/local/sbin/jeterp-local-dr-restore >> /var/log/jeterp-backup/local-dr.log 2>&1
