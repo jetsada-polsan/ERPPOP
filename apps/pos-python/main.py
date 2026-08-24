@@ -64,8 +64,8 @@ def seed(db) -> None:
         )
 
     catalogue = [
-        (1, "800123", "หมูสามชั้นสไลซ์", "กก.", "ของสด", "189.00", 1, None, None),
-        (2, "800124", "เนื้อหมูบด", "กก.", "ของสด", "147.00", 1, None, None),
+        (1, "102201", "หมูสามชั้นสไลซ์", "กก.", "ของสด", "189.00", 1, "801001", "SCALE_PLU"),
+        (2, "102202", "เนื้อหมูบด", "กก.", "ของสด", "147.00", 1, "801002", "SCALE_PLU"),
         (3, "P001203", "น้ำจิ้มหมูกระทะ", "ขวด", "เครื่องปรุง", "45.00", 1, "8850000000003", "EAN13_STANDARD"),
         (4, "P000775", "ผักรวมสด", "ถุง", "ของสด", "59.00", 0, "2990000000017", "INTERNAL_13"),
         (5, "P000126", "น้ำแข็งหลอด", "ถุง", "เครื่องดื่ม", "25.00", 1, "ICE-01", "CUSTOM"),
@@ -79,10 +79,11 @@ def seed(db) -> None:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
             (product_id, sku, name, unit, category, price, is_vat, timestamp),
         )
-        # PLU เครื่องชั่งลงทะเบียนเป็นบาร์โค้ดด้วย เพื่อให้ป้ายที่ถอดออกมาหาสินค้าเจอ
+        # PLU 801xxx คือรหัสอ้างอิงในเครื่องชั่ง ส่วนฉลาก EAN-13 จะถูกถอดเป็น
+        # SCALE_WEIGHT ตอนสแกน ไม่ใช่ barcode row ของสินค้าโดยตรง.
         db.execute(
             "INSERT OR IGNORE INTO product_barcodes (barcode, product_id, barcode_type, price, synced_at) VALUES (?, ?, ?, ?, ?)",
-            (barcode or sku, product_id, barcode_type or "SCALE_WEIGHT", price, timestamp),
+            (barcode or sku, product_id, barcode_type or "CUSTOM", price, timestamp),
         )
     db.commit()
 

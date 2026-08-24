@@ -46,7 +46,7 @@ class SeededAppTest(unittest.TestCase):
     def test_a_scale_label_works_out_of_the_box(self) -> None:
         self.assertGreater(len(load_scale_profiles(self.db)), 0, "เครื่องใหม่ต้องมีรูปแบบป้ายติดมาด้วย")
 
-        body = "800123" + "012550"
+        body = "801001" + "012550"
         line = scale_cart_line(self.db, body + str(ean13_check_digit(body)))
 
         self.assertEqual(line.barcode_type, "SCALE_WEIGHT")
@@ -54,6 +54,7 @@ class SeededAppTest(unittest.TestCase):
 
     def test_each_barcode_type_in_the_seed_scans(self) -> None:
         for barcode, expected in [
+            ("801001", "SCALE_PLU"),
             ("8850000000003", "EAN13_STANDARD"),
             ("2990000000017", "INTERNAL_13"),
             ("ICE-01", "CUSTOM"),

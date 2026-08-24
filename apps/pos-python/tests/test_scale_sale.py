@@ -20,8 +20,8 @@ class ScaleSaleUatTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.db = connect(Path(self.tmp.name) / "pos.db")
         self.db.execute("INSERT INTO local_cashiers (id, code, name, pin_hash, synced_at) VALUES (1, 'POP001', 'Tester', ?, ?)", (pin_hash('1234'), now()))
-        self.db.execute("INSERT INTO products (id, sku, name, unit_name, updated_at) VALUES (1, '800123', 'หมูสามชั้นสไลซ์', 'กก.', ?)", (now(),))
-        self.db.execute("INSERT INTO product_barcodes (barcode, product_id, barcode_type, price, synced_at) VALUES ('800123', 1, 'SCALE_WEIGHT', 200, ?)", (now(),))
+        self.db.execute("INSERT INTO products (id, sku, name, unit_name, updated_at) VALUES (1, '102201', 'หมูสามชั้นสไลซ์', 'กก.', ?)", (now(),))
+        self.db.execute("INSERT INTO product_barcodes (barcode, product_id, barcode_type, price, synced_at) VALUES ('801001', 1, 'SCALE_PLU', 200, ?)", (now(),))
         # เครื่องต้องได้รูปแบบป้ายมาจาก ERP ก่อน ไม่ใช่เดาเองจากตัวเลข
         replace_scale_profiles(self.db, [
             {"code": "POPSTAR-800", "prefix": "800", "plu_length": 6, "value_length": 6,
@@ -38,7 +38,7 @@ class ScaleSaleUatTest(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_scale_label_creates_exact_quantity_and_sale_snapshot(self) -> None:
-        scanned = label("800123", "012550")  # price embedded: 125.50
+        scanned = label("801001", "012550")  # price embedded: 125.50
         line = scale_cart_line(self.db, scanned)
         self.assertEqual(line.qty, Decimal("0.6275"))
         self.assertEqual(line.unit_price, Decimal("200"))
@@ -50,14 +50,14 @@ class ScaleSaleUatTest(unittest.TestCase):
         self.assertEqual(self.pos.pending_sync_count(), 1)
 
     def test_rejects_tampered_scale_label_before_sale(self) -> None:
-        valid = label("800123", "012550")
+        valid = label("801001", "012550")
         with self.assertRaisesRegex(ValueError, "check digit"):
-            scale_cart_line(self.db, "800124" + valid[6:])
+            scale_cart_line(self.db, "801002" + valid[6:])
         self.assertEqual(self.db.execute("SELECT count(*) FROM sales").fetchone()[0], 0)
 
     def test_reports_unknown_scale_plu(self) -> None:
-        with self.assertRaisesRegex(ValueError, "800999"):
-            scale_cart_line(self.db, label("800999", "010000"))
+        with self.assertRaisesRegex(ValueError, "801999"):
+            scale_cart_line(self.db, label("801999", "010000"))
 
 
 if __name__ == "__main__":
