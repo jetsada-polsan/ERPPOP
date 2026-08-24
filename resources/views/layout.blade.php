@@ -894,6 +894,20 @@
             body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .btn:not(.rounded-circle) { font-size: 14px!important; min-height: 36px!important; }
             body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .table th { font-size: 13px!important; padding: 8px 9px!important; }
             body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .table td { font-size: 13px!important; padding: 7px 9px!important; }
+
+            /* Navigation has its own fixed sizing. Keep it readable independently
+               from the data-table font scale. */
+            :root { --erp-rail-w: 76px; --erp-subnav-w: 218px; }
+            .fa-rail { padding: 14px 0; gap: 8px; }
+            .fa-rail-btn { width: 66px; min-height: 62px; padding: 8px 3px 7px; }
+            .fa-rail-btn i { font-size: 21px; }
+            .fa-rail-btn-label { font-size: 11px; max-width: 64px; }
+            .fa-subnav { padding: 14px 12px 22px; }
+            .fa-subnav-brand { height: 54px; }
+            .fa-subnav-brand img { max-width: 124px!important; max-height: 44px!important; }
+            .fa-subnav-title { font-size: 17px; padding: 6px 10px 10px; }
+            .fa-subnav-link { gap: 11px; padding: 9px 10px; font-size: 15px; margin-bottom: 2px; }
+            .fa-subnav-link i { font-size: 15px; width: 18px; }
         }
 
         @media (min-width: 1600px) and (min-height: 820px) {
@@ -914,6 +928,13 @@
             .card-body { padding: 18px; }
             .table > thead > tr > th { padding: 12px 14px; }
             .table > tbody > tr > td { padding: 12px 14px; }
+            :root { --erp-rail-w: 84px; --erp-subnav-w: 242px; }
+            .fa-rail-btn { width: 72px; min-height: 68px; }
+            .fa-rail-btn i { font-size: 23px; }
+            .fa-rail-btn-label { font-size: 12px; max-width: 70px; }
+            .fa-subnav-title { font-size: 19px; }
+            .fa-subnav-link { font-size: 17px; padding: 10px 12px; }
+            .fa-subnav-link i { font-size: 17px; width: 20px; }
             body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) { font-size: 15px!important; }
             body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) :is(.form-control,.form-select) { font-size: 15px!important; }
             body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .table th,
@@ -932,6 +953,13 @@
                 --ui-control-h: 50px;
             }
             .app-content { padding: 28px 34px; }
+            :root { --erp-rail-w: 90px; --erp-subnav-w: 260px; }
+            .fa-rail-btn { width: 78px; min-height: 72px; }
+            .fa-rail-btn i { font-size: 25px; }
+            .fa-rail-btn-label { font-size: 13px; max-width: 76px; }
+            .fa-subnav-title { font-size: 20px; }
+            .fa-subnav-link { font-size: 18px; padding: 11px 13px; }
+            .fa-subnav-link i { font-size: 18px; width: 22px; }
         }
 
         @media print { .app-content{padding:0}.content-card,.card{box-shadow:none}.table-responsive{overflow:visible!important} }

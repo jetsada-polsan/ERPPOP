@@ -66,7 +66,7 @@ class ScalePriceController extends Controller
         ]);
     }
 
-    /** ดึงสินค้าใด ๆ เข้ารายการชั่ง โดยผูกรหัส PLU 800xxx ถัดไปให้อัตโนมัติ */
+    /** ดึงสินค้าใด ๆ เข้ารายการชั่ง โดยผูก PLU ใหม่ช่วง 801xxx อัตโนมัติ */
     public function attachPlu(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -84,15 +84,20 @@ class ScalePriceController extends Controller
                 ->with('success', "{$product->name_th} มี PLU เครื่องชั่งอยู่แล้ว");
         }
 
-        // เลข 800xxx ถัดไป (max+1) + กันซ้ำ
-        $max = ProductBarcode::where('barcode', 'like', '800%')
+        // เก็บ 800xxx เดิมไว้ตามฉลาก/เครื่องชั่งเดิม แต่ PLU ที่สร้างใหม่
+        // เริ่มในช่วง 801xxx เพื่อแยกของใหม่และไม่ทำให้พนักงานสับสน.
+        $max = ProductBarcode::where('barcode', 'like', '801%')
             ->pluck('barcode')
-            ->filter(fn ($b) => preg_match('/^800[0-9]{3}$/', (string) $b) === 1)
+            ->filter(fn ($b) => preg_match('/^801[0-9]{3}$/', (string) $b) === 1)
             ->map(fn ($b) => (int) $b)
             ->max();
-        $next = str_pad((string) (($max ?: 800000) + 1), 6, '0', STR_PAD_LEFT);
-        while (ProductBarcode::where('barcode', $next)->exists()) {
+        $next = str_pad((string) (($max ?: 801000) + 1), 6, '0', STR_PAD_LEFT);
+        while ((int) $next <= 801999 && ProductBarcode::where('barcode', $next)->exists()) {
             $next = str_pad((string) ((int) $next + 1), 6, '0', STR_PAD_LEFT);
+        }
+        if ((int) $next > 801999) {
+            return redirect()->route('scale-prices.index')
+                ->withErrors(['product_id' => 'เลข PLU เครื่องชั่งช่วง 801xxx เต็มแล้ว กรุณาติดต่อผู้ดูแลระบบ']);
         }
 
         $product->barcodes()->create([
