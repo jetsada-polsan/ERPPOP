@@ -182,6 +182,29 @@
         html[data-layout="odoo"] .fa-rail { background:#714b67; }
         html[data-layout="odoo"] .fa-subnav-link.active { background:#f3edf2; color:#714b67; box-shadow:inset 3px 0 #714b67; }
         html[data-layout="odoo"] .app-content { background:#f7f7f7; }
+        html[data-layout="odoo"] body { background:#f7f7f7; }
+        html[data-layout="odoo"] .fa-rail { background:#493047; border-right:0; }
+        html[data-layout="odoo"] .fa-rail-logo { background:#714b67; }
+        html[data-layout="odoo"] .fa-rail-btn { color:#eadfe8; }
+        html[data-layout="odoo"] .fa-rail-btn.active,
+        html[data-layout="odoo"] .fa-rail-btn:hover { background:#714b67; color:#fff; }
+        html[data-layout="odoo"] .fa-subnav { background:#fff; border-right:1px solid #e6e1e5; }
+        html[data-layout="odoo"] .fa-subnav-title { color:#493047; }
+        html[data-layout="odoo"] .fa-subnav-link { color:#5d5360; border-radius:4px; }
+        html[data-layout="odoo"] .fa-subnav-link:hover { background:#f8f3f7; color:#714b67; }
+        html[data-layout="odoo"] .app-main { background:#f7f7f7; }
+        html[data-layout="odoo"] .app-header { border-bottom:1px solid #e6e1e5; box-shadow:0 1px 3px rgba(73,48,71,.06); }
+        html[data-layout="odoo"] .app-header .page-title-icon { background:#f3edf2; color:#714b67; }
+        html[data-layout="odoo"] .app-header h1 { color:#493047; }
+        html[data-layout="odoo"] .card,
+        html[data-layout="odoo"] .content-card,
+        html[data-layout="odoo"] .set-card { border:1px solid #e6e1e5; border-radius:6px; box-shadow:0 1px 3px rgba(73,48,71,.08); }
+        html[data-layout="odoo"] .card-header { background:#fff; border-bottom:1px solid #e6e1e5; color:#493047; }
+        html[data-layout="odoo"] .btn-primary,
+        html[data-layout="odoo"] .btn-success { background:#714b67; border-color:#714b67; }
+        html[data-layout="odoo"] .btn-primary:hover,
+        html[data-layout="odoo"] .btn-success:hover { background:#493047; border-color:#493047; }
+        html[data-layout="odoo"] .table thead th { background:#f3edf2; color:#493047; }
         /* ════════════════════════════════════════
            THEME - FlowAccount-style light (single)
            ════════════════════════════════════════ */
