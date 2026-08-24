@@ -21,7 +21,34 @@ permissions:
   contents: read
 
 jobs:
+  # ด่านแรกก่อนสร้างตัวติดตั้ง — เดิมงาน build ไม่ได้ผูกกับเทสต์เลย
+  # สั่ง release ได้แม้ชุดเทสต์แดง แล้วตัวติดตั้งจะไปถึงเครื่องหน้าร้านทันที
+  # เพราะ publish เขียนทับ latest.json ที่ทุกเครื่องอ่านเพื่อเช็คอัปเดต
+  checks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/pos-desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/pos-desktop/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Unit tests
+        run: pnpm test
+      - name: Production web build
+        run: pnpm build
+
   windows:
+    needs: checks
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
