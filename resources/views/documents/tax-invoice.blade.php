@@ -43,6 +43,10 @@
         .toolbar { max-width: 210mm; margin: 10px auto 2px; display: flex; gap: 8px; justify-content: flex-end; }
         .toolbar a, .toolbar button { font-family: inherit; font-size: 13px; font-weight: 700; padding: 8px 16px; border-radius: 8px; border: 1px solid #cfe0ed; background: #fff; color: #2a4a63; cursor: pointer; text-decoration: none; }
         .toolbar .primary { background: #1a9bdc; border-color: #1585c0; color: #fff; }
+        /* ประกาศขนาดกระดาษให้ชัด — ไม่ประกาศแล้วเครื่องพิมพ์แต่ละเครื่อง
+        จะใช้ค่าที่ตั้งไว้ของตัวเอง เนื้อหาที่วางไว้กว้าง 210mm อาจถูกย่อหรือตัดขอบ
+        โดยที่คนสั่งพิมพ์ไม่รู้จนกว่าจะเห็นกระดาษ */
+        @page { size: A4 portrait; margin: 10mm; }
         @media print {
             body { background: #fff; }
             .sheet { margin: 0; box-shadow: none; width: auto; min-height: auto; }

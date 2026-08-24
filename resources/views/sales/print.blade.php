@@ -65,6 +65,10 @@
         /* Footer */
         .doc-footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 10.5px; color: #94a3b8; text-align: center; }
 
+        /* ประกาศขนาดกระดาษให้ชัด — ไม่ประกาศแล้วเครื่องพิมพ์แต่ละเครื่อง
+        จะใช้ค่าที่ตั้งไว้ของตัวเอง เนื้อหาที่วางไว้กว้าง 210mm อาจถูกย่อหรือตัดขอบ
+        โดยที่คนสั่งพิมพ์ไม่รู้จนกว่าจะเห็นกระดาษ */
+        @page { size: A4 portrait; margin: 10mm; }
         @media print {
             body { background: #fff; }
             .no-print { display: none !important; }

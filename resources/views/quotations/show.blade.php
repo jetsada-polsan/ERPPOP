@@ -80,6 +80,8 @@
 @push('head')
 <style>
     @include('documents.partials.print-theme')
+    /* ใบเสนอราคาเป็นเอกสารส่งลูกค้า ต้องได้ขนาดเดียวกันทุกเครื่องที่สั่งพิมพ์ */
+    @page { size: A4 portrait; margin: 10mm; }
     @media print { .app-sidebar, .app-header, .no-print { display: none !important; } .content-card { border: none; box-shadow: none; } }
 </style>
 @endpush

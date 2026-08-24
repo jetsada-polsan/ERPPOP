@@ -100,6 +100,10 @@
     .bill-sign .sign-box { text-align: center; font-size: 13px; width: 30%; }
     .bill-sign .line { border-top: 1px dashed #64748b; margin-bottom: 6px; }
     @include('documents.partials.print-theme')
+    /* ประกาศขนาดกระดาษให้ชัด — ไม่ประกาศแล้วเครื่องพิมพ์แต่ละเครื่อง
+    จะใช้ค่าที่ตั้งไว้ของตัวเอง เนื้อหาที่วางไว้กว้าง 210mm อาจถูกย่อหรือตัดขอบ
+    โดยที่คนสั่งพิมพ์ไม่รู้จนกว่าจะเห็นกระดาษ */
+    @page { size: A4 portrait; margin: 10mm; }
     @media print {
         .app-sidebar, .app-header, .no-print { display: none !important; }
         .print-sheet { padding: 0; }
