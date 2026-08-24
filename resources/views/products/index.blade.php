@@ -119,8 +119,14 @@
                     <div class="modal-body px-4 pb-4">
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label text-muted small">รหัสสินค้า (SKU)</label>
-                                <input type="text" name="sku_code" required class="form-control">
+                                <label class="form-label text-muted small">ประเภทสินค้า <span class="text-danger">*</span></label>
+                                <select name="product_category_id" required class="form-select">
+                                    <option value="">-- เลือกประเภทเพื่อรันรหัสอัตโนมัติ --</option>
+                                    @foreach($categories as $category)
+                                        <option value="{{ $category->id }}">{{ $category->code }} - {{ $category->name_th }}</option>
+                                    @endforeach
+                                </select>
+                                <div class="form-text">ระบบจะรันรหัสตามประเภท เช่น 101001, 101002 โดยไม่ต้องกรอกเอง</div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label text-muted small">หน่วยหลัก</label>
@@ -152,16 +158,7 @@
                             <div class="col-md-3"><label class="form-label text-muted small">จุดสั่งซื้อ</label><input type="number" step="0.0001" min="0" name="reorder_point" class="form-control"></div>
                             <div class="col-md-3"><label class="form-label text-muted small">สต๊อกขั้นต่ำ</label><input type="number" step="0.0001" min="0" name="minimum_stock" class="form-control"></div>
                             <div class="col-md-3"><label class="form-label text-muted small">สต๊อกสูงสุด</label><input type="number" step="0.0001" min="0" name="maximum_stock" class="form-control"></div>
-                            <div class="col-md-4">
-                                <label class="form-label text-muted small">หมวดหมู่</label>
-                                <select name="product_category_id" class="form-select">
-                                    <option value="">-- ไม่ระบุ --</option>
-                                    @foreach($categories as $category)
-                                        <option value="{{ $category->id }}">{{ $category->name_th }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-4">
+                            <div class="col-md-6">
                                 <label class="form-label text-muted small">แผนก</label>
                                 <select name="product_department_id" class="form-select">
                                     <option value="">-- ไม่ระบุ --</option>
@@ -170,7 +167,7 @@
                                     @endforeach
                                 </select>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-6">
                                 <label class="form-label text-muted small">ยี่ห้อ</label>
                                 <select name="product_brand_id" class="form-select">
                                     <option value="">-- ไม่ระบุ --</option>

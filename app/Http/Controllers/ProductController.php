@@ -23,6 +23,7 @@ use App\Models\StockMovement;
 use App\Models\Supplier;
 use App\Models\SupplierPriceSchedule;
 use App\Services\Inventory\ProductCostHistoryService;
+use App\Services\ProductSkuAllocator;
 use App\Support\DecimalMath;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -89,11 +90,19 @@ class ProductController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, ProductSkuAllocator $skuAllocator): RedirectResponse
     {
         $data = $this->validateProduct($request);
+        if (empty($data['product_category_id'])) {
+            throw ValidationException::withMessages(['product_category_id' => 'ต้องเลือกประเภทสินค้า ระบบจึงจะรันรหัสสินค้าได้']);
+        }
 
-        $product = Product::create($data);
+        $product = DB::transaction(function () use ($data, $skuAllocator): Product {
+            // SKU เป็นเลขควบคุมของระบบ ไม่รับค่าที่ส่งมาจากฟอร์มเพื่อกันการข้ามลำดับ.
+            $data['sku_code'] = $skuAllocator->nextForCategory((int) $data['product_category_id']);
+
+            return Product::create($data);
+        });
 
         return redirect()->route('products.show', $product)->with('success', "เพิ่มสินค้า {$product->sku_code} แล้ว");
     }
@@ -525,7 +534,6 @@ class ProductController extends Controller
     private function validateProduct(Request $request, ?int $ignoreId = null): array
     {
         $data = $request->validate([
-            'sku_code' => ['required', 'string', 'max:30', 'unique:products,sku_code,'.($ignoreId ?? 'NULL').',id'],
             'name_th' => ['required', 'string', 'max:250'],
             'name_en' => ['nullable', 'string', 'max:250'],
             'note' => ['nullable', 'string', 'max:2000'],
@@ -558,6 +566,9 @@ class ProductController extends Controller
         $data['clearance_discount_percent'] = $data['clearance_discount_percent'] ?? 0;
         $data['expiry_sale_policy'] = $data['expiry_sale_policy'] ?? 'block';
         $data['margin_control_policy'] = $data['margin_control_policy'] ?? 'warn';
+
+        // ไม่อนุญาตให้ฟอร์มสร้าง/แก้ SKU เอง; สร้างใหม่เท่านั้นที่ allocator กำหนดค่า.
+        unset($data['sku_code']);
 
         return $data;
     }
