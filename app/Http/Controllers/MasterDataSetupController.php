@@ -21,6 +21,12 @@ class MasterDataSetupController extends Controller
 {
     private const TYPES = ['categories', 'products', 'employees'];
 
+    /**
+     * ผลตรวจมีอายุ เพราะมันคือภาพของฐานข้อมูล ณ ตอนที่ตรวจ
+     * ทิ้งไว้ข้ามวันแล้วกดยืนยัน คือยืนยันกับสถานะที่ไม่มีอยู่แล้ว
+     */
+    private const PREVIEW_TTL_MINUTES = 60;
+
     public function index(): \Illuminate\View\View
     {
         return view('master-data-setup.index', [
@@ -95,11 +101,13 @@ class MasterDataSetupController extends Controller
         }
 
         $validated = $this->validatePlan($type, $plan, app(BarcodePolicy::class));
+        $this->sweepStalePreviews();
         $token = (string) Str::uuid();
         Storage::put("master-data-setup/{$token}.json", json_encode([
             'type' => $type,
             'rows' => $validated['rows'],
             'summary' => $validated['summary'],
+            'created_at' => now()->toIso8601String(),
         ], JSON_UNESCAPED_UNICODE));
         session(['master_data_setup_preview' => ['token' => $token, 'type' => $type] + $validated['summary']]);
 
@@ -112,8 +120,17 @@ class MasterDataSetupController extends Controller
         $pending = session('master_data_setup_preview');
         abort_unless(is_array($pending) && $pending['type'] === $type && $request->string('token')->toString() === $pending['token'], 422, 'ผลตรวจหมดอายุ กรุณาอัปโหลดตรวจใหม่');
 
+        abort_unless(Storage::exists("master-data-setup/{$pending['token']}.json"), 422, 'ไม่พบผลตรวจไฟล์ กรุณาอัปโหลดตรวจใหม่');
         $saved = json_decode((string) Storage::get("master-data-setup/{$pending['token']}.json"), true);
         abort_unless(is_array($saved) && ($saved['type'] ?? null) === $type, 422, 'ไม่พบผลตรวจไฟล์');
+
+        $checkedAt = isset($saved['created_at']) ? \Illuminate\Support\Carbon::parse($saved['created_at']) : null;
+        if ($checkedAt === null || $checkedAt->lt(now()->subMinutes(self::PREVIEW_TTL_MINUTES))) {
+            Storage::delete("master-data-setup/{$pending['token']}.json");
+            session()->forget('master_data_setup_preview');
+
+            return back()->withErrors(['file' => 'ผลตรวจเกิน '.self::PREVIEW_TTL_MINUTES.' นาทีแล้ว ข้อมูลในระบบอาจเปลี่ยนไป กรุณาอัปโหลดตรวจใหม่']);
+        }
         $errors = collect($saved['rows'])->where('action', 'error');
         if ($errors->isNotEmpty()) {
             return back()->withErrors(['file' => 'ไฟล์ยังมีข้อผิดพลาด '.count($errors).' รายการ จึงไม่สามารถนำเข้าได้']);
@@ -131,6 +148,17 @@ class MasterDataSetupController extends Controller
         session()->forget('master_data_setup_preview');
 
         return redirect()->route('master-data-setup.index')->with('success', "นำเข้าข้อมูล {$created} รายการแล้ว รายการเดิมถูกข้ามโดยไม่แก้ไข");
+    }
+
+    /** ลบผลตรวจที่ไม่มีใครกดยืนยัน — ในไฟล์มีชื่อและเบอร์โทรพนักงาน ไม่ควรค้างไว้ */
+    private function sweepStalePreviews(): void
+    {
+        $cutoff = now()->subMinutes(self::PREVIEW_TTL_MINUTES)->getTimestamp();
+        foreach (Storage::files('master-data-setup') as $file) {
+            if (Storage::lastModified($file) < $cutoff) {
+                Storage::delete($file);
+            }
+        }
     }
 
     private function validatePlan(string $type, array $rows, BarcodePolicy $barcodePolicy): array
@@ -159,8 +187,11 @@ class MasterDataSetupController extends Controller
                 $row['message'] = $missingRequired ? 'ข้อมูลบังคับไม่ครบ' : 'คีย์อ้างอิงซ้ำในไฟล์';
             } elseif ($type === 'categories' && isset($categoryCodes[$key])) {
                 $row['action'] = 'skip'; $row['message'] = 'มีประเภทนี้แล้ว ไม่แก้ไขของเดิม';
-            } elseif ($type === 'products' && (Product::withTrashed()->where('legacy_sku', $key)->exists() || Product::withTrashed()->where('sku_code', $key)->exists())) {
-                $row['action'] = 'skip'; $row['message'] = 'มีสินค้าอ้างอิงนี้แล้ว ไม่แก้ไขของเดิม';
+            } elseif ($type === 'products' && Product::withTrashed()->where('legacy_sku', $key)->exists()) {
+                // เทียบเฉพาะ legacy_sku — sku_code เป็นคนละ namespace
+                // เอามาเทียบกันแล้วสินค้าใหม่ที่รหัสเดิมบังเอิญตรงกับ SKU ที่ระบบรันไว้
+                // จะถูกข้ามเงียบ ๆ ทั้งที่ยังไม่เคยมีในระบบ
+                $row['action'] = 'skip'; $row['message'] = 'มีสินค้ารหัสเดิมนี้แล้ว ไม่แก้ไขของเดิม';
             } elseif ($type === 'employees' && Employee::where('source_section', 'excel:'.$key)->exists()) {
                 $row['action'] = 'skip'; $row['message'] = 'มีพนักงานอ้างอิงนี้แล้ว ไม่แก้ไขของเดิม';
             } elseif ($type === 'products' && !isset($categoryCodes[$data['category_code']])) {
@@ -168,7 +199,7 @@ class MasterDataSetupController extends Controller
             } elseif ($type === 'products' && !isset($unitCodes[$data['unit_code']])) {
                 $row['action'] = 'error'; $row['message'] = 'ไม่พบ unit_code';
             } elseif ($type === 'products' && $data['barcode'] !== '' && ProductBarcode::where('barcode', $data['barcode'])->exists()) {
-                $row['action'] = 'skip'; $row['message'] = 'บาร์โค้ดมีในระบบแล้ว ไม่แก้ไขของเดิม';
+                $row['action'] = 'skip'; $row['message'] = 'บาร์โค้ดนี้เป็นของสินค้าอื่นแล้ว — ข้ามทั้งแถว สินค้ายังไม่ถูกเพิ่ม';
             } elseif ($type === 'products' && $data['barcode'] !== '' && ! $barcodePolicy->check($data['barcode_type'] ?: BarcodePolicy::CUSTOM, $data['barcode'])['ok']) {
                 $row['action'] = 'error'; $row['message'] = 'ประเภทหรือรูปแบบบาร์โค้ดไม่ถูกต้อง';
             } elseif ($type === 'employees' && $data['branch_code'] !== '' && !isset($branchCodes[$data['branch_code']])) {
@@ -178,9 +209,17 @@ class MasterDataSetupController extends Controller
             }
             $seen[$key] = true;
             $summary[$row['action']]++;
-            if (count($summary['examples']) < 12) $summary['examples'][] = $row;
         }
         unset($row);
+
+        // โชว์แถวที่ผิดก่อนเสมอ — เดิมหยิบ 12 แถวแรกของไฟล์ ถ้าแถวต้น ๆ ถูกหมด
+        // ผู้ใช้จะเห็นตัวเลข error 30 รายการแต่ไม่เห็นสักบรรทัดว่าผิดตรงไหน
+        $byPriority = ['error' => [], 'skip' => [], 'new' => []];
+        foreach ($rows as $row) {
+            $byPriority[$row['action']][] = $row;
+        }
+        $summary['examples'] = array_slice(array_merge($byPriority['error'], $byPriority['skip'], $byPriority['new']), 0, 12);
+        $summary['examples_capped'] = count($rows) > count($summary['examples']);
 
         return compact('rows', 'summary');
     }

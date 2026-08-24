@@ -24,6 +24,7 @@
         <h4><i class="bi bi-shield-check text-warning"></i> ผลตรวจ: {{ ['categories'=>'ประเภทสินค้า','products'=>'สินค้า','employees'=>'พนักงาน'][$pending['type']] }}</h4>
         <div class="row text-center my-3"><div class="col"><strong class="fs-3 text-success">{{ $pending['new'] }}</strong><br>เพิ่มใหม่</div><div class="col"><strong class="fs-3 text-secondary">{{ $pending['skip'] }}</strong><br>ข้ามของเดิม</div><div class="col"><strong class="fs-3 text-danger">{{ $pending['error'] }}</strong><br>ข้อผิดพลาด</div></div>
         @foreach($pending['examples'] as $row)<div class="small border-top py-1"><strong>บรรทัด {{ $row['line'] }}</strong> · <span class="badge text-bg-{{ $row['action']==='new'?'success':($row['action']==='skip'?'secondary':'danger') }}">{{ $row['action'] }}</span> · {{ $row['message'] }}</div>@endforeach
+        @if($pending['examples_capped'] ?? false)<div class="small text-muted pt-2">แสดงตัวอย่าง {{ count($pending['examples']) }} บรรทัด (แถวที่ผิดขึ้นก่อน) — แก้ตามเลขบรรทัดใน Excel แล้วอัปโหลดตรวจใหม่</div>@endif
         @if($pending['error'] === 0)<form method="post" action="{{ route('master-data-setup.apply',$pending['type']) }}" class="mt-3">@csrf<input type="hidden" name="token" value="{{ $pending['token'] }}"><button class="btn btn-success"><i class="bi bi-check2-circle"></i> ยืนยันเพิ่ม {{ $pending['new'] }} รายการ</button></form>@else <div class="alert alert-danger mb-0 mt-3">แก้ไฟล์ให้ไม่มี error ก่อน ระบบจะไม่เขียนข้อมูลบางส่วน</div>@endif
     </div></section>
     @endif
