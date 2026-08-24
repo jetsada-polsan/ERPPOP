@@ -164,6 +164,24 @@ CREATE TABLE IF NOT EXISTS receipt_templates (
 """
 
 
+# คอลัมน์ที่เพิ่มทีหลัง — CREATE TABLE IF NOT EXISTS ไม่เติมคอลัมน์ให้เครื่องที่ลงไปแล้ว
+# เครื่องหน้าร้านที่อัปเดตจึงต้องมีขั้นตอนเติมทีละคอลัมน์ ไม่ใช่สร้างตารางใหม่ทับ
+# ซึ่งจะทำให้บิลค้างส่งกับประวัติขายหายไปทั้งหมด
+ADDED_COLUMNS: list[tuple[str, str, str]] = [
+    ("payments", "change_amount", "TEXT NOT NULL DEFAULT '0'"),
+    ("sales", "voided_at", "TEXT"),
+    ("sales", "void_reason", "TEXT"),
+    ("sales", "voided_by", "INTEGER"),
+]
+
+
+def _add_missing_columns(connection: sqlite3.Connection) -> None:
+    for table, column, definition in ADDED_COLUMNS:
+        existing = {row["name"] for row in connection.execute(f"PRAGMA table_info({table})")}
+        if column not in existing:
+            connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
 def connect(path: Path) -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(path)
@@ -172,4 +190,6 @@ def connect(path: Path) -> sqlite3.Connection:
     connection.execute("PRAGMA journal_mode = WAL")
     connection.execute("PRAGMA synchronous = FULL")
     connection.executescript(SCHEMA)
+    _add_missing_columns(connection)
+    connection.commit()
     return connection

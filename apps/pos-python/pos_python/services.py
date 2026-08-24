@@ -70,6 +70,13 @@ class PosService:
                  sale_uuid: str | None = None) -> int:
         if not lines:
             raise ValueError("ต้องมีสินค้าอย่างน้อยหนึ่งรายการ")
+        shift = self.db.execute("SELECT status FROM shifts WHERE id = ?", (shift_id,)).fetchone()
+        if not shift:
+            raise ValueError("ไม่พบกะที่ระบุ")
+        if shift["status"] != "open":
+            # ขายเข้ากะที่ปิดไปแล้วแปลว่ายอดขายไปโผล่ในกะที่นับเงินจบแล้ว
+            # เงินในลิ้นชักกับยอดในระบบจะไม่ตรงกันโดยไม่มีใครรู้ว่าเริ่มเพี้ยนตรงไหน
+            raise ValueError("กะนี้ปิดแล้ว เปิดกะใหม่ก่อนขาย")
         sale_uuid = sale_uuid or str(uuid.uuid4())
         existing = self.db.execute("SELECT id FROM sales WHERE sale_uuid = ?", (sale_uuid,)).fetchone()
         if existing:
@@ -100,11 +107,47 @@ class PosService:
                     (sale_id, line.product_id, line.barcode, line.source_barcode, line.barcode_type, product["name"], product["unit_name"],
                      str(line.qty), str(line.unit_price), str(line.discount), str(line_total), line.price_version),
                 )
-            self.db.execute("INSERT INTO payments (sale_id, method, amount) VALUES (?, ?, ?)", (sale_id, payment_method, str(money(paid_amount))))
+            # เก็บทั้งเงินที่รับมาและเงินทอน — บันทึกแต่ยอดรับอย่างเดียว
+            # แล้วยอดเงินสดที่ควรมีในลิ้นชักจะเกินจริงเท่ากับเงินทอนที่จ่ายออกไป
+            change = money(paid_amount) - grand_total
+            self.db.execute(
+                "INSERT INTO payments (sale_id, method, amount, change_amount) VALUES (?, ?, ?, ?)",
+                (sale_id, payment_method, str(money(paid_amount)), str(change)),
+            )
             self.db.execute("INSERT INTO print_jobs (sale_id, created_at) VALUES (?, ?)", (sale_id, now()))
             payload = json.dumps({"sale_uuid": sale_uuid, "document_no": document_no, "grand_total": str(grand_total)})
             self.db.execute("INSERT INTO sync_outbox (aggregate_type, aggregate_uuid, payload, created_at) VALUES ('sale', ?, ?, ?)", (sale_uuid, payload, now()))
         return sale_id
+
+    def void_sale(self, sale_id: int, *, cashier_id: int, reason: str) -> None:
+        """ยกเลิกบิลโดยไม่ลบ — บิลที่ออกไปแล้วต้องยังตรวจย้อนได้เสมอ
+
+        เหตุผลกับผู้ยกเลิกเป็นข้อบังคับ เพราะการยกเลิกบิลเป็นช่องทางเอาเงินออก
+        จากลิ้นชักที่ตรวจสอบยากที่สุดถ้าไม่มีใครต้องรับผิดชอบชื่อตัวเอง
+        """
+        reason = (reason or "").strip()
+        if not reason:
+            raise ValueError("ต้องระบุเหตุผลที่ยกเลิกบิล")
+        sale = self.db.execute("SELECT id, is_void FROM sales WHERE id = ?", (sale_id,)).fetchone()
+        if not sale:
+            raise ValueError("ไม่พบบิลที่ต้องการยกเลิก")
+        if sale["is_void"]:
+            raise ValueError("บิลนี้ถูกยกเลิกไปแล้ว")
+
+        with self.db:
+            self.db.execute(
+                "UPDATE sales SET is_void = 1, voided_at = ?, void_reason = ?, voided_by = ? WHERE id = ?",
+                (now(), reason, cashier_id, sale_id),
+            )
+            sale_uuid = self.db.execute("SELECT sale_uuid FROM sales WHERE id = ?", (sale_id,)).fetchone()["sale_uuid"]
+            payload = json.dumps({"sale_uuid": sale_uuid, "reason": reason, "voided_by": cashier_id})
+            # ส่งการยกเลิกขึ้นเซิร์ฟเวอร์ด้วย ไม่งั้นบิลจะถูกยกเลิกแค่ในเครื่อง
+            # ใช้คีย์ของตัวเองเพราะ aggregate_uuid เป็น unique — การยกเลิกเป็นคนละเหตุการณ์
+            # กับการขาย ทั้งสองต้องอยู่ในคิวพร้อมกันได้ และต้องกันส่งซ้ำแยกกัน
+            self.db.execute(
+                "INSERT INTO sync_outbox (aggregate_type, aggregate_uuid, payload, created_at) VALUES ('sale_void', ?, ?, ?)",
+                (f"{sale_uuid}:void", payload, now()),
+            )
 
     def pending_sync_count(self) -> int:
         return int(self.db.execute("SELECT count(*) FROM sync_outbox WHERE status = 'pending'").fetchone()[0])
