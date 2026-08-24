@@ -169,6 +169,8 @@ CREATE TABLE IF NOT EXISTS receipt_templates (
 # ซึ่งจะทำให้บิลค้างส่งกับประวัติขายหายไปทั้งหมด
 ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("payments", "change_amount", "TEXT NOT NULL DEFAULT '0'"),
+    # ราคาขายรวม VAT อยู่แล้ว ค่านี้จึงมีผลกับการแยกยอดในบิล ไม่ใช่กับยอดที่ลูกค้าจ่าย
+    ("products", "is_vat", "INTEGER NOT NULL DEFAULT 1"),
     ("sales", "voided_at", "TEXT"),
     ("sales", "void_reason", "TEXT"),
     ("sales", "voided_by", "INTEGER"),

@@ -17,6 +17,22 @@ def money(value: Decimal | float | str) -> Decimal:
     return Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
+DEFAULT_VAT_RATE = Decimal("7")
+
+VAT_RATE_SETTING = "vat_rate"
+
+
+def vat_from_inclusive(amount: Decimal, rate: Decimal) -> Decimal:
+    """แยก VAT ออกจากยอดที่รวมภาษีอยู่แล้ว
+
+    ราคาขายหน้าร้านในไทยรวม VAT ไว้แล้ว ยอดที่ลูกค้าจ่ายจึงไม่เปลี่ยนไม่ว่าสินค้า
+    จะเสีย VAT หรือไม่ สิ่งที่เปลี่ยนคือการแยกยอดในบิลและตัวเลขที่ส่งเข้ารายงานภาษี
+    """
+    if rate <= 0 or amount <= 0:
+        return Decimal("0.00")
+    return money(amount * rate / (Decimal("100") + rate))
+
+
 def pin_hash(pin: str) -> str:
     # Prototype only. Production must use Argon2/bcrypt with a per-user salt.
     return hashlib.sha256(pin.encode("utf-8")).hexdigest()
@@ -54,6 +70,20 @@ class PosService:
         self.db.commit()
         return int(cursor.lastrowid)
 
+    def vat_rate(self) -> Decimal:
+        """อัตรา VAT ที่ sync มาจาก ERP — ยังไม่เคย sync ให้ใช้อัตราปัจจุบันของไทย
+
+        ไม่ฝังอัตราไว้ในโค้ดเป็นค่าตายตัว เพราะวันที่อัตราเปลี่ยนจะต้องแก้แล้วออกรุ่นใหม่
+        ให้ทุกเครื่องพร้อมกัน ซึ่งช้ากว่าการแก้ที่ ERP แล้วให้เครื่อง sync มา
+        """
+        row = self.db.execute("SELECT value FROM device_settings WHERE key = ?", (VAT_RATE_SETTING,)).fetchone()
+        if not row:
+            return DEFAULT_VAT_RATE
+        try:
+            return Decimal(str(json.loads(row["value"])))
+        except (ValueError, TypeError, json.JSONDecodeError):
+            return DEFAULT_VAT_RATE
+
     def lookup_barcode(self, barcode: str) -> sqlite3.Row | None:
         return self.db.execute(
             """SELECT p.*, b.barcode, b.barcode_type, b.unit_factor, b.price
@@ -84,15 +114,25 @@ class PosService:
         subtotal = sum((money(line.qty * line.unit_price) for line in lines), Decimal("0"))
         discount = sum((money(line.discount) for line in lines), Decimal("0"))
         grand_total = money(subtotal - discount)
+
+        # VAT คิดจากยอดสุทธิของเฉพาะสินค้าที่เสีย VAT — อาหารสดหลายอย่างได้รับยกเว้น
+        # คิดรวมทั้งบิลจะทำให้ยอดภาษีขายที่ยื่นสูงเกินจริง
+        rate = self.vat_rate()
+        vatable = Decimal("0")
+        for line in lines:
+            flag = self.db.execute("SELECT is_vat FROM products WHERE id = ?", (line.product_id,)).fetchone()
+            if flag and int(flag["is_vat"]):
+                vatable += money(line.qty * line.unit_price - line.discount)
+        vat_total = vat_from_inclusive(vatable, rate)
         if money(paid_amount) < grand_total:
             raise ValueError("ยอดชำระไม่พอ")
         with self.db:
             cursor = self.db.execute(
                 """INSERT INTO sales (sale_uuid, document_no, branch_id, terminal_id, shift_id, cashier_id,
                 sale_datetime, subtotal, discount_total, vat_total, grand_total, payment_status, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'paid', ?)""",
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?)""",
                 (sale_uuid, document_no, branch_id, terminal_id, shift_id, cashier_id, now(), str(subtotal),
-                 str(discount), str(grand_total), now()),
+                 str(discount), str(vat_total), str(grand_total), now()),
             )
             sale_id = int(cursor.lastrowid)
             for line in lines:
@@ -115,7 +155,11 @@ class PosService:
                 (sale_id, payment_method, str(money(paid_amount)), str(change)),
             )
             self.db.execute("INSERT INTO print_jobs (sale_id, created_at) VALUES (?, ?)", (sale_id, now()))
-            payload = json.dumps({"sale_uuid": sale_uuid, "document_no": document_no, "grand_total": str(grand_total)})
+            payload = json.dumps({
+                "sale_uuid": sale_uuid, "document_no": document_no,
+                "grand_total": str(grand_total), "vat_total": str(vat_total), "vat_rate": str(rate),
+                "vat_mode": "included",
+            })
             self.db.execute("INSERT INTO sync_outbox (aggregate_type, aggregate_uuid, payload, created_at) VALUES ('sale', ?, ?, ?)", (sale_uuid, payload, now()))
         return sale_id
 
