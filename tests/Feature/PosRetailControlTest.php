@@ -14,6 +14,7 @@ use App\Models\PosReceipt;
 use App\Models\PosShift;
 use App\Models\PosTerminal;
 use App\Models\Product;
+use App\Models\ProductBarcode;
 use App\Models\ProductUnit;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
@@ -225,6 +226,32 @@ class PosRetailControlTest extends TestCase
         $this->assertTrue($products[0]['margin_warning']);
         $this->assertLessThan(20, $products[0]['margin_percent']);
         $this->assertArrayNotHasKey('average_cost', $products[0]);
+    }
+
+    public function test_exact_pos_scan_prefers_barcode_over_a_same_value_sku(): void
+    {
+        [$user, $branch, , , $barcodeProduct] = $this->posMasters('BARCODE-FIRST');
+        $skuProduct = Product::create([
+            'sku_code' => '101002', 'name_th' => 'สินค้า SKU 101002', 'base_unit_id' => $barcodeProduct->base_unit_id,
+            'default_price' => 15, 'average_cost' => 0, 'is_vat' => false, 'is_active' => true,
+        ]);
+        ProductBarcode::create([
+            'product_id' => $barcodeProduct->id, 'barcode' => '101002', 'unit_id' => $barcodeProduct->base_unit_id,
+            'unit_factor' => 1, 'barcode_type' => 'CUSTOM', 'is_active' => true,
+        ]);
+        $this->actingAs($user);
+
+        $barcodeResult = app(PosController::class)->products(Request::create('/pos/products', 'GET', [
+            'branch_id' => $branch->id, 'q' => '101002', 'exact' => 1, 'lookup' => 'barcode',
+        ]))->getData(true);
+        $skuResult = app(PosController::class)->products(Request::create('/pos/products', 'GET', [
+            'branch_id' => $branch->id, 'q' => '101002', 'exact' => 1, 'lookup' => 'sku',
+        ]))->getData(true);
+
+        $this->assertSame($barcodeProduct->id, $barcodeResult[0]['id']);
+        $this->assertSame('101002', $barcodeResult[0]['matched_barcode']['barcode']);
+        $this->assertSame($skuProduct->id, $skuResult[0]['id']);
+        $this->assertArrayNotHasKey('matched_barcode', $skuResult[0]);
     }
 
     /** @return array{User,Branch,Salesman,PosShift,Product} */

@@ -3033,10 +3033,11 @@ function posApp() {
             return (10 - (sum % 10)) % 10 === checkDigit;
         },
 
-        async fetchExactProducts(query) {
+        async fetchExactProducts(query, lookup = 'barcode') {
             const params = new URLSearchParams();
             params.set('q', query);
             params.set('exact', '1');
+            params.set('lookup', lookup);
             if (this.categoryId) params.set('category_id', this.categoryId);
             if (this.branchId) params.set('branch_id', this.branchId);
 
@@ -3052,7 +3053,9 @@ function posApp() {
 
             try {
                 let scaleBarcode = null;
-                let matches = await this.fetchExactProducts(scanned);
+                // A scanner is always barcode-first.  New category-led SKU
+                // values may equal an old barcode, so SKU is a manual fallback.
+                let matches = await this.fetchExactProducts(scanned, 'barcode');
 
                 if (matches.length === 0) {
                     const candidate = this.parseScaleBarcode(scanned);
@@ -3061,8 +3064,12 @@ function posApp() {
 
                     if (shouldTryScale) {
                         scaleBarcode = candidate;
-                        matches = await this.fetchExactProducts(scaleBarcode.productCode);
+                        matches = await this.fetchExactProducts(scaleBarcode.productCode, 'barcode');
                     }
+                }
+
+                if (matches.length === 0) {
+                    matches = await this.fetchExactProducts(scanned, 'sku');
                 }
 
                 this.products = matches;

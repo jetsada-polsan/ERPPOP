@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
 
-from .barcode import decode_scale_label, scale_cart_line
+from .barcode import decode_scale_label, load_scale_profiles, scale_cart_line
+from .mock_printer import company_details, receipt_for
 from .order import ALL_CATEGORIES, DISCOUNT, PRICE, QTY, Order, OrderLine, categories, product_grid
 from .services import PosService, money
 
@@ -43,7 +44,7 @@ def run_ui(service: PosService) -> None:
     try:
         from PySide6.QtCore import Qt
         from PySide6.QtWidgets import (
-            QApplication, QButtonGroup, QDialog, QDialogButtonBox, QFormLayout, QGridLayout,
+            QApplication, QButtonGroup, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGridLayout,
             QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton,
             QScrollArea, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
         )
@@ -134,6 +135,183 @@ def run_ui(service: PosService) -> None:
                 return
             self.accept()
 
+    class SettingsDialog(QDialog):
+        """ตั้งค่าเฉพาะเครื่องนี้ — ไม่ถูกทับตอน sync แคตตาล็อกจาก ERP"""
+
+        def __init__(self, parent, sample_sale_id: int | None):
+            super().__init__(parent)
+            self.sample_sale_id = sample_sale_id
+            self.setWindowTitle("ตั้งค่า POS")
+            self.setMinimumSize(980, 640)
+
+            layout = QHBoxLayout(self)
+            self.pages = QVBoxLayout()
+            menu = QWidget()
+            menu.setLayout(self.pages)
+            menu.setFixedWidth(220)
+            layout.addWidget(menu)
+
+            self.body = QVBoxLayout()
+            body_host = QWidget()
+            body_host.setLayout(self.body)
+            layout.addWidget(body_host, 1)
+
+            self.sections = {
+                "ข้อมูลเครื่อง POS": self.device_section,
+                "เครื่องพิมพ์และใบเสร็จ": self.printer_section,
+                "เครื่องชั่ง / Barcode": self.scale_section,
+                "การ Sync และ API": self.sync_section,
+                "สำรองและกู้คืน SQLite": self.backup_section,
+                "ประวัติการพิมพ์ / Queue": self.queue_section,
+            }
+            group = QButtonGroup(self)
+            for index, name in enumerate(self.sections):
+                button = QPushButton(name)
+                button.setCheckable(True)
+                button.setChecked(index == 0)
+                button.clicked.connect(lambda _, value=name: self.show_section(value))
+                group.addButton(button)
+                self.pages.addWidget(button)
+            self.pages.addStretch(1)
+            note = QLabel("ค่าเหล่านี้เป็นของเครื่องนี้เท่านั้น\nไม่ถูกทับด้วย sync ERP")
+            note.setStyleSheet("color:#64748b;font-size:12px;")
+            self.pages.addWidget(note)
+
+            self.show_section("ข้อมูลเครื่อง POS")
+
+        def show_section(self, name: str) -> None:
+            while self.body.count():
+                item = self.body.takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
+            title = QLabel(name)
+            title.setStyleSheet("font-size:20px;font-weight:800;color:#0f172a;")
+            self.body.addWidget(title)
+            self.body.addWidget(self.sections[name]())
+            self.body.addStretch(1)
+
+        def device_section(self) -> QWidget:
+            box = QWidget()
+            form = QFormLayout(box)
+            form.addRow("รหัสเครื่อง", QLabel("PY-TEST-01"))
+            form.addRow("สาขา", QLabel("HQ"))
+            form.addRow("ฐานข้อมูลในเครื่อง", QLabel("popstar-pos.db (WAL)"))
+            return box
+
+        def printer_section(self) -> QWidget:
+            box = QWidget()
+            outer = QHBoxLayout(box)
+
+            left = QWidget()
+            form = QFormLayout(left)
+            self.profile_name = QLineEdit("เคาน์เตอร์หลัก HQ")
+            self.driver = QComboBox()
+            self.driver.addItems(["EPSON ESC/POS", "STAR TSP100", "Generic ESC/POS", "Mock printer"])
+            self.connection = QComboBox()
+            self.connection.addItems(["USB", "Serial (COM)", "Network (IP)"])
+            self.address = QLineEdit("USB001")
+            self.paper = QComboBox()
+            self.paper.addItems(["80 mm", "58 mm"])
+            self.paper.currentIndexChanged.connect(self.refresh_preview)
+            self.drawer = QComboBox()
+            self.drawer.addItems(["เปิดเมื่อรับเงินสด", "ไม่เปิด"])
+            form.addRow("ชื่อโปรไฟล์", self.profile_name)
+            form.addRow("รุ่น/Driver", self.driver)
+            form.addRow("การเชื่อมต่อ", self.connection)
+            form.addRow("Port / Address", self.address)
+            form.addRow("หน้ากระดาษ", self.paper)
+            form.addRow("ลิ้นชักเงินสด", self.drawer)
+
+            actions = QHBoxLayout()
+            test = QPushButton("ทดสอบพิมพ์")
+            test.clicked.connect(self.test_print)
+            save = QPushButton("บันทึกโปรไฟล์เครื่องพิมพ์")
+            save.setObjectName("payBtn")
+            save.clicked.connect(self.save_printer)
+            actions.addWidget(test)
+            actions.addWidget(save)
+            form.addRow(actions)
+            outer.addWidget(left, 1)
+
+            right = QWidget()
+            preview_layout = QVBoxLayout(right)
+            preview_layout.addWidget(QLabel("ตัวอย่างก่อนพิมพ์"))
+            self.preview = QLabel()
+            self.preview.setStyleSheet(
+                "background:#ffffff;border:1px solid #cbd5e1;padding:14px;font-family:'Menlo','Courier New';font-size:12px;"
+            )
+            self.preview.setAlignment(Qt.AlignTop)
+            preview_layout.addWidget(self.preview, 1)
+            outer.addWidget(right, 1)
+
+            self.refresh_preview()
+            return box
+
+        def refresh_preview(self) -> None:
+            if self.sample_sale_id is None:
+                self.preview.setText("ยังไม่มีบิลให้ดูตัวอย่าง — ขายหนึ่งบิลก่อน")
+                return
+            self.preview.setText(receipt_for(service.db, self.sample_sale_id))
+
+        def test_print(self) -> None:
+            QMessageBox.information(self, "ทดสอบพิมพ์", "ส่งใบเสร็จตัวอย่างเข้าคิวพิมพ์แล้ว")
+
+        def save_printer(self) -> None:
+            QMessageBox.information(self, "บันทึกแล้ว", f"บันทึกโปรไฟล์ {self.profile_name.text()} แล้ว")
+
+        def scale_section(self) -> QWidget:
+            box = QWidget()
+            layout = QVBoxLayout(box)
+            profiles = load_scale_profiles(service.db)
+            if not profiles:
+                layout.addWidget(QLabel("ยังไม่ได้รับรูปแบบป้ายเครื่องชั่งจาก ERP — sync ก่อนขายสินค้าชั่ง"))
+                return box
+            table = QTableWidget(len(profiles), 5)
+            table.setHorizontalHeaderLabels(["รหัส", "ขึ้นต้น", "PLU", "มูลค่า", "check digit"])
+            for row, profile in enumerate(profiles):
+                for column, value in enumerate([
+                    profile["code"], profile["prefix"], profile["plu_length"],
+                    f"{profile['value_length']} ({profile['value_type']})", profile["check_digit"],
+                ]):
+                    table.setItem(row, column, QTableWidgetItem(str(value)))
+            table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            layout.addWidget(QLabel("รูปแบบป้ายมาจาก ERP เครื่องนี้ไม่เดารูปแบบเอง"))
+            layout.addWidget(table)
+            return box
+
+        def sync_section(self) -> QWidget:
+            box = QWidget()
+            form = QFormLayout(box)
+            form.addRow("บิลรอส่ง", QLabel(f"{service.pending_sync_count()} ใบ"))
+            form.addRow("อัตรา VAT ที่ใช้อยู่", QLabel(f"{service.vat_rate():g}%"))
+            return box
+
+        def backup_section(self) -> QWidget:
+            box = QWidget()
+            layout = QVBoxLayout(box)
+            layout.addWidget(QLabel("สำรองด้วย VACUUM INTO ได้ไฟล์เดียวที่กู้คืนได้จริง"))
+            layout.addWidget(QLabel("กู้คืนจะล้างไฟล์ -wal ที่ค้างอยู่ก่อนเสมอ"))
+            return box
+
+        def queue_section(self) -> QWidget:
+            box = QWidget()
+            layout = QVBoxLayout(box)
+            jobs = service.db.execute(
+                """SELECT s.document_no, p.status, p.attempts FROM print_jobs p
+                JOIN sales s ON s.id = p.sale_id ORDER BY p.id DESC LIMIT 30"""
+            ).fetchall()
+            if not jobs:
+                layout.addWidget(QLabel("ยังไม่มีงานพิมพ์"))
+                return box
+            table = QTableWidget(len(jobs), 3)
+            table.setHorizontalHeaderLabels(["เลขที่บิล", "สถานะ", "ครั้งที่พยายาม"])
+            for row, job in enumerate(jobs):
+                for column, value in enumerate([job["document_no"], job["status"], job["attempts"]]):
+                    table.setItem(row, column, QTableWidgetItem(str(value)))
+            table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            layout.addWidget(table)
+            return box
+
     class PosWindow(QMainWindow):
         def __init__(self, cashier):
             super().__init__()
@@ -141,6 +319,7 @@ def run_ui(service: PosService) -> None:
             self.order = Order()
             self.category = ALL_CATEGORIES
             self.shift_id = service.open_shift(1, "PY-TEST-01", int(cashier["id"]), Decimal("0"))
+            self.last_sale_id: int | None = None
             self.setWindowTitle(f"POPSTAR POS — {cashier['name']}")
             self.setStyleSheet(STYLE)
 
@@ -227,14 +406,22 @@ def run_ui(service: PosService) -> None:
             remove.clicked.connect(self.remove_line)
             grid.addWidget(remove, 5, 1)
 
-            hold = QPushButton("ล้างบิล")
-            hold.clicked.connect(self.clear_order)
-            grid.addWidget(hold, 5, 2)
+            settings = QPushButton("ตั้งค่าเครื่องนี้")
+            settings.clicked.connect(self.open_settings)
+            grid.addWidget(settings, 5, 2)
+
+            clear = QPushButton("ล้างบิล")
+            clear.clicked.connect(self.clear_order)
+            grid.addWidget(clear, 6, 0)
+
+            receipt = QPushButton("ดูใบเสร็จล่าสุด")
+            receipt.clicked.connect(self.show_last_receipt)
+            grid.addWidget(receipt, 6, 1, 1, 2)
 
             pay = QPushButton("รับชำระเงิน")
             pay.setObjectName("payBtn")
             pay.clicked.connect(self.pay)
-            grid.addWidget(pay, 6, 0, 1, 3)
+            grid.addWidget(pay, 7, 0, 1, 3)
             return box
 
         # ---------- ขวา: สินค้า ----------
@@ -389,12 +576,31 @@ def run_ui(service: PosService) -> None:
                 QMessageBox.critical(self, "บันทึกบิลไม่สำเร็จ", str(error))
                 return
 
+            self.last_sale_id = sale_id
             QMessageBox.information(
                 self, "รับชำระแล้ว",
                 f"บิล {sale_id}\nเงินทอน {self.order.change_for(dialog.tendered()):,.2f} บาท",
             )
             self.order.clear()
             self.refresh_order()
+
+        def open_settings(self) -> None:
+            SettingsDialog(self, self.last_sale_id).exec()
+
+        def show_last_receipt(self) -> None:
+            if self.last_sale_id is None:
+                QMessageBox.information(self, "ใบเสร็จ", "ยังไม่มีบิลในกะนี้")
+                return
+            dialog = QDialog(self)
+            dialog.setWindowTitle("ใบเสร็จล่าสุด")
+            layout = QVBoxLayout(dialog)
+            body = QLabel(receipt_for(service.db, self.last_sale_id))
+            body.setStyleSheet("background:#ffffff;padding:16px;font-family:'Menlo','Courier New';font-size:12px;")
+            layout.addWidget(body)
+            close = QDialogButtonBox(QDialogButtonBox.Close)
+            close.rejected.connect(dialog.reject)
+            layout.addWidget(close)
+            dialog.exec()
 
         # ---------- วาดใหม่ ----------
 

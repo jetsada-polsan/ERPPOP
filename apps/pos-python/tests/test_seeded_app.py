@@ -74,5 +74,28 @@ class SeededAppTest(unittest.TestCase):
         self.assertEqual(len(product_grid(self.db)), before, "เปิดโปรแกรมซ้ำต้องไม่ได้สินค้าเพิ่มมาเอง")
 
 
+    def test_a_fresh_till_prints_a_receipt_with_a_company_header(self) -> None:
+        from decimal import Decimal as D
+
+        from pos_python.mock_printer import receipt_for
+        from pos_python.services import CartLine
+
+        shift = self.service.open_shift(1, "PY-TEST-01", 1, D("0"))
+        sale_id = self.service.checkout(
+            document_no="SEED-0001", branch_id=1, terminal_id="PY-TEST-01", shift_id=shift, cashier_id=1,
+            lines=[CartLine(product_id=3, qty=D("1"), unit_price=D("45"))],
+            payment_method="cash", paid_amount=D("100"),
+        )
+
+        text = receipt_for(self.db, sale_id)
+
+        # หัวใบเสร็จว่างเปล่าคือใบเสร็จที่ให้ลูกค้าไม่ได้
+        self.assertIn("ป๊อบสตาร์", text)
+        self.assertIn("ใบเสร็จรับเงิน", text)
+        self.assertIn("ภาษีมูลค่าเพิ่ม", text)
+        self.assertIn("เงินทอน", text)
+        self.assertIn("ขอบคุณที่ใช้บริการ", text)
+
+
 if __name__ == "__main__":
     unittest.main()

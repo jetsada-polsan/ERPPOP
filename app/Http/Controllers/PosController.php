@@ -185,6 +185,13 @@ class PosController extends Controller
         $categoryId = $request->query('category_id');
         $branchId = $this->enforcedBranchId((int) $request->query('branch_id', 0));
         $exact = $request->boolean('exact');
+        // A scanner must never be ambiguous with a newly allocated SKU.  Keep
+        // lookup modes explicit: scanner/scale labels use barcode, while manual
+        // code entry can intentionally ask for SKU after barcode lookup misses.
+        $lookup = (string) $request->query('lookup', 'mixed');
+        if (! in_array($lookup, ['barcode', 'sku', 'mixed'], true)) {
+            $lookup = 'mixed';
+        }
         $all = $request->boolean('all'); // POS desktop ดึงแคตตาล็อกทั้งหมดเก็บ offline
 
         // ตารางราคาแบบชั้นซ้อน: ตารางสาขา (override) -> ตารางหลัก (default) -> default_price
@@ -200,10 +207,12 @@ class PosController extends Controller
         $products = Product::where('is_active', true)
             ->with(['barcodes' => fn ($query) => $query->where('is_active', true)->with('unit')])
             ->when($categoryId, fn ($query) => $query->where('product_category_id', $categoryId))
-            ->when($q !== '' && $exact, fn ($query) => $query->where(fn ($w) => $w
+            ->when($q !== '' && $exact && $lookup === 'barcode', fn ($query) => $query
+                ->whereHas('barcodes', fn ($barcodeQuery) => $barcodeQuery->where('is_active', true)->where('barcode', $q)))
+            ->when($q !== '' && $exact && $lookup === 'sku', fn ($query) => $query->where('sku_code', $q))
+            ->when($q !== '' && $exact && $lookup === 'mixed', fn ($query) => $query->where(fn ($w) => $w
                 ->where('sku_code', $q)
-                ->orWhereHas('barcodes', fn ($barcodeQuery) => $barcodeQuery->where('is_active', true)->where('barcode', $q))
-            ))
+                ->orWhereHas('barcodes', fn ($barcodeQuery) => $barcodeQuery->where('is_active', true)->where('barcode', $q))))
             ->when($q !== '' && ! $exact, fn ($query) => $query->where(fn ($w) => $w
                 ->where('sku_code', 'ilike', "%{$q}%")
                 ->orWhere('name_th', 'ilike', "%{$q}%")
@@ -234,8 +243,8 @@ class PosController extends Controller
         // ตัวคูณหน่วย (id -> qty_per_base_unit) ใช้เลือก "ราคาหน่วยฐาน" เมื่อไม่มีราคา unit_id=null
         $unitFactors = ProductUnit::pluck('qty_per_base_unit', 'id');
 
-        $products = $products->map(function ($p) use ($priceRows, $q, $exact, $branchTableId, $defaultTableId, $unitFactors) {
-            $matchedBarcode = $exact && $q !== ''
+        $products = $products->map(function ($p) use ($priceRows, $q, $exact, $lookup, $branchTableId, $defaultTableId, $unitFactors) {
+            $matchedBarcode = $exact && $lookup !== 'sku' && $q !== ''
                 ? $p->barcodes->first(fn ($barcode) => $barcode->barcode === $q)
                 : null;
             $scalePlu = $p->barcodes->first(fn ($barcode) => $this->isScalePlu($barcode->barcode))?->barcode

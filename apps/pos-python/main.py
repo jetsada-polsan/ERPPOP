@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import argparse
 import os
 import traceback
@@ -49,6 +51,17 @@ def seed(db) -> None:
             {"code": "POPSTAR-801", "prefix": "801", "plu_length": 6, "value_length": 6,
              "value_type": "price", "check_digit": "ean13", "total_length": 13},
         ])
+
+    # หัวใบเสร็จ — ของจริงตั้งได้ในหน้าตั้งค่า ค่านี้ให้เครื่องใหม่พิมพ์ออกมาอ่านได้เลย
+    for key, value in [
+        ("company", {"name": "บริษัท ป๊อบสตาร์ฟู้ดเทรดดิ้ง จำกัด", "branch": "สำนักงานใหญ่",
+                     "phone": "045-000-000", "tax_id": ""}),
+        ("receipt_footer", "ขอบคุณที่ใช้บริการ"),
+    ]:
+        db.execute(
+            "INSERT OR IGNORE INTO device_settings (key, value, updated_at) VALUES (?, ?, ?)",
+            (key, json.dumps(value, ensure_ascii=False), timestamp),
+        )
 
     catalogue = [
         (1, "800123", "หมูสามชั้นสไลซ์", "กก.", "ของสด", "189.00", 1, None, None),
