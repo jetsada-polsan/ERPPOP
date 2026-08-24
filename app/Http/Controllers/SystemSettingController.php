@@ -58,6 +58,19 @@ class SystemSettingController extends Controller
             'menuOrder' => $this->menuOrder(),
             'erpTheme' => AppSetting::get('erp_theme', 'ocean'),
             'posRelease' => $this->currentPosRelease(),
+            'pythonPosInstaller' => $this->currentPythonPosInstaller(),
+        ]);
+    }
+
+    /** Download the tested Python POS installer without requiring GitHub access on a cashier PC. */
+    public function downloadPythonPos()
+    {
+        $installer = $this->currentPythonPosInstaller();
+        abort_unless($installer, 404, 'ยังไม่มีไฟล์ติดตั้ง Python POS รุ่นทดสอบ');
+
+        return response()->download($installer['path'], $installer['filename'], [
+            'Content-Type' => 'application/vnd.microsoft.portable-executable',
+            'Cache-Control' => 'no-cache, must-revalidate',
         ]);
     }
 
@@ -106,6 +119,24 @@ class SystemSettingController extends Controller
     private function currentPosRelease(): ?array
     {
         return app(PosReleaseManifest::class)->current();
+    }
+
+    private function currentPythonPosInstaller(): ?array
+    {
+        $files = collect(File::glob(storage_path('app/pos-python-releases/POPSTAR-Python-POS-UAT-*-setup.exe')))
+            ->filter(fn (string $path) => is_file($path))
+            ->sortByDesc(fn (string $path) => filemtime($path));
+
+        $path = $files->first();
+        if (! $path) {
+            return null;
+        }
+
+        return [
+            'path' => $path,
+            'filename' => basename($path),
+            'size_bytes' => filesize($path),
+        ];
     }
 
     public function issuePosToken(Request $request): RedirectResponse

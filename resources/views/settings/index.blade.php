@@ -241,10 +241,23 @@
                         <div class="set-title">POPSTAR Python POS สำหรับเครื่องแคชเชียร์</div>
                         <div class="set-desc">Python + PySide6 · Local SQLite · รุ่น UAT แยกจาก POS เดิม · ทดสอบติดตั้ง Windows ก่อนเปิดขายจริง</div>
                     </div>
-                    <a href="https://github.com/jetsada-polsan/ERPPOP/actions/workflows/pos-python-windows-uat.yml" target="_blank" rel="noopener" class="btn btn-primary btn-lg pos-download-btn">
-                        <i class="bi bi-box-arrow-up-right me-1"></i> เปิดหน้า Build Windows
-                    </a>
+                    @if($pythonPosInstaller)
+                        <a href="{{ route('python-pos.download') }}" class="btn btn-primary btn-lg pos-download-btn">
+                            <i class="bi bi-download me-1"></i> ดาวน์โหลด Python POS
+                        </a>
+                    @else
+                        <button type="button" class="btn btn-secondary btn-lg pos-download-btn" disabled>
+                            <i class="bi bi-hourglass-split me-1"></i> กำลังสร้างไฟล์ Windows
+                        </button>
+                    @endif
                 </div>
+
+                @if($pythonPosInstaller)
+                    <div class="alert alert-success py-2 mb-3">
+                        <i class="bi bi-shield-check me-1"></i>พร้อมทดสอบ: <code>{{ $pythonPosInstaller['filename'] }}</code>
+                        · {{ number_format($pythonPosInstaller['size_bytes'] / 1048576, 1) }} MB
+                    </div>
+                @endif
 
                 {{-- เก็บกลไก Vue/Tauri รุ่นเดิมไว้ใน source เพื่อ rollback ได้ แต่ไม่แสดงใน ERP แล้ว. --}}
                 @if(false)
