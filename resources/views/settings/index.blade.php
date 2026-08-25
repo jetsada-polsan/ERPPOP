@@ -539,6 +539,64 @@ async function copyPosToken(text) {
     .theme-preview i { width:17px; background:linear-gradient(var(--preview-primary),var(--preview-deep)); }
     .theme-preview b { align-self:flex-start; width:40px; height:7px; margin:8px 6px; border-radius:3px; background:var(--preview-primary); }
 
+    /* Odoo layout: a quiet settings workspace with a clear secondary navigation. */
+    html[data-layout="odoo"] .set-shell { gap: 14px; align-items: start; }
+    html[data-layout="odoo"] .set-nav {
+        background: var(--erp-surface);
+        border: 1px solid var(--erp-border);
+        border-radius: 6px;
+        padding: 8px;
+        box-shadow: 0 1px 2px rgba(29, 59, 82, .06);
+    }
+    html[data-layout="odoo"] .set-nav-group {
+        color: var(--erp-muted);
+        font-size: 10px;
+        letter-spacing: .55px;
+        padding: 13px 9px 6px;
+    }
+    html[data-layout="odoo"] .set-nav-link {
+        color: var(--erp-text);
+        border-radius: 6px;
+        padding: 8px 10px 8px 26px;
+        font-size: 13px;
+    }
+    html[data-layout="odoo"] .set-nav-link:hover { background: var(--erp-primary-soft); }
+    html[data-layout="odoo"] .set-nav-link.active {
+        background: var(--erp-primary-soft);
+        color: var(--erp-primary-dark);
+        font-weight: 600;
+    }
+    html[data-layout="odoo"] .set-main { min-width: 0; }
+    html[data-layout="odoo"] .set-main > .d-flex {
+        min-height: 42px;
+        margin-bottom: 12px !important;
+    }
+    html[data-layout="odoo"] .set-main > .d-flex h2 {
+        color: var(--erp-primary-dark) !important;
+        font-size: 20px;
+        font-weight: 700 !important;
+    }
+    html[data-layout="odoo"] .set-card {
+        border-radius: 6px;
+        padding: 10px 20px;
+        box-shadow: 0 1px 2px rgba(29, 59, 82, .06);
+    }
+    html[data-layout="odoo"] .set-title { color: var(--erp-primary-dark); font-weight: 700; }
+    html[data-layout="odoo"] .set-desc { color: var(--erp-muted); }
+    html[data-layout="odoo"] .set-row + .set-row { border-top-color: var(--erp-border); }
+    html[data-layout="odoo"] .form-control,
+    html[data-layout="odoo"] .form-select {
+        border-color: var(--erp-border);
+        border-radius: 4px;
+    }
+    html[data-layout="odoo"] .form-control:focus,
+    html[data-layout="odoo"] .form-select:focus {
+        border-color: var(--erp-primary);
+        box-shadow: 0 0 0 2px var(--erp-primary-soft);
+    }
+    html[data-layout="odoo"] .btn-success { background: var(--erp-primary); border-color: var(--erp-primary); }
+    html[data-layout="odoo"] .btn-success:hover { background: var(--erp-primary-dark); border-color: var(--erp-primary-dark); }
+
     @media (max-width: 991.98px) {
         .set-shell { grid-template-columns: 1fr; }
         .set-nav { position: static; }
