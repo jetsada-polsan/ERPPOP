@@ -475,18 +475,33 @@ async function copyPosToken(text) {
 <style>
     [x-cloak] { display: none !important; }
     .set-shell { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 14px; align-items: start; }
-    .set-nav { background: #fff; border: 1px solid var(--erp-border); border-radius: 9px; padding: 10px 8px; position: sticky; top: 12px; }
-    .set-nav-group { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 900; color: #29465b; padding: 3px 7px 5px; }
-    .set-nav-group i { color: var(--fa-blue); }
+    /* เมนูตั้งค่า — ใช้ภาษาเดียวกับเมนูข้างของระบบ (token --erp-* และสถานะฟ้า)
+       ไม่ใส่ตราสีประจำหัวข้อ เพราะที่นี่คือ 12 หัวข้อในโมดูลเดียวที่อ่านเรียงลงมา
+       สีจะไปแข่งกับเมนูซ้ายโดยไม่ช่วยให้หาอะไรเจอเร็วขึ้น */
+    .set-nav { background: var(--erp-surface); border: 1px solid var(--erp-border);
+        border-radius: 10px; padding: 6px; position: sticky; top: 12px;
+        box-shadow: 0 1px 3px rgba(29, 59, 82, .05); }
+    /* หัวกลุ่มเป็นป้ายกำกับ ไม่ใช่หัวข้อ — เดิมหนา 900 สีเข้ม แย่งสายตาจากรายการ */
+    .set-nav-group { display: flex; align-items: center; gap: 7px;
+        font-size: 10.5px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase;
+        color: var(--erp-muted); padding: 13px 10px 6px; }
+    .set-nav-group i { font-size: 12px; opacity: .6; }
     .set-nav-link {
         display: block; width: 100%; text-align: left; border: 0; background: none;
-        padding: 7px 8px 7px 26px; border-radius: 7px; font-family: inherit;
-        color: #52708a; font-size: 12px; line-height: 1.25; font-weight: 700; cursor: pointer;
+        padding: 7px 10px 7px 29px; border-radius: 8px; font-family: inherit;
+        color: var(--erp-text); font-size: 13px; line-height: 1.35; font-weight: 400;
+        cursor: pointer; position: relative; margin-bottom: 1px;
     }
-    .set-nav-link:hover { background: #eef7fd; color: var(--fa-blue-deep); }
-    .set-nav-link.active { background: #e3f3fc; color: var(--fa-blue-deep); box-shadow: inset 3px 0 0 var(--fa-blue); }
+    .set-nav-link:hover { background: var(--erp-surface-2, #f8fbfd); }
+    .set-nav-link.active { background: var(--erp-primary-soft); color: var(--erp-primary-dark); font-weight: 600; }
+    /* แท่ง accent มนสั้น แทนเส้นเต็มความสูง ให้เข้าชุดกับเมนูซ้าย */
+    .set-nav-link.active::before { content: ""; position: absolute; left: 8px; top: 50%;
+        transform: translateY(-50%); width: 3px; height: 16px; border-radius: 2px;
+        background: var(--erp-primary); }
+    .set-nav-link:focus-visible { outline: 2px solid var(--erp-primary); outline-offset: -2px; }
 
-    .set-card { background: #fff; border: 1px solid var(--erp-border); border-radius: 12px; padding: 8px 22px; margin-bottom: 14px; }
+    .set-card { background: var(--erp-surface); border: 1px solid var(--erp-border); border-radius: 10px;
+        padding: 8px 22px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(29, 59, 82, .05); }
     .set-card > .set-title, .set-card > .set-desc { padding-top: 12px; }
     .set-row { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 16px 0; }
     .set-row + .set-row { border-top: 1px solid #f0f6fb; }
