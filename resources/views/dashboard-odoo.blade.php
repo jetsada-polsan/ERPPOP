@@ -70,11 +70,21 @@
     </div>
 
     <div class="od-kpi">
-        <span class="od-ico t-info"><i class="bi bi-hourglass-split"></i></span>
+        <span class="od-ico t-info"><i class="bi bi-calendar-x"></i></span>
         <div>
-            <div class="od-lbl">บิลค้างปิด</div>
-            <div class="od-val">{{ $short($openReceipts) }}</div>
-            <div class="od-sub">บิล · จากทั้งหมด {{ $short($summary->receipt_count) }}</div>
+            <div class="od-lbl">ของใกล้หมดอายุ</div>
+            <div class="od-val">{{ $short($expiryAlerts->count()) }}</div>
+            @php $expired = $expiryAlerts->filter(fn ($lot) => $lot->days_left !== null && $lot->days_left < 0)->count(); @endphp
+            <div class="od-sub">
+                @if ($expired > 0)
+                    {{-- หมดอายุไปแล้วต้องพูดตรง ๆ ไม่ใช่ปัดเป็น "อีก 0 วัน" ซึ่งอ่านเหมือนยังขายได้ --}}
+                    <b class="dn">หมดอายุแล้ว {{ $short($expired) }}</b> · ที่เหลือใกล้ครบ
+                @elseif ($expiryAlerts->isNotEmpty())
+                    เร็วสุดอีก {{ (int) $expiryAlerts->min('days_left') }} วัน
+                @else
+                    ไม่มีล็อตใกล้หมดอายุ
+                @endif
+            </div>
         </div>
     </div>
 
@@ -92,7 +102,13 @@
         <div>
             <div class="od-lbl">ใบสั่งซื้อรอรับ</div>
             <div class="od-val">{{ $short($poPending) }}</div>
-            <div class="od-sub">รายการ</div>
+            <div class="od-sub">
+                @if ($poOverdue > 0)
+                    <b class="dn">เลยกำหนด {{ $short($poOverdue) }}</b>
+                @else
+                    รายการ
+                @endif
+            </div>
         </div>
     </div>
 </div>
@@ -244,22 +260,35 @@
 
 <div class="od-row2">
     <section class="od-card">
-        <header><h3>การเคลื่อนไหวสต๊อกล่าสุด</h3></header>
+        <header><h3>ของใกล้หมดอายุ</h3><span class="od-meta">เรียงตามวันที่เหลือน้อยสุด</span></header>
         <div class="table-responsive">
             <table class="table align-middle mb-0">
+                <thead><tr>
+                    <th>สินค้า</th><th>ล็อต</th><th>วันหมดอายุ</th>
+                    <th class="r">คงเหลือ</th><th>เหลืออีก</th>
+                </tr></thead>
                 <tbody>
-                @forelse ($recentMovements as $movement)
+                @forelse ($expiryAlerts->take(6) as $lot)
+                    @php
+                        $days = $lot->days_left;
+                        $tone = $days === null ? 'wait' : ($days <= 0 ? 'fail' : ($days <= 3 ? 'fail' : 'wait'));
+                    @endphp
                     <tr>
-                        <td>{{ $movement->name_th }}</td>
-                        <td class="text-muted">{{ $movement->sku_code }}</td>
-                        <td class="text-muted">{{ $movement->location_name ?: '—' }}</td>
-                        <td class="text-end {{ (float) $movement->qty < 0 ? 'text-danger' : '' }}">
-                            {{ number_format((float) $movement->qty, 2) }}
+                        <td>{{ $lot->name_th }}</td>
+                        <td class="text-muted">{{ $lot->lot_number ?: '—' }}</td>
+                        <td>{{ $lot->expiry_date ? \Illuminate\Support\Carbon::parse($lot->expiry_date)->format('d/m/Y') : '—' }}</td>
+                        <td class="text-end">{{ number_format((float) $lot->remaining_qty, 2) }}</td>
+                        <td>
+                            <span class="od-pill {{ $tone }}">
+                                @if ($days === null) ไม่ระบุวันหมดอายุ
+                                @elseif ($days <= 0) หมดอายุแล้ว
+                                @else {{ $days }} วัน
+                                @endif
+                            </span>
                         </td>
-                        <td>{{ \Illuminate\Support\Carbon::parse($movement->movement_date)->format('d/m/Y') }}</td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="text-center text-muted py-4">ยังไม่มีการเคลื่อนไหว</td></tr>
+                    <tr><td colspan="5" class="text-center text-muted py-4">ไม่มีล็อตที่ใกล้หมดอายุ</td></tr>
                 @endforelse
                 </tbody>
             </table>
@@ -267,20 +296,31 @@
     </section>
 
     <section class="od-card">
-        <header><h3>กิจกรรมล่าสุด</h3></header>
-        <div class="od-nts">
-            @forelse ($activity as $log)
-                <div class="od-nt">
-                    <span class="od-av">{{ mb_substr($log->user_name ?: 'ระบบ', 0, 2) }}</span>
-                    <div>
-                        <div class="od-nt-t"><b>{{ $log->user_name ?: 'ระบบ' }}</b> {{ $log->action }}</div>
-                        <span class="od-nt-d">{{ $log->table_name }}@if ($log->record_id) #{{ $log->record_id }}@endif</span>
-                    </div>
-                    <span class="od-nt-tm">{{ \Illuminate\Support\Carbon::parse($log->created_at)->diffForHumans(short: true) }}</span>
-                </div>
-            @empty
-                <p class="od-empty">ยังไม่มีกิจกรรม</p>
-            @endforelse
+        <header><h3>ส่วนต่างเงินสดปิดรอบ</h3><span class="od-meta">6 รอบล่าสุด</span></header>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead><tr>
+                    <th>รอบ</th><th>สาขา</th><th class="r">ควรมี</th><th class="r">นับได้</th><th class="r">ส่วนต่าง</th>
+                </tr></thead>
+                <tbody>
+                @forelse ($cashVariance as $shift)
+                    @php $off = abs($shift->variance) >= 0.01; @endphp
+                    <tr>
+                        <td>{{ $shift->shift_no }}<div class="od-sub">{{ $shift->cashier_name ?: '—' }}</div></td>
+                        <td>{{ $shift->branch_name ?: '—' }}<div class="od-sub">{{ $shift->pos_code ?: '—' }}</div></td>
+                        <td class="text-end">{{ $money($shift->expected_cash) }}</td>
+                        <td class="text-end">{{ $money($shift->counted_cash) }}</td>
+                        <td class="text-end">
+                            <span class="od-pill {{ $off ? ($shift->variance < 0 ? 'fail' : 'wait') : 'ok' }}">
+                                {{ $shift->variance > 0 ? '+' : '' }}{{ number_format($shift->variance, 2) }}
+                            </span>
+                        </td>
+                    </tr>
+                @empty
+                    <tr><td colspan="5" class="text-center text-muted py-4">ยังไม่มีรอบที่ปิดแล้ว</td></tr>
+                @endforelse
+                </tbody>
+            </table>
         </div>
     </section>
 </div>

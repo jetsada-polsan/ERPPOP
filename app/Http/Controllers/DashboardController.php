@@ -135,10 +135,10 @@ class DashboardController extends Controller
         $odooLayout = \App\Models\AppSetting::get('erp_layout', 'classic') === 'odoo';
         $openReceipts = 0;
         $poPending = 0;
+        $poOverdue = 0;
         $receiptStatus = collect();
         $recentReceipts = collect();
-        $recentMovements = collect();
-        $activity = collect();
+        $cashVariance = collect();
 
         if ($odooLayout) {
             $receiptScope = fn ($q) => $q
@@ -148,12 +148,14 @@ class DashboardController extends Controller
             $openReceipts = (int) $receiptScope(DB::table('pos_receipts as r'))
                 ->where('r.status', 'open')->count();
 
-            $poPending = (int) DB::table('purchase_orders')
+            $poBase = fn () => DB::table('purchase_orders')
                 ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
-                ->whereIn('status', ['approved', 'ordered'])->count();
+                ->whereIn('status', ['approved', 'ordered']);
+            $poPending = (int) $poBase()->count();
+            // เลยกำหนดรับแล้ว — ของไม่เข้าตามนัดคือสิ่งที่ต้องโทรตามวันนี้
+            $poOverdue = (int) $poBase()->whereNotNull('need_by_date')
+                ->whereDate('need_by_date', '<', today())->count();
 
-            // โดนัท: สถานะบิล POS จริง — ระบบนี้ไม่มีตารางคิว sync ฝั่ง ERP
-            // (คิว sync อยู่ใน SQLite ของเครื่อง POS) จึงรายงานสถานะบิลแทน
             $receiptStatus = $receiptScope(DB::table('pos_receipts as r'))
                 ->whereBetween('r.receipt_date', [$from->startOfDay(), $to->copy()->endOfDay()])
                 ->selectRaw("case when r.voided_at is not null then 'voided' else r.status end as state, count(*) as total")
@@ -168,16 +170,24 @@ class DashboardController extends Controller
                     'b.name_th as branch_name', 't.code as pos_code', 'u.name as cashier_name',
                 ]);
 
-            $recentMovements = DB::table('stock_movements as m')
-                ->join('products as p', 'p.id', '=', 'm.product_id')
-                ->leftJoin('warehouse_locations as wl', 'wl.id', '=', 'm.warehouse_location_id')
-                ->orderByDesc('m.movement_date')->orderByDesc('m.id')->limit(5)
-                ->get(['m.movement_type', 'm.qty', 'm.movement_date', 'p.name_th', 'p.sku_code', 'wl.name as location_name']);
+            // เงินขาด/เกินหน้าเคาน์เตอร์ — ตัวเลขที่เจ้าของอยากเห็นทุกเช้า
+            // ข้อมูลมีอยู่ใน pos_shifts อยู่แล้วแต่เดิมไม่เคยเอามาแสดง
+            $cashVariance = DB::table('pos_shifts as s')
+                ->leftJoin('branches as b', 'b.id', '=', 's.branch_id')
+                ->leftJoin('pos_terminals as t', 't.id', '=', 's.pos_terminal_id')
+                ->leftJoin('users as u', 'u.id', '=', 's.cashier_id')
+                ->when($branchId, fn ($q) => $q->where('s.branch_id', $branchId))
+                ->whereNotNull('s.closed_at')
+                ->orderByDesc('s.closed_at')->limit(6)
+                ->get([
+                    's.shift_no', 's.closed_at', 's.expected_cash', 's.counted_cash',
+                    'b.name_th as branch_name', 't.code as pos_code', 'u.name as cashier_name',
+                ])
+                ->map(function ($shift) {
+                    $shift->variance = (float) $shift->counted_cash - (float) $shift->expected_cash;
 
-            $activity = DB::table('audit_logs as a')
-                ->leftJoin('users as u', 'u.id', '=', 'a.user_id')
-                ->orderByDesc('a.created_at')->limit(5)
-                ->get(['a.action', 'a.table_name', 'a.record_id', 'a.created_at', 'u.name as user_name']);
+                    return $shift;
+                });
         }
 
         return view($odooLayout ? 'dashboard-odoo' : 'dashboard', [
@@ -196,10 +206,10 @@ class DashboardController extends Controller
             'expiryAlerts' => $expiryAlerts,
             'openReceipts' => $openReceipts,
             'poPending' => $poPending,
+            'poOverdue' => $poOverdue,
             'receiptStatus' => $receiptStatus,
             'recentReceipts' => $recentReceipts,
-            'recentMovements' => $recentMovements,
-            'activity' => $activity,
+            'cashVariance' => $cashVariance,
         ]);
     }
 }
