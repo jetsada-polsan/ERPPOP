@@ -80,7 +80,7 @@ class ErpMenu
                 'displayLabel' => 'การเงิน / บัญชี',
                 'items' => [
                     ['label' => 'ผังบัญชี / บันทึกบัญชี', 'route' => 'chart-of-accounts.index', 'pattern' => 'chart-of-accounts.*', 'extraPattern' => 'gl-journals.*', 'icon' => 'bi-calculator-fill', 'tone' => 'red'],
-                    ['label' => 'งวดบัญชี / ปิดงวด', 'route' => 'accounting-periods.index', 'pattern' => 'accounting-periods.*', 'icon' => 'bi-calendar2-lock', 'tone' => 'amber'],
+                    ['label' => 'งวดบัญชี / ปิดงวด', 'route' => 'accounting-periods.index', 'pattern' => 'accounting-periods.*', 'icon' => 'bi-calendar-check-fill', 'tone' => 'amber'],
                     ['label' => 'ปิดบัญชีรายเดือน', 'route' => 'monthly-accounting.index', 'pattern' => 'monthly-accounting.*', 'icon' => 'bi-file-earmark-zip-fill', 'tone' => 'teal'],
                     ['label' => 'ภาษีไทย / E-Tax', 'route' => 'tax-compliance.index', 'pattern' => 'tax-compliance.*', 'icon' => 'bi-receipt', 'tone' => 'orange'],
                     ['label' => 'งบการเงิน', 'route' => 'financial-statements.index', 'pattern' => 'financial-statements.*', 'icon' => 'bi-graph-up', 'tone' => 'blue'],
