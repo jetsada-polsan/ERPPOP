@@ -1,0 +1,448 @@
+<title>Popstar ERP Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+<style>
+/* ══════════════════════════════════════════════════════════════
+   Popstar ERP — แผงควบคุมหลังบ้าน โครงแบบ Odoo สีแบรนด์ JET
+   โครงหน้าตามภาพที่สั่งทุกจุด เปลี่ยนแต่ชุดสี:
+   ม่วง Odoo → ฟ้า JET  และ KPI สีม่วง → ฟ้าคราม (ไม่ใช้ม่วง)
+   ชื่อ token ชุดเดียวกับ layout.blade.php และ POS
+   ══════════════════════════════════════════════════════════════ */
+:root{
+  --erp-primary:#1585c0;
+  --erp-primary-dark:#0f4c75;
+  --erp-primary-ink:#147db5;
+  --erp-primary-soft:#eef4f9;
+  --erp-success:#168a65;
+  --erp-success-ink:#158662;
+  --erp-success-on-soft:#147f5d;
+  --erp-success-soft:#eaf7f1;
+  --erp-danger:#c62828;
+  --erp-danger-soft:#fff0f0;
+  --erp-warning:#d98b00;
+  --erp-warning-ink:#9c6400;
+  --erp-warning-soft:#fdf4e3;
+  --erp-info:#0f766e;               /* แทนม่วงของ Odoo — ฟ้าคราม */
+  --erp-info-soft:#e6f4f2;
+
+  --erp-bg:#f3f7fb;
+  --erp-surface:#fff;
+  --erp-surface-2:#f8fbfd;
+  --erp-border:#dbe7ef;
+  --erp-text:#1d3b52;
+  --erp-muted:#627481;
+  --shadow:0 1px 2px rgba(29,59,82,.05),0 1px 3px rgba(29,59,82,.06);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--erp-bg);color:var(--erp-text);
+  font-family:'Sarabun','Noto Sans Thai',system-ui,sans-serif;font-size:13.5px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.num{font-family:'JetBrains Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+button{font:inherit;color:inherit;cursor:pointer}
+
+/* ── แถบบน ───────────────────────────────────────────────── */
+.topbar{background:var(--erp-primary-dark);border-bottom:3px solid var(--erp-primary);
+  color:#fff;display:flex;align-items:center;gap:6px;padding:0 14px;height:48px;position:sticky;top:0;z-index:50}
+.apps{display:grid;place-items:center;width:30px;height:30px;border-radius:6px;background:rgba(255,255,255,.14);border:0;color:#fff;flex:none}
+.apps svg{width:15px;height:15px}
+.brand{font-weight:700;font-size:15.5px;margin-right:10px;white-space:nowrap}
+.topnav{display:flex;gap:1px;flex-wrap:wrap;min-width:0}
+.topnav a{color:rgba(255,255,255,.86);text-decoration:none;padding:6px 11px;border-radius:6px;font-size:13px;white-space:nowrap}
+.topnav a:hover{background:rgba(255,255,255,.1);color:#fff}
+.topnav a.on{background:rgba(255,255,255,.17);color:#fff;font-weight:600;box-shadow:inset 0 -2px 0 rgba(255,255,255,.55)}
+.topright{margin-left:auto;display:flex;align-items:center;gap:12px}
+.iconbtn{position:relative;background:transparent;border:0;color:#fff;padding:5px;border-radius:6px;display:grid;place-items:center}
+.iconbtn:hover{background:rgba(255,255,255,.12)}
+.iconbtn svg{width:17px;height:17px}
+.badge-dot{position:absolute;top:-2px;right:-4px;min-width:16px;height:16px;border-radius:999px;
+  font-size:9.5px;font-weight:700;display:grid;place-items:center;padding:0 4px;color:#fff;border:1.5px solid var(--erp-primary-dark)}
+.badge-dot.g{background:var(--erp-success-ink)}
+.badge-dot.r{background:var(--erp-danger)}
+.company{font-size:12.5px;opacity:.9;white-space:nowrap}
+.userchip{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.12);border:0;color:#fff;border-radius:999px;padding:3px 10px 3px 3px;font-size:12.5px;white-space:nowrap}
+.userchip .av{width:24px;height:24px;border-radius:50%;background:var(--erp-primary);display:grid;place-items:center;font-size:10px;font-weight:700;flex:none}
+
+/* ── แถบค้นหา ─────────────────────────────────────────────── */
+.searchbar{background:var(--erp-surface);border-bottom:1px solid var(--erp-border);padding:9px 14px;display:flex;justify-content:center}
+.searchbox{position:relative;width:100%;max-width:420px}
+.searchbox input{width:100%;border:1px solid var(--erp-border);background:var(--erp-surface-2);
+  border-radius:7px;padding:7px 34px 7px 12px;font:inherit;font-size:13px;color:var(--erp-text)}
+.searchbox input::placeholder{color:var(--erp-muted)}
+.searchbox input:focus{outline:0;border-color:var(--erp-primary);background:#fff;box-shadow:0 0 0 3px rgba(21,133,192,.15)}
+.searchbox svg{position:absolute;right:11px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--erp-muted);pointer-events:none}
+
+/* ── โครง ─────────────────────────────────────────────────── */
+.shell{display:grid;grid-template-columns:204px 1fr;align-items:start}
+.side{background:var(--erp-surface);border-right:1px solid var(--erp-border);padding:8px 0 24px;
+  position:sticky;top:48px;max-height:calc(100vh - 48px);overflow-y:auto;scrollbar-width:thin}
+.grp{display:flex;align-items:center;width:100%;background:none;border:0;padding:11px 14px 5px;
+  font-size:10.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--erp-muted)}
+.grp svg{width:11px;height:11px;margin-left:auto;opacity:.65}
+.side a{display:flex;align-items:center;gap:9px;padding:6px 14px;color:var(--erp-text);
+  text-decoration:none;font-size:13px;border-left:3px solid transparent}
+.side a:hover{background:var(--erp-primary-soft)}
+.side a.on{background:var(--erp-primary-soft);color:var(--erp-primary-dark);font-weight:600;border-left-color:var(--erp-primary)}
+.side a svg{width:15px;height:15px;flex:none;opacity:.55}
+.side a.on svg{opacity:1}
+
+.main{min-width:0}
+
+/* ── แถบควบคุม ────────────────────────────────────────────── */
+.ctrl{background:var(--erp-surface);border-bottom:1px solid var(--erp-border);
+  display:flex;align-items:center;gap:10px;padding:9px 16px;flex-wrap:wrap;position:sticky;top:48px;z-index:20}
+.ctrl h1{font-size:17px;font-weight:700;margin:0;display:flex;align-items:center;gap:7px}
+.ctrl h1 svg{width:14px;height:14px;color:var(--erp-muted)}
+.ctrl .right{margin-left:auto;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:6px;background:var(--erp-surface);
+  border:1px solid var(--erp-border);border-radius:7px;padding:5px 11px;font-size:12.5px;color:var(--erp-text)}
+.btn:hover{background:var(--erp-primary-soft);border-color:var(--erp-primary)}
+.btn svg{width:13px;height:13px}
+.btn.star svg{color:var(--erp-warning)}
+.pager{display:flex;align-items:center;gap:2px;font-size:12.5px;color:var(--erp-muted)}
+.pager button{background:none;border:1px solid var(--erp-border);border-radius:6px;width:26px;height:26px;display:grid;place-items:center;color:var(--erp-text)}
+.pager button:hover{background:var(--erp-primary-soft);border-color:var(--erp-primary)}
+.pager svg{width:12px;height:12px}
+.pager .n{margin-right:6px}
+
+.canvas{padding:14px 16px 30px}
+
+/* ── KPI ──────────────────────────────────────────────────── */
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:11px;margin-bottom:12px}
+.kpi{background:var(--erp-surface);border:1px solid var(--erp-border);border-radius:8px;
+  padding:13px;display:flex;gap:11px;box-shadow:var(--shadow);position:relative}
+.kpi .ico{width:38px;height:38px;border-radius:9px;display:grid;place-items:center;flex:none}
+.kpi .ico svg{width:18px;height:18px}
+.kpi .lbl{font-size:12px;color:var(--erp-muted);line-height:1.35}
+.kpi .val{font-size:20px;font-weight:700;line-height:1.3;letter-spacing:-.4px;margin:1px 0 2px}
+.kpi .sub{font-size:11.5px;color:var(--erp-muted);display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.kpi .up{color:var(--erp-success-on-soft);font-weight:600}
+.kpi .info{position:absolute;right:11px;bottom:11px;color:var(--erp-muted);opacity:.6}
+.kpi .info svg{width:13px;height:13px}
+/* ไอคอนในการ์ดแจ้งเตือน: พื้นอ่อน ตัวไอคอนสีเข้ม */
+.t-blue{background:var(--erp-primary-soft);color:var(--erp-primary-ink)}
+.t-green{background:var(--erp-success-soft);color:var(--erp-success-on-soft)}
+.t-info{background:var(--erp-info-soft);color:var(--erp-info)}
+.t-amber{background:var(--erp-warning-soft);color:var(--erp-warning-ink)}
+.t-red{background:var(--erp-danger-soft);color:var(--erp-danger)}
+/* ไอคอน KPI: พื้นทึบ ไอคอนขาว ตามภาพต้นแบบ
+   เหลืองต้องใช้เฉดเข้ม เพราะขาวบน #d98b00 ได้แค่ 2.75:1 */
+.kpi .ico.t-blue{background:var(--erp-primary-ink);color:#fff}
+.kpi .ico.t-green{background:var(--erp-success-ink);color:#fff}
+.kpi .ico.t-info{background:var(--erp-info);color:#fff}
+.kpi .ico.t-amber{background:var(--erp-warning-ink);color:#fff}
+.kpi .ico.t-red{background:var(--erp-danger);color:#fff}
+
+/* ── การ์ด ────────────────────────────────────────────────── */
+.card{background:var(--erp-surface);border:1px solid var(--erp-border);border-radius:8px;box-shadow:var(--shadow);overflow:hidden}
+.card>header{display:flex;align-items:center;gap:9px;padding:11px 14px;border-bottom:1px solid var(--erp-border)}
+.card>header h2{margin:0;font-size:14.5px;font-weight:700}
+.card>header .sel{margin-left:auto;display:inline-flex;align-items:center;gap:5px;
+  border:1px solid var(--erp-border);border-radius:6px;padding:3px 9px;font-size:12px;color:var(--erp-muted);background:var(--erp-surface)}
+.card>header .sel svg{width:10px;height:10px}
+.card .pad{padding:13px 14px}
+.card footer{border-top:1px solid var(--erp-border);padding:9px 14px;text-align:center}
+.card footer a{color:var(--erp-primary-ink);text-decoration:none;font-size:12.5px;font-weight:600}
+.card footer a:hover{text-decoration:underline}
+
+.row3{display:grid;grid-template-columns:1.05fr 1fr .95fr;gap:12px;margin-bottom:12px}
+.row2{display:grid;grid-template-columns:1.55fr 1fr;gap:12px;margin-bottom:12px}
+
+/* ── กราฟแท่ง ─────────────────────────────────────────────── */
+.chart{display:grid;grid-template-columns:34px 1fr;gap:8px;height:212px}
+.yaxis{display:flex;flex-direction:column;justify-content:space-between;font-size:10.5px;color:var(--erp-muted);text-align:right;padding-bottom:34px}
+.plot{position:relative;display:flex;align-items:flex-end;justify-content:space-around;gap:10px;padding-bottom:34px}
+.plot::before{content:"";position:absolute;inset:0 0 34px 0;
+  background:repeating-linear-gradient(to top,transparent 0,transparent calc(25% - 1px),var(--erp-border) calc(25% - 1px),var(--erp-border) 25%)}
+.bar{position:relative;flex:1;max-width:56px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.bar .v{font-size:11.5px;font-weight:700;margin-bottom:4px}
+.bar .fill{width:100%;border-radius:3px 3px 0 0}
+.bar .x{position:absolute;bottom:-32px;font-size:10.5px;color:var(--erp-muted);text-align:center;line-height:1.3;width:74px}
+
+/* ── ตาราง ────────────────────────────────────────────────── */
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;background:var(--erp-primary-soft);color:var(--erp-primary-dark);
+  font-weight:600;font-size:11.5px;padding:8px 12px;border-bottom:2px solid var(--erp-primary);white-space:nowrap}
+td{padding:8px 12px;border-bottom:1px solid var(--erp-border);white-space:nowrap}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover{background:var(--erp-primary-soft)}
+td.r,th.r{text-align:right}
+
+.pill{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:600}
+.pill svg{width:11px;height:11px}
+.pill.ok{background:var(--erp-success-soft);color:var(--erp-success-on-soft)}
+.pill.wait{background:var(--erp-warning-soft);color:var(--erp-warning-ink)}
+.pill.fail{background:var(--erp-danger-soft);color:var(--erp-danger);box-shadow:inset 0 0 0 1px currentColor}
+
+/* ── สินค้าขายดี ──────────────────────────────────────────── */
+.top10{list-style:none;margin:0;padding:0}
+.top10 li{display:grid;grid-template-columns:20px 1fr auto auto;gap:9px;align-items:center;
+  padding:9px 14px;border-bottom:1px solid var(--erp-border);font-size:12.5px}
+.top10 li:last-child{border-bottom:0}
+.top10 .rk{color:var(--erp-muted);font-size:12px}
+.top10 .q{color:var(--erp-muted);font-size:11.5px;text-align:right}
+.top10 .m{font-weight:700;text-align:right;min-width:66px}
+
+/* ── แจ้งเตือน ────────────────────────────────────────────── */
+.nt{display:flex;gap:10px;padding:11px 14px;border-bottom:1px solid var(--erp-border)}
+.nt:last-of-type{border-bottom:0}
+.nt .ic{width:28px;height:28px;border-radius:7px;display:grid;place-items:center;flex:none}
+.nt .ic svg{width:14px;height:14px}
+.nt .bd{min-width:0;flex:1}
+.nt .ti{font-size:12.5px;font-weight:600;line-height:1.4}
+.nt .ds{font-size:11.5px;color:var(--erp-muted)}
+.nt .ds a{color:var(--erp-primary-ink);text-decoration:none;font-weight:600}
+.nt .ds a:hover{text-decoration:underline}
+.nt .tm{font-size:11px;color:var(--erp-muted);white-space:nowrap;flex:none}
+
+/* ── โดนัท ────────────────────────────────────────────────── */
+.donut{display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:center}
+.donut .ring{position:relative;width:150px;height:150px;flex:none}
+.donut .ring svg{transform:rotate(-90deg);width:150px;height:150px}
+.donut .mid{position:absolute;inset:0;display:grid;place-items:center;text-align:center;line-height:1.15}
+.donut .mid b{font-size:25px;font-weight:700;letter-spacing:-.5px;display:block}
+.donut .mid span{font-size:11.5px;color:var(--erp-muted)}
+.lg{list-style:none;margin:0;padding:0;font-size:12.5px;min-width:170px}
+.lg li{display:flex;align-items:center;gap:8px;padding:5px 0}
+.lg i{width:10px;height:10px;border-radius:3px;flex:none}
+.lg .n{margin-left:auto;font-weight:700}
+.lg .p{color:var(--erp-muted);font-size:11.5px;min-width:52px;text-align:right}
+
+/* ── กิจกรรม ──────────────────────────────────────────────── */
+.act{display:flex;gap:10px;padding:11px 14px;border-bottom:1px solid var(--erp-border)}
+.act:last-of-type{border-bottom:0}
+.act .av{width:30px;height:30px;border-radius:50%;flex:none;display:grid;place-items:center;
+  font-size:11px;font-weight:700;background:var(--erp-primary-soft);color:var(--erp-primary-dark)}
+.act .bd{flex:1;min-width:0}
+.act .ti{font-size:12.5px;line-height:1.4}
+.act .ti b{font-weight:600}
+.act .ds{font-size:11.5px;color:var(--erp-muted)}
+.act .tm{font-size:11px;color:var(--erp-muted);white-space:nowrap;flex:none}
+
+.note{margin-top:14px;border-left:3px solid var(--erp-primary);background:var(--erp-surface);
+  border-radius:0 8px 8px 0;padding:12px 15px;color:var(--erp-muted);font-size:12.5px;box-shadow:var(--shadow)}
+.note b{color:var(--erp-text);font-weight:600}
+
+a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--erp-primary);outline-offset:2px}
+
+@media (max-width:1240px){
+  .kpis{grid-template-columns:repeat(3,1fr)}
+  .row3,.row2{grid-template-columns:1fr}
+}
+@media (max-width:820px){
+  .shell{grid-template-columns:1fr}
+  .side{display:none}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .topnav{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="topbar">
+  <button class="apps" aria-label="โมดูลทั้งหมด"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h5v5H4zM10 4h5v5h-5zM16 4h4v5h-4zM4 10h5v5H4zM10 10h5v5h-5zM16 10h4v5h-4zM4 16h5v4H4zM10 16h5v4h-5zM16 16h4v4h-4z"/></svg></button>
+  <span class="brand">Popstar ERP</span>
+  <nav class="topnav">
+    <a href="#" class="on">หน้าหลัก</a><a href="#">ขาย</a><a href="#">คลังสินค้า</a>
+    <a href="#">จัดซื้อ</a><a href="#">บัญชี</a><a href="#">รายงาน</a><a href="#">ตั้งค่า</a>
+  </nav>
+  <div class="topright">
+    <button class="iconbtn" aria-label="ข้อความ 5 รายการ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L3 21l1.1-4.6A8.4 8.4 0 1 1 21 11.5z"/></svg><span class="badge-dot g num">5</span></button>
+    <button class="iconbtn" aria-label="แจ้งเตือน 12 รายการ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="badge-dot r num">12</span></button>
+    <span class="company">บริษัท ป๊อปสตาร์ จำกัด</span>
+    <button class="userchip"><span class="av">JJ</span>JJ (Administrator)
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" style="width:10px;height:10px"><path d="M6 9l6 6 6-6"/></svg></button>
+  </div>
+</div>
+
+<div class="searchbar">
+  <div class="searchbox">
+    <label for="q" class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">ค้นหา</label>
+    <input id="q" type="search" placeholder="ค้นหาเมนู, เอกสาร, รายงาน…">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+  </div>
+</div>
+
+<div class="shell">
+  <aside class="side">
+    <button class="grp">เมนูด่วน<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></button>
+    <a href="#" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 13h8V3H3zM13 21h8V11h-8zM13 3v6h8V3zM3 21h8v-6H3z"/></svg>แผงควบคุม</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>กิจกรรมของฉัน</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.7 5.6 6.3.9-4.5 4.3 1 6.2-5.5-3-5.5 3 1-6.2L3 9.5l6.3-.9z"/></svg>ที่ค้นหน้า</a>
+
+    <button class="grp">ขาย<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></button>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M7 20h10"/></svg>หน้าร้าน (POS)</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h12v18H6z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>ใบเสนอราคา</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 9h18l-1.5 11h-15z"/><path d="M8 9V6a4 4 0 0 1 8 0v3"/></svg>คำสั่งขาย</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0M16 11a3 3 0 0 0 0-6"/></svg>ลูกค้า</a>
+
+    <button class="grp">คลังสินค้า<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></button>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8l9-5 9 5v8l-9 5-9-5zM3 8l9 5 9-5"/></svg>ภาพรวมคลัง</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></svg>รับสินค้า</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg>โอนสินค้า</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h4"/></svg>นับสต็อก</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M3 11h18M8 7V4h8v3"/></svg>สินค้า</a>
+
+    <button class="grp">จัดซื้อ<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></button>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h12v18H6z"/><path d="M9 9h6M9 13h6"/></svg>ใบขอซื้อ</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.5 12h11L21 7H6"/></svg>ใบสั่งซื้อ</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 6L9 17l-5-5"/></svg>ตรวจรับสินค้า</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 7h12v10H2zM14 10h4l3 3v4h-7z"/><circle cx="6" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg>ผู้ขาย/ซัพพลายเออร์</a>
+
+    <button class="grp">บัญชี<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></button>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h5"/></svg>รายการบัญชี</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v18M7 7h7a3 3 0 0 1 0 6H7"/></svg>ลูกหนี้</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v18M17 7h-7a3 3 0 0 0 0 6h7"/></svg>เจ้าหนี้</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>รายงานการเงิน</a>
+
+    <button class="grp">ตั้งค่า<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></button>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>ตั้งค่าระบบ</a>
+  </aside>
+
+  <main class="main">
+    <div class="ctrl">
+      <h1>แผงควบคุม <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg></h1>
+      <div class="right">
+        <button class="btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6"/></svg>รีเฟรช</button>
+        <button class="btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></svg>ช่วงเวลา: วันนี้
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" style="width:10px;height:10px"><path d="M6 9l6 6 6-6"/></svg></button>
+        <button class="btn star"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l2.7 5.6 6.3.9-4.5 4.3 1 6.2-5.5-3-5.5 3 1-6.2L3 9.5l6.3-.9z"/></svg>ค้นหน้า</button>
+        <div class="pager"><span class="n num">1-6 / 6</span>
+          <button aria-label="ก่อนหน้า"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 6l-6 6 6 6"/></svg></button>
+          <button aria-label="ถัดไป"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="canvas">
+      <div class="kpis">
+        <div class="kpi"><div class="ico t-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14M8 8h8M8 12h8M8 16h4"/></svg></div>
+          <div><div class="lbl">ยอดขายวันนี้</div><div class="val num">฿128,540.00</div>
+          <div class="sub">เมื่อวาน <span class="num">฿118,570.00</span> <span class="up num">▲ 8.42%</span></div></div></div>
+
+        <div class="kpi"><div class="ico t-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg></div>
+          <div><div class="lbl">กำไรขั้นต้น</div><div class="val num">24.8%</div>
+          <div class="sub">เฉลี่ย 7 วัน <span class="up num">▲ 2.1%</span></div></div></div>
+
+        <div class="kpi"><div class="ico t-info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12a9 9 0 1 1-3-6.7M21 3v6h-6"/></svg></div>
+          <div><div class="lbl">บิลรอซิงค์</div><div class="val num">7</div><div class="sub">บิล</div></div>
+          <span class="info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.6v.4"/></svg></span></div>
+
+        <div class="kpi"><div class="ico t-amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M12 13v5"/></svg></div>
+          <div><div class="lbl">สต็อกต่ำ</div><div class="val num">32</div><div class="sub">รายการ</div></div></div>
+
+        <div class="kpi"><div class="ico t-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M8 6V4h8v2M8 12h8"/></svg></div>
+          <div><div class="lbl">ใบสั่งซื้อรอรับ</div><div class="val num">12</div><div class="sub">รายการ</div></div></div>
+      </div>
+
+      <div class="row3">
+        <section class="card">
+          <header><h2>ยอดขายแยกตามสาขา</h2><span class="sel">วันนี้ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></span></header>
+          <div class="pad"><div class="chart">
+            <div class="yaxis"><span>80K</span><span>60K</span><span>40K</span><span>20K</span><span>0</span></div>
+            <div class="plot">
+              <div class="bar"><span class="v num">62,540</span><span class="fill" style="height:78%;background:var(--erp-primary-ink)"></span><span class="x">สาขา 001<br>รามอินทรา</span></div>
+              <div class="bar"><span class="v num">38,900</span><span class="fill" style="height:48.6%;background:var(--erp-success-ink)"></span><span class="x">สาขา 002<br>ลาดพร้าว</span></div>
+              <div class="bar"><span class="v num">17,850</span><span class="fill" style="height:22.3%;background:var(--erp-warning)"></span><span class="x">สาขา 003<br>บางแค</span></div>
+              <div class="bar"><span class="v num">9,250</span><span class="fill" style="height:11.6%;background:var(--erp-info)"></span><span class="x">สาขา 004<br>พระราม 2</span></div>
+            </div>
+          </div></div>
+        </section>
+
+        <section class="card">
+          <header><h2>10 สินค้าขายดี</h2><span class="sel">วันนี้ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></span></header>
+          <ol class="top10">
+            <li><span class="rk num">1.</span><span>หมูสามชั้นสไลด์</span><span class="q num">85.40 kg</span><span class="m num">฿16,146</span></li>
+            <li><span class="rk num">2.</span><span>ปลาแซลมอน</span><span class="q num">42.20 kg</span><span class="m num">฿16,025</span></li>
+            <li><span class="rk num">3.</span><span>เนื้อริบอายแพ็ค</span><span class="q num">18.70 kg</span><span class="m num">฿8,583</span></li>
+            <li><span class="rk num">4.</span><span>ซอสหมักเกาหลี</span><span class="q num">96.00 ขวด</span><span class="m num">฿7,584</span></li>
+            <li><span class="rk num">5.</span><span>เบคอนรมควัน</span><span class="q num">15.30 kg</span><span class="m num">฿6,885</span></li>
+          </ol>
+          <footer><a href="#">ดูทั้งหมด</a></footer>
+        </section>
+
+        <section class="card">
+          <header><h2>การแจ้งเตือน</h2></header>
+          <div class="nt"><span class="ic t-amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l9 17H3zM12 9v5M12 17v.4"/></svg></span>
+            <div class="bd"><div class="ti">สต็อกต่ำกว่าเกณฑ์ 32 รายการ</div><div class="ds"><a href="#">คลิกเพื่อดูรายการ</a></div></div><span class="tm">5 นาทีที่แล้ว</span></div>
+          <div class="nt"><span class="ic t-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.6v.4"/></svg></span>
+            <div class="bd"><div class="ti">บิลรอซิงค์ 7 บิล</div><div class="ds"><a href="#">คลิกเพื่อตรวจสอบ</a></div></div><span class="tm">10 นาทีที่แล้ว</span></div>
+          <div class="nt"><span class="ic t-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16v.4"/></svg></span>
+            <div class="bd"><div class="ti">เนื้อริบอายแพ็ค สต็อกติดลบ</div><div class="ds">เหลือ <span class="num">-1.20 kg</span></div></div><span class="tm">15 นาทีที่แล้ว</span></div>
+          <footer><a href="#">ดูการแจ้งเตือนทั้งหมด</a></footer>
+        </section>
+      </div>
+
+      <div class="row2">
+        <section class="card">
+          <header><h2>บิลขายล่าสุด</h2></header>
+          <div class="tw"><table>
+            <thead><tr><th>เลขที่บิล</th><th>สาขา</th><th>POS</th><th>แคชเชียร์</th><th class="r">ยอดรวม</th><th>การชำระเงิน</th><th>ซิงค์</th><th>เวลา</th></tr></thead>
+            <tbody>
+              <tr><td class="num">001-POS01-20240601-0007</td><td>สาขา 001</td><td class="num">POS01</td><td>สมชาย</td><td class="r num">฿529.00</td><td>เงินสด</td><td><span class="pill ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>ซิงค์แล้ว</span></td><td class="num">11:45</td></tr>
+              <tr><td class="num">001-POS01-20240601-0006</td><td>สาขา 001</td><td class="num">POS01</td><td>สมชาย</td><td class="r num">฿189.00</td><td>เงินสด</td><td><span class="pill wait"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>รอซิงค์</span></td><td class="num">11:32</td></tr>
+              <tr><td class="num">002-POS02-20240601-0004</td><td>สาขา 002</td><td class="num">POS02</td><td>มาลี</td><td class="r num">฿982.00</td><td>เงินโอน</td><td><span class="pill ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>ซิงค์แล้ว</span></td><td class="num">11:28</td></tr>
+              <tr><td class="num">003-POS01-20240601-0003</td><td>สาขา 003</td><td class="num">POS01</td><td>แอน</td><td class="r num">฿75.00</td><td>เงินสด</td><td><span class="pill fail"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M18 6L6 18M6 6l12 12"/></svg>ซิงค์ล้มเหลว</span></td><td class="num">11:15</td></tr>
+              <tr><td class="num">001-POS01-20240601-0005</td><td>สาขา 001</td><td class="num">POS01</td><td>สมชาย</td><td class="r num">฿1,250.00</td><td>บัตรเครดิต</td><td><span class="pill ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>ซิงค์แล้ว</span></td><td class="num">11:10</td></tr>
+            </tbody>
+          </table></div>
+          <footer><a href="#">ดูบิลขายทั้งหมด</a></footer>
+        </section>
+
+        <section class="card">
+          <header><h2>สถานะการซิงค์</h2></header>
+          <div class="pad"><div class="donut">
+            <div class="ring">
+              <svg viewBox="0 0 42 42" aria-label="ซิงค์แล้ว 87.9% รอซิงค์ 8.1% ล้มเหลว 4.0%">
+                <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--erp-success-ink)" stroke-width="7" stroke-dasharray="87.9 12.1" stroke-dashoffset="0"></circle>
+                <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--erp-warning)" stroke-width="7" stroke-dasharray="8.1 91.9" stroke-dashoffset="-87.9"></circle>
+                <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--erp-danger)" stroke-width="7" stroke-dasharray="4 96" stroke-dashoffset="-96"></circle>
+              </svg>
+              <div class="mid"><div><b class="num">248</b><span>บิล</span></div></div>
+            </div>
+            <ul class="lg">
+              <li><i style="background:var(--erp-success-ink)"></i>ซิงค์แล้ว<span class="n num">218</span><span class="p num">(87.9%)</span></li>
+              <li><i style="background:var(--erp-warning)"></i>รอซิงค์<span class="n num">20</span><span class="p num">(8.1%)</span></li>
+              <li><i style="background:var(--erp-danger)"></i>ซิงค์ล้มเหลว<span class="n num">10</span><span class="p num">(4.0%)</span></li>
+            </ul>
+          </div></div>
+          <footer><a href="#">ดูรายละเอียดการซิงค์</a></footer>
+        </section>
+      </div>
+
+      <div class="row2">
+        <section class="card">
+          <header><h2>การเคลื่อนไหวสต็อกล่าสุด</h2></header>
+          <div class="tw"><table>
+            <tbody>
+              <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="var(--erp-primary-ink)" stroke-width="1.8" style="width:15px;height:15px;vertical-align:-2px"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></svg> รับสินค้า</td>
+                  <td class="num">PO-20240601-0012</td><td>บริษัท เอ บี ซี ฟู้ด จำกัด</td><td class="r num">80 รายการ</td><td class="r num">฿45,200.00</td>
+                  <td><span class="pill ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>เสร็จสิ้น</span></td><td class="num">30 นาทีที่แล้ว</td></tr>
+              <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="var(--erp-info)" stroke-width="1.8" style="width:15px;height:15px;vertical-align:-2px"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg> โอนสินค้า</td>
+                  <td class="num">TR-20240601-0004</td><td>สาขา 001 → สาขา 003</td><td class="r num">24 รายการ</td><td class="r num">฿8,940.00</td>
+                  <td><span class="pill wait"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>ระหว่างทาง</span></td><td class="num">1 ชั่วโมงที่แล้ว</td></tr>
+              <tr><td><svg viewBox="0 0 24 24" fill="none" stroke="var(--erp-warning-ink)" stroke-width="1.8" style="width:15px;height:15px;vertical-align:-2px"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8"/></svg> นับสต็อก</td>
+                  <td class="num">SC-20240601-0002</td><td>คลังสาขา 002</td><td class="r num">312 รายการ</td><td class="r num">—</td>
+                  <td><span class="pill wait"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>กำลังนับ</span></td><td class="num">2 ชั่วโมงที่แล้ว</td></tr>
+            </tbody>
+          </table></div>
+          <footer><a href="#">ดูการเคลื่อนไหวทั้งหมด</a></footer>
+        </section>
+
+        <section class="card">
+          <header><h2>กิจกรรม</h2></header>
+          <div class="act"><span class="av">สม</span><div class="bd"><div class="ti"><b>สมชาย</b> แก้ไขราคา หมูสามชั้นสไลด์</div>
+            <div class="ds">จาก <span class="num">185.00</span> เป็น <span class="num">189.00</span> บาท</div></div><span class="tm">1 ชั่วโมงที่แล้ว</span></div>
+          <div class="act"><span class="av">มล</span><div class="bd"><div class="ti"><b>มาลี</b> ตรวจรับ PO-20240601-0012</div>
+            <div class="ds"><span class="num">80</span> รายการ · <span class="num">฿45,200.00</span></div></div><span class="tm">3 ชั่วโมงที่แล้ว</span></div>
+          <div class="act"><span class="av">SY</span><div class="bd"><div class="ti"><b>ระบบ</b> ซิงค์สินค้าไปยัง POS01</div>
+            <div class="ds"><span class="num">6</span> รายการ</div></div><span class="tm">4 ชั่วโมงที่แล้ว</span></div>
+          <footer><a href="#">ดูกิจกรรมทั้งหมด</a></footer>
+        </section>
+      </div>
+
+      <p class="note"><b>ภาพเสนอการออกแบบ</b> — ตัวเลขทั้งหมดเป็นข้อมูลจำลอง ปุ่มยังไม่ทำงาน และไม่มีการอ่านหรือเขียนฐานข้อมูล
+      โครงหน้าตามภาพที่สั่งทุกจุด เปลี่ยนเฉพาะชุดสีจากม่วง Odoo เป็นฟ้า JET ตามที่กำหนดไว้ว่าห้ามใช้ม่วงเป็นสีหลัก</p>
+    </div>
+  </main>
+</div>
