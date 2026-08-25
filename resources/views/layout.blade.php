@@ -321,7 +321,7 @@
         html[data-layout="odoo"] .table-success { --bs-table-bg: var(--erp-success-soft); }
         html[data-layout="odoo"] .table-warning { --bs-table-bg: var(--erp-warning-soft); }
         html[data-layout="odoo"] .alert-danger { background: var(--erp-danger-soft); border-color: var(--erp-danger); color: var(--erp-danger); }
-        html[data-layout="odoo"] .alert-success { background: var(--erp-success-soft); border-color: var(--erp-success); color: var(--erp-success-ink); }
+        html[data-layout="odoo"] .alert-success { background: var(--erp-success-soft); border-color: var(--erp-success); color: var(--erp-success-on-soft); }
 
         /* ════════════════════════════════════════
            THEME - FlowAccount-style light (single)
@@ -376,6 +376,7 @@
                เข้มขึ้นนิดเดียวไว้ใช้ตอนมีตัวอักษรโดยเฉพาะ ตาเปล่าแยกไม่ออก */
             --erp-primary-ink: #147db5;   /* ขาวบนฟ้า  4.54:1 */
             --erp-success-ink: #158662;   /* ขาวบนเขียว 4.55:1 */
+            --erp-success-on-soft: #147f5d; /* เขียวบนพื้นเขียวอ่อน 4.52:1 */
             --erp-warning-ink: #a56a00;   /* เหลืองอ่านบนขาว 4.51:1 */
             /* แดง POPSTAR: ใช้เฉพาะแบรนด์ แจ้งเตือน และข้อผิดพลาด */
             --erp-brand-red: #c62828;
