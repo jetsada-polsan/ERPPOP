@@ -281,6 +281,11 @@
             box-shadow: 0 0 0 3px rgba(21, 133, 192, .18);
         }
         html[data-layout="odoo"] .nav-pills .nav-link.active { background: var(--erp-primary); color: #fff; }
+        html[data-layout="odoo"] .odn-side { overflow-y: auto; }
+        html[data-layout="odoo"] .odn-grp { display: none; }
+        html[data-layout="odoo"] .odn-grp.is-visible { display: block; }
+        html[data-layout="odoo"] .odn-nav-link { white-space: nowrap; }
+        html[data-layout="odoo"] .odn-nav-link.on { color: #fff; background: var(--erp-primary); border-radius: 5px; }
 
         /* ── ปุ่ม: ฟ้า = ทำต่อ, เขียว = ยืนยัน/สำเร็จ, แดง = ลบ/ผิดพลาด ──
            ธีม Odoo เดิมทำ .btn-success ให้เป็นม่วงชุดเดียวกับ .btn-primary
@@ -1512,7 +1517,7 @@
                 @else<span>{{ $companyName }}</span>@endif
             </a>
             @foreach ($menuSections as $i => $section)
-                <div class="odn-grp" id="odn-grp-{{ $i }}" data-sec="{{ $i }}">
+                <div class="odn-grp {{ $i === $activeSection ? 'is-visible' : '' }}" id="odn-grp-{{ $i }}" data-sec="{{ $i }}">
                     <button type="button" class="odn-grp-head" aria-expanded="true">
                         <i class="bi {{ $railIcons[$section['label']] ?? 'bi-grid-fill' }}"></i>
                         <span>{{ $section['displayLabel'] ?? $section['label'] }}</span>
@@ -1798,6 +1803,7 @@
         groups.forEach(function (g) {
             var any = g.querySelector('.odn-item:not([hidden])');
             g.hidden = !any;
+            if (q && any) { g.classList.add('is-visible'); }
             /* ระหว่างค้นหาให้กางทุกหมวด ไม่งั้นผลลัพธ์ซ่อนอยู่ในหมวดที่พับไว้ */
             if (q) { g.classList.remove('collapsed'); }
         });
@@ -1820,6 +1826,8 @@
             var target = document.getElementById('odn-grp-' + link.dataset.sec);
             if (!target) { return; }
             event.preventDefault();
+            document.querySelectorAll('.odn-grp').forEach(function (group) { group.classList.remove('is-visible'); });
+            target.classList.add('is-visible');
             target.classList.remove('collapsed');
             target.scrollIntoView({ block: 'nearest' });
             document.querySelectorAll('.odn-nav-link').forEach(function (other) { other.classList.remove('on'); });
