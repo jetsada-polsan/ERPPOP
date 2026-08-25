@@ -148,7 +148,6 @@
         html[data-layout="odoo"] .odn-grp { display: none; }
         html[data-layout="odoo"] .odn-grp.is-visible { display: block; }
         html[data-layout="odoo"] .odn-nav-link { white-space: nowrap; }
-        html[data-layout="odoo"] .odn-nav-link.on { color: #fff; background: var(--erp-primary); border-radius: 5px; }
 
         /* ── ปุ่ม: ฟ้า = ทำต่อ, เขียว = ยืนยัน/สำเร็จ, แดง = ลบ/ผิดพลาด ──
            ธีม Odoo เดิมทำ .btn-success ให้เป็นม่วงชุดเดียวกับ .btn-primary
@@ -301,19 +300,34 @@
             background: var(--erp-primary-dark); color: #fff;
             display: flex; align-items: center; gap: 6px; padding: 0 12px; height: 44px;
         }
-        .odn-apps { display:grid; place-items:center; width:28px; height:28px; border-radius:6px;
-            background:rgba(255,255,255,.14); color:#fff; flex:none; font-size:14px; text-decoration:none; }
-        .odn-apps:hover { background:rgba(255,255,255,.26); color:#fff; }
-        .odn-brand { font-weight:700; font-size:15px; color:#fff; text-decoration:none; margin-right:8px; white-space:nowrap; }
+        .odn-apps { display:grid; place-items:center; width:30px; height:30px; border-radius:8px;
+            background:rgba(255,255,255,.13); color:#fff; flex:none; font-size:14px; text-decoration:none;
+            transition:background .13s; }
+        .odn-apps:hover { background:rgba(255,255,255,.28); color:#fff; }
+        .odn-apps:focus-visible { outline:2px solid #fff; outline-offset:2px; }
+
+        .odn-brand { font-weight:700; font-size:15px; color:#fff; text-decoration:none;
+            letter-spacing:.3px; white-space:nowrap; padding:0 4px; }
         .odn-brand:hover { color:#fff; }
-        .odn-nav { display:flex; gap:1px; overflow-x:auto; scrollbar-width:none; min-width:0; }
+        /* เส้นคั่นบาง ๆ แยก "ตัวระบบ" ออกจาก "เมนู" ให้ตาอ่านเป็นสองส่วน */
+        .odn-brand::after { content:""; display:inline-block; width:1px; height:16px;
+            background:rgba(255,255,255,.22); margin-left:12px; vertical-align:-3px; }
+
+        .odn-nav { display:flex; gap:2px; overflow-x:auto; scrollbar-width:none; min-width:0; margin-left:4px; }
         .odn-nav::-webkit-scrollbar { display:none; }
-        .odn-nav-link { color:rgba(255,255,255,.85); text-decoration:none; padding:5px 10px;
-            border-radius:6px; font-size:12.5px; white-space:nowrap; }
-        .odn-nav-link:hover { background:rgba(255,255,255,.12); color:#fff; }
-        .odn-nav-link.on { background:rgba(255,255,255,.18); color:#fff; font-weight:600;
-            box-shadow:inset 0 -2px 0 rgba(255,255,255,.6); }
-        .odn-company { margin-left:auto; font-size:12px; opacity:.9; white-space:nowrap; padding-left:10px; }
+        .odn-nav-link { color:rgba(255,255,255,.86); text-decoration:none; padding:6px 12px;
+            border-radius:7px; font-size:13px; white-space:nowrap; transition:background .12s, color .12s; }
+        .odn-nav-link:hover { background:rgba(255,255,255,.14); color:#fff; }
+        .odn-nav-link:focus-visible { outline:2px solid #fff; outline-offset:-2px; }
+        /* ตัวที่เลือกเป็นพิลขาว ไม่ใช่ฟ้าบนฟ้า — ฟ้า #1585c0 บนแถบ #0f4c75 ได้แค่ 2.23:1
+           มองแทบไม่ออกว่าอันไหนถูกเลือก ส่วนพิลขาวได้ 9.09:1 ทั้งพื้นและตัวหนังสือ */
+        .odn-nav-link.on { background:#fff; color:var(--erp-primary-dark); font-weight:600;
+            box-shadow:0 1px 3px rgba(0,0,0,.18); }
+        .odn-nav-link.on:hover { background:#fff; color:var(--erp-primary-dark); }
+
+        .odn-company { margin-left:auto; font-size:12.5px; color:rgba(255,255,255,.82);
+            white-space:nowrap; padding-left:14px; border-left:1px solid rgba(255,255,255,.18);
+            margin-right:2px; }
 
         /* header เดิมยังทำหน้าที่แถบชื่อหน้า แต่ไม่ต้องเป็นสีเข้มซ้อนกันสองชั้น */
         html[data-layout="odoo"] .app-header {
