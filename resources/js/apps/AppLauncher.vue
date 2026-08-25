@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
+interface LauncherMark {
+    svg: string;
+    m1: string;
+    m2: string;
+}
+
 interface LauncherItem {
     label: string;
     icon: string;
     tone: string;
+    mark: LauncherMark;
     url: string;
     target: string | null;
 }
@@ -122,7 +129,11 @@ function accentFor(tone: string | undefined, fallback = '#1687c8') {
                         :target="item.target ?? undefined"
                         :style="{ '--al-accent': accentFor(item.tone, accentFor(section.label)) }"
                     >
-                        <span class="al-card-ico"><i class="bi" :class="item.icon"></i></span>
+                        <!-- ตรามาจาก App\Support\AppMark ฝั่งเซิร์ฟเวอร์ เป็น SVG คงที่
+                             ไม่มีข้อมูลจากผู้ใช้ปนเข้ามา จึงปลอดภัยที่จะใช้ v-html -->
+                        <span class="al-card-ico" :style="{ '--m1': item.mark.m1, '--m2': item.mark.m2 }">
+                            <svg viewBox="0 0 24 24" aria-hidden="true" v-html="item.mark.svg"></svg>
+                        </span>
                         <span class="al-card-label">{{ item.label }}</span>
                     </a>
                 </div>
@@ -189,10 +200,12 @@ function accentFor(tone: string | undefined, fallback = '#1687c8') {
 .al-card:focus-visible{outline:2px solid var(--ti,var(--erp-primary));outline-offset:2px}
 /* สีประจำโมดูลมาจากข้อมูลที่ระบบกำหนดไว้แล้ว 10 โทน — ช่วยให้กวาดตาหาเจอเร็ว
    ทุกโทนคุมให้อยู่ตระกูลเดียวกับฟ้า JET และผ่านคอนทราสต์ AA */
-.al-card-ico{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;
-  background:var(--ts,var(--erp-primary-soft));color:var(--ti,var(--erp-primary-ink));
-  font-size:20px;transition:background .13s,color .13s,transform .13s}
-.al-card:hover .al-card-ico{background:var(--ti);color:#fff;transform:scale(1.06)}
+/* ตราวางบนพื้นขาว ตัวทรงมีสองสีของมันเองแล้ว ไม่ต้องใส่พื้นสีทับอีกชั้น */
+.al-card-ico{width:50px;height:50px;border-radius:14px;display:grid;place-items:center;
+  background:#fff;box-shadow:inset 0 0 0 1px var(--erp-border,#dbe7ef);
+  transition:box-shadow .13s,transform .13s}
+.al-card-ico svg{width:34px;height:34px;display:block}
+.al-card:hover .al-card-ico{box-shadow:inset 0 0 0 2px var(--ti);transform:scale(1.05)}
 .al-card-label{font-size:12.8px;font-weight:600;line-height:1.4;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 

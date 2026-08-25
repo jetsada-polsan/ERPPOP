@@ -36,7 +36,9 @@ if [[ -f "$SSH_IDENTITY_FILE" ]]; then
   RSYNC_RSH+=" -i ${SSH_IDENTITY_FILE} -o IdentitiesOnly=yes"
 fi
 
-rsync -az --delete \
+# --no-owner/--no-group: ห้ามยกเจ้าของไฟล์จากเครื่อง dev ขึ้นไป ครั้งหนึ่งเคยทำให้
+# bootstrap/cache เปลี่ยนเจ้าของเป็น uid ของ macOS แล้ว www-data เขียนไม่ได้ เว็บล่มทั้งระบบ
+rsync -az --delete --no-owner --no-group \
   -e "$RSYNC_RSH" \
   --exclude='.git/' \
   --exclude='.env' \
@@ -44,11 +46,12 @@ rsync -az --delete \
   --exclude='auth.json' \
   --exclude='vendor/' \
   --exclude='node_modules/' \
+  --exclude='.claude/' \
+  --exclude='.codex/' \
   --exclude='bootstrap/cache/' \
   --exclude='database/*.sqlite*' \
   --exclude='.phpunit.result.cache' \
   --exclude='.DS_Store' \
-  --exclude='public/build/' \
   --exclude='public/downloads/' \
   --exclude='public/storage' \
   --exclude='storage/' \
@@ -62,6 +65,7 @@ ssh "${SSH_OPTIONS[@]}" "${SSH_USER}@${SSH_HOST}" \
   && php artisan config:clear \
   && php artisan route:clear \
   && php artisan view:clear \
+  && chown -R www-data:www-data storage bootstrap/cache \
   && php artisan migrate --force"
 
 echo "Deploy complete."
