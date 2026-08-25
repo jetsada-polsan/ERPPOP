@@ -351,29 +351,59 @@
             overflow-y: auto !important; overflow-x: hidden !important;
             scrollbar-width: thin; padding: 0 0 24px;
         }
-        .odn-side-brand { display:flex; align-items:center; justify-content:center; height:52px;
-            margin:0 8px; padding:6px; overflow:hidden; text-decoration:none;
-            color:var(--erp-primary-dark); font-weight:700; font-size:13px; border-bottom:1px solid var(--erp-border); }
-        .odn-side-brand img { max-width:132px; max-height:38px; width:auto; height:auto; object-fit:contain; }
-        .odn-grp { border-bottom:1px solid var(--erp-border); }
-        .odn-grp:last-of-type { border-bottom:0; }
+        /* ── แบรนด์บนสุดของเมนู ───────────────────────────────────── */
+        .odn-side-brand { display:flex; align-items:center; justify-content:center; height:56px;
+            margin:0; padding:10px 14px; overflow:hidden; text-decoration:none;
+            color:var(--erp-primary-dark); font-weight:700; font-size:13px;
+            border-bottom:1px solid var(--erp-border); background:var(--erp-surface); }
+        .odn-side-brand img { max-width:136px; max-height:36px; width:auto; height:auto; object-fit:contain; }
+
+        /* ── หัวหมวด ──────────────────────────────────────────────── */
+        .odn-grp { border-bottom:0; }
         .odn-grp-head { display:flex; align-items:center; gap:8px; width:100%; background:none; border:0;
-            padding:9px 13px; font-size:11px; font-weight:700; letter-spacing:.5px;
-            text-transform:uppercase; color:var(--erp-muted); text-align:left; }
-        .odn-grp-head:hover { color:var(--erp-primary-dark); background:var(--erp-primary-soft); }
-        .odn-grp-head > i:first-child { font-size:13px; opacity:.7; }
-        .odn-caret { margin-left:auto; font-size:10px; transition:transform .15s; }
-        .odn-grp.collapsed .odn-caret { transform:rotate(-90deg); }
-        .odn-grp.collapsed .odn-grp-body { display:none; }
-        .odn-grp-body { padding-bottom:6px; }
-        .odn-item { display:flex; align-items:center; gap:9px; padding:6px 13px; color:var(--erp-text);
-            text-decoration:none; font-size:calc(13px * var(--menu-scale)); border-left:3px solid transparent; line-height:1.3; }
-        .odn-item:hover { background:var(--erp-primary-soft); color:var(--erp-primary-dark); }
-        .odn-item.active { background:var(--erp-primary-soft); color:var(--erp-primary-dark);
-            font-weight:600; border-left-color:var(--erp-primary); }
-        .odn-item i { font-size:13px; width:16px; text-align:center; flex:none; opacity:.6; }
-        .odn-item.active i { opacity:1; color:var(--erp-primary); }
-        .odn-item.hit { box-shadow:inset 0 0 0 2px var(--erp-primary); border-radius:4px; }
+            padding:14px 14px 7px; font-size:10.5px; font-weight:700; letter-spacing:.7px;
+            text-transform:uppercase; color:var(--erp-muted); text-align:left; cursor:default; }
+        .odn-grp-head:hover { background:none; color:var(--erp-muted); }
+        .odn-grp-head > i:first-child { font-size:12px; opacity:.6; }
+        .odn-caret { display:none; }
+        .odn-grp-body { padding:0 8px 10px; }
+
+        /* ── รายการเมนู ───────────────────────────────────────────
+           ไอคอนใส่กล่องสีประจำโมดูล ใช้ค่า tone ชุดเดียวกับหน้า App Launcher
+           เมนูเดิมเป็นไอคอนเทาบางเท่ากันหมด ตากวาดแล้วไม่มีอะไรให้จับ
+           ─────────────────────────────────────────────────────── */
+        .odn-item { display:flex; align-items:center; gap:10px; padding:6px 8px; margin-bottom:1px;
+            color:var(--erp-text); text-decoration:none; font-size:calc(13px * var(--menu-scale));
+            border-radius:8px; line-height:1.35; position:relative; }
+        .odn-item-ico { width:26px; height:26px; border-radius:7px; flex:none;
+            display:grid; place-items:center; font-size:13px;
+            background:var(--ts,var(--erp-primary-soft)); color:var(--ti,var(--erp-primary-ink));
+            transition:background .12s, color .12s; }
+        /* ชื่อยาวให้ตัดสองบรรทัดแทนการตัดท้ายทิ้ง — "เบิก / คืน / สูญเสีย / แปรรูป"
+           ถ้าตัดท้ายจะเหลือ "แปร..." ซึ่งอ่านไม่ออกว่าคืออะไร */
+        .odn-item > span:last-child { min-width:0; display:-webkit-box; -webkit-line-clamp:2;
+            -webkit-box-orient:vertical; overflow:hidden; }
+        .odn-item:hover { background:var(--erp-surface-2, #f8fbfd); }
+        .odn-item:hover .odn-item-ico { background:var(--ti); color:#fff; }
+        /* ตัวที่เปิดอยู่ใช้ฟ้า JET เสมอ ไม่ใช่สีประจำโมดูล — "คุณอยู่ตรงนี้" ต้องเป็น
+           สัญญาณเดียวคงที่ ถ้าเปลี่ยนสีไปตามเมนูจะกลายเป็นสีสุ่มที่อ่านไม่ออกว่าแปลว่าอะไร */
+        .odn-item.active { background:var(--erp-primary-soft); font-weight:600;
+            color:var(--erp-primary-dark); }
+        .odn-item.active .odn-item-ico { background:var(--erp-primary-ink); color:#fff; }
+        .odn-item:focus-visible { outline:2px solid var(--erp-primary); outline-offset:1px; }
+
+        /* สีประจำโมดูล 10 โทน — ชุดเดียวกับ App Launcher ผ่าน AA ทั้งไอคอนและตัวอักษร */
+        .odn-item.t-blue   { --ti:#1274a8; --ts:#e9f2f9; }
+        .odn-item.t-cyan   { --ti:#0e7490; --ts:#e6f2f6; }
+        .odn-item.t-teal   { --ti:#0f766e; --ts:#e6f3f1; }
+        .odn-item.t-indigo { --ti:#4054a8; --ts:#edeff9; }
+        .odn-item.t-slate  { --ti:#52677d; --ts:#eef1f4; }
+        .odn-item.t-amber  { --ti:#9b6400; --ts:#fbf3e3; }
+        .odn-item.t-orange { --ti:#b0530a; --ts:#fbf0e6; }
+        .odn-item.t-red    { --ti:#c62828; --ts:#fdedec; }
+        .odn-item.t-pink   { --ti:#a3376b; --ts:#fbeef3; }
+        .odn-item.t-brown  { --ti:#7c5233; --ts:#f6efe8; }
+
         .odn-noresult { color:var(--erp-muted); font-size:12.5px; text-align:center; padding:20px 12px; margin:0; }
 
         /* ── แผงปรับหน้าจอ (ใช้ได้ทั้ง Classic และ Odoo) ────────────── */
@@ -1517,10 +1547,10 @@
                                 }
                             @endphp
                             <a href="{{ route($item['route'], $item['params'] ?? []) }}"
-                               class="odn-item {{ $active ? 'active' : '' }}"
+                               class="odn-item t-{{ $item['tone'] ?? 'blue' }} {{ $active ? 'active' : '' }}"
                                data-s="{{ mb_strtolower($item['label']) }}"
                                @if(isset($item['target'])) target="{{ $item['target'] }}" @endif>
-                                <i class="bi {{ $item['icon'] }}"></i><span>{{ $item['label'] }}</span>
+                                <span class="odn-item-ico"><i class="bi {{ $item['icon'] }}"></i></span><span>{{ $item['label'] }}</span>
                             </a>
                         @endforeach
                     </div>

@@ -140,9 +140,11 @@ class DashboardLayoutTest extends TestCase
         AppSetting::set('erp_layout', 'classic');
         $classic = $this->actingAs($viewer)->get(route('dashboard'))->getContent();
 
+        /* นับด้วย 'odn-item t-' ไม่ใช่ 'odn-item' เฉย ๆ เพราะกล่องไอคอนข้างในใช้
+           คลาส odn-item-ico ซึ่งขึ้นต้นเหมือนกัน จะถูกนับซ้ำเป็นเมนูอีกตัว */
         $this->assertSame(
             substr_count($classic, 'class="fa-subnav-link'),
-            substr_count($odoo, 'class="odn-item'),
+            substr_count($odoo, 'class="odn-item t-'),
             'จำนวนเมนูของสอง layout ไม่เท่ากัน'
         );
     }
