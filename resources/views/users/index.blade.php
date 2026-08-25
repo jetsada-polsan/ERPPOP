@@ -118,7 +118,7 @@
                 </div>
                 <div class="col-12">
                     <label class="form-label small text-muted d-flex align-items-center flex-wrap gap-1">
-                        <i class="bi bi-shield-check" style="color:var(--fa-blue)"></i>
+                        <i class="bi bi-shield-check" style="color:var(--erp-primary)"></i>
                         <span>บทบาท / สิทธิ์</span>
                         <span class="text-muted">— เลือกได้หลายอัน (เช่น แคชเชียร์ที่รับ/โอนของด้วย ติ๊ก <b>Cashier</b> + <b>คลังสินค้า</b>)</span>
                     </label>
@@ -161,7 +161,7 @@
                 </div>
             </div>
 
-            <hr class="my-4" style="border-color:#eef2f6">
+            <hr class="my-4" style="border-color:var(--erp-border-soft,var(--erp-border))">
             <div class="d-flex gap-2">
                 <button class="btn btn-primary px-5"><i class="bi bi-check-lg me-1"></i><span x-text="editId ? 'บันทึกการแก้ไข' : 'เพิ่มผู้ใช้'"></span></button>
                 <button type="button" class="btn btn-light border" x-show="editId" @click="resetForm()">ยกเลิกแก้ไข</button>
@@ -170,7 +170,7 @@
     </div>
 
     <div class="content-card p-4 mb-3">
-        <h2 class="h5 fw-bold mb-3"><i class="bi bi-people-fill me-2" style="color:var(--fa-blue)"></i>รายชื่อผู้ใช้</h2>
+        <h2 class="h5 fw-bold mb-3"><i class="bi bi-people-fill me-2" style="color:var(--erp-primary)"></i>รายชื่อผู้ใช้</h2>
         <div class="table-responsive">
             <table class="table align-middle user-list-table">
                 <thead><tr><th>ผู้ใช้</th><th>ชื่อ-นามสกุล</th><th>ตำแหน่ง</th><th>สาขา</th><th>สายการขาย</th><th>บทบาท</th><th>เข้าใช้ล่าสุด</th><th>สถานะ</th><th></th></tr></thead>
@@ -235,7 +235,7 @@
     </div>
 
     <div class="content-card p-4">
-        <h2 class="h5 fw-bold mb-3"><i class="bi bi-diagram-3-fill me-2" style="color:var(--fa-blue)"></i>บทบาทและสิทธิ์ (ตามแบบ BPlus)</h2>
+        <h2 class="h5 fw-bold mb-3"><i class="bi bi-diagram-3-fill me-2" style="color:var(--erp-primary)"></i>บทบาทและสิทธิ์ (ตามแบบ BPlus)</h2>
         <div class="table-responsive">
             <table class="table table-sm align-middle">
                 <thead><tr><th>บทบาท</th><th>สิทธิ์ที่ได้รับ</th></tr></thead>
@@ -262,37 +262,37 @@
     [x-cloak]{display:none!important}
     .uf-head-icon{
         width:44px;height:44px;flex:0 0 44px;border-radius:13px;display:grid;place-items:center;
-        background:linear-gradient(135deg,#e0f2fe,#bae6fd);color:var(--fa-blue-deep,#1585c0);font-size:20px;
+        background:var(--erp-primary-soft);color:var(--erp-primary-ink);font-size:20px;
     }
     .form-section-title{
         display:flex;align-items:center;gap:.5rem;
-        font-weight:700;font-size:.88rem;color:var(--fa-blue-deep,#1585c0);
-        margin:.35rem 0 .9rem;padding-bottom:.45rem;border-bottom:1px dashed #dbe7f1;
+        font-weight:700;font-size:.88rem;color:var(--erp-primary-dark);
+        margin:.35rem 0 .9rem;padding-bottom:.45rem;border-bottom:1px dashed var(--erp-border);
     }
-    .form-section-title i{color:var(--fa-blue,#1a9bdc);font-size:1rem}
+    .form-section-title i{color:var(--erp-primary);font-size:1rem}
     .user-form .form-label{margin-bottom:.25rem;font-weight:600}
-    .user-form .input-group-text{background:#f2f8fc;border-color:#e2e8f0;color:#7fa1bd}
-    .user-form .input-group:focus-within .input-group-text{border-color:#10b981;color:var(--fa-blue)}
+    .user-form .input-group-text{background:var(--erp-surface-2,#f8fbfd);border-color:var(--erp-border);color:var(--erp-muted)}
+    .user-form .input-group:focus-within .input-group-text{border-color:var(--erp-primary);color:var(--erp-primary)}
     .user-form .role-grid{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.15rem}
     .user-form .role-chip{margin:0;cursor:pointer}
     .user-form .role-chip input{position:absolute;opacity:0;width:0;height:0}
     .user-form .role-chip span{
         display:inline-block;padding:.4rem .85rem;border-radius:999px;
-        border:1.5px solid #e2e8f0;background:#fafbfc;color:#52708a;
+        border:1.5px solid var(--erp-border);background:var(--erp-surface-2,#f8fbfd);color:var(--erp-text);
         font-size:.85rem;font-weight:600;transition:all .12s;user-select:none;
     }
-    .user-form .role-chip:hover span{border-color:#bcd9ec;color:var(--fa-blue-deep,#1585c0)}
+    .user-form .role-chip:hover span{border-color:var(--erp-primary);color:var(--erp-primary-dark)}
     .user-form .role-chip input:checked + span{
-        border-color:var(--fa-blue,#1a9bdc);background:#e3f3fc;color:var(--fa-blue-deep,#1585c0);
+        border-color:var(--erp-primary);background:var(--erp-primary-soft);color:var(--erp-primary-dark);
     }
     .user-form .role-chip input:checked + span::before{content:"\2713 ";font-weight:800}
-    .user-form .role-chip input:focus-visible + span{box-shadow:0 0 0 3px rgba(26,155,220,.28)}
+    .user-form .role-chip input:focus-visible + span{box-shadow:0 0 0 3px rgba(21,133,192,.28)}
     .user-list-table{font-family:var(--erp-font-family);font-size:13px}
     .user-list-table td{font-weight:400;letter-spacing:0;line-height:1.35}
     .user-list-table td.fw-semibold{font-weight:700!important}
     .user-list-table .badge{font-family:inherit;font-size:11px;font-weight:700}
     .user-reset-backdrop{position:fixed;inset:0;z-index:2100;background:rgba(15,23,42,.46);display:flex;align-items:center;justify-content:center;padding:20px}
-    .user-reset-modal{width:min(520px,100%);background:#fff;border-radius:8px;padding:24px;box-shadow:0 24px 80px rgba(15,23,42,.25)}
+    .user-reset-modal{width:min(520px,100%);background:var(--erp-surface,#fff);border-radius:8px;padding:24px;box-shadow:0 24px 80px rgba(15,23,42,.25)}
 </style>@endpush
 
 @push('scripts')
