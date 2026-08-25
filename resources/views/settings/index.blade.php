@@ -549,10 +549,20 @@ async function copyPosToken(text) {
         box-shadow: 0 1px 2px rgba(29, 59, 82, .06);
     }
     html[data-layout="odoo"] .set-nav-group {
-        color: var(--erp-muted);
-        font-size: 10px;
-        letter-spacing: .55px;
-        padding: 13px 9px 6px;
+        color: var(--erp-primary-dark);
+        background: var(--erp-surface-2, #f8fbfd);
+        border: 1px solid var(--erp-border);
+        border-radius: 4px;
+        font-size: 11px;
+        letter-spacing: 0;
+        padding: 9px 10px;
+        margin: 8px 0 4px;
+        font-weight: 700;
+    }
+    html[data-layout="odoo"] .set-nav-group:first-child { margin-top: 0; }
+    html[data-layout="odoo"] .set-nav-group i {
+        color: var(--erp-primary);
+        opacity: 1;
     }
     html[data-layout="odoo"] .set-nav-link {
         color: var(--erp-text);
