@@ -233,6 +233,28 @@
         .od-meta { margin-left:auto; font-size:11.5px; color:var(--erp-muted); }
         .od-pad { padding:13px 14px; }
         .od-empty { color:var(--erp-muted); font-size:12.5px; text-align:center; padding:18px 0; margin:0; }
+
+        /* ── แท็บแบบ segmented ────────────────────────────────────
+           ใช้แทนปุ่ม btn-dark ทึบ ๆ ของ Bootstrap ที่ดูเป็นปุ่มกดมากกว่าแท็บ */
+        .od-tabs { display:inline-flex; gap:2px; background:var(--erp-surface-2, #f8fbfd);
+            border:1px solid var(--erp-border); border-radius:9px; padding:3px; flex-wrap:wrap; }
+        .od-tab { border:0; background:none; border-radius:7px; padding:6px 14px;
+            font:inherit; font-size:13px; color:var(--erp-muted); cursor:pointer; white-space:nowrap; }
+        .od-tab:hover { color:var(--erp-primary-dark); background:var(--erp-primary-soft); }
+        .od-tab.on { background:var(--erp-surface); color:var(--erp-primary-dark); font-weight:600;
+            box-shadow:0 1px 3px rgba(29,59,82,.14); }
+        .od-tab:focus-visible { outline:2px solid var(--erp-primary); outline-offset:1px; }
+
+        /* ── แถวฟอร์มในการ์ด ─────────────────────────────────────── */
+        .od-form { display:grid; gap:10px; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); align-items:end; }
+        .od-field { display:flex; flex-direction:column; gap:5px; min-width:0; }
+        .od-field > label { font-size:11.5px; font-weight:600; color:var(--erp-muted); }
+        .od-field .form-control, .od-field .form-select { font-size:13px; }
+        .od-form-actions { display:flex; align-items:end; }
+
+        /* ── แถวสรุปท้ายตาราง ────────────────────────────────────── */
+        .od-total td { border-top:2px solid var(--erp-border); font-weight:700;
+            background:var(--erp-surface-2, #f8fbfd); }
         /* empty state ที่อยู่ใน <li> ต้องหลุดจาก grid ของรายการ ไม่งั้นถูกบีบจนขึ้นบรรทัดละคำ */
         .od-top li.od-empty { display:block; grid-template-columns:none; border-bottom:0; }
 
