@@ -1194,6 +1194,8 @@
         }
     </style>
     @stack('head')
+    {{-- Page-specific styles must be emitted in the document head. --}}
+    @stack('styles')
     {{-- อ่านค่าที่ผู้ใช้ตั้งไว้ก่อนหน้าจอถูกวาด ไม่งั้นจะเห็นขนาดเดิมแวบหนึ่งแล้วค่อยกระโดด --}}
     <script>
     (function () {
@@ -1909,6 +1911,10 @@
     var groups = Array.prototype.slice.call(side.querySelectorAll('.odn-grp'));
     var empty = side.querySelector('.odn-noresult');
 
+    /* โมดูลที่กำลังเปิดอยู่ — ต้องจำไว้ เพราะระหว่างค้นหาเราเปิดหลายหมวดชั่วคราว
+       พอล้างคำค้นต้องกลับมาเหลือหมวดเดียวเหมือนเดิม ไม่งั้นเมนูรกกลับมาอีก */
+    var activeGroup = side.querySelector('.odn-grp.is-visible');
+
     function apply() {
         var q = input.value.trim().toLowerCase();
         var shown = 0;
@@ -1921,9 +1927,15 @@
         groups.forEach(function (g) {
             var any = g.querySelector('.odn-item:not([hidden])');
             g.hidden = !any;
-            if (q && any) { g.classList.add('is-visible'); }
-            /* ระหว่างค้นหาให้กางทุกหมวด ไม่งั้นผลลัพธ์ซ่อนอยู่ในหมวดที่พับไว้ */
-            if (q) { g.classList.remove('collapsed'); }
+            if (q) {
+                /* ระหว่างค้นหา เปิดทุกหมวดที่มีผลลัพธ์ เพื่อให้ค้นข้ามโมดูลได้ */
+                if (any) { g.classList.add('is-visible'); }
+                g.classList.remove('collapsed');
+            } else {
+                /* ล้างคำค้นแล้ว กลับไปเหลือเฉพาะโมดูลที่เลือกอยู่ */
+                g.classList.toggle('is-visible', g === activeGroup);
+                g.hidden = false;
+            }
         });
         if (empty) { empty.hidden = shown !== 0; }
         var first = side.querySelector('.odn-item:not([hidden])');
@@ -1946,6 +1958,8 @@
             event.preventDefault();
             document.querySelectorAll('.odn-grp').forEach(function (group) { group.classList.remove('is-visible'); });
             target.classList.add('is-visible');
+            activeGroup = target;
+            if (input) { input.value = ''; apply(); }
             target.classList.remove('collapsed');
             target.scrollIntoView({ block: 'nearest' });
             document.querySelectorAll('.odn-nav-link').forEach(function (other) { other.classList.remove('on'); });
