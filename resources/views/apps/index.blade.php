@@ -23,4 +23,15 @@
 
 @push('head')
     @vite('resources/js/app-launcher.ts')
+    <style>
+        /* หน้านี้คือการ "เลือกโมดูล" เมนูข้างของโมดูลเดิมจึงไม่ควรอยู่
+           ต้องเจาะจงเท่ากฎ html[data-layout="odoo"] .app-sidebar.odn-side (0,3,1)
+           ไม่งั้น !important เฉย ๆ แพ้ แล้วเมนูจะถูกดันไปอยู่ขวาจอแทนที่จะหาย
+           ปล่อยให้คอลัมน์ grid ยุบเองเพราะ AdminLTE ใช้ auto ไม่ต้องแก้ template-areas */
+        html[data-layout="odoo"] .app-sidebar.odn-side,
+        html[data-layout] .app-sidebar,
+        .app-sidebar,
+        .fa-collapse-btn { display: none !important; }
+        .app-content { padding-top: 18px; }
+    </style>
 @endpush
