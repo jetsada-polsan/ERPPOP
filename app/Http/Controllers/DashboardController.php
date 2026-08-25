@@ -130,7 +130,57 @@ class DashboardController extends Controller
                 || $lot->days_left === null || $lot->days_left <= (int) $lot->expiry_warning_days)
             ->take(20)->values();
 
-        return view('dashboard', [
+        // ── ข้อมูลเพิ่มสำหรับแผงควบคุมแบบ Odoo ───────────────────────────
+        // คิดเฉพาะตอนใช้ layout นี้ ไม่ให้ layout เดิมช้าลงเพราะ query ที่ไม่ได้ใช้
+        $odooLayout = \App\Models\AppSetting::get('erp_layout', 'classic') === 'odoo';
+        $openReceipts = 0;
+        $poPending = 0;
+        $receiptStatus = collect();
+        $recentReceipts = collect();
+        $recentMovements = collect();
+        $activity = collect();
+
+        if ($odooLayout) {
+            $receiptScope = fn ($q) => $q
+                ->join('pos_terminals as t', 't.id', '=', 'r.pos_terminal_id')
+                ->when($branchId, fn ($qq) => $qq->where('t.branch_id', $branchId));
+
+            $openReceipts = (int) $receiptScope(DB::table('pos_receipts as r'))
+                ->where('r.status', 'open')->count();
+
+            $poPending = (int) DB::table('purchase_orders')
+                ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+                ->whereIn('status', ['approved', 'ordered'])->count();
+
+            // โดนัท: สถานะบิล POS จริง — ระบบนี้ไม่มีตารางคิว sync ฝั่ง ERP
+            // (คิว sync อยู่ใน SQLite ของเครื่อง POS) จึงรายงานสถานะบิลแทน
+            $receiptStatus = $receiptScope(DB::table('pos_receipts as r'))
+                ->whereBetween('r.receipt_date', [$from->startOfDay(), $to->copy()->endOfDay()])
+                ->selectRaw("case when r.voided_at is not null then 'voided' else r.status end as state, count(*) as total")
+                ->groupBy('state')->pluck('total', 'state');
+
+            $recentReceipts = $receiptScope(DB::table('pos_receipts as r'))
+                ->leftJoin('branches as b', 'b.id', '=', 't.branch_id')
+                ->leftJoin('users as u', 'u.id', '=', 'r.cashier_id')
+                ->orderByDesc('r.receipt_date')->limit(6)
+                ->get([
+                    'r.receipt_no', 'r.receipt_date', 'r.net_sales', 'r.status', 'r.voided_at',
+                    'b.name_th as branch_name', 't.code as pos_code', 'u.name as cashier_name',
+                ]);
+
+            $recentMovements = DB::table('stock_movements as m')
+                ->join('products as p', 'p.id', '=', 'm.product_id')
+                ->leftJoin('warehouse_locations as wl', 'wl.id', '=', 'm.warehouse_location_id')
+                ->orderByDesc('m.movement_date')->orderByDesc('m.id')->limit(5)
+                ->get(['m.movement_type', 'm.qty', 'm.movement_date', 'p.name_th', 'p.sku_code', 'wl.name as location_name']);
+
+            $activity = DB::table('audit_logs as a')
+                ->leftJoin('users as u', 'u.id', '=', 'a.user_id')
+                ->orderByDesc('a.created_at')->limit(5)
+                ->get(['a.action', 'a.table_name', 'a.record_id', 'a.created_at', 'u.name as user_name']);
+        }
+
+        return view($odooLayout ? 'dashboard-odoo' : 'dashboard', [
             'from' => $from->toDateString(),
             'to' => $to->toDateString(),
             'scopeBranchName' => $scopeBranchName,
@@ -144,6 +194,12 @@ class DashboardController extends Controller
             'topProducts' => $topProducts,
             'lowStock' => $lowStock,
             'expiryAlerts' => $expiryAlerts,
+            'openReceipts' => $openReceipts,
+            'poPending' => $poPending,
+            'receiptStatus' => $receiptStatus,
+            'recentReceipts' => $recentReceipts,
+            'recentMovements' => $recentMovements,
+            'activity' => $activity,
         ]);
     }
 }
