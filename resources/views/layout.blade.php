@@ -412,6 +412,108 @@
         .od-card .table td, .od-card .table th { white-space:nowrap; }
         .od-card .table { font-size:12.5px; }
 
+        /* ══════════════════════════════════════════════════════════
+           โครงเปลือกแบบ Odoo — แถบบน + ค้นหาเมนู + เมนูข้างแบบกลุ่ม
+           ทุกกฎขึ้นต้นด้วย .odn- หรือ html[data-layout="odoo"]
+           layout Classic จึงไม่โดนผลกระทบเลย
+           ══════════════════════════════════════════════════════════ */
+        /* .app-wrapper ของ AdminLTE เป็น grid ที่ตั้งชื่อ area ไว้แล้ว
+           ถ้าไม่เพิ่มแถวให้แถบบน มันจะถูก auto-place ไปแถวล่างสุดของหน้า */
+        html[data-layout="odoo"] .app-wrapper {
+            grid-template-areas:
+                "odn-top odn-top"
+                "lte-app-sidebar lte-app-header"
+                "lte-app-sidebar lte-app-main"
+                "lte-app-sidebar lte-app-footer";
+            grid-template-rows: 44px auto 1fr auto;
+        }
+        .odn-topbar {
+            grid-area: odn-top;
+            position: sticky; top: 0; z-index: 1200;
+            background: var(--erp-primary-dark); color: #fff;
+            display: flex; align-items: center; gap: 6px; padding: 0 12px; height: 44px;
+        }
+        .odn-apps { display:grid; place-items:center; width:28px; height:28px; border-radius:6px;
+            background:rgba(255,255,255,.14); color:#fff; flex:none; font-size:14px; text-decoration:none; }
+        .odn-apps:hover { background:rgba(255,255,255,.26); color:#fff; }
+        .odn-brand { font-weight:700; font-size:15px; color:#fff; text-decoration:none; margin-right:8px; white-space:nowrap; }
+        .odn-brand:hover { color:#fff; }
+        .odn-nav { display:flex; gap:1px; overflow-x:auto; scrollbar-width:none; min-width:0; }
+        .odn-nav::-webkit-scrollbar { display:none; }
+        .odn-nav-link { color:rgba(255,255,255,.85); text-decoration:none; padding:5px 10px;
+            border-radius:6px; font-size:12.5px; white-space:nowrap; }
+        .odn-nav-link:hover { background:rgba(255,255,255,.12); color:#fff; }
+        .odn-nav-link.on { background:rgba(255,255,255,.18); color:#fff; font-weight:600;
+            box-shadow:inset 0 -2px 0 rgba(255,255,255,.6); }
+        .odn-company { margin-left:auto; font-size:12px; opacity:.9; white-space:nowrap; padding-left:10px; }
+
+        /* header เดิมยังทำหน้าที่แถบชื่อหน้า แต่ไม่ต้องเป็นสีเข้มซ้อนกันสองชั้น */
+        html[data-layout="odoo"] .app-header {
+            background: var(--erp-surface) !important;
+            color: var(--erp-text);
+            border-bottom: 1px solid var(--erp-border);
+            box-shadow: 0 1px 3px rgba(29,59,82,.07);
+        }
+        html[data-layout="odoo"] .app-header h1 { color: var(--erp-primary-dark); }
+        html[data-layout="odoo"] .app-header .nav-link { color: var(--erp-muted); }
+        html[data-layout="odoo"] .app-header .text-muted { color: var(--erp-muted) !important; }
+        html[data-layout="odoo"] .app-header .page-title-icon { background: var(--erp-primary-soft); color: var(--erp-primary-ink); }
+
+        .odn-search { position:relative; flex:1; max-width:340px; margin:0 16px; }
+        .odn-search input { width:100%; border:1px solid var(--erp-border); background:var(--erp-surface-2, #f8fbfd);
+            border-radius:7px; padding:6px 30px 6px 11px; font-size:12.5px; color:var(--erp-text); }
+        .odn-search input::placeholder { color:var(--erp-muted); }
+        .odn-search input:focus { outline:0; border-color:var(--erp-primary); background:#fff;
+            box-shadow:0 0 0 3px rgba(21,133,192,.16); }
+        .odn-search i { position:absolute; right:10px; top:50%; transform:translateY(-50%);
+            font-size:12px; color:var(--erp-muted); pointer-events:none; }
+
+        /* เมนูข้าง: คอลัมน์เดียว ไม่มี rail ไอคอน */
+        html[data-layout="odoo"] { --lte-sidebar-width: 216px; }
+        /* กฎ .app-sidebar ของธีมเดิมอยู่ท้ายไฟล์และใช้ !important
+           จึงต้องเจาะจงกว่า (0,3,1) ถึงจะเอาชนะได้ ไม่ใช่แค่ !important เท่ากัน */
+        html[data-layout="odoo"] .app-sidebar.odn-side {
+            display: block !important;
+            width: 216px !important; min-width: 216px !important;
+            background: var(--erp-surface) !important;
+            border-right: 1px solid var(--erp-border);
+            height: calc(100vh - 44px); top: 44px;
+            overflow-y: auto !important; overflow-x: hidden !important;
+            scrollbar-width: thin; padding: 0 0 24px;
+        }
+        .odn-side-brand { display:flex; align-items:center; justify-content:center; height:52px;
+            margin:0 8px; padding:6px; overflow:hidden; text-decoration:none;
+            color:var(--erp-primary-dark); font-weight:700; font-size:13px; border-bottom:1px solid var(--erp-border); }
+        .odn-side-brand img { max-width:132px; max-height:38px; width:auto; height:auto; object-fit:contain; }
+        .odn-grp { border-bottom:1px solid var(--erp-border); }
+        .odn-grp:last-of-type { border-bottom:0; }
+        .odn-grp-head { display:flex; align-items:center; gap:8px; width:100%; background:none; border:0;
+            padding:9px 13px; font-size:11px; font-weight:700; letter-spacing:.5px;
+            text-transform:uppercase; color:var(--erp-muted); text-align:left; }
+        .odn-grp-head:hover { color:var(--erp-primary-dark); background:var(--erp-primary-soft); }
+        .odn-grp-head > i:first-child { font-size:13px; opacity:.7; }
+        .odn-caret { margin-left:auto; font-size:10px; transition:transform .15s; }
+        .odn-grp.collapsed .odn-caret { transform:rotate(-90deg); }
+        .odn-grp.collapsed .odn-grp-body { display:none; }
+        .odn-grp-body { padding-bottom:6px; }
+        .odn-item { display:flex; align-items:center; gap:9px; padding:6px 13px; color:var(--erp-text);
+            text-decoration:none; font-size:13px; border-left:3px solid transparent; line-height:1.3; }
+        .odn-item:hover { background:var(--erp-primary-soft); color:var(--erp-primary-dark); }
+        .odn-item.active { background:var(--erp-primary-soft); color:var(--erp-primary-dark);
+            font-weight:600; border-left-color:var(--erp-primary); }
+        .odn-item i { font-size:13px; width:16px; text-align:center; flex:none; opacity:.6; }
+        .odn-item.active i { opacity:1; color:var(--erp-primary); }
+        .odn-item.hit { box-shadow:inset 0 0 0 2px var(--erp-primary); border-radius:4px; }
+        .odn-noresult { color:var(--erp-muted); font-size:12.5px; text-align:center; padding:20px 12px; margin:0; }
+
+        html[data-layout="odoo"] .fa-collapse-btn { display:none; }
+
+        @media (max-width: 991.98px) {
+            .odn-nav, .odn-company { display:none; }
+            .odn-search { margin:0 8px; max-width:none; }
+        }
+        @media print { .odn-topbar, .odn-side, .odn-search { display:none !important; } }
+
         .od-donut { display:flex; align-items:center; gap:16px; flex-wrap:wrap; justify-content:center; }
         .od-ring { position:relative; width:148px; height:148px; flex:none; }
         .od-ring svg { transform:rotate(-90deg); width:148px; height:148px; }
@@ -1270,6 +1372,57 @@
 </head>
 <body class="layout-fixed sidebar-expand-lg {{ request()->boolean('popup') ? 'erp-popup-page' : '' }} {{ request()->routeIs(['bookings.*','cash-sales.*','sales.*','purchases.*','purchase-orders.*','sale-returns.*','credit-debit-notes.*','stock-issues.*','stock-transfers.*','stock-transforms.*','stock-adjustments.*','stock-counts.*']) ? 'erp-classic-document-page' : '' }}">
     <div class="app-wrapper">
+        @php
+            // ไอคอนโมดูลบน rail + หาโมดูลที่ active จาก route ปัจจุบัน
+            $railIcons = [
+                'ภาพรวม' => 'bi-house-door-fill',
+                'งานประจำวัน' => 'bi-cash-coin',
+                'คลัง / ผลิต / ซื้อ' => 'bi-box-seam-fill',
+                'การเงิน / บัญชี' => 'bi-calculator-fill',
+                'ข้อมูลตั้งต้น' => 'bi-people-fill',
+                'เชื่อมต่อ' => 'bi-plug-fill',
+                'ระบบ' => 'bi-gear-fill',
+                'รายงาน' => 'bi-clipboard-data-fill',
+            ];
+            // ชื่อสั้นใต้ไอคอน (พื้นที่ ~60px) - ชื่อเต็มโชว์ใน tooltip ตอน hover
+            $railShort = [
+                'ภาพรวม' => 'หน้าหลัก',
+                'งานประจำวัน' => 'ขาย/เอกสาร',
+                'คลัง / ผลิต / ซื้อ' => 'สินค้า/คลัง',
+                'การเงิน / บัญชี' => 'การเงิน',
+                'ข้อมูลตั้งต้น' => 'ข้อมูลหลัก',
+                'เชื่อมต่อ' => 'เชื่อมต่อ',
+                'ระบบ' => 'ตั้งค่า',
+                'รายงาน' => 'รายงาน',
+            ];
+            $activeSection = 0;
+            foreach ($menuSections as $i => $section) {
+                foreach ($section['items'] as $item) {
+                    if (request()->routeIs($item['pattern']) || (isset($item['extraPattern']) && request()->routeIs($item['extraPattern']))) {
+                        $activeSection = $i;
+                        break 2;
+                    }
+                }
+            }
+            $appLogo = $companyLogo;
+        @endphp
+@if ($erpLayout === 'odoo')
+        {{-- แถบบนแบบ Odoo: ปุ่มโมดูล + ชื่อระบบ + เมนูหมวด
+             ใช้ $menuSections ชุดเดียวกับเมนูข้าง จะได้ไม่มีวันหลุดจากกัน --}}
+        <div class="odn-topbar no-print">
+            <a href="{{ route('features.index') }}" class="odn-apps" title="รวมเมนูการทำงาน" aria-label="รวมเมนูการทำงาน">
+                <i class="bi bi-grid-3x3-gap-fill"></i>
+            </a>
+            <a href="{{ route('dashboard') }}" class="odn-brand">JET ERP</a>
+            <nav class="odn-nav" aria-label="หมวดเมนู">
+                @foreach ($menuSections as $i => $section)
+                    <a href="#odn-grp-{{ $i }}" class="odn-nav-link {{ $i === $activeSection ? 'on' : '' }}"
+                       data-sec="{{ $i }}">{{ $section['displayLabel'] ?? $section['label'] }}</a>
+                @endforeach
+            </nav>
+            <span class="odn-company">{{ $companyName }}</span>
+        </div>
+@endif
         <nav class="app-header navbar navbar-expand bg-white">
             <div class="container-fluid px-4">
                 <ul class="navbar-nav align-items-center">
@@ -1289,6 +1442,17 @@
                         </div>
                     </li>
                 </ul>
+@if ($erpLayout === 'odoo')
+                {{-- ค้นหาเมนู: กรองรายการในเมนูข้างแบบสด ๆ ไม่ได้ยิงหลังบ้าน
+                     เพราะระบบยังไม่มี endpoint ค้นหารวม การทำช่องที่กดแล้วเงียบ
+                     แย่กว่าการบอกตรง ๆ ว่ามันค้นอะไรได้ --}}
+                <div class="odn-search">
+                    <label for="odn-q" class="visually-hidden">ค้นหาเมนู</label>
+                    <input id="odn-q" type="search" autocomplete="off" placeholder="ค้นหาเมนู…"
+                           aria-controls="odn-side">
+                    <i class="bi bi-search" aria-hidden="true"></i>
+                </div>
+@endif
                 <ul class="navbar-nav ms-auto align-items-center gap-3">
                     {{-- กระดิ่งแจ้งเตือน: แต่ละส่วนงานเห็นเฉพาะเรื่องตามหน้าที่ --}}
                     <li class="nav-item" x-data="notifyBell()" x-init="load()">
@@ -1340,40 +1504,43 @@
             </div>
         </nav>
 
-        @php
-            // ไอคอนโมดูลบน rail + หาโมดูลที่ active จาก route ปัจจุบัน
-            $railIcons = [
-                'ภาพรวม' => 'bi-house-door-fill',
-                'งานประจำวัน' => 'bi-cash-coin',
-                'คลัง / ผลิต / ซื้อ' => 'bi-box-seam-fill',
-                'การเงิน / บัญชี' => 'bi-calculator-fill',
-                'ข้อมูลตั้งต้น' => 'bi-people-fill',
-                'เชื่อมต่อ' => 'bi-plug-fill',
-                'ระบบ' => 'bi-gear-fill',
-                'รายงาน' => 'bi-clipboard-data-fill',
-            ];
-            // ชื่อสั้นใต้ไอคอน (พื้นที่ ~60px) - ชื่อเต็มโชว์ใน tooltip ตอน hover
-            $railShort = [
-                'ภาพรวม' => 'หน้าหลัก',
-                'งานประจำวัน' => 'ขาย/เอกสาร',
-                'คลัง / ผลิต / ซื้อ' => 'สินค้า/คลัง',
-                'การเงิน / บัญชี' => 'การเงิน',
-                'ข้อมูลตั้งต้น' => 'ข้อมูลหลัก',
-                'เชื่อมต่อ' => 'เชื่อมต่อ',
-                'ระบบ' => 'ตั้งค่า',
-                'รายงาน' => 'รายงาน',
-            ];
-            $activeSection = 0;
-            foreach ($menuSections as $i => $section) {
-                foreach ($section['items'] as $item) {
-                    if (request()->routeIs($item['pattern']) || (isset($item['extraPattern']) && request()->routeIs($item['extraPattern']))) {
-                        $activeSection = $i;
-                        break 2;
-                    }
-                }
-            }
-            $appLogo = $companyLogo;
-        @endphp
+@if ($erpLayout === 'odoo')
+        {{-- เมนูข้างแบบ Odoo: ทุกหมวดกางพร้อมกัน พับได้ทีละหมวด --}}
+        <aside class="app-sidebar odn-side" id="odn-side">
+            <a href="{{ route('dashboard') }}" class="odn-side-brand">
+                @if($appLogo)<img src="{{ $appLogo }}" alt="{{ $companyName }}">
+                @else<span>{{ $companyName }}</span>@endif
+            </a>
+            @foreach ($menuSections as $i => $section)
+                <div class="odn-grp" id="odn-grp-{{ $i }}" data-sec="{{ $i }}">
+                    <button type="button" class="odn-grp-head" aria-expanded="true">
+                        <i class="bi {{ $railIcons[$section['label']] ?? 'bi-grid-fill' }}"></i>
+                        <span>{{ $section['displayLabel'] ?? $section['label'] }}</span>
+                        <i class="bi bi-chevron-down odn-caret" aria-hidden="true"></i>
+                    </button>
+                    <div class="odn-grp-body">
+                        @foreach ($section['items'] as $item)
+                            @php
+                                $active = request()->routeIs($item['pattern']) || (isset($item['extraPattern']) && request()->routeIs($item['extraPattern']));
+                                if ($active && array_key_exists('queryCategory', $item)) {
+                                    $active = request('category') === $item['queryCategory'];
+                                } elseif ($active && $item['route'] === 'reports.index' && ($item['params'] ?? []) === []) {
+                                    $active = !request()->filled('category');
+                                }
+                            @endphp
+                            <a href="{{ route($item['route'], $item['params'] ?? []) }}"
+                               class="odn-item {{ $active ? 'active' : '' }}"
+                               data-s="{{ mb_strtolower($item['label']) }}"
+                               @if(isset($item['target'])) target="{{ $item['target'] }}" @endif>
+                                <i class="bi {{ $item['icon'] }}"></i><span>{{ $item['label'] }}</span>
+                            </a>
+                        @endforeach
+                    </div>
+                </div>
+            @endforeach
+            <p class="odn-noresult" hidden>ไม่พบเมนูที่ตรงกับคำค้น</p>
+        </aside>
+@else
         <aside class="app-sidebar" x-data="{ sec: {{ $activeSection }} }">
             {{-- ชั้น 1: rail ไอคอนโมดูล --}}
             <div class="fa-rail">
@@ -1424,6 +1591,7 @@
                 @endforeach
             </div>
         </aside>
+@endif
 
         {{-- เลื่อนแตะเพื่อปิด sidebar บนจอมือถือ (แสดงเฉพาะตอน sidebar เปิดอยู่) --}}
         <div class="mobile-sidebar-backdrop" onclick="document.documentElement.classList.remove('mobile-sidebar-open')"></div>
@@ -1598,5 +1766,67 @@
         erpPopup('error', 'ทำรายการไม่สำเร็จ', @json(session('error')));
     </script>
     @endif
+<script>
+/* ค้นหาเมนูและพับหมวด — ทำงานเฉพาะ layout Odoo ที่มี #odn-side อยู่จริง */
+(function () {
+    var side = document.getElementById('odn-side');
+    var input = document.getElementById('odn-q');
+    if (!side) { return; }
+
+    side.querySelectorAll('.odn-grp-head').forEach(function (head) {
+        head.addEventListener('click', function () {
+            var grp = head.closest('.odn-grp');
+            var collapsed = grp.classList.toggle('collapsed');
+            head.setAttribute('aria-expanded', String(!collapsed));
+        });
+    });
+
+    if (!input) { return; }
+    var items = Array.prototype.slice.call(side.querySelectorAll('.odn-item'));
+    var groups = Array.prototype.slice.call(side.querySelectorAll('.odn-grp'));
+    var empty = side.querySelector('.odn-noresult');
+
+    function apply() {
+        var q = input.value.trim().toLowerCase();
+        var shown = 0;
+        items.forEach(function (a) {
+            var hit = !q || a.dataset.s.indexOf(q) !== -1;
+            a.hidden = !hit;
+            a.classList.remove('hit');
+            if (hit) { shown++; }
+        });
+        groups.forEach(function (g) {
+            var any = g.querySelector('.odn-item:not([hidden])');
+            g.hidden = !any;
+            /* ระหว่างค้นหาให้กางทุกหมวด ไม่งั้นผลลัพธ์ซ่อนอยู่ในหมวดที่พับไว้ */
+            if (q) { g.classList.remove('collapsed'); }
+        });
+        if (empty) { empty.hidden = shown !== 0; }
+        var first = side.querySelector('.odn-item:not([hidden])');
+        if (q && first) { first.classList.add('hit'); }
+    }
+
+    input.addEventListener('input', apply);
+    input.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') { input.value = ''; apply(); return; }
+        if (event.key !== 'Enter') { return; }
+        var first = side.querySelector('.odn-item:not([hidden])');
+        if (first) { event.preventDefault(); first.click(); }
+    });
+
+    /* กดหมวดบนแถบบน = เลื่อนไปหมวดนั้นในเมนูข้าง แล้วกางให้ */
+    document.querySelectorAll('.odn-nav-link').forEach(function (link) {
+        link.addEventListener('click', function (event) {
+            var target = document.getElementById('odn-grp-' + link.dataset.sec);
+            if (!target) { return; }
+            event.preventDefault();
+            target.classList.remove('collapsed');
+            target.scrollIntoView({ block: 'nearest' });
+            document.querySelectorAll('.odn-nav-link').forEach(function (other) { other.classList.remove('on'); });
+            link.classList.add('on');
+        });
+    });
+})();
+</script>
 </body>
 </html>

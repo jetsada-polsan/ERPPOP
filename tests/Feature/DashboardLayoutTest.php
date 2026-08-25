@@ -73,6 +73,63 @@ class DashboardLayoutTest extends TestCase
     }
 
     /**
+     * เปลือกของสอง layout ต้องไม่ปนกัน — Odoo ใช้แถบบน + เมนูแบบกลุ่ม
+     * ส่วน Classic ใช้ rail ไอคอนเหมือนเดิม ถ้า markup รั่วข้ามกันเมื่อไร
+     * หน้าจอจะเพี้ยนแบบที่มองไม่เห็นจาก unit test อื่น
+     */
+    public function test_each_layout_renders_only_its_own_shell(): void
+    {
+        $viewer = $this->viewer();
+
+        AppSetting::set('erp_layout', 'odoo');
+        $this->actingAs($viewer)->get(route('dashboard'))
+            ->assertSee('class="odn-topbar', false)
+            ->assertSee('class="odn-item', false)
+            ->assertSee('id="odn-q"', false)
+            ->assertDontSee('class="fa-rail-btn', false);
+
+        AppSetting::set('erp_layout', 'classic');
+        $this->actingAs($viewer)->get(route('dashboard'))
+            ->assertSee('class="fa-rail-btn', false)
+            ->assertDontSee('class="odn-topbar', false)
+            ->assertDontSee('class="odn-item', false);
+    }
+
+    /**
+     * เมนูทั้งสอง layout เดินจาก $menuSections ชุดเดียวกัน ซึ่งถูกกรองด้วย
+     * สิทธิ์มาก่อนแล้ว จำนวนลิงก์เมนูที่ออกมาจึงต้องเท่ากันเป๊ะ
+     * ถ้าใครเพิ่มเมนูให้ layout เดียวในอนาคต เทสต์นี้จะจับได้
+     */
+    public function test_both_shells_list_the_same_number_of_menu_entries(): void
+    {
+        $viewer = $this->viewer();
+
+        AppSetting::set('erp_layout', 'odoo');
+        $odoo = $this->actingAs($viewer)->get(route('dashboard'))->getContent();
+
+        AppSetting::set('erp_layout', 'classic');
+        $classic = $this->actingAs($viewer)->get(route('dashboard'))->getContent();
+
+        $this->assertSame(
+            substr_count($classic, 'class="fa-subnav-link'),
+            substr_count($odoo, 'class="odn-item'),
+            'จำนวนเมนูของสอง layout ไม่เท่ากัน'
+        );
+    }
+
+    /** เมนูที่ผู้ใช้ไม่มีสิทธิ์ ต้องไม่โผล่ในทั้งสอง layout เท่า ๆ กัน */
+    public function test_neither_shell_shows_menu_entries_the_user_cannot_open(): void
+    {
+        $viewer = $this->viewer();
+
+        foreach (['odoo', 'classic'] as $layout) {
+            AppSetting::set('erp_layout', $layout);
+            $this->actingAs($viewer)->get(route('dashboard'))
+                ->assertDontSee('ผังบัญชี / บันทึกบัญชี');
+        }
+    }
+
+    /**
      * แผงควบคุมเป็นหน้าแรกหลังล็อกอิน ตั้งใจให้ผู้ใช้ที่ล็อกอินแล้วเข้าได้ทุกคน
      * (ไม่มีอยู่ใน RoutePermissions::MAP) สิ่งที่ต้องคุมคือการสลับ layout
      * ต้องไม่ทำให้ผู้ที่ยังไม่ล็อกอินหลุดเข้ามาได้
