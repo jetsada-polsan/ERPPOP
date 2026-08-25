@@ -20,6 +20,7 @@ use App\Http\Controllers\DocumentBookController;
 use App\Http\Controllers\DocumentBrowserController;
 use App\Http\Controllers\EcommerceChannelController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\AppLauncherController;
 use App\Http\Controllers\FeatureController;
 use App\Http\Controllers\FinancialStatementController;
 use App\Http\Controllers\FixedAssetController;
@@ -194,6 +195,7 @@ Route::prefix('wh')->name('wh.')->group(function () {
     Route::post('/purchase-orders/{purchaseOrder}/receive', [WarehouseMobileController::class, 'purchaseOrderReceive'])->name('purchase-orders.receive');
 });
 
+Route::get('/apps', [AppLauncherController::class, 'index'])->name('apps.launcher');
 Route::get('/features', [FeatureController::class, 'index'])->name('features.index');
 Route::get('/core-modules', [ManualController::class, 'index'])->name('core-modules.index');
 Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');

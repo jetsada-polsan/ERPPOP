@@ -18,6 +18,7 @@
         gap: 14px;
     }
 
+
     .flow-panel {
         background: #fff;
         border: 1px solid #dfe5ef;
@@ -347,7 +348,7 @@
         background: #f8fafc;
     }
 
-    @media (max-width: 1199.98px) {
+@media (max-width: 1199.98px) {
         .flow-shell {
             grid-template-columns: 1fr;
             height: auto;
