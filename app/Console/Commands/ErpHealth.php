@@ -66,7 +66,7 @@ class ErpHealth extends Command
                         'status' => 'open', 'message' => $detail, 'detected_at' => now(),
                         'created_at' => now(), 'updated_at' => now(),
                     ]);
-                    $alerts->send("POPSTAR ERP ALERT\n{$code}: {$detail}");
+                    $alerts->send("PopCentral ALERT\n{$code}: {$detail}");
                 }
             }
         }

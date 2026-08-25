@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'เบิก-คืน-ตัดชำรุด - POPSTAR ERP')
+@section('title', 'เบิก-คืน-ตัดชำรุด - PopCentral')
 @section('page-title', 'งานคลังสินค้า: เบิก / คืนเบิก / ตัดชำรุด')
 @section('page-subtitle', 'ใบเบิกสินค้า (DR) ใบคืนสินค้าจากการเบิก (IR) และใบตัดสินค้าชำรุด (DD)')
 

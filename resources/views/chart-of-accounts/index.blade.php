@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'ผังบัญชี - POPSTAR ERP')
+@section('title', 'ผังบัญชี - PopCentral')
 @section('page-title', 'ผังบัญชี')
 @section('page-subtitle', 'รายการบัญชีแยกประเภท สำหรับใช้อ้างอิงในระบบบัญชีต่อไป')
 

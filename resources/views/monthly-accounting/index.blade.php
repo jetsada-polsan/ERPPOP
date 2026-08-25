@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'ปิดบัญชีรายเดือน - POPSTAR ERP')
+@section('title', 'ปิดบัญชีรายเดือน - PopCentral')
 @section('page-title', 'ศูนย์ปิดบัญชีรายเดือน')
 @section('page-subtitle', 'ตรวจ Statement สลิป ค่าใช้จ่าย VAT/WHT และส่งข้อมูลให้สำนักงานบัญชี')
 

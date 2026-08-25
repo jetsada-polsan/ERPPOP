@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title','ผังองค์กร - JET ERP')
+@section('title','ผังองค์กร - PopCentral')
 @section('page-title','ผังองค์กรและสายบังคับบัญชา')
 @section('page-subtitle','แยกหน่วยงาน สาขา ผู้รับผิดชอบ และสังกัดพนักงานออกจากกัน')
 

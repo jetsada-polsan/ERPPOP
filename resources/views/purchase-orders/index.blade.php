@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'ใบขอซื้อ / ใบสั่งซื้อ - POPSTAR ERP')
+@section('title', 'ใบขอซื้อ / ใบสั่งซื้อ - PopCentral')
 @section('page-title', 'ใบขอซื้อ / ใบสั่งซื้อ')
 @section('page-subtitle', 'ขอซื้อ → อนุมัติ → สั่งซื้อ → รับของ (สร้างใบซื้อจริงตัดสต๊อก+ตั้งหนี้อัตโนมัติ)')
 @section('content')

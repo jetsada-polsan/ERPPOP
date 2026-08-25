@@ -2567,7 +2567,7 @@ function buildPromptPayPayload(promptPayId, amount) {
 
     payload +=
         tlv('58', 'TH') +
-        tlv('59', @js(strtoupper(\App\Models\AppSetting::company('name_en') ?: 'JET ERP'))) +
+        tlv('59', @js(strtoupper(\App\Models\AppSetting::company('name_en') ?: 'PopCentral'))) +
         tlv('60', 'BANGKOK') +
         '6304';
 

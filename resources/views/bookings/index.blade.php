@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'ใบจอง - POPSTAR ERP')
+@section('title', 'ใบจอง - PopCentral')
 @section('page-title', 'ใบจอง / ขายเชื่อ')
 @section('page-subtitle', 'สร้างใบจองจากข้อมูลจำเป็น แล้วแปลงเป็นใบขายเชื่อเมื่อต้องการตัดสต็อกจริง')
 

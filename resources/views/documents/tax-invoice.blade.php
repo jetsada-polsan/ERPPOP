@@ -162,7 +162,7 @@
         @if($docNote = \App\Models\AppSetting::get('doc_footer_note'))
             <div class="footnote">หมายเหตุ: {{ $docNote }}</div>
         @endif
-        <div class="footnote">เอกสารออกโดยระบบ JET ERP &middot; {{ $document->branch?->name_th }} &middot; พิมพ์เมื่อ {{ now()->thaiDate(true) }} น.</div>
+        <div class="footnote">เอกสารออกโดยระบบ PopCentral &middot; {{ $document->branch?->name_th }} &middot; พิมพ์เมื่อ {{ now()->thaiDate(true) }} น.</div>
     </div>
 </body>
 </html>

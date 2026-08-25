@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', "ใบจองเก่า {$header->doc_number} - POPSTAR ERP")
+@section('title', "ใบจองเก่า {$header->doc_number} - PopCentral")
 @section('page-title', 'ใบจองเก่า BPlus')
 @section('page-subtitle', $header->doc_number)
 

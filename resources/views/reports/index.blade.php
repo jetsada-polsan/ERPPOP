@@ -182,7 +182,7 @@
     $dateParams = ['from' => $from, 'to' => $to, 'branch_id' => $filters['branch_id']];
 @endphp
 
-@section('title', 'รายงาน - POPSTAR ERP')
+@section('title', 'รายงาน - PopCentral')
 @section('page-title', 'รายงาน')
 @section('page-subtitle', 'เลือกรายงานจากแผงซ้าย - ค่าเริ่มต้นแสดงข้อมูลของวันนี้')
 

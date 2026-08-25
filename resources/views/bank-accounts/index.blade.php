@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'บัญชีธนาคาร - POPSTAR ERP')
+@section('title', 'บัญชีธนาคาร - PopCentral')
 @section('page-title', 'บัญชีธนาคาร')
 @section('page-subtitle', 'ทะเบียนบัญชีธนาคารบริษัท สำหรับรับโอนและอ้างอิงในเอกสารชำระ')
 @section('content')

@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'รายงาน BPlus ทั้งหมด - POPSTAR ERP')
+@section('title', 'รายงาน BPlus ทั้งหมด - PopCentral')
 @section('page-title', 'รายงาน BPlus ทั้งหมด')
 @section('page-subtitle', 'นำรายการจาก REPORTFILE เดิมมาใช้เป็นแผนที่รายงานของระบบใหม่')
 

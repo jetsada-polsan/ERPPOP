@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'คลังสินค้า - POPSTAR ERP')
+@section('title', 'คลังสินค้า - PopCentral')
 @section('page-title', 'คลังสินค้า / ที่จัดเก็บ')
 @section('page-subtitle', 'ทะเบียนคลังและที่เก็บสินค้า สำหรับใช้กับสต็อกและโอนย้าย')
 @section('content')

@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'Payroll '.$run->period.' - POPSTAR ERP')
+@section('title', 'Payroll '.$run->period.' - PopCentral')
 @section('page-title', 'Payroll งวด '.$run->period)
 @section('page-subtitle', 'ตรวจภาษีหัก ณ ที่จ่าย รายการหัก แล้วอนุมัติและจ่าย')
 

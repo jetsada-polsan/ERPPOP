@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'สมุดเอกสาร - POPSTAR ERP')
+@section('title', 'สมุดเอกสาร - PopCentral')
 @section('page-title', 'สมุดเอกสาร')
 @section('page-subtitle', 'แยกเอกสารประเภทเดียวเป็นหลายเล่ม แต่ละเล่มมีเลขรันของตัวเอง (เช่น DS / DSN เหมือน BPlus)')
 @section('content')

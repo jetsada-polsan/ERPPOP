@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'โอนย้ายสต็อก - POPSTAR ERP')
+@section('title', 'โอนย้ายสต็อก - PopCentral')
 @section('page-title', 'โอนย้ายสต็อก')
 @section('page-subtitle', 'ย้ายสินค้าระหว่างคลัง/ตู้ขาย โดยไม่กระทบยอดขายหรือยอดซื้อ')
 

@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'Mapping Bplus → ERP - POPSTAR ERP')
+@section('title', 'Mapping Bplus → ERP - PopCentral')
 @section('page-title', 'Mapping Bplus → ERP')
 @section('page-subtitle', 'ทะเบียนตรวจสอบตารางเก่ากับโครงสร้าง ERP ใหม่ โดยไม่แก้ฐานข้อมูลเดิม')
 

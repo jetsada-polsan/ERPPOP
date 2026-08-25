@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'ทะเบียนเช็ค - POPSTAR ERP')
+@section('title', 'ทะเบียนเช็ค - PopCentral')
 @section('page-title', 'ทะเบียนเช็ครับ - เช็คจ่าย')
 @section('page-subtitle', 'ติดตามเช็คทุกใบ: รับ นำฝาก ผ่าน คืน และเช็คจ่ายรอตัดบัญชี')
 @section('content')

@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', "Trace Lot {$stockLot->lot_number} - POPSTAR ERP")
+@section('title', "Trace Lot {$stockLot->lot_number} - PopCentral")
 @section('page-title', 'ติดตาม Lot ย้อนหลัง')
 @section('page-subtitle', $stockLot->lot_number)
 

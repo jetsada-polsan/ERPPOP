@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'ฝาก/ถอนเงินสด - POPSTAR ERP')
+@section('title', 'ฝาก/ถอนเงินสด - PopCentral')
 @section('page-title', 'ฝาก/ถอนเงินสดกับธนาคาร')
 @section('page-subtitle', 'ทุกรายการเข้าสมุดเงินสดและลงบัญชีอัตโนมัติ')
 

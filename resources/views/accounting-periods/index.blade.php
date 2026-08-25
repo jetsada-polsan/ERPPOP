@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'งวดบัญชี - POPSTAR ERP')
+@section('title', 'งวดบัญชี - PopCentral')
 @section('page-title', 'งวดบัญชีและการปิดงวด')
 @section('page-subtitle', 'ควบคุมการบันทึก แก้ไข ยกเลิก และลบเอกสารย้อนหลัง')
 

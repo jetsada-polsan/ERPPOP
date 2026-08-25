@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'หน่วยนับ - POPSTAR ERP')
+@section('title', 'หน่วยนับ - PopCentral')
 @section('page-title', 'หน่วยนับสินค้า')
 @section('page-subtitle', 'จัดการหน่วยนับและตัวคูณเทียบหน่วยฐาน')
 

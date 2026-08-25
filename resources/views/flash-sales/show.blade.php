@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', $flashSale->name . ' - ราคานาทีทอง - POPSTAR ERP')
+@section('title', $flashSale->name . ' - ราคานาทีทอง - PopCentral')
 @section('page-title', 'แคมเปญนาทีทอง: ' . $flashSale->name)
 @section('page-subtitle', 'กำหนดสินค้าและราคาพิเศษสำหรับแคมเปญนี้')
 

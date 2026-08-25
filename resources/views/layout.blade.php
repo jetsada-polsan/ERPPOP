@@ -30,7 +30,7 @@
     <link rel="icon" href="{{ $faviconUrl }}">
     <link rel="shortcut icon" href="{{ $faviconUrl }}">
     <link rel="apple-touch-icon" href="{{ $faviconUrl }}">
-    <title>{{ str_replace('POPSTAR ERP', 'JET ERP', trim($__env->yieldContent('title', 'JET ERP'))) }}</title>
+    <title>{{ trim($__env->yieldContent('title', 'PopCentral')) }}</title>
 
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     <link rel="stylesheet" href="{{ asset('vendor/adminlte/css/adminlte.min.css') }}">
@@ -1405,7 +1405,7 @@
             <a href="{{ route('apps.launcher') }}" class="odn-apps" title="รวมโมดูลทั้งหมด" aria-label="รวมโมดูลทั้งหมด">
                 <i class="bi bi-grid-3x3-gap-fill"></i>
             </a>
-            <a href="{{ route('dashboard') }}" class="odn-brand">JET ERP</a>
+            <a href="{{ route('dashboard') }}" class="odn-brand">PopCentral</a>
             <nav class="odn-nav" aria-label="หมวดเมนู">
                 @foreach ($menuSections as $i => $section)
                     <a href="#odn-grp-{{ $i }}" class="odn-nav-link {{ $i === $activeSection ? 'on' : '' }}"
@@ -1428,7 +1428,7 @@
                         <div class="d-flex align-items-center">
                             <span class="page-title-icon"><i class="bi bi-bar-chart-line-fill"></i></span>
                             <div>
-                                <h1 class="fw-bold mb-0">@yield('page-title', str_replace('POPSTAR ERP', 'JET ERP', trim($__env->yieldContent('title', 'JET ERP'))))</h1>
+                                <h1 class="fw-bold mb-0">@yield('page-title', trim($__env->yieldContent('title', 'PopCentral')))</h1>
                                 <div class="text-muted small">@yield('page-subtitle', 'ภาพรวมธุรกิจ สต็อก และงานที่ต้องจัดการ')</div>
                             </div>
                         </div>
@@ -1603,10 +1603,10 @@
         <aside class="app-sidebar" x-data="{ sec: {{ $activeSection }} }">
             {{-- ชั้น 1: rail ไอคอนโมดูล --}}
             <div class="fa-rail">
-                {{-- โลโก้ = ตรา JET ERP (เครื่องบินเจ็ท) — ตัว J แดงใช้เฉพาะ favicon --}}
+                {{-- โลโก้ = ตรา PopCentral (เครื่องบินเจ็ท) — ตัว J แดงใช้เฉพาะ favicon --}}
                 <a href="{{ route('dashboard') }}" class="fa-rail-logo" title="หน้าแรก">
                     @if(is_file(public_path('images/logo-jet-erp-mark.svg')))
-                        <img src="{{ asset('images/logo-jet-erp-mark.svg') }}" alt="JET ERP logo">
+                        <img src="{{ asset('images/logo-jet-erp-mark.svg') }}" alt="PopCentral logo">
                     @elseif($appLogo)
                         <img src="{{ $appLogo }}" alt="logo">
                     @else

@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'ใบซื้อ - POPSTAR ERP')
+@section('title', 'ใบซื้อ - PopCentral')
 @section('page-title', 'ใบซื้อ / รับสินค้าเข้าคลัง')
 @section('page-subtitle', 'คีย์รับสินค้าเข้า ใช้เฉพาะข้อมูลจำเป็นก่อนต่อบัญชีเต็มระบบ')
 

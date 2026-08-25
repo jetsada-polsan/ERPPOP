@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title','Backup และ Security - POPSTAR ERP')
+@section('title','Backup และ Security - PopCentral')
 @section('page-title','ศูนย์ Backup และ Security')
 @section('page-subtitle','ตรวจสำรองข้อมูล ทดสอบกู้คืน MFA Session และเหตุการณ์ความปลอดภัย')
 @push('head')<style>.ops-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.ops-stat{padding:14px;background:#fff;border:1px solid #dbe7ef;border-radius:7px}.ops-stat span{display:block;color:#6b8190;font-size:11px;font-weight:800}.ops-stat strong{font-size:21px;color:#183c54}.ops-section{margin-top:14px;background:#fff;border:1px solid #dbe7ef;border-radius:7px;padding:14px}.ops-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:10px}.ops-head h2{font-size:15px;font-weight:900;margin:0}.run-log{white-space:pre-wrap;max-width:520px;font-size:10px;color:#526c7d}@media(max-width:850px){.ops-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:480px){.ops-grid{grid-template-columns:1fr}}</style>@endpush

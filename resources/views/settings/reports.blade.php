@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'เปิด/ปิดรายงาน - POPSTAR ERP')
+@section('title', 'เปิด/ปิดรายงาน - PopCentral')
 @section('page-title', 'ทะเบียนรายงาน')
 @section('page-subtitle', 'เปิดหรือปิดรายงานที่แสดงในเมนู โดยไม่ลบรายงานหรือประวัติ')
 

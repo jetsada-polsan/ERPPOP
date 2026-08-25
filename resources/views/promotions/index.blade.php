@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'ราคา/โปรโมชั่น - POPSTAR ERP')
+@section('title', 'ราคา/โปรโมชั่น - PopCentral')
 @section('page-title', 'ราคา/โปรโมชั่น')
 @section('page-subtitle', 'ตั้งแคมเปญ ส่วนลด คูปอง และเงื่อนไขขายหน้าร้าน')
 @section('content')

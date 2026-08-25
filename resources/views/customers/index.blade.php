@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'ลูกค้า - POPSTAR ERP')
+@section('title', 'ลูกค้า - PopCentral')
 @section('page-title', 'ลูกค้า')
 @section('page-subtitle', 'ทะเบียนลูกค้าและยอดค้างชำระ (AR)')
 

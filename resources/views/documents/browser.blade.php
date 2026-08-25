@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'เอกสารย้อนหลัง - POPSTAR ERP')
+@section('title', 'เอกสารย้อนหลัง - PopCentral')
 @section('page-title', 'เอกสารย้อนหลัง')
 @section('page-subtitle', 'ดูเอกสารทุกใบย้อนหลัง แยกประเภท ปี เดือน และกรองรายวันได้เหมือนระบบเดิม')
 @section('content')

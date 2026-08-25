@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'ศูนย์ตั้งต้นระบบ - JET ERP')
+@section('title', 'ศูนย์ตั้งต้นระบบ - PopCentral')
 @section('page-title', 'ศูนย์ตั้งต้นระบบ')
 @section('page-subtitle', 'ส่งออก Excel CSV, แก้ไข และนำเข้ารายการใหม่โดยไม่แก้ข้อมูลเดิม')
 @section('content')

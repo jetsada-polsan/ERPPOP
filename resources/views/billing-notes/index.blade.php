@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'ใบวางบิล - POPSTAR ERP')
+@section('title', 'ใบวางบิล - PopCentral')
 @section('page-title', 'ใบวางบิล')
 @section('page-subtitle', 'รวบใบขายเชื่อค้างชำระของลูกค้าเป็นใบวางบิลสำหรับรอบเก็บเงิน')
 @section('content')

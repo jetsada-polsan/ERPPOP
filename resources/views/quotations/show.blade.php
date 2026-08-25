@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', "ใบเสนอราคา {$quotation->doc_number} - POPSTAR ERP")
+@section('title', "ใบเสนอราคา {$quotation->doc_number} - PopCentral")
 @section('page-title', 'ใบเสนอราคา ' . $quotation->doc_number)
 @section('page-subtitle', $quotation->customerLabel())
 @section('content')

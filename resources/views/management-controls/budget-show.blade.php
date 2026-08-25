@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'งบประมาณ '.$budget->budget_no.' - POPSTAR ERP')
+@section('title', 'งบประมาณ '.$budget->budget_no.' - PopCentral')
 @section('page-title', 'งบประมาณ '.$budget->budget_no)
 @section('page-subtitle', $budget->cost_center_name.' · ปีงบ '.$budget->fiscal_year)
 

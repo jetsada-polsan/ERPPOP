@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'การผลิต - POPSTAR ERP')
+@section('title', 'การผลิต - PopCentral')
 @section('page-title', 'การผลิต')
 @section('page-subtitle', 'สูตรผลิต ใบสั่งผลิต และสถานะงานผลิต')
 @section('content')

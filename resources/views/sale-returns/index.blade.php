@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'ใบรับคืนสินค้า - POPSTAR ERP')
+@section('title', 'ใบรับคืนสินค้า - PopCentral')
 @section('page-title', 'ใบรับคืนสินค้า')
 @section('page-subtitle', 'รับสินค้าคืนเข้าสต็อก และลดมูลค่าขายตามเอกสาร')
 

@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'พิมพ์ป้ายราคา - POPSTAR ERP')
+@section('title', 'พิมพ์ป้ายราคา - PopCentral')
 @section('page-title', 'พิมพ์ป้ายราคา')
 @section('page-subtitle', 'เลือกรูปแบบป้าย เพิ่มสินค้า แล้วสร้างป้ายราคาสำหรับพิมพ์')
 @section('content')

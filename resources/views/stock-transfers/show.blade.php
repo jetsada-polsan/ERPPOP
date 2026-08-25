@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', "ใบโอนย้าย {$transfer->doc_number} - POPSTAR ERP")
+@section('title', "ใบโอนย้าย {$transfer->doc_number} - PopCentral")
 @section('page-title', 'รายละเอียดใบโอนย้ายสต็อก')
 @section('page-subtitle', $transfer->doc_number)
 

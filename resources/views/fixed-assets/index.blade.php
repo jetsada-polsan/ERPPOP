@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'ทะเบียนทรัพย์สิน - POPSTAR ERP')
+@section('title', 'ทะเบียนทรัพย์สิน - PopCentral')
 @section('page-title', 'ทะเบียนทรัพย์สิน / ค่าเสื่อมราคา')
 @section('page-subtitle', 'บันทึกทรัพย์สินถาวรและคิดค่าเสื่อมราคาแบบเส้นตรงรายเดือน')
 @section('content')

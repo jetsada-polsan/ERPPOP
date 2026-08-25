@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'การตั้งค่า - POPSTAR ERP')
+@section('title', 'การตั้งค่า - PopCentral')
 @section('page-title', 'การตั้งค่า')
 @section('page-subtitle', 'ตั้งค่าเอกสาร ข้อมูลกิจการ ภาษี และการรับชำระ')
 @section('content')
@@ -134,7 +134,7 @@
                     <div class="set-title mt-4">รูปแบบหน้าหลังบ้าน</div>
                     <div class="set-desc mb-3">เปลี่ยนเฉพาะ Layout และสี ไม่กระทบข้อมูลขาย สต๊อก บัญชี หรือสิทธิ์</div>
                     <div class="theme-choice-grid">
-                        <label class="theme-choice" :class="layout === 'classic' && 'active'"><input form="layout-form" type="radio" name="erp_layout" value="classic" x-model="layout"><span class="theme-preview" style="--preview-primary:#1585c0;--preview-deep:#0f4c75;--preview-bg:#eef4f9"><i></i><b></b></span><strong>แบบเดิม JET ERP</strong></label>
+                        <label class="theme-choice" :class="layout === 'classic' && 'active'"><input form="layout-form" type="radio" name="erp_layout" value="classic" x-model="layout"><span class="theme-preview" style="--preview-primary:#1585c0;--preview-deep:#0f4c75;--preview-bg:#eef4f9"><i></i><b></b></span><strong>แบบเดิม PopCentral</strong></label>
                         <label class="theme-choice" :class="layout === 'odoo' && 'active'"><input form="layout-form" type="radio" name="erp_layout" value="odoo" x-model="layout"><span class="theme-preview" style="--preview-primary:#714b67;--preview-deep:#493047;--preview-bg:#f7f7f7"><i></i><b></b></span><strong>แบบ Odoo</strong></label>
                     </div>
                 </div>

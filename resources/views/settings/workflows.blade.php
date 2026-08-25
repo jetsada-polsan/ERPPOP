@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title','ตั้งค่า Workflow - JET ERP')
+@section('title','ตั้งค่า Workflow - PopCentral')
 @section('page-title','ตั้งค่า Workflow เอกสาร')
 @section('page-subtitle','กำหนดเอกสารที่ใช้ Fast Lane หรือ Approval Lane และเรียงลำดับขั้นตอน')
 @section('content')

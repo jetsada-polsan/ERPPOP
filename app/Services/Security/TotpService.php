@@ -28,7 +28,7 @@ class TotpService
         return false;
     }
 
-    public function uri(string $secret, string $account, string $issuer = 'POPSTAR ERP'): string
+    public function uri(string $secret, string $account, string $issuer = 'PopCentral'): string
     {
         $label = rawurlencode($issuer.':'.$account);
 

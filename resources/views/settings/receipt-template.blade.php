@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'ออกแบบใบเสร็จ POS - POPSTAR ERP')
+@section('title', 'ออกแบบใบเสร็จ POS - PopCentral')
 @section('page-title', 'ออกแบบใบเสร็จ POS')
 @section('page-subtitle', 'จัดรูปแบบใบเสร็จสำหรับเครื่องแคชเชียร์')
 

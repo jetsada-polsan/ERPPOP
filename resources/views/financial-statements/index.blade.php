@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'งบการเงิน - POPSTAR ERP')
+@section('title', 'งบการเงิน - PopCentral')
 @section('page-title', 'งบการเงิน')
 @section('page-subtitle', 'งบทดลอง งบกำไรขาดทุน และงบแสดงฐานะการเงิน จากการลงบัญชีอัตโนมัติ')
 @section('content')

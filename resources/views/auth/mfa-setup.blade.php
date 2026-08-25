@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title','ตั้งค่า MFA - POPSTAR ERP')
+@section('title','ตั้งค่า MFA - PopCentral')
 @section('page-title','ตั้งค่าการยืนยันตัวตนสองขั้นตอน')
 @section('page-subtitle','ใช้ Google Authenticator, Microsoft Authenticator หรือแอป TOTP มาตรฐาน')
 @section('content')

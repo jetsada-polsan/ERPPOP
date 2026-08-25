@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'แคมเปญซื้อครบ - POPSTAR ERP')
+@section('title', 'แคมเปญซื้อครบ - PopCentral')
 @section('page-title', 'แคมเปญซื้อครบ')
 @section('page-subtitle', 'ซื้อครบได้ของแถม ลดราคา หรือกำหนดราคารวมเป็นชุด เช่น 3 ชิ้น 100 บาท')
 @section('content')

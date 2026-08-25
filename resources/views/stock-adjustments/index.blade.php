@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'ตรวจนับสต็อก - POPSTAR ERP')
+@section('title', 'ตรวจนับสต็อก - PopCentral')
 @section('page-title', 'ตรวจนับ / ปรับปรุงสต็อก')
 @section('page-subtitle', 'เทียบยอดนับจริงกับยอดในระบบ แล้วบันทึกส่วนต่างเป็นใบปรับปรุงสต็อก')
 

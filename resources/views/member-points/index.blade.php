@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'แต้มสมาชิก - POPSTAR ERP')
+@section('title', 'แต้มสมาชิก - PopCentral')
 @section('page-title', 'แต้มสมาชิก')
 @section('page-subtitle', 'ตั้งกติกาแต้มทอง แคมเปญแต้มทวีคูณ และดูประวัติแต้ม')
 @section('content')

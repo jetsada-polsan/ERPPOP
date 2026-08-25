@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'ขอโอนสินค้า - POPSTAR ERP')
+@section('title', 'ขอโอนสินค้า - PopCentral')
 @section('page-title', 'ขอโอนสินค้า')
 @section('page-subtitle', 'ส่งคำขอโอนสินค้าเข้าสาขาของคุณ - รอผู้มีสิทธิ์อนุมัติจึงตัดสต๊อกจริง')
 

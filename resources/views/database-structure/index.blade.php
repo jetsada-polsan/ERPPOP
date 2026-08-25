@@ -1,8 +1,8 @@
 @extends('layout')
 
-@section('title', 'โครงสร้างฐานข้อมูล - POPSTAR ERP')
+@section('title', 'โครงสร้างฐานข้อมูล - PopCentral')
 @section('page-title', 'โครงสร้างฐานข้อมูลทั้งระบบ')
-@section('page-subtitle', 'แผนผังตาราง คอลัมน์ คีย์ และความสัมพันธ์ของ POPSTAR ERP')
+@section('page-subtitle', 'แผนผังตาราง คอลัมน์ คีย์ และความสัมพันธ์ของ PopCentral')
 
 @push('head')
 <style>
@@ -138,7 +138,7 @@
     <section class="db-overview">
         <div class="db-overview-head">
             <div>
-                <h2>แผนผังข้อมูล POPSTAR ERP</h2>
+                <h2>แผนผังข้อมูล PopCentral</h2>
                 <p>แสดงเฉพาะโครงสร้างฐานข้อมูล ไม่มีข้อมูลลูกค้า ยอดขาย รหัสผ่าน หรือค่าลับในหน้านี้</p>
             </div>
             <div class="db-engine">{{ strtoupper($driver) }} · {{ $database }}</div>

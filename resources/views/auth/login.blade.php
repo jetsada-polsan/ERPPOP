@@ -7,7 +7,7 @@
     <link rel="icon" href="{{ $faviconUrl }}">
     <link rel="shortcut icon" href="{{ $faviconUrl }}">
     <link rel="apple-touch-icon" href="{{ $faviconUrl }}">
-    <title>เข้าสู่ระบบ - JET ERP</title>
+    <title>เข้าสู่ระบบ - PopCentral</title>
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -205,11 +205,11 @@
 <body>
 <main class="login-shell">
     <section class="login-story">
-        <div class="story-brand"><img src="{{ asset('images/logo-jet-erp-mark.svg') }}" alt="JET ERP"> JET ERP</div>
+        <div class="story-brand"><img src="{{ asset('images/logo-jet-erp-mark.svg') }}" alt="PopCentral"> PopCentral</div>
         <div class="story-content">
             <div class="story-kicker">BUSINESS OPERATING SYSTEM</div>
             <h1 class="story-title">ควบคุมยอดขาย สต็อก และงานหน้าร้านจากจุดเดียว</h1>
-            <p class="story-copy">ระบบ ERP/POS สำหรับทีมขาย คลังสินค้า จัดซื้อ และการเงิน เชื่อมข้อมูลทุกสาขาให้ตัดสินใจได้เร็วขึ้นทุกวัน</p>
+            <p class="story-copy">ศูนย์กลางการขาย คลังสินค้า จัดซื้อ และการเงิน เชื่อมข้อมูลทุกสาขาให้ทำงานได้เร็วขึ้นทุกวัน</p>
             <div class="story-dashboard">
                 <div class="signal-card">
                     <span>POS TODAY</span>
@@ -223,7 +223,7 @@
                 </div>
             </div>
         </div>
-        <div class="story-foot">JET ERP · Built for POPSTAR operations</div>
+        <div class="story-foot">PopCentral · Built for POPSTAR operations</div>
     </section>
     <form class="login-card" method="post" action="{{ route('login.attempt') }}">
         @csrf

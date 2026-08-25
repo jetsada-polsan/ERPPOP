@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', "{$asset->asset_code} - ทรัพย์สิน - POPSTAR ERP")
+@section('title', "{$asset->asset_code} - ทรัพย์สิน - PopCentral")
 @section('page-title', $asset->name)
 @section('page-subtitle', 'รหัส ' . $asset->asset_code . ' · ' . $asset->statusLabel())
 @section('content')

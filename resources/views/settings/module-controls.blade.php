@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'ศูนย์ควบคุมโมดูล - POPSTAR ERP')
+@section('title', 'ศูนย์ควบคุมโมดูล - PopCentral')
 @section('page-title', 'ศูนย์ควบคุมโมดูล')
 @section('page-subtitle', 'หน้าตั้งค่า ข้อมูลตั้งต้น และกติกาการแก้ไขเอกสารทุกวงจร')
 

@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', "{$sale->doc_number} - ใบขาย/ใบส่งของ - POPSTAR ERP")
+@section('title', "{$sale->doc_number} - ใบขาย/ใบส่งของ - PopCentral")
 @section('page-title', 'ใบขาย / ใบส่งของ / ใบกำกับภาษี')
 @section('page-subtitle', $sale->doc_number)
 

@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'ใบขายสด - POPSTAR ERP')
+@section('title', 'ใบขายสด - PopCentral')
 @section('page-title', 'ใบขายสด')
 @section('page-subtitle', 'คีย์ขายหลังบ้านแบบสั้น ตัดสต็อกทันทีหลังบันทึก')
 

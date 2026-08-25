@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'E-Commerce - POPSTAR ERP')
+@section('title', 'E-Commerce - PopCentral')
 @section('page-title', 'E-Commerce')
 @section('page-subtitle', 'ช่องทางขายออนไลน์ Lazada, Shopee, LINE MyShop, TikTok Shop')
 @section('content')

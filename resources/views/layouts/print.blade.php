@@ -4,7 +4,7 @@
 <html lang="th">
 <head>
     <meta charset="utf-8">
-    <title>{{ str_replace('POPSTAR ERP', 'JET ERP', trim($__env->yieldContent('title', 'เอกสาร - JET ERP'))) }}</title>
+    <title>{{ trim($__env->yieldContent('title', 'เอกสาร - PopCentral')) }}</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Noto Sans Thai', 'Segoe UI', 'Leelawadee UI', sans-serif; font-size: 13px; color: #1a2b3a; background: #eef4f9; }
@@ -78,7 +78,7 @@
         @if($printFootNote = \App\Models\AppSetting::get('doc_footer_note'))
             <div class="footnote">หมายเหตุ: {{ $printFootNote }}</div>
         @endif
-        <div class="footnote">เอกสารออกโดยระบบ JET ERP &middot; พิมพ์เมื่อ {{ now()->thaiDate(true) }} น.</div>
+        <div class="footnote">เอกสารออกโดยระบบ PopCentral &middot; พิมพ์เมื่อ {{ now()->thaiDate(true) }} น.</div>
     </div>
 </body>
 </html>

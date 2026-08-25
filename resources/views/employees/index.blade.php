@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'แฟ้มพนักงาน - JET ERP')
+@section('title', 'แฟ้มพนักงาน - PopCentral')
 @section('page-title', 'แฟ้มพนักงาน')
 @section('page-subtitle', 'ข้อมูลบุคลากรจริง แยกจากบัญชีผู้ใช้และสิทธิ์เข้า ERP')
 

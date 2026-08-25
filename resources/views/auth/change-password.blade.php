@@ -7,7 +7,7 @@
     <link rel="icon" href="{{ $faviconUrl }}">
     <link rel="shortcut icon" href="{{ $faviconUrl }}">
     <link rel="apple-touch-icon" href="{{ $faviconUrl }}">
-    <title>เปลี่ยนรหัสผ่าน - JET ERP</title>
+    <title>เปลี่ยนรหัสผ่าน - PopCentral</title>
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }

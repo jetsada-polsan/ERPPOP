@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'ตารางราคา - POPSTAR ERP')
+@section('title', 'ตารางราคา - PopCentral')
 @section('page-title', 'ตารางราคา')
 @section('page-subtitle', 'จัดการตารางราคาแต่ละสาขา — สาขาต่างกันขายราคาต่างกันได้')
 @section('content')

@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'สร้างใบจอง - POPSTAR ERP')
+@section('title', 'สร้างใบจอง - PopCentral')
 
 @section('content')
     <a href="{{ route('bookings.index') }}" class="text-sm text-blue-600 hover:underline">&larr; กลับไปรายการใบจอง</a>

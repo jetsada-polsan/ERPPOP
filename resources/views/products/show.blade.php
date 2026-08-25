@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', "{$product->sku_code} - สินค้า - POPSTAR ERP")
+@section('title', "{$product->sku_code} - สินค้า - PopCentral")
 @section('page-title', 'รายละเอียดสินค้า')
 @section('page-subtitle', $product->sku_code)
 

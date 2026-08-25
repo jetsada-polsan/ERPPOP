@@ -208,7 +208,7 @@
     </div>
 
     <div class="doc-footer">
-        เอกสารนี้ออกโดยระบบ JET ERP &nbsp;&middot;&nbsp; พิมพ์เมื่อ {{ now()->thaiDate(true) }}
+        เอกสารนี้ออกโดยระบบ PopCentral &nbsp;&middot;&nbsp; พิมพ์เมื่อ {{ now()->thaiDate(true) }}
     </div>
 </div>
 </body>

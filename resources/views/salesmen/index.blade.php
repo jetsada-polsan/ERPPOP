@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'พนักงานขาย - POPSTAR ERP')
+@section('title', 'พนักงานขาย - PopCentral')
 @section('page-title', 'สายการขายและ POS เดิม')
 @section('page-subtitle', 'สายการขายผูกกับบัญชีผู้ใช้โดยตรง ส่วนแฟ้มพนักงานเดิมใช้รองรับ POS และประวัติเก่า')
 @section('content')

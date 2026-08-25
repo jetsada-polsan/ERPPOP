@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'แปรรูปสินค้า - POPSTAR ERP')
+@section('title', 'แปรรูปสินค้า - PopCentral')
 @section('page-title', 'แปรรูปสินค้า / บันทึกสูญเสีย')
 @section('page-subtitle', 'ตัดวัตถุดิบ รับผลผลิตจริง วัด Yield และแยกส่วนสูญเสียผิดปกติ')
 

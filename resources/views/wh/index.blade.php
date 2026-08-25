@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="icon" type="image/png" href="{{ asset('images/logo-jet-j-red.png') }}?v={{ filemtime(public_path('images/logo-jet-j-red.png')) }}">
-    <title>คลังมือถือ — JET ERP</title>
+    <title>คลังมือถือ — PopCentral</title>
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     <script defer src="{{ asset('vendor/alpinejs/alpine.min.js') }}"></script>
     <style>
