@@ -96,6 +96,36 @@ class DashboardLayoutTest extends TestCase
     }
 
     /**
+     * แผงปรับหน้าจอต้องมีทั้งสอง layout — จอแต่ละเครื่องไม่เท่ากัน
+     * ค่าที่ปรับเก็บใน localStorage ของเครื่องนั้น ไม่แตะฐานข้อมูล
+     * และไม่ทับค่ากลางของบริษัท ตรงนี้เทสต์ได้แค่ว่า markup ออกมาครบ
+     */
+    public function test_display_preferences_panel_is_available_in_both_layouts(): void
+    {
+        $viewer = $this->viewer();
+
+        foreach (['classic', 'odoo'] as $layout) {
+            AppSetting::set('erp_layout', $layout);
+            $this->actingAs($viewer)->get(route('dashboard'))
+                ->assertSee('id="erp-display-btn"', false)
+                ->assertSee('data-pref="uiScale"', false)
+                ->assertSee('data-pref="menuScale"', false)
+                ->assertSee('id="edp-font"', false)
+                ->assertSee('id="edp-theme"', false);
+        }
+    }
+
+    /** ค่ากลางของบริษัทต้องยังเป็นค่าตั้งต้นที่ส่งมากับหน้า */
+    public function test_company_theme_still_drives_the_default(): void
+    {
+        AppSetting::set('erp_theme', 'emerald');
+        AppSetting::set('erp_layout', 'odoo');
+
+        $this->actingAs($this->viewer())->get(route('dashboard'))
+            ->assertSee('data-theme="emerald"', false);
+    }
+
+    /**
      * เมนูทั้งสอง layout เดินจาก $menuSections ชุดเดียวกัน ซึ่งถูกกรองด้วย
      * สิทธิ์มาก่อนแล้ว จำนวนลิงก์เมนูที่ออกมาจึงต้องเท่ากันเป๊ะ
      * ถ้าใครเพิ่มเมนูให้ layout เดียวในอนาคต เทสต์นี้จะจับได้

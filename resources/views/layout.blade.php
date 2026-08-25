@@ -474,12 +474,14 @@
             font-size:12px; color:var(--erp-muted); pointer-events:none; }
 
         /* เมนูข้าง: คอลัมน์เดียว ไม่มี rail ไอคอน */
-        html[data-layout="odoo"] { --lte-sidebar-width: 216px; }
+        html[data-layout="odoo"] { --lte-sidebar-width: calc(216px * var(--menu-scale)); }
         /* กฎ .app-sidebar ของธีมเดิมอยู่ท้ายไฟล์และใช้ !important
            จึงต้องเจาะจงกว่า (0,3,1) ถึงจะเอาชนะได้ ไม่ใช่แค่ !important เท่ากัน */
         html[data-layout="odoo"] .app-sidebar.odn-side {
             display: block !important;
-            width: 216px !important; min-width: 216px !important;
+            width: calc(216px * var(--menu-scale)) !important;
+            min-width: calc(216px * var(--menu-scale)) !important;
+            max-width: calc(216px * var(--menu-scale)) !important;
             background: var(--erp-surface) !important;
             border-right: 1px solid var(--erp-border);
             height: calc(100vh - 44px); top: 44px;
@@ -502,7 +504,7 @@
         .odn-grp.collapsed .odn-grp-body { display:none; }
         .odn-grp-body { padding-bottom:6px; }
         .odn-item { display:flex; align-items:center; gap:9px; padding:6px 13px; color:var(--erp-text);
-            text-decoration:none; font-size:13px; border-left:3px solid transparent; line-height:1.3; }
+            text-decoration:none; font-size:calc(13px * var(--menu-scale)); border-left:3px solid transparent; line-height:1.3; }
         .odn-item:hover { background:var(--erp-primary-soft); color:var(--erp-primary-dark); }
         .odn-item.active { background:var(--erp-primary-soft); color:var(--erp-primary-dark);
             font-weight:600; border-left-color:var(--erp-primary); }
@@ -510,6 +512,39 @@
         .odn-item.active i { opacity:1; color:var(--erp-primary); }
         .odn-item.hit { box-shadow:inset 0 0 0 2px var(--erp-primary); border-radius:4px; }
         .odn-noresult { color:var(--erp-muted); font-size:12.5px; text-align:center; padding:20px 12px; margin:0; }
+
+        /* ── แผงปรับหน้าจอ (ใช้ได้ทั้ง Classic และ Odoo) ────────────── */
+        .erp-display-panel {
+            position:absolute; right:0; top:calc(100% + 8px); z-index:3000; width:320px;
+            background:#fff; border:1px solid #e2e8f0; border-radius:14px;
+            box-shadow:0 18px 48px rgba(15,23,42,.18); overflow:hidden; color:#1d3b52;
+            font-size:13px; text-align:left;
+        }
+        .erp-display-panel[hidden] { display:none; }
+        .edp-head { display:flex; align-items:center; justify-content:space-between;
+            padding:11px 14px; border-bottom:1px solid #f1f5f9; background:#f8fafc; }
+        .edp-note { font-size:11px; color:#64748b; background:#eef4f9; border-radius:999px; padding:2px 9px; }
+        .edp-row { padding:11px 14px; border-bottom:1px solid #f1f5f9; }
+        .edp-row > label { display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:7px; }
+        .edp-seg { display:flex; gap:4px; flex-wrap:wrap; }
+        .edp-seg button {
+            flex:1; min-width:52px; font:inherit; font-size:11.5px; cursor:pointer;
+            background:#fff; color:#475569; border:1px solid #dbe7ef; border-radius:6px; padding:5px 4px;
+        }
+        .edp-seg button:hover { border-color:#1585c0; color:#0f4c75; }
+        .edp-seg button[aria-pressed="true"] { background:#1585c0; border-color:#1585c0; color:#fff; font-weight:600; }
+        .edp-row select {
+            width:100%; font:inherit; font-size:12.5px; color:#1d3b52;
+            border:1px solid #dbe7ef; border-radius:6px; padding:6px 9px; background:#fff;
+        }
+        .edp-row select:focus, .edp-seg button:focus-visible {
+            outline:0; border-color:#1585c0; box-shadow:0 0 0 3px rgba(21,133,192,.18);
+        }
+        .edp-foot { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; }
+        .edp-reset { font:inherit; font-size:12px; background:none; border:0; color:#c62828; cursor:pointer; padding:0; }
+        .edp-reset:hover { text-decoration:underline; }
+        .edp-saved { font-size:11.5px; color:#158662; font-weight:600; }
+        @media print { .erp-display-panel { display:none !important; } }
 
         html[data-layout="odoo"] .fa-collapse-btn { display:none; }
 
@@ -553,10 +588,16 @@
            ════════════════════════════════════════ */
         :root {
             /* ฟอนต์เดียวทั้งระบบ (ใช้แทนการ hardcode font-family กระจายไปทีละหน้า) */
+            /* ── ค่าที่ผู้ใช้ปรับเองได้ต่อเครื่อง (เก็บใน localStorage) ──
+               จอแต่ละเครื่องขนาดไม่เท่ากันและคนใช้สายตาไม่เท่ากัน
+               ค่ากลางของบริษัทยังอยู่ที่ AppSetting เหมือนเดิม
+               ตัวนี้เป็นการ "ทับเฉพาะเครื่องนี้" ไม่กระทบคนอื่น */
+            --ui-scale: 1;      /* ตัวคูณขนาดตัวอักษรและระยะห่าง */
+            --menu-scale: 1;    /* ตัวคูณความกว้างและขนาดตัวอักษรของเมนู */
             --erp-font-family: 'Leelawadee UI', 'Noto Sans Thai', Tahoma, 'Segoe UI', sans-serif;
             /* rail 64px + subpanel 236px - adminlte ใช้ var นี้คำนวณ margin ของ main */
-            --erp-rail-w: 68px;
-            --erp-subnav-w: 176px;
+            --erp-rail-w: calc(68px * var(--menu-scale));
+            --erp-subnav-w: calc(176px * var(--menu-scale));
             --lte-sidebar-width: calc(var(--erp-rail-w) + var(--erp-subnav-w));
             --erp-border: #dbe7ef;
             --erp-ink: #1d3b52;
@@ -770,7 +811,7 @@
             padding: 7px 8px;
             border-radius: 9px;
             color: #526f84;
-            font-size: 13px;
+            font-size: calc(13px * var(--menu-scale));
             line-height: 1.25;
             font-weight: 700;
             text-decoration: none;
@@ -1153,18 +1194,31 @@
         }
     </style>
     @stack('head')
+    {{-- อ่านค่าที่ผู้ใช้ตั้งไว้ก่อนหน้าจอถูกวาด ไม่งั้นจะเห็นขนาดเดิมแวบหนึ่งแล้วค่อยกระโดด --}}
+    <script>
+    (function () {
+        try {
+            var p = JSON.parse(localStorage.getItem('erp-display') || '{}');
+            var r = document.documentElement;
+            if (p.uiScale)   { r.style.setProperty('--ui-scale', p.uiScale); }
+            if (p.menuScale) { r.style.setProperty('--menu-scale', p.menuScale); }
+            if (p.font)      { r.style.setProperty('--erp-font-family', p.font); }
+            if (p.theme)     { r.setAttribute('data-theme', p.theme); }
+        } catch (e) { /* localStorage ปิดอยู่ก็ใช้ค่ากลางของบริษัทไป */ }
+    })();
+    </script>
     <style id="erp-ui-standard">
         /* มาตรฐาน UI กลาง: อ่านได้ชัดบนจอ 13–15 นิ้ว และขยายเป็นขั้นบนจอใหญ่ */
         :root {
-            --ui-font-xs: 13px;
-            --ui-font-sm: 14px;
-            --ui-font-md: 15px;
-            --ui-font-lg: 18px;
-            --ui-font-xl: 24px;
-            --ui-control-h: 40px;
+            --ui-font-xs: calc(13px * var(--ui-scale));
+            --ui-font-sm: calc(14px * var(--ui-scale));
+            --ui-font-md: calc(15px * var(--ui-scale));
+            --ui-font-lg: calc(18px * var(--ui-scale));
+            --ui-font-xl: calc(24px * var(--ui-scale));
+            --ui-control-h: calc(40px * var(--ui-scale));
             --ui-radius: 7px;
             --ui-card-radius: 10px;
-            --ui-space: 16px;
+            --ui-space: calc(16px * var(--ui-scale));
         }
         body:not(.erp-popup-page) { font-size:var(--ui-font-md); line-height:1.4; }
         .app-header { min-height:52px; }
@@ -1227,13 +1281,13 @@
 
         @media (max-width: 991.98px) {
             :root {
-                --ui-font-xs: 11px;
-                --ui-font-sm: 12px;
-                --ui-font-md: 13px;
-                --ui-font-lg: 16px;
-                --ui-font-xl: 20px;
-                --ui-control-h: 34px;
-                --ui-space: 12px;
+                --ui-font-xs: calc(11px * var(--ui-scale));
+                --ui-font-sm: calc(12px * var(--ui-scale));
+                --ui-font-md: calc(13px * var(--ui-scale));
+                --ui-font-lg: calc(16px * var(--ui-scale));
+                --ui-font-xl: calc(20px * var(--ui-scale));
+                --ui-control-h: calc(34px * var(--ui-scale));
+                --ui-space: calc(12px * var(--ui-scale));
             }
             .app-content { padding:14px; }
             .card-header { padding:9px 12px; }
@@ -1282,13 +1336,13 @@
         /* ERP web responsive tiers: fixed readable sizes for small, standard and large monitors. */
         @media (min-width: 1366px) and (min-height: 720px) {
             :root {
-                --ui-font-xs: 13px;
-                --ui-font-sm: 14px;
-                --ui-font-md: 15px;
-                --ui-font-lg: 19px;
-                --ui-font-xl: 25px;
-                --ui-control-h: 42px;
-                --ui-space: 16px;
+                --ui-font-xs: calc(13px * var(--ui-scale));
+                --ui-font-sm: calc(14px * var(--ui-scale));
+                --ui-font-md: calc(15px * var(--ui-scale));
+                --ui-font-lg: calc(19px * var(--ui-scale));
+                --ui-font-xl: calc(25px * var(--ui-scale));
+                --ui-control-h: calc(42px * var(--ui-scale));
+                --ui-space: calc(16px * var(--ui-scale));
             }
             .app-content { padding: 20px 24px; }
             .app-header { min-height: 60px; }
@@ -1324,13 +1378,13 @@
             :root {
                 --erp-rail-w: 74px;
                 --erp-subnav-w: 202px;
-                --ui-font-xs: 14px;
-                --ui-font-sm: 15px;
-                --ui-font-md: 17px;
-                --ui-font-lg: 21px;
-                --ui-font-xl: 27px;
-                --ui-control-h: 46px;
-                --ui-space: 18px;
+                --ui-font-xs: calc(14px * var(--ui-scale));
+                --ui-font-sm: calc(15px * var(--ui-scale));
+                --ui-font-md: calc(17px * var(--ui-scale));
+                --ui-font-lg: calc(21px * var(--ui-scale));
+                --ui-font-xl: calc(27px * var(--ui-scale));
+                --ui-control-h: calc(46px * var(--ui-scale));
+                --ui-space: calc(18px * var(--ui-scale));
             }
             .app-content { padding: 24px 30px; }
             .app-header { min-height: 66px; }
@@ -1355,12 +1409,12 @@
             :root {
                 --erp-rail-w: 80px;
                 --erp-subnav-w: 220px;
-                --ui-font-xs: 14px;
-                --ui-font-sm: 16px;
-                --ui-font-md: 18px;
-                --ui-font-lg: 22px;
-                --ui-font-xl: 29px;
-                --ui-control-h: 50px;
+                --ui-font-xs: calc(14px * var(--ui-scale));
+                --ui-font-sm: calc(16px * var(--ui-scale));
+                --ui-font-md: calc(18px * var(--ui-scale));
+                --ui-font-lg: calc(22px * var(--ui-scale));
+                --ui-font-xl: calc(29px * var(--ui-scale));
+                --ui-control-h: calc(50px * var(--ui-scale));
             }
             .app-content { padding: 28px 34px; }
             :root { --erp-rail-w: 90px; --erp-subnav-w: 260px; }
@@ -1480,6 +1534,70 @@
                                 </template>
                                 <div x-show="!items.length" class="text-center text-muted small py-4">
                                     <i class="bi bi-check2-circle d-block fs-4 mb-1" style="color:#10b981"></i>ไม่มีเรื่องค้าง
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    {{-- ปรับหน้าจอเฉพาะเครื่องนี้ --}}
+                    <li class="nav-item">
+                        <div class="position-relative">
+                            <button type="button" class="btn btn-light border rounded-circle" style="width:42px;height:42px"
+                                    id="erp-display-btn" title="ปรับขนาดและสีหน้าจอ" aria-expanded="false" aria-controls="erp-display-panel">
+                                <i class="bi bi-sliders" style="color:#64748b"></i>
+                            </button>
+                            <div class="erp-display-panel" id="erp-display-panel" hidden>
+                                <div class="edp-head">
+                                    <span class="fw-bold">ปรับหน้าจอ</span>
+                                    <span class="edp-note">เฉพาะเครื่องนี้</span>
+                                </div>
+
+                                <div class="edp-row">
+                                    <label for="edp-ui">ขนาดตัวอักษร</label>
+                                    <div class="edp-seg" role="group" data-pref="uiScale">
+                                        <button type="button" data-v="0.85">เล็กมาก</button>
+                                        <button type="button" data-v="0.92">เล็ก</button>
+                                        <button type="button" data-v="1">ปกติ</button>
+                                        <button type="button" data-v="1.12">ใหญ่</button>
+                                        <button type="button" data-v="1.25">ใหญ่มาก</button>
+                                    </div>
+                                </div>
+
+                                <div class="edp-row">
+                                    <label>ขนาดเมนู</label>
+                                    <div class="edp-seg" role="group" data-pref="menuScale">
+                                        <button type="button" data-v="0.85">แคบ</button>
+                                        <button type="button" data-v="1">ปกติ</button>
+                                        <button type="button" data-v="1.15">กว้าง</button>
+                                        <button type="button" data-v="1.3">กว้างมาก</button>
+                                    </div>
+                                </div>
+
+                                <div class="edp-row">
+                                    <label for="edp-font">แบบอักษร</label>
+                                    <select id="edp-font" data-pref="font">
+                                        <option value="">ค่ากลางของบริษัท</option>
+                                        <option value="'Sarabun','Noto Sans Thai',sans-serif">Sarabun</option>
+                                        <option value="'Noto Sans Thai','Segoe UI',sans-serif">Noto Sans Thai</option>
+                                        <option value="'Leelawadee UI',Tahoma,sans-serif">Leelawadee UI</option>
+                                        <option value="'IBM Plex Sans Thai',sans-serif">IBM Plex Sans Thai</option>
+                                    </select>
+                                </div>
+
+                                <div class="edp-row">
+                                    <label for="edp-theme">โทนสี</label>
+                                    <select id="edp-theme" data-pref="theme">
+                                        <option value="">ค่ากลางของบริษัท ({{ $erpTheme }})</option>
+                                        <option value="ocean">ฟ้า JET</option>
+                                        <option value="clear">ฟ้าสด</option>
+                                        <option value="navy">น้ำเงินเข้ม</option>
+                                        <option value="emerald">เขียว</option>
+                                        <option value="slate">เทา</option>
+                                    </select>
+                                </div>
+
+                                <div class="edp-foot">
+                                    <button type="button" id="edp-reset" class="edp-reset">คืนค่าเริ่มต้น</button>
+                                    <span class="edp-saved" id="edp-saved" hidden>บันทึกแล้ว</span>
                                 </div>
                             </div>
                         </div>
@@ -1833,6 +1951,88 @@
             document.querySelectorAll('.odn-nav-link').forEach(function (other) { other.classList.remove('on'); });
             link.classList.add('on');
         });
+    });
+})();
+</script>
+<script>
+/* ปรับหน้าจอต่อเครื่อง — เก็บใน localStorage ไม่แตะฐานข้อมูลและไม่กระทบผู้ใช้คนอื่น */
+(function () {
+    var KEY = 'erp-display';
+    var btn = document.getElementById('erp-display-btn');
+    var panel = document.getElementById('erp-display-panel');
+    if (!btn || !panel) { return; }
+
+    var saved = document.getElementById('edp-saved');
+    var root = document.documentElement;
+    var serverTheme = root.getAttribute('data-theme');
+    var savedTimer = null;
+
+    function read() {
+        try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { return {}; }
+    }
+    function write(prefs) {
+        try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch (e) { /* โหมดส่วนตัวเขียนไม่ได้ */ }
+        if (!saved) { return; }
+        saved.hidden = false;
+        clearTimeout(savedTimer);
+        savedTimer = setTimeout(function () { saved.hidden = true; }, 1600);
+    }
+    function apply(prefs) {
+        root.style.setProperty('--ui-scale', prefs.uiScale || 1);
+        root.style.setProperty('--menu-scale', prefs.menuScale || 1);
+        if (prefs.font) { root.style.setProperty('--erp-font-family', prefs.font); }
+        else { root.style.removeProperty('--erp-font-family'); }
+        root.setAttribute('data-theme', prefs.theme || serverTheme);
+    }
+    function paint(prefs) {
+        panel.querySelectorAll('.edp-seg').forEach(function (seg) {
+            var current = String(prefs[seg.dataset.pref] || 1);
+            seg.querySelectorAll('button').forEach(function (b) {
+                b.setAttribute('aria-pressed', String(b.dataset.v === current));
+            });
+        });
+        panel.querySelectorAll('select[data-pref]').forEach(function (sel) {
+            sel.value = prefs[sel.dataset.pref] || '';
+        });
+    }
+
+    var prefs = read();
+    apply(prefs);
+    paint(prefs);
+
+    btn.addEventListener('click', function () {
+        var open = panel.hidden;
+        panel.hidden = !open;
+        btn.setAttribute('aria-expanded', String(open));
+    });
+    document.addEventListener('click', function (event) {
+        if (!panel.hidden && !panel.contains(event.target) && !btn.contains(event.target)) {
+            panel.hidden = true;
+            btn.setAttribute('aria-expanded', 'false');
+        }
+    });
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && !panel.hidden) { panel.hidden = true; btn.focus(); }
+    });
+
+    panel.querySelectorAll('.edp-seg button').forEach(function (b) {
+        b.addEventListener('click', function () {
+            prefs[b.closest('.edp-seg').dataset.pref] = parseFloat(b.dataset.v);
+            apply(prefs); paint(prefs); write(prefs);
+        });
+    });
+    panel.querySelectorAll('select[data-pref]').forEach(function (sel) {
+        sel.addEventListener('change', function () {
+            if (sel.value) { prefs[sel.dataset.pref] = sel.value; } else { delete prefs[sel.dataset.pref]; }
+            apply(prefs); paint(prefs); write(prefs);
+        });
+    });
+    document.getElementById('edp-reset').addEventListener('click', function () {
+        prefs = {};
+        try { localStorage.removeItem(KEY); } catch (e) { /* ไม่เป็นไร */ }
+        apply(prefs); paint(prefs);
+        if (saved) { saved.hidden = false; clearTimeout(savedTimer);
+            savedTimer = setTimeout(function () { saved.hidden = true; }, 1600); }
     });
 })();
 </script>
