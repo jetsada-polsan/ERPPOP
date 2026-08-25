@@ -45,6 +45,9 @@ rsync -az --delete \
   --exclude='vendor/' \
   --exclude='node_modules/' \
   --exclude='bootstrap/cache/' \
+  --exclude='database/*.sqlite*' \
+  --exclude='.phpunit.result.cache' \
+  --exclude='.DS_Store' \
   --exclude='public/build/' \
   --exclude='public/downloads/' \
   --exclude='public/storage' \
