@@ -180,6 +180,19 @@ ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("sales", "voided_at", "TEXT"),
     ("sales", "void_reason", "TEXT"),
     ("sales", "voided_by", "INTEGER"),
+    # id ของ Salesman ฝั่ง ERP — sync บิลต้องส่ง id นี้ ไม่ใช่ local id ที่ไม่รับประกันว่าตรงกัน
+    ("local_cashiers", "server_id", "INTEGER"),
+    # credential ออฟไลน์ที่ ERP ออกให้ (PBKDF2) เก็บแทนการเก็บ PIN/hash เต็มลงเครื่อง
+    ("local_cashiers", "cred_salt", "TEXT"),
+    ("local_cashiers", "cred_verifier", "TEXT"),
+    ("local_cashiers", "cred_iterations", "INTEGER"),
+    ("local_cashiers", "cred_expires_at", "TEXT"),
+]
+
+# ยูนีคเฉพาะแถวที่มี server_id — กันแคชเชียร์คนเดียวถูก sync ลงซ้ำสองแถว
+# ใช้ partial index เพราะ ALTER TABLE ADD COLUMN เติม UNIQUE ให้ไม่ได้
+ADDED_INDEXES: list[str] = [
+    "CREATE UNIQUE INDEX IF NOT EXISTS ux_local_cashiers_server_id ON local_cashiers(server_id) WHERE server_id IS NOT NULL",
 ]
 
 
@@ -188,6 +201,8 @@ def _add_missing_columns(connection: sqlite3.Connection) -> None:
         existing = {row["name"] for row in connection.execute(f"PRAGMA table_info({table})")}
         if column not in existing:
             connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+    for statement in ADDED_INDEXES:
+        connection.execute(statement)
 
 
 def connect(path: Path) -> sqlite3.Connection:

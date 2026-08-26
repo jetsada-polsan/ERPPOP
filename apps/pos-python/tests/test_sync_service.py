@@ -24,7 +24,7 @@ class SyncServiceTest(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
         self.db = connect(Path(self.tmp.name) / "pos.db")
-        self.db.execute("INSERT INTO local_cashiers (id, code, name, pin_hash, synced_at) VALUES (77, 'POP001', 'Tester', ?, ?)", (pin_hash('1234'), now()))
+        self.db.execute("INSERT INTO local_cashiers (id, server_id, code, name, pin_hash, synced_at) VALUES (77, 900, 'POP001', 'Tester', ?, ?)", (pin_hash('1234'), now()))
         self.db.execute("INSERT INTO products (id, server_id, sku, name, unit_name, updated_at) VALUES (1, 101, 'P000001', 'หมูสด', 'กก.', ?)", (now(),))
         self.db.commit()
         self.pos = PosService(self.db)
@@ -48,7 +48,7 @@ class SyncServiceTest(unittest.TestCase):
         self.assertEqual(len(api.calls), 1)
         path, payload, key = api.calls[0]
         self.assertEqual((path, key), ("/api/pos/checkout", sale_uuid))
-        self.assertEqual((payload["shift_id"], payload["cashier_id"], payload["items"][0]["product_id"]), (500, 77, 101))
+        self.assertEqual((payload["shift_id"], payload["cashier_id"], payload["items"][0]["product_id"]), (500, 900, 101))
         self.assertEqual((payload["items"][0]["barcode"], payload["items"][0]["barcode_type"]), ("8001230125503", "SCALE_WEIGHT"))
         self.assertEqual(self.db.execute("SELECT status FROM sync_outbox").fetchone()[0], "synced")
 

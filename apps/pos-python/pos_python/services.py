@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import base64
 import hashlib
+import hmac
 import json
 import sqlite3
 import uuid
@@ -34,8 +36,27 @@ def vat_from_inclusive(amount: Decimal, rate: Decimal) -> Decimal:
 
 
 def pin_hash(pin: str) -> str:
-    # Prototype only. Production must use Argon2/bcrypt with a per-user salt.
+    # ใช้กับ PIN ตั้งต้นตอน seed เครื่องใหม่ที่ยังไม่เคยต่อ ERP เท่านั้น
+    # PIN จริงของพนักงานยืนยันผ่าน verify_offline_credential ด้วย credential ที่ ERP ออกให้
     return hashlib.sha256(pin.encode("utf-8")).hexdigest()
+
+
+def verify_offline_credential(pin: str, salt_b64: str, verifier_b64: str, iterations: int) -> bool:
+    """ตรวจ PIN ออฟไลน์ด้วย credential ที่ Laravel ออกให้ (ดู PosApiController::offlineCredential)
+
+    Laravel: hash_pbkdf2('sha256', pin, salt_raw, iterations, 32, raw) แล้ว base64
+    ฝั่งนี้จึงถอด base64 กลับเป็นไบต์ดิบ คำนวณซ้ำ แล้วเทียบแบบ constant-time
+    เก็บแต่ salt+verifier ไว้ในเครื่อง ไม่มี PIN จริงหรือ hash เต็มถูกเก็บลง SQLite
+    """
+    try:
+        salt = base64.b64decode(salt_b64)
+        expected = base64.b64decode(verifier_b64)
+    except (ValueError, TypeError):
+        return False
+    if not salt or not expected or iterations <= 0:
+        return False
+    actual = hashlib.pbkdf2_hmac("sha256", pin.encode("utf-8"), salt, int(iterations), dklen=len(expected))
+    return hmac.compare_digest(actual, expected)
 
 
 @dataclass(frozen=True)

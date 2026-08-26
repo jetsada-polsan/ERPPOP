@@ -37,13 +37,20 @@ class SyncService:
 
     def sync_sale(self, sale_uuid: str) -> None:
         sale = self.db.execute(
-            """SELECT s.*, sh.server_id AS server_shift_id
-            FROM sales s JOIN shifts sh ON sh.id = s.shift_id WHERE s.sale_uuid = ?""", (sale_uuid,)
+            """SELECT s.*, sh.server_id AS server_shift_id, c.server_id AS server_cashier_id
+            FROM sales s
+            JOIN shifts sh ON sh.id = s.shift_id
+            LEFT JOIN local_cashiers c ON c.id = s.cashier_id
+            WHERE s.sale_uuid = ?""", (sale_uuid,)
         ).fetchone()
         if not sale:
             raise RuntimeError("ไม่พบบิล local สำหรับ sync")
         if not sale["server_shift_id"]:
             return self._failed(sale_uuid, "ยังไม่ได้ผูกกะ local กับ server_shift_id: ต้องเปิดกะออนไลน์ก่อนขาย offline")
+        # cashier_id ที่ ERP รู้จักคือ Salesman.id ฝั่ง server ห้ามส่ง local id ไปตรง ๆ
+        # เพราะ id สองฝั่งไม่รับประกันว่าตรงกัน ยอดขายจะไปลงชื่อคนผิด
+        if not sale["server_cashier_id"]:
+            return self._failed(sale_uuid, "แคชเชียร์ยังไม่มี server_id: ต้อง sync รายชื่อแคชเชียร์ก่อน")
         lines = self.db.execute(
             """SELECT i.*, p.server_id AS server_product_id FROM sale_items i
             JOIN products p ON p.id = i.product_id WHERE i.sale_id = ? ORDER BY i.id""", (sale["id"],)
@@ -54,7 +61,7 @@ class SyncService:
         if not payment:
             return self._failed(sale_uuid, "ไม่พบข้อมูลชำระเงิน")
         payload = {
-            "branch_id": sale["branch_id"], "shift_id": sale["server_shift_id"], "cashier_id": sale["cashier_id"],
+            "branch_id": sale["branch_id"], "shift_id": sale["server_shift_id"], "cashier_id": sale["server_cashier_id"],
             "method": payment["method"], "payment_ref": payment["reference"],
             "cash_received": payment["amount"] if payment["method"] == "cash" else None,
             "items": [{
