@@ -68,6 +68,11 @@ class Customer extends Model
         return $this->hasMany(CrmActivity::class);
     }
 
+    public function crmOpportunities(): HasMany
+    {
+        return $this->hasMany(CrmOpportunity::class);
+    }
+
     protected function casts(): array
     {
         return [

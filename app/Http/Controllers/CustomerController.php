@@ -61,12 +61,14 @@ class CustomerController extends Controller
         return redirect()->route('customers.show', $customer)->with('success', "เพิ่มลูกค้า {$customer->code} แล้ว");
     }
 
-    public function show(Customer $customer): View
+    public function show(Request $request, Customer $customer): View
     {
+        $this->assertCustomerVisible($request->user(), $customer);
         $customer->load([
             'branch', 'salesUser', 'salesArea', 'addresses', 'contacts', 'creditLimitRequester',
             'openItems' => fn ($q) => $q->orderByDesc('id')->limit(20),
             'openItems.document',
+            'crmActivities' => fn ($q) => $q->with('assignedTo')->orderByRaw('status = \'pending\' desc')->orderByRaw('due_at is null, due_at asc')->orderByDesc('id')->limit(20),
         ]);
 
         $outstandingBalance = (float) $customer->openItems()->whereIn('status', ['open', 'partial'])->sum('balance_amount');
@@ -77,11 +79,17 @@ class CustomerController extends Controller
             'salesUsers' => $this->salesUsers(),
             'salesAreas' => $this->salesAreas(),
             'outstandingBalance' => $outstandingBalance,
+            'activityTypes' => [
+                'call' => 'โทรศัพท์', 'visit' => 'เข้าพบ', 'line' => 'LINE',
+                'email' => 'อีเมล', 'note' => 'หมายเหตุ',
+            ],
+            'activityUsers' => $this->salesUsers(),
         ]);
     }
 
     public function update(Request $request, Customer $customer): RedirectResponse
     {
+        $this->assertCustomerVisible($request->user(), $customer);
         $data = $this->applySalesAssignment($request, $this->validateCustomer($request, $customer->id), $customer);
 
         // เปลี่ยนวงเงินเครดิตต้องรออนุมัติ - ไม่แก้ยอดจริงทันที ส่วนฟิลด์อื่นบันทึกได้เลย
@@ -145,6 +153,7 @@ class CustomerController extends Controller
 
     public function addAddress(Request $request, Customer $customer): RedirectResponse
     {
+        $this->assertCustomerVisible($request->user(), $customer);
         $data = $request->validate([
             'address_line' => ['required', 'string', 'max:2000'],
             'is_default' => ['nullable', 'boolean'],
@@ -158,6 +167,7 @@ class CustomerController extends Controller
 
     public function addContact(Request $request, Customer $customer): RedirectResponse
     {
+        $this->assertCustomerVisible($request->user(), $customer);
         $data = $request->validate([
             'name' => ['nullable', 'string', 'max:150'],
             'phone' => ['nullable', 'string', 'max:30'],
@@ -223,5 +233,14 @@ class CustomerController extends Controller
     private function salesAreas()
     {
         return SalesArea::where('area_type', 'route')->where('is_active', true)->orderBy('code')->get();
+    }
+
+    private function assertCustomerVisible(User $user, Customer $customer): void
+    {
+        if ($user->branch_id && ! $user->hasPermission('reports.all_branches')
+            && $customer->branch_id !== $user->branch_id
+            && $customer->sales_user_id !== $user->id) {
+            abort(404);
+        }
     }
 }

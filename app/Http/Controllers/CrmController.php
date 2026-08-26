@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Customer;
 use App\Models\CustomerOpenItem;
 use App\Models\CrmActivity;
+use App\Models\CrmOpportunity;
 use App\Models\Document;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -13,6 +14,16 @@ use Illuminate\View\View;
 
 class CrmController extends Controller
 {
+    private const STAGES = [
+        'new' => 'ลูกค้าใหม่',
+        'contacted' => 'ติดต่อแล้ว',
+        'qualified' => 'สนใจ',
+        'quotation' => 'ส่งใบเสนอราคา',
+        'waiting' => 'รอปิดการขาย',
+        'won' => 'ชนะการขาย',
+        'lost' => 'ไม่สำเร็จ',
+    ];
+
     public function index(Request $request): View
     {
         $user = $request->user();
@@ -125,6 +136,90 @@ class CrmController extends Controller
         return redirect()->route('crm.index')->with('success', 'ปิดงานติดตามแล้ว');
     }
 
+    public function pipeline(Request $request): View
+    {
+        $user = $request->user();
+        $q = trim((string) $request->query('q', ''));
+        $stage = array_key_exists($request->query('stage'), self::STAGES) ? (string) $request->query('stage') : 'all';
+        $visibleCustomers = $this->visibleCustomers($user);
+
+        $opportunities = CrmOpportunity::query()
+            ->with(['customer', 'salesUser', 'salesArea'])
+            ->whereIn('customer_id', (clone $visibleCustomers)->select('customers.id'))
+            ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
+                ->where('title', 'ilike', "%{$q}%")
+                ->orWhereHas('customer', fn ($customer) => $customer
+                    ->where('code', 'ilike', "%{$q}%")
+                    ->orWhere('name_th', 'ilike', "%{$q}%"))
+            ))
+            ->when($stage !== 'all', fn ($query) => $query->where('stage', $stage))
+            ->orderByRaw('expected_close_date is null, expected_close_date asc')
+            ->orderByDesc('id')
+            ->get();
+
+        $opportunitiesByStage = collect(self::STAGES)->mapWithKeys(fn ($label, $key) => [$key => $opportunities->where('stage', $key)->values()]);
+
+        return view('crm.pipeline', [
+            'stages' => self::STAGES,
+            'opportunitiesByStage' => $opportunitiesByStage,
+            'pipelineCustomers' => (clone $visibleCustomers)->where('is_active', true)->orderBy('name_th')->limit(300)->get(['id', 'code', 'name_th']),
+            'salesUsers' => $this->activityUsers($user),
+            'q' => $q,
+            'stage' => $stage,
+            'totalOpportunities' => $opportunities->count(),
+        ]);
+    }
+
+    public function storeOpportunity(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'customer_id' => ['required', 'integer', 'exists:customers,id'],
+            'title' => ['required', 'string', 'max:200'],
+            'stage' => ['required', 'in:'.implode(',', array_keys(self::STAGES))],
+            'expected_amount' => ['nullable', 'numeric', 'min:0'],
+            'expected_close_date' => ['nullable', 'date'],
+            'note' => ['nullable', 'string', 'max:2000'],
+            'assigned_to' => ['nullable', 'integer', 'exists:users,id'],
+        ]);
+        $user = $request->user();
+        $customer = $this->visibleCustomers($user)->whereKey($data['customer_id'])->firstOrFail();
+        $assignedTo = $user;
+        if ($user->hasPermission('sales.assign') && ! empty($data['assigned_to'])) {
+            $assignedTo = $this->activityUsers($user)->firstWhere('id', (int) $data['assigned_to']);
+            abort_unless($assignedTo, 422, 'ผู้รับผิดชอบไม่อยู่ในสาขาหรือสิทธิ์ที่กำหนด');
+        }
+
+        CrmOpportunity::create([
+            'customer_id' => $customer->id,
+            'branch_id' => $customer->branch_id,
+            'sales_user_id' => $assignedTo->id,
+            'sales_area_id' => $assignedTo->sales_area_id,
+            'title' => $data['title'],
+            'stage' => $data['stage'],
+            'expected_amount' => $data['expected_amount'] ?? 0,
+            'expected_close_date' => $data['expected_close_date'] ?? null,
+            'note' => $data['note'] ?? null,
+        ]);
+
+        return redirect()->route('crm.pipeline')->with('success', 'เพิ่มโอกาสการขายแล้ว');
+    }
+
+    public function updateOpportunityStage(Request $request, CrmOpportunity $opportunity): RedirectResponse
+    {
+        $visible = $this->visibleCustomers($request->user())->whereKey($opportunity->customer_id)->exists();
+        abort_unless($visible, 404);
+        $data = $request->validate([
+            'stage' => ['required', 'in:'.implode(',', array_keys(self::STAGES))],
+            'lost_reason' => ['nullable', 'string', 'max:500'],
+        ]);
+        $opportunity->update([
+            'stage' => $data['stage'],
+            'lost_reason' => $data['stage'] === 'lost' ? ($data['lost_reason'] ?? $opportunity->lost_reason) : null,
+        ]);
+
+        return redirect()->route('crm.pipeline')->with('success', 'อัปเดตสถานะโอกาสการขายแล้ว');
+    }
+
     private function visibleCustomers($user)
     {
         return Customer::query()->when(
@@ -134,5 +229,13 @@ class CrmController extends Controller
                 ->orWhere('sales_user_id', $user->id)
             )
         );
+    }
+
+    private function activityUsers($user)
+    {
+        return User::query()->where('is_active', true)
+            ->whereHas('roles.permissions', fn ($query) => $query->where('code', 'sales.manage'))
+            ->when($user->branch_id && ! $user->hasPermission('reports.all_branches'), fn ($query) => $query->where('branch_id', $user->branch_id))
+            ->orderBy('name')->get(['id', 'name', 'sales_area_id']);
     }
 }

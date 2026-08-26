@@ -72,6 +72,67 @@
             @endif
         </div>
 
+        <div class="customer-360-activity-grid mb-4">
+            <section class="content-card p-4">
+                <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+                    <div>
+                        <div class="text-uppercase small text-muted fw-semibold" style="letter-spacing:.04em">Customer 360</div>
+                        <h3 class="h5 fw-bold mb-1">ประวัติการติดต่อลูกค้า</h3>
+                        <p class="text-muted small mb-0">ติดตามงานขายและกิจกรรมล่าสุดของลูกค้ารายนี้</p>
+                    </div>
+                    <span class="customer-360-count">{{ $customer->crmActivities->count() }} รายการ</span>
+                </div>
+                <div class="customer-activity-timeline">
+                    @forelse($customer->crmActivities as $activity)
+                        @php
+                            $activityIcons = ['call' => 'telephone', 'visit' => 'person-walking', 'line' => 'chat-dots', 'email' => 'envelope', 'note' => 'sticky-note'];
+                        @endphp
+                        <div class="customer-activity-item {{ $activity->status === 'completed' ? 'is-completed' : '' }}">
+                            <span class="customer-activity-icon"><i class="bi bi-{{ $activityIcons[$activity->activity_type] ?? 'check2' }}"></i></span>
+                            <div class="customer-activity-body">
+                                <div class="d-flex align-items-start justify-content-between gap-2">
+                                    <strong>{{ $activity->subject }}</strong>
+                                    @if($activity->status === 'pending')
+                                        <form method="post" action="{{ route('crm.activities.complete', $activity) }}">
+                                            @csrf @method('PATCH')
+                                            <button class="btn btn-sm btn-light border" title="ปิดงาน"><i class="bi bi-check2"></i></button>
+                                        </form>
+                                    @else
+                                        <span class="customer-activity-done"><i class="bi bi-check2-circle me-1"></i>เสร็จแล้ว</span>
+                                    @endif
+                                </div>
+                                <div class="small text-muted mt-1">{{ $activityTypes[$activity->activity_type] ?? $activity->activity_type }} · {{ $activity->assignedTo?->name ?? '-' }}</div>
+                                @if($activity->note)<div class="small mt-2">{{ $activity->note }}</div>@endif
+                                <div class="small text-muted mt-2"><i class="bi bi-calendar3 me-1"></i>{{ $activity->due_at?->thaiDate(true) ?? 'ไม่กำหนดวัน' }}</div>
+                            </div>
+                        </div>
+                    @empty
+                        <div class="customer-activity-empty"><i class="bi bi-chat-square-text"></i><span>ยังไม่มีประวัติการติดต่อลูกค้า</span></div>
+                    @endforelse
+                </div>
+            </section>
+
+            <section class="content-card p-4">
+                <div class="text-uppercase small text-muted fw-semibold" style="letter-spacing:.04em">ติดตามต่อ</div>
+                <h3 class="h5 fw-bold mb-1">เพิ่มงานติดตาม</h3>
+                <p class="text-muted small mb-3">สร้างงานถัดไปให้ลูกค้ารายนี้โดยตรง</p>
+                <form method="post" action="{{ route('crm.activities.store') }}" class="customer-activity-form">
+                    @csrf
+                    <input type="hidden" name="customer_id" value="{{ $customer->id }}">
+                    <label>หัวข้องาน<input name="subject" required maxlength="200" placeholder="เช่น โทรติดตามใบเสนอราคา"></label>
+                    <div class="row g-2">
+                        <div class="col-sm-6"><label>ประเภท<select name="activity_type" required>@foreach($activityTypes as $type => $label)<option value="{{ $type }}">{{ $label }}</option>@endforeach</select></label></div>
+                        <div class="col-sm-6"><label>กำหนดติดตาม<input type="datetime-local" name="due_at"></label></div>
+                    </div>
+                    @if(auth()->user()->hasPermission('sales.assign'))
+                        <label>ผู้รับผิดชอบ<select name="assigned_to"><option value="">ฉัน</option>@foreach($activityUsers as $activityUser)<option value="{{ $activityUser->id }}">{{ $activityUser->name }}</option>@endforeach</select></label>
+                    @endif
+                    <label>รายละเอียด<textarea name="note" rows="3" maxlength="2000" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"></textarea></label>
+                    <button class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>เพิ่มงานติดตาม</button>
+                </form>
+            </section>
+        </div>
+
         <div class="row g-4">
             <div class="col-lg-7">
                 <div class="content-card p-4 mb-4">
@@ -343,6 +404,8 @@
         display: flex; align-items: center; justify-content: center; padding: 24px;
     }
     .booking-modal { background: #fff; border-radius: 18px; box-shadow: 0 24px 80px rgba(15, 23, 42, .24); max-height: calc(100vh - 48px); overflow: auto; }
+    .customer-360-activity-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(320px,.65fr);gap:16px}.customer-360-count{padding:5px 9px;border-radius:999px;background:var(--erp-primary-soft);color:var(--erp-primary-dark);font-size:11px;font-weight:700;white-space:nowrap}.customer-activity-timeline{display:grid;gap:0}.customer-activity-item{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--erp-border-soft,var(--erp-border))}.customer-activity-item:last-child{border-bottom:0;padding-bottom:0}.customer-activity-item:first-child{padding-top:3px}.customer-activity-icon{display:grid;place-items:center;flex:0 0 32px;width:32px;height:32px;border-radius:9px;background:var(--erp-primary-soft);color:var(--erp-primary);font-size:14px}.customer-activity-body{min-width:0;flex:1}.customer-activity-body strong{font-size:13px;color:var(--erp-text)}.customer-activity-item.is-completed .customer-activity-body strong{color:var(--erp-muted);text-decoration:line-through}.customer-activity-done{font-size:11px;color:#168058;white-space:nowrap}.customer-activity-empty{display:flex;align-items:center;justify-content:center;gap:9px;min-height:130px;color:var(--erp-muted);font-size:12px}.customer-activity-empty i{font-size:18px}.customer-activity-form{display:grid;gap:10px}.customer-activity-form label{display:grid;gap:4px;color:var(--erp-muted);font-size:11px;font-weight:600}.customer-activity-form input,.customer-activity-form select,.customer-activity-form textarea{width:100%;border:1px solid var(--erp-border);border-radius:5px;padding:8px 10px;background:var(--erp-surface);color:var(--erp-text);font:inherit;font-size:12px}.customer-activity-form button{justify-self:start}
+    @media(max-width:991.98px){.customer-360-activity-grid{grid-template-columns:1fr}}
 </style>
 @endpush
 
