@@ -151,3 +151,10 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
 - ทดสอบ: `php artisan test tests/Feature/AppLauncherTest.php tests/Feature/ErpMenuIconTest.php` ผ่าน 10 tests / 48 assertions; `php artisan test --compact` ไม่มี failure (386 tests / 385 passed / 1 skipped / 6 incomplete / 2927 assertions); `npm run build` ผ่าน; `git diff --check` ผ่าน
 - Deploy: deploy ขึ้น production แล้ว; backup `erp-db-20260826-224714.sql.gz`; rsync dry-run/จริงแบบไม่ใช้ `--delete`; `php artisan migrate --force` ไม่มี migration ค้าง; production `erp:health` ผ่านครบ; ตรวจ production menu order ได้ `ภาพรวม | งานประจำวัน | POS / หน้าร้าน | ...`; manifest production ผ่าน `manifest ok 13`
 - หมายเหตุ: ไม่เปลี่ยนสิทธิ์ route เดิม; `QR รับเงิน / จอแสดงราคา` ยังใช้ `settings.manage` ตามเดิมเพราะเป็นงานตั้งค่าอุปกรณ์/PromptPay
+
+## Handoff - 2026-08-26 (Codex Python POS workbench copy)
+- Commit: pending
+- ทำอะไร: แก้หน้า `เครื่องมือ POS` ไม่ให้โปรโมต Vue/Tauri รุ่น 0.1.7 แล้ว; ปุ่มหลักและปุ่มอัปเดตเปลี่ยนไป `python-pos.download`; copy ระบุ `PopCentral Python POS`, `Python + PySide6`, `Local SQLite`, และ sync เข้า PopCentral
+- ทดสอบ: `php artisan test tests/Feature/PosWorkbenchTest.php` ผ่าน 1 test / 8 assertions; `php artisan test --compact` ไม่มี failure (387 tests / 386 passed / 1 skipped / 6 incomplete / 2934 assertions); `npm run build` ผ่าน; `git diff --check` ผ่าน
+- Deploy: ยังไม่ deploy ขึ้น production
+- หมายเหตุ: ยังไม่เปลี่ยน `Web POS` route หรือ flag `pos_web_mode`; รอบนี้แก้เฉพาะหน้าเครื่องมือ POS ที่แสดงข้อความผิด

@@ -11,25 +11,25 @@
             <h2>เช็กบิล POS ล่าสุด</h2>
             <p>เลือกวันที่/สาขา แล้วดูเลขบิลตอนลูกค้าขอใบกำกับภาษี หรือตรวจยอดหลังขาย</p>
         </div>
-        <a href="{{ route('pos.index') }}" class="pos-open-btn"><i class="bi bi-cart-check"></i> เปิดหน้า POS</a>
+        <a href="{{ route('python-pos.download') }}" class="pos-open-btn"><i class="bi bi-download"></i> ดาวน์โหลด Python POS</a>
     </div>
 
     <div class="pos-install-card">
         <div class="pos-install-icon"><i class="bi bi-windows"></i></div>
         <div class="pos-install-copy">
-            <strong>ติดตั้งหรืออัปเดต JET POS บนเครื่องแคชเชียร์</strong>
-            <span>Vue + Tauri รุ่น 0.1.7 · ขายผ่าน Local SQLite และ Sync ยอดขึ้น Host</span>
+            <strong>ติดตั้งหรืออัปเดต PopCentral Python POS บนเครื่องแคชเชียร์</strong>
+            <span>Python + PySide6 · Local SQLite · ขายออฟไลน์ได้ และ Sync ยอดขึ้น PopCentral เมื่อออนไลน์</span>
         </div>
-        <a href="{{ route('pos.download') }}" class="pos-install-btn">
-            <i class="bi bi-download"></i> ดาวน์โหลด/อัปเดต POS
+        <a href="{{ route('python-pos.download') }}" class="pos-install-btn">
+            <i class="bi bi-download"></i> ดาวน์โหลด/อัปเดต Python POS
         </a>
     </div>
 
     <div class="pos-note">
         <i class="bi bi-info-circle-fill"></i>
         <div>
-            <strong>พักบิล เรียกบิลคืน และยกเลิกบิล ทำที่หน้า POS โดยตรง</strong>
-            ใช้ปุ่ม "พักบิล" ในหน้าขายได้เลย บิลที่พักจะเก็บไว้ในเครื่องแคชเชียร์เครื่องนั้น ไม่ต้องมาจดซ้ำที่หน้านี้
+            <strong>พักบิล เรียกบิลคืน และยกเลิกบิล ทำใน Python POS โดยตรง</strong>
+            ใช้หน้าขายบนเครื่องแคชเชียร์เป็นงานหลัก บิลที่พักและคิวรอซิงก์เก็บใน Local SQLite ของเครื่องนั้น ไม่ต้องมาจดซ้ำที่หน้านี้
         </div>
     </div>
 
