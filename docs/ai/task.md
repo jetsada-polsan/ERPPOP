@@ -153,8 +153,8 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
 - หมายเหตุ: ไม่เปลี่ยนสิทธิ์ route เดิม; `QR รับเงิน / จอแสดงราคา` ยังใช้ `settings.manage` ตามเดิมเพราะเป็นงานตั้งค่าอุปกรณ์/PromptPay
 
 ## Handoff - 2026-08-26 (Codex Python POS workbench copy)
-- Commit: pending
+- Commit: `f81f828`
 - ทำอะไร: แก้หน้า `เครื่องมือ POS` ไม่ให้โปรโมต Vue/Tauri รุ่น 0.1.7 แล้ว; ปุ่มหลักและปุ่มอัปเดตเปลี่ยนไป `python-pos.download`; copy ระบุ `PopCentral Python POS`, `Python + PySide6`, `Local SQLite`, และ sync เข้า PopCentral
 - ทดสอบ: `php artisan test tests/Feature/PosWorkbenchTest.php` ผ่าน 1 test / 8 assertions; `php artisan test --compact` ไม่มี failure (387 tests / 386 passed / 1 skipped / 6 incomplete / 2934 assertions); `npm run build` ผ่าน; `git diff --check` ผ่าน
-- Deploy: ยังไม่ deploy ขึ้น production
+- Deploy: deploy ขึ้น production แล้ว; backup `erp-db-20260826-225337.sql.gz`; rsync dry-run/จริงแบบไม่ใช้ `--delete`; ล้าง Laravel cache; production `erp:health` ผ่านครบ; ตรวจ source บน host แล้วมี `Python + PySide6` และ `python-pos.download` โดยไม่มี `Vue + Tauri` หรือ `0.1.7`
 - หมายเหตุ: ยังไม่เปลี่ยน `Web POS` route หรือ flag `pos_web_mode`; รอบนี้แก้เฉพาะหน้าเครื่องมือ POS ที่แสดงข้อความผิด
