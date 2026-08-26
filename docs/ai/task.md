@@ -107,3 +107,28 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
 3. เปิดรายงาน VAT กลับถ้าบัญชีต้องใช้ปิดเดือน
 4. เตรียม parallel run: เปิดบัญชีธนาคาร + ยอดยกมาต้นงวด + เลือกสาขา
 5. เครื่อง SQL Server สำหรับวิเคราะห์ BPlus (ยังติดอยู่)
+
+## Handoff - 2026-08-26 (Codex)
+- ทำอะไร: แก้ Odoo navigation ให้กดหมวดบนแถบบนแล้วเปิด sidebar กลุ่มตรงกัน และเชื่อมกับตัวกรองหมวด Vue บนหน้า App Launcher
+- ทดสอบ: `npm run build`, `php artisan test` (380 tests, 379 passed, 1 skipped, 6 incomplete), `php artisan view:cache`, `git diff --check`
+- Deploy: deploy ขึ้น production แล้วหลัง `erp:backup`; rsync แบบ dry-run และจริงโดยไม่ใช้ `--delete`; production `erp:health` ผ่านครบ; manifest และ Launcher JS ตอบ HTTP 200
+- หมายเหตุ: deploy เฉพาะ `layout.blade.php`, `AppLauncher.vue`, `manifest.json` และ asset App Launcher ไม่รวมงาน POS/คลังมือถือที่ยังไม่ commit
+
+## Handoff - 2026-08-26 (Codex runtime fix)
+- เปลี่ยนจากการจำลอง `.click()` ของปุ่ม Vue เป็น custom event `erp:select-section` ให้ AppLauncher รับคำสั่งโดยตรง; รอบนั้นยังไม่ได้พิสูจน์ root cause ด้วย Browser จึงไม่ควรสรุปว่า `.click()` เป็นเหตุหน้าว่าง
+- ทดสอบ: `npm run build`, `php artisan test` (380 tests, 379 passed, 1 skipped, 6 incomplete), `php artisan view:cache`, `git diff --check`
+- Deploy: backup `erp-db-20260826-212725.sql.gz`, rsync แบบ dry-run/จริงโดยไม่ใช้ `--delete`, ล้าง cache และ `erp:health` production ผ่านครบ; ตรวจ asset/manifest HTTP 200 และตรวจ source/asset บน Host แล้ว
+
+## Handoff - 2026-08-26 (Codex verified navigation and warehouse)
+- Commit โค้ด: `7db1cbf` บนฐาน `7b143e9` ของ Claude
+- Launcher: เมนูบนส่งหมวดให้ Vue โดยตรง, การเลือกหมวดด้านในส่งสถานะกลับเมนูบน, "ทั้งหมด" ล้างสถานะหมวดบน, ตัวเลขนับเฉพาะการ์ดที่แสดง และเก็บการเลือกหมวดระหว่างรอโหลด module
+- คลังมือถือ: ยืนยันว่า Blade render `tab: &#039;receive&#039;` ทำให้ JavaScript parse ไม่ผ่านและทุก panel ถูก x-cloak ซ่อน; เปลี่ยนเป็น `@js`, เพิ่ม regression tests ทั้งผู้รับสินค้าและผู้เช็คสต๊อกอย่างเดียว
+- Stock endpoint: กรองตามสาขาที่เลือก และบังคับสาขาของผู้ใช้ที่ถูกผูกสาขาเสมอ; เพิ่ม tests ป้องกันขอดูข้ามสาขา
+- ทดสอบ: `php artisan test --compact` ไม่มี failure (runner รายงาน 384 tests / 383 passed / 1 skipped / 6 incomplete / 2914 assertions); `npm run build`, `php artisan view:cache`, `git diff --check` ผ่าน
+- Browser: ใช้ HTML ที่ Laravel render ด้วยบัญชี fixture ใน SQLite in-memory พร้อม asset build จริง บน local server; ทดสอบ Launcher เลือกหมวดทั้งสองทาง/ทั้งหมด/ค้นหาข้ามหมวด, sidebar ปกติและ Escape ล้างคำค้น, คลังมือถือสลับรับเข้า/รับตาม PO/เช็คสต๊อก; ตรวจ screenshot ที่ 1366x900 และ 390x844 ไม่พบหน้าว่างหรือ overflow แนวนอน; ไม่พบ JS error ใน flow เหล่านี้
+- ขอบเขต Browser: PO endpoint เป็น fixture คืนรายการว่าง ไม่ใช่การรับสินค้าจริง; ยังไม่ทดสอบเขียนเอกสาร, กล้องมือถือจริง หรือ Windows POS จริง; production Browser ยังติดหน้า login จึงไม่ได้ยืนยันการคลิกบน production
+- Assets: ตรวจ manifest 13 entries / 15 files รวม shared chunks ครบใน local build; รอบ deploy ต้องส่ง asset ทั้งชุดก่อนเปลี่ยน manifest ไม่ใช่เฉพาะ launcher JS/CSS; HTTP 200 ของ manifest อย่างเดียวไม่พอ
+- Deploy: **รอบแก้ล่าสุดนี้ยังไม่ deploy**; production มีเพียง hotfix รอบก่อนข้างบน ห้ามถือว่า source บน main กับ host ตรงกันแล้ว
+- POS: ไม่ได้เรียก `pos:web-mode` หรือเปลี่ยนค่า production; โค้ดปัจจุบันเป็น **global AppSetting** ไม่มี `--branch` จึงยัง cutover รายสาขาไม่ได้ ต้องเพิ่ม branch-scoped flag ก่อนหากต้องการ rollout ทีละสาขา; รอทดสอบ 0.4.0 บน Windows จริงก่อนตัด Web POS
+- Deployment warning: `scripts/deploy-ssh.sh` ปัจจุบันยังมี `--delete` ซึ่งขัดกติกา WORKFLOW/PROJECT_MEMORY; ห้ามรันตามเดิม ให้ทำ backup + explicit dry-run/rsync ที่ไม่มี `--delete` ตาม OPERATIONS
+- ไฟล์ `package-lock.json` ที่ไม่ tracked ไม่รวมใน commit; ไม่แตะงาน Python POS, DB migration, tokens หรือ PIN
