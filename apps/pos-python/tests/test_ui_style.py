@@ -5,33 +5,70 @@
 """
 from __future__ import annotations
 
+import re
 import unittest
 
-from pos_python.ui import SECTION_HINTS, STYLE
+from pos_python.ui import PALETTE, SECTION_HINTS, STYLE
 
-BRAND_RED = "#c9212d"
+JET_BLUE = "#1585c0"
+JET_BLUE_DARK = "#0f4c75"
+POPSTAR_RED = "#c9212d"
+
+
+def contrast(fg: str, bg: str) -> float:
+    """อัตราส่วนความต่างตาม WCAG 2.1 — ต้องได้ 4.5:1 ขึ้นไปถึงจะอ่านออก"""
+    def luminance(colour: str) -> float:
+        parts = [int(colour[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+        parts = [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in parts]
+        return 0.2126 * parts[0] + 0.7152 * parts[1] + 0.0722 * parts[2]
+
+    light, dark = sorted((luminance(fg), luminance(bg)), reverse=True)
+    return (light + 0.05) / (dark + 0.05)
 
 
 class UiStyleTest(unittest.TestCase):
-    def test_the_brand_colour_is_the_red_from_the_mockup(self) -> None:
-        self.assertIn(BRAND_RED, STYLE)
+    def test_the_brand_colour_is_the_jet_blue_the_erp_uses(self) -> None:
+        self.assertEqual(PALETTE["primary"], JET_BLUE)
+        self.assertIn(f"#brandBar {{ background: {JET_BLUE_DARK}", STYLE)
         # เขียวเป็นสีที่ผมใส่ไว้ก่อนเห็นภาพร่าง ต้องไม่หลงเหลือ
         self.assertNotIn("#0f766e", STYLE)
 
+    def test_popstar_red_only_marks_danger_and_never_dresses_the_chrome(self) -> None:
+        """แดงเหลือหน้าที่เดียวคือบอกว่าอันตราย ไม่ใช่สีประจำเครื่อง"""
+        self.assertEqual(PALETTE["danger"], POPSTAR_RED)
+        for line in STYLE.splitlines():
+            if POPSTAR_RED in line:
+                self.assertIn("voidBtn", line, f"แดงไปโผล่ที่ไม่ใช่ปุ่มยกเลิก: {line}")
+
     def test_the_selected_menu_item_is_marked_the_way_the_mockup_marks_it(self) -> None:
         self.assertIn("#navItem:checked", STYLE)
-        self.assertIn("#ffe9eb", STYLE)
-        self.assertIn(f"border-left: 4px solid {BRAND_RED}", STYLE)
+        self.assertIn(PALETTE["primary_soft"], STYLE)
+        self.assertIn(f"border-left: 4px solid {JET_BLUE}", STYLE)
 
     def test_the_receipt_sits_on_a_grey_backing_like_paper_on_a_desk(self) -> None:
         self.assertIn("#receiptBg", STYLE)
-        self.assertIn("#d4dade", STYLE)
+        self.assertIn(PALETTE["preview"], STYLE)
         self.assertIn("#receiptPaper", STYLE)
 
     def test_the_warning_note_keeps_its_amber_styling(self) -> None:
         self.assertIn("#note", STYLE)
-        self.assertIn("#e38800", STYLE)
-        self.assertIn("#fff4df", STYLE)
+        self.assertIn(PALETTE["warning"], STYLE)
+        self.assertIn(PALETTE["warning_soft"], STYLE)
+
+    def test_every_colour_on_screen_comes_from_the_palette(self) -> None:
+        """กันสีดิบหลุดเข้ามาอีก — ครั้งก่อนเขียวหลุดรอดเพราะอยู่นอก STYLE"""
+        strays = {c for c in re.findall(r"#[0-9a-fA-F]{6}", STYLE)} - set(PALETTE.values())
+        self.assertEqual(strays, set(), f"สีที่ไม่ได้มาจาก PALETTE: {sorted(strays)}")
+
+    def test_white_text_stays_readable_on_every_colour_it_sits_on(self) -> None:
+        for name in ("primary_dark", "primary_ink", "text", "danger"):
+            ratio = contrast("#ffffff", PALETTE[name])
+            self.assertGreaterEqual(round(ratio, 2), 4.5, f"ขาวบน {name} ได้แค่ {ratio:.2f}:1")
+
+    def test_the_field_border_is_visible_enough_to_aim_at(self) -> None:
+        """WCAG 1.4.11 — ขอบช่องกรอกเป็น UI ไม่ใช่ตัวหนังสือ เกณฑ์คือ 3:1"""
+        ratio = contrast(PALETTE["field"], PALETTE["surface"])
+        self.assertGreaterEqual(round(ratio, 2), 3.0, f"ขอบช่องกรอกได้แค่ {ratio:.2f}:1")
 
     def test_every_settings_section_has_a_line_explaining_it(self) -> None:
         expected = [

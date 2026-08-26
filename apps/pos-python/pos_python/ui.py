@@ -6,58 +6,89 @@ services.py ซึ่งมีเทสต์ครอบอยู่ เพร�
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
+from string import Template
 
 from .barcode import decode_scale_label, load_scale_profiles, scale_cart_line
 from .mock_printer import company_details, receipt_for
 from .order import ALL_CATEGORIES, DISCOUNT, PRICE, QTY, Order, OrderLine, categories, product_grid
 from .services import PosService, money
 
-STYLE = """
-/* สีและระยะตามภาพร่างที่อนุมัติแล้ว — แดง POPSTAR #c9212d บนพื้นเทาอ่อน */
-QMainWindow, QDialog, QWidget { background: #eef2f5; color: #1d2730; font-family: 'Sarabun','Tahoma'; font-size: 14px; }
+PALETTE = {
+    # ชื่อและค่าตรงกับ token --erp-* ในระบบหลังบ้าน เพื่อให้ POS กับ ERP พูดภาษาสี
+    # เดียวกัน เปลี่ยนธีมทีเดียวแล้วขยับตามกันทั้งสองฝั่ง
+    "primary": "#1585c0",       # ฟ้า JET — เส้น accent, ตัวที่เลือกอยู่
+    "primary_dark": "#0f4c75",  # ฟ้าเข้ม — แถบบน, หัวบิล
+    "primary_ink": "#147db5",   # ใช้ตอนมีตัวหนังสือขาวทับ 4.54:1
+    "primary_soft": "#eef4f9",
+    "success": "#158662",       # เงินทอน — ความหมาย ไม่ใช่สีแบรนด์
+    "warning": "#d98b00",
+    "warning_soft": "#fdf4e3",
+    "warning_ink": "#9c6400",   # บนพื้นเหลืองอ่อน 4.54:1
+    "danger": "#c9212d",        # ยกเลิกบิล, เงินรับไม่พอ — ความหมาย ไม่ใช่สีแบรนด์
+    "bg": "#f3f7fb",
+    "surface": "#ffffff",
+    "border": "#dbe7ef",
+    "field": "#7199bb",         # ขอบช่องกรอกต้องเห็นได้ 3:1 ตาม WCAG 1.4.11
+    "text": "#1d3b52",
+    "muted": "#627481",
+    "preview": "#c6d4e0",       # พื้นรองใบเสร็จ ให้กระดาษขาวเด้งออกมา
+    "paper_ink": "#1a1a1a",     # หมึกบนกระดาษ ไม่ใช่สีจอ
+}
 
-#brandBar { background: #c9212d; }
-#brandName { color: #ffffff; font-size: 18px; font-weight: 800; padding: 14px 0; }
-#brandMark { color: #ffffff; border: 2px solid #ffffff; border-radius: 6px; padding: 5px 9px; font-weight: 800; }
-#brandRight { color: #ffffff; font-size: 13px; }
+# QSS ใช้ปีกกาเป็นไวยากรณ์ เลยแทนค่าด้วย $name แทน .format()
+_STYLE_TEMPLATE = Template("""
+/* สีและระยะตามภาพร่างที่อนุมัติแล้ว — โทน JET ชุดเดียวกับ ERP บนพื้นเทาอ่อน */
+QMainWindow, QDialog, QWidget { background: $bg; color: $text; font-family: 'Sarabun','Tahoma'; font-size: 14px; }
 
-#card { background: #ffffff; border: 1px solid #dbe2e7; border-radius: 7px; }
-#cardTitle { font-size: 19px; font-weight: 800; color: #1d2730; }
-#cardHint, #muted { color: #74808c; font-size: 13px; }
-#note { border-left: 4px solid #e38800; background: #fff4df; color: #68470d; font-size: 13px; padding: 12px; }
+/* ป้ายที่วางบนแถบสีต้องโปร่ง ไม่งั้นกินสีพื้นแอปมาเป็นแผ่นขาวทับแถบ */
+#brandBar { background: $primary_dark; border-bottom: 3px solid $primary; }
+#brandName, #brandMark, #brandRight,
+#totalLabel, #vatLine, #grandTotal { background: transparent; }
+#brandName { color: $surface; font-size: 18px; font-weight: 800; padding: 14px 0; }
+#brandMark { color: $surface; border: 2px solid $surface; border-radius: 6px; padding: 5px 9px; font-weight: 800; }
+#brandRight { color: $surface; font-size: 13px; }
 
-/* เมนูซ้ายของหน้าตั้งค่า — ตัวที่เลือกอยู่มีขีดแดงหน้าเหมือนในภาพร่าง */
+#card { background: $surface; border: 1px solid $border; border-radius: 7px; }
+#cardTitle { font-size: 19px; font-weight: 800; color: $primary_dark; }
+#cardHint, #muted { color: $muted; font-size: 13px; }
+#note { border-left: 4px solid $warning; background: $warning_soft; color: $warning_ink; font-size: 13px; padding: 12px; }
+
+/* เมนูซ้ายของหน้าตั้งค่า — ตัวที่เลือกอยู่มีขีดฟ้าหน้าเหมือนในภาพร่าง */
 #navItem { background: transparent; border: 0; border-left: 4px solid transparent; border-radius: 0;
-           text-align: left; padding: 12px 14px; color: #1d2730; font-size: 14.5px; }
-#navItem:hover { background: #f4f7f9; }
-#navItem:checked { background: #ffe9eb; color: #c9212d; border-left: 4px solid #c9212d; font-weight: 700; }
+           text-align: left; padding: 12px 14px; color: $text; font-size: 14.5px; }
+#navItem:hover { background: $primary_soft; }
+#navItem:checked { background: $primary_soft; color: $primary_dark; border-left: 4px solid $primary; font-weight: 700; }
 
-QPushButton { background: #ffffff; border: 1px solid #c8d1d8; border-radius: 7px; padding: 10px 14px; font-size: 14.5px; }
-QPushButton:hover { background: #f7f9fb; }
-QPushButton:checked { background: #c9212d; color: #ffffff; border-color: #c9212d; }
-QPushButton#primary, QPushButton#payBtn { background: #c9212d; color: #ffffff; border-color: #c9212d; font-weight: 700; }
+QPushButton { background: $surface; border: 1px solid $border; border-radius: 7px; padding: 10px 14px; font-size: 14.5px; }
+QPushButton:hover { background: $primary_soft; border-color: $primary; }
+QPushButton:checked { background: $primary_ink; color: $surface; border-color: $primary_ink; }
+QPushButton#primary, QPushButton#payBtn { background: $primary_ink; color: $surface; border-color: $primary_ink; font-weight: 700; }
+QPushButton#primary:hover, QPushButton#payBtn:hover { background: $primary_dark; border-color: $primary_dark; }
 QPushButton#payBtn { font-size: 18px; padding: 16px; }
-QPushButton#voidBtn { color: #c9212d; }
-QPushButton#tile { text-align: left; padding: 12px; background: #ffffff; }
-QPushButton#tile:hover { border-color: #c9212d; }
+QPushButton#voidBtn { color: $danger; }
+QPushButton#tile { text-align: left; padding: 12px; background: $surface; }
+QPushButton#tile:hover { border-color: $primary; }
 
-QLineEdit, QComboBox { background: #ffffff; border: 1px solid #c8d1d8; border-radius: 7px; padding: 9px 11px; font-size: 14.5px; }
-QLineEdit:focus, QComboBox:focus { border-color: #c9212d; }
+QLineEdit, QComboBox { background: $surface; border: 1px solid $field; border-radius: 7px; padding: 9px 11px; font-size: 14.5px; }
+QLineEdit:focus, QComboBox:focus { border-color: $primary; }
 
-#orderPanel { background: #ffffff; border-right: 1px solid #dbe2e7; }
-#orderHead { background: #c9212d; color: #ffffff; padding: 12px 16px; font-weight: 700; }
-#totalBox { background: #1d2730; color: #ffffff; padding: 14px 16px; }
-#grandTotal { font-size: 30px; font-weight: 900; color: #ffffff; }
-#totalLabel, #vatLine { color: #c8d1d8; font-size: 13px; }
+#orderPanel { background: $surface; border-right: 1px solid $border; }
+#orderHead { background: $primary_dark; color: $surface; padding: 12px 16px; font-weight: 700; }
+#totalBox { background: $text; color: $surface; padding: 14px 16px; }
+#totalBox QLabel { background: transparent; }
+#grandTotal { font-size: 30px; font-weight: 900; color: $surface; }
+#totalLabel, #vatLine { color: $preview; font-size: 13px; }
 
-QTableWidget { background: #ffffff; border: 0; }
-QHeaderView::section { background: #f4f7f9; border: 0; border-bottom: 1px solid #dbe2e7; padding: 8px; font-weight: 700; }
+QTableWidget { background: $surface; border: 0; }
+QHeaderView::section { background: $primary_soft; border: 0; border-bottom: 1px solid $border; padding: 8px; font-weight: 700; }
 
 /* กระดาษใบเสร็จวางบนพื้นเทาเหมือนวางบนโต๊ะ */
-#receiptBg { background: #d4dade; border-radius: 6px; }
-#receiptPaper { background: #ffffff; padding: 20px; font-family: 'Menlo','Courier New'; font-size: 12px; color: #1d2730; }
-#statusBar { color: #74808c; font-size: 12.5px; padding: 6px 16px; }
-"""
+#receiptBg { background: $preview; border-radius: 6px; }
+#receiptPaper { background: $surface; padding: 20px; font-family: 'Menlo','Courier New'; font-size: 12px; color: $paper_ink; }
+#statusBar { color: $muted; font-size: 12.5px; padding: 6px 16px; }
+""")
+
+STYLE = _STYLE_TEMPLATE.substitute(PALETTE)
 
 SECTION_HINTS = {
     "ข้อมูลเครื่อง POS": "รหัสเครื่องและสาขาที่ผูกอยู่ ใช้ตอนส่งบิลขึ้น ERP",
@@ -122,7 +153,7 @@ def run_ui(service: PosService) -> None:
             layout = QVBoxLayout(self)
 
             self.due = QLabel(f"ยอดชำระ {order.grand_total():,.2f} บาท")
-            self.due.setStyleSheet("font-size:22px;font-weight:800;color:#0f172a;")
+            self.due.setStyleSheet("font-size:22px;font-weight:800;color:%s;" % PALETTE["text"])
             layout.addWidget(self.due)
 
             self.amount = QLineEdit(str(order.grand_total()))
@@ -141,7 +172,7 @@ def run_ui(service: PosService) -> None:
             layout.addLayout(quick)
 
             self.change = QLabel()
-            self.change.setStyleSheet("font-size:18px;font-weight:700;color:#0f766e;")
+            self.change.setStyleSheet("font-size:18px;font-weight:700;color:%s;" % PALETTE["success"])
             layout.addWidget(self.change)
 
             buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -160,10 +191,10 @@ def run_ui(service: PosService) -> None:
             paid = self.tendered()
             if paid < self.order.grand_total():
                 self.change.setText(f"ยังขาดอีก {self.order.grand_total() - paid:,.2f} บาท")
-                self.change.setStyleSheet("font-size:18px;font-weight:700;color:#b91c1c;")
+                self.change.setStyleSheet("font-size:18px;font-weight:700;color:%s;" % PALETTE["danger"])
             else:
                 self.change.setText(f"เงินทอน {self.order.change_for(paid):,.2f} บาท")
-                self.change.setStyleSheet("font-size:18px;font-weight:700;color:#0f766e;")
+                self.change.setStyleSheet("font-size:18px;font-weight:700;color:%s;" % PALETTE["success"])
 
         def confirm(self):
             if self.tendered() < self.order.grand_total():
@@ -686,7 +717,7 @@ def run_ui(service: PosService) -> None:
             dialog.setWindowTitle("ใบเสร็จล่าสุด")
             layout = QVBoxLayout(dialog)
             body = QLabel(receipt_for(service.db, self.last_sale_id))
-            body.setStyleSheet("background:#ffffff;padding:16px;font-family:'Menlo','Courier New';font-size:12px;")
+            body.setStyleSheet("background:%s;padding:16px;font-family:'Menlo','Courier New';font-size:12px;" % PALETTE["surface"])
             layout.addWidget(body)
             close = QDialogButtonBox(QDialogButtonBox.Close)
             close.rejected.connect(dialog.reject)
