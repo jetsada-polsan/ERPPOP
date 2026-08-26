@@ -10,7 +10,7 @@
     .period-shell { display: grid; gap: 14px; }
     .period-panel { background: #fff; border: 1px solid var(--erp-border); border-radius: 8px; }
     .period-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .period-stat { padding: 15px 18px; border-right: 1px solid #e7eef3; }
+    .period-stat { padding: 15px 18px; border-right: 1px solid var(--erp-border); }
     .period-stat:last-child { border-right: 0; }
     .period-stat span { display: block; color: #718696; font-size: 11px; font-weight: 800; }
     .period-stat strong { color: var(--erp-text); font-size: 22px; font-weight: 900; }
@@ -23,26 +23,26 @@
     .period-table th:last-child { border-top-right-radius: 6px; }
     .period-table td { padding: 11px 13px; color: #425f73; border-bottom: 1px solid var(--erp-surface-2); font-size: 12px; vertical-align: middle; }
     .period-table tr:last-child td { border-bottom: 0; }
-    .period-table strong { color: #183c54; }
+    .period-table strong { color: var(--erp-primary-dark); }
     .period-status { display: inline-flex; align-items: center; gap: 5px; min-width: 76px; padding: 5px 8px; border-radius: 5px; font-size: 10px; font-weight: 900; }
-    .period-open { color: #146c43; background: #d1fae5; }
+    .period-open { color: var(--erp-success-ink); background: var(--erp-success-soft); }
     .period-closed { color: var(--erp-danger); background: var(--erp-danger-soft); }
-    .period-action { width: 34px; height: 34px; display: inline-grid; place-items: center; border: 1px solid #d3e0e8; border-radius: 6px; background: #fff; color: #315f80; }
+    .period-action { width: 34px; height: 34px; display: inline-grid; place-items: center; border: 1px solid #d3e0e8; border-radius: 6px; background: #fff; color: var(--erp-primary-dark); }
     .period-action.close-action:hover { color: #fff; border-color: #b4232c; background: #b4232c; }
     .period-action.open-action:hover { color: #fff; border-color: var(--erp-info); background: var(--erp-info); }
     .period-empty { padding: 36px 20px; color: var(--erp-muted); text-align: center; }
     .close-checks { min-width: 230px; display: grid; gap: 3px; }
     .close-check { display: flex; gap: 6px; align-items: center; font-size: 10px; }
-    .close-check.pass { color: #146c43; } .close-check.block { color: var(--erp-danger); }
+    .close-check.pass { color: var(--erp-success-ink); } .close-check.block { color: var(--erp-danger); }
     .period-modal-backdrop { position: fixed; inset: 0; z-index: 2000; display: grid; place-items: center; padding: 18px; background: rgba(22, 47, 65, .42); }
     .period-modal { width: min(480px, 100%); padding: 20px; border-radius: 8px; background: #fff; box-shadow: 0 24px 70px rgba(22, 47, 65, .24); }
-    .period-modal h2 { margin: 0 0 5px; color: #183c54; font-size: 17px; font-weight: 900; }
+    .period-modal h2 { margin: 0 0 5px; color: var(--erp-primary-dark); font-size: 17px; font-weight: 900; }
     .period-modal p { color: #6b8190; font-size: 12px; line-height: 1.5; }
     .period-modal textarea { width: 100%; min-height: 88px; padding: 10px; border: 1px solid var(--erp-border); border-radius: 6px; font-size: 12px; }
     @media (max-width: 1050px) { .period-form { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     @media (max-width: 640px) {
         .period-summary { grid-template-columns: 1fr; }
-        .period-stat { border-right: 0; border-bottom: 1px solid #e7eef3; }
+        .period-stat { border-right: 0; border-bottom: 1px solid var(--erp-border); }
         .period-stat:last-child { border-bottom: 0; }
         .period-form { grid-template-columns: 1fr; }
     }
@@ -67,7 +67,7 @@
     <section class="period-panel period-summary">
         <div class="period-stat"><span>งวดเปิด</span><strong>{{ number_format($openCount) }}</strong></div>
         <div class="period-stat"><span>งวดปิด</span><strong>{{ number_format($closedCount) }}</strong></div>
-        <div class="period-stat"><span>สถานะวันที่ปัจจุบัน</span><strong style="font-size:15px;color:{{ $currentClosed ? 'var(--erp-danger)' : '#146c43' }}">{{ $currentClosed ? 'ล็อกโดย '.$currentClosed->name : 'บันทึกได้' }}</strong></div>
+        <div class="period-stat"><span>สถานะวันที่ปัจจุบัน</span><strong style="font-size:15px;color:{{ $currentClosed ? 'var(--erp-danger)' : 'var(--erp-success-ink)' }}">{{ $currentClosed ? 'ล็อกโดย '.$currentClosed->name : 'บันทึกได้' }}</strong></div>
     </section>
 
     <section class="period-panel">

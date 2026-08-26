@@ -877,7 +877,7 @@
     .compact-edit-table tr.barcode-disabled td { background:#f3f4f6; color:#7b8790; }
     .barcode-state { display:inline-flex; align-items:center; gap:4px; margin:0; padding:2px 6px; border-radius:3px; white-space:nowrap; font-weight:700; cursor:pointer; }
     .barcode-state.is-on { background:#dcfce7; color:#166534; }
-    .barcode-state.is-off { background:#e5e7eb; color:#4b5563; }
+    .barcode-state.is-off { background:var(--erp-border); color:#4b5563; }
     .barcode-state input { width:auto; min-height:0; margin:0; }
     .compact-row-save { white-space:nowrap; padding:3px 8px; border:1px solid #888; background:linear-gradient(#fff,#ddd); font:700 11px Tahoma,"Noto Sans Thai",sans-serif; }
     .compact-columns { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
@@ -1600,7 +1600,7 @@
         white-space: nowrap;
     }
     .cost-history-table td {
-        color: #29465b;
+        color: var(--erp-primary-dark);
         font-size: 11px;
     }
     .cost-history-table td small {
@@ -1627,7 +1627,7 @@
         color: var(--erp-primary-dark);
     }
     .cost-period-status.is-closed {
-        background: #d1fae5;
+        background: var(--erp-success-soft);
         color: var(--erp-success-ink);
     }
     .cost-note {
@@ -1638,7 +1638,7 @@
         padding: 8px 10px;
         border-left: 3px solid var(--erp-primary);
         background: #f4fafe;
-        color: #526d7f;
+        color: var(--erp-muted);
         font-size: 10.5px;
     }
     .compact-cost-grid {

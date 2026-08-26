@@ -152,7 +152,7 @@
     .exec-kpi-value { display: block; font-size: 28px; font-weight: 900; color: var(--erp-text); line-height: 1.25; margin: 4px 0 2px; }
     .exec-kpi-foot { font-size: 12.5px; color: var(--erp-muted); }
     .exec-up { color: #16a34a; font-weight: 700; }
-    .exec-down { color: #dc2626; font-weight: 700; }
+    .exec-down { color: var(--erp-danger); font-weight: 700; }
 
     .exec-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
     .exec-card { background: #fff; border: 1px solid var(--erp-border); border-radius: 14px; padding: 16px 18px; }

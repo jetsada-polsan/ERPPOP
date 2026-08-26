@@ -27,7 +27,7 @@
                 <tbody>
                 @forelse($notes as $note)
                     <tr>
-                        <td class="fw-semibold" style="color:{{ $type === 'credit' ? '#d97706' : '#dc2626' }}">{{ $note->doc_number }}</td>
+                        <td class="fw-semibold" style="color:{{ $type === 'credit' ? '#d97706' : 'var(--erp-danger)' }}">{{ $note->doc_number }}</td>
                         <td class="text-nowrap">{{ $note->doc_date->thaiDate() }}</td>
                         <td>{{ $note->customer->name_th }}</td>
                         <td class="small">{{ $note->reference ?? '-' }}</td>

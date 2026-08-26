@@ -727,7 +727,7 @@
 
         .fa-subnav-brand { height:48px; display:flex; align-items:center; justify-content:center; margin:0 4px 6px; padding:4px 6px; overflow:hidden; }
         .fa-subnav-brand img { display:block; width:auto!important; max-width:108px!important; height:auto!important; max-height:38px!important; object-fit:contain; }
-        .fa-subnav-brand .brand-logo { font-size: 22px; font-weight: 900; color: #29465b; }
+        .fa-subnav-brand .brand-logo { font-size: 22px; font-weight: 900; color: var(--erp-primary-dark); }
         .fa-subnav-brand .brand-logo span { color: var(--fa-green); }
 
         .fa-subnav-title {
@@ -812,7 +812,7 @@
         [x-cloak] { display: none !important; }
         .notify-badge {
             position: absolute; top: -4px; right: -4px;
-            background: #dc2626; color: #fff; font-size: 10.5px; font-weight: 800;
+            background: var(--erp-danger); color: #fff; font-size: 10.5px; font-weight: 800;
             border-radius: 999px; min-width: 19px; height: 19px; line-height: 19px;
             text-align: center; padding: 0 5px; border: 2px solid #fff;
         }
@@ -897,10 +897,10 @@
         .btn-success:hover { background: linear-gradient(135deg, #34c891, #20a67a); border-color: #20a67a; }
 
         .btn-warning {
-            background: linear-gradient(135deg, #f59e0b, #d97706);
+            background: linear-gradient(135deg, var(--erp-warning-ink), #d97706);
             border-color: #d97706; color: #fff;
         }
-        .btn-warning:hover { color: #fff; background: linear-gradient(135deg, #fbbf24, #f59e0b); }
+        .btn-warning:hover { color: #fff; background: linear-gradient(135deg, #fbbf24, var(--erp-warning-ink)); }
 
         .rounded-pill { border-radius: 100px !important; }
 

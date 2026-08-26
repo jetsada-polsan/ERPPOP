@@ -270,7 +270,7 @@
         padding: 4px 10px; border-radius: 999px; background: #eef7fc; color: #1b6f97;
         font-size: 12px; font-weight: 600;
     }
-    .recipe-bom-table { border: 1px solid #e7eef3; border-radius: 12px; overflow: hidden; }
+    .recipe-bom-table { border: 1px solid var(--erp-border); border-radius: 12px; overflow: hidden; }
     .recipe-bom-table .table { margin-bottom: 0; }
     .recipe-item-dot { width: 8px; height: 8px; border-radius: 50%; background: #20a67a; flex: 0 0 8px; }
     .recipe-bom-total td { background: #f7fbfe; border-top: 2px solid var(--erp-border); padding-top: 10px; padding-bottom: 10px; }

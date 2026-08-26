@@ -483,7 +483,7 @@
                 labels: {!! json_encode($salesDocumentSummary->pluck('doc_name')) !!},
                 datasets: [{
                     data: {!! json_encode($salesDocumentSummary->pluck('amount')) !!},
-                    backgroundColor: ['var(--erp-success-ink)','var(--erp-primary)','#f59e0b','#6366f1','#f43f5e'],
+                    backgroundColor: ['var(--erp-success-ink)','var(--erp-primary)','var(--erp-warning-ink)','#6366f1','#f43f5e'],
                     borderColor: '#ffffff',
                     borderWidth: 3,
                     hoverOffset: 4,

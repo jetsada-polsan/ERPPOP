@@ -147,7 +147,7 @@
     .detail-hero {
         padding: 20px 22px;
         border-bottom: 1px solid #e8edf5;
-        background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+        background: linear-gradient(180deg, #ffffff 0%, var(--erp-surface-2) 100%);
     }
 
     .detail-kicker {
@@ -220,7 +220,7 @@
 
     .legacy-doc-box {
         border: 1px solid #dbeafe;
-        background: #f8fbff;
+        background: var(--erp-surface-2);
         border-radius: 8px;
         padding: 12px;
         margin-bottom: 16px;

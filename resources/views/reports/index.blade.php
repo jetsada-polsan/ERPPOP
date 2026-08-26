@@ -200,7 +200,7 @@
     {{-- แผงซ้าย: ใช้ประจำ + หมวดรายงานแบบต้นไม้ --}}
     <div class="rpt-nav no-print" x-data="{ open: @js($selectedCategory) }">
         <div class="flow-nav-title">รายงาน</div>
-        <div class="rpt-nav-head"><i class="bi bi-star-fill" style="color:#f59e0b"></i> ใช้ประจำ</div>
+        <div class="rpt-nav-head"><i class="bi bi-star-fill" style="color:var(--erp-warning-ink)"></i> ใช้ประจำ</div>
         @foreach($essentialReports as [$favCat, $favReport, $favLabel])
             <a href="{{ route('reports.index', array_merge($dateParams, ['category' => $favCat, 'report' => $favReport])) }}"
                class="rpt-nav-link {{ $selectedCategory === $favCat && $selectedReport === $favReport ? 'active' : '' }}">
@@ -424,7 +424,7 @@
         gap: 0;
         min-height: calc(100vh - 96px);
         margin: 0;
-        background: linear-gradient(180deg, var(--erp-primary-soft) 0%, var(--erp-primary-soft) 220px, #f8fbff 100%);
+        background: linear-gradient(180deg, var(--erp-primary-soft) 0%, var(--erp-primary-soft) 220px, var(--erp-surface-2) 100%);
     }
     .flow-rail {
         display: none;

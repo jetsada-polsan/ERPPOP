@@ -256,7 +256,7 @@
         gap: 10px;
         flex-wrap: wrap;
         border: 1px solid #dbeafe;
-        background: #f8fbff;
+        background: var(--erp-surface-2);
         border-radius: 14px;
         padding: 10px 12px;
     }

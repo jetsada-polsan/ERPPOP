@@ -208,7 +208,7 @@ function stockCountSheet() {
             if (row.counted === null) return '';
             const d = row.counted - row.system;
             if (Math.abs(d) <= 0.0001) return 'color:#059669';
-            return d > 0 ? 'color:#2563eb' : 'color:#dc2626';
+            return d > 0 ? 'color:#2563eb' : 'color:var(--erp-danger)';
         },
         money(v) {
             return Number(v || 0).toLocaleString('th-TH', { maximumFractionDigits: 4 });

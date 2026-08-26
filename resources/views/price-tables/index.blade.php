@@ -164,9 +164,9 @@
 @push('head')<style>[x-cloak]{display:none!important}.booking-modal-backdrop{position:fixed;inset:0;z-index:2000;background:rgba(15,23,42,.42);display:flex;align-items:center;justify-content:center;padding:24px}.booking-modal{background:#fff;border-radius:18px;box-shadow:0 24px 80px rgba(15,23,42,.24);max-height:calc(100vh - 48px);overflow:auto}.border-dashed{border-style:dashed!important}</style>@endpush
 @push('head')
 <style>
-    .price-command { padding: 24px; border: 1px solid #dbe7f0; border-radius: 20px; background: linear-gradient(135deg,#f8fbff 0%,#fff 62%,#f0fdf4 100%); box-shadow: 0 14px 38px rgba(15,23,42,.07); }
+    .price-command { padding: 24px; border: 1px solid #dbe7f0; border-radius: 20px; background: linear-gradient(135deg,var(--erp-surface-2) 0%,#fff 62%,#f0fdf4 100%); box-shadow: 0 14px 38px rgba(15,23,42,.07); }
     .price-command-head { display:flex; justify-content:space-between; gap:18px; align-items:flex-start; margin-bottom:18px; }
-    .price-kicker { color:#168dcc; font-size:11px; font-weight:950; letter-spacing:.14em; }
+    .price-kicker { color:var(--erp-primary-ink); font-size:11px; font-weight:950; letter-spacing:.14em; }
     .price-command h2 { margin:3px 0; color:#18364a; font-size:25px; font-weight:950; }
     .price-command p { margin:0; color:#6b8293; font-size:13px; }
     .price-status { padding:8px 13px; border-radius:999px; color:#087f5b; background:#dcfce7; font-size:12px; font-weight:850; white-space:nowrap; }
@@ -179,8 +179,8 @@
     .price-work-card b { grid-column:2; width:max-content; padding:3px 8px; border-radius:999px; font-size:11px; }
     .price-work-card.blue .price-work-icon,.price-work-card.blue b { color:#0878b9;background:var(--erp-primary-soft); }
     .price-work-card.violet .price-work-icon,.price-work-card.violet b { color:#7c3aed;background:#ede9fe; }
-    .price-work-card.red .price-work-icon,.price-work-card.red b { color:#dc2626;background:var(--erp-danger-soft); }
-    .price-work-card.green .price-work-icon,.price-work-card.green b { color:var(--erp-success-ink);background:#d1fae5; }
+    .price-work-card.red .price-work-icon,.price-work-card.red b { color:var(--erp-danger);background:var(--erp-danger-soft); }
+    .price-work-card.green .price-work-icon,.price-work-card.green b { color:var(--erp-success-ink);background:var(--erp-success-soft); }
     .price-rule { display:flex; gap:20px; align-items:center; margin-top:15px; padding:12px 15px; border:1px dashed #bdd3e1; border-radius:12px; background:rgba(255,255,255,.78); }
     .price-rule-title { color:#36566c; font-size:12px; font-weight:900; white-space:nowrap; }
     .price-rule-flow { display:flex; align-items:center; flex-wrap:wrap; gap:7px; color:#567083; font-size:11px; font-weight:800; }

@@ -12,12 +12,12 @@
     .db-overview-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 16px 18px; border-top: 4px solid var(--erp-primary); }
     .db-overview-head h2 { margin: 0 0 4px; color: var(--erp-text); font-size: 18px; font-weight: 900; }
     .db-overview-head p { margin: 0; color: #6a8191; font-size: 12px; line-height: 1.5; }
-    .db-engine { flex: 0 0 auto; padding: 7px 10px; border: 1px solid #cfe0e9; border-radius: 6px; color: #315f80; background: #f6fafc; font: 700 11px Consolas, monospace; }
+    .db-engine { flex: 0 0 auto; padding: 7px 10px; border: 1px solid #cfe0e9; border-radius: 6px; color: var(--erp-primary-dark); background: #f6fafc; font: 700 11px Consolas, monospace; }
     .db-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--erp-border); }
     .db-stat { min-width: 0; padding: 12px 16px; border-right: 1px solid var(--erp-border); }
     .db-stat:last-child { border-right: 0; }
     .db-stat span { display: block; color: #738998; font-size: 10px; font-weight: 800; }
-    .db-stat strong { display: block; margin-top: 2px; color: #183c54; font-size: 20px; }
+    .db-stat strong { display: block; margin-top: 2px; color: var(--erp-primary-dark); font-size: 20px; }
 
     .db-workspace { display: grid; grid-template-columns: minmax(280px, 330px) minmax(0, 1fr); gap: 12px; align-items: start; }
     .db-browser, .db-detail { min-width: 0; overflow: hidden; background: #fff; border: 1px solid var(--erp-border); border-radius: 7px; }
@@ -55,7 +55,7 @@
     .db-module-red, .db-module-pink { color: #a52a35; background: #fee7e9; }
     .db-module-indigo { color: #4f46a5; background: #eeecff; }
     .db-module-slate, .db-module-brown { color: #51616d; background: #edf1f3; }
-    .db-print { width: 36px; height: 36px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid var(--erp-border); border-radius: 6px; color: #315f80; background: #fff; }
+    .db-print { width: 36px; height: 36px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid var(--erp-border); border-radius: 6px; color: var(--erp-primary-dark); background: #fff; }
     .db-print:hover { color: var(--erp-primary); border-color: var(--erp-primary); }
 
     .db-table-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--erp-surface-2); border-bottom: 1px solid var(--erp-border); }
@@ -84,7 +84,7 @@
 
     .db-table-wrap { overflow-x: auto; border-top: 1px solid var(--erp-surface-2); }
     .db-columns { width: 100%; min-width: 880px; border-collapse: collapse; }
-    .db-columns th { padding: 9px 11px; color: #607989; background: #f7fafc; border-bottom: 1px solid var(--erp-border); font-size: 9px; font-weight: 900; text-align: left; }
+    .db-columns th { padding: 9px 11px; color: #607989; background: var(--erp-surface-2); border-bottom: 1px solid var(--erp-border); font-size: 9px; font-weight: 900; text-align: left; }
     .db-columns td { padding: 9px 11px; color: #456276; border-bottom: 1px solid var(--erp-surface-2); font-size: 10px; vertical-align: top; }
     .db-columns tbody tr:last-child td { border-bottom: 0; }
     .db-column-name { color: var(--erp-text); font: 700 11px Consolas, monospace; }

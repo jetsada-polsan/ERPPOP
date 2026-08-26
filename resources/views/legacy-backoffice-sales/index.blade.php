@@ -12,7 +12,7 @@
 
 <style>
     .legacy-sales-page { color:#17324d; }
-    .legacy-filter { display:flex; align-items:center; gap:14px; padding:18px 24px; background:#fff; border-radius:14px; box-shadow:0 5px 18px rgba(20,62,110,.08); border-left:5px solid #dc2626; }
+    .legacy-filter { display:flex; align-items:center; gap:14px; padding:18px 24px; background:#fff; border-radius:14px; box-shadow:0 5px 18px rgba(20,62,110,.08); border-left:5px solid var(--erp-danger); }
     .legacy-filter-title { display:flex; align-items:center; gap:8px; color:#1d4ed8; font-weight:800; white-space:nowrap; }
     .legacy-filter form { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
     .legacy-filter input { min-width:185px; font-weight:700; }
@@ -37,7 +37,7 @@
     .legacy-total-label { color:var(--erp-muted); font-size:.9rem; font-weight:800; }
     .legacy-total-value { margin:25px 0 17px; color:#3b61d5; font-size:clamp(2rem,4vw,3.75rem); font-weight:900; line-height:1; letter-spacing:0; }
     .legacy-total-value small { font-size:.32em; color:#3159c7; }
-    .legacy-divider { height:1px; background:#e5e7eb; }
+    .legacy-divider { height:1px; background:var(--erp-border); }
     .legacy-meta { padding-top:18px; color:var(--erp-text); font-size:.85rem; font-weight:700; }
     .legacy-chart { margin-top:20px; padding:20px 24px 12px; }
     .legacy-chart-row { display:grid; grid-template-columns:minmax(135px,1fr) minmax(90px,1.15fr); gap:13px; align-items:center; margin:11px 0; }

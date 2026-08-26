@@ -109,7 +109,7 @@
 
 @push('head')
 <style>
-    .status-summary { display:flex; align-items:center; gap:12px; height:78px; padding:14px 18px; background:#fff; border:1px solid #e5e7eb; border-radius:14px; color:inherit; text-decoration:none; transition:.15s ease; }
+    .status-summary { display:flex; align-items:center; gap:12px; height:78px; padding:14px 18px; background:#fff; border:1px solid var(--erp-border); border-radius:14px; color:inherit; text-decoration:none; transition:.15s ease; }
     .status-summary:hover, .status-summary.is-selected { border-color:#93c5fd; box-shadow:0 6px 18px rgba(30,64,175,.10); transform:translateY(-1px); }
     .status-summary-icon { width:40px; height:40px; display:grid; place-items:center; border-radius:12px; background:var(--erp-surface-2); font-size:20px; }
     .status-summary small { display:block; color:var(--erp-muted); font-size:12px; }
