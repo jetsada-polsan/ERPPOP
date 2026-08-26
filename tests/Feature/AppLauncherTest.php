@@ -87,6 +87,36 @@ class AppLauncherTest extends TestCase
         $this->assertNotEmpty($actual);
     }
 
+    public function test_pos_modules_are_grouped_away_from_sales_documents(): void
+    {
+        $sections = collect(ErpMenu::all())->keyBy('label');
+
+        $sales = collect($sections->get('งานประจำวัน')['items'])->pluck('label')->all();
+        $pos = collect($sections->get('POS / หน้าร้าน')['items'])->pluck('label')->all();
+
+        $this->assertContains('ใบเสนอราคา', $sales);
+        $this->assertContains('ใบขายสด', $sales);
+        $this->assertContains('เปิด POS ขาย', $pos);
+        $this->assertContains('ศูนย์ควบคุม POS', $pos);
+        $this->assertContains('ส่งข้อมูลไป POS', $pos);
+        $this->assertNotContains('เปิด POS ขาย', $sales);
+        $this->assertNotContains('เครื่องมือ POS', $sales);
+        $this->assertNotContains('QR รับเงิน / จอแสดงราคา', $sales);
+    }
+
+    public function test_pos_user_sees_the_storefront_section_in_launcher(): void
+    {
+        $sections = $this->actingAs($this->userWith(['pos.use']))
+            ->get(route('apps.launcher'))->viewData('sections');
+
+        $posSection = collect($sections)->firstWhere('label', 'POS / หน้าร้าน');
+
+        $this->assertNotNull($posSection);
+        $this->assertSame('POS / หน้าร้าน', $posSection['title']);
+        $this->assertContains('เปิด POS ขาย', array_column($posSection['items'], 'label'));
+        $this->assertContains('ส่งข้อมูลไป POS', array_column($posSection['items'], 'label'));
+    }
+
     /** ทุกการ์ดต้องมี URL ที่ใช้ได้จริง ไม่ใช่ # */
     public function test_every_card_points_at_a_real_route(): void
     {

@@ -19,6 +19,7 @@ class ErpMenu
     public const SECTION_ICONS = [
         'ภาพรวม' => 'bi-house-door-fill',
         'งานประจำวัน' => 'bi-cash-coin',
+        'POS / หน้าร้าน' => 'bi-shop-window',
         'คลัง / ผลิต / ซื้อ' => 'bi-box-seam-fill',
         'การเงิน / บัญชี' => 'bi-calculator-fill',
         'ข้อมูลตั้งต้น' => 'bi-people-fill',
@@ -45,20 +46,26 @@ class ErpMenu
                 'label' => 'งานประจำวัน',
                 'displayLabel' => 'ขาย / เอกสาร',
                 'items' => [
-                    ['label' => 'เปิด POS ขาย', 'route' => 'pos.index', 'pattern' => 'pos.index', 'icon' => 'bi-display', 'tone' => 'cyan', 'target' => '_blank'],
-                    ['label' => 'ศูนย์ควบคุม POS', 'route' => 'pos.control', 'pattern' => 'pos.control', 'icon' => 'bi-cash-coin', 'tone' => 'red'],
                     ['label' => 'เอกสารย้อนหลัง', 'route' => 'documents.browser', 'pattern' => 'documents.browser', 'icon' => 'bi-archive-fill', 'tone' => 'indigo'],
-                    ['label' => 'เครื่องมือ POS', 'route' => 'bplus.pos-workbench', 'pattern' => 'bplus.pos-workbench', 'icon' => 'bi-window-stack', 'tone' => 'blue'],
-                    ['label' => 'ส่งข้อมูลไป POS', 'route' => 'bplus.pos-preparation', 'pattern' => 'bplus.pos-preparation', 'icon' => 'bi-hdd-network-fill', 'tone' => 'teal'],
                     ['label' => 'ใบเสนอราคา', 'route' => 'quotations.index', 'pattern' => 'quotations.*', 'icon' => 'bi-file-earmark-text', 'tone' => 'slate'],
                     ['label' => 'ใบจอง / ขายเชื่อ', 'route' => 'bookings.index', 'pattern' => 'bookings.*', 'extraPattern' => 'sales.*', 'icon' => 'bi-receipt-cutoff', 'tone' => 'orange'],
                     ['label' => 'ใบขายสด', 'route' => 'cash-sales.index', 'pattern' => 'cash-sales.*', 'icon' => 'bi-cash-stack', 'tone' => 'teal'],
                     ['label' => 'ใบรับคืนสินค้า', 'route' => 'sale-returns.index', 'pattern' => 'sale-returns.*', 'icon' => 'bi-arrow-return-left', 'tone' => 'amber'],
                     ['label' => 'ใบวางบิล', 'route' => 'billing-notes.index', 'pattern' => 'billing-notes.*', 'icon' => 'bi-receipt', 'tone' => 'pink'],
                     ['label' => 'ใบเพิ่ม/ลดหนี้', 'route' => 'credit-debit-notes.index', 'pattern' => 'credit-debit-notes.*', 'icon' => 'bi-plus-slash-minus', 'tone' => 'orange'],
-                    ['label' => 'QR รับเงิน / จอแสดงราคา', 'route' => 'bplus.qr-payments', 'pattern' => 'bplus.qr-payments', 'extraPattern' => 'bplus.show-price', 'icon' => 'bi-qr-code', 'tone' => 'slate'],
                     ['label' => 'ลูกค้าสัมพันธ์ (CRM)', 'route' => 'crm.index', 'pattern' => 'crm.*', 'icon' => 'bi-person-lines-fill', 'tone' => 'indigo'],
                     ['label' => 'Pipeline งานขาย', 'route' => 'crm.pipeline', 'pattern' => 'crm.pipeline', 'icon' => 'bi-kanban-fill', 'tone' => 'purple'],
+                ],
+            ],
+            [
+                'label' => 'POS / หน้าร้าน',
+                'displayLabel' => 'POS / หน้าร้าน',
+                'items' => [
+                    ['label' => 'เปิด POS ขาย', 'route' => 'pos.index', 'pattern' => 'pos.index', 'icon' => 'bi-display', 'tone' => 'cyan', 'target' => '_blank'],
+                    ['label' => 'ศูนย์ควบคุม POS', 'route' => 'pos.control', 'pattern' => 'pos.control', 'icon' => 'bi-cash-coin', 'tone' => 'red'],
+                    ['label' => 'เครื่องมือ POS', 'route' => 'bplus.pos-workbench', 'pattern' => 'bplus.pos-workbench', 'icon' => 'bi-window-stack', 'tone' => 'blue'],
+                    ['label' => 'ส่งข้อมูลไป POS', 'route' => 'bplus.pos-preparation', 'pattern' => 'bplus.pos-preparation', 'icon' => 'bi-hdd-network-fill', 'tone' => 'teal'],
+                    ['label' => 'QR รับเงิน / จอแสดงราคา', 'route' => 'bplus.qr-payments', 'pattern' => 'bplus.qr-payments', 'extraPattern' => 'bplus.show-price', 'icon' => 'bi-qr-code', 'tone' => 'slate'],
                 ],
             ],
             [
@@ -165,8 +172,24 @@ class ErpMenu
 
         $savedOrder = json_decode((string) AppSetting::get('menu_section_order', '[]'), true);
         if (is_array($savedOrder) && $savedOrder !== []) {
+            if (! in_array('POS / หน้าร้าน', $savedOrder, true)) {
+                $afterSales = array_search('งานประจำวัน', $savedOrder, true);
+                if ($afterSales !== false) {
+                    array_splice($savedOrder, $afterSales + 1, 0, ['POS / หน้าร้าน']);
+                } else {
+                    $savedOrder[] = 'POS / หน้าร้าน';
+                }
+            }
+
             $positions = array_flip($savedOrder);
-            usort($sections, fn ($a, $b) => ($positions[$a['label']] ?? 999) <=> ($positions[$b['label']] ?? 999));
+            $originalPositions = array_flip(array_column($sections, 'label'));
+            usort($sections, fn ($a, $b) => [
+                $positions[$a['label']] ?? 999,
+                $originalPositions[$a['label']] ?? 999,
+            ] <=> [
+                $positions[$b['label']] ?? 999,
+                $originalPositions[$b['label']] ?? 999,
+            ]);
         }
 
         if (! $user) {
