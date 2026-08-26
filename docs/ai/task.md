@@ -149,5 +149,5 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
 - ทำอะไร: แยกหมวดเมนูใหม่ `POS / หน้าร้าน` ออกจาก `ขาย / เอกสาร`; ย้าย `เปิด POS ขาย`, `ศูนย์ควบคุม POS`, `เครื่องมือ POS`, `ส่งข้อมูลไป POS`, `QR รับเงิน / จอแสดงราคา` ไปหมวดใหม่
 - รายละเอียด: `ขาย / เอกสาร` เหลือเอกสารขาย/CRM; `SystemSettingController::defaultMenuOrder()` รู้จักหมวดใหม่; `ErpMenu::forUser()` แทรกหมวดใหม่หลัง `งานประจำวัน` แม้ production จะมี `menu_section_order` เก่าที่ยังไม่มี label นี้
 - ทดสอบ: `php artisan test tests/Feature/AppLauncherTest.php tests/Feature/ErpMenuIconTest.php` ผ่าน 10 tests / 48 assertions; `php artisan test --compact` ไม่มี failure (386 tests / 385 passed / 1 skipped / 6 incomplete / 2927 assertions); `npm run build` ผ่าน; `git diff --check` ผ่าน
-- Deploy: ยังไม่ deploy ขึ้น production
+- Deploy: deploy ขึ้น production แล้ว; backup `erp-db-20260826-224714.sql.gz`; rsync dry-run/จริงแบบไม่ใช้ `--delete`; `php artisan migrate --force` ไม่มี migration ค้าง; production `erp:health` ผ่านครบ; ตรวจ production menu order ได้ `ภาพรวม | งานประจำวัน | POS / หน้าร้าน | ...`; manifest production ผ่าน `manifest ok 13`
 - หมายเหตุ: ไม่เปลี่ยนสิทธิ์ route เดิม; `QR รับเงิน / จอแสดงราคา` ยังใช้ `settings.manage` ตามเดิมเพราะเป็นงานตั้งค่าอุปกรณ์/PromptPay
