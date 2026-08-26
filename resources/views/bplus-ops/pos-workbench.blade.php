@@ -118,12 +118,12 @@
         gap: 12px;
         padding: 14px 16px;
         border-radius: 12px;
-        background: #f0f9ff;
-        border: 1px solid #bae6fd;
+        background: var(--erp-primary-soft);
+        border: 1px solid var(--erp-primary-soft);
         box-shadow: 0 8px 22px rgba(2,132,199,.06);
     }
     .pos-kicker {
-        color: #0284c7;
+        color: var(--erp-primary);
         font-size: 12px;
         font-weight: 900;
         text-transform: uppercase;
@@ -149,7 +149,7 @@
         gap: 8px;
         border: 0;
         border-radius: 10px;
-        background: #0284c7;
+        background: var(--erp-primary);
         color: #fff;
         font-weight: 900;
         padding: 9px 14px;
@@ -158,7 +158,7 @@
     }
     .pos-open-btn:hover,
     .pos-save-btn:hover {
-        background: #0369a1;
+        background: var(--erp-primary-dark);
         color: #fff;
     }
     .pos-note {
@@ -240,11 +240,11 @@
         font-weight: 900;
     }
     .pos-card-head > i {
-        color: #38bdf8;
+        color: var(--erp-primary);
         font-size: 24px;
     }
     .pos-card-label {
-        color: #0284c7;
+        color: var(--erp-primary);
         font-size: 12px;
         font-weight: 900;
         margin-bottom: 2px;
@@ -263,7 +263,7 @@
     }
     .pos-card .form-control:focus,
     .pos-card .form-select:focus {
-        border-color: #38bdf8;
+        border-color: var(--erp-primary);
         box-shadow: 0 0 0 3px rgba(56,189,248,.16);
     }
     .pos-filter {
@@ -285,15 +285,15 @@
         border: 1px solid #cfe4f1;
         border-radius: 10px;
         background: #fff;
-        color: #0369a1;
+        color: var(--erp-primary-dark);
         font-weight: 900;
         padding: 9px 12px;
         white-space: nowrap;
     }
     .pos-light-btn:hover {
-        background: #e0f2fe;
+        background: var(--erp-primary-soft);
         color: #0c4a6e;
-        border-color: #bae6fd;
+        border-color: var(--erp-primary-soft);
     }
     .pos-filter-note {
         margin-bottom: 8px;
@@ -320,9 +320,9 @@
         position: sticky;
         top: 0;
         z-index: 2;
-        background: #e0f2fe;
+        background: var(--erp-primary-soft);
         color: #0c4a6e;
-        border-bottom: 2px solid #bae6fd;
+        border-bottom: 2px solid var(--erp-primary-soft);
         font-size: 13px;
         font-weight: 900;
     }
@@ -335,8 +335,8 @@
         min-height: 26px;
         padding: 2px 9px;
         border-radius: 999px;
-        background: #f0f9ff;
-        color: #0369a1;
+        background: var(--erp-primary-soft);
+        color: var(--erp-primary-dark);
         font-weight: 900;
         font-size: 12px;
     }

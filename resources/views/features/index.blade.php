@@ -67,7 +67,7 @@
     }
 
     .flow-tab.active {
-        border-color: #0f9aaa;
+        border-color: var(--erp-info);
         background: #e8f6f8;
         color: var(--erp-info);
     }
@@ -105,7 +105,7 @@
     }
 
     .flow-step.active {
-        border-color: #0f9aaa;
+        border-color: var(--erp-info);
         background: #eefcfc;
     }
 
@@ -122,7 +122,7 @@
     }
 
     .flow-step.active .step-no {
-        background: #0f9aaa;
+        background: var(--erp-info);
         color: #fff;
     }
 
@@ -151,7 +151,7 @@
     }
 
     .detail-kicker {
-        color: #0f9aaa;
+        color: var(--erp-info);
         font-size: 12px;
         font-weight: 900;
         letter-spacing: .04em;
@@ -180,8 +180,8 @@
     }
 
     .action-button {
-        border: 1px solid #0f9aaa;
-        background: #0f9aaa;
+        border: 1px solid var(--erp-info);
+        background: var(--erp-info);
         color: #fff;
         border-radius: 8px;
         padding: 9px 14px;
@@ -199,7 +199,7 @@
 
     .secondary-button {
         background: #fff;
-        color: #0f9aaa;
+        color: var(--erp-info);
     }
 
     .secondary-button:hover {
@@ -240,7 +240,7 @@
     }
 
     .legacy-code-chip {
-        border: 1px solid #cbd5e1;
+        border: 1px solid var(--erp-border);
         background: #fff;
         color: var(--erp-text);
         border-radius: 7px;
@@ -252,7 +252,7 @@
     }
 
     .legacy-code-chip:hover {
-        border-color: #0f9aaa;
+        border-color: var(--erp-info);
         color: var(--erp-info);
         background: #eefcfc;
     }
@@ -290,8 +290,8 @@
         border-radius: 7px;
         display: grid;
         place-items: center;
-        background: #e0f2fe;
-        color: #0369a1;
+        background: var(--erp-primary-soft);
+        color: var(--erp-primary-dark);
         font-size: 11px;
         font-weight: 900;
     }
@@ -321,7 +321,7 @@
     }
 
     .quick-link:hover {
-        border-color: #0f9aaa;
+        border-color: var(--erp-info);
         background: #f5ffff;
         color: var(--erp-text);
     }

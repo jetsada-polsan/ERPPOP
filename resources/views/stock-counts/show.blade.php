@@ -38,7 +38,7 @@
     <div class="content-card p-3 mb-3">
         <div class="d-flex flex-wrap gap-2 align-items-center">
             <div class="position-relative flex-grow-1" style="min-width:280px;max-width:480px">
-                <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94a3b8"></i>
+                <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--erp-muted)"></i>
                 <input type="text" x-model="q" x-ref="searchBox" @input="openDrop = true" @keydown.enter.prevent="pickFirst()"
                     @keydown.escape="openDrop = false"
                     class="form-control ps-5" placeholder="ค้นหา/สแกน รหัส บาร์โค้ด ชื่อสินค้า แล้ว Enter">
@@ -47,8 +47,8 @@
                     style="position:absolute;z-index:120;left:0;right:0;top:100%;margin-top:4px;background:#fff;border:1px solid var(--erp-border);border-radius:10px;box-shadow:0 12px 30px rgba(15,23,42,.15);max-height:300px;overflow-y:auto">
                     <template x-for="row in matches.slice(0, 12)" :key="row.id">
                         <div @click="pick(row)" style="padding:9px 14px;cursor:pointer;font-size:13px;display:flex;gap:10px;border-bottom:1px solid var(--erp-surface-2)"
-                            @mouseenter="$el.style.background='#f0f9ff'" @mouseleave="$el.style.background=''">
-                            <span x-text="row.sku" style="color:#0284c7;font-weight:700;min-width:90px"></span>
+                            @mouseenter="$el.style.background='var(--erp-primary-soft)'" @mouseleave="$el.style.background=''">
+                            <span x-text="row.sku" style="color:var(--erp-primary);font-weight:700;min-width:90px"></span>
                             <span x-text="row.name" class="text-truncate"></span>
                             <span x-text="money(row.system)" style="margin-left:auto;color:var(--erp-muted)"></span>
                         </div>
@@ -115,7 +115,7 @@
                     <template x-for="(row, idx) in visible" :key="row.id">
                         <tr :class="{ 'sc-diff': hasDiff(row), 'sc-counted': row.counted !== null && !hasDiff(row), 'sc-active': activeId === row.id }" :id="'scrow-' + row.id">
                             <td class="text-muted" x-text="idx + 1"></td>
-                            <td class="fw-semibold" style="color:#0284c7" x-text="row.sku"></td>
+                            <td class="fw-semibold" style="color:var(--erp-primary)" x-text="row.sku"></td>
                             <td x-text="row.name"></td>
                             <td class="text-muted" x-text="row.unit"></td>
                             <td class="text-end" x-text="money(row.system)"></td>
@@ -156,10 +156,10 @@
     .sc-grid td { font-size: 13px; }
     .sc-grid tbody tr:nth-child(even) { background: var(--erp-surface-2); }
     .sc-grid tr.sc-counted { background: #ecfdf5 !important; }
-    .sc-grid tr.sc-diff { background: #fef3c7 !important; }
-    .sc-grid tr.sc-active { outline: 2px solid #0ea5e9; outline-offset: -2px; }
+    .sc-grid tr.sc-diff { background: var(--erp-warning-soft) !important; }
+    .sc-grid tr.sc-active { outline: 2px solid var(--erp-primary); outline-offset: -2px; }
     .sc-input { max-width: 120px; margin-left: auto; }
-    .sc-input:focus { border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,.15); }
+    .sc-input:focus { border-color: var(--erp-primary); box-shadow: 0 0 0 3px rgba(14,165,233,.15); }
     .sc-tablet-panel{overflow:hidden;border:1px solid #b8d5e4;border-radius:14px;background:#fff;box-shadow:0 10px 28px rgba(15,70,100,.1)}
     .sc-tablet-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:linear-gradient(120deg,#0b789f,#149dc8);color:#fff}.sc-tablet-head span:first-child b,.sc-tablet-head span:first-child small{display:block}.sc-tablet-head small{opacity:.82;font-size:10px}.sc-online{display:flex;align-items:center;gap:6px;padding:5px 9px;border-radius:14px;background:rgba(255,255,255,.16);font-size:10px}.sc-online.is-offline{background:#fff0d1;color:#9a5800}
     .sc-scan-row{display:grid;grid-template-columns:38px minmax(0,1fr) auto;align-items:center;margin:12px;border:2px solid #20a6d6;border-radius:10px;overflow:hidden}.sc-scan-row>i{font-size:19px;text-align:center;color:#168eb9}.sc-scan-row input{height:48px;border:0;outline:0;font-size:17px;font-weight:700}.sc-scan-row button{height:48px;padding:0 18px;border:0;background:#168fbe;color:#fff;font-weight:800}

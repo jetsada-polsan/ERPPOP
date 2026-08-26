@@ -157,7 +157,7 @@
         background: #fff;
     }
     .legacy-search { position: relative; flex: 1; min-width: 260px; }
-    .legacy-search i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+    .legacy-search i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--erp-muted); }
     .legacy-search input,
     .legacy-toolbar select {
         width: 100%;
@@ -244,7 +244,7 @@
     }
     .legacy-report-table td { border-bottom: 1px solid var(--erp-surface-2); }
     .legacy-code { color: var(--erp-info); font-weight: 950; font-size: 13px; }
-    .legacy-key { color: #94a3b8; font-size: 11px; margin-top: 2px; }
+    .legacy-key { color: var(--erp-muted); font-size: 11px; margin-top: 2px; }
     .legacy-name { color: var(--erp-text); font-weight: 850; line-height: 1.45; }
     .legacy-rpt {
         display: inline-flex;
@@ -268,7 +268,7 @@
         white-space: nowrap;
     }
     .legacy-cat { background: #eef2ff; color: #4338ca; }
-    .legacy-status.on { background: #dcfce7; color: #047857; }
+    .legacy-status.on { background: #dcfce7; color: var(--erp-success-ink); }
     .legacy-status.off { background: var(--erp-surface-2); color: var(--erp-muted); }
     .legacy-dot {
         display: inline-block;
@@ -276,8 +276,8 @@
         height: 12px;
         border-radius: 999px;
     }
-    .legacy-dot.yes { background: #10b981; }
-    .legacy-dot.no { background: #cbd5e1; }
+    .legacy-dot.yes { background: var(--erp-success-ink); }
+    .legacy-dot.no { background: var(--erp-border); }
     .legacy-sql { margin-top: 6px; }
     .legacy-sql summary {
         cursor: pointer;

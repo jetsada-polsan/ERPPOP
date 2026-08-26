@@ -26,7 +26,7 @@
                 <tbody>
                 @forelse($quotations as $qt)
                     <tr>
-                        <td class="fw-semibold" style="color:#0284c7">{{ $qt->doc_number }}</td>
+                        <td class="fw-semibold" style="color:var(--erp-primary)">{{ $qt->doc_number }}</td>
                         <td class="text-nowrap">{{ $qt->doc_date->thaiDate() }}</td>
                         <td>{{ $qt->customerLabel() }}</td>
                         <td class="text-nowrap small {{ $qt->status === 'open' && $qt->valid_until && $qt->valid_until->isPast() ? 'text-danger' : '' }}">{{ $qt->valid_until?->thaiDate() ?? '-' }}</td>

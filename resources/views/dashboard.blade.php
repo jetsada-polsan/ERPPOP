@@ -253,7 +253,7 @@
     }
 
     .filter-title i {
-        color: #0f9aaa;
+        color: var(--erp-info);
     }
 
     .filter-fields {
@@ -341,7 +341,7 @@
 
     .metric-value { color:var(--erp-text);font-size:22px;line-height:1;font-weight:850;font-variant-numeric:tabular-nums; }
 
-    .metric-unit { color: #94a3b8; font-size: 12px; margin-top: 4px; }
+    .metric-unit { color: var(--erp-muted); font-size: 12px; margin-top: 4px; }
 
     .metric-mini-list {
         margin-top: 10px;
@@ -360,7 +360,7 @@
 
     .metric-mini-row strong { flex: 0 0 auto; color: #1e293b; font-weight: 700; white-space: nowrap; }
 
-    .metric-mini-row.muted strong { color: #cbd5e1; }
+    .metric-mini-row.muted strong { color: var(--erp-border); }
 
     /* ── Panel cards ──────────────────────────── */
     .panel-card {
@@ -436,12 +436,12 @@
                 datasets: [{
                     label: 'ยอดขาย',
                     data: {!! json_encode($dailySales->pluck('total_sales')) !!},
-                    borderColor: '#0284c7',
+                    borderColor: 'var(--erp-primary)',
                     backgroundColor: 'rgba(2,132,199,.10)',
                     fill: true,
                     tension: .35,
                     pointRadius: 4,
-                    pointBackgroundColor: '#0284c7',
+                    pointBackgroundColor: 'var(--erp-primary)',
                 }]
             },
             options: {
@@ -462,7 +462,7 @@
                 datasets: [{
                     label: 'ยอดขาย',
                     data: {!! json_encode($byBranch->pluck('total_sales')) !!},
-                    backgroundColor: '#38bdf8',
+                    backgroundColor: 'var(--erp-primary)',
                     borderRadius: 8,
                 }]
             },
@@ -483,7 +483,7 @@
                 labels: {!! json_encode($salesDocumentSummary->pluck('doc_name')) !!},
                 datasets: [{
                     data: {!! json_encode($salesDocumentSummary->pluck('amount')) !!},
-                    backgroundColor: ['#10b981','#38bdf8','#f59e0b','#6366f1','#f43f5e'],
+                    backgroundColor: ['var(--erp-success-ink)','var(--erp-primary)','#f59e0b','#6366f1','#f43f5e'],
                     borderColor: '#ffffff',
                     borderWidth: 3,
                     hoverOffset: 4,

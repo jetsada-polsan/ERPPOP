@@ -217,7 +217,7 @@
             <i class="bi bi-chevron-right ms-auto"></i>
         </a>
 
-        <div class="rpt-nav-head mt-3"><i class="bi bi-folder2-open" style="color:#0284c7"></i> รายงานทั้งหมด</div>
+        <div class="rpt-nav-head mt-3"><i class="bi bi-folder2-open" style="color:var(--erp-primary)"></i> รายงานทั้งหมด</div>
         @foreach($catalog as $catKey => $group)
             @php
                 $meta = $categoryMeta[$catKey] ?? ['icon' => 'bi-grid', 'color' => 'var(--erp-muted)', 'label' => $group['title']];
@@ -226,7 +226,7 @@
                 @click="open = open === '{{ $catKey }}' ? '' : '{{ $catKey }}'">
                 <i class="bi {{ $meta['icon'] }}" style="color:{{ $meta['color'] }}"></i>
                 <span>{{ $meta['label'] }}</span>
-                <i class="bi ms-auto" :class="open === '{{ $catKey }}' ? 'bi-chevron-down' : 'bi-chevron-right'" style="font-size:11px;color:#94a3b8"></i>
+                <i class="bi ms-auto" :class="open === '{{ $catKey }}' ? 'bi-chevron-down' : 'bi-chevron-right'" style="font-size:11px;color:var(--erp-muted)"></i>
             </button>
             <div x-show="open === '{{ $catKey }}'" class="rpt-nav-sub">
                 @foreach($group['reports'] as $repKey => $repLabel)
@@ -412,19 +412,19 @@
 @push('head')
 <style>
     .flow-report-shell {
-        --flow-blue: #0284c7;
-        --flow-blue-dark: #0369a1;
+        --flow-blue: var(--erp-primary);
+        --flow-blue-dark: var(--erp-primary-dark);
         --flow-blue-ink: #0c4a6e;
-        --flow-line: #bae6fd;
+        --flow-line: var(--erp-primary-soft);
         --flow-soft: #eff8ff;
-        --flow-soft-2: #e0f2fe;
+        --flow-soft-2: var(--erp-primary-soft);
         display: grid;
         grid-template-columns: minmax(0, 1fr);
         align-items: start;
         gap: 0;
         min-height: calc(100vh - 96px);
         margin: 0;
-        background: linear-gradient(180deg, #e0f2fe 0%, #f0f9ff 220px, #f8fbff 100%);
+        background: linear-gradient(180deg, var(--erp-primary-soft) 0%, var(--erp-primary-soft) 220px, #f8fbff 100%);
     }
     .flow-rail {
         display: none;
@@ -487,8 +487,8 @@
     }
     .flow-action-btn {
         min-width: 0;
-        border: 1px solid #bae6fd;
-        background: linear-gradient(180deg, #ffffff, #f0f9ff);
+        border: 1px solid var(--erp-primary-soft);
+        background: linear-gradient(180deg, #ffffff, var(--erp-primary-soft));
         color: var(--flow-blue-ink);
         border-radius: 6px;
         padding: 10px 14px;
@@ -499,8 +499,8 @@
         white-space: nowrap;
     }
     .flow-action-btn:hover {
-        border-color: #38bdf8;
-        background: #e0f2fe;
+        border-color: var(--erp-primary);
+        background: var(--erp-primary-soft);
     }
     .flow-action-link {
         display: inline-flex;
@@ -517,7 +517,7 @@
         border: 1px solid var(--flow-line);
         border-bottom: 0;
         border-radius: 8px 8px 0 0;
-        background: linear-gradient(135deg, #f0f9ff, #ffffff 55%, #e0f2fe);
+        background: linear-gradient(135deg, var(--erp-primary-soft), #ffffff 55%, var(--erp-primary-soft));
     }
     .flow-report-meta dl {
         margin: 8px 0 0;
@@ -575,24 +575,24 @@
         padding: 0 24px;
         border-left: 1px solid var(--flow-line);
         border-right: 1px solid var(--flow-line);
-        background: #f0f9ff;
+        background: var(--erp-primary-soft);
     }
     .flow-tabs span {
         min-width: 160px;
         text-align: center;
         padding: 10px 16px;
         border-radius: 6px 6px 0 0;
-        background: #e0f2fe;
+        background: var(--erp-primary-soft);
         color: #075985;
         font-size: 14px;
         font-weight: 700;
     }
     .flow-tabs span.active {
-        background: linear-gradient(180deg, #38bdf8, var(--flow-blue));
+        background: linear-gradient(180deg, var(--erp-primary), var(--flow-blue));
         color: #fff;
     }
     .flow-report-shell .content-card {
-        border: 1px solid #bae6fd;
+        border: 1px solid var(--erp-primary-soft);
         border-radius: 8px;
         box-shadow: 0 16px 40px rgba(2,132,199,.10);
         background: #fff;
@@ -709,7 +709,7 @@
         gap: 8px;
         flex-wrap: wrap;
         background: rgba(255,255,255,.86);
-        border: 1px solid #bae6fd;
+        border: 1px solid var(--erp-primary-soft);
         border-radius: 12px;
         padding: 12px;
         margin-bottom: 24px !important;
@@ -731,7 +731,7 @@
     }
     .rpt-date-input,
     .rpt-select {
-        border: 1px solid #bae6fd;
+        border: 1px solid var(--erp-primary-soft);
         border-radius: 6px;
         padding: 9px 12px;
         font-size: 15px;
@@ -749,12 +749,12 @@
         max-width: none;
     }
     .rpt-date-input:focus,
-    .rpt-select:focus { border-color: #38bdf8; box-shadow: 0 0 0 3px rgba(56,189,248,.18); }
+    .rpt-select:focus { border-color: var(--erp-primary); box-shadow: 0 0 0 3px rgba(56,189,248,.18); }
     .rpt-shortcut {
         font-size: 12px;
         color: var(--flow-blue-dark);
         padding: 5px 10px;
-        border: 1px solid #bae6fd;
+        border: 1px solid var(--erp-primary-soft);
         border-radius: 999px;
         text-decoration: none;
         background: #fff;
@@ -773,9 +773,9 @@
         white-space: nowrap;
     }
     .rpt-btn-filter {
-        background: linear-gradient(180deg, #38bdf8, var(--flow-blue));
+        background: linear-gradient(180deg, var(--erp-primary), var(--flow-blue));
         color: #fff;
-        border: 1px solid #0284c7;
+        border: 1px solid var(--erp-primary);
         min-width: 104px;
         padding: 9px 16px;
         font-size: 15px;
@@ -805,7 +805,7 @@
         left: 10px;
         top: 50%;
         transform: translateY(-50%);
-        color: #94a3b8;
+        color: var(--erp-muted);
         font-size: 13px;
         pointer-events: none;
     }
@@ -829,7 +829,7 @@
     .rpt-report-select { min-width:210px; max-width:none; }
     .rpt-shortcut { padding:3px 6px; border-radius:4px; font-size:9px; }
     .rpt-btn-filter { min-width:66px; height:31px; padding:4px 9px; border-radius:4px; font-size:11px; }
-    .flow-report-summary { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:7px 12px; border-radius:5px 5px 0 0; background:#f8fbfd; }
+    .flow-report-summary { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:7px 12px; border-radius:5px 5px 0 0; background:var(--erp-surface-2); }
     .flow-dash { display:none; }
     .flow-report-meta dl { display:flex; align-items:center; gap:16px; margin:0; }
     .flow-report-meta dl div { display:flex; align-items:center; gap:5px; }

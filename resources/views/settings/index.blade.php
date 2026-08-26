@@ -492,7 +492,7 @@ async function copyPosToken(text) {
         color: var(--erp-text); font-size: 13px; line-height: 1.35; font-weight: 400;
         cursor: pointer; position: relative; margin-bottom: 1px;
     }
-    .set-nav-link:hover { background: var(--erp-surface-2, #f8fbfd); }
+    .set-nav-link:hover { background: var(--erp-surface-2, var(--erp-surface-2)); }
     .set-nav-link.active { background: var(--erp-primary-soft); color: var(--erp-primary-dark); font-weight: 600; }
     /* แท่ง accent มนสั้น แทนเส้นเต็มความสูง ให้เข้าชุดกับเมนูซ้าย */
     .set-nav-link.active::before { content: ""; position: absolute; left: 8px; top: 50%;
@@ -517,17 +517,17 @@ async function copyPosToken(text) {
     .logo-thumb-text { font-size: 24px; font-weight: 900; color: #29465b; }
     .logo-thumb-text span { color: var(--erp-success-ink); }
     .logo-caption { font-size: 11px; color: #7d97ac; margin-top: 6px; word-break: break-all; }
-    .pos-download-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 18px; padding: 24px; border-color: #bae6fd; background: #f0f9ff; }
-    .pos-download-mark { width: 64px; height: 64px; display: grid; place-items: center; border-radius: 16px; background: #0284c7; color: #fff; font-size: 32px; }
+    .pos-download-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 18px; padding: 24px; border-color: var(--erp-primary-soft); background: var(--erp-primary-soft); }
+    .pos-download-mark { width: 64px; height: 64px; display: grid; place-items: center; border-radius: 16px; background: var(--erp-primary); color: #fff; font-size: 32px; }
     .pos-download-copy .set-title { color: #0c4a6e; font-size: 18px; }
     .pos-download-copy .set-desc { max-width: none; }
     .pos-download-btn { min-width: 230px; font-weight: 800; }
     .pos-token-result { border-color: #86efac; background: #f0fdf4; padding-top: 18px; padding-bottom: 18px; }
     .pos-token-copy-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; margin-top: 12px; }
     .menu-order-card { max-width:620px; padding:16px; }
-    .menu-order-row { display:flex; align-items:center; gap:10px; min-height:40px; padding:5px 8px; border:1px solid #dce7ef; border-radius:7px; margin-top:6px; background:#f8fbfd; font-size:12px; }
-    .menu-order-index { width:24px; height:24px; display:grid; place-items:center; border-radius:5px; background:#e0f2fe; color:#0369a1; font-weight:800; }
-    .menu-order-row button { width:28px; height:28px; border:1px solid #cbd5e1; border-radius:5px; background:#fff; color:var(--erp-text); }
+    .menu-order-row { display:flex; align-items:center; gap:10px; min-height:40px; padding:5px 8px; border:1px solid #dce7ef; border-radius:7px; margin-top:6px; background:var(--erp-surface-2); font-size:12px; }
+    .menu-order-index { width:24px; height:24px; display:grid; place-items:center; border-radius:5px; background:var(--erp-primary-soft); color:var(--erp-primary-dark); font-weight:800; }
+    .menu-order-row button { width:28px; height:28px; border:1px solid var(--erp-border); border-radius:5px; background:#fff; color:var(--erp-text); }
     .menu-order-row button:disabled { opacity:.3; }
     .theme-settings-card { max-width:720px; padding:16px; }
     .theme-choice-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
@@ -550,7 +550,7 @@ async function copyPosToken(text) {
     }
     html[data-layout="odoo"] .set-nav-group {
         color: var(--erp-primary-dark);
-        background: var(--erp-surface-2, #f8fbfd);
+        background: var(--erp-surface-2, var(--erp-surface-2));
         border: 1px solid var(--erp-border);
         border-radius: 4px;
         font-size: 11px;

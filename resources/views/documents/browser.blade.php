@@ -128,7 +128,7 @@
                     @forelse($documents as $doc)
                         @php($url = \App\Http\Controllers\DocumentBrowserController::detailUrl($doc))
                         <tr @if($url) style="cursor:pointer" onclick="window.location='{{ $url }}'" @endif>
-                            <td class="fw-semibold" style="color:#0284c7">
+                            <td class="fw-semibold" style="color:var(--erp-primary)">
                                 {{ $doc->doc_number }}
                                 @if($doc->documentBook && ! $doc->documentBook->is_default)<span class="badge text-bg-light border ms-1">{{ $doc->documentBook->code }}</span>@endif
                             </td>
@@ -181,7 +181,7 @@
                     <tbody>
                     @foreach($legacyDocuments as $legacy)
                         <tr style="cursor:pointer" onclick="window.location='{{ route('documents.legacy-show', $legacy->di_key) }}'">
-                            <td class="fw-semibold" style="color:#0284c7">{{ $legacy->doc_number }}</td>
+                            <td class="fw-semibold" style="color:var(--erp-primary)">{{ $legacy->doc_number }}</td>
                             <td>
                                 <div class="fw-semibold">{{ $legacy->legacy_type_code }}</div>
                                 <div class="text-muted small">{{ $legacy->legacy_type_name }}</div>
@@ -233,10 +233,10 @@
     }
     .doc-book-row { display: flex; flex-wrap: wrap; gap: 5px; padding: 4px 8px 6px 14px; }
     .doc-book-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 7px; border: 1px solid var(--erp-border); background: #fff; color: var(--erp-text); font-size: 12px; font-weight: 700; text-decoration: none; }
-    .doc-book-chip:hover { border-color: #0ea5e9; color: #0369a1; }
-    .doc-book-chip.active { background: #0369a1; color: #fff; border-color: #0369a1; }
+    .doc-book-chip:hover { border-color: var(--erp-primary); color: var(--erp-primary-dark); }
+    .doc-book-chip.active { background: var(--erp-primary-dark); color: #fff; border-color: var(--erp-primary-dark); }
     .doc-tree-type:hover { background: var(--erp-surface-2); }
-    .doc-tree-type.active { background: #e0f2fe; color: #0369a1; }
+    .doc-tree-type.active { background: var(--erp-primary-soft); color: var(--erp-primary-dark); }
     .doc-tree-years { padding-left: 14px; }
     .doc-tree-link {
         display: flex; align-items: center; gap: 6px;
@@ -246,15 +246,15 @@
     .doc-tree-link:hover { background: var(--erp-surface-2); }
     .doc-tree-link.active { background: var(--erp-text); color: #fff; }
     .doc-tree-months { padding-left: 18px; }
-    .doc-tree-count { margin-left: auto; font-size: 10.5px; color: #94a3b8; font-weight: 700; }
-    .doc-tree-link.active .doc-tree-count { color: #cbd5e1; }
+    .doc-tree-count { margin-left: auto; font-size: 10.5px; color: var(--erp-muted); font-weight: 700; }
+    .doc-tree-link.active .doc-tree-count { color: var(--erp-border); }
     .doc-grid thead th {
         position: sticky; top: 0; background: var(--erp-text); color: var(--erp-border);
         font-size: 12px; white-space: nowrap; z-index: 2;
     }
     .doc-grid td { font-size: 13px; }
     .doc-grid tbody tr:nth-child(even) { background: var(--erp-surface-2); }
-    .doc-grid tbody tr:hover { background: #f0f9ff; }
+    .doc-grid tbody tr:hover { background: var(--erp-primary-soft); }
     @media (max-width: 1100px) {
         .doc-browser { grid-template-columns: 1fr; }
         .doc-tree-panel { max-height: 300px; }

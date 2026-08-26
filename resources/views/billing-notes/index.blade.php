@@ -30,7 +30,7 @@
                 <tbody>
                 @forelse($notes as $note)
                     <tr>
-                        <td class="fw-semibold" style="color:#0284c7">{{ $note->doc_number }}</td>
+                        <td class="fw-semibold" style="color:var(--erp-primary)">{{ $note->doc_number }}</td>
                         <td class="text-nowrap">{{ $note->doc_date->thaiDate() }}</td>
                         <td>{{ $note->customer->name_th }}</td>
                         <td class="text-nowrap">{{ $note->due_date?->thaiDate() ?? '-' }}</td>

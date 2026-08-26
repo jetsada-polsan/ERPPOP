@@ -578,12 +578,13 @@
             /* แดง POPSTAR: ใช้เฉพาะแบรนด์ แจ้งเตือน และข้อผิดพลาด */
             --erp-brand-red: #c62828;
         }
-        html[data-theme="navy"] { --erp-primary-dark:#183049; --erp-primary-soft:#eef2f7; --erp-border:#dce5ef; --erp-ink:#243b53; --erp-bg:#eef2f7; --fa-blue:#315b86; --fa-blue-deep:#244768; --fa-blue-dark:#3f5f7d; --fa-green:#4e9b72; --fa-green-deep:#397b58; --accent-btn:linear-gradient(135deg,#416f9c,#244768); --accent-btn-hover:linear-gradient(135deg,#527fad,#315b86); }
-        html[data-theme="emerald"] { --erp-primary-dark:#0f5138; --erp-primary-soft:#eaf5f0; --erp-border:#d8ebe3; --erp-ink:#28483c; --erp-bg:#eef7f3; --fa-blue:#23966c; --fa-blue-deep:#187653; --fa-blue-dark:#397563; --fa-green:#65a30d; --fa-green-deep:#4d7c0f; --accent-btn:linear-gradient(135deg,#34b986,#187653); --accent-btn-hover:linear-gradient(135deg,#49c99a,#23966c); }
-        html[data-theme="slate"] { --erp-primary-dark:#334155; --erp-primary-soft:#eef1f4; --erp-border:#e1e5e9; --erp-ink:#374151; --erp-bg:#f1f3f5; --fa-blue:#64748b; --fa-blue-deep:#475569; --fa-blue-dark:#596579; --fa-green:#4f8b72; --fa-green-deep:#3c6f59; --accent-btn:linear-gradient(135deg,#7b8798,#475569); --accent-btn-hover:linear-gradient(135deg,#909aaa,#64748b); }
+        html[data-theme="navy"] { --erp-primary-dark:#183049; --erp-primary-soft:#eef2f7; --erp-border:#dce5ef; --erp-ink:#243b53; --erp-bg:#eef2f7; --fa-blue:#315b86; --fa-blue-deep:#244768; --fa-blue-dark:#3f5f7d; --fa-green:#4e9b72; --fa-green-deep:#397b58; --accent-btn:linear-gradient(135deg,#416f9c,#244768); --accent-btn-hover:linear-gradient(135deg,#527fad,#315b86);  --erp-primary-ink:#244768; --erp-success-ink:#397b58; --erp-success-on-soft:#397b58;}
+        html[data-theme="emerald"] { --erp-primary-dark:#0f5138; --erp-primary-soft:#eaf5f0; --erp-border:#d8ebe3; --erp-ink:#28483c; --erp-bg:#eef7f3; --fa-blue:#23966c; --fa-blue-deep:#187653; --fa-blue-dark:#397563; --fa-green:#65a30d; --fa-green-deep:#4d7c0f; --accent-btn:linear-gradient(135deg,#34b986,#187653); --accent-btn-hover:linear-gradient(135deg,#49c99a,#23966c);  --erp-primary-ink:#187653; --erp-success-ink:#4d7c0f; --erp-success-on-soft:#4d7c0f;}
+        html[data-theme="slate"] { --erp-primary-dark:#334155; --erp-primary-soft:#eef1f4; --erp-border:#e1e5e9; --erp-ink:#374151; --erp-bg:#f1f3f5; --fa-blue:#64748b; --fa-blue-deep:#475569; --fa-blue-dark:#596579; --fa-green:#4f8b72; --fa-green-deep:#3c6f59; --accent-btn:linear-gradient(135deg,#7b8798,#475569); --accent-btn-hover:linear-gradient(135deg,#909aaa,#64748b);  --erp-primary-ink:#475569; --erp-success-ink:#3c6f59; --erp-success-on-soft:#3c6f59;}
         html[data-theme="clear"] {
             --erp-font-family:'Noto Sans Thai','Segoe UI','Leelawadee UI',Tahoma,sans-serif;
             --erp-primary-dark:#1e3a8a; --erp-primary-soft:#eef2ff;
+            --erp-primary-ink:#1d4ed8; --erp-success-ink:#115e59; --erp-success-on-soft:#115e59;
             --erp-border:#d7dde5; --erp-ink:#1f2937; --erp-bg:#f4f6f8;
             --fa-blue:#2563eb; --fa-blue-deep:#1d4ed8; --fa-blue-dark:#334155;
             --fa-green:#0f766e; --fa-green-deep:#115e59;
@@ -714,7 +715,7 @@
         .fa-subnav {
             width: var(--erp-subnav-w);
             flex: 0 0 var(--erp-subnav-w);
-            background: linear-gradient(180deg, #fff, #f8fbfd);
+            background: linear-gradient(180deg, #fff, var(--erp-surface-2));
             border-right: 1px solid var(--erp-border);
             height: 100vh;
             overflow-y: auto;
@@ -799,7 +800,7 @@
             font-size: 20px;
             font-weight: 800;
             letter-spacing: -.03em;
-            color: #0f172a;
+            color: var(--erp-text);
         }
 
         .app-header .text-muted {
@@ -817,19 +818,19 @@
         }
         .notify-panel {
             position: absolute; right: 0; top: calc(100% + 8px); z-index: 3000;
-            width: 330px; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+            width: 330px; background: #fff; border: 1px solid var(--erp-border); border-radius: 14px;
             box-shadow: 0 18px 48px rgba(15,23,42,.18); overflow: hidden;
         }
         .notify-head {
             display: flex; justify-content: space-between; align-items: center;
-            padding: 12px 14px; border-bottom: 1px solid #f1f5f9; background: #f8fafc;
+            padding: 12px 14px; border-bottom: 1px solid var(--erp-surface-2); background: var(--erp-surface-2);
         }
         .notify-item {
             display: flex; align-items: center; gap: 10px;
-            padding: 10px 14px; text-decoration: none; color: #0f172a;
-            border-bottom: 1px solid #f8fafc;
+            padding: 10px 14px; text-decoration: none; color: var(--erp-text);
+            border-bottom: 1px solid var(--erp-surface-2);
         }
-        .notify-item:hover { background: #f0f9ff; }
+        .notify-item:hover { background: var(--erp-primary-soft); }
         .notify-icon {
             width: 32px; height: 32px; border-radius: 9px; flex: 0 0 auto;
             display: inline-grid; place-items: center; font-size: 15px;
@@ -864,7 +865,7 @@
             font-size: 13.5px;
             border-color: #d8e5ed;
             background: #fbfdff;
-            color: #0f172a;
+            color: var(--erp-text);
             transition: border-color .15s, box-shadow .15s;
         }
 
@@ -878,13 +879,13 @@
         .btn { border-radius: 9px; font-weight: 700; font-size: 13.5px; }
 
         .btn-primary {
-            background: var(--accent-btn, linear-gradient(135deg, #0ea5e9, #0284c7));
-            border-color: #0284c7;
+            background: var(--accent-btn, linear-gradient(135deg, var(--erp-primary), var(--erp-primary)));
+            border-color: var(--erp-primary);
             box-shadow: 0 2px 8px rgba(2,132,199,.3);
         }
         .btn-primary:hover {
-            background: var(--accent-btn-hover, linear-gradient(135deg, #38bdf8, #0ea5e9));
-            border-color: #0ea5e9;
+            background: var(--accent-btn-hover, linear-gradient(135deg, var(--erp-primary), var(--erp-primary)));
+            border-color: var(--erp-primary);
         }
 
         /* ปุ่มสร้าง/บันทึกหลัก - เขียวสดแบบ FlowAccount */
@@ -913,7 +914,10 @@
             text-transform: none;
             color: #fff !important;
             border: 0 !important;
-            background: linear-gradient(180deg, #2ba7e4, #1b8ecb) !important;
+            /* เดิม gradient ฟ้าตายตัว ตัวหนังสือขาวได้แค่ 2.71–3.63:1 ตกเกณฑ์ AA
+               และไม่เปลี่ยนตามธีม ทุกตารางจึงเป็นฟ้าแม้ผู้ใช้เลือกธีมเขียว
+               --erp-primary-dark ผูกกับธีมทั้ง 5 และต่ำสุดยังได้ 9.09:1 */
+            background: var(--erp-primary-dark) !important;
             --bs-table-bg: transparent;
         }
         .table thead th:first-child { border-top-left-radius: 6px; }
@@ -943,15 +947,15 @@
             border-radius: 8px;
             font-weight: 600;
             font-size: 13px;
-            color: #64748b;
+            color: var(--erp-muted);
             padding: 6px 14px;
         }
         .nav-pills .nav-link.active,
         .nav-pills .nav-link span.active {
-            background: #0f172a;
+            background: var(--erp-text);
             color: #fff;
         }
-        .nav-pills .nav-link:not(.active):hover { background: #f1f5f9; color: #0f172a; }
+        .nav-pills .nav-link:not(.active):hover { background: var(--erp-surface-2); color: var(--erp-text); }
 
         /* ── Pagination ───────────────────────── */
         .pagination .page-link { border-radius: 6px; font-size: 13px; }
@@ -964,30 +968,30 @@
         }
         .erp-search .erp-search-icon {
             position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
-            color: #94a3b8; font-size: 14px; pointer-events: none;
+            color: var(--erp-muted); font-size: 14px; pointer-events: none;
         }
         .erp-search input[type="text"], .erp-search input[type="search"] {
             width: 100%; padding: 8px 36px 8px 36px;
-            border: 1.5px solid #e2e8f0;
+            border: 1.5px solid var(--erp-border);
             border-radius: 10px;
             font-size: 13.5px;
             background: #fafbfc;
-            color: #0f172a;
+            color: var(--erp-text);
             transition: border-color .15s, box-shadow .15s;
             outline: none;
         }
         .erp-search input:focus {
-            border-color: #10b981;
+            border-color: var(--erp-success-ink);
             box-shadow: 0 0 0 3px rgba(16,185,129,.12);
             background: #fff;
         }
         .erp-search .erp-search-clear {
             position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-            color: #94a3b8; font-size: 13px;
+            color: var(--erp-muted); font-size: 13px;
             text-decoration: none; line-height: 1;
             padding: 2px; border-radius: 50%;
         }
-        .erp-search .erp-search-clear:hover { color: #475569; background: #f1f5f9; }
+        .erp-search .erp-search-clear:hover { color: var(--erp-text); background: var(--erp-surface-2); }
 
         /* list toolbar (search + add button row) */
         .list-toolbar {
@@ -1051,7 +1055,7 @@
         .erp-swal-title {
             padding: 0 26px !important;
             margin: 0 !important;
-            color: #0f172a !important;
+            color: var(--erp-text) !important;
             font-size: 21px !important;
             font-weight: 900 !important;
             letter-spacing: 0 !important;
@@ -1060,7 +1064,7 @@
         .erp-swal-html, .erp-swal-popup .swal2-html-container {
             padding: 8px 28px 2px !important;
             margin: 0 !important;
-            color: #64748b !important;
+            color: var(--erp-muted) !important;
             font-size: 14px !important;
             line-height: 1.55 !important;
         }
@@ -1074,8 +1078,8 @@
             font-weight: 800 !important;
             box-shadow: none !important;
         }
-        .erp-swal-confirm { background: linear-gradient(135deg, #10b981, #0ea5e9) !important; color: #fff !important; }
-        .erp-swal-cancel { background: #f1f5f9 !important; color: #475569 !important; }
+        .erp-swal-confirm { background: linear-gradient(135deg, var(--erp-success-ink), var(--erp-primary)) !important; color: #fff !important; }
+        .erp-swal-cancel { background: var(--erp-surface-2) !important; color: var(--erp-text) !important; }
         .erp-swal-toast {
             width: min(380px, calc(100vw - 24px)) !important;
             padding: 12px 14px !important;
@@ -1083,18 +1087,18 @@
             border-radius: 12px !important;
             box-shadow: 0 16px 45px rgba(15, 23, 42, .16) !important;
         }
-        .erp-swal-toast .swal2-title { font-size: 14px !important; font-weight: 800 !important; color: #0f172a !important; }
-        .erp-swal-toast .swal2-timer-progress-bar { background: linear-gradient(90deg, #10b981, #0ea5e9) !important; }
+        .erp-swal-toast .swal2-title { font-size: 14px !important; font-weight: 800 !important; color: var(--erp-text) !important; }
+        .erp-swal-toast .swal2-timer-progress-bar { background: linear-gradient(90deg, var(--erp-success-ink), var(--erp-primary)) !important; }
         [data-theme="midnight"] .erp-swal-popup,
         [data-theme="midnight"] .erp-swal-toast {
             background: #0e1f38 !important;
             border-color: #1e3a5f !important;
         }
         [data-theme="midnight"] .erp-swal-title,
-        [data-theme="midnight"] .erp-swal-toast .swal2-title { color: #e2e8f0 !important; }
+        [data-theme="midnight"] .erp-swal-toast .swal2-title { color: var(--erp-border) !important; }
         [data-theme="midnight"] .erp-swal-html,
         [data-theme="midnight"] .erp-swal-popup .swal2-html-container { color: #9fb4d0 !important; }
-        [data-theme="midnight"] .erp-swal-cancel { background: #13233a !important; color: #cbd5e1 !important; }
+        [data-theme="midnight"] .erp-swal-cancel { background: #13233a !important; color: var(--erp-border) !important; }
 
         .booking-modal-backdrop,
         .doc-modal-backdrop {
@@ -1110,18 +1114,18 @@
         }
         .booking-modal .modal-header,
         .doc-modal .modal-header {
-            background: linear-gradient(180deg, #ffffff, #f8fafc);
-            border-bottom: 1px solid #e2e8f0 !important;
+            background: linear-gradient(180deg, #ffffff, var(--erp-surface-2));
+            border-bottom: 1px solid var(--erp-border) !important;
         }
         .booking-modal .modal-title,
         .doc-modal .modal-title {
-            color: #0f172a;
+            color: var(--erp-text);
             font-weight: 900;
         }
         .booking-modal .modal-footer,
         .doc-modal .modal-footer {
-            background: #f8fafc;
-            border-top: 1px solid #e2e8f0 !important;
+            background: var(--erp-surface-2);
+            border-top: 1px solid var(--erp-border) !important;
         }
     </style>
     @stack('head')
@@ -1162,13 +1166,13 @@
 
         .content-card,
         .card {
-            border-color:#dbe7ef;
+            border-color:var(--erp-border);
             border-radius:var(--ui-card-radius);
             box-shadow:0 10px 26px rgba(29,59,82,.07);
         }
         .card-header {
             padding:10px 14px;
-            background:linear-gradient(180deg,#fff,#f8fbfd);
+            background:linear-gradient(180deg,#fff,var(--erp-surface-2));
             border-bottom-color:#e4edf4;
         }
         .card-body { padding:14px; }
@@ -1450,7 +1454,7 @@
                     <li class="nav-item" x-data="notifyBell()" x-init="load()">
                         <div class="position-relative">
                             <button type="button" class="btn btn-light border rounded-circle position-relative" style="width:42px;height:42px" @click="open = !open; if (open) load()">
-                                <i class="bi bi-bell-fill" style="color:#64748b"></i>
+                                <i class="bi bi-bell-fill" style="color:var(--erp-muted)"></i>
                                 <span x-show="total > 0" x-cloak class="notify-badge" x-text="total > 99 ? '99+' : total"></span>
                             </button>
                             <div x-show="open" x-cloak @click.outside="open = false" class="notify-panel">
@@ -1466,7 +1470,7 @@
                                     </a>
                                 </template>
                                 <div x-show="!items.length" class="text-center text-muted small py-4">
-                                    <i class="bi bi-check2-circle d-block fs-4 mb-1" style="color:#10b981"></i>ไม่มีเรื่องค้าง
+                                    <i class="bi bi-check2-circle d-block fs-4 mb-1" style="color:var(--erp-success-ink)"></i>ไม่มีเรื่องค้าง
                                 </div>
                             </div>
                         </div>
@@ -1476,7 +1480,7 @@
                         <div class="position-relative">
                             <button type="button" class="btn btn-light border rounded-circle" style="width:42px;height:42px"
                                     id="erp-display-btn" title="ปรับขนาดและสีหน้าจอ" aria-expanded="false" aria-controls="erp-display-panel">
-                                <i class="bi bi-sliders" style="color:#64748b"></i>
+                                <i class="bi bi-sliders" style="color:var(--erp-muted)"></i>
                             </button>
                             <div class="erp-display-panel" id="erp-display-panel" hidden>
                                 <div class="edp-head">

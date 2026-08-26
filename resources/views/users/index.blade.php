@@ -271,14 +271,14 @@
     }
     .form-section-title i{color:var(--erp-primary);font-size:1rem}
     .user-form .form-label{margin-bottom:.25rem;font-weight:600}
-    .user-form .input-group-text{background:var(--erp-surface-2,#f8fbfd);border-color:var(--erp-border);color:var(--erp-muted)}
+    .user-form .input-group-text{background:var(--erp-surface-2,var(--erp-surface-2));border-color:var(--erp-border);color:var(--erp-muted)}
     .user-form .input-group:focus-within .input-group-text{border-color:var(--erp-primary);color:var(--erp-primary)}
     .user-form .role-grid{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.15rem}
     .user-form .role-chip{margin:0;cursor:pointer}
     .user-form .role-chip input{position:absolute;opacity:0;width:0;height:0}
     .user-form .role-chip span{
         display:inline-block;padding:.4rem .85rem;border-radius:999px;
-        border:1.5px solid var(--erp-border);background:var(--erp-surface-2,#f8fbfd);color:var(--erp-text);
+        border:1.5px solid var(--erp-border);background:var(--erp-surface-2,var(--erp-surface-2));color:var(--erp-text);
         font-size:.85rem;font-weight:600;transition:all .12s;user-select:none;
     }
     .user-form .role-chip:hover span{border-color:var(--erp-primary);color:var(--erp-primary-dark)}

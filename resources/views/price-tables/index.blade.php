@@ -177,15 +177,15 @@
     .price-work-card strong { display:block; margin-top:2px; font-size:14px; font-weight:950; }
     .price-work-card small { display:block; margin-top:6px; color:#708595; line-height:1.45; }
     .price-work-card b { grid-column:2; width:max-content; padding:3px 8px; border-radius:999px; font-size:11px; }
-    .price-work-card.blue .price-work-icon,.price-work-card.blue b { color:#0878b9;background:#e0f2fe; }
+    .price-work-card.blue .price-work-icon,.price-work-card.blue b { color:#0878b9;background:var(--erp-primary-soft); }
     .price-work-card.violet .price-work-icon,.price-work-card.violet b { color:#7c3aed;background:#ede9fe; }
-    .price-work-card.red .price-work-icon,.price-work-card.red b { color:#dc2626;background:#fee2e2; }
-    .price-work-card.green .price-work-icon,.price-work-card.green b { color:#047857;background:#d1fae5; }
+    .price-work-card.red .price-work-icon,.price-work-card.red b { color:#dc2626;background:var(--erp-danger-soft); }
+    .price-work-card.green .price-work-icon,.price-work-card.green b { color:var(--erp-success-ink);background:#d1fae5; }
     .price-rule { display:flex; gap:20px; align-items:center; margin-top:15px; padding:12px 15px; border:1px dashed #bdd3e1; border-radius:12px; background:rgba(255,255,255,.78); }
     .price-rule-title { color:#36566c; font-size:12px; font-weight:900; white-space:nowrap; }
     .price-rule-flow { display:flex; align-items:center; flex-wrap:wrap; gap:7px; color:#567083; font-size:11px; font-weight:800; }
     .price-rule-flow span { padding:5px 9px; border-radius:8px; background:#eef5f9; }
-    .price-rule-flow .hot { color:#b91c1c; background:#fee2e2; }
+    .price-rule-flow .hot { color:#b91c1c; background:var(--erp-danger-soft); }
     .price-section-title { display:flex; justify-content:space-between; align-items:center; gap:12px; margin:3px 0 14px; }
     .price-section-title span:first-child { display:block; color:#1f4056; font-size:17px; font-weight:950; }
     .price-section-title small { display:block; color:#7b91a1; margin-top:3px; }

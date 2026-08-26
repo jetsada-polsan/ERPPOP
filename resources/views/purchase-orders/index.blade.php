@@ -38,7 +38,7 @@
                 <tbody>
                 @forelse($orders as $order)
                     <tr>
-                        <td class="fw-semibold" style="color:#0284c7">{{ $order->doc_number }}</td>
+                        <td class="fw-semibold" style="color:var(--erp-primary)">{{ $order->doc_number }}</td>
                         <td class="text-nowrap">{{ $order->doc_date->thaiDate() }}</td>
                         <td>{{ $order->supplier?->name_th ?? '-' }}</td>
                         <td class="small">{{ $order->requester?->name ?? '-' }}</td>

@@ -223,7 +223,7 @@
     .booking-items-table { border: 1px solid #e7eaf2; border-radius: 14px; overflow: visible !important; }
     .booking-items-table .table { margin-bottom: 0; }
     .selected-product { width:100%; min-height:48px; border:1px solid #dbe4ef; border-radius:10px; background:#f8fbff; padding:6px 10px; text-align:left; color:#1e293b; transition:.15s ease; }
-    .selected-product:hover { border-color:#38a7dc; background:#f0f9ff; box-shadow:0 0 0 3px rgba(14,165,233,.08); }
+    .selected-product:hover { border-color:#38a7dc; background:var(--erp-primary-soft); box-shadow:0 0 0 3px rgba(14,165,233,.08); }
     .selected-product.empty { border-style:dashed; color:#168dcc; background:#fff; }
     .selected-empty { display:flex; align-items:center; justify-content:center; gap:8px; font-weight:700; font-size:13px; }
     .selected-product-grid { display:grid; grid-template-columns:72px minmax(0,1fr) 42px; gap:10px; align-items:center; }

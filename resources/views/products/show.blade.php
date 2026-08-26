@@ -1023,8 +1023,8 @@
         min-height: 24px;
         padding: 0 8px;
         border-radius: 999px;
-        background: #e0f2fe;
-        color: #0369a1;
+        background: var(--erp-primary-soft);
+        color: var(--erp-primary-dark);
         font-weight: 950;
     }
     .product-hero {
@@ -1041,7 +1041,7 @@
         width: 54px;
         height: 54px;
         border-radius: 12px;
-        background: linear-gradient(135deg, #0ea5e9, #14b8a6);
+        background: linear-gradient(135deg, var(--erp-primary), #14b8a6);
         color: #fff;
         display: grid;
         place-items: center;
@@ -1069,7 +1069,7 @@
         font-weight: 800;
         white-space: nowrap;
     }
-    .product-status.is-on { background: #dcfce7; color: #047857; }
+    .product-status.is-on { background: #dcfce7; color: var(--erp-success-ink); }
     .product-status.is-off { background: var(--erp-border); color: var(--erp-text); }
     .product-soft-pill { background: var(--erp-surface-2); color: var(--erp-text); }
     .product-identity-grid { display: grid; grid-template-columns: 1.1fr 1fr .72fr; gap: 10px; }
@@ -1157,7 +1157,7 @@
     .barcode-row.is-plu .barcode-code { color: var(--erp-info); font-size: 20px; }
     .barcode-note { color: var(--erp-muted); font-size: 12px; margin-top: 2px; }
     .barcode-price { color: var(--erp-text); font-weight: 850; text-align: right; white-space: nowrap; }
-    .barcode-empty { padding: 14px 12px; color: #94a3b8; font-size: 13px; text-align: center; border-top: 1px solid var(--erp-surface-2); }
+    .barcode-empty { padding: 14px 12px; color: var(--erp-muted); font-size: 13px; text-align: center; border-top: 1px solid var(--erp-surface-2); }
     .booking-modal-backdrop {
         position: fixed; inset: 0; z-index: 2000;
         background: rgba(15, 23, 42, .42);
@@ -1606,7 +1606,7 @@
     .cost-history-table td small {
         display: block;
         margin-top: 2px;
-        color: #7890a1;
+        color: var(--erp-muted);
         font-size: 9.5px;
         white-space: nowrap;
     }
@@ -1623,12 +1623,12 @@
         font-weight: 800;
     }
     .cost-period-status.is-open {
-        background: #e0f2fe;
-        color: #0369a1;
+        background: var(--erp-primary-soft);
+        color: var(--erp-primary-dark);
     }
     .cost-period-status.is-closed {
         background: #d1fae5;
-        color: #047857;
+        color: var(--erp-success-ink);
     }
     .cost-note {
         display: flex;
@@ -1636,7 +1636,7 @@
         gap: 7px;
         margin-top: 10px;
         padding: 8px 10px;
-        border-left: 3px solid #1599d3;
+        border-left: 3px solid var(--erp-primary);
         background: #f4fafe;
         color: #526d7f;
         font-size: 10.5px;
@@ -1664,11 +1664,11 @@
     }
     .compact-cost-grid strong {
         margin: 2px 0;
-        color: #15364d;
+        color: var(--erp-text);
         font-size: 15px;
     }
     .compact-cost-grid small {
-        color: #7890a1;
+        color: var(--erp-muted);
         font-size: 8.5px;
         line-height: 1.3;
     }
