@@ -1,0 +1,73 @@
+name: POS Python e2e (Python → Laravel)
+
+# พิสูจน์ทั้งวงจร: POS Python (client) ยิงขายผ่าน /api/pos จริงเข้า Laravel
+# แล้ว uat:reconcile ยืนยันว่าบิลนั้นลง GL/สต๊อก/ต้นทุนครบและดุล
+# รันบน SQLite (เร็ว, ไม่ต้องมี service) — พฤติกรรมเฉพาะ PostgreSQL มี postgres-uat คุมแยก
+
+on:
+  push:
+    paths:
+      - apps/pos-python/**
+      - app/Console/Commands/PosE2eFixture.php
+      - app/Http/Controllers/Api/PosApiController.php
+      - app/Http/Controllers/PosController.php
+      - routes/api.php
+      - .github/workflows/pos-e2e.yml
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_sqlite, sqlite3, bcmath, zip
+          coverage: none
+
+      - run: composer install --prefer-dist --no-interaction --no-progress
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: เตรียม .env (SQLite)
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          {
+            echo "APP_ENV=local"
+            echo "DB_CONNECTION=sqlite"
+            echo "DB_DATABASE=${{ github.workspace }}/database/database.sqlite"
+          } >> .env
+          : > database/database.sqlite
+
+      - name: migrate + seed ข้อมูลขายจริง
+        run: |
+          php artisan migrate:fresh --force
+          php artisan tinker --execute='require "tools/staging/seed_uat_data.php";'
+
+      - name: ออก device token + cashier/PIN (→ env)
+        run: php artisan pos:e2e-fixture | grep '^POS_E2E_' >> "$GITHUB_ENV"
+
+      - name: สตาร์ท Laravel แล้วรอพร้อม
+        run: |
+          php artisan serve --host=127.0.0.1 --port=8124 &
+          for i in $(seq 1 30); do
+            if curl -sf -o /dev/null http://127.0.0.1:8124/login; then echo "server พร้อม"; break; fi
+            sleep 1
+          done
+
+      - name: ยิงขายจาก POS Python (client จริง, stdlib ล้วน)
+        env:
+          POS_E2E_URL: http://127.0.0.1:8124
+        run: python apps/pos-python/e2e/pos_to_laravel.py
+
+      - name: กระทบยอด — บิลจาก Python ต้องลง GL/สต๊อกครบและดุล
+        run: php artisan uat:reconcile --branch="$POS_E2E_BRANCH"
