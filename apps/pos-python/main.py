@@ -133,7 +133,7 @@ def launch_ui() -> None:
         online = bootstrap(DATA_DIR, db, DB_PATH)
         if online is None:
             seed(db)
-        run_ui(PosService(db), online=online)
+        run_ui(PosService(db), online=online, data_dir=DATA_DIR)
     except Exception as error:
         log_path = DATA_DIR / "startup-error.log"
         log_path.write_text(traceback.format_exc(), encoding="utf-8")

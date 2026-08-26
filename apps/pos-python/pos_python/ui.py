@@ -11,6 +11,7 @@ from string import Template
 from .barcode import decode_scale_label, load_scale_profiles, scale_cart_line
 from .mock_printer import company_details, receipt_for
 from .order import ALL_CATEGORIES, DISCOUNT, PRICE, QTY, Order, OrderLine, categories, product_grid
+from .config import DeviceConfig, load_device_config, save_device_config
 from .services import PosService, money
 
 PALETTE = {
@@ -107,7 +108,7 @@ NUMPAD_KEYS = [
 ]
 
 
-def run_ui(service: PosService, online=None) -> None:
+def run_ui(service: PosService, online=None, data_dir=None) -> None:
     # เครื่องที่ผูก ERP แล้วใช้ branch/terminal จริงจาก ping; เครื่อง demo ใช้ค่าเดิม
     branch_id = int(online.branch_id) if (online is not None and online.branch_id) else 1
     terminal_id = (online.terminal_id if (online is not None and online.terminal_id) else "PY-TEST-01")
@@ -430,10 +431,56 @@ def run_ui(service: PosService, online=None) -> None:
 
         def sync_section(self) -> QWidget:
             box = QWidget()
-            form = QFormLayout(box)
-            form.addRow("บิลรอส่ง", QLabel(f"{service.pending_sync_count()} ใบ"))
-            form.addRow("อัตรา VAT ที่ใช้อยู่", QLabel(f"{service.vat_rate():g}%"))
+            outer = QVBoxLayout(box)
+
+            # สถานะการเชื่อม ERP — อ่านจาก worker/online context ที่ bootstrap สร้าง
+            status = QFormLayout()
+            if online is not None:
+                state = "เชื่อม ERP ได้" if getattr(online.worker, "online", online.online) else "ออฟไลน์ (จะส่งเมื่อเน็ตกลับ)"
+                status.addRow("สถานะ", QLabel(state))
+                status.addRow("สาขา", QLabel(str(online.branch_id or "-")))
+                status.addRow("เครื่อง", QLabel(str(online.terminal_id or "-")))
+                pending = getattr(online.worker, "pending", None)
+                status.addRow("บิลรอส่ง", QLabel(f"{pending if pending is not None else service.pending_sync_count()} ใบ"))
+            else:
+                status.addRow("สถานะ", QLabel("ยังไม่ผูกกับ ERP (โหมดออฟไลน์/ทดสอบ)"))
+                status.addRow("บิลรอส่ง", QLabel(f"{service.pending_sync_count()} ใบ"))
+            status.addRow("อัตรา VAT ที่ใช้อยู่", QLabel(f"{service.vat_rate():g}%"))
+            outer.addLayout(status)
+
+            # ผูกเครื่องกับ ERP — บันทึก server URL + device token ลง pos-config.json
+            if data_dir is not None:
+                outer.addWidget(QLabel("\nผูกเครื่องกับ ERP (บันทึกแล้วเปิดโปรแกรมใหม่เพื่อเชื่อม)"))
+                pair = QFormLayout()
+                current = load_device_config(data_dir)
+                self.server_url = QLineEdit(current.server_url if current else "")
+                self.server_url.setPlaceholderText("https://erp.example.com")
+                self.device_token = QLineEdit(current.device_token if current else "")
+                self.device_token.setPlaceholderText("วาง device token ที่ออกจาก ERP")
+                self.device_token.setEchoMode(QLineEdit.Password)
+                pair.addRow("ที่อยู่ ERP", self.server_url)
+                pair.addRow("Device token", self.device_token)
+                save = QPushButton("บันทึกการผูกเครื่อง")
+                save.setObjectName("primary")
+                save.clicked.connect(self.save_pairing)
+                pair.addRow(save)
+                outer.addLayout(pair)
+
             return box
+
+        def save_pairing(self) -> None:
+            url = self.server_url.text().strip()
+            token = self.device_token.text().strip()
+            if not url or not token:
+                QMessageBox.warning(self, "ข้อมูลไม่ครบ", "กรอกที่อยู่ ERP และ device token ให้ครบ")
+                return
+            insecure = url.startswith("http://")  # ยอม http เฉพาะที่ผู้ใช้ตั้งใจ (แลบ/ในเครื่อง)
+            try:
+                save_device_config(data_dir, DeviceConfig(server_url=url, device_token=token, allow_insecure=insecure))
+            except Exception as error:
+                QMessageBox.critical(self, "บันทึกไม่สำเร็จ", str(error))
+                return
+            QMessageBox.information(self, "ผูกเครื่องแล้ว", "บันทึกการเชื่อมต่อแล้ว\nเปิดโปรแกรมใหม่เพื่อเชื่อมกับ ERP")
 
         def backup_section(self) -> QWidget:
             box = QWidget()
@@ -789,9 +836,17 @@ def run_ui(service: PosService, online=None) -> None:
             )
             self.vat_label.setText(f"รวม VAT {rate:g}% แล้ว {self.order.vat_total(rate):,.2f} บาท")
             self.grand_label.setText(f"{self.order.grand_total():,.2f} ฿")
-            self.status.setText(
-                f"กะ {self.shift_id} · บิลรอส่ง {service.pending_sync_count()} ใบ · โหมด {self.order.mode}"
-            )
+            if online is not None:
+                pending = getattr(online.worker, "pending", None)
+                pending = pending if pending is not None else service.pending_sync_count()
+                link = "เชื่อม ERP" if getattr(online.worker, "online", True) else "ออฟไลน์"
+                self.status.setText(
+                    f"กะ {self.shift_id} · {link} · บิลรอส่ง {pending} ใบ · โหมด {self.order.mode}"
+                )
+            else:
+                self.status.setText(
+                    f"กะ {self.shift_id} · บิลรอส่ง {service.pending_sync_count()} ใบ · โหมด {self.order.mode}"
+                )
 
     app = QApplication([])
     app.setStyleSheet(STYLE)

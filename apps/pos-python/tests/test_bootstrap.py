@@ -110,7 +110,7 @@ class SyncWorkerTest(unittest.TestCase):
             def post(self, path, payload, *, idempotency_key=None):
                 self.calls.append(path); return {"success": True, "receipt_no": "R-1"}
         ok = OkApi()
-        worker = SyncWorker(path, ok, interval_seconds=0.1)
+        worker = SyncWorker(path, ok, idle_interval=0.1, retry_interval=0.1)
         worker.start()
         for _ in range(50):
             check = connect(path)
@@ -122,6 +122,33 @@ class SyncWorkerTest(unittest.TestCase):
         worker.stop()
         self.assertEqual(status, "synced")
         self.assertIn("/api/pos/checkout", ok.calls)
+
+
+    def test_interval_is_fast_with_a_backlog_and_slow_when_idle(self) -> None:
+        from pathlib import Path as P
+        w = SyncWorker(P("/tmp/x.sqlite"), object(), idle_interval=30.0, retry_interval=5.0)
+        w.pending = 0
+        self.assertEqual(w.next_interval(), 30.0)
+        w.pending = 3
+        self.assertEqual(w.next_interval(), 5.0)
+
+    def test_run_once_marks_offline_when_the_network_is_down(self) -> None:
+        db, path = fresh_db()
+        db.execute("INSERT INTO local_cashiers (id, server_id, code, name, pin_hash, synced_at) VALUES (5, 900, 'C', 'c', '', 't')")
+        db.execute("INSERT INTO products (id, server_id, sku, name, unit_name, updated_at) VALUES (1, 101, 'S', 'n', 'u', 't')")
+        db.execute("INSERT INTO shifts (id, server_id, uuid, branch_id, terminal_id, cashier_id, opened_at, opening_cash, status) VALUES (1, 500, 'u', 1, 'T', 5, 't', '0', 'open')")
+        db.commit()
+        PosService(db).checkout(document_no="D1", branch_id=1, terminal_id="T", shift_id=1, cashier_id=5,
+            lines=[CartLine(1, Decimal("1"), Decimal("10"))], payment_method="cash", paid_amount=Decimal("10"), sale_uuid="s-x")
+        db.close()
+
+        class DeadApi:
+            def post(self, *a, **k): raise RuntimeError("network down")
+        w = SyncWorker(path, DeadApi(), retry_interval=0.05)
+        w.run_once()  # sync_pending_sales จับ error ต่อบิล ไม่ throw แต่ยังค้าง
+        self.assertGreater(w.pending, 0)
+        self.assertFalse(w.online)               # มีบิลค้าง + ส่งไม่ได้ = ออฟไลน์
+        self.assertEqual(w.next_interval(), 0.05)  # จึงวนถี่ รอเน็ตกลับ
 
 
 if __name__ == "__main__":
