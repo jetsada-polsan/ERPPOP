@@ -57,6 +57,7 @@ class ErpMenu
                     ['label' => 'ใบวางบิล', 'route' => 'billing-notes.index', 'pattern' => 'billing-notes.*', 'icon' => 'bi-receipt', 'tone' => 'pink'],
                     ['label' => 'ใบเพิ่ม/ลดหนี้', 'route' => 'credit-debit-notes.index', 'pattern' => 'credit-debit-notes.*', 'icon' => 'bi-plus-slash-minus', 'tone' => 'orange'],
                     ['label' => 'QR รับเงิน / จอแสดงราคา', 'route' => 'bplus.qr-payments', 'pattern' => 'bplus.qr-payments', 'extraPattern' => 'bplus.show-price', 'icon' => 'bi-qr-code', 'tone' => 'slate'],
+                    ['label' => 'ลูกค้าสัมพันธ์ (CRM)', 'route' => 'crm.index', 'pattern' => 'crm.*', 'icon' => 'bi-person-lines-fill', 'tone' => 'indigo'],
                 ],
             ],
             [

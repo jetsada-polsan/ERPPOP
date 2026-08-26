@@ -12,6 +12,7 @@ use App\Http\Controllers\ChartOfAccountController;
 use App\Http\Controllers\ChequeController;
 use App\Http\Controllers\CreditDebitNoteController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\CrmController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DatabaseStructureController;
 use App\Http\Controllers\DeliveryNoteController;
@@ -196,6 +197,7 @@ Route::prefix('wh')->name('wh.')->group(function () {
 });
 
 Route::get('/apps', [AppLauncherController::class, 'index'])->name('apps.launcher');
+Route::get('/crm', [CrmController::class, 'index'])->name('crm.index');
 Route::get('/features', [FeatureController::class, 'index'])->name('features.index');
 Route::get('/core-modules', [ManualController::class, 'index'])->name('core-modules.index');
 Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');

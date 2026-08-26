@@ -32,6 +32,7 @@ class RoutePermissions
         'documents.' => 'sales.manage',
         'document-books.' => 'settings.manage',
         'customers.' => 'sales.manage',
+        'crm.' => 'sales.manage',
         'customers.credit-limit.approve' => 'finance.credit.approve',
         'customers.credit-limit.reject' => 'finance.credit.approve',
         'billing-notes.' => 'sales.manage',
