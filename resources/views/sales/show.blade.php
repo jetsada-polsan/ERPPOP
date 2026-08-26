@@ -192,8 +192,8 @@ $isPartial = $openItem && $openItem->status === 'partial';
 [x-cloak]{display:none!important}
 .flow-step{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:100px}
 .flow-dot{width:44px;height:44px;border-radius:50%;border:2px solid var(--erp-border);background:var(--erp-surface-2);display:grid;place-items:center;font-size:18px;color:var(--erp-muted)}
-.flow-step.done .flow-dot{border-color:var(--erp-success-ink);background:#ecfdf5;color:var(--erp-success-ink)}
-.flow-step.partial .flow-dot{border-color:var(--erp-warning-ink);background:#fffbeb;color:var(--erp-warning-ink)}
+.flow-step.done .flow-dot{border-color:var(--erp-success-ink);background:var(--erp-success-soft);color:var(--erp-success-ink)}
+.flow-step.partial .flow-dot{border-color:var(--erp-warning-ink);background:var(--erp-warning-soft);color:var(--erp-warning-ink)}
 .flow-step.pending .flow-dot{border-color:var(--erp-border);background:var(--erp-surface-2);color:var(--erp-border)}
 .flow-label{font-size:12px;font-weight:700;text-align:center;color:var(--erp-text)}
 .flow-sub{font-size:11px;font-weight:400;color:var(--erp-muted);margin-top:2px}

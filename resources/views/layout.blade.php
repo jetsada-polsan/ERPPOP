@@ -635,7 +635,7 @@
         .fa-rail {
             width: var(--erp-rail-w);
             flex: 0 0 var(--erp-rail-w);
-            background: linear-gradient(180deg, #116c9f 0%, #168caa 55%, #177456 100%);
+            background: linear-gradient(180deg, var(--erp-primary-ink) 0%, var(--erp-primary-ink) 55%, var(--erp-success-ink) 100%);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -688,13 +688,13 @@
             text-overflow: ellipsis;
         }
         .fa-rail-btn:hover { background: rgba(255,255,255,.16); color: #fff; }
-        .fa-rail-btn.active { background: #fff; color: #126b9b; box-shadow: 0 10px 22px rgba(0,40,80,.22); }
+        .fa-rail-btn.active { background: #fff; color: var(--erp-primary-ink); box-shadow: 0 10px 22px rgba(0,40,80,.22); }
 
         /* tooltip ชื่อโมดูลเต็มตอน hover (ยื่นออกขวาของ rail) */
         .fa-rail-btn::after {
             content: attr(data-label);
             position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%);
-            background: #123952; color: #fff;
+            background: var(--erp-text); color: #fff;
             font-size: 12.5px; font-weight: 700; white-space: nowrap;
             padding: 6px 12px; border-radius: 8px;
             box-shadow: 0 6px 18px rgba(0,30,60,.3);
@@ -705,7 +705,7 @@
             content: "";
             position: absolute; left: calc(100% + 4px); top: 50%; transform: translateY(-50%);
             border: 6px solid transparent;
-            border-right-color: #123952;
+            border-right-color: var(--erp-text);
             opacity: 0; pointer-events: none; transition: opacity .12s;
             z-index: 4000;
         }
@@ -733,7 +733,7 @@
         .fa-subnav-title {
             font-size: 15px;
             font-weight: 900;
-            color: #1b557a;
+            color: var(--erp-primary-dark);
             letter-spacing: -.01em;
             padding: 4px 8px 8px;
         }
@@ -742,7 +742,7 @@
             display: flex; align-items: center; gap: 10px;
             padding: 7px 8px;
             border-radius: 9px;
-            color: #526f84;
+            color: var(--erp-muted);
             font-size: calc(13px * var(--menu-scale));
             line-height: 1.25;
             font-weight: 700;
@@ -751,10 +751,10 @@
             transition: background .12s, color .12s, transform .12s;
         }
         .fa-subnav-link i { font-size: 13px; color: #7fa1bd; width: 16px; text-align: center; }
-        .fa-subnav-link:hover { background: #edf7fc; color: var(--fa-blue-deep); transform: translateX(1px); }
+        .fa-subnav-link:hover { background: var(--erp-primary-soft); color: var(--fa-blue-deep); transform: translateX(1px); }
         .fa-subnav-link:hover i { color: var(--fa-blue); }
         .fa-subnav-link.active {
-            background: linear-gradient(90deg, #e1f4fc, #f0fbf6);
+            background: linear-gradient(90deg, var(--erp-primary-soft), var(--erp-primary-soft));
             color: var(--fa-blue-deep);
             box-shadow: inset 3px 0 0 var(--fa-blue), 0 6px 16px rgba(26,155,220,.08);
         }
@@ -790,8 +790,8 @@
             display: inline-grid;
             place-items: center;
             border-radius: 11px;
-            background: linear-gradient(135deg, #e1f4fc, #e2f7ef);
-            color: #1685bc;
+            background: linear-gradient(135deg, var(--erp-primary-soft), var(--erp-success-soft));
+            color: var(--erp-primary-ink);
             margin-right: 10px;
             font-size: 16px;
         }
@@ -845,7 +845,7 @@
             width: 34px; height: 34px;
             border-radius: 11px;
             display: grid; place-items: center;
-            background: linear-gradient(135deg, #1a9bdc, #20a67a);
+            background: linear-gradient(135deg, var(--erp-primary-ink), var(--erp-success-ink));
             color: #fff; font-weight: 700; font-size: 13px;
         }
 
@@ -863,14 +863,14 @@
             min-height: 34px;
             padding: 5px 10px;
             font-size: 13.5px;
-            border-color: #d8e5ed;
-            background: #fbfdff;
+            border-color: var(--erp-border);
+            background: var(--erp-surface-2);
             color: var(--erp-text);
             transition: border-color .15s, box-shadow .15s;
         }
 
         .form-control:focus, .form-select:focus {
-            border-color: #1a9bdc;
+            border-color: var(--erp-primary-ink);
             box-shadow: 0 0 0 3px rgba(26,155,220,.12);
             background: #fff;
         }
@@ -890,11 +890,11 @@
 
         /* ปุ่มสร้าง/บันทึกหลัก - เขียวสดแบบ FlowAccount */
         .btn-success {
-            background: linear-gradient(135deg, #28b983, #179263);
-            border-color: #179263;
+            background: linear-gradient(135deg, #28b983, var(--erp-success-ink));
+            border-color: var(--erp-success-ink);
             box-shadow: 0 8px 18px rgba(23,146,99,.24);
         }
-        .btn-success:hover { background: linear-gradient(135deg, #34c891, #20a67a); border-color: #20a67a; }
+        .btn-success:hover { background: linear-gradient(135deg, #34c891, var(--erp-success-ink)); border-color: var(--erp-success-ink); }
 
         .btn-warning {
             background: linear-gradient(135deg, var(--erp-warning-ink), #d97706);
@@ -923,7 +923,7 @@
         .table thead th:first-child { border-top-left-radius: 6px; }
         .table thead th:last-child { border-top-right-radius: 6px; }
 
-        .table tbody tr:hover { background: #f2f9fe; }
+        .table tbody tr:hover { background: var(--erp-surface-2); }
 
         /* Empty state แบบเป็นมิตร: จับ cell ว่างที่ span ทั้งแถว (แนวเดิมของทุกหน้า) */
         .table tbody td[colspan].text-center {
@@ -975,7 +975,7 @@
             border: 1.5px solid var(--erp-border);
             border-radius: 10px;
             font-size: 13.5px;
-            background: #fafbfc;
+            background: var(--erp-surface-2);
             color: var(--erp-text);
             transition: border-color .15s, box-shadow .15s;
             outline: none;
@@ -1091,14 +1091,14 @@
         .erp-swal-toast .swal2-timer-progress-bar { background: linear-gradient(90deg, var(--erp-success-ink), var(--erp-primary)) !important; }
         [data-theme="midnight"] .erp-swal-popup,
         [data-theme="midnight"] .erp-swal-toast {
-            background: #0e1f38 !important;
-            border-color: #1e3a5f !important;
+            background: var(--erp-text) !important;
+            border-color: var(--erp-text) !important;
         }
         [data-theme="midnight"] .erp-swal-title,
         [data-theme="midnight"] .erp-swal-toast .swal2-title { color: var(--erp-border) !important; }
         [data-theme="midnight"] .erp-swal-html,
         [data-theme="midnight"] .erp-swal-popup .swal2-html-container { color: #9fb4d0 !important; }
-        [data-theme="midnight"] .erp-swal-cancel { background: #13233a !important; color: var(--erp-border) !important; }
+        [data-theme="midnight"] .erp-swal-cancel { background: var(--erp-text) !important; color: var(--erp-border) !important; }
 
         .booking-modal-backdrop,
         .doc-modal-backdrop {
@@ -1173,7 +1173,7 @@
         .card-header {
             padding:10px 14px;
             background:linear-gradient(180deg,#fff,var(--erp-surface-2));
-            border-bottom-color:#e4edf4;
+            border-bottom-color:var(--erp-border);
         }
         .card-body { padding:14px; }
 
@@ -1190,24 +1190,24 @@
         .btn-lg:not(.rounded-circle) { min-height:42px; padding:8px 16px; font-size:var(--ui-font-md); }
         .btn.rounded-pill { padding-left:12px!important; padding-right:12px!important; }
 
-        .form-label { margin-bottom:4px; color:#536b7d; font-size:var(--ui-font-sm); font-weight:700; }
-        .form-control,.form-select,.input-group-text { min-height:var(--ui-control-h); padding:5px 8px; border-radius:var(--ui-radius); border-color:#d7e2ea; font-size:var(--ui-font-md); line-height:1.2; }
+        .form-label { margin-bottom:4px; color:var(--erp-muted); font-size:var(--ui-font-sm); font-weight:700; }
+        .form-control,.form-select,.input-group-text { min-height:var(--ui-control-h); padding:5px 8px; border-radius:var(--ui-radius); border-color:var(--erp-border); font-size:var(--ui-font-md); line-height:1.2; }
         textarea.form-control { min-height:64px; }
         .form-control-sm,.form-select-sm { min-height:31px; padding:4px 8px; font-size:var(--ui-font-sm); }
         .form-check-label,.form-text { font-size:var(--ui-font-sm); }
         .input-group > :not(:first-child) { border-top-left-radius:0; border-bottom-left-radius:0; }
         .input-group > :not(:last-child) { border-top-right-radius:0; border-bottom-right-radius:0; }
 
-        .table { margin-bottom:0; font-size:var(--ui-font-md); border-color:#e5edf3; }
+        .table { margin-bottom:0; font-size:var(--ui-font-md); border-color:var(--erp-success-soft); }
         .table-responsive {
             border-radius:10px;
-            border:1px solid #e1ebf2;
+            border:1px solid var(--erp-border);
             background:#fff;
         }
         .table > thead > tr > th { padding:9px 10px; color:#fff; font-size:var(--ui-font-sm); font-weight:900; line-height:1.2; vertical-align:middle; white-space:nowrap; }
         .table > tbody > tr > td { padding:9px 10px; line-height:1.35; vertical-align:middle; }
-        .table > tbody > tr:nth-child(even) > td { background:#fbfdff; }
-        .table > tbody > tr:hover > td { background:#eef8fd; }
+        .table > tbody > tr:nth-child(even) > td { background:var(--erp-surface-2); }
+        .table > tbody > tr:hover > td { background:var(--erp-primary-soft); }
         .table-sm > thead > tr > th,.table-sm > tbody > tr > td { padding:5px 7px; }
         .badge { padding:4px 7px; border-radius:6px; font-size:var(--ui-font-xs); line-height:1; }
 
@@ -1243,30 +1243,30 @@
         body.erp-classic-document-page .booking-modal,
         body.erp-classic-document-page .po-modal,
         body.erp-classic-document-page .cd-modal {
-            border:1px solid #aebdca!important; border-radius:12px!important; background:#f1f4f6!important;
+            border:1px solid #aebdca!important; border-radius:12px!important; background:var(--erp-primary-soft)!important;
             box-shadow:0 24px 72px rgba(15,35,52,.3),0 2px 8px rgba(15,35,52,.12)!important; font-family:Tahoma,"Noto Sans Thai",sans-serif!important;
             font-size:11.5px!important;
         }
         body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .modal-header {
-            min-height:40px!important; padding:6px 10px!important; border-bottom:1px solid #c5d1da!important;
-            border-radius:11px 11px 0 0!important; background:linear-gradient(180deg,#fff,#f4f7f9)!important;
+            min-height:40px!important; padding:6px 10px!important; border-bottom:1px solid var(--erp-border)!important;
+            border-radius:11px 11px 0 0!important; background:linear-gradient(180deg,#fff,var(--erp-primary-soft))!important;
         }
         body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .modal-header h1,
         body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .modal-header h2,
         body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .modal-header h3 { color:#111!important; font-size:14px!important; font-weight:700!important; }
         body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .modal-header .text-muted { display:none; }
-        body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .modal-body { padding:8px 10px!important; background:#f1f4f6!important; }
+        body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .modal-body { padding:8px 10px!important; background:var(--erp-primary-soft)!important; }
         body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .modal-footer {
-            min-height:42px!important; padding:5px 10px!important; border-top:1px solid #c5d1da!important; border-radius:0 0 11px 11px!important; background:#f7f9fa!important;
+            min-height:42px!important; padding:5px 10px!important; border-top:1px solid var(--erp-border)!important; border-radius:0 0 11px 11px!important; background:var(--erp-surface-2)!important;
         }
         body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) :is(.form-control,.form-select) { min-height:28px!important; border-radius:5px!important; padding:3px 6px!important; border-color:#aab9c5!important; background-color:#fff!important; box-shadow:inset 0 1px 2px rgba(15,35,52,.04)!important; font-size:11.5px!important; }
-        body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) :is(.form-control,.form-select):focus { border-color:#249ed4!important; box-shadow:0 0 0 2px rgba(36,158,212,.14)!important; }
+        body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) :is(.form-control,.form-select):focus { border-color:var(--erp-primary-ink)!important; box-shadow:0 0 0 2px rgba(36,158,212,.14)!important; }
         body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .btn:not(.rounded-circle) { min-height:28px!important; border-radius:6px!important; padding:3px 10px!important; border-color:#b6c3cd!important; font-size:11px!important; }
         body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .rounded-circle { width:29px!important; height:29px!important; border-radius:7px!important; }
         body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) :is(.card,.content-card,.table-responsive) { border-radius:7px!important; border-color:#bcc9d3!important; box-shadow:0 1px 3px rgba(15,35,52,.05)!important; }
         body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .table { overflow:hidden;border-radius:6px!important; }
-        body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .table th { padding:5px 6px!important; border-right:1px solid #bcc7cf; border-bottom-color:#aebac3!important; background:linear-gradient(#f9fbfc,#e6edf1)!important; color:#17212a!important; font-size:10.5px!important; }
-        body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .table td { padding:4px 6px!important; border-right:1px solid #d7e0e6; border-bottom-color:#d7e0e6!important; background:#fff!important; font-size:11px!important; }
+        body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .table th { padding:5px 6px!important; border-right:1px solid #bcc7cf; border-bottom-color:#aebac3!important; background:linear-gradient(var(--erp-surface-2),var(--erp-success-soft))!important; color:#17212a!important; font-size:10.5px!important; }
+        body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .table td { padding:4px 6px!important; border-right:1px solid var(--erp-border); border-bottom-color:var(--erp-border)!important; background:#fff!important; font-size:11px!important; }
 
         @media(max-width:991.98px){.app-content{padding:10px}.btn:not(.rounded-circle){min-height:34px}.form-control,.form-select,.input-group-text{min-height:34px}}
 

@@ -132,13 +132,13 @@
     }
     .pos-help-strip h2 {
         margin: 0;
-        color: #0c4a6e;
+        color: var(--erp-primary-dark);
         font-size: 22px;
         font-weight: 900;
     }
     .pos-help-strip p {
         margin: 4px 0 0;
-        color: #526b7d;
+        color: var(--erp-muted);
         font-size: 13px;
     }
     .pos-open-btn,
@@ -168,8 +168,8 @@
         padding: 12px 14px;
         border: 1px solid #fde68a;
         border-radius: 12px;
-        background: #fffbeb;
-        color: #78716c;
+        background: var(--erp-warning-soft);
+        color: var(--erp-muted);
         font-size: 13px;
         line-height: 1.5;
     }
@@ -181,7 +181,7 @@
         padding: 12px 14px;
         border: 1px solid #bbf7d0;
         border-radius: 12px;
-        background: #f0fdf4;
+        background: var(--erp-success-soft);
     }
     .pos-install-icon {
         display: grid;
@@ -189,8 +189,8 @@
         width: 42px;
         height: 42px;
         border-radius: 10px;
-        background: #dcfce7;
-        color: #15803d;
+        background: var(--erp-success-soft);
+        color: var(--erp-success-ink);
         font-size: 22px;
     }
     .pos-install-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -203,13 +203,13 @@
         gap: 7px;
         padding: 9px 14px;
         border-radius: 10px;
-        background: #16a34a;
+        background: var(--erp-success-ink);
         color: #fff;
         font-weight: 900;
         text-decoration: none;
         white-space: nowrap;
     }
-    .pos-install-btn:hover { background: #15803d; color: #fff; }
+    .pos-install-btn:hover { background: var(--erp-success-ink); color: #fff; }
     .pos-note > i {
         color: #d97706;
         font-size: 18px;
@@ -217,12 +217,12 @@
     }
     .pos-note strong {
         display: block;
-        color: #92400e;
+        color: var(--erp-warning-ink);
         font-weight: 900;
     }
     .pos-card {
         padding: 14px;
-        border: 1px solid #d8eaf5;
+        border: 1px solid var(--erp-border);
         border-radius: 12px;
         box-shadow: 0 8px 22px rgba(15,23,42,.04);
     }
@@ -257,7 +257,7 @@
     }
     .pos-card .form-control,
     .pos-card .form-select {
-        border-color: #cfe4f1;
+        border-color: var(--erp-border);
         border-radius: 9px;
         min-height: 42px;
     }
@@ -269,7 +269,7 @@
     .pos-filter {
         margin-bottom: 8px;
         padding: 8px 10px;
-        border: 1px solid #d8eaf5;
+        border: 1px solid var(--erp-border);
         border-radius: 10px;
         background: var(--erp-surface-2);
     }
@@ -282,7 +282,7 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        border: 1px solid #cfe4f1;
+        border: 1px solid var(--erp-border);
         border-radius: 10px;
         background: #fff;
         color: var(--erp-primary-dark);
@@ -292,7 +292,7 @@
     }
     .pos-light-btn:hover {
         background: var(--erp-primary-soft);
-        color: #0c4a6e;
+        color: var(--erp-primary-dark);
         border-color: var(--erp-primary-soft);
     }
     .pos-filter-note {
@@ -304,7 +304,7 @@
     .pos-table-wrap {
         max-height: 480px;
         overflow: auto;
-        border: 1px solid #eef5fa;
+        border: 1px solid var(--erp-primary-soft);
         border-radius: 10px;
     }
     .pos-table {
@@ -321,13 +321,13 @@
         top: 0;
         z-index: 2;
         background: var(--erp-primary-soft);
-        color: #0c4a6e;
+        color: var(--erp-primary-dark);
         border-bottom: 2px solid var(--erp-primary-soft);
         font-size: 13px;
         font-weight: 900;
     }
     .pos-table td {
-        border-bottom-color: #eef5fa;
+        border-bottom-color: var(--erp-primary-soft);
     }
     .pos-chip {
         display: inline-flex;

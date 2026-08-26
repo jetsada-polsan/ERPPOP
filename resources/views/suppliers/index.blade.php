@@ -113,7 +113,7 @@
     .status-summary:hover, .status-summary.is-selected { border-color:#93c5fd; box-shadow:0 6px 18px rgba(30,64,175,.10); transform:translateY(-1px); }
     .status-summary-icon { width:40px; height:40px; display:grid; place-items:center; border-radius:12px; background:var(--erp-surface-2); font-size:20px; }
     .status-summary small { display:block; color:var(--erp-muted); font-size:12px; }
-    .status-summary strong { display:block; color:#172b4d; font-size:22px; line-height:1.1; }
+    .status-summary strong { display:block; color:var(--erp-text); font-size:22px; line-height:1.1; }
     [x-cloak] { display: none !important; }
     .booking-modal-backdrop {
         position: fixed; inset: 0; z-index: 2000;

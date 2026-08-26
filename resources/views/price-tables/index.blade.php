@@ -164,30 +164,30 @@
 @push('head')<style>[x-cloak]{display:none!important}.booking-modal-backdrop{position:fixed;inset:0;z-index:2000;background:rgba(15,23,42,.42);display:flex;align-items:center;justify-content:center;padding:24px}.booking-modal{background:#fff;border-radius:18px;box-shadow:0 24px 80px rgba(15,23,42,.24);max-height:calc(100vh - 48px);overflow:auto}.border-dashed{border-style:dashed!important}</style>@endpush
 @push('head')
 <style>
-    .price-command { padding: 24px; border: 1px solid #dbe7f0; border-radius: 20px; background: linear-gradient(135deg,var(--erp-surface-2) 0%,#fff 62%,#f0fdf4 100%); box-shadow: 0 14px 38px rgba(15,23,42,.07); }
+    .price-command { padding: 24px; border: 1px solid var(--erp-border); border-radius: 20px; background: linear-gradient(135deg,var(--erp-surface-2) 0%,#fff 62%,var(--erp-success-soft) 100%); box-shadow: 0 14px 38px rgba(15,23,42,.07); }
     .price-command-head { display:flex; justify-content:space-between; gap:18px; align-items:flex-start; margin-bottom:18px; }
     .price-kicker { color:var(--erp-primary-ink); font-size:11px; font-weight:950; letter-spacing:.14em; }
-    .price-command h2 { margin:3px 0; color:#18364a; font-size:25px; font-weight:950; }
-    .price-command p { margin:0; color:#6b8293; font-size:13px; }
-    .price-status { padding:8px 13px; border-radius:999px; color:#087f5b; background:#dcfce7; font-size:12px; font-weight:850; white-space:nowrap; }
+    .price-command h2 { margin:3px 0; color:var(--erp-text); font-size:25px; font-weight:950; }
+    .price-command p { margin:0; color:var(--erp-muted); font-size:13px; }
+    .price-status { padding:8px 13px; border-radius:999px; color:var(--erp-success-ink); background:var(--erp-success-soft); font-size:12px; font-weight:850; white-space:nowrap; }
     .price-work-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
-    .price-work-card { display:grid; grid-template-columns:44px minmax(0,1fr); gap:10px; min-height:142px; padding:16px; border:1px solid #dce7ef; border-radius:15px; background:#fff; color:#21394a; text-decoration:none; box-shadow:0 6px 18px rgba(15,23,42,.05); transition:.15s ease; }
-    .price-work-card:hover { color:#162f40; transform:translateY(-2px); box-shadow:0 13px 28px rgba(15,23,42,.10); }
+    .price-work-card { display:grid; grid-template-columns:44px minmax(0,1fr); gap:10px; min-height:142px; padding:16px; border:1px solid var(--erp-border); border-radius:15px; background:#fff; color:var(--erp-text); text-decoration:none; box-shadow:0 6px 18px rgba(15,23,42,.05); transition:.15s ease; }
+    .price-work-card:hover { color:var(--erp-text); transform:translateY(-2px); box-shadow:0 13px 28px rgba(15,23,42,.10); }
     .price-work-icon { width:42px; height:42px; display:grid; place-items:center; border-radius:12px; font-size:20px; }
     .price-work-card strong { display:block; margin-top:2px; font-size:14px; font-weight:950; }
-    .price-work-card small { display:block; margin-top:6px; color:#708595; line-height:1.45; }
+    .price-work-card small { display:block; margin-top:6px; color:var(--erp-muted); line-height:1.45; }
     .price-work-card b { grid-column:2; width:max-content; padding:3px 8px; border-radius:999px; font-size:11px; }
-    .price-work-card.blue .price-work-icon,.price-work-card.blue b { color:#0878b9;background:var(--erp-primary-soft); }
-    .price-work-card.violet .price-work-icon,.price-work-card.violet b { color:#7c3aed;background:#ede9fe; }
+    .price-work-card.blue .price-work-icon,.price-work-card.blue b { color:var(--erp-primary-ink);background:var(--erp-primary-soft); }
+    .price-work-card.violet .price-work-icon,.price-work-card.violet b { color:#7c3aed;background:var(--erp-primary-soft); }
     .price-work-card.red .price-work-icon,.price-work-card.red b { color:var(--erp-danger);background:var(--erp-danger-soft); }
     .price-work-card.green .price-work-icon,.price-work-card.green b { color:var(--erp-success-ink);background:var(--erp-success-soft); }
-    .price-rule { display:flex; gap:20px; align-items:center; margin-top:15px; padding:12px 15px; border:1px dashed #bdd3e1; border-radius:12px; background:rgba(255,255,255,.78); }
-    .price-rule-title { color:#36566c; font-size:12px; font-weight:900; white-space:nowrap; }
-    .price-rule-flow { display:flex; align-items:center; flex-wrap:wrap; gap:7px; color:#567083; font-size:11px; font-weight:800; }
-    .price-rule-flow span { padding:5px 9px; border-radius:8px; background:#eef5f9; }
-    .price-rule-flow .hot { color:#b91c1c; background:var(--erp-danger-soft); }
+    .price-rule { display:flex; gap:20px; align-items:center; margin-top:15px; padding:12px 15px; border:1px dashed var(--erp-border); border-radius:12px; background:rgba(255,255,255,.78); }
+    .price-rule-title { color:var(--erp-primary-dark); font-size:12px; font-weight:900; white-space:nowrap; }
+    .price-rule-flow { display:flex; align-items:center; flex-wrap:wrap; gap:7px; color:var(--erp-muted); font-size:11px; font-weight:800; }
+    .price-rule-flow span { padding:5px 9px; border-radius:8px; background:var(--erp-primary-soft); }
+    .price-rule-flow .hot { color:var(--erp-danger); background:var(--erp-danger-soft); }
     .price-section-title { display:flex; justify-content:space-between; align-items:center; gap:12px; margin:3px 0 14px; }
-    .price-section-title span:first-child { display:block; color:#1f4056; font-size:17px; font-weight:950; }
+    .price-section-title span:first-child { display:block; color:var(--erp-text); font-size:17px; font-weight:950; }
     .price-section-title small { display:block; color:#7b91a1; margin-top:3px; }
     @media(max-width:1100px){.price-work-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
     @media(max-width:680px){.price-command{padding:16px}.price-command-head,.price-rule,.price-section-title{align-items:flex-start;flex-direction:column}.price-work-grid{grid-template-columns:1fr}.price-status{white-space:normal}}

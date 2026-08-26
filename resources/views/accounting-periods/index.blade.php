@@ -12,23 +12,23 @@
     .period-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .period-stat { padding: 15px 18px; border-right: 1px solid var(--erp-border); }
     .period-stat:last-child { border-right: 0; }
-    .period-stat span { display: block; color: #718696; font-size: 11px; font-weight: 800; }
+    .period-stat span { display: block; color: var(--erp-muted); font-size: 11px; font-weight: 800; }
     .period-stat strong { color: var(--erp-text); font-size: 22px; font-weight: 900; }
     .period-form { display: grid; grid-template-columns: 1.15fr .85fr .75fr .75fr 1.2fr auto; gap: 10px; align-items: end; padding: 16px; }
-    .period-field label { display: block; margin-bottom: 5px; color: #5f7788; font-size: 11px; font-weight: 800; }
+    .period-field label { display: block; margin-bottom: 5px; color: var(--erp-muted); font-size: 11px; font-weight: 800; }
     .period-field input, .period-field select { width: 100%; height: 38px; padding: 0 10px; border: 1px solid var(--erp-border); border-radius: 6px; color: var(--erp-primary-dark); background: #fff; font-size: 12px; }
     .period-table { width: 100%; min-width: 880px; border-collapse: collapse; }
-    .period-table th { padding: 10px 13px; color: #fff; background: linear-gradient(180deg, #2ba7e4, #1b8ecb); border-bottom: 0; font-size: 11px; font-weight: 900; }
+    .period-table th { padding: 10px 13px; color: #fff; background: linear-gradient(180deg, #2ba7e4, var(--erp-primary-ink)); border-bottom: 0; font-size: 11px; font-weight: 900; }
     .period-table th:first-child { border-top-left-radius: 6px; }
     .period-table th:last-child { border-top-right-radius: 6px; }
-    .period-table td { padding: 11px 13px; color: #425f73; border-bottom: 1px solid var(--erp-surface-2); font-size: 12px; vertical-align: middle; }
+    .period-table td { padding: 11px 13px; color: var(--erp-muted); border-bottom: 1px solid var(--erp-surface-2); font-size: 12px; vertical-align: middle; }
     .period-table tr:last-child td { border-bottom: 0; }
     .period-table strong { color: var(--erp-primary-dark); }
     .period-status { display: inline-flex; align-items: center; gap: 5px; min-width: 76px; padding: 5px 8px; border-radius: 5px; font-size: 10px; font-weight: 900; }
     .period-open { color: var(--erp-success-ink); background: var(--erp-success-soft); }
     .period-closed { color: var(--erp-danger); background: var(--erp-danger-soft); }
-    .period-action { width: 34px; height: 34px; display: inline-grid; place-items: center; border: 1px solid #d3e0e8; border-radius: 6px; background: #fff; color: var(--erp-primary-dark); }
-    .period-action.close-action:hover { color: #fff; border-color: #b4232c; background: #b4232c; }
+    .period-action { width: 34px; height: 34px; display: inline-grid; place-items: center; border: 1px solid var(--erp-border); border-radius: 6px; background: #fff; color: var(--erp-primary-dark); }
+    .period-action.close-action:hover { color: #fff; border-color: var(--erp-danger); background: var(--erp-danger); }
     .period-action.open-action:hover { color: #fff; border-color: var(--erp-info); background: var(--erp-info); }
     .period-empty { padding: 36px 20px; color: var(--erp-muted); text-align: center; }
     .close-checks { min-width: 230px; display: grid; gap: 3px; }
@@ -37,7 +37,7 @@
     .period-modal-backdrop { position: fixed; inset: 0; z-index: 2000; display: grid; place-items: center; padding: 18px; background: rgba(22, 47, 65, .42); }
     .period-modal { width: min(480px, 100%); padding: 20px; border-radius: 8px; background: #fff; box-shadow: 0 24px 70px rgba(22, 47, 65, .24); }
     .period-modal h2 { margin: 0 0 5px; color: var(--erp-primary-dark); font-size: 17px; font-weight: 900; }
-    .period-modal p { color: #6b8190; font-size: 12px; line-height: 1.5; }
+    .period-modal p { color: var(--erp-muted); font-size: 12px; line-height: 1.5; }
     .period-modal textarea { width: 100%; min-height: 88px; padding: 10px; border: 1px solid var(--erp-border); border-radius: 6px; font-size: 12px; }
     @media (max-width: 1050px) { .period-form { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     @media (max-width: 640px) {

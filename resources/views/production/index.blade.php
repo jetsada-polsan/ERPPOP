@@ -262,30 +262,30 @@
     .recipe-modal-icon {
         width: 42px; height: 42px; flex: 0 0 42px; display: grid; place-items: center;
         border-radius: 12px; font-size: 19px; color: #fff;
-        background: linear-gradient(135deg, #1a9bdc, #20a67a);
+        background: linear-gradient(135deg, var(--erp-primary-ink), var(--erp-success-ink));
         box-shadow: 0 8px 18px rgba(26,155,220,.28);
     }
     .recipe-output-chip {
         display: inline-flex; align-items: center; margin-top: 2px;
-        padding: 4px 10px; border-radius: 999px; background: #eef7fc; color: #1b6f97;
+        padding: 4px 10px; border-radius: 999px; background: var(--erp-primary-soft); color: var(--erp-primary-ink);
         font-size: 12px; font-weight: 600;
     }
     .recipe-bom-table { border: 1px solid var(--erp-border); border-radius: 12px; overflow: hidden; }
     .recipe-bom-table .table { margin-bottom: 0; }
-    .recipe-item-dot { width: 8px; height: 8px; border-radius: 50%; background: #20a67a; flex: 0 0 8px; }
-    .recipe-bom-total td { background: #f7fbfe; border-top: 2px solid var(--erp-border); padding-top: 10px; padding-bottom: 10px; }
+    .recipe-item-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--erp-success-ink); flex: 0 0 8px; }
+    .recipe-bom-total td { background: var(--erp-surface-2); border-top: 2px solid var(--erp-border); padding-top: 10px; padding-bottom: 10px; }
     .recipe-add-panel {
-        border: 1px dashed #bcdcee; border-radius: 12px; background: #fbfeff; padding: 14px 16px;
+        border: 1px dashed var(--erp-border); border-radius: 12px; background: var(--erp-surface-2); padding: 14px 16px;
     }
-    .recipe-add-panel-title { font-size: 13px; font-weight: 800; color: #1b6f97; margin-bottom: 10px; }
+    .recipe-add-panel-title { font-size: 13px; font-weight: 800; color: var(--erp-primary-ink); margin-bottom: 10px; }
     .recipe-bom-modal .typeahead-list {
         position: absolute; z-index: 2050; left: 0; right: 0; top: calc(100% + 4px); max-height: 220px; overflow: auto;
-        background: #fff; border: 1px solid #dbe1ea; border-radius: 12px; box-shadow: 0 14px 36px rgba(15,23,42,.14); padding: 6px;
+        background: #fff; border: 1px solid var(--erp-border); border-radius: 12px; box-shadow: 0 14px 36px rgba(15,23,42,.14); padding: 6px;
     }
     .recipe-bom-modal .typeahead-item {
         width: 100%; border: 0; background: transparent; border-radius: 9px; padding: 9px 10px;
         display: flex; align-items: center; gap: 10px; text-align: left;
     }
-    .recipe-bom-modal .typeahead-item:hover { background: #f2f6ff; }
+    .recipe-bom-modal .typeahead-item:hover { background: var(--erp-primary-soft); }
 </style>
 @endpush

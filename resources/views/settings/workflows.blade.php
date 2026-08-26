@@ -20,16 +20,16 @@
 
 @push('head')
 <style>
-.workflow-builder{display:grid;grid-template-columns:1fr 1fr;gap:16px;background:#f7fbfe;border:1px solid var(--erp-border);border-radius:8px;padding:14px}
+.workflow-builder{display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--erp-surface-2);border:1px solid var(--erp-border);border-radius:8px;padding:14px}
 .workflow-pool,.workflow-target{background:#fff;border:1px solid var(--erp-border);border-radius:7px;padding:12px;min-height:150px}
 .workflow-pool>small,.workflow-target>small{display:block;color:var(--erp-muted);font-size:12px;margin:3px 0 10px}
 .workflow-pool-items{display:flex;flex-wrap:wrap;gap:7px}
-.workflow-role{border:1px solid #c3d4e2;background:var(--erp-primary-soft);color:var(--erp-text);border-radius:5px;padding:7px 9px;font:inherit;font-size:13px;cursor:grab}
+.workflow-role{border:1px solid var(--erp-border);background:var(--erp-primary-soft);color:var(--erp-text);border-radius:5px;padding:7px 9px;font:inherit;font-size:13px;cursor:grab}
 .workflow-role:hover{border-color:var(--erp-primary);color:var(--erp-primary-dark)}
 .workflow-step-list{min-height:95px;border:1px dashed #9bb5c8;border-radius:6px;padding:7px}
 .workflow-step-list:empty:before{content:attr(data-empty);display:block;text-align:center;color:#7b8d99;padding:25px 8px}
-.workflow-step{display:flex;align-items:center;gap:8px;background:var(--erp-primary-soft);border:1px solid #c3d4e2;border-radius:5px;padding:8px;margin-bottom:7px;cursor:grab}
-.workflow-step .handle{color:var(--erp-primary)}.workflow-step .remove{margin-left:auto;border:0;background:transparent;color:#b42318;cursor:pointer}
+.workflow-step{display:flex;align-items:center;gap:8px;background:var(--erp-primary-soft);border:1px solid var(--erp-border);border-radius:5px;padding:8px;margin-bottom:7px;cursor:grab}
+.workflow-step .handle{color:var(--erp-primary)}.workflow-step .remove{margin-left:auto;border:0;background:transparent;color:var(--erp-danger);cursor:pointer}
 @media(max-width:800px){.workflow-builder{grid-template-columns:1fr}}
 </style>
 @endpush

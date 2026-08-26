@@ -11,7 +11,7 @@
 @endphp
 
 <style>
-    .legacy-sales-page { color:#17324d; }
+    .legacy-sales-page { color:var(--erp-text); }
     .legacy-filter { display:flex; align-items:center; gap:14px; padding:18px 24px; background:#fff; border-radius:14px; box-shadow:0 5px 18px rgba(20,62,110,.08); border-left:5px solid var(--erp-danger); }
     .legacy-filter-title { display:flex; align-items:center; gap:8px; color:#1d4ed8; font-weight:800; white-space:nowrap; }
     .legacy-filter form { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
@@ -21,18 +21,18 @@
     .legacy-panel { overflow:hidden; background:#fff; border-radius:14px; box-shadow:0 6px 20px rgba(20,62,110,.10); }
     .legacy-panel-title { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:19px 24px; color:#fff; font-size:1.05rem; font-weight:800; }
     .legacy-panel-title.blue { background:linear-gradient(105deg,#1d4ed8,#3759c9); }
-    .legacy-panel-title.green { background:linear-gradient(105deg,#059669,#18a56f); }
+    .legacy-panel-title.green { background:linear-gradient(105deg,var(--erp-success-ink),var(--erp-success-ink)); }
     .legacy-chip { padding:4px 10px; background:#fff; border-radius:7px; color:#2563eb; font-size:.78rem; }
     .legacy-route-head,.legacy-route-row { display:grid; grid-template-columns:86px minmax(0,1fr) 135px; align-items:center; gap:16px; padding:17px 24px; }
-    .legacy-route-head { background:var(--erp-surface-2); color:#7a8596; font-size:.8rem; font-weight:800; }
-    .legacy-route-row { border-top:1px solid #e9eef5; }
-    .legacy-route-row:nth-child(odd) { background:#fbfdff; }
-    .legacy-code { color:#1f2937; font-weight:900; }
+    .legacy-route-head { background:var(--erp-surface-2); color:var(--erp-muted); font-size:.8rem; font-weight:800; }
+    .legacy-route-row { border-top:1px solid var(--erp-primary-soft); }
+    .legacy-route-row:nth-child(odd) { background:var(--erp-surface-2); }
+    .legacy-code { color:var(--erp-text); font-weight:900; }
     .legacy-name { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-weight:700; }
-    .legacy-bar-track { height:10px; margin-top:8px; overflow:hidden; border-radius:999px; background:#e8edf8; box-shadow:inset 0 1px 2px rgba(0,0,0,.06); }
+    .legacy-bar-track { height:10px; margin-top:8px; overflow:hidden; border-radius:999px; background:var(--erp-primary-soft); box-shadow:inset 0 1px 2px rgba(0,0,0,.06); }
     .legacy-bar { height:100%; min-width:4px; border-radius:999px; background:linear-gradient(90deg,#2d68dd,#759af4); }
-    .legacy-amount { color:#16a34a; font-size:1.05rem; font-weight:900; text-align:right; }
-    .legacy-percent { color:#748195; font-size:.78rem; font-weight:700; text-align:right; }
+    .legacy-amount { color:var(--erp-success-ink); font-size:1.05rem; font-weight:900; text-align:right; }
+    .legacy-percent { color:var(--erp-muted); font-size:.78rem; font-weight:700; text-align:right; }
     .legacy-total { padding:35px 26px 28px; text-align:center; }
     .legacy-total-label { color:var(--erp-muted); font-size:.9rem; font-weight:800; }
     .legacy-total-value { margin:25px 0 17px; color:#3b61d5; font-size:clamp(2rem,4vw,3.75rem); font-weight:900; line-height:1; letter-spacing:0; }
@@ -41,10 +41,10 @@
     .legacy-meta { padding-top:18px; color:var(--erp-text); font-size:.85rem; font-weight:700; }
     .legacy-chart { margin-top:20px; padding:20px 24px 12px; }
     .legacy-chart-row { display:grid; grid-template-columns:minmax(135px,1fr) minmax(90px,1.15fr); gap:13px; align-items:center; margin:11px 0; }
-    .legacy-chart-label { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; color:#526174; font-size:.78rem; font-weight:700; text-align:right; }
-    .legacy-chart-track { position:relative; height:20px; border-bottom:1px solid #dce5f1; }
+    .legacy-chart-label { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; color:var(--erp-muted); font-size:.78rem; font-weight:700; text-align:right; }
+    .legacy-chart-track { position:relative; height:20px; border-bottom:1px solid var(--erp-border); }
     .legacy-chart-bar { height:14px; border:2px solid #3867d3; border-radius:4px; background:#89a8f6; }
-    .legacy-check { margin-top:20px; padding:15px 18px; border-radius:11px; background:#effaf4; color:#176c48; font-size:.87rem; font-weight:700; }
+    .legacy-check { margin-top:20px; padding:15px 18px; border-radius:11px; background:var(--erp-success-soft); color:var(--erp-success-ink); font-size:.87rem; font-weight:700; }
     @media (max-width: 980px) { .legacy-sheet { grid-template-columns:1fr; } }
     @media (max-width: 640px) { .legacy-filter { align-items:flex-start; flex-direction:column; } .legacy-route-head,.legacy-route-row { grid-template-columns:55px minmax(0,1fr) 105px; gap:10px; padding:14px; } .legacy-amount { font-size:.88rem; } }
 </style>

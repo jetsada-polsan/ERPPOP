@@ -155,16 +155,16 @@
     }
     .sc-grid td { font-size: 13px; }
     .sc-grid tbody tr:nth-child(even) { background: var(--erp-surface-2); }
-    .sc-grid tr.sc-counted { background: #ecfdf5 !important; }
+    .sc-grid tr.sc-counted { background: var(--erp-success-soft) !important; }
     .sc-grid tr.sc-diff { background: var(--erp-warning-soft) !important; }
     .sc-grid tr.sc-active { outline: 2px solid var(--erp-primary); outline-offset: -2px; }
     .sc-input { max-width: 120px; margin-left: auto; }
     .sc-input:focus { border-color: var(--erp-primary); box-shadow: 0 0 0 3px rgba(14,165,233,.15); }
-    .sc-tablet-panel{overflow:hidden;border:1px solid #b8d5e4;border-radius:14px;background:#fff;box-shadow:0 10px 28px rgba(15,70,100,.1)}
-    .sc-tablet-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:linear-gradient(120deg,#0b789f,#149dc8);color:#fff}.sc-tablet-head span:first-child b,.sc-tablet-head span:first-child small{display:block}.sc-tablet-head small{opacity:.82;font-size:10px}.sc-online{display:flex;align-items:center;gap:6px;padding:5px 9px;border-radius:14px;background:rgba(255,255,255,.16);font-size:10px}.sc-online.is-offline{background:#fff0d1;color:#9a5800}
-    .sc-scan-row{display:grid;grid-template-columns:38px minmax(0,1fr) auto;align-items:center;margin:12px;border:2px solid #20a6d6;border-radius:10px;overflow:hidden}.sc-scan-row>i{font-size:19px;text-align:center;color:#168eb9}.sc-scan-row input{height:48px;border:0;outline:0;font-size:17px;font-weight:700}.sc-scan-row button{height:48px;padding:0 18px;border:0;background:#168fbe;color:#fff;font-weight:800}
-    .sc-last{display:flex;align-items:center;justify-content:space-between;margin:0 12px 10px;padding:10px 12px;border:1px solid #d9e7ef;border-radius:9px;background:#f6fbfd}.sc-last small,.sc-last b,.sc-last em{display:block}.sc-last small{color:#7890a0;font-size:9px}.sc-last b{color:#18384c;font-size:14px}.sc-last em{color:#6e8797;font-size:10px;font-style:normal}.sc-last strong{color:#09895d;font-size:24px}
-    .sc-quick{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;padding:0 12px 10px}.sc-quick button{min-height:42px;border:1px solid #bdd4e0;border-radius:8px;background:#fff;color:#176d92;font-weight:800}.sc-quick button:hover{background:#eaf7fc}.sc-quick .undo{color:#a26413}.sc-quick .sync{border-color:#1599c6;background:#1599c6;color:#fff}.sc-tablet-stats{display:flex;gap:20px;padding:7px 14px;background:#edf6fa;color:#587183;font-size:10px}.sc-tablet-stats b{color:#123d55;font-size:12px}@media(max-width:760px){.sc-quick{grid-template-columns:repeat(3,1fr)}.sc-scan-row input{font-size:14px}}
+    .sc-tablet-panel{overflow:hidden;border:1px solid var(--erp-border);border-radius:14px;background:#fff;box-shadow:0 10px 28px rgba(15,70,100,.1)}
+    .sc-tablet-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:linear-gradient(120deg,var(--erp-primary-ink),var(--erp-primary-ink));color:#fff}.sc-tablet-head span:first-child b,.sc-tablet-head span:first-child small{display:block}.sc-tablet-head small{opacity:.82;font-size:10px}.sc-online{display:flex;align-items:center;gap:6px;padding:5px 9px;border-radius:14px;background:rgba(255,255,255,.16);font-size:10px}.sc-online.is-offline{background:var(--erp-warning-soft);color:var(--erp-warning-ink)}
+    .sc-scan-row{display:grid;grid-template-columns:38px minmax(0,1fr) auto;align-items:center;margin:12px;border:2px solid var(--erp-primary);border-radius:10px;overflow:hidden}.sc-scan-row>i{font-size:19px;text-align:center;color:var(--erp-primary-ink)}.sc-scan-row input{height:48px;border:0;outline:0;font-size:17px;font-weight:700}.sc-scan-row button{height:48px;padding:0 18px;border:0;background:var(--erp-primary-ink);color:#fff;font-weight:800}
+    .sc-last{display:flex;align-items:center;justify-content:space-between;margin:0 12px 10px;padding:10px 12px;border:1px solid var(--erp-border);border-radius:9px;background:var(--erp-surface-2)}.sc-last small,.sc-last b,.sc-last em{display:block}.sc-last small{color:#7890a0;font-size:9px}.sc-last b{color:var(--erp-text);font-size:14px}.sc-last em{color:var(--erp-muted);font-size:10px;font-style:normal}.sc-last strong{color:var(--erp-success-ink);font-size:24px}
+    .sc-quick{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;padding:0 12px 10px}.sc-quick button{min-height:42px;border:1px solid var(--erp-border);border-radius:8px;background:#fff;color:var(--erp-info);font-weight:800}.sc-quick button:hover{background:var(--erp-primary-soft)}.sc-quick .undo{color:var(--erp-warning-ink)}.sc-quick .sync{border-color:var(--erp-primary-ink);background:var(--erp-primary-ink);color:#fff}.sc-tablet-stats{display:flex;gap:20px;padding:7px 14px;background:var(--erp-primary-soft);color:var(--erp-muted);font-size:10px}.sc-tablet-stats b{color:var(--erp-text);font-size:12px}@media(max-width:760px){.sc-quick{grid-template-columns:repeat(3,1fr)}.sc-scan-row input{font-size:14px}}
 </style>
 @endpush
 
@@ -207,7 +207,7 @@ function stockCountSheet() {
         diffStyle(row) {
             if (row.counted === null) return '';
             const d = row.counted - row.system;
-            if (Math.abs(d) <= 0.0001) return 'color:#059669';
+            if (Math.abs(d) <= 0.0001) return 'color:var(--erp-success-ink)';
             return d > 0 ? 'color:#2563eb' : 'color:var(--erp-danger)';
         },
         money(v) {

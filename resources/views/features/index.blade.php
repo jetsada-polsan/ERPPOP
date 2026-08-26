@@ -21,7 +21,7 @@
 
     .flow-panel {
         background: #fff;
-        border: 1px solid #dfe5ef;
+        border: 1px solid var(--erp-border);
         border-radius: 8px;
         box-shadow: 0 10px 24px rgba(15, 23, 42, .05);
         min-height: 0;
@@ -30,7 +30,7 @@
 
     .flow-head {
         padding: 14px 16px;
-        border-bottom: 1px solid #e8edf5;
+        border-bottom: 1px solid var(--erp-primary-soft);
         background: var(--erp-surface-2);
     }
 
@@ -56,7 +56,7 @@
     }
 
     .flow-tab {
-        border: 1px solid #dce3ee;
+        border: 1px solid var(--erp-border);
         background: #fff;
         border-radius: 999px;
         color: var(--erp-text);
@@ -68,12 +68,12 @@
 
     .flow-tab.active {
         border-color: var(--erp-info);
-        background: #e8f6f8;
+        background: var(--erp-primary-soft);
         color: var(--erp-info);
     }
 
     .flow-search {
-        border: 1px solid #dce3ee;
+        border: 1px solid var(--erp-border);
         border-radius: 8px;
         padding: 9px 12px;
         width: 100%;
@@ -87,7 +87,7 @@
     }
 
     .flow-step {
-        border: 1px solid #e4e9f2;
+        border: 1px solid var(--erp-border);
         background: #fff;
         border-radius: 8px;
         padding: 11px 12px;
@@ -101,12 +101,12 @@
 
     .flow-step:hover {
         border-color: #b9cadf;
-        background: #fbfdff;
+        background: var(--erp-surface-2);
     }
 
     .flow-step.active {
         border-color: var(--erp-info);
-        background: #eefcfc;
+        background: var(--erp-primary-soft);
     }
 
     .step-no {
@@ -146,7 +146,7 @@
 
     .detail-hero {
         padding: 20px 22px;
-        border-bottom: 1px solid #e8edf5;
+        border-bottom: 1px solid var(--erp-primary-soft);
         background: linear-gradient(180deg, #ffffff 0%, var(--erp-surface-2) 100%);
     }
 
@@ -176,7 +176,7 @@
         display: flex;
         flex-wrap: wrap;
         gap: 10px;
-        border-bottom: 1px solid #e8edf5;
+        border-bottom: 1px solid var(--erp-primary-soft);
     }
 
     .action-button {
@@ -194,7 +194,7 @@
 
     .action-button:hover {
         color: #fff;
-        background: #0b7f8b;
+        background: var(--erp-info);
     }
 
     .secondary-button {
@@ -203,8 +203,8 @@
     }
 
     .secondary-button:hover {
-        color: #0b7f8b;
-        background: #edfafa;
+        color: var(--erp-info);
+        background: var(--erp-primary-soft);
     }
 
     .detail-body {
@@ -219,7 +219,7 @@
     }
 
     .legacy-doc-box {
-        border: 1px solid #dbeafe;
+        border: 1px solid var(--erp-border);
         background: var(--erp-surface-2);
         border-radius: 8px;
         padding: 12px;
@@ -254,11 +254,11 @@
     .legacy-code-chip:hover {
         border-color: var(--erp-info);
         color: var(--erp-info);
-        background: #eefcfc;
+        background: var(--erp-primary-soft);
     }
 
     .bplus-flow-box {
-        border: 1px solid #e4e9f2;
+        border: 1px solid var(--erp-border);
         border-radius: 8px;
         background: #fff;
         padding: 12px;
@@ -311,7 +311,7 @@
     }
 
     .quick-link {
-        border: 1px solid #e3e9f2;
+        border: 1px solid var(--erp-border);
         border-radius: 8px;
         padding: 12px;
         text-decoration: none;
@@ -322,7 +322,7 @@
 
     .quick-link:hover {
         border-color: var(--erp-info);
-        background: #f5ffff;
+        background: var(--erp-surface-2);
         color: var(--erp-text);
     }
 
@@ -339,7 +339,7 @@
 
     .flow-footer {
         padding: 10px 22px;
-        border-top: 1px solid #e8edf5;
+        border-top: 1px solid var(--erp-primary-soft);
         color: var(--erp-muted);
         display: flex;
         justify-content: space-between;

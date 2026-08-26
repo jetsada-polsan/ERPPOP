@@ -176,18 +176,18 @@
         border-radius: 18px;
         box-shadow: 0 24px 80px rgba(15, 23, 42, .24);
     }
-    .booking-items-table { border: 1px solid #e7eaf2; border-radius: 14px; }
+    .booking-items-table { border: 1px solid var(--erp-border); border-radius: 14px; }
     .booking-items-table .table { margin-bottom: 0; }
     .typeahead-list {
         position: absolute; z-index: 2050; left: 0; right: 0; top: calc(100% + 4px);
-        max-height: 260px; overflow: auto; background: #fff; border: 1px solid #dbe1ea;
+        max-height: 260px; overflow: auto; background: #fff; border: 1px solid var(--erp-border);
         border-radius: 12px; box-shadow: 0 14px 36px rgba(15, 23, 42, .14); padding: 6px;
     }
     .typeahead-item {
         width: 100%; border: 0; background: transparent; border-radius: 9px; padding: 9px 10px;
         display: flex; align-items: center; gap: 10px; text-align: left;
     }
-    .typeahead-item:hover { background: #f2f6ff; }
+    .typeahead-item:hover { background: var(--erp-primary-soft); }
 </style>
 @endpush
 

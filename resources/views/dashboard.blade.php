@@ -53,7 +53,7 @@
 
     @if(!empty($scopeBranchName))
         <div class="alert border-0 rounded-4 shadow-sm mb-4 d-flex align-items-center gap-2"
-             style="background:#e3f3fc;color:var(--erp-primary)">
+             style="background:var(--erp-primary-soft);color:var(--erp-primary)">
             <i class="bi bi-shop"></i>
             <span class="small fw-semibold">แสดงข้อมูลเฉพาะสาขาของคุณ: {{ $scopeBranchName }}</span>
         </div>
@@ -218,16 +218,16 @@
 @push('head')
 <script src="{{ asset('vendor/chartjs/chart.umd.js') }}"></script>
 <style>
-    .executive-hero { min-height:108px; display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:18px; padding:16px 18px; background:#fff; border:1px solid #dce4ed; border-top:3px solid #1e3a5f; border-radius:8px; box-shadow:0 6px 20px rgba(15,23,42,.06); }
-    .executive-mark { width:46px; height:46px; display:grid; place-items:center; color:#fff; background:#1e3a5f; border-radius:7px; font-size:20px; }
-    .executive-kicker { display:flex; align-items:center; gap:7px; color:#62748a; font-size:10px; font-weight:800; letter-spacing:.12em; }
-    .executive-kicker span { width:7px; height:7px; border-radius:50%; background:#159f78; }
-    .executive-copy h2 { margin:3px 0 3px; color:#172b43; font-size:19px; font-weight:850; }
-    .executive-copy p { margin:0; max-width:720px; color:#63748a; font-size:12px; }
+    .executive-hero { min-height:108px; display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:18px; padding:16px 18px; background:#fff; border:1px solid var(--erp-border); border-top:3px solid var(--erp-text); border-radius:8px; box-shadow:0 6px 20px rgba(15,23,42,.06); }
+    .executive-mark { width:46px; height:46px; display:grid; place-items:center; color:#fff; background:var(--erp-text); border-radius:7px; font-size:20px; }
+    .executive-kicker { display:flex; align-items:center; gap:7px; color:var(--erp-muted); font-size:10px; font-weight:800; letter-spacing:.12em; }
+    .executive-kicker span { width:7px; height:7px; border-radius:50%; background:var(--erp-success-ink); }
+    .executive-copy h2 { margin:3px 0 3px; color:var(--erp-text); font-size:19px; font-weight:850; }
+    .executive-copy p { margin:0; max-width:720px; color:var(--erp-muted); font-size:12px; }
     .executive-signal-grid { display:grid; grid-template-columns:repeat(3,minmax(102px,1fr)); gap:8px; }
-    .executive-signal-grid div { min-width:104px; padding:8px 10px; border-left:1px solid #e5ebf1; }
-    .executive-signal-grid span { display:block; color:#76869a; font-size:10px; margin-bottom:2px; }
-    .executive-signal-grid strong { display:block; color:#172b43; font-size:13px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+    .executive-signal-grid div { min-width:104px; padding:8px 10px; border-left:1px solid var(--erp-border); }
+    .executive-signal-grid span { display:block; color:var(--erp-muted); font-size:10px; margin-bottom:2px; }
+    .executive-signal-grid strong { display:block; color:var(--erp-text); font-size:13px; white-space:nowrap; font-variant-numeric:tabular-nums; }
 
     .dashboard-filter {
         display: flex;
@@ -305,10 +305,10 @@
     }
 
     .metric-card { background:#fff; box-shadow:0 4px 16px rgba(15,23,42,.045); }
-    .metric-card-sales { border-top:3px solid #159f78; }
-    .metric-card-profit { border-top:3px solid #2676a9; }
+    .metric-card-sales { border-top:3px solid var(--erp-success-ink); }
+    .metric-card-profit { border-top:3px solid var(--erp-primary-ink); }
     .metric-card-ar { border-top:3px solid #ca8a04; }
-    .metric-card-pos { border-top:3px solid #d5343f; }
+    .metric-card-pos { border-top:3px solid var(--erp-danger); }
 
     .metric-link {
         display: block;
@@ -332,10 +332,10 @@
         margin-bottom: 9px;
     }
 
-    .metric-icon-sales { background:#e7f6f0; color:#13795b; }
-    .metric-icon-profit { background:#e9f2f9; color:#20618d; }
-    .metric-icon-ar { background:#fff6db; color:#966b06; }
-    .metric-icon-pos { background:#fff0f0; color:#c32d38; }
+    .metric-icon-sales { background:var(--erp-success-soft); color:var(--erp-success-ink); }
+    .metric-icon-profit { background:var(--erp-primary-soft); color:var(--erp-primary-dark); }
+    .metric-icon-ar { background:var(--erp-warning-soft); color:var(--erp-warning-ink); }
+    .metric-icon-pos { background:var(--erp-danger-soft); color:var(--erp-danger); }
 
     .metric-label { color: var(--erp-muted); font-weight: 600; font-size: 13px; margin-bottom: 6px; }
 
@@ -358,7 +358,7 @@
 
     .metric-mini-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-    .metric-mini-row strong { flex: 0 0 auto; color: #1e293b; font-weight: 700; white-space: nowrap; }
+    .metric-mini-row strong { flex: 0 0 auto; color: var(--erp-text); font-weight: 700; white-space: nowrap; }
 
     .metric-mini-row.muted strong { color: var(--erp-border); }
 
@@ -381,8 +381,8 @@
     }
 
     .table td { border-bottom-color: var(--erp-surface-2); }
-    .product-name { color:#172b43; font-weight:750; min-width:230px; }
-    .product-sku { color:#6b7c90; font-size:12px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .product-name { color:var(--erp-text); font-weight:750; min-width:230px; }
+    .product-sku { color:var(--erp-muted); font-size:12px; font-variant-numeric:tabular-nums; white-space:nowrap; }
 
     @media (max-width: 991.98px) {
         .executive-hero{grid-template-columns:auto minmax(0,1fr)}
@@ -450,7 +450,7 @@
                 plugins: { legend: { display: false } },
                 scales: {
                     x: { grid: { display: false } },
-                    y: { grid: { color: '#eef1f6' } }
+                    y: { grid: { color: 'var(--erp-primary-soft)' } }
                 }
             }
         });
@@ -472,7 +472,7 @@
                 plugins: { legend: { display: false } },
                 scales: {
                     x: { grid: { display: false } },
-                    y: { grid: { color: '#eef1f6' }, beginAtZero: true }
+                    y: { grid: { color: 'var(--erp-primary-soft)' }, beginAtZero: true }
                 }
             }
         });

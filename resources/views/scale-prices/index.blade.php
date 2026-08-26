@@ -16,7 +16,7 @@
     } }">
     <div class="content-card p-4">
         {{-- PLU เครื่องชั่งเป็นรหัสลูกจากแฟ้มสินค้าเดิม ไม่สร้างซ้ำจากหน้านี้ --}}
-        <div class="mb-3 p-3 rounded" style="background:#f0fdfa;border:1px solid #99f6e4">
+        <div class="mb-3 p-3 rounded" style="background:var(--erp-surface-2);border:1px solid #99f6e4">
             <div class="fw-bold"><i class="bi bi-upc-scan me-1"></i> PLU เครื่องชั่งมาจากแฟ้มสินค้าเดิม</div>
             <div class="text-muted small mt-1">รหัส `801xxx` เป็นรหัสลูกของสินค้าและเครื่องชั่ง ระบบนี้แสดงและใช้ตามที่ผูกไว้เท่านั้น ไม่สร้างเลขใหม่ ไม่รันเลขทับ และไม่แก้ฉลากเดิม</div>
             <a href="{{ route('products.index') }}" class="btn btn-sm btn-outline-primary mt-2"><i class="bi bi-box-seam me-1"></i> ตรวจสอบ PLU ที่แฟ้มสินค้า</a>
@@ -72,7 +72,7 @@
                             <tr x-show="(!q || $el.dataset.s.includes(q.toLowerCase())) && (!onlyUnpriced || $el.dataset.ph === '1')"
                                 data-s="{{ strtolower(($p->scale_plu ?? '') . ' ' . $p->sku_code . ' ' . $p->name_th) }}"
                                 data-ph="{{ $isPlaceholder ? '1' : '0' }}"
-                                @if($isPlaceholder) style="background:#fff8e1" @endif>
+                                @if($isPlaceholder) style="background:var(--erp-warning-soft)" @endif>
                                 <td class="fw-bold">
                                     @if($p->scale_plu)
                                         <span class="badge text-bg-primary" style="font-size:13px">{{ $p->scale_plu }}</span>

@@ -847,15 +847,15 @@
     body.erp-popup-page div[x-data="productShow()"] > :not(.compact-product-window):not(.booking-modal-backdrop) { display:none !important; }
     body.erp-popup-page { background:#ececec; }
     .compact-product-window { min-height:calc(100vh - 10px); border:1px solid #8d9297; background:#ececec; color:#151515; font:10px Tahoma,"Noto Sans Thai",sans-serif; }
-    .compact-menu { height:24px; display:flex; align-items:center; justify-content:flex-end; padding:0 9px; border-bottom:1px solid #aaa; background:#f4f4f4; }
-    .compact-tools { height:38px; display:flex; align-items:stretch; gap:1px; padding:2px 5px; border-bottom:1px solid #aaa; background:#e4e4e4; }
+    .compact-menu { height:24px; display:flex; align-items:center; justify-content:flex-end; padding:0 9px; border-bottom:1px solid #aaa; background:var(--erp-primary-soft); }
+    .compact-tools { height:38px; display:flex; align-items:stretch; gap:1px; padding:2px 5px; border-bottom:1px solid #aaa; background:var(--erp-border); }
     .compact-tools button { min-width:72px; border:1px solid transparent; background:transparent; font-size:9px; }
-    .compact-tools button:hover { border-color:#9aa0a6; background:#f8f8f8; }
-    .compact-tools i { display:block; color:#1677a8; font-size:13px; }
+    .compact-tools button:hover { border-color:#9aa0a6; background:var(--erp-surface-2); }
+    .compact-tools i { display:block; color:var(--erp-primary-ink); font-size:13px; }
     .compact-tabs { display:flex; gap:1px; padding:4px 7px 0; border-bottom:1px solid #8d9298; background:#ddd; }
-    .compact-tabs button { padding:3px 8px; border:1px solid #999; border-bottom:0; background:#e8e8e8; font-size:9px; }
-    .compact-tabs button.active { position:relative; top:1px; background:#fff; color:#b42318; font-weight:700; }
-    .compact-body { height:calc(100vh - 101px); overflow:auto; padding:8px; background:#f2f2f2; }
+    .compact-tabs button { padding:3px 8px; border:1px solid #999; border-bottom:0; background:var(--erp-border); font-size:9px; }
+    .compact-tabs button.active { position:relative; top:1px; background:#fff; color:var(--erp-danger); font-weight:700; }
+    .compact-body { height:calc(100vh - 101px); overflow:auto; padding:8px; background:var(--erp-primary-soft); }
     .compact-form { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px 9px; max-width:100%; padding:9px; border:1px solid #aaa; background:#eee; }
     .compact-form label { display:grid; grid-template-columns:90px minmax(0,1fr); align-items:center; gap:7px; margin:0; white-space:nowrap; }
     .compact-form label.wide,.compact-form .wide { grid-column:span 3; }
@@ -868,15 +868,15 @@
     .compact-section-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
     .compact-table { width:100%; border-collapse:collapse; background:#fff; }
     .compact-table th,.compact-table td { padding:3px 5px; border:1px solid #aeb3b7; text-align:left; }
-    .compact-table th { background:linear-gradient(#f5f5f5,#d8d8d8); font-weight:700; }
-    .compact-table tr:nth-child(even) td { background:#f5f8fa; }
+    .compact-table th { background:linear-gradient(#f5f5f5,var(--erp-border)); font-weight:700; }
+    .compact-table tr:nth-child(even) td { background:var(--erp-surface-2); }
     .compact-table .num { text-align:right; }
-    .compact-table .code { color:#075985; font-weight:700; }
+    .compact-table .code { color:var(--erp-primary-dark); font-weight:700; }
     .compact-edit-table input,.compact-edit-table select { width:100%; min-height:23px; padding:1px 4px; border:1px solid #92979c; border-radius:0; background:#fff; font:11px Tahoma,"Noto Sans Thai",sans-serif; }
     .compact-edit-table td { padding:3px; }
-    .compact-edit-table tr.barcode-disabled td { background:#f3f4f6; color:#7b8790; }
+    .compact-edit-table tr.barcode-disabled td { background:var(--erp-primary-soft); color:var(--erp-muted); }
     .barcode-state { display:inline-flex; align-items:center; gap:4px; margin:0; padding:2px 6px; border-radius:3px; white-space:nowrap; font-weight:700; cursor:pointer; }
-    .barcode-state.is-on { background:#dcfce7; color:#166534; }
+    .barcode-state.is-on { background:var(--erp-success-soft); color:#166534; }
     .barcode-state.is-off { background:var(--erp-border); color:#4b5563; }
     .barcode-state input { width:auto; min-height:0; margin:0; }
     .compact-row-save { white-space:nowrap; padding:3px 8px; border:1px solid #888; background:linear-gradient(#fff,#ddd); font:700 11px Tahoma,"Noto Sans Thai",sans-serif; }
@@ -889,14 +889,14 @@
     .bplus-setup {
         padding: 0;
         overflow: hidden;
-        border: 1px solid #d7e4ef;
+        border: 1px solid var(--erp-border);
         box-shadow: 0 12px 34px rgba(15, 23, 42, .08);
     }
     .bplus-window-tabs {
         display: flex;
         gap: 2px;
         padding: 10px 16px 0;
-        background: linear-gradient(180deg, var(--erp-surface-2), #eef6fb);
+        background: linear-gradient(180deg, var(--erp-surface-2), var(--erp-primary-soft));
         border-bottom: 1px solid var(--erp-border);
     }
     .bplus-window-tabs span {
@@ -945,7 +945,7 @@
         line-height: 1.35;
     }
     .bplus-input.strong { color: var(--erp-info); font-size: 18px; letter-spacing: 0; }
-    .bplus-input.price { color: #059669; font-size: 19px; justify-content: flex-end; }
+    .bplus-input.price { color: var(--erp-success-ink); font-size: 19px; justify-content: flex-end; }
     .bplus-split {
         display: grid;
         grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr);
@@ -985,9 +985,9 @@
         top: 0;
         z-index: 1;
         padding: 9px 10px;
-        background: #ecfeff;
+        background: var(--erp-primary-soft);
         color: var(--erp-info);
-        border-bottom: 1px solid #ccfbf1;
+        border-bottom: 1px solid var(--erp-border);
         font-size: 11px;
         font-weight: 950;
         white-space: nowrap;
@@ -999,8 +999,8 @@
     }
     .bplus-table tr:nth-child(even) td { background: var(--erp-surface-2); }
     .bplus-table tr.is-plu-row td {
-        background: #f0fdfa;
-        border-bottom-color: #ccfbf1;
+        background: var(--erp-surface-2);
+        border-bottom-color: var(--erp-border);
     }
     .bplus-code {
         color: var(--erp-text);
@@ -1069,7 +1069,7 @@
         font-weight: 800;
         white-space: nowrap;
     }
-    .product-status.is-on { background: #dcfce7; color: var(--erp-success-ink); }
+    .product-status.is-on { background: var(--erp-success-soft); color: var(--erp-success-ink); }
     .product-status.is-off { background: var(--erp-border); color: var(--erp-text); }
     .product-soft-pill { background: var(--erp-surface-2); color: var(--erp-text); }
     .product-identity-grid { display: grid; grid-template-columns: 1.1fr 1fr .72fr; gap: 10px; }
@@ -1082,7 +1082,7 @@
     }
     .identity-card.primary {
         border-color: #99f6e4;
-        background: linear-gradient(180deg, #ecfeff, #f0fdfa);
+        background: linear-gradient(180deg, var(--erp-primary-soft), var(--erp-surface-2));
     }
     .identity-label { color: var(--erp-muted); font-size: 11px; font-weight: 900; text-transform: uppercase; }
     .identity-value {
@@ -1117,7 +1117,7 @@
         font-size: 12px;
         font-weight: 900;
     }
-    .barcode-group.primary .barcode-group-head { background: #ecfeff; color: var(--erp-info); }
+    .barcode-group.primary .barcode-group-head { background: var(--erp-primary-soft); color: var(--erp-info); }
     .barcode-count {
         min-width: 26px;
         height: 22px;
@@ -1146,7 +1146,7 @@
         padding: 10px 12px;
         border-top: 1px solid var(--erp-surface-2);
     }
-    .barcode-row.is-plu { background: #fbfffe; }
+    .barcode-row.is-plu { background: var(--erp-surface-2); }
     .barcode-code {
         color: var(--erp-text);
         font-size: 18px;
@@ -1204,7 +1204,7 @@
         justify-content: space-between;
         gap: 12px;
         padding: 4px 10px;
-        background: #fbfbfb;
+        background: var(--erp-surface-2);
         border-bottom: 1px solid #aab0b7;
         font-weight: 800;
     }
@@ -1219,7 +1219,7 @@
         text-overflow: ellipsis;
         white-space: nowrap;
     }
-    .legacy-window-name i { color: #15803d; }
+    .legacy-window-name i { color: var(--erp-success-ink); }
     .legacy-window-controls {
         display: flex;
         align-items: center;
@@ -1261,7 +1261,7 @@
         justify-content: space-between;
         gap: 12px;
         padding: 3px 8px;
-        background: #e7e7e7;
+        background: var(--erp-border);
         border-bottom: 1px solid #b6bcc3;
     }
     .legacy-menu-group,
@@ -1300,7 +1300,7 @@
     .legacy-tool-group button {
         width: 34px;
         padding: 0;
-        color: #0b7fb8;
+        color: var(--erp-primary-ink);
     }
     .legacy-tool-group button:active,
     .legacy-search-tools button:active,
@@ -1308,7 +1308,7 @@
     .legacy-action-tools a:active {
         border-style: inset;
     }
-    .legacy-save i { color: #15803d; font-size: 18px; }
+    .legacy-save i { color: var(--erp-success-ink); font-size: 18px; }
     .legacy-cancel i { color: var(--erp-text); font-size: 16px; }
     .legacy-product-window .bplus-setup {
         border: 0;
@@ -1334,7 +1334,7 @@
         font-weight: 900;
     }
     .legacy-product-window .bplus-window-tabs span.active {
-        background: #f7f7f7;
+        background: var(--erp-surface-2);
         color: #e11d48;
         transform: none;
     }
@@ -1455,7 +1455,7 @@
     .legacy-radio {
         width: 13px;
         height: 13px;
-        border: 1px solid #6b7280;
+        border: 1px solid var(--erp-muted);
         border-radius: 50%;
         background: #fff;
         box-shadow: inset 0 0 0 2px #fff;
@@ -1536,7 +1536,7 @@
     }
     .legacy-product-window .bplus-table tr:nth-child(even) td,
     .legacy-product-window .bplus-table tr.is-plu-row td {
-        background: #c9fbfb;
+        background: var(--erp-border);
     }
     .legacy-product-window .bplus-code,
     .legacy-product-window .is-plu-row .bplus-code {
@@ -1594,7 +1594,7 @@
     }
     .cost-history-table th {
         border-bottom-width: 1px;
-        background: #edf5f9;
+        background: var(--erp-primary-soft);
         color: #3e5d71;
         font-size: 10.5px;
         white-space: nowrap;
@@ -1611,7 +1611,7 @@
         white-space: nowrap;
     }
     .cost-current-period td {
-        background: #f0f9fd;
+        background: var(--erp-primary-soft);
     }
     .cost-period-status {
         display: inline-block;
@@ -1637,7 +1637,7 @@
         margin-top: 10px;
         padding: 8px 10px;
         border-left: 3px solid var(--erp-primary);
-        background: #f4fafe;
+        background: var(--erp-surface-2);
         color: var(--erp-muted);
         font-size: 10.5px;
     }
@@ -1650,8 +1650,8 @@
     .compact-cost-grid > div {
         min-width: 0;
         padding: 8px 9px;
-        border: 1px solid #cdd8df;
-        background: #f9fbfc;
+        border: 1px solid var(--erp-border);
+        background: var(--erp-surface-2);
     }
     .compact-cost-grid span,
     .compact-cost-grid strong,
@@ -1659,7 +1659,7 @@
         display: block;
     }
     .compact-cost-grid span {
-        color: #60788b;
+        color: var(--erp-muted);
         font-size: 9px;
     }
     .compact-cost-grid strong {

@@ -216,13 +216,13 @@
     [x-cloak] { display: none !important; }
     .booking-modal-backdrop { position: fixed; inset: 0; z-index: 2000; background: rgba(15,23,42,.42); display: flex; align-items: center; justify-content: center; padding: 24px; }
     .booking-modal { width: min(1020px, 100%); max-height: calc(100vh - 48px); overflow: auto; background: #fff; border-radius: 18px; box-shadow: 0 24px 80px rgba(15,23,42,.24); }
-    .booking-items-table { border: 1px solid #e7eaf2; border-radius: 14px; }
+    .booking-items-table { border: 1px solid var(--erp-border); border-radius: 14px; }
     .booking-items-table .table { margin-bottom: 0; }
-    .typeahead-list { position: absolute; z-index: 2050; left: 0; right: 0; top: calc(100% + 4px); max-height: 260px; overflow: auto; background: #fff; border: 1px solid #dbe1ea; border-radius: 12px; box-shadow: 0 14px 36px rgba(15,23,42,.14); padding: 6px; }
+    .typeahead-list { position: absolute; z-index: 2050; left: 0; right: 0; top: calc(100% + 4px); max-height: 260px; overflow: auto; background: #fff; border: 1px solid var(--erp-border); border-radius: 12px; box-shadow: 0 14px 36px rgba(15,23,42,.14); padding: 6px; }
     .typeahead-item { width: 100%; border: 0; background: transparent; border-radius: 9px; padding: 9px 10px; display: flex; align-items: center; gap: 10px; text-align: left; }
-    .typeahead-item:hover { background: #f2f6ff; }
-    .loss-panel{padding:14px;border:1px solid #f3c7c7;border-radius:8px;background:#fffafa}
-    .loss-summary{display:flex;gap:18px;flex-wrap:wrap;padding:10px 12px;border-radius:6px;background:#fff;color:#526579;font-size:13px}
+    .typeahead-item:hover { background: var(--erp-primary-soft); }
+    .loss-panel{padding:14px;border:1px solid #f3c7c7;border-radius:8px;background:var(--erp-surface-2)}
+    .loss-summary{display:flex;gap:18px;flex-wrap:wrap;padding:10px 12px;border-radius:6px;background:#fff;color:var(--erp-muted);font-size:13px}
 </style>
 @endpush
 

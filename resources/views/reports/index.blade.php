@@ -5,14 +5,14 @@
         'sales' => ['icon' => 'bi-receipt-cutoff', 'color' => '#2563eb', 'label' => 'ขาย'],
         'management' => ['icon' => 'bi-graph-up-arrow', 'color' => '#f97316', 'label' => 'ผู้บริหาร'],
         'ar' => ['icon' => 'bi-person-lines-fill', 'color' => '#db2777', 'label' => 'ลูกหนี้'],
-        'inventory' => ['icon' => 'bi-box-seam-fill', 'color' => '#0891b2', 'label' => 'สินค้า / สต็อก'],
+        'inventory' => ['icon' => 'bi-box-seam-fill', 'color' => 'var(--erp-primary-ink)', 'label' => 'สินค้า / สต็อก'],
         'documents' => ['icon' => 'bi-files', 'color' => '#4f46e5', 'label' => 'เอกสาร'],
         'pos' => ['icon' => 'bi-cart-check-fill', 'color' => 'var(--erp-info)', 'label' => 'POS'],
         'purchasing' => ['icon' => 'bi-basket-fill', 'color' => '#d97706', 'label' => 'ซื้อสินค้า'],
         'transfer' => ['icon' => 'bi-arrow-left-right', 'color' => '#7c3aed', 'label' => 'โอนสินค้า'],
-        'payment' => ['icon' => 'bi-cash-coin', 'color' => '#059669', 'label' => 'การเงิน / ชำระ'],
+        'payment' => ['icon' => 'bi-cash-coin', 'color' => 'var(--erp-success-ink)', 'label' => 'การเงิน / ชำระ'],
         'tax' => ['icon' => 'bi-receipt', 'color' => '#9333ea', 'label' => 'ภาษี (ภพ.30)'],
-        'audit' => ['icon' => 'bi-shield-check', 'color' => '#b45309', 'label' => 'ตรวจสอบระบบ'],
+        'audit' => ['icon' => 'bi-shield-check', 'color' => 'var(--erp-warning-ink)', 'label' => 'ตรวจสอบระบบ'],
     ];
 
     $reportLabels = [
@@ -414,9 +414,9 @@
     .flow-report-shell {
         --flow-blue: var(--erp-primary);
         --flow-blue-dark: var(--erp-primary-dark);
-        --flow-blue-ink: #0c4a6e;
+        --flow-blue-ink: var(--erp-primary-dark);
         --flow-line: var(--erp-primary-soft);
-        --flow-soft: #eff8ff;
+        --flow-soft: var(--erp-primary-soft);
         --flow-soft-2: var(--erp-primary-soft);
         display: grid;
         grid-template-columns: minmax(0, 1fr);
@@ -447,7 +447,7 @@
         opacity: 1;
     }
     .flow-nav-title {
-        color: #6b7280;
+        color: var(--erp-muted);
         font-size: 24px;
         line-height: 1;
         font-weight: 800;
@@ -583,7 +583,7 @@
         padding: 10px 16px;
         border-radius: 6px 6px 0 0;
         background: var(--erp-primary-soft);
-        color: #075985;
+        color: var(--erp-primary-dark);
         font-size: 14px;
         font-weight: 700;
     }
@@ -606,7 +606,7 @@
     }
     .rpt-nav {
         display: none;
-        background: #f7f9fc;
+        background: var(--erp-surface-2);
         border: 0;
         border-right: 1px solid var(--erp-border);
         border-radius: 0;
@@ -632,32 +632,32 @@
         display: block;
         padding: 8px 10px 8px 30px;
         border-radius: 8px;
-        color: #667085;
+        color: var(--erp-muted);
         font-size: 15px;
         font-weight: 700;
         text-decoration: none;
         line-height: 1.35;
         overflow-wrap: anywhere;
     }
-    .rpt-nav-link:hover { background: #eef4f8; color: var(--erp-text); }
-    .rpt-nav-link.active { background: #e9edf3; color: #020617; font-weight: 900; }
+    .rpt-nav-link:hover { background: var(--erp-primary-soft); color: var(--erp-text); }
+    .rpt-nav-link.active { background: var(--erp-success-soft); color: #020617; font-weight: 900; }
     .rpt-legacy-card {
         display: flex;
         align-items: center;
         gap: 10px;
         margin: 12px 4px 4px;
         padding: 10px;
-        border: 1px solid #d7ecf7;
+        border: 1px solid var(--erp-border);
         border-radius: 8px;
-        background: #f6fbfe;
+        background: var(--erp-surface-2);
         color: var(--erp-text);
         text-decoration: none;
         box-shadow: 0 8px 22px rgba(35,150,200,.08);
     }
     .rpt-legacy-card:hover {
         border-color: var(--flow-blue);
-        color: #0b76a5;
-        background: #eef8fd;
+        color: var(--erp-primary-ink);
+        background: var(--erp-primary-soft);
     }
     .rpt-legacy-icon {
         width: 34px;
@@ -735,7 +735,7 @@
         border-radius: 6px;
         padding: 9px 12px;
         font-size: 15px;
-        background: #f8fcff;
+        background: var(--erp-surface-2);
         color: var(--flow-blue-ink);
         outline: none;
         font-family: inherit;
@@ -797,7 +797,7 @@
         border-top: 3px solid var(--flow-blue);
         border-bottom: 0;
         border-radius: 0;
-        background: #f8fcff;
+        background: var(--erp-surface-2);
     }
     .erp-search { position: relative; min-width: 260px; }
     .erp-search .erp-search-icon {
@@ -813,7 +813,7 @@
     .rpt-print-header { display: none; }
 
     /* Compact ERP report workspace: toolbar first, data immediately below. */
-    .flow-report-shell { min-height:calc(100vh - 72px); background:#f4f7fa; }
+    .flow-report-shell { min-height:calc(100vh - 72px); background:var(--erp-surface-2); }
     .rpt-main { padding:12px 14px; }
     .flow-report-head { min-height:38px; margin-bottom:8px; gap:10px; flex-wrap:nowrap; }
     .flow-eyebrow { margin-bottom:1px; font-size:10px; }
