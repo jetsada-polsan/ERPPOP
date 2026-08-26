@@ -198,6 +198,8 @@ Route::prefix('wh')->name('wh.')->group(function () {
 });
 
 Route::get('/apps', [AppLauncherController::class, 'index'])->name('apps.launcher');
+// หน้าตัวอย่างแพตเทิร์นผิวใหม่ (Vue 3 + Tailwind v4 + โทน JET) — แยกขาดจากหลังบ้านเดิม
+Route::view('/greenfield', 'greenfield.index')->name('greenfield');
 Route::get('/crm', [CrmController::class, 'index'])->name('crm.index');
 Route::post('/crm/activities', [CrmController::class, 'storeActivity'])->name('crm.activities.store');
 Route::patch('/crm/activities/{activity}/complete', [CrmController::class, 'completeActivity'])->name('crm.activities.complete');
