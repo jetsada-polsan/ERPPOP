@@ -76,7 +76,12 @@ if [[ "$actual" != "$expected" ]]; then
 fi
 
 # ดันรุ่นที่เสิร์ฟอยู่ออกจาก glob ก่อน จะได้เหลือรุ่นเดียวที่ ERP มองเห็น
+# เก็บย้อนกลับได้แค่รุ่นเดียว ไฟล์ละ 166 MB บนดิสก์ 20 GB สะสมไว้หลายรุ่นไม่ไหว
 shopt -s nullglob
+for stale in "${release_dir}"/*.previous.exe; do
+  rm -f "$stale"
+  echo "  ทิ้งรุ่นย้อนกลับเก่า $(basename "$stale")"
+done
 for old in "${release_dir}"/*-UAT-*-setup.exe; do
   [[ "$(basename "$old")" == "$name" ]] && continue
   mv -f "$old" "${old%.exe}.previous.exe"
