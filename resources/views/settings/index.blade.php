@@ -51,7 +51,7 @@
         {{-- เนื้อหาขวา --}}
         <div class="set-main">
             <div class="d-flex align-items-center justify-content-between mb-3">
-                <h2 class="h4 fw-bold mb-0" style="color:var(--fa-blue-dark)"
+                <h2 class="h4 fw-bold mb-0" style="color:var(--erp-primary-dark)"
                     x-text="{ func: 'ฟังก์ชั่นเอกสาร', numbering: 'เลขรันเอกสาร', logo: 'โลโก้และตราประทับ', note: 'หมายเหตุเอกสาร', company: 'ข้อมูลกิจการ', menu: 'จัดลำดับเมนูหลัก', theme: 'ปรับธีมระบบ', payment: 'ข้อมูลการรับชำระ', accounting: 'บันทึกบัญชี', 'pos-download': 'ตั้งค่า Python POS' }[tab]"></h2>
                 <button x-show="tab !== 'pos-download' && tab !== 'theme'" type="submit" class="btn btn-success px-4"><i class="bi bi-check-lg me-1"></i>บันทึกข้อมูล</button>
                 <button x-show="tab === 'theme'" type="submit" form="layout-form" class="btn btn-success px-4"><i class="bi bi-check-lg me-1"></i>บันทึก Layout</button>
@@ -511,11 +511,11 @@ async function copyPosToken(text) {
     .logo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
     .logo-option { border: 2px solid #e3ecf3; border-radius: 12px; padding: 10px; cursor: pointer; background: #fff; text-align: center; transition: all .12s; margin: 0; }
     .logo-option:hover { border-color: #94b8d0; }
-    .logo-option.active { border-color: var(--fa-blue); background: #f0f9ff; box-shadow: 0 6px 16px rgba(26,155,220,.15); }
+    .logo-option.active { border-color: var(--erp-primary); background: var(--erp-primary-soft); box-shadow: 0 6px 16px rgba(21,133,192,.15); }
     .logo-thumb { height: 84px; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 8px; background: #f6fafd; }
     .logo-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
     .logo-thumb-text { font-size: 24px; font-weight: 900; color: #29465b; }
-    .logo-thumb-text span { color: var(--fa-green); }
+    .logo-thumb-text span { color: var(--erp-success-ink); }
     .logo-caption { font-size: 11px; color: #7d97ac; margin-top: 6px; word-break: break-all; }
     .pos-download-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 18px; padding: 24px; border-color: #bae6fd; background: #f0f9ff; }
     .pos-download-mark { width: 64px; height: 64px; display: grid; place-items: center; border-radius: 16px; background: #0284c7; color: #fff; font-size: 32px; }
@@ -532,7 +532,7 @@ async function copyPosToken(text) {
     .theme-settings-card { max-width:720px; padding:16px; }
     .theme-choice-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
     .theme-choice { display:grid; grid-template-columns:auto 1fr; align-items:center; gap:9px; padding:9px; border:2px solid #dce7ef; border-radius:8px; cursor:pointer; background:#fff; }
-    .theme-choice.active { border-color:var(--fa-blue); background:#f8fcff; }
+    .theme-choice.active { border-color:var(--erp-primary); background:var(--erp-primary-soft); }
     .theme-choice input { position:absolute; opacity:0; }
     .theme-choice strong { font-size:12px; }
     .theme-preview { grid-row:span 2; width:70px; height:42px; display:flex; overflow:hidden; border:1px solid #d1d5db; border-radius:5px; background:var(--preview-bg); }
