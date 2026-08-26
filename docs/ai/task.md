@@ -132,3 +132,14 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
 - POS: ไม่ได้เรียก `pos:web-mode` หรือเปลี่ยนค่า production; โค้ดปัจจุบันเป็น **global AppSetting** ไม่มี `--branch` จึงยัง cutover รายสาขาไม่ได้ ต้องเพิ่ม branch-scoped flag ก่อนหากต้องการ rollout ทีละสาขา; รอทดสอบ 0.4.0 บน Windows จริงก่อนตัด Web POS
 - Deployment warning: `scripts/deploy-ssh.sh` ปัจจุบันยังมี `--delete` ซึ่งขัดกติกา WORKFLOW/PROJECT_MEMORY; ห้ามรันตามเดิม ให้ทำ backup + explicit dry-run/rsync ที่ไม่มี `--delete` ตาม OPERATIONS
 - ไฟล์ `package-lock.json` ที่ไม่ tracked ไม่รวมใน commit; ไม่แตะงาน Python POS, DB migration, tokens หรือ PIN
+
+## Handoff - 2026-08-26 (Codex production deploy)
+- Commit deployed: `f4ca475`
+- Deploy: ขึ้น production `/var/www/jeterp` แล้วด้วย rsync แบบ explicit และ **ไม่ใช้ `--delete`**; exclude `.env`, `storage`, `vendor`, `node_modules`, `.claude`, `.codex`, `package-lock.json` และไฟล์ runtime
+- Backup: รันบน host ก่อน deploy สำเร็จที่ `storage/app/backups/erp-db-20260826-223203.sql.gz` พร้อม checksum ตาม `erp:backup`
+- Build/assets: รัน `npm run build` ในเครื่อง dev ก่อน deploy; ส่ง `public/build` ทั้งชุดขึ้น host; ตรวจ production manifest ผ่าน `manifest ok 13` และ `/build/manifest.json` ตอบ HTTP 200
+- Production commands: `php artisan optimize:clear`, `config:clear`, `route:clear`, `view:clear`, `chown -R www-data:www-data storage bootstrap/cache`, `php artisan migrate --force`
+- Health: production `php artisan erp:health` ผ่านครบหลัง deploy: database, migrations, backup, sales-GL, storage, queue
+- Routes checked: `/apps`, `/wh/*`, `/pos` และ POS API routes อยู่ครบบน production; `pos_web_mode` ยังเป็น `sell` จึงยังไม่ได้ตัด Web POS ไป redirect
+- Browser: In-app Browser production redirect ไปหน้า login และ Chrome connector unavailable จึงยังไม่ได้คลิกยืนยัน `/apps` และ `/wh` ด้วย session จริงบน production; ตรวจได้เฉพาะ HTTP/route/asset/server health
+- Local verification before deploy: `php artisan test --compact` ไม่มี failure (384 tests / 383 passed / 1 skipped / 6 incomplete / 2914 assertions), `npm run build` ผ่าน, manifest local ครบ 13 entries
