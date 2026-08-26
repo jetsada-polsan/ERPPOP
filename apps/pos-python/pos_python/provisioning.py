@@ -217,6 +217,38 @@ class ProvisioningService:
         )
         self.db.commit()
 
+    # ── cashier login (ออนไลน์) ──────────────────────────────────
+    def online_cashier_login(self, pin: str, cashier_server_id: int | None = None) -> dict:
+        """ยืนยัน PIN กับ ERP แล้วเก็บ credential ออฟไลน์ + ผูก local cashier row
+
+        คืน {"selection_required": True, "cashiers": [...]} เมื่อ PIN กลางตรงหลายคน
+        (UI ต้องให้เลือกชื่อ) หรือ {"cashier": {...}, "local_cashier_id": n} เมื่อสำเร็จ
+        """
+        payload: dict = {"pin": pin}
+        if cashier_server_id is not None:
+            payload["cashier_id"] = int(cashier_server_id)
+        response = self.api.post("/api/pos/cashier/login", payload)
+        if not response.get("success", False):
+            raise RuntimeError(response.get("message", "PIN ไม่ถูกต้อง"))
+        if response.get("selection_required"):
+            return {"selection_required": True, "cashiers": response.get("cashiers", [])}
+
+        cashier = response.get("cashier") or {}
+        server_id = cashier.get("id")
+        if not server_id:
+            raise RuntimeError("ERP ยืนยันแคชเชียร์แล้วแต่ไม่คืนรหัส")
+        with self.db:
+            local_id = self._upsert_cashier(int(server_id), str(cashier.get("code") or server_id), str(cashier.get("name") or ""))
+        credential = response.get("offline_credential")
+        if credential:
+            self.store_credential(int(server_id), credential)
+        return {
+            "selection_required": False,
+            "cashier": cashier,
+            "local_cashier_id": local_id,
+            "must_change_pin": bool(response.get("must_change_pin")),
+        }
+
     # ── shift ────────────────────────────────────────────────────
     def open_server_shift(self, *, branch_id: int, cashier_server_id: int, opening_cash, local_shift_id: int) -> int:
         """เปิดกะฝั่ง ERP แล้วผูก server_id กลับเข้ากะ local — ต้องทำก่อนขายถึงจะ sync บิลได้"""

@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
+from pos_python.bootstrap import bootstrap
 from pos_python.database import connect
 from pos_python.barcode import replace_scale_profiles
 from pos_python.mock_printer import print_receipt
@@ -127,8 +128,12 @@ def launch_ui() -> None:
 
     try:
         db = connect(DB_PATH)
-        seed(db)
-        run_ui(PosService(db))
+        # ผูกเครื่องกับ ERP แล้ว: ping + ดึงข้อมูลจริง + เริ่มส่งบิลค้างเบื้องหลัง
+        # ยังไม่ผูก (ไม่มี pos-config.json): seed demo ให้เปิดลองใช้ได้ทันที
+        online = bootstrap(DATA_DIR, db, DB_PATH)
+        if online is None:
+            seed(db)
+        run_ui(PosService(db), online=online)
     except Exception as error:
         log_path = DATA_DIR / "startup-error.log"
         log_path.write_text(traceback.format_exc(), encoding="utf-8")

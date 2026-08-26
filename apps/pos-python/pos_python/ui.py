@@ -107,7 +107,10 @@ NUMPAD_KEYS = [
 ]
 
 
-def run_ui(service: PosService) -> None:
+def run_ui(service: PosService, online=None) -> None:
+    # เครื่องที่ผูก ERP แล้วใช้ branch/terminal จริงจาก ping; เครื่อง demo ใช้ค่าเดิม
+    branch_id = int(online.branch_id) if (online is not None and online.branch_id) else 1
+    terminal_id = (online.terminal_id if (online is not None and online.terminal_id) else "PY-TEST-01")
     try:
         from PySide6.QtCore import Qt
         from PySide6.QtWidgets import (
@@ -135,7 +138,31 @@ def run_ui(service: PosService) -> None:
             form.addRow("PIN", self.pin)
             form.addRow(submit)
 
+        def _online_login(self) -> bool:
+            pin = self.pin.text().strip()
+            code = self.code.text().strip()
+            try:
+                result = online.provisioning.online_cashier_login(pin)
+                if result.get("selection_required"):
+                    # PIN กลางตรงหลายคน — เลือกด้วยรหัสแคชเชียร์ที่กรอก
+                    match = next((c for c in result["cashiers"] if str(c.get("code")) == code), None)
+                    if not match:
+                        QMessageBox.warning(self, "เลือกพนักงาน", "PIN นี้มีหลายคน กรุณากรอกรหัสแคชเชียร์ของคุณด้วย")
+                        return False
+                    result = online.provisioning.online_cashier_login(pin, int(match["id"]))
+            except Exception as error:
+                QMessageBox.critical(self, "เข้าสู่ระบบไม่สำเร็จ", str(error))
+                return False
+            self.cashier = service.db.execute(
+                "SELECT * FROM local_cashiers WHERE id = ?", (result["local_cashier_id"],)
+            ).fetchone()
+            return self.cashier is not None
+
         def login(self):
+            if online is not None:
+                if self._online_login():
+                    self.accept()
+                return
             self.cashier = service.login(self.code.text().strip(), self.pin.text())
             if not self.cashier:
                 QMessageBox.warning(self, "เข้าสู่ระบบไม่สำเร็จ", "ไม่พบผู้ใช้หรือ PIN ไม่ถูกต้อง")
@@ -440,7 +467,16 @@ def run_ui(service: PosService) -> None:
             self.cashier = cashier
             self.order = Order()
             self.category = ALL_CATEGORIES
-            self.shift_id = service.open_shift(1, "PY-TEST-01", int(cashier["id"]), Decimal("0"))
+            self.shift_id = service.open_shift(branch_id, terminal_id, int(cashier["id"]), Decimal("0"))
+            if online is not None and cashier["server_id"]:
+                try:
+                    online.provisioning.open_server_shift(
+                        branch_id=branch_id, cashier_server_id=int(cashier["server_id"]),
+                        opening_cash=Decimal("0"), local_shift_id=self.shift_id,
+                    )
+                except Exception:
+                    # เปิดกะ ERP ไม่ได้ตอนนี้ ยังขายออฟไลน์ได้ บิลจะ sync เมื่อผูกกะสำเร็จภายหลัง
+                    pass
             self.last_sale_id: int | None = None
             self.setWindowTitle(f"PopCentral POS — {cashier['name']}")
             self.setStyleSheet(STYLE)
@@ -690,10 +726,12 @@ def run_ui(service: PosService) -> None:
             try:
                 sale_id = service.checkout(
                     document_no=f"PYPOS-{self.shift_id}-{service.pending_sync_count() + 1:06d}",
-                    branch_id=1, terminal_id="PY-TEST-01", shift_id=self.shift_id,
+                    branch_id=branch_id, terminal_id=terminal_id, shift_id=self.shift_id,
                     cashier_id=int(self.cashier["id"]), lines=self.order.to_cart_lines(),
                     payment_method="cash", paid_amount=dialog.tendered(),
                 )
+                if online is not None:
+                    online.worker.wake()  # ส่งบิลขึ้น ERP ทันที ไม่รอรอบถัดไป
             except Exception as error:
                 QMessageBox.critical(self, "บันทึกบิลไม่สำเร็จ", str(error))
                 return
@@ -762,4 +800,8 @@ def run_ui(service: PosService) -> None:
         window = PosWindow(login.cashier)
         window.resize(1280, 820)
         window.showMaximized()
-        app.exec()
+        try:
+            app.exec()
+        finally:
+            if online is not None:
+                online.worker.stop()
