@@ -24,7 +24,7 @@
     .legacy-panel-title.green { background:linear-gradient(105deg,#059669,#18a56f); }
     .legacy-chip { padding:4px 10px; background:#fff; border-radius:7px; color:#2563eb; font-size:.78rem; }
     .legacy-route-head,.legacy-route-row { display:grid; grid-template-columns:86px minmax(0,1fr) 135px; align-items:center; gap:16px; padding:17px 24px; }
-    .legacy-route-head { background:#f8fafc; color:#7a8596; font-size:.8rem; font-weight:800; }
+    .legacy-route-head { background:var(--erp-surface-2); color:#7a8596; font-size:.8rem; font-weight:800; }
     .legacy-route-row { border-top:1px solid #e9eef5; }
     .legacy-route-row:nth-child(odd) { background:#fbfdff; }
     .legacy-code { color:#1f2937; font-weight:900; }
@@ -34,11 +34,11 @@
     .legacy-amount { color:#16a34a; font-size:1.05rem; font-weight:900; text-align:right; }
     .legacy-percent { color:#748195; font-size:.78rem; font-weight:700; text-align:right; }
     .legacy-total { padding:35px 26px 28px; text-align:center; }
-    .legacy-total-label { color:#64748b; font-size:.9rem; font-weight:800; }
+    .legacy-total-label { color:var(--erp-muted); font-size:.9rem; font-weight:800; }
     .legacy-total-value { margin:25px 0 17px; color:#3b61d5; font-size:clamp(2rem,4vw,3.75rem); font-weight:900; line-height:1; letter-spacing:0; }
     .legacy-total-value small { font-size:.32em; color:#3159c7; }
     .legacy-divider { height:1px; background:#e5e7eb; }
-    .legacy-meta { padding-top:18px; color:#475569; font-size:.85rem; font-weight:700; }
+    .legacy-meta { padding-top:18px; color:var(--erp-text); font-size:.85rem; font-weight:700; }
     .legacy-chart { margin-top:20px; padding:20px 24px 12px; }
     .legacy-chart-row { display:grid; grid-template-columns:minmax(135px,1fr) minmax(90px,1.15fr); gap:13px; align-items:center; margin:11px 0; }
     .legacy-chart-label { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; color:#526174; font-size:.78rem; font-weight:700; text-align:right; }

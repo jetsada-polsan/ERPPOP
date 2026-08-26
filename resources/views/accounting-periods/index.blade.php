@@ -8,12 +8,12 @@
 <style>
     [x-cloak] { display: none !important; }
     .period-shell { display: grid; gap: 14px; }
-    .period-panel { background: #fff; border: 1px solid #dbe7ef; border-radius: 8px; }
+    .period-panel { background: #fff; border: 1px solid var(--erp-border); border-radius: 8px; }
     .period-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .period-stat { padding: 15px 18px; border-right: 1px solid #e7eef3; }
     .period-stat:last-child { border-right: 0; }
     .period-stat span { display: block; color: #718696; font-size: 11px; font-weight: 800; }
-    .period-stat strong { color: #1d3b52; font-size: 22px; font-weight: 900; }
+    .period-stat strong { color: var(--erp-text); font-size: 22px; font-weight: 900; }
     .period-form { display: grid; grid-template-columns: 1.15fr .85fr .75fr .75fr 1.2fr auto; gap: 10px; align-items: end; padding: 16px; }
     .period-field label { display: block; margin-bottom: 5px; color: #5f7788; font-size: 11px; font-weight: 800; }
     .period-field input, .period-field select { width: 100%; height: 38px; padding: 0 10px; border: 1px solid #cbdbe5; border-radius: 6px; color: #274b63; background: #fff; font-size: 12px; }
@@ -21,7 +21,7 @@
     .period-table th { padding: 10px 13px; color: #fff; background: linear-gradient(180deg, #2ba7e4, #1b8ecb); border-bottom: 0; font-size: 11px; font-weight: 900; }
     .period-table th:first-child { border-top-left-radius: 6px; }
     .period-table th:last-child { border-top-right-radius: 6px; }
-    .period-table td { padding: 11px 13px; color: #425f73; border-bottom: 1px solid #edf2f5; font-size: 12px; vertical-align: middle; }
+    .period-table td { padding: 11px 13px; color: #425f73; border-bottom: 1px solid var(--erp-surface-2); font-size: 12px; vertical-align: middle; }
     .period-table tr:last-child td { border-bottom: 0; }
     .period-table strong { color: #183c54; }
     .period-status { display: inline-flex; align-items: center; gap: 5px; min-width: 76px; padding: 5px 8px; border-radius: 5px; font-size: 10px; font-weight: 900; }
@@ -29,7 +29,7 @@
     .period-closed { color: #a61b27; background: #fee2e2; }
     .period-action { width: 34px; height: 34px; display: inline-grid; place-items: center; border: 1px solid #d3e0e8; border-radius: 6px; background: #fff; color: #315f80; }
     .period-action.close-action:hover { color: #fff; border-color: #b4232c; background: #b4232c; }
-    .period-action.open-action:hover { color: #fff; border-color: #0f766e; background: #0f766e; }
+    .period-action.open-action:hover { color: #fff; border-color: var(--erp-info); background: var(--erp-info); }
     .period-empty { padding: 36px 20px; color: #7890a1; text-align: center; }
     .close-checks { min-width: 230px; display: grid; gap: 3px; }
     .close-check { display: flex; gap: 6px; align-items: center; font-size: 10px; }

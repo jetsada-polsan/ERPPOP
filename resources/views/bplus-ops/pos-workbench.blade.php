@@ -235,7 +235,7 @@
     }
     .pos-card-head h3 {
         margin: 0;
-        color: #0f172a;
+        color: var(--erp-text);
         font-size: 18px;
         font-weight: 900;
     }
@@ -250,7 +250,7 @@
         margin-bottom: 2px;
     }
     .pos-card .form-label {
-        color: #334155;
+        color: var(--erp-text);
         font-size: 13px;
         font-weight: 900;
         margin-bottom: 5px;
@@ -271,7 +271,7 @@
         padding: 8px 10px;
         border: 1px solid #d8eaf5;
         border-radius: 10px;
-        background: #f8fafc;
+        background: var(--erp-surface-2);
     }
     .pos-filter-actions {
         display: grid;
@@ -297,7 +297,7 @@
     }
     .pos-filter-note {
         margin-bottom: 8px;
-        color: #64748b;
+        color: var(--erp-muted);
         font-size: 12.5px;
         font-weight: 800;
     }

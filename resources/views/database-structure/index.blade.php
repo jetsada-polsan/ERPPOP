@@ -7,8 +7,8 @@
 @push('head')
 <style>
     [x-cloak] { display: none !important; }
-    .db-shell { display: grid; gap: 12px; min-width: 0; color: #1d3b52; }
-    .db-overview { overflow: hidden; background: #fff; border: 1px solid #dbe7ef; border-radius: 7px; }
+    .db-shell { display: grid; gap: 12px; min-width: 0; color: var(--erp-text); }
+    .db-overview { overflow: hidden; background: #fff; border: 1px solid var(--erp-border); border-radius: 7px; }
     .db-overview-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 16px 18px; border-top: 4px solid #1599d3; }
     .db-overview-head h2 { margin: 0 0 4px; color: #15364d; font-size: 18px; font-weight: 900; }
     .db-overview-head p { margin: 0; color: #6a8191; font-size: 12px; line-height: 1.5; }
@@ -20,7 +20,7 @@
     .db-stat strong { display: block; margin-top: 2px; color: #183c54; font-size: 20px; }
 
     .db-workspace { display: grid; grid-template-columns: minmax(280px, 330px) minmax(0, 1fr); gap: 12px; align-items: start; }
-    .db-browser, .db-detail { min-width: 0; overflow: hidden; background: #fff; border: 1px solid #dbe7ef; border-radius: 7px; }
+    .db-browser, .db-detail { min-width: 0; overflow: hidden; background: #fff; border: 1px solid var(--erp-border); border-radius: 7px; }
     .db-browser { position: sticky; top: 76px; }
     .db-toolbar { display: grid; gap: 8px; padding: 11px; border-bottom: 1px solid #e5edf2; background: #f8fbfd; }
     .db-search { position: relative; }
@@ -50,7 +50,7 @@
     .db-detail-label { margin: 5px 0 0; color: #667f90; font-size: 12px; }
     .db-module-badge { display: inline-flex; gap: 5px; align-items: center; padding: 5px 7px; border-radius: 5px; font-size: 10px; font-weight: 900; }
     .db-module-blue, .db-module-cyan { color: #0f6d99; background: #e4f4fb; }
-    .db-module-teal { color: #0f766e; background: #d9f7f1; }
+    .db-module-teal { color: var(--erp-info); background: #d9f7f1; }
     .db-module-amber, .db-module-orange { color: #8a5a00; background: #fef3c7; }
     .db-module-red, .db-module-pink { color: #a52a35; background: #fee7e9; }
     .db-module-indigo { color: #4f46a5; background: #eeecff; }
@@ -70,9 +70,9 @@
     .db-section-head { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 12px 15px; background: #fff; }
     .db-section-head h3 { margin: 0; color: #20455e; font-size: 13px; font-weight: 900; }
     .db-section-head span { color: #7890a1; font-size: 10px; }
-    .db-relations { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #edf2f5; }
+    .db-relations { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--erp-surface-2); }
     .db-relation-group { min-width: 0; padding: 11px 14px 14px; }
-    .db-relation-group + .db-relation-group { border-left: 1px solid #edf2f5; }
+    .db-relation-group + .db-relation-group { border-left: 1px solid var(--erp-surface-2); }
     .db-relation-group h4 { margin: 0 0 8px; color: #61798a; font-size: 10px; font-weight: 900; }
     .db-relation-list { display: grid; gap: 6px; }
     .db-relation { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px 9px; border-left: 3px solid #1599d3; background: #f5fafc; color: #3b5c70; text-decoration: none; }
@@ -82,13 +82,13 @@
     .db-relation i { color: #1599d3; }
     .db-none { padding: 10px; color: #8a9ca8; background: #f7f9fa; font-size: 10px; text-align: center; }
 
-    .db-table-wrap { overflow-x: auto; border-top: 1px solid #edf2f5; }
+    .db-table-wrap { overflow-x: auto; border-top: 1px solid var(--erp-surface-2); }
     .db-columns { width: 100%; min-width: 880px; border-collapse: collapse; }
-    .db-columns th { padding: 9px 11px; color: #607989; background: #f7fafc; border-bottom: 1px solid #dbe7ef; font-size: 9px; font-weight: 900; text-align: left; }
-    .db-columns td { padding: 9px 11px; color: #456276; border-bottom: 1px solid #edf2f5; font-size: 10px; vertical-align: top; }
+    .db-columns th { padding: 9px 11px; color: #607989; background: #f7fafc; border-bottom: 1px solid var(--erp-border); font-size: 9px; font-weight: 900; text-align: left; }
+    .db-columns td { padding: 9px 11px; color: #456276; border-bottom: 1px solid var(--erp-surface-2); font-size: 10px; vertical-align: top; }
     .db-columns tbody tr:last-child td { border-bottom: 0; }
     .db-column-name { color: #15364d; font: 700 11px Consolas, monospace; }
-    .db-type { color: #0f766e; font: 700 10px Consolas, monospace; }
+    .db-type { color: var(--erp-info); font: 700 10px Consolas, monospace; }
     .db-key-tags { display: flex; gap: 4px; flex-wrap: wrap; }
     .db-key { min-width: 24px; padding: 3px 4px; border-radius: 4px; text-align: center; font-size: 8px; font-weight: 900; }
     .db-key-pk { color: #8a5a00; background: #fef3c7; }
@@ -108,7 +108,7 @@
         .db-meta-item:nth-child(2) { border-right: 0; }
         .db-meta-item:nth-child(-n+2) { border-bottom: 1px solid #e5edf2; }
         .db-relations { grid-template-columns: 1fr; }
-        .db-relation-group + .db-relation-group { border-left: 0; border-top: 1px solid #edf2f5; }
+        .db-relation-group + .db-relation-group { border-left: 0; border-top: 1px solid var(--erp-surface-2); }
     }
     @media (max-width: 720px) {
         .db-overview-head { flex-direction: column; }

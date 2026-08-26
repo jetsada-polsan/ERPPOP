@@ -7,7 +7,7 @@
         'ar' => ['icon' => 'bi-person-lines-fill', 'color' => '#db2777', 'label' => 'ลูกหนี้'],
         'inventory' => ['icon' => 'bi-box-seam-fill', 'color' => '#0891b2', 'label' => 'สินค้า / สต็อก'],
         'documents' => ['icon' => 'bi-files', 'color' => '#4f46e5', 'label' => 'เอกสาร'],
-        'pos' => ['icon' => 'bi-cart-check-fill', 'color' => '#0f766e', 'label' => 'POS'],
+        'pos' => ['icon' => 'bi-cart-check-fill', 'color' => 'var(--erp-info)', 'label' => 'POS'],
         'purchasing' => ['icon' => 'bi-basket-fill', 'color' => '#d97706', 'label' => 'ซื้อสินค้า'],
         'transfer' => ['icon' => 'bi-arrow-left-right', 'color' => '#7c3aed', 'label' => 'โอนสินค้า'],
         'payment' => ['icon' => 'bi-cash-coin', 'color' => '#059669', 'label' => 'การเงิน / ชำระ'],
@@ -220,7 +220,7 @@
         <div class="rpt-nav-head mt-3"><i class="bi bi-folder2-open" style="color:#0284c7"></i> รายงานทั้งหมด</div>
         @foreach($catalog as $catKey => $group)
             @php
-                $meta = $categoryMeta[$catKey] ?? ['icon' => 'bi-grid', 'color' => '#64748b', 'label' => $group['title']];
+                $meta = $categoryMeta[$catKey] ?? ['icon' => 'bi-grid', 'color' => 'var(--erp-muted)', 'label' => $group['title']];
             @endphp
             <button type="button" class="rpt-nav-cat {{ $selectedCategory === $catKey ? 'current' : '' }}"
                 @click="open = open === '{{ $catKey }}' ? '' : '{{ $catKey }}'">
@@ -289,9 +289,9 @@
                     </select>
                 </label>
 
-                <i class="bi bi-calendar3" style="color:#64748b"></i>
+                <i class="bi bi-calendar3" style="color:var(--erp-muted)"></i>
                 <input type="date" name="from" value="{{ $from }}" class="rpt-date-input">
-                <span style="color:#64748b;font-size:13px">ถึง</span>
+                <span style="color:var(--erp-muted);font-size:13px">ถึง</span>
                 <input type="date" name="to" value="{{ $to }}" class="rpt-date-input">
 
                 <a href="{{ request()->fullUrlWithQuery(['from'=>now()->toDateString(),'to'=>now()->toDateString()]) }}" class="rpt-shortcut">วันนี้</a>
@@ -608,7 +608,7 @@
         display: none;
         background: #f7f9fc;
         border: 0;
-        border-right: 1px solid #e2e8f0;
+        border-right: 1px solid var(--erp-border);
         border-radius: 0;
         padding: 20px 12px;
         position: sticky;
@@ -624,7 +624,7 @@
         gap: 6px;
         font-size: 12px;
         font-weight: 900;
-        color: #64748b;
+        color: var(--erp-muted);
         padding: 8px 12px 10px;
         text-transform: none;
     }
@@ -639,7 +639,7 @@
         line-height: 1.35;
         overflow-wrap: anywhere;
     }
-    .rpt-nav-link:hover { background: #eef4f8; color: #0f172a; }
+    .rpt-nav-link:hover { background: #eef4f8; color: var(--erp-text); }
     .rpt-nav-link.active { background: #e9edf3; color: #020617; font-weight: 900; }
     .rpt-legacy-card {
         display: flex;
@@ -650,7 +650,7 @@
         border: 1px solid #d7ecf7;
         border-radius: 8px;
         background: #f6fbfe;
-        color: #0f172a;
+        color: var(--erp-text);
         text-decoration: none;
         box-shadow: 0 8px 22px rgba(35,150,200,.08);
     }
@@ -677,7 +677,7 @@
     }
     .rpt-legacy-card small {
         display: block;
-        color: #64748b;
+        color: var(--erp-muted);
         font-size: 11px;
         font-weight: 700;
         line-height: 1.35;
@@ -694,12 +694,12 @@
         border-radius: 8px;
         font-size: 15px;
         font-weight: 850;
-        color: #0f172a;
+        color: var(--erp-text);
         cursor: pointer;
         font-family: inherit;
         text-align: left;
     }
-    .rpt-nav-cat:hover { background: #f1f5f9; }
+    .rpt-nav-cat:hover { background: var(--erp-surface-2); }
     .rpt-nav-cat.current { background: transparent; color: #020617; }
     .rpt-nav-sub { padding-left: 2px; }
 
@@ -721,7 +721,7 @@
         gap: 10px;
         min-width: min(100%, 430px);
         margin: 0;
-        color: #0f172a;
+        color: var(--erp-text);
         font-size: 14px;
         font-weight: 900;
     }
@@ -760,7 +760,7 @@
         background: #fff;
         white-space: nowrap;
     }
-    .rpt-shortcut:hover { background: #f1f5f9; color: #0f172a; }
+    .rpt-shortcut:hover { background: var(--erp-surface-2); color: var(--erp-text); }
     .rpt-btn-filter,
     .rpt-btn-export,
     .rpt-btn-print {
@@ -834,10 +834,10 @@
     .flow-report-meta dl { display:flex; align-items:center; gap:16px; margin:0; }
     .flow-report-meta dl div { display:flex; align-items:center; gap:5px; }
     .flow-report-meta dt,.flow-report-meta dd { font-size:10px; line-height:1.2; }
-    .flow-report-meta dt { color:#64748b; font-weight:600; }
+    .flow-report-meta dt { color:var(--erp-muted); font-weight:600; }
     .flow-report-totals { display:flex; align-items:center; gap:16px; padding:0; }
     .flow-report-totals div { display:flex; align-items:center; gap:5px; }
-    .flow-report-totals span { font-size:10px; color:#64748b; font-weight:600; }
+    .flow-report-totals span { font-size:10px; color:var(--erp-muted); font-weight:600; }
     .flow-report-totals strong { font-size:12px; }
     .flow-tabs { display:none; }
     .flow-report-shell .content-card { border-radius:5px; box-shadow:0 3px 10px rgba(15,51,74,.05); }
@@ -870,14 +870,14 @@
             justify-content: space-between;
             align-items: flex-start;
             gap: 16px;
-            border-bottom: 2px solid #0f172a;
+            border-bottom: 2px solid var(--erp-text);
             padding-bottom: 10px;
             margin-bottom: 12px;
         }
-        .rpt-print-name { font-size: 17px; font-weight: 900; color: #0f172a; }
-        .rpt-print-title { font-size: 15px; font-weight: 800; color: #0f172a; }
+        .rpt-print-name { font-size: 17px; font-weight: 900; color: var(--erp-text); }
+        .rpt-print-title { font-size: 15px; font-weight: 800; color: var(--erp-text); }
         .rpt-print-meta { text-align: right; flex-shrink: 0; }
-        .rpt-print-sub { font-size: 11.5px; color: #334155; line-height: 1.55; }
+        .rpt-print-sub { font-size: 11.5px; color: var(--erp-text); line-height: 1.55; }
     }
     @media (max-width: 1100px) {
         .flow-report-shell { grid-template-columns: 1fr; margin: 0; }
@@ -889,7 +889,7 @@
     }
     @media (max-width: 767.98px) {
         .flow-report-shell { display: block; }
-        .rpt-nav { max-height: 260px; border-right: 0; border-bottom: 1px solid #e2e8f0; }
+        .rpt-nav { max-height: 260px; border-right: 0; border-bottom: 1px solid var(--erp-border); }
         .rpt-main { padding: 14px; }
         .flow-report-head h1 { font-size: 23px; }
         .flow-head-actions { width: 100%; justify-content: stretch; }

@@ -215,45 +215,45 @@
 <style>
     .doc-filter-bar {
         display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-        background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+        background: #fff; border: 1px solid var(--erp-border); border-radius: 10px;
         padding: 10px 12px; box-shadow: 0 1px 4px rgba(15,23,42,.05);
     }
     .doc-browser { display: grid; grid-template-columns: 285px minmax(0, 1fr); gap: 14px; align-items: start; }
     .doc-tree-panel {
-        background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+        background: #fff; border: 1px solid var(--erp-border); border-radius: 12px;
         padding: 8px; max-height: calc(100vh - 240px); overflow-y: auto;
         scrollbar-width: thin;
     }
-    .doc-tree-head { font-size: 12px; font-weight: 900; color: #64748b; padding: 6px 8px; }
+    .doc-tree-head { font-size: 12px; font-weight: 900; color: var(--erp-muted); padding: 6px 8px; }
     .doc-tree-type {
         display: flex; align-items: center; gap: 7px; width: 100%;
         border: 0; background: transparent; text-align: left;
         padding: 7px 9px; border-radius: 8px; font-size: 13px; font-weight: 700;
-        color: #334155; cursor: pointer; text-decoration: none;
+        color: var(--erp-text); cursor: pointer; text-decoration: none;
     }
     .doc-book-row { display: flex; flex-wrap: wrap; gap: 5px; padding: 4px 8px 6px 14px; }
-    .doc-book-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 7px; border: 1px solid #e2e8f0; background: #fff; color: #475569; font-size: 12px; font-weight: 700; text-decoration: none; }
+    .doc-book-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 7px; border: 1px solid var(--erp-border); background: #fff; color: var(--erp-text); font-size: 12px; font-weight: 700; text-decoration: none; }
     .doc-book-chip:hover { border-color: #0ea5e9; color: #0369a1; }
     .doc-book-chip.active { background: #0369a1; color: #fff; border-color: #0369a1; }
-    .doc-tree-type:hover { background: #f1f5f9; }
+    .doc-tree-type:hover { background: var(--erp-surface-2); }
     .doc-tree-type.active { background: #e0f2fe; color: #0369a1; }
     .doc-tree-years { padding-left: 14px; }
     .doc-tree-link {
         display: flex; align-items: center; gap: 6px;
         padding: 5px 9px; border-radius: 7px; font-size: 12.5px;
-        color: #475569; text-decoration: none;
+        color: var(--erp-text); text-decoration: none;
     }
-    .doc-tree-link:hover { background: #f1f5f9; }
-    .doc-tree-link.active { background: #0f172a; color: #fff; }
+    .doc-tree-link:hover { background: var(--erp-surface-2); }
+    .doc-tree-link.active { background: var(--erp-text); color: #fff; }
     .doc-tree-months { padding-left: 18px; }
     .doc-tree-count { margin-left: auto; font-size: 10.5px; color: #94a3b8; font-weight: 700; }
     .doc-tree-link.active .doc-tree-count { color: #cbd5e1; }
     .doc-grid thead th {
-        position: sticky; top: 0; background: #0f172a; color: #e2e8f0;
+        position: sticky; top: 0; background: var(--erp-text); color: var(--erp-border);
         font-size: 12px; white-space: nowrap; z-index: 2;
     }
     .doc-grid td { font-size: 13px; }
-    .doc-grid tbody tr:nth-child(even) { background: #f8fafc; }
+    .doc-grid tbody tr:nth-child(even) { background: var(--erp-surface-2); }
     .doc-grid tbody tr:hover { background: #f0f9ff; }
     @media (max-width: 1100px) {
         .doc-browser { grid-template-columns: 1fr; }

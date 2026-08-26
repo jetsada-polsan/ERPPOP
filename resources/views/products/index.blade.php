@@ -247,8 +247,8 @@
 <style>
     .status-summary { display:flex; align-items:center; gap:12px; height:72px; padding:12px 16px; background:#fff; border:1px solid #e5e7eb; border-radius:14px; color:inherit; text-decoration:none; transition:.15s ease; }
     .status-summary:hover, .status-summary.is-selected { border-color:#93c5fd; box-shadow:0 6px 18px rgba(30,64,175,.10); transform:translateY(-1px); }
-    .status-summary-icon { width:38px; height:38px; display:grid; place-items:center; border-radius:11px; background:#f1f5f9; font-size:19px; }
-    .status-summary small { display:block; color:#64748b; font-size:12px; }
+    .status-summary-icon { width:38px; height:38px; display:grid; place-items:center; border-radius:11px; background:var(--erp-surface-2); font-size:19px; }
+    .status-summary small { display:block; color:var(--erp-muted); font-size:12px; }
     .status-summary strong { display:block; color:#172b4d; font-size:21px; line-height:1.1; }
     [x-cloak] { display: none !important; }
     .booking-modal-backdrop {
@@ -290,7 +290,7 @@
     .product-table tbody tr:hover { background:#f7fbfd; }
     .product-table .badge { border-radius:5px; padding:3px 6px; font-size:9px; font-weight:700; }
     .product-table tbody .btn-primary { min-width:58px; min-height:27px; border-radius:6px; font-size:9px; font-weight:700; padding:3px 7px; box-shadow:none; }
-    .product-pagination { padding:12px 14px 4px; border-top:1px solid #edf2f5; }
+    .product-pagination { padding:12px 14px 4px; border-top:1px solid var(--erp-surface-2); }
     @media(max-width:1200px){.product-toolbar{align-items:stretch;flex-direction:column}.product-actions{justify-content:flex-end}.product-filter-field.search-field{width:min(280px,100%)}}
     @media(max-width:720px){.product-toolbar{padding:10px}.product-filter-bar,.product-filter-field,.product-filter-field.search-field{width:100%}.product-filter-field{min-width:0}.product-filter-bar .btn{flex:1}.product-actions{display:grid;grid-template-columns:1fr 1fr}.product-actions .btn{display:flex;align-items:center;justify-content:center}.product-table thead th,.product-table tbody td{padding:9px 10px}.product-popup-backdrop{padding:0}.product-popup-window{width:100vw;height:100vh;border:0;border-radius:0}}
     @media(max-width:720px){.scale-plu-summary{align-items:flex-start;flex-wrap:wrap}.scale-plu-summary .btn{width:100%;margin-left:0!important}}

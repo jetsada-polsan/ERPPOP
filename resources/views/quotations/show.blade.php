@@ -71,8 +71,8 @@
     @if($docNote = \App\Models\AppSetting::get('doc_footer_note'))<div class="small text-muted mt-1">{{ $docNote }}</div>@endif
 
     <div class="d-flex justify-content-around mt-5 pt-3">
-        <div class="text-center small" style="width:40%"><div style="border-top:1px dashed #64748b;margin-bottom:6px"></div>ผู้เสนอราคา</div>
-        <div class="text-center small" style="width:40%"><div style="border-top:1px dashed #64748b;margin-bottom:6px"></div>ผู้อนุมัติสั่งซื้อ (ลูกค้า)</div>
+        <div class="text-center small" style="width:40%"><div style="border-top:1px dashed var(--erp-muted);margin-bottom:6px"></div>ผู้เสนอราคา</div>
+        <div class="text-center small" style="width:40%"><div style="border-top:1px dashed var(--erp-muted);margin-bottom:6px"></div>ผู้อนุมัติสั่งซื้อ (ลูกค้า)</div>
     </div>
 </div>
 @endsection

@@ -92,13 +92,13 @@
 @push('head')
 <style>
     .print-sheet { background: #fff; padding: 20px; border-radius: 10px; }
-    .bill-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 2px solid #0f172a; padding-bottom: 12px; }
-    .bill-customer { padding: 12px 0; border-bottom: 1px solid #e2e8f0; }
+    .bill-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 2px solid var(--erp-text); padding-bottom: 12px; }
+    .bill-customer { padding: 12px 0; border-bottom: 1px solid var(--erp-border); }
     .bill-table { margin-top: 12px; }
-    .bill-table thead th { background: #f1f5f9; font-size: 13px; }
+    .bill-table thead th { background: var(--erp-surface-2); font-size: 13px; }
     .bill-sign { display: flex; justify-content: space-around; margin-top: 50px; }
     .bill-sign .sign-box { text-align: center; font-size: 13px; width: 30%; }
-    .bill-sign .line { border-top: 1px dashed #64748b; margin-bottom: 6px; }
+    .bill-sign .line { border-top: 1px dashed var(--erp-muted); margin-bottom: 6px; }
     @include('documents.partials.print-theme')
     /* ประกาศขนาดกระดาษให้ชัด — ไม่ประกาศแล้วเครื่องพิมพ์แต่ละเครื่อง
     จะใช้ค่าที่ตั้งไว้ของตัวเอง เนื้อหาที่วางไว้กว้าง 210mm อาจถูกย่อหรือตัดขอบ

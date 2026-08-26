@@ -31,18 +31,18 @@
     .flow-head {
         padding: 14px 16px;
         border-bottom: 1px solid #e8edf5;
-        background: #f8fafc;
+        background: var(--erp-surface-2);
     }
 
     .flow-head-title {
         font-size: 16px;
         font-weight: 800;
-        color: #0f172a;
+        color: var(--erp-text);
         margin: 0;
     }
 
     .flow-head-sub {
-        color: #64748b;
+        color: var(--erp-muted);
         font-size: 12px;
         margin-top: 3px;
     }
@@ -59,7 +59,7 @@
         border: 1px solid #dce3ee;
         background: #fff;
         border-radius: 999px;
-        color: #334155;
+        color: var(--erp-text);
         font-weight: 800;
         font-size: 12px;
         padding: 7px 10px;
@@ -69,7 +69,7 @@
     .flow-tab.active {
         border-color: #0f9aaa;
         background: #e8f6f8;
-        color: #0f766e;
+        color: var(--erp-info);
     }
 
     .flow-search {
@@ -96,7 +96,7 @@
         display: grid;
         grid-template-columns: 32px 1fr;
         gap: 10px;
-        color: #0f172a;
+        color: var(--erp-text);
     }
 
     .flow-step:hover {
@@ -115,8 +115,8 @@
         border-radius: 6px;
         display: grid;
         place-items: center;
-        background: #e2e8f0;
-        color: #334155;
+        background: var(--erp-border);
+        color: var(--erp-text);
         font-weight: 900;
         font-size: 12px;
     }
@@ -132,7 +132,7 @@
     }
 
     .step-note {
-        color: #64748b;
+        color: var(--erp-muted);
         font-size: 12px;
         margin-top: 4px;
         line-height: 1.35;
@@ -161,12 +161,12 @@
     .detail-title {
         font-size: 28px;
         font-weight: 900;
-        color: #0f172a;
+        color: var(--erp-text);
         margin: 4px 0 6px;
     }
 
     .detail-summary {
-        color: #475569;
+        color: var(--erp-text);
         font-size: 15px;
         max-width: 760px;
     }
@@ -227,7 +227,7 @@
     }
 
     .legacy-doc-title {
-        color: #0f172a;
+        color: var(--erp-text);
         font-size: 13px;
         font-weight: 900;
         margin-bottom: 8px;
@@ -242,7 +242,7 @@
     .legacy-code-chip {
         border: 1px solid #cbd5e1;
         background: #fff;
-        color: #0f172a;
+        color: var(--erp-text);
         border-radius: 7px;
         padding: 5px 9px;
         font-size: 12px;
@@ -253,7 +253,7 @@
 
     .legacy-code-chip:hover {
         border-color: #0f9aaa;
-        color: #0f766e;
+        color: var(--erp-info);
         background: #eefcfc;
     }
 
@@ -266,7 +266,7 @@
     }
 
     .bplus-flow-title {
-        color: #0f172a;
+        color: var(--erp-text);
         font-size: 13px;
         font-weight: 900;
         margin-bottom: 10px;
@@ -297,7 +297,7 @@
     }
 
     .bplus-flow-name {
-        color: #0f172a;
+        color: var(--erp-text);
         font-size: 13px;
         font-weight: 850;
         line-height: 1.25;
@@ -315,7 +315,7 @@
         border-radius: 8px;
         padding: 12px;
         text-decoration: none;
-        color: #0f172a;
+        color: var(--erp-text);
         background: #fff;
         min-height: 78px;
     }
@@ -323,7 +323,7 @@
     .quick-link:hover {
         border-color: #0f9aaa;
         background: #f5ffff;
-        color: #0f172a;
+        color: var(--erp-text);
     }
 
     .quick-title {
@@ -332,7 +332,7 @@
     }
 
     .quick-note {
-        color: #64748b;
+        color: var(--erp-muted);
         font-size: 12px;
         margin-top: 5px;
     }
@@ -340,12 +340,12 @@
     .flow-footer {
         padding: 10px 22px;
         border-top: 1px solid #e8edf5;
-        color: #64748b;
+        color: var(--erp-muted);
         display: flex;
         justify-content: space-between;
         gap: 12px;
         font-size: 12px;
-        background: #f8fafc;
+        background: var(--erp-surface-2);
     }
 
 @media (max-width: 1199.98px) {

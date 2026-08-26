@@ -118,11 +118,11 @@
                     <div class="set-desc mb-3">เปลี่ยนสีเมนู ปุ่มหลัก และพื้นหลัง โดยขนาดหน้าจอและตัวอักษรยังคงเดิม</div>
                     <div class="theme-choice-grid">
                         @foreach([
-                            'ocean' => ['ฟ้า JET', '#1a9bdc', '#1585c0', '#eef4f9'],
-                            'navy' => ['กรมท่า', '#315b86', '#244768', '#eef2f7'],
+                            'ocean' => ['ฟ้า JET', '#1a9bdc', 'var(--erp-primary)', 'var(--erp-primary-soft)'],
+                            'navy' => ['กรมท่า', '#315b86', '#244768', 'var(--erp-surface-2)'],
                             'emerald' => ['เขียวมรกต', '#23966c', '#187653', '#eef7f3'],
-                            'slate' => ['เทาสเลต', '#64748b', '#475569', '#f1f3f5'],
-                            'clear' => ['อ่านง่าย', '#2563eb', '#0f766e', '#f4f6f8'],
+                            'slate' => ['เทาสเลต', 'var(--erp-muted)', 'var(--erp-text)', '#f1f3f5'],
+                            'clear' => ['อ่านง่าย', '#2563eb', 'var(--erp-info)', '#f4f6f8'],
                         ] as $key => [$label, $primary, $deep, $bg])
                             <label class="theme-choice" :class="theme === '{{ $key }}' && 'active'">
                                 <input type="radio" name="erp_theme" value="{{ $key }}" x-model="theme">
@@ -527,7 +527,7 @@ async function copyPosToken(text) {
     .menu-order-card { max-width:620px; padding:16px; }
     .menu-order-row { display:flex; align-items:center; gap:10px; min-height:40px; padding:5px 8px; border:1px solid #dce7ef; border-radius:7px; margin-top:6px; background:#f8fbfd; font-size:12px; }
     .menu-order-index { width:24px; height:24px; display:grid; place-items:center; border-radius:5px; background:#e0f2fe; color:#0369a1; font-weight:800; }
-    .menu-order-row button { width:28px; height:28px; border:1px solid #cbd5e1; border-radius:5px; background:#fff; color:#334155; }
+    .menu-order-row button { width:28px; height:28px; border:1px solid #cbd5e1; border-radius:5px; background:#fff; color:var(--erp-text); }
     .menu-order-row button:disabled { opacity:.3; }
     .theme-settings-card { max-width:720px; padding:16px; }
     .theme-choice-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }

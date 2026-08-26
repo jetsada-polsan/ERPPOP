@@ -19,9 +19,9 @@
                 <label class="form-label small text-muted">ค้นหาสินค้า</label>
                 <input type="text" x-model="query" @input.debounce.300ms="search()"
                     placeholder="รหัส / ชื่อสินค้า" class="form-control" autocomplete="off">
-                <div x-show="results.length" style="position:absolute;z-index:100;left:0;right:0;top:100%;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 8px 24px rgba(15,23,42,.12);padding:6px;max-height:240px;overflow-y:auto">
+                <div x-show="results.length" style="position:absolute;z-index:100;left:0;right:0;top:100%;background:#fff;border:1px solid var(--erp-border);border-radius:10px;box-shadow:0 8px 24px rgba(15,23,42,.12);padding:6px;max-height:240px;overflow-y:auto">
                     <template x-for="p in results" :key="p.id">
-                        <div @click="addProduct(p)" style="padding:8px 12px;cursor:pointer;border-radius:7px;font-size:13px" @mouseenter="$el.style.background='#f1f5f9'" @mouseleave="$el.style.background=''">
+                        <div @click="addProduct(p)" style="padding:8px 12px;cursor:pointer;border-radius:7px;font-size:13px" @mouseenter="$el.style.background='var(--erp-surface-2)'" @mouseleave="$el.style.background=''">
                             <span class="fw-semibold" x-text="p.sku_code"></span> — <span x-text="p.name_th"></span>
                         </div>
                     </template>

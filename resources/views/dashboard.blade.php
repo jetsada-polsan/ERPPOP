@@ -53,7 +53,7 @@
 
     @if(!empty($scopeBranchName))
         <div class="alert border-0 rounded-4 shadow-sm mb-4 d-flex align-items-center gap-2"
-             style="background:#e3f3fc;color:#1585c0">
+             style="background:#e3f3fc;color:var(--erp-primary)">
             <i class="bi bi-shop"></i>
             <span class="small fw-semibold">แสดงข้อมูลเฉพาะสาขาของคุณ: {{ $scopeBranchName }}</span>
         </div>
@@ -236,7 +236,7 @@
         justify-content: space-between;
         gap: 12px;
         background: #fff;
-        border: 1px solid #e2e8f0;
+        border: 1px solid var(--erp-border);
         border-radius: 9px;
         padding: 10px 14px;
         box-shadow: 0 1px 4px rgba(15,23,42,.06);
@@ -246,7 +246,7 @@
         display: flex;
         align-items: center;
         gap: 8px;
-        color: #334155;
+        color: var(--erp-text);
         font-size: 14px;
         font-weight: 850;
         white-space: nowrap;
@@ -268,7 +268,7 @@
         align-items: center;
         gap: 7px;
         margin: 0;
-        color: #64748b;
+        color: var(--erp-muted);
         font-size: 12px;
         font-weight: 800;
     }
@@ -276,8 +276,8 @@
     .filter-fields .form-control {
         width: 150px;
         min-height: 32px;
-        border-color: #e2e8f0;
-        background: #f8fafc;
+        border-color: var(--erp-border);
+        background: var(--erp-surface-2);
         font-size: 13px;
     }
 
@@ -337,9 +337,9 @@
     .metric-icon-ar { background:#fff6db; color:#966b06; }
     .metric-icon-pos { background:#fff0f0; color:#c32d38; }
 
-    .metric-label { color: #64748b; font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+    .metric-label { color: var(--erp-muted); font-weight: 600; font-size: 13px; margin-bottom: 6px; }
 
-    .metric-value { color:#0f172a;font-size:22px;line-height:1;font-weight:850;font-variant-numeric:tabular-nums; }
+    .metric-value { color:var(--erp-text);font-size:22px;line-height:1;font-weight:850;font-variant-numeric:tabular-nums; }
 
     .metric-unit { color: #94a3b8; font-size: 12px; margin-top: 4px; }
 
@@ -353,7 +353,7 @@
     .metric-mini-row {
         display: flex; align-items: center;
         justify-content: space-between; gap: 8px;
-        color: #64748b; font-size: 12px; line-height: 1.3;
+        color: var(--erp-muted); font-size: 12px; line-height: 1.3;
     }
 
     .metric-mini-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -365,7 +365,7 @@
     /* ── Panel cards ──────────────────────────── */
     .panel-card {
         background: #fff;
-        border: 1px solid #e2e8f0;
+        border: 1px solid var(--erp-border);
         border-radius: 11px;
         padding: 14px;
         box-shadow:0 4px 16px rgba(15,23,42,.045);
@@ -377,10 +377,10 @@
     .panel-title {
         display: flex; align-items: center; gap: 10px;
         font-size:13px;font-weight:800;margin-bottom:10px;
-        color: #0f172a;
+        color: var(--erp-text);
     }
 
-    .table td { border-bottom-color: #f1f5f9; }
+    .table td { border-bottom-color: var(--erp-surface-2); }
     .product-name { color:#172b43; font-weight:750; min-width:230px; }
     .product-sku { color:#6b7c90; font-size:12px; font-variant-numeric:tabular-nums; white-space:nowrap; }
 

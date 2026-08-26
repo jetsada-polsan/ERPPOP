@@ -106,9 +106,9 @@
                                         <td class="position-relative">
                                             <input type="text" x-model="item.q" @input.debounce.300ms="search(idx)" placeholder="ค้นหารหัส/ชื่อสินค้า" class="form-control form-control-sm" autocomplete="off">
                                             <input type="hidden" :name="`items[${idx}][product_id]`" x-model="item.product_id">
-                                            <div x-show="item.results.length" style="position:absolute;z-index:50;left:0;right:0;background:#fff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.12);max-height:200px;overflow:auto">
+                                            <div x-show="item.results.length" style="position:absolute;z-index:50;left:0;right:0;background:#fff;border:1px solid var(--erp-border);border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.12);max-height:200px;overflow:auto">
                                                 <template x-for="p in item.results" :key="p.id">
-                                                    <div @click="pick(idx, p)" style="padding:7px 10px;cursor:pointer;font-size:13px" @mouseenter="$el.style.background='#f1f5f9'" @mouseleave="$el.style.background=''">
+                                                    <div @click="pick(idx, p)" style="padding:7px 10px;cursor:pointer;font-size:13px" @mouseenter="$el.style.background='var(--erp-surface-2)'" @mouseleave="$el.style.background=''">
                                                         <span class="fw-semibold" x-text="p.sku_code"></span> <span x-text="p.name_th"></span>
                                                     </div>
                                                 </template>

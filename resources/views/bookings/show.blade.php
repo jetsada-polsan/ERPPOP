@@ -194,12 +194,12 @@ $isOverdue = $isDelivery && ! $deliveryDone && $booking->delivery_due_at && $boo
 @push('head')
 <style>
 .flow-step { display:flex;flex-direction:column;align-items:center;gap:6px;min-width:100px; }
-.flow-dot { width:44px;height:44px;border-radius:50%;border:2px solid #e2e8f0;background:#f8fafc;display:grid;place-items:center;font-size:18px;color:#94a3b8;transition:all .2s; }
+.flow-dot { width:44px;height:44px;border-radius:50%;border:2px solid var(--erp-border);background:var(--erp-surface-2);display:grid;place-items:center;font-size:18px;color:#94a3b8;transition:all .2s; }
 .flow-step.done .flow-dot { border-color:#10b981;background:#ecfdf5;color:#10b981; }
-.flow-step.pending .flow-dot { border-color:#e2e8f0;background:#f8fafc;color:#cbd5e1; }
+.flow-step.pending .flow-dot { border-color:var(--erp-border);background:var(--erp-surface-2);color:#cbd5e1; }
 .flow-label { font-size:12px;font-weight:700;text-align:center;color:#374151; }
-.flow-sub { font-size:11px;font-weight:400;color:#64748b;margin-top:2px; }
-.flow-line { flex:1;height:2px;background:#e2e8f0;min-width:40px;margin:0 8px;position:relative;top:-10px; }
+.flow-sub { font-size:11px;font-weight:400;color:var(--erp-muted);margin-top:2px; }
+.flow-line { flex:1;height:2px;background:var(--erp-border);min-width:40px;margin:0 8px;position:relative;top:-10px; }
 .flow-line.done { background:#10b981; }
 .doc-book-picker { min-width: 280px; border: 1px solid #dbeafe; background: #f8fbff; border-radius: 12px; padding: 8px 10px; }
 .doc-book-label { font-size: 11px; font-weight: 800; color: #2563eb; margin-bottom: 4px; }

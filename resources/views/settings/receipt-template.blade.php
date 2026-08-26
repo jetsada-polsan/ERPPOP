@@ -164,7 +164,7 @@
     .paper-switch { display:flex; margin-left:auto; padding:3px; border:1px solid #d8e3ea; border-radius:7px; background:#f4f7f9; }
     .paper-switch button { min-width:70px; height:32px; border:0; border-radius:5px; background:transparent; color:#607585; font-size:11px; font-weight:800; }
     .paper-switch button.active { background:#fff; color:#087fa8; box-shadow:0 1px 4px rgba(34,62,78,.14); }
-    .receipt-designer { height:calc(100vh - 205px); min-height:520px; display:grid; grid-template-columns:230px minmax(430px,1fr) 250px; border:1px solid var(--erp-border); border-radius:8px; overflow:hidden; background:#edf2f5; }
+    .receipt-designer { height:calc(100vh - 205px); min-height:520px; display:grid; grid-template-columns:230px minmax(430px,1fr) 250px; border:1px solid var(--erp-border); border-radius:8px; overflow:hidden; background:var(--erp-surface-2); }
     .designer-panel { min-width:0; overflow:auto; background:#fff; }
     .palette-panel { border-right:1px solid var(--erp-border); }
     .inspector-panel { border-left:1px solid var(--erp-border); }

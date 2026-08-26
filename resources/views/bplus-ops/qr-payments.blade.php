@@ -152,7 +152,7 @@
 </div>
 
 {{-- Info card --}}
-<div class="content-card p-4" style="border:1.5px dashed #e2e8f0">
+<div class="content-card p-4" style="border:1.5px dashed var(--erp-border)">
     <div class="fw-bold mb-2 small"><i class="bi bi-info-circle me-1 text-primary"></i>PromptPay ID คืออะไร?</div>
     <div class="row g-2">
         <div class="col-md-4">

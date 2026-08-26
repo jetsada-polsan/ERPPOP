@@ -273,7 +273,7 @@
     .recipe-bom-table { border: 1px solid #e7eef3; border-radius: 12px; overflow: hidden; }
     .recipe-bom-table .table { margin-bottom: 0; }
     .recipe-item-dot { width: 8px; height: 8px; border-radius: 50%; background: #20a67a; flex: 0 0 8px; }
-    .recipe-bom-total td { background: #f7fbfe; border-top: 2px solid #dbe7ef; padding-top: 10px; padding-bottom: 10px; }
+    .recipe-bom-total td { background: #f7fbfe; border-top: 2px solid var(--erp-border); padding-top: 10px; padding-bottom: 10px; }
     .recipe-add-panel {
         border: 1px dashed #bcdcee; border-radius: 12px; background: #fbfeff; padding: 14px 16px;
     }

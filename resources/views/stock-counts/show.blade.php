@@ -44,13 +44,13 @@
                     class="form-control ps-5" placeholder="ค้นหา/สแกน รหัส บาร์โค้ด ชื่อสินค้า แล้ว Enter">
                 {{-- Dropdown เด้งผลลัพธ์เหมือน select --}}
                 <div x-show="openDrop && q.length > 0" @click.outside="openDrop = false"
-                    style="position:absolute;z-index:120;left:0;right:0;top:100%;margin-top:4px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 12px 30px rgba(15,23,42,.15);max-height:300px;overflow-y:auto">
+                    style="position:absolute;z-index:120;left:0;right:0;top:100%;margin-top:4px;background:#fff;border:1px solid var(--erp-border);border-radius:10px;box-shadow:0 12px 30px rgba(15,23,42,.15);max-height:300px;overflow-y:auto">
                     <template x-for="row in matches.slice(0, 12)" :key="row.id">
-                        <div @click="pick(row)" style="padding:9px 14px;cursor:pointer;font-size:13px;display:flex;gap:10px;border-bottom:1px solid #f1f5f9"
+                        <div @click="pick(row)" style="padding:9px 14px;cursor:pointer;font-size:13px;display:flex;gap:10px;border-bottom:1px solid var(--erp-surface-2)"
                             @mouseenter="$el.style.background='#f0f9ff'" @mouseleave="$el.style.background=''">
                             <span x-text="row.sku" style="color:#0284c7;font-weight:700;min-width:90px"></span>
                             <span x-text="row.name" class="text-truncate"></span>
-                            <span x-text="money(row.system)" style="margin-left:auto;color:#64748b"></span>
+                            <span x-text="money(row.system)" style="margin-left:auto;color:var(--erp-muted)"></span>
                         </div>
                     </template>
                     <div x-show="matches.length === 0" class="text-muted small p-3">ไม่พบสินค้าในใบนี้</div>
@@ -150,11 +150,11 @@
     [x-cloak] { display: none !important; }
     .sc-grid thead th {
         position: sticky; top: 0; z-index: 5;
-        background: #0f172a; color: #e2e8f0;
+        background: var(--erp-text); color: var(--erp-border);
         font-size: 12px; font-weight: 800; white-space: nowrap;
     }
     .sc-grid td { font-size: 13px; }
-    .sc-grid tbody tr:nth-child(even) { background: #f8fafc; }
+    .sc-grid tbody tr:nth-child(even) { background: var(--erp-surface-2); }
     .sc-grid tr.sc-counted { background: #ecfdf5 !important; }
     .sc-grid tr.sc-diff { background: #fef3c7 !important; }
     .sc-grid tr.sc-active { outline: 2px solid #0ea5e9; outline-offset: -2px; }
