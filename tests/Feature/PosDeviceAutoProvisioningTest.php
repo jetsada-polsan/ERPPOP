@@ -35,7 +35,7 @@ class PosDeviceAutoProvisioningTest extends TestCase
         $this->assertSame($branch->id, $device->branch_id);
         $this->assertSame($cashier->id, $device->user_id);
         $this->assertSame('POS-B001-01', $device->terminal_code);
-        $this->assertSame('Python POS POS-B001-01', $device->name);
+        $this->assertSame('PopCentral POS POS-B001-01', $device->name);
     }
 
     public function test_it_does_not_create_a_device_when_branch_has_no_cashier_with_pos_sell(): void

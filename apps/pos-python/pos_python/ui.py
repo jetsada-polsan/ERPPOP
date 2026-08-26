@@ -122,7 +122,7 @@ def run_ui(service: PosService) -> None:
         def __init__(self):
             super().__init__()
             self.cashier = None
-            self.setWindowTitle("POPSTAR POS — เข้าสู่ระบบ")
+            self.setWindowTitle("PopCentral POS — เข้าสู่ระบบ")
             form = QFormLayout(self)
             self.code = QLineEdit()
             self.code.setPlaceholderText("รหัสแคชเชียร์")
@@ -274,7 +274,7 @@ def run_ui(service: PosService) -> None:
             layout.setContentsMargins(18, 0, 18, 0)
             mark = QLabel("★")
             mark.setObjectName("brandMark")
-            name = QLabel("POPSTAR POS")
+            name = QLabel("PopCentral POS")
             name.setObjectName("brandName")
             right = QLabel("HQ · POS-01 · ตั้งค่าเครื่องนี้")
             right.setObjectName("brandRight")
@@ -442,7 +442,7 @@ def run_ui(service: PosService) -> None:
             self.category = ALL_CATEGORIES
             self.shift_id = service.open_shift(1, "PY-TEST-01", int(cashier["id"]), Decimal("0"))
             self.last_sale_id: int | None = None
-            self.setWindowTitle(f"POPSTAR POS — {cashier['name']}")
+            self.setWindowTitle(f"PopCentral POS — {cashier['name']}")
             self.setStyleSheet(STYLE)
 
             root = QWidget()

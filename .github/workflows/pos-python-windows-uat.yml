@@ -1,4 +1,4 @@
-name: Build Python POS UAT for Windows
+name: Build PopCentral POS UAT for Windows
 
 on:
   workflow_dispatch:
@@ -36,7 +36,7 @@ jobs:
       - name: Build Windows application
         run: >-
           pyinstaller --noconfirm --clean --windowed
-          --name POPSTAR-Python-POS
+          --name PopCentral-POS
           --collect-all PySide6
           main.py
       - name: Install Inno Setup
@@ -46,9 +46,9 @@ jobs:
         shell: pwsh
         env:
           UAT_VERSION: ${{ inputs.version || '0.1.0-dev' }}
-        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$env:UAT_VERSION" installer\POPSTAR-Python-POS.iss'
+        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$env:UAT_VERSION" installer\PopCentral-POS.iss'
       - uses: actions/upload-artifact@v4
         with:
-          name: POPSTAR-Python-POS-UAT-${{ inputs.version || '0.1.0-dev' }}
+          name: PopCentral-POS-UAT-${{ inputs.version || '0.1.0-dev' }}
           path: apps/pos-python/dist-installer/*.exe
           if-no-files-found: error

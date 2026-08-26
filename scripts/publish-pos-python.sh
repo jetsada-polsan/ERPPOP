@@ -9,7 +9,7 @@ set -euo pipefail
 #   3. ดันรุ่นเดิมไปเป็น .previous.exe ซึ่งอยู่นอก glob ที่ ERP มองหา
 #      เหลือรุ่นเดียวที่เสิร์ฟจริงเสมอ แต่ย้อนกลับได้ด้วยการเปลี่ยนชื่อคืน
 #
-# ใช้: scripts/publish-pos-python.sh 0.2.0 /path/to/POPSTAR-Python-POS-UAT-0.2.0-setup.exe
+# ใช้: scripts/publish-pos-python.sh 0.3.0 /path/to/PopCentral-POS-UAT-0.3.0-setup.exe
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -40,7 +40,7 @@ if [[ ! -f "$INSTALLER" ]]; then
 fi
 
 # ชื่อไฟล์ต้องตรง glob ที่ SystemSettingController มองหา ไม่งั้นอัปขึ้นไปแล้วเงียบ
-REMOTE_NAME="POPSTAR-Python-POS-UAT-${VERSION}-setup.exe"
+REMOTE_NAME="PopCentral-POS-UAT-${VERSION}-setup.exe"
 RELEASE_DIR="${REMOTE_PATH}/storage/app/pos-python-releases"
 STAGING="${RELEASE_DIR}/.incoming-$$"
 
@@ -77,7 +77,7 @@ fi
 
 # ดันรุ่นที่เสิร์ฟอยู่ออกจาก glob ก่อน จะได้เหลือรุ่นเดียวที่ ERP มองเห็น
 shopt -s nullglob
-for old in "${release_dir}"/POPSTAR-Python-POS-UAT-*-setup.exe; do
+for old in "${release_dir}"/*-UAT-*-setup.exe; do
   [[ "$(basename "$old")" == "$name" ]] && continue
   mv -f "$old" "${old%.exe}.previous.exe"
   echo "  เก็บรุ่นเดิมไว้เป็น $(basename "${old%.exe}.previous.exe")"

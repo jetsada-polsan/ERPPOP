@@ -21,10 +21,23 @@ ROOT = Path(__file__).parent
 
 def application_data_dir() -> Path:
     """Keep mutable POS data outside the Windows installation directory."""
-    if os.name == "nt":
-        return Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "POPSTAR" / "PythonPOS"
+    if os.name != "nt":
+        return ROOT / "storage"
 
-    return ROOT / "storage"
+    local = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+    current = local / "PopCentral" / "POS"
+
+    # เครื่องที่ติดตั้งไว้ตอนโปรแกรมยังชื่อ POPSTAR Python POS เก็บฐานข้อมูลไว้คนละที่
+    # ย้ายให้ครั้งเดียวตอนเปิด ไม่งั้นแคชเชียร์เปิดมาเจอเครื่องเปล่าเหมือนยอดขายหายไปหมด
+    legacy = local / "POPSTAR" / "PythonPOS"
+    if legacy.is_dir() and not current.exists():
+        try:
+            current.parent.mkdir(parents=True, exist_ok=True)
+            legacy.rename(current)
+        except OSError:
+            return legacy  # ย้ายไม่ได้ก็ใช้ที่เดิมต่อไป ดีกว่าเปิดโปรแกรมไม่ขึ้น
+
+    return current
 
 
 DATA_DIR = application_data_dir()
@@ -128,7 +141,7 @@ def launch_ui() -> None:
             app = QApplication.instance() or QApplication([])
             QMessageBox.critical(
                 None,
-                "เปิด POPSTAR POS ไม่สำเร็จ",
+                "เปิด PopCentral POS ไม่สำเร็จ",
                 f"โปรแกรมเริ่มต้นไม่ได้: {error}\n\n"
                 f"กรุณาส่งไฟล์นี้ให้ฝ่าย IT:\n{log_path}",
             )

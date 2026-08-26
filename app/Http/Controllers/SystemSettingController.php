@@ -74,11 +74,11 @@ class SystemSettingController extends Controller
         ]);
     }
 
-    /** Download the tested Python POS installer without requiring GitHub access on a cashier PC. */
+    /** Download the tested PopCentral POS installer without requiring GitHub access on a cashier PC. */
     public function downloadPythonPos()
     {
         $installer = $this->currentPythonPosInstaller();
-        abort_unless($installer, 404, 'ยังไม่มีไฟล์ติดตั้ง Python POS รุ่นทดสอบ');
+        abort_unless($installer, 404, 'ยังไม่มีไฟล์ติดตั้ง PopCentral POS รุ่นทดสอบ');
 
         return response()->download($installer['path'], $installer['filename'], [
             'Content-Type' => 'application/vnd.microsoft.portable-executable',
@@ -135,7 +135,7 @@ class SystemSettingController extends Controller
 
     private function currentPythonPosInstaller(): ?array
     {
-        $files = collect(File::glob(storage_path('app/pos-python-releases/POPSTAR-Python-POS-UAT-*-setup.exe')))
+        $files = collect(File::glob(storage_path('app/pos-python-releases/PopCentral-POS-UAT-*-setup.exe')))
             ->filter(fn (string $path) => is_file($path))
             ->sortByDesc(fn (string $path) => filemtime($path));
 
@@ -174,7 +174,7 @@ class SystemSettingController extends Controller
             }
 
             $terminalCode = PosTerminalCode::next($branch);
-            $name = trim((string) ($data['pos_device_name'] ?? '')) ?: "Python POS {$terminalCode}";
+            $name = trim((string) ($data['pos_device_name'] ?? '')) ?: "PopCentral POS {$terminalCode}";
 
             return PosDevice::issue([
                 'name' => $name,

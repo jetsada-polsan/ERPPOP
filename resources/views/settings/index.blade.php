@@ -45,14 +45,14 @@
 
             <div class="set-nav-group mt-3"><i class="bi bi-pc-display"></i> โปรแกรมหน้าร้าน</div>
             <a href="{{ route('settings.receipt-template.edit') }}" class="set-nav-link text-decoration-none">ออกแบบใบเสร็จ POS</a>
-            <button type="button" class="set-nav-link" :class="tab === 'pos-download' && 'active'" @click="tab = 'pos-download'">Python POS (ทดสอบ Windows)</button>
+            <button type="button" class="set-nav-link" :class="tab === 'pos-download' && 'active'" @click="tab = 'pos-download'">PopCentral POS (ทดสอบ Windows)</button>
         </div>
 
         {{-- เนื้อหาขวา --}}
         <div class="set-main">
             <div class="d-flex align-items-center justify-content-between mb-3">
                 <h2 class="h4 fw-bold mb-0" style="color:var(--erp-primary-dark)"
-                    x-text="{ func: 'ฟังก์ชั่นเอกสาร', numbering: 'เลขรันเอกสาร', logo: 'โลโก้และตราประทับ', note: 'หมายเหตุเอกสาร', company: 'ข้อมูลกิจการ', menu: 'จัดลำดับเมนูหลัก', theme: 'ปรับธีมระบบ', payment: 'ข้อมูลการรับชำระ', accounting: 'บันทึกบัญชี', 'pos-download': 'ตั้งค่า Python POS' }[tab]"></h2>
+                    x-text="{ func: 'ฟังก์ชั่นเอกสาร', numbering: 'เลขรันเอกสาร', logo: 'โลโก้และตราประทับ', note: 'หมายเหตุเอกสาร', company: 'ข้อมูลกิจการ', menu: 'จัดลำดับเมนูหลัก', theme: 'ปรับธีมระบบ', payment: 'ข้อมูลการรับชำระ', accounting: 'บันทึกบัญชี', 'pos-download': 'ตั้งค่า PopCentral POS' }[tab]"></h2>
                 <button x-show="tab !== 'pos-download' && tab !== 'theme'" type="submit" class="btn btn-success px-4"><i class="bi bi-check-lg me-1"></i>บันทึกข้อมูล</button>
                 <button x-show="tab === 'theme'" type="submit" form="layout-form" class="btn btn-success px-4"><i class="bi bi-check-lg me-1"></i>บันทึก Layout</button>
             </div>
@@ -260,12 +260,12 @@
                 <div class="set-card pos-download-card">
                     <div class="pos-download-mark"><i class="bi bi-windows"></i></div>
                     <div class="pos-download-copy">
-                        <div class="set-title">POPSTAR Python POS สำหรับเครื่องแคชเชียร์</div>
+                        <div class="set-title">PopCentral POS สำหรับเครื่องแคชเชียร์</div>
                         <div class="set-desc">Python + PySide6 · Local SQLite · รุ่น UAT แยกจาก POS เดิม · ทดสอบติดตั้ง Windows ก่อนเปิดขายจริง</div>
                     </div>
                     @if($pythonPosInstaller)
                         <a href="{{ route('python-pos.download') }}" class="btn btn-primary btn-lg pos-download-btn">
-                            <i class="bi bi-download me-1"></i> ดาวน์โหลด Python POS
+                            <i class="bi bi-download me-1"></i> ดาวน์โหลด PopCentral POS
                         </a>
                     @else
                         <button type="button" class="btn btn-secondary btn-lg pos-download-btn" disabled>
@@ -325,7 +325,7 @@
                     <div class="set-card pos-token-result">
                         <div>
                             <div class="set-title">Token ใหม่ — {{ session('pos_device_name') }}</div>
-                            <div class="set-desc">Token แสดงครั้งเดียว คัดลอกไปวางในหน้าตั้งค่าของ Python POS ได้เลย</div>
+                            <div class="set-desc">Token แสดงครั้งเดียว คัดลอกไปวางในหน้าตั้งค่าของ PopCentral POS ได้เลย</div>
                         </div>
                         <div class="pos-token-copy-row">
                             <input id="new-pos-token" class="form-control font-monospace" readonly value="{{ session('pos_token') }}">
