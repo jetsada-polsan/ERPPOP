@@ -42,7 +42,7 @@
 
         body {
             font-family: var(--pos-ui-font);
-            background: #eef2f5;
+            background: var(--pos-bg);
             color: var(--pos-text);
             font-size: 14px;
         }
@@ -1183,26 +1183,26 @@
         .action-btn.qr { background: linear-gradient(135deg,#06b6d4,#0284c7); }
         .action-btn.edit { background: linear-gradient(135deg,#f59e0b,#d97706); }
         .action-btn.pay {
-            background: linear-gradient(135deg,#bd2836,#9f1f2b);
+            background: linear-gradient(135deg,var(--pos-red),var(--pos-ui-primary-strong));
             box-shadow: 0 14px 28px rgba(189,40,54,.24);
         }
 
         /* Shared POPSTAR skin: web POS follows the Windows POS visual language. */
-        .pos-wrap { background: #eef2f5; }
-        .pos-topbar { background: #fff; border-bottom-color: #d8e0e7; box-shadow: 0 2px 8px rgba(29,47,61,.06); }
-        .pos-logo { color: #bd2836; }
-        .pos-logo span { background: none; -webkit-text-fill-color: #bd2836; color: #bd2836; }
-        .pos-cart, .pos-products { background: #fff; border-color: #d8e0e7; box-shadow: 0 8px 24px rgba(28,48,62,.07); }
-        .pos-cart-header, .pos-search-bar, .pos-categories { background: #fff; border-color: #d8e0e7; }
-        .cart-item.active { background: #fff5f6; box-shadow: inset 4px 0 0 #bd2836, 0 8px 18px rgba(189,40,54,.10); }
-        .cart-line-no { background: #fce7e9; color: #9f1f2b; }
-        .cart-item-price, .total-row.grand .val, .product-price { color: #bd2836; }
-        .qty-btn:hover, .cat-pill:hover { background: #fff5f6; color: #9f1f2b; border-color: #e6aab1; }
-        .cat-pill.active { background: linear-gradient(135deg,#bd2836,#9f1f2b); box-shadow: 0 10px 24px rgba(189,40,54,.20); }
-        .product-card:hover { border-color: #d67b84; background: #fff5f6; box-shadow: 0 12px 26px rgba(189,40,54,.12); }
-        .product-sku { color: #9f1f2b; }
-        .pos-actionbar { background: #fff; border-color: #d8e0e7; }
-        .action-btn.qr { background: linear-gradient(135deg,#bd2836,#9f1f2b); }
+        .pos-wrap { background: var(--pos-bg); }
+        .pos-topbar { background: #fff; border-bottom-color: var(--pos-border); box-shadow: 0 2px 8px rgba(29,47,61,.06); }
+        .pos-logo { color: var(--pos-red); }
+        .pos-logo span { background: none; -webkit-text-fill-color: var(--pos-red); color: var(--pos-red); }
+        .pos-cart, .pos-products { background: #fff; border-color: var(--pos-border); box-shadow: 0 8px 24px rgba(28,48,62,.07); }
+        .pos-cart-header, .pos-search-bar, .pos-categories { background: #fff; border-color: var(--pos-border); }
+        .cart-item.active { background: var(--pos-card-2); box-shadow: inset 4px 0 0 var(--pos-red), 0 8px 18px rgba(189,40,54,.10); }
+        .cart-line-no { background: #fce7e9; color: var(--pos-ui-primary-strong); }
+        .cart-item-price, .total-row.grand .val, .product-price { color: var(--pos-red); }
+        .qty-btn:hover, .cat-pill:hover { background: var(--pos-card-2); color: var(--pos-ui-primary-strong); border-color: #e6aab1; }
+        .cat-pill.active { background: linear-gradient(135deg,var(--pos-red),var(--pos-ui-primary-strong)); box-shadow: 0 10px 24px rgba(189,40,54,.20); }
+        .product-card:hover { border-color: #d67b84; background: var(--pos-card-2); box-shadow: 0 12px 26px rgba(189,40,54,.12); }
+        .product-sku { color: var(--pos-ui-primary-strong); }
+        .pos-actionbar { background: #fff; border-color: var(--pos-border); }
+        .action-btn.qr { background: linear-gradient(135deg,var(--pos-red),var(--pos-ui-primary-strong)); }
         .action-btn.clear { background: linear-gradient(135deg,#a92130,#7f1722); }
 
         @media print {
@@ -1382,7 +1382,7 @@
                 display: grid;
                 place-items: center;
                 border-radius: 6px;
-                background: #bd2836;
+                background: var(--pos-red);
                 color: #fff;
                 font-size: 9px;
                 font-weight: 900;
@@ -1625,7 +1625,7 @@
                 display: grid;
                 place-items: center;
                 border-radius: 6px;
-                background: #bd2836;
+                background: var(--pos-red);
                 color: #fff;
                 font-size: 9px;
                 font-weight: 900;
@@ -2450,7 +2450,7 @@
     border-color: var(--pos-ui-border);
     box-shadow: 0 2px 6px rgba(28,48,62,.035);
 }
-.product-card:hover { transform: translateY(-1px); background: #fff5f6; border-color: #d67b84; box-shadow: 0 5px 14px rgba(189,40,54,.10); }
+.product-card:hover { transform: translateY(-1px); background: var(--pos-card-2); border-color: #d67b84; box-shadow: 0 5px 14px rgba(189,40,54,.10); }
 .product-sku { color: #75838f; font-size: 10px; }
 .product-name { color: var(--pos-ui-ink); font-size: 13px; line-height: 1.45; }
 .product-price { color: var(--pos-ui-primary-strong); font-size: 16px; }
