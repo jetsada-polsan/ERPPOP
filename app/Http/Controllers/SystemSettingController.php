@@ -125,7 +125,7 @@ class SystemSettingController extends Controller
         File::put($temporary, json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
         File::move($temporary, $directory.'/latest.json');
 
-        return redirect()->route('settings.index')->with('success', 'เผยแพร่ POPSTAR POS รุ่น '.$data['pos_version'].' แล้ว เครื่องสาขาจะตรวจพบอัตโนมัติ');
+        return redirect()->route('settings.index')->with('success', 'เผยแพร่ PopCentral POS รุ่น '.$data['pos_version'].' แล้ว เครื่องสาขาจะตรวจพบอัตโนมัติ');
     }
 
     private function currentPosRelease(): ?array

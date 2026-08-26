@@ -1241,7 +1241,7 @@
             .pos-actionbar { grid-template-columns: 1fr 1fr; }
         }
 
-        /* ── POPSTAR POS popup system ───────────────── */
+        /* ── PopCentral POS popup system ───────────────── */
         .pos-swal-popup {
             width: min(430px, calc(100vw - 28px)) !important;
             padding: 0 !important;
@@ -2474,7 +2474,7 @@
 
 <script src="{{ asset('vendor/qrcodejs/qrcode.min.js') }}"></script>
 <script>
-/* ── POPSTAR POS popup helpers. All Swal.fire() calls inherit this skin. ── */
+/* ── PopCentral POS popup helpers. All Swal.fire() calls inherit this skin. ── */
 (function () {
     if (!window.Swal || window.Swal.__popstarPosPatched) return;
 
