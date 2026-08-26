@@ -48,6 +48,13 @@ class PosController extends Controller
 {
     public function index(MemberPointService $points): View
     {
+        // ขั้น cutover: ย้ายการขายไปแอปเดสก์ท็อป PopCentral POS แล้ว ปิดหน้าขายเว็บด้วย
+        // flag ได้ ดีฟอลต์ 'sell' = ขายได้ตามเดิม (ยังไม่เปลี่ยนอะไร) ตั้ง 'redirect'
+        // เมื่อพร้อม เพื่อให้ /pos เหลือหน้าสถานะ + ลิงก์ดาวน์โหลดแอป
+        if (AppSetting::get('pos_web_mode', 'sell') === 'redirect') {
+            return view('pos.retired');
+        }
+
         $branches = Branch::orderBy('code')->get(['id', 'code', 'name_th']);
         $categories = ProductCategory::orderBy('name_th')->get(['id', 'code', 'name_th']);
         $cashiers = Salesman::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
