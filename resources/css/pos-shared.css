@@ -1,0 +1,14 @@
+:root {
+    --pos-ui-canvas: #eef2f5;
+    --pos-ui-surface: #ffffff;
+    --pos-ui-surface-soft: #f7f9fb;
+    --pos-ui-border: #d8e0e7;
+    --pos-ui-ink: #162331;
+    --pos-ui-muted: #667585;
+    --pos-ui-primary: #bd2836;
+    --pos-ui-primary-strong: #9f1f2b;
+    --pos-ui-success: #147a55;
+    --pos-ui-warning: #a96605;
+    --pos-ui-radius: 8px;
+    --pos-ui-font: "Noto Sans Thai", "Leelawadee UI", Tahoma, sans-serif;
+}

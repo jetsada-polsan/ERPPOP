@@ -75,6 +75,7 @@ const selectedHistory = ref<LocalSaleHistory | null>(null)
 const storageStatus = ref<LocalStorageStatus | null>(null)
 let syncTimer: number | null = null
 const catalogClock = ref(Date.now())
+const browserPreview = import.meta.env.VITE_POS_PREVIEW === '1'
 
 const filteredProducts = computed(() => {
   catalogClock.value
@@ -604,7 +605,7 @@ async function checkUpdate() {
 }
 
 async function start() {
-  if (import.meta.env.DEV && !isTauri()) {
+  if (!isTauri() && (import.meta.env.DEV || browserPreview)) {
     profile.value = { serverUrl: setupUrl.value, deviceName: 'เครื่องทดสอบ', terminalCode: 'POS-0001-01', branchId: 1, branchName: 'สาขาวารินชำราบ', vatRate: 7, company: { name: 'บริษัท ป๊อปสตาร์ฟู้ดเทรดดิ้ง จำกัด' } }
     cashier.value = { id: 1, code: 'C001', name: 'พนักงานทดสอบ' }
     shift.value = { id: 1, shift_no: 'SHIFT-0001-DEMO', status: 'open', opening_cash: 1000, expected_cash: 1000, receipt_count: 0 }

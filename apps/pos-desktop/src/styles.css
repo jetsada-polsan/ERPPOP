@@ -1,18 +1,20 @@
+@import "../../../resources/css/pos-shared.css";
+
 :root {
-  font-family: "Noto Sans Thai", "Leelawadee UI", Tahoma, sans-serif;
-  color: #162331;
-  background: #eef2f5;
+  font-family: var(--pos-ui-font);
+  color: var(--pos-ui-ink);
+  background: var(--pos-ui-canvas);
   font-synthesis: none;
-  --primary: #bd2836;
-  --primary-strong: #9f1f2b;
-  --red: #bd2836;
-  --green: #147a55;
-  --amber: #a96605;
-  --ink: #162331;
-  --muted: #667585;
-  --line: #d8e0e7;
-  --surface: #ffffff;
-  --canvas: #f1f4f7;
+  --primary: var(--pos-ui-primary);
+  --primary-strong: var(--pos-ui-primary-strong);
+  --red: var(--pos-ui-primary);
+  --green: var(--pos-ui-success);
+  --amber: var(--pos-ui-warning);
+  --ink: var(--pos-ui-ink);
+  --muted: var(--pos-ui-muted);
+  --line: var(--pos-ui-border);
+  --surface: var(--pos-ui-surface);
+  --canvas: var(--pos-ui-canvas);
 }
 
 * { box-sizing: border-box; }

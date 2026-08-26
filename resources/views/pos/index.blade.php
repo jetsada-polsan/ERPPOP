@@ -15,6 +15,7 @@
     <link rel="icon" href="{{ asset('images/logo-jet-erp-mark.svg') }}?v={{ filemtime(public_path('images/logo-jet-erp-mark.svg')) }}">
     <link rel="apple-touch-icon" href="{{ asset('images/logo-jet-erp-mark.svg') }}?v={{ filemtime(public_path('images/logo-jet-erp-mark.svg')) }}">
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
+    @vite('resources/css/pos-shared.css')
     <script src="{{ asset('vendor/sweetalert2/sweetalert2.all.min.js') }}"></script>
     <script defer src="{{ asset('vendor/alpinejs/alpine.min.js') }}"></script>
     @vite('resources/js/pos-web.ts')
@@ -22,25 +23,25 @@
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         :root {
-            --pos-bg: #eef2f5;
-            --pos-panel: #ffffff;
-            --pos-panel-2: #f7f9fb;
-            --pos-card: #ffffff;
+            --pos-bg: var(--pos-ui-canvas);
+            --pos-panel: var(--pos-ui-surface);
+            --pos-panel-2: var(--pos-ui-surface-soft);
+            --pos-card: var(--pos-ui-surface);
             --pos-card-2: #fff5f6;
-            --pos-border: #d8e0e7;
-            --pos-text: #162331;
-            --pos-muted: #667585;
-            --pos-green: #10b981;
-            --pos-blue: #bd2836;
-            --pos-red: #bd2836;
-            --pos-amber: #f59e0b;
-            --pos-cyan: #bd2836;
+            --pos-border: var(--pos-ui-border);
+            --pos-text: var(--pos-ui-ink);
+            --pos-muted: var(--pos-ui-muted);
+            --pos-green: var(--pos-ui-success);
+            --pos-blue: var(--pos-ui-primary);
+            --pos-red: var(--pos-ui-primary);
+            --pos-amber: var(--pos-ui-warning);
+            --pos-cyan: var(--pos-ui-primary);
         }
 
         html, body { height: 100%; overflow: hidden; }
 
         body {
-            font-family: 'Leelawadee UI', 'Noto Sans Thai', Tahoma, 'Segoe UI', sans-serif;
+            font-family: var(--pos-ui-font);
             background: #eef2f5;
             color: var(--pos-text);
             font-size: 14px;
@@ -1736,6 +1737,9 @@
         <a href="{{ route('dashboard') }}" target="_blank" class="topbar-btn" style="margin-left:8px">
             <i class="bi bi-grid"></i> ERP
         </a>
+        <a href="{{ route('pos.compare') }}" target="_blank" class="topbar-btn" title="เปิด Web POS และ Vue POS คู่กัน">
+            <i class="bi bi-layout-split"></i> เทียบ UI
+        </a>
         @if($canSell)
         <button class="topbar-btn" @click="openReceiptSettings()">
             <i class="bi bi-receipt"></i> ใบเสร็จ
@@ -2425,6 +2429,46 @@
     .product-card .product-price { font-size: 17px; }
     .cart-item-name { font-size: 16px; }
     .cart-item-price { font-size: 21px; }
+}
+
+/* POS parity: the browser screen follows the Vue POS workspace order and sizing. */
+.pos-body { grid-template-columns: minmax(0, 1fr) minmax(480px, 38vw); }
+.pos-products { order: 1; }
+.pos-cart { order: 2; }
+.pos-products, .pos-cart { border-radius: var(--pos-ui-radius); }
+.pos-search-bar, .pos-categories { background: var(--pos-ui-surface); }
+.pos-search-bar { padding: 12px 14px; }
+.pos-categories { padding: 8px 14px; }
+.pos-search-input { border-color: var(--pos-ui-border); border-radius: 7px; }
+.cat-pill { color: var(--pos-ui-ink); border-radius: 6px; }
+.product-card {
+    min-height: 134px;
+    height: 134px;
+    padding: 12px;
+    border-radius: 7px;
+    background: var(--pos-ui-surface);
+    border-color: var(--pos-ui-border);
+    box-shadow: 0 2px 6px rgba(28,48,62,.035);
+}
+.product-card:hover { transform: translateY(-1px); background: #fff5f6; border-color: #d67b84; box-shadow: 0 5px 14px rgba(189,40,54,.10); }
+.product-sku { color: #75838f; font-size: 10px; }
+.product-name { color: var(--pos-ui-ink); font-size: 13px; line-height: 1.45; }
+.product-price { color: var(--pos-ui-primary-strong); font-size: 16px; }
+.stock-badge { background: #eef9f4; color: var(--pos-ui-success); border-color: #bfe4d3; }
+.stock-badge.low { background: #fff5df; color: var(--pos-ui-warning); border-color: #efd39d; }
+.stock-badge.out { background: #fff0ef; color: #a23832; border-color: #edc6c1; }
+.pos-actionbar { background: var(--pos-ui-surface); border-top-color: var(--pos-ui-border); box-shadow: 0 -4px 14px rgba(28,48,62,.06); }
+.action-btn { border-radius: 6px; box-shadow: none; }
+.action-btn.pay, .action-btn.qr { background: var(--pos-ui-primary); }
+.action-btn.clear { background: var(--pos-ui-primary-strong); }
+
+@media (max-width: 1280px) {
+    .pos-body { grid-template-columns: minmax(0, 1fr) 520px; }
+}
+@media (max-width: 980px) {
+    .pos-body { grid-template-columns: 1fr; }
+    .pos-products { order: 1; }
+    .pos-cart { order: 2; }
 }
 </style>
 

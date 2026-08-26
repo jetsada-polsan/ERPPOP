@@ -168,6 +168,7 @@ Route::get('/notifications', [NotificationController::class, 'index'])->name('no
 // POS: full-screen selling interface, separate layout from ERP backend.
 Route::prefix('pos')->name('pos.')->group(function () {
     Route::get('/', [PosController::class, 'index'])->name('index');
+    Route::view('/compare', 'pos.compare')->name('compare');
     Route::get('/control', [PosController::class, 'control'])->name('control');
     Route::get('/products', [PosController::class, 'products'])->name('products');
     Route::get('/members', [PosController::class, 'members'])->name('members');
