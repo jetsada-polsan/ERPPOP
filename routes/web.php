@@ -198,6 +198,8 @@ Route::prefix('wh')->name('wh.')->group(function () {
 
 Route::get('/apps', [AppLauncherController::class, 'index'])->name('apps.launcher');
 Route::get('/crm', [CrmController::class, 'index'])->name('crm.index');
+Route::post('/crm/activities', [CrmController::class, 'storeActivity'])->name('crm.activities.store');
+Route::patch('/crm/activities/{activity}/complete', [CrmController::class, 'completeActivity'])->name('crm.activities.complete');
 Route::get('/features', [FeatureController::class, 'index'])->name('features.index');
 Route::get('/core-modules', [ManualController::class, 'index'])->name('core-modules.index');
 Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');

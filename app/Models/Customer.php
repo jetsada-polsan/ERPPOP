@@ -63,6 +63,11 @@ class Customer extends Model
         return $this->hasMany(PaymentDocument::class);
     }
 
+    public function crmActivities(): HasMany
+    {
+        return $this->hasMany(CrmActivity::class);
+    }
+
     protected function casts(): array
     {
         return [
