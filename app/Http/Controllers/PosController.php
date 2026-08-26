@@ -87,7 +87,7 @@ class PosController extends Controller
             ->where(fn ($w) => $w->whereNull('effective_to')->orWhere('effective_to', '>=', now()->toDateString()))
             ->orderByDesc('effective_from')->value('rate_percent') ?? 7.0);
 
-        // NOTE: หน้า POS บนเว็บใช้ Alpine ('pos.index'); ตัวแคชเชียร์จริงคือแอป desktop (Tauri+Vue) ใน pos-desktop/.
+        // NOTE: หน้า POS บนเว็บเป็น compatibility/staged flow; แคชเชียร์หลักคือ Python/PySide6 ใน pos-python/.
         return view('pos.index', compact('branches', 'categories', 'cashiers', 'defaultBranchId', 'qrConfig', 'pointValueBaht', 'canSell', 'canVoid', 'company', 'vatRate', 'lockedBranch', 'lockedCashier'));
     }
 

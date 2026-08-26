@@ -1,7 +1,7 @@
-# PopCentral POS (ทดลองแยก)
+# PopCentral POS (Python)
 
-โมดูลทดลอง POS สำหรับ Windows ที่แยกจาก `apps/pos-desktop` โดยสิ้นเชิง
-ไม่มีส่วนใดเชื่อม PostgreSQL โดยตรง และยังไม่กระทบ POS Vue/Tauri ที่ใช้อยู่
+แอป POS หลักสำหรับ Windows แยกจาก ERP โดยสิ้นเชิง
+ไม่มีส่วนใดเชื่อม PostgreSQL โดยตรง และคุยกับ Laravel ผ่าน POS API เท่านั้น
 
 ## ขอบเขต MVP
 
@@ -49,4 +49,5 @@ GitHub Actions จะสร้าง `PopCentral-POS-UAT-<version>-setup.exe` �
 
 ## สถานะ
 
-เป็น prototype สำหรับทดสอบ architecture เท่านั้น ยังไม่แจกติดตั้งหรือใช้ขายจริง
+เป็นช่องทาง POS หลักของ PopCentral แต่ต้องผ่าน Windows/hardware UAT และการติดตั้ง
+บนเครื่องจริงก่อนเปิดขายเต็มรูปแบบ

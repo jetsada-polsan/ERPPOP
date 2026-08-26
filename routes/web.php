@@ -87,21 +87,9 @@ Route::post('/login', [AuthController::class, 'login'])->name('login.attempt');
 Route::get('/mfa/challenge', [AuthController::class, 'showMfaChallenge'])->name('mfa.challenge');
 Route::post('/mfa/challenge', [AuthController::class, 'verifyMfaChallenge'])->name('mfa.verify');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
-Route::get('/download/pos', function () {
-    $manifest = app(PosReleaseManifest::class)->current();
-    $releaseUrl = data_get($manifest, 'platforms.windows-x86_64.url');
-    if ($releaseUrl) {
-        return redirect()->away($releaseUrl);
-    }
-
-    $installer = public_path('downloads/POPSTAR-POS-Setup.exe');
-    abort_unless(is_file($installer), 404);
-
-    return response()->download($installer, 'POPSTAR-POS-Setup.exe', [
-        'Content-Type' => 'application/vnd.microsoft.portable-executable',
-        'Cache-Control' => 'no-cache, must-revalidate',
-    ]);
-})->name('pos.download');
+// Compatibility URL for bookmarks from the retired Vue/Tauri POS. The supported
+// cashier application is now the Python/PySide6 POS.
+Route::get('/download/pos', fn () => redirect()->route('python-pos.download'))->name('pos.download');
 Route::get('/download/pos/latest.json', [PosReleaseController::class, 'latest'])->name('pos.release.latest');
 Route::get('/download/pos/releases/{filename}', [PosReleaseController::class, 'download'])->name('pos.release.download');
 Route::get('/download/python-pos', [SystemSettingController::class, 'downloadPythonPos'])->name('python-pos.download');

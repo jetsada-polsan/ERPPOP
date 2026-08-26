@@ -48,4 +48,10 @@ class PosWorkbenchTest extends TestCase
             ->assertDontSee('0.1.7')
             ->assertDontSee(route('pos.download'), false);
     }
+
+    public function test_legacy_pos_download_url_redirects_to_python_pos(): void
+    {
+        $this->get(route('pos.download'))
+            ->assertRedirect(route('python-pos.download'));
+    }
 }

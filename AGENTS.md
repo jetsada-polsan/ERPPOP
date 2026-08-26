@@ -16,7 +16,8 @@
 ## โปรเจกต์นี้
 
 POPSTAR ERP — Laravel 13, PHP 8.3 (server) / 8.5 (เครื่อง dev), PostgreSQL
-แอป POS แยกอยู่ที่ `apps/pos-desktop` (Tauri + Vue 3 + TypeScript)
+แอป POS หลักแยกอยู่ที่ `apps/pos-python` (Python + PySide6 + SQLite)
+`apps/pos-desktop` (Tauri + Vue 3 + TypeScript) เป็น source เก่าสำหรับ rollback/เทียบ logic เท่านั้น
 
 ```bash
 php artisan test        # เทสต์ใช้ SQLite in-memory

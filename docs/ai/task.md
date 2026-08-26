@@ -158,3 +158,11 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
 - ทดสอบ: `php artisan test tests/Feature/PosWorkbenchTest.php` ผ่าน 1 test / 8 assertions; `php artisan test --compact` ไม่มี failure (387 tests / 386 passed / 1 skipped / 6 incomplete / 2934 assertions); `npm run build` ผ่าน; `git diff --check` ผ่าน
 - Deploy: deploy ขึ้น production แล้ว; backup `erp-db-20260826-225337.sql.gz`; rsync dry-run/จริงแบบไม่ใช้ `--delete`; ล้าง Laravel cache; production `erp:health` ผ่านครบ; ตรวจ source บน host แล้วมี `Python + PySide6` และ `python-pos.download` โดยไม่มี `Vue + Tauri` หรือ `0.1.7`
 - หมายเหตุ: ยังไม่เปลี่ยน `Web POS` route หรือ flag `pos_web_mode`; รอบนี้แก้เฉพาะหน้าเครื่องมือ POS ที่แสดงข้อความผิด
+
+## Handoff - 2026-08-27 (Codex Python POS direction cleanup)
+- Commit: `5c09e05`
+- ทำอะไร: ให้ Python/PySide6 เป็น POS หลักในข้อความและเอกสารกลาง; เปลี่ยน `/download/pos` เดิมให้ redirect ไป `/download/python-pos`; ปรับหน้า Settings และคำอธิบายแอปไม่ให้ชี้ว่า Vue/Tauri เป็นช่องทางใช้งาน
+- ทดสอบ: focused POS tests ผ่าน 7 tests / 25 assertions; `php artisan view:cache`; `git diff --check`
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ทดสอบ installer บน Windows จริง และยังไม่ได้เปิด `pos:web-mode redirect`; การเปิดขายจริงต้องผ่าน Windows/hardware UAT ก่อน
+- Deploy: ยังไม่ deployรอบนี้ เพราะต้อง commit/push และตรวจการเชื่อมต่อ GitHub ก่อน
+- งานถัดไป: push แล้ว deploy source + clear cache + `erp:health`; จากนั้นทดสอบดาวน์โหลดบน host และติดตั้ง Python POS บน Windows จริง

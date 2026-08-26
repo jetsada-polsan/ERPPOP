@@ -45,7 +45,7 @@
 
             <div class="set-nav-group mt-3"><i class="bi bi-pc-display"></i> โปรแกรมหน้าร้าน</div>
             <a href="{{ route('settings.receipt-template.edit') }}" class="set-nav-link text-decoration-none">ออกแบบใบเสร็จ POS</a>
-            <button type="button" class="set-nav-link" :class="tab === 'pos-download' && 'active'" @click="tab = 'pos-download'">PopCentral POS (ทดสอบ Windows)</button>
+            <button type="button" class="set-nav-link" :class="tab === 'pos-download' && 'active'" @click="tab = 'pos-download'">PopCentral POS (Python)</button>
         </div>
 
         {{-- เนื้อหาขวา --}}
@@ -261,7 +261,7 @@
                     <div class="pos-download-mark"><i class="bi bi-windows"></i></div>
                     <div class="pos-download-copy">
                         <div class="set-title">PopCentral POS สำหรับเครื่องแคชเชียร์</div>
-                        <div class="set-desc">Python + PySide6 · Local SQLite · รุ่น UAT แยกจาก POS เดิม · ทดสอบติดตั้ง Windows ก่อนเปิดขายจริง</div>
+                        <div class="set-desc">Python + PySide6 · Local SQLite · แอป POS หลักสำหรับเครื่องแคชเชียร์ · ต้องผ่านการทดสอบ Windows ก่อนเปิดขายจริง</div>
                     </div>
                     @if($pythonPosInstaller)
                         <a href="{{ route('python-pos.download') }}" class="btn btn-primary btn-lg pos-download-btn">

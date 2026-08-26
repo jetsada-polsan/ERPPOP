@@ -16,7 +16,7 @@ use Symfony\Component\HttpFoundation\Response;
 class ErpAuthorize
 {
     private const PUBLIC_ROUTES = [
-        'login', 'login.attempt', 'logout', 'pos.download',
+        'login', 'login.attempt', 'logout', 'pos.download', 'python-pos.download',
         'pos.release.latest', 'pos.release.download',
         'mfa.challenge', 'mfa.verify',
     ];

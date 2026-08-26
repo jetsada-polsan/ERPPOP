@@ -9,7 +9,8 @@
 - Remote: `git@github.com:jetsada-polsan/ERPPOP.git`
 - Branch หลัก: `main`
 - ERP: Laravel 13, PHP 8.3 (production), PostgreSQL
-- POS Desktop: Vue 3 + TypeScript + Tauri + SQLite
+- POS Desktop หลัก: Python + PySide6 + SQLite ใน `apps/pos-python`
+- `apps/pos-desktop` (Vue + TypeScript + Tauri) เก็บไว้เป็น source เก่าเพื่อ rollback/เทียบ logic เท่านั้น ไม่ใช่ช่องทาง POS ที่ประกาศใช้งาน
 - Production: `27.254.143.219`, deploy path `/var/www/jeterp`
 
 ## หลักการทำงานร่วมกัน
