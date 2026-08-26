@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 interface LauncherMark {
     svg: string;
@@ -55,7 +55,7 @@ const visible = computed(() => {
     return matching.value.filter((section) => section.label === activeLabel.value);
 });
 
-const total = computed(() => matching.value.reduce((sum, section) => sum + section.items.length, 0));
+const total = computed(() => visible.value.reduce((sum, section) => sum + section.items.length, 0));
 
 const countFor = (label: string) =>
     props.sections.find((section) => section.label === label)?.items.length ?? 0;
@@ -64,6 +64,36 @@ function pick(label: string | null) {
     activeLabel.value = label;
     query.value = '';
 }
+
+function selectSection(index: number) {
+    const section = props.sections[index];
+    if (section) {
+        pick(section.label);
+    }
+}
+
+function handleSectionSelect(event: Event) {
+    const index = Number((event as CustomEvent<{ index?: number }>).detail?.index);
+    if (Number.isInteger(index) && index >= 0) {
+        selectSection(index);
+    }
+}
+
+function publishSelection() {
+    const index = normalised(query.value) || activeLabel.value === null
+        ? null : props.sections.findIndex(section => section.label === activeLabel.value);
+    window.dispatchEvent(new CustomEvent('erp:section-changed', { detail: { index } }));
+}
+
+watch([activeLabel, query], publishSelection);
+onMounted(() => {
+    window.addEventListener('erp:select-section', handleSectionSelect);
+    // Preserve a top-nav selection made while the module was still loading.
+    const pending = document.getElementById('erp-app-launcher')?.dataset.selectedSection;
+    if (pending !== undefined && /^\d+$/.test(pending)) selectSection(Number(pending));
+    publishSelection();
+});
+onBeforeUnmount(() => window.removeEventListener('erp:select-section', handleSectionSelect));
 
 const toneColors: Record<string, string> = {
     blue: '#1687c8', cyan: '#0891b2', teal: '#0f9f91', green: '#159a68',
@@ -80,7 +110,7 @@ function accentFor(tone: string | undefined, fallback = '#1687c8') {
     <div class="al">
         <aside class="al-side">
             <p class="al-side-head">หมวดโมดูล</p>
-            <button type="button" class="al-cat" :class="{ on: activeLabel === null }" @click="pick(null)">
+            <button type="button" class="al-cat" :class="{ on: activeLabel === null }" :aria-pressed="activeLabel === null" @click="pick(null)">
                 <i class="bi bi-grid-3x3-gap-fill"></i>
                 <span>ทั้งหมด</span>
                 <em>{{ sections.reduce((sum, section) => sum + section.items.length, 0) }}</em>
@@ -91,6 +121,7 @@ function accentFor(tone: string | undefined, fallback = '#1687c8') {
                 type="button"
                 class="al-cat"
                 :class="{ on: activeLabel === section.label }"
+                :aria-pressed="activeLabel === section.label"
                 @click="pick(section.label)"
             >
                 <i class="bi" :class="section.icon"></i>

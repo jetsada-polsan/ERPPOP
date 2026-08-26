@@ -90,11 +90,19 @@ class WarehouseMobileController extends Controller
     /** ยอดคงเหลือของสินค้า แยกตามคลัง/ตำแหน่งเก็บ */
     public function stock(Request $request): JsonResponse
     {
-        $data = $request->validate(['product_id' => ['required', 'integer']]);
+        $data = $request->validate([
+            'product_id' => ['required', 'integer'],
+            'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
+        ]);
+
+        // A branch-bound user can never widen this query by changing the request.
+        $branchId = auth()->user()?->branchScopeId() ?: ($data['branch_id'] ?? null);
 
         $rows = StockBalance::query()
             ->join('warehouse_locations', 'warehouse_locations.id', '=', 'stock_balances.warehouse_location_id')
+            ->join('warehouses', 'warehouses.id', '=', 'warehouse_locations.warehouse_id')
             ->where('stock_balances.product_id', $data['product_id'])
+            ->when($branchId, fn ($q) => $q->where('warehouses.branch_id', $branchId))
             ->orderBy('warehouse_locations.id')
             ->get([
                 'warehouse_locations.id as location_id',

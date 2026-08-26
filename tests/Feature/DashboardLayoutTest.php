@@ -95,6 +95,20 @@ class DashboardLayoutTest extends TestCase
             ->assertDontSee('class="odn-item', false);
     }
 
+    /** เมนูหมวดบนต้องสลับกลุ่มใน sidebar ได้โดยตรง ไม่ผูกกับช่องค้นหา */
+    public function test_odoo_category_navigation_has_a_direct_group_switcher(): void
+    {
+        AppSetting::set('erp_layout', 'odoo');
+
+        $html = $this->actingAs($this->viewer())->get(route('dashboard'))->getContent();
+
+        $this->assertStringContainsString('function showGroup(target, link)', $html);
+        $this->assertStringContainsString('showGroup(target, link);', $html);
+        $this->assertStringContainsString("erp:select-section", $html);
+        $this->assertStringContainsString('var navLinks = Array.prototype.slice.call(document.querySelectorAll(\'.odn-nav-link\'));', $html);
+        $this->assertStringNotContainsString("if (!input) { return; }", $html);
+    }
+
     /**
      * แผงปรับหน้าจอต้องมีทั้งสอง layout — จอแต่ละเครื่องไม่เท่ากัน
      * ค่าที่ปรับเก็บใน localStorage ของเครื่องนั้น ไม่แตะฐานข้อมูล

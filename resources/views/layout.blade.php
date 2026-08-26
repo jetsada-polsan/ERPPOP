@@ -1844,17 +1844,30 @@
         });
     });
 
-    if (!input) { return; }
     var items = Array.prototype.slice.call(side.querySelectorAll('.odn-item'));
     var groups = Array.prototype.slice.call(side.querySelectorAll('.odn-grp'));
     var empty = side.querySelector('.odn-noresult');
+    var navLinks = Array.prototype.slice.call(document.querySelectorAll('.odn-nav-link'));
+    var launcher = document.getElementById('erp-app-launcher');
 
     /* โมดูลที่กำลังเปิดอยู่ — ต้องจำไว้ เพราะระหว่างค้นหาเราเปิดหลายหมวดชั่วคราว
        พอล้างคำค้นต้องกลับมาเหลือหมวดเดียวเหมือนเดิม ไม่งั้นเมนูรกกลับมาอีก */
-    var activeGroup = side.querySelector('.odn-grp.is-visible');
+    var activeGroup = side.querySelector('.odn-grp.is-visible') || groups[0] || null;
+
+    function markActiveNav(link) {
+        navLinks.forEach(function (other) {
+            var selected = other === link;
+            other.classList.toggle('on', selected);
+            if (selected) {
+                other.setAttribute('aria-current', 'page');
+            } else {
+                other.removeAttribute('aria-current');
+            }
+        });
+    }
 
     function apply() {
-        var q = input.value.trim().toLowerCase();
+        var q = input ? input.value.trim().toLowerCase() : '';
         var shown = 0;
         items.forEach(function (a) {
             var hit = !q || a.dataset.s.indexOf(q) !== -1;
@@ -1880,30 +1893,64 @@
         if (q && first) { first.classList.add('hit'); }
     }
 
-    input.addEventListener('input', apply);
-    input.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape') { input.value = ''; apply(); return; }
-        if (event.key !== 'Enter') { return; }
-        var first = side.querySelector('.odn-item:not([hidden])');
-        if (first) { event.preventDefault(); first.click(); }
-    });
+    function showGroup(target, link) {
+        if (!target) { return; }
+        groups.forEach(function (group) {
+            group.classList.toggle('is-visible', group === target);
+            group.hidden = false;
+        });
+        target.classList.remove('collapsed');
+        activeGroup = target;
+        if (input) { input.value = ''; }
+        apply();
+        markActiveNav(link || null);
+
+        /* หน้า App Launcher ซ่อน sidebar ของโมดูลเดิมไว้ — ส่ง event กลาง
+           ให้ Vue เปลี่ยนหมวดเอง ไม่จำลองการคลิก DOM ของ component */
+        if (launcher) {
+            launcher.dataset.selectedSection = target.dataset.sec;
+            window.dispatchEvent(new CustomEvent('erp:select-section', {
+                detail: { index: Number(target.dataset.sec) },
+            }));
+        } else {
+            target.scrollIntoView({ block: 'nearest' });
+        }
+    }
+
+    if (input) {
+        input.addEventListener('input', apply);
+        input.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') { input.value = ''; apply(); return; }
+            if (event.key !== 'Enter') { return; }
+            var first = side.querySelector('.odn-item:not([hidden])');
+            if (first) { event.preventDefault(); first.click(); }
+        });
+    }
 
     /* กดหมวดบนแถบบน = เลื่อนไปหมวดนั้นในเมนูข้าง แล้วกางให้ */
-    document.querySelectorAll('.odn-nav-link').forEach(function (link) {
+    navLinks.forEach(function (link) {
         link.addEventListener('click', function (event) {
             var target = document.getElementById('odn-grp-' + link.dataset.sec);
             if (!target) { return; }
             event.preventDefault();
-            document.querySelectorAll('.odn-grp').forEach(function (group) { group.classList.remove('is-visible'); });
-            target.classList.add('is-visible');
-            activeGroup = target;
-            if (input) { input.value = ''; apply(); }
-            target.classList.remove('collapsed');
-            target.scrollIntoView({ block: 'nearest' });
-            document.querySelectorAll('.odn-nav-link').forEach(function (other) { other.classList.remove('on'); });
-            link.classList.add('on');
+            showGroup(target, link);
         });
     });
+
+    /* ทำให้สถานะเริ่มต้นสอดคล้องกัน แม้หน้าเว็บจะไม่มีช่องค้นหา */
+    if (launcher) {
+        markActiveNav(null);
+        window.addEventListener('erp:section-changed', function (event) {
+            var index = event.detail && event.detail.index;
+            markActiveNav(Number.isInteger(index) ? navLinks.find(function (link) {
+                return Number(link.dataset.sec) === index;
+            }) : null);
+        });
+    } else {
+        showGroup(activeGroup, navLinks.filter(function (link) {
+            return activeGroup && link.dataset.sec === activeGroup.dataset.sec;
+        })[0] || null);
+    }
 })();
 </script>
 <script>

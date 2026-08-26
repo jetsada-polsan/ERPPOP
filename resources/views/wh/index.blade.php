@@ -169,7 +169,7 @@
                             <span class="chip" x-show="curOnHand !== null" x-text="'คงเหลือ ' + fmtQty(curOnHand)"></span>
                         </div>
                     </div>
-                    <button class="del" style="border:0;background:none;font-size:18px;color:var(--ink-soft)" @click="clearCur()">✕</button>
+                    <button type="button" class="del" style="border:0;background:none;font-size:18px;color:var(--ink-soft)" @click="clearCur()">✕</button>
                 </div>
                 <div class="frow">
                     <label>จำนวน (<span x-text="cur?.unit_label"></span>)
@@ -198,8 +198,8 @@
                 </div>
                 <p class="err" x-show="cur?.tracks_expiry && !expiry" x-cloak>สินค้านี้ควบคุมวันหมดอายุ — ต้องระบุก่อนเพิ่ม</p>
                 <div class="btnrow">
-                    <button class="btn" @click="clearCur()">ยกเลิก</button>
-                    <button class="btn primary" :disabled="!canAdd()" @click="addToCart()">+ เพิ่มเข้ารายการ</button>
+                    <button type="button" class="btn" @click="clearCur()">ยกเลิก</button>
+                    <button type="button" class="btn primary" :disabled="!canAdd()" @click="addToCart()">+ เพิ่มเข้ารายการ</button>
                 </div>
             </div>
 
@@ -214,7 +214,7 @@
                             <div class="dt" x-text="fmtQty(it.qty) + ' ' + it.unit_label + ' × ' + fmtMoney(it.price) + (it.lot ? ' · ลอต ' + it.lot : '') + (it.expiry ? ' · หมดอายุ ' + it.expiry : '')"></div>
                         </div>
                         <span class="amt" x-text="fmtMoney(it.qty * it.price)"></span>
-                        <button class="del" @click="cart.splice(i, 1)">✕</button>
+                        <button type="button" class="del" @click="cart.splice(i, 1)">✕</button>
                     </div>
                 </template>
                 <div class="total" x-show="cart.length"><span>รวมทั้งใบ</span><span x-text="'฿' + fmtMoney(cartTotal())"></span></div>
@@ -235,15 +235,15 @@
                 </div>
                 <div x-show="supplier" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
                     <span class="chip" x-text="'ซัพพลายเออร์: ' + (supplier?.name_th ?? '')"></span>
-                    <button class="del" style="border:0;background:none;color:var(--ink-soft)" @click="supplier = null">เปลี่ยน</button>
+                    <button type="button" class="del" style="border:0;background:none;color:var(--ink-soft)" @click="supplier = null">เปลี่ยน</button>
                 </div>
                 <div class="seg" style="margin-bottom:10px">
-                    <button :class="{ on: !isCredit }" @click="isCredit = false">ซื้อสด</button>
-                    <button :class="{ on: isCredit }" @click="isCredit = true">ซื้อเชื่อ (ลงเจ้าหนี้)</button>
+                    <button type="button" :class="{ on: !isCredit }" @click="isCredit = false">ซื้อสด</button>
+                    <button type="button" :class="{ on: isCredit }" @click="isCredit = true">ซื้อเชื่อ (ลงเจ้าหนี้)</button>
                 </div>
                 <input x-model="remark" placeholder="หมายเหตุ (ถ้ามี)" style="width:100%;height:44px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);margin-bottom:10px">
                 <p class="err" x-show="submitError" x-text="submitError"></p>
-                <button class="btn blue" style="width:100%" :disabled="!supplier || submitting" @click="submitReceive()">
+                <button type="button" class="btn blue" style="width:100%" :disabled="!supplier || submitting" @click="submitReceive()">
                     <span x-text="submitting ? 'กำลังบันทึก…' : ('บันทึกรับเข้า → ออกใบซื้อ (' + cart.length + ' รายการ)')"></span>
                 </button>
             </div>
@@ -257,13 +257,13 @@
                         <div class="empty" x-show="!poLoading && !poList.length">ไม่มีใบสั่งซื้อค้างรับของ</div>
                         <div class="empty" x-show="poLoading">กำลังโหลด…</div>
                         <template x-for="po in poList" :key="po.id">
-                            <button class="po" @click="openPo(po.id)">
+                            <button type="button" class="po" @click="openPo(po.id)">
                                 <div style="display:flex;justify-content:space-between"><span class="no" x-text="po.doc_number"></span><b x-text="'฿' + fmtMoney(po.total_amount)"></b></div>
                                 <div class="sub" x-text="(po.supplier ?? '-') + ' · ' + po.item_count + ' รายการ · ' + (po.doc_date ?? '') + (po.is_credit ? ' · เชื่อ' : ' · สด')"></div>
                             </button>
                         </template>
                     </div>
-                    <button class="btn" style="width:100%" @click="loadPos()">↻ โหลดรายการใหม่</button>
+                    <button type="button" class="btn" style="width:100%" @click="loadPos()">↻ โหลดรายการใหม่</button>
                 </div>
             </template>
 
@@ -275,7 +275,7 @@
                                 <div class="pname" x-text="poCur.doc_number"></div>
                                 <div class="psub" x-text="poCur.supplier"></div>
                             </div>
-                            <button class="btn" style="flex:0 0 auto;min-height:40px;padding:0 14px" @click="poCur = null">← กลับ</button>
+                            <button type="button" class="btn" style="flex:0 0 auto;min-height:40px;padding:0 14px" @click="poCur = null">← กลับ</button>
                         </div>
                     </div>
                     <form class="scanbar" @submit.prevent="scan('po')">
@@ -301,7 +301,7 @@
                     </div>
                     <p class="hint" style="margin:0 4px 10px">ยิงสินค้าที่ได้รับจริง ระบบจะออกใบซื้อเฉพาะจำนวนที่สแกน และเก็บยอดที่เหลือไว้รับรอบถัดไป</p>
                     <p class="err" x-show="submitError" x-text="submitError"></p>
-                    <button class="btn primary" style="width:100%" :disabled="submitting" @click="receivePo()">
+                    <button type="button" class="btn primary" style="width:100%" :disabled="submitting" @click="receivePo()">
                         <span x-text="submitting ? 'กำลังรับของ…' : (poAllScanned() ? 'รับครบยอดค้าง ✓' : 'รับของตามจำนวนที่สแกน')"></span>
                     </button>
                 </div>
@@ -357,7 +357,7 @@
     <div class="overlay" x-show="cameraOpen" x-cloak @click.self="closeCamera()">
         <div class="sheet camwrap">
             <video x-ref="video" autoplay playsinline muted></video>
-            <div class="btnrow"><button class="btn" @click="closeCamera()">ปิดกล้อง</button></div>
+            <div class="btnrow"><button type="button" class="btn" @click="closeCamera()">ปิดกล้อง</button></div>
         </div>
     </div>
 
@@ -368,7 +368,7 @@
             <h3 x-text="doneDoc?.title"></h3>
             <div class="doc" x-text="doneDoc?.doc_number"></div>
             <p style="color:var(--ink-soft);font-size:13.5px" x-text="doneDoc?.detail"></p>
-            <button class="btn blue" style="width:100%" @click="doneDoc = null">ตกลง</button>
+            <button type="button" class="btn blue" style="width:100%" @click="doneDoc = null">ตกลง</button>
         </div>
     </div>
 </div>
@@ -387,7 +387,7 @@ function whApp() {
     };
 
     return {
-        tab: {{ $canReceive ? "'receive'" : "'stock'" }},
+        tab: @js($canReceive ? 'receive' : 'stock'),
         branchId: {{ $lockedBranch->id ?? ($branches->first()->id ?? 'null') }},
         branches: @json($branches->map(fn ($b) => ['id' => $b->id, 'name_th' => $b->name_th])),
 
@@ -590,7 +590,7 @@ function whApp() {
         // ---- เช็คสต๊อก ----
         async loadStock(productId) {
             try {
-                const res = await jfetch(`{{ route('wh.stock') }}?product_id=${productId}`);
+                const res = await jfetch(`{{ route('wh.stock') }}?product_id=${productId}&branch_id=${this.branchId ?? ''}`);
                 this.stockRows = res.locations; this.stockTotal = res.total;
             } catch (e) { this.scanError = e.message; }
         },
