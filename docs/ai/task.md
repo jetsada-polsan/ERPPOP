@@ -166,3 +166,11 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ทดสอบ installer บน Windows จริง และยังไม่ได้เปิด `pos:web-mode redirect`; การเปิดขายจริงต้องผ่าน Windows/hardware UAT ก่อน
 - Deploy: ยังไม่ deployรอบนี้ เพราะต้อง commit/push และตรวจการเชื่อมต่อ GitHub ก่อน
 - งานถัดไป: push แล้ว deploy source + clear cache + `erp:health`; จากนั้นทดสอบดาวน์โหลดบน host และติดตั้ง Python POS บน Windows จริง
+
+## Handoff - 2026-08-27 (Codex POS web visual parity)
+- Commit: pending
+- ทำอะไร: ปรับ `/pos` ให้เรียงและใช้โทนตาม Python/PySide6 build: บิล/ตะกร้าซ้าย, สินค้าขวา, แถบค้นหาและหมวดอยู่ด้านบน, แผงสีขาวบนพื้นเทาอ่อน, header และปุ่มใช้ชุดสีเดียวกับ build; มือถือยังเรียงสินค้าไว้ด้านบนเพื่อให้เลือกสินค้าได้สะดวก
+- ทดสอบ: ยังรันทดสอบหลัง patch ไม่เสร็จ
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ตรวจ screenshot บน production เพราะ source รอบนี้ยังไม่ push/deploy
+- Deploy: ยังไม่ deploy
+- งานถัดไป: รันทดสอบ, push และ deploy เมื่อ GitHub เชื่อมต่อได้ แล้วตรวจ `/pos` ด้วย browser

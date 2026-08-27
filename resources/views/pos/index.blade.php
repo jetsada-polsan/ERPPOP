@@ -2431,16 +2431,38 @@
     .cart-item-price { font-size: 21px; }
 }
 
-/* POS parity: the browser screen follows the Vue POS workspace order and sizing. */
-.pos-body { grid-template-columns: minmax(0, 1fr) minmax(480px, 38vw); }
-.pos-products { order: 1; }
-.pos-cart { order: 2; }
+/* POS parity: keep the browser preview aligned with the Python/PySide6 build.
+   The cashier workflow is order/cart on the left and products on the right. */
+.pos-body { grid-template-columns: minmax(480px, 40vw) minmax(0, 1fr); }
+.pos-cart { order: 1; }
+.pos-products { order: 2; }
 .pos-products, .pos-cart { border-radius: var(--pos-ui-radius); }
 .pos-search-bar, .pos-categories { background: var(--pos-ui-surface); }
 .pos-search-bar { padding: 12px 14px; }
 .pos-categories { padding: 8px 14px; }
 .pos-search-input { border-color: var(--pos-ui-border); border-radius: 7px; }
 .cat-pill { color: var(--pos-ui-ink); border-radius: 6px; }
+.pos-cart { background: var(--pos-ui-surface); border-color: var(--pos-ui-border); box-shadow: 0 8px 24px rgba(28,48,62,.07); }
+.pos-cart-header { background: var(--pos-ui-surface); border-color: var(--pos-ui-border); }
+.pos-cart-items { background: var(--pos-ui-surface); }
+.cart-list-head { background: var(--pos-ui-primary-soft, #eef4f9); color: var(--pos-ui-primary-strong); border-color: var(--pos-ui-border); }
+.cart-item, .cart-item:nth-child(even) { background: var(--pos-ui-surface); border-color: var(--pos-ui-border); }
+.cart-item:hover { background: var(--pos-ui-surface-soft); }
+.cart-item.active { background: #eef4f9; box-shadow: inset 4px 0 0 var(--pos-ui-primary); }
+.cart-item-name, .qty-display { color: var(--pos-ui-ink); }
+.cart-item-sku { color: var(--pos-ui-muted); }
+.cart-item-price { color: var(--pos-ui-success); }
+.qty-btn, .price-input, .discount-input, .discount-type { background: var(--pos-ui-surface); color: var(--pos-ui-ink); border-color: var(--pos-ui-border); }
+.pos-cart-footer { background: var(--pos-ui-surface); border-color: var(--pos-ui-border); }
+.total-box { background: var(--pos-ui-ink); }
+.pos-products { background: var(--pos-ui-surface-soft); border-color: var(--pos-ui-border); box-shadow: 0 8px 24px rgba(28,48,62,.07); }
+.pos-topbar { background: var(--pos-ui-primary-strong); border-bottom-color: var(--pos-ui-primary-strong); box-shadow: 0 2px 8px rgba(28,48,62,.14); }
+.pos-logo, .pos-logo span { color: #fff; -webkit-text-fill-color: #fff; }
+.topbar-select, .topbar-btn, .shift-pill { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.30); color: #fff; box-shadow: none; }
+.topbar-btn:hover, .topbar-select:hover { background: rgba(255,255,255,.20); color: #fff; border-color: rgba(255,255,255,.55); }
+.pos-clock { color: #fff; background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.30); }
+.topbar-locked { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.30); color: #fff; }
+.shift-pill.open, .shift-pill.closed { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.30); color: #fff; }
 .product-card {
     min-height: 134px;
     height: 134px;
@@ -2463,12 +2485,12 @@
 .action-btn.clear { background: var(--pos-ui-primary-strong); }
 
 @media (max-width: 1280px) {
-    .pos-body { grid-template-columns: minmax(0, 1fr) 520px; }
+    .pos-body { grid-template-columns: 520px minmax(0, 1fr); }
 }
 @media (max-width: 980px) {
     .pos-body { grid-template-columns: 1fr; }
-    .pos-products { order: 1; }
-    .pos-cart { order: 2; }
+    .pos-products { order: 2; }
+    .pos-cart { order: 1; }
 }
 </style>
 
