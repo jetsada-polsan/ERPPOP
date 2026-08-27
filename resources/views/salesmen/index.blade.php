@@ -1,29 +1,30 @@
 @extends('layout')
 @section('title', 'พนักงานขาย - PopCentral')
-@section('page-title', 'สายการขายและ POS เดิม')
-@section('page-subtitle', 'สายการขายผูกกับบัญชีผู้ใช้โดยตรง ส่วนแฟ้มพนักงานเดิมใช้รองรับ POS และประวัติเก่า')
+@section('page-title', 'รหัสขายเดิมและสายการขาย')
+@section('page-subtitle', 'หน้าหลักของคนและสิทธิ์อยู่ที่ "ผู้ใช้และสิทธิ์" หน้านี้เก็บรหัส POS/BPlus เดิม เล่มเอกสาร และประวัติที่ต้องอ้างอิงต่อ')
 @section('content')
     <div x-data="salesmanPage()" x-cloak>
         <div class="list-toolbar">
             <div class="list-toolbar-left">
-                <h2 class="h5 fw-bold mb-0">แฟ้มอ้างอิง POS เดิม</h2>
+                <h2 class="h5 fw-bold mb-0">รหัสขาย/POS ที่เอกสารเดิมอ้างอิง</h2>
                 @include('partials.search-bar', ['q' => $q, 'placeholder' => 'ค้นหารหัส / ชื่อ'])
             </div>
             <div class="d-flex gap-2">
                 <button type="button" class="btn btn-outline-primary rounded-pill px-4" @click="openAreaCreate()"><i class="bi bi-signpost-split me-1"></i> เพิ่มสายการขาย</button>
-                <button type="button" class="btn btn-primary rounded-pill px-4" @click="openCreate()"><i class="bi bi-plus-lg me-1"></i> เพิ่มพนักงาน</button>
+                <button type="button" class="btn btn-primary rounded-pill px-4" @click="openCreate()"><i class="bi bi-plus-lg me-1"></i> เพิ่มรหัสขายเดิม</button>
             </div>
         </div>
         <div class="content-card p-4">
             <div class="table-responsive">
                 <table class="table align-middle">
-                    <thead><tr><th>รหัส</th><th>ชื่อ</th><th>สาขา</th><th>สถานะ</th><th></th></tr></thead>
+                    <thead><tr><th>รหัส</th><th>ชื่อที่เอกสาร/POS ใช้</th><th>สาขา</th><th>บัญชีผู้ใช้ที่ผูก</th><th>สถานะ</th><th></th></tr></thead>
                     <tbody>
                         @forelse($salesmen as $s)
                         <tr>
                             <td class="fw-semibold">{{ $s->code }}</td>
                             <td>{{ $s->name }}</td>
                             <td>{{ $s->branch?->name_th ?? '-' }}</td>
+                            <td class="small">{{ $s->user ? $s->user->username.' - '.$s->user->name : 'ยังไม่ผูก' }}</td>
                             <td><span class="badge {{ $s->is_active ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $s->is_active ? 'ใช้งาน' : 'ปิด' }}</span></td>
                             <td class="text-end">
                                 <button type="button" class="btn btn-sm btn-light border"
@@ -31,7 +32,7 @@
                             </td>
                         </tr>
                         @empty
-                        <tr><td colspan="5" class="py-5 text-center text-muted">ยังไม่มีพนักงาน</td></tr>
+                        <tr><td colspan="6" class="py-5 text-center text-muted">ยังไม่มีรหัสขายเดิม</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -77,7 +78,7 @@
         <div class="booking-modal-backdrop" x-show="modalOpen" x-transition.opacity @keydown.escape.window="modalOpen = false">
             <div class="booking-modal" style="width:min(520px,100%)" @click.outside="modalOpen = false" x-transition>
                 <div class="modal-header border-0 px-4 pt-4 pb-2">
-                    <h3 class="h5 fw-bold mb-0" x-text="editingId ? 'แก้ไขพนักงาน' : 'เพิ่มพนักงาน'"></h3>
+                    <h3 class="h5 fw-bold mb-0" x-text="editingId ? 'แก้ไขรหัสขายเดิม' : 'เพิ่มรหัสขายเดิม'"></h3>
                     <button type="button" class="btn btn-light rounded-circle" @click="modalOpen=false"><i class="bi bi-x-lg"></i></button>
                 </div>
                 <form method="post" :action="formAction">

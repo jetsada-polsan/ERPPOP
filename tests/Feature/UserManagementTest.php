@@ -79,6 +79,40 @@ class UserManagementTest extends TestCase
             ->assertDontSee('emp-hidden');
     }
 
+    public function test_pos_seller_gets_a_cashier_profile_without_creating_a_duplicate_person_first(): void
+    {
+        $admin = User::factory()->create([
+            'username' => 'admin-create-pos-user',
+            'must_change_password' => false,
+        ]);
+        $branch = Branch::create(['code' => 'AUTO-POS', 'name_th' => 'สาขา POS อัตโนมัติ', 'is_active' => true]);
+        $role = Role::create(['code' => 'AUTO_POS_SELLER', 'name' => 'แคชเชียร์อัตโนมัติ']);
+        $permission = Permission::firstOrCreate(['code' => 'pos.sell'], ['name' => 'ขาย POS']);
+        $role->permissions()->attach($permission->id);
+
+        $response = $this->withoutMiddleware(ErpAuthorize::class)
+            ->actingAs($admin)
+            ->post(route('users.store'), [
+                'username' => 'cashier-auto',
+                'name' => 'แคชเชียร์สร้างครั้งเดียว',
+                'branch_id' => $branch->id,
+                'role_ids' => [$role->id],
+                'password' => 'TempPass123',
+                'password_confirmation' => 'TempPass123',
+            ]);
+
+        $response->assertRedirect(route('users.index'));
+
+        $user = User::where('username', 'cashier-auto')->firstOrFail();
+        $profile = Salesman::where('user_id', $user->id)->firstOrFail();
+
+        $this->assertSame($profile->id, $user->salesman_id);
+        $this->assertSame('CASHIER-AUTO', $profile->code);
+        $this->assertSame('แคชเชียร์สร้างครั้งเดียว', $profile->name);
+        $this->assertSame($branch->id, $profile->branch_id);
+        $this->assertTrue($profile->is_active);
+    }
+
     public function test_admin_can_issue_a_one_time_pos_pin_and_revoke_old_device_verification(): void
     {
         $admin = User::factory()->create([

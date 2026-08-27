@@ -87,7 +87,7 @@ class UserController extends Controller
             'must_change_password' => true,
         ]);
         $user->roles()->sync($data['role_ids']);
-        $this->syncPosProfile($user, $user->salesman_id);
+        $this->syncPosProfile($user, $user->salesman_id, $this->roleIdsCanSellPos($data['role_ids']));
         $this->audit('user_create', $user, [], [
             'username' => $user->username,
             'role_ids' => $data['role_ids'],
@@ -141,7 +141,7 @@ class UserController extends Controller
         }
         $user->save();
         $user->roles()->sync($data['role_ids']);
-        $this->syncPosProfile($user, $user->salesman_id);
+        $this->syncPosProfile($user, $user->salesman_id, $this->roleIdsCanSellPos($data['role_ids']));
         $this->audit('user_update', $user, $oldValues, [
             'name' => $user->name,
             'branch_id' => $user->branch_id,
@@ -288,11 +288,51 @@ class UserController extends Controller
         ]);
     }
 
-    private function syncPosProfile(User $user, ?int $salesmanId): void
+    private function roleIdsCanSellPos(array $roleIds): bool
     {
+        return Role::whereIn('id', $roleIds)
+            ->whereHas('permissions', fn ($query) => $query->where('code', 'pos.sell'))
+            ->exists();
+    }
+
+    private function syncPosProfile(User $user, ?int $salesmanId, bool $canSellPos): void
+    {
+        if (! $salesmanId && $canSellPos) {
+            $profile = Salesman::create([
+                'branch_id' => $user->branch_id,
+                'code' => $this->uniquePosProfileCode($user),
+                'name' => $user->name,
+                'is_active' => true,
+            ]);
+            $salesmanId = $profile->id;
+            $user->forceFill(['salesman_id' => $salesmanId])->save();
+        }
+
         Salesman::where('user_id', $user->id)->update(['user_id' => null]);
         if ($salesmanId) {
-            Salesman::whereKey($salesmanId)->update(['user_id' => $user->id]);
+            Salesman::whereKey($salesmanId)->update([
+                'user_id' => $user->id,
+                'branch_id' => $user->branch_id,
+                'name' => $user->name,
+                'is_active' => true,
+            ]);
         }
+    }
+
+    private function uniquePosProfileCode(User $user): string
+    {
+        $base = strtoupper(preg_replace('/[^A-Za-z0-9_-]+/', '', $user->username) ?: 'U'.$user->id);
+        $base = substr($base, 0, 20) ?: 'U'.$user->id;
+
+        for ($attempt = 0; $attempt < 100; $attempt++) {
+            $suffix = $attempt === 0 ? '' : '-'.$attempt;
+            $candidate = substr($base, 0, 20 - strlen($suffix)).$suffix;
+
+            if (! Salesman::where('code', $candidate)->exists()) {
+                return $candidate;
+            }
+        }
+
+        throw new RuntimeException('ไม่สามารถสร้างรหัสโปรไฟล์ POS ที่ไม่ซ้ำได้ กรุณาระบุโปรไฟล์เอง');
     }
 }

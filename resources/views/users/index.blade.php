@@ -106,17 +106,17 @@
                     </div>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label small text-muted">โปรไฟล์แคชเชียร์ POS <span class="text-danger">(ใช้ระบุตัวตนคนขาย)</span></label>
+                    <label class="form-label small text-muted">โปรไฟล์แคชเชียร์ POS <span class="text-danger">(สร้างอัตโนมัติได้)</span></label>
                     <div class="input-group">
                         <span class="input-group-text"><i class="bi bi-person-vcard"></i></span>
                         <select name="salesman_id" x-model="form.salesman_id" class="form-select">
-                            <option value="">-- ไม่ใช้ POS --</option>
+                            <option value="">-- ระบบสร้างให้เมื่อมีสิทธิ์ขาย POS --</option>
                             @foreach($salesmen as $s)
                                 <option value="{{ $s->id }}">{{ $s->code }} - {{ $s->name }}</option>
                             @endforeach
                         </select>
                     </div>
-                    <div class="form-text">PIN ของแคชเชียร์แยกจากรหัสผ่าน ERP และตั้ง/รีเซ็ตจากรายชื่อผู้ใช้ด้านล่าง</div>
+                    <div class="form-text">ผู้ดูแลสร้างคนจากหน้านี้หน้าเดียวได้ เลือกโปรไฟล์เดิมเฉพาะกรณีต้องผูกรหัส POS/BPlus เก่า</div>
                 </div>
                 <div class="col-12">
                     <label class="form-label small text-muted d-flex align-items-center flex-wrap gap-1">
