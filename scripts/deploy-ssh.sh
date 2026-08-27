@@ -46,6 +46,7 @@ rsync -az --delete --no-owner --no-group \
   --exclude='auth.json' \
   --exclude='vendor/' \
   --exclude='node_modules/' \
+  --exclude='package-lock.json' \
   --exclude='.claude/' \
   --exclude='.codex/' \
   --exclude='bootstrap/cache/' \
