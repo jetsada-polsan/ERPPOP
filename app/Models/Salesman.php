@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Hash;
 
-#[Fillable(['branch_id', 'user_id', 'code', 'name', 'is_active', 'pos_pin_hash', 'must_change_pin', 'pin_changed_at'])]
+#[Fillable(['branch_id', 'user_id', 'code', 'name', 'is_active', 'pos_pin_hash', 'must_change_pin', 'pin_changed_at', 'pos_credential_version'])]
 class Salesman extends Model
 {
     public $timestamps = false;
@@ -31,6 +31,7 @@ class Salesman extends Model
             'pos_pin_hash' => Hash::make($pin),
             'must_change_pin' => $mustChange,
             'pin_changed_at' => $mustChange ? null : now(),
+            'pos_credential_version' => now(),
         ])->save();
     }
 
@@ -40,6 +41,7 @@ class Salesman extends Model
             'is_active' => 'boolean',
             'must_change_pin' => 'boolean',
             'pin_changed_at' => 'datetime',
+            'pos_credential_version' => 'datetime',
         ];
     }
 }

@@ -25,6 +25,7 @@ class PosPinChangeTest extends TestCase
 
         $this->assertTrue($result['success']);
         $this->assertTrue($result['must_change_pin']);
+        $this->assertNull($result['offline_credential']);
         // ยังขายในชื่อคนนี้ไม่ได้ เพราะแอดมินก็รู้ PIN
         $this->assertNull($device->fresh()->active_cashier_id);
     }
@@ -36,9 +37,14 @@ class PosPinChangeTest extends TestCase
 
         $response = $this->changePin($device, $cashier->code, '1234', '860531');
 
-        $this->assertTrue($response->getData(true)['success']);
+        $payload = $response->getData(true);
+        $this->assertTrue($payload['success']);
+        $this->assertFalse($payload['must_change_pin']);
+        $this->assertSame($cashier->id, $payload['cashier']['id']);
+        $this->assertNotEmpty($payload['offline_credential']['credential_version']);
         $this->assertFalse($cashier->fresh()->must_change_pin);
         $this->assertNotNull($cashier->fresh()->pin_changed_at);
+        $this->assertNotNull($cashier->fresh()->pos_credential_version);
         $this->assertSame($cashier->id, (int) $device->fresh()->active_cashier_id);
     }
 
@@ -53,6 +59,7 @@ class PosPinChangeTest extends TestCase
         $result = $this->login($device, $cashier->code, '860531')->getData(true);
         $this->assertTrue($result['success']);
         $this->assertFalse($result['must_change_pin']);
+        $this->assertNotEmpty($result['offline_credential']['credential_version']);
         $this->assertSame($cashier->id, (int) $device->fresh()->active_cashier_id);
     }
 

@@ -47,8 +47,8 @@ PRODUCTS = {"success": True, "products": [
      "pos_price": 69.0, "barcodes": []},
 ]}
 CASHIERS = {"success": True, "cashiers": [
-    {"id": 42, "code": "C001", "name": "สมชาย"},
-    {"id": 43, "code": "C002", "name": "สมหญิง"},
+    {"id": 42, "code": "C001", "name": "สมชาย", "credential_version": "2026-09-01T00:00:00Z"},
+    {"id": 43, "code": "C002", "name": "สมหญิง", "credential_version": "2026-09-01T00:00:00Z"},
 ]}
 
 
@@ -110,10 +110,28 @@ class ProvisioningTest(unittest.TestCase):
     def test_store_credential_writes_pbkdf2_fields(self) -> None:
         self.svc.pull_cashiers(3)
         self.svc.store_credential(42, {"salt": "c2FsdA==", "verifier": "dmVy", "iterations": 120000,
-                                       "expires_at": "2026-09-01T00:00:00Z"})
-        row = self.db.execute("SELECT cred_salt, cred_iterations FROM local_cashiers WHERE server_id = 42").fetchone()
+                                       "expires_at": "2026-09-01T00:00:00Z",
+                                       "credential_version": "2026-09-01T00:00:00Z"})
+        row = self.db.execute("SELECT cred_salt, cred_iterations, credential_version FROM local_cashiers WHERE server_id = 42").fetchone()
         self.assertEqual(row["cred_salt"], "c2FsdA==")
         self.assertEqual(row["cred_iterations"], 120000)
+        self.assertEqual(row["credential_version"], "2026-09-01T00:00:00Z")
+
+    def test_cashier_sync_clears_offline_credential_when_server_version_changes(self) -> None:
+        self.svc.pull_cashiers(3)
+        self.svc.store_credential(42, {"salt": "c2FsdA==", "verifier": "dmVy", "iterations": 120000,
+                                       "expires_at": "2026-09-01T00:00:00Z",
+                                       "credential_version": "2026-09-01T00:00:00Z"})
+        self.api.responses["/api/pos/cashiers"] = {"success": True, "cashiers": [
+            {"id": 42, "code": "C001", "name": "สมชาย", "credential_version": "2026-09-02T00:00:00Z"},
+        ]}
+
+        self.svc.pull_cashiers(3)
+
+        row = self.db.execute("SELECT cred_salt, cred_verifier, credential_version FROM local_cashiers WHERE server_id = 42").fetchone()
+        self.assertIsNone(row["cred_salt"])
+        self.assertIsNone(row["cred_verifier"])
+        self.assertEqual(row["credential_version"], "2026-09-02T00:00:00Z")
 
     def test_open_server_shift_binds_the_server_id_back(self) -> None:
         self.svc.pull_cashiers(3)  # ต้องมีแคชเชียร์ให้ shift.cashier_id อ้าง (FK)

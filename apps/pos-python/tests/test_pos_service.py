@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import base64
+import hashlib
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -29,6 +32,26 @@ class PosServiceTest(unittest.TestCase):
         self.assertEqual(self.db.execute("PRAGMA journal_mode").fetchone()[0], "wal")
         self.assertIsNotNone(self.service.login("POP001", "1234"))
         self.assertIsNone(self.service.login("POP001", "wrong"))
+
+    def test_offline_cashier_login_uses_server_issued_credential_and_expiry(self) -> None:
+        salt = b"server-issued-salt"
+        verifier = hashlib.pbkdf2_hmac("sha256", b"860531", salt, 120000, dklen=32)
+        expires_at = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+        self.db.execute(
+            """UPDATE local_cashiers
+            SET pin_hash = '', cred_salt = ?, cred_verifier = ?, cred_iterations = 120000, cred_expires_at = ?
+            WHERE code = 'POP001'""",
+            (base64.b64encode(salt).decode(), base64.b64encode(verifier).decode(), expires_at),
+        )
+        self.db.commit()
+
+        self.assertIsNotNone(self.service.login("POP001", "860531"))
+        self.assertIsNone(self.service.login("POP001", "1234"))
+
+        expired = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+        self.db.execute("UPDATE local_cashiers SET cred_expires_at = ? WHERE code = 'POP001'", (expired,))
+        self.db.commit()
+        self.assertIsNone(self.service.login("POP001", "860531"))
 
     def test_checkout_is_atomic_idempotent_and_queues_sync(self) -> None:
         line = CartLine(1, Decimal("2"), Decimal("25"), barcode="8850000000003")

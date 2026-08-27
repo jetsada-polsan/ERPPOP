@@ -165,6 +165,7 @@ class UserManagementTest extends TestCase
         $this->assertTrue(Hash::check($temporary, $cashier->fresh()->pos_pin_hash));
         $this->assertTrue($cashier->fresh()->must_change_pin);
         $this->assertNull($cashier->fresh()->pin_changed_at);
+        $this->assertNotNull($cashier->fresh()->pos_credential_version);
         $this->assertNull($device->fresh()->active_cashier_id);
         $this->assertNull($device->fresh()->cashier_verified_at);
         $this->assertDatabaseHas('audit_logs', [

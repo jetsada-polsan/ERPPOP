@@ -77,7 +77,19 @@ class PosService:
 
     def login(self, cashier_code: str, pin: str) -> sqlite3.Row | None:
         row = self.db.execute("SELECT * FROM local_cashiers WHERE code = ? AND active = 1", (cashier_code,)).fetchone()
-        return row if row and row["pin_hash"] == pin_hash(pin) else None
+        if not row:
+            return None
+        if row["cred_salt"] and row["cred_verifier"]:
+            if row["cred_expires_at"]:
+                try:
+                    expires = datetime.fromisoformat(str(row["cred_expires_at"]).replace("Z", "+00:00"))
+                    if expires <= datetime.now(timezone.utc):
+                        return None
+                except ValueError:
+                    return None
+            return row if verify_offline_credential(pin, row["cred_salt"], row["cred_verifier"], row["cred_iterations"] or 0) else None
+
+        return row if row["pin_hash"] == pin_hash(pin) else None
 
     def open_shift(self, branch_id: int, terminal_id: str, cashier_id: int, opening_cash: Decimal) -> int:
         existing = self.db.execute("SELECT id FROM shifts WHERE terminal_id = ? AND status = 'open'", (terminal_id,)).fetchone()

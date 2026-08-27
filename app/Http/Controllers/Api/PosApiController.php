@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\PosController;
 use App\Models\AppSetting;
 use App\Models\AuditLog;
-use App\Models\PosReceipt;
 use App\Models\PosDevice;
+use App\Models\PosReceipt;
 use App\Models\PosTerminal;
 use App\Models\Salesman;
 use App\Services\Sales\SaleReturnService;
@@ -113,7 +113,7 @@ class PosApiController extends Controller
                 ->whereNull('branch_id')
                 ->orWhere('branch_id', $branchId)))
             ->orderBy('code')
-            ->get(['id', 'code', 'name', 'branch_id', 'user_id'])
+            ->get(['id', 'code', 'name', 'branch_id', 'user_id', 'pos_credential_version'])
             ->map(fn (Salesman $cashier) => [
                 'id' => $cashier->id,
                 'code' => $cashier->code,
@@ -121,6 +121,7 @@ class PosApiController extends Controller
                 'branch_id' => $cashier->branch_id,
                 'user_id' => $cashier->user_id,
                 'user_name' => $cashier->user?->name,
+                'credential_version' => $this->credentialVersion($cashier),
             ]);
 
         return response()->json(['success' => true, 'cashiers' => $cashiers]);
@@ -203,7 +204,7 @@ class PosApiController extends Controller
         return response()->json([
             'success' => true,
             'must_change_pin' => (bool) $cashier->must_change_pin,
-            'offline_credential' => $pin ? $this->offlineCredential($cashier, $pin, $device) : null,
+            'offline_credential' => $pin && ! $cashier->must_change_pin ? $this->offlineCredential($cashier, $pin, $device) : null,
             'cashier' => $this->cashierPayload($cashier),
         ]);
     }
@@ -217,7 +218,13 @@ class PosApiController extends Controller
             'branch_id' => $cashier->branch_id,
             'user_id' => $cashier->user_id,
             'user_name' => $cashier->user?->name,
+            'credential_version' => $this->credentialVersion($cashier),
         ];
+    }
+
+    private function credentialVersion(Salesman $cashier): ?string
+    {
+        return $cashier->pos_credential_version?->toIso8601String();
     }
 
     /** แคชเชียร์ที่มีสิทธิ์ใช้บนเครื่องนี้: คนสาขาเดียวกันและคนส่วนกลาง */
@@ -268,6 +275,7 @@ class PosApiController extends Controller
             'verifier' => base64_encode($verifier),
             'iterations' => $iterations,
             'expires_at' => now()->addDays(7)->toIso8601String(),
+            'credential_version' => $this->credentialVersion($cashier),
         ];
     }
 
@@ -307,7 +315,13 @@ class PosApiController extends Controller
             ],
         ]);
 
-        return response()->json(['success' => true, 'message' => 'เปลี่ยน PIN เรียบร้อย']);
+        return response()->json([
+            'success' => true,
+            'message' => 'เปลี่ยน PIN เรียบร้อย',
+            'must_change_pin' => false,
+            'offline_credential' => $this->offlineCredential($cashier, $data['new_pin'], $device),
+            'cashier' => $this->cashierPayload($cashier),
+        ]);
     }
 
     public function checkout(Request $request): JsonResponse

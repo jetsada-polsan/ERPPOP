@@ -187,6 +187,7 @@ ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("local_cashiers", "cred_verifier", "TEXT"),
     ("local_cashiers", "cred_iterations", "INTEGER"),
     ("local_cashiers", "cred_expires_at", "TEXT"),
+    ("local_cashiers", "credential_version", "TEXT"),
 ]
 
 # ยูนีคเฉพาะแถวที่มี server_id — กันแคชเชียร์คนเดียวถูก sync ลงซ้ำสองแถว

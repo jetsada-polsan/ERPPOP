@@ -69,16 +69,36 @@ class OnlineLoginTest(unittest.TestCase):
     def test_login_stores_credential_and_maps_local_cashier(self) -> None:
         db, _ = fresh_db()
         api = FakeApi({"/api/pos/cashier/login": {
-            "success": True, "cashier": {"id": 42, "code": "C001", "name": "สมชาย"},
+            "success": True, "cashier": {"id": 42, "code": "C001", "name": "สมชาย",
+                                         "credential_version": "2026-09-01T00:00:00Z"},
             "offline_credential": {"salt": "c2FsdA==", "verifier": "dmVy", "iterations": 120000,
-                                   "expires_at": "2026-09-01T00:00:00Z"},
+                                   "expires_at": "2026-09-01T00:00:00Z",
+                                   "credential_version": "2026-09-01T00:00:00Z"},
         }})
         result = ProvisioningService(db, api).online_cashier_login("1234")
         self.assertFalse(result["selection_required"])
         self.assertEqual(result["cashier"]["id"], 42)
-        row = db.execute("SELECT server_id, cred_salt FROM local_cashiers WHERE id = ?", (result["local_cashier_id"],)).fetchone()
+        row = db.execute("SELECT server_id, cred_salt, credential_version FROM local_cashiers WHERE id = ?", (result["local_cashier_id"],)).fetchone()
         self.assertEqual(row["server_id"], 42)
         self.assertEqual(row["cred_salt"], "c2FsdA==")
+        self.assertEqual(row["credential_version"], "2026-09-01T00:00:00Z")
+
+    def test_change_pin_stores_the_new_server_credential(self) -> None:
+        db, _ = fresh_db()
+        api = FakeApi({"/api/pos/cashier/pin": {
+            "success": True, "cashier": {"id": 42, "code": "C001", "name": "สมชาย",
+                                         "credential_version": "2026-09-02T00:00:00Z"},
+            "offline_credential": {"salt": "bmV3", "verifier": "dmVyMg==", "iterations": 120000,
+                                   "expires_at": "2026-09-09T00:00:00Z",
+                                   "credential_version": "2026-09-02T00:00:00Z"},
+        }})
+        result = ProvisioningService(db, api).change_cashier_pin("C001", "1234", "860531")
+
+        self.assertEqual(result["cashier"]["id"], 42)
+        row = db.execute("SELECT cred_salt, cred_verifier, credential_version FROM local_cashiers WHERE id = ?", (result["local_cashier_id"],)).fetchone()
+        self.assertEqual(row["cred_salt"], "bmV3")
+        self.assertEqual(row["cred_verifier"], "dmVyMg==")
+        self.assertEqual(row["credential_version"], "2026-09-02T00:00:00Z")
 
     def test_login_surfaces_selection_when_a_shared_pin_matches_many(self) -> None:
         db, _ = fresh_db()

@@ -151,6 +151,10 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
                         QMessageBox.warning(self, "เลือกพนักงาน", "PIN นี้มีหลายคน กรุณากรอกรหัสแคชเชียร์ของคุณด้วย")
                         return False
                     result = online.provisioning.online_cashier_login(pin, int(match["id"]))
+                if result.get("must_change_pin"):
+                    result = self._force_pin_change(result, pin)
+                    if not result:
+                        return False
             except Exception as error:
                 QMessageBox.critical(self, "เข้าสู่ระบบไม่สำเร็จ", str(error))
                 return False
@@ -158,6 +162,41 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
                 "SELECT * FROM local_cashiers WHERE id = ?", (result["local_cashier_id"],)
             ).fetchone()
             return self.cashier is not None
+
+        def _force_pin_change(self, result: dict, current_pin: str) -> dict | None:
+            cashier = result.get("cashier") or {}
+            code = str(cashier.get("code") or self.code.text().strip())
+            dialog = QDialog(self)
+            dialog.setWindowTitle("ตั้ง PIN POS ใหม่")
+            form = QFormLayout(dialog)
+            hint = QLabel("PIN นี้เป็นรหัสชั่วคราวจากผู้ดูแล ต้องเปลี่ยนเป็น PIN ของคุณก่อนเข้า POS")
+            hint.setWordWrap(True)
+            new_pin = QLineEdit()
+            confirm_pin = QLineEdit()
+            new_pin.setEchoMode(QLineEdit.Password)
+            confirm_pin.setEchoMode(QLineEdit.Password)
+            new_pin.setPlaceholderText("ตัวเลข 4-20 หลัก")
+            confirm_pin.setPlaceholderText("กรอกซ้ำ")
+            buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            buttons.accepted.connect(dialog.accept)
+            buttons.rejected.connect(dialog.reject)
+            form.addRow(hint)
+            form.addRow("PIN ใหม่", new_pin)
+            form.addRow("ยืนยัน PIN ใหม่", confirm_pin)
+            form.addRow(buttons)
+
+            if dialog.exec() != QDialog.Accepted:
+                return None
+            new_value = new_pin.text().strip()
+            if new_value != confirm_pin.text().strip():
+                QMessageBox.warning(self, "PIN ไม่ตรงกัน", "กรุณากรอก PIN ใหม่ให้ตรงกัน")
+                return None
+            if not new_value.isdigit() or len(new_value) < 4:
+                QMessageBox.warning(self, "PIN ไม่ถูกต้อง", "PIN ต้องเป็นตัวเลขอย่างน้อย 4 หลัก")
+                return None
+            changed = online.provisioning.change_cashier_pin(code, current_pin, new_value)
+            QMessageBox.information(self, "เปลี่ยน PIN แล้ว", "ใช้ PIN ใหม่ของคุณสำหรับเข้า POS ครั้งถัดไป")
+            return {"selection_required": False, **changed, "must_change_pin": False}
 
         def login(self):
             if online is not None:

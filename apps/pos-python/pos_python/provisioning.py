@@ -172,7 +172,12 @@ class ProvisioningService:
                 code = row.get("code")
                 if not server_id or not code:
                     continue
-                self._upsert_cashier(int(server_id), str(code), str(row.get("name") or code))
+                self._upsert_cashier(
+                    int(server_id),
+                    str(code),
+                    str(row.get("name") or code),
+                    row.get("credential_version"),
+                )
                 seen.append(int(server_id))
                 upserted += 1
             if seen:
@@ -184,24 +189,26 @@ class ProvisioningService:
                 )
         return {"upserted": upserted}
 
-    def _upsert_cashier(self, server_id: int, code: str, name: str) -> int:
-        row = self.db.execute("SELECT id FROM local_cashiers WHERE server_id = ?", (server_id,)).fetchone()
+    def _upsert_cashier(self, server_id: int, code: str, name: str, credential_version: str | None = None) -> int:
+        row = self.db.execute("SELECT * FROM local_cashiers WHERE server_id = ?", (server_id,)).fetchone()
+        clear_credential = row and credential_version and row["credential_version"] and row["credential_version"] != credential_version
         if row:
+            credential_sql = ", cred_salt = NULL, cred_verifier = NULL, cred_iterations = NULL, cred_expires_at = NULL" if clear_credential else ""
             self.db.execute(
-                "UPDATE local_cashiers SET code = ?, name = ?, active = 1, synced_at = ? WHERE id = ?",
-                (code, name, now(), row["id"]),
+                f"UPDATE local_cashiers SET code = ?, name = ?, active = 1, synced_at = ?, credential_version = ?{credential_sql} WHERE id = ?",
+                (code, name, now(), credential_version, row["id"]),
             )
             return int(row["id"])
         existing = self.db.execute("SELECT id FROM local_cashiers WHERE code = ?", (code,)).fetchone()
         if existing:
             self.db.execute(
-                "UPDATE local_cashiers SET server_id = ?, name = ?, active = 1, synced_at = ? WHERE id = ?",
-                (server_id, name, now(), existing["id"]),
+                "UPDATE local_cashiers SET server_id = ?, name = ?, active = 1, synced_at = ?, credential_version = ? WHERE id = ?",
+                (server_id, name, now(), credential_version, existing["id"]),
             )
             return int(existing["id"])
         cur = self.db.execute(
-            "INSERT INTO local_cashiers (server_id, code, name, pin_hash, active, synced_at) VALUES (?, ?, ?, '', 1, ?)",
-            (server_id, code, name, now()),
+            "INSERT INTO local_cashiers (server_id, code, name, pin_hash, active, synced_at, credential_version) VALUES (?, ?, ?, '', 1, ?, ?)",
+            (server_id, code, name, now(), credential_version),
         )
         return int(cur.lastrowid)
 
@@ -210,10 +217,11 @@ class ProvisioningService:
         if not credential:
             return
         self.db.execute(
-            """UPDATE local_cashiers SET cred_salt = ?, cred_verifier = ?, cred_iterations = ?, cred_expires_at = ?
+            """UPDATE local_cashiers SET cred_salt = ?, cred_verifier = ?, cred_iterations = ?, cred_expires_at = ?, credential_version = ?
             WHERE server_id = ?""",
             (credential.get("salt"), credential.get("verifier"),
-             int(credential.get("iterations") or 0), credential.get("expires_at"), server_cashier_id),
+             int(credential.get("iterations") or 0), credential.get("expires_at"),
+             credential.get("credential_version"), server_cashier_id),
         )
         self.db.commit()
 
@@ -238,7 +246,12 @@ class ProvisioningService:
         if not server_id:
             raise RuntimeError("ERP ยืนยันแคชเชียร์แล้วแต่ไม่คืนรหัส")
         with self.db:
-            local_id = self._upsert_cashier(int(server_id), str(cashier.get("code") or server_id), str(cashier.get("name") or ""))
+            local_id = self._upsert_cashier(
+                int(server_id),
+                str(cashier.get("code") or server_id),
+                str(cashier.get("name") or ""),
+                cashier.get("credential_version"),
+            )
         credential = response.get("offline_credential")
         if credential:
             self.store_credential(int(server_id), credential)
@@ -248,6 +261,33 @@ class ProvisioningService:
             "local_cashier_id": local_id,
             "must_change_pin": bool(response.get("must_change_pin")),
         }
+
+    def change_cashier_pin(self, code: str, current_pin: str, new_pin: str) -> dict:
+        """เปลี่ยน PIN กับ ERP แล้วเก็บ offline credential รุ่นใหม่ที่ server ออกให้"""
+        response = self.api.post("/api/pos/cashier/pin", {
+            "code": code,
+            "current_pin": current_pin,
+            "new_pin": new_pin,
+        })
+        if not response.get("success", False):
+            raise RuntimeError(response.get("message", "เปลี่ยน PIN ไม่สำเร็จ"))
+
+        cashier = response.get("cashier") or {}
+        server_id = cashier.get("id")
+        if not server_id:
+            raise RuntimeError("ERP เปลี่ยน PIN แล้วแต่ไม่คืนรหัสแคชเชียร์")
+        with self.db:
+            local_id = self._upsert_cashier(
+                int(server_id),
+                str(cashier.get("code") or server_id),
+                str(cashier.get("name") or ""),
+                cashier.get("credential_version"),
+            )
+        credential = response.get("offline_credential")
+        if credential:
+            self.store_credential(int(server_id), credential)
+
+        return {"cashier": cashier, "local_cashier_id": local_id}
 
     # ── shift ────────────────────────────────────────────────────
     def open_server_shift(self, *, branch_id: int, cashier_server_id: int, opening_cash, local_shift_id: int) -> int:
