@@ -135,9 +135,16 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             self.pin.returnPressed.connect(self.login)
             submit = QPushButton("เข้าสู่ระบบ")
             submit.clicked.connect(self.login)
+            settings = QPushButton("ตั้งค่าเครื่องนี้")
+            settings.clicked.connect(self.open_settings)
             form.addRow("รหัสแคชเชียร์", self.code)
             form.addRow("PIN", self.pin)
             form.addRow(submit)
+            form.addRow(settings)
+
+        def open_settings(self) -> None:
+            dialog = SettingsDialog(self, None)
+            dialog.exec()
 
         def _online_login(self) -> bool:
             pin = self.pin.text().strip()
@@ -525,7 +532,8 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             except Exception as error:
                 QMessageBox.critical(self, "บันทึกไม่สำเร็จ", str(error))
                 return
-            QMessageBox.information(self, "ผูกเครื่องแล้ว", "บันทึกการเชื่อมต่อแล้ว\nเปิดโปรแกรมใหม่เพื่อเชื่อมกับ ERP และ sync ข้อมูล")
+            QMessageBox.information(self, "ผูกเครื่องแล้ว", "บันทึกการเชื่อมต่อแล้ว\nปิดและเปิด POS ใหม่เพื่อเชื่อมกับ ERP และ sync ข้อมูล")
+            self.accept()
 
         def backup_section(self) -> QWidget:
             box = QWidget()
