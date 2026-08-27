@@ -174,3 +174,11 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ตรวจ screenshot บน production เพราะ source รอบนี้ยังไม่ push/deploy
 - Deploy: ยังไม่ deploy
 - งานถัดไป: รันทดสอบ, push และ deploy เมื่อ GitHub เชื่อมต่อได้ แล้วตรวจ `/pos` ด้วย browser
+
+## Handoff - 2026-08-27 (Codex enterprise login skin)
+- Commit: pending
+- ทำอะไร: ปรับ `resources/views/auth/login.blade.php` เป็น enterprise login แบบ SAP-inspired: พื้นหลัง neutral, split panel คม, สีหลักเดียว, ฟอร์มด้านขวา, ข้อความ UI ภาษาอังกฤษแบบสากล และ responsive สำหรับมือถือ โดยไม่แตะ authentication flow
+- ทดสอบ: `php artisan test tests/Feature/ExampleTest.php tests/Feature/DashboardLayoutTest.php --compact` ผ่าน 12 tests / 41 assertions; `php artisan view:cache`; `git diff --check`
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ screenshot บน production เพราะ commit นี้ยังไม่ push/deploy
+- Deploy: ยังไม่ deploy
+- งานถัดไป: push และ deploy แล้วตรวจ `/login` บน host ที่ความกว้าง desktop/mobile

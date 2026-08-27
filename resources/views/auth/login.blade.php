@@ -200,6 +200,83 @@
             label:not(.remember) { margin: 10px 0 5px; }
             .remember { margin: 10px 0 14px; }
         }
+
+        /* Enterprise skin: restrained, application-first login surface. */
+        body {
+            background: #eef1f4;
+            color: #1f2933;
+            padding: 32px;
+        }
+        .login-shell {
+            width: min(1080px, 100%);
+            min-height: 620px;
+            grid-template-columns: minmax(0, 1fr) minmax(380px, 420px);
+            border: 1px solid #cbd3da;
+            border-radius: 8px;
+            box-shadow: 0 18px 48px rgba(31, 41, 51, .12);
+        }
+        .login-story {
+            padding: 48px;
+            background: #16324f;
+        }
+        .login-story::before { inset: 22px; border-radius: 4px; border-color: rgba(255,255,255,.14); }
+        .login-story::after { display: none; }
+        .story-brand { font-size: 21px; letter-spacing: 0; }
+        .story-brand img { border-radius: 8px; box-shadow: none; }
+        .story-kicker { color: #b8d8ee; letter-spacing: .18em; }
+        .story-title {
+            max-width: 16ch;
+            margin: 18px 0 14px;
+            color: #fff;
+            font-size: clamp(30px, 3.4vw, 46px);
+            line-height: 1.08;
+            letter-spacing: 0;
+        }
+        .story-copy { max-width: 43ch; color: #d5e2ec; line-height: 1.7; }
+        .story-dashboard { display: none; }
+        .story-foot { color: #b8c9d7; font-size: 11px; letter-spacing: .02em; }
+        .login-card {
+            justify-content: flex-start;
+            padding: 72px 48px 42px;
+        }
+        .brand { text-align: left; margin-bottom: 22px; }
+        .brand img { max-height: 48px; max-width: 180px; }
+        .brand-text { font-size: 26px; color: #16324f; }
+        .subtitle { text-align: left; color: #627384; margin-bottom: 30px; }
+        label:not(.remember) { color: #34495e; font-size: 12px; letter-spacing: .01em; margin: 18px 0 7px; }
+        .field i { color: #7b8c9b; }
+        input[type=text], input[type=password] {
+            min-height: 48px;
+            border: 1px solid #bfcbd5;
+            border-radius: 4px;
+            background: #fff;
+            color: #1f2933;
+        }
+        input:focus { border-color: #0a6ed1; box-shadow: 0 0 0 2px rgba(10,110,209,.16); }
+        .remember { color: #627384; margin: 18px 0 24px; }
+        .remember input { accent-color: #0a6ed1; }
+        button {
+            min-height: 48px;
+            border-radius: 4px;
+            background: #0a6ed1;
+            box-shadow: none;
+            font-size: 15px;
+            letter-spacing: .01em;
+        }
+        button:hover { background: #085caf; box-shadow: none; transform: none; }
+        .error { border-radius: 4px; margin-bottom: 10px; }
+        .foot { text-align: left; color: #7b8c9b; font-size: 12px; margin-top: 22px; }
+        @media (max-width: 880px) {
+            body { padding: 16px; }
+            .login-shell { grid-template-columns: 1fr; min-height: auto; }
+            .login-story { min-height: 210px; padding: 30px; }
+            .login-card { padding: 34px 30px 32px; }
+        }
+        @media (max-width: 380px) {
+            body { padding: 0; }
+            .login-story { padding: 24px; }
+            .login-card { padding: 28px 22px; }
+        }
     </style>
 </head>
 <body>
@@ -207,9 +284,9 @@
     <section class="login-story">
         <div class="story-brand"><img src="{{ asset('images/logo-jet-erp-mark.svg') }}" alt="PopCentral"> PopCentral</div>
         <div class="story-content">
-            <div class="story-kicker">BUSINESS OPERATING SYSTEM</div>
-            <h1 class="story-title">ควบคุมยอดขาย สต็อก และงานหน้าร้านจากจุดเดียว</h1>
-            <p class="story-copy">ศูนย์กลางการขาย คลังสินค้า จัดซื้อ และการเงิน เชื่อมข้อมูลทุกสาขาให้ทำงานได้เร็วขึ้นทุกวัน</p>
+            <div class="story-kicker">BUSINESS OPERATIONS PLATFORM</div>
+            <h1 class="story-title">One platform for every operation.</h1>
+            <p class="story-copy">Manage sales, inventory, purchasing and finance across every branch from one secure workspace.</p>
             <div class="story-dashboard">
                 <div class="signal-card">
                     <span>POS TODAY</span>
@@ -234,31 +311,31 @@
                 <div class="brand-text">{{ \App\Models\AppSetting::company('name_th') }}</div>
             @endif
         </div>
-        <div class="subtitle">เข้าสู่ระบบบริหารจัดการสำหรับ {{ \App\Models\AppSetting::company('name_th') }}</div>
+        <div class="subtitle">Sign in to your PopCentral workspace</div>
 
         @if($errors->any())
             <div class="error"><i class="bi bi-exclamation-triangle-fill"></i>{{ $errors->first() }}</div>
         @endif
 
-        <label for="username">ชื่อผู้ใช้ / อีเมล / เบอร์โทร</label>
+        <label for="username">Username, email or phone</label>
         <div class="field">
             <i class="bi bi-person-fill"></i>
             <input type="text" id="username" name="username" value="{{ old('username') }}" required autofocus autocomplete="username">
         </div>
 
-        <label for="password">รหัสผ่าน</label>
+        <label for="password">Password</label>
         <div class="field">
             <i class="bi bi-lock-fill"></i>
             <input type="password" id="password" name="password" required autocomplete="current-password">
         </div>
 
         <label class="remember">
-            <input type="checkbox" name="remember" value="1"> จดจำการเข้าสู่ระบบในเครื่องนี้
+            <input type="checkbox" name="remember" value="1"> Keep me signed in on this device
         </label>
 
-        <button type="submit"><i class="bi bi-box-arrow-in-right"></i> เข้าสู่ระบบ</button>
+        <button type="submit"><i class="bi bi-box-arrow-in-right"></i> Sign in</button>
 
-        <div class="foot">ลืมรหัสผ่านติดต่อผู้ดูแลระบบ</div>
+        <div class="foot">Forgot your password? Contact your system administrator.</div>
     </form>
 </main>
 </body>
