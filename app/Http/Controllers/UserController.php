@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\Branch;
+use App\Models\PosDevice;
 use App\Models\Role;
 use App\Models\SalesArea;
 use App\Models\Salesman;
@@ -11,8 +12,10 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
+use RuntimeException;
 
 class UserController extends Controller
 {
@@ -42,7 +45,7 @@ class UserController extends Controller
             ->withQueryString();
         $branches = Branch::orderBy('code')->get(['id', 'code', 'name_th']);
         $roles = Role::with('permissions')->orderBy('id')->get();
-        $salesmen = \App\Models\Salesman::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
+        $salesmen = Salesman::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
         $salesAreas = SalesArea::where('area_type', 'route')->where('is_active', true)->orderBy('code')->get();
 
         return view('users.index', compact('users', 'branches', 'roles', 'salesmen', 'salesAreas', 'q', 'status'));
@@ -174,7 +177,57 @@ class UserController extends Controller
         // รหัสสุ่มต่างกันทุกครั้ง ส่งกลับให้แอดมินคัดลอกครั้งเดียวผ่าน modal ที่ค้างจนกดปิด
         // (ไม่ใช้ toast ที่หายใน 3 วิ ซึ่งคัดลอกรหัสสุ่มไม่ทัน)
         return redirect()->route('users.index')
-            ->with('reset_password_result', ['username' => $user->username, 'password' => $temporary]);
+            ->with('reset_password_result', [
+                'type' => 'password',
+                'username' => $user->username,
+                'password' => $temporary,
+            ]);
+    }
+
+    public function resetPosPin(User $user): RedirectResponse
+    {
+        abort_unless($user->is_active, 422, 'บัญชีผู้ใช้นี้ถูกปิดใช้งาน');
+        abort_unless($user->hasPermission('pos.sell'), 422, 'ผู้ใช้นี้ยังไม่มีสิทธิ์ขายหน้า POS');
+
+        $cashier = $user->salesman;
+        abort_unless($cashier && $cashier->is_active, 422, 'กรุณาผูกโปรไฟล์แคชเชียร์ที่เปิดใช้งานก่อนออก PIN POS');
+        abort_if(
+            $user->branch_id && $cashier->branch_id && (int) $user->branch_id !== (int) $cashier->branch_id,
+            422,
+            'สาขาของผู้ใช้กับโปรไฟล์แคชเชียร์ไม่ตรงกัน'
+        );
+
+        $temporary = $this->temporaryPosPin($cashier);
+
+        DB::transaction(function () use ($user, $cashier, $temporary) {
+            $cashier->setPin($temporary, true);
+
+            // PIN เดิมถูกยกเลิกแล้ว ต้องถอนการยืนยันบนทุกเครื่องทันทีด้วย
+            PosDevice::where('active_cashier_id', $cashier->id)->update([
+                'active_cashier_id' => null,
+                'active_cashier_user_id' => null,
+                'cashier_verified_at' => null,
+            ]);
+
+            AuditLog::create([
+                'user_id' => auth()->id(),
+                'branch_id' => auth()->user()?->branch_id,
+                'action' => 'cashier_pin_reset',
+                'table_name' => 'salesmen',
+                'record_id' => $cashier->id,
+                'new_values' => [
+                    'username' => $user->username,
+                    'cashier_code' => $cashier->code,
+                    'must_change_pin' => true,
+                ],
+            ]);
+        });
+
+        return redirect()->route('users.index')->with('reset_pos_pin_result', [
+            'type' => 'pos_pin',
+            'username' => $user->username,
+            'password' => $temporary,
+        ]);
     }
 
     /**
@@ -198,6 +251,28 @@ class UserController extends Controller
         shuffle($chars); // กันไม่ให้ตัวเลขไปกองท้ายทุกครั้ง
 
         return implode('', $chars);
+    }
+
+    /** PIN ชั่วคราวต้องไม่ชนคนในสาขา เพราะ POS รุ่นใหม่ล็อกอินด้วย PIN อย่างเดียว */
+    private function temporaryPosPin(Salesman $cashier): string
+    {
+        $candidates = Salesman::query()
+            ->where('is_active', true)
+            ->whereNotNull('pos_pin_hash')
+            ->whereKeyNot($cashier->id)
+            ->when($cashier->branch_id, fn ($query) => $query->where(fn ($where) => $where
+                ->whereNull('branch_id')
+                ->orWhere('branch_id', $cashier->branch_id)))
+            ->get(['id', 'pos_pin_hash']);
+
+        for ($attempt = 0; $attempt < 100; $attempt++) {
+            $pin = (string) random_int(100000, 999999);
+            if (! $candidates->contains(fn (Salesman $candidate) => Hash::check($pin, $candidate->pos_pin_hash))) {
+                return $pin;
+            }
+        }
+
+        throw new RuntimeException('ไม่สามารถสร้าง PIN POS ที่ไม่ซ้ำได้ กรุณาลองใหม่');
     }
 
     private function audit(string $action, User $target, array $oldValues, array $newValues): void

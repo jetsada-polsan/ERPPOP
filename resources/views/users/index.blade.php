@@ -3,6 +3,7 @@
 @section('page-title', 'ผู้ใช้และสิทธิ์')
 @section('page-subtitle', 'จัดการผู้ใช้ บทบาท และสิทธิ์การใช้งานตามแบบฉบับ BPlus')
 @section('content')
+@php($resetResult = session('reset_pos_pin_result') ?? session('reset_password_result'))
 <div x-data="userPage()" x-cloak>
 
     <div class="content-card p-3 mb-3">
@@ -105,7 +106,7 @@
                     </div>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label small text-muted">โปรไฟล์แคชเชียร์ POS <span class="text-muted">(เฉพาะระบบหน้าร้านเดิม)</span></label>
+                    <label class="form-label small text-muted">โปรไฟล์แคชเชียร์ POS <span class="text-danger">(ใช้ระบุตัวตนคนขาย)</span></label>
                     <div class="input-group">
                         <span class="input-group-text"><i class="bi bi-person-vcard"></i></span>
                         <select name="salesman_id" x-model="form.salesman_id" class="form-select">
@@ -115,6 +116,7 @@
                             @endforeach
                         </select>
                     </div>
+                    <div class="form-text">PIN ของแคชเชียร์แยกจากรหัสผ่าน ERP และตั้ง/รีเซ็ตจากรายชื่อผู้ใช้ด้านล่าง</div>
                 </div>
                 <div class="col-12">
                     <label class="form-label small text-muted d-flex align-items-center flex-wrap gap-1">
@@ -186,6 +188,17 @@
                             @foreach($user->roles as $role)
                                 <span class="badge text-bg-primary">{{ $role->name }}</span>
                             @endforeach
+                            <div class="mt-1">
+                                @if($user->hasPermission('pos.use'))
+                                    <span class="badge text-bg-light border">เปิด POS</span>
+                                @endif
+                                @if($user->hasPermission('pos.sell'))
+                                    <span class="badge text-bg-success">ขาย POS</span>
+                                    @if(!$user->branch_id || !$user->salesman_id || !$user->salesman?->pos_pin_hash)
+                                        <span class="badge text-bg-warning">POS ยังตั้งค่าไม่ครบ</span>
+                                    @endif
+                                @endif
+                            </div>
                         </td>
                         <td class="small text-muted">{{ $user->last_login_at?->thaiDate(true) ?? 'ยังไม่เคย' }}</td>
                         <td>
@@ -201,8 +214,14 @@
                             </button>
                             <button type="button" class="btn btn-sm btn-outline-warning"
                                 @click="openReset({{ $user->id }}, @js($user->username), @js($user->name))">
-                                <i class="bi bi-key me-1"></i>รีเซ็ตรหัส
+                                <i class="bi bi-key me-1"></i>รหัส ERP
                             </button>
+                            @if($user->salesman_id && $user->hasPermission('pos.sell'))
+                                <button type="button" class="btn btn-sm btn-outline-primary"
+                                    @click="openPosPinReset({{ $user->id }}, @js($user->username), @js($user->name))">
+                                    <i class="bi bi-calculator me-1"></i>PIN POS
+                                </button>
+                            @endif
                         </td>
                     </tr>
                 @empty
@@ -218,19 +237,23 @@
         <div class="user-reset-modal" @click.outside="resetOpen = false" x-transition>
             <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
                 <div>
-                    <h3 class="h5 fw-bold mb-1">ยืนยันรีเซ็ตรหัสผ่าน</h3>
+                    <h3 class="h5 fw-bold mb-1" x-text="resetType === 'pos_pin' ? 'ยืนยันออก PIN POS ใหม่' : 'ยืนยันรีเซ็ตรหัสผ่าน ERP'"></h3>
                     <div class="text-muted small"><strong x-text="resetUsername"></strong> · <span x-text="resetName"></span></div>
                 </div>
                 <button type="button" class="btn btn-light rounded-circle" @click="resetOpen = false" aria-label="ปิด"><i class="bi bi-x-lg"></i></button>
             </div>
-            <div class="alert alert-warning">
+            <div class="alert alert-warning" x-show="resetType === 'password'">
                 ระบบจะสร้าง<strong>รหัสชั่วคราวแบบสุ่ม</strong>ให้ใหม่ และแสดงรหัสหลังยืนยัน
                 ผู้ใช้ต้องตั้งรหัสใหม่ทันทีเมื่อเข้าสู่ระบบ
+            </div>
+            <div class="alert alert-warning" x-show="resetType === 'pos_pin'">
+                ระบบจะสร้าง <strong>PIN POS ชั่วคราว 6 หลัก</strong> แยกจากรหัสผ่าน ERP
+                และถอนการยืนยัน PIN เดิมจากทุกเครื่อง ผู้ใช้ต้องเปลี่ยน PIN หลังเข้า POS
             </div>
             <form method="post" :action="resetAction" class="d-flex justify-content-end gap-2">
                 @csrf
                 <button type="button" class="btn btn-light border" @click="resetOpen = false">ยกเลิก</button>
-                <button class="btn btn-warning"><i class="bi bi-key-fill me-1"></i>ยืนยันรีเซ็ต</button>
+                <button class="btn btn-warning"><i class="bi bi-key-fill me-1"></i>ยืนยัน</button>
             </form>
         </div>
     </div>
@@ -239,13 +262,13 @@
         <div class="user-reset-modal" @click.outside="resultOpen = false" x-transition>
             <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
                 <div>
-                    <h3 class="h5 fw-bold mb-1">รีเซ็ตรหัสผ่านแล้ว</h3>
+                    <h3 class="h5 fw-bold mb-1" x-text="resultType === 'pos_pin' ? 'ออก PIN POS แล้ว' : 'รีเซ็ตรหัสผ่าน ERP แล้ว'"></h3>
                     <div class="text-muted small">ผู้ใช้ <strong x-text="resultUsername"></strong></div>
                 </div>
                 <button type="button" class="btn btn-light rounded-circle" @click="resultOpen = false" aria-label="ปิด"><i class="bi bi-x-lg"></i></button>
             </div>
-            <div class="alert alert-warning small mb-2"><i class="bi bi-exclamation-triangle me-1"></i>รหัสนี้แสดงครั้งเดียว คัดลอกแล้วแจ้งผู้ใช้ทันที — ผู้ใช้ต้องตั้งรหัสใหม่เมื่อเข้าใช้</div>
-            <label class="form-label small text-muted mb-1">รหัสชั่วคราว</label>
+            <div class="alert alert-warning small mb-2"><i class="bi bi-exclamation-triangle me-1"></i><span x-text="resultType === 'pos_pin' ? 'PIN นี้แสดงครั้งเดียว ผู้ใช้ต้องเปลี่ยน PIN หลังเข้า POS' : 'รหัสนี้แสดงครั้งเดียว ผู้ใช้ต้องตั้งรหัสผ่านใหม่เมื่อเข้า ERP'"></span></div>
+            <label class="form-label small text-muted mb-1" x-text="resultType === 'pos_pin' ? 'PIN POS ชั่วคราว' : 'รหัสผ่าน ERP ชั่วคราว'"></label>
             <div class="input-group mb-3">
                 <input type="text" class="form-control font-monospace fw-bold" :value="resultPassword" readonly @focus="$el.select()">
                 <button type="button" class="btn btn-outline-secondary" @click="copyResult()">
@@ -278,7 +301,7 @@
                 </tbody>
             </table>
         </div>
-        <p class="text-muted small mb-0">หมายเหตุ: สิทธิ์ถูกบันทึกไว้ในระบบแล้ว การบังคับใช้จริง (login + จำกัดเมนูตามสิทธิ์) เป็นขั้นตอนถัดไปก่อนใช้งานจริง</p>
+        <p class="text-muted small mb-0">ระบบบังคับสิทธิ์ทุก route แล้ว: <b>เปิด POS</b> ใช้ <code>pos.use</code>, <b>เปิดกะ/ขาย</b> ใช้ <code>pos.sell</code>, และการยกเลิกบิลใช้ <code>pos.void</code> แยกกัน</p>
     </div>
 </div>
 @endsection
@@ -325,10 +348,11 @@
 function userPage() {
     return {
         editId: null, editUsername: '', roleError: false,
-        resetOpen: false, resetId: null, resetUsername: '', resetName: '',
-        resultOpen: {{ session('reset_password_result') ? 'true' : 'false' }},
-        resultUsername: @js(data_get(session('reset_password_result'), 'username', '')),
-        resultPassword: @js(data_get(session('reset_password_result'), 'password', '')),
+        resetOpen: false, resetId: null, resetUsername: '', resetName: '', resetType: 'password',
+        resultOpen: {{ $resetResult ? 'true' : 'false' }},
+        resultType: @js(data_get($resetResult, 'type', 'password')),
+        resultUsername: @js(data_get($resetResult, 'username', '')),
+        resultPassword: @js(data_get($resetResult, 'password', '')),
         copied: false,
         form: { username: '', name: '', email: '', phone: '', position: '', branch_id: '', salesman_id: '', sales_area_id: '', role_ids: [], is_active: true },
 
@@ -361,6 +385,14 @@ function userPage() {
             this.resetId = id;
             this.resetUsername = username;
             this.resetName = name || '';
+            this.resetType = 'password';
+            this.resetOpen = true;
+        },
+        openPosPinReset(id, username, name) {
+            this.resetId = id;
+            this.resetUsername = username;
+            this.resetName = name || '';
+            this.resetType = 'pos_pin';
             this.resetOpen = true;
         },
         copyResult() {
@@ -369,7 +401,8 @@ function userPage() {
                 .catch(() => {});
         },
         get resetAction() {
-            return `{{ url('users') }}/${this.resetId}/reset-password`;
+            const action = this.resetType === 'pos_pin' ? 'reset-pos-pin' : 'reset-password';
+            return `{{ url('users') }}/${this.resetId}/${action}`;
         },
     };
 }
