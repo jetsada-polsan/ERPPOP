@@ -9,6 +9,7 @@ use App\Models\PosDevice;
 use App\Models\Role;
 use App\Models\Salesman;
 use App\Models\User;
+use App\Support\ErpMenu;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -77,6 +78,24 @@ class UserManagementTest extends TestCase
             ->assertOk()
             ->assertSee('emp-visible')
             ->assertDontSee('emp-hidden');
+    }
+
+    public function test_legacy_salesman_page_is_not_a_separate_people_menu_anymore(): void
+    {
+        $admin = User::factory()->create([
+            'username' => 'admin-legacy-salesmen',
+            'must_change_password' => false,
+        ]);
+
+        $this->withoutMiddleware(ErpAuthorize::class)
+            ->actingAs($admin)
+            ->get(route('salesmen.index'))
+            ->assertRedirect(route('users.index'));
+
+        $menuItems = collect(ErpMenu::all())->flatMap(fn (array $section) => $section['items'] ?? []);
+
+        $this->assertFalse($menuItems->contains(fn (array $item) => ($item['route'] ?? null) === 'salesmen.index'));
+        $this->assertFalse($menuItems->contains(fn (array $item) => in_array($item['label'] ?? '', ['พนักงานขาย', 'รหัสขายเดิม', 'แฟ้มพนักงาน'], true)));
     }
 
     public function test_pos_seller_gets_a_cashier_profile_without_creating_a_duplicate_person_first(): void

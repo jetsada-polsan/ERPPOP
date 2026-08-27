@@ -19,7 +19,7 @@ class SalesAreaController extends Controller
             SalesArea::create($data);
         });
 
-        return redirect()->route('salesmen.index')->with('success', "เพิ่มสายการขาย {$data['code']} แล้ว");
+        return redirect()->route('users.index')->with('success', "เพิ่มสายการขาย {$data['code']} แล้ว");
     }
 
     public function update(Request $request, SalesArea $salesArea): RedirectResponse
@@ -30,7 +30,7 @@ class SalesAreaController extends Controller
             $salesArea->update($data);
         });
 
-        return redirect()->route('salesmen.index')->with('success', 'บันทึกสายการขายแล้ว');
+        return redirect()->route('users.index')->with('success', 'บันทึกสายการขายแล้ว');
     }
 
     private function validateArea(Request $request, ?int $ignoreId = null): array

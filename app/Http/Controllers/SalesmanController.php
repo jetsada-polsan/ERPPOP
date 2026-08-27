@@ -2,35 +2,18 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Branch;
-use App\Models\SalesArea;
 use App\Models\Salesman;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
 
 class SalesmanController extends Controller
 {
-    public function index(Request $request): View
+    public function index(): RedirectResponse
     {
-        $q = trim((string) $request->query('q', ''));
-
-        $salesmen = Salesman::with(['branch', 'user:id,username,name'])
-            ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
-                ->where('code', 'ilike', "%{$q}%")
-                ->orWhere('name', 'ilike', "%{$q}%")
-            ))
-            ->orderBy('code')
-            ->paginate(50)
-            ->withQueryString();
-
-        $branches = Branch::orderBy('code')->get();
-        $salesAreas = SalesArea::with(['branch', 'documentBook', 'users:id,username,name,sales_area_id'])
-            ->where('area_type', 'route')
-            ->orderBy('code')
-            ->get();
-
-        return view('salesmen.index', compact('salesmen', 'salesAreas', 'branches', 'q'));
+        return redirect()->route('users.index')->with(
+            'success_popup',
+            'รวมการจัดการคนขายไว้ที่หน้า “ผู้ใช้และสิทธิ์” แล้ว ส่วนรหัสขาย/POS เดิมระบบเก็บไว้ใช้อ้างอิงภายใน'
+        );
     }
 
     public function store(Request $request): RedirectResponse
@@ -39,7 +22,7 @@ class SalesmanController extends Controller
 
         Salesman::create($data);
 
-        return redirect()->route('salesmen.index')->with('success', "เพิ่มรหัสขาย {$data['code']} แล้ว");
+        return redirect()->route('users.index')->with('success', "เพิ่มรหัสขาย {$data['code']} แล้ว");
     }
 
     public function update(Request $request, Salesman $salesman): RedirectResponse
@@ -48,7 +31,7 @@ class SalesmanController extends Controller
 
         $salesman->update($data);
 
-        return redirect()->route('salesmen.index')->with('success', 'บันทึกข้อมูลรหัสขายแล้ว');
+        return redirect()->route('users.index')->with('success', 'บันทึกข้อมูลรหัสขายแล้ว');
     }
 
     private function validateSalesman(Request $request, ?int $ignoreId = null): array
