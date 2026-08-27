@@ -154,7 +154,6 @@ class ErpMenu
                     ['label' => 'Mapping Bplus → ERP', 'route' => 'legacy-mappings.index', 'pattern' => 'legacy-mappings.*', 'icon' => 'bi-arrow-left-right', 'tone' => 'amber'],
                     ['label' => 'สมุดเอกสาร', 'route' => 'document-books.index', 'pattern' => 'document-books.*', 'icon' => 'bi-journals', 'tone' => 'indigo'],
                     ['label' => 'ผู้ใช้และสิทธิ์', 'route' => 'users.index', 'pattern' => 'users.*', 'icon' => 'bi-people-fill', 'tone' => 'indigo'],
-                    ['label' => 'แฟ้มพนักงาน', 'route' => 'employees.index', 'pattern' => 'employees.*', 'icon' => 'bi-person-vcard-fill', 'tone' => 'teal'],
                     ['label' => 'ผังองค์กร', 'route' => 'organizational-units.index', 'pattern' => 'organizational-units.*', 'icon' => 'bi-diagram-3-fill', 'tone' => 'indigo'],
                 ],
             ],
