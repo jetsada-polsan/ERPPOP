@@ -224,13 +224,38 @@
                 <button type="button" class="btn btn-light rounded-circle" @click="resetOpen = false" aria-label="ปิด"><i class="bi bi-x-lg"></i></button>
             </div>
             <div class="alert alert-warning">
-                รหัสชั่วคราวใหม่คือ <strong>12345678</strong> และผู้ใช้ต้องตั้งรหัสใหม่ทันทีเมื่อเข้าสู่ระบบ
+                ระบบจะสร้าง<strong>รหัสชั่วคราวแบบสุ่ม</strong>ให้ใหม่ และแสดงรหัสหลังยืนยัน
+                ผู้ใช้ต้องตั้งรหัสใหม่ทันทีเมื่อเข้าสู่ระบบ
             </div>
             <form method="post" :action="resetAction" class="d-flex justify-content-end gap-2">
                 @csrf
                 <button type="button" class="btn btn-light border" @click="resetOpen = false">ยกเลิก</button>
                 <button class="btn btn-warning"><i class="bi bi-key-fill me-1"></i>ยืนยันรีเซ็ต</button>
             </form>
+        </div>
+    </div>
+
+    <div class="user-reset-backdrop" x-show="resultOpen" x-transition.opacity @keydown.escape.window="resultOpen = false" style="display:none">
+        <div class="user-reset-modal" @click.outside="resultOpen = false" x-transition>
+            <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+                <div>
+                    <h3 class="h5 fw-bold mb-1">รีเซ็ตรหัสผ่านแล้ว</h3>
+                    <div class="text-muted small">ผู้ใช้ <strong x-text="resultUsername"></strong></div>
+                </div>
+                <button type="button" class="btn btn-light rounded-circle" @click="resultOpen = false" aria-label="ปิด"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="alert alert-warning small mb-2"><i class="bi bi-exclamation-triangle me-1"></i>รหัสนี้แสดงครั้งเดียว คัดลอกแล้วแจ้งผู้ใช้ทันที — ผู้ใช้ต้องตั้งรหัสใหม่เมื่อเข้าใช้</div>
+            <label class="form-label small text-muted mb-1">รหัสชั่วคราว</label>
+            <div class="input-group mb-3">
+                <input type="text" class="form-control font-monospace fw-bold" :value="resultPassword" readonly @focus="$el.select()">
+                <button type="button" class="btn btn-outline-secondary" @click="copyResult()">
+                    <i class="bi" :class="copied ? 'bi-check-lg' : 'bi-clipboard'"></i>
+                    <span x-text="copied ? 'คัดลอกแล้ว' : 'คัดลอก'"></span>
+                </button>
+            </div>
+            <div class="d-flex justify-content-end">
+                <button type="button" class="btn btn-primary" @click="resultOpen = false">เสร็จสิ้น</button>
+            </div>
         </div>
     </div>
 
@@ -301,6 +326,10 @@ function userPage() {
     return {
         editId: null, editUsername: '', roleError: false,
         resetOpen: false, resetId: null, resetUsername: '', resetName: '',
+        resultOpen: {{ session('reset_password_result') ? 'true' : 'false' }},
+        resultUsername: @js(data_get(session('reset_password_result'), 'username', '')),
+        resultPassword: @js(data_get(session('reset_password_result'), 'password', '')),
+        copied: false,
         form: { username: '', name: '', email: '', phone: '', position: '', branch_id: '', salesman_id: '', sales_area_id: '', role_ids: [], is_active: true },
 
         editUser(user) {
@@ -333,6 +362,11 @@ function userPage() {
             this.resetUsername = username;
             this.resetName = name || '';
             this.resetOpen = true;
+        },
+        copyResult() {
+            navigator.clipboard?.writeText(this.resultPassword)
+                .then(() => { this.copied = true; setTimeout(() => this.copied = false, 1500); })
+                .catch(() => {});
         },
         get resetAction() {
             return `{{ url('users') }}/${this.resetId}/reset-password`;

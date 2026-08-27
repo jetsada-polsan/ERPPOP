@@ -30,8 +30,16 @@ class UserManagementTest extends TestCase
             ->post(route('users.reset-password', $user));
 
         $response->assertRedirect(route('users.index'));
+        // รหัสสุ่มถูกส่งกลับให้แอดมินคัดลอกครั้งเดียว (ไม่ใช่ค่าตายตัวเดิม)
+        $response->assertSessionHas('reset_password_result');
+        $temporary = session('reset_password_result')['password'];
+        $this->assertNotSame('12345678', $temporary, 'ต้องไม่ใช่รหัสตายตัวเดิม');
+        $this->assertNotSame('OldPassword123', $temporary);
+        $this->assertGreaterThanOrEqual(8, strlen($temporary));
+
         $user->refresh();
-        $this->assertTrue(Hash::check('12345678', $user->password));
+        $this->assertTrue(Hash::check($temporary, $user->password), 'รหัสที่โชว์ต้องตรงกับที่เก็บ');
+        $this->assertFalse(Hash::check('12345678', $user->password));
         $this->assertTrue($user->must_change_password);
         $this->assertNull($user->password_changed_at);
         $this->assertDatabaseHas('audit_logs', [

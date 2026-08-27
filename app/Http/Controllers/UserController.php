@@ -154,22 +154,50 @@ class UserController extends Controller
 
     public function resetPassword(User $user): RedirectResponse
     {
-        DB::transaction(function () use ($user) {
+        $temporary = $this->temporaryPassword();
+
+        DB::transaction(function () use ($user, $temporary) {
             $user->forceFill([
-                'password' => '12345678',
+                'password' => $temporary,
                 'must_change_password' => true,
                 'password_changed_at' => null,
                 'remember_token' => null,
             ])->save();
 
+            // ไม่บันทึกตัวรหัสลง audit — เก็บแค่ว่าใครรีเซ็ตให้ใครและบังคับเปลี่ยน
             $this->audit('user_password_reset', $user, [], [
                 'username' => $user->username,
                 'must_change_password' => true,
             ]);
         });
 
+        // รหัสสุ่มต่างกันทุกครั้ง ส่งกลับให้แอดมินคัดลอกครั้งเดียวผ่าน modal ที่ค้างจนกดปิด
+        // (ไม่ใช้ toast ที่หายใน 3 วิ ซึ่งคัดลอกรหัสสุ่มไม่ทัน)
         return redirect()->route('users.index')
-            ->with('success', "รีเซ็ตรหัสผ่าน {$user->username} เป็น 12345678 แล้ว และบังคับเปลี่ยนเมื่อเข้าใช้ครั้งแรก");
+            ->with('reset_password_result', ['username' => $user->username, 'password' => $temporary]);
+    }
+
+    /**
+     * รหัสชั่วคราวแบบสุ่ม เดิมตั้งเป็น 12345678 ตายตัวทุกคน ซึ่งเดาได้ และช่วงก่อนที่
+     * ผู้ใช้จะเปลี่ยน ใครรู้ก็ล็อกอินได้ ตัดตัวที่สับสน (0/O/1/l/I) ออกให้พิมพ์ครั้งเดียวไม่ผิด
+     */
+    private function temporaryPassword(): string
+    {
+        $letters = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+        $digits = '23456789';
+        $pick = function (string $pool, int $count): string {
+            $out = '';
+            for ($i = 0; $i < $count; $i++) {
+                $out .= $pool[random_int(0, strlen($pool) - 1)];
+            }
+
+            return $out;
+        };
+
+        $chars = str_split($pick($letters, 7).$pick($digits, 3));
+        shuffle($chars); // กันไม่ให้ตัวเลขไปกองท้ายทุกครั้ง
+
+        return implode('', $chars);
     }
 
     private function audit(string $action, User $target, array $oldValues, array $newValues): void
