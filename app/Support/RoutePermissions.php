@@ -69,6 +69,7 @@ class RoutePermissions
 
         // การเงิน / บัญชี
         'chart-of-accounts.' => 'finance.manage',
+        'accounting-automation.' => 'finance.manage',
         'accounting-periods.' => 'finance.manage',
         'monthly-accounting.' => 'finance.manage',
         'tax-compliance.' => 'finance.manage',

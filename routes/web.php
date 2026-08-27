@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\AccountingAutomationController;
 use App\Http\Controllers\AccountingPeriodController;
+use App\Http\Controllers\AppLauncherController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\BillingNoteController;
@@ -11,8 +13,8 @@ use App\Http\Controllers\CashTransferController;
 use App\Http\Controllers\ChartOfAccountController;
 use App\Http\Controllers\ChequeController;
 use App\Http\Controllers\CreditDebitNoteController;
-use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CrmController;
+use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DatabaseStructureController;
 use App\Http\Controllers\DeliveryNoteController;
@@ -21,19 +23,20 @@ use App\Http\Controllers\DocumentBookController;
 use App\Http\Controllers\DocumentBrowserController;
 use App\Http\Controllers\EcommerceChannelController;
 use App\Http\Controllers\EmployeeController;
-use App\Http\Controllers\AppLauncherController;
+use App\Http\Controllers\ErpMockupController;
+use App\Http\Controllers\ExecutiveDashboardController;
 use App\Http\Controllers\FeatureController;
 use App\Http\Controllers\FinancialStatementController;
 use App\Http\Controllers\FixedAssetController;
 use App\Http\Controllers\FlashSaleController;
 use App\Http\Controllers\GlJournalController;
-use App\Http\Controllers\LegacyReportController;
 use App\Http\Controllers\LegacyBackofficeSalesController;
+use App\Http\Controllers\LegacyReportController;
 use App\Http\Controllers\LegacyTableMappingController;
 use App\Http\Controllers\LineIntegrationController;
 use App\Http\Controllers\ManagementControlController;
-use App\Http\Controllers\MasterDataSetupController;
 use App\Http\Controllers\ManualController;
+use App\Http\Controllers\MasterDataSetupController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\MemberPointController;
 use App\Http\Controllers\ModuleControlController;
@@ -43,9 +46,7 @@ use App\Http\Controllers\OperationsController;
 use App\Http\Controllers\OrganizationalUnitController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PosController;
-use App\Support\PosReleaseManifest;
 use App\Http\Controllers\PosReleaseController;
-use App\Http\Controllers\WorkflowDefinitionController;
 use App\Http\Controllers\PriceTableController;
 use App\Http\Controllers\PriceTagController;
 use App\Http\Controllers\ProductController;
@@ -57,14 +58,12 @@ use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\QtyPromotionController;
 use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\ReceiptTemplateController;
-use App\Http\Controllers\ErpMockupController;
-use App\Http\Controllers\ExecutiveDashboardController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReportGovernanceController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\SaleReturnController;
-use App\Http\Controllers\SalesmanController;
 use App\Http\Controllers\SalesAreaController;
+use App\Http\Controllers\SalesmanController;
 use App\Http\Controllers\ScalePriceController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\StockAdjustmentController;
@@ -78,6 +77,7 @@ use App\Http\Controllers\TaxComplianceController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WarehouseLocationController;
 use App\Http\Controllers\WarehouseMobileController;
+use App\Http\Controllers\WorkflowDefinitionController;
 use Illuminate\Support\Facades\Route;
 
 // Auth: ทุก route ถูกคุมโดย ErpAuthorize middleware (ดู bootstrap/app.php +
@@ -473,6 +473,14 @@ Route::prefix('accounting-periods')->name('accounting-periods.')->group(function
     Route::post('/', [AccountingPeriodController::class, 'store'])->name('store');
     Route::post('/{accountingPeriod}/close', [AccountingPeriodController::class, 'close'])->name('close');
     Route::post('/{accountingPeriod}/reopen', [AccountingPeriodController::class, 'reopen'])->name('reopen');
+});
+
+Route::prefix('accounting-automation')->name('accounting-automation.')->group(function () {
+    Route::get('/', [AccountingAutomationController::class, 'index'])->name('index');
+    Route::post('/recurring-rules', [AccountingAutomationController::class, 'storeRecurring'])->name('recurring.store');
+    Route::post('/recurring-rules/{rule}/run', [AccountingAutomationController::class, 'runRecurring'])->name('recurring.run');
+    Route::post('/imports', [AccountingAutomationController::class, 'uploadImport'])->name('imports.upload');
+    Route::post('/imports/{batch}/review', [AccountingAutomationController::class, 'reviewImport'])->name('imports.review');
 });
 
 Route::prefix('monthly-accounting')->name('monthly-accounting.')->group(function () {

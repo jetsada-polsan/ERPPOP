@@ -88,6 +88,7 @@ class ErpMenu
                 'label' => 'การเงิน / บัญชี',
                 'displayLabel' => 'การเงิน / บัญชี',
                 'items' => [
+                    ['label' => 'บัญชีครบวงจร', 'route' => 'accounting-automation.index', 'pattern' => 'accounting-automation.*', 'icon' => 'bi-cpu-fill', 'tone' => 'indigo'],
                     ['label' => 'ผังบัญชี / บันทึกบัญชี', 'route' => 'chart-of-accounts.index', 'pattern' => 'chart-of-accounts.*', 'extraPattern' => 'gl-journals.*', 'icon' => 'bi-calculator-fill', 'tone' => 'red'],
                     ['label' => 'งวดบัญชี / ปิดงวด', 'route' => 'accounting-periods.index', 'pattern' => 'accounting-periods.*', 'icon' => 'bi-calendar-check-fill', 'tone' => 'amber'],
                     ['label' => 'ปิดบัญชีรายเดือน', 'route' => 'monthly-accounting.index', 'pattern' => 'monthly-accounting.*', 'icon' => 'bi-file-earmark-zip-fill', 'tone' => 'teal'],
