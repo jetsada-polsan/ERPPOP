@@ -321,6 +321,23 @@
                 </div>
                 @endif
 
+                <div class="set-card">
+                    <div class="set-title pt-2">วิธีผูกเครื่อง POS หลังติดตั้ง</div>
+                    <div class="set-desc mb-3">
+                        เครื่อง POS ไม่ได้ใช้รหัสผ่าน ERP จากหน้า “ผู้ใช้และสิทธิ์” โดยตรง ต้องผูกเครื่องด้วย Device token ก่อน แล้วให้แคชเชียร์ยืนยันตัวด้วย PIN POS
+                    </div>
+                    <ol class="mb-3 ps-3 small text-muted">
+                        <li>เลือกสาขาที่ติดตั้ง แล้วกด <strong>สร้างอัตโนมัติ</strong> เพื่อออก Device token ให้เครื่องนั้น</li>
+                        <li>คัดลอก Token ที่แสดง แล้วไปที่โปรแกรม PopCentral POS → <strong>ตั้งค่าเครื่องนี้</strong></li>
+                        <li>กรอกที่อยู่ ERP เป็น <code>{{ request()->getSchemeAndHttpHost() }}</code> และวาง Device token</li>
+                        <li>เปิดโปรแกรม POS ใหม่หนึ่งครั้งเพื่อ sync สินค้า ราคา สาขา เครื่อง และรายชื่อแคชเชียร์</li>
+                        <li>แคชเชียร์เข้า POS ด้วย <strong>รหัสพนักงาน + PIN POS</strong>; ถ้าเป็น PIN ชั่วคราว ระบบจะบังคับตั้ง PIN ใหม่ก่อนขาย</li>
+                    </ol>
+                    <div class="alert alert-warning py-2 mb-0 small">
+                        รีเซ็ตรหัสผ่านในหน้า “ผู้ใช้และสิทธิ์” ใช้กับการเข้าเว็บ ERP เท่านั้น ถ้าต้องการเข้า POS ให้ใช้ปุ่ม <strong>PIN POS</strong> ของผู้ใช้ หรือออก Device token ใหม่ให้เครื่อง
+                    </div>
+                </div>
+
                 @if(session('pos_token'))
                     <div class="set-card pos-token-result">
                         <div>

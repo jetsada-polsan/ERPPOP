@@ -490,10 +490,16 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             # ผูกเครื่องกับ ERP — บันทึก server URL + device token ลง pos-config.json
             if data_dir is not None:
                 outer.addWidget(QLabel("\nผูกเครื่องกับ ERP (บันทึกแล้วเปิดโปรแกรมใหม่เพื่อเชื่อม)"))
+                help_text = QLabel(
+                    "ใช้ URL และ Device token จาก ERP > ตั้งค่าระบบ > เพิ่มเครื่อง POS\n"
+                    "ถ้า ERP ยังเป็น http:// ให้กรอก http:// ตามจริง โปรแกรมจะบันทึก allow_insecure ให้เฉพาะเครื่องนี้"
+                )
+                help_text.setWordWrap(True)
+                outer.addWidget(help_text)
                 pair = QFormLayout()
                 current = load_device_config(data_dir)
                 self.server_url = QLineEdit(current.server_url if current else "")
-                self.server_url.setPlaceholderText("https://erp.example.com")
+                self.server_url.setPlaceholderText("เช่น http://27.254.143.219 หรือ https://erp.example.com")
                 self.device_token = QLineEdit(current.device_token if current else "")
                 self.device_token.setPlaceholderText("วาง device token ที่ออกจาก ERP")
                 self.device_token.setEchoMode(QLineEdit.Password)
@@ -519,7 +525,7 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             except Exception as error:
                 QMessageBox.critical(self, "บันทึกไม่สำเร็จ", str(error))
                 return
-            QMessageBox.information(self, "ผูกเครื่องแล้ว", "บันทึกการเชื่อมต่อแล้ว\nเปิดโปรแกรมใหม่เพื่อเชื่อมกับ ERP")
+            QMessageBox.information(self, "ผูกเครื่องแล้ว", "บันทึกการเชื่อมต่อแล้ว\nเปิดโปรแกรมใหม่เพื่อเชื่อมกับ ERP และ sync ข้อมูล")
 
         def backup_section(self) -> QWidget:
             box = QWidget()
