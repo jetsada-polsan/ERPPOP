@@ -21,6 +21,8 @@
             <div class="crm-kpi"><span class="crm-kpi-icon"><i class="bi bi-person-lines-fill"></i></span><div><small>ยังไม่กำหนดผู้ดูแล</small><strong>{{ number_format($counts['unassigned']) }}</strong><span>ราย</span></div></div>
             <div class="crm-kpi crm-kpi-warning"><span class="crm-kpi-icon"><i class="bi bi-wallet2"></i></span><div><small>ยอดค้างชำระรวม</small><strong>{{ number_format($outstandingBalance, 2) }}</strong><span>บาท</span></div></div>
             <div class="crm-kpi"><span class="crm-kpi-icon"><i class="bi bi-person-dash-fill"></i></span><div><small>พักการใช้งาน</small><strong>{{ number_format($counts['inactive']) }}</strong><span>ราย</span></div></div>
+            <div class="crm-kpi"><span class="crm-kpi-icon"><i class="bi bi-kanban-fill"></i></span><div><small>Pipeline ที่เปิดอยู่</small><strong>{{ number_format((int) ($pipeline->open_count ?? 0)) }}</strong><span>งาน · ฿{{ number_format((float) ($pipeline->open_value ?? 0), 2) }}</span></div></div>
+            <div class="crm-kpi {{ $overdueActivities ? 'crm-kpi-warning' : '' }}"><span class="crm-kpi-icon"><i class="bi bi-alarm-fill"></i></span><div><small>งานติดตามเกินกำหนด</small><strong>{{ number_format($overdueActivities) }}</strong><span>งาน</span></div></div>
         </div>
 
         <div class="crm-grid crm-grid-top">

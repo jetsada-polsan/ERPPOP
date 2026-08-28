@@ -21,11 +21,13 @@
 @php
     $suggestedValue = $suggestions->sum(fn($row) => $row['suggested_qty'] * $row['unit_price']);
     $missingSupplier = $suggestions->whereNull('supplier_id')->count();
+    $urgentItems = $suggestions->whereIn('urgency', ['critical', 'urgent'])->count();
 @endphp
 <div class="replenish-summary mb-3">
     <div><span>รายการควรเติม</span><strong>{{ number_format($suggestions->count()) }}</strong></div>
     <div><span>มูลค่าเสนอซื้อ</span><strong>฿{{ number_format($suggestedValue, 2) }}</strong></div>
     <div><span>ยังไม่มี Supplier หลัก</span><strong class="{{ $missingSupplier ? 'text-danger' : 'text-success' }}">{{ number_format($missingSupplier) }}</strong></div>
+    <div><span>ต้องสั่งด่วน</span><strong class="{{ $urgentItems ? 'text-danger' : 'text-success' }}">{{ number_format($urgentItems) }}</strong></div>
     <div><span>ช่วงวิเคราะห์</span><strong>{{ $salesDays }} + {{ $safetyDays }} วัน</strong></div>
 </div>
 
@@ -39,7 +41,7 @@
         </div>
         <div class="table-responsive">
             <table class="table table-sm align-middle mb-0 replenish-table">
-                <thead><tr><th></th><th>สินค้า / Supplier</th><th class="text-end">พร้อมขาย</th><th class="text-end">กำลังมา</th><th class="text-end">ขาย/วัน</th><th class="text-end">Lead</th><th class="text-end">จุดสั่ง</th><th class="text-end">เป้า</th><th class="text-end">MOQ</th><th class="text-end" style="width:125px">เสนอซื้อ</th><th class="text-end">มูลค่า</th></tr></thead>
+                <thead><tr><th></th><th>สินค้า / Supplier</th><th class="text-end">พร้อมขาย</th><th class="text-end">กำลังมา</th><th class="text-end">ขาย/วัน</th><th class="text-end">เหลือประมาณ</th><th class="text-end">Lead</th><th class="text-end">จุดสั่ง</th><th class="text-end">เป้า</th><th class="text-end">MOQ</th><th class="text-end" style="width:125px">เสนอซื้อ</th><th class="text-end">มูลค่า</th></tr></thead>
                 <tbody>
                 @forelse($suggestions as $index => $row)
                     <tr x-data="{ checked: false }">
@@ -48,6 +50,7 @@
                         <td class="text-end {{ $row['available'] < 0 ? 'text-danger fw-bold' : '' }}">{{ number_format($row['available'], 2) }}<small>คงเหลือ {{ number_format($row['on_hand'], 2) }} / จอง {{ number_format($row['reserved'], 2) }}</small></td>
                         <td class="text-end">{{ number_format($row['incoming'], 2) }}</td>
                         <td class="text-end">{{ number_format($row['daily_sales'], 2) }}<small>{{ number_format($row['sold_qty'], 2) }} ใน {{ $salesDays }} วัน</small></td>
+                        <td class="text-end"><span class="replenish-urgency {{ $row['urgency'] }}">{{ $row['coverage_days'] === null ? 'ไม่มีข้อมูล' : number_format($row['coverage_days'], 1).' วัน' }}</span></td>
                         <td class="text-end">{{ number_format($row['lead_days']) }} วัน</td>
                         <td class="text-end">{{ number_format($row['reorder_point'], 2) }}</td>
                         <td class="text-end">{{ number_format($row['target_stock'], 2) }}</td>
@@ -61,7 +64,7 @@
                         <td class="text-end fw-semibold">฿{{ number_format($row['suggested_qty'] * $row['unit_price'], 2) }}</td>
                     </tr>
                 @empty
-                    <tr><td colspan="11" class="text-center text-muted py-5"><i class="bi bi-check2-circle d-block fs-3 text-success mb-2"></i>ไม่มีสินค้าต่ำกว่าจุดสั่งซื้อ</td></tr>
+                    <tr><td colspan="12" class="text-center text-muted py-5"><i class="bi bi-check2-circle d-block fs-3 text-success mb-2"></i>ไม่มีสินค้าต่ำกว่าจุดสั่งซื้อ</td></tr>
                 @endforelse
                 </tbody>
             </table>
@@ -78,6 +81,7 @@
 
 @push('head')
 <style>
-.replenish-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.replenish-summary>div{padding:11px 13px;border:1px solid var(--erp-border);border-radius:7px;background:#fff}.replenish-summary span,.replenish-table small{display:block;color:var(--erp-muted);font-size:10px}.replenish-summary strong{display:block;margin-top:2px;color:var(--erp-text);font-size:18px}.replenish-table{min-width:1180px}.replenish-table th{color:var(--erp-muted);background:var(--erp-surface-2);font-size:10px}.replenish-table td{font-size:11px}.replenish-table td>strong{color:var(--erp-primary-dark);font-size:11.5px}@media(max-width:800px){.replenish-summary{grid-template-columns:1fr 1fr}}
+.replenish-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.replenish-summary>div{padding:11px 13px;border:1px solid var(--erp-border);border-radius:7px;background:#fff}.replenish-summary span,.replenish-table small{display:block;color:var(--erp-muted);font-size:10px}.replenish-summary strong{display:block;margin-top:2px;color:var(--erp-text);font-size:18px}.replenish-table{min-width:1280px}.replenish-table th{color:var(--erp-muted);background:var(--erp-surface-2);font-size:10px}.replenish-table td{font-size:11px}.replenish-table td>strong{color:var(--erp-primary-dark);font-size:11.5px}@media(max-width:800px){.replenish-summary{grid-template-columns:1fr 1fr}}
+.replenish-urgency{display:inline-block;padding:3px 6px;border-radius:4px;font-weight:700;font-size:10px}.replenish-urgency.critical{color:#a61b1b;background:#fee2e2}.replenish-urgency.urgent{color:#9a5b00;background:#fef3c7}.replenish-urgency.planned{color:#166534;background:#dcfce7}
 </style>
 @endpush

@@ -53,6 +53,7 @@ class ReplenishmentService
                     ? (float) $product->maximum_stock
                     : max($minimum, $reorderPoint, $dailySales * ($leadDays + $safetyDays + $reviewDays));
                 $stockPosition = $available + $incomingQty;
+                $coverageDays = $dailySales > 0 ? max(0, $available / $dailySales) : null;
                 $rawSuggestion = $stockPosition <= $reorderPoint + 0.0001 ? max(0, $target - $stockPosition) : 0;
                 $moq = max(0, (float) ($supplierLink?->minimum_order_qty ?? 0));
                 $suggested = $rawSuggestion > 0 && $moq > 0
@@ -76,6 +77,8 @@ class ReplenishmentService
                     'incoming' => $incomingQty,
                     'sold_qty' => $soldQty,
                     'daily_sales' => $dailySales,
+                    'coverage_days' => $coverageDays,
+                    'urgency' => $available <= 0 ? 'critical' : (($coverageDays !== null && $coverageDays <= $leadDays) ? 'urgent' : 'planned'),
                     'lead_days' => $leadDays,
                     'reorder_point' => $reorderPoint,
                     'target_stock' => $target,

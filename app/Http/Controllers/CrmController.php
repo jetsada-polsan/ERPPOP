@@ -83,6 +83,14 @@ class CrmController extends Controller
             ->orderByRaw('due_at is null, due_at asc')
             ->limit(8)
             ->get();
+        $pipeline = CrmOpportunity::query()
+            ->whereIn('customer_id', (clone $visibleCustomers)->select('customers.id'))
+            ->whereNotIn('stage', ['won', 'lost'])
+            ->selectRaw('count(*) as open_count, coalesce(sum(expected_amount), 0) as open_value')
+            ->first();
+        $overdueActivities = CrmActivity::query()
+            ->whereIn('customer_id', (clone $visibleCustomers)->select('customers.id'))
+            ->where('status', 'pending')->whereNotNull('due_at')->where('due_at', '<', now())->count();
         $activityTypes = [
             'call' => 'โทรศัพท์', 'visit' => 'เข้าพบ', 'line' => 'LINE',
             'email' => 'อีเมล', 'note' => 'หมายเหตุ',
@@ -94,7 +102,7 @@ class CrmController extends Controller
 
         return view('crm.index', compact(
             'customers', 'topCustomers', 'recentDocuments', 'counts',
-            'outstandingBalance', 'q', 'status', 'activities', 'activityTypes', 'activityUsers', 'activityCustomers'
+            'outstandingBalance', 'q', 'status', 'activities', 'activityTypes', 'activityUsers', 'activityCustomers', 'pipeline', 'overdueActivities'
         ));
     }
 

@@ -56,6 +56,7 @@ class ExecutiveDashboardController extends Controller
             'branches' => $this->salesByBranch($today, $branchId),
             'channels' => $this->salesByChannel($today, $branchId),
             'topProducts' => $this->topProducts($today, $branchId),
+            'profitAlerts' => $this->profitAlerts($branchId),
             'attention' => $this->needsAttention($branchId),
             'branchName' => $branchId ? DB::table('branches')->where('id', $branchId)->value('name_th') : 'ทุกสาขา',
         ];
@@ -193,6 +194,30 @@ class ExecutiveDashboardController extends Controller
                 'qty' => round((float) $row->qty, 2), 'amount' => round((float) $row->amount, 2),
             ])
             ->all();
+    }
+
+    /** สินค้าที่มียอดขายแต่ margin ต่ำ เพื่อให้ผู้บริหารแก้ราคาหรือสูตรต้นทุนได้ก่อนปิดงวด */
+    private function profitAlerts(?int $branchId): array
+    {
+        return DB::table('stock_document_items as sdi')
+            ->join('stock_documents as sd', 'sd.id', '=', 'sdi.stock_document_id')
+            ->join('documents as d', 'd.id', '=', 'sd.document_id')
+            ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
+            ->join('products as p', 'p.id', '=', 'sdi.product_id')
+            ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE'])
+            ->where('d.status', 'active')
+            ->whereDate('d.doc_date', '>=', now()->subDays(30)->toDateString())
+            ->when($branchId, fn ($query) => $query->where('d.branch_id', $branchId))
+            ->groupBy('p.sku_code', 'p.name_th')
+            ->selectRaw('p.sku_code, p.name_th as name, sum(sdi.qty * sdi.unit_price) as sales, sum(coalesce(sdi.cost_amount, 0)) as cost, sum(sdi.qty) as qty')
+            ->get()
+            ->map(function ($row): array {
+                $sales = (float) $row->sales;
+                $profit = $sales - (float) $row->cost;
+                return ['sku' => $row->sku_code, 'name' => $row->name, 'sales' => round($sales, 2), 'profit' => round($profit, 2), 'margin' => $sales > 0 ? round($profit / $sales * 100, 1) : 0.0, 'qty' => round((float) $row->qty, 2)];
+            })
+            ->filter(fn (array $row): bool => $row['margin'] < 10)
+            ->sortBy('margin')->take(8)->values()->all();
     }
 
     /**

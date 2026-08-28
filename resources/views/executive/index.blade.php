@@ -114,6 +114,17 @@
         </section>
 
         <section class="exec-card exec-card-wide">
+            <h2>สินค้าที่ควรทบทวนกำไร</h2>
+            <p class="exec-note">ยอดขายย้อนหลัง 30 วัน · แสดงสินค้าที่ margin ต่ำกว่า 10%</p>
+            <template x-if="data.profitAlerts.length === 0"><p class="exec-empty">ยังไม่พบสินค้าที่ margin ต่ำกว่าเกณฑ์</p></template>
+            <div class="exec-profit-alerts" x-show="data.profitAlerts.length > 0">
+                <template x-for="row in data.profitAlerts" :key="row.sku">
+                    <div class="exec-profit-row"><span><b x-text="row.sku"></b> <span x-text="row.name"></span></span><span x-text="number(row.qty) + ' หน่วย'"></span><span x-text="money(row.sales)"></span><strong :class="row.margin < 0 ? 'exec-loss' : 'exec-low-margin'" x-text="row.margin + '%' "></strong></div>
+                </template>
+            </div>
+        </section>
+
+        <section class="exec-card exec-card-wide">
             <h2>เรื่องที่ต้องตาม</h2>
             <p class="exec-note">ทุกช่องควรเป็นศูนย์ — ตัวไหนไม่เป็นศูนย์คือมีงานค้าง</p>
             <div class="exec-attention">
@@ -192,6 +203,14 @@
     .exec-attn-count { display: block; font-size: 24px; font-weight: 900; color: var(--erp-text); }
     .exec-attn.is-warn .exec-attn-count { color: var(--erp-danger); }
     .exec-attn-amount { font-size: 12.5px; color: var(--erp-muted); }
+    .exec-profit-alerts { display: grid; gap: 6px; }
+    .exec-profit-row { display: grid; grid-template-columns: 1fr 110px 130px 70px; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px dashed var(--erp-border); font-size: 13px; }
+    .exec-profit-row:last-child { border-bottom: 0; }
+    .exec-profit-row b { color: var(--erp-info); }
+    .exec-profit-row > span:nth-child(n+2) { text-align: right; color: var(--erp-muted); }
+    .exec-profit-row strong { text-align: right; }
+    .exec-low-margin { color: #b45309; }
+    .exec-loss { color: var(--erp-danger); }
 
     @page { size: A4 landscape; margin: 10mm; }
     @media print {
@@ -207,6 +226,8 @@
     @media (max-width: 640px) {
         .exec-kpis, .exec-attention { grid-template-columns: 1fr; }
         .exec-bar-row { grid-template-columns: 100px 1fr 90px; }
+        .exec-profit-row { grid-template-columns: 1fr 70px; }
+        .exec-profit-row > span:nth-child(2), .exec-profit-row > span:nth-child(3) { display: none; }
     }
 </style>
 @endpush
@@ -235,7 +256,7 @@ function execBoard() {
                 this.data = {
                     today: fresh.today, compare: fresh.compare, trend: fresh.trend,
                     branches: fresh.branches, channels: fresh.channels,
-                    topProducts: fresh.topProducts, attention: fresh.attention,
+                    topProducts: fresh.topProducts, profitAlerts: fresh.profitAlerts, attention: fresh.attention,
                 };
                 this.stamp = fresh.refreshed_at;
             } finally {
