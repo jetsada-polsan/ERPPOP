@@ -76,7 +76,6 @@ jobs:
         env:
           SSH_USER: ${{ secrets.POS_RELEASE_USER }}
           SSH_HOST: ${{ secrets.POS_RELEASE_HOST }}
-          REMOTE_PATH: /var/www/jeterp
           BASE_URL: http://${{ secrets.POS_RELEASE_HOST }}
         run: |
           installer="$(find release -type f -name '*.exe' -print -quit)"
@@ -84,4 +83,12 @@ jobs:
             echo "No installer artifact found" >&2
             exit 1
           fi
-          scripts/publish-pos-python.sh "${{ inputs.version }}" "$installer"
+          target="PopCentral-POS-UAT-${{ inputs.version }}-setup.exe"
+          mv "$installer" "release/$target"
+          cat > release.sftp <<EOF
+          put release/$target /var/www/jeterp/storage/app/pos-python-releases/$target
+          EOF
+          sftp -b release.sftp "$SSH_USER@$SSH_HOST"
+          code="$(curl -s -o /dev/null -w '%{http_code}' -I "$BASE_URL/download/python-pos" || true)"
+          echo "GET /download/python-pos -> $code"
+          [ "$code" = "200" ] || [ "$code" = "302" ]
