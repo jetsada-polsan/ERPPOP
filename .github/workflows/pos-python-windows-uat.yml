@@ -84,7 +84,9 @@ jobs:
             exit 1
           fi
           target="PopCentral-POS-UAT-${{ inputs.version }}-setup.exe"
-          mv "$installer" "release/$target"
+          if [ "$installer" != "release/$target" ]; then
+            mv "$installer" "release/$target"
+          fi
           cat > release.sftp <<EOF
           put release/$target /var/www/jeterp/storage/app/pos-python-releases/$target
           EOF
