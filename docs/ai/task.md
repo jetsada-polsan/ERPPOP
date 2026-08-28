@@ -190,3 +190,11 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ deploy; ต้องตรวจผู้ใช้จริงที่ติด `must_change_password` ให้เปลี่ยนรหัสชั่วคราวก่อนเข้าเมนูตามนโยบายความปลอดภัย
 - Deploy: ยังไม่ deploy
 - งานถัดไป: push แล้ว deploy พร้อมล้าง cache และตรวจ `/pos` ด้วยบัญชีแคชเชียร์จริง
+
+## Handoff - 2026-08-28 (Codex POS sync production test)
+- Commit: `8d6d9cb` (source ที่ push แล้ว; deploy ส่งไฟล์โดยไม่ใช้ `--delete`)
+- ทำอะไร: นำ source ล่าสุดของ POS Python, Laravel POS API และ permission fix ขึ้น production เพื่อเตรียมทดสอบ sync จริง; ไม่เปลี่ยน `pos_web_mode` และไม่แตะข้อมูลขายเดิม
+- ทดสอบ: Python POS unittest ผ่าน 128 tests; production backup สำเร็จที่ `storage/app/backups/erp-db-20260828-220108.sql.gz`; `php artisan migrate --force` ไม่มี migration ค้าง; `php artisan erp:health` ผ่าน database, migration, backup, sales-GL, storage และ queue
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ยิง checkout จริงจากเครื่อง POS เพราะต้องใช้ device token/PIN/terminal ที่ผูกสาขาจริง; production ยังเป็น HTTP จึงต้องตั้ง `allow_insecure=true` ในไฟล์ pair ของเครื่องตามที่ระบบบังคับให้ผู้ใช้ยืนยันเอง
+- Deploy: deploy แล้ว พร้อมล้าง Laravel cache และตรวจ health ผ่าน
+- งานถัดไป: บน Windows เปิดแอป → pair เครื่อง → ping → sync catalog/cashier → login PIN → เปิดกะ → ขาย 1 บิล → ตรวจเลข receipt และรายการบน `/bplus/pos-workbench`
