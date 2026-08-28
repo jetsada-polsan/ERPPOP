@@ -207,6 +207,14 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
 - Deploy: deploy เฉพาะ 6 ไฟล์ที่แก้ขึ้น `/var/www/jeterp` หลัง backup `erp-db-20260828-222527.sql.gz`; clear cache สำเร็จ
 - งานถัดไป: ทดลองเปิดหน้า Executive/CRM/Purchase Planning กับสิทธิ์ผู้ใช้จริง และทำ UAT 1 รอบโดยใช้ข้อมูลสาขาจริง
 
+## Handoff - 2026-08-28 (Codex production-host isolated POS UAT)
+- Commit: `79de91a`
+- ทำอะไร: เพิ่มคำสั่ง `pos:uat-seed` ที่บังคับ `APP_ENV=staging/local/testing` และฐานข้อมูลลงท้าย `_uat`; ใช้เตรียม UAT database แยกบน production host โดยไม่แตะฐาน `jeterp`
+- ทดสอบ: สร้าง `jeterp_uat` บน host, migrate 165 migrations, seed 50 สินค้า/50 lots/20 ลูกค้า, pair device, sync catalog 50 รายการและ cashier 19 ราย, login PIN, เปิดกะ, ยิงขายจาก Python ผ่าน Laravel server จริง ได้ receipt `CSUAT20260828001`; `uat:reconcile` ผ่าน 7/7 (GL, เลขซ้ำ, posting, COGS, revenue+VAT, stock)
+- ยังไม่ทดสอบ/ความเสี่ยง: void ถูกปฏิเสธ 401 เพราะ fixture ไม่มีสิทธิ์ `pos.void` ซึ่งเป็น policy ที่ถูกต้อง; ยังไม่ได้ทดสอบเครื่องพิมพ์/ลิ้นชักเงินจริง
+- Deploy: UAT server หยุดแล้วและ drop ฐาน `jeterp_uat` หลังทดสอบ; ฐาน production `jeterp` ไม่ถูกแก้โดยชุดทดสอบนี้
+- งานถัดไป: ทดสอบ void ด้วยบัญชีที่ได้รับ `pos.void` บนฐาน UAT ใหม่เมื่อจำเป็น และทำ Windows hardware UAT
+
 ## Handoff - 2026-08-28 (Codex production readiness gate)
 - Commit: `6bc534b`
 - ทำอะไร: เพิ่มคำสั่งอ่านอย่างเดียว `php artisan erp:readiness` ตรวจฐานข้อมูล, migration, backup+checksum, เอกสารขายลง GL, POS device binding, idempotency ที่ค้าง และคำเตือน queue/E-Tax ก่อนเปิดใช้งานจริง
