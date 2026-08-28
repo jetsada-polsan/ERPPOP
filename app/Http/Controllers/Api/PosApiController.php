@@ -94,11 +94,31 @@ class PosApiController extends Controller
                 'auto_print' => false,
                 'print_copies' => 1,
             ],
+            'pos_layout' => $this->publishedPosLayout(),
             'vat_rate' => (float) (DB::table('vat_rates')
                 ->where('effective_from', '<=', now()->toDateString())
                 ->where(fn ($w) => $w->whereNull('effective_to')->orWhere('effective_to', '>=', now()->toDateString()))
                 ->orderByDesc('effective_from')->value('rate_percent') ?? 7.0),
         ]);
+    }
+
+    private function publishedPosLayout(): array
+    {
+        $layout = json_decode((string) AppSetting::get('pos_layout_published'), true);
+        if (! is_array($layout) || ! is_array($layout['components'] ?? null)) {
+            return [
+                'schema' => 'popcentral-pos-layout', 'version' => 1,
+                'canvas' => ['columns' => 12, 'rows' => 8],
+                'components' => [
+                    ['id' => 'search', 'type' => 'search', 'x' => 1, 'y' => 1, 'w' => 7, 'h' => 1],
+                    ['id' => 'category', 'type' => 'category_tabs', 'x' => 1, 'y' => 2, 'w' => 7, 'h' => 1],
+                    ['id' => 'products', 'type' => 'product_grid', 'x' => 1, 'y' => 3, 'w' => 7, 'h' => 5],
+                    ['id' => 'cart', 'type' => 'cart', 'x' => 8, 'y' => 1, 'w' => 5, 'h' => 5],
+                    ['id' => 'payment', 'type' => 'payment', 'x' => 8, 'y' => 6, 'w' => 5, 'h' => 2],
+                ],
+            ];
+        }
+        return $layout;
     }
 
     public function cashiers(Request $request): JsonResponse

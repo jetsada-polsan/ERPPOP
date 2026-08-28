@@ -153,6 +153,16 @@ class ProvisioningTest(unittest.TestCase):
         self.assertEqual(out["catalog"]["upserted"], 2)
         self.assertEqual(out["cashiers"]["upserted"], 2)
 
+    def test_ping_caches_published_pos_layout(self) -> None:
+        self.api.responses["/api/pos/ping"]["pos_layout"] = {
+            "schema": "popcentral-pos-layout", "version": 3,
+            "components": [{"id": "cart", "type": "cart", "x": 1, "y": 1, "w": 6, "h": 4}],
+        }
+        self.svc.ping()
+        row = self.db.execute("SELECT value FROM device_settings WHERE key = 'pos_layout'").fetchone()
+        self.assertIsNotNone(row)
+        self.assertIn('"version": 3', row[0])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -35,7 +35,8 @@
 
             <div class="set-nav-group mt-3"><i class="bi bi-building"></i> ตั้งค่ากิจการ</div>
             <button type="button" class="set-nav-link" :class="tab === 'company' && 'active'" @click="tab = 'company'">ข้อมูลกิจการ</button>
-            <a href="{{ route('settings.module-controls') }}" class="set-nav-link text-decoration-none">ศูนย์ควบคุมโมดูล</a>
+                    <a href="{{ route('settings.module-controls') }}" class="set-nav-link text-decoration-none">ศูนย์ควบคุมโมดูล</a>
+                    <a href="{{ route('settings.pos-designer') }}" class="set-nav-link text-decoration-none">POS Designer</a>
             <button type="button" class="set-nav-link" :class="tab === 'menu' && 'active'" @click="tab = 'menu'">จัดลำดับเมนู</button>
             <button type="button" class="set-nav-link" :class="tab === 'theme' && 'active'" @click="tab = 'theme'">ปรับธีม</button>
 

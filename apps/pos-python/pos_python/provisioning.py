@@ -33,6 +33,7 @@ _PING_SETTINGS = {
     "company": ("company",),
     "receipt_template": ("receipt_template",),
     "hardware_profile": ("hardware_profile",),
+    "pos_layout": ("pos_layout",),
 }
 
 

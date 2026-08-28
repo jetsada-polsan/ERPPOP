@@ -199,6 +199,11 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
 - Deploy: deploy แล้ว พร้อมล้าง Laravel cache และตรวจ health ผ่าน
 - งานถัดไป: บน Windows เปิดแอป → pair เครื่อง → ping → sync catalog/cashier → login PIN → เปิดกะ → ขาย 1 บิล → ตรวจเลข receipt และรายการบน `/bplus/pos-workbench`
 
+## Handoff - 2026-08-28 (Codex web POS designer)
+- ทำอะไร: เพิ่มหน้า `settings/pos-designer` แบบลากวาง, component whitelist, บันทึก draft และ Build & Publish พร้อม version; เพิ่ม `pos_layout` ใน POS ping เพื่อให้ Python POS แคช layout ใช้งานออฟไลน์ได้
+- ทดสอบ: Blade cache, PHP syntax, route list และ Python provisioning 10 tests ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: การจัดวางยังเป็น schema สำหรับ renderer; ต้องทดสอบการแสดงผลบนเครื่อง Windows จริงก่อนเปิดใช้เป็น layout หลัก
+
 ## Handoff - 2026-08-28 (Codex profit, CRM and replenishment insights)
 - Commit: `4255ca9`
 - ทำอะไร: เพิ่ม Profit Intelligence เตือนสินค้าที่ margin ต่ำกว่า 10% ย้อนหลัง 30 วัน; CRM สรุป Pipeline ที่เปิดอยู่และงานติดตามเกินกำหนด; Replenishment แสดงวันคงเหลือและระดับเร่งด่วนพร้อมจำนวนที่ต้องสั่งด่วน

@@ -18,6 +18,77 @@ use Illuminate\View\View;
 
 class SystemSettingController extends Controller
 {
+    private const DEFAULT_POS_LAYOUT = [
+        'schema' => 'popcentral-pos-layout',
+        'version' => 1,
+        'canvas' => ['columns' => 12, 'rows' => 8],
+        'components' => [
+            ['id' => 'search', 'type' => 'search', 'x' => 1, 'y' => 1, 'w' => 7, 'h' => 1],
+            ['id' => 'category', 'type' => 'category_tabs', 'x' => 1, 'y' => 2, 'w' => 7, 'h' => 1],
+            ['id' => 'products', 'type' => 'product_grid', 'x' => 1, 'y' => 3, 'w' => 7, 'h' => 5],
+            ['id' => 'cart', 'type' => 'cart', 'x' => 8, 'y' => 1, 'w' => 5, 'h' => 5],
+            ['id' => 'payment', 'type' => 'payment', 'x' => 8, 'y' => 6, 'w' => 5, 'h' => 2],
+        ],
+    ];
+
+    public function posDesigner(): View
+    {
+        $published = json_decode((string) AppSetting::get('pos_layout_published'), true);
+        $draft = json_decode((string) AppSetting::get('pos_layout_draft'), true);
+        $layout = is_array($draft) ? $draft : (is_array($published) ? $published : self::DEFAULT_POS_LAYOUT);
+
+        return view('settings.pos-designer', [
+            'layout' => $layout,
+            'publishedVersion' => (int) AppSetting::get('pos_layout_version', '0'),
+            'publishedAt' => AppSetting::get('pos_layout_published_at'),
+        ]);
+    }
+
+    public function savePosLayout(Request $request): RedirectResponse
+    {
+        $layout = $this->validatedPosLayout($request->input('layout'));
+        AppSetting::set('pos_layout_draft', json_encode($layout, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
+        if ($request->boolean('publish')) {
+            $version = (int) AppSetting::get('pos_layout_version', '0') + 1;
+            $layout['version'] = $version;
+            AppSetting::set('pos_layout_published', json_encode($layout, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+            AppSetting::set('pos_layout_version', (string) $version);
+            AppSetting::set('pos_layout_published_at', now()->toIso8601String());
+            return redirect()->route('settings.pos-designer')->with('success', "Build และเผยแพร่ POS layout รุ่น {$version} แล้ว เครื่อง POS จะรับค่าเมื่อ Sync");
+        }
+
+        return redirect()->route('settings.pos-designer')->with('success', 'บันทึกแบบร่าง POS layout แล้ว');
+    }
+
+    private function validatedPosLayout(mixed $value): array
+    {
+        abort_unless(is_array($value), 422, 'รูปแบบ POS layout ไม่ถูกต้อง');
+        $allowed = ['search', 'category_tabs', 'product_grid', 'cart', 'payment', 'customer', 'held_bills', 'numpad', 'shift_status'];
+        $components = [];
+        foreach (array_values($value['components'] ?? []) as $component) {
+            if (! is_array($component) || ! in_array($component['type'] ?? '', $allowed, true)) {
+                continue;
+            }
+            $components[] = [
+                'id' => preg_replace('/[^a-z0-9_-]/i', '', (string) ($component['id'] ?? $component['type'])),
+                'type' => $component['type'],
+                'x' => max(1, min(12, (int) ($component['x'] ?? 1))),
+                'y' => max(1, min(12, (int) ($component['y'] ?? 1))),
+                'w' => max(1, min(12, (int) ($component['w'] ?? 3))),
+                'h' => max(1, min(12, (int) ($component['h'] ?? 2))),
+            ];
+        }
+        abort_if(count($components) === 0, 422, 'ต้องมีอย่างน้อย 1 ส่วนประกอบ');
+
+        return [
+            'schema' => 'popcentral-pos-layout',
+            'version' => (int) ($value['version'] ?? 1),
+            'canvas' => ['columns' => 12, 'rows' => 12],
+            'components' => $components,
+        ];
+    }
+
     public function updateLayout(Request $request): RedirectResponse
     {
         $data = $request->validate(['erp_layout' => ['required', 'in:classic,odoo']]);
