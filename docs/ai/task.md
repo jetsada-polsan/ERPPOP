@@ -200,9 +200,9 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
 - งานถัดไป: บน Windows เปิดแอป → pair เครื่อง → ping → sync catalog/cashier → login PIN → เปิดกะ → ขาย 1 บิล → ตรวจเลข receipt และรายการบน `/bplus/pos-workbench`
 
 ## Handoff - 2026-08-28 (Codex production readiness gate)
-- Commit: pending
+- Commit: `6bc534b`
 - ทำอะไร: เพิ่มคำสั่งอ่านอย่างเดียว `php artisan erp:readiness` ตรวจฐานข้อมูล, migration, backup+checksum, เอกสารขายลง GL, POS device binding, idempotency ที่ค้าง และคำเตือน queue/E-Tax ก่อนเปิดใช้งานจริง
-- ทดสอบ: รัน focused/full verification หลัง commit
+- ทดสอบ: focused Laravel 15 tests / 67 assertions ผ่าน; Python POS 128 tests ผ่าน; full Laravel 395 tests, 393 passed, 1 skipped, 6 incomplete, 1 unrelated quarantine failure; production `erp:health` และ `erp:readiness` ผ่านครบ
 - ยังไม่ทดสอบ/ความเสี่ยง: คำสั่งนี้ตรวจโครงสร้างและความสมบูรณ์ ไม่แทนการขายจริงบน Windows, การตรวจโดยนักบัญชี หรือการตอบรับ E-Tax provider
-- Deploy: ยังไม่ deployรอบนี้
-- งานถัดไป: รัน readiness บน host แล้วทำ Windows UAT 1 บิล พร้อมตรวจ `/bplus/pos-workbench`
+- Deploy: deploy แล้วที่ `/var/www/jeterp`; backup ก่อน deploy สำเร็จที่ `storage/app/backups/erp-db-20260828-220843.sql.gz`; clear cache และ migrate สำเร็จ
+- งานถัดไป: บน Windows เปิดแอป → pair เครื่อง → ping → sync catalog/cashier → login PIN → เปิดกะ → ขาย 1 บิล → ตรวจเลข receipt และรายการบน `/bplus/pos-workbench`
