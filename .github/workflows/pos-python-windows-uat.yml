@@ -70,14 +70,14 @@ jobs:
           path: release
       - uses: webfactory/ssh-agent@v0.9.0
         with:
-          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
-      - run: ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+          ssh-private-key: ${{ secrets.POS_RELEASE_SSH_KEY }}
+      - run: ssh-keyscan -H "${{ secrets.POS_RELEASE_HOST }}" >> ~/.ssh/known_hosts
       - name: Publish Python POS installer to ERP
         env:
-          SSH_USER: ${{ secrets.DEPLOY_USER }}
-          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
-          REMOTE_PATH: ${{ vars.APP_DIR }}
-          BASE_URL: http://${{ secrets.DEPLOY_HOST }}
+          SSH_USER: ${{ secrets.POS_RELEASE_USER }}
+          SSH_HOST: ${{ secrets.POS_RELEASE_HOST }}
+          REMOTE_PATH: /var/www/jeterp
+          BASE_URL: http://${{ secrets.POS_RELEASE_HOST }}
         run: |
           installer="$(find release -type f -name '*.exe' -print -quit)"
           if [ -z "$installer" ]; then
