@@ -198,3 +198,11 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ยิง checkout จริงจากเครื่อง POS เพราะต้องใช้ device token/PIN/terminal ที่ผูกสาขาจริง; production ยังเป็น HTTP จึงต้องตั้ง `allow_insecure=true` ในไฟล์ pair ของเครื่องตามที่ระบบบังคับให้ผู้ใช้ยืนยันเอง
 - Deploy: deploy แล้ว พร้อมล้าง Laravel cache และตรวจ health ผ่าน
 - งานถัดไป: บน Windows เปิดแอป → pair เครื่อง → ping → sync catalog/cashier → login PIN → เปิดกะ → ขาย 1 บิล → ตรวจเลข receipt และรายการบน `/bplus/pos-workbench`
+
+## Handoff - 2026-08-28 (Codex production readiness gate)
+- Commit: pending
+- ทำอะไร: เพิ่มคำสั่งอ่านอย่างเดียว `php artisan erp:readiness` ตรวจฐานข้อมูล, migration, backup+checksum, เอกสารขายลง GL, POS device binding, idempotency ที่ค้าง และคำเตือน queue/E-Tax ก่อนเปิดใช้งานจริง
+- ทดสอบ: รัน focused/full verification หลัง commit
+- ยังไม่ทดสอบ/ความเสี่ยง: คำสั่งนี้ตรวจโครงสร้างและความสมบูรณ์ ไม่แทนการขายจริงบน Windows, การตรวจโดยนักบัญชี หรือการตอบรับ E-Tax provider
+- Deploy: ยังไม่ deployรอบนี้
+- งานถัดไป: รัน readiness บน host แล้วทำ Windows UAT 1 บิล พร้อมตรวจ `/bplus/pos-workbench`
