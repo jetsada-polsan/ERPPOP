@@ -199,6 +199,14 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
 - Deploy: deploy แล้ว พร้อมล้าง Laravel cache และตรวจ health ผ่าน
 - งานถัดไป: บน Windows เปิดแอป → pair เครื่อง → ping → sync catalog/cashier → login PIN → เปิดกะ → ขาย 1 บิล → ตรวจเลข receipt และรายการบน `/bplus/pos-workbench`
 
+## Handoff - 2026-08-28 (Codex profit, CRM and replenishment insights)
+- Commit: `4255ca9`
+- ทำอะไร: เพิ่ม Profit Intelligence เตือนสินค้าที่ margin ต่ำกว่า 10% ย้อนหลัง 30 วัน; CRM สรุป Pipeline ที่เปิดอยู่และงานติดตามเกินกำหนด; Replenishment แสดงวันคงเหลือและระดับเร่งด่วนพร้อมจำนวนที่ต้องสั่งด่วน
+- ทดสอบ: Executive 4 tests / 22 assertions และ CRM + Replenishment 7 tests / 39 assertions ผ่าน; `view:cache`; `git diff --check`; production `erp:health` และ `erp:readiness` ผ่านครบ
+- ยังไม่ทดสอบ/ความเสี่ยง: ตัวเลขกำไรขึ้นกับ cost_amount ที่ลงในเอกสารขาย; คำแนะนำเติมเต็มยังควรเทียบกับผู้จัดซื้อและฤดูกาลจริงก่อนอนุมัติ; CRM ยังไม่แทนการยืนยันเครดิตโดยฝ่ายบัญชี
+- Deploy: deploy เฉพาะ 6 ไฟล์ที่แก้ขึ้น `/var/www/jeterp` หลัง backup `erp-db-20260828-222527.sql.gz`; clear cache สำเร็จ
+- งานถัดไป: ทดลองเปิดหน้า Executive/CRM/Purchase Planning กับสิทธิ์ผู้ใช้จริง และทำ UAT 1 รอบโดยใช้ข้อมูลสาขาจริง
+
 ## Handoff - 2026-08-28 (Codex production readiness gate)
 - Commit: `6bc534b`
 - ทำอะไร: เพิ่มคำสั่งอ่านอย่างเดียว `php artisan erp:readiness` ตรวจฐานข้อมูล, migration, backup+checksum, เอกสารขายลง GL, POS device binding, idempotency ที่ค้าง และคำเตือน queue/E-Tax ก่อนเปิดใช้งานจริง
