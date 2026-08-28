@@ -37,6 +37,24 @@ class PosWebModeTest extends TestCase
             ->assertViewIs('pos.index');
     }
 
+    public function test_a_pos_seller_can_open_the_pos_page_without_a_separate_view_permission(): void
+    {
+        $user = User::factory()->create([
+            'username' => 'pos-sell-only',
+            'is_active' => true,
+            'must_change_password' => false,
+        ]);
+        $role = Role::create(['code' => 'POS_SELL_ONLY', 'name' => 'POS Seller Only']);
+        $role->permissions()->attach(
+            Permission::firstOrCreate(['code' => 'pos.sell'], ['name' => 'ขาย POS'])->id
+        );
+        $user->roles()->attach($role->id);
+
+        $this->actingAs($user)->get('/pos')
+            ->assertOk()
+            ->assertViewIs('pos.index');
+    }
+
     public function test_redirect_flag_replaces_selling_with_a_status_page(): void
     {
         AppSetting::set('pos_web_mode', 'redirect');

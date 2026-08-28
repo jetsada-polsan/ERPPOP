@@ -95,6 +95,13 @@ class User extends Authenticatable
             return true;
         }
 
+        // การขาย POS เป็นสิทธิ์ที่สูงกว่าการเปิดดูหน้า POS อยู่แล้ว
+        // ผู้ใช้ที่ถูกกำหนด pos.sell จึงต้องเห็นและเข้า /pos ได้ด้วย
+        // โดยไม่ทำให้สิทธิ์ pos.use เปิดทางให้เปิดกะหรือคิดเงินได้
+        if ($code === 'pos.use' && in_array('pos.sell', $codes, true)) {
+            return true;
+        }
+
         if (in_array($code, self::NON_BYPASS_PERMISSIONS, true)) {
             return false;
         }

@@ -182,3 +182,11 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ screenshot บน production เพราะ commit นี้ยังไม่ push/deploy
 - Deploy: ยังไม่ deploy
 - งานถัดไป: push และ deploy แล้วตรวจ `/login` บน host ที่ความกว้าง desktop/mobile
+
+## Handoff - 2026-08-28 (Codex POS permission access)
+- Commit: `5a7e362`
+- ทำอะไร: ให้สิทธิ์ `pos.sell` ซึ่งเป็นสิทธิ์ขาย POS ที่สูงกว่า รวมสิทธิ์เปิดหน้า `pos.use` อัตโนมัติ แก้กรณีแคชเชียร์มีสิทธิ์ขายแต่เมนู POS ถูกซ่อนหรือเข้า `/pos` แล้วได้ 403; ผู้ใช้ที่มี `pos.use` อย่างเดียวยังดูได้แต่เปิดกะ/คิดเงินไม่ได้
+- ทดสอบ: `php artisan test tests/Feature/PosWebModeTest.php tests/Feature/PosDeviceConnectionTest.php tests/Feature/UserManagementTest.php --compact` ผ่าน 14 tests / 63 assertions; `php artisan view:cache`; `git diff --check`
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ deploy; ต้องตรวจผู้ใช้จริงที่ติด `must_change_password` ให้เปลี่ยนรหัสชั่วคราวก่อนเข้าเมนูตามนโยบายความปลอดภัย
+- Deploy: ยังไม่ deploy
+- งานถัดไป: push แล้ว deploy พร้อมล้าง cache และตรวจ `/pos` ด้วยบัญชีแคชเชียร์จริง
