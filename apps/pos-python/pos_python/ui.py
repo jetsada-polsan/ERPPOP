@@ -206,7 +206,7 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             return {"selection_required": False, **changed, "must_change_pin": False}
 
         def login(self):
-            if online is not None:
+            if online is not None and online.online:
                 if self._online_login():
                     self.accept()
                 return
