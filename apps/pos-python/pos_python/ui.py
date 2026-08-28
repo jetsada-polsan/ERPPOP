@@ -5,6 +5,7 @@ services.py ซึ่งมีเทสต์ครอบอยู่ เพร�
 """
 from __future__ import annotations
 
+import json
 from decimal import Decimal, InvalidOperation
 from string import Template
 
@@ -123,6 +124,7 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
     # เครื่องที่ผูก ERP แล้วใช้ branch/terminal จริงจาก ping; เครื่อง demo ใช้ค่าเดิม
     branch_id = int(online.branch_id) if (online is not None and online.branch_id) else 1
     terminal_id = (online.terminal_id if (online is not None and online.terminal_id) else "PY-TEST-01")
+    layout_config = _cached_layout(service.db)
     try:
         from PySide6.QtCore import QSize, Qt
         from PySide6.QtGui import QKeySequence, QShortcut
@@ -589,7 +591,8 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
                     # เปิดกะ ERP ไม่ได้ตอนนี้ ยังขายออฟไลน์ได้ บิลจะ sync เมื่อผูกกะสำเร็จภายหลัง
                     pass
             self.last_sale_id: int | None = None
-            self.setWindowTitle(f"PopCentral POS — {cashier['name']}")
+            layout_version = layout_config.get("version", 1)
+            self.setWindowTitle(f"PopCentral POS — {cashier['name']} · Layout {layout_version}")
             self.setStyleSheet(STYLE)
             self.settings_shortcut = QShortcut(QKeySequence("Ctrl+Alt+S"), self)
             self.settings_shortcut.activated.connect(self.open_settings)
@@ -598,8 +601,18 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             columns = QHBoxLayout(root)
             columns.setContentsMargins(0, 0, 0, 0)
             columns.setSpacing(0)
-            columns.addWidget(self.build_order_panel(), 4)
-            columns.addWidget(self.build_product_panel(), 6)
+            order_panel = self.build_order_panel()
+            product_panel = self.build_product_panel()
+            # The web designer controls the two primary panes without allowing
+            # arbitrary code or widget classes into the desktop application.
+            order_x = self._layout_x("cart", 8)
+            product_x = self._layout_x("product_grid", 1)
+            if order_x < product_x:
+                columns.addWidget(order_panel, 4)
+                columns.addWidget(product_panel, 6)
+            else:
+                columns.addWidget(product_panel, 6)
+                columns.addWidget(order_panel, 4)
             self.setCentralWidget(root)
 
             self.refresh_products()
@@ -648,6 +661,10 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             self.status.setObjectName("statusBar")
             layout.addWidget(self.status)
             return panel
+
+        def _layout_x(self, component_type: str, fallback: int) -> int:
+            return next((int(item.get("x", fallback)) for item in layout_config.get("components", [])
+                         if item.get("type") == component_type), fallback)
 
         def build_numpad(self) -> QWidget:
             box = QWidget()
@@ -928,12 +945,26 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
     app = QApplication([])
     app.setStyleSheet(STYLE)
     login = LoginDialog()
-    if login.exec() == QDialog.Accepted:
-        window = PosWindow(login.cashier)
-        window.resize(1280, 820)
-        window.showMaximized()
-        try:
+    try:
+        if login.exec() == QDialog.Accepted:
+            window = PosWindow(login.cashier)
+            window.resize(1280, 820)
+            window.showMaximized()
             app.exec()
-        finally:
-            if online is not None:
-                online.worker.stop()
+    finally:
+        if online is not None:
+            online.worker.stop()
+
+
+def _cached_layout(db) -> dict:
+    """Return only the published, cached schema; malformed data falls back safely."""
+    row = db.execute("SELECT value FROM device_settings WHERE key = 'pos_layout'").fetchone()
+    if not row:
+        return {"schema": "popcentral-pos-layout", "version": 1, "components": []}
+    try:
+        value = json.loads(row["value"])
+    except (TypeError, ValueError):
+        return {"schema": "popcentral-pos-layout", "version": 1, "components": []}
+    if value.get("schema") != "popcentral-pos-layout" or not isinstance(value.get("components"), list):
+        return {"schema": "popcentral-pos-layout", "version": 1, "components": []}
+    return value
