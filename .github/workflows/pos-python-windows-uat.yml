@@ -8,6 +8,11 @@ on:
         required: true
         default: 0.1.0
         type: string
+      publish:
+        description: Publish installer to ERP /download/python-pos
+        required: false
+        default: false
+        type: boolean
   push:
     paths:
       - apps/pos-python/**
@@ -52,3 +57,31 @@ jobs:
           name: PopCentral-POS-UAT-${{ inputs.version || '0.1.0-dev' }}
           path: apps/pos-python/dist-installer/*.exe
           if-no-files-found: error
+
+  publish:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+    needs: test-and-package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: PopCentral-POS-UAT-${{ inputs.version }}
+          path: release
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+      - run: ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+      - name: Publish Python POS installer to ERP
+        env:
+          SSH_USER: ${{ secrets.DEPLOY_USER }}
+          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+          REMOTE_PATH: ${{ vars.APP_DIR }}
+          BASE_URL: http://${{ secrets.DEPLOY_HOST }}
+        run: |
+          installer="$(find release -type f -name '*.exe' -print -quit)"
+          if [ -z "$installer" ]; then
+            echo "No installer artifact found" >&2
+            exit 1
+          fi
+          scripts/publish-pos-python.sh "${{ inputs.version }}" "$installer"
