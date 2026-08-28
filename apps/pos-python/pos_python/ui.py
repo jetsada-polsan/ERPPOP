@@ -67,8 +67,17 @@ QPushButton#primary, QPushButton#payBtn { background: $primary_ink; color: $surf
 QPushButton#primary:hover, QPushButton#payBtn:hover { background: $primary_dark; border-color: $primary_dark; }
 QPushButton#payBtn { font-size: 18px; padding: 16px; }
 QPushButton#voidBtn { color: $danger; }
-QPushButton#tile { text-align: left; padding: 12px; background: $surface; }
-QPushButton#tile:hover { border-color: $primary; }
+QToolButton#tile {
+    text-align: left;
+    padding: 12px;
+    background: $surface;
+    border: 1px solid $border;
+    border-radius: 9px;
+    font-size: 14px;
+    font-weight: 650;
+}
+QToolButton#tile:hover { background: $primary_soft; border-color: $primary; }
+QScrollArea#productScroll { background: transparent; border: 0; }
 
 QLineEdit, QComboBox { background: $surface; border: 1px solid $field; border-radius: 7px; padding: 9px 11px; font-size: 14.5px; }
 QLineEdit:focus, QComboBox:focus { border-color: $primary; }
@@ -107,17 +116,20 @@ NUMPAD_KEYS = [
     [".", "0", "backspace"],
 ]
 
+PRODUCT_TILE_COLUMNS = 4
+
 
 def run_ui(service: PosService, online=None, data_dir=None) -> None:
     # เครื่องที่ผูก ERP แล้วใช้ branch/terminal จริงจาก ping; เครื่อง demo ใช้ค่าเดิม
     branch_id = int(online.branch_id) if (online is not None and online.branch_id) else 1
     terminal_id = (online.terminal_id if (online is not None and online.terminal_id) else "PY-TEST-01")
     try:
-        from PySide6.QtCore import Qt
+        from PySide6.QtCore import QSize, Qt
+        from PySide6.QtGui import QKeySequence, QShortcut
         from PySide6.QtWidgets import (
             QApplication, QButtonGroup, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGridLayout,
             QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton,
-            QScrollArea, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+            QScrollArea, QTableWidget, QTableWidgetItem, QToolButton, QVBoxLayout, QWidget,
         )
     except ImportError as error:
         raise RuntimeError("ยังไม่ได้ติดตั้ง PySide6: python3 -m pip install -r requirements.txt") from error
@@ -135,12 +147,11 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             self.pin.returnPressed.connect(self.login)
             submit = QPushButton("เข้าสู่ระบบ")
             submit.clicked.connect(self.login)
-            settings = QPushButton("ตั้งค่าเครื่องนี้")
-            settings.clicked.connect(self.open_settings)
             form.addRow("รหัสแคชเชียร์", self.code)
             form.addRow("PIN", self.pin)
             form.addRow(submit)
-            form.addRow(settings)
+            self.settings_shortcut = QShortcut(QKeySequence("Ctrl+Alt+S"), self)
+            self.settings_shortcut.activated.connect(self.open_settings)
 
         def open_settings(self) -> None:
             dialog = SettingsDialog(self, None)
@@ -580,6 +591,8 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             self.last_sale_id: int | None = None
             self.setWindowTitle(f"PopCentral POS — {cashier['name']}")
             self.setStyleSheet(STYLE)
+            self.settings_shortcut = QShortcut(QKeySequence("Ctrl+Alt+S"), self)
+            self.settings_shortcut.activated.connect(self.open_settings)
 
             root = QWidget()
             columns = QHBoxLayout(root)
@@ -664,22 +677,18 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             remove.clicked.connect(self.remove_line)
             grid.addWidget(remove, 5, 1)
 
-            settings = QPushButton("ตั้งค่าเครื่องนี้")
-            settings.clicked.connect(self.open_settings)
-            grid.addWidget(settings, 5, 2)
+            receipt = QPushButton("ดูใบเสร็จล่าสุด")
+            receipt.clicked.connect(self.show_last_receipt)
+            grid.addWidget(receipt, 5, 2)
 
             clear = QPushButton("ล้างบิล")
             clear.clicked.connect(self.clear_order)
             grid.addWidget(clear, 6, 0)
 
-            receipt = QPushButton("ดูใบเสร็จล่าสุด")
-            receipt.clicked.connect(self.show_last_receipt)
-            grid.addWidget(receipt, 6, 1, 1, 2)
-
             pay = QPushButton("รับชำระเงิน")
             pay.setObjectName("payBtn")
             pay.clicked.connect(self.pay)
-            grid.addWidget(pay, 7, 0, 1, 3)
+            grid.addWidget(pay, 6, 1, 1, 2)
             return box
 
         # ---------- ขวา: สินค้า ----------
@@ -687,6 +696,8 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
         def build_product_panel(self) -> QWidget:
             panel = QWidget()
             layout = QVBoxLayout(panel)
+            layout.setContentsMargins(14, 12, 14, 12)
+            layout.setSpacing(10)
 
             self.scan = QLineEdit()
             self.scan.setPlaceholderText("สแกนบาร์โค้ด ป้ายเครื่องชั่ง หรือพิมพ์ค้นหาสินค้า")
@@ -695,11 +706,16 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             layout.addWidget(self.scan)
 
             self.category_bar = QHBoxLayout()
+            self.category_bar.setSpacing(8)
             layout.addLayout(self.category_bar)
 
             self.grid_host = QWidget()
             self.grid = QGridLayout(self.grid_host)
+            self.grid.setContentsMargins(0, 0, 0, 0)
+            self.grid.setHorizontalSpacing(10)
+            self.grid.setVerticalSpacing(10)
             scroll = QScrollArea()
+            scroll.setObjectName("productScroll")
             scroll.setWidgetResizable(True)
             scroll.setWidget(self.grid_host)
             layout.addWidget(scroll, 1)
@@ -731,11 +747,19 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             search = "" if term.isdigit() else term
             for index, product in enumerate(product_grid(service.db, category=self.category, search=search)):
                 price = money(product["price"] or 0)
-                tile = QPushButton(f"{product['name']}\n{price:,.2f} / {product['unit_name']}")
+                sku = str(product["sku"] or "").strip()
+                unit = str(product["unit_name"] or "หน่วย")
+                tile = QToolButton()
                 tile.setObjectName("tile")
-                tile.setMinimumHeight(72)
+                tile.setToolButtonStyle(Qt.ToolButtonTextOnly)
+                tile.setText(f"{product['name']}\n{price:,.2f} ฿ / {unit}" + (f"\n{sku}" if sku else ""))
+                tile.setToolTip(str(product["name"] or ""))
+                tile.setMinimumSize(QSize(154, 98))
+                tile.setMaximumHeight(118)
                 tile.clicked.connect(lambda _, row=product: self.add_product_row(row))
-                self.grid.addWidget(tile, index // 3, index % 3)
+                self.grid.addWidget(tile, index // PRODUCT_TILE_COLUMNS, index % PRODUCT_TILE_COLUMNS)
+            for column in range(PRODUCT_TILE_COLUMNS):
+                self.grid.setColumnStretch(column, 1)
 
         # ---------- การกระทำ ----------
 
