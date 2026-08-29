@@ -47,8 +47,13 @@ class UserController extends Controller
         $roles = Role::with('permissions')->orderBy('id')->get();
         $salesmen = Salesman::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
         $salesAreas = SalesArea::where('area_type', 'route')->where('is_active', true)->orderBy('code')->get();
+        $posUsers = User::with(['branch', 'salesman'])
+            ->where('is_active', true)
+            ->whereHas('roles.permissions', fn ($query) => $query->where('code', 'pos.sell'))
+            ->orderBy('name')
+            ->get();
 
-        return view('users.index', compact('users', 'branches', 'roles', 'salesmen', 'salesAreas', 'q', 'status'));
+        return view('users.index', compact('users', 'posUsers', 'branches', 'roles', 'salesmen', 'salesAreas', 'q', 'status'));
     }
 
     public function store(Request $request): RedirectResponse

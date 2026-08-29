@@ -26,6 +26,39 @@
         </form>
     </div>
 
+    <div class="content-card pos-users-panel p-3 mb-3" x-data="{ quick: '' }">
+        <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-2">
+            <div>
+                <h2 class="h5 fw-bold mb-1"><i class="bi bi-shop-window me-2" style="color:var(--erp-primary)"></i>ผู้ใช้สำหรับ POS</h2>
+                <p class="text-muted small mb-0">เลือกคนที่กำลังจะเข้าเครื่อง POS ได้จากหน้านี้ทันที</p>
+            </div>
+            <div class="pos-quick-search input-group" style="max-width:320px">
+                <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                <input class="form-control" x-model="quick" placeholder="ค้นหาชื่อ / username / รหัสแคชเชียร์" autocomplete="off">
+            </div>
+        </div>
+        <div class="pos-user-grid">
+            @forelse($posUsers as $user)
+                <article class="pos-user-card" x-show="!quick || '{{ strtolower($user->name.' '.$user->username.' '.($user->salesman?->code ?? '')) }}'.includes(quick.toLowerCase())">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="pos-user-avatar"><i class="bi bi-person-fill"></i></div>
+                        <div class="min-w-0"><strong class="d-block text-truncate">{{ $user->name }}</strong><span class="text-muted small">{{ $user->username }}</span></div>
+                    </div>
+                    <div class="pos-user-meta"><span><i class="bi bi-shop me-1"></i>{{ $user->branch?->code ?? 'ส่วนกลาง' }}</span><span><i class="bi bi-person-vcard me-1"></i>{{ $user->salesman?->code ?? 'ยังไม่ผูก' }}</span></div>
+                    <div class="pos-user-status {{ $user->salesman?->pos_pin_hash && !$user->salesman?->must_change_pin ? 'ready' : 'needs' }}">
+                        <i class="bi {{ $user->salesman?->pos_pin_hash && !$user->salesman?->must_change_pin ? 'bi-check-circle-fill' : 'bi-exclamation-circle-fill' }}"></i>
+                        {{ $user->salesman?->pos_pin_hash && !$user->salesman?->must_change_pin ? 'พร้อมเข้า POS' : 'ต้องออก/เปลี่ยน PIN' }}
+                    </div>
+                    <button type="button" class="btn btn-sm {{ $user->salesman_id ? 'btn-outline-primary' : 'btn-light border' }} w-100 mt-2" @click="{{ $user->salesman_id ? "openPosPinReset({$user->id}, '".addslashes($user->username)."', '".addslashes($user->name)."')" : "editUser(".json_encode(['id' => $user->id, 'username' => $user->username, 'name' => $user->name, 'email' => $user->email, 'phone' => $user->phone, 'position' => $user->position, 'branch_id' => $user->branch_id, 'salesman_id' => $user->salesman_id, 'sales_area_id' => $user->sales_area_id, 'role_ids' => $user->roles->pluck('id'), 'is_active' => $user->is_active]).")" }}>
+                        <i class="bi {{ $user->salesman_id ? 'bi-key' : 'bi-link-45deg' }} me-1"></i>{{ $user->salesman_id ? 'ออก PIN POS' : 'ผูกแคชเชียร์' }}
+                    </button>
+                </article>
+            @empty
+                <div class="text-muted small py-3">ยังไม่มีผู้ใช้ที่มีสิทธิ์ขาย POS</div>
+            @endforelse
+        </div>
+    </div>
+
     <div class="content-card p-4 mb-3">
         <div class="d-flex align-items-center gap-3 mb-3">
             <span class="uf-head-icon"><i class="bi" :class="editId ? 'bi-pencil-square' : 'bi-person-plus'"></i></span>
@@ -339,6 +372,12 @@
     .user-list-table td{font-weight:400;letter-spacing:0;line-height:1.35}
     .user-list-table td.fw-semibold{font-weight:700!important}
     .user-list-table .badge{font-family:inherit;font-size:11px;font-weight:700}
+    .pos-users-panel{background:linear-gradient(110deg,#f8fbff,#fff)}
+    .pos-user-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:10px}
+    .pos-user-card{border:1px solid var(--erp-border);border-radius:8px;background:#fff;padding:12px;min-width:0}
+    .pos-user-avatar{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;background:var(--erp-primary-soft);color:var(--erp-primary);flex:0 0 34px}
+    .pos-user-meta{display:flex;justify-content:space-between;gap:8px;margin-top:12px;color:var(--erp-muted);font-size:11px}
+    .pos-user-status{font-size:12px;font-weight:700;margin-top:9px}.pos-user-status.ready{color:#158662}.pos-user-status.needs{color:#b7791f}
     .user-reset-backdrop{position:fixed;inset:0;z-index:2100;background:rgba(15,23,42,.46);display:flex;align-items:center;justify-content:center;padding:20px}
     .user-reset-modal{width:min(520px,100%);background:var(--erp-surface,#fff);border-radius:8px;padding:24px;box-shadow:0 24px 80px rgba(15,23,42,.25)}
 </style>@endpush
