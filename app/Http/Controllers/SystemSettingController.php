@@ -46,7 +46,11 @@ class SystemSettingController extends Controller
 
     public function savePosLayout(Request $request): RedirectResponse
     {
-        $layout = $this->validatedPosLayout($request->input('layout'));
+        $rawLayout = $request->input('layout');
+        if (is_string($rawLayout)) {
+            $rawLayout = json_decode($rawLayout, true);
+        }
+        $layout = $this->validatedPosLayout($rawLayout);
         AppSetting::set('pos_layout_draft', json_encode($layout, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
         if ($request->boolean('publish')) {
@@ -63,7 +67,7 @@ class SystemSettingController extends Controller
 
     private function validatedPosLayout(mixed $value): array
     {
-        abort_unless(is_array($value), 422, 'รูปแบบ POS layout ไม่ถูกต้อง');
+        abort_unless(is_array($value), 422, 'รูปแบบ POS layout ไม่ถูกต้อง หรือ JSON ไม่สมบูรณ์');
         $allowed = ['search', 'category_tabs', 'product_grid', 'cart', 'payment', 'customer', 'held_bills', 'numpad', 'shift_status'];
         $components = [];
         foreach (array_values($value['components'] ?? []) as $component) {
