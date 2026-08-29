@@ -36,7 +36,7 @@ class PosCashierIdentityTest extends TestCase
         $response = app(PosApiController::class)->cashierLogin($request);
 
         $payload = $response->getData(true);
-        $this->assertTrue($payload['success']);
+        $this->assertTrue($payload['success'], json_encode($payload, JSON_UNESCAPED_UNICODE));
         $this->assertSame(120000, $payload['offline_credential']['iterations']);
         $this->assertNotEmpty($payload['offline_credential']['salt']);
         $this->assertNotEmpty($payload['offline_credential']['verifier']);
@@ -63,6 +63,21 @@ class PosCashierIdentityTest extends TestCase
 
         $this->assertTrue($response->getData(true)['success']);
         $this->assertSame($alice->code, $response->getData(true)['cashier']['code']);
+    }
+
+    public function test_login_accepts_the_username_of_the_user_linked_to_the_cashier(): void
+    {
+        [$branch, $alice, $user] = $this->branchWithCashier('USERNAME', 'ALICE');
+        $alice->forceFill(['pos_pin_hash' => Hash::make('4821')])->save();
+        $device = $this->device($branch, $alice);
+
+        $request = Request::create('/api/pos/cashier/login', 'POST', ['code' => $user->username, 'pin' => '4821']);
+        $request->attributes->set('pos_device', $device);
+
+        $payload = app(PosApiController::class)->cashierLogin($request)->getData(true);
+
+        $this->assertTrue($payload['success'], json_encode($payload, JSON_UNESCAPED_UNICODE));
+        $this->assertSame($alice->id, (int) $payload['cashier']['id']);
     }
 
     public function test_passwordless_mode_still_limits_cashier_selection_to_the_device_branch(): void

@@ -253,7 +253,22 @@ class PosApiController extends Controller
         return Salesman::query()
             ->with('user:id,name,username')
             ->where('is_active', true)
-            ->when($code, fn ($query) => $query->where('code', $code))
+            ->when($code, fn ($query) => $query->where(function ($where) use ($code) {
+                $where->where('code', $code)
+                    ->orWhereHas('user', fn ($user) => $user
+                        ->where('username', $code)
+                        ->orWhere('email', $code)
+                        ->orWhere('phone', $code))
+                    // รองรับข้อมูลเก่าที่ผูกจาก users.salesman_id ก่อนย้ายไป salesmen.user_id
+                    ->orWhereExists(fn ($subquery) => $subquery
+                        ->select(DB::raw('1'))
+                        ->from('users')
+                        ->whereColumn('users.salesman_id', 'salesmen.id')
+                        ->where(fn ($user) => $user
+                            ->where('users.username', $code)
+                            ->orWhere('users.email', $code)
+                            ->orWhere('users.phone', $code)));
+            }))
             ->when($branchId, fn ($query) => $query->where(fn ($w) => $w
                 ->whereNull('branch_id')
                 ->orWhere('branch_id', $branchId)));
