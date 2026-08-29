@@ -853,6 +853,10 @@
         .receipt-item { display: flex; justify-content: space-between; margin-bottom: 4px; }
         .receipt-total { font-size: 18px; font-weight: 900; margin-top: 4px; }
         .receipt-method { font-size: 12px; color: #64748b; margin-top: 4px; }
+        .receipt-qr { margin: 14px auto 4px; text-align: center; }
+        .receipt-qr-box { display: inline-block; background: #fff; padding: 5px; border: 1px solid #e2e8f0; }
+        .receipt-qr-box canvas, .receipt-qr-box img { display: block; width: 150px !important; height: 150px !important; }
+        .receipt-qr-caption { font-size: 10px; color: #64748b; margin-top: 4px; }
         .receipt-thanks { font-size: 13px; color: #64748b; margin-top: 14px; }
         .receipt-bottom-feed { display: none; }
         .receipt-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 18px; }
@@ -2339,6 +2343,12 @@
         <div class="receipt-total">฿ <span x-text="money(lastTotal)"></span></div>
         <div style="font-size:10px;color:#94a3b8">ราคานี้รวมภาษีมูลค่าเพิ่มแล้ว</div>
         <div class="receipt-method" x-text="paymentMethodLabel(lastMethod)"></div>
+        <template x-if="lastMethod === 'transfer' && {!! json_encode((bool) ($qrConfig && $qrConfig->merchant_ref)) !!}">
+            <div class="receipt-qr" x-effect="if (receiptOpen && lastMethod === 'transfer') $nextTick(() => renderReceiptQR(lastTotal))">
+                <div id="receipt-qr-box" class="receipt-qr-box"></div>
+                <div class="receipt-qr-caption">สแกนเพื่อชำระเงินตามยอดนี้</div>
+            </div>
+        </template>
         <div class="receipt-method" x-show="lastEarnedPoints > 0" style="color:#d97706;font-weight:700">
             ⭐ ได้รับแต้มสะสม +<span x-text="money(lastEarnedPoints)"></span>
         </div>
@@ -2653,6 +2663,20 @@ function renderQR(amount) {
         text: payload,
         width: 160,
         height: 160,
+        colorDark: '#000', colorLight: '#fff',
+        correctLevel: QRCode.CorrectLevel.H,
+    });
+}
+
+function renderReceiptQR(amount) {
+    const box = document.getElementById('receipt-qr-box');
+    if (!box || !PROMPTPAY_ID || typeof QRCode === 'undefined') return;
+    box.innerHTML = '';
+    const payload = buildPromptPayPayload(PROMPTPAY_ID, Number(amount || 0));
+    new QRCode(box, {
+        text: payload,
+        width: 150,
+        height: 150,
         colorDark: '#000', colorLight: '#fff',
         correctLevel: QRCode.CorrectLevel.H,
     });
