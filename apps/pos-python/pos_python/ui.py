@@ -161,14 +161,16 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             pin = self.pin.text().strip()
             code = self.code.text().strip()
             try:
-                result = online.provisioning.online_cashier_login(pin)
+                result = online.provisioning.online_cashier_login(pin, cashier_code=code)
                 if result.get("selection_required"):
                     # PIN กลางตรงหลายคน — เลือกด้วยรหัสแคชเชียร์ที่กรอก
                     match = next((c for c in result["cashiers"] if str(c.get("code")) == code), None)
                     if not match:
                         QMessageBox.warning(self, "เลือกพนักงาน", "PIN นี้มีหลายคน กรุณากรอกรหัสแคชเชียร์ของคุณด้วย")
                         return False
-                    result = online.provisioning.online_cashier_login(pin, int(match["id"]))
+                    result = online.provisioning.online_cashier_login(
+                        pin, cashier_code=code, cashier_server_id=int(match["id"])
+                    )
                 if result.get("must_change_pin"):
                     result = self._force_pin_change(result, pin)
                     if not result:

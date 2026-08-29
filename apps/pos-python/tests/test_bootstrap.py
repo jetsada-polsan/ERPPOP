@@ -75,13 +75,14 @@ class OnlineLoginTest(unittest.TestCase):
                                    "expires_at": "2026-09-01T00:00:00Z",
                                    "credential_version": "2026-09-01T00:00:00Z"},
         }})
-        result = ProvisioningService(db, api).online_cashier_login("1234")
+        result = ProvisioningService(db, api).online_cashier_login("1234", cashier_code="C001")
         self.assertFalse(result["selection_required"])
         self.assertEqual(result["cashier"]["id"], 42)
         row = db.execute("SELECT server_id, cred_salt, credential_version FROM local_cashiers WHERE id = ?", (result["local_cashier_id"],)).fetchone()
         self.assertEqual(row["server_id"], 42)
         self.assertEqual(row["cred_salt"], "c2FsdA==")
         self.assertEqual(row["credential_version"], "2026-09-01T00:00:00Z")
+        self.assertEqual(api.posted[0][1]["code"], "C001")
 
     def test_change_pin_stores_the_new_server_credential(self) -> None:
         db, _ = fresh_db()
