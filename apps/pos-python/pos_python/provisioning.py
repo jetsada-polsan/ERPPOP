@@ -263,6 +263,15 @@ class ProvisioningService:
             "must_change_pin": bool(response.get("must_change_pin")),
         }
 
+    def authorize_admin(self, username: str, password: str) -> dict:
+        response = self.api.post("/api/pos/admin/authorize", {
+            "username": username,
+            "password": password,
+        })
+        if not response.get("success", False):
+            raise RuntimeError(response.get("message", "ผู้ดูแลไม่มีสิทธิ์ตั้งค่า POS"))
+        return response
+
     def change_cashier_pin(self, code: str, current_pin: str, new_pin: str) -> dict:
         """เปลี่ยน PIN กับ ERP แล้วเก็บ offline credential รุ่นใหม่ที่ server ออกให้"""
         response = self.api.post("/api/pos/cashier/pin", {

@@ -11,8 +11,10 @@ use App\Models\PosDevice;
 use App\Models\PosHeldBill;
 use App\Models\PosShift;
 use App\Models\PosTerminal;
+use App\Models\Permission;
 use App\Models\Product;
 use App\Models\ProductUnit;
+use App\Models\Role;
 use App\Models\Salesman;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -78,6 +80,57 @@ class PosCashierIdentityTest extends TestCase
 
         $this->assertTrue($payload['success'], json_encode($payload, JSON_UNESCAPED_UNICODE));
         $this->assertSame($alice->id, (int) $payload['cashier']['id']);
+    }
+
+    public function test_pos_settings_authorization_accepts_an_active_admin_with_settings_permission(): void
+    {
+        [$branch, $alice] = $this->branchWithCashier('ADMINSET', 'ALICE');
+        $device = $this->device($branch, $alice);
+        $admin = User::factory()->create([
+            'username' => 'pos_admin_'.uniqid(),
+            'password' => Hash::make('admin-secret'),
+            'is_active' => true,
+        ]);
+        $role = Role::create([
+            'code' => 'pos-settings-admin-'.uniqid(),
+            'name' => 'POS settings admin',
+        ]);
+        $role->permissions()->attach(Permission::firstOrCreate(
+            ['code' => 'settings.manage'],
+            ['name' => 'จัดการตั้งค่า']
+        )->id);
+        $admin->roles()->attach($role->id);
+
+        $request = Request::create('/api/pos/admin/authorize', 'POST', [
+            'username' => $admin->username,
+            'password' => 'admin-secret',
+        ]);
+        $request->attributes->set('pos_device', $device);
+
+        $response = app(PosApiController::class)->authorizeAdmin($request);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertTrue($response->getData(true)['success']);
+        $this->assertSame($admin->username, $response->getData(true)['admin']['username']);
+        $this->assertSame(1, AuditLog::where('action', 'pos_admin_settings_authorized')->count());
+    }
+
+    public function test_pos_settings_authorization_rejects_a_cashier_without_admin_permission(): void
+    {
+        [$branch, $alice, $cashierUser] = $this->branchWithCashier('CASHSET', 'ALICE');
+        $device = $this->device($branch, $alice);
+
+        $request = Request::create('/api/pos/admin/authorize', 'POST', [
+            'username' => $cashierUser->username,
+            'password' => 'password',
+        ]);
+        $request->attributes->set('pos_device', $device);
+
+        $response = app(PosApiController::class)->authorizeAdmin($request);
+
+        $this->assertSame(422, $response->getStatusCode());
+        $this->assertFalse($response->getData(true)['success']);
+        $this->assertSame(0, AuditLog::where('action', 'pos_admin_settings_authorized')->count());
     }
 
     public function test_passwordless_mode_still_limits_cashier_selection_to_the_device_branch(): void

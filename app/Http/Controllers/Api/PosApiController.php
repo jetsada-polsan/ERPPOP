@@ -10,6 +10,7 @@ use App\Models\PosDevice;
 use App\Models\PosReceipt;
 use App\Models\PosTerminal;
 use App\Models\Salesman;
+use App\Models\User;
 use App\Services\Sales\SaleReturnService;
 use App\Support\DecimalMath;
 use App\Support\PosReceiptTemplate;
@@ -145,6 +146,33 @@ class PosApiController extends Controller
             ]);
 
         return response()->json(['success' => true, 'cashiers' => $cashiers]);
+    }
+
+    public function authorizeAdmin(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'username' => ['required', 'string', 'max:150'],
+            'password' => ['required', 'string', 'max:200'],
+        ]);
+        $admin = User::query()
+            ->where('username', $data['username'])
+            ->orWhere('email', $data['username'])
+            ->orWhere('phone', $data['username'])
+            ->first();
+        if (! $admin || ! $admin->is_active || ! Hash::check($data['password'], (string) $admin->password)
+            || (! $admin->hasPermission('settings.manage') && ! $admin->hasPermission('users.manage'))) {
+            return response()->json(['success' => false, 'message' => 'บัญชีผู้ดูแลไม่ถูกต้องหรือไม่มีสิทธิ์ตั้งค่า POS'], 422);
+        }
+        $device = $request->attributes->get('pos_device');
+        AuditLog::create([
+            'user_id' => $admin->id,
+            'branch_id' => $device?->branch_id,
+            'action' => 'pos_admin_settings_authorized',
+            'table_name' => 'pos_devices',
+            'record_id' => $device?->id,
+            'new_values' => ['admin_username' => $admin->username],
+        ]);
+        return response()->json(['success' => true, 'admin' => ['username' => $admin->username]]);
     }
 
     public function cashierLogin(Request $request): JsonResponse

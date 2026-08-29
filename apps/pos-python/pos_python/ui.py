@@ -572,6 +572,41 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             layout.addWidget(table)
             return box
 
+    class AdminAuthDialog(QDialog):
+        def __init__(self, parent):
+            super().__init__(parent)
+            self.setWindowTitle("ยืนยันผู้ดูแลก่อนตั้งค่า POS")
+            self.setMinimumWidth(390)
+            layout = QVBoxLayout(self)
+            hint = QLabel("เมนูตั้งค่าใช้ได้เฉพาะผู้ดูแลที่มีสิทธิ์ตั้งค่า POS")
+            hint.setWordWrap(True)
+            layout.addWidget(hint)
+            form = QFormLayout()
+            self.username = QLineEdit()
+            self.username.setPlaceholderText("username / email / เบอร์โทร")
+            self.password = QLineEdit()
+            self.password.setEchoMode(QLineEdit.Password)
+            self.password.setPlaceholderText("รหัสผ่าน ERP")
+            form.addRow("ผู้ดูแล", self.username)
+            form.addRow("รหัสผ่าน", self.password)
+            layout.addLayout(form)
+            buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            buttons.button(QDialogButtonBox.Ok).setText("ยืนยัน")
+            buttons.accepted.connect(self.authorize)
+            buttons.rejected.connect(self.reject)
+            self.password.returnPressed.connect(self.authorize)
+            layout.addWidget(buttons)
+
+        def authorize(self):
+            try:
+                online.provisioning.authorize_admin(
+                    self.username.text().strip(), self.password.text()
+                )
+            except Exception as error:
+                QMessageBox.warning(self, "ยืนยันไม่สำเร็จ", str(error))
+                return
+            self.accept()
+
     class PosWindow(QMainWindow):
         def __init__(self, cashier):
             super().__init__()
@@ -884,7 +919,11 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             self.refresh_order()
 
         def open_settings(self) -> None:
-            SettingsDialog(self, self.last_sale_id).exec()
+            if online is None or not online.online:
+                QMessageBox.warning(self, "ต้องเชื่อม ERP ก่อน", "เมนูตั้งค่า POS ต้องออนไลน์และยืนยันผู้ดูแลก่อน")
+                return
+            if AdminAuthDialog(self).exec() == QDialog.Accepted:
+                SettingsDialog(self, self.last_sale_id).exec()
 
         def show_last_receipt(self) -> None:
             if self.last_sale_id is None:
