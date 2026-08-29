@@ -250,6 +250,40 @@ class UserController extends Controller
         ]);
     }
 
+    public function alignPosBranch(User $user): RedirectResponse
+    {
+        if (! $user->is_active || ! $user->hasPermission('pos.sell')) {
+            return redirect()->route('users.index')->withErrors([
+                'pos_pin' => 'แก้สาขา POS ไม่ได้: บัญชีต้องเปิดใช้งานและมีสิทธิ์ขายหน้า POS',
+            ]);
+        }
+
+        $cashier = $user->salesman ?: $user->posCashierProfile;
+        if (! $cashier || ! $cashier->is_active || ! $cashier->branch_id) {
+            return redirect()->route('users.index')->withErrors([
+                'pos_pin' => 'แก้สาขา POS ไม่ได้: โปรไฟล์แคชเชียร์ยังไม่มีสาขาที่ใช้งาน',
+            ]);
+        }
+
+        $oldBranchId = $user->branch_id;
+        $user->forceFill(['branch_id' => $cashier->branch_id])->save();
+        AuditLog::create([
+            'user_id' => auth()->id(),
+            'branch_id' => auth()->user()?->branch_id,
+            'action' => 'pos_user_branch_aligned',
+            'table_name' => 'users',
+            'record_id' => $user->id,
+            'old_values' => ['branch_id' => $oldBranchId],
+            'new_values' => [
+                'branch_id' => $cashier->branch_id,
+                'cashier_id' => $cashier->id,
+                'cashier_code' => $cashier->code,
+            ],
+        ]);
+
+        return redirect()->route('users.index')->with('success', "ปรับสาขา {$user->username} ให้ตรงกับโปรไฟล์ POS แล้ว กดออก PIN POS ได้เลย");
+    }
+
     /**
      * รหัสชั่วคราวแบบสุ่ม เดิมตั้งเป็น 12345678 ตายตัวทุกคน ซึ่งเดาได้ และช่วงก่อนที่
      * ผู้ใช้จะเปลี่ยน ใครรู้ก็ล็อกอินได้ ตัดตัวที่สับสน (0/O/1/l/I) ออกให้พิมพ์ครั้งเดียวไม่ผิด

@@ -551,6 +551,7 @@ Route::prefix('users')->name('users.')->group(function () {
     Route::post('/', [UserController::class, 'store'])->name('store');
     Route::post('/{user}/reset-password', [UserController::class, 'resetPassword'])->name('reset-password');
     Route::post('/{user}/reset-pos-pin', [UserController::class, 'resetPosPin'])->name('reset-pos-pin');
+    Route::post('/{user}/align-pos-branch', [UserController::class, 'alignPosBranch'])->name('align-pos-branch');
     Route::put('/{user}', [UserController::class, 'update'])->name('update');
 });
 

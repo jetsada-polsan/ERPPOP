@@ -246,5 +246,19 @@ class UserManagementTest extends TestCase
         $response->assertRedirect(route('users.index'));
         $response->assertSessionHasErrors('pos_pin');
         $this->assertSame($cashierBranch->code, $legacyCashier->fresh()->branch?->code);
+
+        $response = $this->withoutMiddleware(ErpAuthorize::class)
+            ->actingAs($admin)
+            ->post(route('users.align-pos-branch', $mismatchUser));
+
+        $response->assertRedirect(route('users.index'));
+        $this->assertSame($cashierBranch->id, $mismatchUser->fresh()->branch_id);
+
+        $response = $this->withoutMiddleware(ErpAuthorize::class)
+            ->actingAs($admin)
+            ->post(route('users.reset-pos-pin', $mismatchUser));
+
+        $response->assertRedirect(route('users.index'));
+        $response->assertSessionHas('reset_pos_pin_result');
     }
 }

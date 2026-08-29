@@ -57,9 +57,16 @@
                         <i class="bi {{ $posBranchMismatch ? 'bi-exclamation-octagon-fill' : ($posCashier?->pos_pin_hash && !$posCashier?->must_change_pin ? 'bi-check-circle-fill' : 'bi-exclamation-circle-fill') }}"></i>
                         {{ $posBranchMismatch ? 'สาขาไม่ตรง ต้องแก้ก่อน' : ($posCashier?->pos_pin_hash && !$posCashier?->must_change_pin ? 'พร้อมเข้า POS' : 'ต้องออก/เปลี่ยน PIN') }}
                     </div>
-                    <button type="button" class="btn btn-sm {{ $posCashier && !$posBranchMismatch ? 'btn-outline-primary' : 'btn-light border' }} w-100 mt-2" @click="{{ $posCashier && !$posBranchMismatch ? "openPosPinReset({$user->id}, '".addslashes($user->username)."', '".addslashes($user->name)."')" : "editUser(".json_encode(['id' => $user->id, 'username' => $user->username, 'name' => $user->name, 'email' => $user->email, 'phone' => $user->phone, 'position' => $user->position, 'branch_id' => $user->branch_id, 'salesman_id' => $user->salesman_id, 'sales_area_id' => $user->sales_area_id, 'role_ids' => $user->roles->pluck('id'), 'is_active' => $user->is_active]).")" }}>
-                        <i class="bi {{ $posCashier && !$posBranchMismatch ? 'bi-key' : 'bi-pencil-square' }} me-1"></i>{{ $posCashier && !$posBranchMismatch ? 'ออก PIN POS' : ($posBranchMismatch ? 'แก้สาขาให้ตรง' : 'ผูกแคชเชียร์') }}
-                    </button>
+                    @if($posBranchMismatch)
+                        <form method="post" action="{{ route('users.align-pos-branch', $user) }}" class="mt-2" onsubmit="return confirm('ให้ใช้สาขา {{ $posCashier->branch?->code }} ตามโปรไฟล์ POS นี้หรือไม่?')">
+                            @csrf
+                            <button class="btn btn-sm btn-light border w-100"><i class="bi bi-arrow-left-right me-1"></i>ใช้สาขาโปรไฟล์ POS</button>
+                        </form>
+                    @else
+                        <button type="button" class="btn btn-sm {{ $posCashier ? 'btn-outline-primary' : 'btn-light border' }} w-100 mt-2" @click="{{ $posCashier ? "openPosPinReset({$user->id}, '".addslashes($user->username)."', '".addslashes($user->name)."')" : "editUser(".json_encode(['id' => $user->id, 'username' => $user->username, 'name' => $user->name, 'email' => $user->email, 'phone' => $user->phone, 'position' => $user->position, 'branch_id' => $user->branch_id, 'salesman_id' => $user->salesman_id, 'sales_area_id' => $user->sales_area_id, 'role_ids' => $user->roles->pluck('id'), 'is_active' => $user->is_active]).")" }}>
+                            <i class="bi {{ $posCashier ? 'bi-key' : 'bi-link-45deg' }} me-1"></i>{{ $posCashier ? 'ออก PIN POS' : 'ผูกแคชเชียร์' }}
+                        </button>
+                    @endif
                 </article>
             @empty
                 <div class="text-muted small py-3">ยังไม่มีผู้ใช้ที่มีสิทธิ์ขาย POS</div>
