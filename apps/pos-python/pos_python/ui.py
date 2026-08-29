@@ -10,6 +10,7 @@ from decimal import Decimal, InvalidOperation
 from string import Template
 
 from .barcode import decode_scale_label, load_scale_profiles, scale_cart_line
+from .api_client import LaravelPosClient
 from .mock_printer import company_details, receipt_for
 from .order import ALL_CATEGORIES, DISCOUNT, PRICE, QTY, Order, OrderLine, categories, product_grid
 from .config import DeviceConfig, load_device_config, save_device_config
@@ -36,6 +37,66 @@ PALETTE = {
     "preview": "#c6d4e0",       # พื้นรองใบเสร็จ ให้กระดาษขาวเด้งออกมา
     "paper_ink": "#1a1a1a",     # หมึกบนกระดาษ ไม่ใช่สีจอ
 }
+
+
+def run_pairing_wizard(data_dir) -> bool:
+    """Pair a new terminal before showing the cashier login screen."""
+    try:
+        from PySide6.QtWidgets import QApplication, QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit, QMessageBox
+    except ImportError as error:
+        raise RuntimeError("ยังไม่ได้ติดตั้ง PySide6") from error
+
+    app = QApplication.instance() or QApplication([])
+    dialog = QDialog()
+    dialog.setWindowTitle("เชื่อมต่อ PopCentral POS")
+    dialog.setMinimumWidth(460)
+    form = QFormLayout(dialog)
+    title = QLabel("ตั้งค่าเครื่องครั้งแรก")
+    title.setStyleSheet("font-size:20px;font-weight:800")
+    hint = QLabel("กรอกข้อมูลที่ IT ออกให้ เครื่องจะตรวจสอบสาขาและรหัส POS ก่อนบันทึก")
+    hint.setWordWrap(True)
+    form.addRow(title)
+    form.addRow(hint)
+    server = QLineEdit("http://27.254.143.219")
+    server.setPlaceholderText("เช่น https://erp.example.com")
+    token = QLineEdit()
+    token.setPlaceholderText("Device token จาก ERP")
+    token.setEchoMode(QLineEdit.Password)
+    form.addRow("ที่อยู่ ERP", server)
+    form.addRow("รหัสเชื่อมต่อเครื่อง", token)
+    buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+    buttons.button(QDialogButtonBox.Ok).setText("ตรวจสอบและเริ่มใช้งาน")
+    buttons.button(QDialogButtonBox.Cancel).setText("ปิด")
+    form.addRow(buttons)
+
+    def pair() -> None:
+        url = server.text().strip().rstrip("/")
+        device_token = token.text().strip()
+        if not url or not device_token:
+            QMessageBox.warning(dialog, "ข้อมูลไม่ครบ", "กรอกที่อยู่ ERP และรหัสเชื่อมต่อเครื่องให้ครบ")
+            return
+        try:
+            profile = LaravelPosClient(url, device_token, allow_insecure=url.startswith("http://")).get("/api/pos/ping")
+            if not profile.get("success", False):
+                raise RuntimeError(profile.get("message", "ERP ไม่ยืนยันเครื่องนี้"))
+            save_device_config(data_dir, DeviceConfig(url, device_token, url.startswith("http://")))
+            QMessageBox.information(
+                dialog,
+                "เชื่อมต่อสำเร็จ",
+                f"สาขา: {profile.get('branch_name', '-')}\n"
+                f"เครื่อง: {(profile.get('device') or {}).get('terminal_code', '-')}\n\n"
+                "กำลังเปิด POS และ sync ข้อมูลครั้งแรก",
+            )
+            dialog.accept()
+        except Exception as error:
+            QMessageBox.warning(dialog, "เชื่อมต่อไม่สำเร็จ", str(error))
+
+    buttons.accepted.connect(pair)
+    buttons.rejected.connect(dialog.reject)
+    result = dialog.exec() == QDialog.Accepted
+    if QApplication.instance() is app:
+        app.processEvents()
+    return result
 
 # QSS ใช้ปีกกาเป็นไวยากรณ์ เลยแทนค่าด้วย $name แทน .format()
 _STYLE_TEMPLATE = Template("""

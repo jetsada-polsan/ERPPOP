@@ -14,7 +14,8 @@ from pos_python.database import connect
 from pos_python.barcode import replace_scale_profiles
 from pos_python.mock_printer import print_receipt
 from pos_python.services import CartLine, PosService, now, pin_hash
-from pos_python.ui import run_ui
+from pos_python.config import load_device_config
+from pos_python.ui import run_pairing_wizard, run_ui
 
 
 ROOT = Path(__file__).parent
@@ -128,11 +129,11 @@ def launch_ui() -> None:
 
     try:
         db = connect(DB_PATH)
-        # ผูกเครื่องกับ ERP แล้ว: ping + ดึงข้อมูลจริง + เริ่มส่งบิลค้างเบื้องหลัง
-        # ยังไม่ผูก (ไม่มี pos-config.json): seed demo ให้เปิดลองใช้ได้ทันที
+        # เครื่องใหม่ต้อง pair กับ ERP ก่อน เพื่อไม่ให้ผู้ใช้เผลอขายในโหมด demo
+        # จากนั้น bootstrap จะ sync ข้อมูลจริงและเริ่มส่งบิลค้างเบื้องหลัง
+        if load_device_config(DATA_DIR) is None and not run_pairing_wizard(DATA_DIR):
+            return
         online = bootstrap(DATA_DIR, db, DB_PATH)
-        if online is None:
-            seed(db)
         run_ui(PosService(db), online=online, data_dir=DATA_DIR)
     except Exception as error:
         log_path = DATA_DIR / "startup-error.log"
