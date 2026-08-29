@@ -203,38 +203,39 @@
             .remember { margin: 10px 0 14px; }
         }
 
-        /* Enterprise skin: restrained, application-first login surface. */
+        /* JetTime-inspired light enterprise skin. */
         body {
-            background: #eef1f4;
-            color: #1f2933;
+            background: #f4f7ff;
+            color: #1d2a44;
             padding: 32px;
         }
         .login-shell {
             width: min(1080px, 100%);
             min-height: 620px;
             grid-template-columns: minmax(0, 1fr) minmax(380px, 420px);
-            border: 1px solid #cbd3da;
-            border-radius: 8px;
-            box-shadow: 0 18px 48px rgba(31, 41, 51, .12);
+            border: 1px solid #e0e8f5;
+            border-radius: 22px;
+            box-shadow: 0 22px 60px rgba(71, 92, 135, .14);
         }
         .login-story {
             padding: 48px;
-            background: #16324f;
+            background: #eef4ff;
+            color: #1d2a44;
         }
-        .login-story::before { inset: 22px; border-radius: 4px; border-color: rgba(255,255,255,.14); }
+        .login-story::before { inset: 22px; border-radius: 18px; border-color: #dce7f8; }
         .login-story::after { display: none; }
-        .story-brand { font-size: 21px; letter-spacing: 0; }
-        .story-brand img { border-radius: 8px; box-shadow: none; }
-        .story-kicker { color: #b8d8ee; letter-spacing: .18em; }
+        .story-brand { color: #1d2a44; font-size: 21px; letter-spacing: 0; }
+        .story-brand img { border-radius: 10px; box-shadow: 0 8px 18px rgba(37, 99, 235, .12); }
+        .story-kicker { color: #2563eb; letter-spacing: .04em; }
         .story-title {
             max-width: 16ch;
             margin: 18px 0 14px;
-            color: #fff;
+            color: #1d2a44;
             font-size: clamp(30px, 3.4vw, 46px);
             line-height: 1.08;
             letter-spacing: 0;
         }
-        .story-copy { max-width: 43ch; color: #d5e2ec; line-height: 1.7; }
+        .story-copy { max-width: 43ch; color: #70809b; line-height: 1.7; }
         .story-dashboard {
             display: grid;
             grid-template-columns: 1.15fr .85fr;
@@ -244,18 +245,18 @@
         }
         .signal-card {
             min-height: 116px;
-            border: 1px solid rgba(255,255,255,.16);
+            border: 1px solid #dfe8f5;
             border-radius: 6px;
-            background: rgba(255,255,255,.07);
+            background: #fff;
             padding: 16px;
-            backdrop-filter: none;
+            box-shadow: 0 8px 20px rgba(83, 105, 145, .08);
         }
-        .signal-card span { color: #a9c5d8; font-size: 10px; letter-spacing: .12em; }
-        .signal-card strong { font-size: 22px; margin-top: 8px; }
-        .signal-card small { color: #c7d9e5; font-size: 11px; line-height: 1.5; }
+        .signal-card span { color: #f97316; font-size: 10px; letter-spacing: .04em; }
+        .signal-card strong { color: #1d2a44; font-size: 22px; margin-top: 8px; }
+        .signal-card small { color: #70809b; font-size: 11px; line-height: 1.5; }
         .signal-bars { height: 38px; gap: 5px; margin-top: 14px; }
-        .signal-bars i { background: #6dc3e8; border-radius: 2px 2px 0 0; }
-        .story-foot { color: #b8c9d7; font-size: 11px; letter-spacing: .02em; }
+        .signal-bars i { background: #3b82f6; border-radius: 2px 2px 0 0; }
+        .story-foot { color: #8492a8; font-size: 11px; letter-spacing: .02em; }
         .login-card {
             justify-content: flex-start;
             padding: 72px 48px 42px;
@@ -288,12 +289,12 @@
         .error { border-radius: 4px; margin-bottom: 10px; }
         .foot { text-align: left; color: #7b8c9b; font-size: 12px; margin-top: 22px; }
         .login-card::before {
-            content: "SECURE WORKSPACE";
+            content: "พื้นที่ทำงานปลอดภัย";
             display: block;
-            color: #7b8c9b;
+            color: #2563eb;
             font-size: 10px;
             font-weight: 800;
-            letter-spacing: .14em;
+            letter-spacing: .02em;
             margin-bottom: 22px;
         }
         .login-card .subtitle { max-width: 30ch; }
