@@ -10,14 +10,14 @@
     <title>เข้าสู่ระบบ - PopCentral</title>
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap');
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             min-height: 100vh;
             /* Sukhumvit Set คือฟอนต์ไทยของ macOS/iOS — ของเดิมตกไปใช้ Tahoma
                บนเครื่องที่ไม่ใช่ Windows ซึ่งตัวไทยดูเก่ากว่าที่ควร */
-            font-family: 'Noto Sans Thai', 'Leelawadee UI', 'Sukhumvit Set', Tahoma, 'Segoe UI', sans-serif;
+            font-family: 'IBM Plex Sans Thai', 'Noto Sans Thai', 'Leelawadee UI', 'Sukhumvit Set', Tahoma, 'Segoe UI', sans-serif;
             color: #173247;
             background:
                 linear-gradient(120deg, rgba(20, 96, 141, .09), transparent 32%),
