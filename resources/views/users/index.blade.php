@@ -5,6 +5,12 @@
 @section('content')
 @php($resetResult = session('reset_pos_pin_result') ?? session('reset_password_result'))
 <div x-data="userPage()" x-cloak>
+    @if($errors->has('pos_pin'))
+        <div class="alert alert-danger d-flex align-items-start gap-2 mb-3" role="alert">
+            <i class="bi bi-exclamation-octagon-fill mt-1"></i>
+            <div><strong>ออก PIN POS ไม่สำเร็จ</strong><div>{{ $errors->first('pos_pin') }}</div></div>
+        </div>
+    @endif
 
     <div class="content-card p-3 mb-3">
         <form method="get" class="d-flex align-items-end gap-2 flex-wrap">
@@ -39,18 +45,20 @@
         </div>
         <div class="pos-user-grid">
             @forelse($posUsers as $user)
-                <article class="pos-user-card" x-show="!quick || '{{ strtolower($user->name.' '.$user->username.' '.($user->salesman?->code ?? '')) }}'.includes(quick.toLowerCase())">
+                @php($posCashier = $user->salesman ?? $user->posCashierProfile)
+                @php($posBranchMismatch = $user->branch_id && $posCashier?->branch_id && (int) $user->branch_id !== (int) $posCashier->branch_id)
+                <article class="pos-user-card" x-show="!quick || '{{ strtolower($user->name.' '.$user->username.' '.($posCashier?->code ?? '')) }}'.includes(quick.toLowerCase())">
                     <div class="d-flex align-items-center gap-2">
                         <div class="pos-user-avatar"><i class="bi bi-person-fill"></i></div>
                         <div class="min-w-0"><strong class="d-block text-truncate">{{ $user->name }}</strong><span class="text-muted small">{{ $user->username }}</span></div>
                     </div>
-                    <div class="pos-user-meta"><span><i class="bi bi-shop me-1"></i>{{ $user->branch?->code ?? 'ส่วนกลาง' }}</span><span><i class="bi bi-person-vcard me-1"></i>{{ $user->salesman?->code ?? 'ยังไม่ผูก' }}</span></div>
-                    <div class="pos-user-status {{ $user->salesman?->pos_pin_hash && !$user->salesman?->must_change_pin ? 'ready' : 'needs' }}">
-                        <i class="bi {{ $user->salesman?->pos_pin_hash && !$user->salesman?->must_change_pin ? 'bi-check-circle-fill' : 'bi-exclamation-circle-fill' }}"></i>
-                        {{ $user->salesman?->pos_pin_hash && !$user->salesman?->must_change_pin ? 'พร้อมเข้า POS' : 'ต้องออก/เปลี่ยน PIN' }}
+                    <div class="pos-user-meta"><span><i class="bi bi-shop me-1"></i>{{ $user->branch?->code ?? 'ส่วนกลาง' }}</span><span><i class="bi bi-person-vcard me-1"></i>{{ $posCashier?->code ?? 'ยังไม่ผูก' }}</span></div>
+                    <div class="pos-user-status {{ $posBranchMismatch ? 'needs' : ($posCashier?->pos_pin_hash && !$posCashier?->must_change_pin ? 'ready' : 'needs') }}">
+                        <i class="bi {{ $posBranchMismatch ? 'bi-exclamation-octagon-fill' : ($posCashier?->pos_pin_hash && !$posCashier?->must_change_pin ? 'bi-check-circle-fill' : 'bi-exclamation-circle-fill') }}"></i>
+                        {{ $posBranchMismatch ? 'สาขาไม่ตรง ต้องแก้ก่อน' : ($posCashier?->pos_pin_hash && !$posCashier?->must_change_pin ? 'พร้อมเข้า POS' : 'ต้องออก/เปลี่ยน PIN') }}
                     </div>
-                    <button type="button" class="btn btn-sm {{ $user->salesman_id ? 'btn-outline-primary' : 'btn-light border' }} w-100 mt-2" @click="{{ $user->salesman_id ? "openPosPinReset({$user->id}, '".addslashes($user->username)."', '".addslashes($user->name)."')" : "editUser(".json_encode(['id' => $user->id, 'username' => $user->username, 'name' => $user->name, 'email' => $user->email, 'phone' => $user->phone, 'position' => $user->position, 'branch_id' => $user->branch_id, 'salesman_id' => $user->salesman_id, 'sales_area_id' => $user->sales_area_id, 'role_ids' => $user->roles->pluck('id'), 'is_active' => $user->is_active]).")" }}>
-                        <i class="bi {{ $user->salesman_id ? 'bi-key' : 'bi-link-45deg' }} me-1"></i>{{ $user->salesman_id ? 'ออก PIN POS' : 'ผูกแคชเชียร์' }}
+                    <button type="button" class="btn btn-sm {{ $posCashier && !$posBranchMismatch ? 'btn-outline-primary' : 'btn-light border' }} w-100 mt-2" @click="{{ $posCashier && !$posBranchMismatch ? "openPosPinReset({$user->id}, '".addslashes($user->username)."', '".addslashes($user->name)."')" : "editUser(".json_encode(['id' => $user->id, 'username' => $user->username, 'name' => $user->name, 'email' => $user->email, 'phone' => $user->phone, 'position' => $user->position, 'branch_id' => $user->branch_id, 'salesman_id' => $user->salesman_id, 'sales_area_id' => $user->sales_area_id, 'role_ids' => $user->roles->pluck('id'), 'is_active' => $user->is_active]).")" }}>
+                        <i class="bi {{ $posCashier && !$posBranchMismatch ? 'bi-key' : 'bi-pencil-square' }} me-1"></i>{{ $posCashier && !$posBranchMismatch ? 'ออก PIN POS' : ($posBranchMismatch ? 'แก้สาขาให้ตรง' : 'ผูกแคชเชียร์') }}
                     </button>
                 </article>
             @empty

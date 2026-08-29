@@ -30,7 +30,7 @@ class UserController extends Controller
     {
         $q = trim((string) $request->query('q', ''));
         $status = trim((string) $request->query('status', ''));
-        $users = User::with(['branch', 'salesman', 'salesArea', 'roles'])
+        $users = User::with(['branch', 'salesman', 'posCashierProfile', 'salesArea', 'roles'])
             ->when($q !== '', fn ($query) => $query->where(fn ($where) => $where
                 ->whereLike('username', "%{$q}%")
                 ->orWhereLike('name', "%{$q}%")
@@ -47,9 +47,10 @@ class UserController extends Controller
         $roles = Role::with('permissions')->orderBy('id')->get();
         $salesmen = Salesman::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
         $salesAreas = SalesArea::where('area_type', 'route')->where('is_active', true)->orderBy('code')->get();
-        $posUsers = User::with(['branch', 'salesman'])
+        $posUsers = User::with(['branch', 'salesman', 'posCashierProfile'])
             ->where('is_active', true)
             ->whereHas('roles.permissions', fn ($query) => $query->where('code', 'pos.sell'))
+            ->where(fn ($query) => $query->whereHas('salesman')->orWhereHas('posCashierProfile'))
             ->orderBy('name')
             ->get();
 
@@ -191,16 +192,30 @@ class UserController extends Controller
 
     public function resetPosPin(User $user): RedirectResponse
     {
-        abort_unless($user->is_active, 422, 'บัญชีผู้ใช้นี้ถูกปิดใช้งาน');
-        abort_unless($user->hasPermission('pos.sell'), 422, 'ผู้ใช้นี้ยังไม่มีสิทธิ์ขายหน้า POS');
+        $fail = function (string $message) use ($user): RedirectResponse {
+            return redirect()->route('users.index')
+                ->withErrors(['pos_pin' => $message])
+                ->withInput(['q' => $user->username]);
+        };
 
-        $cashier = $user->salesman;
-        abort_unless($cashier && $cashier->is_active, 422, 'กรุณาผูกโปรไฟล์แคชเชียร์ที่เปิดใช้งานก่อนออก PIN POS');
-        abort_if(
-            $user->branch_id && $cashier->branch_id && (int) $user->branch_id !== (int) $cashier->branch_id,
-            422,
-            'สาขาของผู้ใช้กับโปรไฟล์แคชเชียร์ไม่ตรงกัน'
-        );
+        if (! $user->is_active) {
+            return $fail('ออก PIN POS ไม่ได้: บัญชีผู้ใช้นี้ถูกปิดใช้งาน');
+        }
+        if (! $user->hasPermission('pos.sell')) {
+            return $fail('ออก PIN POS ไม่ได้: ผู้ใช้นี้ยังไม่มีสิทธิ์ขายหน้า POS');
+        }
+
+        // รองรับทั้ง mapping ใหม่ (users.salesman_id) และข้อมูลเก่า (salesmen.user_id)
+        // เพื่อให้ผู้ใช้ที่นำเข้าจาก BPlus ยังออก PIN ได้จากหน้าเดียวกัน
+        $cashier = $user->salesman ?: $user->posCashierProfile;
+        if (! $cashier || ! $cashier->is_active) {
+            return $fail('ออก PIN POS ไม่ได้: กรุณาผูกโปรไฟล์แคชเชียร์ที่เปิดใช้งานก่อน');
+        }
+        if (
+            $user->branch_id && $cashier->branch_id && (int) $user->branch_id !== (int) $cashier->branch_id
+        ) {
+            return $fail("ออก PIN POS ไม่ได้: สาขาผู้ใช้ ({$user->branch?->code}) กับโปรไฟล์แคชเชียร์ ({$cashier->branch?->code}) ไม่ตรงกัน กรุณาแก้ไขผู้ใช้ให้เลือกสาขาเดียวกับโปรไฟล์ POS แล้วลองใหม่");
+        }
 
         $temporary = $this->temporaryPosPin($cashier);
 

@@ -194,4 +194,57 @@ class UserManagementTest extends TestCase
             'record_id' => $cashier->id,
         ]);
     }
+
+    public function test_pos_pin_reset_handles_legacy_mapping_and_reports_branch_mismatch_in_the_users_page(): void
+    {
+        $admin = User::factory()->create(['username' => 'admin-pos-legacy', 'must_change_password' => false]);
+        $adminRole = Role::create(['code' => 'LEGACY_PIN_ADMIN', 'name' => 'ผู้ดูแล PIN legacy']);
+        $manageUsers = Permission::firstOrCreate(['code' => 'users.manage'], ['name' => 'จัดการผู้ใช้']);
+        $posSell = Permission::firstOrCreate(['code' => 'pos.sell'], ['name' => 'ขาย POS']);
+        $adminRole->permissions()->sync([$manageUsers->id]);
+        $admin->roles()->attach($adminRole->id);
+        $cashierRole = Role::create(['code' => 'LEGACY_PIN_CASHIER', 'name' => 'แคชเชียร์ legacy']);
+        $cashierRole->permissions()->attach($posSell->id);
+
+        $userBranch = Branch::create(['code' => 'LEGACY-HQ', 'name_th' => 'สำนักงานใหญ่ legacy', 'is_active' => true]);
+        $cashierBranch = Branch::create(['code' => 'LEGACY-BR', 'name_th' => 'สาขา legacy', 'is_active' => true]);
+        $legacyUser = User::factory()->create([
+            'username' => 'legacy-pos-user',
+            'branch_id' => $userBranch->id,
+            'salesman_id' => null,
+            'is_active' => true,
+        ]);
+        $legacyUser->roles()->attach($cashierRole->id);
+        $legacyCashier = Salesman::create([
+            'branch_id' => $userBranch->id,
+            'user_id' => $legacyUser->id,
+            'code' => 'LEGACY-CASHIER',
+            'name' => 'แคชเชียร์ legacy',
+            'is_active' => true,
+        ]);
+
+        $response = $this->withoutMiddleware(ErpAuthorize::class)
+            ->actingAs($admin)
+            ->post(route('users.reset-pos-pin', $legacyUser));
+
+        $response->assertRedirect(route('users.index'));
+        $this->assertTrue(Hash::check(session('reset_pos_pin_result.password'), $legacyCashier->fresh()->pos_pin_hash));
+
+        $mismatchUser = User::factory()->create([
+            'username' => 'mismatch-pos-user',
+            'branch_id' => $userBranch->id,
+            'salesman_id' => $legacyCashier->id,
+            'is_active' => true,
+        ]);
+        $mismatchUser->roles()->attach($cashierRole->id);
+        $legacyCashier->update(['branch_id' => $cashierBranch->id]);
+
+        $response = $this->withoutMiddleware(ErpAuthorize::class)
+            ->actingAs($admin)
+            ->post(route('users.reset-pos-pin', $mismatchUser));
+
+        $response->assertRedirect(route('users.index'));
+        $response->assertSessionHasErrors('pos_pin');
+        $this->assertSame($cashierBranch->code, $legacyCashier->fresh()->branch?->code);
+    }
 }
