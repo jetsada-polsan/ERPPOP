@@ -10,12 +10,14 @@
     <title>เข้าสู่ระบบ - PopCentral</title>
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800;900&display=swap');
+
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             min-height: 100vh;
             /* Sukhumvit Set คือฟอนต์ไทยของ macOS/iOS — ของเดิมตกไปใช้ Tahoma
                บนเครื่องที่ไม่ใช่ Windows ซึ่งตัวไทยดูเก่ากว่าที่ควร */
-            font-family: 'Leelawadee UI', 'Noto Sans Thai', 'Sukhumvit Set', Tahoma, 'Segoe UI', sans-serif;
+            font-family: 'Noto Sans Thai', 'Leelawadee UI', 'Sukhumvit Set', Tahoma, 'Segoe UI', sans-serif;
             color: #173247;
             background:
                 linear-gradient(120deg, rgba(20, 96, 141, .09), transparent 32%),
@@ -313,23 +315,23 @@
     <section class="login-story">
         <div class="story-brand"><img src="{{ asset('images/logo-jet-erp-mark.svg') }}" alt="PopCentral"> PopCentral</div>
         <div class="story-content">
-            <div class="story-kicker">BUSINESS OPERATIONS PLATFORM</div>
+            <div class="story-kicker">แพลตฟอร์มบริหารงานธุรกิจ</div>
             <h1 class="story-title">บริหารยอดขาย สต๊อก และต้นทุน ด้วยข้อมูลเรียลไทม์</h1>
-            <p class="story-copy">เชื่อมทุกสาขาไว้ใน workspace เดียว พร้อมข้อมูลสำคัญสำหรับการตัดสินใจ</p>
+            <p class="story-copy">เชื่อมทุกสาขาไว้ในศูนย์กลางเดียว พร้อมข้อมูลสำคัญสำหรับการตัดสินใจ</p>
             <div class="story-dashboard">
                 <div class="signal-card">
-                    <span>POS TODAY</span>
+                    <span>ยอดขายวันนี้</span>
                     <strong>พร้อมขาย</strong>
                     <small>รองรับงานหน้าร้านและการนำเข้ายอดขาย</small>
                 </div>
                 <div class="signal-card">
-                    <span>STOCK CONTROL</span>
-                    <strong>Real-time</strong>
+                    <span>ควบคุมสต๊อก</span>
+                    <strong>เรียลไทม์</strong>
                     <div class="signal-bars" aria-hidden="true"><i style="height:36%"></i><i style="height:54%"></i><i style="height:44%"></i><i style="height:72%"></i><i style="height:63%"></i><i style="height:88%"></i></div>
                 </div>
             </div>
         </div>
-        <div class="story-foot">PopCentral · Built for POPSTAR operations</div>
+        <div class="story-foot">PopCentral · สร้างเพื่อการดำเนินงานของ POPSTAR</div>
     </section>
     <form class="login-card" method="post" action="{{ route('login.attempt') }}">
         @csrf
@@ -340,31 +342,31 @@
                 <div class="brand-text">{{ \App\Models\AppSetting::company('name_th') }}</div>
             @endif
         </div>
-        <div class="subtitle">Sign in to your PopCentral workspace</div>
+        <div class="subtitle">เข้าสู่ระบบศูนย์กลางการทำงานของ PopCentral</div>
 
         @if($errors->any())
             <div class="error"><i class="bi bi-exclamation-triangle-fill"></i>{{ $errors->first() }}</div>
         @endif
 
-        <label for="username">Username, email or phone</label>
+        <label for="username">ชื่อผู้ใช้ อีเมล หรือเบอร์โทรศัพท์</label>
         <div class="field">
             <i class="bi bi-person-fill"></i>
             <input type="text" id="username" name="username" value="{{ old('username') }}" required autofocus autocomplete="username">
         </div>
 
-        <label for="password">Password</label>
+        <label for="password">รหัสผ่าน</label>
         <div class="field">
             <i class="bi bi-lock-fill"></i>
             <input type="password" id="password" name="password" required autocomplete="current-password">
         </div>
 
         <label class="remember">
-            <input type="checkbox" name="remember" value="1"> Keep me signed in on this device
+            <input type="checkbox" name="remember" value="1"> จดจำการเข้าสู่ระบบบนอุปกรณ์นี้
         </label>
 
-        <button type="submit"><i class="bi bi-box-arrow-in-right"></i> Sign in</button>
+        <button type="submit"><i class="bi bi-box-arrow-in-right"></i> เข้าสู่ระบบ</button>
 
-        <div class="foot">Forgot your password? Contact your system administrator.</div>
+        <div class="foot">ลืมรหัสผ่าน? กรุณาติดต่อผู้ดูแลระบบ</div>
     </form>
 </main>
 </body>
