@@ -233,7 +233,26 @@
             letter-spacing: 0;
         }
         .story-copy { max-width: 43ch; color: #d5e2ec; line-height: 1.7; }
-        .story-dashboard { display: none; }
+        .story-dashboard {
+            display: grid;
+            grid-template-columns: 1.15fr .85fr;
+            gap: 12px;
+            margin-top: 34px;
+            max-width: 560px;
+        }
+        .signal-card {
+            min-height: 116px;
+            border: 1px solid rgba(255,255,255,.16);
+            border-radius: 6px;
+            background: rgba(255,255,255,.07);
+            padding: 16px;
+            backdrop-filter: none;
+        }
+        .signal-card span { color: #a9c5d8; font-size: 10px; letter-spacing: .12em; }
+        .signal-card strong { font-size: 22px; margin-top: 8px; }
+        .signal-card small { color: #c7d9e5; font-size: 11px; line-height: 1.5; }
+        .signal-bars { height: 38px; gap: 5px; margin-top: 14px; }
+        .signal-bars i { background: #6dc3e8; border-radius: 2px 2px 0 0; }
         .story-foot { color: #b8c9d7; font-size: 11px; letter-spacing: .02em; }
         .login-card {
             justify-content: flex-start;
@@ -266,6 +285,16 @@
         button:hover { background: #085caf; box-shadow: none; transform: none; }
         .error { border-radius: 4px; margin-bottom: 10px; }
         .foot { text-align: left; color: #7b8c9b; font-size: 12px; margin-top: 22px; }
+        .login-card::before {
+            content: "SECURE WORKSPACE";
+            display: block;
+            color: #7b8c9b;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: .14em;
+            margin-bottom: 22px;
+        }
+        .login-card .subtitle { max-width: 30ch; }
         @media (max-width: 880px) {
             body { padding: 16px; }
             .login-shell { grid-template-columns: 1fr; min-height: auto; }
