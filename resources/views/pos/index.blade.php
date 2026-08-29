@@ -1737,6 +1737,11 @@
         <a href="{{ route('dashboard') }}" target="_blank" class="topbar-btn" style="margin-left:8px">
             <i class="bi bi-grid"></i> ERP
         </a>
+        @if($canManageSettings)
+        <a href="{{ route('settings.pos-designer') }}" target="_blank" class="topbar-btn pos-admin-entry" title="ตั้งค่า POS สำหรับผู้ดูแลระบบ" aria-label="ตั้งค่า POS สำหรับผู้ดูแลระบบ">
+            <i class="bi bi-sliders2"></i>
+        </a>
+        @endif
         <a href="{{ route('pos.compare') }}" target="_blank" class="topbar-btn" title="เปิด Web POS และ Vue POS คู่กัน">
             <i class="bi bi-layout-split"></i> เทียบ UI
         </a>

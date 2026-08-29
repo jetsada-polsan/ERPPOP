@@ -66,6 +66,7 @@ class PosController extends Controller
         $authUser = auth()->user();
         $canSell = (bool) $authUser?->hasPermission('pos.sell');
         $canVoid = (bool) $authUser?->hasPermission('pos.void');
+        $canManageSettings = (bool) $authUser?->hasPermission('settings.manage');
 
         // บังคับใช้ตัวเอง: ล็อกสาขา+คนขายเป็นของ user ที่ login (แคชเชียร์เลือกเองไม่ได้)
         $authUser?->loadMissing(['branch', 'salesman']);
@@ -88,7 +89,7 @@ class PosController extends Controller
             ->orderByDesc('effective_from')->value('rate_percent') ?? 7.0);
 
         // NOTE: หน้า POS บนเว็บเป็น compatibility/staged flow; แคชเชียร์หลักคือ Python/PySide6 ใน pos-python/.
-        return view('pos.index', compact('branches', 'categories', 'cashiers', 'defaultBranchId', 'qrConfig', 'pointValueBaht', 'canSell', 'canVoid', 'company', 'vatRate', 'lockedBranch', 'lockedCashier'));
+        return view('pos.index', compact('branches', 'categories', 'cashiers', 'defaultBranchId', 'qrConfig', 'pointValueBaht', 'canSell', 'canVoid', 'canManageSettings', 'company', 'vatRate', 'lockedBranch', 'lockedCashier'));
     }
 
     // สาขา+คนขายที่บังคับใช้สำหรับ user ที่ login (ถ้ากำหนดไว้) ใช้ override ค่าที่ client ส่งมา
