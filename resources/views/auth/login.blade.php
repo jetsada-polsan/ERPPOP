@@ -315,7 +315,7 @@
         <div class="story-content">
             <div class="story-kicker">BUSINESS OPERATIONS PLATFORM</div>
             <h1 class="story-title">ทุกการดำเนินงาน เชื่อมเป็นหนึ่งเดียว</h1>
-            <p class="story-copy">Manage sales, inventory, purchasing and finance across every branch from one secure workspace.</p>
+            <p class="story-copy">บริหารยอดขาย สต๊อก และต้นทุน ด้วยข้อมูลเรียลไทม์</p>
             <div class="story-dashboard">
                 <div class="signal-card">
                     <span>POS TODAY</span>
