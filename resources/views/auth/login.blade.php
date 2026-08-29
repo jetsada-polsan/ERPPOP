@@ -205,7 +205,10 @@
 
         /* JetTime-inspired light enterprise skin. */
         body {
-            background: #f4f7ff;
+            background:
+                linear-gradient(135deg, rgba(37, 99, 235, .08), transparent 42%),
+                linear-gradient(315deg, rgba(249, 115, 22, .08), transparent 38%),
+                #f5f8ff;
             color: #1d2a44;
             padding: 32px;
         }
@@ -213,20 +216,29 @@
             width: min(1080px, 100%);
             min-height: 620px;
             grid-template-columns: minmax(0, 1fr) minmax(380px, 420px);
-            border: 1px solid #e0e8f5;
+            border: 1px solid #dfe7f4;
             border-radius: 22px;
-            box-shadow: 0 22px 60px rgba(71, 92, 135, .14);
+            box-shadow: 0 24px 64px rgba(42, 73, 127, .16);
         }
         .login-story {
             padding: 48px;
-            background: #eef4ff;
+            background: linear-gradient(135deg, #edf4ff 0%, #f8fbff 68%, #fff7ef 100%);
             color: #1d2a44;
         }
         .login-story::before { inset: 22px; border-radius: 18px; border-color: #dce7f8; }
         .login-story::after { display: none; }
         .story-brand { color: #1d2a44; font-size: 21px; letter-spacing: 0; }
         .story-brand img { border-radius: 10px; box-shadow: 0 8px 18px rgba(37, 99, 235, .12); }
-        .story-kicker { color: #2563eb; letter-spacing: .04em; }
+        .story-kicker { color: #f97316; letter-spacing: .04em; }
+        .story-kicker::after {
+            content: "";
+            display: block;
+            width: 42px;
+            height: 3px;
+            margin-top: 8px;
+            border-radius: 3px;
+            background: #2563eb;
+        }
         .story-title {
             max-width: 16ch;
             margin: 18px 0 14px;
@@ -255,7 +267,8 @@
         .signal-card strong { color: #1d2a44; font-size: 22px; margin-top: 8px; }
         .signal-card small { color: #70809b; font-size: 11px; line-height: 1.5; }
         .signal-bars { height: 38px; gap: 5px; margin-top: 14px; }
-        .signal-bars i { background: #3b82f6; border-radius: 2px 2px 0 0; }
+        .signal-bars i { background: #2563eb; border-radius: 2px 2px 0 0; }
+        .signal-bars i:nth-child(3n) { background: #f97316; }
         .story-foot { color: #8492a8; font-size: 11px; letter-spacing: .02em; }
         .login-card {
             justify-content: flex-start;
@@ -291,7 +304,7 @@
         .login-card::before {
             content: "พื้นที่ทำงานปลอดภัย";
             display: block;
-            color: #2563eb;
+            color: #f97316;
             font-size: 10px;
             font-weight: 800;
             letter-spacing: .02em;
