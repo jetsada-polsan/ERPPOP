@@ -314,8 +314,8 @@
         <div class="story-brand"><img src="{{ asset('images/logo-jet-erp-mark.svg') }}" alt="PopCentral"> PopCentral</div>
         <div class="story-content">
             <div class="story-kicker">BUSINESS OPERATIONS PLATFORM</div>
-            <h1 class="story-title">ทุกการดำเนินงาน เชื่อมเป็นหนึ่งเดียว</h1>
-            <p class="story-copy">บริหารยอดขาย สต๊อก และต้นทุน ด้วยข้อมูลเรียลไทม์</p>
+            <h1 class="story-title">บริหารยอดขาย สต๊อก และต้นทุน ด้วยข้อมูลเรียลไทม์</h1>
+            <p class="story-copy">เชื่อมทุกสาขาไว้ใน workspace เดียว พร้อมข้อมูลสำคัญสำหรับการตัดสินใจ</p>
             <div class="story-dashboard">
                 <div class="signal-card">
                     <span>POS TODAY</span>
