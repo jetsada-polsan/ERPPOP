@@ -1741,9 +1741,6 @@
             <i class="bi bi-layout-split"></i> เทียบ UI
         </a>
         @if($canSell)
-        <button class="topbar-btn" @click="openReceiptSettings()">
-            <i class="bi bi-receipt"></i> ใบเสร็จ
-        </button>
         <button class="topbar-btn" @click="cancelBill()" :disabled="cart.length === 0">
             <i class="bi bi-trash"></i> ยกเลิก
         </button>
@@ -2346,9 +2343,6 @@
         <div class="receipt-actions">
             <button class="receipt-action-btn" type="button" @click="printReceipt()">
                 <i class="bi bi-printer"></i> พิมพ์
-            </button>
-            <button class="receipt-action-btn" type="button" @click="openReceiptSettings()">
-                <i class="bi bi-gear"></i> ตั้งค่า
             </button>
             <button class="receipt-action-btn danger" type="button" x-show="canVoidBill && lastReceiptId" @click="voidLastReceipt()" style="display:none">
                 <i class="bi bi-x-octagon"></i> ยกเลิก

@@ -152,8 +152,6 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             form.addRow("รหัสแคชเชียร์", self.code)
             form.addRow("PIN", self.pin)
             form.addRow(submit)
-            self.settings_shortcut = QShortcut(QKeySequence("Ctrl+Alt+S"), self)
-            self.settings_shortcut.activated.connect(self.open_settings)
 
         def open_settings(self) -> None:
             dialog = SettingsDialog(self, None)
