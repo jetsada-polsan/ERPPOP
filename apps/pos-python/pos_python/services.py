@@ -7,9 +7,8 @@ import json
 import sqlite3
 import uuid
 from dataclasses import dataclass
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
-from zoneinfo import ZoneInfo
 
 
 def now() -> str:
@@ -116,7 +115,9 @@ class PosService:
         Sales timestamps are stored in UTC.  Reports are grouped by Thailand's
         business day so a sale shortly after midnight does not land in yesterday.
         """
-        business_tz = ZoneInfo("Asia/Bangkok")
+        # Thailand has no DST.  A fixed offset also keeps Windows installers
+        # independent from an optional system/tzdata timezone database.
+        business_tz = timezone(timedelta(hours=7), name="ICT")
         report_date = report_date or datetime.now(business_tz).date()
         start = datetime.combine(report_date, time.min, tzinfo=business_tz).astimezone(timezone.utc).isoformat()
         end = datetime.combine(report_date, time.max, tzinfo=business_tz).astimezone(timezone.utc).isoformat()
