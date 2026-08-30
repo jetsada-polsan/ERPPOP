@@ -18,7 +18,6 @@ use App\Models\PosTerminal;
 use App\Models\PriceTable;
 use App\Models\Product;
 use App\Models\ProductBarcode;
-use App\Support\BarcodePolicy;
 use App\Models\ProductCategory;
 use App\Models\ProductPrice;
 use App\Models\ProductUnit;
@@ -28,24 +27,39 @@ use App\Models\QtyPromotion;
 use App\Models\Salesman;
 use App\Models\StockBalance;
 use App\Models\StockDocument;
+use App\Services\Accounting\CashBookPostingService;
 use App\Services\Accounting\GlPostingService;
 use App\Services\Inventory\FifoStockService;
-use App\Services\Accounting\CashBookPostingService;
 use App\Services\Sales\CashSaleService;
 use App\Services\Sales\MemberPointService;
 use App\Services\Sales\PosPaymentValidator;
-use App\Services\Sales\PosPricingGuard;
 use App\Services\Sales\PosPriceScheduleService;
+use App\Services\Sales\PosPricingGuard;
+use App\Support\BarcodePolicy;
 use App\Support\DecimalMath;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use RuntimeException;
 
 class PosController extends Controller
 {
+    private const DEFAULT_POS_LAYOUT = [
+        'schema' => 'popcentral-pos-layout',
+        'version' => 1,
+        'canvas' => ['columns' => 12, 'rows' => 8],
+        'components' => [
+            ['id' => 'search', 'type' => 'search', 'x' => 1, 'y' => 1, 'w' => 7, 'h' => 1],
+            ['id' => 'category', 'type' => 'category_tabs', 'x' => 1, 'y' => 2, 'w' => 7, 'h' => 1],
+            ['id' => 'products', 'type' => 'product_grid', 'x' => 1, 'y' => 3, 'w' => 7, 'h' => 5],
+            ['id' => 'cart', 'type' => 'cart', 'x' => 8, 'y' => 1, 'w' => 5, 'h' => 5],
+            ['id' => 'payment', 'type' => 'payment', 'x' => 8, 'y' => 6, 'w' => 5, 'h' => 2],
+        ],
+    ];
+
     public function index(MemberPointService $points): View
     {
         // ขั้น cutover: ย้ายการขายไปแอปเดสก์ท็อป PopCentral POS แล้ว ปิดหน้าขายเว็บด้วย
@@ -90,6 +104,49 @@ class PosController extends Controller
 
         // NOTE: หน้า POS บนเว็บเป็น compatibility/staged flow; แคชเชียร์หลักคือ Python/PySide6 ใน pos-python/.
         return view('pos.index', compact('branches', 'categories', 'cashiers', 'defaultBranchId', 'qrConfig', 'pointValueBaht', 'canSell', 'canVoid', 'canManageSettings', 'company', 'vatRate', 'lockedBranch', 'lockedCashier'));
+    }
+
+    public function preview(): View
+    {
+        $published = json_decode((string) AppSetting::get('pos_layout_published'), true);
+        $layout = is_array($published) ? $published : self::DEFAULT_POS_LAYOUT;
+        $allowed = ['search', 'category_tabs', 'product_grid', 'cart', 'payment', 'customer', 'held_bills', 'numpad', 'shift_status'];
+
+        $layout['components'] = collect($layout['components'] ?? [])
+            ->filter(fn ($component) => is_array($component) && in_array($component['type'] ?? '', $allowed, true))
+            ->map(function ($component) {
+                $x = max(1, min(12, (int) ($component['x'] ?? 1)));
+                $y = max(1, min(12, (int) ($component['y'] ?? 1)));
+
+                return [
+                    'id' => (string) ($component['id'] ?? $component['type']),
+                    'type' => (string) $component['type'],
+                    'x' => $x,
+                    'y' => $y,
+                    'w' => max(1, min(13 - $x, (int) ($component['w'] ?? 3))),
+                    'h' => max(1, min(13 - $y, (int) ($component['h'] ?? 2))),
+                ];
+            })->values()->all();
+
+        if ($layout['components'] === []) {
+            $layout = self::DEFAULT_POS_LAYOUT;
+        }
+
+        $previewProducts = Product::where('is_active', true)
+            ->orderBy('name_th')
+            ->limit(8)
+            ->get(['id', 'sku_code', 'name_th', 'default_price']);
+        $previewCategories = ProductCategory::orderBy('name_th')
+            ->limit(5)
+            ->get(['id', 'name_th']);
+
+        return view('pos.preview', [
+            'layout' => $layout,
+            'previewProducts' => $previewProducts,
+            'previewCategories' => $previewCategories,
+            'publishedAt' => AppSetting::get('pos_layout_published_at'),
+            'publishedVersion' => (int) AppSetting::get('pos_layout_version', (string) ($layout['version'] ?? 1)),
+        ]);
     }
 
     // สาขา+คนขายที่บังคับใช้สำหรับ user ที่ login (ถ้ากำหนดไว้) ใช้ override ค่าที่ client ส่งมา
@@ -780,7 +837,7 @@ class PosController extends Controller
             'date' => ['nullable', 'date'],
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
         ]);
-        $date = \Carbon\Carbon::parse($data['date'] ?? now())->toDateString();
+        $date = Carbon::parse($data['date'] ?? now())->toDateString();
         $branchId = isset($data['branch_id']) ? (int) $data['branch_id'] : null;
         $branches = Branch::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name_th']);
 

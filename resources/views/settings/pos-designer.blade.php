@@ -8,7 +8,7 @@
     .posd h1 { margin:0; color:var(--ink); font-size:28px; font-weight:750; }
     .posd p { margin:5px 0 0; color:var(--muted); }
     .posd-actions { display:flex; gap:10px; }
-    .posd-btn { border:0; border-radius:7px; padding:10px 15px; font-weight:700; cursor:pointer; }
+    .posd-btn { display:inline-flex; align-items:center; border:0; border-radius:7px; padding:10px 15px; font-weight:700; text-decoration:none; cursor:pointer; }
     .posd-btn.secondary { background:#fff; border:1px solid var(--line); color:var(--ink); }
     .posd-btn.primary { color:#fff; background:#2563eb; }
     .posd-layout { display:grid; grid-template-columns:230px minmax(0,1fr) 280px; gap:16px; align-items:start; }
@@ -51,6 +51,7 @@
     <div class="posd-head">
         <div><h1>POS Designer</h1><p>ออกแบบหน้าขายบนเว็บ แล้ว Build เป็น layout ให้ PopCentral POS</p></div>
         <div class="posd-actions">
+            <a class="posd-btn secondary" href="{{ route('pos.preview') }}" target="_blank" rel="noopener"><i class="bi bi-display me-1"></i> ดูหน้าที่ Build แล้ว</a>
             <form method="POST" action="{{ route('settings.pos-designer.save') }}" @submit="sync($event)">@csrf
                 <input type="hidden" name="layout" x-ref="layoutDraft"><button class="posd-btn secondary" type="submit">บันทึกแบบร่าง</button>
             </form>

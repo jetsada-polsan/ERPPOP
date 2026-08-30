@@ -65,6 +65,29 @@ class PosWebModeTest extends TestCase
             ->assertSee(route('python-pos.download'));
     }
 
+    public function test_published_pos_layout_can_be_previewed_without_writing_a_sale(): void
+    {
+        AppSetting::set('pos_layout_published', json_encode([
+            'schema' => 'popcentral-pos-layout',
+            'version' => 7,
+            'canvas' => ['columns' => 12, 'rows' => 8],
+            'components' => [
+                ['id' => 'search', 'type' => 'search', 'x' => 1, 'y' => 1, 'w' => 7, 'h' => 1],
+                ['id' => 'cart', 'type' => 'cart', 'x' => 8, 'y' => 1, 'w' => 5, 'h' => 5],
+            ],
+        ], JSON_UNESCAPED_UNICODE));
+        AppSetting::set('pos_layout_version', '7');
+
+        $this->actingAs($this->cashier())->get('/pos/preview')
+            ->assertOk()
+            ->assertViewIs('pos.preview')
+            ->assertSee('ตัวอย่างจาก Build รุ่น 7')
+            ->assertSee('Preview mode')
+            ->assertSee('บิลปัจจุบัน');
+
+        $this->assertDatabaseCount('pos_receipts', 0);
+    }
+
     public function test_the_command_toggles_the_flag_both_ways(): void
     {
         $this->artisan('pos:web-mode redirect')->assertSuccessful();
