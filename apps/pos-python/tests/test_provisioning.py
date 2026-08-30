@@ -1,12 +1,17 @@
 """ดึงข้อมูลลงเครื่องต้องผูก server_id ให้ถูก และ upsert ไม่ทำลายของเดิม"""
 from __future__ import annotations
 
+import base64
+import hashlib
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from pos_python.database import connect
 from pos_python.provisioning import ProvisioningService
+from pos_python.services import PosService
+from pos_python.time_service import TimeService
 
 
 class FakeApi:
@@ -72,6 +77,16 @@ class ProvisioningTest(unittest.TestCase):
         # กฎเครื่องชั่งถูกเก็บจาก ping
         self.assertEqual(self.db.execute("SELECT count(*) FROM scale_profiles").fetchone()[0], 1)
 
+    def test_ping_calibrates_the_local_clock_from_erp_time(self) -> None:
+        self.api.responses["/api/pos/ping"] = {
+            **PING,
+            "server_time": (datetime.now(timezone.utc) + timedelta(seconds=90)).isoformat(),
+        }
+
+        self.svc.ping()
+
+        self.assertGreaterEqual(TimeService(self.db).offset_seconds(), 88)
+
     def test_catalog_upserts_products_with_server_id_and_barcodes(self) -> None:
         self.svc.pull_catalog(3)
         rows = {r["server_id"]: r for r in self.db.execute("SELECT * FROM products")}
@@ -116,6 +131,29 @@ class ProvisioningTest(unittest.TestCase):
         self.assertEqual(row["cred_salt"], "c2FsdA==")
         self.assertEqual(row["cred_iterations"], 120000)
         self.assertEqual(row["credential_version"], "2026-09-01T00:00:00Z")
+
+    def test_replacing_credential_archives_the_previous_valid_verifier(self) -> None:
+        self.svc.pull_cashiers(3)
+        expires = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+        old_salt = b"old-salt"
+        new_salt = b"new-salt"
+        old = {
+            "salt": base64.b64encode(old_salt).decode(),
+            "verifier": base64.b64encode(hashlib.pbkdf2_hmac("sha256", b"1111", old_salt, 120000, dklen=32)).decode(),
+            "iterations": 120000, "expires_at": expires, "credential_version": "v1",
+        }
+        new = {
+            "salt": base64.b64encode(new_salt).decode(),
+            "verifier": base64.b64encode(hashlib.pbkdf2_hmac("sha256", b"2222", new_salt, 120000, dklen=32)).decode(),
+            "iterations": 120000, "expires_at": expires, "credential_version": "v2",
+        }
+        self.svc.store_credential(42, old)
+        self.svc.store_credential(42, new)
+
+        self.assertEqual(self.db.execute("SELECT count(*) FROM cashier_credential_history").fetchone()[0], 1)
+        auth = PosService(self.db)
+        self.assertTrue(auth.login_offline("C001", "1111").success)
+        self.assertTrue(auth.login_offline("C001", "2222").success)
 
     def test_cashier_sync_keeps_valid_offline_credential_when_server_version_changes(self) -> None:
         self.svc.pull_cashiers(3)

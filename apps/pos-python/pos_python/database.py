@@ -34,6 +34,17 @@ CREATE TABLE IF NOT EXISTS auth_events_outbox (
     attempts INTEGER NOT NULL DEFAULT 0,
     last_error TEXT
 );
+CREATE TABLE IF NOT EXISTS cashier_credential_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cashier_id INTEGER NOT NULL REFERENCES local_cashiers(id),
+    credential_version TEXT NOT NULL,
+    cred_salt TEXT NOT NULL,
+    cred_verifier TEXT NOT NULL,
+    cred_iterations INTEGER NOT NULL,
+    offline_valid_until TEXT NOT NULL,
+    superseded_at TEXT NOT NULL,
+    UNIQUE(cashier_id, credential_version)
+);
 CREATE TABLE IF NOT EXISTS products (
     id INTEGER PRIMARY KEY,
     server_id INTEGER UNIQUE,
@@ -220,12 +231,18 @@ ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("local_cashiers", "local_override_pin_hash", "TEXT"),
     ("local_cashiers", "local_override_expires_at", "TEXT"),
     ("local_cashiers", "local_override_set_by", "TEXT"),
+    # Outbox ordering is additive. Existing pending sales retain priority 2.
+    ("sync_outbox", "priority", "INTEGER NOT NULL DEFAULT 2"),
+    ("sync_outbox", "depends_on_uuid", "TEXT"),
+    ("sync_outbox", "next_attempt_at", "TEXT"),
 ]
 
 # ยูนีคเฉพาะแถวที่มี server_id — กันแคชเชียร์คนเดียวถูก sync ลงซ้ำสองแถว
 # ใช้ partial index เพราะ ALTER TABLE ADD COLUMN เติม UNIQUE ให้ไม่ได้
 ADDED_INDEXES: list[str] = [
     "CREATE UNIQUE INDEX IF NOT EXISTS ux_local_cashiers_server_id ON local_cashiers(server_id) WHERE server_id IS NOT NULL",
+    "CREATE INDEX IF NOT EXISTS ix_sync_outbox_ready ON sync_outbox(status, priority, created_at)",
+    "CREATE INDEX IF NOT EXISTS ix_credential_history_cashier ON cashier_credential_history(cashier_id, superseded_at DESC)",
 ]
 
 

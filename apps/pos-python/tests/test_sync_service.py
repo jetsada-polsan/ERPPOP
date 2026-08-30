@@ -88,6 +88,10 @@ class SyncServiceTest(unittest.TestCase):
             self.db.execute("SELECT status FROM sync_outbox WHERE aggregate_uuid = ?", (f"{sale_uuid}:void",)).fetchone()[0],
             "synced",
         )
+        queued = self.db.execute(
+            "SELECT priority, depends_on_uuid FROM sync_outbox WHERE aggregate_uuid = ?", (f"{sale_uuid}:void",)
+        ).fetchone()
+        self.assertEqual((queued["priority"], queued["depends_on_uuid"]), (3, sale_uuid))
 
 
 if __name__ == "__main__":

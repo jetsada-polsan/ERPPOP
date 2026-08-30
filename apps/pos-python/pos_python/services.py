@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 
+from .time_service import TimeService
+
 
 def now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -59,11 +61,11 @@ def verify_offline_credential(pin: str, salt_b64: str, verifier_b64: str, iterat
     return hmac.compare_digest(actual, expected)
 
 
-def _is_expired(value: str | None) -> bool:
+def _is_expired(value: str | None, current_time: datetime) -> bool:
     if not value:
         return False
     try:
-        return datetime.fromisoformat(str(value).replace("Z", "+00:00")) <= datetime.now(timezone.utc)
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")) <= current_time
     except ValueError:
         # A malformed expiry must never become an unlimited offline credential.
         return True
@@ -108,6 +110,10 @@ class DailySalesSummary:
 class PosService:
     def __init__(self, connection: sqlite3.Connection):
         self.db = connection
+        self.clock = TimeService(connection)
+
+    def _now(self) -> str:
+        return self.clock.now_iso()
 
     def daily_sales_summary(self, report_date: date | None = None) -> DailySalesSummary:
         """Return a terminal-local daily summary without contacting ERP.
@@ -118,7 +124,7 @@ class PosService:
         # Thailand has no DST.  A fixed offset also keeps Windows installers
         # independent from an optional system/tzdata timezone database.
         business_tz = timezone(timedelta(hours=7), name="ICT")
-        report_date = report_date or datetime.now(business_tz).date()
+        report_date = report_date or self.clock.now().astimezone(business_tz).date()
         start = datetime.combine(report_date, time.min, tzinfo=business_tz).astimezone(timezone.utc).isoformat()
         end = datetime.combine(report_date, time.max, tzinfo=business_tz).astimezone(timezone.utc).isoformat()
         sales = self.db.execute(
@@ -176,7 +182,7 @@ class PosService:
         if not bool(row["active"]) or row["revoked_at"]:
             result = OfflineLoginResult(None, "บัญชีแคชเชียร์ถูกปิดใช้งาน")
         elif row["local_override_pin_hash"]:
-            if _is_expired(row["local_override_expires_at"]):
+            if _is_expired(row["local_override_expires_at"], self.clock.now()):
                 result = OfflineLoginResult(None, "PIN ชั่วคราวหมดอายุแล้ว กรุณาเชื่อมต่อ ERP")
             elif hmac.compare_digest(str(row["local_override_pin_hash"]), pin_hash(pin)):
                 result = OfflineLoginResult(row, None, True)
@@ -184,10 +190,12 @@ class PosService:
                 result = OfflineLoginResult(None, "PIN ไม่ถูกต้อง")
         elif not (row["offline_valid_until"] or row["cred_expires_at"]):
             result = OfflineLoginResult(None, "ยังไม่มีสิทธิ์ใช้งานออฟไลน์ กรุณาเชื่อมต่อ ERP เพื่อ sync แคชเชียร์")
-        elif _is_expired(row["offline_valid_until"] or row["cred_expires_at"]):
+        elif _is_expired(row["offline_valid_until"] or row["cred_expires_at"], self.clock.now()):
             result = OfflineLoginResult(None, "Offline login expired, please reconnect to server")
         elif row["cred_salt"] and row["cred_verifier"]:
             verified = verify_offline_credential(pin, row["cred_salt"], row["cred_verifier"], row["cred_iterations"] or 0)
+            if not verified:
+                verified = self._verify_credential_history(int(row["id"]), pin)
             result = OfflineLoginResult(
                 row if verified else None,
                 None if verified else "PIN ไม่ถูกต้อง",
@@ -199,6 +207,20 @@ class PosService:
         self.record_auth_event(cashier_code, "offline_login", result.success, result.reason, terminal_code, branch_code)
         return result
 
+    def _verify_credential_history(self, cashier_id: int, pin: str) -> bool:
+        """Allow a previously verified offline PIN only through its original expiry."""
+        rows = self.db.execute(
+            """SELECT cred_salt, cred_verifier, cred_iterations, offline_valid_until
+               FROM cashier_credential_history WHERE cashier_id = ? ORDER BY superseded_at DESC""",
+            (cashier_id,),
+        ).fetchall()
+        current_time = self.clock.now()
+        return any(
+            not _is_expired(row["offline_valid_until"], current_time)
+            and verify_offline_credential(pin, row["cred_salt"], row["cred_verifier"], row["cred_iterations"])
+            for row in rows
+        )
+
     def record_auth_event(self, cashier_code: str, event_type: str, success: bool, reason: str | None,
                           terminal_code: str | None = None, branch_code: str | None = None) -> str:
         event_uuid = str(uuid.uuid4())
@@ -207,7 +229,13 @@ class PosService:
                 """INSERT INTO auth_events_outbox
                 (event_uuid, cashier_code, event_type, success, reason, terminal_code, branch_code, occurred_at, synced)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)""",
-                (event_uuid, cashier_code, event_type, int(success), reason, terminal_code, branch_code, now()),
+                (event_uuid, cashier_code, event_type, int(success), reason, terminal_code, branch_code, self._now()),
+            )
+            self.db.execute(
+                """INSERT INTO sync_outbox
+                (aggregate_type, aggregate_uuid, payload, priority, created_at)
+                VALUES ('auth_event', ?, ?, 4, ?)""",
+                (f"auth:{event_uuid}", json.dumps({"event_uuid": event_uuid}), self._now()),
             )
         return event_uuid
 
@@ -225,9 +253,7 @@ class PosService:
         if not target or not bool(target["active"]) or target["revoked_at"]:
             self.record_auth_event(cashier_code, "manager_override_denied", False, "ไม่พบหรือปิดใช้งาน", terminal_code, branch_code)
             return OfflineLoginResult(None, "ไม่พบแคชเชียร์ที่เปิดใช้งาน")
-        expires = datetime.now(timezone.utc).replace(microsecond=0)
-        from datetime import timedelta
-        expires = (expires + timedelta(minutes=max(1, min(valid_minutes, 240)))).isoformat()
+        expires = (self.clock.now().replace(microsecond=0) + timedelta(minutes=max(1, min(valid_minutes, 240)))).isoformat()
         with self.db:
             self.db.execute(
                 """UPDATE local_cashiers SET local_override_pin_hash = ?, local_override_expires_at = ?,
@@ -248,7 +274,7 @@ class PosService:
             self.db.execute(
                 """INSERT INTO device_settings (key, value, updated_at) VALUES (?, ?, ?)
                 ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at""",
-                ("local_it_pin_hash", json.dumps(pin_hash(pin)), now()),
+                ("local_it_pin_hash", json.dumps(pin_hash(pin)), self._now()),
             )
 
     def verify_local_it_pin(self, pin: str) -> bool:
@@ -265,13 +291,17 @@ class PosService:
             return str(row["value"])
 
     def open_shift(self, branch_id: int, terminal_id: str, cashier_id: int, opening_cash: Decimal) -> int:
-        existing = self.db.execute("SELECT id FROM shifts WHERE terminal_id = ? AND status = 'open'", (terminal_id,)).fetchone()
+        existing = self.db.execute(
+            "SELECT id, cashier_id FROM shifts WHERE terminal_id = ? AND status = 'open'", (terminal_id,)
+        ).fetchone()
         if existing:
-            return int(existing["id"])
+            if int(existing["cashier_id"]) == cashier_id:
+                return int(existing["id"])
+            raise ValueError("เครื่องนี้มีกะของแคชเชียร์คนอื่นเปิดอยู่ ต้องปิดหรือส่งมอบกะก่อน")
         cursor = self.db.execute(
             """INSERT INTO shifts (uuid, branch_id, terminal_id, cashier_id, opened_at, opening_cash, status)
             VALUES (?, ?, ?, ?, ?, ?, 'open')""",
-            (str(uuid.uuid4()), branch_id, terminal_id, cashier_id, now(), str(money(opening_cash))),
+            (str(uuid.uuid4()), branch_id, terminal_id, cashier_id, self._now(), str(money(opening_cash))),
         )
         self.db.commit()
         return int(cursor.lastrowid)
@@ -337,8 +367,8 @@ class PosService:
                 """INSERT INTO sales (sale_uuid, document_no, branch_id, terminal_id, shift_id, cashier_id,
                 sale_datetime, subtotal, discount_total, vat_total, grand_total, payment_status, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?)""",
-                (sale_uuid, document_no, branch_id, terminal_id, shift_id, cashier_id, now(), str(subtotal),
-                 str(discount), str(vat_total), str(grand_total), now()),
+                (sale_uuid, document_no, branch_id, terminal_id, shift_id, cashier_id, self._now(), str(subtotal),
+                 str(discount), str(vat_total), str(grand_total), self._now()),
             )
             sale_id = int(cursor.lastrowid)
             for line in lines:
@@ -360,13 +390,16 @@ class PosService:
                 "INSERT INTO payments (sale_id, method, amount, change_amount) VALUES (?, ?, ?, ?)",
                 (sale_id, payment_method, str(money(paid_amount)), str(change)),
             )
-            self.db.execute("INSERT INTO print_jobs (sale_id, created_at) VALUES (?, ?)", (sale_id, now()))
+            self.db.execute("INSERT INTO print_jobs (sale_id, created_at) VALUES (?, ?)", (sale_id, self._now()))
             payload = json.dumps({
                 "sale_uuid": sale_uuid, "document_no": document_no,
                 "grand_total": str(grand_total), "vat_total": str(vat_total), "vat_rate": str(rate),
                 "vat_mode": "included",
             })
-            self.db.execute("INSERT INTO sync_outbox (aggregate_type, aggregate_uuid, payload, created_at) VALUES ('sale', ?, ?, ?)", (sale_uuid, payload, now()))
+            self.db.execute(
+                "INSERT INTO sync_outbox (aggregate_type, aggregate_uuid, payload, priority, created_at) VALUES ('sale', ?, ?, 2, ?)",
+                (sale_uuid, payload, self._now()),
+            )
         return sale_id
 
     def void_sale(self, sale_id: int, *, cashier_id: int, reason: str) -> None:
@@ -387,7 +420,7 @@ class PosService:
         with self.db:
             self.db.execute(
                 "UPDATE sales SET is_void = 1, voided_at = ?, void_reason = ?, voided_by = ? WHERE id = ?",
-                (now(), reason, cashier_id, sale_id),
+                (self._now(), reason, cashier_id, sale_id),
             )
             sale_uuid = self.db.execute("SELECT sale_uuid FROM sales WHERE id = ?", (sale_id,)).fetchone()["sale_uuid"]
             payload = json.dumps({"sale_uuid": sale_uuid, "reason": reason, "voided_by": cashier_id})
@@ -395,8 +428,10 @@ class PosService:
             # ใช้คีย์ของตัวเองเพราะ aggregate_uuid เป็น unique — การยกเลิกเป็นคนละเหตุการณ์
             # กับการขาย ทั้งสองต้องอยู่ในคิวพร้อมกันได้ และต้องกันส่งซ้ำแยกกัน
             self.db.execute(
-                "INSERT INTO sync_outbox (aggregate_type, aggregate_uuid, payload, created_at) VALUES ('sale_void', ?, ?, ?)",
-                (f"{sale_uuid}:void", payload, now()),
+                """INSERT INTO sync_outbox
+                (aggregate_type, aggregate_uuid, payload, priority, depends_on_uuid, created_at)
+                VALUES ('sale_void', ?, ?, 3, ?, ?)""",
+                (f"{sale_uuid}:void", payload, sale_uuid, self._now()),
             )
 
     def pending_sync_count(self) -> int:

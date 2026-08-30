@@ -17,19 +17,24 @@ class SyncService:
         self.api = api
 
     def sync_pending_sales(self) -> dict[str, int]:
-        rows = self.db.execute("SELECT aggregate_uuid FROM sync_outbox WHERE aggregate_type = 'sale' AND status IN ('pending', 'failed') ORDER BY id").fetchall()
+        rows = self.db.execute(
+            """SELECT aggregate_type, aggregate_uuid, depends_on_uuid FROM sync_outbox
+               WHERE aggregate_type IN ('sale', 'sale_void') AND status IN ('pending', 'failed')
+               ORDER BY priority ASC, created_at ASC, id ASC"""
+        ).fetchall()
         result = {"synced": 0, "failed": 0}
         for row in rows:
+            if row["depends_on_uuid"]:
+                dependency = self.db.execute(
+                    "SELECT status FROM sync_outbox WHERE aggregate_uuid = ?", (row["depends_on_uuid"],)
+                ).fetchone()
+                if not dependency or dependency["status"] != "synced":
+                    continue
             try:
-                self.sync_sale(row["aggregate_uuid"])
-                result["synced"] += 1
-            except RuntimeError:
-                result["failed"] += 1
-        # ต้องส่งใบขายก่อนใบยกเลิกเสมอ เพราะ ERP ยังไม่มี receipt_no ให้ยกเลิก
-        voids = self.db.execute("SELECT aggregate_uuid FROM sync_outbox WHERE aggregate_type = 'sale_void' AND status IN ('pending', 'failed') ORDER BY id").fetchall()
-        for row in voids:
-            try:
-                self.sync_void(row["aggregate_uuid"])
+                if row["aggregate_type"] == "sale":
+                    self.sync_sale(row["aggregate_uuid"])
+                else:
+                    self.sync_void(row["aggregate_uuid"])
                 result["synced"] += 1
             except RuntimeError:
                 result["failed"] += 1
@@ -68,12 +73,20 @@ class SyncService:
                         "UPDATE auth_events_outbox SET synced = 1, synced_at = ?, attempts = attempts + 1, last_error = NULL WHERE id = ?",
                         (now(), row["id"]),
                     )
+                    self.db.execute(
+                        "UPDATE sync_outbox SET status = 'synced', synced_at = ?, attempts = attempts + 1, last_error = NULL WHERE aggregate_uuid = ?",
+                        (now(), f"auth:{row['event_uuid']}"),
+                    )
                 result["synced"] += 1
             except Exception as error:
                 with self.db:
                     self.db.execute(
                         "UPDATE auth_events_outbox SET attempts = attempts + 1, last_error = ? WHERE id = ?",
                         (str(error)[:1000], row["id"]),
+                    )
+                    self.db.execute(
+                        "UPDATE sync_outbox SET status = 'failed', attempts = attempts + 1, last_error = ? WHERE aggregate_uuid = ?",
+                        (str(error)[:1000], f"auth:{row['event_uuid']}"),
                     )
                 result["failed"] += 1
         return result

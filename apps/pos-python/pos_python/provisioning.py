@@ -16,6 +16,7 @@ from typing import Any, Protocol
 
 from .barcode import replace_scale_profiles
 from .services import money, now
+from .time_service import TimeService
 
 
 class PosApiDown(Protocol):
@@ -49,6 +50,8 @@ class ProvisioningService:
         if not profile.get("success", False):
             raise RuntimeError(profile.get("message", "ping ไม่สำเร็จ"))
         with self.db:
+            if profile.get("server_time"):
+                TimeService(self.db).update_offset(str(profile["server_time"]))
             for key, path in _PING_SETTINGS.items():
                 value: Any = profile
                 for step in path:
@@ -222,20 +225,39 @@ class ProvisioningService:
         return int(cur.lastrowid)
 
     def store_credential(self, server_cashier_id: int, credential: dict) -> None:
-        """เก็บ credential ออฟไลน์ที่ ERP ออกให้หลังพนักงานยืนยัน PIN ออนไลน์สำเร็จ"""
+        """Store a newly verified credential without invalidating a valid old PIN.
+
+        A remote reset may reach the POS while it is about to lose connectivity.
+        Archive the previous verifier before replacing it, retaining it only to
+        its original offline expiry.
+        """
         if not credential:
             return
-        self.db.execute(
-            """UPDATE local_cashiers SET cred_salt = ?, cred_verifier = ?, cred_iterations = ?, cred_expires_at = ?,
-            offline_valid_until = ?, credential_version = ?, server_credential_version = ?, force_pin_change = 0,
-            local_override_pin_hash = NULL, local_override_expires_at = NULL, local_override_set_by = NULL
-            WHERE server_id = ?""",
-            (credential.get("salt"), credential.get("verifier"),
-             int(credential.get("iterations") or 0), credential.get("expires_at"),
-             credential.get("expires_at"), credential.get("credential_version"),
-             credential.get("credential_version"), server_cashier_id),
-        )
-        self.db.commit()
+        with self.db:
+            current = self.db.execute("SELECT * FROM local_cashiers WHERE server_id = ?", (server_cashier_id,)).fetchone()
+            if not current:
+                raise RuntimeError("ไม่พบแคชเชียร์ local สำหรับเก็บ credential")
+            new_version = str(credential.get("credential_version") or "")
+            if (
+                current["cred_salt"] and current["cred_verifier"] and current["credential_version"]
+                and str(current["credential_version"]) != new_version and current["offline_valid_until"]
+            ):
+                self.db.execute(
+                    """INSERT OR IGNORE INTO cashier_credential_history
+                    (cashier_id, credential_version, cred_salt, cred_verifier, cred_iterations, offline_valid_until, superseded_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (current["id"], current["credential_version"], current["cred_salt"], current["cred_verifier"],
+                     current["cred_iterations"] or 0, current["offline_valid_until"], TimeService(self.db).now_iso()),
+                )
+            self.db.execute(
+                """UPDATE local_cashiers SET cred_salt = ?, cred_verifier = ?, cred_iterations = ?, cred_expires_at = ?,
+                offline_valid_until = ?, credential_version = ?, server_credential_version = ?, force_pin_change = 0,
+                local_override_pin_hash = NULL, local_override_expires_at = NULL, local_override_set_by = NULL
+                WHERE server_id = ?""",
+                (credential.get("salt"), credential.get("verifier"), int(credential.get("iterations") or 0),
+                 credential.get("expires_at"), credential.get("expires_at"), credential.get("credential_version"),
+                 credential.get("credential_version"), server_cashier_id),
+            )
 
     # ── cashier login (ออนไลน์) ──────────────────────────────────
     def online_cashier_login(self, pin: str, cashier_code: str | None = None,

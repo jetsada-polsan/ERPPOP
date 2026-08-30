@@ -57,6 +57,10 @@ class OfflineFirstAuthTest(unittest.TestCase):
         event = self.db.execute("SELECT * FROM auth_events_outbox").fetchone()
         self.assertEqual((event["cashier_code"], event["event_type"], event["success"]), ("C001", "offline_login", 1))
         self.assertEqual((event["terminal_code"], event["branch_code"]), ("POS001", "B001"))
+        queued = self.db.execute(
+            "SELECT aggregate_type, priority FROM sync_outbox WHERE aggregate_uuid = ?", (f"auth:{event['event_uuid']}",)
+        ).fetchone()
+        self.assertEqual((queued["aggregate_type"], queued["priority"]), ("auth_event", 4))
 
     def test_remote_pin_reset_metadata_does_not_delete_a_still_valid_local_pin(self) -> None:
         self.cashier("C001", "4821", credential_version="old", server_credential_version="new")
