@@ -45,6 +45,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OperationsController;
 use App\Http\Controllers\OrganizationalUnitController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\PosBuildController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\PosReleaseController;
 use App\Http\Controllers\PriceTableController;
@@ -639,6 +640,9 @@ Route::prefix('settings')->name('settings.')->group(function () {
     Route::post('/layout', [SystemSettingController::class, 'updateLayout'])->name('layout.update');
     Route::get('/pos-designer', [SystemSettingController::class, 'posDesigner'])->name('pos-designer');
     Route::post('/pos-designer', [SystemSettingController::class, 'savePosLayout'])->name('pos-designer.save');
+    Route::get('/pos-builds', [PosBuildController::class, 'index'])->name('pos-builds.index');
+    Route::post('/pos-builds', [PosBuildController::class, 'store'])->name('pos-builds.store');
+    Route::post('/pos-builds/{posBuild}/refresh', [PosBuildController::class, 'refresh'])->name('pos-builds.refresh');
     Route::get('/reports', [ReportGovernanceController::class, 'index'])->name('reports');
     Route::post('/reports', [ReportGovernanceController::class, 'update'])->name('reports.update');
     Route::get('/workflows', [WorkflowDefinitionController::class, 'index'])->name('workflows');

@@ -46,6 +46,7 @@
 
             <div class="set-nav-group mt-3"><i class="bi bi-pc-display"></i> โปรแกรมหน้าร้าน</div>
             <a href="{{ route('settings.receipt-template.edit') }}" class="set-nav-link text-decoration-none">ออกแบบใบเสร็จ POS</a>
+            <a href="{{ route('settings.pos-builds.index') }}" class="set-nav-link text-decoration-none">POS Build Center</a>
             <button type="button" class="set-nav-link" :class="tab === 'pos-download' && 'active'" @click="tab = 'pos-download'">PopCentral POS (Python)</button>
         </div>
 

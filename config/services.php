@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'github_pos_build' => [
+        'token' => env('GITHUB_POS_BUILD_TOKEN'),
+        'repository' => env('GITHUB_POS_BUILD_REPOSITORY', 'jetsada-polsan/ERPPOP'),
+        'workflow' => env('GITHUB_POS_BUILD_WORKFLOW', 'pos-python-windows-uat.yml'),
+        'ref' => env('GITHUB_POS_BUILD_REF', 'main'),
+    ],
+
 ];

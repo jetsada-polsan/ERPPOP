@@ -52,6 +52,7 @@
         <div><h1>POS Designer</h1><p>ออกแบบหน้าขายบนเว็บ แล้ว Build เป็น layout ให้ PopCentral POS</p></div>
         <div class="posd-actions">
             <a class="posd-btn secondary" href="{{ route('pos.preview') }}" target="_blank" rel="noopener"><i class="bi bi-display me-1"></i> ดูหน้าที่ Build แล้ว</a>
+            <a class="posd-btn secondary" href="{{ route('settings.pos-builds.index') }}"><i class="bi bi-box-seam me-1"></i> Build โปรแกรม</a>
             <form method="POST" action="{{ route('settings.pos-designer.save') }}" @submit="sync($event)">@csrf
                 <input type="hidden" name="layout" x-ref="layoutDraft"><button class="posd-btn secondary" type="submit">บันทึกแบบร่าง</button>
             </form>
