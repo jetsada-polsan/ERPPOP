@@ -323,19 +323,35 @@
                 @endif
 
                 <div class="set-card">
-                    <div class="set-title pt-2">วิธีผูกเครื่อง POS หลังติดตั้ง</div>
+                    <div class="set-title pt-2">การผูก Token กับเครื่อง POS</div>
                     <div class="set-desc mb-3">
-                        เครื่อง POS ไม่ได้ใช้รหัสผ่าน ERP จากหน้า “ผู้ใช้และสิทธิ์” โดยตรง ต้องผูกเครื่องด้วย Device token ก่อน แล้วให้แคชเชียร์ยืนยันตัวด้วย PIN POS
+                        Device token คือกุญแจของ <strong>เครื่อง POS และสาขา</strong> ไม่ใช่รหัสของแคชเชียร์ ระบบใช้ token เพื่อรู้ว่าเครื่องนี้เป็น POS ใด อยู่สาขาใด และมีสิทธิ์ sync ข้อมูลของสาขาใดเท่านั้น
                     </div>
-                    <ol class="mb-3 ps-3 small text-muted">
-                        <li>เลือกสาขาที่ติดตั้ง แล้วกด <strong>สร้างอัตโนมัติ</strong> เพื่อออก Device token ให้เครื่องนั้น</li>
-                        <li>คัดลอก Token ที่แสดง แล้วไปที่โปรแกรม PopCentral POS → <strong>ตั้งค่าเครื่องนี้</strong></li>
-                        <li>กรอกที่อยู่ ERP เป็น <code>{{ request()->getSchemeAndHttpHost() }}</code> และวาง Device token</li>
-                        <li>เปิดโปรแกรม POS ใหม่หนึ่งครั้งเพื่อ sync สินค้า ราคา สาขา เครื่อง และรายชื่อแคชเชียร์</li>
-                        <li>แคชเชียร์เข้า POS ด้วย <strong>รหัสพนักงาน + PIN POS</strong>; ถ้าเป็น PIN ชั่วคราว ระบบจะบังคับตั้ง PIN ใหม่ก่อนขาย</li>
-                    </ol>
+                    <div class="row g-3 small mb-3">
+                        <div class="col-md-4">
+                            <div class="fw-semibold text-primary mb-1">1. ออก token ให้เครื่อง</div>
+                            <div class="text-muted">เลือกสาขา ตั้งชื่อเครื่อง เช่น POS001 แล้วกด <strong>สร้างอัตโนมัติ</strong> ระบบเก็บเฉพาะ hash ของ token บน ERP และแสดงค่าเต็มให้คัดลอกในครั้งนั้น</div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="fw-semibold text-primary mb-1">2. ตั้งค่าเครื่องครั้งแรก</div>
+                            <div class="text-muted">เปิด PopCentral POS → <strong>ตั้งค่าเครื่องนี้</strong> กรอก ERP <code>{{ request()->getSchemeAndHttpHost() }}</code> และวาง token แล้วกดตรวจสอบ</div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="fw-semibold text-primary mb-1">3. Sync และเริ่มขาย</div>
+                            <div class="text-muted">POS ตรวจ token, สาขา และรหัสเครื่องก่อน sync สินค้า ราคา layout และแคชเชียร์ จากนั้นผู้ใช้เข้าเครื่องด้วย <strong>รหัสพนักงาน + PIN POS</strong></div>
+                        </div>
+                    </div>
+                    <div class="alert alert-info py-2 mb-3 small">
+                        <strong>แยกหน้าที่ชัดเจน:</strong> token ยืนยันตัวตนของเครื่องเพื่อเชื่อม ERP; PIN POS ยืนยันตัวตนของคนขายเพื่อเปิดกะและบันทึกผู้รับผิดชอบในบิล. การเปลี่ยนรหัสผ่านเข้าเว็บ ERP ไม่เปลี่ยน PIN POS.
+                    </div>
+                    <div class="set-title fs-6">หลังผูกครั้งแรก</div>
+                    <ul class="mb-3 ps-3 small text-muted">
+                        <li>เมื่อ online POS จะ sync ข้อมูลและ credential ของแคชเชียร์ก่อน login; หลังจากนั้นยังขายและดูยอดใน SQLite ของเครื่องได้เมื่อ offline</li>
+                        <li>หาก reset PIN บน ERP ขณะที่เครื่อง offline เครื่องยังใช้ PIN ที่ sync ล่าสุดได้จนถึงวันหมดอายุของสิทธิ์ offline; PIN ใหม่จะเริ่มใช้หลัง POS sync สำเร็จ</li>
+                        <li>IT เท่านั้นที่เปิด <strong>IT Maintenance</strong> เพื่อเปลี่ยน token, ทดสอบการเชื่อมต่อ, sync แคชเชียร์, สำรองฐานข้อมูล หรือดู log ได้</li>
+                    </ul>
                     <div class="alert alert-warning py-2 mb-0 small">
-                        รีเซ็ตรหัสผ่านในหน้า “ผู้ใช้และสิทธิ์” ใช้กับการเข้าเว็บ ERP เท่านั้น ถ้าต้องการเข้า POS ให้ใช้ปุ่ม <strong>PIN POS</strong> ของผู้ใช้ หรือออก Device token ใหม่ให้เครื่อง
+                        <strong>ความปลอดภัย:</strong> ห้ามใช้ token เดียวกับหลายเครื่องหรือส่งผ่านแชต หากเครื่องสูญหาย ย้ายสาขา หรือสงสัยว่ารหัสหลุด ให้กด <strong>ออก Token ใหม่</strong> หรือเพิกถอนเครื่องเดิมทันที แล้ววาง token ใหม่ใน IT Maintenance ของเครื่องนั้น. การออก token ใหม่ไม่ต้องรีเซ็ต PIN ของพนักงาน
                     </div>
                 </div>
 
