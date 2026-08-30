@@ -117,7 +117,7 @@ class ProvisioningTest(unittest.TestCase):
         self.assertEqual(row["cred_iterations"], 120000)
         self.assertEqual(row["credential_version"], "2026-09-01T00:00:00Z")
 
-    def test_cashier_sync_clears_offline_credential_when_server_version_changes(self) -> None:
+    def test_cashier_sync_keeps_valid_offline_credential_when_server_version_changes(self) -> None:
         self.svc.pull_cashiers(3)
         self.svc.store_credential(42, {"salt": "c2FsdA==", "verifier": "dmVy", "iterations": 120000,
                                        "expires_at": "2026-09-01T00:00:00Z",
@@ -128,10 +128,13 @@ class ProvisioningTest(unittest.TestCase):
 
         self.svc.pull_cashiers(3)
 
-        row = self.db.execute("SELECT cred_salt, cred_verifier, credential_version FROM local_cashiers WHERE server_id = 42").fetchone()
-        self.assertIsNone(row["cred_salt"])
-        self.assertIsNone(row["cred_verifier"])
-        self.assertEqual(row["credential_version"], "2026-09-02T00:00:00Z")
+        row = self.db.execute("SELECT cred_salt, cred_verifier, credential_version, server_credential_version FROM local_cashiers WHERE server_id = 42").fetchone()
+        self.assertEqual(row["cred_salt"], "c2FsdA==")
+        self.assertEqual(row["cred_verifier"], "dmVy")
+        # credential_version tells which verifier is cached; server_credential_version
+        # announces a newer PIN without breaking a disconnected terminal.
+        self.assertEqual(row["credential_version"], "2026-09-01T00:00:00Z")
+        self.assertEqual(row["server_credential_version"], "2026-09-02T00:00:00Z")
 
     def test_open_server_shift_binds_the_server_id_back(self) -> None:
         self.svc.pull_cashiers(3)  # ต้องมีแคชเชียร์ให้ shift.cashier_id อ้าง (FK)

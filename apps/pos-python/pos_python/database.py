@@ -11,7 +11,28 @@ CREATE TABLE IF NOT EXISTS local_cashiers (
     name TEXT NOT NULL,
     pin_hash TEXT NOT NULL,
     active INTEGER NOT NULL DEFAULT 1,
+    role TEXT NOT NULL DEFAULT 'cashier',
+    credential_version TEXT,
+    last_synced_at TEXT,
+    offline_valid_until TEXT,
+    force_pin_change INTEGER NOT NULL DEFAULT 0,
+    revoked_at TEXT,
     synced_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS auth_events_outbox (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_uuid TEXT NOT NULL UNIQUE,
+    cashier_code TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    success INTEGER NOT NULL,
+    reason TEXT,
+    terminal_code TEXT,
+    branch_code TEXT,
+    occurred_at TEXT NOT NULL,
+    synced INTEGER NOT NULL DEFAULT 0,
+    synced_at TEXT,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    last_error TEXT
 );
 CREATE TABLE IF NOT EXISTS products (
     id INTEGER PRIMARY KEY,
@@ -188,6 +209,17 @@ ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("local_cashiers", "cred_iterations", "INTEGER"),
     ("local_cashiers", "cred_expires_at", "TEXT"),
     ("local_cashiers", "credential_version", "TEXT"),
+    # Offline-first authentication metadata.  These are additive so upgrading a
+    # terminal never destroys its cached cashier or pending sales records.
+    ("local_cashiers", "role", "TEXT NOT NULL DEFAULT 'cashier'"),
+    ("local_cashiers", "last_synced_at", "TEXT"),
+    ("local_cashiers", "offline_valid_until", "TEXT"),
+    ("local_cashiers", "force_pin_change", "INTEGER NOT NULL DEFAULT 0"),
+    ("local_cashiers", "revoked_at", "TEXT"),
+    ("local_cashiers", "server_credential_version", "TEXT"),
+    ("local_cashiers", "local_override_pin_hash", "TEXT"),
+    ("local_cashiers", "local_override_expires_at", "TEXT"),
+    ("local_cashiers", "local_override_set_by", "TEXT"),
 ]
 
 # ยูนีคเฉพาะแถวที่มี server_id — กันแคชเชียร์คนเดียวถูก sync ลงซ้ำสองแถว
@@ -204,6 +236,17 @@ def _add_missing_columns(connection: sqlite3.Connection) -> None:
             connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
     for statement in ADDED_INDEXES:
         connection.execute(statement)
+    # Preserve credentials issued before the new names were introduced.  A
+    # blank value means "unknown", not expired; cred_expires_at is authoritative
+    # for older releases until the next cashier sync updates both fields.
+    connection.execute(
+        "UPDATE local_cashiers SET last_synced_at = synced_at "
+        "WHERE last_synced_at IS NULL AND synced_at IS NOT NULL"
+    )
+    connection.execute(
+        "UPDATE local_cashiers SET offline_valid_until = cred_expires_at "
+        "WHERE offline_valid_until IS NULL AND cred_expires_at IS NOT NULL"
+    )
 
 
 def connect(path: Path) -> sqlite3.Connection:

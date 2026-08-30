@@ -33,6 +33,49 @@ class SyncService:
                 result["synced"] += 1
             except RuntimeError:
                 result["failed"] += 1
+        auth = self.sync_auth_events()
+        result["synced"] += auth["synced"]
+        result["failed"] += auth["failed"]
+        return result
+
+    def sync_auth_events(self) -> dict[str, int]:
+        """Upload offline login/recovery audit events without blocking sales sync.
+
+        The event UUID is the idempotency key.  A reconnect may retry the same
+        audit record many times; ERP accepts it once and returns the same result.
+        """
+        rows = self.db.execute(
+            "SELECT * FROM auth_events_outbox WHERE synced = 0 ORDER BY id LIMIT 100"
+        ).fetchall()
+        result = {"synced": 0, "failed": 0}
+        for row in rows:
+            payload = {
+                "event_uuid": row["event_uuid"],
+                "cashier_code": row["cashier_code"],
+                "event_type": row["event_type"],
+                "success": bool(row["success"]),
+                "reason": row["reason"],
+                "terminal_code": row["terminal_code"],
+                "branch_code": row["branch_code"],
+                "occurred_at": row["occurred_at"],
+            }
+            try:
+                response = self.api.post("/api/pos/auth-events", {"events": [payload]}, idempotency_key=row["event_uuid"])
+                if not response.get("success", False):
+                    raise RuntimeError(response.get("message", "server rejected auth event"))
+                with self.db:
+                    self.db.execute(
+                        "UPDATE auth_events_outbox SET synced = 1, synced_at = ?, attempts = attempts + 1, last_error = NULL WHERE id = ?",
+                        (now(), row["id"]),
+                    )
+                result["synced"] += 1
+            except Exception as error:
+                with self.db:
+                    self.db.execute(
+                        "UPDATE auth_events_outbox SET attempts = attempts + 1, last_error = ? WHERE id = ?",
+                        (str(error)[:1000], row["id"]),
+                    )
+                result["failed"] += 1
         return result
 
     def sync_sale(self, sale_uuid: str) -> None:

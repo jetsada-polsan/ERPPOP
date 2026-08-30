@@ -128,7 +128,7 @@ class PosApiController extends Controller
         $branchId = $device?->branch_id ?: $request->user()?->branch_id;
 
         $cashiers = Salesman::query()
-            ->with('user:id,name,username')
+            ->with(['user:id,name,username', 'user.roles:id,code'])
             ->where('is_active', true)
             ->when($branchId, fn ($query) => $query->where(fn ($w) => $w
                 ->whereNull('branch_id')
@@ -143,6 +143,8 @@ class PosApiController extends Controller
                 'user_id' => $cashier->user_id,
                 'user_name' => $cashier->user?->name,
                 'credential_version' => $this->credentialVersion($cashier),
+                'role' => $this->cashierRole($cashier),
+                'must_change_pin' => (bool) $cashier->must_change_pin,
             ]);
 
         return response()->json(['success' => true, 'cashiers' => $cashiers]);
@@ -225,6 +227,59 @@ class PosApiController extends Controller
         return $this->authenticatedCashierResponse($request, $cashier, $device, $branchId, $data['pin']);
     }
 
+    /** รับ audit ที่ POS บันทึกไว้ระหว่างออฟไลน์; event_uuid ป้องกันการซ้ำตอน retry */
+    public function authEvents(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'events' => ['required', 'array', 'min:1', 'max:100'],
+            'events.*.event_uuid' => ['required', 'uuid'],
+            'events.*.cashier_code' => ['required', 'string', 'max:40'],
+            // audit_logs.action is 60 chars including the "pos_" namespace.
+            'events.*.event_type' => ['required', 'string', 'max:56'],
+            'events.*.success' => ['required', 'boolean'],
+            'events.*.reason' => ['nullable', 'string', 'max:1000'],
+            'events.*.terminal_code' => ['nullable', 'string', 'max:80'],
+            'events.*.branch_code' => ['nullable', 'string', 'max:80'],
+            'events.*.occurred_at' => ['required', 'date'],
+        ]);
+        $device = $request->attributes->get('pos_device');
+        $inserted = 0;
+        foreach ($data['events'] as $event) {
+            $created = DB::table('pos_auth_event_ingests')->insertOrIgnore([
+                'event_uuid' => $event['event_uuid'],
+                'pos_device_id' => $device?->id,
+                'cashier_code' => $event['cashier_code'],
+                'event_type' => $event['event_type'],
+                'success' => $event['success'],
+                'reason' => $event['reason'] ?? null,
+                'terminal_code' => $event['terminal_code'] ?? $device?->terminal_code,
+                'branch_code' => $event['branch_code'] ?? null,
+                'occurred_at' => $event['occurred_at'],
+                'created_at' => now(),
+            ]);
+            if (! $created) {
+                continue;
+            }
+            $inserted++;
+            $cashier = Salesman::where('code', $event['cashier_code'])->first();
+            AuditLog::create([
+                'branch_id' => $device?->branch_id,
+                'action' => 'pos_'.$event['event_type'],
+                'table_name' => 'salesmen',
+                'record_id' => $cashier?->id,
+                'new_values' => [
+                    'event_uuid' => $event['event_uuid'],
+                    'success' => (bool) $event['success'],
+                    'reason' => $event['reason'] ?? null,
+                    'terminal_code' => $event['terminal_code'] ?? $device?->terminal_code,
+                    'branch_code' => $event['branch_code'] ?? null,
+                    'occurred_at' => $event['occurred_at'],
+                ],
+            ]);
+        }
+        return response()->json(['success' => true, 'accepted' => $inserted]);
+    }
+
     private function authenticatedCashierResponse(Request $request, Salesman $cashier, ?PosDevice $device, ?int $branchId, ?string $pin): JsonResponse
     {
         // ผูกผลการยืนยันไว้กับเครื่อง เพื่อให้คำสั่งขายหลังจากนี้อ้างชื่อคนอื่นไม่ได้
@@ -267,7 +322,15 @@ class PosApiController extends Controller
             'user_id' => $cashier->user_id,
             'user_name' => $cashier->user?->name,
             'credential_version' => $this->credentialVersion($cashier),
+            'role' => $this->cashierRole($cashier),
+            'must_change_pin' => (bool) $cashier->must_change_pin,
         ];
+    }
+
+    private function cashierRole(Salesman $cashier): string
+    {
+        $roles = $cashier->user?->roles?->pluck('code')->all() ?? [];
+        return array_intersect($roles, ['GM', 'BRANCH_MGR']) ? 'manager' : 'cashier';
     }
 
     private function credentialVersion(Salesman $cashier): ?string

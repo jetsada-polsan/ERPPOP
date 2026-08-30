@@ -78,7 +78,8 @@ class SyncWorker:
 
     def _pending_count(self, db) -> int:
         return int(db.execute(
-            "SELECT count(*) FROM sync_outbox WHERE status IN ('pending', 'failed')"
+            "SELECT (SELECT count(*) FROM sync_outbox WHERE status IN ('pending', 'failed')) + "
+            "(SELECT count(*) FROM auth_events_outbox WHERE synced = 0)"
         ).fetchone()[0])
 
     def _run(self) -> None:

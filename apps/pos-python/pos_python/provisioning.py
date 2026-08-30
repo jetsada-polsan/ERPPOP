@@ -159,7 +159,9 @@ class ProvisioningService:
         """ดึงรายชื่อแคชเชียร์ที่ใช้เครื่องนี้ได้ upsert ตาม server_id
 
         ไม่เก็บ PIN — พนักงานยืนยันตัวออนไลน์ผ่าน /cashier/login แล้วเก็บ credential
-        PBKDF2 ที่ ERP ออกให้ (store_credential) ไว้ใช้ตอนออฟไลน์
+        PBKDF2 ที่ ERP ออกให้ (store_credential) ไว้ใช้ตอนออฟไลน์.  การเห็น
+        credential_version ใหม่จาก server ห้ามลบ credential เดิม เพราะเครื่องอาจ
+        หลุดเน็ตหลัง reset PIN และยังต้องขายต่อได้จนกว่าจะหมด offline validity.
         """
         response = self.api.get("/api/pos/cashiers")
         rows = response.get("cashiers") if isinstance(response, dict) else response
@@ -178,38 +180,44 @@ class ProvisioningService:
                     str(code),
                     str(row.get("name") or code),
                     row.get("credential_version"),
+                    str(row.get("role") or "cashier"),
+                    bool(row.get("must_change_pin") or row.get("force_pin_change")),
                 )
                 seen.append(int(server_id))
                 upserted += 1
             if seen:
                 placeholders = ",".join("?" for _ in seen)
                 self.db.execute(
-                    f"UPDATE local_cashiers SET active = 0 "
+                    f"UPDATE local_cashiers SET active = 0, revoked_at = COALESCE(revoked_at, ?) "
                     f"WHERE server_id IS NOT NULL AND server_id NOT IN ({placeholders})",
-                    seen,
+                    [now(), *seen],
                 )
         return {"upserted": upserted}
 
-    def _upsert_cashier(self, server_id: int, code: str, name: str, credential_version: str | None = None) -> int:
+    def _upsert_cashier(self, server_id: int, code: str, name: str, credential_version: str | None = None,
+                        role: str = "cashier", force_pin_change: bool = False) -> int:
         row = self.db.execute("SELECT * FROM local_cashiers WHERE server_id = ?", (server_id,)).fetchone()
-        clear_credential = row and credential_version and row["credential_version"] and row["credential_version"] != credential_version
         if row:
-            credential_sql = ", cred_salt = NULL, cred_verifier = NULL, cred_iterations = NULL, cred_expires_at = NULL" if clear_credential else ""
             self.db.execute(
-                f"UPDATE local_cashiers SET code = ?, name = ?, active = 1, synced_at = ?, credential_version = ?{credential_sql} WHERE id = ?",
-                (code, name, now(), credential_version, row["id"]),
+                """UPDATE local_cashiers SET code = ?, name = ?, active = 1, role = ?,
+                last_synced_at = ?, synced_at = ?, server_credential_version = ?,
+                force_pin_change = ?, revoked_at = NULL WHERE id = ?""",
+                (code, name, role, now(), now(), credential_version, int(force_pin_change), row["id"]),
             )
             return int(row["id"])
         existing = self.db.execute("SELECT id FROM local_cashiers WHERE code = ?", (code,)).fetchone()
         if existing:
             self.db.execute(
-                "UPDATE local_cashiers SET server_id = ?, name = ?, active = 1, synced_at = ?, credential_version = ? WHERE id = ?",
-                (server_id, name, now(), credential_version, existing["id"]),
+                """UPDATE local_cashiers SET server_id = ?, name = ?, active = 1, role = ?,
+                last_synced_at = ?, synced_at = ?, server_credential_version = ?, force_pin_change = ?, revoked_at = NULL
+                WHERE id = ?""",
+                (server_id, name, role, now(), now(), credential_version, int(force_pin_change), existing["id"]),
             )
             return int(existing["id"])
         cur = self.db.execute(
-            "INSERT INTO local_cashiers (server_id, code, name, pin_hash, active, synced_at, credential_version) VALUES (?, ?, ?, '', 1, ?, ?)",
-            (server_id, code, name, now(), credential_version),
+            """INSERT INTO local_cashiers (server_id, code, name, pin_hash, active, role, synced_at, last_synced_at,
+            server_credential_version, force_pin_change) VALUES (?, ?, ?, '', 1, ?, ?, ?, ?, ?)""",
+            (server_id, code, name, role, now(), now(), credential_version, int(force_pin_change)),
         )
         return int(cur.lastrowid)
 
@@ -218,10 +226,13 @@ class ProvisioningService:
         if not credential:
             return
         self.db.execute(
-            """UPDATE local_cashiers SET cred_salt = ?, cred_verifier = ?, cred_iterations = ?, cred_expires_at = ?, credential_version = ?
+            """UPDATE local_cashiers SET cred_salt = ?, cred_verifier = ?, cred_iterations = ?, cred_expires_at = ?,
+            offline_valid_until = ?, credential_version = ?, server_credential_version = ?, force_pin_change = 0,
+            local_override_pin_hash = NULL, local_override_expires_at = NULL, local_override_set_by = NULL
             WHERE server_id = ?""",
             (credential.get("salt"), credential.get("verifier"),
              int(credential.get("iterations") or 0), credential.get("expires_at"),
+             credential.get("expires_at"), credential.get("credential_version"),
              credential.get("credential_version"), server_cashier_id),
         )
         self.db.commit()
@@ -255,6 +266,8 @@ class ProvisioningService:
                 str(cashier.get("code") or server_id),
                 str(cashier.get("name") or ""),
                 cashier.get("credential_version"),
+                str(cashier.get("role") or "cashier"),
+                bool(cashier.get("must_change_pin")),
             )
         credential = response.get("offline_credential")
         if credential:
@@ -295,6 +308,8 @@ class ProvisioningService:
                 str(cashier.get("code") or server_id),
                 str(cashier.get("name") or ""),
                 cashier.get("credential_version"),
+                str(cashier.get("role") or "cashier"),
+                bool(cashier.get("must_change_pin")),
             )
         credential = response.get("offline_credential")
         if credential:

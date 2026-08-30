@@ -59,6 +59,27 @@ def verify_offline_credential(pin: str, salt_b64: str, verifier_b64: str, iterat
     return hmac.compare_digest(actual, expected)
 
 
+def _is_expired(value: str | None) -> bool:
+    if not value:
+        return False
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")) <= datetime.now(timezone.utc)
+    except ValueError:
+        # A malformed expiry must never become an unlimited offline credential.
+        return True
+
+
+@dataclass(frozen=True)
+class OfflineLoginResult:
+    cashier: sqlite3.Row | None
+    reason: str | None = None
+    used_manager_override: bool = False
+
+    @property
+    def success(self) -> bool:
+        return self.cashier is not None
+
+
 @dataclass(frozen=True)
 class CartLine:
     product_id: int
@@ -76,20 +97,114 @@ class PosService:
         self.db = connection
 
     def login(self, cashier_code: str, pin: str) -> sqlite3.Row | None:
-        row = self.db.execute("SELECT * FROM local_cashiers WHERE code = ? AND active = 1", (cashier_code,)).fetchone()
+        """Compatibility wrapper for older callers; records the same offline audit event."""
+        return self.login_offline(cashier_code, pin).cashier
+
+    def login_offline(self, cashier_code: str, pin: str, *, terminal_code: str | None = None,
+                      branch_code: str | None = None) -> OfflineLoginResult:
+        """Authenticate solely with SQLite, never requiring the ERP to be reachable.
+
+        The last verified credential remains usable through offline_valid_until even
+        if the server has announced a newer credential version.  This deliberately
+        prevents a remote PIN reset from taking a disconnected checkout offline.
+        """
+        row = self.db.execute("SELECT * FROM local_cashiers WHERE code = ?", (cashier_code,)).fetchone()
+        terminal_code = terminal_code or self._setting("terminal_code")
+        branch_code = branch_code or self._setting("branch_code") or self._setting("branch_name")
+        result = OfflineLoginResult(None, "ไม่พบแคชเชียร์ในเครื่องนี้")
+        if not row:
+            self.record_auth_event(cashier_code, "offline_login", False, result.reason, terminal_code, branch_code)
+            return result
+        if not bool(row["active"]) or row["revoked_at"]:
+            result = OfflineLoginResult(None, "บัญชีแคชเชียร์ถูกปิดใช้งาน")
+        elif row["local_override_pin_hash"]:
+            if _is_expired(row["local_override_expires_at"]):
+                result = OfflineLoginResult(None, "PIN ชั่วคราวหมดอายุแล้ว กรุณาเชื่อมต่อ ERP")
+            elif hmac.compare_digest(str(row["local_override_pin_hash"]), pin_hash(pin)):
+                result = OfflineLoginResult(row, None, True)
+            else:
+                result = OfflineLoginResult(None, "PIN ไม่ถูกต้อง")
+        elif not (row["offline_valid_until"] or row["cred_expires_at"]):
+            result = OfflineLoginResult(None, "ยังไม่มีสิทธิ์ใช้งานออฟไลน์ กรุณาเชื่อมต่อ ERP เพื่อ sync แคชเชียร์")
+        elif _is_expired(row["offline_valid_until"] or row["cred_expires_at"]):
+            result = OfflineLoginResult(None, "Offline login expired, please reconnect to server")
+        elif row["cred_salt"] and row["cred_verifier"]:
+            verified = verify_offline_credential(pin, row["cred_salt"], row["cred_verifier"], row["cred_iterations"] or 0)
+            result = OfflineLoginResult(
+                row if verified else None,
+                None if verified else "PIN ไม่ถูกต้อง",
+            )
+        elif row["pin_hash"] and hmac.compare_digest(str(row["pin_hash"]), pin_hash(pin)):
+            result = OfflineLoginResult(row)
+        else:
+            result = OfflineLoginResult(None, "PIN ไม่ถูกต้อง")
+        self.record_auth_event(cashier_code, "offline_login", result.success, result.reason, terminal_code, branch_code)
+        return result
+
+    def record_auth_event(self, cashier_code: str, event_type: str, success: bool, reason: str | None,
+                          terminal_code: str | None = None, branch_code: str | None = None) -> str:
+        event_uuid = str(uuid.uuid4())
+        with self.db:
+            self.db.execute(
+                """INSERT INTO auth_events_outbox
+                (event_uuid, cashier_code, event_type, success, reason, terminal_code, branch_code, occurred_at, synced)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)""",
+                (event_uuid, cashier_code, event_type, int(success), reason, terminal_code, branch_code, now()),
+            )
+        return event_uuid
+
+    def manager_override_reset(self, *, manager_code: str, manager_pin: str, cashier_code: str,
+                               temporary_pin: str, terminal_code: str | None = None,
+                               branch_code: str | None = None, valid_minutes: int = 60) -> OfflineLoginResult:
+        """Create a short-lived local recovery PIN after an offline supervisor check."""
+        if not temporary_pin.isdigit() or not 4 <= len(temporary_pin) <= 20:
+            raise ValueError("PIN ชั่วคราวต้องเป็นตัวเลข 4-20 หลัก")
+        manager = self.login_offline(manager_code, manager_pin, terminal_code=terminal_code, branch_code=branch_code)
+        if not manager.success or str(manager.cashier["role"]).lower() not in {"manager", "supervisor"}:
+            self.record_auth_event(cashier_code, "manager_override_denied", False, "ผู้อนุมัติไม่มีสิทธิ์", terminal_code, branch_code)
+            return OfflineLoginResult(None, "ผู้จัดการหรือ PIN ไม่ถูกต้อง")
+        target = self.db.execute("SELECT * FROM local_cashiers WHERE code = ?", (cashier_code,)).fetchone()
+        if not target or not bool(target["active"]) or target["revoked_at"]:
+            self.record_auth_event(cashier_code, "manager_override_denied", False, "ไม่พบหรือปิดใช้งาน", terminal_code, branch_code)
+            return OfflineLoginResult(None, "ไม่พบแคชเชียร์ที่เปิดใช้งาน")
+        expires = datetime.now(timezone.utc).replace(microsecond=0)
+        from datetime import timedelta
+        expires = (expires + timedelta(minutes=max(1, min(valid_minutes, 240)))).isoformat()
+        with self.db:
+            self.db.execute(
+                """UPDATE local_cashiers SET local_override_pin_hash = ?, local_override_expires_at = ?,
+                local_override_set_by = ?, force_pin_change = 1 WHERE id = ?""",
+                (pin_hash(temporary_pin), expires, manager.cashier["code"], target["id"]),
+            )
+        self.record_auth_event(cashier_code, "manager_override_reset", True,
+                               f"approved_by:{manager.cashier['code']};expires:{expires}", terminal_code, branch_code)
+        return OfflineLoginResult(target)
+
+    def has_local_it_pin(self) -> bool:
+        return bool(self._setting("local_it_pin_hash"))
+
+    def set_local_it_pin(self, pin: str) -> None:
+        if not pin.isdigit() or not 6 <= len(pin) <= 20:
+            raise ValueError("Local IT PIN ต้องเป็นตัวเลข 6-20 หลัก")
+        with self.db:
+            self.db.execute(
+                """INSERT INTO device_settings (key, value, updated_at) VALUES (?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at""",
+                ("local_it_pin_hash", json.dumps(pin_hash(pin)), now()),
+            )
+
+    def verify_local_it_pin(self, pin: str) -> bool:
+        stored = self._setting("local_it_pin_hash")
+        return bool(stored) and hmac.compare_digest(stored, pin_hash(pin))
+
+    def _setting(self, key: str) -> str | None:
+        row = self.db.execute("SELECT value FROM device_settings WHERE key = ?", (key,)).fetchone()
         if not row:
             return None
-        if row["cred_salt"] and row["cred_verifier"]:
-            if row["cred_expires_at"]:
-                try:
-                    expires = datetime.fromisoformat(str(row["cred_expires_at"]).replace("Z", "+00:00"))
-                    if expires <= datetime.now(timezone.utc):
-                        return None
-                except ValueError:
-                    return None
-            return row if verify_offline_credential(pin, row["cred_salt"], row["cred_verifier"], row["cred_iterations"] or 0) else None
-
-        return row if row["pin_hash"] == pin_hash(pin) else None
+        try:
+            return str(json.loads(row["value"]))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return str(row["value"])
 
     def open_shift(self, branch_id: int, terminal_id: str, cashier_id: int, opening_cash: Decimal) -> int:
         existing = self.db.execute("SELECT id FROM shifts WHERE terminal_id = ? AND status = 'open'", (terminal_id,)).fetchone()

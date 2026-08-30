@@ -17,7 +17,12 @@ class PosServiceTest(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
         self.db = connect(Path(self.tmp.name) / "pos.db")
-        self.db.execute("INSERT INTO local_cashiers (id, code, name, pin_hash, synced_at) VALUES (1, 'POP001', 'Tester', ?, ?)", (pin_hash('1234'), now()))
+        valid_until = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+        self.db.execute(
+            """INSERT INTO local_cashiers (id, code, name, pin_hash, synced_at, last_synced_at, offline_valid_until)
+            VALUES (1, 'POP001', 'Tester', ?, ?, ?, ?)""",
+            (pin_hash('1234'), now(), now(), valid_until),
+        )
         self.db.execute("INSERT INTO products (id, sku, name, unit_name, updated_at) VALUES (1, 'P000001', 'หมูสด', 'กก.', ?)", (now(),))
         self.db.execute("INSERT INTO product_barcodes (barcode, product_id, barcode_type, price, synced_at) VALUES ('8850000000003', 1, 'CUSTOM', 25, ?)", (now(),))
         self.db.commit()
@@ -39,9 +44,9 @@ class PosServiceTest(unittest.TestCase):
         expires_at = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
         self.db.execute(
             """UPDATE local_cashiers
-            SET pin_hash = '', cred_salt = ?, cred_verifier = ?, cred_iterations = 120000, cred_expires_at = ?
+            SET pin_hash = '', cred_salt = ?, cred_verifier = ?, cred_iterations = 120000, cred_expires_at = ?, offline_valid_until = ?
             WHERE code = 'POP001'""",
-            (base64.b64encode(salt).decode(), base64.b64encode(verifier).decode(), expires_at),
+            (base64.b64encode(salt).decode(), base64.b64encode(verifier).decode(), expires_at, expires_at),
         )
         self.db.commit()
 
@@ -49,7 +54,7 @@ class PosServiceTest(unittest.TestCase):
         self.assertIsNone(self.service.login("POP001", "1234"))
 
         expired = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
-        self.db.execute("UPDATE local_cashiers SET cred_expires_at = ? WHERE code = 'POP001'", (expired,))
+        self.db.execute("UPDATE local_cashiers SET cred_expires_at = ?, offline_valid_until = ? WHERE code = 'POP001'", (expired, expired))
         self.db.commit()
         self.assertIsNone(self.service.login("POP001", "860531"))
 

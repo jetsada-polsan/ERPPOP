@@ -5,7 +5,7 @@ import json
 import argparse
 import os
 import traceback
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -54,8 +54,10 @@ def seed(db) -> None:
     """
     timestamp = now()
     db.execute(
-        "INSERT OR IGNORE INTO local_cashiers (id, code, name, pin_hash, synced_at) VALUES (1, 'POP001', 'แคชเชียร์ทดสอบ', ?, ?)",
-        (pin_hash("1234"), timestamp),
+        """INSERT OR IGNORE INTO local_cashiers
+        (id, code, name, pin_hash, synced_at, last_synced_at, offline_valid_until)
+        VALUES (1, 'POP001', 'แคชเชียร์ทดสอบ', ?, ?, ?, ?)""",
+        (pin_hash("1234"), timestamp, timestamp, (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()),
     )
 
     # รูปแบบป้ายเครื่องชั่ง — ของจริงมาจาก ERP ตอน sync ค่านี้ให้เครื่องใหม่ยิงป้ายได้เลย

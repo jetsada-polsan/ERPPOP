@@ -6,11 +6,13 @@ services.py ซึ่งมีเทสต์ครอบอยู่ เพร�
 from __future__ import annotations
 
 import json
+import sqlite3
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from string import Template
 
 from .barcode import decode_scale_label, load_scale_profiles, scale_cart_line
-from .api_client import LaravelPosClient
+from .api_client import LaravelApiError, LaravelPosClient
 from .mock_printer import company_details, receipt_for
 from .order import ALL_CATEGORIES, DISCOUNT, PRICE, QTY, Order, OrderLine, categories, product_grid
 from .config import DeviceConfig, load_device_config, save_device_config
@@ -208,20 +210,51 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             self.pin = QLineEdit()
             self.pin.setEchoMode(QLineEdit.Password)
             self.pin.returnPressed.connect(self.login)
+            self.connection_status = QLabel(self._offline_notice())
+            self.connection_status.setWordWrap(True)
             submit = QPushButton("เข้าสู่ระบบ")
             submit.clicked.connect(self.login)
+            maintenance = QPushButton("IT Maintenance")
+            maintenance.clicked.connect(self.open_maintenance)
+            override = QPushButton("ผู้จัดการช่วยกู้ PIN")
+            override.clicked.connect(self.manager_override)
             form.addRow("รหัสแคชเชียร์ / username", self.code)
             form.addRow("PIN", self.pin)
+            form.addRow(self.connection_status)
             form.addRow(submit)
+            form.addRow(maintenance)
+            form.addRow(override)
 
         def open_settings(self) -> None:
             dialog = SettingsDialog(self, None)
             dialog.exec()
 
+        def _offline_notice(self) -> str:
+            last = service.db.execute(
+                "SELECT max(last_synced_at) FROM local_cashiers WHERE last_synced_at IS NOT NULL"
+            ).fetchone()[0]
+            if online is not None and online.online:
+                return f"เชื่อมต่อ ERP แล้ว · ข้อมูลแคชเชียร์ sync ล่าสุด {last or 'กำลัง sync'}"
+            return (
+                f"Offline Mode · Cashier data last synced at {last or 'ยังไม่มีข้อมูล'}\n"
+                "PIN ใหม่จะใช้ได้หลัง POS sync · Offline login expired, please reconnect to server"
+            )
+
+        def _offline_login(self) -> bool:
+            result = service.login_offline(self.code.text().strip(), self.pin.text())
+            if not result.success:
+                QMessageBox.warning(self, "เข้าสู่ระบบออฟไลน์ไม่สำเร็จ", result.reason or "ไม่พบผู้ใช้หรือ PIN ไม่ถูกต้อง")
+                return False
+            self.cashier = result.cashier
+            return True
+
         def _online_login(self) -> bool:
             pin = self.pin.text().strip()
             code = self.code.text().strip()
             try:
+                # ดึงสถานะแคชเชียร์ล่าสุดก่อนยืนยันเสมอ แต่ห้ามลบ verifier เก่า
+                # เพราะถ้าเน็ตหลุดกลางทางยังต้อง fallback ไป SQLite ได้ทันที.
+                online.provisioning.pull_cashiers(online.branch_id)
                 result = online.provisioning.online_cashier_login(pin, cashier_code=code)
                 if result.get("selection_required"):
                     # PIN กลางตรงหลายคน — เลือกด้วยรหัสแคชเชียร์ที่กรอก
@@ -237,11 +270,19 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
                     if not result:
                         return False
             except Exception as error:
+                if isinstance(error, LaravelApiError) and "network:" in str(error):
+                    online.online = False
+                    self.connection_status.setText(self._offline_notice())
+                    return self._offline_login()
+                service.record_auth_event(code, "online_login", False, str(error)[:500])
                 QMessageBox.critical(self, "เข้าสู่ระบบไม่สำเร็จ", str(error))
                 return False
             self.cashier = service.db.execute(
                 "SELECT * FROM local_cashiers WHERE id = ?", (result["local_cashier_id"],)
             ).fetchone()
+            service.record_auth_event(code, "online_login", self.cashier is not None,
+                                      None if self.cashier is not None else "ไม่พบข้อมูลใน SQLite")
+            online.worker.wake()
             return self.cashier is not None
 
         def _force_pin_change(self, result: dict, current_pin: str) -> dict | None:
@@ -284,11 +325,58 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
                 if self._online_login():
                     self.accept()
                 return
-            self.cashier = service.login(self.code.text().strip(), self.pin.text())
-            if not self.cashier:
-                QMessageBox.warning(self, "เข้าสู่ระบบไม่สำเร็จ", "ไม่พบผู้ใช้หรือ PIN ไม่ถูกต้อง")
+            if self._offline_login():
+                self.accept()
+
+        def open_maintenance(self) -> None:
+            if not service.has_local_it_pin():
+                if online is None or not online.online or AdminAuthDialog(self).exec() != QDialog.Accepted:
+                    QMessageBox.warning(self, "ต้องตั้ง Local IT PIN", "เชื่อม ERP และยืนยันผู้ดูแลเพื่อตั้ง Local IT PIN ครั้งแรก")
+                    return
+                pin, ok = self._ask_pin("ตั้ง Local IT PIN", "PIN สำหรับ IT เครื่องนี้ (6-20 หลัก)")
+                if not ok:
+                    return
+                try:
+                    service.set_local_it_pin(pin)
+                except ValueError as error:
+                    QMessageBox.warning(self, "PIN ไม่ถูกต้อง", str(error))
+                    return
+            pin, ok = self._ask_pin("IT Maintenance", "กรอก Local IT PIN")
+            if ok and service.verify_local_it_pin(pin):
+                SettingsDialog(self, None).exec()
+            elif ok:
+                QMessageBox.warning(self, "ยืนยันไม่สำเร็จ", "Local IT PIN ไม่ถูกต้อง")
+
+        def manager_override(self) -> None:
+            dialog = QDialog(self)
+            dialog.setWindowTitle("ผู้จัดการช่วยกู้ PIN")
+            form = QFormLayout(dialog)
+            manager_code, manager_pin, cashier_code, temporary_pin = QLineEdit(), QLineEdit(), QLineEdit(), QLineEdit()
+            manager_pin.setEchoMode(QLineEdit.Password)
+            temporary_pin.setEchoMode(QLineEdit.Password)
+            temporary_pin.setPlaceholderText("PIN ชั่วคราว 4-20 หลัก · ใช้ได้สูงสุด 4 ชั่วโมง")
+            form.addRow("รหัสผู้จัดการ", manager_code)
+            form.addRow("PIN ผู้จัดการ", manager_pin)
+            form.addRow("รหัสแคชเชียร์", cashier_code)
+            form.addRow("PIN ชั่วคราว", temporary_pin)
+            buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            buttons.accepted.connect(dialog.accept)
+            buttons.rejected.connect(dialog.reject)
+            form.addRow(buttons)
+            if dialog.exec() != QDialog.Accepted:
                 return
-            self.accept()
+            result = service.manager_override_reset(
+                manager_code=manager_code.text().strip(), manager_pin=manager_pin.text(),
+                cashier_code=cashier_code.text().strip(), temporary_pin=temporary_pin.text(),
+            )
+            if not result.success:
+                QMessageBox.warning(self, "กู้ PIN ไม่สำเร็จ", result.reason or "ไม่สามารถทำรายการได้")
+                return
+            QMessageBox.information(self, "ออก PIN ชั่วคราวแล้ว", "ให้แคชเชียร์เข้า POS ด้วย PIN นี้ก่อนหมดอายุ\nรายการจะถูกส่งเป็น audit เมื่อเชื่อม ERP")
+
+        def _ask_pin(self, title: str, label: str) -> tuple[str, bool]:
+            from PySide6.QtWidgets import QInputDialog
+            return QInputDialog.getText(self, title, label, QLineEdit.Password)
 
     class PaymentDialog(QDialog):
         """หน้าชำระเงิน — เงินทอนคำนวณสด ๆ ระหว่างพิมพ์ ไม่ต้องคิดในหัว"""
@@ -568,6 +656,16 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             status.addRow("อัตรา VAT ที่ใช้อยู่", QLabel(f"{service.vat_rate():g}%"))
             outer.addLayout(status)
 
+            actions = QHBoxLayout()
+            test_sync = QPushButton("ทดสอบการเชื่อมต่อและ sync แคชเชียร์")
+            test_sync.setObjectName("primary")
+            test_sync.clicked.connect(self.test_connection_and_sync)
+            show_logs = QPushButton("ดูบันทึกการเชื่อมต่อ")
+            show_logs.clicked.connect(self.show_sync_logs)
+            actions.addWidget(test_sync)
+            actions.addWidget(show_logs)
+            outer.addLayout(actions)
+
             # ผูกเครื่องกับ ERP — บันทึก server URL + device token ลง pos-config.json
             if data_dir is not None:
                 outer.addWidget(QLabel("\nผูกเครื่องกับ ERP (บันทึกแล้วเปิดโปรแกรมใหม่เพื่อเชื่อม)"))
@@ -594,6 +692,29 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
 
             return box
 
+        def test_connection_and_sync(self) -> None:
+            if online is None:
+                QMessageBox.warning(self, "ยังไม่ผูก ERP", "บันทึก URL และ Device token ก่อนทดสอบการเชื่อมต่อ")
+                return
+            try:
+                profile = online.provisioning.ping()
+                branch_id = int(profile.get("branch_id") or online.branch_id or 0)
+                result = online.provisioning.pull_cashiers(branch_id)
+                online.online = True
+                online.worker.wake()
+                QMessageBox.information(self, "เชื่อมต่อสำเร็จ", f"sync แคชเชียร์ {result['upserted']} คนแล้ว")
+            except Exception as error:
+                online.online = False
+                QMessageBox.warning(self, "เชื่อมต่อไม่สำเร็จ", str(error))
+
+        def show_sync_logs(self) -> None:
+            rows = service.db.execute(
+                "SELECT direction, status, message, created_at FROM sync_logs ORDER BY id DESC LIMIT 20"
+            ).fetchall()
+            auth_pending = service.db.execute("SELECT count(*) FROM auth_events_outbox WHERE synced = 0").fetchone()[0]
+            text = "\n".join(f"{row['created_at']} · {row['direction']} · {row['status']} · {row['message'] or '-'}" for row in rows)
+            QMessageBox.information(self, "บันทึกการเชื่อมต่อ", f"Audit login รอส่ง: {auth_pending}\n\n{text or 'ยังไม่มีบันทึก'}")
+
         def save_pairing(self) -> None:
             url = self.server_url.text().strip()
             token = self.device_token.text().strip()
@@ -612,9 +733,28 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
         def backup_section(self) -> QWidget:
             box = QWidget()
             layout = QVBoxLayout(box)
-            layout.addWidget(QLabel("สำรองด้วย VACUUM INTO ได้ไฟล์เดียวที่กู้คืนได้จริง"))
-            layout.addWidget(QLabel("กู้คืนจะล้างไฟล์ -wal ที่ค้างอยู่ก่อนเสมอ"))
+            layout.addWidget(QLabel("สำรอง SQLite เป็นไฟล์เดียวที่กู้คืนได้จริง โดยไม่แตะยอดขายหรือคิวที่ค้าง"))
+            backup = QPushButton("สำรองฐานข้อมูลเครื่องนี้")
+            backup.setObjectName("primary")
+            backup.clicked.connect(self.backup_database)
+            layout.addWidget(backup)
             return box
+
+        def backup_database(self) -> None:
+            if data_dir is None:
+                QMessageBox.warning(self, "สำรองไม่ได้", "ไม่พบโฟลเดอร์ข้อมูล POS")
+                return
+            backup_dir = data_dir / "backups"
+            backup_dir.mkdir(parents=True, exist_ok=True)
+            path = backup_dir / f"pos-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.sqlite"
+            try:
+                target = sqlite3.connect(path)
+                service.db.backup(target)
+                target.close()
+            except Exception as error:
+                QMessageBox.warning(self, "สำรองไม่สำเร็จ", str(error))
+                return
+            QMessageBox.information(self, "สำรองแล้ว", f"บันทึกฐานข้อมูลไว้ที่\n{path}")
 
         def queue_section(self) -> QWidget:
             box = QWidget()
