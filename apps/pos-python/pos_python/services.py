@@ -7,8 +7,9 @@ import json
 import sqlite3
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timezone
 from decimal import Decimal, ROUND_HALF_UP
+from zoneinfo import ZoneInfo
 
 
 def now() -> str:
@@ -92,9 +93,65 @@ class CartLine:
     price_version: str | None = None
 
 
+@dataclass(frozen=True)
+class DailySalesSummary:
+    report_date: date
+    transaction_count: int
+    void_count: int
+    subtotal: Decimal
+    discount_total: Decimal
+    vat_total: Decimal
+    grand_total: Decimal
+    payments: tuple[tuple[str, Decimal], ...]
+    pending_sync_count: int
+
+
 class PosService:
     def __init__(self, connection: sqlite3.Connection):
         self.db = connection
+
+    def daily_sales_summary(self, report_date: date | None = None) -> DailySalesSummary:
+        """Return a terminal-local daily summary without contacting ERP.
+
+        Sales timestamps are stored in UTC.  Reports are grouped by Thailand's
+        business day so a sale shortly after midnight does not land in yesterday.
+        """
+        business_tz = ZoneInfo("Asia/Bangkok")
+        report_date = report_date or datetime.now(business_tz).date()
+        start = datetime.combine(report_date, time.min, tzinfo=business_tz).astimezone(timezone.utc).isoformat()
+        end = datetime.combine(report_date, time.max, tzinfo=business_tz).astimezone(timezone.utc).isoformat()
+        sales = self.db.execute(
+            """SELECT id, subtotal, discount_total, vat_total, grand_total, is_void
+               FROM sales WHERE sale_datetime >= ? AND sale_datetime <= ?""",
+            (start, end),
+        ).fetchall()
+        valid_sales = [row for row in sales if not bool(row["is_void"])]
+        payments = self.db.execute(
+            """SELECT p.method, p.amount, coalesce(p.change_amount, '0') AS change_amount
+               FROM payments p JOIN sales s ON s.id = p.sale_id
+               WHERE s.is_void = 0 AND s.sale_datetime >= ? AND s.sale_datetime <= ?""",
+            (start, end),
+        ).fetchall()
+        pending = self.db.execute(
+            """SELECT count(*) FROM sales
+               WHERE sync_status != 'synced' AND sale_datetime >= ? AND sale_datetime <= ?""",
+            (start, end),
+        ).fetchone()[0]
+        by_method: dict[str, Decimal] = {}
+        for payment in payments:
+            method = str(payment["method"])
+            by_method[method] = money(by_method.get(method, Decimal("0")) + Decimal(str(payment["amount"])) - Decimal(str(payment["change_amount"])))
+        return DailySalesSummary(
+            report_date=report_date,
+            transaction_count=len(sales),
+            void_count=len(sales) - len(valid_sales),
+            subtotal=money(sum((Decimal(str(row["subtotal"])) for row in valid_sales), Decimal("0"))),
+            discount_total=money(sum((Decimal(str(row["discount_total"])) for row in valid_sales), Decimal("0"))),
+            vat_total=money(sum((Decimal(str(row["vat_total"])) for row in valid_sales), Decimal("0"))),
+            grand_total=money(sum((Decimal(str(row["grand_total"])) for row in valid_sales), Decimal("0"))),
+            payments=tuple(sorted(by_method.items())),
+            pending_sync_count=int(pending),
+        )
 
     def login(self, cashier_code: str, pin: str) -> sqlite3.Row | None:
         """Compatibility wrapper for older callers; records the same offline audit event."""

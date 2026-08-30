@@ -148,6 +148,9 @@ QLineEdit:focus, QComboBox:focus { border-color: $primary; }
 
 #orderPanel { background: $surface; border-right: 1px solid $border; }
 #orderHead { background: $primary_dark; color: $surface; padding: 12px 16px; font-weight: 700; }
+#orderHead QLabel { background: transparent; color: $surface; font-weight: 700; }
+QPushButton#headerAction { background: transparent; color: $surface; border-color: rgba(255,255,255,0.45); padding: 5px 10px; }
+QPushButton#headerAction:hover { background: rgba(255,255,255,0.12); border-color: $surface; }
 #totalBox { background: $text; color: $surface; padding: 14px 16px; }
 #totalBox QLabel { background: transparent; }
 #grandTotal { font-size: 30px; font-weight: 900; color: $surface; }
@@ -863,8 +866,17 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             layout.setContentsMargins(0, 0, 0, 0)
             layout.setSpacing(0)
 
-            head = QLabel(f"บิลปัจจุบัน · {self.cashier['name']}")
+            head = QWidget()
             head.setObjectName("orderHead")
+            head_layout = QHBoxLayout(head)
+            head_layout.setContentsMargins(0, 0, 0, 0)
+            head_layout.setSpacing(8)
+            head_layout.addWidget(QLabel(f"บิลปัจจุบัน · {self.cashier['name']}"), 1)
+            report = QPushButton("ยอดวันนี้")
+            report.setObjectName("headerAction")
+            report.setToolTip("ดูยอดขายของเครื่องนี้จาก SQLite")
+            report.clicked.connect(self.show_daily_sales)
+            head_layout.addWidget(report)
             layout.addWidget(head)
 
             self.table = QTableWidget(0, 4)
@@ -1138,6 +1150,69 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             body = QLabel(receipt_for(service.db, self.last_sale_id))
             body.setStyleSheet("background:%s;padding:16px;font-family:'Menlo','Courier New';font-size:12px;" % PALETTE["surface"])
             layout.addWidget(body)
+            close = QDialogButtonBox(QDialogButtonBox.Close)
+            close.rejected.connect(dialog.reject)
+            layout.addWidget(close)
+            dialog.exec()
+
+        def show_daily_sales(self) -> None:
+            """Show the local terminal's sales without requiring a web server."""
+            summary = service.daily_sales_summary()
+            dialog = QDialog(self)
+            dialog.setWindowTitle("ยอดขายวันนี้ · เครื่องนี้")
+            dialog.setMinimumWidth(620)
+            layout = QVBoxLayout(dialog)
+
+            title = QLabel(f"สรุปยอดวันที่ {summary.report_date.strftime('%d/%m/%Y')} · ข้อมูลจาก SQLite เครื่องนี้")
+            title.setObjectName("cardTitle")
+            layout.addWidget(title)
+            status = QLabel(
+                f"{summary.transaction_count} บิล · ยกเลิก {summary.void_count} บิล · "
+                f"รอ sync {summary.pending_sync_count} บิล"
+            )
+            status.setObjectName("cardHint")
+            layout.addWidget(status)
+
+            totals = QTableWidget(4, 2)
+            totals.setHorizontalHeaderLabels(["รายการ", "ยอด (บาท)"])
+            totals.verticalHeader().setVisible(False)
+            totals.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            for row, values in enumerate([
+                ("ยอดขายก่อนส่วนลด", f"{summary.subtotal:,.2f}"),
+                ("ส่วนลด", f"-{summary.discount_total:,.2f}"),
+                ("VAT", f"{summary.vat_total:,.2f}"),
+                ("ยอดขายสุทธิ", f"{summary.grand_total:,.2f}"),
+            ]):
+                totals.setItem(row, 0, QTableWidgetItem(values[0]))
+                item = QTableWidgetItem(values[1])
+                item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                totals.setItem(row, 1, item)
+            totals.setFixedHeight(190)
+            layout.addWidget(totals)
+
+            payment_text = ", ".join(f"{method}: {amount:,.2f}" for method, amount in summary.payments) or "ยังไม่มีรายการรับชำระ"
+            payments = QLabel(f"รับชำระตามประเภท: {payment_text}")
+            payments.setWordWrap(True)
+            layout.addWidget(payments)
+
+            rows = service.db.execute(
+                """SELECT document_no, sale_datetime, grand_total, sync_status
+                   FROM sales WHERE is_void = 0 AND date(sale_datetime, '+7 hours') = ?
+                   ORDER BY sale_datetime DESC LIMIT 10""",
+                (summary.report_date.isoformat(),),
+            ).fetchall()
+            recent = QTableWidget(len(rows), 4)
+            recent.setHorizontalHeaderLabels(["บิลล่าสุด", "เวลา", "ยอด", "Sync"])
+            recent.verticalHeader().setVisible(False)
+            recent.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            for row_number, sale in enumerate(rows):
+                for column, value in enumerate([
+                    sale["document_no"], str(sale["sale_datetime"])[11:16],
+                    f"{Decimal(str(sale['grand_total'])):,.2f}", sale["sync_status"],
+                ]):
+                    recent.setItem(row_number, column, QTableWidgetItem(str(value)))
+            layout.addWidget(recent)
+
             close = QDialogButtonBox(QDialogButtonBox.Close)
             close.rejected.connect(dialog.reject)
             layout.addWidget(close)

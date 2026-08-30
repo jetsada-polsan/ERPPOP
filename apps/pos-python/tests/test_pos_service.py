@@ -67,6 +67,29 @@ class PosServiceTest(unittest.TestCase):
         self.assertEqual(self.db.execute("SELECT count(*) FROM sale_items").fetchone()[0], 1)
         self.assertEqual(self.service.pending_sync_count(), 1)
 
+    def test_daily_sales_summary_reads_local_sqlite_and_excludes_voids(self) -> None:
+        cash_sale = self.service.checkout(
+            document_no="T-DAILY-CASH", branch_id=1, terminal_id="TEST-01", shift_id=self.shift_id,
+            cashier_id=1, lines=[CartLine(1, Decimal("1"), Decimal("25"))],
+            payment_method="cash", paid_amount=Decimal("25"), sale_uuid="daily-cash",
+        )
+        void_sale = self.service.checkout(
+            document_no="T-DAILY-VOID", branch_id=1, terminal_id="TEST-01", shift_id=self.shift_id,
+            cashier_id=1, lines=[CartLine(1, Decimal("2"), Decimal("25"))],
+            payment_method="transfer", paid_amount=Decimal("50"), sale_uuid="daily-void",
+        )
+        self.service.void_sale(void_sale, cashier_id=1, reason="ทดสอบยกเลิก")
+        self.db.execute("UPDATE sales SET sync_status = 'synced' WHERE id = ?", (cash_sale,))
+        self.db.commit()
+
+        summary = self.service.daily_sales_summary()
+
+        self.assertEqual(summary.transaction_count, 2)
+        self.assertEqual(summary.void_count, 1)
+        self.assertEqual(summary.grand_total, Decimal("25.00"))
+        self.assertEqual(summary.payments, (("cash", Decimal("25.00")),))
+        self.assertEqual(summary.pending_sync_count, 1)
+
     def test_underpayment_rolls_back_everything(self) -> None:
         with self.assertRaisesRegex(ValueError, "ยอดชำระไม่พอ"):
             self.service.checkout(document_no="T-UNDER", branch_id=1, terminal_id="TEST-01", shift_id=self.shift_id, cashier_id=1, lines=[CartLine(1, Decimal("1"), Decimal("25"))], payment_method="cash", paid_amount=Decimal("20"))
