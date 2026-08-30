@@ -88,12 +88,26 @@ class PosWebModeTest extends TestCase
         $this->assertDatabaseCount('pos_receipts', 0);
     }
 
+    public function test_preview_mode_shows_the_built_layout_on_the_main_pos_url(): void
+    {
+        AppSetting::set('pos_web_mode', 'preview');
+
+        $this->actingAs($this->cashier())->get('/pos')
+            ->assertOk()
+            ->assertViewIs('pos.preview')
+            ->assertSee('Preview mode');
+
+        $this->assertDatabaseCount('pos_receipts', 0);
+    }
+
     public function test_the_command_toggles_the_flag_both_ways(): void
     {
         $this->artisan('pos:web-mode redirect')->assertSuccessful();
         $this->assertSame('redirect', AppSetting::get('pos_web_mode'));
         $this->artisan('pos:web-mode sell')->assertSuccessful();
         $this->assertSame('sell', AppSetting::get('pos_web_mode'));
+        $this->artisan('pos:web-mode preview')->assertSuccessful();
+        $this->assertSame('preview', AppSetting::get('pos_web_mode'));
         $this->artisan('pos:web-mode nonsense')->assertFailed();
     }
 }

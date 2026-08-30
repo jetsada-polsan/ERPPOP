@@ -62,10 +62,15 @@ class PosController extends Controller
 
     public function index(MemberPointService $points): View
     {
+        $webMode = AppSetting::get('pos_web_mode', 'sell');
+        if ($webMode === 'preview') {
+            return $this->preview();
+        }
+
         // ขั้น cutover: ย้ายการขายไปแอปเดสก์ท็อป PopCentral POS แล้ว ปิดหน้าขายเว็บด้วย
         // flag ได้ ดีฟอลต์ 'sell' = ขายได้ตามเดิม (ยังไม่เปลี่ยนอะไร) ตั้ง 'redirect'
         // เมื่อพร้อม เพื่อให้ /pos เหลือหน้าสถานะ + ลิงก์ดาวน์โหลดแอป
-        if (AppSetting::get('pos_web_mode', 'sell') === 'redirect') {
+        if ($webMode === 'redirect') {
             return view('pos.retired');
         }
 
