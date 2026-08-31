@@ -5,10 +5,12 @@ namespace Tests\Feature;
 use App\Http\Controllers\Api\PosApiController;
 use App\Http\Controllers\PosController;
 use App\Models\AppSetting;
+use App\Models\BankAccount;
 use App\Models\Branch;
 use App\Models\PosDevice;
 use App\Models\PosShift;
 use App\Models\PosTerminal;
+use App\Models\QrPaymentConfig;
 use App\Models\Salesman;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -35,6 +37,30 @@ class PosTransactionSafetyTest extends TestCase
         $this->assertSame(58, $data['receipt_template']['paper_width']);
         $this->assertSame('สาขาทดสอบ', $data['receipt_template']['blocks'][0]['text']);
         $this->assertContains('items', array_column($data['receipt_template']['blocks'], 'type'));
+    }
+
+    public function test_desktop_ping_includes_the_active_branch_qr_account(): void
+    {
+        [$device] = $this->device('QR');
+        $branch = Branch::create(['code' => 'QR01', 'name_th' => 'สาขา QR', 'is_active' => true]);
+        $device->update(['branch_id' => $branch->id]);
+        $bank = BankAccount::create([
+            'branch_id' => $branch->id, 'bank_name' => 'ธนาคารทดสอบ',
+            'account_no' => '1234567890', 'account_name' => 'บริษัททดสอบ',
+        ]);
+        QrPaymentConfig::create([
+            'code' => 'QR-BRANCH', 'name' => 'พร้อมเพย์สาขา', 'qr_type' => 'dynamic',
+            'bank_account_id' => $bank->id, 'merchant_ref' => '0812345678', 'is_active' => true,
+        ]);
+        $request = Request::create('/api/pos/ping', 'GET');
+        $request->attributes->set('pos_device', $device);
+        $request->setUserResolver(fn () => $device->user);
+
+        $data = app(PosApiController::class)->ping($request)->getData(true);
+
+        $this->assertSame('QR-BRANCH', $data['qr_payment']['code']);
+        $this->assertSame('0812345678', $data['qr_payment']['merchant_ref']);
+        $this->assertSame('ธนาคารทดสอบ', $data['qr_payment']['bank_name']);
     }
 
     public function test_desktop_checkout_replays_one_completed_result_for_the_same_key(): void

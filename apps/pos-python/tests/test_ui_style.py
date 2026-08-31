@@ -98,6 +98,17 @@ class UiStyleTest(unittest.TestCase):
         self.assertIn("has_local_it_pin", settings)
         self.assertIn("AdminAuthDialog", settings)
 
+    def test_cashier_can_pick_a_synced_name_and_tap_a_pin(self) -> None:
+        source = inspect.getsource(run_ui)
+        self.assertIn('self.cashier_select.addItem(f"{cashier[\'name\']}  ·  {cashier[\'code\']}"', source)
+        self.assertIn('for index, key in enumerate(["1", "2", "3"', source)
+
+    def test_transfer_requires_visible_money_received_confirmation(self) -> None:
+        source = inspect.getsource(run_ui)
+        self.assertIn("โอน / QR", source)
+        self.assertIn("ตรวจสอบแล้วว่าเงินเข้าบัญชีครบตามยอด", source)
+        self.assertIn("not self.transfer_confirmed.isChecked()", source)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -31,6 +31,7 @@ _PING_SETTINGS = {
     "terminal_code": ("device", "terminal_code"),
     "vat_rate": ("vat_rate",),
     "cashier_login_mode": ("cashier_login_mode",),
+    "qr_payment": ("qr_payment",),
     "company": ("company",),
     "receipt_template": ("receipt_template",),
     "hardware_profile": ("hardware_profile",),

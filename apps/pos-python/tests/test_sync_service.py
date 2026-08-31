@@ -62,6 +62,22 @@ class SyncServiceTest(unittest.TestCase):
         self.assertEqual(row["status"], "failed")
         self.assertIn("เปิดกะออนไลน์", row["last_error"])
 
+    def test_confirmed_qr_transfer_syncs_as_confirmed(self) -> None:
+        sale_uuid = "sale-qr-confirmed"
+        self.pos.checkout(
+            document_no="PY-QR-0001", branch_id=1, terminal_id="HQ-01", shift_id=self.shift_id,
+            cashier_id=77, lines=[CartLine(1, Decimal("1"), Decimal("125.50"))],
+            payment_method="transfer", paid_amount=Decimal("125.50"), sale_uuid=sale_uuid,
+            payment_reference="QR-HQ", qr_payload="PROMPTPAY", payment_confirmed=True,
+        )
+        self.pos.bind_server_shift(self.shift_id, 500)
+        api = FakeApi()
+        SyncService(self.db, api).sync_sale(sale_uuid)
+        payload = api.calls[0][1]
+        self.assertEqual(payload["method"], "transfer")
+        self.assertTrue(payload["payment_confirmed"])
+        self.assertEqual(payload["payment_ref"], "QR-HQ")
+
     def test_retries_failed_queue_without_creating_new_local_sale(self) -> None:
         sale_uuid = self.sale()
         self.pos.bind_server_shift(self.shift_id, 500)

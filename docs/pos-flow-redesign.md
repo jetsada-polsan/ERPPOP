@@ -45,6 +45,10 @@ can inspect products, the empty cart and local daily reports without a cashier
 session. Cashier authentication is deferred until `Start selling` or payment; only
 then does the POS open a shift and permit a receipt to be committed. Device/API
 settings remain protected by a Local IT PIN, bootstrapped once with an ERP admin.
+The cashier picker is populated from the branch-scoped SQLite cache, so the normal
+operator selects their name and enters only a PIN. Dynamic PromptPay configuration
+is downloaded with `ping`; transfer checkout snapshots the amount-bound payload and
+requires an explicit money-received confirmation before a receipt can be committed.
 
 Offline rules:
 

@@ -16,6 +16,7 @@ from .api_client import LaravelApiError, LaravelPosClient
 from .mock_printer import company_details, receipt_for
 from .order import ALL_CATEGORIES, DISCOUNT, PRICE, QTY, Order, OrderLine, categories, product_grid
 from .config import DeviceConfig, load_device_config, save_device_config
+from .promptpay import promptpay_payload, qr_matrix
 from .services import PosService, money
 
 PALETTE = {
@@ -193,14 +194,31 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
     layout_config = _cached_layout(service.db)
     try:
         from PySide6.QtCore import QSize, Qt
-        from PySide6.QtGui import QKeySequence, QShortcut
+        from PySide6.QtGui import QColor, QImage, QKeySequence, QPainter, QPixmap, QShortcut
         from PySide6.QtWidgets import (
-            QApplication, QButtonGroup, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGridLayout,
+            QApplication, QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGridLayout,
             QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton,
             QScrollArea, QTableWidget, QTableWidgetItem, QToolButton, QVBoxLayout, QWidget,
         )
     except ImportError as error:
         raise RuntimeError("ยังไม่ได้ติดตั้ง PySide6: python3 -m pip install -r requirements.txt") from error
+
+    def _qr_pixmap(payload: str, size: int) -> QPixmap:
+        matrix = qr_matrix(payload, border=3)
+        modules = len(matrix)
+        scale = max(1, size // modules)
+        actual = modules * scale
+        image = QImage(actual, actual, QImage.Format_RGB32)
+        image.fill(QColor("white"))
+        painter = QPainter(image)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor("black"))
+        for row, values in enumerate(matrix):
+            for column, filled in enumerate(values):
+                if filled:
+                    painter.drawRect(column * scale, row * scale, scale, scale)
+        painter.end()
+        return QPixmap.fromImage(image)
 
     class LoginDialog(QDialog):
         def __init__(self):
@@ -215,8 +233,18 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             hint.setWordWrap(True)
             self.code = QLineEdit()
             self.code.setPlaceholderText("รหัสแคชเชียร์ หรือ username ERP")
+            self.cashier_select = QComboBox()
+            self.cashier_select.addItem("เลือกชื่อคนขาย", None)
+            cashiers = service.db.execute(
+                """SELECT code, name FROM local_cashiers
+                   WHERE active = 1 AND revoked_at IS NULL ORDER BY name, code"""
+            ).fetchall()
+            for cashier in cashiers:
+                self.cashier_select.addItem(f"{cashier['name']}  ·  {cashier['code']}", cashier["code"])
+            self.cashier_select.currentIndexChanged.connect(lambda _: self._select_cashier())
             self.pin = QLineEdit()
             self.pin.setEchoMode(QLineEdit.Password)
+            self.pin.setPlaceholderText("แตะ PIN")
             self.pin.returnPressed.connect(self.login)
             self.connection_status = QLabel(self._offline_notice())
             self.connection_status.setWordWrap(True)
@@ -228,12 +256,38 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             override = QPushButton("ผู้จัดการช่วยกู้ PIN")
             override.clicked.connect(self.manager_override)
             form.addRow(hint)
-            form.addRow("รหัสแคชเชียร์ / username", self.code)
+            if cashiers:
+                form.addRow("คนขาย", self.cashier_select)
+            else:
+                form.addRow("รหัสแคชเชียร์", self.code)
             form.addRow("PIN", self.pin)
+            pin_pad = QWidget()
+            pin_grid = QGridLayout(pin_pad)
+            pin_grid.setContentsMargins(0, 0, 0, 0)
+            for index, key in enumerate(["1", "2", "3", "4", "5", "6", "7", "8", "9", "ล้าง", "0", "⌫"]):
+                button = QPushButton(key)
+                button.setMinimumHeight(42)
+                button.clicked.connect(lambda _, value=key: self._press_pin(value))
+                pin_grid.addWidget(button, index // 3, index % 3)
+            form.addRow("", pin_pad)
             form.addRow(self.connection_status)
             form.addRow(submit)
             form.addRow(maintenance)
             form.addRow(override)
+
+        def _select_cashier(self) -> None:
+            code = self.cashier_select.currentData()
+            self.code.setText(str(code or ""))
+            if code:
+                self.pin.setFocus()
+
+        def _press_pin(self, key: str) -> None:
+            if key == "ล้าง":
+                self.pin.clear()
+            elif key == "⌫":
+                self.pin.backspace()
+            else:
+                self.pin.insert(key)
 
         def open_settings(self) -> None:
             dialog = SettingsDialog(self, None)
@@ -331,6 +385,9 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             return {"selection_required": False, **changed, "must_change_pin": False}
 
         def login(self):
+            if not self.code.text().strip():
+                QMessageBox.information(self, "เลือกคนขาย", "เลือกชื่อคนขายก่อนกรอก PIN")
+                return
             if online is not None and online.online:
                 if self._online_login():
                     self.accept()
@@ -394,20 +451,42 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
         def __init__(self, parent, order: Order):
             super().__init__(parent)
             self.order = order
+            self.payment_method = "cash"
+            self.qr_payload: str | None = None
+            self.qr_config = _cached_json_setting(service.db, "qr_payment") or {}
             self.setWindowTitle("รับชำระเงิน")
-            self.setMinimumWidth(360)
+            self.setMinimumWidth(520)
             layout = QVBoxLayout(self)
 
             self.due = QLabel(f"ยอดชำระ {order.grand_total():,.2f} บาท")
             self.due.setStyleSheet("font-size:22px;font-weight:800;color:%s;" % PALETTE["text"])
             layout.addWidget(self.due)
 
+            methods = QHBoxLayout()
+            self.cash_method = QPushButton("เงินสด")
+            self.cash_method.setCheckable(True)
+            self.cash_method.setChecked(True)
+            self.cash_method.clicked.connect(lambda: self.set_payment_method("cash"))
+            self.transfer_method = QPushButton("โอน / QR")
+            self.transfer_method.setCheckable(True)
+            self.transfer_method.clicked.connect(lambda: self.set_payment_method("transfer"))
+            method_group = QButtonGroup(self)
+            method_group.setExclusive(True)
+            method_group.addButton(self.cash_method)
+            method_group.addButton(self.transfer_method)
+            methods.addWidget(self.cash_method)
+            methods.addWidget(self.transfer_method)
+            layout.addLayout(methods)
+
+            self.cash_label = QLabel("เงินที่รับมา")
             self.amount = QLineEdit(str(order.grand_total()))
             self.amount.textChanged.connect(self.refresh_change)
-            layout.addWidget(QLabel("เงินที่รับมา"))
+            layout.addWidget(self.cash_label)
             layout.addWidget(self.amount)
 
-            quick = QHBoxLayout()
+            self.quick_host = QWidget()
+            quick = QHBoxLayout(self.quick_host)
+            quick.setContentsMargins(0, 0, 0, 0)
             for note in (100, 500, 1000):
                 button = QPushButton(f"{note:,}")
                 button.clicked.connect(lambda _, value=note: self.amount.setText(str(value)))
@@ -415,11 +494,26 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             exact = QPushButton("พอดี")
             exact.clicked.connect(lambda: self.amount.setText(str(order.grand_total())))
             quick.addWidget(exact)
-            layout.addLayout(quick)
+            layout.addWidget(self.quick_host)
 
             self.change = QLabel()
             self.change.setStyleSheet("font-size:18px;font-weight:700;color:%s;" % PALETTE["success"])
             layout.addWidget(self.change)
+
+            self.qr_box = QWidget()
+            qr_layout = QVBoxLayout(self.qr_box)
+            self.qr_account = QLabel()
+            self.qr_account.setAlignment(Qt.AlignCenter)
+            self.qr_account.setWordWrap(True)
+            self.qr_image = QLabel()
+            self.qr_image.setAlignment(Qt.AlignCenter)
+            self.transfer_confirmed = QCheckBox("ตรวจสอบแล้วว่าเงินเข้าบัญชีครบตามยอด")
+            self.transfer_confirmed.setStyleSheet("font-size:16px;font-weight:700")
+            qr_layout.addWidget(self.qr_account)
+            qr_layout.addWidget(self.qr_image)
+            qr_layout.addWidget(self.transfer_confirmed)
+            self.qr_box.hide()
+            layout.addWidget(self.qr_box)
 
             buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
             buttons.accepted.connect(self.confirm)
@@ -427,7 +521,45 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             layout.addWidget(buttons)
             self.refresh_change()
 
+        def set_payment_method(self, method: str) -> None:
+            if method == "transfer" and not self.qr_config.get("merchant_ref"):
+                QMessageBox.warning(self, "ยังไม่ได้ตั้ง QR", "ให้ IT ตั้งบัญชี PromptPay ใน ERP แล้ว Sync เครื่อง POS ก่อน")
+                self.cash_method.setChecked(True)
+                return
+            self.payment_method = method
+            transfer = method == "transfer"
+            self.cash_label.setVisible(not transfer)
+            self.amount.setVisible(not transfer)
+            self.quick_host.setVisible(not transfer)
+            self.qr_box.setVisible(transfer)
+            if transfer:
+                try:
+                    self.qr_payload = promptpay_payload(
+                        str(self.qr_config["merchant_ref"]), self.order.grand_total()
+                    )
+                    self.qr_image.setPixmap(_qr_pixmap(self.qr_payload, 250))
+                except (ValueError, RuntimeError) as error:
+                    QMessageBox.warning(self, "สร้าง QR ไม่สำเร็จ", str(error))
+                    self.payment_method = "cash"
+                    self.cash_method.setChecked(True)
+                    self.set_payment_method("cash")
+                    return
+                account = " · ".join(filter(None, [
+                    self.qr_config.get("bank_name"), self.qr_config.get("account_name"),
+                ]))
+                self.qr_account.setText(
+                    f"สแกนชำระ {self.order.grand_total():,.2f} บาท\n{account or self.qr_config.get('name', 'PromptPay')}"
+                )
+                self.change.setText("รอตรวจสอบเงินเข้า")
+                self.change.setStyleSheet("font-size:18px;font-weight:700;color:%s;" % PALETTE["warning_ink"])
+            else:
+                self.qr_payload = None
+                self.transfer_confirmed.setChecked(False)
+                self.refresh_change()
+
         def tendered(self) -> Decimal:
+            if self.payment_method == "transfer":
+                return self.order.grand_total()
             try:
                 return money(self.amount.text() or "0")
             except (InvalidOperation, ValueError):
@@ -443,6 +575,9 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
                 self.change.setStyleSheet("font-size:18px;font-weight:700;color:%s;" % PALETTE["success"])
 
         def confirm(self):
+            if self.payment_method == "transfer" and not self.transfer_confirmed.isChecked():
+                QMessageBox.warning(self, "ยังไม่ยืนยันเงินเข้า", "ตรวจรายการเงินเข้าก่อน แล้วทำเครื่องหมายยืนยัน")
+                return
             if self.tendered() < self.order.grand_total():
                 QMessageBox.warning(self, "ยอดชำระไม่พอ", "รับเงินมาน้อยกว่ายอดที่ต้องชำระ")
                 return
@@ -1128,7 +1263,10 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
                     document_no=f"PYPOS-{self.shift_id}-{service.pending_sync_count() + 1:06d}",
                     branch_id=branch_id, terminal_id=terminal_id, shift_id=self.shift_id,
                     cashier_id=int(self.cashier["id"]), lines=self.order.to_cart_lines(),
-                    payment_method="cash", paid_amount=dialog.tendered(),
+                    payment_method=dialog.payment_method, paid_amount=dialog.tendered(),
+                    payment_reference=str(dialog.qr_config.get("code") or "") or None,
+                    qr_payload=dialog.qr_payload,
+                    payment_confirmed=dialog.payment_method == "transfer" and dialog.transfer_confirmed.isChecked(),
                 )
                 if online is not None:
                     online.worker.wake()  # ส่งบิลขึ้น ERP ทันที ไม่รอรอบถัดไป
@@ -1137,10 +1275,9 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
                 return
 
             self.last_sale_id = sale_id
-            QMessageBox.information(
-                self, "รับชำระแล้ว",
-                f"บิล {sale_id}\nเงินทอน {self.order.change_for(dialog.tendered()):,.2f} บาท",
-            )
+            detail = (f"เงินทอน {self.order.change_for(dialog.tendered()):,.2f} บาท"
+                      if dialog.payment_method == "cash" else "รับชำระผ่านโอน / QR แล้ว")
+            QMessageBox.information(self, "รับชำระแล้ว", f"บิล {sale_id}\n{detail}")
             self.order.clear()
             self.refresh_order()
 
@@ -1358,3 +1495,14 @@ def _cached_layout(db) -> dict:
     if value.get("schema") != "popcentral-pos-layout" or not isinstance(value.get("components"), list):
         return {"schema": "popcentral-pos-layout", "version": 1, "components": []}
     return value
+
+
+def _cached_json_setting(db, key: str) -> dict | None:
+    row = db.execute("SELECT value FROM device_settings WHERE key = ?", (key,)).fetchone()
+    if not row:
+        return None
+    try:
+        value = json.loads(row["value"])
+    except (TypeError, ValueError):
+        return None
+    return value if isinstance(value, dict) else None

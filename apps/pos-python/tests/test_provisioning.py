@@ -39,6 +39,7 @@ PING = {
     "vat_rate": 7.0,
     "cashier_login_mode": "pin",
     "company": {"name": "ป๊อบสตาร์"},
+    "qr_payment": {"code": "QR-HQ", "name": "พร้อมเพย์ HQ", "merchant_ref": "0812345678"},
     "scale_profiles": [
         {"code": "S800", "prefix": "800", "plu_length": 6, "value_length": 6,
          "value_type": "price", "check_digit": "ean13", "total_length": 13},
@@ -74,6 +75,8 @@ class ProvisioningTest(unittest.TestCase):
         self.assertIn("branch_id", settings)
         self.assertEqual(settings["branch_id"], "3")
         self.assertIn("terminal_code", settings)
+        self.assertIn("qr_payment", settings)
+        self.assertIn("0812345678", settings["qr_payment"])
         # กฎเครื่องชั่งถูกเก็บจาก ping
         self.assertEqual(self.db.execute("SELECT count(*) FROM scale_profiles").fetchone()[0], 1)
 

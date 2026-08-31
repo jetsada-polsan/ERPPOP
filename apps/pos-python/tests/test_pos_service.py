@@ -77,6 +77,7 @@ class PosServiceTest(unittest.TestCase):
             document_no="T-DAILY-VOID", branch_id=1, terminal_id="TEST-01", shift_id=self.shift_id,
             cashier_id=1, lines=[CartLine(1, Decimal("2"), Decimal("25"))],
             payment_method="transfer", paid_amount=Decimal("50"), sale_uuid="daily-void",
+            payment_confirmed=True,
         )
         self.service.void_sale(void_sale, cashier_id=1, reason="ทดสอบยกเลิก")
         self.db.execute("UPDATE sales SET sync_status = 'synced' WHERE id = ?", (cash_sale,))
@@ -89,6 +90,27 @@ class PosServiceTest(unittest.TestCase):
         self.assertEqual(summary.grand_total, Decimal("25.00"))
         self.assertEqual(summary.payments, (("cash", Decimal("25.00")),))
         self.assertEqual(summary.pending_sync_count, 1)
+
+    def test_transfer_requires_money_received_confirmation(self) -> None:
+        with self.assertRaisesRegex(ValueError, "ตรวจเงินเข้า"):
+            self.service.checkout(
+                document_no="T-QR-NO-MONEY", branch_id=1, terminal_id="TEST-01", shift_id=self.shift_id,
+                cashier_id=1, lines=[CartLine(1, Decimal("1"), Decimal("25"))],
+                payment_method="transfer", paid_amount=Decimal("25"), qr_payload="PROMPTPAY",
+            )
+        self.assertEqual(self.db.execute("SELECT count(*) FROM sales").fetchone()[0], 0)
+
+    def test_confirmed_transfer_snapshots_qr_without_cash_change(self) -> None:
+        sale_id = self.service.checkout(
+            document_no="T-QR-PAID", branch_id=1, terminal_id="TEST-01", shift_id=self.shift_id,
+            cashier_id=1, lines=[CartLine(1, Decimal("1"), Decimal("25"))],
+            payment_method="transfer", paid_amount=Decimal("25"), payment_reference="QR-HQ",
+            qr_payload="PROMPTPAY-SNAPSHOT", payment_confirmed=True,
+        )
+        payment = self.db.execute("SELECT * FROM payments WHERE sale_id = ?", (sale_id,)).fetchone()
+        self.assertEqual((payment["method"], payment["change_amount"]), ("transfer", "0"))
+        self.assertEqual(payment["qr_payload"], "PROMPTPAY-SNAPSHOT")
+        self.assertIsNotNone(payment["confirmed_at"])
 
     def test_underpayment_rolls_back_everything(self) -> None:
         with self.assertRaisesRegex(ValueError, "ยอดชำระไม่พอ"):

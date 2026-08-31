@@ -9,6 +9,7 @@ use App\Models\AuditLog;
 use App\Models\PosDevice;
 use App\Models\PosReceipt;
 use App\Models\PosTerminal;
+use App\Models\QrPaymentConfig;
 use App\Models\Salesman;
 use App\Models\User;
 use App\Services\Sales\SaleReturnService;
@@ -47,6 +48,17 @@ class PosApiController extends Controller
         $terminal ??= PosTerminal::where('branch_id', $branchId)
             ->orderBy('id')
             ->first();
+        $qrPayment = QrPaymentConfig::query()
+            ->where('is_active', true)
+            ->with('bankAccount:id,branch_id,bank_name,account_name')
+            ->where(function ($query) use ($branchId) {
+                $query->whereNull('bank_account_id')
+                    ->orWhereHas('bankAccount', fn ($bank) => $bank
+                        ->whereNull('branch_id')
+                        ->when($branchId, fn ($branch) => $branch->orWhere('branch_id', $branchId)));
+            })
+            ->orderBy('id')
+            ->first();
 
         return response()->json([
             'success' => true,
@@ -60,6 +72,15 @@ class PosApiController extends Controller
             'branch_name' => $branchName,
             'device_user' => $user?->name,
             'cashier_login_mode' => AppSetting::get('pos_passwordless_login') === '1' ? 'selection' : 'pin',
+            'qr_payment' => $qrPayment ? [
+                'code' => $qrPayment->code,
+                'name' => $qrPayment->name,
+                'qr_type' => $qrPayment->qr_type,
+                'merchant_ref' => $qrPayment->merchant_ref,
+                'payload_template' => $qrPayment->payload_template,
+                'bank_name' => $qrPayment->bankAccount?->bank_name,
+                'account_name' => $qrPayment->bankAccount?->account_name,
+            ] : null,
             // กฎการอ่านป้ายเครื่องชั่งมาจากที่นี่ที่เดียว เครื่องขายไม่ต้องเดารูปแบบเอง
             // เดิมทั้ง ERP และ POS ต่างฝังกฎของตัวเองไว้ แก้ทีต้องไล่แก้ให้ตรงกันสองที่
             'scale_profiles' => DB::table('scale_barcode_profiles')

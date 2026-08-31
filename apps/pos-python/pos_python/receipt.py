@@ -10,6 +10,7 @@ import sqlite3
 from decimal import Decimal
 
 from .services import money
+from .promptpay import compact_qr_lines
 
 # สระบนล่างและวรรณยุกต์ไทยไม่กินความกว้างตอนพิมพ์ นับด้วย len() ตรง ๆ
 # แล้วคอลัมน์ขวาจะเยื้องทีละนิดจนตัวเลขไม่ตรงแถวกัน
@@ -72,7 +73,8 @@ def render(db: sqlite3.Connection, sale_id: int, *, company: dict | None = None,
         (sale_id,),
     ).fetchall()
     payment = db.execute(
-        "SELECT method, amount, change_amount FROM payments WHERE sale_id = ? ORDER BY id LIMIT 1", (sale_id,)
+        """SELECT method, amount, change_amount, reference, qr_payload
+           FROM payments WHERE sale_id = ? ORDER BY id LIMIT 1""", (sale_id,)
     ).fetchone()
     cashier = db.execute("SELECT code FROM local_cashiers WHERE id = ?", (sale["cashier_id"],)).fetchone()
 
@@ -112,9 +114,16 @@ def render(db: sqlite3.Connection, sale_id: int, *, company: dict | None = None,
     if payment:
         received = money(payment["amount"])
         change = money(payment["change_amount"] or 0)
-        lines.append(columns("เงินสดรับ" if payment["method"] == "cash" else "รับชำระ", f"{received:,.2f}", width))
+        lines.append(columns("เงินสดรับ" if payment["method"] == "cash" else "โอนเงิน / QR", f"{received:,.2f}", width))
         if change > 0:
             lines.append(columns("เงินทอน", f"{change:,.2f}", width))
+        if payment["method"] == "transfer" and payment["qr_payload"]:
+            lines.append(rule(width))
+            lines.append(centre("สแกน QR เพื่อชำระยอดนี้", width))
+            for qr_line in compact_qr_lines(str(payment["qr_payload"])):
+                lines.append(centre(qr_line, width))
+            if payment["reference"]:
+                lines.append(centre(f"บัญชี {payment['reference']}", width))
 
     if sale["is_void"]:
         lines.append(rule(width, "="))

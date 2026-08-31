@@ -113,12 +113,16 @@ class SyncService:
         ).fetchall()
         if any(not item["server_product_id"] for item in lines):
             return self._failed(sale_uuid, "มีสินค้า local ที่ยังไม่มี server_id: ต้อง sync catalog ก่อน")
-        payment = self.db.execute("SELECT method, amount, reference FROM payments WHERE sale_id = ? ORDER BY id LIMIT 1", (sale["id"],)).fetchone()
+        payment = self.db.execute(
+            "SELECT method, amount, reference, confirmed_at FROM payments WHERE sale_id = ? ORDER BY id LIMIT 1",
+            (sale["id"],),
+        ).fetchone()
         if not payment:
             return self._failed(sale_uuid, "ไม่พบข้อมูลชำระเงิน")
         payload = {
             "branch_id": sale["branch_id"], "shift_id": sale["server_shift_id"], "cashier_id": sale["server_cashier_id"],
             "method": payment["method"], "payment_ref": payment["reference"],
+            "payment_confirmed": payment["method"] != "transfer" or bool(payment["confirmed_at"]),
             "cash_received": payment["amount"] if payment["method"] == "cash" else None,
             "items": [{
                 "product_id": item["server_product_id"], "qty": item["qty"], "unit_price": item["unit_price"],
