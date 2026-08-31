@@ -10,343 +10,406 @@
     <title>เข้าสู่ระบบ - PopCentral</title>
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700;800&display=swap');
+
+        :root {
+            --ink: #10233a;
+            --ink-soft: #5b7186;
+            --ink-faint: #93a5b7;
+            --line: #e2eaf2;
+            --surface: #ffffff;
+            --bg: #eef3f9;
+            --primary: #1467c7;
+            --primary-dark: #0e4c96;
+            --teal: #16a893;
+            --amber: #f2994a;
+            --danger-bg: #fef2f2;
+            --danger-border: #f8caca;
+            --danger-text: #b3261e;
+            --radius-lg: 26px;
+            --radius-md: 14px;
+            --radius-sm: 10px;
+        }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
             min-height: 100vh;
-            /* Sukhumvit Set คือฟอนต์ไทยของ macOS/iOS — ของเดิมตกไปใช้ Tahoma
-               บนเครื่องที่ไม่ใช่ Windows ซึ่งตัวไทยดูเก่ากว่าที่ควร */
-            font-family: 'IBM Plex Sans Thai', 'Noto Sans Thai', 'Leelawadee UI', 'Sukhumvit Set', Tahoma, 'Segoe UI', sans-serif;
-            color: #173247;
+            font-family: 'IBM Plex Sans Thai', 'Noto Sans Thai', 'Leelawadee UI', Tahoma, 'Segoe UI', sans-serif;
+            color: var(--ink);
             background:
-                linear-gradient(120deg, rgba(20, 96, 141, .09), transparent 32%),
-                linear-gradient(300deg, rgba(49, 151, 107, .12), transparent 34%),
-                #f3f7fb;
-            padding: clamp(12px, 2.2vw, 28px);
+                radial-gradient(1100px 620px at 14% -8%, rgba(20, 103, 199, .10), transparent 60%),
+                radial-gradient(900px 560px at 100% 108%, rgba(22, 168, 147, .12), transparent 55%),
+                var(--bg);
+            padding: clamp(14px, 3vw, 32px);
             display: grid;
             place-items: center;
         }
+
         .login-shell {
-            width: min(1080px, 100%);
-            /* ความสูงยืดตามจอ ไม่ล็อก 640px ตายตัว จอเตี้ย (โน้ตบุ๊ก 768px
-               หรือมือถือแนวนอน) จะได้ไม่ถูกดันจนต้องเลื่อน */
-            min-height: min(640px, calc(100vh - 2 * clamp(12px, 2.2vw, 28px)));
+            width: min(1040px, 100%);
+            min-height: min(620px, calc(100vh - 2 * clamp(14px, 3vw, 32px)));
             display: grid;
-            /* คอลัมน์ฟอร์มยืดได้ในช่วง 360-430px แทนที่จะตรึง 430px
-               ช่วง 880-1150px เดิมจะบีบฝั่งซ้ายจนอึดอัด */
-            grid-template-columns: minmax(0, 1.05fr) clamp(360px, 34vw, 430px);
+            grid-template-columns: minmax(0, 1.08fr) clamp(360px, 36vw, 420px);
             overflow: hidden;
-            border: 1px solid #dbe7ef;
-            border-radius: 22px;
-            background: #fff;
-            box-shadow: 0 24px 70px rgba(25, 58, 84, .15);
+            border-radius: var(--radius-lg);
+            background: var(--surface);
+            box-shadow:
+                0 1px 2px rgba(16, 35, 58, .04),
+                0 30px 70px -20px rgba(16, 35, 58, .28);
+            animation: rise .55s cubic-bezier(.2, .7, .2, 1) both;
         }
+
+        @keyframes rise {
+            from { opacity: 0; transform: translateY(14px) scale(.99); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* ---------- Story / brand panel ---------- */
         .login-story {
             position: relative;
-            padding: clamp(28px, 3.6vw, 46px);
+            padding: clamp(30px, 3.8vw, 48px);
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            background:
-                linear-gradient(135deg, rgba(8, 80, 127, .92), rgba(20, 125, 140, .86)),
-                #0e5c89;
             color: #fff;
             overflow: hidden;
+            background:
+                linear-gradient(155deg, #0b2d55 0%, #0e4c96 46%, #127a86 100%);
         }
-        .login-story::before {
-            content: "";
+        .login-story .grid-tex {
             position: absolute;
-            inset: 20px;
-            border: 1px solid rgba(255,255,255,.16);
-            border-radius: 18px;
+            inset: 0;
+            opacity: .5;
+            background-image: radial-gradient(rgba(255,255,255,.16) 1px, transparent 1px);
+            background-size: 22px 22px;
+            mask-image: radial-gradient(circle at 30% 20%, #000 0%, transparent 72%);
             pointer-events: none;
         }
-        .login-story::after {
-            content: "";
+        .login-story .glow-a {
             position: absolute;
-            width: 420px;
-            height: 420px;
-            right: -170px;
-            bottom: -190px;
+            width: 460px;
+            height: 460px;
+            right: -180px;
+            top: -160px;
             border-radius: 50%;
-            background: radial-gradient(circle, rgba(255,255,255,.2), rgba(255,255,255,0) 66%);
+            background: radial-gradient(circle, rgba(255,255,255,.18), transparent 68%);
             pointer-events: none;
         }
-        .story-brand,
-        .story-content,
-        .story-dashboard,
-        .story-foot { position: relative; z-index: 1; }
-        .story-brand { display: flex; align-items: center; gap: 12px; font-size: clamp(18px, 1.8vw, 22px); font-weight: 900; }
-        .story-brand img { width: clamp(38px, 3.6vw, 46px); height: clamp(38px, 3.6vw, 46px); padding: 6px; border-radius: 14px; background: rgba(255,255,255,.96); box-shadow: 0 10px 28px rgba(0,0,0,.18); }
-        .story-kicker { color: #bff3ff; font-size: clamp(10px, .9vw, 11px); font-weight: 900; letter-spacing: .14em; }
-        /* พาดหัวย่อ-ขยายตามความกว้างจอ ของเดิมตรึง 40px ทำให้ช่วงจอกลางล้นสามบรรทัด */
-        .story-title { max-width: 22ch; margin: 12px 0; font-size: clamp(24px, 3.1vw, 40px); line-height: 1.16; font-weight: 900; }
-        .story-copy { max-width: 46ch; color: #d9f0f7; font-size: clamp(13px, 1.15vw, 14px); line-height: 1.75; }
-        .story-dashboard {
+        .login-story .glow-b {
+            position: absolute;
+            width: 380px;
+            height: 380px;
+            left: -140px;
+            bottom: -160px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(242,153,74,.20), transparent 70%);
+            pointer-events: none;
+        }
+        .story-brand, .story-content, .story-panel, .story-foot { position: relative; z-index: 1; }
+        .story-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: clamp(17px, 1.7vw, 20px);
+            font-weight: 800;
+            letter-spacing: .01em;
+        }
+        .story-brand img {
+            width: clamp(36px, 3.4vw, 44px);
+            height: clamp(36px, 3.4vw, 44px);
+            padding: 7px;
+            border-radius: 13px;
+            background: rgba(255,255,255,.97);
+            box-shadow: 0 10px 26px rgba(0,0,0,.2);
+        }
+        .story-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            color: #ffd9ad;
+            font-size: clamp(10.5px, .95vw, 11.5px);
+            font-weight: 800;
+            letter-spacing: .12em;
+            margin-top: clamp(20px, 3vw, 30px);
+        }
+        .story-kicker::before {
+            content: "";
+            width: 22px;
+            height: 2px;
+            border-radius: 2px;
+            background: var(--amber);
+        }
+        .story-title {
+            max-width: 19ch;
+            margin: 14px 0 12px;
+            font-size: clamp(25px, 2.9vw, 38px);
+            line-height: 1.18;
+            font-weight: 800;
+            letter-spacing: -.01em;
+        }
+        .story-copy {
+            max-width: 42ch;
+            color: #d7ecf5;
+            font-size: clamp(13px, 1.05vw, 14.5px);
+            line-height: 1.75;
+        }
+        .story-panel {
             display: grid;
-            grid-template-columns: 1.1fr .9fr;
-            gap: clamp(10px, 1vw, 12px);
-            margin-top: clamp(18px, 2.4vw, 28px);
+            grid-template-columns: 1fr 1fr;
+            gap: clamp(10px, 1.1vw, 14px);
+            margin-top: clamp(20px, 2.8vw, 30px);
         }
-        .signal-card {
-            min-height: clamp(104px, 11vw, 124px);
-            border: 1px solid rgba(255,255,255,.16);
-            border-radius: 14px;
-            background: rgba(255,255,255,.11);
-            padding: clamp(12px, 1.3vw, 16px);
-            backdrop-filter: blur(10px);
+        .stat-card {
+            border: 1px solid rgba(255,255,255,.18);
+            border-radius: var(--radius-md);
+            background: rgba(255,255,255,.08);
+            backdrop-filter: blur(14px);
+            padding: clamp(13px, 1.4vw, 16px);
         }
-        .signal-card span { display: block; color: #bde9f3; font-size: clamp(10px, .9vw, 11px); font-weight: 800; margin-bottom: 8px; }
-        .signal-card strong { display: block; font-size: clamp(19px, 2vw, 25px); line-height: 1.1; }
-        .signal-card small { display: block; margin-top: 10px; color: #d8f4f8; font-size: clamp(11px, 1vw, 12px); }
-        .signal-bars { height: clamp(40px, 4.6vw, 58px); display: flex; align-items: end; gap: 6px; margin-top: clamp(12px, 1.4vw, 16px); }
-        .signal-bars i { flex: 1; border-radius: 5px 5px 0 0; background: linear-gradient(#ffffff, #95f0d0); opacity: .86; }
-        .story-foot { color: #c6eef7; font-size: 12px; }
+        .stat-card .icon {
+            width: 30px;
+            height: 30px;
+            display: grid;
+            place-items: center;
+            border-radius: 9px;
+            background: rgba(255,255,255,.16);
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+        .stat-card .label { display: block; color: #bfe6ee; font-size: clamp(10px, .9vw, 11px); font-weight: 700; letter-spacing: .02em; }
+        .stat-card .value { display: block; margin-top: 6px; font-size: clamp(18px, 1.9vw, 23px); font-weight: 800; line-height: 1.1; }
+        .stat-card .bars { display: flex; align-items: end; gap: 4px; height: 30px; margin-top: 10px; }
+        .stat-card .bars i { flex: 1; border-radius: 3px 3px 0 0; background: linear-gradient(#fff, #9fe8d6); opacity: .9; }
+        .story-foot {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #bfe1ea;
+            font-size: 11.5px;
+            padding-top: clamp(18px, 2.4vw, 24px);
+            border-top: 1px solid rgba(255,255,255,.14);
+        }
+
+        /* ---------- Form panel ---------- */
         .login-card {
             display: flex;
             flex-direction: column;
             justify-content: center;
-            padding: clamp(30px, 3.4vw, 48px) clamp(24px, 3vw, 42px) clamp(26px, 2.8vw, 38px);
-            background: #fff;
+            padding: clamp(32px, 3.6vw, 50px) clamp(28px, 3.2vw, 44px);
+            background: var(--surface);
         }
-        .brand { text-align: center; margin-bottom: 10px; }
-        .brand img { max-height: clamp(44px, 4.4vw, 54px); max-width: min(190px, 70%); object-fit: contain; }
-        .brand-text { font-size: clamp(23px, 2.5vw, 30px); font-weight: 900; color: #153349; }
-        .subtitle { text-align: center; color: #63798a; font-size: clamp(12.5px, 1.1vw, 13px); line-height: 1.55; margin-bottom: clamp(20px, 2.2vw, 26px); }
-        label:not(.remember) { display: block; font-size: 12.5px; font-weight: 800; color: #3c5668; margin: 14px 0 6px; }
-        .field { position: relative; }
-        .field i { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: #7f99ad; font-size: 15px; }
-        input[type=text], input[type=password] {
-            width: 100%;
-            min-height: clamp(44px, 4.4vw, 48px);
-            padding: 11px 13px 11px 40px;
-            border: 1px solid #d7e4ed;
-            border-radius: 12px;
-            /* 16px ห้ามต่ำกว่านี้ ไม่งั้น Safari บน iPhone จะซูมหน้าจอเองตอนแตะช่องกรอก
-               แล้ว layout เพี้ยนทั้งหน้า (ของเดิม 14px จึงโดนซูมทุกครั้ง) */
-            font-size: 16px;
-            font-family: inherit;
-            color: #173247;
-            outline: none;
-            background: #fbfdff;
-            transition: border-color .15s, box-shadow .15s, background .15s;
+        .brand { text-align: center; margin-bottom: 6px; }
+        .brand img { max-height: clamp(42px, 4vw, 50px); max-width: min(180px, 70%); object-fit: contain; }
+        .brand-text { font-size: clamp(21px, 2.2vw, 27px); font-weight: 800; color: var(--ink); }
+        .subtitle {
+            text-align: center;
+            color: var(--ink-soft);
+            font-size: clamp(12.5px, 1.05vw, 13.5px);
+            line-height: 1.55;
+            margin: 6px 0 clamp(22px, 2.6vw, 28px);
         }
-        input:focus { border-color: #1a9bdc; box-shadow: 0 0 0 4px rgba(26,155,220,.12); background: #fff; }
-        .remember { display: flex; align-items: center; gap: 8px; margin: 15px 0 20px; font-size: 13px; color: #536b7d; }
-        .remember input { width: 16px; height: 16px; accent-color: #1a9bdc; }
-        button {
-            width: 100%;
-            min-height: clamp(46px, 4.6vw, 50px);
-            padding: 12px;
-            border: none;
-            border-radius: 12px;
-            background: linear-gradient(135deg, #1a9bdc, #20a67a);
-            color: #fff;
-            font-size: 15px;
-            font-weight: 900;
-            font-family: inherit;
-            cursor: pointer;
-            box-shadow: 0 12px 24px rgba(26,155,220,.26);
-            transition: transform .15s, box-shadow .15s;
-        }
-        button:hover { transform: translateY(-1px); box-shadow: 0 15px 30px rgba(26,155,220,.32); }
-        .error {
+
+        .alert-error {
             display: flex;
-            align-items: center;
-            gap: 8px;
-            background: #fff5f5;
-            border: 1px solid #fecaca;
-            color: #b91c1c;
-            border-radius: 12px;
+            align-items: flex-start;
+            gap: 9px;
+            background: var(--danger-bg);
+            border: 1px solid var(--danger-border);
+            color: var(--danger-text);
+            border-radius: var(--radius-sm);
             padding: 11px 13px;
             font-size: 13px;
-            margin-bottom: 8px;
+            line-height: 1.5;
+            margin-bottom: 14px;
         }
-        .foot { text-align: center; color: #8aa1b2; font-size: 11.5px; margin-top: 24px; }
-        /* จอกลาง: ยังวางการ์ดสองใบได้ แค่แบ่งพื้นที่เท่ากันและลดความกว้างข้อความ
-           ของเดิมใช้ 1.1fr/.9fr ซึ่งพอแคบลงใบขวาจะบีบจนกราฟแท่งเบียดกัน */
+        .alert-error i { margin-top: 1px; }
+
+        label.field-label {
+            display: block;
+            font-size: 12.5px;
+            font-weight: 700;
+            color: #33495d;
+            margin: 14px 0 6px;
+        }
+        .field { position: relative; }
+        .field i.field-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--ink-faint);
+            font-size: 15px;
+            transition: color .15s;
+        }
+        .field input[type=text],
+        .field input[type=password] {
+            width: 100%;
+            min-height: 48px;
+            padding: 11px 14px 11px 42px;
+            border: 1.5px solid var(--line);
+            border-radius: var(--radius-sm);
+            font-size: 16px;
+            font-family: inherit;
+            color: var(--ink);
+            outline: none;
+            background: #f9fbfd;
+            transition: border-color .15s, box-shadow .15s, background .15s;
+        }
+        .field input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(20,103,199,.13); background: #fff; }
+        .field input:focus + i.field-icon,
+        .field input:focus ~ i.field-icon { color: var(--primary); }
+        .field-toggle {
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            border: none;
+            background: transparent;
+            color: var(--ink-faint);
+            width: 34px;
+            height: 34px;
+            border-radius: 9px;
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+            font-size: 15px;
+            transition: background .15s, color .15s;
+        }
+        .field-toggle:hover { background: #eef3f9; color: var(--ink-soft); }
+
+        .row-between {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 17px 0 22px;
+        }
+        .remember { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--ink-soft); cursor: pointer; user-select: none; }
+        .switch { position: relative; width: 34px; height: 20px; flex: none; }
+        .switch input { position: absolute; inset: 0; opacity: 0; cursor: pointer; margin: 0; }
+        .switch .track {
+            position: absolute; inset: 0;
+            background: #d7e1ea;
+            border-radius: 20px;
+            transition: background .18s;
+        }
+        .switch .track::after {
+            content: "";
+            position: absolute;
+            top: 2px; left: 2px;
+            width: 16px; height: 16px;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,.25);
+            transition: transform .18s;
+        }
+        .switch input:checked + .track { background: var(--primary); }
+        .switch input:checked + .track::after { transform: translateX(14px); }
+        .switch input:focus-visible + .track { box-shadow: 0 0 0 3px rgba(20,103,199,.25); }
+
+        button.submit {
+            width: 100%;
+            min-height: 50px;
+            border: none;
+            border-radius: var(--radius-sm);
+            background: linear-gradient(135deg, var(--primary), var(--teal));
+            color: #fff;
+            font-size: 15px;
+            font-weight: 800;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            cursor: pointer;
+            box-shadow: 0 14px 26px -8px rgba(20,103,199,.45);
+            transition: transform .15s, box-shadow .15s, filter .15s;
+        }
+        button.submit:hover { transform: translateY(-1px); box-shadow: 0 18px 32px -8px rgba(20,103,199,.5); }
+        button.submit:active { transform: translateY(0); filter: brightness(.97); }
+
+        .foot-note {
+            text-align: center;
+            color: var(--ink-faint);
+            font-size: 11.5px;
+            margin-top: 22px;
+        }
+        .secure-badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            color: #6a8b7c;
+            font-size: 11px;
+            font-weight: 700;
+            margin-top: 12px;
+        }
+        .secure-badge i { color: var(--teal); }
+
+        /* ---------- Breakpoints ---------- */
         @media (max-width: 1150px) {
-            .story-dashboard { grid-template-columns: 1fr 1fr; }
-            .story-copy { max-width: 40ch; }
+            .story-title { max-width: 17ch; }
+            .story-copy { max-width: 38ch; }
         }
-        /* แคบกว่านี้วางสองใบไม่ไหวแล้ว ซ้อนลงมาแทนการบีบให้เล็กจนอ่านไม่ออก */
         @media (min-width: 881px) and (max-width: 1000px) {
-            .story-dashboard { grid-template-columns: 1fr; }
-            .signal-card { min-height: 0; }
+            .story-panel { display: none; }
         }
-        /* จอเตี้ย เช่น โน้ตบุ๊ก 1366x768 หรือมือถือแนวนอน: ซ่อนส่วนประกอบรอง
-           ไม่ให้การ์ดสูงเกินจอจนต้องเลื่อน */
         @media (min-width: 881px) and (max-height: 700px) {
-            .story-dashboard { display: none; }
+            .story-panel { display: none; }
             .login-shell { min-height: auto; }
         }
         @media (max-width: 880px) {
             body { padding: 14px; align-items: start; }
-            .login-shell { grid-template-columns: 1fr; max-width: 480px; min-height: auto; }
-            .login-story { min-height: auto; padding: clamp(22px, 6vw, 28px); }
-            .login-story::before { inset: 12px; }
-            .story-title { font-size: clamp(21px, 6.2vw, 28px); }
-            .story-copy, .story-dashboard, .story-foot { display: none; }
-            .login-card { padding: clamp(26px, 7vw, 34px) clamp(20px, 6vw, 28px); }
+            .login-shell { grid-template-columns: 1fr; max-width: 460px; min-height: auto; }
+            .login-story { padding: clamp(24px, 6.5vw, 30px); }
+            .story-title { font-size: clamp(21px, 6vw, 27px); max-width: 20ch; }
+            .story-copy, .story-panel, .story-foot { display: none; }
+            .login-card { padding: clamp(28px, 7vw, 36px) clamp(22px, 6vw, 28px); }
         }
-        /* มือถือจอแคบ (iPhone SE 320px): บีบระยะให้ปุ่มเข้าสู่ระบบอยู่ในจอโดยไม่ต้องเลื่อน
-           ของเดิมปุ่มตกใต้ขอบจอไป 27px ต้องเลื่อนก่อนถึงจะกดได้ */
         @media (max-width: 380px) {
             body { padding: 0; }
-            .login-shell { border: none; border-radius: 0; box-shadow: none; max-width: none; }
-            .story-brand { font-size: 17px; }
+            .login-shell { border-radius: 0; box-shadow: none; max-width: none; }
             .brand { margin-bottom: 4px; }
-            .brand img { max-height: 42px; }
-            .subtitle { margin-bottom: 14px; }
-            label:not(.remember) { margin: 10px 0 5px; }
-            .remember { margin: 10px 0 14px; }
-        }
-
-        /* JetTime-inspired light enterprise skin. */
-        body {
-            background:
-                linear-gradient(135deg, rgba(37, 99, 235, .08), transparent 42%),
-                linear-gradient(315deg, rgba(249, 115, 22, .08), transparent 38%),
-                #f5f8ff;
-            color: #1d2a44;
-            padding: 32px;
-        }
-        .login-shell {
-            width: min(1080px, 100%);
-            min-height: 620px;
-            grid-template-columns: minmax(0, 1fr) minmax(380px, 420px);
-            border: 1px solid #dfe7f4;
-            border-radius: 22px;
-            box-shadow: 0 24px 64px rgba(42, 73, 127, .16);
-        }
-        .login-story {
-            padding: 48px;
-            background: linear-gradient(135deg, #edf4ff 0%, #f8fbff 68%, #fff7ef 100%);
-            color: #1d2a44;
-        }
-        .login-story::before { inset: 22px; border-radius: 18px; border-color: #dce7f8; }
-        .login-story::after { display: none; }
-        .story-brand { color: #1d2a44; font-size: 21px; letter-spacing: 0; }
-        .story-brand img { border-radius: 10px; box-shadow: 0 8px 18px rgba(37, 99, 235, .12); }
-        .story-kicker { color: #f97316; letter-spacing: .04em; }
-        .story-kicker::after {
-            content: "";
-            display: block;
-            width: 42px;
-            height: 3px;
-            margin-top: 8px;
-            border-radius: 3px;
-            background: #2563eb;
-        }
-        .story-title {
-            max-width: 16ch;
-            margin: 18px 0 14px;
-            color: #1d2a44;
-            font-size: clamp(30px, 3.4vw, 46px);
-            line-height: 1.08;
-            letter-spacing: 0;
-        }
-        .story-copy { max-width: 43ch; color: #70809b; line-height: 1.7; }
-        .story-dashboard {
-            display: grid;
-            grid-template-columns: 1.15fr .85fr;
-            gap: 12px;
-            margin-top: 34px;
-            max-width: 560px;
-        }
-        .signal-card {
-            min-height: 116px;
-            border: 1px solid #dfe8f5;
-            border-radius: 6px;
-            background: #fff;
-            padding: 16px;
-            box-shadow: 0 8px 20px rgba(83, 105, 145, .08);
-        }
-        .signal-card span { color: #f97316; font-size: 10px; letter-spacing: .04em; }
-        .signal-card strong { color: #1d2a44; font-size: 22px; margin-top: 8px; }
-        .signal-card small { color: #70809b; font-size: 11px; line-height: 1.5; }
-        .signal-bars { height: 38px; gap: 5px; margin-top: 14px; }
-        .signal-bars i { background: #2563eb; border-radius: 2px 2px 0 0; }
-        .signal-bars i:nth-child(3n) { background: #f97316; }
-        .story-foot { color: #8492a8; font-size: 11px; letter-spacing: .02em; }
-        .login-card {
-            justify-content: flex-start;
-            padding: 72px 48px 42px;
-        }
-        .brand { text-align: left; margin-bottom: 22px; }
-        .brand img { max-height: 48px; max-width: 180px; }
-        .brand-text { font-size: 26px; color: #16324f; }
-        .subtitle { text-align: left; color: #627384; margin-bottom: 30px; }
-        label:not(.remember) { color: #34495e; font-size: 12px; letter-spacing: .01em; margin: 18px 0 7px; }
-        .field i { color: #7b8c9b; }
-        input[type=text], input[type=password] {
-            min-height: 48px;
-            border: 1px solid #bfcbd5;
-            border-radius: 4px;
-            background: #fff;
-            color: #1f2933;
-        }
-        input:focus { border-color: #0a6ed1; box-shadow: 0 0 0 2px rgba(10,110,209,.16); }
-        .remember { color: #627384; margin: 18px 0 24px; }
-        .remember input { accent-color: #0a6ed1; }
-        button {
-            min-height: 48px;
-            border-radius: 4px;
-            background: #0a6ed1;
-            box-shadow: none;
-            font-size: 15px;
-            letter-spacing: .01em;
-        }
-        button:hover { background: #085caf; box-shadow: none; transform: none; }
-        .error { border-radius: 4px; margin-bottom: 10px; }
-        .foot { text-align: left; color: #7b8c9b; font-size: 12px; margin-top: 22px; }
-        .login-card::before {
-            content: "พื้นที่ทำงานปลอดภัย";
-            display: block;
-            color: #f97316;
-            font-size: 10px;
-            font-weight: 800;
-            letter-spacing: .02em;
-            margin-bottom: 22px;
-        }
-        .login-card .subtitle { max-width: 30ch; }
-        @media (max-width: 880px) {
-            body { padding: 16px; }
-            .login-shell { grid-template-columns: 1fr; min-height: auto; }
-            .login-story { min-height: 210px; padding: 30px; }
-            .login-card { padding: 34px 30px 32px; }
-        }
-        @media (max-width: 380px) {
-            body { padding: 0; }
-            .login-story { padding: 24px; }
-            .login-card { padding: 28px 22px; }
+            .subtitle { margin-bottom: 16px; }
+            label.field-label { margin: 10px 0 5px; }
+            .row-between { margin: 14px 0 18px; }
         }
     </style>
 </head>
 <body>
 <main class="login-shell">
     <section class="login-story">
-        <div class="story-brand"><img src="{{ asset('images/logo-jet-erp-mark.svg') }}" alt="PopCentral"> PopCentral</div>
+        <div class="grid-tex" aria-hidden="true"></div>
+        <div class="glow-a" aria-hidden="true"></div>
+        <div class="glow-b" aria-hidden="true"></div>
+        <div class="story-brand">
+            <img src="{{ asset('images/logo-jet-erp-mark.svg') }}" alt="PopCentral">
+            PopCentral
+        </div>
         <div class="story-content">
             <div class="story-kicker">แพลตฟอร์มบริหารงานธุรกิจ</div>
-            <h1 class="story-title">บริหารยอดขาย สต๊อก และต้นทุน ด้วยข้อมูลเรียลไทม์</h1>
-            <p class="story-copy">เชื่อมทุกสาขาไว้ในศูนย์กลางเดียว พร้อมข้อมูลสำคัญสำหรับการตัดสินใจ</p>
-            <div class="story-dashboard">
-                <div class="signal-card">
-                    <span>ยอดขายวันนี้</span>
-                    <strong>พร้อมขาย</strong>
-                    <small>รองรับงานหน้าร้านและการนำเข้ายอดขาย</small>
+            <h1 class="story-title">บริหารยอดขาย สต๊อก และต้นทุน ในที่เดียว แบบเรียลไทม์</h1>
+            <p class="story-copy">เชื่อมทุกสาขา หน้าร้าน และคลังสินค้าไว้ในระบบเดียว พร้อมข้อมูลที่แม่นยำสำหรับการตัดสินใจทุกวัน</p>
+            <div class="story-panel">
+                <div class="stat-card">
+                    <div class="icon"><i class="bi bi-shop"></i></div>
+                    <span class="label">หลายสาขา</span>
+                    <strong class="value">เชื่อมต่อกัน</strong>
                 </div>
-                <div class="signal-card">
-                    <span>ควบคุมสต๊อก</span>
-                    <strong>เรียลไทม์</strong>
-                    <div class="signal-bars" aria-hidden="true"><i style="height:36%"></i><i style="height:54%"></i><i style="height:44%"></i><i style="height:72%"></i><i style="height:63%"></i><i style="height:88%"></i></div>
+                <div class="stat-card">
+                    <div class="icon"><i class="bi bi-boxes"></i></div>
+                    <span class="label">ควบคุมสต๊อก</span>
+                    <strong class="value">เรียลไทม์</strong>
+                    <div class="bars" aria-hidden="true"><i style="height:38%"></i><i style="height:58%"></i><i style="height:46%"></i><i style="height:74%"></i><i style="height:64%"></i><i style="height:90%"></i></div>
                 </div>
             </div>
         </div>
-        <div class="story-foot">PopCentral · สร้างเพื่อการดำเนินงานของ POPSTAR</div>
+        <div class="story-foot">
+            <i class="bi bi-shield-check"></i>
+            PopCentral · สร้างเพื่อการดำเนินงานของ POPSTAR
+        </div>
     </section>
+
     <form class="login-card" method="post" action="{{ route('login.attempt') }}">
         @csrf
         <div class="brand">
@@ -359,28 +422,38 @@
         <div class="subtitle">เข้าสู่ระบบศูนย์กลางการทำงานของ PopCentral</div>
 
         @if($errors->any())
-            <div class="error"><i class="bi bi-exclamation-triangle-fill"></i>{{ $errors->first() }}</div>
+            <div class="alert-error"><i class="bi bi-exclamation-triangle-fill"></i><span>{{ $errors->first() }}</span></div>
         @endif
 
-        <label for="username">ชื่อผู้ใช้ อีเมล หรือเบอร์โทรศัพท์</label>
+        <label class="field-label" for="username">ชื่อผู้ใช้ อีเมล หรือเบอร์โทรศัพท์</label>
         <div class="field">
-            <i class="bi bi-person-fill"></i>
+            <i class="bi bi-person-fill field-icon"></i>
             <input type="text" id="username" name="username" value="{{ old('username') }}" required autofocus autocomplete="username">
         </div>
 
-        <label for="password">รหัสผ่าน</label>
+        <label class="field-label" for="password">รหัสผ่าน</label>
         <div class="field">
-            <i class="bi bi-lock-fill"></i>
+            <i class="bi bi-lock-fill field-icon"></i>
             <input type="password" id="password" name="password" required autocomplete="current-password">
+            <button type="button" class="field-toggle" aria-label="แสดง/ซ่อนรหัสผ่าน" onclick="const p=document.getElementById('password'); const i=this.querySelector('i'); const show=p.type==='password'; p.type = show ? 'text' : 'password'; i.className = show ? 'bi bi-eye-slash-fill' : 'bi bi-eye-fill';">
+                <i class="bi bi-eye-fill"></i>
+            </button>
         </div>
 
-        <label class="remember">
-            <input type="checkbox" name="remember" value="1"> จดจำการเข้าสู่ระบบบนอุปกรณ์นี้
-        </label>
+        <div class="row-between">
+            <label class="remember">
+                <span class="switch">
+                    <input type="checkbox" name="remember" value="1">
+                    <span class="track" aria-hidden="true"></span>
+                </span>
+                จดจำการเข้าสู่ระบบบนอุปกรณ์นี้
+            </label>
+        </div>
 
-        <button type="submit"><i class="bi bi-box-arrow-in-right"></i> เข้าสู่ระบบ</button>
+        <button type="submit" class="submit"><i class="bi bi-box-arrow-in-right"></i> เข้าสู่ระบบ</button>
 
-        <div class="foot">ลืมรหัสผ่าน? กรุณาติดต่อผู้ดูแลระบบ</div>
+        <div class="secure-badge"><i class="bi bi-shield-lock-fill"></i> การเชื่อมต่อได้รับการป้องกัน</div>
+        <div class="foot-note">ลืมรหัสผ่าน? กรุณาติดต่อผู้ดูแลระบบ</div>
     </form>
 </main>
 </body>
