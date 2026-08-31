@@ -153,7 +153,7 @@ class PosCashierIdentityTest extends TestCase
         $this->assertSame(422, app(PosApiController::class)->cashierLogin($otherRequest)->getStatusCode());
     }
 
-    public function test_shared_pin_requires_cashier_selection_and_then_binds_the_selected_cashier(): void
+    public function test_device_uses_its_assigned_user_when_another_cashier_shares_a_pin(): void
     {
         [$branch, $alice] = $this->branchWithCashier('DUPPIN', 'ALICE');
         $bob = Salesman::create([
@@ -172,17 +172,15 @@ class PosCashierIdentityTest extends TestCase
 
         $response = app(PosApiController::class)->cashierLogin($request);
 
-        $this->assertTrue($response->getData(true)['selection_required']);
-        $this->assertCount(2, $response->getData(true)['cashiers']);
-        $this->assertSame(0, AuditLog::where('action', 'cashier_login')->count());
+        $this->assertTrue($response->getData(true)['success']);
+        $this->assertSame($alice->id, (int) $response->getData(true)['cashier']['id']);
+        $this->assertSame($alice->id, (int) $device->fresh()->active_cashier_id);
 
-        $selected = Request::create('/api/pos/cashier/login', 'POST', ['pin' => '482165', 'cashier_id' => $bob->id]);
-        $selected->attributes->set('pos_device', $device);
-        $selectedResponse = app(PosApiController::class)->cashierLogin($selected);
-
-        $this->assertTrue($selectedResponse->getData(true)['success']);
-        $this->assertSame($bob->id, (int) $selectedResponse->getData(true)['cashier']['id']);
-        $this->assertSame($bob->id, (int) $device->fresh()->active_cashier_id);
+        $other = Request::create('/api/pos/cashier/login', 'POST', [
+            'pin' => '482165', 'cashier_id' => $bob->id,
+        ]);
+        $other->attributes->set('pos_device', $device);
+        $this->assertSame(422, app(PosApiController::class)->cashierLogin($other)->getStatusCode());
     }
 
     public function test_device_cannot_sell_under_another_cashier_after_pin_login(): void
@@ -323,11 +321,7 @@ class PosCashierIdentityTest extends TestCase
     {
         return PosDevice::create([
             'name' => 'POS '.$branch->code,
-            'user_id' => User::factory()->create([
-                'username' => 'dev_'.strtolower($branch->code).'_'.uniqid(),
-                'branch_id' => $branch->id,
-                'salesman_id' => $cashier->id,
-            ])->id,
+            'user_id' => $cashier->user_id,
             'branch_id' => $branch->id,
             'token_hash' => hash('sha256', 'token-'.$branch->code),
         ]);

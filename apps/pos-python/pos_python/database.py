@@ -217,6 +217,8 @@ ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("sales", "voided_by", "INTEGER"),
     # id ของ Salesman ฝั่ง ERP — sync บิลต้องส่ง id นี้ ไม่ใช่ local id ที่ไม่รับประกันว่าตรงกัน
     ("local_cashiers", "server_id", "INTEGER"),
+    # User คือ identity จริง; server_id คงไว้เป็น adapter ส่งบิลเข้าระบบเก่า
+    ("local_cashiers", "user_id", "INTEGER"),
     # credential ออฟไลน์ที่ ERP ออกให้ (PBKDF2) เก็บแทนการเก็บ PIN/hash เต็มลงเครื่อง
     ("local_cashiers", "cred_salt", "TEXT"),
     ("local_cashiers", "cred_verifier", "TEXT"),
@@ -244,6 +246,7 @@ ADDED_COLUMNS: list[tuple[str, str, str]] = [
 # ใช้ partial index เพราะ ALTER TABLE ADD COLUMN เติม UNIQUE ให้ไม่ได้
 ADDED_INDEXES: list[str] = [
     "CREATE UNIQUE INDEX IF NOT EXISTS ux_local_cashiers_server_id ON local_cashiers(server_id) WHERE server_id IS NOT NULL",
+    "CREATE UNIQUE INDEX IF NOT EXISTS ux_local_cashiers_user_id ON local_cashiers(user_id) WHERE user_id IS NOT NULL",
     "CREATE INDEX IF NOT EXISTS ix_sync_outbox_ready ON sync_outbox(status, priority, created_at)",
     "CREATE INDEX IF NOT EXISTS ix_credential_history_cashier ON cashier_credential_history(cashier_id, superseded_at DESC)",
 ]

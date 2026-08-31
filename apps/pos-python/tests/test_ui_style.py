@@ -83,9 +83,10 @@ class UiStyleTest(unittest.TestCase):
 
     def test_pos_opens_before_cashier_authentication(self) -> None:
         source = inspect.getsource(run_ui)
-        startup = source[source.rfind("app = QApplication([])"):]
-        self.assertIn("window = PosWindow()", startup)
-        self.assertNotIn("login.exec()", startup)
+        self.assertIn("window = PosWindow()", source)
+        self.assertIn("window.showMaximized()", source)
+        self.assertNotIn("QApplication(", source)
+        self.assertNotIn("app.exec()", source)
 
     def test_checkout_authenticates_before_opening_payment(self) -> None:
         source = inspect.getsource(run_ui)

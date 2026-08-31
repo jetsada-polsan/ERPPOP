@@ -158,10 +158,7 @@ class PosPinChangeTest extends TestCase
         $cashierUser->roles()->syncWithoutDetaching([$role->id]);
         $device = PosDevice::create([
             'name' => 'POS '.$code,
-            'user_id' => User::factory()->create([
-                'username' => 'pin_'.strtolower($code).'_'.uniqid(),
-                'branch_id' => $branch->id,
-            ])->id,
+            'user_id' => $cashierUser->id,
             'branch_id' => $branch->id,
             'token_hash' => hash('sha256', 'pin-token-'.$code),
         ]);

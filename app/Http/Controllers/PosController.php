@@ -27,6 +27,7 @@ use App\Models\QtyPromotion;
 use App\Models\Salesman;
 use App\Models\StockBalance;
 use App\Models\StockDocument;
+use App\Models\User;
 use App\Services\Accounting\CashBookPostingService;
 use App\Services\Accounting\GlPostingService;
 use App\Services\Inventory\FifoStockService;
@@ -76,7 +77,21 @@ class PosController extends Controller
 
         $branches = Branch::orderBy('code')->get(['id', 'code', 'name_th']);
         $categories = ProductCategory::orderBy('name_th')->get(['id', 'code', 'name_th']);
-        $cashiers = Salesman::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
+        // User is the visible POS identity. The adapter id only travels in the
+        // compatibility request field used by existing shift/document tables.
+        $cashiers = User::query()
+            ->where('is_active', true)
+            ->whereHas('roles.permissions', fn ($permission) => $permission->where('code', 'pos.sell'))
+            ->with('posCashierProfile:id,user_id')
+            ->orderBy('name')
+            ->get(['id', 'username', 'name'])
+            ->filter(fn (User $user) => $user->posCashierProfile !== null)
+            ->map(fn (User $user) => (object) [
+                'id' => $user->posCashierProfile->id,
+                'user_id' => $user->id,
+                'code' => $user->username,
+                'name' => $user->name,
+            ]);
         $defaultBranchId = $branches->first()?->id;
         $qrConfig = QrPaymentConfig::where('is_active', true)->with('bankAccount')->first();
         $pointValueBaht = $points->pointValueBaht();
@@ -88,9 +103,9 @@ class PosController extends Controller
         $canManageSettings = (bool) $authUser?->hasPermission('settings.manage');
 
         // บังคับใช้ตัวเอง: ล็อกสาขา+คนขายเป็นของ user ที่ login (แคชเชียร์เลือกเองไม่ได้)
-        $authUser?->loadMissing(['branch', 'salesman']);
+        $authUser?->loadMissing(['branch', 'posCashierProfile']);
         $lockedBranch = $authUser?->branch;           // สาขาที่ user สังกัด (null = ยังไม่กำหนด)
-        $lockedCashier = $authUser?->salesman;         // รหัสพนักงานขายของ user
+        $lockedCashier = $authUser?->posCashierProfile;
         if ($lockedBranch) {
             $defaultBranchId = $lockedBranch->id;
         }
@@ -181,9 +196,9 @@ class PosController extends Controller
             return self::requiresCashierPin() ? null : $this->validatedCashierId($requested);
         }
 
-        // POS บนเว็บ: user ที่ผูกรหัสพนักงานไว้ ขายได้ในชื่อตัวเองเท่านั้น และรหัสนั้น
-        // ต้องยังใช้งานอยู่ ไม่งั้นคนที่ถูกปิดการใช้งานแล้วยังขายต่อได้
-        return $this->validatedCashierId(auth()->user()?->salesman_id ?: $requested);
+        // POS บนเว็บ: ใช้ User ที่ล็อกอินเป็นคนขายเสมอ โดย adapter เป็นรายละเอียด
+        // ภายในสำหรับ schema รุ่นเก่าที่ไม่ให้ UI หรือพนักงานจัดการเอง.
+        return $this->validatedCashierId(auth()->user()?->posCashierProfile?->id ?: $requested);
     }
 
     /** รหัสพนักงานที่ client ส่งมาใช้ได้จริงไหม (ยังใช้งานอยู่ + อยู่สาขาที่ตัวเองมีสิทธิ์) */

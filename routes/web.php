@@ -441,11 +441,9 @@ Route::prefix('suppliers')->name('suppliers.')->group(function () {
     Route::post('/{supplier}/payments', [PaymentController::class, 'storeSupplierPayment'])->name('payments.store');
 });
 
-// Master data management: salesmen, warehouse locations, bank accounts
+// Legacy salesman bookmarks redirect to Users. Salesman rows remain internal adapters.
 Route::prefix('salesmen')->name('salesmen.')->group(function () {
     Route::get('/', [SalesmanController::class, 'index'])->name('index');
-    Route::post('/', [SalesmanController::class, 'store'])->name('store');
-    Route::put('/{salesman}', [SalesmanController::class, 'update'])->name('update');
 });
 Route::prefix('sales-areas')->name('sales-areas.')->group(function () {
     Route::post('/', [SalesAreaController::class, 'store'])->name('store');

@@ -68,6 +68,7 @@ class PosApiController extends Controller
                 'id' => $device?->id,
                 'name' => $device?->name,
                 'terminal_code' => $device?->terminal_code,
+                'user_id' => $device?->user_id,
             ],
             'branch_id' => $branchId,
             'branch_name' => $branchName,
@@ -149,7 +150,7 @@ class PosApiController extends Controller
         $device = $request->attributes->get('pos_device');
         $branchId = $device?->branch_id ?: $request->user()?->branch_id;
 
-        $cashiers = $this->cashierCandidates($branchId)
+        $cashiers = $this->cashierCandidates($branchId, null, $device?->user_id)
             ->orderBy(User::select('name')->whereColumn('users.id', 'salesmen.user_id'))
             ->get()
             ->map(fn (Salesman $cashier) => $this->cashierPayload($cashier));
@@ -197,7 +198,7 @@ class PosApiController extends Controller
         $branchId = $device?->branch_id ?: $request->user()?->branch_id;
         $passwordless = AppSetting::get('pos_passwordless_login') === '1';
         if ($passwordless && isset($data['cashier_id']) && blank($data['pin'] ?? null)) {
-            $cashier = $this->cashierCandidates($branchId)->find($data['cashier_id']);
+            $cashier = $this->cashierCandidates($branchId, null, $device?->user_id)->find($data['cashier_id']);
             if (! $cashier) {
                 return response()->json(['success' => false, 'message' => 'ไม่พบพนักงานในสาขานี้'], 422);
             }
@@ -207,7 +208,7 @@ class PosApiController extends Controller
         if (blank($data['pin'] ?? null)) {
             return response()->json(['success' => false, 'message' => 'กรุณาระบุ PIN'], 422);
         }
-        $matches = $this->cashierCandidates($branchId, $data['code'] ?? null)
+        $matches = $this->cashierCandidates($branchId, $data['code'] ?? null, $device?->user_id)
             ->get()
             ->filter(fn (Salesman $candidate) => $this->pinMatches($candidate, $data['pin']))
             ->values();
@@ -225,6 +226,9 @@ class PosApiController extends Controller
             ]);
         }
         $cashier = $matches->firstWhere('id', (int) ($data['cashier_id'] ?? 0));
+        if (isset($data['cashier_id']) && ! $cashier) {
+            return response()->json(['success' => false, 'message' => 'ไม่พบพนักงานที่อนุญาตบนเครื่องนี้'], 422);
+        }
         $cashier ??= $matches->count() === 1 ? $matches->first() : null;
         if (! $cashier) {
             return response()->json(['success' => false, 'message' => 'กรุณาเลือกชื่อพนักงานใหม่'], 422);
@@ -351,12 +355,13 @@ class PosApiController extends Controller
     }
 
     /** แคชเชียร์ที่มีสิทธิ์ใช้บนเครื่องนี้: คนสาขาเดียวกันและคนส่วนกลาง */
-    private function cashierCandidates(?int $branchId, ?string $code = null)
+    private function cashierCandidates(?int $branchId, ?string $code = null, ?int $assignedUserId = null)
     {
         return Salesman::query()
             ->with(['user.roles:id,code', 'user.branchRoles.permissions', 'user.posCredential'])
             ->where('is_active', true)
             ->whereNotNull('user_id')
+            ->when($assignedUserId, fn ($query) => $query->where('user_id', $assignedUserId))
             ->whereHas('user', function ($user) use ($branchId) {
                 $user->where('is_active', true);
 
@@ -474,7 +479,7 @@ class PosApiController extends Controller
 
         $device = $request->attributes->get('pos_device');
         $branchId = $device?->branch_id ?: $request->user()?->branch_id;
-        $cashier = $this->cashierCandidates($branchId, $data['code'])->first();
+        $cashier = $this->cashierCandidates($branchId, $data['code'], $device?->user_id)->first();
 
         if (! $cashier || ! $this->pinMatches($cashier, $data['current_pin'])) {
             return response()->json(['success' => false, 'message' => 'รหัสแคชเชียร์หรือ PIN ปัจจุบันไม่ถูกต้อง'], 422);

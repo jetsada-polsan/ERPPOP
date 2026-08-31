@@ -16,8 +16,10 @@ from .api_client import LaravelApiError, LaravelPosClient
 from .mock_printer import company_details, receipt_for
 from .order import ALL_CATEGORIES, DISCOUNT, PRICE, QTY, Order, OrderLine, categories, product_grid
 from .config import DeviceConfig, load_device_config, save_device_config
+from .printers import installed_printer_names, print_text_to_windows_queue
 from .promptpay import promptpay_payload, qr_matrix
 from .services import PosService, money
+from .settings_service import PrinterProfile, SettingsService
 
 PALETTE = {
     # ชื่อและค่าตรงกับ token --erp-* ในระบบหลังบ้าน เพื่อให้ POS กับ ERP พูดภาษาสี
@@ -42,14 +44,15 @@ PALETTE = {
 }
 
 
-def run_pairing_wizard(data_dir) -> bool:
+def run_pairing_wizard(data_dir, app) -> bool:
     """Pair a new terminal before showing the cashier login screen."""
     try:
-        from PySide6.QtWidgets import QApplication, QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit, QMessageBox
+        from PySide6.QtWidgets import QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit, QMessageBox
     except ImportError as error:
         raise RuntimeError("ยังไม่ได้ติดตั้ง PySide6") from error
 
-    app = QApplication.instance() or QApplication([])
+    if app is None:
+        raise RuntimeError("POS ต้องเริ่ม QApplication จาก main.py ก่อนเปิดหน้าต่าง")
     dialog = QDialog()
     dialog.setWindowTitle("เชื่อมต่อ PopCentral POS")
     dialog.setMinimumWidth(460)
@@ -97,8 +100,7 @@ def run_pairing_wizard(data_dir) -> bool:
     buttons.accepted.connect(pair)
     buttons.rejected.connect(dialog.reject)
     result = dialog.exec() == QDialog.Accepted
-    if QApplication.instance() is app:
-        app.processEvents()
+    app.processEvents()
     return result
 
 # QSS ใช้ปีกกาเป็นไวยากรณ์ เลยแทนค่าด้วย $name แทน .format()
@@ -187,7 +189,7 @@ NUMPAD_KEYS = [
 PRODUCT_TILE_COLUMNS = 4
 
 
-def run_ui(service: PosService, online=None, data_dir=None) -> None:
+def run_ui(service: PosService, online=None, data_dir=None, app=None):
     # เครื่องที่ผูก ERP แล้วใช้ branch/terminal จริงจาก ping; เครื่อง demo ใช้ค่าเดิม
     branch_id = int(online.branch_id) if (online is not None and online.branch_id) else 1
     terminal_id = (online.terminal_id if (online is not None and online.terminal_id) else "PY-TEST-01")
@@ -196,7 +198,7 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
         from PySide6.QtCore import QSize, Qt
         from PySide6.QtGui import QColor, QImage, QKeySequence, QPainter, QPixmap, QShortcut
         from PySide6.QtWidgets import (
-            QApplication, QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGridLayout,
+            QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGridLayout,
             QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton,
             QScrollArea, QTableWidget, QTableWidgetItem, QToolButton, QVBoxLayout, QWidget,
         )
@@ -237,7 +239,7 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             self.cashier_select.addItem("เลือกชื่อคนขาย", None)
             cashiers = service.db.execute(
                 """SELECT code, name FROM local_cashiers
-                   WHERE active = 1 AND revoked_at IS NULL ORDER BY name, code"""
+                   WHERE active = 1 AND user_id IS NOT NULL AND revoked_at IS NULL ORDER BY name, code"""
             ).fetchall()
             for cashier in cashiers:
                 self.cashier_select.addItem(f"{cashier['name']}  ·  {cashier['code']}", cashier["code"])
@@ -706,6 +708,10 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             self.connection = QComboBox()
             self.connection.addItems(["USB", "Serial (COM)", "Network (IP)"])
             self.address = QLineEdit("USB001")
+            self.windows_printer = QComboBox()
+            self.windows_printer.addItem("ยังไม่เลือกเครื่องพิมพ์ Windows", "")
+            self._load_windows_printers()
+            self.windows_printer.currentIndexChanged.connect(self._select_windows_printer)
             self.paper = QComboBox()
             self.paper.addItems(["80 mm", "58 mm"])
             self.paper.currentIndexChanged.connect(self.refresh_preview)
@@ -713,6 +719,7 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             self.drawer.addItems(["เปิดเมื่อรับเงินสด", "ไม่เปิด"])
             form.addRow("ชื่อโปรไฟล์", self.profile_name)
             form.addRow("รุ่น/Driver", self.driver)
+            form.addRow("เครื่องพิมพ์ที่ติดตั้งใน Windows", self.windows_printer)
             form.addRow("การเชื่อมต่อ", self.connection)
             form.addRow("Port / Address", self.address)
             form.addRow("หน้ากระดาษ", self.paper)
@@ -756,11 +763,54 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
                 return
             self.preview.setText(receipt_for(service.db, self.sample_sale_id))
 
+        def _load_windows_printers(self) -> None:
+            selected = SettingsService(service.db).get_device_setting("windows_printer_queue", "")
+            for printer_name in installed_printer_names():
+                self.windows_printer.addItem(printer_name, printer_name)
+            index = self.windows_printer.findData(selected)
+            if index >= 0:
+                self.windows_printer.setCurrentIndex(index)
+
+        def _select_windows_printer(self) -> None:
+            printer_name = str(self.windows_printer.currentData() or "")
+            if printer_name:
+                self.address.setText(printer_name)
+
         def test_print(self) -> None:
-            QMessageBox.information(self, "ทดสอบพิมพ์", "ส่งใบเสร็จตัวอย่างเข้าคิวพิมพ์แล้ว")
+            printer_name = str(self.windows_printer.currentData() or "")
+            if not printer_name:
+                QMessageBox.warning(self, "ยังไม่ได้เลือกเครื่องพิมพ์", "เลือก printer ที่ Windows ติดตั้งก่อนทดสอบพิมพ์")
+                return
+            text = receipt_for(service.db, self.sample_sale_id) if self.sample_sale_id else "PopCentral POS\nทดสอบเครื่องพิมพ์\n"
+            try:
+                print_text_to_windows_queue(text, printer_name)
+            except Exception as error:
+                QMessageBox.critical(self, "ส่งงานพิมพ์ไม่สำเร็จ", str(error))
+                return
+            QMessageBox.information(self, "ทดสอบพิมพ์", f"ส่งใบเสร็จตัวอย่างไปที่ {printer_name} แล้ว")
 
         def save_printer(self) -> None:
-            QMessageBox.information(self, "บันทึกแล้ว", f"บันทึกโปรไฟล์ {self.profile_name.text()} แล้ว")
+            drivers = ["EPSON_ESC_POS", "STAR", "GENERIC_ESC_POS", "MOCK"]
+            profile_name = self.profile_name.text().strip()
+            if not profile_name:
+                QMessageBox.warning(self, "บันทึกไม่ได้", "กรุณาระบุชื่อโปรไฟล์เครื่องพิมพ์")
+                return
+            try:
+                SettingsService(service.db).save_printer_profile(PrinterProfile(
+                    name=profile_name,
+                    driver_type=drivers[self.driver.currentIndex()],
+                    connection_type=["USB", "SERIAL", "NETWORK"][self.connection.currentIndex()],
+                    address=self.address.text().strip() or None,
+                    paper_width_mm=80 if self.paper.currentIndex() == 0 else 58,
+                    open_drawer=self.drawer.currentIndex() == 0,
+                ))
+                SettingsService(service.db).set_device_setting(
+                    "windows_printer_queue", str(self.windows_printer.currentData() or "")
+                )
+            except Exception as error:
+                QMessageBox.critical(self, "บันทึกไม่ได้", str(error))
+                return
+            QMessageBox.information(self, "บันทึกแล้ว", f"บันทึกโปรไฟล์ {profile_name} แล้ว")
 
         def scale_section(self) -> QWidget:
             box = QWidget()
@@ -1275,6 +1325,23 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
                 return
 
             self.last_sale_id = sale_id
+            printer_name = str(SettingsService(service.db).get_device_setting("windows_printer_queue", "") or "")
+            if printer_name:
+                try:
+                    print_text_to_windows_queue(receipt_for(service.db, sale_id), printer_name)
+                    service.db.execute(
+                        "UPDATE print_jobs SET status = 'printed', attempts = attempts + 1, last_error = NULL WHERE sale_id = ?",
+                        (sale_id,),
+                    )
+                    service.db.commit()
+                except Exception as error:
+                    # Sale is already committed locally. Keep it sellable and leave a
+                    # diagnosable queue record instead of rolling back a paid bill.
+                    service.db.execute(
+                        "UPDATE print_jobs SET status = 'failed', attempts = attempts + 1, last_error = ? WHERE sale_id = ?",
+                        (str(error)[:500], sale_id),
+                    )
+                    service.db.commit()
             detail = (f"เงินทอน {self.order.change_for(dialog.tendered()):,.2f} บาท"
                       if dialog.payment_method == "cash" else "รับชำระผ่านโอน / QR แล้ว")
             QMessageBox.information(self, "รับชำระแล้ว", f"บิล {sale_id}\n{detail}")
@@ -1471,16 +1538,15 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
                     f"บิลรอส่ง {service.pending_sync_count()} ใบ · โหมด {self.order.mode}"
                 )
 
-    app = QApplication([])
+    if app is None:
+        raise RuntimeError("POS ต้องเริ่ม QApplication จาก main.py ก่อนเปิดหน้าต่าง")
     app.setStyleSheet(STYLE)
-    try:
-        window = PosWindow()
-        window.resize(1280, 820)
-        window.showMaximized()
-        app.exec()
-    finally:
-        if online is not None:
-            online.worker.stop()
+    window = PosWindow()
+    window.resize(1280, 820)
+    window.showMaximized()
+    if online is not None:
+        app.aboutToQuit.connect(online.worker.stop)
+    return window
 
 
 def _cached_layout(db) -> dict:

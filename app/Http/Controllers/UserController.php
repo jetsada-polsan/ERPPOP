@@ -9,6 +9,7 @@ use App\Models\Role;
 use App\Models\SalesArea;
 use App\Models\Salesman;
 use App\Models\User;
+use App\Models\UserPosCredential;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +31,7 @@ class UserController extends Controller
     {
         $q = trim((string) $request->query('q', ''));
         $status = trim((string) $request->query('status', ''));
-        $users = User::with(['branch', 'salesman', 'posCashierProfile', 'salesArea', 'roles'])
+        $users = User::with(['branch', 'salesman', 'posCashierProfile', 'posCredential', 'branchRoles', 'salesArea', 'roles'])
             ->when($q !== '', fn ($query) => $query->where(fn ($where) => $where
                 ->whereLike('username', "%{$q}%")
                 ->orWhereLike('name', "%{$q}%")
@@ -45,16 +46,16 @@ class UserController extends Controller
             ->withQueryString();
         $branches = Branch::orderBy('code')->get(['id', 'code', 'name_th']);
         $roles = Role::with('permissions')->orderBy('id')->get();
-        $salesmen = Salesman::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
         $salesAreas = SalesArea::where('area_type', 'route')->where('is_active', true)->orderBy('code')->get();
-        $posUsers = User::with(['branch', 'salesman', 'posCashierProfile'])
+        $posUsers = User::with(['branch', 'branchRoles', 'posCredential'])
             ->where('is_active', true)
-            ->whereHas('roles.permissions', fn ($query) => $query->where('code', 'pos.sell'))
-            ->where(fn ($query) => $query->whereHas('salesman')->orWhereHas('posCashierProfile'))
+            ->where(fn ($query) => $query
+                ->whereHas('roles.permissions', fn ($permission) => $permission->where('code', 'pos.sell'))
+                ->orWhereHas('branchRoles.permissions', fn ($permission) => $permission->where('code', 'pos.sell')))
             ->orderBy('name')
             ->get();
 
-        return view('users.index', compact('users', 'posUsers', 'branches', 'roles', 'salesmen', 'salesAreas', 'q', 'status'));
+        return view('users.index', compact('users', 'posUsers', 'branches', 'roles', 'salesAreas', 'q', 'status'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -66,7 +67,8 @@ class UserController extends Controller
             'phone' => ['nullable', 'string', 'max:30'],
             'position' => ['nullable', 'string', 'max:100'],
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
-            'salesman_id' => ['nullable', 'integer', 'exists:salesmen,id'],
+            'branch_ids' => ['nullable', 'array'],
+            'branch_ids.*' => ['integer', 'exists:branches,id'],
             'sales_area_id' => ['nullable', 'integer', 'exists:sales_areas,id'],
             'role_ids' => ['required', 'array', 'min:1'],
             'role_ids.*' => ['integer', 'exists:roles,id'],
@@ -86,14 +88,15 @@ class UserController extends Controller
             'phone' => $data['phone'] ?? null,
             'position' => $data['position'] ?? null,
             'branch_id' => $data['branch_id'] ?? null,
-            'salesman_id' => $data['salesman_id'] ?? null,
             'sales_area_id' => $data['sales_area_id'] ?? null,
             'password' => $data['password'],
             'is_active' => true,
             'must_change_password' => true,
         ]);
         $user->roles()->sync($data['role_ids']);
-        $this->syncPosProfile($user, $user->salesman_id, $this->roleIdsCanSellPos($data['role_ids']));
+        $this->syncHomeBranchRoles($user, $data['role_ids']);
+        $this->addBranchRoles($user, $data['role_ids'], $data['branch_ids'] ?? []);
+        $this->syncPosProfile($user, $this->roleIdsCanSellPos($data['role_ids']));
         $this->audit('user_create', $user, [], [
             'username' => $user->username,
             'role_ids' => $data['role_ids'],
@@ -108,7 +111,6 @@ class UserController extends Controller
         $oldValues = [
             'name' => $user->name,
             'branch_id' => $user->branch_id,
-            'salesman_id' => $user->salesman_id,
             'sales_area_id' => $user->sales_area_id,
             'is_active' => $user->is_active,
             'role_ids' => $user->roles()->pluck('roles.id')->all(),
@@ -119,7 +121,8 @@ class UserController extends Controller
             'phone' => ['nullable', 'string', 'max:30'],
             'position' => ['nullable', 'string', 'max:100'],
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
-            'salesman_id' => ['nullable', 'integer', 'exists:salesmen,id'],
+            'branch_ids' => ['nullable', 'array'],
+            'branch_ids.*' => ['integer', 'exists:branches,id'],
             'sales_area_id' => ['nullable', 'integer', 'exists:sales_areas,id'],
             'role_ids' => ['required', 'array', 'min:1'],
             'role_ids.*' => ['integer', 'exists:roles,id'],
@@ -137,7 +140,6 @@ class UserController extends Controller
             'phone' => $data['phone'] ?? null,
             'position' => $data['position'] ?? null,
             'branch_id' => $data['branch_id'] ?? null,
-            'salesman_id' => $data['salesman_id'] ?? null,
             'sales_area_id' => $data['sales_area_id'] ?? null,
             'is_active' => $request->boolean('is_active', true),
         ]);
@@ -147,11 +149,12 @@ class UserController extends Controller
         }
         $user->save();
         $user->roles()->sync($data['role_ids']);
-        $this->syncPosProfile($user, $user->salesman_id, $this->roleIdsCanSellPos($data['role_ids']));
+        $this->syncHomeBranchRoles($user, $data['role_ids']);
+        $this->addBranchRoles($user, $data['role_ids'], $data['branch_ids'] ?? []);
+        $this->syncPosProfile($user, $this->roleIdsCanSellPos($data['role_ids']));
         $this->audit('user_update', $user, $oldValues, [
             'name' => $user->name,
             'branch_id' => $user->branch_id,
-            'salesman_id' => $user->salesman_id,
             'sales_area_id' => $user->sales_area_id,
             'is_active' => $user->is_active,
             'role_ids' => $data['role_ids'],
@@ -205,9 +208,11 @@ class UserController extends Controller
             return $fail('ออก PIN POS ไม่ได้: ผู้ใช้นี้ยังไม่มีสิทธิ์ขายหน้า POS');
         }
 
-        // รองรับทั้ง mapping ใหม่ (users.salesman_id) และข้อมูลเก่า (salesmen.user_id)
-        // เพื่อให้ผู้ใช้ที่นำเข้าจาก BPlus ยังออก PIN ได้จากหน้าเดียวกัน
-        $cashier = $user->salesman ?: $user->posCashierProfile;
+        // User is the POS identity. A Salesman row is created only as a hidden adapter for
+        // old shift/document foreign keys while installed clients are being upgraded.
+        $this->syncPosProfile($user, true);
+        $user->refresh();
+        $cashier = $user->posCashierProfile;
         if (! $cashier || ! $cashier->is_active) {
             return $fail('ออก PIN POS ไม่ได้: กรุณาผูกโปรไฟล์แคชเชียร์ที่เปิดใช้งานก่อน');
         }
@@ -217,9 +222,11 @@ class UserController extends Controller
             return $fail("ออก PIN POS ไม่ได้: สาขาผู้ใช้ ({$user->branch?->code}) กับโปรไฟล์แคชเชียร์ ({$cashier->branch?->code}) ไม่ตรงกัน กรุณาแก้ไขผู้ใช้ให้เลือกสาขาเดียวกับโปรไฟล์ POS แล้วลองใหม่");
         }
 
-        $temporary = $this->temporaryPosPin($cashier);
+        $temporary = $this->temporaryPosPin($user);
 
         DB::transaction(function () use ($user, $cashier, $temporary) {
+            UserPosCredential::firstOrCreate(['user_id' => $user->id])->setPin($temporary, true);
+            // Temporary compatibility write; authentication now reads user_pos_credentials first.
             $cashier->setPin($temporary, true);
 
             // PIN เดิมถูกยกเลิกแล้ว ต้องถอนการยืนยันบนทุกเครื่องทันทีด้วย
@@ -233,11 +240,11 @@ class UserController extends Controller
                 'user_id' => auth()->id(),
                 'branch_id' => auth()->user()?->branch_id,
                 'action' => 'cashier_pin_reset',
-                'table_name' => 'salesmen',
-                'record_id' => $cashier->id,
+                'table_name' => 'users',
+                'record_id' => $user->id,
                 'new_values' => [
                     'username' => $user->username,
-                    'cashier_code' => $cashier->code,
+                    'legacy_cashier_id' => $cashier->id,
                     'must_change_pin' => true,
                 ],
             ]);
@@ -258,7 +265,7 @@ class UserController extends Controller
             ]);
         }
 
-        $cashier = $user->salesman ?: $user->posCashierProfile;
+        $cashier = $user->posCashierProfile;
         if (! $cashier || ! $cashier->is_active || ! $cashier->branch_id) {
             return redirect()->route('users.index')->withErrors([
                 'pos_pin' => 'แก้สาขา POS ไม่ได้: โปรไฟล์แคชเชียร์ยังไม่มีสาขาที่ใช้งาน',
@@ -308,20 +315,17 @@ class UserController extends Controller
     }
 
     /** PIN ชั่วคราวต้องไม่ชนคนในสาขา เพราะ POS รุ่นใหม่ล็อกอินด้วย PIN อย่างเดียว */
-    private function temporaryPosPin(Salesman $cashier): string
+    private function temporaryPosPin(User $user): string
     {
-        $candidates = Salesman::query()
-            ->where('is_active', true)
-            ->whereNotNull('pos_pin_hash')
-            ->whereKeyNot($cashier->id)
-            ->when($cashier->branch_id, fn ($query) => $query->where(fn ($where) => $where
-                ->whereNull('branch_id')
-                ->orWhere('branch_id', $cashier->branch_id)))
-            ->get(['id', 'pos_pin_hash']);
+        $candidates = UserPosCredential::query()
+            ->whereNotNull('pin_hash')
+            ->where('user_id', '!=', $user->id)
+            ->whereNull('revoked_at')
+            ->get(['id', 'pin_hash']);
 
         for ($attempt = 0; $attempt < 100; $attempt++) {
             $pin = (string) random_int(100000, 999999);
-            if (! $candidates->contains(fn (Salesman $candidate) => Hash::check($pin, $candidate->pos_pin_hash))) {
+            if (! $candidates->contains(fn (UserPosCredential $candidate) => Hash::check($pin, $candidate->pin_hash))) {
                 return $pin;
             }
         }
@@ -349,17 +353,21 @@ class UserController extends Controller
             ->exists();
     }
 
-    private function syncPosProfile(User $user, ?int $salesmanId, bool $canSellPos): void
+    private function syncPosProfile(User $user, bool $canSellPos): void
     {
+        // The User is the sole identity. This row is only an internal adapter for
+        // legacy document foreign keys and is never selected or managed by the user.
+        $salesmanId = $user->posCashierProfile?->id;
+
         if (! $salesmanId && $canSellPos) {
             $profile = Salesman::create([
                 'branch_id' => $user->branch_id,
+                'user_id' => $user->id,
                 'code' => $this->uniquePosProfileCode($user),
                 'name' => $user->name,
                 'is_active' => true,
             ]);
             $salesmanId = $profile->id;
-            $user->forceFill(['salesman_id' => $salesmanId])->save();
         }
 
         Salesman::where('user_id', $user->id)->update(['user_id' => null]);
@@ -370,6 +378,54 @@ class UserController extends Controller
                 'name' => $user->name,
                 'is_active' => true,
             ]);
+        }
+    }
+
+    /** Keep the old home-branch field working while enabling explicit multi-branch roles. */
+    private function syncHomeBranchRoles(User $user, array $roleIds): void
+    {
+        if (! $user->branch_id) {
+            return;
+        }
+
+        DB::table('user_branch_roles')
+            ->where('user_id', $user->id)
+            ->where('branch_id', $user->branch_id)
+            ->whereNotIn('role_id', $roleIds)
+            ->update(['is_active' => false, 'updated_at' => now()]);
+
+        foreach ($roleIds as $roleId) {
+            DB::table('user_branch_roles')->updateOrInsert([
+                'user_id' => $user->id,
+                'branch_id' => $user->branch_id,
+                'role_id' => $roleId,
+            ], [
+                'is_active' => true,
+                'effective_from' => null,
+                'effective_to' => null,
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]);
+        }
+    }
+
+    /** Add access to extra branches without silently revoking an existing branch assignment. */
+    private function addBranchRoles(User $user, array $roleIds, array $branchIds): void
+    {
+        foreach (collect($branchIds)->filter()->unique() as $branchId) {
+            foreach ($roleIds as $roleId) {
+                DB::table('user_branch_roles')->updateOrInsert([
+                    'user_id' => $user->id,
+                    'branch_id' => $branchId,
+                    'role_id' => $roleId,
+                ], [
+                    'is_active' => true,
+                    'effective_from' => null,
+                    'effective_to' => null,
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]);
+            }
         }
     }
 

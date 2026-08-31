@@ -29,6 +29,7 @@ _PING_SETTINGS = {
     "branch_id": ("branch_id",),
     "branch_name": ("branch_name",),
     "terminal_code": ("device", "terminal_code"),
+    "device_user_id": ("device", "user_id"),
     "vat_rate": ("vat_rate",),
     "cashier_login_mode": ("cashier_login_mode",),
     "qr_payment": ("qr_payment",),
@@ -173,16 +174,20 @@ class ProvisioningService:
             raise RuntimeError("รูปแบบข้อมูลแคชเชียร์จาก ERP ไม่ถูกต้อง")
         seen: list[int] = []
         upserted = 0
+        assigned_user_id = self._get_setting("device_user_id")
+        assigned_user_id = int(assigned_user_id) if assigned_user_id is not None else None
         with self.db:
             for row in rows:
                 server_id = row.get("id")
                 code = row.get("code")
-                if not server_id or not code:
+                user_id = row.get("user_id")
+                if not server_id or not code or (assigned_user_id is not None and int(user_id or 0) != assigned_user_id):
                     continue
                 self._upsert_cashier(
                     int(server_id),
                     str(code),
                     str(row.get("name") or code),
+                    int(user_id) if user_id is not None else None,
                     row.get("credential_version"),
                     str(row.get("role") or "cashier"),
                     bool(row.get("must_change_pin") or row.get("force_pin_change")),
@@ -191,37 +196,42 @@ class ProvisioningService:
                 upserted += 1
             if seen:
                 placeholders = ",".join("?" for _ in seen)
+                scope = " AND (user_id IS NULL OR user_id != ?)" if assigned_user_id is not None else ""
+                parameters = [now(), *seen]
+                if assigned_user_id is not None:
+                    parameters.append(assigned_user_id)
                 self.db.execute(
                     f"UPDATE local_cashiers SET active = 0, revoked_at = COALESCE(revoked_at, ?) "
-                    f"WHERE server_id IS NOT NULL AND server_id NOT IN ({placeholders})",
-                    [now(), *seen],
+                    f"WHERE server_id IS NOT NULL AND server_id NOT IN ({placeholders}){scope}",
+                    parameters,
                 )
         return {"upserted": upserted}
 
-    def _upsert_cashier(self, server_id: int, code: str, name: str, credential_version: str | None = None,
+    def _upsert_cashier(self, server_id: int, code: str, name: str, user_id: int | None = None,
+                        credential_version: str | None = None,
                         role: str = "cashier", force_pin_change: bool = False) -> int:
         row = self.db.execute("SELECT * FROM local_cashiers WHERE server_id = ?", (server_id,)).fetchone()
         if row:
             self.db.execute(
                 """UPDATE local_cashiers SET code = ?, name = ?, active = 1, role = ?,
-                last_synced_at = ?, synced_at = ?, server_credential_version = ?,
+                user_id = ?, last_synced_at = ?, synced_at = ?, server_credential_version = ?,
                 force_pin_change = ?, revoked_at = NULL WHERE id = ?""",
-                (code, name, role, now(), now(), credential_version, int(force_pin_change), row["id"]),
+                (code, name, role, user_id, now(), now(), credential_version, int(force_pin_change), row["id"]),
             )
             return int(row["id"])
         existing = self.db.execute("SELECT id FROM local_cashiers WHERE code = ?", (code,)).fetchone()
         if existing:
             self.db.execute(
-                """UPDATE local_cashiers SET server_id = ?, name = ?, active = 1, role = ?,
+                """UPDATE local_cashiers SET server_id = ?, user_id = ?, name = ?, active = 1, role = ?,
                 last_synced_at = ?, synced_at = ?, server_credential_version = ?, force_pin_change = ?, revoked_at = NULL
                 WHERE id = ?""",
-                (server_id, name, role, now(), now(), credential_version, int(force_pin_change), existing["id"]),
+                (server_id, user_id, name, role, now(), now(), credential_version, int(force_pin_change), existing["id"]),
             )
             return int(existing["id"])
         cur = self.db.execute(
-            """INSERT INTO local_cashiers (server_id, code, name, pin_hash, active, role, synced_at, last_synced_at,
-            server_credential_version, force_pin_change) VALUES (?, ?, ?, '', 1, ?, ?, ?, ?, ?)""",
-            (server_id, code, name, role, now(), now(), credential_version, int(force_pin_change)),
+            """INSERT INTO local_cashiers (server_id, user_id, code, name, pin_hash, active, role, synced_at, last_synced_at,
+            server_credential_version, force_pin_change) VALUES (?, ?, ?, ?, '', 1, ?, ?, ?, ?, ?)""",
+            (server_id, user_id, code, name, role, now(), now(), credential_version, int(force_pin_change)),
         )
         return int(cur.lastrowid)
 
@@ -373,3 +383,12 @@ class ProvisioningService:
             "INSERT INTO device_settings (key, value, updated_at) VALUES (?, ?, ?)",
             (key, json.dumps(value, ensure_ascii=False), now()),
         )
+
+    def _get_setting(self, key: str) -> Any:
+        row = self.db.execute("SELECT value FROM device_settings WHERE key = ?", (key,)).fetchone()
+        if not row:
+            return None
+        try:
+            return json.loads(row["value"])
+        except (ValueError, TypeError):
+            return row["value"]

@@ -11,6 +11,7 @@ use App\Models\Salesman;
 use App\Models\User;
 use App\Support\ErpMenu;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -80,6 +81,33 @@ class UserManagementTest extends TestCase
             ->assertDontSee('emp-hidden');
     }
 
+    public function test_explicit_branch_roles_limit_a_pos_user_to_the_assigned_branches(): void
+    {
+        $branchOne = Branch::create(['code' => 'B001', 'name_th' => 'สาขา 1', 'is_active' => true]);
+        $branchTwo = Branch::create(['code' => 'B002', 'name_th' => 'สาขา 2', 'is_active' => true]);
+        $branchThree = Branch::create(['code' => 'B003', 'name_th' => 'สาขา 3', 'is_active' => true]);
+        $permission = Permission::firstOrCreate(['code' => 'pos.sell'], ['name' => 'ขาย POS']);
+        $role = Role::create(['code' => 'MULTI_BRANCH_CASHIER', 'name' => 'แคชเชียร์หลายสาขา']);
+        $role->permissions()->attach($permission->id);
+        $user = User::factory()->create(['username' => 'cashier_b001_b002', 'branch_id' => $branchOne->id]);
+        $user->roles()->attach($role->id);
+
+        foreach ([$branchOne, $branchTwo] as $branch) {
+            DB::table('user_branch_roles')->insert([
+                'user_id' => $user->id,
+                'branch_id' => $branch->id,
+                'role_id' => $role->id,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $this->assertTrue($user->canAccessBranch($branchOne->id, 'pos.sell'));
+        $this->assertTrue($user->canAccessBranch($branchTwo->id, 'pos.sell'));
+        $this->assertFalse($user->canAccessBranch($branchThree->id, 'pos.sell'));
+    }
+
     public function test_legacy_salesman_page_is_not_a_separate_people_menu_anymore(): void
     {
         $admin = User::factory()->create([
@@ -125,7 +153,8 @@ class UserManagementTest extends TestCase
         $user = User::where('username', 'cashier-auto')->firstOrFail();
         $profile = Salesman::where('user_id', $user->id)->firstOrFail();
 
-        $this->assertSame($profile->id, $user->salesman_id);
+        $this->assertNull($user->salesman_id);
+        $this->assertSame($user->id, $profile->user_id);
         $this->assertSame('CASHIER-AUTO', $profile->code);
         $this->assertSame('แคชเชียร์สร้างครั้งเดียว', $profile->name);
         $this->assertSame($branch->id, $profile->branch_id);
@@ -185,17 +214,26 @@ class UserManagementTest extends TestCase
         $this->assertTrue($cashier->fresh()->must_change_pin);
         $this->assertNull($cashier->fresh()->pin_changed_at);
         $this->assertNotNull($cashier->fresh()->pos_credential_version);
+
+        // User is the POS identity now: user_pos_credentials is the record that authentication
+        // actually reads. The salesmen columns above are kept only for the installed-client transition.
+        $credential = \App\Models\UserPosCredential::where('user_id', $user->id)->firstOrFail();
+        $this->assertTrue(Hash::check($temporary, $credential->pin_hash));
+        $this->assertTrue($credential->force_pin_change);
+        $this->assertNull($credential->pin_changed_at);
+        $this->assertNotNull($credential->credential_version);
+
         $this->assertNull($device->fresh()->active_cashier_id);
         $this->assertNull($device->fresh()->cashier_verified_at);
         $this->assertDatabaseHas('audit_logs', [
             'user_id' => $admin->id,
             'action' => 'cashier_pin_reset',
-            'table_name' => 'salesmen',
-            'record_id' => $cashier->id,
+            'table_name' => 'users',
+            'record_id' => $user->id,
         ]);
     }
 
-    public function test_pos_pin_reset_handles_legacy_mapping_and_reports_branch_mismatch_in_the_users_page(): void
+    public function test_pos_pin_reset_reuses_legacy_mapping_and_aligns_its_adapter_to_the_user_branch(): void
     {
         $admin = User::factory()->create(['username' => 'admin-pos-legacy', 'must_change_password' => false]);
         $adminRole = Role::create(['code' => 'LEGACY_PIN_ADMIN', 'name' => 'ผู้ดูแล PIN legacy']);
@@ -244,21 +282,7 @@ class UserManagementTest extends TestCase
             ->post(route('users.reset-pos-pin', $mismatchUser));
 
         $response->assertRedirect(route('users.index'));
-        $response->assertSessionHasErrors('pos_pin');
-        $this->assertSame($cashierBranch->code, $legacyCashier->fresh()->branch?->code);
-
-        $response = $this->withoutMiddleware(ErpAuthorize::class)
-            ->actingAs($admin)
-            ->post(route('users.align-pos-branch', $mismatchUser));
-
-        $response->assertRedirect(route('users.index'));
-        $this->assertSame($cashierBranch->id, $mismatchUser->fresh()->branch_id);
-
-        $response = $this->withoutMiddleware(ErpAuthorize::class)
-            ->actingAs($admin)
-            ->post(route('users.reset-pos-pin', $mismatchUser));
-
-        $response->assertRedirect(route('users.index'));
         $response->assertSessionHas('reset_pos_pin_result');
+        $this->assertSame($userBranch->id, Salesman::where('user_id', $mismatchUser->id)->sole()->branch_id);
     }
 }

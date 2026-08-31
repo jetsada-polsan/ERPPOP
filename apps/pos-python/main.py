@@ -4,6 +4,7 @@ import json
 
 import argparse
 import os
+import sys
 import traceback
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -125,7 +126,17 @@ def demo() -> None:
     print(f"บันทึกบิล {receipt_no}; pending sync={service.pending_sync_count()}; receipt={receipt}")
 
 
-def launch_ui() -> None:
+def create_application():
+    """Create the one and only QApplication for this process."""
+    try:
+        from PySide6.QtWidgets import QApplication
+    except ImportError as error:
+        raise RuntimeError("ยังไม่ได้ติดตั้ง PySide6") from error
+
+    return QApplication.instance() or QApplication(sys.argv)
+
+
+def launch_ui(app):
     """Start the installed application and leave a diagnosable error if startup fails."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -133,30 +144,26 @@ def launch_ui() -> None:
         db = connect(DB_PATH)
         # เครื่องใหม่ต้อง pair กับ ERP ก่อน เพื่อไม่ให้ผู้ใช้เผลอขายในโหมด demo
         # จากนั้น bootstrap จะ sync ข้อมูลจริงและเริ่มส่งบิลค้างเบื้องหลัง
-        if load_device_config(DATA_DIR) is None and not run_pairing_wizard(DATA_DIR):
-            return
+        if load_device_config(DATA_DIR) is None and not run_pairing_wizard(DATA_DIR, app):
+            return None
         online = bootstrap(DATA_DIR, db, DB_PATH)
-        run_ui(PosService(db), online=online, data_dir=DATA_DIR)
+        return run_ui(PosService(db), online=online, data_dir=DATA_DIR, app=app)
     except Exception as error:
         log_path = DATA_DIR / "startup-error.log"
         log_path.write_text(traceback.format_exc(), encoding="utf-8")
 
         # A windowed PyInstaller build has no terminal. Surface the exact recovery path to the user.
         try:
-            from PySide6.QtWidgets import QApplication, QMessageBox
+            from PySide6.QtWidgets import QMessageBox
 
-            created_app = QApplication.instance() is None
-            app = QApplication.instance() or QApplication([])
             QMessageBox.critical(
                 None,
                 "เปิด PopCentral POS ไม่สำเร็จ",
                 f"โปรแกรมเริ่มต้นไม่ได้: {error}\n\n"
                 f"กรุณาส่งไฟล์นี้ให้ฝ่าย IT:\n{log_path}",
             )
-            if created_app:
-                app.quit()
         finally:
-            raise SystemExit(1) from error
+            raise RuntimeError(f"เริ่ม PopCentral POS ไม่สำเร็จ: {log_path}") from error
 
 
 def main() -> None:
@@ -166,10 +173,12 @@ def main() -> None:
     args = parser.parse_args()
     if args.demo:
         demo()
-    elif args.ui:
-        launch_ui()
-    else:
-        launch_ui()
+        return
+
+    app = create_application()
+    window = launch_ui(app)
+    if window is not None:
+        app.exec()
 
 
 if __name__ == "__main__":
