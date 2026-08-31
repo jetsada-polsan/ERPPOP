@@ -18,7 +18,9 @@
         .terminal b { color:#fff; }
         .top-spacer { flex:1; }
         .preview-badge { display:flex; align-items:center; gap:7px; padding:6px 10px; border:1px solid #526173; border-radius:6px; color:#dbe5ef; font-size:12px; }
-        .back { color:#fff; text-decoration:none; width:34px; height:34px; display:grid; place-items:center; border:1px solid #526173; border-radius:6px; }
+        .topbar-action { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:34px; padding:6px 10px; border:1px solid #526173; border-radius:6px; background:transparent; color:#fff; text-decoration:none; font-size:11px; font-weight:800; cursor:pointer; }
+        .topbar-action:hover { background:#26344b; border-color:#8fa2ba; }
+        .topbar-action.icon-only { width:34px; padding:6px; }
         .pos-stage { min-height:0; padding:10px; overflow:auto; }
         .pos-canvas { min-width:960px; min-height:690px; height:calc(100vh - 110px); display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); grid-template-rows:repeat(12,minmax(48px,1fr)); gap:8px; }
         .widget { min-width:0; min-height:0; overflow:hidden; border:1px solid var(--line); border-radius:8px; background:#fff; box-shadow:0 5px 18px #1623310b; }
@@ -48,9 +50,11 @@
         .total-row { display:flex; justify-content:space-between; padding:3px 0; color:var(--muted); font-size:12px; }
         .total-row.grand { margin-top:4px; color:var(--ink); font-size:20px; font-weight:900; }
         .payment { height:100%; display:grid; grid-template-columns:repeat(3,1fr) 1.5fr; gap:8px; padding:10px; }
-        .pay-method { border:1px solid var(--line); border-radius:7px; background:#fff; color:#425466; font-weight:800; }
+        .pay-method { border:1px solid var(--line); border-radius:7px; background:#fff; color:#425466; font-weight:800; cursor:default; }
         .pay-method i { display:block; margin-bottom:4px; font-size:20px; color:var(--green); }
-        .pay-now { border:0; border-radius:7px; background:var(--red); color:#fff; font-size:15px; font-weight:900; box-shadow:0 5px 14px #c9233633; }
+        .pay-method.qr i { color:#0284c7; }
+        .pay-method.card i { color:#b7791f; }
+        .pay-now { border:0; border-radius:7px; background:var(--red); color:#fff; font-size:15px; font-weight:900; box-shadow:0 5px 14px #c9233633; cursor:default; }
         .customer,.held,.shift { height:100%; padding:12px; display:flex; align-items:center; gap:10px; }
         .customer i,.held i,.shift i { width:38px; height:38px; display:grid; place-items:center; border-radius:7px; background:#eef4ff; color:#2563eb; font-size:18px; }
         .customer small,.held small,.shift small { display:block; color:var(--muted); }
@@ -58,7 +62,21 @@
         .numpad button { border:1px solid var(--line); border-radius:5px; background:#f8fafb; font-weight:800; }
         .statusbar { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:0 14px; background:#fff; border-top:1px solid var(--line); color:var(--muted); font-size:11px; }
         .statusbar b { color:var(--green); }
-        @media (max-width:700px) { .terminal { display:none; } .preview-badge span { display:none; } .pos-stage { padding:6px; } }
+        .settings-modal { position:fixed; inset:0; z-index:30; display:grid; place-items:center; padding:16px; background:rgba(15,23,42,.55); }
+        .settings-modal[hidden] { display:none; }
+        .settings-box { width:min(410px, calc(100vw - 28px)); border:1px solid #dce3e8; border-radius:12px; background:#fff; box-shadow:0 24px 70px rgba(15,23,42,.25); overflow:hidden; }
+        .settings-head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border-bottom:1px solid #edf1f4; }
+        .settings-head strong { font-size:15px; }
+        .settings-close { width:30px; height:30px; border:1px solid #dce3e8; border-radius:7px; background:#fff; color:#64748b; cursor:pointer; }
+        .settings-close:hover { color:#9f1f2b; border-color:#e8aab1; background:#fff7f7; }
+        .settings-body { padding:12px 14px 14px; }
+        .settings-body p { margin:0 0 10px; color:var(--muted); font-size:11px; line-height:1.45; }
+        .settings-links { display:grid; gap:7px; }
+        .settings-link { display:flex; align-items:center; gap:9px; min-height:42px; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--ink); text-decoration:none; font-size:12px; font-weight:800; }
+        .settings-link i { width:22px; color:var(--red); text-align:center; font-size:15px; }
+        .settings-link small { display:block; margin-top:2px; color:var(--muted); font-size:10px; font-weight:500; }
+        .settings-link:hover { border-color:#e2a4aa; background:#fff7f7; }
+        @media (max-width:700px) { .terminal { display:none; } .preview-badge span { display:none; } .pos-stage { padding:6px; } .topbar { gap:6px; padding:0 8px; } .topbar-action span { display:none; } .topbar-action.icon-only { display:inline-flex; } .statusbar span:last-child { display:none; } }
     </style>
 </head>
 <body>
@@ -74,8 +92,37 @@
         <div class="terminal"><i class="bi bi-display"></i><span>เครื่อง <b>POS001</b></span><span>สาขา <b>B001</b></span><span>แคชเชียร์ <b>{{ auth()->user()?->name ?? 'Demo Cashier' }}</b></span></div>
         <div class="top-spacer"></div>
         <div class="preview-badge"><i class="bi bi-eye"></i><span>ตัวอย่างจาก Build รุ่น {{ $publishedVersion }}</span></div>
-        <a class="back" href="{{ route('settings.pos-designer') }}" title="กลับไป POS Designer"><i class="bi bi-sliders"></i></a>
+        @if(auth()->user()?->hasPermission('settings.manage'))
+            <button class="topbar-action icon-only" type="button" data-open-pos-settings title="ตั้งค่า POS" aria-label="ตั้งค่า POS"><i class="bi bi-sliders2"></i></button>
+        @endif
+        <a class="topbar-action" href="{{ route('dashboard') }}" title="ออกจากหน้าขายกลับไป ERP"><i class="bi bi-box-arrow-left"></i><span>ออกจาก POS</span></a>
+        <form method="post" action="{{ route('logout') }}" style="display:contents">
+            @csrf
+            <button class="topbar-action" type="submit" title="ออกจากระบบ"><i class="bi bi-box-arrow-right"></i><span>ออกจากระบบ</span></button>
+        </form>
     </header>
+
+    @if(auth()->user()?->hasPermission('settings.manage'))
+        <div class="settings-modal" id="posSettingsModal" hidden role="dialog" aria-modal="true" aria-labelledby="posSettingsTitle">
+            <div class="settings-box">
+                <div class="settings-head">
+                    <strong id="posSettingsTitle"><i class="bi bi-sliders2 me-2" style="color:var(--red)"></i>ตั้งค่า POS</strong>
+                    <button class="settings-close" type="button" data-close-pos-settings title="ปิด" aria-label="ปิดหน้าต่างตั้งค่า"><i class="bi bi-x-lg"></i></button>
+                </div>
+                <div class="settings-body">
+                    <p>เมนูสำหรับผู้ดูแลระบบ การปิดหน้าต่างจะกลับไปหน้าขาย</p>
+                    <div class="settings-links">
+                        <a class="settings-link" href="{{ route('settings.pos-designer') }}" target="_blank" rel="noopener" data-close-pos-settings>
+                            <i class="bi bi-grid-3x3-gap"></i><span>ออกแบบหน้าขาย<small>ลากวางและ Build layout ของ POS</small></span>
+                        </a>
+                        <a class="settings-link" href="{{ route('pos.control') }}" target="_blank" rel="noopener" data-close-pos-settings>
+                            <i class="bi bi-bar-chart-line"></i><span>ศูนย์ควบคุม POS<small>ตรวจยอดขาย กะ และสถานะการซิงก์</small></span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 
     <main class="pos-stage">
         <div class="pos-canvas">
@@ -103,7 +150,7 @@
                             </div><div class="cart-total"><div class="total-row"><span>ยอดก่อนภาษี</span><span>฿{{ number_format($cartTotal > 0 ? $cartTotal / 1.07 : 417.76, 2) }}</span></div><div class="total-row"><span>VAT 7%</span><span>฿{{ number_format($cartTotal > 0 ? $cartTotal - ($cartTotal / 1.07) : 29.24, 2) }}</span></div><div class="total-row grand"><span>ยอดสุทธิ</span><span>฿{{ number_format($cartTotal > 0 ? $cartTotal : 447, 2) }}</span></div></div></div>
                             @break
                         @case('payment')
-                            <div class="payment"><button class="pay-method"><i class="bi bi-cash-stack"></i>เงินสด</button><button class="pay-method"><i class="bi bi-qr-code"></i>พร้อมเพย์</button><button class="pay-method"><i class="bi bi-credit-card"></i>บัตร</button><button class="pay-now">รับชำระ ฿{{ number_format($cartTotal > 0 ? $cartTotal : 447, 2) }}</button></div>
+                            <div class="payment"><button class="pay-method cash" type="button" disabled><i class="bi bi-cash-stack"></i>เงินสด</button><button class="pay-method qr" type="button" disabled><i class="bi bi-qr-code"></i>พร้อมเพย์</button><button class="pay-method card" type="button" disabled><i class="bi bi-credit-card"></i>บัตร</button><button class="pay-now" type="button" disabled>รับชำระ ฿{{ number_format($cartTotal > 0 ? $cartTotal : 447, 2) }}</button></div>
                             @break
                         @case('customer')
                             <div class="customer"><i class="bi bi-person"></i><div><strong>ลูกค้าทั่วไป</strong><small>ค้นหาสมาชิกด้วยชื่อหรือเบอร์โทร</small></div></div>
@@ -125,5 +172,16 @@
 
     <footer class="statusbar"><span><b>● Preview mode</b> หน้านี้ไม่บันทึกยอดขายและไม่ตัดสต็อก</span><span>เผยแพร่ล่าสุด {{ $publishedAt ? \Illuminate\Support\Carbon::parse($publishedAt)->timezone('Asia/Bangkok')->format('d/m/Y H:i') : 'ยังไม่มีข้อมูลเวลา' }}</span></footer>
 </div>
+<script>
+    (() => {
+        const modal = document.getElementById('posSettingsModal');
+        if (!modal) return;
+        const close = () => { modal.hidden = true; };
+        document.querySelector('[data-open-pos-settings]')?.addEventListener('click', () => { modal.hidden = false; document.querySelector('[data-close-pos-settings]')?.focus(); });
+        modal.querySelectorAll('[data-close-pos-settings]').forEach((element) => element.addEventListener('click', close));
+        modal.addEventListener('click', (event) => { if (event.target === modal) close(); });
+        document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !modal.hidden) close(); });
+    })();
+</script>
 </body>
 </html>
