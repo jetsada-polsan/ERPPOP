@@ -100,10 +100,34 @@ jobs:
           if [ "$installer" != "release/$target" ]; then
             mv "$installer" "release/$target"
           fi
-          cat > release.sftp <<EOF
-          put release/$target /var/www/jeterp/storage/app/pos-python-releases/$target
-          EOF
-          sftp -b release.sftp "$SSH_USER@$SSH_HOST"
+          remote_dir="/var/www/jeterp/storage/app/pos-python-releases"
+          remote_tmp="/tmp/popcentral-pos-release-${GITHUB_RUN_ID}/${target}"
+          ssh "$SSH_USER@$SSH_HOST" "mkdir -p '$(dirname "$remote_tmp")'"
+          scp "release/$target" "$SSH_USER@$SSH_HOST:$remote_tmp"
+          # The release directory belongs to www-data, while the release SSH
+          # account is intentionally separate. Install through passwordless
+          # sudo after uploading to a user-owned staging path.
+          local_sum="$(sha256sum "release/$target" | cut -d' ' -f1)"
+          ssh "$SSH_USER@$SSH_HOST" bash -s -- "$remote_dir" "$remote_tmp" "$target" "$local_sum" <<'REMOTE'
+          set -euo pipefail
+          release_dir="$1"; source_file="$2"; name="$3"; expected="$4"
+          actual="$(sha256sum "$source_file" | cut -d' ' -f1)"
+          if [[ "$actual" != "$expected" ]]; then
+            echo "sha256 ไม่ตรงกัน ไฟล์เสียระหว่างส่ง — ไม่ทับของเดิม" >&2
+            exit 1
+          fi
+          sudo -n mkdir -p "$release_dir"
+          shopt -s nullglob
+          for stale in "$release_dir"/*.previous.exe; do
+            sudo -n rm -f "$stale"
+          done
+          for old in "$release_dir"/*-UAT-*-setup.exe; do
+            [[ "$(basename "$old")" == "$name" ]] && continue
+            sudo -n mv -f "$old" "${old%.exe}.previous.exe"
+          done
+          sudo -n install -o www-data -g www-data -m 0664 "$source_file" "$release_dir/$name"
+          rm -f "$source_file"
+          REMOTE
           code="$(curl -s -o /dev/null -w '%{http_code}' -I "$BASE_URL/download/python-pos" || true)"
           echo "GET /download/python-pos -> $code"
           [ "$code" = "200" ] || [ "$code" = "302" ]
