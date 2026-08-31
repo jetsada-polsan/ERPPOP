@@ -6,9 +6,10 @@
 from __future__ import annotations
 
 import re
+import inspect
 import unittest
 
-from pos_python.ui import PALETTE, SECTION_HINTS, STYLE
+from pos_python.ui import PALETTE, SECTION_HINTS, STYLE, run_ui
 
 JET_BLUE = "#1585c0"
 JET_BLUE_DARK = "#0f4c75"
@@ -79,6 +80,23 @@ class UiStyleTest(unittest.TestCase):
         self.assertEqual(list(SECTION_HINTS), expected, "หัวข้อต้องครบและเรียงตามภาพร่าง")
         for name, hint in SECTION_HINTS.items():
             self.assertTrue(hint.strip(), f"{name} ยังไม่มีคำอธิบาย")
+
+    def test_pos_opens_before_cashier_authentication(self) -> None:
+        source = inspect.getsource(run_ui)
+        startup = source[source.rfind("app = QApplication([])"):]
+        self.assertIn("window = PosWindow()", startup)
+        self.assertNotIn("login.exec()", startup)
+
+    def test_checkout_authenticates_before_opening_payment(self) -> None:
+        source = inspect.getsource(run_ui)
+        pay = source[source.index("        def pay(self)"):source.index("        def ensure_sale_session(self)")]
+        self.assertLess(pay.index("ensure_sale_session"), pay.index("PaymentDialog"))
+
+    def test_settings_remain_it_protected_without_cashier_login(self) -> None:
+        source = inspect.getsource(run_ui)
+        settings = source[source.index("        def open_settings(self) -> None", source.index("class PosWindow")):]
+        self.assertIn("has_local_it_pin", settings)
+        self.assertIn("AdminAuthDialog", settings)
 
 
 if __name__ == "__main__":

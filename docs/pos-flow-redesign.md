@@ -40,6 +40,12 @@ hash centrally. On a successful online login the POS receives a device-bound,
 PBKDF2 verifier and stores it in the local SQLite table `offline_cashiers`.
 The verifier cannot be used as the original PIN or as an ERP password.
 
+The terminal shell opens immediately after the one-time device-token pairing. Staff
+can inspect products, the empty cart and local daily reports without a cashier
+session. Cashier authentication is deferred until `Start selling` or payment; only
+then does the POS open a shift and permit a receipt to be committed. Device/API
+settings remain protected by a Local IT PIN, bootstrapped once with an ERP admin.
+
 Offline rules:
 
 1. The cashier must have logged in successfully on that same POS before.
@@ -94,4 +100,3 @@ auditable and do not overwrite the normal price table.
    promotion, VAT and stock movement before completing the receipt.
 7. Accounting and reports read `sales_postings`; POS and back-office sales are
    reconciled without adding the same sale twice.
-

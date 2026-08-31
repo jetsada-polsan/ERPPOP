@@ -206,8 +206,13 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
         def __init__(self):
             super().__init__()
             self.cashier = None
-            self.setWindowTitle("PopCentral POS — เข้าสู่ระบบ")
+            self.setWindowTitle("PopCentral POS — ยืนยันก่อนเริ่มขาย")
             form = QFormLayout(self)
+            hint = QLabel(
+                "ดูสินค้าและรายงานได้โดยไม่ต้องล็อกอิน "
+                "กรอกรหัสแคชเชียร์และ PIN เมื่อต้องการเริ่มขาย"
+            )
+            hint.setWordWrap(True)
             self.code = QLineEdit()
             self.code.setPlaceholderText("รหัสแคชเชียร์ หรือ username ERP")
             self.pin = QLineEdit()
@@ -215,12 +220,14 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             self.pin.returnPressed.connect(self.login)
             self.connection_status = QLabel(self._offline_notice())
             self.connection_status.setWordWrap(True)
-            submit = QPushButton("เข้าสู่ระบบ")
+            submit = QPushButton("ยืนยันและเริ่มขาย")
+            submit.setObjectName("primary")
             submit.clicked.connect(self.login)
             maintenance = QPushButton("IT Maintenance")
             maintenance.clicked.connect(self.open_maintenance)
             override = QPushButton("ผู้จัดการช่วยกู้ PIN")
             override.clicked.connect(self.manager_override)
+            form.addRow(hint)
             form.addRow("รหัสแคชเชียร์ / username", self.code)
             form.addRow("PIN", self.pin)
             form.addRow(self.connection_status)
@@ -814,24 +821,15 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             self.accept()
 
     class PosWindow(QMainWindow):
-        def __init__(self, cashier):
+        def __init__(self, cashier=None):
             super().__init__()
             self.cashier = cashier
             self.order = Order()
             self.category = ALL_CATEGORIES
-            self.shift_id = service.open_shift(branch_id, terminal_id, int(cashier["id"]), Decimal("0"))
-            if online is not None and cashier["server_id"]:
-                try:
-                    online.provisioning.open_server_shift(
-                        branch_id=branch_id, cashier_server_id=int(cashier["server_id"]),
-                        opening_cash=Decimal("0"), local_shift_id=self.shift_id,
-                    )
-                except Exception:
-                    # เปิดกะ ERP ไม่ได้ตอนนี้ ยังขายออฟไลน์ได้ บิลจะ sync เมื่อผูกกะสำเร็จภายหลัง
-                    pass
+            self.shift_id: int | None = None
             self.last_sale_id: int | None = None
             layout_version = layout_config.get("version", 1)
-            self.setWindowTitle(f"PopCentral POS — {cashier['name']} · Layout {layout_version}")
+            self.setWindowTitle(f"PopCentral POS — พร้อมใช้งาน · Layout {layout_version}")
             self.setStyleSheet(STYLE)
             self.settings_shortcut = QShortcut(QKeySequence("Ctrl+Alt+S"), self)
             self.settings_shortcut.activated.connect(self.open_settings)
@@ -871,12 +869,23 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             head_layout = QHBoxLayout(head)
             head_layout.setContentsMargins(0, 0, 0, 0)
             head_layout.setSpacing(8)
-            head_layout.addWidget(QLabel(f"บิลปัจจุบัน · {self.cashier['name']}"), 1)
+            self.cashier_label = QLabel("บิลปัจจุบัน · ยังไม่ได้เริ่มขาย")
+            head_layout.addWidget(self.cashier_label, 1)
+            self.auth_button = QPushButton("เริ่มขาย")
+            self.auth_button.setObjectName("headerAction")
+            self.auth_button.setToolTip("ยืนยันรหัสแคชเชียร์และ PIN ก่อนบันทึกยอดขาย")
+            self.auth_button.clicked.connect(self.ensure_sale_session)
+            head_layout.addWidget(self.auth_button)
             report = QPushButton("ยอดวันนี้")
             report.setObjectName("headerAction")
             report.setToolTip("ดูยอดขายของเครื่องนี้จาก SQLite")
             report.clicked.connect(self.show_daily_sales)
             head_layout.addWidget(report)
+            settings = QPushButton("⚙")
+            settings.setObjectName("headerAction")
+            settings.setToolTip("ตั้งค่าเครื่อง POS สำหรับ IT")
+            settings.clicked.connect(self.open_settings)
+            head_layout.addWidget(settings)
             layout.addWidget(head)
 
             self.table = QTableWidget(0, 4)
@@ -1108,6 +1117,8 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
         def pay(self) -> None:
             if not self.order.lines:
                 return
+            if not self.ensure_sale_session():
+                return
             dialog = PaymentDialog(self, self.order)
             if dialog.exec() != QDialog.Accepted:
                 return
@@ -1133,11 +1144,75 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
             self.order.clear()
             self.refresh_order()
 
+        def ensure_sale_session(self) -> bool:
+            """Authenticate and open a shift only when the operator starts selling."""
+            if self.cashier is not None and self.shift_id is not None:
+                return True
+
+            login = LoginDialog()
+            if login.exec() != QDialog.Accepted or login.cashier is None:
+                return False
+
+            try:
+                shift_id = service.open_shift(
+                    branch_id, terminal_id, int(login.cashier["id"]), Decimal("0")
+                )
+            except Exception as error:
+                QMessageBox.warning(self, "เริ่มขายไม่ได้", str(error))
+                return False
+
+            self.cashier = login.cashier
+            self.shift_id = shift_id
+            if online is not None and self.cashier["server_id"]:
+                try:
+                    online.provisioning.open_server_shift(
+                        branch_id=branch_id, cashier_server_id=int(self.cashier["server_id"]),
+                        opening_cash=Decimal("0"), local_shift_id=self.shift_id,
+                    )
+                except Exception:
+                    # Local shift remains usable offline and is reconciled on a later sync.
+                    pass
+
+            self.cashier_label.setText(f"บิลปัจจุบัน · {self.cashier['name']}")
+            self.auth_button.setText(f"กำลังขาย: {self.cashier['code']}")
+            self.auth_button.setEnabled(False)
+            layout_version = layout_config.get("version", 1)
+            self.setWindowTitle(f"PopCentral POS — {self.cashier['name']} · Layout {layout_version}")
+            self.refresh_order(keep_selection=True)
+            return True
+
         def open_settings(self) -> None:
+            if service.has_local_it_pin():
+                from PySide6.QtWidgets import QInputDialog
+                pin, ok = QInputDialog.getText(
+                    self, "ตั้งค่าเครื่อง POS", "กรอก Local IT PIN", QLineEdit.Password
+                )
+                if not ok:
+                    return
+                if not service.verify_local_it_pin(pin):
+                    QMessageBox.warning(self, "ยืนยันไม่สำเร็จ", "Local IT PIN ไม่ถูกต้อง")
+                    return
+                SettingsDialog(self, self.last_sale_id).exec()
+                return
             if online is None or not online.online:
-                QMessageBox.warning(self, "ต้องเชื่อม ERP ก่อน", "เมนูตั้งค่า POS ต้องออนไลน์และยืนยันผู้ดูแลก่อน")
+                QMessageBox.warning(
+                    self, "ต้องตั้ง Local IT PIN",
+                    "เชื่อม ERP และยืนยันผู้ดูแลหนึ่งครั้งเพื่อตั้ง Local IT PIN สำหรับเครื่องนี้",
+                )
                 return
             if AdminAuthDialog(self).exec() == QDialog.Accepted:
+                from PySide6.QtWidgets import QInputDialog
+                pin, ok = QInputDialog.getText(
+                    self, "ตั้ง Local IT PIN ครั้งแรก",
+                    "PIN สำหรับเปิดตั้งค่าเครื่องนี้ (6-20 หลัก)", QLineEdit.Password,
+                )
+                if not ok:
+                    return
+                try:
+                    service.set_local_it_pin(pin)
+                except ValueError as error:
+                    QMessageBox.warning(self, "PIN ไม่ถูกต้อง", str(error))
+                    return
                 SettingsDialog(self, self.last_sale_id).exec()
 
         def show_last_receipt(self) -> None:
@@ -1250,22 +1325,22 @@ def run_ui(service: PosService, online=None, data_dir=None) -> None:
                 pending = pending if pending is not None else service.pending_sync_count()
                 link = "เชื่อม ERP" if getattr(online.worker, "online", True) else "ออฟไลน์"
                 self.status.setText(
-                    f"กะ {self.shift_id} · {link} · บิลรอส่ง {pending} ใบ · โหมด {self.order.mode}"
+                    f"{f'กะ {self.shift_id}' if self.shift_id else 'พร้อมใช้งาน · ยังไม่ได้เริ่มขาย'} · "
+                    f"{link} · บิลรอส่ง {pending} ใบ · โหมด {self.order.mode}"
                 )
             else:
                 self.status.setText(
-                    f"กะ {self.shift_id} · บิลรอส่ง {service.pending_sync_count()} ใบ · โหมด {self.order.mode}"
+                    f"{f'กะ {self.shift_id}' if self.shift_id else 'พร้อมใช้งาน · ยังไม่ได้เริ่มขาย'} · "
+                    f"บิลรอส่ง {service.pending_sync_count()} ใบ · โหมด {self.order.mode}"
                 )
 
     app = QApplication([])
     app.setStyleSheet(STYLE)
-    login = LoginDialog()
     try:
-        if login.exec() == QDialog.Accepted:
-            window = PosWindow(login.cashier)
-            window.resize(1280, 820)
-            window.showMaximized()
-            app.exec()
+        window = PosWindow()
+        window.resize(1280, 820)
+        window.showMaximized()
+        app.exec()
     finally:
         if online is not None:
             online.worker.stop()
