@@ -587,6 +587,25 @@
             max-height: calc(100vh - 32px); overflow: hidden;
             box-shadow: 0 24px 80px rgba(0,0,0,.6);
         }
+        .pos-settings-box {
+            width: min(430px, calc(100vw - 28px));
+            max-height: min(520px, calc(100dvh - 28px));
+            border-radius: 14px;
+        }
+        .pos-settings-box .modal-head { padding: 13px 15px; }
+        .pos-settings-box .modal-title { font-size: 16px; }
+        .pos-settings-body { padding: 12px 14px 14px; }
+        .pos-settings-note { margin: 0 0 10px; color: var(--pos-muted); font-size: 11px; line-height: 1.45; }
+        .pos-settings-actions { display: grid; gap: 7px; }
+        .pos-settings-action {
+            display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px;
+            padding: 8px 10px; border: 1px solid var(--pos-border); border-radius: 9px;
+            background: var(--pos-card); color: var(--pos-text); text-decoration: none;
+            font: inherit; font-size: 12px; font-weight: 900; cursor: pointer; text-align: left;
+        }
+        .pos-settings-action i { width: 25px; text-align: center; color: var(--pos-ui-primary, #bd2836); font-size: 16px; }
+        .pos-settings-action small { display: block; margin-top: 2px; color: var(--pos-muted); font-size: 10px; font-weight: 600; }
+        .pos-settings-action:hover { border-color: var(--pos-ui-primary, #bd2836); background: var(--pos-card-2); }
         .modal-head {
             padding: 18px 20px;
             border-bottom: 1px solid var(--pos-border);
@@ -1345,7 +1364,7 @@
         body.view-only .pos-body { grid-template-columns:minmax(500px,38vw) 1fr; }
         body.view-only .pos-actionbar,
         body.view-only .pos-cart-header,
-        body.view-only .pos-cart-footer,
+        body.view-only .pos-cart > .pos-cart-footer,
         body.view-only .cart-line-tools,
         body.view-only .trash-btn { display:none!important; }
         body.view-only .cart-qty-cell { pointer-events:none; }
@@ -1674,6 +1693,7 @@
                 max-height: none;
                 overflow: visible;
             }
+            .pos-settings-box { width: min(430px, calc(100vw - 20px)); max-height: calc(100dvh - 20px); overflow: hidden; }
         }
     </style>
 </head>
@@ -1738,13 +1758,13 @@
             <i class="bi bi-download"></i> ติดตั้งแอพ
         </button>
 
-        <a href="{{ route('dashboard') }}" target="_blank" class="topbar-btn" style="margin-left:8px">
-            <i class="bi bi-grid"></i> ERP
+        <a href="{{ route('dashboard') }}" class="topbar-btn topbar-exit" title="ออกจากหน้าขายกลับไป ERP" style="margin-left:8px">
+            <i class="bi bi-box-arrow-left"></i> ออกจาก POS
         </a>
         @if($canManageSettings)
-        <a href="{{ route('settings.pos-designer') }}" target="_blank" class="topbar-btn pos-admin-entry" title="ตั้งค่า POS สำหรับผู้ดูแลระบบ" aria-label="ตั้งค่า POS สำหรับผู้ดูแลระบบ">
+        <button type="button" class="topbar-btn pos-admin-entry" title="ตั้งค่า POS สำหรับผู้ดูแลระบบ" aria-label="ตั้งค่า POS สำหรับผู้ดูแลระบบ" @click="settingsOpen = true">
             <i class="bi bi-sliders2"></i>
-        </a>
+        </button>
         @endif
         <a href="{{ route('pos.compare') }}" target="_blank" class="topbar-btn" title="เปิด Web POS และ Vue POS คู่กัน">
             <i class="bi bi-layout-split"></i> เทียบ UI
@@ -1761,6 +1781,35 @@
             </button>
         </form>
     </div>
+
+    {{-- COMPACT ADMIN SETTINGS --}}
+    @if($canManageSettings)
+    <div class="modal-overlay" x-show="settingsOpen" @keydown.escape.window="settingsOpen = false" style="display:none">
+        <div class="modal-box pos-settings-box" @click.outside="settingsOpen = false" x-transition>
+            <div class="modal-head">
+                <div class="modal-title"><i class="bi bi-sliders2 me-2" style="color:var(--pos-ui-primary,#bd2836)"></i>ตั้งค่า POS</div>
+                <button class="modal-close" type="button" title="ปิด" aria-label="ปิดหน้าต่างตั้งค่า" @click="settingsOpen = false"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="pos-settings-body">
+                <p class="pos-settings-note">เมนูนี้สำหรับผู้ดูแลระบบเท่านั้น การปิดหน้าต่างจะกลับไปหน้าขายทันที</p>
+                <div class="pos-settings-actions">
+                    <button type="button" class="pos-settings-action" @click="settingsOpen = false; openReceiptSettings()">
+                        <i class="bi bi-receipt"></i>
+                        <span>ตั้งค่าใบเสร็จ<small>เลือกกระดาษและรูปแบบการพิมพ์</small></span>
+                    </button>
+                    <a href="{{ route('settings.pos-designer') }}" class="pos-settings-action" target="_blank" rel="noopener" @click="settingsOpen = false">
+                        <i class="bi bi-grid-3x3-gap"></i>
+                        <span>ออกแบบหน้าขาย<small>ลากวางและ Build layout ของ POS</small></span>
+                    </a>
+                    <a href="{{ route('pos.control') }}" class="pos-settings-action" target="_blank" rel="noopener" @click="settingsOpen = false">
+                        <i class="bi bi-bar-chart-line"></i>
+                        <span>ศูนย์ควบคุม POS<small>ตรวจยอดขาย กะ และสถานะการซิงก์</small></span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
 
     <div class="pos-body">
 
@@ -2693,6 +2742,7 @@ function posApp() {
         activeShift: null,
         shiftModalOpen: false,
         closeShiftModalOpen: false,
+        settingsOpen: false,
         shiftProcessing: false,
         openingCash: 0,
         openingNote: '',
@@ -2807,7 +2857,7 @@ function posApp() {
                 return;
             }
             if (action.type === 'open-payment') {
-                this.openPayment();
+                this.openPayment(action.method || null);
             }
         },
 

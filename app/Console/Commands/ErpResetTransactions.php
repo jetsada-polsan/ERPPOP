@@ -37,7 +37,8 @@ class ErpResetTransactions extends Command
      * ตอนลบจะไล่ย้อนจากท้ายขึ้นต้น เพื่อให้ลบลูกก่อนแม่เสมอ
      */
     public const TRANSACTIONAL = [
-        'documents', 'stock_documents', 'stock_document_items', 'gl_journals', 'document_sequences',
+        'documents', 'ocr_documents', 'ocr_extracted_lines', 'ocr_match_results', 'ocr_review_logs', 'ocr_attachments',
+        'stock_documents', 'stock_document_items', 'gl_journals', 'document_sequences',
         'stock_movements', 'stock_lots', 'stock_lot_quality_checks', 'stock_counts', 'stock_count_items',
         'pos_receipts', 'pos_receipt_items', 'pos_receipt_discounts', 'pos_payments', 'pos_shifts',
         'pos_cash_movements', 'pos_held_bills', 'pos_receipt_returns', 'pos_logs', 'pos_preparation_jobs',

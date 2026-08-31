@@ -22,9 +22,10 @@
                     <div class="text-muted small">บันทึกแล้วเพิ่มสต็อกเข้าคลังทันที</div>
                 </div>
             </div>
-            <button type="button" class="btn btn-primary rounded-pill px-4" @click="openModal()">
-                <i class="bi bi-plus-lg me-1"></i> สร้างใบซื้อ
-            </button>
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="{{ route('ocr.documents.create') }}" class="btn btn-light border"><i class="bi bi-camera me-1"></i>รับจาก OCR</a>
+                <button type="button" class="btn btn-primary rounded-pill px-4" @click="openModal()"><i class="bi bi-plus-lg me-1"></i> สร้างใบซื้อ</button>
+            </div>
         </div>
 
         <div class="content-card p-4">

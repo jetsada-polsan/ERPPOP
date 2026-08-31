@@ -42,6 +42,7 @@ use App\Http\Controllers\MemberPointController;
 use App\Http\Controllers\ModuleControlController;
 use App\Http\Controllers\MonthlyAccountingController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\OcrDocumentController;
 use App\Http\Controllers\OperationsController;
 use App\Http\Controllers\OrganizationalUnitController;
 use App\Http\Controllers\PaymentController;
@@ -153,6 +154,19 @@ Route::prefix('management-controls')->name('management-controls.')->group(functi
 // กระดิ่งแจ้งเตือน header: รายการตามภาระหน้าที่ของผู้ใช้ (ทุกคนที่ล็อกอินเรียกได้
 // ตัวกรองสิทธิ์อยู่ใน NotificationService)
 Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+
+Route::prefix('ocr/documents')->name('ocr.documents.')->group(function () {
+    Route::get('/', [OcrDocumentController::class, 'index'])->name('index');
+    Route::get('/create', [OcrDocumentController::class, 'create'])->name('create');
+    Route::post('/', [OcrDocumentController::class, 'store'])->name('store');
+    Route::get('/{document}', [OcrDocumentController::class, 'show'])->name('show');
+    Route::get('/{document}/file', [OcrDocumentController::class, 'file'])->name('file');
+    Route::post('/{document}/process', [OcrDocumentController::class, 'process'])->name('process');
+    Route::post('/{document}/review', [OcrDocumentController::class, 'review'])->name('review');
+    Route::post('/{document}/approve', [OcrDocumentController::class, 'approve'])->name('approve');
+    Route::post('/{document}/reject', [OcrDocumentController::class, 'reject'])->name('reject');
+    Route::post('/{document}/post-to-goods-receipt', [OcrDocumentController::class, 'postToGoodsReceipt'])->name('post');
+});
 
 // POS: full-screen selling interface, separate layout from ERP backend.
 Route::prefix('pos')->name('pos.')->group(function () {

@@ -8,6 +8,8 @@ use App\Models\StockMovement;
 use App\Observers\DocumentObserver;
 use App\Observers\GlJournalObserver;
 use App\Observers\StockMovementObserver;
+use App\Services\OCR\MockOcrEngine;
+use App\Services\OCR\OcrEngineInterface;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\ServiceProvider;
@@ -19,7 +21,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(OcrEngineInterface::class, MockOcrEngine::class);
     }
 
     /**

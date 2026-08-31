@@ -231,6 +231,23 @@ onUnmounted(() => window.removeEventListener('pos-vue-state', syncState));
                 <div class="total-row muted"><span>VAT {{ state.vatRate }}%</span><span>฿{{ money(vat) }}</span></div>
                 <div class="total-row grand"><span>ยอดสุทธิ</span><span class="val">฿{{ money(total) }}</span></div>
             </div>
+            <div class="vue-payment-preview" :class="{ 'is-view-only': !state.canSell }">
+                <div class="vue-payment-preview-head">
+                    <span>ช่องทางชำระเงิน</span>
+                    <small v-if="!state.canSell">ดูอย่างเดียว</small>
+                </div>
+                <div class="vue-payment-methods">
+                    <button type="button" class="vue-payment-method cash" :disabled="!state.canSell || !state.cart.length" @click="action('open-payment', { method: 'cash' })">
+                        <i class="bi bi-cash-stack"></i><span>เงินสด</span>
+                    </button>
+                    <button type="button" class="vue-payment-method qr" :disabled="!state.canSell || !state.cart.length" @click="action('open-payment', { method: 'transfer' })">
+                        <i class="bi bi-qr-code"></i><span>QR พร้อมเพย์</span>
+                    </button>
+                    <button type="button" class="vue-payment-method card" :disabled="!state.canSell || !state.cart.length" @click="action('open-payment', { method: 'credit_card' })">
+                        <i class="bi bi-credit-card"></i><span>บัตร</span>
+                    </button>
+                </div>
+            </div>
         </div>
         <button v-if="state.canSell" class="vue-cart-actions" type="button" :disabled="!state.cart.length" @click="action('open-payment')"><i class="bi bi-cash-coin"></i> คิดเงิน / ชำระเงิน</button>
     </section>
@@ -240,6 +257,19 @@ onUnmounted(() => window.removeEventListener('pos-vue-state', syncState));
 .pos-vue-cart { height: 100%; display: flex; flex-direction: column; min-height: 0; }
 .pos-vue-cart > .cart-empty { flex: 1; }
 .gift-label { color: #059669; font-weight: 900; }
+.vue-payment-preview { margin: 8px 10px 0; padding-top: 8px; border-top: 1px solid var(--pos-ui-border, #dbe7ef); }
+.vue-payment-preview-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; color: var(--pos-ui-ink, #162331); font-size: 11px; font-weight: 900; }
+.vue-payment-preview-head small { color: var(--pos-ui-muted, #6c7b88); font-size: 10px; font-weight: 700; }
+.vue-payment-methods { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.vue-payment-method { min-height: 42px; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 5px 4px; border: 1px solid var(--pos-ui-border, #dbe7ef); border-radius: 7px; background: var(--pos-ui-surface, #fff); color: var(--pos-ui-ink, #162331); font: inherit; font-size: 11px; font-weight: 900; cursor: pointer; }
+.vue-payment-method i { font-size: 15px; }
+.vue-payment-method.cash i { color: #16805b; }
+.vue-payment-method.qr i { color: #0284c7; }
+.vue-payment-method.card i { color: #b7791f; }
+.vue-payment-method:hover:not(:disabled) { border-color: var(--pos-ui-primary, #bd2836); background: #fff7f7; }
+.vue-payment-method:disabled { cursor: not-allowed; opacity: .58; }
+.vue-payment-preview.is-view-only .vue-payment-method { background: #f8fafc; }
 .vue-cart-actions { margin: 8px 10px 10px; min-height: 48px; border: 0; border-radius: 12px; background: linear-gradient(135deg,#10b981,#047857); color: #fff; font: inherit; font-size: 16px; font-weight: 900; cursor: pointer; box-shadow: 0 4px 16px rgba(16,185,129,.25); }
 .vue-cart-actions:disabled { opacity: .4; cursor: not-allowed; }
+@media (max-width: 1120px) { .vue-payment-method { font-size: 10px; } }
 </style>

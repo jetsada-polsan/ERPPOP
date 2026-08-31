@@ -118,8 +118,9 @@ class PurchaseService
                 'document_type_id' => $documentType->id,
                 'branch_id' => $branch->id,
                 'doc_number' => $this->numbers->next('PURCHASE', $branch->id),
-                'doc_date' => now()->toDateString(),
+                'doc_date' => $data['doc_date'] ?? now()->toDateString(),
                 'supplier_id' => $data['supplier_id'],
+                'reference' => $data['reference'] ?? null,
                 'status' => 'active',
                 'total_items' => $items->count(),
                 'total_amount' => $totalAmount,
@@ -128,6 +129,7 @@ class PurchaseService
                 'prices_include_vat' => $pricesIncludeVat,
                 'claim_input_vat' => $claimInputVat,
                 'remark' => $data['remark'] ?? null,
+                'created_by' => $data['created_by'] ?? auth()->id(),
             ]);
 
             $stockDocument = StockDocument::create([

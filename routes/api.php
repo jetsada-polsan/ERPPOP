@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\PosApiController;
+use App\Http\Controllers\Api\OcrDocumentController;
 use App\Http\Controllers\Api\LegacyBackofficeSummaryController;
 use App\Http\Controllers\PosController;
 use Illuminate\Support\Facades\Route;
@@ -30,3 +31,15 @@ Route::prefix('pos')->middleware('pos.device')->name('api.pos.')->group(function
 });
 
 Route::post('/legacy-backoffice/summary', [LegacyBackofficeSummaryController::class, 'store'])->name('api.legacy-backoffice.summary');
+
+Route::prefix('ocr')->middleware('auth')->name('api.ocr.')->group(function () {
+    Route::get('/documents', [OcrDocumentController::class, 'index'])->name('documents.index');
+    Route::post('/documents', [OcrDocumentController::class, 'store'])->name('documents.store');
+    Route::get('/documents/{document}', [OcrDocumentController::class, 'show'])->name('documents.show');
+    Route::get('/documents/{document}/file', [OcrDocumentController::class, 'file'])->name('documents.file');
+    Route::post('/documents/{document}/process', [OcrDocumentController::class, 'process'])->name('documents.process');
+    Route::post('/documents/{document}/review', [OcrDocumentController::class, 'review'])->name('documents.review');
+    Route::post('/documents/{document}/approve', [OcrDocumentController::class, 'approve'])->name('documents.approve');
+    Route::post('/documents/{document}/reject', [OcrDocumentController::class, 'reject'])->name('documents.reject');
+    Route::post('/documents/{document}/post-to-goods-receipt', [OcrDocumentController::class, 'postToGoodsReceipt'])->name('documents.post');
+});
