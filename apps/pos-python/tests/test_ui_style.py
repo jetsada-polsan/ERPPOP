@@ -110,6 +110,14 @@ class UiStyleTest(unittest.TestCase):
         self.assertIn("ตรวจสอบแล้วว่าเงินเข้าบัญชีครบตามยอด", source)
         self.assertIn("not self.transfer_confirmed.isChecked()", source)
 
+    def test_pos_layout_adapts_to_small_pos_displays(self) -> None:
+        source = inspect.getsource(run_ui)
+        self.assertIn("def resizeEvent", source)
+        self.assertIn('self.width() <= 1450 or self.height() <= 900', source)
+        self.assertIn("def _product_columns_for_width", source)
+        self.assertIn("self.grid_host.width()", source)
+        self.assertIn("window.setMinimumSize(960, 600)", source)
+
 
 if __name__ == "__main__":
     unittest.main()

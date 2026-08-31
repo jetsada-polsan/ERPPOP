@@ -149,6 +149,16 @@ QScrollArea#productScroll { background: transparent; border: 0; }
 QLineEdit, QComboBox { background: $surface; border: 1px solid $field; border-radius: 7px; padding: 9px 11px; font-size: 14.5px; }
 QLineEdit:focus, QComboBox:focus { border-color: $primary; }
 
+/* จอ POS 14-15 นิ้วมักเป็น 1366x768 — ลดเฉพาะ chrome ของหน้าจอ
+   เพื่อเก็บพื้นที่ไว้ให้รายการสินค้าและบิล ไม่เปลี่ยนขนาดตัวเลขทางธุรกิจ */
+QMainWindow[compact="true"] #brandName { font-size: 15px; padding: 8px 0; }
+QMainWindow[compact="true"] #brandRight { font-size: 11px; }
+QMainWindow[compact="true"] QPushButton { padding: 6px 8px; font-size: 13px; }
+QMainWindow[compact="true"] QPushButton#payBtn { font-size: 15px; padding: 10px 8px; }
+QMainWindow[compact="true"] QLineEdit, QComboBox { padding: 6px 8px; font-size: 13px; }
+QMainWindow[compact="true"] QToolButton#tile { padding: 8px; font-size: 12.5px; }
+QMainWindow[compact="true"] #grandTotal { font-size: 25px; }
+
 #orderPanel { background: $surface; border-right: 1px solid $border; }
 #orderHead { background: $primary_dark; color: $surface; padding: 12px 16px; font-weight: 700; }
 #orderHead QLabel { background: transparent; color: $surface; font-weight: 700; }
@@ -1013,6 +1023,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.category = ALL_CATEGORIES
             self.shift_id: int | None = None
             self.last_sale_id: int | None = None
+            self._product_columns: int | None = None
             layout_version = layout_config.get("version", 1)
             self.setWindowTitle(f"PopCentral POS — พร้อมใช้งาน · Layout {layout_version}")
             self.setStyleSheet(STYLE)
@@ -1039,6 +1050,20 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
             self.refresh_products()
             self.refresh_order()
+
+        def resizeEvent(self, event) -> None:
+            """Keep the working area usable on common 14-15 inch POS screens."""
+            super().resizeEvent(event)
+            compact = self.width() <= 1450 or self.height() <= 900
+            mode_changed = self.property("compact") != compact
+            if mode_changed:
+                self.setProperty("compact", compact)
+                self.style().unpolish(self)
+                self.style().polish(self)
+
+            columns = self._product_columns_for_width()
+            if mode_changed or columns != self._product_columns:
+                self.refresh_products()
 
         # ---------- ซ้าย: บิล ----------
 
@@ -1079,6 +1104,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.table.setSelectionBehavior(QTableWidget.SelectRows)
             self.table.setEditTriggers(QTableWidget.NoEditTriggers)
             self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+            for column in (1, 2, 3):
+                self.table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeToContents)
             self.table.itemSelectionChanged.connect(self.on_line_selected)
             layout.addWidget(self.table, 1)
 
@@ -1182,6 +1209,15 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.build_category_bar()
             return panel
 
+        def _product_columns_for_width(self) -> int:
+            """Choose a grid that fits without a horizontal scrollbar."""
+            available = self.grid_host.width()
+            if available <= 0:
+                return 4
+            gap = 10
+            minimum_tile = 128 if self.property("compact") else 154
+            return max(1, min(4, (available + gap) // (minimum_tile + gap)))
+
         def build_category_bar(self) -> None:
             group = QButtonGroup(self)
             for name in categories(service.db):
@@ -1201,6 +1237,11 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             while self.grid.count():
                 self.grid.takeAt(0).widget().deleteLater()
 
+            columns = self._product_columns_for_width()
+            self._product_columns = columns
+            available = max(self.grid_host.width(), columns * 110 + (columns - 1) * 10)
+            tile_width = max(110, (available - (columns - 1) * 10) // columns)
+            tile_height = 104 if self.property("compact") else 118
             term = self.scan.text().strip()
             # ตัวเลขล้วนคือกำลังยิงบาร์โค้ด ไม่ใช่ค้นหา — อย่าให้ตารางกระพริบระหว่างสแกน
             search = "" if term.isdigit() else term
@@ -1213,12 +1254,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 tile.setToolButtonStyle(Qt.ToolButtonTextOnly)
                 tile.setText(f"{product['name']}\n{price:,.2f} ฿ / {unit}" + (f"\n{sku}" if sku else ""))
                 tile.setToolTip(str(product["name"] or ""))
-                tile.setMinimumSize(QSize(154, 98))
-                tile.setMaximumHeight(118)
+                tile.setMinimumSize(QSize(tile_width, tile_height))
+                tile.setMaximumHeight(tile_height)
                 tile.clicked.connect(lambda _, row=product: self.add_product_row(row))
-                self.grid.addWidget(tile, index // PRODUCT_TILE_COLUMNS, index % PRODUCT_TILE_COLUMNS)
+                self.grid.addWidget(tile, index // columns, index % columns)
             for column in range(PRODUCT_TILE_COLUMNS):
-                self.grid.setColumnStretch(column, 1)
+                self.grid.setColumnStretch(column, 1 if column < columns else 0)
 
         # ---------- การกระทำ ----------
 
@@ -1542,6 +1583,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         raise RuntimeError("POS ต้องเริ่ม QApplication จาก main.py ก่อนเปิดหน้าต่าง")
     app.setStyleSheet(STYLE)
     window = PosWindow()
+    window.setMinimumSize(960, 600)
     window.resize(1280, 820)
     window.showMaximized()
     if online is not None:
