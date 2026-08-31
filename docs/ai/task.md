@@ -227,3 +227,57 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
 - ยังไม่ทดสอบ/ความเสี่ยง: คำสั่งนี้ตรวจโครงสร้างและความสมบูรณ์ ไม่แทนการขายจริงบน Windows, การตรวจโดยนักบัญชี หรือการตอบรับ E-Tax provider
 - Deploy: deploy แล้วที่ `/var/www/jeterp`; backup ก่อน deploy สำเร็จที่ `storage/app/backups/erp-db-20260828-220843.sql.gz`; clear cache และ migrate สำเร็จ
 - งานถัดไป: บน Windows เปิดแอป → pair เครื่อง → ping → sync catalog/cashier → login PIN → เปิดกะ → ขาย 1 บิล → ตรวจเลข receipt และรายการบน `/bplus/pos-workbench`
+
+## Handoff - 2026-08-31 (Claude ต่อจาก Codex — User เป็นตัวตน POS/ERP)
+
+- Commit: pending (ยังไม่ commit/push ตามคำสั่ง — รอทดสอบและรับอนุญาตก่อน)
+- สถานะที่รับต่อ: Codex แก้ค้างอยู่ตอนย้าย identity POS จาก `salesmen` ไปเป็น `User` (ใช้ครบโควตาเมื่อ 2026-08-31)
+  ไฟล์ที่แก้ไว้แล้วตอนรับงาน: migration `2026_08_31_000157_make_users_the_pos_identity.php`,
+  `UserPosCredential.php` (ใหม่), `User.php`, `PosApiController.php`, `UserController.php`,
+  `BookingController.php`, `BookingService.php`, `users/index.blade.php`, `bookings/index.blade.php`,
+  `entry-modal.blade.php`, `entry-assets.blade.php`
+
+### ตรวจแล้วและแก้เพิ่ม
+1. **`resources/views/users/index.blade.php`** มีโค้ดตายที่ยังอ้าง `$posCashier` ที่ไม่มีตัวแปรแล้ว
+   (ซ่อนอยู่ใต้ `@if(false)` เก่า) — ลบบล็อกนั้นออกแล้ว ไม่กระทบ runtime (เพราะเป็น false branch)
+   แต่เป็นโค้ดค้างที่ไม่ควรทิ้งไว้ตามที่สั่ง
+2. **`BookingController::index()`** รายการผู้รับผิดชอบใบจอง (`$salesUsers`) เดิมกรองเฉพาะคนที่มีสิทธิ์
+   `sales.manage/sales.assign` แบบ role ระดับบริษัทเท่านั้น ไม่รวมคนที่ได้สิทธิ์ผ่าน `branchRoles`
+   (สิทธิ์รายสาขา) และไม่รับประกันว่าจะมี current user อยู่ในลิสต์เสมอ (ตรงกับความเสี่ยงที่ระบุไว้) —
+   แก้ให้รวมทั้งสอง scope และ `orWhere('id', $currentUser->id)` เสมอ
+3. **`app/Console/Commands/SetPosPin.php`** (คำสั่ง `pos:pin` ที่เจ้าของโปรเจกต์รันเองเพื่อออก PIN) —
+   พบว่าเขียน PIN ลงเฉพาะ `salesmen.pos_pin_hash` เท่านั้น แต่การล็อกอินตอนนี้อ่าน
+   `user_pos_credentials` ก่อนเสมอ (`PosApiController::pinHash()`) ถ้า user มี credential แถวนี้อยู่แล้ว
+   คำสั่งนี้จะรันสำเร็จแต่ PIN ที่ตั้งใหม่ใช้ล็อกอินจริงไม่ได้ — แก้ให้ dual-write เข้า
+   `user_pos_credentials` ด้วยเมื่อ salesman ผูก user_id พร้อมเช็คชนกับ credential เดิมด้วย
+4. **`tests/Feature/UserManagementTest.php`** เทสต์ reset PIN เดิมตรวจแค่ตาราง `salesmen` และ
+   audit log ที่ `table_name = salesmen` — เพิ่มให้ตรวจ `user_pos_credentials` (pin_hash,
+   force_pin_change, credential_version) และแก้ audit assertion เป็น `table_name = users`,
+   `record_id = $user->id` ให้ตรงกับโค้ดใหม่
+5. **`tests/Feature/BookingSalesAreaTest.php`** มี 2 เคสที่ยังคาดหวังพฤติกรรมเดิม (ตามที่สั่งให้แก้):
+   - เคสที่เคย assert ว่าลูกค้าไม่มีเจ้าของจะถูก "claim" เป็นของผู้สร้างใบจอง — พฤติกรรมนี้ถูกถอดออกแล้ว
+     ตามกติกาใหม่ (ไม่ผูก user กับลูกค้าทีละราย) เปลี่ยนเป็นยืนยันว่าลูกค้า**ไม่ถูก claim**
+   - เคสที่เคย reject การจองเพราะ "ลูกค้ามีเจ้าของเป็นคนอื่น" — เปลี่ยนเป็นยืนยันว่าตอนนี้จองได้ปกติ
+     (เพราะไม่เช็คเจ้าของลูกค้าอีกต่อไป) และเพิ่มเทสต์ใหม่แทนที่คุมกติกาจริงคือ
+     "มอบใบจองให้คนอื่นโดยไม่มีสิทธิ์ sales.assign ต้องถูกปฏิเสธ"
+
+### ยังไม่ได้ทำ / ยังไม่ตรวจ (สำคัญ)
+- **ยังไม่ได้รัน `php artisan test`, `npm run build`, หรือเทสต์ Python POS เลย** — เครื่องมือที่ผมมีในรอบนี้
+  เป็น sandbox แยกที่ไม่มี PHP/Composer/Node ติดตั้ง และไม่มีสิทธิ์ apt/root เพื่อติดตั้งเอง
+  (Codex เดิมรันบนเครื่อง Mac จริงโดยตรงจึงมีเครื่องมือครบ) **ต้องรันชุดทดสอบก่อน commit/push จริง**
+  ตามกติกา `docs/ai/WORKFLOW.md`
+- Python POS (`apps/pos-python`) ยังไม่ถูกแตะเลยในรอบนี้ (ยังอิง flow เดิม) — ตามแผนเดิมต้อง sync ด้วย
+  `user_id` แต่ backward-compat ใน API (ส่ง `code`/`legacy_cashier_id` คู่กับ `user_id`/`user_name`)
+  ทำให้ POS รุ่นที่ติดตั้งอยู่ยังใช้งานต่อได้ระหว่างนี้
+- ยังมี `cashier_code` (ค่า legacy) หลงเหลือใน audit log payload อีก 2 จุด
+  (`UserController::alignPosBranch`, `PosApiController::changeCashierPin`) — เป็นแค่ metadata ใน
+  audit_logs ไม่ใช่ UI ที่ผู้ใช้เห็น จึงไม่ได้แก้ในรอบนี้ (ไม่กระทบฟังก์ชัน)
+- ยังไม่ได้ตรวจ migration `148`-อื่นๆ บน PostgreSQL แยกก่อน — เช็คเฉพาะไวยากรณ์ (Schema builder,
+  insertOrIgnore/updateOrInsert) ที่ใช้เป็นแบบเดียวกับ migration เก่าที่ผ่าน production มาแล้ว
+
+### งานถัดไป (ก่อน commit/push)
+1. รัน `php artisan test` ให้ผ่านทั้งหมด (โดยเฉพาะ `UserManagementTest`, `BookingSalesAreaTest`,
+   `PosPinChangeTest`, และเทสต์ POS อื่นๆ ที่แตะ `PosApiController`)
+2. รัน `git diff --check` และ `npm run build` ถ้าแตะ asset
+3. ถ้าเทสต์ผ่านครบค่อย commit เป็นชุดเล็กที่มีความหมาย แล้วอัปเดต handoff นี้ด้วย commit hash + ผลทดสอบจริง
+4. ห้าม deploy จนกว่าเจ้าของโปรเจกต์สั่ง

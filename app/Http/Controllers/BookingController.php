@@ -69,8 +69,17 @@ class BookingController extends Controller
         }
 
         $branches = Branch::orderBy('code')->get();
+        $currentUser = $request->user();
+        // ต้องรวมทั้งสิทธิ์ระดับบริษัท (roles) และสิทธิ์เฉพาะสาขา (branchRoles) และต้องมีคนที่ล็อกอินอยู่เสมอ
+        // เพื่อให้เลือกตัวเองเป็นผู้รับผิดชอบได้แม้ยังไม่ได้รับสิทธิ์ sales.manage/sales.assign
         $salesUsers = User::where('is_active', true)
-            ->whereHas('roles.permissions', fn ($query) => $query->where('code', 'sales.manage'))
+            ->where(function ($query) use ($currentUser) {
+                $query->whereHas('roles.permissions', fn ($permission) => $permission->whereIn('code', ['sales.manage', 'sales.assign']))
+                    ->orWhereHas('branchRoles.permissions', fn ($permission) => $permission->whereIn('code', ['sales.manage', 'sales.assign']));
+                if ($currentUser) {
+                    $query->orWhere('id', $currentUser->id);
+                }
+            })
             ->with('salesArea:id,code,name')
             ->orderBy('username')
             ->get(['id', 'username', 'name', 'sales_area_id']);
@@ -110,6 +119,7 @@ class BookingController extends Controller
             'customer_id' => ['required', 'integer', 'exists:customers,id'],
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
             'sales_area_id' => ['nullable', 'integer', 'exists:sales_areas,id'],
+            'sales_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'remark' => ['nullable', 'string', 'max:1000'],
             // ไม่ส่งมา = รับเองที่สาขา (ค่าเดิมของใบจองทั้งหมดก่อนมีฟิลด์นี้)
             'fulfillment_type' => ['nullable', 'in:pickup,delivery'],
@@ -122,21 +132,19 @@ class BookingController extends Controller
         ]);
 
         $user = $request->user()->loadMissing('salesArea');
-        $customer = \App\Models\Customer::findOrFail($data['customer_id']);
         $canAssign = $user->hasPermission('sales.assign');
-
-        if ($customer->sales_user_id && (int) $customer->sales_user_id !== (int) $user->id && ! $canAssign) {
-            return back()->withInput()->with('error', 'ลูกค้ารายนี้มีผู้ดูแลคนอื่น กรุณาให้หัวหน้าฝ่ายขายโอนผู้ดูแลก่อน');
+        $assigneeId = (int) ($data['sales_user_id'] ?? $user->id);
+        if ($assigneeId !== (int) $user->id && ! $canAssign) {
+            return back()->withInput()->with('error', 'การมอบใบจองให้ผู้ใช้อื่นต้องมีสิทธิ์กำหนดผู้รับผิดชอบ');
+        }
+        $assignee = User::where('is_active', true)->with(['salesman', 'posCashierProfile'])->findOrFail($assigneeId);
+        if (! $assignee->canAccessBranch((int) $data['branch_id'])) {
+            return back()->withInput()->with('error', 'ผู้รับผิดชอบที่เลือกไม่มีสิทธิ์ทำงานในสาขาของใบจอง');
         }
 
-        $data['sales_user_id'] = $canAssign && $customer->sales_user_id
-            ? $customer->sales_user_id
-            : $user->id;
-        $data['salesman_id'] = $user->salesman_id;
-        $data['sales_area_id'] = $customer->sales_area_id
-            ?? $user->sales_area_id
-            ?? ($data['sales_area_id'] ?? null);
-        $data['claim_customer_owner'] = $customer->sales_user_id === null || $customer->sales_area_id === null;
+        $data['sales_user_id'] = $assignee->id;
+        $data['salesman_id'] = ($assignee->salesman ?: $assignee->posCashierProfile)?->id;
+        $data['sales_area_id'] = $data['sales_area_id'] ?? $assignee->sales_area_id;
 
         if (! empty($data['sales_area_id'])) {
             $area = SalesArea::where('is_active', true)->where('area_type', 'route')->findOrFail($data['sales_area_id']);
@@ -146,7 +154,7 @@ class BookingController extends Controller
             $data['document_book_id'] = $area->document_book_id;
         }
 
-        if ($user->branch_id && (int) $user->branch_id !== (int) $data['branch_id'] && ! $canAssign) {
+        if (! $user->canAccessBranch((int) $data['branch_id']) && ! $canAssign) {
             return back()->withInput()->with('error', 'ผู้ใช้นี้สร้างใบจองได้เฉพาะสาขาประจำของตนเอง');
         }
 

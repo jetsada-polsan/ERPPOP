@@ -158,13 +158,15 @@ function docEntryPage(config) {
         selectParty(party) {
             this.partyId = party.id;
             this.partyQuery = `${party.code} - ${party.name_th}`;
-            this.salesUserId = party.sales_user_id
-                ? String(party.sales_user_id)
-                : String(this.config.defaultSalesUserId || '');
-            this.salesUserName = party.sales_user_name || this.config.defaultSalesUserName || '';
-            this.salesAreaId = party.sales_area_id
-                ? String(party.sales_area_id)
-                : String(this.config.defaultSalesAreaId || '');
+            if (this.config.salesUserFromParty !== false) {
+                this.salesUserId = party.sales_user_id
+                    ? String(party.sales_user_id)
+                    : String(this.config.defaultSalesUserId || '');
+                this.salesUserName = party.sales_user_name || this.config.defaultSalesUserName || '';
+                this.salesAreaId = party.sales_area_id
+                    ? String(party.sales_area_id)
+                    : String(this.config.defaultSalesAreaId || '');
+            }
             this.partyResults = [];
         },
         onBranchChanged() {

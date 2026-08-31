@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Http\Controllers\Api\PosApiController;
 use App\Models\Branch;
 use App\Models\PosDevice;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\Salesman;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -143,6 +145,17 @@ class PosPinChangeTest extends TestCase
             'name' => 'แคชเชียร์ '.$code,
             'is_active' => true,
         ]);
+        $cashierUser = User::factory()->create([
+            'username' => 'cashier_pin_'.strtolower($code).'_'.uniqid(),
+            'branch_id' => $branch->id,
+            'salesman_id' => $cashier->id,
+            'is_active' => true,
+        ]);
+        $cashier->update(['user_id' => $cashierUser->id]);
+        $permission = Permission::firstOrCreate(['code' => 'pos.sell'], ['name' => 'ขาย POS']);
+        $role = Role::firstOrCreate(['code' => 'POS_PIN_TEST_ROLE'], ['name' => 'แคชเชียร์ PIN ทดสอบ']);
+        $role->permissions()->syncWithoutDetaching([$permission->id]);
+        $cashierUser->roles()->syncWithoutDetaching([$role->id]);
         $device = PosDevice::create([
             'name' => 'POS '.$code,
             'user_id' => User::factory()->create([

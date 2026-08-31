@@ -40,33 +40,26 @@
             </div>
             <div class="pos-quick-search input-group" style="max-width:320px">
                 <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
-                <input class="form-control" x-model="quick" placeholder="ค้นหาชื่อ / username / รหัสแคชเชียร์" autocomplete="off">
+                <input class="form-control" x-model="quick" placeholder="ค้นหาชื่อ / username" autocomplete="off">
             </div>
         </div>
         <div class="pos-user-grid">
             @forelse($posUsers as $user)
-                @php($posCashier = $user->salesman ?? $user->posCashierProfile)
-                @php($posBranchMismatch = $user->branch_id && $posCashier?->branch_id && (int) $user->branch_id !== (int) $posCashier->branch_id)
-                <article class="pos-user-card" x-show="!quick || '{{ strtolower($user->name.' '.$user->username.' '.($posCashier?->code ?? '')) }}'.includes(quick.toLowerCase())">
+                @php($posReady = $user->posCredential?->pin_hash && !$user->posCredential?->force_pin_change && !$user->posCredential?->revoked_at)
+                @php($branchCodes = $user->branchRoles->pluck('pivot.branch_id')->unique()->map(fn ($id) => $branches->firstWhere('id', $id)?->code)->filter()->implode(', '))
+                <article class="pos-user-card" x-show="!quick || '{{ strtolower($user->name.' '.$user->username) }}'.includes(quick.toLowerCase())">
                     <div class="d-flex align-items-center gap-2">
                         <div class="pos-user-avatar"><i class="bi bi-person-fill"></i></div>
                         <div class="min-w-0"><strong class="d-block text-truncate">{{ $user->name }}</strong><span class="text-muted small">{{ $user->username }}</span></div>
                     </div>
-                    <div class="pos-user-meta"><span><i class="bi bi-shop me-1"></i>{{ $user->branch?->code ?? 'ส่วนกลาง' }}</span><span><i class="bi bi-person-vcard me-1"></i>{{ $posCashier?->code ?? 'ยังไม่ผูก' }}</span></div>
-                    <div class="pos-user-status {{ $posBranchMismatch ? 'needs' : ($posCashier?->pos_pin_hash && !$posCashier?->must_change_pin ? 'ready' : 'needs') }}">
-                        <i class="bi {{ $posBranchMismatch ? 'bi-exclamation-octagon-fill' : ($posCashier?->pos_pin_hash && !$posCashier?->must_change_pin ? 'bi-check-circle-fill' : 'bi-exclamation-circle-fill') }}"></i>
-                        {{ $posBranchMismatch ? 'สาขาไม่ตรง ต้องแก้ก่อน' : ($posCashier?->pos_pin_hash && !$posCashier?->must_change_pin ? 'พร้อมเข้า POS' : 'ต้องออก/เปลี่ยน PIN') }}
+                    <div class="pos-user-meta"><span><i class="bi bi-shop me-1"></i>{{ $branchCodes ?: ($user->branch?->code ?? 'ทุกสาขา') }}</span><span><i class="bi bi-person-badge me-1"></i>User เดียวกับ ERP</span></div>
+                    <div class="pos-user-status {{ $posReady ? 'ready' : 'needs' }}">
+                        <i class="bi {{ $posReady ? 'bi-check-circle-fill' : 'bi-exclamation-circle-fill' }}"></i>
+                        {{ $posReady ? 'พร้อมเข้า POS' : 'ต้องออก/เปลี่ยน PIN' }}
                     </div>
-                    @if($posBranchMismatch)
-                        <form method="post" action="{{ route('users.align-pos-branch', $user) }}" class="mt-2" onsubmit="return confirm('ให้ใช้สาขา {{ $posCashier->branch?->code }} ตามโปรไฟล์ POS นี้หรือไม่?')">
-                            @csrf
-                            <button class="btn btn-sm btn-light border w-100"><i class="bi bi-arrow-left-right me-1"></i>ใช้สาขาโปรไฟล์ POS</button>
-                        </form>
-                    @else
-                        <button type="button" class="btn btn-sm {{ $posCashier ? 'btn-outline-primary' : 'btn-light border' }} w-100 mt-2" @click="{{ $posCashier ? "openPosPinReset({$user->id}, '".addslashes($user->username)."', '".addslashes($user->name)."')" : "editUser(".json_encode(['id' => $user->id, 'username' => $user->username, 'name' => $user->name, 'email' => $user->email, 'phone' => $user->phone, 'position' => $user->position, 'branch_id' => $user->branch_id, 'salesman_id' => $user->salesman_id, 'sales_area_id' => $user->sales_area_id, 'role_ids' => $user->roles->pluck('id'), 'is_active' => $user->is_active]).")" }}>
-                            <i class="bi {{ $posCashier ? 'bi-key' : 'bi-link-45deg' }} me-1"></i>{{ $posCashier ? 'ออก PIN POS' : 'ผูกแคชเชียร์' }}
-                        </button>
-                    @endif
+                    <button type="button" class="btn btn-sm btn-outline-primary w-100 mt-2" @click="openPosPinReset({{ $user->id }}, @js($user->username), @js($user->name))">
+                        <i class="bi bi-key me-1"></i>ออก PIN POS
+                    </button>
                 </article>
             @empty
                 <div class="text-muted small py-3">ยังไม่มีผู้ใช้ที่มีสิทธิ์ขาย POS</div>
@@ -130,7 +123,7 @@
             <div class="form-section-title"><i class="bi bi-shield-lock"></i> การเข้าถึง &amp; POS</div>
             <div class="row g-3 mb-3">
                 <div class="col-md-6">
-                    <label class="form-label small text-muted">สาขาประจำ <span class="text-danger">(POS ล็อกสาขานี้)</span></label>
+                    <label class="form-label small text-muted">สาขาหลัก <span class="text-muted">(POS ตรวจสิทธิ์จาก User และสาขาเครื่อง)</span></label>
                     <div class="input-group">
                         <span class="input-group-text"><i class="bi bi-shop"></i></span>
                         <select name="branch_id" x-model="form.branch_id" class="form-select">
@@ -142,7 +135,16 @@
                     </div>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label small text-muted">สายการขาย / สายส่งประจำ <span class="text-danger">(ใบจองดึงอัตโนมัติ)</span></label>
+                    <label class="form-label small text-muted">สาขาที่อนุญาตเพิ่มเติม</label>
+                    <select name="branch_ids[]" x-model.number="form.branch_ids" class="form-select" multiple size="4" aria-describedby="branchAccessHelp">
+                        @foreach($branches as $b)
+                            <option value="{{ $b->id }}">{{ $b->code }} - {{ $b->name_th }}</option>
+                        @endforeach
+                    </select>
+                    <div id="branchAccessHelp" class="form-text">เลือกสาขาที่ User นี้เข้า POS และทำเอกสารได้ สิทธิ์เดิมจะไม่ถูกถอนอัตโนมัติ</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small text-muted">สายการขาย / สายส่งเริ่มต้น</label>
                     <div class="input-group">
                         <span class="input-group-text"><i class="bi bi-signpost-split"></i></span>
                         <select name="sales_area_id" x-model="form.sales_area_id" class="form-select">
@@ -152,19 +154,6 @@
                             @endforeach
                         </select>
                     </div>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label small text-muted">โปรไฟล์แคชเชียร์ POS <span class="text-danger">(สร้างอัตโนมัติได้)</span></label>
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="bi bi-person-vcard"></i></span>
-                        <select name="salesman_id" x-model="form.salesman_id" class="form-select">
-                            <option value="">-- ระบบสร้างให้เมื่อมีสิทธิ์ขาย POS --</option>
-                            @foreach($salesmen as $s)
-                                <option value="{{ $s->id }}">{{ $s->code }} - {{ $s->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="form-text">ผู้ดูแลสร้างคนจากหน้านี้หน้าเดียวได้ เลือกโปรไฟล์เดิมเฉพาะกรณีต้องผูกรหัส POS/BPlus เก่า</div>
                 </div>
                 <div class="col-12">
                     <label class="form-label small text-muted d-flex align-items-center flex-wrap gap-1">
@@ -242,7 +231,7 @@
                                 @endif
                                 @if($user->hasPermission('pos.sell'))
                                     <span class="badge text-bg-success">ขาย POS</span>
-                                    @if(!$user->branch_id || !$user->salesman_id || !$user->salesman?->pos_pin_hash)
+                                    @if(!$user->posCredential?->pin_hash)
                                         <span class="badge text-bg-warning">POS ยังตั้งค่าไม่ครบ</span>
                                     @endif
                                 @endif
@@ -257,14 +246,14 @@
                         </td>
                         <td class="text-end">
                             <button type="button" class="btn btn-sm btn-light border"
-                                @click="editUser({{ json_encode(['id' => $user->id, 'username' => $user->username, 'name' => $user->name, 'email' => $user->email, 'phone' => $user->phone, 'position' => $user->position, 'branch_id' => $user->branch_id, 'salesman_id' => $user->salesman_id, 'sales_area_id' => $user->sales_area_id, 'role_ids' => $user->roles->pluck('id'), 'is_active' => $user->is_active]) }})">
+                                @click="editUser({{ json_encode(['id' => $user->id, 'username' => $user->username, 'name' => $user->name, 'email' => $user->email, 'phone' => $user->phone, 'position' => $user->position, 'branch_id' => $user->branch_id, 'branch_ids' => $user->branchRoles->pluck('pivot.branch_id')->unique()->values(), 'sales_area_id' => $user->sales_area_id, 'role_ids' => $user->roles->pluck('id'), 'is_active' => $user->is_active]) }})">
                                 <i class="bi bi-pencil me-1"></i>แก้ไข
                             </button>
                             <button type="button" class="btn btn-sm btn-outline-warning"
                                 @click="openReset({{ $user->id }}, @js($user->username), @js($user->name))">
                                 <i class="bi bi-key me-1"></i>รหัส ERP
                             </button>
-                            @if($user->salesman_id && $user->hasPermission('pos.sell'))
+                            @if($user->hasPermission('pos.sell'))
                                 <button type="button" class="btn btn-sm btn-outline-primary"
                                     @click="openPosPinReset({{ $user->id }}, @js($user->username), @js($user->name))">
                                     <i class="bi bi-calculator me-1"></i>PIN POS
@@ -408,7 +397,7 @@ function userPage() {
         resultUsername: @js(data_get($resetResult, 'username', '')),
         resultPassword: @js(data_get($resetResult, 'password', '')),
         copied: false,
-        form: { username: '', name: '', email: '', phone: '', position: '', branch_id: '', salesman_id: '', sales_area_id: '', role_ids: [], is_active: true },
+        form: { username: '', name: '', email: '', phone: '', position: '', branch_id: '', branch_ids: [], sales_area_id: '', role_ids: [], is_active: true },
 
         editUser(user) {
             this.editId = user.id;
@@ -420,7 +409,7 @@ function userPage() {
                 phone: user.phone || '',
                 position: user.position || '',
                 branch_id: user.branch_id || '',
-                salesman_id: user.salesman_id || '',
+                branch_ids: user.branch_ids || [],
                 sales_area_id: user.sales_area_id || '',
                 role_ids: user.role_ids || [],
                 is_active: !!user.is_active,
@@ -433,7 +422,7 @@ function userPage() {
             this.editId = null;
             this.editUsername = '';
             this.roleError = false;
-            this.form = { username: '', name: '', email: '', phone: '', position: '', branch_id: '', salesman_id: '', sales_area_id: '', role_ids: [], is_active: true };
+            this.form = { username: '', name: '', email: '', phone: '', position: '', branch_id: '', branch_ids: [], sales_area_id: '', role_ids: [], is_active: true };
         },
         openReset(id, username, name) {
             this.resetId = id;

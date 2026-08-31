@@ -19,7 +19,7 @@ class BookingSalesAreaTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_booking_uses_logged_in_user_and_claims_unassigned_customer(): void
+    public function test_booking_uses_logged_in_user_without_claiming_the_customer(): void
     {
         [$branch, $customer, $product] = $this->masters('BP');
         $route = SalesArea::with('documentBook')
@@ -54,10 +54,10 @@ class BookingSalesAreaTest extends TestCase
             'doc_number' => 'B11'.$branch->code.now()->format('Ymd').'001',
             'total_amount' => 270,
         ]);
+        // ผู้รับผิดชอบใบจองไม่ผูก user กับลูกค้าอีกต่อไป: ลูกค้ายังไม่มีเจ้าของ
         $this->assertDatabaseHas('customers', [
             'id' => $customer->id,
-            'sales_user_id' => $user->id,
-            'sales_area_id' => $route->id,
+            'sales_user_id' => null,
         ]);
     }
 
@@ -105,8 +105,9 @@ class BookingSalesAreaTest extends TestCase
         ]);
     }
 
-    public function test_booking_rejects_a_customer_owned_by_another_user(): void
+    public function test_booking_ignores_customer_ownership_and_lets_the_creator_book_for_themselves(): void
     {
+        // ใบจองไม่ผูก user กับลูกค้าทีละรายอีกต่อไป: ลูกค้ามีเจ้าของเป็นคนอื่นก็ไม่ควรกันคนที่กำลังสร้างใบจองออก
         [$branch, $customer, $product] = $this->masters('OWN');
         $area = SalesArea::create([
             'code' => 'ROUTE-OWN',
@@ -125,6 +126,39 @@ class BookingSalesAreaTest extends TestCase
             ->post(route('bookings.store'), [
                 'customer_id' => $customer->id,
                 'branch_id' => $branch->id,
+                'items' => [[
+                    'product_id' => $product->id,
+                    'qty' => 1,
+                    'unit_price' => 100,
+                ]],
+            ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('documents', [
+            'branch_id' => $branch->id,
+            'sales_user_id' => $other->id,
+        ]);
+        // เจ้าของลูกค้าเดิมต้องไม่ถูกเปลี่ยนโดยการสร้างใบจอง
+        $this->assertDatabaseHas('customers', [
+            'id' => $customer->id,
+            'sales_user_id' => $owner->id,
+        ]);
+    }
+
+    public function test_booking_rejects_assigning_another_user_without_sales_assign_permission(): void
+    {
+        // User ที่ไม่มีสิทธิ์ sales.assign มอบหมายใบจองให้คนอื่นไม่ได้ (ไม่เกี่ยวกับเจ้าของลูกค้าอีกต่อไป)
+        [$branch, $customer, $product] = $this->masters('ASSIGN');
+        $creator = User::factory()->create(['username' => 'assign_creator', 'branch_id' => $branch->id]);
+        $target = User::factory()->create(['username' => 'assign_target', 'branch_id' => $branch->id]);
+
+        $response = $this->withoutMiddleware(ErpAuthorize::class)
+            ->actingAs($creator)
+            ->from(route('bookings.index'))
+            ->post(route('bookings.store'), [
+                'customer_id' => $customer->id,
+                'branch_id' => $branch->id,
+                'sales_user_id' => $target->id,
                 'items' => [[
                     'product_id' => $product->id,
                     'qty' => 1,

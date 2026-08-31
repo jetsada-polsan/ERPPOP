@@ -48,7 +48,7 @@ class PosCashierIdentityTest extends TestCase
 
         // ต้องไล่ย้อนได้ว่าใครลงเครื่องไหนตอนไหน แม้ยังไม่มีการขาย
         $audit = AuditLog::where('action', 'cashier_login')->sole();
-        $this->assertSame($alice->id, (int) $audit->record_id);
+        $this->assertSame($alice->user_id, (int) $audit->record_id);
         $this->assertSame($device->id, $audit->new_values['device_id']);
     }
 
@@ -64,7 +64,7 @@ class PosCashierIdentityTest extends TestCase
         $response = app(PosApiController::class)->cashierLogin($request);
 
         $this->assertTrue($response->getData(true)['success']);
-        $this->assertSame($alice->code, $response->getData(true)['cashier']['code']);
+        $this->assertSame($alice->user->username, $response->getData(true)['cashier']['code']);
     }
 
     public function test_login_accepts_the_username_of_the_user_linked_to_the_cashier(): void
@@ -163,6 +163,7 @@ class PosCashierIdentityTest extends TestCase
             'is_active' => true,
             'pos_pin_hash' => Hash::make('482165'),
         ]);
+        $this->linkCashierUser($bob, $branch);
         $alice->forceFill(['pos_pin_hash' => Hash::make('482165')])->save();
         $device = $this->device($branch, $alice);
 
@@ -280,9 +281,28 @@ class PosCashierIdentityTest extends TestCase
             'branch_id' => $branch->id,
             'salesman_id' => $cashier->id,
         ]);
+        $this->linkCashierUser($cashier, $branch, $user);
         $terminal = PosTerminal::create(['branch_id' => $branch->id, 'code' => 'T-'.$code, 'name' => 'POS '.$code]);
 
         return [$branch, $cashier, $user, $this->openShift($branch, $terminal, $cashier, $code)];
+    }
+
+    private function linkCashierUser(Salesman $cashier, Branch $branch, ?User $user = null): User
+    {
+        $user ??= User::factory()->create([
+            'username' => 'cashier_'.strtolower($branch->code).'_'.uniqid(),
+            'branch_id' => $branch->id,
+            'salesman_id' => $cashier->id,
+            'is_active' => true,
+        ]);
+        $cashier->update(['user_id' => $user->id]);
+
+        $permission = Permission::firstOrCreate(['code' => 'pos.sell'], ['name' => 'ขาย POS']);
+        $role = Role::firstOrCreate(['code' => 'POS_SELL_TEST_ROLE'], ['name' => 'แคชเชียร์ทดสอบ']);
+        $role->permissions()->syncWithoutDetaching([$permission->id]);
+        $user->roles()->syncWithoutDetaching([$role->id]);
+
+        return $user->fresh();
     }
 
     private function openShift(Branch $branch, PosTerminal $terminal, Salesman $cashier, string $code): PosShift

@@ -12,6 +12,7 @@ use App\Models\PosTerminal;
 use App\Models\QrPaymentConfig;
 use App\Models\Salesman;
 use App\Models\User;
+use App\Models\UserPosCredential;
 use App\Services\Sales\SaleReturnService;
 use App\Support\DecimalMath;
 use App\Support\PosReceiptTemplate;
@@ -148,25 +149,10 @@ class PosApiController extends Controller
         $device = $request->attributes->get('pos_device');
         $branchId = $device?->branch_id ?: $request->user()?->branch_id;
 
-        $cashiers = Salesman::query()
-            ->with(['user:id,name,username', 'user.roles:id,code'])
-            ->where('is_active', true)
-            ->when($branchId, fn ($query) => $query->where(fn ($w) => $w
-                ->whereNull('branch_id')
-                ->orWhere('branch_id', $branchId)))
-            ->orderBy('code')
-            ->get(['id', 'code', 'name', 'branch_id', 'user_id', 'pos_credential_version'])
-            ->map(fn (Salesman $cashier) => [
-                'id' => $cashier->id,
-                'code' => $cashier->code,
-                'name' => $cashier->name,
-                'branch_id' => $cashier->branch_id,
-                'user_id' => $cashier->user_id,
-                'user_name' => $cashier->user?->name,
-                'credential_version' => $this->credentialVersion($cashier),
-                'role' => $this->cashierRole($cashier),
-                'must_change_pin' => (bool) $cashier->must_change_pin,
-            ]);
+        $cashiers = $this->cashierCandidates($branchId)
+            ->orderBy(User::select('name')->whereColumn('users.id', 'salesmen.user_id'))
+            ->get()
+            ->map(fn (Salesman $cashier) => $this->cashierPayload($cashier));
 
         return response()->json(['success' => true, 'cashiers' => $cashiers]);
     }
@@ -222,9 +208,8 @@ class PosApiController extends Controller
             return response()->json(['success' => false, 'message' => 'กรุณาระบุ PIN'], 422);
         }
         $matches = $this->cashierCandidates($branchId, $data['code'] ?? null)
-            ->whereNotNull('pos_pin_hash')
             ->get()
-            ->filter(fn (Salesman $candidate) => Hash::check($data['pin'], $candidate->pos_pin_hash))
+            ->filter(fn (Salesman $candidate) => $this->pinMatches($candidate, $data['pin']))
             ->values();
 
         if ($matches->isEmpty()) {
@@ -282,12 +267,13 @@ class PosApiController extends Controller
                 continue;
             }
             $inserted++;
-            $cashier = Salesman::where('code', $event['cashier_code'])->first();
+            $cashier = Salesman::whereHas('user', fn ($user) => $user->where('username', $event['cashier_code']))
+                ->orWhere('code', $event['cashier_code'])->first();
             AuditLog::create([
                 'branch_id' => $device?->branch_id,
                 'action' => 'pos_'.$event['event_type'],
-                'table_name' => 'salesmen',
-                'record_id' => $cashier?->id,
+                'table_name' => $cashier?->user_id ? 'users' : 'salesmen',
+                'record_id' => $cashier?->user_id ?: $cashier?->id,
                 'new_values' => [
                     'event_uuid' => $event['event_uuid'],
                     'success' => (bool) $event['success'],
@@ -305,7 +291,7 @@ class PosApiController extends Controller
     {
         // ผูกผลการยืนยันไว้กับเครื่อง เพื่อให้คำสั่งขายหลังจากนี้อ้างชื่อคนอื่นไม่ได้
         // PIN ที่แอดมินตั้งให้ยังไม่ผูก เพราะคนอื่นก็รู้ค่า ใช้ยืนยันว่าเป็นเจ้าตัวไม่ได้
-        if (! $cashier->must_change_pin) {
+        if (! $this->mustChangePin($cashier)) {
             $device?->markCashierVerified($cashier);
         }
 
@@ -315,10 +301,11 @@ class PosApiController extends Controller
             'user_id' => $request->user()?->id,
             'branch_id' => $branchId,
             'action' => 'cashier_login',
-            'table_name' => 'salesmen',
-            'record_id' => $cashier->id,
+            'table_name' => 'users',
+            'record_id' => $cashier->user_id,
             'new_values' => [
-                'cashier_code' => $cashier->code,
+                'username' => $cashier->user?->username,
+                'legacy_cashier_id' => $cashier->id,
                 'device_id' => $device?->id,
                 'terminal_code' => $device?->terminal_code,
                 'ip' => $request->ip(),
@@ -327,8 +314,8 @@ class PosApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'must_change_pin' => (bool) $cashier->must_change_pin,
-            'offline_credential' => $pin && ! $cashier->must_change_pin ? $this->offlineCredential($cashier, $pin, $device) : null,
+            'must_change_pin' => $this->mustChangePin($cashier),
+            'offline_credential' => $pin && ! $this->mustChangePin($cashier) ? $this->offlineCredential($cashier, $pin, $device) : null,
             'cashier' => $this->cashierPayload($cashier),
         ]);
     }
@@ -337,14 +324,17 @@ class PosApiController extends Controller
     {
         return [
             'id' => $cashier->id,
-            'code' => $cashier->code,
-            'name' => $cashier->name,
-            'branch_id' => $cashier->branch_id,
+            // id remains the compatibility adapter expected by old shift/receipt tables.
+            // User is the identity shown and authenticated by every new client.
+            'code' => $cashier->user?->username ?? $cashier->code,
+            'name' => $cashier->user?->name ?? $cashier->name,
+            'branch_id' => $cashier->user?->branch_id ?? $cashier->branch_id,
             'user_id' => $cashier->user_id,
             'user_name' => $cashier->user?->name,
+            'legacy_cashier_id' => $cashier->id,
             'credential_version' => $this->credentialVersion($cashier),
             'role' => $this->cashierRole($cashier),
-            'must_change_pin' => (bool) $cashier->must_change_pin,
+            'must_change_pin' => $this->mustChangePin($cashier),
         ];
     }
 
@@ -356,21 +346,60 @@ class PosApiController extends Controller
 
     private function credentialVersion(Salesman $cashier): ?string
     {
-        return $cashier->pos_credential_version?->toIso8601String();
+        return $cashier->user?->posCredential?->credential_version?->toIso8601String()
+            ?? $cashier->pos_credential_version?->toIso8601String();
     }
 
     /** แคชเชียร์ที่มีสิทธิ์ใช้บนเครื่องนี้: คนสาขาเดียวกันและคนส่วนกลาง */
     private function cashierCandidates(?int $branchId, ?string $code = null)
     {
         return Salesman::query()
-            ->with('user:id,name,username')
+            ->with(['user.roles:id,code', 'user.branchRoles.permissions', 'user.posCredential'])
             ->where('is_active', true)
+            ->whereNotNull('user_id')
+            ->whereHas('user', function ($user) use ($branchId) {
+                $user->where('is_active', true);
+
+                if (! $branchId) {
+                    $user->whereHas('roles.permissions', fn ($permission) => $permission->where('code', 'pos.sell'));
+                    return;
+                }
+
+                $user->where(function ($access) use ($branchId) {
+                    // Explicit branch roles are authoritative when present.
+                    $access->whereHas('branchRoles', fn ($role) => $role
+                        ->where('user_branch_roles.branch_id', $branchId)
+                        ->where('user_branch_roles.is_active', true)
+                        ->where(fn ($window) => $window
+                            ->whereNull('user_branch_roles.effective_from')
+                            ->orWhere('user_branch_roles.effective_from', '<=', now()))
+                        ->where(fn ($window) => $window
+                            ->whereNull('user_branch_roles.effective_to')
+                            ->orWhere('user_branch_roles.effective_to', '>', now()))
+                        ->whereHas('permissions', fn ($permission) => $permission->where('code', 'pos.sell')))
+                    // Existing records with no explicit assignments continue using the old
+                    // home-branch rule until an administrator assigns their branches.
+                    ->orWhere(function ($legacy) use ($branchId) {
+                        $legacy->whereDoesntHave('branchRoles', fn ($role) => $role
+                            ->where('user_branch_roles.is_active', true)
+                            ->where(fn ($window) => $window
+                                ->whereNull('user_branch_roles.effective_from')
+                                ->orWhere('user_branch_roles.effective_from', '<=', now()))
+                            ->where(fn ($window) => $window
+                                ->whereNull('user_branch_roles.effective_to')
+                                ->orWhere('user_branch_roles.effective_to', '>', now())))
+                            ->whereHas('roles.permissions', fn ($permission) => $permission->where('code', 'pos.sell'))
+                            ->where(fn ($home) => $home->whereNull('branch_id')->orWhere('branch_id', $branchId));
+                    });
+                });
+            })
             ->when($code, fn ($query) => $query->where(function ($where) use ($code) {
-                $where->where('code', $code)
-                    ->orWhereHas('user', fn ($user) => $user
+                $where->whereHas('user', fn ($user) => $user
                         ->where('username', $code)
                         ->orWhere('email', $code)
                         ->orWhere('phone', $code))
+                    // Transitional fallback for installed clients that still cached a legacy code.
+                    ->orWhere('code', $code)
                     // รองรับข้อมูลเก่าที่ผูกจาก users.salesman_id ก่อนย้ายไป salesmen.user_id
                     ->orWhereExists(fn ($subquery) => $subquery
                         ->select(DB::raw('1'))
@@ -380,25 +409,33 @@ class PosApiController extends Controller
                             ->where('users.username', $code)
                             ->orWhere('users.email', $code)
                             ->orWhere('users.phone', $code)));
-            }))
-            ->when($branchId, fn ($query) => $query->where(fn ($w) => $w
-                ->whereNull('branch_id')
-                ->orWhere('branch_id', $branchId)));
+            }));
+    }
+
+    private function pinHash(Salesman $cashier): ?string
+    {
+        return $cashier->user?->posCredential?->pin_hash ?: $cashier->pos_pin_hash;
+    }
+
+    private function pinMatches(Salesman $cashier, string $pin): bool
+    {
+        $hash = $this->pinHash($cashier);
+
+        return filled($hash) && Hash::check($pin, $hash);
+    }
+
+    private function mustChangePin(Salesman $cashier): bool
+    {
+        return (bool) ($cashier->user?->posCredential?->force_pin_change ?? $cashier->must_change_pin);
     }
 
     /** PIN ของคนส่วนกลางต้องไม่ซ้ำทุกสาขา; คนประจำสาขาห้ามซ้ำกับคนสาขาเดียวกัน/ส่วนกลาง */
     private function pinIsAvailable(Salesman $cashier, string $pin): bool
     {
-        $candidates = Salesman::query()
-            ->where('is_active', true)
-            ->whereNotNull('pos_pin_hash')
-            ->whereKeyNot($cashier->id)
-            ->when($cashier->branch_id, fn ($query) => $query->where(fn ($w) => $w
-                ->whereNull('branch_id')
-                ->orWhere('branch_id', $cashier->branch_id)))
-            ->get();
+        $candidates = $this->cashierCandidates($cashier->user?->branch_id ?? $cashier->branch_id)
+            ->whereKeyNot($cashier->id)->get();
 
-        return ! $candidates->contains(fn (Salesman $candidate) => Hash::check($pin, $candidate->pos_pin_hash));
+        return ! $candidates->contains(fn (Salesman $candidate) => $this->pinMatches($candidate, $pin));
     }
 
     /**
@@ -439,13 +476,16 @@ class PosApiController extends Controller
         $branchId = $device?->branch_id ?: $request->user()?->branch_id;
         $cashier = $this->cashierCandidates($branchId, $data['code'])->first();
 
-        if (! $cashier || ! $cashier->pos_pin_hash || ! Hash::check($data['current_pin'], $cashier->pos_pin_hash)) {
+        if (! $cashier || ! $this->pinMatches($cashier, $data['current_pin'])) {
             return response()->json(['success' => false, 'message' => 'รหัสแคชเชียร์หรือ PIN ปัจจุบันไม่ถูกต้อง'], 422);
         }
         if (! $this->pinIsAvailable($cashier, $data['new_pin'])) {
             return response()->json(['success' => false, 'message' => 'PIN นี้ถูกใช้ในสาขาแล้ว กรุณาเลือก PIN ใหม่'], 422);
         }
 
+        $credential = UserPosCredential::firstOrCreate(['user_id' => $cashier->user_id]);
+        $credential->setPin($data['new_pin'], false);
+        // Dual-write during the installed-client transition. This column is not identity anymore.
         $cashier->setPin($data['new_pin'], false);
         $device?->markCashierVerified($cashier);
 
@@ -453,8 +493,8 @@ class PosApiController extends Controller
             'user_id' => $request->user()?->id,
             'branch_id' => $branchId,
             'action' => 'cashier_pin_set',
-            'table_name' => 'salesmen',
-            'record_id' => $cashier->id,
+            'table_name' => 'users',
+            'record_id' => $cashier->user_id,
             'new_values' => [
                 'cashier_code' => $cashier->code,
                 'device_id' => $device?->id,

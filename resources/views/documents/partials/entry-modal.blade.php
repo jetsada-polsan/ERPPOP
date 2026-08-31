@@ -5,6 +5,7 @@
     $showParty = $partyType !== 'none';
     $showSalesman = $showSalesman ?? false;
     $showSalesArea = $showSalesArea ?? false;
+    $salesUsers = $salesUsers ?? null;
     $showCreditType = $showCreditType ?? false;
     $showLotFields = $showLotFields ?? false;
     $showPurchaseTaxMode = $showPurchaseTaxMode ?? false;
@@ -85,12 +86,20 @@
                                 </div>
                                 @endif
                                 <div class="doc-field" style="grid-column: span 4;">
-                                    <label>ผู้ดูแลลูกค้า / ผู้เปิดใบจอง</label>
-                                    <input type="hidden" name="sales_user_id" x-model="salesUserId">
-                                    <div class="doc-input d-flex align-items-center gap-2 bg-light">
-                                        <i class="bi bi-person-check text-success"></i>
-                                        <strong x-text="salesUserName || 'ระบบจะใช้ผู้ที่ล็อกอิน'"></strong>
-                                    </div>
+                                    <label>ผู้รับผิดชอบเอกสาร</label>
+                                    @if($salesUsers)
+                                        <select name="sales_user_id" class="doc-select" x-model="salesUserId">
+                                            @foreach($salesUsers as $salesUser)
+                                                <option value="{{ $salesUser->id }}">{{ $salesUser->name }} ({{ $salesUser->username }})</option>
+                                            @endforeach
+                                        </select>
+                                    @else
+                                        <input type="hidden" name="sales_user_id" x-model="salesUserId">
+                                        <div class="doc-input d-flex align-items-center gap-2 bg-light">
+                                            <i class="bi bi-person-check text-success"></i>
+                                            <strong x-text="salesUserName || 'ระบบจะใช้ผู้ที่ล็อกอิน'"></strong>
+                                        </div>
+                                    @endif
                                 </div>
                             @endif
 

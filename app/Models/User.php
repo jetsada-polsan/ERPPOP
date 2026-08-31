@@ -67,6 +67,54 @@ class User extends Authenticatable
         return $this->belongsToMany(Role::class);
     }
 
+    public function branchRoles(): BelongsToMany
+    {
+        return $this->belongsToMany(Role::class, 'user_branch_roles')
+            ->withPivot(['branch_id', 'is_active', 'effective_from', 'effective_to'])
+            ->withTimestamps();
+    }
+
+    public function posCredential(): HasOne
+    {
+        return $this->hasOne(UserPosCredential::class);
+    }
+
+    /** Device branch is authoritative. Explicit assignments win; branch_id is migration fallback. */
+    public function canAccessBranch(int $branchId, ?string $permission = null): bool
+    {
+        $activeAssignments = $this->branchRoles()
+            ->wherePivot('is_active', true)
+            ->where(fn ($roles) => $roles
+                ->whereNull('user_branch_roles.effective_from')
+                ->orWhere('user_branch_roles.effective_from', '<=', now()))
+            ->where(fn ($roles) => $roles
+                ->whereNull('user_branch_roles.effective_to')
+                ->orWhere('user_branch_roles.effective_to', '>', now()));
+
+        // Once an administrator has assigned branches explicitly, that list is the
+        // boundary. Do not fall back to a global role and accidentally open every branch.
+        if (! $activeAssignments->exists()) {
+            return ($this->branch_id === null || (int) $this->branch_id === $branchId)
+                && ($permission === null || $this->hasPermission($permission));
+        }
+
+        $query = $this->branchRoles()
+            ->wherePivot('branch_id', $branchId)
+            ->wherePivot('is_active', true)
+            ->where(fn ($roles) => $roles
+                ->whereNull('user_branch_roles.effective_from')
+                ->orWhere('user_branch_roles.effective_from', '<=', now()))
+            ->where(fn ($roles) => $roles
+                ->whereNull('user_branch_roles.effective_to')
+                ->orWhere('user_branch_roles.effective_to', '>', now()));
+
+        if ($permission !== null) {
+            $query->whereHas('permissions', fn ($permissions) => $permissions->where('code', $permission));
+        }
+
+        return $query->exists();
+    }
+
     /** @var array<int, string>|null per-request cache of permission codes */
     private ?array $permissionCodes = null;
 

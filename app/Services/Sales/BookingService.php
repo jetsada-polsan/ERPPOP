@@ -27,7 +27,7 @@ class BookingService
     ) {}
 
     /**
-     * @param  array{customer_id:int, branch_id:int, sales_area_id?:?int, sales_user_id:?int, salesman_id:?int, document_book_id?:?int, claim_customer_owner?:bool, remark:?string, items: array<int, array{product_id:int, qty:float, unit_price:float}>}  $data
+     * @param  array{customer_id:int, branch_id:int, sales_area_id?:?int, sales_user_id:?int, salesman_id:?int, document_book_id?:?int, remark:?string, items: array<int, array{product_id:int, qty:float, unit_price:float}>}  $data
      */
     public function create(array $data): Document
     {
@@ -58,14 +58,6 @@ class BookingService
             $items = collect($data['items']);
             $totalQty = $items->sum('qty');
             $totalAmount = $items->sum(fn ($i) => $i['qty'] * $i['unit_price']);
-
-            if (! empty($data['claim_customer_owner'])) {
-                $customer = Customer::whereKey($data['customer_id'])->lockForUpdate()->firstOrFail();
-                $customer->fill([
-                    'sales_user_id' => $customer->sales_user_id ?? ($data['sales_user_id'] ?? null),
-                    'sales_area_id' => $customer->sales_area_id ?? ($data['sales_area_id'] ?? null),
-                ])->save();
-            }
 
             $document = Document::create([
                 'document_type_id' => $documentType->id,

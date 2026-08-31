@@ -26,6 +26,7 @@
     defaultSalesUserId: @js($bookingDefaults['sales_user_id']),
     defaultSalesUserName: @js($bookingDefaults['sales_user_name']),
     defaultSalesAreaId: @js($bookingDefaults['sales_area_id']),
+    salesUserFromParty: false,
     salesAreas: @js($salesAreas->map(fn ($area) => [
         'id' => $area->id,
         'area_type' => $area->area_type,
@@ -101,7 +102,7 @@
                 </select>
             </div>
             <div class="filter-field">
-                <label>ผู้ดูแลลูกค้า</label>
+                <label>ผู้รับผิดชอบใบจอง</label>
                 <select name="sales_user_id" class="form-select form-select-sm">
                     <option value="">ทุกคน</option>
                     @foreach($salesUsers as $salesUser)
@@ -136,7 +137,7 @@
                             <th>สาขา</th>
                             <th>ลูกค้า</th>
                             <th>เขต/สาย</th>
-                            <th>ผู้ดูแลลูกค้า</th>
+                            <th>ผู้รับผิดชอบ</th>
                             <th class="text-end">ยอดรวม</th>
                             <th>สถานะ</th>
                             <th></th>
@@ -239,6 +240,7 @@
         'partyRequired' => true,
         'showSalesman' => true,
         'showSalesArea' => true,
+        'salesUsers' => $salesUsers,
         'itemTitle' => 'รายการจอง',
         'submitLabel' => 'บันทึกใบจอง',
         'remarkPlaceholder' => 'เงื่อนไขส่งของ / หมายเหตุการจอง',
