@@ -210,7 +210,14 @@ class SystemSettingController extends Controller
 
     private function currentPythonPosInstaller(): ?array
     {
-        $files = collect(File::glob(storage_path('app/pos-python-releases/PopCentral-POS-UAT-*-setup.exe')))
+        // The SFTP-only release account writes to pos-releases. Keep the
+        // dedicated folder too so existing installers remain downloadable.
+        $directories = [
+            storage_path('app/pos-python-releases'),
+            storage_path('app/pos-releases'),
+        ];
+        $files = collect($directories)
+            ->flatMap(fn (string $directory) => File::glob($directory.'/PopCentral-POS-UAT-*-setup.exe'))
             ->filter(fn (string $path) => is_file($path))
             ->sortByDesc(fn (string $path) => filemtime($path));
 
