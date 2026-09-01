@@ -41,7 +41,10 @@ class LegacyPosImportQuarantineTest extends TestCase
             }
             $contents = file_get_contents($file);
             foreach (self::QUARANTINED_TABLES as $table) {
-                if (str_contains($contents, $table)) {
+                // Do not confuse a new namespaced table such as
+                // accounting_import_batches with the quarantined legacy table.
+                $pattern = '/(?<![A-Za-z0-9_])'.preg_quote($table, '/').'(?!(?:[A-Za-z0-9_]))/';
+                if (preg_match($pattern, $contents) === 1) {
                     $offenders[] = str_replace(base_path().'/', '', $file).' -> '.$table;
                 }
             }
