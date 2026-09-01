@@ -102,9 +102,10 @@ jobs:
           fi
           local_bytes="$(wc -c < "release/$target" | tr -d ' ')"
           remote_tmp=".${target}.next-${GITHUB_RUN_ID}"
-          # POS_RELEASE_USER is SFTP-only and starts in the writable
-          # pos-releases folder. Upload before switching the active file.
+          # POS_RELEASE_USER is SFTP-only and starts in pos-releases. The
+          # Python installer folder is its sibling; upload before switching.
           sftp -q -b - "$POS_RELEASE_USER@$POS_RELEASE_HOST" > sftp-publish.log <<SFTP
+          cd ../pos-python-releases
           put release/$target $remote_tmp
           ls -l $remote_tmp
           -rm ${target}.previous.exe
