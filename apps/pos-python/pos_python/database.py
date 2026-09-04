@@ -82,7 +82,21 @@ CREATE TABLE IF NOT EXISTS shifts (
     opened_at TEXT NOT NULL,
     closed_at TEXT,
     opening_cash TEXT NOT NULL DEFAULT '0',
+    counted_cash TEXT,
+    cash_difference TEXT,
+    closing_note TEXT,
     status TEXT NOT NULL CHECK(status IN ('open', 'closed'))
+);
+CREATE TABLE IF NOT EXISTS cash_movements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    movement_uuid TEXT NOT NULL UNIQUE,
+    shift_id INTEGER NOT NULL REFERENCES shifts(id),
+    movement_type TEXT NOT NULL CHECK(movement_type IN ('cash_in', 'drop', 'payout')),
+    amount TEXT NOT NULL,
+    reference_no TEXT,
+    reason TEXT NOT NULL,
+    occurred_at TEXT NOT NULL,
+    sync_status TEXT NOT NULL DEFAULT 'pending'
 );
 CREATE TABLE IF NOT EXISTS sales (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -150,6 +164,25 @@ CREATE TABLE IF NOT EXISTS sync_logs (
     message TEXT,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS sync_state (
+    entity TEXT PRIMARY KEY,
+    status TEXT NOT NULL DEFAULT 'never' CHECK(status IN ('never', 'running', 'synced', 'failed')),
+    last_started_at TEXT,
+    last_success_at TEXT,
+    last_error TEXT,
+    last_server_version TEXT,
+    item_count INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sync_runs (
+    run_uuid TEXT PRIMARY KEY,
+    direction TEXT NOT NULL CHECK(direction IN ('down', 'up')),
+    status TEXT NOT NULL CHECK(status IN ('running', 'synced', 'failed')),
+    started_at TEXT NOT NULL,
+    finished_at TEXT,
+    datasets_json TEXT NOT NULL DEFAULT '{}',
+    error TEXT
+);
 CREATE TABLE IF NOT EXISTS scale_profiles (
     code TEXT PRIMARY KEY,
     prefix TEXT NOT NULL,
@@ -210,6 +243,13 @@ ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("products", "category_id", "INTEGER"),
     ("products", "category_name", "TEXT"),
     ("products", "price", "TEXT NOT NULL DEFAULT '0'"),
+    # Snapshot จาก ERP ใช้แสดง/ควบคุมสต๊อกตอน offline; NULL หมายถึงยังไม่มี snapshot
+    ("products", "stock_qty", "TEXT"),
+    ("products", "average_cost", "TEXT"),
+    ("price_versions", "unit_id", "INTEGER"),
+    ("shifts", "counted_cash", "TEXT"),
+    ("shifts", "cash_difference", "TEXT"),
+    ("shifts", "closing_note", "TEXT"),
     # เลขนี้มาจาก ERP หลัง sync สำเร็จ และเป็นกุญแจที่ ERP ใช้ยกเลิกบิล
     ("sales", "server_receipt_no", "TEXT"),
     ("sales", "voided_at", "TEXT"),
@@ -249,6 +289,10 @@ ADDED_INDEXES: list[str] = [
     "CREATE UNIQUE INDEX IF NOT EXISTS ux_local_cashiers_user_id ON local_cashiers(user_id) WHERE user_id IS NOT NULL",
     "CREATE INDEX IF NOT EXISTS ix_sync_outbox_ready ON sync_outbox(status, priority, created_at)",
     "CREATE INDEX IF NOT EXISTS ix_credential_history_cashier ON cashier_credential_history(cashier_id, superseded_at DESC)",
+    "CREATE INDEX IF NOT EXISTS ix_auth_events_pending ON auth_events_outbox(synced, id)",
+    "CREATE INDEX IF NOT EXISTS ix_sync_runs_started ON sync_runs(started_at DESC)",
+    "CREATE INDEX IF NOT EXISTS ix_price_versions_effective ON price_versions(product_id, unit_id, starts_at, ends_at)",
+    "CREATE INDEX IF NOT EXISTS ix_cash_movements_shift ON cash_movements(shift_id, occurred_at)",
 ]
 
 
@@ -277,8 +321,11 @@ def connect(path: Path) -> sqlite3.Connection:
     connection = sqlite3.connect(path)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
+    connection.execute("PRAGMA busy_timeout = 5000")
     connection.execute("PRAGMA journal_mode = WAL")
     connection.execute("PRAGMA synchronous = FULL")
+    connection.execute("PRAGMA wal_autocheckpoint = 1000")
+    connection.execute("PRAGMA temp_store = MEMORY")
     connection.executescript(SCHEMA)
     _add_missing_columns(connection)
     connection.commit()

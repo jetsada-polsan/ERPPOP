@@ -52,6 +52,20 @@ class SyncServiceTest(unittest.TestCase):
         self.assertEqual((payload["items"][0]["barcode"], payload["items"][0]["barcode_type"]), ("8001230125503", "SCALE_WEIGHT"))
         self.assertEqual(self.db.execute("SELECT status FROM sync_outbox").fetchone()[0], "synced")
 
+    def test_syncs_an_offline_shift_before_sales_are_uploaded(self) -> None:
+        api = FakeApi({"success": True, "shift": {"id": 501}})
+        self.pos.queue_shift_open(self.shift_id)
+
+        SyncService(self.db, api).sync_pending_sales()
+
+        shift = self.db.execute("SELECT server_id FROM shifts WHERE id = ?", (self.shift_id,)).fetchone()
+        queued = self.db.execute(
+            "SELECT status FROM sync_outbox WHERE aggregate_type = 'shift_open'"
+        ).fetchone()
+        self.assertEqual(shift["server_id"], 501)
+        self.assertEqual(queued["status"], "synced")
+        self.assertEqual(api.calls[0][0], "/api/pos/shift/open")
+
     def test_keeps_sale_when_offline_shift_has_no_server_mapping(self) -> None:
         sale_uuid = self.sale()
         api = FakeApi()

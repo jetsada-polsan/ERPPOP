@@ -70,6 +70,7 @@ class OnlineLoginTest(unittest.TestCase):
         db, _ = fresh_db()
         api = FakeApi({"/api/pos/cashier/login": {
             "success": True, "cashier": {"id": 42, "code": "C001", "name": "สมชาย",
+                                         "user_id": 501,
                                          "credential_version": "2026-09-01T00:00:00Z"},
             "offline_credential": {"salt": "c2FsdA==", "verifier": "dmVy", "iterations": 120000,
                                    "expires_at": "2026-09-01T00:00:00Z",
@@ -82,6 +83,7 @@ class OnlineLoginTest(unittest.TestCase):
         self.assertEqual(row["server_id"], 42)
         self.assertEqual(row["cred_salt"], "c2FsdA==")
         self.assertEqual(row["credential_version"], "2026-09-01T00:00:00Z")
+        self.assertEqual(db.execute("SELECT user_id FROM local_cashiers WHERE id = ?", (result["local_cashier_id"],)).fetchone()[0], 501)
         self.assertEqual(api.posted[0][1]["code"], "C001")
 
     def test_change_pin_stores_the_new_server_credential(self) -> None:
@@ -112,6 +114,31 @@ class OnlineLoginTest(unittest.TestCase):
 
 
 class SyncWorkerTest(unittest.TestCase):
+    def test_worker_refreshes_cached_master_data_after_reconnect(self) -> None:
+        db, path = fresh_db()
+        api = FakeApi({"/api/pos/ping": PING, "/api/pos/products": PRODUCTS, "/api/pos/cashiers": CASHIERS})
+        calls = []
+
+        def refresh_down():
+            refresh_db = connect(path)
+            try:
+                result = ProvisioningService(refresh_db, api).sync_down(3)
+                calls.append(result)
+                return result
+            finally:
+                refresh_db.close()
+
+        worker = SyncWorker(path, api, refresh_down=refresh_down)
+        worker.needs_down_sync = True
+        result = worker.run_once()
+        db.close()
+
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(result["download"]["cashiers"]["upserted"], 2)
+        check = connect(path)
+        self.assertEqual(check.execute("SELECT count(*) FROM local_cashiers WHERE server_id IS NOT NULL").fetchone()[0], 2)
+        check.close()
+
     def test_worker_drains_the_queue_in_the_background(self) -> None:
         db, path = fresh_db()
         # เตรียมบิลที่พร้อม sync (มี server ids ครบ)

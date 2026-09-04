@@ -75,6 +75,11 @@ class Product extends Model
         return $this->hasMany(SupplierPriceSchedule::class);
     }
 
+    public function posPriceSchedules(): HasMany
+    {
+        return $this->hasMany(PosPriceSchedule::class);
+    }
+
     protected function casts(): array
     {
         return [

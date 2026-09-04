@@ -2301,14 +2301,14 @@
                                 <span x-text="transferConfirmed ? 'ตรวจเงินเข้าแล้ว พร้อมออกบิล' : 'รอลูกค้าสแกนจ่าย แล้วตรวจเงินเข้า'"></span>
                                 <i :class="transferConfirmed ? 'bi bi-check-circle-fill' : 'bi bi-hourglass-split'"></i>
                             </div>
-                            <button type="button" class="check-paid" :class="{ done: transferConfirmed }" @click="markTransferPaid()">
+                            <button type="button" class="check-paid" :class="{ done: transferConfirmed }" @click="confirmTransferAndCheckout()">
                                 <i class="bi bi-bank me-1"></i>
-                                <span x-text="transferConfirmed ? 'ตรวจแล้ว' : 'เงินเข้าแล้ว'"></span>
+                                <span x-text="transferConfirmed ? 'กำลังออกบิล...' : 'ยืนยันเงินเข้าและออกบิล'"></span>
                             </button>
                             <input class="ref-input" type="text" x-model="paymentRef"
                                 placeholder="เลขอ้างอิง / 4 ตัวท้ายสลิป (ไม่บังคับ)"
-                                @keydown.enter.prevent="markTransferPaid()">
-                            <div class="pay-hint">กดเงินเข้าแล้วหลังดูแอปธนาคาร จากนั้นกดยืนยันชำระเพื่อออกบิล</div>
+                                @keydown.enter.prevent="confirmTransferAndCheckout()">
+                            <div class="pay-hint">ตรวจยอดเงินเข้าในแอปธนาคาร แล้วกดปุ่มนี้เพื่อบันทึกและออกบิลทันที</div>
                         </div>
                         @else
                         <div class="qr-panel qr-unconfigured">
@@ -2341,7 +2341,7 @@
 
                 <div class="modal-actions">
                     <button class="btn-cancel" @click="payModalOpen = false">ยกเลิก</button>
-                    <button class="btn-confirm" :disabled="processing || !canConfirm" @click="processPayment()">
+                    <button x-ref="paymentConfirmButton" class="btn-confirm" :disabled="processing || !canConfirm" @click="processPayment()">
                         <span class="confirm-ready" x-show="!processing"><i class="bi bi-check-circle me-1"></i> <span x-text="confirmLabel"></span> ฿<span x-text="money(totalAmount)"></span></span>
                         <span x-show="!processing"><i class="bi bi-check-circle me-1"></i> ยืนยันชำระ ฿<span x-text="money(totalAmount)"></span></span>
                         <span x-show="processing">กำลังบันทึก...</span>
@@ -2659,7 +2659,7 @@ function crc16(data) {
 }
 
 function tlv(tag, value) {
-    const len = String(value.length).padStart(2, '0');
+    const len = String(new TextEncoder().encode(String(value)).length).padStart(2, '0');
     return `${tag}${len}${value}`;
 }
 
@@ -2670,6 +2670,9 @@ function promptPayTarget(id) {
     }
     if (raw.length === 13) {
         return { tag: '02', value: raw };
+    }
+    if (raw.length === 15) {
+        return { tag: '03', value: raw };
     }
     return { tag: '01', value: raw };
 }
@@ -3890,6 +3893,13 @@ function posApp() {
             this.transferConfirmed = true;
         },
 
+        async confirmTransferAndCheckout() {
+            if (this.processing) return;
+            this.transferConfirmed = true;
+            await this.$nextTick();
+            await this.processPayment();
+        },
+
         get canConfirm() {
             if (this.cart.length === 0) return false;
             if (this.method === 'cash') return Number(this.received || 0) >= this.totalAmount;
@@ -3976,6 +3986,10 @@ function posApp() {
 
         async processPayment() {
             if (this.cart.length === 0) return;
+            if (this.method === 'transfer' && !this.transferConfirmed) {
+                erpPopup('warning', 'ยังไม่ยืนยันเงินเข้า', 'ตรวจรายการเงินเข้าก่อนออกบิล');
+                return;
+            }
             this.processing = true;
 
             const payload = {
@@ -4002,11 +4016,27 @@ function posApp() {
             try {
                 const res = await fetch('{{ route('pos.checkout') }}', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': payload._token },
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': payload._token,
+                    },
                     body: JSON.stringify(payload),
                 });
-                const data = await res.json();
-                if (data.success) {
+                const contentType = res.headers.get('content-type') || '';
+                const data = contentType.includes('application/json')
+                    ? await res.json()
+                    : { success: false, message: res.status === 419
+                        ? 'หน้าเว็บหมดอายุแล้ว กรุณาโหลดหน้า POS ใหม่ก่อนทำรายการ'
+                        : `เซิร์ฟเวอร์ตอบกลับรหัส ${res.status}` };
+                if (res.status === 419) {
+                    this.processing = false;
+                    await erpPopup('warning', 'เซสชันหมดอายุ', data.message, { confirmButtonText: 'โหลดหน้าใหม่' });
+                    window.location.reload();
+                    return;
+                }
+                if (res.ok && data.success) {
                     this.lastReceiptId = data.receipt_id || null;
                     this.lastDocNumber = data.receipt_no || data.doc_number;
                     this.lastItems = this.cart.map((item, index) => ({
@@ -4026,7 +4056,7 @@ function posApp() {
                     this.transferConfirmed = false;
                     this.loadActiveShift();
                 } else {
-                    erpPopup('error', data.message || 'เกิดข้อผิดพลาด');
+                    erpPopup('error', data.message || `บันทึกบิลไม่สำเร็จ (${res.status})`);
                 }
             } catch(e) {
                 erpPopup('error', 'เชื่อมต่อ server ไม่ได้');

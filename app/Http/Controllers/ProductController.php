@@ -13,6 +13,7 @@ use App\Models\ProductCategory;
 use App\Models\ProductDepartment;
 use App\Models\ProductPrice;
 use App\Models\ProductSupplier;
+use App\Models\PosPriceSchedule;
 use App\Support\BarcodePolicy;
 use App\Models\ProductUnit;
 use App\Models\RecallCase;
@@ -120,6 +121,9 @@ class ProductController extends Controller
                 ->with(['supplier', 'unit'])
                 ->orderByDesc('effective_from')
                 ->orderByDesc('minimum_qty'),
+            'posPriceSchedules' => fn ($query) => $query
+                ->with(['branch', 'unit'])
+                ->orderByDesc('effective_from'),
         ]);
 
         // Load all price tables with this product's prices + which branches use each table
@@ -171,7 +175,38 @@ class ProductController extends Controller
             'nextScalePlu' => $nextScalePlu,
             'costHistory' => $costHistoryService->history($product),
             'suppliers' => Supplier::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name_th']),
+            'branches' => Branch::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name_th']),
         ]);
+    }
+
+    public function storePosPriceSchedule(Request $request, Product $product): RedirectResponse
+    {
+        $data = $request->validate([
+            'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
+            'unit_id' => ['nullable', 'integer', 'exists:product_units,id'],
+            'price' => ['required', 'numeric', 'min:0'],
+            'effective_from' => ['required', 'date'],
+            'effective_to' => ['nullable', 'date', 'after:effective_from'],
+            'note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        PosPriceSchedule::create([
+            ...$data,
+            'status' => 'published',
+            'created_by' => auth()->id(),
+            'published_by' => auth()->id(),
+            'published_at' => now(),
+        ]);
+
+        return back()->with('success', 'เผยแพร่ราคาขาย POS ตามเวลาที่กำหนดแล้ว เครื่อง POS จะรับเมื่อ sync ครั้งถัดไป');
+    }
+
+    public function cancelPosPriceSchedule(Product $product, PosPriceSchedule $schedule): RedirectResponse
+    {
+        abort_unless((int) $schedule->product_id === (int) $product->id, 404);
+        $schedule->update(['status' => 'cancelled']);
+
+        return back()->with('success', 'ยกเลิกช่วงราคาขาย POS แล้ว เครื่อง POS จะนำออกเมื่อ sync ครั้งถัดไป');
     }
 
     // Upsert price from product show page

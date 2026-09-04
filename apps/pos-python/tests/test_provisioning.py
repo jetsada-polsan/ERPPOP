@@ -53,8 +53,8 @@ PRODUCTS = {"success": True, "products": [
      "pos_price": 69.0, "barcodes": []},
 ]}
 CASHIERS = {"success": True, "cashiers": [
-    {"id": 42, "code": "C001", "name": "สมชาย", "credential_version": "2026-09-01T00:00:00Z"},
-    {"id": 43, "code": "C002", "name": "สมหญิง", "credential_version": "2026-09-01T00:00:00Z"},
+    {"id": 42, "user_id": 501, "code": "C001", "name": "สมชาย", "credential_version": "2026-09-01T00:00:00Z"},
+    {"id": 43, "user_id": 502, "code": "C002", "name": "สมหญิง", "credential_version": "2026-09-01T00:00:00Z"},
 ]}
 
 
@@ -101,6 +101,30 @@ class ProvisioningTest(unittest.TestCase):
         bc = self.db.execute("SELECT product_id FROM product_barcodes WHERE barcode = ?", ("8850001",)).fetchone()
         self.assertEqual(bc["product_id"], rows[101]["id"])
 
+    def test_catalog_caches_stock_cost_and_future_price_schedule(self) -> None:
+        self.api.responses["/api/pos/products"] = {"success": True, "products": [{
+            **PRODUCTS["products"][0],
+            "base_pos_price": 189.0,
+            "stock_qty": 37.5,
+            "average_cost": 120.25,
+            "scheduled_prices": [{
+                "id": 7001, "branch_id": 3, "unit_id": None, "price": 159.0,
+                "effective_from": "2999-01-01T05:00:00+07:00",
+                "effective_to": "2999-01-02T05:00:00+07:00",
+            }],
+        }]}
+
+        self.svc.pull_catalog(3)
+
+        product = self.db.execute("SELECT stock_qty, average_cost FROM products WHERE server_id = 101").fetchone()
+        self.assertEqual((product["stock_qty"], product["average_cost"]), ("37.5", "120.25"))
+        schedule = self.db.execute(
+            "SELECT price, unit_id, version, branch_id, starts_at, ends_at FROM price_versions WHERE version LIKE 'schedule:%'"
+        ).fetchone()
+        self.assertEqual((schedule["price"], schedule["unit_id"], schedule["version"], schedule["branch_id"]),
+                         ("159.00", None, "schedule:7001", 3))
+        self.assertEqual(schedule["starts_at"], "2998-12-31T22:00:00+00:00")
+
     def test_catalog_binds_server_id_onto_a_seeded_row_instead_of_duplicating(self) -> None:
         # เครื่องที่ seed สินค้า sku A001 ไว้ก่อน (ยังไม่มี server_id)
         self.db.execute(
@@ -124,6 +148,8 @@ class ProvisioningTest(unittest.TestCase):
         self.svc.pull_cashiers(3)
         rows = {r["server_id"]: r["code"] for r in self.db.execute("SELECT server_id, code FROM local_cashiers WHERE server_id IS NOT NULL")}
         self.assertEqual(rows, {42: "C001", 43: "C002"})
+        users = {r["server_id"]: r["user_id"] for r in self.db.execute("SELECT server_id, user_id FROM local_cashiers WHERE server_id IS NOT NULL")}
+        self.assertEqual(users, {42: 501, 43: 502})
 
     def test_store_credential_writes_pbkdf2_fields(self) -> None:
         self.svc.pull_cashiers(3)
@@ -196,6 +222,19 @@ class ProvisioningTest(unittest.TestCase):
         out = self.svc.sync_down(3)
         self.assertEqual(out["catalog"]["upserted"], 2)
         self.assertEqual(out["cashiers"]["upserted"], 2)
+
+    def test_sync_down_records_each_dataset_without_deleting_local_rows(self) -> None:
+        self.svc.sync_down(3)
+
+        state = self.svc.sync_status()
+        self.assertEqual(state["catalog"]["status"], "synced")
+        self.assertEqual(state["cashiers"]["status"], "synced")
+        self.assertEqual(state["catalog"]["item_count"], 2)
+        run = self.db.execute(
+            "SELECT direction, status, datasets_json FROM sync_runs ORDER BY started_at DESC LIMIT 1"
+        ).fetchone()
+        self.assertEqual((run["direction"], run["status"]), ("down", "synced"))
+        self.assertIn('"cashiers"', run["datasets_json"])
 
     def test_ping_caches_published_pos_layout(self) -> None:
         self.api.responses["/api/pos/ping"]["pos_layout"] = {

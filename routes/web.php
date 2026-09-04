@@ -338,6 +338,8 @@ Route::prefix('products')->name('products.')->group(function () {
     Route::post('/{product}/barcodes', [ProductController::class, 'addBarcode'])->name('barcodes.store');
     Route::put('/{product}/barcodes/{productBarcode}', [ProductController::class, 'updateBarcode'])->name('barcodes.update');
     Route::post('/{product}/prices', [ProductController::class, 'upsertPrice'])->name('prices.upsert');
+    Route::post('/{product}/pos-price-schedules', [ProductController::class, 'storePosPriceSchedule'])->name('pos-price-schedules.store');
+    Route::delete('/{product}/pos-price-schedules/{schedule}', [ProductController::class, 'cancelPosPriceSchedule'])->name('pos-price-schedules.destroy');
     Route::post('/{product}/suppliers', [ProductController::class, 'upsertSupplier'])->name('suppliers.upsert');
     Route::delete('/{product}/suppliers/{productSupplier}', [ProductController::class, 'removeSupplier'])->name('suppliers.destroy');
     Route::post('/{product}/supplier-prices', [ProductController::class, 'storeSupplierPrice'])->name('supplier-prices.store');

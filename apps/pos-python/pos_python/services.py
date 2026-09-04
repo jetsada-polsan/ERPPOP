@@ -107,6 +107,19 @@ class DailySalesSummary:
     pending_sync_count: int
 
 
+@dataclass(frozen=True)
+class ShiftCashSummary:
+    shift_id: int
+    opening_cash: Decimal
+    cash_sales: Decimal
+    cash_in: Decimal
+    drops: Decimal
+    payouts: Decimal
+    expected_cash: Decimal
+    counted_cash: Decimal | None = None
+    cash_difference: Decimal | None = None
+
+
 class PosService:
     def __init__(self, connection: sqlite3.Connection):
         self.db = connection
@@ -223,6 +236,8 @@ class PosService:
 
     def record_auth_event(self, cashier_code: str, event_type: str, success: bool, reason: str | None,
                           terminal_code: str | None = None, branch_code: str | None = None) -> str:
+        terminal_code = terminal_code or self._setting("terminal_code")
+        branch_code = branch_code or self._setting("branch_code") or self._setting("branch_name")
         event_uuid = str(uuid.uuid4())
         with self.db:
             self.db.execute(
@@ -291,6 +306,9 @@ class PosService:
             return str(row["value"])
 
     def open_shift(self, branch_id: int, terminal_id: str, cashier_id: int, opening_cash: Decimal) -> int:
+        opening_cash = money(opening_cash)
+        if opening_cash < 0:
+            raise ValueError("เงินทอนตั้งต้นต้องไม่ติดลบ")
         existing = self.db.execute(
             "SELECT id, cashier_id FROM shifts WHERE terminal_id = ? AND status = 'open'", (terminal_id,)
         ).fetchone()
@@ -305,6 +323,138 @@ class PosService:
         )
         self.db.commit()
         return int(cursor.lastrowid)
+
+    def queue_shift_open(self, shift_id: int) -> None:
+        """Queue an offline shift so it is opened on ERP before its sales."""
+        shift = self.db.execute(
+            """SELECT s.*, c.server_id AS cashier_server_id
+               FROM shifts s JOIN local_cashiers c ON c.id = s.cashier_id
+               WHERE s.id = ?""", (shift_id,)
+        ).fetchone()
+        if not shift:
+            raise ValueError("ไม่พบกะที่ต้องการเข้าคิวซิงก์")
+        if shift["server_id"]:
+            return
+        aggregate_uuid = f"shift:{shift['uuid']}:open"
+        payload = json.dumps({
+            "shift_uuid": shift["uuid"], "branch_id": shift["branch_id"],
+            "cashier_server_id": shift["cashier_server_id"],
+            "opening_cash": str(money(shift["opening_cash"])),
+        }, ensure_ascii=False)
+        with self.db:
+            self.db.execute(
+                """INSERT OR IGNORE INTO sync_outbox
+                   (aggregate_type, aggregate_uuid, payload, priority, created_at)
+                   VALUES ('shift_open', ?, ?, 1, ?)""",
+                (aggregate_uuid, payload, self._now()),
+            )
+
+    def shift_cash_summary(self, shift_id: int) -> ShiftCashSummary:
+        """Calculate the drawer balance from local sales and cash movements."""
+        shift = self.db.execute("SELECT * FROM shifts WHERE id = ?", (shift_id,)).fetchone()
+        if not shift:
+            raise ValueError("ไม่พบกะที่ระบุ")
+        sales = self.db.execute(
+            """SELECT coalesce(sum(p.amount - coalesce(p.change_amount, '0')), 0) AS total
+               FROM payments p JOIN sales s ON s.id = p.sale_id
+               WHERE s.shift_id = ? AND s.is_void = 0 AND p.method = 'cash'""", (shift_id,)
+        ).fetchone()
+        movements = self.db.execute(
+            """SELECT movement_type, coalesce(sum(amount), 0) AS total
+               FROM cash_movements WHERE shift_id = ? GROUP BY movement_type""", (shift_id,)
+        ).fetchall()
+        totals = {str(row["movement_type"]): money(row["total"]) for row in movements}
+        opening = money(shift["opening_cash"])
+        cash_sales = money(sales["total"])
+        cash_in = totals.get("cash_in", Decimal("0"))
+        drops = totals.get("drop", Decimal("0"))
+        payouts = totals.get("payout", Decimal("0"))
+        expected = money(opening + cash_sales + cash_in - drops - payouts)
+        counted = money(shift["counted_cash"]) if shift["counted_cash"] is not None else None
+        difference = money(counted - expected) if counted is not None else None
+        return ShiftCashSummary(shift_id, opening, cash_sales, cash_in, drops, payouts, expected, counted, difference)
+
+    def record_cash_movement(self, *, shift_id: int, movement_type: str, amount: Decimal,
+                             reason: str, reference_no: str | None = None,
+                             movement_uuid: str | None = None) -> str:
+        if movement_type not in {"cash_in", "drop", "payout"}:
+            raise ValueError("ประเภทเงินสดไม่ถูกต้อง")
+        amount = money(amount)
+        if amount <= 0:
+            raise ValueError("จำนวนเงินต้องมากกว่า 0")
+        reason = (reason or "").strip()
+        if not reason:
+            raise ValueError("ต้องระบุเหตุผลของรายการเงินสด")
+        shift = self.db.execute("SELECT * FROM shifts WHERE id = ? AND status = 'open'", (shift_id,)).fetchone()
+        if not shift:
+            raise ValueError("ไม่พบกะที่เปิดอยู่")
+        movement_uuid = movement_uuid or str(uuid.uuid4())
+        with self.db:
+            self.db.execute(
+                """INSERT INTO cash_movements
+                   (movement_uuid, shift_id, movement_type, amount, reference_no, reason, occurred_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (movement_uuid, shift_id, movement_type, str(amount), reference_no, reason, self._now()),
+            )
+            self.db.execute(
+                """INSERT INTO sync_outbox
+                   (aggregate_type, aggregate_uuid, payload, priority, created_at)
+                   VALUES ('cash_movement', ?, ?, 2, ?)""",
+                (f"cash:{movement_uuid}", json.dumps({"movement_uuid": movement_uuid}, ensure_ascii=False), self._now()),
+            )
+        return movement_uuid
+
+    def close_shift(self, *, shift_id: int, counted_cash: Decimal, closing_note: str | None = None) -> ShiftCashSummary:
+        counted_cash = money(counted_cash)
+        if counted_cash < 0:
+            raise ValueError("เงินสดนับจริงต้องไม่ติดลบ")
+        shift = self.db.execute("SELECT * FROM shifts WHERE id = ? AND status = 'open'", (shift_id,)).fetchone()
+        if not shift:
+            raise ValueError("ไม่พบกะที่เปิดอยู่")
+        summary = self.shift_cash_summary(shift_id)
+        closed_at = self._now()
+        with self.db:
+            self.db.execute(
+                """UPDATE shifts SET status = 'closed', closed_at = ?, counted_cash = ?,
+                   cash_difference = ?, closing_note = ? WHERE id = ?""",
+                (closed_at, str(counted_cash), str(money(counted_cash - summary.expected_cash)),
+                 (closing_note or "").strip() or None, shift_id),
+            )
+            self.db.execute(
+                """INSERT INTO sync_outbox
+                   (aggregate_type, aggregate_uuid, payload, priority, created_at)
+                   VALUES ('shift_close', ?, ?, 3, ?)""",
+                (f"shift:{shift['uuid']}:close", json.dumps({
+                    "shift_uuid": shift["uuid"], "counted_cash": str(counted_cash),
+                    "closing_note": (closing_note or "").strip() or None,
+                }, ensure_ascii=False), closed_at),
+            )
+        return ShiftCashSummary(
+            summary.shift_id, summary.opening_cash, summary.cash_sales, summary.cash_in,
+            summary.drops, summary.payouts, summary.expected_cash, counted_cash,
+            money(counted_cash - summary.expected_cash),
+        )
+
+    def effective_price(self, product_id: int, fallback_price: Decimal | str | float = 0,
+                        unit_id: int | None = None) -> tuple[Decimal, str | None]:
+        """Resolve the price at sale time, including future schedules cached offline."""
+        branch_id = self._setting("branch_id")
+        try:
+            branch_id = int(branch_id) if branch_id is not None else None
+        except (TypeError, ValueError):
+            branch_id = None
+        row = self.db.execute(
+            """SELECT price, version FROM price_versions
+               WHERE product_id = ? AND (unit_id = ? OR (unit_id IS NULL AND ? IS NULL))
+                 AND starts_at <= ? AND (ends_at IS NULL OR ends_at > ?)
+                 AND (branch_id IS NULL OR branch_id = ?)
+               ORDER BY CASE WHEN branch_id = ? THEN 0 ELSE 1 END, starts_at DESC, id DESC
+               LIMIT 1""",
+            (product_id, unit_id, unit_id, self._now(), self._now(), branch_id, branch_id),
+        ).fetchone()
+        if row:
+            return money(row["price"]), row["version"]
+        return money(fallback_price), None
 
     def vat_rate(self) -> Decimal:
         """อัตรา VAT ที่ sync มาจาก ERP — ยังไม่เคย sync ให้ใช้อัตราปัจจุบันของไทย

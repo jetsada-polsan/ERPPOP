@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import uuid
+from datetime import datetime, timezone
 from typing import Any, Protocol
 
 from .barcode import replace_scale_profiles
@@ -64,6 +66,7 @@ class ProvisioningService:
             if profiles:
                 # กฎอ่านป้ายเครื่องชั่งมาจาก ERP ที่เดียว เครื่องขายไม่เดารูปแบบเอง
                 replace_scale_profiles(self.db, profiles)
+            self._mark_sync_state("device_profile", "synced", item_count=1)
         return profile
 
     # ── catalog ──────────────────────────────────────────────────
@@ -104,12 +107,16 @@ class ProvisioningService:
         category_id = item.get("product_category_id") or item.get("category_id")
         category_name = item.get("category_name")
         price = str(item.get("pos_price") if item.get("pos_price") is not None else item.get("normal_price") or 0)
+        stock_qty = item.get("stock_qty")
+        average_cost = item.get("average_cost")
         row = self.db.execute("SELECT id FROM products WHERE server_id = ?", (server_id,)).fetchone()
         if row:
             self.db.execute(
                 """UPDATE products SET sku = ?, name = ?, unit_name = ?, active = 1, is_vat = ?,
-                category_id = ?, category_name = ?, price = ?, updated_at = ? WHERE id = ?""",
-                (sku, name, unit, is_vat, category_id, category_name, price, now(), row["id"]),
+                category_id = ?, category_name = ?, price = ?, stock_qty = ?, average_cost = ?, updated_at = ? WHERE id = ?""",
+                (sku, name, unit, is_vat, category_id, category_name, price,
+                 str(stock_qty) if stock_qty is not None else None,
+                 str(average_cost) if average_cost is not None else None, now(), row["id"]),
             )
             return int(row["id"])
         # กัน sku ชนกับแถวที่เคย seed ไว้ก่อนมี server_id: ผูก server_id เข้าแถวเดิมแทนสร้างซ้ำ
@@ -117,14 +124,19 @@ class ProvisioningService:
         if existing:
             self.db.execute(
                 """UPDATE products SET server_id = ?, name = ?, unit_name = ?, active = 1, is_vat = ?,
-                category_id = ?, category_name = ?, price = ?, updated_at = ? WHERE id = ?""",
-                (server_id, name, unit, is_vat, category_id, category_name, price, now(), existing["id"]),
+                category_id = ?, category_name = ?, price = ?, stock_qty = ?, average_cost = ?, updated_at = ? WHERE id = ?""",
+                (server_id, name, unit, is_vat, category_id, category_name, price,
+                 str(stock_qty) if stock_qty is not None else None,
+                 str(average_cost) if average_cost is not None else None, now(), existing["id"]),
             )
             return int(existing["id"])
         cur = self.db.execute(
-            """INSERT INTO products (server_id, sku, name, unit_name, active, is_vat, category_id, category_name, price, updated_at)
-            VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?)""",
-            (server_id, sku, name, unit, is_vat, category_id, category_name, price, now()),
+            """INSERT INTO products (server_id, sku, name, unit_name, active, is_vat, category_id, category_name,
+               price, stock_qty, average_cost, updated_at)
+            VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)""",
+            (server_id, sku, name, unit, is_vat, category_id, category_name, price,
+             str(stock_qty) if stock_qty is not None else None,
+             str(average_cost) if average_cost is not None else None, now()),
         )
         return int(cur.lastrowid)
 
@@ -145,19 +157,55 @@ class ProvisioningService:
             )
 
     def _record_price(self, local_product_id: int, item: dict, branch_id: int) -> None:
-        price = item.get("pos_price") if item.get("pos_price") is not None else item.get("normal_price")
+        # เก็บราคาฐานแยกจากราคาที่ active ณ เวลาที่ ERP ตอบกลับ เพื่อให้ราคา
+        # ที่ตั้งไว้ล่วงหน้ากลับมาเป็นราคาฐานได้เมื่อช่วงเวลาสิ้นสุดลง
+        price = item.get("base_pos_price")
         if price is None:
-            return
-        version = str(item.get("price_source") or "catalog")
-        # เก็บเป็น version ล่าสุดหนึ่งแถวต่อสินค้า ไม่สะสมประวัติราคาทุกครั้งที่ sync
+            price = item.get("normal_price") if item.get("normal_price") is not None else item.get("pos_price")
+        if price is not None:
+            # ราคาฐานหนึ่งแถวต่อสินค้า ไม่สะสมทุกครั้งที่ sync
+            self.db.execute(
+                "DELETE FROM price_versions WHERE product_id = ? AND version = ?", (local_product_id, "catalog-current")
+            )
+            self.db.execute(
+                """INSERT INTO price_versions (product_id, unit_id, price, starts_at, ends_at, version, branch_id, synced_at)
+                VALUES (?, NULL, ?, ?, NULL, 'catalog-current', ?, ?)""",
+                (local_product_id, str(money(price)), "1970-01-01T00:00:00+00:00", branch_id, now()),
+            )
+
+        # เก็บทุกช่วงราคาที่ ERP อนุมัติให้เครื่องนี้ล่วงหน้า; ใช้เวลาเครื่องที่
+        # calibrate จาก /ping จึงเปลี่ยนราคาได้แม้สายหลุดตอนเวลามีผลพอดี
         self.db.execute(
-            "DELETE FROM price_versions WHERE product_id = ? AND version = ?", (local_product_id, "catalog-current")
+            "DELETE FROM price_versions WHERE product_id = ? AND version LIKE 'schedule:%'",
+            (local_product_id,),
         )
-        self.db.execute(
-            """INSERT INTO price_versions (product_id, price, starts_at, ends_at, version, branch_id, synced_at)
-            VALUES (?, ?, ?, NULL, 'catalog-current', ?, ?)""",
-            (local_product_id, str(money(price)), now(), branch_id, now()),
-        )
+        for schedule in item.get("scheduled_prices") or []:
+            starts_at = self._utc_iso(schedule.get("effective_from"))
+            if not starts_at or schedule.get("price") is None:
+                continue
+            ends_at = self._utc_iso(schedule.get("effective_to"))
+            unit_id = schedule.get("unit_id")
+            schedule_id = schedule.get("id") or f"{starts_at}:{unit_id or 'base'}"
+            self.db.execute(
+                """INSERT INTO price_versions (product_id, unit_id, price, starts_at, ends_at, version, branch_id, synced_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (local_product_id, int(unit_id) if unit_id is not None else None,
+                 str(money(schedule["price"])), starts_at, ends_at,
+                 f"schedule:{schedule_id}", schedule.get("branch_id", branch_id), now()),
+            )
+
+    @staticmethod
+    def _utc_iso(value: Any) -> str | None:
+        if not value:
+            return None
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.astimezone(timezone.utc).isoformat()
+        except ValueError:
+            # A malformed schedule must not silently become active forever.
+            return None
 
     # ── cashiers ─────────────────────────────────────────────────
     def pull_cashiers(self, branch_id: int | None = None) -> dict[str, int]:
@@ -298,9 +346,10 @@ class ProvisioningService:
                 int(server_id),
                 str(cashier.get("code") or server_id),
                 str(cashier.get("name") or ""),
-                cashier.get("credential_version"),
-                str(cashier.get("role") or "cashier"),
-                bool(cashier.get("must_change_pin")),
+                user_id=int(cashier["user_id"]) if cashier.get("user_id") is not None else None,
+                credential_version=cashier.get("credential_version"),
+                role=str(cashier.get("role") or "cashier"),
+                force_pin_change=bool(cashier.get("must_change_pin")),
             )
         credential = response.get("offline_credential")
         if credential:
@@ -340,9 +389,10 @@ class ProvisioningService:
                 int(server_id),
                 str(cashier.get("code") or server_id),
                 str(cashier.get("name") or ""),
-                cashier.get("credential_version"),
-                str(cashier.get("role") or "cashier"),
-                bool(cashier.get("must_change_pin")),
+                user_id=int(cashier["user_id"]) if cashier.get("user_id") is not None else None,
+                credential_version=cashier.get("credential_version"),
+                role=str(cashier.get("role") or "cashier"),
+                force_pin_change=bool(cashier.get("must_change_pin")),
             )
         credential = response.get("offline_credential")
         if credential:
@@ -368,13 +418,103 @@ class ProvisioningService:
         self.db.commit()
         return int(server_shift_id)
 
+    def record_server_cash_movement(self, *, server_shift_id: int, movement_type: str,
+                                    amount, reason: str, reference_no: str | None = None,
+                                    movement_uuid: str | None = None) -> dict:
+        response = self.api.post("/api/pos/shift/cash-movement", {
+            "shift_id": int(server_shift_id), "movement_type": movement_type,
+            "amount": str(money(amount)), "reason": reason, "reference_no": reference_no,
+        }, idempotency_key=movement_uuid)
+        if not response.get("success", False):
+            raise RuntimeError(response.get("message", "บันทึกเงินเข้าออกที่ ERP ไม่สำเร็จ"))
+        return response
+
+    def close_server_shift(self, *, server_shift_id: int, counted_cash,
+                           closing_note: str | None = None, idempotency_key: str | None = None) -> dict:
+        response = self.api.post("/api/pos/shift/close", {
+            "shift_id": int(server_shift_id), "counted_cash": str(money(counted_cash)),
+            "closing_note": closing_note,
+        }, idempotency_key=idempotency_key)
+        if not response.get("success", False):
+            raise RuntimeError(response.get("message", "ปิดกะที่ ERP ไม่สำเร็จ"))
+        return response
+
     # ── orchestrator ─────────────────────────────────────────────
     def sync_down(self, branch_id: int) -> dict[str, Any]:
-        """ดึงข้อมูลลงเครื่องทั้งชุด — mirror ของ syncAll ขั้นที่ 2 ฝั่ง Tauri"""
-        return {
-            "catalog": self.pull_catalog(branch_id),
-            "cashiers": self.pull_cashiers(branch_id),
-        }
+        """ดึงข้อมูลลงเครื่องแบบแยกชุดและบันทึกผลทุกชุด
+
+        การ sync ซ้ำปลอดภัย: ข้อมูล master ใช้ upsert/ปิดใช้งานแบบไม่ลบ ส่วน
+        บิลและ audit อยู่ใน outbox แยกกัน จึงไม่มีการเขียนทับยอดขายระหว่างดึงข้อมูล.
+        """
+        run_uuid = str(uuid.uuid4())
+        started_at = now()
+        self.db.execute(
+            "INSERT INTO sync_runs (run_uuid, direction, status, started_at) VALUES (?, 'down', 'running', ?)",
+            (run_uuid, started_at),
+        )
+        self.db.commit()
+        result: dict[str, Any] = {}
+        try:
+            result["catalog"] = self._sync_dataset("catalog", lambda: self.pull_catalog(branch_id))
+            result["cashiers"] = self._sync_dataset("cashiers", lambda: self.pull_cashiers(branch_id))
+            with self.db:
+                self.db.execute(
+                    "UPDATE sync_runs SET status = 'synced', finished_at = ?, datasets_json = ? WHERE run_uuid = ?",
+                    (now(), json.dumps(result, ensure_ascii=False), run_uuid),
+                )
+            return result
+        except Exception as error:
+            with self.db:
+                self.db.execute(
+                    "UPDATE sync_runs SET status = 'failed', finished_at = ?, datasets_json = ?, error = ? WHERE run_uuid = ?",
+                    (now(), json.dumps(result, ensure_ascii=False), str(error)[:1000], run_uuid),
+                )
+            raise
+
+    def sync_status(self) -> dict[str, dict[str, Any]]:
+        """สถานะ sync รายชุดสำหรับหน้า IT และการตรวจสอบเครื่องโดยไม่ยิง network."""
+        rows = self.db.execute("SELECT * FROM sync_state ORDER BY entity").fetchall()
+        return {str(row["entity"]): dict(row) for row in rows}
+
+    def _sync_dataset(self, entity: str, operation) -> Any:
+        started_at = now()
+        self._mark_sync_state(entity, "running", started_at=started_at)
+        try:
+            value = operation()
+        except Exception as error:
+            self._mark_sync_state(entity, "failed", started_at=started_at, error=str(error)[:1000])
+            self.db.execute(
+                "INSERT INTO sync_logs (direction, status, message, created_at) VALUES ('down', 'failed', ?, ?)",
+                (f"{entity}: {str(error)[:900]}", now()),
+            )
+            self.db.commit()
+            raise
+        count = int(value.get("upserted", 0)) if isinstance(value, dict) else 0
+        self._mark_sync_state(entity, "synced", started_at=started_at, item_count=count)
+        self.db.execute(
+            "INSERT INTO sync_logs (direction, status, message, created_at) VALUES ('down', 'synced', ?, ?)",
+            (f"{entity}: {count}", now()),
+        )
+        self.db.commit()
+        return value
+
+    def _mark_sync_state(self, entity: str, status: str, *, started_at: str | None = None,
+                         item_count: int = 0, error: str | None = None) -> None:
+        timestamp = now()
+        success_at = timestamp if status == "synced" else None
+        self.db.execute(
+            """INSERT INTO sync_state
+               (entity, status, last_started_at, last_success_at, last_error, item_count, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(entity) DO UPDATE SET
+                 status = excluded.status,
+                 last_started_at = COALESCE(excluded.last_started_at, sync_state.last_started_at),
+                 last_success_at = COALESCE(excluded.last_success_at, sync_state.last_success_at),
+                 last_error = excluded.last_error,
+                 item_count = CASE WHEN excluded.status = 'synced' THEN excluded.item_count ELSE sync_state.item_count END,
+                 updated_at = excluded.updated_at""",
+            (entity, status, started_at, success_at, error, item_count, timestamp),
+        )
 
     # ── helpers ──────────────────────────────────────────────────
     def _put_setting(self, key: str, value: Any) -> None:

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from typing import Protocol
+from typing import Any, Protocol
 
-from .services import now
+from .services import money, now
 
 
 class PosApi(Protocol):
@@ -16,13 +16,27 @@ class SyncService:
         self.db = connection
         self.api = api
 
-    def sync_pending_sales(self) -> dict[str, int]:
+    def sync_pending_sales(self) -> dict[str, Any]:
+        # A locally opened shift must be created on ERP before any sale that
+        # belongs to it.  This is the dependency that makes offline selling
+        # recoverable after reconnecting.
+        result = {"synced": 0, "failed": 0}
+        for row in self.db.execute(
+            """SELECT aggregate_uuid FROM sync_outbox
+               WHERE aggregate_type = 'shift_open' AND status IN ('pending', 'failed')
+               ORDER BY priority ASC, created_at ASC, id ASC"""
+        ).fetchall():
+            try:
+                self.sync_shift_open(row["aggregate_uuid"])
+                result["synced"] += 1
+            except RuntimeError:
+                result["failed"] += 1
+
         rows = self.db.execute(
             """SELECT aggregate_type, aggregate_uuid, depends_on_uuid FROM sync_outbox
                WHERE aggregate_type IN ('sale', 'sale_void') AND status IN ('pending', 'failed')
                ORDER BY priority ASC, created_at ASC, id ASC"""
         ).fetchall()
-        result = {"synced": 0, "failed": 0}
         for row in rows:
             if row["depends_on_uuid"]:
                 dependency = self.db.execute(
@@ -38,10 +52,43 @@ class SyncService:
                 result["synced"] += 1
             except RuntimeError:
                 result["failed"] += 1
+        for row in self.db.execute(
+            """SELECT aggregate_uuid FROM sync_outbox
+               WHERE aggregate_type IN ('cash_movement', 'shift_close')
+                 AND status IN ('pending', 'failed')
+               ORDER BY priority ASC, created_at ASC, id ASC"""
+        ).fetchall():
+            try:
+                if row["aggregate_uuid"].startswith("cash:"):
+                    self.sync_cash_movement(row["aggregate_uuid"])
+                else:
+                    self.sync_shift_close(row["aggregate_uuid"])
+                result["synced"] += 1
+            except RuntimeError:
+                result["failed"] += 1
         auth = self.sync_auth_events()
-        result["synced"] += auth["synced"]
-        result["failed"] += auth["failed"]
-        return result
+        self._mark_outbox_state("sales_outbox", result)
+        self._mark_outbox_state("auth_events", auth)
+        return {"synced": result["synced"] + auth["synced"], "failed": result["failed"] + auth["failed"]}
+
+    def _mark_outbox_state(self, entity: str, result: dict[str, int]) -> None:
+        status = "failed" if result["failed"] else "synced"
+        timestamp = now()
+        self.db.execute(
+            """INSERT INTO sync_state
+               (entity, status, last_success_at, last_error, item_count, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(entity) DO UPDATE SET
+                 status = excluded.status,
+                 last_success_at = CASE WHEN excluded.status = 'synced' THEN excluded.last_success_at ELSE sync_state.last_success_at END,
+                 last_error = excluded.last_error,
+                 item_count = excluded.item_count,
+                 updated_at = excluded.updated_at""",
+            (entity, status, timestamp if status == "synced" else None,
+             f"{result['failed']} รายการยังส่งไม่สำเร็จ" if result["failed"] else None,
+             result["synced"], timestamp),
+        )
+        self.db.commit()
 
     def sync_auth_events(self) -> dict[str, int]:
         """Upload offline login/recovery audit events without blocking sales sync.
@@ -90,6 +137,108 @@ class SyncService:
                     )
                 result["failed"] += 1
         return result
+
+    def sync_shift_open(self, aggregate_uuid: str) -> None:
+        row = self.db.execute(
+            "SELECT payload FROM sync_outbox WHERE aggregate_uuid = ? AND aggregate_type = 'shift_open'",
+            (aggregate_uuid,),
+        ).fetchone()
+        if not row:
+            raise RuntimeError("ไม่พบคิวเปิดกะ")
+        try:
+            event = json.loads(row["payload"])
+            shift_uuid = str(event["shift_uuid"])
+            cashier_id = int(event["cashier_server_id"])
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+            return self._failed_outbox(aggregate_uuid, f"ข้อมูลเปิดกะไม่ถูกต้อง: {error}")
+        if cashier_id <= 0:
+            return self._failed_outbox(aggregate_uuid, "แคชเชียร์ยังไม่มี server_id: ต้อง sync รายชื่อก่อน")
+        shift = self.db.execute("SELECT * FROM shifts WHERE uuid = ?", (shift_uuid,)).fetchone()
+        if not shift:
+            return self._failed_outbox(aggregate_uuid, "ไม่พบกะ local สำหรับ sync")
+        if shift["server_id"]:
+            self._mark_synced(aggregate_uuid)
+            return
+        try:
+            response = self.api.post("/api/pos/shift/open", {
+                "branch_id": int(event["branch_id"]), "cashier_id": cashier_id,
+                "opening_cash": str(money(shift["opening_cash"])),
+            }, idempotency_key=aggregate_uuid)
+        except Exception as error:
+            return self._failed_outbox(aggregate_uuid, str(error))
+        if not response.get("success", False):
+            return self._failed_outbox(aggregate_uuid, response.get("message", "เปิดกะไม่สำเร็จ"))
+        server_shift_id = (response.get("shift") or {}).get("id")
+        if not server_shift_id:
+            return self._failed_outbox(aggregate_uuid, "ERP เปิดกะแล้วแต่ไม่คืนเลขกะ")
+        with self.db:
+            self.db.execute("UPDATE shifts SET server_id = ? WHERE uuid = ?", (int(server_shift_id), shift_uuid))
+        self._mark_synced(aggregate_uuid)
+
+    def sync_cash_movement(self, aggregate_uuid: str) -> None:
+        row = self.db.execute("SELECT payload FROM sync_outbox WHERE aggregate_uuid = ?", (aggregate_uuid,)).fetchone()
+        if not row:
+            raise RuntimeError("ไม่พบคิวเงินเข้าออก")
+        try:
+            movement_uuid = str(json.loads(row["payload"])["movement_uuid"])
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+            return self._failed_outbox(aggregate_uuid, f"ข้อมูลเงินเข้าออกไม่ถูกต้อง: {error}")
+        movement = self.db.execute(
+            """SELECT m.*, s.server_id AS server_shift_id FROM cash_movements m
+               JOIN shifts s ON s.id = m.shift_id WHERE m.movement_uuid = ?""", (movement_uuid,)
+        ).fetchone()
+        if not movement or not movement["server_shift_id"]:
+            return self._failed_outbox(aggregate_uuid, "ยังไม่ได้ผูกกะบน ERP")
+        try:
+            response = self.api.post("/api/pos/shift/cash-movement", {
+                "shift_id": int(movement["server_shift_id"]),
+                "movement_type": movement["movement_type"], "amount": str(money(movement["amount"])),
+                "reference_no": movement["reference_no"], "reason": movement["reason"],
+            }, idempotency_key=movement_uuid)
+        except Exception as error:
+            return self._failed_outbox(aggregate_uuid, str(error))
+        if not response.get("success", False):
+            return self._failed_outbox(aggregate_uuid, response.get("message", "ซิงก์เงินเข้าออกไม่สำเร็จ"))
+        with self.db:
+            self.db.execute("UPDATE cash_movements SET sync_status = 'synced' WHERE movement_uuid = ?", (movement_uuid,))
+        self._mark_synced(aggregate_uuid)
+
+    def sync_shift_close(self, aggregate_uuid: str) -> None:
+        row = self.db.execute("SELECT payload FROM sync_outbox WHERE aggregate_uuid = ?", (aggregate_uuid,)).fetchone()
+        if not row:
+            raise RuntimeError("ไม่พบคิวปิดกะ")
+        try:
+            event = json.loads(row["payload"])
+            shift = self.db.execute("SELECT * FROM shifts WHERE uuid = ?", (str(event["shift_uuid"]),)).fetchone()
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+            return self._failed_outbox(aggregate_uuid, f"ข้อมูลปิดกะไม่ถูกต้อง: {error}")
+        if not shift or not shift["server_id"]:
+            return self._failed_outbox(aggregate_uuid, "ยังไม่ได้ผูกกะบน ERP")
+        try:
+            response = self.api.post("/api/pos/shift/close", {
+                "shift_id": int(shift["server_id"]), "counted_cash": str(money(event["counted_cash"])),
+                "closing_note": event.get("closing_note"),
+            }, idempotency_key=aggregate_uuid)
+        except Exception as error:
+            return self._failed_outbox(aggregate_uuid, str(error))
+        if not response.get("success", False):
+            return self._failed_outbox(aggregate_uuid, response.get("message", "ปิดกะบน ERP ไม่สำเร็จ"))
+        self._mark_synced(aggregate_uuid)
+
+    def _mark_synced(self, aggregate_uuid: str) -> None:
+        with self.db:
+            self.db.execute(
+                "UPDATE sync_outbox SET status = 'synced', synced_at = ?, attempts = attempts + 1, last_error = NULL WHERE aggregate_uuid = ?",
+                (now(), aggregate_uuid),
+            )
+
+    def _failed_outbox(self, aggregate_uuid: str, message: str) -> None:
+        with self.db:
+            self.db.execute(
+                "UPDATE sync_outbox SET status = 'failed', attempts = attempts + 1, last_error = ? WHERE aggregate_uuid = ?",
+                (message[:1000], aggregate_uuid),
+            )
+        raise RuntimeError(message)
 
     def sync_sale(self, sale_uuid: str) -> None:
         sale = self.db.execute(

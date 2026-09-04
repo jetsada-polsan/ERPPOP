@@ -20,12 +20,17 @@ from .sync_service import SyncService
 
 class SyncWorker:
     def __init__(self, db_path: Path, api, *, idle_interval: float = 30.0,
-                 retry_interval: float = 5.0, on_result: Callable[[dict], None] | None = None):
+                 retry_interval: float = 5.0, on_result: Callable[[dict], None] | None = None,
+                 refresh_down: Callable[[], dict] | None = None):
         self.db_path = Path(db_path)
         self.api = api
         self.idle_interval = idle_interval
         self.retry_interval = retry_interval
         self.on_result = on_result
+        # bootstrap supplies a callback that opens its own SQLite connection.
+        # The worker must never share the GUI connection across threads.
+        self.refresh_down = refresh_down
+        self.needs_down_sync = False
         # สถานะให้ GUI อ่านโชว์ผู้ใช้ (แถบล่าง): เชื่อม ERP ได้ไหม + ค้างกี่ใบ
         self.online = True
         self.pending = 0
@@ -59,8 +64,14 @@ class SyncWorker:
         db = connect(self.db_path)
         try:
             db.execute("PRAGMA busy_timeout = 5000")
+            download = {}
+            if self.needs_down_sync and self.refresh_down is not None:
+                download = self.refresh_down()
+                self.needs_down_sync = False
             service = SyncService(db, self.api)
             result = service.sync_pending_sales()
+            if download:
+                result = {**result, "download": download}
             self.pending = self._pending_count(db)
             self.last_result = result
             # ยังส่งไม่หมด = ถือว่าเน็ต/ERP มีปัญหา (บิลค้างเพราะเหตุใดก็ตาม)
@@ -68,6 +79,9 @@ class SyncWorker:
             return result
         except Exception:
             self.online = False
+            # A failed request is also the reconnect trigger. The next cycle
+            # will refresh server master data before attempting the outbox.
+            self.needs_down_sync = True
             raise
         finally:
             db.close()

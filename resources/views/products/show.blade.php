@@ -86,6 +86,41 @@
             </div>
         </section>
         @endif
+        <div class="content-card p-4 mb-4">
+            <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <h3 class="h6 fw-bold mb-1">ราคาขาย POS ตามเวลา</h3>
+                    <div class="text-muted small">ตั้งราคาเริ่มขายล่วงหน้าได้ เช่น พรุ่งนี้ 05:00 หรือ 12:00 เครื่อง POS จะรับช่วงราคาเมื่อ sync และเปลี่ยนราคาเองตามเวลา ERP</div>
+                </div>
+            </div>
+            <div class="table-responsive mb-3">
+                <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>สาขา</th><th>หน่วย</th><th class="text-end">ราคา</th><th>ช่วงเวลาที่มีผล</th><th>สถานะ</th><th></th></tr></thead>
+                    <tbody>
+                    @forelse($posPriceSchedules as $schedule)
+                        <tr>
+                            <td>{{ $schedule->branch?->code ?? 'ทุกสาขา' }}{{ $schedule->branch?->name_th ? ' - '.$schedule->branch->name_th : '' }}</td>
+                            <td>{{ $schedule->unit?->displayLabel() ?? 'หน่วยฐาน' }}</td>
+                            <td class="text-end fw-semibold">{{ number_format((float) $schedule->price, 2) }}</td>
+                            <td>{{ $schedule->effective_from?->format('d/m/Y H:i') }} - {{ $schedule->effective_to?->format('d/m/Y H:i') ?? 'ไม่สิ้นสุด' }}</td>
+                            <td><span class="badge {{ $schedule->status === 'published' ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $schedule->status === 'published' ? 'เผยแพร่' : 'ยกเลิก' }}</span></td>
+                            <td class="text-end">@if($schedule->status === 'published')<form method="post" action="{{ route('products.pos-price-schedules.destroy', [$product, $schedule]) }}" onsubmit="return confirm('ยกเลิกช่วงราคานี้?')">@csrf @method('DELETE')<button class="btn btn-sm btn-light text-danger border" title="ยกเลิกช่วงราคา"><i class="bi bi-x-lg"></i></button></form>@endif</td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="6" class="text-center text-muted py-3">ยังไม่มีราคาขายตามเวลา</td></tr>
+                    @endforelse
+                    </tbody>
+                </table>
+            </div>
+            <form method="post" action="{{ route('products.pos-price-schedules.store', $product) }}" class="row g-2 align-items-end">@csrf
+                <div class="col-md-2"><label class="form-label small text-muted">สาขา</label><select name="branch_id" class="form-select form-select-sm"><option value="">ทุกสาขา</option>@foreach($branches as $branch)<option value="{{ $branch->id }}">{{ $branch->code }} - {{ $branch->name_th }}</option>@endforeach</select></div>
+                <div class="col-md-2"><label class="form-label small text-muted">หน่วย</label><select name="unit_id" class="form-select form-select-sm"><option value="">หน่วยฐาน</option>@foreach($units as $unit)<option value="{{ $unit->id }}">{{ $unit->displayLabel() }}</option>@endforeach</select></div>
+                <div class="col-md-2"><label class="form-label small text-muted">ราคาขาย</label><input type="number" step="0.01" min="0" name="price" required class="form-control form-control-sm"></div>
+                <div class="col-md-2"><label class="form-label small text-muted">เริ่มใช้</label><input type="datetime-local" name="effective_from" value="{{ now()->addDay()->setTime(5, 0)->format('Y-m-d\\TH:i') }}" required class="form-control form-control-sm"></div>
+                <div class="col-md-2"><label class="form-label small text-muted">สิ้นสุด</label><input type="datetime-local" name="effective_to" class="form-control form-control-sm"></div>
+                <div class="col-md-2"><label class="form-label small text-muted">หมายเหตุ</label><div class="d-flex gap-2"><input name="note" class="form-control form-control-sm"><button class="btn btn-sm btn-primary text-nowrap"><i class="bi bi-clock"></i> ตั้งราคา</button></div></div>
+            </form>
+        </div>
         <a href="{{ route('products.index') }}" class="text-decoration-none small d-inline-block mb-3">
             <i class="bi bi-arrow-left me-1"></i> กลับไปรายการสินค้า
         </a>

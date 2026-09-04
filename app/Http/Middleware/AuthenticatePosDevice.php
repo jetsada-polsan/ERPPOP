@@ -34,7 +34,7 @@ class AuthenticatePosDevice
         if (! $user || ! $user->is_active) {
             return response()->json(['success' => false, 'message' => 'บัญชีผู้ใช้ของอุปกรณ์ถูกปิดใช้งาน'], 403);
         }
-        if (! $user->hasPermission('pos.sell')) {
+        if (! $user->canUsePosDevice($device->branch_id ? (int) $device->branch_id : null)) {
             return response()->json(['success' => false, 'message' => 'บัญชีนี้ไม่มีสิทธิ์ขายหน้า POS'], 403);
         }
 

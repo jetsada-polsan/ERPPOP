@@ -115,15 +115,55 @@ class User extends Authenticatable
         return $query->exists();
     }
 
+    /**
+     * POS device branch is authoritative. A global POS seller can use any
+     * active device; a branch-only seller must be assigned to that branch.
+     */
+    public function canUsePosDevice(?int $branchId): bool
+    {
+        if ($this->hasGlobalPermission('pos.sell')) {
+            return true;
+        }
+
+        return $branchId !== null && $this->canAccessBranch($branchId, 'pos.sell');
+    }
+
     /** @var array<int, string>|null per-request cache of permission codes */
     private ?array $permissionCodes = null;
 
-    /** @return array<int, string> */
+    /**
+     * Return permissions from the user's global roles plus active branch roles.
+     * Branch roles grant access to the assigned branch; controllers and POS
+     * device checks still call canAccessBranch() when a branch is authoritative.
+     *
+     * @return array<int, string>
+     */
     public function permissionCodes(): array
     {
         return $this->permissionCodes ??= $this->roles()->with('permissions')->get()
+            ->merge($this->activeBranchRoles())
             ->flatMap(fn ($role) => $role->permissions->pluck('code'))
             ->unique()->values()->all();
+    }
+
+    public function hasGlobalPermission(string $code): bool
+    {
+        return $this->roles()->whereHas('permissions', fn ($permissions) => $permissions->where('code', $code))->exists();
+    }
+
+    /** @return \Illuminate\Support\Collection<int, Role> */
+    private function activeBranchRoles()
+    {
+        return $this->branchRoles()
+            ->wherePivot('is_active', true)
+            ->where(fn ($roles) => $roles
+                ->whereNull('user_branch_roles.effective_from')
+                ->orWhere('user_branch_roles.effective_from', '<=', now()))
+            ->where(fn ($roles) => $roles
+                ->whereNull('user_branch_roles.effective_to')
+                ->orWhere('user_branch_roles.effective_to', '>', now()))
+            ->with('permissions')
+            ->get();
     }
 
     // สิทธิ์ที่ superadmin bypass ห้ามแตะ - ต้องถือจริงเท่านั้น (ควบคุมภายใน POS):

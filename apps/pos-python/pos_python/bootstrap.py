@@ -16,6 +16,7 @@ from typing import Any
 
 from .api_client import LaravelPosClient
 from .config import DeviceConfig, load_device_config
+from .database import connect
 from .provisioning import ProvisioningService
 from .sync_worker import SyncWorker
 
@@ -41,7 +42,26 @@ def bootstrap(data_dir: Path, db: sqlite3.Connection, db_path: Path,
 
     api = LaravelPosClient(config.server_url, config.device_token, allow_insecure=config.allow_insecure)
     prov = ProvisioningService(db, api)
-    worker = SyncWorker(db_path, api)
+    # On a reconnect, refresh the server snapshot before uploading local work.
+    # A new connection is required because SyncWorker runs outside the GUI thread.
+    def refresh_down() -> dict[str, Any]:
+        refresh_db = connect(db_path)
+        try:
+            refresh = ProvisioningService(refresh_db, api)
+            profile = refresh.ping()
+            branch = profile.get("branch_id") or _cached_setting(refresh_db, "branch_id")
+            if not branch:
+                raise RuntimeError("ERP ไม่คืนสาขาของเครื่อง POS")
+            result = refresh.sync_down(int(branch))
+            ctx.branch_id = int(branch)
+            ctx.terminal_id = (profile.get("device") or {}).get("terminal_code") or _cached_setting(refresh_db, "terminal_code")
+            ctx.profile = profile
+            ctx.online = True
+            return result
+        finally:
+            refresh_db.close()
+
+    worker = SyncWorker(db_path, api, refresh_down=refresh_down)
     ctx = OnlineContext(api=api, provisioning=prov, worker=worker)
 
     try:
@@ -59,6 +79,7 @@ def bootstrap(data_dir: Path, db: sqlite3.Connection, db_path: Path,
         cached = _cached_setting(db, "branch_id")
         ctx.branch_id = int(cached) if cached else None
         ctx.terminal_id = _cached_setting(db, "terminal_code")
+        worker.needs_down_sync = True
 
     worker.start()
     return ctx

@@ -418,6 +418,7 @@ class PosController extends Controller
             }
             $p->scheduled_prices = $catalogSchedules->get($p->id, collect())->map(fn ($row) => [
                 'id' => $row->id,
+                'branch_id' => $row->branch_id,
                 'unit_id' => $row->unit_id,
                 'price' => (float) $row->price,
                 'effective_from' => $row->effective_from->toIso8601String(),

@@ -38,6 +38,50 @@ class PosServiceTest(unittest.TestCase):
         self.assertIsNotNone(self.service.login("POP001", "1234"))
         self.assertIsNone(self.service.login("POP001", "wrong"))
 
+    def test_open_shift_persists_opening_cash_for_cash_drawer_reconciliation(self) -> None:
+        opening_cash = self.db.execute("SELECT opening_cash FROM shifts WHERE id = ?", (self.shift_id,)).fetchone()[0]
+        self.assertEqual(opening_cash, "100.00")
+
+        with self.assertRaisesRegex(ValueError, "เงินทอนตั้งต้นต้องไม่ติดลบ"):
+            self.service.open_shift(1, "TEST-02", 1, Decimal("-1"))
+
+    def test_cash_movements_and_close_shift_reconcile_the_local_drawer(self) -> None:
+        self.service.checkout(
+            document_no="T-CASH-DRAWER", branch_id=1, terminal_id="TEST-01", shift_id=self.shift_id,
+            cashier_id=1, lines=[CartLine(1, Decimal("2"), Decimal("25"))],
+            payment_method="cash", paid_amount=Decimal("60"), sale_uuid="cash-drawer-sale",
+        )
+        self.service.record_cash_movement(
+            shift_id=self.shift_id, movement_type="cash_in", amount=Decimal("20"), reason="เงินทอนเพิ่ม"
+        )
+        self.service.record_cash_movement(
+            shift_id=self.shift_id, movement_type="drop", amount=Decimal("30"), reason="นำส่งรอบแรก"
+        )
+
+        summary = self.service.shift_cash_summary(self.shift_id)
+        self.assertEqual(summary.expected_cash, Decimal("140.00"))
+        closed = self.service.close_shift(shift_id=self.shift_id, counted_cash=Decimal("139"), closing_note="ขาด 1 บาท")
+        self.assertEqual(closed.cash_difference, Decimal("-1.00"))
+        self.assertEqual(self.db.execute("SELECT status FROM shifts WHERE id = ?", (self.shift_id,)).fetchone()[0], "closed")
+        queued = self.db.execute(
+            "SELECT aggregate_type FROM sync_outbox WHERE aggregate_type IN ('cash_movement', 'shift_close') ORDER BY id"
+        ).fetchall()
+        self.assertEqual([row[0] for row in queued], ["cash_movement", "cash_movement", "shift_close"])
+
+    def test_effective_price_uses_a_cached_schedule_at_sale_time(self) -> None:
+        self.db.execute(
+            "INSERT INTO device_settings (key, value, updated_at) VALUES ('branch_id', '1', ?)",
+            (now(),),
+        )
+        self.db.execute(
+            """INSERT INTO price_versions (product_id, price, starts_at, ends_at, version, branch_id, synced_at)
+               VALUES (1, '19.00', '1970-01-01T00:00:00+00:00', '2999-01-01T00:00:00+00:00', 'schedule:1', 1, ?)""",
+            (now(),),
+        )
+        self.db.commit()
+        price, version = self.service.effective_price(1, "25.00")
+        self.assertEqual((price, version), (Decimal("19.00"), "schedule:1"))
+
     def test_offline_cashier_login_uses_server_issued_credential_and_expiry(self) -> None:
         salt = b"server-issued-salt"
         verifier = hashlib.pbkdf2_hmac("sha256", b"860531", salt, 120000, dklen=32)

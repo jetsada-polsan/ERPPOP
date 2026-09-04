@@ -169,7 +169,10 @@ return [
     |
     */
 
-    'secure' => env('SESSION_SECURE_COOKIE'),
+    // Production currently serves the ERP over HTTP at the internal host. Keep
+    // this opt-in so an unset value does not silently create a Secure cookie
+    // that the browser will never send over HTTP. Set true when HTTPS is ready.
+    'secure' => env('SESSION_SECURE_COOKIE', false),
 
     /*
     |--------------------------------------------------------------------------

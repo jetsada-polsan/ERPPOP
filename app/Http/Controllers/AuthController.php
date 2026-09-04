@@ -13,12 +13,22 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 
 class AuthController extends Controller
 {
-    public function showLogin(): View|RedirectResponse
+    public function showLogin(): View|RedirectResponse|Response
     {
-        return Auth::check() ? redirect()->route('dashboard') : view('auth.login');
+        if (Auth::check()) {
+            return redirect()->route('dashboard');
+        }
+
+        // Do not let a browser or reverse proxy reuse a login form whose CSRF
+        // token belongs to an old session after deploy/session rotation.
+        return response()->view('auth.login')
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            ->header('Pragma', 'no-cache')
+            ->header('Expires', '0');
     }
 
     public function login(Request $request): RedirectResponse

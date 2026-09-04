@@ -99,16 +99,33 @@ class UiStyleTest(unittest.TestCase):
         self.assertIn("has_local_it_pin", settings)
         self.assertIn("AdminAuthDialog", settings)
 
+    def test_pos_dialogs_are_compact_and_have_a_close_path(self) -> None:
+        source = inspect.getsource(run_ui)
+        self.assertIn("self.setMinimumSize(860, 560)", source)
+        self.assertIn("self.setWindowFlag(Qt.WindowCloseButtonHint, True)", source)
+        self.assertIn("close_button.clicked.connect(self.reject)", source)
+        self.assertIn("QToolButton#dialogClose", STYLE)
+
     def test_cashier_can_pick_a_synced_name_and_tap_a_pin(self) -> None:
         source = inspect.getsource(run_ui)
         self.assertIn('self.cashier_select.addItem(f"{cashier[\'name\']}  ·  {cashier[\'code\']}"', source)
         self.assertIn('for index, key in enumerate(["1", "2", "3"', source)
+
+    def test_opening_shift_requests_and_reuses_opening_cash(self) -> None:
+        source = inspect.getsource(run_ui)
+        start = source.index("def ensure_sale_session")
+        session = source[start:source.index("def open_settings", start)]
+        self.assertIn('"เงินทอนตั้งต้น (บาท)"', session)
+        self.assertIn("opening_cash=opening_cash", session)
+        self.assertNotIn('opening_cash=Decimal("0")', session)
 
     def test_transfer_requires_visible_money_received_confirmation(self) -> None:
         source = inspect.getsource(run_ui)
         self.assertIn("โอน / QR", source)
         self.assertIn("ตรวจสอบแล้วว่าเงินเข้าบัญชีครบตามยอด", source)
         self.assertIn("not self.transfer_confirmed.isChecked()", source)
+        self.assertIn("self.transfer_confirmed.toggled.connect(self._confirm_transfer_checkbox)", source)
+        self.assertIn("self.confirm()", source)
 
     def test_pos_layout_adapts_to_small_pos_displays(self) -> None:
         source = inspect.getsource(run_ui)
