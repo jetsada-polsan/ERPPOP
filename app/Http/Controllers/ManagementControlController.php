@@ -28,9 +28,10 @@ class ManagementControlController extends Controller
                 ->selectRaw("coalesce(sum(case when dt.code='SALE_RETURN' then -d.total_amount else d.total_amount end),0) as amount")->value('amount');
             $cogs = (float) DB::table('stock_document_items as i')->join('stock_documents as s', 's.id', '=', 'i.stock_document_id')
                 ->join('documents as d', 'd.id', '=', 's.document_id')->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
+                ->join('products as p', 'p.id', '=', 'i.product_id')
                 ->where('d.branch_id', $branch->id)->where('d.status', 'active')->whereBetween('d.doc_date', [$from, $to])
                 ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN'])
-                ->selectRaw("coalesce(sum(case when dt.code='SALE_RETURN' then -i.cost_amount else i.cost_amount end),0) as amount")->value('amount');
+                ->selectRaw("coalesce(sum(case when dt.code='SALE_RETURN' then -coalesce(i.cost_amount, i.qty * coalesce(i.unit_cost, p.average_cost, 0)) else coalesce(i.cost_amount, i.qty * coalesce(i.unit_cost, p.average_cost, 0)) end),0) as amount")->value('amount');
             $expenses = (float) DB::table('branch_expenses')->where('branch_id', $branch->id)
                 ->whereBetween('expense_date', [$from, $to])->sum('total_amount');
             $branch->sales = $sales;
