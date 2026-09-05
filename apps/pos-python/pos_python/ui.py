@@ -613,6 +613,51 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.opening_cash = value
             self.accept()
 
+    class ExistingShiftDialog(QDialog):
+        """Make an open shift explicit instead of silently skipping opening cash."""
+
+        def __init__(self, parent, shift):
+            super().__init__(parent)
+            self.close_existing = False
+            self.setWindowTitle("พบกะที่ยังเปิดอยู่")
+            self.setWindowFlag(Qt.WindowCloseButtonHint, True)
+            self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
+            self.setWindowModality(Qt.WindowModal)
+            self.setMinimumWidth(420)
+
+            layout = QVBoxLayout(self)
+            title = QLabel("เครื่องนี้มีกะเดิมที่ยังไม่ได้ปิด")
+            title.setStyleSheet("font-size:19px;font-weight:800")
+            detail = QLabel(
+                f"เปิดเมื่อ {str(shift['opened_at'])[:16].replace('T', ' ')}\n"
+                f"เงินทอนต้นกะ {money(shift['opening_cash']):,.2f} บาท"
+            )
+            detail.setObjectName("shiftSummary")
+            detail.setAlignment(Qt.AlignCenter)
+            note = QLabel("ทำกะเดิมต่อได้ทันที หรือปิดกะเดิมก่อนเพื่อใส่เงินทอนตั้งต้นยอดใหม่")
+            note.setObjectName("cardHint")
+            note.setWordWrap(True)
+            layout.addWidget(title)
+            layout.addWidget(detail)
+            layout.addWidget(note)
+
+            actions = QHBoxLayout()
+            cancel = QPushButton("ยกเลิก")
+            close_old = QPushButton("ปิดกะเดิม")
+            resume = QPushButton("ทำกะเดิมต่อ")
+            resume.setObjectName("primary")
+            cancel.clicked.connect(self.reject)
+            close_old.clicked.connect(self.request_close)
+            resume.clicked.connect(self.accept)
+            actions.addWidget(cancel)
+            actions.addWidget(close_old)
+            actions.addWidget(resume)
+            layout.addLayout(actions)
+
+        def request_close(self) -> None:
+            self.close_existing = True
+            self.accept()
+
     class PaymentDialog(QDialog):
         """หน้าชำระเงิน — เงินทอนคำนวณสด ๆ ระหว่างพิมพ์ ไม่ต้องคิดในหัว"""
 
@@ -1299,36 +1344,41 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
             head = QWidget()
             head.setObjectName("orderHead")
-            head_layout = QHBoxLayout(head)
-            head_layout.setContentsMargins(0, 0, 0, 0)
-            head_layout.setSpacing(8)
+            head_layout = QVBoxLayout(head)
+            head_layout.setContentsMargins(12, 8, 12, 8)
+            head_layout.setSpacing(6)
             self.cashier_label = QLabel("บิลปัจจุบัน · ยังไม่ได้เริ่มขาย")
-            head_layout.addWidget(self.cashier_label, 1)
+            self.cashier_label.setWordWrap(True)
+            head_layout.addWidget(self.cashier_label)
+            action_row = QHBoxLayout()
+            action_row.setSpacing(6)
             self.auth_button = QPushButton("เปิดกะ")
             self.auth_button.setObjectName("headerAction")
             self.auth_button.setToolTip("ยืนยันผู้ขายและใส่เงินทอนตั้งต้นก่อนเริ่มขาย")
             self.auth_button.clicked.connect(self.ensure_sale_session)
-            head_layout.addWidget(self.auth_button)
+            action_row.addWidget(self.auth_button, 1)
             report = QPushButton("ยอดวันนี้")
             report.setObjectName("headerAction")
             report.setToolTip("ดูยอดขายของเครื่องนี้จาก SQLite")
             report.clicked.connect(self.show_daily_sales)
-            head_layout.addWidget(report)
+            action_row.addWidget(report, 1)
             cash = QPushButton("เงินสด")
             cash.setObjectName("headerAction")
             cash.setToolTip("บันทึกเงินเข้า นำส่ง หรือเบิกจ่ายจากลิ้นชัก")
             cash.clicked.connect(self.record_cash_movement)
-            head_layout.addWidget(cash)
+            action_row.addWidget(cash, 1)
             close_shift = QPushButton("ปิดกะ")
             close_shift.setObjectName("headerAction")
             close_shift.setToolTip("นับเงินและปิดกะขาย")
             close_shift.clicked.connect(self.close_current_shift)
-            head_layout.addWidget(close_shift)
+            action_row.addWidget(close_shift, 1)
             settings = QPushButton("⚙")
             settings.setObjectName("headerAction")
             settings.setToolTip("ตั้งค่าเครื่อง POS สำหรับ IT")
             settings.clicked.connect(self.open_settings)
-            head_layout.addWidget(settings)
+            settings.setMinimumWidth(42)
+            action_row.addWidget(settings)
+            head_layout.addLayout(action_row)
             layout.addWidget(head)
 
             self.table = QTableWidget(0, 4)
@@ -1375,6 +1425,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.mode_group = QButtonGroup(box)
             for column, (mode, label) in enumerate([(QTY, "จำนวน"), (PRICE, "ราคา"), (DISCOUNT, "ส่วนลด")]):
                 button = QPushButton(label)
+                button.setMinimumHeight(34)
                 button.setCheckable(True)
                 button.setChecked(mode == QTY)
                 button.clicked.connect(lambda _, value=mode: self.set_mode(value))
@@ -1384,27 +1435,33 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             for row, keys in enumerate(NUMPAD_KEYS, start=1):
                 for column, key in enumerate(keys):
                     button = QPushButton("⌫" if key == "backspace" else key)
+                    button.setMinimumHeight(34)
                     button.clicked.connect(lambda _, value=key: self.press(value))
                     grid.addWidget(button, row, column)
 
             sign = QPushButton("+/−")
+            sign.setMinimumHeight(34)
             sign.clicked.connect(lambda: self.press("+/-"))
             grid.addWidget(sign, 5, 0)
 
             remove = QPushButton("ลบรายการ")
+            remove.setMinimumHeight(34)
             remove.setObjectName("voidBtn")
             remove.clicked.connect(self.remove_line)
             grid.addWidget(remove, 5, 1)
 
             receipt = QPushButton("ดูใบเสร็จล่าสุด")
+            receipt.setMinimumHeight(34)
             receipt.clicked.connect(self.show_last_receipt)
             grid.addWidget(receipt, 5, 2)
 
             clear = QPushButton("ล้างบิล")
+            clear.setMinimumHeight(40)
             clear.clicked.connect(self.clear_order)
             grid.addWidget(clear, 6, 0)
 
             pay = QPushButton("รับชำระเงิน")
+            pay.setMinimumHeight(40)
             pay.setObjectName("payBtn")
             pay.clicked.connect(self.pay)
             grid.addWidget(pay, 6, 1, 1, 2)
@@ -1583,8 +1640,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 return
 
             try:
+                document_no = service.next_document_no(terminal_id)
                 sale_id = service.checkout(
-                    document_no=f"PYPOS-{self.shift_id}-{service.pending_sync_count() + 1:06d}",
+                    document_no=document_no,
                     branch_id=branch_id, terminal_id=terminal_id, shift_id=self.shift_id,
                     cashier_id=int(self.cashier["id"]), lines=self.order.to_cart_lines(),
                     payment_method=dialog.payment_method, paid_amount=dialog.tendered(),
@@ -1621,7 +1679,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     service.db.commit()
             detail = (f"เงินทอน {self.order.change_for(dialog.tendered()):,.2f} บาท"
                       if dialog.payment_method == "cash" else "รับชำระผ่านโอน / QR แล้ว")
-            QMessageBox.information(self, "รับชำระแล้ว", f"บิล {sale_id}\n{detail}")
+            QMessageBox.information(self, "รับชำระแล้ว", f"บิล {document_no}\n{detail}")
             self.order.clear()
             self.refresh_order()
 
@@ -1659,8 +1717,29 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 return False
 
             if existing_shift:
+                existing_dialog = ExistingShiftDialog(self, existing_shift)
+                existing_dialog.show()
+                existing_dialog.raise_()
+                existing_dialog.activateWindow()
+                app.processEvents()
+                if existing_dialog.exec() != QDialog.Accepted:
+                    return False
                 opening_cash = money(existing_shift["opening_cash"])
-            else:
+                if existing_dialog.close_existing:
+                    # Attach the authenticated operator to the existing shift so the
+                    # normal audited close flow can reconcile it before reopening.
+                    self.cashier = login.cashier
+                    self.shift_id = int(existing_shift["id"])
+                    self.opening_cash = opening_cash
+                    self.close_current_shift()
+                    if self.shift_id is not None:
+                        self.cashier = None
+                        self.shift_id = None
+                        self.opening_cash = None
+                        return False
+                    existing_shift = None
+
+            if not existing_shift:
                 # Use our own numeric dialog: Qt's static getDouble dialog can be
                 # covered by the Windows On-Screen Keyboard on touch POS devices.
                 opening_dialog = OpeningShiftDialog(self)
@@ -1693,7 +1772,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     # The local shift is already committed and remains usable. Keep the
                     # reason visible in the normal sync queue instead of blocking sales.
                     service.record_auth_event(
-                        str(self.cashier.get("code") or ""),
+                        str(self.cashier["code"] or ""),
                         "shift_open_queue",
                         False,
                         str(error)[:500],

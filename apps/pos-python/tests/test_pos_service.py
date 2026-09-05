@@ -111,6 +111,27 @@ class PosServiceTest(unittest.TestCase):
         self.assertEqual(self.db.execute("SELECT count(*) FROM sale_items").fetchone()[0], 1)
         self.assertEqual(self.service.pending_sync_count(), 1)
 
+    def test_document_number_keeps_increasing_after_sync_and_restart(self) -> None:
+        first = self.service.next_document_no("POS-001")
+        self.db.execute(
+            "UPDATE sync_outbox SET status = 'synced' WHERE aggregate_type = 'sale'"
+        )
+        self.db.commit()
+        second = self.service.next_document_no("POS-001")
+
+        self.assertRegex(first, r"^PYPOS-POS001-\d{8}-000001$")
+        self.assertRegex(second, r"^PYPOS-POS001-\d{8}-000002$")
+        self.assertNotEqual(first, second)
+
+        reopened = PosService(self.db).next_document_no("POS-001")
+        self.assertRegex(reopened, r"^PYPOS-POS001-\d{8}-000003$")
+
+    def test_document_number_sequence_is_separate_for_each_terminal(self) -> None:
+        self.service.next_document_no("POS-001")
+        other = self.service.next_document_no("POS-002")
+
+        self.assertRegex(other, r"^PYPOS-POS002-\d{8}-000001$")
+
     def test_daily_sales_summary_reads_local_sqlite_and_excludes_voids(self) -> None:
         cash_sale = self.service.checkout(
             document_no="T-DAILY-CASH", branch_id=1, terminal_id="TEST-01", shift_id=self.shift_id,

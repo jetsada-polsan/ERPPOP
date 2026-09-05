@@ -4,6 +4,7 @@ import base64
 import hashlib
 import hmac
 import json
+import re
 import sqlite3
 import uuid
 from dataclasses import dataclass
@@ -480,6 +481,32 @@ class PosService:
     def bind_server_shift(self, local_shift_id: int, server_shift_id: int) -> None:
         self.db.execute("UPDATE shifts SET server_id = ? WHERE id = ?", (server_shift_id, local_shift_id))
         self.db.commit()
+
+    def next_document_no(self, terminal_id: str) -> str:
+        """Reserve a durable local receipt number independent from sync state.
+
+        Pending outbox counts can decrease after a successful sync, so they must
+        never be used as a document sequence. This counter stays in SQLite and
+        therefore keeps increasing across restarts and online/offline changes.
+        """
+        terminal_code = re.sub(r"[^A-Za-z0-9]", "", str(terminal_id).upper())[:12] or "POS"
+        business_tz = timezone(timedelta(hours=7), name="ICT")
+        business_date = self.clock.now().astimezone(business_tz).strftime("%Y%m%d")
+        timestamp = self._now()
+        with self.db:
+            self.db.execute(
+                """INSERT INTO document_sequences (terminal_id, business_date, last_number, updated_at)
+                   VALUES (?, ?, 1, ?)
+                   ON CONFLICT(terminal_id, business_date) DO UPDATE SET
+                     last_number = document_sequences.last_number + 1,
+                     updated_at = excluded.updated_at""",
+                (terminal_code, business_date, timestamp),
+            )
+            sequence = int(self.db.execute(
+                "SELECT last_number FROM document_sequences WHERE terminal_id = ? AND business_date = ?",
+                (terminal_code, business_date),
+            ).fetchone()["last_number"])
+        return f"PYPOS-{terminal_code}-{business_date}-{sequence:06d}"
 
     def checkout(self, *, document_no: str, branch_id: int, terminal_id: str, shift_id: int,
                  cashier_id: int, lines: list[CartLine], payment_method: str, paid_amount: Decimal,

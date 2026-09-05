@@ -38,13 +38,22 @@ def print_text_to_windows_queue(text: str, printer_name: str, *, paper_width_mm:
         raise ValueError("ยังไม่ได้เลือกเครื่องพิมพ์ Windows")
 
     try:
-        from PySide6.QtGui import QFont, QTextDocument, QTextOption
-        from PySide6.QtPrintSupport import QPrinter
+        from PySide6.QtCore import QMarginsF
+        from PySide6.QtGui import QFont, QPageLayout, QTextDocument, QTextOption
+        from PySide6.QtPrintSupport import QPrinter, QPrinterInfo
     except ImportError as error:
         raise RuntimeError("รุ่นนี้ยังไม่มี Qt PrintSupport") from error
 
-    printer = QPrinter(QPrinter.PrinterMode.HighResolution)
-    printer.setPrinterName(selected)
+    printer_info = next(
+        (info for info in QPrinterInfo.availablePrinters() if info.printerName().strip() == selected),
+        None,
+    )
+    if printer_info is None:
+        raise RuntimeError(f"Windows ไม่พบเครื่องพิมพ์: {selected}\nตรวจว่าเปิดเครื่องและติดตั้ง Driver แล้ว")
+
+    # Constructing QPrinter from the installed queue is more reliable on Windows
+    # than constructing an empty printer and assigning only its display name.
+    printer = QPrinter(printer_info, QPrinter.PrinterMode.HighResolution)
     if not printer.isValid():
         raise RuntimeError(f"Windows ไม่พบเครื่องพิมพ์: {selected}")
 
@@ -53,7 +62,9 @@ def print_text_to_windows_queue(text: str, printer_name: str, *, paper_width_mm:
     # Keep the text renderer deterministic. The Windows queue supplies the
     # continuous-paper height, while the document font controls readable 58/80mm
     # columns instead of falling back to a tiny proportional default.
-    printer.setPageMargins(0, 0, 0, 0, QPrinter.Unit.Millimeter)
+    # Qt6 accepts QMarginsF + QPageLayout.Unit. The old Qt5 five-argument call
+    # raises TypeError before the job ever reaches the Windows spooler.
+    printer.setPageMargins(QMarginsF(0, 0, 0, 0), QPageLayout.Unit.Millimeter)
     document = QTextDocument()
     document.setDocumentMargin(0)
     document.setDefaultFont(QFont("Courier New", 9 if paper_width_mm == 80 else 8))

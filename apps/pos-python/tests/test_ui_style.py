@@ -128,6 +128,9 @@ class UiStyleTest(unittest.TestCase):
         self.assertIn("service.open_shift(", session)
         self.assertIn("opening_dialog.opening_cash", session)
         self.assertNotIn('opening_cash=Decimal("0")', session)
+        self.assertIn("ExistingShiftDialog(self, existing_shift)", session)
+        self.assertIn("ทำกะเดิมต่อ", source)
+        self.assertIn("ปิดกะเดิม", source)
 
     def test_opening_shift_is_local_first_and_does_not_block_on_erp(self) -> None:
         source = inspect.getsource(run_ui)
@@ -167,6 +170,14 @@ class UiStyleTest(unittest.TestCase):
         self.assertIn("window.setMinimumSize(960, 600)", source)
         self.assertIn("QSplitter(Qt.Horizontal)", source)
         self.assertIn("first.setMinimumWidth(520)", source)
+        self.assertIn("head_layout = QVBoxLayout(head)", source)
+        self.assertIn("button.setMinimumHeight(34)", source)
+
+    def test_checkout_uses_a_durable_document_sequence(self) -> None:
+        source = inspect.getsource(run_ui)
+        pay = source[source.index("        def pay(self)"):source.index("        def ensure_sale_session(self)")]
+        self.assertIn("service.next_document_no(terminal_id)", pay)
+        self.assertNotIn("pending_sync_count() + 1", pay)
 
 
 if __name__ == "__main__":
