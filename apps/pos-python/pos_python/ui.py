@@ -243,6 +243,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.cashier = None
             self.setWindowTitle("PopCentral POS — ยืนยันก่อนเริ่มขาย")
             self.setWindowFlag(Qt.WindowCloseButtonHint, True)
+            self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
+            self.setWindowModality(Qt.WindowModal)
             self.setMinimumWidth(420)
             form = QFormLayout(self)
             hint = QLabel(
@@ -1497,8 +1499,24 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             if self.cashier is not None and self.shift_id is not None:
                 return True
 
-            login = LoginDialog()
-            if login.exec() != QDialog.Accepted or login.cashier is None:
+            try:
+                login = LoginDialog()
+                # Some Windows POS setups keep the on-screen keyboard above the
+                # parent window. Show and raise the login prompt before exec().
+                login.show()
+                login.raise_()
+                login.activateWindow()
+                app.processEvents()
+                login_result = login.exec()
+            except Exception as error:
+                QMessageBox.critical(
+                    self,
+                    "เปิดหน้าล็อกอินไม่ได้",
+                    f"POS เปิดหน้าต่างเริ่มขายไม่สำเร็จ: {error}\n\n"
+                    "กรุณาถ่ายภาพข้อความนี้ส่งให้ฝ่าย IT",
+                )
+                return False
+            if login_result != QDialog.Accepted or login.cashier is None:
                 return False
 
             existing_shift = service.db.execute(

@@ -135,6 +135,13 @@ class UiStyleTest(unittest.TestCase):
         self.assertIn("online.worker.wake()", session)
         self.assertNotIn("online.provisioning.open_server_shift", session)
         self.assertIn("Qt.WindowStaysOnTopHint", session)
+        self.assertIn("เปิดหน้าล็อกอินไม่ได้", session)
+
+    def test_cashier_login_dialog_is_raised_above_windows_osk(self) -> None:
+        source = inspect.getsource(run_ui)
+        login = source[source.index("class LoginDialog"):source.index("class PaymentDialog")]
+        self.assertIn("Qt.WindowStaysOnTopHint", login)
+        self.assertIn("Qt.WindowModal", login)
 
     def test_transfer_requires_visible_money_received_confirmation(self) -> None:
         source = inspect.getsource(run_ui)
