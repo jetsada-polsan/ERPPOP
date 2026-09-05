@@ -51,6 +51,11 @@ jobs:
         run: python -m pip install --upgrade pip -r requirements-build.txt
       - name: Run core and scale tests
         run: python -m unittest discover -s tests -v
+      - name: Stamp application version
+        shell: pwsh
+        env:
+          UAT_VERSION: ${{ inputs.version || '0.1.0-dev' }}
+        run: Set-Content -Path pos_python/build_info.py -Value "APP_VERSION = `"$env:UAT_VERSION`""
       - name: Build Windows application
         run: >-
           pyinstaller --noconfirm --clean --windowed

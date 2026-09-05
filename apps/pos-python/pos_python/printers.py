@@ -38,8 +38,7 @@ def print_text_to_windows_queue(text: str, printer_name: str, *, paper_width_mm:
         raise ValueError("ยังไม่ได้เลือกเครื่องพิมพ์ Windows")
 
     try:
-        from PySide6.QtCore import QMarginsF
-        from PySide6.QtGui import QFont, QPageLayout, QTextDocument, QTextOption
+        from PySide6.QtGui import QFont, QTextDocument, QTextOption
         from PySide6.QtPrintSupport import QPrinter, QPrinterInfo
     except ImportError as error:
         raise RuntimeError("รุ่นนี้ยังไม่มี Qt PrintSupport") from error
@@ -62,9 +61,10 @@ def print_text_to_windows_queue(text: str, printer_name: str, *, paper_width_mm:
     # Keep the text renderer deterministic. The Windows queue supplies the
     # continuous-paper height, while the document font controls readable 58/80mm
     # columns instead of falling back to a tiny proportional default.
-    # Qt6 accepts QMarginsF + QPageLayout.Unit. The old Qt5 five-argument call
-    # raises TypeError before the job ever reaches the Windows spooler.
-    printer.setPageMargins(QMarginsF(0, 0, 0, 0), QPageLayout.Unit.Millimeter)
+    # Do not call QPagedPaintDevice.setPageMargins here. PySide6 exposes
+    # incompatible overloads across supported Windows builds and can raise
+    # before the job reaches the spooler. The installed thermal-driver profile
+    # owns its physical margins; QTextDocument still removes its own margin.
     document = QTextDocument()
     document.setDocumentMargin(0)
     document.setDefaultFont(QFont("Courier New", 9 if paper_width_mm == 80 else 8))

@@ -9,7 +9,7 @@ import re
 import inspect
 import unittest
 
-from pos_python.ui import PALETTE, SECTION_HINTS, STYLE, run_ui
+from pos_python.ui import APP_VERSION, PALETTE, SECTION_HINTS, STYLE, run_ui
 
 JET_BLUE = "#1585c0"
 JET_BLUE_DARK = "#0f4c75"
@@ -123,7 +123,7 @@ class UiStyleTest(unittest.TestCase):
         start = source.index("def ensure_sale_session")
         session = source[start:source.index("def open_settings", start)]
         self.assertIn("class OpeningShiftDialog", source)
-        self.assertIn('"เงินทอนตั้งต้น"', source)
+        self.assertIn('"ใส่เงินทอนก่อนเปิดกะ"', source)
         self.assertIn("OpeningShiftDialog(self)", session)
         self.assertIn("service.open_shift(", session)
         self.assertIn("opening_dialog.opening_cash", session)
@@ -131,6 +131,16 @@ class UiStyleTest(unittest.TestCase):
         self.assertIn("ExistingShiftDialog(self, existing_shift)", session)
         self.assertIn("ทำกะเดิมต่อ", source)
         self.assertIn("ปิดกะเดิม", source)
+        self.assertIn("self.setMinimumSize(500, 590)", source)
+        self.assertIn("self.resize(520, 620)", source)
+        self.assertIn("#shiftKeypad QPushButton { min-height: 58px", STYLE)
+
+    def test_windows_font_is_selected_by_qt_and_build_version_is_visible(self) -> None:
+        source = inspect.getsource(run_ui)
+        self.assertIn('"Leelawadee UI"', source)
+        self.assertNotIn("font-family:", STYLE)
+        self.assertIn("APP_VERSION", source)
+        self.assertEqual(APP_VERSION, "dev")
 
     def test_opening_shift_is_local_first_and_does_not_block_on_erp(self) -> None:
         source = inspect.getsource(run_ui)

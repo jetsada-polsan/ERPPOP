@@ -16,8 +16,9 @@ class InstalledPrintersTest(unittest.TestCase):
         self.assertIn('setDefaultFont(QFont("Courier New"', source)
         self.assertIn("QPrinterInfo.availablePrinters()", source)
         self.assertIn("QPrinter(printer_info, QPrinter.PrinterMode.HighResolution)", source)
-        self.assertIn("setPageMargins(QMarginsF(0, 0, 0, 0), QPageLayout.Unit.Millimeter)", source)
+        self.assertNotIn("setPageMargins(", source)
         self.assertNotIn("QPrinter.Unit.Millimeter", source)
+        self.assertIn("document.setDocumentMargin(0)", source)
         self.assertIn("paper_width_mm", source)
 
     def test_windows_queues_are_sorted_and_deduplicated(self) -> None:

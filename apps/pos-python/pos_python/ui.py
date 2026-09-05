@@ -12,6 +12,7 @@ from decimal import Decimal, InvalidOperation
 from string import Template
 
 from .barcode import decode_scale_label, load_scale_profiles, scale_cart_line
+from .build_info import APP_VERSION
 from .api_client import LaravelApiError, LaravelPosClient
 from .bootstrap import _cached_setting
 from .mock_printer import active_paper_width, company_details, receipt_for
@@ -110,7 +111,7 @@ def run_pairing_wizard(data_dir, app) -> bool:
 # QSS ใช้ปีกกาเป็นไวยากรณ์ เลยแทนค่าด้วย $name แทน .format()
 _STYLE_TEMPLATE = Template("""
 /* สีและระยะตามภาพร่างที่อนุมัติแล้ว — โทน JET ชุดเดียวกับ ERP บนพื้นเทาอ่อน */
-QMainWindow, QDialog, QWidget { background: $bg; color: $text; font-family: 'Noto Sans Thai','Leelawadee UI','Sarabun','Tahoma'; font-size: 14px; }
+QMainWindow, QDialog, QWidget { background: $bg; color: $text; font-size: 14px; }
 
 /* ป้ายที่วางบนแถบสีต้องโปร่ง ไม่งั้นกินสีพื้นแอปมาเป็นแผ่นขาวทับแถบ */
 #brandBar { background: $primary_dark; border-bottom: 3px solid $primary; }
@@ -180,12 +181,12 @@ QHeaderView::section { background: $primary_soft; border: 0; border-bottom: 1px 
 
 /* กระดาษใบเสร็จวางบนพื้นเทาเหมือนวางบนโต๊ะ */
 #receiptBg { background: $preview; border-radius: 6px; }
-#receiptPaper { background: $surface; padding: 20px; font-family: 'Noto Sans Thai','Leelawadee UI','Tahoma','Courier New'; font-size: 12px; color: $paper_ink; }
+#receiptPaper { background: $surface; padding: 20px; font-size: 12px; color: $paper_ink; }
 #statusBar { color: $muted; font-size: 12.5px; padding: 6px 16px; }
 
-#shiftAmount { font-size: 25px; font-weight: 800; padding: 12px 14px; }
-#shiftSummary { background: $primary_soft; border: 1px solid $border; border-radius: 7px; padding: 10px 12px; font-size: 15px; font-weight: 700; }
-#shiftKeypad QPushButton { min-height: 42px; font-size: 18px; font-weight: 700; }
+#shiftAmount { font-size: 32px; font-weight: 800; padding: 14px 16px; }
+#shiftSummary { background: $primary_soft; border: 1px solid $border; border-radius: 7px; padding: 12px 14px; font-size: 17px; font-weight: 700; }
+#shiftKeypad QPushButton { min-height: 58px; font-size: 22px; font-weight: 700; }
 """)
 
 STYLE = _STYLE_TEMPLATE.substitute(PALETTE)
@@ -256,7 +257,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         def __init__(self):
             super().__init__()
             self.cashier = None
-            self.setWindowTitle("PopCentral POS — ยืนยันก่อนเริ่มขาย")
+            self.setWindowTitle(f"PopCentral POS v{APP_VERSION} — ยืนยันก่อนเริ่มขาย")
             self.setWindowFlag(Qt.WindowCloseButtonHint, True)
             self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
             self.setWindowModality(Qt.WindowModal)
@@ -525,12 +526,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.setWindowFlag(Qt.WindowCloseButtonHint, True)
             self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
             self.setWindowModality(Qt.WindowModal)
-            self.setMinimumWidth(390)
-            self.resize(420, 520)
+            self.setMinimumSize(500, 590)
+            self.resize(520, 620)
 
             layout = QVBoxLayout(self)
-            title = QLabel("เงินทอนตั้งต้น")
-            title.setStyleSheet("font-size:20px;font-weight:800")
+            title = QLabel("ใส่เงินทอนก่อนเปิดกะ")
+            title.setStyleSheet("font-size:24px;font-weight:800")
             hint = QLabel("ใส่เงินสดที่เตรียมไว้ในลิ้นชักก่อนเริ่มขาย")
             hint.setObjectName("cardHint")
             hint.setWordWrap(True)
@@ -1275,7 +1276,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.last_sale_id: int | None = None
             self._product_columns: int | None = None
             layout_version = layout_config.get("version", 1)
-            self.setWindowTitle(f"PopCentral POS — พร้อมใช้งาน · Layout {layout_version}")
+            self.setWindowTitle(f"PopCentral POS v{APP_VERSION} — พร้อมใช้งาน · Layout {layout_version}")
             self.setStyleSheet(STYLE)
             self.settings_shortcut = QShortcut(QKeySequence("Ctrl+Alt+S"), self)
             self.settings_shortcut.activated.connect(self.open_settings)
@@ -1347,7 +1348,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             head_layout = QVBoxLayout(head)
             head_layout.setContentsMargins(12, 8, 12, 8)
             head_layout.setSpacing(6)
-            self.cashier_label = QLabel("บิลปัจจุบัน · ยังไม่ได้เริ่มขาย")
+            self.cashier_label = QLabel(f"บิลปัจจุบัน · ยังไม่ได้เริ่มขาย · v{APP_VERSION}")
             self.cashier_label.setWordWrap(True)
             head_layout.addWidget(self.cashier_label)
             action_row = QHBoxLayout()
@@ -1784,7 +1785,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.auth_button.setText(f"กำลังขาย: {self.cashier['code']}")
             self.auth_button.setEnabled(False)
             layout_version = layout_config.get("version", 1)
-            self.setWindowTitle(f"PopCentral POS — {self.cashier['name']} · Layout {layout_version}")
+            self.setWindowTitle(f"PopCentral POS v{APP_VERSION} — {self.cashier['name']} · Layout {layout_version}")
             self.refresh_order(keep_selection=True)
             return True
 
@@ -1874,8 +1875,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.opening_cash = None
             self.auth_button.setText("เปิดกะ")
             self.auth_button.setEnabled(True)
-            self.cashier_label.setText("บิลปัจจุบัน · ยังไม่ได้เริ่มขาย")
-            self.setWindowTitle(f"PopCentral POS — พร้อมใช้งาน · Layout {layout_config.get('version', 1)}")
+            self.cashier_label.setText(f"บิลปัจจุบัน · ยังไม่ได้เริ่มขาย · v{APP_VERSION}")
+            self.setWindowTitle(f"PopCentral POS v{APP_VERSION} — พร้อมใช้งาน · Layout {layout_config.get('version', 1)}")
 
         def open_settings(self) -> None:
             if service.has_local_it_pin():

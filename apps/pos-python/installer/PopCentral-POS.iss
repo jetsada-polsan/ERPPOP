@@ -19,6 +19,8 @@ WizardStyle=modern
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=lowest
+CloseApplications=force
+RestartApplications=no
 
 [Files]
 Source: "..\dist\PopCentral-POS\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
@@ -26,6 +28,10 @@ Source: "..\dist\PopCentral-POS\*"; DestDir: "{app}"; Flags: recursesubdirs igno
 [Icons]
 Name: "{autoprograms}\PopCentral POS (UAT)"; Filename: "{app}\PopCentral-POS.exe"
 Name: "{autodesktop}\PopCentral POS (UAT)"; Filename: "{app}\PopCentral-POS.exe"; Tasks: desktopicon
+
+[InstallDelete]
+Type: files; Name: "{autodesktop}\POPSTAR Python POS.lnk"
+Type: files; Name: "{autoprograms}\POPSTAR Python POS.lnk"
 
 [Tasks]
 Name: "desktopicon"; Description: "สร้างทางลัดบน Desktop"; GroupDescription: "ทางลัดเพิ่มเติม:"
