@@ -112,6 +112,17 @@ class OnlineLoginTest(unittest.TestCase):
         self.assertTrue(result["selection_required"])
         self.assertEqual(len(result["cashiers"]), 2)
 
+    def test_passwordless_login_sends_only_the_bound_cashier_id(self) -> None:
+        db, _ = fresh_db()
+        api = FakeApi({"/api/pos/cashier/login": {
+            "success": True, "cashier": {"id": 42, "code": "C001", "name": "สมชาย",
+                                         "user_id": 501, "credential_version": "v1"}}})
+
+        result = ProvisioningService(db, api).online_cashier_login(None, cashier_code="C001", cashier_server_id=42)
+
+        self.assertFalse(result["selection_required"])
+        self.assertEqual(api.posted[0][1], {"cashier_id": 42, "code": "C001"})
+
 
 class SyncWorkerTest(unittest.TestCase):
     def test_worker_refreshes_cached_master_data_after_reconnect(self) -> None:

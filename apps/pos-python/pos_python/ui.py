@@ -254,12 +254,20 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.code.setPlaceholderText("รหัสแคชเชียร์ หรือ username ERP")
             self.cashier_select = QComboBox()
             self.cashier_select.addItem("เลือกชื่อคนขาย", None)
-            cashiers = service.db.execute(
-                """SELECT code, name FROM local_cashiers
-                   WHERE active = 1 AND user_id IS NOT NULL AND revoked_at IS NULL ORDER BY name, code"""
-            ).fetchall()
+            device_user_id = _cached_setting(service.db, "device_user_id")
+            cashier_query = """SELECT code, name, server_id, user_id FROM local_cashiers
+                              WHERE active = 1 AND user_id IS NOT NULL AND revoked_at IS NULL"""
+            cashier_params: tuple = ()
+            if device_user_id is not None:
+                cashier_query += " AND user_id = ?"
+                cashier_params = (int(device_user_id),)
+            cashier_query += " ORDER BY name, code"
+            cashiers = service.db.execute(cashier_query, cashier_params).fetchall()
             for cashier in cashiers:
-                self.cashier_select.addItem(f"{cashier['name']}  ·  {cashier['code']}", cashier["code"])
+                self.cashier_select.addItem(
+                    f"{cashier['name']}  ·  {cashier['code']}",
+                    {"code": cashier["code"], "server_id": cashier["server_id"]},
+                )
             self.cashier_select.currentIndexChanged.connect(lambda _: self._select_cashier())
             self.pin = QLineEdit()
             self.pin.setEchoMode(QLineEdit.Password)
@@ -274,12 +282,23 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             maintenance.clicked.connect(self.open_maintenance)
             override = QPushButton("ผู้จัดการช่วยกู้ PIN")
             override.clicked.connect(self.manager_override)
+            self.passwordless = bool(
+                online is not None and online.online
+                and _cached_setting(service.db, "cashier_login_mode") == "selection"
+                and len(cashiers) == 1
+            )
+            if self.passwordless:
+                hint.setText("เครื่องนี้ผูกกับผู้ใช้ POS แล้ว · กดเริ่มขายได้เลย")
+                submit.setText("เริ่มขาย")
+                self.pin.hide()
+                override.hide()
             form.addRow(hint)
             if cashiers:
                 form.addRow("คนขาย", self.cashier_select)
             else:
                 form.addRow("รหัสแคชเชียร์", self.code)
-            form.addRow("PIN", self.pin)
+            if not self.passwordless:
+                form.addRow("PIN", self.pin)
             pin_pad = QWidget()
             pin_grid = QGridLayout(pin_pad)
             pin_grid.setContentsMargins(0, 0, 0, 0)
@@ -295,9 +314,10 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             form.addRow(override)
 
         def _select_cashier(self) -> None:
-            code = self.cashier_select.currentData()
+            selected = self.cashier_select.currentData() or {}
+            code = selected.get("code") if isinstance(selected, dict) else selected
             self.code.setText(str(code or ""))
-            if code:
+            if code and not self.passwordless:
                 self.pin.setFocus()
 
         def _press_pin(self, key: str) -> None:
@@ -338,7 +358,17 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 # ดึงสถานะแคชเชียร์ล่าสุดก่อนยืนยันเสมอ แต่ห้ามลบ verifier เก่า
                 # เพราะถ้าเน็ตหลุดกลางทางยังต้อง fallback ไป SQLite ได้ทันที.
                 online.provisioning.pull_cashiers(online.branch_id)
-                result = online.provisioning.online_cashier_login(pin, cashier_code=code)
+                selected = self.cashier_select.currentData() or {}
+                selected_server_id = selected.get("server_id") if isinstance(selected, dict) else None
+                if self.passwordless:
+                    if not selected_server_id:
+                        QMessageBox.warning(self, "ยังไม่พร้อมเริ่มขาย", "ยังไม่พบผู้ใช้ที่ผูกกับเครื่องนี้ กรุณา Sync จาก ERP")
+                        return False
+                    result = online.provisioning.online_cashier_login(
+                        None, cashier_code=code, cashier_server_id=int(selected_server_id)
+                    )
+                else:
+                    result = online.provisioning.online_cashier_login(pin, cashier_code=code)
                 if result.get("selection_required"):
                     # PIN กลางตรงหลายคน — เลือกด้วยรหัสแคชเชียร์ที่กรอก
                     match = next((c for c in result["cashiers"] if str(c.get("code")) == code), None)

@@ -108,8 +108,15 @@ class UiStyleTest(unittest.TestCase):
 
     def test_cashier_can_pick_a_synced_name_and_tap_a_pin(self) -> None:
         source = inspect.getsource(run_ui)
-        self.assertIn('self.cashier_select.addItem(f"{cashier[\'name\']}  ·  {cashier[\'code\']}"', source)
+        self.assertIn('f"{cashier[\'name\']}  ·  {cashier[\'code\']}"', source)
+        self.assertIn('"server_id": cashier["server_id"]', source)
         self.assertIn('for index, key in enumerate(["1", "2", "3"', source)
+
+    def test_bound_cashier_can_start_online_without_retyping_a_pin(self) -> None:
+        source = inspect.getsource(run_ui)
+        self.assertIn('device_user_id', source)
+        self.assertIn('cashier_login_mode', source)
+        self.assertIn('online_cashier_login(\n                        None', source)
 
     def test_opening_shift_requests_and_reuses_opening_cash(self) -> None:
         source = inspect.getsource(run_ui)

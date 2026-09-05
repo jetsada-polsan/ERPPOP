@@ -319,14 +319,16 @@ class ProvisioningService:
             )
 
     # ── cashier login (ออนไลน์) ──────────────────────────────────
-    def online_cashier_login(self, pin: str, cashier_code: str | None = None,
+    def online_cashier_login(self, pin: str | None, cashier_code: str | None = None,
                              cashier_server_id: int | None = None) -> dict:
         """ยืนยัน PIN กับ ERP แล้วเก็บ credential ออฟไลน์ + ผูก local cashier row
 
         คืน {"selection_required": True, "cashiers": [...]} เมื่อ PIN กลางตรงหลายคน
         (UI ต้องให้เลือกชื่อ) หรือ {"cashier": {...}, "local_cashier_id": n} เมื่อสำเร็จ
         """
-        payload: dict = {"pin": pin}
+        payload: dict = {}
+        if pin:
+            payload["pin"] = pin
         if cashier_code:
             payload["code"] = cashier_code
         if cashier_server_id is not None:
