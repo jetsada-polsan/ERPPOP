@@ -13,6 +13,9 @@ class InstalledPrintersTest(unittest.TestCase):
         source = inspect.getsource(printers.print_text_to_windows_queue)
         self.assertIn('getattr(document, "print_", None)', source)
         self.assertIn('getattr(document, "print", None)', source)
+        self.assertIn('setDefaultFont(QFont("Courier New"', source)
+        self.assertIn("setPageMargins(0, 0, 0, 0", source)
+        self.assertIn("paper_width_mm", source)
 
     def test_windows_queues_are_sorted_and_deduplicated(self) -> None:
         class PrinterInfo:

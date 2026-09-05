@@ -14,7 +14,7 @@ from string import Template
 from .barcode import decode_scale_label, load_scale_profiles, scale_cart_line
 from .api_client import LaravelApiError, LaravelPosClient
 from .bootstrap import _cached_setting
-from .mock_printer import company_details, receipt_for
+from .mock_printer import active_paper_width, company_details, receipt_for
 from .order import ALL_CATEGORIES, DISCOUNT, PRICE, QTY, Order, OrderLine, categories, product_grid
 from .config import DeviceConfig, load_device_config, save_device_config
 from .printers import installed_printer_names, print_text_to_windows_queue
@@ -216,7 +216,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         from PySide6.QtWidgets import (
             QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGridLayout,
             QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton,
-            QScrollArea, QTableWidget, QTableWidgetItem, QToolButton, QVBoxLayout, QWidget,
+            QScrollArea, QSplitter, QTableWidget, QTableWidgetItem, QToolButton, QVBoxLayout, QWidget,
         )
     except ImportError as error:
         raise RuntimeError("ยังไม่ได้ติดตั้ง PySide6: python3 -m pip install -r requirements.txt") from error
@@ -861,7 +861,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 return
             text = receipt_for(service.db, self.sample_sale_id) if self.sample_sale_id else "PopCentral POS\nทดสอบเครื่องพิมพ์\n"
             try:
-                print_text_to_windows_queue(text, printer_name)
+                print_text_to_windows_queue(
+                    text, printer_name, paper_width_mm=active_paper_width(service.db)
+                )
             except Exception as error:
                 QMessageBox.critical(self, "ส่งงานพิมพ์ไม่สำเร็จ", str(error))
                 return
@@ -1127,16 +1129,29 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             columns.setSpacing(0)
             order_panel = self.build_order_panel()
             product_panel = self.build_product_panel()
-            # The web designer controls the two primary panes without allowing
-            # arbitrary code or widget classes into the desktop application.
+            # The web designer controls pane order, while the splitter keeps both
+            # panes usable on 14-15 inch POS screens instead of squeezing buttons.
             order_x = self._layout_x("cart", 8)
             product_x = self._layout_x("product_grid", 1)
+            splitter = QSplitter(Qt.Horizontal)
+            splitter.setObjectName("primarySplitter")
+            splitter.setChildrenCollapsible(False)
+            splitter.setHandleWidth(6)
             if order_x < product_x:
-                columns.addWidget(order_panel, 4)
-                columns.addWidget(product_panel, 6)
+                first, second = order_panel, product_panel
+                first.setMinimumWidth(400)
+                second.setMinimumWidth(520)
             else:
-                columns.addWidget(product_panel, 6)
-                columns.addWidget(order_panel, 4)
+                first, second = product_panel, order_panel
+                first.setMinimumWidth(520)
+                second.setMinimumWidth(400)
+            splitter.addWidget(first)
+            splitter.addWidget(second)
+            splitter.setStretchFactor(0, 6 if first is product_panel else 4)
+            splitter.setStretchFactor(1, 4 if second is order_panel else 6)
+            splitter.setSizes([740, 520] if first is product_panel else [520, 740])
+            self.primary_splitter = splitter
+            columns.addWidget(splitter)
             self.setCentralWidget(root)
 
             self.refresh_products()
@@ -1475,7 +1490,10 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             printer_name = str(SettingsService(service.db).get_device_setting("windows_printer_queue", "") or "")
             if printer_name:
                 try:
-                    print_text_to_windows_queue(receipt_for(service.db, sale_id), printer_name)
+                    print_text_to_windows_queue(
+                        receipt_for(service.db, sale_id), printer_name,
+                        paper_width_mm=active_paper_width(service.db),
+                    )
                     service.db.execute(
                         "UPDATE print_jobs SET status = 'printed', attempts = attempts + 1, last_error = NULL WHERE sale_id = ?",
                         (sale_id,),

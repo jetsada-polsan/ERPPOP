@@ -163,6 +163,8 @@ class UiStyleTest(unittest.TestCase):
         self.assertIn("def _product_columns_for_width", source)
         self.assertIn("self.grid_host.width()", source)
         self.assertIn("window.setMinimumSize(960, 600)", source)
+        self.assertIn("QSplitter(Qt.Horizontal)", source)
+        self.assertIn("first.setMinimumWidth(520)", source)
 
 
 if __name__ == "__main__":

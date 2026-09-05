@@ -28,7 +28,7 @@ def installed_printer_names(printer_info=None) -> list[str]:
     return sorted({str(name).strip() for name in names if str(name).strip()}, key=str.casefold)
 
 
-def print_text_to_windows_queue(text: str, printer_name: str) -> None:
+def print_text_to_windows_queue(text: str, printer_name: str, *, paper_width_mm: int = 80) -> None:
     """Hand receipt text to the selected Windows spooler queue.
 
     This must run from the already-created QApplication on the UI thread.
@@ -38,7 +38,7 @@ def print_text_to_windows_queue(text: str, printer_name: str) -> None:
         raise ValueError("ยังไม่ได้เลือกเครื่องพิมพ์ Windows")
 
     try:
-        from PySide6.QtGui import QTextDocument
+        from PySide6.QtGui import QFont, QTextDocument, QTextOption
         from PySide6.QtPrintSupport import QPrinter
     except ImportError as error:
         raise RuntimeError("รุ่นนี้ยังไม่มี Qt PrintSupport") from error
@@ -48,7 +48,18 @@ def print_text_to_windows_queue(text: str, printer_name: str) -> None:
     if not printer.isValid():
         raise RuntimeError(f"Windows ไม่พบเครื่องพิมพ์: {selected}")
 
+    if paper_width_mm not in (58, 80):
+        paper_width_mm = 80
+    # Keep the text renderer deterministic. The Windows queue supplies the
+    # continuous-paper height, while the document font controls readable 58/80mm
+    # columns instead of falling back to a tiny proportional default.
+    printer.setPageMargins(0, 0, 0, 0, QPrinter.Unit.Millimeter)
     document = QTextDocument()
+    document.setDocumentMargin(0)
+    document.setDefaultFont(QFont("Courier New", 9 if paper_width_mm == 80 else 8))
+    text_option = QTextOption()
+    text_option.setWrapMode(QTextOption.WrapMode.NoWrap)
+    document.setDefaultTextOption(text_option)
     document.setPlainText(text)
     # Qt exposes QTextDocument::print as print_ in PySide6 because print is a
     # Python keyword. Keep the fallback for bindings that expose the C++ name.
