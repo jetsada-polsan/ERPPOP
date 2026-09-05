@@ -248,31 +248,36 @@ class SystemSettingController extends Controller
             'pos_device_name' => ['nullable', 'string', 'max:100'],
         ]);
 
-        [$device, $token] = DB::transaction(function () use ($data) {
-            // Lock the branch while issuing its next terminal number. Two admins cannot receive the same code.
-            $branch = Branch::query()->lockForUpdate()->findOrFail($data['pos_branch_id']);
-            $user = User::query()
-                ->where('is_active', true)
-                ->where('branch_id', $branch->id)
-                ->with('roles.permissions')
-                ->orderBy('id')
-                ->get()
-                ->first(fn (User $candidate) => $candidate->hasPermission('pos.sell'));
+        try {
+            [$device, $token] = DB::transaction(function () use ($data) {
+                // Lock the branch while issuing its next terminal number. Two admins cannot receive the same code.
+                $branch = Branch::query()->lockForUpdate()->findOrFail($data['pos_branch_id']);
+                $user = User::query()
+                    ->where('is_active', true)
+                    ->where('branch_id', $branch->id)
+                    ->with('roles.permissions')
+                    ->orderBy('id')
+                    ->get()
+                    ->first(fn (User $candidate) => $candidate->hasPermission('pos.sell'));
 
-            if (! $user) {
-                abort(422, "สาขา {$branch->code} ยังไม่มีแคชเชียร์ที่มีสิทธิ์ขาย POS จึงยังสร้างเครื่องไม่ได้");
-            }
+                if (! $user) {
+                    throw new \RuntimeException("สาขา {$branch->code} ยังไม่มีแคชเชียร์ที่มีสิทธิ์ขาย POS จึงยังสร้างเครื่องไม่ได้");
+                }
 
-            $terminalCode = PosTerminalCode::next($branch);
-            $name = trim((string) ($data['pos_device_name'] ?? '')) ?: "PopCentral POS {$terminalCode}";
+                $terminalCode = PosTerminalCode::next($branch);
+                $name = trim((string) ($data['pos_device_name'] ?? '')) ?: "PopCentral POS {$terminalCode}";
 
-            return PosDevice::issue([
-                'name' => $name,
-                'user_id' => $user->id,
-                'branch_id' => $branch->id,
-                'terminal_code' => $terminalCode,
-            ]);
-        });
+                return PosDevice::issue([
+                    'name' => $name,
+                    'user_id' => $user->id,
+                    'branch_id' => $branch->id,
+                    'terminal_code' => $terminalCode,
+                ]);
+            });
+        } catch (\RuntimeException $exception) {
+            // ขาดแคชเชียร์ที่มีสิทธิ์ pos.sell เป็นเงื่อนไขทางธุรกิจ ไม่ใช่ข้อผิดพลาดของระบบ เด้ง back() แทน abort() กันตกหน้า Whoops
+            return back()->withErrors(['pos_branch_id' => $exception->getMessage()]);
+        }
 
         return redirect()->route('settings.index')->with([
             'success' => "สร้าง {$device->name} ({$device->terminal_code}) และ Token ให้แล้ว กรุณาคัดลอกไปตั้งค่าในเครื่อง POS",
