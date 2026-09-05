@@ -1513,18 +1513,27 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 opening_cash = money(existing_shift["opening_cash"])
             else:
                 from PySide6.QtWidgets import QInputDialog
-                opening_value, ok = QInputDialog.getDouble(
-                    self,
-                    "เปิดกะขาย",
-                    "เงินทอนตั้งต้น (บาท)",
-                    0.00,
-                    0.00,
-                    999999999.99,
-                    2,
-                )
-                if not ok:
+                # Windows On-Screen Keyboard can cover the static getDouble dialog.
+                # Keep this dialog compact and above it so a tap on "เริ่มขาย" never
+                # leaves the operator waiting on a hidden prompt.
+                opening_dialog = QInputDialog(self)
+                opening_dialog.setWindowTitle("เปิดกะขาย")
+                opening_dialog.setLabelText("เงินทอนตั้งต้น (บาท)")
+                opening_dialog.setInputMode(QInputDialog.DoubleInput)
+                opening_dialog.setDoubleValue(0.00)
+                opening_dialog.setDoubleRange(0.00, 999999999.99)
+                opening_dialog.setDoubleDecimals(2)
+                opening_dialog.setMinimumWidth(360)
+                opening_dialog.setWindowFlag(Qt.WindowCloseButtonHint, True)
+                opening_dialog.setWindowFlag(Qt.WindowStaysOnTopHint, True)
+                opening_dialog.setWindowModality(Qt.WindowModal)
+                opening_dialog.show()
+                opening_dialog.raise_()
+                opening_dialog.activateWindow()
+                app.processEvents()
+                if opening_dialog.exec() != QDialog.Accepted:
                     return False
-                opening_cash = money(str(opening_value))
+                opening_cash = money(str(opening_dialog.doubleValue()))
 
             try:
                 shift_id = service.open_shift(
@@ -1537,15 +1546,21 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.cashier = login.cashier
             self.shift_id = shift_id
             self.opening_cash = opening_cash
-            if online is not None and self.cashier["server_id"]:
+            if online is not None:
                 try:
-                    online.provisioning.open_server_shift(
-                        branch_id=branch_id, cashier_server_id=int(self.cashier["server_id"]),
-                        opening_cash=opening_cash, local_shift_id=self.shift_id,
-                    )
-                except Exception:
-                    # Local shift remains usable offline and is reconciled on a later sync.
+                    # Never wait for ERP from the GUI thread. The sync worker opens the
+                    # server shift first, then uploads any sale that belongs to it.
                     service.queue_shift_open(self.shift_id)
+                    online.worker.wake()
+                except Exception as error:
+                    # The local shift is already committed and remains usable. Keep the
+                    # reason visible in the normal sync queue instead of blocking sales.
+                    service.record_auth_event(
+                        str(self.cashier.get("code") or ""),
+                        "shift_open_queue",
+                        False,
+                        str(error)[:500],
+                    )
 
             self.cashier_label.setText(
                 f"บิลปัจจุบัน · {self.cashier['name']} · เงินทอนต้นกะ {opening_cash:,.2f} บาท"

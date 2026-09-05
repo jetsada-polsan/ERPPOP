@@ -123,8 +123,18 @@ class UiStyleTest(unittest.TestCase):
         start = source.index("def ensure_sale_session")
         session = source[start:source.index("def open_settings", start)]
         self.assertIn('"เงินทอนตั้งต้น (บาท)"', session)
-        self.assertIn("opening_cash=opening_cash", session)
+        self.assertIn("service.open_shift(", session)
+        self.assertIn("opening_cash", session)
         self.assertNotIn('opening_cash=Decimal("0")', session)
+
+    def test_opening_shift_is_local_first_and_does_not_block_on_erp(self) -> None:
+        source = inspect.getsource(run_ui)
+        start = source.index("def ensure_sale_session")
+        session = source[start:source.index("def open_settings", start)]
+        self.assertIn("service.queue_shift_open(self.shift_id)", session)
+        self.assertIn("online.worker.wake()", session)
+        self.assertNotIn("online.provisioning.open_server_shift", session)
+        self.assertIn("Qt.WindowStaysOnTopHint", session)
 
     def test_transfer_requires_visible_money_received_confirmation(self) -> None:
         source = inspect.getsource(run_ui)
