@@ -316,6 +316,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 submit.setText("เริ่มขาย")
                 self.pin.hide()
                 override.hide()
+            # อุปกรณ์ที่ผูกผู้ใช้ไว้มีตัวเลือกจริงเพียงรายการเดียว ส่วนรายการแรก
+            # เป็น placeholder จึงต้องเลือกให้เอง ไม่เช่นนั้นปุ่มเริ่มขายจะยังไม่มี
+            # cashier_server_id และกดแล้วไม่เกิดการ login
+            if len(cashiers) == 1:
+                self.cashier_select.setCurrentIndex(1)
+                self._select_cashier()
             form.addRow(hint)
             if cashiers:
                 form.addRow("ผู้ใช้ประจำเครื่อง" if device_user_id is not None else "ผู้ใช้ POS", self.cashier_select)
@@ -341,8 +347,14 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             selected = self.cashier_select.currentData() or {}
             code = selected.get("code") if isinstance(selected, dict) else selected
             self.code.setText(str(code or ""))
-            if code and not self.passwordless:
+            if code and not getattr(self, "passwordless", False):
                 self.pin.setFocus()
+
+        def _ensure_cashier_selection(self) -> None:
+            """เลือกผู้ใช้คนเดียวซ้ำก่อน submit เผื่อ widget ยังอยู่ที่ placeholder."""
+            if self.cashier_select.count() == 2 and self.cashier_select.currentIndex() == 0:
+                self.cashier_select.setCurrentIndex(1)
+                self._select_cashier()
 
         def _press_pin(self, key: str) -> None:
             if key == "ล้าง":
@@ -379,6 +391,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             pin = self.pin.text().strip()
             code = self.code.text().strip()
             try:
+                self._ensure_cashier_selection()
                 # ดึงสถานะแคชเชียร์ล่าสุดก่อนยืนยันเสมอ แต่ห้ามลบ verifier เก่า
                 # เพราะถ้าเน็ตหลุดกลางทางยังต้อง fallback ไป SQLite ได้ทันที.
                 online.provisioning.pull_cashiers(online.branch_id)
@@ -476,6 +489,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             return {"selection_required": False, **changed, "must_change_pin": False}
 
         def login(self):
+            self._ensure_cashier_selection()
             if not self.code.text().strip():
                 QMessageBox.information(self, "เลือกคนขาย", "เลือกชื่อคนขายก่อนกรอก PIN")
                 return
