@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import inspect
 import unittest
 from unittest.mock import patch
 
+from pos_python import printers
 from pos_python.printers import installed_printer_names
 
 
 class InstalledPrintersTest(unittest.TestCase):
+    def test_qt6_uses_the_python_safe_qtextdocument_print_method(self) -> None:
+        source = inspect.getsource(printers.print_text_to_windows_queue)
+        self.assertIn('getattr(document, "print_", None)', source)
+        self.assertIn('getattr(document, "print", None)', source)
+
     def test_windows_queues_are_sorted_and_deduplicated(self) -> None:
         class PrinterInfo:
             @staticmethod

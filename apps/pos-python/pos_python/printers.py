@@ -50,4 +50,9 @@ def print_text_to_windows_queue(text: str, printer_name: str) -> None:
 
     document = QTextDocument()
     document.setPlainText(text)
-    document.print(printer)
+    # Qt exposes QTextDocument::print as print_ in PySide6 because print is a
+    # Python keyword. Keep the fallback for bindings that expose the C++ name.
+    send_to_printer = getattr(document, "print_", None) or getattr(document, "print", None)
+    if send_to_printer is None:
+        raise RuntimeError("PySide6 รุ่นนี้ไม่รองรับการส่งเอกสารไปเครื่องพิมพ์")
+    send_to_printer(printer)
