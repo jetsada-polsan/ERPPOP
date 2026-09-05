@@ -152,18 +152,18 @@
             </tr>
         </thead>
         <tbody>
-            @foreach($sale->stockDocument->items as $i => $item)
+            @foreach($sale->stockDocument?->items ?? [] as $i => $item)
             <tr>
                 <td style="text-align:center">{{ $i + 1 }}</td>
-                <td class="mono">{{ $item->product->sku_code }}</td>
-                <td>{{ $item->product->name_th }}</td>
+                <td class="mono">{{ $item->product?->sku_code }}</td>
+                <td>{{ $item->product?->name_th }}</td>
                 <td class="right mono">{{ number_format($item->qty, 2) }}</td>
                 <td class="right mono">{{ number_format($item->unit_price, 2) }}</td>
                 <td class="right mono">{{ number_format($item->qty * $item->unit_price, 2) }}</td>
             </tr>
             @endforeach
             {{-- Pad rows to min 10 --}}
-            @for($p = $sale->stockDocument->items->count(); $p < 10; $p++)
+            @for($p = $sale->stockDocument?->items->count() ?? 0; $p < 10; $p++)
             <tr><td colspan="6" style="height:26px"></td></tr>
             @endfor
         </tbody>

@@ -97,7 +97,7 @@
                 <table class="table table-sm align-middle mb-0">
                     <thead><tr><th>สาขา</th><th>หน่วย</th><th class="text-end">ราคา</th><th>ช่วงเวลาที่มีผล</th><th>สถานะ</th><th></th></tr></thead>
                     <tbody>
-                    @forelse($posPriceSchedules as $schedule)
+                    @forelse($product->posPriceSchedules as $schedule)
                         <tr>
                             <td>{{ $schedule->branch?->code ?? 'ทุกสาขา' }}{{ $schedule->branch?->name_th ? ' - '.$schedule->branch->name_th : '' }}</td>
                             <td>{{ $schedule->unit?->displayLabel() ?? 'หน่วยฐาน' }}</td>

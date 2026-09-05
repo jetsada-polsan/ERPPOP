@@ -111,8 +111,8 @@
                 <tbody>
                     @forelse($productPrices as $pp)
                     <tr>
-                        <td class="fw-semibold">{{ $pp->product->sku_code }}</td>
-                        <td>{{ $pp->product->name_th }}</td>
+                        <td class="fw-semibold">{{ $pp->product?->sku_code ?? '(สินค้าถูกลบ)' }}</td>
+                        <td>{{ $pp->product?->name_th ?? '-' }}</td>
                         <td class="text-muted">{{ $pp->unit?->displayLabel() ?? 'ทั่วไป' }}</td>
                         <td class="text-end">{{ $pp->cost_price > 0 ? number_format($pp->cost_price, 2) : '-' }}</td>
                         <td class="text-end fw-bold text-success">{{ number_format($pp->price, 2) }}</td>
@@ -124,7 +124,7 @@
                         </td>
                         <td class="text-end">
                             <button type="button" class="btn btn-sm btn-light border"
-                                @click="editExisting({{ $pp->product_id }}, '{{ addslashes($pp->product->sku_code) }}', '{{ addslashes($pp->product->name_th) }}', {{ $pp->unit_id ?? 'null' }}, {{ $pp->price }}, {{ $pp->cost_price }})">
+                                @click="editExisting({{ $pp->product_id }}, '{{ addslashes($pp->product?->sku_code ?? '') }}', '{{ addslashes($pp->product?->name_th ?? '') }}', {{ $pp->unit_id ?? 'null' }}, {{ $pp->price }}, {{ $pp->cost_price }})">
                                 แก้ไข
                             </button>
                         </td>
