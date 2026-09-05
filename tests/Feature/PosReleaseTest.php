@@ -9,13 +9,17 @@ class PosReleaseTest extends TestCase
 {
     private string $directory;
 
+    private string $pythonDirectory;
+
     private ?string $originalManifest = null;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->directory = storage_path('app/pos-releases');
+        $this->pythonDirectory = storage_path('app/pos-python-releases');
         File::ensureDirectoryExists($this->directory);
+        File::ensureDirectoryExists($this->pythonDirectory);
         $manifest = $this->directory.'/latest.json';
         $this->originalManifest = is_file($manifest) ? file_get_contents($manifest) : null;
     }
@@ -23,12 +27,24 @@ class PosReleaseTest extends TestCase
     protected function tearDown(): void
     {
         File::delete($this->directory.'/POPSTAR-POS-test.zip');
+        File::delete($this->directory.'/PopCentral-POS-UAT-99.98.97-setup.exe');
+        File::delete($this->pythonDirectory.'/PopCentral-POS-UAT-99.98.98-setup.exe');
         if ($this->originalManifest === null) {
             File::delete($this->directory.'/latest.json');
         } else {
             File::put($this->directory.'/latest.json', $this->originalManifest);
         }
         parent::tearDown();
+    }
+
+    public function test_python_download_prefers_the_highest_version_across_legacy_folders(): void
+    {
+        File::put($this->directory.'/PopCentral-POS-UAT-99.98.97-setup.exe', 'legacy');
+        File::put($this->pythonDirectory.'/PopCentral-POS-UAT-99.98.98-setup.exe', 'new');
+
+        $this->get('/download/python-pos')
+            ->assertOk()
+            ->assertDownload('PopCentral-POS-UAT-99.98.98-setup.exe');
     }
 
     public function test_latest_manifest_is_public_and_not_cached(): void

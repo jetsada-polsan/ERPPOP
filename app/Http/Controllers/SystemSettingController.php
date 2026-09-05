@@ -210,19 +210,26 @@ class SystemSettingController extends Controller
 
     private function currentPythonPosInstaller(): ?array
     {
-        // Prefer the SFTP release folder so the web download follows the
-        // installer published by GitHub. Keep the dedicated folder as a
-        // fallback for existing manually uploaded installers.
-        $files = collect(File::glob(storage_path('app/pos-releases/PopCentral-POS-UAT-*-setup.exe')))
+        // Both folders are supported for backward compatibility. Choose by
+        // semantic version, otherwise an older legacy file can mask a newer
+        // installer published by GitHub.
+        $files = collect(array_merge(
+            File::glob(storage_path('app/pos-releases/PopCentral-POS-UAT-*-setup.exe')),
+            File::glob(storage_path('app/pos-python-releases/PopCentral-POS-UAT-*-setup.exe')),
+        ))
             ->filter(fn (string $path) => is_file($path))
-            ->sortByDesc(fn (string $path) => filemtime($path));
-        if ($files->isEmpty()) {
-            $files = collect(File::glob(storage_path('app/pos-python-releases/PopCentral-POS-UAT-*-setup.exe')))
-                ->filter(fn (string $path) => is_file($path))
-                ->sortByDesc(fn (string $path) => filemtime($path));
-        }
+            ->unique()
+            ->values()
+            ->all();
+        usort($files, static function (string $left, string $right): int {
+            preg_match('/-(\d+\.\d+\.\d+)-setup\.exe$/', basename($left), $leftMatch);
+            preg_match('/-(\d+\.\d+\.\d+)-setup\.exe$/', basename($right), $rightMatch);
+            $versionOrder = version_compare($rightMatch[1] ?? '0.0.0', $leftMatch[1] ?? '0.0.0');
 
-        $path = $files->first();
+            return $versionOrder !== 0 ? $versionOrder : filemtime($right) <=> filemtime($left);
+        });
+
+        $path = $files[0] ?? null;
         if (! $path) {
             return null;
         }
