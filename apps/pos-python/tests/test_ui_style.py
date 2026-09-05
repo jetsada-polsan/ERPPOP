@@ -117,6 +117,10 @@ class UiStyleTest(unittest.TestCase):
         self.assertIn('device_user_id', source)
         self.assertIn('cashier_login_mode', source)
         self.assertIn('online_cashier_login(\n                        None', source)
+        self.assertIn('not bool(cashiers[0]["force_pin_change"])', source)
+        self.assertIn('"ยืนยัน PIN ชั่วคราว"', source)
+        self.assertIn("temporary_pin.strip()", source)
+        self.assertNotIn("change_cashier_pin(code, \"\",", source)
 
     def test_opening_shift_requests_and_reuses_opening_cash(self) -> None:
         source = inspect.getsource(run_ui)

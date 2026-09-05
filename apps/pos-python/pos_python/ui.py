@@ -273,7 +273,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.cashier_select = QComboBox()
             self.cashier_select.addItem("เลือกชื่อคนขาย", None)
             device_user_id = _cached_setting(service.db, "device_user_id")
-            cashier_query = """SELECT code, name, server_id, user_id FROM local_cashiers
+            cashier_query = """SELECT code, name, server_id, user_id, force_pin_change FROM local_cashiers
                               WHERE active = 1 AND user_id IS NOT NULL AND revoked_at IS NULL"""
             cashier_params: tuple = ()
             if device_user_id is not None:
@@ -284,7 +284,11 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             for cashier in cashiers:
                 self.cashier_select.addItem(
                     f"{cashier['name']}  ·  {cashier['code']}",
-                    {"code": cashier["code"], "server_id": cashier["server_id"]},
+                    {
+                        "code": cashier["code"],
+                        "server_id": cashier["server_id"],
+                        "force_pin_change": bool(cashier["force_pin_change"]),
+                    },
                 )
             self.cashier_select.currentIndexChanged.connect(lambda _: self._select_cashier())
             self.pin = QLineEdit()
@@ -304,6 +308,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 online is not None and online.online
                 and _cached_setting(service.db, "cashier_login_mode") == "selection"
                 and len(cashiers) == 1
+                and not bool(cashiers[0]["force_pin_change"])
             )
             if self.passwordless:
                 hint.setText("เครื่องนี้ผูกกับผู้ใช้ POS แล้ว · กดเริ่มขายได้เลย")
@@ -385,6 +390,22 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     result = online.provisioning.online_cashier_login(
                         None, cashier_code=code, cashier_server_id=int(selected_server_id)
                     )
+                    if result.get("must_change_pin"):
+                        # A stale local cache or an older ERP can still report a
+                        # forced PIN change after device selection. Never call
+                        # changeCashierPin with an empty current PIN; ask for the
+                        # temporary PIN and retry the normal credential flow.
+                        temporary_pin, ok = self._ask_pin(
+                            "ยืนยัน PIN ชั่วคราว",
+                            "กรอก PIN ชั่วคราวที่ผู้ดูแลออกให้ก่อนตั้ง PIN ใหม่",
+                        )
+                        if not ok or not temporary_pin.strip():
+                            return False
+                        result = online.provisioning.online_cashier_login(
+                            temporary_pin.strip(),
+                            cashier_code=code,
+                            cashier_server_id=int(selected_server_id),
+                        )
                 else:
                     result = online.provisioning.online_cashier_login(pin, cashier_code=code)
                 if result.get("selection_required"):
