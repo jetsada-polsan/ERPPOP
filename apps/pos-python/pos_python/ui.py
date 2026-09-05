@@ -110,7 +110,7 @@ def run_pairing_wizard(data_dir, app) -> bool:
 # QSS ใช้ปีกกาเป็นไวยากรณ์ เลยแทนค่าด้วย $name แทน .format()
 _STYLE_TEMPLATE = Template("""
 /* สีและระยะตามภาพร่างที่อนุมัติแล้ว — โทน JET ชุดเดียวกับ ERP บนพื้นเทาอ่อน */
-QMainWindow, QDialog, QWidget { background: $bg; color: $text; font-family: 'Sarabun','Tahoma'; font-size: 14px; }
+QMainWindow, QDialog, QWidget { background: $bg; color: $text; font-family: 'Noto Sans Thai','Leelawadee UI','Sarabun','Tahoma'; font-size: 14px; }
 
 /* ป้ายที่วางบนแถบสีต้องโปร่ง ไม่งั้นกินสีพื้นแอปมาเป็นแผ่นขาวทับแถบ */
 #brandBar { background: $primary_dark; border-bottom: 3px solid $primary; }
@@ -180,8 +180,12 @@ QHeaderView::section { background: $primary_soft; border: 0; border-bottom: 1px 
 
 /* กระดาษใบเสร็จวางบนพื้นเทาเหมือนวางบนโต๊ะ */
 #receiptBg { background: $preview; border-radius: 6px; }
-#receiptPaper { background: $surface; padding: 20px; font-family: 'Menlo','Courier New'; font-size: 12px; color: $paper_ink; }
+#receiptPaper { background: $surface; padding: 20px; font-family: 'Noto Sans Thai','Leelawadee UI','Tahoma','Courier New'; font-size: 12px; color: $paper_ink; }
 #statusBar { color: $muted; font-size: 12.5px; padding: 6px 16px; }
+
+#shiftAmount { font-size: 25px; font-weight: 800; padding: 12px 14px; }
+#shiftSummary { background: $primary_soft; border: 1px solid $border; border-radius: 7px; padding: 10px 12px; font-size: 15px; font-weight: 700; }
+#shiftKeypad QPushButton { min-height: 42px; font-size: 18px; font-weight: 700; }
 """)
 
 STYLE = _STYLE_TEMPLATE.substitute(PALETTE)
@@ -212,7 +216,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
     layout_config = _cached_layout(service.db)
     try:
         from PySide6.QtCore import QTimer, QSize, Qt
-        from PySide6.QtGui import QColor, QImage, QKeySequence, QPainter, QPixmap, QShortcut
+        from PySide6.QtGui import QColor, QFont, QFontDatabase, QImage, QKeySequence, QPainter, QPixmap, QShortcut
         from PySide6.QtWidgets import (
             QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGridLayout,
             QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton,
@@ -220,6 +224,16 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         )
     except ImportError as error:
         raise RuntimeError("ยังไม่ได้ติดตั้ง PySide6: python3 -m pip install -r requirements.txt") from error
+
+    # Prefer a modern Thai-capable Windows font, but never assume it is installed.
+    # Qt will otherwise fall back inconsistently between the POS screen and dialogs.
+    available_fonts = set(QFontDatabase.families())
+    ui_font_family = next(
+        (family for family in ("Noto Sans Thai", "Leelawadee UI", "Sarabun", "Tahoma", "Arial")
+         if family in available_fonts),
+        "Tahoma",
+    )
+    app.setFont(QFont(ui_font_family, 14))
 
     def _qr_pixmap(payload: str, size: int) -> QPixmap:
         matrix = qr_matrix(payload, border=3)
@@ -500,6 +514,104 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         def _ask_pin(self, title: str, label: str) -> tuple[str, bool]:
             from PySide6.QtWidgets import QInputDialog
             return QInputDialog.getText(self, title, label, QLineEdit.Password)
+
+    class OpeningShiftDialog(QDialog):
+        """หน้าต่างเปิดกะที่ไม่ถูก On-Screen Keyboard บัง และกดยอดเงินทอนได้ง่าย"""
+
+        def __init__(self, parent):
+            super().__init__(parent)
+            self.opening_cash = Decimal("0.00")
+            self.setWindowTitle("เปิดกะขาย")
+            self.setWindowFlag(Qt.WindowCloseButtonHint, True)
+            self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
+            self.setWindowModality(Qt.WindowModal)
+            self.setMinimumWidth(390)
+            self.resize(420, 520)
+
+            layout = QVBoxLayout(self)
+            title = QLabel("เงินทอนตั้งต้น")
+            title.setStyleSheet("font-size:20px;font-weight:800")
+            hint = QLabel("ใส่เงินสดที่เตรียมไว้ในลิ้นชักก่อนเริ่มขาย")
+            hint.setObjectName("cardHint")
+            hint.setWordWrap(True)
+            layout.addWidget(title)
+            layout.addWidget(hint)
+
+            self.amount = QLineEdit()
+            self.amount.setObjectName("shiftAmount")
+            self.amount.setAlignment(Qt.AlignRight)
+            self.amount.setPlaceholderText("0.00")
+            self.amount.setInputMethodHints(Qt.ImhFormattedNumbersOnly)
+            self.amount.textChanged.connect(self.refresh_summary)
+            self.amount.returnPressed.connect(self.accept_value)
+            layout.addWidget(self.amount)
+
+            self.summary = QLabel("เงินทอนตั้งต้น 0.00 บาท")
+            self.summary.setObjectName("shiftSummary")
+            self.summary.setAlignment(Qt.AlignCenter)
+            layout.addWidget(self.summary)
+
+            keypad = QWidget()
+            keypad.setObjectName("shiftKeypad")
+            grid = QGridLayout(keypad)
+            grid.setContentsMargins(0, 0, 0, 0)
+            grid.setSpacing(7)
+            keys = [["7", "8", "9"], ["4", "5", "6"], ["1", "2", "3"], ["ล้าง", "0", "⌫"]]
+            for row, values in enumerate(keys):
+                for column, key in enumerate(values):
+                    button = QPushButton(key)
+                    button.clicked.connect(lambda _, value=key: self.press(value))
+                    grid.addWidget(button, row, column)
+            decimal = QPushButton("จุดทศนิยม")
+            decimal.clicked.connect(lambda: self.press("."))
+            grid.addWidget(decimal, 4, 0, 1, 3)
+            layout.addWidget(keypad)
+
+            buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            buttons.button(QDialogButtonBox.Ok).setText("เปิดกะขาย")
+            buttons.button(QDialogButtonBox.Cancel).setText("ยกเลิก")
+            buttons.button(QDialogButtonBox.Ok).setObjectName("primary")
+            buttons.accepted.connect(self.accept_value)
+            buttons.rejected.connect(self.reject)
+            layout.addWidget(buttons)
+
+        def press(self, key: str) -> None:
+            current = self.amount.text()
+            if key == "ล้าง":
+                self.amount.clear()
+            elif key == "⌫":
+                self.amount.backspace()
+            elif key == ".":
+                if "." not in current:
+                    self.amount.insert("." if current else "0.")
+            elif current in ("0", "0.00"):
+                self.amount.setText(key)
+            else:
+                self.amount.insert(key)
+            self.amount.setFocus()
+
+        def value(self) -> Decimal:
+            return money(self.amount.text().strip() or "0")
+
+        def refresh_summary(self) -> None:
+            try:
+                value = self.value()
+                self.summary.setText(f"เงินทอนตั้งต้น {value:,.2f} บาท")
+            except (InvalidOperation, ValueError):
+                self.summary.setText("กรอกจำนวนเงินเป็นตัวเลข เช่น 500 หรือ 500.00")
+
+        def accept_value(self) -> None:
+            try:
+                value = self.value()
+            except (InvalidOperation, ValueError):
+                QMessageBox.warning(self, "จำนวนเงินไม่ถูกต้อง", "กรอกจำนวนเงินเป็นตัวเลขเท่านั้น")
+                self.amount.setFocus()
+                return
+            if value < 0:
+                QMessageBox.warning(self, "จำนวนเงินไม่ถูกต้อง", "เงินทอนตั้งต้นต้องไม่ติดลบ")
+                return
+            self.opening_cash = value
+            self.accept()
 
     class PaymentDialog(QDialog):
         """หน้าชำระเงิน — เงินทอนคำนวณสด ๆ ระหว่างพิมพ์ ไม่ต้องคิดในหัว"""
@@ -1192,9 +1304,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             head_layout.setSpacing(8)
             self.cashier_label = QLabel("บิลปัจจุบัน · ยังไม่ได้เริ่มขาย")
             head_layout.addWidget(self.cashier_label, 1)
-            self.auth_button = QPushButton("เริ่มขาย")
+            self.auth_button = QPushButton("เปิดกะ")
             self.auth_button.setObjectName("headerAction")
-            self.auth_button.setToolTip("ยืนยันรหัสแคชเชียร์และ PIN ก่อนบันทึกยอดขาย")
+            self.auth_button.setToolTip("ยืนยันผู้ขายและใส่เงินทอนตั้งต้นก่อนเริ่มขาย")
             self.auth_button.clicked.connect(self.ensure_sale_session)
             head_layout.addWidget(self.auth_button)
             report = QPushButton("ยอดวันนี้")
@@ -1549,28 +1661,16 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             if existing_shift:
                 opening_cash = money(existing_shift["opening_cash"])
             else:
-                from PySide6.QtWidgets import QInputDialog
-                # Windows On-Screen Keyboard can cover the static getDouble dialog.
-                # Keep this dialog compact and above it so a tap on "เริ่มขาย" never
-                # leaves the operator waiting on a hidden prompt.
-                opening_dialog = QInputDialog(self)
-                opening_dialog.setWindowTitle("เปิดกะขาย")
-                opening_dialog.setLabelText("เงินทอนตั้งต้น (บาท)")
-                opening_dialog.setInputMode(QInputDialog.DoubleInput)
-                opening_dialog.setDoubleValue(0.00)
-                opening_dialog.setDoubleRange(0.00, 999999999.99)
-                opening_dialog.setDoubleDecimals(2)
-                opening_dialog.setMinimumWidth(360)
-                opening_dialog.setWindowFlag(Qt.WindowCloseButtonHint, True)
-                opening_dialog.setWindowFlag(Qt.WindowStaysOnTopHint, True)
-                opening_dialog.setWindowModality(Qt.WindowModal)
+                # Use our own numeric dialog: Qt's static getDouble dialog can be
+                # covered by the Windows On-Screen Keyboard on touch POS devices.
+                opening_dialog = OpeningShiftDialog(self)
                 opening_dialog.show()
                 opening_dialog.raise_()
                 opening_dialog.activateWindow()
                 app.processEvents()
                 if opening_dialog.exec() != QDialog.Accepted:
                     return False
-                opening_cash = money(str(opening_dialog.doubleValue()))
+                opening_cash = opening_dialog.opening_cash
 
             try:
                 shift_id = service.open_shift(
@@ -1693,7 +1793,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.cashier = None
             self.shift_id = None
             self.opening_cash = None
-            self.auth_button.setText("เริ่มขาย")
+            self.auth_button.setText("เปิดกะ")
             self.auth_button.setEnabled(True)
             self.cashier_label.setText("บิลปัจจุบัน · ยังไม่ได้เริ่มขาย")
             self.setWindowTitle(f"PopCentral POS — พร้อมใช้งาน · Layout {layout_config.get('version', 1)}")
