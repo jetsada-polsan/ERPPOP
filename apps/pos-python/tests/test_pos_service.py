@@ -36,6 +36,7 @@ class PosServiceTest(unittest.TestCase):
     def test_uses_wal_and_logs_in_offline_cashier(self) -> None:
         self.assertEqual(self.db.execute("PRAGMA journal_mode").fetchone()[0], "wal")
         self.assertIsNotNone(self.service.login("POP001", "1234"))
+        self.assertIsNotNone(self.service.login("POP001", "๑๒๓๔"))
         self.assertIsNone(self.service.login("POP001", "wrong"))
 
     def test_open_shift_persists_opening_cash_for_cash_drawer_reconciliation(self) -> None:
