@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from typing import Any, Protocol
 
 from .barcode import replace_scale_profiles
-from .services import money, normalize_pin, now
+from .services import money, now
 from .time_service import TimeService
 
 
@@ -327,12 +327,8 @@ class ProvisioningService:
         (UI ต้องให้เลือกชื่อ) หรือ {"cashier": {...}, "local_cashier_id": n} เมื่อสำเร็จ
         """
         payload: dict = {}
-        if pin is not None:
-            normalized_pin = normalize_pin(pin)
-            if normalized_pin and (not normalized_pin.isascii() or not normalized_pin.isdigit()):
-                raise ValueError("PIN ต้องเป็นตัวเลข 4-20 หลัก")
-            if normalized_pin:
-                payload["pin"] = normalized_pin
+        if pin:
+            payload["pin"] = pin
         if cashier_code:
             payload["code"] = cashier_code
         if cashier_server_id is not None:
@@ -378,12 +374,6 @@ class ProvisioningService:
 
     def change_cashier_pin(self, code: str, current_pin: str, new_pin: str) -> dict:
         """เปลี่ยน PIN กับ ERP แล้วเก็บ offline credential รุ่นใหม่ที่ server ออกให้"""
-        current_pin = normalize_pin(current_pin)
-        new_pin = normalize_pin(new_pin)
-        if (not current_pin.isascii() or not current_pin.isdigit()
-                or not new_pin.isascii() or not new_pin.isdigit()
-                or not 4 <= len(current_pin) <= 20 or not 4 <= len(new_pin) <= 20):
-            raise ValueError("PIN ต้องเป็นตัวเลข 4-20 หลัก")
         response = self.api.post("/api/pos/cashier/pin", {
             "code": code,
             "current_pin": current_pin,

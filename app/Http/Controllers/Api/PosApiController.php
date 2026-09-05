@@ -362,7 +362,7 @@ class PosApiController extends Controller
             ->where('is_active', true)
             ->whereNotNull('user_id')
             ->when($assignedUserId, fn ($query) => $query->where('user_id', $assignedUserId))
-            ->whereHas('user', function ($user) use ($branchId) {
+            ->whereHas('user', function ($user) use ($branchId, $assignedUserId) {
                 $user->where('is_active', true);
 
                 if (! $branchId) {
@@ -370,7 +370,7 @@ class PosApiController extends Controller
                     return;
                 }
 
-                $user->where(function ($access) use ($branchId) {
+                $branchAccess = function ($access) use ($branchId) {
                     // Explicit branch roles are authoritative when present.
                     $access->whereHas('branchRoles', fn ($role) => $role
                         ->where('user_branch_roles.branch_id', $branchId)
@@ -396,6 +396,18 @@ class PosApiController extends Controller
                             ->whereHas('roles.permissions', fn ($permission) => $permission->where('code', 'pos.sell'))
                             ->where(fn ($home) => $home->whereNull('branch_id')->orWhere('branch_id', $branchId));
                     });
+                };
+
+                $user->where(function ($access) use ($branchAccess, $assignedUserId) {
+                    // A global POS seller is allowed here only when an admin explicitly
+                    // bound that user to this device during token issuance.
+                    if ($assignedUserId) {
+                        $access->whereHas('roles.permissions', fn ($permission) => $permission->where('code', 'pos.sell'));
+                        $access->orWhere($branchAccess);
+                        return;
+                    }
+
+                    $branchAccess($access);
                 });
             })
             ->when($code, fn ($query) => $query->where(function ($where) use ($code) {

@@ -7,7 +7,6 @@ import json
 import re
 import sqlite3
 import uuid
-import unicodedata
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
@@ -43,21 +42,6 @@ def pin_hash(pin: str) -> str:
     # ใช้กับ PIN ตั้งต้นตอน seed เครื่องใหม่ที่ยังไม่เคยต่อ ERP เท่านั้น
     # PIN จริงของพนักงานยืนยันผ่าน verify_offline_credential ด้วย credential ที่ ERP ออกให้
     return hashlib.sha256(pin.encode("utf-8")).hexdigest()
-
-
-def normalize_pin(pin: str) -> str:
-    """Convert Unicode decimal digits from Windows/Thai input to ASCII digits.
-
-    The Laravel API deliberately accepts only ``0-9``.  Touch keyboards and
-    Thai Windows input can otherwise send the visually identical ``๐-๙`` and
-    produce a confusing 422 validation error.
-    """
-    value = str(pin).strip()
-    normalized = "".join(
-        str(unicodedata.digit(char)) if char.isdecimal() else char
-        for char in value
-    )
-    return normalized
 
 
 def verify_offline_credential(pin: str, salt_b64: str, verifier_b64: str, iterations: int) -> bool:
@@ -202,7 +186,6 @@ class PosService:
         if the server has announced a newer credential version.  This deliberately
         prevents a remote PIN reset from taking a disconnected checkout offline.
         """
-        pin = normalize_pin(pin)
         row = self.db.execute("SELECT * FROM local_cashiers WHERE code = ?", (cashier_code,)).fetchone()
         terminal_code = terminal_code or self._setting("terminal_code")
         branch_code = branch_code or self._setting("branch_code") or self._setting("branch_name")
@@ -276,8 +259,6 @@ class PosService:
                                temporary_pin: str, terminal_code: str | None = None,
                                branch_code: str | None = None, valid_minutes: int = 60) -> OfflineLoginResult:
         """Create a short-lived local recovery PIN after an offline supervisor check."""
-        temporary_pin = normalize_pin(temporary_pin)
-        manager_pin = normalize_pin(manager_pin)
         if not temporary_pin.isdigit() or not 4 <= len(temporary_pin) <= 20:
             raise ValueError("PIN ชั่วคราวต้องเป็นตัวเลข 4-20 หลัก")
         manager = self.login_offline(manager_code, manager_pin, terminal_code=terminal_code, branch_code=branch_code)
@@ -303,7 +284,6 @@ class PosService:
         return bool(self._setting("local_it_pin_hash"))
 
     def set_local_it_pin(self, pin: str) -> None:
-        pin = normalize_pin(pin)
         if not pin.isdigit() or not 6 <= len(pin) <= 20:
             raise ValueError("Local IT PIN ต้องเป็นตัวเลข 6-20 หลัก")
         with self.db:
@@ -314,7 +294,6 @@ class PosService:
             )
 
     def verify_local_it_pin(self, pin: str) -> bool:
-        pin = normalize_pin(pin)
         stored = self._setting("local_it_pin_hash")
         return bool(stored) and hmac.compare_digest(stored, pin_hash(pin))
 

@@ -86,16 +86,6 @@ class OnlineLoginTest(unittest.TestCase):
         self.assertEqual(db.execute("SELECT user_id FROM local_cashiers WHERE id = ?", (result["local_cashier_id"],)).fetchone()[0], 501)
         self.assertEqual(api.posted[0][1]["code"], "C001")
 
-    def test_online_login_normalizes_thai_digits_before_calling_laravel(self) -> None:
-        db, _ = fresh_db()
-        api = FakeApi({"/api/pos/cashier/login": {
-            "success": True, "cashier": {"id": 42, "code": "C001", "name": "สมชาย",
-                                         "credential_version": "v1"}}})
-
-        ProvisioningService(db, api).online_cashier_login("๔๘๒๑", cashier_code="C001")
-
-        self.assertEqual(api.posted[0][1]["pin"], "4821")
-
     def test_change_pin_stores_the_new_server_credential(self) -> None:
         db, _ = fresh_db()
         api = FakeApi({"/api/pos/cashier/pin": {

@@ -373,24 +373,34 @@
 
                 <div class="set-card">
                     <div class="set-title pt-2">เพิ่มเครื่อง POS และสร้าง Token อัตโนมัติ</div>
-                    <div class="set-desc mb-3">เลือกสาขาเพียงอย่างเดียว ระบบหาแคชเชียร์ที่มีสิทธิ์ขายของสาขานั้น จ่ายรหัสเครื่อง และสร้าง Token ให้ทันที แคชเชียร์ยังต้องยืนยันตัวเองก่อนเปิดกะ/ขาย</div>
+                    <div class="set-desc mb-3">แอดมินกำหนดเองได้ว่าเครื่องนี้ผูกกับ User ใด ระบบจะตรวจสิทธิ์ขายและโปรไฟล์ POS ก่อนออก Token ชื่อคนขายเก่าจะไม่ถูกนำมาเลือกแทน User</div>
                     <div class="row g-3 align-items-end pb-3">
-                        <div class="col-md-5">
+                        <div class="col-md-4">
                             <label class="form-label">สาขาที่ติดตั้ง <span class="text-danger">*</span></label>
-                            <select name="pos_branch_id" class="form-select" required>
+                            <select name="pos_branch_id" class="form-select" aria-required="true">
                                 <option value="">เลือกสาขา</option>
                                 @foreach($posBranches as $branch)
                                     <option value="{{ $branch->id }}">{{ $branch->code }} - {{ $branch->name_th }}</option>
                                 @endforeach
                             </select>
                         </div>
-                        <div class="col-md-5">
+                        <div class="col-md-4">
+                            <label class="form-label">ผู้ใช้ POS <span class="text-danger">*</span></label>
+                            <select name="pos_user_id" class="form-select" aria-required="true">
+                                <option value="">เลือก User ที่จะผูกกับเครื่อง</option>
+                                @foreach($posUsers as $user)
+                                    <option value="{{ $user->id }}">{{ $user->username }} — {{ $user->name }}{{ $user->branch ? ' · '.$user->branch->code : '' }}</option>
+                                @endforeach
+                            </select>
+                            <div class="form-text">User นี้จะเป็นตัวตนหลักของเครื่อง และเปลี่ยนได้ด้วยการออก Token ใหม่</div>
+                        </div>
+                        <div class="col-md-4">
                             <label class="form-label">ชื่อเครื่อง (ไม่บังคับ)</label>
                             <input name="pos_device_name" class="form-control" placeholder="เช่น แคชเชียร์ 1 — เว้นว่างให้ระบบตั้งชื่อเอง">
                         </div>
-                        <div class="col-md-2 d-grid">
+                        <div class="col-12 d-flex justify-content-end">
                             <button type="submit" formaction="{{ route('settings.pos-token.issue') }}" formnovalidate class="btn btn-primary">
-                                <i class="bi bi-magic me-1"></i> สร้างอัตโนมัติ
+                                <i class="bi bi-link-45deg me-1"></i> ผูก User และสร้าง Token
                             </button>
                         </div>
                     </div>

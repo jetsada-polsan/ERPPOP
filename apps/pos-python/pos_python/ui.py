@@ -291,7 +291,6 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     },
                 )
             self.cashier_select.currentIndexChanged.connect(lambda _: self._select_cashier())
-            self.cashier_select.setEnabled(device_user_id is None)
             self.pin = QLineEdit()
             self.pin.setEchoMode(QLineEdit.Password)
             self.pin.setPlaceholderText("แตะ PIN")
@@ -318,7 +317,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 override.hide()
             form.addRow(hint)
             if cashiers:
-                form.addRow("ผู้ใช้ประจำเครื่อง" if device_user_id is not None else "ผู้ใช้ POS", self.cashier_select)
+                form.addRow("คนขาย", self.cashier_select)
             else:
                 form.addRow("รหัสแคชเชียร์", self.code)
             if not self.passwordless:

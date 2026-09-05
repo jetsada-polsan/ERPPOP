@@ -6,6 +6,7 @@ use App\Models\Branch;
 use App\Models\Permission;
 use App\Models\PosDevice;
 use App\Models\Role;
+use App\Models\Salesman;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -14,7 +15,7 @@ class PosDeviceAutoProvisioningTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_admin_can_issue_a_terminal_and_token_by_selecting_only_a_branch(): void
+    public function test_admin_can_issue_a_terminal_and_token_for_the_selected_user(): void
     {
         $branch = $this->branch('B001');
         $cashier = User::factory()->create([
@@ -23,9 +24,17 @@ class PosDeviceAutoProvisioningTest extends TestCase
             'is_active' => true,
         ]);
         $this->grantPosSell($cashier);
+        Salesman::create([
+            'branch_id' => $branch->id,
+            'user_id' => $cashier->id,
+            'code' => 'CASHIER-B001',
+            'name' => 'แคชเชียร์ B001',
+            'is_active' => true,
+        ]);
 
         $response = $this->withoutMiddleware()->post(route('settings.pos-token.issue'), [
             'pos_branch_id' => $branch->id,
+            'pos_user_id' => $cashier->id,
         ]);
 
         $response->assertRedirect(route('settings.index'));
@@ -38,18 +47,77 @@ class PosDeviceAutoProvisioningTest extends TestCase
         $this->assertSame('PopCentral POS POS-B001-01', $device->name);
     }
 
+    public function test_admin_choice_wins_when_multiple_users_can_sell(): void
+    {
+        $branch = $this->branch('B003');
+        $first = User::factory()->create([
+            'username' => 'cashier-first',
+            'branch_id' => $branch->id,
+            'is_active' => true,
+        ]);
+        $second = User::factory()->create([
+            'username' => 'cashier-second',
+            'branch_id' => $branch->id,
+            'is_active' => true,
+        ]);
+        $this->grantPosSell($first);
+        $this->grantPosSell($second);
+        foreach ([$first, $second] as $index => $user) {
+            Salesman::create([
+                'branch_id' => $branch->id,
+                'user_id' => $user->id,
+                'code' => 'CASHIER-B003-'.($index + 1),
+                'name' => 'แคชเชียร์ B003 '.($index + 1),
+                'is_active' => true,
+            ]);
+        }
+
+        $this->withoutMiddleware()->post(route('settings.pos-token.issue'), [
+            'pos_branch_id' => $branch->id,
+            'pos_user_id' => $second->id,
+        ])->assertRedirect(route('settings.index'));
+
+        $this->assertSame($second->id, PosDevice::firstOrFail()->user_id);
+    }
+
+    public function test_admin_cannot_bind_an_active_user_without_pos_sell(): void
+    {
+        $branch = $this->branch('B004');
+        $staff = User::factory()->create([
+            'username' => 'staff-b004',
+            'branch_id' => $branch->id,
+            'is_active' => true,
+        ]);
+        Salesman::create([
+            'branch_id' => $branch->id,
+            'user_id' => $staff->id,
+            'code' => 'STAFF-B004',
+            'name' => 'พนักงานไม่มีสิทธิ์ POS',
+            'is_active' => true,
+        ]);
+
+        $this->withoutMiddleware()->post(route('settings.pos-token.issue'), [
+            'pos_branch_id' => $branch->id,
+            'pos_user_id' => $staff->id,
+        ])->assertRedirect();
+
+        $this->assertDatabaseCount('pos_devices', 0);
+    }
+
     public function test_it_does_not_create_a_device_when_branch_has_no_cashier_with_pos_sell(): void
     {
         $branch = $this->branch('B002');
-        User::factory()->create([
+        $staff = User::factory()->create([
             'username' => 'staff-b002',
             'branch_id' => $branch->id,
             'is_active' => true,
         ]);
 
         $this->withoutMiddleware()
-            ->post(route('settings.pos-token.issue'), ['pos_branch_id' => $branch->id])
-            ->assertStatus(422);
+            ->post(route('settings.pos-token.issue'), [
+                'pos_branch_id' => $branch->id,
+                'pos_user_id' => $staff->id,
+            ])->assertRedirect();
 
         $this->assertDatabaseCount('pos_devices', 0);
     }

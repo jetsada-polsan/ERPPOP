@@ -137,7 +137,14 @@ class SystemSettingController extends Controller
             ],
             'bookCount' => DB::table('document_books')->where('is_active', true)->count(),
             'bankCount' => DB::table('bank_accounts')->count(),
-            'posUsers' => User::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'username', 'branch_id']),
+            // รายชื่อที่เลือกผูกกับเครื่องต้องเป็น User ใหม่ที่มีโปรไฟล์ POS แล้ว
+            // ไม่แสดง salesman เก่าที่ไม่มีตัวตน User ให้แอดมินเลือก
+            'posUsers' => User::query()
+                ->where('is_active', true)
+                ->whereHas('posCashierProfile', fn ($cashier) => $cashier->where('is_active', true))
+                ->with('branch:id,code,name_th')
+                ->orderBy('name')
+                ->get(['id', 'name', 'username', 'branch_id']),
             'posBranches' => Branch::query()->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name_th']),
             'posDevices' => PosDevice::with(['user:id,name,username', 'branch:id,code,name_th'])->latest()->limit(20)->get(),
             'posTerminals' => PosTerminal::with('branch:id,code,name_th')->orderBy('code')->get(),
@@ -245,34 +252,39 @@ class SystemSettingController extends Controller
     {
         $data = $request->validate([
             'pos_branch_id' => ['required', 'integer', 'exists:branches,id'],
+            'pos_user_id' => ['required', 'integer', 'exists:users,id'],
             'pos_device_name' => ['nullable', 'string', 'max:100'],
         ]);
 
-        [$device, $token] = DB::transaction(function () use ($data) {
-            // Lock the branch while issuing its next terminal number. Two admins cannot receive the same code.
-            $branch = Branch::query()->lockForUpdate()->findOrFail($data['pos_branch_id']);
-            $user = User::query()
-                ->where('is_active', true)
-                ->where('branch_id', $branch->id)
-                ->with('roles.permissions')
-                ->orderBy('id')
-                ->get()
-                ->first(fn (User $candidate) => $candidate->hasPermission('pos.sell'));
+        try {
+            [$device, $token] = DB::transaction(function () use ($data) {
+                // Lock the branch while issuing its next terminal number. Two admins cannot receive the same code.
+                $branch = Branch::query()->lockForUpdate()->findOrFail($data['pos_branch_id']);
+                $user = User::query()
+                    ->whereKey($data['pos_user_id'])
+                    ->where('is_active', true)
+                    ->with(['posCashierProfile', 'roles.permissions', 'branchRoles.permissions'])
+                    ->first();
+                $cashier = $user?->posCashierProfile;
 
-            if (! $user) {
-                abort(422, "สาขา {$branch->code} ยังไม่มีแคชเชียร์ที่มีสิทธิ์ขาย POS จึงยังสร้างเครื่องไม่ได้");
-            }
+                if (! $user || ! $cashier?->is_active || ! $user->canUsePosDevice($branch->id)) {
+                    throw new \RuntimeException("ผู้ใช้ที่เลือกยังไม่มีสิทธิ์ขาย POS ที่สาขา {$branch->code} หรือไม่มีโปรไฟล์ POS ที่ใช้งานได้");
+                }
 
-            $terminalCode = PosTerminalCode::next($branch);
-            $name = trim((string) ($data['pos_device_name'] ?? '')) ?: "PopCentral POS {$terminalCode}";
+                $terminalCode = PosTerminalCode::next($branch);
+                $name = trim((string) ($data['pos_device_name'] ?? '')) ?: "PopCentral POS {$terminalCode}";
 
-            return PosDevice::issue([
-                'name' => $name,
-                'user_id' => $user->id,
-                'branch_id' => $branch->id,
-                'terminal_code' => $terminalCode,
-            ]);
-        });
+                return PosDevice::issue([
+                    'name' => $name,
+                    'user_id' => $user->id,
+                    'branch_id' => $branch->id,
+                    'terminal_code' => $terminalCode,
+                ]);
+            });
+        } catch (\RuntimeException $exception) {
+            // ขาดแคชเชียร์ที่มีสิทธิ์ pos.sell เป็นเงื่อนไขทางธุรกิจ ไม่ใช่ข้อผิดพลาดของระบบ เด้ง back() แทน abort() กันตกหน้า Whoops
+            return back()->withErrors(['pos_branch_id' => $exception->getMessage()]);
+        }
 
         return redirect()->route('settings.index')->with([
             'success' => "สร้าง {$device->name} ({$device->terminal_code}) และ Token ให้แล้ว กรุณาคัดลอกไปตั้งค่าในเครื่อง POS",

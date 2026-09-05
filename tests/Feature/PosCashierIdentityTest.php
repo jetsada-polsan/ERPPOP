@@ -183,6 +183,33 @@ class PosCashierIdentityTest extends TestCase
         $this->assertSame(422, app(PosApiController::class)->cashierLogin($other)->getStatusCode());
     }
 
+    public function test_explicitly_bound_global_pos_user_is_available_on_that_device(): void
+    {
+        $branch = Branch::create(['code' => 'GLOBALPOS', 'name_th' => 'สาขาเครื่องที่ผูก', 'is_active' => true]);
+        $user = User::factory()->create([
+            'username' => 'global-pos-'.uniqid(),
+            'branch_id' => null,
+            'is_active' => true,
+        ]);
+        $cashier = Salesman::create([
+            'branch_id' => $branch->id,
+            'user_id' => $user->id,
+            'code' => 'GLOBALPOS-1',
+            'name' => 'ผู้ใช้ POS ส่วนกลาง',
+            'is_active' => true,
+            'pos_pin_hash' => Hash::make('4821'),
+        ]);
+        $this->linkCashierUser($cashier, $branch, $user);
+        $device = $this->device($branch, $cashier);
+
+        $request = Request::create('/api/pos/cashiers', 'GET');
+        $request->attributes->set('pos_device', $device);
+        $payload = app(PosApiController::class)->cashiers($request)->getData(true);
+
+        $this->assertTrue($payload['success']);
+        $this->assertSame($user->username, $payload['cashiers'][0]['code']);
+    }
+
     public function test_device_cannot_sell_under_another_cashier_after_pin_login(): void
     {
         [$branch, $alice, $user] = $this->branchWithCashier('SPOOF', 'ALICE');
