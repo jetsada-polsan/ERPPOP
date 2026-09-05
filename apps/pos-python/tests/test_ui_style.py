@@ -143,6 +143,11 @@ class UiStyleTest(unittest.TestCase):
         self.assertIn("Qt.WindowStaysOnTopHint", login)
         self.assertIn("Qt.WindowModal", login)
 
+    def test_login_dialog_imports_cached_device_settings(self) -> None:
+        source = inspect.getsource(run_ui)
+        self.assertIn("from .bootstrap import _cached_setting", inspect.getsource(__import__("pos_python.ui", fromlist=["run_ui"])))
+        self.assertIn("_cached_setting(service.db, \"device_user_id\")", source)
+
     def test_transfer_requires_visible_money_received_confirmation(self) -> None:
         source = inspect.getsource(run_ui)
         self.assertIn("โอน / QR", source)

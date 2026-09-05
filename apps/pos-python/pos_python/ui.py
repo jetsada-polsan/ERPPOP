@@ -13,6 +13,7 @@ from string import Template
 
 from .barcode import decode_scale_label, load_scale_profiles, scale_cart_line
 from .api_client import LaravelApiError, LaravelPosClient
+from .bootstrap import _cached_setting
 from .mock_printer import company_details, receipt_for
 from .order import ALL_CATEGORIES, DISCOUNT, PRICE, QTY, Order, OrderLine, categories, product_grid
 from .config import DeviceConfig, load_device_config, save_device_config
