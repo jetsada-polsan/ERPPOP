@@ -79,6 +79,7 @@ class ErpMenu
                     ['label' => 'ตรวจนับสินค้า', 'route' => 'stock-counts.index', 'pattern' => 'stock-counts.*', 'icon' => 'bi-clipboard-check-fill', 'tone' => 'cyan'],
                     ['label' => 'เบิก / คืน / สูญเสีย / แปรรูป', 'route' => 'stock-issues.index', 'pattern' => 'stock-issues.*', 'extraPattern' => 'stock-transforms.*', 'icon' => 'bi-box-arrow-up', 'tone' => 'orange'],
                     ['label' => 'การผลิต', 'route' => 'production.index', 'pattern' => 'production.*', 'icon' => 'bi-gear-wide-connected', 'tone' => 'slate'],
+                    ['label' => 'รายงานประสิทธิภาพผลิต', 'route' => 'production.efficiency', 'pattern' => 'production.efficiency', 'icon' => 'bi-graph-up-arrow', 'tone' => 'slate'],
                     ['label' => 'ใบขอซื้อ / ใบสั่งซื้อ', 'route' => 'purchase-orders.index', 'pattern' => 'purchase-orders.*', 'icon' => 'bi-cart-plus-fill', 'tone' => 'orange'],
                     ['label' => 'รับสินค้าเข้าจากผู้ขาย', 'route' => 'purchases.index', 'pattern' => 'purchases.*', 'icon' => 'bi-basket-fill', 'tone' => 'amber'],
                     ['label' => 'OCR รับสินค้า (Draft)', 'route' => 'ocr.documents.index', 'pattern' => 'ocr.documents.*', 'icon' => 'bi-file-earmark-richtext-fill', 'tone' => 'indigo'],

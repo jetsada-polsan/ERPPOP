@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\Product;
 use App\Models\ProductionOrder;
@@ -142,5 +143,35 @@ class ProductionController extends Controller
 
         return redirect()->route('production.index')
             ->with('success', "รับสินค้าเข้าคลังแล้ว เอกสาร {$document->doc_number} (ใบสั่งผลิต {$order->doc_no})");
+    }
+
+    // ปิดใบสั่งผลิตด้วยมือ - ใช้เมื่อผลิตได้น้อยกว่าแผน (ProductionReceiptService จะปิด
+    // ให้อัตโนมัติเฉพาะตอนผลิตครบ/เกินแผนเท่านั้น) บังคับกรอกเหตุผลเสมอเพื่อตรวจสอบย้อนหลังได้
+    public function closeOrder(Request $request, ProductionOrder $order): RedirectResponse
+    {
+        abort_if($order->status === 'completed', 422, 'ใบสั่งผลิตนี้ปิดแล้ว');
+
+        $data = $request->validate([
+            'close_note' => ['required', 'string', 'max:1000'],
+        ], ['close_note.required' => 'กรุณาระบุเหตุผลที่ปิดงาน']);
+
+        $oldValues = ['status' => $order->status, 'produced_qty' => (string) $order->produced_qty];
+
+        $order->update([
+            'status' => 'completed',
+            'closed_at' => now(),
+            'closed_by' => auth()->id(),
+            'close_note' => $data['close_note'],
+        ]);
+
+        AuditLog::create([
+            'user_id' => auth()->id(), 'branch_id' => $order->branch_id,
+            'action' => 'close', 'table_name' => 'production_orders', 'record_id' => $order->id,
+            'old_values' => $oldValues,
+            'new_values' => ['status' => 'completed', 'close_note' => $data['close_note']],
+        ]);
+
+        return redirect()->route('production.index')
+            ->with('success', "ปิดใบสั่งผลิต {$order->doc_no} แล้ว (ผลิตได้ {$order->produced_qty} จากแผน {$order->planned_qty})");
     }
 }

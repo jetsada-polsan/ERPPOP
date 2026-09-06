@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable([
     'doc_no', 'doc_date', 'production_recipe_id', 'finished_product_id', 'branch_id',
     'warehouse_location_id', 'planned_qty', 'produced_qty', 'status', 'note',
+    'closed_at', 'closed_by', 'close_note',
 ])]
 class ProductionOrder extends Model
 {
@@ -33,6 +34,12 @@ class ProductionOrder extends Model
         return $this->belongsTo(WarehouseLocation::class);
     }
 
+    // ผู้ปิดงานด้วยมือ (เมื่อผลิตได้น้อยกว่าแผน) - ว่างถ้าปิดอัตโนมัติตอนผลิตครบแผน
+    public function closedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'closed_by');
+    }
+
     public function items(): HasMany
     {
         return $this->hasMany(ProductionOrderItem::class);
@@ -44,6 +51,7 @@ class ProductionOrder extends Model
             'doc_date' => 'date',
             'planned_qty' => 'decimal:8',
             'produced_qty' => 'decimal:8',
+            'closed_at' => 'datetime',
         ];
     }
 }

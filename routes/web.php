@@ -54,6 +54,7 @@ use App\Http\Controllers\PriceTableController;
 use App\Http\Controllers\PriceTagController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductionController;
+use App\Http\Controllers\ProductionEfficiencyController;
 use App\Http\Controllers\ProductUnitController;
 use App\Http\Controllers\PromotionController;
 use App\Http\Controllers\PurchaseController;
@@ -545,6 +546,7 @@ Route::prefix('members')->name('members.')->group(function () {
 
 Route::prefix('production')->name('production.')->group(function () {
     Route::get('/', [ProductionController::class, 'index'])->name('index');
+    Route::get('/efficiency', [ProductionEfficiencyController::class, 'index'])->name('efficiency');
     Route::post('/recipes', [ProductionController::class, 'storeRecipe'])->name('recipes.store');
     Route::put('/recipes/{recipe}', [ProductionController::class, 'updateRecipe'])->name('recipes.update');
     Route::post('/recipes/{recipe}/items', [ProductionController::class, 'storeRecipeItem'])->name('recipes.items.store');
@@ -552,6 +554,7 @@ Route::prefix('production')->name('production.')->group(function () {
     Route::post('/orders', [ProductionController::class, 'storeOrder'])->name('orders.store');
     Route::put('/orders/{order}', [ProductionController::class, 'updateOrder'])->name('orders.update');
     Route::post('/orders/{order}/receive', [ProductionController::class, 'receiveOrder'])->name('orders.receive');
+    Route::post('/orders/{order}/close', [ProductionController::class, 'closeOrder'])->name('orders.close');
 });
 
 // สมุดเอกสาร (Document Books): แยกเอกสารประเภทเดียวเป็นหลายเล่ม แต่ละเล่มเลขรันเอง

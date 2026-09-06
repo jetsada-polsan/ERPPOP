@@ -110,12 +110,18 @@
                             <td><span class="badge {{ $order->status === 'completed' ? 'text-bg-success' : 'text-bg-light border' }}">{{ $order->status === 'completed' ? 'ปิดงานแล้ว' : $order->status }}</span></td>
                             <td>
                                 @if($order->status !== 'completed')
-                                <form method="post" action="{{ route('production.orders.receive', $order) }}" class="d-flex gap-1"
+                                <form method="post" action="{{ route('production.orders.receive', $order) }}" class="d-flex gap-1 mb-1"
                                     onsubmit="return confirm('รับสินค้าเข้าคลังตามจำนวนที่ระบุ?')">
                                     @csrf
                                     <input type="number" step="0.0001" min="0.0001" name="qty" class="form-control form-control-sm text-end"
                                         value="{{ max(0, (float) $order->planned_qty - (float) $order->produced_qty) }}" style="width:90px" required>
                                     <button class="btn btn-sm btn-success text-nowrap"><i class="bi bi-box-arrow-in-down"></i> รับ</button>
+                                </form>
+                                <form method="post" action="{{ route('production.orders.close', $order) }}" class="d-flex gap-1"
+                                    onsubmit="return confirm('ปิดใบสั่งผลิตนี้ทั้งที่ยังผลิตไม่ครบแผนใช่หรือไม่? หลังปิดจะรับเพิ่มอีกไม่ได้')">
+                                    @csrf
+                                    <input name="close_note" required class="form-control form-control-sm" placeholder="เหตุผลปิดงาน">
+                                    <button class="btn btn-sm btn-outline-secondary text-nowrap">ปิดงาน</button>
                                 </form>
                                 @else
                                 <span class="text-muted small">ครบแล้ว</span>
