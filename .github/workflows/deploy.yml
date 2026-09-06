@@ -21,10 +21,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: '8.5.10'
           extensions: mbstring, pdo_sqlite, zip
       - run: composer install --prefer-dist --no-interaction
-      - run: cp .env.example .env && php artisan key:generate && APP_ENV=testing php artisan test --filter='~^(?!.*RouteIntegrityTest).*~'
+      - name: Test all routes and workflows before deployment
+        run: bash push-migrate-test.sh
 
   deploy:
     needs: test
@@ -32,8 +33,7 @@ jobs:
     environment: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v4
-      # public/build ถูก git ignore ไว้ ถ้าไม่ build ตรงนี้ checkout จะไม่มีโฟลเดอร์นี้
-      # แล้ว rsync --delete จะลบ asset ของ production ทิ้ง ทำให้หน้า POS บนเว็บพัง
+      # Build the assets belonging to this tested commit before uploading.
       - uses: pnpm/action-setup@v4
         with:
           version: 10
@@ -52,7 +52,7 @@ jobs:
       - run: ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
       - name: Upload release
         run: >-
-          rsync -az --delete
+          rsync -az
           --exclude=.git/ --exclude=.claude/ --exclude=.codex/
           --exclude=.env --exclude=.env.* --exclude=vendor/
           --exclude=node_modules/ --exclude=storage/ --exclude=bootstrap/cache/
