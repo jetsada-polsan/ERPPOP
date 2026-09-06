@@ -25,7 +25,7 @@ jobs:
           extensions: mbstring, pdo_sqlite, zip
       - run: composer install --prefer-dist --no-interaction
       - name: Test all routes and workflows before deployment
-        run: bash push-migrate-test.sh
+        run: php artisan test
 
   deploy:
     needs: test
