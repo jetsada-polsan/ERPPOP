@@ -58,6 +58,7 @@ use App\Http\Controllers\ProductionEfficiencyController;
 use App\Http\Controllers\ProductUnitController;
 use App\Http\Controllers\PromotionController;
 use App\Http\Controllers\PurchaseController;
+use App\Http\Controllers\PurchaseCostAdjustmentController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\QtyPromotionController;
 use App\Http\Controllers\QuotationController;
@@ -324,6 +325,8 @@ Route::prefix('purchases')->name('purchases.')->group(function () {
     Route::get('/create', [PurchaseController::class, 'create'])->name('create');
     Route::post('/', [PurchaseController::class, 'store'])->name('store');
     Route::get('/{purchase}', [PurchaseController::class, 'show'])->name('show');
+    Route::get('/{purchase}/cost-adjustments', [PurchaseCostAdjustmentController::class, 'create'])->name('cost-adjustments.create');
+    Route::post('/{purchase}/cost-adjustments', [PurchaseCostAdjustmentController::class, 'store'])->name('cost-adjustments.store');
 });
 
 // Product master data (สินค้า/หน่วยนับ): the read-only ETL'd catalog is now editable

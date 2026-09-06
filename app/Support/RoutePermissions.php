@@ -63,6 +63,7 @@ class RoutePermissions
 
         // จัดซื้อ
         'purchases.' => 'purchasing.manage',
+        'purchases.cost-adjustments.' => 'inventory.cost.close',
         'purchase-orders.' => 'purchasing.manage',
         'ocr.documents.' => 'purchasing.manage',
         'purchase-orders.approve' => 'purchasing.approve',

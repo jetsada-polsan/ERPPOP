@@ -26,7 +26,14 @@
                 <div class="text-muted small mt-1">หมายเหตุ: {{ $purchase->remark }}</div>
                 @endif
             </div>
-            <span class="badge text-bg-success fs-6 px-3 py-2">รับเข้าคลังแล้ว</span>
+            <div class="d-flex gap-2 align-items-center">
+                <span class="badge text-bg-success fs-6 px-3 py-2">รับเข้าคลังแล้ว</span>
+                @if(auth()->user()->hasPermission('inventory.cost.close'))
+                <a href="{{ route('purchases.cost-adjustments.create', $purchase) }}" class="btn btn-outline-warning btn-sm">
+                    <i class="bi bi-pencil-square me-1"></i>ปรับต้นทุนย้อนหลัง
+                </a>
+                @endif
+            </div>
         </div>
     </div>
 
