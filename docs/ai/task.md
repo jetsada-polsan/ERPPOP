@@ -340,3 +340,21 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
 - Deploy: **ยังไม่ push/deploy ขึ้น production** ผู้ใช้ต้อง `git push origin main` เอง แล้ว `php artisan migrate` (คอลัมน์ใหม่ 3 คอลัมน์ใน `production_orders`) ก่อน ค่อย deploy ตามขั้นตอนปกติของโปรเจกต์ (backup ก่อนเสมอ)
 - งานถัดไป: `git push origin main`; รัน `php artisan test` + `php artisan migrate` บนเครื่องที่มี toolchain จริง; ทดสอบปุ่มปิดงาน/หน้ารายงานประสิทธิภาพ/สิทธิ์ search.* ใหม่กับผู้ใช้จริงทุกบทบาทก่อนพึ่งพา; ตัดสินใจเรื่อง GitHub Actions deploy pipeline; Feature 4 (ปรับต้นทุนซื้อย้อนหลัง) ยังไม่เริ่ม รอคำสั่งต่อไป
 
+
+## Handoff - 2026-09-06 (Claude — ปรับต้นทุนซื้อย้อนหลัง Feature 4)
+- Commit: `8da5cae` (ยังไม่ได้ push — sandbox นี้ไม่มีเน็ต/SSH key เข้า GitHub ผู้ใช้ต้อง `git push origin main` เอง)
+- ทำอะไร: เพิ่มฟีเจอร์ที่ 4 ตามแผนเดิม "ปรับต้นทุนซื้อย้อนหลัง" — หน้าจอเข้าจากปุ่มในใบซื้อ (purchases.show) ให้แก้ต้นทุนต่อหน่วยของ Lot ที่มาจากใบซื้อนั้น (เช่น กรอกราคาผิดตอนรับของ/ใบแจ้งหนี้จริงราคาต่างจากที่บันทึกไว้)
+  - จับคู่รายการในใบซื้อกับ Lot แบบตำแหน่งต่อตำแหน่ง (seq/id ตามลำดับที่สร้างตอนบันทึกใบซื้อ) เพราะ `stock_document_items` ไม่ได้เก็บ `stock_lot_id` ย้อนกลับไว้
+  - แก้เฉพาะ `stock_lots.unit_cost` (ผลกับ FIFO ตัดสต๊อกครั้งถัดไป) และ nudge `products.average_cost` ตามสัดส่วนจำนวนคงเหลือของ Lot ต่อยอดคงเหลือทั้งหมด — เป็นค่าประมาณสอดคล้องวิธี moving average เดิมของระบบ ไม่ใช่การคำนวณใหม่ทั้งหมดจาก Lot ทุกใบ (ระบบไม่มีโครงสร้างรองรับการ replay ธุรกรรมทั้งหมด)
+  - **ตั้งใจไม่แตะ** `documents.total_amount`/`stock_document_items.unit_cost`/`supplier_ledger`/GL ที่โพสต์ไปแล้วของใบซื้อเดิมเลย และ**ไม่ย้อนแก้ต้นทุนขาย/COGS**ของจำนวนที่ตัดสต๊อกออกไปแล้ว (ตามกฎห้ามแก้ยอดขายย้อนหลัง) — เก็บมูลค่าผลต่างส่วนที่ตัดไปแล้วไว้ในตารางใหม่ `purchase_cost_adjustments` (audit trail แบบ immutable ไม่มี updated_at) ให้บัญชีพิจารณาปรับผ่าน journal แยกเอง
+  - เคารพงวดที่ปิดต้นทุนแล้วผ่าน `InventoryCostCloseGuard::assertOpen()` (เดิมมีแค่ observer ผูกอัตโนมัติกับการสร้าง `StockMovement` เท่านั้น ฟีเจอร์นี้ไม่สร้าง movement เพราะไม่มีการเคลื่อนไหวจำนวน จึงต้องเรียก guard เองตรงๆ ในเซอร์วิส)
+  - จำกัดสิทธิ์ด้วย `inventory.cost.close` (อยู่ใน `NON_BYPASS_PERMISSIONS` อยู่แล้ว บล็อกแม้ admin ต้องได้รับมอบสิทธิ์ชัดเจนก่อน) เพิ่ม route permission mapping `purchases.cost-adjustments.` แยกจาก `purchases.` เดิมที่ใช้แค่ `purchasing.manage`
+- ทดสอบ: **ยังไม่ได้รัน `php artisan test`/`migrate`** — sandbox นี้ไม่มี PHP/Composer เหมือนทุกรอบก่อนหน้า ตรวจได้แค่ static analysis: grep เทียบ field/relation ทุกจุดกับ model จริง (`StockLot`, `Product`, `StockBalance`, `Document`, `DecimalMath`), เช็ค brace ทุกไฟล์ PHP สมดุลด้วย python, เช็คคู่ `@if/@endif`/`@foreach/@endforeach` ในไฟล์ blade สมดุลครบ, เช็ค `git status --short` ก่อนแตะทุกไฟล์กันชนกับที่ Codex แก้ค้างอยู่ (ไม่มีจุดชนกันเลยในรอบนี้)
+- ยังไม่ทดสอบ/ความเสี่ยง (สำคัญมาก เพราะฟีเจอร์นี้กระทบมูลค่าสต๊อกโดยตรง):
+  - Migration ใหม่ `2026_09_06_000500_create_purchase_cost_adjustments_table` ยังไม่เคยรัน `php artisan migrate` เลย
+  - สูตร nudge `average_cost` เป็น**ค่าประมาณ**ไม่ใช่การคำนวณที่แม่นยำ 100% สำหรับระบบ moving average (อธิบายเหตุผล/ข้อจำกัดไว้ละเอียดในคอมเมนต์ `PurchaseCostAdjustmentService`) — ควรให้ผู้มีความรู้บัญชี/ต้นทุนตรวจทานตรรกะนี้กับเคสจริงก่อนใช้งานจริงกับใบซื้อที่มีมูลค่าสูง โดยเฉพาะเคสที่มีการซื้อ/ขายสินค้าตัวเดียวกันหลายครั้งหลังใบซื้อที่จะปรับ
+  - ยังไม่เคยทดสอบเคสที่จำนวนรายการในใบซื้อกับจำนวน Lot ไม่ตรงกัน (โค้ดโยน RuntimeException บล็อกไว้ แต่ยังไม่เคยเจอเคสจริงว่าเกิดขึ้นได้ในระบบหรือไม่)
+  - ยังไม่ได้ทดสอบร่วมกับ `InventoryCostCloseGuard` จริง (ต้องมีข้อมูล `inventory_cost_close_periods` ที่ปิดจริงถึงจะยืนยันว่าบล็อกได้ถูกต้อง)
+  - GitHub Actions "Deploy ERP" ยัง fail 100% ค้างจาก session ก่อนหน้า — ยังไม่มีคำตอบว่า production deploy จริงทำผ่านช่องทางไหน
+- Deploy: **ยังไม่ push/deploy ขึ้น production** ผู้ใช้ต้อง `git push origin main` เอง แล้ว `php artisan migrate` ก่อน ค่อย deploy ตามขั้นตอนปกติ (backup ก่อนเสมอ) — แนะนำให้ทดสอบฟีเจอร์นี้กับใบซื้อทดสอบในสภาพแวดล้อม staging ก่อนใช้กับข้อมูลจริงเป็นพิเศษ เพราะกระทบมูลค่าสต๊อก
+- งานถัดไป: `git push origin main`; รัน `php artisan migrate` + `php artisan test` บนเครื่องที่มี toolchain จริง; ให้ผู้มีความรู้บัญชีตรวจทานตรรกะ nudge average_cost กับเคสจริงก่อนเปิดใช้งานกับผู้ใช้ทั่วไป; Feature 1-4 ตามแผนเดิมครบแล้วทั้งหมด รอผู้ใช้ตรวจสอบและทดสอบก่อนใช้งานจริง
