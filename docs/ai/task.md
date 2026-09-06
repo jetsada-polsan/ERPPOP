@@ -387,3 +387,17 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
   - ยังไม่ได้ตรวจว่ามีจุดอื่นที่ใช้ pattern เดียวกับ `ErpResetTransactions::TRANSACTIONAL` (เช่น สคริปต์ backup/restore อื่น ๆ) ที่อาจลืมเพิ่ม `purchase_cost_adjustments` เหมือนกัน
 - Deploy: ต้อง `git push origin main` เพิ่มอีกครั้ง (commit `763070f` ใหม่กว่ารอบที่ push ไปแล้ว) ไม่ต้อง migrate เพิ่ม (ไม่มี migration ใหม่ในรอบนี้)
 - งานถัดไป: `git push origin main`; รัน `php artisan test` ซ้ำอีกรอบแล้วส่งผลมาดูว่าเหลือ fail กี่เคสและเป็นเคสไหนบ้าง (โดยเฉพาะเคสที่ 4 ที่ยังไม่ชัดเจน + 6 incomplete + 1 skipped); ที่เหลือค้างเหมือนเดิม: ตัดสินใจเรื่อง GitHub Actions deploy pipeline และ account lockout
+
+## Handoff - 2026-09-06 (Claude — ปิดรอบ Feature 1-4: test ผ่านครบหลังแก้ 3 บั๊ก whitelist)
+- Commit: `6f7a8d9` (push แล้ว — ผู้ใช้ยืนยันผลเทสหลัง push+migrate+test บนเครื่องจริงครบ 3 รอบ)
+- ผลเทสสุดท้ายจากผู้ใช้: **0 failed, 414 passed (3196 assertions), 6 incomplete, 1 skipped** — ผ่านครบ ไม่มี fail เหลือ
+  - incomplete 6 เคสเป็นของ `ErpStructuralGapsTest` (ตั้งใจเขียนไว้บันทึกช่องว่างที่ยังไม่แก้ ไม่ใช่บั๊ก) และ skipped 1 เคสเป็นของ `ReportSmokeTest` (รันได้เฉพาะ PostgreSQL เครื่องผู้ใช้ทดสอบด้วย SQLite) — ทั้งสองกลุ่มไม่เกี่ยวกับงานรอบนี้เลย ตรวจแล้วว่าเป็นของเดิม
+- สรุปที่แก้เพิ่มจากผลเทสจริงรอบนี้ (ต่อจาก `763070f`): พบว่า `stock_transfer_receipts`/`stock_transfer_receipt_items` (จาก migration `2026_09_06_000300` ของรอบก่อนหน้า Feature 3-4) ก็ไม่ได้อยู่ใน `ErpResetTransactions::TRANSACTIONAL` เหมือนกัน (มี FK ไปที่ `documents`) ทำให้เทส "a failure midway rolls everything back" fail ด้วยสาเหตุเดียวกับ `purchase_cost_adjustments` ก่อนหน้า — เพิ่มเข้า whitelist แล้ว (`6f7a8d9`) พร้อมไล่ตรวจ FK ทุกจุดในทุก migration ของทั้งโปรเจกต์ด้วยสคริปต์ python ยืนยันว่าไม่มีตารางไหนหลุด whitelist แบบนี้อีก
+- สถานะ Feature 1-4 ทั้งหมด: **เสร็จ + push + migrate + test ผ่านครบแล้ว** พร้อมใช้งาน แต่ยังต้องการการตรวจทานเพิ่มก่อนใช้งานจริงเต็มรูปแบบ (ดูหัวข้อถัดไป)
+- ยังไม่ทดสอบ/ความเสี่ยง (ของเดิมที่ยังค้างอยู่ ไม่เกี่ยวกับบั๊กที่เพิ่งแก้):
+  - ยังไม่เคยทดสอบ UI จริงของปุ่ม "ปิดงาน", หน้ารายงานประสิทธิภาพผลิต, หน้าปรับต้นทุนซื้อย้อนหลัง, หน้าคู่มือ PopStar 4M (accordion ใหม่) กับข้อมูลจริงในเบราว์เซอร์
+  - สูตร nudge `average_cost` ใน Feature 4 เป็นค่าประมาณ ควรให้ผู้มีความรู้บัญชีตรวจทานก่อนใช้กับใบซื้อมูลค่าสูง
+  - สิทธิ์ `search.*` ใหม่ (`authorizeAny` ใน `SearchController`) ผ่านเทสแล้วแต่ยังไม่ได้ทดสอบกับผู้ใช้จริงทุก role ในระบบ (เทสอัตโนมัติครอบคลุมแค่เคสที่เขียนไว้)
+  - GitHub Actions "Deploy ERP" ยัง fail ค้างจาก session ก่อนหน้า (secrets/vars ว่าง) — ยังไม่มีคำตอบเรื่อง production deploy
+  - ยังไม่มี account lockout ถาวร (ทางเลือกเชิงออกแบบ รอเจ้าของโปรเจกต์ตัดสินใจ)
+- งานถัดไป: `git push origin main` (commit เอกสารนี้), ทดสอบ UI ฟีเจอร์ใหม่ทั้งหมดกับผู้ใช้จริงก่อนพึ่งพา 100%, ให้ผู้มีความรู้บัญชีตรวจทาน Feature 4, ทดสอบสิทธิ์ search.* กับผู้ใช้ทุก role, ตัดสินใจเรื่อง deploy pipeline และ account lockout — ไม่มีงานเขียนโค้ดใหม่ค้างจากแผนเดิมแล้ว รอคำสั่งต่อไป
