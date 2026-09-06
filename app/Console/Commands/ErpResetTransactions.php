@@ -39,6 +39,7 @@ class ErpResetTransactions extends Command
     public const TRANSACTIONAL = [
         'documents', 'ocr_documents', 'ocr_extracted_lines', 'ocr_match_results', 'ocr_review_logs', 'ocr_attachments',
         'stock_documents', 'stock_document_items', 'gl_journals', 'document_sequences',
+        'stock_transfer_receipts', 'stock_transfer_receipt_items',
         'stock_movements', 'stock_lots', 'stock_lot_quality_checks', 'stock_counts', 'stock_count_items',
         'pos_receipts', 'pos_receipt_items', 'pos_receipt_discounts', 'pos_payments', 'pos_shifts',
         'pos_cash_movements', 'pos_held_bills', 'pos_receipt_returns', 'pos_logs', 'pos_preparation_jobs',
