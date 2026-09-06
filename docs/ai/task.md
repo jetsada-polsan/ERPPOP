@@ -281,3 +281,11 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
 2. รัน `git diff --check` และ `npm run build` ถ้าแตะ asset
 3. ถ้าเทสต์ผ่านครบค่อย commit เป็นชุดเล็กที่มีความหมาย แล้วอัปเดต handoff นี้ด้วย commit hash + ผลทดสอบจริง
 4. ห้าม deploy จนกว่าเจ้าของโปรเจกต์สั่ง
+
+## Handoff - 2026-09-06 (Codex ตรวจและแก้ HTTP 500 production)
+- Commit: `6dfbfdc` (source ตรงกับ `origin/main`; ไม่มีโค้ดใหม่ในรอบตรวจนี้)
+- ทำอะไร: ตรวจ PHP syntax ทั้งโปรเจกต์, route/view cache, Laravel tests, production health และ HTTP smoke test; พบว่า production ยังใช้ source เก่ากว่า `main` จึง deploy source/assets ปัจจุบันแบบ explicit โดยไม่ใช้ `rsync --delete`
+- จุดที่แก้หายจาก production source เก่า: product detail ใช้ตัวแปรผิด, sale/print รองรับ stock document หรือ product ที่หายไป, price-table รองรับ orphaned product price และ Vite manifest ของ POS shared CSS
+- ทดสอบ: `php artisan test --compact` ผ่าน 420 tests / 419 passed / 1 skipped / 6 incomplete / 3165 assertions; `php artisan view:cache` ผ่าน; `npm run build` ผ่าน; regression route/POS/users ผ่าน 122 tests / 1276 assertions; production `erp:health` ผ่านครบ; production HTTP smoke ทุกหน้าหลัก 200/302 และไม่มี 500; error count หลัง deploy window = 0
+- Deploy: สำรองก่อน deploy ที่ `storage/app/backups/erp-db-20260906-110031.sql.gz`; production migration เป็นปัจจุบัน, route/view/config cache ผ่าน, health ผ่าน
+- ยังไม่ทดสอบ: POST workflow ที่ต้องใช้ session/สิทธิ์จริงและเครื่อง POS Windows/Printer จริง; รอบนี้ตรวจเฉพาะเส้นทาง GET/HEAD และชุด test ที่ไม่ทำลายข้อมูล
