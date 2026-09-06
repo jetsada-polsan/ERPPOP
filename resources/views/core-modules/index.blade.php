@@ -100,6 +100,13 @@
     .control-block h3 { margin: 0 0 6px; color: var(--erp-primary-dark); font-size: 12px; font-weight: 900; }
     .control-block ol,.control-block ul { margin: 0; padding-left: 18px; color: var(--erp-muted); font-size: 11px; line-height: 1.65; }
     .control-purpose { margin: 9px 0 0; color: var(--erp-muted); font-size: 12px; line-height: 1.5; }
+
+    .module-guide-list { display: grid; gap: 10px; }
+    .module-guide-item { padding: 11px 13px; border: 1px solid var(--erp-border); border-radius: 7px; background: #fff; }
+    .module-guide-item-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+    .module-guide-item-head strong { color: var(--erp-text); font-size: 13px; }
+    .module-guide-item p { margin: 4px 0 6px; color: var(--erp-muted); font-size: 12px; line-height: 1.5; }
+    .module-guide-item ul { margin: 0; padding-left: 18px; color: var(--erp-muted); font-size: 11.5px; line-height: 1.6; }
     .benchmark-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; padding: 12px; border-bottom: 1px solid var(--erp-surface-2); }
     .benchmark-summary div { padding: 10px 12px; border: 1px solid var(--erp-border); border-radius: 7px; background: var(--erp-surface-2); }
     .benchmark-summary span { display: block; color: var(--erp-muted); font-size: 10px; font-weight: 800; }
@@ -288,6 +295,40 @@
             </div>
         </section>
     @endforeach
+
+    <section class="manual-panel">
+        <div class="manual-section-head"><h2><i class="bi bi-hand-index-thumb me-2"></i>คู่มือใช้งานแต่ละหน้าจอ (ทำหน้าที่อะไร กดอะไรได้บ้าง)</h2><span>จัดตามเมนูจริงบนแถบด้านข้าง</span></div>
+        <div class="control-manuals" x-data="{openGroup: 'overview'}">
+            @foreach ($moduleGuide as $group)
+                <article class="control-manual">
+                    <button type="button" class="control-title" @click="openGroup=openGroup==='{{ $group['key'] }}'?'':'{{ $group['key'] }}'">
+                        <span><i class="bi {{ $group['icon'] }} me-2"></i>{{ $group['label'] }} <span class="text-muted fw-normal">({{ count($group['items']) }} เมนู)</span></span>
+                        <i class="bi" :class="openGroup==='{{ $group['key'] }}'?'bi-chevron-up':'bi-chevron-down'"></i>
+                    </button>
+                    <div class="control-body" x-show="openGroup==='{{ $group['key'] }}'" x-cloak>
+                        <div class="module-guide-list">
+                            @foreach ($group['items'] as $item)
+                                <div class="module-guide-item">
+                                    <div class="module-guide-item-head">
+                                        <strong>{{ $item['label'] }}</strong>
+                                        @if ($routeAccess($item['route']))
+                                            <a class="btn btn-sm btn-outline-primary" href="{{ route($item['route']) }}"><i class="bi bi-box-arrow-up-right me-1"></i>เปิด</a>
+                                        @endif
+                                    </div>
+                                    <p>{{ $item['purpose'] }}</p>
+                                    <ul>
+                                        @foreach ($item['actions'] as $action)
+                                            <li>{{ $action }}</li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </article>
+            @endforeach
+        </div>
+    </section>
 
     <section class="manual-panel">
         <div class="manual-section-head">
