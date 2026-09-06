@@ -31,12 +31,15 @@ class SearchController extends Controller
             ))
             ->orderBy('name_th')
             ->limit(20)
-            ->get(['id', 'code', 'name_th', 'credit_limit', 'sales_user_id', 'sales_area_id'])
+            // ไม่ดึง credit_limit มาด้วย - endpoint นี้เปิดให้ผู้ใช้ที่ login แล้วทุกคนเรียกได้
+            // (ใช้เป็น typeahead ในหลายหน้าคนละสิทธิ์) แต่วงเงินเครดิตเป็นข้อมูลอ่อนไหวที่
+            // ควรเห็นเฉพาะหน้า customers (sales.manage) กับรายงาน (reports.view) เท่านั้น -
+            // ไม่มีหน้าไหนที่เรียก endpoint นี้ (bookings/create, pos, entry-assets) ใช้ค่านี้เลย
+            ->get(['id', 'code', 'name_th', 'sales_user_id', 'sales_area_id'])
             ->map(fn (Customer $customer) => [
                 'id' => $customer->id,
                 'code' => $customer->code,
                 'name_th' => $customer->name_th,
-                'credit_limit' => (float) $customer->credit_limit,
                 'sales_user_id' => $customer->sales_user_id,
                 'sales_user_name' => $customer->salesUser?->name,
                 'sales_area_id' => $customer->sales_area_id,
