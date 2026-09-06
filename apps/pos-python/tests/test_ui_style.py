@@ -176,7 +176,8 @@ class UiStyleTest(unittest.TestCase):
         self.assertIn("ตรวจสอบแล้วว่าเงินเข้าบัญชีครบตามยอด", source)
         self.assertIn("not self.transfer_confirmed.isChecked()", source)
         self.assertIn("self.transfer_confirmed.toggled.connect(self._confirm_transfer_checkbox)", source)
-        self.assertIn("self.confirm()", source)
+        self.assertIn("เลขท้ายบัญชีผู้โอน (4 หลัก)", source)
+        self.assertIn("not re.fullmatch(r\"\\d{4}\"", source)
 
     def test_pos_layout_adapts_to_small_pos_displays(self) -> None:
         source = inspect.getsource(run_ui)
@@ -186,7 +187,7 @@ class UiStyleTest(unittest.TestCase):
         self.assertIn("self.grid_host.width()", source)
         self.assertIn("window.setMinimumSize(960, 600)", source)
         self.assertIn("QSplitter(Qt.Horizontal)", source)
-        self.assertIn("first.setMinimumWidth(520)", source)
+        self.assertIn("first.setMinimumWidth(460)", source)
         self.assertIn("head_layout = QVBoxLayout(head)", source)
         self.assertIn("button.setMinimumHeight(34)", source)
 

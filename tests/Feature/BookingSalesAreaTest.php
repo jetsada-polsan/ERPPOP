@@ -9,6 +9,7 @@ use App\Models\DocumentType;
 use App\Models\Product;
 use App\Models\ProductUnit;
 use App\Models\SalesArea;
+use App\Models\StockBalance;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseLocation;
@@ -201,6 +202,46 @@ class BookingSalesAreaTest extends TestCase
         $this->assertDatabaseCount('documents', 0);
     }
 
+    public function test_booking_shows_and_enforces_available_stock_after_reservations(): void
+    {
+        [$branch, $customer, $product] = $this->masters('STOCK');
+        StockBalance::where('product_id', $product->id)
+            ->where('warehouse_location_id', $branch->default_warehouse_location_id)
+            ->update(['on_hand_qty' => 10, 'reserved_qty' => 4]);
+        $user = User::factory()->create([
+            'username' => 'booking_stock_uat',
+            'branch_id' => $branch->id,
+        ]);
+
+        $stockResponse = $this->withoutMiddleware(ErpAuthorize::class)
+            ->actingAs($user)
+            ->getJson(route('search.products', ['q' => $product->sku_code, 'branch_id' => $branch->id]));
+
+        $stockResponse->assertOk();
+        $stock = $stockResponse->json()[0];
+        $this->assertSame(10.0, (float) $stock['on_hand_qty']);
+        $this->assertSame(4.0, (float) $stock['reserved_qty']);
+        $this->assertSame(6.0, (float) $stock['available_qty']);
+
+        $response = $this->from(route('bookings.index'))
+            ->post(route('bookings.store'), [
+                'customer_id' => $customer->id,
+                'branch_id' => $branch->id,
+                'items' => [[
+                    'product_id' => $product->id,
+                    'qty' => 7,
+                    'unit_price' => 100,
+                ]],
+            ]);
+
+        $response->assertRedirect(route('bookings.index'))->assertSessionHas('error');
+        $this->assertDatabaseCount('documents', 0);
+        $this->assertDatabaseHas('stock_balances', [
+            'product_id' => $product->id,
+            'reserved_qty' => 4,
+        ]);
+    }
+
     /** @return array{Branch, Customer, Product} */
     private function masters(string $suffix): array
     {
@@ -240,6 +281,12 @@ class BookingSalesAreaTest extends TestCase
             'name_th' => 'สินค้าทดสอบ '.$suffix,
             'base_unit_id' => $unit->id,
             'is_active' => true,
+        ]);
+        StockBalance::create([
+            'product_id' => $product->id,
+            'warehouse_location_id' => $location->id,
+            'on_hand_qty' => 100,
+            'reserved_qty' => 0,
         ]);
 
         return [$branch->fresh(), $customer, $product];

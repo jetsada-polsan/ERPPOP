@@ -1,4 +1,4 @@
-"""หน้าจอขายแบบ Odoo — บิลอยู่ซ้าย ตารางสินค้าอยู่ขวา numpad แก้บรรทัดที่เลือก
+"""หน้าจอขาย PopCentral — แผงสินค้าและบิลแบบสองคอลัมน์ พร้อม numpad แก้บรรทัดที่เลือก
 
 ชั้นนี้ทำหน้าที่วาดและรับปุ่มเท่านั้น การคิดเงินทั้งหมดอยู่ใน order.py กับ
 services.py ซึ่งมีเทสต์ครอบอยู่ เพราะตัวเลขที่ผิดในชั้นหน้าจอจะไม่มีอะไรจับได้
@@ -6,6 +6,7 @@ services.py ซึ่งมีเทสต์ครอบอยู่ เพร�
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
@@ -736,6 +737,16 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             layout.addWidget(self.cash_label)
             layout.addWidget(self.amount)
 
+            self.transfer_account_label = QLabel("เลขท้ายบัญชีผู้โอน (4 หลัก)")
+            self.transfer_account_last4 = QLineEdit()
+            self.transfer_account_last4.setMaxLength(4)
+            self.transfer_account_last4.setPlaceholderText("เช่น 4821")
+            self.transfer_account_last4.setInputMethodHints(Qt.ImhDigitsOnly)
+            self.transfer_account_label.hide()
+            self.transfer_account_last4.hide()
+            layout.addWidget(self.transfer_account_label)
+            layout.addWidget(self.transfer_account_last4)
+
             self.quick_host = QWidget()
             quick = QHBoxLayout(self.quick_host)
             quick.setContentsMargins(0, 0, 0, 0)
@@ -775,9 +786,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.refresh_change()
 
         def _confirm_transfer_checkbox(self, checked: bool) -> None:
-            """การยืนยันเงินเข้าเป็น action เดียวกับปุ่มออกบิล ไม่ต้องกดซ้ำ"""
+            """Checkbox เป็นหลักฐานการตรวจเงิน ส่วนปุ่ม OK เป็น action ออกบิล"""
             if checked and self.payment_method == "transfer":
-                self.confirm()
+                self.transfer_account_last4.setFocus()
 
         def set_payment_method(self, method: str) -> None:
             if method == "transfer" and not self.qr_config.get("merchant_ref"):
@@ -789,6 +800,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.cash_label.setVisible(not transfer)
             self.amount.setVisible(not transfer)
             self.quick_host.setVisible(not transfer)
+            self.transfer_account_label.setVisible(transfer)
+            self.transfer_account_last4.setVisible(transfer)
             self.qr_box.setVisible(transfer)
             if transfer:
                 try:
@@ -833,9 +846,14 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 self.change.setStyleSheet("font-size:18px;font-weight:700;color:%s;" % PALETTE["success"])
 
         def confirm(self):
-            if self.payment_method == "transfer" and not self.transfer_confirmed.isChecked():
-                QMessageBox.warning(self, "ยังไม่ยืนยันเงินเข้า", "ตรวจรายการเงินเข้าก่อน แล้วทำเครื่องหมายยืนยัน")
-                return
+            if self.payment_method == "transfer":
+                if not self.transfer_confirmed.isChecked():
+                    QMessageBox.warning(self, "ยังไม่ยืนยันเงินเข้า", "ตรวจรายการเงินเข้าก่อน แล้วทำเครื่องหมายยืนยัน")
+                    return
+                if not re.fullmatch(r"\d{4}", self.transfer_account_last4.text().strip()):
+                    QMessageBox.warning(self, "ข้อมูลโอนไม่ครบ", "กรอกเลขท้ายบัญชีผู้โอนให้ครบ 4 หลัก")
+                    self.transfer_account_last4.setFocus()
+                    return
             if self.tendered() < self.order.grand_total():
                 QMessageBox.warning(self, "ยอดชำระไม่พอ", "รับเงินมาน้อยกว่ายอดที่ต้องชำระ")
                 return
@@ -1333,17 +1351,17 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             splitter.setHandleWidth(6)
             if order_x < product_x:
                 first, second = order_panel, product_panel
-                first.setMinimumWidth(400)
-                second.setMinimumWidth(520)
+                first.setMinimumWidth(620)
+                second.setMinimumWidth(460)
             else:
                 first, second = product_panel, order_panel
-                first.setMinimumWidth(520)
-                second.setMinimumWidth(400)
+                first.setMinimumWidth(460)
+                second.setMinimumWidth(620)
             splitter.addWidget(first)
             splitter.addWidget(second)
-            splitter.setStretchFactor(0, 6 if first is product_panel else 4)
-            splitter.setStretchFactor(1, 4 if second is order_panel else 6)
-            splitter.setSizes([740, 520] if first is product_panel else [520, 740])
+            splitter.setStretchFactor(0, 4 if first is product_panel else 6)
+            splitter.setStretchFactor(1, 6 if second is order_panel else 4)
+            splitter.setSizes([620, 740] if first is product_panel else [740, 620])
             self.primary_splitter = splitter
             columns.addWidget(splitter)
             self.setCentralWidget(root)
@@ -1370,7 +1388,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             if mode_changed or columns != self._product_columns:
                 self.refresh_products()
 
-        # ---------- ซ้าย: บิล ----------
+        # ---------- พื้นที่บิล ----------
 
         def build_order_panel(self) -> QWidget:
             panel = QWidget()
@@ -1504,7 +1522,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             grid.addWidget(pay, 6, 1, 1, 2)
             return box
 
-        # ---------- ขวา: สินค้า ----------
+        # ---------- พื้นที่สินค้า ----------
 
         def build_product_panel(self) -> QWidget:
             panel = QWidget()
@@ -1686,6 +1704,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     payment_reference=str(dialog.qr_config.get("code") or "") or None,
                     qr_payload=dialog.qr_payload,
                     payment_confirmed=dialog.payment_method == "transfer" and dialog.transfer_confirmed.isChecked(),
+                    transfer_account_last4=dialog.transfer_account_last4.text().strip() or None,
                 )
                 if online is not None:
                     online.worker.wake()  # ส่งบิลขึ้น ERP ทันที ไม่รอรอบถัดไป

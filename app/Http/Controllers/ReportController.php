@@ -782,8 +782,9 @@ class ReportController extends Controller
 
             'pos_receipts' => $this->tableResult('ใบเสร็จ POS', [
                 ['label' => 'เลขที่', 'key' => 'receipt_no'],
-                ['label' => 'วันที่', 'key' => 'receipt_date'],
+                ['label' => 'วันที่/เวลา', 'key' => 'receipt_date'],
                 ['label' => 'เครื่อง', 'key' => 'terminal_name'],
+                ['label' => 'เลขท้ายบัญชีผู้โอน', 'key' => 'transfer_account_last4'],
                 ['label' => 'สถานะ', 'key' => 'status', 'type' => 'badge'],
                 ['label' => 'ยอดขาย', 'key' => 'net_sales', 'type' => 'money', 'class' => 'text-end'],
             ], $this->posReceipts($fromStart, $toEnd, $filters)),
@@ -2400,7 +2401,9 @@ class ReportController extends Controller
 
         return $query
             ->orderByDesc('r.receipt_date')
-            ->selectRaw('r.receipt_no, r.receipt_date, coalesce(t.name, t.code) as terminal_name, r.status, r.net_sales')
+            ->selectRaw("r.receipt_no, r.receipt_date, coalesce(t.name, t.code) as terminal_name, r.status, r.net_sales,
+                (select max(p.transfer_account_last4) from pos_payments p
+                 where p.pos_receipt_id = r.id and p.method in ('transfer', 'qr', 'bank')) as transfer_account_last4")
             ->limit($filters['per_page'])
             ->get();
     }

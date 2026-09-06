@@ -179,10 +179,16 @@
                                                             <small x-show="product.is_scale" class="d-block text-success fw-bold">
                                                                 ชั่ง <span x-text="product.unit_name || 'หน่วยฐาน'"></span><span x-show="product.scale_plu"> · PLU <span x-text="product.scale_plu"></span></span>
                                                             </small>
+                                                            <small x-show="config.showStock && product.available_qty !== null" class="d-block stock-hint">
+                                                                มี <span x-text="money(product.on_hand_qty)"></span> · จองแล้ว <span x-text="money(product.reserved_qty)"></span> · พร้อมจอง <span x-text="money(product.available_qty)"></span>
+                                                            </small>
                                                         </span>
                                                         <strong class="text-success" x-text="'฿' + money(product.default_price)"></strong>
                                                     </button>
                                                 </template>
+                                            </div>
+                                            <div x-show="config.showStock && item.product_id && item.available_qty !== null" class="stock-hint mt-1">
+                                                คงเหลือ <span x-text="money(item.on_hand_qty)"></span> · จองแล้ว <span x-text="money(item.reserved_qty)"></span> · พร้อมจอง <strong x-text="money(item.available_qty)"></strong>
                                             </div>
                                             @if($showLotFields)
                                             <div x-show="item.product_id" class="d-flex gap-1 align-items-center flex-wrap mt-1">

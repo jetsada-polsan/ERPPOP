@@ -532,7 +532,8 @@ class PosService:
     def checkout(self, *, document_no: str, branch_id: int, terminal_id: str, shift_id: int,
                  cashier_id: int, lines: list[CartLine], payment_method: str, paid_amount: Decimal,
                  sale_uuid: str | None = None, payment_reference: str | None = None,
-                 qr_payload: str | None = None, payment_confirmed: bool = False) -> int:
+                 qr_payload: str | None = None, payment_confirmed: bool = False,
+                 transfer_account_last4: str | None = None) -> int:
         if not lines:
             raise ValueError("ต้องมีสินค้าอย่างน้อยหนึ่งรายการ")
         shift = self.db.execute("SELECT status FROM shifts WHERE id = ?", (shift_id,)).fetchone()
@@ -563,6 +564,9 @@ class PosService:
             raise ValueError("ยอดชำระไม่พอ")
         if payment_method == "transfer" and not payment_confirmed:
             raise ValueError("กรุณาตรวจเงินเข้าก่อนออกบิล")
+        if payment_method == "transfer" and transfer_account_last4 is not None:
+            if not re.fullmatch(r"\d{4}", str(transfer_account_last4)):
+                raise ValueError("เลขท้ายบัญชีผู้โอนต้องเป็นตัวเลข 4 หลัก")
         with self.db:
             cursor = self.db.execute(
                 """INSERT INTO sales (sale_uuid, document_no, branch_id, terminal_id, shift_id, cashier_id,
@@ -589,10 +593,11 @@ class PosService:
             change = money(paid_amount) - grand_total if payment_method == "cash" else Decimal("0")
             self.db.execute(
                 """INSERT INTO payments
-                   (sale_id, method, amount, change_amount, reference, qr_payload, confirmed_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                   (sale_id, method, amount, change_amount, reference, qr_payload, confirmed_at,
+                    transfer_account_last4)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (sale_id, payment_method, str(money(paid_amount)), str(change), payment_reference,
-                 qr_payload, self._now() if payment_confirmed else None),
+                 qr_payload, self._now() if payment_confirmed else None, transfer_account_last4),
             )
             self.db.execute("INSERT INTO print_jobs (sale_id, created_at) VALUES (?, ?)", (sale_id, self._now()))
             payload = json.dumps({

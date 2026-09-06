@@ -902,7 +902,7 @@ class PosController extends Controller
                 ->where('br.status', 'matched'))
             ->orderBy('r.receipt_date')
             ->limit(100)
-            ->get(['r.receipt_no', 'r.receipt_date', 'b.code as branch_code', 'b.name_th as branch_name', 'p.method', 'p.payment_reference', 'p.amount']);
+            ->get(['r.receipt_no', 'r.receipt_date', 'b.code as branch_code', 'b.name_th as branch_name', 'p.method', 'p.payment_reference', 'p.transfer_account_last4', 'p.amount']);
 
         return view('pos.control', [
             'date' => $date,
@@ -931,6 +931,7 @@ class PosController extends Controller
             'redeem_points' => ['nullable', 'numeric', 'min:0'],
             'method' => ['required', 'string', 'in:cash,transfer,credit_card,cheque,mixed'],
             'payment_ref' => ['nullable', 'string', 'max:80'],
+            'transfer_account_last4' => ['nullable', 'string', 'regex:/^\d{4}$/'],
             'payment_confirmed' => ['nullable', 'boolean'],
             'cash_received' => ['nullable', 'numeric', 'min:0'],
             'change_amount' => ['nullable', 'numeric', 'min:0'],
@@ -1020,6 +1021,9 @@ class PosController extends Controller
         }
         if (in_array($data['method'], ['transfer', 'mixed'], true)) {
             $remarkParts[] = 'ตรวจเงินเข้าแล้ว';
+            if (! empty($data['transfer_account_last4'])) {
+                $remarkParts[] = 'เลขท้ายบัญชีผู้โอน: '.$data['transfer_account_last4'];
+            }
         }
         if (! empty($data['payment_ref'])) {
             $remarkParts[] = 'อ้างอิง: '.$data['payment_ref'];
@@ -1326,6 +1330,7 @@ class PosController extends Controller
                 'pos_receipt_id' => $receipt->id,
                 'method' => 'transfer',
                 'payment_reference' => $data['payment_ref'] ?? null,
+                'transfer_account_last4' => $data['transfer_account_last4'] ?? null,
                 'amount' => $transferPart,
             ]);
         } else {
@@ -1333,6 +1338,7 @@ class PosController extends Controller
                 'pos_receipt_id' => $receipt->id,
                 'method' => $data['method'],
                 'payment_reference' => $data['payment_ref'] ?? null,
+                'transfer_account_last4' => $data['method'] === 'transfer' ? ($data['transfer_account_last4'] ?? null) : null,
                 'amount' => $net,
                 'cash_received' => $data['method'] === 'cash' ? ($data['cash_received'] ?? $net) : null,
                 'change_amount' => $data['method'] === 'cash' ? ($data['change_amount'] ?? 0) : null,

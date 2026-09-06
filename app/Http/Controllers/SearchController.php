@@ -50,6 +50,9 @@ class SearchController extends Controller
     public function products(Request $request): JsonResponse
     {
         $q = trim((string) $request->query('q', ''));
+        $search = mb_strtolower($q);
+        $productId = $request->integer('product_id') ?: null;
+        $branchId = $request->integer('branch_id') ?: null;
 
         $products = Product::query()
             ->with(['baseUnit:id,name,qty_per_base_unit', 'barcodes' => fn ($query) => $query
@@ -59,23 +62,38 @@ class SearchController extends Controller
                 ->orderByDesc('received_date')->limit(50)]))
             ->where('is_active', true)
             ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
-                ->where('sku_code', 'ilike', "%{$q}%")
-                ->orWhere('name_th', 'ilike', "%{$q}%")
+                ->whereRaw('LOWER(sku_code) LIKE ?', ["%{$search}%"])
+                ->orWhereRaw('LOWER(name_th) LIKE ?', ["%{$search}%"])
                 ->orWhereHas('barcodes', fn ($barcode) => $barcode
                     ->where('is_active', true)
-                    ->where('barcode', 'ilike', "%{$q}%"))
+                    ->whereRaw('LOWER(barcode) LIKE ?', ["%{$search}%"]))
             ))
+            ->when($productId, fn ($query) => $query->whereKey($productId))
             ->when(
                 $q !== '',
                 fn ($query) => $query->orderByRaw(
                     'case when lower(sku_code) = ? then 0 when lower(sku_code) like ? then 1 else 2 end',
-                    [mb_strtolower($q), mb_strtolower($q).'%'],
+                    [$search, $search.'%'],
                 ),
             )
             ->orderBy('name_th')
             ->limit(20)
-            ->get(['id', 'sku_code', 'name_th', 'base_unit_id', 'default_price', 'average_cost', 'tracks_expiry', 'shelf_life_days'])
-            ->map(fn (Product $product) => [
+            ->get(['id', 'sku_code', 'name_th', 'base_unit_id', 'default_price', 'average_cost', 'tracks_expiry', 'shelf_life_days']);
+
+        $locationId = $branchId
+            ? Branch::whereKey($branchId)->value('default_warehouse_location_id')
+            : null;
+        $stockByProduct = $locationId
+            ? StockBalance::where('warehouse_location_id', $locationId)
+                ->whereIn('product_id', $products->pluck('id'))
+                ->get(['product_id', 'on_hand_qty', 'reserved_qty'])
+                ->keyBy('product_id')
+            : collect();
+
+        $products = $products->map(function (Product $product) use ($request, $locationId, $stockByProduct) {
+            $stock = $stockByProduct->get($product->id);
+
+            return [
                 'id' => $product->id,
                 'sku_code' => $product->sku_code,
                 'name_th' => $product->name_th,
@@ -90,12 +108,18 @@ class SearchController extends Controller
                     ?->barcode,
                 'is_scale' => $product->barcodes->contains(fn ($barcode) => preg_match('/^80[01][0-9]{3}$/', (string) $barcode->barcode) === 1)
                     || preg_match('/ชั่ง|ซั่ง/u', (string) $product->name_th) === 1,
+                'on_hand_qty' => $locationId ? (float) ($stock?->on_hand_qty ?? 0) : null,
+                'reserved_qty' => $locationId ? (float) ($stock?->reserved_qty ?? 0) : null,
+                'available_qty' => $locationId
+                    ? max(0, (float) ($stock?->on_hand_qty ?? 0) - (float) ($stock?->reserved_qty ?? 0))
+                    : null,
                 'lots' => $request->boolean('include_lots') ? $product->stockLots->map(fn ($lot) => [
                     'id' => $lot->id, 'lot_number' => $lot->lot_number,
                     'expiry_date' => $lot->expiry_date?->toDateString(),
                     'remaining_qty' => (float) $lot->remaining_qty,
                 ])->values() : [],
-            ]);
+            ];
+        });
 
         return response()->json($products);
     }

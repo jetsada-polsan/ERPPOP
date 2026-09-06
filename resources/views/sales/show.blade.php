@@ -44,7 +44,7 @@ $isPartial = $openItem && $openItem->status === 'partial';
         <div>
             <h2 class="h4 fw-bold mb-1">{{ $sale->doc_number }}</h2>
             <div class="text-muted small">
-                {{ $sale->doc_date->thaiDate() }} &middot; {{ $sale->branch->name_th }}
+                {{ $sale->doc_date->thaiDate() }} @if($sale->posReceipt) เวลา {{ $sale->posReceipt->receipt_date?->format('H:i:s') }} @endif &middot; {{ $sale->branch->name_th }}
                 @if($sale->salesman) &middot; {{ $sale->salesman->name }}@endif
             </div>
             <div class="fw-semibold mt-1">{{ $sale->customer->name_th }}
@@ -72,6 +72,20 @@ $isPartial = $openItem && $openItem->status === 'partial';
         </div>
     </div>
 </div>
+
+@if($sale->posReceipt)
+<div class="content-card p-4 mb-4">
+    <h3 class="h6 fw-bold mb-3"><i class="bi bi-bank me-1"></i>ข้อมูลรับชำระจาก POS</h3>
+    <div class="row g-3 small">
+        <div class="col-md-4"><span class="text-muted d-block">เวลาขาย</span><strong>{{ $sale->posReceipt->receipt_date?->format('d/m/Y H:i:s') }}</strong></div>
+        @foreach($sale->posReceipt->payments as $payment)
+        <div class="col-md-4"><span class="text-muted d-block">{{ ['cash'=>'เงินสด','transfer'=>'โอน / QR','qr'=>'QR','bank'=>'ธนาคาร'][$payment->method] ?? $payment->method }}</span><strong>฿{{ number_format((float) $payment->amount, 2) }}</strong>
+            @if($payment->transfer_account_last4)<span class="text-muted d-block">เลขท้ายบัญชีผู้โอน {{ $payment->transfer_account_last4 }}</span>@endif
+        </div>
+        @endforeach
+    </div>
+</div>
+@endif
 
 {{-- Items + AR --}}
 <div class="row g-4">

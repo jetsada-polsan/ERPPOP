@@ -13,7 +13,7 @@ class SaleController extends Controller
     {
         $sale->load([
             'customer', 'branch', 'salesman', 'documentType',
-            'stockDocument.items.product.baseUnit', 'stockDocument.items.product.barcodes', 'openItem',
+            'stockDocument.items.product.baseUnit', 'stockDocument.items.product.barcodes', 'openItem', 'posReceipt.payments',
         ]);
 
         $booking = SaleBooking::where('confirmed_document_id', $sale->id)->first();
@@ -26,7 +26,7 @@ class SaleController extends Controller
     {
         $sale->load([
             'customer', 'branch', 'salesman', 'documentType',
-            'stockDocument.items.product.baseUnit', 'stockDocument.items.product.barcodes', 'openItem',
+            'stockDocument.items.product.baseUnit', 'stockDocument.items.product.barcodes', 'openItem', 'posReceipt.payments',
         ]);
 
         return view('sales.print', compact('sale'));

@@ -289,3 +289,22 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
 - ทดสอบ: `php artisan test --compact` ผ่าน 420 tests / 419 passed / 1 skipped / 6 incomplete / 3165 assertions; `php artisan view:cache` ผ่าน; `npm run build` ผ่าน; regression route/POS/users ผ่าน 122 tests / 1276 assertions; production `erp:health` ผ่านครบ; production HTTP smoke ทุกหน้าหลัก 200/302 และไม่มี 500; error count หลัง deploy window = 0
 - Deploy: สำรองก่อน deploy ที่ `storage/app/backups/erp-db-20260906-110031.sql.gz`; production migration เป็นปัจจุบัน, route/view/config cache ผ่าน, health ผ่าน
 - ยังไม่ทดสอบ: POST workflow ที่ต้องใช้ session/สิทธิ์จริงและเครื่อง POS Windows/Printer จริง; รอบนี้ตรวจเฉพาะเส้นทาง GET/HEAD และชุด test ที่ไม่ทำลายข้อมูล
+
+## Handoff - 2026-09-06 (POS transfer identity and reconciliation)
+- Commit: pending (ยังไม่ได้ commit/push/deploy รอบนี้)
+- ทำอะไร: ให้ข้อมูลการรับชำระแบบโอน/QR เก็บเลขท้ายบัญชีผู้โอน 4 หลักใน ERP และ SQLite โดยไม่เก็บเลขบัญชีเต็ม; เพิ่มช่องกรอกและ validation ใน POS Web/Python; ส่งต่อข้อมูลใน sync payload และพิมพ์ลงใบเสร็จ
+- ERP: หน้า POS Control, Monthly Accounting, รายงานใบเสร็จ POS และหน้าเอกสารขาย/ขายสดแสดงวันที่เวลาเต็มและเลขท้ายบัญชีผู้โอนเพื่อเทียบ Statement; เพิ่ม migration `2026_09_06_000158_add_transfer_account_last4_to_pos_payments.php`
+- การผูกเครื่อง: ใช้ `pos_devices.user_id` เป็นผู้ใช้ประจำเครื่องอยู่แล้ว; API จะดึง cashier ที่ผูกกับ device user เท่านั้น ขณะที่สิทธิ์สาขา/โมดูลยังคุมการทำงานแต่ละส่วนตามเดิม จึงไม่ต้องสร้าง user POS แยกซ้ำ
+- UI: คงหน้าขายเดิม แต่ขยายพื้นที่บิล/รายการทางขวาและบีบพื้นที่สินค้าให้เหมาะกับจอ POS; ปรับ placeholder ให้แยกเลขอ้างอิงการโอนออกจากเลขท้ายบัญชีอย่างชัดเจน
+- ทดสอบ: Laravel `php artisan test --compact` ผ่าน 420 tests / 419 passed / 1 skipped / 6 incomplete / 3167 assertions; Python POS unittest ผ่าน 174 tests; POS control regression ผ่าน 7 tests / 33 assertions; `php artisan view:cache` ผ่าน; `git diff --check` ผ่าน
+- ยังไม่ทดสอบ: migration และการขายจริงบน production, statement matching จริง, เครื่องพิมพ์ Windows/XPrinter จริง; ต้องทำ backup และขออนุมัติก่อน deploy
+- งานถัดไป: review diff แล้ว commit; เมื่อต้องการขึ้น production ให้ migrate แบบมี backup ก่อน แล้วทดสอบบิลโอน 1 ใบและเปิดรายงานเทียบ Statement
+
+## Handoff - 2026-09-06 (Booking stock availability before reservation)
+- Commit: pending (ยังไม่ได้ commit/push/deploy รอบนี้)
+- ทำอะไร: หน้าใบจองส่ง `branch_id` ไปค้นหาสต๊อกและแสดง `มีอยู่ / จองแล้ว / พร้อมจอง` ต่อสินค้า; เมื่อเปลี่ยนสาขาจะ refresh ยอดให้ตรงคลังสาขานั้น และเตือนก่อน submit หากจำนวนที่กรอกเกินยอดพร้อมจอง
+- Server guard: `BookingService` รวมรายการซ้ำเป็นยอดต่อสินค้า, lock `stock_balances` ใน transaction กันการจองชนกัน, ปฏิเสธเมื่อยอดพร้อมจองไม่พอ และไม่สร้างเอกสาร/ไม่เพิ่ม `reserved_qty` เมื่อปฏิเสธ; ไม่ลบหรือแก้ข้อมูลเดิม
+- Compatibility: product search ใช้ `LOWER(...) LIKE` แทน `ILIKE` ในส่วนค้นหาสินค้า เพื่อให้ endpoint ที่เพิ่มการแสดงสต๊อกทำงานได้ทั้ง PostgreSQL และ SQLite tests; หากสาขายังไม่มี balance จะแสดงพร้อมจองเป็น 0 และ server จะไม่อนุญาตให้จองเกินจริง
+- ทดสอบ: `BookingSalesAreaTest` + `BookingDeliveryDueTest` ผ่าน 10 tests / 38 assertions; `BookingDeliveryAndCashTransferTest` + `CashTransferScreenTest` ผ่าน 13 tests / 50 assertions; PHP lint และ Blade view cache ผ่าน; `git diff --check` ผ่าน
+- Full suite: 421 tests, 417 passed, 3 failures อยู่ใน `ErpResetTransactionsTest` เดิม (คำสั่ง reset/UAT ไม่เกี่ยวกับงานนี้), 1 skipped, 6 incomplete; ไม่มี failure จาก booking stock guard
+- ยังไม่ได้ทำ: ยังไม่ได้ commit/push/deploy รอบนี้

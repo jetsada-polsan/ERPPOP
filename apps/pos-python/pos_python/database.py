@@ -244,6 +244,8 @@ ADDED_COLUMNS: list[tuple[str, str, str]] = [
     # Snapshot ของ QR และเวลาที่พนักงานตรวจเงินเข้าแล้ว ต้องไม่เปลี่ยนตาม config ภายหลัง
     ("payments", "qr_payload", "TEXT"),
     ("payments", "confirmed_at", "TEXT"),
+    # เก็บเฉพาะ 4 หลักท้ายของบัญชีผู้โอนเพื่อเทียบ Statement โดยไม่เก็บเลขบัญชีเต็ม
+    ("payments", "transfer_account_last4", "TEXT"),
     # ราคาขายรวม VAT อยู่แล้ว ค่านี้จึงมีผลกับการแยกยอดในบิล ไม่ใช่กับยอดที่ลูกค้าจ่าย
     ("products", "is_vat", "INTEGER NOT NULL DEFAULT 1"),
     # หมวดสินค้าใช้ทำแถบกรองบนหน้าขาย ERP ส่ง id มาให้ ส่วนชื่อเติมตอน sync

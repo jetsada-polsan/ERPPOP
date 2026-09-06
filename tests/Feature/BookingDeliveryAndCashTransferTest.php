@@ -13,6 +13,7 @@ use App\Models\GlJournal;
 use App\Models\Product;
 use App\Models\ProductUnit;
 use App\Models\SaleBooking;
+use App\Models\StockBalance;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseLocation;
@@ -183,6 +184,12 @@ class BookingDeliveryAndCashTransferTest extends TestCase
         $product = Product::create([
             'sku_code' => 'SKU'.$suffix, 'name_th' => 'สินค้าทดสอบ', 'base_unit_id' => $unit->id,
             'default_price' => 100, 'is_active' => true,
+        ]);
+        StockBalance::create([
+            'product_id' => $product->id,
+            'warehouse_location_id' => $location->id,
+            'on_hand_qty' => 100,
+            'reserved_qty' => 0,
         ]);
         $customer = Customer::create(['code' => 'CUS'.$suffix, 'name_th' => 'ลูกค้า', 'branch_id' => $branch->id, 'is_active' => true]);
         $user = User::factory()->create(['username' => 'bk_'.strtolower($suffix), 'branch_id' => $branch->id]);

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="theme-color" content="#bd2836">
+    <meta name="theme-color" content="#0f4c75">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="JET POS">
@@ -74,7 +74,7 @@
 
         .pos-body {
             display: grid;
-            grid-template-columns: minmax(610px, 44vw) 1fr;
+            grid-template-columns: minmax(560px, 52vw) minmax(400px, 1fr);
             overflow: hidden;
             gap: 6px;
             padding: 6px;
@@ -1247,7 +1247,7 @@
         }
 
         @media (max-width: 1280px) {
-            .pos-body { grid-template-columns: 520px 1fr; }
+            .pos-body { grid-template-columns: 600px 1fr; }
             .cart-list-head,
             .cart-item { grid-template-columns: 26px minmax(0, 1fr) 78px 86px 28px; gap: 5px; }
             .product-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
@@ -1694,6 +1694,114 @@
                 overflow: visible;
             }
             .pos-settings-box { width: min(430px, calc(100vw - 20px)); max-height: calc(100dvh - 20px); overflow: hidden; }
+        }
+
+        /* Legacy POS workspace: product picking left, bill/payment right.
+           Keep this desktop arrangement close to the Windows POS so staff do not
+           have to relearn the selling screen. Mobile remains a vertical flow. */
+        @media (min-width: 700px) {
+            .pos-wrap { background: #eef4f9; }
+            .pos-topbar {
+                background: #0f4c75;
+                color: #fff;
+                border-bottom: 0;
+                box-shadow: 0 3px 10px rgba(15, 76, 117, .22);
+            }
+            .pos-logo { color: #fff; letter-spacing: 0; }
+            .pos-logo span {
+                background: none;
+                color: #f59e0b;
+                -webkit-text-fill-color: #f59e0b;
+            }
+            .topbar-select,
+            .topbar-btn,
+            .pos-clock,
+            .shift-pill {
+                background: rgba(255,255,255,.08);
+                border-color: rgba(255,255,255,.28);
+                color: #fff;
+                box-shadow: none;
+            }
+            .topbar-btn:hover,
+            .topbar-select:hover { background: rgba(255,255,255,.16); color: #fff; border-color: #fff; }
+            .pos-clock { color: #d7efff; background: rgba(21,133,192,.34); border-color: rgba(215,239,255,.3); }
+            .shift-pill.open { color: #b9f6d5; background: rgba(20,122,85,.35); border-color: rgba(185,246,213,.45); }
+            .shift-pill.closed { color: #ffe4a8; background: rgba(217,139,0,.28); border-color: rgba(255,228,168,.45); }
+
+            .pos-body {
+                grid-template-columns: minmax(0, 1.25fr) minmax(390px, .75fr);
+                gap: 5px;
+                padding: 5px;
+            }
+            .pos-products { order: 1; }
+            .pos-cart { order: 2; }
+            .pos-cart,
+            .pos-products {
+                border-radius: 6px;
+                border-color: #cbdbe7;
+                background: #fff;
+                box-shadow: 0 3px 12px rgba(29,59,82,.09);
+            }
+            .pos-search-bar,
+            .pos-categories,
+            .pos-cart-header { background: #fff; border-color: #dbe7ef; }
+            .pos-search-bar { padding: 8px 10px; }
+            .pos-search-input { height: 38px; border: 1px solid #b9ccda; border-radius: 6px; box-shadow: none; }
+            .pos-search-input:focus { border-color: #1585c0; box-shadow: 0 0 0 3px rgba(21,133,192,.12); }
+            .pos-categories { padding: 6px 8px; gap: 5px; }
+            .cat-pill { border-radius: 6px; padding: 6px 12px; background: #f8fbfd; color: #1d3b52; border-color: #cbdbe7; box-shadow: none; }
+            .cat-pill:hover { background: #eef4f9; color: #0f4c75; border-color: #8cb8d2; }
+            .cat-pill.active { background: #1585c0; border-color: #1585c0; color: #fff; box-shadow: none; }
+            .product-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; padding: 7px; background: #eef4f9; }
+            .product-card {
+                height: auto;
+                min-height: 82px;
+                grid-template-columns: 1fr auto;
+                grid-template-rows: auto 1fr auto;
+                gap: 3px 8px;
+                padding: 8px 10px;
+                border-radius: 6px;
+                border-color: #cbdbe7;
+                box-shadow: 0 1px 3px rgba(29,59,82,.08);
+            }
+            .product-card .product-sku { grid-column: 1 / -1; color: #627481; font-size: 10px; }
+            .product-card .product-name { grid-column: 1 / -1; color: #1d3b52; font-size: 12px; line-height: 1.35; }
+            .product-card .product-price { grid-column: 1 / -1; color: #c9212d; font-size: 15px; text-align: left; }
+            .product-card:hover { border-color: #1585c0; background: #f5fbff; box-shadow: 0 3px 8px rgba(21,133,192,.14); }
+            .product-card.flash-sale { border-left: 3px solid #d98b00; background: #fffaf0; }
+
+            .pos-cart-header { padding: 7px 8px 6px; }
+            .pos-cart-items { scrollbar-color: #b9ccda transparent; }
+            .cart-list-head { background: #eaf2f8; color: #0f4c75; border-color: #cbdbe7; }
+            .cart-item,
+            .cart-item:nth-child(even) { background: #fff; border-color: #e1eaf0; }
+            .cart-item:hover { background: #f5fbff; }
+            .cart-item.active { background: #eef7fc; box-shadow: inset 4px 0 0 #1585c0; }
+            .cart-line-no { background: #e1f0f8; color: #0f4c75; }
+            .cart-item-name,
+            .cart-item-price,
+            .total-row.grand { color: #1d3b52; }
+            .cart-item-sku,
+            .total-row,
+            .total-row.muted span,
+            .bill-tools label,
+            .cart-line-tools .tool-label { color: #627481; }
+            .cart-item-price,
+            .total-row.grand .val { color: #c9212d; }
+            .pos-cart-footer { background: #fff; border-color: #dbe7ef; }
+            .vue-payment-preview { border-color: #dbe7ef; }
+            .vue-payment-preview-head { color: #1d3b52; }
+            .vue-payment-method { border-color: #cbdbe7; background: #fff; color: #1d3b52; border-radius: 6px; }
+            .vue-payment-method:hover:not(:disabled) { border-color: #1585c0; background: #f5fbff; }
+            .vue-cart-actions { border-radius: 6px; background: #c9212d; box-shadow: 0 3px 10px rgba(201,33,45,.22); }
+        }
+
+        @media (min-width: 700px) and (max-width: 1120px) {
+            .pos-body { grid-template-columns: minmax(0, 1.05fr) minmax(370px, .95fr); }
+            .product-grid { grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); }
+            .product-card { min-height: 72px; padding: 6px 8px; }
+            .product-card .product-name { font-size: 10.5px; }
+            .product-card .product-price { font-size: 13px; }
         }
     </style>
 </head>
@@ -2306,7 +2414,11 @@
                                 <span x-text="transferConfirmed ? 'กำลังออกบิล...' : 'ยืนยันเงินเข้าและออกบิล'"></span>
                             </button>
                             <input class="ref-input" type="text" x-model="paymentRef"
-                                placeholder="เลขอ้างอิง / 4 ตัวท้ายสลิป (ไม่บังคับ)"
+                                placeholder="เลขอ้างอิงการโอน (ไม่บังคับ)"
+                                @keydown.enter.prevent="confirmTransferAndCheckout()">
+                            <input class="ref-input" type="text" x-model="transferAccountLast4"
+                                inputmode="numeric" maxlength="4" pattern="[0-9]{4}"
+                                placeholder="เลขท้ายบัญชีผู้โอน 4 หลัก"
                                 @keydown.enter.prevent="confirmTransferAndCheckout()">
                             <div class="pay-hint">ตรวจยอดเงินเข้าในแอปธนาคาร แล้วกดปุ่มนี้เพื่อบันทึกและออกบิลทันที</div>
                         </div>
@@ -2775,7 +2887,7 @@ function posApp() {
 
         // Payment
         payModalOpen: false, method: 'cash', received: 0, receivedInput: '', processing: false,
-        paymentRef: '', transferConfirmed: false,
+        paymentRef: '', transferAccountLast4: '', transferConfirmed: false,
 
         // Receipt
         receiptOpen: false, lastReceiptId: null, lastDocNumber: '', lastItems: [], lastTotal: 0, lastMethod: 'cash',
@@ -3821,6 +3933,7 @@ function posApp() {
             if (method !== 'transfer') {
                 this.transferConfirmed = false;
                 this.paymentRef = '';
+                this.transferAccountLast4 = '';
                 return;
             }
 
@@ -3990,6 +4103,10 @@ function posApp() {
                 erpPopup('warning', 'ยังไม่ยืนยันเงินเข้า', 'ตรวจรายการเงินเข้าก่อนออกบิล');
                 return;
             }
+            if (this.method === 'transfer' && !/^\d{4}$/.test(String(this.transferAccountLast4 || '').trim())) {
+                erpPopup('warning', 'ข้อมูลโอนไม่ครบ', 'กรอกเลขท้ายบัญชีผู้โอนให้ครบ 4 หลัก');
+                return;
+            }
             this.processing = true;
 
             const payload = {
@@ -4001,6 +4118,7 @@ function posApp() {
                 redeem_points: this.effectiveRedeemPoints,
                 method: this.method,
                 payment_ref: this.paymentRef || null,
+                transfer_account_last4: this.method === 'transfer' ? (String(this.transferAccountLast4 || '').trim() || null) : null,
                 payment_confirmed: this.method !== 'transfer' || this.transferConfirmed,
                 cash_received: this.method === 'cash' ? this.received : null,
                 change_amount: this.method === 'cash' ? this.cashChangeAmount : null,
@@ -4053,6 +4171,7 @@ function posApp() {
                     this.payModalOpen = false;
                     this.receiptOpen = true;
                     this.paymentRef = '';
+                    this.transferAccountLast4 = '';
                     this.transferConfirmed = false;
                     this.loadActiveShift();
                 } else {

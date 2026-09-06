@@ -85,6 +85,11 @@ class Document extends Model
         return $this->hasOne(PaymentDocument::class);
     }
 
+    public function posReceipt(): HasOne
+    {
+        return $this->hasOne(PosReceipt::class);
+    }
+
     protected function casts(): array
     {
         return [

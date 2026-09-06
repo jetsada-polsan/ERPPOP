@@ -7,10 +7,12 @@ use App\Models\Document;
 use App\Models\DocumentBook;
 use App\Models\DocumentType;
 use App\Models\Customer;
+use App\Models\Product;
 use App\Models\SaleBooking;
 use App\Models\StockBalance;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
+use App\Support\DecimalMath;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -56,6 +58,37 @@ class BookingService
 
         return DB::transaction(function () use ($data, $branch, $documentType, $documentBook) {
             $items = collect($data['items']);
+            $requestedByProduct = $items->groupBy('product_id')->map(
+                fn ($rows) => DecimalMath::sum($rows->pluck('qty'), DecimalMath::QUANTITY_SCALE)
+            );
+            $balances = [];
+
+            // Lock each balance before reserving so concurrent bookings cannot
+            // consume the same available quantity. Duplicate rows are checked as
+            // one product total, matching the reservations written below.
+            foreach ($requestedByProduct as $productId => $requestedQty) {
+                $balance = StockBalance::where('product_id', $productId)
+                    ->where('warehouse_location_id', $branch->default_warehouse_location_id)
+                    ->lockForUpdate()
+                    ->first();
+                $onHand = $balance?->on_hand_qty ?? 0;
+                $reserved = $balance?->reserved_qty ?? 0;
+                $availableRaw = DecimalMath::subtract($onHand, $reserved, DecimalMath::QUANTITY_SCALE);
+                $available = DecimalMath::compare($availableRaw, 0) < 0 ? '0' : $availableRaw;
+                if (DecimalMath::compare($requestedQty, $available) > 0) {
+                    $product = Product::find($productId);
+                    throw new RuntimeException(sprintf(
+                        'สินค้า %s มีพร้อมจอง %s แต่ขอจอง %s (มีอยู่ %s, จองแล้ว %s)',
+                        $product?->sku_code ?? $productId,
+                        $available,
+                        $requestedQty,
+                        $onHand,
+                        $reserved,
+                    ));
+                }
+                $balances[$productId] = $balance;
+            }
+
             $totalQty = $items->sum('qty');
             $totalAmount = $items->sum(fn ($i) => $i['qty'] * $i['unit_price']);
 
@@ -105,10 +138,16 @@ class BookingService
                     'unit_price' => $item['unit_price'],
                 ]);
 
-                $balance = StockBalance::firstOrCreate(
-                    ['product_id' => $item['product_id'], 'warehouse_location_id' => $branch->default_warehouse_location_id],
-                    ['on_hand_qty' => 0, 'reserved_qty' => 0]
-                );
+                $balance = $balances[$item['product_id']] ?? null;
+                if (! $balance) {
+                    $balance = StockBalance::create([
+                        'product_id' => $item['product_id'],
+                        'warehouse_location_id' => $branch->default_warehouse_location_id,
+                        'on_hand_qty' => 0,
+                        'reserved_qty' => 0,
+                    ]);
+                    $balances[$item['product_id']] = $balance;
+                }
                 $balance->increment('reserved_qty', $item['qty']);
             }
 

@@ -49,7 +49,7 @@ class MonthlyAccountingController extends Controller
             })
             ->whereBetween('pr.receipt_date', [$from, $to])->where('pr.status', 'completed')
             ->when($branchId, fn ($q) => $q->where('pt.branch_id', $branchId))
-            ->get(['pp.id', 'pp.method', 'pp.amount', 'pp.payment_reference', 'pr.receipt_no', 'pr.receipt_date', 'pt.branch_id', 'br.status as reconciliation_status']);
+            ->get(['pp.id', 'pp.method', 'pp.amount', 'pp.payment_reference', 'pp.transfer_account_last4', 'pr.receipt_no', 'pr.receipt_date', 'pt.branch_id', 'br.status as reconciliation_status']);
         $posMethodTotals = $posPayments->groupBy('method')->map(fn ($rows) => [
             'count' => $rows->count(), 'amount' => (float) $rows->sum('amount'),
         ]);

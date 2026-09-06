@@ -27,6 +27,7 @@
     defaultSalesUserName: @js($bookingDefaults['sales_user_name']),
     defaultSalesAreaId: @js($bookingDefaults['sales_area_id']),
     salesUserFromParty: false,
+    showStock: true,
     salesAreas: @js($salesAreas->map(fn ($area) => [
         'id' => $area->id,
         'area_type' => $area->area_type,

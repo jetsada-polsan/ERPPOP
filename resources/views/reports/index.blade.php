@@ -91,7 +91,7 @@
 
     $columnLabels = [
         'sale_date' => 'วันที่',
-        'receipt_date' => 'วันที่',
+        'receipt_date' => 'วันที่/เวลา',
         'doc_date' => 'วันที่',
         'movement_date' => 'วันที่',
         'entry_date' => 'วันที่',
@@ -138,6 +138,7 @@
         'supplier_name' => 'ผู้ขาย',
         'doc_number' => 'เลขที่',
         'receipt_no' => 'เลขที่',
+        'transfer_account_last4' => 'เลขท้ายบัญชีผู้โอน',
         'status' => 'สถานะ',
         'method' => 'ช่องทางชำระ',
         'movement_type' => 'ประเภท',

@@ -56,7 +56,7 @@ class CashSaleController extends Controller
 
     public function show(Document $cashSale): View
     {
-        $cashSale->load(['branch', 'customer', 'stockDocument.items.product']);
+        $cashSale->load(['branch', 'customer', 'stockDocument.items.product', 'posReceipt.payments']);
 
         return view('cash-sales.show', ['sale' => $cashSale]);
     }

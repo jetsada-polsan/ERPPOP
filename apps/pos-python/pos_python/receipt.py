@@ -73,7 +73,7 @@ def render(db: sqlite3.Connection, sale_id: int, *, company: dict | None = None,
         (sale_id,),
     ).fetchall()
     payment = db.execute(
-        """SELECT method, amount, change_amount, reference, qr_payload
+        """SELECT method, amount, change_amount, reference, qr_payload, transfer_account_last4
            FROM payments WHERE sale_id = ? ORDER BY id LIMIT 1""", (sale_id,)
     ).fetchone()
     cashier = db.execute("SELECT code FROM local_cashiers WHERE id = ?", (sale["cashier_id"],)).fetchone()
@@ -124,6 +124,8 @@ def render(db: sqlite3.Connection, sale_id: int, *, company: dict | None = None,
                 lines.append(centre(qr_line, width))
             if payment["reference"]:
                 lines.append(centre(f"บัญชี {payment['reference']}", width))
+        if payment["method"] == "transfer" and payment["transfer_account_last4"]:
+            lines.append(columns("เลขท้ายบัญชีผู้โอน", str(payment["transfer_account_last4"]), width))
 
     if sale["is_void"]:
         lines.append(rule(width, "="))

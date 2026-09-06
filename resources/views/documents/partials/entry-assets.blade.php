@@ -30,6 +30,7 @@
     .doc-option { width: 100%; border: 0; background: transparent; display: grid; grid-template-columns: 84px 1fr auto; gap: 8px; align-items: center; text-align: left; padding: 7px 8px; border-radius: 6px; font-size: 12.5px; color: #1e293b; }
     .doc-option:hover { background: #eefafa; }
     .doc-code { color: #0284c7; font-weight: 900; font-size: 11.5px; }
+    .stock-hint { color: #2563eb; font-size: 10.5px; font-weight: 700; }
     .doc-meta-line { display: grid; grid-template-columns: 110px 1fr; gap: 8px; align-items: center; margin-bottom: 8px; }
     .doc-meta-line span { color: #64748b; font-size: 12px; font-weight: 800; text-align: right; }
     .doc-meta-total { border-top: 1px dashed #dbe3ef; margin-top: 10px; padding-top: 10px; display: flex; justify-content: space-between; align-items: baseline; }
@@ -134,7 +135,7 @@ function docEntryPage(config) {
         salesAreaId: config.defaultSalesAreaId ? String(config.defaultSalesAreaId) : '',
         salesUserId: config.defaultSalesUserId ? String(config.defaultSalesUserId) : '',
         salesUserName: config.defaultSalesUserName || '',
-        items: [{ product_id: '', productQuery: '', qty: 1, unit_price: 0, unit_name: '', is_scale: false, scale_plu: '', lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [], results: [] }],
+        items: [{ product_id: '', productQuery: '', qty: 1, unit_price: 0, unit_name: '', is_scale: false, scale_plu: '', lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, on_hand_qty: null, reserved_qty: null, available_qty: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [], results: [] }],
         openModal() {
             this.modalOpen = true;
             this.$nextTick(() => {
@@ -175,19 +176,37 @@ function docEntryPage(config) {
                 const selected = areas.find(item => String(item.id) === String(this.salesAreaId));
                 if (selected?.branch_id && String(selected.branch_id) !== String(this.branchId)) this.salesAreaId = '';
             }
+            this.items.forEach((item, index) => {
+                if (item.product_id) this.refreshProductStock(index);
+            });
         },
         onSalesAreaChanged() {
             const area = (this.config.salesAreas || []).find(item => String(item.id) === String(this.salesAreaId));
             if (!area) return;
-            if (area.branch_id) this.branchId = String(area.branch_id);
+            if (area.branch_id) {
+                this.branchId = String(area.branch_id);
+                this.onBranchChanged();
+            }
         },
-        addItem() { this.items.push({ product_id: '', productQuery: '', qty: 1, unit_price: 0, unit_name: '', is_scale: false, scale_plu: '', lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [], results: [] }); },
+        addItem() { this.items.push({ product_id: '', productQuery: '', qty: 1, unit_price: 0, unit_name: '', is_scale: false, scale_plu: '', lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, on_hand_qty: null, reserved_qty: null, available_qty: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [], results: [] }); },
         removeItem(index) { this.items.splice(index, 1); },
         async searchProducts(index) {
             const query = this.items[index].productQuery;
             if (query.length < 1) { this.items[index].results = []; this.items[index].product_id = ''; return; }
-            const response = await fetch(`{{ route('search.products') }}?q=${encodeURIComponent(query)}&include_lots=${this.config.returnLots ? 1 : 0}`);
+            const response = await fetch(`{{ route('search.products') }}?q=${encodeURIComponent(query)}&include_lots=${this.config.returnLots ? 1 : 0}&branch_id=${encodeURIComponent(this.branchId || '')}`);
             this.items[index].results = await response.json();
+        },
+        async refreshProductStock(index) {
+            const item = this.items[index];
+            if (!item?.product_id || !this.branchId || !this.config.showStock) return;
+            const response = await fetch(`{{ route('search.products') }}?product_id=${encodeURIComponent(item.product_id)}&branch_id=${encodeURIComponent(this.branchId)}`);
+            if (!response.ok) return;
+            const products = await response.json();
+            const product = products[0];
+            if (!product || String(product.id) !== String(item.product_id)) return;
+            item.on_hand_qty = product.on_hand_qty;
+            item.reserved_qty = product.reserved_qty;
+            item.available_qty = product.available_qty;
         },
         selectProduct(index, product) {
             this.items[index].product_id = product.id;
@@ -198,6 +217,9 @@ function docEntryPage(config) {
             this.items[index].scale_plu = product.scale_plu || '';
             this.items[index].tracks_expiry = Boolean(product.tracks_expiry);
             this.items[index].shelf_life_days = product.shelf_life_days;
+            this.items[index].on_hand_qty = product.on_hand_qty;
+            this.items[index].reserved_qty = product.reserved_qty;
+            this.items[index].available_qty = product.available_qty;
             this.items[index].lots = product.lots || [];
             this.items[index].results = [];
         },
@@ -220,6 +242,19 @@ function docEntryPage(config) {
             if (this.items.some(item => !item.product_id)) {
                 event.preventDefault();
                 Swal.fire({ icon: 'warning', title: 'เลือกสินค้าให้ครบทุกแถว' });
+                return;
+            }
+            if (this.config.showStock) {
+                const unavailable = this.items.find(item => item.available_qty !== null
+                    && Number(item.qty) > Number(item.available_qty) + 0.00000001);
+                if (unavailable) {
+                    event.preventDefault();
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'จำนวนจองเกินสินค้าพร้อมจอง',
+                        text: `${unavailable.productQuery} เหลือพร้อมจอง ${this.money(unavailable.available_qty)} กรุณาปรับจำนวนก่อนบันทึก`,
+                    });
+                }
             }
         },
     };

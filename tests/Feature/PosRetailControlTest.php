@@ -44,7 +44,13 @@ class PosRetailControlTest extends TestCase
             'pos_terminal_id' => $terminal->id, 'pos_shift_id' => $shift->id, 'receipt_no' => 'POS-CONTROL-001',
             'receipt_date' => '2026-08-02 09:00:00', 'net_sales' => 250, 'status' => 'completed',
         ]);
-        PosPayment::create(['pos_receipt_id' => $receipt->id, 'method' => 'qr', 'payment_reference' => 'QR-CONTROL-01', 'amount' => 250]);
+        PosPayment::create([
+            'pos_receipt_id' => $receipt->id,
+            'method' => 'qr',
+            'payment_reference' => 'QR-CONTROL-01',
+            'transfer_account_last4' => '4821',
+            'amount' => 250,
+        ]);
 
         $user = User::factory()->create(['username' => 'pos-control-user', 'is_active' => true, 'must_change_password' => false]);
         $role = Role::create(['code' => 'POS_CONTROL', 'name' => 'POS Control']);
@@ -57,7 +63,9 @@ class PosRetailControlTest extends TestCase
             ->assertSee('ศูนย์ควบคุม POS')
             ->assertSee('SHIFT-CONTROL-01')
             ->assertSee('POS-CONTROL-001')
-            ->assertSee('QR-CONTROL-01');
+            ->assertSee('QR-CONTROL-01')
+            ->assertSee('02/08/2026 09:00:00')
+            ->assertSee('4821');
     }
 
     public function test_held_bill_is_shared_by_branch_and_can_only_be_resumed_once(): void
