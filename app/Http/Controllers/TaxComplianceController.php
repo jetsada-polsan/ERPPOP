@@ -33,7 +33,11 @@ class TaxComplianceController extends Controller
     public function prepare(Request $request, TaxComplianceService $service): RedirectResponse
     {
         $data = $request->validate(['period' => ['required', 'date_format:Y-m'], 'branch_id' => ['nullable', 'exists:branches,id'], 'form_type' => ['required', 'in:PP30,PND3,PND53']]);
-        $run = $service->prepareFiling($data['period'], isset($data['branch_id']) ? (int) $data['branch_id'] : null, $data['form_type']);
+        try {
+            $run = $service->prepareFiling($data['period'], isset($data['branch_id']) ? (int) $data['branch_id'] : null, $data['form_type']);
+        } catch (\RuntimeException $exception) {
+            return back()->withErrors(['period' => $exception->getMessage()]);
+        }
         $this->audit('tax_prepare', 'tax_filing_runs', $run->id, ['period' => $run->period, 'form' => $run->form_type, 'hash' => $run->file_hash]);
 
         return back()->with('success', "จัดทำชุด {$run->form_type} แล้ว กรุณาให้ผู้ตรวจคนที่สองทบทวนก่อนบันทึกการยื่น");
@@ -72,7 +76,11 @@ class TaxComplianceController extends Controller
     public function prepareEtax(Request $request, TaxComplianceService $service): RedirectResponse
     {
         $data = $request->validate(['period' => ['required', 'date_format:Y-m'], 'branch_id' => ['nullable', 'exists:branches,id']]);
-        $count = $service->prepareEtax($data['period'], isset($data['branch_id']) ? (int) $data['branch_id'] : null);
+        try {
+            $count = $service->prepareEtax($data['period'], isset($data['branch_id']) ? (int) $data['branch_id'] : null);
+        } catch (\RuntimeException $exception) {
+            return back()->withErrors(['period' => $exception->getMessage()]);
+        }
         $this->audit('etax_prepare', 'etax_documents', null, ['period' => $data['period'], 'count' => $count]);
 
         return back()->with('success', "เตรียม E-Tax provider package ใหม่ {$count} เอกสาร");

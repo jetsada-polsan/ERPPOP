@@ -98,12 +98,17 @@ class ProductController extends Controller
             throw ValidationException::withMessages(['product_category_id' => 'ต้องเลือกประเภทสินค้า ระบบจึงจะรันรหัสสินค้าได้']);
         }
 
-        $product = DB::transaction(function () use ($data, $skuAllocator): Product {
-            // SKU เป็นเลขควบคุมของระบบ ไม่รับค่าที่ส่งมาจากฟอร์มเพื่อกันการข้ามลำดับ.
-            $data['sku_code'] = $skuAllocator->nextForCategory((int) $data['product_category_id']);
+        try {
+            $product = DB::transaction(function () use ($data, $skuAllocator): Product {
+                // SKU เป็นเลขควบคุมของระบบ ไม่รับค่าที่ส่งมาจากฟอร์มเพื่อกันการข้ามลำดับ.
+                $data['sku_code'] = $skuAllocator->nextForCategory((int) $data['product_category_id']);
 
-            return Product::create($data);
-        });
+                return Product::create($data);
+            });
+        } catch (\RuntimeException $exception) {
+            // เช่นหมวดสินค้ายกเลิกใช้/รหัสในหมวดเต็มแล้ว - เงื่อนไขทางธุรกิจ ไม่ใช่ข้อผิดพลาดของระบบ
+            return back()->withInput()->withErrors(['product_category_id' => $exception->getMessage()]);
+        }
 
         return redirect()->route('products.show', $product)->with('success', "เพิ่มสินค้า {$product->sku_code} แล้ว");
     }

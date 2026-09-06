@@ -136,13 +136,19 @@ class MasterDataSetupController extends Controller
             return back()->withErrors(['file' => 'ไฟล์ยังมีข้อผิดพลาด '.count($errors).' รายการ จึงไม่สามารถนำเข้าได้']);
         }
 
-        $created = DB::transaction(function () use ($type, $saved, $skuAllocator, $barcodePolicy): int {
-            return match ($type) {
-                'categories' => $this->applyCategories($saved['rows']),
-                'products' => $this->applyProducts($saved['rows'], $skuAllocator, $barcodePolicy),
-                'employees' => $this->applyEmployees($saved['rows']),
-            };
-        });
+        try {
+            $created = DB::transaction(function () use ($type, $saved, $skuAllocator, $barcodePolicy): int {
+                return match ($type) {
+                    'categories' => $this->applyCategories($saved['rows']),
+                    'products' => $this->applyProducts($saved['rows'], $skuAllocator, $barcodePolicy),
+                    'employees' => $this->applyEmployees($saved['rows']),
+                };
+            });
+        } catch (\RuntimeException $exception) {
+            // เช่นบาร์โค้ดชนกัน/หมวดสินค้ารันรหัสไม่ได้ระหว่างที่ผลตรวจค้างอยู่ (ตรวจซ้ำตอน apply) -
+            // เงื่อนไขทางธุรกิจ ไม่ใช่ข้อผิดพลาดของระบบ ให้กลับไปหน้าเดิมพร้อมข้อความ ไม่ล้างผลตรวจทิ้ง
+            return back()->withErrors(['file' => $exception->getMessage()]);
+        }
 
         Storage::delete("master-data-setup/{$pending['token']}.json");
         session()->forget('master_data_setup_preview');

@@ -60,14 +60,19 @@ class OcrDocumentController extends Controller
     {
         $this->authorizeOcr($request);
 
-        return response()->json($service->process($document));
+        try {
+            return response()->json($service->process($document));
+        } catch (\RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
     }
 
     public function review(Request $request, OcrDocument $document, OcrDocumentService $service): JsonResponse
     {
         $this->authorizeOcr($request);
 
-        return response()->json($service->review($document, $request->validate([
+        try {
+            return response()->json($service->review($document, $request->validate([
             'supplier_id' => ['nullable', 'integer', 'exists:suppliers,id'],
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
             'reference_no' => ['nullable', 'string', 'max:100'],
@@ -86,14 +91,21 @@ class OcrDocumentController extends Controller
             'lines.*.extracted_discount' => ['nullable', 'numeric', 'min:0'],
             'lines.*.extracted_line_total' => ['nullable', 'numeric', 'min:0'],
             'lines.*.review_note' => ['nullable', 'string', 'max:1000'],
-        ])));
+            ])));
+        } catch (\RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
     }
 
     public function approve(Request $request, OcrDocument $document, OcrDocumentService $service): JsonResponse
     {
         $this->authorizeOcr($request);
 
-        return response()->json($service->approve($document));
+        try {
+            return response()->json($service->approve($document));
+        } catch (\RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
     }
 
     public function reject(Request $request, OcrDocument $document, OcrDocumentService $service): JsonResponse
@@ -101,14 +113,22 @@ class OcrDocumentController extends Controller
         $this->authorizeOcr($request);
         $data = $request->validate(['note' => ['nullable', 'string', 'max:2000']]);
 
-        return response()->json($service->reject($document, $data['note'] ?? null));
+        try {
+            return response()->json($service->reject($document, $data['note'] ?? null));
+        } catch (\RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
     }
 
     public function postToGoodsReceipt(Request $request, OcrDocument $document, GoodsReceiptDraftService $service): JsonResponse
     {
         $this->authorizeOcr($request);
 
-        return response()->json($service->post($document));
+        try {
+            return response()->json($service->post($document));
+        } catch (\RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
     }
 
     public function file(Request $request, OcrDocument $document)
