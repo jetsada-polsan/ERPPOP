@@ -75,6 +75,7 @@ class ErpMenu
                     ['label' => 'สินค้า / บริการ', 'route' => 'products.index', 'pattern' => 'products.*', 'extraPattern' => 'product-units.*', 'icon' => 'bi-box-seam-fill', 'tone' => 'brown'],
                     ['label' => 'โอนย้าย / ปรับยอดสต๊อก', 'route' => 'stock-transfers.index', 'pattern' => 'stock-transfers.index', 'extraPattern' => 'stock-adjustments.*', 'icon' => 'bi-box-seam-fill', 'tone' => 'teal'],
                     ['label' => 'ขอโอนสินค้า', 'route' => 'stock-transfers.request', 'pattern' => 'stock-transfers.request*', 'icon' => 'bi-box-arrow-in-down', 'tone' => 'cyan'],
+                    ['label' => 'แนะนำเติมสินค้าสาขา', 'route' => 'stock-transfers.replenishment.index', 'pattern' => 'stock-transfers.replenishment.*', 'icon' => 'bi-signpost-split-fill', 'tone' => 'teal'],
                     ['label' => 'ตรวจนับสินค้า', 'route' => 'stock-counts.index', 'pattern' => 'stock-counts.*', 'icon' => 'bi-clipboard-check-fill', 'tone' => 'cyan'],
                     ['label' => 'เบิก / คืน / สูญเสีย / แปรรูป', 'route' => 'stock-issues.index', 'pattern' => 'stock-issues.*', 'extraPattern' => 'stock-transforms.*', 'icon' => 'bi-box-arrow-up', 'tone' => 'orange'],
                     ['label' => 'การผลิต', 'route' => 'production.index', 'pattern' => 'production.*', 'icon' => 'bi-gear-wide-connected', 'tone' => 'slate'],

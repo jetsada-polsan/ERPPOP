@@ -8,6 +8,7 @@ use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\BillingNoteController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\BplusOperationController;
+use App\Http\Controllers\BranchReplenishmentController;
 use App\Http\Controllers\CashSaleController;
 use App\Http\Controllers\CashTransferController;
 use App\Http\Controllers\ChartOfAccountController;
@@ -353,6 +354,9 @@ Route::prefix('stock-transfers')->name('stock-transfers.')->group(function () {
     // ขอโอน (พนักงานสาขา, stock.request) - ต้องมาก่อน /{stockTransfer}
     Route::get('/request', [StockTransferController::class, 'requestForm'])->name('request');
     Route::post('/request', [StockTransferController::class, 'requestStore'])->name('request.store');
+    // แนะนำเติมสินค้าระหว่างสาขา (คำนวณจาก branch_stock_policies) - ต้องมาก่อน /{stockTransfer}
+    Route::get('/replenishment', [BranchReplenishmentController::class, 'index'])->name('replenishment.index');
+    Route::post('/replenishment', [BranchReplenishmentController::class, 'store'])->name('replenishment.store');
     Route::post('/', [StockTransferController::class, 'store'])->name('store');
     Route::post('/{stockTransfer}/approve', [StockTransferController::class, 'approve'])->name('approve');
     Route::post('/{stockTransfer}/reject', [StockTransferController::class, 'reject'])->name('reject');
