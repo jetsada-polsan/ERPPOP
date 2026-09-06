@@ -15,11 +15,19 @@ use Illuminate\Http\Request;
  * Typeahead search endpoints backing the Alpine.js customer/supplier/product
  * pickers on the booking/sale/purchase forms - these tables are too large for a
  * plain <select> (4.6k customers, 3.6k products, 231 suppliers).
+ *
+ * customers()/products()/stockBalance() คืนข้อมูลกึ่งอ่อนไหว (ยอดขาย/ต้นทุน/สต๊อก)
+ * และไม่มีสิทธิ์เดียวที่ครอบคลุมทุกหน้าที่เรียกใช้จริง (ขาย/จัดซื้อ/คลัง/ข้อมูลตั้งต้น
+ * คนละสิทธิ์กัน) จึงเช็คแบบ "มีสิทธิ์ใดสิทธิ์หนึ่งในกลุ่มที่ใช้งานจริง" ในนี้เอง แทนที่จะ
+ * ผูกกับ RoutePermissions (ซึ่งรองรับได้แค่สิทธิ์เดียวต่อ route) - suppliers()/
+ * salesmen()/branches() คืนแค่รหัส+ชื่อ ไม่มีข้อมูลอ่อนไหว จึงเปิดให้ผู้ใช้ที่ login
+ * แล้วทุกคนเรียกได้เหมือนเดิม
  */
 class SearchController extends Controller
 {
     public function customers(Request $request): JsonResponse
     {
+        $this->authorizeAny($request, ['sales.manage', 'purchasing.manage', 'pos.use']);
         $q = trim((string) $request->query('q', ''));
 
         $customers = Customer::query()
@@ -52,6 +60,7 @@ class SearchController extends Controller
 
     public function products(Request $request): JsonResponse
     {
+        $this->authorizeAny($request, ['sales.manage', 'purchasing.manage', 'stock.manage', 'stock.request', 'masterdata.manage']);
         $q = trim((string) $request->query('q', ''));
         $search = mb_strtolower($q);
         $productId = $request->integer('product_id') ?: null;
@@ -180,6 +189,7 @@ class SearchController extends Controller
     // for a product at a specific location right after it's picked.
     public function stockBalance(Request $request): JsonResponse
     {
+        $this->authorizeAny($request, ['stock.manage', 'stock.request']);
         $data = $request->validate([
             'product_id' => ['required', 'integer'],
             'warehouse_location_id' => ['required', 'integer'],
@@ -190,5 +200,14 @@ class SearchController extends Controller
             ->value('on_hand_qty') ?? 0);
 
         return response()->json(['on_hand_qty' => $onHandQty]);
+    }
+
+    // มีสิทธิ์ใดสิทธิ์หนึ่งในกลุ่มก็พอ - ดู docblock บนสุดของคลาสว่าทำไมเช็คแบบนี้แทน
+    // RoutePermissions ปกติ (ซึ่งรองรับได้แค่สิทธิ์เดียวต่อ route name)
+    private function authorizeAny(Request $request, array $permissions): void
+    {
+        $user = $request->user();
+        $ok = $user && collect($permissions)->contains(fn (string $permission) => $user->hasPermission($permission));
+        abort_unless($ok, 403, 'ไม่มีสิทธิ์ค้นหาข้อมูลนี้');
     }
 }
