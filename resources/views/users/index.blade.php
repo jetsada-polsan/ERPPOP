@@ -13,22 +13,23 @@
     @endif
 
     <div class="content-card p-3 mb-3">
-        <form method="get" class="d-flex align-items-end gap-2 flex-wrap">
+        <form method="get" class="d-flex align-items-end gap-2 flex-wrap" x-ref="userSearch">
             <div style="min-width:min(360px,100%)">
                 <label class="form-label small text-muted mb-1">ค้นหาผู้ใช้</label>
-                <input name="q" value="{{ $q }}" class="form-control" placeholder="รหัสพนักงาน / ชื่อ / ตำแหน่ง / โทรศัพท์">
+                <input name="q" value="{{ $q }}" class="form-control" placeholder="รหัสพนักงาน / ชื่อ / ตำแหน่ง / โทรศัพท์" autocomplete="off" @input.debounce.350ms="$refs.userSearch.requestSubmit()">
             </div>
             <div style="min-width:190px">
                 <label class="form-label small text-muted mb-1">สถานะ</label>
-                <select name="status" class="form-select">
+                <select name="status" class="form-select" @change="$refs.userSearch.requestSubmit()">
                     <option value="">ทุกสถานะ</option>
                     <option value="active" @selected($status === 'active')>เปิดใช้งาน</option>
                     <option value="inactive" @selected($status === 'inactive')>ปิดใช้งาน</option>
                     <option value="must_change" @selected($status === 'must_change')>รอเปลี่ยนรหัสผ่าน</option>
                 </select>
             </div>
-            <button class="btn btn-primary"><i class="bi bi-search me-1"></i>ค้นหา</button>
+            <button class="btn btn-primary d-none"><i class="bi bi-search me-1"></i>ค้นหา</button>
             <a href="{{ route('users.index') }}" class="btn btn-light border">ล้าง</a>
+            <button type="button" class="btn btn-primary ms-auto" @click="openCreate()"><i class="bi bi-person-plus me-1"></i>เพิ่มผู้ใช้</button>
         </form>
     </div>
 
@@ -67,13 +68,17 @@
         </div>
     </div>
 
-    <div class="content-card p-4 mb-3">
+    <div class="user-form-backdrop" x-show="formOpen" x-transition.opacity @keydown.escape.window="resetForm()" style="display:none">
+    <div class="user-form-modal" @click.outside="resetForm()" x-transition>
+        <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
         <div class="d-flex align-items-center gap-3 mb-3">
             <span class="uf-head-icon"><i class="bi" :class="editId ? 'bi-pencil-square' : 'bi-person-plus'"></i></span>
             <div>
                 <h2 class="h5 fw-bold mb-0" x-text="editId ? 'แก้ไขผู้ใช้: ' + editUsername : 'เพิ่มผู้ใช้ใหม่'"></h2>
                 <p class="text-muted small mb-0">รหัสผ่านต้องยาวอย่างน้อย 8 ตัว มีตัวพิมพ์เล็ก พิมพ์ใหญ่ และตัวเลข (เก็บแบบเข้ารหัส bcrypt)</p>
             </div>
+            <button type="button" class="btn btn-light rounded-circle" @click="resetForm()" aria-label="ปิด"><i class="bi bi-x-lg"></i></button>
+        </div>
         </div>
 
         <form method="post" :action="editId ? '{{ url('users') }}/' + editId : '{{ route('users.store') }}'" class="user-form"
@@ -84,11 +89,12 @@
             <div class="form-section-title"><i class="bi bi-person-badge"></i> ข้อมูลผู้ใช้</div>
             <div class="row g-3 mb-3">
                 <div class="col-md-6 col-lg-4">
-                    <label class="form-label small text-muted">ชื่อผู้ใช้ (username)</label>
+                    <label class="form-label small text-muted">รหัสพนักงาน / ชื่อผู้ใช้</label>
                     <div class="input-group">
                         <span class="input-group-text"><i class="bi bi-at"></i></span>
-                        <input name="username" x-model="form.username" :readonly="!!editId" :required="!editId" class="form-control" autocomplete="off">
+                        <input name="username" x-model="form.username" readonly class="form-control bg-light" placeholder="ระบบจะสร้าง POP001 อัตโนมัติ" autocomplete="off">
                     </div>
+                    <div class="form-text">ผู้ใช้ใหม่ไม่ต้องกรอกรหัส ระบบจะรัน `POP001`, `POP002` ต่อให้อัตโนมัติ</div>
                 </div>
                 <div class="col-md-6 col-lg-4">
                     <label class="form-label small text-muted">ชื่อ-นามสกุล (เต็ม)</label>
@@ -206,6 +212,7 @@
                 <button type="button" class="btn btn-light border" x-show="editId" @click="resetForm()">ยกเลิกแก้ไข</button>
             </div>
         </form>
+    </div>
     </div>
 
     <div class="content-card p-4 mb-3">
@@ -345,6 +352,9 @@
 
 @push('head')<style>
     [x-cloak]{display:none!important}
+    .user-form-backdrop{position:fixed;inset:0;z-index:2050;background:rgba(15,23,42,.48);display:flex;align-items:flex-start;justify-content:center;padding:24px;overflow:auto}
+    .user-form-modal{width:min(920px,100%);margin:auto;background:var(--erp-surface,#fff);border-radius:8px;padding:22px;box-shadow:0 24px 80px rgba(15,23,42,.28)}
+    .user-form-modal .user-form{max-height:calc(100vh - 150px);overflow:auto;padding-right:4px}
     .uf-head-icon{
         width:44px;height:44px;flex:0 0 44px;border-radius:13px;display:grid;place-items:center;
         background:var(--erp-primary-soft);color:var(--erp-primary-ink);font-size:20px;
@@ -390,7 +400,7 @@
 <script>
 function userPage() {
     return {
-        editId: null, editUsername: '', roleError: false,
+        editId: null, editUsername: '', formOpen: false, roleError: false,
         resetOpen: false, resetId: null, resetUsername: '', resetName: '', resetType: 'password',
         resultOpen: {{ $resetResult ? 'true' : 'false' }},
         resultType: @js(data_get($resetResult, 'type', 'password')),
@@ -398,6 +408,11 @@ function userPage() {
         resultPassword: @js(data_get($resetResult, 'password', '')),
         copied: false,
         form: { username: '', name: '', email: '', phone: '', position: '', branch_id: '', branch_ids: [], sales_area_id: '', role_ids: [], is_active: true },
+
+        openCreate() {
+            this.resetForm();
+            this.formOpen = true;
+        },
 
         editUser(user) {
             this.editId = user.id;
@@ -415,12 +430,14 @@ function userPage() {
                 is_active: !!user.is_active,
             };
             this.roleError = false;
+            this.formOpen = true;
             window.scrollTo({ top: 0, behavior: 'smooth' });
         },
 
         resetForm() {
             this.editId = null;
             this.editUsername = '';
+            this.formOpen = false;
             this.roleError = false;
             this.form = { username: '', name: '', email: '', phone: '', position: '', branch_id: '', branch_ids: [], sales_area_id: '', role_ids: [], is_active: true };
         },

@@ -61,7 +61,7 @@ class UserController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'username' => ['required', 'string', 'max:50', 'alpha_dash', 'unique:users,username'],
+            'username' => ['nullable', 'string', 'max:50', 'alpha_dash', 'unique:users,username'],
             'name' => ['required', 'string', 'max:150'],
             'email' => ['nullable', 'email', 'max:150', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:30'],
@@ -81,8 +81,23 @@ class UserController extends Controller
             'role_ids.required' => 'กรุณาเลือกบทบาท/สิทธิ์อย่างน้อย 1 อัน',
         ]);
 
+        $username = $data['username'] ?? null;
+        if (! $username) {
+            $username = DB::transaction(function (): string {
+                $max = User::query()->lockForUpdate()->pluck('username')->reduce(function (int $max, string $value): int {
+                    if (preg_match('/^POP(\d+)$/i', $value, $matches)) {
+                        return max($max, (int) $matches[1]);
+                    }
+
+                    return $max;
+                }, 0);
+
+                return 'POP'.str_pad((string) ($max + 1), 3, '0', STR_PAD_LEFT);
+            });
+        }
+
         $user = User::create([
-            'username' => $data['username'],
+            'username' => $username,
             'name' => $data['name'],
             'email' => $data['email'] ?? null,
             'phone' => $data['phone'] ?? null,
