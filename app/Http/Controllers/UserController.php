@@ -363,7 +363,7 @@ class UserController extends Controller
             $profile = Salesman::create([
                 'branch_id' => $user->branch_id,
                 'user_id' => $user->id,
-                'code' => $this->uniquePosProfileCode($user),
+                'code' => $this->nextPosProfileCode(),
                 'name' => $user->name,
                 'is_active' => true,
             ]);
@@ -429,20 +429,25 @@ class UserController extends Controller
         }
     }
 
-    private function uniquePosProfileCode(User $user): string
+    /** POS profiles use a short operator-facing code, independent of the ERP username. */
+    private function nextPosProfileCode(): string
     {
-        $base = strtoupper(preg_replace('/[^A-Za-z0-9_-]+/', '', $user->username) ?: 'U'.$user->id);
-        $base = substr($base, 0, 20) ?: 'U'.$user->id;
+        $max = Salesman::query()
+            ->where('code', 'like', 'POS%')
+            ->pluck('code')
+            ->reduce(function (int $max, string $code): int {
+                return preg_match('/^POS(\d+)$/', $code, $matches)
+                    ? max($max, (int) $matches[1])
+                    : $max;
+            }, 0);
 
-        for ($attempt = 0; $attempt < 100; $attempt++) {
-            $suffix = $attempt === 0 ? '' : '-'.$attempt;
-            $candidate = substr($base, 0, 20 - strlen($suffix)).$suffix;
-
+        for ($next = $max + 1; $next <= $max + 1000; $next++) {
+            $candidate = 'POS'.str_pad((string) $next, 3, '0', STR_PAD_LEFT);
             if (! Salesman::where('code', $candidate)->exists()) {
                 return $candidate;
             }
         }
 
-        throw new RuntimeException('ไม่สามารถสร้างรหัสโปรไฟล์ POS ที่ไม่ซ้ำได้ กรุณาระบุโปรไฟล์เอง');
+        throw new RuntimeException('ไม่สามารถสร้างรหัสโปรไฟล์ POS ที่ไม่ซ้ำได้ กรุณาตรวจสอบรหัส POS');
     }
 }

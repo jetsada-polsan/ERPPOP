@@ -155,7 +155,7 @@ class UserManagementTest extends TestCase
 
         $this->assertNull($user->salesman_id);
         $this->assertSame($user->id, $profile->user_id);
-        $this->assertSame('CASHIER-AUTO', $profile->code);
+        $this->assertSame('POS001', $profile->code);
         $this->assertSame('แคชเชียร์สร้างครั้งเดียว', $profile->name);
         $this->assertSame($branch->id, $profile->branch_id);
         $this->assertTrue($profile->is_active);
