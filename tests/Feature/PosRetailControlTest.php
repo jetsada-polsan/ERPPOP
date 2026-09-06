@@ -238,7 +238,7 @@ class PosRetailControlTest extends TestCase
 
     public function test_exact_pos_scan_prefers_barcode_over_a_same_value_sku(): void
     {
-        [$user, $branch, , , $barcodeProduct] = $this->posMasters('BARCODE-FIRST');
+        [$user, $branch, , , $barcodeProduct] = $this->posMasters('BCFIRST');
         $skuProduct = Product::create([
             'sku_code' => '101002', 'name_th' => 'สินค้า SKU 101002', 'base_unit_id' => $barcodeProduct->base_unit_id,
             'default_price' => 15, 'average_cost' => 0, 'is_vat' => false, 'is_active' => true,

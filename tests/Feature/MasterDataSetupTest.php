@@ -215,7 +215,7 @@ class MasterDataSetupTest extends TestCase
     {
         $this->fixtures();
         Employee::create([
-            'employee_code' => 'POP001', 'full_name' => 'ชื่อเดิมห้ามเปลี่ยน',
+            'employee_code' => 'POP900', 'full_name' => 'ชื่อเดิมห้ามเปลี่ยน',
             'status' => 'Active', 'source_section' => 'excel:HR-1',
         ]);
         $user = $this->manager();
