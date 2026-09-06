@@ -6,8 +6,10 @@ use App\Http\Middleware\ErpAuthorize;
 use App\Models\Branch;
 use App\Models\Customer;
 use App\Models\DocumentType;
+use App\Models\Permission;
 use App\Models\Product;
 use App\Models\ProductUnit;
+use App\Models\Role;
 use App\Models\SalesArea;
 use App\Models\StockBalance;
 use App\Models\User;
@@ -212,6 +214,12 @@ class BookingSalesAreaTest extends TestCase
             'username' => 'booking_stock_uat',
             'branch_id' => $branch->id,
         ]);
+        // หน้าจองต้องมีสิทธิ์ sales.manage อยู่แล้ว (ดู RoutePermissions: 'bookings.' => 'sales.manage')
+        // จึงต้องให้สิทธิ์นี้กับผู้ใช้ทดสอบด้วย ไม่งั้น search.products จะตอบ 403 (ผูกสิทธิ์เพิ่มใน 9587d7c)
+        $role = Role::create(['code' => 'BOOKING_STOCK_UAT', 'name' => 'booking stock uat']);
+        $role->permissions()->attach(Permission::firstOrCreate(['code' => 'sales.manage'], ['name' => 'sales.manage'])->id);
+        $user->roles()->attach($role->id);
+        $user = $user->fresh();
 
         $stockResponse = $this->withoutMiddleware(ErpAuthorize::class)
             ->actingAs($user)

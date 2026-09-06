@@ -52,6 +52,7 @@ class ErpResetTransactions extends Command
         'member_point_transactions', 'ecommerce_orders', 'ecommerce_order_items',
         'pos_coupons', 'pos_receipt_return_items',
         'stock_lot_lineages', 'recall_cases', 'recall_contacts',
+        'purchase_cost_adjustments',
         // staging ของท่อนำเข้า POS เก่าที่ถอดออกไปแล้ว
         'imported_payments', 'imported_receipt_items', 'imported_receipts',
         'import_errors', 'import_files', 'import_batches',
