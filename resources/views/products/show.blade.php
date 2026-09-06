@@ -22,6 +22,11 @@
         $currentCostPeriod = $costHistory->first();
         $currentPeriodAverageCost = (float) ($currentCostPeriod['period_average_cost'] ?? $product->average_cost ?? 0);
         $currentPurchaseAverageCost = $currentCostPeriod['purchase_average_cost'] ?? null;
+        $productUnits = collect([$product->baseUnit])
+            ->merge($product->barcodes->pluck('unit'))
+            ->filter()
+            ->unique('id')
+            ->values();
     @endphp
 
     <div x-data="productShow()" x-cloak>
@@ -100,7 +105,7 @@
                     @forelse($product->posPriceSchedules as $schedule)
                         <tr>
                             <td>{{ $schedule->branch?->code ?? 'ทุกสาขา' }}{{ $schedule->branch?->name_th ? ' - '.$schedule->branch->name_th : '' }}</td>
-                            <td>{{ $schedule->unit?->displayLabel() ?? 'หน่วยฐาน' }}</td>
+                            <td>{{ $schedule->unit?->displayLabel() ?? $product->baseUnit?->displayLabel() ?? 'หน่วยฐาน' }}</td>
                             <td class="text-end fw-semibold">{{ number_format((float) $schedule->price, 2) }}</td>
                             <td>{{ $schedule->effective_from?->format('d/m/Y H:i') }} - {{ $schedule->effective_to?->format('d/m/Y H:i') ?? 'ไม่สิ้นสุด' }}</td>
                             <td><span class="badge {{ $schedule->status === 'published' ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $schedule->status === 'published' ? 'เผยแพร่' : 'ยกเลิก' }}</span></td>
@@ -114,7 +119,7 @@
             </div>
             <form method="post" action="{{ route('products.pos-price-schedules.store', $product) }}" class="row g-2 align-items-end">@csrf
                 <div class="col-md-2"><label class="form-label small text-muted">สาขา</label><select name="branch_id" class="form-select form-select-sm"><option value="">ทุกสาขา</option>@foreach($branches as $branch)<option value="{{ $branch->id }}">{{ $branch->code }} - {{ $branch->name_th }}</option>@endforeach</select></div>
-                <div class="col-md-2"><label class="form-label small text-muted">หน่วย</label><select name="unit_id" class="form-select form-select-sm"><option value="">หน่วยฐาน</option>@foreach($units as $unit)<option value="{{ $unit->id }}">{{ $unit->displayLabel() }}</option>@endforeach</select></div>
+                <div class="col-md-2"><label class="form-label small text-muted">หน่วยสินค้า</label><select name="unit_id" class="form-select form-select-sm"><option value="">{{ $product->baseUnit?->displayLabel() ?? 'หน่วยฐาน' }}</option>@foreach($productUnits as $unit)@if((int) $unit->id !== (int) $product->base_unit_id)<option value="{{ $unit->id }}">{{ $unit->displayLabel() }}</option>@endif @endforeach</select><div class="form-text">ดึงจากหน่วยที่ผูกกับสินค้านี้</div></div>
                 <div class="col-md-2"><label class="form-label small text-muted">ราคาขาย</label><input type="number" step="0.01" min="0" name="price" required class="form-control form-control-sm"></div>
                 <div class="col-md-2"><label class="form-label small text-muted">เริ่มใช้</label><input type="datetime-local" name="effective_from" value="{{ now()->addDay()->setTime(5, 0)->format('Y-m-d\\TH:i') }}" required class="form-control form-control-sm"></div>
                 <div class="col-md-2"><label class="form-label small text-muted">สิ้นสุด</label><input type="datetime-local" name="effective_to" class="form-control form-control-sm"></div>
