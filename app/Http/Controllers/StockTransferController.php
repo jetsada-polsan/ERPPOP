@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use App\Models\Document;
+use App\Models\StockTransferReceipt;
 use App\Models\WarehouseLocation;
 use App\Services\Inventory\StockTransferService;
 use Illuminate\Http\RedirectResponse;
@@ -146,7 +147,13 @@ class StockTransferController extends Controller
         $this->assertTransfer($stockTransfer);
         $stockTransfer->load(['branch', 'createdBy', 'stockDocument.toWarehouseLocation', 'stockDocument.items.product', 'stockDocument.items.warehouseLocation']);
 
-        return view('stock-transfers.show', ['transfer' => $stockTransfer]);
+        // ผลตรวจรับด้วยสแกน (ถ้ามี) - แยกตารางต่างหาก ไม่ผูกเป็น relation บน Document
+        // เพื่อลดจุดแก้ไขในโมเดลที่ใช้ร่วมกันหลายจุด
+        $receipt = StockTransferReceipt::where('document_id', $stockTransfer->id)
+            ->with(['items.product:id,sku_code'])
+            ->first();
+
+        return view('stock-transfers.show', ['transfer' => $stockTransfer, 'receipt' => $receipt]);
     }
 
     private function assertTransfer(Document $document): void

@@ -22,7 +22,33 @@
                 <div class="text-muted small mt-1">หมายเหตุ: {{ $transfer->remark }}</div>
                 @endif
             </div>
-            <span class="badge text-bg-success fs-6 px-3 py-2">โอนย้ายสำเร็จ</span>
+            <div class="text-end">
+                <span class="badge text-bg-success fs-6 px-3 py-2 d-inline-block mb-2">โอนย้ายสำเร็จ</span>
+                @if($transfer->status === 'active')
+                    <div>
+                        @if(! $receipt)
+                            <a href="{{ route('stock-transfers.receipt.create', $transfer) }}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-upc-scan me-1"></i> ตรวจรับด้วยสแกน
+                            </a>
+                        @elseif($receipt->isEditable())
+                            <a href="{{ route('stock-transfers.receipt.create', $transfer) }}" class="btn btn-sm btn-primary">
+                                <i class="bi bi-upc-scan me-1"></i> ตรวจรับต่อ (ยังไม่ปิด)
+                            </a>
+                        @else
+                            @php $mismatches = $receipt->items->filter(fn ($i) => abs((float) $i->scanned_qty - (float) $i->expected_qty) > 0.0001); @endphp
+                            @if($mismatches->isEmpty())
+                                <span class="badge text-bg-success-subtle text-success border border-success-subtle">
+                                    <i class="bi bi-patch-check-fill me-1"></i>ตรวจรับแล้ว ยอดตรงทุกรายการ
+                                </span>
+                            @else
+                                <a href="{{ route('stock-transfers.receipt.create', $transfer) }}" class="badge text-bg-warning text-decoration-none">
+                                    <i class="bi bi-exclamation-triangle-fill me-1"></i>ตรวจรับแล้ว พบยอดไม่ตรง {{ $mismatches->count() }} รายการ
+                                </a>
+                            @endif
+                        @endif
+                    </div>
+                @endif
+            </div>
         </div>
     </div>
 

@@ -49,6 +49,7 @@ class RoutePermissions
         'wh.purchase-orders' => 'purchasing.manage',
         'stock-transfers.' => 'stock.manage',
         'stock-transfers.request' => 'stock.request', // พนักงานสาขาขอโอน (longest-prefix)
+        'stock-transfers.receipt.' => 'stock.request', // พนักงานสาขาปลายทางตรวจรับของเอง (longest-prefix)
         'stock-adjustments.' => 'stock.manage',
         'stock-adjustments.approve' => 'stock.adjust.approve',
         'stock-adjustments.reject' => 'stock.adjust.approve',

@@ -73,6 +73,7 @@ use App\Http\Controllers\StockAdjustmentController;
 use App\Http\Controllers\StockCountController;
 use App\Http\Controllers\StockIssueController;
 use App\Http\Controllers\StockTransferController;
+use App\Http\Controllers\StockTransferReceiptController;
 use App\Http\Controllers\StockTransformController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SystemSettingController;
@@ -360,6 +361,10 @@ Route::prefix('stock-transfers')->name('stock-transfers.')->group(function () {
     Route::post('/', [StockTransferController::class, 'store'])->name('store');
     Route::post('/{stockTransfer}/approve', [StockTransferController::class, 'approve'])->name('approve');
     Route::post('/{stockTransfer}/reject', [StockTransferController::class, 'reject'])->name('reject');
+    // ตรวจรับสินค้าโอนย้ายด้วยสแกนบาร์โค้ดที่ปลายทาง (เสริม ไม่แทนที่ approve/reject เดิม)
+    Route::get('/{stockTransfer}/receipt', [StockTransferReceiptController::class, 'create'])->name('receipt.create');
+    Route::post('/{stockTransfer}/receipt/items', [StockTransferReceiptController::class, 'saveItems'])->name('receipt.save-items');
+    Route::post('/{stockTransfer}/receipt/complete', [StockTransferReceiptController::class, 'complete'])->name('receipt.complete');
     Route::get('/{stockTransfer}', [StockTransferController::class, 'show'])->name('show');
 });
 
