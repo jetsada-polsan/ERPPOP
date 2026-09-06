@@ -13,8 +13,6 @@ class EmployeeCreationTest extends TestCase
     public function test_authorized_user_can_create_employee_with_the_next_system_code(): void
     {
         $this->withoutMiddleware();
-        Employee::where('employee_code', 'EMP0107')->update(['full_name' => 'พนักงานเดิม']);
-
         $response = $this->post(route('employees.store'), [
             'full_name' => 'พนักงานใหม่',
             'department' => '__other__',
@@ -26,7 +24,7 @@ class EmployeeCreationTest extends TestCase
 
         $response->assertRedirect(route('employees.index'));
         $this->assertDatabaseHas('employees', [
-            'employee_code' => 'POP001',
+            'employee_code' => 'POP002',
             'full_name' => 'พนักงานใหม่',
             'department' => 'ควบคุมคุณภาพ',
             'monthly_salary' => 18000,
@@ -38,7 +36,7 @@ class EmployeeCreationTest extends TestCase
             'status' => 'Active',
         ])->assertRedirect(route('employees.index'));
         $this->assertDatabaseHas('employees', [
-            'employee_code' => 'POP002',
+            'employee_code' => 'POP003',
             'full_name' => 'พนักงานคนถัดไป',
         ]);
     }

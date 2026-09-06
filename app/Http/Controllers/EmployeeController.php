@@ -84,7 +84,7 @@ class EmployeeController extends Controller
             ->with('success', "เพิ่มพนักงาน {$employee->employee_code} - {$employee->full_name} แล้ว");
     }
 
-    // เลขพนักงานใหม่ใช้ชุด POP001, POP002, ... แยกจากรหัส EMP เดิมที่นำเข้ามา
+    // เลขพนักงานใหม่ใช้ชุด POP001, POP002, ... ต่อจากข้อมูลเดิมที่แปลงแล้ว
     private function nextEmployeeCode(): string
     {
         $max = DB::table('employees')->where('employee_code', 'like', 'POP%')
