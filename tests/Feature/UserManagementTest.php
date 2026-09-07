@@ -108,6 +108,14 @@ class UserManagementTest extends TestCase
         $this->assertFalse($user->canAccessBranch($branchThree->id, 'pos.sell'));
     }
 
+    public function test_branch_manager_can_request_stock_without_getting_pos_selling_access(): void
+    {
+        $role = Role::where('code', 'BRANCH_MGR')->firstOrFail();
+
+        $this->assertTrue($role->permissions()->where('code', 'stock.request')->exists());
+        $this->assertFalse($role->permissions()->where('code', 'pos.sell')->exists());
+    }
+
     public function test_legacy_salesman_page_is_not_a_separate_people_menu_anymore(): void
     {
         $admin = User::factory()->create([

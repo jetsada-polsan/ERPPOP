@@ -27,6 +27,7 @@ use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\ErpMockupController;
 use App\Http\Controllers\ExecutiveDashboardController;
 use App\Http\Controllers\FeatureController;
+use App\Http\Controllers\FleetController;
 use App\Http\Controllers\FinancialStatementController;
 use App\Http\Controllers\FixedAssetController;
 use App\Http\Controllers\FlashSaleController;
@@ -108,6 +109,12 @@ Route::delete('/security/mfa', [AuthController::class, 'disableMfa'])->name('mfa
 Route::get('/', fn () => redirect()->route('dashboard'));
 Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
 Route::post('/employees', [EmployeeController::class, 'store'])->name('employees.store');
+Route::prefix('fleet')->name('fleet.')->group(function () {
+    Route::get('/', [FleetController::class, 'index'])->name('index');
+    Route::post('/vehicles', [FleetController::class, 'vehicle'])->name('vehicles.store');
+    Route::post('/trips', [FleetController::class, 'trip'])->name('trips.store');
+    Route::post('/repairs', [FleetController::class, 'repair'])->name('repairs.store');
+});
 // หน้าตัวอย่างการออกแบบระบบหลังบ้าน — ข้อมูลจำลองล้วน ไม่แตะฐานข้อมูล
 Route::prefix('erp-mockup')->name('erp-mockup.')->group(function () {
     Route::get('/', [ErpMockupController::class, 'launcher'])->name('launcher');

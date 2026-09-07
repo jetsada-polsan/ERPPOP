@@ -138,6 +138,7 @@ class RoutePermissions
         'operations.' => 'settings.manage',
         'database-structure.' => 'settings.manage',
         'legacy-mappings.' => 'settings.manage',
+        'fleet.' => 'transport.manage',
         'mfa.' => null,
         'line-integrations.' => 'settings.manage',
         'ecommerce-channels.' => 'settings.manage',

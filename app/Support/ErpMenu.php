@@ -151,6 +151,7 @@ class ErpMenu
                 'label' => 'ระบบ',
                 'displayLabel' => 'ตั้งค่าระบบ',
                 'items' => [
+                    ['label' => 'ยานพาหนะ / ขนส่ง', 'route' => 'fleet.index', 'pattern' => 'fleet.*', 'icon' => 'bi-truck', 'tone' => 'orange'],
                     ['label' => 'ตั้งค่าระบบ', 'route' => 'settings.index', 'pattern' => 'settings.*', 'icon' => 'bi-gear-fill', 'tone' => 'slate'],
                     ['label' => 'ตั้งค่า Workflow เอกสาร', 'route' => 'settings.workflows', 'pattern' => 'settings.workflows*', 'icon' => 'bi-diagram-3-fill', 'tone' => 'red'],
                     ['label' => 'Backup / Security', 'route' => 'operations.index', 'pattern' => 'operations.*', 'icon' => 'bi-shield-lock-fill', 'tone' => 'red'],
