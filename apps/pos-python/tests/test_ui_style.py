@@ -138,8 +138,8 @@ class UiStyleTest(unittest.TestCase):
         self.assertIn("ExistingShiftDialog(self, existing_shift)", session)
         self.assertIn("ทำกะเดิมต่อ", source)
         self.assertIn("ปิดกะเดิม", source)
-        self.assertIn("self.setMinimumSize(500, 590)", source)
-        self.assertIn("self.resize(520, 620)", source)
+        self.assertIn("self.setMinimumSize(680, 760)", source)
+        self.assertIn("self.resize(720, 820)", source)
         self.assertIn("#shiftKeypad QPushButton { min-height: 58px", STYLE)
 
     def test_windows_font_is_selected_by_qt_and_build_version_is_visible(self) -> None:

@@ -563,8 +563,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.setWindowFlag(Qt.WindowCloseButtonHint, True)
             self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
             self.setWindowModality(Qt.WindowModal)
-            self.setMinimumSize(500, 590)
-            self.resize(520, 620)
+            self.setMinimumSize(680, 760)
+            self.resize(720, 820)
 
             layout = QVBoxLayout(self)
             title = QLabel("ใส่เงินทอนก่อนเปิดกะ")
@@ -612,6 +612,15 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             buttons.accepted.connect(self.accept_value)
             buttons.rejected.connect(self.reject)
             layout.addWidget(buttons)
+
+            # Put focus on the amount immediately so a touch keyboard or keypad
+            # can be used without an extra click before opening the shift.
+            self.amount.setFocus()
+
+        def showEvent(self, event) -> None:
+            super().showEvent(event)
+            self.amount.setFocus()
+            self.amount.selectAll()
 
         def press(self, key: str) -> None:
             current = self.amount.text()
