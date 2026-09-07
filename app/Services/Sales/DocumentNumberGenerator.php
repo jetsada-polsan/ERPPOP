@@ -46,12 +46,25 @@ class DocumentNumberGenerator
     // เลขที่ตามสมุดเอกสาร (BPlus): ใช้ prefix ของเล่ม + นับเฉพาะเอกสารในเล่มนั้น
     public function nextInBook(DocumentBook $book, int $branchId): string
     {
+        if ($book->documentType()->where('code', 'BOOKING')->exists()) {
+            return $this->nextBooking();
+        }
+
         return $this->format($book->prefix, $branchId, 'BOOK:'.$book->id.':'.$branchId);
     }
 
     public function next(string $documentTypeCode, int $branchId): string
     {
+        if ($documentTypeCode === 'BOOKING') {
+            return $this->nextBooking();
+        }
+
         return $this->format(self::PREFIXES[$documentTypeCode] ?? 'DC', $branchId, $documentTypeCode.':'.$branchId);
+    }
+
+    private function nextBooking(): string
+    {
+        return sprintf('B%02d', $this->nextSequence('BOOKING:GLOBAL', 'ALL'));
     }
 
     // ตารางที่ออกเลขเอง ไม่ได้อยู่ใน documents — ใช้ตัวนับชุดเดียวกันเพื่อไม่ให้ซ้ำ

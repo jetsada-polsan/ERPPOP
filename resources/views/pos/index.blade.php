@@ -2504,6 +2504,12 @@
         <div class="receipt-total">฿ <span x-text="money(lastTotal)"></span></div>
         <div style="font-size:10px;color:#94a3b8">ราคานี้รวมภาษีมูลค่าเพิ่มแล้ว</div>
         <div class="receipt-method" x-text="paymentMethodLabel(lastMethod)"></div>
+        <template x-if="lastMethod === 'cash'">
+            <div class="receipt-cash-summary">
+                <div class="receipt-item"><span>เงินสดรับ</span><span x-text="money(lastCashReceived)"></span></div>
+                <div class="receipt-item"><span>เงินทอน</span><span x-text="money(lastChangeAmount)"></span></div>
+            </div>
+        </template>
         <template x-if="lastMethod === 'transfer' && {!! json_encode((bool) ($qrConfig && $qrConfig->merchant_ref)) !!}">
             <div class="receipt-qr" x-effect="if (receiptOpen && lastMethod === 'transfer') $nextTick(() => renderReceiptQR(lastTotal))">
                 <div id="receipt-qr-box" class="receipt-qr-box"></div>
@@ -2890,7 +2896,7 @@ function posApp() {
         paymentRef: '', transferAccountLast4: '', transferConfirmed: false,
 
         // Receipt
-        receiptOpen: false, lastReceiptId: null, lastDocNumber: '', lastItems: [], lastTotal: 0, lastMethod: 'cash',
+        receiptOpen: false, lastReceiptId: null, lastDocNumber: '', lastItems: [], lastTotal: 0, lastMethod: 'cash', lastCashReceived: 0, lastChangeAmount: 0,
         lastCashierName: '', lastDateTime: '', vatRate: {{ json_encode((float) $vatRate) }},
         receiptSettings: { paperWidth: '80mm' },
         heldBills: [],
@@ -4163,6 +4169,8 @@ function posApp() {
                     }));
                     this.lastTotal = this.totalAmount;
                     this.lastMethod = this.method;
+                    this.lastCashReceived = this.method === 'cash' ? Number(this.received) || 0 : 0;
+                    this.lastChangeAmount = this.method === 'cash' ? Number(this.cashChangeAmount) || 0 : 0;
                     this.lastEarnedPoints = Number(data.earned_points) || 0;
                     const cashierSel = this.$refs.cashierSelect;
                     this.lastCashierName = this.lockedCashierName

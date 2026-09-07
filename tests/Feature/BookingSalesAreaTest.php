@@ -54,7 +54,7 @@ class BookingSalesAreaTest extends TestCase
             'sales_area_id' => $route->id,
             'sales_user_id' => $user->id,
             'document_book_id' => $route->document_book_id,
-            'doc_number' => 'B11'.$branch->code.now()->format('Ymd').'001',
+            'doc_number' => 'B01',
             'total_amount' => 270,
         ]);
         // ผู้รับผิดชอบใบจองไม่ผูก user กับลูกค้าอีกต่อไป: ลูกค้ายังไม่มีเจ้าของ
