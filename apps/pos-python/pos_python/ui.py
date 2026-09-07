@@ -1751,6 +1751,18 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         def ensure_sale_session(self) -> bool:
             """Authenticate and open a shift only when the operator starts selling."""
             if self.cashier is not None and self.shift_id is not None:
+                if online is not None and online.online:
+                    server_shift = service.db.execute(
+                        "SELECT server_id FROM shifts WHERE id = ?", (self.shift_id,)
+                    ).fetchone()
+                    if not server_shift or not server_shift["server_id"]:
+                        online.worker.wake()
+                        QMessageBox.information(
+                            self,
+                            "กำลังเชื่อมต่อ ERP",
+                            "กะเปิดในเครื่องแล้ว แต่กำลังยืนยันกะกับ ERP\nกรุณารอสักครู่แล้วกดคิดเงินอีกครั้ง",
+                        )
+                        return False
                 return True
 
             try:
@@ -1823,30 +1835,6 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             except Exception as error:
                 QMessageBox.warning(self, "เริ่มขายไม่ได้", str(error))
                 return False
-
-            # When online, the local shift is not sell-ready until ERP has
-            # accepted it and returned its server shift id. Otherwise checkout
-            # can reach ERP with a local-only shift and send the cashier back to
-            # the opening-shift dialog on the next payment attempt.
-            if online is not None and online.online:
-                try:
-                    online.provisioning.open_server_shift(
-                        branch_id=branch_id,
-                        cashier_server_id=int(login.cashier["id"]),
-                        opening_cash=opening_cash,
-                        local_shift_id=shift_id,
-                    )
-                except Exception as error:
-                    try:
-                        service.close_shift(shift_id=shift_id, counted_cash=opening_cash, closing_note="ERP เปิดกะไม่สำเร็จ")
-                    except Exception:
-                        pass
-                    QMessageBox.warning(
-                        self,
-                        "เปิดกะไม่ผ่าน",
-                        f"ERP ยังไม่รับการเปิดกะ จึงยังเริ่มขายไม่ได้:\n{error}",
-                    )
-                    return False
 
             self.cashier = login.cashier
             self.shift_id = shift_id
