@@ -18,6 +18,11 @@ class PosPaymentValidator
             throw new RuntimeException('กรุณาตรวจเงินเข้าก่อนออกบิล');
         }
 
+        if (in_array($data['method'], ['transfer', 'mixed'], true)
+            && ! preg_match('/^\d{4}$/', (string) ($data['transfer_account_last4'] ?? ''))) {
+            throw new RuntimeException('รายการโอนต้องระบุเลขท้ายบัญชีผู้โอน 4 หลัก');
+        }
+
         if ($data['method'] === 'cash') {
             $received = DecimalMath::round($data['cash_received'] ?? 0, DecimalMath::DISPLAY_MONEY_SCALE);
             if (DecimalMath::compare(DecimalMath::add($received, '0.01', 2), $total) < 0) {
