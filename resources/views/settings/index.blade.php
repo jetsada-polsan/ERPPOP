@@ -421,6 +421,14 @@
                                     <td>{{ $device->last_seen_at?->diffForHumans() ?? 'ยังไม่เคย' }}</td>
                                     <td><span class="badge {{ $device->isActive() ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $device->isActive() ? 'ใช้งาน' : 'เพิกถอน' }}</span></td>
                                     <td class="text-end">
+                                        <form method="POST" action="{{ route('settings.pos-token.delete') }}" class="d-inline" onsubmit="return confirm('ลบเครื่อง {{ addslashes($device->name) }} และ Token ของเครื่องนี้ใช่หรือไม่? เครื่องนี้จะเชื่อม ERP ไม่ได้อีก')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <input type="hidden" name="pos_device_id" value="{{ $device->id }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="ลบเครื่อง POS">
+                                                <i class="bi bi-trash3"></i> ลบ
+                                            </button>
+                                        </form>
                                         @if($device->token_encrypted)
                                             <button type="button" class="btn btn-sm btn-outline-success" data-token="{{ $device->token_encrypted }}" onclick="copyPosToken(this.dataset.token).then(ok => { if (ok) this.innerHTML='<i class=&quot;bi bi-check-lg&quot;></i> คัดลอกแล้ว'; })">
                                                 <i class="bi bi-clipboard"></i> คัดลอก

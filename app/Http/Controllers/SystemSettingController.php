@@ -309,6 +309,19 @@ class SystemSettingController extends Controller
         ]);
     }
 
+    public function deletePosDevice(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'pos_device_id' => ['required', 'integer', 'exists:pos_devices,id'],
+        ]);
+
+        $device = PosDevice::findOrFail($data['pos_device_id']);
+        $name = $device->name;
+        $device->delete();
+
+        return redirect()->route('settings.index')->with('success', "ลบเครื่อง POS {$name} แล้ว");
+    }
+
     public function updatePosTerminalHardware(Request $request): RedirectResponse
     {
         $terminalId = $request->integer('pos_terminal_id');
