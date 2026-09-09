@@ -8,7 +8,7 @@
     <title>คลังมือถือ — PopCentral</title>
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     <script defer src="{{ asset('vendor/alpinejs/alpine.min.js') }}"></script>
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/zxing-browser.min.js"></script>
     <style>
         /* ธีมขาว-ฟ้าเดียวกับ ERP (FlowAccount reskin) — หน้าเดียวจบสำหรับมือถือ/PDA */
         :root {
@@ -411,7 +411,7 @@ function whApp() {
         poList: [], poLoading: false, poCur: null, poScanError: '',
         stockProduct: null, stockRows: [], stockTotal: 0,
 
-        cameraOk: false, cameraOpen: false, camStream: null, camTarget: 'receive', camTimer: null, qrScanner: null,
+        cameraOk: false, cameraOpen: false, camStream: null, camTarget: 'receive', camTimer: null, qrScanner: null, camControls: null,
         countId: null, countNumber: '', countProduct: null, countSystem: 0, countQty: '', countBusy: false, countError: '',
 
         init() {
@@ -617,11 +617,12 @@ function whApp() {
         // ---- กล้องสแกนบาร์โค้ด (BarcodeDetector — ใช้ได้บน HTTPS/localhost) ----
         async openCamera(target) {
             this.camTarget = target; this.cameraOpen = true;
-            if (window.Html5Qrcode) {
+            if (window.ZXingBrowser) {
                 this.$nextTick(async () => {
                     try {
-                        this.qrScanner = new Html5Qrcode('qr-reader');
-                        await this.qrScanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 260, height: 180 } }, code => { this.scanCode = code; this.closeCamera(); this.scan(this.camTarget); }, () => {});
+                        this.qrScanner = new ZXingBrowser.BrowserMultiFormatReader();
+                        this.qrScanner = new ZXingBrowser.BrowserMultiFormatReader();
+                        this.camControls = await this.qrScanner.decodeFromConstraints({ video: { facingMode: { ideal: 'environment' } } }, 'qr-reader', (result) => { if (result) { this.scanCode = result.getText(); this.closeCamera(); this.scan(this.camTarget); } });
                     } catch (e) { this.closeCamera(); this.scanError = 'เปิดกล้องไม่ได้: ' + e.message; }
                 });
                 return;
@@ -629,7 +630,8 @@ function whApp() {
             this.closeCamera(); this.scanError = 'ตัวสแกนกล้องยังโหลดไม่สำเร็จ กรุณาพิมพ์รหัสหรือรีโหลดหน้า'; return;
         },
         closeCamera() {
-            if (this.qrScanner) { this.qrScanner.stop().catch(() => {}); this.qrScanner.clear().catch(() => {}); this.qrScanner = null; }
+            this.camControls?.stop?.(); this.camControls = null;
+            this.qrScanner?.reset?.(); this.qrScanner = null;
             if (this.camTimer) clearInterval(this.camTimer);
             this.camStream?.getTracks().forEach(t => t.stop());
             this.camStream = null; this.cameraOpen = false;

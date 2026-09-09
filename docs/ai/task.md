@@ -402,8 +402,8 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
   - ยังไม่มี account lockout ถาวร (ทางเลือกเชิงออกแบบ รอเจ้าของโปรเจกต์ตัดสินใจ)
 - งานถัดไป: `git push origin main` (commit เอกสารนี้), ทดสอบ UI ฟีเจอร์ใหม่ทั้งหมดกับผู้ใช้จริงก่อนพึ่งพา 100%, ให้ผู้มีความรู้บัญชีตรวจทาน Feature 4, ทดสอบสิทธิ์ search.* กับผู้ใช้ทุก role, ตัดสินใจเรื่อง deploy pipeline และ account lockout — ไม่มีงานเขียนโค้ดใหม่ค้างจากแผนเดิมแล้ว รอคำสั่งต่อไป
 ## Handoff - 2026-09-09
-- Commit: `ยังไม่ commit`
-- ทำอะไร: เพิ่ม flow คลังมือถือสำหรับนับสต๊อกแบบ draft: เปิดรอบนับ partial, สแกน QR/บาร์โค้ด, แสดงยอดระบบ, กรอกยอดจริงและบันทึกทีละรายการ; เพิ่ม endpoint ที่ใช้ StockCountService เดิมและเปลี่ยนกล้องเป็น html5-qrcode
+- Commit: `497f213` และงานเปลี่ยนตัวสแกนรอ commit
+- ทำอะไร: เพิ่ม flow คลังมือถือสำหรับนับสต๊อกแบบ draft: เปิดรอบนับ partial, สแกน QR/บาร์โค้ด, แสดงยอดระบบ, กรอกยอดจริงและบันทึกทีละรายการ; เพิ่ม endpoint ที่ใช้ StockCountService เดิม และเปลี่ยนกล้องเป็น ZXing Browser (`@zxing/browser`, MIT) รองรับ QR/EAN และ 1D/2D หลายแบบ
 - ทดสอบ: `php artisan route:list --name=wh.stock-counts --no-ansi` ผ่าน; `php artisan test --compact` ผ่าน 419/422 โดยมี 2 เคสเดิมใน `PosPaymentValidatorTest` ล้มเหลวเพราะข้อความ error ถูกเปลี่ยนจากงานก่อนหน้า
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ทดสอบกล้องจริงบนมือถือและยังใช้ CDN ของ html5-qrcode; ยังไม่ได้ deploy production
 - Deploy: ยังไม่ deploy
