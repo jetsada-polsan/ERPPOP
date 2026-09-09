@@ -8,6 +8,7 @@
     <title>คลังมือถือ — PopCentral</title>
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     <script defer src="{{ asset('vendor/alpinejs/alpine.min.js') }}"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
         /* ธีมขาว-ฟ้าเดียวกับ ERP (FlowAccount reskin) — หน้าเดียวจบสำหรับมือถือ/PDA */
         :root {
@@ -341,22 +342,33 @@
             <div class="empty" x-show="!stockProduct">ยิงบาร์โค้ดหรือค้นหาชื่อ เพื่อดูยอดคงเหลือรายคลัง</div>
         </section>
 
+        <section x-show="tab === 'count'" x-cloak>
+            <div class="card" x-show="!countId"><div class="pname">นับสต๊อกจริง</div><div class="hint">เปิดรอบนับก่อน ยอดที่กรอกจะถูกเก็บเป็นดราฟต์และยังไม่ปรับสต๊อกจริง</div><button type="button" class="btn blue" style="width:100%;margin-top:12px" @click="startCount()" :disabled="countBusy">เปิดรอบนับ</button></div>
+            <template x-if="countId"><div>
+                <div class="card found"><b>รอบนับ <span x-text="countNumber"></span></b><div class="hint">บันทึกอัตโนมัติเป็นดราฟต์ · <a :href="countUrl">เปิดใบตรวจนับ</a></div></div>
+                <form class="scanbar" @submit.prevent="scan('count')"><input x-ref="scanCount" x-model="scanCode" placeholder="ยิง QR / บาร์โค้ด แล้วกรอกยอดจริง" autocomplete="off"><button type="button" x-show="cameraOk" @click="openCamera('count')"><i class="bi bi-camera-fill"></i></button></form>
+                <div class="card found" x-show="countProduct" x-cloak><div class="pname" x-text="countProduct?.name_th"></div><div class="psub"><span x-text="countProduct?.sku_code"></span> · ยอดระบบ <b x-text="fmtQty(countSystem)"></b> <span x-text="countProduct?.base_unit_label"></span></div><div class="frow one"><label>ยอดที่นับได้<input x-model="countQty" inputmode="decimal" type="number" min="0" step="0.001"></label></div><p class="err" x-show="countError" x-text="countError"></p><button type="button" class="btn primary" style="width:100%;margin-top:12px" @click="saveCountItem()" :disabled="countBusy">บันทึกดราฟต์ แล้วสแกนรายการถัดไป</button></div>
+                <div class="empty" x-show="!countProduct">ยิงสินค้าเพื่อดูยอดระบบและกรอกยอดจริง</div>
+            </div></template>
+        </section>
+
         <p class="err" x-show="scanError" x-text="scanError"></p>
     </main>
 
     {{-- แถบเมนูล่างแบบแอปมือถือ --}}
-    <nav class="bottomnav" style="--tabs: {{ $canReceive ? 3 : 1 }}">
+    <nav class="bottomnav" style="--tabs: {{ $canReceive ? 4 : 2 }}">
         @if($canReceive)
             <button :class="{ on: tab === 'receive' }" @click="switchTab('receive')"><i class="bi bi-box-arrow-in-down"></i>รับเข้า</button>
             <button :class="{ on: tab === 'po' }" @click="switchTab('po')"><i class="bi bi-cart-check"></i>รับตาม PO</button>
         @endif
         <button :class="{ on: tab === 'stock' }" @click="switchTab('stock')"><i class="bi bi-search"></i>เช็คสต๊อก</button>
+        <button :class="{ on: tab === 'count' }" @click="switchTab('count')"><i class="bi bi-clipboard-check"></i>นับสต๊อก</button>
     </nav>
 
     {{-- สแกนด้วยกล้อง (ต้องเปิดผ่าน HTTPS/localhost เท่านั้น) --}}
     <div class="overlay" x-show="cameraOpen" x-cloak @click.self="closeCamera()">
         <div class="sheet camwrap">
-            <video x-ref="video" autoplay playsinline muted></video>
+            <div id="qr-reader" style="width:100%"></div>
             <div class="btnrow"><button type="button" class="btn" @click="closeCamera()">ปิดกล้อง</button></div>
         </div>
     </div>
@@ -399,10 +411,11 @@ function whApp() {
         poList: [], poLoading: false, poCur: null, poScanError: '',
         stockProduct: null, stockRows: [], stockTotal: 0,
 
-        cameraOk: false, cameraOpen: false, camStream: null, camTarget: 'receive', camTimer: null,
+        cameraOk: false, cameraOpen: false, camStream: null, camTarget: 'receive', camTimer: null, qrScanner: null,
+        countId: null, countNumber: '', countProduct: null, countSystem: 0, countQty: '', countBusy: false, countError: '',
 
         init() {
-            this.cameraOk = !!(window.BarcodeDetector && navigator.mediaDevices?.getUserMedia);
+            this.cameraOk = !!(navigator.mediaDevices?.getUserMedia);
             this.$watch('tab', () => { this.scanError = ''; this.suggests = []; this.q = ''; });
         },
         branchName() {
@@ -414,7 +427,7 @@ function whApp() {
             this.$nextTick(() => this.focusScan());
         },
         focusScan() {
-            const r = { receive: 'scanReceive', po: 'scanPo', stock: 'scanStock' }[this.tab];
+            const r = { receive: 'scanReceive', po: 'scanPo', stock: 'scanStock', count: 'scanCount' }[this.tab];
             this.$refs[r]?.focus();
         },
 
@@ -445,6 +458,8 @@ function whApp() {
             if (target === 'stock') {
                 this.stockProduct = res.product;
                 this.loadStock(res.product.id);
+            } else if (target === 'count') {
+                this.countProduct = res.product; this.countSystem = res.on_hand; this.countQty = ''; this.countError = '';
             } else if (target === 'po') {
                 this.tickPoLine(res.product);
             } else {
@@ -595,29 +610,26 @@ function whApp() {
             } catch (e) { this.scanError = e.message; }
         },
 
+        get countUrl() { return this.countId ? '{{ url('/stock-counts') }}/' + this.countId : '#'; },
+        async startCount() { this.countBusy = true; this.countError = ''; try { const r = await jfetch('{{ route('wh.stock-counts.start') }}', { method: 'POST', body: JSON.stringify({ branch_id: this.branchId }) }); this.countId = r.id; this.countNumber = r.doc_number; this.$nextTick(() => this.focusScan()); } catch (e) { this.countError = e.message; } this.countBusy = false; },
+        async saveCountItem() { if (!this.countProduct || this.countQty === '' || +this.countQty < 0) { this.countError = 'กรุณากรอกยอดที่นับได้'; return; } this.countBusy = true; try { await jfetch('{{ url('/wh/stock-counts') }}/' + this.countId + '/item', { method: 'POST', body: JSON.stringify({ product_id: this.countProduct.id, counted_qty: +this.countQty }) }); this.countProduct = null; this.countQty = ''; this.$nextTick(() => this.focusScan()); } catch (e) { this.countError = e.message; } this.countBusy = false; },
+
         // ---- กล้องสแกนบาร์โค้ด (BarcodeDetector — ใช้ได้บน HTTPS/localhost) ----
         async openCamera(target) {
             this.camTarget = target; this.cameraOpen = true;
-            try {
-                this.camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-                this.$refs.video.srcObject = this.camStream;
-                const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e'] });
-                this.camTimer = setInterval(async () => {
+            if (window.Html5Qrcode) {
+                this.$nextTick(async () => {
                     try {
-                        const codes = await detector.detect(this.$refs.video);
-                        if (codes.length) {
-                            this.scanCode = codes[0].rawValue;
-                            this.closeCamera();
-                            this.scan(this.camTarget);
-                        }
-                    } catch { /* เฟรมยังไม่พร้อม */ }
-                }, 250);
-            } catch (e) {
-                this.closeCamera();
-                this.scanError = 'เปิดกล้องไม่ได้ (ต้องเปิดผ่าน HTTPS): ' + e.message;
+                        this.qrScanner = new Html5Qrcode('qr-reader');
+                        await this.qrScanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 260, height: 180 } }, code => { this.scanCode = code; this.closeCamera(); this.scan(this.camTarget); }, () => {});
+                    } catch (e) { this.closeCamera(); this.scanError = 'เปิดกล้องไม่ได้: ' + e.message; }
+                });
+                return;
             }
+            this.closeCamera(); this.scanError = 'ตัวสแกนกล้องยังโหลดไม่สำเร็จ กรุณาพิมพ์รหัสหรือรีโหลดหน้า'; return;
         },
         closeCamera() {
+            if (this.qrScanner) { this.qrScanner.stop().catch(() => {}); this.qrScanner.clear().catch(() => {}); this.qrScanner = null; }
             if (this.camTimer) clearInterval(this.camTimer);
             this.camStream?.getTracks().forEach(t => t.stop());
             this.camStream = null; this.cameraOpen = false;

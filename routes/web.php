@@ -206,6 +206,8 @@ Route::prefix('wh')->name('wh.')->group(function () {
     Route::get('/lookup', [WarehouseMobileController::class, 'lookup'])->name('lookup');
     Route::get('/products/{product}', [WarehouseMobileController::class, 'productDetail'])->name('products.detail');
     Route::get('/stock', [WarehouseMobileController::class, 'stock'])->name('stock');
+    Route::post('/stock-counts', [WarehouseMobileController::class, 'countStart'])->name('stock-counts.start');
+    Route::post('/stock-counts/{stockCount}/item', [WarehouseMobileController::class, 'countItem'])->name('stock-counts.item');
     Route::post('/receive', [WarehouseMobileController::class, 'receiveStore'])->name('receive');
     Route::get('/purchase-orders', [WarehouseMobileController::class, 'purchaseOrders'])->name('purchase-orders');
     Route::get('/purchase-orders/{purchaseOrder}', [WarehouseMobileController::class, 'purchaseOrderDetail'])->name('purchase-orders.detail');

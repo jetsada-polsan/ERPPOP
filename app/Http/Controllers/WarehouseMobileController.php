@@ -9,6 +9,7 @@ use App\Models\PurchaseOrder;
 use App\Models\StockBalance;
 use App\Services\Purchasing\PurchaseOrderReceivingService;
 use App\Services\Purchasing\PurchaseService;
+use App\Services\Inventory\StockCountService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -114,6 +115,23 @@ class WarehouseMobileController extends Controller
             'locations' => $rows,
             'total' => (float) $rows->sum('on_hand_qty'),
         ]);
+    }
+
+    public function countStart(Request $request, StockCountService $service): JsonResponse
+    {
+        $data = $request->validate(['branch_id' => ['required', 'integer', 'exists:branches,id'], 'warehouse_location_id' => ['nullable', 'integer', 'exists:warehouse_locations,id']]);
+        $count = $service->create(['branch_id' => auth()->user()?->branchScopeId() ?: (int) $data['branch_id'], 'warehouse_location_id' => $data['warehouse_location_id'] ?? null, 'count_mode' => 'partial', 'note' => 'ตรวจนับผ่านคลังมือถือ']);
+        return response()->json(['id' => $count->id, 'doc_number' => $count->doc_number]);
+    }
+
+    public function countItem(Request $request, \App\Models\StockCount $stockCount): JsonResponse
+    {
+        abort_unless($stockCount->isEditable(), 422, 'ใบตรวจนับนี้ส่งตรวจแล้ว');
+        $data = $request->validate(['product_id' => ['required', 'integer', 'exists:products,id'], 'counted_qty' => ['required', 'numeric', 'min:0']]);
+        $item = $stockCount->items()->where('product_id', $data['product_id'])->first();
+        abort_unless($item, 422, 'สินค้านี้ไม่อยู่ในตำแหน่งที่กำลังนับ');
+        $item->update(['counted_qty' => $data['counted_qty']]);
+        return response()->json(['ok' => true, 'system_qty' => (float) $item->system_qty, 'counted_qty' => (float) $item->counted_qty, 'difference' => (float) $item->counted_qty - (float) $item->system_qty]);
     }
 
     /** บันทึกรับเข้าอิสระ → ใบซื้อ (PURCHASE) */
