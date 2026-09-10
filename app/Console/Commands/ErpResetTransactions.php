@@ -48,7 +48,7 @@ class ErpResetTransactions extends Command
         'purchase_quote_items', 'supplier_ledger', 'supplier_open_items', 'quotations', 'quotation_items',
         'payment_documents', 'payment_lines', 'payment_allocations', 'cheques',
         'cash_books', 'bank_statements', 'bank_reconciliations', 'branch_expenses',
-        'transport_load_items',
+        'transport_load_items', 'transport_jobs',
         'production_orders', 'production_order_items', 'production_batches', 'production_batch_packages',
         'depreciation_records', 'tax_filing_runs', 'etax_documents', 'accounting_export_runs',
         'member_point_transactions', 'ecommerce_orders', 'ecommerce_order_items',
@@ -65,7 +65,6 @@ class ErpResetTransactions extends Command
         'products', 'customers', 'suppliers', 'users', 'roles', 'permissions',
         'chart_of_accounts', 'report_definitions', 'app_settings', 'audit_logs',
         'branches', 'pos_devices', 'employees', 'salesmen',
-        'transport_jobs',
     ];
 
     public function handle(): int

@@ -506,3 +506,19 @@ pending
 ## ความเสี่ยง/งานถัดไป
 - ยังไม่ได้ deploy production รอบนี้
 - สิทธิ์ระดับ role และ branch access มีอยู่แล้ว; ควรทำ UAT ด้วยบัญชีจริงของแต่ละแผนกก่อนเปิดใช้งานเต็มรูปแบบ
+# Handoff — 2026-09-10 (Codex reset transport dependency)
+
+## Commit
+pending
+
+## ทำอะไรไป
+- แก้คำสั่ง reset ให้ลบ `transport_jobs` พร้อมเอกสารที่อ้างถึง ไม่ทิ้ง foreign key ข้าม whitelist
+- ยืนยันว่าคำสั่ง production รอบแรก rollback และไม่มีข้อมูลถูกลบ
+
+## ทดสอบไปแล้วแค่ไหน
+- `ErpResetTransactionsTest` ผ่าน 8 tests / 40 assertions
+- `git diff --check` ผ่าน
+
+## ความเสี่ยง/งานถัดไป
+- ต้อง deploy commit นี้ก่อนจึงจะรันล้าง production จริงได้
+- backup production เดิม `erp-db-20260910-152534.sql.gz` ยังพร้อมกู้คืน
