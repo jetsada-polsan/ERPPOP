@@ -37,13 +37,16 @@ class FleetController extends Controller
     {
         abort_unless($booking->isDelivery(),404); $job=TransportJob::firstOrCreate(['booking_id'=>$booking->id]);
         $data=$request->validate(['items'=>'required|array','items.*.loaded_qty'=>'required|numeric|min:0','items.*.availability'=>'required|in:available,unavailable,partial','items.*.note'=>'nullable|max:500']);
-        foreach($data['items'] as $id=>$row) { $line=$job->loadItems()->whereKey($id)->firstOrFail(); abort_if($row['loaded_qty']>$line->planned_qty,422,'จำนวนขึ้นรถเกินจำนวนในใบจอง'); $line->update($row+['updated_by'=>auth()->id()]); }
+        foreach($data['items'] as $id=>$row) { $line=$job->loadItems()->whereKey($id)->firstOrFail(); abort_if($row['loaded_qty']>$line->planned_qty,422,'จำนวนขึ้นรถเกินจำนวนในใบจอง'); if ($row['availability']==='unavailable') abort_if((float)$row['loaded_qty']>0,422,'สินค้าที่ไม่มีต้องมีจำนวนขึ้นรถเป็นศูนย์'); $line->update($row+['updated_by'=>auth()->id()]); }
         return redirect()->route('fleet.load-sheet',$booking)->with('success','บันทึกใบขึ้นของแล้ว สามารถพิมพ์ใบส่งของได้');
     }
     public function updateBoard(Request $request, SaleBooking $booking, CustomerPaymentService $payments): RedirectResponse
     {
         $data=$request->validate(['status'=>'required|in:booked,loaded,in_transit,delivered,paid,cancelled','vehicle_id'=>'nullable|exists:fleet_vehicles,id','payment_method'=>['nullable','in:cash,transfer','required_if:status,paid'],'paid_amount'=>['nullable','numeric','min:0','required_if:status,paid'],'transfer_last4'=>['nullable','digits:4','required_if:payment_method,transfer'],'note'=>'nullable|max:1000']);
         $job=TransportJob::firstOrCreate(['booking_id'=>$booking->id]);
+        $allowed=['booked'=>['booked','cancelled'],'loaded'=>['booked'],'in_transit'=>['loaded'],'delivered'=>['in_transit'],'paid'=>['delivered'],'cancelled'=>['booked','loaded']];
+        abort_unless(in_array($job->status,$allowed[$data['status']]??[],true),422,'ไม่สามารถข้ามลำดับสถานะขนส่งได้');
+        if ($data['status']==='loaded') abort_unless($job->loadItems()->where('availability','pending')->doesntExist(),422,'ต้องบันทึกใบขึ้นของให้ครบทุกรายการก่อนขึ้นรถ');
         if ($data['status']==='paid' && ! $job->payment_document_id) {
             $document=$booking->confirmedDocument; abort_unless($document,422,'ใบจองต้องแปลงเป็นใบขายก่อนรับเงิน'); $open=$document->openItem; abort_unless($open,422,'ไม่พบยอดลูกหนี้ของใบขายนี้');
             try { $receipt=$payments->create(['customer_id'=>$document->customer_id,'branch_id'=>$document->branch_id,'method'=>$data['payment_method'],'allocations'=>[['customer_open_item_id'=>$open->id,'amount'=>$data['paid_amount']]]]); } catch (\RuntimeException $e) { return back()->with('error',$e->getMessage()); }
