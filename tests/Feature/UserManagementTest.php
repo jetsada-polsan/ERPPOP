@@ -108,6 +108,24 @@ class UserManagementTest extends TestCase
         $this->assertFalse($user->canAccessBranch($branchThree->id, 'pos.sell'));
     }
 
+    public function test_updating_user_revokes_removed_extra_branch_access(): void
+    {
+        $admin = User::factory()->create(['username' => 'admin-branch-revoke', 'must_change_password' => false]);
+        $home = Branch::create(['code' => 'BR-HOME', 'name_th' => 'สาขาหลัก', 'is_active' => true]);
+        $extra = Branch::create(['code' => 'BR-EXTRA', 'name_th' => 'สาขาเสริม', 'is_active' => true]);
+        $role = Role::where('code', 'BRANCH_MGR')->firstOrFail();
+        $user = User::factory()->create(['username' => 'branch-revoke', 'branch_id' => $home->id, 'must_change_password' => false]);
+        $user->roles()->attach($role->id);
+        DB::table('user_branch_roles')->insert(['user_id' => $user->id, 'branch_id' => $extra->id, 'role_id' => $role->id, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
+
+        $this->withoutMiddleware(ErpAuthorize::class)->actingAs($admin)->put(route('users.update', $user), [
+            'name' => $user->name, 'branch_id' => $home->id, 'role_ids' => [$role->id], 'is_active' => 1,
+        ])->assertRedirect(route('users.index'));
+
+        $this->assertDatabaseHas('user_branch_roles', ['user_id' => $user->id, 'branch_id' => $extra->id, 'is_active' => 0]);
+        $this->assertFalse($user->fresh()->canAccessBranch($extra->id, 'stock.manage'));
+    }
+
     public function test_branch_manager_can_request_stock_without_getting_pos_selling_access(): void
     {
         $role = Role::where('code', 'BRANCH_MGR')->firstOrFail();

@@ -424,10 +424,16 @@ class UserController extends Controller
         }
     }
 
-    /** Add access to extra branches without silently revoking an existing branch assignment. */
+    /** Sync explicit extra-branch access; removing a branch in the form must revoke it. */
     private function addBranchRoles(User $user, array $roleIds, array $branchIds): void
     {
-        foreach (collect($branchIds)->filter()->unique() as $branchId) {
+        $selected = collect($branchIds)->filter()->unique()->map(fn ($id) => (int) $id);
+        DB::table('user_branch_roles')
+            ->where('user_id', $user->id)
+            ->when($user->branch_id, fn ($query) => $query->where('branch_id', '!=', $user->branch_id))
+            ->when($selected->isNotEmpty(), fn ($query) => $query->whereNotIn('branch_id', $selected->all()))
+            ->update(['is_active' => false, 'effective_to' => now(), 'updated_at' => now()]);
+        foreach ($selected as $branchId) {
             foreach ($roleIds as $roleId) {
                 DB::table('user_branch_roles')->updateOrInsert([
                     'user_id' => $user->id,

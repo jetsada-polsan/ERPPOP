@@ -488,3 +488,21 @@ pending
 ## ความเสี่ยง/งานถัดไป
 - ยังไม่ได้ deploy production รอบนี้
 - การตัดสต๊อกเกิดตอนแปลงใบจองเป็นใบขายตาม flow เดิม จึงไม่ตัดซ้ำตอนใบขึ้นของ
+# Handoff — 2026-09-10 (Codex access revocation)
+
+## Commit
+pending
+
+## ทำอะไรไป
+- แก้การแก้ไขผู้ใช้ให้ถอนสิทธิ์สาขาที่เอาออกจากฟอร์มจริง โดยปิด `user_branch_roles` และกำหนดวันสิ้นสุด
+- ปรับคำอธิบายหน้า Users ให้ชัดว่าสาขาที่เอาออกจะถูกปิดสิทธิ์
+- เพิ่มเทสต์ยืนยันการถอนสิทธิ์สาขาเสริม
+
+## ทดสอบไปแล้วแค่ไหน
+- `php artisan test --compact` ผ่าน 422 tests, 1 skipped, 6 incomplete, 3,230 assertions
+- UserManagementTest ผ่าน 9 tests / 59 assertions
+- `php artisan view:cache` และ `git diff --check` ผ่าน
+
+## ความเสี่ยง/งานถัดไป
+- ยังไม่ได้ deploy production รอบนี้
+- สิทธิ์ระดับ role และ branch access มีอยู่แล้ว; ควรทำ UAT ด้วยบัญชีจริงของแต่ละแผนกก่อนเปิดใช้งานเต็มรูปแบบ

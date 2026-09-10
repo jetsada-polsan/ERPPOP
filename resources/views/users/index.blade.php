@@ -147,7 +147,7 @@
                             <option value="{{ $b->id }}">{{ $b->code }} - {{ $b->name_th }}</option>
                         @endforeach
                     </select>
-                    <div id="branchAccessHelp" class="form-text">เลือกสาขาที่ User นี้เข้า POS และทำเอกสารได้ สิทธิ์เดิมจะไม่ถูกถอนอัตโนมัติ</div>
+                    <div id="branchAccessHelp" class="form-text">เลือกสาขาที่ User นี้เข้า POS และทำเอกสารได้ สาขาที่เอาออกจะถูกปิดสิทธิ์ทันที</div>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label small text-muted">สายการขาย / สายส่งเริ่มต้น</label>
