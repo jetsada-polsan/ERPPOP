@@ -113,6 +113,7 @@ Route::prefix('fleet')->name('fleet.')->group(function () {
     Route::get('/', [FleetController::class, 'index'])->name('index');
     Route::get('/board', [FleetController::class, 'board'])->name('board');
     Route::post('/board/{booking}', [FleetController::class, 'updateBoard'])->name('board.update');
+    Route::post('/board/{booking}/payment', [FleetController::class, 'collectPayment'])->name('board.payment');
     Route::post('/vehicles', [FleetController::class, 'vehicle'])->name('vehicles.store');
     Route::post('/trips', [FleetController::class, 'trip'])->name('trips.store');
     Route::post('/repairs', [FleetController::class, 'repair'])->name('repairs.store');
