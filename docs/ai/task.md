@@ -436,7 +436,7 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
 # Handoff — 2026-09-10 (Codex Transport driver flow)
 
 ## Commit
-pending
+`2ca6ec7`
 
 ## ทำอะไรไป
 - เพิ่มหน้าคนขับมือถือที่ `/fleet/driver` สำหรับเลือกงานและเปลี่ยนสถานะ ขึ้นรถแล้ว → เริ่มส่งของ → ส่งสำเร็จ
@@ -449,7 +449,7 @@ pending
 - `git diff --check` ผ่าน
 
 ## ความเสี่ยง/งานถัดไป
-- ยังไม่ได้ deploy production รอบนี้
+- deploy production แล้วผ่าน GitHub Actions run `34450358978`
 - ใบขึ้นของแบบตรวจมี/ไม่มีและแก้จำนวนยังเป็นงานถัดไป
 # Handoff — 2026-09-10 (Codex transport load sheet)
 
