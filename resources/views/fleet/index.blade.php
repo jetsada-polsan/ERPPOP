@@ -3,6 +3,7 @@
 @section('page-title','ยานพาหนะ / ขนส่ง')
 @section('page-subtitle','ทะเบียนรถ การวิ่งรายวัน และประวัติซ่อม')
 @section('content')
+<div class="d-flex justify-content-end mb-3"><a class="btn btn-outline-primary" href="{{ route('fleet.report') }}">รายงานสรุปรถ</a></div>
 <div class="row g-3">
 <div class="col-lg-4"><div class="card"><div class="card-header">เพิ่มทะเบียนรถ</div><div class="card-body"><form method="POST" action="{{ route('fleet.vehicles.store') }}">@csrf
 <select name="branch_id" class="form-select mb-2"><option value="">ไม่ระบุสาขา</option>@foreach($branches as $b)<option value="{{ $b->id }}">{{ $b->code }} · {{ $b->name_th }}</option>@endforeach</select>

@@ -9,6 +9,7 @@ use App\Models\TransportJob;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Illuminate\Support\Carbon;
 use App\Services\Sales\CustomerPaymentService;
 
 class FleetController extends Controller
@@ -41,7 +42,15 @@ class FleetController extends Controller
         return back()->with('success',"รับเงินและตัดลูกหนี้แล้ว {$receipt->doc_number}");
     }
     public function index(): View { return view('fleet.index', ['vehicles'=>FleetVehicle::with('branch')->latest()->get(), 'branches'=>Branch::where('is_active',true)->orderBy('code')->get(), 'trips'=>FleetTrip::with('vehicle')->latest('trip_date')->limit(20)->get(), 'repairs'=>FleetRepair::with('vehicle')->latest('repair_date')->limit(20)->get()]); }
+    public function report(Request $request): View
+    {
+        $data=$request->validate(['from'=>'nullable|date','to'=>'nullable|date|after_or_equal:from','vehicle_id'=>'nullable|exists:fleet_vehicles,id']);
+        $from=Carbon::parse($data['from']??now()->startOfMonth())->startOfDay(); $to=Carbon::parse($data['to']??now())->endOfDay();
+        $vehicles=FleetVehicle::with(['branch','trips'=>fn($q)=>$q->whereBetween('trip_date',[$from->toDateString(),$to->toDateString()]),'repairs'=>fn($q)=>$q->whereBetween('repair_date',[$from->toDateString(),$to->toDateString()])])->when($data['vehicle_id']??null,fn($q,$id)=>$q->whereKey($id))->orderBy('registration')->get();
+        $summary=['distance'=>$vehicles->sum(fn($v)=>$v->trips->sum(fn($t)=>$t->odometer_end-$t->odometer_start)),'fuel_liters'=>$vehicles->sum(fn($v)=>$v->trips->sum('fuel_liters')),'fuel_cost'=>$vehicles->sum(fn($v)=>$v->trips->sum('fuel_cost')),'repair_cost'=>$vehicles->sum(fn($v)=>$v->repairs->sum('cost'))];
+        return view('fleet.report',compact('vehicles','summary','from','to'));
+    }
     public function vehicle(Request $request): RedirectResponse { $data=$request->validate(['branch_id'=>'nullable|exists:branches,id','code'=>'required|max:30|unique:fleet_vehicles,code','registration'=>'required|max:30|unique:fleet_vehicles,registration','vehicle_type'=>'required|max:80','brand'=>'nullable|max:80','model'=>'nullable|max:80','current_odometer'=>'required|integer|min:0']); FleetVehicle::create($data+['status'=>'active']); return back()->with('success','เพิ่มรถเข้าทะเบียนแล้ว'); }
-    public function trip(Request $request): RedirectResponse { $data=$request->validate(['vehicle_id'=>'required|exists:fleet_vehicles,id','trip_date'=>'required|date','odometer_start'=>'required|integer|min:0','odometer_end'=>'required|integer|gte:odometer_start','route'=>'required|max:255','fuel_liters'=>'nullable|numeric|min:0','fuel_cost'=>'nullable|numeric|min:0']); $data['created_by']=auth()->id(); FleetTrip::create($data); FleetVehicle::whereKey($data['vehicle_id'])->update(['current_odometer'=>$data['odometer_end']]); return back()->with('success','บันทึกการวิ่งแล้ว'); }
-    public function repair(Request $request): RedirectResponse { $data=$request->validate(['vehicle_id'=>'required|exists:fleet_vehicles,id','repair_date'=>'required|date','odometer'=>'required|integer|min:0','summary'=>'required|max:255','vendor'=>'nullable|max:150','cost'=>'nullable|numeric|min:0','next_service_date'=>'nullable|date']); $data['created_by']=auth()->id(); FleetRepair::create($data); return back()->with('success','บันทึกประวัติซ่อมแล้ว'); }
+    public function trip(Request $request): RedirectResponse { $data=$request->validate(['vehicle_id'=>'required|exists:fleet_vehicles,id','trip_date'=>'required|date','odometer_start'=>'required|integer|min:0','odometer_end'=>'required|integer|gte:odometer_start','route'=>'required|max:255','fuel_liters'=>'nullable|numeric|min:0','fuel_cost'=>'nullable|numeric|min:0']); $vehicle=FleetVehicle::findOrFail($data['vehicle_id']); abort_if($data['odometer_start']<$vehicle->current_odometer,422,'เลขไมล์เริ่มต้นน้อยกว่าเลขไมล์ปัจจุบัน'); $data['created_by']=auth()->id(); FleetTrip::create($data); $vehicle->update(['current_odometer'=>$data['odometer_end']]); return back()->with('success','บันทึกการวิ่งแล้ว'); }
+    public function repair(Request $request): RedirectResponse { $data=$request->validate(['vehicle_id'=>'required|exists:fleet_vehicles,id','repair_date'=>'required|date','odometer'=>'required|integer|min:0','summary'=>'required|max:255','vendor'=>'nullable|max:150','cost'=>'nullable|numeric|min:0','next_service_date'=>'nullable|date']); $vehicle=FleetVehicle::findOrFail($data['vehicle_id']); abort_if($data['odometer']<$vehicle->current_odometer,422,'เลขไมล์ตอนซ่อมน้อยกว่าเลขไมล์ปัจจุบัน'); $data['created_by']=auth()->id(); FleetRepair::create($data); return back()->with('success','บันทึกประวัติซ่อมแล้ว'); }
 }
