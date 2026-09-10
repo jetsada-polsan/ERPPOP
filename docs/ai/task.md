@@ -418,7 +418,7 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
 # Handoff — 2026-09-10 (Codex Fleet report)
 
 ## Commit
-pending
+`d4e9a31`
 
 ## ทำอะไรไป
 - เพิ่ม route และหน้า `fleet/report` สำหรับกรองช่วงวันที่/รถ และสรุประยะทาง น้ำมัน ค่าน้ำมัน ค่าซ่อม และค่าใช้จ่ายต่อกิโลเมตรแยกรถ
@@ -431,5 +431,5 @@ pending
 - `git diff --check` ผ่าน
 
 ## ความเสี่ยง/งานถัดไป
-- ยังไม่ได้ deploy production; ต้อง push และรัน deploy workflow ก่อนใช้งานจริง
+- deploy production แล้วผ่าน GitHub Actions run `34447570421`
 - รายงานคำนวณจากข้อมูลการวิ่ง/ซ่อมที่มีอยู่ ยังไม่ลงบัญชีค่าใช้จ่ายอัตโนมัติ
