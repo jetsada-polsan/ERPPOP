@@ -114,6 +114,8 @@ Route::prefix('fleet')->name('fleet.')->group(function () {
     Route::get('/report', [FleetController::class, 'report'])->name('report');
     Route::get('/board', [FleetController::class, 'board'])->name('board');
     Route::get('/driver', [FleetController::class, 'driver'])->name('driver');
+    Route::get('/load-sheet/{booking}', [FleetController::class, 'loadSheet'])->name('load-sheet');
+    Route::post('/load-sheet/{booking}', [FleetController::class, 'saveLoadSheet'])->name('load-sheet.save');
     Route::post('/board/{booking}', [FleetController::class, 'updateBoard'])->name('board.update');
     Route::post('/board/{booking}/payment', [FleetController::class, 'collectPayment'])->name('board.payment');
     Route::post('/vehicles', [FleetController::class, 'vehicle'])->name('vehicles.store');

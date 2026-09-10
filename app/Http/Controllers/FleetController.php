@@ -6,6 +6,7 @@ use App\Models\FleetTrip;
 use App\Models\FleetVehicle;
 use App\Models\SaleBooking;
 use App\Models\TransportJob;
+use App\Models\TransportLoadItem;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -23,6 +24,21 @@ class FleetController extends Controller
     {
         SaleBooking::where('fulfillment_type','delivery')->whereNotIn('delivery_status',['cancelled'])->each(fn($b)=>TransportJob::firstOrCreate(['booking_id'=>$b->id]));
         return view('fleet.driver', ['jobs'=>TransportJob::with(['booking.document.customer','vehicle'])->whereIn('status',['booked','loaded','in_transit','delivered'])->latest()->get()]);
+    }
+    public function loadSheet(SaleBooking $booking): View
+    {
+        abort_unless($booking->isDelivery(),404);
+        $job=TransportJob::firstOrCreate(['booking_id'=>$booking->id]);
+        $items=$booking->document->stockDocument?->items()->with('product')->get() ?? collect();
+        foreach($items as $item) TransportLoadItem::firstOrCreate(['transport_job_id'=>$job->id,'stock_document_item_id'=>$item->id],['planned_qty'=>$item->qty]);
+        return view('fleet.load-sheet',['job'=>$job->load('booking.document.customer','loadItems.stockItem.product'),'items'=>$job->loadItems()->with('stockItem.product')->get()]);
+    }
+    public function saveLoadSheet(Request $request, SaleBooking $booking): RedirectResponse
+    {
+        abort_unless($booking->isDelivery(),404); $job=TransportJob::firstOrCreate(['booking_id'=>$booking->id]);
+        $data=$request->validate(['items'=>'required|array','items.*.loaded_qty'=>'required|numeric|min:0','items.*.availability'=>'required|in:available,unavailable,partial','items.*.note'=>'nullable|max:500']);
+        foreach($data['items'] as $id=>$row) { $line=$job->loadItems()->whereKey($id)->firstOrFail(); abort_if($row['loaded_qty']>$line->planned_qty,422,'จำนวนขึ้นรถเกินจำนวนในใบจอง'); $line->update($row+['updated_by'=>auth()->id()]); }
+        return redirect()->route('fleet.load-sheet',$booking)->with('success','บันทึกใบขึ้นของแล้ว สามารถพิมพ์ใบส่งของได้');
     }
     public function updateBoard(Request $request, SaleBooking $booking, CustomerPaymentService $payments): RedirectResponse
     {

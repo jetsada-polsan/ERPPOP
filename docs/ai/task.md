@@ -451,3 +451,23 @@ pending
 ## ความเสี่ยง/งานถัดไป
 - ยังไม่ได้ deploy production รอบนี้
 - ใบขึ้นของแบบตรวจมี/ไม่มีและแก้จำนวนยังเป็นงานถัดไป
+# Handoff — 2026-09-10 (Codex transport load sheet)
+
+## Commit
+pending
+
+## ทำอะไรไป
+- เพิ่ม `transport_load_items` สำหรับใบขึ้นของ ผูกกับรายการสินค้าในใบจอง พร้อมสถานะมีครบ/มีบางส่วน/ไม่มี และจำนวนขึ้นรถจริง
+- เพิ่มหน้า `/fleet/load-sheet/{booking}` สำหรับตรวจ แก้จำนวน และพิมพ์ใบส่งของ
+- เพิ่ม endpoint บันทึกใบขึ้นของและป้องกันจำนวนส่งเกินจำนวนในใบจอง
+- เพิ่ม migration table ใบขึ้นของในรายการ reset transactions
+
+## ทดสอบไปแล้วแค่ไหน
+- `php artisan test --compact` ผ่าน 421 tests, 1 skipped, 6 incomplete, 3,226 assertions
+- `php artisan test tests/Feature/ErpResetTransactionsTest.php --compact` ผ่าน 8 tests / 40 assertions
+- `php artisan view:cache` ผ่าน
+- `git diff --check` ผ่าน
+
+## ความเสี่ยง/งานถัดไป
+- ยังไม่ได้ deploy production รอบนี้
+- ยังไม่ได้บังคับให้สถานะขึ้นรถต้องผ่านการบันทึกใบขึ้นของครบทุกบรรทัด; ควรเพิ่มเป็น policy ก่อนเปิดใช้งานจริง
