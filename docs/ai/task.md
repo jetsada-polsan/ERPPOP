@@ -408,3 +408,10 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ทดสอบกล้องจริงบนมือถือและยังใช้ CDN ของ html5-qrcode; ยังไม่ได้ deploy production
 - Deploy: ยังไม่ deploy
 - งานถัดไป: ติดตั้ง bundle ของ html5-qrcode ภายในโปรเจกต์แทน CDN หากต้องรองรับ offline/PWA และทดสอบ flow ด้วยข้อมูลสาขาจริง
+## Handoff - 2026-09-10
+- Commit: `a70aaf5`
+- ทำอะไร: เพิ่มโมดูลบอร์ดขนส่ง `/fleet/board` ผูกใบจอง delivery กับรถและสถานะใบจอง/ขึ้นรถ/กำลังขนส่ง/ส่งแล้ว/รับเงินแล้ว/ยกเลิก พร้อมบันทึกเงินสดหรือโอน จำนวนเงิน และเลขบัญชีท้าย 4 หลัก; เก็บ `transport_jobs` เป็นประวัติถาวรและไม่รวมใน reset transactions
+- ทดสอบ: `php artisan test --compact` ผ่าน 421/422, `git diff --check` ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ deploy production; งานขนส่งเก่าที่ไม่มี job จะถูกสร้างเมื่อเปิดบอร์ดครั้งแรก
+- Deploy: ยังไม่ deploy
+- งานถัดไป: deploy migration และทดสอบบอร์ดกับใบจองจริง
