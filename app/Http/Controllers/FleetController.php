@@ -19,6 +19,11 @@ class FleetController extends Controller
         SaleBooking::where('fulfillment_type','delivery')->whereNotIn('delivery_status',['cancelled'])->each(fn($b)=>TransportJob::firstOrCreate(['booking_id'=>$b->id]));
         return view('fleet.board', ['jobs'=>TransportJob::with(['booking.document.customer','vehicle'])->whereHas('booking', fn($q)=>$q->where('fulfillment_type','delivery'))->latest()->get(), 'vehicles'=>FleetVehicle::where('status','active')->orderBy('registration')->get()]);
     }
+    public function driver(): View
+    {
+        SaleBooking::where('fulfillment_type','delivery')->whereNotIn('delivery_status',['cancelled'])->each(fn($b)=>TransportJob::firstOrCreate(['booking_id'=>$b->id]));
+        return view('fleet.driver', ['jobs'=>TransportJob::with(['booking.document.customer','vehicle'])->whereIn('status',['booked','loaded','in_transit','delivered'])->latest()->get()]);
+    }
     public function updateBoard(Request $request, SaleBooking $booking, CustomerPaymentService $payments): RedirectResponse
     {
         $data=$request->validate(['status'=>'required|in:booked,loaded,in_transit,delivered,paid,cancelled','vehicle_id'=>'nullable|exists:fleet_vehicles,id','payment_method'=>['nullable','in:cash,transfer','required_if:status,paid'],'paid_amount'=>['nullable','numeric','min:0','required_if:status,paid'],'transfer_last4'=>['nullable','digits:4','required_if:payment_method,transfer'],'note'=>'nullable|max:1000']);
