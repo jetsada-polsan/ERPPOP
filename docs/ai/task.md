@@ -522,3 +522,20 @@ pending
 ## ความเสี่ยง/งานถัดไป
 - ต้อง deploy commit นี้ก่อนจึงจะรันล้าง production จริงได้
 - backup production เดิม `erp-db-20260910-152534.sql.gz` ยังพร้อมกู้คืน
+# Handoff — 2026-09-10 (Production transaction reset)
+
+## Commit
+`2704379`
+
+## ทำอะไรไป
+- แก้และ deploy คำสั่ง reset ให้ลบ `transport_jobs` พร้อมเอกสารที่อ้างถึง
+- สำรอง production ก่อนล้าง: `erp-db-20260910-152534.sql.gz` checksum ผ่าน
+- ล้างธุรกรรม production ตามที่ยืนยัน: 977 แถวจาก 74 ตาราง และตั้ง `stock_balances` 2,527 แถวเป็นศูนย์
+
+## ทดสอบไปแล้วแค่ไหน
+- Production `erp:health` ผ่าน database, migration, backup, sales-GL, storage และ queue
+- หลังล้าง: products 5,280, users 114, employees 107, documents 0, receipts 0, transport_jobs 0
+
+## ความเสี่ยง/งานถัดไป
+- ข้อมูลธุรกรรมเดิมกู้ได้จาก backup ที่ระบุเท่านั้น
+- ลูกค้า สาขา สิทธิ์ และข้อมูลระบบยังคงอยู่เพื่อให้ระบบทำงานได้
