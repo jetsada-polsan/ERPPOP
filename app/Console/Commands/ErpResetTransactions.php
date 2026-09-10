@@ -64,6 +64,7 @@ class ErpResetTransactions extends Command
         'products', 'customers', 'suppliers', 'users', 'roles', 'permissions',
         'chart_of_accounts', 'report_definitions', 'app_settings', 'audit_logs',
         'branches', 'pos_devices', 'employees', 'salesmen',
+        'transport_jobs',
     ];
 
     public function handle(): int
@@ -202,7 +203,7 @@ class ErpResetTransactions extends Command
 
         foreach (Schema::getTableListing() as $table) {
             $table = str_contains($table, '.') ? explode('.', $table, 2)[1] : $table;
-            if (in_array($table, $whitelist, true)) {
+            if (in_array($table, $whitelist, true) || in_array($table, self::PRESERVED, true)) {
                 continue;
             }
 
