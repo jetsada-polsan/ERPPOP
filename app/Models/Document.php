@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'document_type_id', 'document_book_id', 'branch_id', 'doc_number', 'doc_date', 'salesman_id', 'sales_user_id', 'sales_area_id',
     'customer_id', 'supplier_id', 'reference', 'status', 'total_items', 'total_amount',
     'subtotal_amount', 'vat_amount', 'prices_include_vat', 'claim_input_vat',
-    'remark', 'created_by',
+    'remark', 'created_by', 'submitted_by', 'submitted_at', 'approved_by', 'approved_at', 'approval_note',
 ])]
 class Document extends Model
 {
@@ -60,6 +60,16 @@ class Document extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function submittedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'submitted_by');
+    }
+
+    public function approvedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
     public function stockDocument(): HasOne
     {
         return $this->hasOne(StockDocument::class);
@@ -100,6 +110,8 @@ class Document extends Model
             'prices_include_vat' => 'boolean',
             'claim_input_vat' => 'boolean',
             'cancelled_at' => 'datetime',
+            'submitted_at' => 'datetime',
+            'approved_at' => 'datetime',
         ];
     }
 }

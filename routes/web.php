@@ -22,6 +22,7 @@ use App\Http\Controllers\DeliveryNoteController;
 use App\Http\Controllers\DiscountCardController;
 use App\Http\Controllers\DocumentBookController;
 use App\Http\Controllers\DocumentBrowserController;
+use App\Http\Controllers\DocumentLifecycleController;
 use App\Http\Controllers\EcommerceChannelController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\ErpMockupController;
@@ -589,6 +590,9 @@ Route::get('/documents/legacy/{diKey}', [DocumentBrowserController::class, 'lega
 
 // ใบส่งของ/ใบส่งของชั่วคราว (A5): พิมพ์ได้จากใบจองและใบขายทุกชนิด
 Route::get('/documents/{document}/delivery-note', [DeliveryNoteController::class, 'show'])->name('documents.delivery-note');
+Route::post('/documents/{document}/submit', [DocumentLifecycleController::class, 'submit'])->name('documents.submit');
+Route::post('/documents/{document}/approve', [DocumentLifecycleController::class, 'approve'])->name('documents.approve');
+Route::post('/documents/{document}/reject', [DocumentLifecycleController::class, 'reject'])->name('documents.reject');
 // ใบกำกับภาษีเต็มรูปแบบ A4 (ขายสด/ขายเชื่อ) ตามหลัก 9 จุดของสรรพากร
 Route::get('/documents/{document}/tax-invoice', [DeliveryNoteController::class, 'taxInvoice'])->name('documents.tax-invoice');
 

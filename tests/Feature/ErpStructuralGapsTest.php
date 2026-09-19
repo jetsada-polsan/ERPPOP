@@ -45,12 +45,13 @@ class ErpStructuralGapsTest extends TestCase
 
         // สร้างมาเป็น active ทันที ข้ามร่าง/รอตรวจ/อนุมัติทั้งหมด
         $this->assertSame('active', $document->status);
-        $this->assertFalse(Schema::hasColumn('documents', 'approved_by'));
-        $this->assertFalse(Schema::hasColumn('documents', 'submitted_at'));
+        $this->assertTrue(Schema::hasColumn('documents', 'approved_by'));
+        $this->assertTrue(Schema::hasColumn('documents', 'submitted_at'));
 
         $this->markTestIncomplete(
-            'เอกสารขายยังไม่มีวงจร ร่าง -> รอตรวจ -> อนุมัติ -> ยืนยัน -> ยกเลิก '.
-            'ตามหลักข้อ 1 ของ BplusBack ต้องมี: คอลัมน์สถานะที่มากกว่า active/cancelled, '.
+            'เอกสารขายมีคอลัมน์รองรับการส่งตรวจ/อนุมัติแล้ว แต่ service การสร้างเอกสารยังสร้างเป็น active ทันที '.
+            'และยังไม่มีวงจร ร่าง -> รอตรวจ -> อนุมัติ -> ยืนยัน -> ยกเลิก '.
+            'ตามหลักข้อ 1 ของ BplusBack ต้องมีกติกาว่าสถานะไหนตัดสต๊อกและลง GL ได้, '.
             'ผู้ส่งตรวจ/ผู้อนุมัติ/เวลา, กติกาว่าสถานะไหนตัดสต๊อกและลง GL ได้, '.
             'และห้ามแก้ข้อมูลสำคัญหลังยืนยัน'
         );
