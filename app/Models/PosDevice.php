@@ -8,7 +8,8 @@ use Illuminate\Support\Str;
 
 /**
  * Token ต่อเครื่องสำหรับ POS desktop (Tauri). device ล็อก "สาขา" ไว้ ส่วน "คนขาย"
- * มาจากการยืนยัน PIN ที่ /api/pos/cashier/login ซึ่งบันทึกไว้ที่ active_cashier_id
+ * มาจากการยืนยัน PIN หรือการเลือกชื่อในโหมด passwordless ที่ /api/pos/cashier/login
+ * ซึ่งบันทึกไว้ที่ active_cashier_id
  * ทำให้ client ปลอม cashier_id ของคนอื่นในสาขาไม่ได้
  */
 class PosDevice extends Model
@@ -53,7 +54,7 @@ class PosDevice extends Model
         return $this->revoked_at === null;
     }
 
-    /** บันทึกว่าใส่ PIN ผ่านแล้ว — ใช้ตอนแคชเชียร์ล็อกอินหรือสลับคนบนเครื่องเดิม */
+    /** บันทึกว่าคนขายถูกเลือก/ยืนยันแล้ว — ใช้ตอนเริ่มกะหรือสลับคนบนเครื่องเดิม */
     public function markCashierVerified(Salesman $cashier): void
     {
         $this->forceFill([

@@ -14,8 +14,7 @@ from string import Template
 
 from .barcode import decode_scale_label, load_scale_profiles, scale_cart_line
 from .build_info import APP_VERSION
-from .api_client import LaravelApiError, LaravelPosClient
-from .bootstrap import _cached_setting
+from .api_client import LaravelPosClient
 from .mock_printer import active_paper_width, company_details, receipt_for
 from .order import ALL_CATEGORIES, DISCOUNT, PRICE, QTY, Order, OrderLine, categories, product_grid
 from .config import DeviceConfig, load_device_config, save_device_config
@@ -48,7 +47,7 @@ PALETTE = {
 
 
 def run_pairing_wizard(data_dir, app) -> bool:
-    """Pair a new terminal before showing the cashier login screen."""
+    """Pair a new terminal before showing the seller selection screen."""
     try:
         from PySide6.QtCore import Qt
         from PySide6.QtWidgets import QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit, QMessageBox
@@ -254,304 +253,86 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         painter.end()
         return QPixmap.fromImage(image)
 
-    class LoginDialog(QDialog):
+    class SellerSelectionDialog(QDialog):
         def __init__(self):
             super().__init__()
             self.cashier = None
-            self.setWindowTitle(f"PopCentral POS v{APP_VERSION} — ยืนยันก่อนเริ่มขาย")
+            self.setWindowTitle(f"PopCentral POS v{APP_VERSION} — เลือกคนขาย")
             self.setWindowFlag(Qt.WindowCloseButtonHint, True)
             self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
             self.setWindowModality(Qt.WindowModal)
-            self.setMinimumWidth(420)
+            self.setMinimumWidth(480)
             form = QFormLayout(self)
             hint = QLabel(
-                "ดูสินค้าและรายงานได้โดยไม่ต้องล็อกอิน "
-                "กรอกรหัสแคชเชียร์และ PIN เมื่อต้องการเริ่มขาย"
+                "เลือกชื่อคนขาย แล้วใส่เงินทอนเพื่อเปิดกะ\n"
+                "ไม่ต้องกรอกรหัสหรือ PIN"
             )
             hint.setWordWrap(True)
-            self.code = QLineEdit()
-            self.code.setPlaceholderText("รหัสแคชเชียร์ หรือ username ERP")
             self.cashier_select = QComboBox()
-            self.cashier_select.addItem("เลือกชื่อคนขาย", None)
-            device_user_id = _cached_setting(service.db, "device_user_id")
-            cashier_query = """SELECT code, name, server_id, user_id, force_pin_change FROM local_cashiers
-                              WHERE active = 1 AND user_id IS NOT NULL AND revoked_at IS NULL"""
-            cashier_params: tuple = ()
-            if device_user_id is not None:
-                cashier_query += " AND user_id = ?"
-                cashier_params = (int(device_user_id),)
-            cashier_query += " ORDER BY name, code"
-            cashiers = service.db.execute(cashier_query, cashier_params).fetchall()
-            for cashier in cashiers:
-                self.cashier_select.addItem(
-                    f"{cashier['name']}  ·  {cashier['code']}",
-                    {
-                        "code": cashier["code"],
-                        "server_id": cashier["server_id"],
-                        "force_pin_change": bool(cashier["force_pin_change"]),
-                    },
-                )
-            self.cashier_select.currentIndexChanged.connect(lambda _: self._select_cashier())
-            self.cashier_select.setEnabled(device_user_id is None)
-            self.pin = QLineEdit()
-            self.pin.setEchoMode(QLineEdit.Password)
-            self.pin.setPlaceholderText("แตะ PIN")
-            self.pin.returnPressed.connect(self.login)
-            self.connection_status = QLabel(self._offline_notice())
+            self.connection_status = QLabel()
             self.connection_status.setWordWrap(True)
-            submit = QPushButton("ยืนยันและเริ่มขาย")
+            refresh = QPushButton("อัปเดตรายชื่อ")
+            refresh.clicked.connect(self.refresh_cashiers)
+            submit = QPushButton("เลือกชื่อและเปิดกะ")
             submit.setObjectName("primary")
-            submit.clicked.connect(self.login)
-            maintenance = QPushButton("IT Maintenance")
-            maintenance.clicked.connect(self.open_maintenance)
-            override = QPushButton("ผู้จัดการช่วยกู้ PIN")
-            override.clicked.connect(self.manager_override)
-            self.passwordless = bool(
-                online is not None and online.online
-                and _cached_setting(service.db, "cashier_login_mode") == "selection"
-                and len(cashiers) == 1
-                and not bool(cashiers[0]["force_pin_change"])
-            )
-            if self.passwordless:
-                hint.setText("เครื่องนี้ผูกกับผู้ใช้ POS แล้ว · กดเริ่มขายได้เลย")
-                submit.setText("เริ่มขาย")
-                self.pin.hide()
-                override.hide()
-            # อุปกรณ์ที่ผูกผู้ใช้ไว้มีตัวเลือกจริงเพียงรายการเดียว ส่วนรายการแรก
-            # เป็น placeholder จึงต้องเลือกให้เอง ไม่เช่นนั้นปุ่มเริ่มขายจะยังไม่มี
-            # cashier_server_id และกดแล้วไม่เกิดการ login
-            if len(cashiers) == 1:
-                self.cashier_select.setCurrentIndex(1)
-                self._select_cashier()
+            submit.clicked.connect(self.choose)
+            cancel = QPushButton("ยกเลิก")
+            cancel.clicked.connect(self.reject)
+            self.refresh_cashiers()
             form.addRow(hint)
-            if cashiers:
-                form.addRow("ผู้ใช้ประจำเครื่อง" if device_user_id is not None else "ผู้ใช้ POS", self.cashier_select)
-            else:
-                form.addRow("รหัสแคชเชียร์", self.code)
-            if not self.passwordless:
-                form.addRow("PIN", self.pin)
-            pin_pad = QWidget()
-            pin_grid = QGridLayout(pin_pad)
-            pin_grid.setContentsMargins(0, 0, 0, 0)
-            for index, key in enumerate(["1", "2", "3", "4", "5", "6", "7", "8", "9", "ล้าง", "0", "⌫"]):
-                button = QPushButton(key)
-                button.setMinimumHeight(42)
-                button.clicked.connect(lambda _, value=key: self._press_pin(value))
-                pin_grid.addWidget(button, index // 3, index % 3)
-            form.addRow("", pin_pad)
+            form.addRow("ชื่อคนขาย", self.cashier_select)
             form.addRow(self.connection_status)
-            form.addRow(submit)
-            form.addRow(maintenance)
-            form.addRow(override)
+            actions = QHBoxLayout()
+            actions.addWidget(refresh)
+            actions.addStretch(1)
+            actions.addWidget(cancel)
+            actions.addWidget(submit)
+            form.addRow(actions)
 
-        def _select_cashier(self) -> None:
-            selected = self.cashier_select.currentData() or {}
-            code = selected.get("code") if isinstance(selected, dict) else selected
-            self.code.setText(str(code or ""))
-            if code and not getattr(self, "passwordless", False):
-                self.pin.setFocus()
-
-        def _ensure_cashier_selection(self) -> None:
-            """เลือกผู้ใช้คนเดียวซ้ำก่อน submit เผื่อ widget ยังอยู่ที่ placeholder."""
-            if self.cashier_select.count() == 2 and self.cashier_select.currentIndex() == 0:
-                self.cashier_select.setCurrentIndex(1)
-                self._select_cashier()
-
-        def _press_pin(self, key: str) -> None:
-            if key == "ล้าง":
-                self.pin.clear()
-            elif key == "⌫":
-                self.pin.backspace()
-            else:
-                self.pin.insert(key)
-
-        def open_settings(self) -> None:
-            dialog = SettingsDialog(self, None)
-            dialog.exec()
-
-        def _offline_notice(self) -> str:
-            last = service.db.execute(
-                "SELECT max(last_synced_at) FROM local_cashiers WHERE last_synced_at IS NOT NULL"
-            ).fetchone()[0]
+        def refresh_cashiers(self) -> None:
+            sync_error = None
             if online is not None and online.online:
-                return f"เชื่อมต่อ ERP แล้ว · ข้อมูลแคชเชียร์ sync ล่าสุด {last or 'กำลัง sync'}"
-            return (
-                f"Offline Mode · Cashier data last synced at {last or 'ยังไม่มีข้อมูล'}\n"
-                "PIN ใหม่จะใช้ได้หลัง POS sync · Offline login expired, please reconnect to server"
-            )
-
-        def _offline_login(self) -> bool:
-            result = service.login_offline(self.code.text().strip(), self.pin.text())
-            if not result.success:
-                QMessageBox.warning(self, "เข้าสู่ระบบออฟไลน์ไม่สำเร็จ", result.reason or "ไม่พบผู้ใช้หรือ PIN ไม่ถูกต้อง")
-                return False
-            self.cashier = result.cashier
-            return True
-
-        def _online_login(self) -> bool:
-            pin = self.pin.text().strip()
-            code = self.code.text().strip()
-            try:
-                self._ensure_cashier_selection()
-                # ดึงสถานะแคชเชียร์ล่าสุดก่อนยืนยันเสมอ แต่ห้ามลบ verifier เก่า
-                # เพราะถ้าเน็ตหลุดกลางทางยังต้อง fallback ไป SQLite ได้ทันที.
-                online.provisioning.pull_cashiers(online.branch_id)
-                selected = self.cashier_select.currentData() or {}
-                selected_server_id = selected.get("server_id") if isinstance(selected, dict) else None
-                if self.passwordless:
-                    if not selected_server_id:
-                        QMessageBox.warning(self, "ยังไม่พร้อมเริ่มขาย", "ยังไม่พบผู้ใช้ที่ผูกกับเครื่องนี้ กรุณา Sync จาก ERP")
-                        return False
-                    result = online.provisioning.online_cashier_login(
-                        None, cashier_code=code, cashier_server_id=int(selected_server_id)
-                    )
-                    if result.get("must_change_pin"):
-                        # A stale local cache or an older ERP can still report a
-                        # forced PIN change after device selection. Never call
-                        # changeCashierPin with an empty current PIN; ask for the
-                        # temporary PIN and retry the normal credential flow.
-                        temporary_pin, ok = self._ask_pin(
-                            "ยืนยัน PIN ชั่วคราว",
-                            "กรอก PIN ชั่วคราวที่ผู้ดูแลออกให้ก่อนตั้ง PIN ใหม่",
-                        )
-                        if not ok or not temporary_pin.strip():
-                            return False
-                        result = online.provisioning.online_cashier_login(
-                            temporary_pin.strip(),
-                            cashier_code=code,
-                            cashier_server_id=int(selected_server_id),
-                        )
-                else:
-                    result = online.provisioning.online_cashier_login(pin, cashier_code=code)
-                if result.get("selection_required"):
-                    # PIN กลางตรงหลายคน — เลือกด้วยรหัสแคชเชียร์ที่กรอก
-                    match = next((c for c in result["cashiers"] if str(c.get("code")) == code), None)
-                    if not match:
-                        QMessageBox.warning(self, "เลือกพนักงาน", "PIN นี้มีหลายคน กรุณากรอกรหัสแคชเชียร์ของคุณด้วย")
-                        return False
-                    result = online.provisioning.online_cashier_login(
-                        pin, cashier_code=code, cashier_server_id=int(match["id"])
-                    )
-                if result.get("must_change_pin"):
-                    result = self._force_pin_change(result, pin)
-                    if not result:
-                        return False
-            except Exception as error:
-                if isinstance(error, LaravelApiError) and "network:" in str(error):
-                    online.online = False
-                    self.connection_status.setText(self._offline_notice())
-                    return self._offline_login()
-                service.record_auth_event(code, "online_login", False, str(error)[:500])
-                QMessageBox.critical(self, "เข้าสู่ระบบไม่สำเร็จ", str(error))
-                return False
-            self.cashier = service.db.execute(
-                "SELECT * FROM local_cashiers WHERE id = ?", (result["local_cashier_id"],)
-            ).fetchone()
-            service.record_auth_event(code, "online_login", self.cashier is not None,
-                                      None if self.cashier is not None else "ไม่พบข้อมูลใน SQLite")
-            online.worker.wake()
-            return self.cashier is not None
-
-        def _force_pin_change(self, result: dict, current_pin: str) -> dict | None:
-            cashier = result.get("cashier") or {}
-            code = str(cashier.get("code") or self.code.text().strip())
-            dialog = QDialog(self)
-            dialog.setWindowTitle("ตั้ง PIN POS ใหม่")
-            dialog.setWindowFlag(Qt.WindowCloseButtonHint, True)
-            dialog.setMinimumWidth(420)
-            form = QFormLayout(dialog)
-            hint = QLabel("PIN นี้เป็นรหัสชั่วคราวจากผู้ดูแล ต้องเปลี่ยนเป็น PIN ของคุณก่อนเข้า POS")
-            hint.setWordWrap(True)
-            new_pin = QLineEdit()
-            confirm_pin = QLineEdit()
-            new_pin.setEchoMode(QLineEdit.Password)
-            confirm_pin.setEchoMode(QLineEdit.Password)
-            new_pin.setPlaceholderText("ตัวเลข 4-20 หลัก")
-            confirm_pin.setPlaceholderText("กรอกซ้ำ")
-            buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-            buttons.accepted.connect(dialog.accept)
-            buttons.rejected.connect(dialog.reject)
-            form.addRow(hint)
-            form.addRow("PIN ใหม่", new_pin)
-            form.addRow("ยืนยัน PIN ใหม่", confirm_pin)
-            form.addRow(buttons)
-
-            if dialog.exec() != QDialog.Accepted:
-                return None
-            new_value = new_pin.text().strip()
-            if new_value != confirm_pin.text().strip():
-                QMessageBox.warning(self, "PIN ไม่ตรงกัน", "กรุณากรอก PIN ใหม่ให้ตรงกัน")
-                return None
-            if not new_value.isdigit() or len(new_value) < 4:
-                QMessageBox.warning(self, "PIN ไม่ถูกต้อง", "PIN ต้องเป็นตัวเลขอย่างน้อย 4 หลัก")
-                return None
-            changed = online.provisioning.change_cashier_pin(code, current_pin, new_value)
-            QMessageBox.information(self, "เปลี่ยน PIN แล้ว", "ใช้ PIN ใหม่ของคุณสำหรับเข้า POS ครั้งถัดไป")
-            return {"selection_required": False, **changed, "must_change_pin": False}
-
-        def login(self):
-            self._ensure_cashier_selection()
-            if not self.code.text().strip():
-                QMessageBox.information(self, "เลือกคนขาย", "เลือกชื่อคนขายก่อนกรอก PIN")
-                return
-            if online is not None and online.online:
-                if self._online_login():
-                    self.accept()
-                return
-            if self._offline_login():
-                self.accept()
-
-        def open_maintenance(self) -> None:
-            if not service.has_local_it_pin():
-                if online is None or not online.online or AdminAuthDialog(self).exec() != QDialog.Accepted:
-                    QMessageBox.warning(self, "ต้องตั้ง Local IT PIN", "เชื่อม ERP และยืนยันผู้ดูแลเพื่อตั้ง Local IT PIN ครั้งแรก")
-                    return
-                pin, ok = self._ask_pin("ตั้ง Local IT PIN", "PIN สำหรับ IT เครื่องนี้ (6-20 หลัก)")
-                if not ok:
-                    return
                 try:
-                    service.set_local_it_pin(pin)
-                except ValueError as error:
-                    QMessageBox.warning(self, "PIN ไม่ถูกต้อง", str(error))
-                    return
-            pin, ok = self._ask_pin("IT Maintenance", "กรอก Local IT PIN")
-            if ok and service.verify_local_it_pin(pin):
-                SettingsDialog(self, None).exec()
-            elif ok:
-                QMessageBox.warning(self, "ยืนยันไม่สำเร็จ", "Local IT PIN ไม่ถูกต้อง")
+                    online.provisioning.pull_cashiers(online.branch_id)
+                except Exception as error:
+                    sync_error = str(error)
 
-        def manager_override(self) -> None:
-            dialog = QDialog(self)
-            dialog.setWindowTitle("ผู้จัดการช่วยกู้ PIN")
-            dialog.setWindowFlag(Qt.WindowCloseButtonHint, True)
-            dialog.setMinimumWidth(420)
-            form = QFormLayout(dialog)
-            manager_code, manager_pin, cashier_code, temporary_pin = QLineEdit(), QLineEdit(), QLineEdit(), QLineEdit()
-            manager_pin.setEchoMode(QLineEdit.Password)
-            temporary_pin.setEchoMode(QLineEdit.Password)
-            temporary_pin.setPlaceholderText("PIN ชั่วคราว 4-20 หลัก · ใช้ได้สูงสุด 4 ชั่วโมง")
-            form.addRow("รหัสผู้จัดการ", manager_code)
-            form.addRow("PIN ผู้จัดการ", manager_pin)
-            form.addRow("รหัสแคชเชียร์", cashier_code)
-            form.addRow("PIN ชั่วคราว", temporary_pin)
-            buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-            buttons.accepted.connect(dialog.accept)
-            buttons.rejected.connect(dialog.reject)
-            form.addRow(buttons)
-            if dialog.exec() != QDialog.Accepted:
-                return
-            result = service.manager_override_reset(
-                manager_code=manager_code.text().strip(), manager_pin=manager_pin.text(),
-                cashier_code=cashier_code.text().strip(), temporary_pin=temporary_pin.text(),
-            )
-            if not result.success:
-                QMessageBox.warning(self, "กู้ PIN ไม่สำเร็จ", result.reason or "ไม่สามารถทำรายการได้")
-                return
-            QMessageBox.information(self, "ออก PIN ชั่วคราวแล้ว", "ให้แคชเชียร์เข้า POS ด้วย PIN นี้ก่อนหมดอายุ\nรายการจะถูกส่งเป็น audit เมื่อเชื่อม ERP")
+            rows = service.db.execute(
+                """SELECT id, code, name, server_id FROM local_cashiers
+                   WHERE active = 1 AND revoked_at IS NULL ORDER BY name, code"""
+            ).fetchall()
+            self.cashier_select.clear()
+            self.cashier_select.addItem("เลือกชื่อคนขาย", None)
+            for cashier in rows:
+                # แสดงเฉพาะชื่อบนหน้าขาย ส่วน code/server_id ใช้ภายในเพื่อผูกยอดขายให้ถูกคน
+                self.cashier_select.addItem(str(cashier["name"] or cashier["code"]), int(cashier["id"]))
+            if len(rows) == 1:
+                self.cashier_select.setCurrentIndex(1)
 
-        def _ask_pin(self, title: str, label: str) -> tuple[str, bool]:
-            from PySide6.QtWidgets import QInputDialog
-            return QInputDialog.getText(self, title, label, QLineEdit.Password)
+            if rows:
+                mode = "เชื่อมต่อ ERP แล้ว" if online is not None and online.online else "โหมดออฟไลน์"
+                message = f"{mode} · เลือกได้ {len(rows)} คน · ไม่ต้องใช้ PIN"
+                if sync_error:
+                    message += f"\nใช้รายชื่อที่แคชไว้: {sync_error}"
+            else:
+                message = "ยังไม่พบรายชื่อคนขาย · กดอัปเดตรายชื่อหรือตรวจการผูกเครื่องกับ ERP"
+                if sync_error:
+                    message += f"\n{sync_error}"
+            self.connection_status.setText(message)
+
+        def choose(self) -> None:
+            local_id = self.cashier_select.currentData()
+            if local_id is None:
+                QMessageBox.information(self, "เลือกคนขาย", "เลือกชื่อคนขายก่อนเปิดกะ")
+                return
+            self.cashier = service.db.execute(
+                "SELECT * FROM local_cashiers WHERE id = ? AND active = 1 AND revoked_at IS NULL",
+                (int(local_id),),
+            ).fetchone()
+            if self.cashier is None:
+                QMessageBox.warning(self, "เลือกคนขายไม่ได้", "รายชื่อคนขายนี้ถูกปิดใช้งานแล้ว กรุณาอัปเดตรายชื่อ")
+                return
+            self.accept()
 
     class OpeningShiftDialog(QDialog):
         """หน้าต่างเปิดกะที่ไม่ถูก On-Screen Keyboard บัง และกดยอดเงินทอนได้ง่าย"""
@@ -1231,7 +1012,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             ).fetchall()
             auth_pending = service.db.execute("SELECT count(*) FROM auth_events_outbox WHERE synced = 0").fetchone()[0]
             text = "\n".join(f"{row['created_at']} · {row['direction']} · {row['status']} · {row['message'] or '-'}" for row in rows)
-            QMessageBox.information(self, "บันทึกการเชื่อมต่อ", f"Audit login รอส่ง: {auth_pending}\n\n{text or 'ยังไม่มีบันทึก'}")
+            QMessageBox.information(self, "บันทึกการเชื่อมต่อ", f"Audit รอส่ง: {auth_pending}\n\n{text or 'ยังไม่มีบันทึก'}")
 
         def save_pairing(self) -> None:
             url = self.server_url.text().strip()
@@ -1749,7 +1530,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.refresh_order()
 
         def ensure_sale_session(self) -> bool:
-            """Authenticate and open a shift only when the operator starts selling."""
+            """เลือกคนขายและเปิดกะเมื่อเริ่มขาย โดยไม่ถาม PIN."""
             if self.cashier is not None and self.shift_id is not None:
                 if online is not None and online.online:
                     server_shift = service.db.execute(
@@ -1766,30 +1547,64 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 return True
 
             try:
-                login = LoginDialog()
+                seller = SellerSelectionDialog()
                 # Some Windows POS setups keep the on-screen keyboard above the
-                # parent window. Show and raise the login prompt before exec().
-                login.show()
-                login.raise_()
-                login.activateWindow()
+                # parent window. Show and raise the seller prompt before exec().
+                seller.show()
+                seller.raise_()
+                seller.activateWindow()
                 app.processEvents()
-                login_result = login.exec()
+                seller_result = seller.exec()
             except Exception as error:
                 QMessageBox.critical(
                     self,
-                    "เปิดหน้าล็อกอินไม่ได้",
+                    "เปิดหน้าต่างเลือกคนขายไม่ได้",
                     f"POS เปิดหน้าต่างเริ่มขายไม่สำเร็จ: {error}\n\n"
                     "กรุณาถ่ายภาพข้อความนี้ส่งให้ฝ่าย IT",
                 )
                 return False
-            if login_result != QDialog.Accepted or login.cashier is None:
+            if seller_result != QDialog.Accepted or seller.cashier is None:
                 return False
+            cashier = seller.cashier
+
+            if online is not None and online.online:
+                if not cashier["server_id"]:
+                    QMessageBox.warning(
+                        self,
+                        "คนขายยังไม่พร้อม",
+                        "รายชื่อนี้ยังไม่มีรหัสจาก ERP กรุณากดอัปเดตรายชื่อคนขายก่อน",
+                    )
+                    return False
+                try:
+                    # The API call uses the device token and the selected server id;
+                    # no cashier code or PIN is requested from the operator.
+                    selected = online.provisioning.select_cashier(
+                        str(cashier["code"]), int(cashier["server_id"])
+                    )
+                    local_id = selected.get("local_cashier_id")
+                    if local_id:
+                        cashier = service.db.execute(
+                            "SELECT * FROM local_cashiers WHERE id = ?", (int(local_id),)
+                        ).fetchone() or cashier
+                    online.worker.wake()
+                except Exception as error:
+                    message = str(error)
+                    if "network:" in message:
+                        online.online = False
+                    else:
+                        if "กรุณาระบุ PIN" in message:
+                            message = (
+                                "ERP ยังไม่เปิดโหมดเลือกชื่อคนขายโดยไม่ใช้ PIN\n"
+                                "ให้ผู้ดูแลรัน: php artisan pos:passwordless enable"
+                            )
+                        QMessageBox.warning(self, "เลือกคนขายไม่ได้", message)
+                        return False
 
             existing_shift = service.db.execute(
                 "SELECT id, cashier_id, opening_cash FROM shifts WHERE terminal_id = ? AND status = 'open'",
                 (terminal_id,),
             ).fetchone()
-            if existing_shift and int(existing_shift["cashier_id"]) != int(login.cashier["id"]):
+            if existing_shift and int(existing_shift["cashier_id"]) != int(cashier["id"]):
                 QMessageBox.warning(self, "เริ่มขายไม่ได้", "เครื่องนี้มีกะของแคชเชียร์คนอื่นเปิดอยู่ ต้องปิดกะหรือส่งมอบกะก่อน")
                 return False
 
@@ -1803,9 +1618,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     return False
                 opening_cash = money(existing_shift["opening_cash"])
                 if existing_dialog.close_existing:
-                    # Attach the authenticated operator to the existing shift so the
+                    # Attach the selected operator to the existing shift so the
                     # normal audited close flow can reconcile it before reopening.
-                    self.cashier = login.cashier
+                    self.cashier = cashier
                     self.shift_id = int(existing_shift["id"])
                     self.opening_cash = opening_cash
                     self.close_current_shift()
@@ -1830,13 +1645,13 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
             try:
                 shift_id = service.open_shift(
-                    branch_id, terminal_id, int(login.cashier["id"]), opening_cash
+                    branch_id, terminal_id, int(cashier["id"]), opening_cash
                 )
             except Exception as error:
                 QMessageBox.warning(self, "เริ่มขายไม่ได้", str(error))
                 return False
 
-            self.cashier = login.cashier
+            self.cashier = cashier
             self.shift_id = shift_id
             self.opening_cash = opening_cash
             if online is not None:
@@ -1849,8 +1664,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     # The local shift is already committed and remains usable. Keep the
                     # reason visible in the normal sync queue instead of blocking sales.
                     service.record_auth_event(
-                        str(self.cashier["code"] or ""),
-                        "shift_open_queue",
+                        str(self.cashier["code"] or ""), "shift_open_queue",
                         False,
                         str(error)[:500],
                     )
@@ -1858,7 +1672,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.cashier_label.setText(
                 f"บิลปัจจุบัน · {self.cashier['name']} · เงินทอนต้นกะ {opening_cash:,.2f} บาท"
             )
-            self.auth_button.setText(f"กำลังขาย: {self.cashier['code']}")
+            self.auth_button.setText(f"กำลังขาย: {self.cashier['name']}")
             self.auth_button.setEnabled(False)
             layout_version = layout_config.get("version", 1)
             self.setWindowTitle(f"PopCentral POS v{APP_VERSION} — {self.cashier['name']} · Layout {layout_version}")

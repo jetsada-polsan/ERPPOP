@@ -137,6 +137,7 @@ class PosCashierIdentityTest extends TestCase
     {
         AppSetting::set('pos_passwordless_login', '1');
         [$branch, $alice] = $this->branchWithCashier('NOPIN', 'ALICE');
+        $alice->forceFill(['must_change_pin' => true])->save();
         $otherBranch = Branch::create(['code' => 'OTHER', 'name_th' => 'สาขาอื่น', 'is_active' => true]);
         $otherCashier = Salesman::create(['branch_id' => $otherBranch->id, 'code' => 'OTHER-1', 'name' => 'คนอื่น', 'is_active' => true]);
         $device = $this->device($branch, $alice);
@@ -147,6 +148,8 @@ class PosCashierIdentityTest extends TestCase
 
         $this->assertTrue($response->getData(true)['success']);
         $this->assertSame($alice->id, (int) $device->fresh()->active_cashier_id);
+        $this->assertNotNull($device->fresh()->cashier_verified_at);
+        $this->assertSame('cashier_selected', AuditLog::where('action', 'cashier_selected')->sole()->action);
 
         $otherRequest = Request::create('/api/pos/cashier/login', 'POST', ['cashier_id' => $otherCashier->id]);
         $otherRequest->attributes->set('pos_device', $device);

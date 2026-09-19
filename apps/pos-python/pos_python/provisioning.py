@@ -367,6 +367,14 @@ class ProvisioningService:
             "must_change_pin": bool(response.get("must_change_pin")),
         }
 
+    def select_cashier(self, cashier_code: str, cashier_server_id: int) -> dict:
+        """ผูกชื่อคนขายกับเครื่องด้วย Device Token โดยไม่ถาม PIN จากหน้าจอ POS."""
+        return self.online_cashier_login(
+            None,
+            cashier_code=cashier_code,
+            cashier_server_id=cashier_server_id,
+        )
+
     def authorize_admin(self, username: str, password: str) -> dict:
         response = self.api.post("/api/pos/admin/authorize", {
             "username": username,

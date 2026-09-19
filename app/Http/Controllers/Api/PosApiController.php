@@ -293,9 +293,10 @@ class PosApiController extends Controller
 
     private function authenticatedCashierResponse(Request $request, Salesman $cashier, ?PosDevice $device, ?int $branchId, ?string $pin): JsonResponse
     {
-        // ผูกผลการยืนยันไว้กับเครื่อง เพื่อให้คำสั่งขายหลังจากนี้อ้างชื่อคนอื่นไม่ได้
-        // PIN ที่แอดมินตั้งให้ยังไม่ผูก เพราะคนอื่นก็รู้ค่า ใช้ยืนยันว่าเป็นเจ้าตัวไม่ได้
-        if (! $this->mustChangePin($cashier)) {
+        // ผูกผลการเลือก/ยืนยันไว้กับเครื่อง เพื่อให้คำสั่งขายหลังจากนี้อ้างชื่อคนอื่นไม่ได้
+        // โหมดเลือกชื่อโดยไม่ใช้ PIN ต้องผูกได้แม้ credential เดิมจะถูกตั้งให้เปลี่ยน PIN
+        // เพราะโหมดนี้ตั้งใจไม่ถาม PIN จากหน้าจอ POS อยู่แล้ว.
+        if ($pin === null || ! $this->mustChangePin($cashier)) {
             $device?->markCashierVerified($cashier);
         }
 
@@ -304,7 +305,7 @@ class PosApiController extends Controller
         AuditLog::create([
             'user_id' => $request->user()?->id,
             'branch_id' => $branchId,
-            'action' => 'cashier_login',
+            'action' => $pin === null ? 'cashier_selected' : 'cashier_login',
             'table_name' => 'users',
             'record_id' => $cashier->user_id,
             'new_values' => [

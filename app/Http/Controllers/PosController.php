@@ -184,14 +184,14 @@ class PosController extends Controller
     {
         $device = request()->attributes->get('pos_device');
         if ($device) {
-            // ยืนยัน PIN บนเครื่องนี้แล้ว = ขายได้ในชื่อคนนั้นคนเดียว ส่ง cashier_id
-            // ของคนอื่นมาไม่ผ่าน แม้จะอยู่สาขาเดียวกันก็ตาม
+            // ยืนยัน PIN หรือเลือกชื่อบนเครื่องนี้แล้ว = ขายได้ในชื่อคนนั้นคนเดียว
+            // ส่ง cashier_id ของคนอื่นมาไม่ผ่าน แม้จะอยู่สาขาเดียวกันก็ตาม
             $verified = $device->verifiedCashierId();
             if ($verified !== null) {
                 return ($requested === null || $requested === $verified) ? $verified : null;
             }
 
-            // ยังไม่ยืนยัน: โหมดเข้มบังคับให้ใส่ PIN ก่อน, โหมดปกติยอมให้ขายต่อได้
+            // ยังไม่ยืนยัน: โหมดเข้มบังคับให้ยืนยัน/เลือกคนขายก่อน, โหมดปกติยอมให้ขายต่อได้
             // เพื่อไม่ให้เครื่องที่เปิดค้างข้ามคืนถูกตัดกลางกะตอนอัปเดต
             return self::requiresCashierPin() ? null : $this->validatedCashierId($requested);
         }

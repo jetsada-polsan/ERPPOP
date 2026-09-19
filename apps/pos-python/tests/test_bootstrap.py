@@ -128,7 +128,7 @@ class OnlineLoginTest(unittest.TestCase):
             "success": True, "cashier": {"id": 42, "code": "C001", "name": "สมชาย",
                                          "user_id": 501, "credential_version": "v1"}}})
 
-        result = ProvisioningService(db, api).online_cashier_login(None, cashier_code="C001", cashier_server_id=42)
+        result = ProvisioningService(db, api).select_cashier("C001", 42)
 
         self.assertFalse(result["selection_required"])
         self.assertEqual(api.posted[0][1], {"cashier_id": 42, "code": "C001"})
