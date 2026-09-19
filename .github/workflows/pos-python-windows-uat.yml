@@ -94,7 +94,9 @@ jobs:
         env:
           POS_RELEASE_USER: ${{ secrets.POS_RELEASE_USER }}
           POS_RELEASE_HOST: ${{ secrets.POS_RELEASE_HOST }}
-          BASE_URL: http://${{ secrets.POS_RELEASE_HOST }}
+          # Production redirects/serves the named HTTPS vhost; the raw IP on
+          # port 80 intentionally returns 404, so validate the public URL.
+          BASE_URL: https://popstarcenter.com
         run: |
           installer="$(find release -type f -name '*.exe' -print -quit)"
           if [ -z "$installer" ]; then
