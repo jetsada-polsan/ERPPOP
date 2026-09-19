@@ -545,3 +545,9 @@ pending
 - ทดสอบ: `php artisan test tests/Feature/ErpStructuralGapsTest.php` ผ่าน 7 tests / 26 assertions (ยังมี incomplete 6 รายการตามช่องว่างที่ประกาศไว้); `git diff --check` ผ่าน
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่มี UI ปุ่มในแต่ละหน้าเอกสาร และ service การสร้างใบขายเดิมยังสร้างเป็น `active` ทันที จึงยังไม่ถือว่า approval flow เสร็จสมบูรณ์; ยังไม่ deploy production
 - งานถัดไป: ผูกปุ่ม/หน้าจอเอกสารกับ lifecycle และกำหนดกติกาการตัด stock/ลง GL ก่อนเปิดใช้จริง
+# Handoff - 2026-09-19 (document lifecycle UI)
+- Commit: `82df0a4`
+- ทำอะไร: เพิ่มปุ่มส่งตรวจ/อนุมัติ/ตีกลับในหน้ารายละเอียดใบขายและใบขายสด เชื่อม endpoint lifecycle และแสดงสถานะ/เหตุผลการอนุมัติ
+- ทดสอบ: `php artisan view:cache` ผ่าน; `php artisan test tests/Feature/ErpStructuralGapsTest.php` ผ่าน 7 tests / 26 assertions; `git diff --check` ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่เปิดให้ service สร้างใบขายเป็น draft เพราะต้องกำหนดกติกาตัดสต๊อก/GL และทดสอบกับ flow POS ก่อน; ยังไม่ deploy รอบนี้
+- งานถัดไป: เพิ่ม feature tests ของ lifecycle และกำหนด transition สำหรับเอกสารแต่ละประเภทก่อนเปิดใช้งานจริง
