@@ -559,3 +559,10 @@ pending
 - ยังไม่ทดสอบ/ความเสี่ยง: Mac เครื่องนี้ไม่มี PySide6/PyInstaller จึงสร้าง Windows `.exe` ในเครื่องไม่ได้; GitHub Actions run `35429997668` ผ่านครบและสร้าง artifact `PopCentral-POS-UAT-0.1.0-dev` แล้ว; production ต้องเปิดโหมดด้วย `php artisan pos:passwordless enable` ก่อน และต้องทำ Windows/hardware UAT จริง
 - Deploy: ยังไม่ deploy ERP และยังไม่เปลี่ยนค่า production
 - งานถัดไป: push commit นี้และ commit handoff, รอ/ตรวจ GitHub Actions Windows installer, จากนั้นติดตั้ง UAT แล้วทดสอบเลือกชื่อคนขาย เปิดกะ ขายเงินสด 1 ใบ ปิดกะ และตรวจ receipt/ยอด ERP
+
+# Handoff - 2026-09-19 (POS passwordless production deploy)
+- Commit: `63d37eb`
+- ทำอะไร: deploy POS รุ่นเลือกชื่อคนขายโดยไม่ใช้ login/PIN ไป production ผ่าน GitHub Actions run `35430375079`; อัปโหลด release, ติดตั้ง dependencies, migrate, clear/cache Laravel และนำระบบกลับ live
+- ผลตรวจ production: `erp:health` ผ่าน database, migration, backup, sales-GL, storage และ queue; migration เป็นปัจจุบัน และ workflow test/build ผ่าน
+- ยังไม่เปลี่ยนค่า production setting `pos_passwordless_login`; ต้องรัน `php artisan pos:passwordless enable` บน production ก่อนใช้งาน flow เลือกชื่อแบบไม่ใช้ PIN
+- งานถัดไป: เปิด setting ตามคำสั่งเจ้าของระบบ แล้วทำ Windows/hardware UAT: เลือกชื่อคนขาย → เปิดกะ → ขายเงินสด 1 ใบ → ปิดกะ → ตรวจ receipt/ยอด ERP
