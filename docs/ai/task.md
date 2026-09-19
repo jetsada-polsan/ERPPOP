@@ -556,6 +556,6 @@ pending
 - Commit: `9e2a511`
 - ทำอะไร: เปลี่ยน POS Python จากหน้าล็อกอิน/PIN เป็นเลือกชื่อคนขายอย่างเดียว แล้วเปิดกะ → ขาย → ปิดกะได้ตาม flow เดิม; online ผูกชื่อกับ Device Token และ offline ใช้รายชื่อที่ sync ไว้; ตั้ง audit passwordless เป็น `cashier_selected`; คง Local IT PIN ไว้เฉพาะการตั้งค่าเครื่อง
 - ทดสอบ: Python POS `python3 -m unittest discover -s tests` ผ่าน 174 tests; Laravel `php artisan test --compact` ผ่าน 422 tests, 1 skipped, 6 incomplete, 3,241 assertions; focused POS identity/device 19 tests / 51 assertions; Python AST syntax check และ `git diff --check` ผ่าน
-- ยังไม่ทดสอบ/ความเสี่ยง: Mac เครื่องนี้ไม่มี PySide6/PyInstaller จึงยังสร้าง Windows `.exe` ในเครื่องไม่ได้; ต้องให้ GitHub Actions สร้าง installer หลัง push; production ต้องเปิดโหมดด้วย `php artisan pos:passwordless enable` ก่อน และต้องทำ Windows/hardware UAT จริง
+- ยังไม่ทดสอบ/ความเสี่ยง: Mac เครื่องนี้ไม่มี PySide6/PyInstaller จึงสร้าง Windows `.exe` ในเครื่องไม่ได้; GitHub Actions run `35429997668` ผ่านครบและสร้าง artifact `PopCentral-POS-UAT-0.1.0-dev` แล้ว; production ต้องเปิดโหมดด้วย `php artisan pos:passwordless enable` ก่อน และต้องทำ Windows/hardware UAT จริง
 - Deploy: ยังไม่ deploy ERP และยังไม่เปลี่ยนค่า production
 - งานถัดไป: push commit นี้และ commit handoff, รอ/ตรวจ GitHub Actions Windows installer, จากนั้นติดตั้ง UAT แล้วทดสอบเลือกชื่อคนขาย เปิดกะ ขายเงินสด 1 ใบ ปิดกะ และตรวจ receipt/ยอด ERP
