@@ -539,3 +539,9 @@ pending
 ## ความเสี่ยง/งานถัดไป
 - ข้อมูลธุรกรรมเดิมกู้ได้จาก backup ที่ระบุเท่านั้น
 - ลูกค้า สาขา สิทธิ์ และข้อมูลระบบยังคงอยู่เพื่อให้ระบบทำงานได้
+# Handoff - 2026-09-19 (document approval lifecycle foundation)
+- Commit: `038118d`
+- ทำอะไร: เพิ่มคอลัมน์และ model relations สำหรับส่งตรวจ/อนุมัติเอกสาร, เพิ่ม `DocumentLifecycleService` และ endpoint submit/approve/reject พร้อมกันผู้ส่งอนุมัติเอกสารตัวเองไม่ได้; migration รองรับ SQLite view `sales_postings` และ PostgreSQL
+- ทดสอบ: `php artisan test tests/Feature/ErpStructuralGapsTest.php` ผ่าน 7 tests / 26 assertions (ยังมี incomplete 6 รายการตามช่องว่างที่ประกาศไว้); `git diff --check` ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่มี UI ปุ่มในแต่ละหน้าเอกสาร และ service การสร้างใบขายเดิมยังสร้างเป็น `active` ทันที จึงยังไม่ถือว่า approval flow เสร็จสมบูรณ์; ยังไม่ deploy production
+- งานถัดไป: ผูกปุ่ม/หน้าจอเอกสารกับ lifecycle และกำหนดกติกาการตัด stock/ลง GL ก่อนเปิดใช้จริง
