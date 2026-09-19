@@ -107,7 +107,13 @@ Route::get('/security/mfa', [AuthController::class, 'showMfaSetup'])->name('mfa.
 Route::post('/security/mfa', [AuthController::class, 'enableMfa'])->name('mfa.enable');
 Route::delete('/security/mfa', [AuthController::class, 'disableMfa'])->name('mfa.disable');
 
-Route::get('/', fn () => view('portal'))->name('portal');
+Route::get('/', function () {
+    if (request()->getHost() === 'pos.popstarcenter.com') {
+        return redirect()->route('python-pos.download');
+    }
+
+    return view('portal');
+})->name('portal');
 Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
 Route::post('/employees', [EmployeeController::class, 'store'])->name('employees.store');
 Route::prefix('fleet')->name('fleet.')->group(function () {

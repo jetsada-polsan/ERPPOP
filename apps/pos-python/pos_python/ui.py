@@ -68,7 +68,7 @@ def run_pairing_wizard(data_dir, app) -> bool:
     hint.setWordWrap(True)
     form.addRow(title)
     form.addRow(hint)
-    server = QLineEdit("http://27.254.143.219")
+    server = QLineEdit("https://erp.popstarcenter.com")
     server.setPlaceholderText("เช่น https://erp.example.com")
     token = QLineEdit()
     token.setPlaceholderText("Device token จาก ERP")
@@ -1217,11 +1217,11 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             close_shift.setToolTip("นับเงินและปิดกะขาย")
             close_shift.clicked.connect(self.close_current_shift)
             action_row.addWidget(close_shift, 1)
-            settings = QPushButton("⚙")
+            settings = QPushButton("⚙ ตั้งค่า POS")
             settings.setObjectName("headerAction")
             settings.setToolTip("ตั้งค่าเครื่อง POS สำหรับ IT")
             settings.clicked.connect(self.open_settings)
-            settings.setMinimumWidth(42)
+            settings.setMinimumWidth(132)
             action_row.addWidget(settings)
             head_layout.addLayout(action_row)
             layout.addWidget(head)
@@ -1564,6 +1564,11 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 )
                 return False
             if seller_result != QDialog.Accepted or seller.cashier is None:
+                QMessageBox.information(
+                    self,
+                    "ยังไม่ได้เปิดกะ",
+                    "กรุณาเลือกชื่อคนขายก่อน แล้วจึงใส่เงินทอนต้นกะเพื่อเปิดกะขาย",
+                )
                 return False
             cashier = seller.cashier
 

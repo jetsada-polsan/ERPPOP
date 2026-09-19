@@ -566,3 +566,17 @@ pending
 - ผลตรวจ production: `erp:health` ผ่าน database, migration, backup, sales-GL, storage และ queue; migration เป็นปัจจุบัน และ workflow test/build ผ่าน
 - ยังไม่เปลี่ยนค่า production setting `pos_passwordless_login`; ต้องรัน `php artisan pos:passwordless enable` บน production ก่อนใช้งาน flow เลือกชื่อแบบไม่ใช้ PIN
 - งานถัดไป: เปิด setting ตามคำสั่งเจ้าของระบบ แล้วทำ Windows/hardware UAT: เลือกชื่อคนขาย → เปิดกะ → ขายเงินสด 1 ใบ → ปิดกะ → ตรวจ receipt/ยอด ERP
+
+# Handoff - 2026-09-19 (POS installer published on web)
+- Commit/source: `main` หลัง `ab439c7`
+- ทำอะไร: สร้างและอัปโหลด Windows POS รุ่นใหม่ผ่าน GitHub Actions run `35431977569`; เว็บเลือกไฟล์ `PopCentral-POS-UAT-0.6.17-setup.exe` รุ่นใหม่แล้ว ขนาด 174,653,534 ไบต์
+- ตรวจจริง: controller production เลือกไฟล์ `0.6.17`; `https://popstarcenter.com/download/python-pos` ตอบ HTTP 200 และ Content-Type เป็น Windows executable
+- หมายเหตุ: เดิม publish job รายงานล้มเหลวเฉพาะ health-check เพราะใช้ HTTP raw IP ซึ่ง Nginx ปฏิเสธ; ปรับ workflow ให้ตรวจโดเมน HTTPS จริงแล้ว
+- งานถัดไป: ทดสอบดาวน์โหลด/ติดตั้งบน Windows และเปิด `pos_passwordless_login` ด้วย `php artisan pos:passwordless enable` ก่อน UAT flow เลือกชื่อคนขาย
+
+# Handoff - 2026-09-19 (portal and POS entry-point)
+- Commit: pending
+- ทำอะไร: ปรับหน้า `popstarcenter.com` ให้เป็นศูนย์รวมระบบมาตรฐาน และเปลี่ยนการ์ด POS เป็นลิงก์ดาวน์โหลด PopCentral POS Python สำหรับเครื่องแคชเชียร์ แทนการอ้างถึง Web POS ที่ไม่มีใช้งานจริง; เมื่อเข้า root ผ่าน `pos.popstarcenter.com` ให้ redirect ไปหน้าดาวน์โหลด POS
+- ทดสอบ: `php artisan view:cache` ผ่าน; route list ยืนยัน root route; `php artisan test tests/Feature/AppLauncherTest.php --compact` ผ่าน 8 tests / 38 assertions; `git diff --check` ผ่าน
+- Deploy: ยังไม่ deploy production รอบนี้ รอคำสั่ง deploy โดยตรง
+- งานถัดไป: หลังเจ้าของยืนยัน deploy ให้ backup production แล้ว deployเฉพาะ `routes/web.php` และ `resources/views/portal.blade.php`, clear/cache และรัน `erp:health`; ตรวจลิงก์ดาวน์โหลดบนโดเมนจริง
