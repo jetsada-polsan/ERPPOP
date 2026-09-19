@@ -16,13 +16,17 @@
         .intro { max-width:720px; margin-bottom:28px; }
         h1 { margin:0 0 10px; font-size:clamp(2rem,4vw,3.2rem); letter-spacing:0; }
         .intro p { margin:0; color:var(--muted); line-height:1.7; }
+        .pos-download { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:0 0 24px; margin-bottom:26px; border-bottom:1px solid var(--line); }
+        .pos-download strong { display:block; margin-bottom:4px; font-size:1.05rem; }
+        .pos-download span { color:var(--muted); line-height:1.55; font-size:.95rem; }
+        .pos-download a { flex:none; color:#fff; background:var(--brand); border-radius:7px; padding:11px 16px; font-weight:800; text-decoration:none; }
         .grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
         .card { display:flex; flex-direction:column; min-height:190px; padding:22px; border:1px solid var(--line); border-radius:8px; background:var(--surface); box-shadow:0 8px 24px rgba(23,33,43,.05); }
         .card h2 { margin:0 0 8px; font-size:1.15rem; }
         .card p { flex:1; margin:0 0 20px; color:var(--muted); line-height:1.55; font-size:.95rem; }
         .card a { align-self:flex-start; color:var(--brand-dark); font-weight:800; text-decoration:none; }
         footer { margin-top:34px; color:var(--muted); font-size:.85rem; }
-        @media (max-width:760px) { .shell { padding:18px 14px 28px; } header { padding-bottom:26px; } .grid { grid-template-columns:1fr; } .card { min-height:150px; } }
+        @media (max-width:760px) { .shell { padding:18px 14px 28px; } header { padding-bottom:26px; } .pos-download { align-items:flex-start; flex-direction:column; gap:12px; } .pos-download a { width:100%; text-align:center; } .grid { grid-template-columns:1fr; } .card { min-height:150px; } }
     </style>
 </head>
 <body>
@@ -35,11 +39,13 @@
         <h1>ศูนย์รวมระบบงาน</h1>
         <p>เลือกพื้นที่ทำงานที่ต้องการ ระบบแต่ละส่วนจะแยกสิทธิ์และหน้าที่ออกจากกันอย่างชัดเจน</p>
     </section>
+    <section class="pos-download" aria-label="ดาวน์โหลด PopCentral POS">
+        <div><strong>PopCentral POS</strong><span>โปรแกรม POS สำหรับเครื่องแคชเชียร์ เปิดกะ ขายสินค้า รับชำระ และทำงานออฟไลน์</span></div>
+        <a href="https://erp.popstarcenter.com/download/python-pos">ดาวน์โหลด POS →</a>
+    </section>
     <section class="grid" aria-label="ระบบที่ใช้งาน">
         <article class="card"><h2>ERP กลาง</h2><p>ขาย คลัง จัดซื้อ บัญชี รายงาน ขนส่ง และข้อมูลหลัก</p><a href="https://erp.popstarcenter.com/login">เข้าสู่ ERP →</a></article>
-        <article class="card"><h2>POS หน้าร้าน</h2><p>ระบบขายหน้าร้านสำหรับเครื่องแคชเชียร์และการเปิดกะ</p><a href="https://pos.popstarcenter.com/login">เข้าสู่ POS →</a></article>
         <article class="card"><h2>ระบบสมาชิก</h2><p>จัดการสมาชิกและข้อมูลลูกค้าสำหรับช่องทางบริการ</p><a href="https://popstarmember.com/">เปิดระบบสมาชิก →</a></article>
-        <article class="card"><h2>JetTime HR</h2><p>พนักงาน เวลาเข้างาน และระบบเงินเดือน</p><a href="https://ubonhrpro.com/">เปิดระบบ HR →</a></article>
         <article class="card"><h2>PopSpend</h2><p>บันทึกและวิเคราะห์รายจ่าย งบประมาณ และเอกสารค่าใช้จ่าย</p><a href="https://popstarcenter.com/popspend/">เปิด PopSpend →</a></article>
         <article class="card"><h2>TempLog Pro</h2><p>บันทึกและตรวจสอบ Log สำหรับงานหลังบ้าน</p><a href="https://popstarcenter.com/templog/login.php">เข้าสู่ TempLog →</a></article>
         <article class="card"><h2>เว็บไซต์สินค้า</h2><p>รายการอาหารแช่แข็งและข้อมูลหน้าร้าน PopStar Foods</p><a href="https://popstarshops.com/">เปิดเว็บไซต์สินค้า →</a></article>
