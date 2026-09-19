@@ -19,6 +19,7 @@
             </div>
         </div>
     </div>
+    @include('documents._lifecycle-actions', ['sale' => $sale])
     @if($sale->posReceipt)
     <div class="content-card p-4 mb-4">
         <h3 class="h6 fw-bold mb-3"><i class="bi bi-bank me-1"></i>ข้อมูลรับชำระจาก POS</h3>
