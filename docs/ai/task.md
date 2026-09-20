@@ -602,3 +602,8 @@ pending
 - Deploy: สำรอง production ที่ `storage/app/backups/erp-db-20260920-144250.sql.gz`; ส่ง `routes/web.php` และ `resources/views/pos/browser.blade.php` ขึ้น `/var/www/jeterp` แบบ dry-run ก่อนและไม่ใช้ `--delete`; clear/cache Laravel และตรวจ `erp:health` ผ่านครบ
 - ตรวจ live: `https://pos.popstarcenter.com/` ตอบ HTTP 200 และแสดง `PopCentral Web POS`; `/api/pos/ping` เมื่อไม่ส่ง Device Token ตอบ HTTP 401 ตามที่ควรเป็น
 - หมายเหตุ: Web POS พร้อมใช้งานแบบ online-only; ต้องใส่ Device Token ที่ผูกเครื่อง/สาขาเพื่อเลือกคนขายและทำรายการจริง; ยังไม่ได้ยิงขายจริงด้วย token ของสาขา
+
+# Handoff - 2026-09-20 (activate Warin web POS user)
+- ทำอะไร: สำรอง production ที่ `storage/app/backups/erp-db-20260920-145810.sql.gz`; เปิดใช้งาน User POS เดิมของสาขาวาริน (user id 4) และเปลี่ยน username จาก `pos0002` เป็น `warin`; คง role `CASHIER`, สิทธิ์ `pos.sell`, โปรไฟล์คนขาย และ Device Token/อุปกรณ์เดิมไว้ ไม่ตั้งรหัสผ่าน/PIN และไม่ออก Token ใหม่
+- ตรวจผล: อุปกรณ์ POS id 3 และ 9 ยัง active และผูกกับ `warin`; `erp:health` production ผ่านครบ
+- งานถัดไป: refresh `https://pos.popstarcenter.com`, ใช้ Device Token เดิมของเครื่องวาริน แล้วเลือกชื่อคนขายเพื่อเปิดกะ; ยังต้องทดสอบขายจริง 1 บิลก่อนใช้งานเต็มรูปแบบ
