@@ -645,3 +645,10 @@ pending
 - ทดสอบ: Python UI style 23 tests; Python ทั้งชุด 174 tests; `php artisan view:cache`; `php artisan test --compact tests/Feature/PosBrowserTest.php tests/Feature/PrintablePageSizeTest.php` ผ่าน 4 tests / 13 assertions; `git diff --check`
 - Deploy: ยังไม่ deploy รอบนี้ รอคำสั่งเจ้าของระบบ
 - งานถัดไป: push และ build Python installer; เมื่อสั่ง deploy ให้ตรวจภาพ live บนจอ 1366x768/1440x900 ว่าปุ่มรับชำระอยู่ในจอโดยไม่ต้องเลื่อนหน้า
+
+# Handoff - 2026-09-20 (single-screen POS selling layout production deploy)
+- Commit/source: `9bec2d3`
+- Deploy: GitHub Actions run `35511324665` production ผ่านครบทั้ง Laravel test, frontend build, upload release และ `scripts/deploy.sh`
+- ตรวจภาพ live: เปิด Web POS ใน Chrome viewport 1440x810 หลังเลือกคนขายแล้ว เห็นแถบข้อมูลย่อ, grid สินค้า, รายการขาย, ยอดรวม และปุ่ม `รับชำระ`/`ปิดกะ` ครบในจอเดียว; scroll อยู่เฉพาะรายการด้านใน
+- หมายเหตุ: ภาพแคปจากหน้า live อยู่ในผลการตรวจของงานนี้; Python source อยู่ใน commit ก่อนหน้าและ Windows installer build ผ่านแล้ว แต่ยังไม่ได้ publish installer ใหม่ทับลิงก์ดาวน์โหลด production
+- งานถัดไป: UAT ด้วย Device Token/เครื่อง POS จริง โดยเพิ่มสินค้า 1 รายการ ตรวจปุ่มรับชำระและพิมพ์ใบเสร็จ 80 มม.; ตรวจ Python installer บน Windows จริง
