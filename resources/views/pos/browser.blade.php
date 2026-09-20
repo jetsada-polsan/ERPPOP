@@ -73,6 +73,7 @@
         .section-head { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
         .section-head h2 { margin: 0; font-size: 18px; }
         .section-head .grow { flex: 1; }
+        .catalog .section-head small { color: var(--muted); font-size: 11px; font-weight: 600; }
         .catalog .section-head { color: var(--navy); background: var(--blue-soft); }
         .cart .section-head { color: #fff; background: var(--navy); }
         .cart .section-head .button.light { color: #fff; border-color: rgba(255,255,255,.42); background: transparent; }
@@ -166,7 +167,7 @@
 
             <section id="salePanel" class="sale-grid hidden">
                 <div class="panel catalog">
-                    <div class="section-head"><h2>สินค้า</h2><span class="grow"></span><button id="reloadProducts" class="button light small" type="button">รีเฟรช</button></div>
+                    <div class="section-head"><h2>สินค้า</h2><small>โหลดทีละ 100 รายการ · ค้นหาเพิ่มได้</small><span class="grow"></span><button id="reloadProducts" class="button light small" type="button">รีเฟรช</button></div>
                     <div style="padding:12px 14px 0"><input id="productSearch" class="input" type="search" placeholder="ค้นหาชื่อสินค้า / SKU / บาร์โค้ด"></div>
                     <div id="productGrid" class="product-grid"></div>
                 </div>
@@ -233,7 +234,7 @@
         (() => {
             const TOKEN_KEY = 'popstar_web_pos_device_token';
             const PAPER_KEY = 'popstar_web_pos_paper_width';
-            const state = { token: '', config: null, cashiers: [], cashier: null, shift: null, products: [], cart: [], lastReceipt: null, shiftAction: 'open', toastTimer: null };
+            const state = { token: '', config: null, cashiers: [], cashier: null, shift: null, products: [], cart: [], lastReceipt: null, shiftAction: 'open', toastTimer: null, productSearchTimer: null, productRequestId: 0 };
             const $ = (id) => document.getElementById(id);
             const money = (value) => `฿${Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' }[char]));
@@ -332,16 +333,25 @@
             async function enterSale() {
                 show('salePanel'); await loadProducts(); renderCart();
             }
-            async function loadProducts() {
+            async function loadProducts(query = '') {
+                const requestId = ++state.productRequestId;
                 const grid = $('productGrid'); grid.innerHTML = '<div class="empty-state">กำลังโหลดสินค้า…</div>';
-                try { state.products = await api(`/products?branch_id=${encodeURIComponent(state.config.branch_id)}&all=1`); renderProducts(); }
-                catch (exception) { grid.innerHTML = `<div class="error">${escapeHtml(exception.message)}</div>`; }
+                try {
+                    const params = new URLSearchParams({ branch_id: String(state.config.branch_id) });
+                    if (query.trim()) params.set('q', query.trim());
+                    state.products = await api(`/products?${params.toString()}`);
+                    if (requestId === state.productRequestId) renderProducts();
+                }
+                catch (exception) { if (requestId === state.productRequestId) grid.innerHTML = `<div class="error">${escapeHtml(exception.message)}</div>`; }
             }
             function renderProducts() {
-                const q = $('productSearch').value.trim().toLowerCase();
-                const products = state.products.filter((product) => !q || [product.name_th, product.sku_code, product.matched_barcode?.barcode].some((value) => String(value || '').toLowerCase().includes(q)));
+                const products = state.products;
                 $('productGrid').innerHTML = products.length ? products.map((product) => `<button class="product" type="button" data-product-id="${product.id}"><div class="name">${escapeHtml(product.name_th)}</div><div class="sku">${escapeHtml(product.sku_code || '')}</div><div class="price">${money(product.pos_price)}</div><div class="stock">สต๊อก ${product.stock_qty === null || product.stock_qty === undefined ? 'ไม่ระบุ' : Number(product.stock_qty).toLocaleString('th-TH')}</div></button>`).join('') : '<div class="empty-state">ไม่พบสินค้า</div>';
                 $('productGrid').querySelectorAll('[data-product-id]').forEach((button) => button.addEventListener('click', () => addToCart(Number(button.dataset.productId))));
+            }
+            function scheduleProductSearch() {
+                clearTimeout(state.productSearchTimer);
+                state.productSearchTimer = setTimeout(() => loadProducts($('productSearch').value), 220);
             }
             function addToCart(id) { const product = state.products.find((item) => Number(item.id) === id); if (!product) return; const line = state.cart.find((item) => item.id === id); if (line) line.qty = Number(line.qty) + 1; else state.cart.push({ ...product, qty: 1 }); renderCart(); }
             function setQty(id, delta) { const line = state.cart.find((item) => item.id === id); if (!line) return; line.qty = Math.max(0, Number(line.qty) + delta); state.cart = state.cart.filter((item) => item.qty > 0); renderCart(); }
@@ -374,7 +384,7 @@
                 const receipt = state.lastReceipt || {}; const company = state.config?.company || {}; const paper = localStorage.getItem(PAPER_KEY) || '80mm'; $('receiptPaper').style.width = paper; $('receiptPaper').innerHTML = `<h3>${escapeHtml(company.name || 'PopStar')}</h3><div class="center">${escapeHtml(company.address || '')}</div><div class="center">${escapeHtml(company.phone || '')}</div><hr><div>เลขที่: ${escapeHtml(receipt.receipt_no || receipt.doc_number || '—')}</div><div>ผู้ขาย: ${escapeHtml(state.cashier?.name || '')}</div><div>เวลา: ${new Date().toLocaleString('th-TH')}</div><hr>${(receipt.items || []).map((item) => `<div class="line"><span>${escapeHtml(item.name_th)} x${item.qty}</span><span>${money(Number(item.qty) * Number(item.pos_price || 0))}</span></div>`).join('')}<hr><div class="line"><strong>รวมสุทธิ</strong><strong>${money(receipt.total_amount || 0)}</strong></div><div class="center" style="margin-top:10px">ขอบคุณที่ใช้บริการ</div>`; }
 
             document.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => hide(button.dataset.close)));
-            $('connectButton').addEventListener('click', connect); $('tokenInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') connect(); }); $('reloadCashiers').addEventListener('click', loadCashiers); $('reloadProducts').addEventListener('click', loadProducts); $('productSearch').addEventListener('input', renderProducts); $('clearCart').addEventListener('click', () => { state.cart = []; renderCart(); }); $('payButton').addEventListener('click', openPayment); $('closeShiftButton').addEventListener('click', closeShiftModal); $('shiftSubmitButton').addEventListener('click', submitShift); $('paymentMethod').addEventListener('change', updatePaymentFields); $('cashReceived').addEventListener('input', updateChange); $('submitPayment').addEventListener('click', submitPayment); $('settingsButton').addEventListener('click', () => { $('settingsToken').value = state.token || ''; $('paperWidth').value = localStorage.getItem(PAPER_KEY) || '80mm'; show('settingsModal'); }); $('saveSettingsButton').addEventListener('click', () => { const token = $('settingsToken').value.trim(); if (!token) return toast('กรุณาใส่ Device Token'); localStorage.setItem(PAPER_KEY, $('paperWidth').value); $('tokenInput').value = token; hide('settingsModal'); connect(); }); $('clearTokenButton').addEventListener('click', () => { resetSession(true); hide('settingsModal'); toast('ล้าง Device Token จากเครื่องนี้แล้ว'); }); $('printReceipt').addEventListener('click', () => { document.body.classList.add('printing'); window.print(); setTimeout(() => document.body.classList.remove('printing'), 500); });
+            $('connectButton').addEventListener('click', connect); $('tokenInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') connect(); }); $('reloadCashiers').addEventListener('click', loadCashiers); $('reloadProducts').addEventListener('click', () => loadProducts($('productSearch').value)); $('productSearch').addEventListener('input', scheduleProductSearch); $('clearCart').addEventListener('click', () => { state.cart = []; renderCart(); }); $('payButton').addEventListener('click', openPayment); $('closeShiftButton').addEventListener('click', closeShiftModal); $('shiftSubmitButton').addEventListener('click', submitShift); $('paymentMethod').addEventListener('change', updatePaymentFields); $('cashReceived').addEventListener('input', updateChange); $('submitPayment').addEventListener('click', submitPayment); $('settingsButton').addEventListener('click', () => { $('settingsToken').value = state.token || ''; $('paperWidth').value = localStorage.getItem(PAPER_KEY) || '80mm'; show('settingsModal'); }); $('saveSettingsButton').addEventListener('click', () => { const token = $('settingsToken').value.trim(); if (!token) return toast('กรุณาใส่ Device Token'); localStorage.setItem(PAPER_KEY, $('paperWidth').value); $('tokenInput').value = token; hide('settingsModal'); connect(); }); $('clearTokenButton').addEventListener('click', () => { resetSession(true); hide('settingsModal'); toast('ล้าง Device Token จากเครื่องนี้แล้ว'); }); $('printReceipt').addEventListener('click', () => { document.body.classList.add('printing'); window.print(); setTimeout(() => document.body.classList.remove('printing'), 500); });
 
             state.token = localStorage.getItem(TOKEN_KEY) || ''; $('tokenInput').value = state.token;
             if (state.token) connect();

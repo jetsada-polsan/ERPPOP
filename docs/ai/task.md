@@ -627,3 +627,9 @@ pending
 - ตรวจ live: `https://pos.popstarcenter.com/` ตอบ HTTP 200 และมี Web POS รุ่นใหม่; `/api/pos/ping` เมื่อไม่ส่ง Device Token ตอบ HTTP 401 ตามที่ควรเป็น
 - Python build: GitHub Actions run `35500582391` สร้าง Windows executable/installer และ upload artifact สำเร็จ; ยังไม่ publish installer ทับลิงก์ดาวน์โหลด production
 - งานถัดไป: ใช้ Device Token ของเครื่องจริงเพื่อทดสอบเลือกคนขาย → เปิดกะ → ขาย → พิมพ์ใบเสร็จ 80 มม. → ปิดกะ; ตรวจภาพบนจอ POS จริง
+
+# Handoff - 2026-09-20 (bounded Web POS product loading)
+- ทำอะไร: เอา `all=1` ออกจาก Web POS; หน้าแรกโหลดสินค้าไม่เกิน 100 รายการตาม API limit และช่องค้นหาจะเรียกค้น server-side ตามชื่อ/SKU/บาร์โค้ด พร้อม debounce และกันผลลัพธ์จาก request เก่าทับผลใหม่
+- ทดสอบ: `php artisan view:cache`; `php artisan test --compact tests/Feature/PosBrowserTest.php tests/Feature/PrintablePageSizeTest.php` ผ่าน 4 tests / 13 assertions; `git diff --check`
+- Deploy: ยังไม่ deploy รอบนี้ รอคำสั่งเจ้าของระบบ
+- งานถัดไป: push commit นี้แล้ว deploy view Web POS เมื่อได้รับคำสั่ง; ตรวจว่าหน้า live โหลดไม่เกิน 100 รายการแรกและค้นหาสินค้ารหัสที่อยู่นอกชุดแรกได้

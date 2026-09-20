@@ -16,6 +16,9 @@ class PosBrowserTest extends TestCase
             ->assertSee('เลือกชื่อคนขาย')
             ->assertSee('เปิดกะ')
             ->assertSee('ปิดกะ')
+            ->assertSee('โหลดทีละ 100 รายการ')
+            ->assertSee('new URLSearchParams')
+            ->assertDontSee('&all=1')
             ->assertDontSee('เข้าสู่ระบบ ERP');
     }
 }
