@@ -659,3 +659,10 @@ pending
 - ทดสอบ: `php artisan test` ผ่าน 424 tests (423 passed, 1 skipped, 6 incomplete); `PYTHONPATH=apps/pos-python python3 -m unittest discover -s apps/pos-python/tests -p 'test_*.py'` ผ่าน 174 tests; `php artisan view:cache`; ตรวจ syntax JavaScript และ `git diff --check` ผ่าน
 - Deploy: ยังไม่ deploy production; push `main` แล้ว รอคำสั่ง `deploy` โดยตรง
 - ความเสี่ยง/งานถัดไป: ต้องตรวจ QR กับบัญชี PromptPay ที่ตั้งค่าไว้จริง และยิงบัตรส่วนลด/ขาย 1 บิลบน Web POS ด้วย Device Token จริง; Python installer ยังต้อง build/publish รุ่นที่มี layout นี้ก่อนใช้งานบน Windows
+
+# Handoff - 2026-09-20 (POS QR, discount scan, and touch layout production deploy)
+- Commit/source: `a1d21af` (รวมโค้ด POS จาก `97b9874`)
+- Deploy: GitHub Actions run `35520214673` ผ่านครบใน production; test 56 วินาที, deploy 29 วินาที, รวม 1 นาที 32 วินาที; workflow แสดงสถานะ `Success`
+- ตรวจ live: `https://pos.popstarcenter.com/` โหลดได้หลังเลือกคนขายสาขาวาริน; พบช่อง `ส่วนลดบัตร / สแกนบาร์โค้ด` และปุ่ม `ใช้บัตร`; เปิดหน้ารับชำระและเลือก `โอนเงิน / QR` พบ QR PromptPay พร้อมยอด ฿15.00 และชื่อบัญชี `เจษฎา พลแสน`
+- ความปลอดภัยการตรวจ: ไม่ได้กดออกใบเสร็จและไม่เกิดการขายจริง; ปิดหน้าทดสอบและล้างรายการกลับเป็นว่างแล้ว
+- งานถัดไป: UAT ด้วยบัตรส่วนลดจริงและขายจริง 1 บิลบนเครื่องสาขาวาริน; Python installer รุ่น layout นี้ยังต้อง build/publish ทับลิงก์ดาวน์โหลด production หากต้องการแจกเวอร์ชันใหม่
