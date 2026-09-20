@@ -26,16 +26,16 @@
         button, input, select { font: inherit; }
         button { cursor: pointer; }
         button:disabled { cursor: not-allowed; opacity: .55; }
-        .topbar { min-height: 52px; padding: 7px 15px; display: flex; align-items: center; gap: 12px; color: #fff; background: linear-gradient(110deg, var(--navy-dark), var(--navy)); box-shadow: 0 3px 14px rgba(8, 47, 73, .25); }
-        .brand { font-size: 17px; font-weight: 900; letter-spacing: -.03em; white-space: nowrap; }
+        .topbar { min-height: 56px; padding: 7px 15px; display: flex; align-items: center; gap: 12px; color: #fff; background: linear-gradient(110deg, var(--navy-dark), var(--navy)); box-shadow: 0 3px 14px rgba(8, 47, 73, .25); }
+        .brand { font-size: 18px; font-weight: 900; letter-spacing: -.03em; white-space: nowrap; }
         .brand small { display: inline; margin-left: 7px; color: #bde5f7; font-size: 10px; font-weight: 600; letter-spacing: 0; }
         .top-meta { display: flex; align-items: center; gap: 8px; margin-left: auto; color: #d9effb; font-size: 13px; }
         .status { padding: 5px 10px; border: 1px solid rgba(255,255,255,.25); border-radius: 999px; background: rgba(255,255,255,.09); }
         .status.online { color: #bbf7d0; background: rgba(20, 122, 85, .35); }
         .icon-btn { width: 38px; height: 38px; padding: 0; border: 1px solid rgba(255,255,255,.3); border-radius: 8px; color: #fff; background: rgba(255,255,255,.1); }
         .icon-btn:hover { background: rgba(255,255,255,.2); }
-        .page { max-width: 1500px; margin: 0 auto; padding: 22px; }
-        .panel { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+        .page { max-width: 1600px; margin: 0 auto; padding: 14px; }
+        .panel { border: 1px solid var(--line); border-radius: 9px; background: var(--panel); box-shadow: 0 3px 12px rgba(15, 76, 117, .08); }
         .connect-panel { max-width: 580px; margin: 8vh auto; padding: 34px; text-align: center; }
         h1, h2, h3, p { margin-top: 0; }
         h1 { margin-bottom: 8px; font-size: clamp(26px, 4vw, 38px); letter-spacing: -.04em; }
@@ -62,23 +62,27 @@
         .hidden { display: none !important; }
         .workspace { display: grid; gap: 14px; }
         .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-        .summary { padding: 8px 12px; min-height: 58px; display: flex; flex-direction: column; justify-content: center; }
+        .summary { padding: 7px 12px; min-height: 54px; display: flex; flex-direction: column; justify-content: center; }
         .summary .label { color: var(--muted); font-size: 10px; font-weight: 700; }
         .summary .value { margin-top: 2px; font-size: 14px; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .summary.shift-open { border-color: #b5e4ca; background: #f2fff7; }
         .summary.shift-open .value { color: var(--green); }
-        .sale-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(360px, .7fr); gap: 14px; align-items: stretch; min-height: calc(100vh - 190px); }
+        .sale-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(380px, .65fr); gap: 12px; align-items: stretch; min-height: calc(100vh - 174px); }
         .catalog, .cart { min-width: 0; overflow: hidden; }
         .catalog { display: flex; flex-direction: column; }
-        .section-head { padding: 15px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+        .section-head { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
         .section-head h2 { margin: 0; font-size: 18px; }
         .section-head .grow { flex: 1; }
-        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; flex: 1; min-height: 420px; padding: 14px; overflow: auto; }
-        .product { min-height: 114px; padding: 12px; border: 1px solid #d5e2ea; border-radius: 10px; color: var(--ink); background: #fff; text-align: left; }
+        .catalog .section-head { color: var(--navy); background: var(--blue-soft); }
+        .cart .section-head { color: #fff; background: var(--navy); }
+        .cart .section-head .button.light { color: #fff; border-color: rgba(255,255,255,.42); background: transparent; }
+        .cart .section-head .button.light:hover { background: rgba(255,255,255,.12); }
+        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(154px, 1fr)); gap: 9px; flex: 1; min-height: 420px; padding: 12px; overflow: auto; }
+        .product { min-height: 122px; padding: 11px; border: 1px solid #cbdde8; border-radius: 8px; color: var(--ink); background: #fff; text-align: left; }
         .product:hover { border-color: var(--blue); box-shadow: 0 4px 12px rgba(21,133,192,.13); }
         .product .name { min-height: 40px; font-size: 13px; font-weight: 800; line-height: 1.45; }
         .product .sku { margin-top: 5px; color: var(--muted); font-size: 11px; }
-        .product .price { margin-top: 8px; color: var(--blue); font-size: 17px; font-weight: 900; }
+        .product .price { margin-top: 8px; color: var(--blue); font-size: 18px; font-weight: 900; }
         .product .stock { margin-top: 4px; color: var(--muted); font-size: 11px; }
         .cart { display: flex; flex-direction: column; }
         .cart-list { flex: 1; min-height: 420px; overflow: auto; }
@@ -90,10 +94,12 @@
         .qty-btn { width: 28px; height: 28px; border: 1px solid #bdd0dd; border-radius: 6px; color: var(--navy); background: #fff; }
         .qty { min-width: 30px; text-align: center; font-weight: 800; }
         .remove { border: 0; color: var(--red); background: transparent; font-size: 12px; }
-        .cart-footer { padding: 15px; border-top: 1px solid var(--line); background: #f9fcfd; }
-        .total-line { display: flex; justify-content: space-between; gap: 10px; margin: 6px 0; color: #526579; }
-        .total-line.grand { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--ink); font-size: 23px; font-weight: 900; }
+        .cart-footer { padding: 14px; border-top: 1px solid var(--line); color: #d9effb; background: var(--navy-dark); }
+        .total-line { display: flex; justify-content: space-between; gap: 10px; margin: 5px 0; color: #b9d9e9; }
+        .total-line.grand { margin-top: 11px; padding-top: 11px; border-top: 1px solid rgba(255,255,255,.25); color: #fff; font-size: 25px; font-weight: 900; }
         .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+        #payButton { min-height: 48px; font-size: 17px; background: var(--blue); }
+        #closeShiftButton { min-height: 48px; }
         .empty-state { padding: 38px 20px; text-align: center; color: var(--muted); }
         .modal-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 16px; background: rgba(8, 47, 73, .48); }
         .modal { width: min(480px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: 22px; border-radius: 14px; background: #fff; box-shadow: 0 20px 70px rgba(8,47,73,.3); }
@@ -102,11 +108,11 @@
         .modal-head h2 { flex: 1; margin: 0; }
         .close { width: 34px; height: 34px; border: 0; border-radius: 7px; color: #526579; background: #eef4f7; }
         .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
-        #sellerPanel { display: flex; align-items: center; min-height: 52px; }
+        #sellerPanel { display: flex; align-items: center; min-height: 48px; }
         #sellerPanel .section-head { flex: 0 0 auto; padding: 9px 13px; border-bottom: 0; }
         #sellerPanel .section-head h2 { font-size: 14px; }
         #sellerPanel .seller-grid { flex: 1; display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin: 0; padding: 0 12px 0 0 !important; }
-        .seller { min-height: 38px; padding: 6px 10px; border: 1px solid #c8d9e4; border-radius: 8px; color: var(--ink); background: #fff; text-align: left; }
+        .seller { min-height: 36px; padding: 5px 10px; border: 1px solid #c8d9e4; border-radius: 8px; color: var(--ink); background: #fff; text-align: left; }
         .seller:hover { border-color: var(--blue); background: var(--blue-soft); }
         .seller strong { display: inline; font-size: 12px; }
         .seller small { display: inline; margin: 0 0 0 5px; color: var(--muted); font-size: 10px; }

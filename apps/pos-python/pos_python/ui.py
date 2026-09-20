@@ -110,18 +110,22 @@ def run_pairing_wizard(data_dir, app) -> bool:
 
 # QSS ใช้ปีกกาเป็นไวยากรณ์ เลยแทนค่าด้วย $name แทน .format()
 _STYLE_TEMPLATE = Template("""
-/* สีและระยะตามภาพร่างที่อนุมัติแล้ว — โทน JET ชุดเดียวกับ ERP บนพื้นเทาอ่อน */
+/* โทน POS หน้าร้านแบบเครื่องแคชเชียร์ — PopCentral ใช้ token เดียวกับ ERP */
 QMainWindow, QDialog, QWidget { background: $bg; color: $text; font-size: 14px; }
 
 /* ป้ายที่วางบนแถบสีต้องโปร่ง ไม่งั้นกินสีพื้นแอปมาเป็นแผ่นขาวทับแถบ */
-#brandBar { background: $primary_dark; border-bottom: 3px solid $primary; }
+#brandBar { background: $primary_dark; border-bottom: 2px solid $primary; }
 #brandName, #brandMark, #brandRight,
 #totalLabel, #vatLine, #grandTotal { background: transparent; }
-#brandName { color: $surface; font-size: 18px; font-weight: 800; padding: 14px 0; }
+#brandName { color: $surface; font-size: 16px; font-weight: 800; padding: 10px 0; }
 #brandMark { color: $surface; border: 2px solid $surface; border-radius: 6px; padding: 5px 9px; font-weight: 800; }
 #brandRight { color: $surface; font-size: 13px; }
 QToolButton#dialogClose { color: $surface; background: transparent; border: 0; padding: 3px 10px; font-size: 24px; font-weight: 800; }
 QToolButton#dialogClose:hover { background: rgba(255,255,255,.16); border-radius: 6px; }
+
+#primarySplitter { background: $bg; }
+QSplitter::handle { background: $border; }
+QSplitter::handle:hover { background: $primary; }
 
 #card { background: $surface; border: 1px solid $border; border-radius: 7px; }
 #cardTitle { font-size: 19px; font-weight: 800; color: $primary_dark; }
@@ -146,12 +150,16 @@ QToolButton#tile {
     padding: 12px;
     background: $surface;
     border: 1px solid $border;
-    border-radius: 9px;
+    border-radius: 8px;
     font-size: 14px;
     font-weight: 650;
 }
 QToolButton#tile:hover { background: $primary_soft; border-color: $primary; }
 QScrollArea#productScroll { background: transparent; border: 0; }
+#productPanel { background: $bg; }
+#productHead { background: $primary_soft; border: 1px solid $border; border-radius: 7px; padding: 7px 10px; }
+#productTitle { color: $primary_dark; font-size: 18px; font-weight: 800; }
+#productHint { color: $muted; font-size: 12px; }
 
 QLineEdit, QComboBox { background: $surface; border: 1px solid $field; border-radius: 7px; padding: 9px 11px; font-size: 14.5px; }
 QLineEdit:focus, QComboBox:focus { border-color: $primary; }
@@ -167,14 +175,16 @@ QMainWindow[compact="true"] QToolButton#tile { padding: 8px; font-size: 12.5px; 
 QMainWindow[compact="true"] #grandTotal { font-size: 25px; }
 
 #orderPanel { background: $surface; border-right: 1px solid $border; }
-#orderHead { background: $primary_dark; color: $surface; padding: 12px 16px; font-weight: 700; }
+#orderHead { background: $primary_dark; color: $surface; padding: 10px 14px; font-weight: 700; }
 #orderHead QLabel { background: transparent; color: $surface; font-weight: 700; }
 QPushButton#headerAction { background: transparent; color: $surface; border-color: rgba(255,255,255,0.45); padding: 5px 10px; }
 QPushButton#headerAction:hover { background: rgba(255,255,255,0.12); border-color: $surface; }
-#totalBox { background: $text; color: $surface; padding: 14px 16px; }
+#totalBox { background: $primary_dark; color: $surface; padding: 14px 16px; }
 #totalBox QLabel { background: transparent; }
 #grandTotal { font-size: 30px; font-weight: 900; color: $surface; }
 #totalLabel, #vatLine { color: $preview; font-size: 13px; }
+
+QTableWidget::item:selected { background: $primary_soft; color: $text; }
 
 QTableWidget { background: $surface; border: 0; }
 QHeaderView::section { background: $primary_soft; border: 0; border-bottom: 1px solid $border; padding: 8px; font-weight: 700; }
@@ -1192,7 +1202,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             head_layout = QVBoxLayout(head)
             head_layout.setContentsMargins(12, 8, 12, 8)
             head_layout.setSpacing(6)
-            self.cashier_label = QLabel(f"บิลปัจจุบัน · ยังไม่ได้เริ่มขาย · v{APP_VERSION}")
+            self.cashier_label = QLabel(f"รายการขาย · ยังไม่ได้เริ่มขาย · v{APP_VERSION}")
             self.cashier_label.setWordWrap(True)
             head_layout.addWidget(self.cashier_label)
             action_row = QHBoxLayout()
@@ -1316,12 +1326,26 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
         def build_product_panel(self) -> QWidget:
             panel = QWidget()
+            panel.setObjectName("productPanel")
             layout = QVBoxLayout(panel)
             layout.setContentsMargins(14, 12, 14, 12)
             layout.setSpacing(10)
 
+            product_head = QWidget()
+            product_head.setObjectName("productHead")
+            product_head_layout = QHBoxLayout(product_head)
+            product_head_layout.setContentsMargins(10, 7, 10, 7)
+            product_title = QLabel("สินค้า")
+            product_title.setObjectName("productTitle")
+            product_hint = QLabel("แตะสินค้าเพื่อเพิ่มเข้าบิล")
+            product_hint.setObjectName("productHint")
+            product_head_layout.addWidget(product_title)
+            product_head_layout.addStretch(1)
+            product_head_layout.addWidget(product_hint)
+            layout.addWidget(product_head)
+
             self.scan = QLineEdit()
-            self.scan.setPlaceholderText("สแกนบาร์โค้ด ป้ายเครื่องชั่ง หรือพิมพ์ค้นหาสินค้า")
+            self.scan.setPlaceholderText("สแกน / ค้นหาสินค้า / SKU / บาร์โค้ด")
             self.scan.returnPressed.connect(self.on_scan)
             self.scan.textChanged.connect(self.refresh_products)
             layout.addWidget(self.scan)

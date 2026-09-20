@@ -613,3 +613,10 @@ pending
 - ทดสอบ: `php artisan view:cache`; `php artisan test --compact tests/Feature/PosBrowserTest.php tests/Feature/PrintablePageSizeTest.php` ผ่าน 4 tests / 10 assertions; `git diff --check`
 - Deploy: ยังไม่ deploy รอบนี้
 - งานถัดไป: หากสั่ง deploy ให้ส่ง `resources/views/pos/browser.blade.php`, clear/cache และตรวจภาพจริงบน `pos.popstarcenter.com`
+
+# Handoff - 2026-09-20 (SeniorSoft-inspired selling UI)
+- ทำอะไร: ปรับ Web POS และ Python POS ให้ใช้ภาษาหน้าขายเดียวกันแบบเครื่องแคชเชียร์: แถบหัวสีน้ำเงินเข้ม, พื้นที่สินค้า/ปุ่มสัมผัสเด่น, บิลแยกด้านขวา, ยอดรวมและปุ่มรับชำระเด่น, ข้อมูลคนขาย/ตั้งค่าเป็นข้อมูลรองขนาดเล็ก; เพิ่มหัวข้อสินค้าและคำแนะนำการแตะสินค้าใน Python POS โดยไม่เปลี่ยน business logic
+- ทดสอบ: `PYTHONPATH=apps/pos-python python3 -m unittest discover -s apps/pos-python/tests` ผ่าน 174 tests; `php artisan test --compact` ผ่าน 423 tests, 1 skipped, 6 incomplete, 3,248 assertions; `php artisan view:cache`; `git diff --check`
+- ขอบเขต: ใช้แบรนด์ PopCentral และโค้ดของโครงการเอง โดยนำแนวทาง workflow/การจัดวางของ POS เครื่องแคชเชียร์มาเป็นแรงบันดาลใจ ไม่ได้นำโลโก้หรือ asset ของ SeniorSoft มาใช้
+- Deploy: ยังไม่ deploy รอบนี้ รอคำสั่ง `deploy` โดยตรง
+- งานถัดไป: push commit นี้; หากสั่ง deploy ให้ส่ง view Web POS และ source/build Python POS ตาม workflow แล้วตรวจภาพจริงบน `pos.popstarcenter.com` และเครื่อง POS
