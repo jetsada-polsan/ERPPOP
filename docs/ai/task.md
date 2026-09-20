@@ -672,3 +672,10 @@ pending
 - ทดสอบ: `php artisan test` ผ่าน 424 tests (423 passed, 1 skipped, 6 incomplete); `php artisan view:cache`; `git diff --check`
 - Deploy: ยังไม่ deploy production; ต้องรอคำสั่ง `deploy` โดยตรง
 - งานถัดไป: ตรวจภาพจริงที่ viewport POS 1366x768/1440x900 แล้ว deploy เมื่อเจ้าของยืนยัน
+
+# Handoff - 2026-09-20 (three-row product catalog and wider sale list production deploy)
+- Commit/source: `e67f320`
+- Deploy: GitHub Actions run `35522011991` production ผ่านครบ; test 55 วินาที, deploy 29 วินาที, รวม 1 นาที 30 วินาที; สถานะ `Success`
+- ตรวจ live: รีโหลด `https://pos.popstarcenter.com/` และเลือกคนขายสาขาวารินแล้ว พบ catalog ใช้กรอบ 3 แถวพร้อม scroll ภายใน และฝั่ง `รายการขาย` กว้างขึ้นประมาณ 40% ของพื้นที่ขาย; ช่องส่วนลดและปุ่มรับชำระยังอยู่ครบ
+- หมายเหตุ: ใน viewport ความสูงต่ำมาก แถวที่สามอาจถูกตัดบางส่วนตามพื้นที่จริง แต่จะเลื่อนต่อได้ภายในกรอบสินค้า; layout desktop เป้าหมายคือ 3 แถวในจอ POS มาตรฐาน
+- งานถัดไป: ตรวจบนจอเครื่อง POS จริงที่ความละเอียดใช้งานประจำ และพิจารณาปรับ breakpoint หากมีเครื่องจอเตี้ยกว่ามาตรฐาน
