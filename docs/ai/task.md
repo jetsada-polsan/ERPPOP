@@ -685,3 +685,9 @@ pending
 - ทดสอบ: `php artisan test` ผ่าน 424 tests (423 passed, 1 skipped, 6 incomplete); `php artisan view:cache`; `git diff --check`
 - Deploy: ยังไม่ deploy production; push source แล้ว รอคำสั่ง `deploy` โดยตรง
 - งานถัดไป: ตรวจภาพ live หลัง deploy ที่ viewport POS จริง และยืนยันว่าการเลือกคนขาย/เปิด-ปิดกะจากเมนูฟันเฟืองทำงานครบ
+
+# Handoff - 2026-09-20 (compact POS context and settings production deploy)
+- Commit/source: `56f401f`
+- Deploy: GitHub Actions run `35522602336` production ผ่านครบทั้ง Laravel test, frontend build, upload release และ `scripts/deploy.sh`; สถานะ `Success`
+- ตรวจ live: `https://pos.popstarcenter.com/` ตอบ HTTP 200 และ HTML production มี `topContext`, `settingsShiftButton`, สัดส่วน `55fr`/`45fr` และ product grid 3 แถวตาม release ใหม่; ไม่พบ `sellerPanel` เดิม
+- งานถัดไป: ทดสอบด้วย Device Token จริงบนจอ POS โดยเลือกคนขาย/เปิดกะจากเมนูฟันเฟือง และตรวจภาพว่าการ์ดสินค้าไม่ทับซ้อน
