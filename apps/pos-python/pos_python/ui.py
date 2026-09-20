@@ -173,26 +173,34 @@ QMainWindow[compact="true"] QPushButton#payBtn { font-size: 15px; padding: 10px 
 QMainWindow[compact="true"] QLineEdit, QComboBox { padding: 6px 8px; font-size: 13px; }
 QMainWindow[compact="true"] QToolButton#tile { padding: 8px; font-size: 12.5px; }
 QMainWindow[compact="true"] #grandTotal { font-size: 25px; }
+QMainWindow[compact="true"] #orderHead { padding: 5px 8px; }
+QMainWindow[compact="true"] #orderHead QLabel { font-size: 12px; }
+QMainWindow[compact="true"] QPushButton#headerAction { padding: 2px 5px; font-size: 11px; }
+QMainWindow[compact="true"] #totalBox { padding: 6px 10px; }
+QMainWindow[compact="true"] #grandTotal { font-size: 22px; }
+QMainWindow[compact="true"] #saleKeypad QPushButton { min-height: 27px; padding: 3px 4px; font-size: 12px; }
 
 #orderPanel { background: $surface; border-right: 1px solid $border; }
-#orderHead { background: $primary_dark; color: $surface; padding: 10px 14px; font-weight: 700; }
-#orderHead QLabel { background: transparent; color: $surface; font-weight: 700; }
-QPushButton#headerAction { background: transparent; color: $surface; border-color: rgba(255,255,255,0.45); padding: 5px 10px; }
+#orderHead { background: $primary_dark; color: $surface; padding: 6px 10px; font-weight: 700; }
+#orderHead QLabel { background: transparent; color: $surface; font-size: 13px; font-weight: 700; }
+QPushButton#headerAction { background: transparent; color: $surface; border-color: rgba(255,255,255,0.45); padding: 3px 7px; font-size: 12px; }
 QPushButton#headerAction:hover { background: rgba(255,255,255,0.12); border-color: $surface; }
-#totalBox { background: $primary_dark; color: $surface; padding: 14px 16px; }
+#totalBox { background: $primary_dark; color: $surface; padding: 8px 12px; }
 #totalBox QLabel { background: transparent; }
-#grandTotal { font-size: 30px; font-weight: 900; color: $surface; }
-#totalLabel, #vatLine { color: $preview; font-size: 13px; }
+ #grandTotal { font-size: 26px; font-weight: 900; color: $surface; }
+#totalLabel, #vatLine { color: $preview; font-size: 11px; }
 
 QTableWidget::item:selected { background: $primary_soft; color: $text; }
+QTableWidget::item { padding: 4px; }
 
 QTableWidget { background: $surface; border: 0; }
-QHeaderView::section { background: $primary_soft; border: 0; border-bottom: 1px solid $border; padding: 8px; font-weight: 700; }
+QHeaderView::section { background: $primary_soft; border: 0; border-bottom: 1px solid $border; padding: 5px; font-weight: 700; }
+ #saleKeypad QPushButton { min-height: 30px; padding: 4px 6px; }
 
 /* กระดาษใบเสร็จวางบนพื้นเทาเหมือนวางบนโต๊ะ */
 #receiptBg { background: $preview; border-radius: 6px; }
 #receiptPaper { background: $surface; padding: 20px; font-size: 12px; color: $paper_ink; }
-#statusBar { color: $muted; font-size: 12.5px; padding: 6px 16px; }
+#statusBar { color: $muted; font-size: 11px; padding: 3px 10px; }
 
 #shiftAmount { font-size: 32px; font-weight: 800; padding: 14px 16px; }
 #shiftSummary { background: $primary_soft; border: 1px solid $border; border-radius: 7px; padding: 12px 14px; font-size: 17px; font-weight: 700; }
@@ -1200,8 +1208,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             head = QWidget()
             head.setObjectName("orderHead")
             head_layout = QVBoxLayout(head)
-            head_layout.setContentsMargins(12, 8, 12, 8)
-            head_layout.setSpacing(6)
+            head_layout.setContentsMargins(10, 6, 10, 6)
+            head_layout.setSpacing(4)
             self.cashier_label = QLabel(f"รายการขาย · ยังไม่ได้เริ่มขาย · v{APP_VERSION}")
             self.cashier_label.setWordWrap(True)
             head_layout.addWidget(self.cashier_label)
@@ -1231,7 +1239,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             settings.setObjectName("headerAction")
             settings.setToolTip("ตั้งค่าเครื่อง POS สำหรับ IT")
             settings.clicked.connect(self.open_settings)
-            settings.setMinimumWidth(132)
+            settings.setMinimumWidth(104)
             action_row.addWidget(settings)
             head_layout.addLayout(action_row)
             layout.addWidget(head)
@@ -1275,7 +1283,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
         def build_numpad(self) -> QWidget:
             box = QWidget()
+            box.setObjectName("saleKeypad")
             grid = QGridLayout(box)
+            grid.setSpacing(4)
 
             self.mode_group = QButtonGroup(box)
             for column, (mode, label) in enumerate([(QTY, "จำนวน"), (PRICE, "ราคา"), (DISCOUNT, "ส่วนลด")]):
@@ -1794,7 +1804,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.opening_cash = None
             self.auth_button.setText("เปิดกะ")
             self.auth_button.setEnabled(True)
-            self.cashier_label.setText(f"บิลปัจจุบัน · ยังไม่ได้เริ่มขาย · v{APP_VERSION}")
+            self.cashier_label.setText(f"รายการขาย · ยังไม่ได้เริ่มขาย · v{APP_VERSION}")
             self.setWindowTitle(f"PopCentral POS v{APP_VERSION} — พร้อมใช้งาน · Layout {layout_config.get('version', 1)}")
 
         def open_settings(self) -> None:

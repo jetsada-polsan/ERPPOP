@@ -639,3 +639,9 @@ pending
 - Deploy: GitHub Actions run `35502019720` production ผ่านครบทั้ง Laravel test, frontend build, upload release และ `scripts/deploy.sh`
 - ตรวจ live: `https://pos.popstarcenter.com/` มีข้อความ `โหลดทีละ 100 รายการ · ค้นหาเพิ่มได้`, มี `URLSearchParams` สำหรับค้นหา server-side และไม่พบ `all=1`; `/api/pos/ping` ไม่ส่ง token ตอบ HTTP 401
 - งานถัดไป: ทดสอบด้วย Device Token จริง โดยค้นหาสินค้าที่อยู่นอก 100 รายการแรก แล้วเลือกขาย 1 รายการเพื่อยืนยันผลลัพธ์จาก API และ flow ขายจริง
+
+# Handoff - 2026-09-20 (single-screen POS selling layout)
+- ทำอะไร: ปรับ Web POS ให้หน้าขายอยู่ใน viewport เดียวบน desktop; ย่อ summary สาขา/เครื่อง/คนขาย/กะและ seller bar, ล็อกความสูง workspace, ให้ scroll เฉพาะ product grid/cart list และตรึงยอดรวมกับปุ่มรับชำระไว้ด้านล่างของบิล; ปรับ Python POS ให้ header/ยอดรวม/numpad/ปุ่มตั้งค่าใช้พื้นที่กะทัดรัดแบบเดียวกัน
+- ทดสอบ: Python UI style 23 tests; Python ทั้งชุด 174 tests; `php artisan view:cache`; `php artisan test --compact tests/Feature/PosBrowserTest.php tests/Feature/PrintablePageSizeTest.php` ผ่าน 4 tests / 13 assertions; `git diff --check`
+- Deploy: ยังไม่ deploy รอบนี้ รอคำสั่งเจ้าของระบบ
+- งานถัดไป: push และ build Python installer; เมื่อสั่ง deploy ให้ตรวจภาพ live บนจอ 1366x768/1440x900 ว่าปุ่มรับชำระอยู่ในจอโดยไม่ต้องเลื่อนหน้า
