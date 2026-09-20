@@ -31,6 +31,12 @@
         .topbar { min-height: 56px; padding: 7px 15px; display: flex; align-items: center; gap: 12px; color: #fff; background: linear-gradient(110deg, var(--navy-dark), var(--navy)); box-shadow: 0 3px 14px rgba(8, 47, 73, .25); }
         .brand { font-size: 18px; font-weight: 900; letter-spacing: -.03em; white-space: nowrap; }
         .brand small { display: inline; margin-left: 7px; color: #bde5f7; font-size: 10px; font-weight: 600; letter-spacing: 0; }
+        .top-context { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 auto; overflow: hidden; }
+        .context-item { min-width: 0; padding: 4px 8px; border: 1px solid rgba(255,255,255,.18); border-radius: 7px; background: rgba(255,255,255,.08); }
+        .context-item .label { display: inline; margin-right: 5px; color: #a9d3e8; font-size: 9px; font-weight: 700; }
+        .context-item .value { display: inline-block; max-width: 190px; overflow: hidden; color: #fff; font-size: 11px; font-weight: 900; vertical-align: bottom; text-overflow: ellipsis; white-space: nowrap; }
+        .context-item.shift-open { border-color: rgba(187,247,208,.65); background: rgba(20,122,85,.35); }
+        .context-item.shift-open .value { color: #bbf7d0; }
         .top-meta { display: flex; align-items: center; gap: 8px; margin-left: auto; color: #d9effb; font-size: 13px; }
         .status { padding: 5px 10px; border: 1px solid rgba(255,255,255,.25); border-radius: 999px; background: rgba(255,255,255,.09); }
         .status.online { color: #bbf7d0; background: rgba(20, 122, 85, .35); }
@@ -62,14 +68,8 @@
         .notice { margin: 14px 0; padding: 11px 13px; border-radius: 8px; color: #6a4a00; background: #fff7da; font-size: 13px; line-height: 1.55; text-align: left; }
         .error { margin: 12px 0; padding: 10px 12px; border-radius: 8px; color: #9d2439; background: #fff0f2; font-size: 13px; text-align: left; }
         .hidden { display: none !important; }
-        .workspace { display: grid; grid-template-rows: 40px 40px minmax(0, 1fr); gap: 8px; height: 100%; min-height: 0; }
-        .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; min-height: 0; }
-        .summary { padding: 4px 10px; min-height: 0; display: flex; flex-direction: row; align-items: center; gap: 7px; }
-        .summary .label { color: var(--muted); font-size: 9px; font-weight: 700; white-space: nowrap; }
-        .summary .value { margin-top: 0; font-size: 12px; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .summary.shift-open { border-color: #b5e4ca; background: #f2fff7; }
-        .summary.shift-open .value { color: var(--green); }
-        .sale-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(420px, .8fr); gap: 10px; align-items: stretch; min-height: 0; height: 100%; }
+        .workspace { height: 100%; min-height: 0; }
+        .sale-grid { display: grid; grid-template-columns: minmax(0, 55fr) minmax(360px, 45fr); gap: 10px; align-items: stretch; min-height: 0; height: 100%; }
         .catalog, .cart { min-width: 0; min-height: 0; height: 100%; overflow: hidden; }
         .catalog { display: flex; flex-direction: column; }
         .section-head { padding: 8px 11px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; }
@@ -80,14 +80,14 @@
         .cart .section-head { color: #fff; background: var(--navy); }
         .cart .section-head .button.light { color: #fff; border-color: rgba(255,255,255,.42); background: transparent; }
         .cart .section-head .button.light:hover { background: rgba(255,255,255,.12); }
-        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); grid-auto-rows: minmax(128px, 1fr); gap: 10px; flex: 1 1 auto; width: 100%; height: 0; min-height: 0; padding: 10px; overflow: auto; }
-        .product { display: flex; flex-direction: column; justify-content: space-between; gap: 4px; min-height: 124px; padding: 12px; border: 1px solid #cbdde8; border-radius: 9px; color: var(--ink); background: #fff; text-align: left; transition: border-color .12s, box-shadow .12s, transform .08s; }
+        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: 8px; flex: 1 1 auto; width: 100%; height: 0; min-height: 0; padding: 10px; overflow: auto; }
+        .product { display: flex; flex-direction: column; justify-content: space-between; gap: 3px; min-height: 0; min-width: 0; padding: 10px; border: 1px solid #cbdde8; border-radius: 9px; color: var(--ink); background: #fff; overflow: hidden; text-align: left; transition: border-color .12s, box-shadow .12s, transform .08s; }
         .product:hover { border-color: var(--blue); box-shadow: 0 5px 14px rgba(21,133,192,.15); transform: translateY(-1px); }
         .product:active { transform: translateY(1px); }
-        .product .name { min-height: 40px; font-size: 14px; font-weight: 800; line-height: 1.4; }
-        .product .sku { margin-top: 5px; color: var(--muted); font-size: 11px; }
-        .product .price { margin-top: 6px; color: var(--blue); font-size: 20px; font-weight: 900; }
-        .product .stock { margin-top: 4px; color: var(--muted); font-size: 11px; }
+        .product .name { min-height: 0; display: -webkit-box; overflow: hidden; font-size: 13px; font-weight: 800; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+        .product .sku { margin-top: 2px; color: var(--muted); font-size: 10px; }
+        .product .price { margin-top: 2px; color: var(--blue); font-size: 18px; font-weight: 900; }
+        .product .stock { margin-top: 2px; color: var(--muted); font-size: 10px; }
         .cart { display: flex; flex-direction: column; }
         .cart-list { flex: 1 1 auto; width: 100%; height: 0; min-height: 0; overflow: auto; }
         .cart-empty { display: grid; place-items: center; height: 100%; min-height: 0; padding: 20px; color: var(--muted); text-align: center; }
@@ -130,10 +130,14 @@
         .payment-qr-amount { margin-top: 7px; color: var(--green); font-size: 20px; font-weight: 900; }
         .payment-qr-account { margin-top: 4px; color: var(--muted); font-size: 12px; }
         .payment-qr-unavailable { color: #9d2439; font-size: 12px; line-height: 1.45; }
-        #sellerPanel { display: flex; align-items: center; min-height: 0; height: 40px; }
-        #sellerPanel .section-head { flex: 0 0 auto; padding: 5px 10px; border-bottom: 0; }
-        #sellerPanel .section-head h2 { font-size: 14px; }
-        #sellerPanel .seller-grid { flex: 1; display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin: 0; padding: 0 12px 0 0 !important; }
+        .settings-section { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+        .settings-section h3 { margin-bottom: 8px; color: var(--navy); }
+        .settings-section-head { display: flex; align-items: center; gap: 8px; }
+        .settings-section-head .grow { flex: 1; }
+        .settings-seller-grid { display: flex; flex-wrap: wrap; gap: 7px; }
+        .settings-seller-grid .seller { min-height: 38px; }
+        .settings-shift-row { display: flex; align-items: center; gap: 10px; }
+        .settings-shift-row .value { flex: 1; color: var(--muted); font-size: 13px; font-weight: 700; }
         .seller { min-height: 28px; padding: 3px 9px; border: 1px solid #c8d9e4; border-radius: 7px; color: var(--ink); background: #fff; text-align: left; }
         .seller:hover { border-color: var(--blue); background: var(--blue-soft); }
         .seller strong { display: inline; font-size: 12px; }
@@ -144,14 +148,20 @@
         .receipt-paper .line { display: flex; justify-content: space-between; gap: 8px; margin: 5px 0; }
         .receipt-paper hr { border: 0; border-top: 1px dashed #333; }
         .toast { position: fixed; right: 18px; bottom: 18px; z-index: 40; max-width: min(390px, calc(100vw - 36px)); padding: 12px 15px; border-radius: 9px; color: #fff; background: #183447; box-shadow: var(--shadow); }
-        @media (max-width: 900px) { body.pos-active { overflow: auto; } body.pos-active .page { position: static; height: auto; max-width: 1600px; overflow: visible; } .workspace { height: auto; grid-template-rows: auto auto auto; } .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sale-grid { grid-template-columns: 1fr; min-height: 0; height: auto; } .cart-list { height: auto; max-height: 430px; min-height: 260px; } .product-grid { grid-template-rows: none; grid-auto-rows: minmax(112px, auto); height: auto; min-height: 360px; } }
-        @media (max-width: 560px) { .page { padding: 10px; } .topbar { padding: 9px 11px; } .top-meta { gap: 5px; font-size: 11px; } .status { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .connect-panel { margin: 5vh auto; padding: 22px 17px; } .summary-grid { gap: 7px; } .summary { padding: 8px 10px; min-height: 58px; } .summary .value { font-size: 13px; } #sellerPanel { display: block; } #sellerPanel .section-head { padding: 9px 12px 5px; } #sellerPanel .seller-grid { padding: 0 10px 10px !important; } .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 10px; gap: 7px; } .product { min-height: 112px; padding: 9px; } .action-row { grid-template-columns: 1fr; } .payment-qr-box canvas, .payment-qr-box img { width: 160px !important; height: 160px !important; } }
+        @media (max-width: 900px) { body.pos-active { overflow: auto; } body.pos-active .page { position: static; height: auto; max-width: 1600px; overflow: visible; } .workspace { height: auto; } .top-context { gap: 4px; } .context-item { padding: 3px 6px; } .context-item .value { max-width: 130px; } .sale-grid { grid-template-columns: 1fr; min-height: 0; height: auto; } .cart-list { height: auto; max-height: 430px; min-height: 260px; } .product-grid { grid-template-rows: none; grid-auto-rows: minmax(112px, auto); height: auto; min-height: 360px; } }
+        @media (max-width: 560px) { .page { padding: 10px; } .topbar { padding: 9px 11px; } .brand small { display: none; } .top-context { gap: 3px; } .top-meta { gap: 5px; font-size: 11px; } .status { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .context-item .label { display: block; margin: 0; font-size: 8px; } .context-item .value { max-width: 92px; font-size: 10px; } .connect-panel { margin: 5vh auto; padding: 22px 17px; } .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 10px; gap: 7px; } .product { min-height: 112px; padding: 9px; } .action-row { grid-template-columns: 1fr; } .payment-qr-box canvas, .payment-qr-box img { width: 160px !important; height: 160px !important; } }
         @media print { @page { size: 80mm auto; margin: 0; } body { background: #fff; } body.printing > *:not(#receiptModal) { display: none !important; } body.printing #receiptModal { position: static; display: block !important; padding: 0; background: #fff; } body.printing #receiptModal .modal { width: auto; max-height: none; padding: 0; box-shadow: none; } body.printing #receiptModal .modal-head, body.printing #receiptModal .modal-actions { display: none; } body.printing .receipt-paper { width: 80mm; } }
     </style>
 </head>
 <body>
     <header class="topbar">
         <div class="brand">PopCentral Web POS <small>ขายออนไลน์ผ่านเว็บ</small></div>
+        <div id="topContext" class="top-context hidden" aria-label="ข้อมูลเครื่อง POS">
+            <div class="context-item"><span class="label">สาขา</span><strong id="branchValue" class="value">—</strong></div>
+            <div class="context-item"><span class="label">เครื่อง</span><strong id="deviceValue" class="value">—</strong></div>
+            <div class="context-item"><span class="label">คนขาย</span><strong id="cashierValue" class="value">ยังไม่เลือก</strong></div>
+            <div id="shiftSummary" class="context-item"><span class="label">กะ</span><strong id="shiftValue" class="value">ยังไม่เปิดกะ</strong></div>
+        </div>
         <div class="top-meta">
             <span id="status" class="status">ยังไม่เชื่อมต่อ</span>
             <button id="settingsButton" class="icon-btn" type="button" title="ตั้งค่า">⚙</button>
@@ -173,19 +183,6 @@
         </section>
 
         <section id="workspace" class="workspace hidden">
-            <div class="summary-grid">
-                <div class="panel summary"><div class="label">สาขา</div><div id="branchValue" class="value">—</div></div>
-                <div class="panel summary"><div class="label">เครื่อง</div><div id="deviceValue" class="value">—</div></div>
-                <div class="panel summary"><div class="label">คนขาย</div><div id="cashierValue" class="value">ยังไม่เลือก</div></div>
-                <div id="shiftSummary" class="panel summary"><div class="label">สถานะกะ</div><div id="shiftValue" class="value">ยังไม่เปิดกะ</div></div>
-            </div>
-
-            <section id="sellerPanel" class="panel">
-                <div class="section-head"><h2>เลือกชื่อคนขาย</h2><span class="grow"></span><button id="reloadCashiers" class="button light small" type="button">โหลดรายชื่อใหม่</button></div>
-                <div id="sellerError" class="error hidden" style="margin:14px"></div>
-                <div id="sellerGrid" class="seller-grid" style="padding:0 14px 14px"></div>
-            </section>
-
             <section id="salePanel" class="sale-grid hidden">
                 <div class="panel catalog">
                     <div class="section-head"><h2>สินค้า</h2><small>โหลดทีละ 100 รายการ · ค้นหาเพิ่มได้</small><span class="grow"></span><button id="reloadProducts" class="button light small" type="button">รีเฟรช</button></div>
@@ -214,6 +211,15 @@
     <div id="settingsModal" class="modal-backdrop hidden">
         <div class="modal">
             <div class="modal-head"><h2>ตั้งค่า Web POS</h2><button class="close" type="button" data-close="settingsModal">×</button></div>
+            <div class="settings-section" style="margin-top:0;padding-top:0;border-top:0">
+                <div class="settings-section-head"><h3>คนขาย</h3><span class="grow"></span><button id="reloadCashiers" class="button light small" type="button">โหลดรายชื่อใหม่</button></div>
+                <div id="sellerError" class="error hidden" style="margin:8px 0 0"></div>
+                <div id="sellerGrid" class="settings-seller-grid"></div>
+            </div>
+            <div class="settings-section">
+                <h3>กะขาย</h3>
+                <div class="settings-shift-row"><span id="settingsShiftValue" class="value">ยังไม่เลือกคนขาย</span><button id="settingsShiftButton" class="button light small" type="button" disabled>เปิดกะ</button></div>
+            </div>
             <div class="field"><label for="settingsToken">Device Token</label><input id="settingsToken" class="input token-input" type="password" autocomplete="off"></div>
             <div class="field" style="margin-top:12px"><label for="paperWidth">ขนาดใบเสร็จ</label><select id="paperWidth" class="select"><option value="80mm">80 มม.</option></select></div>
             <div class="notice">Token จะถูกเก็บใน localStorage ของเบราว์เซอร์เครื่องนี้เท่านั้น ถ้าเป็นเครื่องสาธารณะให้ล้างค่าเมื่อเลิกใช้งาน</div>
@@ -296,7 +302,7 @@
             function resetSession(clearToken = false) {
                 state.config = null; state.cashiers = []; state.cashier = null; state.shift = null; state.products = []; state.cart = []; state.discountCard = null;
                 if (clearToken) { state.token = ''; localStorage.removeItem(TOKEN_KEY); $('tokenInput').value = ''; }
-                document.body.classList.remove('pos-active');
+                document.body.classList.remove('pos-active'); hide('topContext');
                 hide('workspace'); show('connectPanel'); setStatus('ยังไม่เชื่อมต่อ'); renderCart();
             }
 
@@ -309,7 +315,7 @@
                     state.config = config; localStorage.setItem(TOKEN_KEY, state.token);
                     $('branchValue').textContent = config.branch_name || `สาขา #${config.branch_id || '—'}`;
                     $('deviceValue').textContent = config.device?.name || config.device?.terminal_code || 'เครื่อง POS';
-                    document.body.classList.add('pos-active'); show('workspace'); hide('connectPanel'); setStatus('เชื่อมต่อแล้ว', true);
+                    document.body.classList.add('pos-active'); show('topContext'); show('workspace'); hide('connectPanel'); setStatus('เชื่อมต่อแล้ว', true); renderShift();
                     await loadCashiers();
                     toast('เชื่อมต่อ ERP สำเร็จ');
                 } catch (exception) {
@@ -332,7 +338,7 @@
                 error('sellerError', ''); setStatus('กำลังเลือกคนขาย…');
                 try {
                     const response = await api('/cashier/login', { method: 'POST', body: JSON.stringify({ cashier_id: id }) });
-                    state.cashier = response.cashier || cashier; $('cashierValue').textContent = state.cashier.name || cashier.name || cashier.code; setStatus('เลือกคนขายแล้ว', true);
+                    state.cashier = response.cashier || cashier; $('cashierValue').textContent = state.cashier.name || cashier.name || cashier.code; setStatus('เลือกคนขายแล้ว', true); hide('settingsModal');
                     await loadShift();
                     if (state.shift) { await enterSale(); } else { openShiftModal(); }
                 } catch (exception) { error('sellerError', exception.message); setStatus('เลือกคนขายไม่สำเร็จ'); }
@@ -345,7 +351,10 @@
             }
 
             function renderShift() {
-                const open = Boolean(state.shift); $('shiftSummary').classList.toggle('shift-open', open); $('shiftValue').textContent = open ? `เปิดอยู่ ${state.shift.shift_no || ''}`.trim() : 'ยังไม่เปิดกะ';
+                const open = Boolean(state.shift); const shiftText = open ? `เปิดอยู่ ${state.shift.shift_no || ''}`.trim() : 'ยังไม่เปิดกะ';
+                $('shiftSummary').classList.toggle('shift-open', open); $('shiftValue').textContent = shiftText;
+                const settingsValue = $('settingsShiftValue'); const settingsButton = $('settingsShiftButton');
+                settingsValue.textContent = state.cashier ? shiftText : 'ยังไม่เลือกคนขาย'; settingsButton.disabled = !state.cashier; settingsButton.textContent = open ? 'ปิดกะ' : 'เปิดกะ'; settingsButton.classList.toggle('danger', open); settingsButton.classList.toggle('light', !open);
             }
 
             function openShiftModal() {
@@ -497,7 +506,7 @@
                 const receipt = state.lastReceipt || {}; const company = state.config?.company || {}; const paper = localStorage.getItem(PAPER_KEY) || '80mm'; $('receiptPaper').style.width = paper; $('receiptPaper').innerHTML = `<h3>${escapeHtml(company.name || 'PopStar')}</h3><div class="center">${escapeHtml(company.address || '')}</div><div class="center">${escapeHtml(company.phone || '')}</div><hr><div>เลขที่: ${escapeHtml(receipt.receipt_no || receipt.doc_number || '—')}</div><div>ผู้ขาย: ${escapeHtml(state.cashier?.name || '')}</div><div>เวลา: ${new Date().toLocaleString('th-TH')}</div><hr>${(receipt.items || []).map((item) => `<div class="line"><span>${escapeHtml(item.name_th)} x${item.qty}</span><span>${money(Number(item.qty) * Number(item.pos_price || 0))}</span></div>`).join('')}<hr><div class="line"><strong>รวมสุทธิ</strong><strong>${money(receipt.total_amount || 0)}</strong></div><div class="center" style="margin-top:10px">ขอบคุณที่ใช้บริการ</div>`; }
 
             document.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => hide(button.dataset.close)));
-            $('connectButton').addEventListener('click', connect); $('tokenInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') connect(); }); $('reloadCashiers').addEventListener('click', loadCashiers); $('reloadProducts').addEventListener('click', () => loadProducts($('productSearch').value)); $('productSearch').addEventListener('input', scheduleProductSearch); $('clearCart').addEventListener('click', () => { invalidateDiscountCard(); state.cart = []; renderCart(); }); $('discountCardCode').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); applyDiscountCard(); } }); $('applyDiscountCard').addEventListener('click', applyDiscountCard); $('payButton').addEventListener('click', openPayment); $('closeShiftButton').addEventListener('click', closeShiftModal); $('shiftSubmitButton').addEventListener('click', submitShift); $('paymentMethod').addEventListener('change', updatePaymentFields); $('cashReceived').addEventListener('input', updateChange); $('submitPayment').addEventListener('click', submitPayment); $('settingsButton').addEventListener('click', () => { $('settingsToken').value = state.token || ''; $('paperWidth').value = localStorage.getItem(PAPER_KEY) || '80mm'; show('settingsModal'); }); $('saveSettingsButton').addEventListener('click', () => { const token = $('settingsToken').value.trim(); if (!token) return toast('กรุณาใส่ Device Token'); localStorage.setItem(PAPER_KEY, $('paperWidth').value); $('tokenInput').value = token; hide('settingsModal'); connect(); }); $('clearTokenButton').addEventListener('click', () => { resetSession(true); hide('settingsModal'); toast('ล้าง Device Token จากเครื่องนี้แล้ว'); }); $('printReceipt').addEventListener('click', () => { document.body.classList.add('printing'); window.print(); setTimeout(() => document.body.classList.remove('printing'), 500); });
+            $('connectButton').addEventListener('click', connect); $('tokenInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') connect(); }); $('reloadCashiers').addEventListener('click', loadCashiers); $('settingsShiftButton').addEventListener('click', () => { if (!state.cashier) return toast('กรุณาเลือกคนขายก่อน'); if (state.shift) closeShiftModal(); else openShiftModal(); }); $('reloadProducts').addEventListener('click', () => loadProducts($('productSearch').value)); $('productSearch').addEventListener('input', scheduleProductSearch); $('clearCart').addEventListener('click', () => { invalidateDiscountCard(); state.cart = []; renderCart(); }); $('discountCardCode').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); applyDiscountCard(); } }); $('applyDiscountCard').addEventListener('click', applyDiscountCard); $('payButton').addEventListener('click', openPayment); $('closeShiftButton').addEventListener('click', closeShiftModal); $('shiftSubmitButton').addEventListener('click', submitShift); $('paymentMethod').addEventListener('change', updatePaymentFields); $('cashReceived').addEventListener('input', updateChange); $('submitPayment').addEventListener('click', submitPayment); $('settingsButton').addEventListener('click', () => { $('settingsToken').value = state.token || ''; $('paperWidth').value = localStorage.getItem(PAPER_KEY) || '80mm'; renderShift(); show('settingsModal'); }); $('saveSettingsButton').addEventListener('click', () => { const token = $('settingsToken').value.trim(); if (!token) return toast('กรุณาใส่ Device Token'); localStorage.setItem(PAPER_KEY, $('paperWidth').value); $('tokenInput').value = token; hide('settingsModal'); connect(); }); $('clearTokenButton').addEventListener('click', () => { resetSession(true); hide('settingsModal'); toast('ล้าง Device Token จากเครื่องนี้แล้ว'); }); $('printReceipt').addEventListener('click', () => { document.body.classList.add('printing'); window.print(); setTimeout(() => document.body.classList.remove('printing'), 500); });
 
             state.token = localStorage.getItem(TOKEN_KEY) || ''; $('tokenInput').value = state.token;
             if (state.token) connect();
