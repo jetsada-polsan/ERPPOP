@@ -620,3 +620,10 @@ pending
 - ขอบเขต: ใช้แบรนด์ PopCentral และโค้ดของโครงการเอง โดยนำแนวทาง workflow/การจัดวางของ POS เครื่องแคชเชียร์มาเป็นแรงบันดาลใจ ไม่ได้นำโลโก้หรือ asset ของ SeniorSoft มาใช้
 - Deploy: ยังไม่ deploy รอบนี้ รอคำสั่ง `deploy` โดยตรง
 - งานถัดไป: push commit นี้; หากสั่ง deploy ให้ส่ง view Web POS และ source/build Python POS ตาม workflow แล้วตรวจภาพจริงบน `pos.popstarcenter.com` และเครื่อง POS
+
+# Handoff - 2026-09-20 (SeniorSoft-inspired POS UI production deploy)
+- Commit/source: `6056832`
+- Deploy: GitHub Actions run `35501050060` production ผ่านครบทั้ง Laravel test, frontend build, upload release และ `scripts/deploy.sh`
+- ตรวจ live: `https://pos.popstarcenter.com/` ตอบ HTTP 200 และมี Web POS รุ่นใหม่; `/api/pos/ping` เมื่อไม่ส่ง Device Token ตอบ HTTP 401 ตามที่ควรเป็น
+- Python build: GitHub Actions run `35500582391` สร้าง Windows executable/installer และ upload artifact สำเร็จ; ยังไม่ publish installer ทับลิงก์ดาวน์โหลด production
+- งานถัดไป: ใช้ Device Token ของเครื่องจริงเพื่อทดสอบเลือกคนขาย → เปิดกะ → ขาย → พิมพ์ใบเสร็จ 80 มม. → ปิดกะ; ตรวจภาพบนจอ POS จริง
