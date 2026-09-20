@@ -652,3 +652,10 @@ pending
 - ตรวจภาพ live: เปิด Web POS ใน Chrome viewport 1440x810 หลังเลือกคนขายแล้ว เห็นแถบข้อมูลย่อ, grid สินค้า, รายการขาย, ยอดรวม และปุ่ม `รับชำระ`/`ปิดกะ` ครบในจอเดียว; scroll อยู่เฉพาะรายการด้านใน
 - หมายเหตุ: ภาพแคปจากหน้า live อยู่ในผลการตรวจของงานนี้; Python source อยู่ใน commit ก่อนหน้าและ Windows installer build ผ่านแล้ว แต่ยังไม่ได้ publish installer ใหม่ทับลิงก์ดาวน์โหลด production
 - งานถัดไป: UAT ด้วย Device Token/เครื่อง POS จริง โดยเพิ่มสินค้า 1 รายการ ตรวจปุ่มรับชำระและพิมพ์ใบเสร็จ 80 มม.; ตรวจ Python installer บน Windows จริง
+
+# Handoff - 2026-09-20 (POS QR, discount scan, and touch layout)
+- Commit/source: `97b9874`
+- ทำอะไร: เพิ่ม API ตรวจสอบบัตรส่วนลดสำหรับ Web POS ผ่าน Device Token; เพิ่มช่องสแกน/พิมพ์รหัสบัตรส่วนลดในตะกร้าและส่งส่วนลดไป checkout อย่างปลอดภัย; เพิ่ม QR PromptPay แบบยอดตามบิลในหน้ารับชำระ; ขยายฝั่งสินค้าและทำการ์ด/ปุ่มสินค้าและปุ่มปรับจำนวนให้เหมาะกับการแตะ; ปรับ Python POS ให้ฝั่งสินค้าใหญ่ขึ้น การ์ดสูง/กดง่ายขึ้น และคง QR ในหน้าชำระเงินเดิม
+- ทดสอบ: `php artisan test` ผ่าน 424 tests (423 passed, 1 skipped, 6 incomplete); `PYTHONPATH=apps/pos-python python3 -m unittest discover -s apps/pos-python/tests -p 'test_*.py'` ผ่าน 174 tests; `php artisan view:cache`; ตรวจ syntax JavaScript และ `git diff --check` ผ่าน
+- Deploy: ยังไม่ deploy production; push `main` แล้ว รอคำสั่ง `deploy` โดยตรง
+- ความเสี่ยง/งานถัดไป: ต้องตรวจ QR กับบัญชี PromptPay ที่ตั้งค่าไว้จริง และยิงบัตรส่วนลด/ขาย 1 บิลบน Web POS ด้วย Device Token จริง; Python installer ยังต้อง build/publish รุ่นที่มี layout นี้ก่อนใช้งานบน Windows
