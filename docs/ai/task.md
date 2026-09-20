@@ -596,3 +596,9 @@ pending
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ยิงขายจริงจากเบราว์เซอร์ด้วย Device Token จริง; ต้องใช้ Token ที่ผูกเครื่อง/สาขาและมีสิทธิ์ POS, หน้าเว็บเป็น online-only ไม่มี offline queue; ยังไม่ได้ deploy production
 - Deploy: ยังไม่ deploy รอคำสั่งเจ้าของโดยตรง
 - งานถัดไป: push commit แล้ว หากสั่ง deploy ให้ backup production, ส่ง `routes/web.php`, `resources/views/pos/browser.blade.php`, test และ handoff, clear/cache, รัน health และตรวจ `pos.popstarcenter.com`
+
+# Handoff - 2026-09-20 (browser POS production deploy)
+- Commit/source: `bc2c5fb`
+- Deploy: สำรอง production ที่ `storage/app/backups/erp-db-20260920-144250.sql.gz`; ส่ง `routes/web.php` และ `resources/views/pos/browser.blade.php` ขึ้น `/var/www/jeterp` แบบ dry-run ก่อนและไม่ใช้ `--delete`; clear/cache Laravel และตรวจ `erp:health` ผ่านครบ
+- ตรวจ live: `https://pos.popstarcenter.com/` ตอบ HTTP 200 และแสดง `PopCentral Web POS`; `/api/pos/ping` เมื่อไม่ส่ง Device Token ตอบ HTTP 401 ตามที่ควรเป็น
+- หมายเหตุ: Web POS พร้อมใช้งานแบบ online-only; ต้องใส่ Device Token ที่ผูกเครื่อง/สาขาเพื่อเลือกคนขายและทำรายการจริง; ยังไม่ได้ยิงขายจริงด้วย token ของสาขา
