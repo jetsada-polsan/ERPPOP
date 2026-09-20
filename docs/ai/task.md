@@ -590,7 +590,7 @@ pending
 - ความเสี่ยง/งานถัดไป: ต้องทำ Windows/hardware UAT จริง: เลือกชื่อคนขาย → เปิดกะ → ขายเงินสด 1 ใบ → พิมพ์ใบเสร็จ 80 มม. → ปิดกะ → ตรวจ receipt/ยอด ERP
 
 # Handoff - 2026-09-20 (browser POS prototype)
-- Commit: pending
+- Commit: `6e25698`
 - ทำอะไร: เปลี่ยน `pos.popstarcenter.com` จากหน้าดาวน์โหลดเป็นหน้า Web POS สาธารณะสำหรับเครื่องที่มี Device Token; ใช้ API POS เดิมสำหรับ ping, เลือกคนขายแบบไม่ใช้ login/PIN, เปิดกะ, โหลดสินค้า, ขายเงินสดหรือโอน, ออกใบเสร็จ และปิดกะ; เพิ่มปุ่มตั้งค่า Token และพิมพ์ใบเสร็จ thermal 80 มม.
 - ทดสอบ: `php artisan test --compact` ผ่าน 423 tests, 1 skipped, 6 incomplete, 3,248 assertions; `php artisan view:cache`; `php artisan test tests/Feature/PosBrowserTest.php tests/Feature/PrintablePageSizeTest.php`; `git diff --check`; `php artisan erp:health` เชื่อมฐานข้อมูล/ขาย-GL/storage/queue ผ่าน แต่รายงาน migration ค้าง 6 รายการและยังไม่พบ backup ตามสถานะเดิมของเครื่องพัฒนา
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ยิงขายจริงจากเบราว์เซอร์ด้วย Device Token จริง; ต้องใช้ Token ที่ผูกเครื่อง/สาขาและมีสิทธิ์ POS, หน้าเว็บเป็น online-only ไม่มี offline queue; ยังไม่ได้ deploy production
