@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\PosController;
 use App\Models\AppSetting;
 use App\Models\AuditLog;
+use App\Models\DiscountCard;
 use App\Models\PosDevice;
 use App\Models\PosReceipt;
 use App\Models\PosTerminal;
@@ -605,6 +606,45 @@ class PosApiController extends Controller
 
             return $response;
         }, 3);
+    }
+
+    /**
+     * Preview a scanned discount card for the browser POS.
+     * The card is only consumed by the real checkout transaction.
+     */
+    public function checkDiscountCard(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'card_code' => ['required', 'string', 'max:30'],
+            'subtotal' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $card = DiscountCard::where('card_code', $data['card_code'])->first();
+        if (! $card) {
+            return response()->json(['success' => false, 'message' => 'ไม่พบบัตรส่วนลดนี้'], 404);
+        }
+
+        if (! $card->isValidAt(now())) {
+            return response()->json(['success' => false, 'message' => 'บัตรนี้หมดอายุ ปิดใช้งาน หรือใช้ครบจำนวนแล้ว'], 422);
+        }
+
+        $discount = $card->computeDiscount((float) $data['subtotal']);
+        if ($discount === null) {
+            $minText = $card->min_amount ? number_format((float) $card->min_amount, 2) : '0.00';
+
+            return response()->json(['success' => false, 'message' => "ยอดซื้อไม่ถึงขั้นต่ำ ({$minText} บาท)"], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'card_code' => $card->card_code,
+            'name' => $card->name,
+            'discount_amount' => $discount,
+            'discount_type' => $card->discount_type,
+            'discount_value' => (float) $card->discount_value,
+            'min_amount' => $card->min_amount !== null ? (float) $card->min_amount : null,
+            'max_discount_amount' => $card->max_discount_amount !== null ? (float) $card->max_discount_amount : null,
+        ]);
     }
 
     private function payloadHash(array $payload): string

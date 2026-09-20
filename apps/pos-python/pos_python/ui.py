@@ -147,14 +147,15 @@ QPushButton#payBtn { font-size: 18px; padding: 16px; }
 QPushButton#voidBtn { color: $danger; }
 QToolButton#tile {
     text-align: left;
-    padding: 12px;
+    padding: 13px;
     background: $surface;
     border: 1px solid $border;
     border-radius: 8px;
-    font-size: 14px;
+    font-size: 14.5px;
     font-weight: 650;
 }
 QToolButton#tile:hover { background: $primary_soft; border-color: $primary; }
+QToolButton#tile:pressed { background: $field; }
 QScrollArea#productScroll { background: transparent; border: 0; }
 #productPanel { background: $bg; }
 #productHead { background: $primary_soft; border: 1px solid $border; border-radius: 7px; padding: 7px 10px; }
@@ -171,7 +172,7 @@ QMainWindow[compact="true"] #brandRight { font-size: 11px; }
 QMainWindow[compact="true"] QPushButton { padding: 6px 8px; font-size: 13px; }
 QMainWindow[compact="true"] QPushButton#payBtn { font-size: 15px; padding: 10px 8px; }
 QMainWindow[compact="true"] QLineEdit, QComboBox { padding: 6px 8px; font-size: 13px; }
-QMainWindow[compact="true"] QToolButton#tile { padding: 8px; font-size: 12.5px; }
+QMainWindow[compact="true"] QToolButton#tile { padding: 10px; font-size: 13px; }
 QMainWindow[compact="true"] #grandTotal { font-size: 25px; }
 QMainWindow[compact="true"] #orderHead { padding: 5px 8px; }
 QMainWindow[compact="true"] #orderHead QLabel { font-size: 12px; }
@@ -1164,12 +1165,14 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             else:
                 first, second = product_panel, order_panel
                 first.setMinimumWidth(460)
-                second.setMinimumWidth(620)
+                second.setMinimumWidth(560)
             splitter.addWidget(first)
             splitter.addWidget(second)
-            splitter.setStretchFactor(0, 4 if first is product_panel else 6)
-            splitter.setStretchFactor(1, 6 if second is order_panel else 4)
-            splitter.setSizes([620, 740] if first is product_panel else [740, 620])
+            # Keep the catalogue as the wide touch target area; the order pane
+            # stays large enough for the receipt, keypad, and payment button.
+            splitter.setStretchFactor(0, 6 if first is product_panel else 4)
+            splitter.setStretchFactor(1, 4 if second is order_panel else 6)
+            splitter.setSizes([760, 600] if first is product_panel else [600, 760])
             self.primary_splitter = splitter
             columns.addWidget(splitter)
             self.setCentralWidget(root)
@@ -1384,7 +1387,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             if available <= 0:
                 return 4
             gap = 10
-            minimum_tile = 128 if self.property("compact") else 154
+            minimum_tile = 170 if self.property("compact") else 190
             return max(1, min(4, (available + gap) // (minimum_tile + gap)))
 
         def build_category_bar(self) -> None:
@@ -1410,7 +1413,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self._product_columns = columns
             available = max(self.grid_host.width(), columns * 110 + (columns - 1) * 10)
             tile_width = max(110, (available - (columns - 1) * 10) // columns)
-            tile_height = 104 if self.property("compact") else 118
+            tile_height = 116 if self.property("compact") else 132
             term = self.scan.text().strip()
             # ตัวเลขล้วนคือกำลังยิงบาร์โค้ด ไม่ใช่ค้นหา — อย่าให้ตารางกระพริบระหว่างสแกน
             search = "" if term.isdigit() else term

@@ -69,7 +69,7 @@
         .summary .value { margin-top: 0; font-size: 12px; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .summary.shift-open { border-color: #b5e4ca; background: #f2fff7; }
         .summary.shift-open .value { color: var(--green); }
-        .sale-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(380px, .65fr); gap: 10px; align-items: stretch; min-height: 0; height: 100%; }
+        .sale-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(360px, .45fr); gap: 10px; align-items: stretch; min-height: 0; height: 100%; }
         .catalog, .cart { min-width: 0; min-height: 0; height: 100%; overflow: hidden; }
         .catalog { display: flex; flex-direction: column; }
         .section-head { padding: 8px 11px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; }
@@ -80,12 +80,13 @@
         .cart .section-head { color: #fff; background: var(--navy); }
         .cart .section-head .button.light { color: #fff; border-color: rgba(255,255,255,.42); background: transparent; }
         .cart .section-head .button.light:hover { background: rgba(255,255,255,.12); }
-        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(142px, 1fr)); gap: 8px; flex: 1 1 auto; width: 100%; height: 0; min-height: 0; padding: 10px; overflow: auto; }
-        .product { min-height: 102px; padding: 9px; border: 1px solid #cbdde8; border-radius: 8px; color: var(--ink); background: #fff; text-align: left; }
-        .product:hover { border-color: var(--blue); box-shadow: 0 4px 12px rgba(21,133,192,.13); }
-        .product .name { min-height: 34px; font-size: 12px; font-weight: 800; line-height: 1.4; }
+        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; flex: 1 1 auto; width: 100%; height: 0; min-height: 0; padding: 10px; overflow: auto; }
+        .product { display: flex; flex-direction: column; justify-content: space-between; gap: 4px; min-height: 118px; padding: 11px; border: 1px solid #cbdde8; border-radius: 9px; color: var(--ink); background: #fff; text-align: left; transition: border-color .12s, box-shadow .12s, transform .08s; }
+        .product:hover { border-color: var(--blue); box-shadow: 0 5px 14px rgba(21,133,192,.15); transform: translateY(-1px); }
+        .product:active { transform: translateY(1px); }
+        .product .name { min-height: 40px; font-size: 13px; font-weight: 800; line-height: 1.4; }
         .product .sku { margin-top: 5px; color: var(--muted); font-size: 11px; }
-        .product .price { margin-top: 6px; color: var(--blue); font-size: 16px; font-weight: 900; }
+        .product .price { margin-top: 6px; color: var(--blue); font-size: 19px; font-weight: 900; }
         .product .stock { margin-top: 4px; color: var(--muted); font-size: 11px; }
         .cart { display: flex; flex-direction: column; }
         .cart-list { flex: 1 1 auto; width: 100%; height: 0; min-height: 0; overflow: auto; }
@@ -94,10 +95,21 @@
         .cart-row .name { font-size: 13px; font-weight: 800; line-height: 1.4; }
         .cart-row .line-total { text-align: right; font-weight: 900; }
         .cart-row .controls { display: flex; align-items: center; gap: 5px; margin-top: 6px; }
-        .qty-btn { width: 28px; height: 28px; border: 1px solid #bdd0dd; border-radius: 6px; color: var(--navy); background: #fff; }
+        .qty-btn { width: 34px; height: 34px; border: 1px solid #bdd0dd; border-radius: 7px; color: var(--navy); background: #fff; font-size: 18px; font-weight: 800; }
+        .qty-btn:hover { border-color: var(--blue); background: var(--blue-soft); }
         .qty { min-width: 30px; text-align: center; font-weight: 800; }
-        .remove { border: 0; color: var(--red); background: transparent; font-size: 12px; }
+        .remove { min-height: 34px; padding: 0 7px; border: 1px solid rgba(189,47,69,.25); border-radius: 7px; color: var(--red); background: #fff7f8; font-size: 12px; font-weight: 800; }
+        .remove:hover { background: #ffe8ec; }
         .cart-footer { flex: 0 0 auto; padding: 10px 12px; border-top: 1px solid var(--line); color: #d9effb; background: var(--navy-dark); }
+        .discount-card-row { margin-bottom: 7px; }
+        .discount-card-row label { display: block; margin-bottom: 4px; color: #b9d9e9; font-size: 11px; font-weight: 800; }
+        .discount-card-input { display: flex; gap: 6px; }
+        .discount-card-input .input { min-height: 36px; padding: 6px 9px; border-color: rgba(255,255,255,.3); color: #fff; background: rgba(255,255,255,.1); }
+        .discount-card-input .input::placeholder { color: #b9d9e9; }
+        .discount-card-input .button { min-height: 36px; padding: 5px 9px; color: #fff; border-color: rgba(255,255,255,.4); background: rgba(255,255,255,.13); white-space: nowrap; }
+        .discount-card-input .button:hover:not(:disabled) { background: rgba(255,255,255,.22); }
+        .discount-card-status { margin-top: 4px; color: #bbf7d0; font-size: 11px; }
+        .discount-card-status.error { margin: 4px 0 0; padding: 0; color: #fecaca; background: transparent; }
         .total-line { display: flex; justify-content: space-between; gap: 10px; margin: 5px 0; color: #b9d9e9; }
         .total-line.grand { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.25); color: #fff; font-size: 22px; font-weight: 900; }
         .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 9px; }
@@ -111,6 +123,13 @@
         .modal-head h2 { flex: 1; margin: 0; }
         .close { width: 34px; height: 34px; border: 0; border-radius: 7px; color: #526579; background: #eef4f7; }
         .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+        .payment-qr { margin-top: 12px; padding: 12px; border: 1px solid #c7e3ee; border-radius: 10px; text-align: center; background: #f4fbfe; }
+        .payment-qr h3 { margin-bottom: 7px; color: var(--navy); font-size: 15px; }
+        .payment-qr-box { display: inline-block; padding: 7px; border: 1px solid #d6e3e9; border-radius: 8px; background: #fff; }
+        .payment-qr-box canvas, .payment-qr-box img { display: block; width: 188px !important; height: 188px !important; }
+        .payment-qr-amount { margin-top: 7px; color: var(--green); font-size: 20px; font-weight: 900; }
+        .payment-qr-account { margin-top: 4px; color: var(--muted); font-size: 12px; }
+        .payment-qr-unavailable { color: #9d2439; font-size: 12px; line-height: 1.45; }
         #sellerPanel { display: flex; align-items: center; min-height: 0; height: 40px; }
         #sellerPanel .section-head { flex: 0 0 auto; padding: 5px 10px; border-bottom: 0; }
         #sellerPanel .section-head h2 { font-size: 14px; }
@@ -126,7 +145,7 @@
         .receipt-paper hr { border: 0; border-top: 1px dashed #333; }
         .toast { position: fixed; right: 18px; bottom: 18px; z-index: 40; max-width: min(390px, calc(100vw - 36px)); padding: 12px 15px; border-radius: 9px; color: #fff; background: #183447; box-shadow: var(--shadow); }
         @media (max-width: 900px) { body.pos-active { overflow: auto; } body.pos-active .page { position: static; height: auto; max-width: 1600px; overflow: visible; } .workspace { height: auto; grid-template-rows: auto auto auto; } .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sale-grid { grid-template-columns: 1fr; min-height: 0; height: auto; } .cart-list { height: auto; max-height: 430px; min-height: 260px; } .product-grid { height: auto; min-height: 360px; } }
-        @media (max-width: 560px) { .page { padding: 10px; } .topbar { padding: 9px 11px; } .top-meta { gap: 5px; font-size: 11px; } .status { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .connect-panel { margin: 5vh auto; padding: 22px 17px; } .summary-grid { gap: 7px; } .summary { padding: 8px 10px; min-height: 58px; } .summary .value { font-size: 13px; } #sellerPanel { display: block; } #sellerPanel .section-head { padding: 9px 12px 5px; } #sellerPanel .seller-grid { padding: 0 10px 10px !important; } .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 10px; gap: 7px; } .product { min-height: 112px; padding: 9px; } .action-row { grid-template-columns: 1fr; } }
+        @media (max-width: 560px) { .page { padding: 10px; } .topbar { padding: 9px 11px; } .top-meta { gap: 5px; font-size: 11px; } .status { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .connect-panel { margin: 5vh auto; padding: 22px 17px; } .summary-grid { gap: 7px; } .summary { padding: 8px 10px; min-height: 58px; } .summary .value { font-size: 13px; } #sellerPanel { display: block; } #sellerPanel .section-head { padding: 9px 12px 5px; } #sellerPanel .seller-grid { padding: 0 10px 10px !important; } .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 10px; gap: 7px; } .product { min-height: 112px; padding: 9px; } .action-row { grid-template-columns: 1fr; } .payment-qr-box canvas, .payment-qr-box img { width: 160px !important; height: 160px !important; } }
         @media print { @page { size: 80mm auto; margin: 0; } body { background: #fff; } body.printing > *:not(#receiptModal) { display: none !important; } body.printing #receiptModal { position: static; display: block !important; padding: 0; background: #fff; } body.printing #receiptModal .modal { width: auto; max-height: none; padding: 0; box-shadow: none; } body.printing #receiptModal .modal-head, body.printing #receiptModal .modal-actions { display: none; } body.printing .receipt-paper { width: 80mm; } }
     </style>
 </head>
@@ -177,7 +196,13 @@
                     <div class="section-head"><h2>รายการขาย</h2><span class="grow"></span><button id="clearCart" class="button light small" type="button">ล้างรายการ</button></div>
                     <div id="cartList" class="cart-list"></div>
                     <div class="cart-footer">
+                        <div class="discount-card-row">
+                            <label for="discountCardCode">ส่วนลดบัตร / สแกนบาร์โค้ด</label>
+                            <div class="discount-card-input"><input id="discountCardCode" class="input" type="text" autocomplete="off" placeholder="สแกนหรือพิมพ์รหัสบัตรส่วนลด"><button id="applyDiscountCard" class="button" type="button">ใช้บัตร</button></div>
+                            <div id="discountCardStatus" class="discount-card-status hidden"></div>
+                        </div>
                         <div class="total-line"><span>จำนวนรายการ</span><strong id="cartCount">0</strong></div>
+                        <div id="discountLine" class="total-line hidden"><span>ส่วนลด</span><strong id="cartDiscount">-฿0.00</strong></div>
                         <div class="total-line grand"><span>รวมสุทธิ</span><span id="cartTotal">฿0.00</span></div>
                         <div class="action-row"><button id="payButton" class="button success" type="button" disabled>รับชำระ</button><button id="closeShiftButton" class="button danger" type="button">ปิดกะ</button></div>
                     </div>
@@ -214,6 +239,13 @@
             <div id="cashFields" class="field" style="margin-top:12px"><label for="cashReceived">รับเงินมา</label><input id="cashReceived" class="input" type="number" min="0" step="0.01"></div>
             <div id="changeRow" class="total-line" style="margin-top:10px"><span>เงินทอน</span><strong id="changeAmount">฿0.00</strong></div>
             <div id="transferFields" class="hidden">
+                <div id="paymentQrPanel" class="payment-qr">
+                    <h3>สแกนจ่าย PromptPay</h3>
+                    <div id="paymentQr" class="payment-qr-box"></div>
+                    <div id="paymentQrAmount" class="payment-qr-amount">฿0.00</div>
+                    <div id="paymentQrAccount" class="payment-qr-account"></div>
+                    <div id="paymentQrUnavailable" class="payment-qr-unavailable hidden"></div>
+                </div>
                 <div class="field" style="margin-top:12px"><label for="transferLast4">เลขท้ายบัญชีผู้โอน 4 หลัก</label><input id="transferLast4" class="input" inputmode="numeric" maxlength="4" placeholder="เช่น 1234"></div>
                 <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px"><input id="paymentConfirmed" type="checkbox"> ตรวจเงินเข้าแล้ว</label>
             </div>
@@ -232,11 +264,12 @@
 
     <div id="toast" class="toast hidden"></div>
 
+    <script src="{{ asset('vendor/qrcodejs/qrcode.min.js') }}"></script>
     <script>
         (() => {
             const TOKEN_KEY = 'popstar_web_pos_device_token';
             const PAPER_KEY = 'popstar_web_pos_paper_width';
-            const state = { token: '', config: null, cashiers: [], cashier: null, shift: null, products: [], cart: [], lastReceipt: null, shiftAction: 'open', toastTimer: null, productSearchTimer: null, productRequestId: 0 };
+            const state = { token: '', config: null, cashiers: [], cashier: null, shift: null, products: [], cart: [], discountCard: null, lastReceipt: null, shiftAction: 'open', toastTimer: null, productSearchTimer: null, productRequestId: 0 };
             const $ = (id) => document.getElementById(id);
             const money = (value) => `฿${Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' }[char]));
@@ -261,7 +294,7 @@
             }
 
             function resetSession(clearToken = false) {
-                state.config = null; state.cashiers = []; state.cashier = null; state.shift = null; state.products = []; state.cart = [];
+                state.config = null; state.cashiers = []; state.cashier = null; state.shift = null; state.products = []; state.cart = []; state.discountCard = null;
                 if (clearToken) { state.token = ''; localStorage.removeItem(TOKEN_KEY); $('tokenInput').value = ''; }
                 document.body.classList.remove('pos-active');
                 hide('workspace'); show('connectPanel'); setStatus('ยังไม่เชื่อมต่อ'); renderCart();
@@ -356,38 +389,115 @@
                 clearTimeout(state.productSearchTimer);
                 state.productSearchTimer = setTimeout(() => loadProducts($('productSearch').value), 220);
             }
-            function addToCart(id) { const product = state.products.find((item) => Number(item.id) === id); if (!product) return; const line = state.cart.find((item) => item.id === id); if (line) line.qty = Number(line.qty) + 1; else state.cart.push({ ...product, qty: 1 }); renderCart(); }
-            function setQty(id, delta) { const line = state.cart.find((item) => item.id === id); if (!line) return; line.qty = Math.max(0, Number(line.qty) + delta); state.cart = state.cart.filter((item) => item.qty > 0); renderCart(); }
-            function cartTotal() { return state.cart.reduce((sum, item) => sum + Number(item.qty) * Number(item.pos_price || 0), 0); }
+            function addToCart(id) { const product = state.products.find((item) => Number(item.id) === id); if (!product) return; invalidateDiscountCard(); const line = state.cart.find((item) => item.id === id); if (line) line.qty = Number(line.qty) + 1; else state.cart.push({ ...product, qty: 1 }); renderCart(); }
+            function invalidateDiscountCard() {
+                if (!state.discountCard) return;
+                state.discountCard = null;
+                $('discountCardCode').value = '';
+                const status = $('discountCardStatus'); status.textContent = ''; status.classList.add('hidden'); status.classList.remove('error');
+            }
+            function setQty(id, delta) { const line = state.cart.find((item) => item.id === id); if (!line) return; invalidateDiscountCard(); line.qty = Math.max(0, Number(line.qty) + delta); state.cart = state.cart.filter((item) => item.qty > 0); renderCart(); }
+            function cartSubtotal() { return state.cart.reduce((sum, item) => sum + Number(item.qty) * Number(item.pos_price || 0), 0); }
+            function cartDiscount() { return Math.min(cartSubtotal(), Math.max(0, Number(state.discountCard?.discount_amount || 0))); }
+            function cartTotal() { return Math.max(0, cartSubtotal() - cartDiscount()); }
+            function rounded(value) { return Math.round((Number(value) || 0) * 100) / 100; }
+            function checkoutItems() {
+                const subtotal = cartSubtotal();
+                const discount = cartDiscount();
+                let remaining = discount;
+                return state.cart.map((item, index) => {
+                    const qty = Number(item.qty);
+                    const gross = rounded(qty * Number(item.pos_price || 0));
+                    const lineDiscount = discount > 0
+                        ? (index === state.cart.length - 1 ? remaining : Math.min(remaining, rounded(discount * gross / subtotal)))
+                        : 0;
+                    remaining = rounded(remaining - lineDiscount);
+                    const unitPrice = qty > 0 ? rounded(Math.max(0, gross - lineDiscount) / qty) : 0;
+                    return { product_id: item.id, qty, unit_price: unitPrice, barcode: item.matched_barcode?.barcode || null, barcode_type: item.matched_barcode?.barcode_type || null };
+                });
+            }
             function renderCart() {
-                const total = cartTotal(); $('cartCount').textContent = state.cart.reduce((sum, item) => sum + Number(item.qty), 0).toLocaleString('th-TH'); $('cartTotal').textContent = money(total); $('payButton').disabled = state.cart.length === 0 || !state.shift;
+                const subtotal = cartSubtotal(); const discount = cartDiscount(); const total = cartTotal();
+                $('cartCount').textContent = state.cart.reduce((sum, item) => sum + Number(item.qty), 0).toLocaleString('th-TH'); $('cartTotal').textContent = money(total); $('payButton').disabled = state.cart.length === 0 || !state.shift;
+                $('discountLine').classList.toggle('hidden', discount <= 0); $('cartDiscount').textContent = `-${money(discount)}`;
+                if (!state.cart.length) invalidateDiscountCard();
                 $('cartList').innerHTML = state.cart.length ? state.cart.map((item) => `<div class="cart-row"><div><div class="name">${escapeHtml(item.name_th)}</div><div class="controls"><button class="qty-btn" type="button" data-minus="${item.id}">−</button><span class="qty">${item.qty}</span><button class="qty-btn" type="button" data-plus="${item.id}">+</button><button class="remove" type="button" data-remove="${item.id}">ลบ</button></div></div><div class="line-total">${money(Number(item.qty) * Number(item.pos_price || 0))}</div></div>`).join('') : '<div class="cart-empty">ยังไม่มีสินค้าในรายการ<br><small>แตะสินค้าด้านซ้ายเพื่อเพิ่มเข้าบิล</small></div>';
                 $('cartList').querySelectorAll('[data-minus]').forEach((button) => button.addEventListener('click', () => setQty(Number(button.dataset.minus), -1)));
                 $('cartList').querySelectorAll('[data-plus]').forEach((button) => button.addEventListener('click', () => setQty(Number(button.dataset.plus), 1)));
-                $('cartList').querySelectorAll('[data-remove]').forEach((button) => button.addEventListener('click', () => { state.cart = state.cart.filter((item) => item.id !== Number(button.dataset.remove)); renderCart(); }));
+                $('cartList').querySelectorAll('[data-remove]').forEach((button) => button.addEventListener('click', () => { invalidateDiscountCard(); state.cart = state.cart.filter((item) => item.id !== Number(button.dataset.remove)); renderCart(); }));
             }
 
+            function promptPayTarget(id) {
+                const raw = String(id || '').replace(/[^0-9]/g, '');
+                if (raw.length === 10 && raw.startsWith('0')) return { tag: '01', value: `0066${raw.substring(1)}` };
+                if (raw.length === 13) return { tag: '02', value: raw };
+                if (raw.length === 15) return { tag: '03', value: raw };
+                throw new Error('PromptPay ID ต้องเป็นเบอร์โทร 10 หลัก เลขบัตร/ภาษี 13 หลัก หรือ e-Wallet 15 หลัก');
+            }
+            function crc16(data) {
+                let crc = 0xFFFF;
+                for (let index = 0; index < data.length; index += 1) {
+                    crc ^= data.charCodeAt(index) << 8;
+                    for (let bit = 0; bit < 8; bit += 1) crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) & 0xFFFF : (crc << 1) & 0xFFFF;
+                }
+                return crc.toString(16).toUpperCase().padStart(4, '0');
+            }
+            function tlv(tag, value) { return `${tag}${String(new TextEncoder().encode(String(value)).length).padStart(2, '0')}${value}`; }
+            function buildPromptPayPayload(id, amount, type = 'dynamic') {
+                const target = promptPayTarget(id);
+                const merchant = tlv('00', 'A000000677010111') + tlv(target.tag, target.value);
+                let payload = tlv('00', '01') + tlv('01', type === 'static' ? '11' : '12') + tlv('29', merchant) + tlv('53', '764');
+                if (type !== 'static') payload += tlv('54', Number(amount || 0).toFixed(2));
+                payload += tlv('58', 'TH') + tlv('59', 'POPSTAR') + tlv('60', 'UBON') + '6304';
+                return payload + crc16(payload);
+            }
+            function renderPaymentQr(amount) {
+                const config = state.config?.qr_payment; const box = $('paymentQr'); const unavailable = $('paymentQrUnavailable');
+                box.innerHTML = ''; $('paymentQrAmount').textContent = money(amount); $('paymentQrAccount').textContent = '';
+                if (!config?.merchant_ref || typeof window.QRCode === 'undefined') {
+                    unavailable.textContent = !config?.merchant_ref ? 'ยังไม่ได้ตั้งค่าบัญชี PromptPay ใน ERP' : 'เบราว์เซอร์ยังโหลดตัวสร้าง QR ไม่สำเร็จ';
+                    unavailable.classList.remove('hidden'); return;
+                }
+                try {
+                    new window.QRCode(box, { text: buildPromptPayPayload(config.merchant_ref, amount, config.qr_type), width: 188, height: 188, colorDark: '#000', colorLight: '#fff', correctLevel: window.QRCode.CorrectLevel.H });
+                    $('paymentQrAccount').textContent = [config.bank_name, config.account_name || config.name].filter(Boolean).join(' · ');
+                    unavailable.classList.add('hidden');
+                } catch (exception) {
+                    unavailable.textContent = exception.message || 'สร้าง QR ไม่สำเร็จ'; unavailable.classList.remove('hidden');
+                }
+            }
             function openPayment() { $('paymentTotal').textContent = money(cartTotal()); $('cashReceived').value = cartTotal().toFixed(2); $('transferLast4').value = ''; $('paymentConfirmed').checked = false; error('paymentError', ''); updatePaymentFields(); show('paymentModal'); }
-            function updatePaymentFields() { const method = $('paymentMethod').value; $('cashFields').classList.toggle('hidden', method !== 'cash'); $('changeRow').classList.toggle('hidden', method !== 'cash'); $('transferFields').classList.toggle('hidden', method !== 'transfer'); updateChange(); }
+            function updatePaymentFields() { const method = $('paymentMethod').value; $('cashFields').classList.toggle('hidden', method !== 'cash'); $('changeRow').classList.toggle('hidden', method !== 'cash'); $('transferFields').classList.toggle('hidden', method !== 'transfer'); if (method === 'transfer') renderPaymentQr(cartTotal()); updateChange(); }
             function updateChange() { const change = Math.max(0, Number($('cashReceived').value || 0) - cartTotal()); $('changeAmount').textContent = money(change); }
+            async function applyDiscountCard() {
+                const code = $('discountCardCode').value.trim();
+                if (!code || !state.cart.length) return;
+                const button = $('applyDiscountCard'); button.disabled = true; const status = $('discountCardStatus'); status.textContent = 'กำลังตรวจสอบบัตร…'; status.classList.remove('hidden', 'error');
+                try {
+                    const response = await api('/discount-card/check', { method: 'POST', body: JSON.stringify({ card_code: code, subtotal: cartSubtotal() }) });
+                    state.discountCard = response; status.textContent = `ใช้ ${response.name || response.card_code} · ลด ${money(response.discount_amount)}`; status.classList.remove('error'); $('discountCardCode').value = '';
+                    renderCart(); toast('ใช้บัตรส่วนลดแล้ว');
+                } catch (exception) { state.discountCard = null; status.textContent = exception.message; status.classList.remove('hidden'); status.classList.add('error'); }
+                finally { button.disabled = false; }
+            }
             async function submitPayment() {
                 const method = $('paymentMethod').value; const total = cartTotal(); const received = Number($('cashReceived').value || 0); const last4 = $('transferLast4').value.trim();
                 if (method === 'cash' && received + .009 < total) return error('paymentError', `รับเงินไม่ครบ ขาดอีก ${money(total - received)}`);
                 if (method === 'transfer' && (!/^\d{4}$/.test(last4) || !$('paymentConfirmed').checked)) return error('paymentError', 'กรุณาระบุเลขท้ายบัญชี 4 หลักและยืนยันว่าตรวจเงินเข้าแล้ว');
                 const button = $('submitPayment'); button.disabled = true; error('paymentError', '');
                 const vatRate = Number(state.config?.vat_rate || 0); const vatAmount = Math.round((total * vatRate / (100 + vatRate)) * 100) / 100;
-                const payload = { branch_id: state.config.branch_id, shift_id: state.shift.id, cashier_id: state.cashier.id, method, payment_confirmed: method === 'cash' || $('paymentConfirmed').checked, cash_received: method === 'cash' ? received : null, change_amount: method === 'cash' ? Math.max(0, received - total) : null, transfer_account_last4: method === 'transfer' ? last4 : null, items: state.cart.map((item) => ({ product_id: item.id, qty: Number(item.qty), unit_price: Number(item.pos_price), barcode: item.matched_barcode?.barcode || null, barcode_type: item.matched_barcode?.barcode_type || null })), vat_mode: 'included', vat_amount: vatAmount };
+                const payload = { branch_id: state.config.branch_id, shift_id: state.shift.id, cashier_id: state.cashier.id, method, payment_confirmed: method === 'cash' || $('paymentConfirmed').checked, cash_received: method === 'cash' ? received : null, change_amount: method === 'cash' ? Math.max(0, received - total) : null, transfer_account_last4: method === 'transfer' ? last4 : null, discount_amount: cartDiscount(), manual_discount_amount: 0, discount_card_code: state.discountCard?.card_code || null, items: checkoutItems(), vat_mode: 'included', vat_amount: vatAmount };
                 try {
                     const key = `web-${Date.now()}-${window.crypto?.randomUUID ? window.crypto.randomUUID() : Math.random().toString(36).slice(2)}`;
                     const response = await api('/checkout', { method: 'POST', headers: { 'Idempotency-Key': key }, body: JSON.stringify(payload) });
-                    state.lastReceipt = { ...response, items: state.cart.map((item) => ({ ...item })) }; state.cart = []; hide('paymentModal'); renderCart(); renderReceipt(); show('receiptModal'); await loadProducts(); toast(`ออกใบเสร็จ ${response.receipt_no || response.doc_number || ''} แล้ว`);
+                    state.lastReceipt = { ...response, discount_amount: cartDiscount(), items: state.cart.map((item) => ({ ...item })) }; state.cart = []; state.discountCard = null; hide('paymentModal'); renderCart(); renderReceipt(); show('receiptModal'); await loadProducts(); toast(`ออกใบเสร็จ ${response.receipt_no || response.doc_number || ''} แล้ว`);
                 } catch (exception) { error('paymentError', exception.message); } finally { button.disabled = false; }
             }
             function renderReceipt() {
                 const receipt = state.lastReceipt || {}; const company = state.config?.company || {}; const paper = localStorage.getItem(PAPER_KEY) || '80mm'; $('receiptPaper').style.width = paper; $('receiptPaper').innerHTML = `<h3>${escapeHtml(company.name || 'PopStar')}</h3><div class="center">${escapeHtml(company.address || '')}</div><div class="center">${escapeHtml(company.phone || '')}</div><hr><div>เลขที่: ${escapeHtml(receipt.receipt_no || receipt.doc_number || '—')}</div><div>ผู้ขาย: ${escapeHtml(state.cashier?.name || '')}</div><div>เวลา: ${new Date().toLocaleString('th-TH')}</div><hr>${(receipt.items || []).map((item) => `<div class="line"><span>${escapeHtml(item.name_th)} x${item.qty}</span><span>${money(Number(item.qty) * Number(item.pos_price || 0))}</span></div>`).join('')}<hr><div class="line"><strong>รวมสุทธิ</strong><strong>${money(receipt.total_amount || 0)}</strong></div><div class="center" style="margin-top:10px">ขอบคุณที่ใช้บริการ</div>`; }
 
             document.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => hide(button.dataset.close)));
-            $('connectButton').addEventListener('click', connect); $('tokenInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') connect(); }); $('reloadCashiers').addEventListener('click', loadCashiers); $('reloadProducts').addEventListener('click', () => loadProducts($('productSearch').value)); $('productSearch').addEventListener('input', scheduleProductSearch); $('clearCart').addEventListener('click', () => { state.cart = []; renderCart(); }); $('payButton').addEventListener('click', openPayment); $('closeShiftButton').addEventListener('click', closeShiftModal); $('shiftSubmitButton').addEventListener('click', submitShift); $('paymentMethod').addEventListener('change', updatePaymentFields); $('cashReceived').addEventListener('input', updateChange); $('submitPayment').addEventListener('click', submitPayment); $('settingsButton').addEventListener('click', () => { $('settingsToken').value = state.token || ''; $('paperWidth').value = localStorage.getItem(PAPER_KEY) || '80mm'; show('settingsModal'); }); $('saveSettingsButton').addEventListener('click', () => { const token = $('settingsToken').value.trim(); if (!token) return toast('กรุณาใส่ Device Token'); localStorage.setItem(PAPER_KEY, $('paperWidth').value); $('tokenInput').value = token; hide('settingsModal'); connect(); }); $('clearTokenButton').addEventListener('click', () => { resetSession(true); hide('settingsModal'); toast('ล้าง Device Token จากเครื่องนี้แล้ว'); }); $('printReceipt').addEventListener('click', () => { document.body.classList.add('printing'); window.print(); setTimeout(() => document.body.classList.remove('printing'), 500); });
+            $('connectButton').addEventListener('click', connect); $('tokenInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') connect(); }); $('reloadCashiers').addEventListener('click', loadCashiers); $('reloadProducts').addEventListener('click', () => loadProducts($('productSearch').value)); $('productSearch').addEventListener('input', scheduleProductSearch); $('clearCart').addEventListener('click', () => { invalidateDiscountCard(); state.cart = []; renderCart(); }); $('discountCardCode').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); applyDiscountCard(); } }); $('applyDiscountCard').addEventListener('click', applyDiscountCard); $('payButton').addEventListener('click', openPayment); $('closeShiftButton').addEventListener('click', closeShiftModal); $('shiftSubmitButton').addEventListener('click', submitShift); $('paymentMethod').addEventListener('change', updatePaymentFields); $('cashReceived').addEventListener('input', updateChange); $('submitPayment').addEventListener('click', submitPayment); $('settingsButton').addEventListener('click', () => { $('settingsToken').value = state.token || ''; $('paperWidth').value = localStorage.getItem(PAPER_KEY) || '80mm'; show('settingsModal'); }); $('saveSettingsButton').addEventListener('click', () => { const token = $('settingsToken').value.trim(); if (!token) return toast('กรุณาใส่ Device Token'); localStorage.setItem(PAPER_KEY, $('paperWidth').value); $('tokenInput').value = token; hide('settingsModal'); connect(); }); $('clearTokenButton').addEventListener('click', () => { resetSession(true); hide('settingsModal'); toast('ล้าง Device Token จากเครื่องนี้แล้ว'); }); $('printReceipt').addEventListener('click', () => { document.body.classList.add('printing'); window.print(); setTimeout(() => document.body.classList.remove('printing'), 500); });
 
             state.token = localStorage.getItem(TOKEN_KEY) || ''; $('tokenInput').value = state.token;
             if (state.token) connect();

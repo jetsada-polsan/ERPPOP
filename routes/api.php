@@ -22,6 +22,7 @@ Route::prefix('pos')->middleware('pos.device')->name('api.pos.')->group(function
     Route::post('/shift/open', [PosController::class, 'openShift'])->name('shift.open');
     Route::post('/shift/close', [PosController::class, 'closeShift'])->name('shift.close');
     Route::post('/shift/cash-movement', [PosController::class, 'recordCashMovement'])->name('shift.cash-movement');
+    Route::post('/discount-card/check', [PosApiController::class, 'checkDiscountCard'])->name('discount-card.check');
     Route::get('/held-bills', [PosController::class, 'heldBills'])->name('held-bills.index');
     Route::post('/held-bills', [PosController::class, 'holdBill'])->name('held-bills.store');
     Route::post('/held-bills/{heldBill}/resume', [PosController::class, 'resumeHeldBill'])->name('held-bills.resume');
