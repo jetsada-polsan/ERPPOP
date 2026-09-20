@@ -633,3 +633,9 @@ pending
 - ทดสอบ: `php artisan view:cache`; `php artisan test --compact tests/Feature/PosBrowserTest.php tests/Feature/PrintablePageSizeTest.php` ผ่าน 4 tests / 13 assertions; `git diff --check`
 - Deploy: ยังไม่ deploy รอบนี้ รอคำสั่งเจ้าของระบบ
 - งานถัดไป: push commit นี้แล้ว deploy view Web POS เมื่อได้รับคำสั่ง; ตรวจว่าหน้า live โหลดไม่เกิน 100 รายการแรกและค้นหาสินค้ารหัสที่อยู่นอกชุดแรกได้
+
+# Handoff - 2026-09-20 (bounded Web POS product loading production deploy)
+- Commit/source: `1f064bd`
+- Deploy: GitHub Actions run `35502019720` production ผ่านครบทั้ง Laravel test, frontend build, upload release และ `scripts/deploy.sh`
+- ตรวจ live: `https://pos.popstarcenter.com/` มีข้อความ `โหลดทีละ 100 รายการ · ค้นหาเพิ่มได้`, มี `URLSearchParams` สำหรับค้นหา server-side และไม่พบ `all=1`; `/api/pos/ping` ไม่ส่ง token ตอบ HTTP 401
+- งานถัดไป: ทดสอบด้วย Device Token จริง โดยค้นหาสินค้าที่อยู่นอก 100 รายการแรก แล้วเลือกขาย 1 รายการเพื่อยืนยันผลลัพธ์จาก API และ flow ขายจริง
