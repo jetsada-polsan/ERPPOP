@@ -19,7 +19,8 @@ class PosBrowserTest extends TestCase
             ->assertSee('โหลดทีละ 100 รายการ')
             ->assertSee('discountCardCode')
             ->assertSee('paymentQr')
-            ->assertSee('1.55fr')
+            ->assertSee('1.2fr')
+            ->assertSee('repeat(3, minmax(0, 1fr))')
             ->assertSee('new URLSearchParams')
             ->assertDontSee('&all=1')
             ->assertDontSee('เข้าสู่ระบบ ERP');
