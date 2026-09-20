@@ -109,7 +109,7 @@ Route::delete('/security/mfa', [AuthController::class, 'disableMfa'])->name('mfa
 
 Route::get('/', function () {
     if (request()->getHost() === 'pos.popstarcenter.com') {
-        return redirect()->route('python-pos.download');
+        return view('pos.browser');
     }
 
     return view('portal');
