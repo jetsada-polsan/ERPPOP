@@ -607,3 +607,9 @@ pending
 - ทำอะไร: สำรอง production ที่ `storage/app/backups/erp-db-20260920-145810.sql.gz`; เปิดใช้งาน User POS เดิมของสาขาวาริน (user id 4) และเปลี่ยน username จาก `pos0002` เป็น `warin`; คง role `CASHIER`, สิทธิ์ `pos.sell`, โปรไฟล์คนขาย และ Device Token/อุปกรณ์เดิมไว้ ไม่ตั้งรหัสผ่าน/PIN และไม่ออก Token ใหม่
 - ตรวจผล: อุปกรณ์ POS id 3 และ 9 ยัง active และผูกกับ `warin`; `erp:health` production ผ่านครบ
 - งานถัดไป: refresh `https://pos.popstarcenter.com`, ใช้ Device Token เดิมของเครื่องวาริน แล้วเลือกชื่อคนขายเพื่อเปิดกะ; ยังต้องทดสอบขายจริง 1 บิลก่อนใช้งานเต็มรูปแบบ
+
+# Handoff - 2026-09-20 (compact Web POS context bar)
+- ทำอะไร: ลดพื้นที่แถบสาขา/เครื่อง/กะ/คนขายและทำรายชื่อคนขายเป็นแถบสั้น; ขยายพื้นที่ catalog และรายการขายให้เน้นข้อมูลการขายมากขึ้น; คงปุ่มตั้งค่าไว้เล็กที่มุมขวาและคงใบเสร็จ 80 มม.
+- ทดสอบ: `php artisan view:cache`; `php artisan test --compact tests/Feature/PosBrowserTest.php tests/Feature/PrintablePageSizeTest.php` ผ่าน 4 tests / 10 assertions; `git diff --check`
+- Deploy: ยังไม่ deploy รอบนี้
+- งานถัดไป: หากสั่ง deploy ให้ส่ง `resources/views/pos/browser.blade.php`, clear/cache และตรวจภาพจริงบน `pos.popstarcenter.com`
