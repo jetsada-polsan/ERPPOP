@@ -580,3 +580,11 @@ pending
 - ทดสอบ: `php artisan view:cache` ผ่าน; route list ยืนยัน root route; `php artisan test tests/Feature/AppLauncherTest.php --compact` ผ่าน 8 tests / 38 assertions; `git diff --check` ผ่าน
 - Deploy: ยังไม่ deploy production รอบนี้ รอคำสั่ง deploy โดยตรง
 - งานถัดไป: หลังเจ้าของยืนยัน deploy ให้ backup production แล้ว deployเฉพาะ `routes/web.php` และ `resources/views/portal.blade.php`, clear/cache และรัน `erp:health`; ตรวจลิงก์ดาวน์โหลดบนโดเมนจริง
+
+# Handoff - 2026-09-20 (public portal and passwordless POS live)
+- Commit: `af876fc`
+- ทำอะไร: deploy public portal/POS download entry และแก้ smoke test ให้ root public portal ไม่คาดหวัง redirect ไป login; หน้าเว็บแยก POS download ออกจากการ์ดและลบ JetTime HR แล้ว
+- Deploy: GitHub Actions run `35434385619` ผ่านครบ; production migration/cache/health ผ่าน
+- Production setting: รัน `php artisan pos:passwordless enable` แล้ว ตรวจค่า `pos_passwordless_login` ได้ `1`; การเลือกชื่อคนขายไม่ต้องใช้ PIN และยังจำกัดตาม Device Token กับสาขา
+- ทดสอบ: Laravel `php artisan test --compact` ผ่าน 422 tests, 1 skipped, 6 incomplete, 3,241 assertions; ตรวจ live `popstarcenter.com` พบ POS download bar และไม่พบ JetTime HR; download endpoint ตอบ HTTP 200
+- ความเสี่ยง/งานถัดไป: ต้องทำ Windows/hardware UAT จริง: เลือกชื่อคนขาย → เปิดกะ → ขายเงินสด 1 ใบ → พิมพ์ใบเสร็จ 80 มม. → ปิดกะ → ตรวจ receipt/ยอด ERP
