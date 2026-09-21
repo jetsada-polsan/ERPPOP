@@ -861,6 +861,6 @@ pending
 - ทำอะไร: ปรับแถบบนเป็น `PopCentral Web POS` พร้อมชิปสาขา/เครื่อง/คนขาย/กะ, เพิ่มปุ่มเลือกคนขายและเมนูฟันเฟืองสำหรับตั้งค่า/ยอดวันนี้/เงินสด/ปิดกะ, ย้ายปุ่มล้างรายการไว้หัวบิล, ซ่อนแถบหมวดที่กินพื้นที่, เพิ่มข้อความช่วยสแกน/กรอกจำนวนหรือน้ำหนัก และเพิ่มปุ่มรีเฟรชสินค้า
 - ทำอะไรเพิ่มเติม: คง logic ขาย/ชำระเงิน/ออฟไลน์/num pad เดิมไว้ เปลี่ยนเฉพาะการจัดวางและข้อความให้ใกล้ Web POS ที่สุด
 - ทดสอบ: `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=apps/pos-python python3 -m unittest discover -s apps/pos-python/tests -p 'test_*.py'` → **178 tests ผ่าน**; Python AST parse ผ่าน; `git diff --check` ผ่าน
-- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้เปิด Qt บนเครื่องจริงเพื่อถ่ายภาพยืนยัน และยังไม่ได้สร้าง installer รุ่นใหม่
-- Deploy: ยังไม่ deploy รอคำสั่งเจ้าของโปรเจกต์
-- งานถัดไป: review ภาพบนเครื่อง POS จริง แล้วค่อย merge/deploy; ถ้าต้องการ installer ให้รัน Windows UAT build workflow แยก
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้เปิด Qt บนเครื่องจริงเพื่อถ่ายภาพยืนยัน
+- Deploy: production workflow `35578390373` ผ่านครบ และเผยแพร่ installer `0.6.19` ผ่าน Windows workflow `35578559621`; ตรวจ `pos.popstarcenter.com` และ `/download/python-pos` ได้ HTTP 200 แล้ว
+- งานถัดไป: ติดตั้ง `PopCentral-POS-UAT-0.6.19-setup.exe` บนเครื่อง POS จริงแล้วตรวจภาพ/การใช้งานหน้างาน
