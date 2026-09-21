@@ -8,6 +8,7 @@
     <title>คลังมือถือ — PopCentral</title>
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     <script defer src="{{ asset('vendor/alpinejs/alpine.min.js') }}"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/zxing-browser.min.js"></script>
     <style>
         /* ธีมขาว-ฟ้าเดียวกับ ERP (FlowAccount reskin) — หน้าเดียวจบสำหรับมือถือ/PDA */
@@ -411,7 +412,7 @@ function whApp() {
         poList: [], poLoading: false, poCur: null, poScanError: '',
         stockProduct: null, stockRows: [], stockTotal: 0,
 
-        cameraOk: false, cameraOpen: false, camStream: null, camTarget: 'receive', camTimer: null, qrScanner: null, camControls: null,
+        cameraOk: false, cameraOpen: false, camStream: null, camTarget: 'receive', camTimer: null, qrScanner: null, camControls: null, html5QrCode: null,
         countId: null, countNumber: '', countProduct: null, countSystem: 0, countQty: '', countBusy: false, countError: '',
 
         init() {
@@ -614,9 +615,35 @@ function whApp() {
         async startCount() { this.countBusy = true; this.countError = ''; try { const r = await jfetch('{{ route('wh.stock-counts.start') }}', { method: 'POST', body: JSON.stringify({ branch_id: this.branchId }) }); this.countId = r.id; this.countNumber = r.doc_number; this.$nextTick(() => this.focusScan()); } catch (e) { this.countError = e.message; } this.countBusy = false; },
         async saveCountItem() { if (!this.countProduct || this.countQty === '' || +this.countQty < 0) { this.countError = 'กรุณากรอกยอดที่นับได้'; return; } this.countBusy = true; try { await jfetch('{{ url('/wh/stock-counts') }}/' + this.countId + '/item', { method: 'POST', body: JSON.stringify({ product_id: this.countProduct.id, counted_qty: +this.countQty }) }); this.countProduct = null; this.countQty = ''; this.$nextTick(() => this.focusScan()); } catch (e) { this.countError = e.message; } this.countBusy = false; },
 
-        // ---- กล้องสแกนบาร์โค้ด (BarcodeDetector — ใช้ได้บน HTTPS/localhost) ----
+        // ---- กล้องสแกน QR/EAN/barcode (ต้องเปิดผ่าน HTTPS/localhost) ----
         async openCamera(target) {
             this.camTarget = target; this.cameraOpen = true;
+            if (window.Html5Qrcode) {
+                this.$nextTick(async () => {
+                    try {
+                        this.html5QrCode = new Html5Qrcode('qr-reader');
+                        await this.html5QrCode.start(
+                            { facingMode: 'environment' },
+                            { fps: 10, qrbox: { width: 260, height: 160 }, aspectRatio: 1.777778 },
+                            async (decodedText) => {
+                                const code = String(decodedText || '').trim();
+                                if (!code) return;
+                                await this.closeCamera();
+                                this.scanCode = code;
+                                this.scan(this.camTarget);
+                            },
+                            () => {},
+                        );
+                    } catch (e) {
+                        this.html5QrCode = null;
+                        if (!window.ZXingBrowser) {
+                            this.closeCamera();
+                            this.scanError = 'เปิดกล้องไม่ได้: ' + e.message;
+                        }
+                    }
+                });
+                return;
+            }
             if (window.ZXingBrowser) {
                 this.$nextTick(async () => {
                     try {
@@ -629,7 +656,12 @@ function whApp() {
             }
             this.closeCamera(); this.scanError = 'ตัวสแกนกล้องยังโหลดไม่สำเร็จ กรุณาพิมพ์รหัสหรือรีโหลดหน้า'; return;
         },
-        closeCamera() {
+        async closeCamera() {
+            if (this.html5QrCode) {
+                try { await this.html5QrCode.stop(); } catch (e) { /* กล้องอาจหยุดไปแล้ว */ }
+                try { this.html5QrCode.clear(); } catch (e) { /* DOM ถูกปิดไปแล้ว */ }
+                this.html5QrCode = null;
+            }
             this.camControls?.stop?.(); this.camControls = null;
             this.qrScanner?.reset?.(); this.qrScanner = null;
             if (this.camTimer) clearInterval(this.camTimer);

@@ -27,6 +27,8 @@ class WarehouseMobileTest extends TestCase
             ->assertSee('รับเข้า')
             ->assertSee('รับตาม PO')
             ->assertSee('เช็คสต๊อก')
+            ->assertSee('html5-qrcode@2.3.8/html5-qrcode.min.js', false)
+            ->assertSee('new Html5Qrcode', false)
             ->assertSee("tab: 'receive',", false)
             ->assertSee('x-show="tab === \'receive\'"', false)
             ->assertSee('x-show="tab === \'po\'"', false)
