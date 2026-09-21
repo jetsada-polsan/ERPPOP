@@ -537,7 +537,29 @@ class PosApiController extends Controller
             return response()->json(['success' => false, 'message' => 'ไม่พบอุปกรณ์ POS'], 401);
         }
 
-        $request->merge(['allow_negative_stock' => true]);
+        // Selling into negative stock is an explicit supervisor action.  The
+        // desktop POS used to force this flag on for every checkout, which
+        // silently bypassed the product policy and made offline retries more
+        // dangerous.  Keep the default blocked and require a real permission
+        // plus a durable reason when a cashier intentionally overrides it.
+        $allowNegativeStock = $request->boolean('allow_negative_stock');
+        $negativeStockReason = trim((string) $request->input('negative_stock_reason', ''));
+        if ($allowNegativeStock) {
+            if (! $request->user()?->hasPermission('pos.sell_negative_stock')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'ไม่มีสิทธิ์อนุมัติการขายติดสต๊อกลบ',
+                ], 403);
+            }
+            if ($negativeStockReason === '') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'กรุณาระบุเหตุผลการขายติดสต๊อกลบ',
+                ], 422);
+            }
+            $request->merge(['negative_stock_reason' => $negativeStockReason]);
+        }
+        $request->merge(['allow_negative_stock' => $allowNegativeStock]);
         $requestHash = $this->payloadHash($request->all());
 
         return DB::transaction(function () use ($request, $key, $device, $requestHash) {

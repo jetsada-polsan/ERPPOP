@@ -105,4 +105,10 @@
 - ยังไม่ทดสอบ/ความเสี่ยง: ...
 - Deploy: ยังไม่ deploy / deploy แล้วพร้อมผลตรวจ
 - งานถัดไป: ...
+
+## POS control decisions — 2026-09-21
+
+- การขายติดสต๊อกลบจาก POS ไม่เปิดโดยอัตโนมัติอีกต่อไป; ต้องมีสิทธิ์แยก `pos.sell_negative_stock` และระบุเหตุผล ซึ่งถูกเก็บไว้ใน remark ของเอกสารขาย
+- POS Python แบบออฟไลน์ใช้ stock snapshot ที่ sync ล่าสุดและหักยอดขาย local หลัง snapshot เพื่อบล็อกการขายติดลบที่เครื่องรู้ได้เอง; หากต้องอนุมัติข้อยกเว้นให้กลับมาออนไลน์
+- การรับรองฮาร์ดแวร์ใช้ UAT บน Windows จริง: scanner แบบ keyboard-wedge, profile ป้ายชั่งจาก ERP (800/801) และ Windows printer queue จริง; คำสั่งอยู่ที่ `apps/pos-python/e2e/hardware_uat.py`
 ```

@@ -169,7 +169,7 @@ class User extends Authenticatable
     // สิทธิ์ที่ superadmin bypass ห้ามแตะ - ต้องถือจริงเท่านั้น (ควบคุมภายใน POS):
     // ขาย/ยกเลิกบิลหน้าร้าน ต้องเป็นแคชเชียร์/ผู้อนุมัติตัวจริง แม้แต่ GM ก็ทำแทนไม่ได้
     private const NON_BYPASS_PERMISSIONS = [
-        'pos.sell', 'pos.void', 'pos.discount.override', 'pos.sell_below_cost', 'purchasing.approve',
+        'pos.sell', 'pos.void', 'pos.discount.override', 'pos.sell_below_cost', 'pos.sell_negative_stock', 'purchasing.approve',
         'stock.adjust.approve', 'inventory.quality.manage', 'inventory.cost.close',
         'stock.damage.approve', 'finance.note.approve',
         'management.view', 'budget.manage', 'payroll.manage', 'ecommerce.sync', 'monitoring.manage',

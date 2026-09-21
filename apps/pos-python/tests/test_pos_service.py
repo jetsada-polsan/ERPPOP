@@ -112,6 +112,26 @@ class PosServiceTest(unittest.TestCase):
         self.assertEqual(self.db.execute("SELECT count(*) FROM sale_items").fetchone()[0], 1)
         self.assertEqual(self.service.pending_sync_count(), 1)
 
+    def test_offline_checkout_blocks_known_negative_stock(self) -> None:
+        self.db.execute(
+            "UPDATE products SET stock_qty = '3', updated_at = '2020-01-01T00:00:00+00:00' WHERE id = 1"
+        )
+        self.db.commit()
+        self.service.checkout(
+            document_no="T-STOCK-1", branch_id=1, terminal_id="TEST-01", shift_id=self.shift_id,
+            cashier_id=1, lines=[CartLine(1, Decimal("2"), Decimal("25"))],
+            payment_method="cash", paid_amount=Decimal("50"), sale_uuid="stock-sale-1",
+        )
+
+        with self.assertRaisesRegex(ValueError, "สต๊อกในเครื่องไม่พอ"):
+            self.service.checkout(
+                document_no="T-STOCK-2", branch_id=1, terminal_id="TEST-01", shift_id=self.shift_id,
+                cashier_id=1, lines=[CartLine(1, Decimal("2"), Decimal("25"))],
+                payment_method="cash", paid_amount=Decimal("50"), sale_uuid="stock-sale-2",
+            )
+
+        self.assertEqual(self.db.execute("SELECT count(*) FROM sales").fetchone()[0], 1)
+
     def test_document_number_keeps_increasing_after_sync_and_restart(self) -> None:
         first = self.service.next_document_no("POS-001")
         self.db.execute(

@@ -10,7 +10,9 @@ use App\Models\Branch;
 use App\Models\PosDevice;
 use App\Models\PosShift;
 use App\Models\PosTerminal;
+use App\Models\Permission;
 use App\Models\QrPaymentConfig;
+use App\Models\Role;
 use App\Models\Salesman;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -122,6 +124,62 @@ class PosTransactionSafetyTest extends TestCase
         $success = $controller->checkout($this->apiRequest($device, $key));
         $this->assertSame(200, $success->getStatusCode());
         $this->assertDatabaseHas('pos_api_idempotency', ['idempotency_key' => $key, 'state' => 'completed']);
+    }
+
+    public function test_desktop_checkout_rejects_negative_stock_without_explicit_permission(): void
+    {
+        [$device] = $this->device('NEG-NO');
+        $downstream = $this->mock(PosController::class);
+        $downstream->shouldNotReceive('checkout');
+
+        $response = app(PosApiController::class)->checkout($this->apiRequest($device, 'POS-NEG:NO', [
+            'allow_negative_stock' => true,
+            'negative_stock_reason' => 'ทดสอบ',
+        ]));
+
+        $this->assertSame(403, $response->getStatusCode());
+        $this->assertStringContainsString('สิทธิ์', $response->getData(true)['message']);
+    }
+
+    public function test_desktop_checkout_requires_a_reason_for_authorized_negative_stock_sale(): void
+    {
+        [$device, $user] = $this->device('NEG-REASON');
+        $role = Role::create(['code' => 'NEG_APPROVER', 'name' => 'Negative stock approver']);
+        $permission = Permission::firstOrCreate(['code' => 'pos.sell_negative_stock'], ['name' => 'อนุมัติขายติดสต๊อกลบ POS']);
+        $role->permissions()->attach($permission);
+        $user->roles()->attach($role);
+
+        $downstream = $this->mock(PosController::class);
+        $downstream->shouldNotReceive('checkout');
+
+        $response = app(PosApiController::class)->checkout($this->apiRequest($device, 'POS-NEG:REASON', [
+            'allow_negative_stock' => true,
+        ]));
+
+        $this->assertSame(422, $response->getStatusCode());
+        $this->assertStringContainsString('เหตุผล', $response->getData(true)['message']);
+    }
+
+    public function test_authorized_negative_stock_checkout_reaches_pos_controller_with_reason(): void
+    {
+        [$device, $user] = $this->device('NEG-YES');
+        $role = Role::create(['code' => 'NEG_APPROVER', 'name' => 'Negative stock approver']);
+        $permission = Permission::firstOrCreate(['code' => 'pos.sell_negative_stock'], ['name' => 'อนุมัติขายติดสต๊อกลบ POS']);
+        $role->permissions()->attach($permission);
+        $user->roles()->attach($role);
+
+        $downstream = $this->mock(PosController::class);
+        $downstream->shouldReceive('checkout')->once()->withArgs(function (Request $request): bool {
+            return $request->boolean('allow_negative_stock')
+                && $request->input('negative_stock_reason') === 'สินค้าเข้าช้า';
+        })->andReturn(response()->json(['success' => true, 'receipt_no' => 'CS-NEG-1']));
+
+        $response = app(PosApiController::class)->checkout($this->apiRequest($device, 'POS-NEG:YES', [
+            'allow_negative_stock' => true,
+            'negative_stock_reason' => 'สินค้าเข้าช้า',
+        ]));
+
+        $this->assertSame(200, $response->getStatusCode());
     }
 
     public function test_cashier_cannot_view_or_close_another_branch_shift(): void

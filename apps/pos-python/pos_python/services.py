@@ -547,6 +547,7 @@ class PosService:
         existing = self.db.execute("SELECT id FROM sales WHERE sale_uuid = ?", (sale_uuid,)).fetchone()
         if existing:
             return int(existing["id"])
+        self._assert_cached_stock_available(lines)
         subtotal = sum((money(line.qty * line.unit_price) for line in lines), Decimal("0"))
         discount = sum((money(line.discount) for line in lines), Decimal("0"))
         grand_total = money(subtotal - discount)
@@ -610,6 +611,43 @@ class PosService:
                 (sale_uuid, payload, self._now()),
             )
         return sale_id
+
+    def _assert_cached_stock_available(self, lines: list[CartLine]) -> None:
+        """Block an offline sale when the last known stock cannot cover it.
+
+        A disconnected terminal has no safe way to ask the ERP for a negative
+        stock approval.  Treat the catalog stock snapshot as a reservation
+        ledger and subtract local sales made after that snapshot, including
+        sales that are already synced but have not been pulled back down yet.
+        Products without a stock snapshot remain sellable so an unconfigured
+        test/offline terminal does not pretend it knows the warehouse balance.
+        """
+        requested: dict[int, Decimal] = {}
+        for line in lines:
+            requested[line.product_id] = requested.get(line.product_id, Decimal("0")) + line.qty
+
+        for product_id, quantity in requested.items():
+            product = self.db.execute(
+                "SELECT name, stock_qty, updated_at FROM products WHERE id = ? AND active = 1",
+                (product_id,),
+            ).fetchone()
+            if not product or product["stock_qty"] is None:
+                continue
+
+            local_sold = self.db.execute(
+                """SELECT coalesce(sum(item.qty), '0') AS qty
+                   FROM sale_items item
+                   JOIN sales sale ON sale.id = item.sale_id
+                   WHERE item.product_id = ? AND sale.is_void = 0
+                     AND sale.sale_datetime >= ?""",
+                (product_id, product["updated_at"]),
+            ).fetchone()
+            available = Decimal(str(product["stock_qty"])) - Decimal(str(local_sold["qty"] or "0"))
+            if quantity > available:
+                raise ValueError(
+                    f"สต๊อกในเครื่องไม่พอสำหรับ {product['name']} "
+                    f"(เหลือประมาณ {available:,.3f} ให้เชื่อม ERP ก่อนขายต่อ)"
+                )
 
     def void_sale(self, sale_id: int, *, cashier_id: int, reason: str) -> None:
         """ยกเลิกบิลโดยไม่ลบ — บิลที่ออกไปแล้วต้องยังตรวจย้อนได้เสมอ

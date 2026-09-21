@@ -864,3 +864,13 @@ pending
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้เปิด Qt บนเครื่องจริงเพื่อถ่ายภาพยืนยัน
 - Deploy: production workflow `35578390373` ผ่านครบ และเผยแพร่ installer `0.6.19` ผ่าน Windows workflow `35578559621`; ตรวจ `pos.popstarcenter.com` และ `/download/python-pos` ได้ HTTP 200 แล้ว
 - งานถัดไป: ติดตั้ง `PopCentral-POS-UAT-0.6.19-setup.exe` บนเครื่อง POS จริงแล้วตรวจภาพ/การใช้งานหน้างาน
+
+## Handoff - 2026-09-21 (Codex แก้ negative-stock และ hardware UAT)
+
+- Branch: `codex/pos-negative-stock-hardware-tests`
+- ทำอะไร: เอา `allow_negative_stock=true` ที่ API บังคับไว้ออก; เพิ่มสิทธิ์แยก `pos.sell_negative_stock`, บังคับเหตุผลไม่เกิน 500 ตัวอักษร และเก็บเหตุผลใน remark ของเอกสารขาย; เพิ่ม migration โดยไม่ grant สิทธิ์ให้อัตโนมัติ
+- ทำอะไรเพิ่มเติม: POS Python ออฟไลน์บล็อกบิลเมื่อ stock snapshot ที่รู้ล่าสุดไม่พอ โดยหักยอดขาย local หลังเวลา snapshot; เพิ่ม `pos_python.hardware_uat` และ `e2e/hardware_uat.py` สำหรับตรวจ scanner ปกติ, ป้ายชั่ง 800/801 และ printer queue 58/80mm จริงบน Windows; เพิ่มคู่มือ `docs/pos-hardware-uat.md`
+- ทดสอบ: `php artisan test --compact` → 441 tests, 440 passed, 1 skipped, 6 incomplete; Python `python3 -m unittest discover -s tests` ใน `apps/pos-python` → 181 tests ผ่าน; focused POS safety 9 tests ผ่าน; PHP lint, `python3 -B e2e/hardware_uat.py --help`, `git diff --check` ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่มีเครื่อง Windows/scanner/ตาชั่ง/printer จริงในสภาพแวดล้อมนี้ จึงยังต้องรัน UAT ตามคู่มือบน POS จริง; การแก้ยังไม่ได้ deploy และยังไม่ได้ build installer ใหม่
+- Deploy: ยังไม่ deploy
+- งานถัดไป: review แล้ว push branch; ก่อนใช้สิทธิ์ขายติดสต๊อกลบ ให้เจ้าของกำหนด role/ผู้อนุมัติใน ERP เอง และรัน hardware UAT บนสาขาวาริน

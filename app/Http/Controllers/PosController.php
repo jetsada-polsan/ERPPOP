@@ -1014,6 +1014,7 @@ class PosController extends Controller
             'items.*.barcode' => ['nullable', 'string', 'max:50'],
             'items.*.barcode_type' => ['nullable', Rule::in(BarcodePolicy::ALL)],
             'allow_negative_stock' => ['nullable', 'boolean'],
+            'negative_stock_reason' => ['nullable', 'string', 'max:500'],
         ]);
 
         if ($mismatch = $this->barcodeBelongsToAnotherProduct($data['items'])) {
@@ -1027,6 +1028,21 @@ class PosController extends Controller
         if (! $data['cashier_id']) {
             return response()->json(['success' => false, 'message' => 'บัญชีนี้ยังไม่ได้กำหนดรหัสพนักงานขาย ติดต่อผู้ดูแลระบบ'], 422);
         }
+
+        $allowNegativeStock = (bool) ($data['allow_negative_stock'] ?? false);
+        $negativeStockReason = trim((string) ($data['negative_stock_reason'] ?? ''));
+        if ($allowNegativeStock) {
+            if (! auth()->user()?->hasPermission('pos.sell_negative_stock')) {
+                return response()->json(['success' => false, 'message' => 'ไม่มีสิทธิ์อนุมัติการขายติดสต๊อกลบ'], 403);
+            }
+            if ($negativeStockReason === '') {
+                return response()->json(['success' => false, 'message' => 'กรุณาระบุเหตุผลการขายติดสต๊อกลบ'], 422);
+            }
+            $data['negative_stock_reason'] = $negativeStockReason;
+        }
+        // Never let a missing/falsey request value become an implicit override
+        // in CashSaleService.  The only true path above is permission-checked.
+        $data['allow_negative_stock'] = $allowNegativeStock;
 
         try {
             // ป้ายชั่งฝังราคารวมไว้ในบาร์โค้ด ต้องถอดเป็นน้ำหนัก+ราคาต่อหน่วยฝั่ง server ก่อนตรวจราคา
@@ -1080,6 +1096,9 @@ class PosController extends Controller
             default => 'เช็ค',
         };
         $remarkParts = ['POS: '.$methodText];
+        if ($allowNegativeStock) {
+            $remarkParts[] = 'อนุมัติขายติดสต๊อกลบ: '.$negativeStockReason;
+        }
         if ($data['method'] === 'mixed') {
             $remarkParts[] = 'เงินสด: '.number_format((float) ($data['cash_amount'] ?? 0), 2)
                 .' | โอน: '.number_format((float) ($data['transfer_amount'] ?? 0), 2);
