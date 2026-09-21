@@ -80,7 +80,7 @@
         .cart .section-head { color: #fff; background: var(--navy); }
         .cart .section-head .button.light { color: #fff; border-color: rgba(255,255,255,.42); background: transparent; }
         .cart .section-head .button.light:hover { background: rgba(255,255,255,.12); }
-        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: 8px; flex: 1 1 auto; width: 100%; height: 0; min-height: 0; padding: 10px; overflow: auto; }
+        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); grid-template-rows: repeat(3, minmax(124px, 1fr)); grid-auto-rows: minmax(124px, auto); align-content: start; gap: 8px; flex: 1 1 auto; width: 100%; height: 0; min-height: 0; padding: 10px; overflow: auto; }
         .product { display: flex; flex-direction: column; justify-content: space-between; gap: 3px; min-height: 0; min-width: 0; padding: 10px; border: 1px solid #cbdde8; border-radius: 9px; color: var(--ink); background: #fff; overflow: hidden; text-align: left; transition: border-color .12s, box-shadow .12s, transform .08s; }
         .product:hover { border-color: var(--blue); box-shadow: 0 5px 14px rgba(21,133,192,.15); transform: translateY(-1px); }
         .product:active { transform: translateY(1px); }

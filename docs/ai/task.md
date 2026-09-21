@@ -691,3 +691,9 @@ pending
 - Deploy: GitHub Actions run `35522602336` production ผ่านครบทั้ง Laravel test, frontend build, upload release และ `scripts/deploy.sh`; สถานะ `Success`
 - ตรวจ live: `https://pos.popstarcenter.com/` ตอบ HTTP 200 และ HTML production มี `topContext`, `settingsShiftButton`, สัดส่วน `55fr`/`45fr` และ product grid 3 แถวตาม release ใหม่; ไม่พบ `sellerPanel` เดิม
 - งานถัดไป: ทดสอบด้วย Device Token จริงบนจอ POS โดยเลือกคนขาย/เปิดกะจากเมนูฟันเฟือง และตรวจภาพว่าการ์ดสินค้าไม่ทับซ้อน
+
+# Handoff - 2026-09-21 (fix collapsed Web POS product cards)
+- ทำอะไร: แก้ CSS product grid ที่ทำให้แถวสินค้าจำนวนมากถูกย่อจนข้อความซ้อน/อ่านไม่ได้; ล็อก 3 แถวแรกให้มีความสูงขั้นต่ำ 124px, แถวถัดไปไม่น้อยกว่า 124px และให้เลื่อนภายในกรอบสินค้าแทนการบีบการ์ด
+- ทดสอบ: `php artisan test` ผ่าน 424 tests (423 passed, 1 skipped, 6 incomplete); `php artisan view:cache`; `git diff --check`
+- Deploy: ยังไม่ deploy production; push source แล้ว รอคำสั่ง `deploy`
+- งานถัดไป: ตรวจภาพ live หลัง deploy ที่จอ POS จริงว่าชื่อสินค้า/ราคา/สต๊อกแสดงครบโดยไม่ซ้อนกัน
