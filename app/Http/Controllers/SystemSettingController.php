@@ -7,90 +7,101 @@ use App\Models\Branch;
 use App\Models\PosDevice;
 use App\Models\PosTerminal;
 use App\Models\User;
+use App\Support\PosLayout;
 use App\Support\PosReleaseManifest;
 use App\Support\PosTerminalCode;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class SystemSettingController extends Controller
 {
-    private const DEFAULT_POS_LAYOUT = [
-        'schema' => 'popcentral-pos-layout',
-        'version' => 1,
-        'canvas' => ['columns' => 12, 'rows' => 8],
-        'components' => [
-            ['id' => 'search', 'type' => 'search', 'x' => 1, 'y' => 1, 'w' => 7, 'h' => 1],
-            ['id' => 'category', 'type' => 'category_tabs', 'x' => 1, 'y' => 2, 'w' => 7, 'h' => 1],
-            ['id' => 'products', 'type' => 'product_grid', 'x' => 1, 'y' => 3, 'w' => 7, 'h' => 5],
-            ['id' => 'cart', 'type' => 'cart', 'x' => 8, 'y' => 1, 'w' => 5, 'h' => 5],
-            ['id' => 'payment', 'type' => 'payment', 'x' => 8, 'y' => 6, 'w' => 5, 'h' => 2],
-        ],
-    ];
-
     public function posDesigner(): View
     {
-        $published = json_decode((string) AppSetting::get('pos_layout_published'), true);
-        $draft = json_decode((string) AppSetting::get('pos_layout_draft'), true);
-        $layout = is_array($draft) ? $draft : (is_array($published) ? $published : self::DEFAULT_POS_LAYOUT);
-
         return view('settings.pos-designer', [
-            'layout' => $layout,
-            'publishedVersion' => (int) AppSetting::get('pos_layout_version', '0'),
-            'publishedAt' => AppSetting::get('pos_layout_published_at'),
+            'layout' => PosLayout::draft(),
+            'defaultRuntime' => PosLayout::defaultRuntime(),
+            'publishedRuntime' => PosLayout::published()['runtime'],
+            'publishedVersion' => PosLayout::publishedVersion(),
+            'publishedAt' => PosLayout::publishedAt(),
+            'limits' => [
+                'pane_min' => PosLayout::MIN_PANE_WIDTH,
+                'pane_max' => PosLayout::MAX_PANE_WIDTH,
+                'rows_min' => PosLayout::MIN_PRODUCT_ROWS,
+                'rows_max' => PosLayout::MAX_PRODUCT_ROWS,
+                'columns_min' => PosLayout::MIN_PRODUCT_COLUMNS,
+                'columns_max' => PosLayout::MAX_PRODUCT_COLUMNS,
+                'densities' => PosLayout::DENSITIES,
+                'button_sizes' => PosLayout::BUTTON_SIZES,
+            ],
+            // ตารางเดียวกับที่ฝั่งเซิร์ฟเวอร์ใช้แปลงเป็น CSS เพื่อให้ preview ไม่เพี้ยนจากของจริง
+            'metrics' => [
+                'density' => PosLayout::densityMetrics(),
+                'button' => PosLayout::buttonMetrics(),
+            ],
         ]);
     }
 
     public function savePosLayout(Request $request): RedirectResponse
     {
+        // ปุ่ม "คืนค่าเริ่มต้น" ต้องไม่ต้องผ่าน validation ของฟอร์มที่ผู้ใช้เพิ่งทำพัง
+        if ($request->boolean('reset')) {
+            AppSetting::set('pos_layout_draft', $this->encodeLayout(PosLayout::defaults()));
+
+            return redirect()->route('settings.pos-designer')
+                ->with('success', 'คืนค่าแบบร่างกลับเป็นค่าเริ่มต้นแล้ว ยังไม่ได้ Publish ให้เครื่อง POS');
+        }
+
         $rawLayout = $request->input('layout');
         if (is_string($rawLayout)) {
             $rawLayout = json_decode($rawLayout, true);
         }
-        $layout = $this->validatedPosLayout($rawLayout);
-        AppSetting::set('pos_layout_draft', json_encode($layout, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
+        $validator = Validator::make($request->all(), PosLayout::runtimeRules(), PosLayout::runtimeMessages());
+        $validator->after(function ($validator) use ($request, $rawLayout) {
+            // สองฝั่งต้องเต็มหน้าจอพอดี ไม่งั้นหน้าขายจะเหลือช่องว่างหรือดันคอลัมน์ล้น
+            $product = (int) $request->input('runtime.product_width');
+            $cart = (int) $request->input('runtime.cart_width');
+            if ($product > 0 && $cart > 0 && $product + $cart !== 100) {
+                $validator->errors()->add('runtime.cart_width', 'ความกว้างฝั่งสินค้ากับฝั่งบิลรวมกันต้องได้ 100% (ตอนนี้ได้ '.($product + $cart).'%)');
+            }
+
+            if (! is_array($rawLayout)) {
+                $validator->errors()->add('layout', 'รูปแบบ POS layout ไม่ถูกต้อง หรือ JSON ไม่สมบูรณ์');
+            } elseif (PosLayout::componentsFrom($rawLayout['components'] ?? null) === []) {
+                $validator->errors()->add('layout', 'ต้องมีอย่างน้อย 1 ส่วนประกอบบน canvas');
+            }
+        });
+        $validator->validate();
+
+        $layout = PosLayout::normalize([
+            'version' => $rawLayout['version'] ?? 1,
+            'components' => $rawLayout['components'] ?? null,
+            'runtime' => $request->input('runtime'),
+        ]);
+        AppSetting::set('pos_layout_draft', $this->encodeLayout($layout));
 
         if ($request->boolean('publish')) {
-            $version = (int) AppSetting::get('pos_layout_version', '0') + 1;
+            $version = PosLayout::publishedVersion() + 1;
             $layout['version'] = $version;
-            AppSetting::set('pos_layout_published', json_encode($layout, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+            $layout['layout_version'] = $version;
+            AppSetting::set('pos_layout_published', $this->encodeLayout($layout));
             AppSetting::set('pos_layout_version', (string) $version);
             AppSetting::set('pos_layout_published_at', now()->toIso8601String());
+
             return redirect()->route('settings.pos-designer')->with('success', "Build และเผยแพร่ POS layout รุ่น {$version} แล้ว เครื่อง POS จะรับค่าเมื่อ Sync");
         }
 
         return redirect()->route('settings.pos-designer')->with('success', 'บันทึกแบบร่าง POS layout แล้ว');
     }
 
-    private function validatedPosLayout(mixed $value): array
+    private function encodeLayout(array $layout): string
     {
-        abort_unless(is_array($value), 422, 'รูปแบบ POS layout ไม่ถูกต้อง หรือ JSON ไม่สมบูรณ์');
-        $allowed = ['search', 'category_tabs', 'product_grid', 'cart', 'payment', 'customer', 'held_bills', 'numpad', 'shift_status'];
-        $components = [];
-        foreach (array_values($value['components'] ?? []) as $component) {
-            if (! is_array($component) || ! in_array($component['type'] ?? '', $allowed, true)) {
-                continue;
-            }
-            $components[] = [
-                'id' => preg_replace('/[^a-z0-9_-]/i', '', (string) ($component['id'] ?? $component['type'])),
-                'type' => $component['type'],
-                'x' => max(1, min(12, (int) ($component['x'] ?? 1))),
-                'y' => max(1, min(12, (int) ($component['y'] ?? 1))),
-                'w' => max(1, min(12, (int) ($component['w'] ?? 3))),
-                'h' => max(1, min(12, (int) ($component['h'] ?? 2))),
-            ];
-        }
-        abort_if(count($components) === 0, 422, 'ต้องมีอย่างน้อย 1 ส่วนประกอบ');
-
-        return [
-            'schema' => 'popcentral-pos-layout',
-            'version' => (int) ($value['version'] ?? 1),
-            'canvas' => ['columns' => 12, 'rows' => 12],
-            'components' => $components,
-        ];
+        return json_encode($layout, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 
     public function updateLayout(Request $request): RedirectResponse

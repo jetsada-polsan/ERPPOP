@@ -1,3 +1,11 @@
+@php
+    // หน้านี้ถูกเรียกได้ทั้งจาก PosController::browser() และ (เผื่อไว้) จาก view() ตรงๆ
+    // จึงต้องยืนหยัดได้เองเมื่อไม่มีตัวแปรส่งมา ห้ามให้หน้าขายล้มเพราะ layout
+    $posLayout = $layout ?? \App\Support\PosLayout::published();
+    $posRuntime = $runtime ?? $posLayout['runtime'];
+    $posLayoutCss = $layoutCss ?? \App\Support\PosLayout::cssVariableString($posRuntime);
+    $posLayoutVersion = (int) ($posLayout['layout_version'] ?? $posLayout['version'] ?? 1);
+@endphp
 <!doctype html>
 <html lang="th">
 <head>
@@ -19,7 +27,27 @@
             --canvas: #f1f6f9;
             --panel: #ffffff;
             --shadow: 0 8px 25px rgba(15, 76, 117, .10);
+
+            /* ── POS layout runtime ──────────────────────────────────────────
+               ค่าพวกนี้มาจากหน้า POS Designer (settings → POS Designer) ผ่าน
+               App\Support\PosLayout::cssVariables() ห้าม hard-code สัดส่วนหรือ
+               จำนวนแถวไว้ในกฎ CSS ด้านล่างอีก ให้แก้ผ่านตัวแปรชุดนี้เท่านั้น
+               บรรทัดต่อไปนี้คือค่า fallback ถ้ายังไม่เคย publish layout */
+            --pos-product-fr: 55fr;
+            --pos-cart-fr: 45fr;
+            --pos-cart-min: 360px;
+            --pos-product-columns: 4;
+            --pos-product-rows: 3;
+            --pos-card-min-height: 124px;
+            --pos-card-font-size: 13px;
+            --pos-grid-gap: 8px;
+            --pos-grid-padding: 10px;
+            --pos-button-min-height: 42px;
+            --pos-button-font-size: 16px;
+            --pos-button-padding: 9px;
         }
+        /* ค่าที่ publish แล้วจริง ๆ ของร้านนี้ — ทับ fallback ด้านบน */
+        :root { {!! $posLayoutCss !!} }
         * { box-sizing: border-box; }
         html, body { margin: 0; min-height: 100%; }
         body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: var(--canvas); }
@@ -55,7 +83,7 @@
         .input, .select { width: 100%; min-height: 43px; padding: 9px 12px; border: 1px solid #b9ccda; border-radius: 8px; color: var(--ink); background: #fff; outline: none; }
         .input:focus, .select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(21,133,192,.12); }
         .token-input { letter-spacing: .08em; }
-        .button { min-height: 42px; padding: 9px 16px; border: 1px solid transparent; border-radius: 8px; font-weight: 800; transition: transform .08s, filter .12s; }
+        .button { min-height: var(--pos-button-min-height); padding: var(--pos-button-padding) 16px; border: 1px solid transparent; border-radius: 8px; font-weight: 800; transition: transform .08s, filter .12s; }
         .button:active { transform: translateY(1px); }
         .button:hover:not(:disabled) { filter: brightness(.97); }
         .button.primary { color: #fff; background: var(--blue); }
@@ -69,7 +97,7 @@
         .error { margin: 12px 0; padding: 10px 12px; border-radius: 8px; color: #9d2439; background: #fff0f2; font-size: 13px; text-align: left; }
         .hidden { display: none !important; }
         .workspace { height: 100%; min-height: 0; }
-        .sale-grid { display: grid; grid-template-columns: minmax(0, 55fr) minmax(360px, 45fr); gap: 10px; align-items: stretch; min-height: 0; height: 100%; }
+        .sale-grid { display: grid; grid-template-columns: minmax(0, var(--pos-product-fr)) minmax(var(--pos-cart-min), var(--pos-cart-fr)); gap: var(--pos-grid-gap); align-items: stretch; min-height: 0; height: 100%; }
         .catalog, .cart { min-width: 0; min-height: 0; height: 100%; overflow: hidden; }
         .catalog { display: flex; flex-direction: column; }
         .section-head { padding: 8px 11px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; }
@@ -80,11 +108,11 @@
         .cart .section-head { color: #fff; background: var(--navy); }
         .cart .section-head .button.light { color: #fff; border-color: rgba(255,255,255,.42); background: transparent; }
         .cart .section-head .button.light:hover { background: rgba(255,255,255,.12); }
-        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); grid-template-rows: repeat(3, minmax(124px, 1fr)); grid-auto-rows: minmax(124px, auto); align-content: start; gap: 8px; flex: 1 1 auto; width: 100%; height: 0; min-height: 0; padding: 10px; overflow: auto; }
+        .product-grid { display: grid; grid-template-columns: repeat(var(--pos-product-columns), minmax(0, 1fr)); grid-template-rows: repeat(var(--pos-product-rows), minmax(var(--pos-card-min-height), 1fr)); grid-auto-rows: minmax(var(--pos-card-min-height), auto); align-content: start; gap: var(--pos-grid-gap); flex: 1 1 auto; width: 100%; height: 0; min-height: 0; padding: var(--pos-grid-padding); overflow: auto; }
         .product { display: flex; flex-direction: column; justify-content: space-between; gap: 3px; min-height: 0; min-width: 0; padding: 10px; border: 1px solid #cbdde8; border-radius: 9px; color: var(--ink); background: #fff; overflow: hidden; text-align: left; transition: border-color .12s, box-shadow .12s, transform .08s; }
         .product:hover { border-color: var(--blue); box-shadow: 0 5px 14px rgba(21,133,192,.15); transform: translateY(-1px); }
         .product:active { transform: translateY(1px); }
-        .product .name { min-height: 0; display: -webkit-box; overflow: hidden; font-size: 13px; font-weight: 800; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+        .product .name { min-height: 0; display: -webkit-box; overflow: hidden; font-size: var(--pos-card-font-size); font-weight: 800; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
         .product .sku { margin-top: 2px; color: var(--muted); font-size: 10px; }
         .product .price { margin-top: 2px; color: var(--blue); font-size: 18px; font-weight: 900; }
         .product .stock { margin-top: 2px; color: var(--muted); font-size: 10px; }
@@ -113,8 +141,8 @@
         .total-line { display: flex; justify-content: space-between; gap: 10px; margin: 5px 0; color: #b9d9e9; }
         .total-line.grand { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.25); color: #fff; font-size: 22px; font-weight: 900; }
         .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 9px; }
-        #payButton { min-height: 42px; font-size: 16px; background: var(--blue); }
-        #closeShiftButton { min-height: 42px; }
+        #payButton { min-height: var(--pos-button-min-height); font-size: var(--pos-button-font-size); background: var(--blue); }
+        #closeShiftButton { min-height: var(--pos-button-min-height); }
         .empty-state { padding: 38px 20px; text-align: center; color: var(--muted); }
         .modal-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 16px; background: rgba(8, 47, 73, .48); }
         .modal { width: min(480px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: 22px; border-radius: 14px; background: #fff; box-shadow: 0 20px 70px rgba(8,47,73,.3); }
@@ -160,7 +188,8 @@
         .receipt-paper hr { border: 0; border-top: 1px dashed #333; }
         .toast { position: fixed; right: 18px; bottom: 18px; z-index: 40; max-width: min(390px, calc(100vw - 36px)); padding: 12px 15px; border-radius: 9px; color: #fff; background: #183447; box-shadow: var(--shadow); }
         @media (max-width: 900px) { body.pos-active { overflow: auto; } body.pos-active .page { position: static; height: auto; max-width: 1600px; overflow: visible; } .workspace { height: auto; } .top-context { gap: 4px; } .context-item { padding: 3px 6px; } .context-item .value { max-width: 130px; } .sale-grid { grid-template-columns: 1fr; min-height: 0; height: auto; } .cart-list { height: auto; max-height: 430px; min-height: 260px; } .product-grid { grid-template-rows: none; grid-auto-rows: minmax(112px, auto); height: auto; min-height: 360px; } }
-        @media (max-width: 560px) { .page { padding: 10px; } .topbar { padding: 9px 11px; } .brand small { display: none; } .top-context { gap: 3px; } .top-meta { gap: 5px; font-size: 11px; } .status { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .context-item .label { display: block; margin: 0; font-size: 8px; } .context-item .value { max-width: 92px; font-size: 10px; } .connect-panel { margin: 5vh auto; padding: 22px 17px; } .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 10px; gap: 7px; } .product { min-height: 112px; padding: 9px; } .action-row { grid-template-columns: 1fr; } .payment-qr-box canvas, .payment-qr-box img { width: 160px !important; height: 160px !important; } }
+        /* จอเล็กบังคับคอลัมน์แคบลงผ่านตัวแปรเดิม เพื่อให้ยังเป็นที่เดียวที่คุมจำนวนคอลัมน์ */
+        @media (max-width: 560px) { .page { padding: 10px; } .topbar { padding: 9px 11px; } .brand small { display: none; } .top-context { gap: 3px; } .top-meta { gap: 5px; font-size: 11px; } .status { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .context-item .label { display: block; margin: 0; font-size: 8px; } .context-item .value { max-width: 92px; font-size: 10px; } .connect-panel { margin: 5vh auto; padding: 22px 17px; } .product-grid { --pos-product-columns: 2; padding: 10px; gap: 7px; } .product { min-height: 112px; padding: 9px; } .action-row { grid-template-columns: 1fr; } .payment-qr-box canvas, .payment-qr-box img { width: 160px !important; height: 160px !important; } }
         @media print { @page { size: 80mm auto; margin: 0; } body { background: #fff; } body.printing > *:not(#receiptModal) { display: none !important; } body.printing #receiptModal { position: static; display: block !important; padding: 0; background: #fff; } body.printing #receiptModal .modal { width: auto; max-height: none; padding: 0; box-shadow: none; } body.printing #receiptModal .modal-head, body.printing #receiptModal .modal-actions { display: none; } body.printing .receipt-paper { width: 80mm; } }
     </style>
 </head>
@@ -168,10 +197,10 @@
     <header class="topbar">
         <div class="brand">PopCentral Web POS <small>ขายออนไลน์ผ่านเว็บ</small></div>
         <div id="topContext" class="top-context hidden" aria-label="ข้อมูลเครื่อง POS">
-            <div class="context-item"><span class="label">สาขา</span><strong id="branchValue" class="value">—</strong></div>
-            <div class="context-item"><span class="label">เครื่อง</span><strong id="deviceValue" class="value">—</strong></div>
-            <div class="context-item"><span class="label">คนขาย</span><strong id="cashierValue" class="value">ยังไม่เลือก</strong></div>
-            <div id="shiftSummary" class="context-item"><span class="label">กะ</span><strong id="shiftValue" class="value">ยังไม่เปิดกะ</strong></div>
+            <div id="branchContext" class="context-item {{ $posRuntime['show_branch'] ? '' : 'hidden' }}"><span class="label">สาขา</span><strong id="branchValue" class="value">—</strong></div>
+            <div id="deviceContext" class="context-item {{ $posRuntime['show_terminal'] ? '' : 'hidden' }}"><span class="label">เครื่อง</span><strong id="deviceValue" class="value">—</strong></div>
+            <div id="cashierContext" class="context-item {{ $posRuntime['show_seller'] ? '' : 'hidden' }}"><span class="label">คนขาย</span><strong id="cashierValue" class="value">ยังไม่เลือก</strong></div>
+            <div id="shiftSummary" class="context-item {{ $posRuntime['show_shift'] ? '' : 'hidden' }}"><span class="label">กะ</span><strong id="shiftValue" class="value">ยังไม่เปิดกะ</strong></div>
         </div>
         <div class="top-meta">
             <span id="status" class="status">ยังไม่เชื่อมต่อ</span>
@@ -311,7 +340,33 @@
         (() => {
             const TOKEN_KEY = 'popstar_web_pos_device_token';
             const PAPER_KEY = 'popstar_web_pos_paper_width';
-            const state = { token: '', config: null, cashiers: [], cashier: null, shift: null, products: [], cart: [], discountCard: null, lastReceipt: null, weightTarget: null, quantityTarget: null, shiftAction: 'open', toastTimer: null, productSearchTimer: null, productRequestId: 0 };
+            const state = { token: '', config: null, cashiers: [], cashier: null, shift: null, products: [], cart: [], discountCard: null, lastReceipt: null, weightTarget: null, quantityTarget: null, shiftAction: 'open', toastTimer: null, productSearchTimer: null, productRequestId: 0, layoutVersion: {{ $posLayoutVersion }} };
+
+            // Layout ที่ publish แล้ว: server render มาให้รอบแรก แล้ว /api/pos/ping
+            // เป็นคนบอกค่าล่าสุดหลังเชื่อมต่อ หน้านี้จึงไม่ต้อง reload เมื่อแอดมิน Build ใหม่
+            // ค่า css มาจาก App\Support\PosLayout::cssVariables() ฝั่งเซิร์ฟเวอร์ที่เดียว
+            const CONTEXT_TOGGLES = { show_branch: 'branchContext', show_terminal: 'deviceContext', show_seller: 'cashierContext', show_shift: 'shiftSummary' };
+
+            function applyPosLayout(layout) {
+                if (!layout || typeof layout !== 'object') return;
+                const css = layout.css;
+                if (css && typeof css === 'object') {
+                    Object.entries(css).forEach(([name, value]) => {
+                        if (/^--pos-[a-z-]+$/.test(name) && /^[0-9a-z.% -]+$/i.test(String(value))) {
+                            document.documentElement.style.setProperty(name, String(value));
+                        }
+                    });
+                }
+                const runtime = layout.runtime;
+                if (runtime && typeof runtime === 'object') {
+                    Object.entries(CONTEXT_TOGGLES).forEach(([key, id]) => {
+                        const node = document.getElementById(id);
+                        if (node) node.classList.toggle('hidden', runtime[key] === false);
+                    });
+                }
+                const version = Number(layout.layout_version || layout.version || 0);
+                if (version > 0) state.layoutVersion = version;
+            }
             const $ = (id) => document.getElementById(id);
             const money = (value) => `฿${Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' }[char]));
@@ -349,6 +404,7 @@
                 try {
                     const config = await api('/ping');
                     state.config = config; localStorage.setItem(TOKEN_KEY, state.token);
+                    applyPosLayout(config.pos_layout);
                     $('branchValue').textContent = config.branch_name || `สาขา #${config.branch_id || '—'}`;
                     $('deviceValue').textContent = config.device?.name || config.device?.terminal_code || 'เครื่อง POS';
                     document.body.classList.add('pos-active'); show('topContext'); show('workspace'); hide('connectPanel'); setStatus('เชื่อมต่อแล้ว', true); renderShift();

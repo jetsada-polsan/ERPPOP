@@ -735,3 +735,92 @@ pending
 - ทดสอบ: Python POS `python3 -m unittest discover -s apps/pos-python/tests` ผ่าน 175 tests; packaged-entrypoint self-check ผ่านในเครื่อง dev; `git diff --check`
 - Deploy: ยังไม่ publish installer รุ่นใหม่และยังไม่ deploy production; เปลี่ยนเฉพาะ pipeline/สคริปต์ build รอคำสั่งเจ้าของระบบ
 - งานถัดไป: สั่ง workflow `Build PopCentral POS UAT for Windows` แบบ `workflow_dispatch` ด้วย version ใหม่เพื่อสร้าง artifact และค่อยเลือก `publish=true` เมื่อต้องการเปลี่ยนลิงก์ดาวน์โหลดจริง
+
+# Handoff - 2026-09-21 (POS Layout Designer ใช้งานจริง — Claude, branch `claude/pos-layout-ui`)
+
+> **ไม่ได้แตะ `main` และไม่ได้ push** งานอยู่บน branch `claude/pos-layout-ui` รอ Codex review/merge
+> ไม่ได้ deploy อะไรทั้งสิ้น
+
+## ทำอะไร
+
+- เพิ่ม `app/Support/PosLayout.php` เป็นแหล่งความจริงเดียวของ POS layout
+  เดิมค่า default ถูกคัดลอกไว้ 3 ที่ (`SystemSettingController`, `PosController`, `Api\PosApiController`)
+  แล้ว clamp ไม่เหมือนกัน — `savePosLayout` clamp `w` เป็น 1-12 แต่ `preview()` clamp เป็น `13 - x`
+  หน้า Designer จึงบันทึกค่าหนึ่งแต่หน้าพรีวิวแสดงอีกค่าหนึ่งได้ ตอนนี้ normalize ที่เดียว
+- เพิ่มชุดค่า `runtime` ที่ปลอดภัยต่อการรันจริง: `product_width`, `cart_width`, `product_rows`,
+  `product_columns`, `density`, `button_size` และ `show_branch/terminal/seller/shift`
+  รายละเอียดสัญญาอยู่ที่ `docs/pos-layout-contract.md`
+- หน้า POS Designer ใช้งานได้จริง ไม่ใช่แค่พรีวิว: มีแผงตั้งค่า runtime, preview สัดส่วน/จำนวนช่อง/
+  ขนาดปุ่มแบบสด, validation ทั้งฝั่งเบราว์เซอร์และเซิร์ฟเวอร์, ปุ่ม **คืนค่าเริ่มต้น** และบอกรุ่นที่ publish อยู่
+- Web POS (`pos/browser.blade.php`) เลิก hard-code `55fr/45fr` และ `repeat(3, minmax(124px,1fr))`
+  เปลี่ยนเป็นตัวแปร CSS ที่ server render มาจาก layout ที่ publish และทับอีกรอบด้วย
+  `config.pos_layout.css` หลัง `/api/pos/ping` สำเร็จ (ฟังก์ชัน `applyPosLayout`)
+  ชิปสาขา/เครื่อง/คนขาย/กะ ถูกซ่อนตั้งแต่ HTML ก้อนแรกเมื่อปิดไว้ ไม่ต้องรอ JavaScript
+- `/pos/preview` ใช้ตัวแปรชุดเดียวกัน ทำให้ "ดูหน้าที่ Build แล้ว" ตรงกับของจริง
+- `/api/pos/ping` ส่ง `runtime`, `layout_version` และ `css` เพิ่มเข้ามา โดย `schema/version/canvas/components`
+  เหมือนเดิมทุกประการ — POS Python รุ่นที่ติดตั้งไปแล้วจะข้ามคีย์ใหม่ไปเอง ไม่พัง
+- `PosLayout::published()` ถอยไปใช้ค่าเริ่มต้นเมื่ออ่าน AppSetting ไม่ได้ เพื่อไม่ให้หน้าขาย
+  บนโดเมน `pos.*` กลายเป็น 500 ตอนฐานข้อมูลมีปัญหา
+
+## ไฟล์ที่แก้
+
+| ไฟล์ | สถานะ |
+|---|---|
+| `app/Support/PosLayout.php` | ใหม่ |
+| `app/Http/Controllers/SystemSettingController.php` | แก้ (validation + reset, เลิกถือ default เอง) |
+| `app/Http/Controllers/PosController.php` | แก้ (`preview()` ใช้ PosLayout, เพิ่ม `browser()`) |
+| `app/Http/Controllers/Api/PosApiController.php` | แก้ (`publishedPosLayout()` ใช้ PosLayout + css) |
+| `routes/web.php` | แก้ (โดเมน `pos.*` เรียก `PosController::browser()`) |
+| `resources/views/settings/pos-designer.blade.php` | แก้ (แผง runtime + preview + reset) |
+| `resources/views/pos/browser.blade.php` | แก้ (CSS variables + `applyPosLayout`) |
+| `resources/views/pos/preview.blade.php` | แก้ (ใช้ตัวแปรเดียวกัน) |
+| `tests/Feature/PosBrowserTest.php` | แก้ (assert ตัวแปรแทนค่าที่ฝังไว้) |
+| `tests/Feature/PosLayoutDesignerTest.php` | ใหม่ (9 เทสต์) |
+| `docs/pos-layout-contract.md` | ใหม่ |
+
+## ทดสอบไปแล้วแค่ไหน
+
+- `php artisan test` → **438 tests, 436 passed, 1 failed, 3357 assertions**
+  ตัวที่แดงคือ `FinanceSecurityControlTest::test_operations_page_stays_available_when_a_backup_checksum_is_unreadable`
+  ซึ่ง **แดงอยู่ก่อนแล้วตั้งแต่ commit ฐาน `6ab2775`** (รัน baseline ก่อนแก้: 427 tests, 425 passed, 1 failed ตัวเดียวกัน)
+  สาเหตุคือสภาพแวดล้อมที่รันเทสต์เป็น root จึงอ่านไฟล์ที่ `chmod 0000` ได้ ข้อความ "อ่าน checksum ไม่ได้" เลยไม่ขึ้น
+  ไม่เกี่ยวกับงานรอบนี้ และบนเครื่อง dev ปกติ (ไม่ใช่ root) ควรผ่าน
+- `php artisan view:cache` → `Blade templates cached successfully.`
+- `git diff --check` → ไม่มี whitespace error
+- **ข้อจำกัดที่ต้องรู้**: เครื่องที่รันงานรอบนี้ไม่มี PHP ติดตั้ง จึงรันเทสต์บน PHP 8.4 ในคอนเทนเนอร์แยก
+  ไม่ได้รันบน PHP 8.3 (production) หรือ 8.5 (เครื่อง dev) — ไม่ได้ใช้ไวยากรณ์ 8.4+ แต่ควรรันซ้ำก่อน merge
+
+## ยังไม่ได้ทดสอบ / ความเสี่ยง
+
+- ยังไม่ได้เปิดหน้าจริงบนเบราว์เซอร์ ทดสอบเป็น assertion บน HTML ที่ render เท่านั้น
+- `repeat(var(--pos-product-columns), ...)` ใช้ได้ในเบราว์เซอร์ปัจจุบันทั้งหมด แต่ควรดูด้วยตาบนเครื่อง POS จริง
+- ยังไม่ได้ทดสอบกับ Device Token จริง — เทสต์ ping ใช้ token ที่ออกในเทสต์
+- layout เดิมที่ publish ไว้แล้วจะถูก normalize ตอนอ่าน ถ้ามีบล็อกที่ล้นขอบ canvas (`x + w > 13`)
+  จะถูกหดให้พอดีตั้งแต่ตอนแสดงผล — ตรงกับที่ `preview()` ทำอยู่เดิม แต่ต่างจากที่ `savePosLayout` เคยเก็บ
+
+## งานฝั่ง Python ที่ยกให้ Codex ทำต่อ (รอบนี้ไม่แตะตามที่สั่ง)
+
+ข้อมูลเดินทางถึงเครื่องแล้ว — `provisioning.py` เก็บ `pos_layout` ทั้งก้อนลง `device_settings`
+และ `_cached_layout()` ตรวจแค่ `schema` กับ `components` จึงปล่อย `runtime`/`css` ผ่านมาอยู่แล้ว
+**ไม่ต้องแก้ sync** เหลือแค่เอาไปใช้ใน `apps/pos-python/pos_python/ui.py`:
+
+1. `runtime.product_width` / `cart_width` → `QSplitter` ใน `PosWindow.__init__`
+   ตอนนี้ล็อก `setMinimumWidth(620/460)` ตายตัว ควรใช้ `splitter.setSizes()` ตามสัดส่วนที่ตั้งไว้
+   (`_layout_x()` ยังใช้ตัดสินลำดับซ้าย/ขวาเหมือนเดิมได้)
+2. `runtime.product_columns` → `_product_columns_for_width()` ปัจจุบันคำนวณจากความกว้างล้วน
+   ควรใช้ค่าที่ตั้งไว้เป็นหลัก แล้วลดลงเฉพาะตอนที่กว้างไม่พอจริงๆ
+3. `runtime.product_rows` → ใช้คุม `tile_height` / จำนวนที่โหลดต่อหน้าใน `refresh_products()`
+4. `runtime.density` → `contentsMargins`/`setSpacing`/`gap` ที่ตอนนี้ฝังเป็น 14/12/10
+5. `runtime.button_size` → ความสูงปุ่มใน `STYLE`
+6. `runtime.show_branch/terminal/seller/shift` → ชิปบนแถบบนของหน้าต่าง POS
+7. `layout_version` → ตอนนี้ title ใช้ `layout_config.get("version", 1)` เปลี่ยนไปอ่าน
+   `layout_version` ก่อนแล้วค่อย fallback เป็น `version` จะตรงกับเลขรุ่นที่แอดมินเห็นในหน้า Designer
+
+ค่าที่ควรใช้แปลงเป็นหน่วย px คือชุดเดียวกับฝั่งเว็บ อยู่ใน `PosLayout::DENSITY_METRICS`
+และ `PosLayout::BUTTON_METRICS` (ping ส่งมาให้แล้วใน `pos_layout.css`)
+
+## งานถัดไปฝั่ง ERP
+
+- ยังไม่ได้อัปเดต `docs/ai/PROJECT_MEMORY.md` เพื่อเลี่ยง conflict ตอน merge
+  ถ้ารับงานนี้แล้วควรเพิ่มบรรทัดเรื่อง `pos_layout` runtime contract เข้าไป
+- ยังไม่ push และยังไม่ deploy รอคำสั่งเจ้าของโปรเจกต์

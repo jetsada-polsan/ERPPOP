@@ -39,6 +39,7 @@ use App\Services\Sales\PosPriceScheduleService;
 use App\Services\Sales\PosPricingGuard;
 use App\Support\BarcodePolicy;
 use App\Support\DecimalMath;
+use App\Support\PosLayout;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -49,19 +50,6 @@ use RuntimeException;
 
 class PosController extends Controller
 {
-    private const DEFAULT_POS_LAYOUT = [
-        'schema' => 'popcentral-pos-layout',
-        'version' => 1,
-        'canvas' => ['columns' => 12, 'rows' => 8],
-        'components' => [
-            ['id' => 'search', 'type' => 'search', 'x' => 1, 'y' => 1, 'w' => 7, 'h' => 1],
-            ['id' => 'category', 'type' => 'category_tabs', 'x' => 1, 'y' => 2, 'w' => 7, 'h' => 1],
-            ['id' => 'products', 'type' => 'product_grid', 'x' => 1, 'y' => 3, 'w' => 7, 'h' => 5],
-            ['id' => 'cart', 'type' => 'cart', 'x' => 8, 'y' => 1, 'w' => 5, 'h' => 5],
-            ['id' => 'payment', 'type' => 'payment', 'x' => 8, 'y' => 6, 'w' => 5, 'h' => 2],
-        ],
-    ];
-
     public function index(MemberPointService $points): View
     {
         $webMode = AppSetting::get('pos_web_mode', 'sell');
@@ -129,29 +117,7 @@ class PosController extends Controller
 
     public function preview(): View
     {
-        $published = json_decode((string) AppSetting::get('pos_layout_published'), true);
-        $layout = is_array($published) ? $published : self::DEFAULT_POS_LAYOUT;
-        $allowed = ['search', 'category_tabs', 'product_grid', 'cart', 'payment', 'customer', 'held_bills', 'numpad', 'shift_status'];
-
-        $layout['components'] = collect($layout['components'] ?? [])
-            ->filter(fn ($component) => is_array($component) && in_array($component['type'] ?? '', $allowed, true))
-            ->map(function ($component) {
-                $x = max(1, min(12, (int) ($component['x'] ?? 1)));
-                $y = max(1, min(12, (int) ($component['y'] ?? 1)));
-
-                return [
-                    'id' => (string) ($component['id'] ?? $component['type']),
-                    'type' => (string) $component['type'],
-                    'x' => $x,
-                    'y' => $y,
-                    'w' => max(1, min(13 - $x, (int) ($component['w'] ?? 3))),
-                    'h' => max(1, min(13 - $y, (int) ($component['h'] ?? 2))),
-                ];
-            })->values()->all();
-
-        if ($layout['components'] === []) {
-            $layout = self::DEFAULT_POS_LAYOUT;
-        }
+        $layout = PosLayout::published();
 
         $previewProducts = Product::where('is_active', true)
             ->orderBy('name_th')
@@ -163,10 +129,28 @@ class PosController extends Controller
 
         return view('pos.preview', [
             'layout' => $layout,
+            'runtime' => $layout['runtime'],
+            'layoutCss' => PosLayout::cssVariableString($layout['runtime']),
             'previewProducts' => $previewProducts,
             'previewCategories' => $previewCategories,
-            'publishedAt' => AppSetting::get('pos_layout_published_at'),
-            'publishedVersion' => (int) AppSetting::get('pos_layout_version', (string) ($layout['version'] ?? 1)),
+            'publishedAt' => PosLayout::publishedAt(),
+            'publishedVersion' => PosLayout::publishedVersion() ?: (int) $layout['version'],
+        ]);
+    }
+
+    /**
+     * หน้าขายบนเบราว์เซอร์ (โดเมน pos.*) — ต้องได้ layout ที่ publish แล้วตั้งแต่ render แรก
+     * เพื่อไม่ให้หน้าจอกระพริบจากค่า default ไปค่าจริงหลังเครื่องต่อ ERP สำเร็จ
+     * ค่าล่าสุดจะถูกทับอีกรอบจาก /api/pos/ping หลังเชื่อมต่อ
+     */
+    public function browser(): View
+    {
+        $layout = PosLayout::published();
+
+        return view('pos.browser', [
+            'layout' => $layout,
+            'runtime' => $layout['runtime'],
+            'layoutCss' => PosLayout::cssVariableString($layout['runtime']),
         ]);
     }
 

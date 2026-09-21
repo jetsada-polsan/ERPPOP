@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Models\UserPosCredential;
 use App\Services\Sales\SaleReturnService;
 use App\Support\DecimalMath;
+use App\Support\PosLayout;
 use App\Support\PosReceiptTemplate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -127,23 +128,14 @@ class PosApiController extends Controller
         ]);
     }
 
+    /**
+     * โครงเดิม (schema/version/canvas/components) ยังเหมือนเดิมทุกประการเพื่อไม่ให้
+     * POS Python รุ่นที่ติดตั้งไปแล้วพัง ของใหม่คือคีย์ `runtime` กับ `layout_version`
+     * ซึ่ง client รุ่นเก่าจะมองข้ามไปเอง
+     */
     private function publishedPosLayout(): array
     {
-        $layout = json_decode((string) AppSetting::get('pos_layout_published'), true);
-        if (! is_array($layout) || ! is_array($layout['components'] ?? null)) {
-            return [
-                'schema' => 'popcentral-pos-layout', 'version' => 1,
-                'canvas' => ['columns' => 12, 'rows' => 8],
-                'components' => [
-                    ['id' => 'search', 'type' => 'search', 'x' => 1, 'y' => 1, 'w' => 7, 'h' => 1],
-                    ['id' => 'category', 'type' => 'category_tabs', 'x' => 1, 'y' => 2, 'w' => 7, 'h' => 1],
-                    ['id' => 'products', 'type' => 'product_grid', 'x' => 1, 'y' => 3, 'w' => 7, 'h' => 5],
-                    ['id' => 'cart', 'type' => 'cart', 'x' => 8, 'y' => 1, 'w' => 5, 'h' => 5],
-                    ['id' => 'payment', 'type' => 'payment', 'x' => 8, 'y' => 6, 'w' => 5, 'h' => 2],
-                ],
-            ];
-        }
-        return $layout;
+        return PosLayout::withCss(PosLayout::published());
     }
 
     public function cashiers(Request $request): JsonResponse

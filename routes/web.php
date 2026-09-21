@@ -109,7 +109,8 @@ Route::delete('/security/mfa', [AuthController::class, 'disableMfa'])->name('mfa
 
 Route::get('/', function () {
     if (request()->getHost() === 'pos.popstarcenter.com') {
-        return view('pos.browser');
+        // หน้าขายบนเบราว์เซอร์ต้องได้ layout ที่ publish แล้วมาพร้อม HTML ก้อนแรก
+        return app(PosController::class)->browser();
     }
 
     return view('portal');

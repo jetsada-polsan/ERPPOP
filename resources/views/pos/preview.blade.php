@@ -6,7 +6,13 @@
     <title>ตัวอย่าง PopCentral POS รุ่น {{ $publishedVersion }}</title>
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     <style>
-        :root { --ink:#162331; --muted:#6c7b88; --line:#dce3e8; --red:#c92336; --red-dark:#9f1f2b; --green:#147a55; --canvas:#edf1f4; }
+        :root {
+            --ink:#162331; --muted:#6c7b88; --line:#dce3e8; --red:#c92336; --red-dark:#9f1f2b; --green:#147a55; --canvas:#edf1f4;
+            /* ค่า fallback — ของจริงถูกทับด้วยค่าที่ publish ในบรรทัดถัดไป */
+            --pos-product-columns:4; --pos-product-rows:3; --pos-card-min-height:104px; --pos-card-font-size:13px;
+            --pos-grid-gap:8px; --pos-grid-padding:10px; --pos-button-min-height:42px; --pos-button-font-size:16px; --pos-button-padding:9px;
+        }
+        :root { {!! $layoutCss !!} }
         * { box-sizing:border-box; }
         html,body { margin:0; min-height:100%; font-family:"Noto Sans Thai","Leelawadee UI",Tahoma,sans-serif; color:var(--ink); background:var(--canvas); }
         button,input { font:inherit; }
@@ -34,7 +40,7 @@
         .category-list button { border:1px solid var(--line); border-radius:6px; padding:8px 13px; background:#fff; color:#425466; white-space:nowrap; cursor:default; }
         .category-list button.active { border-color:var(--red); background:#fff1f3; color:var(--red-dark); font-weight:800; }
         .products { height:100%; display:grid; grid-template-rows:auto 1fr; }
-        .product-grid { min-height:0; overflow:hidden; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); grid-auto-rows:minmax(104px,1fr); gap:8px; padding:10px; }
+        .product-grid { min-height:0; overflow:hidden; display:grid; grid-template-columns:repeat(var(--pos-product-columns),minmax(0,1fr)); grid-template-rows:repeat(var(--pos-product-rows),minmax(var(--pos-card-min-height),1fr)); grid-auto-rows:minmax(var(--pos-card-min-height),1fr); gap:var(--pos-grid-gap); padding:var(--pos-grid-padding); }
         .product { position:relative; display:flex; flex-direction:column; justify-content:space-between; min-width:0; padding:12px; border:1px solid var(--line); border-radius:7px; background:#fff; text-align:left; color:var(--ink); }
         .product::before { content:""; position:absolute; top:0; left:0; right:0; height:4px; background:var(--product-accent,#d8e0e7); border-radius:7px 7px 0 0; }
         .product .sku { color:var(--muted); font-size:10px; }
@@ -54,7 +60,7 @@
         .pay-method i { display:block; margin-bottom:4px; font-size:20px; color:var(--green); }
         .pay-method.qr i { color:#0284c7; }
         .pay-method.card i { color:#b7791f; }
-        .pay-now { border:0; border-radius:7px; background:var(--red); color:#fff; font-size:15px; font-weight:900; box-shadow:0 5px 14px #c9233633; cursor:default; }
+        .pay-now { border:0; border-radius:7px; background:var(--red); color:#fff; min-height:var(--pos-button-min-height); font-size:var(--pos-button-font-size); font-weight:900; box-shadow:0 5px 14px #c9233633; cursor:default; }
         .customer,.held,.shift { height:100%; padding:12px; display:flex; align-items:center; gap:10px; }
         .customer i,.held i,.shift i { width:38px; height:38px; display:grid; place-items:center; border-radius:7px; background:#eef4ff; color:#2563eb; font-size:18px; }
         .customer small,.held small,.shift small { display:block; color:var(--muted); }
@@ -89,7 +95,7 @@
 <div class="preview-shell">
     <header class="topbar">
         <div class="brand">PopCentral <span>POS</span></div>
-        <div class="terminal"><i class="bi bi-display"></i><span>เครื่อง <b>POS001</b></span><span>สาขา <b>B001</b></span><span>แคชเชียร์ <b>{{ auth()->user()?->name ?? 'Demo Cashier' }}</b></span></div>
+        <div class="terminal"><i class="bi bi-display"></i>@if($runtime['show_terminal'])<span>เครื่อง <b>POS001</b></span>@endif @if($runtime['show_branch'])<span>สาขา <b>B001</b></span>@endif @if($runtime['show_seller'])<span>แคชเชียร์ <b>{{ auth()->user()?->name ?? 'Demo Cashier' }}</b></span>@endif</div>
         <div class="top-spacer"></div>
         <div class="preview-badge"><i class="bi bi-eye"></i><span>ตัวอย่างจาก Build รุ่น {{ $publishedVersion }}</span></div>
         @if(auth()->user()?->hasPermission('settings.manage'))
