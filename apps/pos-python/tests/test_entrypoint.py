@@ -17,6 +17,15 @@ class EntrypointTest(unittest.TestCase):
         create_application.assert_called_once_with()
         launch_ui.assert_called_once_with(app)
 
+    def test_packaged_self_check_does_not_open_the_ui(self) -> None:
+        with patch.object(pos_main, "self_check") as self_check, \
+             patch.object(pos_main, "create_application") as create_application, \
+             patch("sys.argv", ["PopCentral-POS.exe", "--self-check"]):
+            pos_main.main()
+
+        self_check.assert_called_once_with()
+        create_application.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

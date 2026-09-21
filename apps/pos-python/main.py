@@ -136,6 +136,18 @@ def create_application():
     return QApplication.instance() or QApplication(sys.argv)
 
 
+def self_check() -> None:
+    """Run the packaged entrypoint without opening a window.
+
+    This is intentionally small and side-effect free so CI can prove that the
+    PyInstaller executable starts and imports the same modules as the real UI.
+    """
+    from pos_python.build_info import APP_VERSION
+
+    if not isinstance(APP_VERSION, str) or not APP_VERSION.strip():
+        raise RuntimeError("ไม่มีข้อมูลรุ่นของ PopCentral POS ในไฟล์ที่ build")
+
+
 def launch_ui(app):
     """Start the installed application and leave a diagnosable error if startup fails."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -169,10 +181,14 @@ def launch_ui(app):
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--demo", action="store_true")
+    parser.add_argument("--self-check", action="store_true")
     parser.add_argument("--ui", action="store_true")
     args = parser.parse_args()
     if args.demo:
         demo()
+        return
+    if args.self_check:
+        self_check()
         return
 
     app = create_application()

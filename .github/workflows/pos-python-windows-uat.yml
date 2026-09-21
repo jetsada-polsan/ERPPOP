@@ -55,13 +55,36 @@ jobs:
         shell: pwsh
         env:
           UAT_VERSION: ${{ inputs.version || '0.1.0-dev' }}
-        run: Set-Content -Path pos_python/build_info.py -Value "APP_VERSION = `"$env:UAT_VERSION`""
+        run: |
+          if ($env:UAT_VERSION -notmatch '^\d+\.\d+\.\d+([.-][0-9A-Za-z.-]+)?$') {
+            throw "UAT_VERSION ไม่ถูกต้อง: $env:UAT_VERSION"
+          }
+          $versionPath = Join-Path $PWD 'pos_python/build_info.py'
+          $content = "APP_VERSION = `"$env:UAT_VERSION`"`r`n"
+          [System.IO.File]::WriteAllText(
+            $versionPath,
+            $content,
+            [System.Text.UTF8Encoding]::new($false)
+          )
+          $pythonFiles = @('main.py') + @(Get-ChildItem -File 'pos_python\*.py' | ForEach-Object FullName)
+          python -m py_compile @pythonFiles
       - name: Build Windows application
         run: >-
           pyinstaller --noconfirm --clean --windowed
           --name PopCentral-POS
           --collect-all PySide6
           main.py
+      - name: Smoke test packaged application
+        shell: pwsh
+        run: |
+          $exe = Join-Path $PWD 'dist\PopCentral-POS\PopCentral-POS.exe'
+          if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
+            throw "ไม่พบไฟล์ executable ที่ build: $exe"
+          }
+          $process = Start-Process -FilePath $exe -ArgumentList '--self-check' -Wait -PassThru -WindowStyle Hidden
+          if ($process.ExitCode -ne 0) {
+            throw "ตัว executable เปิดโหมด self-check ไม่ผ่าน, exit code $($process.ExitCode)"
+          }
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --no-progress --yes
@@ -70,6 +93,28 @@ jobs:
         env:
           UAT_VERSION: ${{ inputs.version || '0.1.0-dev' }}
         run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$env:UAT_VERSION" installer\PopCentral-POS.iss'
+      - name: Verify installer artifact
+        shell: pwsh
+        run: |
+          $installers = @(Get-ChildItem -File 'dist-installer\PopCentral-POS-UAT-*-setup.exe')
+          if ($installers.Count -ne 1) {
+            throw "ต้องมี installer 1 ไฟล์ แต่พบ $($installers.Count) ไฟล์"
+          }
+          $installer = $installers[0]
+          if ($installer.Length -lt 10MB) {
+            throw "installer มีขนาดผิดปกติ: $($installer.Length) ไบต์"
+          }
+          $stream = [System.IO.File]::OpenRead($installer.FullName)
+          try {
+            $first = $stream.ReadByte()
+            $second = $stream.ReadByte()
+          } finally {
+            $stream.Dispose()
+          }
+          if ($first -ne 0x4D -or $second -ne 0x5A) {
+            throw "installer ไม่ใช่ Windows executable (MZ)"
+          }
+          Write-Host "Installer ผ่านการตรวจสอบ: $($installer.Name), $($installer.Length) ไบต์"
       - uses: actions/upload-artifact@v4
         with:
           name: PopCentral-POS-UAT-${{ inputs.version || '0.1.0-dev' }}

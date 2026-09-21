@@ -24,7 +24,10 @@ fi
 : "${SSH_PORT:=22}"
 : "${SSH_IDENTITY_FILE:=${HOME}/.ssh/id_ed25519_erppop}"
 : "${REMOTE_PATH:=/var/www/jeterp}"
-: "${BASE_URL:=http://27.254.143.219}"
+# The production server routes the public download through the named HTTPS
+# vhost. The raw IP intentionally returns a different site/404, so do not use
+# it as the default health-check target.
+: "${BASE_URL:=https://popstarcenter.com}"
 
 VERSION="${1:-}"
 INSTALLER="${2:-}"

@@ -728,3 +728,10 @@ pending
 - Deploy: GitHub Actions run `35561210225` production ผ่านครบทั้ง Laravel test, frontend build, upload release และ `scripts/deploy.sh`; สถานะ `Success`
 - ตรวจ live: `https://pos.popstarcenter.com/` ตอบ HTTP 200 และ HTML production มี `quantityModal`, `weightModal`, `scanProduct`, `/scan`, `กรอกจำนวน` และ `กรอกน้ำหนัก`; เรียก `POST /api/pos/scan` โดยไม่มี Device Token ได้ HTTP 401 ตามการป้องกันที่คาดไว้
 - งานถัดไป: ทดสอบสแกนบาร์โค้ดมาตรฐาน/ฉลากเครื่องชั่งจริงด้วย Device Token และตรวจขาย 1 บิลบนเครื่อง POS จริง
+
+# Handoff - 2026-09-21 (harden Python POS installer build)
+- ทำอะไร: เพิ่ม `--self-check` ให้ executable เปิดตรวจ import และ build metadata โดยไม่เปิดหน้าต่าง, เพิ่ม CI smoke test หลัง PyInstaller, ตรวจว่า Inno Setup สร้าง installer เพียง 1 ไฟล์ที่เป็น Windows executable ขนาดสมเหตุผล และเขียน `build_info.py` เป็น UTF-8 แบบไม่มี BOM อย่างแน่นอน
+- แก้สาเหตุ publish ที่ทำให้ดูเหมือน build พัง: ค่าเริ่มต้นของ `scripts/publish-pos-python.sh` เปลี่ยนจาก raw IP/HTTP เป็น `https://popstarcenter.com`; log เดิมพบว่าไฟล์ถูกอัปโหลดแล้ว แต่ health-check ไปโฮสต์ผิดจึงได้ 404
+- ทดสอบ: Python POS `python3 -m unittest discover -s apps/pos-python/tests` ผ่าน 175 tests; packaged-entrypoint self-check ผ่านในเครื่อง dev; `git diff --check`
+- Deploy: ยังไม่ publish installer รุ่นใหม่และยังไม่ deploy production; เปลี่ยนเฉพาะ pipeline/สคริปต์ build รอคำสั่งเจ้าของระบบ
+- งานถัดไป: สั่ง workflow `Build PopCentral POS UAT for Windows` แบบ `workflow_dispatch` ด้วย version ใหม่เพื่อสร้าง artifact และค่อยเลือก `publish=true` เมื่อต้องการเปลี่ยนลิงก์ดาวน์โหลดจริง
