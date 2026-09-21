@@ -206,6 +206,7 @@ QMainWindow, QDialog, QWidget { background: $bg; color: $text; font-size: 14px; 
 #brandRight { color: $surface; font-size: 13px; }
 #runtimeChip { color: $surface; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.28); border-radius: 6px; padding: 4px 7px; font-size: 11px; font-weight: 700; }
 #runtimeChip[shiftOpen="true"] { color: $success_light; border-color: $success_light; background: rgba(20,122,85,.35); }
+#scanHint { background: transparent; color: $muted; font-size: 11px; padding: 0 2px; }
 QToolButton#dialogClose { color: $surface; background: transparent; border: 0; padding: 3px 10px; font-size: 24px; font-weight: 800; }
 QToolButton#dialogClose:hover { background: rgba(255,255,255,.16); border-radius: 6px; }
 
@@ -369,7 +370,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         from PySide6.QtGui import QColor, QFont, QFontDatabase, QImage, QKeySequence, QPainter, QPixmap, QShortcut
         from PySide6.QtWidgets import (
             QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGridLayout, QInputDialog,
-            QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton,
+            QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton, QMenu,
             QScrollArea, QSplitter, QTableWidget, QTableWidgetItem, QToolButton, QVBoxLayout, QWidget,
         )
     except ImportError as error:
@@ -1353,13 +1354,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             layout.setContentsMargins(10, 4, 10, 4)
             layout.setSpacing(6)
 
-            mark = QLabel("POS")
-            mark.setObjectName("brandMark")
-            layout.addWidget(mark)
-            name = QLabel("PopCentral POS")
+            name = QLabel("PopCentral Web POS")
             name.setObjectName("brandName")
             layout.addWidget(name)
-            layout.addStretch(1)
 
             branch_name = (online.profile.get("branch_name") if online is not None else None) or service._setting("branch_name") or f"สาขา {branch_id}"
             context = [
@@ -1377,9 +1374,26 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 layout.addWidget(chip)
                 self.runtime_context[key] = chip
 
-            right = QLabel(f"v{APP_VERSION} · Layout {layout_config.get('layout_version', layout_config.get('version', 1))}")
-            right.setObjectName("brandRight")
-            layout.addWidget(right)
+            layout.addStretch(1)
+
+            self.auth_button = QPushButton("เลือกคนขายแล้ว")
+            self.auth_button.setObjectName("headerAction")
+            self.auth_button.setToolTip("เลือกคนขายและเปิดกะขาย")
+            self.auth_button.clicked.connect(self.ensure_sale_session)
+            layout.addWidget(self.auth_button)
+
+            self.settings_button = QPushButton("⚙")
+            self.settings_button.setObjectName("headerAction")
+            self.settings_button.setFixedWidth(36)
+            self.settings_button.setToolTip("ตั้งค่าและการจัดการกะ")
+            settings_menu = QMenu(self.settings_button)
+            settings_menu.addAction("ตั้งค่า POS", self.open_settings)
+            settings_menu.addSeparator()
+            settings_menu.addAction("ยอดวันนี้", self.show_daily_sales)
+            settings_menu.addAction("เงินสด", self.record_cash_movement)
+            settings_menu.addAction("ปิดกะ", self.close_current_shift)
+            self.settings_button.setMenu(settings_menu)
+            layout.addWidget(self.settings_button)
             return bar
 
         def refresh_runtime_context(self) -> None:
@@ -1393,6 +1407,10 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.runtime_context["show_shift"].setProperty("shiftOpen", "true" if self.shift_id is not None else "false")
             self.runtime_context["show_shift"].style().unpolish(self.runtime_context["show_shift"])
             self.runtime_context["show_shift"].style().polish(self.runtime_context["show_shift"])
+            if getattr(self, "auth_button", None) is not None:
+                self.auth_button.setText(
+                    f"คนขาย: {cashier_name}" if self.cashier is not None else "เลือกคนขายแล้ว"
+                )
 
         # ---------- พื้นที่บิล ----------
 
@@ -1408,38 +1426,20 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             head_layout = QVBoxLayout(head)
             head_layout.setContentsMargins(10, 6, 10, 6)
             head_layout.setSpacing(4)
+            title_row = QHBoxLayout()
+            title = QLabel("รายการขาย")
+            title_row.addWidget(title)
+            title_row.addStretch(1)
+            clear_header = QPushButton("ล้างรายการ")
+            clear_header.setObjectName("headerAction")
+            clear_header.clicked.connect(self.clear_order)
+            title_row.addWidget(clear_header)
+            head_layout.addLayout(title_row)
+
             self.cashier_label = QLabel(f"รายการขาย · ยังไม่ได้เริ่มขาย · v{APP_VERSION}")
             self.cashier_label.setWordWrap(True)
+            self.cashier_label.setVisible(False)
             head_layout.addWidget(self.cashier_label)
-            action_row = QHBoxLayout()
-            action_row.setSpacing(6)
-            self.auth_button = QPushButton("เปิดกะ")
-            self.auth_button.setObjectName("headerAction")
-            self.auth_button.setToolTip("ยืนยันผู้ขายและใส่เงินทอนตั้งต้นก่อนเริ่มขาย")
-            self.auth_button.clicked.connect(self.ensure_sale_session)
-            action_row.addWidget(self.auth_button, 1)
-            report = QPushButton("ยอดวันนี้")
-            report.setObjectName("headerAction")
-            report.setToolTip("ดูยอดขายของเครื่องนี้จาก SQLite")
-            report.clicked.connect(self.show_daily_sales)
-            action_row.addWidget(report, 1)
-            cash = QPushButton("เงินสด")
-            cash.setObjectName("headerAction")
-            cash.setToolTip("บันทึกเงินเข้า นำส่ง หรือเบิกจ่ายจากลิ้นชัก")
-            cash.clicked.connect(self.record_cash_movement)
-            action_row.addWidget(cash, 1)
-            close_shift = QPushButton("ปิดกะ")
-            close_shift.setObjectName("headerAction")
-            close_shift.setToolTip("นับเงินและปิดกะขาย")
-            close_shift.clicked.connect(self.close_current_shift)
-            action_row.addWidget(close_shift, 1)
-            settings = QPushButton("⚙ ตั้งค่า POS")
-            settings.setObjectName("headerAction")
-            settings.setToolTip("ตั้งค่าเครื่อง POS สำหรับ IT")
-            settings.clicked.connect(self.open_settings)
-            settings.setMinimumWidth(104)
-            action_row.addWidget(settings)
-            head_layout.addLayout(action_row)
             layout.addWidget(head)
 
             self.table = QTableWidget(0, 4)
@@ -1545,22 +1545,32 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             product_head_layout.setContentsMargins(10, 7, 10, 7)
             product_title = QLabel("สินค้า")
             product_title.setObjectName("productTitle")
-            product_hint = QLabel("สแกนแล้วเพิ่มอัตโนมัติ · แตะเองเพื่อกรอกจำนวน/น้ำหนัก")
+            product_hint = QLabel("โหลดทีละ 100 รายการ · ค้นหาเพิ่มได้")
             product_hint.setObjectName("productHint")
             product_head_layout.addWidget(product_title)
             product_head_layout.addStretch(1)
             product_head_layout.addWidget(product_hint)
+            refresh = QPushButton("รีเฟรช")
+            refresh.setMaximumWidth(78)
+            refresh.clicked.connect(self.refresh_products)
+            product_head_layout.addWidget(refresh)
             layout.addWidget(product_head)
 
             self.scan = QLineEdit()
-            self.scan.setPlaceholderText("สแกน / ค้นหาสินค้า / SKU / บาร์โค้ด")
+            self.scan.setPlaceholderText("สแกนบาร์โค้ด หรือค้นหาชื่อสินค้า / SKU")
             self.scan.returnPressed.connect(self.on_scan)
             self.scan.textChanged.connect(self.refresh_products)
             layout.addWidget(self.scan)
 
-            self.category_bar = QHBoxLayout()
+            self.scan_hint = QLabel("สแกนแล้วกด Enter เพื่อเพิ่มอัตโนมัติ · กดเลือกสินค้าเองเพื่อกรอกจำนวนหรือน้ำหนัก")
+            self.scan_hint.setObjectName("scanHint")
+            layout.addWidget(self.scan_hint)
+
+            self.category_host = QWidget()
+            self.category_bar = QHBoxLayout(self.category_host)
             self.category_bar.setSpacing(8)
-            layout.addLayout(self.category_bar)
+            self.category_host.setVisible(False)
+            layout.addWidget(self.category_host)
 
             self.grid_host = QWidget()
             self.grid = QGridLayout(self.grid_host)
@@ -1942,7 +1952,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 f"บิลปัจจุบัน · {self.cashier['name']} · เงินทอนต้นกะ {opening_cash:,.2f} บาท"
             )
             self.refresh_runtime_context()
-            self.auth_button.setText(f"กำลังขาย: {self.cashier['name']}")
+            self.auth_button.setText(f"คนขาย: {self.cashier['name']}")
             self.auth_button.setEnabled(False)
             layout_version = layout_config.get("layout_version", layout_config.get("version", 1))
             self.setWindowTitle(f"PopCentral POS v{APP_VERSION} — {self.cashier['name']} · Layout {layout_version}")
@@ -2033,7 +2043,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.cashier = None
             self.shift_id = None
             self.opening_cash = None
-            self.auth_button.setText("เปิดกะ")
+            self.auth_button.setText("เลือกคนขายแล้ว")
             self.auth_button.setEnabled(True)
             self.cashier_label.setText(f"รายการขาย · ยังไม่ได้เริ่มขาย · v{APP_VERSION}")
             self.refresh_runtime_context()
