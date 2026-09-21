@@ -854,3 +854,13 @@ pending
 - review diff แล้ว push branch นี้เพื่อให้ owner/Claude ตรวจร่วมกัน
 - เมื่อ owner สั่ง deploy ให้รัน production workflow ตาม `docs/OPERATIONS.md`
 - หากต้องส่ง installer ใหม่ ต้องรัน Windows UAT build workflow แยก ไม่ใช่ production deploy
+
+## Handoff - 2026-09-21 (Codex ปรับหน้าตา POS Python ให้ตรง Web POS)
+
+- Branch: `codex/pos-python-web-layout`
+- ทำอะไร: ปรับแถบบนเป็น `PopCentral Web POS` พร้อมชิปสาขา/เครื่อง/คนขาย/กะ, เพิ่มปุ่มเลือกคนขายและเมนูฟันเฟืองสำหรับตั้งค่า/ยอดวันนี้/เงินสด/ปิดกะ, ย้ายปุ่มล้างรายการไว้หัวบิล, ซ่อนแถบหมวดที่กินพื้นที่, เพิ่มข้อความช่วยสแกน/กรอกจำนวนหรือน้ำหนัก และเพิ่มปุ่มรีเฟรชสินค้า
+- ทำอะไรเพิ่มเติม: คง logic ขาย/ชำระเงิน/ออฟไลน์/num pad เดิมไว้ เปลี่ยนเฉพาะการจัดวางและข้อความให้ใกล้ Web POS ที่สุด
+- ทดสอบ: `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=apps/pos-python python3 -m unittest discover -s apps/pos-python/tests -p 'test_*.py'` → **178 tests ผ่าน**; Python AST parse ผ่าน; `git diff --check` ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้เปิด Qt บนเครื่องจริงเพื่อถ่ายภาพยืนยัน และยังไม่ได้สร้าง installer รุ่นใหม่
+- Deploy: ยังไม่ deploy รอคำสั่งเจ้าของโปรเจกต์
+- งานถัดไป: review ภาพบนเครื่อง POS จริง แล้วค่อย merge/deploy; ถ้าต้องการ installer ให้รัน Windows UAT build workflow แยก
