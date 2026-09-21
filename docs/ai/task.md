@@ -710,3 +710,9 @@ pending
 - ทดสอบ: `php artisan test` ผ่าน 425 tests (424 passed, 1 skipped, 6 incomplete); `php artisan view:cache`; `node --check` inline Web POS JavaScript; `git diff --check`
 - Deploy: ยังไม่ deploy production; push source แล้ว รอคำสั่ง `deploy`
 - งานถัดไป: ตรวจบนหน้า live ด้วยสินค้าชั่งจริง เช่นค้นหา SKU/PLU แล้วกรอก 0.250 กก. ก่อนขายจริง
+
+# Handoff - 2026-09-21 (manual weight entry for Web POS production deploy)
+- Commit/source: `c616a7c`
+- Deploy: GitHub Actions run `35558291161` production ผ่านครบทั้ง Laravel test, frontend build, upload release และ `scripts/deploy.sh`; สถานะ `Success`
+- ตรวจ live: `https://pos.popstarcenter.com/` ตอบ HTTP 200 และ HTML production มี `weightModal`, `weightInput`, `confirmWeight`, `แก้น้ำหนัก` และ `is_scale`
+- งานถัดไป: ค้นหาสินค้าชั่งจริงบนหน้า POS กดการ์ด กรอก `0.250` กก. ตรวจยอด แล้วทดสอบขายจริงตามขั้นตอน UAT
