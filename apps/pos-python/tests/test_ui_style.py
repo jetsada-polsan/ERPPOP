@@ -182,7 +182,8 @@ class UiStyleTest(unittest.TestCase):
         self.assertIn("self.grid_host.width()", source)
         self.assertIn("window.setMinimumSize(960, 600)", source)
         self.assertIn("QSplitter(Qt.Horizontal)", source)
-        self.assertIn("first.setMinimumWidth(460)", source)
+        self.assertIn("first.setMinimumWidth(360)", source)
+        self.assertIn("second.setMinimumWidth(360)", source)
         self.assertIn("head_layout = QVBoxLayout(head)", source)
         self.assertIn("button.setMinimumHeight(34)", source)
 
@@ -195,15 +196,26 @@ class UiStyleTest(unittest.TestCase):
     def test_published_layout_is_safe_when_cache_is_missing_or_malformed(self) -> None:
         layout = normalize_pos_layout({"runtime": {"product_width": 99, "cart_width": 1, "product_columns": "bad", "show_shift": "false"}})
         self.assertEqual(layout["runtime"]["product_width"] + layout["runtime"]["cart_width"], 100)
-        self.assertEqual(layout["runtime"]["product_columns"], 4)
+        self.assertEqual(layout["runtime"]["product_columns"], 2)
         self.assertFalse(layout["runtime"]["show_shift"])
         self.assertEqual(layout["runtime"]["density"], "comfortable")
 
     def test_runtime_layout_changes_python_qss_without_rebuilding_the_app(self) -> None:
-        style = _style_for_layout({"button_size": "large", "density": "compact"})
-        self.assertIn("min-height: 54px", style)
-        self.assertIn("font-size: 12px", style)
+        style = _style_for_layout(
+            {"button_size": "large", "density": "compact"},
+            {"--pos-button-min-height": "61px", "--pos-card-font-size": "11px"},
+        )
+        self.assertIn("min-height: 61px", style)
+        self.assertIn("font-size: 11px", style)
         self.assertIn("padding: 7px", style)
+
+    def test_runtime_layout_reaches_the_python_window_and_product_grid(self) -> None:
+        source = inspect.getsource(run_ui)
+        self.assertIn('layout_runtime["product_width"]', source)
+        self.assertIn('layout_runtime["cart_width"]', source)
+        self.assertIn('self.layout_runtime.get("product_columns", 4)', source)
+        self.assertIn("self.runtime_context", source)
+        self.assertIn("layout_version", source)
 
 
 if __name__ == "__main__":

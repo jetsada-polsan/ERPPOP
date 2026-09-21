@@ -837,13 +837,15 @@ pending
 - ใช้ `product_rows` / `product_columns` คุมจำนวนแถวที่เห็นและคอลัมน์ปุ่มสินค้า
 - ใช้ `density` คุมระยะห่าง ขนาดการ์ด และตัวอักษรสินค้า
 - ใช้ `button_size` คุมความสูง/ฟอนต์/ระยะ padding ของปุ่มและปุ่มคิดเงิน
+- ใช้ `pos_layout.css` ที่ Laravel คำนวณมาเป็น source ของ metric ฝั่ง Python ก่อน fallback ค่าเดิม
+  จึงปรับ density/button จากเว็บแล้วไม่ต้อง build installer ใหม่
 - เพิ่มแถบบนแบบ Web POS พร้อมชิปสาขา เครื่อง คนขาย และกะ ซึ่งเปิด/ซ่อนได้จาก Designer
 - แสดง `layout_version` ใน title/แถบบน เพื่อยืนยันว่าเครื่องอ่าน layout รุ่นใด
 - เพิ่ม unit tests กัน cache layout ผิดรูปและยืนยันว่า runtime เปลี่ยน QSS ได้โดยไม่ต้อง build ใหม่
 
 ## ทดสอบ
 
-- Python POS: `python3 -m unittest discover -s apps/pos-python/tests -p 'test_*.py'` → **177 tests ผ่าน**
+- Python POS: `python3 -m unittest discover -s apps/pos-python/tests -p 'test_*.py'` → **178 tests ผ่าน**
 - Laravel POS tests: `php artisan test --filter='Pos(Browser|Layout|Controller)'` → **12 tests ผ่าน**
 - Python AST parse และ `git diff --check` ผ่าน
 

@@ -76,10 +76,14 @@ POS_LAYOUT_BUTTON = {
 
 
 def _layout_int(value, fallback: int, minimum: int, maximum: int) -> int:
+    if value is None:
+        value = fallback
     try:
         value = int(value)
     except (TypeError, ValueError):
-        value = fallback
+        # Keep the same behavior as PHP's (int) cast + clamp for a malformed
+        # published cache. Valid layouts are already rejected by the server.
+        value = 0
     return max(minimum, min(maximum, value))
 
 
@@ -105,7 +109,9 @@ def normalize_pos_layout(value) -> dict:
     cart = _layout_int(raw.get("cart_width"), 100 - product, 30, 70)
     total = product + cart
     if total != 100:
-        product = _layout_int(round(product / total * 100), defaults["product_width"], 30, 70)
+        # PHP round() rounds positive .5 upward; Python round() uses bankers'
+        # rounding, so use the explicit form to keep both runtimes identical.
+        product = _layout_int(int(product / total * 100 + 0.5), defaults["product_width"], 30, 70)
     cart = 100 - product
     runtime = {
         "product_width": product,
@@ -288,21 +294,43 @@ QHeaderView::section { background: $primary_soft; border: 0; border-bottom: 1px 
 #shiftKeypad QPushButton { min-height: 58px; font-size: 22px; font-weight: 700; }
 """)
 
-def _style_for_layout(runtime: dict | None = None) -> str:
-    runtime = normalize_pos_layout({"runtime": runtime or {}})["runtime"]
-    density = POS_LAYOUT_DENSITY[runtime["density"]]
-    button = POS_LAYOUT_BUTTON[runtime["button_size"]]
+def _layout_px(css: dict, name: str, fallback: int) -> int:
+    value = css.get(name) if isinstance(css, dict) else None
+    match = re.fullmatch(r"\s*([0-9]+(?:\.[0-9]+)?)px\s*", str(value or ""))
+    if not match:
+        return fallback
+    return max(0, int(float(match.group(1))))
+
+
+def _layout_metrics(runtime: dict | None = None, css: dict | None = None) -> dict:
+    normalized = normalize_pos_layout({"runtime": runtime or {}})["runtime"]
+    density = POS_LAYOUT_DENSITY[normalized["density"]]
+    button = POS_LAYOUT_BUTTON[normalized["button_size"]]
+    css = css if isinstance(css, dict) else {}
+    return {
+        "gap": _layout_px(css, "--pos-grid-gap", density["gap"]),
+        "padding": _layout_px(css, "--pos-grid-padding", density["padding"]),
+        "card": _layout_px(css, "--pos-card-min-height", density["card"]),
+        "font": _layout_px(css, "--pos-card-font-size", density["font"]),
+        "button_height": _layout_px(css, "--pos-button-min-height", button["height"]),
+        "button_font": _layout_px(css, "--pos-button-font-size", button["font"]),
+        "button_padding": _layout_px(css, "--pos-button-padding", button["padding"]),
+    }
+
+
+def _style_for_layout(runtime: dict | None = None, css: dict | None = None) -> str:
+    metrics = _layout_metrics(runtime, css)
     values = {
         **PALETTE,
-        "button_height": f'{button["height"]}px',
-        "button_padding": f'{button["padding"]}px',
-        "button_font": f'{button["font"]}px',
-        "compact_button_padding": f'{max(4, button["padding"] - 2)}px',
-        "compact_button_font": f'{max(12, button["font"] - 2)}px',
-        "pay_padding": f'{button["padding"] + 4}px',
-        "pay_font": f'{max(15, button["font"] + 2)}px',
-        "tile_padding": f'{density["padding"]}px',
-        "tile_font": f'{density["font"]}px',
+        "button_height": f'{metrics["button_height"]}px',
+        "button_padding": f'{metrics["button_padding"]}px',
+        "button_font": f'{metrics["button_font"]}px',
+        "compact_button_padding": f'{max(4, metrics["button_padding"] - 2)}px',
+        "compact_button_font": f'{max(12, metrics["button_font"] - 2)}px',
+        "pay_padding": f'{metrics["button_padding"] + 4}px',
+        "pay_font": f'{max(15, metrics["button_font"] + 2)}px',
+        "tile_padding": f'{metrics["padding"]}px',
+        "tile_font": f'{metrics["font"]}px',
     }
     return _STYLE_TEMPLATE.substitute(values)
 
@@ -335,6 +363,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
     layout_config = _cached_layout(service.db)
     layout_config = normalize_pos_layout(layout_config)
     layout_runtime = layout_config["runtime"]
+    layout_metrics = _layout_metrics(layout_runtime, layout_config.get("css"))
     try:
         from PySide6.QtCore import QTimer, QSize, Qt
         from PySide6.QtGui import QColor, QFont, QFontDatabase, QImage, QKeySequence, QPainter, QPixmap, QShortcut
@@ -355,7 +384,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         "Tahoma",
     )
     app.setFont(QFont(ui_font_family, 14))
-    runtime_style = _style_for_layout(layout_runtime)
+    runtime_style = _style_for_layout(layout_runtime, layout_config.get("css"))
 
     def _qr_pixmap(payload: str, size: int) -> QPixmap:
         matrix = qr_matrix(payload, border=3)
@@ -1267,12 +1296,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             splitter.setHandleWidth(6)
             if order_x < product_x:
                 first, second = order_panel, product_panel
-                first.setMinimumWidth(620)
-                second.setMinimumWidth(460)
+                first.setMinimumWidth(360)
+                second.setMinimumWidth(360)
             else:
                 first, second = product_panel, order_panel
-                first.setMinimumWidth(460)
-                second.setMinimumWidth(560)
+                first.setMinimumWidth(360)
+                second.setMinimumWidth(360)
             splitter.addWidget(first)
             splitter.addWidget(second)
             # Keep the same product/cart ratio as the Web POS. The designer owns
@@ -1307,7 +1336,13 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 self.style().polish(self)
 
             columns = self._product_columns_for_width()
-            if mode_changed or columns != self._product_columns:
+            viewport = getattr(self, "product_scroll", None)
+            view_size = (
+                viewport.viewport().width(), viewport.viewport().height()
+            ) if viewport is not None else None
+            size_changed = getattr(self, "_product_view_size", None) != view_size
+            if mode_changed or columns != self._product_columns or size_changed:
+                self._product_view_size = view_size
                 self.refresh_products()
 
         def build_runtime_topbar(self) -> QWidget:
@@ -1540,9 +1575,15 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             return panel
 
         def _product_columns_for_width(self) -> int:
-            """Use the published column count, with a safe fallback before first resize."""
+            """Use the published count, reducing only when a narrow display cannot fit it."""
             configured = int(self.layout_runtime.get("product_columns", 4))
-            return max(2, min(8, configured))
+            available = self.grid_host.width()
+            if available <= 0:
+                return max(2, min(8, configured))
+            gap = layout_metrics["gap"]
+            minimum_tile = 100 if self.property("compact") else 110
+            max_fit = max(2, (available + gap) // (minimum_tile + gap))
+            return max(2, min(8, configured, max_fit))
 
         def build_category_bar(self) -> None:
             group = QButtonGroup(self)
@@ -1565,16 +1606,15 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
             columns = self._product_columns_for_width()
             self._product_columns = columns
-            density = POS_LAYOUT_DENSITY[self.layout_runtime["density"]]
-            self.grid.setHorizontalSpacing(density["gap"])
-            self.grid.setVerticalSpacing(density["gap"])
-            available = max(self.grid_host.width(), columns * 110 + (columns - 1) * density["gap"])
-            tile_width = max(80, (available - (columns - 1) * density["gap"]) // columns)
+            self.grid.setHorizontalSpacing(layout_metrics["gap"])
+            self.grid.setVerticalSpacing(layout_metrics["gap"])
+            available = max(self.grid_host.width(), columns * 80 + (columns - 1) * layout_metrics["gap"])
+            tile_width = max(80, (available - (columns - 1) * layout_metrics["gap"]) // columns)
             visible_rows = int(self.layout_runtime.get("product_rows", 3))
             viewport_height = self.product_scroll.viewport().height()
             row_height = max(
-                density["card"],
-                (max(viewport_height, visible_rows * density["card"]) - density["gap"] * (visible_rows - 1)) // visible_rows,
+                layout_metrics["card"],
+                (max(viewport_height, visible_rows * layout_metrics["card"]) - layout_metrics["gap"] * (visible_rows - 1)) // visible_rows,
             )
             term = self.scan.text().strip()
             # ตัวเลขล้วนคือกำลังยิงบาร์โค้ด ไม่ใช่ค้นหา — อย่าให้ตารางกระพริบระหว่างสแกน
