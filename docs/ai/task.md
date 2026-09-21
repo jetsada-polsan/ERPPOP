@@ -697,3 +697,9 @@ pending
 - ทดสอบ: `php artisan test` ผ่าน 424 tests (423 passed, 1 skipped, 6 incomplete); `php artisan view:cache`; `git diff --check`
 - Deploy: ยังไม่ deploy production; push source แล้ว รอคำสั่ง `deploy`
 - งานถัดไป: ตรวจภาพ live หลัง deploy ที่จอ POS จริงว่าชื่อสินค้า/ราคา/สต๊อกแสดงครบโดยไม่ซ้อนกัน
+
+# Handoff - 2026-09-21 (fix collapsed Web POS product cards production deploy)
+- Commit/source: `6e8dffa`
+- Deploy: GitHub Actions run `35555496230` production ผ่านครบทั้ง Laravel test, frontend build, upload release และ `scripts/deploy.sh`; สถานะ `Success`
+- ตรวจ live: `https://pos.popstarcenter.com/` ตอบ HTTP 200 และ HTML production มี `repeat(3, minmax(124px, 1fr))` กับ `grid-auto-rows: minmax(124px, auto)`; ไม่พบ CSS เดิมที่ทำให้แถวสินค้ายุบเป็นแถบบาง
+- งานถัดไป: รีเฟรชหน้า POS แล้วเลือกคนขายเพื่อยืนยันภาพการ์ดสินค้า 3 แถวบนเครื่องจริง
