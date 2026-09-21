@@ -722,3 +722,9 @@ pending
 - ทดสอบ: `php artisan test --compact` ผ่าน 427 tests (426 passed, 1 skipped, 6 incomplete); `php artisan view:cache`; `node --check` inline Web POS JavaScript; Python POS `python3 -m unittest discover -s tests` ผ่าน 174 tests; ตรวจ AST Python และ `git diff --check`
 - Deploy: ยังไม่ deploy production; รอคำสั่ง `deploy` โดยตรง
 - ความเสี่ยง/งานถัดไป: ต้องทดสอบสแกนบาร์โค้ดมาตรฐานและฉลากเครื่องชั่งจริงด้วย Device Token/เครื่อง POS จริงก่อนเปิดขายจริง
+
+# Handoff - 2026-09-21 (scan versus manual quantity/weight flow production deploy)
+- Commit/source: `4658660`
+- Deploy: GitHub Actions run `35561210225` production ผ่านครบทั้ง Laravel test, frontend build, upload release และ `scripts/deploy.sh`; สถานะ `Success`
+- ตรวจ live: `https://pos.popstarcenter.com/` ตอบ HTTP 200 และ HTML production มี `quantityModal`, `weightModal`, `scanProduct`, `/scan`, `กรอกจำนวน` และ `กรอกน้ำหนัก`; เรียก `POST /api/pos/scan` โดยไม่มี Device Token ได้ HTTP 401 ตามการป้องกันที่คาดไว้
+- งานถัดไป: ทดสอบสแกนบาร์โค้ดมาตรฐาน/ฉลากเครื่องชั่งจริงด้วย Device Token และตรวจขาย 1 บิลบนเครื่อง POS จริง
