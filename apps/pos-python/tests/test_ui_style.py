@@ -9,7 +9,7 @@ import re
 import inspect
 import unittest
 
-from pos_python.ui import APP_VERSION, PALETTE, SECTION_HINTS, STYLE, run_ui
+from pos_python.ui import APP_VERSION, PALETTE, SECTION_HINTS, STYLE, _style_for_layout, normalize_pos_layout, run_ui
 
 JET_BLUE = "#1585c0"
 JET_BLUE_DARK = "#0f4c75"
@@ -191,6 +191,19 @@ class UiStyleTest(unittest.TestCase):
         pay = source[source.index("        def pay(self)"):source.index("        def ensure_sale_session(self)")]
         self.assertIn("service.next_document_no(terminal_id)", pay)
         self.assertNotIn("pending_sync_count() + 1", pay)
+
+    def test_published_layout_is_safe_when_cache_is_missing_or_malformed(self) -> None:
+        layout = normalize_pos_layout({"runtime": {"product_width": 99, "cart_width": 1, "product_columns": "bad", "show_shift": "false"}})
+        self.assertEqual(layout["runtime"]["product_width"] + layout["runtime"]["cart_width"], 100)
+        self.assertEqual(layout["runtime"]["product_columns"], 4)
+        self.assertFalse(layout["runtime"]["show_shift"])
+        self.assertEqual(layout["runtime"]["density"], "comfortable")
+
+    def test_runtime_layout_changes_python_qss_without_rebuilding_the_app(self) -> None:
+        style = _style_for_layout({"button_size": "large", "density": "compact"})
+        self.assertIn("min-height: 54px", style)
+        self.assertIn("font-size: 12px", style)
+        self.assertIn("padding: 7px", style)
 
 
 if __name__ == "__main__":

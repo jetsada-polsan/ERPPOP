@@ -31,6 +31,7 @@ PALETTE = {
     "primary_ink": "#147db5",   # ใช้ตอนมีตัวหนังสือขาวทับ 4.54:1
     "primary_soft": "#eef4f9",
     "success": "#158662",       # เงินทอน — ความหมาย ไม่ใช่สีแบรนด์
+    "success_light": "#bbf7d0",
     "warning": "#d98b00",
     "warning_soft": "#fdf4e3",
     "warning_ink": "#9c6400",   # บนพื้นเหลืองอ่อน 4.54:1
@@ -44,6 +45,83 @@ PALETTE = {
     "preview": "#c6d4e0",       # พื้นรองใบเสร็จ ให้กระดาษขาวเด้งออกมา
     "paper_ink": "#1a1a1a",     # หมึกบนกระดาษ ไม่ใช่สีจอ
 }
+
+# ค่าเหล่านี้ใช้ชื่อเดียวกับ PosLayout::defaultRuntime() ของ Laravel
+# เพื่อให้ layout ที่ผู้ดูแล Build จากเว็บส่งผลกับเครื่อง Python ได้โดยไม่ต้อง build
+# installer ใหม่ทุกครั้ง
+POS_LAYOUT_DEFAULT_RUNTIME = {
+    "product_width": 55,
+    "cart_width": 45,
+    "product_rows": 3,
+    "product_columns": 4,
+    "density": "comfortable",
+    "button_size": "medium",
+    "show_branch": True,
+    "show_terminal": True,
+    "show_seller": True,
+    "show_shift": True,
+}
+
+POS_LAYOUT_DENSITY = {
+    "compact": {"gap": 6, "padding": 7, "card": 104, "font": 12},
+    "comfortable": {"gap": 8, "padding": 10, "card": 124, "font": 13},
+    "roomy": {"gap": 12, "padding": 14, "card": 148, "font": 15},
+}
+
+POS_LAYOUT_BUTTON = {
+    "small": {"height": 36, "font": 13, "padding": 7},
+    "medium": {"height": 42, "font": 16, "padding": 9},
+    "large": {"height": 54, "font": 19, "padding": 12},
+}
+
+
+def _layout_int(value, fallback: int, minimum: int, maximum: int) -> int:
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        value = fallback
+    return max(minimum, min(maximum, value))
+
+
+def _layout_bool(value, fallback: bool) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        if value.strip().lower() in {"false", "0", "no", "off"}:
+            return False
+        if value.strip().lower() in {"true", "1", "yes", "on"}:
+            return True
+    if value is None:
+        return fallback
+    return bool(value)
+
+
+def normalize_pos_layout(value) -> dict:
+    """Normalize the published layout before a malformed cache can reach Qt."""
+    layout = value if isinstance(value, dict) else {}
+    raw = layout.get("runtime") if isinstance(layout.get("runtime"), dict) else {}
+    defaults = POS_LAYOUT_DEFAULT_RUNTIME
+    product = _layout_int(raw.get("product_width"), defaults["product_width"], 30, 70)
+    cart = _layout_int(raw.get("cart_width"), 100 - product, 30, 70)
+    total = product + cart
+    if total != 100:
+        product = _layout_int(round(product / total * 100), defaults["product_width"], 30, 70)
+    cart = 100 - product
+    runtime = {
+        "product_width": product,
+        "cart_width": cart,
+        "product_rows": _layout_int(raw.get("product_rows"), defaults["product_rows"], 1, 8),
+        "product_columns": _layout_int(raw.get("product_columns"), defaults["product_columns"], 2, 8),
+        "density": raw.get("density") if raw.get("density") in POS_LAYOUT_DENSITY else defaults["density"],
+        "button_size": raw.get("button_size") if raw.get("button_size") in POS_LAYOUT_BUTTON else defaults["button_size"],
+        "show_branch": _layout_bool(raw.get("show_branch"), defaults["show_branch"]),
+        "show_terminal": _layout_bool(raw.get("show_terminal"), defaults["show_terminal"]),
+        "show_seller": _layout_bool(raw.get("show_seller"), defaults["show_seller"]),
+        "show_shift": _layout_bool(raw.get("show_shift"), defaults["show_shift"]),
+    }
+    normalized = dict(layout)
+    normalized["runtime"] = runtime
+    return normalized
 
 
 def run_pairing_wizard(data_dir, app) -> bool:
@@ -120,6 +198,8 @@ QMainWindow, QDialog, QWidget { background: $bg; color: $text; font-size: 14px; 
 #brandName { color: $surface; font-size: 16px; font-weight: 800; padding: 10px 0; }
 #brandMark { color: $surface; border: 2px solid $surface; border-radius: 6px; padding: 5px 9px; font-weight: 800; }
 #brandRight { color: $surface; font-size: 13px; }
+#runtimeChip { color: $surface; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.28); border-radius: 6px; padding: 4px 7px; font-size: 11px; font-weight: 700; }
+#runtimeChip[shiftOpen="true"] { color: $success_light; border-color: $success_light; background: rgba(20,122,85,.35); }
 QToolButton#dialogClose { color: $surface; background: transparent; border: 0; padding: 3px 10px; font-size: 24px; font-weight: 800; }
 QToolButton#dialogClose:hover { background: rgba(255,255,255,.16); border-radius: 6px; }
 
@@ -138,20 +218,20 @@ QSplitter::handle:hover { background: $primary; }
 #navItem:hover { background: $primary_soft; }
 #navItem:checked { background: $primary_soft; color: $primary_dark; border-left: 4px solid $primary; font-weight: 700; }
 
-QPushButton { background: $surface; border: 1px solid $border; border-radius: 7px; padding: 10px 14px; font-size: 14.5px; }
+QPushButton { background: $surface; border: 1px solid $border; border-radius: 7px; padding: $button_padding 14px; font-size: $button_font; }
 QPushButton:hover { background: $primary_soft; border-color: $primary; }
 QPushButton:checked { background: $primary_ink; color: $surface; border-color: $primary_ink; }
 QPushButton#primary, QPushButton#payBtn { background: $primary_ink; color: $surface; border-color: $primary_ink; font-weight: 700; }
 QPushButton#primary:hover, QPushButton#payBtn:hover { background: $primary_dark; border-color: $primary_dark; }
-QPushButton#payBtn { font-size: 18px; padding: 16px; }
+QPushButton#payBtn { font-size: $pay_font; padding: $pay_padding; }
 QPushButton#voidBtn { color: $danger; }
 QToolButton#tile {
     text-align: left;
-    padding: 13px;
+    padding: $tile_padding;
     background: $surface;
     border: 1px solid $border;
     border-radius: 8px;
-    font-size: 14.5px;
+    font-size: $tile_font;
     font-weight: 650;
 }
 QToolButton#tile:hover { background: $primary_soft; border-color: $primary; }
@@ -169,10 +249,10 @@ QLineEdit:focus, QComboBox:focus { border-color: $primary; }
    เพื่อเก็บพื้นที่ไว้ให้รายการสินค้าและบิล ไม่เปลี่ยนขนาดตัวเลขทางธุรกิจ */
 QMainWindow[compact="true"] #brandName { font-size: 15px; padding: 8px 0; }
 QMainWindow[compact="true"] #brandRight { font-size: 11px; }
-QMainWindow[compact="true"] QPushButton { padding: 6px 8px; font-size: 13px; }
-QMainWindow[compact="true"] QPushButton#payBtn { font-size: 15px; padding: 10px 8px; }
+QMainWindow[compact="true"] QPushButton { padding: $compact_button_padding 8px; font-size: $compact_button_font; }
+QMainWindow[compact="true"] QPushButton#payBtn { font-size: $pay_font; padding: $pay_padding 8px; }
 QMainWindow[compact="true"] QLineEdit, QComboBox { padding: 6px 8px; font-size: 13px; }
-QMainWindow[compact="true"] QToolButton#tile { padding: 10px; font-size: 13px; }
+QMainWindow[compact="true"] QToolButton#tile { padding: $tile_padding; font-size: $tile_font; }
 QMainWindow[compact="true"] #grandTotal { font-size: 25px; }
 QMainWindow[compact="true"] #orderHead { padding: 5px 8px; }
 QMainWindow[compact="true"] #orderHead QLabel { font-size: 12px; }
@@ -196,7 +276,7 @@ QTableWidget::item { padding: 4px; }
 
 QTableWidget { background: $surface; border: 0; }
 QHeaderView::section { background: $primary_soft; border: 0; border-bottom: 1px solid $border; padding: 5px; font-weight: 700; }
- #saleKeypad QPushButton { min-height: 30px; padding: 4px 6px; }
+ #saleKeypad QPushButton { min-height: $button_height; padding: $button_padding 6px; font-size: $button_font; }
 
 /* กระดาษใบเสร็จวางบนพื้นเทาเหมือนวางบนโต๊ะ */
 #receiptBg { background: $preview; border-radius: 6px; }
@@ -208,7 +288,26 @@ QHeaderView::section { background: $primary_soft; border: 0; border-bottom: 1px 
 #shiftKeypad QPushButton { min-height: 58px; font-size: 22px; font-weight: 700; }
 """)
 
-STYLE = _STYLE_TEMPLATE.substitute(PALETTE)
+def _style_for_layout(runtime: dict | None = None) -> str:
+    runtime = normalize_pos_layout({"runtime": runtime or {}})["runtime"]
+    density = POS_LAYOUT_DENSITY[runtime["density"]]
+    button = POS_LAYOUT_BUTTON[runtime["button_size"]]
+    values = {
+        **PALETTE,
+        "button_height": f'{button["height"]}px',
+        "button_padding": f'{button["padding"]}px',
+        "button_font": f'{button["font"]}px',
+        "compact_button_padding": f'{max(4, button["padding"] - 2)}px',
+        "compact_button_font": f'{max(12, button["font"] - 2)}px',
+        "pay_padding": f'{button["padding"] + 4}px',
+        "pay_font": f'{max(15, button["font"] + 2)}px',
+        "tile_padding": f'{density["padding"]}px',
+        "tile_font": f'{density["font"]}px',
+    }
+    return _STYLE_TEMPLATE.substitute(values)
+
+
+STYLE = _style_for_layout(POS_LAYOUT_DEFAULT_RUNTIME)
 
 SECTION_HINTS = {
     "ข้อมูลเครื่อง POS": "รหัสเครื่องและสาขาที่ผูกอยู่ ใช้ตอนส่งบิลขึ้น ERP",
@@ -234,6 +333,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
     branch_id = int(online.branch_id) if (online is not None and online.branch_id) else 1
     terminal_id = (online.terminal_id if (online is not None and online.terminal_id) else "PY-TEST-01")
     layout_config = _cached_layout(service.db)
+    layout_config = normalize_pos_layout(layout_config)
+    layout_runtime = layout_config["runtime"]
     try:
         from PySide6.QtCore import QTimer, QSize, Qt
         from PySide6.QtGui import QColor, QFont, QFontDatabase, QImage, QKeySequence, QPainter, QPixmap, QShortcut
@@ -254,6 +355,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         "Tahoma",
     )
     app.setFont(QFont(ui_font_family, 14))
+    runtime_style = _style_for_layout(layout_runtime)
 
     def _qr_pixmap(payload: str, size: int) -> QPixmap:
         matrix = qr_matrix(payload, border=3)
@@ -1138,14 +1240,19 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.opening_cash: Decimal | None = None
             self.last_sale_id: int | None = None
             self._product_columns: int | None = None
-            layout_version = layout_config.get("version", 1)
+            self.layout_runtime = layout_runtime
+            layout_version = layout_config.get("layout_version", layout_config.get("version", 1))
             self.setWindowTitle(f"PopCentral POS v{APP_VERSION} — พร้อมใช้งาน · Layout {layout_version}")
-            self.setStyleSheet(STYLE)
+            self.setStyleSheet(runtime_style)
             self.settings_shortcut = QShortcut(QKeySequence("Ctrl+Alt+S"), self)
             self.settings_shortcut.activated.connect(self.open_settings)
 
             root = QWidget()
-            columns = QHBoxLayout(root)
+            shell = QVBoxLayout(root)
+            shell.setContentsMargins(0, 0, 0, 0)
+            shell.setSpacing(0)
+            shell.addWidget(self.build_runtime_topbar())
+            columns = QHBoxLayout()
             columns.setContentsMargins(0, 0, 0, 0)
             columns.setSpacing(0)
             order_panel = self.build_order_panel()
@@ -1168,13 +1275,17 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 second.setMinimumWidth(560)
             splitter.addWidget(first)
             splitter.addWidget(second)
-            # Keep the catalogue as the wide touch target area; the order pane
-            # stays large enough for the receipt, keypad, and payment button.
-            splitter.setStretchFactor(0, 6 if first is product_panel else 4)
-            splitter.setStretchFactor(1, 4 if second is order_panel else 6)
-            splitter.setSizes([760, 600] if first is product_panel else [600, 760])
+            # Keep the same product/cart ratio as the Web POS. The designer owns
+            # the ratio; the minimum widths above only protect touch controls.
+            first_is_product = first is product_panel
+            first_ratio = layout_runtime["product_width"] if first_is_product else layout_runtime["cart_width"]
+            second_ratio = layout_runtime["cart_width"] if first_is_product else layout_runtime["product_width"]
+            splitter.setStretchFactor(0, first_ratio)
+            splitter.setStretchFactor(1, second_ratio)
+            splitter.setSizes([first_ratio * 10, second_ratio * 10])
             self.primary_splitter = splitter
             columns.addWidget(splitter)
+            shell.addLayout(columns, 1)
             self.setCentralWidget(root)
 
             self.refresh_products()
@@ -1198,6 +1309,55 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             columns = self._product_columns_for_width()
             if mode_changed or columns != self._product_columns:
                 self.refresh_products()
+
+        def build_runtime_topbar(self) -> QWidget:
+            """Compact context bar matching the Web POS and honoring designer toggles."""
+            bar = QWidget()
+            bar.setObjectName("brandBar")
+            layout = QHBoxLayout(bar)
+            layout.setContentsMargins(10, 4, 10, 4)
+            layout.setSpacing(6)
+
+            mark = QLabel("POS")
+            mark.setObjectName("brandMark")
+            layout.addWidget(mark)
+            name = QLabel("PopCentral POS")
+            name.setObjectName("brandName")
+            layout.addWidget(name)
+            layout.addStretch(1)
+
+            branch_name = (online.profile.get("branch_name") if online is not None else None) or service._setting("branch_name") or f"สาขา {branch_id}"
+            context = [
+                ("show_branch", "สาขา", branch_name),
+                ("show_terminal", "เครื่อง", terminal_id),
+                ("show_seller", "คนขาย", "ยังไม่เลือก"),
+                ("show_shift", "กะ", "ยังไม่เปิดกะ"),
+            ]
+            self.runtime_context = {}
+            for key, label, value in context:
+                chip = QLabel(f"{label} {value}")
+                chip.setObjectName("runtimeChip")
+                chip.setProperty("contextKey", key)
+                chip.setVisible(bool(layout_runtime.get(key, True)))
+                layout.addWidget(chip)
+                self.runtime_context[key] = chip
+
+            right = QLabel(f"v{APP_VERSION} · Layout {layout_config.get('layout_version', layout_config.get('version', 1))}")
+            right.setObjectName("brandRight")
+            layout.addWidget(right)
+            return bar
+
+        def refresh_runtime_context(self) -> None:
+            """Refresh small context chips after selecting a cashier or closing a shift."""
+            if not getattr(self, "runtime_context", None):
+                return
+            cashier_name = self.cashier["name"] if self.cashier is not None else "ยังไม่เลือก"
+            shift_text = f"เปิดอยู่ #{self.shift_id}" if self.shift_id is not None else "ยังไม่เปิดกะ"
+            self.runtime_context["show_seller"].setText(f"คนขาย {cashier_name}")
+            self.runtime_context["show_shift"].setText(f"กะ {shift_text}")
+            self.runtime_context["show_shift"].setProperty("shiftOpen", "true" if self.shift_id is not None else "false")
+            self.runtime_context["show_shift"].style().unpolish(self.runtime_context["show_shift"])
+            self.runtime_context["show_shift"].style().polish(self.runtime_context["show_shift"])
 
         # ---------- พื้นที่บิล ----------
 
@@ -1370,25 +1530,19 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.grid_host = QWidget()
             self.grid = QGridLayout(self.grid_host)
             self.grid.setContentsMargins(0, 0, 0, 0)
-            self.grid.setHorizontalSpacing(10)
-            self.grid.setVerticalSpacing(10)
-            scroll = QScrollArea()
-            scroll.setObjectName("productScroll")
-            scroll.setWidgetResizable(True)
-            scroll.setWidget(self.grid_host)
-            layout.addWidget(scroll, 1)
+            self.product_scroll = QScrollArea()
+            self.product_scroll.setObjectName("productScroll")
+            self.product_scroll.setWidgetResizable(True)
+            self.product_scroll.setWidget(self.grid_host)
+            layout.addWidget(self.product_scroll, 1)
 
             self.build_category_bar()
             return panel
 
         def _product_columns_for_width(self) -> int:
-            """Choose a grid that fits without a horizontal scrollbar."""
-            available = self.grid_host.width()
-            if available <= 0:
-                return 4
-            gap = 10
-            minimum_tile = 170 if self.property("compact") else 190
-            return max(1, min(4, (available + gap) // (minimum_tile + gap)))
+            """Use the published column count, with a safe fallback before first resize."""
+            configured = int(self.layout_runtime.get("product_columns", 4))
+            return max(2, min(8, configured))
 
         def build_category_bar(self) -> None:
             group = QButtonGroup(self)
@@ -1411,9 +1565,17 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
             columns = self._product_columns_for_width()
             self._product_columns = columns
-            available = max(self.grid_host.width(), columns * 110 + (columns - 1) * 10)
-            tile_width = max(110, (available - (columns - 1) * 10) // columns)
-            tile_height = 116 if self.property("compact") else 132
+            density = POS_LAYOUT_DENSITY[self.layout_runtime["density"]]
+            self.grid.setHorizontalSpacing(density["gap"])
+            self.grid.setVerticalSpacing(density["gap"])
+            available = max(self.grid_host.width(), columns * 110 + (columns - 1) * density["gap"])
+            tile_width = max(80, (available - (columns - 1) * density["gap"]) // columns)
+            visible_rows = int(self.layout_runtime.get("product_rows", 3))
+            viewport_height = self.product_scroll.viewport().height()
+            row_height = max(
+                density["card"],
+                (max(viewport_height, visible_rows * density["card"]) - density["gap"] * (visible_rows - 1)) // visible_rows,
+            )
             term = self.scan.text().strip()
             # ตัวเลขล้วนคือกำลังยิงบาร์โค้ด ไม่ใช่ค้นหา — อย่าให้ตารางกระพริบระหว่างสแกน
             search = "" if term.isdigit() else term
@@ -1426,11 +1588,11 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 tile.setToolButtonStyle(Qt.ToolButtonTextOnly)
                 tile.setText(f"{product['name']}\n{price:,.2f} ฿ / {unit}" + (f"\n{sku}" if sku else ""))
                 tile.setToolTip(str(product["name"] or ""))
-                tile.setMinimumSize(QSize(tile_width, tile_height))
-                tile.setMaximumHeight(tile_height)
+                tile.setMinimumSize(QSize(tile_width, row_height))
+                tile.setMaximumHeight(row_height)
                 tile.clicked.connect(lambda _, row=product: self.add_product_row(row))
                 self.grid.addWidget(tile, index // columns, index % columns)
-            for column in range(PRODUCT_TILE_COLUMNS):
+            for column in range(max(PRODUCT_TILE_COLUMNS, columns)):
                 self.grid.setColumnStretch(column, 1 if column < columns else 0)
 
         # ---------- การกระทำ ----------
@@ -1739,9 +1901,10 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.cashier_label.setText(
                 f"บิลปัจจุบัน · {self.cashier['name']} · เงินทอนต้นกะ {opening_cash:,.2f} บาท"
             )
+            self.refresh_runtime_context()
             self.auth_button.setText(f"กำลังขาย: {self.cashier['name']}")
             self.auth_button.setEnabled(False)
-            layout_version = layout_config.get("version", 1)
+            layout_version = layout_config.get("layout_version", layout_config.get("version", 1))
             self.setWindowTitle(f"PopCentral POS v{APP_VERSION} — {self.cashier['name']} · Layout {layout_version}")
             self.refresh_order(keep_selection=True)
             return True
@@ -1833,7 +1996,11 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.auth_button.setText("เปิดกะ")
             self.auth_button.setEnabled(True)
             self.cashier_label.setText(f"รายการขาย · ยังไม่ได้เริ่มขาย · v{APP_VERSION}")
-            self.setWindowTitle(f"PopCentral POS v{APP_VERSION} — พร้อมใช้งาน · Layout {layout_config.get('version', 1)}")
+            self.refresh_runtime_context()
+            self.setWindowTitle(
+                f"PopCentral POS v{APP_VERSION} — พร้อมใช้งาน · Layout "
+                f"{layout_config.get('layout_version', layout_config.get('version', 1))}"
+            )
 
         def open_settings(self) -> None:
             if service.has_local_it_pin():
@@ -1996,7 +2163,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
     if app is None:
         raise RuntimeError("POS ต้องเริ่ม QApplication จาก main.py ก่อนเปิดหน้าต่าง")
-    app.setStyleSheet(STYLE)
+    app.setStyleSheet(runtime_style)
     window = PosWindow()
     window.setMinimumSize(960, 600)
     window.resize(1280, 820)

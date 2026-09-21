@@ -824,3 +824,31 @@ pending
 - ยังไม่ได้อัปเดต `docs/ai/PROJECT_MEMORY.md` เพื่อเลี่ยง conflict ตอน merge
   ถ้ารับงานนี้แล้วควรเพิ่มบรรทัดเรื่อง `pos_layout` runtime contract เข้าไป
 - ยังไม่ push และยังไม่ deploy รอคำสั่งเจ้าของโปรเจกต์
+
+# Handoff - 2026-09-21 (Codex ต่อ runtime layout ให้ POS Python)
+
+> งานต่อจาก Claude commit `c0898d8` บน branch `codex/pos-layout-runtime`
+> ยังไม่ได้ push และยังไม่ได้ deploy production
+
+## ทำอะไร
+
+- POS Python อ่าน `pos_layout.runtime` จาก `device_settings` หลัง sync แล้ว normalize ค่าให้ปลอดภัย
+- ใช้ `product_width` / `cart_width` คุมสัดส่วน QSplitter ให้ตรงกับ Web POS
+- ใช้ `product_rows` / `product_columns` คุมจำนวนแถวที่เห็นและคอลัมน์ปุ่มสินค้า
+- ใช้ `density` คุมระยะห่าง ขนาดการ์ด และตัวอักษรสินค้า
+- ใช้ `button_size` คุมความสูง/ฟอนต์/ระยะ padding ของปุ่มและปุ่มคิดเงิน
+- เพิ่มแถบบนแบบ Web POS พร้อมชิปสาขา เครื่อง คนขาย และกะ ซึ่งเปิด/ซ่อนได้จาก Designer
+- แสดง `layout_version` ใน title/แถบบน เพื่อยืนยันว่าเครื่องอ่าน layout รุ่นใด
+- เพิ่ม unit tests กัน cache layout ผิดรูปและยืนยันว่า runtime เปลี่ยน QSS ได้โดยไม่ต้อง build ใหม่
+
+## ทดสอบ
+
+- Python POS: `python3 -m unittest discover -s apps/pos-python/tests -p 'test_*.py'` → **177 tests ผ่าน**
+- Laravel POS tests: `php artisan test --filter='Pos(Browser|Layout|Controller)'` → **12 tests ผ่าน**
+- Python AST parse และ `git diff --check` ผ่าน
+
+## งานถัดไป
+
+- review diff แล้ว push branch นี้เพื่อให้ owner/Claude ตรวจร่วมกัน
+- เมื่อ owner สั่ง deploy ให้รัน production workflow ตาม `docs/OPERATIONS.md`
+- หากต้องส่ง installer ใหม่ ต้องรัน Windows UAT build workflow แยก ไม่ใช่ production deploy
