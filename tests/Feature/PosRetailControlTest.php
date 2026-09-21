@@ -23,6 +23,7 @@ use App\Models\Salesman;
 use App\Models\Supplier;
 use App\Models\SupplierPriceSchedule;
 use App\Models\User;
+use App\Services\Inventory\ScaleBarcodeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Tests\TestCase;
@@ -260,6 +261,64 @@ class PosRetailControlTest extends TestCase
         $this->assertSame('101002', $barcodeResult[0]['matched_barcode']['barcode']);
         $this->assertSame($skuProduct->id, $skuResult[0]['id']);
         $this->assertArrayNotHasKey('matched_barcode', $skuResult[0]);
+    }
+
+    public function test_pos_scan_adds_a_registered_barcode_as_one_unit(): void
+    {
+        [$user, $branch, , , $product] = $this->posMasters('SCAN');
+        ProductBarcode::create([
+            'product_id' => $product->id,
+            'barcode' => '8850000000003',
+            'unit_id' => $product->base_unit_id,
+            'unit_factor' => 1,
+            'barcode_type' => 'EAN13_STANDARD',
+            'is_active' => true,
+        ]);
+        $this->actingAs($user);
+
+        $response = app(PosController::class)->scan(Request::create('/api/pos/scan', 'POST', [
+            'branch_id' => $branch->id,
+            'barcode' => '8850000000003',
+        ]), app(ScaleBarcodeService::class));
+        $data = $response->getData(true);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('barcode', $data['mode']);
+        $this->assertSame($product->id, $data['product']['id']);
+        $this->assertSame(1, $data['qty']);
+        $this->assertSame('8850000000003', $data['barcode']);
+        $this->assertSame('EAN13_STANDARD', $data['barcode_type']);
+    }
+
+    public function test_pos_scan_converts_a_scale_label_total_into_weight(): void
+    {
+        [$user, $branch, , , $product] = $this->posMasters('SCALE');
+        $product->update(['default_price' => 200]);
+        ProductBarcode::create([
+            'product_id' => $product->id,
+            'barcode' => '801001',
+            'unit_id' => $product->base_unit_id,
+            'unit_factor' => 1,
+            'price' => 200,
+            'barcode_type' => 'SCALE_PLU',
+            'is_active' => true,
+        ]);
+        $label = app(ScaleBarcodeService::class)->fromTotalPrice('801001', 50.00);
+        $this->actingAs($user);
+
+        $response = app(PosController::class)->scan(Request::create('/api/pos/scan', 'POST', [
+            'branch_id' => $branch->id,
+            'barcode' => $label,
+        ]), app(ScaleBarcodeService::class));
+        $data = $response->getData(true);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('scale', $data['mode']);
+        $this->assertSame($product->id, $data['product']['id']);
+        $this->assertEqualsWithDelta(0.25, $data['qty'], 0.000001);
+        $this->assertSame($label, $data['barcode']);
+        $this->assertSame('SCALE_WEIGHT', $data['barcode_type']);
+        $this->assertSame('801001', $data['plu']);
     }
 
     /** @return array{User,Branch,Salesman,PosShift,Product} */

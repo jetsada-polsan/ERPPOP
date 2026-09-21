@@ -145,6 +145,10 @@
         .weight-total strong { color: var(--green); font-size: 22px; }
         .weight-edit { min-height: 34px; padding: 0 9px; border: 1px solid #b9ccda; border-radius: 7px; color: var(--navy); background: #fff; font-size: 12px; font-weight: 800; }
         .weight-edit:hover { border-color: var(--blue); background: var(--blue-soft); }
+        .quantity-product-name { margin-bottom: 6px; color: var(--navy); font-size: 16px; font-weight: 900; line-height: 1.45; }
+        .quantity-price { color: var(--muted); font-size: 13px; }
+        .quantity-price strong { color: var(--blue); font-size: 17px; }
+        .scan-hint { margin: 5px 14px 0; color: var(--muted); font-size: 11px; }
         .seller { min-height: 28px; padding: 3px 9px; border: 1px solid #c8d9e4; border-radius: 7px; color: var(--ink); background: #fff; text-align: left; }
         .seller:hover { border-color: var(--blue); background: var(--blue-soft); }
         .seller strong { display: inline; font-size: 12px; }
@@ -193,7 +197,8 @@
             <section id="salePanel" class="sale-grid hidden">
                 <div class="panel catalog">
                     <div class="section-head"><h2>สินค้า</h2><small>โหลดทีละ 100 รายการ · ค้นหาเพิ่มได้</small><span class="grow"></span><button id="reloadProducts" class="button light small" type="button">รีเฟรช</button></div>
-                    <div style="padding:12px 14px 0"><input id="productSearch" class="input" type="search" placeholder="ค้นหาชื่อสินค้า / SKU / บาร์โค้ด"></div>
+                    <div style="padding:12px 14px 0"><input id="productSearch" class="input" type="search" placeholder="สแกนบาร์โค้ด หรือค้นหาชื่อสินค้า / SKU"></div>
+                    <div class="scan-hint">สแกนแล้วกด Enter เพื่อเพิ่มอัตโนมัติ · กดเลือกสินค้าเองเพื่อกรอกจำนวนหรือน้ำหนัก</div>
                     <div id="productGrid" class="product-grid"></div>
                 </div>
                 <div class="panel cart">
@@ -256,6 +261,18 @@
         </div>
     </div>
 
+    <div id="quantityModal" class="modal-backdrop hidden">
+        <div class="modal">
+            <div class="modal-head"><h2>กรอกจำนวน</h2><button class="close" type="button" data-close="quantityModal">×</button></div>
+            <div id="quantityProductName" class="quantity-product-name"></div>
+            <div class="quantity-price">ราคาต่อหน่วย <strong id="quantityUnitPrice">฿0.00</strong></div>
+            <div class="field" style="margin-top:14px"><label for="quantityInput">จำนวน (ชิ้น/หน่วย)</label><input id="quantityInput" class="input" type="number" min="1" step="1" inputmode="numeric" value="1"></div>
+            <div class="weight-total"><span>ยอดสินค้านี้</span><strong id="quantityTotal">฿0.00</strong></div>
+            <div id="quantityError" class="error hidden"></div>
+            <div class="modal-actions"><button class="button light" type="button" data-close="quantityModal">ยกเลิก</button><button id="confirmQuantity" class="button primary" type="button">เพิ่มเข้ารายการ</button></div>
+        </div>
+    </div>
+
     <div id="paymentModal" class="modal-backdrop hidden">
         <div class="modal">
             <div class="modal-head"><h2>รับชำระเงิน</h2><button class="close" type="button" data-close="paymentModal">×</button></div>
@@ -294,7 +311,7 @@
         (() => {
             const TOKEN_KEY = 'popstar_web_pos_device_token';
             const PAPER_KEY = 'popstar_web_pos_paper_width';
-            const state = { token: '', config: null, cashiers: [], cashier: null, shift: null, products: [], cart: [], discountCard: null, lastReceipt: null, weightTarget: null, shiftAction: 'open', toastTimer: null, productSearchTimer: null, productRequestId: 0 };
+            const state = { token: '', config: null, cashiers: [], cashier: null, shift: null, products: [], cart: [], discountCard: null, lastReceipt: null, weightTarget: null, quantityTarget: null, shiftAction: 'open', toastTimer: null, productSearchTimer: null, productRequestId: 0 };
             const $ = (id) => document.getElementById(id);
             const money = (value) => `฿${Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' }[char]));
@@ -413,12 +430,42 @@
                 $('productGrid').innerHTML = products.length ? products.map((product) => `<button class="product" type="button" data-product-id="${product.id}"><div class="name">${escapeHtml(product.name_th)}</div><div class="sku">${escapeHtml(product.sku_code || '')}</div><div class="price">${money(product.pos_price)}</div><div class="stock">สต๊อก ${product.stock_qty === null || product.stock_qty === undefined ? 'ไม่ระบุ' : Number(product.stock_qty).toLocaleString('th-TH')}</div></button>`).join('') : '<div class="empty-state">ไม่พบสินค้า</div>';
                 $('productGrid').querySelectorAll('[data-product-id]').forEach((button) => button.addEventListener('click', () => {
                     const product = state.products.find((item) => Number(item.id) === Number(button.dataset.productId));
-                    if (product?.is_scale) openWeightModal(product); else addToCart(Number(button.dataset.productId));
+                    if (product?.is_scale) openWeightModal(product); else openQuantityModal(product);
                 }));
             }
             function scheduleProductSearch() {
                 clearTimeout(state.productSearchTimer);
                 state.productSearchTimer = setTimeout(() => loadProducts($('productSearch').value), 220);
+            }
+            async function scanProduct() {
+                const barcode = $('productSearch').value.trim();
+                if (!barcode || !state.config?.branch_id) return;
+                clearTimeout(state.productSearchTimer);
+                state.productRequestId += 1;
+                setStatus('กำลังอ่านบาร์โค้ด…');
+                try {
+                    const result = await api('/scan', { method: 'POST', body: JSON.stringify({ branch_id: state.config.branch_id, barcode }) });
+                    addScannedProduct(result.product, Number(result.qty), result.barcode, result.barcode_type);
+                    $('productSearch').value = '';
+                    await loadProducts();
+                    setStatus('พร้อมขาย', true);
+                } catch (exception) {
+                    setStatus('พร้อมขาย', true);
+                    toast(exception.message || 'อ่านบาร์โค้ดไม่สำเร็จ');
+                }
+            }
+            function addScannedProduct(product, qty, barcode, barcodeType) {
+                if (!product || !Number.isFinite(qty) || qty <= 0) return;
+                invalidateDiscountCard();
+                const existing = state.cart.find((item) => item.id === product.id && item.scan_barcode_type !== 'SCALE_WEIGHT');
+                if (existing) {
+                    existing.qty = Number(existing.qty) + qty;
+                    existing.scan_barcode ||= barcode;
+                    existing.scan_barcode_type ||= barcodeType;
+                } else {
+                    state.cart.push({ ...product, qty, scan_barcode: barcode, scan_barcode_type: barcodeType });
+                }
+                renderCart();
             }
             function isScaleProduct(product) { return Boolean(product?.is_scale); }
             function formatWeight(value) { return Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: 3, maximumFractionDigits: 3 }); }
@@ -426,6 +473,29 @@
                 const product = state.weightTarget?.product;
                 const weight = Number($('weightInput').value || 0);
                 $('weightTotal').textContent = money(weight * Number(product?.pos_price || 0));
+            }
+            function updateQuantityTotal() {
+                const product = state.quantityTarget?.product;
+                const quantity = Number($('quantityInput').value || 0);
+                $('quantityTotal').textContent = money(quantity * Number(product?.pos_price || 0));
+            }
+            function openQuantityModal(product) {
+                state.quantityTarget = { product };
+                $('quantityProductName').textContent = product.name_th || 'สินค้า';
+                $('quantityUnitPrice').textContent = `${money(product.pos_price)} / หน่วย`;
+                $('quantityInput').value = '1';
+                error('quantityError', ''); updateQuantityTotal(); show('quantityModal');
+                window.setTimeout(() => $('quantityInput').focus(), 0);
+            }
+            function confirmQuantity() {
+                const product = state.quantityTarget?.product;
+                const quantity = Number($('quantityInput').value);
+                if (!product || !Number.isFinite(quantity) || quantity <= 0) return error('quantityError', 'กรุณากรอกจำนวนมากกว่า 0');
+                invalidateDiscountCard();
+                const existing = state.cart.find((item) => item.id === product.id && !item.scan_barcode);
+                if (existing) existing.qty = Number(existing.qty) + quantity;
+                else state.cart.push({ ...product, qty: quantity });
+                state.quantityTarget = null; hide('quantityModal'); renderCart();
             }
             function openWeightModal(product, line = null) {
                 state.weightTarget = { product, lineId: line?.id || null };
@@ -442,7 +512,7 @@
                 const weight = Number($('weightInput').value);
                 if (!target?.product || !Number.isFinite(weight) || weight <= 0) return error('weightError', 'กรุณากรอกน้ำหนักมากกว่า 0 กิโลกรัม');
                 invalidateDiscountCard();
-                const existing = state.cart.find((item) => item.id === target.product.id);
+                const existing = state.cart.find((item) => item.id === target.product.id && item.scan_barcode_type !== 'SCALE_WEIGHT');
                 if (target.lineId) {
                     if (existing) existing.qty = weight;
                 } else if (existing) {
@@ -476,7 +546,7 @@
                         : 0;
                     remaining = rounded(remaining - lineDiscount);
                     const unitPrice = qty > 0 ? rounded(Math.max(0, gross - lineDiscount) / qty) : 0;
-                    return { product_id: item.id, qty, unit_price: unitPrice, barcode: item.matched_barcode?.barcode || null, barcode_type: item.matched_barcode?.barcode_type || null };
+                    return { product_id: item.id, qty, unit_price: unitPrice, barcode: item.scan_barcode || item.matched_barcode?.barcode || null, barcode_type: item.scan_barcode_type || item.matched_barcode?.barcode_type || null };
                 });
             }
             function renderCart() {
@@ -485,7 +555,9 @@
                 $('discountLine').classList.toggle('hidden', discount <= 0); $('cartDiscount').textContent = `-${money(discount)}`;
                 if (!state.cart.length) invalidateDiscountCard();
                 $('cartList').innerHTML = state.cart.length ? state.cart.map((item) => {
-                    const controls = isScaleProduct(item)
+                    const controls = item.scan_barcode_type === 'SCALE_WEIGHT'
+                        ? `<span class="qty">${formatWeight(item.qty)} กก. (จากฉลาก)</span>`
+                        : isScaleProduct(item)
                         ? `<button class="weight-edit" type="button" data-weight-edit="${item.id}">แก้น้ำหนัก ${formatWeight(item.qty)} กก.</button>`
                         : `<button class="qty-btn" type="button" data-minus="${item.id}">−</button><span class="qty">${item.qty}</span><button class="qty-btn" type="button" data-plus="${item.id}">+</button>`;
                     return `<div class="cart-row"><div><div class="name">${escapeHtml(item.name_th)}</div><div class="controls">${controls}<button class="remove" type="button" data-remove="${item.id}">ลบ</button></div></div><div class="line-total">${money(Number(item.qty) * Number(item.pos_price || 0))}</div></div>`;
@@ -493,7 +565,7 @@
                 $('cartList').querySelectorAll('[data-minus]').forEach((button) => button.addEventListener('click', () => setQty(Number(button.dataset.minus), -1)));
                 $('cartList').querySelectorAll('[data-plus]').forEach((button) => button.addEventListener('click', () => setQty(Number(button.dataset.plus), 1)));
                 $('cartList').querySelectorAll('[data-weight-edit]').forEach((button) => button.addEventListener('click', () => {
-                    const line = state.cart.find((item) => item.id === Number(button.dataset.weightEdit));
+                    const line = state.cart.find((item) => item.id === Number(button.dataset.weightEdit) && item.scan_barcode_type !== 'SCALE_WEIGHT');
                     if (line) openWeightModal(line, line);
                 }));
                 $('cartList').querySelectorAll('[data-remove]').forEach((button) => button.addEventListener('click', () => { invalidateDiscountCard(); state.cart = state.cart.filter((item) => item.id !== Number(button.dataset.remove)); renderCart(); }));
@@ -569,7 +641,7 @@
                 const receipt = state.lastReceipt || {}; const company = state.config?.company || {}; const paper = localStorage.getItem(PAPER_KEY) || '80mm'; $('receiptPaper').style.width = paper; $('receiptPaper').innerHTML = `<h3>${escapeHtml(company.name || 'PopStar')}</h3><div class="center">${escapeHtml(company.address || '')}</div><div class="center">${escapeHtml(company.phone || '')}</div><hr><div>เลขที่: ${escapeHtml(receipt.receipt_no || receipt.doc_number || '—')}</div><div>ผู้ขาย: ${escapeHtml(state.cashier?.name || '')}</div><div>เวลา: ${new Date().toLocaleString('th-TH')}</div><hr>${(receipt.items || []).map((item) => `<div class="line"><span>${escapeHtml(item.name_th)} x${item.qty}</span><span>${money(Number(item.qty) * Number(item.pos_price || 0))}</span></div>`).join('')}<hr><div class="line"><strong>รวมสุทธิ</strong><strong>${money(receipt.total_amount || 0)}</strong></div><div class="center" style="margin-top:10px">ขอบคุณที่ใช้บริการ</div>`; }
 
             document.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => hide(button.dataset.close)));
-            $('connectButton').addEventListener('click', connect); $('tokenInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') connect(); }); $('reloadCashiers').addEventListener('click', loadCashiers); $('settingsShiftButton').addEventListener('click', () => { if (!state.cashier) return toast('กรุณาเลือกคนขายก่อน'); if (state.shift) closeShiftModal(); else openShiftModal(); }); $('reloadProducts').addEventListener('click', () => loadProducts($('productSearch').value)); $('productSearch').addEventListener('input', scheduleProductSearch); $('weightInput').addEventListener('input', updateWeightTotal); $('weightInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') confirmWeight(); }); $('confirmWeight').addEventListener('click', confirmWeight); $('clearCart').addEventListener('click', () => { invalidateDiscountCard(); state.cart = []; renderCart(); }); $('discountCardCode').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); applyDiscountCard(); } }); $('applyDiscountCard').addEventListener('click', applyDiscountCard); $('payButton').addEventListener('click', openPayment); $('closeShiftButton').addEventListener('click', closeShiftModal); $('shiftSubmitButton').addEventListener('click', submitShift); $('paymentMethod').addEventListener('change', updatePaymentFields); $('cashReceived').addEventListener('input', updateChange); $('submitPayment').addEventListener('click', submitPayment); $('settingsButton').addEventListener('click', () => { $('settingsToken').value = state.token || ''; $('paperWidth').value = localStorage.getItem(PAPER_KEY) || '80mm'; renderShift(); show('settingsModal'); }); $('saveSettingsButton').addEventListener('click', () => { const token = $('settingsToken').value.trim(); if (!token) return toast('กรุณาใส่ Device Token'); localStorage.setItem(PAPER_KEY, $('paperWidth').value); $('tokenInput').value = token; hide('settingsModal'); connect(); }); $('clearTokenButton').addEventListener('click', () => { resetSession(true); hide('settingsModal'); toast('ล้าง Device Token จากเครื่องนี้แล้ว'); }); $('printReceipt').addEventListener('click', () => { document.body.classList.add('printing'); window.print(); setTimeout(() => document.body.classList.remove('printing'), 500); });
+            $('connectButton').addEventListener('click', connect); $('tokenInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') connect(); }); $('reloadCashiers').addEventListener('click', loadCashiers); $('settingsShiftButton').addEventListener('click', () => { if (!state.cashier) return toast('กรุณาเลือกคนขายก่อน'); if (state.shift) closeShiftModal(); else openShiftModal(); }); $('reloadProducts').addEventListener('click', () => loadProducts($('productSearch').value)); $('productSearch').addEventListener('input', scheduleProductSearch); $('productSearch').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); scanProduct(); } }); $('weightInput').addEventListener('input', updateWeightTotal); $('weightInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') confirmWeight(); }); $('confirmWeight').addEventListener('click', confirmWeight); $('quantityInput').addEventListener('input', updateQuantityTotal); $('quantityInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') confirmQuantity(); }); $('confirmQuantity').addEventListener('click', confirmQuantity); $('clearCart').addEventListener('click', () => { invalidateDiscountCard(); state.cart = []; renderCart(); }); $('discountCardCode').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); applyDiscountCard(); } }); $('applyDiscountCard').addEventListener('click', applyDiscountCard); $('payButton').addEventListener('click', openPayment); $('closeShiftButton').addEventListener('click', closeShiftModal); $('shiftSubmitButton').addEventListener('click', submitShift); $('paymentMethod').addEventListener('change', updatePaymentFields); $('cashReceived').addEventListener('input', updateChange); $('submitPayment').addEventListener('click', submitPayment); $('settingsButton').addEventListener('click', () => { $('settingsToken').value = state.token || ''; $('paperWidth').value = localStorage.getItem(PAPER_KEY) || '80mm'; renderShift(); show('settingsModal'); }); $('saveSettingsButton').addEventListener('click', () => { const token = $('settingsToken').value.trim(); if (!token) return toast('กรุณาใส่ Device Token'); localStorage.setItem(PAPER_KEY, $('paperWidth').value); $('tokenInput').value = token; hide('settingsModal'); connect(); }); $('clearTokenButton').addEventListener('click', () => { resetSession(true); hide('settingsModal'); toast('ล้าง Device Token จากเครื่องนี้แล้ว'); }); $('printReceipt').addEventListener('click', () => { document.body.classList.add('printing'); window.print(); setTimeout(() => document.body.classList.remove('printing'), 500); });
 
             state.token = localStorage.getItem(TOKEN_KEY) || ''; $('tokenInput').value = state.token;
             if (state.token) connect();

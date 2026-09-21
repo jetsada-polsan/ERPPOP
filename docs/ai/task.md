@@ -716,3 +716,9 @@ pending
 - Deploy: GitHub Actions run `35558291161` production ผ่านครบทั้ง Laravel test, frontend build, upload release และ `scripts/deploy.sh`; สถานะ `Success`
 - ตรวจ live: `https://pos.popstarcenter.com/` ตอบ HTTP 200 และ HTML production มี `weightModal`, `weightInput`, `confirmWeight`, `แก้น้ำหนัก` และ `is_scale`
 - งานถัดไป: ค้นหาสินค้าชั่งจริงบนหน้า POS กดการ์ด กรอก `0.250` กก. ตรวจยอด แล้วทดสอบขายจริงตามขั้นตอน UAT
+
+# Handoff - 2026-09-21 (scan versus manual quantity/weight flow)
+- ทำอะไร: แยก Web POS เป็น 2 โฟลว์ชัดเจน — สแกนบาร์โค้ดแล้วเพิ่มเข้าบิลอัตโนมัติ, ฉลากเครื่องชั่งคำนวณน้ำหนักจากยอดที่ฝังในฉลาก, ส่วนการกดการ์ดสินค้าเองเปิดกรอกจำนวนหรือกรอกน้ำหนักตามชนิดสินค้า; เพิ่ม endpoint `POST /api/pos/scan` และปรับ Python POS ให้แตะการ์ดแล้วถามจำนวน/น้ำหนักเหมือนกัน
+- ทดสอบ: `php artisan test --compact` ผ่าน 427 tests (426 passed, 1 skipped, 6 incomplete); `php artisan view:cache`; `node --check` inline Web POS JavaScript; Python POS `python3 -m unittest discover -s tests` ผ่าน 174 tests; ตรวจ AST Python และ `git diff --check`
+- Deploy: ยังไม่ deploy production; รอคำสั่ง `deploy` โดยตรง
+- ความเสี่ยง/งานถัดไป: ต้องทดสอบสแกนบาร์โค้ดมาตรฐานและฉลากเครื่องชั่งจริงด้วย Device Token/เครื่อง POS จริงก่อนเปิดขายจริง

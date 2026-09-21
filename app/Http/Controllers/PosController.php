@@ -30,6 +30,7 @@ use App\Models\StockDocument;
 use App\Models\User;
 use App\Services\Accounting\CashBookPostingService;
 use App\Services\Accounting\GlPostingService;
+use App\Services\Inventory\ScaleBarcodeService;
 use App\Services\Inventory\FifoStockService;
 use App\Services\Sales\CashSaleService;
 use App\Services\Sales\MemberPointService;
@@ -546,6 +547,86 @@ class PosController extends Controller
         }
 
         return response()->json($products);
+    }
+
+    /**
+     * Resolve a scanner input without treating it as a manual product search.
+     *
+     * Registered barcodes always win. If no registered barcode exists, try the
+     * configured scale-label profiles and turn the embedded total into a
+     * decimal quantity using the product's current POS unit price.
+     */
+    public function scan(Request $request, ScaleBarcodeService $scaleBarcodes): JsonResponse
+    {
+        $data = $request->validate([
+            'branch_id' => ['required', 'integer', 'exists:branches,id'],
+            'barcode' => ['required', 'string', 'max:64'],
+        ]);
+        $barcode = trim((string) $data['barcode']);
+        $branchId = $this->enforcedBranchId((int) $data['branch_id']);
+
+        $registered = $this->products(Request::create('/api/pos/products', 'GET', [
+            'branch_id' => $branchId,
+            'q' => $barcode,
+            'exact' => 1,
+            'lookup' => 'barcode',
+        ]))->getData(true);
+        if ($registered !== []) {
+            $product = $registered[0];
+
+            return response()->json([
+                'mode' => 'barcode',
+                'product' => $product,
+                'qty' => 1,
+                'barcode' => $barcode,
+                'barcode_type' => $product['matched_barcode']['barcode_type'] ?? BarcodePolicy::CUSTOM,
+            ]);
+        }
+
+        $decoded = $scaleBarcodes->decode($barcode);
+        if ($decoded === null) {
+            return response()->json(['message' => "ไม่พบบาร์โค้ด {$barcode}"], 404);
+        }
+
+        $productRows = $this->products(Request::create('/api/pos/products', 'GET', [
+            'branch_id' => $branchId,
+            'q' => $decoded['plu'],
+            'exact' => 1,
+            'lookup' => 'barcode',
+        ]))->getData(true);
+        if ($productRows === []) {
+            $productRows = $this->products(Request::create('/api/pos/products', 'GET', [
+                'branch_id' => $branchId,
+                'q' => $decoded['plu'],
+                'exact' => 1,
+                'lookup' => 'sku',
+            ]))->getData(true);
+        }
+        if ($productRows === []) {
+            return response()->json(['message' => "ไม่พบสินค้าสำหรับ PLU เครื่องชั่ง {$decoded['plu']}"], 404);
+        }
+
+        $product = $productRows[0];
+        $unitPrice = (float) ($product['pos_price'] ?? 0);
+        if ($unitPrice <= 0) {
+            return response()->json(['message' => "สินค้า PLU {$decoded['plu']} ยังไม่ได้ตั้งราคาขาย"], 422);
+        }
+
+        $qty = (float) $decoded['price'] / $unitPrice;
+        if ($qty <= 0) {
+            return response()->json(['message' => 'น้ำหนักจากฉลากเครื่องชั่งไม่ถูกต้อง'], 422);
+        }
+
+        return response()->json([
+            'mode' => 'scale',
+            'product' => $product,
+            'qty' => $qty,
+            'barcode' => $barcode,
+            'barcode_type' => BarcodePolicy::SCALE_WEIGHT,
+            'plu' => $decoded['plu'],
+            'total_price' => $decoded['price'],
+            'scale_profile' => $decoded['profile'],
+        ]);
     }
 
     /**

@@ -238,7 +238,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         from PySide6.QtCore import QTimer, QSize, Qt
         from PySide6.QtGui import QColor, QFont, QFontDatabase, QImage, QKeySequence, QPainter, QPixmap, QShortcut
         from PySide6.QtWidgets import (
-            QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGridLayout,
+            QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGridLayout, QInputDialog,
             QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton,
             QScrollArea, QSplitter, QTableWidget, QTableWidgetItem, QToolButton, QVBoxLayout, QWidget,
         )
@@ -1350,7 +1350,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             product_head_layout.setContentsMargins(10, 7, 10, 7)
             product_title = QLabel("สินค้า")
             product_title.setObjectName("productTitle")
-            product_hint = QLabel("แตะสินค้าเพื่อเพิ่มเข้าบิล")
+            product_hint = QLabel("สแกนแล้วเพิ่มอัตโนมัติ · แตะเองเพื่อกรอกจำนวน/น้ำหนัก")
             product_hint.setObjectName("productHint")
             product_head_layout.addWidget(product_title)
             product_head_layout.addStretch(1)
@@ -1435,14 +1435,39 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
         # ---------- การกระทำ ----------
 
+        def is_scale_product(self, product) -> bool:
+            name = str(product["name"] or "")
+            sku = str(product["sku"] or "")
+            if re.search(r"ชั่ง|น้ำหนัก", name) or re.fullmatch(r"80[01]\d{3}", sku):
+                return True
+            return service.db.execute(
+                """SELECT 1 FROM product_barcodes
+                   WHERE product_id = ? AND barcode_type IN ('SCALE_PLU', 'SCALE_WEIGHT') LIMIT 1""",
+                (int(product["id"]),),
+            ).fetchone() is not None
+
         def add_product_row(self, product) -> None:
             price, price_version = service.effective_price(int(product["id"]), product["price"] or 0)
             if price <= 0:
                 QMessageBox.warning(self, "ยังไม่ได้ตั้งราคา", f"{product['name']} ยังไม่มีราคาขาย")
                 return
+
+            if self.is_scale_product(product):
+                quantity, ok = QInputDialog.getDouble(
+                    self, "กรอกน้ำหนัก", f"{product['name']}\nราคาต่อกิโลกรัม {price:,.2f} บาท\nน้ำหนัก (กิโลกรัม)",
+                    0.001, 0.001, 999999.999, 3,
+                )
+            else:
+                quantity, ok = QInputDialog.getInt(
+                    self, "กรอกจำนวน", f"{product['name']}\nราคาต่อหน่วย {price:,.2f} บาท\nจำนวน (ชิ้น/หน่วย)",
+                    1, 1, 999999,
+                )
+            if not ok:
+                return
+
             self.order.add_product(OrderLine(
                 product_id=int(product["id"]), name=product["name"], unit_name=product["unit_name"],
-                qty=Decimal("1"), unit_price=price, is_vat=bool(product["is_vat"]), price_version=price_version,
+                qty=Decimal(str(quantity)), unit_price=price, is_vat=bool(product["is_vat"]), price_version=price_version,
             ))
             self.refresh_order()
 

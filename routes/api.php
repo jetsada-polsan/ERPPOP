@@ -16,6 +16,7 @@ Route::prefix('pos')->middleware('pos.device')->name('api.pos.')->group(function
     Route::post('/auth-events', [PosApiController::class, 'authEvents'])->name('auth-events');
     Route::post('/admin/authorize', [PosApiController::class, 'authorizeAdmin'])->name('admin.authorize');
     Route::get('/products', [PosController::class, 'products'])->name('products');
+    Route::post('/scan', [PosController::class, 'scan'])->name('scan');
     Route::get('/promotions', [PosController::class, 'promotions'])->name('promotions');
     Route::get('/members', [PosController::class, 'members'])->name('members');
     Route::get('/shift', [PosController::class, 'activeShift'])->name('shift');
