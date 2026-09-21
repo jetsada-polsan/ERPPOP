@@ -43,6 +43,15 @@ class PosPricingGuardTest extends TestCase
         $this->assertSame(90.0, app(PosPricingGuard::class)->validate($this->payload($branch, $product, 90), $user));
     }
 
+    public function test_server_accepts_decimal_quantity_for_manual_weighing(): void
+    {
+        [$user, $branch, $product] = $this->masters();
+        $payload = $this->payload($branch, $product, 100);
+        $payload['items'][0]['qty'] = 0.25;
+
+        $this->assertSame(25.0, app(PosPricingGuard::class)->validate($payload, $user));
+    }
+
     public function test_server_calculates_bundle_price_for_complete_sets_and_regular_price_for_remainder(): void
     {
         [$user, $branch, $product] = $this->masters();

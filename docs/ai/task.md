@@ -703,3 +703,10 @@ pending
 - Deploy: GitHub Actions run `35555496230` production ผ่านครบทั้ง Laravel test, frontend build, upload release และ `scripts/deploy.sh`; สถานะ `Success`
 - ตรวจ live: `https://pos.popstarcenter.com/` ตอบ HTTP 200 และ HTML production มี `repeat(3, minmax(124px, 1fr))` กับ `grid-auto-rows: minmax(124px, auto)`; ไม่พบ CSS เดิมที่ทำให้แถวสินค้ายุบเป็นแถบบาง
 - งานถัดไป: รีเฟรชหน้า POS แล้วเลือกคนขายเพื่อยืนยันภาพการ์ดสินค้า 3 แถวบนเครื่องจริง
+
+# Handoff - 2026-09-21 (manual weight entry for Web POS)
+- ทำอะไร: เพิ่มหน้ากรอกน้ำหนักสำหรับสินค้าที่ API ระบุ `is_scale`; กดการ์ดสินค้าชั่งจะกรอกน้ำหนักเป็นกิโลกรัมและเห็นยอดคำนวณทันที, เพิ่มน้ำหนักเข้าบิลได้, แก้ไขน้ำหนักจากรายการขายได้ และสินค้าปกติยังใช้ปุ่มจำนวนเดิม
+- ความถูกต้อง: checkout เดิมรองรับ `qty` แบบทศนิยมและ server pricing guard คำนวณยอดจากราคาต่อหน่วยฐาน; เพิ่มเทสต์ยืนยันน้ำหนัก `0.25` ที่ราคา 100 บาทคำนวณเป็น 25 บาท
+- ทดสอบ: `php artisan test` ผ่าน 425 tests (424 passed, 1 skipped, 6 incomplete); `php artisan view:cache`; `node --check` inline Web POS JavaScript; `git diff --check`
+- Deploy: ยังไม่ deploy production; push source แล้ว รอคำสั่ง `deploy`
+- งานถัดไป: ตรวจบนหน้า live ด้วยสินค้าชั่งจริง เช่นค้นหา SKU/PLU แล้วกรอก 0.250 กก. ก่อนขายจริง

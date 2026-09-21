@@ -138,6 +138,13 @@
         .settings-seller-grid .seller { min-height: 38px; }
         .settings-shift-row { display: flex; align-items: center; gap: 10px; }
         .settings-shift-row .value { flex: 1; color: var(--muted); font-size: 13px; font-weight: 700; }
+        .weight-product-name { margin-bottom: 6px; color: var(--navy); font-size: 16px; font-weight: 900; line-height: 1.45; }
+        .weight-price { color: var(--muted); font-size: 13px; }
+        .weight-price strong { color: var(--blue); font-size: 17px; }
+        .weight-total { display: flex; justify-content: space-between; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); }
+        .weight-total strong { color: var(--green); font-size: 22px; }
+        .weight-edit { min-height: 34px; padding: 0 9px; border: 1px solid #b9ccda; border-radius: 7px; color: var(--navy); background: #fff; font-size: 12px; font-weight: 800; }
+        .weight-edit:hover { border-color: var(--blue); background: var(--blue-soft); }
         .seller { min-height: 28px; padding: 3px 9px; border: 1px solid #c8d9e4; border-radius: 7px; color: var(--ink); background: #fff; text-align: left; }
         .seller:hover { border-color: var(--blue); background: var(--blue-soft); }
         .seller strong { display: inline; font-size: 12px; }
@@ -237,6 +244,18 @@
         </div>
     </div>
 
+    <div id="weightModal" class="modal-backdrop hidden">
+        <div class="modal">
+            <div class="modal-head"><h2 id="weightModalTitle">กรอกน้ำหนัก</h2><button class="close" type="button" data-close="weightModal">×</button></div>
+            <div id="weightProductName" class="weight-product-name"></div>
+            <div class="weight-price">ราคาต่อกิโลกรัม <strong id="weightUnitPrice">฿0.00</strong></div>
+            <div class="field" style="margin-top:14px"><label for="weightInput">น้ำหนัก (กิโลกรัม)</label><input id="weightInput" class="input" type="number" min="0.001" step="0.001" inputmode="decimal" placeholder="เช่น 0.250"></div>
+            <div class="weight-total"><span>ยอดสินค้านี้</span><strong id="weightTotal">฿0.00</strong></div>
+            <div id="weightError" class="error hidden"></div>
+            <div class="modal-actions"><button class="button light" type="button" data-close="weightModal">ยกเลิก</button><button id="confirmWeight" class="button primary" type="button">เพิ่มเข้ารายการ</button></div>
+        </div>
+    </div>
+
     <div id="paymentModal" class="modal-backdrop hidden">
         <div class="modal">
             <div class="modal-head"><h2>รับชำระเงิน</h2><button class="close" type="button" data-close="paymentModal">×</button></div>
@@ -275,7 +294,7 @@
         (() => {
             const TOKEN_KEY = 'popstar_web_pos_device_token';
             const PAPER_KEY = 'popstar_web_pos_paper_width';
-            const state = { token: '', config: null, cashiers: [], cashier: null, shift: null, products: [], cart: [], discountCard: null, lastReceipt: null, shiftAction: 'open', toastTimer: null, productSearchTimer: null, productRequestId: 0 };
+            const state = { token: '', config: null, cashiers: [], cashier: null, shift: null, products: [], cart: [], discountCard: null, lastReceipt: null, weightTarget: null, shiftAction: 'open', toastTimer: null, productSearchTimer: null, productRequestId: 0 };
             const $ = (id) => document.getElementById(id);
             const money = (value) => `฿${Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' }[char]));
@@ -392,11 +411,46 @@
             function renderProducts() {
                 const products = state.products;
                 $('productGrid').innerHTML = products.length ? products.map((product) => `<button class="product" type="button" data-product-id="${product.id}"><div class="name">${escapeHtml(product.name_th)}</div><div class="sku">${escapeHtml(product.sku_code || '')}</div><div class="price">${money(product.pos_price)}</div><div class="stock">สต๊อก ${product.stock_qty === null || product.stock_qty === undefined ? 'ไม่ระบุ' : Number(product.stock_qty).toLocaleString('th-TH')}</div></button>`).join('') : '<div class="empty-state">ไม่พบสินค้า</div>';
-                $('productGrid').querySelectorAll('[data-product-id]').forEach((button) => button.addEventListener('click', () => addToCart(Number(button.dataset.productId))));
+                $('productGrid').querySelectorAll('[data-product-id]').forEach((button) => button.addEventListener('click', () => {
+                    const product = state.products.find((item) => Number(item.id) === Number(button.dataset.productId));
+                    if (product?.is_scale) openWeightModal(product); else addToCart(Number(button.dataset.productId));
+                }));
             }
             function scheduleProductSearch() {
                 clearTimeout(state.productSearchTimer);
                 state.productSearchTimer = setTimeout(() => loadProducts($('productSearch').value), 220);
+            }
+            function isScaleProduct(product) { return Boolean(product?.is_scale); }
+            function formatWeight(value) { return Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: 3, maximumFractionDigits: 3 }); }
+            function updateWeightTotal() {
+                const product = state.weightTarget?.product;
+                const weight = Number($('weightInput').value || 0);
+                $('weightTotal').textContent = money(weight * Number(product?.pos_price || 0));
+            }
+            function openWeightModal(product, line = null) {
+                state.weightTarget = { product, lineId: line?.id || null };
+                $('weightModalTitle').textContent = line ? 'แก้ไขน้ำหนัก' : 'กรอกน้ำหนัก';
+                $('weightProductName').textContent = product.name_th || 'สินค้าชั่งน้ำหนัก';
+                $('weightUnitPrice').textContent = `${money(product.pos_price)} / กก.`;
+                $('weightInput').value = line ? Number(line.qty).toFixed(3) : '';
+                $('confirmWeight').textContent = line ? 'บันทึกน้ำหนัก' : 'เพิ่มเข้ารายการ';
+                error('weightError', ''); updateWeightTotal(); show('weightModal');
+                window.setTimeout(() => $('weightInput').focus(), 0);
+            }
+            function confirmWeight() {
+                const target = state.weightTarget;
+                const weight = Number($('weightInput').value);
+                if (!target?.product || !Number.isFinite(weight) || weight <= 0) return error('weightError', 'กรุณากรอกน้ำหนักมากกว่า 0 กิโลกรัม');
+                invalidateDiscountCard();
+                const existing = state.cart.find((item) => item.id === target.product.id);
+                if (target.lineId) {
+                    if (existing) existing.qty = weight;
+                } else if (existing) {
+                    existing.qty = Number(existing.qty) + weight;
+                } else {
+                    state.cart.push({ ...target.product, qty: weight });
+                }
+                state.weightTarget = null; hide('weightModal'); renderCart();
             }
             function addToCart(id) { const product = state.products.find((item) => Number(item.id) === id); if (!product) return; invalidateDiscountCard(); const line = state.cart.find((item) => item.id === id); if (line) line.qty = Number(line.qty) + 1; else state.cart.push({ ...product, qty: 1 }); renderCart(); }
             function invalidateDiscountCard() {
@@ -427,12 +481,21 @@
             }
             function renderCart() {
                 const subtotal = cartSubtotal(); const discount = cartDiscount(); const total = cartTotal();
-                $('cartCount').textContent = state.cart.reduce((sum, item) => sum + Number(item.qty), 0).toLocaleString('th-TH'); $('cartTotal').textContent = money(total); $('payButton').disabled = state.cart.length === 0 || !state.shift;
+                $('cartCount').textContent = state.cart.reduce((sum, item) => sum + Number(item.qty), 0).toLocaleString('th-TH', { maximumFractionDigits: 3 }); $('cartTotal').textContent = money(total); $('payButton').disabled = state.cart.length === 0 || !state.shift;
                 $('discountLine').classList.toggle('hidden', discount <= 0); $('cartDiscount').textContent = `-${money(discount)}`;
                 if (!state.cart.length) invalidateDiscountCard();
-                $('cartList').innerHTML = state.cart.length ? state.cart.map((item) => `<div class="cart-row"><div><div class="name">${escapeHtml(item.name_th)}</div><div class="controls"><button class="qty-btn" type="button" data-minus="${item.id}">−</button><span class="qty">${item.qty}</span><button class="qty-btn" type="button" data-plus="${item.id}">+</button><button class="remove" type="button" data-remove="${item.id}">ลบ</button></div></div><div class="line-total">${money(Number(item.qty) * Number(item.pos_price || 0))}</div></div>`).join('') : '<div class="cart-empty">ยังไม่มีสินค้าในรายการ<br><small>แตะสินค้าด้านซ้ายเพื่อเพิ่มเข้าบิล</small></div>';
+                $('cartList').innerHTML = state.cart.length ? state.cart.map((item) => {
+                    const controls = isScaleProduct(item)
+                        ? `<button class="weight-edit" type="button" data-weight-edit="${item.id}">แก้น้ำหนัก ${formatWeight(item.qty)} กก.</button>`
+                        : `<button class="qty-btn" type="button" data-minus="${item.id}">−</button><span class="qty">${item.qty}</span><button class="qty-btn" type="button" data-plus="${item.id}">+</button>`;
+                    return `<div class="cart-row"><div><div class="name">${escapeHtml(item.name_th)}</div><div class="controls">${controls}<button class="remove" type="button" data-remove="${item.id}">ลบ</button></div></div><div class="line-total">${money(Number(item.qty) * Number(item.pos_price || 0))}</div></div>`;
+                }).join('') : '<div class="cart-empty">ยังไม่มีสินค้าในรายการ<br><small>แตะสินค้าด้านซ้ายเพื่อเพิ่มเข้าบิล</small></div>';
                 $('cartList').querySelectorAll('[data-minus]').forEach((button) => button.addEventListener('click', () => setQty(Number(button.dataset.minus), -1)));
                 $('cartList').querySelectorAll('[data-plus]').forEach((button) => button.addEventListener('click', () => setQty(Number(button.dataset.plus), 1)));
+                $('cartList').querySelectorAll('[data-weight-edit]').forEach((button) => button.addEventListener('click', () => {
+                    const line = state.cart.find((item) => item.id === Number(button.dataset.weightEdit));
+                    if (line) openWeightModal(line, line);
+                }));
                 $('cartList').querySelectorAll('[data-remove]').forEach((button) => button.addEventListener('click', () => { invalidateDiscountCard(); state.cart = state.cart.filter((item) => item.id !== Number(button.dataset.remove)); renderCart(); }));
             }
 
@@ -506,7 +569,7 @@
                 const receipt = state.lastReceipt || {}; const company = state.config?.company || {}; const paper = localStorage.getItem(PAPER_KEY) || '80mm'; $('receiptPaper').style.width = paper; $('receiptPaper').innerHTML = `<h3>${escapeHtml(company.name || 'PopStar')}</h3><div class="center">${escapeHtml(company.address || '')}</div><div class="center">${escapeHtml(company.phone || '')}</div><hr><div>เลขที่: ${escapeHtml(receipt.receipt_no || receipt.doc_number || '—')}</div><div>ผู้ขาย: ${escapeHtml(state.cashier?.name || '')}</div><div>เวลา: ${new Date().toLocaleString('th-TH')}</div><hr>${(receipt.items || []).map((item) => `<div class="line"><span>${escapeHtml(item.name_th)} x${item.qty}</span><span>${money(Number(item.qty) * Number(item.pos_price || 0))}</span></div>`).join('')}<hr><div class="line"><strong>รวมสุทธิ</strong><strong>${money(receipt.total_amount || 0)}</strong></div><div class="center" style="margin-top:10px">ขอบคุณที่ใช้บริการ</div>`; }
 
             document.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => hide(button.dataset.close)));
-            $('connectButton').addEventListener('click', connect); $('tokenInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') connect(); }); $('reloadCashiers').addEventListener('click', loadCashiers); $('settingsShiftButton').addEventListener('click', () => { if (!state.cashier) return toast('กรุณาเลือกคนขายก่อน'); if (state.shift) closeShiftModal(); else openShiftModal(); }); $('reloadProducts').addEventListener('click', () => loadProducts($('productSearch').value)); $('productSearch').addEventListener('input', scheduleProductSearch); $('clearCart').addEventListener('click', () => { invalidateDiscountCard(); state.cart = []; renderCart(); }); $('discountCardCode').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); applyDiscountCard(); } }); $('applyDiscountCard').addEventListener('click', applyDiscountCard); $('payButton').addEventListener('click', openPayment); $('closeShiftButton').addEventListener('click', closeShiftModal); $('shiftSubmitButton').addEventListener('click', submitShift); $('paymentMethod').addEventListener('change', updatePaymentFields); $('cashReceived').addEventListener('input', updateChange); $('submitPayment').addEventListener('click', submitPayment); $('settingsButton').addEventListener('click', () => { $('settingsToken').value = state.token || ''; $('paperWidth').value = localStorage.getItem(PAPER_KEY) || '80mm'; renderShift(); show('settingsModal'); }); $('saveSettingsButton').addEventListener('click', () => { const token = $('settingsToken').value.trim(); if (!token) return toast('กรุณาใส่ Device Token'); localStorage.setItem(PAPER_KEY, $('paperWidth').value); $('tokenInput').value = token; hide('settingsModal'); connect(); }); $('clearTokenButton').addEventListener('click', () => { resetSession(true); hide('settingsModal'); toast('ล้าง Device Token จากเครื่องนี้แล้ว'); }); $('printReceipt').addEventListener('click', () => { document.body.classList.add('printing'); window.print(); setTimeout(() => document.body.classList.remove('printing'), 500); });
+            $('connectButton').addEventListener('click', connect); $('tokenInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') connect(); }); $('reloadCashiers').addEventListener('click', loadCashiers); $('settingsShiftButton').addEventListener('click', () => { if (!state.cashier) return toast('กรุณาเลือกคนขายก่อน'); if (state.shift) closeShiftModal(); else openShiftModal(); }); $('reloadProducts').addEventListener('click', () => loadProducts($('productSearch').value)); $('productSearch').addEventListener('input', scheduleProductSearch); $('weightInput').addEventListener('input', updateWeightTotal); $('weightInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') confirmWeight(); }); $('confirmWeight').addEventListener('click', confirmWeight); $('clearCart').addEventListener('click', () => { invalidateDiscountCard(); state.cart = []; renderCart(); }); $('discountCardCode').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); applyDiscountCard(); } }); $('applyDiscountCard').addEventListener('click', applyDiscountCard); $('payButton').addEventListener('click', openPayment); $('closeShiftButton').addEventListener('click', closeShiftModal); $('shiftSubmitButton').addEventListener('click', submitShift); $('paymentMethod').addEventListener('change', updatePaymentFields); $('cashReceived').addEventListener('input', updateChange); $('submitPayment').addEventListener('click', submitPayment); $('settingsButton').addEventListener('click', () => { $('settingsToken').value = state.token || ''; $('paperWidth').value = localStorage.getItem(PAPER_KEY) || '80mm'; renderShift(); show('settingsModal'); }); $('saveSettingsButton').addEventListener('click', () => { const token = $('settingsToken').value.trim(); if (!token) return toast('กรุณาใส่ Device Token'); localStorage.setItem(PAPER_KEY, $('paperWidth').value); $('tokenInput').value = token; hide('settingsModal'); connect(); }); $('clearTokenButton').addEventListener('click', () => { resetSession(true); hide('settingsModal'); toast('ล้าง Device Token จากเครื่องนี้แล้ว'); }); $('printReceipt').addEventListener('click', () => { document.body.classList.add('printing'); window.print(); setTimeout(() => document.body.classList.remove('printing'), 500); });
 
             state.token = localStorage.getItem(TOKEN_KEY) || ''; $('tokenInput').value = state.token;
             if (state.token) connect();
