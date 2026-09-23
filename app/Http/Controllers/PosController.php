@@ -1161,7 +1161,7 @@ class PosController extends Controller
         }
     }
 
-    public function voidReceipt(Request $request, PosReceipt $receipt, GlPostingService $glPosting): JsonResponse
+    public function voidReceipt(Request $request, PosReceipt $receipt, GlPostingService $glPosting, MemberPointService $points): JsonResponse
     {
         if (! auth()->user()?->hasPermission('pos.void')) {
             return response()->json(['success' => false, 'message' => 'เฉพาะผู้จัดการหรือ IT เท่านั้นที่ยกเลิกบิลได้'], 403);
@@ -1195,8 +1195,8 @@ class PosController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($receipt, $data, $glPosting) {
-                $receipt = PosReceipt::with(['terminal', 'shift'])
+            DB::transaction(function () use ($receipt, $data, $glPosting, $points) {
+                $receipt = PosReceipt::with(['terminal', 'shift', 'member'])
                     ->whereKey($receipt->id)
                     ->lockForUpdate()
                     ->firstOrFail();
@@ -1246,6 +1246,9 @@ class PosController extends Controller
 
                         $this->restoreStockForVoidedDocument($document);
                         $glPosting->reverseDocument($document, 'POS void '.$receipt->receipt_no.' - '.$data['reason']);
+                        if ($receipt->member) {
+                            $points->reverseDocument($receipt->member, $document, 'ยกเลิกบิล POS '.$receipt->receipt_no);
+                        }
                     }
                 }
 

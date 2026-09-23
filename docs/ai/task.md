@@ -32,6 +32,15 @@
 - Deploy: ยังไม่ deploy; ใช้คำสั่งนี้ตรวจ production หลัง backup และก่อน migration
 - งานถัดไป: เพิ่ม reversal service ให้ void/return สร้าง ledger กลับรายการอย่าง idempotent
 
+## Handoff - 2026-09-23 (CRM Phase 1 void reversal)
+
+- เพิ่ม `MemberPointService::reverseDocument()` สำหรับย้อน earn/redeem ของเอกสารโดยเขียน `adjust` ledger
+  และอ้าง `reversal_of_id`; ไม่ลบรายการเดิม และ retry ซ้ำได้
+- เชื่อม reversal เข้ากับ `PosController::voidReceipt()` หลังเอกสารถูกยกเลิกและ reverse GL สำเร็จ
+- ทดสอบ: `php artisan test --filter='Pos|Sales|ReconcileMemberPoints|Crm'` ผ่าน 154 tests / 686 assertions / incomplete 2
+- Deploy: พร้อมเรียก workflow `Deploy ERP` production หลัง commit; workflow จะรัน full test, build, backup/migrate/cache/health ผ่าน `scripts/deploy.sh`
+- หมายเหตุ: ใบรับคืนสินค้าหลังปิดกะยังเป็นงานต่อเนื่อง ต้องเชื่อม reversal กับ return service แยกจาก void
+
 ## Commit
 
 ```

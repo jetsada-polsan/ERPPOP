@@ -105,4 +105,37 @@ class MemberPointService
             return $existing->has('earn') ? (float) $existing->get('earn')->points : $earned;
         });
     }
+
+    /** Reverse all loyalty movements created by a document without deleting history. */
+    public function reverseDocument(Member $member, Document $document, string $reason): void
+    {
+        DB::transaction(function () use ($member, $document, $reason): void {
+            $member = Member::whereKey($member->getKey())->lockForUpdate()->firstOrFail();
+            $source = 'document_reversal';
+            $sourceId = (string) $document->getKey();
+            $originals = MemberPointTransaction::where('member_id', $member->id)
+                ->where('source', 'document')->where('source_id', $sourceId)
+                ->whereIn('direction', ['earn', 'redeem'])->orderBy('id')->get();
+            foreach ($originals as $original) {
+                $reversalSourceId = $sourceId.':'.$original->id;
+                if (MemberPointTransaction::where('member_id', $member->id)
+                    ->where('source', $source)->where('source_id', $reversalSourceId)->where('direction', 'adjust')->exists()) {
+                    continue;
+                }
+                $delta = $original->direction === 'earn' ? -(float) $original->points : (float) $original->points;
+                $member->increment('points', $delta);
+                MemberPointTransaction::create([
+                    'member_id' => $member->id,
+                    'document_id' => $document->id,
+                    'direction' => 'adjust',
+                    'source' => $source,
+                    'source_id' => $reversalSourceId,
+                    'reversal_of_id' => $original->id,
+                    'points' => $delta,
+                    'balance_after' => (float) $member->fresh()->points,
+                    'note' => "ย้อนรายการแต้ม {$document->doc_number}: {$reason}",
+                ]);
+            }
+        });
+    }
 }
