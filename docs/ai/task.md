@@ -1,5 +1,17 @@
 # Handoff — 2026-08-23 รอบที่ 4 (Claude) — **Deploy แล้ว**
 
+## Handoff - 2026-09-23 (CRM Phase 0)
+
+- ทำอะไร: ตรวจสถาปัตยกรรม CRM, Customer, Member, Point, POS และ LINE integration บน `main` และจัดทำ
+  `docs/crm/EXISTING_SYSTEM_ANALYSIS.md`
+- ผลวิเคราะห์: ระบบมี `customers` สำหรับลูกค้าธุรกิจ, `members` สำหรับสมาชิก POS, แต้มมี ledger เดิมแต่ยัง
+  พึ่ง `members.points` และขาด idempotency; LINE ที่มีอยู่เป็น notification integration ยังไม่ใช่ customer linking
+- ความเสี่ยงที่บันทึก: migration/model ของ `line_integrations` ไม่ตรงกันเรื่อง `target_id`, token ถูกจัดการผ่าน
+  fillable/controller, point settlement ยังกัน replay ซ้ำไม่ได้
+- ทดสอบ: `git diff --check`; ยังไม่รัน test suite เพราะรอบนี้เพิ่มเฉพาะเอกสารวิเคราะห์
+- Deploy: ยังไม่ deploy และไม่มีการแก้ production
+- งานถัดไป: ขอใช้ผลวิเคราะห์เป็นฐานออกแบบ Phase 1 โดยเริ่มจาก point ledger/idempotency และ reconciliation
+
 ## Commit
 
 ```
