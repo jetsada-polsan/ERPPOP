@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['member_code', 'name', 'phone', 'member_type_id', 'branch_id', 'points', 'is_active'])]
+#[Fillable(['member_code', 'name', 'phone', 'phone_normalized', 'member_type_id', 'branch_id', 'points', 'is_active'])]
 class Member extends Model
 {
     const UPDATED_AT = null;

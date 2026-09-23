@@ -41,6 +41,14 @@
 - Deploy: พร้อมเรียก workflow `Deploy ERP` production หลัง commit; workflow จะรัน full test, build, backup/migrate/cache/health ผ่าน `scripts/deploy.sh`
 - หมายเหตุ: ใบรับคืนสินค้าหลังปิดกะยังเป็นงานต่อเนื่อง ต้องเชื่อม reversal กับ return service แยกจาก void
 
+## Handoff - 2026-09-23 (Member registration API)
+
+- เพิ่ม `MemberRegistrationService` สำหรับ normalize เบอร์ไทยและป้องกันสมาชิก active ใช้เบอร์ซ้ำ
+- เพิ่ม POS device API สำหรับค้นหา/สร้าง/ดูสมาชิกที่ `/api/pos/members*`
+- เพิ่ม `phone_normalized` พร้อม index โดยไม่ทำลายข้อมูลเบอร์เดิม
+- เพิ่ม tests สำหรับเบอร์รูปแบบ `+66`, duplicate และเบอร์ไม่ถูกต้อง
+- ยังไม่ deploy รอบนี้จนกว่า full test และ review flow POS registration จะผ่าน
+
 ## Commit
 
 ```

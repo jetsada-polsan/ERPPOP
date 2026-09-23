@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\PosApiController;
 use App\Http\Controllers\Api\OcrDocumentController;
 use App\Http\Controllers\Api\LegacyBackofficeSummaryController;
+use App\Http\Controllers\Api\MemberApiController;
 use App\Http\Controllers\PosController;
 use Illuminate\Support\Facades\Route;
 
@@ -19,6 +20,9 @@ Route::prefix('pos')->middleware('pos.device')->name('api.pos.')->group(function
     Route::post('/scan', [PosController::class, 'scan'])->name('scan');
     Route::get('/promotions', [PosController::class, 'promotions'])->name('promotions');
     Route::get('/members', [PosController::class, 'members'])->name('members');
+    Route::get('/members/search', [MemberApiController::class, 'search'])->name('members.search');
+    Route::post('/members', [MemberApiController::class, 'store'])->name('members.store');
+    Route::get('/members/{member}', [MemberApiController::class, 'show'])->name('members.show');
     Route::get('/shift', [PosController::class, 'activeShift'])->name('shift');
     Route::post('/shift/open', [PosController::class, 'openShift'])->name('shift.open');
     Route::post('/shift/close', [PosController::class, 'closeShift'])->name('shift.close');
