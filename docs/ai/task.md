@@ -23,6 +23,15 @@
 - Deploy: ยังไม่ deploy; migration ต้องตรวจข้อมูลซ้ำและ reconciliation บน production ก่อนรัน
 - งานถัดไป: เพิ่ม reconciliation command/report, reversal service สำหรับ void/return และทดสอบ migration บน PostgreSQL
 
+## Handoff - 2026-09-23 (CRM Phase 1 reconciliation)
+
+- เพิ่มคำสั่ง `loyalty:reconcile-points` ตรวจ `members.points` เทียบผลรวม ledger แบบ read-only
+- รองรับตรวจทั้งระบบหรือเฉพาะ `--member=<id>` และคืน exit code 1 เมื่อพบส่วนต่าง
+- เพิ่ม feature tests กรณียอดตรง/ไม่ตรง โดยยืนยันว่า command ไม่แก้ข้อมูลเอง
+- ทดสอบ: `php artisan test --filter='ReconcileMemberPoints|Pos|Sales|Crm'`
+- Deploy: ยังไม่ deploy; ใช้คำสั่งนี้ตรวจ production หลัง backup และก่อน migration
+- งานถัดไป: เพิ่ม reversal service ให้ void/return สร้าง ledger กลับรายการอย่าง idempotent
+
 ## Commit
 
 ```
