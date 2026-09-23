@@ -61,7 +61,15 @@ class MemberPointService
                 throw new RuntimeException('ไม่พบสมาชิก กรุณาเลือกสมาชิกใหม่');
             }
 
-            if ($redeemPoints > 0) {
+            $source = 'document';
+            $sourceId = (string) $document->getKey();
+            $existing = MemberPointTransaction::where('member_id', $member->id)
+                ->where('source', $source)
+                ->where('source_id', $sourceId)
+                ->get()
+                ->keyBy('direction');
+
+            if ($redeemPoints > 0 && ! $existing->has('redeem')) {
                 if ((float) $member->points + 0.0001 < $redeemPoints) {
                     throw new RuntimeException('แต้มสะสมไม่พอ กรุณาตรวจสอบยอดแต้มอีกครั้ง');
                 }
@@ -71,6 +79,8 @@ class MemberPointService
                     'member_id' => $member->id,
                     'document_id' => $document->id,
                     'direction' => 'redeem',
+                    'source' => $source,
+                    'source_id' => $sourceId,
                     'points' => $redeemPoints,
                     'balance_after' => (float) $member->fresh()->points,
                     'note' => 'แลกแต้มเป็นส่วนลดบิล ' . $document->doc_number,
@@ -78,19 +88,21 @@ class MemberPointService
             }
 
             $earned = $this->pointsForAmount((float) $document->total_amount);
-            if ($earned > 0) {
+            if ($earned > 0 && ! $existing->has('earn')) {
                 $member->increment('points', $earned);
                 MemberPointTransaction::create([
                     'member_id' => $member->id,
                     'document_id' => $document->id,
                     'direction' => 'earn',
+                    'source' => $source,
+                    'source_id' => $sourceId,
                     'points' => $earned,
                     'balance_after' => (float) $member->fresh()->points,
                     'note' => 'สะสมแต้มจากบิล ' . $document->doc_number,
                 ]);
             }
 
-            return $earned;
+            return $existing->has('earn') ? (float) $existing->get('earn')->points : $earned;
         });
     }
 }

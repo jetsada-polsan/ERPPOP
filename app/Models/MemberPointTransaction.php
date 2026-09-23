@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['member_id', 'document_id', 'direction', 'points', 'balance_after', 'note'])]
+#[Fillable(['member_id', 'document_id', 'direction', 'source', 'source_id', 'reversal_of_id', 'points', 'balance_after', 'note'])]
 class MemberPointTransaction extends Model
 {
     const UPDATED_AT = null;
@@ -19,6 +19,11 @@ class MemberPointTransaction extends Model
     public function document(): BelongsTo
     {
         return $this->belongsTo(Document::class);
+    }
+
+    public function reversalOf(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'reversal_of_id');
     }
 
     protected function casts(): array

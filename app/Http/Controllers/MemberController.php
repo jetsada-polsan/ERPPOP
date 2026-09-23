@@ -44,10 +44,8 @@ class MemberController extends Controller
             'phone' => ['nullable', 'string', 'max:30'],
             'member_type_id' => ['nullable', 'integer', 'exists:member_types,id'],
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
-            'points' => ['nullable', 'numeric', 'min:0'],
             'is_active' => ['nullable', 'boolean'],
         ]);
-        $data['points'] = $data['points'] ?? 0;
         $data['is_active'] = $request->boolean('is_active', true);
 
         return $data;

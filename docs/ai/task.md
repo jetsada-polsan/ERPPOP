@@ -12,6 +12,17 @@
 - Deploy: ยังไม่ deploy และไม่มีการแก้ production
 - งานถัดไป: ขอใช้ผลวิเคราะห์เป็นฐานออกแบบ Phase 1 โดยเริ่มจาก point ledger/idempotency และ reconciliation
 
+## Handoff - 2026-09-23 (CRM Phase 1 foundation)
+
+- ทำอะไร: เพิ่ม migration `2026_09_23_000001_harden_member_point_ledger.php` ให้ ledger มี `source`,
+  `source_id`, `reversal_of_id`, index และ unique idempotency key ต่อสมาชิก/เหตุการณ์/ทิศทาง
+- ปรับ `MemberPointService::settle()` ให้ replay เอกสารเดิมไม่สร้างรายการ earn/redeem ซ้ำ โดยยังใช้ row lock
+- ปรับ `MemberController` ไม่รับ `points` จากฟอร์มอีกต่อไป เพื่อไม่ให้แก้ยอดแต้มข้าม ledger
+- ปรับ `MemberPointTransaction` ให้รองรับข้อมูล source และ reversal
+- ทดสอบ: `git diff --check`; `php artisan test --filter='Pos|Sales|Crm'` ผ่าน 152 tests / 683 assertions / incomplete 2
+- Deploy: ยังไม่ deploy; migration ต้องตรวจข้อมูลซ้ำและ reconciliation บน production ก่อนรัน
+- งานถัดไป: เพิ่ม reconciliation command/report, reversal service สำหรับ void/return และทดสอบ migration บน PostgreSQL
+
 ## Commit
 
 ```
