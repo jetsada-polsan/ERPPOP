@@ -49,6 +49,15 @@
 - เพิ่ม tests สำหรับเบอร์รูปแบบ `+66`, duplicate และเบอร์ไม่ถูกต้อง
 - ยังไม่ deploy รอบนี้จนกว่า full test และ review flow POS registration จะผ่าน
 
+## Handoff - 2026-09-23 (LINE points webhook)
+
+- เพิ่ม `member_line_accounts` สำหรับความสัมพันธ์ member ↔ LINE user แบบแยกตาราง
+- เพิ่ม `/api/line/webhook` ตรวจ `x-line-signature` ด้วย HMAC-SHA256 จาก raw body ก่อน parse/process
+- เมื่อบัญชีถูกผูกแล้วและสมาชิกส่งข้อความที่มีคำว่า `แต้ม` ระบบตอบยอดแต้มผ่าน LINE Reply API
+- เพิ่ม config ผ่าน `LINE_CHANNEL_ID`, `LINE_CHANNEL_SECRET`, `LINE_CHANNEL_ACCESS_TOKEN` ใน environment เท่านั้น
+- เพิ่ม tests signature invalid/valid; test suite ที่เกี่ยวข้องผ่าน 158 tests / 692 assertions / incomplete 2
+- ข้อจำกัด: ยังไม่มี LINE Login/LIFF + OTP linking จริง จึงยังไม่ควรเปิด webhook กับผู้ใช้ทั่วไปจนกว่าจะทำ flow ผูกบัญชี
+
 ## Commit
 
 ```

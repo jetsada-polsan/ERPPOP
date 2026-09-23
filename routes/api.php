@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\PosApiController;
 use App\Http\Controllers\Api\OcrDocumentController;
 use App\Http\Controllers\Api\LegacyBackofficeSummaryController;
 use App\Http\Controllers\Api\MemberApiController;
+use App\Http\Controllers\LineWebhookController;
 use App\Http\Controllers\PosController;
 use Illuminate\Support\Facades\Route;
 
@@ -37,6 +38,7 @@ Route::prefix('pos')->middleware('pos.device')->name('api.pos.')->group(function
 });
 
 Route::post('/legacy-backoffice/summary', [LegacyBackofficeSummaryController::class, 'store'])->name('api.legacy-backoffice.summary');
+Route::post('/line/webhook', LineWebhookController::class)->name('api.line.webhook');
 
 Route::prefix('ocr')->middleware('auth')->name('api.ocr.')->group(function () {
     Route::get('/documents', [OcrDocumentController::class, 'index'])->name('documents.index');
