@@ -109,6 +109,31 @@
         }
         .pos-customer-field input::placeholder { color: var(--pos-muted); }
 
+        /* ลูกค้า/สมาชิกเป็นข้อมูลเสริม ไม่ควรแย่งพื้นที่จากการขายปกติ */
+        [x-cloak] { display: none !important; }
+        .pos-customer-tools { position: relative; }
+        .pos-customer-toggle {
+            width: 100%; min-height: 34px; display: flex; align-items: center; gap: 7px;
+            padding: 5px 9px; border: 1px solid var(--pos-border); border-radius: 8px;
+            color: var(--pos-muted); background: var(--pos-card); font: inherit;
+            font-size: 12px; font-weight: 800; text-align: left; cursor: pointer;
+        }
+        .pos-customer-toggle:hover,
+        .pos-customer-toggle[aria-expanded="true"] { border-color: var(--pos-ui-primary); background: var(--pos-card-2); color: var(--pos-ui-primary-strong); }
+        .pos-customer-toggle .toggle-label { display: inline-flex; align-items: center; gap: 6px; }
+        .pos-customer-toggle small { color: var(--pos-muted); font-size: 10px; font-weight: 700; }
+        .pos-customer-toggle .selected-value {
+            min-width: 0; margin-left: auto; overflow: hidden; color: var(--pos-ui-success);
+            font-size: 11px; font-weight: 900; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .pos-customer-toggle .chevron { margin-left: 3px; font-size: 11px; }
+        .pos-customer-tools-body { display: grid; gap: 6px; padding-top: 6px; }
+
+        /* Vue owns the cart UI. Give its list a real scroll area so rows never
+           push the totals/payment controls on top of one another. */
+        #pos-vue-cart-panel { display: flex; flex: 1 1 auto; width: 100%; height: 0; min-height: 0; overflow: hidden; }
+        #pos-vue-cart-panel > .pos-vue-cart { width: 100%; min-width: 0; }
+
         .pos-cart-items {
             flex: 1; overflow-y: auto; padding: 0;
             scrollbar-width: thin; scrollbar-color: #334155 transparent;
@@ -1934,51 +1959,61 @@
             </div>
             @endunless
             <div class="pos-cart-header">
-                <div class="pos-customer-field">
-                    <i class="bi bi-person" style="color:#94a3b8;font-size:15px"></i>
-                    <input type="text" placeholder="ค้นหาลูกค้า (ไม่บังคับ)" x-model="customerQuery"
-                        @input.debounce.400ms="searchCustomers()" autocomplete="off">
-                    <span x-show="customerName" @click="clearCustomer()" style="color:#94a3b8;cursor:pointer;font-size:12px" x-text="'✕ ' + customerName"></span>
-                    <div x-show="customerResults.length" style="position:absolute;left:0;right:0;top:100%;margin-top:4px;background:#1e293b;border:1px solid rgba(255,255,255,.1);border-radius:10px;z-index:100;overflow:hidden">
-                        <template x-for="c in customerResults" :key="c.id">
-                            <div @click="selectCustomer(c)" style="padding:9px 14px;cursor:pointer;font-size:13px;display:flex;gap:10px" :style="'border-bottom:1px solid rgba(255,255,255,.06)'" @mouseenter="$el.style.background='rgba(255,255,255,.05)'" @mouseleave="$el.style.background='transparent'">
-                                <span x-text="c.code" style="color:#94a3b8;font-size:11px;min-width:60px"></span>
-                                <span x-text="c.name_th"></span>
-                            </div>
-                        </template>
-                    </div>
-                </div>
+                <div class="pos-customer-tools">
+                    <button type="button" class="pos-customer-toggle" :aria-expanded="customerToolsOpen" @click="customerToolsOpen = !customerToolsOpen">
+                        <span class="toggle-label"><i class="bi bi-person-plus"></i> ลูกค้า / สมาชิก <small>(ถ้ามี)</small></span>
+                        <span class="selected-value" x-show="customerName || member" x-text="customerName || (member ? member.name : '')"></span>
+                        <i class="bi chevron" :class="customerToolsOpen ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+                    </button>
 
-                {{-- Member (สะสม/แลกแต้ม) --}}
-                <div class="pos-customer-field" style="margin-top:6px">
-                    <i class="bi bi-person-vcard" style="color:#fbbf24;font-size:15px"></i>
-                    <template x-if="!member">
-                        <input type="text" placeholder="สมาชิกสะสมแต้ม รหัส/ชื่อ/เบอร์ (ไม่บังคับ)" x-model="memberQuery"
-                            @input.debounce.400ms="searchMembers()" autocomplete="off">
-                    </template>
-                    <template x-if="member">
-                        <div style="display:flex;align-items:center;gap:8px;flex:1;font-size:13px">
-                            <span style="font-weight:800;color:#0f172a" x-text="member.name"></span>
-                            <span style="color:#d97706;font-weight:800" x-text="money(member.points) + ' แต้ม'"></span>
-                            <template x-if="pointValueBaht > 0">
-                                <span style="display:flex;align-items:center;gap:5px;margin-left:auto">
-                                    <span style="color:#64748b;font-size:11px;font-weight:900">ใช้แต้ม</span>
-                                    <input class="discount-input" type="number" min="0" step="1" x-model.number="redeemPoints"
-                                        style="width:64px;height:26px" @focus="$el.select()">
-                                    <span style="color:#059669;font-weight:800" x-text="'-฿' + money(pointsDiscountAmount)"></span>
-                                </span>
-                            </template>
-                            <span @click="clearMember()" style="color:#94a3b8;cursor:pointer;font-size:12px" :style="pointValueBaht > 0 ? '' : 'margin-left:auto'">✕</span>
-                        </div>
-                    </template>
-                    <div x-show="memberResults.length" style="position:absolute;left:0;right:0;top:100%;margin-top:4px;background:#1e293b;border:1px solid rgba(255,255,255,.1);border-radius:10px;z-index:100;overflow:hidden">
-                        <template x-for="m in memberResults" :key="m.id">
-                            <div @click="selectMember(m)" style="padding:9px 14px;cursor:pointer;font-size:13px;display:flex;gap:10px;border-bottom:1px solid rgba(255,255,255,.06)" @mouseenter="$el.style.background='rgba(255,255,255,.05)'" @mouseleave="$el.style.background='transparent'">
-                                <span x-text="m.member_code" style="color:#94a3b8;font-size:11px;min-width:60px"></span>
-                                <span x-text="m.name"></span>
-                                <span x-text="money(m.points) + ' แต้ม'" style="margin-left:auto;color:#fbbf24;font-size:11px;font-weight:800"></span>
+                    <div class="pos-customer-tools-body" x-show="customerToolsOpen" x-cloak>
+                        <div class="pos-customer-field">
+                            <i class="bi bi-person" style="color:#94a3b8;font-size:15px"></i>
+                            <input type="text" placeholder="ค้นหาลูกค้า (ไม่บังคับ)" x-model="customerQuery"
+                                @input.debounce.400ms="searchCustomers()" autocomplete="off">
+                            <span x-show="customerName" @click="clearCustomer()" style="color:#94a3b8;cursor:pointer;font-size:12px" x-text="'✕ ' + customerName"></span>
+                            <div x-show="customerResults.length" style="position:absolute;left:0;right:0;top:100%;margin-top:4px;background:#1e293b;border:1px solid rgba(255,255,255,.1);border-radius:10px;z-index:100;overflow:hidden">
+                                <template x-for="c in customerResults" :key="c.id">
+                                    <div @click="selectCustomer(c)" style="padding:9px 14px;cursor:pointer;font-size:13px;display:flex;gap:10px" :style="'border-bottom:1px solid rgba(255,255,255,.06)'" @mouseenter="$el.style.background='rgba(255,255,255,.05)'" @mouseleave="$el.style.background='transparent'">
+                                        <span x-text="c.code" style="color:#94a3b8;font-size:11px;min-width:60px"></span>
+                                        <span x-text="c.name_th"></span>
+                                    </div>
+                                </template>
                             </div>
-                        </template>
+                        </div>
+
+                        {{-- Member (สะสม/แลกแต้ม) --}}
+                        <div class="pos-customer-field">
+                            <i class="bi bi-person-vcard" style="color:#fbbf24;font-size:15px"></i>
+                            <template x-if="!member">
+                                <input type="text" placeholder="สมาชิกสะสมแต้ม รหัส/ชื่อ/เบอร์ (ไม่บังคับ)" x-model="memberQuery"
+                                    @input.debounce.400ms="searchMembers()" autocomplete="off">
+                            </template>
+                            <template x-if="member">
+                                <div style="display:flex;align-items:center;gap:8px;flex:1;font-size:13px">
+                                    <span style="font-weight:800;color:#0f172a" x-text="member.name"></span>
+                                    <span style="color:#d97706;font-weight:800" x-text="money(member.points) + ' แต้ม'"></span>
+                                    <template x-if="pointValueBaht > 0">
+                                        <span style="display:flex;align-items:center;gap:5px;margin-left:auto">
+                                            <span style="color:#64748b;font-size:11px;font-weight:900">ใช้แต้ม</span>
+                                            <input class="discount-input" type="number" min="0" step="1" x-model.number="redeemPoints"
+                                                style="width:64px;height:26px" @focus="$el.select()">
+                                            <span style="color:#059669;font-weight:800" x-text="'-฿' + money(pointsDiscountAmount)"></span>
+                                        </span>
+                                    </template>
+                                    <span @click="clearMember()" style="color:#94a3b8;cursor:pointer;font-size:12px" :style="pointValueBaht > 0 ? '' : 'margin-left:auto'">✕</span>
+                                </div>
+                            </template>
+                            <div x-show="memberResults.length" style="position:absolute;left:0;right:0;top:100%;margin-top:4px;background:#1e293b;border:1px solid rgba(255,255,255,.1);border-radius:10px;z-index:100;overflow:hidden">
+                                <template x-for="m in memberResults" :key="m.id">
+                                    <div @click="selectMember(m)" style="padding:9px 14px;cursor:pointer;font-size:13px;display:flex;gap:10px;border-bottom:1px solid rgba(255,255,255,.06)" @mouseenter="$el.style.background='rgba(255,255,255,.05)'" @mouseleave="$el.style.background='transparent'">
+                                        <span x-text="m.member_code" style="color:#94a3b8;font-size:11px;min-width:60px"></span>
+                                        <span x-text="m.name"></span>
+                                        <span x-text="money(m.points) + ' แต้ม'" style="margin-left:auto;color:#fbbf24;font-size:11px;font-weight:800"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2608,8 +2643,9 @@
 }
 
 /* POS parity: keep the browser preview aligned with the Python/PySide6 build.
-   The cashier workflow is order/cart on the left and products on the right. */
-.pos-body { grid-template-columns: minmax(480px, 40vw) minmax(0, 1fr); }
+   The cashier workflow is products on the left and order/cart on the right.
+   Keep a stable 55/45 split so the bill never becomes a narrow side strip. */
+.pos-body { grid-template-columns: minmax(0, 55fr) minmax(390px, 45fr); }
 .pos-cart { order: 1; }
 .pos-products { order: 2; }
 .pos-products, .pos-cart { border-radius: var(--pos-ui-radius); }
@@ -2640,8 +2676,9 @@
 .topbar-locked { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.30); color: #fff; }
 .shift-pill.open, .shift-pill.closed { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.30); color: #fff; }
 .product-card {
-    min-height: 134px;
-    height: 134px;
+    min-height: 0;
+    height: auto;
+    min-width: 0;
     padding: 12px;
     border-radius: 7px;
     background: var(--pos-ui-surface);
@@ -2649,6 +2686,13 @@
     box-shadow: 0 2px 6px rgba(28,48,62,.035);
 }
 .product-card:hover { transform: translateY(-1px); background: var(--pos-card-2); border-color: #d67b84; box-shadow: 0 5px 14px rgba(189,40,54,.10); }
+.product-card .product-name {
+    min-width: 0;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+}
 .product-sku { color: #75838f; font-size: 10px; }
 .product-name { color: var(--pos-ui-ink); font-size: 13px; line-height: 1.45; }
 .product-price { color: var(--pos-ui-primary-strong); font-size: 16px; }
@@ -2660,8 +2704,17 @@
 .action-btn.pay, .action-btn.qr { background: var(--pos-ui-primary); }
 .action-btn.clear { background: var(--pos-ui-primary-strong); }
 
+/* Keep the catalogue easy to scan: show three usable rows and scroll the
+   remaining products instead of shrinking cards until their text overlaps. */
+.product-grid {
+    grid-template-rows: repeat(3, minmax(120px, 1fr));
+    grid-auto-rows: 120px;
+    align-content: start;
+}
+
 @media (max-width: 1280px) {
-    .pos-body { grid-template-columns: 520px minmax(0, 1fr); }
+    .pos-body { grid-template-columns: minmax(0, 55fr) minmax(370px, 45fr); }
+    .product-grid { grid-template-rows: repeat(3, minmax(100px, 1fr)); grid-auto-rows: 100px; }
 }
 @media (max-width: 980px) {
     .pos-body { grid-template-columns: 1fr; }
@@ -2889,7 +2942,7 @@ function posApp() {
         promotions: [],
 
         // Customer
-        customerQuery: '', customerId: null, customerName: '', customerResults: [],
+        customerQuery: '', customerId: null, customerName: '', customerResults: [], customerToolsOpen: false,
 
         // Payment
         payModalOpen: false, method: 'cash', received: 0, receivedInput: '', processing: false,
@@ -3509,6 +3562,7 @@ function posApp() {
             this.customerQuery = '';
             this.customerId = null;
             this.customerName = '';
+            this.customerToolsOpen = false;
             this.billDiscountValue = 0;
             this.billDiscountType = 'baht';
             this.removeDiscountCard();

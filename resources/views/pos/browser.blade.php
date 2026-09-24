@@ -190,6 +190,21 @@
         @media (max-width: 900px) { body.pos-active { overflow: auto; } body.pos-active .page { position: static; height: auto; max-width: 1600px; overflow: visible; } .workspace { height: auto; } .top-context { gap: 4px; } .context-item { padding: 3px 6px; } .context-item .value { max-width: 130px; } .sale-grid { grid-template-columns: 1fr; min-height: 0; height: auto; } .cart-list { height: auto; max-height: 430px; min-height: 260px; } .product-grid { grid-template-rows: none; grid-auto-rows: minmax(112px, auto); height: auto; min-height: 360px; } }
         /* จอเล็กบังคับคอลัมน์แคบลงผ่านตัวแปรเดิม เพื่อให้ยังเป็นที่เดียวที่คุมจำนวนคอลัมน์ */
         @media (max-width: 560px) { .page { padding: 10px; } .topbar { padding: 9px 11px; } .brand small { display: none; } .top-context { gap: 3px; } .top-meta { gap: 5px; font-size: 11px; } .status { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .context-item .label { display: block; margin: 0; font-size: 8px; } .context-item .value { max-width: 92px; font-size: 10px; } .connect-panel { margin: 5vh auto; padding: 22px 17px; } .product-grid { --pos-product-columns: 2; padding: 10px; gap: 7px; } .product { min-height: 112px; padding: 9px; } .action-row { grid-template-columns: 1fr; } .payment-qr-box canvas, .payment-qr-box img { width: 160px !important; height: 160px !important; } }
+
+        /* Final stability guard: each desktop product card keeps a real
+           height. A bad/old published layout must never collapse cards into
+           thin overlapping rows; remaining products stay scrollable. */
+        @media (min-width: 901px) {
+            .product-grid {
+                grid-template-rows: repeat(var(--pos-product-rows), var(--pos-card-min-height));
+                grid-auto-rows: var(--pos-card-min-height);
+                align-content: start;
+            }
+            .product {
+                min-height: var(--pos-card-min-height);
+                height: var(--pos-card-min-height);
+            }
+        }
         @media print { @page { size: 80mm auto; margin: 0; } body { background: #fff; } body.printing > *:not(#receiptModal) { display: none !important; } body.printing #receiptModal { position: static; display: block !important; padding: 0; background: #fff; } body.printing #receiptModal .modal { width: auto; max-height: none; padding: 0; box-shadow: none; } body.printing #receiptModal .modal-head, body.printing #receiptModal .modal-actions { display: none; } body.printing .receipt-paper { width: 80mm; } }
     </style>
 </head>

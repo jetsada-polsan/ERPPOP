@@ -174,47 +174,49 @@ onUnmounted(() => window.removeEventListener('pos-vue-state', syncState));
 
 <template>
     <section class="pos-vue-cart" aria-label="ตะกร้าสินค้า Vue">
-        <div v-if="!state.cart.length" class="cart-empty">
-            <i class="bi bi-bag"></i>
-            <span>ยังไม่มีสินค้า</span>
-        </div>
-        <template v-else>
-            <div class="cart-list-head"><span>#</span><span>สินค้า</span><span>จำนวน</span><span class="text-end">รวม</span><span></span></div>
-            <div v-for="(item, index) in state.cart" :key="item.uid || `${item.id}-${index}`" class="cart-item" :class="{ 'gift-line': item.is_free_gift }">
-                <div class="cart-line-no">{{ index + 1 }}</div>
-                <div class="cart-product-cell">
-                    <div class="cart-item-name">{{ item.name_th }}</div>
-                    <div class="cart-item-sku">
-                        <span>{{ item.sku_code }}</span>
-                        <span v-if="!item.is_free_gift"> • ฿{{ money(item.unit_price) }}/หน่วย</span>
-                        <span v-if="item.unit_name"> • {{ item.unit_name }}{{ item.unit_factor && item.unit_factor !== 1 ? ` x${money(item.unit_factor)}` : '' }}</span>
-                        <span v-if="item.is_free_gift" class="gift-label"> • ของแถม: {{ item.promo_name || '' }}</span>
-                    </div>
-                </div>
-                <div class="cart-qty-cell">
-                    <template v-if="!item.is_free_gift">
-                        <button class="qty-btn" type="button" @click="action('change-qty', { index, delta: -1 })"><i class="bi bi-dash"></i></button>
-                        <input class="qty-input" type="number" min="0.001" step="0.001" :value="item.qty" @change="setItemField(index, 'qty', eventValue($event))">
-                        <button class="qty-btn" type="button" @click="action('change-qty', { index, delta: 1 })"><i class="bi bi-plus"></i></button>
-                    </template>
-                    <div v-else class="qty-display">{{ money(item.qty) }}</div>
-                </div>
-                <div class="cart-item-price">{{ item.is_free_gift ? 'ฟรี' : `฿${money(lineNet(item))}` }}</div>
-                <button v-if="!item.is_free_gift" class="trash-btn" type="button" @click="action('remove-item', { index })"><i class="bi bi-trash3"></i></button>
-                <span v-else></span>
-                <div v-if="!item.is_free_gift" class="cart-line-tools">
-                    <span class="tool-label">ราคา</span>
-                    <input class="price-input" type="number" min="0" step="0.01" :value="item.unit_price" @change="setItemField(index, 'unit_price', eventValue($event))">
-                    <span class="tool-label">ลด</span>
-                    <div class="discount-cell">
-                        <input class="discount-input" type="number" min="0" step="0.01" :value="item.discount_value || 0" @change="setItemField(index, 'discount_value', eventValue($event))">
-                        <select class="discount-type" :value="item.discount_type || 'baht'" @change="setItemField(index, 'discount_type', eventValue($event))">
-                            <option value="baht">฿</option><option value="percent">%</option>
-                        </select>
-                    </div>
-                </div>
+        <div class="pos-vue-cart-items">
+            <div v-if="!state.cart.length" class="cart-empty">
+                <i class="bi bi-bag"></i>
+                <span>ยังไม่มีสินค้า</span>
             </div>
-        </template>
+            <template v-else>
+                <div class="cart-list-head"><span>#</span><span>สินค้า</span><span>จำนวน</span><span class="text-end">รวม</span><span></span></div>
+                <div v-for="(item, index) in state.cart" :key="item.uid || `${item.id}-${index}`" class="cart-item" :class="{ 'gift-line': item.is_free_gift }">
+                    <div class="cart-line-no">{{ index + 1 }}</div>
+                    <div class="cart-product-cell">
+                        <div class="cart-item-name">{{ item.name_th }}</div>
+                        <div class="cart-item-sku">
+                            <span>{{ item.sku_code }}</span>
+                            <span v-if="!item.is_free_gift"> • ฿{{ money(item.unit_price) }}/หน่วย</span>
+                            <span v-if="item.unit_name"> • {{ item.unit_name }}{{ item.unit_factor && item.unit_factor !== 1 ? ` x${money(item.unit_factor)}` : '' }}</span>
+                            <span v-if="item.is_free_gift" class="gift-label"> • ของแถม: {{ item.promo_name || '' }}</span>
+                        </div>
+                    </div>
+                    <div class="cart-qty-cell">
+                        <template v-if="!item.is_free_gift">
+                            <button class="qty-btn" type="button" @click="action('change-qty', { index, delta: -1 })"><i class="bi bi-dash"></i></button>
+                            <input class="qty-input" type="number" min="0.001" step="0.001" :value="item.qty" @change="setItemField(index, 'qty', eventValue($event))">
+                            <button class="qty-btn" type="button" @click="action('change-qty', { index, delta: 1 })"><i class="bi bi-plus"></i></button>
+                        </template>
+                        <div v-else class="qty-display">{{ money(item.qty) }}</div>
+                    </div>
+                    <div class="cart-item-price">{{ item.is_free_gift ? 'ฟรี' : `฿${money(lineNet(item))}` }}</div>
+                    <button v-if="!item.is_free_gift" class="trash-btn" type="button" @click="action('remove-item', { index })"><i class="bi bi-trash3"></i></button>
+                    <span v-else></span>
+                    <div v-if="!item.is_free_gift" class="cart-line-tools">
+                        <span class="tool-label">ราคา</span>
+                        <input class="price-input" type="number" min="0" step="0.01" :value="item.unit_price" @change="setItemField(index, 'unit_price', eventValue($event))">
+                        <span class="tool-label">ลด</span>
+                        <div class="discount-cell">
+                            <input class="discount-input" type="number" min="0" step="0.01" :value="item.discount_value || 0" @change="setItemField(index, 'discount_value', eventValue($event))">
+                            <select class="discount-type" :value="item.discount_type || 'baht'" @change="setItemField(index, 'discount_type', eventValue($event))">
+                                <option value="baht">฿</option><option value="percent">%</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
 
         <div class="pos-cart-footer">
             <div class="bill-tools">
@@ -255,7 +257,8 @@ onUnmounted(() => window.removeEventListener('pos-vue-state', syncState));
 
 <style scoped>
 .pos-vue-cart { height: 100%; display: flex; flex-direction: column; min-height: 0; }
-.pos-vue-cart > .cart-empty { flex: 1; }
+.pos-vue-cart-items { flex: 1 1 auto; height: 0; min-height: 0; overflow: auto; scrollbar-width: thin; }
+.pos-vue-cart-items > .cart-empty { height: 100%; min-height: 220px; }
 .gift-label { color: #059669; font-weight: 900; }
 .vue-payment-preview { margin: 8px 10px 0; padding-top: 8px; border-top: 1px solid var(--pos-ui-border, #dbe7ef); }
 .vue-payment-preview-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; color: var(--pos-ui-ink, #162331); font-size: 11px; font-weight: 900; }

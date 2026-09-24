@@ -32,12 +32,16 @@ class PosBrowserTest extends TestCase
             ->assertSee('scanProduct')
             ->assertSee('topContext')
             ->assertSee('settingsShiftButton')
+            // Web POS เน้นขายสินค้า; ลูกค้า/สมาชิกเป็นงานเสริม ไม่แทรกในหน้าหลัก
+            ->assertDontSee('สมาชิก')
             // สัดส่วนและจำนวนแถวต้องมาจากตัวแปร layout ไม่ใช่ค่าที่ฝังไว้ในกฎ CSS
             ->assertSee('--pos-product-fr: 55fr')
             ->assertSee('--pos-cart-fr: 45fr')
             ->assertSee('grid-template-columns: minmax(0, var(--pos-product-fr)) minmax(var(--pos-cart-min), var(--pos-cart-fr))')
             ->assertSee('repeat(var(--pos-product-rows), minmax(var(--pos-card-min-height), 1fr))')
             ->assertSee('grid-auto-rows: minmax(var(--pos-card-min-height), auto)')
+            ->assertSee('grid-template-rows: repeat(var(--pos-product-rows), var(--pos-card-min-height))')
+            ->assertSee('min-height: var(--pos-card-min-height)')
             ->assertDontSee('minmax(0, 55fr)')
             ->assertDontSee('repeat(3, minmax(124px, 1fr))')
             ->assertDontSee('id="sellerPanel"')

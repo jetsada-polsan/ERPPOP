@@ -32,9 +32,21 @@ class PosWebModeTest extends TestCase
     public function test_web_pos_keeps_selling_by_default(): void
     {
         // flag ไม่ตั้ง = ขายได้ตามเดิม — cutover ต้องไม่เกิดเองโดยไม่สั่ง
-        $this->actingAs($this->cashier())->get('/pos')
+        $response = $this->actingAs($this->cashier())->get('/pos');
+
+        $response
             ->assertOk()
-            ->assertViewIs('pos.index');
+            ->assertViewIs('pos.index')
+            ->assertSee('ลูกค้า / สมาชิก')
+            ->assertSee('x-show="customerToolsOpen" x-cloak', false)
+            ->assertSee('id="pos-vue-cart-panel"', false)
+            ->assertSee('grid-template-columns: minmax(0, 55fr) minmax(390px, 45fr)', false)
+            ->assertSee('grid-template-rows: repeat(3, minmax(120px, 1fr))', false)
+            ->assertSee('grid-auto-rows: 120px', false);
+
+        $html = $response->getContent();
+        $this->assertSame(1, substr_count($html, 'placeholder="ค้นหาลูกค้า (ไม่บังคับ)"'));
+        $this->assertSame(1, substr_count($html, 'placeholder="สมาชิกสะสมแต้ม รหัส/ชื่อ/เบอร์ (ไม่บังคับ)"'));
     }
 
     public function test_a_pos_seller_can_open_the_pos_page_without_a_separate_view_permission(): void
