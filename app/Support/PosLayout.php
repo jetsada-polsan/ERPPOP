@@ -186,8 +186,8 @@ final class PosLayout
                 continue;
             }
 
-            $x = self::clamp($component['x'] ?? 1, 1, self::CANVAS_COLUMNS);
-            $y = self::clamp($component['y'] ?? 1, 1, self::CANVAS_ROWS);
+            $x = self::clamp($component['x'] ?? null, 1, self::CANVAS_COLUMNS, 1);
+            $y = self::clamp($component['y'] ?? null, 1, self::CANVAS_ROWS, 1);
             $id = preg_replace('/[^a-z0-9_-]/i', '', (string) ($component['id'] ?? $component['type']));
 
             $components[] = [
@@ -197,8 +197,8 @@ final class PosLayout
                 'x' => $x,
                 'y' => $y,
                 // กันบล็อกล้นขอบขวา/ล่างของ canvas ตั้งแต่ตอนบันทึก ไม่ใช่ตอน render
-                'w' => self::clamp($component['w'] ?? 3, 1, self::CANVAS_COLUMNS + 1 - $x),
-                'h' => self::clamp($component['h'] ?? 2, 1, self::CANVAS_ROWS + 1 - $y),
+                'w' => self::clamp($component['w'] ?? null, 1, self::CANVAS_COLUMNS + 1 - $x, 3),
+                'h' => self::clamp($component['h'] ?? null, 1, self::CANVAS_ROWS + 1 - $y, 2),
             ];
         }
 
@@ -211,21 +211,23 @@ final class PosLayout
         $defaults = self::defaultRuntime();
         $value = is_array($value) ? $value : [];
 
-        $product = self::clamp($value['product_width'] ?? $defaults['product_width'], self::MIN_PANE_WIDTH, self::MAX_PANE_WIDTH);
-        $cart = self::clamp($value['cart_width'] ?? (100 - $product), self::MIN_PANE_WIDTH, self::MAX_PANE_WIDTH);
+        $product = self::clamp($value['product_width'] ?? null, self::MIN_PANE_WIDTH, self::MAX_PANE_WIDTH, $defaults['product_width']);
+        $cart = self::clamp($value['cart_width'] ?? null, self::MIN_PANE_WIDTH, self::MAX_PANE_WIDTH, 100 - $product);
 
         // สองฝั่งต้องเต็มแถวเสมอ ถ้ารวมกันไม่ครบ 100 ให้เกลี่ยตามสัดส่วนที่ผู้ใช้ตั้งใจ
+        // ปัดครึ่งขึ้นด้วยเลขจำนวนเต็มล้วน (ไม่ใช้ round() ของ float) เพื่อให้ POS Python
+        // ได้ผลเดียวกันทุกกรณี — Python round() เป็น banker's rounding และ float อาจคลาด .5
         $total = $product + $cart;
         if ($total !== 100) {
-            $product = self::clamp((int) round($product / $total * 100), self::MIN_PANE_WIDTH, self::MAX_PANE_WIDTH);
+            $product = self::clamp(intdiv($product * 200 + $total, $total * 2), self::MIN_PANE_WIDTH, self::MAX_PANE_WIDTH, $defaults['product_width']);
         }
         $cart = 100 - $product;
 
         return [
             'product_width' => $product,
             'cart_width' => $cart,
-            'product_rows' => self::clamp($value['product_rows'] ?? $defaults['product_rows'], self::MIN_PRODUCT_ROWS, self::MAX_PRODUCT_ROWS),
-            'product_columns' => self::clamp($value['product_columns'] ?? $defaults['product_columns'], self::MIN_PRODUCT_COLUMNS, self::MAX_PRODUCT_COLUMNS),
+            'product_rows' => self::clamp($value['product_rows'] ?? null, self::MIN_PRODUCT_ROWS, self::MAX_PRODUCT_ROWS, $defaults['product_rows']),
+            'product_columns' => self::clamp($value['product_columns'] ?? null, self::MIN_PRODUCT_COLUMNS, self::MAX_PRODUCT_COLUMNS, $defaults['product_columns']),
             'density' => in_array($value['density'] ?? null, self::DENSITIES, true) ? $value['density'] : $defaults['density'],
             'button_size' => in_array($value['button_size'] ?? null, self::BUTTON_SIZES, true) ? $value['button_size'] : $defaults['button_size'],
             'show_branch' => self::bool($value['show_branch'] ?? $defaults['show_branch']),
@@ -335,9 +337,29 @@ final class PosLayout
         return is_array($value) ? $value : null;
     }
 
-    private static function clamp(mixed $value, int $min, int $max): int
+    /**
+     * แปลงค่าตัวเลขจาก cache/JSON ให้ได้ int ในช่วงที่กำหนด — กติกาเดียวกับ
+     * `_layout_int()` ใน apps/pos-python/pos_python/ui.py และถูกล็อกด้วย
+     * tests/Fixtures/pos-layout-runtime-parity.json ที่ทั้งสองฝั่งอ่านร่วมกัน
+     *
+     *  - int / float / สตริงตัวเลขเต็มรูปแบบตาม is_numeric() ("7.5", "1e1", " 5 ") ใช้ได้
+     *  - อย่างอื่นทั้งหมด (null, bool, array, "", "6abc", "NaN", "1e400") ใช้ $default
+     *    ไม่ใช้ (int) cast ตรงๆ เพราะ PHP อ่าน "6abc" เป็น 6 และ "bad" เป็น 0
+     *    ซึ่ง Python เลียนแบบให้ตรงทุกกรณีไม่ได้
+     *  - clamp ในโดเมน float ก่อนค่อยตัดทศนิยม เพื่อไม่ให้ float ใหญ่เกิน int
+     *    ได้ผลต่างกันตามแพลตฟอร์ม
+     */
+    private static function clamp(mixed $value, int $min, int $max, int $default): int
     {
-        return max($min, min($max, (int) $value));
+        $number = null;
+        if (is_int($value) || is_float($value) || (is_string($value) && is_numeric($value))) {
+            $number = (float) $value;
+        }
+        if ($number === null || ! is_finite($number)) {
+            $number = (float) $default;
+        }
+
+        return (int) max($min, min($max, $number));
     }
 
     private static function bool(mixed $value): bool

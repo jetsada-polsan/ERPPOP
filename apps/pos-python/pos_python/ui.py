@@ -75,16 +75,34 @@ POS_LAYOUT_BUTTON = {
 }
 
 
+# PHP is_numeric() grammar (PHP 8): optional surrounding whitespace, sign,
+# integer/decimal part and exponent. ASCII digits only, so Thai "๕" or "1_000"
+# are rejected exactly like PHP rejects them.
+_PHP_NUMERIC = re.compile(r"[ \t\n\r\v\f]*[+-]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][+-]?[0-9]+)?[ \t\n\r\v\f]*")
+
+
 def _layout_int(value, fallback: int, minimum: int, maximum: int) -> int:
-    if value is None:
-        value = fallback
-    try:
-        value = int(value)
-    except (TypeError, ValueError):
-        # Keep the same behavior as PHP's (int) cast + clamp for a malformed
-        # published cache. Valid layouts are already rejected by the server.
-        value = 0
-    return max(minimum, min(maximum, value))
+    """Mirror PosLayout::clamp() in Laravel exactly.
+
+    Both sides are pinned by tests/Fixtures/pos-layout-runtime-parity.json:
+    numbers and fully numeric strings are accepted, anything else (None, bool,
+    list, "", "6abc", "NaN", "1e400") falls back to the field default. The value
+    is clamped as a float before truncation so huge numbers behave the same as
+    PHP on every platform.
+    """
+    number = None
+    if not isinstance(value, bool):
+        try:
+            if isinstance(value, (int, float)):
+                number = float(value)
+            elif isinstance(value, str) and _PHP_NUMERIC.fullmatch(value):
+                number = float(value)
+        except (OverflowError, ValueError):
+            # json.loads keeps a 400-digit literal as int; PHP decodes it to INF.
+            number = None
+    if number is None or number != number or number in (float("inf"), float("-inf")):
+        number = float(fallback)
+    return int(max(minimum, min(maximum, number)))
 
 
 def _layout_bool(value, fallback: bool) -> bool:
@@ -109,9 +127,9 @@ def normalize_pos_layout(value) -> dict:
     cart = _layout_int(raw.get("cart_width"), 100 - product, 30, 70)
     total = product + cart
     if total != 100:
-        # PHP round() rounds positive .5 upward; Python round() uses bankers'
-        # rounding, so use the explicit form to keep both runtimes identical.
-        product = _layout_int(int(product / total * 100 + 0.5), defaults["product_width"], 30, 70)
+        # Round half up in pure integer arithmetic, identical to intdiv() in
+        # PosLayout::normalizeRuntime(). Float maths can land on 62.4999.
+        product = _layout_int((product * 200 + total) // (total * 2), defaults["product_width"], 30, 70)
     cart = 100 - product
     runtime = {
         "product_width": product,
@@ -1476,8 +1494,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             return panel
 
         def _layout_x(self, component_type: str, fallback: int) -> int:
-            return next((int(item.get("x", fallback)) for item in layout_config.get("components", [])
-                         if item.get("type") == component_type), fallback)
+            # A malformed cached x must not crash the window before it opens.
+            return next((_layout_int(item.get("x"), fallback, 1, 12) for item in layout_config.get("components", [])
+                         if isinstance(item, dict) and item.get("type") == component_type), fallback)
 
         def build_numpad(self) -> QWidget:
             box = QWidget()

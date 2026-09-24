@@ -196,7 +196,8 @@ class UiStyleTest(unittest.TestCase):
     def test_published_layout_is_safe_when_cache_is_missing_or_malformed(self) -> None:
         layout = normalize_pos_layout({"runtime": {"product_width": 99, "cart_width": 1, "product_columns": "bad", "show_shift": "false"}})
         self.assertEqual(layout["runtime"]["product_width"] + layout["runtime"]["cart_width"], 100)
-        self.assertEqual(layout["runtime"]["product_columns"], 2)
+        # ค่าที่อ่านเป็นตัวเลขไม่ได้ใช้ค่าเริ่มต้น ไม่ใช่ขอบล่าง — กติกาเดียวกับ PosLayout::clamp()
+        self.assertEqual(layout["runtime"]["product_columns"], 4)
         self.assertFalse(layout["runtime"]["show_shift"])
         self.assertEqual(layout["runtime"]["density"], "comfortable")
 

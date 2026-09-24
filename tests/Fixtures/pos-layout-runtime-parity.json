@@ -1,0 +1,38 @@
+{
+  "about": "สัญญา normalize ของ pos_layout.runtime ที่ Laravel (App\\Support\\PosLayout::normalizeRuntime) และ POS Python (pos_python.ui.normalize_pos_layout) ต้องให้ผลเหมือนกันทุกบรรทัด ค่า expected คิดด้วยมือจากกติกาใน docs/pos-layout-contract.md ห้าม generate จากโค้ดฝั่งใดฝั่งหนึ่ง",
+  "defaults": {
+    "product_width": 55,
+    "cart_width": 45,
+    "product_rows": 3,
+    "product_columns": 4,
+    "density": "comfortable",
+    "button_size": "medium",
+    "show_branch": true,
+    "show_terminal": true,
+    "show_seller": true,
+    "show_shift": true
+  },
+  "cases": [
+    {"name": "empty runtime uses defaults", "input": {}, "expected": {}},
+    {"name": "out of range panes clamp to 70/30", "input": {"product_width": 99, "cart_width": 1}, "expected": {"product_width": 70, "cart_width": 30}},
+    {"name": "tie 62.5 rounds half up", "input": {"product_width": 50, "cart_width": 30}, "expected": {"product_width": 63, "cart_width": 37}},
+    {"name": "panes short of 100 keep ratio", "input": {"product_width": 45, "cart_width": 44}, "expected": {"product_width": 51, "cart_width": 49}},
+    {"name": "panes over 100 keep ratio", "input": {"product_width": 60, "cart_width": 60}, "expected": {"product_width": 50, "cart_width": 50}},
+    {"name": "exact integer ratio", "input": {"product_width": 30, "cart_width": 50}, "expected": {"product_width": 38, "cart_width": 62}},
+    {"name": "empty and null panes fall back", "input": {"product_width": "", "cart_width": null}, "expected": {}},
+    {"name": "decimal strings truncate then rebalance", "input": {"product_width": "62.9", "cart_width": "37.1"}, "expected": {"product_width": 63, "cart_width": 37}},
+    {"name": "signed and trailing-dot strings", "input": {"product_width": " +45 ", "cart_width": "55."}, "expected": {"product_width": 45, "cart_width": 55}},
+    {"name": "garbage strings fall back to default", "input": {"product_rows": "bad", "product_columns": "bad"}, "expected": {}},
+    {"name": "decimal accepted, leading-number junk rejected", "input": {"product_rows": "7.5", "product_columns": "6abc"}, "expected": {"product_rows": 7}},
+    {"name": "whitespace and exponent strings", "input": {"product_rows": " 5 ", "product_columns": "1e1"}, "expected": {"product_rows": 5, "product_columns": 8}},
+    {"name": "booleans are not numbers", "input": {"product_rows": true, "product_columns": false}, "expected": {}},
+    {"name": "arrays and objects are not numbers", "input": {"product_rows": [], "product_columns": {}}, "expected": {}},
+    {"name": "floats clamp before truncation", "input": {"product_rows": 9.9, "product_columns": -3}, "expected": {"product_rows": 8, "product_columns": 2}},
+    {"name": "infinite and NaN fall back", "input": {"product_rows": "1e400", "product_columns": "NaN"}, "expected": {}},
+    {"name": "non-ascii digits and underscores rejected", "input": {"product_rows": "๕", "product_columns": "1_0"}, "expected": {}},
+    {"name": "unknown enum values fall back", "input": {"density": "nope", "button_size": "huge"}, "expected": {}},
+    {"name": "known enum values kept", "input": {"density": "roomy", "button_size": "large"}, "expected": {"density": "roomy", "button_size": "large"}},
+    {"name": "boolean-ish toggles", "input": {"show_branch": 0, "show_terminal": "no", "show_seller": null, "show_shift": "maybe"}, "expected": {"show_branch": false, "show_terminal": false}},
+    {"name": "string toggles are case-insensitive", "input": {"show_branch": "", "show_terminal": "off", "show_seller": "YES", "show_shift": "0"}, "expected": {"show_branch": false, "show_terminal": false, "show_shift": false}}
+  ]
+}

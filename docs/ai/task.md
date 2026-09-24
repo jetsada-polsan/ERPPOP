@@ -922,3 +922,38 @@ pending
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้เปิด Qt บนเครื่องจริงเพื่อถ่ายภาพยืนยัน
 - Deploy: production workflow `35578390373` ผ่านครบ และเผยแพร่ installer `0.6.19` ผ่าน Windows workflow `35578559621`; ตรวจ `pos.popstarcenter.com` และ `/download/python-pos` ได้ HTTP 200 แล้ว
 - งานถัดไป: ติดตั้ง `PopCentral-POS-UAT-0.6.19-setup.exe` บนเครื่อง POS จริงแล้วตรวจภาพ/การใช้งานหน้างาน
+
+## Handoff - 2026-09-24 (Claude ปิดงานค้าง pos_layout parity)
+
+- Branch: `claude/pos-layout-parity` แตกจาก `main` `3296867` — **ยังไม่ merge, ยังไม่ push, ยังไม่ deploy**
+- ที่มา: ตรวจ 5 ประเด็นจากรอบ review `a8870a3` กับ `main` ล่าสุด พบว่า Codex ปิดไปแล้ว 4 ข้อ
+  (อ่าน `pos_layout.css`, พื้นแผง 360px, ลดคอลัมน์ตอนจอแคบ + refresh ตอน viewport เปลี่ยน, เทสต์ source)
+  เหลือข้อเดียวคือ **normalize ยังให้ผลต่างกันระหว่าง PHP กับ Python** เมื่อเจอ cache ที่พัง
+  รัน 14 กรณีเทียบกันบน `main` แล้วต่าง 2 กรณี: `"7.5"`/`"6abc"` (PHP 7/6, Python 1/2) และ `"1e1"` (PHP 8, Python 2)
+  สาเหตุคือ PHP `(int)` cast อ่านเลขนำหน้าแบบหลวม แต่ Python `int()` เข้มงวด — `main` ขยับ Python ให้เหมือน PHP แล้ว
+  แต่เลียนแบบ `(int)` ของ PHP ให้ตรงทุกกรณีไม่ได้
+- ทำอะไร:
+  - เปลี่ยนกติกาทั้งสองฝั่งเป็นแบบเดียวที่ย้ายภาษาได้ตรงๆ: รับเฉพาะตัวเลขหรือสตริงที่ `is_numeric()` ยอมรับทั้งก้อน
+    อย่างอื่น **ใช้ค่า default ของช่องนั้น** แทนการตกไปขอบล่าง (`"bad"` → 4 คอลัมน์ ไม่ใช่ 2)
+    — เป็นการเปลี่ยนจากที่ `main` เลือกไว้ จึงแก้เทสต์ของ Codex ใน `test_ui_style.py` หนึ่งบรรทัดให้ตรงกติกาใหม่
+  - ปัดครึ่งขึ้นด้วยเลขจำนวนเต็มล้วน `(p×200+t)÷(t×2)` ทั้งสองฝั่ง แทน `round()`/`+0.5` แบบ float
+  - `PosLayout::componentsFrom()` ใช้กติกาเดียวกัน (x/y/w/h พังได้ default 1/1/3/2)
+  - `_layout_x()` ใน Python เดิม `int(item.get("x"))` ตรงๆ — cache ที่ x พังจะทำให้หน้าต่าง POS เปิดไม่ขึ้น
+    เปลี่ยนเป็น `_layout_int()` แล้ว
+  - เพิ่ม fixture กลาง `tests/Fixtures/pos-layout-runtime-parity.json` (21 กรณี ค่า expected คิดด้วยมือ)
+    ที่ `tests/Unit/PosLayoutParityTest.php` และ `apps/pos-python/tests/test_pos_layout_parity.py` อ่านร่วมกัน
+  - อัปเดต `docs/pos-layout-contract.md` ส่วนกติกา normalize และพฤติกรรมที่ตั้งใจให้ต่างกันระหว่างเว็บกับ Qt
+- ทดสอบ:
+  - `php artisan test` → **467 tests, 465 passed, 1 skipped, 1 failed** — ตัวที่แดงคือ
+    `FinanceSecurityControlTest::test_operations_page_stays_available_when_a_backup_checksum_is_unreadable`
+    ซึ่งแดงอยู่ก่อนแล้วเพราะเครื่องที่รันเป็น root (อ่านไฟล์ `chmod 0000` ได้) ไม่เกี่ยวกับรอบนี้
+  - Python `python3 -m unittest discover -s tests` → **181 tests ผ่าน** (ติดตั้ง `qrcode` ตาม requirements.txt แล้ว)
+  - พิสูจน์ว่าเทสต์ใหม่จับ bug ได้จริง: คืน `PosLayout.php` เป็นของ `main` → PHP parity แดง 8 กรณี,
+    คืน `ui.py` เป็นของ `main` → Python parity แดง แล้วคืนโค้ดใหม่กลับมาเขียวทั้งคู่
+  - `php artisan view:cache` ผ่าน, `git diff --check` ผ่าน
+  - รันบน PHP 8.4 / Python 3.11 ในคอนเทนเนอร์แยก ไม่ใช่ PHP 8.3 (production) หรือ 8.5 (เครื่อง dev)
+- ความเสี่ยง: เปลี่ยนผลเฉพาะ cache ที่พังเท่านั้น ค่าที่ Designer publish ผ่าน `runtimeRules()` เป็นจำนวนเต็มในช่วงเสมอ
+  จึงไม่กระทบ layout ที่ใช้งานอยู่จริง
+- Deploy: ยังไม่ deploy — ฝั่ง ERP ต้อง deploy `PosLayout.php`; ฝั่งเครื่องสาขาต้องออก installer ใหม่ (ต่อจาก `0.6.19`)
+  ถึงจะได้ `_layout_int()` / `_layout_x()` รุ่นใหม่ ทั้งสองอย่างรอคำสั่งเจ้าของโปรเจกต์
+- งานถัดไป: review + merge เข้า `main`
