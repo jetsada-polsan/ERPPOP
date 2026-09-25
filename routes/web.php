@@ -576,6 +576,7 @@ Route::prefix('operations')->name('operations.')->group(function () {
     Route::post('/users/{user}/mfa-reset', [OperationsController::class, 'resetMfa'])->name('mfa-reset');
 });
 Route::get('/database-structure', [DatabaseStructureController::class, 'index'])->name('database-structure.index');
+Route::get('/member/liff', [MemberPortalController::class, 'liff'])->name('member.liff');
 Route::get('/member', [MemberPortalController::class, 'page'])->name('member.portal');
 Route::get('/legacy-mappings', [LegacyTableMappingController::class, 'index'])->name('legacy-mappings.index');
 

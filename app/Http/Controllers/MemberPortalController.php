@@ -6,8 +6,19 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 class MemberPortalController extends Controller
 {
+    public function liff(): RedirectResponse
+    {
+        $liffId = trim((string) config('services.line.liff_id'));
+        if ($liffId === '') {
+            return redirect()->route('member.portal')->with('error', 'ยังไม่ได้ตั้งค่า LINE LIFF ID');
+        }
+
+        return redirect()->away('https://liff.line.me/'.rawurlencode($liffId));
+    }
+
     public function page(): View { return view('member-portal.index', ['liffId' => config('services.line.liff_id')]); }
     public function authenticateLiff(Request $request): JsonResponse
     {
