@@ -11,7 +11,7 @@
 <body><main class="shell">
   <div class="top"><div><div class="brand">POPSTAR MEMBER</div><div class="muted">สิทธิประโยชน์ของคุณ</div></div><button class="logout" id="logout">ออก</button></div>
   <div id="app" class="loading">กำลังตรวจสอบสมาชิก...</div>
-</main><nav class="nav"><button class="active">⭐<br>แต้ม</button><button>🎟️<br>คูปอง</button><button>🎁<br>รางวัล</button><button>🧾<br>ซื้อ</button></nav>
+</main><nav class="nav"><button class="active" data-tab="points">⭐<br>แต้ม</button><button data-tab="coupons">🎟️<br>คูปอง</button><button data-tab="rewards">🎁<br>รางวัล</button><button data-tab="purchases">🧾<br>ซื้อ</button></nav>
 <script>
 const LIFF_ID=@json($liffId); const app=document.querySelector('#app');
 async function get(path){const r=await fetch('/api/member/me'+path,{headers:{Accept:'application/json'}});if(!r.ok)throw new Error('กรุณาเปิดหน้านี้จาก LINE OA');return r.json()}
@@ -20,5 +20,15 @@ async function boot(){try{
   const [{member},points,history,purchases]=await Promise.all([get(''),get('/points'),get('/point-history'),get('/purchases')]);
   app.className='';app.innerHTML=`<section class="hero"><span class="tier">${points.tier}</span><h1>${member.name}</h1><div class="muted">รหัสสมาชิก ${member.member_code}</div><div class="points">${points.points.toLocaleString()} <small>Points</small></div><div class="bar"><i></i></div></section><div class="grid"><div class="card">⭐ แต้ม<b>${points.points.toLocaleString()}</b><span class="muted">แต้มคงเหลือ</span></div><div class="card">🧾 ซื้อ<b>${purchases.items.length}</b><span class="muted">รายการล่าสุด</span></div></div><section class="section"><h2>กิจกรรมแต้มล่าสุด</h2>${history.items.length?history.items.slice(0,5).map(x=>`<div class="card activity"><span class="activity-icon">${x.direction==='earn'?'＋':'－'}</span><div><b style="font-size:15px;margin:0">${x.direction==='earn'?'+':'-'}${x.points.toLocaleString()} แต้ม</b><span class="muted">${x.note||'รายการแต้ม'} · ${new Date(x.created_at).toLocaleDateString('th-TH')}</span></div></div>`).join(''):'<div class="card empty">ยังไม่มีรายการแต้ม</div>'}</section>`;
 }catch(e){app.innerHTML=`<div class="error">${e.message}</div>`}}
+function setActive(tab){document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab))}
+function showRows(title,icon,items,empty){app.className='';app.innerHTML=`<section class="section" style="margin-top:8px"><h2>${icon} ${title}</h2>${items.length?items.map(item=>`<div class="card activity"><span class="activity-icon">${icon}</span><div><b style="font-size:15px;margin:0">${item.title}</b><span class="muted">${item.detail||''}</span></div></div>`).join(''):`<div class="card empty">${empty}</div>`}</section>`}
+async function openTab(tab){setActive(tab);app.innerHTML='<div class="loading">กำลังโหลดข้อมูล...</div>';try{
+  if(tab==='points'){location.reload();return}
+  const data=await get('/'+tab);
+  if(tab==='purchases')showRows('ประวัติการซื้อ','🧾',(data.items||[]).map(x=>({title:`${x.receipt_no} · ${Number(x.total).toLocaleString()} บาท`,detail:new Date(x.date).toLocaleDateString('th-TH')})),'ยังไม่มีประวัติการซื้อ');
+  else if(tab==='coupons')showRows('คูปองของฉัน','🎟️',(data.items||[]).map(x=>({title:x.name||x.title||'คูปองสมาชิก',detail:x.detail||x.description||''})),data.message||'ยังไม่มีคูปองที่พร้อมใช้งาน');
+  else showRows('รางวัลของฉัน','🎁',(data.items||[]).map(x=>({title:x.name||x.title||'รางวัลสมาชิก',detail:x.detail||x.description||''})),data.message||'ยังไม่มีรางวัลที่พร้อมแลก');
+ }catch(e){app.innerHTML=`<div class="error">${e.message}</div>`}}
+document.querySelectorAll('.nav button').forEach(button=>button.addEventListener('click',()=>openTab(button.dataset.tab)));
 document.querySelector('#logout').onclick=async()=>{await fetch('/api/member/logout',{method:'POST'});location.reload()};boot();
 </script></body></html>
