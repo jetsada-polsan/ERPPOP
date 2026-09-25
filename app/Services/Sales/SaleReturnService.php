@@ -4,6 +4,8 @@ namespace App\Services\Sales;
 
 use App\Models\Branch;
 use App\Models\CustomerOpenItem;
+use App\Models\CustomerLedger;
+use App\Models\User;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\Product;
@@ -47,12 +49,21 @@ class SaleReturnService
         $openItem = null;
         if (! empty($data['customer_open_item_id'])) {
             $openItem = CustomerOpenItem::findOrFail($data['customer_open_item_id']);
+            if ((int) $openItem->customer_id !== (int) ($data['customer_id'] ?? 0)
+                || (int) $openItem->document->branch_id !== (int) $branch->id) {
+                throw new RuntimeException('ใบขายอ้างอิงไม่ตรงกับลูกค้าหรือสาขา');
+            }
         }
 
         $documentType = DocumentType::where('code', 'SALE_RETURN')->firstOrFail();
 
         return DB::transaction(function () use ($data, $branch, $documentType, $openItem) {
             $items = collect($data['items']);
+            foreach ($items as $item) {
+                if (DecimalMath::compare($item['qty'], 0) <= 0 || DecimalMath::compare($item['unit_price'], 0) < 0) {
+                    throw new RuntimeException('จำนวนคืนต้องมากกว่าศูนย์ และราคาต้องไม่ติดลบ');
+                }
+            }
             $totalAmount = DecimalMath::sum(
                 $items->map(fn ($item) => DecimalMath::multiply($item['qty'], $item['unit_price'])),
             );
@@ -67,7 +78,9 @@ class SaleReturnService
                 'doc_number' => $this->numbers->next('SALE_RETURN', $branch->id),
                 'doc_date' => now()->toDateString(),
                 'customer_id' => $data['customer_id'] ?? null,
-                'status' => 'active',
+                'created_by' => auth()->id(),
+                'reference' => $openItem?->document->doc_number,
+                'status' => 'pending_approval',
                 'total_items' => $items->count(),
                 'total_amount' => $totalAmount,
                 'remark' => $data['remark'] ?? null,
@@ -109,48 +122,97 @@ class SaleReturnService
                     'cost_amount' => DecimalMath::multiply($item['qty'], $unitCost),
                 ]);
 
+                // Stock is restored only by approve(); creation must be side-effect free.
+            }
+
+            return $document->fresh();
+        });
+    }
+
+    public function approve(Document $document, int $userId): Document
+    {
+        $actor = User::findOrFail($userId);
+        if (! $actor->hasPermission('finance.note.approve')) {
+            throw new RuntimeException('ไม่มีสิทธิ์อนุมัติใบรับคืน');
+        }
+        return DB::transaction(function () use ($document, $userId): Document {
+            $locked = Document::whereKey($document->id)->lockForUpdate()->firstOrFail();
+            $locked->load(['documentType', 'stockDocument.items.sourceStockLot']);
+            app(\App\Services\Documents\ApprovalPolicyService::class)->authorize('SALE_RETURN', $locked->total_amount,
+                (int) $locked->branch_id, $locked->created_by, User::findOrFail($userId), 'finance.note.approve');
+            if ($locked->documentType->code !== 'SALE_RETURN' || $locked->status !== 'pending_approval') {
+                throw new RuntimeException('เอกสารนี้ไม่ใช่ใบรับคืนที่รออนุมัติ');
+            }
+            if ((int) $locked->created_by === $userId) {
+                throw new RuntimeException('ผู้สร้างใบรับคืนไม่สามารถอนุมัติรายการของตนเอง');
+            }
+            $actor = User::findOrFail($userId);
+            if ($actor->branch_id && (int) $actor->branch_id !== (int) $locked->branch_id) {
+                throw new RuntimeException('ไม่สามารถอนุมัติใบรับคืนต่างสาขา');
+            }
+
+            $openItem = $locked->customer_id
+                ? CustomerOpenItem::where('customer_id', $locked->customer_id)
+                    ->whereHas('document', fn ($q) => $q->where('doc_number', $locked->reference))
+                    ->lockForUpdate()->first()
+                : null;
+            if ($locked->reference && ! $openItem) {
+                throw new RuntimeException('ไม่พบลูกหนี้อ้างอิง กรุณาตรวจเอกสารต้นทาง');
+            }
+            if ($openItem && DecimalMath::compare($locked->total_amount, $openItem->balance_amount) > 0) {
+                throw new RuntimeException('ยอดลูกหนี้ต้นทางไม่พอสำหรับใบรับคืนนี้');
+            }
+            $posReturn = DB::table('pos_receipt_returns')->where('document_id', $locked->id)->lockForUpdate()->first();
+            if ($posReturn?->pos_shift_id) {
+                $shift = DB::table('pos_shifts')->where('id', $posReturn->pos_shift_id)->lockForUpdate()->first();
+                if (! $shift || $shift->status !== 'open' || (int) $shift->branch_id !== (int) $locked->branch_id) {
+                    throw new RuntimeException('กะคืนเงินต้องยังเปิดอยู่และอยู่ในสาขาเดียวกัน');
+                }
+            }
+
+            foreach ($locked->stockDocument->items as $item) {
+                $sourceLot = $item->sourceStockLot;
+                $unitCost = $item->unit_cost ?? 0;
                 $returnedLot = $this->fifo->receive(
-                    (int) $item['product_id'],
-                    (int) $branch->default_warehouse_location_id,
-                    (float) $item['qty'],
-                    $document->id,
-                    'return_in',
-                    unitCost: $unitCost,
+                    (int) $item->product_id, (int) $item->warehouse_location_id,
+                    $item->qty, $locked->id, 'return_in', unitCost: $unitCost,
                 );
-                $disposition = $item['return_disposition'] ?? 'quarantine';
+                $disposition = $item->return_disposition ?? 'quarantine';
                 $returnedLot->update([
                     'source_lot_id' => $sourceLot?->id,
-                    'lot_number' => $sourceLot
-                        ? $sourceLot->lot_number.'-RET-'.$document->id
-                        : $returnedLot->lot_number,
+                    'lot_number' => $sourceLot ? $sourceLot->lot_number.'-RET-'.$locked->id : $returnedLot->lot_number,
                     'manufacture_date' => $sourceLot?->manufacture_date,
                     'expiry_date' => $sourceLot?->expiry_date,
                     'quality_status' => $disposition === 'available' ? 'available' : 'quarantine',
-                    'quality_reason' => $disposition === 'available'
-                        ? null : ($disposition === 'damage' ? 'สินค้ารับคืนรอตัดของเสีย' : 'สินค้ารับคืนรอตรวจคุณภาพ'),
-                    'quality_updated_by' => auth()->id(),
-                    'quality_updated_at' => now(),
+                    'quality_reason' => $disposition === 'available' ? null : ($disposition === 'damage' ? 'สินค้ารับคืนรอตัดของเสีย' : 'สินค้ารับคืนรอตรวจคุณภาพ'),
+                    'quality_updated_by' => $userId, 'quality_updated_at' => now(),
                 ]);
             }
 
-            if ($openItem !== null) {
-                $reduction = DecimalMath::compare($totalAmount, $openItem->balance_amount) <= 0
-                    ? $totalAmount
-                    : $openItem->balance_amount;
-                $newBalance = DecimalMath::subtract($openItem->balance_amount, $reduction);
-                $openItem->update([
-                    'balance_amount' => $newBalance,
-                    'status' => DecimalMath::compare($newBalance, '0.01') <= 0
-                        ? CustomerOpenItem::STATUS_PAID
-                        : CustomerOpenItem::STATUS_PARTIAL,
+            if ($openItem) {
+                $newBalance = DecimalMath::subtract($openItem->balance_amount, $locked->total_amount);
+                $openItem->update(['balance_amount' => $newBalance, 'status' => DecimalMath::compare($newBalance, '0.01') <= 0 ? CustomerOpenItem::STATUS_PAID : CustomerOpenItem::STATUS_PARTIAL]);
+                $lastBalance = CustomerLedger::where('customer_id', $locked->customer_id)->latest('id')->value('balance_after') ?? 0;
+                CustomerLedger::create([
+                    'customer_id' => $locked->customer_id, 'document_id' => $locked->id,
+                    'entry_type' => 'credit', 'amount' => $locked->total_amount,
+                    'balance_after' => DecimalMath::subtract($lastBalance, $locked->total_amount),
+                    'entry_date' => $locked->doc_date,
                 ]);
             }
-
-            // ลง GL: กลับรายได้+ภาษี และกลับต้นทุนขาย - คืนที่มีลูกหนี้ = ลด AR,
-            // ไม่มี (ขายสด) = คืนเงินสด
-            $this->glPosting->postSaleReturn($document, $openItem !== null);
-
-            return $document->fresh();
+            $this->glPosting->postSaleReturn($locked, $openItem !== null, $posReturn?->refund_method ?? 'cash');
+            if ($posReturn) {
+                DB::table('pos_receipt_returns')->where('id', $posReturn->id)->update(['status' => 'completed', 'updated_at' => now()]);
+                if ($posReturn->pos_shift_id) {
+                    $field = $posReturn->refund_method === 'cash' ? 'cash_sales' : 'transfer_sales';
+                    DB::table('pos_shifts')->where('id', $posReturn->pos_shift_id)->decrement($field, $locked->total_amount);
+                    if ($posReturn->refund_method === 'cash') {
+                        DB::table('pos_shifts')->where('id', $posReturn->pos_shift_id)->decrement('expected_cash', $locked->total_amount);
+                    }
+                }
+            }
+            $locked->update(['status' => 'active', 'approved_by' => $userId, 'approved_at' => now()]);
+            return $locked->fresh();
         });
     }
 }

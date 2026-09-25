@@ -28,6 +28,8 @@ class DocumentNumberGenerator
         'CREDIT_NOTE' => 'RN',
         'DEBIT_NOTE' => 'DN',
         'PURCHASE' => 'PO',
+        'SUPPLIER_CREDIT_NOTE' => 'SCN',
+        'SUPPLIER_DEBIT_NOTE' => 'SDN',
         'STOCK_TRANSFER' => 'TF',
         'STOCK_REQUISITION' => 'DR',
         'STOCK_REQUISITION_RETURN' => 'IR',

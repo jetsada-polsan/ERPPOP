@@ -42,6 +42,7 @@ use App\Http\Controllers\ManualController;
 use App\Http\Controllers\MasterDataSetupController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\MemberPointController;
+use App\Http\Controllers\MemberPortalController;
 use App\Http\Controllers\ModuleControlController;
 use App\Http\Controllers\MonthlyAccountingController;
 use App\Http\Controllers\NotificationController;
@@ -276,6 +277,7 @@ Route::prefix('sale-returns')->name('sale-returns.')->group(function () {
     Route::get('/', [SaleReturnController::class, 'index'])->name('index');
     Route::post('/', [SaleReturnController::class, 'store'])->name('store');
     Route::get('/{saleReturn}', [SaleReturnController::class, 'show'])->name('show');
+    Route::post('/{saleReturn}/approve', [SaleReturnController::class, 'approve'])->name('approve');
 });
 
 // Payment receipt / voucher show page.
@@ -342,6 +344,17 @@ Route::prefix('purchase-orders')->name('purchase-orders.')->group(function () {
     Route::post('/{purchaseOrder}/order', [PurchaseOrderController::class, 'order'])->name('order');
     Route::post('/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])->name('receive');
     Route::post('/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->name('cancel');
+});
+
+Route::get('/settings/approval-rules', [\App\Http\Controllers\ApprovalRuleController::class, 'index'])->name('settings.approval-rules.index');
+Route::post('/settings/approval-rules', [\App\Http\Controllers\ApprovalRuleController::class, 'store'])->name('settings.approval-rules.store');
+Route::patch('/settings/approval-rules/{rule}', [\App\Http\Controllers\ApprovalRuleController::class, 'toggle'])->name('settings.approval-rules.toggle');
+
+Route::prefix('supplier-notes')->name('supplier-notes.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\SupplierNoteController::class, 'index'])->name('index');
+    Route::post('/', [\App\Http\Controllers\SupplierNoteController::class, 'store'])->name('store');
+    Route::post('/{note}/approve', [\App\Http\Controllers\SupplierNoteController::class, 'approve'])->name('approve');
+    Route::post('/{note}/reject', [\App\Http\Controllers\SupplierNoteController::class, 'reject'])->name('reject');
 });
 
 Route::prefix('purchases')->name('purchases.')->group(function () {
@@ -563,6 +576,7 @@ Route::prefix('operations')->name('operations.')->group(function () {
     Route::post('/users/{user}/mfa-reset', [OperationsController::class, 'resetMfa'])->name('mfa-reset');
 });
 Route::get('/database-structure', [DatabaseStructureController::class, 'index'])->name('database-structure.index');
+Route::get('/member', [MemberPortalController::class, 'page'])->name('member.portal');
 Route::get('/legacy-mappings', [LegacyTableMappingController::class, 'index'])->name('legacy-mappings.index');
 
 Route::prefix('members')->name('members.')->group(function () {
@@ -718,6 +732,7 @@ Route::prefix('settings')->name('settings.')->group(function () {
 
 Route::prefix('line-integrations')->name('line-integrations.')->group(function () {
     Route::get('/', [LineIntegrationController::class, 'index'])->name('index');
+    Route::delete('/members/{memberLineAccount}', [LineIntegrationController::class, 'unlinkMember'])->name('members.unlink');
     Route::post('/', [LineIntegrationController::class, 'store'])->name('store');
     Route::put('/{lineIntegration}', [LineIntegrationController::class, 'update'])->name('update');
 });

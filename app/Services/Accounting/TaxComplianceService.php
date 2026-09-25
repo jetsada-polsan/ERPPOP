@@ -86,7 +86,7 @@ class TaxComplianceService
             $sales = DB::table('documents as d')->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
                 ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')->leftJoin('branches as b', 'b.id', '=', 'd.branch_id')
                 ->whereBetween('d.doc_date', [$from, $to])->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN', 'CREDIT_NOTE', 'DEBIT_NOTE'])
-                ->where('d.status', '!=', 'cancelled')->when($branchId, fn ($q) => $q->where('d.branch_id', $branchId))
+                ->where('d.status', 'active')->when($branchId, fn ($q) => $q->where('d.branch_id', $branchId))
                 ->get(['d.doc_date', 'd.doc_number', 'dt.code as type_code', 'b.code as branch_code', 'c.name_th as party_name', 'c.tax_id', 'd.subtotal_amount', 'd.vat_amount'])
                 ->map(function ($r) {
                     $sign = in_array($r->type_code, ['SALE_RETURN', 'CREDIT_NOTE'], true) ? -1 : 1;
@@ -105,14 +105,29 @@ class TaxComplianceService
                 ->get(['e.expense_date', 'e.tax_invoice_no', 'b.code as branch_code', 'e.supplier_name', 'e.supplier_tax_id', 'e.base_amount', 'e.vat_amount'])
                 ->map(fn ($r) => ['category' => 'INPUT', 'date' => $r->expense_date, 'document_no' => $r->tax_invoice_no, 'branch' => $r->branch_code, 'party' => $r->supplier_name, 'tax_id' => $r->supplier_tax_id, 'taxable_amount' => -(float) $r->base_amount, 'tax_amount' => -(float) $r->vat_amount]);
 
-            return $sales->concat($purchases)->concat($expenses)->values();
+            $notes = DB::table('supplier_notes as n')->join('documents as d', 'd.id', '=', 'n.document_id')
+                ->join('suppliers as s', 's.id', '=', 'd.supplier_id')->join('branches as b', 'b.id', '=', 'd.branch_id')
+                ->where('d.status', 'active')->whereBetween('d.doc_date', [$from, $to])
+                ->when($branchId, fn ($q) => $q->where('d.branch_id', $branchId))
+                ->get(['d.doc_date', 'd.doc_number', 'b.code as branch_code', 's.name_th', 's.tax_id', 'n.kind', 'n.base_amount', 'n.vat_amount'])
+                ->map(fn ($r) => ['category' => 'INPUT', 'date' => $r->doc_date, 'document_no' => $r->doc_number, 'branch' => $r->branch_code,
+                    'party' => $r->name_th, 'tax_id' => $r->tax_id, 'taxable_amount' => ($r->kind === 'credit' ? 1 : -1) * (float) $r->base_amount,
+                    'tax_amount' => ($r->kind === 'credit' ? 1 : -1) * (float) $r->vat_amount]);
+            return $sales->concat($purchases)->concat($expenses)->concat($notes)->values();
         }
 
+        $supplierRows = DB::table('supplier_withholdings as w')->join('payment_documents as p', 'p.id', '=', 'w.payment_document_id')
+            ->join('branches as b', 'b.id', '=', 'p.branch_id')->where('p.status', 'active')
+            ->where('w.form', $form)->whereBetween('w.paid_on', [$from, $to])
+            ->when($branchId, fn ($q) => $q->where('p.branch_id', $branchId))
+            ->get(['w.*', 'b.code as branch_code'])
+            ->map(fn ($r) => ['category' => $form, 'date' => $r->paid_on, 'document_no' => $r->certificate_no, 'branch' => $r->branch_code,
+                'party' => $r->supplier_name, 'tax_id' => $r->supplier_tax_id, 'taxable_amount' => (float) $r->base_amount, 'tax_amount' => (float) $r->tax_amount]);
         return DB::table('branch_expenses as e')->leftJoin('branches as b', 'b.id', '=', 'e.branch_id')
             ->whereBetween('e.expense_date', [$from, $to])->where('e.withholding_form', $form)->where('e.withholding_amount', '>', 0)
             ->when($branchId, fn ($q) => $q->where('e.branch_id', $branchId))
             ->get(['e.expense_date', 'e.payment_reference', 'b.code as branch_code', 'e.supplier_name', 'e.supplier_tax_id', 'e.base_amount', 'e.withholding_amount'])
-            ->map(fn ($r) => ['category' => $form, 'date' => $r->expense_date, 'document_no' => $r->payment_reference, 'branch' => $r->branch_code, 'party' => $r->supplier_name, 'tax_id' => $r->supplier_tax_id, 'taxable_amount' => (float) $r->base_amount, 'tax_amount' => (float) $r->withholding_amount]);
+            ->map(fn ($r) => ['category' => $form, 'date' => $r->expense_date, 'document_no' => $r->payment_reference, 'branch' => $r->branch_code, 'party' => $r->supplier_name, 'tax_id' => $r->supplier_tax_id, 'taxable_amount' => (float) $r->base_amount, 'tax_amount' => (float) $r->withholding_amount])->concat($supplierRows)->values();
     }
 
     private function csv(Collection $rows): string

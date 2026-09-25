@@ -98,9 +98,9 @@ class CreditSaleService
                     ['on_hand_qty' => 0, 'reserved_qty' => 0]
                 );
                 // ตัด FIFO lot จริงก่อน แล้วคิดต้นทุนขายจาก Lot ที่ถูกตัดจริง (ดู CashSaleService)
+                $balance->decrement('reserved_qty', $qty);
                 $allocations = $this->fifo->issue($productId, (int) $item->warehouse_location_id, $qty, $saleDocument->id);
                 $unitCost = $this->costing->unitCostFromAllocations($allocations, $qty, $fallbackCost);
-                $balance->decrement('reserved_qty', $qty);
 
                 StockDocumentItem::create([
                     'stock_document_id' => $stockDocument->id,

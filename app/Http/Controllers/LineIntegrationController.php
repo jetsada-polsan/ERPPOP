@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\LineIntegration;
+use App\Models\Member;
+use App\Models\MemberLineAccount;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -13,7 +16,21 @@ class LineIntegrationController extends Controller
     {
         $integrations = LineIntegration::orderBy('code')->paginate(50);
 
-        return view('line-integrations.index', compact('integrations'));
+        return view('line-integrations.index', [
+            'integrations' => $integrations,
+            'lineChannelId' => config('services.line.channel_id'),
+            'webhookUrl' => route('api.line.webhook'),
+            'activeMembers' => Member::where('is_active', true)->count(),
+            'linkedMembers' => MemberLineAccount::where('is_active', true)->distinct('member_id')->count('member_id'),
+            'linkedAccounts' => MemberLineAccount::with(['member.customer'])->where('is_active', true)->latest('linked_at')->get(),
+        ]);
+    }
+
+    public function unlinkMember(MemberLineAccount $memberLineAccount): RedirectResponse
+    {
+        $memberLineAccount->forceFill(['is_active' => false, 'unlinked_at' => now()])->save();
+
+        return redirect()->route('line-integrations.index')->with('success', 'ปลดผูกบัญชี LINE ของสมาชิกแล้ว');
     }
 
     public function store(Request $request): RedirectResponse

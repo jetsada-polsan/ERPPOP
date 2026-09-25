@@ -28,6 +28,7 @@ class RoutePermissions
         'bookings.' => 'sales.manage',
         'cash-sales.' => 'sales.manage',
         'sale-returns.' => 'sales.manage',
+        'sale-returns.approve' => 'finance.note.approve',
         'sales.' => 'sales.manage',
         'documents.' => 'sales.manage',
         'document-books.' => 'settings.manage',
@@ -68,6 +69,9 @@ class RoutePermissions
         'ocr.documents.' => 'purchasing.manage',
         'purchase-orders.approve' => 'purchasing.approve',
         'suppliers.' => 'purchasing.manage',
+        'supplier-notes.' => 'purchasing.manage',
+        'supplier-notes.approve' => 'finance.note.approve',
+        'supplier-notes.reject' => 'finance.note.approve',
         'bplus.purchase-planning' => 'purchasing.manage',
 
         // การเงิน / บัญชี

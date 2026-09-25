@@ -38,12 +38,14 @@ class FifoStockService
     public function issue(int $productId, int $locationId, int|float|string $qty, ?int $documentId, string $movementType = 'out', ?string $movementDate = null, bool $allowNegative = false, bool $allowExpired = false, bool $allowRestricted = false): Collection
     {
         $balance = $this->balance($productId, $locationId);
-        $available = $balance->on_hand_qty;
+        // Reservations belong to open bookings and must remain unavailable to other issues.
+        $balance = StockBalance::whereKey($balance->id)->lockForUpdate()->firstOrFail();
+        $available = DecimalMath::subtract($balance->on_hand_qty, $balance->reserved_qty ?? 0, DecimalMath::QUANTITY_SCALE);
         if (! $allowNegative && DecimalMath::compare($qty, $available) > 0) {
             throw new RuntimeException('สต๊อกไม่พอสำหรับการตัดสินค้า');
         }
 
-        $this->ensureOpeningLot($productId, $locationId, DecimalMath::compare($available, 0) > 0 ? $available : 0);
+        $this->ensureOpeningLot($productId, $locationId, DecimalMath::compare($balance->on_hand_qty, 0) > 0 ? $balance->on_hand_qty : 0);
         $product = Product::find($productId);
         $blockExpired = (bool) $product?->tracks_expiry
             && ($product->expiry_sale_policy ?? 'block') === 'block'

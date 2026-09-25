@@ -8,6 +8,35 @@ from __future__ import annotations
 import platform
 
 
+def open_cash_drawer(printer_name: str) -> None:
+    """Send the standard ESC/POS drawer pulse through the Windows queue.
+
+    PyWin32 is optional on development machines; on Windows POS builds it is
+    bundled with the hardware profile. Never claim success when the raw queue
+    API is unavailable.
+    """
+    selected = printer_name.strip()
+    if not selected:
+        raise ValueError("ยังไม่ได้เลือกเครื่องพิมพ์สำหรับเปิดลิ้นชัก")
+    if platform.system() != "Windows":
+        raise RuntimeError("การเปิดลิ้นชักใช้ได้บน Windows POS เท่านั้น")
+    try:
+        import win32print
+    except ImportError as error:
+        raise RuntimeError("รุ่น POS นี้ยังไม่มีไลบรารี Windows printer (pywin32)") from error
+    handle = win32print.OpenPrinter(selected)
+    try:
+        win32print.StartDocPrinter(handle, 1, ("PopCentral cash drawer", None, "RAW"))
+        try:
+            win32print.StartPagePrinter(handle)
+            win32print.WritePrinter(handle, b"\x1b\x70\x00\x19\xfa")
+            win32print.EndPagePrinter(handle)
+        finally:
+            win32print.EndDocPrinter(handle)
+    finally:
+        win32print.ClosePrinter(handle)
+
+
 def installed_printer_names(printer_info=None) -> list[str]:
     """Return installed Windows printer queue names; never invent a device."""
     if platform.system() != "Windows":

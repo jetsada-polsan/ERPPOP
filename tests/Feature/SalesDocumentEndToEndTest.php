@@ -36,6 +36,108 @@ class SalesDocumentEndToEndTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_supplier_notes_adjust_ap_and_gl_only_after_approval(): void
+    {
+        $this->stockedBranch('APNOTE', 10, 60);
+        $item = \App\Models\SupplierOpenItem::sole();
+        $maker = \App\Models\User::factory()->create();
+        $checker = \App\Models\User::factory()->create();
+        $role = \App\Models\Role::create(['code' => 'AP_NOTE', 'name' => 'AP']);
+        foreach (['purchasing.manage', 'finance.note.approve'] as $code) {
+            $role->permissions()->attach(\App\Models\Permission::firstOrCreate(['code' => $code], ['name' => $code]));
+        }
+        $maker->roles()->attach($role);
+        $checker->roles()->attach($role);
+        $service = app(\App\Services\Purchasing\SupplierNoteService::class);
+        foreach (['credit' => 493.0, 'debit' => 600.0] as $kind => $expected) {
+            $doc = $service->create([
+                'supplier_open_item_id' => $item->id, 'kind' => $kind,
+                'account_id' => ChartOfAccount::where('default_role', ChartOfAccount::ROLE_COGS)->sole()->id,
+                'base_amount' => 100, 'vat_amount' => 7, 'reason' => 'Supplier adjustment',
+            ], $maker);
+            $before = $item->fresh()->balance_amount;
+            $this->assertDatabaseMissing('gl_journals', ['document_id' => $doc->id]);
+            try {
+                $service->approve($doc, $maker);
+                $this->fail('Self approval must fail');
+            } catch (\RuntimeException $e) {
+                $this->assertSame($before, $item->fresh()->balance_amount);
+            }
+            $service->approve($doc, $checker);
+            $this->assertSame($expected, (float) $item->fresh()->balance_amount);
+            $this->assertGlBalanced($doc);
+            $this->assertGlHas($doc, ChartOfAccount::ROLE_AP, debit: $kind === 'credit' ? 107 : 0, credit: $kind === 'debit' ? 107 : 0);
+            try {
+                $service->approve($doc, $checker);
+                $this->fail('Duplicate approval must fail');
+            } catch (\RuntimeException $e) {
+                $this->assertSame($expected, (float) $item->fresh()->balance_amount);
+            }
+        }
+    }
+
+    public function test_a_fully_reserved_booking_can_consume_its_own_stock(): void
+    {
+        [$branch, $location, $product, $customer] = $this->stockedBranch('RES', 3, 60, true);
+        $booking = app(BookingService::class)->create([
+            'branch_id' => $branch->id, 'customer_id' => $customer->id,
+            'items' => [['product_id' => $product->id, 'qty' => 3, 'unit_price' => 100]],
+        ]);
+        $sale = app(CreditSaleService::class)->convertBookingToCreditSale($booking->saleBooking);
+        $this->assertDatabaseHas('stock_balances', ['product_id' => $product->id, 'on_hand_qty' => 0, 'reserved_qty' => 0]);
+        $this->assertGlBalanced($sale);
+    }
+
+    public function test_return_waits_for_another_authorized_user_and_posts_exactly_once(): void
+    {
+        [$branch, $location, $product, $customer] = $this->stockedBranch('RET', 10, 60, true);
+        DocumentType::firstOrCreate(['code' => 'SALE_RETURN'], ['name_th' => 'Return']);
+        $maker = \App\Models\User::factory()->create();
+        $checker = \App\Models\User::factory()->create();
+        $role = \App\Models\Role::create(['code' => 'RETURN_APPROVER', 'name' => 'Return approver']);
+        $permission = \App\Models\Permission::firstOrCreate(['code' => 'finance.note.approve'], ['name' => 'Approve']);
+        $role->permissions()->attach($permission);
+        $maker->roles()->attach($role);
+        $checker->roles()->attach($role);
+        $this->actingAs($maker);
+        $booking = app(BookingService::class)->create([
+            'branch_id' => $branch->id, 'customer_id' => $customer->id,
+            'items' => [['product_id' => $product->id, 'qty' => 3, 'unit_price' => 100]],
+        ]);
+        $sale = app(CreditSaleService::class)->convertBookingToCreditSale($booking->saleBooking);
+        $service = app(\App\Services\Sales\SaleReturnService::class);
+        $return = $service->create([
+            'branch_id' => $branch->id, 'customer_id' => $customer->id,
+            'customer_open_item_id' => $sale->openItem->id,
+            'items' => [['product_id' => $product->id, 'qty' => 1, 'unit_price' => 100]],
+        ]);
+        $this->assertSame('pending_approval', $return->status);
+        $this->assertSame($maker->id, $return->created_by);
+        $this->assertSame($sale->doc_number, $return->reference);
+        $this->assertDatabaseHas('stock_balances', ['product_id' => $product->id, 'on_hand_qty' => 7]);
+        $this->assertSame(300.0, (float) $sale->openItem->fresh()->balance_amount);
+        $this->assertDatabaseMissing('gl_journals', ['document_id' => $return->id]);
+        try {
+            $service->approve($return, $maker->id);
+            $this->fail('Maker must not approve their own return');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('ผู้สร้าง', $e->getMessage());
+        }
+        $this->actingAs($checker);
+        $service->approve($return, $checker->id);
+        $this->assertDatabaseHas('stock_balances', ['product_id' => $product->id, 'on_hand_qty' => 8]);
+        $this->assertSame(200.0, (float) $sale->openItem->fresh()->balance_amount);
+        $this->assertGlBalanced($return);
+        $this->assertGlHas($return, ChartOfAccount::ROLE_AR, credit: 100);
+        $this->assertDatabaseHas('customer_ledger', ['document_id' => $return->id, 'entry_type' => 'credit', 'amount' => 100]);
+        try {
+            $service->approve($return, $checker->id);
+            $this->fail('Duplicate approval must fail');
+        } catch (\RuntimeException $e) {
+            $this->assertSame(200.0, (float) $sale->openItem->fresh()->balance_amount);
+        }
+    }
+
     public function test_a_back_office_cash_sale_reaches_stock_cost_gl_and_the_report(): void
     {
         [$branch, $location, $product] = $this->stockedBranch('E2E1', qty: 10, unitCost: 60);

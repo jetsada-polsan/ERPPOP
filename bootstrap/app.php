@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'pos.device' => \App\Http\Middleware\AuthenticatePosDevice::class,
+            'member.portal' => \App\Http\Middleware\MemberPortalAuth::class,
         ]);
         // ประตูเดียวของทั้ง ERP: guest -> หน้า login, ผู้ใช้ถูกปิด -> เตะออก,
         // แต่ละเมนูเช็คสิทธิ์ตาม App\Support\RoutePermissions

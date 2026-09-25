@@ -46,9 +46,9 @@ class GlPostingService
         ]);
     }
 
-    public function postSupplierPayment(PaymentDocument $paymentDocument, float $amount, string $entryDate, string $remark): void
+    public function postSupplierPayment(PaymentDocument $paymentDocument, float $amount, string $entryDate, string $remark, float $withholding = 0, string $method = 'cash'): void
     {
-        $cashAccount = ChartOfAccount::where('default_role', ChartOfAccount::ROLE_CASH)->first();
+        $cashAccount = ChartOfAccount::where('default_role', $method === 'cash' ? ChartOfAccount::ROLE_CASH : ChartOfAccount::ROLE_BANK)->first();
         $apAccount = ChartOfAccount::where('default_role', ChartOfAccount::ROLE_AP)->first();
         if (! $cashAccount || ! $apAccount) {
             throw new RuntimeException('ผังบัญชีเงินสดหรือเจ้าหนี้ยังไม่ครบ ไม่สามารถจ่ายชำระโดยไม่ลง GL ได้');
@@ -66,10 +66,15 @@ class GlPostingService
             'payment_document_id' => $paymentDocument->id,
             'account_id' => $cashAccount->id,
             'debit' => 0,
-            'credit' => $amount,
+            'credit' => round($amount - $withholding, 2),
             'remark' => $remark,
             'entry_date' => $entryDate,
         ]);
+        if ($withholding > 0) {
+            $account = ChartOfAccount::where('default_role', ChartOfAccount::ROLE_WHT_PAYABLE)->sole();
+            GlJournal::create(['payment_document_id' => $paymentDocument->id, 'account_id' => $account->id,
+                'debit' => 0, 'credit' => $withholding, 'remark' => $remark, 'entry_date' => $entryDate]);
+        }
     }
 
     // อัตรา VAT ปัจจุบัน (ไม่มี = 7%)
@@ -335,14 +340,14 @@ class GlPostingService
 
     // รับคืนสินค้า: Dr รับคืน + ภาษีขาย(กลับ) / Cr ลูกหนี้ (ขายเชื่อ) หรือเงินสด
     // (ขายสด) + กลับต้นทุนขาย (สินค้ากลับเข้าคลัง). $againstAr = คืนที่ลดลูกหนี้
-    public function postSaleReturn(Document $document, bool $againstAr = true): void
+    public function postSaleReturn(Document $document, bool $againstAr = true, string $refundMethod = 'cash'): void
     {
         $total = (float) $document->total_amount;
         $base = round($total * 100 / (100 + $this->vatRate()), 2);
         $this->postDocument($document, [
             ['role' => ChartOfAccount::ROLE_SALES_RETURN, 'debit' => $base],
             ['role' => ChartOfAccount::ROLE_VAT_OUTPUT, 'debit' => round($total - $base, 2)],
-            ['role' => $againstAr ? ChartOfAccount::ROLE_AR : ChartOfAccount::ROLE_CASH, 'credit' => $total],
+            ['role' => $againstAr ? ChartOfAccount::ROLE_AR : ($refundMethod === 'transfer' ? ChartOfAccount::ROLE_BANK : ChartOfAccount::ROLE_CASH), 'credit' => $total],
         ], 'รับคืนสินค้า '.$document->doc_number);
         $this->appendCogs($document, $document->doc_number, reverse: true);
     }

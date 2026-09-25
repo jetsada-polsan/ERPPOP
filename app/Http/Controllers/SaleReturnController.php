@@ -62,4 +62,14 @@ class SaleReturnController extends Controller
 
         return view('sale-returns.show', ['saleReturn' => $saleReturn]);
     }
+
+    public function approve(Document $saleReturn, SaleReturnService $service): RedirectResponse
+    {
+        try {
+            $service->approve($saleReturn, (int) auth()->id());
+        } catch (RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+        return back()->with('success', 'อนุมัติใบรับคืนและปรับสต๊อก/บัญชีแล้ว');
+    }
 }

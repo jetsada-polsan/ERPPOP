@@ -29,6 +29,9 @@ final class DocumentLifecycleService
 
     public function approve(Document $document, int $userId, ?string $note = null): Document
     {
+        if ($document->documentType->code === 'SALE_RETURN') {
+            return app(\App\Services\Sales\SaleReturnService::class)->approve($document, $userId);
+        }
         if ($document->status !== 'pending_approval') {
             throw new RuntimeException('เอกสารนี้ยังไม่อยู่ในสถานะรออนุมัติ');
         }

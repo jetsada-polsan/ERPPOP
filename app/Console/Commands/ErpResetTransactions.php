@@ -46,6 +46,7 @@ class ErpResetTransactions extends Command
         'sale_bookings', 'customer_open_items', 'customer_ledger', 'billing_notes', 'billing_note_items',
         'purchase_orders', 'purchase_order_items', 'purchase_order_receipts', 'purchase_quotes',
         'purchase_quote_items', 'supplier_ledger', 'supplier_open_items', 'quotations', 'quotation_items',
+        'supplier_withholdings', 'supplier_notes', 'approval_rules',
         'payment_documents', 'payment_lines', 'payment_allocations', 'cheques',
         'cash_books', 'bank_statements', 'bank_reconciliations', 'branch_expenses',
         'transport_load_items', 'transport_jobs',

@@ -3,7 +3,46 @@
 @section('page-title', 'LINE / Messaging API')
 @section('page-subtitle', 'ตั้งค่าช่องทางแจ้งเตือนแทน LINE Notify เดิม')
 @section('content')
-<div class="alert alert-warning border-0 shadow-sm">LINE Notify ปิดบริการแล้ว ให้เก็บค่า Messaging API channel token หรือ note การเชื่อมต่อใหม่ไว้ในหน้านี้</div>
+<div class="content-card p-4 mb-3">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+        <div>
+            <h2 class="h5 fw-bold mb-1">LINE OA · PopstarCenter Member</h2>
+            <div class="text-muted small">ศูนย์ควบคุมการเชื่อมต่อสมาชิก แต้ม ยอดซื้อ และ Rich Menu</div>
+        </div>
+        <span class="badge text-bg-success px-3 py-2">● Webhook พร้อมใช้งาน</span>
+    </div>
+    <div class="row g-3 mt-2">
+        <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="small text-muted">Channel ID</div><strong>{{ $lineChannelId ?: 'ยังไม่ตั้งค่า' }}</strong></div></div>
+        <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="small text-muted">สมาชิกใช้งาน</div><strong>{{ number_format($activeMembers) }} ราย</strong></div></div>
+        <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="small text-muted">ผูก LINE แล้ว</div><strong>{{ number_format($linkedMembers) }} ราย</strong></div></div>
+        <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="small text-muted">Rich Menu</div><strong>6 เมนูหลัก</strong></div></div>
+    </div>
+    <div class="mt-3">
+        <label class="form-label small text-muted mb-1">Webhook URL</label>
+        <div class="input-group"><input class="form-control" value="{{ $webhookUrl }}" readonly><button type="button" class="btn btn-outline-secondary" onclick="navigator.clipboard.writeText(@js($webhookUrl))">คัดลอก</button></div>
+    </div>
+    <div class="alert alert-info mt-3 mb-0 py-2 small">การสมัครสมาชิกให้สร้างสมาชิกใน ERP ก่อน แล้วให้ลูกค้ากดผูกสมาชิกและยืนยันด้วยเบอร์โทรศัพท์</div>
+</div>
+<div class="alert alert-warning border-0 shadow-sm">LINE Notify ปิดบริการแล้ว ช่องนี้ใช้สำหรับเก็บทะเบียนช่องทางแจ้งเตือนเดิม ส่วน Channel Secret และ Access Token ให้เก็บใน Environment ของเซิร์ฟเวอร์และไม่แสดงบนหน้าเว็บ</div>
+<div class="content-card p-4 mb-3">
+    <h2 class="h5 fw-bold mb-3">สมาชิกที่ผูก LINE แล้ว</h2>
+    <div class="table-responsive"><table class="table align-middle mb-0">
+        <thead><tr><th>สมาชิก</th><th>ลูกค้า/ลูกหนี้</th><th>LINE User ID</th><th>ผูกเมื่อ</th><th></th></tr></thead>
+        <tbody>
+        @forelse($linkedAccounts as $account)
+            <tr>
+                <td><strong>{{ $account->member?->name ?: '-' }}</strong><div class="small text-muted">{{ $account->member?->phone ?: '-' }}</div></td>
+                <td>{{ $account->member?->customer?->code ?: '-' }} {{ $account->member?->customer?->name_th }}</td>
+                <td><code>{{ \Illuminate\Support\Str::mask($account->line_user_id, '*', 4) }}</code></td>
+                <td>{{ $account->linked_at?->format('d/m/Y H:i') ?: '-' }}</td>
+                <td class="text-end"><form method="post" action="{{ route('line-integrations.members.unlink', $account) }}" onsubmit="return confirm('ยืนยันปลดผูกสมาชิกคนนี้?')">@csrf @method('DELETE')<button class="btn btn-sm btn-outline-danger">ปลดผูก</button></form></td>
+            </tr>
+        @empty
+            <tr><td colspan="5" class="text-center text-muted py-4">ยังไม่มีสมาชิกที่ผูก LINE</td></tr>
+        @endforelse
+        </tbody>
+    </table></div>
+</div>
 <div class="content-card p-4 mb-3">
     <h2 class="h5 fw-bold mb-3">เพิ่มช่องทางแจ้งเตือน</h2>
     <form method="post" action="{{ route('line-integrations.store') }}" class="row g-3">

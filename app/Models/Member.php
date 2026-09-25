@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['member_code', 'name', 'phone', 'phone_normalized', 'member_type_id', 'branch_id', 'points', 'is_active'])]
+#[Fillable(['member_code', 'name', 'phone', 'phone_normalized', 'member_type_id', 'branch_id', 'customer_id', 'points', 'is_active'])]
 class Member extends Model
 {
     const UPDATED_AT = null;
@@ -22,9 +22,19 @@ class Member extends Model
         return $this->belongsTo(Branch::class);
     }
 
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
+    }
+
     public function posReceipts(): HasMany
     {
         return $this->hasMany(PosReceipt::class);
+    }
+
+    public function pointTransactions(): HasMany
+    {
+        return $this->hasMany(MemberPointTransaction::class);
     }
 
     protected function casts(): array

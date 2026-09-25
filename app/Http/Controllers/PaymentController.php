@@ -71,6 +71,10 @@ class PaymentController extends Controller
             'cheque_due_date' => ['nullable', 'required_if:method,cheque', 'date'],
             'cheque_bank' => ['nullable', 'string', 'max:100'],
             'amount' => ['required', 'numeric', 'min:0.01'],
+            'withholding_base' => ['nullable', 'numeric', 'min:0'],
+            'withholding_rate' => ['nullable', 'numeric', 'min:0', 'max:99.9999'],
+            'withholding_form' => ['nullable', 'in:PND3,PND53'],
+            'withholding_income_type' => ['nullable', 'string', 'max:255'],
         ], [
             'cheque_no.required_if' => 'กรุณากรอกเลขที่เช็ค',
             'cheque_due_date.required_if' => 'กรุณาระบุวันที่บนเช็ค',
@@ -79,6 +83,10 @@ class PaymentController extends Controller
         try {
             $document = $this->supplierPayments->create([
                 'supplier_id' => $supplier->id,
+                'withholding_base' => $data['withholding_base'] ?? 0,
+                'withholding_rate' => $data['withholding_rate'] ?? 0,
+                'withholding_form' => $data['withholding_form'] ?? null,
+                'withholding_income_type' => $data['withholding_income_type'] ?? null,
                 'branch_id' => $data['branch_id'],
                 'method' => $data['method'],
                 'cheque_no' => $data['cheque_no'] ?? null,

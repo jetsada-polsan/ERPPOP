@@ -769,7 +769,7 @@ class PosApiController extends Controller
                 $returned = DB::table('pos_receipt_return_items')
                     ->join('pos_receipt_returns', 'pos_receipt_returns.id', '=', 'pos_receipt_return_items.pos_receipt_return_id')
                     ->where('pos_receipt_returns.pos_receipt_id', $receipt->id)
-                    ->where('pos_receipt_returns.status', 'completed')
+                    ->whereIn('pos_receipt_returns.status', ['completed', 'pending_approval'])
                     ->selectRaw('pos_receipt_return_items.product_id, sum(pos_receipt_return_items.qty) as qty')
                     ->groupBy('pos_receipt_return_items.product_id')
                     ->pluck('qty', 'product_id');
@@ -818,7 +818,7 @@ class PosApiController extends Controller
                     'returned_by' => auth()->id(),
                     'refund_method' => $data['refund_method'],
                     'total_amount' => $totalAmount,
-                    'status' => 'completed',
+                    'status' => 'pending_approval',
                     'reason' => $data['reason'],
                     'created_at' => now(),
                     'updated_at' => now(),
@@ -868,7 +868,7 @@ class PosApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'รับคืนสินค้าเรียบร้อย',
+            'message' => 'บันทึกใบรับคืนรออนุมัติ ยังไม่มีการคืนเงิน',
             ...$result,
         ]);
     }

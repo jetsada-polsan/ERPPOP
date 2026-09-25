@@ -934,3 +934,13 @@ pending
 - ทดสอบ: Laravel POS regression 21 tests / 147 assertions ผ่าน; Python POS 178 tests ผ่าน; `pnpm build` ผ่าน; `git diff --check` ผ่าน
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ deploy production และยังไม่ได้ถ่ายภาพจาก browser หลัง build; production download URL เดิมยังตอบ HTTP 200 และไฟล์ installer ปัจจุบันคือ `0.6.19`
 - งานถัดไป: review diff แล้ว commit/push branch นี้; ก่อน deploy ให้เปิดตรวจบน browser/เครื่อง POS จริงอีกครั้ง
+
+## Handoff - 2026-09-25 (ERP control modules and POS hardware path)
+
+- Branch: `codex/simplify-pos-customer-flow`
+- ทำอะไร: เพิ่ม flow ใบรับคืนแบบรออนุมัติก่อนคืนสต๊อก/ปรับลูกหนี้/ลง GL, Supplier Credit/Debit Note แบบ maker-checker, WHT ฝั่งเจ้าหนี้พร้อมใบรับรองและรายการภาษี, Approval Matrix กลาง, และเชื่อมรายงาน/รีเซ็ตข้อมูลกับตารางใหม่
+- ทำอะไรเพิ่มเติม: เพิ่มการล็อกสต๊อกก่อนออกขายเชื่อเพื่อไม่ให้ reservation ของเอกสารตัวเองทำให้ขายไม่ได้, เพิ่ม POS Windows printer queue และ raw ESC/POS cash-drawer pulse ที่เปิดได้เฉพาะการรับเงินสด, คง Void แบบไม่ลบบิลและส่ง event ขึ้น ERP
+- ทดสอบ: `php artisan test --compact` → 450 tests, 449 passed, 1 skipped, 6 incomplete; `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s apps/pos-python/tests -p 'test_*.py' -q` → 178 passed; `php artisan migrate --pretend --database=sqlite` ผ่าน; `git diff --check` ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่มีเครื่องพิมพ์/ลิ้นชักจริงในเครื่องพัฒนา จึงต้องทำ hardware UAT บน Windows POS; `compileall` บน macOS เขียน bytecode ไป cache ของระบบไม่ได้ แต่ unittest/import ผ่าน
+- Deploy: รอ commit/push และรัน production workflow หลังตรวจสถานะ GitHub; ไม่ล้างข้อมูล production
+- งานถัดไป: ตรวจ production health หลัง deploy และทดสอบ UAT ซื้อ → รับของ → ขาย → ลูกหนี้ → รับเงิน → GL/รายงาน รวมถึงเครื่องพิมพ์/ลิ้นชักจริง

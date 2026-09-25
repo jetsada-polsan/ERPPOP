@@ -117,7 +117,17 @@ class PurchaseOrderController extends Controller
     {
         abort_unless($purchaseOrder->status === 'requested', 422, 'สถานะไม่ถูกต้อง');
         abort_if($purchaseOrder->requested_by === Auth::id(), 403, 'ผู้ขอซื้อไม่สามารถอนุมัติรายการของตนเอง');
-        $purchaseOrder->update(['status' => 'approved', 'approved_by' => Auth::id(), 'approved_at' => now()]);
+        try {
+            DB::transaction(function () use ($purchaseOrder) {
+                $locked = PurchaseOrder::whereKey($purchaseOrder->id)->lockForUpdate()->firstOrFail();
+                abort_unless($locked->status === 'requested', 422);
+                app(\App\Services\Documents\ApprovalPolicyService::class)->authorize('PURCHASE_ORDER', $locked->total_amount,
+                    (int) $locked->branch_id, $locked->requested_by, Auth::user(), 'purchasing.approve');
+                $locked->update(['status' => 'approved', 'approved_by' => Auth::id(), 'approved_at' => now()]);
+            });
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
 
         return back()->with('success', "อนุมัติใบขอซื้อ {$purchaseOrder->doc_number} แล้ว");
     }

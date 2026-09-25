@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
+use App\Models\Customer;
 use App\Models\Member;
 use App\Models\MemberType;
 use Illuminate\Http\RedirectResponse;
@@ -13,11 +14,12 @@ class MemberController extends Controller
 {
     public function index(): View
     {
-        $members = Member::with(['memberType', 'branch'])->orderBy('member_code')->paginate(50);
+        $members = Member::with(['memberType', 'branch', 'customer'])->orderBy('member_code')->paginate(50);
         $memberTypes = MemberType::orderBy('code')->get();
         $branches = Branch::orderBy('code')->get();
+        $customers = Customer::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name_th']);
 
-        return view('members.index', compact('members', 'memberTypes', 'branches'));
+        return view('members.index', compact('members', 'memberTypes', 'branches', 'customers'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -44,6 +46,7 @@ class MemberController extends Controller
             'phone' => ['nullable', 'string', 'max:30'],
             'member_type_id' => ['nullable', 'integer', 'exists:member_types,id'],
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
+            'customer_id' => ['nullable', 'integer', 'exists:customers,id'],
             'is_active' => ['nullable', 'boolean'],
         ]);
         $data['is_active'] = $request->boolean('is_active', true);

@@ -17,6 +17,7 @@
                     <div class="text-muted small">{{ $supplier->name_en }}</div>
                 </div>
                 <div class="d-flex align-items-center gap-2">
+                    <a class="btn btn-outline-primary" href="{{ route('supplier-notes.index') }}">ใบเพิ่ม/ลดหนี้ผู้ขาย</a>
                     <span class="badge {{ $supplier->is_active ? 'text-bg-success' : 'text-bg-secondary' }}">
                         {{ $supplier->is_active ? 'ใช้งาน' : 'ปิดใช้งาน' }}
                     </span>
@@ -186,6 +187,12 @@
                             <label class="form-label text-muted small">ยอดชำระ (ค้างชำระ {{ number_format($currentBalance, 2) }})</label>
                             <input type="number" step="0.01" min="0.01" max="{{ $currentBalance }}"
                                    name="amount" required class="form-control" value="{{ $currentBalance }}">
+                            <div class="row g-2 mt-2">
+                                <div class="col-6"><label class="form-label">ฐานหัก ณ ที่จ่าย</label><input name="withholding_base" type="number" min="0" step="0.01" value="0" class="form-control"></div>
+                                <div class="col-6"><label class="form-label">อัตรา (%)</label><input name="withholding_rate" type="number" min="0" max="99.99" step="0.01" value="0" class="form-control"></div>
+                                <div class="col-6"><label class="form-label">แบบภาษี</label><select name="withholding_form" class="form-select"><option value="PND53">ภ.ง.ด.53</option><option value="PND3">ภ.ง.ด.3</option></select></div>
+                                <div class="col-6"><label class="form-label">ประเภทเงินได้</label><input name="withholding_income_type" maxlength="255" class="form-control"></div>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer border-0 px-4 pb-4 pt-0">

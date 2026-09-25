@@ -1231,6 +1231,7 @@ class ReportController extends Controller
             ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
             ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')
             ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN'])
+            ->where('d.status', 'active')
             ->whereNull('d.cancelled_at')
             ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('pos_receipts as linked_pos')->whereColumn('linked_pos.document_id', 'd.id'))
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
@@ -1768,6 +1769,7 @@ class ReportController extends Controller
 
         $rows = (clone $base)
             ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN'])
+            ->where('d.status', 'active')
             ->groupBy('p.id', 'p.sku_code', 'p.name_th')
             ->selectRaw("p.sku_code, p.name_th,
                 sum(case when dt.code <> 'SALE_RETURN' then sdi.qty else 0 end) as sold_qty,

@@ -4,6 +4,7 @@
 @section('page-subtitle','กำหนดเอกสารที่ใช้ Fast Lane หรือ Approval Lane และเรียงลำดับขั้นตอน')
 @section('content')
 <div class="container-fluid" style="max-width:1200px">
+ <a class="btn btn-outline-primary mb-3" href="{{ route('settings.approval-rules.index') }}">ตารางอนุมัติวงเงิน</a>
  @if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
  @if($errors->any())<div class="alert alert-danger">{{ $errors->first() }}</div>@endif
  <div class="alert alert-info">Fast Lane ทำงานได้ทันทีตามสิทธิ์ ส่วน Approval Lane ต้องผ่านขั้นตอนที่กำหนดก่อนจึงกระทบ Stock/บัญชี การเปลี่ยนค่าถูกบันทึก Audit Log</div>

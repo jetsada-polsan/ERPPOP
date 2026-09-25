@@ -18,7 +18,7 @@ from .api_client import LaravelPosClient
 from .mock_printer import active_paper_width, company_details, receipt_for
 from .order import ALL_CATEGORIES, DISCOUNT, PRICE, QTY, Order, OrderLine, categories, product_grid
 from .config import DeviceConfig, load_device_config, save_device_config
-from .printers import installed_printer_names, print_text_to_windows_queue
+from .printers import installed_printer_names, open_cash_drawer, print_text_to_windows_queue
 from .promptpay import promptpay_payload, qr_matrix
 from .services import PosService, money
 from .settings_service import PrinterProfile, SettingsService
@@ -1040,6 +1040,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 SettingsService(service.db).set_device_setting(
                     "windows_printer_queue", str(self.windows_printer.currentData() or "")
                 )
+                SettingsService(service.db).set_device_setting(
+                    "cash_drawer_enabled", "1" if self.drawer.currentIndex() == 0 else "0"
+                )
             except Exception as error:
                 QMessageBox.critical(self, "บันทึกไม่ได้", str(error))
                 return
@@ -1797,6 +1800,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                         (str(error)[:500], sale_id),
                     )
                     service.db.commit()
+                else:
+                    if dialog.payment_method == "cash" and SettingsService(service.db).get_device_setting("cash_drawer_enabled", "1") == "1":
+                        try:
+                            open_cash_drawer(printer_name)
+                        except Exception as error:
+                            QMessageBox.warning(self, "เปิดลิ้นชักไม่สำเร็จ", str(error))
             detail = (f"เงินทอน {self.order.change_for(dialog.tendered()):,.2f} บาท"
                       if dialog.payment_method == "cash" else "รับชำระผ่านโอน / QR แล้ว")
             QMessageBox.information(self, "รับชำระแล้ว", f"บิล {document_no}\n{detail}")

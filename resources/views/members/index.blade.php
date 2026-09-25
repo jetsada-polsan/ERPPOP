@@ -26,6 +26,13 @@
                         @foreach($branches as $branch)<option value="{{ $branch->id }}">{{ $branch->code }} - {{ $branch->name_th }}</option>@endforeach
                     </select>
                 </div>
+                <div class="col-12">
+                    <label class="form-label small text-muted">เชื่อมกับลูกค้า/ลูกหนี้ <span class="text-muted">(ถ้ามี)</span></label>
+                    <select name="customer_id" class="form-select">
+                        <option value="">-- ยังไม่เชื่อมลูกค้า --</option>
+                        @foreach($customers as $customer)<option value="{{ $customer->id }}">{{ $customer->code }} - {{ $customer->name_th }}</option>@endforeach
+                    </select>
+                </div>
                 <div class="col-6"><label class="form-label small text-muted">แต้ม</label><input type="number" step="0.0001" min="0" name="points" value="0" class="form-control"></div>
                 <div class="col-6 d-flex align-items-end"><div class="form-check mb-2"><input type="checkbox" name="is_active" value="1" checked class="form-check-input" id="memberActive"><label class="form-check-label" for="memberActive">ใช้งาน</label></div></div>
                 <div class="col-12"><button class="btn btn-primary w-100"><i class="bi bi-plus-lg me-1"></i> เพิ่มสมาชิก</button></div>
@@ -37,7 +44,7 @@
             <h2 class="h5 fw-bold mb-3">รายการสมาชิก</h2>
             <div class="table-responsive">
                 <table class="table align-middle">
-                    <thead><tr><th>รหัส</th><th>ชื่อ</th><th>ประเภท</th><th class="text-end">แต้ม</th><th>สถานะ</th><th></th></tr></thead>
+                    <thead><tr><th>รหัส</th><th>ชื่อ</th><th>ลูกค้า/ลูกหนี้</th><th>ประเภท</th><th class="text-end">แต้ม</th><th>สถานะ</th><th></th></tr></thead>
                     <tbody>
                     @forelse($members as $member)
                         <tr>
@@ -45,6 +52,12 @@
                                 @csrf @method('PUT')
                                 <td><input name="member_code" value="{{ $member->member_code }}" required class="form-control form-control-sm"></td>
                                 <td><input name="name" value="{{ $member->name }}" required class="form-control form-control-sm"><input type="hidden" name="phone" value="{{ $member->phone }}"></td>
+                                <td>
+                                    <select name="customer_id" class="form-select form-select-sm">
+                                        <option value="">-- ไม่เชื่อม --</option>
+                                        @foreach($customers as $customer)<option value="{{ $customer->id }}" @selected($member->customer_id === $customer->id)>{{ $customer->code }} - {{ $customer->name_th }}</option>@endforeach
+                                    </select>
+                                </td>
                                 <td>
                                     <select name="member_type_id" class="form-select form-select-sm">
                                         <option value="">-- ไม่ระบุ --</option>
@@ -57,7 +70,7 @@
                             </form>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="text-center text-muted py-5">ยังไม่มีสมาชิก</td></tr>
+                        <tr><td colspan="7" class="text-center text-muted py-5">ยังไม่มีสมาชิก</td></tr>
                     @endforelse
                     </tbody>
                 </table>

@@ -18,7 +18,7 @@ class ErpAuthorize
     private const PUBLIC_ROUTES = [
         'login', 'login.attempt', 'logout', 'pos.download', 'python-pos.download',
         'pos.release.latest', 'pos.release.download',
-        'mfa.challenge', 'mfa.verify', 'portal',
+        'mfa.challenge', 'mfa.verify', 'portal', 'member.portal',
     ];
 
     private const PASSWORD_CHANGE_ROUTES = ['password.change', 'password.update'];

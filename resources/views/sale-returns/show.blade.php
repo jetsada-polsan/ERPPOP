@@ -12,10 +12,18 @@
                 @if($saleReturn->remark)<div class="text-muted small mt-1">หมายเหตุ: {{ $saleReturn->remark }}</div>@endif
             </div>
             <div class="d-flex gap-2 align-items-center">
+                @if($saleReturn->status === 'pending_approval' && auth()->user()->hasPermission('finance.note.approve') && (int) $saleReturn->created_by !== (int) auth()->id())
+                    <form method="post" action="{{ route('sale-returns.approve', $saleReturn) }}" onsubmit="return confirm('ยืนยันอนุมัติใบรับคืน ปรับสต๊อกและบัญชีหรือไม่?')">
+                        @csrf
+                        <button class="btn btn-success px-3"><i class="bi bi-check2-circle me-1"></i> อนุมัติ</button>
+                    </form>
+                @endif
                 <a href="{{ route('documents.tax-invoice', $saleReturn) }}" target="_blank" class="btn btn-primary px-3">
                     <i class="bi bi-receipt me-1"></i> ใบรับคืน/ใบลดหนี้ (A4)
                 </a>
-                <span class="badge text-bg-warning fs-6 px-3 py-2">รับคืนแล้ว</span>
+                <span class="badge {{ $saleReturn->status === 'active' ? 'text-bg-success' : 'text-bg-warning' }} fs-6 px-3 py-2">
+                    {{ $saleReturn->status === 'active' ? 'อนุมัติแล้ว' : 'รออนุมัติ' }}
+                </span>
             </div>
         </div>
     </div>
