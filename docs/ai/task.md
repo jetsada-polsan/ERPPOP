@@ -944,3 +944,12 @@ pending
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่มีเครื่องพิมพ์/ลิ้นชักจริงในเครื่องพัฒนา จึงต้องทำ hardware UAT บน Windows POS; `compileall` บน macOS เขียน bytecode ไป cache ของระบบไม่ได้ แต่ unittest/import ผ่าน
 - Deploy: รอ commit/push และรัน production workflow หลังตรวจสถานะ GitHub; ไม่ล้างข้อมูล production
 - งานถัดไป: ตรวจ production health หลัง deploy และทดสอบ UAT ซื้อ → รับของ → ขาย → ลูกหนี้ → รับเงิน → GL/รายงาน รวมถึงเครื่องพิมพ์/ลิ้นชักจริง
+
+## Handoff - 2026-09-26 (Codex แก้กล้อง EAN-13 คลังมือถือ)
+
+- Branch: `codex/simplify-pos-customer-flow`
+- Commit: `a201622`
+- ทำอะไร: แก้ปัญหา `element width` ตอนเปิดกล้อง โดยรอให้ `#qr-reader` มีความกว้างจริงก่อนเริ่มอ่าน, จำกัด `qrbox` ตามพื้นที่หน้าจอ, เพิ่ม `min-width: 0` ให้กล่องกล้อง และคง fallback ไป ZXing
+- ทดสอบ: `php artisan test tests/Feature/WarehouseMobileTest.php` ผ่าน 4 tests / 22 assertions; `git diff --check` ผ่าน
+- Deploy: commit ก่อนหน้า `0aa4cce` ถูก deploy production สำเร็จแล้ว; commit `a201622` push แล้วแต่ **ยังไม่ deploy**
+- งานถัดไป: รัน workflow `Deploy ERP` production แล้วเปิด `/wh/` บนมือถือทดสอบกล้องจริงกับฉลาก EAN-13
