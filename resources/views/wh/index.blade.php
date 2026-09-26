@@ -373,9 +373,9 @@
             <div id="qr-reader" style="width:100%"></div>
             <div class="hint" style="text-align:center;margin:8px 0 0">วางบาร์โค้ด EAN‑13 เพียง 1 ดวงให้ใหญ่และตรงในกรอบ</div>
             <div class="err" x-show="cameraError" x-text="cameraError" style="text-align:center;margin:8px 0 0"></div>
-            <div class="btnrow" x-show="cameraError" x-cloak>
+            <div class="btnrow">
                 <button type="button" class="btn blue" @click="$refs.cameraFile.click()"><i class="bi bi-camera-fill"></i> ถ่ายภาพบาร์โค้ดแทน</button>
-                <button type="button" class="btn" @click="openCamera(camTarget)">ลองเปิดกล้องใหม่</button>
+                <button type="button" class="btn" x-show="cameraError" @click="openCamera(camTarget)">ลองเปิดกล้องใหม่</button>
             </div>
             <input x-ref="cameraFile" type="file" accept="image/*" capture="environment" hidden @change="scanCameraFile($event)">
             <div id="qr-file-reader" hidden></div>
