@@ -21,6 +21,7 @@ use App\Models\Supplier;
 use App\Models\VatRate;
 use App\Services\Purchasing\ReplenishmentService;
 use App\Services\Sales\DocumentNumberGenerator;
+use App\Support\PythonPosInstaller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -86,6 +87,7 @@ class BplusOperationController extends Controller
             'selectedDate' => $selectedDate,
             'selectedBranchId' => $selectedBranchId,
             'lockedBranchId' => $lockedBranchId,
+            'pythonPosInstaller' => PythonPosInstaller::current(),
         ]);
     }
 

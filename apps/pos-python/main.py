@@ -174,8 +174,15 @@ def launch_ui(app):
                 f"โปรแกรมเริ่มต้นไม่ได้: {error}\n\n"
                 f"กรุณาส่งไฟล์นี้ให้ฝ่าย IT:\n{log_path}",
             )
-        finally:
-            raise RuntimeError(f"เริ่ม PopCentral POS ไม่สำเร็จ: {log_path}") from error
+        except Exception:
+            # The log file is still available if the desktop dialog cannot be
+            # created (for example while Qt itself is starting).
+            pass
+
+        # Do not re-raise in the windowed build: PyInstaller would show a
+        # second technical traceback dialog on top of this actionable message.
+        # Keep the full traceback in startup-error.log for IT instead.
+        return None
 
 
 def main() -> None:

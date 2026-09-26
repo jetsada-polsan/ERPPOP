@@ -263,12 +263,12 @@
                 <div class="set-card pos-download-card">
                     <div class="pos-download-mark"><i class="bi bi-windows"></i></div>
                     <div class="pos-download-copy">
-                        <div class="set-title">PopCentral POS สำหรับเครื่องแคชเชียร์</div>
+                        <div class="set-title">PopCentral POS สำหรับเครื่องแคชเชียร์ @if($pythonPosInstaller)<span class="pos-version-badge">รุ่น {{ $pythonPosInstaller['version'] }}</span>@endif</div>
                         <div class="set-desc">Python + PySide6 · Local SQLite · แอป POS หลักสำหรับเครื่องแคชเชียร์ · ต้องผ่านการทดสอบ Windows ก่อนเปิดขายจริง</div>
                     </div>
                     @if($pythonPosInstaller)
                         <a href="{{ route('python-pos.download') }}" class="btn btn-primary btn-lg pos-download-btn">
-                            <i class="bi bi-download me-1"></i> ดาวน์โหลด PopCentral POS
+                            <i class="bi bi-download me-1"></i> ดาวน์โหลดรุ่น {{ $pythonPosInstaller['version'] }}
                         </a>
                     @else
                         <button type="button" class="btn btn-secondary btn-lg pos-download-btn" disabled>
@@ -279,7 +279,7 @@
 
                 @if($pythonPosInstaller)
                     <div class="alert alert-success py-2 mb-3">
-                        <i class="bi bi-shield-check me-1"></i>พร้อมทดสอบ: <code>{{ $pythonPosInstaller['filename'] }}</code>
+                        <i class="bi bi-shield-check me-1"></i>ไฟล์พร้อมติดตั้ง: <code>{{ $pythonPosInstaller['filename'] }}</code>
                         · {{ number_format($pythonPosInstaller['size_bytes'] / 1048576, 1) }} MB
                     </div>
                 @endif
@@ -574,6 +574,7 @@ async function copyPosToken(text) {
     .logo-thumb-text span { color: var(--erp-success-ink); }
     .logo-caption { font-size: 11px; color: #7d97ac; margin-top: 6px; word-break: break-all; }
     .pos-download-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 18px; padding: 24px; border-color: var(--erp-primary-soft); background: var(--erp-primary-soft); }
+    .pos-download-card .pos-version-badge { display: inline-flex; margin-left: 7px; padding: 3px 8px; border-radius: 999px; background: #dbeafe; color: #1d4ed8; font-size: 11px; font-weight: 800; vertical-align: middle; }
     .pos-download-mark { width: 64px; height: 64px; display: grid; place-items: center; border-radius: 16px; background: var(--erp-primary); color: #fff; font-size: 32px; }
     .pos-download-copy .set-title { color: var(--erp-primary-dark); font-size: 18px; }
     .pos-download-copy .set-desc { max-width: none; }

@@ -18,12 +18,24 @@ PUBLIC_HTTPS_HOSTS = {"erp.popstarcenter.com"}
 
 def normalize_server_url(value: str) -> str:
     """Upgrade the public ERP hostname while preserving explicit private HTTP URLs."""
-    raw = str(value or "").strip().rstrip("/")
+    # Config files can be copied from a browser or an older installer. Remove
+    # a BOM as well as surrounding whitespace before urlsplit sees the value.
+    raw = str(value or "").replace("\ufeff", "").strip().rstrip("/")
     if not raw:
         return raw
     parts = urlsplit(raw)
-    if parts.scheme.lower() == "http" and (parts.hostname or "").lower() in PUBLIC_HTTPS_HOSTS:
-        return urlunsplit(("https", parts.netloc, parts.path, parts.query, parts.fragment)).rstrip("/")
+    host = (parts.hostname or "").lower()
+    if host in PUBLIC_HTTPS_HOSTS:
+        # Canonicalize the public endpoint so copied URL casing cannot change
+        # the security check or request target.
+        netloc = host
+        try:
+            port = parts.port
+        except ValueError:
+            port = None
+        if port:
+            netloc = f"{host}:{port}"
+        return urlunsplit(("https", netloc, parts.path, parts.query, parts.fragment)).rstrip("/")
     return raw
 
 

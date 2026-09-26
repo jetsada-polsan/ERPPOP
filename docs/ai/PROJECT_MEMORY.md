@@ -49,8 +49,8 @@
 - SQLite local มี: `products`, `promotions`, `offline_cashiers`, `checkout_queue`, `pos_sale_history`, `app_state`.
 - ข้อมูล POS เก็บที่ไดรฟ์ `D:` เมื่อมีไดรฟ์ พร้อม backup, restore และ integrity check.
 - POS ต้องได้รับ Device Token ที่ผูกเครื่อง/สาขา จึงเรียก `/api/pos/ping` และซิงก์ได้.
-- API POS ใช้ `Authorization: Bearer <Device Token>`; URL มาตรฐานคือ `http://27.254.143.219`.
-- **production ไม่ได้เปิด HTTPS** (port 443 ปิดสนิท) อย่าแนะนำ `https://` ในคู่มือหรือหน้าตั้งค่า.
+- API POS ใช้ `Authorization: Bearer <Device Token>`; URL production มาตรฐานคือ `https://erp.popstarcenter.com`.
+- **ห้ามใช้ HTTP กับ production** เพราะ Device Token อยู่ในทุก request; อนุญาต HTTP เฉพาะ localhost/เครือข่ายทดสอบที่ระบุ `allow_insecure` ชัดเจนเท่านั้น.
 - แอป POS ถูกล็อกให้ต่อได้เฉพาะ `27.254.143.219` ผ่าน Tauri http scope
   (`src-tauri/capabilities/default.json`) และ CSP ใน `tauri.conf.json` — ถ้าย้าย host หรือ
   เปิดโดเมนใหม่ ต้องแก้สองไฟล์นั้นแล้ว build ใหม่ ไม่ใช่แค่พิมพ์ URL ใหม่ในหน้าตั้งค่า.
@@ -83,6 +83,8 @@
 ต้อง build 1.5.0 ผ่าน GitHub Actions ถึงจะมีผลกับสาขา (รายละเอียดใน `docs/ai/task.md`)
 
 ## ตรวจและปล่อยงาน
+
+- ทุกหน้าดาวน์โหลด POS ต้องแสดงเลขรุ่นของไฟล์ติดตั้งและมีปุ่มดาวน์โหลดหลักเพียงปุ่มเดียว ห้ามใช้ปุ่ม “ดาวน์โหลด” กับ “ดาวน์โหลด/อัปเดต” ที่ชี้ไฟล์เดียวกันจนทำให้ผู้ใช้สับสน.
 
 - Laravel: `php artisan test`
 - Health: `php artisan erp:health`

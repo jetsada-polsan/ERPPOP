@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\PosBuild;
 use App\Services\Pos\GithubPosBuildService;
+use App\Support\PythonPosInstaller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,6 +22,7 @@ class PosBuildController extends Controller
             'githubConfigured' => $github->isConfigured(),
             'suggestedVersion' => $this->suggestedVersion(),
             'repository' => config('services.github_pos_build.repository'),
+            'pythonPosInstaller' => PythonPosInstaller::current(),
         ]);
     }
 

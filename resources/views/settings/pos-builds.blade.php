@@ -82,7 +82,7 @@
     </div>
 
     <section class="build-history">
-        <div class="build-history-head"><div><h2>ประวัติการ Build</h2><div class="small text-muted">Repository: {{ $repository }}</div></div><a class="btn btn-sm btn-outline-primary" href="{{ route('python-pos.download') }}"><i class="bi bi-download me-1"></i> ดาวน์โหลดรุ่นล่าสุด</a></div>
+        <div class="build-history-head"><div><h2>ประวัติการ Build</h2><div class="small text-muted">Repository: {{ $repository }}</div></div>@if($pythonPosInstaller)<a class="btn btn-sm btn-primary" href="{{ route('python-pos.download') }}"><i class="bi bi-download me-1"></i> ดาวน์โหลดรุ่น {{ $pythonPosInstaller['version'] }}</a>@else<span class="text-muted small align-self-center">ยังไม่มีไฟล์ติดตั้งที่เผยแพร่</span>@endif</div>
         @if($builds->isEmpty())
             <div class="build-empty"><i class="bi bi-clock-history fs-2 d-block mb-2"></i>ยังไม่มีประวัติการ Build จาก ERP</div>
         @else
@@ -97,7 +97,7 @@
                     <td><div class="d-flex gap-2">
                         @if($build->github_run_url)<a class="btn btn-sm btn-light border" href="{{ $build->github_run_url }}" target="_blank" rel="noopener">ดู Log</a>@endif
                         @if($build->isActive())<form method="POST" action="{{ route('settings.pos-builds.refresh', $build) }}">@csrf<button class="btn btn-sm btn-outline-primary" type="submit"><i class="bi bi-arrow-clockwise"></i> สถานะ</button></form>@endif
-                        @if($build->status === 'success')<a class="btn btn-sm btn-success" href="{{ route('python-pos.download') }}"><i class="bi bi-download"></i></a>@endif
+                        @if($build->status === 'success')<a class="btn btn-sm btn-success" href="{{ route('python-pos.download') }}"><i class="bi bi-download me-1"></i> {{ $build->version }}</a>@endif
                     </div></td>
                 </tr>
             @endforeach

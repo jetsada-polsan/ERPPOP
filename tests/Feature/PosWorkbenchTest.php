@@ -43,7 +43,9 @@ class PosWorkbenchTest extends TestCase
             ->assertSee('PopCentral Python POS')
             ->assertSee('Python + PySide6')
             ->assertSee('Local SQLite')
-            ->assertSee(route('python-pos.download'), false)
+            ->assertSee('ช่องทางดาวน์โหลดปลอดภัยด้วย HTTPS')
+            ->assertSee('ยังไม่มีไฟล์ติดตั้งที่ผ่านการ Build และ Publish')
+            ->assertDontSee('ดาวน์โหลด/อัปเดต Python POS')
             ->assertDontSee('Vue + Tauri')
             ->assertDontSee('0.1.7')
             ->assertDontSee(route('pos.download'), false);

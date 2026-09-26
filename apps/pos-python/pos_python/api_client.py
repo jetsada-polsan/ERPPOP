@@ -34,9 +34,10 @@ class LaravelPosClient:
         self.timeout_seconds = timeout_seconds
         parts = urlsplit(self.base_url)
         host = (parts.hostname or "").lower()
-        if parts.scheme != "https" and not (allow_insecure or host in _LOCAL_HOSTS):
+        if parts.scheme.lower() != "https" and not (allow_insecure or host in _LOCAL_HOSTS):
             raise LaravelApiError(
-                f"ปลายทาง POS ต้องเป็น https ไม่งั้น device token รั่วได้: {base_url}"
+                "ปลายทาง POS ต้องเป็น HTTPS เพื่อป้องกัน device token รั่วไหล "
+                f"(ค่าที่อ่านได้: {self.base_url or 'ว่าง'}; production ใช้ https://erp.popstarcenter.com)"
             )
 
     def get(self, path: str) -> dict[str, Any]:

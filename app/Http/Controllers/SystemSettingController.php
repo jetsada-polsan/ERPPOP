@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Support\PosLayout;
 use App\Support\PosReleaseManifest;
 use App\Support\PosTerminalCode;
+use App\Support\PythonPosInstaller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -228,35 +229,7 @@ class SystemSettingController extends Controller
 
     private function currentPythonPosInstaller(): ?array
     {
-        // Both folders are supported for backward compatibility. Choose by
-        // semantic version, otherwise an older legacy file can mask a newer
-        // installer published by GitHub.
-        $files = collect(array_merge(
-            File::glob(storage_path('app/pos-releases/PopCentral-POS-UAT-*-setup.exe')),
-            File::glob(storage_path('app/pos-python-releases/PopCentral-POS-UAT-*-setup.exe')),
-        ))
-            ->filter(fn (string $path) => is_file($path))
-            ->unique()
-            ->values()
-            ->all();
-        usort($files, static function (string $left, string $right): int {
-            preg_match('/-(\d+\.\d+\.\d+)-setup\.exe$/', basename($left), $leftMatch);
-            preg_match('/-(\d+\.\d+\.\d+)-setup\.exe$/', basename($right), $rightMatch);
-            $versionOrder = version_compare($rightMatch[1] ?? '0.0.0', $leftMatch[1] ?? '0.0.0');
-
-            return $versionOrder !== 0 ? $versionOrder : filemtime($right) <=> filemtime($left);
-        });
-
-        $path = $files[0] ?? null;
-        if (! $path) {
-            return null;
-        }
-
-        return [
-            'path' => $path,
-            'filename' => basename($path),
-            'size_bytes' => filesize($path),
-        ];
+        return PythonPosInstaller::current();
     }
 
     public function issuePosToken(Request $request): RedirectResponse

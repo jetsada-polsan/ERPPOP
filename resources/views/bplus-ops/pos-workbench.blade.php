@@ -11,18 +11,32 @@
             <h2>เช็กบิล POS ล่าสุด</h2>
             <p>เลือกวันที่/สาขา แล้วดูเลขบิลตอนลูกค้าขอใบกำกับภาษี หรือตรวจยอดหลังขาย</p>
         </div>
-        <a href="{{ route('python-pos.download') }}" class="pos-open-btn"><i class="bi bi-download"></i> ดาวน์โหลด Python POS</a>
+        <span class="pos-page-status"><i class="bi bi-shield-check"></i> ช่องทางดาวน์โหลดปลอดภัยด้วย HTTPS</span>
     </div>
 
     <div class="pos-install-card">
         <div class="pos-install-icon"><i class="bi bi-windows"></i></div>
         <div class="pos-install-copy">
-            <strong>ติดตั้งหรืออัปเดต PopCentral Python POS บนเครื่องแคชเชียร์</strong>
-            <span>Python + PySide6 · Local SQLite · ขายออฟไลน์ได้ และ Sync ยอดขึ้น PopCentral เมื่อออนไลน์</span>
+            <div class="pos-install-title">
+                <strong>PopCentral Python POS</strong>
+                @if($pythonPosInstaller)
+                    <span class="pos-version-badge">รุ่น {{ $pythonPosInstaller['version'] }}</span>
+                @endif
+            </div>
+            <span>Windows · Python + PySide6 · Local SQLite · ขายออฟไลน์ได้ และ Sync ยอดขึ้น PopCentral เมื่อออนไลน์</span>
+            @if($pythonPosInstaller)
+                <small class="pos-install-meta">ไฟล์ {{ $pythonPosInstaller['filename'] }} · {{ number_format($pythonPosInstaller['size_bytes'] / 1048576, 1) }} MB · อัปเดต {{ \Illuminate\Support\Carbon::createFromTimestamp($pythonPosInstaller['updated_at'])->timezone('Asia/Bangkok')->format('d/m/Y H:i') }}</small>
+            @else
+                <small class="pos-install-meta">ยังไม่มีไฟล์ติดตั้งที่ผ่านการ Build และ Publish</small>
+            @endif
         </div>
-        <a href="{{ route('python-pos.download') }}" class="pos-install-btn">
-            <i class="bi bi-download"></i> ดาวน์โหลด/อัปเดต Python POS
-        </a>
+        @if($pythonPosInstaller)
+            <a href="{{ route('python-pos.download') }}" class="pos-install-btn">
+                <i class="bi bi-download"></i> ดาวน์โหลดรุ่น {{ $pythonPosInstaller['version'] }}
+            </a>
+        @else
+            <span class="pos-install-disabled"><i class="bi bi-hourglass-split"></i> รอไฟล์รุ่นใหม่</span>
+        @endif
     </div>
 
     <div class="pos-note">
@@ -31,6 +45,11 @@
             <strong>พักบิล เรียกบิลคืน และยกเลิกบิล ทำใน Python POS โดยตรง</strong>
             ใช้หน้าขายบนเครื่องแคชเชียร์เป็นงานหลัก บิลที่พักและคิวรอซิงก์เก็บใน Local SQLite ของเครื่องนั้น ไม่ต้องมาจดซ้ำที่หน้านี้
         </div>
+    </div>
+
+    <div class="pos-https-note">
+        <i class="bi bi-lock-fill"></i>
+        <div><strong>ตั้งค่าเครื่อง POS ให้ใช้ปลายทางนี้</strong><code>https://erp.popstarcenter.com</code> เท่านั้น เพื่อป้องกัน Device Token ระหว่างซิงก์ข้อมูล</div>
     </div>
 
     <div id="latest-receipts" class="content-card pos-card">
@@ -118,8 +137,8 @@
         gap: 12px;
         padding: 14px 16px;
         border-radius: 12px;
-        background: var(--erp-primary-soft);
-        border: 1px solid var(--erp-primary-soft);
+        background: linear-gradient(135deg, #f1f8ff 0%, #ffffff 70%);
+        border: 1px solid #cfe5f4;
         box-shadow: 0 8px 22px rgba(2,132,199,.06);
     }
     .pos-kicker {
@@ -156,6 +175,19 @@
         text-decoration: none;
         white-space: nowrap;
     }
+    .pos-page-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        color: #166534;
+        background: #ecfdf3;
+        border: 1px solid #bbf7d0;
+        border-radius: 999px;
+        padding: 8px 12px;
+        font-size: 12px;
+        font-weight: 800;
+        white-space: nowrap;
+    }
     .pos-open-btn:hover,
     .pos-save-btn:hover {
         background: var(--erp-primary-dark);
@@ -178,10 +210,11 @@
         grid-template-columns: auto minmax(0, 1fr) auto;
         align-items: center;
         gap: 12px;
-        padding: 12px 14px;
-        border: 1px solid #bbf7d0;
-        border-radius: 12px;
-        background: var(--erp-success-soft);
+        padding: 18px;
+        border: 1px solid #b9e6cb;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 82%);
+        box-shadow: 0 10px 24px rgba(22,101,52,.06);
     }
     .pos-install-icon {
         display: grid;
@@ -193,9 +226,12 @@
         color: var(--erp-success-ink);
         font-size: 22px;
     }
-    .pos-install-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .pos-install-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .pos-install-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .pos-install-copy strong { color: #166534; font-weight: 900; }
     .pos-install-copy span { color: #4b6353; font-size: 12.5px; }
+    .pos-install-meta { color: #64748b; font-size: 11.5px; }
+    .pos-version-badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 8px; background: #dcfce7; color: #166534; font-size: 11px !important; font-weight: 900; }
     .pos-install-btn {
         display: inline-flex;
         align-items: center;
@@ -210,6 +246,7 @@
         white-space: nowrap;
     }
     .pos-install-btn:hover { background: var(--erp-success-ink); color: #fff; }
+    .pos-install-disabled { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 14px; border-radius: 10px; background: #e2e8f0; color: #64748b; font-weight: 800; white-space: nowrap; }
     .pos-note > i {
         color: #d97706;
         font-size: 18px;
@@ -220,6 +257,10 @@
         color: var(--erp-warning-ink);
         font-weight: 900;
     }
+    .pos-https-note { display: flex; align-items: flex-start; gap: 10px; padding: 11px 14px; border: 1px solid #bfdbfe; border-radius: 12px; background: #eff6ff; color: #475569; font-size: 12.5px; line-height: 1.5; }
+    .pos-https-note > i { color: #2563eb; font-size: 16px; }
+    .pos-https-note strong { color: #1e3a8a; margin-right: 8px; }
+    .pos-https-note code { color: #1d4ed8; font-weight: 800; }
     .pos-card {
         padding: 14px;
         border: 1px solid var(--erp-border);
@@ -343,6 +384,7 @@
     @media (max-width: 767.98px) {
         .pos-help-strip { align-items: stretch; flex-direction: column; }
         .pos-open-btn, .pos-save-btn { width: 100%; }
+        .pos-page-status { width: 100%; justify-content: center; }
         .pos-filter-actions { grid-template-columns: 1fr; }
         .pos-install-card { grid-template-columns: auto minmax(0, 1fr); }
         .pos-install-btn { grid-column: 1 / -1; width: 100%; }
