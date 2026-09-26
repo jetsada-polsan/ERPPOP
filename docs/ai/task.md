@@ -962,3 +962,11 @@ pending
 - ทดสอบ: `php artisan test tests/Feature/WarehouseMobileTest.php` ผ่าน 4 tests / 25 assertions; `git diff --check` ผ่าน
 - Deploy: workflow `36227161895` ผ่านครบและเผยแพร่ production แล้ว
 - ข้อจำกัด: การกดอนุญาตกล้องใน Chrome/ระบบปฏิบัติการยังต้องทำโดยผู้ใช้; หากไม่อนุญาต ให้ใช้ปุ่มถ่ายภาพแทนบนมือถือ
+
+## Handoff - 2026-09-26 (Codex แก้ ZXing ต้องใช้ video element)
+
+- Branch: `codex/simplify-pos-customer-flow`
+- Commit: `4e4fbfc`
+- ทำอะไร: แยก `<video id="qr-video">` สำหรับ `ZXingBrowser.decodeFromConstraints()` และไม่ส่ง `<div id="qr-reader">` ให้ ZXing อีกต่อไป; สลับแสดง/ซ่อน element ตามตัวอ่านที่กำลังทำงาน และคืน layout เมื่อปิดกล้อง
+- ทดสอบ: `php artisan test tests/Feature/WarehouseMobileTest.php` ผ่าน 4 tests / 28 assertions; `git diff --check` ผ่าน
+- Deploy: workflow `36227490051` ผ่านครบและเผยแพร่ production แล้ว; ตรวจหน้า `/wh` หลัง reload พบ element `qr-video` แสดงใน overlay และไม่มี error `must be a video element`
