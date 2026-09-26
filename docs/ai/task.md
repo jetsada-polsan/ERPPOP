@@ -978,3 +978,10 @@ pending
 - ทำอะไร: `whApp.scan()` ลองค้นหาเลขที่อ่านได้ก่อน และถ้าเป็นตัวเลข 12 หลักจะลองเติม `0` เป็นเลข EAN-13 13 หลักอัตโนมัติ; รองรับช่องว่างที่ตัวอ่านอาจส่งมา
 - ทดสอบ: `php artisan test tests/Feature/WarehouseMobileTest.php` ผ่าน 4 tests / 30 assertions; `git diff --check` ผ่าน
 - Deploy: workflow `36227925305` ผ่านครบและเผยแพร่ production แล้ว; ตรวจ source หน้า production พบ `barcodeCandidates`, fallback เติม `0` และ `qr-video` ครบ
+
+## Handoff - 2026-09-26 (Codex Python POS API/layout fix)
+- Commit: `daa7af9`
+- ทำอะไร: แก้ POS Python ให้แปลง URL เก่า `http://erp.popstarcenter.com` เป็น HTTPS อัตโนมัติก่อน ping/API โดยยังคงรองรับ IP ภายในแบบ HTTP; ลด layout เป็นสินค้า 45% / รายการขาย 55%, compact/small, การ์ดสินค้าไม่ยืดเต็ม viewport และลด numpad เพื่อให้รายการที่ยิงกับยอดรวมเห็นเด่นขึ้น; เครื่องที่ยัง cache layout รุ่น 1 แบบเดิมจะ migrate เป็น layout ใหม่อัตโนมัติ
+- ทดสอบ: Python POS `183 tests` ผ่าน; Laravel full test ผ่าน; Laravel POS/layout focused `23 tests / 152 assertions` ผ่าน; `py_compile` และ `git diff --check` ผ่าน
+- Deploy: ยังไม่ deploy ERP; รอ Windows workflow build/publish installer รุ่นใหม่
+- งานถัดไป: push branch, build installer รุ่นใหม่, ตรวจ artifact/self-check และตรวจลิงก์ดาวน์โหลดก่อนส่งให้ติดตั้งบนเครื่อง POS จริง
