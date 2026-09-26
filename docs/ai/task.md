@@ -970,3 +970,11 @@ pending
 - ทำอะไร: แยก `<video id="qr-video">` สำหรับ `ZXingBrowser.decodeFromConstraints()` และไม่ส่ง `<div id="qr-reader">` ให้ ZXing อีกต่อไป; สลับแสดง/ซ่อน element ตามตัวอ่านที่กำลังทำงาน และคืน layout เมื่อปิดกล้อง
 - ทดสอบ: `php artisan test tests/Feature/WarehouseMobileTest.php` ผ่าน 4 tests / 28 assertions; `git diff --check` ผ่าน
 - Deploy: workflow `36227490051` ผ่านครบและเผยแพร่ production แล้ว; ตรวจหน้า `/wh` หลัง reload พบ element `qr-video` แสดงใน overlay และไม่มี error `must be a video element`
+
+## Handoff - 2026-09-26 (Codex เติมเลขศูนย์หน้า EAN-13 จากกล้อง)
+
+- Branch: `codex/simplify-pos-customer-flow`
+- Commit: `4262409`
+- ทำอะไร: `whApp.scan()` ลองค้นหาเลขที่อ่านได้ก่อน และถ้าเป็นตัวเลข 12 หลักจะลองเติม `0` เป็นเลข EAN-13 13 หลักอัตโนมัติ; รองรับช่องว่างที่ตัวอ่านอาจส่งมา
+- ทดสอบ: `php artisan test tests/Feature/WarehouseMobileTest.php` ผ่าน 4 tests / 30 assertions; `git diff --check` ผ่าน
+- Deploy: workflow `36227925305` ผ่านครบและเผยแพร่ production แล้ว; ตรวจ source หน้า production พบ `barcodeCandidates`, fallback เติม `0` และ `qr-video` ครบ
