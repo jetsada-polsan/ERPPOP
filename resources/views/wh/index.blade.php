@@ -112,10 +112,11 @@
         .bottomnav button.on { color: var(--blue-deep); }
 
         .overlay { position: fixed; inset: 0; z-index: 40; background: rgba(15,35,50,.5); display: grid; place-items: center; padding: 18px; }
-        .sheet { width: 100%; max-width: 420px; background: #fff; border-radius: 16px; padding: 22px; text-align: center; }
+        .sheet { width: 100%; max-width: 420px; min-width: 0; background: #fff; border-radius: 16px; padding: 22px; text-align: center; }
         .sheet .ok-ic { font-size: 52px; color: var(--green-deep); }
         .sheet h3 { margin: 6px 0 4px; }
         .sheet .doc { font-size: 20px; font-weight: 900; color: var(--blue-deep); }
+        .camwrap #qr-reader { width: 100%; min-width: 0; overflow: hidden; }
         .camwrap video { width: 100%; border-radius: 12px; background: #000; }
     </style>
 </head>
@@ -617,16 +618,26 @@ function whApp() {
         async saveCountItem() { if (!this.countProduct || this.countQty === '' || +this.countQty < 0) { this.countError = 'กรุณากรอกยอดที่นับได้'; return; } this.countBusy = true; try { await jfetch('{{ url('/wh/stock-counts') }}/' + this.countId + '/item', { method: 'POST', body: JSON.stringify({ product_id: this.countProduct.id, counted_qty: +this.countQty }) }); this.countProduct = null; this.countQty = ''; this.$nextTick(() => this.focusScan()); } catch (e) { this.countError = e.message; } this.countBusy = false; },
 
         // ---- กล้องสแกน QR/EAN/barcode (ต้องเปิดผ่าน HTTPS/localhost) ----
-        cameraDecodeConfig() {
+        async waitForCameraElement() {
+            const reader = document.getElementById('qr-reader');
+            for (let i = 0; i < 12; i++) {
+                await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                if (reader && reader.getBoundingClientRect().width > 0) return reader;
+            }
+            return null;
+        },
+        cameraDecodeConfig(elementWidth = window.innerWidth) {
             const formats = window.Html5QrcodeSupportedFormats ?? {};
             const wanted = ['EAN_13', 'EAN_8', 'UPC_A', 'UPC_E', 'CODE_128', 'CODE_39', 'ITF', 'QR_CODE']
                 .map((name) => formats[name])
                 .filter((value) => value !== undefined);
+            const availableWidth = Math.max(180, Math.floor(elementWidth));
+            const scanWidth = Math.min(360, Math.max(180, Math.floor(availableWidth * 0.92)));
             const config = {
                 fps: 12,
                 qrbox: {
-                    width: Math.min(360, Math.max(260, Math.floor(window.innerWidth * 0.82))),
-                    height: 150,
+                    width: scanWidth,
+                    height: Math.min(150, Math.max(100, Math.floor(scanWidth * 0.42))),
                 },
                 aspectRatio: 2,
                 disableFlip: false,
@@ -645,6 +656,8 @@ function whApp() {
         },
         async startZxingCamera() {
             if (!this.cameraOpen || !window.ZXingBrowser || this.camHandled) return;
+            const reader = await this.waitForCameraElement();
+            if (!reader) throw new Error('พื้นที่แสดงกล้องมีความกว้างเป็นศูนย์');
             if (this.html5QrCode) {
                 try { await this.html5QrCode.stop(); } catch (e) { /* ตัวอ่านเดิมอาจหยุดไปแล้ว */ }
                 try { this.html5QrCode.clear(); } catch (e) { /* DOM อาจถูกล้างแล้ว */ }
@@ -663,10 +676,12 @@ function whApp() {
             if (window.Html5Qrcode) {
                 this.$nextTick(async () => {
                     try {
+                        const reader = await this.waitForCameraElement();
+                        if (!reader) throw new Error('พื้นที่แสดงกล้องมีความกว้างเป็นศูนย์');
                         this.html5QrCode = new Html5Qrcode('qr-reader');
                         await this.html5QrCode.start(
                             { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
-                            this.cameraDecodeConfig(),
+                            this.cameraDecodeConfig(reader.getBoundingClientRect().width),
                             (decodedText) => this.acceptCameraCode(decodedText),
                             () => {},
                         );
