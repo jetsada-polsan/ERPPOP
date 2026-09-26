@@ -31,8 +31,11 @@ class SyncWorker:
         # The worker must never share the GUI connection across threads.
         self.refresh_down = refresh_down
         self.needs_down_sync = False
-        # สถานะให้ GUI อ่านโชว์ผู้ใช้ (แถบล่าง): เชื่อม ERP ได้ไหม + ค้างกี่ใบ
-        self.online = True
+        # สถานะนี้จะเป็น True ได้ต่อเมื่อ bootstrap/manual health check เรียก
+        # /api/pos/ping ผ่านแล้วเท่านั้น ห้ามอนุมานจาก pending == 0 เพราะคิวว่าง
+        # ไม่ได้แปลว่า Device Token ถูกยืนยันแล้ว
+        self.online = False
+        self.last_error = "ยังไม่ได้ยืนยัน Device Token กับ ERP"
         self.pending = 0
         self.last_result: dict = {"synced": 0, "failed": 0}
         self._stop = threading.Event()
@@ -68,17 +71,23 @@ class SyncWorker:
             if self.needs_down_sync and self.refresh_down is not None:
                 download = self.refresh_down()
                 self.needs_down_sync = False
+                self.online = True
+                self.last_error = ""
             service = SyncService(db, self.api)
             result = service.sync_pending_sales()
             if download:
                 result = {**result, "download": download}
             self.pending = self._pending_count(db)
             self.last_result = result
-            # ยังส่งไม่หมด = ถือว่าเน็ต/ERP มีปัญหา (บิลค้างเพราะเหตุใดก็ตาม)
-            self.online = self.pending == 0 or result["synced"] > 0
+            # ผล sync คิวอย่างเดียวไม่ใช่ health check: คิวว่างไม่เรียก API และ
+            # จึงไม่มีสิทธิ์เปลี่ยนสถานะ Device Token ให้เป็นออนไลน์
+            if result["failed"]:
+                self.online = False
+                self.last_error = f"มีรายการ sync ล้มเหลว {result['failed']} รายการ"
             return result
-        except Exception:
+        except Exception as error:
             self.online = False
+            self.last_error = str(error)
             # A failed request is also the reconnect trigger. The next cycle
             # will refresh server master data before attempting the outbox.
             self.needs_down_sync = True

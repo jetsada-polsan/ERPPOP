@@ -144,6 +144,16 @@ class OnlineLoginTest(unittest.TestCase):
 
 
 class SyncWorkerTest(unittest.TestCase):
+    def test_empty_queue_does_not_claim_device_token_is_online(self) -> None:
+        db, path = fresh_db()
+        worker = SyncWorker(path, object())
+
+        worker.run_once()
+
+        self.assertFalse(worker.online)
+        self.assertIn("ยังไม่ได้ยืนยัน Device Token", worker.last_error)
+        db.close()
+
     def test_worker_refreshes_cached_master_data_after_reconnect(self) -> None:
         db, path = fresh_db()
         api = FakeApi({"/api/pos/ping": PING, "/api/pos/products": PRODUCTS, "/api/pos/cashiers": CASHIERS})

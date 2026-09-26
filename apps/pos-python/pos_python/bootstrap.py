@@ -67,6 +67,8 @@ def bootstrap(data_dir: Path, db: sqlite3.Connection, db_path: Path,
     try:
         profile = prov.ping()
         ctx.online = True
+        worker.online = True
+        worker.last_error = ""
         ctx.profile = profile
         ctx.branch_id = profile.get("branch_id")
         ctx.terminal_id = (profile.get("device") or {}).get("terminal_code")
@@ -76,6 +78,8 @@ def bootstrap(data_dir: Path, db: sqlite3.Connection, db_path: Path,
         # เน็ตล่ม/ERP ตอบช้า — ยังเปิดขายด้วยข้อมูลที่แคชไว้ได้ ไม่ใช่ bootstrap ล้ม
         ctx.online = False
         ctx.error = str(error)
+        worker.online = False
+        worker.last_error = str(error)
         cached = _cached_setting(db, "branch_id")
         ctx.branch_id = int(cached) if cached else None
         ctx.terminal_id = _cached_setting(db, "terminal_code")

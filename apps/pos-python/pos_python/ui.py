@@ -1089,12 +1089,16 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             # สถานะการเชื่อม ERP — อ่านจาก worker/online context ที่ bootstrap สร้าง
             status = QFormLayout()
             if online is not None:
-                state = "เชื่อม ERP ได้" if getattr(online.worker, "online", online.online) else "ออฟไลน์ (จะส่งเมื่อเน็ตกลับ)"
+                token_ok = bool(getattr(online.worker, "online", online.online))
+                state = "ยืนยัน Device Token ผ่าน · เชื่อม ERP แล้ว" if token_ok else "ยังไม่ยืนยัน Device Token · ออฟไลน์"
                 status.addRow("สถานะ", QLabel(state))
                 status.addRow("สาขา", QLabel(str(online.branch_id or "-")))
                 status.addRow("เครื่อง", QLabel(str(online.terminal_id or "-")))
                 pending = getattr(online.worker, "pending", None)
                 status.addRow("บิลรอส่ง", QLabel(f"{pending if pending is not None else service.pending_sync_count()} ใบ"))
+                last_error = getattr(online.worker, "last_error", "") or online.error
+                if last_error and not token_ok:
+                    status.addRow("รายละเอียด", QLabel(last_error))
             else:
                 status.addRow("สถานะ", QLabel("ยังไม่ผูกกับ ERP (โหมดออฟไลน์/ทดสอบ)"))
                 status.addRow("บิลรอส่ง", QLabel(f"{service.pending_sync_count()} ใบ"))
@@ -1168,11 +1172,22 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 branch_id = int(profile.get("branch_id") or online.branch_id or 0)
                 result = online.provisioning.pull_cashiers(branch_id)
                 online.online = True
+                online.worker.online = True
+                online.worker.last_error = ""
+                online.worker.needs_down_sync = False
                 online.worker.wake()
-                QMessageBox.information(self, "เชื่อมต่อสำเร็จ", f"sync แคชเชียร์ {result['upserted']} คนแล้ว")
+                QMessageBox.information(
+                    self,
+                    "ตรวจสอบผ่าน",
+                    "Device Token ยืนยันกับ ERP ผ่านแล้ว\n"
+                    "API /api/pos/ping ตอบกลับสำเร็จ\n"
+                    f"ซิงก์แคชเชียร์ {result['upserted']} คนแล้ว",
+                )
             except Exception as error:
                 online.online = False
-                QMessageBox.warning(self, "เชื่อมต่อไม่สำเร็จ", str(error))
+                online.worker.online = False
+                online.worker.last_error = str(error)
+                QMessageBox.warning(self, "ตรวจสอบไม่ผ่าน", f"Device Token หรือ API ใช้งานไม่ได้\n\n{error}")
 
         def show_sync_logs(self) -> None:
             rows = service.db.execute(
