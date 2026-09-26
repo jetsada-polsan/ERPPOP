@@ -1008,3 +1008,12 @@ pending
 - Publish: workflow publish สำเร็จ; `https://erp.popstarcenter.com/download/python-pos` และ `https://popstarcenter.com/download/python-pos` ตอบ HTTP 200 และส่งไฟล์ `PopCentral-POS-UAT-0.6.22-setup.exe` ขนาด 174,722,646 bytes
 - Deploy: เผยแพร่ installer แล้ว; **ยังไม่ได้ deploy source Laravel** เพราะรอคำสั่ง deploy ของเจ้าของโปรเจกต์
 - งานถัดไป: ติดตั้งรุ่น 0.6.22 บน Windows POS จริง; หลัง owner สั่ง deploy ให้ deployหน้า Workbench/Settings แล้วตรวจว่ามีปุ่มเดียวพร้อมเลขรุ่นบน production
+
+## Handoff - 2026-09-26 (Codex Python POS 0.6.23 legacy URL repair)
+- Commit: `cd833bb` บน branch `codex/simplify-pos-customer-flow`
+- สาเหตุ: installer รุ่นก่อนหน้าพบ config ที่เก็บ public endpoint เป็น `https.erp.popstarcenter.com` หรือ hostname โดยไม่มี `://` ทำให้ตัวตรวจ HTTPS ปฏิเสธก่อนเริ่มเรียก `/api/pos/ping`
+- ทำอะไร: normalize เฉพาะโดเมน public ของ PopCentral ให้ซ่อมรูปแบบ URL เก่ากลับเป็น `https://erp.popstarcenter.com` อัตโนมัติ และลบปุ่มดาวน์โหลดซ้ำจากรายการประวัติ Build
+- ทดสอบ: Python POS **185 tests ผ่าน**; focused Laravel POS download tests **10 tests / 39 assertions ผ่าน**; `git diff --check` ผ่าน
+- Build/Publish: GitHub Actions `36232801519` ผ่านครบ; `https://erp.popstarcenter.com/download/python-pos` ตอบ HTTP 200 และส่ง `PopCentral-POS-UAT-0.6.23-setup.exe`
+- Deploy: เผยแพร่ installer แล้ว; source Laravel หน้า UI ยังรอคำสั่ง deploy ของเจ้าของโปรเจกต์
+- งานถัดไป: ติดตั้ง 0.6.23 ทับบนเครื่อง Windows แล้วทดสอบ ping → ดึงสินค้า → เลือกแคชเชียร์ → เปิดกะ → ขาย/ซิงก์
