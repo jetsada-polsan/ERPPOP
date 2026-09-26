@@ -118,6 +118,7 @@
         .sheet .doc { font-size: 20px; font-weight: 900; color: var(--blue-deep); }
         .camwrap #qr-reader { width: 100%; min-width: 0; overflow: hidden; }
         .camwrap video { width: 100%; border-radius: 12px; background: #000; }
+        .camwrap #qr-video { max-height: 60vh; object-fit: cover; }
     </style>
 </head>
 <body>
@@ -371,6 +372,7 @@
     <div class="overlay" x-show="cameraOpen" x-cloak @click.self="closeCamera()">
         <div class="sheet camwrap">
             <div id="qr-reader" style="width:100%"></div>
+            <video id="qr-video" class="cam-video" playsinline muted hidden></video>
             <div class="hint" style="text-align:center;margin:8px 0 0">วางบาร์โค้ด EAN‑13 เพียง 1 ดวงให้ใหญ่และตรงในกรอบ</div>
             <div class="err" x-show="cameraError" x-text="cameraError" style="text-align:center;margin:8px 0 0"></div>
             <div class="btnrow">
@@ -625,8 +627,8 @@ function whApp() {
         async saveCountItem() { if (!this.countProduct || this.countQty === '' || +this.countQty < 0) { this.countError = 'กรุณากรอกยอดที่นับได้'; return; } this.countBusy = true; try { await jfetch('{{ url('/wh/stock-counts') }}/' + this.countId + '/item', { method: 'POST', body: JSON.stringify({ product_id: this.countProduct.id, counted_qty: +this.countQty }) }); this.countProduct = null; this.countQty = ''; this.$nextTick(() => this.focusScan()); } catch (e) { this.countError = e.message; } this.countBusy = false; },
 
         // ---- กล้องสแกน QR/EAN/barcode (ต้องเปิดผ่าน HTTPS/localhost) ----
-        async waitForCameraElement() {
-            const reader = document.getElementById('qr-reader');
+        async waitForCameraElement(id = 'qr-reader') {
+            const reader = document.getElementById(id);
             for (let i = 0; i < 12; i++) {
                 await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
                 if (reader && reader.getBoundingClientRect().width > 0) return reader;
@@ -695,26 +697,39 @@ function whApp() {
             this.camTimer = null;
             this.camStream?.getTracks().forEach(t => t.stop());
             this.camStream = null;
+            const reader = document.getElementById('qr-reader');
+            const video = document.getElementById('qr-video');
+            if (reader) reader.style.display = '';
+            if (video) video.hidden = true;
         },
         async startZxingCamera() {
             if (!this.cameraOpen || !window.ZXingBrowser || this.camHandled) return;
-            const reader = await this.waitForCameraElement();
-            if (!reader) throw new Error('พื้นที่แสดงกล้องมีความกว้างเป็นศูนย์');
             if (this.html5QrCode) {
                 try { await this.html5QrCode.stop(); } catch (e) { /* ตัวอ่านเดิมอาจหยุดไปแล้ว */ }
                 try { this.html5QrCode.clear(); } catch (e) { /* DOM อาจถูกล้างแล้ว */ }
                 this.html5QrCode = null;
             }
             if (!this.cameraOpen || this.camHandled) return;
+            const reader = document.getElementById('qr-reader');
+            const video = document.getElementById('qr-video');
+            if (!video) throw new Error('ไม่พบพื้นที่วิดีโอสำหรับกล้อง');
+            if (reader) reader.style.display = 'none';
+            video.hidden = false;
+            const videoElement = await this.waitForCameraElement('qr-video');
+            if (!videoElement) throw new Error('พื้นที่วิดีโอกล้องมีความกว้างเป็นศูนย์');
             this.qrScanner = new ZXingBrowser.BrowserMultiFormatReader();
             this.camControls = await this.qrScanner.decodeFromConstraints(
                 { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } },
-                'qr-reader',
+                'qr-video',
                 (result) => { if (result) this.acceptCameraCode(result.getText()); },
             );
         },
         async openCamera(target) {
             this.camTarget = target; this.cameraOpen = true; this.cameraError = ''; this.scanError = ''; this.camHandled = false;
+            const reader = document.getElementById('qr-reader');
+            const video = document.getElementById('qr-video');
+            if (reader) reader.style.display = '';
+            if (video) video.hidden = true;
             if (window.Html5Qrcode) {
                 this.$nextTick(async () => {
                     try {
@@ -730,8 +745,8 @@ function whApp() {
                         // ถ้ากล้องเปิดได้แต่ Html5Qrcode อ่าน EAN-13 ไม่ออก ให้ลอง ZXing ต่อ
                         this.camTimer = setTimeout(() => {
                             if (this.cameraOpen && !this.camHandled) {
-                                this.startZxingCamera().catch((e) => {
-                                    if (this.cameraOpen) { this.closeCamera(); this.scanError = 'อ่านบาร์โค้ดจากกล้องไม่ได้: ' + e.message; }
+                                this.startZxingCamera().catch(async (e) => {
+                                    if (this.cameraOpen) { await this.stopCameraReaders(); this.cameraError = this.cameraErrorMessage(e); }
                                 });
                             }
                         }, 4500);
