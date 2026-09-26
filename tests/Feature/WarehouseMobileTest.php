@@ -29,6 +29,8 @@ class WarehouseMobileTest extends TestCase
             ->assertSee('เช็คสต๊อก')
             ->assertSee('html5-qrcode@2.3.8/html5-qrcode.min.js', false)
             ->assertSee('new Html5Qrcode', false)
+            ->assertSee('barcodeCandidates', false)
+            ->assertSee("candidates.push('0' + code)", false)
             ->assertSee('id="qr-video"', false)
             ->assertSee("decodeFromConstraints(", false)
             ->assertSee("'qr-video'", false)

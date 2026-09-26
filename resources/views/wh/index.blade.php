@@ -447,15 +447,26 @@ function whApp() {
         fmtQty(v) { return (+v || 0).toLocaleString('th-TH', { maximumFractionDigits: 3 }); },
 
         // ---- สแกน/ค้นหา ----
+        barcodeCandidates(raw) {
+            const code = String(raw ?? '').trim().replace(/\s+/g, '');
+            const candidates = [code];
+            // กล้อง/ตัวอ่านบางรุ่นตัดเลขศูนย์นำหน้าของ EAN-13 ออก เหลือ 12 หลัก
+            if (/^\d{12}$/.test(code)) candidates.push('0' + code);
+            return candidates;
+        },
         async scan(target) {
             const code = this.scanCode.trim();
             this.scanCode = '';
             if (!code) return;
             this.scanError = ''; this.poScanError = '';
             try {
-                const res = await jfetch(`{{ route('wh.lookup') }}?code=${encodeURIComponent(code)}&branch_id=${this.branchId ?? ''}`);
-                if (!res.found) { this.scanError = 'ไม่พบสินค้า: ' + code; return; }
-                this.handleFound(res, target);
+                let found = null;
+                for (const candidate of this.barcodeCandidates(code)) {
+                    const res = await jfetch(`{{ route('wh.lookup') }}?code=${encodeURIComponent(candidate)}&branch_id=${this.branchId ?? ''}`);
+                    if (res.found) { found = res; break; }
+                }
+                if (!found) { this.scanError = 'ไม่พบสินค้า: ' + code; return; }
+                this.handleFound(found, target);
             } catch (e) { this.scanError = e.message; }
             this.focusScan();
         },
