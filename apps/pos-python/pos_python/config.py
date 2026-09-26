@@ -23,6 +23,20 @@ def normalize_server_url(value: str) -> str:
     raw = str(value or "").replace("\ufeff", "").strip().rstrip("/")
     if not raw:
         return raw
+
+    # Some legacy setup dialogs saved a copied hostname as
+    # ``https.erp.popstarcenter.com`` (or without a scheme at all). Repair only
+    # the known public host; never guess a scheme for arbitrary endpoints.
+    lowered = raw.lower()
+    for prefix in ("https.", "http."):
+        malformed_prefix = prefix + "erp.popstarcenter.com"
+        if lowered.startswith(malformed_prefix):
+            raw = prefix[:-1] + "://" + raw[len(prefix):]
+            break
+    else:
+        if lowered.startswith("erp.popstarcenter.com"):
+            raw = "https://" + raw
+
     parts = urlsplit(raw)
     host = (parts.hostname or "").lower()
     if host in PUBLIC_HTTPS_HOSTS:

@@ -97,7 +97,6 @@
                     <td><div class="d-flex gap-2">
                         @if($build->github_run_url)<a class="btn btn-sm btn-light border" href="{{ $build->github_run_url }}" target="_blank" rel="noopener">ดู Log</a>@endif
                         @if($build->isActive())<form method="POST" action="{{ route('settings.pos-builds.refresh', $build) }}">@csrf<button class="btn btn-sm btn-outline-primary" type="submit"><i class="bi bi-arrow-clockwise"></i> สถานะ</button></form>@endif
-                        @if($build->status === 'success')<a class="btn btn-sm btn-success" href="{{ route('python-pos.download') }}"><i class="bi bi-download me-1"></i> {{ $build->version }}</a>@endif
                     </div></td>
                 </tr>
             @endforeach

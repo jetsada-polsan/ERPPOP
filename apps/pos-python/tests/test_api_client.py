@@ -23,6 +23,11 @@ class ApiClientSecurityTest(unittest.TestCase):
         client = LaravelPosClient("  HTTPS://ERP.POPSTARCENTER.COM/  ", "tok")
         self.assertEqual(client.base_url, "https://erp.popstarcenter.com")
 
+    def test_legacy_public_hostname_without_url_separator_is_repaired(self) -> None:
+        for value in ("https.erp.popstarcenter.com", "erp.popstarcenter.com"):
+            client = LaravelPosClient(value, "tok")
+            self.assertEqual(client.base_url, "https://erp.popstarcenter.com")
+
     def test_http_localhost_is_allowed_for_local_dev(self) -> None:
         for url in ("http://127.0.0.1:8000", "http://localhost:8123"):
             self.assertTrue(LaravelPosClient(url, "tok").base_url)
