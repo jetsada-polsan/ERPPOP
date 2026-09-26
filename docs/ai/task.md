@@ -985,3 +985,10 @@ pending
 - ทดสอบ: Python POS `183 tests` ผ่าน; Laravel full test ผ่าน; Laravel POS/layout focused `23 tests / 152 assertions` ผ่าน; `py_compile` และ `git diff --check` ผ่าน
 - Deploy: ยังไม่ deploy ERP; รอ Windows workflow build/publish installer รุ่นใหม่
 - งานถัดไป: push branch, build installer รุ่นใหม่, ตรวจ artifact/self-check และตรวจลิงก์ดาวน์โหลดก่อนส่งให้ติดตั้งบนเครื่อง POS จริง
+
+## Handoff - 2026-09-26 (Codex Python POS 0.6.21 build)
+- Commit: `f8768c2` (source `daa7af9`)
+- Build: GitHub Actions `36230896987` ผ่าน `test-and-package` และ `publish` ครบ; Windows executable self-check และ Inno Setup artifact verification ผ่าน
+- Publish: `https://popstarcenter.com/download/python-pos` และ `https://erp.popstarcenter.com/download/python-pos` ตอบ HTTP 200, Content-Disposition เป็น `PopCentral-POS-UAT-0.6.21-setup.exe`, ขนาด 174,671,155 bytes
+- Deploy: publish เฉพาะ installer แล้ว; ยังไม่ได้ deploy source Laravel/layout default ขึ้น production
+- งานถัดไป: ติดตั้งรุ่น 0.6.21 บนเครื่อง POS Windows, ตรวจ ping/API, เลือกคนขาย → เปิดกะ, ยิงสินค้า 1 รายการ และตรวจบิล/คิว sync กับ ERP
