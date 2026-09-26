@@ -992,3 +992,12 @@ pending
 - Publish: `https://popstarcenter.com/download/python-pos` และ `https://erp.popstarcenter.com/download/python-pos` ตอบ HTTP 200, Content-Disposition เป็น `PopCentral-POS-UAT-0.6.21-setup.exe`, ขนาด 174,671,155 bytes
 - Deploy: publish เฉพาะ installer แล้ว; ยังไม่ได้ deploy source Laravel/layout default ขึ้น production
 - งานถัดไป: ติดตั้งรุ่น 0.6.21 บนเครื่อง POS Windows, ตรวจ ping/API, เลือกคนขาย → เปิดกะ, ยิงสินค้า 1 รายการ และตรวจบิล/คิว sync กับ ERP
+
+## Handoff - 2026-09-26 (Codex แก้หน้าโหลดและ HTTPS startup)
+- Commit: `91f652d`
+- ทำอะไร: รวมปุ่มดาวน์โหลด Python POS ในหน้า Workbench ให้เหลือปุ่มหลักเดียวพร้อมเลขรุ่น/ชื่อไฟล์/ขนาด/เวลาที่อัปเดต, ปรับการ์ดดาวน์โหลดและข้อความ HTTPS ให้ทันสมัยขึ้น, และแสดงเลขรุ่นใน Settings/Build Center
+- ทำอะไรเพิ่มเติม: แยกตัวค้นหา installer กลางเพื่อเลือกไฟล์รุ่นสูงสุดจากทั้งโฟลเดอร์ใหม่และ legacy, บันทึกกติกาใน `PROJECT_MEMORY.md` ว่าหน้าดาวน์โหลดต้องบอกรุ่นและห้ามมีปุ่มซ้ำ
+- ทำอะไรเพิ่มเติม: POS Python ล้าง BOM/ช่องว่างและ canonicalize `HTTPS://ERP.POPSTARCENTER.COM`, ยอมรับ scheme ตัวพิมพ์ต่างกัน, อัปเกรด public HTTP เดิมเป็น HTTPS และไม่ re-raise traceback ซ้อนใน Windows windowed build
+- ทดสอบ: `python3 -m unittest discover -s apps/pos-python/tests -p 'test_*.py'` → **184 tests ผ่าน**; `php artisan test --compact` → **450 tests, 449 passed, 1 skipped, 6 incomplete**; PHP lint 4 ไฟล์ผ่าน; `git diff --check` ผ่าน
+- Deploy: ยังไม่ deploy source Laravel; commit พร้อม push และรอ Windows UAT build/publish รุ่นถัดไป
+- งานถัดไป: build/publish installer รุ่นใหม่, ตรวจลิงก์หน้าโหลดบน production และติดตั้งทดสอบบน Windows POS จริง
