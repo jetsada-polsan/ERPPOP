@@ -953,3 +953,12 @@ pending
 - ทดสอบ: `php artisan test tests/Feature/WarehouseMobileTest.php` ผ่าน 4 tests / 22 assertions; `git diff --check` ผ่าน
 - Deploy: workflow `36226683076` deploy production สำเร็จแล้ว; รวม commit แก้ `a201622` และ handoff `977e4e1`
 - งานถัดไป: เปิด `/wh/` บนมือถือทดสอบกล้องจริงกับฉลาก EAN-13 และรีโหลดหน้าให้ได้ asset ล่าสุด
+
+## Handoff - 2026-09-26 (Codex เพิ่ม fallback เมื่อสิทธิ์กล้องถูกปฏิเสธ)
+
+- Branch: `codex/simplify-pos-customer-flow`
+- Commits: `66667d2`, `cff7972`
+- ทำอะไร: รองรับ `Permission dismissed` ด้วยการถ่ายภาพบาร์โค้ดผ่าน input `capture="environment"` แล้วอ่านภาพด้วย Html5Qrcode; แสดงปุ่ม `ถ่ายภาพบาร์โค้ดแทน` ตั้งแต่เปิด overlay เพื่อไม่ให้ค้างแม้คำขอสิทธิ์กล้องยังไม่ตอบกลับ; เพิ่มข้อความแนะนำให้อนุญาตกล้องใน Chrome
+- ทดสอบ: `php artisan test tests/Feature/WarehouseMobileTest.php` ผ่าน 4 tests / 25 assertions; `git diff --check` ผ่าน
+- Deploy: workflow `36227161895` ผ่านครบและเผยแพร่ production แล้ว
+- ข้อจำกัด: การกดอนุญาตกล้องใน Chrome/ระบบปฏิบัติการยังต้องทำโดยผู้ใช้; หากไม่อนุญาต ให้ใช้ปุ่มถ่ายภาพแทนบนมือถือ
