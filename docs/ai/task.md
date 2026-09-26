@@ -1001,3 +1001,10 @@ pending
 - ทดสอบ: `python3 -m unittest discover -s apps/pos-python/tests -p 'test_*.py'` → **184 tests ผ่าน**; `php artisan test --compact` → **450 tests, 449 passed, 1 skipped, 6 incomplete**; PHP lint 4 ไฟล์ผ่าน; `git diff --check` ผ่าน
 - Deploy: ยังไม่ deploy source Laravel; commit พร้อม push และรอ Windows UAT build/publish รุ่นถัดไป
 - งานถัดไป: build/publish installer รุ่นใหม่, ตรวจลิงก์หน้าโหลดบน production และติดตั้งทดสอบบน Windows POS จริง
+
+## Handoff - 2026-09-26 (Codex Python POS 0.6.22 publish)
+- Source: `91f652d` และ handoff `e05aa28` บน branch `codex/simplify-pos-customer-flow`
+- Build: GitHub Actions `36231997932` ผ่านครบทั้ง Python tests, executable self-check, Inno Setup และ artifact verification
+- Publish: workflow publish สำเร็จ; `https://erp.popstarcenter.com/download/python-pos` และ `https://popstarcenter.com/download/python-pos` ตอบ HTTP 200 และส่งไฟล์ `PopCentral-POS-UAT-0.6.22-setup.exe` ขนาด 174,722,646 bytes
+- Deploy: เผยแพร่ installer แล้ว; **ยังไม่ได้ deploy source Laravel** เพราะรอคำสั่ง deploy ของเจ้าของโปรเจกต์
+- งานถัดไป: ติดตั้งรุ่น 0.6.22 บน Windows POS จริง; หลัง owner สั่ง deploy ให้ deployหน้า Workbench/Settings แล้วตรวจว่ามีปุ่มเดียวพร้อมเลขรุ่นบน production
