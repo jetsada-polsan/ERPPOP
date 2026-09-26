@@ -1017,3 +1017,12 @@ pending
 - Build/Publish: GitHub Actions `36232801519` ผ่านครบ; `https://erp.popstarcenter.com/download/python-pos` ตอบ HTTP 200 และส่ง `PopCentral-POS-UAT-0.6.23-setup.exe`
 - Deploy: เผยแพร่ installer แล้ว; source Laravel หน้า UI ยังรอคำสั่ง deploy ของเจ้าของโปรเจกต์
 - งานถัดไป: ติดตั้ง 0.6.23 ทับบนเครื่อง Windows แล้วทดสอบ ping → ดึงสินค้า → เลือกแคชเชียร์ → เปิดกะ → ขาย/ซิงก์
+
+## Handoff - 2026-09-26 (Codex แยกผล API health ออกจากคิว sync)
+- Commit: `79e447d` บน branch `codex/simplify-pos-customer-flow`
+- สาเหตุที่รายงานผ่านผิด: `SyncWorker` ตั้งสถานะออนไลน์ตั้งแต่เริ่มและใช้ `pending == 0` เป็นหลัก จึงดูเหมือน sync ผ่านทั้งที่ไม่มี request ยืนยัน Device Token
+- ทำอะไร: ให้สถานะออนไลน์เป็นจริงได้หลัง `/api/pos/ping` ผ่านเท่านั้น, แสดง `ยืนยัน Device Token ผ่าน` แยกจากสถานะคิว, และให้ปุ่มทดสอบรายงานผล ping/API โดยตรงพร้อม error ที่อ่านได้
+- ทดสอบ: Python POS **186 tests ผ่าน**; `git diff --check` ผ่าน
+- Build/Publish: GitHub Actions `36233746539` ผ่านครบ; URL ดาวน์โหลดตอบ HTTP 200 และส่ง `PopCentral-POS-UAT-0.6.24-setup.exe`
+- Deploy: เผยแพร่ installer แล้ว; source Laravel หน้าโหลดเดิมยังรอคำสั่ง deploy ของเจ้าของโปรเจกต์
+- งานถัดไป: ติดตั้ง 0.6.24 แล้วเปิดเมนูตั้งค่า → การ Sync และ API → กด “ทดสอบการเชื่อมต่อและ sync แคชเชียร์”; ต้องเห็น `Device Token ยืนยันกับ ERP ผ่านแล้ว` ก่อนถือว่าออนไลน์
