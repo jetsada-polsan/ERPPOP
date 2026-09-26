@@ -185,7 +185,7 @@ class UiStyleTest(unittest.TestCase):
         self.assertIn("first.setMinimumWidth(360)", source)
         self.assertIn("second.setMinimumWidth(360)", source)
         self.assertIn("head_layout = QVBoxLayout(head)", source)
-        self.assertIn("button.setMinimumHeight(34)", source)
+        self.assertIn("button.setMinimumHeight(28)", source)
 
     def test_checkout_uses_a_durable_document_sequence(self) -> None:
         source = inspect.getsource(run_ui)
@@ -198,14 +198,39 @@ class UiStyleTest(unittest.TestCase):
         self.assertEqual(layout["runtime"]["product_width"] + layout["runtime"]["cart_width"], 100)
         self.assertEqual(layout["runtime"]["product_columns"], 2)
         self.assertFalse(layout["runtime"]["show_shift"])
-        self.assertEqual(layout["runtime"]["density"], "comfortable")
+        self.assertEqual(layout["runtime"]["density"], "compact")
+
+    def test_default_runtime_prioritizes_customer_facing_bill(self) -> None:
+        self.assertEqual(normalize_pos_layout({})["runtime"], {
+            "product_width": 45,
+            "cart_width": 55,
+            "product_rows": 3,
+            "product_columns": 4,
+            "density": "compact",
+            "button_size": "small",
+            "show_branch": True,
+            "show_terminal": True,
+            "show_seller": True,
+            "show_shift": True,
+        })
+
+    def test_untouched_version_one_layout_is_migrated_for_existing_terminals(self) -> None:
+        legacy = {
+            "version": 1,
+            "runtime": {
+                "product_width": 55, "cart_width": 45, "product_rows": 3,
+                "product_columns": 4, "density": "comfortable", "button_size": "medium",
+                "show_branch": True, "show_terminal": True, "show_seller": True, "show_shift": True,
+            },
+        }
+        self.assertEqual(normalize_pos_layout(legacy)["runtime"]["cart_width"], 55)
 
     def test_runtime_layout_changes_python_qss_without_rebuilding_the_app(self) -> None:
         style = _style_for_layout(
             {"button_size": "large", "density": "compact"},
             {"--pos-button-min-height": "61px", "--pos-card-font-size": "11px"},
         )
-        self.assertIn("min-height: 61px", style)
+        self.assertIn("min-height: 53px", style)
         self.assertIn("font-size: 11px", style)
         self.assertIn("padding: 7px", style)
 

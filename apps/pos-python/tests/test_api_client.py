@@ -15,6 +15,10 @@ class ApiClientSecurityTest(unittest.TestCase):
         client = LaravelPosClient("https://erp.popstar.example", "tok")
         self.assertEqual(client.base_url, "https://erp.popstar.example")
 
+    def test_public_http_hostname_is_upgraded_before_requests(self) -> None:
+        client = LaravelPosClient("http://erp.popstarcenter.com", "tok")
+        self.assertEqual(client.base_url, "https://erp.popstarcenter.com")
+
     def test_http_localhost_is_allowed_for_local_dev(self) -> None:
         for url in ("http://127.0.0.1:8000", "http://localhost:8123"):
             self.assertTrue(LaravelPosClient(url, "tok").base_url)

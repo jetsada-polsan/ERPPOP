@@ -10,8 +10,21 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 CONFIG_FILENAME = "pos-config.json"
+PUBLIC_HTTPS_HOSTS = {"erp.popstarcenter.com"}
+
+
+def normalize_server_url(value: str) -> str:
+    """Upgrade the public ERP hostname while preserving explicit private HTTP URLs."""
+    raw = str(value or "").strip().rstrip("/")
+    if not raw:
+        return raw
+    parts = urlsplit(raw)
+    if parts.scheme.lower() == "http" and (parts.hostname or "").lower() in PUBLIC_HTTPS_HOSTS:
+        return urlunsplit(("https", parts.netloc, parts.path, parts.query, parts.fragment)).rstrip("/")
+    return raw
 
 
 @dataclass(frozen=True)
@@ -39,14 +52,18 @@ def load_device_config(data_dir: Path) -> DeviceConfig | None:
 
     if not server or not token:
         return None
-    return DeviceConfig(server_url=str(server).rstrip("/"), device_token=str(token), allow_insecure=bool(insecure))
+    return DeviceConfig(
+        server_url=normalize_server_url(str(server)),
+        device_token=str(token),
+        allow_insecure=bool(insecure),
+    )
 
 
 def save_device_config(data_dir: Path, config: DeviceConfig) -> None:
     path = Path(data_dir) / CONFIG_FILENAME
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({
-        "server_url": config.server_url,
+        "server_url": normalize_server_url(config.server_url),
         "device_token": config.device_token,
         "allow_insecure": config.allow_insecure,
     }, ensure_ascii=False, indent=2), encoding="utf-8")

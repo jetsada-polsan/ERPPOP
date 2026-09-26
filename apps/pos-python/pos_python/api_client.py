@@ -6,6 +6,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
+from .config import normalize_server_url
+
 
 class LaravelApiError(RuntimeError):
     pass
@@ -24,7 +26,10 @@ class LaravelPosClient:
     """
 
     def __init__(self, base_url: str, device_token: str, timeout_seconds: int = 20, *, allow_insecure: bool = False):
-        self.base_url = base_url.rstrip("/")
+        # Pair files from older installers may still contain the HTTP public
+        # hostname. Normalize it here as a final guard, including callers that
+        # construct the client directly instead of loading DeviceConfig.
+        self.base_url = normalize_server_url(base_url)
         self.device_token = device_token
         self.timeout_seconds = timeout_seconds
         parts = urlsplit(self.base_url)

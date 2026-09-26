@@ -8,7 +8,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from pos_python.bootstrap import bootstrap
-from pos_python.config import DeviceConfig, load_device_config, save_device_config
+from pos_python.config import DeviceConfig, load_device_config, normalize_server_url, save_device_config
 from pos_python.database import connect
 from pos_python.provisioning import ProvisioningService
 from pos_python.services import CartLine, PosService
@@ -30,6 +30,15 @@ class ConfigTest(unittest.TestCase):
         save_device_config(d, DeviceConfig("https://erp.example", "tok123"))
         loaded = load_device_config(d)
         self.assertEqual((loaded.server_url, loaded.device_token), ("https://erp.example", "tok123"))
+
+    def test_old_public_http_hostname_is_upgraded_to_https(self) -> None:
+        d = Path(tempfile.mkdtemp())
+        save_device_config(d, DeviceConfig("http://erp.popstarcenter.com", "tok123", allow_insecure=True))
+        loaded = load_device_config(d)
+        self.assertEqual(loaded.server_url, "https://erp.popstarcenter.com")
+
+    def test_private_http_endpoints_are_not_rewritten(self) -> None:
+        self.assertEqual(normalize_server_url("http://27.254.143.219"), "http://27.254.143.219")
 
 
 class BootstrapTest(unittest.TestCase):

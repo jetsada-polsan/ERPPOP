@@ -17,7 +17,7 @@ from .build_info import APP_VERSION
 from .api_client import LaravelPosClient
 from .mock_printer import active_paper_width, company_details, receipt_for
 from .order import ALL_CATEGORIES, DISCOUNT, PRICE, QTY, Order, OrderLine, categories, product_grid
-from .config import DeviceConfig, load_device_config, save_device_config
+from .config import DeviceConfig, load_device_config, normalize_server_url, save_device_config
 from .printers import installed_printer_names, open_cash_drawer, print_text_to_windows_queue
 from .promptpay import promptpay_payload, qr_matrix
 from .services import PosService, money
@@ -50,12 +50,12 @@ PALETTE = {
 # เพื่อให้ layout ที่ผู้ดูแล Build จากเว็บส่งผลกับเครื่อง Python ได้โดยไม่ต้อง build
 # installer ใหม่ทุกครั้ง
 POS_LAYOUT_DEFAULT_RUNTIME = {
-    "product_width": 55,
-    "cart_width": 45,
+    "product_width": 45,
+    "cart_width": 55,
     "product_rows": 3,
     "product_columns": 4,
-    "density": "comfortable",
-    "button_size": "medium",
+    "density": "compact",
+    "button_size": "small",
     "show_branch": True,
     "show_terminal": True,
     "show_seller": True,
@@ -105,6 +105,19 @@ def normalize_pos_layout(value) -> dict:
     layout = value if isinstance(value, dict) else {}
     raw = layout.get("runtime") if isinstance(layout.get("runtime"), dict) else {}
     defaults = POS_LAYOUT_DEFAULT_RUNTIME
+    # Layout version 1 was the first runtime rollout and used the old
+    # 55/45, comfortable/medium screen. Treat that untouched baseline as a
+    # migration marker so an existing terminal receives the customer-facing
+    # layout on its first launch after this installer update. Published
+    # versions or deliberately customized layouts remain untouched.
+    layout_version = layout.get("layout_version", layout.get("version", 1))
+    legacy_runtime = {
+        "product_width": 55, "cart_width": 45, "product_rows": 3,
+        "product_columns": 4, "density": "comfortable", "button_size": "medium",
+        "show_branch": True, "show_terminal": True, "show_seller": True, "show_shift": True,
+    }
+    if str(layout_version).isdigit() and int(layout_version) <= 1 and raw == legacy_runtime:
+        raw = {}
     product = _layout_int(raw.get("product_width"), defaults["product_width"], 30, 70)
     cart = _layout_int(raw.get("cart_width"), 100 - product, 30, 70)
     total = product + cart
@@ -165,7 +178,7 @@ def run_pairing_wizard(data_dir, app) -> bool:
     form.addRow(buttons)
 
     def pair() -> None:
-        url = server.text().strip().rstrip("/")
+        url = normalize_server_url(server.text())
         device_token = token.text().strip()
         if not url or not device_token:
             QMessageBox.warning(dialog, "ข้อมูลไม่ครบ", "กรอกที่อยู่ ERP และรหัสเชื่อมต่อเครื่องให้ครบ")
@@ -266,7 +279,7 @@ QMainWindow[compact="true"] #orderHead QLabel { font-size: 12px; }
 QMainWindow[compact="true"] QPushButton#headerAction { padding: 2px 5px; font-size: 11px; }
 QMainWindow[compact="true"] #totalBox { padding: 6px 10px; }
 QMainWindow[compact="true"] #grandTotal { font-size: 22px; }
-QMainWindow[compact="true"] #saleKeypad QPushButton { min-height: 27px; padding: 3px 4px; font-size: 12px; }
+QMainWindow[compact="true"] #saleKeypad QPushButton { min-height: $keypad_height; padding: 2px 4px; font-size: 12px; }
 
 #orderPanel { background: $surface; border-right: 1px solid $border; }
 #orderHead { background: $primary_dark; color: $surface; padding: 6px 10px; font-weight: 700; }
@@ -283,7 +296,7 @@ QTableWidget::item { padding: 4px; }
 
 QTableWidget { background: $surface; border: 0; }
 QHeaderView::section { background: $primary_soft; border: 0; border-bottom: 1px solid $border; padding: 5px; font-weight: 700; }
- #saleKeypad QPushButton { min-height: $button_height; padding: $button_padding 6px; font-size: $button_font; }
+ #saleKeypad QPushButton { min-height: $keypad_height; padding: 3px 6px; font-size: $compact_button_font; }
 
 /* กระดาษใบเสร็จวางบนพื้นเทาเหมือนวางบนโต๊ะ */
 #receiptBg { background: $preview; border-radius: 6px; }
@@ -328,6 +341,7 @@ def _style_for_layout(runtime: dict | None = None, css: dict | None = None) -> s
         "button_font": f'{metrics["button_font"]}px',
         "compact_button_padding": f'{max(4, metrics["button_padding"] - 2)}px',
         "compact_button_font": f'{max(12, metrics["button_font"] - 2)}px',
+        "keypad_height": f'{max(26, metrics["button_height"] - 8)}px',
         "pay_padding": f'{metrics["button_padding"] + 4}px',
         "pay_font": f'{max(15, metrics["button_font"] + 2)}px',
         "tile_padding": f'{metrics["padding"]}px',
@@ -1124,14 +1138,14 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 outer.addWidget(QLabel("\nผูกเครื่องกับ ERP (บันทึกแล้วเปิดโปรแกรมใหม่เพื่อเชื่อม)"))
                 help_text = QLabel(
                     "ใช้ URL และ Device token จาก ERP > ตั้งค่าระบบ > เพิ่มเครื่อง POS\n"
-                    "ถ้า ERP ยังเป็น http:// ให้กรอก http:// ตามจริง โปรแกรมจะบันทึก allow_insecure ให้เฉพาะเครื่องนี้"
+                    "ใช้ https://erp.popstarcenter.com สำหรับ production; ถ้าเป็น IP ภายในหรือเครื่องทดสอบจึงใช้ http:// ได้"
                 )
                 help_text.setWordWrap(True)
                 outer.addWidget(help_text)
                 pair = QFormLayout()
                 current = load_device_config(data_dir)
                 self.server_url = QLineEdit(current.server_url if current else "")
-                self.server_url.setPlaceholderText("เช่น http://27.254.143.219 หรือ https://erp.example.com")
+                self.server_url.setPlaceholderText("เช่น https://erp.popstarcenter.com หรือ http://27.254.143.219")
                 self.device_token = QLineEdit(current.device_token if current else "")
                 self.device_token.setPlaceholderText("วาง device token ที่ออกจาก ERP")
                 self.device_token.setEchoMode(QLineEdit.Password)
@@ -1169,12 +1183,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             QMessageBox.information(self, "บันทึกการเชื่อมต่อ", f"Audit รอส่ง: {auth_pending}\n\n{text or 'ยังไม่มีบันทึก'}")
 
         def save_pairing(self) -> None:
-            url = self.server_url.text().strip()
+            url = normalize_server_url(self.server_url.text())
             token = self.device_token.text().strip()
             if not url or not token:
                 QMessageBox.warning(self, "ข้อมูลไม่ครบ", "กรอกที่อยู่ ERP และ device token ให้ครบ")
                 return
-            insecure = url.startswith("http://")  # ยอม http เฉพาะที่ผู้ใช้ตั้งใจ (แลบ/ในเครื่อง)
+            insecure = url.startswith("http://")  # ยอม http เฉพาะ IP/แลบที่ผู้ใช้ตั้งใจ
             try:
                 save_device_config(data_dir, DeviceConfig(server_url=url, device_token=token, allow_insecure=insecure))
             except Exception as error:
@@ -1486,12 +1500,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             box = QWidget()
             box.setObjectName("saleKeypad")
             grid = QGridLayout(box)
-            grid.setSpacing(4)
+            grid.setSpacing(3)
 
             self.mode_group = QButtonGroup(box)
             for column, (mode, label) in enumerate([(QTY, "จำนวน"), (PRICE, "ราคา"), (DISCOUNT, "ส่วนลด")]):
                 button = QPushButton(label)
-                button.setMinimumHeight(34)
+                button.setMinimumHeight(28)
                 button.setCheckable(True)
                 button.setChecked(mode == QTY)
                 button.clicked.connect(lambda _, value=mode: self.set_mode(value))
@@ -1501,33 +1515,33 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             for row, keys in enumerate(NUMPAD_KEYS, start=1):
                 for column, key in enumerate(keys):
                     button = QPushButton("⌫" if key == "backspace" else key)
-                    button.setMinimumHeight(34)
+                    button.setMinimumHeight(28)
                     button.clicked.connect(lambda _, value=key: self.press(value))
                     grid.addWidget(button, row, column)
 
             sign = QPushButton("+/−")
-            sign.setMinimumHeight(34)
+            sign.setMinimumHeight(28)
             sign.clicked.connect(lambda: self.press("+/-"))
             grid.addWidget(sign, 5, 0)
 
             remove = QPushButton("ลบรายการ")
-            remove.setMinimumHeight(34)
+            remove.setMinimumHeight(28)
             remove.setObjectName("voidBtn")
             remove.clicked.connect(self.remove_line)
             grid.addWidget(remove, 5, 1)
 
             receipt = QPushButton("ดูใบเสร็จล่าสุด")
-            receipt.setMinimumHeight(34)
+            receipt.setMinimumHeight(28)
             receipt.clicked.connect(self.show_last_receipt)
             grid.addWidget(receipt, 5, 2)
 
             clear = QPushButton("ล้างบิล")
-            clear.setMinimumHeight(40)
+            clear.setMinimumHeight(32)
             clear.clicked.connect(self.clear_order)
             grid.addWidget(clear, 6, 0)
 
             pay = QPushButton("รับชำระเงิน")
-            pay.setMinimumHeight(40)
+            pay.setMinimumHeight(34)
             pay.setObjectName("payBtn")
             pay.clicked.connect(self.pay)
             grid.addWidget(pay, 6, 1, 1, 2)
@@ -1623,12 +1637,11 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.grid.setVerticalSpacing(layout_metrics["gap"])
             available = max(self.grid_host.width(), columns * 80 + (columns - 1) * layout_metrics["gap"])
             tile_width = max(80, (available - (columns - 1) * layout_metrics["gap"]) // columns)
-            visible_rows = int(self.layout_runtime.get("product_rows", 3))
-            viewport_height = self.product_scroll.viewport().height()
-            row_height = max(
-                layout_metrics["card"],
-                (max(viewport_height, visible_rows * layout_metrics["card"]) - layout_metrics["gap"] * (visible_rows - 1)) // visible_rows,
-            )
+            # Keep product cards at the published compact height. Stretching
+            # them to fill the viewport made the product buttons dominate the
+            # screen and left too little room for the customer-facing bill.
+            # Extra products remain available by scrolling inside this panel.
+            row_height = layout_metrics["card"]
             term = self.scan.text().strip()
             # ตัวเลขล้วนคือกำลังยิงบาร์โค้ด ไม่ใช่ค้นหา — อย่าให้ตารางกระพริบระหว่างสแกน
             search = "" if term.isdigit() else term

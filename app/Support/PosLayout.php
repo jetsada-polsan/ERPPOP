@@ -67,16 +67,16 @@ final class PosLayout
         'large' => ['height' => 54, 'font' => 19, 'padding' => 12],
     ];
 
-    /** ค่า runtime เริ่มต้น = หน้าตาที่สาขาใช้อยู่ตอนนี้ (55/45, 3 แถว) */
+    /** ค่า runtime เริ่มต้น = บิลเด่น สินค้ากะทัดรัด (45/55, 3 แถว) */
     public static function defaultRuntime(): array
     {
         return [
-            'product_width' => 55,
-            'cart_width' => 45,
+            'product_width' => 45,
+            'cart_width' => 55,
             'product_rows' => 3,
             'product_columns' => 4,
-            'density' => 'comfortable',
-            'button_size' => 'medium',
+            'density' => 'compact',
+            'button_size' => 'small',
             'show_branch' => true,
             'show_terminal' => true,
             'show_seller' => true,
