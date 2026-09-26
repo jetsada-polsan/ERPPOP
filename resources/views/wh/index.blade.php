@@ -370,6 +370,7 @@
     <div class="overlay" x-show="cameraOpen" x-cloak @click.self="closeCamera()">
         <div class="sheet camwrap">
             <div id="qr-reader" style="width:100%"></div>
+            <div class="hint" style="text-align:center;margin:8px 0 0">วางบาร์โค้ด EAN‑13 เพียง 1 ดวงให้ใหญ่และตรงในกรอบ</div>
             <div class="btnrow"><button type="button" class="btn" @click="closeCamera()">ปิดกล้อง</button></div>
         </div>
     </div>
@@ -412,7 +413,7 @@ function whApp() {
         poList: [], poLoading: false, poCur: null, poScanError: '',
         stockProduct: null, stockRows: [], stockTotal: 0,
 
-        cameraOk: false, cameraOpen: false, camStream: null, camTarget: 'receive', camTimer: null, qrScanner: null, camControls: null, html5QrCode: null,
+        cameraOk: false, cameraOpen: false, camStream: null, camTarget: 'receive', camTimer: null, camHandled: false, qrScanner: null, camControls: null, html5QrCode: null,
         countId: null, countNumber: '', countProduct: null, countSystem: 0, countQty: '', countBusy: false, countError: '',
 
         init() {
@@ -616,30 +617,75 @@ function whApp() {
         async saveCountItem() { if (!this.countProduct || this.countQty === '' || +this.countQty < 0) { this.countError = 'กรุณากรอกยอดที่นับได้'; return; } this.countBusy = true; try { await jfetch('{{ url('/wh/stock-counts') }}/' + this.countId + '/item', { method: 'POST', body: JSON.stringify({ product_id: this.countProduct.id, counted_qty: +this.countQty }) }); this.countProduct = null; this.countQty = ''; this.$nextTick(() => this.focusScan()); } catch (e) { this.countError = e.message; } this.countBusy = false; },
 
         // ---- กล้องสแกน QR/EAN/barcode (ต้องเปิดผ่าน HTTPS/localhost) ----
+        cameraDecodeConfig() {
+            const formats = window.Html5QrcodeSupportedFormats ?? {};
+            const wanted = ['EAN_13', 'EAN_8', 'UPC_A', 'UPC_E', 'CODE_128', 'CODE_39', 'ITF', 'QR_CODE']
+                .map((name) => formats[name])
+                .filter((value) => value !== undefined);
+            const config = {
+                fps: 12,
+                qrbox: {
+                    width: Math.min(360, Math.max(260, Math.floor(window.innerWidth * 0.82))),
+                    height: 150,
+                },
+                aspectRatio: 2,
+                disableFlip: false,
+            };
+            if (wanted.length) config.formatsToSupport = wanted;
+            return config;
+        },
+        async acceptCameraCode(raw) {
+            const code = String(raw ?? '').trim();
+            if (!code || this.camHandled) return;
+            this.camHandled = true;
+            const target = this.camTarget;
+            await this.closeCamera();
+            this.scanCode = code;
+            await this.scan(target);
+        },
+        async startZxingCamera() {
+            if (!this.cameraOpen || !window.ZXingBrowser || this.camHandled) return;
+            if (this.html5QrCode) {
+                try { await this.html5QrCode.stop(); } catch (e) { /* ตัวอ่านเดิมอาจหยุดไปแล้ว */ }
+                try { this.html5QrCode.clear(); } catch (e) { /* DOM อาจถูกล้างแล้ว */ }
+                this.html5QrCode = null;
+            }
+            if (!this.cameraOpen || this.camHandled) return;
+            this.qrScanner = new ZXingBrowser.BrowserMultiFormatReader();
+            this.camControls = await this.qrScanner.decodeFromConstraints(
+                { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } },
+                'qr-reader',
+                (result) => { if (result) this.acceptCameraCode(result.getText()); },
+            );
+        },
         async openCamera(target) {
-            this.camTarget = target; this.cameraOpen = true;
+            this.camTarget = target; this.cameraOpen = true; this.camHandled = false;
             if (window.Html5Qrcode) {
                 this.$nextTick(async () => {
                     try {
                         this.html5QrCode = new Html5Qrcode('qr-reader');
                         await this.html5QrCode.start(
-                            { facingMode: 'environment' },
-                            { fps: 10, qrbox: { width: 260, height: 160 }, aspectRatio: 1.777778 },
-                            async (decodedText) => {
-                                const code = String(decodedText || '').trim();
-                                if (!code) return;
-                                await this.closeCamera();
-                                this.scanCode = code;
-                                this.scan(this.camTarget);
-                            },
+                            { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+                            this.cameraDecodeConfig(),
+                            (decodedText) => this.acceptCameraCode(decodedText),
                             () => {},
                         );
+                        // ถ้ากล้องเปิดได้แต่ Html5Qrcode อ่าน EAN-13 ไม่ออก ให้ลอง ZXing ต่อ
+                        this.camTimer = setTimeout(() => {
+                            if (this.cameraOpen && !this.camHandled) {
+                                this.startZxingCamera().catch((e) => {
+                                    if (this.cameraOpen) { this.closeCamera(); this.scanError = 'อ่านบาร์โค้ดจากกล้องไม่ได้: ' + e.message; }
+                                });
+                            }
+                        }, 4500);
+                        return;
                     } catch (e) {
                         this.html5QrCode = null;
-                        if (!window.ZXingBrowser) {
-                            this.closeCamera();
-                            this.scanError = 'เปิดกล้องไม่ได้: ' + e.message;
+                        if (window.ZXingBrowser) {
+                            try { await this.startZxingCamera(); return; } catch (fallbackError) { e = fallbackError; }
                         }
+                        this.closeCamera();
+                        this.scanError = 'เปิดกล้องไม่ได้: ' + e.message;
                     }
                 });
                 return;
@@ -647,9 +693,7 @@ function whApp() {
             if (window.ZXingBrowser) {
                 this.$nextTick(async () => {
                     try {
-                        this.qrScanner = new ZXingBrowser.BrowserMultiFormatReader();
-                        this.qrScanner = new ZXingBrowser.BrowserMultiFormatReader();
-                        this.camControls = await this.qrScanner.decodeFromConstraints({ video: { facingMode: { ideal: 'environment' } } }, 'qr-reader', (result) => { if (result) { this.scanCode = result.getText(); this.closeCamera(); this.scan(this.camTarget); } });
+                        await this.startZxingCamera();
                     } catch (e) { this.closeCamera(); this.scanError = 'เปิดกล้องไม่ได้: ' + e.message; }
                 });
                 return;
@@ -664,7 +708,8 @@ function whApp() {
             }
             this.camControls?.stop?.(); this.camControls = null;
             this.qrScanner?.reset?.(); this.qrScanner = null;
-            if (this.camTimer) clearInterval(this.camTimer);
+            if (this.camTimer) clearTimeout(this.camTimer);
+            this.camTimer = null;
             this.camStream?.getTracks().forEach(t => t.stop());
             this.camStream = null; this.cameraOpen = false;
         },
