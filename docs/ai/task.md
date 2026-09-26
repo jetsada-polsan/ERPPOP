@@ -951,5 +951,5 @@ pending
 - Commit: `a201622`
 - ทำอะไร: แก้ปัญหา `element width` ตอนเปิดกล้อง โดยรอให้ `#qr-reader` มีความกว้างจริงก่อนเริ่มอ่าน, จำกัด `qrbox` ตามพื้นที่หน้าจอ, เพิ่ม `min-width: 0` ให้กล่องกล้อง และคง fallback ไป ZXing
 - ทดสอบ: `php artisan test tests/Feature/WarehouseMobileTest.php` ผ่าน 4 tests / 22 assertions; `git diff --check` ผ่าน
-- Deploy: commit ก่อนหน้า `0aa4cce` ถูก deploy production สำเร็จแล้ว; commit `a201622` push แล้วแต่ **ยังไม่ deploy**
-- งานถัดไป: รัน workflow `Deploy ERP` production แล้วเปิด `/wh/` บนมือถือทดสอบกล้องจริงกับฉลาก EAN-13
+- Deploy: workflow `36226683076` deploy production สำเร็จแล้ว; รวม commit แก้ `a201622` และ handoff `977e4e1`
+- งานถัดไป: เปิด `/wh/` บนมือถือทดสอบกล้องจริงกับฉลาก EAN-13 และรีโหลดหน้าให้ได้ asset ล่าสุด
