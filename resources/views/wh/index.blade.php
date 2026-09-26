@@ -372,6 +372,13 @@
         <div class="sheet camwrap">
             <div id="qr-reader" style="width:100%"></div>
             <div class="hint" style="text-align:center;margin:8px 0 0">วางบาร์โค้ด EAN‑13 เพียง 1 ดวงให้ใหญ่และตรงในกรอบ</div>
+            <div class="err" x-show="cameraError" x-text="cameraError" style="text-align:center;margin:8px 0 0"></div>
+            <div class="btnrow" x-show="cameraError" x-cloak>
+                <button type="button" class="btn blue" @click="$refs.cameraFile.click()"><i class="bi bi-camera-fill"></i> ถ่ายภาพบาร์โค้ดแทน</button>
+                <button type="button" class="btn" @click="openCamera(camTarget)">ลองเปิดกล้องใหม่</button>
+            </div>
+            <input x-ref="cameraFile" type="file" accept="image/*" capture="environment" hidden @change="scanCameraFile($event)">
+            <div id="qr-file-reader" hidden></div>
             <div class="btnrow"><button type="button" class="btn" @click="closeCamera()">ปิดกล้อง</button></div>
         </div>
     </div>
@@ -414,7 +421,7 @@ function whApp() {
         poList: [], poLoading: false, poCur: null, poScanError: '',
         stockProduct: null, stockRows: [], stockTotal: 0,
 
-        cameraOk: false, cameraOpen: false, camStream: null, camTarget: 'receive', camTimer: null, camHandled: false, qrScanner: null, camControls: null, html5QrCode: null,
+        cameraOk: false, cameraOpen: false, cameraError: '', camStream: null, camTarget: 'receive', camTimer: null, camHandled: false, qrScanner: null, camControls: null, html5QrCode: null,
         countId: null, countNumber: '', countProduct: null, countSystem: 0, countQty: '', countBusy: false, countError: '',
 
         init() {
@@ -654,6 +661,41 @@ function whApp() {
             this.scanCode = code;
             await this.scan(target);
         },
+        cameraErrorMessage(error) {
+            const message = String(error?.message ?? error ?? 'ไม่ทราบสาเหตุ');
+            if (/permission dismissed|notallowed|permission denied|denied/i.test(message)) {
+                return 'เบราว์เซอร์ยังไม่อนุญาตใช้กล้อง กดไอคอนตั้งค่าเว็บไซต์ข้างที่อยู่เว็บแล้วเลือกอนุญาตกล้อง หรือกด “ถ่ายภาพบาร์โค้ดแทน”';
+            }
+            return 'เปิดกล้องไม่ได้: ' + message;
+        },
+        async scanCameraFile(event) {
+            const file = event.target.files?.[0];
+            event.target.value = '';
+            if (!file || !window.Html5Qrcode) return;
+            this.cameraError = '';
+            this.camHandled = false;
+            try {
+                const scanner = new Html5Qrcode('qr-file-reader');
+                const code = await scanner.scanFile(file, false);
+                try { scanner.clear(); } catch (e) { /* ตัวอ่านภาพอาจล้างตัวเองแล้ว */ }
+                await this.acceptCameraCode(code);
+            } catch (e) {
+                this.cameraError = 'อ่านภาพบาร์โค้ดไม่สำเร็จ กรุณาถ่ายให้เห็นบาร์โค้ดเพียง 1 ดวงชัด ๆ';
+            }
+        },
+        async stopCameraReaders() {
+            if (this.html5QrCode) {
+                try { await this.html5QrCode.stop(); } catch (e) { /* กล้องอาจหยุดไปแล้ว */ }
+                try { this.html5QrCode.clear(); } catch (e) { /* DOM อาจถูกล้างแล้ว */ }
+                this.html5QrCode = null;
+            }
+            this.camControls?.stop?.(); this.camControls = null;
+            this.qrScanner?.reset?.(); this.qrScanner = null;
+            if (this.camTimer) clearTimeout(this.camTimer);
+            this.camTimer = null;
+            this.camStream?.getTracks().forEach(t => t.stop());
+            this.camStream = null;
+        },
         async startZxingCamera() {
             if (!this.cameraOpen || !window.ZXingBrowser || this.camHandled) return;
             const reader = await this.waitForCameraElement();
@@ -672,7 +714,7 @@ function whApp() {
             );
         },
         async openCamera(target) {
-            this.camTarget = target; this.cameraOpen = true; this.camHandled = false;
+            this.camTarget = target; this.cameraOpen = true; this.cameraError = ''; this.scanError = ''; this.camHandled = false;
             if (window.Html5Qrcode) {
                 this.$nextTick(async () => {
                     try {
@@ -695,12 +737,12 @@ function whApp() {
                         }, 4500);
                         return;
                     } catch (e) {
-                        this.html5QrCode = null;
+                        await this.stopCameraReaders();
                         if (window.ZXingBrowser) {
                             try { await this.startZxingCamera(); return; } catch (fallbackError) { e = fallbackError; }
                         }
-                        this.closeCamera();
-                        this.scanError = 'เปิดกล้องไม่ได้: ' + e.message;
+                        await this.stopCameraReaders();
+                        this.cameraError = this.cameraErrorMessage(e);
                     }
                 });
                 return;
@@ -709,24 +751,15 @@ function whApp() {
                 this.$nextTick(async () => {
                     try {
                         await this.startZxingCamera();
-                    } catch (e) { this.closeCamera(); this.scanError = 'เปิดกล้องไม่ได้: ' + e.message; }
+                    } catch (e) { await this.stopCameraReaders(); this.cameraError = this.cameraErrorMessage(e); }
                 });
                 return;
             }
-            this.closeCamera(); this.scanError = 'ตัวสแกนกล้องยังโหลดไม่สำเร็จ กรุณาพิมพ์รหัสหรือรีโหลดหน้า'; return;
+            this.cameraError = 'ตัวสแกนกล้องยังโหลดไม่สำเร็จ กด “ถ่ายภาพบาร์โค้ดแทน” หรือพิมพ์รหัส'; return;
         },
         async closeCamera() {
-            if (this.html5QrCode) {
-                try { await this.html5QrCode.stop(); } catch (e) { /* กล้องอาจหยุดไปแล้ว */ }
-                try { this.html5QrCode.clear(); } catch (e) { /* DOM ถูกปิดไปแล้ว */ }
-                this.html5QrCode = null;
-            }
-            this.camControls?.stop?.(); this.camControls = null;
-            this.qrScanner?.reset?.(); this.qrScanner = null;
-            if (this.camTimer) clearTimeout(this.camTimer);
-            this.camTimer = null;
-            this.camStream?.getTracks().forEach(t => t.stop());
-            this.camStream = null; this.cameraOpen = false;
+            await this.stopCameraReaders();
+            this.cameraError = ''; this.cameraOpen = false;
         },
     };
 }
