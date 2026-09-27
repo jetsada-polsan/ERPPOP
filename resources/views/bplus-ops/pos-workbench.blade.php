@@ -39,6 +39,28 @@
         @endif
     </div>
 
+    <div class="pos-pairing-card">
+        <div class="pos-pairing-icon"><i class="bi bi-link-45deg"></i></div>
+        <div class="pos-pairing-copy">
+            <div class="pos-pairing-title">ผูกเครื่อง POS กับ ERP ก่อนติดตั้ง</div>
+            <div class="pos-pairing-flow">
+                <span><b>1</b> เลือกสาขา + ผู้ใช้ POS</span>
+                <i class="bi bi-chevron-right"></i>
+                <span><b>2</b> สร้าง Device Token</span>
+                <i class="bi bi-chevron-right"></i>
+                <span><b>3</b> วาง token ใน POS</span>
+            </div>
+            <small>Token จะล็อกสาขาและเครื่องให้เอง — หน้า POS ไม่ต้องเลือก token และไม่ควรใช้ token เดียวกันหลายเครื่อง</small>
+        </div>
+        @if(auth()->user()?->hasPermission('settings.manage'))
+            <a href="{{ route('settings.index', ['tab' => 'pos-download']) }}" class="pos-pairing-btn">
+                <i class="bi bi-gear-wide-connected"></i> ผูกสาขา / ออก Device Token
+            </a>
+        @else
+            <span class="pos-pairing-disabled"><i class="bi bi-lock-fill"></i> ให้ผู้ดูแลระบบผูกเครื่อง</span>
+        @endif
+    </div>
+
     <div class="pos-note">
         <i class="bi bi-info-circle-fill"></i>
         <div>
@@ -247,6 +269,17 @@
     }
     .pos-install-btn:hover { background: var(--erp-success-ink); color: #fff; }
     .pos-install-disabled { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 14px; border-radius: 10px; background: #e2e8f0; color: #64748b; font-weight: 800; white-space: nowrap; }
+    .pos-pairing-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 16px 18px; border: 1px solid #c7d2fe; border-radius: 16px; background: linear-gradient(135deg, #eef2ff 0%, #ffffff 84%); }
+    .pos-pairing-icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 10px; background: #e0e7ff; color: #4338ca; font-size: 22px; }
+    .pos-pairing-copy { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+    .pos-pairing-title { color: #312e81; font-weight: 900; }
+    .pos-pairing-flow { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: #4338ca; font-size: 12px; font-weight: 800; }
+    .pos-pairing-flow b { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: #4f46e5; color: #fff; font-size: 11px; }
+    .pos-pairing-flow i { color: #818cf8; }
+    .pos-pairing-copy small { color: #64748b; font-size: 11.5px; line-height: 1.45; }
+    .pos-pairing-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 14px; border-radius: 10px; background: #4f46e5; color: #fff; font-weight: 900; text-decoration: none; white-space: nowrap; }
+    .pos-pairing-btn:hover { background: #3730a3; color: #fff; }
+    .pos-pairing-disabled { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 14px; border-radius: 10px; background: #e2e8f0; color: #64748b; font-weight: 800; white-space: nowrap; }
     .pos-note > i {
         color: #d97706;
         font-size: 18px;
@@ -388,6 +421,8 @@
         .pos-filter-actions { grid-template-columns: 1fr; }
         .pos-install-card { grid-template-columns: auto minmax(0, 1fr); }
         .pos-install-btn { grid-column: 1 / -1; width: 100%; }
+        .pos-pairing-card { grid-template-columns: auto minmax(0, 1fr); }
+        .pos-pairing-btn, .pos-pairing-disabled { grid-column: 1 / -1; width: 100%; }
     }
 </style>
 @endpush

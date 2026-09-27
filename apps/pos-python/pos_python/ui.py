@@ -1594,7 +1594,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.scan.textChanged.connect(self.refresh_products)
             layout.addWidget(self.scan)
 
-            self.scan_hint = QLabel("สแกนแล้วกด Enter เพื่อเพิ่มอัตโนมัติ · กดเลือกสินค้าเองเพื่อกรอกจำนวนหรือน้ำหนัก")
+            self.scan_hint = QLabel("สแกนแล้วกด Enter เพื่อเพิ่มอัตโนมัติ · สินค้าปกติเข้า 1 ชิ้น · สินค้าชั่งเท่านั้นที่กรอกน้ำหนักเองได้")
             self.scan_hint.setObjectName("scanHint")
             layout.addWidget(self.scan_hint)
 
@@ -1701,10 +1701,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     0.001, 0.001, 999999.999, 3,
                 )
             else:
-                quantity, ok = QInputDialog.getInt(
-                    self, "กรอกจำนวน", f"{product['name']}\nราคาต่อหน่วย {price:,.2f} บาท\nจำนวน (ชิ้น/หน่วย)",
-                    1, 1, 999999,
-                )
+                # การเลือกการ์ดสินค้าปกติเท่ากับยิงสินค้า 1 หน่วย
+                # ถ้าต้องการหลายชิ้นให้กด + ในรายการขายหลังเพิ่มแล้ว
+                quantity, ok = Decimal("1"), True
             if not ok:
                 return
 

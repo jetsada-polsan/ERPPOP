@@ -20,7 +20,7 @@
 @endif
 
 <form method="post" action="{{ route('settings.update') }}" enctype="multipart/form-data"
-      x-data="{ tab: @js(session('pos_token') || $errors->has('pos_version') || $errors->has('pos_installer') ? 'pos-download' : 'func'), choice: @js($currentLogo ?? '__none__'), theme: @js($erpTheme), layout: @js($erpLayout), copied: false, menuOrder: @js($menuOrder), moveMenu(i, d) { const n=i+d; if(n<0 || n>=this.menuOrder.length) return; const a=[...this.menuOrder]; [a[i],a[n]]=[a[n],a[i]]; this.menuOrder=a; } }">
+      x-data="{ tab: @js(request()->query('tab') === 'pos-download' || session('pos_token') || $errors->has('pos_version') || $errors->has('pos_installer') ? 'pos-download' : 'func'), choice: @js($currentLogo ?? '__none__'), theme: @js($erpTheme), layout: @js($erpLayout), copied: false, menuOrder: @js($menuOrder), moveMenu(i, d) { const n=i+d; if(n<0 || n>=this.menuOrder.length) return; const a=[...this.menuOrder]; [a[i],a[n]]=[a[n],a[i]]; this.menuOrder=a; } }">
     @csrf
     <input type="hidden" name="menu_order" :value="JSON.stringify(menuOrder)">
 
@@ -48,7 +48,7 @@
             <div class="set-nav-group mt-3"><i class="bi bi-pc-display"></i> โปรแกรมหน้าร้าน</div>
             <a href="{{ route('settings.receipt-template.edit') }}" class="set-nav-link text-decoration-none">ออกแบบใบเสร็จ POS</a>
             <a href="{{ route('settings.pos-builds.index') }}" class="set-nav-link text-decoration-none">POS Build Center</a>
-            <button type="button" class="set-nav-link" :class="tab === 'pos-download' && 'active'" @click="tab = 'pos-download'">PopCentral POS (Python)</button>
+            <button type="button" class="set-nav-link" :class="tab === 'pos-download' && 'active'" @click="tab = 'pos-download'"><i class="bi bi-link-45deg me-1"></i>ผูกเครื่อง / Device Token</button>
         </div>
 
         {{-- เนื้อหาขวา --}}
@@ -325,9 +325,9 @@
                 @endif
 
                 <div class="set-card">
-                    <div class="set-title pt-2">การผูก Token กับเครื่อง POS</div>
+                    <div class="set-title pt-2">ผูกสาขาและเครื่องด้วย Device Token</div>
                     <div class="set-desc mb-3">
-                        Device token คือกุญแจของ <strong>เครื่อง POS และสาขา</strong> ไม่ใช่รหัสของแคชเชียร์ ระบบใช้ token เพื่อรู้ว่าเครื่องนี้เป็น POS ใด อยู่สาขาใด และมีสิทธิ์ sync ข้อมูลของสาขาใดเท่านั้น
+                        หน้านี้คือจุดที่ผู้ดูแลระบบต้องใช้ก่อนติดตั้ง POS: เลือก <strong>สาขา + ผู้ใช้ POS + ชื่อเครื่อง</strong> แล้วระบบจะออก Device Token ที่ผูกกับเครื่องและสาขาให้เอง หน้า POS มีหน้าที่แค่วาง token นี้ ไม่ต้องเลือก token หรือสาขาเอง
                     </div>
                     <div class="row g-3 small mb-3">
                         <div class="col-md-4">

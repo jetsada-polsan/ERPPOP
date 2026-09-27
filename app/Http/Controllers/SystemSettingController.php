@@ -270,7 +270,7 @@ class SystemSettingController extends Controller
             return back()->withErrors(['pos_branch_id' => $exception->getMessage()]);
         }
 
-        return redirect()->route('settings.index')->with([
+        return redirect()->route('settings.index', ['tab' => 'pos-download'])->with([
             'success' => "สร้าง {$device->name} ({$device->terminal_code}) และ Token ให้แล้ว กรุณาคัดลอกไปตั้งค่าในเครื่อง POS",
             'pos_token' => $token,
             'pos_device_name' => $device->name,
@@ -286,7 +286,7 @@ class SystemSettingController extends Controller
         $device = PosDevice::findOrFail($data['pos_device_id']);
         $token = $device->rotateToken();
 
-        return redirect()->route('settings.index')->with([
+        return redirect()->route('settings.index', ['tab' => 'pos-download'])->with([
             'success' => "ออก Token ใหม่สำหรับ {$device->name} แล้ว Token เดิมจะใช้งานไม่ได้",
             'pos_token' => $token,
             'pos_device_name' => $device->name,
@@ -303,7 +303,7 @@ class SystemSettingController extends Controller
         $name = $device->name;
         $device->delete();
 
-        return redirect()->route('settings.index')->with('success', "ลบเครื่อง POS {$name} แล้ว");
+        return redirect()->route('settings.index', ['tab' => 'pos-download'])->with('success', "ลบเครื่อง POS {$name} แล้ว");
     }
 
     public function updatePosTerminalHardware(Request $request): RedirectResponse

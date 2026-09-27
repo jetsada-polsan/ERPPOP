@@ -93,6 +93,14 @@ class UiStyleTest(unittest.TestCase):
         pay = source[source.index("        def pay(self)"):source.index("        def ensure_sale_session(self)")]
         self.assertLess(pay.index("ensure_sale_session"), pay.index("PaymentDialog"))
 
+    def test_manual_product_selection_prompts_weight_only_for_scale_items(self) -> None:
+        source = inspect.getsource(run_ui)
+        start = source.index("        def add_product_row")
+        add_product = source[start:source.index("        def on_scan", start)]
+        self.assertIn("if self.is_scale_product(product)", add_product)
+        self.assertIn('quantity, ok = Decimal("1"), True', add_product)
+        self.assertNotIn("QInputDialog.getInt", add_product)
+
     def test_settings_remain_it_protected_without_seller_login(self) -> None:
         source = inspect.getsource(run_ui)
         settings = source[source.index("        def open_settings(self) -> None", source.index("class PosWindow")):]

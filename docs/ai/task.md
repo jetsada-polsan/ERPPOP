@@ -1026,3 +1026,13 @@ pending
 - Build/Publish: GitHub Actions `36233746539` ผ่านครบ; URL ดาวน์โหลดตอบ HTTP 200 และส่ง `PopCentral-POS-UAT-0.6.24-setup.exe`
 - Deploy: เผยแพร่ installer แล้ว; source Laravel หน้าโหลดเดิมยังรอคำสั่ง deploy ของเจ้าของโปรเจกต์
 - งานถัดไป: ติดตั้ง 0.6.24 แล้วเปิดเมนูตั้งค่า → การ Sync และ API → กด “ทดสอบการเชื่อมต่อและ sync แคชเชียร์”; ต้องเห็น `Device Token ยืนยันกับ ERP ผ่านแล้ว` ก่อนถือว่าออนไลน์
+
+## Handoff - 2026-09-27 (Codex แก้ token binding และกติกาสินค้าชั่ง)
+
+- Branch: `codex/simplify-pos-customer-flow`
+- ทำอะไรฝั่ง ERP: เพิ่มการ์ดขั้นตอนบนหน้าเครื่องมือ POS ให้เห็นชัดว่าแอดมินต้องเลือกสาขา + ผู้ใช้ POS → สร้าง Device Token → วาง token ใน POS; ปุ่มพาไปหน้า `ตั้งค่า?tab=pos-download` โดยตรง และบัญชีที่ไม่มี `settings.manage` จะเห็นข้อความให้ผู้ดูแลระบบดำเนินการ
+- ทำอะไรฝั่ง ERP: เปลี่ยนชื่อแท็บเป็น `ผูกเครื่อง / Device Token`, เปิดแท็บจาก query string ได้, และหลังสร้าง/หมุน/ลบ token จะกลับมาที่แท็บผูกเครื่อง ไม่หลุดไปหน้าตั้งค่าทั่วไป; token ยังคงถูกเก็บกับ `branch_id`, `user_id` และ `terminal_code` ของ `PosDevice`
+- ทำอะไรฝั่ง Python POS: การเลือกการ์ดสินค้าปกติไม่ถามจำนวน/น้ำหนักแล้ว และเพิ่มเข้าบิล 1 หน่วยทันที; สินค้าชั่งเท่านั้นที่เปิด dialog น้ำหนัก; การยิงบาร์โค้ดปกติยังเพิ่ม 1 หน่วย และป้ายชั่ง 800/801 ยังคำนวณน้ำหนักจากฉลากตาม profile
+- ทดสอบ: `python3 -m unittest discover -s apps/pos-python/tests -v` → **187 tests ผ่าน**; `php artisan test --compact` → **450 tests, 449 passed, 1 skipped, 6 incomplete, 3474 assertions**; `php artisan view:cache` และ `git diff --check` ผ่าน
+- Deploy: ยังไม่ได้ deploy source Laravel ตามกติกาเจ้าของโปรเจกต์; ยังไม่ได้ build installer รุ่นใหม่จากการเปลี่ยนแปลงรอบนี้
+- งานถัดไป: commit/push branch นี้; เมื่อ owner สั่ง `deploy` ให้ deploy source Laravel แล้วทดสอบหน้าเครื่องมือ POS และหน้า Settings ด้วยบัญชี `settings.manage`; หากจะติดตั้ง Python รุ่นนี้ ให้รัน Windows UAT build/publish เป็นรุ่นถัดไป
