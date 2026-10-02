@@ -1,5 +1,18 @@
 # Handoff — 2026-08-23 รอบที่ 4 (Claude) — **Deploy แล้ว**
 
+## Handoff - 2026-10-02 (QR/Barcode Web POS)
+
+- ทำอะไร: เพิ่มเครื่องสแกน html5-qrcode ในหน้า POS รองรับกล้อง, เปลี่ยนกล้อง, หยุด/ปิด, สแกนจากรูป,
+  manual input และ keyboard-wedge จาก USB/Bluetooth พร้อม debounce 1 วินาที, สั่น/เสียงเมื่อพบสินค้า
+  และปิดกล้องเมื่อออกจากหน้า; เพิ่ม `ProductScanLog` และ migration สำหรับ audit ที่ไม่ขวางการขาย
+- เพิ่ม BarcodePolicy สำหรับ Code128, Code39 และ QR Code โดยคงข้อมูล barcode เดิมและ SKU เป็น fallback
+- ปรับฉลาก A4 ให้สร้าง Code128/Code39/EAN-13 และ QR จาก barcode หรือ SKU ด้วย bwip-js พร้อมชื่อสินค้า,
+  SKU, ราคา และข้อมูลหน่วยเดิม
+- ทดสอบ: `git diff --check` ผ่าน, `npm run build` ผ่าน, PHP syntax ผ่าน; `php artisan test` ยังรันไม่ได้
+  เพราะ checkout นี้ยังไม่มี `vendor/autoload.php` (ยังไม่ได้ติดตั้ง Composer dependencies)
+- Deploy: ยังไม่ deploy; ต้องติดตั้ง dependency ตาม `package.json`, รัน migration และทดสอบกล้องจริงบน Android/iPhone
+- งานถัดไป: UAT กล้อง/เครื่องสแกนจริง, ตรวจฉลากกับเครื่องพิมพ์ A4, และ deploy หลังเจ้าของอนุมัติ
+
 ## Handoff - 2026-09-23 (CRM Phase 0)
 
 - ทำอะไร: ตรวจสถาปัตยกรรม CRM, Customer, Member, Point, POS และ LINE integration บน `main` และจัดทำ

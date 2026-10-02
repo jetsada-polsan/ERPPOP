@@ -28,7 +28,12 @@ class BarcodePolicy
     /** ของเก่าหรือรหัสที่กำหนดเอง ไม่บังคับรูปแบบ */
     public const CUSTOM = 'CUSTOM';
 
-    public const ALL = [self::EAN13_STANDARD, self::INTERNAL_13, self::SCALE_WEIGHT, self::SCALE_PLU, self::CUSTOM];
+    /** รหัสสำหรับเครื่องสแกนทั่วไป เก็บ SKU หรือรหัสสินค้าตามจริง */
+    public const CODE128 = 'CODE128';
+    public const CODE39 = 'CODE39';
+    public const QR_CODE = 'QR_CODE';
+
+    public const ALL = [self::EAN13_STANDARD, self::INTERNAL_13, self::SCALE_WEIGHT, self::SCALE_PLU, self::CUSTOM, self::CODE128, self::CODE39, self::QR_CODE];
 
     public const LABELS = [
         self::EAN13_STANDARD => 'EAN-13 มาตรฐาน (GS1)',
@@ -36,6 +41,9 @@ class BarcodePolicy
         self::SCALE_WEIGHT => 'บาร์โค้ดเครื่องชั่ง',
         self::SCALE_PLU => 'PLU เครื่องชั่ง (6 หลัก)',
         self::CUSTOM => 'กำหนดเอง / ของเก่า',
+        self::CODE128 => 'Code 128',
+        self::CODE39 => 'Code 39',
+        self::QR_CODE => 'QR Code',
     ];
 
     /**
@@ -90,6 +98,9 @@ class BarcodePolicy
                 break;
 
             case self::CUSTOM:
+            case self::CODE128:
+            case self::CODE39:
+            case self::QR_CODE:
                 // ไม่บังคับรูปแบบโดยเจตนา ของเก่ามีได้หลายแบบ
                 break;
         }

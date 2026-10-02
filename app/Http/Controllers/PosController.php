@@ -17,6 +17,7 @@ use App\Models\PosShift;
 use App\Models\PosTerminal;
 use App\Models\PriceTable;
 use App\Models\Product;
+use App\Models\ProductScanLog;
 use App\Models\ProductBarcode;
 use App\Models\ProductCategory;
 use App\Models\ProductPrice;
@@ -557,6 +558,7 @@ class PosController extends Controller
         ]))->getData(true);
         if ($registered !== []) {
             $product = $registered[0];
+            $this->recordScan($barcode, $branchId, $product['id'] ?? null, $request->input('source', 'manual'), 'matched');
 
             return response()->json([
                 'mode' => 'barcode',
@@ -569,6 +571,7 @@ class PosController extends Controller
 
         $decoded = $scaleBarcodes->decode($barcode);
         if ($decoded === null) {
+            $this->recordScan($barcode, $branchId, null, $request->input('source', 'manual'), 'not_found');
             return response()->json(['message' => "ไม่พบบาร์โค้ด {$barcode}"], 404);
         }
 
@@ -587,6 +590,7 @@ class PosController extends Controller
             ]))->getData(true);
         }
         if ($productRows === []) {
+            $this->recordScan($barcode, $branchId, null, $request->input('source', 'manual'), 'not_found');
             return response()->json(['message' => "ไม่พบสินค้าสำหรับ PLU เครื่องชั่ง {$decoded['plu']}"], 404);
         }
 
@@ -611,6 +615,19 @@ class PosController extends Controller
             'total_price' => $decoded['price'],
             'scale_profile' => $decoded['profile'],
         ]);
+    }
+
+    private function recordScan(string $code, int $branchId, ?int $productId, string $source, string $result): void
+    {
+        try {
+            ProductScanLog::create([
+                'user_id' => auth()->id(), 'branch_id' => $branchId, 'product_id' => $productId,
+                'context' => 'pos', 'code' => $code, 'source' => in_array($source, ['camera', 'image', 'keyboard', 'manual'], true) ? $source : 'manual',
+                'result' => $result,
+            ]);
+        } catch (\Throwable) {
+            // Audit must never make a valid sale unavailable.
+        }
     }
 
     /**

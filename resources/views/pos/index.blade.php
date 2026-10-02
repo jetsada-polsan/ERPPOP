@@ -18,6 +18,7 @@
     @vite('resources/css/pos-shared.css')
     <script src="{{ asset('vendor/sweetalert2/sweetalert2.all.min.js') }}"></script>
     <script defer src="{{ asset('vendor/alpinejs/alpine.min.js') }}"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     @vite('resources/js/pos-web.ts')
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -2193,6 +2194,9 @@
                     <input class="pos-search-input" type="text" placeholder="พิมพ์รหัสหรือชื่อสินค้า..."
                         x-model="searchQ" @input.debounce.180ms="loadProducts()" @keydown.enter.prevent="scanSearch()" autofocus>
                 </div>
+                <button type="button" class="btn btn-primary" @click="openScanner()" title="สแกน QR / Barcode">
+                    <i class="bi bi-camera-fill"></i><span class="d-none d-md-inline"> สแกน</span>
+                </button>
             </div>
 
             <div class="pos-categories">
@@ -2652,7 +2656,10 @@
 .pos-search-bar, .pos-categories { background: var(--pos-ui-surface); }
 .pos-search-bar { padding: 12px 14px; }
 .pos-categories { padding: 8px 14px; }
-.pos-search-input { border-color: var(--pos-ui-border); border-radius: 7px; }
+        .pos-search-input { border-color: var(--pos-ui-border); border-radius: 7px; }
+        .pos-modal-backdrop { position: fixed; inset: 0; z-index: 1200; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(2,8,23,.72); }
+        .pos-modal { width: min(520px, 100%); background: #fff; color: #0f172a; border-radius: 12px; box-shadow: 0 24px 80px rgba(0,0,0,.35); overflow: hidden; }
+        .pos-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #e2e8f0; }
 .cat-pill { color: var(--pos-ui-ink); border-radius: 6px; }
 .pos-cart { background: var(--pos-ui-surface); border-color: var(--pos-ui-border); box-shadow: 0 8px 24px rgba(28,48,62,.07); }
 .pos-cart-header { background: var(--pos-ui-surface); border-color: var(--pos-ui-border); }
@@ -2724,6 +2731,27 @@
 </style>
 
 <script src="{{ asset('vendor/qrcodejs/qrcode.min.js') }}"></script>
+    <div x-show="scannerOpen" x-cloak class="pos-modal-backdrop" @keydown.escape.window="closeScanner()">
+        <div class="pos-modal" role="dialog" aria-modal="true" aria-label="สแกน QR หรือ Barcode">
+            <div class="pos-modal-header">
+                <strong><i class="bi bi-qr-code-scan"></i> สแกน QR / Barcode</strong>
+                <button type="button" class="btn btn-sm btn-light" @click="closeScanner()" title="ปิด"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="p-3">
+                <div id="pos-qr-reader" style="width:100%; min-height:180px; background:#0f172a; border-radius:10px; overflow:hidden"></div>
+                <div id="pos-qr-file-reader" class="d-none"></div>
+                <div class="d-flex gap-2 mt-3 flex-wrap">
+                    <button type="button" class="btn btn-primary" @click="startScanner()" :disabled="scannerRunning"><i class="bi bi-play-fill"></i> เริ่มสแกน</button>
+                    <button type="button" class="btn btn-outline-secondary" @click="stopScanner()" :disabled="!scannerRunning"><i class="bi bi-stop-fill"></i> หยุด</button>
+                    <button type="button" class="btn btn-outline-secondary" @click="switchScannerCamera()" :disabled="scannerCameras.length < 2"><i class="bi bi-camera-rotate"></i> เปลี่ยนกล้อง</button>
+                    <label class="btn btn-outline-secondary mb-0"><i class="bi bi-image"></i> เลือกรูป<input type="file" accept="image/*" class="d-none" @change="scanImage($event)"></label>
+                </div>
+                <input class="form-control mt-3" x-model="scannerManualCode" @keydown.enter.prevent="submitManualScan()" placeholder="กรอก Barcode หรือ SKU แล้วกด Enter">
+                <div x-show="scannerError" class="alert alert-warning mt-3 mb-0" x-text="scannerError"></div>
+            </div>
+        </div>
+    </div>
+
 <script>
 /* ── PopCentral POS popup helpers. All Swal.fire() calls inherit this skin. ── */
 (function () {
@@ -2944,6 +2972,11 @@ function posApp() {
         // Customer
         customerQuery: '', customerId: null, customerName: '', customerResults: [], customerToolsOpen: false,
 
+        // Camera / keyboard-wedge scanner
+        scannerOpen: false, scannerRunning: false, scannerError: '', scannerManualCode: '',
+        scannerCameras: [], scannerCameraIndex: 0, scannerInstance: null,
+        lastScanCode: '', lastScanAt: 0,
+
         // Payment
         payModalOpen: false, method: 'cash', received: 0, receivedInput: '', processing: false,
         paymentRef: '', transferAccountLast4: '', transferConfirmed: false,
@@ -2979,6 +3012,94 @@ function posApp() {
             });
             window.addEventListener('pos-vue-action', (event) => this.handleVueAction(event.detail || {}));
             this.registerServiceWorker();
+            window.addEventListener('beforeunload', () => this.stopScanner());
+        },
+
+        async openScanner() {
+            this.scannerOpen = true;
+            this.scannerError = '';
+            this.scannerManualCode = '';
+            if (location.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(location.hostname)) {
+                this.scannerError = 'การใช้กล้องต้องเปิดผ่าน HTTPS หรือ localhost';
+                return;
+            }
+            await this.startScanner();
+        },
+
+        async startScanner() {
+            if (typeof Html5Qrcode === 'undefined') {
+                this.scannerError = 'โหลดตัวสแกนไม่สำเร็จ กรุณาใช้งานช่องกรอกด้วยมือ';
+                return;
+            }
+            try {
+                if (!this.scannerInstance) this.scannerInstance = new Html5Qrcode('pos-qr-reader');
+                if (!this.scannerCameras.length) {
+                    this.scannerCameras = await Html5Qrcode.getCameras();
+                }
+                const camera = this.scannerCameras[this.scannerCameraIndex] || { facingMode: 'environment' };
+                await this.scannerInstance.start(camera, { fps: 10, qrbox: { width: 250, height: 180 } },
+                    (decoded) => this.acceptScannerCode(decoded), () => {});
+                this.scannerRunning = true;
+                this.scannerError = '';
+            } catch (error) {
+                this.scannerRunning = false;
+                this.scannerError = 'เปิดกล้องไม่ได้ กรุณาอนุญาตกล้องหรือกรอก Barcode/SKU ด้วยมือ';
+            }
+        },
+
+        async stopScanner() {
+            if (!this.scannerInstance || !this.scannerRunning) return;
+            try { await this.scannerInstance.stop(); } catch (e) {}
+            this.scannerRunning = false;
+        },
+
+        async closeScanner() {
+            await this.stopScanner();
+            try { await this.scannerInstance?.clear(); } catch (e) {}
+            this.scannerInstance = null;
+            this.scannerOpen = false;
+        },
+
+        async switchScannerCamera() {
+            await this.stopScanner();
+            if (this.scannerCameras.length > 1) {
+                this.scannerCameraIndex = (this.scannerCameraIndex + 1) % this.scannerCameras.length;
+            }
+            await this.startScanner();
+        },
+
+        acceptScannerCode(code) {
+            const value = String(code || '').trim();
+            const now = Date.now();
+            if (!value || (value === this.lastScanCode && now - this.lastScanAt < 1000)) return;
+            this.lastScanCode = value;
+            this.lastScanAt = now;
+            this.scannerManualCode = value;
+            this.stopScanner();
+            this.closeScanner();
+            this.searchQ = value;
+            this.scanSearch('camera');
+        },
+
+        submitManualScan() {
+            const value = this.scannerManualCode.trim();
+            if (!value) return;
+            this.closeScanner();
+            this.searchQ = value;
+            this.scanSearch('manual');
+        },
+
+        async scanImage(event) {
+            const file = event.target.files?.[0];
+            if (!file || typeof Html5Qrcode === 'undefined') return;
+            try {
+                const reader = new Html5Qrcode('pos-qr-file-reader');
+                const code = await reader.scanFile(file, false);
+                await reader.clear();
+                this.acceptScannerCode(code);
+            } catch (e) {
+                this.scannerError = 'อ่าน QR/Barcode จากรูปไม่สำเร็จ';
+            }
         },
 
         // Vue owns the live cart presentation; Alpine remains the API/payment boundary during migration.
@@ -3358,9 +3479,14 @@ function posApp() {
             return await res.json();
         },
 
-        async scanSearch() {
+        async scanSearch(source = 'keyboard') {
             const scanned = String(this.searchQ || '').trim();
             if (!scanned) return;
+
+            const now = Date.now();
+            if (scanned === this.lastScanCode && now - this.lastScanAt < 1000) return;
+            this.lastScanCode = scanned;
+            this.lastScanAt = now;
 
             this.loading = true;
 
@@ -3397,6 +3523,12 @@ function posApp() {
                             : 1;
                     }
                     this.addToCart(matches[0], scaleQty, { scaleBarcode });
+                    if (navigator.vibrate) navigator.vibrate(70);
+                    try {
+                        const audio = new (window.AudioContext || window.webkitAudioContext)();
+                        const oscillator = audio.createOscillator(); oscillator.frequency.value = 880;
+                        oscillator.connect(audio.destination); oscillator.start(); oscillator.stop(audio.currentTime + 0.06);
+                    } catch (e) {}
                     this.searchQ = '';
                     await this.loadProducts();
                 } else {

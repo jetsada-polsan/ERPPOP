@@ -75,7 +75,8 @@ class PriceTagController extends Controller
 
         $template = PriceTagTemplate::findOrFail($data['price_tag_template_id']);
         $productIds = collect($data['items'])->pluck('product_id')->unique();
-        $products = Product::whereIn('id', $productIds)->get()->keyBy('id');
+        $products = Product::with(['barcodes' => fn ($q) => $q->where('is_active', true)->orderBy('id')])
+            ->whereIn('id', $productIds)->get()->keyBy('id');
 
         $priceTableValues = collect();
         if ($template->price_source === PriceTagTemplate::SOURCE_PRICE_TABLE && $template->price_table_id) {
