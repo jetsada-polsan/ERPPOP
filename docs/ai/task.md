@@ -11,6 +11,16 @@
 - งานถัดไป: ติดตั้ง `vendor` บนเครื่องที่มี network หรือ production staging แล้วรัน full test, migrate แบบ backup ก่อน,
   จากนั้นทำ UAT ตามตารางในคู่มือ
 
+## Handoff - 2026-10-03 (Production Deploy QR/Barcode)
+
+- Commit ที่ deploy: `e535a05` (รวม `600ca96`, `e2ad911` และ lockfile dependency)
+- ทำอะไร: สำรองฐานข้อมูล production, อัปโหลดโค้ดและ compiled assets โดยไม่ลบไฟล์ปลายทาง,
+  รัน Composer production install, migration, Laravel cache และเปิดระบบกลับ
+- ผล production: migration `2026_10_02_000001_create_product_scan_logs_table` ผ่านเป็น batch `[125]`
+- Health: ฐานข้อมูล, migration, backup, ขาย-GL, storage และ queue ผ่านทั้งหมด
+- Smoke test: `https://erp.popstarcenter.com/` ตอบ HTTP 200 และ `build/manifest.json` ตอบ HTTP 200
+- Deploy: deploy แล้ว; ยังเหลือ UAT กล้อง Android/iPhone, เครื่องสแกนจริง และเครื่องพิมพ์ A4
+
 ## Handoff - 2026-10-02 (QR/Barcode Web POS)
 
 - ทำอะไร: เพิ่มเครื่องสแกน html5-qrcode ในหน้า POS รองรับกล้อง, เปลี่ยนกล้อง, หยุด/ปิด, สแกนจากรูป,
