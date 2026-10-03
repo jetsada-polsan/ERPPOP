@@ -1149,7 +1149,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 pair = QFormLayout()
                 current = load_device_config(data_dir)
                 self.server_url = QLineEdit(current.server_url if current else "")
-                self.server_url.setPlaceholderText("เช่น https://erp.popstarcenter.com หรือ http://27.254.143.219")
+                self.server_url.setPlaceholderText("เช่น https://erp.popstarcenter.com หรือ http://192.168.1.10 สำหรับเครื่องทดสอบ")
                 self.device_token = QLineEdit(current.device_token if current else "")
                 self.device_token.setPlaceholderText("วาง device token ที่ออกจาก ERP")
                 self.device_token.setEchoMode(QLineEdit.Password)
