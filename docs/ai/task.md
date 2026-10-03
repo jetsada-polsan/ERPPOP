@@ -21,6 +21,14 @@
 - Smoke test: `https://erp.popstarcenter.com/` ตอบ HTTP 200 และ `build/manifest.json` ตอบ HTTP 200
 - Deploy: deploy แล้ว; ยังเหลือ UAT กล้อง Android/iPhone, เครื่องสแกนจริง และเครื่องพิมพ์ A4
 
+## Handoff - 2026-10-03 (Post-deploy smoke check)
+
+- ตรวจ `https://erp.popstarcenter.com/login`, `/pos` และ `/wh`: ทุก URL ตอบ HTTP 200 และ flow ที่ยังไม่ login
+  กลับไปหน้าเข้าสู่ระบบตามปกติ
+- ตรวจ production migration status: `product_scan_logs` เป็น `[125] Ran`
+- ตรวจ asset manifest: `/build/manifest.json` ตอบ HTTP 200
+- หมายเหตุ: browser automation timeout ก่อนเข้าหน้า authenticated จึงยังไม่อ้างผลกล้อง/เครื่องสแกนจริงผ่าน browser
+
 ## Handoff - 2026-10-02 (QR/Barcode Web POS)
 
 - ทำอะไร: เพิ่มเครื่องสแกน html5-qrcode ในหน้า POS รองรับกล้อง, เปลี่ยนกล้อง, หยุด/ปิด, สแกนจากรูป,
