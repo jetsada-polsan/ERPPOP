@@ -1,5 +1,16 @@
 # Handoff — 2026-08-23 รอบที่ 4 (Claude) — **Deploy แล้ว**
 
+## Handoff - 2026-10-03 (QR/Barcode คู่มือและตรวจระบบ)
+
+- ทำอะไร: เพิ่มคู่มือใช้งาน/ติดตั้ง/ความปลอดภัย/UAT/แก้ปัญหาสำหรับ QR และ Barcode ครบทั้งสินค้า,
+  POS, รับเข้า/นับสต็อก, กล้องมือถือ, keyboard-wedge และการพิมพ์ฉลาก A4 ที่ `docs/QR-BARCODE-POS-GUIDE.md`
+- ทดสอบ: `npm run build` ผ่าน, PHP syntax ของไฟล์ที่แก้ผ่าน, `git diff --check` ผ่าน
+- ทดสอบที่ยังทำไม่ได้: `php artisan test` และ migration integration เพราะ Composer download จาก Packagist/GitHub
+  ใช้งานไม่ได้ในสภาพแวดล้อมนี้; Android/iPhone/กล้อง/เครื่องสแกน/เครื่องพิมพ์ต้องทำ UAT จริง
+- Deploy: ยังไม่ deploy
+- งานถัดไป: ติดตั้ง `vendor` บนเครื่องที่มี network หรือ production staging แล้วรัน full test, migrate แบบ backup ก่อน,
+  จากนั้นทำ UAT ตามตารางในคู่มือ
+
 ## Handoff - 2026-10-02 (QR/Barcode Web POS)
 
 - ทำอะไร: เพิ่มเครื่องสแกน html5-qrcode ในหน้า POS รองรับกล้อง, เปลี่ยนกล้อง, หยุด/ปิด, สแกนจากรูป,
