@@ -46,6 +46,7 @@ class VatTest(unittest.TestCase):
         return self.pos.checkout(
             document_no=document_no, branch_id=1, terminal_id="TILL-1", shift_id=self.shift_id,
             cashier_id=1, lines=lines, payment_method="cash", paid_amount=Decimal(paid),
+            adjustment_approved_by="ผู้จัดการทดสอบ",
         )
 
     def sale(self, sale_id: int):

@@ -109,6 +109,31 @@ class CartLine:
     barcode_type: str = "CUSTOM"
     discount: Decimal = Decimal("0")
     price_version: str | None = None
+    # ราคาตั้งตอนหยิบสินค้า (ไม่ส่ง = เท่ากับ unit_price) ใช้แยกส่วนลดที่คนกดเองออกจากราคาปกติ
+    list_price: Decimal | None = None
+
+
+def line_adjustment(line: CartLine) -> Decimal:
+    """ส่วนลดที่คนกดเองของบรรทัดนี้ = ยอดตามราคาตั้ง - ยอดสุทธิที่เก็บเงินจริง"""
+    listed = line.list_price if line.list_price is not None else line.unit_price
+    return money(line.qty * listed) - money(line.qty * line.unit_price - line.discount)
+
+
+def validate_cart_lines(lines: list[CartLine]) -> None:
+    """กันบิลที่ ERP จะปฏิเสธแน่นอน ก่อนเก็บเงินลูกค้า
+
+    บิลที่ออกไปแล้วแต่ ERP ไม่รับจะค้างในเครื่องตลอดไป ยอดขายและสต๊อกไม่เข้า ERP
+    """
+    for line in lines:
+        listed = line.list_price if line.list_price is not None else line.unit_price
+        if line.qty <= 0:
+            raise ValueError("จำนวนสินค้าต้องมากกว่า 0 ถ้าลูกค้าคืนของให้ทำใบรับคืน")
+        if line.unit_price < 0 or line.discount < 0:
+            raise ValueError("ราคาและส่วนลดต้องไม่ติดลบ")
+        if line.unit_price > listed:
+            raise ValueError(f"ขึ้นราคาเกินราคาตั้ง ({listed:,.2f} บาท) ไม่ได้")
+        if money(line.discount) > money(line.qty * line.unit_price):
+            raise ValueError("ส่วนลดมากกว่ายอดของบรรทัดนั้นไม่ได้")
 
 
 @dataclass(frozen=True)
@@ -533,9 +558,14 @@ class PosService:
                  cashier_id: int, lines: list[CartLine], payment_method: str, paid_amount: Decimal,
                  sale_uuid: str | None = None, payment_reference: str | None = None,
                  qr_payload: str | None = None, payment_confirmed: bool = False,
-                 transfer_account_last4: str | None = None) -> int:
+                 transfer_account_last4: str | None = None, adjustment_approved_by: str | None = None) -> int:
         if not lines:
             raise ValueError("ต้องมีสินค้าอย่างน้อยหนึ่งรายการ")
+        validate_cart_lines(lines)
+        adjustment = sum((line_adjustment(line) for line in lines), Decimal("0"))
+        approver = (adjustment_approved_by or "").strip() or None
+        if adjustment > 0 and not approver:
+            raise ValueError("บิลนี้มีการลดราคาหรือส่วนลด ต้องมีผู้อนุมัติก่อนออกบิล")
         shift = self.db.execute("SELECT status FROM shifts WHERE id = ?", (shift_id,)).fetchone()
         if not shift:
             raise ValueError("ไม่พบกะที่ระบุ")
@@ -570,10 +600,11 @@ class PosService:
         with self.db:
             cursor = self.db.execute(
                 """INSERT INTO sales (sale_uuid, document_no, branch_id, terminal_id, shift_id, cashier_id,
-                sale_datetime, subtotal, discount_total, vat_total, grand_total, payment_status, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?)""",
+                sale_datetime, subtotal, discount_total, vat_total, grand_total, payment_status, created_at,
+                adjustment_approved_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?)""",
                 (sale_uuid, document_no, branch_id, terminal_id, shift_id, cashier_id, self._now(), str(subtotal),
-                 str(discount), str(vat_total), str(grand_total), self._now()),
+                 str(discount), str(vat_total), str(grand_total), self._now(), approver if adjustment > 0 else None),
             )
             sale_id = int(cursor.lastrowid)
             for line in lines:
@@ -583,10 +614,11 @@ class PosService:
                 line_total = money(line.qty * line.unit_price - line.discount)
                 self.db.execute(
                     """INSERT INTO sale_items (sale_id, product_id, barcode, source_barcode, barcode_type, product_name_snapshot,
-                    unit_name_snapshot, qty, unit_price, discount, line_total, price_version)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    unit_name_snapshot, qty, unit_price, discount, line_total, price_version, list_price)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (sale_id, line.product_id, line.barcode, line.source_barcode, line.barcode_type, product["name"], product["unit_name"],
-                     str(line.qty), str(line.unit_price), str(line.discount), str(line_total), line.price_version),
+                     str(line.qty), str(line.unit_price), str(line.discount), str(line_total), line.price_version,
+                     str(line.list_price if line.list_price is not None else line.unit_price)),
                 )
             # เก็บทั้งเงินที่รับมาและเงินทอน — บันทึกแต่ยอดรับอย่างเดียว
             # แล้วยอดเงินสดที่ควรมีในลิ้นชักจะเกินจริงเท่ากับเงินทอนที่จ่ายออกไป

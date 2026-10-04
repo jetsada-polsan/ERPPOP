@@ -8,6 +8,7 @@ use App\Models\PriceTable;
 use App\Models\Product;
 use App\Models\ProductBarcode;
 use App\Models\ProductPrice;
+use App\Models\ProductUnit;
 use App\Models\Promotion;
 use App\Models\QtyPromotion;
 use App\Models\User;
@@ -95,8 +96,14 @@ class PosPricingGuard
      *
      * @param  array<string,mixed>  $data
      */
-    public function validate(array $data, User $user): float
+    /**
+     * @param  string|null  $offlineApprovedBy  ผู้อนุมัติส่วนลดที่หน้าร้าน (เฉพาะเครื่อง POS ที่ผูกแล้ว)
+     *                                          เงินถูกเก็บจากลูกค้าไปแล้วตอนบิลมาถึง การปฏิเสธจะทำให้บิลค้างในเครื่อง
+     *                                          ตลอดไป จึงบันทึกตามพร้อมชื่อผู้อนุมัติแทนการปฏิเสธ
+     */
+    public function validate(array $data, User $user, ?string $offlineApprovedBy = null): float
     {
+        $approvedAtCounter = filled($offlineApprovedBy);
         $items = collect($data['items']);
         $products = Product::whereIn('id', $items->pluck('product_id')->unique())
             ->where('is_active', true)->get()->keyBy('id');
@@ -164,7 +171,7 @@ class PosPricingGuard
 
         $manualDiscount = DecimalMath::round($data['manual_discount_amount'] ?? 0, DecimalMath::DISPLAY_MONEY_SCALE);
         if (DecimalMath::compare($manualDiscount, 0) > 0) {
-            if (! $user->hasPermission('pos.discount.override')) {
+            if (! $approvedAtCounter && ! $user->hasPermission('pos.discount.override')) {
                 throw new RuntimeException('ส่วนลดพิเศษต้องให้ผู้จัดการที่มีสิทธิ์อนุมัติ');
             }
             $expected = DecimalMath::subtract($expected, $manualDiscount, DecimalMath::DISPLAY_MONEY_SCALE);
@@ -212,6 +219,7 @@ class PosPricingGuard
         )), DecimalMath::DISPLAY_MONEY_SCALE);
         if (DecimalMath::compare($manualDiscount, 0) > 0
             && DecimalMath::compare(DecimalMath::add($submitted, '0.01', 2), $cost) < 0
+            && ! $approvedAtCounter
             && ! $user->hasPermission('pos.sell_below_cost')) {
             throw new RuntimeException('ยอดขายต่ำกว่าทุน ต้องให้ผู้จัดการที่มีสิทธิ์อนุมัติ');
         }
@@ -247,6 +255,7 @@ class PosPricingGuard
                 );
             }
             if (DecimalMath::compare($marginPercent, $product->minimum_margin_percent) < 0
+                && ! ($approvedAtCounter && DecimalMath::compare($manualDiscount, 0) > 0)
                 && ! $user->hasPermission('pos.sell_below_cost')) {
                 throw new RuntimeException(
                     "กำไร {$product->name_th} ต่ำกว่าเกณฑ์ "
@@ -299,10 +308,17 @@ class PosPricingGuard
         $tableId = PriceTable::where('is_default', true)->value('id');
         $rows = $tableId ? ProductPrice::where('price_table_id', $tableId)
             ->whereIn('product_id', $productIds)->where('is_active', true)
-            ->orderByRaw('CASE WHEN unit_id IS NULL THEN 0 ELSE 1 END')->get()->groupBy('product_id') : collect();
+            ->get()->groupBy('product_id') : collect();
+        $unitFactors = ProductUnit::pluck('qty_per_base_unit', 'id');
 
-        $basePrices = collect($productIds)->mapWithKeys(function ($id) use ($products, $rows) {
-            $row = $rows->get($id)?->first();
+        // กติกาเดียวกับรายการสินค้าที่ส่งให้เครื่อง POS (PosController::products):
+        // ราคาหน่วยฐาน (unit_id ว่าง) -> ไม่มีก็ใช้ราคาหน่วยเล็กสุด -> ไม่มีก็ default_price
+        // เดิมหยิบแถวแรกที่เจอ สินค้าที่มีแต่ราคาหลายหน่วย (เช่น ตับหมู 79 กับ 10 บาท)
+        // จึงได้ราคาไม่ตรงกับที่เครื่องขาย บิลถูกปฏิเสธทุกใบ
+        $basePrices = collect($productIds)->mapWithKeys(function ($id) use ($products, $rows, $unitFactors) {
+            $forProduct = $rows->get($id, collect());
+            $row = $forProduct->firstWhere('unit_id', null)
+                ?? $forProduct->sortBy(fn ($r) => (float) ($unitFactors[$r->unit_id] ?? 1))->first();
 
             return [$id => (float) ($row?->price ?? $products[$id]?->default_price ?? 0)];
         });

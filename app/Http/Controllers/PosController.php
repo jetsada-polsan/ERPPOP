@@ -1021,6 +1021,7 @@ class PosController extends Controller
             'transfer_amount' => ['nullable', 'numeric', 'min:0'],
             'discount_amount' => ['nullable', 'numeric', 'min:0'],
             'manual_discount_amount' => ['nullable', 'numeric', 'min:0'],
+            'discount_approved_by' => ['nullable', 'string', 'max:120'],
             'discount_card_code' => ['nullable', 'string', 'max:30'],
             'vat_amount' => ['nullable', 'numeric', 'min:0'],
             'vat_mode' => ['nullable', 'string', 'in:included,excluded'],
@@ -1048,7 +1049,9 @@ class PosController extends Controller
         try {
             // ป้ายชั่งฝังราคารวมไว้ในบาร์โค้ด ต้องถอดเป็นน้ำหนัก+ราคาต่อหน่วยฝั่ง server ก่อนตรวจราคา
             $data['items'] = $pricingGuard->resolveScaleLines($data['items'], (int) $data['branch_id']);
-            $pricingGuard->validate($data, auth()->user());
+            // ผู้อนุมัติส่วนลดจากหน้าร้านเชื่อได้เฉพาะเครื่อง POS ที่ผูก token แล้ว หน้าเว็บยังต้องมีสิทธิ์เหมือนเดิม
+            $counterApprover = $request->attributes->get('pos_device') ? ($data['discount_approved_by'] ?? null) : null;
+            $pricingGuard->validate($data, auth()->user(), $counterApprover);
             $data['items'] = $pricingGuard->normalizeItems($data['items']);
             $paymentValidator->validate($data);
         } catch (RuntimeException $e) {
@@ -1112,6 +1115,9 @@ class PosController extends Controller
         }
         if (! empty($data['discount_amount'])) {
             $remarkParts[] = 'ส่วนลด: '.number_format((float) $data['discount_amount'], 2);
+        }
+        if (! empty($counterApprover) && (float) ($data['manual_discount_amount'] ?? 0) > 0) {
+            $remarkParts[] = 'อนุมัติส่วนลดที่หน้าร้าน: '.$counterApprover;
         }
         if ($discountCard) {
             $remarkParts[] = 'บัตรส่วนลด: '.$discountCard->card_code;

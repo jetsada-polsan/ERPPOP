@@ -289,6 +289,9 @@ ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("sync_outbox", "priority", "INTEGER NOT NULL DEFAULT 2"),
     ("sync_outbox", "depends_on_uuid", "TEXT"),
     ("sync_outbox", "next_attempt_at", "TEXT"),
+    # ราคาตั้ง + ผู้อนุมัติส่วนลด — ERP ตรวจบิลจากราคาตั้ง แล้วบันทึกส่วนลดแยกพร้อมชื่อคนอนุมัติ
+    ("sale_items", "list_price", "TEXT"),
+    ("sales", "adjustment_approved_by", "TEXT"),
 ]
 
 # ยูนีคเฉพาะแถวที่มี server_id — กันแคชเชียร์คนเดียวถูก sync ลงซ้ำสองแถว

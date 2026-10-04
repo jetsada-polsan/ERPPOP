@@ -1534,16 +1534,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     button.clicked.connect(lambda _, value=key: self.press(value))
                     grid.addWidget(button, row, column)
 
-            sign = QPushButton("+/−")
-            sign.setMinimumHeight(28)
-            sign.clicked.connect(lambda: self.press("+/-"))
-            grid.addWidget(sign, 5, 0)
-
+            # ไม่มีปุ่ม +/− แล้ว บิลขายติดลบ ERP ไม่รับ คืนของต้องทำเป็นใบรับคืน
             remove = QPushButton("ลบรายการ")
             remove.setMinimumHeight(28)
             remove.setObjectName("voidBtn")
             remove.clicked.connect(self.remove_line)
-            grid.addWidget(remove, 5, 1)
+            grid.addWidget(remove, 5, 0, 1, 2)
 
             receipt = QPushButton("ดูใบเสร็จล่าสุด")
             receipt.setMinimumHeight(28)
@@ -1757,7 +1753,50 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.refresh_order()
 
         def set_mode(self, mode: str) -> None:
+            if mode in (PRICE, DISCOUNT) and not self.approve_adjustment():
+                # ไม่อนุมัติ = กลับไปโหมดจำนวน ปุ่มที่กดค้างไว้ต้องเด้งกลับด้วย
+                self.order.set_mode(QTY)
+                for button in self.mode_group.buttons():
+                    button.setChecked(button.text() == "จำนวน")
+                return
             self.order.set_mode(mode)
+
+        def reset_mode_buttons(self) -> None:
+            # บิลใหม่เริ่มที่โหมดจำนวนเสมอ และต้องขออนุมัติส่วนลดใหม่
+            for button in self.mode_group.buttons():
+                button.setChecked(button.text() == "จำนวน")
+
+        def approve_adjustment(self) -> bool:
+            """แก้ราคาหรือให้ส่วนลด = เงินหายจากลิ้นชักได้ ต้องมีคนรับผิดชอบชื่อตัวเองทุกบิล
+
+            ผู้จัดการที่เป็นคนขายอยู่อนุมัติได้เลย คนอื่นต้องใส่รหัสผู้ดูแลเครื่อง
+            ชื่อผู้อนุมัติถูกส่งขึ้น ERP พร้อมยอดส่วนลด
+            """
+            if self.order.adjustment_approved_by:
+                return True
+            role = str(self.cashier["role"] or "").lower() if self.cashier is not None else ""
+            if role in {"manager", "supervisor"}:
+                self.order.adjustment_approved_by = f"ผู้จัดการ {self.cashier['name']}"
+                return True
+            if not service.has_local_it_pin():
+                QMessageBox.warning(
+                    self, "ต้องให้ผู้จัดการอนุมัติ",
+                    "การแก้ราคาและให้ส่วนลดต้องให้ผู้จัดการอนุมัติ\n"
+                    "เครื่องนี้ยังไม่ได้ตั้งรหัสผู้ดูแลเครื่อง ให้ผู้จัดการเป็นคนขายบิลนี้ หรือให้ IT ตั้งรหัสใน ⚙ › ตั้งค่า POS",
+                )
+                return False
+            from PySide6.QtWidgets import QInputDialog
+            pin, ok = QInputDialog.getText(
+                self, "อนุมัติส่วนลด", "แก้ราคา/ให้ส่วนลดบิลนี้ ต้องให้ผู้จัดการกรอกรหัสผู้ดูแลเครื่อง", QLineEdit.Password
+            )
+            if not ok:
+                return False
+            if not service.verify_local_it_pin(pin):
+                QMessageBox.warning(self, "อนุมัติไม่สำเร็จ", "รหัสผู้ดูแลเครื่องไม่ถูกต้อง")
+                return False
+            cashier_name = self.cashier["name"] if self.cashier is not None else "-"
+            self.order.adjustment_approved_by = f"รหัสผู้ดูแลเครื่อง (คนขาย {cashier_name})"
+            return True
 
         def press(self, key: str) -> None:
             self.order.press(key)
@@ -1777,6 +1816,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             ) != QMessageBox.Yes:
                 return
             self.order.clear()
+            self.reset_mode_buttons()
             self.refresh_order()
 
         def pay(self) -> None:
@@ -1799,6 +1839,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     qr_payload=dialog.qr_payload,
                     payment_confirmed=dialog.payment_method == "transfer" and dialog.transfer_confirmed.isChecked(),
                     transfer_account_last4=dialog.transfer_account_last4.text().strip() or None,
+                    adjustment_approved_by=self.order.adjustment_approved_by,
                 )
                 if online is not None:
                     online.worker.wake()  # ส่งบิลขึ้น ERP ทันที ไม่รอรอบถัดไป
@@ -1837,6 +1878,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                       if dialog.payment_method == "cash" else "รับชำระผ่านโอน / QR แล้ว")
             QMessageBox.information(self, "รับชำระแล้ว", f"บิล {document_no}\n{detail}")
             self.order.clear()
+            self.reset_mode_buttons()
             self.refresh_order()
 
         def ensure_sale_session(self) -> bool:

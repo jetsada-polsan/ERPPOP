@@ -2,9 +2,24 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Any, Protocol
 
 from .services import money, now
+
+# ส่งไม่ผ่านแล้วรอนานขึ้นเรื่อยๆ (10 วิ, 20 วิ, ... สูงสุด 15 นาที)
+# เดิมยิงซ้ำทุก 5 วินาทีไม่หยุด บิลที่ ERP ปฏิเสธเคยถูกยิงซ้ำ 842 ครั้งในวันเดียว
+RETRY_BASE_SECONDS = 10
+RETRY_MAX_SECONDS = 15 * 60
+
+
+def retry_at(attempts: int) -> str:
+    delay = min(RETRY_BASE_SECONDS * 2 ** max(attempts - 1, 0), RETRY_MAX_SECONDS)
+    return (datetime.now(timezone.utc) + timedelta(seconds=delay)).isoformat()
+
+
+READY = "AND (next_attempt_at IS NULL OR next_attempt_at <= ?)"
 
 
 class PosApi(Protocol):
@@ -23,8 +38,9 @@ class SyncService:
         result = {"synced": 0, "failed": 0}
         for row in self.db.execute(
             """SELECT aggregate_uuid FROM sync_outbox
-               WHERE aggregate_type = 'shift_open' AND status IN ('pending', 'failed')
-               ORDER BY priority ASC, created_at ASC, id ASC"""
+               WHERE aggregate_type = 'shift_open' AND status IN ('pending', 'failed') """
+               + READY + """
+               ORDER BY priority ASC, created_at ASC, id ASC""", (now(),)
         ).fetchall():
             try:
                 self.sync_shift_open(row["aggregate_uuid"])
@@ -34,8 +50,9 @@ class SyncService:
 
         rows = self.db.execute(
             """SELECT aggregate_type, aggregate_uuid, depends_on_uuid FROM sync_outbox
-               WHERE aggregate_type IN ('sale', 'sale_void') AND status IN ('pending', 'failed')
-               ORDER BY priority ASC, created_at ASC, id ASC"""
+               WHERE aggregate_type IN ('sale', 'sale_void') AND status IN ('pending', 'failed') """
+               + READY + """
+               ORDER BY priority ASC, created_at ASC, id ASC""", (now(),)
         ).fetchall()
         for row in rows:
             if row["depends_on_uuid"]:
@@ -55,8 +72,9 @@ class SyncService:
         for row in self.db.execute(
             """SELECT aggregate_uuid FROM sync_outbox
                WHERE aggregate_type IN ('cash_movement', 'shift_close')
-                 AND status IN ('pending', 'failed')
-               ORDER BY priority ASC, created_at ASC, id ASC"""
+                 AND status IN ('pending', 'failed') """
+               + READY + """
+               ORDER BY priority ASC, created_at ASC, id ASC""", (now(),)
         ).fetchall():
             try:
                 if row["aggregate_uuid"].startswith("cash:"):
@@ -232,12 +250,18 @@ class SyncService:
                 (now(), aggregate_uuid),
             )
 
+    def _schedule_retry(self, aggregate_uuid: str, message: str) -> None:
+        row = self.db.execute("SELECT attempts FROM sync_outbox WHERE aggregate_uuid = ?", (aggregate_uuid,)).fetchone()
+        attempts = (int(row["attempts"]) if row else 0) + 1
+        self.db.execute(
+            """UPDATE sync_outbox SET status = 'failed', attempts = ?, last_error = ?, next_attempt_at = ?
+               WHERE aggregate_uuid = ?""",
+            (attempts, message[:1000], retry_at(attempts), aggregate_uuid),
+        )
+
     def _failed_outbox(self, aggregate_uuid: str, message: str) -> None:
         with self.db:
-            self.db.execute(
-                "UPDATE sync_outbox SET status = 'failed', attempts = attempts + 1, last_error = ? WHERE aggregate_uuid = ?",
-                (message[:1000], aggregate_uuid),
-            )
+            self._schedule_retry(aggregate_uuid, message)
         raise RuntimeError(message)
 
     def sync_sale(self, sale_uuid: str) -> None:
@@ -275,11 +299,18 @@ class SyncService:
             "payment_confirmed": payment["method"] != "transfer" or bool(payment["confirmed_at"]),
             "cash_received": payment["amount"] if payment["method"] == "cash" else None,
             "items": [{
-                "product_id": item["server_product_id"], "qty": item["qty"], "unit_price": item["unit_price"],
+                "product_id": item["server_product_id"], "qty": item["qty"], "unit_price": net_unit_price(item),
                 # Server re-parses the raw one-time scale label, protecting price/quantity at both ends.
                 "barcode": item["source_barcode"] or item["barcode"], "barcode_type": item["barcode_type"],
             } for item in lines],
         }
+        # ERP ตรวจบิลจากราคาตั้ง แล้วยอมให้ลดได้เท่ายอดส่วนลดที่ระบุพร้อมชื่อผู้อนุมัติ
+        # ไม่ส่งตรงนี้ ERP จะเห็นแค่ราคาเต็ม บิลที่ลดราคาจะถูกปฏิเสธหรือยอดขายเกินจริง
+        adjustment = sum((line_adjustment(item) for item in lines), Decimal("0"))
+        if adjustment > 0:
+            payload["manual_discount_amount"] = str(money(adjustment))
+            payload["discount_amount"] = str(money(adjustment))
+            payload["discount_approved_by"] = sale["adjustment_approved_by"] or "ไม่ระบุ"
         try:
             response = self.api.post("/api/pos/checkout", payload, idempotency_key=sale_uuid)
         except Exception as error:
@@ -341,6 +372,24 @@ class SyncService:
 
     def _failed(self, sale_uuid: str, message: str) -> None:
         with self.db:
-            self.db.execute("UPDATE sync_outbox SET status = 'failed', attempts = attempts + 1, last_error = ? WHERE aggregate_uuid = ?", (message[:1000], sale_uuid))
+            self._schedule_retry(sale_uuid, message)
             self.db.execute("INSERT INTO sync_logs (direction, status, message, created_at) VALUES ('up', 'failed', ?, ?)", (f"sale {sale_uuid}: {message}"[:1000], now()))
         raise RuntimeError(message)
+
+
+def _listed(item: sqlite3.Row) -> Decimal:
+    value = item["list_price"] if "list_price" in item.keys() else None
+    return Decimal(value) if value not in (None, "") else Decimal(item["unit_price"])
+
+
+def line_adjustment(item: sqlite3.Row) -> Decimal:
+    qty = Decimal(item["qty"])
+    return money(qty * _listed(item)) - Decimal(item["line_total"])
+
+
+def net_unit_price(item: sqlite3.Row) -> str:
+    """ราคาต่อหน่วยหลังหักส่วนลดท้ายบรรทัด ให้ qty x ราคา ได้เท่ายอดที่เก็บเงินจริง"""
+    qty = Decimal(item["qty"])
+    if Decimal(item["discount"] or "0") == 0 or qty == 0:
+        return str(item["unit_price"])
+    return str((Decimal(item["line_total"]) / qty).quantize(Decimal("0.00000001")))

@@ -70,10 +70,12 @@ class SaleConditionsTest(unittest.TestCase):
             discount=Decimal(discount), barcode=barcode, source_barcode=barcode, barcode_type=barcode_type,
         )
 
-    def sell(self, document_no: str, lines: list[CartLine], paid: str, method: str = "cash") -> int:
+    def sell(self, document_no: str, lines: list[CartLine], paid: str, method: str = "cash",
+             approver: str | None = "ผู้จัดการทดสอบ") -> int:
         return self.pos.checkout(
             document_no=document_no, branch_id=1, terminal_id="TILL-1", shift_id=self.shift_id,
             cashier_id=1, lines=lines, payment_method=method, paid_amount=Decimal(paid),
+            adjustment_approved_by=approver,
         )
 
     # ---------- เงื่อนไขที่ต้องขายได้ ----------
@@ -106,6 +108,29 @@ class SaleConditionsTest(unittest.TestCase):
         self.assertEqual(Decimal(sale["subtotal"]), Decimal("100.00"))
         self.assertEqual(Decimal(sale["discount_total"]), Decimal("20.00"))
         self.assertEqual(Decimal(sale["grand_total"]), Decimal("80.00"))
+
+    def test_a_discount_without_an_approver_is_refused_before_taking_money(self) -> None:
+        with self.assertRaisesRegex(ValueError, "ผู้อนุมัติ"):
+            self.sell("B-010", [self.line(1, "4", "25", "8850000000003", "EAN13_STANDARD", discount="20")], "80", approver=None)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM sales").fetchone()[0], 0)
+
+    def test_a_lowered_price_counts_as_a_discount_that_needs_approval(self) -> None:
+        line = CartLine(product_id=1, qty=Decimal("2"), unit_price=Decimal("20"), list_price=Decimal("25"))
+        with self.assertRaisesRegex(ValueError, "ผู้อนุมัติ"):
+            self.sell("B-011", [line], "40", approver=None)
+        sale_id = self.sell("B-012", [line], "40")
+        sale = self.db.execute("SELECT grand_total, adjustment_approved_by FROM sales WHERE id = ?", (sale_id,)).fetchone()
+        self.assertEqual(Decimal(sale["grand_total"]), Decimal("40.00"))
+        self.assertEqual(sale["adjustment_approved_by"], "ผู้จัดการทดสอบ")
+
+    def test_raising_a_price_above_the_list_price_is_refused(self) -> None:
+        line = CartLine(product_id=1, qty=Decimal("1"), unit_price=Decimal("30"), list_price=Decimal("25"))
+        with self.assertRaisesRegex(ValueError, "ขึ้นราคาเกินราคาตั้ง"):
+            self.sell("B-013", [line], "30")
+
+    def test_a_negative_quantity_is_refused_because_erp_rejects_it(self) -> None:
+        with self.assertRaisesRegex(ValueError, "ใบรับคืน"):
+            self.sell("B-014", [self.line(1, "-1", "25", "8850000000003", "EAN13_STANDARD")], "0")
 
     def test_a_scale_label_sells_by_the_price_printed_on_it(self) -> None:
         line = scale_cart_line(self.db, label("800123", "012550"))

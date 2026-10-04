@@ -120,12 +120,38 @@ class OrderTest(unittest.TestCase):
 
         self.assertEqual(self.order.lines, [])
 
-    def test_sign_toggle_turns_a_line_into_a_return(self) -> None:
+    def test_sign_toggle_cannot_make_a_negative_line(self) -> None:
+        # ERP ไม่รับบิลขายติดลบ บรรทัดติดลบจะทำให้บิลค้างส่งไม่ขึ้นตลอดไป
         self.order.add_product(line(qty="2"))
         self.order.press("3")
         self.order.press("+/-")
 
-        self.assertEqual(self.order.lines[0].qty, Decimal("-3"))
+        self.assertEqual(self.order.lines[0].qty, Decimal("3"))
+
+    def test_a_scale_line_keeps_its_label_price_and_takes_no_discount(self) -> None:
+        self.order.add_product(line(qty="0.5", locked_qty=True))
+        self.order.set_mode("price")
+        self.order.press("1")
+        self.order.set_mode("discount")
+        self.order.press("5")
+
+        self.assertEqual(self.order.lines[0].unit_price, self.order.lines[0].list_price)
+        self.assertEqual(self.order.lines[0].discount, Decimal("0"))
+
+    def test_adjustment_total_counts_lowered_prices_and_line_discounts(self) -> None:
+        self.order.add_product(line(qty="2", price="50"))
+        self.order.set_mode("price")
+        self.order.press("4")
+        self.order.press("0")
+        self.order.set_mode("discount")
+        self.order.press("5")
+
+        self.assertEqual(self.order.adjustment_total(), Decimal("25.00"))   # 100 - (80 - 5)
+
+    def test_clearing_the_bill_drops_the_approval(self) -> None:
+        self.order.adjustment_approved_by = "ผู้จัดการ"
+        self.order.clear()
+        self.assertIsNone(self.order.adjustment_approved_by)
 
     def test_removing_the_selected_line_moves_the_selection(self) -> None:
         self.order.add_product(line(product_id=1))

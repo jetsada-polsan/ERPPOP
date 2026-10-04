@@ -35,6 +35,12 @@ class OrderLine:
     price_version: str | None = None
     # ป้ายเครื่องชั่งหนึ่งใบคือของหนึ่งถุง แก้จำนวนทีหลังไม่ได้เพราะน้ำหนักมาจากป้าย
     locked_qty: bool = False
+    # ราคาตั้งตอนหยิบสินค้า ERP ตรวจบิลจากราคานี้ ส่วนต่างจากราคาที่แก้คือส่วนลดที่ต้องมีคนอนุมัติ
+    list_price: Decimal | None = None
+
+    def __post_init__(self) -> None:
+        if self.list_price is None:
+            self.list_price = self.unit_price
 
     @property
     def total(self) -> Decimal:
@@ -47,6 +53,8 @@ class Order:
     selected_index: int | None = None
     mode: str = QTY
     _entry: str = ""
+    # คนที่อนุมัติให้แก้ราคา/ให้ส่วนลดในบิลนี้ — ล้างทุกครั้งที่เริ่มบิลใหม่
+    adjustment_approved_by: str | None = None
 
     # ---------- การเพิ่มสินค้า ----------
 
@@ -86,6 +94,8 @@ class Order:
 
     def clear(self) -> None:
         self.lines = []
+        self.adjustment_approved_by = None
+        self.mode = QTY
         self.select(None)
 
     # ---------- numpad ----------
@@ -108,8 +118,7 @@ class Order:
             return
 
         if key == "+/-":
-            self._entry = self._entry[1:] if self._entry.startswith("-") else "-" + (self._entry or "0")
-            self._apply(line, self._entry)
+            # ยอดติดลบ ERP ไม่รับ (ดู _apply) จึงไม่มีปุ่มสลับเครื่องหมายแล้ว
             return
 
         if key == "." and "." in self._entry:
@@ -125,12 +134,19 @@ class Order:
             value = Decimal(raw or "0")
         except InvalidOperation:
             return
+        if value < 0:
+            # ERP รับเฉพาะบิลขายที่ยอดเป็นบวก บรรทัดติดลบจะทำให้บิลส่งไม่ขึ้นตลอดไป
+            # การคืนสินค้าต้องทำเป็นใบรับคืนแยก ไม่ใช่บิลขายติดลบ
+            return
 
         if self.mode == QTY:
             if line.locked_qty:
                 # แก้จำนวนของป้ายชั่งไม่ได้ น้ำหนักมาจากป้ายที่พิมพ์มาแล้ว
                 return
             line.qty = value
+        elif line.locked_qty:
+            # ERP คิดราคาป้ายชั่งใหม่จากป้ายเอง ราคาหรือส่วนลดที่แก้ในเครื่องจะไม่ตรงกับ ERP
+            return
         elif self.mode == PRICE:
             line.unit_price = value
         else:
@@ -155,6 +171,11 @@ class Order:
         vatable = sum((line.total for line in self.lines if line.is_vat), Decimal("0"))
         return vat_from_inclusive(money(vatable), rate)
 
+    def adjustment_total(self) -> Decimal:
+        """ส่วนลดทั้งหมดที่คนกดเอง (ลดราคา + ส่วนลดท้ายบรรทัด) เทียบกับราคาตั้ง"""
+        listed = money(sum((money(line.qty * line.list_price) for line in self.lines), Decimal("0")))
+        return money(listed - self.grand_total())
+
     def change_for(self, paid: Decimal) -> Decimal:
         return money(max(Decimal("0"), money(paid) - self.grand_total()))
 
@@ -163,7 +184,7 @@ class Order:
             CartLine(
                 product_id=line.product_id, qty=line.qty, unit_price=line.unit_price,
                 discount=line.discount, barcode=line.barcode, source_barcode=line.source_barcode,
-                barcode_type=line.barcode_type, price_version=line.price_version,
+                barcode_type=line.barcode_type, price_version=line.price_version, list_price=line.list_price,
             )
             for line in self.lines
         ]

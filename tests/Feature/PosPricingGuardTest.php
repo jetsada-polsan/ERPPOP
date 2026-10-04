@@ -105,6 +105,53 @@ class PosPricingGuardTest extends TestCase
         app(PosPricingGuard::class)->validate($payload, $user);
     }
 
+    public function test_a_discount_approved_at_the_counter_is_recorded_instead_of_rejected(): void
+    {
+        // เงินถูกเก็บจากลูกค้าไปแล้วตอนบิลจากเครื่อง POS มาถึง ปฏิเสธไม่ได้ ต้องบันทึกตามพร้อมผู้อนุมัติ
+        [$user, $branch, $product] = $this->masters();
+        $payload = $this->payload($branch, $product, 90);
+        $payload['manual_discount_amount'] = 10;
+
+        $this->assertSame(90.0, app(PosPricingGuard::class)->validate($payload, $user, 'ผู้จัดการ ก'));
+    }
+
+    public function test_a_counter_approval_still_cannot_hide_an_unreported_discount(): void
+    {
+        // อนุมัติแล้วก็ต้องแจ้งยอดส่วนลดให้ตรง ราคาที่ลดเกินยอดที่แจ้งยังถูกปฏิเสธ
+        [$user, $branch, $product] = $this->masters();
+        $payload = $this->payload($branch, $product, 80);
+        $payload['manual_discount_amount'] = 10;
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('ราคาหรือส่วนลดเปลี่ยน');
+        app(PosPricingGuard::class)->validate($payload, $user, 'ผู้จัดการ ก');
+    }
+
+    public function test_a_counter_approved_discount_may_go_below_margin(): void
+    {
+        [$user, $branch, $product] = $this->masters();
+        $product->update(['average_cost' => 80, 'minimum_margin_percent' => 20, 'margin_control_policy' => 'block']);
+        $payload = $this->payload($branch, $product, 85);
+        $payload['manual_discount_amount'] = 15;
+
+        $this->assertSame(85.0, app(PosPricingGuard::class)->validate($payload, $user, 'ผู้จัดการ ก'));
+    }
+
+    public function test_a_product_priced_only_per_unit_uses_its_smallest_unit_like_the_pos_catalog(): void
+    {
+        // ตับหมูบนระบบจริง: ไม่มีราคาหน่วยฐาน มีแต่ราคา 2 หน่วย เครื่อง POS ได้ราคาหน่วยเล็กสุด
+        // เดิมตัวตรวจหยิบแถวแรกที่เจอ ราคาไม่ตรงกัน บิลถูกปฏิเสธซ้ำ 842 ครั้ง
+        [$user, $branch, $product] = $this->masters();
+        $kilo = ProductUnit::create(['code' => 'KG', 'name' => 'กก.', 'qty_per_base_unit' => 10]);
+        $small = ProductUnit::create(['code' => 'HG', 'name' => 'ขีด', 'qty_per_base_unit' => 1]);
+        ProductPrice::where('product_id', $product->id)->delete();
+        $table = PriceTable::where('is_default', true)->first();
+        ProductPrice::create(['product_id' => $product->id, 'price_table_id' => $table->id, 'unit_id' => $kilo->id, 'price' => 79, 'is_active' => true]);
+        ProductPrice::create(['product_id' => $product->id, 'price_table_id' => $table->id, 'unit_id' => $small->id, 'price' => 10, 'is_active' => true]);
+
+        $this->assertSame(10.0, app(PosPricingGuard::class)->validate($this->payload($branch, $product, 10), $user));
+    }
+
     public function test_verified_pack_barcode_is_normalized_to_base_stock_units(): void
     {
         [$user, $branch, $product] = $this->masters();

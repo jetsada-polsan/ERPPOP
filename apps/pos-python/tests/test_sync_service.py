@@ -92,6 +92,53 @@ class SyncServiceTest(unittest.TestCase):
         self.assertTrue(payload["payment_confirmed"])
         self.assertEqual(payload["payment_ref"], "QR-HQ")
 
+    def test_a_discounted_bill_reaches_erp_at_the_price_actually_paid(self) -> None:
+        # ลด 20 บาทจาก 4 x 25 ลูกค้าจ่าย 80 — เดิมส่งขึ้น ERP เป็นราคาเต็ม 100 ไม่มีส่วนลด
+        self.pos.checkout(document_no="PY-0002", branch_id=1, terminal_id="HQ-01", shift_id=self.shift_id, cashier_id=77,
+            lines=[CartLine(1, Decimal("4"), Decimal("25"), discount=Decimal("20"))],
+            payment_method="cash", paid_amount=Decimal("80"), sale_uuid="sale-discount", adjustment_approved_by="ผู้จัดการ ก")
+        self.pos.bind_server_shift(self.shift_id, 500)
+        api = FakeApi()
+        SyncService(self.db, api).sync_sale("sale-discount")
+        payload = api.calls[0][1]
+        item = payload["items"][0]
+        self.assertEqual(Decimal(item["qty"]) * Decimal(item["unit_price"]), Decimal("80"))
+        self.assertEqual(payload["manual_discount_amount"], "20.00")
+        self.assertEqual(payload["discount_approved_by"], "ผู้จัดการ ก")
+        self.assertEqual(payload["cash_received"], "80.00")
+
+    def test_a_lowered_price_is_sent_with_its_discount_from_the_list_price(self) -> None:
+        self.pos.checkout(document_no="PY-0003", branch_id=1, terminal_id="HQ-01", shift_id=self.shift_id, cashier_id=77,
+            lines=[CartLine(1, Decimal("3"), Decimal("20"), list_price=Decimal("25"))],
+            payment_method="cash", paid_amount=Decimal("60"), sale_uuid="sale-lowered", adjustment_approved_by="ผู้จัดการ ก")
+        self.pos.bind_server_shift(self.shift_id, 500)
+        api = FakeApi()
+        SyncService(self.db, api).sync_sale("sale-lowered")
+        payload = api.calls[0][1]
+        self.assertEqual(payload["items"][0]["unit_price"], "20")
+        self.assertEqual(payload["manual_discount_amount"], "15.00")
+
+    def test_a_full_price_bill_sends_no_discount_fields(self) -> None:
+        sale_uuid = self.sale()
+        self.pos.bind_server_shift(self.shift_id, 500)
+        api = FakeApi()
+        SyncService(self.db, api).sync_sale(sale_uuid)
+        self.assertNotIn("manual_discount_amount", api.calls[0][1])
+
+    def test_a_rejected_bill_waits_longer_after_each_failure(self) -> None:
+        from datetime import datetime
+        sale_uuid = self.sale()
+        self.pos.bind_server_shift(self.shift_id, 500)
+        sync = SyncService(self.db, FakeApi({"success": False, "message": "ราคาไม่ตรง"}))
+        waits = []
+        for _ in range(3):
+            self.db.execute("UPDATE sync_outbox SET next_attempt_at = NULL WHERE aggregate_uuid = ?", (sale_uuid,))
+            sync.sync_pending_sales()
+            row = self.db.execute("SELECT next_attempt_at FROM sync_outbox WHERE aggregate_uuid = ?", (sale_uuid,)).fetchone()
+            waits.append((datetime.fromisoformat(row["next_attempt_at"]) - datetime.now().astimezone()).total_seconds())
+        self.assertTrue(waits[0] < waits[1] < waits[2], waits)
+        self.assertLessEqual(max(waits), 15 * 60 + 5)
+
     def test_retries_failed_queue_without_creating_new_local_sale(self) -> None:
         sale_uuid = self.sale()
         self.pos.bind_server_shift(self.shift_id, 500)
@@ -99,6 +146,9 @@ class SyncServiceTest(unittest.TestCase):
         sync = SyncService(self.db, api)
         self.assertEqual(sync.sync_pending_sales(), {"synced": 0, "failed": 1})
         api.response = {"success": True, "receipt_no": "PS-HQ-000002"}
+        # บิลที่เพิ่งส่งไม่ผ่านต้องรอก่อน ไม่ยิงซ้ำทันที
+        self.assertEqual(sync.sync_pending_sales(), {"synced": 0, "failed": 0})
+        self.db.execute("UPDATE sync_outbox SET next_attempt_at = '2000-01-01T00:00:00+00:00'")
         self.assertEqual(sync.sync_pending_sales(), {"synced": 1, "failed": 0})
         self.assertEqual(self.db.execute("SELECT count(*) FROM sales").fetchone()[0], 1)
 
