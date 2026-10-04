@@ -150,6 +150,48 @@ class SalesAdjustmentLedgerTest extends TestCase
         }
     }
 
+    public function test_a_bounced_cheque_reopens_the_debt_and_reverses_the_bank_entry(): void
+    {
+        $sale = $this->document('CREDIT_SALE', 'CR-010', [[$this->freshProduct, 3, 100]]);
+        $item = \App\Models\CustomerOpenItem::create([
+            'customer_id' => $this->customer->id, 'document_id' => $sale->id,
+            'gross_amount' => 300, 'net_amount' => 300, 'balance_amount' => 300, 'paid_amount' => 0,
+            'due_date' => now()->addDays(30)->toDateString(), 'status' => \App\Models\CustomerOpenItem::STATUS_OPEN,
+        ]);
+        $service = app(\App\Services\Sales\CustomerPaymentService::class);
+        $receipt = $service->create([
+            'customer_id' => $this->customer->id, 'branch_id' => $this->branch->id, 'method' => 'cheque',
+            'cheque_no' => 'CHQ-77', 'cheque_due_date' => now()->toDateString(),
+            'allocations' => [['customer_open_item_id' => $item->id, 'amount' => 300]],
+        ]);
+        $this->assertSame(\App\Models\CustomerOpenItem::STATUS_PAID, $item->fresh()->status);
+        $cheque = \App\Models\Cheque::where('cheque_no', 'CHQ-77')->firstOrFail();
+
+        $service->bounceCheque($cheque, 'บัญชีปิด');
+        try {
+            $service->bounceCheque($cheque->fresh(), 'กดซ้ำ');
+            $this->fail('เช็คที่เด้งไปแล้วต้องกดเด้งซ้ำไม่ได้');
+        } catch (RuntimeException) {
+            // กดซ้ำถูกปฏิเสธ จึงไม่กลับรายการซ้ำ
+        }
+
+        $item->refresh();
+        $this->assertSame(300.0, (float) $item->balance_amount);
+        $this->assertSame(0.0, (float) $item->paid_amount);
+        $this->assertSame(\App\Models\CustomerOpenItem::STATUS_OPEN, $item->status);
+        $this->assertSame('bounced', $cheque->fresh()->status);
+        $this->assertSame('void', $receipt->fresh()->status);
+
+        $payment = PaymentDocument::where('document_id', $receipt->id)->firstOrFail();
+        $bank = ChartOfAccount::where('default_role', ChartOfAccount::ROLE_BANK)->value('id');
+        $ar = ChartOfAccount::where('default_role', ChartOfAccount::ROLE_AR)->value('id');
+        $net = fn (int $account) => round((float) GlJournal::where('payment_document_id', $payment->id)->where('account_id', $account)->sum('debit')
+            - (float) GlJournal::where('payment_document_id', $payment->id)->where('account_id', $account)->sum('credit'), 2);
+        $this->assertSame(0.0, $net($bank), 'เงินที่ไม่เคยได้ต้องออกจากบัญชีธนาคาร');
+        $this->assertSame(0.0, $net($ar), 'ลูกหนี้ต้องกลับมาเท่าเดิม');
+        $this->assertSame(4, GlJournal::where('payment_document_id', $payment->id)->count());
+    }
+
     public function test_depreciation_is_posted_to_the_ledger_and_balances(): void
     {
         $asset = FixedAsset::create([

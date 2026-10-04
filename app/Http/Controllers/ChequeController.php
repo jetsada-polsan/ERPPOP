@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\BankAccount;
 use App\Models\Branch;
 use App\Models\Cheque;
+use App\Services\Sales\CustomerPaymentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -109,16 +110,19 @@ class ChequeController extends Controller
     }
 
     // เช็ครับคืน/เด้ง - ต้องกลับไปตามหนี้ลูกค้าต่อ
-    public function bounce(Request $request, Cheque $cheque): RedirectResponse
+    public function bounce(Request $request, Cheque $cheque, CustomerPaymentService $payments): RedirectResponse
     {
         abort_unless($cheque->direction === 'in' && ! $cheque->isFinal(), 422, 'สถานะเช็คไม่ถูกต้อง');
 
-        $cheque->update([
-            'status' => 'bounced',
-            'remark' => trim(($cheque->remark ? $cheque->remark.' | ' : '').'เช็คคืน '.now()->thaiDate().($request->input('reason') ? ': '.$request->input('reason') : '')),
-        ]);
+        try {
+            $payments->bounceCheque($cheque, $request->input('reason'));
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
 
-        return back()->with('success', "บันทึกเช็คคืน {$cheque->cheque_no} แล้ว — อย่าลืมติดตามหนี้จากลูกค้าต่อ");
+        return back()->with('success', $cheque->payment_document_id
+            ? "บันทึกเช็คคืน {$cheque->cheque_no} แล้ว — คืนยอดค้างให้ลูกค้าและกลับรายการบัญชีให้แล้ว"
+            : "บันทึกเช็คคืน {$cheque->cheque_no} แล้ว — อย่าลืมติดตามหนี้จากลูกค้าต่อ");
     }
 
     public function cancel(Cheque $cheque): RedirectResponse

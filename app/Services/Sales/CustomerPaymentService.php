@@ -2,6 +2,7 @@
 
 namespace App\Services\Sales;
 
+use App\Models\Cheque;
 use App\Models\CustomerOpenItem;
 use App\Models\Document;
 use App\Models\DocumentType;
@@ -125,6 +126,57 @@ class CustomerPaymentService
             }
 
             return $document->fresh();
+        });
+    }
+
+    /**
+     * เช็ครับเด้ง: เดิมแค่เปลี่ยนสถานะเช็ค หนี้ของลูกค้ายังเป็น "จ่ายแล้ว" และบัญชีธนาคาร
+     * ยังนับเงินที่ไม่เคยได้ ตอนนี้คืนยอดค้างให้ทุกบิลที่เช็คใบนี้เคยตัด กลับรายการบัญชี
+     * และปิดใบเสร็จนั้น ส่วนเช็คที่ลงทะเบียนเองโดยไม่ผูกใบเสร็จ เปลี่ยนแค่สถานะเหมือนเดิม
+     */
+    public function bounceCheque(Cheque $cheque, ?string $reason = null): Cheque
+    {
+        return DB::transaction(function () use ($cheque, $reason): Cheque {
+            $locked = Cheque::whereKey($cheque->id)->lockForUpdate()->firstOrFail();
+            if ($locked->direction !== 'in' || $locked->isFinal()) {
+                throw new RuntimeException('สถานะเช็คไม่ถูกต้อง');
+            }
+            $note = 'เช็คคืน '.now()->thaiDate().($reason ? ': '.$reason : '');
+            $locked->update([
+                'status' => 'bounced',
+                'remark' => trim(($locked->remark ? $locked->remark.' | ' : '').$note),
+            ]);
+
+            $payment = $locked->payment_document_id
+                ? PaymentDocument::whereKey($locked->payment_document_id)->lockForUpdate()->first()
+                : null;
+            if (! $payment || $payment->status === 'bounced') {
+                return $locked->fresh();
+            }
+
+            foreach (PaymentAllocation::where('payment_document_id', $payment->id)->get() as $allocation) {
+                $item = CustomerOpenItem::whereKey($allocation->customer_open_item_id)->lockForUpdate()->first();
+                if (! $item) {
+                    continue;
+                }
+                $amount = (float) $allocation->allocated_amount;
+                $paid = max(0, round((float) $item->paid_amount - $amount, 4));
+                $item->update([
+                    'paid_amount' => $paid,
+                    'balance_amount' => round((float) $item->balance_amount + $amount, 4),
+                    'status' => $paid <= 0.01 ? CustomerOpenItem::STATUS_OPEN : CustomerOpenItem::STATUS_PARTIAL,
+                ]);
+            }
+
+            $receipt = $payment->document;
+            $this->glPosting->reverseCustomerReceipt($payment, ($receipt?->doc_number ?? 'เช็ค '.$locked->cheque_no).' เช็ค '.$locked->cheque_no);
+            $payment->update(['status' => 'bounced']);
+            $receipt?->update([
+                'status' => 'void',
+                'remark' => trim(($receipt->remark ? $receipt->remark.' | ' : '').$note.' เช็ค '.$locked->cheque_no),
+            ]);
+
+            return $locked->fresh();
         });
     }
 }

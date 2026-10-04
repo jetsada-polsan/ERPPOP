@@ -49,6 +49,30 @@ class GlPostingService
         ]);
     }
 
+    /**
+     * เช็ครับเด้ง: กลับรายการรับชำระของใบนั้นทั้งชุด (Dr ลูกหนี้ / Cr ธนาคาร) ลงวันที่เช็คเด้ง
+     * ไม่ลบรายการเดิม ประวัติว่าเคยรับและเคยเด้งต้องตรวจย้อนได้ เรียกซ้ำก็ไม่กลับซ้ำ
+     */
+    public function reverseCustomerReceipt(PaymentDocument $paymentDocument, string $remark): void
+    {
+        $lines = GlJournal::where('payment_document_id', $paymentDocument->id)
+            ->where('remark', 'not like', 'เช็คคืน:%')->get();
+        if ($lines->isEmpty() || GlJournal::where('payment_document_id', $paymentDocument->id)
+            ->where('remark', 'like', 'เช็คคืน:%')->exists()) {
+            return;
+        }
+        foreach ($lines as $line) {
+            GlJournal::create([
+                'payment_document_id' => $paymentDocument->id,
+                'account_id' => $line->account_id,
+                'debit' => (float) $line->credit,
+                'credit' => (float) $line->debit,
+                'remark' => 'เช็คคืน: '.$remark,
+                'entry_date' => now()->toDateString(),
+            ]);
+        }
+    }
+
     public function postSupplierPayment(PaymentDocument $paymentDocument, float $amount, string $entryDate, string $remark, float $withholding = 0, string $method = 'cash'): void
     {
         $cashAccount = ChartOfAccount::where('default_role', $method === 'cash' ? ChartOfAccount::ROLE_CASH : ChartOfAccount::ROLE_BANK)->first();
