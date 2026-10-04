@@ -20,12 +20,15 @@ use RuntimeException;
  */
 class GlPostingService
 {
-    public function postCustomerReceipt(PaymentDocument $paymentDocument, float $amount, string $entryDate, string $remark): void
+    public function postCustomerReceipt(PaymentDocument $paymentDocument, float $amount, string $entryDate, string $remark, string $method = 'cash'): void
     {
-        $cashAccount = ChartOfAccount::where('default_role', ChartOfAccount::ROLE_CASH)->first();
+        // รับโอน/เช็คไม่ได้เข้าลิ้นชัก — เดิมลงเงินสดทุกวิธี ยอดเงินสดในบัญชีเกินจริง ยอดธนาคารขาด
+        $cashAccount = ChartOfAccount::where('default_role', $method === 'cash' ? ChartOfAccount::ROLE_CASH : ChartOfAccount::ROLE_BANK)->first();
         $arAccount = ChartOfAccount::where('default_role', ChartOfAccount::ROLE_AR)->first();
         if (! $cashAccount || ! $arAccount) {
-            throw new RuntimeException('ผังบัญชีเงินสดหรือลูกหนี้ยังไม่ครบ ไม่สามารถรับชำระโดยไม่ลง GL ได้');
+            throw new RuntimeException($method === 'cash'
+                ? 'ผังบัญชีเงินสดหรือลูกหนี้ยังไม่ครบ ไม่สามารถรับชำระโดยไม่ลง GL ได้'
+                : 'ผังบัญชีธนาคารหรือลูกหนี้ยังไม่ครบ ไม่สามารถรับชำระด้วยโอน/เช็คโดยไม่ลง GL ได้');
         }
 
         GlJournal::create([
@@ -340,13 +343,17 @@ class GlPostingService
 
     // รับคืนสินค้า: Dr รับคืน + ภาษีขาย(กลับ) / Cr ลูกหนี้ (ขายเชื่อ) หรือเงินสด
     // (ขายสด) + กลับต้นทุนขาย (สินค้ากลับเข้าคลัง). $againstAr = คืนที่ลดลูกหนี้
+    // VAT แยกรายสินค้าแบบเดียวกับตอนขาย สินค้ายกเว้น VAT (ของสด) ไม่กลับภาษีขาย
+    // และเก็บยอดไว้ในเอกสารให้รายงานภาษีขายหักยอดรับคืนได้
     public function postSaleReturn(Document $document, bool $againstAr = true, string $refundMethod = 'cash'): void
     {
         $total = (float) $document->total_amount;
-        $base = round($total * 100 / (100 + $this->vatRate()), 2);
+        $amounts = $this->salesBreakdown($document);
+        $vat = round($total - $amounts['subtotal'], 2);
+        $document->update(['subtotal_amount' => $amounts['subtotal'], 'vat_amount' => $vat]);
         $this->postDocument($document, [
-            ['role' => ChartOfAccount::ROLE_SALES_RETURN, 'debit' => $base],
-            ['role' => ChartOfAccount::ROLE_VAT_OUTPUT, 'debit' => round($total - $base, 2)],
+            ['role' => ChartOfAccount::ROLE_SALES_RETURN, 'debit' => $amounts['subtotal']],
+            ['role' => ChartOfAccount::ROLE_VAT_OUTPUT, 'debit' => $vat],
             ['role' => $againstAr ? ChartOfAccount::ROLE_AR : ($refundMethod === 'transfer' ? ChartOfAccount::ROLE_BANK : ChartOfAccount::ROLE_CASH), 'credit' => $total],
         ], 'รับคืนสินค้า '.$document->doc_number);
         $this->appendCogs($document, $document->doc_number, reverse: true);
@@ -356,10 +363,10 @@ class GlPostingService
     public function postCreditNote(Document $document): void
     {
         $total = (float) $document->total_amount;
-        $base = round($total * 100 / (100 + $this->vatRate()), 2);
+        ['base' => $base, 'vat' => $vat] = $this->noteBreakdown($document);
         $this->postDocument($document, [
             ['role' => ChartOfAccount::ROLE_SALES_RETURN, 'debit' => $base],
-            ['role' => ChartOfAccount::ROLE_VAT_OUTPUT, 'debit' => round($total - $base, 2)],
+            ['role' => ChartOfAccount::ROLE_VAT_OUTPUT, 'debit' => $vat],
             ['role' => ChartOfAccount::ROLE_AR, 'credit' => $total],
         ], 'ใบลดหนี้ '.$document->doc_number);
     }
@@ -368,11 +375,66 @@ class GlPostingService
     public function postDebitNote(Document $document): void
     {
         $total = (float) $document->total_amount;
-        $base = round($total * 100 / (100 + $this->vatRate()), 2);
+        ['base' => $base, 'vat' => $vat] = $this->noteBreakdown($document);
         $this->postDocument($document, [
             ['role' => ChartOfAccount::ROLE_AR, 'debit' => $total],
             ['role' => ChartOfAccount::ROLE_SALES_REVENUE, 'credit' => $base],
-            ['role' => ChartOfAccount::ROLE_VAT_OUTPUT, 'credit' => round($total - $base, 2)],
+            ['role' => ChartOfAccount::ROLE_VAT_OUTPUT, 'credit' => $vat],
         ], 'ใบเพิ่มหนี้ '.$document->doc_number);
+    }
+
+    /**
+     * ใบลด/เพิ่มหนี้ไม่มีรายการสินค้า จึงแยก VAT ตามสัดส่วน VAT ของใบขายที่อ้างอิง
+     * (ใบขายของสดล้วน = ไม่มี VAT ให้ปรับ) ไม่มีใบอ้างอิงจึงใช้อัตรามาตรฐาน
+     * แล้วเก็บยอดลงเอกสาร — เดิมไม่เก็บ รายงานภาษีขายจึงไม่นับเอกสารพวกนี้เลย
+     *
+     * @return array{base:float,vat:float}
+     */
+    private function noteBreakdown(Document $document): array
+    {
+        $total = round((float) $document->total_amount, 2);
+        $source = $document->reference
+            ? Document::where('doc_number', $document->reference)->where('id', '!=', $document->id)->first()
+            : null;
+
+        if ($source && (float) $source->total_amount > 0) {
+            if ($source->subtotal_amount === null && (float) $source->vat_amount == 0.0) {
+                // ใบขายเก่าที่ยังไม่เคยแยก VAT ไว้ — คำนวณจากรายการสินค้าของใบนั้น
+                $breakdown = $this->salesBreakdown($source);
+                $source->update(['subtotal_amount' => $breakdown['subtotal'], 'vat_amount' => $breakdown['vat']]);
+            }
+            $vat = round($total * (float) $source->vat_amount / (float) $source->total_amount, 2);
+        } else {
+            $rate = $this->vatRate();
+            $vat = $rate > 0 ? round($total - round($total * 100 / (100 + $rate), 2), 2) : 0.0;
+        }
+        $base = round($total - $vat, 2);
+        $document->update(['subtotal_amount' => $base, 'vat_amount' => $vat]);
+
+        return ['base' => $base, 'vat' => $vat];
+    }
+
+    /**
+     * ค่าเสื่อมราคารายเดือน: Dr ค่าเสื่อมราคา / Cr ค่าเสื่อมราคาสะสม
+     * เดิมคิดแค่ในทะเบียนทรัพย์สิน ไม่ลงบัญชี งบกำไรขาดทุนจึงไม่มีค่าเสื่อม
+     * และมูลค่าทรัพย์สินในงบดุลสูงเกินจริง
+     */
+    public function postDepreciation(string $assetCode, float $amount, string $periodEnd): void
+    {
+        $expense = $this->role(ChartOfAccount::ROLE_DEPRECIATION_EXPENSE);
+        $accumulated = $this->role(ChartOfAccount::ROLE_ACCUMULATED_DEPRECIATION);
+        if (! $expense || ! $accumulated) {
+            throw new RuntimeException('ยังไม่ได้ผูกบัญชีค่าเสื่อมราคาและค่าเสื่อมราคาสะสมในผังบัญชี คิดค่าเสื่อมโดยไม่ลงบัญชีไม่ได้');
+        }
+        $amount = round($amount, 2);
+        $remark = 'ค่าเสื่อมราคา '.$assetCode.' งวด '.substr($periodEnd, 0, 7);
+        GlJournal::create(['account_id' => $expense->id, 'debit' => $amount, 'credit' => 0, 'remark' => $remark, 'entry_date' => $periodEnd]);
+        GlJournal::create(['account_id' => $accumulated->id, 'debit' => 0, 'credit' => $amount, 'remark' => $remark, 'entry_date' => $periodEnd]);
+    }
+
+    public function depreciationAccountsReady(): bool
+    {
+        return $this->role(ChartOfAccount::ROLE_DEPRECIATION_EXPENSE) !== null
+            && $this->role(ChartOfAccount::ROLE_ACCUMULATED_DEPRECIATION) !== null;
     }
 }

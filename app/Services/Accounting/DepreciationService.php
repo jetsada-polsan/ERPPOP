@@ -6,6 +6,7 @@ use App\Models\DepreciationRecord;
 use App\Models\FixedAsset;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 /**
  * คิดค่าเสื่อมราคาแบบเส้นตรงรายเดือนสำหรับทรัพย์สินที่ยังใช้งาน กันคิดซ้ำงวดเดิม
@@ -13,6 +14,8 @@ use Illuminate\Support\Facades\DB;
  */
 class DepreciationService
 {
+    public function __construct(private readonly GlPostingService $glPosting) {}
+
     /**
      * คิดค่าเสื่อมให้ทุกทรัพย์สินที่ active สำหรับงวด (เดือน) ที่กำหนด
      *
@@ -21,6 +24,10 @@ class DepreciationService
     public function runForPeriod(Carbon $period): array
     {
         $periodEnd = $period->copy()->endOfMonth()->toDateString();
+        // ตรวจผังบัญชีก่อนเริ่ม ไม่ให้คิดไปครึ่งงวดแล้วค่อยพังกลางทาง
+        if (FixedAsset::where('status', 'active')->exists() && ! $this->glPosting->depreciationAccountsReady()) {
+            throw new RuntimeException('ยังไม่ได้ผูกบัญชีค่าเสื่อมราคาและค่าเสื่อมราคาสะสม — ตั้งที่ ผังบัญชี › บัญชีเริ่มต้น ก่อนคิดค่าเสื่อม');
+        }
         $posted = 0;
         $skipped = 0;
         $totalAmount = 0.0;
@@ -78,6 +85,7 @@ class DepreciationService
                 'book_value_after' => $bookValue,
             ]);
 
+            $this->glPosting->postDepreciation($asset->asset_code, (float) $amount, $periodEnd);
             $asset->update([
                 'accumulated_depreciation' => $newAccumulated,
                 'status' => $newAccumulated >= $asset->depreciableBase() - 0.01 ? 'fully_depreciated' : 'active',

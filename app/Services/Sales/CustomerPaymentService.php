@@ -118,7 +118,7 @@ class CustomerPaymentService
                 ]);
             }
 
-            $this->glPosting->postCustomerReceipt($paymentDocument, (float) $totalAmount, $document->doc_date->toDateString(), $document->doc_number);
+            $this->glPosting->postCustomerReceipt($paymentDocument, (float) $totalAmount, $document->doc_date->toDateString(), $document->doc_number, $data['method']);
 
             if ($data['method'] === 'cash') {
                 $this->cashBook->postCustomerPayment($document, (float) $totalAmount);

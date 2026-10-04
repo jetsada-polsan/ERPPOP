@@ -52,6 +52,12 @@ class ChartOfAccount extends Model
     /** บัญชีพักสำหรับยอดยกมาตอนตั้งต้นระบบ */
     public const ROLE_OPENING_BALANCE = 'opening_balance';
 
+    /** ค่าเสื่อมราคา (ค่าใช้จ่าย) ที่คิดรายเดือนจากทะเบียนทรัพย์สิน */
+    public const ROLE_DEPRECIATION_EXPENSE = 'depreciation_expense';
+
+    /** ค่าเสื่อมราคาสะสม (บัญชีปรับลดมูลค่าทรัพย์สิน) */
+    public const ROLE_ACCUMULATED_DEPRECIATION = 'accumulated_depreciation';
+
     public const ROLES = [
         self::ROLE_CASH => 'บัญชีเงินสด/รับจ่ายเริ่มต้น',
         self::ROLE_BANK => 'บัญชีเงินฝากธนาคารเริ่มต้น',
@@ -67,6 +73,8 @@ class ChartOfAccount extends Model
         self::ROLE_WHT_PAYABLE => 'บัญชีภาษีหัก ณ ที่จ่ายค้างจ่าย',
         self::ROLE_RETAINED_EARNINGS => 'บัญชีกำไรสะสม',
         self::ROLE_OPENING_BALANCE => 'บัญชีพักยอดยกมา',
+        self::ROLE_DEPRECIATION_EXPENSE => 'บัญชีค่าเสื่อมราคา',
+        self::ROLE_ACCUMULATED_DEPRECIATION => 'บัญชีค่าเสื่อมราคาสะสม',
     ];
 
     public function journalEntries(): HasMany
