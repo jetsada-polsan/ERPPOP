@@ -16,6 +16,8 @@ fi
 : "${REMOTE_PATH:=/var/www/jeterp}"
 : "${RUN_COMPOSER_INSTALL:=0}"
 : "${RUN_NPM_BUILD:=0}"
+# DRY_RUN=1 แสดงเฉพาะไฟล์ที่เนื้อหาจะเปลี่ยน/ถูกลบบนเครื่องจริง โดยไม่อัปอะไรเลย
+: "${DRY_RUN:=0}"
 
 if [[ -z "$SSH_HOST" || -z "$REMOTE_PATH" ]]; then
   echo "Missing SSH_HOST or REMOTE_PATH" >&2
@@ -29,6 +31,11 @@ fi
 
 echo "Deploying $(git rev-parse --short HEAD) to ${SSH_USER}@${SSH_HOST}:${REMOTE_PATH}"
 
+# ไฟล์ที่ไม่อยู่ใน git (สคริปต์ส่วนตัว ไฟล์ทดลอง) ห้ามหลุดขึ้นเครื่องจริง
+UNTRACKED_LIST="$(mktemp)"
+trap 'rm -f "$UNTRACKED_LIST"' EXIT
+git ls-files --others --exclude-standard | sed 's|^|/|' > "$UNTRACKED_LIST"
+
 SSH_OPTIONS=(-p "$SSH_PORT")
 RSYNC_RSH="ssh -p ${SSH_PORT}"
 if [[ -f "$SSH_IDENTITY_FILE" ]]; then
@@ -38,8 +45,20 @@ fi
 
 # --no-owner/--no-group: ห้ามยกเจ้าของไฟล์จากเครื่อง dev ขึ้นไป ครั้งหนึ่งเคยทำให้
 # bootstrap/cache เปลี่ยนเจ้าของเป็น uid ของ macOS แล้ว www-data เขียนไม่ได้ เว็บล่มทั้งระบบ
-rsync -az --delete --no-owner --no-group \
+RSYNC_MODE=(-az)
+if [[ "$DRY_RUN" == "1" ]]; then
+  RSYNC_MODE=(-azn -c --itemize-changes)
+fi
+
+# public/build ไม่อยู่ใน git — เครื่องจริงมีชุดที่ build ล่าสุดของตัวเอง ถ้าอัปจากเครื่อง dev
+# จะเอาหน้าเว็บ POS รุ่นที่ไม่รู้ที่มาไปทับ (เกือบเกิดจริง 2026-10-04) ให้ build บนเครื่องจริงด้วย RUN_NPM_BUILD=1
+# public/images: เครื่องจริงมีรูปที่อัปผ่านระบบ เช่น รูปโปรโมชันที่บอท LINE ส่ง — ห้าม --delete ลบทิ้ง
+rsync "${RSYNC_MODE[@]}" --delete --no-owner --no-group \
   -e "$RSYNC_RSH" \
+  --exclude-from="$UNTRACKED_LIST" \
+  --exclude='/public/build/' \
+  --filter='P /public/images/**' \
+  --exclude='__pycache__/' \
   --exclude='.git/' \
   --exclude='.env' \
   --exclude='.env.*' \
@@ -56,7 +75,13 @@ rsync -az --delete --no-owner --no-group \
   --exclude='public/downloads/' \
   --exclude='public/storage' \
   --exclude='storage/' \
-  ./ "${SSH_USER}@${SSH_HOST}:${REMOTE_PATH}/"
+  ./ "${SSH_USER}@${SSH_HOST}:${REMOTE_PATH}/" \
+  | { if [[ "$DRY_RUN" == "1" ]]; then grep -v '^\.[df]\.\.t\|^\.d' || true; else cat; fi; }
+
+if [[ "$DRY_RUN" == "1" ]]; then
+  echo "DRY_RUN=1: ไม่ได้อัปอะไรขึ้นเครื่องจริง"
+  exit 0
+fi
 
 ssh "${SSH_OPTIONS[@]}" "${SSH_USER}@${SSH_HOST}" \
   "cd '${REMOTE_PATH}' \
