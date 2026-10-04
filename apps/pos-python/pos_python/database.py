@@ -153,6 +153,21 @@ CREATE TABLE IF NOT EXISTS print_jobs (
     last_error TEXT,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS qty_promotions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id INTEGER,
+    name TEXT NOT NULL DEFAULT '',
+    promo_type TEXT NOT NULL,
+    product_id INTEGER NOT NULL,
+    min_qty TEXT NOT NULL,
+    free_product_id INTEGER,
+    free_qty TEXT NOT NULL DEFAULT '0',
+    discount_type TEXT,
+    discount_value TEXT NOT NULL DEFAULT '0',
+    bundle_price TEXT NOT NULL DEFAULT '0',
+    starts_date TEXT,
+    ends_date TEXT
+);
 CREATE TABLE IF NOT EXISTS sync_outbox (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     aggregate_type TEXT NOT NULL,
@@ -292,6 +307,8 @@ ADDED_COLUMNS: list[tuple[str, str, str]] = [
     # ราคาตั้ง + ผู้อนุมัติส่วนลด — ERP ตรวจบิลจากราคาตั้ง แล้วบันทึกส่วนลดแยกพร้อมชื่อคนอนุมัติ
     ("sale_items", "list_price", "TEXT"),
     ("sales", "adjustment_approved_by", "TEXT"),
+    # ส่วนลดจากโปรซื้อครบจำนวน แยกจากส่วนลดที่คนกด เพราะ ERP คิดเองไม่ต้องมีผู้อนุมัติ
+    ("sale_items", "promo_discount", "TEXT NOT NULL DEFAULT '0'"),
 ]
 
 # ยูนีคเฉพาะแถวที่มี server_id — กันแคชเชียร์คนเดียวถูก sync ลงซ้ำสองแถว

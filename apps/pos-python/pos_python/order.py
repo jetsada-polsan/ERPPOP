@@ -10,6 +10,7 @@ import sqlite3
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 
+from .promotions import QtyPromotion, promotion_discounts
 from .services import CartLine, money, vat_from_inclusive
 
 QTY = "qty"
@@ -55,6 +56,8 @@ class Order:
     _entry: str = ""
     # คนที่อนุมัติให้แก้ราคา/ให้ส่วนลดในบิลนี้ — ล้างทุกครั้งที่เริ่มบิลใหม่
     adjustment_approved_by: str | None = None
+    # โปรซื้อครบจำนวนที่ใช้ได้วันนี้ (โหลดจากเครื่อง) ERP หักเองทุกบิล เครื่องจึงต้องหักให้ตรง
+    promotions: list[QtyPromotion] = field(default_factory=list)
 
     # ---------- การเพิ่มสินค้า ----------
 
@@ -158,35 +161,47 @@ class Order:
 
     # ---------- ยอดรวม ----------
 
+    def promotion_by_line(self) -> dict[int, Decimal]:
+        return promotion_discounts(self.lines, self.promotions) if self.promotions else {}
+
+    def promotion_total(self) -> Decimal:
+        return money(sum(self.promotion_by_line().values(), Decimal("0")))
+
     def subtotal(self) -> Decimal:
         return money(sum((money(line.qty * line.unit_price) for line in self.lines), Decimal("0")))
 
     def discount_total(self) -> Decimal:
-        return money(sum((money(line.discount) for line in self.lines), Decimal("0")))
+        manual = money(sum((money(line.discount) for line in self.lines), Decimal("0")))
+        return money(manual + self.promotion_total())
 
     def grand_total(self) -> Decimal:
         return money(self.subtotal() - self.discount_total())
 
     def vat_total(self, rate: Decimal) -> Decimal:
-        vatable = sum((line.total for line in self.lines if line.is_vat), Decimal("0"))
+        promo = self.promotion_by_line()
+        vatable = sum((line.total - promo.get(index, Decimal("0"))
+                       for index, line in enumerate(self.lines) if line.is_vat), Decimal("0"))
         return vat_from_inclusive(money(vatable), rate)
 
     def adjustment_total(self) -> Decimal:
         """ส่วนลดทั้งหมดที่คนกดเอง (ลดราคา + ส่วนลดท้ายบรรทัด) เทียบกับราคาตั้ง"""
         listed = money(sum((money(line.qty * line.list_price) for line in self.lines), Decimal("0")))
-        return money(listed - self.grand_total())
+        # ส่วนลดโปรไม่นับ เพราะ ERP คิดเอง ไม่ใช่คนหน้าร้านให้
+        return money(listed - self.grand_total() - self.promotion_total())
 
     def change_for(self, paid: Decimal) -> Decimal:
         return money(max(Decimal("0"), money(paid) - self.grand_total()))
 
     def to_cart_lines(self) -> list[CartLine]:
+        promo = self.promotion_by_line()
         return [
             CartLine(
                 product_id=line.product_id, qty=line.qty, unit_price=line.unit_price,
                 discount=line.discount, barcode=line.barcode, source_barcode=line.source_barcode,
                 barcode_type=line.barcode_type, price_version=line.price_version, list_price=line.list_price,
+                promo_discount=promo.get(index, Decimal("0")),
             )
-            for line in self.lines
+            for index, line in enumerate(self.lines)
         ]
 
 

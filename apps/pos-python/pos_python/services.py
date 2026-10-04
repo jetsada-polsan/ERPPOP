@@ -111,6 +111,8 @@ class CartLine:
     price_version: str | None = None
     # ราคาตั้งตอนหยิบสินค้า (ไม่ส่ง = เท่ากับ unit_price) ใช้แยกส่วนลดที่คนกดเองออกจากราคาปกติ
     list_price: Decimal | None = None
+    # ส่วนลดโปรซื้อครบจำนวนที่ลงบรรทัดนี้ ERP คิดเองจากโปร จึงไม่นับเป็นส่วนลดที่ต้องอนุมัติ
+    promo_discount: Decimal = Decimal("0")
 
 
 def line_adjustment(line: CartLine) -> Decimal:
@@ -132,7 +134,7 @@ def validate_cart_lines(lines: list[CartLine]) -> None:
             raise ValueError("ราคาและส่วนลดต้องไม่ติดลบ")
         if line.unit_price > listed:
             raise ValueError(f"ขึ้นราคาเกินราคาตั้ง ({listed:,.2f} บาท) ไม่ได้")
-        if money(line.discount) > money(line.qty * line.unit_price):
+        if money(line.discount) + money(line.promo_discount) > money(line.qty * line.unit_price):
             raise ValueError("ส่วนลดมากกว่ายอดของบรรทัดนั้นไม่ได้")
 
 
@@ -578,7 +580,7 @@ class PosService:
         if existing:
             return int(existing["id"])
         subtotal = sum((money(line.qty * line.unit_price) for line in lines), Decimal("0"))
-        discount = sum((money(line.discount) for line in lines), Decimal("0"))
+        discount = sum((money(line.discount) + money(line.promo_discount) for line in lines), Decimal("0"))
         grand_total = money(subtotal - discount)
 
         # VAT คิดจากยอดสุทธิของเฉพาะสินค้าที่เสีย VAT — อาหารสดหลายอย่างได้รับยกเว้น
@@ -588,7 +590,7 @@ class PosService:
         for line in lines:
             flag = self.db.execute("SELECT is_vat FROM products WHERE id = ?", (line.product_id,)).fetchone()
             if flag and int(flag["is_vat"]):
-                vatable += money(line.qty * line.unit_price - line.discount)
+                vatable += money(line.qty * line.unit_price - line.discount - line.promo_discount)
         vat_total = vat_from_inclusive(vatable, rate)
         if money(paid_amount) < grand_total:
             raise ValueError("ยอดชำระไม่พอ")
@@ -611,14 +613,14 @@ class PosService:
                 product = self.db.execute("SELECT name, unit_name FROM products WHERE id = ? AND active = 1", (line.product_id,)).fetchone()
                 if not product:
                     raise ValueError(f"ไม่พบสินค้าที่ใช้งานได้ id={line.product_id}")
-                line_total = money(line.qty * line.unit_price - line.discount)
+                line_total = money(line.qty * line.unit_price - line.discount - line.promo_discount)
                 self.db.execute(
                     """INSERT INTO sale_items (sale_id, product_id, barcode, source_barcode, barcode_type, product_name_snapshot,
-                    unit_name_snapshot, qty, unit_price, discount, line_total, price_version, list_price)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    unit_name_snapshot, qty, unit_price, discount, line_total, price_version, list_price, promo_discount)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (sale_id, line.product_id, line.barcode, line.source_barcode, line.barcode_type, product["name"], product["unit_name"],
                      str(line.qty), str(line.unit_price), str(line.discount), str(line_total), line.price_version,
-                     str(line.list_price if line.list_price is not None else line.unit_price)),
+                     str(line.list_price if line.list_price is not None else line.unit_price), str(money(line.promo_discount))),
                 )
             # เก็บทั้งเงินที่รับมาและเงินทอน — บันทึกแต่ยอดรับอย่างเดียว
             # แล้วยอดเงินสดที่ควรมีในลิ้นชักจะเกินจริงเท่ากับเงินทอนที่จ่ายออกไป

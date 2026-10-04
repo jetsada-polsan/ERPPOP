@@ -65,6 +65,7 @@ class ProvisioningTest(unittest.TestCase):
             "/api/pos/ping": PING,
             "/api/pos/products": PRODUCTS,
             "/api/pos/cashiers": CASHIERS,
+            "/api/pos/promotions": [],
             "/api/pos/shift/open": {"success": True, "shift": {"id": 9001}},
         })
         self.svc = ProvisioningService(self.db, self.api)
@@ -217,6 +218,22 @@ class ProvisioningTest(unittest.TestCase):
         self.assertEqual(self.db.execute("SELECT server_id FROM shifts WHERE id = ?", (local_id,)).fetchone()[0], 9001)
         # payload ที่ส่งไปต้องใช้ cashier_id ฝั่ง server
         self.assertEqual(self.api.posted[-1][1]["cashier_id"], 42)
+
+    def test_sync_down_pulls_qty_promotions_with_local_product_ids(self) -> None:
+        self.svc.pull_catalog(3)
+        server_id = PRODUCTS["products"][0]["id"]
+        self.api.responses["/api/pos/promotions"] = [
+            {"id": 5, "name": "ซื้อ 3 ลด 10", "promo_type": "discount", "product_id": server_id, "min_qty": "3",
+             "discount_type": "fixed", "discount_value": "10", "starts_date": None, "ends_date": None},
+            {"id": 6, "name": "สินค้าที่เครื่องไม่มี", "promo_type": "discount", "product_id": 999999, "min_qty": "1",
+             "discount_type": "fixed", "discount_value": "1"},
+        ]
+
+        out = self.svc.sync_down(3)
+
+        self.assertEqual(out["promotions"]["upserted"], 1)
+        row = self.db.execute("SELECT q.product_id, p.server_id FROM qty_promotions q JOIN products p ON p.id = q.product_id").fetchone()
+        self.assertEqual(row["server_id"], server_id)
 
     def test_sync_down_pulls_both_catalog_and_cashiers(self) -> None:
         out = self.svc.sync_down(3)

@@ -222,8 +222,10 @@ class PosController extends Controller
         $promotions = QtyPromotion::with('freeProduct:id,sku_code,name_th')
             ->runningToday()
             ->where(fn ($w) => $w->whereNull('branch_id')->orWhere('branch_id', $branchId))
+            // วันเริ่ม/สิ้นสุดส่งไปด้วย เครื่อง POS ที่ออฟไลน์ข้ามวันจะได้ไม่ใช้โปรที่หมดแล้ว
             ->get(['id', 'code', 'name', 'promo_type', 'product_id', 'min_qty',
-                'free_product_id', 'free_qty', 'discount_type', 'discount_value', 'bundle_price']);
+                'free_product_id', 'free_qty', 'discount_type', 'discount_value', 'bundle_price',
+                'starts_date', 'ends_date']);
 
         return response()->json($promotions);
     }

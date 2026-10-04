@@ -44,7 +44,8 @@ class ConfigTest(unittest.TestCase):
 class BootstrapTest(unittest.TestCase):
     def setUp(self) -> None:
         self.db, self.path = fresh_db()
-        self.api = FakeApi({"/api/pos/ping": PING, "/api/pos/products": PRODUCTS, "/api/pos/cashiers": CASHIERS})
+        self.api = FakeApi({"/api/pos/ping": PING, "/api/pos/products": PRODUCTS, "/api/pos/cashiers": CASHIERS,
+                          "/api/pos/promotions": []})
 
     def test_no_config_means_no_context_so_main_falls_back_to_demo(self) -> None:
         self.assertIsNone(bootstrap(Path(tempfile.mkdtemp()), self.db, self.path))
@@ -156,7 +157,8 @@ class SyncWorkerTest(unittest.TestCase):
 
     def test_worker_refreshes_cached_master_data_after_reconnect(self) -> None:
         db, path = fresh_db()
-        api = FakeApi({"/api/pos/ping": PING, "/api/pos/products": PRODUCTS, "/api/pos/cashiers": CASHIERS})
+        api = FakeApi({"/api/pos/ping": PING, "/api/pos/products": PRODUCTS, "/api/pos/cashiers": CASHIERS,
+                          "/api/pos/promotions": []})
         calls = []
 
         def refresh_down():

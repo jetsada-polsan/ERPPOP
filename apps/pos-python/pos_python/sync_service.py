@@ -382,14 +382,20 @@ def _listed(item: sqlite3.Row) -> Decimal:
     return Decimal(value) if value not in (None, "") else Decimal(item["unit_price"])
 
 
+def _promo(item: sqlite3.Row) -> Decimal:
+    value = item["promo_discount"] if "promo_discount" in item.keys() else None
+    return Decimal(value) if value not in (None, "") else Decimal("0")
+
+
 def line_adjustment(item: sqlite3.Row) -> Decimal:
+    """ส่วนลดที่คนหน้าร้านให้เอง (ไม่รวมส่วนลดโป ซึ่ง ERP คิดเอง)"""
     qty = Decimal(item["qty"])
-    return money(qty * _listed(item)) - Decimal(item["line_total"])
+    return money(qty * _listed(item)) - Decimal(item["line_total"]) - _promo(item)
 
 
 def net_unit_price(item: sqlite3.Row) -> str:
-    """ราคาต่อหน่วยหลังหักส่วนลดท้ายบรรทัด ให้ qty x ราคา ได้เท่ายอดที่เก็บเงินจริง"""
+    """ราคาต่อหน่วยหลังหักส่วนลดท้ายบรรทัดและส่วนลดโปร ให้ qty x ราคา ได้เท่ายอดที่เก็บเงินจริง"""
     qty = Decimal(item["qty"])
-    if Decimal(item["discount"] or "0") == 0 or qty == 0:
+    if (Decimal(item["discount"] or "0") == 0 and _promo(item) == 0) or qty == 0:
         return str(item["unit_price"])
     return str((Decimal(item["line_total"]) / qty).quantize(Decimal("0.00000001")))

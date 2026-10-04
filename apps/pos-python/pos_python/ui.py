@@ -20,6 +20,7 @@ from .order import ALL_CATEGORIES, DISCOUNT, PRICE, QTY, Order, OrderLine, categ
 from .config import DeviceConfig, load_device_config, normalize_server_url, save_device_config
 from .printers import installed_printer_names, open_cash_drawer, print_text_to_windows_queue
 from .promptpay import promptpay_payload, qr_matrix
+from .promotions import active_promotions
 from .services import PosService, money
 from .settings_service import PrinterProfile, SettingsService
 
@@ -2249,16 +2250,21 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         # ---------- วาดใหม่ ----------
 
         def refresh_order(self, keep_selection: bool = False) -> None:
+            # โปรซื้อครบจำนวนของวันนี้ — ERP หักเองทุกบิล หน้าจอต้องหักให้ตรงตั้งแต่ก่อนรับเงิน
+            self.order.promotions = active_promotions(service.db)
             selected = self.order.selected_index
             self.table.blockSignals(True)
             self.table.setRowCount(0)
-            for line in self.order.lines:
+            promo = self.order.promotion_by_line()
+            for index, line in enumerate(self.order.lines):
                 row = self.table.rowCount()
                 self.table.insertRow(row)
                 name = line.name if not line.locked_qty else f"{line.name}  (ชั่ง)"
+                if promo.get(index):
+                    name = f"{name}  (โปร -{promo[index]:,.2f})"
                 for column, value in enumerate([
                     name, f"{line.qty:,.3f}".rstrip("0").rstrip("."),
-                    f"{line.unit_price:,.2f}", f"{line.total:,.2f}",
+                    f"{line.unit_price:,.2f}", f"{line.total - promo.get(index, 0):,.2f}",
                 ]):
                     self.table.setItem(row, column, QTableWidgetItem(str(value)))
             if selected is not None and selected < self.table.rowCount():

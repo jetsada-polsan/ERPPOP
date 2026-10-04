@@ -16,6 +16,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Protocol
 
+from .promotions import replace_promotions
 from .barcode import replace_scale_profiles
 from .services import money, normalize_pin, now
 from .time_service import TimeService
@@ -99,6 +100,16 @@ class ProvisioningService:
                 )
                 result["deactivated"] = cur.rowcount
         return result
+
+    def pull_promotions(self, branch_id: int) -> dict[str, int]:
+        """โปรซื้อครบจำนวนของสาขานี้ — ERP หักโปรเองทุกบิล เครื่องต้องรู้โปรชุดเดียวกัน"""
+        response = self.api.get(f"/api/pos/promotions?branch_id={int(branch_id)}")
+        rows = response.get("promotions") if isinstance(response, dict) else response
+        if not isinstance(rows, list):
+            raise RuntimeError("รูปแบบข้อมูลโปรโมชั่นจาก ERP ไม่ถูกต้อง")
+        with self.db:
+            saved = replace_promotions(self.db, rows)
+        return {"upserted": saved}
 
     def _upsert_product(self, item: dict, server_id: int, sku: str) -> int:
         name = str(item.get("name_th") or item.get("name") or sku)
@@ -477,6 +488,7 @@ class ProvisioningService:
         try:
             result["catalog"] = self._sync_dataset("catalog", lambda: self.pull_catalog(branch_id))
             result["cashiers"] = self._sync_dataset("cashiers", lambda: self.pull_cashiers(branch_id))
+            result["promotions"] = self._sync_dataset("promotions", lambda: self.pull_promotions(branch_id))
             with self.db:
                 self.db.execute(
                     "UPDATE sync_runs SET status = 'synced', finished_at = ?, datasets_json = ? WHERE run_uuid = ?",
