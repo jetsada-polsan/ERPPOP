@@ -53,10 +53,10 @@ class ChartOfAccount extends Model
     public const ROLE_OPENING_BALANCE = 'opening_balance';
 
     /** ค่าเสื่อมราคา (ค่าใช้จ่าย) ที่คิดรายเดือนจากทะเบียนทรัพย์สิน */
-    public const ROLE_DEPRECIATION_EXPENSE = 'depreciation_expense';
+    public const ROLE_DEPRECIATION_EXPENSE = 'depreciation';
 
     /** ค่าเสื่อมราคาสะสม (บัญชีปรับลดมูลค่าทรัพย์สิน) */
-    public const ROLE_ACCUMULATED_DEPRECIATION = 'accumulated_depreciation';
+    public const ROLE_ACCUMULATED_DEPRECIATION = 'accum_depreciation';
 
     public const ROLES = [
         self::ROLE_CASH => 'บัญชีเงินสด/รับจ่ายเริ่มต้น',
