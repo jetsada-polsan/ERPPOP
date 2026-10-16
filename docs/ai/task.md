@@ -1166,3 +1166,11 @@ pending
 - แก้: เพิ่ม `$clientBillUuid` ใน `use`; e2e script ยอมรับ key `review` ใหม่
 - ตรวจ: e2e Python → Laravel ผ่าน + `uat:reconcile` ผ่านทุกเกณฑ์
 - ผลกระทบ: POS Python เก็บบิลในคิวและส่งใหม่เองหลัง deploy; Web POS แสดง error ทุกบิลในช่วงนั้น
+
+## UAT อัตโนมัติ - 2026-10-16 (Claude)
+- `ErpJourneyUatTest`: ผ่าน route จริงด้วยข้อมูล UAT- (seed_uat_data.php)
+  1) ซื้อเชื่อ 20×40 → สต๊อก +20 → เจ้าหนี้ 800 → จ่ายโอน 800 → เจ้าหนี้ 0 → GL ดุล → `uat:reconcile` ผ่าน
+  2) ใบจอง (ไม่ตัดสต๊อก) → แปลงขายเชื่อ (ตัดสต๊อก, ลูกหนี้ 600) → วางบิล → รับโอน 600 → ลูกหนี้ 0 → นำเข้า Statement → กระทบยอดตรง → GL ดุล → reconcile ผ่าน
+- `PosWebCheckoutRealTest`: checkout Web POS จริง + `X-Offline-Uuid` ส่งซ้ำได้บิลเดิม, คิวออฟไลน์ลงบิลจริง; ถอด fix ออกแล้วเทสต์แดงจริง
+- CI บน main: PostgreSQL UAT ผ่าน, POS Python e2e ผ่านหลัง hotfix (รันในเครื่องพร้อม `uat:reconcile`)
+- ยังทำไม่ได้จาก sandbox: restore drill บน server จริง, UAT อุปกรณ์จริง (กล้อง/เครื่องสแกน/POS 0.6.28/ขายออฟไลน์)
