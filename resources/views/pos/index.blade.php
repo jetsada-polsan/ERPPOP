@@ -3520,10 +3520,10 @@ function posApp() {
             try {
                 if (!this.hostOnline) throw new Error('offline');
                 const res = await fetch(`{{ route('pos.products') }}?${params}`);
-                if (!res.ok) throw new Error('HTTP ' + res.status);
+                if (!res.ok) throw Object.assign(new Error('HTTP ' + res.status), { status: res.status });
                 this.products = await res.json();
             } catch (e) {
-                this.markHostDown();
+                if (this.isHostDownError(e)) this.markHostDown();
                 this.products = window.PosOffline ? await PosOffline.search(this.searchQ, this.categoryId).catch(() => []) : [];
             }
             this.loading = false;
@@ -3572,10 +3572,10 @@ function posApp() {
             try {
                 if (!this.hostOnline) throw new Error('offline');
                 const res = await fetch(`{{ route('pos.products') }}?${params}`);
-                if (!res.ok) throw new Error('HTTP ' + res.status);
+                if (!res.ok) throw Object.assign(new Error('HTTP ' + res.status), { status: res.status });
                 return await res.json();
             } catch (e) {
-                this.markHostDown();
+                if (this.isHostDownError(e)) this.markHostDown();
                 return window.PosOffline ? await PosOffline.exact(query, lookup).catch(() => []) : [];
             }
         },
@@ -4450,6 +4450,8 @@ function posApp() {
             // เลขบิลในเครื่อง: ถ้าเน็ตหลุดกลางทาง บิลเดียวกันที่ส่งซ้ำจากคิวจะไม่กลายเป็นสองบิล
             const billUuid = window.PosOffline ? PosOffline.uuid() : null;
 
+            // ก่อนสลับไปขายในเครื่อง ลองถาม Host อีกครั้ง — สถานะอาจค้างจากรอบก่อน
+            if (!this.hostOnline) await this.checkHost();
             if (!this.hostOnline) {
                 await this.checkoutOffline(payload, billUuid);
                 this.processing = false;
@@ -4575,6 +4577,11 @@ function posApp() {
             this.hostOnline = true;
             this.lastOnlineAt = Date.now();
             try { localStorage.setItem(`popstar_pos_last_online_${this.posUserId}`, String(this.lastOnlineAt)); } catch (e) {}
+        },
+
+        // เน็ตหลุด (fetch throw) หรือ gateway ล่ม = Host ล่ม; 4xx/500 คือ Host ยังตอบอยู่ ห้ามสลับไปขายออฟไลน์
+        isHostDownError(e) {
+            return !this.hostOnline || !e?.status || [502, 503, 504].includes(e.status);
         },
 
         markHostDown() {

@@ -1174,3 +1174,12 @@ pending
 - `PosWebCheckoutRealTest`: checkout Web POS จริง + `X-Offline-Uuid` ส่งซ้ำได้บิลเดิม, คิวออฟไลน์ลงบิลจริง; ถอด fix ออกแล้วเทสต์แดงจริง
 - CI บน main: PostgreSQL UAT ผ่าน, POS Python e2e ผ่านหลัง hotfix (รันในเครื่องพร้อม `uat:reconcile`)
 - ยังทำไม่ได้จาก sandbox: restore drill บน server จริง, UAT อุปกรณ์จริง (กล้อง/เครื่องสแกน/POS 0.6.28/ขายออฟไลน์)
+
+## UAT Web POS ในเบราว์เซอร์จริง - 2026-10-16 (Claude)
+- `tools/uat/webpos/*` (Playwright + Chromium) บนเซิร์ฟเวอร์ local: ทุก CHECK ผ่าน
+  keyboard wedge ยิงซ้ำเร็วได้ 2 ชิ้น, `acceptScannerCode` เพิ่มลงตะกร้า, Service Worker คุมหน้า, catalog 50 รายการใน IndexedDB,
+  ตัดเน็ต → ขายในเครื่อง `OFF-…`, ปิดเปิดแอปตอนออฟไลน์คิวยังอยู่, ต่อเน็ต → sync เหลือ 0, เน็ตหลุดหลัง server บันทึก → ไม่เกิดบิลซ้ำ, `uat:reconcile` ผ่าน
+- บั๊กที่เจอและแก้: ค้นสินค้าที่ตอบ 500 ทำให้ POS คิดว่า Host ล่ม แล้วบิลออนไลน์ถัดไปไปเข้าคิวออฟไลน์ทั้งที่ server ยังดี
+  → นับ Host ล่มเฉพาะเน็ตหลุด/502/503/504 และถาม Host อีกครั้งก่อนสลับไปขายในเครื่อง
+- `pnpm run build` ผ่านเมื่อปิดการโหลดฟอนต์ bunny (sandbox บล็อก fonts.bunny.net) — CI build ได้ตามปกติ
+- Backup: server มี `erp:backup --keep-days=30` ทุกคืน 02:15 ผ่าน scheduler อยู่แล้ว; ยังขาดสำเนานอกเครื่อง (rclone ไม่ได้ติดตั้ง)

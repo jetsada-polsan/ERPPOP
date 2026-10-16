@@ -1,0 +1,20 @@
+import { chromium } from 'playwright';
+const BASE = 'http://127.0.0.1:8125';
+const log = (k, v) => console.log(`CHECK ${k}: ${JSON.stringify(v)}`);
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }).catch(() => chromium.launch());
+const ctx = await b.newContext(); const page = await ctx.newPage();
+await page.goto(BASE + '/login'); await page.fill('#username', 'uatcashier'); await page.fill('#password', 'Uat-Pass-2026!');
+await Promise.all([page.waitForNavigation(), page.click('button[type=submit]')]);
+await page.goto(BASE + '/pos');
+await page.waitForFunction(() => window.Alpine && Alpine.$data(document.body).catalogCount > 0, null, { timeout: 30000 });
+// server saves the bill, but the reply never reaches the till
+await page.route('**/pos/checkout', async (route) => { await route.fetch(); await route.abort('connectionreset'); });
+const input = page.locator('.pos-search-input');
+await input.fill('8850000000013'); await input.press('Enter'); await page.waitForTimeout(1000);
+await page.evaluate(async () => { const a = Alpine.$data(document.body); a.method = 'cash'; a.received = a.totalAmount; await a.processPayment(); });
+log('receipt_shown', await page.evaluate(() => Alpine.$data(document.body).lastDocNumber));
+await page.unroute('**/pos/checkout');
+await page.evaluate(() => Alpine.$data(document.body).checkHost());
+await page.waitForFunction(() => Alpine.$data(document.body).offlineQueueCount === 0, null, { timeout: 45000 }).catch(() => {});
+log('queue_after_sync', await page.evaluate(() => Alpine.$data(document.body).offlineQueueCount));
+await b.close();
