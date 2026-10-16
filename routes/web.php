@@ -111,8 +111,8 @@ Route::delete('/security/mfa', [AuthController::class, 'disableMfa'])->name('mfa
 
 Route::get('/', function () {
     if (request()->getHost() === 'pos.popstarcenter.com') {
-        // หน้าขายบนเบราว์เซอร์ต้องได้ layout ที่ publish แล้วมาพร้อม HTML ก้อนแรก
-        return app(PosController::class)->browser();
+        // เครื่องแคชเชียร์ใช้ POS Python; ขายบนเว็บใช้ /pos ของ ERP — โดเมนนี้จึงพาไปหน้าดาวน์โหลด POS
+        return redirect()->route('python-pos.download');
     }
 
     return view('portal');

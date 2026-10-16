@@ -1152,3 +1152,8 @@ pending
   `dashboard-odoo` (ธีมให้ผู้ใช้เลือก), `/pos/preview` (ใช้ใน POS designer), `apps/pos-desktop` (เก็บไว้ rollback ตาม PROJECT_MEMORY), หน้า legacy (อ้างอิงตามนโยบาย)
 - ทดสอบ: `php artisan test` 476 ผ่าน 474 (FinanceSecurityControlTest ล้มเพราะรันเป็น root เหมือนเดิม)
 - หมายเหตุ deploy: rsync ไม่มี `--delete` ไฟล์เก่าบน server ยังอยู่แต่ไม่มี route เข้าถึง ยกเว้น `public/pos-desktop-preview/` ที่ยังเปิดได้ตรง ๆ ต้องลบบน server ด้วยมือ
+
+## Handoff - 2026-10-16 (Claude: เลิก Web POS ที่ pos.popstarcenter.com + ล้างไฟล์ค้างบน server)
+- เจ้าของยืนยันให้ลบ: `pos.popstarcenter.com/` redirect ไป `/download/python-pos`; ลบ `PosController::browser()` และ `pos/browser.blade.php`
+- `scripts/deploy.sh` ลบไฟล์ที่เลิกใช้ตามรายชื่อ `RETIRED_PATHS` (rsync ไม่มี --delete) รวม `public/pos-desktop-preview`
+- ทดสอบ: `php artisan test` 475 ผ่าน 473 (FinanceSecurityControlTest ล้มเพราะรันเป็น root)

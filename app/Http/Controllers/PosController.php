@@ -140,22 +140,6 @@ class PosController extends Controller
         ]);
     }
 
-    /**
-     * หน้าขายบนเบราว์เซอร์ (โดเมน pos.*) — ต้องได้ layout ที่ publish แล้วตั้งแต่ render แรก
-     * เพื่อไม่ให้หน้าจอกระพริบจากค่า default ไปค่าจริงหลังเครื่องต่อ ERP สำเร็จ
-     * ค่าล่าสุดจะถูกทับอีกรอบจาก /api/pos/ping หลังเชื่อมต่อ
-     */
-    public function browser(): View
-    {
-        $layout = PosLayout::published();
-
-        return view('pos.browser', [
-            'layout' => $layout,
-            'runtime' => $layout['runtime'],
-            'layoutCss' => PosLayout::cssVariableString($layout['runtime']),
-        ]);
-    }
-
     // สาขา+คนขายที่บังคับใช้สำหรับ user ที่ login (ถ้ากำหนดไว้) ใช้ override ค่าที่ client ส่งมา
     private function enforcedBranchId(?int $requested): int
     {
