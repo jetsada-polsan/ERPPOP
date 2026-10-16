@@ -1,0 +1,22 @@
+name: Production inspect (read-only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+      - run: ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+      - name: Inspect backup readiness
+        run: |
+          ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "APP_DIR='${{ vars.APP_DIR }}' bash -s" < scripts/ops/backup-inspect.sh | tee result.txt
+          grep '^RESULT ' result.txt | sed 's/^RESULT /::notice title=inspect::/'
