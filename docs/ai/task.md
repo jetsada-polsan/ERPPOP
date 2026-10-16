@@ -1137,3 +1137,9 @@ pending
   ถอดการตรวจ needs_review ออก → เทสต์ใหม่แดงจริง; ui.py ตรวจแค่ compile (ไม่มี PySide6 ใน sandbox)
 - ยังไม่ทดสอบ: หน้าจอ PySide6 จริง, installer Windows (ต้อง build ผ่าน GitHub Actions + ออกรุ่นใหม่ให้สาขา)
 - Deploy: ยังไม่ deploy
+
+## Deploy - 2026-10-16 (claude/pos-python-review → production + POS 0.6.28)
+- ERP: GitHub Actions `Deploy ERP` run 38846628464 จาก `46962da` test/deploy ผ่าน (migration `2026_10_16_000002` รันในขั้น deploy — ยังไม่ได้เปิด log ดู)
+- POS Python: run 38846794930 (version 0.6.28, publish) ผ่าน test-and-package + publish
+- ตรวจ: `/download/python-pos` 200 `PopCentral-POS-UAT-0.6.28-setup.exe` 178,557,216 bytes, `/login` 200, `/api/pos/ping` 401 (ไม่มี token ตามปกติ)
+- งานถัดไป: ติดตั้ง 0.6.28 ที่สาขา 1 เครื่อง ทดสอบบิลที่ ERP ปฏิเสธ → ขึ้น "ต้องตรวจสอบ" ทั้งในเครื่องและ `/pos/offline-sales` → แก้ต้นเหตุ → กดส่งใหม่
