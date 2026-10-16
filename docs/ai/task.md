@@ -1143,3 +1143,12 @@ pending
 - POS Python: run 38846794930 (version 0.6.28, publish) ผ่าน test-and-package + publish
 - ตรวจ: `/download/python-pos` 200 `PopCentral-POS-UAT-0.6.28-setup.exe` 178,557,216 bytes, `/login` 200, `/api/pos/ping` 401 (ไม่มี token ตามปกติ)
 - งานถัดไป: ติดตั้ง 0.6.28 ที่สาขา 1 เครื่อง ทดสอบบิลที่ ERP ปฏิเสธ → ขึ้น "ต้องตรวจสอบ" ทั้งในเครื่องและ `/pos/offline-sales` → แก้ต้นเหตุ → กดส่งใหม่
+
+## Handoff - 2026-10-16 (Claude: เอาหน้าซ้ำซ้อนออก)
+- Branch: `claude/remove-redundant-pages` (ต่อจาก `claude/pos-python-review`)
+- เอาออก: `/pos/compare` + ปุ่ม "เทียบ UI" + `public/pos-desktop-preview` (เทียบกับ Vue/Tauri POS ที่เลิกใช้แล้ว),
+  `/erp-mockup/*` (หน้าข้อมูลจำลอง ErpMockupController/ErpMockData), `/greenfield` (หน้า starter Tailwind v4 + `resources/css/app.css`)
+- ไม่เอาออก (ต้องให้เจ้าของตัดสิน): Web POS สาธารณะที่ `pos.popstarcenter.com` (`pos/browser.blade.php`, ใช้ Device Token) ซ้อนกับ `/pos`;
+  `dashboard-odoo` (ธีมให้ผู้ใช้เลือก), `/pos/preview` (ใช้ใน POS designer), `apps/pos-desktop` (เก็บไว้ rollback ตาม PROJECT_MEMORY), หน้า legacy (อ้างอิงตามนโยบาย)
+- ทดสอบ: `php artisan test` 476 ผ่าน 474 (FinanceSecurityControlTest ล้มเพราะรันเป็น root เหมือนเดิม)
+- หมายเหตุ deploy: rsync ไม่มี `--delete` ไฟล์เก่าบน server ยังอยู่แต่ไม่มี route เข้าถึง ยกเว้น `public/pos-desktop-preview/` ที่ยังเปิดได้ตรง ๆ ต้องลบบน server ด้วยมือ

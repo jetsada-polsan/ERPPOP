@@ -103,7 +103,6 @@ class RoutePermissions
         'executive.' => 'reports.view',
         'products.' => 'masterdata.manage',
         // หน้าตัวอย่างการออกแบบ — ให้คนที่ดูแลระบบเปิดดูได้ ไม่เปิดสาธารณะ
-        'erp-mockup.' => 'settings.manage',
         'master-data-setup.' => 'masterdata.manage',
         'products.lots.quality-checks' => 'inventory.quality.manage',
         'products.lots.recalls' => 'inventory.quality.manage',

@@ -1908,9 +1908,6 @@
             <i class="bi bi-sliders2"></i>
         </button>
         @endif
-        <a href="{{ route('pos.compare') }}" target="_blank" class="topbar-btn" title="เปิด Web POS และ Vue POS คู่กัน">
-            <i class="bi bi-layout-split"></i> เทียบ UI
-        </a>
         @if($canSell)
         <button class="topbar-btn" @click="cancelBill()" :disabled="cart.length === 0">
             <i class="bi bi-trash"></i> ยกเลิก

@@ -25,7 +25,6 @@ use App\Http\Controllers\DocumentBrowserController;
 use App\Http\Controllers\DocumentLifecycleController;
 use App\Http\Controllers\EcommerceChannelController;
 use App\Http\Controllers\EmployeeController;
-use App\Http\Controllers\ErpMockupController;
 use App\Http\Controllers\ExecutiveDashboardController;
 use App\Http\Controllers\FeatureController;
 use App\Http\Controllers\FleetController;
@@ -133,16 +132,6 @@ Route::prefix('fleet')->name('fleet.')->group(function () {
     Route::post('/trips', [FleetController::class, 'trip'])->name('trips.store');
     Route::post('/repairs', [FleetController::class, 'repair'])->name('repairs.store');
 });
-// หน้าตัวอย่างการออกแบบระบบหลังบ้าน — ข้อมูลจำลองล้วน ไม่แตะฐานข้อมูล
-Route::prefix('erp-mockup')->name('erp-mockup.')->group(function () {
-    Route::get('/', [ErpMockupController::class, 'launcher'])->name('launcher');
-    Route::get('/dashboard', [ErpMockupController::class, 'dashboard'])->name('dashboard');
-    Route::get('/products', [ErpMockupController::class, 'products'])->name('products');
-    Route::get('/products/form', [ErpMockupController::class, 'productForm'])->name('product-form');
-    Route::get('/pos-orders', [ErpMockupController::class, 'posOrders'])->name('pos-orders');
-    Route::get('/inventory', [ErpMockupController::class, 'inventory'])->name('inventory');
-    Route::get('/purchase', [ErpMockupController::class, 'purchase'])->name('purchase');
-});
 Route::prefix('master-data-setup')->name('master-data-setup.')->group(function () {
     Route::get('/', [MasterDataSetupController::class, 'index'])->name('index');
     Route::get('/template/{type}', [MasterDataSetupController::class, 'template'])->name('template');
@@ -201,7 +190,6 @@ Route::prefix('ocr/documents')->name('ocr.documents.')->group(function () {
 Route::prefix('pos')->name('pos.')->group(function () {
     Route::get('/', [PosController::class, 'index'])->name('index');
     Route::get('/preview', [PosController::class, 'preview'])->name('preview');
-    Route::view('/compare', 'pos.compare')->name('compare');
     Route::get('/control', [PosController::class, 'control'])->name('control');
     Route::get('/products', [PosController::class, 'products'])->name('products');
     Route::get('/members', [PosController::class, 'members'])->name('members');
@@ -241,7 +229,6 @@ Route::prefix('wh')->name('wh.')->group(function () {
 
 Route::get('/apps', [AppLauncherController::class, 'index'])->name('apps.launcher');
 // หน้าตัวอย่างแพตเทิร์นผิวใหม่ (Vue 3 + Tailwind v4 + โทน JET) — แยกขาดจากหลังบ้านเดิม
-Route::view('/greenfield', 'greenfield.index')->name('greenfield');
 Route::get('/crm', [CrmController::class, 'index'])->name('crm.index');
 Route::post('/crm/activities', [CrmController::class, 'storeActivity'])->name('crm.activities.store');
 Route::patch('/crm/activities/{activity}/complete', [CrmController::class, 'completeActivity'])->name('crm.activities.complete');
