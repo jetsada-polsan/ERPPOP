@@ -1096,3 +1096,10 @@ pending
   library ยังโหลดจาก unpkg (ยังไม่ bundle ผ่าน Vite); Web POS ยังค้นสินค้าออนไลน์เท่านั้น
 - Deploy: ยังไม่ deploy (ไม่มี migration ใหม่)
 - งานถัดไป: bundle html5-qrcode/bwip-js/zxing ผ่าน Vite, UAT อุปกรณ์จริง
+
+## Deploy - 2026-10-16 (claude/fix-pos-scanner → production)
+- เจ้าของสั่ง deploy; ใช้ GitHub Actions `Deploy ERP` (production) run 38837350569 จาก commit `81e73fb`
+- ผล: job test ผ่าน, job deploy ผ่าน (รวม 7 commit ของ main ที่ต่อจาก e535a05 ด้วย เช่น migration `2026_10_04_000201_assign_depreciation_account_roles`)
+- Smoke หลัง deploy: `/login` 200, `/build/manifest.json` 200, `/pos` และ `/wh` redirect ไปหน้า login ตามปกติ
+- ยังไม่ได้ดู log migration/erp:health ของ run (proxy บล็อกการดาวน์โหลด log) ให้ดูที่หน้า Actions
+- ยังต้อง merge branch เข้า main และทำ UAT กล้อง/เครื่องสแกน/พิมพ์ A4 บนอุปกรณ์จริง
