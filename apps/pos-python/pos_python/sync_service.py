@@ -21,6 +21,28 @@ def retry_at(attempts: int) -> str:
 
 READY = "AND (next_attempt_at IS NULL OR next_attempt_at <= ?)"
 
+# ERP ปฏิเสธบิลด้วยเหตุทางธุรกิจ (ราคา/กะ/สินค้า) และเก็บบิลไว้ให้ผู้จัดการตรวจแล้ว
+# ยิงซ้ำก็ไม่ผ่าน จึงหยุดส่งเองจนกว่าคนจะกด "ส่งใหม่" หลังแก้ต้นเหตุ
+NEEDS_REVIEW = "needs_review"
+
+
+class SaleNeedsReview(RuntimeError):
+    """ERP เก็บบิลนี้ไว้ที่หน้า "ต้องตรวจสอบ" แล้ว ไม่ต้องลองส่งซ้ำอัตโนมัติ"""
+
+
+def review_message(error: Exception) -> str | None:
+    """คืนข้อความจาก ERP ถ้า error นี้คือการปฏิเสธที่ ERP เก็บไว้ตรวจ (422 + needs_review)"""
+    text = str(error)
+    if not text.startswith("HTTP 422:"):
+        return None
+    try:
+        body = json.loads(text.split(":", 1)[1])
+    except (ValueError, IndexError):
+        return None
+    if not isinstance(body, dict) or not body.get("needs_review"):
+        return None
+    return str(body.get("message") or "ERP ปฏิเสธบิล")
+
 
 class PosApi(Protocol):
     def post(self, path: str, payload: dict, *, idempotency_key: str | None = None) -> dict: ...
@@ -35,7 +57,7 @@ class SyncService:
         # A locally opened shift must be created on ERP before any sale that
         # belongs to it.  This is the dependency that makes offline selling
         # recoverable after reconnecting.
-        result = {"synced": 0, "failed": 0}
+        result = {"synced": 0, "failed": 0, "review": 0}
         for row in self.db.execute(
             """SELECT aggregate_uuid FROM sync_outbox
                WHERE aggregate_type = 'shift_open' AND status IN ('pending', 'failed') """
@@ -67,6 +89,8 @@ class SyncService:
                 else:
                     self.sync_void(row["aggregate_uuid"])
                 result["synced"] += 1
+            except SaleNeedsReview:
+                result["review"] += 1
             except RuntimeError:
                 result["failed"] += 1
         for row in self.db.execute(
@@ -87,7 +111,7 @@ class SyncService:
         auth = self.sync_auth_events()
         self._mark_outbox_state("sales_outbox", result)
         self._mark_outbox_state("auth_events", auth)
-        return {"synced": result["synced"] + auth["synced"], "failed": result["failed"] + auth["failed"]}
+        return {"synced": result["synced"] + auth["synced"], "failed": result["failed"] + auth["failed"], "review": result["review"]}
 
     def _mark_outbox_state(self, entity: str, result: dict[str, int]) -> None:
         status = "failed" if result["failed"] else "synced"
@@ -314,8 +338,13 @@ class SyncService:
         try:
             response = self.api.post("/api/pos/checkout", payload, idempotency_key=sale_uuid)
         except Exception as error:
+            message = review_message(error)
+            if message is not None:
+                return self._needs_review(sale_uuid, message)
             return self._failed(sale_uuid, str(error))
         if not response.get("success", False):
+            if response.get("needs_review"):
+                return self._needs_review(sale_uuid, str(response.get("message") or "ERP ปฏิเสธบิล"))
             return self._failed(sale_uuid, response.get("message", "server rejected sale"))
         receipt_no = str(response.get("receipt_no") or "").strip()
         if not receipt_no:
@@ -369,6 +398,38 @@ class SyncService:
         with self.db:
             self.db.execute("UPDATE sync_outbox SET status = 'synced', synced_at = ?, attempts = attempts + 1, last_error = NULL WHERE aggregate_uuid = ?", (now(), void_uuid))
             self.db.execute("INSERT INTO sync_logs (direction, status, message, created_at) VALUES ('up', 'synced', ?, ?)", (f"void {sale_uuid}", now()))
+
+    def _needs_review(self, sale_uuid: str, message: str) -> None:
+        with self.db:
+            self.db.execute(
+                """UPDATE sync_outbox SET status = ?, attempts = attempts + 1, last_error = ?, next_attempt_at = NULL
+                   WHERE aggregate_uuid = ?""",
+                (NEEDS_REVIEW, message[:1000], sale_uuid),
+            )
+            self.db.execute("UPDATE sales SET sync_status = ? WHERE sale_uuid = ?", (NEEDS_REVIEW, sale_uuid))
+            self.db.execute(
+                "INSERT INTO sync_logs (direction, status, message, created_at) VALUES ('up', 'failed', ?, ?)",
+                (f"sale {sale_uuid}: ต้องตรวจสอบ: {message}"[:1000], now()),
+            )
+        raise SaleNeedsReview(message)
+
+    def review_sales(self) -> list[sqlite3.Row]:
+        return self.db.execute(
+            """SELECT s.sale_uuid, s.document_no, s.sale_datetime, s.grand_total, o.last_error
+               FROM sync_outbox o JOIN sales s ON s.sale_uuid = o.aggregate_uuid
+               WHERE o.aggregate_type = 'sale' AND o.status = ? ORDER BY s.sale_datetime""",
+            (NEEDS_REVIEW,),
+        ).fetchall()
+
+    def requeue_review_sales(self) -> int:
+        """หลังแก้ต้นเหตุบน ERP (เปิดกะ/แก้ราคา) ให้ส่งบิลที่ติดตรวจใหม่ในรอบ sync ถัดไป"""
+        with self.db:
+            cursor = self.db.execute(
+                "UPDATE sync_outbox SET status = 'pending', next_attempt_at = NULL WHERE aggregate_type = 'sale' AND status = ?",
+                (NEEDS_REVIEW,),
+            )
+            self.db.execute("UPDATE sales SET sync_status = 'pending' WHERE sync_status = ?", (NEEDS_REVIEW,))
+        return cursor.rowcount
 
     def _failed(self, sale_uuid: str, message: str) -> None:
         with self.db:

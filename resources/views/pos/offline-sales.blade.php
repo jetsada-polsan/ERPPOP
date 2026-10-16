@@ -28,7 +28,7 @@
         <tr @class(['table-warning' => $sale->status === 'needs_review'])>
             <td class="text-nowrap">{{ $sale->sold_at?->timezone(config('app.timezone'))->format('d/m/Y H:i') }}<br><small class="text-muted font-monospace">{{ substr($sale->offline_uuid, 0, 8) }}</small></td>
             <td>{{ $sale->branch?->code }}</td>
-            <td>{{ $sale->user?->name }}</td>
+            <td>{{ $sale->user?->name }}<br><small class="text-muted">{{ $sale->source === 'desktop' ? 'เครื่อง POS '.($sale->device?->terminal_code ?? $sale->device?->name) : 'Web POS' }}</small></td>
             <td class="text-end">{{ number_format((float) $sale->offline_total, 2) }}</td>
             <td><small>
                 @foreach(($sale->payload['items'] ?? []) as $item)
@@ -38,12 +38,15 @@
             <td><span class="badge {{ $sale->status === 'needs_review' ? 'bg-warning text-dark' : ($sale->status === 'posted' ? 'bg-success' : 'bg-secondary') }}">{{ $labels[$sale->status] ?? $sale->status }}</span></td>
             <td style="max-width:320px"><small style="white-space:pre-line">{{ $sale->receipt_no ? 'บิล '.$sale->receipt_no."\n" : '' }}{{ $sale->review_reason }}</small></td>
             <td class="text-nowrap">
-                @if($sale->status === 'needs_review')
+                @if($sale->status === 'needs_review' && $sale->source !== 'desktop')
                     <form method="post" action="{{ route('pos.offline-sales.retry', $sale) }}" class="d-flex gap-1 mb-1">
                         @csrf
                         <input type="number" name="shift_id" class="form-control form-control-sm" style="width:90px" placeholder="กะใหม่" title="ระบุรหัสกะที่เปิดอยู่ ถ้ากะเดิมปิดไปแล้ว">
                         <button class="btn btn-sm btn-primary">ส่งใหม่</button>
                     </form>
+                @endif
+                @if($sale->status === 'needs_review')
+                    @if($sale->source === 'desktop')<small class="d-block text-muted mb-1">ส่งใหม่ได้ที่เครื่อง POS</small>@endif
                     <form method="post" action="{{ route('pos.offline-sales.resolve', $sale) }}" class="d-flex gap-1">
                         @csrf
                         <input name="note" required maxlength="500" class="form-control form-control-sm" placeholder="จัดการแล้วอย่างไร">

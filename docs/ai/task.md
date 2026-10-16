@@ -1124,3 +1124,16 @@ pending
 - Smoke: `/login` 200, `/build/manifest.json` 200, `/pos-offline.js` 200, `/pos-sw.js` 200 (cache `popstar-pos-v3`),
   `/pos`, `/pos/ping`, `/pos/offline-sales` redirect ไป login ตามปกติ
 - ยังไม่ได้ดู log migration `pos_offline_sales` (proxy บล็อก log) และยังไม่ได้ทำ UAT ออฟไลน์ 6 ข้อใน `docs/POS-WEB-OFFLINE.md`
+
+## Handoff - 2026-10-16 (Claude: POS Python บิลที่ ERP ปฏิเสธ → ต้องตรวจสอบ)
+- Branch: `claude/pos-python-review` (ต่อจาก `claude/web-pos-offline`)
+- ปัญหาเดิม: บิลที่ ERP ตอบ 422 ค้างในเครื่อง POS ลองใหม่ทุก ≤15 นาทีไม่รู้จบ ผู้จัดการไม่เห็นใน ERP (มีแค่ Log::warning)
+- ทำอะไร:
+  - ERP: `PosApiController::checkout` เก็บบิล 422 ที่ key เป็น UUID ลง `pos_offline_sales` (source desktop) ตอบ `needs_review: true`; ส่งใหม่สำเร็จปิดรายการเอง
+  - migration `2026_10_16_000002_add_device_source_to_pos_offline_sales`; หน้า `/pos/offline-sales` แสดงเครื่อง POS
+  - POS Python: `sync_service` สถานะ `needs_review` หยุดยิงซ้ำ, `review_sales()`, `requeue_review_sales()`; worker นับ `review`; หน้าสถานะมีรายการ + ปุ่มส่งใหม่
+- ทดสอบ: `php artisan test` 485 รายการ ผ่าน 483 (FinanceSecurityControlTest ล้มเพราะรันเป็น root, อีก 1 ไม่ใช่ failure);
+  `PosDesktopRejectedSaleReviewTest` 5/5; POS Python `unittest` 210 รายการ ผ่าน 208 — 2 error เดิมจาก sandbox ไม่มีโมดูล `qrcode`;
+  ถอดการตรวจ needs_review ออก → เทสต์ใหม่แดงจริง; ui.py ตรวจแค่ compile (ไม่มี PySide6 ใน sandbox)
+- ยังไม่ทดสอบ: หน้าจอ PySide6 จริง, installer Windows (ต้อง build ผ่าน GitHub Actions + ออกรุ่นใหม่ให้สาขา)
+- Deploy: ยังไม่ deploy

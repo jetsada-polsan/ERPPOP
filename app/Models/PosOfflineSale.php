@@ -15,9 +15,14 @@ class PosOfflineSale extends Model
 
     public const RESOLVED = 'resolved';
 
+    public const SOURCE_WEB = 'web';
+
+    public const SOURCE_DESKTOP = 'desktop';
+
     protected $fillable = [
         'offline_uuid', 'user_id', 'branch_id', 'shift_id', 'sold_at', 'offline_total', 'status',
         'pos_receipt_id', 'receipt_no', 'review_reason', 'payload', 'attempts', 'resolved_by', 'resolved_at',
+        'source', 'pos_device_id',
     ];
 
     protected function casts(): array
@@ -38,6 +43,11 @@ class PosOfflineSale extends Model
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    public function device(): BelongsTo
+    {
+        return $this->belongsTo(PosDevice::class, 'pos_device_id');
     }
 
     public function resolver(): BelongsTo

@@ -55,7 +55,7 @@ class PosOfflineSaleController extends Controller
     public function index(Request $request): View
     {
         $status = $request->query('status', PosOfflineSale::NEEDS_REVIEW);
-        $sales = PosOfflineSale::with(['user:id,name', 'branch:id,code,name_th', 'resolver:id,name'])
+        $sales = PosOfflineSale::with(['user:id,name', 'branch:id,code,name_th', 'resolver:id,name', 'device:id,name,terminal_code'])
             ->when($status !== 'all', fn ($q) => $q->where('status', $status))
             ->latest('sold_at')
             ->paginate(50)
@@ -73,6 +73,10 @@ class PosOfflineSaleController extends Controller
     {
         if ($offlineSale->status !== PosOfflineSale::NEEDS_REVIEW) {
             return back()->with('error', 'บิลนี้ไม่ได้อยู่ในสถานะต้องตรวจสอบ');
+        }
+
+        if ($offlineSale->source === PosOfflineSale::SOURCE_DESKTOP) {
+            return back()->with('error', 'บิลจากเครื่อง POS: แก้ต้นเหตุแล้วกด "ส่งบิลต้องตรวจสอบใหม่" ที่เครื่อง POS หรือปิดรายการที่นี่');
         }
 
         $payload = $offlineSale->payload;

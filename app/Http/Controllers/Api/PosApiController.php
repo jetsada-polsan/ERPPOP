@@ -9,6 +9,7 @@ use App\Models\AuditLog;
 use App\Models\DiscountCard;
 use App\Models\PosDevice;
 use App\Models\PosReceipt;
+use App\Models\PosOfflineSale;
 use App\Models\PosTerminal;
 use App\Models\QrPaymentConfig;
 use App\Models\Salesman;
@@ -575,6 +576,7 @@ class PosApiController extends Controller
 
             if ($response->getStatusCode() >= 400) {
                 DB::table('pos_api_idempotency')->where('idempotency_key', $key)->delete();
+                $response = $this->queueRejectedSaleForReview($response, $request, $key, $device);
                 Log::warning('POS desktop checkout rejected', [
                     'idempotency_key' => $key,
                     'device_id' => $device->id,
@@ -589,6 +591,20 @@ class PosApiController extends Controller
                 return $response;
             }
 
+            // บิลที่เคยติดตรวจแล้วเครื่อง POS กดส่งใหม่สำเร็จ: ปิดรายการตรวจให้เอง
+            if (\Illuminate\Support\Str::isUuid($key)) {
+                $body = json_decode($response->getContent(), true) ?: [];
+                PosOfflineSale::where('offline_uuid', strtolower($key))
+                    ->where('pos_device_id', $device->id)
+                    ->where('status', PosOfflineSale::NEEDS_REVIEW)
+                    ->update([
+                        'status' => PosOfflineSale::POSTED,
+                        'pos_receipt_id' => $body['receipt_id'] ?? null,
+                        'receipt_no' => $body['receipt_no'] ?? $body['doc_number'] ?? null,
+                        'updated_at' => now(),
+                    ]);
+            }
+
             DB::table('pos_api_idempotency')->where('idempotency_key', $key)->update([
                 'state' => 'completed',
                 'status_code' => $response->getStatusCode(),
@@ -598,6 +614,46 @@ class PosApiController extends Controller
 
             return $response;
         }, 3);
+    }
+
+    /**
+     * ERP ปฏิเสธบิลด้วยเหตุทางธุรกิจ (422: ราคา/กะ/สินค้า) — ส่งซ้ำกี่รอบก็ไม่ผ่าน
+     * เก็บบิลทั้งก้อนไว้ให้ผู้จัดการตรวจที่ /pos/offline-sales แล้วบอกเครื่อง POS ให้หยุดยิงซ้ำ
+     * 409/5xx เป็นปัญหาชั่วคราว ปล่อยให้เครื่อง POS ลองใหม่ตามเดิม
+     */
+    private function queueRejectedSaleForReview(JsonResponse $response, Request $request, string $key, $device): JsonResponse
+    {
+        if ($response->getStatusCode() !== 422 || ! \Illuminate\Support\Str::isUuid($key)) {
+            return $response;
+        }
+
+        $body = json_decode($response->getContent(), true) ?: [];
+        $message = $body['message'] ?? 'ERP ปฏิเสธบิล';
+        $uuid = strtolower($key);
+        $existing = PosOfflineSale::where('offline_uuid', $uuid)->first();
+        if ($existing && ((int) $existing->pos_device_id !== (int) $device->id || $existing->status === PosOfflineSale::POSTED)) {
+            return $response;
+        }
+
+        $review = PosOfflineSale::updateOrCreate(['offline_uuid' => $uuid], [
+            'source' => PosOfflineSale::SOURCE_DESKTOP,
+            'pos_device_id' => $device->id,
+            'user_id' => $device->user_id,
+            'branch_id' => $request->input('branch_id') ? (int) $request->input('branch_id') : null,
+            'shift_id' => $request->input('shift_id') ? (int) $request->input('shift_id') : null,
+            'sold_at' => $existing?->sold_at ?? now(),
+            'offline_total' => collect($request->input('items', []))
+                ->sum(fn ($item) => (float) ($item['qty'] ?? 0) * (float) ($item['unit_price'] ?? 0)),
+            'status' => $existing?->status === PosOfflineSale::RESOLVED ? PosOfflineSale::RESOLVED : PosOfflineSale::NEEDS_REVIEW,
+            'review_reason' => $message,
+            'payload' => $request->except(['_token']),
+            'attempts' => ($existing?->attempts ?? 0) + 1,
+        ]);
+
+        return response()->json($body + [
+            'needs_review' => true,
+            'review_status' => $review->status,
+        ], 422);
     }
 
     /**

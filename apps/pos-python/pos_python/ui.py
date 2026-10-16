@@ -22,6 +22,7 @@ from .printers import installed_printer_names, open_cash_drawer, print_text_to_w
 from .promptpay import promptpay_payload, qr_matrix
 from .promotions import active_promotions
 from .services import PosService, money
+from .sync_service import SyncService
 from .settings_service import PrinterProfile, SettingsService
 
 PALETTE = {
@@ -1103,6 +1104,15 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             else:
                 status.addRow("สถานะ", QLabel("ยังไม่ผูกกับ ERP (โหมดออฟไลน์/ทดสอบ)"))
                 status.addRow("บิลรอส่ง", QLabel(f"{service.pending_sync_count()} ใบ"))
+            review_rows = SyncService(service.db, None).review_sales()
+            if review_rows:
+                review_label = QLabel(
+                    f"{len(review_rows)} ใบ — ERP ไม่รับบิล ดูเหตุผลที่ ERP > POS > บิลขายออฟไลน์\n"
+                    + "\n".join(f"{row['document_no']}: {row['last_error'] or '-'}" for row in review_rows[:5])
+                )
+                review_label.setWordWrap(True)
+                review_label.setStyleSheet("color:#9a5b00;font-weight:600")
+                status.addRow("บิลต้องตรวจสอบ", review_label)
             status.addRow("อัตรา VAT ที่ใช้อยู่", QLabel(f"{service.vat_rate():g}%"))
             outer.addLayout(status)
 
@@ -1136,6 +1146,11 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             show_logs.clicked.connect(self.show_sync_logs)
             actions.addWidget(test_sync)
             actions.addWidget(show_logs)
+            if review_rows:
+                resend_review = QPushButton(f"ส่งบิลต้องตรวจสอบใหม่ ({len(review_rows)})")
+                resend_review.setToolTip("กดหลังผู้จัดการแก้ต้นเหตุบน ERP แล้ว เช่น เปิดกะหรือแก้ราคา")
+                resend_review.clicked.connect(self.resend_review_sales)
+                actions.addWidget(resend_review)
             outer.addLayout(actions)
 
             # ผูกเครื่องกับ ERP — บันทึก server URL + device token ลง pos-config.json
@@ -1163,6 +1178,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 outer.addLayout(pair)
 
             return box
+
+        def resend_review_sales(self) -> None:
+            count = SyncService(service.db, None).requeue_review_sales()
+            if online is not None and hasattr(online.worker, "wake"):
+                online.worker.wake()
+            QMessageBox.information(self, "ส่งบิลใหม่", f"นำบิล {count} ใบกลับเข้าคิว ระบบจะส่งขึ้น ERP ในรอบถัดไป")
 
         def test_connection_and_sync(self) -> None:
             if online is None:

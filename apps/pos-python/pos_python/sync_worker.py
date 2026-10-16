@@ -37,6 +37,8 @@ class SyncWorker:
         self.online = False
         self.last_error = "ยังไม่ได้ยืนยัน Device Token กับ ERP"
         self.pending = 0
+        # บิลที่ ERP ปฏิเสธและเก็บไว้ให้ผู้จัดการตรวจ — ไม่นับเป็นคิวรอส่ง
+        self.review = 0
         self.last_result: dict = {"synced": 0, "failed": 0}
         self._stop = threading.Event()
         self._wake = threading.Event()
@@ -78,6 +80,7 @@ class SyncWorker:
             if download:
                 result = {**result, "download": download}
             self.pending = self._pending_count(db)
+            self.review = int(db.execute("SELECT count(*) FROM sync_outbox WHERE status = 'needs_review'").fetchone()[0])
             self.last_result = result
             # ผล sync คิวอย่างเดียวไม่ใช่ health check: คิวว่างไม่เรียก API และ
             # จึงไม่มีสิทธิ์เปลี่ยนสถานะ Device Token ให้เป็นออนไลน์

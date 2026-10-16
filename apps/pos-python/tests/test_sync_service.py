@@ -144,12 +144,12 @@ class SyncServiceTest(unittest.TestCase):
         self.pos.bind_server_shift(self.shift_id, 500)
         api = FakeApi({"success": False, "message": "temporary server validation"})
         sync = SyncService(self.db, api)
-        self.assertEqual(sync.sync_pending_sales(), {"synced": 0, "failed": 1})
+        self.assertEqual(sync.sync_pending_sales(), {"synced": 0, "failed": 1, "review": 0})
         api.response = {"success": True, "receipt_no": "PS-HQ-000002"}
         # บิลที่เพิ่งส่งไม่ผ่านต้องรอก่อน ไม่ยิงซ้ำทันที
-        self.assertEqual(sync.sync_pending_sales(), {"synced": 0, "failed": 0})
+        self.assertEqual(sync.sync_pending_sales(), {"synced": 0, "failed": 0, "review": 0})
         self.db.execute("UPDATE sync_outbox SET next_attempt_at = '2000-01-01T00:00:00+00:00'")
-        self.assertEqual(sync.sync_pending_sales(), {"synced": 1, "failed": 0})
+        self.assertEqual(sync.sync_pending_sales(), {"synced": 1, "failed": 0, "review": 0})
         self.assertEqual(self.db.execute("SELECT count(*) FROM sales").fetchone()[0], 1)
 
     def test_syncs_an_offline_void_after_its_sale_and_uses_the_server_receipt_number(self) -> None:
@@ -159,7 +159,7 @@ class SyncServiceTest(unittest.TestCase):
         self.pos.void_sale(sale_id, cashier_id=77, reason="ลูกค้าเปลี่ยนใจ")
         api = FakeApi({"success": True, "receipt_no": "PS-HQ-000001"})
 
-        self.assertEqual(SyncService(self.db, api).sync_pending_sales(), {"synced": 2, "failed": 0})
+        self.assertEqual(SyncService(self.db, api).sync_pending_sales(), {"synced": 2, "failed": 0, "review": 0})
         self.assertEqual(api.calls[0][0], "/api/pos/checkout")
         self.assertEqual(api.calls[1][0], "/api/pos/receipt/void")
         self.assertEqual(api.calls[1][1]["receipt_no"], "PS-HQ-000001")
@@ -172,6 +172,49 @@ class SyncServiceTest(unittest.TestCase):
             "SELECT priority, depends_on_uuid FROM sync_outbox WHERE aggregate_uuid = ?", (f"{sale_uuid}:void",)
         ).fetchone()
         self.assertEqual((queued["priority"], queued["depends_on_uuid"]), (3, sale_uuid))
+
+
+    def test_a_bill_erp_keeps_for_review_stops_retrying_until_requeued(self) -> None:
+        from pos_python.api_client import LaravelApiError
+        sale_uuid = self.sale()
+        self.pos.bind_server_shift(self.shift_id, 500)
+
+        class RejectingApi(FakeApi):
+            def post(self, path, payload, *, idempotency_key=None):
+                self.calls.append((path, payload, idempotency_key))
+                raise LaravelApiError('HTTP 422: {"success":false,"message":"ราคาต่ำกว่าทุน","needs_review":true}')
+
+        api = RejectingApi()
+        sync = SyncService(self.db, api)
+        result = sync.sync_pending_sales()
+        self.assertEqual((result["review"], result["failed"]), (1, 0))
+        row = self.db.execute("SELECT status, last_error, next_attempt_at FROM sync_outbox WHERE aggregate_uuid = ?", (sale_uuid,)).fetchone()
+        self.assertEqual((row["status"], row["last_error"], row["next_attempt_at"]), ("needs_review", "ราคาต่ำกว่าทุน", None))
+        self.assertEqual(self.db.execute("SELECT sync_status FROM sales WHERE sale_uuid = ?", (sale_uuid,)).fetchone()[0], "needs_review")
+
+        sync.sync_pending_sales()
+        self.assertEqual(len(api.calls), 1, "บิลที่ติดตรวจต้องไม่ถูกยิงซ้ำเอง")
+        self.assertEqual([r["sale_uuid"] for r in sync.review_sales()], [sale_uuid])
+
+        self.assertEqual(sync.requeue_review_sales(), 1)
+        sync.api = FakeApi()
+        sync.sync_pending_sales()
+        self.assertEqual(self.db.execute("SELECT status FROM sync_outbox WHERE aggregate_uuid = ?", (sale_uuid,)).fetchone()[0], "synced")
+        self.assertEqual(sync.review_sales(), [])
+
+    def test_a_422_without_review_flag_keeps_the_old_retry_behaviour(self) -> None:
+        from pos_python.api_client import LaravelApiError
+        sale_uuid = self.sale()
+        self.pos.bind_server_shift(self.shift_id, 500)
+
+        class OldServerApi(FakeApi):
+            def post(self, path, payload, *, idempotency_key=None):
+                raise LaravelApiError('HTTP 422: {"success":false,"message":"x"}')
+
+        result = SyncService(self.db, OldServerApi()).sync_pending_sales()
+        self.assertEqual((result["review"], result["failed"]), (0, 1))
+        status = self.db.execute("SELECT status FROM sync_outbox WHERE aggregate_uuid = ?", (sale_uuid,)).fetchone()[0]
+        self.assertEqual(status, "failed")
 
 
 if __name__ == "__main__":
