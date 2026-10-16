@@ -2656,10 +2656,10 @@
 .pos-search-bar, .pos-categories { background: var(--pos-ui-surface); }
 .pos-search-bar { padding: 12px 14px; }
 .pos-categories { padding: 8px 14px; }
-        .pos-search-input { border-color: var(--pos-ui-border); border-radius: 7px; }
-        .pos-modal-backdrop { position: fixed; inset: 0; z-index: 1200; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(2,8,23,.72); }
-        .pos-modal { width: min(520px, 100%); background: #fff; color: #0f172a; border-radius: 12px; box-shadow: 0 24px 80px rgba(0,0,0,.35); overflow: hidden; }
-        .pos-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #e2e8f0; }
+.pos-search-input { border-color: var(--pos-ui-border); border-radius: 7px; }
+.pos-modal-backdrop { position: fixed; inset: 0; z-index: 1200; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(2,8,23,.72); }
+.pos-modal { width: min(520px, 100%); background: #fff; color: #0f172a; border-radius: 12px; box-shadow: 0 24px 80px rgba(0,0,0,.35); overflow: hidden; }
+.pos-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #e2e8f0; }
 .cat-pill { color: var(--pos-ui-ink); border-radius: 6px; }
 .pos-cart { background: var(--pos-ui-surface); border-color: var(--pos-ui-border); box-shadow: 0 8px 24px rgba(28,48,62,.07); }
 .pos-cart-header { background: var(--pos-ui-surface); border-color: var(--pos-ui-border); }
@@ -2744,7 +2744,8 @@
                     <button type="button" class="btn btn-primary" @click="startScanner()" :disabled="scannerRunning"><i class="bi bi-play-fill"></i> เริ่มสแกน</button>
                     <button type="button" class="btn btn-outline-secondary" @click="stopScanner()" :disabled="!scannerRunning"><i class="bi bi-stop-fill"></i> หยุด</button>
                     <button type="button" class="btn btn-outline-secondary" @click="switchScannerCamera()" :disabled="scannerCameras.length < 2"><i class="bi bi-camera-rotate"></i> เปลี่ยนกล้อง</button>
-                    <label class="btn btn-outline-secondary mb-0"><i class="bi bi-image"></i> เลือกรูป<input type="file" accept="image/*" class="d-none" @change="scanImage($event)"></label>
+                    <button type="button" class="btn btn-outline-secondary" x-show="scannerTorchSupported" @click="toggleTorch()" :class="{ active: scannerTorchOn }"><i class="bi bi-lightbulb"></i> ไฟฉาย</button>
+                    <label class="btn mb-0" :class="scannerPhotoOnly ? 'btn-warning' : 'btn-outline-secondary'"><i class="bi bi-camera"></i> ถ่ายรูปบาร์โค้ด<input type="file" accept="image/*" capture="environment" class="d-none" @change="scanImage($event)"></label>
                 </div>
                 <input class="form-control mt-3" x-model="scannerManualCode" @keydown.enter.prevent="submitManualScan()" placeholder="กรอก Barcode หรือ SKU แล้วกด Enter">
                 <div x-show="scannerError" class="alert alert-warning mt-3 mb-0" x-text="scannerError"></div>
@@ -2973,9 +2974,9 @@ function posApp() {
         customerQuery: '', customerId: null, customerName: '', customerResults: [], customerToolsOpen: false,
 
         // Camera / keyboard-wedge scanner
-        scannerOpen: false, scannerRunning: false, scannerError: '', scannerManualCode: '',
+        scannerOpen: false, scannerRunning: false, scannerPhotoOnly: false, scannerError: '', scannerManualCode: '',
         scannerCameras: [], scannerCameraIndex: 0, scannerInstance: null,
-        lastScanCode: '', lastScanAt: 0,
+        scannerLastCode: '', scannerLastAt: 0, scannerTorchSupported: false, scannerTorchOn: false,
 
         // Payment
         payModalOpen: false, method: 'cash', received: 0, receivedInput: '', processing: false,
@@ -3019,8 +3020,10 @@ function posApp() {
             this.scannerOpen = true;
             this.scannerError = '';
             this.scannerManualCode = '';
+            this.scannerPhotoOnly = false;
             if (location.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(location.hostname)) {
-                this.scannerError = 'การใช้กล้องต้องเปิดผ่าน HTTPS หรือ localhost';
+                this.scannerError = 'เปิดกล้องสดได้เฉพาะ HTTPS — กด “ถ่ายรูปบาร์โค้ด” เพื่ออ่านจากรูปแทน';
+                this.scannerPhotoOnly = true;
                 return;
             }
             await this.startScanner();
@@ -3041,9 +3044,14 @@ function posApp() {
                     (decoded) => this.acceptScannerCode(decoded), () => {});
                 this.scannerRunning = true;
                 this.scannerError = '';
+                this.scannerTorchOn = false;
+                try {
+                    this.scannerTorchSupported = !!this.scannerInstance.getRunningTrackCameraCapabilities?.().torchFeature().isSupported();
+                } catch (e) { this.scannerTorchSupported = false; }
             } catch (error) {
                 this.scannerRunning = false;
-                this.scannerError = 'เปิดกล้องไม่ได้ กรุณาอนุญาตกล้องหรือกรอก Barcode/SKU ด้วยมือ';
+                this.scannerPhotoOnly = true;
+                this.scannerError = 'เปิดกล้องสดไม่ได้ — กด “ถ่ายรูปบาร์โค้ด” เพื่ออ่านจากรูป หรือกรอก Barcode/SKU ด้วยมือ';
             }
         },
 
@@ -3051,6 +3059,8 @@ function posApp() {
             if (!this.scannerInstance || !this.scannerRunning) return;
             try { await this.scannerInstance.stop(); } catch (e) {}
             this.scannerRunning = false;
+            this.scannerTorchSupported = false;
+            this.scannerTorchOn = false;
         },
 
         async closeScanner() {
@@ -3068,17 +3078,28 @@ function posApp() {
             await this.startScanner();
         },
 
-        acceptScannerCode(code) {
+        async toggleTorch() {
+            try {
+                const torch = this.scannerInstance?.getRunningTrackCameraCapabilities().torchFeature();
+                if (!torch?.isSupported()) return;
+                await torch.apply(!this.scannerTorchOn);
+                this.scannerTorchOn = !this.scannerTorchOn;
+            } catch (e) {
+                this.scannerError = 'เปิดไฟฉายไม่ได้บนกล้องนี้';
+            }
+        },
+
+        // กล้องอ่านเฟรมเดิมซ้ำหลายครั้งต่อวินาที จึงกันซ้ำเฉพาะฝั่งกล้อง
+        // เครื่องสแกน keyboard ต้องยิงสินค้าเดิมติดกันได้ (ขายหลายชิ้น)
+        async acceptScannerCode(code, source = 'camera') {
             const value = String(code || '').trim();
             const now = Date.now();
-            if (!value || (value === this.lastScanCode && now - this.lastScanAt < 1000)) return;
-            this.lastScanCode = value;
-            this.lastScanAt = now;
-            this.scannerManualCode = value;
-            this.stopScanner();
-            this.closeScanner();
+            if (!value || (value === this.scannerLastCode && now - this.scannerLastAt < 1500)) return;
+            this.scannerLastCode = value;
+            this.scannerLastAt = now;
+            await this.closeScanner();
             this.searchQ = value;
-            this.scanSearch('camera');
+            await this.scanSearch(source);
         },
 
         submitManualScan() {
@@ -3091,12 +3112,13 @@ function posApp() {
 
         async scanImage(event) {
             const file = event.target.files?.[0];
+            event.target.value = '';
             if (!file || typeof Html5Qrcode === 'undefined') return;
             try {
                 const reader = new Html5Qrcode('pos-qr-file-reader');
                 const code = await reader.scanFile(file, false);
                 await reader.clear();
-                this.acceptScannerCode(code);
+                this.acceptScannerCode(code, 'image');
             } catch (e) {
                 this.scannerError = 'อ่าน QR/Barcode จากรูปไม่สำเร็จ';
             }
@@ -3483,12 +3505,8 @@ function posApp() {
             const scanned = String(this.searchQ || '').trim();
             if (!scanned) return;
 
-            const now = Date.now();
-            if (scanned === this.lastScanCode && now - this.lastScanAt < 1000) return;
-            this.lastScanCode = scanned;
-            this.lastScanAt = now;
-
             this.loading = true;
+            let loggedProductId = null;
 
             try {
                 let scaleBarcode = null;
@@ -3523,20 +3541,41 @@ function posApp() {
                             : 1;
                     }
                     this.addToCart(matches[0], scaleQty, { scaleBarcode });
+                    loggedProductId = matches[0].id ?? null;
                     if (navigator.vibrate) navigator.vibrate(70);
                     try {
-                        const audio = new (window.AudioContext || window.webkitAudioContext)();
-                        const oscillator = audio.createOscillator(); oscillator.frequency.value = 880;
-                        oscillator.connect(audio.destination); oscillator.start(); oscillator.stop(audio.currentTime + 0.06);
+                        window.posScanAudio ??= new (window.AudioContext || window.webkitAudioContext)();
+                        const oscillator = window.posScanAudio.createOscillator(); oscillator.frequency.value = 880;
+                        oscillator.connect(window.posScanAudio.destination); oscillator.start(); oscillator.stop(window.posScanAudio.currentTime + 0.06);
                     } catch (e) {}
                     this.searchQ = '';
                     await this.loadProducts();
                 } else {
                     erpToast('warning', 'ไม่พบสินค้า: ' + scanned, { timer: 1800 });
                 }
+                this.logScan(scanned, source, loggedProductId);
             } finally {
                 this.loading = false;
             }
+        },
+
+        logScan(code, source, productId) {
+            // fire-and-forget: audit ห้ามทำให้การขายช้าหรือล้ม
+            try {
+                fetch(`{{ route('pos.scan-logs.store') }}`, {
+                    method: 'POST',
+                    keepalive: true,
+                    headers: {
+                        'Content-Type': 'application/json', 'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                    },
+                    body: JSON.stringify({
+                        code: String(code).slice(0, 100), context: 'pos', source,
+                        result: productId ? 'matched' : 'not_found',
+                        product_id: productId, branch_id: this.branchId || null,
+                    }),
+                }).catch(() => {});
+            } catch (e) {}
         },
 
         selectCategory(id) {

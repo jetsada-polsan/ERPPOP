@@ -423,7 +423,7 @@ function whApp() {
         poList: [], poLoading: false, poCur: null, poScanError: '',
         stockProduct: null, stockRows: [], stockTotal: 0,
 
-        cameraOk: false, cameraOpen: false, cameraError: '', camStream: null, camTarget: 'receive', camTimer: null, camHandled: false, qrScanner: null, camControls: null, html5QrCode: null,
+        scanSource: 'keyboard', cameraOk: false, cameraOpen: false, cameraError: '', camStream: null, camTarget: 'receive', camTimer: null, camHandled: false, qrScanner: null, camControls: null, html5QrCode: null,
         countId: null, countNumber: '', countProduct: null, countSystem: 0, countQty: '', countBusy: false, countError: '',
 
         init() {
@@ -456,6 +456,8 @@ function whApp() {
         },
         async scan(target) {
             const code = this.scanCode.trim();
+            const source = this.scanSource || 'keyboard';
+            this.scanSource = 'keyboard';
             this.scanCode = '';
             if (!code) return;
             this.scanError = ''; this.poScanError = '';
@@ -465,6 +467,7 @@ function whApp() {
                     const res = await jfetch(`{{ route('wh.lookup') }}?code=${encodeURIComponent(candidate)}&branch_id=${this.branchId ?? ''}`);
                     if (res.found) { found = res; break; }
                 }
+                this.logScan(code, target, source, found?.product?.id ?? null);
                 if (!found) { this.scanError = 'ไม่พบสินค้า: ' + code; return; }
                 this.handleFound(found, target);
             } catch (e) { this.scanError = e.message; }
@@ -665,13 +668,25 @@ function whApp() {
             if (wanted.length) config.formatsToSupport = wanted;
             return config;
         },
-        async acceptCameraCode(raw) {
+        logScan(code, target, source, productId) {
+            // fire-and-forget: audit ห้ามทำให้การรับเข้า/นับสต๊อกล้ม
+            fetch(`{{ route('wh.scan-logs.store') }}`, {
+                method: 'POST', keepalive: true,
+                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf },
+                body: JSON.stringify({
+                    code: String(code).slice(0, 100), context: 'wh_' + target, source,
+                    result: productId ? 'matched' : 'not_found', product_id: productId, branch_id: this.branchId || null,
+                }),
+            }).catch(() => {});
+        },
+        async acceptCameraCode(raw, source = 'camera') {
             const code = String(raw ?? '').trim();
             if (!code || this.camHandled) return;
             this.camHandled = true;
             const target = this.camTarget;
             await this.closeCamera();
             this.scanCode = code;
+            this.scanSource = source;
             await this.scan(target);
         },
         cameraErrorMessage(error) {
@@ -691,7 +706,7 @@ function whApp() {
                 const scanner = new Html5Qrcode('qr-file-reader');
                 const code = await scanner.scanFile(file, false);
                 try { scanner.clear(); } catch (e) { /* ตัวอ่านภาพอาจล้างตัวเองแล้ว */ }
-                await this.acceptCameraCode(code);
+                await this.acceptCameraCode(code, 'image');
             } catch (e) {
                 this.cameraError = 'อ่านภาพบาร์โค้ดไม่สำเร็จ กรุณาถ่ายให้เห็นบาร์โค้ดเพียง 1 ดวงชัด ๆ';
             }

@@ -85,6 +85,7 @@ use App\Http\Controllers\SystemSettingController;
 use App\Http\Controllers\TaxComplianceController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WarehouseLocationController;
+use App\Http\Controllers\ProductScanLogController;
 use App\Http\Controllers\WarehouseMobileController;
 use App\Http\Controllers\WorkflowDefinitionController;
 use Illuminate\Support\Facades\Route;
@@ -215,11 +216,13 @@ Route::prefix('pos')->name('pos.')->group(function () {
     Route::post('/receipts/{receipt}/void', [PosController::class, 'voidReceipt'])->name('receipts.void');
     Route::get('/checkout', fn () => redirect()->route('pos.index'))->name('checkout.redirect');
     Route::post('/checkout', [PosController::class, 'checkout'])->name('checkout');
+    Route::post('/scan-logs', [ProductScanLogController::class, 'store'])->name('scan-logs.store');
 });
 // คลังมือถือ: หน้าเดียวสำหรับมือถือ/PDA — รับเข้า (ใบซื้อ/รับตาม PO) + เช็คสต๊อก
 Route::prefix('wh')->name('wh.')->group(function () {
     Route::get('/', [WarehouseMobileController::class, 'index'])->name('index');
     Route::get('/lookup', [WarehouseMobileController::class, 'lookup'])->name('lookup');
+    Route::post('/scan-logs', [ProductScanLogController::class, 'store'])->name('scan-logs.store');
     Route::get('/products/{product}', [WarehouseMobileController::class, 'productDetail'])->name('products.detail');
     Route::get('/stock', [WarehouseMobileController::class, 'stock'])->name('stock');
     Route::post('/stock-counts', [WarehouseMobileController::class, 'countStart'])->name('stock-counts.start');

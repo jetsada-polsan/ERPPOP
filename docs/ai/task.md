@@ -1080,3 +1080,19 @@ pending
 - Deploy: owner สั่ง `deploy` แล้ว; production workflow `36294643809` ผ่านทั้ง full test, frontend build, upload release และ `scripts/deploy.sh` จาก commit `0e53294`
 - ตรวจหลัง deploy: `/bplus/pos-workbench` ตอบ `302` ไป login ตามสิทธิ์, `/api/pos/ping` ตอบ `401 Unauthorized` ตามปกติเมื่อไม่ส่ง Device Token (ไม่ใช่ 404), และ `/download/python-pos` ตอบ `200` พร้อม `PopCentral-POS-UAT-0.6.25-setup.exe`
 - งานถัดไป: เปิดหน้าเครื่องมือ POS ด้วยบัญชีที่มี `settings.manage` เพื่อกด `ผูกสาขา / ออก Device Token`; จากนั้นติดตั้ง 0.6.25 บน Windows POS จริงและทดสอบ ping → sync → เลือกคนขาย → เปิดกะ → ยิงสินค้าปกติ/สินค้าชั่ง
+
+## Handoff - 2026-10-16 (Claude: แก้สแกน QR/Barcode)
+- Branch: `claude/fix-pos-scanner` (จาก `origin/main` 8eaf600)
+- ทำอะไร:
+  - แก้ bug สแกนกล้อง/รูปบน Web POS แล้วสินค้าไม่เข้าตะกร้า (dedup ของ `acceptScannerCode` ชนกับ `scanSearch`)
+  - เลิกกันซ้ำ 1 วินาทีกับเครื่องสแกน keyboard (ยิงสินค้าเดิมติดกันได้); กล้องกันซ้ำ 1.5 วินาทีแยกเอง
+  - Web POS และคลังมือถือบันทึก `product_scan_logs` ผ่าน `POST /pos/scan-logs`, `POST /wh/scan-logs` (`ProductScanLogController`)
+  - ปุ่มไฟฉาย (ถ้ากล้องรองรับ), ปุ่ม "ถ่ายรูปบาร์โค้ด" (`capture=environment`) ถูกเน้นเมื่อเปิดกล้องสดไม่ได้
+  - ป้ายราคา: เลือกบาร์โค้ด+QR / บาร์โค้ด / QR, EAN-13 ผิด check digit fallback เป็น Code128, แสดง error บนป้าย
+- ทดสอบ: `php artisan test` (PHP 8.3, SQLite) 470 รายการ ผ่าน 469; ที่ไม่ผ่านคือ
+  `FinanceSecurityControlTest::test_operations_page_stays_available_when_a_backup_checksum_is_unreadable` เพราะรันเป็น root (chmod 0000 ไม่มีผล) ไม่เกี่ยวกับงานนี้;
+  `ProductScanLogTest` 8/8 ผ่าน; `node --check` สคริปต์ inline ของ `/pos` และ `/wh` ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้รัน `pnpm run build`; UAT กล้อง Android/iPhone, ไฟฉาย, เครื่องสแกนจริง, พิมพ์ A4;
+  library ยังโหลดจาก unpkg (ยังไม่ bundle ผ่าน Vite); Web POS ยังค้นสินค้าออนไลน์เท่านั้น
+- Deploy: ยังไม่ deploy (ไม่มี migration ใหม่)
+- งานถัดไป: bundle html5-qrcode/bwip-js/zxing ผ่าน Vite, UAT อุปกรณ์จริง

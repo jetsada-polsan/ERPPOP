@@ -36,6 +36,9 @@
         .label-code { width: 100%; height: 14mm; margin-top: 2mm; }
         .label-code-text { font-size: 8px; text-align: center; color: #334155; font-family: monospace; }
         .label-qr { width: 18mm; height: 18mm; margin-left: auto; display: block; }
+        .label-code-error { font-size: 8px; text-align: center; color: #b91c1c; }
+        body.code-barcode .label-qr { display: none; }
+        body.code-qr .label-code, body.code-qr .label-code-text { display: none; }
 
         @media print {
             body { background: #fff; padding: 0; }
@@ -46,12 +49,18 @@
 </head>
 <body onload="window.print()">
     <div class="toolbar">
+        <label>รหัสบนป้าย
+            <select id="code-mode" onchange="setCodeMode(this.value)">
+                <option value="both">บาร์โค้ด + QR</option>
+                <option value="barcode">บาร์โค้ดอย่างเดียว</option>
+                <option value="qr">QR อย่างเดียว</option>
+            </select>
+        </label>
         <button onclick="window.print()">พิมพ์ป้ายราคา ({{ count($labels) }} ป้าย)</button>
     </div>
     <div class="sheet">
         @foreach($labels as $index => $label)
             @php($barcode = $label['product']->barcodes->first()?->barcode ?: $label['product']->sku_code)
-            @php($barcodeType = $label['product']->barcodes->first()?->barcode_type ?: 'CODE128')
             <div class="label">
                 <div>
                     <div class="label-name">{{ $label['product']->name_th }}</div>
@@ -73,11 +82,38 @@
             const index = canvas.id.replace('barcode-', '');
             const value = @json(collect($labels)->map(fn ($label) => $label['product']->barcodes->first()?->barcode ?: $label['product']->sku_code)->values());
             const type = @json(collect($labels)->map(fn ($label) => match ($label['product']->barcodes->first()?->barcode_type) {
-                'EAN13_STANDARD' => 'ean13', 'CODE39' => 'code39', default => 'code128',
+                'EAN13_STANDARD', 'INTERNAL_13' => 'ean13', 'CODE39' => 'code39', default => 'code128',
             })->values());
-            try { bwipjs.toCanvas(canvas, { bcid: type[index], text: value[index], scale: 2, height: 10, includetext: false }); } catch (e) {}
-            try { bwipjs.toCanvas(document.getElementById('qr-' + index), { bcid: 'qrcode', text: value[index], scale: 3, padding: 0 }); } catch (e) {}
+            const markError = (el, text) => {
+                const note = document.createElement('div');
+                note.className = 'label-code-error';
+                note.textContent = text;
+                el.replaceWith(note);
+            };
+            try {
+                bwipjs.toCanvas(canvas, { bcid: type[index], text: value[index], scale: 2, height: 10, includetext: false });
+            } catch (e) {
+                // EAN-13 ของเก่าที่ check digit ไม่ถูก: พิมพ์เป็น Code128 แทน ค่าที่ยิงได้ยังเหมือนเดิม
+                try {
+                    bwipjs.toCanvas(canvas, { bcid: 'code128', text: value[index], scale: 2, height: 10, includetext: false });
+                } catch (e2) { markError(canvas, 'สร้างบาร์โค้ดไม่ได้'); }
+            }
+            const qr = document.getElementById('qr-' + index);
+            try { bwipjs.toCanvas(qr, { bcid: 'qrcode', text: value[index], scale: 3, padding: 0 }); } catch (e) { markError(qr, 'สร้าง QR ไม่ได้'); }
         });
+
+        function setCodeMode(mode) {
+            document.body.classList.remove('code-barcode', 'code-qr');
+            if (mode === 'barcode' || mode === 'qr') document.body.classList.add('code-' + mode);
+            try { localStorage.setItem('priceTagCodeMode', mode); } catch (e) {}
+        }
+        (function () {
+            let mode = new URLSearchParams(location.search).get('codes');
+            try { mode = mode || localStorage.getItem('priceTagCodeMode'); } catch (e) {}
+            mode = ['both', 'barcode', 'qr'].includes(mode) ? mode : 'both';
+            document.getElementById('code-mode').value = mode;
+            setCodeMode(mode);
+        })();
     </script>
 </body>
 </html>
