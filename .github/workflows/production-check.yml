@@ -1,0 +1,31 @@
+name: Production check (backup + restore drill + usage)
+
+# ตรวจ production โดยไม่แก้ข้อมูลจริง: backup, restore ลงฐานแยกแล้วลบทิ้ง, health, จำนวนแถวต่อโมดูล
+# ผลออกเป็น annotation (::notice::) เพื่ออ่านได้จากหน้า run โดยไม่ต้องเปิด log
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+      - run: ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+      - name: Run checks on the server
+        run: |
+          ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "APP_DIR='${{ vars.APP_DIR }}' bash -s" < scripts/ops/production-check.sh | tee result.txt
+          grep '^RESULT ' result.txt | sed 's/^RESULT /::notice title=check::/'
+          {
+            echo '### Production check'
+            echo '```'
+            grep '^RESULT ' result.txt | sed 's/^RESULT //'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
