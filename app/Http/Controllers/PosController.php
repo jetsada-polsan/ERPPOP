@@ -1164,6 +1164,7 @@ class PosController extends Controller
                 $member,
                 $points,
                 $redeemPoints,
+                $clientBillUuid,
             ) {
                 $document = $service->create([
                     'branch_id' => $data['branch_id'],

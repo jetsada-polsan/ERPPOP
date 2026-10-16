@@ -92,7 +92,7 @@ def main() -> int:
 
     print("6) sync ขึ้น → /api/pos/checkout")
     result = sync.sync_pending_sales()
-    assert result == {"synced": 1, "failed": 0}, f"sync ไม่สำเร็จ: {result}"
+    assert (result["synced"], result["failed"], result.get("review", 0)) == (1, 0, 0), f"sync ไม่สำเร็จ: {result}"
     row = db.execute("SELECT sync_status, server_receipt_no FROM sales WHERE sale_uuid=?", (su,)).fetchone()
     assert row["sync_status"] == "synced", f"สถานะบิลไม่ใช่ synced: {row['sync_status']}"
     assert row["server_receipt_no"], "ERP ไม่คืน receipt_no"

@@ -1157,3 +1157,12 @@ pending
 - เจ้าของยืนยันให้ลบ: `pos.popstarcenter.com/` redirect ไป `/download/python-pos`; ลบ `PosController::browser()` และ `pos/browser.blade.php`
 - `scripts/deploy.sh` ลบไฟล์ที่เลิกใช้ตามรายชื่อ `RETIRED_PATHS` (rsync ไม่มี --delete) รวม `public/pos-desktop-preview`
 - ทดสอบ: `php artisan test` 475 ผ่าน 473 (FinanceSecurityControlTest ล้มเพราะรันเป็น root)
+
+## Hotfix - 2026-10-16 (Claude): POS checkout ล้มทุกบิลตั้งแต่ deploy web-pos-offline
+- อาการ: `PosController::checkout` ใช้ `$clientBillUuid` ใน `DB::transaction` closure แต่ไม่ได้อยู่ใน `use (...)`
+  → ErrorException ทุกบิล (ทั้ง Web POS และ `/api/pos/checkout` ของ POS Python) ตั้งแต่ deploy `b993c0c` (~09:40)
+- พบจาก: `POS Python e2e` workflow แดงตั้งแต่ `claude/web-pos-offline` และรันซ้ำในเครื่องได้ (`Undefined variable $clientBillUuid`)
+- ทำไมเทสต์ไม่จับ: `PosOfflineSaleTest` mock checkout ทั้งหมด และไม่มีเทสต์ checkout จริงฝั่ง web
+- แก้: เพิ่ม `$clientBillUuid` ใน `use`; e2e script ยอมรับ key `review` ใหม่
+- ตรวจ: e2e Python → Laravel ผ่าน + `uat:reconcile` ผ่านทุกเกณฑ์
+- ผลกระทบ: POS Python เก็บบิลในคิวและส่งใหม่เองหลัง deploy; Web POS แสดง error ทุกบิลในช่วงนั้น
