@@ -22,10 +22,13 @@ jobs:
       - name: Run checks on the server
         run: |
           ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "APP_DIR='${{ vars.APP_DIR }}' bash -s" < scripts/ops/production-check.sh | tee result.txt
-          grep '^RESULT ' result.txt | sed 's/^RESULT /::notice title=check::/'
+          grep '^RESULT ' result.txt | grep -vE '^RESULT (rows|pos_|offline_|desktop_)' | sed 's/^RESULT /::notice title=check::/'
           {
             echo '### Production check'
             echo '```'
             grep '^RESULT ' result.txt | sed 's/^RESULT //'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+      # annotation ได้ไม่เกิน 10 บรรทัดต่อ step: ตัวเลขการใช้งานแยกไว้อีก step
+      - name: Usage annotations
+        run: grep -E '^RESULT (rows|pos_|offline_|desktop_)' result.txt | sed 's/^RESULT /::notice title=usage::/'
