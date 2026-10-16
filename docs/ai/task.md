@@ -1103,3 +1103,18 @@ pending
 - Smoke หลัง deploy: `/login` 200, `/build/manifest.json` 200, `/pos` และ `/wh` redirect ไปหน้า login ตามปกติ
 - ยังไม่ได้ดู log migration/erp:health ของ run (proxy บล็อกการดาวน์โหลด log) ให้ดูที่หน้า Actions
 - ยังต้อง merge branch เข้า main และทำ UAT กล้อง/เครื่องสแกน/พิมพ์ A4 บนอุปกรณ์จริง
+
+## Handoff - 2026-10-16 (Claude: Web POS ขายออฟไลน์)
+- Branch: `claude/web-pos-offline` (ต่อจาก `claude/fix-pos-scanner`)
+- ทำอะไร: Web POS ขายออฟไลน์แบบ PWA ตาม `docs/POS-WEB-OFFLINE.md`
+  - `public/pos-offline.js` (IndexedDB), `public/pos-sw.js` v3, Alpine ใน `pos/index.blade.php`
+  - migration `2026_10_16_000001_create_pos_offline_sales_table`, `PosOfflineSaleController`, หน้า `/pos/offline-sales`
+  - `PosController::checkout` รับ `X-Offline-Uuid` (web เท่านั้น) กันบิลซ้ำ และใส่หมายเหตุเวลาขายจริงเฉพาะบิลจากคิว
+  - `erp:reset-transactions` รวม `pos_offline_sales`
+- ทดสอบ: `php artisan test` 480 รายการ ผ่าน 479 (ที่ไม่ผ่านคือ FinanceSecurityControlTest เพราะรันเป็น root เหมือนรอบก่อน);
+  `PosOfflineSaleTest` 10/10 รวมเทสต์ที่ผ่าน checkout จริงไม่ mock; ทดลองถอดการค้นบิลเดิมออก → เทสต์แดงจริง;
+  `pos-offline.js` ทดสอบใน Chromium (บันทึก/ค้นบาร์โค้ด/แพ็ค/SKU/คิว) ผ่าน; `node --check` สคริปต์ inline ของ `/pos` ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ทดสอบ end-to-end บนเบราว์เซอร์กับ Host จริง (UAT 6 ข้อใน docs);
+  `pnpm run build` ใน sandbox ไม่ได้ (fonts.bunny.net ถูกบล็อก) ให้ CI build; ไม่ได้แก้ TS
+- Deploy: ยังไม่ deploy (มี migration ใหม่ 1 ไฟล์ — สร้างตารางใหม่อย่างเดียว)
+- งานถัดไป: UAT ออฟไลน์บนเครื่องสาขา 1 เครื่องก่อนเปิดทุกสาขา

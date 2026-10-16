@@ -63,6 +63,13 @@
 - ข้อมูลสินค้าไม่ขึ้นบน POS หมายถึง catalog sync ล้มเหลว; ให้ดูข้อความ error และกดโหลดสินค้าใหม่.
 - POS รองรับโหมดเลือกพนักงานตามอุปกรณ์ในช่วงทดสอบ แต่ก่อนเปิดใช้งานจริงต้องทบทวน PIN/สิทธิ์และการยืนยันตัวตน.
 
+## Web POS ขายออฟไลน์
+
+- Web POS เป็น PWA ขายสำรองตอนเน็ต/Host ล่ม: IndexedDB (`public/pos-offline.js`) + Service Worker (`public/pos-sw.js`)
+- คิวบิลส่งที่ `POST /pos/offline-sales/sync` → `PosController::checkout` เดิม, กันซ้ำด้วย `offline_uuid` (`pos_offline_sales`)
+- บิลที่รับไม่ได้ไม่ทิ้ง: `needs_review` ที่ `/pos/offline-sales` ห้ามเปลี่ยนให้ Host เชื่อราคาจากเครื่องโดยตรง
+- รายละเอียด: `docs/POS-WEB-OFFLINE.md`
+
 ## ขอบเขต Legacy และการนำเข้าข้อมูล
 
 - ไม่ import ประวัติ POS legacy เข้าระบบใหม่ เพราะสาขา, ชื่อ, terminal และเลขเอกสารเดิมเปลี่ยนแล้ว และเสี่ยงยอดซ้ำ.

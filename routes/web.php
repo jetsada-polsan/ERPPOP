@@ -52,6 +52,7 @@ use App\Http\Controllers\OrganizationalUnitController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PosBuildController;
 use App\Http\Controllers\PosController;
+use App\Http\Controllers\PosOfflineSaleController;
 use App\Http\Controllers\PosReleaseController;
 use App\Http\Controllers\PriceTableController;
 use App\Http\Controllers\PriceTagController;
@@ -217,6 +218,11 @@ Route::prefix('pos')->name('pos.')->group(function () {
     Route::get('/checkout', fn () => redirect()->route('pos.index'))->name('checkout.redirect');
     Route::post('/checkout', [PosController::class, 'checkout'])->name('checkout');
     Route::post('/scan-logs', [ProductScanLogController::class, 'store'])->name('scan-logs.store');
+    Route::get('/ping', [PosOfflineSaleController::class, 'ping'])->name('ping');
+    Route::post('/offline-sales/sync', [PosOfflineSaleController::class, 'sync'])->name('offline-sales.sync');
+    Route::get('/offline-sales', [PosOfflineSaleController::class, 'index'])->name('offline-sales.index');
+    Route::post('/offline-sales/{offlineSale}/retry', [PosOfflineSaleController::class, 'retry'])->name('offline-sales.retry');
+    Route::post('/offline-sales/{offlineSale}/resolve', [PosOfflineSaleController::class, 'resolve'])->name('offline-sales.resolve');
 });
 // คลังมือถือ: หน้าเดียวสำหรับมือถือ/PDA — รับเข้า (ใบซื้อ/รับตาม PO) + เช็คสต๊อก
 Route::prefix('wh')->name('wh.')->group(function () {

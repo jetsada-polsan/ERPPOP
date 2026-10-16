@@ -14,6 +14,7 @@ use App\Models\PosPayment;
 use App\Models\PosReceipt;
 use App\Models\PosReceiptItem;
 use App\Models\PosShift;
+use App\Models\PosOfflineSale;
 use App\Models\PosTerminal;
 use App\Models\PriceTable;
 use App\Models\Product;
@@ -164,6 +165,20 @@ class PosController extends Controller
         }
 
         return (int) (auth()->user()?->branch_id ?: $requested);
+    }
+
+    /** เลขบิลในเครื่องของ Web POS (header หรือจากคิวออฟไลน์) — เครื่อง POS desktop ใช้ Idempotency-Key แยกอยู่แล้ว */
+    private function clientBillUuid(Request $request): ?string
+    {
+        if ($request->attributes->get('pos_device')) {
+            return null;
+        }
+        $value = $request->attributes->get('pos_offline_sync')
+            ? $request->input('offline_uuid')
+            : $request->header('X-Offline-Uuid');
+        $value = strtolower(trim((string) $value));
+
+        return \Illuminate\Support\Str::isUuid($value) ? $value : null;
     }
 
     private function enforcedCashierId(?int $requested): ?int
@@ -1025,6 +1040,9 @@ class PosController extends Controller
             'manual_discount_amount' => ['nullable', 'numeric', 'min:0'],
             'discount_approved_by' => ['nullable', 'string', 'max:120'],
             'discount_card_code' => ['nullable', 'string', 'max:30'],
+            // บิลที่ Web POS ขายตอนออฟไลน์: เวลาที่ขายจริง (ส่งผ่าน PosOfflineSaleController เท่านั้น)
+            'offline_sold_at' => ['nullable', 'date'],
+            'offline_uuid' => ['nullable', 'uuid'],
             'vat_amount' => ['nullable', 'numeric', 'min:0'],
             'vat_mode' => ['nullable', 'string', 'in:included,excluded'],
             'items' => ['required', 'array', 'min:1'],
@@ -1035,6 +1053,16 @@ class PosController extends Controller
             'items.*.barcode_type' => ['nullable', Rule::in(BarcodePolicy::ALL)],
             'allow_negative_stock' => ['nullable', 'boolean'],
         ]);
+
+        // Web POS ส่งเลขบิลในเครื่องมากับทุกบิล ถ้าเน็ตหลุดหลังบันทึกแล้ว แล้วบิลเดียวกันถูกส่งซ้ำจากคิวออฟไลน์
+        // ต้องได้ผลเดิม ไม่ใช่บิลที่สอง
+        $clientBillUuid = $this->clientBillUuid($request);
+        if ($clientBillUuid && ($replay = PosOfflineSale::where('offline_uuid', $clientBillUuid)->where('user_id', auth()->id())->where('status', PosOfflineSale::POSTED)->first())) {
+            return response()->json([
+                'success' => true, 'replayed' => true,
+                'doc_number' => $replay->receipt_no, 'receipt_id' => $replay->pos_receipt_id, 'receipt_no' => $replay->receipt_no,
+            ]);
+        }
 
         if ($mismatch = $this->barcodeBelongsToAnotherProduct($data['items'])) {
             return response()->json(['success' => false, 'message' => $mismatch], 422);
@@ -1101,7 +1129,14 @@ class PosController extends Controller
             'mixed' => 'เงินสด+โอน',
             default => 'เช็ค',
         };
+        if (! $request->attributes->get('pos_offline_sync')) {
+            unset($data['offline_sold_at'], $data['offline_uuid']);
+        }
         $remarkParts = ['POS: '.$methodText];
+        if (! empty($data['offline_sold_at'])) {
+            $remarkParts[] = 'ขายออฟไลน์ '.\Illuminate\Support\Carbon::parse($data['offline_sold_at'])->timezone(config('app.timezone'))->format('d/m/Y H:i')
+                .(! empty($data['offline_uuid']) ? ' ('.substr((string) $data['offline_uuid'], 0, 8).')' : '');
+        }
         if ($data['method'] === 'mixed') {
             $remarkParts[] = 'เงินสด: '.number_format((float) ($data['cash_amount'] ?? 0), 2)
                 .' | โอน: '.number_format((float) ($data['transfer_amount'] ?? 0), 2);
@@ -1167,6 +1202,16 @@ class PosController extends Controller
                 }
 
                 $earnedPoints = $member ? $points->settle($member, $document, $redeemPoints) : 0.0;
+
+                if ($clientBillUuid) {
+                    // จองเลขบิลในเครื่องไว้ใน transaction เดียวกับบิล: ซ้ำ = rollback ทั้งบิล
+                    PosOfflineSale::updateOrCreate(['offline_uuid' => $clientBillUuid], [
+                        'user_id' => auth()->id(), 'branch_id' => $data['branch_id'], 'shift_id' => $shift->id,
+                        'sold_at' => $data['offline_sold_at'] ?? now(), 'offline_total' => (float) $document->total_amount,
+                        'status' => PosOfflineSale::POSTED, 'pos_receipt_id' => $receipt->id, 'receipt_no' => $receipt->receipt_no,
+                        'review_reason' => null, 'payload' => request()->attributes->get('pos_offline_sync') ? request()->except('_token') : ['online' => true],
+                    ]);
+                }
 
                 return [$document, $receipt, $earnedPoints];
             });

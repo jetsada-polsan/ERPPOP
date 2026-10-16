@@ -19,6 +19,7 @@
     <script src="{{ asset('vendor/sweetalert2/sweetalert2.all.min.js') }}"></script>
     <script defer src="{{ asset('vendor/alpinejs/alpine.min.js') }}"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="{{ asset('pos-offline.js') }}?v={{ @filemtime(public_path('pos-offline.js')) }}"></script>
     @vite('resources/js/pos-web.ts')
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1881,6 +1882,13 @@
         </button>
         @endif
 
+        <button type="button" class="topbar-btn pos-offline-pill" @click="openOfflinePanel()"
+            :class="{ 'is-down': !hostOnline, 'is-stale': hostOnline && catalogStale }" title="ความพร้อมขายออฟไลน์">
+            <i class="bi" :class="hostOnline ? 'bi-wifi' : 'bi-wifi-off'"></i>
+            <span x-text="hostOnline ? catalogUpdatedLabel : 'ออฟไลน์ — ขายในเครื่อง'"></span>
+            <span class="pos-offline-count" x-show="offlineQueueCount > 0" x-text="'รอส่ง ' + offlineQueueCount"></span>
+        </button>
+
         <div class="pos-clock" x-text="clock"></div>
 
         <button class="topbar-btn" @click="toggleFullscreen()">
@@ -2659,6 +2667,11 @@
 .pos-search-input { border-color: var(--pos-ui-border); border-radius: 7px; }
 .pos-modal-backdrop { position: fixed; inset: 0; z-index: 1200; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(2,8,23,.72); }
 .pos-modal { width: min(520px, 100%); background: #fff; color: #0f172a; border-radius: 12px; box-shadow: 0 24px 80px rgba(0,0,0,.35); overflow: hidden; }
+.pos-offline-pill { gap: 6px; }
+.pos-offline-pill.is-stale { background: #fff4d6 !important; color: #8a5a00 !important; }
+.pos-offline-pill.is-down { background: #b42318 !important; color: #fff !important; }
+.pos-offline-count { background: #fff; color: #b42318; border-radius: 999px; padding: 0 7px; font-size: 11px; font-weight: 800; }
+.pos-offline-warn { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 1100; background: #fff4d6; color: #6b4500; border: 1px solid #f0c36d; border-radius: 10px; padding: 8px 12px; font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
 .pos-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #e2e8f0; }
 .cat-pill { color: var(--pos-ui-ink); border-radius: 6px; }
 .pos-cart { background: var(--pos-ui-surface); border-color: var(--pos-ui-border); box-shadow: 0 8px 24px rgba(28,48,62,.07); }
@@ -2731,6 +2744,41 @@
 </style>
 
 <script src="{{ asset('vendor/qrcodejs/qrcode.min.js') }}"></script>
+    <div x-show="!offlineReady && !offlineError && catalogCount === 0 && hostOnline" x-cloak class="pos-offline-warn">
+        <i class="bi bi-exclamation-triangle-fill"></i> เครื่องนี้ยังไม่พร้อมขายออฟไลน์ — กำลังโหลดสินค้าลงเครื่อง
+        <button type="button" class="btn btn-sm btn-light ms-2" @click="openOfflinePanel()">ดูเช็กลิสต์</button>
+    </div>
+
+    <div x-show="offlinePanelOpen" x-cloak class="pos-modal-backdrop" @keydown.escape.window="offlinePanelOpen = false">
+        <div class="pos-modal" role="dialog" aria-modal="true" aria-label="ความพร้อมขายออฟไลน์">
+            <div class="pos-modal-header">
+                <strong><i class="bi bi-cloud-slash"></i> ความพร้อมขายออฟไลน์</strong>
+                <button type="button" class="btn btn-sm btn-light" @click="offlinePanelOpen = false" title="ปิด"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="p-3">
+                <template x-for="check in offlineChecks" :key="check.label">
+                    <div class="d-flex align-items-start gap-2 py-1 border-bottom">
+                        <i class="bi" :class="check.ok ? 'bi-check-circle-fill text-success' : 'bi-exclamation-circle-fill text-warning'"></i>
+                        <div><div class="fw-semibold" x-text="check.label"></div><small class="text-muted" x-text="check.note"></small></div>
+                    </div>
+                </template>
+                <div class="d-flex gap-2 mt-3 flex-wrap">
+                    <button type="button" class="btn btn-primary btn-sm" @click="refreshCatalog().then(() => openOfflinePanel())" :disabled="!hostOnline || catalogSyncing">
+                        <i class="bi bi-arrow-repeat"></i> อัปเดตสินค้าลงเครื่อง
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @click="checkHost().then(() => openOfflinePanel())" :disabled="offlineSyncing">
+                        <i class="bi bi-cloud-upload"></i> ส่งบิลรอส่ง
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" x-show="canInstall" @click="installApp()"><i class="bi bi-download"></i> ติดตั้งแอป</button>
+                </div>
+                <small class="d-block text-muted mt-3">
+                    ตอนออฟไลน์: คิดเงินจากราคาในเครื่อง, บัตรส่วนลด/แลกแต้มใช้ไม่ได้, เลขที่บิลจริงออกตอนส่งขึ้น Host,
+                    สต็อกตัดตอนส่งขึ้น Host และเครื่องอื่นจะไม่เห็นสต็อกที่ขายไปจนกว่าจะส่ง บิลที่ราคาไม่ตรงจะติด "ต้องตรวจสอบ"
+                </small>
+            </div>
+        </div>
+    </div>
+
     <div x-show="scannerOpen" x-cloak class="pos-modal-backdrop" @keydown.escape.window="closeScanner()">
         <div class="pos-modal" role="dialog" aria-modal="true" aria-label="สแกน QR หรือ Barcode">
             <div class="pos-modal-header">
@@ -2991,6 +3039,14 @@ function posApp() {
         // Clock
         clock: '', isFullscreen: false, canInstall: false, installPrompt: null,
 
+        // Offline selling (PWA + IndexedDB)
+        posUserId: {{ (int) auth()->id() }},
+        hostOnline: navigator.onLine, offlineReady: false, offlineError: '',
+        catalogUpdatedAt: null, catalogCount: 0, catalogSyncing: false,
+        offlineQueueCount: 0, offlineSyncing: false, offlineLastSyncError: '',
+        offlinePanelOpen: false, offlineChecks: [], swActive: false, storagePersisted: false,
+        lastOnlineAt: null, offlineTimer: null,
+
         init() {
             this.loadReceiptSettings();
             this.loadHeldBills();
@@ -3014,6 +3070,7 @@ function posApp() {
             window.addEventListener('pos-vue-action', (event) => this.handleVueAction(event.detail || {}));
             this.registerServiceWorker();
             window.addEventListener('beforeunload', () => this.stopScanner());
+            this.initOffline();
         },
 
         async openScanner() {
@@ -3205,13 +3262,16 @@ function posApp() {
             if (this.cashierId) qs.set('cashier_id', this.cashierId);
             try {
                 const res = await fetch(`{{ route('pos.shift.active') }}?${qs.toString()}`);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
                 this.activeShift = data.shift || null;
+                this.cacheLocal('shift', this.activeShift);
                 if (this.activeShift) {
                     this.countedCash = Number(this.activeShift.expected_cash) || 0;
                 }
             } catch (e) {
-                this.activeShift = null;
+                // Host ล่ม: ใช้กะล่าสุดที่เครื่องนี้เห็น (บิลออฟไลน์ต้องผูกกะเดิม)
+                this.activeShift = this.readLocal('shift');
             }
         },
 
@@ -3276,6 +3336,13 @@ function posApp() {
 
         async submitCloseShift() {
             if (!this.activeShift) return;
+            if (this.offlineQueueCount > 0) {
+                await this.syncOfflineQueue();
+                if (this.offlineQueueCount > 0) {
+                    erpPopup('warning', 'ยังปิดกะไม่ได้', 'มีบิลขายออฟไลน์รอส่งขึ้น Host ' + this.offlineQueueCount + ' บิล ต้องส่งให้ครบก่อนปิดกะ ยอดเงินจึงจะตรง');
+                    return;
+                }
+            }
             this.shiftProcessing = true;
             try {
                 const res = await fetch('{{ route('pos.shift.close') }}', {
@@ -3439,11 +3506,12 @@ function posApp() {
         registerServiceWorker() {
             if (!('serviceWorker' in navigator)) return;
 
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('{{ asset('pos-sw.js') }}', {
-                    scope: '{{ rtrim(url('/'), '/') }}/',
-                }).catch(() => {});
-            });
+            const register = () => navigator.serviceWorker.register('{{ asset('pos-sw.js') }}', {
+                scope: '{{ rtrim(url('/'), '/') }}/',
+            }).catch(() => {});
+            // Alpine init อาจรันหลัง load แล้ว — ถ้ารอ event load จะไม่เคยลงทะเบียน
+            if (document.readyState === 'complete') register();
+            else window.addEventListener('load', register);
         },
 
         async loadProducts() {
@@ -3452,8 +3520,15 @@ function posApp() {
             if (this.searchQ) params.set('q', this.searchQ);
             if (this.categoryId) params.set('category_id', this.categoryId);
             if (this.branchId) params.set('branch_id', this.branchId);
-            const res = await fetch(`{{ route('pos.products') }}?${params}`);
-            this.products = await res.json();
+            try {
+                if (!this.hostOnline) throw new Error('offline');
+                const res = await fetch(`{{ route('pos.products') }}?${params}`);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                this.products = await res.json();
+            } catch (e) {
+                this.markHostDown();
+                this.products = window.PosOffline ? await PosOffline.search(this.searchQ, this.categoryId).catch(() => []) : [];
+            }
             this.loading = false;
         },
 
@@ -3497,8 +3572,15 @@ function posApp() {
             if (this.categoryId) params.set('category_id', this.categoryId);
             if (this.branchId) params.set('branch_id', this.branchId);
 
-            const res = await fetch(`{{ route('pos.products') }}?${params}`);
-            return await res.json();
+            try {
+                if (!this.hostOnline) throw new Error('offline');
+                const res = await fetch(`{{ route('pos.products') }}?${params}`);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return await res.json();
+            } catch (e) {
+                this.markHostDown();
+                return window.PosOffline ? await PosOffline.exact(query, lookup).catch(() => []) : [];
+            }
         },
 
         async scanSearch(source = 'keyboard') {
@@ -3631,7 +3713,12 @@ function posApp() {
         },
 
         confirmLogout() {
+            if (!this.hostOnline) {
+                erpPopup('warning', 'ออกจากระบบไม่ได้ตอนออฟไลน์', 'ถ้าออกตอนนี้จะเข้าใหม่ไม่ได้จนกว่าเน็ต/Host กลับมา ให้ขายต่อได้ตามปกติ');
+                return;
+            }
             const warn = [];
+            if (this.offlineQueueCount > 0) warn.push('มีบิลออฟไลน์รอส่ง ' + this.offlineQueueCount + ' บิล (เก็บไว้ในเครื่อง จะส่งเมื่อล็อกอินกลับมา)');
             if (this.activeShift) warn.push('กะ ' + this.activeShift.shift_no + ' ยังเปิดอยู่ — จะยังเปิดค้างไว้');
             if (this.cart.length > 0) warn.push('มีรายการค้างในตะกร้า ' + this.cart.length + ' รายการ (จะหายไป)');
             erpConfirm('ต้องการออกจากระบบใช่หรือไม่?', warn.join(' · '), {
@@ -3643,9 +3730,11 @@ function posApp() {
         async loadPromotions() {
             try {
                 const res = await fetch(`{{ route('pos.promotions') }}?branch_id=${this.branchId}`);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
                 this.promotions = await res.json();
+                this.cacheLocal('promotions', this.promotions);
             } catch (e) {
-                this.promotions = [];
+                this.promotions = this.readLocal('promotions') || [];
             }
             this.applyQtyPromotions();
         },
@@ -4361,18 +4450,39 @@ function posApp() {
                 items: this.checkoutItems(),
                 _token: document.querySelector('meta[name=csrf-token]').content,
             };
+            // เลขบิลในเครื่อง: ถ้าเน็ตหลุดกลางทาง บิลเดียวกันที่ส่งซ้ำจากคิวจะไม่กลายเป็นสองบิล
+            const billUuid = window.PosOffline ? PosOffline.uuid() : null;
+
+            if (!this.hostOnline) {
+                await this.checkoutOffline(payload, billUuid);
+                this.processing = false;
+                return;
+            }
 
             try {
-                const res = await fetch('{{ route('pos.checkout') }}', {
-                    method: 'POST',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'X-CSRF-TOKEN': payload._token,
-                    },
-                    body: JSON.stringify(payload),
-                });
+                let res;
+                try {
+                    res = await fetch('{{ route('pos.checkout') }}', {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': payload._token,
+                            ...(billUuid ? { 'X-Offline-Uuid': billUuid } : {}),
+                        },
+                        body: JSON.stringify(payload),
+                    });
+                } catch (networkError) {
+                    res = null;
+                }
+                // เน็ตหลุด หรือ Host ล่ม (502/503/504): สลับไปขายในเครื่องด้วยเลขบิลเดิม
+                if (!res || [502, 503, 504].includes(res.status)) {
+                    this.markHostDown();
+                    await this.checkoutOffline(payload, billUuid);
+                    this.processing = false;
+                    return;
+                }
                 const contentType = res.headers.get('content-type') || '';
                 const data = contentType.includes('application/json')
                     ? await res.json()
@@ -4414,6 +4524,231 @@ function posApp() {
                 erpPopup('error', 'เชื่อมต่อ server ไม่ได้');
             }
             this.processing = false;
+        },
+
+        // ───────────── ขายออฟไลน์ ─────────────
+        cacheLocal(key, value) {
+            try { localStorage.setItem(`popstar_pos_${key}_${this.posUserId}`, JSON.stringify({ at: Date.now(), value })); } catch (e) {}
+        },
+
+        readLocal(key) {
+            try { return JSON.parse(localStorage.getItem(`popstar_pos_${key}_${this.posUserId}`) || 'null')?.value ?? null; } catch (e) { return null; }
+        },
+
+        async initOffline() {
+            try {
+                this.lastOnlineAt = Number(localStorage.getItem(`popstar_pos_last_online_${this.posUserId}`)) || null;
+            } catch (e) {}
+            if (!window.PosOffline) {
+                this.offlineError = 'โหลดตัวขายออฟไลน์ไม่สำเร็จ';
+                return;
+            }
+            try {
+                await PosOffline.open();
+                this.storagePersisted = await PosOffline.persist();
+                await this.refreshOfflineStatus();
+            } catch (e) {
+                this.offlineError = e.message || 'เปิดฐานข้อมูลในเครื่องไม่ได้';
+                return;
+            }
+            window.addEventListener('online', () => this.checkHost());
+            window.addEventListener('offline', () => this.markHostDown());
+            if (this.hostOnline) {
+                this.markOnline();
+                this.refreshCatalog();
+            }
+            this.syncOfflineQueue();
+            // อัปเดตสินค้าทุก 10 นาที, เช็ก Host ทุก 20 วินาทีตอนล่มหรือมีคิวค้าง
+            setInterval(() => { if (this.hostOnline) this.refreshCatalog(); }, 10 * 60 * 1000);
+            // ping ทุก 20 วินาทีเสมอ: Service Worker อาจตอบหน้าค้นสินค้าจาก cache จนดูเหมือนออนไลน์
+            setInterval(() => this.checkHost(), 20 * 1000);
+        },
+
+        async refreshOfflineStatus() {
+            if (!window.PosOffline) return;
+            this.catalogUpdatedAt = await PosOffline.getMeta('catalogUpdatedAt');
+            this.catalogCount = Number(await PosOffline.getMeta('catalogCount', 0)) || 0;
+            this.offlineQueueCount = (await PosOffline.queued()).length;
+            this.swActive = Boolean(navigator.serviceWorker?.controller);
+            this.storagePersisted = await PosOffline.persisted();
+            this.offlineReady = this.catalogCount > 0 && this.offlineSessionValid();
+        },
+
+        markOnline() {
+            this.hostOnline = true;
+            this.lastOnlineAt = Date.now();
+            try { localStorage.setItem(`popstar_pos_last_online_${this.posUserId}`, String(this.lastOnlineAt)); } catch (e) {}
+        },
+
+        markHostDown() {
+            if (this.hostOnline) erpToast('warning', 'เชื่อม Host ไม่ได้ — สลับไปขายในเครื่อง', { timer: 2500 });
+            this.hostOnline = false;
+        },
+
+        // ขายออฟไลน์ได้ภายใน 15 วันนับจากออนไลน์ครั้งล่าสุดบนเครื่องนี้ (ต่ออายุเองทุกครั้งที่ต่อ Host ได้)
+        offlineSessionValid() {
+            return Boolean(this.lastOnlineAt) && (Date.now() - this.lastOnlineAt) < 15 * 24 * 3600 * 1000;
+        },
+
+        get catalogStale() {
+            return !this.catalogUpdatedAt || (Date.now() - new Date(this.catalogUpdatedAt).getTime()) > 30 * 60 * 1000;
+        },
+
+        get catalogUpdatedLabel() {
+            if (!this.catalogUpdatedAt) return 'ยังไม่มีสินค้าในเครื่อง';
+            return 'สินค้าอัปเดต ' + new Date(this.catalogUpdatedAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+        },
+
+        async refreshCatalog() {
+            if (!window.PosOffline || this.catalogSyncing) return;
+            this.catalogSyncing = true;
+            try {
+                const params = new URLSearchParams({ all: '1' });
+                if (this.branchId) params.set('branch_id', this.branchId);
+                const res = await fetch(`{{ route('pos.products') }}?${params}`, { headers: { 'Accept': 'application/json' } });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const rows = await res.json();
+                await PosOffline.saveCatalog(rows, this.branchId);
+                this.markOnline();
+            } catch (e) {
+                this.offlineError = 'อัปเดตสินค้าลงเครื่องไม่สำเร็จ: ' + (e.message || e);
+            } finally {
+                this.catalogSyncing = false;
+                await this.refreshOfflineStatus();
+            }
+        },
+
+        async checkHost() {
+            try {
+                const res = await fetch('{{ route('pos.ping') }}', { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
+                const contentType = res.headers.get('content-type') || '';
+                if (!res.ok || !contentType.includes('application/json')) {
+                    // Host ตอบแต่ session หลุด: ต้องล็อกอินใหม่ก่อนส่งคิว
+                    if (res.status === 401 || res.redirected) this.offlineLastSyncError = 'เซสชันหมดอายุ — ล็อกอินใหม่เพื่อส่งบิลออฟไลน์';
+                    return false;
+                }
+                const data = await res.json();
+                if (data.csrf_token) document.querySelector('meta[name=csrf-token]').content = data.csrf_token;
+                const wasDown = !this.hostOnline;
+                this.markOnline();
+                if (wasDown) {
+                    erpToast('success', 'เชื่อม Host ได้แล้ว', { timer: 1800 });
+                    this.loadActiveShift();
+                    this.refreshCatalog();
+                }
+                await this.syncOfflineQueue();
+                return true;
+            } catch (e) {
+                this.markHostDown();
+                return false;
+            }
+        },
+
+        async checkoutOffline(payload, billUuid) {
+            if (!window.PosOffline || !billUuid) {
+                erpPopup('error', 'ขายออฟไลน์ไม่ได้', this.offlineError || 'เครื่องนี้ยังไม่พร้อมขายออฟไลน์');
+                return;
+            }
+            if (!this.offlineSessionValid()) {
+                erpPopup('error', 'ขายออฟไลน์ไม่ได้', 'เครื่องนี้ไม่ได้ออนไลน์เกิน 15 วัน ต้องต่อ Host แล้วล็อกอินใหม่ก่อน');
+                return;
+            }
+            if (!payload.shift_id) {
+                erpPopup('warning', 'ยังไม่เปิดกะ', 'ต้องเปิดกะตอนออนไลน์ก่อนจึงจะขายออฟไลน์ได้');
+                return;
+            }
+            if (payload.discount_card_code || Number(payload.redeem_points) > 0) {
+                erpPopup('warning', 'ใช้ไม่ได้ตอนออฟไลน์', 'บัตรส่วนลดและการแลกแต้มต้องตรวจกับ Host — นำออกแล้วคิดเงินใหม่');
+                return;
+            }
+            const soldAt = new Date().toISOString();
+            const { _token, ...body } = payload;
+            await PosOffline.enqueue({
+                offline_uuid: billUuid, sold_at: soldAt, total: this.totalAmount,
+                cashier_name: this.lockedCashierName || '', payload: body,
+            });
+            await this.refreshOfflineStatus();
+
+            this.lastReceiptId = null;
+            this.lastDocNumber = 'OFF-' + billUuid.slice(0, 8).toUpperCase();
+            this.lastItems = this.cart.map((item, index) => ({ ...item, unit_price: payload.items[index]?.unit_price ?? item.unit_price }));
+            this.lastTotal = this.totalAmount;
+            this.lastMethod = this.method;
+            this.lastCashReceived = this.method === 'cash' ? Number(this.received) || 0 : 0;
+            this.lastChangeAmount = this.method === 'cash' ? Number(this.cashChangeAmount) || 0 : 0;
+            this.lastEarnedPoints = 0;
+            this.lastCashierName = this.lockedCashierName || '';
+            this.lastDateTime = new Date(soldAt).toLocaleString('th-TH', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+            this.payModalOpen = false;
+            this.receiptOpen = true;
+            this.paymentRef = '';
+            this.transferAccountLast4 = '';
+            this.transferConfirmed = false;
+            erpToast('info', 'บันทึกบิลในเครื่องแล้ว จะส่งขึ้น Host เองเมื่อเชื่อมได้', { timer: 2500 });
+        },
+
+        async syncOfflineQueue() {
+            if (!window.PosOffline || this.offlineSyncing || !this.hostOnline) return;
+            const rows = await PosOffline.queued();
+            this.offlineQueueCount = rows.length;
+            if (!rows.length) return;
+            this.offlineSyncing = true;
+            this.offlineLastSyncError = '';
+            try {
+                for (let i = 0; i < rows.length; i += 50) {
+                    const batch = rows.slice(i, i + 50);
+                    const res = await fetch('{{ route('pos.offline-sales.sync') }}', {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json', 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                        },
+                        body: JSON.stringify({ sales: batch.map((r) => ({ offline_uuid: r.offline_uuid, sold_at: r.sold_at, total: r.total, payload: r.payload })) }),
+                    });
+                    const contentType = res.headers.get('content-type') || '';
+                    if (!res.ok || !contentType.includes('application/json')) {
+                        this.offlineLastSyncError = res.status === 419 || res.redirected || res.status === 401
+                            ? 'เซสชันหมดอายุ — ล็อกอินใหม่เพื่อส่งบิลออฟไลน์'
+                            : 'ส่งบิลไม่สำเร็จ (' + res.status + ')';
+                        break;
+                    }
+                    const data = await res.json();
+                    let review = 0;
+                    for (const r of (data.results || [])) {
+                        // posted / needs_review / resolved = Host เก็บบิลไว้แล้ว ลบออกจากเครื่องได้
+                        if (['posted', 'needs_review', 'resolved'].includes(r.status)) {
+                            await PosOffline.removeQueued(r.offline_uuid);
+                            if (r.status === 'needs_review') review++;
+                        } else {
+                            await PosOffline.markQueued(r.offline_uuid, { last_error: r.message || r.status });
+                        }
+                    }
+                    if (review) erpToast('warning', `ส่งบิลแล้ว ${review} บิลติด "ต้องตรวจสอบ" ให้ผู้จัดการดู`, { timer: 4000 });
+                }
+            } catch (e) {
+                this.markHostDown();
+            } finally {
+                this.offlineSyncing = false;
+                await this.refreshOfflineStatus();
+                if (this.offlineQueueCount === 0 && !this.offlineLastSyncError) this.loadActiveShift();
+            }
+        },
+
+        async openOfflinePanel() {
+            await this.refreshOfflineStatus();
+            const standalone = window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true;
+            const days = this.lastOnlineAt ? Math.floor((Date.now() - this.lastOnlineAt) / 86400000) : null;
+            this.offlineChecks = [
+                { ok: !!window.PosOffline && !this.offlineError, label: 'ฐานข้อมูลในเครื่อง (IndexedDB)', note: this.offlineError || 'พร้อม' },
+                { ok: this.swActive, label: 'เก็บตัวแอปไว้ในเครื่อง (Service Worker)', note: this.swActive ? 'พร้อม' : 'โหลดหน้า POS ใหม่ 1 ครั้งตอนออนไลน์' },
+                { ok: standalone, label: 'ติดตั้งเป็นแอป', note: standalone ? 'ติดตั้งแล้ว' : 'Chrome/Edge → เมนู → ติดตั้งแอป' },
+                { ok: this.storagePersisted, label: 'ขอพื้นที่ถาวร (กันเบราว์เซอร์ลบข้อมูล)', note: this.storagePersisted ? 'ได้รับแล้ว' : 'ติดตั้งเป็นแอปแล้วเปิดใหม่' },
+                { ok: this.catalogCount > 0 && !this.catalogStale, label: 'สินค้าและราคาในเครื่อง', note: this.catalogCount.toLocaleString() + ' รายการ · ' + this.catalogUpdatedLabel },
+                { ok: !!this.activeShift, label: 'เปิดกะไว้แล้ว', note: this.activeShift ? this.activeShift.shift_no : 'ต้องเปิดกะตอนออนไลน์' },
+                { ok: this.offlineSessionValid(), label: 'ออนไลน์ภายใน 15 วัน', note: days === null ? 'ยังไม่เคยออนไลน์บนเครื่องนี้' : ('ล่าสุด ' + days + ' วันก่อน') },
+                { ok: this.offlineQueueCount === 0, label: 'บิลออฟไลน์รอส่ง', note: this.offlineQueueCount + ' บิล' + (this.offlineLastSyncError ? ' · ' + this.offlineLastSyncError : '') },
+            ];
+            this.offlinePanelOpen = true;
         },
     };
 }

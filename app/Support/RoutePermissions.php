@@ -21,6 +21,10 @@ class RoutePermissions
         'pos.shift.cash-movement' => 'pos.sell',
         'pos.held-bills.' => 'pos.sell',
         'pos.receipts.void' => 'pos.void',
+        'pos.offline-sales.sync' => 'pos.sell',
+        'pos.offline-sales.index' => 'reports.view',
+        'pos.offline-sales.retry' => 'pos.void',
+        'pos.offline-sales.resolve' => 'pos.void',
         'bplus.pos-preparation' => 'pos.use',
         'bplus.pos-workbench' => 'pos.use',
 

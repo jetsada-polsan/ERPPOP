@@ -53,7 +53,7 @@ class ErpResetTransactions extends Command
         'production_orders', 'production_order_items', 'production_batches', 'production_batch_packages',
         'depreciation_records', 'tax_filing_runs', 'etax_documents', 'accounting_export_runs',
         'member_point_transactions', 'ecommerce_orders', 'ecommerce_order_items',
-        'pos_coupons', 'pos_receipt_return_items',
+        'pos_coupons', 'pos_receipt_return_items', 'pos_offline_sales',
         'stock_lot_lineages', 'recall_cases', 'recall_contacts',
         'purchase_cost_adjustments',
         // staging ของท่อนำเข้า POS เก่าที่ถอดออกไปแล้ว
