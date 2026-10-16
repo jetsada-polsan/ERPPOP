@@ -1118,3 +1118,9 @@ pending
   `pnpm run build` ใน sandbox ไม่ได้ (fonts.bunny.net ถูกบล็อก) ให้ CI build; ไม่ได้แก้ TS
 - Deploy: ยังไม่ deploy (มี migration ใหม่ 1 ไฟล์ — สร้างตารางใหม่อย่างเดียว)
 - งานถัดไป: UAT ออฟไลน์บนเครื่องสาขา 1 เครื่องก่อนเปิดทุกสาขา
+
+## Deploy - 2026-10-16 (claude/web-pos-offline → production)
+- เจ้าของสั่ง deploy; GitHub Actions `Deploy ERP` (production) run 38841224684 จาก `b993c0c`: test ผ่าน, deploy ผ่าน
+- Smoke: `/login` 200, `/build/manifest.json` 200, `/pos-offline.js` 200, `/pos-sw.js` 200 (cache `popstar-pos-v3`),
+  `/pos`, `/pos/ping`, `/pos/offline-sales` redirect ไป login ตามปกติ
+- ยังไม่ได้ดู log migration `pos_offline_sales` (proxy บล็อก log) และยังไม่ได้ทำ UAT ออฟไลน์ 6 ข้อใน `docs/POS-WEB-OFFLINE.md`
