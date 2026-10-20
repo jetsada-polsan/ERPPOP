@@ -219,6 +219,15 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
 - ทดสอบ: `npm run build`, `php artisan test` (380 tests, 379 passed, 1 skipped, 6 incomplete), `php artisan view:cache`, `git diff --check`
 - Deploy: backup `erp-db-20260826-212725.sql.gz`, rsync แบบ dry-run/จริงโดยไม่ใช้ `--delete`, ล้าง cache และ `erp:health` production ผ่านครบ; ตรวจ asset/manifest HTTP 200 และตรวจ source/asset บน Host แล้ว
 
+## Handoff - 2026-10-20 (Codex — Backup memory fix)
+- Commit: `a35bd59`
+- ทำอะไร: แก้ `erp:backup` จากการอ่าน dump ทั้งไฟล์ด้วย `File::get()` เป็นการบีบอัดแบบ streaming ทีละ 1 MB และส่งสำเนา offsite ผ่าน stream เพื่อลดการใช้ RAM; เพิ่ม `ErpBackupTest`
+- ทดสอบ: `php artisan test` ผ่าน 480 tests / 3,615 assertions (ผ่าน 479, skipped 1, incomplete 6); `php -l` และ `git diff --check` ผ่าน
+- Production ที่ตรวจ: migration ครบถึง `2026_10_16_000002`, ดิสก์เหลือประมาณ 9.2 GB; 500 เกิดจาก PHP memory limit 128 MB ระหว่าง `erp:backup` และมีไฟล์ `.sql` ดิบค้าง 3 ไฟล์
+- Deploy: ยังไม่ deploy; push ขึ้น `origin/main` แล้ว รอเจ้าของสั่ง Deploy ผ่าน GitHub Actions
+- ความเสี่ยง: Production มี local modifications/untracked files จำนวนมากและ branch ต่างจาก origin จึงห้าม `git pull`, `reset` หรือ cleanup ทับโดยไม่ได้ทบทวน
+- งานถัดไป: รัน workflow `Deploy ERP` environment `production`, ตรวจ backup ใหม่, `php artisan erp:health`, และค่อยพิจารณาลบไฟล์ `.sql` ดิบค้างหลังยืนยันว่าไม่ต้องเก็บ
+
 ## Handoff - 2026-08-26 (Codex verified navigation and warehouse)
 - Commit โค้ด: `7db1cbf` บนฐาน `7b143e9` ของ Claude
 - Launcher: เมนูบนส่งหมวดให้ Vue โดยตรง, การเลือกหมวดด้านในส่งสถานะกลับเมนูบน, "ทั้งหมด" ล้างสถานะหมวดบน, ตัวเลขนับเฉพาะการ์ดที่แสดง และเก็บการเลือกหมวดระหว่างรอโหลด module
