@@ -39,7 +39,7 @@ class ErpBackup extends Command
             }
 
             $compressed = $raw.'.gz';
-            File::put($compressed, gzencode(File::get($raw), 9));
+            $this->compressFile($raw, $compressed);
             File::delete($raw);
             File::put($compressed.'.sha256', hash_file('sha256', $compressed).'  '.basename($compressed).PHP_EOL);
             $this->securePath($compressed);
@@ -47,8 +47,8 @@ class ErpBackup extends Command
             $disk = $this->option('disk') ?: env('ERP_BACKUP_OFFSITE_DISK');
             if ($disk) {
                 $target = 'erp-backups/'.now()->format('Y/m').'/'.basename($compressed);
-                Storage::disk($disk)->put($target, File::get($compressed));
-                Storage::disk($disk)->put($target.'.sha256', File::get($compressed.'.sha256'));
+                $this->putStream($disk, $target, $compressed);
+                $this->putStream($disk, $target.'.sha256', $compressed.'.sha256');
                 $this->info("ส่งสำเนานอกเครื่องไป disk {$disk}: {$target}");
             }
             $this->prune($directory, max(1, (int) $this->option('keep-days')));
@@ -60,6 +60,59 @@ class ErpBackup extends Command
             $this->error('สำรองฐานข้อมูลไม่สำเร็จ: '.$exception->getMessage());
 
             return self::FAILURE;
+        }
+    }
+
+    /**
+     * Compress a backup in bounded memory instead of loading the whole dump.
+     */
+    private function compressFile(string $source, string $target): void
+    {
+        $input = @fopen($source, 'rb');
+        if ($input === false) {
+            throw new RuntimeException("ไม่สามารถอ่านไฟล์ backup {$source}");
+        }
+
+        $output = @gzopen($target, 'wb9');
+        if ($output === false) {
+            fclose($input);
+            throw new RuntimeException("ไม่สามารถสร้างไฟล์บีบอัด {$target}");
+        }
+
+        try {
+            while (! feof($input)) {
+                $chunk = fread($input, 1024 * 1024);
+                if ($chunk === false) {
+                    throw new RuntimeException("อ่านไฟล์ backup ไม่สำเร็จ {$source}");
+                }
+
+                if ($chunk === '') {
+                    continue;
+                }
+
+                if (gzwrite($output, $chunk) !== strlen($chunk)) {
+                    throw new RuntimeException("เขียนไฟล์บีบอัดไม่สำเร็จ {$target}");
+                }
+            }
+        } finally {
+            fclose($input);
+            gzclose($output);
+        }
+    }
+
+    private function putStream(string $disk, string $target, string $source): void
+    {
+        $stream = @fopen($source, 'rb');
+        if ($stream === false) {
+            throw new RuntimeException("ไม่สามารถอ่านไฟล์สำหรับส่งไป disk {$disk}: {$source}");
+        }
+
+        try {
+            if (! Storage::disk($disk)->put($target, $stream)) {
+                throw new RuntimeException("ส่งไฟล์ไป disk {$disk} ไม่สำเร็จ: {$target}");
+            }
+        } finally {
+            fclose($stream);
         }
     }
 
