@@ -228,6 +228,13 @@ foreach (App\Models\Document::whereIn('id', [1,2,3,4,5])->get() as $d) {
 - ความเสี่ยง: Production มี local modifications/untracked files จำนวนมากและ branch ต่างจาก origin จึงห้าม `git pull`, `reset` หรือ cleanup ทับโดยไม่ได้ทบทวน
 - งานถัดไป: รัน workflow `Deploy ERP` environment `production`, ตรวจ backup ใหม่, `php artisan erp:health`, และค่อยพิจารณาลบไฟล์ `.sql` ดิบค้างหลังยืนยันว่าไม่ต้องเก็บ
 
+## Handoff - 2026-10-22 (Codex — System overview for developer)
+- Commit: `2c9399a`
+- ทำอะไร: เพิ่ม `docs/POPSTAR_SYSTEM_HANDOFF.md` สรุป architecture, technology stack, ERP/POS/warehouse modules, API contract, normal/scale product flow, offline sync, database ownership, security rules และ developer checklist สำหรับส่งต่อให้นักพัฒนา
+- ทดสอบ: `git diff --check` ผ่าน และตรวจเอกสารไม่พบ credential หรือ token จริง
+- Deploy: ไม่เกี่ยวกับ runtime และยังไม่ deploy
+- งานถัดไป: ให้นักพัฒนาอ่านเอกสารนี้ร่วมกับ `docs/POS_DEVELOPER_HANDOFF.md` ก่อนแก้ POS/API
+
 ## Handoff - 2026-08-26 (Codex verified navigation and warehouse)
 - Commit โค้ด: `7db1cbf` บนฐาน `7b143e9` ของ Claude
 - Launcher: เมนูบนส่งหมวดให้ Vue โดยตรง, การเลือกหมวดด้านในส่งสถานะกลับเมนูบน, "ทั้งหมด" ล้างสถานะหมวดบน, ตัวเลขนับเฉพาะการ์ดที่แสดง และเก็บการเลือกหมวดระหว่างรอโหลด module
