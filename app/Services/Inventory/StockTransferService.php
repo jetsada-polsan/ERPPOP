@@ -9,6 +9,7 @@ use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
 use App\Services\Sales\DocumentNumberGenerator;
 use App\Support\DecimalMath;
+use App\Support\StockShortage;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -150,14 +151,19 @@ class StockTransferService
             throw new RuntimeException('ไม่มีรายการสินค้า');
         }
 
+        // รวมทุกรายการที่ขาดก่อนค่อยโยน เพื่อให้ผู้ใช้เห็นครบในรอบเดียว
+        $shortages = [];
         foreach ($items as $item) {
             $fromLocationId = (int) $item->warehouse_location_id;
             $available = StockBalance::where('product_id', $item->product_id)
                 ->where('warehouse_location_id', $fromLocationId)
                 ->value('on_hand_qty') ?? 0;
             if (DecimalMath::compare($item->qty, $available) > 0) {
-                throw new RuntimeException('สต็อกต้นทางไม่พอสำหรับสินค้าบางรายการ');
+                $shortages[] = StockShortage::line((int) $item->product_id, $item->qty, $available);
             }
+        }
+        if ($shortages !== []) {
+            throw new RuntimeException(StockShortage::message($shortages, 'สต็อกต้นทางไม่พอ'));
         }
 
         foreach ($items as $item) {

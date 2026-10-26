@@ -7,6 +7,7 @@ use App\Models\StockBalance;
 use App\Models\StockLot;
 use App\Models\StockMovement;
 use App\Support\DecimalMath;
+use App\Support\StockShortage;
 use Illuminate\Support\Collection;
 use RuntimeException;
 
@@ -42,7 +43,9 @@ class FifoStockService
         $balance = StockBalance::whereKey($balance->id)->lockForUpdate()->firstOrFail();
         $available = DecimalMath::subtract($balance->on_hand_qty, $balance->reserved_qty ?? 0, DecimalMath::QUANTITY_SCALE);
         if (! $allowNegative && DecimalMath::compare($qty, $available) > 0) {
-            throw new RuntimeException('สต๊อกไม่พอสำหรับการตัดสินค้า');
+            throw new RuntimeException(StockShortage::message([
+                StockShortage::line($productId, $qty, $available),
+            ]));
         }
 
         $this->ensureOpeningLot($productId, $locationId, DecimalMath::compare($balance->on_hand_qty, 0) > 0 ? $balance->on_hand_qty : 0);
@@ -62,7 +65,10 @@ class FifoStockService
                 ->where('remaining_qty', '>', 0)->where('quality_status', '!=', 'available')
                 ->sum('remaining_qty');
             if (DecimalMath::compare($restricted, 0) > 0 && DecimalMath::compare($qty, $usable) > 0) {
-                throw new RuntimeException('สต๊อกที่ใช้ได้ไม่พอ เนื่องจากมี Lot ถูกพักตรวจ กักกัน หรือเรียกคืน');
+                throw new RuntimeException(StockShortage::message(
+                    [StockShortage::line($productId, $qty, $usable)],
+                    'สต๊อกที่ใช้ได้ไม่พอ เนื่องจากมี Lot ถูกพักตรวจ กักกัน หรือเรียกคืน',
+                ));
             }
         }
         if ($blockExpired) {
@@ -73,7 +79,10 @@ class FifoStockService
                 ->where('remaining_qty', '>', 0)->whereDate('expiry_date', '<', now()->toDateString())
                 ->sum('remaining_qty');
             if (DecimalMath::compare($expired, 0) > 0 && DecimalMath::compare($qty, $sellable) > 0) {
-                throw new RuntimeException('สต๊อกที่ขายได้ไม่พอ เนื่องจากมี Lot หมดอายุถูกระงับ กรุณาตัดเป็นสินค้าชำรุด');
+                throw new RuntimeException(StockShortage::message(
+                    [StockShortage::line($productId, $qty, $sellable)],
+                    'สต๊อกที่ขายได้ไม่พอ เนื่องจากมี Lot หมดอายุถูกระงับ กรุณาตัดเป็นสินค้าชำรุด',
+                ));
             }
         }
 

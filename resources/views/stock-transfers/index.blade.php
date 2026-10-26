@@ -94,7 +94,8 @@
                     </button>
                 </div>
 
-                <form method="post" action="{{ route('stock-transfers.store') }}" @submit="onSubmit">
+                {{-- novalidate: validate เองใน onSubmit เพื่อไม่ให้ browser บล็อก submit เงียบ ๆ --}}
+                <form method="post" action="{{ route('stock-transfers.store') }}" novalidate @submit="onSubmit">
                     @csrf
                     <div class="modal-body px-4 pb-4">
                         <div class="row g-3 mb-4">
@@ -260,16 +261,27 @@
             },
 
             onSubmit(event) {
-                if (!this.fromLocationId) {
-                    event.preventDefault();
-                    Swal.fire({ icon: 'warning', title: 'กรุณาเลือกคลังต้นทาง' });
-                    return;
+                const form = event.target;
+                const toLocationId = form.to_warehouse_location_id.value;
+                const problems = [];
+
+                if (! form.branch_id.value) problems.push('ยังไม่ได้เลือกสาขา');
+                if (! this.fromLocationId) problems.push('ยังไม่ได้เลือกคลังต้นทาง');
+                if (! toLocationId) problems.push('ยังไม่ได้เลือกคลังปลายทาง');
+                if (toLocationId && String(toLocationId) === String(this.fromLocationId)) {
+                    problems.push('คลังต้นทางและปลายทางต้องไม่ใช่คลังเดียวกัน');
                 }
-                if (this.items.some(item => !item.product_id)) {
-                    event.preventDefault();
-                    Swal.fire({ icon: 'warning', title: 'กรุณาเลือกสินค้าให้ครบทุกแถว' });
-                    return;
-                }
+
+                this.items.forEach((item, index) => {
+                    const row = `แถวที่ ${index + 1}`;
+                    if (! item.product_id) {
+                        problems.push(`${row}: ยังไม่ได้เลือกสินค้า`);
+                    } else if (! (Number(item.qty) > 0)) {
+                        problems.push(`${row} (${item.sku_code}): จำนวนที่โอนต้องมากกว่า 0`);
+                    }
+                });
+
+                window.erpStopSubmit(event, problems);
             },
         };
     }

@@ -1762,6 +1762,30 @@
             });
         })();
 
+        // ── แจ้ง validation ฝั่งหน้าเว็บ ──
+        // ใช้แทน HTML5 required: ถ้า required ว่าง เบราว์เซอร์จะบล็อก submit ตั้งแต่ก่อน
+        // เกิด submit event ทำให้ handler ของหน้าไม่ทำงานและผู้ใช้ไม่เห็นข้อความอะไรเลย.
+        // ประกาศไว้นอก IIFE ข้างบนเพื่อให้มีเสมอ แม้ SweetAlert โหลดไม่สำเร็จ.
+        window.erpStopSubmit = function (event, problems) {
+            if (! Array.isArray(problems) || problems.length === 0) return false;
+
+            event.preventDefault();
+            try {
+                if (window.erpPopup) {
+                    window.erpPopup('warning', 'ยังบันทึกไม่ได้', null, {
+                        icon: 'warning',
+                        html: problems.map((problem) => '• ' + problem).join('<br>'),
+                    });
+                } else {
+                    window.alert('ยังบันทึกไม่ได้\n\n' + problems.join('\n'));
+                }
+            } catch (error) {
+                window.alert('ยังบันทึกไม่ได้\n\n' + problems.join('\n'));
+            }
+
+            return true;
+        };
+
         // ── ยืนยันก่อน submit แบบสวย (Swal) แทน confirm() ของ browser ──
         // ดักได้ทั้ง form[data-confirm="..."] และของเดิม onsubmit="return confirm('...')"
         document.addEventListener('submit', function (e) {

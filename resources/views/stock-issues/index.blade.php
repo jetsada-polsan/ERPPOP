@@ -71,7 +71,8 @@
                 <button type="button" class="btn btn-light rounded-circle" @click="modalOpen = false"><i class="bi bi-x-lg"></i></button>
             </div>
 
-            <form method="post" action="{{ route('stock-issues.store') }}" @submit="onSubmit">
+            {{-- novalidate: validate เองใน onSubmit เพื่อไม่ให้ browser บล็อก submit เงียบ ๆ --}}
+            <form method="post" action="{{ route('stock-issues.store') }}" novalidate @submit="onSubmit">
                 @csrf
                 <input type="hidden" name="type" value="{{ $type }}">
                 <div class="modal-body px-4 pb-4">
@@ -220,10 +221,22 @@
             },
 
             onSubmit(event) {
-                if (this.items.some(item => !item.product_id)) {
-                    event.preventDefault();
-                    Swal.fire({ icon: 'warning', title: 'กรุณาเลือกสินค้าให้ครบทุกแถว' });
-                }
+                const form = event.target;
+                const problems = [];
+
+                if (! form.branch_id.value) problems.push('ยังไม่ได้เลือกสาขา');
+                if (form.purpose && ! form.purpose.value) problems.push('ยังไม่ได้เลือกประเภทการเบิก');
+
+                this.items.forEach((item, index) => {
+                    const row = `แถวที่ ${index + 1}`;
+                    if (! item.product_id) {
+                        problems.push(`${row}: ยังไม่ได้เลือกสินค้า`);
+                    } else if (! (Number(item.qty) > 0)) {
+                        problems.push(`${row} (${item.sku_code}): จำนวนต้องมากกว่า 0`);
+                    }
+                });
+
+                window.erpStopSubmit(event, problems);
             },
         };
     }

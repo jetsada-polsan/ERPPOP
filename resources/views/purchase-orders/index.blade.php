@@ -70,7 +70,8 @@
                 </div>
                 <button type="button" class="btn btn-light rounded-circle" @click="modalOpen = false"><i class="bi bi-x-lg"></i></button>
             </div>
-            <form method="post" action="{{ route('purchase-orders.store') }}" @submit="onSubmit">
+            {{-- novalidate: validate เองใน onSubmit เพื่อไม่ให้ browser บล็อก submit เงียบ ๆ --}}
+            <form method="post" action="{{ route('purchase-orders.store') }}" novalidate @submit="onSubmit">
                 @csrf
                 <div class="px-4 pb-4">
                     <div class="row g-3 mb-3">
@@ -165,8 +166,22 @@ function poPage() {
             this.items.push(poItem());
             this.openProductPicker(this.items.length - 1);
         },
-        onSubmit(e) {
-            if (this.items.some(i => !i.product_id)) { e.preventDefault(); Swal.fire({ icon: 'warning', title: 'กรุณาเลือกสินค้าให้ครบทุกแถว' }); }
+        onSubmit(event) {
+            const form = event.target;
+            const problems = [];
+
+            if (! form.branch_id.value) problems.push('ยังไม่ได้เลือกสาขา');
+
+            this.items.forEach((item, index) => {
+                const row = `แถวที่ ${index + 1}`;
+                if (! item.product_id) {
+                    problems.push(`${row}: ยังไม่ได้เลือกสินค้า`);
+                } else if (! (Number(item.qty) > 0)) {
+                    problems.push(`${row} (${item.sku_code}): จำนวนต้องมากกว่า 0`);
+                }
+            });
+
+            window.erpStopSubmit(event, problems);
         },
     };
 }
