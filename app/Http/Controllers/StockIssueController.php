@@ -43,7 +43,7 @@ class StockIssueController extends Controller
             'type' => $type,
             'typeLabels' => self::TYPE_LABELS,
             'purposes' => StockIssueService::PURPOSES,
-            'branches' => Branch::orderBy('code')->get(['id', 'code', 'name_th']),
+            'branches' => Branch::orderBy('code')->get(['id', 'code', 'name_th', 'default_warehouse_location_id']),
             'locations' => WarehouseLocation::orderBy('code')->get(['id', 'code', 'name']),
             'recentRequisitions' => $recentRequisitions,
             'q' => $q,
@@ -63,6 +63,13 @@ class StockIssueController extends Controller
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'items.*.qty' => ['required', 'numeric', 'min:0.0001'],
         ]);
+
+        // ไม่ระบุตำแหน่งเก็บ = ใช้คลังเริ่มต้นของสาขา ซึ่งต้องมีอยู่จริงก่อน
+        if (! ($data['warehouse_location_id'] ?? null)) {
+            if ($redirect = $this->guardBranchWarehouse($data['branch_id'])) {
+                return $redirect;
+            }
+        }
 
         try {
             $document = $service->create($data);

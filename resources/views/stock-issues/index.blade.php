@@ -80,9 +80,7 @@
                         <div class="col-lg-4">
                             <label class="form-label text-muted small">สาขา</label>
                             <select name="branch_id" required class="form-select">
-                                @foreach($branches as $branch)
-                                    <option value="{{ $branch->id }}">{{ $branch->code }} - {{ $branch->name_th }}</option>
-                                @endforeach
+                                @include('partials.branch-options', ['branches' => $branches])
                             </select>
                         </div>
                         <div class="col-lg-4">

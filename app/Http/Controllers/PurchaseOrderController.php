@@ -43,7 +43,7 @@ class PurchaseOrderController extends Controller
             'status' => $status,
             'q' => $q,
             'statusCounts' => $statusCounts,
-            'branches' => Branch::orderBy('code')->get(['id', 'code', 'name_th']),
+            'branches' => Branch::orderBy('code')->get(['id', 'code', 'name_th', 'default_warehouse_location_id']),
             'suppliers' => Supplier::where('is_active', true)->orderBy('code')->limit(500)->get(['id', 'code', 'name_th']),
         ]);
     }
@@ -63,6 +63,11 @@ class PurchaseOrderController extends Controller
         ], [
             'items.required' => 'กรุณาเพิ่มรายการสินค้าที่ขอซื้ออย่างน้อย 1 รายการ',
         ]);
+
+        // ใบขอซื้อจบที่การรับของเข้าคลังของสาขา - กันไว้ตั้งแต่ต้นทาง
+        if ($redirect = $this->guardBranchWarehouse($data['branch_id'])) {
+            return $redirect;
+        }
 
         $order = DB::transaction(function () use ($data, $numbers) {
             $order = PurchaseOrder::create([

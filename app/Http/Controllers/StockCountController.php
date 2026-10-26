@@ -38,6 +38,13 @@ class StockCountController extends Controller
             'note' => ['nullable', 'string', 'max:2000'],
         ]);
 
+        // ไม่ระบุตำแหน่งเก็บ = ใช้คลังเริ่มต้นของสาขา ซึ่งต้องมีอยู่จริงก่อน
+        if (! ($data['warehouse_location_id'] ?? null)) {
+            if ($redirect = $this->guardBranchWarehouse($data['branch_id'])) {
+                return $redirect;
+            }
+        }
+
         try {
             $count = $service->create($data);
         } catch (RuntimeException $e) {

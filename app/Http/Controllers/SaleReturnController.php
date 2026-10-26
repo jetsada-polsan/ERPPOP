@@ -46,6 +46,11 @@ class SaleReturnController extends Controller
             'items.*.return_disposition' => ['required', 'in:quarantine,available,damage'],
         ]);
 
+        // รับคืน = รับของกลับเข้าคลังเริ่มต้นของสาขา ซึ่งต้องมีอยู่จริงก่อน
+        if ($redirect = $this->guardBranchWarehouse($data['branch_id'])) {
+            return $redirect;
+        }
+
         try {
             $document = $service->create($data);
         } catch (RuntimeException $e) {

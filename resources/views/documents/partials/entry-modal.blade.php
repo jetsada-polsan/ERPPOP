@@ -37,9 +37,7 @@
                             <div class="doc-field" style="grid-column: span 4;">
                                 <label><span class="required">*</span> สาขา / คลัง</label>
                                 <select name="branch_id" required class="doc-select" x-model="branchId" @change="onBranchChanged()">
-                                    @foreach($branches as $branch)
-                                        <option value="{{ $branch->id }}">{{ $branch->code }} - {{ $branch->name_th }}</option>
-                                    @endforeach
+                                    @include('partials.branch-options', ['branches' => $branches])
                                 </select>
                             </div>
 

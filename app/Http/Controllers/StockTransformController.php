@@ -88,6 +88,13 @@ class StockTransformController extends Controller
         ]);
         $data['batch_mode'] = $request->boolean('batch_mode');
 
+        // ไม่ระบุตำแหน่งเก็บ = ใช้คลังเริ่มต้นของสาขา ซึ่งต้องมีอยู่จริงก่อน
+        if (! ($data['warehouse_location_id'] ?? null)) {
+            if ($redirect = $this->guardBranchWarehouse($data['branch_id'])) {
+                return $redirect;
+            }
+        }
+
         try {
             $document = $service->create($data);
         } catch (RuntimeException $e) {

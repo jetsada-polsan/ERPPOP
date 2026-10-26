@@ -52,6 +52,10 @@ class PurchaseController extends Controller
         $data['prices_include_vat'] = $request->boolean('prices_include_vat', true);
         $data['claim_input_vat'] = $request->boolean('claim_input_vat');
 
+        if ($redirect = $this->guardBranchWarehouse($data['branch_id'])) {
+            return $redirect;
+        }
+
         try {
             $document = $service->create($data);
         } catch (RuntimeException $e) {

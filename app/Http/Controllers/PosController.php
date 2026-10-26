@@ -66,7 +66,7 @@ class PosController extends Controller
             return view('pos.retired');
         }
 
-        $branches = Branch::orderBy('code')->get(['id', 'code', 'name_th']);
+        $branches = Branch::orderBy('code')->get(['id', 'code', 'name_th', 'default_warehouse_location_id']);
         $categories = ProductCategory::orderBy('name_th')->get(['id', 'code', 'name_th']);
         // User is the visible POS identity. The adapter id only travels in the
         // compatibility request field used by existing shift/document tables.
@@ -83,7 +83,9 @@ class PosController extends Controller
                 'code' => $user->username,
                 'name' => $user->name,
             ]);
-        $defaultBranchId = $branches->first()?->id;
+        // อย่า default ไปสาขาที่ยังไม่มีคลัง ไม่อย่างนั้นขายแล้วตัดสต๊อกไม่ได้
+        $defaultBranchId = $branches->first(fn (Branch $branch) => $branch->hasDefaultWarehouse())?->id
+            ?? $branches->first()?->id;
         $qrConfig = QrPaymentConfig::where('is_active', true)->with('bankAccount')->first();
         $pointValueBaht = $points->pointValueBaht();
 

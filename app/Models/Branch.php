@@ -15,6 +15,15 @@ class Branch extends Model
         return $this->belongsTo(WarehouseLocation::class, 'default_warehouse_location_id');
     }
 
+    /**
+     * สาขาที่ยังไม่มีคลังเริ่มต้นใช้ออกเอกสารที่ต้องตัด/รับสต๊อกไม่ได้ - เช็คก่อนบันทึก
+     * ทุกครั้ง แทนที่จะปล่อยให้ไปพังลึก ๆ ในชั้น service.
+     */
+    public function hasDefaultWarehouse(): bool
+    {
+        return $this->default_warehouse_location_id !== null;
+    }
+
     public function priceTable(): BelongsTo
     {
         return $this->belongsTo(PriceTable::class);
