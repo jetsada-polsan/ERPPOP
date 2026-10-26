@@ -58,18 +58,20 @@
                         <tbody>
                             <template x-for="(item, index) in items" :key="index">
                                 <tr>
-                                    <td class="position-relative">
-                                        <input type="text" x-model="item.productQuery" @input.debounce.300ms="searchProducts(index)"
-                                            placeholder="ค้นหารหัส/ชื่อสินค้า" class="form-control" autocomplete="off">
+                                    <td>
                                         <input type="hidden" :name="`items[${index}][product_id]`" x-model="item.product_id">
-                                        <div class="typeahead-list" x-show="item.results.length" x-transition>
-                                            <template x-for="product in item.results" :key="product.id">
-                                                <button type="button" class="typeahead-item" @click="selectProduct(index, product)">
-                                                    <span class="fw-semibold" x-text="product.sku_code"></span>
-                                                    <span x-text="product.name_th"></span>
-                                                </button>
+                                        <button type="button" class="selected-product" :class="{ empty: !item.product_id }" @click="openProductPicker(index)">
+                                            <template x-if="!item.product_id">
+                                                <span class="selected-empty"><i class="bi bi-search"></i> ค้นหาและเลือกสินค้า</span>
                                             </template>
-                                        </div>
+                                            <template x-if="item.product_id">
+                                                <span class="selected-product-grid">
+                                                    <b class="selected-code" x-text="item.sku_code"></b>
+                                                    <span class="selected-copy"><strong x-text="item.name_th"></strong><small x-text="item.unit_name + (item.barcode ? ' · ' + item.barcode : '')"></small></span>
+                                                    <span class="selected-change">เปลี่ยน</span>
+                                                </span>
+                                            </template>
+                                        </button>
                                     </td>
                                     <td class="text-end" x-text="item.onHandQty"></td>
                                     <td>
@@ -128,46 +130,49 @@
             </table>
         </div>
     </div>
+
+    {{-- Product picker: อยู่นอกตาราง ไม่ให้ overflow บังผลค้นหา --}}
+    @include('partials.product-picker')
 </div>
 @endsection
 
 @push('head')
 <style>
     [x-cloak]{display:none!important}
-    .tr-items-table{border:1px solid var(--erp-border,var(--erp-border));border-radius:14px}
-    .typeahead-list{position:absolute;z-index:2050;left:0;right:0;top:calc(100% + 4px);
-        max-height:260px;overflow:auto;background:var(--erp-surface,#fff);border:1px solid var(--erp-border,var(--erp-border));border-radius:12px;
-        box-shadow:0 14px 36px rgba(15,23,42,.14);padding:6px}
-    .typeahead-item{width:100%;border:0;background:transparent;border-radius:9px;padding:9px 10px;
-        display:flex;align-items:center;gap:10px;text-align:left}
-    .typeahead-item:hover{background:var(--erp-primary-soft,var(--erp-primary-soft))}
+    .tr-items-table{border:1px solid var(--erp-border);border-radius:14px}
 </style>
 @endpush
 
 @push('scripts')
 <script>
+    function requestTransferItem() {
+        return { product_id: '', sku_code: '', name_th: '', unit_name: '', barcode: '', qty: 1, onHandQty: '-' };
+    }
+
     function requestTransferPage() {
         return {
+            ...erpProductPicker(),
+
             fromLocationId: '',
-            items: [{ product_id: '', productQuery: '', qty: 1, onHandQty: '-', results: [] }],
-            addItem() { this.items.push({ product_id: '', productQuery: '', qty: 1, onHandQty: '-', results: [] }); },
+            items: [requestTransferItem()],
+            addItem() {
+                this.items.push(requestTransferItem());
+                this.openProductPicker(this.items.length - 1);
+            },
             removeItem(index) { this.items.splice(index, 1); },
             onFromLocationChange() { this.items.forEach((item, index) => this.refreshOnHandQty(index)); },
-            async searchProducts(index) {
-                const query = this.items[index].productQuery;
-                if (query.length < 1) { this.items[index].results = []; this.items[index].product_id = ''; return; }
-                const response = await fetch(`{{ route('search.products') }}?q=${encodeURIComponent(query)}`);
-                this.items[index].results = await response.json();
+
+            // hook ที่ picker เรียกหลังเลือกสินค้า
+            onProductPicked(index) {
+                this.refreshOnHandQty(index);
             },
-            async selectProduct(index, product) {
-                this.items[index].product_id = product.id;
-                this.items[index].productQuery = `${product.sku_code} - ${product.name_th}`;
-                this.items[index].results = [];
-                await this.refreshOnHandQty(index);
-            },
+
             async refreshOnHandQty(index) {
                 const item = this.items[index];
-                if (!item.product_id || !this.fromLocationId) { item.onHandQty = '-'; return; }
+                if (! item?.product_id || ! this.fromLocationId) {
+                    if (item) item.onHandQty = '-';
+                    return;
+                }
                 const response = await fetch(`{{ route('search.stock-balance') }}?product_id=${item.product_id}&warehouse_location_id=${this.fromLocationId}`);
                 const data = await response.json();
                 item.onHandQty = Number(data.on_hand_qty || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

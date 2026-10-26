@@ -173,45 +173,7 @@
     </div>
 
     {{-- Product picker: แยกจากตารางเพื่อไม่ให้ผลค้นหาถูก modal/scroll บัง --}}
-    <div class="product-picker-backdrop" x-show="pickerOpen" x-transition.opacity @keydown.escape.window="closeProductPicker()" style="display:none">
-        <div class="product-picker" @click.outside="closeProductPicker()" x-transition>
-            <div class="product-picker-head">
-                <div><i class="bi bi-box-seam"></i><h3>แฟ้มสินค้า — เลือกสินค้า</h3></div>
-                <strong>รายการสินค้า</strong>
-                <button type="button" @click="closeProductPicker()"><i class="bi bi-x-lg"></i></button>
-            </div>
-            <div class="product-picker-menu"><span>แฟ้ม</span><span>แก้ไข</span><span>มุมมอง</span><span>วิธีใช้</span></div>
-            <div class="product-picker-tools">
-                <button type="button" @click="$refs.productPickerSearch.focus()"><i class="bi bi-search"></i><span>ค้นหา</span></button>
-                <button type="button" @click="searchPickerProducts()"><i class="bi bi-arrow-clockwise"></i><span>เรียกใหม่</span></button>
-                <button type="button" @click="closeProductPicker()"><i class="bi bi-x-circle"></i><span>ปิด</span></button>
-            </div>
-            <div class="product-picker-tabs"><span class="active">รายการสินค้า</span><span>ค้นหาจากรหัส / บาร์โค้ด</span></div>
-            <div class="product-picker-search">
-                <label>ค้นหาสินค้า</label><i class="bi bi-search"></i>
-                <input x-ref="productPickerSearch" type="text" x-model="pickerQuery" @input.debounce.220ms="searchPickerProducts()"
-                    @keydown.enter.prevent="selectFirstPickerProduct()" placeholder="พิมพ์รหัส ชื่อ หรือยิงบาร์โค้ด..." autocomplete="off">
-                <button type="button" x-show="pickerQuery" @click="pickerQuery=''; searchPickerProducts()">ล้าง</button>
-            </div>
-            <div class="product-picker-body">
-                <div class="picker-state" x-show="pickerLoading"><i class="bi bi-arrow-repeat"></i> กำลังค้นหา...</div>
-                <div class="picker-state" x-show="!pickerLoading && pickerResults.length === 0">ไม่พบสินค้า ลองเปลี่ยนคำค้นหา</div>
-                <div class="product-picker-grid" x-show="!pickerLoading && pickerResults.length">
-                    <div class="picker-table-head"><span>รหัสสินค้า</span><span>ชื่อสินค้า</span><span>หน่วยนับ</span><span>บาร์โค้ด</span><span>ราคา</span></div>
-                    <template x-for="product in pickerResults" :key="product.id">
-                        <button type="button" class="picker-card" @click="selectPickerProduct(product)">
-                            <span class="picker-code" x-text="product.sku_code"></span>
-                            <span class="picker-copy"><strong x-text="product.name_th"></strong></span>
-                            <span class="picker-unit" x-text="product.unit_name"></span>
-                            <span class="picker-barcode" x-text="product.barcode || '-' "></span>
-                            <span class="picker-price" x-text="'฿' + money(product.default_price)"></span>
-                        </button>
-                    </template>
-                </div>
-            </div>
-            <div class="product-picker-foot"><span x-text="pickerResults.length + ' รายการ — ดับเบิลคลิกหรือกด Enter เพื่อเลือกสินค้า'"></span><button type="button" @click="closeProductPicker()"><i class="bi bi-x-lg"></i> ยกเลิก</button></div>
-        </div>
-    </div>
+    @include('partials.product-picker')
 </div>
 @endsection
 
@@ -222,136 +184,39 @@
     .booking-modal { width: min(960px, 100%); max-height: calc(100vh - 48px); overflow: auto; background: #fff; border-radius: 18px; box-shadow: 0 24px 80px rgba(15,23,42,.24); }
     .booking-items-table { border: 1px solid var(--erp-border); border-radius: 14px; overflow: visible !important; }
     .booking-items-table .table { margin-bottom: 0; }
-    .selected-product { width:100%; min-height:48px; border:1px solid var(--erp-border); border-radius:10px; background:var(--erp-surface-2); padding:6px 10px; text-align:left; color:var(--erp-text); transition:.15s ease; }
-    .selected-product:hover { border-color:#38a7dc; background:var(--erp-primary-soft); box-shadow:0 0 0 3px rgba(14,165,233,.08); }
-    .selected-product.empty { border-style:dashed; color:var(--erp-primary-ink); background:#fff; }
-    .selected-empty { display:flex; align-items:center; justify-content:center; gap:8px; font-weight:700; font-size:13px; }
-    .selected-product-grid { display:grid; grid-template-columns:72px minmax(0,1fr) 42px; gap:10px; align-items:center; }
-    .selected-code { color:var(--erp-primary-ink); font-size:12px; font-variant-numeric:tabular-nums; }
-    .selected-copy { display:grid; min-width:0; gap:1px; }
-    .selected-copy strong,.selected-copy small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .selected-copy strong { font-size:13px; }
-    .selected-copy small { color:var(--erp-muted); font-size:10.5px; }
-    .selected-change { color:var(--erp-primary-ink); font-size:11px; font-weight:700; text-align:right; }
-    .product-picker-backdrop { position:fixed; inset:0; z-index:2200; padding:24px; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.5); backdrop-filter:blur(2px); }
-    .product-picker { width:min(980px,100%); height:min(650px,calc(100vh - 48px)); overflow:hidden; display:grid; grid-template-rows:42px 28px 66px 31px 50px minmax(0,1fr) 40px; background:#ececec; border:1px solid var(--erp-muted); border-radius:2px; box-shadow:0 24px 70px rgba(15,23,42,.38); font-family:Tahoma,"Noto Sans Thai",sans-serif; }
-    .product-picker-head { padding:0 10px; display:grid; grid-template-columns:1fr auto 36px; align-items:center; gap:10px; background:var(--erp-surface-2); border-bottom:1px solid #aeb4ba; }
-    .product-picker-head > div { display:flex; align-items:center; gap:8px; }
-    .product-picker-head > div > i { color:var(--erp-primary-ink); font-size:16px; }
-    .product-picker-head h3 { margin:0; font-size:14px; font-weight:700; color:#161616; }
-    .product-picker-head strong { font-size:12px; color:#111; }
-    .product-picker-head button { width:30px; height:30px; border:0; background:transparent; color:var(--erp-text); }
-    .product-picker-head button:hover { background:var(--erp-border); }
-    .product-picker-menu { display:flex; align-items:center; gap:25px; padding:0 12px; background:#f5f5f5; border-bottom:1px solid #aaa; color:#111; font-size:11.5px; }
-    .product-picker-tools { display:flex; align-items:stretch; padding:4px 10px; gap:2px; background:var(--erp-border); border-bottom:1px solid #aaa; }
-    .product-picker-tools button { width:88px; display:grid; place-items:center; align-content:center; gap:1px; border:0; border-right:1px solid #b7b7b7; background:transparent; color:#111; font-size:10.5px; }
-    .product-picker-tools button:hover { background:var(--erp-surface-2); }
-    .product-picker-tools i { color:var(--erp-primary-ink); font-size:19px; line-height:20px; }
-    .product-picker-tabs { display:flex; align-items:end; padding-left:10px; background:#ddd; border-bottom:1px solid #9ca3aa; }
-    .product-picker-tabs span { height:28px; padding:5px 18px 4px; border:1px solid #999; border-bottom:0; background:#e9e9e9; font-size:11px; }
-    .product-picker-tabs .active { background:#fff; color:var(--erp-danger); font-weight:700; }
-    .product-picker-search { margin:7px 10px; min-height:36px; padding:0 8px; display:grid; grid-template-columns:82px 18px minmax(0,1fr) auto; align-items:center; gap:6px; border:1px solid #a6a6a6; background:var(--erp-primary-soft); }
-    .product-picker-search label { margin:0; font-size:11.5px; font-weight:700; }
-    .product-picker-search > i { color:var(--erp-primary-ink); font-size:14px; }
-    .product-picker-search input { height:27px; min-width:0; border:1px solid #8f969c; outline:0; padding:3px 8px; background:#fff; font-size:12px; color:#111; }
-    .product-picker-search input:focus { border-color:var(--erp-primary-ink); box-shadow:inset 0 0 0 1px var(--erp-primary-ink); }
-    .product-picker-search button { height:27px; min-width:52px; border:1px solid #999; padding:2px 10px; background:linear-gradient(#fff,var(--erp-border)); color:#111; font-size:11px; }
-    .product-picker-body { min-height:0; overflow:auto; margin:0 10px 8px; padding:0; border:1px solid #8f969c; background:#fff; }
-    .product-picker-grid { display:block; min-width:700px; }
-    .picker-table-head,.picker-card { display:grid; grid-template-columns:105px minmax(260px,1fr) 120px 170px 100px; align-items:center; }
-    .picker-table-head { position:sticky; top:0; z-index:1; height:29px; background:linear-gradient(var(--erp-surface-2),var(--erp-border)); border-bottom:1px solid #999; color:#111; font-size:11px; font-weight:700; }
-    .picker-table-head span { height:100%; padding:6px 9px; border-right:1px solid #aaa; }
-    .picker-card { width:100%; min-height:31px; padding:0; text-align:left; color:#111; background:#fff; border:0; border-bottom:1px solid var(--erp-border); font-size:11.5px; }
-    .picker-card:nth-of-type(odd) { background:var(--erp-primary-soft); }
-    .picker-card:hover,.picker-card:focus { outline:0; background:var(--erp-border); box-shadow:inset 3px 0 var(--erp-primary-ink); }
-    .picker-card > span { min-width:0; padding:6px 9px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border-right:1px solid var(--erp-border); }
-    .picker-code { color:#005f99; font-weight:700; font-variant-numeric:tabular-nums; }
-    .picker-copy { min-width:0; }
-    .picker-copy strong { font-size:11.5px; font-weight:500; }
-    .picker-unit,.picker-barcode { color:var(--erp-text); }
-    .picker-price { text-align:right; color:#111; font-weight:700; font-variant-numeric:tabular-nums; }
-    .picker-state { padding:70px 20px; text-align:center; color:var(--erp-muted); font-size:13px; }
-    .picker-state i { margin-right:5px; }
-    .product-picker-foot { padding:5px 10px; display:flex; align-items:center; justify-content:space-between; background:#eee; border-top:1px solid #aeb4ba; color:var(--erp-text); font-size:10.5px; }
-    .product-picker-foot button { min-width:82px; height:28px; border:1px solid #999; padding:3px 12px; background:linear-gradient(#fff,var(--erp-border)); color:#111; font-size:11px; }
-    @media (max-width: 760px) {
-        .product-picker-backdrop { padding:10px; }
-        .product-picker { height:calc(100vh - 20px); grid-template-rows:42px 28px 56px 31px 50px minmax(0,1fr) 40px; }
-        .product-picker-foot span { display:none; }
-        .product-picker-foot { justify-content:flex-end; }
-    }
 </style>
 @endpush
 
 @push('scripts')
 <script>
+    function stockIssueItem() {
+        return { product_id: '', sku_code: '', name_th: '', unit_name: '', barcode: '', qty: 1, onHandQty: '-' };
+    }
+
     function stockIssuePage() {
         return {
+            ...erpProductPicker(),
+
             modalOpen: false,
             locationId: '',
-            items: [{ product_id: '', sku_code: '', name_th: '', unit_name: '', barcode: '', qty: 1, onHandQty: '-' }],
-            pickerOpen: false,
-            pickerIndex: null,
-            pickerQuery: '',
-            pickerResults: [],
-            pickerLoading: false,
-
-            money(value) { return Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+            items: [stockIssueItem()],
 
             addItem() {
-                this.items.push({ product_id: '', sku_code: '', name_th: '', unit_name: '', barcode: '', qty: 1, onHandQty: '-' });
+                this.items.push(stockIssueItem());
                 this.openProductPicker(this.items.length - 1);
             },
 
-            openProductPicker(index) {
-                this.pickerIndex = index;
-                this.pickerQuery = '';
-                this.pickerResults = [];
-                this.pickerOpen = true;
-                this.$nextTick(() => {
-                    this.$refs.productPickerSearch?.focus();
-                    this.searchPickerProducts();
-                });
+            // hook ที่ picker เรียกหลังเลือกสินค้า
+            onProductPicked(index) {
+                this.refreshOnHandQty(index);
             },
 
-            closeProductPicker() {
-                this.pickerOpen = false;
-                this.pickerIndex = null;
-                this.pickerQuery = '';
-                this.pickerResults = [];
-            },
-
-            async searchPickerProducts() {
-                if (!this.pickerOpen) return;
-                const query = this.pickerQuery.trim();
-                this.pickerLoading = true;
-                try {
-                    const response = await fetch(`{{ route('search.products') }}?q=${encodeURIComponent(query)}`);
-                    this.pickerResults = response.ok ? await response.json() : [];
-                } finally {
-                    this.pickerLoading = false;
-                }
-            },
-
-            selectFirstPickerProduct() {
-                const product = this.pickerResults[0];
-                if (product) this.selectPickerProduct(product);
-            },
-
-            async selectPickerProduct(product) {
-                const index = this.pickerIndex;
-                if (index === null || !this.items[index]) return;
-                this.items[index].product_id = product.id;
-                this.items[index].sku_code = product.sku_code || '';
-                this.items[index].name_th = product.name_th || '';
-                this.items[index].unit_name = product.unit_name || 'ไม่ระบุหน่วย';
-                this.items[index].barcode = product.barcode || '';
-                this.closeProductPicker();
-                if (this.locationId) {
-                    const response = await fetch(`{{ route('search.stock-balance') }}?product_id=${product.id}&warehouse_location_id=${this.locationId}`);
-                    const data = await response.json();
-                    this.items[index].onHandQty = Number(data.on_hand_qty || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 });
-                }
+            async refreshOnHandQty(index) {
+                const item = this.items[index];
+                if (! item?.product_id || ! this.locationId) return;
+                const response = await fetch(`{{ route('search.stock-balance') }}?product_id=${item.product_id}&warehouse_location_id=${this.locationId}`);
+                const data = await response.json();
+                item.onHandQty = Number(data.on_hand_qty || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 });
             },
 
             onSubmit(event) {

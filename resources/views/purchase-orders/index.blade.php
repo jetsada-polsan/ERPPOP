@@ -103,16 +103,20 @@
                             <tbody>
                                 <template x-for="(item, idx) in items" :key="idx">
                                     <tr>
-                                        <td class="position-relative">
-                                            <input type="text" x-model="item.q" @input.debounce.300ms="search(idx)" placeholder="ค้นหารหัส/ชื่อสินค้า" class="form-control form-control-sm" autocomplete="off">
+                                        <td>
                                             <input type="hidden" :name="`items[${idx}][product_id]`" x-model="item.product_id">
-                                            <div x-show="item.results.length" style="position:absolute;z-index:50;left:0;right:0;background:#fff;border:1px solid var(--erp-border);border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.12);max-height:200px;overflow:auto">
-                                                <template x-for="p in item.results" :key="p.id">
-                                                    <div @click="pick(idx, p)" style="padding:7px 10px;cursor:pointer;font-size:13px" @mouseenter="$el.style.background='var(--erp-surface-2)'" @mouseleave="$el.style.background=''">
-                                                        <span class="fw-semibold" x-text="p.sku_code"></span> <span x-text="p.name_th"></span>
-                                                    </div>
+                                            <button type="button" class="selected-product" :class="{ empty: !item.product_id }" @click="openProductPicker(idx)">
+                                                <template x-if="!item.product_id">
+                                                    <span class="selected-empty"><i class="bi bi-search"></i> ค้นหาและเลือกสินค้า</span>
                                                 </template>
-                                            </div>
+                                                <template x-if="item.product_id">
+                                                    <span class="selected-product-grid">
+                                                        <b class="selected-code" x-text="item.sku_code"></b>
+                                                        <span class="selected-copy"><strong x-text="item.name_th"></strong><small x-text="item.unit_name + (item.barcode ? ' · ' + item.barcode : '')"></small></span>
+                                                        <span class="selected-change">เปลี่ยน</span>
+                                                    </span>
+                                                </template>
+                                            </button>
                                         </td>
                                         <td><input type="number" step="0.0001" min="0.0001" :name="`items[${idx}][qty]`" x-model.number="item.qty" required class="form-control form-control-sm text-end"></td>
                                         <td><input type="number" step="0.01" min="0" :name="`items[${idx}][unit_price]`" x-model.number="item.unit_price" class="form-control form-control-sm text-end" placeholder="0.00"></td>
@@ -131,6 +135,9 @@
             </form>
         </div>
     </div>
+
+    {{-- Product picker: อยู่นอก modal/ตาราง ไม่ให้ overflow บังผลค้นหา --}}
+    @include('partials.product-picker')
 </div>
 @endsection
 
@@ -144,20 +151,19 @@
 
 @push('scripts')
 <script>
+function poItem() {
+    return { product_id: '', sku_code: '', name_th: '', unit_name: '', barcode: '', qty: 1, unit_price: '' };
+}
+
 function poPage() {
     return {
+        ...erpProductPicker(),
+
         modalOpen: false,
-        items: [{ q: '', product_id: '', qty: 1, unit_price: '', results: [] }],
-        addItem() { this.items.push({ q: '', product_id: '', qty: 1, unit_price: '', results: [] }); },
-        async search(idx) {
-            if (this.items[idx].q.length < 1) { this.items[idx].results = []; this.items[idx].product_id = ''; return; }
-            const res = await fetch(`{{ route('search.products') }}?q=${encodeURIComponent(this.items[idx].q)}`);
-            this.items[idx].results = await res.json();
-        },
-        pick(idx, p) {
-            this.items[idx].product_id = p.id;
-            this.items[idx].q = `${p.sku_code} - ${p.name_th}`;
-            this.items[idx].results = [];
+        items: [poItem()],
+        addItem() {
+            this.items.push(poItem());
+            this.openProductPicker(this.items.length - 1);
         },
         onSubmit(e) {
             if (this.items.some(i => !i.product_id)) { e.preventDefault(); Swal.fire({ icon: 'warning', title: 'กรุณาเลือกสินค้าให้ครบทุกแถว' }); }
