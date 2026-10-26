@@ -7,6 +7,7 @@ use App\Models\Branch;
 use App\Models\PosDevice;
 use App\Models\PosTerminal;
 use App\Models\User;
+use App\Services\Accounting\OpeningBalanceService;
 use App\Support\PosLayout;
 use App\Support\PosReleaseManifest;
 use App\Support\PosTerminalCode;
@@ -111,6 +112,48 @@ class SystemSettingController extends Controller
         AppSetting::set('erp_layout', $data['erp_layout']);
 
         return redirect()->route('settings.index')->with('success', 'บันทึกรูปแบบหน้าหลังบ้านแล้ว');
+    }
+
+    /**
+     * นโยบายสต๊อกติดลบรายสาขา: บางสาขายังต้องขายต่อได้แม้ยอดคงเหลือยังไม่ตรง
+     * (เช่น เพิ่งเปิดและยังไม่ได้ลงยอดยกมา) จึงแยกตั้งทีละสาขา ไม่ใช่ทั้งระบบ.
+     */
+    public function stockPolicies(): View
+    {
+        return view('settings.stock-policies', [
+            'branches' => Branch::with('defaultWarehouseLocation')->orderBy('code')->get(),
+            'negativeCounts' => $this->negativeStockCountsByBranch(),
+        ]);
+    }
+
+    public function updateStockPolicies(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'policies' => ['required', 'array'],
+            'policies.*' => ['required', 'in:block,allow'],
+        ]);
+
+        $branches = Branch::whereIn('id', array_keys($data['policies']))->get();
+        foreach ($branches as $branch) {
+            $branch->update(['negative_stock_policy' => $data['policies'][$branch->id]]);
+        }
+
+        return redirect()->route('settings.stock-policies')
+            ->with('success', "บันทึกนโยบายสต๊อกติดลบ {$branches->count()} สาขาแล้ว");
+    }
+
+    /**
+     * จำนวนรายการสต๊อกติดลบของแต่ละสาขา - ใช้เตือนตอนเลือกนโยบาย.
+     *
+     * @return array<int, int> branch_id => จำนวนรายการติดลบ
+     */
+    private function negativeStockCountsByBranch(): array
+    {
+        // ใช้กติกาเจ้าของคลังเดียวกับการยกยอด (warehouses.branch_id บนฐานจริงเป็น NULL)
+        return app(OpeningBalanceService::class)->negativeStockRows()
+            ->whereNotNull('branch_id')
+            ->countBy('branch_id')
+            ->all();
     }
 
     public function index(): View

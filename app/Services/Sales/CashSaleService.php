@@ -86,7 +86,10 @@ class CashSaleService
                     (int) $branch->default_warehouse_location_id,
                     $qty,
                     $document->id,
-                    allowNegative: (bool) ($data['allow_negative_stock'] ?? false)
+                    // สาขาเป็นประตูชั้นนอก: ตั้ง "ห้ามขายติดลบ" แล้วนโยบายรายสินค้า
+                    // และ flag ที่ส่งมากับรายการก็เปิดให้ติดลบไม่ได้
+                    allowNegative: $branch->allowsNegativeStock()
+                        && (bool) ($data['allow_negative_stock'] ?? false)
                         && ($policies[$productId] ?? 'allow') === 'allow',
                 );
                 $unitCost = $this->costing->unitCostFromAllocations($allocations, $qty, $fallbackCost);

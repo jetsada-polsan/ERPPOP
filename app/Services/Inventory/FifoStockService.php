@@ -118,6 +118,41 @@ class FifoStockService
         return $allocations;
     }
 
+    /**
+     * ตั้งยอดยกมาให้ยอดคงเหลือที่ติดลบกลับมาเป็น 0.
+     *
+     * สต๊อกติดลบเกิดจากการขายของที่ไม่เคยรับเข้าระบบ ตัว lot จึงถูกตัดจนหมดไปแล้ว
+     * และเหลือแต่ balance ที่ติดลบ ของจริงไม่ได้ย้อนกลับมา สิ่งที่ขาดคือ "ของที่
+     * เคยมีอยู่แต่ไม่เคยบันทึกรับเข้า" จึงลงเป็น lot ยกมาที่ใช้หมดแล้ว (remaining 0)
+     * พร้อม movement ไว้ตามรอย แล้วดึง balance กลับมาที่ 0 - lot กับ balance
+     * จึงยังตรงกัน และมีมูลค่าต้นทุนของยอดยกมาบันทึกไว้ให้งานบัญชีใช้ต่อ.
+     */
+    public function openingBalanceForNegative(int $productId, int $locationId, int|float|string $unitCost = 0): ?StockLot
+    {
+        $balance = $this->balance($productId, $locationId);
+        if (DecimalMath::compare($balance->on_hand_qty, 0) >= 0) {
+            return null;
+        }
+
+        $missing = DecimalMath::subtract(0, $balance->on_hand_qty, DecimalMath::QUANTITY_SCALE);
+        $date = now()->toDateString();
+
+        $lot = StockLot::create([
+            'product_id' => $productId,
+            'warehouse_location_id' => $locationId,
+            'lot_number' => 'OPENING-'.now()->format('Ymd').'-'.$productId.'-'.$locationId,
+            'received_date' => $date,
+            'initial_qty' => $missing,
+            'remaining_qty' => 0,
+            'unit_cost' => $unitCost,
+        ]);
+
+        $this->movement($productId, $locationId, null, $lot->id, 'opening', $missing, $date);
+        $balance->update(['on_hand_qty' => 0]);
+
+        return $lot;
+    }
+
     public function restoreDocumentIssues(int $documentId, string $movementType = 'void_in', ?string $movementDate = null): void
     {
         $issues = StockMovement::query()

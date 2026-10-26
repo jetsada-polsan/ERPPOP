@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['code', 'name_th', 'name_en', 'is_active', 'default_warehouse_location_id', 'price_table_id'])]
+#[Fillable(['code', 'name_th', 'name_en', 'is_active', 'default_warehouse_location_id', 'price_table_id', 'negative_stock_policy'])]
 class Branch extends Model
 {
     public function defaultWarehouseLocation(): BelongsTo
@@ -22,6 +22,17 @@ class Branch extends Model
     public function hasDefaultWarehouse(): bool
     {
         return $this->default_warehouse_location_id !== null;
+    }
+
+    /**
+     * สาขานี้ยอมให้ตัดสต๊อกเกินยอดคงเหลือหรือไม่.
+     *
+     * เป็นประตูชั้นนอกสุด: ถ้าสาขาตั้ง 'block' ก็ติดลบไม่ได้เลย ไม่ว่านโยบายราย
+     * สินค้าหรือ flag ที่ส่งมากับรายการจะว่าอย่างไร.
+     */
+    public function allowsNegativeStock(): bool
+    {
+        return ($this->negative_stock_policy ?? 'allow') !== 'block';
     }
 
     public function priceTable(): BelongsTo

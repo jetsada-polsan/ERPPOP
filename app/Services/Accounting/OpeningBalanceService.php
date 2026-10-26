@@ -14,6 +14,8 @@ use App\Models\StockBalance;
 use App\Models\Supplier;
 use App\Models\Warehouse;
 use App\Models\WarehouseLocation;
+use App\Services\Inventory\FifoStockService;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -30,6 +32,19 @@ use RuntimeException;
 class OpeningBalanceService
 {
     public const KINDS = ['stock', 'ar', 'ap', 'cash'];
+
+    /** ชนิด run ของการยกยอดให้สต๊อกที่ติดลบ - แยกจาก 'stock' เพื่อไม่ชนกับการยกยอดตั้งต้นวันเดียวกัน */
+    public const KIND_NEGATIVE_STOCK = 'stock_negative';
+
+    /**
+     * สาขาเจ้าของพื้นที่เก็บ ตามกติกาเดียวกับ resolveLocation(): warehouses.branch_id
+     * ถ้ามี ไม่อย่างนั้นสาขาที่ตั้งพื้นที่นี้เป็นคลังเริ่มต้น (บนฐานจริง warehouses.branch_id
+     * เป็น NULL ทั้งหมด ถ้าดูทางเดียวจะหาเจ้าของไม่เจอเลย)
+     */
+    public const LOCATION_OWNER_SQL = 'coalesce(warehouses.branch_id, '
+        .'(select min(owner.id) from branches owner where owner.default_warehouse_location_id = warehouse_locations.id))';
+
+    public function __construct(private readonly FifoStockService $fifo) {}
 
     /**
      * ตรวจข้อมูลทั้งชุดโดยไม่เขียนอะไรลงฐาน
@@ -108,6 +123,81 @@ class OpeningBalanceService
             ]);
 
             return ['run' => $run, 'lines' => $checked['lines'], 'total' => $amount];
+        });
+    }
+
+    /**
+     * สต๊อกที่ติดลบอยู่ (ขายหรือตัดไปก่อนจะเคยรับเข้าระบบ) พร้อมสาขาเจ้าของ.
+     *
+     * @return Collection<int, object>
+     */
+    public function negativeStockRows(?int $branchId = null): Collection
+    {
+        return DB::table('stock_balances')
+            ->join('warehouse_locations', 'warehouse_locations.id', '=', 'stock_balances.warehouse_location_id')
+            ->leftJoin('warehouses', 'warehouses.id', '=', 'warehouse_locations.warehouse_id')
+            ->join('products', 'products.id', '=', 'stock_balances.product_id')
+            ->where('stock_balances.on_hand_qty', '<', 0)
+            ->when($branchId, fn ($query) => $query->whereRaw(self::LOCATION_OWNER_SQL.' = ?', [$branchId]))
+            ->orderBy('products.sku_code')
+            ->get([
+                'stock_balances.product_id',
+                'stock_balances.warehouse_location_id',
+                'stock_balances.on_hand_qty',
+                'warehouse_locations.code as location_code',
+                'products.sku_code',
+                'products.name_th',
+                'products.average_cost',
+                DB::raw(self::LOCATION_OWNER_SQL.' as branch_id'),
+            ]);
+    }
+
+    /**
+     * ยกยอดให้สต๊อกที่ติดลบของสาขาหนึ่งกลับมาเป็นศูนย์ ทั้งสต๊อกและบัญชี.
+     *
+     * ของที่ขายไปแล้วไม่ได้ย้อนกลับมา สิ่งที่ขาดคือ "ของที่เคยมีแต่ไม่เคยบันทึกรับเข้า"
+     * จึงลงเป็น lot ยกมาที่ใช้หมดแล้ว (FifoStockService::openingBalanceForNegative) แทนการ
+     * ใส่ lot เต็มจำนวนแบบ writeStock() ซึ่งจะทำให้ lot กับ balance ไม่ตรงกัน แล้วลง GL
+     * Dr สินค้าคงเหลือ / Cr บัญชีพักยกยอด ที่มูลค่าต้นทุนเฉลี่ย - เป็นตัวดึง 1140-00
+     * ที่ติดลบกลับขึ้นมา - และบันทึก run ไว้กันทำซ้ำในวันเดียวกัน.
+     *
+     * @return array{run:OpeningBalanceRun, lines:int, total:float}
+     */
+    public function postNegativeStock(int $branchId, string $asOf, ?int $userId = null): array
+    {
+        if (OpeningBalanceRun::where('kind', self::KIND_NEGATIVE_STOCK)->where('branch_id', $branchId)->whereDate('as_of_date', $asOf)->exists()) {
+            throw new RuntimeException("ยกยอดสต๊อกติดลบของสาขานี้ ณ {$asOf} ไปแล้ว — ยกซ้ำไม่ได้");
+        }
+
+        $rows = $this->negativeStockRows($branchId);
+        if ($rows->isEmpty()) {
+            throw new RuntimeException('สาขานี้ไม่มีสต๊อกติดลบ');
+        }
+
+        return DB::transaction(function () use ($rows, $branchId, $asOf, $userId) {
+            $total = 0.0;
+            foreach ($rows as $row) {
+                $missing = abs((float) $row->on_hand_qty);
+                $unitCost = max(0.0, (float) $row->average_cost);
+                $this->fifo->openingBalanceForNegative((int) $row->product_id, (int) $row->warehouse_location_id, $unitCost);
+                $total += round($missing * $unitCost, 2);
+            }
+            $total = round($total, 2);
+
+            $this->postJournal('stock', $total, $asOf);
+
+            $run = OpeningBalanceRun::create([
+                'kind' => self::KIND_NEGATIVE_STOCK,
+                'branch_id' => $branchId,
+                'as_of_date' => $asOf,
+                'line_count' => $rows->count(),
+                'total_amount' => $total,
+                'source_name' => 'erp:stock-negative-report --fix-opening',
+                'posted_by' => $userId,
+                'posted_at' => now(),
+            ]);
+
+            return ['run' => $run, 'lines' => $rows->count(), 'total' => $total];
         });
     }
 

@@ -714,6 +714,8 @@ Route::prefix('settings')->name('settings.')->group(function () {
     Route::post('/reports', [ReportGovernanceController::class, 'update'])->name('reports.update');
     Route::get('/workflows', [WorkflowDefinitionController::class, 'index'])->name('workflows');
     Route::put('/workflows/{workflowDefinition}', [WorkflowDefinitionController::class, 'update'])->name('workflows.update');
+    Route::get('/stock-policies', [SystemSettingController::class, 'stockPolicies'])->name('stock-policies');
+    Route::post('/stock-policies', [SystemSettingController::class, 'updateStockPolicies'])->name('stock-policies.update');
     Route::get('/module-controls', [ModuleControlController::class, 'index'])->name('module-controls');
     Route::post('/module-controls/taxonomies/{type}', [ModuleControlController::class, 'storeTaxonomy'])->name('module-controls.taxonomies.store');
     Route::put('/module-controls/taxonomies/{type}/{id}', [ModuleControlController::class, 'updateTaxonomy'])->name('module-controls.taxonomies.update');

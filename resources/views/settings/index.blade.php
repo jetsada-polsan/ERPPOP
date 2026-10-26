@@ -44,6 +44,7 @@
             <div class="set-nav-group mt-3"><i class="bi bi-sliders"></i> ตั้งค่าด้านบัญชี</div>
             <button type="button" class="set-nav-link" :class="tab === 'payment' && 'active'" @click="tab = 'payment'">ข้อมูลการรับชำระ</button>
             <button type="button" class="set-nav-link" :class="tab === 'accounting' && 'active'" @click="tab = 'accounting'">บันทึกบัญชี</button>
+            <a href="{{ route('settings.stock-policies') }}" class="set-nav-link text-decoration-none">นโยบายสต๊อกติดลบ</a>
 
             <div class="set-nav-group mt-3"><i class="bi bi-pc-display"></i> โปรแกรมหน้าร้าน</div>
             <a href="{{ route('settings.receipt-template.edit') }}" class="set-nav-link text-decoration-none">ออกแบบใบเสร็จ POS</a>
