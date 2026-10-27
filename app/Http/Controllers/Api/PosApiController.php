@@ -62,6 +62,9 @@ class PosApiController extends Controller
                         ->when($branchId, fn ($branch) => $branch->orWhere('branch_id', $branchId)));
             })
             ->orderBy('id')
+            ->get()
+            // QR ของสาขานี้มาก่อน QR กลาง (ไม่ผูกบัญชี หรือบัญชีไม่ระบุสาขา)
+            ->sortBy(fn (QrPaymentConfig $config) => $branchId && (int) $config->bankAccount?->branch_id === (int) $branchId ? 0 : 1)
             ->first();
 
         return response()->json([

@@ -11,24 +11,69 @@
             </div>
             <button type="button" class="btn btn-primary rounded-pill px-4" @click="openCreate()"><i class="bi bi-plus-lg me-1"></i> เพิ่มบัญชี</button>
         </div>
+        {{-- ภาพรวมรายสาขา: ช่องที่ยังว่างคือรอเลขบัญชีของสาขานั้น --}}
+        <div class="content-card p-4 mb-3">
+            <h2 class="h6 fw-bold mb-1">บัญชีรับเงินรายสาขา</h2>
+            <p class="small text-muted mb-3">
+                สาขาที่ยังไม่ตั้ง เงินโอน/QR/เช็คจะลงบัญชีกลาง
+                <b>{{ $fallbackGl ? $fallbackGl->code.' '.$fallbackGl->name_th : 'ยังไม่มีบัญชีธนาคารในผัง' }}</b>
+                และใช้ QR กลาง <b>{{ $centralQr?->name ?? '— ยังไม่ได้ตั้ง —' }}</b>
+                · เพิ่มบัญชีแล้วเลือกสาขา + บัญชี GL ของสาขานั้นเพื่อแยก
+            </p>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>สาขา</th><th>บัญชีธนาคาร</th><th>บัญชี GL</th><th>QR พร้อมเพย์</th></tr></thead>
+                    <tbody>
+                        @foreach($overview as $row)
+                        <tr>
+                            <td class="fw-semibold">{{ $row['branch']->code }} - {{ $row['branch']->name_th }}</td>
+                            <td>
+                                @if($row['bank'])
+                                    {{ $row['bank']->bank_name }} {{ $row['bank']->account_no }}
+                                @else
+                                    <span class="badge text-bg-light border text-muted">ยังว่าง — ใช้บัญชีกลาง</span>
+                                @endif
+                            </td>
+                            <td class="small">
+                                @if($row['bank']?->chartOfAccount)
+                                    {{ $row['bank']->chartOfAccount->code }} {{ $row['bank']->chartOfAccount->name_th }}
+                                @else
+                                    <span class="text-muted">{{ $fallbackGl?->code ?? '-' }} (กลาง)</span>
+                                @endif
+                            </td>
+                            <td class="small">
+                                @if($row['qr'])
+                                    {{ $row['qr']->name }}
+                                @else
+                                    <span class="text-muted">ใช้ QR กลาง</span>
+                                @endif
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <div class="content-card p-4">
             <div class="table-responsive">
                 <table class="table align-middle">
-                    <thead><tr><th>ธนาคาร</th><th>เลขที่บัญชี</th><th>ชื่อบัญชี</th><th>สาขา</th><th></th></tr></thead>
+                    <thead><tr><th>ธนาคาร</th><th>เลขที่บัญชี</th><th>ชื่อบัญชี</th><th>สาขา</th><th>บัญชี GL</th><th></th></tr></thead>
                     <tbody>
                         @forelse($accounts as $acc)
                         <tr>
                             <td class="fw-semibold">{{ $acc->bank_name }}</td>
                             <td>{{ $acc->account_no }}</td>
                             <td>{{ $acc->account_name }}</td>
-                            <td>{{ $acc->branch?->name_th ?? '-' }}</td>
+                            <td>{{ $acc->branch?->name_th ?? 'บัญชีกลาง (ทุกสาขา)' }}</td>
+                            <td class="small">{{ $acc->chartOfAccount ? $acc->chartOfAccount->code.' '.$acc->chartOfAccount->name_th : '— ยังไม่ผูก —' }}</td>
                             <td class="text-end">
                                 <button type="button" class="btn btn-sm btn-light border"
-                                    @click="openEdit({{ $acc->id }}, '{{ addslashes($acc->bank_name) }}', '{{ $acc->account_no }}', '{{ addslashes($acc->account_name ?? '') }}', {{ $acc->branch_id ?? 'null' }})">แก้ไข</button>
+                                    @click="openEdit({{ $acc->id }}, '{{ addslashes($acc->bank_name) }}', '{{ $acc->account_no }}', '{{ addslashes($acc->account_name ?? '') }}', {{ $acc->branch_id ?? 'null' }}, {{ $acc->chart_of_account_id ?? 'null' }})">แก้ไข</button>
                             </td>
                         </tr>
                         @empty
-                        <tr><td colspan="5" class="py-5 text-center text-muted">ยังไม่มีบัญชีธนาคาร — กด “เพิ่มบัญชี” แล้วกรอกบัญชีจริงของบริษัทก่อนใช้งานรับโอน ฝาก/ถอน และเช็ค</td></tr>
+                        <tr><td colspan="6" class="py-5 text-center text-muted">ยังไม่มีบัญชีธนาคาร — กด “เพิ่มบัญชี” แล้วกรอกบัญชีจริงของบริษัทก่อนใช้งานรับโอน ฝาก/ถอน และเช็ค</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -52,9 +97,16 @@
                             <div class="col-6"><label class="form-label text-muted small">ชื่อบัญชี</label><input type="text" name="account_name" x-model="accountName" class="form-control"></div>
                             <div class="col-12"><label class="form-label text-muted small">สาขา</label>
                                 <select name="branch_id" x-model="branchId" class="form-select">
-                                    <option value="">-- ไม่ระบุ --</option>
+                                    <option value="">-- บัญชีกลาง (ทุกสาขา) --</option>
                                     @foreach($branches as $b)<option value="{{ $b->id }}">{{ $b->code }} - {{ $b->name_th }}</option>@endforeach
                                 </select>
+                            </div>
+                            <div class="col-12"><label class="form-label text-muted small">บัญชีในผัง GL (เงินเข้า/ออกบัญชีนี้ลงที่นี่)</label>
+                                <select name="chart_of_account_id" x-model="glAccountId" class="form-select">
+                                    <option value="">-- ยังไม่ผูก (ใช้บัญชีธนาคารกลาง) --</option>
+                                    @foreach($glAccounts as $gl)<option value="{{ $gl->id }}">{{ $gl->code }} - {{ $gl->name_th }}</option>@endforeach
+                                </select>
+                                <small class="text-muted">อยากแยกเงินรายสาขาใน GL ให้สร้างบัญชีย่อย เช่น 1020-01 ในผังบัญชีก่อน แล้วเลือกที่นี่</small>
                             </div>
                         </div>
                     </div>
@@ -72,9 +124,9 @@
 <script>
 function bankAccountPage() {
     return {
-        modalOpen: false, editingId: null, bankName: '', accountNo: '', accountName: '', branchId: '',
-        openCreate() { this.editingId=null; this.bankName=''; this.accountNo=''; this.accountName=''; this.branchId=''; this.modalOpen=true; },
-        openEdit(id,bankName,accountNo,accountName,branchId) { this.editingId=id; this.bankName=bankName; this.accountNo=accountNo; this.accountName=accountName; this.branchId=branchId||''; this.modalOpen=true; },
+        modalOpen: false, editingId: null, bankName: '', accountNo: '', accountName: '', branchId: '', glAccountId: '',
+        openCreate() { this.editingId=null; this.bankName=''; this.accountNo=''; this.accountName=''; this.branchId=''; this.glAccountId=''; this.modalOpen=true; },
+        openEdit(id,bankName,accountNo,accountName,branchId,glAccountId) { this.editingId=id; this.bankName=bankName; this.accountNo=accountNo; this.accountName=accountName; this.branchId=branchId||''; this.glAccountId=glAccountId||''; this.modalOpen=true; },
         get formAction() { return this.editingId ? `{{ url('bank-accounts') }}/${this.editingId}` : `{{ route('bank-accounts.store') }}`; },
     };
 }

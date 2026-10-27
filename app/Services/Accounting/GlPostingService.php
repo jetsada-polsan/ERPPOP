@@ -2,6 +2,7 @@
 
 namespace App\Services\Accounting;
 
+use App\Models\BankAccount;
 use App\Models\ChartOfAccount;
 use App\Models\Document;
 use App\Models\GlJournal;
@@ -23,7 +24,9 @@ class GlPostingService
     public function postCustomerReceipt(PaymentDocument $paymentDocument, float $amount, string $entryDate, string $remark, string $method = 'cash'): void
     {
         // รับโอน/เช็คไม่ได้เข้าลิ้นชัก — เดิมลงเงินสดทุกวิธี ยอดเงินสดในบัญชีเกินจริง ยอดธนาคารขาด
-        $cashAccount = ChartOfAccount::where('default_role', $method === 'cash' ? ChartOfAccount::ROLE_CASH : ChartOfAccount::ROLE_BANK)->first();
+        $cashAccount = $method === 'cash'
+            ? ChartOfAccount::where('default_role', ChartOfAccount::ROLE_CASH)->first()
+            : $this->bankAccountFor($paymentDocument->branch_id);
         $arAccount = ChartOfAccount::where('default_role', ChartOfAccount::ROLE_AR)->first();
         if (! $cashAccount || ! $arAccount) {
             throw new RuntimeException($method === 'cash'
@@ -75,7 +78,9 @@ class GlPostingService
 
     public function postSupplierPayment(PaymentDocument $paymentDocument, float $amount, string $entryDate, string $remark, float $withholding = 0, string $method = 'cash'): void
     {
-        $cashAccount = ChartOfAccount::where('default_role', $method === 'cash' ? ChartOfAccount::ROLE_CASH : ChartOfAccount::ROLE_BANK)->first();
+        $cashAccount = $method === 'cash'
+            ? ChartOfAccount::where('default_role', ChartOfAccount::ROLE_CASH)->first()
+            : $this->bankAccountFor($paymentDocument->branch_id);
         $apAccount = ChartOfAccount::where('default_role', ChartOfAccount::ROLE_AP)->first();
         if (! $cashAccount || ! $apAccount) {
             throw new RuntimeException('ผังบัญชีเงินสดหรือเจ้าหนี้ยังไม่ครบ ไม่สามารถจ่ายชำระโดยไม่ลง GL ได้');
@@ -154,6 +159,26 @@ class GlPostingService
      *
      * @param  array<int, array{role:string, debit?:float, credit?:float}>  $lines
      */
+    /**
+     * บัญชี GL ของเงินฝากธนาคารสำหรับสาขาหนึ่ง
+     *
+     * ลำดับ: บัญชีธนาคารที่ผูกสาขานี้ -> บัญชีธนาคารกลาง (ไม่ระบุสาขา) -> role bank (1020)
+     * นับเฉพาะบัญชีธนาคารที่ผูกบัญชี GL แล้ว สาขาที่ยังว่างจึงใช้บัญชีกลางต่อได้ไม่สะดุด
+     */
+    public function bankAccountFor(?int $branchId): ?ChartOfAccount
+    {
+        $bank = BankAccount::query()
+            ->whereNotNull('chart_of_account_id')
+            ->where(fn ($query) => $query->whereNull('branch_id')
+                ->when($branchId, fn ($q) => $q->orWhere('branch_id', $branchId)))
+            ->with('chartOfAccount')
+            ->get()
+            ->sortBy(fn (BankAccount $account) => [$account->branch_id === null ? 1 : 0, $account->id])
+            ->first();
+
+        return $bank?->chartOfAccount ?? $this->role(ChartOfAccount::ROLE_BANK);
+    }
+
     private function postDocument(Document $document, array $lines, string $remark): void
     {
         $resolved = [];
@@ -161,7 +186,10 @@ class GlPostingService
             if (($line['debit'] ?? 0) == 0.0 && ($line['credit'] ?? 0) == 0.0) {
                 continue;
             }
-            $account = $this->role($line['role']);
+            // เงินเข้า/ออกธนาคารลงบัญชีของสาขาเอกสาร (ถ้าสาขาตั้งไว้)
+            $account = $line['role'] === ChartOfAccount::ROLE_BANK
+                ? $this->bankAccountFor($document->branch_id)
+                : $this->role($line['role']);
             if (! $account) {
                 throw new RuntimeException("ยังไม่ได้ผูกบัญชีเริ่มต้น [{$line['role']}] ไม่สามารถบันทึกเอกสารโดยไม่ลง GL ได้");
             }
@@ -335,7 +363,9 @@ class GlPostingService
         string $paymentMethod,
     ): void {
         $expenseAccount = ChartOfAccount::whereKey($expenseAccountId)->where('account_type', 'expense')->first();
-        $paymentAccount = $this->role($paymentMethod === 'cash' ? ChartOfAccount::ROLE_CASH : ChartOfAccount::ROLE_BANK);
+        $paymentAccount = $paymentMethod === 'cash'
+            ? $this->role(ChartOfAccount::ROLE_CASH)
+            : $this->bankAccountFor($document->branch_id);
         $vatAccount = $vatAmount > 0 ? $this->role(ChartOfAccount::ROLE_VAT_INPUT) : null;
         $withholdingAccount = $withholdingAmount > 0 ? $this->role(ChartOfAccount::ROLE_WHT_PAYABLE) : null;
 
