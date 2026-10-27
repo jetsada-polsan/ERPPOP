@@ -1199,3 +1199,18 @@ pending
   → นับ Host ล่มเฉพาะเน็ตหลุด/502/503/504 และถาม Host อีกครั้งก่อนสลับไปขายในเครื่อง
 - `pnpm run build` ผ่านเมื่อปิดการโหลดฟอนต์ bunny (sandbox บล็อก fonts.bunny.net) — CI build ได้ตามปกติ
 - Backup: server มี `erp:backup --keep-days=30` ทุกคืน 02:15 ผ่าน scheduler อยู่แล้ว; ยังขาดสำเนานอกเครื่อง (rclone ไม่ได้ติดตั้ง)
+
+## Handoff - 2026-10-27 (Claude: P1 ข้อ 1–4 จากรายงาน E2E)
+- Commits: `581440a` product picker กลาง, `6b415d6` ฟอร์มบันทึกเงียบ, `397ca11` รวมสาขาซ้ำ + กันสาขาไม่มีคลัง,
+  `5658e2a` นโยบายสต๊อกติดลบรายสาขา, `f63f66f` ปิด picker จาก backdrop
+- Deploy: แล้ว ผ่าน workflow `Deploy ERP` production run `40473812567` (test + deploy ผ่าน, migration
+  `2026_10_26_000135_add_negative_stock_policy_to_branches` ผ่าน, `erp:health` ผ่านทุกข้อ) — รอบนี้พา `a35bd59`
+  (backup แบบ streaming) ที่ค้าง deploy ขึ้นไปด้วย
+- ใหม่: `erp:merge-branches --from --into --dry-run` (เช็คทุก unique index ที่มี branch_id ก่อนย้าย),
+  `erp:stock-negative-report --branch --csv --fix-opening --as-of --dry-run` (ยกยอดผ่าน `OpeningBalanceService`
+  ลง GL Dr สินค้าคงเหลือ / Cr 3030 และ run ชนิด `stock_negative`), หน้า `/settings/stock-policies`
+- ข้อ 5 (approval ใบรับคืน) ไม่ได้ทำ: main มี `WorkflowDefinition` + `SaleReturnController::approve()` อยู่แล้ว
+- ยังไม่ได้รันบนข้อมูลจริง: `erp:merge-branches --from=0001 --into=HQ` และ `erp:stock-negative-report --fix-opening`
+  — รอเจ้าของสั่ง ให้รัน `--dry-run` ก่อนทุกครั้ง; นโยบายสต๊อกทุกสาขาเริ่มที่ "ยอมให้ติดลบ" (พฤติกรรมเดิม)
+- ข้อควรระวังที่เจอ: ห้ามรัน `scripts/deploy-ssh.sh` จาก git worktree — `.git` ใน worktree เป็นไฟล์ ไม่ถูก
+  `--exclude='.git/'` กันไว้ rsync `--delete` จะลบ `.git/` บน server ทิ้ง (dry-run เห็น `*deleting .git/...`)
