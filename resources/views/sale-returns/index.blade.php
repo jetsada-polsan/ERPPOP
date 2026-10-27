@@ -5,7 +5,7 @@
 @section('page-subtitle', 'รับสินค้าคืนเข้าสต็อก และลดมูลค่าขายตามเอกสาร')
 
 @section('content')
-<div x-data="docEntryPage({ partyType: 'customer', partyLabel: 'ลูกค้า', partyRequired: false, returnLots: true })" x-cloak>
+<div x-data="docEntryPage({ partyType: 'customer', partyLabel: 'ลูกค้า', partyRequired: false, returnLots: true, returnSourceUrl: '{{ route('sale-returns.source') }}' })" x-cloak>
     <div class="doc-shell">
         <div class="doc-tabs">
             <a href="{{ route('bookings.index') }}" class="doc-tab">ใบจอง / ขายเชื่อ</a>
@@ -74,6 +74,8 @@
         'submitLabel' => 'บันทึกใบรับคืน',
         'remarkPlaceholder' => 'เช่น สินค้าชำรุด / ผิดรายการ / ลูกค้าเปลี่ยนใจ',
         'showReturnLotFields' => true,
+        'showReturnSource' => true,
+        'allowUnreferencedReturn' => auth()->user()?->hasPermission('sales.return.unreferenced'),
     ])
 </div>
 @endsection

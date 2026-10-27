@@ -854,6 +854,8 @@ class PosApiController extends Controller
                     'branch_id' => (int) $branchId,
                     'customer_id' => null,
                     'customer_open_item_id' => null,
+                    // อ้างบิล POS และตรวจจำนวนคืนกับบิลแล้วด้านบน (pos_receipt_return_items)
+                    'allow_unreferenced' => true,
                     'remark' => trim('POS return '.$receipt->receipt_no.': '.$data['reason']),
                     'items' => array_map(fn ($item) => [
                         'product_id' => $item['product_id'],

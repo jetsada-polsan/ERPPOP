@@ -273,6 +273,7 @@ Route::prefix('cash-sales')->name('cash-sales.')->group(function () {
 Route::prefix('sale-returns')->name('sale-returns.')->group(function () {
     Route::get('/', [SaleReturnController::class, 'index'])->name('index');
     Route::post('/', [SaleReturnController::class, 'store'])->name('store');
+    Route::get('/source', [SaleReturnController::class, 'source'])->name('source');
     Route::get('/{saleReturn}', [SaleReturnController::class, 'show'])->name('show');
     Route::post('/{saleReturn}/approve', [SaleReturnController::class, 'approve'])->name('approve');
 });

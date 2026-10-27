@@ -131,6 +131,8 @@ function docEntryPage(config) {
         partyQuery: '',
         partyId: '',
         partyResults: [],
+        sourceDocNumber: '',
+        sourceInfo: '',
         branchId: config.defaultBranchId ? String(config.defaultBranchId) : '',
         salesAreaId: config.defaultSalesAreaId ? String(config.defaultSalesAreaId) : '',
         salesUserId: config.defaultSalesUserId ? String(config.defaultSalesUserId) : '',
@@ -150,6 +152,33 @@ function docEntryPage(config) {
             });
         },
         closeModal() { this.modalOpen = false; },
+        // ใบรับคืน: ดึงลูกค้าและรายการจากใบขายต้นทาง จำนวนตั้งต้น = จำนวนที่ยังคืนได้
+        async loadReturnSource() {
+            const docNumber = this.sourceDocNumber.trim();
+            if (!docNumber || !this.config.returnSourceUrl) return;
+            const response = await fetch(`${this.config.returnSourceUrl}?doc_number=${encodeURIComponent(docNumber)}`, { headers: { Accept: 'application/json' } });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                this.sourceInfo = '';
+                window.erpPopup?.('warning', 'ไม่พบใบขาย', data.message || `ไม่พบใบขายเลขที่ ${docNumber}`);
+                return;
+            }
+            if (data.branch_id) { this.branchId = String(data.branch_id); }
+            this.partyId = data.customer_id ? String(data.customer_id) : '';
+            this.partyQuery = data.customer_name || 'ลูกค้าทั่วไป (ไม่ระบุ)';
+            const lines = (data.lines || []).filter(line => line.returnable > 0);
+            this.items = lines.map(line => ({
+                product_id: line.product_id, productQuery: `${line.sku_code} - ${line.name_th}`,
+                qty: line.returnable, unit_price: line.unit_price, unit_name: '', is_scale: false, scale_plu: '',
+                lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null,
+                on_hand_qty: null, reserved_qty: null, available_qty: null, source_stock_lot_id: '',
+                return_disposition: 'quarantine', lots: [], results: [],
+            }));
+            this.sourceInfo = lines.length
+                ? `ใบขาย ${data.doc_number}: คืนได้อีก ${lines.length} รายการ (แก้จำนวนลงได้ ห้ามเกินที่แสดง)`
+                : `ใบขาย ${data.doc_number} คืนครบทุกรายการแล้ว`;
+            if (!this.items.length) this.addItem();
+        },
         async searchParty() {
             if (this.partyQuery.length < 1) { this.partyResults = []; this.partyId = ''; return; }
             const url = this.config.partyType === 'supplier' ? '{{ route('search.suppliers') }}' : '{{ route('search.customers') }}';

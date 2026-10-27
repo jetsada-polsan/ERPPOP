@@ -16,6 +16,7 @@ use App\Models\StockMovement;
 use App\Services\Accounting\GlPostingService;
 use App\Services\Inventory\FifoStockService;
 use App\Support\DecimalMath;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -26,6 +27,12 @@ use RuntimeException;
  */
 class SaleReturnService
 {
+    /** ชนิดเอกสารขายที่รับคืนได้ */
+    public const SALE_TYPES = ['CASH_SALE', 'CREDIT_SALE'];
+
+    /** ใบรับคืนสถานะเหล่านี้ไม่นับว่า "คืนไปแล้ว" */
+    private const NOT_COUNTED_STATUSES = ['rejected', 'cancelled', 'void'];
+
     public function __construct(
         private readonly DocumentNumberGenerator $numbers,
         private readonly GlPostingService $glPosting,
@@ -55,9 +62,37 @@ class SaleReturnService
             }
         }
 
+        // ใบขายต้นทาง: จากลูกหนี้ที่เลือก หรือจากเลขที่ใบขายที่พิมพ์มา (ขายสด/ขายเชื่อ)
+        $source = $openItem?->document;
+        if (! $source && trim((string) ($data['source_doc_number'] ?? '')) !== '') {
+            $source = $this->findSourceSale(trim((string) $data['source_doc_number']));
+            if (! $source) {
+                throw new RuntimeException("ไม่พบใบขายเลขที่ {$data['source_doc_number']}");
+            }
+        }
+
+        if (! $source && empty($data['allow_unreferenced'])) {
+            throw new RuntimeException('ต้องอ้างอิงใบขายต้นทางก่อนรับคืน (คืนโดยไม่อ้างใบขายได้เฉพาะผู้มีสิทธิ์พิเศษ)');
+        }
+
+        if ($source) {
+            if ((int) $source->branch_id !== (int) $branch->id) {
+                throw new RuntimeException("ใบขาย {$source->doc_number} ไม่ได้ขายที่สาขานี้");
+            }
+            if ($source->customer_id) {
+                if (! empty($data['customer_id']) && (int) $data['customer_id'] !== (int) $source->customer_id) {
+                    throw new RuntimeException("ลูกค้าไม่ตรงกับใบขาย {$source->doc_number}");
+                }
+                $data['customer_id'] = $source->customer_id;
+            }
+            // ใบขายเชื่อ: ผูกลูกหนี้ใบนั้นให้อัตโนมัติ approve() จะไปลดยอดถูกใบ
+            $openItem ??= CustomerOpenItem::where('document_id', $source->id)->first();
+            $this->assertReturnable($source, $data['items']);
+        }
+
         $documentType = DocumentType::where('code', 'SALE_RETURN')->firstOrFail();
 
-        return DB::transaction(function () use ($data, $branch, $documentType, $openItem) {
+        return DB::transaction(function () use ($data, $branch, $documentType, $openItem, $source) {
             $items = collect($data['items']);
             foreach ($items as $item) {
                 if (DecimalMath::compare($item['qty'], 0) <= 0 || DecimalMath::compare($item['unit_price'], 0) < 0) {
@@ -79,7 +114,9 @@ class SaleReturnService
                 'doc_date' => now()->toDateString(),
                 'customer_id' => $data['customer_id'] ?? null,
                 'created_by' => auth()->id(),
+                // reference = ใบขายเชื่อที่มีลูกหนี้ (approve() ใช้หาลูกหนี้) ส่วนใบขายสดอ้างผ่าน source_document_id
                 'reference' => $openItem?->document->doc_number,
+                'source_document_id' => $source?->id,
                 'status' => 'pending_approval',
                 'total_items' => $items->count(),
                 'total_amount' => $totalAmount,
@@ -127,6 +164,98 @@ class SaleReturnService
 
             return $document->fresh();
         });
+    }
+
+    /** หาใบขาย (สด/เชื่อ) จากเลขที่เอกสาร */
+    public function findSourceSale(string $docNumber): ?Document
+    {
+        return Document::where('doc_number', $docNumber)
+            ->whereHas('documentType', fn ($q) => $q->whereIn('code', self::SALE_TYPES))
+            ->first();
+    }
+
+    /**
+     * รายการในใบขายพร้อมจำนวนที่ขาย คืนไปแล้ว และยังคืนได้ (ต่อสินค้า)
+     *
+     * "คืนไปแล้ว" นับใบรับคืนที่รออนุมัติด้วย เพื่อกันการยื่นคืนซ้ำซ้อนระหว่างรออนุมัติ
+     *
+     * @return Collection<int, array{product_id:int, sku_code:string, name_th:string, unit_price:float, sold:float, returned:float, returnable:float}>
+     */
+    public function returnableLines(Document $sale): Collection
+    {
+        $sold = DB::table('stock_document_items')
+            ->join('stock_documents', 'stock_documents.id', '=', 'stock_document_items.stock_document_id')
+            ->join('products', 'products.id', '=', 'stock_document_items.product_id')
+            ->where('stock_documents.document_id', $sale->id)
+            ->groupBy('stock_document_items.product_id', 'products.sku_code', 'products.name_th')
+            ->get([
+                'stock_document_items.product_id',
+                'products.sku_code',
+                'products.name_th',
+                DB::raw('sum(stock_document_items.qty) as sold'),
+                DB::raw('max(stock_document_items.unit_price) as unit_price'),
+            ]);
+
+        $returned = DB::table('stock_document_items')
+            ->join('stock_documents', 'stock_documents.id', '=', 'stock_document_items.stock_document_id')
+            ->join('documents', 'documents.id', '=', 'stock_documents.document_id')
+            ->join('document_types', 'document_types.id', '=', 'documents.document_type_id')
+            ->where('document_types.code', 'SALE_RETURN')
+            ->whereNotIn('documents.status', self::NOT_COUNTED_STATUSES)
+            ->where(fn ($q) => $q->where('documents.source_document_id', $sale->id)
+                ->orWhere(fn ($legacy) => $legacy->whereNull('documents.source_document_id')
+                    ->where('documents.reference', $sale->doc_number)))
+            ->groupBy('stock_document_items.product_id')
+            ->selectRaw('stock_document_items.product_id as product_id, sum(stock_document_items.qty) as returned_qty')
+            ->pluck('returned_qty', 'product_id');
+
+        return $sold->map(function ($row) use ($returned) {
+            $back = (float) ($returned[$row->product_id] ?? 0);
+
+            return [
+                'product_id' => (int) $row->product_id,
+                'sku_code' => (string) $row->sku_code,
+                'name_th' => (string) $row->name_th,
+                'unit_price' => (float) $row->unit_price,
+                'sold' => (float) $row->sold,
+                'returned' => $back,
+                'returnable' => max(0.0, round((float) $row->sold - $back, 4)),
+            ];
+        })->keyBy('product_id');
+    }
+
+    /** จำนวนคืนต่อสินค้าต้องไม่เกิน ขาย - คืนไปแล้ว และสินค้าต้องอยู่ในใบขาย */
+    private function assertReturnable(Document $sale, array $items): void
+    {
+        $lines = $this->returnableLines($sale);
+        $wanted = collect($items)->groupBy(fn ($item) => (int) $item['product_id'])
+            ->map(fn ($rows) => (float) $rows->sum(fn ($item) => (float) $item['qty']));
+
+        $problems = [];
+        foreach ($wanted as $productId => $qty) {
+            $line = $lines->get($productId);
+            if (! $line) {
+                $sku = Product::whereKey($productId)->value('sku_code') ?? "#{$productId}";
+                $problems[] = "{$sku} ไม่อยู่ในใบขาย {$sale->doc_number}";
+                continue;
+            }
+            if (DecimalMath::compare($qty, $line['returnable']) > 0) {
+                $problems[] = sprintf(
+                    '%s %s คืนได้อีก %s (ขาย %s คืนไปแล้ว %s) แต่จะคืน %s',
+                    $line['sku_code'], $line['name_th'],
+                    $this->qty($line['returnable']), $this->qty($line['sold']), $this->qty($line['returned']), $this->qty($qty),
+                );
+            }
+        }
+
+        if ($problems !== []) {
+            throw new RuntimeException('รับคืนเกินจำนวนที่ขาย: '.implode(' / ', $problems));
+        }
+    }
+
+    private function qty(float $value): string
+    {
+        return rtrim(rtrim(number_format($value, 4, '.', ','), '0'), '.') ?: '0';
     }
 
     public function approve(Document $document, int $userId): Document

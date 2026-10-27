@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Branch;
 use App\Models\Document;
 use App\Services\Sales\SaleReturnService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -37,6 +38,7 @@ class SaleReturnController extends Controller
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
             'customer_id' => ['nullable', 'integer', 'exists:customers,id'],
             'customer_open_item_id' => ['nullable', 'integer', 'exists:customer_open_items,id'],
+            'source_doc_number' => ['nullable', 'string', 'max:60'],
             'remark' => ['nullable', 'string', 'max:1000'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
@@ -51,6 +53,9 @@ class SaleReturnController extends Controller
             return $redirect;
         }
 
+        // คืนโดยไม่อ้างใบขายต้นทาง ได้เฉพาะผู้ถือสิทธิ์พิเศษ
+        $data['allow_unreferenced'] = (bool) $request->user()?->hasPermission('sales.return.unreferenced');
+
         try {
             $document = $service->create($data);
         } catch (RuntimeException $e) {
@@ -59,6 +64,26 @@ class SaleReturnController extends Controller
 
         return redirect()->route('sale-returns.show', $document)
             ->with('success', "บันทึกใบรับคืน {$document->doc_number} แล้ว");
+    }
+
+    /** รายการในใบขายต้นทางที่ยังคืนได้ - ฟอร์มรับคืนใช้เติมลูกค้าและสินค้าให้ */
+    public function source(Request $request, SaleReturnService $service): JsonResponse
+    {
+        $docNumber = trim((string) $request->query('doc_number', ''));
+        $sale = $docNumber !== '' ? $service->findSourceSale($docNumber) : null;
+        if (! $sale) {
+            return response()->json(['message' => "ไม่พบใบขายเลขที่ {$docNumber}"], 404);
+        }
+        $sale->loadMissing('customer');
+
+        return response()->json([
+            'doc_number' => $sale->doc_number,
+            'doc_date' => $sale->doc_date?->toDateString(),
+            'branch_id' => $sale->branch_id,
+            'customer_id' => $sale->customer_id,
+            'customer_name' => $sale->customer?->name_th,
+            'lines' => $service->returnableLines($sale)->values(),
+        ]);
     }
 
     public function show(Document $saleReturn): View

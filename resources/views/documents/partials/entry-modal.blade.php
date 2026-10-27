@@ -117,6 +117,24 @@
                                     </div>
                                 </div>
                             @endif
+
+                            @if($showReturnSource ?? false)
+                                {{-- ใบรับคืนต้องอ้างใบขาย: ดึงลูกค้า สินค้า ราคา และจำนวนที่ยังคืนได้จากใบขายนั้น --}}
+                                <div class="doc-field" style="grid-column: span 12;">
+                                    <label>@unless($allowUnreferencedReturn ?? false)<span class="required">*</span>@endunless ใบขายต้นทาง (ขายสด / ขายเชื่อ)</label>
+                                    <div class="d-flex gap-2">
+                                        <input type="text" name="source_doc_number" x-model="sourceDocNumber" class="doc-input"
+                                            placeholder="พิมพ์หรือยิงเลขที่ใบขาย" autocomplete="off" @keydown.enter.prevent="loadReturnSource()">
+                                        <button type="button" class="btn btn-light border text-nowrap" @click="loadReturnSource()">
+                                            <i class="bi bi-download me-1"></i>ดึงรายการ
+                                        </button>
+                                    </div>
+                                    <small class="text-muted" x-text="sourceInfo"></small>
+                                    @if($allowUnreferencedReturn ?? false)
+                                        <small class="d-block text-muted">บัญชีของคุณรับคืนโดยไม่อ้างใบขายได้ (สิทธิ์พิเศษ)</small>
+                                    @endif
+                                </div>
+                            @endif
                         </div>
 
                         <details class="doc-details">

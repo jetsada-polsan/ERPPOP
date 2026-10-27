@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'document_type_id', 'document_book_id', 'branch_id', 'doc_number', 'doc_date', 'salesman_id', 'sales_user_id', 'sales_area_id',
-    'customer_id', 'supplier_id', 'reference', 'status', 'total_items', 'total_amount',
+    'customer_id', 'supplier_id', 'reference', 'source_document_id', 'status', 'total_items', 'total_amount',
     'subtotal_amount', 'vat_amount', 'prices_include_vat', 'claim_input_vat',
     'remark', 'created_by', 'submitted_by', 'submitted_at', 'approved_by', 'approved_at', 'approval_note',
 ])]
@@ -53,6 +53,12 @@ class Document extends Model
     public function salesArea(): BelongsTo
     {
         return $this->belongsTo(SalesArea::class);
+    }
+
+    /** เอกสารต้นทางที่เอกสารนี้อ้างถึง (เช่น ใบขายของใบรับคืน) */
+    public function sourceDocument(): BelongsTo
+    {
+        return $this->belongsTo(Document::class, 'source_document_id');
     }
 
     public function createdBy(): BelongsTo
