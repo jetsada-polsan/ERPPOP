@@ -15,6 +15,7 @@ class PosCategoryVisibilityTest extends TestCase
 
     public function test_cancelled_product_category_is_hidden_from_web_pos(): void
     {
+        $this->withoutVite();
         ProductCategory::create(['code' => 'CANCEL', 'name_th' => 'สินค้ายกเลิก']);
         ProductCategory::create(['code' => 'ACTIVE', 'name_th' => 'อาหารสด']);
         $response = $this->withoutMiddleware(ErpAuthorize::class)->actingAs(User::factory()->create())
