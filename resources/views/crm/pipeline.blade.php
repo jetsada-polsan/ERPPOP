@@ -18,7 +18,7 @@
                 <div class="pipeline-add-popover">
                     <h2>เพิ่มโอกาสการขาย</h2>
                     <p>เก็บงานขายที่กำลังติดตามไว้ใน Pipeline</p>
-                    <form method="post" action="{{ route('crm.opportunities.store') }}" class="pipeline-form" novalidate @submit="window.erpStopSubmit($event, [!$event.target.elements.customer_id.value ? 'กรุณาค้นหาและเลือกลูกค้า' : null, !$event.target.elements.title.value.trim() ? 'กรุณากรอกชื่อโอกาสการขาย' : null].filter(Boolean))">
+                    <form method="post" action="{{ route('crm.opportunities.store') }}" class="pipeline-form" x-data novalidate @submit="window.erpStopSubmit($event, [!$event.target.elements.customer_id.value ? 'กรุณาค้นหาและเลือกลูกค้า' : null, !$event.target.elements.title.value.trim() ? 'กรุณากรอกชื่อโอกาสการขาย' : null].filter(Boolean))">
                         @csrf
                         <div x-data="pipelineCustomerSearch()">
                             <label>ค้นหาลูกค้า<input type="search" x-model="query" @input="clearSelection(); search()" placeholder="พิมพ์รหัสหรือชื่อลูกค้าอย่างน้อย 2 ตัว" autocomplete="off"></label>
