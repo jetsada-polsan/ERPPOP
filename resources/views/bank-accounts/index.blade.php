@@ -28,7 +28,7 @@
                             </td>
                         </tr>
                         @empty
-                        <tr><td colspan="5" class="py-5 text-center text-muted">ยังไม่มีบัญชีธนาคาร</td></tr>
+                        <tr><td colspan="5" class="py-5 text-center text-muted">ยังไม่มีบัญชีธนาคาร — กด “เพิ่มบัญชี” แล้วกรอกบัญชีจริงของบริษัทก่อนใช้งานรับโอน ฝาก/ถอน และเช็ค</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -42,7 +42,7 @@
                     <h3 class="h5 fw-bold mb-0" x-text="editingId ? 'แก้ไขบัญชีธนาคาร' : 'เพิ่มบัญชีธนาคาร'"></h3>
                     <button type="button" class="btn btn-light rounded-circle" @click="modalOpen=false"><i class="bi bi-x-lg"></i></button>
                 </div>
-                <form method="post" :action="formAction">
+                <form method="post" :action="formAction" novalidate @submit="window.erpStopSubmit($event, [!bankName.trim() ? 'กรุณากรอกธนาคาร' : null, !accountNo.trim() ? 'กรุณากรอกเลขที่บัญชี' : null].filter(Boolean))">
                     @csrf
                     <template x-if="editingId"><input type="hidden" name="_method" value="PUT"></template>
                     <div class="modal-body px-4 pb-4">
