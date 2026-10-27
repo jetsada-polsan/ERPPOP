@@ -79,21 +79,31 @@
                         </div>
                         <div class="col-12">
                             <label class="form-label small text-muted">
-                                อ้างอิงใบขายเชื่อค้างชำระ
+                                อ้างอิงใบขายเชื่อ{{ $type === 'credit' ? ' (ค้างชำระหรือชำระแล้ว)' : 'ค้างชำระ' }}
                                 @if($type === 'credit')<span class="text-danger">*</span>@else (ไม่บังคับ)@endif
                             </label>
                             <select name="open_item_id" x-model="openItemId" {{ $type === 'credit' ? 'required' : '' }} class="form-select">
                                 <option value="">{{ $type === 'credit' ? '-- เลือกใบขายเชื่อ --' : '-- ไม่อ้างอิง --' }}</option>
                                 <template x-for="item in openItems" :key="item.id">
-                                    <option :value="item.id" x-text="item.doc_number + ' (ค้าง ' + item.balance_amount.toLocaleString('th-TH',{minimumFractionDigits:2}) + ')'"></option>
+                                    <option :value="item.id" x-text="item.doc_number + (item.is_paid ? ' (ชำระแล้ว' : ' (ค้าง ' + money(item.balance_amount)) + ' · ลดได้อีก ' + money(item.creditable_amount) + ')'"></option>
                                 </template>
                             </select>
-                            <div class="small text-muted mt-1" x-show="customerId && openItems.length === 0" x-cloak>ลูกค้ารายนี้ไม่มีใบค้างชำระ</div>
+                            <div class="small text-muted mt-1" x-show="customerId && openItems.length === 0" x-cloak>ลูกค้ารายนี้ไม่มีใบขายเชื่อ</div>
                         </div>
                         <div class="col-md-5">
                             <label class="form-label small text-muted">จำนวนเงิน</label>
-                            <input type="number" step="0.01" min="0.01" name="amount" required class="form-control text-end fw-bold">
+                            <input type="number" step="0.01" min="0.01" name="amount" x-model.number="amount" required class="form-control text-end fw-bold">
                         </div>
+                        @if($type === 'credit')
+                        {{-- ลดเกินยอดที่ยังค้าง (ใบชำระแล้ว) ต้องเลือกว่าส่วนเกินจัดการอย่างไร --}}
+                        <div class="col-12" x-show="excess() > 0" x-cloak>
+                            <div class="alert alert-info py-2 small mb-2">
+                                ใบนี้ค้างอยู่ <b x-text="money(selected()?.balance_amount)"></b> บาท ส่วนที่เกิน <b x-text="money(excess())"></b> บาท จะ:
+                            </div>
+                            <label class="form-check"><input class="form-check-input" type="radio" name="settlement" value="credit" checked> เป็นเครดิตลูกค้า (หักกับใบขายถัดไป)</label>
+                            <label class="form-check"><input class="form-check-input" type="radio" name="settlement" value="refund"> คืนเงินสดให้ลูกค้า</label>
+                        </div>
+                        @endif
                         <div class="col-md-7">
                             <label class="form-label small text-muted">เหตุผล / รายละเอียด</label>
                             <input name="reason" required class="form-control" placeholder="{{ $type === 'credit' ? 'เช่น ลดราคาสินค้าชำรุด' : 'เช่น ค่าขนส่งเพิ่ม' }}">
@@ -122,7 +132,13 @@
 <script>
 function cdNotePage() {
     return {
-        modalOpen: false, customerId: '', openItemId: '', openItems: [],
+        modalOpen: false, customerId: '', openItemId: '', openItems: [], amount: '',
+        money(value) { return Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+        selected() { return this.openItems.find(item => String(item.id) === String(this.openItemId)); },
+        excess() {
+            const item = this.selected();
+            return item ? Math.max(0, Math.round((Number(this.amount || 0) - item.balance_amount) * 100) / 100) : 0;
+        },
         async loadOpenItems() {
             this.openItemId = ''; this.openItems = [];
             if (!this.customerId) return;

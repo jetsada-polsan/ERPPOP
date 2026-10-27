@@ -70,18 +70,24 @@ class CreditDebitNoteController extends Controller
         ]);
     }
 
-    // ใบขายเชื่อค้างชำระของลูกค้า สำหรับเลือกอ้างอิงในใบลดหนี้
-    public function openItems(Customer $customer): JsonResponse
+    // ใบขายเชื่อของลูกค้า (ทั้งที่ค้างและชำระแล้ว) สำหรับเลือกอ้างอิงในใบลดหนี้
+    public function openItems(Customer $customer, CreditDebitNoteService $service): JsonResponse
     {
         $items = CustomerOpenItem::with('document')
             ->where('customer_id', $customer->id)
-            ->where('balance_amount', '>', 0)
+            ->where('net_amount', '>', 0)
+            ->orderByDesc('id')
+            ->limit(200)
             ->get()
+            ->filter(fn ($item) => $item->document !== null)
             ->map(fn ($item) => [
                 'id' => $item->id,
                 'doc_number' => $item->document->doc_number,
                 'balance_amount' => (float) $item->balance_amount,
-            ]);
+                'creditable_amount' => $service->creditableAmount($item),
+                'is_paid' => (float) $item->balance_amount <= 0.01,
+            ])
+            ->values();
 
         return response()->json($items);
     }
@@ -95,6 +101,7 @@ class CreditDebitNoteController extends Controller
             'amount' => ['required', 'numeric', 'min:0.01'],
             'reason' => ['required', 'string', 'max:500'],
             'open_item_id' => ['nullable', 'integer', 'exists:customer_open_items,id'],
+            'settlement' => ['nullable', 'in:credit,refund'],
         ], [
             'reason.required' => 'กรุณาระบุเหตุผล/รายละเอียด',
             'amount.required' => 'กรุณากรอกจำนวนเงิน',

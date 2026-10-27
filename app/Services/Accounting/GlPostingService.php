@@ -384,14 +384,22 @@ class GlPostingService
     }
 
     // ใบลดหนี้: Dr รับคืน/ส่วนลด + ภาษีขาย(กลับ) / Cr ลูกหนี้
-    public function postCreditNote(Document $document): void
+    /**
+     * ใบลดหนี้: Dr รับคืน/ส่วนลด + ภาษีขาย / Cr ลูกหนี้
+     *
+     * $refund = ส่วนที่คืนเป็นเงินสดให้ลูกค้า (ใบขายต้นทางชำระไปแล้ว) ส่วนนั้นลง Cr เงินสดแทนลูกหนี้
+     * ส่วนที่เหลือลง Cr ลูกหนี้ - ถ้าเกินยอดค้างจะกลายเป็นยอดเครดิตของลูกค้าไว้หักใบถัดไป
+     */
+    public function postCreditNote(Document $document, float $refund = 0.0): void
     {
         $total = (float) $document->total_amount;
+        $refund = round(max(0.0, min($refund, $total)), 2);
         ['base' => $base, 'vat' => $vat] = $this->noteBreakdown($document);
         $this->postDocument($document, [
             ['role' => ChartOfAccount::ROLE_SALES_RETURN, 'debit' => $base],
             ['role' => ChartOfAccount::ROLE_VAT_OUTPUT, 'debit' => $vat],
-            ['role' => ChartOfAccount::ROLE_AR, 'credit' => $total],
+            ['role' => ChartOfAccount::ROLE_AR, 'credit' => round($total - $refund, 2)],
+            ['role' => ChartOfAccount::ROLE_CASH, 'credit' => $refund],
         ], 'ใบลดหนี้ '.$document->doc_number);
     }
 

@@ -51,19 +51,32 @@ class CreditDebitNoteService
             }
         }
 
-        // ใบลดหนี้: ต้องอ้างอิงใบค้าง และลดได้ไม่เกินยอดค้าง
+        // ใบลดหนี้: ต้องอ้างอิงใบขายเชื่อ (ค้างหรือชำระแล้วก็ได้) และลดได้ไม่เกินมูลค่าใบ
+        // หักใบลดหนี้ที่ออกไปแล้ว ส่วนที่เกินยอดค้างต้องเลือกว่าเป็นเครดิตหรือคืนเงิน
+        $settlement = null;
         if ($isCredit) {
             if (! $openItem) {
-                throw new RuntimeException('ใบลดหนี้ต้องอ้างอิงใบขายเชื่อที่ค้างชำระ');
+                throw new RuntimeException('ใบลดหนี้ต้องอ้างอิงใบขายเชื่อ');
+            }
+            $creditable = $this->creditableAmount($openItem);
+            if ($amount > $creditable + 0.01) {
+                throw new RuntimeException(sprintf(
+                    'ยอดลดหนี้เกินมูลค่าที่ลดได้ของเอกสาร %s (ลดได้อีก %s บาท)',
+                    $openItem->document->doc_number,
+                    number_format($creditable, 2),
+                ));
             }
             if ($amount > (float) $openItem->balance_amount + 0.01) {
-                throw new RuntimeException('ยอดลดหนี้เกินยอดค้างของเอกสาร '.$openItem->document->doc_number);
+                $settlement = $data['settlement'] ?? 'credit';
+                if (! in_array($settlement, ['credit', 'refund'], true)) {
+                    throw new RuntimeException('ส่วนที่เกินยอดค้างต้องเลือกเป็นเครดิตลูกค้าหรือคืนเงิน');
+                }
             }
         }
 
         $documentType = DocumentType::where('code', $typeCode)->firstOrFail();
 
-        return DB::transaction(function () use ($data, $isCredit, $typeCode, $amount, $openItem, $documentType) {
+        return DB::transaction(function () use ($data, $isCredit, $typeCode, $amount, $openItem, $documentType, $settlement) {
             $document = Document::create([
                 'document_type_id' => $documentType->id,
                 'branch_id' => $data['branch_id'],
@@ -71,6 +84,7 @@ class CreditDebitNoteService
                 'doc_date' => now()->toDateString(),
                 'customer_id' => $data['customer_id'],
                 'reference' => $openItem?->document->doc_number,
+                'credit_settlement' => $settlement,
                 'status' => $isCredit ? 'pending_approval' : 'active',
                 'total_items' => 1,
                 'total_amount' => $amount,
@@ -132,6 +146,22 @@ class CreditDebitNoteService
         });
     }
 
+    /**
+     * มูลค่าที่ยังลดหนี้ได้ของใบขายหนึ่งใบ = มูลค่าสุทธิหลังลดหนี้ที่อนุมัติแล้ว (net_amount)
+     * หักใบลดหนี้ที่ยังรออนุมัติ เพื่อกันลดซ้ำซ้อนระหว่างรอ
+     */
+    public function creditableAmount(CustomerOpenItem $openItem, ?int $exceptNoteId = null): float
+    {
+        $pending = (float) Document::whereHas('documentType', fn ($q) => $q->where('code', 'CREDIT_NOTE'))
+            ->where('status', 'pending_approval')
+            ->where('customer_id', $openItem->customer_id)
+            ->where('reference', $openItem->document?->doc_number)
+            ->when($exceptNoteId, fn ($q) => $q->whereKeyNot($exceptNoteId))
+            ->sum('total_amount');
+
+        return max(0.0, round((float) $openItem->net_amount - $pending, 2));
+    }
+
     public function approveCredit(Document $document): Document
     {
         if ($document->created_by && $document->created_by === auth()->id()) {
@@ -146,21 +176,32 @@ class CreditDebitNoteService
             }
             $sourceDocumentId = Document::where('doc_number', $locked->reference)->value('id');
             $openItem = CustomerOpenItem::where('customer_id', $locked->customer_id)->where('document_id', $sourceDocumentId)->lockForUpdate()->first();
-            if (! $openItem || (float) $locked->total_amount > (float) $openItem->balance_amount + 0.01) {
-                throw new RuntimeException('ยอดค้างของเอกสารต้นทางเปลี่ยนไป กรุณาตรวจใบลดหนี้ใหม่');
-            }
             $amount = (float) $locked->total_amount;
-            $newBalance = round((float) $openItem->balance_amount - $amount, 2);
+            if (! $openItem || $amount > $this->creditableAmount($openItem, $locked->id) + 0.01) {
+                throw new RuntimeException('มูลค่าที่ลดได้ของเอกสารต้นทางเปลี่ยนไป กรุณาตรวจใบลดหนี้ใหม่');
+            }
+
+            // ลดยอดค้างได้เท่าที่ค้างอยู่ ส่วนเกินเป็นเครดิตลูกค้าหรือคืนเงินตามที่เลือกไว้
+            $reduce = round(min($amount, (float) $openItem->balance_amount), 2);
+            $excess = round($amount - $reduce, 2);
+            if ($excess > 0.01 && ! in_array($locked->credit_settlement, ['credit', 'refund'], true)) {
+                throw new RuntimeException('ยอดค้างของใบต้นทางลดลงหลังออกใบลดหนี้ ต้องเลือกว่าส่วนเกินเป็นเครดิตหรือคืนเงิน');
+            }
+            $refund = $locked->credit_settlement === 'refund' ? $excess : 0.0;
+
+            $newBalance = round((float) $openItem->balance_amount - $reduce, 2);
             $openItem->update([
                 'net_amount' => round((float) $openItem->net_amount - $amount, 2), 'balance_amount' => $newBalance,
                 'status' => $newBalance <= 0.01 ? CustomerOpenItem::STATUS_PAID : CustomerOpenItem::STATUS_PARTIAL,
             ]);
+            // สมุดลูกหนี้: เงินที่คืนสดออกไปแล้วไม่ค้างเป็นเครดิต จึงลดยอดเฉพาะส่วนที่ไม่ได้คืนเงิน
+            $ledgerCredit = round($amount - $refund, 2);
             $lastBalance = (float) (CustomerLedger::where('customer_id', $locked->customer_id)->latest('id')->value('balance_after') ?? 0);
             CustomerLedger::create([
                 'customer_id' => $locked->customer_id, 'document_id' => $locked->id, 'entry_type' => 'credit',
-                'amount' => $amount, 'balance_after' => round($lastBalance - $amount, 2), 'entry_date' => now()->toDateString(),
+                'amount' => $ledgerCredit, 'balance_after' => round($lastBalance - $ledgerCredit, 2), 'entry_date' => now()->toDateString(),
             ]);
-            $this->glPosting->postCreditNote($locked);
+            $this->glPosting->postCreditNote($locked, $refund);
             $locked->update(['status' => 'active']);
 
             return $locked->fresh();
