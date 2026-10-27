@@ -1238,3 +1238,14 @@ pending
 - รอข้อมูลจากเจ้าของ: mapping ผู้ใช้→สาขา และบัญชีธนาคาร/ผังบัญชีจริง (ถามแล้วระหว่างทำงาน ยังไม่ตอบ); เกณฑ์ลูกค้า 291 ราย/รายการธุรกรรมทดสอบที่ยืนยันแล้ว/รายงาน BPlus และวันสาขาที่คาดหวัง
 - งานถัดไป: รอคำสั่ง deploy ตาม OPERATIONS; รัน dry-run ให้เจ้าของดูก่อนแก้ข้อมูลจริง; งาน session ก่อนข้อ 11–14,16–18 ยังคงค้าง โดยเฉพาะ void กลับ stock/GL/AR/AP และการเลือกบัญชีธนาคารผูก GL ทุกหน้ารับจ่าย ห้ามใช้ reset-transactions แทนการล้างเฉพาะเอกสารทดสอบ
 - ไม่แตะ `docs/servers.md` ที่ untracked อยู่ก่อนเริ่ม
+
+## Deploy - 2026-10-27 (Codex: UAT fixes และงาน session เดิม → production)
+- เจ้าของสั่ง `deploy`; ใช้ GitHub Actions `Deploy ERP` production run `40492657123` จาก commit `64ee96e76e6758be041477bd592d87b2492feeed`: test และ deploy สำเร็จทั้งคู่; frontend build ผ่าน; rsync ไม่มี --delete
+- Scope: รวมโค้ดหลัง deploy เดิม `f63f66f` ทั้ง AP payments, quotation conversion, sale-return source, credit settlement, billing-note observer และ UAT menu fixes ที่ส่งมอบถึง `adf8d3b`
+- Backup ก่อน deploy: `/var/www/jeterp/storage/app/backups/erp-db-20261027-175611.sql.gz`; erp:health ก่อน deploy ผ่านทุกข้อ; ตรวจอ่านอย่างเดียวพบ active central admin ที่มี global users.manage+settings.manage 1 บัญชี
+- รอบแรก `40492365759` ถูก CI test บล็อกก่อน deploy เพราะ PosCategoryVisibilityTest พึ่ง Vite manifest ในเครื่อง dev; แก้ด้วย withoutVite() ใน `64ee96e` ตามขอบเขตเทสต์ (ไม่ข้าม assertions); รัน php artisan test ในเครื่องซ้ำผ่าน 556 tests (555 passed, 1 skipped, runner incomplete 6 เหมือน baseline) แล้ว push และ deploy รอบใหม่สำเร็จ
+- Migration production: `2026_10_27_000001` supplier allocation, `000002` unreferenced-return permission, `000003` source_document_id, `000004` credit_settlement — DONE ทั้ง 4 ใน deploy log และตรวจ migrate:status บน server เป็น batch 130 Ran ทั้งหมด
+- ตรวจหลัง deploy: erp:health ผ่าน DB/Migration/Backup/ขาย-GL/Storage/Queue (failed jobs 0); HTTP /login และ /build/manifest.json = 200; /pos, /price-tags, /crm/pipeline, /members, /operations, /database-structure = 302 ไป authentication ตามปกติ
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ UAT หลังล็อกอินหรือสร้างเอกสารธุรกิจบน production ไม่ยืนยัน flow อุปกรณ์จริงจาก HTTP smoke อย่างเดียว
+- ข้อมูลจริง: ไม่ได้รัน erp:remove-test-price-tag, erp:prune-products, reset-transactions หรือแก้ master data; TEST01 และข้อมูลทดสอบยังรอตรวจ dry-run/ขั้นตอนเดิม การอนุมัติ deploy ไม่ได้ขยายเป็นการล้างข้อมูล
+- งานถัดไป: UAT ป้ายราคา/Pipeline/สมาชิก/สิทธิ์ admin บน production และรับ mapping ผู้ใช้→สาขา/บัญชีธนาคารจริง; รายละเอียดคงค้างใน docs/uat/2026-10-27-menu-readiness.md
