@@ -4,42 +4,7 @@
 @section('page-subtitle', 'แฟ้มสมาชิก คะแนนสะสม ประเภทสมาชิก และสาขาที่ดูแล')
 @section('content')
 <div class="row g-3">
-    <div class="col-12 col-xl-4">
-        <div class="content-card p-4">
-            <h2 class="h5 fw-bold mb-3">เพิ่มสมาชิก</h2>
-            <form method="post" action="{{ route('members.store') }}" class="row g-3">
-                @csrf
-                <div class="col-6"><label class="form-label small text-muted">รหัส</label><input name="member_code" required class="form-control"></div>
-                <div class="col-6"><label class="form-label small text-muted">เบอร์โทร</label><input name="phone" class="form-control"></div>
-                <div class="col-12"><label class="form-label small text-muted">ชื่อสมาชิก</label><input name="name" required class="form-control"></div>
-                <div class="col-6">
-                    <label class="form-label small text-muted">ประเภท</label>
-                    <select name="member_type_id" class="form-select">
-                        <option value="">-- ไม่ระบุ --</option>
-                        @foreach($memberTypes as $type)<option value="{{ $type->id }}">{{ $type->code }} - {{ $type->name }}</option>@endforeach
-                    </select>
-                </div>
-                <div class="col-6">
-                    <label class="form-label small text-muted">สาขา</label>
-                    <select name="branch_id" class="form-select">
-                        <option value="">-- ทุกสาขา --</option>
-                        @foreach($branches as $branch)<option value="{{ $branch->id }}">{{ $branch->code }} - {{ $branch->name_th }}</option>@endforeach
-                    </select>
-                </div>
-                <div class="col-12">
-                    <label class="form-label small text-muted">เชื่อมกับลูกค้า/ลูกหนี้ <span class="text-muted">(ถ้ามี)</span></label>
-                    <select name="customer_id" class="form-select">
-                        <option value="">-- ยังไม่เชื่อมลูกค้า --</option>
-                        @foreach($customers as $customer)<option value="{{ $customer->id }}">{{ $customer->code }} - {{ $customer->name_th }}</option>@endforeach
-                    </select>
-                </div>
-                <div class="col-6"><label class="form-label small text-muted">แต้ม</label><input type="number" step="0.0001" min="0" name="points" value="0" class="form-control"></div>
-                <div class="col-6 d-flex align-items-end"><div class="form-check mb-2"><input type="checkbox" name="is_active" value="1" checked class="form-check-input" id="memberActive"><label class="form-check-label" for="memberActive">ใช้งาน</label></div></div>
-                <div class="col-12"><button class="btn btn-primary w-100"><i class="bi bi-plus-lg me-1"></i> เพิ่มสมาชิก</button></div>
-            </form>
-        </div>
-    </div>
-    <div class="col-12 col-xl-8">
+    <div class="col-12">
         <div class="content-card p-4">
             <h2 class="h5 fw-bold mb-3">รายการสมาชิก</h2>
             <div class="table-responsive">
@@ -78,5 +43,42 @@
             {{ $members->links() }}
         </div>
     </div>
+    <div class="col-12">
+        <div class="content-card p-4">
+            <details><summary class="h5 fw-bold">เพิ่มสมาชิก</summary>
+            <form method="post" action="{{ route('members.store') }}" class="row g-3">
+                @csrf
+                <div class="col-6"><label class="form-label small text-muted">รหัส</label><input name="member_code" required class="form-control"></div>
+                <div class="col-6"><label class="form-label small text-muted">เบอร์โทร</label><input name="phone" class="form-control"></div>
+                <div class="col-12"><label class="form-label small text-muted">ชื่อสมาชิก</label><input name="name" required class="form-control"></div>
+                <div class="col-6">
+                    <label class="form-label small text-muted">ประเภท</label>
+                    <select name="member_type_id" class="form-select">
+                        <option value="">-- ไม่ระบุ --</option>
+                        @foreach($memberTypes as $type)<option value="{{ $type->id }}">{{ $type->code }} - {{ $type->name }}</option>@endforeach
+                    </select>
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted">สาขา</label>
+                    <select name="branch_id" class="form-select">
+                        <option value="">-- ทุกสาขา --</option>
+                        @foreach($branches as $branch)<option value="{{ $branch->id }}">{{ $branch->code }} - {{ $branch->name_th }}</option>@endforeach
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label small text-muted">เชื่อมกับลูกค้า/ลูกหนี้ <span class="text-muted">(ถ้ามี)</span></label>
+                    <select name="customer_id" class="form-select">
+                        <option value="">-- ยังไม่เชื่อมลูกค้า --</option>
+                        @foreach($customers as $customer)<option value="{{ $customer->id }}">{{ $customer->code }} - {{ $customer->name_th }}</option>@endforeach
+                    </select>
+                </div>
+                <div class="col-6"><label class="form-label small text-muted">แต้ม</label><input type="number" step="0.0001" min="0" name="points" value="0" class="form-control"></div>
+                <div class="col-6 d-flex align-items-end"><div class="form-check mb-2"><input type="checkbox" name="is_active" value="1" checked class="form-check-input" id="memberActive"><label class="form-check-label" for="memberActive">ใช้งาน</label></div></div>
+                <div class="col-12"><button class="btn btn-primary w-100"><i class="bi bi-plus-lg me-1"></i> เพิ่มสมาชิก</button></div>
+            </form>
+            </details>
+        </div>
+    </div>
+
 </div>
 @endsection
