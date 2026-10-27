@@ -1214,3 +1214,15 @@ pending
   — รอเจ้าของสั่ง ให้รัน `--dry-run` ก่อนทุกครั้ง; นโยบายสต๊อกทุกสาขาเริ่มที่ "ยอมให้ติดลบ" (พฤติกรรมเดิม)
 - ข้อควรระวังที่เจอ: ห้ามรัน `scripts/deploy-ssh.sh` จาก git worktree — `.git` ใน worktree เป็นไฟล์ ไม่ถูก
   `--exclude='.git/'` กันไว้ rsync `--delete` จะลบ `.git/` บน server ทิ้ง (dry-run เห็น `*deleting .git/...`)
+
+## Handoff - 2026-10-27 (Codex: รับงาน session เดิมและข้อ 10 ใบวางบิล)
+- Commit: `8680725` — เปลี่ยนสถานะใบวางบิลตามยอดลูกหนี้อัตโนมัติ
+- รับไม้ต่อ: pull main จาก `8c4967a` เป็น `15f31df`; fetch จาก worktree เดิมและ fast-forward งานที่ยังไม่ push ทั้ง 5 commit (`21fd98a`, `02a9266`, `1a04e65`, `6c07f94`, `89eef43`) เข้ามา ไม่มี rebase เพราะฐานตรงกับ origin/main
+- ทำอะไร: ลงทะเบียน CustomerOpenItemObserver ด้วย ObservedBy; เมื่อ balance_amount/status เปลี่ยน ตรวจทุกใบวางบิล open/collected ที่เกี่ยวข้อง เปลี่ยนเป็น collected เมื่อทุกยอดค้าง ≤ 0.01 หรือกลับเป็น open เมื่อหนี้กลับมา ไม่เปลี่ยนใบ cancelled และอยู่ใน transaction เดียวกับบริการรับชำระ/ปรับหนี้
+- ตรวจเส้นทางเขียนลูกหนี้: CustomerPaymentService, SaleReturnService, CreditDebitNoteService ใช้ model update; query builder ใน OpeningBalanceService เป็น insert ยอดยกมาใหม่ (ยังไม่มีใบวางบิล) และ reset-transactions ล้างใบวางบิลด้วย ไม่พบ query-builder update ยอดลูกหนี้ที่ข้าม observer ใน app
+- ทดสอบ: งานเดิมก่อนเพิ่มข้อ 10 `php artisan test` ผ่าน (540 tests, passed 539, skipped 1); หลังเพิ่มข้อ 10 ผ่าน (543 tests, passed 542, skipped 1; runner รายงาน incomplete 6 เหมือน baseline); รวมหลายใบขาย/หลายใบวางบิล, ยอด 0.01, หนี้กลับมา, ใบ cancelled, rollback และรับชำระเช็คจริง→เช็คเด้ง; `vendor/bin/pint --dirty` ผ่าน; `git diff --check` ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่รัน PostgreSQL หรือ UAT บน production; ไม่ backfill สถานะใบวางบิลเก่าจนกว่าจะมีการเปลี่ยนยอด/สถานะลูกหนี้; มี migration เดิมจากข้อ 8–9 ที่ยังต้อง deploy ตามขั้นตอน
+- Deploy: ยังไม่ deploy และไม่ได้แก้ข้อมูล production
+- งานถัดไปตามไฟล์ส่งต่อ: ข้อ 11 void พร้อมเหตุผล/กลับสต๊อก GL AR/AP และ audit, 12 เลือกบัญชีธนาคาร, 13 เปิดกะ POS, 14 ผลิต, 16 เลขใบจอง, 17 artisan แก้/รายงานข้อมูลหลักแบบ dry-run, 18 แจ้งเตือนตรวจนับค้าง; ข้อเหล่านี้ยังไม่ได้ทำในรอบนี้ ข้อ 15 อยู่ใน `02a9266` แล้ว
+- การคลีน production: รอเจ้าของอนุมัติทุกขั้นและต้องแสดง dry-run ก่อน; ความหมายของ “ใบขายเก่าเอาออก” ยังไม่ได้ยืนยัน ห้ามรัน reset-transactions โดยตีความเอง
+- ไฟล์ `docs/servers.md` เป็น untracked ที่มีอยู่ก่อนเริ่ม ไม่แก้และไม่ commit
