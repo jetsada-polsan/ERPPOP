@@ -25,6 +25,7 @@ class ImportPopstarExportTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        Customer::withTrashed()->forceDelete(); // แฟ้มลูกค้าที่ล้างแล้ว (migration seed ลูกค้าตัวอย่างไว้)
         $this->file = base_path('tests/Fixtures/popstar_export_sample.txt');
         foreach (['101' => 'หมูหมัก', '109' => 'ปู', 'CO' => 'ค่าใช้จ่าย', 'CC' => 'สินค้ายกเลิก'] as $code => $name) {
             ProductCategory::create(['code' => $code, 'name_th' => $name]);
@@ -48,6 +49,9 @@ class ImportPopstarExportTest extends TestCase
         // 116 ชื่อ+เบอร์ตรงกับ 115 = ซ้ำ; คุณทดสอบสองคนเบอร์ต่าง = คนละคน
         $this->assertSame(['115', '1467', '186'], Customer::orderBy('code')->pluck('code')->all());
         $this->assertSame('090-000-0001', CustomerContact::where('customer_id', Customer::where('code', '115')->value('id'))->value('phone'));
+        // ช่องเบอร์ที่มีหลายเบอร์ยาวเกิน 30 ตัว แยกเป็นผู้ติดต่อละเบอร์
+        $this->assertSame(['0048500000000001', '0048500000000002'],
+            CustomerContact::where('customer_id', Customer::where('code', '186')->value('id'))->orderBy('phone')->pluck('phone')->all());
 
         $main = Product::where('sku_code', '101001')->first();
         $this->assertSame('101', $this->categoryCode($main));
@@ -74,10 +78,23 @@ class ImportPopstarExportTest extends TestCase
         $this->assertSame(0, Product::count());
     }
 
+    public function test_it_refuses_while_old_customers_are_still_there(): void
+    {
+        $this->freshBackup();
+        Customer::create(['code' => 'OLD-1', 'name_th' => 'ลูกค้าเดิม', 'is_active' => true]);
+
+        $this->artisan('erp:import-popstar-export', ['file' => $this->file, '--force' => true])
+            ->expectsOutputToContain('erp:purge-legacy-masters')
+            ->assertFailed();
+
+        $this->assertSame(0, Product::count());
+    }
+
     public function test_it_refuses_when_old_products_are_still_there(): void
     {
         $this->freshBackup();
         $this->artisan('erp:import-popstar-export', ['file' => $this->file, '--force' => true])->assertSuccessful();
+        Customer::withTrashed()->forceDelete();
 
         $this->artisan('erp:import-popstar-export', ['file' => $this->file, '--force' => true])
             ->expectsOutputToContain('erp:purge-products')

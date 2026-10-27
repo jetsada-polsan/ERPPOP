@@ -69,12 +69,13 @@ class ImportPopstarExport extends Command
         unset($product);
         $uncategorised = array_keys(array_filter($products, fn ($p) => $p['category_id'] === null));
 
-        $existingCustomers = Customer::withTrashed()->whereIn('code', array_column($customers, 'code'))->count();
+        // ต้องเป็นแฟ้มลูกค้าที่ล้างแล้วเท่านั้น รหัสใหม่ไม่ชนของเก่าก็จริง แต่จะได้ลูกค้าสองชุดปนกัน
+        $existingCustomers = Customer::withTrashed()->count();
         $existingProducts = Product::withTrashed()->whereIn('sku_code', array_keys($products))->orWhereIn('legacy_sku', array_keys($products))->count();
         $barcodes = array_merge(...array_map(fn ($p) => array_column($p['barcodes'], 'barcode'), array_values($products)));
         $existingBarcodes = ProductBarcode::whereIn('barcode', $barcodes)->count();
         if ($existingCustomers > 0) {
-            $errors[] = "มีรหัสลูกค้าซ้ำกับในระบบ {$existingCustomers} ราย (ล้างด้วย erp:purge-legacy-masters ก่อน)";
+            $errors[] = "ยังมีลูกค้าเดิมในระบบ {$existingCustomers} ราย (ล้างด้วย erp:purge-legacy-masters ก่อน)";
         }
         if ($existingProducts > 0 || $existingBarcodes > 0) {
             $errors[] = "มีสินค้า {$existingProducts} / บาร์โค้ด {$existingBarcodes} ซ้ำกับในระบบ (ล้างด้วย erp:purge-products ก่อน)";
@@ -127,8 +128,8 @@ class ImportPopstarExport extends Command
                     if ($row['address'] !== '') {
                         CustomerAddress::create(['customer_id' => $customer->id, 'address_line' => $row['address'], 'is_default' => true]);
                     }
-                    if ($row['phone'] !== '') {
-                        CustomerContact::create(['customer_id' => $customer->id, 'name' => $row['name'], 'phone' => $row['phone']]);
+                    foreach ($this->phones($row['phone']) as $phone) {
+                        CustomerContact::create(['customer_id' => $customer->id, 'name' => $row['name'], 'phone' => $phone]);
                     }
                 }
 
@@ -207,6 +208,20 @@ class ImportPopstarExport extends Command
         }
 
         return [$kept, $duplicates];
+    }
+
+    /**
+     * แยกช่องเบอร์ที่มีหลายเบอร์ ("062-834-2714 , 087-549-5063") เป็นผู้ติดต่อละเบอร์
+     * ช่องเบอร์ในระบบยาวได้ 30 ตัวอักษร
+     *
+     * @return array<int, string>
+     */
+    private function phones(string $raw): array
+    {
+        preg_match_all('/\+?\d[\d-]{4,}\d/', $raw, $matches);
+        $phones = $matches[0] !== [] ? $matches[0] : array_filter([trim($raw)]);
+
+        return array_values(array_unique(array_map(fn ($phone) => mb_substr($phone, 0, 30), $phones)));
     }
 
     /** @return array<string, array<string, mixed>> */
