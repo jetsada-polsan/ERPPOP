@@ -10,16 +10,8 @@
         <input type="hidden" name="type" value="{{ $filters['type'] }}">
         <input type="hidden" name="year" value="{{ $filters['year'] }}">
         <input type="hidden" name="month" value="{{ $filters['month'] }}">
-        <input type="hidden" name="legacy_type" value="{{ $filters['legacy_type'] ?? '' }}">
 
         <span class="text-muted small fw-bold text-nowrap"><i class="bi bi-calendar3 me-1"></i>ดูรายวัน</span>
-        @if(! empty($filters['legacy_type']))
-            <span class="badge text-bg-info border">
-                BPlus {{ $filters['legacy_type'] }}
-                <a class="text-decoration-none text-dark ms-1" href="{{ route('documents.browser', ['year' => $filters['year'], 'month' => $filters['month'], 'q' => $filters['q']]) }}">x</a>
-            </span>
-        @endif
-
         <input type="date" name="day" value="{{ $filters['day'] }}" class="form-control form-control-sm" style="width:150px"
             onchange="this.form.year.value='';this.form.month.value='';this.form.submit()">
 
@@ -156,57 +148,6 @@
             <div class="p-3">{{ $documents->links() }}</div>
         </div>
 
-        @if($legacyDocuments && $legacyDocuments->count())
-        <div class="content-card overflow-hidden mt-3">
-            <div class="d-flex align-items-center gap-2 flex-wrap px-3 py-2 border-bottom">
-                <span class="fw-bold">เอกสารเก่า BPlus</span>
-                <span class="badge text-bg-info border">{{ number_format($legacySummary['count']) }} ใบ</span>
-                <span class="badge text-bg-success">รวม ฿{{ number_format($legacySummary['amount'], 2) }}</span>
-                <span class="text-muted small">อ่านย้อนหลังจาก legacy.dbo__docinfo / transtkh / transtkd</span>
-            </div>
-            <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0 doc-grid">
-                    <thead>
-                        <tr>
-                            <th>เลขที่เดิม</th>
-                            <th>ประเภท</th>
-                            <th>วันที่</th>
-                            <th>ลูกค้า</th>
-                            <th class="text-end">รายการ</th>
-                            <th class="text-end">จำนวน</th>
-                            <th class="text-end">ยอดรวม</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    @foreach($legacyDocuments as $legacy)
-                        <tr style="cursor:pointer" onclick="window.location='{{ route('documents.legacy-show', $legacy->di_key) }}'">
-                            <td class="fw-semibold" style="color:var(--erp-primary)">{{ $legacy->doc_number }}</td>
-                            <td>
-                                <div class="fw-semibold">{{ $legacy->legacy_type_code }}</div>
-                                <div class="text-muted small">{{ $legacy->legacy_type_name }}</div>
-                            </td>
-                            <td class="text-nowrap">{{ \Illuminate\Support\Carbon::parse($legacy->doc_date)->thaiDate() }}</td>
-                            <td class="small">
-                                {{ $legacy->customer_name ?: '-' }}
-                                @if($legacy->customer_code)
-                                    <div class="text-muted">{{ $legacy->customer_code }}</div>
-                                @endif
-                            </td>
-                            <td class="text-end">{{ number_format((float) $legacy->item_count) }}</td>
-                            <td class="text-end">{{ number_format((float) $legacy->total_qty, 2) }}</td>
-                            <td class="text-end fw-semibold">{{ number_format((float) $legacy->total_amount, 2) }}</td>
-                            <td class="text-end" onclick="event.stopPropagation()">
-                                <a href="{{ route('documents.legacy-show', $legacy->di_key) }}" class="btn btn-sm btn-light border">ดู</a>
-                            </td>
-                        </tr>
-                    @endforeach
-                    </tbody>
-                </table>
-            </div>
-            <div class="p-3">{{ $legacyDocuments->links() }}</div>
-        </div>
-        @endif
     </div>
 </div>
 @endsection

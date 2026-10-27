@@ -209,15 +209,6 @@
             </a>
         @endforeach
 
-        <a href="{{ route('legacy-reports.index') }}" class="rpt-legacy-card">
-            <span class="rpt-legacy-icon"><i class="bi bi-database-check"></i></span>
-            <span>
-                <strong>รายงาน BPlus เดิม</strong>
-                <small>REPORTFILE / SQL / .rpt ทั้งหมด</small>
-            </span>
-            <i class="bi bi-chevron-right ms-auto"></i>
-        </a>
-
         <div class="rpt-nav-head mt-3"><i class="bi bi-folder2-open" style="color:var(--erp-primary)"></i> รายงานทั้งหมด</div>
         @foreach($catalog as $catKey => $group)
             @php
@@ -252,9 +243,6 @@
                     <h1>{{ $reportLabels[$selectedReport] ?? $result['title'] }}</h1>
                 </div>
                 <div class="flow-head-actions">
-                    <a href="{{ route('legacy-reports.index') }}" class="flow-action-btn flow-action-link">
-                        <i class="bi bi-database-check"></i> รายงาน BPlus เดิม
-                    </a>
                     @if($canExport)
                     <button type="button" class="flow-action-btn" onclick="exportCsv()">
                         <i class="bi bi-download"></i> ดาวน์โหลด Excel
@@ -642,48 +630,6 @@
     }
     .rpt-nav-link:hover { background: var(--erp-primary-soft); color: var(--erp-text); }
     .rpt-nav-link.active { background: var(--erp-success-soft); color: #020617; font-weight: 900; }
-    .rpt-legacy-card {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin: 12px 4px 4px;
-        padding: 10px;
-        border: 1px solid var(--erp-border);
-        border-radius: 8px;
-        background: var(--erp-surface-2);
-        color: var(--erp-text);
-        text-decoration: none;
-        box-shadow: 0 8px 22px rgba(35,150,200,.08);
-    }
-    .rpt-legacy-card:hover {
-        border-color: var(--flow-blue);
-        color: var(--erp-primary-ink);
-        background: var(--erp-primary-soft);
-    }
-    .rpt-legacy-icon {
-        width: 34px;
-        height: 34px;
-        display: inline-grid;
-        place-items: center;
-        border-radius: 9px;
-        background: var(--flow-blue);
-        color: #fff;
-        flex: 0 0 auto;
-    }
-    .rpt-legacy-card strong {
-        display: block;
-        font-size: 13px;
-        font-weight: 900;
-        line-height: 1.2;
-    }
-    .rpt-legacy-card small {
-        display: block;
-        color: var(--erp-muted);
-        font-size: 11px;
-        font-weight: 700;
-        line-height: 1.35;
-        margin-top: 2px;
-    }
     .rpt-nav-cat {
         display: flex;
         align-items: center;

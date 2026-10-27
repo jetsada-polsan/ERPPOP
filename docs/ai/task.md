@@ -1,3 +1,11 @@
+# Handoff - 2026-10-27 (นำประวัติและรายงาน BPlus ออกจาก ERP)
+- Commit: pending
+- ทำอะไร: เอาส่วนเอกสารเก่า BPlus ออกจากหน้าเอกสารย้อนหลัง ปิด URL รายละเอียดเก่า และถอดเมนู/หน้า/เส้นทางรายงาน BPlus เดิม
+- ทดสอบ: `php artisan test` ผ่าน 569 tests, skipped 1, incomplete 6; `git diff --check` ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: ไม่ได้ลบข้อมูลในฐาน/ไฟล์ต้นฉบับ BPlus ตามนโยบาย read-only; ไม่ deploy production
+- Deploy: ยังไม่ deploy
+- งานถัดไป: deploy ตามคำสั่งเจ้าของหากต้องการให้เมนูและหน้า production หายไป
+
 # Handoff — 2026-08-23 รอบที่ 4 (Claude) — **Deploy แล้ว**
 
 ## Handoff - 2026-10-03 (QR/Barcode คู่มือและตรวจระบบ)

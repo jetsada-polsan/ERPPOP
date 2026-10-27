@@ -123,7 +123,6 @@ class RoutePermissions
 
         // รายงาน
         'reports.' => 'reports.view',
-        'legacy-reports.' => 'reports.view',
         'legacy-backoffice-sales.' => 'reports.view',
         'core-modules.' => 'reports.view',
         'features.' => 'reports.view',

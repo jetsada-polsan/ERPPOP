@@ -34,7 +34,6 @@ use App\Http\Controllers\FixedAssetController;
 use App\Http\Controllers\FlashSaleController;
 use App\Http\Controllers\GlJournalController;
 use App\Http\Controllers\LegacyBackofficeSalesController;
-use App\Http\Controllers\LegacyReportController;
 use App\Http\Controllers\LegacyTableMappingController;
 use App\Http\Controllers\LineIntegrationController;
 use App\Http\Controllers\ManagementControlController;
@@ -240,7 +239,6 @@ Route::patch('/crm/opportunities/{opportunity}/stage', [CrmController::class, 'u
 Route::get('/features', [FeatureController::class, 'index'])->name('features.index');
 Route::get('/core-modules', [ManualController::class, 'index'])->name('core-modules.index');
 Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
-Route::get('/legacy-reports', [LegacyReportController::class, 'index'])->name('legacy-reports.index');
 Route::get('/legacy-backoffice-sales', [LegacyBackofficeSalesController::class, 'index'])->name('legacy-backoffice-sales.index');
 
 // Typeahead search (Alpine.js pickers on the booking/sale/purchase forms).
@@ -615,7 +613,6 @@ Route::prefix('document-books')->name('document-books.')->group(function () {
 
 // ศูนย์เอกสารย้อนหลัง: ต้นไม้ ประเภท->ปี->เดือน + กรองรายวัน ทุกประเภทเอกสาร
 Route::get('/documents', [DocumentBrowserController::class, 'index'])->name('documents.browser');
-Route::get('/documents/legacy/{diKey}', [DocumentBrowserController::class, 'legacyShow'])->name('documents.legacy-show');
 
 // ใบส่งของ/ใบส่งของชั่วคราว (A5): พิมพ์ได้จากใบจองและใบขายทุกชนิด
 Route::get('/documents/{document}/delivery-note', [DeliveryNoteController::class, 'show'])->name('documents.delivery-note');

@@ -145,7 +145,6 @@ class ErpMenu
                     ['label' => 'รายงานคลัง', 'route' => 'reports.index', 'pattern' => 'reports.*', 'icon' => 'bi-box-seam-fill', 'tone' => 'cyan', 'params' => ['category' => 'inventory'], 'queryCategory' => 'inventory'],
                     ['label' => 'รายงานบัญชี', 'route' => 'reports.index', 'pattern' => 'reports.*', 'icon' => 'bi-calculator-fill', 'tone' => 'red', 'params' => ['category' => 'payment'], 'queryCategory' => 'payment'],
                     ['label' => 'รายงานภาษี', 'route' => 'reports.index', 'pattern' => 'reports.*', 'icon' => 'bi-receipt', 'tone' => 'orange', 'params' => ['category' => 'tax'], 'queryCategory' => 'tax'],
-                    ['label' => 'รายงาน BPlus เดิม', 'route' => 'legacy-reports.index', 'pattern' => 'legacy-reports.*', 'icon' => 'bi-files', 'tone' => 'indigo'],
                 ],
             ],
             [
