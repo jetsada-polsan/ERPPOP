@@ -115,3 +115,8 @@
 - Deploy: ยังไม่ deploy / deploy แล้วพร้อมผลตรวจ
 - งานถัดไป: ...
 ```
+
+## สิทธิ์ดูแลระบบหลัง UAT 2026-10-27
+
+- `operations.*` (รวม Backup/restore drill/reset MFA) และ `database-structure.*` ใช้สิทธิ์คำนวณ `system.admin`: ต้องถือ **global** `users.manage` และ `settings.manage` ทั้งคู่ ไม่ให้ settings operator หรือบทบาทสาขาเข้าถึงข้อมูล/คำสั่งดูแลระบบส่วนกลาง
+- รายงานรับ UAT 14 ข้อและงานที่ยังรอข้อมูลจริง: `docs/uat/2026-10-27-menu-readiness.md`; `erp:uat-readiness --dry-run` อ่านอย่างเดียว, `erp:remove-test-price-tag --dry-run` ตรวจเฉพาะ TEST01 / TEST-Claude ก่อนลบจริงพร้อม audit ห้ามใช้ยอดเอกสาร 150–200 เป็นเกณฑ์ลบธุรกรรม
