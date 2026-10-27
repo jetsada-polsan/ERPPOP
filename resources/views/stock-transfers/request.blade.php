@@ -11,6 +11,9 @@
         <div class="content-card p-4 text-center text-muted">
             <i class="bi bi-exclamation-triangle-fill text-warning fs-3 d-block mb-2"></i>
             บัญชีของคุณยังไม่ได้กำหนด <b>สาขาประจำ</b> จึงยังขอโอนสินค้าไม่ได้ — ติดต่อผู้ดูแลระบบให้ตั้งค่าที่หน้า "ผู้ใช้และสิทธิ์"
+            @if(auth()->user()->hasPermission('users.manage'))
+                <div class="mt-3"><a class="btn btn-primary" href="{{ route('users.index', ['status' => 'unassigned']) }}">กำหนดสาขาให้ผู้ใช้</a></div>
+            @endif
         </div>
     @else
         <div class="content-card p-4 mb-3">

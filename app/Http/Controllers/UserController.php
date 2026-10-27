@@ -40,6 +40,7 @@ class UserController extends Controller
             ))
             ->when($status === 'active', fn ($query) => $query->where('is_active', true))
             ->when($status === 'inactive', fn ($query) => $query->where('is_active', false))
+            ->when($status === 'unassigned', fn ($query) => $query->whereNull('branch_id')->where('is_active', true))
             ->when($status === 'must_change', fn ($query) => $query->where('must_change_password', true))
             ->orderBy('username')
             ->paginate(50)
@@ -55,7 +56,9 @@ class UserController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('users.index', compact('users', 'posUsers', 'branches', 'roles', 'salesAreas', 'q', 'status'));
+        $unassignedBranchCount = User::where('is_active', true)->whereNull('branch_id')->count();
+
+        return view('users.index', compact('unassignedBranchCount', 'users', 'posUsers', 'branches', 'roles', 'salesAreas', 'q', 'status'));
     }
 
     public function store(Request $request): RedirectResponse

@@ -5,6 +5,12 @@
 @section('content')
 @php($resetResult = session('reset_pos_pin_result') ?? session('reset_password_result'))
 <div x-data="userPage()" x-cloak>
+    @if($unassignedBranchCount)
+        <div class="alert alert-warning">
+            มีผู้ใช้เปิดใช้งาน {{ $unassignedBranchCount }} คนที่ยังไม่มีสาขาประจำ — ผู้ใช้ที่ขอโอนสินค้าต้องตั้งสาขาก่อน ส่วนบัญชีส่วนกลางให้ตรวจตามหน้าที่
+            <a href="{{ route('users.index', ['status' => 'unassigned']) }}">ตรวจผู้ใช้ที่ยังไม่กำหนดสาขา</a>
+        </div>
+    @endif
     @if($errors->has('pos_pin'))
         <div class="alert alert-danger d-flex align-items-start gap-2 mb-3" role="alert">
             <i class="bi bi-exclamation-octagon-fill mt-1"></i>
@@ -24,6 +30,7 @@
                     <option value="">ทุกสถานะ</option>
                     <option value="active" @selected($status === 'active')>เปิดใช้งาน</option>
                     <option value="inactive" @selected($status === 'inactive')>ปิดใช้งาน</option>
+                    <option value="unassigned" @selected($status === 'unassigned')>ยังไม่กำหนดสาขา</option>
                     <option value="must_change" @selected($status === 'must_change')>รอเปลี่ยนรหัสผ่าน</option>
                 </select>
             </div>
