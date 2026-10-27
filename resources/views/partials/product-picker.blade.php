@@ -12,9 +12,12 @@
       5. ถ้าต้องทำอะไรต่อหลังเลือกสินค้า ให้ประกาศ onProductPicked(index, product) ในหน้า
 --}}
 
+{{-- ปิดเมื่อคลิกพื้นที่มืดรอบนอก (@click.self) แทน @click.outside ซึ่งบางจังหวะ
+     จับคลิกเดียวกับที่ใช้เปิด picker แล้วปิดทันที --}}
 <div class="product-picker-backdrop" x-show="pickerOpen" x-transition.opacity
+    @click.self="closeProductPicker()"
     @keydown.escape.window="closeProductPicker()" style="display:none">
-    <div class="product-picker" role="dialog" aria-label="เลือกสินค้า" @click.outside="closeProductPicker()" x-transition>
+    <div class="product-picker" role="dialog" aria-label="เลือกสินค้า" x-transition>
         <div class="product-picker-head">
             <span class="product-picker-icon"><i class="bi bi-box-seam"></i></span>
             <div>
