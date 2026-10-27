@@ -85,6 +85,7 @@
         @endif
 
         <div class="content-card p-4">
+            <p class="small text-muted">จำนวนราคาในตารางนับเฉพาะราคาที่กำหนดแยกไว้ หากไม่มีรายการ POS จะใช้ราคาขายทั่วไปของสินค้า ไม่ใช่จำนวนสินค้าที่ซิงก์สำเร็จ</p>
             <div class="table-responsive">
                 <table class="table align-middle">
                     <thead>
