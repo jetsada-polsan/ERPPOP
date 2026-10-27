@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\RequiresFreshBackup;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -25,6 +26,8 @@ use Throwable;
  */
 class ErpResetTransactions extends Command
 {
+    use RequiresFreshBackup;
+
     protected $signature = 'erp:reset-transactions
         {--confirm-database= : ชื่อฐานข้อมูลที่ต้องการล้าง ต้องพิมพ์ให้ตรง}
         {--dry-run : แสดงสิ่งที่จะลบและสิ่งที่จะคงไว้ โดยไม่แก้ข้อมูลใด ๆ}
@@ -223,42 +226,5 @@ class ErpResetTransactions extends Command
         }
 
         return $blocking;
-    }
-
-    /** ไม่มี backup สดที่ตรวจ checksum แล้ว = ไม่ให้ลบ */
-    private function hasFreshBackup(): bool
-    {
-        $latest = collect(glob(storage_path('app/backups/erp-db-*.sql.gz')) ?: [])
-            ->sortByDesc(fn (string $file) => filemtime($file))
-            ->first();
-
-        if (! $latest) {
-            $this->error('ไม่พบไฟล์สำรอง — รัน php artisan erp:backup ก่อน');
-
-            return false;
-        }
-
-        $ageHours = (time() - filemtime($latest)) / 3600;
-        if ($ageHours > 2) {
-            $this->error(sprintf('ไฟล์สำรองล่าสุดเก่า %.1f ชั่วโมง — รัน php artisan erp:backup ใหม่ก่อน', $ageHours));
-
-            return false;
-        }
-
-        $checksumFile = $latest.'.sha256';
-        if (! is_file($checksumFile)) {
-            $this->error('ไม่พบไฟล์ checksum ของ backup');
-
-            return false;
-        }
-        if (! hash_equals(trim(explode(' ', (string) file_get_contents($checksumFile))[0]), hash_file('sha256', $latest))) {
-            $this->error('checksum ของ backup ไม่ตรง — ไฟล์อาจเสียหาย ห้ามลบข้อมูล');
-
-            return false;
-        }
-
-        $this->info(sprintf('backup ผ่าน: %s (%.1f ชม.ที่แล้ว, checksum ตรง)', basename($latest), $ageHours));
-
-        return true;
     }
 }
