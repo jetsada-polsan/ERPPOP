@@ -67,17 +67,22 @@ class PurgeLegacyMasters extends Command
         $customerChildren = array_values(array_filter($customerRefs, fn ($ref) => ! in_array($ref[0], ErpResetTransactions::TRANSACTIONAL, true)));
         $salesmanLinks = array_values(array_filter($salesmanRefs, fn ($ref) => ! in_array($ref[0], ErpResetTransactions::TRANSACTIONAL, true)));
 
+        // ชั้นหลาน เช่น บัญชี LINE ของสมาชิกที่ผูกลูกค้า: ลบตามเฉพาะแถวที่ชี้ไปยังแถวที่จะลบ
+        // ถ้าเป็นตารางธุรกรรมแปลว่ายังไม่ได้ล้าง ให้หยุด
         $childTables = array_column($customerChildren, 0);
-        foreach ($customerChildren as [$table]) {
+        $grandchildren = [];
+        foreach ($customerChildren as [$table, $parentColumn]) {
             foreach ($this->foreignKeysTo($table) as [$referrer, $column]) {
                 if (in_array($referrer, $childTables, true)) {
                     continue;
                 }
-                if (($rows = DB::table($referrer)->whereNotNull($column)->count()) > 0) {
-                    $this->error("หยุด: {$referrer}.{$column} ยังอ้าง {$table} อยู่ {$rows} แถว");
+                $scoped = DB::table($referrer)->whereIn($column, DB::table($table)->whereNotNull($parentColumn)->select('id'))->count();
+                if ($scoped > 0 && in_array($referrer, ErpResetTransactions::TRANSACTIONAL, true)) {
+                    $this->error("หยุด: {$referrer}.{$column} ยังอ้าง {$table} อยู่ {$scoped} แถว");
 
                     return self::FAILURE;
                 }
+                $grandchildren[] = [$referrer, $column, $table, $parentColumn];
             }
         }
 
@@ -85,6 +90,9 @@ class PurgeLegacyMasters extends Command
         usort($customerChildren, fn ($a, $b) => $this->referencedBy($a[0], $childTables) <=> $this->referencedBy($b[0], $childTables));
 
         $rows = [];
+        foreach ($grandchildren as [$table, $column, $parent, $parentColumn]) {
+            $rows[] = ["{$table} (ลบ ที่ผูก {$parent})", number_format(DB::table($table)->whereIn($column, DB::table($parent)->whereNotNull($parentColumn)->select('id'))->count())];
+        }
         foreach ($customerChildren as [$table, $column]) {
             $rows[] = ["{$table} (ลบ)", number_format(DB::table($table)->whereNotNull($column)->count())];
         }
@@ -122,7 +130,10 @@ class PurgeLegacyMasters extends Command
         }
 
         try {
-            DB::transaction(function () use ($customerChildren, $salesmanLinks) {
+            DB::transaction(function () use ($grandchildren, $customerChildren, $salesmanLinks) {
+                foreach ($grandchildren as [$table, $column, $parent, $parentColumn]) {
+                    DB::table($table)->whereIn($column, DB::table($parent)->whereNotNull($parentColumn)->select('id'))->delete();
+                }
                 foreach ($customerChildren as [$table, $column]) {
                     DB::table($table)->whereNotNull($column)->delete();
                 }

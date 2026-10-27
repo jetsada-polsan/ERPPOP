@@ -45,6 +45,9 @@ class PurgeLegacyMastersTest extends TestCase
         $this->assertSame(0, DB::table('customers')->count());
         $this->assertSame(0, DB::table('customer_addresses')->count());
         $this->assertSame(0, DB::table('salesmen')->count());
+        // บัญชี LINE ของสมาชิกที่ผูกลูกค้าหายตาม; สมาชิกที่ไม่ผูกลูกค้ายังอยู่พร้อมบัญชี LINE
+        $this->assertSame(['LINE-FREE'], DB::table('member_line_accounts')->pluck('line_user_id')->all());
+        $this->assertSame(['M-FREE'], DB::table('members')->pluck('member_code')->all());
         $this->assertSame(0, DB::table('legacy_table_mappings')->count());
         $this->assertSame(0, DB::table('app_settings')->where('key', 'like', 'legacy_backoffice_%')->count());
         $this->assertNull($user->fresh()->salesman_id);
@@ -93,6 +96,12 @@ class PurgeLegacyMastersTest extends TestCase
         $user = User::factory()->create(['username' => 'legacy_probe', 'salesman_id' => $salesman->id]);
         $customer = Customer::create(['code' => 'C-LG', 'name_th' => 'ลูกค้าทดสอบ', 'is_active' => true]);
         CustomerAddress::create(['customer_id' => $customer->id, 'address_line' => 'ที่อยู่ทดสอบ', 'is_default' => true]);
+        $linked = DB::table('members')->insertGetId(['member_code' => 'M-LG', 'name' => 'สมาชิกทดสอบ', 'customer_id' => $customer->id]);
+        $free = DB::table('members')->insertGetId(['member_code' => 'M-FREE', 'name' => 'สมาชิกอิสระ']);
+        DB::table('member_line_accounts')->insert([
+            ['member_id' => $linked, 'line_user_id' => 'LINE-LG'],
+            ['member_id' => $free, 'line_user_id' => 'LINE-FREE'],
+        ]);
         Supplier::create(['code' => 'SUP-LG', 'name_th' => 'ผู้ขายทดสอบ', 'is_active' => true]);
         DB::table('legacy_table_mappings')->insert($this->mappingRow());
         DB::table('app_settings')->insert(['key' => 'legacy_backoffice_summary_test', 'value' => '{}', 'created_at' => now(), 'updated_at' => now()]);
