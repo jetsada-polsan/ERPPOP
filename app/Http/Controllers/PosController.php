@@ -706,7 +706,8 @@ class PosController extends Controller
 
         $terminal = $this->terminalForBranch((int) $data['branch_id']);
 
-        $shift = PosShift::create([
+        // เลขกะต้องออกใน transaction เดียวกับการสร้าง (lockForUpdate ใน nextShiftNo)
+        $shift = DB::transaction(fn () => PosShift::create([
             'branch_id' => $data['branch_id'],
             'pos_terminal_id' => $terminal->id,
             'cashier_id' => $data['cashier_id'],
@@ -717,7 +718,7 @@ class PosController extends Controller
             'expected_cash' => $data['opening_cash'],
             'status' => 'open',
             'opening_note' => $data['opening_note'] ?? null,
-        ]);
+        ]));
 
         return response()->json(['success' => true, 'shift' => $this->shiftPayload($shift)]);
     }
@@ -1368,11 +1369,29 @@ class PosController extends Controller
         );
     }
 
+    /**
+     * เลขกะรันต่อสาขาต่อวัน: SHIFT-{สาขา}-{วันที่}-0001
+     *
+     * เดิมใช้เวลาถึงหลักวินาที ถ้าเปิด 2 กะในสาขาเดียวกันภายในวินาทีเดียว (เช่น เครื่อง
+     * POS หลายเครื่องกลับมาออนไลน์แล้วส่งกะที่เปิดตอนออฟไลน์ขึ้นพร้อมกัน) จะชน unique
+     * แล้ว ERP ตอบ 500 กะไม่ขึ้นและบิลทั้งกะค้างที่เครื่อง
+     */
     private function nextShiftNo(int $branchId): string
     {
         $branchCode = Branch::find($branchId)?->code ?? sprintf('%04d', $branchId);
+        $prefix = 'SHIFT-'.$branchCode.'-'.now()->format('Ymd').'-';
+        $last = PosShift::where('shift_no', 'like', $prefix.'%')
+            ->orderByDesc('id')
+            ->lockForUpdate()
+            ->value('shift_no');
+        $next = $last ? ((int) substr($last, strlen($prefix))) + 1 : 1;
 
-        return 'SHIFT-'.$branchCode.'-'.now()->format('Ymd-His');
+        // กันเลขเดิมรูปแบบเวลา (Ymd-His) ที่ยังอยู่ในวันเดียวกัน: ถ้าเลขนี้มีแล้วให้ขยับต่อ
+        while (PosShift::where('shift_no', $prefix.sprintf('%04d', $next))->exists()) {
+            $next++;
+        }
+
+        return $prefix.sprintf('%04d', $next);
     }
 
     private function nextHoldNo(int $branchId): string
