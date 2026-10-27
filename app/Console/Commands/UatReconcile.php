@@ -63,12 +63,14 @@ class UatReconcile extends Command
 
         // 4. ต้นทุนขายใน GL ต้องเท่ากับต้นทุนที่บันทึกบนบรรทัดเอกสาร
         $cogsAccount = ChartOfAccount::where('default_role', ChartOfAccount::ROLE_COGS)->value('id');
-        $glCogs = (float) DB::table('gl_journals')->where('account_id', $cogsAccount)->sum('debit');
+        // สุทธิ (Dr - Cr): บิลที่ยกเลิกกลับรายการต้นทุนด้วย Cr แล้ว
+        $glCogs = (float) DB::table('gl_journals')->where('account_id', $cogsAccount)->sum(DB::raw('debit - credit'));
         $lineCogs = (float) DB::table('stock_document_items as sdi')
             ->join('stock_documents as sd', 'sd.id', '=', 'sdi.stock_document_id')
             ->join('documents as d', 'd.id', '=', 'sd.document_id')
             ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
             ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE'])
+            ->where('d.status', '!=', 'cancelled')
             ->when($branchId, fn ($q) => $q->where('d.branch_id', $branchId))
             ->sum('sdi.cost_amount');
         // ขายแล้วต้นทุนเป็นศูนย์ไม่ใช่ "ตรงกัน" แต่แปลว่าไม่มีใครลงต้นทุนเลย
@@ -107,12 +109,14 @@ class UatReconcile extends Command
             ->join('documents as d', 'd.id', '=', 'sd.document_id')
             ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
             ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE'])
+            ->where('d.status', '!=', 'cancelled')
             ->when($branchId, fn ($q) => $q->where('d.branch_id', $branchId))
             ->sum('sdi.qty');
         $movementQty = (float) DB::table('stock_movements as m')
             ->join('documents as d', 'd.id', '=', 'm.document_id')
             ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
             ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE'])
+            ->where('d.status', '!=', 'cancelled')
             ->when($branchId, fn ($q) => $q->where('d.branch_id', $branchId))
             ->sum('m.qty');
         $checks[] = [
@@ -130,10 +134,11 @@ class UatReconcile extends Command
         return $failed === 0 ? self::SUCCESS : self::FAILURE;
     }
 
+    /** ยอดสุทธิฝั่งเครดิต (Cr - Dr) — บิลที่ยกเลิกกลับรายได้/ภาษีด้วย Dr จึงต้องหักออก */
     private function ledgerCredit(string $role): float
     {
         return (float) DB::table('gl_journals')
             ->where('account_id', ChartOfAccount::where('default_role', $role)->value('id'))
-            ->sum('credit');
+            ->sum(DB::raw('credit - debit'));
     }
 }
