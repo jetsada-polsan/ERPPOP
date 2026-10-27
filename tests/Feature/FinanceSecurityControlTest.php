@@ -114,7 +114,7 @@ class FinanceSecurityControlTest extends TestCase
     {
         $user = User::factory()->create(['username' => 'control-user', 'is_active' => true, 'must_change_password' => false]);
         $role = Role::create(['code' => 'CONTROL', 'name' => 'Control Center']);
-        $permissions = collect(['finance.manage', 'settings.manage', 'reports.view'])->map(fn ($code) => Permission::firstOrCreate(['code' => $code], ['name' => $code]));
+        $permissions = collect(['finance.manage', 'settings.manage', 'users.manage', 'reports.view'])->map(fn ($code) => Permission::firstOrCreate(['code' => $code], ['name' => $code]));
         $role->permissions()->sync($permissions->pluck('id')->all());
         $user->roles()->attach($role->id);
         $this->actingAs($user);
@@ -134,6 +134,22 @@ class FinanceSecurityControlTest extends TestCase
         $this->get('/security/mfa')->assertOk()->assertSee('Setup key');
     }
 
+    public function test_settings_operator_cannot_access_admin_pages_or_backup_actions(): void
+    {
+        $user = User::factory()->create(['is_active' => true, 'must_change_password' => false]);
+        $role = Role::create(['code' => 'SETTINGS_ONLY', 'name' => 'ตั้งค่า']);
+        $role->permissions()->attach(Permission::firstOrCreate(['code' => 'settings.manage'], ['name' => 'ตั้งค่า'])->id);
+        $user->roles()->attach($role->id);
+        $this->actingAs($user);
+        $this->get('/operations')->assertForbidden();
+        $this->get('/database-structure')->assertForbidden();
+        $this->post('/operations/backup')->assertForbidden();
+        $this->post('/operations/restore-verify')->assertForbidden();
+        $this->post('/operations/users/'.$user->id.'/mfa-reset')->assertForbidden();
+        $this->get('/')->assertDontSee('href="'.route('operations.index').'"', false)
+            ->assertDontSee('href="'.route('database-structure.index').'"', false);
+    }
+
     public function test_database_structure_requires_system_settings_permission(): void
     {
         $user = User::factory()->create(['username' => 'ordinary-user', 'is_active' => true, 'must_change_password' => false]);
@@ -147,6 +163,7 @@ class FinanceSecurityControlTest extends TestCase
         $role = Role::create(['code' => 'BACKUP_ADMIN', 'name' => 'Backup Admin']);
         $permission = Permission::firstOrCreate(['code' => 'settings.manage'], ['name' => 'settings.manage']);
         $role->permissions()->attach($permission->id);
+        $role->permissions()->attach(Permission::firstOrCreate(['code' => 'users.manage'], ['name' => 'users.manage'])->id);
         $user->roles()->attach($role->id);
 
         $directory = storage_path('app/backups');

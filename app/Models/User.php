@@ -179,6 +179,13 @@ class User extends Authenticatable
     {
         $codes = $this->permissionCodes();
 
+        // Backup/schema access requires the full system-admin combination;
+        // a settings operator alone must not inspect backups or reset MFA.
+        if ($code === 'system.admin') {
+            return $this->hasGlobalPermission('users.manage')
+                && $this->hasGlobalPermission('settings.manage');
+        }
+
         if (in_array($code, $codes, true)) {
             return true;
         }
