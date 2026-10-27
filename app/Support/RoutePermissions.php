@@ -90,6 +90,7 @@ class RoutePermissions
         'cash-transfers.' => 'finance.manage',
         'bank-accounts.' => 'finance.manage',
         'payments.' => 'finance.manage',
+        'ap-payments.' => 'finance.manage',
         'cheques.' => 'finance.manage',
         'bplus.finance' => 'finance.manage',
         'bplus.tax' => 'finance.manage',

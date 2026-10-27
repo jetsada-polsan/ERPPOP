@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'payment_document_id', 'customer_open_item_id', 'allocated_amount',
+    'payment_document_id', 'customer_open_item_id', 'supplier_open_item_id', 'allocated_amount',
     'discount_amount', 'wht_amount',
 ])]
 class PaymentAllocation extends Model
@@ -22,6 +22,11 @@ class PaymentAllocation extends Model
     public function openItem(): BelongsTo
     {
         return $this->belongsTo(CustomerOpenItem::class, 'customer_open_item_id');
+    }
+
+    public function supplierOpenItem(): BelongsTo
+    {
+        return $this->belongsTo(SupplierOpenItem::class, 'supplier_open_item_id');
     }
 
     protected function casts(): array

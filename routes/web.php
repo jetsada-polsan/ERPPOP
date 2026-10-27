@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountingAutomationController;
 use App\Http\Controllers\AccountingPeriodController;
+use App\Http\Controllers\ApPaymentController;
 use App\Http\Controllers\AppLauncherController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BankAccountController;
@@ -277,6 +278,13 @@ Route::prefix('sale-returns')->name('sale-returns.')->group(function () {
 });
 
 // Payment receipt / voucher show page.
+// จ่ายชำระเจ้าหนี้: เลือกใบซื้อค้างจ่ายได้หลายใบ เงินสด/โอน/เช็ค + หัก ณ ที่จ่าย
+Route::prefix('ap-payments')->name('ap-payments.')->group(function () {
+    Route::get('/', [ApPaymentController::class, 'index'])->name('index');
+    Route::get('/create', [ApPaymentController::class, 'create'])->name('create');
+    Route::post('/', [ApPaymentController::class, 'store'])->name('store');
+});
+
 Route::get('/payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
 Route::get('/payments/{payment}/print', [PaymentController::class, 'print'])->name('payments.print');
 

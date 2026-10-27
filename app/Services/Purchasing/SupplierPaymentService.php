@@ -4,6 +4,7 @@ namespace App\Services\Purchasing;
 
 use App\Models\Document;
 use App\Models\DocumentType;
+use App\Models\PaymentAllocation;
 use App\Models\PaymentDocument;
 use App\Models\PaymentLine;
 use App\Models\SupplierLedger;
@@ -30,19 +31,33 @@ class SupplierPaymentService
     ) {}
 
     /**
-     * @param  array{supplier_id:int, branch_id:int, method:string, amount:float}  $data
+     * ถ้าส่ง allocations มา (เลือกใบซื้อค้างจ่ายเอง) ยอดจ่าย = ผลรวมของ allocations
+     * และตัดเฉพาะใบเหล่านั้น ถ้าไม่ส่ง ตัดใบเก่าสุดก่อนตามยอด amount เหมือนเดิม
+     *
+     * @param  array{supplier_id:int, branch_id:int, method:string, amount?:float, allocations?: array<int, array{supplier_open_item_id:int, amount:float}>}  $data
      */
     public function create(array $data): Document
     {
-        $amount = (float) $data['amount'];
+        $allocations = array_values(array_filter(
+            $data['allocations'] ?? [],
+            fn ($row) => (float) ($row['amount'] ?? 0) > 0,
+        ));
+        $amount = $allocations !== []
+            ? round(array_sum(array_map(fn ($row) => round((float) $row['amount'], 2), $allocations)), 2)
+            : (float) ($data['amount'] ?? 0);
         if ($amount <= 0) {
             throw new RuntimeException('ยอดชำระต้องมากกว่า 0');
         }
 
         $documentType = DocumentType::where('code', 'PAYMENT_VOUCHER')->firstOrFail();
 
-        return DB::transaction(function () use ($data, $documentType, $amount) {
+        return DB::transaction(function () use ($data, $documentType, $amount, $allocations) {
             $supplier = Supplier::whereKey($data['supplier_id'])->lockForUpdate()->firstOrFail();
+            if ($allocations !== []) {
+                // ตรวจรายใบก่อน ข้อความผิดพลาดจะได้บอกได้ว่าใบไหน ไม่ใช่แค่ "เกินยอดหนี้"
+                $this->openItems->assertAllocatable($supplier->id, collect($allocations)
+                    ->mapWithKeys(fn ($row) => [(int) $row['supplier_open_item_id'] => round((float) $row['amount'], 2)])->all());
+            }
             $currentBalance = (float) (SupplierLedger::where('supplier_id', $supplier->id)->latest('id')->value('balance_after') ?? 0);
             if ($amount > $currentBalance + 0.0001) {
                 throw new RuntimeException('ยอดชำระเกินยอดหนี้คงค้าง');
@@ -111,8 +126,24 @@ class SupplierPaymentService
                 'entry_date' => now()->toDateString(),
             ]);
 
-            // ตัดใบที่ค้างเรียงใบเก่าก่อน เพื่อให้ AP aging ลดลงตามจริง ไม่ใช่แค่ยอดรวมใน ledger
-            $this->openItems->applyPayment((int) $data['supplier_id'], (float) $amount);
+            // ตัดใบที่ค้าง: ตามที่ผู้ใช้เลือก หรือเรียงใบเก่าก่อน เพื่อให้ AP aging ลดลงตามจริง
+            // แล้วจำไว้ว่าตัดใบไหนเท่าไร ใช้ตอนยกเลิกใบจ่ายและตอบว่าใบซื้อจ่ายด้วยใบจ่ายไหน
+            $applied = $allocations !== []
+                ? $this->openItems->applyToItems((int) $data['supplier_id'], $allocations)
+                : $this->openItems->applyPaymentFifo((int) $data['supplier_id'], (float) $amount);
+            $whtLeft = $tax;
+            $lastItemId = array_key_last($applied);
+            foreach ($applied as $itemId => $allocated) {
+                // ภาษีหัก ณ ที่จ่ายเฉลี่ยตามสัดส่วนยอดที่ตัด ใบสุดท้ายรับเศษ
+                $wht = $itemId === $lastItemId ? $whtLeft : round($tax * $allocated / $amount, 2);
+                $whtLeft = round($whtLeft - $wht, 2);
+                PaymentAllocation::create([
+                    'payment_document_id' => $paymentDocument->id,
+                    'supplier_open_item_id' => $itemId,
+                    'allocated_amount' => $allocated,
+                    'wht_amount' => $wht,
+                ]);
+            }
 
             if ($tax > 0) {
                 DB::table('supplier_withholdings')->insert([

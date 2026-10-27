@@ -28,6 +28,16 @@
             </div>
             <div class="d-flex gap-2 align-items-center">
                 <span class="badge text-bg-success fs-6 px-3 py-2">รับเข้าคลังแล้ว</span>
+                @if($openItem && (float) $openItem->balance_amount > 0)
+                    <span class="badge text-bg-warning fs-6 px-3 py-2">ค้างจ่าย {{ number_format((float) $openItem->balance_amount, 2) }}</span>
+                    @if(auth()->user()->hasPermission('finance.manage'))
+                    <a href="{{ route('ap-payments.create', ['supplier_id' => $purchase->supplier_id, 'open_item_id' => $openItem->id]) }}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-wallet2 me-1"></i>จ่ายชำระ
+                    </a>
+                    @endif
+                @elseif($openItem)
+                    <span class="badge text-bg-light border fs-6 px-3 py-2">จ่ายครบแล้ว</span>
+                @endif
                 @if(auth()->user()->hasPermission('inventory.cost.close'))
                 <a href="{{ route('purchases.cost-adjustments.create', $purchase) }}" class="btn btn-outline-warning btn-sm">
                     <i class="bi bi-pencil-square me-1"></i>ปรับต้นทุนย้อนหลัง

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Branch;
 use App\Models\Document;
 use App\Models\SupplierLedger;
+use App\Models\SupplierOpenItem;
 use App\Services\Purchasing\PurchaseService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -71,7 +72,9 @@ class PurchaseController extends Controller
         $purchase->load(['supplier', 'branch', 'stockDocument.items.product']);
 
         $ledgerEntry = SupplierLedger::where('document_id', $purchase->id)->first();
+        // ยอดค้างจ่ายของใบนี้ (มีเฉพาะใบซื้อเชื่อ) ใช้แสดงปุ่ม "จ่ายชำระ"
+        $openItem = SupplierOpenItem::where('source_document_id', $purchase->id)->first();
 
-        return view('purchases.show', compact('purchase', 'ledgerEntry'));
+        return view('purchases.show', compact('purchase', 'ledgerEntry', 'openItem'));
     }
 }

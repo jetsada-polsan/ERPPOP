@@ -5,7 +5,9 @@ namespace App\Services\Purchasing;
 use App\Models\Document;
 use App\Models\SupplierOpenItem;
 use App\Support\DecimalMath;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 /**
  * ยอดเจ้าหนี้ค้างชำระรายใบ — เกิดอัตโนมัติเมื่อยืนยันใบซื้อเชื่อ/ใบกำกับซื้อ
@@ -44,12 +46,23 @@ class SupplierOpenItemService
      */
     public function applyPayment(int $supplierId, float $amount): float
     {
+        return round(array_sum($this->applyPaymentFifo($supplierId, $amount)), 4);
+    }
+
+    /**
+     * เหมือน applyPayment() แต่คืนรายละเอียดว่าตัดใบไหนไปเท่าไร
+     *
+     * @return array<int, float> supplier_open_item_id => ยอดที่ตัด
+     */
+    public function applyPaymentFifo(int $supplierId, float $amount): array
+    {
         if ($amount <= 0) {
-            return 0.0;
+            return [];
         }
 
         return DB::transaction(function () use ($supplierId, $amount) {
             $remaining = $amount;
+            $applied = [];
 
             $items = SupplierOpenItem::where('supplier_id', $supplierId)
                 ->whereIn('status', ['open', 'partial'])
@@ -64,23 +77,90 @@ class SupplierOpenItemService
                     break;
                 }
 
-                $applied = min($remaining, (float) $item->balance_amount);
-                if ($applied <= 0) {
+                $take = min($remaining, (float) $item->balance_amount);
+                if ($take <= 0) {
                     continue;
                 }
 
-                $newBalance = round((float) DecimalMath::subtract((string) $item->balance_amount, (string) $applied), 4);
-                $item->update([
-                    'paid_amount' => DecimalMath::add((string) $item->paid_amount, (string) $applied),
-                    'balance_amount' => $newBalance,
-                    'status' => $newBalance <= 0.0001 ? 'cleared' : 'partial',
-                    'cleared_at' => $newBalance <= 0.0001 ? now() : null,
-                ]);
-
-                $remaining = round($remaining - $applied, 4);
+                $this->reduce($item, $take);
+                $applied[$item->id] = $take;
+                $remaining = round($remaining - $take, 4);
             }
 
-            return round($amount - $remaining, 4);
+            return $applied;
         });
+    }
+
+    /**
+     * ตัดยอดตามใบที่ผู้ใช้เลือกเอง (จ่ายเฉพาะบางใบ / จ่ายบางส่วนของใบ)
+     *
+     * ตรวจทุกบรรทัดก่อนตัดใบแรก: ใบต้องเป็นของผู้ขายรายนี้ ยังค้างอยู่ และยอดไม่เกินยอดค้าง
+     *
+     * @param  array<int, array{supplier_open_item_id:int, amount:float}>  $allocations
+     * @return array<int, float> supplier_open_item_id => ยอดที่ตัด
+     */
+    public function applyToItems(int $supplierId, array $allocations): array
+    {
+        $wanted = collect($allocations)
+            ->filter(fn ($row) => (float) ($row['amount'] ?? 0) > 0)
+            ->mapWithKeys(fn ($row) => [(int) $row['supplier_open_item_id'] => round((float) $row['amount'], 2)]);
+
+        if ($wanted->isEmpty()) {
+            throw new RuntimeException('กรุณาเลือกใบซื้อที่จะจ่ายอย่างน้อย 1 ใบ');
+        }
+
+        return DB::transaction(function () use ($supplierId, $wanted) {
+            $items = $this->assertAllocatable($supplierId, $wanted->all());
+
+            $applied = [];
+            foreach ($wanted as $itemId => $amount) {
+                $this->reduce($items->get($itemId), $amount);
+                $applied[$itemId] = $amount;
+            }
+
+            return $applied;
+        });
+    }
+
+    /**
+     * ตรวจว่าตัดยอดตามที่ขอได้ทุกบรรทัด (ของผู้ขายรายนี้ ยังค้าง ยอดไม่เกิน) โดยยังไม่แก้อะไร
+     *
+     * @param  array<int, float>  $wanted  supplier_open_item_id => ยอดที่จะตัด
+     * @return Collection<int, SupplierOpenItem>
+     */
+    public function assertAllocatable(int $supplierId, array $wanted): Collection
+    {
+        $items = SupplierOpenItem::whereIn('id', array_keys($wanted))->lockForUpdate()->get()->keyBy('id');
+
+        foreach ($wanted as $itemId => $amount) {
+            $item = $items->get($itemId);
+            if (! $item || (int) $item->supplier_id !== $supplierId) {
+                throw new RuntimeException('มีใบซื้อที่เลือกไม่ใช่ของผู้จำหน่ายรายนี้');
+            }
+            if (! in_array($item->status, ['open', 'partial'], true)) {
+                throw new RuntimeException("ใบ {$item->document_no} จ่ายครบไปแล้ว");
+            }
+            if ($amount > round((float) $item->balance_amount, 2) + 0.001) {
+                throw new RuntimeException(sprintf(
+                    'ใบ %s ค้างจ่าย %s บาท แต่จะจ่าย %s บาท',
+                    $item->document_no,
+                    number_format((float) $item->balance_amount, 2),
+                    number_format($amount, 2),
+                ));
+            }
+        }
+
+        return $items;
+    }
+
+    private function reduce(SupplierOpenItem $item, float $amount): void
+    {
+        $newBalance = round((float) DecimalMath::subtract((string) $item->balance_amount, (string) $amount), 4);
+        $item->update([
+            'paid_amount' => DecimalMath::add((string) $item->paid_amount, (string) $amount),
+            'balance_amount' => $newBalance,
+            'status' => $newBalance <= 0.0001 ? 'cleared' : 'partial',
+            'cleared_at' => $newBalance <= 0.0001 ? now() : null,
+        ]);
     }
 }
