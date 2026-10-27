@@ -67,7 +67,7 @@ class PosController extends Controller
         }
 
         $branches = Branch::orderBy('code')->get(['id', 'code', 'name_th', 'default_warehouse_location_id']);
-        $categories = ProductCategory::orderBy('name_th')->get(['id', 'code', 'name_th']);
+        $categories = ProductCategory::forPos()->orderBy('name_th')->get(['id', 'code', 'name_th']);
         // User is the visible POS identity. The adapter id only travels in the
         // compatibility request field used by existing shift/document tables.
         $cashiers = User::query()
@@ -127,7 +127,7 @@ class PosController extends Controller
             ->orderBy('name_th')
             ->limit(8)
             ->get(['id', 'sku_code', 'name_th', 'default_price']);
-        $previewCategories = ProductCategory::orderBy('name_th')
+        $previewCategories = ProductCategory::forPos()->orderBy('name_th')
             ->limit(5)
             ->get(['id', 'name_th']);
 
