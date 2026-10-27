@@ -30,6 +30,20 @@ class PriceTagController extends Controller
         return redirect()->route('price-tags.index')->with('success', "เพิ่มป้ายราคา {$data['code']} แล้ว");
     }
 
+    public function edit(PriceTagTemplate $priceTag): View
+    {
+        $priceTables = PriceTable::orderBy('name')->get(['id', 'code', 'name']);
+
+        return view('price-tags.edit', compact('priceTag', 'priceTables'));
+    }
+
+    public function destroy(PriceTagTemplate $priceTag): RedirectResponse
+    {
+        $priceTag->delete();
+
+        return redirect()->route('price-tags.index')->with('success', 'ลบรูปแบบป้ายราคาแล้ว');
+    }
+
     public function update(Request $request, PriceTagTemplate $priceTag): RedirectResponse
     {
         $data = $this->validateTemplate($request, $priceTag->id);

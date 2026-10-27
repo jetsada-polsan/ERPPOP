@@ -678,7 +678,9 @@ Route::prefix('flash-sales')->name('flash-sales.')->group(function () {
 Route::prefix('price-tags')->name('price-tags.')->group(function () {
     Route::get('/', [PriceTagController::class, 'index'])->name('index');
     Route::post('/', [PriceTagController::class, 'store'])->name('store');
+    Route::get('/{priceTag}/edit', [PriceTagController::class, 'edit'])->name('edit');
     Route::put('/{priceTag}', [PriceTagController::class, 'update'])->name('update');
+    Route::delete('/{priceTag}', [PriceTagController::class, 'destroy'])->name('destroy');
     Route::get('/print', [PriceTagController::class, 'print'])->name('print');
     Route::get('/search-products', [PriceTagController::class, 'searchProducts'])->name('search-products');
     Route::post('/preview', [PriceTagController::class, 'preview'])->name('preview');

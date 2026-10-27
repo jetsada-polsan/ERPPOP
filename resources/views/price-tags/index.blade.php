@@ -11,38 +11,14 @@
 
 <div class="content-card p-4 mb-3" x-data="{ source: 'default' }">
     <h2 class="h5 fw-bold mb-3">เพิ่มรูปแบบป้ายราคา</h2>
-    <form method="post" action="{{ route('price-tags.store') }}" class="row g-3">
-        @csrf
-        <div class="col-md-2"><label class="form-label small text-muted">รหัสป้ายราคา</label><input name="code" required class="form-control"></div>
-        <div class="col-md-3"><label class="form-label small text-muted">ชื่อป้ายราคา</label><input name="name" required class="form-control" placeholder="เช่น ป้ายขายสดหน้าร้าน"></div>
-        <div class="col-md-3">
-            <label class="form-label small text-muted">แหล่งราคา</label>
-            <select name="price_source" x-model="source" class="form-select">
-                <option value="default">ราคาขายทั่วไป</option>
-                <option value="price_table">ตามตารางราคา</option>
-                <option value="flash_sale">ราคานาทีทอง (ถ้ามีแคมเปญ)</option>
-                <option value="no_price">ไม่แสดงราคา</option>
-            </select>
-        </div>
-        <div class="col-md-3" x-show="source === 'price_table'" x-cloak>
-            <label class="form-label small text-muted">ตารางราคา</label>
-            <select name="price_table_id" class="form-select">
-                <option value="">-- เลือกตารางราคา --</option>
-                @foreach($priceTables as $pt)
-                    <option value="{{ $pt->id }}">{{ $pt->code }} - {{ $pt->name }}</option>
-                @endforeach
-            </select>
-        </div>
-        <div class="col-md-1 d-flex align-items-end"><div class="form-check mb-2"><input type="checkbox" name="is_active" value="1" checked class="form-check-input" id="tagActive"><label class="form-check-label" for="tagActive">ใช้</label></div></div>
-        <div class="col-md-2 d-flex align-items-end"><button class="btn btn-primary w-100">เพิ่ม</button></div>
-    </form>
+    @include('price-tags.form')
 </div>
 
 <div class="content-card p-4">
     <h2 class="h5 fw-bold mb-3">รายการรูปแบบป้ายราคา</h2>
     <div class="table-responsive">
         <table class="table align-middle">
-            <thead><tr><th>รหัส</th><th>ชื่อป้ายราคา</th><th>แหล่งราคา</th><th>สถานะ</th></tr></thead>
+            <thead><tr><th>รหัส</th><th>ชื่อป้ายราคา</th><th>แหล่งราคา</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
             <tbody>
             @forelse($templates as $tpl)
                 <tr>
@@ -57,9 +33,16 @@
                         @endswitch
                     </td>
                     <td><span class="badge {{ $tpl->is_active ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $tpl->is_active ? 'ใช้งาน' : 'ปิด' }}</span></td>
+                    <td class="text-nowrap">
+                        <a class="btn btn-sm btn-light border" href="{{ route('price-tags.edit', $tpl) }}">แก้ไข</a>
+                        <form class="d-inline" method="post" action="{{ route('price-tags.destroy', $tpl) }}" data-confirm="ยืนยันลบรูปแบบป้ายราคา {{ $tpl->code }}?">
+                            @csrf @method('DELETE')
+                            <button class="btn btn-sm btn-outline-danger">ลบ</button>
+                        </form>
+                    </td>
                 </tr>
             @empty
-                <tr><td colspan="4" class="text-center text-muted py-5">ยังไม่มีรูปแบบป้ายราคา</td></tr>
+                <tr><td colspan="5" class="text-center text-muted py-5">ยังไม่มีรูปแบบป้ายราคา</td></tr>
             @endforelse
             </tbody>
         </table>
