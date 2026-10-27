@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Observers\CustomerOpenItemObserver;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -10,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'customer_id', 'document_id', 'salesman_id', 'sales_user_id', 'gross_amount', 'vat_amount', 'discount_amount',
     'net_amount', 'paid_amount', 'balance_amount', 'gps_lat', 'gps_lng', 'due_date', 'status',
 ])]
+#[ObservedBy([CustomerOpenItemObserver::class])]
 class CustomerOpenItem extends Model
 {
     const UPDATED_AT = null;

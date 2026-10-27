@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\BillingNote;
 use App\Models\Branch;
 use App\Models\ChartOfAccount;
+use App\Models\Cheque;
 use App\Models\Customer;
+use App\Models\CustomerOpenItem;
 use App\Models\DepreciationRecord;
 use App\Models\Document;
 use App\Models\DocumentType;
@@ -20,6 +23,7 @@ use App\Models\WarehouseLocation;
 use App\Services\Accounting\DepreciationService;
 use App\Services\Accounting\GlPostingService;
 use App\Services\Accounting\TaxComplianceService;
+use App\Services\Sales\CustomerPaymentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use ReflectionMethod;
@@ -153,19 +157,25 @@ class SalesAdjustmentLedgerTest extends TestCase
     public function test_a_bounced_cheque_reopens_the_debt_and_reverses_the_bank_entry(): void
     {
         $sale = $this->document('CREDIT_SALE', 'CR-010', [[$this->freshProduct, 3, 100]]);
-        $item = \App\Models\CustomerOpenItem::create([
+        $item = CustomerOpenItem::create([
             'customer_id' => $this->customer->id, 'document_id' => $sale->id,
             'gross_amount' => 300, 'net_amount' => 300, 'balance_amount' => 300, 'paid_amount' => 0,
-            'due_date' => now()->addDays(30)->toDateString(), 'status' => \App\Models\CustomerOpenItem::STATUS_OPEN,
+            'due_date' => now()->addDays(30)->toDateString(), 'status' => CustomerOpenItem::STATUS_OPEN,
         ]);
-        $service = app(\App\Services\Sales\CustomerPaymentService::class);
+        $billing = BillingNote::create([
+            'doc_number' => 'BN-CHQ', 'customer_id' => $this->customer->id,
+            'doc_date' => now()->toDateString(), 'total_amount' => 300, 'status' => 'open',
+        ]);
+        $billing->items()->create(['customer_open_item_id' => $item->id, 'balance_at_billing' => 300]);
+        $service = app(CustomerPaymentService::class);
         $receipt = $service->create([
             'customer_id' => $this->customer->id, 'branch_id' => $this->branch->id, 'method' => 'cheque',
             'cheque_no' => 'CHQ-77', 'cheque_due_date' => now()->toDateString(),
             'allocations' => [['customer_open_item_id' => $item->id, 'amount' => 300]],
         ]);
-        $this->assertSame(\App\Models\CustomerOpenItem::STATUS_PAID, $item->fresh()->status);
-        $cheque = \App\Models\Cheque::where('cheque_no', 'CHQ-77')->firstOrFail();
+        $this->assertSame(CustomerOpenItem::STATUS_PAID, $item->fresh()->status);
+        $this->assertSame('collected', $billing->fresh()->status);
+        $cheque = Cheque::where('cheque_no', 'CHQ-77')->firstOrFail();
 
         $service->bounceCheque($cheque, 'บัญชีปิด');
         try {
@@ -178,8 +188,9 @@ class SalesAdjustmentLedgerTest extends TestCase
         $item->refresh();
         $this->assertSame(300.0, (float) $item->balance_amount);
         $this->assertSame(0.0, (float) $item->paid_amount);
-        $this->assertSame(\App\Models\CustomerOpenItem::STATUS_OPEN, $item->status);
+        $this->assertSame(CustomerOpenItem::STATUS_OPEN, $item->status);
         $this->assertSame('bounced', $cheque->fresh()->status);
+        $this->assertSame('open', $billing->fresh()->status);
         $this->assertSame('void', $receipt->fresh()->status);
 
         $payment = PaymentDocument::where('document_id', $receipt->id)->firstOrFail();
