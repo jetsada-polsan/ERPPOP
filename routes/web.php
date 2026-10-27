@@ -233,6 +233,7 @@ Route::get('/apps', [AppLauncherController::class, 'index'])->name('apps.launche
 Route::get('/crm', [CrmController::class, 'index'])->name('crm.index');
 Route::post('/crm/activities', [CrmController::class, 'storeActivity'])->name('crm.activities.store');
 Route::patch('/crm/activities/{activity}/complete', [CrmController::class, 'completeActivity'])->name('crm.activities.complete');
+Route::get('/crm/search-customers', [CrmController::class, 'searchCustomers'])->name('crm.search-customers');
 Route::get('/crm/pipeline', [CrmController::class, 'pipeline'])->name('crm.pipeline');
 Route::post('/crm/opportunities', [CrmController::class, 'storeOpportunity'])->name('crm.opportunities.store');
 Route::patch('/crm/opportunities/{opportunity}/stage', [CrmController::class, 'updateOpportunityStage'])->name('crm.opportunities.stage');

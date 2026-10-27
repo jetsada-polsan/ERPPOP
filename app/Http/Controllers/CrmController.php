@@ -8,6 +8,7 @@ use App\Models\CrmActivity;
 use App\Models\CrmOpportunity;
 use App\Models\Document;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -170,12 +171,27 @@ class CrmController extends Controller
         return view('crm.pipeline', [
             'stages' => self::STAGES,
             'opportunitiesByStage' => $opportunitiesByStage,
-            'pipelineCustomers' => (clone $visibleCustomers)->where('is_active', true)->orderBy('name_th')->limit(300)->get(['id', 'code', 'name_th']),
             'salesUsers' => $this->activityUsers($user),
             'q' => $q,
             'stage' => $stage,
             'totalOpportunities' => $opportunities->count(),
         ]);
+    }
+
+    public function searchCustomers(Request $request): JsonResponse
+    {
+        $data = $request->validate(['q' => ['nullable', 'string', 'max:150']]);
+        $q = trim($data['q'] ?? '');
+        if (mb_strlen($q) < 2) {
+            return response()->json([]);
+        }
+
+        $customers = $this->visibleCustomers($request->user())
+            ->where('is_active', true)
+            ->where(fn ($query) => $query->whereLike('code', "%{$q}%")->orWhereLike('name_th', "%{$q}%"))
+            ->orderBy('code')->limit(20)->get(['id', 'code', 'name_th']);
+
+        return response()->json($customers);
     }
 
     public function storeOpportunity(Request $request): RedirectResponse

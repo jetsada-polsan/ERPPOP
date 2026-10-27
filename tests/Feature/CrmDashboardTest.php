@@ -15,6 +15,24 @@ class CrmDashboardTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_pipeline_search_is_bounded_active_and_branch_scoped(): void
+    {
+        $branch = Branch::create(['code' => 'SEARCH', 'name_th' => 'สาขาค้นหา']);
+        $other = Branch::create(['code' => 'OTHER', 'name_th' => 'อื่น']);
+        $user = User::factory()->create(['branch_id' => $branch->id]);
+        foreach (range(1, 25) as $i) {
+            Customer::create(['code' => 'FIND-'.$i, 'name_th' => 'ลูกค้า '.$i, 'branch_id' => $branch->id, 'is_active' => true]);
+        }
+        Customer::create(['code' => 'FIND-HIDDEN', 'name_th' => 'อื่น', 'branch_id' => $other->id, 'is_active' => true]);
+        Customer::create(['code' => 'FIND-OFF', 'name_th' => 'ปิด', 'branch_id' => $branch->id, 'is_active' => false]);
+        $this->withoutMiddleware(ErpAuthorize::class)->actingAs($user);
+        $this->getJson(route('crm.search-customers', ['q' => 'FIND']))->assertOk()->assertJsonCount(20)
+            ->assertJsonMissing(['code' => 'FIND-HIDDEN'])->assertJsonMissing(['code' => 'FIND-OFF']);
+        $this->getJson(route('crm.search-customers', ['q' => 'FIND-25']))->assertOk()->assertJsonPath('0.code', 'FIND-25');
+        $this->getJson(route('crm.search-customers', ['q' => 'F']))->assertOk()->assertExactJson([]);
+        $this->get(route('crm.pipeline'))->assertOk()->assertDontSee('FIND-25')->assertSee('pipelineCustomerSearch()');
+    }
+
     public function test_crm_dashboard_shows_customer_360_summary(): void
     {
         $branch = Branch::create(['code' => 'CRM1', 'name_th' => 'สาขา CRM', 'is_active' => true]);

@@ -18,9 +18,18 @@
                 <div class="pipeline-add-popover">
                     <h2>เพิ่มโอกาสการขาย</h2>
                     <p>เก็บงานขายที่กำลังติดตามไว้ใน Pipeline</p>
-                    <form method="post" action="{{ route('crm.opportunities.store') }}" class="pipeline-form">
+                    <form method="post" action="{{ route('crm.opportunities.store') }}" class="pipeline-form" novalidate @submit="window.erpStopSubmit($event, [!$event.target.elements.customer_id.value ? 'กรุณาค้นหาและเลือกลูกค้า' : null, !$event.target.elements.title.value.trim() ? 'กรุณากรอกชื่อโอกาสการขาย' : null].filter(Boolean))">
                         @csrf
-                        <label>ลูกค้า<select name="customer_id" required><option value="">เลือกลูกค้า...</option>@foreach($pipelineCustomers as $customer)<option value="{{ $customer->id }}">{{ $customer->code }} - {{ $customer->name_th }}</option>@endforeach</select></label>
+                        <div x-data="pipelineCustomerSearch()">
+                            <label>ค้นหาลูกค้า<input type="search" x-model="query" @input="clearSelection(); search()" placeholder="พิมพ์รหัสหรือชื่อลูกค้าอย่างน้อย 2 ตัว" autocomplete="off"></label>
+                            <input type="hidden" name="customer_id" :value="selectedId">
+                            <div class="small text-muted" role="status" x-text="message"></div>
+                            <div class="list-group" x-show="results.length">
+                                <template x-for="customer in results" :key="customer.id">
+                                    <button type="button" class="list-group-item list-group-item-action" @click="choose(customer)" x-text="customer.code + ' - ' + customer.name_th"></button>
+                                </template>
+                            </div>
+                        </div>
                         <label>ชื่อโอกาสการขาย<input name="title" required maxlength="200" placeholder="เช่น ขยายออเดอร์สาขาใหม่"></label>
                         <div class="pipeline-form-two"><label>สถานะ<select name="stage" required>@foreach($stages as $key => $label)<option value="{{ $key }}">{{ $label }}</option>@endforeach</select></label><label>มูลค่าคาดการณ์<input type="number" name="expected_amount" step="0.01" min="0" placeholder="0.00"></label></div>
                         <div class="pipeline-form-two"><label>คาดว่าจะปิดวันที่<input type="date" name="expected_close_date"></label>@if(auth()->user()->hasPermission('sales.assign'))<label>ผู้รับผิดชอบ<select name="assigned_to"><option value="">ฉัน</option>@foreach($salesUsers as $salesUser)<option value="{{ $salesUser->id }}">{{ $salesUser->name }}</option>@endforeach</select></label>@endif</div>
@@ -72,4 +81,39 @@
     .pipeline-board{display:grid;grid-template-columns:repeat(7,minmax(220px,1fr));gap:10px;overflow-x:auto;padding-bottom:8px;align-items:start}.pipeline-column{min-width:220px;background:var(--erp-surface-2,#f8fbfd);border:1px solid var(--pipeline-line);border-radius:7px;overflow:hidden}.pipeline-column-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 12px;background:var(--erp-surface);border-bottom:2px solid var(--erp-primary)}.pipeline-column-head span{display:flex;align-items:center;gap:7px;color:var(--erp-primary-dark);font-size:12px;font-weight:700}.pipeline-column-head i{font-size:8px;color:var(--erp-primary)}.pipeline-column-head b{display:grid;place-items:center;min-width:22px;height:22px;padding:0 5px;border-radius:999px;background:var(--pipeline-soft);color:var(--erp-primary-dark);font-size:10px}.pipeline-column-contacted .pipeline-column-head{border-color:#4b9cbb}.pipeline-column-qualified .pipeline-column-head{border-color:#b98b2c}.pipeline-column-quotation .pipeline-column-head{border-color:#8272b8}.pipeline-column-waiting .pipeline-column-head{border-color:#d08038}.pipeline-column-won .pipeline-column-head{border-color:#29936f}.pipeline-column-lost .pipeline-column-head{border-color:#bc5c68}.pipeline-column-body{display:grid;gap:9px;padding:9px;min-height:170px}.pipeline-card{padding:12px;background:var(--erp-surface);border:1px solid var(--pipeline-line);border-radius:6px;box-shadow:0 1px 2px rgba(29,59,82,.05)}.pipeline-card-top{display:flex;justify-content:space-between;gap:8px}.pipeline-card-code{font-size:10px;color:var(--erp-muted)}.pipeline-card-amount{font-size:11px;color:var(--erp-primary-dark);font-weight:700;white-space:nowrap}.pipeline-card h3{margin:6px 0 9px;font-size:13px;line-height:1.35;color:var(--erp-text)}.pipeline-customer{display:flex;align-items:center;gap:7px;color:var(--erp-text);font-size:11px;text-decoration:none}.pipeline-customer:hover{color:var(--erp-primary)}.pipeline-avatar{display:grid;place-items:center;flex:0 0 24px;width:24px;height:24px;border-radius:6px;background:var(--pipeline-soft);color:var(--erp-primary-dark);font-size:10px;font-weight:700}.pipeline-card-meta{display:grid;gap:3px;margin-top:10px;padding-top:9px;border-top:1px solid var(--erp-border-soft,var(--pipeline-line));color:var(--erp-muted);font-size:10px}.pipeline-card-note{margin:9px 0 0;color:var(--erp-muted);font-size:10px;line-height:1.45}.pipeline-stage-form{display:grid;gap:6px;margin-top:10px}.pipeline-stage-form select{padding:6px 7px;font-size:10px}.pipeline-stage-form input{padding:6px 7px;font-size:10px}.pipeline-empty{display:grid;place-items:center;gap:5px;min-height:140px;color:var(--erp-muted);font-size:11px}.pipeline-empty i{font-size:18px}
     @media(max-width:900px){.pipeline-toolbar{flex-wrap:wrap}.pipeline-search{flex-basis:100%;max-width:none}.pipeline-summary{align-items:flex-start;flex-direction:column}.pipeline-stage-filter{max-width:100%;width:100%}}
 </style>
+@endpush
+
+@push('scripts')
+<script>
+function pipelineCustomerSearch() {
+    return {
+        query: '', selectedId: '', results: [], message: '', timer: null, version: 0,
+        clearSelection() { this.selectedId = ''; this.version++; this.results = []; },
+        search() {
+            clearTimeout(this.timer);
+            const version = this.version;
+            const q = this.query.trim();
+            if (q.length < 2) { this.message = 'พิมพ์อย่างน้อย 2 ตัวอักษร'; return; }
+            this.message = 'กำลังค้นหา...';
+            this.timer = setTimeout(async () => {
+                try {
+                    const response = await fetch(@js(route('crm.search-customers')) + '?q=' + encodeURIComponent(q), { headers: { Accept: 'application/json' } });
+                    if (!response.ok) throw new Error('search');
+                    const results = await response.json();
+                    if (version !== this.version) return;
+                    this.results = results;
+                    this.message = results.length ? 'เลือกลูกค้าจากผลค้นหา (แสดงสูงสุด 20 ราย)' : 'ไม่พบลูกค้า';
+                } catch (error) {
+                    if (version === this.version) { this.results = []; this.message = 'ค้นหาไม่สำเร็จ กรุณาลองใหม่'; }
+                }
+            }, 300);
+        },
+        choose(customer) {
+            this.version++; clearTimeout(this.timer);
+            this.selectedId = customer.id; this.query = customer.code + ' - ' + customer.name_th;
+            this.results = []; this.message = 'เลือกลูกค้าแล้ว';
+        }
+    };
+}
+</script>
 @endpush
