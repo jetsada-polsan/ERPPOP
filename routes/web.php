@@ -294,6 +294,7 @@ Route::prefix('quotations')->name('quotations.')->group(function () {
     Route::post('/', [QuotationController::class, 'store'])->name('store');
     Route::get('/{quotation}', [QuotationController::class, 'show'])->name('show');
     Route::post('/{quotation}/status', [QuotationController::class, 'updateStatus'])->name('status');
+    Route::post('/{quotation}/accept', [QuotationController::class, 'accept'])->name('accept');
     Route::post('/{quotation}/convert', [QuotationController::class, 'convert'])->name('convert');
 });
 

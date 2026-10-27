@@ -6,12 +6,17 @@
 <div class="d-flex flex-wrap gap-2 mb-3 no-print">
     <a href="{{ route('quotations.index') }}" class="btn btn-light border"><i class="bi bi-arrow-left me-1"></i>กลับ</a>
     <button onclick="window.print()" class="btn btn-primary"><i class="bi bi-printer me-1"></i>พิมพ์ใบเสนอราคา</button>
-    @if($quotation->status === 'open')
-        @if($quotation->customer_id)
-            <form method="post" action="{{ route('quotations.convert', $quotation) }}" onsubmit="return confirm('แปลงเป็นใบจอง? จะสร้างใบจองและจองสต๊อกให้ลูกค้า')">
-                @csrf<button class="btn btn-success"><i class="bi bi-arrow-right-circle me-1"></i>แปลงเป็นใบจอง</button>
+    @if(in_array($quotation->status, ['open', 'accepted'], true) && ! $quotation->converted_booking_id)
+        @if($quotation->status === 'open')
+            <form method="post" action="{{ route('quotations.accept', $quotation) }}">
+                @csrf<button class="btn btn-outline-success"><i class="bi bi-hand-thumbs-up me-1"></i>ลูกค้าตอบรับ</button>
             </form>
+        @else
+            <span class="badge text-bg-success align-self-center px-3 py-2">ลูกค้าตอบรับแล้ว</span>
         @endif
+        <button type="button" class="btn btn-success" onclick="document.getElementById('quotation-convert').classList.toggle('d-none')">
+            <i class="bi bi-arrow-right-circle me-1"></i>แปลงเป็นใบจอง / ใบขาย
+        </button>
         <form method="post" action="{{ route('quotations.status', $quotation) }}" class="ms-auto">
             @csrf <input type="hidden" name="status" value="cancelled">
             <button class="btn btn-light border text-danger">ยกเลิก</button>
@@ -22,6 +27,57 @@
         <span class="badge ms-auto align-self-center px-3 py-2 text-bg-secondary">{{ $quotation->statusLabel() }}</span>
     @endif
 </div>
+
+@if(in_array($quotation->status, ['open', 'accepted'], true) && ! $quotation->converted_booking_id)
+{{-- แปลงเป็นเอกสารขาย: คัดลอกรายการและอ้างอิงเลขใบเสนอราคาลงในใบจอง --}}
+<div id="quotation-convert" class="content-card p-4 mb-3 no-print d-none" x-data="{ mode: '{{ $customerMatches->isNotEmpty() ? 'existing' : 'new' }}' }">
+    <form method="post" action="{{ route('quotations.convert', $quotation) }}"
+        data-confirm="แปลงใบเสนอราคา {{ $quotation->doc_number }}? ระบบจะคัดลอกรายการทั้งหมดไปยังเอกสารใหม่">
+        @csrf
+        <h2 class="h6 fw-bold mb-3">แปลงใบเสนอราคา {{ $quotation->doc_number }}</h2>
+        <div class="row g-3">
+            <div class="col-md-5">
+                <label class="form-label small text-muted">แปลงเป็น</label>
+                <div class="form-check"><input class="form-check-input" type="radio" name="target" value="booking" id="target-booking" checked>
+                    <label class="form-check-label" for="target-booking">ใบจอง (จองสต๊อก ยังไม่ตัด)</label></div>
+                <div class="form-check"><input class="form-check-input" type="radio" name="target" value="sale" id="target-sale">
+                    <label class="form-check-label" for="target-sale">ใบขายเชื่อ (ตัดสต๊อกและตั้งลูกหนี้ทันที)</label></div>
+            </div>
+            <div class="col-md-7">
+                @if($quotation->customer_id)
+                    <label class="form-label small text-muted">ลูกค้า</label>
+                    <div class="fw-semibold">{{ $quotation->customer->code }} - {{ $quotation->customer->name_th }}</div>
+                @else
+                    <label class="form-label small text-muted">ลูกค้า "{{ $quotation->customer_name ?: 'ลูกค้าทั่วไป' }}" ยังไม่อยู่ในทะเบียน</label>
+                    <div class="d-flex gap-3 mb-2">
+                        <label class="form-check"><input class="form-check-input" type="radio" x-model="mode" value="existing" @disabled($customerMatches->isEmpty())> เลือกลูกค้าที่มีอยู่</label>
+                        <label class="form-check"><input class="form-check-input" type="radio" x-model="mode" value="new"> สร้างลูกค้าใหม่</label>
+                    </div>
+                    <div x-show="mode === 'existing'">
+                        @if($customerMatches->isEmpty())
+                            <div class="small text-muted">ไม่พบลูกค้าที่ชื่อใกล้เคียงในทะเบียน</div>
+                        @else
+                            <select name="customer_id" class="form-select" :disabled="mode !== 'existing'">
+                                @foreach($customerMatches as $match)
+                                    <option value="{{ $match->id }}">{{ $match->code }} - {{ $match->name_th }}{{ $match->tax_id ? ' ('.$match->tax_id.')' : '' }}</option>
+                                @endforeach
+                            </select>
+                        @endif
+                    </div>
+                    <div class="row g-2" x-show="mode === 'new'">
+                        <div class="col-4"><label class="form-label small text-muted">รหัสลูกค้า</label><input name="new_customer_code" value="{{ $suggestedCustomerCode }}" maxlength="20" class="form-control" :disabled="mode !== 'new'"></div>
+                        <div class="col-8"><label class="form-label small text-muted">ชื่อลูกค้า</label><input name="new_customer_name" value="{{ $quotation->customer_name }}" maxlength="250" class="form-control" :disabled="mode !== 'new'"></div>
+                        <div class="col-6"><label class="form-label small text-muted">เลขผู้เสียภาษี (ถ้ามี)</label><input name="new_customer_tax_id" maxlength="20" class="form-control" :disabled="mode !== 'new'"></div>
+                    </div>
+                @endif
+            </div>
+        </div>
+        <div class="d-flex justify-content-end mt-3">
+            <button class="btn btn-success px-4"><i class="bi bi-check2-circle me-1"></i>ยืนยันการแปลง</button>
+        </div>
+    </form>
+</div>
+@endif
 
 <div class="content-card p-4 print-sheet">
     <div class="d-flex justify-content-between align-items-start border-bottom border-2 border-dark pb-3">
