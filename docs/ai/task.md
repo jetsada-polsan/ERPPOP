@@ -1,5 +1,5 @@
 # Handoff - 2026-10-27 (นำประวัติและรายงาน BPlus ออกจาก ERP)
-- Commit: `ae5c2d0` (implementation)
+- Commit: `942befc` (implementation)
 - ทำอะไร: เอาส่วนเอกสารเก่า BPlus ออกจากหน้าเอกสารย้อนหลัง ปิด URL รายละเอียดเก่า และถอดเมนู/หน้า/เส้นทางรายงาน BPlus เดิม
 - ทดสอบ: `php artisan test` ผ่าน 569 tests, skipped 1, incomplete 6; `git diff --check` ผ่าน
 - ยังไม่ทดสอบ/ความเสี่ยง: ไม่ได้ลบข้อมูลในฐาน/ไฟล์ต้นฉบับ BPlus ตามนโยบาย read-only; ไม่ deploy production
