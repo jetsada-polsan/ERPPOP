@@ -17,7 +17,8 @@
         <button type="button" class="btn btn-success" onclick="document.getElementById('quotation-convert').classList.toggle('d-none')">
             <i class="bi bi-arrow-right-circle me-1"></i>แปลงเป็นใบจอง / ใบขาย
         </button>
-        <form method="post" action="{{ route('quotations.status', $quotation) }}" class="ms-auto">
+        <form method="post" action="{{ route('quotations.status', $quotation) }}" class="ms-auto"
+            data-confirm="ยกเลิกใบเสนอราคา {{ $quotation->doc_number }}? ยกเลิกแล้วจะแปลงเป็นใบจอง/ใบขายไม่ได้อีก">
             @csrf <input type="hidden" name="status" value="cancelled">
             <button class="btn btn-light border text-danger">ยกเลิก</button>
         </form>

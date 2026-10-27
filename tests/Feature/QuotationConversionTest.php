@@ -138,6 +138,21 @@ class QuotationConversionTest extends TestCase
         $this->assertNull($quotation->fresh()->converted_booking_id);
     }
 
+    public function test_cancelling_asks_for_confirmation_first(): void
+    {
+        [$branch, $product, $customer] = $this->masters();
+        $quotation = $this->quotation($branch, $product, customer: $customer);
+        $this->signIn();
+
+        $html = $this->get(route('quotations.show', $quotation))->assertOk()->getContent();
+
+        // layout แปลง data-confirm เป็นหน้าต่างยืนยัน (SweetAlert) ก่อนส่งฟอร์ม
+        $this->assertMatchesRegularExpression(
+            '/<form[^>]+quotations\/'.$quotation->id.'\/status[^>]+data-confirm="ยกเลิกใบเสนอราคา/u',
+            $html,
+        );
+    }
+
     private function quotation(Branch $branch, Product $product, ?Customer $customer = null, ?string $customerName = null): Quotation
     {
         $quotation = Quotation::create([
