@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import contextlib
 import io
+import os
+import subprocess
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from e2e import pos_smoke_production as smoke
 
@@ -80,6 +82,67 @@ class ProductionSmokeTest(unittest.TestCase):
         api.get.return_value = {"shift": None}
         smoke.verify_no_open_shift(api, 3, 10)
         api.post.assert_not_called()
+
+
+class ExistingDeviceTokenTest(unittest.TestCase):
+    def test_token_is_captured_in_memory_without_being_printed_or_passed_in_argv(self) -> None:
+        token = "x" * 48  # Synthetic fixture, never a real credential.
+        output = io.StringIO()
+        with patch.object(smoke.subprocess, "run", return_value=Mock(
+            returncode=0, stdout='{"token":"' + token + '"}', stderr="",
+        )) as run, contextlib.redirect_stdout(output):
+            self.assertEqual(token, smoke.existing_device_token())
+        self.assertNotIn(token, output.getvalue())
+        args, kwargs = run.call_args
+        self.assertNotIn(token, str(args))
+        self.assertTrue(kwargs["capture_output"])
+        self.assertEqual(30, kwargs["timeout"])
+        self.assertIn("BatchMode=yes", args[0])
+
+    def test_failed_ssh_never_exposes_its_output(self) -> None:
+        secret = "do-not-echo-response-material"
+        with patch.object(smoke.subprocess, "run", return_value=Mock(
+            returncode=1, stdout=secret, stderr=secret,
+        )), self.assertRaises(RuntimeError) as error:
+            smoke.existing_device_token()
+        self.assertNotIn(secret, str(error.exception))
+
+    def test_ssh_timeout_never_exposes_partial_output(self) -> None:
+        with patch.object(smoke.subprocess, "run", side_effect=subprocess.TimeoutExpired(
+            "ssh", 30, output="sensitive-partial-output",
+        )), self.assertRaises(RuntimeError) as error:
+            smoke.existing_device_token()
+        self.assertNotIn("sensitive-partial-output", str(error.exception))
+
+    def test_invalid_token_response_is_rejected_without_echoing_it(self) -> None:
+        with patch.object(smoke.subprocess, "run", return_value=Mock(
+            returncode=0, stdout='{"token":"invalid-private-value"}', stderr="",
+        )), self.assertRaises(RuntimeError) as error:
+            smoke.existing_device_token()
+        self.assertNotIn("invalid-private-value", str(error.exception))
+
+    def test_production_token_cannot_be_requested_for_another_destination(self) -> None:
+        with patch.dict(os.environ, {"POS_SMOKE_URL": "https://example.com"}), \
+                patch.object(smoke, "existing_device_token") as load, \
+                patch.object(smoke.getpass, "getpass") as prompt, \
+                self.assertRaises(SystemExit):
+            smoke.main(["--token-from-ssh"])
+        load.assert_not_called()
+        prompt.assert_not_called()
+
+    def test_ssh_mode_prompts_only_for_the_owners_pin(self) -> None:
+        token = "x" * 48
+        output = io.StringIO()
+        with patch.dict(os.environ, {"POS_SMOKE_URL": "https://erp.popstarcenter.com",
+                                    "POS_SMOKE_CASHIER": "B001"}), \
+                patch.object(smoke, "existing_device_token", return_value=token), \
+                patch.object(smoke.getpass, "getpass", side_effect=KeyboardInterrupt) as prompt, \
+                patch.object(smoke, "connect") as connect, \
+                contextlib.redirect_stdout(output), self.assertRaises(KeyboardInterrupt):
+            smoke.main(["--token-from-ssh"])
+        prompt.assert_called_once_with("PIN ของ B001: ")
+        connect.assert_not_called()
+        self.assertNotIn(token, output.getvalue())
 
 
 if __name__ == "__main__":

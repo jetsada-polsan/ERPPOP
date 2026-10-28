@@ -1,14 +1,19 @@
 """ทดสอบขายจริงขึ้น ERP production แทนเครื่อง POS (ใช้โค้ดชุดเดียวกับโปรแกรมหน้าร้าน)
 
 ถาม Device Token และ PIN แบบซ่อนตัวอักษร ไม่บันทึกลงไฟล์ ฐานข้อมูลเครื่องเป็นไฟล์ชั่วคราว
+ใช้ --token-from-ssh เพื่ออ่าน Token เดิมของ POS-B001-01 ผ่าน SSH alias jeterp แล้วถามเฉพาะ PIN
 ขั้นตอน: ping/sync สินค้า -> ล็อกอิน PIN -> เปิดกะ -> ขาย 3 บิล -> sync -> นำเงินออก -> ปิดกะ -> sync
 
 บิลที่ขายจะเข้า ยอดขาย/สต็อก/บัญชีจริง ต้องล้างก่อนเปิดขายจริง
 """
 from __future__ import annotations
 
+import argparse
 import getpass
+import json
 import os
+import re
+import subprocess
 import sys
 import tempfile
 import uuid
@@ -22,6 +27,51 @@ from pos_python.database import connect
 from pos_python.provisioning import ProvisioningService
 from pos_python.services import CartLine, PosService
 from pos_python.sync_service import SyncService
+
+
+def existing_device_token() -> str:
+    """Read the existing token over SSH, keeping both output streams out of logs."""
+    query = r'''<?php
+try {
+    require 'vendor/autoload.php';
+    $app = require 'bootstrap/app.php';
+    $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+    $devices = App\Models\PosDevice::where('terminal_code', 'POS-B001-01')
+        ->whereNull('revoked_at')->get();
+    if ($devices->count() !== 1) {
+        throw new RuntimeException('Device is not unique');
+    }
+    $device = $devices->first();
+    $token = $device->token_encrypted;
+    if (! is_string($token) || ! preg_match('/^[A-Za-z0-9]{48}$/', $token)
+        || ! hash_equals($device->token_hash, App\Models\PosDevice::hashToken($token))) {
+        throw new RuntimeException('Existing token is unavailable');
+    }
+    echo json_encode(['token' => $token], JSON_THROW_ON_ERROR);
+} catch (Throwable $error) {
+    fwrite(STDERR, "Cannot read existing device token\n");
+    exit(1);
+}
+'''
+    try:
+        result = subprocess.run(
+            ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", "jeterp",
+             "cd /var/www/jeterp && php"],
+            input=query, text=True, capture_output=True, timeout=30, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        raise RuntimeError("อ่าน Token เดิมผ่าน SSH ไม่สำเร็จ ไม่มีการออก Token ใหม่") from None
+    if result.returncode != 0:
+        # Never include SSH/PHP output: it may contain credential material.
+        raise RuntimeError("อ่าน Token เดิมผ่าน SSH ไม่สำเร็จ ไม่มีการออก Token ใหม่")
+    try:
+        payload = json.loads(result.stdout)
+        token = payload.get("token") if isinstance(payload, dict) else None
+    except (ValueError, TypeError):
+        token = None
+    if not isinstance(token, str) or not re.fullmatch(r"[A-Za-z0-9]{48}", token):
+        raise RuntimeError("รูปแบบ Token เดิมจาก SSH ไม่ถูกต้อง")
+    return token
 
 
 def step(ok: bool, text: str) -> None:
@@ -58,11 +108,24 @@ def verify_no_open_shift(api: LaravelPosClient, branch: int, cashier: int) -> No
          "ไม่มีกะเดิมเปิดอยู่ — หยุดแทนการขายหรือปิดกะเดิม")
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--token-from-ssh", action="store_true",
+                        help="อ่าน Token เดิมผ่าน SSH alias jeterp โดยไม่แสดงหรือบันทึกค่า")
+    args = parser.parse_args(argv)
     base = os.environ.get("POS_SMOKE_URL", "https://erp.popstarcenter.com")
     code = os.environ.get("POS_SMOKE_CASHIER", "B001")
+    if args.token_from_ssh and base.rstrip("/") != "https://erp.popstarcenter.com":
+        sys.exit("Token production ใช้ได้เฉพาะ https://erp.popstarcenter.com")
     print(f"ERP: {base}  คนขาย: {code}")
-    token = getpass.getpass("Device Token (ไม่แสดงตัวอักษร): ").strip()
+    if args.token_from_ssh:
+        try:
+            token = existing_device_token()
+        except RuntimeError as error:
+            sys.exit(str(error))
+        print("อ่าน Token เดิมของ POS-B001-01 ผ่าน SSH แล้ว (ไม่แสดงค่า)")
+    else:
+        token = getpass.getpass("Device Token (ไม่แสดงตัวอักษร): ").strip()
     pin = getpass.getpass(f"PIN ของ {code}: ").strip()
     if not token or not pin:
         sys.exit("ต้องใส่ทั้ง Token และ PIN")
