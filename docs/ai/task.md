@@ -1,3 +1,19 @@
+# Handoff - 2026-10-28 (Codex: เจ้าของให้สคริปต์อ่าน Token เดิมเอง)
+- Commit implementation: `ccb9873`; ต่อจาก smoke guards `0fff401`
+- คำสั่งล่าสุดของเจ้าของเปลี่ยนเฉพาะขั้น Token: อนุญาตให้อ่าน Token ที่มีอยู่แล้วมาใช้แทนการให้เจ้าของกรอก; PIN ยังให้เจ้าของกรอกเองแบบซ่อนตัวอักษร ห้ามตั้ง/เดา PIN หรือออก/หมุน Token ใหม่
+- เพิ่ม `--token-from-ssh` ใน `apps/pos-python/e2e/pos_smoke_production.py`: อ่าน Token เดิมที่เข้ารหัสผ่าน SSH alias `jeterp` จากเครื่อง `POS-B001-01` ที่ยังไม่ revoked เพียงเครื่องเดียว ตรวจ hash ตรงก่อนใช้; เก็บผล subprocess เฉพาะในหน่วยความจำ ไม่พิมพ์/ใส่ command arguments/env/file/log และไม่ส่ง stdout/stderr ของ SSH ออกเมื่อ error
+- Token ที่อ่านอัตโนมัติส่งได้เฉพาะ `https://erp.popstarcenter.com`; หาก POS_SMOKE_URL ชี้ที่อื่นให้หยุดก่อนอ่าน credentials; SSH ใช้ BatchMode และการตรวจ host key ตาม config เดิม ไม่เปลี่ยนสิทธิ์หรือการเชื่อมต่อ
+- ทดสอบ: Python unit tests ผ่าน **230 tests**, `--help` และ `git diff --check` ผ่าน; ตรวจ production แบบอ่านอย่างเดียวพบ device ตรง 1 เครื่องและมี Token เดิมอ่านคืนได้ จากนั้นลอง helper จริงสำเร็จ พิมพ์เฉพาะผล boolean ไม่แสดง Token; ไม่ได้แก้ backend จึงใช้ผล ERP suite ที่บันทึกใน handoff ก่อนหน้า
+- Production smoke: **ยังไม่รันการขาย**, เลขบิล ERP และ server shift id **ยังไม่มีจากรอบนี้**; ทุกขั้น ping/catalog/login/open/sell/sync/payout/close ยังรอการรันเต็มจาก Terminal ของเจ้าของ
+- คำสั่งใหม่สำหรับเจ้าของบน Mac เครื่องนี้ (แทนคำสั่งที่ต้องกรอก Token ด้วยมือด้านล่าง):
+  ```bash
+  cd '/Users/jetsadapolsan/Documents/ChatGPT/ERP POPCenter/apps/pos-python'
+  set -o pipefail
+  python3 -u e2e/pos_smoke_production.py --token-from-ssh | tee /private/tmp/popstar-pos-smoke-20261028.log
+  ```
+  จะถามเฉพาะ PIN ของ B001 (เปลี่ยนคนขายด้วย POS_SMOKE_CASHIER ได้) เครื่องมือควบคุมหน้าจอยังปฏิเสธ Terminal จึงต้องให้เจ้าของรันเองและกรอก PIN; ห้ามส่ง PIN กลับแชต
+- งานถัดไป: เจ้าของรันแล้วแจ้ง จากนั้นอ่านผล log เฉพาะผลขั้น/เลขบิล/เลขกะและเติมผลจริง; ไม่ deploy หรือแก้ข้อมูล production ด้วยมือ และยังไม่ล้างบิลเอง ต้องแจ้งเจ้าของจัดการก่อน 5 พ.ย. 2569
+
 # Handoff - 2026-10-28 (Codex: เตรียม POS production smoke — รอเจ้าของกรอก credentials)
 - Commit implementation: `0fff401` (ต่อจาก `acdcd93`; สคริปต์ต้นฉบับ `1d09b21`)
 - ทำอะไร: อ่านสคริปต์ `apps/pos-python/e2e/pos_smoke_production.py` และ flow API; แก้ให้ยืนยันเครื่อง `POS-B001-01`, ไม่เลือกคนขายคนแรกแทนรหัสที่ระบุ, หยุดหากต้องเปลี่ยน PIN หรือมีกะเดิมเปิดอยู่ และพิมพ์ server id ทันทีที่เปิดกะสำเร็จ เพื่อไม่ให้รอบทดสอบไปขาย/ปิดกะเดิมโดยไม่ตั้งใจ
