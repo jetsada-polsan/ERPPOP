@@ -3,6 +3,19 @@
 @section('page-title', 'ตรวจนับสินค้า')
 @section('page-subtitle', 'เปิดใบตรวจนับตามสาขา กรอกหรือ import ยอดนับจริง แล้วปรับปรุงสต๊อกอัตโนมัติ')
 @section('content')
+@if($staleCounts->isNotEmpty())
+<div class="alert alert-warning d-flex gap-2 align-items-start" data-testid="stale-counts">
+    <i class="bi bi-exclamation-triangle-fill mt-1"></i>
+    <div>
+        <div class="fw-semibold">ใบตรวจนับค้าง "กำลังนับ" เกิน {{ \App\Models\StockCount::STALE_DAYS }} วัน {{ $staleCounts->count() }} ใบ — นับให้จบหรือยกเลิก สต๊อกระหว่างนี้อาจคลาดเคลื่อน</div>
+        <div class="small">
+            @foreach($staleCounts as $stale)
+                <a href="{{ route('stock-counts.show', $stale) }}" class="me-2">{{ $stale->doc_number }}</a><span class="text-muted me-3">{{ $stale->branch?->code }} · เปิด {{ $stale->created_at->thaiDate() }} ({{ (int) $stale->created_at->diffInDays(now()) }} วัน)</span>
+            @endforeach
+        </div>
+    </div>
+</div>
+@endif
 <div class="content-card p-4 mb-3">
     <h2 class="h5 fw-bold mb-3">เปิดใบตรวจนับใหม่</h2>
     <form method="post" action="{{ route('stock-counts.store') }}" class="row g-3">

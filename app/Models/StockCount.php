@@ -37,6 +37,15 @@ class StockCount extends Model
 
     protected function casts(): array
     {
-        return ['submitted_at'=>'datetime', 'confirmed_at'=>'datetime'];
+        return ['submitted_at' => 'datetime', 'confirmed_at' => 'datetime'];
+    }
+
+    /** วันที่ใบตรวจนับค้างสถานะกำลังนับได้ก่อนแจ้งเตือน (ข้อ 18) */
+    public const STALE_DAYS = 3;
+
+    /** ใบที่ยังนับไม่จบเกิน N วัน — สต๊อกระหว่างนั้นคลาดเคลื่อนและใบนี้มักถูกลืม */
+    public function scopeStale($query, int $days = self::STALE_DAYS)
+    {
+        return $query->where('status', 'counting')->where('created_at', '<', now()->subDays($days));
     }
 }

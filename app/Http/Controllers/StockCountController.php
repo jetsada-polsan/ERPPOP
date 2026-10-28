@@ -25,8 +25,9 @@ class StockCountController extends Controller
             ->paginate(30);
         $branches = Branch::orderBy('code')->get(['id', 'code', 'name_th']);
         $locations = WarehouseLocation::orderBy('code')->get(['id', 'code', 'name']);
+        $staleCounts = StockCount::stale()->with('branch')->orderBy('created_at')->get();
 
-        return view('stock-counts.index', compact('counts', 'branches', 'locations'));
+        return view('stock-counts.index', compact('counts', 'branches', 'locations', 'staleCounts'));
     }
 
     public function store(Request $request, StockCountService $service): RedirectResponse

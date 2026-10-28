@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\StockCount;
 use App\Services\AlertDispatchService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -10,7 +11,7 @@ use Throwable;
 
 class ErpHealth extends Command
 {
-    protected $signature = 'erp:health {--max-backup-age=26 : Maximum backup age in hours}';
+    protected $signature = 'erp:health {--max-backup-age=26 : Maximum backup age in hours} {--stale-count-days=3 : วันที่ใบตรวจนับค้างได้ก่อนเตือน}';
 
     protected $description = 'Check ERP database, migrations, queue failures, storage, and backup freshness';
 
@@ -45,6 +46,7 @@ class ErpHealth extends Command
         // เอกสารขายที่ไม่มี GL — เคยเกิดจริงกับบิล POS 5 ใบแรก (6-12 ก.ค. 2026) ที่ขายก่อนต่อ GL
         // ตอนนั้นไม่มีอะไรจับได้เลยจนกระทบยอดตอนตรวจสองเดือนถัดมา
         $checks[] = $this->salesWithoutLedger();
+        $checks[] = $this->staleStockCounts(max(1, (int) $this->option('stale-count-days')));
 
         $checks[] = ['Storage', is_writable(storage_path()) ? 'ผ่าน' : 'ไม่ผ่าน', storage_path()];
         $failedJobs = Schema::hasTable('failed_jobs') ? DB::table('failed_jobs')->count() : 0;
@@ -74,6 +76,26 @@ class ErpHealth extends Command
         return collect($checks)->contains(fn (array $row) => $row[1] === 'ไม่ผ่าน')
             ? self::FAILURE
             : self::SUCCESS;
+    }
+
+    /**
+     * ใบตรวจนับที่ค้าง "กำลังนับ" นานเกินไป (ข้อ 18) — เคยมีใบค้างตั้งแต่ 26 ก.ย. โดยไม่มีใครรู้
+     * เป็นแค่ "เตือน" ไม่ทำให้ health ล้ม แต่ส่ง alert ผ่าน monitor_events
+     *
+     * @return array{0: string, 1: string, 2: string}
+     */
+    private function staleStockCounts(int $days): array
+    {
+        if (! Schema::hasTable('stock_counts')) {
+            return ['ตรวจนับค้าง', 'ผ่าน', 'ไม่มีตาราง'];
+        }
+        $stale = StockCount::stale($days)->orderBy('created_at')->get(['doc_number', 'created_at']);
+        if ($stale->isEmpty()) {
+            return ['ตรวจนับค้าง', 'ผ่าน', "ไม่มีใบกำลังนับเกิน {$days} วัน"];
+        }
+
+        return ['ตรวจนับค้าง', 'เตือน', sprintf('กำลังนับเกิน %d วัน %d ใบ: %s', $days, $stale->count(),
+            $stale->take(5)->map(fn ($c) => $c->doc_number.' ('.$c->created_at->format('d/m').')')->implode(', '))];
     }
 
     /**
