@@ -30,6 +30,34 @@ def step(ok: bool, text: str) -> None:
         raise SystemExit(1)
 
 
+def verify_device(profile: dict) -> tuple[int, str]:
+    terminal = (profile.get("device") or {}).get("terminal_code")
+    step(terminal == "POS-B001-01" and bool(profile.get("branch_id")),
+         f"เครื่องทดสอบต้องเป็น POS-B001-01 (ERP คืน {terminal or '-'})")
+    return int(profile["branch_id"]), terminal
+
+
+def login_cashier(prov: ProvisioningService, pin: str, code: str) -> dict:
+    login = prov.online_cashier_login(pin, cashier_code=code)
+    if login.get("selection_required"):
+        matches = [c for c in login.get("cashiers", [])
+                   if str(c.get("code", "")).upper() == code.upper()]
+        step(len(matches) == 1, f"ต้องพบคนขายรหัส {code} เพียงคนเดียว หยุดหากรหัสไม่ตรง")
+        login = prov.online_cashier_login(pin, cashier_server_id=int(matches[0]["id"]))
+    cashier = login.get("cashier") or {}
+    step(bool(cashier.get("id")) and str(cashier.get("code", "")).upper() == code.upper(),
+         f"ยืนยันคนขายตรงรหัส {code}")
+    step(not login.get("must_change_pin") and not cashier.get("must_change_pin"),
+         "PIN พร้อมใช้ (หากต้องเปลี่ยน PIN ให้เจ้าของเปลี่ยนเองก่อนทดสอบ)")
+    return login
+
+
+def verify_no_open_shift(api: LaravelPosClient, branch: int, cashier: int) -> None:
+    current = api.get(f"/api/pos/shift?branch_id={branch}&cashier_id={cashier}")
+    step("shift" in current and current["shift"] is None,
+         "ไม่มีกะเดิมเปิดอยู่ — หยุดแทนการขายหรือปิดกะเดิม")
+
+
 def main() -> int:
     base = os.environ.get("POS_SMOKE_URL", "https://erp.popstarcenter.com")
     code = os.environ.get("POS_SMOKE_CASHIER", "B001")
@@ -44,9 +72,8 @@ def main() -> int:
     prov, pos, sync = ProvisioningService(db, api), PosService(db), SyncService(db, api)
 
     profile = prov.ping()
-    branch = profile["branch_id"]
-    terminal = (profile.get("device") or {}).get("terminal_code")
-    step(bool(terminal), f"เชื่อม ERP ได้ สาขา id={branch} เครื่อง {terminal}")
+    branch, terminal = verify_device(profile)
+    step(True, f"เชื่อม ERP ได้ สาขา id={branch} เครื่อง {terminal}")
     prov.sync_down(branch)
     products = db.execute(
         "SELECT id, name, price FROM products WHERE active=1 AND server_id IS NOT NULL "
@@ -54,17 +81,15 @@ def main() -> int:
     step(len(products) == 3, f"ดึงสินค้าได้ {db.execute('SELECT count(*) FROM products').fetchone()[0]} รายการ")
     price = lambda p: Decimal(str(p["price"]))  # noqa: E731
 
-    login = prov.online_cashier_login(pin, cashier_code=code)
-    if login.get("selection_required"):
-        match = [c for c in login["cashiers"] if str(c.get("code", "")).upper() == code.upper()]
-        login = prov.online_cashier_login(pin, cashier_server_id=int((match or login["cashiers"])[0]["id"]))
-    step("cashier" in login, f"ล็อกอิน {login.get('cashier', {}).get('name', '-')}")
+    login = login_cashier(prov, pin, code)
+    step(True, f"ล็อกอิน {login['cashier'].get('name', '-')}")
     server_cashier, cashier = login["cashier"]["id"], login["local_cashier_id"]
 
+    verify_no_open_shift(api, branch, server_cashier)
     shift = pos.open_shift(branch, terminal, cashier, Decimal("1000"))
-    prov.open_server_shift(branch_id=branch, cashier_server_id=server_cashier,
-                           opening_cash=Decimal("1000"), local_shift_id=shift)
-    step(True, "เปิดกะ เงินทอน 1,000")
+    shift_no = prov.open_server_shift(branch_id=branch, cashier_server_id=server_cashier,
+                                      opening_cash=Decimal("1000"), local_shift_id=shift)
+    step(True, f"เปิดกะ server id={shift_no} เงินทอน 1,000")
 
     sales = []
 
