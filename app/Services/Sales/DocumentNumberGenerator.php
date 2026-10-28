@@ -49,7 +49,7 @@ class DocumentNumberGenerator
     public function nextInBook(DocumentBook $book, int $branchId): string
     {
         if ($book->documentType()->where('code', 'BOOKING')->exists()) {
-            return $this->nextBooking();
+            return $this->nextBooking($branchId);
         }
 
         return $this->format($book->prefix, $branchId, 'BOOK:'.$book->id.':'.$branchId);
@@ -58,15 +58,19 @@ class DocumentNumberGenerator
     public function next(string $documentTypeCode, int $branchId): string
     {
         if ($documentTypeCode === 'BOOKING') {
-            return $this->nextBooking();
+            return $this->nextBooking($branchId);
         }
 
         return $this->format(self::PREFIXES[$documentTypeCode] ?? 'DC', $branchId, $documentTypeCode.':'.$branchId);
     }
 
-    private function nextBooking(): string
+    /**
+     * ใบจองใช้รูปแบบเดียวกับเอกสารอื่น: BK + สาขา + วันที่ + ลำดับ (เดิม B01, B02 นับรวมทั้งบริษัท — ข้อ 16)
+     * ทุกเล่มใบจองของสาขาใช้ตัวนับเดียวกัน เพราะ prefix เดียวกัน แยกตัวนับตามเล่มจะได้เลขซ้ำ
+     */
+    private function nextBooking(int $branchId): string
     {
-        return sprintf('B%02d', $this->nextSequence('BOOKING:GLOBAL', 'ALL'));
+        return $this->format(self::PREFIXES['BOOKING'], $branchId, 'BOOKING:'.$branchId);
     }
 
     // ตารางที่ออกเลขเอง ไม่ได้อยู่ใน documents — ใช้ตัวนับชุดเดียวกันเพื่อไม่ให้ซ้ำ
