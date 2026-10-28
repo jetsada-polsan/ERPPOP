@@ -1,3 +1,23 @@
+# Handoff - 2026-10-28 (Codex: เตรียม POS production smoke — รอเจ้าของกรอก credentials)
+- Commit implementation: `0fff401` (ต่อจาก `acdcd93`; สคริปต์ต้นฉบับ `1d09b21`)
+- ทำอะไร: อ่านสคริปต์ `apps/pos-python/e2e/pos_smoke_production.py` และ flow API; แก้ให้ยืนยันเครื่อง `POS-B001-01`, ไม่เลือกคนขายคนแรกแทนรหัสที่ระบุ, หยุดหากต้องเปลี่ยน PIN หรือมีกะเดิมเปิดอยู่ และพิมพ์ server id ทันทีที่เปิดกะสำเร็จ เพื่อไม่ให้รอบทดสอบไปขาย/ปิดกะเดิมโดยไม่ตั้งใจ
+- ทดสอบ: ก่อนแก้ Python `python3 -m unittest discover -s tests` ผ่าน 215 tests; หลังเพิ่ม regression tests ผ่าน 224 tests; `git diff --check` ผ่าน
+- ERP tests: `php artisan test` หยุดที่ memory_limit 128 MB ใน ReportExportTest; รัน suite เดิมด้วย `php -d memory_limit=512M vendor/bin/phpunit` สำเร็จ (runner: tests 630, passed 629, skipped 1, incomplete 6, assertions 4,371)
+- สถานะ production: **ยังไม่ได้รัน** เพราะเจ้าของต้องกรอก Device Token/PIN เอง และเครื่องมือควบคุมหน้าจอปฏิเสธการเปิดแอป Terminal จึงไม่ได้พยายามเปิด Terminal ด้วยช่องทางอื่น ไม่ได้ขอหรือรับ credentials ผ่านแชต/ไฟล์/log
+- เลขบิล ERP: **ยังไม่มีจากรอบนี้**
+- เลขกะ server id: **ยังไม่มีจากรอบนี้**
+- ขั้น production ที่ยังรอ: ping/catalog, login PIN, เปิดกะ 1,000, ขายเงินสดหลายรายการ, ขายเงินสดรายการเดียว, ขายโอน, sync 3 บิล, นำเงินออก 20, ปิดกะ, sync เงินออก/ปิดกะ — ทุกขั้นยังไม่เริ่ม ไม่ใช่ผลทดสอบผ่าน
+- ให้เจ้าของรันใน Terminal บน Mac จาก checkout นี้ (กรอก Token และ PIN เฉพาะ prompt ซ่อนตัวอักษร):
+  ```bash
+  cd '/Users/jetsadapolsan/Documents/ChatGPT/ERP POPCenter/apps/pos-python'
+  set -o pipefail
+  python3 -u e2e/pos_smoke_production.py | tee /private/tmp/popstar-pos-smoke-20261028.log
+  ```
+  `tee` เก็บเฉพาะ stdout ผลขั้นทดสอบ; getpass อ่านจาก terminal แบบไม่ echo และไม่พิมพ์ค่าลง stdout ห้ามใส่ Token/PIN ใน command/env หรือส่งกลับแชต หากเปลี่ยนคนขายใช้ `POS_SMOKE_CASHIER` ตามคำสั่งเจ้าของ
+- งานถัดไป: เมื่อเจ้าของรันแล้ว อ่านเฉพาะผลขั้นทดสอบ/เลขบิล/เลขกะจาก log ด้านบน; หากมี ✘ ตรวจสาเหตุโดยไม่สร้างบิลซ้ำหรือแก้ production ด้วยมือ แล้วเติมผลจริงใน handoff นี้
+- Deploy/ข้อมูลจริง: ไม่ deploy, ไม่แก้ฐาน production ด้วยมือ, ไม่ล้างบิลทดสอบ; หลังรันจริงต้องแจ้งเจ้าของให้จัดการชุดทดสอบก่อนเปิดขาย **5 พ.ย. 2569** ตามขอบเขตที่เจ้าของอนุมัติ
+- ไม่แตะ `docs/servers.md` ซึ่งเป็นไฟล์ untracked เดิม
+
 # Handoff - 2026-10-27 (นำประวัติและรายงาน BPlus ออกจาก ERP)
 - Commit: `942befc` (implementation)
 - ทำอะไร: เอาส่วนเอกสารเก่า BPlus ออกจากหน้าเอกสารย้อนหลัง ปิด URL รายละเอียดเก่า และถอดเมนู/หน้า/เส้นทางรายงาน BPlus เดิม
