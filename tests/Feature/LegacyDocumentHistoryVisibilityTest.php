@@ -11,8 +11,10 @@ class LegacyDocumentHistoryVisibilityTest extends TestCase
     {
         $this->assertFalse(Route::has('documents.legacy-show'));
         $this->assertFalse(Route::has('legacy-reports.index'));
+        $this->assertFalse(Route::has('bookings.legacy-show'));
 
         $this->get('/documents/legacy/2474118')->assertNotFound();
         $this->get('/legacy-reports')->assertNotFound();
+        $this->get('/bookings/legacy/2474118')->assertNotFound();
     }
 }

@@ -4,6 +4,7 @@ use App\Http\Controllers\AccountingAutomationController;
 use App\Http\Controllers\AccountingPeriodController;
 use App\Http\Controllers\ApPaymentController;
 use App\Http\Controllers\AppLauncherController;
+use App\Http\Controllers\ApprovalRuleController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\BillingNoteController;
@@ -28,10 +29,10 @@ use App\Http\Controllers\EcommerceChannelController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\ExecutiveDashboardController;
 use App\Http\Controllers\FeatureController;
-use App\Http\Controllers\FleetController;
 use App\Http\Controllers\FinancialStatementController;
 use App\Http\Controllers\FixedAssetController;
 use App\Http\Controllers\FlashSaleController;
+use App\Http\Controllers\FleetController;
 use App\Http\Controllers\GlJournalController;
 use App\Http\Controllers\LegacyBackofficeSalesController;
 use App\Http\Controllers\LegacyTableMappingController;
@@ -58,6 +59,7 @@ use App\Http\Controllers\PriceTagController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductionController;
 use App\Http\Controllers\ProductionEfficiencyController;
+use App\Http\Controllers\ProductScanLogController;
 use App\Http\Controllers\ProductUnitController;
 use App\Http\Controllers\PromotionController;
 use App\Http\Controllers\PurchaseController;
@@ -81,11 +83,11 @@ use App\Http\Controllers\StockTransferController;
 use App\Http\Controllers\StockTransferReceiptController;
 use App\Http\Controllers\StockTransformController;
 use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\SupplierNoteController;
 use App\Http\Controllers\SystemSettingController;
 use App\Http\Controllers\TaxComplianceController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WarehouseLocationController;
-use App\Http\Controllers\ProductScanLogController;
 use App\Http\Controllers\WarehouseMobileController;
 use App\Http\Controllers\WorkflowDefinitionController;
 use Illuminate\Support\Facades\Route;
@@ -255,7 +257,6 @@ Route::prefix('bookings')->name('bookings.')->group(function () {
     Route::get('/', [BookingController::class, 'index'])->name('index');
     Route::get('/create', [BookingController::class, 'create'])->name('create');
     Route::post('/', [BookingController::class, 'store'])->name('store');
-    Route::get('/legacy/{diKey}', [BookingController::class, 'legacyShow'])->name('legacy-show');
     Route::get('/{booking}', [BookingController::class, 'show'])->name('show');
     Route::post('/{booking}/convert', [BookingController::class, 'convert'])->name('convert');
     Route::post('/{booking}/delivery', [BookingController::class, 'recordDelivery'])->name('delivery');
@@ -351,15 +352,15 @@ Route::prefix('purchase-orders')->name('purchase-orders.')->group(function () {
     Route::post('/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->name('cancel');
 });
 
-Route::get('/settings/approval-rules', [\App\Http\Controllers\ApprovalRuleController::class, 'index'])->name('settings.approval-rules.index');
-Route::post('/settings/approval-rules', [\App\Http\Controllers\ApprovalRuleController::class, 'store'])->name('settings.approval-rules.store');
-Route::patch('/settings/approval-rules/{rule}', [\App\Http\Controllers\ApprovalRuleController::class, 'toggle'])->name('settings.approval-rules.toggle');
+Route::get('/settings/approval-rules', [ApprovalRuleController::class, 'index'])->name('settings.approval-rules.index');
+Route::post('/settings/approval-rules', [ApprovalRuleController::class, 'store'])->name('settings.approval-rules.store');
+Route::patch('/settings/approval-rules/{rule}', [ApprovalRuleController::class, 'toggle'])->name('settings.approval-rules.toggle');
 
 Route::prefix('supplier-notes')->name('supplier-notes.')->group(function () {
-    Route::get('/', [\App\Http\Controllers\SupplierNoteController::class, 'index'])->name('index');
-    Route::post('/', [\App\Http\Controllers\SupplierNoteController::class, 'store'])->name('store');
-    Route::post('/{note}/approve', [\App\Http\Controllers\SupplierNoteController::class, 'approve'])->name('approve');
-    Route::post('/{note}/reject', [\App\Http\Controllers\SupplierNoteController::class, 'reject'])->name('reject');
+    Route::get('/', [SupplierNoteController::class, 'index'])->name('index');
+    Route::post('/', [SupplierNoteController::class, 'store'])->name('store');
+    Route::post('/{note}/approve', [SupplierNoteController::class, 'approve'])->name('approve');
+    Route::post('/{note}/reject', [SupplierNoteController::class, 'reject'])->name('reject');
 });
 
 Route::prefix('purchases')->name('purchases.')->group(function () {
@@ -733,8 +734,8 @@ Route::prefix('settings')->name('settings.')->group(function () {
     Route::get('/receipt-template', [ReceiptTemplateController::class, 'edit'])->name('receipt-template.edit');
     Route::post('/receipt-template', [ReceiptTemplateController::class, 'update'])->name('receipt-template.update');
     Route::post('/pos-token', [SystemSettingController::class, 'issuePosToken'])->name('pos-token.issue');
-  Route::post('/pos-token/rotate', [SystemSettingController::class, 'rotatePosToken'])->name('pos-token.rotate');
-  Route::delete('/pos-token', [SystemSettingController::class, 'deletePosDevice'])->name('pos-token.delete');
+    Route::post('/pos-token/rotate', [SystemSettingController::class, 'rotatePosToken'])->name('pos-token.rotate');
+    Route::delete('/pos-token', [SystemSettingController::class, 'deletePosDevice'])->name('pos-token.delete');
     Route::post('/pos-terminal/hardware', [SystemSettingController::class, 'updatePosTerminalHardware'])->name('pos-terminal.hardware');
     Route::post('/pos-release', [SystemSettingController::class, 'publishPosRelease'])->name('pos-release.publish');
 });
