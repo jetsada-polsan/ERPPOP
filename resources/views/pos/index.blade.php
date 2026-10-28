@@ -1383,6 +1383,14 @@
             display:grid; grid-template-columns:36px minmax(0,1fr) auto; align-items:center; gap:10px;
             padding:9px 11px; border-bottom:1px solid #bae6fd; background:#f0f9ff; color:#0c4a6e;
         }
+        .shift-needed {
+            display:grid; grid-template-columns:24px minmax(0,1fr) auto; align-items:center; gap:10px;
+            padding:10px 12px; border-bottom:1px solid #fde68a; background:#fffbeb; color:#92400e;
+        }
+        .shift-needed > i { font-size:18px; }
+        .shift-needed strong { display:block; font-size:13px; }
+        .shift-needed span { display:block; font-size:11px; font-weight:700; color:#a16207; }
+        .shift-needed button { border:0; border-radius:8px; background:#d97706; color:#fff; padding:8px 14px; font:800 13px inherit; cursor:pointer; white-space:nowrap; }
         .preview-notice-icon { width:34px; height:34px; display:grid; place-items:center; border-radius:9px; background:#0284c7; color:#fff; font-size:17px; }
         .preview-notice strong { display:block; font-size:13px; }
         .preview-notice span { display:block; margin-top:1px; color:#52708a; font-size:10.5px; font-weight:700; }
@@ -1960,10 +1968,24 @@
                 <div>
                     <strong>รายการตรวจสอบสินค้า</strong>
                     <span>คลิกสินค้าเพื่อดูรายการและราคา หน้านี้ไม่ออกบิลและไม่ตัดสต็อก</span>
+                    <span class="text-danger">{{ $shiftBlocker }}</span>
                 </div>
                 <button type="button" x-show="cart.length" @click="clearCart()"><i class="bi bi-x-circle"></i> ล้างรายการ</button>
             </div>
             @endunless
+            @if($canSell)
+            {{-- ยังไม่มีกะ: ปุ่มเปิดกะต้องเห็นชัด ไม่ใช่ซ่อนในหัวที่หดบนจอเล็ก (ข้อ 13) --}}
+            <div class="shift-needed" x-show="!activeShift" x-cloak data-testid="shift-needed">
+                <i class="bi bi-lock-fill"></i>
+                <div>
+                    <strong>ยังไม่เปิดกะ</strong>
+                    <span>{{ $shiftBlocker ?? 'เปิดกะก่อนจึงจะคิดเงินได้' }}</span>
+                </div>
+                @unless($shiftBlocker)
+                <button type="button" @click="openShiftModal()"><i class="bi bi-unlock me-1"></i> เปิดกะ</button>
+                @endunless
+            </div>
+            @endif
             <div class="pos-cart-header">
                 <div class="pos-customer-tools">
                     <button type="button" class="pos-customer-toggle" :aria-expanded="customerToolsOpen" @click="customerToolsOpen = !customerToolsOpen">

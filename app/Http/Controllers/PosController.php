@@ -10,18 +10,18 @@ use App\Models\FlashSaleItem;
 use App\Models\Member;
 use App\Models\PosCashMovement;
 use App\Models\PosHeldBill;
+use App\Models\PosOfflineSale;
 use App\Models\PosPayment;
 use App\Models\PosReceipt;
 use App\Models\PosReceiptItem;
 use App\Models\PosShift;
-use App\Models\PosOfflineSale;
 use App\Models\PosTerminal;
 use App\Models\PriceTable;
 use App\Models\Product;
-use App\Models\ProductScanLog;
 use App\Models\ProductBarcode;
 use App\Models\ProductCategory;
 use App\Models\ProductPrice;
+use App\Models\ProductScanLog;
 use App\Models\ProductUnit;
 use App\Models\Promotion;
 use App\Models\QrPaymentConfig;
@@ -32,8 +32,8 @@ use App\Models\StockDocument;
 use App\Models\User;
 use App\Services\Accounting\CashBookPostingService;
 use App\Services\Accounting\GlPostingService;
-use App\Services\Inventory\ScaleBarcodeService;
 use App\Services\Inventory\FifoStockService;
+use App\Services\Inventory\ScaleBarcodeService;
 use App\Services\Sales\CashSaleService;
 use App\Services\Sales\MemberPointService;
 use App\Services\Sales\PosPaymentValidator;
@@ -46,6 +46,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use RuntimeException;
@@ -103,6 +104,14 @@ class PosController extends Controller
             $defaultBranchId = $lockedBranch->id;
         }
 
+        // เหตุผลที่เปิดกะไม่ได้ แสดงบนหน้าแทนปุ่มที่กดแล้วไม่เกิดอะไร (ข้อ 13)
+        $shiftBlocker = match (true) {
+            ! $canSell => 'บัญชีนี้เปิดดูได้อย่างเดียว ไม่มีสิทธิ์ขาย (pos.sell) — ให้ผู้ดูแลเพิ่มบทบาทแคชเชียร์',
+            ! $lockedCashier => 'บัญชีนี้ยังไม่ได้ผูกกับแคชเชียร์ — ให้ผู้ดูแลผูกที่หน้าผู้ใช้ก่อนเปิดกะ',
+            $lockedBranch && ! $lockedBranch->hasDefaultWarehouse() => "สาขา {$lockedBranch->name_th} ยังไม่มีคลังเริ่มต้น — ตั้งคลังก่อนเปิดกะ",
+            default => null,
+        };
+
         // ข้อมูลออกใบกำกับภาษีอย่างย่อ (มาตรา 86/6): ชื่อ+เลขภาษีผู้ขาย + อัตรา VAT
         $company = [
             'name' => AppSetting::company('name_th'),
@@ -116,7 +125,7 @@ class PosController extends Controller
             ->orderByDesc('effective_from')->value('rate_percent') ?? 7.0);
 
         // NOTE: หน้า POS บนเว็บเป็น compatibility/staged flow; แคชเชียร์หลักคือ Python/PySide6 ใน pos-python/.
-        return view('pos.index', compact('branches', 'categories', 'cashiers', 'defaultBranchId', 'qrConfig', 'pointValueBaht', 'canSell', 'canVoid', 'canManageSettings', 'company', 'vatRate', 'lockedBranch', 'lockedCashier'));
+        return view('pos.index', compact('branches', 'categories', 'cashiers', 'defaultBranchId', 'qrConfig', 'pointValueBaht', 'canSell', 'canVoid', 'canManageSettings', 'company', 'vatRate', 'lockedBranch', 'lockedCashier', 'shiftBlocker'));
     }
 
     public function preview(): View
@@ -164,7 +173,7 @@ class PosController extends Controller
             : $request->header('X-Offline-Uuid');
         $value = strtolower(trim((string) $value));
 
-        return \Illuminate\Support\Str::isUuid($value) ? $value : null;
+        return Str::isUuid($value) ? $value : null;
     }
 
     private function enforcedCashierId(?int $requested): ?int
@@ -575,6 +584,7 @@ class PosController extends Controller
         $decoded = $scaleBarcodes->decode($barcode);
         if ($decoded === null) {
             $this->recordScan($barcode, $branchId, null, $request->input('source', 'manual'), 'not_found');
+
             return response()->json(['message' => "ไม่พบบาร์โค้ด {$barcode}"], 404);
         }
 
@@ -594,6 +604,7 @@ class PosController extends Controller
         }
         if ($productRows === []) {
             $this->recordScan($barcode, $branchId, null, $request->input('source', 'manual'), 'not_found');
+
             return response()->json(['message' => "ไม่พบสินค้าสำหรับ PLU เครื่องชั่ง {$decoded['plu']}"], 404);
         }
 
