@@ -7,10 +7,12 @@ use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\Product;
 use App\Models\ProductionOrder;
+use App\Models\StockBalance;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
 use App\Services\Sales\DocumentNumberGenerator;
 use App\Support\DecimalMath;
+use App\Support\StockShortage;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -64,6 +66,19 @@ class ProductionReceiptService
                 'qty' => DecimalMath::multiply($item->qty, $factor, DecimalMath::QUANTITY_SCALE),
             ]);
             $products = Product::whereIn('id', $rawItems->pluck('product_id'))->get()->keyBy('id');
+
+            // ตรวจวัตถุดิบทุกตัวก่อนตัด แล้วบอกครบทุกตัวที่ขาด (ข้อ 14) — เดิมรู้ทีละตัวตอน issue ล้ม
+            $shortages = $rawItems->map(function ($raw) use ($locationId) {
+                $balance = StockBalance::where('product_id', $raw['product_id'])->where('warehouse_location_id', $locationId)->first();
+                $available = DecimalMath::subtract($balance->on_hand_qty ?? 0, $balance->reserved_qty ?? 0, DecimalMath::QUANTITY_SCALE);
+
+                return DecimalMath::compare($raw['qty'], $available) > 0
+                    ? StockShortage::line((int) $raw['product_id'], $raw['qty'], $available)
+                    : null;
+            })->filter()->values()->all();
+            if ($shortages !== []) {
+                throw new RuntimeException(StockShortage::message($shortages, 'วัตถุดิบไม่พอผลิต'));
+            }
 
             $document = Document::create([
                 'document_type_id' => $documentType->id,

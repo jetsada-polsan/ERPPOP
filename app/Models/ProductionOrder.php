@@ -54,4 +54,28 @@ class ProductionOrder extends Model
             'closed_at' => 'datetime',
         ];
     }
+
+    public const STATUS_LABELS = [
+        'planned' => 'วางแผน',
+        'released' => 'เปิดงาน',
+        'in_progress' => 'กำลังผลิต',
+        'done' => 'เสร็จแล้ว',
+        'completed' => 'ปิดงาน',
+        'cancelled' => 'ยกเลิก',
+    ];
+
+    /** สถานะภาษาไทย ใบที่ปิดแล้วบอกด้วยว่าผลิตครบ ไม่ครบ หรือไม่ได้ผลิต (ข้อ 14) */
+    public function statusLabel(): string
+    {
+        if (! in_array($this->status, ['completed', 'done'], true)) {
+            return self::STATUS_LABELS[$this->status] ?? $this->status;
+        }
+        $produced = (float) $this->produced_qty;
+
+        return match (true) {
+            $produced <= 0 => 'ปิดงาน (ไม่ได้ผลิต)',
+            $produced + 0.0001 < (float) $this->planned_qty => 'ปิดงาน (ผลิตไม่ครบแผน)',
+            default => 'ผลิตครบแล้ว',
+        };
+    }
 }

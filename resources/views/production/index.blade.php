@@ -14,7 +14,7 @@
                 <div class="col-md-8"><label class="form-label small text-muted">ชื่อสูตร</label><input name="name" required class="form-control"></div>
                 <div class="col-12">
                     <label class="form-label small text-muted">สินค้าสำเร็จรูป</label>
-                    <select name="finished_product_id" required class="form-select">
+                    <select name="finished_product_id" x-ref="finishedProduct" required class="form-select">
                         <option value="">-- เลือกสินค้า --</option>
                         @foreach($products as $product)<option value="{{ $product->id }}">{{ $product->sku_code }} - {{ $product->name_th }}</option>@endforeach
                     </select>
@@ -38,14 +38,16 @@
                 <div class="col-md-4"><label class="form-label small text-muted">สถานะ</label><select name="status" class="form-select"><option value="planned">วางแผน</option><option value="released">เปิดงาน</option><option value="completed">เสร็จแล้ว</option></select></div>
                 <div class="col-md-6">
                     <label class="form-label small text-muted">สูตรผลิต</label>
-                    <select name="production_recipe_id" class="form-select">
+                    {{-- เลือกสูตรแล้วเติมสินค้าสำเร็จรูปของสูตรให้ (ข้อ 14) --}}
+                    <select name="production_recipe_id" class="form-select"
+                        @change="const p = $event.target.selectedOptions[0]?.dataset.product; if (p) $refs.finishedProduct.value = p">
                         <option value="">-- ไม่ระบุ --</option>
-                        @foreach($recipes as $recipe)<option value="{{ $recipe->id }}">{{ $recipe->code }} - {{ $recipe->name }}</option>@endforeach
+                        @foreach($recipes as $recipe)<option value="{{ $recipe->id }}" data-product="{{ $recipe->finished_product_id }}">{{ $recipe->code }} - {{ $recipe->name }}</option>@endforeach
                     </select>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label small text-muted">สินค้าสำเร็จรูป</label>
-                    <select name="finished_product_id" required class="form-select">
+                    <select name="finished_product_id" x-ref="finishedProduct" required class="form-select">
                         <option value="">-- เลือกสินค้า --</option>
                         @foreach($products as $product)<option value="{{ $product->id }}">{{ $product->sku_code }} - {{ $product->name_th }}</option>@endforeach
                     </select>
@@ -107,7 +109,7 @@
                             <td>{{ $order->finishedProduct?->sku_code }} - {{ $order->finishedProduct?->name_th }}</td>
                             <td class="text-end">{{ number_format((float) $order->planned_qty, 4) }}</td>
                             <td class="text-end">{{ number_format((float) $order->produced_qty, 4) }}</td>
-                            <td><span class="badge {{ $order->status === 'completed' ? 'text-bg-success' : 'text-bg-light border' }}">{{ $order->status === 'completed' ? 'ปิดงานแล้ว' : $order->status }}</span></td>
+                            <td><span class="badge {{ $order->statusLabel() === 'ผลิตครบแล้ว' ? 'text-bg-success' : ($order->status === 'completed' ? 'text-bg-secondary' : 'text-bg-light border') }}">{{ $order->statusLabel() }}</span></td>
                             <td>
                                 @if($order->status !== 'completed')
                                 <form method="post" action="{{ route('production.orders.receive', $order) }}" class="d-flex gap-1 mb-1"
@@ -124,7 +126,7 @@
                                     <button class="btn btn-sm btn-outline-secondary text-nowrap">ปิดงาน</button>
                                 </form>
                                 @else
-                                <span class="text-muted small">ครบแล้ว</span>
+                                <span class="text-muted small">{{ $order->statusLabel() }}</span>
                                 @endif
                             </td>
                         </tr>
