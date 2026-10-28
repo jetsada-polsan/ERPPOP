@@ -1271,3 +1271,10 @@ pending
   5. บัญชีธนาคาร/QR บริษัท (ยังเป็นเบอร์ส่วนตัว)
 - ไฟล์ที่มีข้อมูลลูกค้าบนเซิร์ฟเวอร์: `storage/app/imports/popstar_customers_products.txt` ควรลบหลังเจ้าของยืนยัน
 - auto-mode ของ Claude ไม่อนุญาตให้ Claude รันคำสั่งลบ/deploy บน production เอง เจ้าของรันเอง
+
+## Handoff - 2026-10-28 (Claude: ปิดรายการแก้ข้อ 11–18 + จัดสาขา/คนขายสำหรับ go-live B001)
+- ข้อมูล production ที่เจ้าของรันแล้ว: unit/VAT จาก BPlus (`erp:apply-unit-export` 4,057 สินค้า, VAT 2,181), ปิดสินค้าที่ BPlus ปิด (เปิดใช้ 1,622), เติมบาร์โค้ด BPlus 1,329 + รหัส 6 หลักให้สินค้าเปิดใช้ครบ, แก้ราคาหลักเป็นหน่วยฐาน 676 + 6 ตัวตามเจ้าของ, `erp:reset-branches` เหลือ HQ + B001 อำนาจเจริญ (เดิม B006), `erp:setup-branch-pos-staff` amnat + B001 แคชเชียร์ + M001 หัวหน้า (เจ้าของตั้ง PIN เอง), ลบหน้า/API/ข้อมูลระบบเดิมทั้งหมด
+- โค้ดรายการแก้: ข้อ 11 `f890652` DocumentVoidService (ขายเชื่อ/ขายสด/รับคืน/ซื้อ/ใบเสร็จ กลับสต๊อก GL AR/AP สมุดเงินสด audit, สิทธิ์ใหม่ `documents.void`), ข้อ 13 `1af0c3a`, ข้อ 12 `336de04` เลือกบัญชีธนาคาร, ข้อ 16 `a51a707` เลขใบจอง BK+สาขา+วันที่, ข้อ 14 `5d46e5b`, ข้อ 17 `ea0b0b1` (`erp:repair-master-names`, `erp:report-duplicate-product-names`; เปลี่ยนชื่อคลังวารินไม่ต้องทำแล้วเพราะลบสาขา), ข้อ 18 `372565e`
+- ทดสอบ: phpunit 616 ผ่าน, POS e2e CI + PostgreSQL UAT ผ่านบน `372565e`
+- ยังไม่ deploy `f890652..372565e` (มี migration `documents.void`)
+- ค้าง: ชื่อผู้จำหน่ายเพี้ยน 10 ราย ต้องดึงจาก BPlus APFILE (สคริปต์ให้เจ้าของรัน) แล้วรัน `erp:repair-master-names --suppliers=...`; หน่วยเพี้ยนไม่มีใครใช้ 74 รายการ `--drop-unused-units`; QR/บัญชีธนาคารบริษัท; สต๊อกตั้งต้น; เครื่อง POS จริง; คู่มือเทส `docs/uat/2026-10-28-b001-golive-test.md`
