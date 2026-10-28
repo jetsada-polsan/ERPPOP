@@ -63,6 +63,7 @@ class ErpMenu
                 'items' => [
                     ['label' => 'เปิด POS ขาย', 'route' => 'pos.index', 'pattern' => 'pos.index', 'icon' => 'bi-display', 'tone' => 'cyan', 'target' => '_blank'],
                     ['label' => 'ศูนย์ควบคุม POS', 'route' => 'pos.control', 'pattern' => 'pos.control', 'icon' => 'bi-cash-coin', 'tone' => 'red'],
+                    ['label' => 'จัดการเครื่อง POS', 'route' => 'pos-admin.index', 'pattern' => 'pos-admin.*', 'icon' => 'bi-pc-display', 'tone' => 'blue'],
                     ['label' => 'เครื่องมือ POS', 'route' => 'bplus.pos-workbench', 'pattern' => 'bplus.pos-workbench', 'icon' => 'bi-window-stack', 'tone' => 'blue'],
                     ['label' => 'ส่งข้อมูลไป POS', 'route' => 'bplus.pos-preparation', 'pattern' => 'bplus.pos-preparation', 'icon' => 'bi-hdd-network-fill', 'tone' => 'teal'],
                     ['label' => 'QR รับเงิน / จอแสดงราคา', 'route' => 'bplus.qr-payments', 'pattern' => 'bplus.qr-payments', 'extraPattern' => 'bplus.show-price', 'icon' => 'bi-qr-code', 'tone' => 'slate'],

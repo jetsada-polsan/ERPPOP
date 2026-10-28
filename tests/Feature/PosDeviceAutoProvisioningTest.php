@@ -37,7 +37,7 @@ class PosDeviceAutoProvisioningTest extends TestCase
             'pos_user_id' => $cashier->id,
         ]);
 
-        $response->assertRedirect(route('settings.index', ['tab' => 'pos-download']));
+        $response->assertRedirect(route('pos-admin.index'));
         $response->assertSessionHas('pos_token');
 
         $device = PosDevice::firstOrFail();
@@ -75,7 +75,7 @@ class PosDeviceAutoProvisioningTest extends TestCase
         $this->withoutMiddleware()->post(route('settings.pos-token.issue'), [
             'pos_branch_id' => $branch->id,
             'pos_user_id' => $second->id,
-        ])->assertRedirect(route('settings.index', ['tab' => 'pos-download']));
+        ])->assertRedirect(route('pos-admin.index'));
 
         $this->assertSame($second->id, PosDevice::firstOrFail()->user_id);
     }

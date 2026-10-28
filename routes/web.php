@@ -49,6 +49,7 @@ use App\Http\Controllers\OcrDocumentController;
 use App\Http\Controllers\OperationsController;
 use App\Http\Controllers\OrganizationalUnitController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\PosAdminController;
 use App\Http\Controllers\PosBuildController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\PosOfflineSaleController;
@@ -104,6 +105,7 @@ Route::get('/download/pos', fn () => redirect()->route('python-pos.download'))->
 Route::get('/download/pos/latest.json', [PosReleaseController::class, 'latest'])->name('pos.release.latest');
 Route::get('/download/pos/releases/{filename}', [PosReleaseController::class, 'download'])->name('pos.release.download');
 Route::get('/download/python-pos', [SystemSettingController::class, 'downloadPythonPos'])->name('python-pos.download');
+Route::get('/pos-admin', [PosAdminController::class, 'index'])->name('pos-admin.index');
 Route::get('/password/change', [AuthController::class, 'showChangePassword'])->name('password.change');
 Route::post('/password/change', [AuthController::class, 'updatePassword'])->name('password.update');
 Route::get('/security/mfa', [AuthController::class, 'showMfaSetup'])->name('mfa.setup');

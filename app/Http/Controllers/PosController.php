@@ -9,6 +9,7 @@ use App\Models\Document;
 use App\Models\FlashSaleItem;
 use App\Models\Member;
 use App\Models\PosCashMovement;
+use App\Models\PosDevice;
 use App\Models\PosHeldBill;
 use App\Models\PosOfflineSale;
 use App\Models\PosPayment;
@@ -715,7 +716,7 @@ class PosController extends Controller
             return response()->json(['success' => true, 'shift' => $this->shiftPayload($existing), 'message' => 'มีกะเปิดอยู่แล้ว']);
         }
 
-        $terminal = $this->terminalForBranch((int) $data['branch_id']);
+        $terminal = $this->terminalForBranch((int) $data['branch_id'], request()->attributes->get('pos_device'));
 
         // เลขกะต้องออกใน transaction เดียวกับการสร้าง (lockForUpdate ใน nextShiftNo)
         $shift = DB::transaction(fn () => PosShift::create([
@@ -1370,9 +1371,20 @@ class PosController extends Controller
             ->first();
     }
 
-    private function terminalForBranch(int $branchId): PosTerminal
+    /**
+     * จุดขายของกะ: เครื่อง POS ที่ผูก token ใช้จุดขายตามรหัสเครื่องของตัวเอง (POS-B001-01)
+     * เดิมทุกเครื่องในสาขาใช้ WEB-<สาขา> ร่วมกัน ERP จึงแยกกะ/บิล/ฮาร์ดแวร์รายเครื่องไม่ได้
+     * หน้า POS บนเว็บ (ไม่มีเครื่อง) ยังใช้ WEB-<สาขา> เหมือนเดิม
+     */
+    private function terminalForBranch(int $branchId, ?PosDevice $device = null): PosTerminal
     {
         $branch = Branch::findOrFail($branchId);
+        if ($device?->terminal_code && (int) $device->branch_id === $branchId) {
+            return PosTerminal::firstOrCreate(
+                ['code' => $device->terminal_code],
+                ['branch_id' => $branchId, 'name' => $device->name]
+            );
+        }
 
         return PosTerminal::firstOrCreate(
             ['code' => 'WEB-'.$branch->code],

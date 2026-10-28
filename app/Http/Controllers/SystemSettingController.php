@@ -196,24 +196,11 @@ class SystemSettingController extends Controller
             ],
             'bookCount' => DB::table('document_books')->where('is_active', true)->count(),
             'bankCount' => DB::table('bank_accounts')->count(),
-            // รายชื่อที่เลือกผูกกับเครื่องต้องเป็น User ใหม่ที่มีโปรไฟล์ POS แล้ว
-            // ไม่แสดง salesman เก่าที่ไม่มีตัวตน User ให้แอดมินเลือก
-            'posUsers' => User::query()
-                ->where('is_active', true)
-                ->whereHas('posCashierProfile', fn ($cashier) => $cashier->where('is_active', true))
-                ->with('branch:id,code,name_th')
-                ->orderBy('name')
-                ->get(['id', 'name', 'username', 'branch_id']),
-            'posBranches' => Branch::query()->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name_th']),
-            'posDevices' => PosDevice::with(['user:id,name,username', 'branch:id,code,name_th'])->latest()->limit(20)->get(),
-            'posTerminals' => PosTerminal::with('branch:id,code,name_th')->orderBy('code')->get(),
             'menuOrder' => $this->menuOrder(),
             'erpTheme' => AppSetting::get('erp_theme', 'ocean'),
             'erpLayout' => AppSetting::get('erp_layout', 'classic'),
             'posRelease' => $this->currentPosRelease(),
             'pythonPosInstaller' => $this->currentPythonPosInstaller(),
-            'posReadiness' => $this->posReadiness(),
-            'posPinMode' => AppSetting::get('pos_passwordless_login') === '1' ? 'selection' : 'pin',
         ]);
     }
 
@@ -243,7 +230,7 @@ class SystemSettingController extends Controller
             ]);
         });
 
-        return redirect()->route('settings.index', ['tab' => 'pos-download'])
+        return redirect()->route('pos-admin.index')
             ->with('cashier_pin_result', ['code' => $salesman->code, 'name' => $salesman->name, 'pin' => $temporary]);
     }
 
@@ -258,38 +245,6 @@ class SystemSettingController extends Controller
             }
         }
         abort(500, 'สร้าง PIN ที่ไม่ซ้ำไม่ได้ กรุณาลองใหม่');
-    }
-
-    /**
-     * ความพร้อมขายของแต่ละสาขา สำหรับแถบตรวจในหน้าดาวน์โหลด POS
-     * นับเครื่องที่ยังไม่เพิกถอน, เครื่องที่เคยต่อเข้ามา และคนขายที่ตั้ง PIN แล้ว (PIN ของ user หรือของคนขายเอง)
-     */
-    private function posReadiness(): array
-    {
-        return Branch::query()->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name_th', 'default_warehouse_location_id'])
-            ->map(function (Branch $branch) {
-                $devices = PosDevice::where('branch_id', $branch->id)->whereNull('revoked_at')->get(['id', 'name', 'last_seen_at']);
-                $cashiers = Salesman::with('user.posCredential')->where('branch_id', $branch->id)->where('is_active', true)->get();
-                $withPin = $cashiers->filter(fn (Salesman $s) => filled($s->user?->posCredential?->pin_hash) || filled($s->pos_pin_hash));
-
-                // ผู้ใช้ที่ผูกกับเครื่องให้อัตโนมัติ: user ของสาขาที่ผูกคนขายไว้ (หัวหน้า เช่น amnat) และมีสิทธิ์ขาย
-                $deviceUser = User::where('branch_id', $branch->id)->where('is_active', true)
-                    ->whereHas('posCashierProfile', fn ($q) => $q->where('is_active', true))
-                    ->with(['roles.permissions', 'branchRoles.permissions'])->orderBy('id')->get()
-                    ->first(fn (User $user) => $user->canUsePosDevice($branch->id));
-
-                return [
-                    'branch' => $branch,
-                    'device_user' => $deviceUser,
-                    'cashier_list' => $cashiers,
-                    'devices' => $devices->count(),
-                    'online_devices' => $devices->whereNotNull('last_seen_at')->count(),
-                    'last_seen' => $devices->max('last_seen_at'),
-                    'cashiers' => $cashiers->count(),
-                    'cashiers_with_pin' => $withPin->count(),
-                    'has_warehouse' => $branch->hasDefaultWarehouse(),
-                ];
-            })->all();
     }
 
     /** Download the tested PopCentral POS installer without requiring GitHub access on a cashier PC. */
@@ -394,7 +349,7 @@ class SystemSettingController extends Controller
             return back()->withErrors(['pos_branch_id' => $exception->getMessage()]);
         }
 
-        return redirect()->route('settings.index', ['tab' => 'pos-download'])->with([
+        return redirect()->route('pos-admin.index')->with([
             'success' => "สร้าง {$device->name} ({$device->terminal_code}) และ Token ให้แล้ว กรุณาคัดลอกไปตั้งค่าในเครื่อง POS",
             'pos_token' => $token,
             'pos_device_name' => $device->name,
@@ -410,7 +365,7 @@ class SystemSettingController extends Controller
         $device = PosDevice::findOrFail($data['pos_device_id']);
         $token = $device->rotateToken();
 
-        return redirect()->route('settings.index', ['tab' => 'pos-download'])->with([
+        return redirect()->route('pos-admin.index')->with([
             'success' => "ออก Token ใหม่สำหรับ {$device->name} แล้ว Token เดิมจะใช้งานไม่ได้",
             'pos_token' => $token,
             'pos_device_name' => $device->name,
@@ -427,7 +382,7 @@ class SystemSettingController extends Controller
         $name = $device->name;
         $device->delete();
 
-        return redirect()->route('settings.index', ['tab' => 'pos-download'])->with('success', "ลบเครื่อง POS {$name} แล้ว");
+        return redirect()->route('pos-admin.index')->with('success', "ลบเครื่อง POS {$name} แล้ว");
     }
 
     public function updatePosTerminalHardware(Request $request): RedirectResponse
@@ -455,7 +410,7 @@ class SystemSettingController extends Controller
             ],
         ]);
 
-        return redirect()->route('settings.index')->with('success', 'บันทึกโปรไฟล์อุปกรณ์ POS แล้ว');
+        return redirect()->route('pos-admin.index', ['tab' => 'hardware'])->with('success', 'บันทึกโปรไฟล์อุปกรณ์ POS แล้ว');
     }
 
     public function update(Request $request): RedirectResponse
