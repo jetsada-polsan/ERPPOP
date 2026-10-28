@@ -67,7 +67,7 @@ class SetupBranchPosStaff extends Command
             ['user ของสาขา', "{$user->username} → เปิดใช้งาน, สาขา {$branch->code}, เพิ่มบทบาท BRANCH_MGR"],
             ...array_map(fn ($code, $i) => ['แคชเชียร์เครื่อง '.($i + 1), "{$code} ".$this->cashierName($branch, $code, count($cashierCodes)).' (ไม่ผูก user)'], $cashierCodes, array_keys($cashierCodes)),
             ['หัวหน้า', "{$managerCode} หัวหน้า {$branch->name_th} (ผูก {$user->username})"],
-            ['PIN', 'ยังไม่ตั้ง — ใช้ pos:pin ตั้งเอง เครื่องจะบังคับเปลี่ยนตอนล็อกอินครั้งแรก'],
+            ['PIN', 'ตั้งที่ ERP: ตั้งค่า → ผูกเครื่อง → คนขาย POS และ PIN → ออก PIN ชั่วคราว (PIN เดิมไม่ถูกแตะ)'],
         ]);
 
         if ($this->option('dry-run')) {
@@ -103,7 +103,7 @@ class SetupBranchPosStaff extends Command
             return self::FAILURE;
         }
 
-        $this->info("ตั้งคนขายสาขา {$branch->code} แล้ว — ตั้ง PIN เริ่มต้นด้วย pos:pin ".implode(', pos:pin ', $cashierCodes)." และ pos:pin {$managerCode}");
+        $this->info("ตั้งคนขายสาขา {$branch->code} แล้ว — รหัสที่ยังไม่มี PIN ให้ออก PIN ชั่วคราวที่ ERP: ตั้งค่า → ผูกเครื่อง");
 
         return self::SUCCESS;
     }
@@ -111,7 +111,8 @@ class SetupBranchPosStaff extends Command
     /** ชื่อแสดงในบิล/รายงานกะ — หลายเครื่องใส่เลขเครื่องท้ายรหัสให้รู้ว่าลิ้นชักไหน */
     private function cashierName(Branch $branch, string $code, int $count): string
     {
-        $suffix = preg_match('/-(\d+)$/', $code, $m) ? ' เครื่อง '.$m[1] : ($count > 1 ? ' '.$code : '');
+        // รหัสไม่มีเลขท้าย (B001) คือเครื่องแรก เมื่อสาขามีหลายเครื่อง
+        $suffix = preg_match('/-(\d+)$/', $code, $m) ? ' เครื่อง '.$m[1] : ($count > 1 ? ' เครื่อง 1' : '');
 
         return 'แคชเชียร์ '.$branch->name_th.$suffix;
     }

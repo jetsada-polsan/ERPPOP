@@ -52,6 +52,8 @@ class SetupBranchPosStaffTest extends TestCase
         $run(['b903-1']);
         Salesman::where('code', 'B903-1')->first()->setPin('482917', false);
         $run(['b903-1', 'b903-2', 'b903-3']);
+        $run(['b903', 'b903-2']);
+        $this->assertSame('แคชเชียร์ สาขาสามเครื่อง เครื่อง 1', Salesman::where('code', 'B903')->value('name'));
 
         $this->assertSame(['B903-1', 'B903-2', 'B903-3'], Salesman::where('code', 'like', 'B903-%')->orderBy('code')->pluck('code')->all());
         $this->assertSame('แคชเชียร์ สาขาสามเครื่อง เครื่อง 2', Salesman::where('code', 'B903-2')->value('name'));
