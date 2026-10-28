@@ -1257,3 +1257,17 @@ pending
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ UAT หลังล็อกอินหรือสร้างเอกสารธุรกิจบน production ไม่ยืนยัน flow อุปกรณ์จริงจาก HTTP smoke อย่างเดียว
 - ข้อมูลจริง: ไม่ได้รัน erp:remove-test-price-tag, erp:prune-products, reset-transactions หรือแก้ master data; TEST01 และข้อมูลทดสอบยังรอตรวจ dry-run/ขั้นตอนเดิม การอนุมัติ deploy ไม่ได้ขยายเป็นการล้างข้อมูล
 - งานถัดไป: UAT ป้ายราคา/Pipeline/สมาชิก/สิทธิ์ admin บน production และรับ mapping ผู้ใช้→สาขา/บัญชีธนาคารจริง; รายละเอียดคงค้างใน docs/uat/2026-10-27-menu-readiness.md
+
+## Handoff - 2026-10-27/28 (Claude: ล้างข้อมูลเก่า + นำเข้าลูกค้า/สินค้าชุดใหม่ บน production)
+- Commits: `7e9bf8a` erp:purge-products, `7f391ba`+`34a6fd7` erp:purge-legacy-masters, `60b1420`+`57e3a9f` erp:import-popstar-export, `ac9b8da` erp:apply-unit-export (ทุกตัวมี --dry-run, ต้องมี backup ≤2 ชม., transaction เดียว, มี Feature test)
+- เจ้าของรันเองบน production ตามลำดับ (deploy ล่าสุด `57e3a9f` run 40525603394): backup `erp-db-20261027-214430` → reset-transactions (1,056 แถว) → purge-products (5,332) → สร้างประเภท 900 "ค่าขนส่ง/บริการ" → backup `erp-db-20261027-215806` → purge-legacy-masters (ลูกค้า 7,422, พนักงานขาย 45, legacy_table_mappings 311) → import-popstar-export
+- ผลหลังนำเข้า (ตรวจแล้ว): customers 7,183 (ตัดซ้ำชื่อ+เบอร์ 19), contacts 7,563, products 4,057 (active 3,637; CC ปิดใช้ 420 = ต้นทุน 0/#ยกเลิก#), barcodes 7,658 (SCALE_PLU 801xxx 76; ไม่นำเข้า 801 ที่ยกเลิก 7 ตัว), salesmen 0; erp:health ผ่านทุกข้อ
+- ลบ MSSQL_SOURCE_* ออกจาก .env production แล้ว (สำรองที่ `.env.bak-20261027-mssql` ยังมีรหัสผ่าน รอเจ้าของสั่งลบ); LEGACY_POS_SYNC_SECRET ยังอยู่
+- ค้าง/ความเสี่ยงก่อน go-live 5 พ.ย. (B006 อำนาจเจริญ):
+  1. **ยังไม่ deploy `ac9b8da`** แล้วรัน `erp:apply-unit-export storage/app/imports/legacy_price_units.tsv` (ข้อมูลจากหน้า p_product1.php ของเว็บระบบเดิม อ่านอย่างเดียว) — ตอนนี้ **is_vat=false ทุกสินค้า** และทุกบาร์โค้ด unit_factor=1 (หน่วย PCS) ลัง/แพ็กตัดสต๊อกผิด; 36 SKU หน่วยขัดกันต้องตั้งเอง
+  2. ไม่มีพนักงานขาย/แคชเชียร์เลย ต้องตั้งแคชเชียร์ + PIN B006 ใหม่ (เจ้าของตั้งเอง)
+  3. สต๊อกเป็น 0 ทุกตัว ต้องรับเข้า/นับตั้งต้น (เว็บเดิมไม่มีคลังอำนาจเจริญ)
+  4. สินค้า ~2,400 SKU ไม่ปรากฏในเว็บระบบเดิมเลย (น่าจะเลิกขาย) — เสนอเจ้าของย้ายไป CC ปิดใช้ ยังไม่ได้คำตอบ
+  5. บัญชีธนาคาร/QR บริษัท (ยังเป็นเบอร์ส่วนตัว)
+- ไฟล์ที่มีข้อมูลลูกค้าบนเซิร์ฟเวอร์: `storage/app/imports/popstar_customers_products.txt` ควรลบหลังเจ้าของยืนยัน
+- auto-mode ของ Claude ไม่อนุญาตให้ Claude รันคำสั่งลบ/deploy บน production เอง เจ้าของรันเอง
