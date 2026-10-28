@@ -6,6 +6,7 @@ use App\Models\AppSetting;
 use App\Models\Branch;
 use App\Models\PosDevice;
 use App\Models\PosTerminal;
+use App\Models\Salesman;
 use App\Models\User;
 use App\Services\Accounting\OpeningBalanceService;
 use App\Support\PosLayout;
@@ -208,7 +209,33 @@ class SystemSettingController extends Controller
             'erpLayout' => AppSetting::get('erp_layout', 'classic'),
             'posRelease' => $this->currentPosRelease(),
             'pythonPosInstaller' => $this->currentPythonPosInstaller(),
+            'posReadiness' => $this->posReadiness(),
+            'posPinMode' => AppSetting::get('pos_passwordless_login') === '1' ? 'selection' : 'pin',
         ]);
+    }
+
+    /**
+     * ความพร้อมขายของแต่ละสาขา สำหรับแถบตรวจในหน้าดาวน์โหลด POS
+     * นับเครื่องที่ยังไม่เพิกถอน, เครื่องที่เคยต่อเข้ามา และคนขายที่ตั้ง PIN แล้ว (PIN ของ user หรือของคนขายเอง)
+     */
+    private function posReadiness(): array
+    {
+        return Branch::query()->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name_th', 'default_warehouse_location_id'])
+            ->map(function (Branch $branch) {
+                $devices = PosDevice::where('branch_id', $branch->id)->whereNull('revoked_at')->get(['id', 'name', 'last_seen_at']);
+                $cashiers = Salesman::with('user.posCredential')->where('branch_id', $branch->id)->where('is_active', true)->get();
+                $withPin = $cashiers->filter(fn (Salesman $s) => filled($s->user?->posCredential?->pin_hash) || filled($s->pos_pin_hash));
+
+                return [
+                    'branch' => $branch,
+                    'devices' => $devices->count(),
+                    'online_devices' => $devices->whereNotNull('last_seen_at')->count(),
+                    'last_seen' => $devices->max('last_seen_at'),
+                    'cashiers' => $cashiers->count(),
+                    'cashiers_with_pin' => $withPin->count(),
+                    'has_warehouse' => $branch->hasDefaultWarehouse(),
+                ];
+            })->all();
     }
 
     /** Download the tested PopCentral POS installer without requiring GitHub access on a cashier PC. */

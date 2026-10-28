@@ -261,29 +261,92 @@
             </div>
 
             <div x-show="tab === 'pos-download'" x-cloak>
-                <div class="set-card pos-download-card">
-                    <div class="pos-download-mark"><i class="bi bi-windows"></i></div>
-                    <div class="pos-download-copy">
-                        <div class="set-title">PopCentral POS สำหรับเครื่องแคชเชียร์ @if($pythonPosInstaller)<span class="pos-version-badge">รุ่น {{ $pythonPosInstaller['version'] }}</span>@endif</div>
-                        <div class="set-desc">Python + PySide6 · Local SQLite · แอป POS หลักสำหรับเครื่องแคชเชียร์ · ต้องผ่านการทดสอบ Windows ก่อนเปิดขายจริง</div>
+                {{-- ความพร้อมขายต่อสาขา: เห็นทันทีว่าสาขาไหนยังขาดเครื่อง คนขาย หรือ PIN --}}
+                <div class="set-card" data-testid="pos-readiness">
+                    <div class="set-title pt-2 mb-2">ความพร้อมขายแต่ละสาขา</div>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-2">
+                            <thead><tr><th>สาขา</th><th>คลัง</th><th>เครื่อง POS</th><th>ต่อเข้ามาล่าสุด</th><th>คนขายที่ตั้ง PIN</th><th>สถานะ</th></tr></thead>
+                            <tbody>
+                            @foreach($posReadiness as $row)
+                                @php $ready = $row['has_warehouse'] && $row['online_devices'] > 0 && $row['cashiers_with_pin'] > 0; @endphp
+                                <tr>
+                                    <td class="fw-semibold">{{ $row['branch']->code }} {{ $row['branch']->name_th }}</td>
+                                    <td>{!! $row['has_warehouse'] ? '<i class="bi bi-check-circle-fill text-success"></i>' : '<span class="text-danger">ยังไม่มี</span>' !!}</td>
+                                    <td>{{ $row['devices'] }} เครื่อง @if($row['devices'] > $row['online_devices'])<span class="text-muted small">(ยังไม่เคยต่อ {{ $row['devices'] - $row['online_devices'] }})</span>@endif</td>
+                                    <td>{{ $row['last_seen'] ? \Illuminate\Support\Carbon::parse($row['last_seen'])->diffForHumans() : '—' }}</td>
+                                    <td>{{ $row['cashiers_with_pin'] }} / {{ $row['cashiers'] }}</td>
+                                    <td>
+                                        @if($ready)
+                                            <span class="badge text-bg-success">พร้อมขาย</span>
+                                        @else
+                                            <span class="badge text-bg-warning">ยังไม่พร้อม</span>
+                                            <div class="small text-muted">
+                                                {{ collect([
+                                                    $row['has_warehouse'] ? null : 'ตั้งคลัง',
+                                                    $row['devices'] === 0 ? 'ผูกเครื่อง (ขั้น 2)' : ($row['online_devices'] === 0 ? 'เปิดโปรแกรมแล้ววาง token (ขั้น 3)' : null),
+                                                    $row['cashiers_with_pin'] === 0 ? 'ตั้ง PIN คนขาย' : null,
+                                                ])->filter()->implode(' · ') }}
+                                            </div>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                            </tbody>
+                        </table>
                     </div>
-                    @if($pythonPosInstaller)
-                        <a href="{{ route('python-pos.download') }}" class="btn btn-primary btn-lg pos-download-btn">
-                            <i class="bi bi-download me-1"></i> ดาวน์โหลดรุ่น {{ $pythonPosInstaller['version'] }}
-                        </a>
-                    @else
-                        <button type="button" class="btn btn-secondary btn-lg pos-download-btn" disabled>
-                            <i class="bi bi-hourglass-split me-1"></i> กำลังสร้างไฟล์ Windows
-                        </button>
-                    @endif
+                    <div class="small {{ $posPinMode === 'pin' ? 'text-success' : 'text-danger' }}">
+                        <i class="bi {{ $posPinMode === 'pin' ? 'bi-shield-lock-fill' : 'bi-exclamation-triangle-fill' }} me-1"></i>
+                        {{ $posPinMode === 'pin' ? 'เปิดกะต้องใส่ PIN ของคนขาย' : 'โหมดเลือกชื่อไม่ใช้ PIN เปิดอยู่ — ใครก็เปิดกะได้ ปิดด้วย php artisan pos:passwordless disable' }}
+                    </div>
                 </div>
 
-                @if($pythonPosInstaller)
-                    <div class="alert alert-success py-2 mb-3">
-                        <i class="bi bi-shield-check me-1"></i>ไฟล์พร้อมติดตั้ง: <code>{{ $pythonPosInstaller['filename'] }}</code>
-                        · {{ number_format($pythonPosInstaller['size_bytes'] / 1048576, 1) }} MB
+                {{-- ติดตั้งเครื่องใหม่ 4 ขั้น ตามลำดับที่ทำจริงที่หน้าร้าน --}}
+                <div class="set-card pos-steps">
+                    <div class="set-title pt-2 mb-3">ติดตั้งเครื่อง POS ใหม่ 4 ขั้น</div>
+                    <div class="pos-step">
+                        <span class="pos-step-no">1</span>
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold">ดาวน์โหลดโปรแกรมที่เครื่องแคชเชียร์ (Windows)</div>
+                            <div class="small text-muted">
+                                เปิดหน้านี้ที่เครื่องร้าน หรือเข้า <code>{{ route('python-pos.download') }}</code> หลังล็อกอิน ·
+                                Windows อาจขึ้น SmartScreen เพราะไฟล์ยังไม่ได้เซ็น ให้กด <strong>More info → Run anyway</strong>
+                            </div>
+                            @if($pythonPosInstaller)
+                                <div class="small mt-1"><i class="bi bi-shield-check text-success me-1"></i><code>{{ $pythonPosInstaller['filename'] }}</code> · {{ number_format($pythonPosInstaller['size_bytes'] / 1048576, 1) }} MB</div>
+                            @endif
+                        </div>
+                        @if($pythonPosInstaller)
+                            <a href="{{ route('python-pos.download') }}" class="btn btn-primary pos-download-btn"><i class="bi bi-download me-1"></i> ดาวน์โหลดรุ่น {{ $pythonPosInstaller['version'] }}</a>
+                        @else
+                            <button type="button" class="btn btn-secondary pos-download-btn" disabled><i class="bi bi-hourglass-split me-1"></i> ยังไม่มีไฟล์ติดตั้ง</button>
+                        @endif
                     </div>
-                @endif
+                    <div class="pos-step">
+                        <span class="pos-step-no">2</span>
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold">ออก Device Token ให้เครื่อง</div>
+                            <div class="small text-muted">ใช้ฟอร์ม <strong>เพิ่มเครื่อง POS</strong> ด้านล่าง เลือกสาขา + ผู้ใช้ของสาขา (เช่น amnat) · Token แสดงครั้งเดียว คัดลอกเก็บไว้ ห้ามส่งในแชท</div>
+                        </div>
+                    </div>
+                    <div class="pos-step">
+                        <span class="pos-step-no">3</span>
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold">ติดตั้ง เปิดโปรแกรม แล้ววาง Token</div>
+                            <div class="small text-muted">ใส่ ERP <code>{{ request()->getSchemeAndHttpHost() }}</code> และ Token → ตรวจสอบ → โปรแกรม sync สินค้า ราคา และคนขายลงเครื่อง · ตั้ง Local IT PIN ของเครื่อง (ใช้เข้าหน้าตั้งค่า ไม่ใช่ PIN ขาย)</div>
+                        </div>
+                    </div>
+                    <div class="pos-step">
+                        <span class="pos-step-no">4</span>
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold">ทดลองขาย 1 บิล</div>
+                            <div class="small text-muted">PIN แคชเชียร์ → เปิดกะ → สแกน → รับเงิน → พิมพ์ใบเสร็จ → ปิดกะ · ครั้งแรกเครื่องบังคับเปลี่ยน PIN · แถบด้านบนจะขึ้น "พร้อมขาย" เมื่อเครื่องต่อเข้ามาแล้ว</div>
+                        </div>
+                    </div>
+                    <div class="alert alert-warning py-2 mt-3 mb-0 small">
+                        เครื่องหาย ย้ายสาขา หรือสงสัยว่า Token หลุด: กด <strong>ออกใหม่</strong> หรือ <strong>ลบ</strong> ในตารางเครื่องด้านล่าง แล้ววาง Token ใหม่ที่เครื่อง ไม่ต้องรีเซ็ต PIN พนักงาน
+                    </div>
+                </div>
 
                 {{-- เก็บกลไก Vue/Tauri รุ่นเดิมไว้ใน source เพื่อ rollback ได้ แต่ไม่แสดงใน ERP แล้ว. --}}
                 @if(false)
@@ -324,39 +387,6 @@
                     </div>
                 </div>
                 @endif
-
-                <div class="set-card">
-                    <div class="set-title pt-2">ผูกสาขาและเครื่องด้วย Device Token</div>
-                    <div class="set-desc mb-3">
-                        หน้านี้คือจุดที่ผู้ดูแลระบบต้องใช้ก่อนติดตั้ง POS: เลือก <strong>สาขา + ผู้ใช้ POS + ชื่อเครื่อง</strong> แล้วระบบจะออก Device Token ที่ผูกกับเครื่องและสาขาให้เอง หน้า POS มีหน้าที่แค่วาง token นี้ ไม่ต้องเลือก token หรือสาขาเอง
-                    </div>
-                    <div class="row g-3 small mb-3">
-                        <div class="col-md-4">
-                            <div class="fw-semibold text-primary mb-1">1. ออก token ให้เครื่อง</div>
-                            <div class="text-muted">เลือกสาขา ตั้งชื่อเครื่อง เช่น POS001 แล้วกด <strong>สร้างอัตโนมัติ</strong> ระบบเก็บเฉพาะ hash ของ token บน ERP และแสดงค่าเต็มให้คัดลอกในครั้งนั้น</div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="fw-semibold text-primary mb-1">2. ตั้งค่าเครื่องครั้งแรก</div>
-                            <div class="text-muted">เปิด PopCentral POS → <strong>ตั้งค่าเครื่องนี้</strong> กรอก ERP <code>{{ request()->getSchemeAndHttpHost() }}</code> และวาง token แล้วกดตรวจสอบ</div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="fw-semibold text-primary mb-1">3. Sync และเริ่มขาย</div>
-                            <div class="text-muted">POS ตรวจ token, สาขา และรหัสเครื่องก่อน sync สินค้า ราคา layout และแคชเชียร์ จากนั้นผู้ใช้เข้าเครื่องด้วย <strong>รหัสพนักงาน + PIN POS</strong></div>
-                        </div>
-                    </div>
-                    <div class="alert alert-info py-2 mb-3 small">
-                        <strong>แยกหน้าที่ชัดเจน:</strong> token ยืนยันตัวตนของเครื่องเพื่อเชื่อม ERP; PIN POS ยืนยันตัวตนของคนขายเพื่อเปิดกะและบันทึกผู้รับผิดชอบในบิล. การเปลี่ยนรหัสผ่านเข้าเว็บ ERP ไม่เปลี่ยน PIN POS.
-                    </div>
-                    <div class="set-title fs-6">หลังผูกครั้งแรก</div>
-                    <ul class="mb-3 ps-3 small text-muted">
-                        <li>เมื่อ online POS จะ sync ข้อมูลและ credential ของแคชเชียร์ก่อน login; หลังจากนั้นยังขายและดูยอดใน SQLite ของเครื่องได้เมื่อ offline</li>
-                        <li>หาก reset PIN บน ERP ขณะที่เครื่อง offline เครื่องยังใช้ PIN ที่ sync ล่าสุดได้จนถึงวันหมดอายุของสิทธิ์ offline; PIN ใหม่จะเริ่มใช้หลัง POS sync สำเร็จ</li>
-                        <li>IT เท่านั้นที่เปิด <strong>IT Maintenance</strong> เพื่อเปลี่ยน token, ทดสอบการเชื่อมต่อ, sync แคชเชียร์, สำรองฐานข้อมูล หรือดู log ได้</li>
-                    </ul>
-                    <div class="alert alert-warning py-2 mb-0 small">
-                        <strong>ความปลอดภัย:</strong> ห้ามใช้ token เดียวกับหลายเครื่องหรือส่งผ่านแชต หากเครื่องสูญหาย ย้ายสาขา หรือสงสัยว่ารหัสหลุด ให้กด <strong>ออก Token ใหม่</strong> หรือเพิกถอนเครื่องเดิมทันที แล้ววาง token ใหม่ใน IT Maintenance ของเครื่องนั้น. การออก token ใหม่ไม่ต้องรีเซ็ต PIN ของพนักงาน
-                    </div>
-                </div>
 
                 @if(session('pos_token'))
                     <div class="set-card pos-token-result">
@@ -574,6 +604,10 @@ async function copyPosToken(text) {
     .logo-thumb-text { font-size: 24px; font-weight: 900; color: var(--erp-primary-dark); }
     .logo-thumb-text span { color: var(--erp-success-ink); }
     .logo-caption { font-size: 11px; color: #7d97ac; margin-top: 6px; word-break: break-all; }
+    .pos-step { display: flex; gap: 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--erp-border); }
+    .pos-step:first-of-type { border-top: 0; }
+    .pos-step-no { flex: 0 0 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: var(--erp-primary); color: #fff; font-weight: 800; }
+    @media (max-width: 640px) { .pos-step { flex-wrap: wrap; } .pos-step .pos-download-btn { width: 100%; } }
     .pos-download-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 18px; padding: 24px; border-color: var(--erp-primary-soft); background: var(--erp-primary-soft); }
     .pos-download-card .pos-version-badge { display: inline-flex; margin-left: 7px; padding: 3px 8px; border-radius: 999px; background: #dbeafe; color: #1d4ed8; font-size: 11px; font-weight: 800; vertical-align: middle; }
     .pos-download-mark { width: 64px; height: 64px; display: grid; place-items: center; border-radius: 16px; background: var(--erp-primary); color: #fff; font-size: 32px; }
