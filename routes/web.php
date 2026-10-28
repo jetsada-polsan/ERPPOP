@@ -34,8 +34,6 @@ use App\Http\Controllers\FixedAssetController;
 use App\Http\Controllers\FlashSaleController;
 use App\Http\Controllers\FleetController;
 use App\Http\Controllers\GlJournalController;
-use App\Http\Controllers\LegacyBackofficeSalesController;
-use App\Http\Controllers\LegacyTableMappingController;
 use App\Http\Controllers\LineIntegrationController;
 use App\Http\Controllers\ManagementControlController;
 use App\Http\Controllers\ManualController;
@@ -241,7 +239,6 @@ Route::patch('/crm/opportunities/{opportunity}/stage', [CrmController::class, 'u
 Route::get('/features', [FeatureController::class, 'index'])->name('features.index');
 Route::get('/core-modules', [ManualController::class, 'index'])->name('core-modules.index');
 Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
-Route::get('/legacy-backoffice-sales', [LegacyBackofficeSalesController::class, 'index'])->name('legacy-backoffice-sales.index');
 
 // Typeahead search (Alpine.js pickers on the booking/sale/purchase forms).
 Route::get('/search/customers', [SearchController::class, 'customers'])->name('search.customers');
@@ -584,7 +581,6 @@ Route::prefix('operations')->name('operations.')->group(function () {
 Route::get('/database-structure', [DatabaseStructureController::class, 'index'])->name('database-structure.index');
 Route::get('/member/liff', [MemberPortalController::class, 'liff'])->name('member.liff');
 Route::get('/member', [MemberPortalController::class, 'page'])->name('member.portal');
-Route::get('/legacy-mappings', [LegacyTableMappingController::class, 'index'])->name('legacy-mappings.index');
 
 Route::prefix('members')->name('members.')->group(function () {
     Route::get('/', [MemberController::class, 'index'])->name('index');

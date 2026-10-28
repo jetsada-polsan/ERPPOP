@@ -1,12 +1,12 @@
 <?php
 
-use App\Http\Controllers\Api\PosApiController;
-use App\Http\Controllers\Api\OcrDocumentController;
-use App\Http\Controllers\Api\LegacyBackofficeSummaryController;
 use App\Http\Controllers\Api\MemberApiController;
-use App\Http\Controllers\MemberPortalController;
+use App\Http\Controllers\Api\OcrDocumentController;
+use App\Http\Controllers\Api\PosApiController;
 use App\Http\Controllers\LineWebhookController;
+use App\Http\Controllers\MemberPortalController;
 use App\Http\Controllers\PosController;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
 
 // API สำหรับ POS desktop (Tauri) — auth ด้วย Bearer device token (AuthenticatePosDevice)
@@ -38,11 +38,10 @@ Route::prefix('pos')->middleware('pos.device')->name('api.pos.')->group(function
     Route::post('/receipt/return', [PosApiController::class, 'returnReceipt'])->name('receipt.return');
 });
 
-Route::post('/legacy-backoffice/summary', [LegacyBackofficeSummaryController::class, 'store'])->name('api.legacy-backoffice.summary');
 Route::post('/line/webhook', LineWebhookController::class)->name('api.line.webhook');
-Route::post('/member/auth/liff', [MemberPortalController::class, 'authenticateLiff'])->middleware(\Illuminate\Session\Middleware\StartSession::class)->name('api.member.auth.liff');
-Route::post('/member/logout', [MemberPortalController::class, 'logout'])->middleware(\Illuminate\Session\Middleware\StartSession::class)->name('api.member.logout');
-Route::prefix('member/me')->middleware([\Illuminate\Session\Middleware\StartSession::class, 'member.portal'])->name('api.member.me.')->group(function () {
+Route::post('/member/auth/liff', [MemberPortalController::class, 'authenticateLiff'])->middleware(StartSession::class)->name('api.member.auth.liff');
+Route::post('/member/logout', [MemberPortalController::class, 'logout'])->middleware(StartSession::class)->name('api.member.logout');
+Route::prefix('member/me')->middleware([StartSession::class, 'member.portal'])->name('api.member.me.')->group(function () {
     Route::get('/', [MemberPortalController::class, 'me'])->name('show');
     Route::get('/points', [MemberPortalController::class, 'points'])->name('points');
     Route::get('/point-history', [MemberPortalController::class, 'pointHistory'])->name('point-history');

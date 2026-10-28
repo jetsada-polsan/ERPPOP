@@ -123,7 +123,6 @@ class RoutePermissions
 
         // รายงาน
         'reports.' => 'reports.view',
-        'legacy-backoffice-sales.' => 'reports.view',
         'core-modules.' => 'reports.view',
         'features.' => 'reports.view',
         'management-controls.' => 'management.view',
@@ -144,7 +143,6 @@ class RoutePermissions
         'settings.' => 'settings.manage',
         'operations.' => 'system.admin',
         'database-structure.' => 'system.admin',
-        'legacy-mappings.' => 'settings.manage',
         'fleet.' => 'transport.manage',
         'mfa.' => null,
         'line-integrations.' => 'settings.manage',
