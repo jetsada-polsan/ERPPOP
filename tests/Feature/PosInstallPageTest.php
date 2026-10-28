@@ -6,7 +6,9 @@ use App\Http\Middleware\ErpAuthorize;
 use App\Models\AppSetting;
 use App\Models\AuditLog;
 use App\Models\Branch;
+use App\Models\Permission;
 use App\Models\PosDevice;
+use App\Models\Role;
 use App\Models\Salesman;
 use App\Models\User;
 use App\Models\Warehouse;
@@ -80,6 +82,28 @@ class PosInstallPageTest extends TestCase
 
         $pin = session('cashier_pin_result')['pin'];
         $this->assertTrue(Hash::check($pin, $user->fresh()->posCredential->pin_hash));
+    }
+
+    public function test_one_click_add_device_uses_the_branch_login_and_shows_the_token_on_top(): void
+    {
+        $branch = $this->branch();
+        $role = Role::firstOrCreate(['code' => 'PI_SELL'], ['name' => 'ขาย']);
+        $role->permissions()->syncWithoutDetaching([Permission::firstOrCreate(['code' => 'pos.sell'], ['name' => 'ขาย'])->id]);
+        $login = User::factory()->create(['username' => 'b901', 'branch_id' => $branch->id]);
+        $login->roles()->attach($role->id);
+        Salesman::create(['branch_id' => $branch->id, 'user_id' => $login->id, 'code' => 'M901', 'name' => 'หัวหน้า', 'is_active' => true]);
+
+        $this->page()
+            ->assertSee('เพิ่มเครื่อง')
+            ->assertSee('ผูกกับ b901')
+            ->assertViewHas('posReadiness', fn ($rows) => collect($rows)->firstWhere('branch.code', 'B901')['device_user']?->is($login));
+
+        // ปุ่มส่งสาขา + user ของสาขาไปที่ route ออก token เดิม
+        $this->post(route('settings.pos-token.issue'), ['pos_branch_id' => $branch->id, 'pos_user_id' => $login->id])
+            ->assertRedirect()->assertSessionHas('pos_token');
+        $this->assertSame(1, PosDevice::where('branch_id', $branch->id)->count());
+
+        $this->get(route('settings.index', ['tab' => 'pos-download']))->assertSee('data-testid="pos-token-result"', false);
     }
 
     private function page()

@@ -261,12 +261,27 @@
             </div>
 
             <div x-show="tab === 'pos-download'" x-cloak>
+                @if(session('pos_token'))
+                    <div class="set-card pos-token-result border-success" data-testid="pos-token-result">
+                        <div>
+                            <div class="set-title">Token ใหม่ — {{ session('pos_device_name') }}</div>
+                            <div class="set-desc">กด <strong>คัดลอก Token</strong> แล้วไปวางในโปรแกรม PopCentral POS ที่เครื่องร้าน (ERP: <code>{{ request()->getSchemeAndHttpHost() }}</code>) · แสดงครั้งเดียว ห้ามส่งในแชท</div>
+                        </div>
+                        <div class="pos-token-copy-row">
+                            <input id="new-pos-token" class="form-control font-monospace" readonly value="{{ session('pos_token') }}">
+                            <button type="button" class="btn btn-success text-nowrap" @click="copyPosToken(document.getElementById('new-pos-token').value).then(ok => copied = ok)">
+                                <i class="bi bi-clipboard-check me-1"></i><span x-text="copied ? 'คัดลอกแล้ว' : 'คัดลอก Token'"></span>
+                            </button>
+                        </div>
+                    </div>
+                @endif
+
                 {{-- ความพร้อมขายต่อสาขา: เห็นทันทีว่าสาขาไหนยังขาดเครื่อง คนขาย หรือ PIN --}}
                 <div class="set-card" data-testid="pos-readiness">
                     <div class="set-title pt-2 mb-2">ความพร้อมขายแต่ละสาขา</div>
                     <div class="table-responsive">
                         <table class="table table-sm align-middle mb-2">
-                            <thead><tr><th>สาขา</th><th>คลัง</th><th>เครื่อง POS</th><th>ต่อเข้ามาล่าสุด</th><th>คนขายที่ตั้ง PIN</th><th>สถานะ</th></tr></thead>
+                            <thead><tr><th>สาขา</th><th>คลัง</th><th>เครื่อง POS</th><th>ต่อเข้ามาล่าสุด</th><th>คนขายที่ตั้ง PIN</th><th>สถานะ</th><th class="text-end"></th></tr></thead>
                             <tbody>
                             @foreach($posReadiness as $row)
                                 @php $ready = $row['has_warehouse'] && $row['online_devices'] > 0 && $row['cashiers_with_pin'] > 0; @endphp
@@ -288,6 +303,22 @@
                                                     $row['cashiers_with_pin'] === 0 ? 'ตั้ง PIN คนขาย' : null,
                                                 ])->filter()->implode(' · ') }}
                                             </div>
+                                        @endif
+                                    </td>
+                                    <td class="text-end">
+                                        @if($row['device_user'] && $row['has_warehouse'])
+                                            {{-- กดครั้งเดียว: ผูก user ของสาขาให้อัตโนมัติ แล้วโชว์ Token ด้านบน --}}
+                                            <button type="submit" formaction="{{ route('settings.pos-token.issue') }}" formnovalidate class="btn btn-sm btn-primary text-nowrap"
+                                                @click="$el.form.querySelectorAll('[data-auto-device]').forEach(e => e.remove());
+                                                    for (const [k, v] of Object.entries({pos_branch_id: {{ $row['branch']->id }}, pos_user_id: {{ $row['device_user']->id }}})) {
+                                                        const i = document.createElement('input'); i.type = 'hidden'; i.name = k; i.value = v; i.dataset.autoDevice = 1; $el.form.appendChild(i);
+                                                    }
+                                                    $el.form.querySelectorAll('select[name=pos_branch_id], select[name=pos_user_id]').forEach(e => e.disabled = true)">
+                                                <i class="bi bi-plus-lg me-1"></i>เพิ่มเครื่อง
+                                            </button>
+                                            <div class="small text-muted">ผูกกับ {{ $row['device_user']->username }}</div>
+                                        @else
+                                            <span class="small text-muted">{{ $row['has_warehouse'] ? 'ยังไม่มี user ของสาขา' : 'ตั้งคลังก่อน' }}</span>
                                         @endif
                                     </td>
                                 </tr>
@@ -367,7 +398,7 @@
                         <span class="pos-step-no">2</span>
                         <div class="flex-grow-1">
                             <div class="fw-semibold">ออก Device Token ให้เครื่อง</div>
-                            <div class="small text-muted">ใช้ฟอร์ม <strong>เพิ่มเครื่อง POS</strong> ด้านล่าง เลือกสาขา + ผู้ใช้ของสาขา (เช่น amnat) · Token แสดงครั้งเดียว คัดลอกเก็บไว้ ห้ามส่งในแชท</div>
+                            <div class="small text-muted">กดปุ่ม <strong>เพิ่มเครื่อง</strong> ที่แถวสาขาในตารางด้านบน — Token ขึ้นที่บนสุดของหน้า กดคัดลอกได้เลย · แสดงครั้งเดียว ห้ามส่งในแชท</div>
                         </div>
                     </div>
                     <div class="pos-step">
@@ -429,23 +460,9 @@
                 </div>
                 @endif
 
-                @if(session('pos_token'))
-                    <div class="set-card pos-token-result">
-                        <div>
-                            <div class="set-title">Token ใหม่ — {{ session('pos_device_name') }}</div>
-                            <div class="set-desc">Token แสดงครั้งเดียว คัดลอกไปวางในหน้าตั้งค่าของ PopCentral POS ได้เลย</div>
-                        </div>
-                        <div class="pos-token-copy-row">
-                            <input id="new-pos-token" class="form-control font-monospace" readonly value="{{ session('pos_token') }}">
-                            <button type="button" class="btn btn-success text-nowrap" @click="copyPosToken(document.getElementById('new-pos-token').value).then(ok => copied = ok)">
-                                <i class="bi bi-clipboard-check me-1"></i><span x-text="copied ? 'คัดลอกแล้ว' : 'คัดลอก Token'"></span>
-                            </button>
-                        </div>
-                    </div>
-                @endif
 
-                <div class="set-card">
-                    <div class="set-title pt-2">เพิ่มเครื่อง POS และสร้าง Token อัตโนมัติ</div>
+                <details class="set-card">
+                    <summary class="set-title pt-2">ขั้นสูง: เลือกสาขาและผู้ใช้ที่ผูกกับเครื่องเอง</summary>
                     <div class="set-desc mb-3">แอดมินกำหนดเองได้ว่าเครื่องนี้ผูกกับ User ใด ระบบจะตรวจสิทธิ์ขายและโปรไฟล์ POS ก่อนออก Token ชื่อคนขายเก่าจะไม่ถูกนำมาเลือกแทน User</div>
                     <div class="row g-3 align-items-end pb-3">
                         <div class="col-md-4">
@@ -477,7 +494,7 @@
                             </button>
                         </div>
                     </div>
-                </div>
+                </details>
 
                 <div class="set-card">
                     <div class="set-title pt-2 mb-2">เครื่องที่ออก Token แล้ว</div>

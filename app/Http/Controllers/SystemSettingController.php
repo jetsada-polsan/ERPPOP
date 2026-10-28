@@ -272,8 +272,15 @@ class SystemSettingController extends Controller
                 $cashiers = Salesman::with('user.posCredential')->where('branch_id', $branch->id)->where('is_active', true)->get();
                 $withPin = $cashiers->filter(fn (Salesman $s) => filled($s->user?->posCredential?->pin_hash) || filled($s->pos_pin_hash));
 
+                // ผู้ใช้ที่ผูกกับเครื่องให้อัตโนมัติ: user ของสาขาที่ผูกคนขายไว้ (หัวหน้า เช่น amnat) และมีสิทธิ์ขาย
+                $deviceUser = User::where('branch_id', $branch->id)->where('is_active', true)
+                    ->whereHas('posCashierProfile', fn ($q) => $q->where('is_active', true))
+                    ->with(['roles.permissions', 'branchRoles.permissions'])->orderBy('id')->get()
+                    ->first(fn (User $user) => $user->canUsePosDevice($branch->id));
+
                 return [
                     'branch' => $branch,
+                    'device_user' => $deviceUser,
                     'cashier_list' => $cashiers,
                     'devices' => $devices->count(),
                     'online_devices' => $devices->whereNotNull('last_seen_at')->count(),
