@@ -15,6 +15,7 @@ from string import Template
 from .barcode import decode_scale_label, load_scale_profiles, scale_cart_line
 from .build_info import APP_VERSION
 from .api_client import LaravelPosClient
+from . import device_status
 from .mock_printer import active_paper_width, company_details, receipt_for
 from .order import ALL_CATEGORIES, DISCOUNT, PRICE, QTY, Order, OrderLine, categories, product_grid
 from .config import DeviceConfig, load_device_config, normalize_server_url, save_device_config
@@ -163,17 +164,21 @@ def run_pairing_wizard(data_dir, app) -> bool:
     form = QFormLayout(dialog)
     title = QLabel("ตั้งค่าเครื่องครั้งแรก")
     title.setStyleSheet("font-size:20px;font-weight:800")
-    hint = QLabel("กรอกข้อมูลที่ IT ออกให้ เครื่องจะตรวจสอบสาขาและรหัส POS ก่อนบันทึก")
+    hint = QLabel(
+        "1. ที่ ERP: POS / หน้าร้าน → จัดการเครื่อง POS → กด เพิ่มเครื่อง ที่สาขานี้\n"
+        "2. คัดลอก Token ที่ขึ้นบนสุดของหน้า แล้ววางด้านล่าง\n"
+        "3. กด ตรวจสอบและเริ่มใช้งาน"
+    )
     hint.setWordWrap(True)
     form.addRow(title)
     form.addRow(hint)
     server = QLineEdit("https://erp.popstarcenter.com")
     server.setPlaceholderText("เช่น https://erp.example.com")
     token = QLineEdit()
-    token.setPlaceholderText("Device token จาก ERP")
+    token.setPlaceholderText("วาง Token ที่คัดลอกจาก ERP")
     token.setEchoMode(QLineEdit.Password)
     form.addRow("ที่อยู่ ERP", server)
-    form.addRow("รหัสเชื่อมต่อเครื่อง", token)
+    form.addRow("Token", token)
     buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
     buttons.button(QDialogButtonBox.Ok).setText("ตรวจสอบและเริ่มใช้งาน")
     buttons.button(QDialogButtonBox.Cancel).setText("ปิด")
@@ -183,7 +188,7 @@ def run_pairing_wizard(data_dir, app) -> bool:
         url = normalize_server_url(server.text())
         device_token = token.text().strip()
         if not url or not device_token:
-            QMessageBox.warning(dialog, "ข้อมูลไม่ครบ", "กรอกที่อยู่ ERP และรหัสเชื่อมต่อเครื่องให้ครบ")
+            QMessageBox.warning(dialog, "ข้อมูลไม่ครบ", "กรอกที่อยู่ ERP และวาง Token ให้ครบ")
             return
         try:
             profile = LaravelPosClient(url, device_token, allow_insecure=url.startswith("http://")).get("/api/pos/ping")
@@ -199,7 +204,7 @@ def run_pairing_wizard(data_dir, app) -> bool:
             )
             dialog.accept()
         except Exception as error:
-            QMessageBox.warning(dialog, "เชื่อมต่อไม่สำเร็จ", str(error))
+            QMessageBox.warning(dialog, "เชื่อมต่อไม่สำเร็จ", f"{error}\n\nตรวจว่าเครื่องต่อเน็ต Token คัดลอกครบ และ ERP ยังไม่ได้ออก Token ใหม่ทับ")
 
     buttons.accepted.connect(pair)
     buttons.rejected.connect(dialog.reject)
@@ -355,13 +360,17 @@ def _style_for_layout(runtime: dict | None = None, css: dict | None = None) -> s
 STYLE = _style_for_layout(POS_LAYOUT_DEFAULT_RUNTIME)
 
 SECTION_HINTS = {
-    "ข้อมูลเครื่อง POS": "รหัสเครื่องและสาขาที่ผูกอยู่ ใช้ตอนส่งบิลขึ้น ERP",
+    "สถานะเครื่อง": "เครื่องนี้ผูกกับสาขาไหน เชื่อม ERP อยู่ไหม และมีอะไรค้างส่ง",
+    "ผูกเครื่องกับ ERP": "ใส่ที่อยู่ ERP และ Token จาก ERP > POS / หน้าร้าน > จัดการเครื่อง POS > เพิ่มเครื่อง",
     "เครื่องพิมพ์และใบเสร็จ": "ตั้งค่าเครื่องพิมพ์และดูตัวอย่างใบเสร็จก่อนบันทึก",
     "เครื่องชั่ง / Barcode": "รูปแบบป้ายมาจาก ERP เครื่องนี้ไม่เดารูปแบบเอง",
-    "การ Sync และ API": "สถานะคิวบิลและค่าที่ sync มาจาก ERP",
-    "สำรองและกู้คืน SQLite": "สำรองฐานข้อมูลในเครื่องและกู้คืนเมื่อจำเป็น",
-    "ประวัติการพิมพ์ / Queue": "งานพิมพ์ล่าสุดและจำนวนครั้งที่พยายามส่ง",
+    "สำรองฐานข้อมูล": "สำรองฐานข้อมูลในเครื่องเป็นไฟล์เดียว ไม่แตะยอดขายหรือคิวที่ค้าง",
+    "งานพิมพ์ล่าสุด": "งานพิมพ์ล่าสุดและจำนวนครั้งที่พยายามส่ง",
 }
+
+STATUS_COLORS = {"ok": ("#e7f6ec", "#166534"), "warn": ("#fff7e0", "#92400e"), "bad": ("#fde8e8", "#991b1b")}
+DATASET_ICONS = {"ok": "●", "failed": "●", "running": "◌", "never": "○"}
+DATASET_COLORS = {"ok": "#16a34a", "failed": "#dc2626", "running": "#d97706", "never": "#9ca3af"}
 
 NUMPAD_KEYS = [
     ["7", "8", "9"],
@@ -387,7 +396,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         from PySide6.QtWidgets import (
             QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGridLayout, QInputDialog,
             QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton, QMenu,
-            QScrollArea, QSplitter, QTableWidget, QTableWidgetItem, QToolButton, QVBoxLayout, QWidget,
+            QFrame, QScrollArea, QSplitter, QTableWidget, QTableWidgetItem, QToolButton, QVBoxLayout, QWidget,
         )
     except ImportError as error:
         raise RuntimeError("ยังไม่ได้ติดตั้ง PySide6: python3 -m pip install -r requirements.txt") from error
@@ -860,12 +869,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             outer.addLayout(footer)
 
             self.sections = {
-                "ข้อมูลเครื่อง POS": self.device_section,
+                "สถานะเครื่อง": self.status_section,
+                "ผูกเครื่องกับ ERP": self.pairing_section,
                 "เครื่องพิมพ์และใบเสร็จ": self.printer_section,
                 "เครื่องชั่ง / Barcode": self.scale_section,
-                "การ Sync และ API": self.sync_section,
-                "สำรองและกู้คืน SQLite": self.backup_section,
-                "ประวัติการพิมพ์ / Queue": self.queue_section,
+                "สำรองฐานข้อมูล": self.backup_section,
+                "งานพิมพ์ล่าสุด": self.queue_section,
             }
             heading = QLabel("ตั้งค่า POS")
             heading.setObjectName("cardHint")
@@ -888,7 +897,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             note.setWordWrap(True)
             self.pages.addWidget(note)
 
-            self.show_section("ข้อมูลเครื่อง POS")
+            paired = data_dir is not None and load_device_config(data_dir) is not None
+            self.show_section("สถานะเครื่อง" if paired else "ผูกเครื่องกับ ERP")
 
         def brand_bar(self) -> QWidget:
             bar = QWidget()
@@ -899,7 +909,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             mark.setObjectName("brandMark")
             name = QLabel("PopCentral POS")
             name.setObjectName("brandName")
-            right = QLabel("HQ · POS-01 · ตั้งค่าเครื่องนี้")
+            current = self.current_status()
+            right = QLabel(f"{current.branch} · {current.terminal} · ตั้งค่าเครื่องนี้")
             right.setObjectName("brandRight")
             close_button = QToolButton()
             close_button.setObjectName("dialogClose")
@@ -917,8 +928,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         def show_section(self, name: str) -> None:
             while self.body.count():
                 item = self.body.takeAt(0)
-                if item.widget():
-                    item.widget().deleteLater()
+                widget = item.widget()
+                if widget:
+                    # ซ่อนและถอดออกทันที ไม่งั้นหัวข้อเก่าค้างซ้อนอยู่จนกว่า deleteLater จะทำงาน
+                    widget.hide()
+                    widget.setParent(None)
+                    widget.deleteLater()
 
             title = QLabel(name)
             title.setObjectName("cardTitle")
@@ -933,14 +948,138 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             card_layout = QVBoxLayout(card)
             card_layout.setContentsMargins(20, 20, 20, 20)
             card_layout.addWidget(self.sections[name]())
-            self.body.addWidget(card, 1)
+            # จอเล็กเลื่อนดูได้ ไม่ให้ปุ่มทับเนื้อหา
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setFrameShape(QFrame.NoFrame)
+            scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            scroll.setWidget(card)
+            self.body.addWidget(scroll, 1)
 
-        def device_section(self) -> QWidget:
+        def current_status(self) -> "device_status.DeviceStatus":
+            config = load_device_config(data_dir) if data_dir is not None else None
+            if online is not None:
+                connected = bool(getattr(online.worker, "online", online.online))
+                error = getattr(online.worker, "last_error", "") or online.error or ""
+            else:
+                connected, error = False, ""
+            return device_status.collect(service.db, server_url=config.server_url if config else "",
+                                         online=connected, error=error, paired=config is not None)
+
+        def status_section(self) -> QWidget:
             box = QWidget()
-            form = QFormLayout(box)
-            form.addRow("รหัสเครื่อง", QLabel("PY-TEST-01"))
-            form.addRow("สาขา", QLabel("HQ"))
-            form.addRow("ฐานข้อมูลในเครื่อง", QLabel("popstar-pos.db (WAL)"))
+            outer = QVBoxLayout(box)
+            outer.setSpacing(12)
+            status = self.current_status()
+
+            # แถบสรุปบรรทัดเดียว อ่านจบรู้เลยว่าต้องทำอะไร
+            bg, fg = STATUS_COLORS[status.level]
+            banner = QLabel(status.headline)
+            banner.setWordWrap(True)
+            banner.setStyleSheet(f"background:{bg};color:{fg};font-size:16px;font-weight:800;padding:12px 14px;border-radius:7px")
+            outer.addWidget(banner)
+
+            # สองคอลัมน์ ให้ทั้งหน้าพอดีจอเครื่องแคชเชียร์โดยไม่ต้องเลื่อน
+            identity = QGridLayout()
+            identity.setHorizontalSpacing(14)
+            identity.setVerticalSpacing(6)
+            pairs = [
+                ("สาขา", status.branch), ("รหัสเครื่อง", status.terminal),
+                ("ERP", status.server_url), ("VAT", f"{service.vat_rate():g}%"),
+                ("บิลรอส่ง", f"{status.pending_sales} ใบ"), ("ERP ไม่รับบิล", f"{status.review_sales} ใบ"),
+            ]
+            for index, (label, value) in enumerate(pairs):
+                caption = QLabel(label)
+                caption.setObjectName("muted")
+                identity.addWidget(caption, index // 2, (index % 2) * 2)
+                identity.addWidget(QLabel(value), index // 2, (index % 2) * 2 + 1)
+            identity.setColumnStretch(1, 1)
+            identity.setColumnStretch(3, 1)
+            outer.addLayout(identity)
+            if status.error and status.level != "ok":
+                detail = QLabel(f"รายละเอียด: {status.error}")
+                detail.setWordWrap(True)
+                detail.setObjectName("muted")
+                outer.addWidget(detail)
+
+            table = QTableWidget(len(status.datasets), 2)
+            table.setHorizontalHeaderLabels(["ข้อมูล", "sync ล่าสุด"])
+            table.verticalHeader().setVisible(False)
+            for row, dataset in enumerate(status.datasets):
+                name = QTableWidgetItem(f"{DATASET_ICONS[dataset.state]}  {dataset.label}")
+                name.setForeground(QColor(DATASET_COLORS[dataset.state]))
+                table.setItem(row, 0, name)
+                table.setItem(row, 1, QTableWidgetItem(dataset.detail))
+            table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+            table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+            table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            table.resizeRowsToContents()
+            # สูงพอให้เห็นครบทุกชุดโดยไม่ต้องเลื่อน
+            table.setFixedHeight(table.horizontalHeader().sizeHint().height()
+                                 + sum(table.rowHeight(r) for r in range(table.rowCount())) + 4)
+            outer.addWidget(table)
+
+            review_rows = SyncService(service.db, None).review_sales()
+            if review_rows:
+                review = QLabel("บิลที่ ERP ไม่รับ:\n" + "\n".join(
+                    f"{row['document_no']}: {row['last_error'] or '-'}" for row in review_rows[:5]))
+                review.setWordWrap(True)
+                review.setStyleSheet("color:#9a5b00;font-weight:600")
+                outer.addWidget(review)
+
+            actions = QHBoxLayout()
+            sync_now = QPushButton("Sync ตอนนี้")
+            sync_now.setObjectName("primary")
+            sync_now.clicked.connect(self.test_connection_and_sync)
+            actions.addWidget(sync_now)
+            if review_rows:
+                resend = QPushButton(f"ส่งบิลค้างใหม่ ({len(review_rows)})")
+                resend.setToolTip("กดหลังแก้ต้นเหตุบน ERP แล้ว เช่น เปิดกะหรือแก้ราคา")
+                resend.clicked.connect(self.resend_review_sales)
+                actions.addWidget(resend)
+            logs = QPushButton("ดูบันทึก")
+            logs.clicked.connect(self.show_sync_logs)
+            actions.addWidget(logs)
+            actions.addStretch(1)
+            outer.addLayout(actions)
+            outer.addStretch(1)
+            return box
+
+        def pairing_section(self) -> QWidget:
+            box = QWidget()
+            outer = QVBoxLayout(box)
+            if data_dir is None:
+                outer.addWidget(QLabel("ไม่พบโฟลเดอร์ข้อมูล POS"))
+                return box
+            steps = QLabel(
+                "1. ที่ ERP: POS / หน้าร้าน → จัดการเครื่อง POS → กด เพิ่มเครื่อง ที่สาขานี้\n"
+                "2. คัดลอก Token ที่ขึ้นบนสุดของหน้า\n"
+                "3. วางด้านล่าง แล้วกด ทดสอบและบันทึก"
+            )
+            steps.setWordWrap(True)
+            outer.addWidget(steps)
+            form = QFormLayout()
+            current = load_device_config(data_dir)
+            self.server_url = QLineEdit(current.server_url if current else "https://erp.popstarcenter.com")
+            self.server_url.setPlaceholderText("https://erp.popstarcenter.com")
+            self.device_token = QLineEdit(current.device_token if current else "")
+            self.device_token.setPlaceholderText("วาง Token ที่คัดลอกจาก ERP")
+            self.device_token.setEchoMode(QLineEdit.Password)
+            show = QCheckBox("แสดง Token")
+            show.toggled.connect(lambda on: self.device_token.setEchoMode(QLineEdit.Normal if on else QLineEdit.Password))
+            form.addRow("ที่อยู่ ERP", self.server_url)
+            form.addRow("Token", self.device_token)
+            form.addRow("", show)
+            outer.addLayout(form)
+            save = QPushButton("ทดสอบและบันทึก")
+            save.setObjectName("primary")
+            save.clicked.connect(self.save_pairing)
+            outer.addWidget(save)
+            note = QLabel("เปลี่ยน Token เมื่อ ERP ออก Token ใหม่ให้เครื่องนี้ · ไม่ต้องรีเซ็ต PIN พนักงาน")
+            note.setObjectName("muted")
+            note.setWordWrap(True)
+            outer.addWidget(note)
+            outer.addStretch(1)
             return box
 
         def printer_section(self) -> QWidget:
@@ -949,7 +1088,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
             left = QWidget()
             form = QFormLayout(left)
-            self.profile_name = QLineEdit("เคาน์เตอร์หลัก HQ")
+            self.profile_name = QLineEdit(f"เคาน์เตอร์ {self.current_status().terminal}")
             self.driver = QComboBox()
             self.driver.addItems(["EPSON ESC/POS", "STAR TSP100", "Generic ESC/POS", "Mock printer"])
             self.connection = QComboBox()
@@ -964,6 +1103,10 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.paper.currentIndexChanged.connect(self.refresh_preview)
             self.drawer = QComboBox()
             self.drawer.addItems(["เปิดเมื่อรับเงินสด", "ไม่เปิด"])
+            for field in (self.profile_name, self.driver, self.windows_printer, self.connection, self.address, self.paper, self.drawer):
+                field.setMinimumWidth(160)
+            self.windows_printer.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+            self.windows_printer.setMinimumContentsLength(14)
             form.addRow("ชื่อโปรไฟล์", self.profile_name)
             form.addRow("รุ่น/Driver", self.driver)
             form.addRow("เครื่องพิมพ์ที่ติดตั้งใน Windows", self.windows_printer)
@@ -984,6 +1127,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             outer.addWidget(left, 1)
 
             right = QWidget()
+            right.setMinimumWidth(0)
             preview_layout = QVBoxLayout(right)
             caption = QLabel("ตัวอย่างก่อนพิมพ์ · 80mm")
             caption.setObjectName("cardHint")
@@ -996,6 +1140,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.preview = QLabel()
             self.preview.setObjectName("receiptPaper")
             self.preview.setAlignment(Qt.AlignTop)
+            # ห่อบรรทัดได้ ไม่งั้นข้อความยาวดันหน้าต่างกว้างจนตัวอย่างล้นขอบ
+            self.preview.setWordWrap(True)
             background_layout.addWidget(self.preview)
             background_layout.addStretch(1)
             preview_layout.addWidget(background, 1)
@@ -1084,101 +1230,6 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             layout.addWidget(table)
             return box
 
-        def sync_section(self) -> QWidget:
-            box = QWidget()
-            outer = QVBoxLayout(box)
-
-            # สถานะการเชื่อม ERP — อ่านจาก worker/online context ที่ bootstrap สร้าง
-            status = QFormLayout()
-            if online is not None:
-                token_ok = bool(getattr(online.worker, "online", online.online))
-                state = "ยืนยัน Device Token ผ่าน · เชื่อม ERP แล้ว" if token_ok else "ยังไม่ยืนยัน Device Token · ออฟไลน์"
-                status.addRow("สถานะ", QLabel(state))
-                status.addRow("สาขา", QLabel(str(online.branch_id or "-")))
-                status.addRow("เครื่อง", QLabel(str(online.terminal_id or "-")))
-                pending = getattr(online.worker, "pending", None)
-                status.addRow("บิลรอส่ง", QLabel(f"{pending if pending is not None else service.pending_sync_count()} ใบ"))
-                last_error = getattr(online.worker, "last_error", "") or online.error
-                if last_error and not token_ok:
-                    status.addRow("รายละเอียด", QLabel(last_error))
-            else:
-                status.addRow("สถานะ", QLabel("ยังไม่ผูกกับ ERP (โหมดออฟไลน์/ทดสอบ)"))
-                status.addRow("บิลรอส่ง", QLabel(f"{service.pending_sync_count()} ใบ"))
-            review_rows = SyncService(service.db, None).review_sales()
-            if review_rows:
-                review_label = QLabel(
-                    f"{len(review_rows)} ใบ — ERP ไม่รับบิล ดูเหตุผลที่ ERP > POS > บิลขายออฟไลน์\n"
-                    + "\n".join(f"{row['document_no']}: {row['last_error'] or '-'}" for row in review_rows[:5])
-                )
-                review_label.setWordWrap(True)
-                review_label.setStyleSheet("color:#9a5b00;font-weight:600")
-                status.addRow("บิลต้องตรวจสอบ", review_label)
-            status.addRow("อัตรา VAT ที่ใช้อยู่", QLabel(f"{service.vat_rate():g}%"))
-            outer.addLayout(status)
-
-            # แสดงสถานะเป็นรายชุด เพื่อแยกให้ได้ว่าเน็ตกลับแล้วแต่ catalog หรือ
-            # cashier ยังไม่ลงเครื่องหรือไม่ โดยไม่ต้องเปิดดูฐานข้อมูลเอง
-            if online is not None:
-                labels = {
-                    "device_profile": "โปรไฟล์เครื่อง", "catalog": "สินค้า/ราคา", "cashiers": "ผู้ใช้งาน POS",
-                    "sales_outbox": "คิวบิลขาย", "auth_events": "คิวประวัติการเข้าใช้",
-                }
-                sync_state = online.provisioning.sync_status()
-                sync_box = QFormLayout()
-                for entity, label in labels.items():
-                    row = sync_state.get(entity)
-                    if not row:
-                        value = "ยังไม่เคย sync"
-                    elif row["status"] == "synced":
-                        value = f"สำเร็จ · {row['item_count']} รายการ · {row['last_success_at']}"
-                    elif row["status"] == "failed":
-                        value = f"ผิดพลาด · {row['last_error'] or 'ตรวจสอบ log'}"
-                    else:
-                        value = str(row["status"])
-                    sync_box.addRow(label, QLabel(value))
-                outer.addLayout(sync_box)
-
-            actions = QHBoxLayout()
-            test_sync = QPushButton("ทดสอบการเชื่อมต่อและ sync แคชเชียร์")
-            test_sync.setObjectName("primary")
-            test_sync.clicked.connect(self.test_connection_and_sync)
-            show_logs = QPushButton("ดูบันทึกการเชื่อมต่อ")
-            show_logs.clicked.connect(self.show_sync_logs)
-            actions.addWidget(test_sync)
-            actions.addWidget(show_logs)
-            if review_rows:
-                resend_review = QPushButton(f"ส่งบิลต้องตรวจสอบใหม่ ({len(review_rows)})")
-                resend_review.setToolTip("กดหลังผู้จัดการแก้ต้นเหตุบน ERP แล้ว เช่น เปิดกะหรือแก้ราคา")
-                resend_review.clicked.connect(self.resend_review_sales)
-                actions.addWidget(resend_review)
-            outer.addLayout(actions)
-
-            # ผูกเครื่องกับ ERP — บันทึก server URL + device token ลง pos-config.json
-            if data_dir is not None:
-                outer.addWidget(QLabel("\nผูกเครื่องกับ ERP (บันทึกแล้วเปิดโปรแกรมใหม่เพื่อเชื่อม)"))
-                help_text = QLabel(
-                    "ใช้ URL และ Device token จาก ERP > ตั้งค่าระบบ > เพิ่มเครื่อง POS\n"
-                    "ใช้ https://erp.popstarcenter.com สำหรับ production; ถ้าเป็น IP ภายในหรือเครื่องทดสอบจึงใช้ http:// ได้"
-                )
-                help_text.setWordWrap(True)
-                outer.addWidget(help_text)
-                pair = QFormLayout()
-                current = load_device_config(data_dir)
-                self.server_url = QLineEdit(current.server_url if current else "")
-                self.server_url.setPlaceholderText("เช่น https://erp.popstarcenter.com หรือ http://192.168.1.10 สำหรับเครื่องทดสอบ")
-                self.device_token = QLineEdit(current.device_token if current else "")
-                self.device_token.setPlaceholderText("วาง device token ที่ออกจาก ERP")
-                self.device_token.setEchoMode(QLineEdit.Password)
-                pair.addRow("ที่อยู่ ERP", self.server_url)
-                pair.addRow("Device token", self.device_token)
-                save = QPushButton("บันทึกการผูกเครื่อง")
-                save.setObjectName("primary")
-                save.clicked.connect(self.save_pairing)
-                pair.addRow(save)
-                outer.addLayout(pair)
-
-            return box
-
         def resend_review_sales(self) -> None:
             count = SyncService(service.db, None).requeue_review_sales()
             if online is not None and hasattr(online.worker, "wake"):
@@ -1187,7 +1238,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
         def test_connection_and_sync(self) -> None:
             if online is None:
-                QMessageBox.warning(self, "ยังไม่ผูก ERP", "บันทึก URL และ Device token ก่อนทดสอบการเชื่อมต่อ")
+                QMessageBox.warning(self, "ยังไม่ผูก ERP", "ไปที่ ผูกเครื่องกับ ERP แล้ววาง Token ก่อน")
                 return
             try:
                 profile = online.provisioning.ping()
@@ -1196,20 +1247,23 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 online.online = True
                 online.worker.online = True
                 online.worker.last_error = ""
-                online.worker.needs_down_sync = False
+                # ให้ worker ดึงสินค้า/ราคาใหม่ทั้งชุดแล้วส่งคิวที่ค้างในรอบถัดไปทันที
+                online.worker.needs_down_sync = True
                 online.worker.wake()
                 QMessageBox.information(
                     self,
-                    "ตรวจสอบผ่าน",
-                    "Device Token ยืนยันกับ ERP ผ่านแล้ว\n"
-                    "API /api/pos/ping ตอบกลับสำเร็จ\n"
-                    f"ซิงก์แคชเชียร์ {result['upserted']} คนแล้ว",
+                    "เชื่อม ERP ได้",
+                    f"สาขา: {profile.get('branch_name', '-')}\n"
+                    f"อัปเดตคนขาย {result['upserted']} คน\n"
+                    "กำลังดึงสินค้า/ราคา และส่งบิลค้างในเบื้องหลัง",
                 )
+                self.show_section("สถานะเครื่อง")
             except Exception as error:
                 online.online = False
                 online.worker.online = False
                 online.worker.last_error = str(error)
-                QMessageBox.warning(self, "ตรวจสอบไม่ผ่าน", f"Device Token หรือ API ใช้งานไม่ได้\n\n{error}")
+                QMessageBox.warning(self, "เชื่อม ERP ไม่ได้", f"{error}\n\nตรวจเน็ต หรือไปที่ ผูกเครื่องกับ ERP เพื่อวาง Token ใหม่")
+                self.show_section("สถานะเครื่อง")
 
         def show_sync_logs(self) -> None:
             rows = service.db.execute(
@@ -1226,12 +1280,24 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 QMessageBox.warning(self, "ข้อมูลไม่ครบ", "กรอกที่อยู่ ERP และ device token ให้ครบ")
                 return
             insecure = url.startswith("http://")  # ยอม http เฉพาะ IP/แลบที่ผู้ใช้ตั้งใจ
+            # ทดสอบกับ ERP ก่อนบันทึก — Token ผิดจะไม่ทับค่าที่ใช้งานได้อยู่
+            try:
+                profile = LaravelPosClient(url, token, allow_insecure=insecure).get("/api/pos/ping")
+                if not profile.get("success", False):
+                    raise RuntimeError(profile.get("message", "ERP ไม่ยืนยันเครื่องนี้"))
+            except Exception as error:
+                QMessageBox.warning(self, "เชื่อม ERP ไม่ได้", f"{error}\n\nตรวจว่า Token คัดลอกครบ และที่อยู่ ERP ถูกต้อง")
+                return
             try:
                 save_device_config(data_dir, DeviceConfig(server_url=url, device_token=token, allow_insecure=insecure))
             except Exception as error:
                 QMessageBox.critical(self, "บันทึกไม่สำเร็จ", str(error))
                 return
-            QMessageBox.information(self, "ผูกเครื่องแล้ว", "บันทึกการเชื่อมต่อแล้ว\nปิดและเปิด POS ใหม่เพื่อเชื่อมกับ ERP และ sync ข้อมูล")
+            QMessageBox.information(
+                self, "ผูกเครื่องแล้ว",
+                f"สาขา: {profile.get('branch_name', '-')}\nเครื่อง: {(profile.get('device') or {}).get('terminal_code', '-')}\n\n"
+                "ปิดและเปิด POS ใหม่เพื่อ sync ข้อมูลของสาขานี้",
+            )
             self.accept()
 
         def backup_section(self) -> QWidget:

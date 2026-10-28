@@ -72,12 +72,13 @@ class UiStyleTest(unittest.TestCase):
         self.assertGreaterEqual(round(ratio, 2), 3.0, f"ขอบช่องกรอกได้แค่ {ratio:.2f}:1")
 
     def test_every_settings_section_has_a_line_explaining_it(self) -> None:
+        # สถานะเครื่องมาก่อน เพราะ IT หน้าร้านเปิดหน้านี้เพื่อดูว่าเชื่อม ERP อยู่ไหม
         expected = [
-            "ข้อมูลเครื่อง POS", "เครื่องพิมพ์และใบเสร็จ", "เครื่องชั่ง / Barcode",
-            "การ Sync และ API", "สำรองและกู้คืน SQLite", "ประวัติการพิมพ์ / Queue",
+            "สถานะเครื่อง", "ผูกเครื่องกับ ERP", "เครื่องพิมพ์และใบเสร็จ", "เครื่องชั่ง / Barcode",
+            "สำรองฐานข้อมูล", "งานพิมพ์ล่าสุด",
         ]
 
-        self.assertEqual(list(SECTION_HINTS), expected, "หัวข้อต้องครบและเรียงตามภาพร่าง")
+        self.assertEqual(list(SECTION_HINTS), expected, "หัวข้อต้องครบและเรียงตามลำดับที่ใช้งาน")
         for name, hint in SECTION_HINTS.items():
             self.assertTrue(hint.strip(), f"{name} ยังไม่มีคำอธิบาย")
 
