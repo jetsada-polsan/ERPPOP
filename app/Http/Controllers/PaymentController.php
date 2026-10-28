@@ -24,6 +24,7 @@ class PaymentController extends Controller
         $data = $request->validate([
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
             'method' => ['required', 'string', 'in:cash,transfer,cheque'],
+            'bank_account_id' => ['nullable', 'integer', 'exists:bank_accounts,id'],
             'cheque_no' => ['nullable', 'required_if:method,cheque', 'string', 'max:40'],
             'cheque_due_date' => ['nullable', 'required_if:method,cheque', 'date'],
             'cheque_bank' => ['nullable', 'string', 'max:100'],
@@ -49,6 +50,7 @@ class PaymentController extends Controller
                 'customer_id' => $customer->id,
                 'branch_id' => $data['branch_id'],
                 'method' => $data['method'],
+                'bank_account_id' => $data['bank_account_id'] ?? null,
                 'cheque_no' => $data['cheque_no'] ?? null,
                 'cheque_due_date' => $data['cheque_due_date'] ?? null,
                 'cheque_bank' => $data['cheque_bank'] ?? null,
@@ -67,6 +69,7 @@ class PaymentController extends Controller
         $data = $request->validate([
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
             'method' => ['required', 'string', 'in:cash,transfer,cheque'],
+            'bank_account_id' => ['nullable', 'integer', 'exists:bank_accounts,id'],
             'cheque_no' => ['nullable', 'required_if:method,cheque', 'string', 'max:40'],
             'cheque_due_date' => ['nullable', 'required_if:method,cheque', 'date'],
             'cheque_bank' => ['nullable', 'string', 'max:100'],
@@ -89,6 +92,7 @@ class PaymentController extends Controller
                 'withholding_income_type' => $data['withholding_income_type'] ?? null,
                 'branch_id' => $data['branch_id'],
                 'method' => $data['method'],
+                'bank_account_id' => $data['bank_account_id'] ?? null,
                 'cheque_no' => $data['cheque_no'] ?? null,
                 'cheque_due_date' => $data['cheque_due_date'] ?? null,
                 'cheque_bank' => $data['cheque_bank'] ?? null,

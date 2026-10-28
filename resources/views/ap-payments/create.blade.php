@@ -110,6 +110,7 @@
                         <option value="transfer">โอนเงิน</option>
                         <option value="cheque">เช็ค</option>
                     </select>
+                    @include('payments._bank-account-select', ['model' => 'method'])
                 </div>
                 <div class="row g-2" x-show="method === 'cheque'" x-cloak>
                     <div class="col-4"><label class="form-label small text-muted">เลขที่เช็ค</label><input name="cheque_no" x-model="chequeNo" class="form-control" :disabled="method !== 'cheque'"></div>

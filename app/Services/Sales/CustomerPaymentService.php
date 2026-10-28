@@ -81,6 +81,7 @@ class CustomerPaymentService
                 'payment_document_id' => $paymentDocument->id,
                 'seq' => 1,
                 'method' => $data['method'],
+                'bank_account_id' => $this->bankAccountId($data),
                 'amount' => $totalAmount,
                 'cheque_no' => $data['cheque_no'] ?? null,
                 'cheque_due_date' => $data['cheque_due_date'] ?? null,
@@ -88,7 +89,7 @@ class CustomerPaymentService
 
             // รับชำระด้วยเช็ค -> ลงทะเบียนเช็ครับอัตโนมัติ (สถานะ: ในมือ รอนำฝาก)
             if ($data['method'] === 'cheque') {
-                \App\Models\Cheque::create([
+                Cheque::create([
                     'direction' => 'in',
                     'cheque_no' => $data['cheque_no'] ?? $document->doc_number,
                     'bank_name' => $data['cheque_bank'] ?? null,
@@ -119,7 +120,7 @@ class CustomerPaymentService
                 ]);
             }
 
-            $this->glPosting->postCustomerReceipt($paymentDocument, (float) $totalAmount, $document->doc_date->toDateString(), $document->doc_number, $data['method']);
+            $this->glPosting->postCustomerReceipt($paymentDocument, (float) $totalAmount, $document->doc_date->toDateString(), $document->doc_number, $data['method'], $this->bankAccountId($data));
 
             if ($data['method'] === 'cash') {
                 $this->cashBook->postCustomerPayment($document, (float) $totalAmount);
@@ -178,5 +179,11 @@ class CustomerPaymentService
 
             return $locked->fresh();
         });
+    }
+
+    /** บัญชีธนาคารที่ผู้ใช้เลือก ใช้เฉพาะโอน/เช็ค (เงินสดไม่เกี่ยว) */
+    private function bankAccountId(array $data): ?int
+    {
+        return ($data['method'] ?? 'cash') !== 'cash' && ! empty($data['bank_account_id']) ? (int) $data['bank_account_id'] : null;
     }
 }

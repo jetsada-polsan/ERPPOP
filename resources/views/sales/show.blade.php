@@ -175,6 +175,7 @@ $isPartial = $openItem && $openItem->status === 'partial';
                             <option value="cheque">เช็ค</option>
                         </select>
                     </div>
+                    <div class="col-12">@include('payments._bank-account-select', ['model' => 'm', 'class' => ''])</div>
                     <template x-if="m === 'cheque'">
                         <div class="col-12">
                             <div class="row g-2">

@@ -21,12 +21,12 @@ use RuntimeException;
  */
 class GlPostingService
 {
-    public function postCustomerReceipt(PaymentDocument $paymentDocument, float $amount, string $entryDate, string $remark, string $method = 'cash'): void
+    public function postCustomerReceipt(PaymentDocument $paymentDocument, float $amount, string $entryDate, string $remark, string $method = 'cash', ?int $bankAccountId = null): void
     {
         // รับโอน/เช็คไม่ได้เข้าลิ้นชัก — เดิมลงเงินสดทุกวิธี ยอดเงินสดในบัญชีเกินจริง ยอดธนาคารขาด
         $cashAccount = $method === 'cash'
             ? ChartOfAccount::where('default_role', ChartOfAccount::ROLE_CASH)->first()
-            : $this->bankAccountFor($paymentDocument->branch_id);
+            : $this->bankAccountFor($paymentDocument->branch_id, $bankAccountId);
         $arAccount = ChartOfAccount::where('default_role', ChartOfAccount::ROLE_AR)->first();
         if (! $cashAccount || ! $arAccount) {
             throw new RuntimeException($method === 'cash'
@@ -100,11 +100,11 @@ class GlPostingService
         }
     }
 
-    public function postSupplierPayment(PaymentDocument $paymentDocument, float $amount, string $entryDate, string $remark, float $withholding = 0, string $method = 'cash'): void
+    public function postSupplierPayment(PaymentDocument $paymentDocument, float $amount, string $entryDate, string $remark, float $withholding = 0, string $method = 'cash', ?int $bankAccountId = null): void
     {
         $cashAccount = $method === 'cash'
             ? ChartOfAccount::where('default_role', ChartOfAccount::ROLE_CASH)->first()
-            : $this->bankAccountFor($paymentDocument->branch_id);
+            : $this->bankAccountFor($paymentDocument->branch_id, $bankAccountId);
         $apAccount = ChartOfAccount::where('default_role', ChartOfAccount::ROLE_AP)->first();
         if (! $cashAccount || ! $apAccount) {
             throw new RuntimeException('ผังบัญชีเงินสดหรือเจ้าหนี้ยังไม่ครบ ไม่สามารถจ่ายชำระโดยไม่ลง GL ได้');
@@ -188,9 +188,13 @@ class GlPostingService
      *
      * ลำดับ: บัญชีธนาคารที่ผูกสาขานี้ -> บัญชีธนาคารกลาง (ไม่ระบุสาขา) -> role bank (1020)
      * นับเฉพาะบัญชีธนาคารที่ผูกบัญชี GL แล้ว สาขาที่ยังว่างจึงใช้บัญชีกลางต่อได้ไม่สะดุด
+     * ผู้ใช้เลือกบัญชีเองได้ (ข้อ 12) — ใช้บัญชีนั้นถ้าผูก GL แล้ว
      */
-    public function bankAccountFor(?int $branchId): ?ChartOfAccount
+    public function bankAccountFor(?int $branchId, ?int $bankAccountId = null): ?ChartOfAccount
     {
+        if ($bankAccountId && ($chosen = BankAccount::with('chartOfAccount')->whereKey($bankAccountId)->whereNotNull('chart_of_account_id')->first())) {
+            return $chosen->chartOfAccount;
+        }
         $bank = BankAccount::query()
             ->whereNotNull('chart_of_account_id')
             ->where(fn ($query) => $query->whereNull('branch_id')

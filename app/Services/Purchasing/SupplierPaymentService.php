@@ -2,16 +2,17 @@
 
 namespace App\Services\Purchasing;
 
+use App\Models\Cheque;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\PaymentAllocation;
 use App\Models\PaymentDocument;
 use App\Models\PaymentLine;
-use App\Models\SupplierLedger;
 use App\Models\Supplier;
-use App\Support\DecimalMath;
+use App\Models\SupplierLedger;
 use App\Services\Accounting\GlPostingService;
 use App\Services\Sales\DocumentNumberGenerator;
+use App\Support\DecimalMath;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -97,6 +98,7 @@ class SupplierPaymentService
                 'payment_document_id' => $paymentDocument->id,
                 'seq' => 1,
                 'method' => $data['method'],
+                'bank_account_id' => $this->bankAccountId($data),
                 'amount' => $net,
                 'cheque_no' => $data['cheque_no'] ?? null,
                 'cheque_due_date' => $data['cheque_due_date'] ?? null,
@@ -104,7 +106,7 @@ class SupplierPaymentService
 
             // จ่ายด้วยเช็ค -> ลงทะเบียนเช็คจ่ายอัตโนมัติ (สถานะ: ออกเช็ค รอตัดบัญชี)
             if ($data['method'] === 'cheque') {
-                \App\Models\Cheque::create([
+                Cheque::create([
                     'direction' => 'out',
                     'cheque_no' => $data['cheque_no'] ?? $document->doc_number,
                     'bank_name' => $data['cheque_bank'] ?? null,
@@ -154,9 +156,15 @@ class SupplierPaymentService
                     'created_at' => now(), 'updated_at' => now(),
                 ]);
             }
-            $this->glPosting->postSupplierPayment($paymentDocument, $amount, $document->doc_date->toDateString(), $document->doc_number, $tax, $data['method']);
+            $this->glPosting->postSupplierPayment($paymentDocument, $amount, $document->doc_date->toDateString(), $document->doc_number, $tax, $data['method'], $this->bankAccountId($data));
 
             return $document->fresh();
         });
+    }
+
+    /** บัญชีธนาคารที่ผู้ใช้เลือก ใช้เฉพาะโอน/เช็ค (เงินสดไม่เกี่ยว) */
+    private function bankAccountId(array $data): ?int
+    {
+        return ($data['method'] ?? 'cash') !== 'cash' && ! empty($data['bank_account_id']) ? (int) $data['bank_account_id'] : null;
     }
 }

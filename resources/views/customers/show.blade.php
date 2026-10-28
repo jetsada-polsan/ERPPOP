@@ -350,13 +350,14 @@
                                     @endforeach
                                 </select>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-6" x-data="{ m: 'cash' }">
                                 <label class="form-label text-muted small">วิธีชำระ</label>
-                                <select name="method" required class="form-select">
+                                <select name="method" x-model="m" required class="form-select">
                                     <option value="cash">เงินสด</option>
                                     <option value="transfer">โอนเงิน</option>
                                     <option value="cheque">เช็ค</option>
                                 </select>
+                                @include('payments._bank-account-select', ['model' => 'm'])
                             </div>
                         </div>
                         <label class="form-label text-muted small">เลือกรายการที่จะตัดชำระ</label>
