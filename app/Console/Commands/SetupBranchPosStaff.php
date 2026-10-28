@@ -11,7 +11,11 @@ use Illuminate\Support\Facades\DB;
 use Throwable;
 
 /**
- * ตั้งคนขายของสาขาแบบ "1 สาขา 1 user": แคชเชียร์กลาง 1 รหัส + หัวหน้า 1 รหัส
+ * ตั้งคนขายของสาขาแบบ "1 สาขา 1 user": แคชเชียร์ 1 รหัสต่อเครื่อง POS + หัวหน้า 1 รหัส
+ *
+ * ระบบเปิดกะได้ 1 กะต่อรหัสแคชเชียร์ต่อสาขา — หลายเครื่องใช้รหัสเดียวกันจะเข้ากะเดียวกัน
+ * เงินทุกลิ้นชักรวมกันนับแยกไม่ได้ จึงต้องมีรหัสแคชเชียร์แยกตามเครื่อง (เช่น B001-1, B001-2, B001-3)
+ * รันซ้ำเพื่อเพิ่มเครื่องได้ รหัสที่มีอยู่แล้วไม่ถูกสร้างซ้ำ
  *
  * - user ของสาขา (เช่น amnat) เปิดใช้งาน ผูกสาขา และได้บทบาท BRANCH_MGR
  * - หัวหน้า (เช่น m001) ผูกกับ user นั้น เพราะ POS ดูบทบาทของ user ที่ผูกเพื่อให้สิทธิ์อนุมัติลดราคา/ยกเลิกบิล
@@ -24,27 +28,27 @@ class SetupBranchPosStaff extends Command
     protected $signature = 'erp:setup-branch-pos-staff
         {branch : รหัสสาขา}
         {--user= : username ของสาขา}
-        {--cashier= : รหัสแคชเชียร์กลาง}
+        {--cashier=* : รหัสแคชเชียร์ 1 รหัสต่อเครื่อง POS (ระบุซ้ำได้)}
         {--manager= : รหัสหัวหน้า}
         {--dry-run : สรุปโดยไม่บันทึก}';
 
-    protected $description = 'Set up one branch login plus a shared cashier and a manager for the till';
+    protected $description = 'Set up one branch login, one cashier code per till and a manager';
 
     public function handle(): int
     {
         $branch = Branch::where('code', (string) $this->argument('branch'))->first();
         $user = User::where('username', (string) $this->option('user'))->first();
-        $cashierCode = strtoupper(trim((string) $this->option('cashier')));
+        $cashierCodes = collect((array) $this->option('cashier'))->map(fn ($c) => strtoupper(trim((string) $c)))->filter()->unique()->values()->all();
         $managerCode = strtoupper(trim((string) $this->option('manager')));
         $role = Role::where('code', 'BRANCH_MGR')->first();
 
         $errors = array_filter([
             $branch ? null : 'ไม่พบสาขา',
             $user ? null : 'ไม่พบ user',
-            $cashierCode !== '' && $managerCode !== '' && $cashierCode !== $managerCode ? null : 'ต้องระบุ --cashier และ --manager คนละรหัส',
+            $cashierCodes !== [] && $managerCode !== '' && ! in_array($managerCode, $cashierCodes, true) ? null : 'ต้องระบุ --cashier อย่างน้อย 1 รหัส และ --manager ที่ไม่ซ้ำกับแคชเชียร์',
             $role ? null : 'ไม่พบบทบาท BRANCH_MGR',
         ]);
-        foreach ([$cashierCode, $managerCode] as $code) {
+        foreach ([...$cashierCodes, $managerCode] as $code) {
             $taken = $code !== '' ? Salesman::where('code', $code)->first() : null;
             if ($taken && $taken->branch_id !== $branch?->id) {
                 $errors[] = "รหัส {$code} ถูกใช้กับสาขาอื่นแล้ว";
@@ -61,7 +65,7 @@ class SetupBranchPosStaff extends Command
         $this->table(['รายการ', 'ค่า'], [
             ['สาขา', "{$branch->code} {$branch->name_th}"],
             ['user ของสาขา', "{$user->username} → เปิดใช้งาน, สาขา {$branch->code}, เพิ่มบทบาท BRANCH_MGR"],
-            ['แคชเชียร์กลาง', "{$cashierCode} แคชเชียร์ {$branch->name_th} (ไม่ผูก user)"],
+            ...array_map(fn ($code, $i) => ['แคชเชียร์เครื่อง '.($i + 1), "{$code} ".$this->cashierName($branch, $code, count($cashierCodes)).' (ไม่ผูก user)'], $cashierCodes, array_keys($cashierCodes)),
             ['หัวหน้า', "{$managerCode} หัวหน้า {$branch->name_th} (ผูก {$user->username})"],
             ['PIN', 'ยังไม่ตั้ง — ใช้ pos:pin ตั้งเอง เครื่องจะบังคับเปลี่ยนตอนล็อกอินครั้งแรก'],
         ]);
@@ -73,17 +77,23 @@ class SetupBranchPosStaff extends Command
         }
 
         try {
-            DB::transaction(function () use ($branch, $user, $role, $cashierCode, $managerCode) {
+            DB::transaction(function () use ($branch, $user, $role, $cashierCodes, $managerCode) {
                 $user->update(['is_active' => true, 'branch_id' => $branch->id]);
                 $user->roles()->syncWithoutDetaching([$role->id]);
 
-                Salesman::updateOrCreate(['code' => $cashierCode], [
-                    'branch_id' => $branch->id, 'user_id' => null, 'name' => 'แคชเชียร์ '.$branch->name_th,
-                    'is_active' => true, 'must_change_pin' => true,
-                ]);
+                foreach ($cashierCodes as $code) {
+                    $existing = Salesman::where('code', $code)->first();
+                    Salesman::updateOrCreate(['code' => $code], [
+                        'branch_id' => $branch->id, 'user_id' => null, 'name' => $this->cashierName($branch, $code, count($cashierCodes)),
+                        'is_active' => true,
+                        // รันซ้ำเพื่อเพิ่มเครื่อง: รหัสเดิมที่ตั้ง PIN แล้วไม่ถูกบังคับเปลี่ยนใหม่
+                        'must_change_pin' => $existing ? (bool) $existing->must_change_pin : true,
+                    ]);
+                }
+                $manager = Salesman::where('code', $managerCode)->first();
                 Salesman::updateOrCreate(['code' => $managerCode], [
                     'branch_id' => $branch->id, 'user_id' => $user->id, 'name' => 'หัวหน้า '.$branch->name_th,
-                    'is_active' => true, 'must_change_pin' => true,
+                    'is_active' => true, 'must_change_pin' => $manager ? (bool) $manager->must_change_pin : true,
                 ]);
                 $user->update(['salesman_id' => Salesman::where('code', $managerCode)->value('id')]);
             });
@@ -93,8 +103,16 @@ class SetupBranchPosStaff extends Command
             return self::FAILURE;
         }
 
-        $this->info("ตั้งคนขายสาขา {$branch->code} แล้ว — ตั้ง PIN เริ่มต้นด้วย pos:pin {$cashierCode} และ pos:pin {$managerCode}");
+        $this->info("ตั้งคนขายสาขา {$branch->code} แล้ว — ตั้ง PIN เริ่มต้นด้วย pos:pin ".implode(', pos:pin ', $cashierCodes)." และ pos:pin {$managerCode}");
 
         return self::SUCCESS;
+    }
+
+    /** ชื่อแสดงในบิล/รายงานกะ — หลายเครื่องใส่เลขเครื่องท้ายรหัสให้รู้ว่าลิ้นชักไหน */
+    private function cashierName(Branch $branch, string $code, int $count): string
+    {
+        $suffix = preg_match('/-(\d+)$/', $code, $m) ? ' เครื่อง '.$m[1] : ($count > 1 ? ' '.$code : '');
+
+        return 'แคชเชียร์ '.$branch->name_th.$suffix;
     }
 }

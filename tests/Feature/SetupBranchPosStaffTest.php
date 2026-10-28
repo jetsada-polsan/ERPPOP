@@ -42,6 +42,26 @@ class SetupBranchPosStaffTest extends TestCase
         $this->assertSame('cashier', $role->invoke(app(PosApiController::class), $cashier->fresh()));
     }
 
+    public function test_each_till_gets_its_own_cashier_code_and_rerunning_adds_tills_without_resetting_pins(): void
+    {
+        Branch::create(['code' => 'B903', 'name_th' => 'สาขาสามเครื่อง', 'is_active' => true]);
+        Role::firstOrCreate(['code' => 'BRANCH_MGR'], ['name' => 'ผู้จัดการสาขา']);
+        User::factory()->create(['username' => 'branch903']);
+        $run = fn (array $cashiers) => $this->artisan('erp:setup-branch-pos-staff', ['branch' => 'B903', '--user' => 'branch903', '--cashier' => $cashiers, '--manager' => 'm903'])->assertSuccessful();
+
+        $run(['b903-1']);
+        Salesman::where('code', 'B903-1')->first()->setPin('482917', false);
+        $run(['b903-1', 'b903-2', 'b903-3']);
+
+        $this->assertSame(['B903-1', 'B903-2', 'B903-3'], Salesman::where('code', 'like', 'B903-%')->orderBy('code')->pluck('code')->all());
+        $this->assertSame('แคชเชียร์ สาขาสามเครื่อง เครื่อง 2', Salesman::where('code', 'B903-2')->value('name'));
+        // เครื่องแรกตั้ง PIN แล้ว เพิ่มเครื่องไม่ทำให้ต้องเปลี่ยน PIN ใหม่ และ PIN ยังอยู่
+        $first = Salesman::where('code', 'B903-1')->first();
+        $this->assertFalse((bool) $first->must_change_pin);
+        $this->assertNotNull($first->pos_pin_hash);
+        $this->assertTrue((bool) Salesman::where('code', 'B903-3')->value('must_change_pin'));
+    }
+
     public function test_dry_run_saves_nothing(): void
     {
         Branch::create(['code' => 'B902', 'name_th' => 'สาขาทดสอบ', 'is_active' => true]);
