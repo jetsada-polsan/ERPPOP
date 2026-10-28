@@ -8,8 +8,8 @@ use App\Models\AppSetting;
 use App\Models\AuditLog;
 use App\Models\DiscountCard;
 use App\Models\PosDevice;
-use App\Models\PosReceipt;
 use App\Models\PosOfflineSale;
+use App\Models\PosReceipt;
 use App\Models\PosTerminal;
 use App\Models\QrPaymentConfig;
 use App\Models\Salesman;
@@ -24,6 +24,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
@@ -179,6 +180,7 @@ class PosApiController extends Controller
             'record_id' => $device?->id,
             'new_values' => ['admin_username' => $admin->username],
         ]);
+
         return response()->json(['success' => true, 'admin' => ['username' => $admin->username]]);
     }
 
@@ -285,6 +287,7 @@ class PosApiController extends Controller
                 ],
             ]);
         }
+
         return response()->json(['success' => true, 'accepted' => $inserted]);
     }
 
@@ -343,6 +346,7 @@ class PosApiController extends Controller
     private function cashierRole(Salesman $cashier): string
     {
         $roles = $cashier->user?->roles?->pluck('code')->all() ?? [];
+
         return array_intersect($roles, ['GM', 'BRANCH_MGR']) ? 'manager' : 'cashier';
     }
 
@@ -359,12 +363,20 @@ class PosApiController extends Controller
             ->with(['user.roles:id,code', 'user.branchRoles.permissions', 'user.posCredential'])
             ->where('is_active', true)
             ->whereNotNull('user_id')
-            ->when($assignedUserId, fn ($query) => $query->where('user_id', $assignedUserId))
+            // เครื่องที่ผูก user: แสดงคนขายของเครื่องนั้น + หัวหน้า (GM/BRANCH_MGR) ไว้อนุมัติลดราคา/ยกเลิกบิล
+            // เดิมกรองเหลือแค่ user ของเครื่อง หัวหน้าเลยไม่มีในเครื่องและอนุมัติอะไรไม่ได้
+            ->when($assignedUserId, fn ($query) => $query->where(fn ($who) => $who
+                ->where('user_id', $assignedUserId)
+                ->orWhereHas('user', fn ($manager) => $manager
+                    ->whereHas('roles', fn ($role) => $role->whereIn('code', ['GM', 'BRANCH_MGR']))
+                    // หัวหน้าของสาขานี้ (หรือส่วนกลางที่ไม่ผูกสาขา) เท่านั้น
+                    ->where(fn ($home) => $home->whereNull('branch_id')->when($branchId, fn ($b) => $b->orWhere('branch_id', $branchId))))))
             ->whereHas('user', function ($user) use ($branchId, $assignedUserId) {
                 $user->where('is_active', true);
 
                 if (! $branchId) {
                     $user->whereHas('roles.permissions', fn ($permission) => $permission->where('code', 'pos.sell'));
+
                     return;
                 }
 
@@ -382,18 +394,18 @@ class PosApiController extends Controller
                         ->whereHas('permissions', fn ($permission) => $permission->where('code', 'pos.sell')))
                     // Existing records with no explicit assignments continue using the old
                     // home-branch rule until an administrator assigns their branches.
-                    ->orWhere(function ($legacy) use ($branchId) {
-                        $legacy->whereDoesntHave('branchRoles', fn ($role) => $role
-                            ->where('user_branch_roles.is_active', true)
-                            ->where(fn ($window) => $window
-                                ->whereNull('user_branch_roles.effective_from')
-                                ->orWhere('user_branch_roles.effective_from', '<=', now()))
-                            ->where(fn ($window) => $window
-                                ->whereNull('user_branch_roles.effective_to')
-                                ->orWhere('user_branch_roles.effective_to', '>', now())))
-                            ->whereHas('roles.permissions', fn ($permission) => $permission->where('code', 'pos.sell'))
-                            ->where(fn ($home) => $home->whereNull('branch_id')->orWhere('branch_id', $branchId));
-                    });
+                        ->orWhere(function ($legacy) use ($branchId) {
+                            $legacy->whereDoesntHave('branchRoles', fn ($role) => $role
+                                ->where('user_branch_roles.is_active', true)
+                                ->where(fn ($window) => $window
+                                    ->whereNull('user_branch_roles.effective_from')
+                                    ->orWhere('user_branch_roles.effective_from', '<=', now()))
+                                ->where(fn ($window) => $window
+                                    ->whereNull('user_branch_roles.effective_to')
+                                    ->orWhere('user_branch_roles.effective_to', '>', now())))
+                                ->whereHas('roles.permissions', fn ($permission) => $permission->where('code', 'pos.sell'))
+                                ->where(fn ($home) => $home->whereNull('branch_id')->orWhere('branch_id', $branchId));
+                        });
                 };
 
                 $user->where(function ($access) use ($branchAccess, $assignedUserId) {
@@ -402,6 +414,7 @@ class PosApiController extends Controller
                     if ($assignedUserId) {
                         $access->whereHas('roles.permissions', fn ($permission) => $permission->where('code', 'pos.sell'));
                         $access->orWhere($branchAccess);
+
                         return;
                     }
 
@@ -410,9 +423,9 @@ class PosApiController extends Controller
             })
             ->when($code, fn ($query) => $query->where(function ($where) use ($code) {
                 $where->whereHas('user', fn ($user) => $user
-                        ->where('username', $code)
-                        ->orWhere('email', $code)
-                        ->orWhere('phone', $code))
+                    ->where('username', $code)
+                    ->orWhere('email', $code)
+                    ->orWhere('phone', $code))
                     // Transitional fallback for installed clients that still cached a legacy code.
                     ->orWhere('code', $code)
                     // รองรับข้อมูลเก่าที่ผูกจาก users.salesman_id ก่อนย้ายไป salesmen.user_id
@@ -595,7 +608,7 @@ class PosApiController extends Controller
             }
 
             // บิลที่เคยติดตรวจแล้วเครื่อง POS กดส่งใหม่สำเร็จ: ปิดรายการตรวจให้เอง
-            if (\Illuminate\Support\Str::isUuid($key)) {
+            if (Str::isUuid($key)) {
                 $body = json_decode($response->getContent(), true) ?: [];
                 PosOfflineSale::where('offline_uuid', strtolower($key))
                     ->where('pos_device_id', $device->id)
@@ -626,7 +639,7 @@ class PosApiController extends Controller
      */
     private function queueRejectedSaleForReview(JsonResponse $response, Request $request, string $key, $device): JsonResponse
     {
-        if ($response->getStatusCode() !== 422 || ! \Illuminate\Support\Str::isUuid($key)) {
+        if ($response->getStatusCode() !== 422 || ! Str::isUuid($key)) {
             return $response;
         }
 

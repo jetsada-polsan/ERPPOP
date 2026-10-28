@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Http\Controllers\Api\PosApiController;
 use App\Models\Branch;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Salesman;
 use App\Models\User;
@@ -21,6 +22,7 @@ class SetupBranchPosStaffTest extends TestCase
     {
         $branch = Branch::create(['code' => 'B901', 'name_th' => 'สาขาทดสอบ', 'is_active' => true]);
         Role::firstOrCreate(['code' => 'BRANCH_MGR'], ['name' => 'ผู้จัดการสาขา']);
+        Role::firstOrCreate(['code' => 'CASHIER'], ['name' => 'แคชเชียร์'])->permissions()->syncWithoutDetaching([Permission::firstOrCreate(['code' => 'pos.sell'], ['name' => 'ขาย'])->id]);
         $user = User::factory()->create(['username' => 'branch901', 'is_active' => false]);
 
         $this->artisan('erp:setup-branch-pos-staff', ['branch' => 'B901', '--user' => 'branch901', '--cashier' => 'b901', '--manager' => 'm901'])
@@ -32,10 +34,13 @@ class SetupBranchPosStaffTest extends TestCase
 
         $cashier = Salesman::where('code', 'B901')->first();
         $manager = Salesman::where('code', 'M901')->first();
-        $this->assertNull($cashier->user_id);
+        // โปรแกรม POS ถือคนขาย = user เครื่องแสดงเฉพาะ user ที่ผูก จึงต้องมี user ของแคชเชียร์เอง
+        $this->assertSame('b901', $cashier->user?->username);
+        $this->assertSame($branch->id, $cashier->user->branch_id);
         $this->assertSame($user->id, $manager->user_id);
         $this->assertTrue((bool) $cashier->must_change_pin);
         $this->assertNull($cashier->pos_pin_hash); // เจ้าของตั้ง PIN เอง
+        $this->assertNull($cashier->user->posCredential);
 
         $role = new \ReflectionMethod(PosApiController::class, 'cashierRole');
         $this->assertSame('manager', $role->invoke(app(PosApiController::class), $manager->fresh('user.roles')));
@@ -46,6 +51,7 @@ class SetupBranchPosStaffTest extends TestCase
     {
         Branch::create(['code' => 'B903', 'name_th' => 'สาขาสามเครื่อง', 'is_active' => true]);
         Role::firstOrCreate(['code' => 'BRANCH_MGR'], ['name' => 'ผู้จัดการสาขา']);
+        Role::firstOrCreate(['code' => 'CASHIER'], ['name' => 'แคชเชียร์'])->permissions()->syncWithoutDetaching([Permission::firstOrCreate(['code' => 'pos.sell'], ['name' => 'ขาย'])->id]);
         User::factory()->create(['username' => 'branch903']);
         $run = fn (array $cashiers) => $this->artisan('erp:setup-branch-pos-staff', ['branch' => 'B903', '--user' => 'branch903', '--cashier' => $cashiers, '--manager' => 'm903'])->assertSuccessful();
 
@@ -68,6 +74,7 @@ class SetupBranchPosStaffTest extends TestCase
     {
         Branch::create(['code' => 'B902', 'name_th' => 'สาขาทดสอบ', 'is_active' => true]);
         Role::firstOrCreate(['code' => 'BRANCH_MGR'], ['name' => 'ผู้จัดการสาขา']);
+        Role::firstOrCreate(['code' => 'CASHIER'], ['name' => 'แคชเชียร์'])->permissions()->syncWithoutDetaching([Permission::firstOrCreate(['code' => 'pos.sell'], ['name' => 'ขาย'])->id]);
         User::factory()->create(['username' => 'branch902', 'is_active' => false]);
 
         $this->artisan('erp:setup-branch-pos-staff', ['branch' => 'B902', '--user' => 'branch902', '--cashier' => 'b902', '--manager' => 'm902', '--dry-run' => true])

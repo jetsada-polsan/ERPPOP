@@ -293,6 +293,10 @@ QMainWindow[compact="true"] #saleKeypad QPushButton { min-height: $keypad_height
 #orderHead QLabel { background: transparent; color: $surface; font-size: 13px; font-weight: 700; }
 QPushButton#headerAction { background: transparent; color: $surface; border-color: rgba(255,255,255,0.45); padding: 3px 7px; font-size: 12px; }
 QPushButton#headerAction:hover { background: rgba(255,255,255,0.12); border-color: $surface; }
+QPushButton#menuAction { background: rgba(255,255,255,0.16); color: $surface; border: 1px solid rgba(255,255,255,0.7); border-radius: 7px; padding: 6px 14px; font-size: 15px; font-weight: 800; }
+QPushButton#menuAction:hover, QPushButton#menuAction:pressed { background: rgba(255,255,255,0.28); }
+QMenu#bigMenu { font-size: 16px; padding: 6px; }
+QMenu#bigMenu::item { padding: 12px 28px; min-width: 200px; }
 #totalBox { background: $primary_dark; color: $surface; padding: 8px 12px; }
 #totalBox QLabel { background: transparent; }
  #grandTotal { font-size: 26px; font-weight: 900; color: $surface; }
@@ -1502,11 +1506,13 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.auth_button.clicked.connect(self.ensure_sale_session)
             layout.addWidget(self.auth_button)
 
-            self.settings_button = QPushButton("⚙")
-            self.settings_button.setObjectName("headerAction")
-            self.settings_button.setFixedWidth(36)
-            self.settings_button.setToolTip("ตั้งค่าและการจัดการกะ")
+            # ปุ่มใหญ่มีคำกำกับ — เดิมเป็น ⚙ กว้าง 36px กดด้วยนิ้วบนจอสัมผัสยาก
+            self.settings_button = QPushButton("ตั้งค่า / กะ ▾")
+            self.settings_button.setObjectName("menuAction")
+            self.settings_button.setMinimumSize(132, 40)
+            self.settings_button.setToolTip("ตั้งค่า POS · ยอดวันนี้ · เงินสด · ปิดกะ (Ctrl+Alt+S เปิดตั้งค่า)")
             settings_menu = QMenu(self.settings_button)
+            settings_menu.setObjectName("bigMenu")
             settings_menu.addAction("ตั้งค่า POS", self.open_settings)
             settings_menu.addSeparator()
             settings_menu.addAction("ยอดวันนี้", self.show_daily_sales)
@@ -1870,7 +1876,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 QMessageBox.warning(
                     self, "ต้องให้ผู้จัดการอนุมัติ",
                     "การแก้ราคาและให้ส่วนลดต้องให้ผู้จัดการอนุมัติ\n"
-                    "เครื่องนี้ยังไม่ได้ตั้งรหัสผู้ดูแลเครื่อง ให้ผู้จัดการเป็นคนขายบิลนี้ หรือให้ IT ตั้งรหัสใน ⚙ › ตั้งค่า POS",
+                    "เครื่องนี้ยังไม่ได้ตั้งรหัสผู้ดูแลเครื่อง ให้ผู้จัดการเป็นคนขายบิลนี้ หรือให้ IT ตั้งรหัสใน ตั้งค่า / กะ › ตั้งค่า POS",
                 )
                 return False
             from PySide6.QtWidgets import QInputDialog

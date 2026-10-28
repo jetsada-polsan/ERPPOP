@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Branch;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Salesman;
 use App\Models\User;
@@ -21,6 +22,7 @@ class OpenBranchTest extends TestCase
     {
         parent::setUp();
         Role::firstOrCreate(['code' => 'BRANCH_MGR'], ['name' => 'ผู้จัดการสาขา']);
+        Role::firstOrCreate(['code' => 'CASHIER'], ['name' => 'แคชเชียร์'])->permissions()->syncWithoutDetaching([Permission::firstOrCreate(['code' => 'pos.sell'], ['name' => 'ขาย'])->id]);
         Branch::create(['code' => 'B001', 'name_th' => 'สาขาอำนาจเจริญ', 'is_active' => true, 'negative_stock_policy' => 'block']);
     }
 

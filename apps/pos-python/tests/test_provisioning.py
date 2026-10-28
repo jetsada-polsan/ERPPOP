@@ -152,6 +152,21 @@ class ProvisioningTest(unittest.TestCase):
         users = {r["server_id"]: r["user_id"] for r in self.db.execute("SELECT server_id, user_id FROM local_cashiers WHERE server_id IS NOT NULL")}
         self.assertEqual(users, {42: 501, 43: 502})
 
+    def test_a_bound_till_keeps_its_own_cashier_and_the_managers_and_drops_stale_ones(self) -> None:
+        # ติดตั้งรอบก่อนเคยมีคนขายสาขาเก่า ค้างอยู่ในเครื่อง
+        self.svc.pull_cashiers(3)
+        self.db.execute("INSERT OR REPLACE INTO device_settings (key, value, updated_at) VALUES ('device_user_id', '601', datetime('now'))")
+        self.api.responses["/api/pos/cashiers"] = {"success": True, "cashiers": [
+            {"id": 70, "user_id": 601, "code": "b001", "name": "แคชเชียร์ เครื่อง 1", "role": "cashier"},
+            {"id": 71, "user_id": 602, "code": "amnat", "name": "หัวหน้า", "role": "manager"},
+            {"id": 72, "user_id": 603, "code": "b001-2", "name": "แคชเชียร์ เครื่อง 2", "role": "cashier"},
+        ]}
+
+        self.svc.pull_cashiers(3)
+
+        active = {r["code"] for r in self.db.execute("SELECT code FROM local_cashiers WHERE active = 1 AND server_id IS NOT NULL")}
+        self.assertEqual(active, {"b001", "amnat"}, "เครื่อง 1 เห็นแค่คนขายของตัวเองกับหัวหน้า คนขายสาขาเก่าต้องหายไป")
+
     def test_store_credential_writes_pbkdf2_fields(self) -> None:
         self.svc.pull_cashiers(3)
         self.svc.store_credential(42, {"salt": "c2FsdA==", "verifier": "dmVy", "iterations": 120000,

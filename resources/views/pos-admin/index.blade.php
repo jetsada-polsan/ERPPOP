@@ -97,9 +97,10 @@
                                         <input type="hidden" name="pos_branch_id" value="{{ $row['branch']->id }}">
                                         <input type="hidden" name="pos_user_id" value="{{ $row['device_user']->id }}">
                                         <button class="btn btn-sm btn-primary text-nowrap"><i class="bi bi-plus-lg me-1"></i>เพิ่มเครื่อง</button>
+                                        <div class="small text-muted">ผูกกับ {{ $row['device_user']->posCashierProfile?->code ?? $row['device_user']->username }}</div>
                                     </form>
                                 @else
-                                    <span class="small text-muted">{{ $row['has_warehouse'] ? 'ยังไม่มี user ของสาขา' : 'ตั้งคลังก่อน' }}</span>
+                                    <span class="small text-muted">{{ $row['has_warehouse'] ? 'แคชเชียร์ทุกรหัสมีเครื่องแล้ว — เพิ่มรหัสด้วย erp:setup-branch-pos-staff' : 'ตั้งคลังก่อน' }}</span>
                                 @endif
                             </td>
                         </tr>

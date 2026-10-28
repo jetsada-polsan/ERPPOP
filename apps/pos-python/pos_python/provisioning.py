@@ -240,7 +240,11 @@ class ProvisioningService:
                 server_id = row.get("id")
                 code = row.get("code")
                 user_id = row.get("user_id")
-                if not server_id or not code or (assigned_user_id is not None and int(user_id or 0) != assigned_user_id):
+                # เครื่องที่ผูก user รับเฉพาะคนขายของเครื่องนี้ กับหัวหน้า (ไว้อนุมัติลดราคา/ยกเลิกบิล)
+                is_manager = str(row.get("role") or "").lower() in {"manager", "supervisor"}
+                if not server_id or not code or (
+                    assigned_user_id is not None and int(user_id or 0) != assigned_user_id and not is_manager
+                ):
                     continue
                 self._upsert_cashier(
                     int(server_id),
@@ -254,15 +258,12 @@ class ProvisioningService:
                 seen.append(int(server_id))
                 upserted += 1
             if seen:
+                # คนที่ ERP ไม่ส่งมาแล้ว (เช่น คนขายสาขาเก่าที่ค้างจากการติดตั้งรอบก่อน) ปิดใช้งานในเครื่อง
                 placeholders = ",".join("?" for _ in seen)
-                scope = " AND (user_id IS NULL OR user_id != ?)" if assigned_user_id is not None else ""
-                parameters = [now(), *seen]
-                if assigned_user_id is not None:
-                    parameters.append(assigned_user_id)
                 self.db.execute(
                     f"UPDATE local_cashiers SET active = 0, revoked_at = COALESCE(revoked_at, ?) "
-                    f"WHERE server_id IS NOT NULL AND server_id NOT IN ({placeholders}){scope}",
-                    parameters,
+                    f"WHERE server_id IS NOT NULL AND server_id NOT IN ({placeholders})",
+                    [now(), *seen],
                 )
         return {"upserted": upserted}
 
