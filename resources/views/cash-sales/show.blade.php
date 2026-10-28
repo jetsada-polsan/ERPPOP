@@ -16,6 +16,7 @@
                     <i class="bi bi-receipt me-1"></i> ใบกำกับภาษี/ใบเสร็จ (A4)
                 </a>
                 <span class="badge text-bg-success fs-6 px-3 py-2">ขายสำเร็จ</span>
+                @include('documents._void-action', ['doc' => $sale])
             </div>
         </div>
     </div>

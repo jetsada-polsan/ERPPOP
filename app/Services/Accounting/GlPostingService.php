@@ -76,6 +76,30 @@ class GlPostingService
         }
     }
 
+    /**
+     * ยกเลิกใบเสร็จ/ใบจ่าย: กลับทุกบรรทัด GL ของ payment document ลงวันที่ยกเลิก
+     * ไม่ลบรายการเดิม เรียกซ้ำไม่กลับซ้ำ (แยก prefix จากเช็คคืน)
+     */
+    public function reversePaymentDocument(PaymentDocument $paymentDocument, string $remark): void
+    {
+        $lines = GlJournal::where('payment_document_id', $paymentDocument->id)
+            ->where('remark', 'not like', 'VOID REVERSAL:%')->get();
+        if ($lines->isEmpty() || GlJournal::where('payment_document_id', $paymentDocument->id)
+            ->where('remark', 'like', 'VOID REVERSAL:%')->exists()) {
+            return;
+        }
+        foreach ($lines as $line) {
+            GlJournal::create([
+                'payment_document_id' => $paymentDocument->id,
+                'account_id' => $line->account_id,
+                'debit' => (float) $line->credit,
+                'credit' => (float) $line->debit,
+                'remark' => 'VOID REVERSAL: '.$remark,
+                'entry_date' => now()->toDateString(),
+            ]);
+        }
+    }
+
     public function postSupplierPayment(PaymentDocument $paymentDocument, float $amount, string $entryDate, string $remark, float $withholding = 0, string $method = 'cash'): void
     {
         $cashAccount = $method === 'cash'

@@ -58,6 +58,7 @@ $isPartial = $openItem && $openItem->status === 'partial';
             <a href="{{ route('documents.delivery-note', $sale) }}" target="_blank" class="btn btn-light border px-3">
                 <i class="bi bi-truck me-1"></i> ใบส่งของ (A5)
             </a>
+            @include('documents._void-action', ['doc' => $sale])
             @if($openItem && !$isPaid)
             <button type="button" class="btn btn-success px-4" @click="payOpen = true">
                 <i class="bi bi-cash-coin me-1"></i>

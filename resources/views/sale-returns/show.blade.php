@@ -18,6 +18,7 @@
                         <button class="btn btn-success px-3"><i class="bi bi-check2-circle me-1"></i> อนุมัติ</button>
                     </form>
                 @endif
+                @include('documents._void-action', ['doc' => $saleReturn])
                 <a href="{{ route('documents.tax-invoice', $saleReturn) }}" target="_blank" class="btn btn-primary px-3">
                     <i class="bi bi-receipt me-1"></i> ใบรับคืน/ใบลดหนี้ (A4)
                 </a>

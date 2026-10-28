@@ -35,6 +35,7 @@ class RoutePermissions
         'sale-returns.approve' => 'finance.note.approve',
         'sales.' => 'sales.manage',
         'documents.' => 'sales.manage',
+        'documents.void' => 'documents.void',
         'document-books.' => 'settings.manage',
         'customers.' => 'sales.manage',
         'crm.' => 'sales.manage',

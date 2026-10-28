@@ -19,6 +19,7 @@
                     <i class="bi bi-receipt me-1"></i> {{ $payment->documentType->code === 'RECEIPT' ? 'ใบเสร็จรับเงิน (A4)' : 'ใบสำคัญจ่าย (A4)' }}
                 </a>
                 <span class="badge text-bg-success fs-6 px-3 py-2">{{ $payment->paymentDocument?->status }}</span>
+                @include('documents._void-action', ['doc' => $payment])
             </div>
         </div>
     </div>

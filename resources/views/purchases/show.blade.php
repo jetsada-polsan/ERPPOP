@@ -28,6 +28,7 @@
             </div>
             <div class="d-flex gap-2 align-items-center">
                 <span class="badge text-bg-success fs-6 px-3 py-2">รับเข้าคลังแล้ว</span>
+                @include('documents._void-action', ['doc' => $purchase])
                 @if($openItem && (float) $openItem->balance_amount > 0)
                     <span class="badge text-bg-warning fs-6 px-3 py-2">ค้างจ่าย {{ number_format((float) $openItem->balance_amount, 2) }}</span>
                     @if(auth()->user()->hasPermission('finance.manage'))
