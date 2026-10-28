@@ -51,6 +51,11 @@ class ResetBranchesTest extends TestCase
         $this->freshBackup();
         $warinCashier = User::factory()->create(['username' => 'warin_probe', 'branch_id' => $this->warin->id, 'is_active' => true]);
         $amnatUser = User::factory()->create(['username' => 'amnat_probe', 'branch_id' => $this->amnat->id]);
+        // พบบน production: สาขาชี้คลังตัวเอง และเครื่อง POS มี log idempotency / auth
+        $this->warin->update(['default_warehouse_location_id' => WarehouseLocation::whereHas('warehouse', fn ($w) => $w->where('branch_id', $this->warin->id))->value('id')]);
+        $device = DB::table('pos_devices')->insertGetId(['name' => 'วาริน 1', 'user_id' => $warinCashier->id, 'branch_id' => $this->warin->id, 'token_hash' => hash('sha256', 'rb'), 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('pos_api_idempotency')->insert(['idempotency_key' => 'rb-1', 'pos_device_id' => $device, 'endpoint' => 'checkout', 'status_code' => 200, 'response_body' => '{}']);
+        DB::table('pos_auth_event_ingests')->insert(['event_uuid' => '00000000-0000-0000-0000-000000000001', 'pos_device_id' => $device, 'cashier_code' => 'C', 'event_type' => 'login', 'success' => true, 'occurred_at' => now()]);
 
         $this->artisan('erp:reset-branches', $this->resetOptions())->assertSuccessful();
 
@@ -66,6 +71,8 @@ class ResetBranchesTest extends TestCase
         $this->assertNull($warinCashier->fresh()->branch_id);
         $this->assertFalse((bool) $warinCashier->fresh()->is_active);
         $this->assertSame($this->amnat->id, $amnatUser->fresh()->branch_id);
+        $this->assertSame(0, DB::table('pos_devices')->where('id', $device)->count());
+        $this->assertSame(0, DB::table('pos_api_idempotency')->count());
     }
 
     public function test_it_stops_while_a_deleted_branch_still_has_documents(): void

@@ -25,6 +25,9 @@ class ResetBranches extends Command
     /** ตารางที่ลบทั้งแถวเมื่อสาขาถูกลบ เรียงลูกก่อนแม่ */
     private const DELETE_WITH_BRANCH = ['pos_devices', 'pos_terminals', 'user_branch_roles', 'warehouses'];
 
+    /** log ทางเทคนิคของเครื่อง POS ที่ถูกลบ ลบตามเครื่อง */
+    private const DEVICE_LOGS = ['pos_api_idempotency', 'pos_auth_event_ingests'];
+
     /** ตารางที่ตั้งสาขาเป็นว่างแล้วปิดใช้งานด้วย */
     private const DEACTIVATE_WITH_BRANCH = ['users', 'sales_areas'];
 
@@ -103,10 +106,14 @@ class ResetBranches extends Command
                 continue;
             }
             foreach ($this->foreignKeysTo($parent) as [$table, $column]) {
-                if (in_array($table, ['warehouse_locations', 'warehouses', 'pos_terminals', 'pos_devices'], true)) {
+                if (in_array($table, ['warehouse_locations', 'warehouses', 'pos_terminals', 'pos_devices', ...self::DEVICE_LOGS], true)) {
                     continue;
                 }
-                if (($rows = DB::table($table)->whereIn($column, $ids)->count()) > 0) {
+                $query = DB::table($table)->whereIn($column, $ids);
+                if ($table === 'branches') {
+                    $query->whereNotIn('id', $doomedIds); // สาขาที่ลบชี้คลังตัวเอง หายไปพร้อมกัน
+                }
+                if (($rows = $query->count()) > 0) {
                     $blocking[] = [$table, "{$column} -> {$parent}", number_format($rows)];
                 }
             }
@@ -121,6 +128,12 @@ class ResetBranches extends Command
         ], $plan));
         if ($locationIds !== []) {
             $this->line('ตำแหน่งเก็บที่ลบตามคลัง: '.number_format(count($locationIds)));
+        }
+        $deviceIds = $this->ids('pos_devices', $doomedIds);
+        foreach (self::DEVICE_LOGS as $table) {
+            if ($deviceIds !== [] && Schema::hasTable($table)) {
+                $this->line("log เครื่อง POS ที่ลบตามเครื่อง ({$table}): ".number_format(DB::table($table)->whereIn('pos_device_id', $deviceIds)->count()));
+            }
         }
 
         if ($blocking !== []) {
@@ -153,6 +166,13 @@ class ResetBranches extends Command
                         default => $query->update([$p['column'] => null]),
                     };
                 }
+                $deviceIds = DB::table('pos_devices')->whereIn('branch_id', $doomedIds)->pluck('id')->all();
+                foreach (self::DEVICE_LOGS as $table) {
+                    if (Schema::hasTable($table)) {
+                        DB::table($table)->whereIn('pos_device_id', $deviceIds)->delete();
+                    }
+                }
+                DB::table('branches')->whereIn('id', $doomedIds)->update(['default_warehouse_location_id' => null]);
                 foreach (self::DELETE_WITH_BRANCH as $table) {
                     if ($table === 'warehouses') {
                         DB::table('warehouse_locations')->whereIn('id', $locationIds)->delete();
