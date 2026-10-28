@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\AppSetting;
+use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\PosDevice;
 use App\Models\PosTerminal;
 use App\Models\Salesman;
 use App\Models\User;
+use App\Models\UserPosCredential;
 use App\Services\Accounting\OpeningBalanceService;
 use App\Support\PosLayout;
 use App\Support\PosReleaseManifest;
@@ -17,6 +19,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -215,6 +218,49 @@ class SystemSettingController extends Controller
     }
 
     /**
+     * ออก PIN ชั่วคราวให้รหัสคนขาย POS จากหลังบ้าน (แคชเชียร์รายเครื่องไม่ผูก user จึงใช้ปุ่มในหน้าผู้ใช้ไม่ได้)
+     * PIN สุ่ม ไม่ซ้ำกับคนขายอื่น แสดงครั้งเดียว เครื่องบังคับเปลี่ยนตอนล็อกอินครั้งแรก
+     * ถอนการยืนยันคนขายนี้ออกจากทุกเครื่องทันที เหมือนรีเซ็ตจากหน้าผู้ใช้
+     */
+    public function resetCashierPin(Salesman $salesman): RedirectResponse
+    {
+        abort_unless($salesman->is_active, 422, 'รหัสคนขายนี้ปิดใช้งานอยู่');
+        $temporary = $this->uniqueTemporaryPin($salesman);
+
+        DB::transaction(function () use ($salesman, $temporary) {
+            $salesman->setPin($temporary, true);
+            // คนขายที่ผูก user (เช่นหัวหน้า) ระบบอ่าน PIN จาก user ก่อน ต้องตั้งที่นั่นด้วย
+            if ($salesman->user) {
+                UserPosCredential::firstOrCreate(['user_id' => $salesman->user_id])->setPin($temporary, true);
+            }
+            PosDevice::where('active_cashier_id', $salesman->id)->update([
+                'active_cashier_id' => null, 'active_cashier_user_id' => null, 'cashier_verified_at' => null,
+            ]);
+            AuditLog::create([
+                'user_id' => auth()->id(), 'branch_id' => $salesman->branch_id, 'action' => 'cashier_pin_reset',
+                'table_name' => 'salesmen', 'record_id' => $salesman->id,
+                'new_values' => ['code' => $salesman->code, 'must_change_pin' => true],
+            ]);
+        });
+
+        return redirect()->route('settings.index', ['tab' => 'pos-download'])
+            ->with('cashier_pin_result', ['code' => $salesman->code, 'name' => $salesman->name, 'pin' => $temporary]);
+    }
+
+    private function uniqueTemporaryPin(Salesman $salesman): string
+    {
+        $hashes = Salesman::whereKeyNot($salesman->id)->whereNotNull('pos_pin_hash')->pluck('pos_pin_hash')
+            ->merge(UserPosCredential::whereNotNull('pin_hash')->whereNull('revoked_at')->pluck('pin_hash'));
+        for ($attempt = 0; $attempt < 100; $attempt++) {
+            $pin = (string) random_int(100000, 999999);
+            if (! $hashes->contains(fn ($hash) => Hash::check($pin, $hash))) {
+                return $pin;
+            }
+        }
+        abort(500, 'สร้าง PIN ที่ไม่ซ้ำไม่ได้ กรุณาลองใหม่');
+    }
+
+    /**
      * ความพร้อมขายของแต่ละสาขา สำหรับแถบตรวจในหน้าดาวน์โหลด POS
      * นับเครื่องที่ยังไม่เพิกถอน, เครื่องที่เคยต่อเข้ามา และคนขายที่ตั้ง PIN แล้ว (PIN ของ user หรือของคนขายเอง)
      */
@@ -228,6 +274,7 @@ class SystemSettingController extends Controller
 
                 return [
                     'branch' => $branch,
+                    'cashier_list' => $cashiers,
                     'devices' => $devices->count(),
                     'online_devices' => $devices->whereNotNull('last_seen_at')->count(),
                     'last_seen' => $devices->max('last_seen_at'),

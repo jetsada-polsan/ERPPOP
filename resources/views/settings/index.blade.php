@@ -20,7 +20,7 @@
 @endif
 
 <form method="post" action="{{ route('settings.update') }}" enctype="multipart/form-data"
-      x-data="{ tab: @js(request()->query('tab') === 'pos-download' || session('pos_token') || $errors->has('pos_version') || $errors->has('pos_installer') ? 'pos-download' : 'func'), choice: @js($currentLogo ?? '__none__'), theme: @js($erpTheme), layout: @js($erpLayout), copied: false, menuOrder: @js($menuOrder), moveMenu(i, d) { const n=i+d; if(n<0 || n>=this.menuOrder.length) return; const a=[...this.menuOrder]; [a[i],a[n]]=[a[n],a[i]]; this.menuOrder=a; } }">
+      x-data="{ tab: @js(request()->query('tab') === 'pos-download' || session('pos_token') || session('cashier_pin_result') || $errors->has('pos_version') || $errors->has('pos_installer') ? 'pos-download' : 'func'), choice: @js($currentLogo ?? '__none__'), theme: @js($erpTheme), layout: @js($erpLayout), copied: false, menuOrder: @js($menuOrder), moveMenu(i, d) { const n=i+d; if(n<0 || n>=this.menuOrder.length) return; const a=[...this.menuOrder]; [a[i],a[n]]=[a[n],a[i]]; this.menuOrder=a; } }">
     @csrf
     <input type="hidden" name="menu_order" :value="JSON.stringify(menuOrder)">
 
@@ -298,6 +298,47 @@
                     <div class="small {{ $posPinMode === 'pin' ? 'text-success' : 'text-danger' }}">
                         <i class="bi {{ $posPinMode === 'pin' ? 'bi-shield-lock-fill' : 'bi-exclamation-triangle-fill' }} me-1"></i>
                         {{ $posPinMode === 'pin' ? 'เปิดกะต้องใส่ PIN ของคนขาย' : 'โหมดเลือกชื่อไม่ใช้ PIN เปิดอยู่ — ใครก็เปิดกะได้ ปิดด้วย php artisan pos:passwordless disable' }}
+                    </div>
+                </div>
+
+                {{-- คนขายรายสาขา + ออก PIN ชั่วคราวจากหลังบ้าน --}}
+                @if(session('cashier_pin_result'))
+                    <div class="alert alert-success" data-testid="cashier-pin-result">
+                        <div class="fw-semibold">PIN ชั่วคราวของ {{ session('cashier_pin_result.code') }} — {{ session('cashier_pin_result.name') }}</div>
+                        <div class="fs-3 font-monospace fw-bold my-1">{{ session('cashier_pin_result.pin') }}</div>
+                        <div class="small">แสดงครั้งเดียว บอกพนักงานโดยตรง ห้ามส่งในแชทกลุ่ม · ล็อกอินครั้งแรกเครื่องบังคับเปลี่ยน PIN</div>
+                    </div>
+                @endif
+                <div class="set-card" data-testid="pos-cashiers">
+                    <div class="set-title pt-2 mb-1">คนขาย POS และ PIN</div>
+                    <div class="set-desc mb-2">แคชเชียร์ 1 รหัสต่อเครื่อง · หัวหน้าใช้อนุมัติลดราคา/ยกเลิกบิล · กด "ออก PIN ชั่วคราว" แล้วบอกพนักงาน เครื่องจะให้เปลี่ยนเองตอนล็อกอินครั้งแรก</div>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead><tr><th>สาขา</th><th>รหัส</th><th>ชื่อ</th><th>PIN</th><th class="text-end"></th></tr></thead>
+                            <tbody>
+                            @foreach($posReadiness as $row)
+                                @foreach($row['cashier_list'] as $cashier)
+                                    @php $hasPin = filled($cashier->user?->posCredential?->pin_hash) || filled($cashier->pos_pin_hash); @endphp
+                                    <tr>
+                                        <td>{{ $row['branch']->code }}</td>
+                                        <td class="fw-semibold">{{ $cashier->code }}</td>
+                                        <td>{{ $cashier->name }}</td>
+                                        <td>
+                                            @if(! $hasPin)<span class="badge text-bg-warning">ยังไม่ตั้ง</span>
+                                            @elseif($cashier->must_change_pin)<span class="badge text-bg-info">รอเปลี่ยนครั้งแรก</span>
+                                            @else<span class="badge text-bg-success">ตั้งแล้ว</span>@endif
+                                        </td>
+                                        <td class="text-end">
+                                            <button type="submit" formaction="{{ route('settings.pos-cashiers.reset-pin', $cashier) }}" formnovalidate class="btn btn-sm btn-outline-primary"
+                                                onclick="return confirm('ออก PIN ชั่วคราวให้ {{ $cashier->code }}? PIN เดิมจะใช้ไม่ได้ทันที')">
+                                                <i class="bi bi-key me-1"></i>ออก PIN ชั่วคราว
+                                            </button>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            @endforeach
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 

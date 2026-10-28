@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Http\Middleware\ErpAuthorize;
 use App\Models\AppSetting;
+use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\PosDevice;
 use App\Models\Salesman;
@@ -11,6 +12,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseLocation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 /**
@@ -48,6 +50,36 @@ class PosInstallPageTest extends TestCase
         AppSetting::updateOrCreate(['key' => 'pos_passwordless_login'], ['value' => '1']);
 
         $this->page()->assertSee('โหมดเลือกชื่อไม่ใช้ PIN เปิดอยู่');
+    }
+
+    public function test_back_office_issues_a_temporary_pin_for_a_till_cashier_shown_once(): void
+    {
+        $branch = $this->branch();
+        $cashier = Salesman::create(['branch_id' => $branch->id, 'code' => 'B901-2', 'name' => 'แคชเชียร์ เครื่อง 2', 'is_active' => true]);
+        $this->page()->assertSee('data-testid="pos-cashiers"', false)->assertSee('B901-2')->assertSee('ยังไม่ตั้ง');
+
+        $response = $this->post(route('settings.pos-cashiers.reset-pin', $cashier))
+            ->assertRedirect()->assertSessionHas('cashier_pin_result');
+        $pin = session('cashier_pin_result')['pin'];
+
+        $cashier->refresh();
+        $this->assertMatchesRegularExpression('/^\d{6}$/', $pin);
+        $this->assertTrue(Hash::check($pin, $cashier->pos_pin_hash));
+        $this->assertTrue((bool) $cashier->must_change_pin);
+        $this->assertTrue(AuditLog::where('action', 'cashier_pin_reset')->where('record_id', $cashier->id)->exists());
+    }
+
+    public function test_a_manager_linked_to_a_user_gets_the_pin_on_the_user_credential_too(): void
+    {
+        $branch = $this->branch();
+        $user = User::factory()->create(['username' => 'b901_mgr', 'branch_id' => $branch->id]);
+        $manager = Salesman::create(['branch_id' => $branch->id, 'user_id' => $user->id, 'code' => 'M901', 'name' => 'หัวหน้า', 'is_active' => true]);
+        $this->page();
+
+        $this->post(route('settings.pos-cashiers.reset-pin', $manager));
+
+        $pin = session('cashier_pin_result')['pin'];
+        $this->assertTrue(Hash::check($pin, $user->fresh()->posCredential->pin_hash));
     }
 
     private function page()
