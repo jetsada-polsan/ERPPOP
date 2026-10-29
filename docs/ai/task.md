@@ -1322,3 +1322,12 @@ pending
 - POS smoke: รอบแรกหยุดก่อนเปิดกะเพราะ plan เลือก `102397` ที่สต็อก 0; ไม่มี POS shift หรือบิลจากรอบนั้น หลังปรับ planner preflight ผ่านแล้ว แต่ยัง **ไม่ได้** ล็อกอิน/เปิดกะ/ขาย/นำเงินออก/ปิดกะ; เลขบิลและ server shift id จึงยังไม่มี
 - ให้เจ้าของรันต่อใน Terminal เพื่อกรอก PIN เองแบบซ่อนตัวอักษร แล้วสคริปต์จะทำรายการขายจริง: `cd apps/pos-python && python3 -u e2e/pos_smoke_production.py --token-from-ssh --unit-coverage`; ห้ามใส่ PIN ในแชต/ไฟล์/log และห้ามล้างบิลหรือกะทดสอบเอง
 - ทดสอบล่าสุด `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests`: 244 tests ผ่าน; `--help`, AST parse และ `git diff --check` ผ่าน; ยังไม่ deploy
+
+## Handoff - 2026-10-29 (Codex: ตรวจฟอร์ม/บันทึก และเร่ง toast)
+- Commit: `f83c9d9`
+- ทำอะไร: toast สำเร็จทั่วไปยังแสดงมุมขวาบน แต่ปิดใน 2.2 วินาที (เดิม 2.6–3 วินาที); ลดเวลา animation เข้า/ออกเหลือ 180 ms; error popup ยังคงแสดง 5.2 วินาทีเพื่อให้อ่านทัน
+- ทดสอบ: `php -d memory_limit=512M vendor/bin/phpunit` ผ่าน 630 tests, 1 skipped, 6 incomplete, 4,376 assertions; `php artisan test --filter=RouteIntegrityTest` ผ่าน 3 tests / 932 assertions (หน้า GET และฟอร์ม literal Blade 139+ จุด); `DashboardLayoutTest` ผ่าน 12 tests / 44 assertions; `git diff --check` ผ่าน
+- หมายเหตุ runner: `php artisan test` ใช้ subprocess ที่ยังจำกัด 128 MB และหยุดตอนสร้าง MIME ของ XLSX ใน `ReportExportTest`; รัน PHPUnit โดยตรงที่ 512 MB แล้วผ่านครบ
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้เดินคลิกทุกปุ่มใน browser ที่ล็อกอิน production; ขอเจ้าของล็อกอินใน Chrome ก่อนตรวจหน้าจอ งานบันทึกขาย/ซื้อ/รับชำระ/โอนที่มีผลต่อ stock หรือบัญชีจริงไม่ยิงซ้ำจาก browser; automated feature suite ครอบคลุม flow บันทึกบนฐานทดสอบ
+- Deploy: ยังไม่ deploy
+- งานถัดไป: ตรวจ production UI แบบอ่าน/validation เมื่อเจ้าของพร้อมล็อกอิน; หากต้องยิง save จริง ให้ใช้ staging/ฐานทดสอบ หรือกำหนดเอกสารทดสอบและการกลับรายการที่อนุมัติชัดเจน
