@@ -4,6 +4,7 @@ from __future__ import annotations
 import contextlib
 import io
 import os
+import sqlite3
 import subprocess
 import unittest
 from unittest.mock import Mock, patch
@@ -133,15 +134,28 @@ class ExistingDeviceTokenTest(unittest.TestCase):
     def test_ssh_mode_prompts_only_for_the_owners_pin(self) -> None:
         token = "x" * 48
         output = io.StringIO()
+        db = sqlite3.connect(":memory:")
+        db.row_factory = sqlite3.Row
+        db.execute("CREATE TABLE products (id INTEGER, name TEXT, price TEXT, active INTEGER, server_id INTEGER)")
+        db.executemany("INSERT INTO products VALUES (?, ?, ?, 1, ?)", [
+            (1, "one", "10.00", 101), (2, "two", "20.00", 102), (3, "three", "30.00", 103),
+        ])
+        prov = Mock()
+        prov.ping.return_value = {
+            "success": True, "branch_id": 34, "device": {"terminal_code": "POS-B001-01"},
+        }
         with patch.dict(os.environ, {"POS_SMOKE_URL": "https://erp.popstarcenter.com",
                                     "POS_SMOKE_CASHIER": "B001"}), \
                 patch.object(smoke, "existing_device_token", return_value=token), \
                 patch.object(smoke.getpass, "getpass", side_effect=KeyboardInterrupt) as prompt, \
-                patch.object(smoke, "connect") as connect, \
+                patch.object(smoke, "connect", return_value=db) as connect, \
+                patch.object(smoke, "ProvisioningService", return_value=prov), \
+                patch.object(smoke, "SyncService"), \
                 contextlib.redirect_stdout(output), self.assertRaises(KeyboardInterrupt):
             smoke.main(["--token-from-ssh"])
         prompt.assert_called_once_with("PIN ของ B001: ")
-        connect.assert_not_called()
+        connect.assert_called_once()
+        prov.online_cashier_login.assert_not_called()
         self.assertNotIn(token, output.getvalue())
 
 

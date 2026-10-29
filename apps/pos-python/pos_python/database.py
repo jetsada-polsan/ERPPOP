@@ -271,6 +271,8 @@ ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("products", "stock_qty", "TEXT"),
     ("products", "average_cost", "TEXT"),
     ("price_versions", "unit_id", "INTEGER"),
+    ("product_barcodes", "unit_id", "INTEGER"),
+    ("product_barcodes", "unit_name", "TEXT"),
     ("shifts", "counted_cash", "TEXT"),
     ("shifts", "cash_difference", "TEXT"),
     ("shifts", "closing_note", "TEXT"),

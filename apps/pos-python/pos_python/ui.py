@@ -1812,9 +1812,15 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             # กันสินค้านำเข้าที่ขึ้นต้น 800 ถูกอ่านเป็นป้ายชั่งแล้วคิดเงินผิด
             product = service.lookup_barcode(scanned)
             if product:
+                try:
+                    cart_line = service.barcode_cart_line(scanned)
+                except ValueError as error:
+                    QMessageBox.warning(self, "หน่วยขาย", str(error))
+                    return
                 self.order.add_product(OrderLine(
-                    product_id=int(product["id"]), name=product["name"], unit_name=product["unit_name"],
-                    qty=Decimal("1"), unit_price=service.effective_price(int(product["id"]), product["price"] or 0)[0],
+                    product_id=int(product["id"]), name=product["name"],
+                    unit_name=product["barcode_unit_name"] or product["unit_name"],
+                    qty=cart_line.qty, unit_price=cart_line.unit_price, price_version=cart_line.price_version,
                     is_vat=bool(product["is_vat"]), barcode=scanned, source_barcode=scanned,
                     barcode_type=product["barcode_type"],
                 ))

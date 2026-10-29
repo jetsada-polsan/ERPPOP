@@ -1314,3 +1314,11 @@ pending
 - ทดสอบ: phpunit 616 ผ่าน, POS e2e CI + PostgreSQL UAT ผ่านบน `372565e`
 - ยังไม่ deploy `f890652..372565e` (มี migration `documents.void`)
 - ค้าง: ชื่อผู้จำหน่ายเพี้ยน 10 ราย ต้องดึงจาก BPlus APFILE (สคริปต์ให้เจ้าของรัน) แล้วรัน `erp:repair-master-names --suppliers=...`; หน่วยเพี้ยนไม่มีใครใช้ 74 รายการ `--drop-unused-units`; QR/บัญชีธนาคารบริษัท; สต๊อกตั้งต้น; เครื่อง POS จริง; คู่มือเทส `docs/uat/2026-10-28-b001-golive-test.md`
+
+## Handoff - 2026-10-29 (Codex: POS Python unit coverage production preflight)
+- แก้ POS barcode cart ให้ใช้ราคาบาร์โค้ด/หน่วยขายที่ ERP ส่งมา, เก็บ unit ID/name ใน SQLite, ไม่รวมบรรทัดขายที่เป็นคนละบาร์โค้ด/หน่วย; ปรับ planner ให้เลือกสินค้าที่มีสต็อกโดยยังบังคับครอบคลุม unit/barcode universe ทั้งแค็ตตาล็อก และตรวจ exact barcode/ราคา live ก่อนเปิดกะ
+- Production read-only preflight ผ่าน: เครื่อง `POS-B001-01`, branch 34, สินค้า active 1,622; plan ที่มีสต็อก 82 SKU ครอบคลุมหน่วยขาย 109 class และ barcode `CUSTOM`, `EAN13_STANDARD`, `SCALE_PLU`; exact lookup/ราคา ERP ตรงครบ 109 barcode
+- ใบรับเข้าทดสอบที่บันทึกแล้ว: `POB00120261029001`, 82 SKU × 10 หน่วยฐาน, ฿48,086.80 ซื้อเชื่อกับ `UAT-POS-TEST`; เป็นสต็อก/เจ้าหนี้จริง ต้องให้เจ้าของจัดการก่อนเปิดขาย 5 พ.ย. ห้ามล้างเอง; ใบ `POB00120261028001` ถูกยกเลิกและกลับรายการครบ ยอดสุทธิเป็นศูนย์
+- POS smoke: รอบแรกหยุดก่อนเปิดกะเพราะ plan เลือก `102397` ที่สต็อก 0; ไม่มี POS shift หรือบิลจากรอบนั้น หลังปรับ planner preflight ผ่านแล้ว แต่ยัง **ไม่ได้** ล็อกอิน/เปิดกะ/ขาย/นำเงินออก/ปิดกะ; เลขบิลและ server shift id จึงยังไม่มี
+- ให้เจ้าของรันต่อใน Terminal เพื่อกรอก PIN เองแบบซ่อนตัวอักษร แล้วสคริปต์จะทำรายการขายจริง: `cd apps/pos-python && python3 -u e2e/pos_smoke_production.py --token-from-ssh --unit-coverage`; ห้ามใส่ PIN ในแชต/ไฟล์/log และห้ามล้างบิลหรือกะทดสอบเอง
+- ทดสอบล่าสุด `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests`: 244 tests ผ่าน; `--help`, AST parse และ `git diff --check` ผ่าน; ยังไม่ deploy

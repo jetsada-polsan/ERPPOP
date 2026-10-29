@@ -72,6 +72,9 @@ class Order:
                 if (
                     existing.product_id == line.product_id
                     and existing.unit_price == line.unit_price
+                    and existing.barcode == line.barcode
+                    and existing.source_barcode == line.source_barcode
+                    and existing.unit_name == line.unit_name
                     and not existing.locked_qty
                 ):
                     existing.qty += line.qty

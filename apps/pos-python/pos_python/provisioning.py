@@ -158,13 +158,15 @@ class ProvisioningService:
             if not value:
                 continue
             self.db.execute(
-                """INSERT OR REPLACE INTO product_barcodes (barcode, product_id, barcode_type, unit_factor, price, synced_at)
-                VALUES (?, ?, ?, ?, ?, ?)""",
+                """INSERT OR REPLACE INTO product_barcodes
+                (barcode, product_id, barcode_type, unit_factor, price, synced_at, unit_id, unit_name)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (str(value), local_product_id,
                  str(code.get("barcode_type", "CUSTOM")) if isinstance(code, dict) else "CUSTOM",
                  str(code.get("unit_factor", "1")) if isinstance(code, dict) else "1",
                  str(code.get("price")) if isinstance(code, dict) and code.get("price") is not None else None,
-                 now()),
+                 now(), code.get("unit_id") if isinstance(code, dict) else None,
+                 ((code.get("unit") or {}).get("name") or code.get("unit_name")) if isinstance(code, dict) else None),
             )
 
     def _record_price(self, local_product_id: int, item: dict, branch_id: int) -> None:

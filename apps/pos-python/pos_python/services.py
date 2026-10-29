@@ -485,7 +485,7 @@ class PosService:
         )
 
     def effective_price(self, product_id: int, fallback_price: Decimal | str | float = 0,
-                        unit_id: int | None = None) -> tuple[Decimal, str | None]:
+                        unit_id: int | None = None, *, scheduled_only: bool = False) -> tuple[Decimal, str | None]:
         """Resolve the price at sale time, including future schedules cached offline."""
         branch_id = self._setting("branch_id")
         try:
@@ -497,9 +497,10 @@ class PosService:
                WHERE product_id = ? AND (unit_id = ? OR (unit_id IS NULL AND ? IS NULL))
                  AND starts_at <= ? AND (ends_at IS NULL OR ends_at > ?)
                  AND (branch_id IS NULL OR branch_id = ?)
+                 AND (? = 0 OR version LIKE 'schedule:%')
                ORDER BY CASE WHEN branch_id = ? THEN 0 ELSE 1 END, starts_at DESC, id DESC
                LIMIT 1""",
-            (product_id, unit_id, unit_id, self._now(), self._now(), branch_id, branch_id),
+            (product_id, unit_id, unit_id, self._now(), self._now(), branch_id, int(scheduled_only), branch_id),
         ).fetchone()
         if row:
             return money(row["price"]), row["version"]
@@ -521,10 +522,41 @@ class PosService:
 
     def lookup_barcode(self, barcode: str) -> sqlite3.Row | None:
         return self.db.execute(
-            """SELECT p.*, b.barcode, b.barcode_type, b.unit_factor, b.price
+            """SELECT p.*, b.barcode, b.barcode_type, b.unit_factor, b.price AS barcode_price,
+                      b.unit_id AS barcode_unit_id, b.unit_name AS barcode_unit_name
             FROM product_barcodes b JOIN products p ON p.id = b.product_id
             WHERE b.barcode = ? AND p.active = 1""", (barcode,)
         ).fetchone()
+
+    def barcode_cart_line(self, barcode: str) -> CartLine | None:
+        """Price a registered selling unit; retain its barcode for ERP stock conversion."""
+        product = self.lookup_barcode(barcode)
+        if product is None:
+            return None
+        factor = Decimal(str(product["unit_factor"]))
+        if not factor.is_finite() or factor <= 0:
+            raise ValueError("ตัวคูณหน่วยขายไม่ถูกต้อง กรุณาโหลดข้อมูลสินค้าใหม่")
+        explicit = Decimal(str(product["barcode_price"] or 0))
+        fallback = explicit if explicit > 0 else self.effective_price(product["id"], product["price"])[0]
+        price, version = self.effective_price(
+            product["id"], fallback, unit_id=product["barcode_unit_id"], scheduled_only=True,
+        )
+        if version is None and product["barcode_unit_id"] is not None:
+            # ERP falls back from a unit schedule to an active base schedule.
+            price, version = self.effective_price(
+                product["id"], fallback, unit_id=None, scheduled_only=True,
+            )
+        # A missing pack price may live in ERP's unit price table. The local base
+        # price is not enough to infer that price or any pack-specific discount.
+        if factor != 1 and explicit <= 0 and version is None:
+            raise ValueError("ยังไม่มีราคาหน่วยขายนี้ กรุณาโหลดข้อมูลสินค้า/ตรวจตารางราคา ERP")
+        if price <= 0:
+            raise ValueError("ยังไม่มีราคาหน่วยขายนี้")
+        return CartLine(
+            product_id=int(product["id"]), qty=Decimal("1"), unit_price=price,
+            barcode=barcode, source_barcode=barcode, barcode_type=product["barcode_type"],
+            price_version=version,
+        )
 
     def bind_server_shift(self, local_shift_id: int, server_shift_id: int) -> None:
         self.db.execute("UPDATE shifts SET server_id = ? WHERE id = ?", (server_shift_id, local_shift_id))
