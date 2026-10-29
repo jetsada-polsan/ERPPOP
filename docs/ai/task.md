@@ -1331,3 +1331,12 @@ pending
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้เดินคลิกทุกปุ่มใน browser ที่ล็อกอิน production; ขอเจ้าของล็อกอินใน Chrome ก่อนตรวจหน้าจอ งานบันทึกขาย/ซื้อ/รับชำระ/โอนที่มีผลต่อ stock หรือบัญชีจริงไม่ยิงซ้ำจาก browser; automated feature suite ครอบคลุม flow บันทึกบนฐานทดสอบ
 - Deploy: ยังไม่ deploy
 - งานถัดไป: ตรวจ production UI แบบอ่าน/validation เมื่อเจ้าของพร้อมล็อกอิน; หากต้องยิง save จริง ให้ใช้ staging/ฐานทดสอบ หรือกำหนดเอกสารทดสอบและการกลับรายการที่อนุมัติชัดเจน
+
+## UAT - 2026-10-29 (Codex: production deployment และ POS preflight)
+- Commit ที่ปล่อย: `11574f6`; GitHub Actions Deploy ERP production run `40869177182` ผ่านทั้ง test, build และ deploy
+- `erp:health` หลังปล่อย: ฐานข้อมูล, migration, backup (16.7 ชั่วโมง), ขาย-GL, ตรวจนับค้าง, storage และ queue ผ่าน; failed queue 0
+- POS read-only preflight: `POS-B001-01`, branch 34, catalog สินค้า 1,622; 109 หน่วยขาย/บาร์โค้ดทั้ง `CUSTOM`, `EAN13_STANDARD`, `SCALE_PLU` ตรงรหัสและราคากับ ERP; แผน 82 SKU ไม่เกิน 10 หน่วยฐานต่อ SKU
+- `python3 -m unittest discover -s tests`: 244 ผ่าน
+- สคริปต์ production POS หยุดที่ prompt PIN ของ B001 ตามข้อกำหนดให้เจ้าของกรอกเอง; ยังไม่เปิดกะ/สร้างบิล/นำเงินออก/ปิดกะ จึงไม่มีเลขกะหรือเลขบิลจากรอบนี้
+- Browser UAT ยังรอเจ้าของล็อกอินในแท็บ ERP; ยังไม่ได้ตรวจคลิกปุ่มและฟอร์มบน production หลัง deploy
+- ไม่ล้างข้อมูลหรือสต๊อก; เมื่อทำ POS UAT ต่อ ให้เก็บเลขบิล/กะทั้งหมดเพื่อกลับรายการและเคลียร์ภายหลังตามที่เจ้าของกำหนด
