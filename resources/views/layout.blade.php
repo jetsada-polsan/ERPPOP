@@ -1087,6 +1087,8 @@
             border-radius: 12px !important;
             box-shadow: 0 16px 45px rgba(15, 23, 42, .16) !important;
         }
+        .erp-swal-toast.swal2-show,
+        .erp-swal-toast.swal2-hide { animation-duration: 180ms !important; }
         .erp-swal-toast .swal2-title { font-size: 14px !important; font-weight: 800 !important; color: var(--erp-text) !important; }
         .erp-swal-toast .swal2-timer-progress-bar { background: linear-gradient(90deg, var(--erp-success-ink), var(--erp-primary)) !important; }
         [data-theme="midnight"] .erp-swal-popup,
@@ -1739,7 +1741,7 @@
                 position: 'top-end',
                 icon,
                 title,
-                timer: icon === 'error' ? 5200 : 2600,
+                timer: icon === 'error' ? 5200 : 2200,
                 showConfirmButton: false,
                 ...options,
             });
@@ -1844,7 +1846,7 @@
             timerProgressBar: true,
         });
         @else
-        erpToast('success', @json(session('success')), { timer: 3000 });
+        erpToast('success', @json(session('success')), { timer: 2200 });
         @endif
     </script>
     @endif

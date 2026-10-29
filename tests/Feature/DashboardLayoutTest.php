@@ -44,6 +44,20 @@ class DashboardLayoutTest extends TestCase
             ->assertViewIs('dashboard');
     }
 
+    public function test_success_feedback_uses_a_fast_top_right_toast(): void
+    {
+        $html = $this->actingAs($this->viewer())
+            ->withSession(['success' => 'บันทึกข้อมูลแล้ว'])
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString("position: 'top-end'", $html);
+        $this->assertStringContainsString("{ timer: 2200 }", $html);
+        $this->assertStringContainsString('.erp-swal-toast.swal2-show', $html);
+        $this->assertStringContainsString('animation-duration: 180ms', $html);
+    }
+
     public function test_odoo_layout_renders_the_odoo_dashboard(): void
     {
         AppSetting::set('erp_layout', 'odoo');
