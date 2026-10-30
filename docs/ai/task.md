@@ -1,3 +1,24 @@
+# Handoff — 2026-10-30 (ปรับ UI ทุก flow ของ POS Central)
+
+## Commit
+`cb4f0a8` — `Polish POS Central screens with shared theme`
+
+## ทำอะไรไป
+- เพิ่มธีมร่วมให้ทุกหน้าต่างหลักและ dialog ของ POS Central: หน้าขาย, เข้าระบบ/ผูกเครื่อง, เปิด-ปิดกะ, สแกน/ชั่งน้ำหนัก, ส่วนลด, พักบิล, ชำระเงิน, ใบเสร็จ, ซิงก์, คู่มือ, จอแสดงลูกค้า และรายงานกะ
+- ปรับโทนสีหลักให้สอดคล้องกัน เพิ่มรูปแบบช่องกรอก ตาราง ปุ่ม โฟกัส และแถบเลื่อน พร้อมคงสีเขียว/แดงสำหรับสถานะสำเร็จและข้อผิดพลาดตามความหมาย
+- ไม่เปลี่ยนกติกาขาย การคำนวณ หน่วยสินค้า การตัดสต็อก การชำระ หรือการส่ง API; เพิ่มการทดสอบสัญญาธีมส่วนกลาง
+
+## ทดสอบ
+- `git diff --check` ผ่าน
+- `PYTHONPYCACHEPREFIX=/private/tmp/poscentral-theme-pycache python3 -m compileall -q apps/pos-central/ui apps/pos-central/tests` ผ่าน
+- ตรวจ AST ครบ 17 window/dialog constructors และยืนยันว่าเรียกธีมส่วนกลางครบ
+- รัน `python3 -m pytest -q apps/pos-central/tests` ไม่ได้ เพราะ Python เครื่องนี้ไม่มี `pytest` ติดตั้ง (และไม่มี PySide6/SQLAlchemy); หลัง push ให้ดู workflow `POS Central Desktop UAT for Windows` ซึ่งรันทดสอบและแพ็ก build บน Windows
+
+## ความเสี่ยง/งานถัดไป
+- ยังไม่ได้ตรวจภาพจริงบนเครื่อง Windows POS; ให้ดู artifact จาก Windows UAT เพื่อยืนยันขนาดตัวอักษร/หน้าจอและอุปกรณ์สัมผัส
+- เป็น UI ของ candidate `apps/pos-central`; POS หลัก `apps/pos-python` และ ERP Web ไม่ได้เปลี่ยน
+- ไม่ deploy production และไม่สร้าง/แก้บิล production จากงาน UI รอบนี้
+
 # Handoff — 2026-10-30 (ผ่อนเงื่อนไขตั้งรหัสผ่าน ERP)
 
 ## Commit
