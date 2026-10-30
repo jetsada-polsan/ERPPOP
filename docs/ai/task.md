@@ -1,3 +1,25 @@
+# Handoff — 2026-10-30 (Codex: regression audit ERP และ POS ทั้งระบบ)
+
+## Commit
+- `8971126` — `Use valid branch codes in PostgreSQL tests` (push แล้ว)
+
+## ทำอะไรและผลตรวจ
+- รัน ERP suite บน SQLite: 656 tests, 655 ผ่าน, 1 skipped, incomplete 6, 4,589 assertions
+- `RouteIntegrityTest`: 3 tests / 928 assertions ผ่าน; ตรวจ 476 routes, GET pages, route references และ method ของฟอร์มโดยไม่ยิง mutation ไป production
+- PostgreSQL UAT [run 41071605247](https://github.com/jetsada-polsan/ERPPOP/actions/runs/41071605247): full suite ผ่าน 656 tests / 4,590 assertions (incomplete 6); migration และ workflow concurrency ผ่าน
+- UAT concurrency: 30 process สร้างเลขเอกสารและ 30 process ขายจริง (รวม 150 sales documents) พบ error/deadlock/เลขซ้ำ 0; reconcile ผ่านทุกเกณฑ์ — GL ดุล, GL ต้นทุน 7,125.00 ตรงกับบรรทัดขาย, ยอดขาย 15,000.00 ตรงกับรายได้ 14,509.50 + VAT 490.50 และสต๊อกตัด 150 ตรงรายการขาย 150
+- POS Python รุ่นใช้งาน [Windows UAT run 41069707946](https://github.com/jetsada-polsan/ERPPOP/actions/runs/41069707946): 244 tests ผ่าน, Windows build, packaged smoke test และ installer verification ผ่าน; upload เป็น UAT artifact และ publish ถูกข้ามตาม `publish=false`
+- POS Central candidate [Windows UAT run 41066981240](https://github.com/jetsada-polsan/ERPPOP/actions/runs/41066981240): 52 tests, Windows build และ ZIP artifact ผ่าน
+- Legacy POS desktop CI [run 41070454333](https://github.com/jetsada-polsan/ERPPOP/actions/runs/41070454333): Vue typecheck, unit tests, web build และ Rust build ผ่าน
+
+## สิ่งที่พบและแก้
+- PostgreSQL ครั้งแรกจับ fixture ใน `BookingSalesAreaTest` และ `SalesDocumentEndToEndTest` ใช้รหัสสาขายาวเกิน schema `branches.code` ที่กำหนด 10 ตัว (SQLite ไม่บังคับความยาว); ย่อเฉพาะรหัสทดสอบแล้วรัน SQLite และ PostgreSQL suite ผ่าน
+
+## ขอบเขตที่ยังต้องทดสอบหน้างาน
+- ไม่ได้คลิกทุกปุ่มที่สร้าง/อนุมัติ/ลบข้อมูลบน production และไม่มี production data ถูกสร้างหรือแก้ไขในรอบนี้; route/form contract และ end-to-end ใช้ test DB แทน
+- ยังไม่ได้ต่อเครื่องจริงเพื่อทดสอบ scanner, เครื่องชั่ง, ลิ้นชักเงิน และเครื่องพิมพ์ใบเสร็จ; ควรทำ UAT ด้วยอุปกรณ์และสินค้าเดโมก่อนเปิดขาย
+- ไม่มีการ deploy ในงานนี้; production deploy workflow เป็น manual-only
+
 # Handoff — 2026-10-30 (คำนวณยอดขาย POS Central ให้ตรง ERP)
 
 ## Commits
