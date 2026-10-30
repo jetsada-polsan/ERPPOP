@@ -1385,10 +1385,12 @@ pending
 - งานถัดไป: ทำ browser UAT ตามขั้นตอนใบจอง/ขึ้นรถ/ส่งของบน production โดยไม่สร้างเอกสารจริง เว้นแต่เจ้าของสั่งทดสอบการบันทึก
 
 ## Handoff - 2026-10-30 (Codex: สคริปต์เติมสต๊อกสินค้าเพื่อ UAT POS)
-- Commit: รอ commit
+- Commits: `2390013c444bbb76b71af2ac5154ddfb72cf82dd` (สคริปต์/เวิร์กโฟลว์) และ `a33c51e` (ปรับเพดานยอดให้เทียบความละเอียด 4 ตำแหน่งของเอกสาร); push แล้วที่ `origin/main`
 - ทำอะไร: เพิ่ม Artisan command `erp:uat-receive-all-active-products` และ GitHub Actions `UAT receive all active products`; preview เป็นค่าเริ่มต้น เติมเฉพาะจำนวนที่ขาดให้สินค้าที่เปิดใช้ขายได้หนึ่งครั้งต่อหน่วยขายที่มี barcode โดยใช้ทุนรับเข้าล่าสุดหรือทุนเฉลี่ย และผู้ขาย UAT `UAT-POS-TEST`; บันทึกจริงผ่าน `PurchaseService` ปกติ จึงสร้างใบซื้อเชื่อ เพิ่มสต๊อก เปิด AP และลง GL
 - การ์ดป้องกัน: โหมดจริงต้องระบุ admin ผู้บันทึก, เพดานยอดซื้อ, คำยืนยัน; ล็อกสาขาและตรวจ reference ซ้ำใน transaction; สินค้าไม่มีต้นทุนหรือขาด lot/วันหมดอายุหยุดทั้งชุด และปฏิเสธ lot หมดอายุ; ไม่มีการเพิ่มสิทธิ์ admin และไม่ได้ใช้ขั้นอนุมัติใบขอซื้อเพื่อเลี่ยงกฎ self-approval
 - ทดสอบล่าสุด: `php -d memory_limit=1G vendor/bin/phpunit` ผ่าน 649 tests (648 ผ่าน, 1 skipped), 4,517 assertions, incomplete 6; test สคริปต์ 6 tests / 44 assertions; Pint, PHP lint, workflow YAML parse และ `git diff --check` ผ่าน
-- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ deploy และยังไม่รันกับฐาน production; คำสั่งรับจริงจะเปลี่ยน stock/AP/GL และอัปเดต product supplier/costing; ต้องรัน preview production ก่อนดูยอดรวมและจำนวนสินค้าที่ต้องระบุ lot
-- Deploy: รุ่นแรก deploy แล้วใน run `41001541659`; ปรับเพิ่มให้เพดานยอดตรง precision 4 ตำแหน่งของเอกสาร ต้อง push/deploy รุ่นแก้ไขก่อนรับเข้าจริง; preflight `41001477345` ผ่าน
-- งานถัดไป: deploy แล้ว dispatch preview; หากไม่มีสินค้าขาดต้นทุน/lot ให้ใช้ยอด preview เป็นเพดานก่อนรับเข้าจริง; ตรวจเลขใบซื้อและยอดหลังรับเข้าก่อนเริ่ม POS test
+- Production preflight: run `41002024039` ผ่าน; backup `erp-db-20261030-111714.sql.gz` (792K), PostgreSQL restore drill ผ่าน, `health=ok`, `migrations_pending=0`; ก่อนรับเข้ามี products 4,057, documents 5, GL journals 11, stock balances 83, stock movements 85
+- Deploy: command/workflow รุ่นเริ่มต้น deploy ผ่าน run `41001541659`; รุ่นแก้ precision deploy ผ่าน run `41002092081` (test, asset build, upload และ `scripts/deploy.sh` ผ่าน)
+- Production preview: run `41002241005` ผ่านแบบ dry-run; B001 / `UAT-POS-TEST`, active products 1,623, ครบสต๊อกแล้ว 21, รับเพิ่ม 1,602 บรรทัด รวม 19,689 หน่วยฐาน, ประมาณใบซื้อเชื่อ/AP ฿818,160.88 (ยอดเอกสาร 818,160.8800); ไม่แจ้งต้นทุนหรือ lot metadata ขาด; preview ไม่เปลี่ยนข้อมูล
+- รับจริง: ยังไม่ได้สร้างเอกสารและไม่มีเลขใบซื้อ เพราะ auto-review ปฏิเสธการสร้างใบซื้อเชื่อจริง ฿818,160.8800 สำหรับ 1,602 รายการ โดยให้ขออนุมัติจากเจ้าของสำหรับยอดและผลกระทบ stock/AP/GL ที่แน่นอนก่อน; ห้ามลองส่งซ้ำหรือเลี่ยง reviewer; reference ที่ตั้งใจใช้คือ `UAT-ALLSKU-B001-20261030`
+- งานถัดไป: รอเจ้าของยืนยันยอดรับเข้าจริง; เมื่อได้รับอนุมัติแล้วให้ dispatch workflow `mode=receive` ด้วย reference และ cap ที่ยืนยัน แล้วบันทึกเลขใบซื้อ/ยอดรับจริงก่อนทำ UAT POS
