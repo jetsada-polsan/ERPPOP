@@ -6,8 +6,6 @@ use App\Models\ApprovalRequest;
 use App\Models\BankAccount;
 use App\Models\Branch;
 use App\Models\CashBook;
-use App\Models\User;
-use App\Services\Accounting\CashBookPostingService;
 use App\Models\PosPreparationJob;
 use App\Models\PosReceipt;
 use App\Models\PosTerminal;
@@ -18,7 +16,9 @@ use App\Models\PurchasePlan;
 use App\Models\QrPaymentConfig;
 use App\Models\ShowPriceDevice;
 use App\Models\Supplier;
+use App\Models\User;
 use App\Models\VatRate;
+use App\Services\Accounting\CashBookPostingService;
 use App\Services\Purchasing\ReplenishmentService;
 use App\Services\Sales\DocumentNumberGenerator;
 use App\Support\PythonPosInstaller;
@@ -63,20 +63,33 @@ class BplusOperationController extends Controller
             $request->query('date', now('Asia/Bangkok')->toDateString()),
             'Asia/Bangkok'
         )->toDateString();
-        $lockedBranchId = auth()->user()?->branchScopeId();
-        $selectedBranchId = $lockedBranchId ?: ($request->integer('branch_id') ?: null);
+        $user = $request->user();
+        $canSeeAllBranches = $user?->hasPermission('reports.all_branches') ?? false;
+        $lockedBranchId = $canSeeAllBranches ? null : $user?->branchScopeId();
+        $requestedBranchId = $request->query('branch_id');
+        if ($canSeeAllBranches && ! in_array($requestedBranchId, [null, '', 'all'], true)) {
+            $request->validate(['branch_id' => ['required', 'integer', 'exists:branches,id']]);
+        }
+        $selectedBranchId = $canSeeAllBranches
+            ? (in_array($requestedBranchId, [null, '', 'all'], true) ? null : $request->integer('branch_id'))
+            : $lockedBranchId;
 
         $branches = Branch::query()
-            ->when($lockedBranchId, fn ($query) => $query->whereKey($lockedBranchId))
+            ->when(! $canSeeAllBranches, function ($query) use ($lockedBranchId) {
+                return $lockedBranchId
+                    ? $query->whereKey($lockedBranchId)
+                    : $query->whereRaw('1 = 0');
+            })
             ->orderBy('code')
             ->get();
 
         $receipts = PosReceipt::with(['terminal.branch', 'shift.branch'])
             ->whereDate('receipt_date', $selectedDate)
-            ->when($selectedBranchId, fn ($query) => $query->where(function ($w) use ($selectedBranchId) {
+            ->when($selectedBranchId !== null, fn ($query) => $query->where(function ($w) use ($selectedBranchId) {
                 $w->whereHas('terminal', fn ($terminal) => $terminal->where('branch_id', $selectedBranchId))
                     ->orWhereHas('shift', fn ($shift) => $shift->where('branch_id', $selectedBranchId));
             }))
+            ->when(! $canSeeAllBranches && ! $lockedBranchId, fn ($query) => $query->whereRaw('1 = 0'))
             ->latest('receipt_date')
             ->limit(20)
             ->get();
@@ -87,6 +100,7 @@ class BplusOperationController extends Controller
             'selectedDate' => $selectedDate,
             'selectedBranchId' => $selectedBranchId,
             'lockedBranchId' => $lockedBranchId,
+            'canSeeAllBranches' => $canSeeAllBranches,
             'pythonPosInstaller' => PythonPosInstaller::current(),
         ]);
     }

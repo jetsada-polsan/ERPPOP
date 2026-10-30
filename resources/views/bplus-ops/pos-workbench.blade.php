@@ -89,13 +89,13 @@
             </div>
             <div class="col-12 col-md-5">
                 <label class="form-label">สาขา</label>
-                <select name="branch_id" class="form-select" @disabled($lockedBranchId)>
-                    <option value="">ทุกสาขา</option>
+                <select name="branch_id" class="form-select" @disabled(! $canSeeAllBranches)>
+                    <option value="" @selected($selectedBranchId === null)>{{ $canSeeAllBranches ? 'ทุกสาขา' : 'ยังไม่กำหนดสาขา' }}</option>
                     @foreach($branches as $branch)
                         <option value="{{ $branch->id }}" @selected((int) $selectedBranchId === (int) $branch->id)>{{ $branch->code }} - {{ $branch->name_th }}</option>
                     @endforeach
                 </select>
-                @if($lockedBranchId)
+                @if(! $canSeeAllBranches && $lockedBranchId)
                     <input type="hidden" name="branch_id" value="{{ $lockedBranchId }}">
                 @endif
             </div>
@@ -110,7 +110,7 @@
         </form>
         <div class="pos-filter-note">
             แสดงบิลวันที่ {{ \Illuminate\Support\Carbon::parse($selectedDate)->thaiDate() }}
-            · สาขา {{ $selectedBranchId ? ($branches->firstWhere('id', $selectedBranchId)?->name_th ?? '-') : 'ทุกสาขา' }}
+            · สาขา {{ $selectedBranchId !== null ? ($branches->firstWhere('id', $selectedBranchId)?->name_th ?? '-') : ($canSeeAllBranches ? 'ทุกสาขา' : 'ยังไม่กำหนดสาขา') }}
             · {{ $receipts->count() }} บิลล่าสุด
         </div>
         <div class="table-responsive pos-table-wrap">
