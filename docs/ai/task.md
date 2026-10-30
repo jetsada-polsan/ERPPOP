@@ -1,7 +1,9 @@
 # Handoff — 2026-10-30 (คำนวณยอดขาย POS Central ให้ตรง ERP)
 
-## Commit
-`aa4686a` — `Fix POS Central transaction calculations`
+## Commits
+- `aa4686a` — `Fix POS Central transaction calculations`
+- `9a1873b` — `Align POS Central regression tests with precise values`
+- `ef082eb` — `Correct POS receipt test totals`
 
 ## ทำอะไรไป
 - ใช้ Decimal และกติกาปัดครึ่งขึ้นแบบ ERP: จำนวน/ราคาหน่วยเก็บ 8 ตำแหน่ง, รวมบรรทัดก่อนปัดยอดบิล, ส่วนลด/เงินทอน/VAT ปัดเป็นสตางค์; กระจายเศษส่วนลดและยอดแสดงรายบรรทัดให้รวมตรงกับยอดบิล
@@ -10,10 +12,11 @@
 - รองรับการตรวจยอดเงินสด, QR, เงินสด+โอน, บัตรเครดิต และเช็ค รวมถึงยอดแยกแต่ละช่องทางในรายงานกะ
 
 ## ทดสอบ
+- Windows UAT run [41066981240](https://github.com/jetsada-polsan/ERPPOP/actions/runs/41066981240) ผ่านครบ: 52 pytest, PyInstaller build, ZIP package และ upload artifact
+- Artifact `PopCentral-POS-Central-UAT-0.1.0-dev`, ID `12984470046`, ขนาด 285,957,118 bytes; ดาวน์โหลดจากหน้า [GitHub Actions run](https://github.com/jetsada-polsan/ERPPOP/actions/runs/41066981240)
 - AST parse ทุกไฟล์ Python ใน `apps/pos-central` ผ่าน; สุ่มตรวจสูตรส่วนลด/ปัดยอดรายบรรทัด 10,000 กรณีผ่าน; ทดสอบ VAT และตัวอย่างโปรซื้อครบผ่าน
-- `php -d memory_limit=512M artisan test --filter='PosWebCheckoutRealTest|PosPricingGuardTest'` ผ่าน 16 tests / 41 assertions
-- `git diff --check` ผ่าน
-- รัน pytest/PySide UI tests บน Mac นี้ไม่ได้ เพราะไม่มี `pytest`, PySide6 และ SQLAlchemy; push แล้วให้ Windows UAT workflow รันชุดเต็มและสร้าง ZIP
+- `php -d memory_limit=512M artisan test --filter='PosWebCheckoutRealTest|PosPricingGuardTest'` ผ่าน 16 tests / 41 assertions; `git diff --check` ผ่าน
+- รัน pytest/PySide UI tests บน Mac นี้ไม่ได้ เพราะไม่มี `pytest`, PySide6 และ SQLAlchemy; ใช้ Windows UAT runner ยืนยันชุด UI tests แทน
 
 ## ความเสี่ยง/งานถัดไป
 - ยังไม่ได้ตรวจเครื่องชั่ง/เครื่องสแกน/เครื่องพิมพ์จริง; ทดสอบอุปกรณ์จริงและเทียบยอดก่อนใช้ demo
