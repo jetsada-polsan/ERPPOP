@@ -67,6 +67,7 @@
 - POS หลักมีคิว `shift_open`, `sale`, `sale_void`, `cash_movement`, `shift_close` และ auth events; candidate ตอนนี้ sync เฉพาะ `sale_checkout`. ต้องพอร์ต/แปลงทุก event และคง idempotency ก่อน cutover.
 - candidate ยังใช้ `Float` กับยอด/ปริมาณ; ERP ตรวจราคาขายซ้ำ แต่ต้องตรวจความแม่นยำเงินสด/ปัดเศษและเปลี่ยนเป็น Decimal หรือพิสูจน์ความเท่ากันก่อนเปิดใช้.
 - 2026-10-30 เพิ่ม E2E ของ candidate บน Laravel HTTP API + SQLite ชั่วคราว: catalog, PIN login, shift, barcode scan, local-first checkout, receipt, GL และ stock reconciliation ผ่าน; non-demo URL เริ่มต้นและ URL เก่าที่เป็น localhost เปลี่ยนเป็น `https://erp.popstarcenter.com`. มี Windows UAT ZIP workflow สำหรับทดสอบแยก; ยังไม่มีการยิงบิลทดสอบเข้าฐาน production และ installer/release ใช้งานจริงยังชี้ `apps/pos-python`.
+- 2026-10-30 หน้าต่างชั่งน้ำหนักของ POS Central ส่งฉลากเข้ารหัสไป `/api/pos/scan` เพื่อใช้น้ำหนักจาก ERP และล็อกน้ำหนักตามฉลาก; เมื่อ offline ใช้ ScaleProfile ที่ซิงก์ไว้. การสแกน SKU/บาร์โค้ดสินค้าปกติเลือกสินค้าและยังให้ผู้ใช้กรอกน้ำหนักเอง. ยังต้องทดสอบด้วยฉลากและเครื่องชั่งจริง.
 - 2026-10-30 เจ้าของชี้แจงให้ POS Central ใช้ Production ERP API ระหว่าง UAT ได้ และจะเคลียร์รายการทดสอบก่อนวันขาย; ใบเสร็จจาก API production เป็นเอกสารจริงที่กระทบยอดขาย/สต๊อก/GL จึงต้องจดเลขเอกสารและใช้ขั้นตอน ERP ที่ตรวจสอบย้อนหลังได้. คำสั่งนี้ยังไม่ได้สร้างรายการ production จาก Codex ในรอบเอกสารนี้.
 - ป้ายชั่งที่ profile กำหนด `value_type=weight` เก็บค่าบนฉลากเป็นกรัม; API/checkout ต้องตีความเป็นกิโลกรัมก่อนคิดราคาและตัดสต๊อก.
 
