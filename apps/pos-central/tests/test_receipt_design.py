@@ -40,11 +40,11 @@ def test_receipt_dialog_matches_reference_slip(qtbot):
     receipt_data = {
         "doc_number": "000201254756",
         "date": "2026-10-26 16:04:00",
-        "total": 59.00,
-        "satang_discount": 0.18,
+        "total": 59.18,
+        "satang_discount": 0.00,
         "discount_amount": 0.00,
         "payment_method": "cash",
-        "cash_received": 59.00,
+        "cash_received": 59.18,
         "change_amount": 0.00,
         "cashier": "01",
         "items": [
