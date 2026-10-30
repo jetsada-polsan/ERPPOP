@@ -170,7 +170,7 @@ class AuthController extends Controller
     {
         $data = $request->validate([
             'current_password' => ['required', 'current_password'],
-            'password' => ['required', 'confirmed', Password::min(8)->letters()->mixedCase()->numbers()],
+            'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
         ], [
             'current_password.required' => 'กรุณากรอกรหัสผ่านปัจจุบัน',
             'current_password.current_password' => 'รหัสผ่านปัจจุบันไม่ถูกต้อง',

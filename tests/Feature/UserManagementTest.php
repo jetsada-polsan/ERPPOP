@@ -173,8 +173,8 @@ class UserManagementTest extends TestCase
                 'name' => 'แคชเชียร์สร้างครั้งเดียว',
                 'branch_id' => $branch->id,
                 'role_ids' => [$role->id],
-                'password' => 'TempPass123',
-                'password_confirmation' => 'TempPass123',
+                'password' => 'easypass123',
+                'password_confirmation' => 'easypass123',
             ]);
 
         $response->assertRedirect(route('users.index'));

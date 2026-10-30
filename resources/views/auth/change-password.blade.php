@@ -123,7 +123,7 @@
             <button type="submit"><i class="bi bi-check-lg"></i> บันทึกรหัสผ่านใหม่</button>
         </form>
 
-        <p class="hint">รหัสผ่านต้องยาวอย่างน้อย 8 ตัว มีตัวอักษรพิมพ์เล็ก พิมพ์ใหญ่ และตัวเลข</p>
+        <p class="hint">รหัสผ่านต้องยาวอย่างน้อย 8 ตัว และมีทั้งตัวอักษรกับตัวเลข ไม่บังคับตัวพิมพ์ใหญ่/เล็กหรืออักขระพิเศษ</p>
 
         <form class="logout" method="post" action="{{ route('logout') }}">
             @csrf

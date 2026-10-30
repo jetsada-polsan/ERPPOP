@@ -20,11 +20,11 @@ use RuntimeException;
 
 class UserController extends Controller
 {
-    // มาตรฐานรหัสผ่าน: อย่างน้อย 8 ตัว มีตัวพิมพ์เล็ก/ใหญ่และตัวเลข
+    // มาตรฐานรหัสผ่าน: อย่างน้อย 8 ตัว มีตัวอักษรและตัวเลข โดยไม่บังคับรูปแบบตัวพิมพ์
     // เก็บแบบ bcrypt hash ผ่าน casts 'password' => 'hashed' ของ User model
     private function passwordRule(): Password
     {
-        return Password::min(8)->letters()->mixedCase()->numbers();
+        return Password::min(8)->letters()->numbers();
     }
 
     public function index(Request $request): View

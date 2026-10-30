@@ -88,7 +88,7 @@
             <span class="uf-head-icon"><i class="bi" :class="editId ? 'bi-pencil-square' : 'bi-person-plus'"></i></span>
             <div>
                 <h2 class="h5 fw-bold mb-0" x-text="editId ? 'แก้ไขผู้ใช้: ' + editUsername : 'เพิ่มผู้ใช้ใหม่'"></h2>
-                <p class="text-muted small mb-0">รหัสผ่านที่ผู้ดูแลตั้งใช้เข้าสู่ระบบได้ทันที (อย่างน้อย 8 ตัว มีพิมพ์เล็ก พิมพ์ใหญ่ และตัวเลข)</p>
+                <p class="text-muted small mb-0">รหัสผ่านที่ผู้ดูแลตั้งใช้เข้าสู่ระบบได้ทันที (อย่างน้อย 8 ตัว มีทั้งตัวอักษรและตัวเลข ไม่บังคับอักขระพิเศษ)</p>
             </div>
             <button type="button" class="btn btn-light rounded-circle" @click="resetForm()" aria-label="ปิด"><i class="bi bi-x-lg"></i></button>
         </div>

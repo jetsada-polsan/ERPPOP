@@ -2,11 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\ErpAuthorize;
 use App\Models\Branch;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class AuthTest extends TestCase
@@ -46,6 +48,29 @@ class AuthTest extends TestCase
 
         $response->assertRedirect(route('dashboard'));
         $this->assertAuthenticatedAs($user);
+    }
+
+    public function test_user_can_change_to_a_password_with_letters_and_numbers_without_mixed_case(): void
+    {
+        $user = User::factory()->create([
+            'username' => 'simple-password-user',
+            'password' => 'OldPassword123',
+            'is_active' => true,
+            'must_change_password' => true,
+        ]);
+
+        $response = $this->withoutMiddleware(ErpAuthorize::class)
+            ->actingAs($user)
+            ->post(route('password.update'), [
+                'current_password' => 'OldPassword123',
+                'password' => 'easypass123',
+                'password_confirmation' => 'easypass123',
+            ]);
+
+        $response->assertRedirect(route('dashboard'));
+        $user->refresh();
+        $this->assertTrue(Hash::check('easypass123', $user->password));
+        $this->assertFalse($user->must_change_password);
     }
 
     public function test_stale_login_token_recovers_to_a_fresh_login_page(): void
