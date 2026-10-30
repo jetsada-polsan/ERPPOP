@@ -1396,7 +1396,7 @@ pending
 - งานถัดไป: รอเจ้าของยืนยันยอดรับเข้าจริง; เมื่อได้รับอนุมัติแล้วให้ dispatch workflow `mode=receive` ด้วย reference และ cap ที่ยืนยัน แล้วบันทึกเลขใบซื้อ/ยอดรับจริงก่อนทำ UAT POS
 
 ## Handoff - 2026-10-30 (Codex: แก้หน้าต่างเลือกสินค้าถูกโมดัลบังและค้นหาหน่วง)
-- Commit: `48b8df9` (`Fix shared product picker layering and search`)
+- Commit: `4046471` (`Fix shared product picker layering and search`)
 - ทำอะไร: ย้ายหน้าต่างเลือกสินค้าแบบใช้ร่วมกันไปไว้ใต้ `body` ด้วย Alpine teleport และยกชั้นแสดงผลเหนือโมดัลเอกสาร; ลด debounce ค้นหาจาก 220 เป็น 100 ms และยกเลิกคำขอเก่า/ละทิ้งผลลัพธ์ที่มาช้า เพื่อไม่ให้ผลค้นหาล่าสุดถูกเขียนทับ
 - ทดสอบ: `php artisan test --filter=ProductPickerSharedTest` ผ่าน 6 tests / 63 assertions; `php -d memory_limit=1G vendor/bin/phpunit` ผ่าน 650 tests (649 ผ่าน, 1 skipped), 4,532 assertions, incomplete 6; `vendor/bin/pint --dirty`, `php artisan view:clear`, `php artisan view:cache` และ `git diff --check` ผ่าน
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ตรวจภาพใน browser หลังแก้; แท็บ Chrome ปัจจุบันอยู่ที่ใบปรับปรุงสต็อก production จึงไม่ได้คลิกหรือบันทึกข้อมูลจริง; ไม่มี migration และไม่ได้แก้ข้อมูล production
