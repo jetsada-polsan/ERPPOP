@@ -76,7 +76,7 @@ jobs:
             [[ "$LOTS_PATH" != *".."* ]]
           fi
           if [[ "$MODE" == "receive" ]]; then
-            [[ "$MAX_TOTAL" =~ ^[0-9]+([.][0-9]{1,2})?$ ]]
+            [[ "$MAX_TOTAL" =~ ^[0-9]+([.][0-9]{1,4})?$ ]]
             awk -v amount="$MAX_TOTAL" 'BEGIN { exit !(amount > 0) }'
           fi
 

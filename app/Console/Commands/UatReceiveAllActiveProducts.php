@@ -116,7 +116,7 @@ class UatReceiveAllActiveProducts extends Command
                 }
 
                 $lineAmount = DecimalMath::multiply($shortfall, $unitCost);
-                $estimatedTotal = DecimalMath::add($estimatedTotal, $lineAmount, DecimalMath::DISPLAY_MONEY_SCALE);
+                $estimatedTotal = DecimalMath::add($estimatedTotal, $lineAmount);
                 $lotInfo = $lotMetadata[$product->sku_code] ?? null;
                 if ($product->tracks_expiry && empty($lotInfo['expiry_date'])) {
                     $missingLotData[] = $product->sku_code.' '.$product->name_th;
@@ -144,7 +144,10 @@ class UatReceiveAllActiveProducts extends Command
             $this->line('บรรทัดที่จะรับเพิ่ม: '.number_format(count($items)));
             $this->line('เป้าหมายรวม: '.number_format((float) $targetTotalQty, 4).' หน่วยฐาน; มีของขายได้แล้ว '.number_format((float) $currentAvailableQty, 4));
             $this->line('จำนวนรับเพิ่ม: '.number_format((float) DecimalMath::sum(array_column($items, 'qty'), DecimalMath::QUANTITY_SCALE), 4).' หน่วยฐาน');
-            $this->line('ประมาณยอดใบซื้อเชื่อ/เจ้าหนี้: ฿'.number_format((float) $estimatedTotal, 2));
+            // Documents retain four decimal places; use that stored precision for the cap.
+            $estimatedDocumentTotal = DecimalMath::round($estimatedTotal, DecimalMath::MONEY_SCALE);
+            $this->line('ประมาณยอดใบซื้อเชื่อ/เจ้าหนี้: ฿'.number_format((float) $estimatedDocumentTotal, 2)
+                .' (ยอดเอกสาร '.number_format((float) $estimatedDocumentTotal, DecimalMath::MONEY_SCALE).')');
 
             if ($missingCost !== []) {
                 $this->warn('สินค้าทุนเป็นศูนย์และต้องกำหนดต้นทุนก่อนรับ '.count($missingCost).' รายการ:');
@@ -165,7 +168,7 @@ class UatReceiveAllActiveProducts extends Command
                 return self::SUCCESS;
             }
 
-            $this->assertExecutionApproved($branch, $supplier, $reference, $estimatedTotal, $missingCost, $missingLotData);
+            $this->assertExecutionApproved($branch, $supplier, $reference, $estimatedDocumentTotal, $missingCost, $missingLotData);
             if ($items === []) {
                 $this->info('ไม่มีสินค้าขาด ไม่สร้างเอกสาร');
 

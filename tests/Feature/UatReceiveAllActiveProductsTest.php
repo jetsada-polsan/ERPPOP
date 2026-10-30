@@ -49,6 +49,41 @@ class UatReceiveAllActiveProductsTest extends TestCase
         $this->assertSame(2.0, (float) StockBalance::first()->on_hand_qty);
     }
 
+    public function test_execute_respects_the_amount_cap_at_document_precision(): void
+    {
+        [$branch, , $coveredProduct, $actor] = $this->masters();
+        StockBalance::create([
+            'product_id' => $coveredProduct->id,
+            'warehouse_location_id' => $branch->default_warehouse_location_id,
+            'on_hand_qty' => 7,
+            'reserved_qty' => 0,
+        ]);
+
+        foreach (['SKU-UAT-ROUND-1', 'SKU-UAT-ROUND-2'] as $sku) {
+            Product::create([
+                'sku_code' => $sku, 'name_th' => $sku, 'base_unit_id' => $coveredProduct->base_unit_id,
+                'default_price' => 1, 'average_cost' => 0.006, 'last_purchase_cost' => 0.006,
+                'is_vat' => false, 'is_active' => true,
+            ]);
+        }
+
+        $this->artisan('erp:uat-receive-all-active-products', [
+            '--reference' => 'UAT-ROUNDING-1', '--execute' => true,
+            '--actor' => $actor->username, '--confirm' => 'RECEIVE-ALL-ACTIVE-PRODUCTS', '--max-total' => '0.011',
+        ])->expectsOutputToContain('เกินเพดาน')->assertExitCode(1);
+
+        $this->artisan('erp:uat-receive-all-active-products', [
+            '--reference' => 'UAT-ROUNDING-1', '--execute' => true,
+            '--actor' => $actor->username, '--confirm' => 'RECEIVE-ALL-ACTIVE-PRODUCTS', '--max-total' => '0.012',
+        ])->expectsOutputToContain('ประมาณยอดใบซื้อเชื่อ/เจ้าหนี้: ฿0.01 (ยอดเอกสาร 0.0120)')
+            ->expectsOutputToContain('รับสินค้าแล้ว:')
+            ->assertExitCode(0);
+
+        $document = Document::where('reference', 'UAT-ROUNDING-1')->firstOrFail();
+        $this->assertSame(0.012, (float) $document->total_amount);
+        $this->assertSame(2, $document->total_items);
+    }
+
     public function test_execute_requires_admin_confirmation_and_respects_the_amount_cap(): void
     {
         [$branch, , $product, $actor] = $this->masters();
