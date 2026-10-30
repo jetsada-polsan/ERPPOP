@@ -1364,3 +1364,11 @@ pending
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้คลิกทดสอบ UI บน production และไม่ได้บันทึกเอกสารจริง; การค้นหาเรียก endpoint สินค้าเดิมและขึ้นกับสิทธิ์ที่หน้าเดิมกำหนด
 - Deploy: ยังไม่ deploy
 - งานถัดไป: push commit และรอเจ้าของสั่ง deploy ก่อนตรวจหน้าใช้งาน production
+
+## Handoff - 2026-10-30 (แก้ปุ่มปิดหน้าต่างยกเลิกเอกสาร)
+- Commit: `21a8078`
+- ทำอะไร: แก้ backdrop โมดัลยกเลิกเอกสารให้ใช้ `d-flex` เฉพาะตอนเปิด เพื่อไม่ให้ Bootstrap บังคับแสดงทับคำสั่งซ่อนจาก Alpine; เพิ่ม regression test ตรวจคลาสและปุ่มปิด
+- ทดสอบ: `php -d memory_limit=512M vendor/bin/phpunit tests/Feature/DocumentVoidTest.php` ผ่าน 9 tests / 52 assertions; `php -d memory_limit=1G vendor/bin/phpunit` ผ่าน 638 tests (637 passed, 1 skipped), 4,425 assertions, incomplete 6; `vendor/bin/pint --dirty` และ `git diff --check` ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: ยืนยันสาเหตุจาก markup และ computed CSS บน production; ยังไม่ได้ deploy จึงยังไม่เปลี่ยนพฤติกรรมบน production
+- Deploy: ยังไม่ deploy
+- งานถัดไป: deploy ตามขั้นตอน `docs/OPERATIONS.md` เมื่อเจ้าของสั่ง แล้วตรวจปุ่มปิดโมดัลบน production โดยไม่ส่งคำสั่งยกเลิกเอกสาร
