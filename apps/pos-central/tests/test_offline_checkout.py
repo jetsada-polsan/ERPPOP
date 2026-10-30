@@ -126,7 +126,9 @@ def test_checkout_is_saved_before_any_network_request(qtbot, tmp_path, monkeypat
         assert outbox.status == "pending"
         assert outbox.idempotency_key == sale.idempotency_key
         assert outbox.idempotency_key.startswith("offline-receipt-")
-        assert payload["items"] == [{"product_id": 101, "qty": 1.0, "unit_price": 100.0}]
+        # Decimal quantities and prices are serialized as strings so the JSON
+        # round-trip cannot silently reintroduce binary float rounding.
+        assert payload["items"] == [{"product_id": 101, "qty": "1", "unit_price": "100"}]
     finally:
         session.close()
 

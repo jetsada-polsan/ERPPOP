@@ -1,6 +1,6 @@
 import pytest
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QMessageBox, QInputDialog
+from PySide6.QtWidgets import QDialog, QMessageBox, QInputDialog
 from ui.main_window import MainWindow
 
 @pytest.fixture
@@ -78,7 +78,7 @@ def test_split_payment_uses_exact_remaining_transfer_and_requires_confirmation(a
     dialog.transfer_account_last4_input.setText("1234")
     dialog.payment_confirm_check.setChecked(True)
     dialog.accept_payment()
-    assert dialog.result() == dialog.Accepted
+    assert dialog.result() == QDialog.DialogCode.Accepted
 
 
 def test_card_payment_requires_and_keeps_reference(app_window, qtbot):
@@ -90,5 +90,5 @@ def test_card_payment_requires_and_keeps_reference(app_window, qtbot):
     dialog.payment_reference_input.setText("AUTH-123")
     dialog.accept_payment()
 
-    assert dialog.result() == dialog.Accepted
+    assert dialog.result() == QDialog.DialogCode.Accepted
     assert dialog.payment_reference == "AUTH-123"

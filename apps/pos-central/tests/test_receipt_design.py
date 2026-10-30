@@ -57,7 +57,7 @@ def test_receipt_dialog_matches_reference_slip(qtbot):
     plain = dlg.receipt_text.toPlainText()
     assert "POP STAR SHOP" in plain
     assert "ใบรับเงิน" in plain
-    assert "0.2 ** ตับไก่" in plain
+    assert "0.27 ตับไก่" in plain
     assert "24.03#" in plain
     assert "35.15#" in plain
     assert "ลดจากปัดเศษสตางค์" not in plain
