@@ -18,10 +18,17 @@
 - `php -d memory_limit=512M artisan test --filter='PosWebCheckoutRealTest|PosPricingGuardTest'` ผ่าน 16 tests / 41 assertions; `git diff --check` ผ่าน
 - รัน pytest/PySide UI tests บน Mac นี้ไม่ได้ เพราะไม่มี `pytest`, PySide6 และ SQLAlchemy; ใช้ Windows UAT runner ยืนยันชุด UI tests แทน
 
+## Deploy production
+- Deploy ERP workflow [41068609157](https://github.com/jetsada-polsan/ERPPOP/actions/runs/41068609157) สำเร็จจาก commit `40175f6a41852701813bd1ff0613f3c80d57140f` หลัง full PHP tests และ frontend build ผ่าน
+- Production deploy อัปโหลด release, รัน deployment script, migration (คง current), clear/cache routes/views และ `erp:health`; database, migrations, backup freshness, sales-to-GL, pending stock count, storage และ queue ผ่าน
+- ก่อน deploy รัน Production check [41068504714](https://github.com/jetsada-polsan/ERPPOP/actions/runs/41068504714): backup `erp-db-20261030-210355.sql.gz` ขนาด 800 KB; restore drill ผ่านและจำนวนแถว 8 ตารางตรงกัน; health ผ่าน, migrations pending 0
+- Production check พบ `pos_receipts_today=22`, `offline_needs_review=0`, `desktop_rejects_logged_today=0`; deployment ไม่ได้สร้างบิลขายใหม่
+
 ## ความเสี่ยง/งานถัดไป
 - ยังไม่ได้ตรวจเครื่องชั่ง/เครื่องสแกน/เครื่องพิมพ์จริง; ทดสอบอุปกรณ์จริงและเทียบยอดก่อนใช้ demo
-- ยังเป็น candidate `apps/pos-central`; installer หลักยังชี้ `apps/pos-python`; ยังไม่ได้สร้างบิล production หรือ deploy production
+- `apps/pos-central` ยังเป็น candidate; installer หลักยังชี้ `apps/pos-python`; deploy รอบนี้อัปเดต ERP/API ไม่ได้เปลี่ยนช่องทาง installer POS
 - ส่วนลดที่ต้องลดเฉพาะรายการชั่ง/โปรที่ลงกับฉลากชั่งยังไม่รองรับ; ระบบบล็อกกรณีที่กระจายส่วนลดให้ ERP ตรวจราคาได้ไม่ตรง ต้องทดสอบป้ายชั่งจริงร่วมกับโปรก่อนเปิดใช้กรณีนั้น
+- Production inspect พบไม่มี `rclone` และ `scripts/backup/production.env`; local backup กับ restore drill ผ่าน แต่การตั้งค่า offsite backup ยังเป็นงานค้าง
 
 # Handoff — 2026-10-30 (ปรับ UI ทุก flow ของ POS Central)
 
