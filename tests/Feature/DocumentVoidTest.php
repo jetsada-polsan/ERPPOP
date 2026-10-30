@@ -203,6 +203,28 @@ class DocumentVoidTest extends TestCase
         $this->assertSame('cancelled', $purchase->fresh()->status);
     }
 
+    public function test_void_dialog_only_uses_flex_display_when_open(): void
+    {
+        $this->purchase(2);
+        $sale = $this->creditSale(1);
+        $role = Role::firstOrCreate(['code' => 'VOID_DIALOG_TEST'], ['name' => 'ทดสอบหน้าต่างยกเลิก']);
+        $permission = Permission::firstOrCreate(['code' => 'documents.void'], ['name' => 'ยกเลิกเอกสาร']);
+        $role->permissions()->syncWithoutDetaching([$permission->id]);
+        auth()->user()->roles()->syncWithoutDetaching([$role->id]);
+        $this->actingAs(auth()->user()->fresh());
+
+        $html = view('documents._void-action', ['doc' => $sale])->render();
+
+        $this->assertMatchesRegularExpression(
+            '/x-show="voidOpen" x-cloak class="([^"]*)"\s+:class="\{ \'d-flex\': voidOpen \}"/u',
+            $html,
+        );
+        preg_match('/x-show="voidOpen" x-cloak class="([^"]*)"/u', $html, $matches);
+        $this->assertArrayHasKey(1, $matches);
+        $this->assertStringNotContainsString('d-flex', $matches[1]);
+        $this->assertStringContainsString('@click="voidOpen = false">ปิด</button>', $html);
+    }
+
     private function userWith(string $username, array $permissions): User
     {
         $role = Role::create(['code' => 'VR_'.$username, 'name' => $username]);

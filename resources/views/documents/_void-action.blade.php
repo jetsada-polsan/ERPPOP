@@ -17,7 +17,8 @@
             </button>
             <div class="small text-muted mt-1">{{ implode(' / ', $voidBlockers) }}</div>
         @endif
-        <div x-show="voidOpen" x-cloak class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+        <div x-show="voidOpen" x-cloak class="position-fixed top-0 start-0 w-100 h-100 align-items-center justify-content-center"
+             :class="{ 'd-flex': voidOpen }"
              style="background: rgba(15,23,42,.45); z-index: 1060;" @click.self="voidOpen = false">
             <form method="post" action="{{ route('documents.void', $doc) }}" class="content-card p-4" style="width: min(480px, 92vw);"
                   data-confirm="ยืนยันยกเลิก {{ $doc->doc_number }}? ระบบจะกลับรายการสต๊อกและบัญชี ย้อนไม่ได้" data-confirm-ok="ยกเลิกเอกสาร" data-confirm-icon="warning">
