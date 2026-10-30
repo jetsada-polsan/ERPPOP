@@ -12,10 +12,11 @@
 - `git diff --check` ผ่าน
 - `PYTHONPYCACHEPREFIX=/private/tmp/poscentral-theme-pycache python3 -m compileall -q apps/pos-central/ui apps/pos-central/tests` ผ่าน
 - ตรวจ AST ครบ 17 window/dialog constructors และยืนยันว่าเรียกธีมส่วนกลางครบ
-- รัน `python3 -m pytest -q apps/pos-central/tests` ไม่ได้ เพราะ Python เครื่องนี้ไม่มี `pytest` ติดตั้ง (และไม่มี PySide6/SQLAlchemy); หลัง push ให้ดู workflow `POS Central Desktop UAT for Windows` ซึ่งรันทดสอบและแพ็ก build บน Windows
+- รัน `python3 -m pytest -q apps/pos-central/tests` ในเครื่อง dev ไม่ได้ เพราะไม่มี `pytest`/PySide6/SQLAlchemy ติดตั้ง; หลัง push, workflow `POS Central Desktop UAT for Windows` run `41058958611` ผ่านครบทั้ง tests, Windows build, ZIP และ upload artifact
+- Artifact `PopCentral-POS-Central-UAT-0.1.0-dev` (SHA-256 `b79e8e17afa816176cd22b1be68201a30deb37b63569ef005667a9f18ffce1f0`), ใช้ดาวน์โหลดจาก [GitHub Actions run](https://github.com/jetsada-polsan/ERPPOP/actions/runs/41058958611)
 
 ## ความเสี่ยง/งานถัดไป
-- ยังไม่ได้ตรวจภาพจริงบนเครื่อง Windows POS; ให้ดู artifact จาก Windows UAT เพื่อยืนยันขนาดตัวอักษร/หน้าจอและอุปกรณ์สัมผัส
+- ยังไม่ได้ตรวจภาพจริงบนเครื่อง Windows POS; ให้ติดตั้ง artifact UAT แล้วลองขนาดตัวอักษร/หน้าจอและอุปกรณ์สัมผัสก่อน demo
 - เป็น UI ของ candidate `apps/pos-central`; POS หลัก `apps/pos-python` และ ERP Web ไม่ได้เปลี่ยน
 - ไม่ deploy production และไม่สร้าง/แก้บิล production จากงาน UI รอบนี้
 
