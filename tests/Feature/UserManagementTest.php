@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\Api\PosApiController;
 use App\Http\Middleware\ErpAuthorize;
 use App\Models\Branch;
 use App\Models\Permission;
@@ -11,7 +12,9 @@ use App\Models\Salesman;
 use App\Models\User;
 use App\Models\UserPosCredential;
 use App\Support\ErpMenu;
+use App\Support\RoutePermissions;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -20,7 +23,7 @@ class UserManagementTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_admin_can_reset_a_user_to_the_temporary_password(): void
+    public function test_admin_can_reset_a_user_to_a_permanent_password_without_forcing_another_reset(): void
     {
         $admin = User::factory()->create([
             'username' => 'admin-reset',
@@ -38,17 +41,17 @@ class UserManagementTest extends TestCase
             ->post(route('users.reset-password', $user));
 
         $response->assertRedirect(route('users.index'));
-        // รหัสชั่วคราวเป็นเลข 6 หลักและส่งให้แอดมินคัดลอกครั้งเดียว
+        // รหัสผ่านที่สุ่มให้แอดมินส่งต่อใช้ได้ทันที โดยไม่ติดสถานะบังคับเปลี่ยนซ้ำ
         $response->assertSessionHas('reset_password_result');
-        $temporary = session('reset_password_result')['password'];
-        $this->assertNotSame('OldPassword123', $temporary);
-        $this->assertMatchesRegularExpression('/^\d{6}$/', $temporary);
+        $password = session('reset_password_result')['password'];
+        $this->assertNotSame('OldPassword123', $password);
+        $this->assertMatchesRegularExpression('/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)[A-Za-z\d]{18}$/', $password);
 
         $user->refresh();
-        $this->assertTrue(Hash::check($temporary, $user->password), 'รหัสที่โชว์ต้องตรงกับที่เก็บ');
+        $this->assertTrue(Hash::check($password, $user->password), 'รหัสที่โชว์ต้องตรงกับที่เก็บ');
         $this->assertFalse(Hash::check('12345678', $user->password));
-        $this->assertTrue($user->must_change_password);
-        $this->assertNull($user->password_changed_at);
+        $this->assertFalse($user->must_change_password);
+        $this->assertNotNull($user->password_changed_at);
         $this->assertDatabaseHas('audit_logs', [
             'user_id' => $admin->id,
             'action' => 'user_password_reset',
@@ -177,6 +180,7 @@ class UserManagementTest extends TestCase
         $response->assertRedirect(route('users.index'));
 
         $user = User::where('username', 'cashier-auto')->firstOrFail();
+        $this->assertFalse($user->must_change_password);
         $profile = Salesman::where('user_id', $user->id)->firstOrFail();
 
         $this->assertNull($user->salesman_id);
@@ -187,7 +191,7 @@ class UserManagementTest extends TestCase
         $this->assertTrue($profile->is_active);
     }
 
-    public function test_admin_can_issue_a_one_time_pos_pin_and_revoke_old_device_verification(): void
+    public function test_admin_can_issue_a_permanent_pos_pin_and_revoke_old_device_verification(): void
     {
         $admin = User::factory()->create([
             'username' => 'admin-pos-pin',
@@ -237,16 +241,16 @@ class UserManagementTest extends TestCase
         $this->assertMatchesRegularExpression('/^\\d{6}$/', $temporary);
         $this->assertNotSame('482165', $temporary);
         $this->assertTrue(Hash::check($temporary, $cashier->fresh()->pos_pin_hash));
-        $this->assertTrue($cashier->fresh()->must_change_pin);
-        $this->assertNull($cashier->fresh()->pin_changed_at);
+        $this->assertFalse($cashier->fresh()->must_change_pin);
+        $this->assertNotNull($cashier->fresh()->pin_changed_at);
         $this->assertNotNull($cashier->fresh()->pos_credential_version);
 
         // User is the POS identity now: user_pos_credentials is the record that authentication
         // actually reads. The salesmen columns above are kept only for the installed-client transition.
         $credential = UserPosCredential::where('user_id', $user->id)->firstOrFail();
         $this->assertTrue(Hash::check($temporary, $credential->pin_hash));
-        $this->assertTrue($credential->force_pin_change);
-        $this->assertNull($credential->pin_changed_at);
+        $this->assertFalse($credential->force_pin_change);
+        $this->assertNotNull($credential->pin_changed_at);
         $this->assertNotNull($credential->credential_version);
 
         $this->assertNull($device->fresh()->active_cashier_id);
@@ -257,6 +261,91 @@ class UserManagementTest extends TestCase
             'table_name' => 'users',
             'record_id' => $user->id,
         ]);
+    }
+
+    public function test_one_admin_action_resets_erp_and_pos_credentials_for_immediate_use(): void
+    {
+        $admin = User::factory()->create(['username' => 'admin-full-reset', 'must_change_password' => false]);
+        $manageUsers = Permission::firstOrCreate(['code' => 'users.manage'], ['name' => 'จัดการผู้ใช้']);
+        $adminRole = Role::create(['code' => 'FULL_RESET_ADMIN', 'name' => 'ผู้ดูแล reset ทดสอบ']);
+        $adminRole->permissions()->attach($manageUsers->id);
+        $admin->roles()->attach($adminRole->id);
+
+        $branch = Branch::create(['code' => 'FULL-RESET', 'name_th' => 'สาขาทดสอบ reset', 'is_active' => true]);
+        $posSell = Permission::firstOrCreate(['code' => 'pos.sell'], ['name' => 'ขาย POS']);
+        $cashierRole = Role::create(['code' => 'FULL_RESET_CASHIER', 'name' => 'แคชเชียร์ reset ทดสอบ']);
+        $cashierRole->permissions()->attach($posSell->id);
+        $user = User::factory()->create([
+            'username' => 'full-reset-cashier',
+            'branch_id' => $branch->id,
+            'password' => 'OldPassword123',
+            'must_change_password' => true,
+        ]);
+        $user->roles()->attach($cashierRole->id);
+        $cashier = Salesman::create([
+            'branch_id' => $branch->id,
+            'user_id' => $user->id,
+            'code' => 'FULL-RESET-CASHIER',
+            'name' => $user->name,
+            'is_active' => true,
+        ]);
+        $cashier->setPin('482165', false);
+        $device = PosDevice::create([
+            'name' => 'POS full reset',
+            'user_id' => $user->id,
+            'branch_id' => $branch->id,
+            'token_hash' => hash('sha256', 'full-reset-device-token'),
+            'active_cashier_id' => $cashier->id,
+            'active_cashier_user_id' => $user->id,
+            'cashier_verified_at' => now(),
+        ]);
+
+        $this->assertTrue($admin->fresh()->hasPermission('users.manage'));
+        $this->assertSame('users.manage', RoutePermissions::resolve('users.reset-login'));
+        $response = $this->withoutMiddleware(ErpAuthorize::class)
+            ->actingAs($admin)->post(route('users.reset-login', $user));
+        $response
+            ->assertRedirect(route('users.index'))
+            ->assertSessionHas('reset_login_result');
+
+        $result = session('reset_login_result');
+        $password = $result['password'];
+        $pin = $result['pin'];
+        $user->refresh();
+        $cashier->refresh();
+        $credential = UserPosCredential::where('user_id', $user->id)->firstOrFail();
+
+        $this->assertTrue(Hash::check($password, $user->password));
+        $this->assertFalse($user->must_change_password);
+        $this->assertNotNull($user->password_changed_at);
+        $this->assertMatchesRegularExpression('/^\d{6}$/', $pin);
+        $this->assertNotSame('482165', $pin);
+        $this->assertTrue(Hash::check($pin, $credential->pin_hash));
+        $this->assertFalse($credential->force_pin_change);
+        $this->assertNotNull($credential->pin_changed_at);
+        $this->assertFalse($cashier->must_change_pin);
+        $this->assertNull($device->fresh()->active_cashier_id);
+        $this->assertNull($device->fresh()->cashier_verified_at);
+        $this->assertDatabaseHas('audit_logs', [
+            'user_id' => $admin->id,
+            'action' => 'user_login_reset',
+            'table_name' => 'users',
+            'record_id' => $user->id,
+        ]);
+
+        $request = Request::create('/api/pos/cashier/login', 'POST', ['pin' => $pin, 'cashier_id' => $cashier->id]);
+        $request->attributes->set('pos_device', $device->fresh());
+        try {
+            $posLogin = app(PosApiController::class)->cashierLogin($request)->getData(true);
+        } catch (\Throwable $error) {
+            $this->fail($error->getMessage()."\n".$error->getTraceAsString());
+        }
+        $this->assertTrue($posLogin['success']);
+        $this->assertFalse($posLogin['must_change_pin']);
+        $this->assertNotEmpty($posLogin['offline_credential']);
+
+        $this->post(route('login.attempt'), ['username' => $user->username, 'password' => $password]);
+        $this->assertAuthenticatedAs($user);
     }
 
     public function test_pos_pin_reset_reuses_legacy_mapping_and_aligns_its_adapter_to_the_user_branch(): void

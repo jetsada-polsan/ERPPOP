@@ -109,7 +109,8 @@ class UserController extends Controller
             'sales_area_id' => $data['sales_area_id'] ?? null,
             'password' => $data['password'],
             'is_active' => true,
-            'must_change_password' => true,
+            'must_change_password' => false,
+            'password_changed_at' => now(),
         ]);
         $user->roles()->sync($data['role_ids']);
         $this->syncHomeBranchRoles($user, $data['role_ids']);
@@ -118,7 +119,7 @@ class UserController extends Controller
         $this->audit('user_create', $user, [], [
             'username' => $user->username,
             'role_ids' => $data['role_ids'],
-            'must_change_password' => true,
+            'must_change_password' => false,
         ]);
 
         return redirect()->route('users.index')->with('success', "เพิ่มผู้ใช้ {$user->username} แล้ว");
@@ -163,7 +164,8 @@ class UserController extends Controller
         ]);
         if (! empty($data['password'])) {
             $user->password = $data['password'];
-            $user->must_change_password = true;
+            $user->must_change_password = false;
+            $user->password_changed_at = now();
         }
         $user->save();
         $user->roles()->sync($data['role_ids']);
@@ -184,31 +186,106 @@ class UserController extends Controller
 
     public function resetPassword(User $user): RedirectResponse
     {
-        $temporary = $this->temporaryPassword();
+        $password = $this->generatePassword();
 
-        DB::transaction(function () use ($user, $temporary) {
+        DB::transaction(function () use ($user, $password) {
             $user->forceFill([
-                'password' => $temporary,
-                'must_change_password' => true,
-                'password_changed_at' => null,
+                'password' => $password,
+                'must_change_password' => false,
+                'password_changed_at' => now(),
                 'remember_token' => null,
             ])->save();
 
-            // ไม่บันทึกตัวรหัสลง audit — เก็บแค่ว่าใครรีเซ็ตให้ใครและบังคับเปลี่ยน
+            // ไม่บันทึกรหัสลง audit — เก็บเฉพาะว่าใครรีเซ็ตให้ใคร
             $this->audit('user_password_reset', $user, [], [
                 'username' => $user->username,
-                'must_change_password' => true,
+                'must_change_password' => false,
             ]);
         });
 
-        // รหัสสุ่มต่างกันทุกครั้ง ส่งกลับให้แอดมินคัดลอกครั้งเดียวผ่าน modal ที่ค้างจนกดปิด
-        // (ไม่ใช้ toast ที่หายใน 3 วิ ซึ่งคัดลอกรหัสสุ่มไม่ทัน)
+        // รหัสผ่านที่สุ่มมีความแข็งแรงและใช้ได้ทันที แสดงให้แอดมินคัดลอกครั้งเดียว
         return redirect()->route('users.index')
             ->with('reset_password_result', [
                 'type' => 'password',
                 'username' => $user->username,
-                'password' => $temporary,
+                'password' => $password,
             ]);
+    }
+
+    public function resetLogin(User $user): RedirectResponse
+    {
+        $fail = function (string $message) use ($user): RedirectResponse {
+            return redirect()->route('users.index')
+                ->withErrors(['login_reset' => $message])
+                ->withInput(['q' => $user->username]);
+        };
+
+        if (! $user->is_active) {
+            return $fail('รีเซ็ตล็อกอินไม่ได้: บัญชีผู้ใช้นี้ถูกปิดใช้งาน');
+        }
+
+        $cashier = null;
+        $pin = null;
+        $hasPosAccess = $user->hasPermission('pos.sell');
+        if ($hasPosAccess) {
+            $this->syncPosProfile($user, true);
+            $user->refresh();
+            $cashier = $user->posCashierProfile;
+            if (! $cashier || ! $cashier->is_active) {
+                return $fail('รีเซ็ตล็อกอินไม่ได้: กรุณาผูกโปรไฟล์แคชเชียร์ที่เปิดใช้งานก่อน');
+            }
+            if (
+                $user->branch_id && $cashier->branch_id && (int) $user->branch_id !== (int) $cashier->branch_id
+            ) {
+                return $fail("รีเซ็ตล็อกอินไม่ได้: สาขาผู้ใช้ ({$user->branch?->code}) กับโปรไฟล์ POS ({$cashier->branch?->code}) ไม่ตรงกัน กรุณาแก้สาขาก่อน");
+            }
+
+            $pin = $this->generatePosPin($user);
+        }
+
+        $password = $this->generatePassword();
+        DB::transaction(function () use ($user, $cashier, $password, $pin) {
+            $user->forceFill([
+                'password' => $password,
+                'must_change_password' => false,
+                'password_changed_at' => now(),
+                'remember_token' => null,
+            ])->save();
+
+            if ($cashier && $pin) {
+                UserPosCredential::firstOrCreate(['user_id' => $user->id])->setPin($pin, false);
+                // Keep installed POS versions that still read the legacy adapter in sync.
+                $cashier->setPin($pin, false);
+
+                PosDevice::where('active_cashier_id', $cashier->id)->update([
+                    'active_cashier_id' => null,
+                    'active_cashier_user_id' => null,
+                    'cashier_verified_at' => null,
+                ]);
+            }
+
+            AuditLog::create([
+                'user_id' => auth()->id(),
+                'branch_id' => auth()->user()?->branch_id,
+                'action' => 'user_login_reset',
+                'table_name' => 'users',
+                'record_id' => $user->id,
+                'new_values' => [
+                    'username' => $user->username,
+                    'erp_password_reset' => true,
+                    'pos_pin_reset' => (bool) $pin,
+                    'must_change_password' => false,
+                    'must_change_pin' => $pin === null ? null : false,
+                ],
+            ]);
+        });
+
+        return redirect()->route('users.index')->with('reset_login_result', [
+            'type' => 'login',
+            'username' => $user->username,
+            'password' => $password,
+            'pin' => $pin,
+        ]);
     }
 
     public function resetPosPin(User $user): RedirectResponse
@@ -240,12 +317,12 @@ class UserController extends Controller
             return $fail("ออก PIN POS ไม่ได้: สาขาผู้ใช้ ({$user->branch?->code}) กับโปรไฟล์แคชเชียร์ ({$cashier->branch?->code}) ไม่ตรงกัน กรุณาแก้ไขผู้ใช้ให้เลือกสาขาเดียวกับโปรไฟล์ POS แล้วลองใหม่");
         }
 
-        $temporary = $this->temporaryPosPin($user);
+        $pin = $this->generatePosPin($user);
 
-        DB::transaction(function () use ($user, $cashier, $temporary) {
-            UserPosCredential::firstOrCreate(['user_id' => $user->id])->setPin($temporary, true);
-            // Temporary compatibility write; authentication now reads user_pos_credentials first.
-            $cashier->setPin($temporary, true);
+        DB::transaction(function () use ($user, $cashier, $pin) {
+            UserPosCredential::firstOrCreate(['user_id' => $user->id])->setPin($pin, false);
+            // Compatibility write; authentication now reads user_pos_credentials first.
+            $cashier->setPin($pin, false);
 
             // PIN เดิมถูกยกเลิกแล้ว ต้องถอนการยืนยันบนทุกเครื่องทันทีด้วย
             PosDevice::where('active_cashier_id', $cashier->id)->update([
@@ -263,7 +340,7 @@ class UserController extends Controller
                 'new_values' => [
                     'username' => $user->username,
                     'legacy_cashier_id' => $cashier->id,
-                    'must_change_pin' => true,
+                    'must_change_pin' => false,
                 ],
             ]);
         });
@@ -271,7 +348,7 @@ class UserController extends Controller
         return redirect()->route('users.index')->with('reset_pos_pin_result', [
             'type' => 'pos_pin',
             'username' => $user->username,
-            'password' => $temporary,
+            'password' => $pin,
         ]);
     }
 
@@ -309,26 +386,46 @@ class UserController extends Controller
         return redirect()->route('users.index')->with('success', "ปรับสาขา {$user->username} ให้ตรงกับโปรไฟล์ POS แล้ว กดออก PIN POS ได้เลย");
     }
 
-    /**
-     * รหัส ERP ชั่วคราวแบบตัวเลข 6 หลัก สุ่มด้วย CSPRNG และบังคับเปลี่ยนหลังเข้าใช้ครั้งแรก
-     */
-    private function temporaryPassword(): string
+    /** สร้างรหัส ERP ใช้งานได้ทันที โดยไม่ต้องผ่านหน้าบังคับเปลี่ยนรหัสซ้ำ */
+    private function generatePassword(): string
     {
-        return (string) random_int(100000, 999999);
+        $groups = [
+            'ABCDEFGHJKLMNPQRSTUVWXYZ',
+            'abcdefghijkmnopqrstuvwxyz',
+            '23456789',
+        ];
+        $alphabet = implode('', $groups);
+        $characters = array_map(fn (string $group): string => $group[random_int(0, strlen($group) - 1)], $groups);
+
+        while (count($characters) < 18) {
+            $characters[] = $alphabet[random_int(0, strlen($alphabet) - 1)];
+        }
+
+        for ($index = count($characters) - 1; $index > 0; $index--) {
+            $swap = random_int(0, $index);
+            [$characters[$index], $characters[$swap]] = [$characters[$swap], $characters[$index]];
+        }
+
+        return implode('', $characters);
     }
 
-    /** PIN ชั่วคราวต้องไม่ชนคนในสาขา เพราะ POS รุ่นใหม่ล็อกอินด้วย PIN อย่างเดียว */
-    private function temporaryPosPin(User $user): string
+    /** PIN ที่แอดมินออกให้ต้องไม่ชน credential ของ POS คนอื่น */
+    private function generatePosPin(User $user): string
     {
-        $candidates = UserPosCredential::query()
+        $hashes = collect(UserPosCredential::query()
             ->whereNotNull('pin_hash')
             ->where('user_id', '!=', $user->id)
             ->whereNull('revoked_at')
-            ->get(['id', 'pin_hash']);
+            ->pluck('pin_hash'))->all();
+        $hashes = array_merge($hashes, collect(Salesman::query()
+            ->where('is_active', true)
+            ->whereNotNull('pos_pin_hash')
+            ->where(fn ($query) => $query->whereNull('user_id')->orWhere('user_id', '!=', $user->id))
+            ->pluck('pos_pin_hash'))->all());
 
         for ($attempt = 0; $attempt < 100; $attempt++) {
             $pin = (string) random_int(100000, 999999);
-            if (! $candidates->contains(fn (UserPosCredential $candidate) => Hash::check($pin, $candidate->pin_hash))) {
+            if (! collect($hashes)->contains(fn (?string $hash) => $hash && Hash::check($pin, $hash))) {
                 return $pin;
             }
         }
