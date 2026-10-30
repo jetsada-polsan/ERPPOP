@@ -379,7 +379,7 @@ class BookingSalesAreaTest extends TestCase
 
     public function test_booking_edit_that_exceeds_available_stock_keeps_the_existing_booking_and_reservation(): void
     {
-        [$branch, $customer, $product] = $this->masters('EDITSTOCK');
+        [$branch, $customer, $product] = $this->masters('EDSTOCK');
         $user = User::factory()->create(['username' => 'booking_edit_stock_uat', 'branch_id' => $branch->id]);
         $this->withoutMiddleware(ErpAuthorize::class)->actingAs($user)
             ->post(route('bookings.store'), [

@@ -224,7 +224,7 @@ class SalesDocumentEndToEndTest extends TestCase
 
     public function test_a_delivery_booking_posts_a_sale_only_after_full_delivery_and_uses_the_delivery_date(): void
     {
-        [$branch, $location, $product, $customer] = $this->stockedBranch('DELIVERYSALE', qty: 10, unitCost: 60, withCustomer: true);
+        [$branch, $location, $product, $customer] = $this->stockedBranch('DELSALE', qty: 10, unitCost: 60, withCustomer: true);
         $bookingDocument = app(BookingService::class)->create([
             'branch_id' => $branch->id,
             'customer_id' => $customer->id,
