@@ -1383,3 +1383,12 @@ pending
 - Production preflight: GitHub Actions run `41000157976` ผ่าน; backup `erp-db-20261030-105715.sql.gz` (788K), PostgreSQL restore drill ผ่าน, `health=ok`, `migrations_pending=0`, counts ตรงกันหลัง restore
 - Deploy: GitHub Actions `Deploy ERP` run `41000130298` สำเร็จบน production ที่ commit ข้างต้น; test, asset build, upload และ `scripts/deploy.sh` ผ่าน (รวม `php artisan erp:health`)
 - งานถัดไป: ทำ browser UAT ตามขั้นตอนใบจอง/ขึ้นรถ/ส่งของบน production โดยไม่สร้างเอกสารจริง เว้นแต่เจ้าของสั่งทดสอบการบันทึก
+
+## Handoff - 2026-10-30 (Codex: สคริปต์เติมสต๊อกสินค้าเพื่อ UAT POS)
+- Commit: รอ commit
+- ทำอะไร: เพิ่ม Artisan command `erp:uat-receive-all-active-products` และ GitHub Actions `UAT receive all active products`; preview เป็นค่าเริ่มต้น เติมเฉพาะจำนวนที่ขาดให้สินค้าที่เปิดใช้ขายได้หนึ่งครั้งต่อหน่วยขายที่มี barcode โดยใช้ทุนรับเข้าล่าสุดหรือทุนเฉลี่ย และผู้ขาย UAT `UAT-POS-TEST`; บันทึกจริงผ่าน `PurchaseService` ปกติ จึงสร้างใบซื้อเชื่อ เพิ่มสต๊อก เปิด AP และลง GL
+- การ์ดป้องกัน: โหมดจริงต้องระบุ admin ผู้บันทึก, เพดานยอดซื้อ, คำยืนยัน; ล็อกสาขาและตรวจ reference ซ้ำใน transaction; สินค้าไม่มีต้นทุนหรือขาด lot/วันหมดอายุหยุดทั้งชุด และปฏิเสธ lot หมดอายุ; ไม่มีการเพิ่มสิทธิ์ admin และไม่ได้ใช้ขั้นอนุมัติใบขอซื้อเพื่อเลี่ยงกฎ self-approval
+- ทดสอบ: `php -d memory_limit=1G vendor/bin/phpunit` ผ่าน 648 tests (647 ผ่าน, 1 skipped), 4,510 assertions, incomplete 6; test สคริปต์ 5 tests / 37 assertions; Pint, PHP lint, workflow YAML parse และ `git diff --check` ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ deploy และยังไม่รันกับฐาน production; คำสั่งรับจริงจะเปลี่ยน stock/AP/GL และอัปเดต product supplier/costing; ต้องรัน preview production ก่อนดูยอดรวมและจำนวนสินค้าที่ต้องระบุ lot
+- Deploy: ยังไม่ deploy; รอ push, production backup/restore preflight และ deploy workflow
+- งานถัดไป: deploy แล้ว dispatch preview; หากไม่มีสินค้าขาดต้นทุน/lot ให้ใช้ยอด preview เป็นเพดานก่อนรับเข้าจริง; ตรวจเลขใบซื้อและยอดหลังรับเข้าก่อนเริ่ม POS test

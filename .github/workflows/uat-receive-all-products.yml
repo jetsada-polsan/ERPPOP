@@ -1,0 +1,98 @@
+name: UAT receive all active products
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Preview only, or post one real UAT purchase receipt
+        required: true
+        type: choice
+        options: [preview, receive]
+        default: preview
+      branch:
+        description: Receiving branch code
+        required: true
+        type: string
+        default: B001
+      supplier:
+        description: Active UAT supplier code
+        required: true
+        type: string
+        default: UAT-POS-TEST
+      actor:
+        description: Active system-admin username for document audit
+        required: true
+        type: string
+        default: admin
+      max_total:
+        description: Required maximum purchase/AP amount in THB when mode is receive
+        required: false
+        type: string
+      reference:
+        description: Optional idempotency reference for this UAT receipt
+        required: false
+        type: string
+      lots_path:
+        description: Optional server-side CSV path for expiry-controlled product lots
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  receive:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+      - run: ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+      - name: Run guarded production preview or receipt
+        env:
+          MODE: ${{ inputs.mode }}
+          BRANCH: ${{ inputs.branch }}
+          SUPPLIER: ${{ inputs.supplier }}
+          ACTOR: ${{ inputs.actor }}
+          MAX_TOTAL: ${{ inputs.max_total }}
+          REFERENCE: ${{ inputs.reference }}
+          LOTS_PATH: ${{ inputs.lots_path }}
+          APP_DIR: ${{ vars.APP_DIR }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+          [[ "$MODE" == "preview" || "$MODE" == "receive" ]]
+          [[ "$BRANCH" =~ ^[A-Za-z0-9-]{1,20}$ ]]
+          [[ "$SUPPLIER" =~ ^[A-Za-z0-9-]{1,40}$ ]]
+          [[ "$ACTOR" =~ ^[A-Za-z0-9._-]{1,80}$ ]]
+          [[ "$REFERENCE" =~ ^[A-Za-z0-9._-]{0,100}$ ]]
+          [[ "$LOTS_PATH" =~ ^[A-Za-z0-9_./-]{0,240}$ ]]
+          [[ -n "$APP_DIR" ]]
+          if [[ -n "$LOTS_PATH" ]]; then
+            [[ "$LOTS_PATH" == storage/app/uat-lots/* ]]
+            [[ "$LOTS_PATH" != *".."* ]]
+          fi
+          if [[ "$MODE" == "receive" ]]; then
+            [[ "$MAX_TOTAL" =~ ^[0-9]+([.][0-9]{1,2})?$ ]]
+            awk -v amount="$MAX_TOTAL" 'BEGIN { exit !(amount > 0) }'
+          fi
+
+          args=(php artisan erp:uat-receive-all-active-products "--branch=$BRANCH" "--supplier=$SUPPLIER")
+          [[ -z "$REFERENCE" ]] || args+=("--reference=$REFERENCE")
+          [[ -z "$LOTS_PATH" ]] || args+=("--lots=$LOTS_PATH")
+          if [[ "$MODE" == "receive" ]]; then
+            args+=(--execute "--actor=$ACTOR" --confirm=RECEIVE-ALL-ACTIVE-PRODUCTS "--max-total=$MAX_TOTAL")
+          fi
+
+          printf -v remote_command '%q ' "${args[@]}"
+          printf -v remote_app_dir '%q' "$APP_DIR"
+          ssh "${DEPLOY_USER}@${DEPLOY_HOST}" "cd -- $remote_app_dir && $remote_command" | tee result.txt
+          {
+            echo '### UAT receive all active products'
+            echo '```'
+            cat result.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
