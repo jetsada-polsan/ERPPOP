@@ -9,6 +9,7 @@ use App\Models\PosDevice;
 use App\Models\Role;
 use App\Models\Salesman;
 use App\Models\User;
+use App\Models\UserPosCredential;
 use App\Support\ErpMenu;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -37,12 +38,11 @@ class UserManagementTest extends TestCase
             ->post(route('users.reset-password', $user));
 
         $response->assertRedirect(route('users.index'));
-        // รหัสสุ่มถูกส่งกลับให้แอดมินคัดลอกครั้งเดียว (ไม่ใช่ค่าตายตัวเดิม)
+        // รหัสชั่วคราวเป็นเลข 6 หลักและส่งให้แอดมินคัดลอกครั้งเดียว
         $response->assertSessionHas('reset_password_result');
         $temporary = session('reset_password_result')['password'];
-        $this->assertNotSame('12345678', $temporary, 'ต้องไม่ใช่รหัสตายตัวเดิม');
         $this->assertNotSame('OldPassword123', $temporary);
-        $this->assertGreaterThanOrEqual(8, strlen($temporary));
+        $this->assertMatchesRegularExpression('/^\d{6}$/', $temporary);
 
         $user->refresh();
         $this->assertTrue(Hash::check($temporary, $user->password), 'รหัสที่โชว์ต้องตรงกับที่เก็บ');
@@ -243,7 +243,7 @@ class UserManagementTest extends TestCase
 
         // User is the POS identity now: user_pos_credentials is the record that authentication
         // actually reads. The salesmen columns above are kept only for the installed-client transition.
-        $credential = \App\Models\UserPosCredential::where('user_id', $user->id)->firstOrFail();
+        $credential = UserPosCredential::where('user_id', $user->id)->firstOrFail();
         $this->assertTrue(Hash::check($temporary, $credential->pin_hash));
         $this->assertTrue($credential->force_pin_change);
         $this->assertNull($credential->pin_changed_at);

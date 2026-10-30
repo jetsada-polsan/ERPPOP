@@ -310,26 +310,11 @@ class UserController extends Controller
     }
 
     /**
-     * รหัสชั่วคราวแบบสุ่ม เดิมตั้งเป็น 12345678 ตายตัวทุกคน ซึ่งเดาได้ และช่วงก่อนที่
-     * ผู้ใช้จะเปลี่ยน ใครรู้ก็ล็อกอินได้ ตัดตัวที่สับสน (0/O/1/l/I) ออกให้พิมพ์ครั้งเดียวไม่ผิด
+     * รหัส ERP ชั่วคราวแบบตัวเลข 6 หลัก สุ่มด้วย CSPRNG และบังคับเปลี่ยนหลังเข้าใช้ครั้งแรก
      */
     private function temporaryPassword(): string
     {
-        $letters = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-        $digits = '23456789';
-        $pick = function (string $pool, int $count): string {
-            $out = '';
-            for ($i = 0; $i < $count; $i++) {
-                $out .= $pool[random_int(0, strlen($pool) - 1)];
-            }
-
-            return $out;
-        };
-
-        $chars = str_split($pick($letters, 7).$pick($digits, 3));
-        shuffle($chars); // กันไม่ให้ตัวเลขไปกองท้ายทุกครั้ง
-
-        return implode('', $chars);
+        return (string) random_int(100000, 999999);
     }
 
     /** PIN ชั่วคราวต้องไม่ชนคนในสาขา เพราะ POS รุ่นใหม่ล็อกอินด้วย PIN อย่างเดียว */
