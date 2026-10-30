@@ -177,8 +177,13 @@ def main():
             config['cashier_name'] = 'Admin / Demo Cashier'
             config['cashier_username'] = 'admin'
         else:
+            # Older candidate builds saved localhost as their default. During
+            # normal startup, move that old default to the company ERP URL;
+            # explicit server URLs remain untouched. Demo mode stays local.
+            if config.get('api_url') in (None, '', 'http://localhost:8000'):
+                config['api_url'] = 'https://erp.popstarcenter.com'
             token_dlg = PosTokenLoginDialog(
-                api_url=config.get('api_url', 'http://localhost:8000'),
+                api_url=config.get('api_url', 'https://erp.popstarcenter.com'),
                 default_token=config.get('pos_token', ''),
                 default_username=config.get('cashier_username', config.get('cashier_name', '')),
                 cached_offline_auth=config.get('offline_auth')

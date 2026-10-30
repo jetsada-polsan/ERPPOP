@@ -364,7 +364,7 @@ class MainWindow(QMainWindow):
 
         return {
 
-            'api_url': 'http://localhost:8000',
+            'api_url': 'https://erp.popstarcenter.com',
 
             'pos_token': '',
 
@@ -442,7 +442,7 @@ class MainWindow(QMainWindow):
         if worker and worker.isRunning():
             return False
 
-        self.sync_worker = SyncWorker(self.db_path, self.config.get('api_url', 'http://localhost:8000'), token, config=self.config)
+        self.sync_worker = SyncWorker(self.db_path, self.config.get('api_url', 'https://erp.popstarcenter.com'), token, config=self.config)
         self.sync_worker.sync_started.connect(self.on_sync_started)
         self.sync_worker.sync_finished.connect(self.on_sync_finished)
         self.sync_worker.products_updated.connect(self.load_products_from_db)
@@ -2930,7 +2930,7 @@ class MainWindow(QMainWindow):
 
     def open_settings(self):
 
-        url, ok1 = QInputDialog.getText(self, "ตั้งค่าเชื่อมต่อเซิร์ฟเวอร์", "กรุณาใส่ API URL:", text=self.config.get('api_url', 'http://localhost:8000'))
+        url, ok1 = QInputDialog.getText(self, "ตั้งค่าเชื่อมต่อเซิร์ฟเวอร์", "กรุณาใส่ API URL:", text=self.config.get('api_url', 'https://erp.popstarcenter.com'))
 
         if not ok1: return
 
@@ -3495,7 +3495,7 @@ class MainWindow(QMainWindow):
 
         # 1. พยายามยิงไปเก็บที่ Server ERP ก่อน
 
-        api_url = (self.config.get('api_url') or 'http://localhost:8000').rstrip('/')
+        api_url = (self.config.get('api_url') or 'https://erp.popstarcenter.com').rstrip('/')
 
         pos_token = self.config.get('pos_token')
 
@@ -3625,7 +3625,7 @@ class MainWindow(QMainWindow):
 
         all_held = []
 
-        api_url = (self.config.get('api_url') or 'http://localhost:8000').rstrip('/')
+        api_url = (self.config.get('api_url') or 'https://erp.popstarcenter.com').rstrip('/')
 
         pos_token = self.config.get('pos_token')
 

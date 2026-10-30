@@ -14,6 +14,7 @@ def test_mainwindow_initialization(qtbot, tmp_path, monkeypatch):
     assert hasattr(window, "manual_open_drawer")
     assert hasattr(window, "cancel_current_bill")
     assert hasattr(window, "create_products_panel")
+    assert window.config["api_url"] == "https://erp.popstarcenter.com"
 
 
 def test_unpaired_startup_does_not_create_a_background_sync_worker(qtbot, tmp_path, monkeypatch):

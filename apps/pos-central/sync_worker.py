@@ -61,7 +61,7 @@ class SyncWorker(QThread):
 
         self.db_path = db_path
 
-        self.api_url = api_url.rstrip('/') if api_url else 'http://localhost:8000'
+        self.api_url = api_url.rstrip('/') if api_url else 'https://erp.popstarcenter.com'
 
         self.pos_token = pos_token
 

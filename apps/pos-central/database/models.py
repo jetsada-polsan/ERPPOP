@@ -24,7 +24,7 @@ class DeviceConfig(Base):
     branch_id = Column(Integer, nullable=True)
     branch_name = Column(String(255), nullable=True)
     device_token = Column(Text, nullable=True)
-    api_url = Column(String(255), default='http://localhost:8000')
+    api_url = Column(String(255), default='https://erp.popstarcenter.com')
     registered_at = Column(DateTime, default=datetime.utcnow)
     is_active = Column(Boolean, default=True)
 

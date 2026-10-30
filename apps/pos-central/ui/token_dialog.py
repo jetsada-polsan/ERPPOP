@@ -17,9 +17,9 @@ class PosTokenLoginDialog(QDialog):
     หน้าต่างเข้าสู่ระบบจุดขาย (POS Terminal Authentication)
     ธีมสีแดง-ขาว (Signature Pop Star Red & White) คมชัด สวยงาม ทรงพลัง ระดับ Commercial POS
     """
-    def __init__(self, parent=None, api_url="http://localhost:8000", default_token="", default_username="", cached_offline_auth=None):
+    def __init__(self, parent=None, api_url="https://erp.popstarcenter.com", default_token="", default_username="", cached_offline_auth=None):
         super().__init__(parent)
-        self.api_url = (api_url or "http://localhost:8000").rstrip("/")
+        self.api_url = (api_url or "https://erp.popstarcenter.com").rstrip("/")
         self.token = default_token.strip()
         self.username = default_username.strip()
         self.verified_device = None

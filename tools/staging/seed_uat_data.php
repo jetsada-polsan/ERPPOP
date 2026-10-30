@@ -72,6 +72,16 @@ DB::transaction(function () {
         $products++;
     }
 
+    // Stable custom barcode for desktop POS E2E coverage of the real scan API.
+    $scanProductId = DB::table('products')->where('sku_code', 'UAT-SKU-001')->value('id');
+    if ($scanProductId && ! DB::table('product_barcodes')->where('barcode', 'UAT-BC-0001')->exists()) {
+        DB::table('product_barcodes')->insert([
+            'product_id' => $scanProductId, 'barcode' => 'UAT-BC-0001',
+            'unit_id' => $unitId, 'unit_factor' => 1, 'price' => null,
+            'is_active' => true,
+        ]);
+    }
+
     $customers = 0;
     for ($i = 1; $i <= 20; $i++) {
         $code = sprintf('UAT-CUS-%03d', $i);

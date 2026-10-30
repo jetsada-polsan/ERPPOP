@@ -6,6 +6,13 @@ from PySide6.QtWidgets import QInputDialog
 from ui.token_dialog import PosTokenLoginDialog
 
 
+def test_default_server_is_the_company_erp(qtbot):
+    dialog = PosTokenLoginDialog()
+    qtbot.addWidget(dialog)
+
+    assert dialog.api_url == "https://erp.popstarcenter.com"
+
+
 def test_login_dialog_warns_when_api_url_targets_this_computer(qtbot):
     dialog = PosTokenLoginDialog(
         api_url="http://localhost:8000",
