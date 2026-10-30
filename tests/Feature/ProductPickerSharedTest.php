@@ -25,6 +25,7 @@ class ProductPickerSharedTest extends TestCase
 
     /** หน้าที่ต้องใช้ picker ร่วมกัน */
     private const ITEM_ENTRY_PAGES = [
+        '/bookings',
         '/purchase-orders',
         '/stock-transfers',
         '/stock-transfers/request',
@@ -73,6 +74,24 @@ class ProductPickerSharedTest extends TestCase
         $this->assertStringContainsString('@keydown.escape.window="closeProductPicker()"', $html);
         // แถวที่โฟกัสด้วยคีย์บอร์ดต้องถูกไฮไลต์
         $this->assertStringContainsString("'is-active': pickerRow === pickerActiveIndex", $html);
+    }
+
+    public function test_picker_is_portaled_above_entry_modals_and_drops_stale_searches(): void
+    {
+        $this->signIn();
+
+        $html = $this->get('/bookings')->assertOk()->getContent();
+
+        // Move the overlay out of transformed/overflow-clipped document modals.
+        $this->assertStringContainsString('x-teleport="body"', $html);
+        $this->assertStringContainsString('z-index:10000', $html);
+        $this->assertStringContainsString('aria-modal="true"', $html);
+
+        // Keep search responsive while preventing slower, older requests replacing newer results.
+        $this->assertStringContainsString('@input.debounce.100ms="searchPickerProducts()"', $html);
+        $this->assertStringContainsString('this.pickerSearchController?.abort()', $html);
+        $this->assertStringContainsString('signal: controller.signal', $html);
+        $this->assertStringContainsString('sequence !== this.pickerSearchSequence', $html);
     }
 
     public function test_shared_picker_css_and_script_are_emitted_only_once_per_page(): void

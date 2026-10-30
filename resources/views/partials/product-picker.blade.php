@@ -14,10 +14,11 @@
 
 {{-- ปิดเมื่อคลิกพื้นที่มืดรอบนอก (@click.self) แทน @click.outside ซึ่งบางจังหวะ
      จับคลิกเดียวกับที่ใช้เปิด picker แล้วปิดทันที --}}
+<template x-teleport="body">
 <div class="product-picker-backdrop" x-show="pickerOpen" x-transition.opacity
     @click.self="closeProductPicker()"
     @keydown.escape.window="closeProductPicker()" style="display:none">
-    <div class="product-picker" role="dialog" aria-label="เลือกสินค้า" x-transition>
+    <div class="product-picker" role="dialog" aria-modal="true" aria-label="เลือกสินค้า" x-transition>
         <div class="product-picker-head">
             <span class="product-picker-icon"><i class="bi bi-box-seam"></i></span>
             <div>
@@ -29,7 +30,7 @@
         <div class="product-picker-search">
             <i class="bi bi-search"></i>
             <input x-ref="productPickerSearch" type="text" x-model="pickerQuery"
-                @input.debounce.220ms="searchPickerProducts()"
+                @input.debounce.100ms="searchPickerProducts()"
                 @keydown.enter.prevent="selectActivePickerProduct()"
                 @keydown.arrow-down.prevent="movePickerActive(1)"
                 @keydown.arrow-up.prevent="movePickerActive(-1)"
@@ -61,6 +62,7 @@
         </div>
     </div>
 </div>
+</template>
 
 @once
 @push('head')
@@ -79,7 +81,8 @@
     .selected-change { color:var(--erp-primary-ink,var(--erp-primary,#1585c0)); font-size:11px; font-weight:600; text-align:right; }
 
     /* หน้าต่างเลือกสินค้า - ใช้ตัวแปรธีมเดียวกับหน้าอื่นของ PopCentral */
-    .product-picker-backdrop { position:fixed; inset:0; z-index:2200; padding:24px; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); backdrop-filter:blur(2px); }
+    /* Teleport to body prevents parent modal/transform stacking contexts from covering the picker. */
+    .product-picker-backdrop { position:fixed; inset:0; z-index:10000; padding:24px; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); backdrop-filter:blur(2px); }
     .product-picker { width:min(920px,100%); height:min(640px,calc(100vh - 48px)); display:flex; flex-direction:column; overflow:hidden; background:var(--erp-surface,#fff); border:1px solid var(--erp-border,#dbe7ef); border-radius:16px; box-shadow:0 24px 70px rgba(15,23,42,.28); font-family:var(--erp-font-family,inherit); color:var(--erp-text,var(--erp-ink,#1d3b52)); }
     .product-picker-head { display:flex; align-items:center; gap:12px; padding:18px 20px 14px; border-bottom:1px solid var(--erp-border,#dbe7ef); }
     .product-picker-icon { width:40px; height:40px; flex:none; display:grid; place-items:center; border-radius:10px; background:var(--erp-primary-soft,#eef7fd); color:var(--erp-primary,#1a9bdc); font-size:18px; }
@@ -134,6 +137,8 @@
             pickerLoading: false,
             pickerActiveIndex: 0,
             pickerContext: null,
+            pickerSearchSequence: 0,
+            pickerSearchController: null,
 
             money(value) {
                 return Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -154,6 +159,10 @@
 
             closeProductPicker() {
                 this.pickerOpen = false;
+                this.pickerSearchSequence++;
+                this.pickerSearchController?.abort();
+                this.pickerSearchController = null;
+                this.pickerLoading = false;
                 this.pickerIndex = null;
                 this.pickerContext = null;
                 this.pickerQuery = '';
@@ -163,20 +172,30 @@
 
             async searchPickerProducts() {
                 if (! this.pickerOpen) return;
+                const sequence = ++this.pickerSearchSequence;
+                this.pickerSearchController?.abort();
+                const controller = new AbortController();
+                this.pickerSearchController = controller;
                 this.pickerLoading = true;
                 try {
                     const params = new URLSearchParams({ q: this.pickerQuery.trim() });
                     if (typeof this.pickerSearchParams === 'function') this.pickerSearchParams(params);
-                    const response = await fetch(`${searchUrl}?${params.toString()}`);
+                    const response = await fetch(`${searchUrl}?${params.toString()}`, { signal: controller.signal });
                     const products = response.ok ? await response.json() : [];
+                    if (sequence !== this.pickerSearchSequence) return;
                     this.pickerResults = typeof this.filterPickerProduct === 'function'
                         ? products.filter(product => this.filterPickerProduct(product))
                         : products;
                 } catch (error) {
-                    this.pickerResults = [];
+                    if (error.name !== 'AbortError' && sequence === this.pickerSearchSequence) {
+                        this.pickerResults = [];
+                    }
                 } finally {
-                    this.pickerLoading = false;
-                    this.pickerActiveIndex = 0;
+                    if (sequence === this.pickerSearchSequence) {
+                        this.pickerSearchController = null;
+                        this.pickerLoading = false;
+                        this.pickerActiveIndex = 0;
+                    }
                 }
             },
 
