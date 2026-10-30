@@ -140,6 +140,8 @@ powershell -ExecutionPolicy Bypass -File .\build_pos.ps1 -Version "1.2.9"
 ```
 ไฟล์ติดตั้งสำเร็จรูปจะถูกสร้างไว้ที่โฟลเดอร์ `dist\PopCentral-POS-UAT-1.2.9-setup.exe`
 
+สำหรับทดสอบบน Windows ให้รัน GitHub Actions workflow **Build POS Central Desktop UAT for Windows** แล้วดาวน์โหลด ZIP artifact `PopCentral-POS-Central-UAT-*` จาก run นั้น วิธีนี้สร้างแอปทดสอบแยกและไม่เผยแพร่ทับตัวติดตั้ง POS ที่ใช้อยู่
+
 ---
 
 ## โครงสร้างโปรเจกต์ (Project Structure)

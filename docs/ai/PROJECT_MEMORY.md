@@ -66,7 +66,7 @@
 - candidate ใช้ SQLite schema, path เก็บข้อมูล และชนิดตัวเลขต่างจาก POS หลัก; ยังไม่มี migration ที่รักษาบิล/กะ/เงินเข้าออกที่ค้างส่งหรือข้อมูลยืนยันตัวตนออฟไลน์ จึงห้ามสลับตัวติดตั้งจนกว่าจะทำ migration และตรวจ parity ครบ.
 - POS หลักมีคิว `shift_open`, `sale`, `sale_void`, `cash_movement`, `shift_close` และ auth events; candidate ตอนนี้ sync เฉพาะ `sale_checkout`. ต้องพอร์ต/แปลงทุก event และคง idempotency ก่อน cutover.
 - candidate ยังใช้ `Float` กับยอด/ปริมาณ; ERP ตรวจราคาขายซ้ำ แต่ต้องตรวจความแม่นยำเงินสด/ปัดเศษและเปลี่ยนเป็น Decimal หรือพิสูจน์ความเท่ากันก่อนเปิดใช้.
-- 2026-10-30 เพิ่ม E2E ของ candidate บน Laravel HTTP API + SQLite ชั่วคราว: catalog, PIN login, shift, barcode scan, local-first checkout, receipt, GL และ stock reconciliation ผ่าน; non-demo URL เริ่มต้นและ URL เก่าที่เป็น localhost เปลี่ยนเป็น `https://erp.popstarcenter.com`. ยังไม่มีการยิงบิลทดสอบเข้าฐาน production และยังไม่เปลี่ยน installer/release จาก `apps/pos-python`.
+- 2026-10-30 เพิ่ม E2E ของ candidate บน Laravel HTTP API + SQLite ชั่วคราว: catalog, PIN login, shift, barcode scan, local-first checkout, receipt, GL และ stock reconciliation ผ่าน; non-demo URL เริ่มต้นและ URL เก่าที่เป็น localhost เปลี่ยนเป็น `https://erp.popstarcenter.com`. มี Windows UAT ZIP workflow สำหรับทดสอบแยก; ยังไม่มีการยิงบิลทดสอบเข้าฐาน production และ installer/release ใช้งานจริงยังชี้ `apps/pos-python`.
 - ป้ายชั่งที่ profile กำหนด `value_type=weight` เก็บค่าบนฉลากเป็นกรัม; API/checkout ต้องตีความเป็นกิโลกรัมก่อนคิดราคาและตัดสต๊อก.
 
 ## Web POS ขายออฟไลน์

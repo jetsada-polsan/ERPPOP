@@ -1,0 +1,93 @@
+name: Build POS Central Desktop UAT for Windows
+run-name: POS Central UAT ${{ inputs.version || 'dev' }} · ${{ inputs.source_ref || github.sha }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: UAT build label
+        required: true
+        default: 0.1.0
+        type: string
+      source_ref:
+        description: Branch, tag, or commit containing the POS Central source
+        required: false
+        default: main
+        type: string
+  push:
+    paths:
+      - apps/pos-central/**
+      - .github/workflows/pos-central-windows-uat.yml
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-package:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: apps/pos-central
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref || github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: apps/pos-central/requirements.txt
+
+      - name: Install app, test, and packaging dependencies
+        run: python -m pip install --upgrade pip -r requirements.txt -r requirements-dev.txt pyinstaller
+
+      - name: Run POS Central tests
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = 'offscreen'
+          $env:LOCALAPPDATA = Join-Path $env:RUNNER_TEMP 'poscentral-testdata'
+          python -m pytest -q tests
+
+      - name: Build Windows app directory
+        shell: pwsh
+        env:
+          UAT_VERSION: ${{ inputs.version || '0.1.0-dev' }}
+        run: |
+          if ($env:UAT_VERSION -notmatch '^\d+\.\d+\.\d+([.-][0-9A-Za-z.-]+)?$') {
+            throw "UAT_VERSION ไม่ถูกต้อง: $env:UAT_VERSION"
+          }
+          python -m PyInstaller --noconfirm --clean --windowed --onedir `
+            --name PopCentral-POS-Central-UAT `
+            --icon assets/icon.ico `
+            --collect-all PySide6 `
+            --add-data 'assets;assets' `
+            main.py
+          if ($LASTEXITCODE -ne 0) {
+            throw "PyInstaller failed with exit code $LASTEXITCODE"
+          }
+          $exe = Join-Path $PWD 'dist\PopCentral-POS-Central-UAT\PopCentral-POS-Central-UAT.exe'
+          if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
+            throw "ไม่พบไฟล์ executable ที่ build: $exe"
+          }
+          Copy-Item -Recurse -Force assets (Join-Path (Split-Path $exe) 'assets')
+
+      - name: Package UAT zip
+        shell: pwsh
+        env:
+          UAT_VERSION: ${{ inputs.version || '0.1.0-dev' }}
+        run: |
+          $output = Join-Path $PWD "dist-installer\PopCentral-POS-Central-UAT-$env:UAT_VERSION.zip"
+          New-Item -ItemType Directory -Force -Path (Split-Path $output) | Out-Null
+          Compress-Archive -Path 'dist\PopCentral-POS-Central-UAT' -DestinationPath $output -CompressionLevel Optimal
+          $archive = Get-Item -LiteralPath $output
+          if ($archive.Length -lt 10MB) {
+            throw "UAT package มีขนาดผิดปกติ: $($archive.Length) ไบต์"
+          }
+          Write-Host "UAT package ผ่าน: $($archive.Name), $($archive.Length) ไบต์"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PopCentral-POS-Central-UAT-${{ inputs.version || '0.1.0-dev' }}
+          path: apps/pos-central/dist-installer/*.zip
+          if-no-files-found: error
