@@ -61,6 +61,25 @@ class ProductBarcode(Base):
     unit_factor = Column(Float, nullable=False, default=1.0)
     price = Column(Float, nullable=True)
 
+
+class QtyPromotion(Base):
+    """Branch-scoped replica of ERP buy-N quantity promotions for offline pricing."""
+    __tablename__ = 'qty_promotions'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    server_id = Column(Integer, nullable=False, unique=True)
+    name = Column(String(255), nullable=True)
+    promo_type = Column(String(30), nullable=False)
+    product_id = Column(Integer, nullable=False, index=True)
+    min_qty = Column(String(40), nullable=False, default='0')
+    free_product_id = Column(Integer, nullable=True)
+    free_qty = Column(String(40), nullable=False, default='0')
+    discount_type = Column(String(30), nullable=True)
+    discount_value = Column(String(40), nullable=False, default='0')
+    bundle_price = Column(String(40), nullable=False, default='0')
+    starts_date = Column(String(30), nullable=True)
+    ends_date = Column(String(30), nullable=True)
+
 # 4. scale_profiles
 class ScaleProfile(Base):
     __tablename__ = 'scale_profiles'

@@ -11,6 +11,8 @@ from ui.customer_display import generate_promptpay
 from PySide6.QtGui import QFont, QIcon, QDoubleValidator
 from services.promptpay import promptpay_payload
 import re
+from decimal import InvalidOperation
+from services.money import change_for, decimal_value, money, money_text
 
 
 class IdleTimeoutDialog(QDialog):
@@ -60,8 +62,8 @@ class PaymentDialog(QDialog):
         self.setFixedSize(850, 600)
         self.setStyleSheet("background-color: white; color: #111827;")
 
-        self.discount_amount = discount_amount
-        self.total_amount = total_amount
+        self.discount_amount = float(money(discount_amount))
+        self.total_amount = float(money(total_amount))
         self.total_items = total_items
         self.total_qty = total_qty
 
@@ -107,7 +109,7 @@ class PaymentDialog(QDialog):
         methods_layout = QGridLayout()
         self.method_btns = {}
         row, col = 0, 0
-        for m in ["เงินสด", "QR"]:
+        for m in ["เงินสด", "QR", "ผสม (Split)", "บัตรเครดิต", "เช็ค"]:
             btn = QPushButton(m)
             btn.setCheckable(True)
             btn.setFixedHeight(60)
@@ -228,6 +230,11 @@ class PaymentDialog(QDialog):
         self.payment_confirm_check.hide()
         right_layout.addWidget(self.payment_confirm_check)
 
+        self.payment_reference_input = QLineEdit()
+        self.payment_reference_input.setPlaceholderText("เลขอ้างอิงบัตร / เลขที่เช็ค")
+        self.payment_reference_input.hide()
+        right_layout.addWidget(self.payment_reference_input)
+
 
 
         # Action Buttons
@@ -278,68 +285,88 @@ class PaymentDialog(QDialog):
                 self.clear_cart_requested = True
                 self.reject()
 
+    def _render_qr(self, amount):
+        amount = money(amount)
+        if amount <= 0:
+            self.qr_payload = None
+            self.qr_label.setText("กรอกยอดเงินสดก่อน ระบบจะแสดงยอดโอนที่เหลือ")
+            return
+        parent_window = self.parent()
+        qr_config = (parent_window.config.get('qr_payment') or {}) if parent_window else {}
+        qr_type = qr_config.get('qr_type')
+        if qr_type == "static" and qr_config.get("payload_template"):
+            payload = str(qr_config["payload_template"]).strip()
+        elif qr_type == "dynamic" and qr_config.get("merchant_ref"):
+            payload = promptpay_payload(qr_config["merchant_ref"], amount)
+        else:
+            raise ValueError("ERP ยังไม่ได้ตั้งค่า QR สำหรับเครื่องนี้")
+        if not payload:
+            raise ValueError("ข้อมูล QR จาก ERP ว่างเปล่า")
+        self.qr_payload = payload
+        display_name = qr_config.get("name") or qr_config.get("bank_name") or "QR"
+        self.title_lbl.setText(f"{display_name} · โอน ฿{amount:,.2f}")
+        import io
+        qr_img = qrcode.make(payload)
+        buf = io.BytesIO()
+        qr_img.save(buf, format="PNG")
+        pix = QPixmap()
+        pix.loadFromData(buf.getvalue())
+        self.qr_label.setPixmap(pix.scaled(300, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+
+
     def set_method(self, method):
         for m, btn in self.method_btns.items():
             btn.setChecked(m == method)
         self.selected_method = method
-        if hasattr(self, 'qr_label'):
-            self.qr_label.hide()
+        self.qr_label.hide()
         self.transfer_account_last4_input.hide()
         self.payment_confirm_check.hide()
+        self.payment_reference_input.hide()
         self.qr_payload = None
         self.payment_reference = None
+        self.payment_confirmed = False
+        self.transfer_account_last4 = ""
+        self.payment_reference_input.clear()
         self.title_lbl.setText(f"ยอดรับชำระ: {method}")
         parent_window = self.parent()
         if parent_window and getattr(parent_window, "customer_display", None) and not parent_window.customer_display.isHidden():
             parent_window.customer_display.show_payment(method)
 
-        if method == "QR":
+        if method in ("QR", "ผสม (Split)"):
+            self.qr_label.show()
+            self.transfer_account_last4_input.show()
+            self.payment_confirm_check.show()
+            if method == "QR":
+                self.keypad_widget.hide()
+                self.input_field.hide()
+                self.change_lbl.hide()
+                self.received_str = money_text(self.total_amount)
+            else:
+                self.keypad_widget.show()
+                self.input_field.show()
+                self.change_lbl.show()
+                self.change_lbl.setText("ยอดโอนที่เหลือ: ฿ 0.00")
+                self.received_str = ""
+            self.update_displays()
+            return
+
+        if method in ("บัตรเครดิต", "เช็ค"):
             self.keypad_widget.hide()
             self.input_field.hide()
             self.change_lbl.hide()
-
-
-            # Show QR
-            self.qr_label.show()
-            try:
-                parent_window = self.parent()
-                qr_config = (parent_window.config.get('qr_payment') or {}) if parent_window else {}
-                qr_type = qr_config.get('qr_type')
-                if qr_type == "static" and qr_config.get("payload_template"):
-                    payload = str(qr_config["payload_template"]).strip()
-                elif qr_type == "dynamic" and qr_config.get("merchant_ref"):
-                    payload = promptpay_payload(qr_config["merchant_ref"], self.total_amount)
-                else:
-                    raise ValueError("ERP ยังไม่ได้ตั้งค่า QR สำหรับเครื่องนี้")
-                if not payload:
-                    raise ValueError("ข้อมูล QR จาก ERP ว่างเปล่า")
-                self.qr_payload = payload
-                self.payment_reference = qr_config.get("code")
-                display_name = qr_config.get("name") or qr_config.get("bank_name") or "QR"
-                self.title_lbl.setText(f"{display_name} · ฿{self.total_amount:,.2f}")
-                import io
-                qr_img = qrcode.make(payload)
-                buf = io.BytesIO()
-                qr_img.save(buf, format="PNG")
-                pix = QPixmap()
-                pix.loadFromData(buf.getvalue())
-                pix = pix.scaled(300, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                self.qr_label.setPixmap(pix)
-                self.transfer_account_last4_input.show()
-                self.payment_confirm_check.show()
-            except Exception as e:
-                self.qr_label.setText(str(e))
-                self.qr_label.setStyleSheet("color: #b91c1c; font-weight: bold;")
-
-            self.received_str = f"{self.total_amount:.2f}"
+            self.received_str = money_text(self.total_amount)
+            self.payment_reference_input.show()
             self.update_displays()
-        else:
+            return
+
+        if method == "เงินสด":
             self.keypad_widget.show()
             self.input_field.show()
             self.change_lbl.show()
-
+            self.change_lbl.setText("เงินทอน: ฿ 0.00")
             self.received_str = ""
             self.update_displays()
+            return
 
     def append_input(self, val):
         if val == "." and "." in self.received_str:
@@ -351,9 +378,9 @@ class PaymentDialog(QDialog):
         self.update_displays()
 
     def quick_cash(self, val):
-        amount = float(val.replace(",", ""))
-        current = float(self.received_str or 0)
-        self.received_str = str(current + amount)
+        amount = decimal_value(val.replace(",", ""))
+        current = decimal_value(self.received_str or 0)
+        self.received_str = money_text(current + amount)
         self.update_displays()
 
     def clear_input(self):
@@ -362,30 +389,76 @@ class PaymentDialog(QDialog):
 
     def update_displays(self):
         try:
-            self.received_amount = float(self.received_str or 0)
-        except ValueError:
-            self.received_amount = 0.0
+            entered = money(self.received_str or 0)
+        except (ValueError, InvalidOperation):
+            entered = money(0)
 
+        total = money(self.total_amount)
+        if self.selected_method == "ผสม (Split)":
+            cash = min(entered, total)
+            transfer = max(money(0), money(total - cash))
+            self.received_amount = float(total)
+            self.change_amount = 0.0
+            self.cash_amount = float(cash)
+            self.transfer_amount = float(transfer)
+            self.change_lbl.setText(f"ยอดโอนที่เหลือ: ฿ {float(transfer):,.2f}")
+            self.change_lbl.setStyleSheet("font-size: 20px; font-weight: bold; color: #2563eb;")
+            self.input_field.setText(f"{float(entered):,.2f}")
+            if transfer > 0:
+                try:
+                    self._render_qr(transfer)
+                except Exception as error:
+                    self.qr_payload = None
+                    self.qr_label.setText(str(error))
+                    self.qr_label.setStyleSheet("color: #b91c1c; font-weight: bold;")
+            else:
+                self.qr_payload = None
+                self.qr_label.clear()
+            return
+
+        if self.selected_method in ("บัตรเครดิต", "เช็ค"):
+            self.received_amount = float(total)
+            self.change_amount = 0.0
+            self.cash_amount = 0.0
+            self.transfer_amount = 0.0
+            self.payment_reference = self.payment_reference_input.text().strip()
+            return
+
+        if self.selected_method == "QR":
+            self.received_amount = float(total)
+            self.change_amount = 0.0
+            self.cash_amount = 0.0
+            self.transfer_amount = float(total)
+            self.input_field.setText(f"{float(total):,.2f}")
+            try:
+                self._render_qr(total)
+            except Exception as error:
+                self.qr_payload = None
+                self.qr_label.setText(str(error))
+                self.qr_label.setStyleSheet("color: #b91c1c; font-weight: bold;")
+            return
+
+        self.received_amount = float(entered)
         self.input_field.setText(f"{self.received_amount:,.2f}")
-
-        if self.received_amount >= self.total_amount:
-            self.change_amount = self.received_amount - self.total_amount
+        if entered >= total:
+            self.change_amount = float(change_for(entered, total))
             self.change_lbl.setStyleSheet("font-size: 20px; font-weight: bold; color: #10b981;")
         else:
             self.change_amount = 0.0
             self.change_lbl.setStyleSheet("font-size: 20px; font-weight: bold; color: #ef4444;")
-
         self.change_lbl.setText(f"เงินทอน: ฿ {self.change_amount:,.2f}")
-
         self.cash_amount = self.received_amount if self.selected_method == "เงินสด" else 0.0
-        self.transfer_amount = self.total_amount if self.selected_method == "QR" else 0.0
+        self.transfer_amount = 0.0
 
     def request_cancel_bill(self):
         self.explicit_cancel_bill = True
         self.reject()
 
     def accept_payment(self):
-        if self.selected_method == "QR":
+        if self.selected_method == "ผสม (Split)" and (self.cash_amount <= 0 or self.transfer_amount <= 0):
+            QMessageBox.warning(self, "ยอดแบ่งชำระไม่ครบ", "จ่ายผสมต้องมีทั้งเงินสดและเงินโอน กรุณาใช้เงินสดหรือ QR หากจ่ายช่องทางเดียว")
+            return
+        if self.selected_method in ("QR", "ผสม (Split)"):
             last4 = self.transfer_account_last4_input.text().strip()
             if not self.qr_payload:
                 QMessageBox.warning(self, "ตั้งค่า QR ไม่ครบ", "ยังไม่มี QR ที่ยืนยันจาก ERP กรุณาตรวจการตั้งค่ารับชำระ")
@@ -400,7 +473,14 @@ class PaymentDialog(QDialog):
                 return
             self.payment_confirmed = True
             self.transfer_account_last4 = last4
-        if self.received_amount < self.total_amount:
+        elif self.selected_method in ("บัตรเครดิต", "เช็ค"):
+            reference = self.payment_reference_input.text().strip()
+            if not reference:
+                QMessageBox.warning(self, "ข้อมูลไม่ครบ", "กรุณาระบุเลขอ้างอิงบัตรหรือเลขที่เช็ค")
+                self.payment_reference_input.setFocus()
+                return
+            self.payment_reference = reference
+        if money(self.received_amount) < money(self.total_amount):
             from PySide6.QtWidgets import QMessageBox
             QMessageBox.warning(self, "แจ้งเตือน", "ยอดเงินรับยังไม่ครบ!")
             return

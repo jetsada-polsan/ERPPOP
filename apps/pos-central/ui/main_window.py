@@ -27,7 +27,7 @@ from sync_worker import SyncWorker
 
 from database.models import (
 
-    init_db, Product, ProductBarcode, Category, PosReceipt, PosReceiptItem, PosShift,
+    init_db, Product, ProductBarcode, QtyPromotion, Category, PosReceipt, PosReceiptItem, PosShift,
 
     Sale, SaleItem, Payment, Outbox, SyncLog, ScaleProfile,
 
@@ -36,6 +36,11 @@ from database.models import (
 )
 
 from services.scale_service import ScaleBarcodeParser
+from services.money import (
+    allocate_discount, allocate_display_amounts, cart_subtotal, change_for, decimal_text, decimal_value,
+    line_amount, money,
+)
+from services.promotions import quantity_promotion_discount
 
 from sqlalchemy.orm import Session
 
@@ -64,6 +69,10 @@ class MainWindow(QMainWindow):
         self.discount_amount = 0.0
 
         self.discount_label = ""
+
+        self.discount_approved_by = None
+
+        self.promotion_discount_amount = 0.0
 
         self.setWindowTitle("PopCentral POS")
 
@@ -959,7 +968,7 @@ class MainWindow(QMainWindow):
 
         if is_scale:
 
-            weight, ok = QInputDialog.getDouble(self, "สินค้าน้ำหนัก", f"ระบุน้ำหนักสำหรับ '{prod_name}' (กก.):", 1.0, 0.001, 999.0, 3)
+            weight, ok = QInputDialog.getDouble(self, "สินค้าน้ำหนัก", f"ระบุน้ำหนักสำหรับ '{prod_name}' (กก.):", 1.0, 0.00000001, 999999.99999999, 8)
 
             if ok and weight > 0:
 
@@ -1141,7 +1150,7 @@ class MainWindow(QMainWindow):
                 (Product.sku_code == query) | (Product.name_th == query) | (Product.barcode == query)
             ).first()
             if product and getattr(product, 'is_scale_item', False):
-                weight, ok = QInputDialog.getDouble(self, 'สินค้าน้ำหนัก', f"ระบุน้ำหนักสำหรับ '{product.name_th}' (กก.):", 1.0, 0.001, 999.0, 3)
+                weight, ok = QInputDialog.getDouble(self, 'สินค้าน้ำหนัก', f"ระบุน้ำหนักสำหรับ '{product.name_th}' (กก.):", 1.0, 0.00000001, 999999.99999999, 8)
                 if ok and weight > 0:
                     self.add_to_cart(product, qty=weight, is_scale=True)
                     self.search_input.clear()
@@ -1274,29 +1283,31 @@ class MainWindow(QMainWindow):
 
         if price_override is not None:
 
-            prod_price = float(price_override)
+            prod_price = decimal_value(price_override)
 
         elif isinstance(product, dict):
 
-            prod_price = float(product.get('pos_price') if product.get('pos_price') is not None else (product.get('default_price') or 0.0))
+            prod_price = decimal_value(product.get('pos_price') if product.get('pos_price') is not None else (product.get('default_price') or 0.0))
 
         else:
 
-            prod_price = float(getattr(product, 'pos_price') if getattr(product, 'pos_price', None) is not None else (getattr(product, 'default_price', 0.0) or 0.0))
+            prod_price = decimal_value(getattr(product, 'pos_price') if getattr(product, 'pos_price', None) is not None else (getattr(product, 'default_price', 0.0) or 0.0))
 
 
 
-        projected_base_qty = sum(
+        qty_dec = decimal_value(qty)
+        unit_factor_dec = decimal_value(unit_factor or 1)
+        projected_base_qty = qty_dec * unit_factor_dec
+        for r in range(self.cart_table.rowCount()):
+            row_name = self.cart_table.item(r, 0)
+            row_qty = self.cart_table.item(r, 1)
+            if row_name and row_qty and row_name.data(Qt.UserRole) == prod_id:
+                projected_base_qty += (
+                    decimal_value(row_qty.text())
+                    * decimal_value(row_name.data(Qt.UserRole + 3) or 1)
+                )
 
-            float(self.cart_table.item(r, 1).text()) * float(self.cart_table.item(r, 0).data(Qt.UserRole + 3) or 1)
-
-            for r in range(self.cart_table.rowCount())
-
-            if self.cart_table.item(r, 0) and self.cart_table.item(r, 0).data(Qt.UserRole) == prod_id
-
-        ) + float(qty) * float(unit_factor or 1)
-
-        if projected_base_qty > stock_qty:
+        if projected_base_qty > decimal_value(stock_qty):
 
             QMessageBox.warning(self, "แจ้งเตือน", f"สต็อกไม่พอ (เหลือ {stock_qty:g} หน่วยฐาน)")
 
@@ -1332,15 +1343,15 @@ class MainWindow(QMainWindow):
 
                     row_barcode = item.data(Qt.UserRole + 1) or ''
 
-                    row_factor = float(item.data(Qt.UserRole + 3) or 1)
+                    row_factor = decimal_value(item.data(Qt.UserRole + 3) or 1)
 
                     if (row_product_id == prod_id and row_price
 
                             and row_barcode == (source_barcode or '')
 
-                            and round(row_factor - float(unit_factor or 1), 6) == 0
+                            and row_factor == unit_factor_dec
 
-                            and round(float(row_price.text()) - prod_price, 2) == 0):
+                            and decimal_value(row_price.text().replace(',', '')) == prod_price):
 
                         matching_rows.append(row)
 
@@ -1351,20 +1362,16 @@ class MainWindow(QMainWindow):
                     keep_row = matching_rows[0]
 
                     current_cart_qty = sum(
-
-                        float(self.cart_table.item(row, 1).text())
-
-                        for row in matching_rows
-
-                        if self.cart_table.item(row, 1)
-
+                        (decimal_value(self.cart_table.item(row, 1).text())
+                         for row in matching_rows if self.cart_table.item(row, 1)),
+                        decimal_value(0),
                     )
 
-                    new_qty = current_cart_qty + qty
+                    new_qty = current_cart_qty + qty_dec
 
-                    self.cart_table.item(keep_row, 1).setText(f"{new_qty:g}")
+                    self.cart_table.item(keep_row, 1).setText(decimal_text(new_qty))
 
-                    self.cart_table.item(keep_row, 3).setText(f"{prod_price * new_qty:.2f}")
+                    self.cart_table.item(keep_row, 3).setText(f"{money(line_amount(new_qty, prod_price)):.2f}")
 
                     for duplicate_row in reversed(matching_rows[1:]):
 
@@ -1410,24 +1417,27 @@ class MainWindow(QMainWindow):
 
             name_item.setData(Qt.UserRole, prod_id)
             name_item.setData(Qt.UserRole + 1, source_barcode or "")
-            name_item.setData(Qt.UserRole + 2, barcode_type or "")
+            name_item.setData(
+                Qt.UserRole + 2,
+                "SCALE_WEIGHT" if is_scale else (barcode_type or ""),
+            )
 
             name_item.setData(Qt.UserRole + 3, float(unit_factor or 1))
 
 
-            qty_item = QTableWidgetItem(f"{qty:g}")
+            qty_item = QTableWidgetItem(decimal_text(qty_dec))
 
             qty_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
 
 
-            price_item = QTableWidgetItem(f"{prod_price:.2f}")
+            price_item = QTableWidgetItem(decimal_text(prod_price))
 
             price_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
 
 
-            total_item = QTableWidgetItem(f"{prod_price * qty:.2f}")
+            total_item = QTableWidgetItem(f"{money(line_amount(qty, prod_price)):.2f}")
 
             total_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
@@ -1533,15 +1543,36 @@ class MainWindow(QMainWindow):
 
 
 
-            current_qty = float(qty_item.text())
+            current_qty = decimal_value(qty_item.text())
 
-            new_qty, ok = QInputDialog.getDouble(self, "แก้ไขจำนวน", "จำนวนใหม่:", current_qty, 0.01, 9999, 2)
+            name_item = self.cart_table.item(row, 0)
+            barcode_type = (name_item.data(Qt.UserRole + 2) or "") if name_item else ""
+            if barcode_type == "SCALE_WEIGHT":
+                QMessageBox.warning(self, "แก้จำนวนไม่ได้", "น้ำหนักจากฉลากเครื่องชั่งยืนยันโดย ERP แล้ว กรุณาสแกนฉลากใหม่หากต้องการเปลี่ยนน้ำหนัก")
+                return
+
+            new_qty, ok = QInputDialog.getDouble(
+                self, "แก้ไขจำนวน", "จำนวนใหม่:", float(current_qty),
+                0.00000001, 999999.99999999, 8,
+            )
 
 
 
             if ok:
 
-                if new_qty > stock_qty:
+                new_qty_dec = decimal_value(new_qty)
+                unit_factor = decimal_value(name_item.data(Qt.UserRole + 3) or 1) if name_item else decimal_value(1)
+                other_base_qty = decimal_value(0)
+                for other_row in range(self.cart_table.rowCount()):
+                    other_name = self.cart_table.item(other_row, 0)
+                    other_qty = self.cart_table.item(other_row, 1)
+                    if (other_row != row and other_name and other_qty
+                            and other_name.data(Qt.UserRole) == product_id):
+                        other_base_qty += (
+                            decimal_value(other_qty.text())
+                            * decimal_value(other_name.data(Qt.UserRole + 3) or 1)
+                        )
+                if other_base_qty + new_qty_dec * unit_factor > decimal_value(stock_qty):
 
                     QMessageBox.warning(self, "แจ้งเตือน", f"สต็อกไม่พอ (เหลือ {stock_qty:g} ชิ้น)")
 
@@ -1549,19 +1580,19 @@ class MainWindow(QMainWindow):
 
 
 
-                qty_item.setText(str(new_qty))
+                qty_item.setText(decimal_text(new_qty_dec))
 
                 price_item = self.cart_table.item(row, 2)
 
                 if price_item:
 
-                    price = float(price_item.text())
+                    price = decimal_value(price_item.text())
 
                     total_item = self.cart_table.item(row, 3)
 
                     if total_item:
 
-                        total_item.setText(f"{new_qty * price:.2f}")
+                        total_item.setText(f"{money(line_amount(new_qty_dec, price)):.2f}")
 
                 self.update_cart_total()
 
@@ -1597,21 +1628,38 @@ class MainWindow(QMainWindow):
 
 
 
+    def _active_quantity_promotions(self):
+        from datetime import date
+
+        session = init_db(f"sqlite:///{self.db_path}")
+        try:
+            today = date.today().isoformat()
+            return session.query(QtyPromotion).filter(
+                (QtyPromotion.starts_date.is_(None) | (QtyPromotion.starts_date <= today))
+                & (QtyPromotion.ends_date.is_(None) | (QtyPromotion.ends_date >= today))
+            ).order_by(QtyPromotion.server_id).all()
+        finally:
+            session.close()
+
+
     def _compute_rounded_totals(self, subtotal):
 
-        from decimal import Decimal
-
-        sub_dec = Decimal(str(round(max(0.0, float(subtotal or 0.0)), 2))).quantize(Decimal('0.01'))
-
-        disc_dec = min(Decimal(str(round(max(0.0, float(getattr(self, 'discount_amount', 0.0))), 2))).quantize(Decimal('0.01')), sub_dec)
-
-        net_total = max(Decimal('0.00'), sub_dec - disc_dec).quantize(Decimal('0.01'))
+        sub_dec = money(max(0, subtotal or 0))
+        promo_dec = min(money(max(0, getattr(self, 'promotion_discount_amount', 0) or 0)), sub_dec)
+        manual_dec = min(
+            money(max(0, getattr(self, 'discount_amount', 0) or 0)),
+            max(money(0), money(sub_dec - promo_dec)),
+        )
+        disc_dec = money(promo_dec + manual_dec)
+        net_total = max(money(0), money(sub_dec - disc_dec))
 
         return {
 
             'subtotal': float(sub_dec),
 
-            'manual_discount': float(disc_dec),
+            'manual_discount': float(manual_dec),
+
+            'promotion_discount': float(promo_dec),
 
             'satang_discount': 0.0,
 
@@ -1627,15 +1675,32 @@ class MainWindow(QMainWindow):
 
         try:
 
-            subtotal = 0.0
-
+            lines = []
+            line_rows = []
+            promotion_lines = []
             for row in range(self.cart_table.rowCount()):
-
-                item = self.cart_table.item(row, 3)
-
-                if item:
-
-                    subtotal += float(item.text().replace(',', ''))
+                name_item = self.cart_table.item(row, 0)
+                qty_item = self.cart_table.item(row, 1)
+                price_item = self.cart_table.item(row, 2)
+                if name_item and qty_item and price_item:
+                    lines.append((qty_item.text(), price_item.text().replace(',', '')))
+                    line_rows.append(row)
+                    promotion_lines.append({
+                        'product_id': name_item.data(Qt.UserRole),
+                        'qty': qty_item.text(),
+                        'unit_price': price_item.text().replace(',', ''),
+                    })
+            subtotal = cart_subtotal(lines)
+            displayed_lines = allocate_display_amounts(
+                line_amount(qty, price) for qty, price in lines
+            )
+            for row, amount in zip(line_rows, displayed_lines):
+                total_item = self.cart_table.item(row, 3)
+                if total_item:
+                    total_item.setText(f"{amount:.2f}")
+            self.promotion_discount_amount = float(
+                quantity_promotion_discount(promotion_lines, self._active_quantity_promotions())
+            )
 
 
 
@@ -1647,11 +1712,17 @@ class MainWindow(QMainWindow):
 
                 self.discount_label = ""
 
+                self.discount_approved_by = None
+
+                self.promotion_discount_amount = 0.0
+
 
 
             totals = self._compute_rounded_totals(subtotal)
 
-            discount = totals['manual_discount']
+            self.discount_amount = totals['manual_discount']
+
+            discount = totals['total_discount']
 
             grand_total = totals['grand_total']
 
@@ -1659,13 +1730,15 @@ class MainWindow(QMainWindow):
 
             if hasattr(self, 'subtotal_val'):
 
-                self.subtotal_val.setText(f"฿{subtotal:,.2f}")
+                self.subtotal_val.setText(f"฿{float(subtotal):,.2f}")
 
             if hasattr(self, 'discount_container'):
 
                 if discount > 0:
 
                     lbl = f" ({self.discount_label})" if self.discount_label else ""
+                    if totals['promotion_discount'] > 0:
+                        lbl += " (โปร)"
 
                     self.discount_title_lbl.setText(f"ส่วนลด{lbl}:")
 
@@ -1682,6 +1755,8 @@ class MainWindow(QMainWindow):
                 if discount > 0:
 
                     lbl = f" ({self.discount_label})" if self.discount_label else ""
+                    if totals['promotion_discount'] > 0:
+                        lbl += " (โปร)"
 
                     self.discount_title_lbl.setText(f"ส่วนลด{lbl}:")
 
@@ -2794,15 +2869,28 @@ class MainWindow(QMainWindow):
 
                 local_sales = session.query(Sale).filter_by(shift_id=shift_id).all()
 
-                if local_sales and (not shift_data.get('cash_sales') and not shift_data.get('transfer_sales')):
-
-                    c_sales = sum(s.cash_amount or (s.total_amount if s.payment_method == 'cash' else 0) for s in local_sales)
-
-                    t_sales = sum(s.transfer_amount or (s.total_amount if s.payment_method == 'transfer' else 0) for s in local_sales)
-
-                    shift_data['cash_sales'] = c_sales
-
-                    shift_data['transfer_sales'] = t_sales
+                channel_keys = ('cash_sales', 'transfer_sales', 'card_sales', 'cheque_sales')
+                if local_sales and not any(shift_data.get(key) for key in channel_keys):
+                    channel_totals = {
+                        'cash_sales': sum((
+                            decimal_value(s.cash_amount or (s.total_amount if s.payment_method == 'cash' else 0))
+                            for s in local_sales
+                        ), decimal_value(0)),
+                        'transfer_sales': sum((
+                            decimal_value(s.transfer_amount or (s.total_amount if s.payment_method == 'transfer' else 0))
+                            for s in local_sales
+                        ), decimal_value(0)),
+                        'card_sales': sum((
+                            decimal_value(s.total_amount if s.payment_method == 'credit_card' else 0)
+                            for s in local_sales
+                        ), decimal_value(0)),
+                        'cheque_sales': sum((
+                            decimal_value(s.total_amount if s.payment_method == 'cheque' else 0)
+                            for s in local_sales
+                        ), decimal_value(0)),
+                    }
+                    for key, value in channel_totals.items():
+                        shift_data[key] = float(money(value))
 
                     shift_data['receipt_count'] = len(local_sales)
 
@@ -3398,27 +3486,68 @@ class MainWindow(QMainWindow):
 
 
 
-        subtotal = 0.0
-
-        for row in range(self.cart_table.rowCount()):
-
-            item = self.cart_table.item(row, 3)
-
-            if item:
-
-                subtotal += float(item.text().replace(',', ''))
+        self.update_cart_total()
+        subtotal_lines = [
+            (self.cart_table.item(row, 1).text(), self.cart_table.item(row, 2).text())
+            for row in range(self.cart_table.rowCount())
+            if self.cart_table.item(row, 1) and self.cart_table.item(row, 2)
+        ]
+        subtotal = cart_subtotal(subtotal_lines)
+        available_after_promotions = max(
+            money(0), money(subtotal - self.promotion_discount_amount)
+        )
 
 
 
         from ui.discount_dialog import DiscountDialog
 
-        dlg = DiscountDialog(self, subtotal=subtotal, current_discount=self.discount_amount, current_label=self.discount_label)
+        dlg = DiscountDialog(
+            self,
+            subtotal=available_after_promotions,
+            current_discount=min(self.discount_amount, float(available_after_promotions)),
+            current_label=self.discount_label,
+        )
 
         if dlg.exec() == QDialog.Accepted:
+            proposed_discount = money(dlg.discount_amount)
+            eligible_lines = []
+            for row in range(self.cart_table.rowCount()):
+                name_item = self.cart_table.item(row, 0)
+                qty_item = self.cart_table.item(row, 1)
+                price_item = self.cart_table.item(row, 2)
+                if name_item and qty_item and price_item and name_item.data(Qt.UserRole + 2) != "SCALE_WEIGHT":
+                    eligible_lines.append((qty_item.text(), price_item.text()))
+            if money(self.promotion_discount_amount + float(proposed_discount)) > cart_subtotal(eligible_lines):
+                QMessageBox.warning(
+                    self,
+                    "ใช้ส่วนลดนี้ไม่ได้",
+                    "ส่วนลดรวมของบิลสูงกว่ายอดสินค้าปกติที่ POS ปรับราคาได้อย่างปลอดภัย กรุณาแยกรายการหรือให้ผู้ดูแลตรวจโปรสินค้าชั่ง",
+                )
+                return
+            approver_name = None
+            if proposed_discount > 0:
+                from ui.login_dialog import CashierLoginDialog
 
-            self.discount_amount = dlg.discount_amount
+                approval = CashierLoginDialog(
+                    self,
+                    api_url=self.config.get('api_url', ''),
+                    pos_token=self.config.get('pos_token', ''),
+                    cached_offline_auth=self.config.get('offline_auth'),
+                )
+                if approval.exec() != QDialog.Accepted:
+                    return
+                approver = approval.selected_cashier or {}
+                if approver.get('role') != 'manager':
+                    QMessageBox.warning(self, "ยังไม่อนุมัติส่วนลด", "ส่วนลดบิลต้องยืนยัน PIN จากผู้จัดการก่อน")
+                    return
+                approver_name = approver.get('name') or approver.get('code')
+                if not approver_name:
+                    QMessageBox.warning(self, "ยังไม่อนุมัติส่วนลด", "ERP ไม่ได้ส่งชื่อผู้จัดการกลับมา กรุณาลองใหม่")
+                    return
 
+            self.discount_amount = float(proposed_discount)
             self.discount_label = dlg.discount_label
+            self.discount_approved_by = approver_name
 
             self.update_cart_total()
 
@@ -3454,11 +3583,10 @@ class MainWindow(QMainWindow):
 
 
 
-        # Build cart items payload
-
+        # Refresh promotion and bill totals before persisting a held ticket.
+        self.update_cart_total()
         cart_items = []
-
-        total_amount = 0.0
+        base_lines = []
 
         for row in range(self.cart_table.rowCount()):
 
@@ -3476,13 +3604,10 @@ class MainWindow(QMainWindow):
 
             p_id = name_item.data(Qt.UserRole)
 
-            qty = float(qty_item.text())
-
-            price = float(price_item.text().replace(',', ''))
-
-            tot = float(total_item.text().replace(',', '')) if total_item else qty * price
-
-            total_amount += tot
+            qty = decimal_value(qty_item.text())
+            price = decimal_value(price_item.text().replace(',', ''))
+            base_lines.append((qty, price))
+            tot = money(line_amount(qty, price))
 
             cart_items.append({
 
@@ -3492,11 +3617,17 @@ class MainWindow(QMainWindow):
 
                 "name_th": name_item.text(),  # alias for compatibility
 
-                "qty": qty,
+                "qty": decimal_text(qty),
 
-                "unit_price": price,
+                "unit_price": decimal_text(price),
 
-                "total": tot
+                "barcode": name_item.data(Qt.UserRole + 1) or "",
+
+                "barcode_type": name_item.data(Qt.UserRole + 2) or "",
+
+                "unit_factor": decimal_text(name_item.data(Qt.UserRole + 3) or 1),
+
+                "total": money_text(tot)
 
             })
 
@@ -3526,13 +3657,15 @@ class MainWindow(QMainWindow):
 
                     "label": note,
 
-                    "total_amount": total_amount,
+                    "total_amount": money_text(self._compute_rounded_totals(cart_subtotal(base_lines))['grand_total']),
 
                     "payload": {
 
                         "cart": cart_items,
 
-                        "discount_amount": self.discount_amount,
+                        "discount_amount": money_text(self.discount_amount),
+
+                        "promotion_discount_amount": money_text(self.promotion_discount_amount),
 
                         "discount_label": self.discount_label
 
@@ -3592,9 +3725,11 @@ class MainWindow(QMainWindow):
 
             "createdAt": datetime.now().isoformat(),
 
-            "total_amount": total_amount,
+            "total_amount": money_text(self._compute_rounded_totals(cart_subtotal(base_lines))['grand_total']),
 
-            "discount_amount": self.discount_amount,
+            "discount_amount": money_text(self.discount_amount),
+
+            "promotion_discount_amount": money_text(self.promotion_discount_amount),
 
             "discount_label": self.discount_label,
 
@@ -3619,6 +3754,8 @@ class MainWindow(QMainWindow):
         self.discount_amount = 0.0
 
         self.discount_label = ""
+
+        self.discount_approved_by = None
 
         self.cart_table.setRowCount(0)
 
@@ -3760,9 +3897,9 @@ class MainWindow(QMainWindow):
 
                 price_val = item.get('unit_price') if item.get('unit_price') is not None else item.get('price')
 
-                qty = float(item.get('qty') or 1)
+                qty = decimal_value(item.get('qty') or 1)
 
-                price = float(price_val) if price_val is not None else 0.0
+                price = decimal_value(price_val) if price_val is not None else decimal_value(0)
 
 
 
@@ -3782,7 +3919,7 @@ class MainWindow(QMainWindow):
 
                             if price == 0.0:
 
-                                price = float(
+                                price = decimal_value(
 
                                     db_prod.pos_price if db_prod.pos_price is not None
 
@@ -3798,7 +3935,7 @@ class MainWindow(QMainWindow):
 
                 name = name or 'สินค้า'
 
-                tot = qty * price
+                tot = money(line_amount(qty, price))
 
 
 
@@ -3811,12 +3948,15 @@ class MainWindow(QMainWindow):
                 name_item = QTableWidgetItem(name)
 
                 name_item.setData(Qt.UserRole, p_id)
+                name_item.setData(Qt.UserRole + 1, item.get("barcode") or "")
+                name_item.setData(Qt.UserRole + 2, item.get("barcode_type") or "")
+                name_item.setData(Qt.UserRole + 3, decimal_text(item.get("unit_factor") or 1))
 
-                qty_item = QTableWidgetItem(f"{qty:g}")
+                qty_item = QTableWidgetItem(decimal_text(qty))
 
                 qty_item.setTextAlignment(Qt.AlignCenter)
 
-                price_item = QTableWidgetItem(f"{price:.2f}")
+                price_item = QTableWidgetItem(decimal_text(price))
 
                 price_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
@@ -3887,6 +4027,9 @@ class MainWindow(QMainWindow):
             self.discount_amount = float(_disc_src.get('discount_amount') or 0.0)
 
             self.discount_label = str(_disc_src.get('discount_label') or "")
+
+            # A held bill must be re-approved after recall; edits may have changed its lines.
+            self.discount_approved_by = None
 
             self.update_cart_total()
 
@@ -3994,23 +4137,46 @@ class MainWindow(QMainWindow):
 
         try:
 
-            total_amount = 0.0
-
-            items_list = []
-
+            self.update_cart_total()
+            sale_lines = []
+            source_items = []
             for row in range(self.cart_table.rowCount()):
+                name_item = self.cart_table.item(row, 0)
+                qty_item = self.cart_table.item(row, 1)
+                price_item = self.cart_table.item(row, 2)
+                if not name_item or not qty_item or not price_item:
+                    continue
+                qty = decimal_value(qty_item.text())
+                price = decimal_value(price_item.text().replace(',', ''))
+                sale_lines.append((qty, price))
+                source_items.append((name_item, qty, price))
 
-                name = self.cart_table.item(row, 0).text()
-
-                qty = float(self.cart_table.item(row, 1).text())
-
-                price = float(self.cart_table.item(row, 2).text())
-
-                total = float(self.cart_table.item(row, 3).text())
-
-                total_amount += total
-
-                items_list.append({"name": name, "qty": qty, "price": price, "total": total})
+            subtotal = cart_subtotal(sale_lines)
+            totals = self._compute_rounded_totals(subtotal)
+            display_totals = allocate_display_amounts(
+                line_amount(qty, price) for qty, price in sale_lines
+            )
+            items_list = [
+                {
+                    "name": name_item.text(),
+                    "qty": decimal_text(qty),
+                    "price": decimal_text(price),
+                    "total": money_text(display_totals[index]),
+                    "barcode": name_item.data(Qt.UserRole + 1) or "",
+                    "barcode_type": name_item.data(Qt.UserRole + 2) or "",
+                    "unit_factor": decimal_text(name_item.data(Qt.UserRole + 3) or 1),
+                }
+                for index, (name_item, qty, price) in enumerate(source_items)
+            ]
+            audit_items = {
+                "version": 2,
+                "subtotal": money_text(subtotal),
+                "manual_discount_amount": money_text(totals['manual_discount']),
+                "promotion_discount_amount": money_text(totals['promotion_discount']),
+                "total_discount": money_text(totals['total_discount']),
+                "payable_amount": money_text(totals['grand_total']),
+                "items": items_list,
+            }
 
 
 
@@ -4032,9 +4198,9 @@ class MainWindow(QMainWindow):
 
                 reason=reason.strip(),
 
-                total_amount=total_amount,
+                total_amount=float(totals['grand_total']),
 
-                items_json=json.dumps(items_list)
+                items_json=json.dumps(audit_items, ensure_ascii=False)
 
             )
 
@@ -4126,13 +4292,16 @@ class MainWindow(QMainWindow):
 
                 return
 
+            self.update_cart_total()
 
 
-            total_amount = 0.0
+
+            sale_lines = []
+            discount_eligible = []
 
             total_items = self.cart_table.rowCount()
 
-            total_qty = 0.0
+            total_qty = decimal_value(0)
 
 
 
@@ -4140,17 +4309,21 @@ class MainWindow(QMainWindow):
 
                 qty_item = self.cart_table.item(row, 1)
 
-                total_item = self.cart_table.item(row, 3)
+                price_item = self.cart_table.item(row, 2)
+                name_item = self.cart_table.item(row, 0)
 
-                if qty_item and total_item:
+                if qty_item and price_item:
 
-                    qty = float(qty_item.text())
+                    qty = decimal_value(qty_item.text())
 
-                    total = float(total_item.text().replace(',', ''))
+                    total = line_amount(qty_item.text(), price_item.text().replace(',', ''))
 
                     total_qty += qty
 
-                    total_amount += total
+                    sale_lines.append((qty_item.text(), price_item.text().replace(',', '')))
+                    discount_eligible.append(bool(name_item and name_item.data(Qt.UserRole + 2) != "SCALE_WEIGHT"))
+
+            total_amount = cart_subtotal(sale_lines)
 
 
 
@@ -4159,6 +4332,12 @@ class MainWindow(QMainWindow):
             discount = totals['total_discount']
 
             grand_total = totals['grand_total']
+
+            try:
+                allocate_discount(sale_lines, discount, eligible=discount_eligible)
+            except ValueError as error:
+                QMessageBox.warning(self, "คำนวณส่วนลดไม่ได้", f"ส่วนลด/โปรของบิลนี้ยังจัดสรรกับรายการที่ส่ง ERP ได้ไม่ครบ: {error}")
+                return
 
 
 
@@ -4251,6 +4430,7 @@ class MainWindow(QMainWindow):
             receipt_id = str(uuid.uuid4())
 
             total_amount = 0.0
+            base_lines = []
 
 
 
@@ -4262,9 +4442,9 @@ class MainWindow(QMainWindow):
 
                 'ผสม (Split)': 'mixed',
 
-                'บัตรเครดิต': 'card',
+                'บัตรเครดิต': 'credit_card',
 
-                'เช็ค': 'check'
+                'เช็ค': 'cheque'
 
             }
 
@@ -4272,13 +4452,13 @@ class MainWindow(QMainWindow):
 
             if method == 'เงินสด':
 
-                cash_amount = received_amount - change_amount
+                cash_amount = float(money(received_amount) - money(change_amount))
 
                 transfer_amount = 0
 
             elif method == 'QR':
 
-                transfer_amount = received_amount
+                transfer_amount = float(money(received_amount))
 
                 cash_amount = 0
 
@@ -4299,6 +4479,8 @@ class MainWindow(QMainWindow):
             items = []
 
             api_items = []
+
+            pricing_lines = []
 
             for row in range(self.cart_table.rowCount()):
 
@@ -4322,10 +4504,15 @@ class MainWindow(QMainWindow):
 
                 price = float(price_item.text())
 
-                total = qty * price
-                total_amount += total
+                total = float(line_amount(qty_item.text(), price_item.text()))
+                base_lines.append((qty_item.text(), price_item.text()))
                 source_barcode = name_item.data(Qt.UserRole + 1) or None
                 source_barcode_type = name_item.data(Qt.UserRole + 2) or None
+                pricing_lines.append({
+                    "product_id": product_id,
+                    "qty": qty_item.text(),
+                    "unit_price": price_item.text(),
+                })
 
                 items.append(PosReceiptItem(
                     receipt_id=receipt_id,
@@ -4345,14 +4532,19 @@ class MainWindow(QMainWindow):
 
                 api_item = {
                     "product_id": product_id,
-                    "qty": qty,
-                    "unit_price": price
+                    "qty": decimal_text(qty_item.text()),
+                    "unit_price": decimal_text(price_item.text())
                 }
                 if source_barcode:
                     api_item["barcode"] = source_barcode
                     if source_barcode_type:
                         api_item["barcode_type"] = source_barcode_type
                 api_items.append(api_item)
+
+            total_amount = float(cart_subtotal(base_lines))
+            self.promotion_discount_amount = float(
+                quantity_promotion_discount(pricing_lines, self._active_quantity_promotions())
+            )
 
 
             # Resolve valid active branch_id, cashier_id, shift_id
@@ -4403,6 +4595,27 @@ class MainWindow(QMainWindow):
             discount_applied = totals['total_discount']
 
             net_total = totals['grand_total']
+
+            if manual_discount > 0:
+                if not self.discount_approved_by:
+                    session.close()
+                    QMessageBox.warning(self, "ยังไม่มีผู้อนุมัติ", "ส่วนลดบิลต้องยืนยัน PIN จากผู้จัดการก่อนชำระ")
+                    return
+
+            if discount_applied > 0:
+                try:
+                    eligible = [item.get("barcode_type") != "SCALE_WEIGHT" for item in api_items]
+                    net_prices = allocate_discount(
+                        [(item["qty"], item["unit_price"]) for item in api_items],
+                        discount_applied,
+                        eligible=eligible,
+                    )
+                except ValueError as error:
+                    session.close()
+                    QMessageBox.warning(self, "ใช้ส่วนลดนี้ไม่ได้", f"ส่วนลดกระจายลงรายการสินค้าอย่างปลอดภัยไม่ได้: {error}")
+                    return
+                for api_item, net_price in zip(api_items, net_prices):
+                    api_item["unit_price"] = f"{net_price:.8f}"
 
             idempotency_key = f"offline-receipt-{receipt_id}"
 
@@ -4496,7 +4709,11 @@ class MainWindow(QMainWindow):
 
                 "payment_confirmed": bool(payment_confirmed),
 
-                "cash_received": received_amount,
+                "cash_received": (
+                    float(money(cash_amount))
+                    if method == "ผสม (Split)"
+                    else float(money(received_amount))
+                ),
 
                 "cash_amount": cash_amount,
 
@@ -4514,6 +4731,10 @@ class MainWindow(QMainWindow):
 
                 "discount_amount": discount_applied,
 
+                "manual_discount_amount": manual_discount,
+
+                "discount_approved_by": self.discount_approved_by,
+
                 "items": api_items
 
             }
@@ -4526,9 +4747,9 @@ class MainWindow(QMainWindow):
 
                     outbox_payload["transfer_account_last4"] = transfer_account_last4
 
-                if payment_reference:
+            if payment_reference:
 
-                    outbox_payload["payment_ref"] = payment_reference
+                outbox_payload["payment_ref"] = payment_reference
 
             outbox_record = Outbox(
 
@@ -4560,7 +4781,18 @@ class MainWindow(QMainWindow):
 
             # Extract data before commit expires the instances
 
-            receipt_items_data = [{'name': i.name, 'qty': i.qty, 'price': i.unit_price, 'total': i.total_price} for i in items]
+            receipt_line_totals = allocate_display_amounts(
+                line_amount(qty, price) for qty, price in base_lines
+            )
+            receipt_items_data = [
+                {
+                    'name': item.name,
+                    'qty': decimal_text(base_lines[index][0]),
+                    'price': decimal_text(base_lines[index][1]),
+                    'total': float(receipt_line_totals[index]),
+                }
+                for index, item in enumerate(items)
+            ]
 
 
 
@@ -4594,6 +4826,8 @@ class MainWindow(QMainWindow):
 
             self.discount_label = ""
 
+            self.discount_approved_by = None
+
 
 
             self.cart_table.setRowCount(0)
@@ -4620,11 +4854,13 @@ class MainWindow(QMainWindow):
 
                 'doc_number': doc_no,
 
-                'subtotal': round(total_amount, 2),
+                'subtotal': float(money(total_amount)),
 
                 'total': net_total,
 
-                'discount_amount': manual_discount,
+                'discount_amount': discount_applied,
+                'manual_discount_amount': manual_discount,
+                'promotion_discount_amount': self.promotion_discount_amount,
 
                 'satang_discount': satang_discount,
 
@@ -4634,7 +4870,10 @@ class MainWindow(QMainWindow):
 
                 'item_count': len(receipt_items_data),
 
-                'total_qty': sum(float(item.get('qty', 0) or 0) for item in receipt_items_data),
+                'total_qty': sum(
+                    (decimal_value(item.get('qty', 0) or 0) for item in receipt_items_data),
+                    decimal_value(0),
+                ),
 
                 'is_full_tax': is_full_tax,
 

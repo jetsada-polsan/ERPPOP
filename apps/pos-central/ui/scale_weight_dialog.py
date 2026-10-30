@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QTimer
 from database.models import init_db, Product, ProductBarcode
 from services.scale_service import ScaleBarcodeParser
+from services.money import line_amount, money
 
 class ScaleWeightDialog(QDialog):
     """
@@ -139,8 +140,8 @@ class ScaleWeightDialog(QDialog):
 
         weight_row = QHBoxLayout()
         self.weight_input = QDoubleSpinBox()
-        self.weight_input.setDecimals(3)
-        self.weight_input.setRange(0.001, 999999.999)
+        self.weight_input.setDecimals(8)
+        self.weight_input.setRange(0.00000001, 999999.99999999)
         self.weight_input.setSingleStep(0.100)
         self.weight_input.setValue(1.000)
         self.weight_input.setStyleSheet("font-size: 22px; font-weight: bold; color: #0f172a; height: 50px;")
@@ -254,7 +255,7 @@ class ScaleWeightDialog(QDialog):
         price = self._product_value(self.selected_product, 'pos_price') or self._product_value(self.selected_product, 'default_price') or 0.0
         price = float(self.price_override if self.price_override is not None else price)
         weight = float(self.weight_input.value())
-        total = price * weight
+        total = money(line_amount(weight, price))
         self.calc_total_lbl.setText(f"฿{total:,.2f}")
 
     def on_scan_barcode(self):
@@ -293,7 +294,7 @@ class ScaleWeightDialog(QDialog):
                         qty = float(api_result.get('qty') or 0)
                     except (TypeError, ValueError):
                         qty = 0
-                    if qty < 0.001 or qty > 999999.999:
+                    if qty < 0.00000001 or qty > 999999.99999999:
                         QMessageBox.warning(self, 'น้ำหนักจากฉลากไม่ถูกต้อง', 'น้ำหนักจากฉลากอยู่นอกช่วงที่รองรับ')
                         self._clear_selection()
                         self.scan_input.selectAll()

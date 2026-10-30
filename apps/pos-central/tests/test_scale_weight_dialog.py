@@ -34,7 +34,7 @@ def test_scale_label_scan_uses_erp_weight_and_locks_the_label(qtbot, tmp_path, m
             "default_price": 100,
             "pos_price": 100,
         },
-        "qty": 0.75,
+        "qty": 0.12345678,
         "barcode": "8010010007500",
         "barcode_type": "SCALE_WEIGHT",
     }
@@ -55,7 +55,8 @@ def test_scale_label_scan_uses_erp_weight_and_locks_the_label(qtbot, tmp_path, m
     dialog.on_scan_barcode()
 
     assert dialog.selected_product.id == product_id
-    assert dialog.weight_input.value() == 0.75
+    assert dialog.weight_input.decimals() == 8
+    assert dialog.weight_input.value() == 0.12345678
     assert not dialog.weight_input.isEnabled()
     assert dialog.source_barcode == response_data["barcode"]
     assert dialog.barcode_type == "SCALE_WEIGHT"

@@ -18,8 +18,9 @@ import os
 import json
 import html
 import sys
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
+from services.money import included_vat, money
 
 def _receipt_amount(value):
     return Decimal(str(value or 0))
@@ -45,15 +46,13 @@ def _receipt_date_label(value):
     return date.strftime('%d/%m/') + f'{thai_year:04d} ' + date.strftime('%H:%M')
 
 def _format_receipt_qty(qty_value):
-    from decimal import ROUND_FLOOR
-    qty_dec = _receipt_amount(qty_value)
+    qty_dec = _receipt_amount(qty_value).quantize(Decimal('0.00000001'), rounding=ROUND_HALF_UP).normalize()
     if qty_dec == int(qty_dec):
         return f"{int(qty_dec)}"
-    first_dec = (qty_dec * Decimal('10')).to_integral_value(rounding=ROUND_FLOOR) / Decimal('10')
-    return f"{first_dec:.1f} **"
+    return format(qty_dec, 'f').rstrip('0').rstrip('.')
 
 def _format_total_qty(qty_value):
-    qty_dec = _receipt_amount(qty_value).quantize(Decimal('0.001')).normalize()
+    qty_dec = _receipt_amount(qty_value).quantize(Decimal('0.00000001'), rounding=ROUND_HALF_UP).normalize()
     if qty_dec == int(qty_dec):
         return f"{int(qty_dec)}"
     text = f"{qty_dec:f}"
@@ -315,7 +314,9 @@ def print_escpos_receipt(printer_name, receipt_data, config):
 
     cmds += enc('-' * 48) + LINE_FEED
 
-    subtotal = sum(float(it.get('total', 0.0)) for it in receipt_data.get('items', []))
+    subtotal = float(receipt_data.get('subtotal', 0.0) or 0.0)
+    if subtotal == 0 and receipt_data.get('items'):
+        subtotal = sum(float(it.get('total', 0.0)) for it in receipt_data.get('items', []))
     discount = float(receipt_data.get('discount_amount', 0.0))
     if discount > 0:
         cmds += enc(f"รวมเป็นเงิน: {subtotal:,.2f}") + LINE_FEED
@@ -324,7 +325,7 @@ def print_escpos_receipt(printer_name, receipt_data, config):
 
     vat_rate = _receipt_amount(receipt_data.get('vat_rate', 7))
     net_amount = _receipt_amount(total_amount)
-    vat_amount = net_amount * vat_rate / (Decimal('100') + vat_rate) if vat_rate else Decimal('0')
+    vat_amount = included_vat(net_amount, vat_rate)
     before_vat = net_amount - vat_amount
     cmds += enc(f"มูลค่าสินค้า (ก่อน VAT) {before_vat:,.2f}") + LINE_FEED
     cmds += enc(f"ภาษีมูลค่าเพิ่ม {vat_rate}% {vat_amount:,.2f}") + LINE_FEED
@@ -861,17 +862,28 @@ class ReceiptDialog(QDialog):
         date_str = self.receipt_data.get('date', '-')
 
         items_list = self.receipt_data.get('items', [])
-        items_sum = sum((_receipt_amount(it.get('total', 0)) for it in items_list), Decimal('0.00')).quantize(Decimal('0.01'))
-        manual_discount = _receipt_amount(self.receipt_data.get('discount_amount', 0)).quantize(Decimal('0.01'))
+        items_sum = sum((_receipt_amount(it.get('total', 0)) for it in items_list), Decimal('0.00')).quantize(
+            Decimal('0.01'), rounding=ROUND_HALF_UP
+        )
+        manual_discount = _receipt_amount(self.receipt_data.get('discount_amount', 0)).quantize(
+            Decimal('0.01'), rounding=ROUND_HALF_UP
+        )
 
-        if items_sum > Decimal('0.00'):
-            total_amount = max(Decimal('0.00'), items_sum - manual_discount).quantize(Decimal('0.01'))
+        if self.receipt_data.get('total') is not None:
+            total_amount = max(
+                Decimal('0.00'),
+                _receipt_amount(self.receipt_data.get('total')),
+            ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        elif items_sum > Decimal('0.00'):
+            total_amount = max(Decimal('0.00'), items_sum - manual_discount).quantize(
+                Decimal('0.01'), rounding=ROUND_HALF_UP
+            )
         else:
             total_amount = _receipt_amount(self.receipt_data.get('total', 0)).quantize(Decimal('0.01'))
         satang_discount = Decimal('0.00')
 
         vat_rate = _receipt_amount(self.receipt_data.get('vat_rate', 7))
-        vat_amount = total_amount * vat_rate / (Decimal('100') + vat_rate) if vat_rate else Decimal('0')
+        vat_amount = included_vat(total_amount, vat_rate)
         before_vat = total_amount - vat_amount
 
         safe = lambda value: html.escape(str(value or ''))
@@ -1207,18 +1219,17 @@ class ShiftReportDialog(QDialog):
         closed_at = str(shift.get('closed_at') or '-') if status != 'open' else 'ยังไม่ปิด'
 
         opening_cash = float(shift.get('opening_cash') or 0.0)
-        cash_sales = float(shift.get('cash_sales') or 0.0)
-        transfer_sales = float(shift.get('transfer_sales') or 0.0)
-        card_sales = float(shift.get('card_sales') or 0.0)
-        gross_sales = cash_sales + transfer_sales + card_sales
-        total_sales = gross_sales
-        expected_cash = float(shift.get('expected_cash') or (opening_cash + cash_sales))
+        cash_sales = money(shift.get('cash_sales') or 0.0)
+        transfer_sales = money(shift.get('transfer_sales') or 0.0)
+        card_sales = money(shift.get('card_sales') or 0.0)
+        cheque_sales = money(shift.get('cheque_sales') or 0.0)
+        total_sales = money(cash_sales + transfer_sales + card_sales + cheque_sales)
+        expected_cash = float(shift.get('expected_cash') or (money(opening_cash) + cash_sales))
         counted_cash = shift.get('counted_cash')
         cash_difference = shift.get('cash_difference')
         receipt_count = int(shift.get('receipt_count') or 0)
 
-        # VAT calculation (approx 7% included)
-        vat_amount = round(total_sales * 7 / 107, 2)
+        vat_amount = included_vat(total_sales, 7)
         before_vat = total_sales - vat_amount
 
         now_str = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
@@ -1278,6 +1289,7 @@ class ShiftReportDialog(QDialog):
                 <tr><td style="padding: 2px 0;">เงินสด (Cash)</td><td align="right" style="font-weight: 800;">{cash_sales:,.2f}</td></tr>
                 <tr><td style="padding: 2px 0;">โอนเงิน / PromptPay</td><td align="right" style="font-weight: 800;">{transfer_sales:,.2f}</td></tr>
                 <tr><td style="padding: 2px 0;">บัตรเครดิต</td><td align="right" style="font-weight: 800;">{card_sales:,.2f}</td></tr>
+                <tr><td style="padding: 2px 0;">เช็ค</td><td align="right" style="font-weight: 800;">{cheque_sales:,.2f}</td></tr>
                 <tr style="font-weight: 900;"><td style="padding: 4px 0;">รวมยอดชำระ</td><td align="right" style="padding: 4px 0;">{total_sales:,.2f}</td></tr>
             </table>
             <div class="rule"></div>

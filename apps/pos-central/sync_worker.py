@@ -19,7 +19,7 @@ import threading
 
 from database.models import (
 
-    init_db, Product, ProductBarcode, Category, Sale, SaleItem, Payment, Outbox, SyncLog, PosShift, ScaleProfile
+    init_db, Product, ProductBarcode, QtyPromotion, Category, Sale, SaleItem, Payment, Outbox, SyncLog, PosShift, ScaleProfile
 
 )
 
@@ -559,7 +559,7 @@ class SyncWorker(QThread):
 
             if getattr(self, '_last_products_hash', None) == current_hash and not changed:
 
-                return False
+                return self._sync_promotions(session, headers)
 
             self._last_products_hash = current_hash
 
@@ -662,7 +662,9 @@ class SyncWorker(QThread):
 
             session.commit()
 
-            return changed
+            promotions_changed = self._sync_promotions(session, headers)
+
+            return changed or promotions_changed
 
         except Exception as e:
 
@@ -697,6 +699,57 @@ class SyncWorker(QThread):
         finally:
 
             session.close()
+
+
+    def _sync_promotions(self, session, headers):
+        """Refresh the branch's quantity promos so offline checkout matches ERP."""
+        response = requests.get(
+            f'{self.api_url}/api/pos/promotions',
+            headers=headers,
+            params={'branch_id': self.config.get('branch_id') or 0},
+            timeout=30,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        rows = payload.get('promotions', []) if isinstance(payload, dict) else payload
+        if not isinstance(rows, list):
+            raise ValueError('ERP ส่งข้อมูลโปร POS ไม่ถูกต้อง')
+
+        normalized = []
+        for row in rows:
+            if not isinstance(row, dict) or not row.get('id') or not row.get('product_id'):
+                continue
+            normalized.append({
+                'server_id': int(row['id']),
+                'name': str(row.get('name') or ''),
+                'promo_type': str(row.get('promo_type') or ''),
+                'product_id': int(row['product_id']),
+                'min_qty': str(row.get('min_qty') or '0'),
+                'free_product_id': int(row['free_product_id']) if row.get('free_product_id') else None,
+                'free_qty': str(row.get('free_qty') or '0'),
+                'discount_type': row.get('discount_type'),
+                'discount_value': str(row.get('discount_value') or '0'),
+                'bundle_price': str(row.get('bundle_price') or '0'),
+                'starts_date': str(row.get('starts_date')) if row.get('starts_date') else None,
+                'ends_date': str(row.get('ends_date')) if row.get('ends_date') else None,
+            })
+        normalized.sort(key=lambda item: item['server_id'])
+
+        fields = tuple(normalized[0].keys()) if normalized else (
+            'server_id', 'name', 'promo_type', 'product_id', 'min_qty', 'free_product_id',
+            'free_qty', 'discount_type', 'discount_value', 'bundle_price', 'starts_date', 'ends_date',
+        )
+        existing = [
+            {field: getattr(row, field) for field in fields}
+            for row in session.query(QtyPromotion).order_by(QtyPromotion.server_id).all()
+        ]
+        if existing == normalized:
+            return False
+
+        session.query(QtyPromotion).delete(synchronize_session=False)
+        session.add_all([QtyPromotion(**row) for row in normalized])
+        session.commit()
+        return True
 
 
 

@@ -9,12 +9,21 @@ from ui.receipt_dialog import (
 
 
 def test_receipt_helper_formatters():
-    assert _format_receipt_qty(0.27) == "0.2 **"
-    assert _format_receipt_qty(0.37) == "0.3 **"
+    assert _format_receipt_qty(0.27) == "0.27"
+    assert _format_receipt_qty(0.37) == "0.37"
+    assert _format_receipt_qty("0.12345678") == "0.12345678"
     assert _format_receipt_qty(2) == "2"
     assert _format_total_qty(0.64) == "0.64"
+    assert _format_total_qty("0.12345678") == "0.12345678"
     assert _format_total_qty(2.0) == "2"
     assert _receipt_date_label("2026-10-26 16:04:00") == "26/10/2569 16:04"
+
+
+def test_included_vat_uses_half_up_satang_rounding():
+    from decimal import Decimal
+    from services.money import included_vat
+
+    assert included_vat("0.08", 7) == Decimal("0.01")
 
 
 def test_no_satang_rounding_calculation():

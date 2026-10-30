@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QDoubleValidator
+from services.money import discount_for, money
 
 
 class DiscountDialog(QDialog):
@@ -18,8 +19,8 @@ class DiscountDialog(QDialog):
     """
     def __init__(self, parent=None, subtotal=0.0, current_discount=0.0, current_label=""):
         super().__init__(parent)
-        self.subtotal = float(subtotal or 0.0)
-        self.discount_amount = float(current_discount or 0.0)
+        self.subtotal = float(money(subtotal or 0.0))
+        self.discount_amount = float(money(current_discount or 0.0))
         self.discount_label = str(current_label or "")
 
         self.setWindowTitle("กำหนดส่วนลดบิล")
@@ -304,14 +305,13 @@ class DiscountDialog(QDialog):
             val = 0.0
 
         if mode_id == 1:  # Baht
-            disc = max(0.0, min(val, self.subtotal))
+            disc = float(discount_for(self.subtotal, amount=val))
             net = max(0.0, self.subtotal - disc)
             self.preview_disc_lbl.setText(f"-฿{disc:,.2f}")
             self.preview_net_lbl.setText(f"฿{net:,.2f}")
         elif mode_id == 2:  # Percent
             pct = max(0.0, min(val, 100.0))
-            disc = round(self.subtotal * (pct / 100.0), 2)
-            disc = max(0.0, min(disc, self.subtotal))
+            disc = float(discount_for(self.subtotal, percent=pct))
             net = max(0.0, self.subtotal - disc)
             self.preview_disc_lbl.setText(f"-฿{disc:,.2f} ({pct:g}%)")
             self.preview_net_lbl.setText(f"฿{net:,.2f}")
@@ -339,14 +339,13 @@ class DiscountDialog(QDialog):
             if val > self.subtotal:
                 QMessageBox.warning(self, "แจ้งเตือน", f"ส่วนลดต้องไม่เกินยอดรวม ฿{self.subtotal:,.2f}")
                 return
-            self.discount_amount = round(val, 2)
+            self.discount_amount = float(discount_for(self.subtotal, amount=val))
             self.discount_label = f"฿{self.discount_amount:,.2f}" if self.discount_amount > 0 else ""
         elif mode_id == 2:  # Percent
             if val > 100:
                 QMessageBox.warning(self, "แจ้งเตือน", "เปอร์เซ็นต์ส่วนลดต้องไม่เกิน 100%")
                 return
-            calc_val = round(self.subtotal * (val / 100.0), 2)
-            self.discount_amount = min(calc_val, self.subtotal)
+            self.discount_amount = float(discount_for(self.subtotal, percent=val))
             self.discount_label = f"{val:g}%" if self.discount_amount > 0 else ""
 
         self.accept()
