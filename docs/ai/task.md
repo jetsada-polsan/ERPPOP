@@ -1,9 +1,9 @@
 ## Handoff - 2026-10-30 (Codex: รีเซ็ตล็อกอิน ERP+POS และ UAT ผ่าน API)
 - Commit implementation: `991a497`
 - ทำอะไร: รวมปุ่มผู้ดูแลให้รีเซ็ตรหัส ERP และ PIN POS ในครั้งเดียวสำหรับผู้ขาย; รหัสใหม่ใช้ได้ทันที ไม่บังคับเปลี่ยนซ้ำ, ถอนการยืนยันคนขายเดิมจากอุปกรณ์ทุกเครื่อง, แสดงข้อมูลให้คัดลอกครั้งเดียว; ผู้ใช้ที่ไม่ขาย POS รีเซ็ตเฉพาะ ERP. การเพิ่ม/แก้รหัสผ่านโดยแอดมินก็เข้าใช้ได้ทันที. อัปเดต POS Central README ตามคำสั่งเจ้าของให้ใช้ Production ERP API ในช่วง UAT และจดเลขเอกสารเพื่อเคลียร์ผ่าน ERP ก่อนวันขาย.
-- ทดสอบ: `php -d memory_limit=1G vendor/bin/phpunit` ผ่าน 652 tests (651 passed, 1 skipped, 6 incomplete; 4,567 assertions); Pint, PHP lint และ `git diff --check` ผ่าน. ทดสอบ reset ครอบคลุม ERP login, PIN POS login, ถอน verified cashier และ audit.
-- ยังไม่ทดสอบ/ความเสี่ยง: `php artisan test` ติดข้อจำกัด child process 128 MB ใน `ReportExportTest` (full PHPUnit ตรงผ่าน); Python ในเครื่องไม่มี pytest/PySide6 จึงยังไม่ได้รัน POS Central tests/build รอบนี้. ไม่มี migration และยังไม่ได้สร้าง/รีเซ็ตรหัสหรือบิล production.
-- Deploy: ยังไม่ deploy; ต้องตรวจ backup/migration readiness ก่อนปล่อย ERP และ build UAT Windows เพื่อทดสอบบนเครื่อง POS.
+- ทดสอบ: `php -d memory_limit=1G vendor/bin/phpunit` ผ่าน 652 tests (651 passed, 1 skipped, 6 incomplete; 4,567 assertions); Pint, PHP lint และ `git diff --check` ผ่าน. ทดสอบ reset ครอบคลุม ERP login, PIN POS login, ถอน verified cashier และ audit. Windows workflow run `41026951380` ผ่าน POS Central tests, PyInstaller build, ZIP packaging และ upload artifact `PopCentral-POS-Central-UAT-0.1.0-dev` (`sha256:a6e123dcee3607fa4310af36e2678a66d8ed1e89d3c07a251632fc4568bb5b83`).
+- ยังไม่ทดสอบ/ความเสี่ยง: `php artisan test` ติดข้อจำกัด child process 128 MB ใน `ReportExportTest` (full PHPUnit ตรงผ่าน); ยังไม่ได้ทดลองแพ็กเกจกับเครื่อง POS/เครื่องพิมพ์/เครื่องชั่งจริง และยังไม่มีรายการทดสอบส่งเข้า API production. ไม่มี migration และไม่ได้สร้าง/รีเซ็ตรหัสหรือบิล production.
+- Deploy: Production preflight ผ่านแบบ read-only — health ทุกหัวข้อผ่าน, backup อายุ 4.3 ชั่วโมง, migrations current, `migrate --pretend` ไม่มีงานค้าง. ยังไม่ได้เรียก Deploy ERP production เพราะ GitHub Actions ใน Chrome ออกจากระบบและ GitHub CLI token ใช้ไม่ได้; รอให้เจ้าของลงชื่อเข้าใช้เพื่อ dispatch workflow ตาม `docs/OPERATIONS.md`.
 
 ## Handoff - 2026-10-30 (Codex: นำ POS Central มาเตรียมเป็น candidate)
 - Commit: `12750a085f1ae223cf62f33fc2c66fa7e2024176`
