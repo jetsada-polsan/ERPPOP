@@ -1,3 +1,22 @@
+# Handoff — 2026-10-30 (Codex: แก้สแกนฉลากชั่งใน POS Central)
+
+## Commit
+`9b8361cbcf5c45e0dbdefe288fbcfe817c7eb490` — `Fix scale-label scanning in POS weight dialog`
+
+## ทำอะไรไป
+- หน้าต่าง “ใส่ กก.” ใช้ `/api/pos/scan` เหมือนช่องสแกนหลัก; ฉลากเครื่องชั่งใส่น้ำหนักจาก ERP ให้อัตโนมัติและล็อกค่าตามฉลาก ส่วนบาร์โค้ด/SKU สินค้าปกติเลือกสินค้าแล้วให้กรอกน้ำหนักเอง
+- เมื่อ ERP ใช้งานไม่ได้ ใช้ parser และ ScaleProfile ที่ซิงก์ไว้ในเครื่อง; เปิดหน้าต่างมาไม่เลือกสินค้าตัวแรกเองแล้ว
+- เพิ่ม UI regression tests สำหรับฉลากชั่งและบาร์โค้ดสินค้าปกติ
+
+## ทดสอบไปแล้วแค่ไหน
+- `git diff --check` ผ่าน
+- `ast.parse` ผ่านสำหรับ dialog, main window และ regression tests; `compileall` ผ่านเมื่อกำหนด `PYTHONPYCACHEPREFIX=/private/tmp/poscentral-pycache`
+- ยังรัน pytest/PySide UI tests ในเครื่องนี้ไม่ได้ เพราะไม่มี `pytest`, `PySide6` และ SQLAlchemy ติดตั้งไว้; push แล้วให้ `POS Central Windows UAT` workflow รัน tests และ build
+
+## ความเสี่ยง/งานถัดไป
+- ต้องทดสอบฉลากจริงจากเครื่องชั่งและทดสอบสแกนผ่านอุปกรณ์ POS; ยังไม่ได้สแกน/ขายเข้าฐาน Production จากรอบนี้
+- `apps/pos-python` ยังเป็นแอปหลัก; การเปลี่ยนนี้ใช้กับ candidate `apps/pos-central` เท่านั้น
+
 ## Handoff - 2026-10-30 (Codex: รีเซ็ตล็อกอิน ERP+POS และ UAT ผ่าน API)
 - Commit implementation: `991a497`
 - ทำอะไร: รวมปุ่มผู้ดูแลให้รีเซ็ตรหัส ERP และ PIN POS ในครั้งเดียวสำหรับผู้ขาย; รหัสใหม่ใช้ได้ทันที ไม่บังคับเปลี่ยนซ้ำ, ถอนการยืนยันคนขายเดิมจากอุปกรณ์ทุกเครื่อง, แสดงข้อมูลให้คัดลอกครั้งเดียว; ผู้ใช้ที่ไม่ขาย POS รีเซ็ตเฉพาะ ERP. การเพิ่ม/แก้รหัสผ่านโดยแอดมินก็เข้าใช้ได้ทันที. อัปเดต POS Central README ตามคำสั่งเจ้าของให้ใช้ Production ERP API ในช่วง UAT และจดเลขเอกสารเพื่อเคลียร์ผ่าน ERP ก่อนวันขาย.
