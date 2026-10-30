@@ -1426,3 +1426,10 @@ pending
 - ยังไม่ทดสอบ/ความเสี่ยง: ไม่ได้รีเซ็ตรหัสบัญชี production; รหัส 6 หลักมีชุดค่าที่เป็นไปได้น้อยกว่ารหัสยาว แต่หน้า login จำกัดการลองผิด 5 ครั้งต่อนาทีต่อ username และ IP และบังคับเปลี่ยนเมื่อเข้าได้
 - Deploy: GitHub Actions `Deploy ERP` production run `41004046336` สำเร็จบน `main` ที่ commit `fe7b6d35171f30f80c18916b1aac82dd33594f46`; test job และ deploy job ผ่าน รวม asset build, upload และ `scripts/deploy.sh`; health check หลัง deploy ผ่าน (migration up to date, backup 0.4 ชั่วโมง, storage ผ่าน, queue failed jobs 0)
 - งานถัดไป: หากต้องการรหัสใหม่ ให้ผู้ดูแลกดรีเซ็ตรหัส ERP ของบัญชีเป้าหมายเองหลัง deploy; งานนี้ไม่ได้รีเซ็ตรหัสบัญชี production
+
+## Handoff - 2026-10-30 (Codex: POS Central ยิงขายผ่าน ERP API)
+- Commit โค้ด: `fdafa60` (`Prove POS Central sales through ERP API`)
+- ทำอะไร: ตั้ง URL เริ่มต้นของ POS Central เป็น `https://erp.popstarcenter.com` และย้าย config เก่าที่ชี้ `http://localhost:8000` ไป URL บริษัทใน startup ปกติ; เพิ่ม E2E ที่ใช้ตัว UI checkout, local outbox และ SyncWorker ของ POS Central ยิงเข้า Laravel API พร้อม barcode UAT; เพิ่ม step นี้เข้า workflow POS E2E เดิม
+- ทดสอบ: POS Central `28 passed`; local Laravel + SQLite E2E ได้ใบเสร็จ `CSUAT20261030001`, สแกน `UAT-BC-0001`, แล้ว `uat:reconcile` ผ่าน GL/ต้นทุน/สต๊อก; POS Python E2E เดิมผ่าน 10/10 เงื่อนไขและได้ reconcile ผ่านหลัง candidate; PHPUnit `651 tests` (650 ผ่าน, 1 skipped), 4,543 assertions, incomplete 6; workflow YAML, PHP lint และ `git diff --check` ผ่าน
+- ข้อมูล/ความเสี่ยง: การขายทดสอบทั้งหมดอยู่ใน SQLite ชั่วคราว ไม่มีบิลหรือกะทดสอบถูกสร้างใน production; ยังไม่ได้ deploy หรือเปลี่ยน installer/release ซึ่งยังชี้ `apps/pos-python`; candidate ยังไม่มี migration คิว/กะออฟไลน์จาก POS หลักและยัง sync event น้อยกว่า จึงใช้เป็นตัวทดสอบแยกก่อน
+- งานถัดไป: push commit และให้เจ้าของเปิด POS Central บนเครื่อง Windows จับคู่ Device Token เองเพื่อทดลองขายผ่าน ERP จริงตามแผน UAT; ยังไม่สลับ installer จนกว่าจะทบทวนข้อมูลค้างและส่วนต่าง flow
