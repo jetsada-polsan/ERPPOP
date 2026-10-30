@@ -3,17 +3,18 @@
 namespace Tests\Feature;
 
 use App\Models\Branch;
+use App\Models\PosPriceSchedule;
 use App\Models\PriceTable;
 use App\Models\Product;
 use App\Models\ProductBarcode;
 use App\Models\ProductPrice;
 use App\Models\ProductUnit;
-use App\Models\PosPriceSchedule;
 use App\Models\Promotion;
 use App\Models\QtyPromotion;
 use App\Models\User;
 use App\Services\Sales\PosPricingGuard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -171,6 +172,31 @@ class PosPricingGuardTest extends TestCase
         $this->assertSame(12.0, (float) $normalized[0]['qty']);
         $this->assertSame(100.0, (float) $normalized[0]['unit_price']);
         $this->assertArrayNotHasKey('barcode', $normalized[0]);
+    }
+
+    public function test_weight_scale_label_is_revalidated_as_grams_then_priced_in_kilograms(): void
+    {
+        [$user, $branch, $product] = $this->masters();
+        ProductBarcode::create([
+            'product_id' => $product->id, 'barcode' => '27001', 'unit_id' => $product->base_unit_id,
+            'unit_factor' => 1, 'barcode_type' => 'SCALE_PLU', 'is_active' => true,
+        ]);
+        DB::table('scale_barcode_profiles')->insert([
+            'code' => 'WEIGHT-GRAMS', 'name' => 'เครื่องชั่งกรัม', 'prefix' => '27',
+            'plu_length' => 5, 'value_length' => 5, 'value_type' => 'weight',
+            'check_digit' => 'none', 'total_length' => 10, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $items = $this->payload($branch, $product, 100)['items'];
+        $items[0]['barcode'] = '2700101250'; // PLU 27001, 1,250 g = 1.25 kg
+        $items[0]['qty'] = 99; // The scale label is authoritative; client quantity is ignored.
+
+        $resolved = app(PosPricingGuard::class)->resolveScaleLines($items, $branch->id);
+
+        $this->assertEqualsWithDelta(1.25, $resolved[0]['qty'], 0.000001);
+        $this->assertSame(100.0, $resolved[0]['unit_price']);
+        $this->assertArrayNotHasKey('barcode', $resolved[0]);
     }
 
     public function test_server_enforces_maximum_sale_price_per_base_unit(): void

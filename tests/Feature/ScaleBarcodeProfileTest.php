@@ -55,6 +55,8 @@ class ScaleBarcodeProfileTest extends TestCase
 
         $this->assertSame('27001', $decoded['plu']);
         $this->assertEqualsWithDelta(1250, $decoded['price'], 0.001, 'ประเภท weight ต้องคืนค่าดิบ ไม่หารร้อยเหมือนราคา');
+        $this->assertSame('weight', $decoded['value_type']);
+        $this->assertEqualsWithDelta(1.25, $decoded['weight_kg'], 0.001, 'น้ำหนักบนฉลากเป็นกรัม ต้องแปลงเป็นกิโลกรัมก่อนคิดราคา');
         $this->assertSame('NEW-SCALE', $decoded['profile']);
     }
 

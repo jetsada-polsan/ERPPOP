@@ -615,10 +615,15 @@ class PosController extends Controller
             return response()->json(['message' => "สินค้า PLU {$decoded['plu']} ยังไม่ได้ตั้งราคาขาย"], 422);
         }
 
-        $qty = (float) $decoded['price'] / $unitPrice;
+        $qty = ($decoded['value_type'] ?? 'price') === 'weight'
+            ? (float) ($decoded['weight_kg'] ?? 0)
+            : (float) $decoded['price'] / $unitPrice;
         if ($qty <= 0) {
             return response()->json(['message' => 'น้ำหนักจากฉลากเครื่องชั่งไม่ถูกต้อง'], 422);
         }
+        $totalPrice = ($decoded['value_type'] ?? 'price') === 'weight'
+            ? $qty * $unitPrice
+            : (float) $decoded['price'];
 
         return response()->json([
             'mode' => 'scale',
@@ -627,7 +632,7 @@ class PosController extends Controller
             'barcode' => $barcode,
             'barcode_type' => BarcodePolicy::SCALE_WEIGHT,
             'plu' => $decoded['plu'],
-            'total_price' => $decoded['price'],
+            'total_price' => $totalPrice,
             'scale_profile' => $decoded['profile'],
         ]);
     }

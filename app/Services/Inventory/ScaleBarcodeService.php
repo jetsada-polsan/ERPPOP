@@ -2,6 +2,8 @@
 
 namespace App\Services\Inventory;
 
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 class ScaleBarcodeService
@@ -30,7 +32,7 @@ class ScaleBarcodeService
      *
      * คืน null เมื่อไม่ตรง profile ไหนเลย ผู้เรียกจะได้ไปหาบาร์โค้ดปกติต่อ
      *
-     * @return array{plu: string, price: float, profile: string}|null
+     * @return array{plu: string, price: float, profile: string, value_type: string, weight_kg: float|null}|null
      */
     public function decode(string $barcode): ?array
     {
@@ -51,7 +53,7 @@ class ScaleBarcodeService
 
     /**
      * @param  object  $profile
-     * @return array{plu: string, price: float, profile: string}|null
+     * @return array{plu: string, price: float, profile: string, value_type: string, weight_kg: float|null}|null
      */
     private function decodeWith(string $barcode, $profile): ?array
     {
@@ -79,10 +81,16 @@ class ScaleBarcodeService
             }
         }
 
+        $valueType = (string) $profile->value_type;
+
         return [
             'plu' => $plu,
-            'price' => $profile->value_type === 'price' ? (int) $value / 100 : (int) $value,
+            // Keep the raw field for compatibility, but expose gram labels as kg
+            // so callers never treat a weight as a baht amount.
+            'price' => $valueType === 'price' ? (int) $value / 100 : (int) $value,
             'profile' => (string) $profile->code,
+            'value_type' => $valueType,
+            'weight_kg' => $valueType === 'weight' ? (int) $value / 1000 : null,
         ];
     }
 
@@ -92,11 +100,11 @@ class ScaleBarcodeService
      * ป้ายเดียวกันอาจเข้าได้ทั้งแบบตรวจและไม่ตรวจ ถ้าให้แบบไม่ตรวจชนะ
      * ป้ายที่ถูกแก้ตัวเลขจะผ่านไปได้ทั้งที่ควรถูกปฏิเสธ
      *
-     * @return \Illuminate\Support\Collection<int, object>
+     * @return Collection<int, object>
      */
     private function profiles()
     {
-        return \Illuminate\Support\Facades\DB::table('scale_barcode_profiles')
+        return DB::table('scale_barcode_profiles')
             ->where('is_active', true)
             ->orderByRaw("case when check_digit = 'ean13' then 0 else 1 end")
             ->orderByDesc('total_length')

@@ -69,8 +69,9 @@ class PosPricingGuard
             if ((int) $product->id !== (int) $item['product_id']) {
                 throw new RuntimeException('ป้ายชั่งไม่ตรงกับสินค้าที่เลือก กรุณาสแกนใหม่');
             }
-            if ($scale['price'] <= 0) {
-                throw new RuntimeException('ป้ายชั่งไม่มีราคา กรุณาชั่งและพิมพ์ป้ายใหม่');
+            $weightLabel = ($scale['value_type'] ?? 'price') === 'weight';
+            if ($weightLabel ? (float) ($scale['weight_kg'] ?? 0) <= 0 : $scale['price'] <= 0) {
+                throw new RuntimeException('ป้ายชั่งไม่มีน้ำหนักหรือราคา กรุณาชั่งและพิมพ์ป้ายใหม่');
             }
 
             $perUnit = $this->campaignPrice(
@@ -82,7 +83,9 @@ class PosPricingGuard
                 throw new RuntimeException('สินค้าชั่ง '.$scale['plu'].' ยังไม่ได้ตั้งราคาขายต่อหน่วย');
             }
 
-            $item['qty'] = (float) DecimalMath::divide($scale['price'], $perUnit, DecimalMath::QUANTITY_SCALE);
+            $item['qty'] = $weightLabel
+                ? (float) $scale['weight_kg']
+                : (float) DecimalMath::divide($scale['price'], $perUnit, DecimalMath::QUANTITY_SCALE);
             $item['unit_price'] = $perUnit;
             unset($item['barcode']);
 
