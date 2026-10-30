@@ -1,3 +1,20 @@
+# Handoff — 2026-10-30 (Codex: ตรวจ matrix สิทธิ์ทุก role และ route)
+
+## Commit
+- `dd8fce3` — `Audit role permissions and branch scopes`
+
+## ทำอะไรและผลตรวจ
+- เพิ่มชุดทดสอบเทียบ permission grants ของทั้ง 13 role กับสิทธิ์ทั้ง 35 รายการ รวมสิทธิ์ system.admin และตรวจ route เว็บที่ตั้งชื่อ 431 เส้นว่า map permission หรือเป็น public exception ที่ระบุชัด
+- ตรวจ middleware allow/deny สำหรับ permission ที่ map อยู่, route อนุมัติสำคัญ และ API POS 24 เส้น, member 6 เส้น, OCR 9 เส้น; OCR API บังคับ `purchasing.manage` ที่ controller อยู่แล้วและมี regression test ครบทุก endpoint
+- ปิดช่องอ่านยอดสต็อก/lot ข้ามสาขาจาก search endpoint, ไม่ส่ง `average_cost` ผ่าน product picker และแก้กรณี assignment สาขาที่ inactive/future/expired แล้วสิทธิ์ global เปิดทางกลับมาทุกสาขา
+- `PermissionMatrixTest`: 9 tests / 1,091 assertions ผ่าน
+- PHP suite ทั้งชุด: 665 tests, 664 ผ่าน, 1 skipped, 6 incomplete, 5,680 assertions
+- Pint และ `git diff --check` ผ่าน
+
+## Deploy และงานถัดไป
+- ยังไม่ deploy และไม่ได้แตะข้อมูล production; `docs/servers.md` เป็นไฟล์ untracked เดิมและไม่ได้รวมใน commit
+- รอผล CI หลัง push; การทดสอบรอบนี้ใช้ SQLite in-memory ยังไม่ได้ทดสอบ PostgreSQL หรืออุปกรณ์หน้าร้านจริง
+
 # Handoff — 2026-10-30 (Codex: regression audit ERP และ POS ทั้งระบบ)
 
 ## Commit
