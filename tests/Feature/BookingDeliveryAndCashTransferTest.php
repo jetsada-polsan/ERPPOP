@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\ErpAuthorize;
 use App\Models\AuditLog;
 use App\Models\BankAccount;
 use App\Models\Branch;
@@ -14,6 +15,8 @@ use App\Models\Product;
 use App\Models\ProductUnit;
 use App\Models\SaleBooking;
 use App\Models\StockBalance;
+use App\Models\TransportJob;
+use App\Models\TransportLoadItem;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseLocation;
@@ -38,6 +41,7 @@ class BookingDeliveryAndCashTransferTest extends TestCase
     public function test_recording_a_full_delivery_clears_it_from_the_outstanding_list(): void
     {
         [$booking, $user] = $this->deliveryBooking('BD1');
+        $this->prepareDeliveredJob($booking);
         $this->actingAs($user);
         $service = app(BookingDeliveryService::class);
 
@@ -66,6 +70,7 @@ class BookingDeliveryAndCashTransferTest extends TestCase
     public function test_a_delivery_cannot_be_recorded_twice(): void
     {
         [$booking, $user] = $this->deliveryBooking('BD3');
+        $this->prepareDeliveredJob($booking);
         $this->actingAs($user);
         $service = app(BookingDeliveryService::class);
         $service->record($booking, SaleBooking::DELIVERY_DELIVERED);
@@ -91,6 +96,7 @@ class BookingDeliveryAndCashTransferTest extends TestCase
     public function test_recording_a_delivery_is_written_to_the_audit_log(): void
     {
         [$booking, $user] = $this->deliveryBooking('BD5');
+        $this->prepareDeliveredJob($booking);
         $this->actingAs($user);
 
         app(BookingDeliveryService::class)->record($booking, SaleBooking::DELIVERY_DELIVERED, 'ส่งโดยรถบริษัท');
@@ -99,6 +105,62 @@ class BookingDeliveryAndCashTransferTest extends TestCase
         $this->assertSame('booking_delivery_delivered', $audit->action);
         $this->assertSame('pending', $audit->old_values['delivery_status']);
         $this->assertSame('ส่งโดยรถบริษัท', $audit->new_values['note']);
+    }
+
+    public function test_a_booking_cannot_be_marked_delivered_without_a_completed_load_sheet(): void
+    {
+        [$booking, $user] = $this->deliveryBooking('BD6');
+        $this->actingAs($user);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('ต้องยืนยันขึ้นรถและส่งครบผ่านบอร์ดขนส่งก่อน');
+        app(BookingDeliveryService::class)->record($booking, SaleBooking::DELIVERY_DELIVERED);
+    }
+
+    public function test_a_transport_job_cannot_be_marked_loaded_with_a_short_quantity(): void
+    {
+        [$booking, $user] = $this->deliveryBooking('BD7');
+        $item = $booking->document->stockDocument->items->sole();
+        $job = TransportJob::create(['booking_id' => $booking->id, 'status' => 'booked']);
+        TransportLoadItem::create([
+            'transport_job_id' => $job->id,
+            'stock_document_item_id' => $item->id,
+            'planned_qty' => $item->qty,
+            'loaded_qty' => 1,
+            'availability' => 'partial',
+        ]);
+
+        $response = $this->withoutMiddleware(ErpAuthorize::class)
+            ->actingAs($user)
+            ->from(route('fleet.board'))
+            ->post(route('fleet.board.update', $booking), ['status' => 'loaded']);
+
+        $response->assertRedirect(route('fleet.board'))->assertSessionHas('error', 'จำนวนขึ้นรถไม่ครบตามใบจอง กรุณาแก้ใบจองตามของที่มี แล้วบันทึกใบขึ้นของใหม่');
+        $this->assertSame('booked', $job->fresh()->status);
+        $this->assertNull($job->fresh()->loaded_at);
+    }
+
+    public function test_full_load_and_delivery_updates_the_booking_and_audit_trail_in_order(): void
+    {
+        [$booking, $user] = $this->deliveryBooking('BD8');
+        $this->withoutMiddleware(ErpAuthorize::class)->actingAs($user);
+        $this->get(route('fleet.load-sheet', $booking))->assertOk();
+        $job = TransportJob::where('booking_id', $booking->id)->sole();
+        $line = $job->loadItems()->sole();
+
+        $this->post(route('fleet.load-sheet.save', $booking), [
+            'items' => [$line->id => ['loaded_qty' => $line->planned_qty, 'availability' => 'available']],
+        ])->assertRedirect(route('fleet.load-sheet', $booking));
+        $this->post(route('fleet.board.update', $booking), ['status' => 'loaded'])->assertRedirect();
+        $this->assertSame('loaded', $job->fresh()->status);
+        $this->assertNotNull($job->fresh()->loaded_at);
+
+        $this->post(route('fleet.board.update', $booking), ['status' => 'in_transit'])->assertRedirect();
+        $this->post(route('fleet.board.update', $booking), ['status' => 'delivered'])->assertRedirect();
+
+        $this->assertSame('delivered', $job->fresh()->status);
+        $this->assertSame(SaleBooking::DELIVERY_DELIVERED, $booking->fresh()->delivery_status);
+        $this->assertSame('booking_delivery_delivered', AuditLog::where('table_name', 'sale_bookings')->sole()->action);
     }
 
     public function test_depositing_cash_moves_it_out_of_the_drawer_and_into_the_bank(): void
@@ -204,5 +266,28 @@ class BookingDeliveryAndCashTransferTest extends TestCase
         ]);
 
         return [SaleBooking::where('document_id', $document->id)->sole(), $user];
+    }
+
+    private function prepareDeliveredJob(SaleBooking $booking): TransportJob
+    {
+        $booking->load('document.stockDocument.items');
+        $job = TransportJob::create([
+            'booking_id' => $booking->id,
+            'status' => 'delivered',
+            'loaded_at' => now()->subHour(),
+            'delivered_at' => now(),
+        ]);
+
+        foreach ($booking->document->stockDocument->items as $item) {
+            TransportLoadItem::create([
+                'transport_job_id' => $job->id,
+                'stock_document_item_id' => $item->id,
+                'planned_qty' => $item->qty,
+                'loaded_qty' => $item->qty,
+                'availability' => 'available',
+            ]);
+        }
+
+        return $job;
     }
 }

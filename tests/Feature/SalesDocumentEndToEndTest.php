@@ -9,17 +9,25 @@ use App\Models\CustomerOpenItem;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\GlJournal;
+use App\Models\Permission;
 use App\Models\Product;
 use App\Models\ProductUnit;
+use App\Models\Role;
 use App\Models\SaleBooking;
 use App\Models\StockBalance;
 use App\Models\Supplier;
+use App\Models\SupplierOpenItem;
+use App\Models\TransportJob;
+use App\Models\TransportLoadItem;
+use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseLocation;
 use App\Services\Purchasing\PurchaseService;
+use App\Services\Purchasing\SupplierNoteService;
 use App\Services\Sales\BookingService;
 use App\Services\Sales\CashSaleService;
 use App\Services\Sales\CreditSaleService;
+use App\Services\Sales\SaleReturnService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -39,16 +47,16 @@ class SalesDocumentEndToEndTest extends TestCase
     public function test_supplier_notes_adjust_ap_and_gl_only_after_approval(): void
     {
         $this->stockedBranch('APNOTE', 10, 60);
-        $item = \App\Models\SupplierOpenItem::sole();
-        $maker = \App\Models\User::factory()->create();
-        $checker = \App\Models\User::factory()->create();
-        $role = \App\Models\Role::create(['code' => 'AP_NOTE', 'name' => 'AP']);
+        $item = SupplierOpenItem::sole();
+        $maker = User::factory()->create();
+        $checker = User::factory()->create();
+        $role = Role::create(['code' => 'AP_NOTE', 'name' => 'AP']);
         foreach (['purchasing.manage', 'finance.note.approve'] as $code) {
-            $role->permissions()->attach(\App\Models\Permission::firstOrCreate(['code' => $code], ['name' => $code]));
+            $role->permissions()->attach(Permission::firstOrCreate(['code' => $code], ['name' => $code]));
         }
         $maker->roles()->attach($role);
         $checker->roles()->attach($role);
-        $service = app(\App\Services\Purchasing\SupplierNoteService::class);
+        $service = app(SupplierNoteService::class);
         foreach (['credit' => 493.0, 'debit' => 600.0] as $kind => $expected) {
             $doc = $service->create([
                 'supplier_open_item_id' => $item->id, 'kind' => $kind,
@@ -92,10 +100,10 @@ class SalesDocumentEndToEndTest extends TestCase
     {
         [$branch, $location, $product, $customer] = $this->stockedBranch('RET', 10, 60, true);
         DocumentType::firstOrCreate(['code' => 'SALE_RETURN'], ['name_th' => 'Return']);
-        $maker = \App\Models\User::factory()->create();
-        $checker = \App\Models\User::factory()->create();
-        $role = \App\Models\Role::create(['code' => 'RETURN_APPROVER', 'name' => 'Return approver']);
-        $permission = \App\Models\Permission::firstOrCreate(['code' => 'finance.note.approve'], ['name' => 'Approve']);
+        $maker = User::factory()->create();
+        $checker = User::factory()->create();
+        $role = Role::create(['code' => 'RETURN_APPROVER', 'name' => 'Return approver']);
+        $permission = Permission::firstOrCreate(['code' => 'finance.note.approve'], ['name' => 'Approve']);
         $role->permissions()->attach($permission);
         $maker->roles()->attach($role);
         $checker->roles()->attach($role);
@@ -105,7 +113,7 @@ class SalesDocumentEndToEndTest extends TestCase
             'items' => [['product_id' => $product->id, 'qty' => 3, 'unit_price' => 100]],
         ]);
         $sale = app(CreditSaleService::class)->convertBookingToCreditSale($booking->saleBooking);
-        $service = app(\App\Services\Sales\SaleReturnService::class);
+        $service = app(SaleReturnService::class);
         $return = $service->create([
             'branch_id' => $branch->id, 'customer_id' => $customer->id,
             'customer_open_item_id' => $sale->openItem->id,
@@ -212,6 +220,63 @@ class SalesDocumentEndToEndTest extends TestCase
         $postings = DB::table('sales_postings')->where('document_id', $saleDocument->id)->get();
         $this->assertCount(1, $postings);
         $this->assertSame('CREDIT_SALE', $postings[0]->channel);
+    }
+
+    public function test_a_delivery_booking_posts_a_sale_only_after_full_delivery_and_uses_the_delivery_date(): void
+    {
+        [$branch, $location, $product, $customer] = $this->stockedBranch('DELIVERYSALE', qty: 10, unitCost: 60, withCustomer: true);
+        $bookingDocument = app(BookingService::class)->create([
+            'branch_id' => $branch->id,
+            'customer_id' => $customer->id,
+            'fulfillment_type' => SaleBooking::FULFILLMENT_DELIVERY,
+            'delivery_due_at' => now()->addDay()->setTime(12, 0)->toDateTimeString(),
+            'items' => [['product_id' => $product->id, 'qty' => 3, 'unit_price' => 100]],
+        ]);
+        $booking = SaleBooking::where('document_id', $bookingDocument->id)->sole();
+        $balance = StockBalance::where('product_id', $product->id)->where('warehouse_location_id', $location->id)->sole();
+
+        try {
+            app(CreditSaleService::class)->convertBookingToCreditSale($booking);
+            $this->fail('Delivery must be completed before conversion');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('ส่งสินค้าให้ลูกค้าครบ', $exception->getMessage());
+        }
+        $this->assertSame(10.0, (float) $balance->fresh()->on_hand_qty);
+        $this->assertSame(3.0, (float) $balance->fresh()->reserved_qty);
+
+        $sourceItem = $bookingDocument->stockDocument->items->sole();
+        $deliveredAt = now()->subDay()->setTime(16, 45, 0);
+        $job = TransportJob::create([
+            'booking_id' => $booking->id,
+            'status' => 'delivered',
+            'loaded_at' => $deliveredAt->copy()->subHours(2),
+            'delivered_at' => $deliveredAt,
+        ]);
+        $loadItem = TransportLoadItem::create([
+            'transport_job_id' => $job->id,
+            'stock_document_item_id' => $sourceItem->id,
+            'planned_qty' => 3,
+            'loaded_qty' => 2,
+            'availability' => 'partial',
+        ]);
+        $booking->update(['delivery_status' => SaleBooking::DELIVERY_DELIVERED, 'delivered_at' => $deliveredAt]);
+
+        try {
+            app(CreditSaleService::class)->convertBookingToCreditSale($booking->fresh());
+            $this->fail('A partial load sheet must not be posted as a full sale');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('จำนวนสินค้าที่ส่งจริงไม่ครบ', $exception->getMessage());
+        }
+        $this->assertSame(10.0, (float) $balance->fresh()->on_hand_qty);
+
+        $loadItem->update(['loaded_qty' => 3, 'availability' => 'available']);
+        $sale = app(CreditSaleService::class)->convertBookingToCreditSale($booking->fresh());
+
+        $this->assertSame($deliveredAt->toDateString(), $sale->doc_date->toDateString());
+        $this->assertStringContainsString($deliveredAt->format('Ymd'), $sale->doc_number);
+        $this->assertSame(7.0, (float) $balance->fresh()->on_hand_qty);
+        $this->assertSame(0.0, (float) $balance->fresh()->reserved_qty);
+        $this->assertSame($deliveredAt->copy()->addDays(30)->toDateString(), CustomerOpenItem::where('document_id', $sale->id)->sole()->due_date->toDateString());
     }
 
     public function test_every_posted_document_keeps_the_ledger_balanced(): void

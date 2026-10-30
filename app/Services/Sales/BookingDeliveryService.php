@@ -4,6 +4,7 @@ namespace App\Services\Sales;
 
 use App\Models\AuditLog;
 use App\Models\SaleBooking;
+use App\Models\TransportJob;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -21,6 +22,8 @@ use RuntimeException;
  */
 class BookingDeliveryService
 {
+    public function __construct(private readonly BookingLoadSheetValidator $loadSheets) {}
+
     /** @param  SaleBooking::DELIVERY_*  $status */
     public function record(SaleBooking $booking, string $status, ?string $note = null): SaleBooking
     {
@@ -41,11 +44,20 @@ class BookingDeliveryService
                 throw new RuntimeException('การส่งของใบจองนี้ถูกยกเลิกไปแล้ว');
             }
 
+            $job = null;
+            if ($status === SaleBooking::DELIVERY_DELIVERED) {
+                $job = TransportJob::where('booking_id', $locked->id)->lockForUpdate()->first();
+                if (! $job || $job->status !== 'delivered' || ! $job->loaded_at || ! $job->delivered_at
+                    || ! $this->loadSheets->isComplete($locked, $job)) {
+                    throw new RuntimeException('ต้องยืนยันขึ้นรถและส่งครบผ่านบอร์ดขนส่งก่อน');
+                }
+            }
+
             $previous = $locked->delivery_status;
             $locked->update([
                 'delivery_status' => $status,
                 // วันเวลาส่งจริงบันทึกเฉพาะตอนส่งครบ ส่งบางส่วนยังไม่ถือว่าจบ
-                'delivered_at' => $status === SaleBooking::DELIVERY_DELIVERED ? now() : null,
+                'delivered_at' => $status === SaleBooking::DELIVERY_DELIVERED ? $job->delivered_at : null,
             ]);
 
             AuditLog::create([

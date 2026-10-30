@@ -4,6 +4,7 @@ namespace App\Services\Sales;
 
 use App\Models\Branch;
 use App\Models\DocumentBook;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -46,31 +47,31 @@ class DocumentNumberGenerator
     ];
 
     // เลขที่ตามสมุดเอกสาร (BPlus): ใช้ prefix ของเล่ม + นับเฉพาะเอกสารในเล่มนั้น
-    public function nextInBook(DocumentBook $book, int $branchId): string
+    public function nextInBook(DocumentBook $book, int $branchId, ?string $date = null): string
     {
         if ($book->documentType()->where('code', 'BOOKING')->exists()) {
-            return $this->nextBooking($branchId);
+            return $this->nextBooking($branchId, $date);
         }
 
-        return $this->format($book->prefix, $branchId, 'BOOK:'.$book->id.':'.$branchId);
+        return $this->format($book->prefix, $branchId, 'BOOK:'.$book->id.':'.$branchId, $date);
     }
 
-    public function next(string $documentTypeCode, int $branchId): string
+    public function next(string $documentTypeCode, int $branchId, ?string $date = null): string
     {
         if ($documentTypeCode === 'BOOKING') {
-            return $this->nextBooking($branchId);
+            return $this->nextBooking($branchId, $date);
         }
 
-        return $this->format(self::PREFIXES[$documentTypeCode] ?? 'DC', $branchId, $documentTypeCode.':'.$branchId);
+        return $this->format(self::PREFIXES[$documentTypeCode] ?? 'DC', $branchId, $documentTypeCode.':'.$branchId, $date);
     }
 
     /**
      * ใบจองใช้รูปแบบเดียวกับเอกสารอื่น: BK + สาขา + วันที่ + ลำดับ (เดิม B01, B02 นับรวมทั้งบริษัท — ข้อ 16)
      * ทุกเล่มใบจองของสาขาใช้ตัวนับเดียวกัน เพราะ prefix เดียวกัน แยกตัวนับตามเล่มจะได้เลขซ้ำ
      */
-    private function nextBooking(int $branchId): string
+    private function nextBooking(int $branchId, ?string $date = null): string
     {
-        return $this->format(self::PREFIXES['BOOKING'], $branchId, 'BOOKING:'.$branchId);
+        return $this->format(self::PREFIXES['BOOKING'], $branchId, 'BOOKING:'.$branchId, $date);
     }
 
     // ตารางที่ออกเลขเอง ไม่ได้อยู่ใน documents — ใช้ตัวนับชุดเดียวกันเพื่อไม่ให้ซ้ำ
@@ -94,12 +95,12 @@ class DocumentNumberGenerator
         return $this->format('QT', $branchId, 'QUOTATION:'.$branchId);
     }
 
-    private function format(string $prefix, int $branchId, string $scope): string
+    private function format(string $prefix, int $branchId, string $scope, ?string $date = null): string
     {
         $branchCode = Branch::whereKey($branchId)->value('code') ?? (string) $branchId;
-        $today = now()->format('Ymd');
+        $period = $date ? Carbon::parse($date)->format('Ymd') : now()->format('Ymd');
 
-        return sprintf('%s%s%s%03d', $prefix, $branchCode, $today, $this->nextSequence($scope, $today));
+        return sprintf('%s%s%s%03d', $prefix, $branchCode, $period, $this->nextSequence($scope, $period));
     }
 
     /**

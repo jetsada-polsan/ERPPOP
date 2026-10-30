@@ -6,6 +6,7 @@ use App\Models\Branch;
 use App\Models\DocumentBook;
 use App\Models\SaleBooking;
 use App\Models\SalesArea;
+use App\Models\TransportJob;
 use App\Models\User;
 use App\Services\Sales\BookingDeliveryService;
 use App\Services\Sales\BookingService;
@@ -150,10 +151,14 @@ class BookingController extends Controller
 
     public function edit(Request $request, SaleBooking $booking): View|RedirectResponse
     {
+        $transportJob = $booking->isDelivery()
+            ? TransportJob::where('booking_id', $booking->id)->first()
+            : null;
         if ($booking->status !== SaleBooking::STATUS_PENDING
-            || $booking->delivery_status !== SaleBooking::DELIVERY_PENDING) {
+            || $booking->delivery_status !== SaleBooking::DELIVERY_PENDING
+            || ($transportJob && ($transportJob->status !== 'booked' || $transportJob->loaded_at !== null))) {
             return redirect()->route('bookings.show', $booking)
-                ->with('error', 'แก้ไขได้เฉพาะใบจองที่ยังไม่แปลงเป็นใบขายและยังไม่มีการส่งสินค้า');
+                ->with('error', 'แก้ไขได้ก่อนยืนยันขึ้นรถเท่านั้น');
         }
 
         $booking->load([
@@ -270,8 +275,9 @@ class BookingController extends Controller
         $creditSaleBooks = DocumentBook::withCount('documents')
             ->whereHas('documentType', fn ($q) => $q->where('code', 'CREDIT_SALE'))
             ->where('is_active', true)->orderByDesc('is_default')->orderBy('id')->get();
+        $transportJob = TransportJob::where('booking_id', $booking->id)->first();
 
-        return view('bookings.show', compact('booking', 'creditSaleBooks'));
+        return view('bookings.show', compact('booking', 'creditSaleBooks', 'transportJob'));
     }
 
     public function convert(Request $request, SaleBooking $booking, CreditSaleService $service): RedirectResponse

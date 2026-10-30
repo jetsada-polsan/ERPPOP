@@ -12,10 +12,13 @@ use App\Models\SaleBooking;
 use App\Models\StockBalance;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
+use App\Models\TransportJob;
+use App\Services\Accounting\AccountingPeriodGuard;
 use App\Services\Accounting\GlPostingService;
 use App\Services\Inventory\CostingService;
 use App\Services\Inventory\FifoStockService;
 use App\Support\DecimalMath;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -36,6 +39,8 @@ class CreditSaleService
         private readonly GlPostingService $glPosting,
         private readonly FifoStockService $fifo,
         private readonly CostingService $costing,
+        private readonly AccountingPeriodGuard $periods,
+        private readonly BookingLoadSheetValidator $loadSheets,
     ) {}
 
     public function convertBookingToCreditSale(SaleBooking $booking, ?DocumentBook $book = null): Document
@@ -50,11 +55,37 @@ class CreditSaleService
                 throw new RuntimeException("ใบจองนี้ถูกใช้ไปแล้ว (สถานะปัจจุบัน: {$lockedBooking->status})");
             }
 
+            if ($lockedBooking->isDelivery()) {
+                if ($lockedBooking->delivery_status !== SaleBooking::DELIVERY_DELIVERED || ! $lockedBooking->delivered_at) {
+                    throw new RuntimeException('ต้องส่งสินค้าให้ลูกค้าครบและบันทึกผลส่งจริงก่อนออกใบขาย');
+                }
+
+                $transportJob = TransportJob::where('booking_id', $lockedBooking->id)->lockForUpdate()->first();
+                if (! $transportJob || $transportJob->status !== 'delivered' || ! $transportJob->loaded_at) {
+                    throw new RuntimeException('ต้องบันทึกขึ้นรถและส่งครบในบอร์ดขนส่งก่อนออกใบขาย');
+                }
+            } else {
+                $transportJob = null;
+            }
+
             $bookingDocument = $lockedBooking->document()->with('stockDocument.items')->firstOrFail();
             $sourceItems = $bookingDocument->stockDocument?->items ?? collect();
             if ($sourceItems->isEmpty()) {
                 throw new RuntimeException('ใบจองนี้ไม่มีรายการสินค้า');
             }
+
+            if ($lockedBooking->isDelivery() && $lockedBooking->delivery_due_at === null) {
+                throw new RuntimeException('ใบจองแบบส่งของยังไม่ได้ระบุวันที่ต้องส่ง ยืนยันเป็นใบขายไม่ได้');
+            }
+
+            if ($transportJob && ! $this->loadSheets->isComplete($lockedBooking, $transportJob)) {
+                throw new RuntimeException('จำนวนสินค้าที่ส่งจริงไม่ครบตามใบจอง กรุณาแก้ใบจองก่อนออกใบขาย');
+            }
+
+            $saleDate = $lockedBooking->isDelivery()
+                ? $lockedBooking->delivered_at->toDateString()
+                : now()->toDateString();
+            $this->periods->assertOpen($saleDate, $bookingDocument->branch_id);
 
             $totalQty = DecimalMath::sum($sourceItems->pluck('qty'), DecimalMath::QUANTITY_SCALE);
             $totalAmount = DecimalMath::sum(
@@ -66,9 +97,9 @@ class CreditSaleService
                 'document_book_id' => $book?->id,
                 'branch_id' => $bookingDocument->branch_id,
                 'doc_number' => $book
-                    ? $this->numbers->nextInBook($book, $bookingDocument->branch_id)
-                    : $this->numbers->next(DocumentType::CREDIT_SALE, $bookingDocument->branch_id),
-                'doc_date' => now()->toDateString(),
+                    ? $this->numbers->nextInBook($book, $bookingDocument->branch_id, $saleDate)
+                    : $this->numbers->next(DocumentType::CREDIT_SALE, $bookingDocument->branch_id, $saleDate),
+                'doc_date' => $saleDate,
                 'salesman_id' => $bookingDocument->salesman_id,
                 'sales_user_id' => $bookingDocument->sales_user_id,
                 'sales_area_id' => $bookingDocument->sales_area_id,
@@ -122,13 +153,11 @@ class CreditSaleService
                 'gross_amount' => $totalAmount,
                 'net_amount' => $totalAmount,
                 'balance_amount' => $totalAmount,
-                'due_date' => now()->addDays((int) (AppSetting::get('default_credit_days') ?: self::DEFAULT_CREDIT_DAYS))->toDateString(),
+                'due_date' => Carbon::parse($saleDate)
+                    ->addDays((int) (AppSetting::get('default_credit_days') ?: self::DEFAULT_CREDIT_DAYS))
+                    ->toDateString(),
                 'status' => CustomerOpenItem::STATUS_OPEN,
             ]);
-
-            if ($lockedBooking->isDelivery() && $lockedBooking->delivery_due_at === null) {
-                throw new RuntimeException('ใบจองแบบส่งของยังไม่ได้ระบุวันที่ต้องส่ง ยืนยันเป็นใบขายไม่ได้');
-            }
 
             $lockedBooking->update([
                 'status' => SaleBooking::STATUS_CONVERTED,

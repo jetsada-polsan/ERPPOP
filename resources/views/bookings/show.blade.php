@@ -13,6 +13,11 @@ $deliveryLabel = ['pending' => 'ยังไม่ส่ง', 'partial' => 'ส�
 $deliveryColor = ['pending' => 'text-bg-warning', 'partial' => 'text-bg-info', 'delivered' => 'text-bg-success', 'cancelled' => 'text-bg-secondary'];
 $deliveryDone = in_array($booking->delivery_status, ['delivered', 'cancelled'], true);
 $isOverdue = $isDelivery && ! $deliveryDone && $booking->delivery_due_at && $booking->delivery_due_at->isPast();
+$transportLoaded = $transportJob?->loaded_at !== null;
+$transportDelivered = $transportJob?->status === 'delivered';
+$canConvert = ! $isDelivery || ($booking->delivery_status === 'delivered' && $transportDelivered);
+$canEdit = $isPending && $booking->delivery_status === 'pending'
+    && (! $transportJob || ($transportJob->status === 'booked' && $transportJob->loaded_at === null));
 @endphp
 
 @section('content')
@@ -27,29 +32,39 @@ $isOverdue = $isDelivery && ! $deliveryDone && $booking->delivery_due_at && $boo
             <div class="flow-dot"><i class="bi bi-journal-text"></i></div>
             <div class="flow-label">ใบจอง<div class="flow-sub">{{ $booking->document->doc_number }}</div></div>
         </div>
-        <div class="flow-line {{ $isConverted ? 'done' : '' }}"></div>
-        <div class="flow-step {{ $isConverted ? 'done' : 'pending' }}">
-            <div class="flow-dot"><i class="bi bi-receipt-cutoff"></i></div>
-            <div class="flow-label">ใบขาย/ใบส่งของ
-                @if($isConverted && $booking->confirmedDocument)
-                    <div class="flow-sub">{{ $booking->confirmedDocument->doc_number }}</div>
-                @else
-                    <div class="flow-sub text-muted">ยังไม่แปลง</div>
-                @endif
-            </div>
-        </div>
         @if($isDelivery)
-            <div class="flow-line {{ $booking->delivery_status === 'delivered' ? 'done' : '' }}"></div>
-            <div class="flow-step {{ $booking->delivery_status === 'delivered' ? 'done' : 'pending' }}">
+            <div class="flow-line {{ $transportLoaded ? 'done' : '' }}"></div>
+            <div class="flow-step {{ $transportLoaded ? 'done' : 'pending' }}">
+                <div class="flow-dot"><i class="bi bi-box-seam"></i></div>
+                <div class="flow-label">ตรวจของ / ขึ้นรถ
+                    <div class="flow-sub">{{ $transportLoaded ? 'ขึ้นรถแล้ว' : 'รอจัดของ' }}</div>
+                </div>
+            </div>
+            <div class="flow-line {{ $transportDelivered ? 'done' : '' }}"></div>
+            <div class="flow-step {{ $transportDelivered ? 'done' : 'pending' }}">
                 <div class="flow-dot"><i class="bi bi-truck"></i></div>
                 <div class="flow-label">ส่งของ
                     <div class="flow-sub {{ $isOverdue ? 'text-danger fw-semibold' : 'text-muted' }}">
-                        {{ $deliveryLabel[$booking->delivery_status] ?? $booking->delivery_status }}
+                        {{ $transportDelivered ? 'ส่งครบแล้ว' : ($deliveryLabel[$booking->delivery_status] ?? $booking->delivery_status) }}
                         @if($isOverdue) &middot; เกินกำหนด @endif
                     </div>
                 </div>
             </div>
+            <div class="flow-line {{ $isConverted ? 'done' : '' }}"></div>
+            <div class="flow-step {{ $isConverted ? 'done' : 'pending' }}">
+                <div class="flow-dot"><i class="bi bi-receipt-cutoff"></i></div>
+                <div class="flow-label">ใบขาย / ลูกหนี้
+                    <div class="flow-sub">{{ $isConverted && $booking->confirmedDocument ? $booking->confirmedDocument->doc_number : 'หลังส่งครบ' }}</div>
+                </div>
+            </div>
         @else
+            <div class="flow-line {{ $isConverted ? 'done' : '' }}"></div>
+            <div class="flow-step {{ $isConverted ? 'done' : 'pending' }}">
+                <div class="flow-dot"><i class="bi bi-receipt-cutoff"></i></div>
+                <div class="flow-label">ใบขาย / ลูกหนี้
+                    <div class="flow-sub">{{ $isConverted && $booking->confirmedDocument ? $booking->confirmedDocument->doc_number : 'รับเองที่สาขา' }}</div>
+                </div>
+            </div>
             <div class="flow-line"></div>
             <div class="flow-step pending">
                 <div class="flow-dot"><i class="bi bi-shop"></i></div>
@@ -78,15 +93,15 @@ $isOverdue = $isDelivery && ! $deliveryDone && $booking->delivery_due_at && $boo
             <span class="badge {{ $statusColor[$booking->status] ?? 'text-bg-light' }} fs-6 px-3 py-2">
                 {{ $statusLabel[$booking->status] ?? $booking->status }}
             </span>
-            <a href="{{ route('documents.delivery-note', $booking->document) }}" target="_blank" class="btn btn-light border px-3">
+            <a href="{{ route('documents.delivery-note', $booking->document) }}" target="_blank" class="btn btn-light border px-3" title="เอกสารประกอบการจัดของ ไม่ตัดสต๊อกและไม่ใช่ใบขาย">
                 <i class="bi bi-truck me-1"></i> ใบส่งของชั่วคราว (A5)
             </a>
-            @if($isPending && $booking->delivery_status === 'pending')
+            @if($canEdit)
                 <a href="{{ route('bookings.edit', $booking) }}" class="btn btn-outline-primary px-3">
                     <i class="bi bi-pencil-square me-1"></i> แก้ไขใบจอง
                 </a>
             @endif
-            @if($isPending)
+            @if($isPending && $canConvert)
             <form method="post" action="{{ route('bookings.convert', $booking) }}" id="convert-form" class="d-flex flex-column gap-2 align-items-end">
                 @csrf
                 @if($creditSaleBooks->count() > 1)
@@ -100,11 +115,15 @@ $isOverdue = $isDelivery && ! $deliveryDone && $booking->delivery_due_at && $boo
                 </div>
                 @endif
                 <button type="button"
-                    onclick="Swal.fire({ title:'แปลงเป็นใบขาย?', text:'จะตัดสต็อกและตั้งลูกหนี้ทันที ย้อนกลับไม่ได้', icon:'warning', showCancelButton:true, confirmButtonText:'ยืนยัน', cancelButtonText:'ยกเลิก', confirmButtonColor:'var(--erp-success-ink)' }).then(r => r.isConfirmed && document.getElementById('convert-form').submit())"
+                    onclick="Swal.fire({ title:'แปลงเป็นใบขาย?', text:'จะตัดสต็อกและตั้งลูกหนี้ทันที{{ $isDelivery ? ' โดยใช้วันที่ส่งจริง' : '' }}', icon:'warning', showCancelButton:true, confirmButtonText:'ยืนยัน', cancelButtonText:'ยกเลิก', confirmButtonColor:'var(--erp-success-ink)' }).then(r => r.isConfirmed && document.getElementById('convert-form').submit())"
                     class="btn btn-success px-4">
-                    <i class="bi bi-arrow-right-circle me-1"></i> แปลงเป็นใบขาย / ใบส่งของ
+                    <i class="bi bi-arrow-right-circle me-1"></i> แปลงเป็นใบขาย
                 </button>
             </form>
+            @elseif($isPending && $isDelivery)
+                <button class="btn btn-outline-secondary px-4" disabled title="ต้องตรวจของ ขึ้นรถ และบันทึกส่งครบก่อน">
+                    <i class="bi bi-hourglass-split me-1"></i> รอส่งครบก่อนออกใบขาย
+                </button>
             @elseif($isConverted && $booking->confirmedDocument)
             <a href="{{ route('sales.show', $booking->confirmedDocument) }}" class="btn btn-outline-success px-4">
                 <i class="bi bi-receipt-cutoff me-1"></i> ดูใบขาย {{ $booking->confirmedDocument->doc_number }}
@@ -135,35 +154,27 @@ $isOverdue = $isDelivery && ! $deliveryDone && $booking->delivery_due_at && $boo
         </span>
     </div>
 
-    @if($deliveryDone)
-        <p class="text-muted small mb-0">
-            บันทึกการส่งของใบนี้ปิดแล้ว แก้ไขไม่ได้ — ถ้าบันทึกผิดต้องให้ผู้ดูแลระบบตรวจสอบจาก audit log
-        </p>
+    @if($booking->delivery_status === 'delivered')
+        <div class="alert alert-success mb-0">
+            ส่งครบแล้ว{{ $booking->delivered_at ? ' เมื่อ '.$booking->delivered_at->format('d/m/Y H:i') : '' }} — ตรวจใบส่งของที่ลูกค้าเซ็นกลับ แล้วแปลงเป็นใบขายเพื่อบันทึกสต๊อกและลูกหนี้
+        </div>
+    @elseif($deliveryDone)
+        <p class="text-muted small mb-0">การส่งของถูกปิดแล้ว แก้ไขไม่ได้ หากบันทึกผิดให้ผู้ดูแลตรวจสอบประวัติ</p>
     @else
-        <form method="post" action="{{ route('bookings.delivery', $booking) }}" class="row g-2 align-items-end">
-            @csrf
-            <div class="col-md-3">
-                <label class="form-label small text-muted mb-1">บันทึกผลการส่ง</label>
-                <select name="delivery_status" class="form-select form-select-sm" required>
-                    <option value="delivered">ส่งครบแล้ว</option>
-                    <option value="partial">ส่งบางส่วน</option>
-                    <option value="cancelled">ยกเลิกการส่ง</option>
-                </select>
-            </div>
-            <div class="col-md-6">
-                <label class="form-label small text-muted mb-1">หมายเหตุ</label>
-                <input type="text" name="note" maxlength="500" class="form-control form-control-sm"
-                       placeholder="เช่น ส่งโดยรถบริษัท ผู้รับเซ็นแล้ว">
-            </div>
-            <div class="col-md-3 text-end">
-                <button class="btn btn-sm btn-primary w-100">
-                    <i class="bi bi-check2-circle me-1"></i>บันทึกการส่ง
-                </button>
-            </div>
-        </form>
-        <p class="text-muted small mt-2 mb-0">
-            บันทึก "ส่งครบแล้ว" หรือ "ยกเลิกการส่ง" แล้วจะแก้ไม่ได้อีก และใบจองจะหลุดจากรายงานค้างส่งทันที
-        </p>
+        <div class="alert alert-info mb-3">
+            ใบส่งของชั่วคราวใช้ตรวจรายการและแนบเอกสาร ยังไม่ตัดสต๊อกและไม่ใช่ใบขาย
+            หากสินค้าไม่ครบ ให้แก้จำนวนในใบจองก่อนยืนยันขึ้นรถ จากนั้นลงสถานะส่งของจริงในบอร์ดขนส่ง
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{{ route('fleet.load-sheet', $booking) }}" class="btn btn-outline-primary"><i class="bi bi-box-seam me-1"></i>เปิดใบขึ้นของ</a>
+            <a href="{{ route('fleet.board') }}" class="btn btn-primary"><i class="bi bi-truck me-1"></i>ไปบอร์ดขนส่ง</a>
+            @if($canEdit)
+                <a href="{{ route('bookings.edit', $booking) }}" class="btn btn-outline-secondary"><i class="bi bi-pencil-square me-1"></i>แก้จำนวนก่อนขึ้นรถ</a>
+            @endif
+        </div>
+        @if($transportJob)
+            <div class="small text-muted mt-2">สถานะขนส่ง: {{ ['booked'=>'รอจัดของ','loaded'=>'ขึ้นรถแล้ว','in_transit'=>'กำลังส่ง','delivered'=>'ส่งครบแล้ว','paid'=>'รับเงินแล้ว','cancelled'=>'ยกเลิก'][$transportJob->status] ?? $transportJob->status }}</div>
+        @endif
     @endif
 </div>
 @endif

@@ -13,6 +13,8 @@ use App\Models\Role;
 use App\Models\SaleBooking;
 use App\Models\SalesArea;
 use App\Models\StockBalance;
+use App\Models\TransportJob;
+use App\Models\TransportLoadItem;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseLocation;
@@ -405,6 +407,56 @@ class BookingSalesAreaTest extends TestCase
             'warehouse_location_id' => $branch->default_warehouse_location_id,
             'reserved_qty' => 3,
         ]);
+    }
+
+    public function test_a_booking_can_be_adjusted_after_opening_a_load_sheet_but_not_after_loading_the_truck(): void
+    {
+        [$branch, $customer, $product] = $this->masters('LOADEDIT');
+        $user = User::factory()->create(['username' => 'booking_load_edit_uat', 'branch_id' => $branch->id]);
+        $this->withoutMiddleware(ErpAuthorize::class)->actingAs($user)
+            ->post(route('bookings.store'), [
+                'customer_id' => $customer->id,
+                'branch_id' => $branch->id,
+                'sales_user_id' => $user->id,
+                'fulfillment_type' => SaleBooking::FULFILLMENT_DELIVERY,
+                'delivery_due_at' => now()->addDay()->format('Y-m-d H:i:s'),
+                'items' => [['product_id' => $product->id, 'qty' => 3, 'unit_price' => 10]],
+            ])->assertRedirect();
+
+        $booking = SaleBooking::with('document.stockDocument.items')->latest('id')->firstOrFail();
+        $this->get(route('fleet.load-sheet', $booking))->assertOk();
+        $line = TransportLoadItem::sole();
+        $this->post(route('fleet.load-sheet.save', $booking), [
+            'items' => [$line->id => ['loaded_qty' => 2, 'availability' => 'partial', 'note' => 'ของขาด 1']],
+        ])->assertRedirect(route('fleet.load-sheet', $booking));
+
+        $this->put(route('bookings.update', $booking), [
+            'customer_id' => $customer->id,
+            'branch_id' => $branch->id,
+            'sales_user_id' => $user->id,
+            'fulfillment_type' => SaleBooking::FULFILLMENT_DELIVERY,
+            'delivery_due_at' => now()->addDay()->format('Y-m-d H:i:s'),
+            'items' => [['product_id' => $product->id, 'qty' => 2, 'unit_price' => 10]],
+        ])->assertRedirect(route('bookings.show', $booking));
+
+        $this->assertSame(0, TransportLoadItem::count(), 'การแก้ใบจองต้องล้างใบขึ้นของเก่าที่อ้างรายการเดิม');
+        $this->get(route('fleet.load-sheet', $booking))->assertOk();
+        $refreshedLine = TransportLoadItem::sole();
+        $this->assertSame('2.00000000', (string) $refreshedLine->planned_qty);
+        $this->assertSame('pending', $refreshedLine->availability);
+
+        TransportJob::where('booking_id', $booking->id)->update(['status' => 'loaded', 'loaded_at' => now()]);
+        $this->get(route('bookings.edit', $booking))->assertRedirect(route('bookings.show', $booking));
+        $this->from(route('bookings.edit', $booking))->put(route('bookings.update', $booking), [
+            'customer_id' => $customer->id,
+            'branch_id' => $branch->id,
+            'sales_user_id' => $user->id,
+            'fulfillment_type' => SaleBooking::FULFILLMENT_DELIVERY,
+            'delivery_due_at' => now()->addDay()->format('Y-m-d H:i:s'),
+            'items' => [['product_id' => $product->id, 'qty' => 1, 'unit_price' => 10]],
+        ])->assertRedirect(route('bookings.edit', $booking))->assertSessionHas('error');
+
+        $this->assertSame('2.00000000', (string) $booking->fresh()->document->stockDocument->items->sole()->qty);
     }
 
     /** @return array{Branch, Customer, Product} */

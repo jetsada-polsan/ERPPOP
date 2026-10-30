@@ -1373,3 +1373,12 @@ pending
 - Deploy: GitHub Actions Deploy ERP run `40997413458` (#93) สำเร็จบน production ที่ commit `95a14f67f5765667f429ccb039593f395249d267`; test, asset build, deploy และ `php artisan erp:health` ผ่าน
 - ตรวจหลัง deploy: เปิด `/sales/4` และทดสอบเปิดโมดัลแล้วกด “ปิด”; โมดัลหายไปและยังแสดงใบขาย `DSB00120261030001` ตามเดิม
 - งานถัดไป: ไม่มี
+
+## Handoff - 2026-10-30 (Codex: flow ใบจองส่งสินค้า → ใบขาย)
+- Commit: รอ commit
+- ทำอะไร: ใบส่งของชั่วคราวระบุชัดว่าเป็นเอกสารประกอบและไม่ลงขาย; ใบขึ้นของบันทึกจำนวนที่ตรวจจริงและบังคับให้ของครบตามใบจองก่อนยืนยันขึ้นรถ; หากของขาดยังแก้ใบจองได้ก่อนรถออก โดยล้างรายการขึ้นของเก่าและให้ตรวจใหม่; ลำดับบอร์ดเป็นขึ้นรถ → กำลังส่ง → ส่งครบ พร้อม audit log; ใบขายเชื่อของการส่งจะออกได้เมื่อใบขึ้นของครบและส่งจริงแล้วเท่านั้น ใช้วันที่ส่งจริงทั้งวันที่เอกสาร เลขที่ และวันครบกำหนดชำระ พร้อมปฏิเสธวันที่ในงวดบัญชีปิด
+- ทดสอบ: `php -d memory_limit=1G vendor/bin/phpunit` ผ่าน 643 tests (642 ผ่าน, 1 skipped), 4,473 assertions, incomplete 6; ทดสอบเฉพาะ 3 ชุดใบจอง/ขนส่ง/ขายผ่าน 29 tests / 215 assertions; `CashTransferScreenTest` ผ่าน 5 tests / 26 assertions; `vendor/bin/pint --dirty`, `git diff --check`, `php artisan view:cache` ผ่าน
+- ข้อจำกัด runner: `php -d memory_limit=1G artisan test` ในเครื่องหยุดที่ 128 MB ระหว่างตรวจ MIME ของ XLSX ใน `ReportExportTest`; รัน PHPUnit ตรงด้วย memory 1 GB แล้วผ่านครบ
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ทำ browser UAT บน production; ไม่มี migration และไม่ได้แก้ข้อมูล production; สินค้าที่ขาดต้องปรับใบจองก่อนขึ้นรถ ส่วนการส่งบางส่วนยังไม่มี workflow แยกเที่ยวในระบบ
+- Deploy: ยังไม่ deploy; ต้องสำรอง/ตรวจ readiness ตาม production workflow แล้วใช้ GitHub Actions `Deploy ERP` หลัง push
+- งานถัดไป: commit/push `main`, รัน production preflight, dispatch Deploy ERP และตรวจผล/สุขภาพหลัง deploy

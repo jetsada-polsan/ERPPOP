@@ -11,7 +11,7 @@ use App\Models\SaleBooking;
 use App\Models\StockBalance;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
-use App\Models\TransportLoadItem;
+use App\Models\TransportJob;
 use App\Support\DecimalMath;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -196,8 +196,9 @@ class BookingService
             if ($oldItems->isEmpty()) {
                 throw new RuntimeException('ไม่พบรายการสินค้าเดิมของใบจองนี้');
             }
-            if (TransportLoadItem::whereIn('stock_document_item_id', $oldItems->pluck('id'))->exists()) {
-                throw new RuntimeException('ใบจองนี้เริ่มจัดรายการขึ้นรถแล้ว จึงแก้ไขรายการสินค้าไม่ได้');
+            $transportJob = TransportJob::where('booking_id', $lockedBooking->id)->lockForUpdate()->first();
+            if ($transportJob && ($transportJob->status !== 'booked' || $transportJob->loaded_at !== null)) {
+                throw new RuntimeException('ใบจองนี้ขึ้นรถแล้ว จึงแก้ไขรายการสินค้าไม่ได้');
             }
 
             $newItems = collect($data['items']);
