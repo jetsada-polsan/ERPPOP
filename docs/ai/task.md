@@ -1348,3 +1348,11 @@ pending
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ทดสอบคลิกบน production หลัง deploy; screenshot มีสินค้าคงเหลือพร้อมจอง 0.00 จึงบล็อกการจองอย่างถูกต้อง แม้ย้าย popup ไปมุมขวาบนแล้วก็ยังต้องมีสต๊อกพร้อมจองก่อนบันทึก; ไม่ได้สร้าง/แก้เอกสาร production
 - Deploy: ยังไม่ deploy
 - งานถัดไป: deploy ตามขั้นตอน `docs/OPERATIONS.md` เมื่อเจ้าของสั่ง แล้วตรวจหน้าใบจองจริงและตำแหน่ง toast บน production
+
+## Handoff - 2026-10-30 (สิทธิ์ IT สำหรับทดสอบ POS)
+- Commit: `dd0dd63`
+- ทำอะไร: ตรวจหน้า “ผู้ใช้และสิทธิ์” บน production พบ role IT_MGR มี `pos.use`/`pos.void` แต่ไม่มี `pos.sell`/`pos.cash.manage`; เพิ่ม migration ให้ IT_MGR ใช้ POS flow ปกติได้: เปิดกะ/ขาย/ปิดกะและจัดการเงินลิ้นชัก โดยไม่เพิ่มสิทธิ์อนุมัติส่วนลดพิเศษหรือขายต่ำกว่าทุน
+- ทดสอบ: `php -d memory_limit=512M vendor/bin/phpunit tests/Feature/ItPosUatAccessTest.php` ผ่าน 1 test / 10 assertions; `php -d memory_limit=512M vendor/bin/phpunit` ผ่าน 636 tests (635 passed, 1 skipped), 4,417 assertions, incomplete 6; `vendor/bin/pint --dirty` และ `git diff --check` ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: migration ยังไม่รันบน production; หลัง deploy role IT_MGR จะขายได้บน POS ทุกสาขาที่อุปกรณ์/สต๊อก/กะพร้อม และจะต้องตั้ง PIN ด้วยตนเองก่อนล็อกอินแคชเชียร์; บิล POS ที่บันทึกจะลงยอดขาย/สต๊อก/บัญชีจริง
+- Deploy: ยังไม่ deploy
+- งานถัดไป: เจ้าของสั่ง deploy ก่อนจึงมีผลบน production; หลัง deploy ตรวจ role และให้เจ้าของตั้ง PIN เอง แล้วค่อยทดสอบด้วยเอกสารที่จดเลขไว้สำหรับกลับรายการ
