@@ -1,3 +1,4 @@
+from ui.theme import apply_pos_theme
 import sys
 import os
 import io
@@ -33,7 +34,7 @@ class CustomerDisplayWindow(QMainWindow):
         header_layout.setAlignment(Qt.AlignTop)
 
         welcome_lbl = QLabel("ยินดีต้อนรับ (Welcome)")
-        welcome_lbl.setStyleSheet("font-size: 30px; font-weight: 900; color: #059669; margin: 0px; padding: 0px;")
+        welcome_lbl.setStyleSheet("font-size: 30px; font-weight: 900; color: #147da8; margin: 0px; padding: 0px;")
         header_layout.addWidget(welcome_lbl, 0, Qt.AlignTop)
 
         header_layout.addStretch()
@@ -56,7 +57,7 @@ class CustomerDisplayWindow(QMainWindow):
         left_layout.setSpacing(0)
 
         tbl_header_frame = QFrame()
-        tbl_header_frame.setStyleSheet("QFrame { background-color: #059669; border-top-left-radius: 10px; border-top-right-radius: 10px; border-bottom-left-radius: 0px; border-bottom-right-radius: 0px; }")
+        tbl_header_frame.setStyleSheet("QFrame { background-color: #147da8; border-top-left-radius: 10px; border-top-right-radius: 10px; border-bottom-left-radius: 0px; border-bottom-right-radius: 0px; }")
         tbl_header_layout = QHBoxLayout(tbl_header_frame)
         tbl_header_layout.setContentsMargins(15, 10, 15, 10)
 
@@ -108,7 +109,7 @@ class CustomerDisplayWindow(QMainWindow):
         # REMOVED right_panel.setAlignment(Qt.AlignTop)
 
         total_box = QFrame()
-        total_box.setStyleSheet("QFrame { background-color: white; border-radius: 12px; border: 2px solid #10b981; }")
+        total_box.setStyleSheet("QFrame { background-color: white; border-radius: 12px; border: 2px solid #b9d9e8; }")
         total_box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         total_layout = QVBoxLayout(total_box)
         total_layout.setContentsMargins(15, 15, 15, 15)
@@ -119,7 +120,7 @@ class CustomerDisplayWindow(QMainWindow):
         total_layout.addWidget(total_title)
 
         self.total_lbl = QLabel("0.00")
-        self.total_lbl.setStyleSheet("font-size: 60px; font-weight: 900; color: #dc2626; border: none; font-family: Arial;")
+        self.total_lbl.setStyleSheet("font-size: 60px; font-weight: 900; color: #0b5275; border: none; font-family: Arial;")
         self.total_lbl.setAlignment(Qt.AlignCenter)
         total_layout.addWidget(self.total_lbl)
 
@@ -129,7 +130,7 @@ class CustomerDisplayWindow(QMainWindow):
         total_layout.addWidget(total_currency)
 
         subtotal_frame = QFrame()
-        subtotal_frame.setStyleSheet("QFrame { background-color: #f0fdf4; border-radius: 10px; border: none; margin-top: 10px; }")
+        subtotal_frame.setStyleSheet("QFrame { background-color: #eaf3f8; border-radius: 10px; border: none; margin-top: 10px; }")
         subtotal_layout = QHBoxLayout(subtotal_frame)
 
         sub1 = QVBoxLayout()
@@ -150,9 +151,9 @@ class CustomerDisplayWindow(QMainWindow):
 
         sub3 = QVBoxLayout()
         lbl_s3 = QLabel("ส่วนลด")
-        lbl_s3.setStyleSheet("color: #059669; font-size: 13px; font-weight: bold;")
+        lbl_s3.setStyleSheet("color: #0b5e83; font-size: 13px; font-weight: bold;")
         self.disc_lbl = QLabel("0.00 ฿")
-        self.disc_lbl.setStyleSheet("color: #10b981; font-size: 15px; font-weight: bold;")
+        self.disc_lbl.setStyleSheet("color: #147da8; font-size: 15px; font-weight: bold;")
         sub3.addWidget(lbl_s3)
         sub3.addWidget(self.disc_lbl)
 
@@ -239,6 +240,7 @@ class CustomerDisplayWindow(QMainWindow):
         self.timer.timeout.connect(self.update_time)
         self.timer.start(1000)
         self.update_time()
+        apply_pos_theme(self)
 
     def update_time(self):
         dt = QDateTime.currentDateTime()
@@ -256,7 +258,7 @@ class CustomerDisplayWindow(QMainWindow):
         self.spacer_widget.show()
 
         self.total_lbl.setText(f"{total_amount:,.2f}")
-        self.total_lbl.setStyleSheet("font-size: 60px; font-weight: 900; color: #dc2626; border: none; font-family: Arial;")
+        self.total_lbl.setStyleSheet("font-size: 60px; font-weight: 900; color: #0b5275; border: none; font-family: Arial;")
 
         sub = total_amount / 1.07
         vat = total_amount - sub
@@ -330,5 +332,5 @@ class CustomerDisplayWindow(QMainWindow):
         self.table.setRowCount(0)
         self.qr_box.hide()
         self.spacer_widget.show()
-        self.total_lbl.setStyleSheet("font-size: 60px; font-weight: 900; color: #10b981; border: none; font-family: Arial;")
+        self.total_lbl.setStyleSheet("font-size: 60px; font-weight: 900; color: #0b5275; border: none; font-family: Arial;")
         self.total_lbl.setText(f"{change:,.2f}")

@@ -1,4 +1,5 @@
-﻿from PySide6.QtWidgets import (
+﻿from ui.theme import apply_pos_theme
+from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QLineEdit, QFrame, QMessageBox, QWidget
 )
 from PySide6.QtCore import Qt
@@ -20,6 +21,7 @@ class ShiftOpenDialog(QDialog):
         self.opening_note = ""
         self.cashier_name = cashier_name
         self.init_ui()
+        apply_pos_theme(self)
 
     def init_ui(self):
         main_layout = QVBoxLayout(self)
@@ -32,7 +34,7 @@ class ShiftOpenDialog(QDialog):
         header_layout.setContentsMargins(20, 15, 20, 15)
 
         title_lbl = QLabel("เปิดกะขาย")
-        title_lbl.setStyleSheet("font-size: 20px; font-weight: bold; color: #00643c;")
+        title_lbl.setStyleSheet("font-size: 20px; font-weight: bold; color: #0b5e83;")
 
         close_btn = QPushButton("X")
         close_btn.setFixedSize(32, 32)
@@ -112,7 +114,7 @@ class ShiftOpenDialog(QDialog):
 
         confirm_btn = QPushButton("เปิดกะ")
         confirm_btn.setFixedHeight(48)
-        confirm_btn.setStyleSheet("QPushButton { background-color: #10b981; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; } QPushButton:hover { background-color: #059669; }")
+        confirm_btn.setStyleSheet("QPushButton { background-color: #147da8; color: white; border: none; border-radius: 9px; font-size: 16px; font-weight: bold; } QPushButton:hover { background-color: #0b5e83; }")
         confirm_btn.clicked.connect(self.on_confirm)
 
         footer_layout.addWidget(cancel_btn)
@@ -140,6 +142,7 @@ class ShiftCloseDialog(QDialog):
         self.expected_cash = expected_cash
         self.counted_cash = 0.0
         self.init_ui()
+        apply_pos_theme(self)
 
     def init_ui(self):
         layout = QVBoxLayout(self)

@@ -1,3 +1,4 @@
+from ui.theme import apply_pos_theme
 import os
 import sys
 from PySide6.QtWidgets import QFrame, QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QSpacerItem, QSizePolicy
@@ -29,6 +30,7 @@ class HelpDialog(QDialog):
 
         self.setup_ui()
         self.update_view()
+        apply_pos_theme(self)
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
@@ -36,7 +38,7 @@ class HelpDialog(QDialog):
 
         # Header
         header = QFrame()
-        header.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #b91c1c, stop:1 #7f1d1d);")
+        header.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #147da8, stop:1 #0b5275);")
         header.setFixedHeight(50)
         header_layout = QHBoxLayout(header)
 
@@ -54,7 +56,7 @@ class HelpDialog(QDialog):
 
         # Description
         self.desc_label = QLabel()
-        self.desc_label.setStyleSheet("background-color: #fef2f2; border: 2px solid #b91c1c; border-radius: 12px; padding: 15px; font-size: 14px; color: #334155; margin: 10px 15px;")
+        self.desc_label.setStyleSheet("background-color: #eaf3f8; border: 1px solid #cfe2ed; border-radius: 12px; padding: 15px; font-size: 14px; color: #334155; margin: 10px 15px;")
         self.desc_label.setWordWrap(True)
         self.desc_label.setTextFormat(Qt.RichText)
         layout.addWidget(self.desc_label)

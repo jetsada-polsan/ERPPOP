@@ -1,3 +1,4 @@
+from ui.theme import apply_pos_theme
 import traceback
 import json
 import sqlite3
@@ -91,6 +92,7 @@ class PendingSyncDialog(QDialog):
         if worker:
             worker.manual_sync_finished.connect(self.on_manual_sync_finished)
         self.load_pending_sales()
+        apply_pos_theme(self)
 
     def setup_ui(self):
         layout = QVBoxLayout(self)

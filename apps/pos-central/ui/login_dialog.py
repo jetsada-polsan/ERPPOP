@@ -1,3 +1,4 @@
+from ui.theme import apply_pos_theme
 import os
 import requests
 from services.offline_auth import verify_offline_login
@@ -20,6 +21,7 @@ class CashierLoginDialog(QDialog):
         self.setStyleSheet("background-color: white; color: #111827; font-family: 'Segoe UI', sans-serif;")
 
         self.init_ui()
+        apply_pos_theme(self)
 
     def init_ui(self):
         layout = QVBoxLayout(self)

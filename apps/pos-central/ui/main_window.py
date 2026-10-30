@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from ui.theme import apply_pos_theme
 
 import sys
 
@@ -339,6 +340,7 @@ class MainWindow(QMainWindow):
 
 
         QTimer.singleShot(500, self.check_config_and_start)
+        apply_pos_theme(self)
 
 
 
@@ -3233,7 +3235,7 @@ class MainWindow(QMainWindow):
 
         self.total_val = QLabel("฿0.00")
 
-        self.total_val.setStyleSheet("font-size: 26px; font-weight: bold; color: #b91c1c;")
+        self.total_val.setStyleSheet("font-size: 26px; font-weight: bold; color: #0b5275;")
 
         self.total_val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
@@ -3261,7 +3263,7 @@ class MainWindow(QMainWindow):
 
         self.scale_btn.setToolTip("สินค้าชั่งน้ำหนัก (เลือกสินค้าและระบุน้ำหนักเป็นกิโลกรัม)")
 
-        self.scale_btn.setStyleSheet("background-color: #0d9488; color: white; border-radius: 6px; padding: 8px 10px; font-size: 13px; font-weight: bold;")
+        self.scale_btn.setStyleSheet("background-color: #147da8; color: white; border-radius: 9px; padding: 8px 10px; font-size: 13px; font-weight: bold;")
 
         self.scale_btn.clicked.connect(self.prompt_scale_weight_item)
 

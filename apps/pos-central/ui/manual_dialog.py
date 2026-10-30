@@ -1,3 +1,4 @@
+from ui.theme import apply_pos_theme
 import os
 import sys
 from PySide6.QtCore import Qt
@@ -17,7 +18,7 @@ def get_asset_path(filename: str) -> str:
 
 class ManualDialog(QDialog):
     """
-    Modern Red & White Enterprise User Manual Dialog
+    Shared PopCentral POS visual system for the in-app user manual.
     for PopCentral POS Desktop Application.
     """
     def __init__(self, parent=None, initial_step=0):
@@ -31,10 +32,10 @@ class ManualDialog(QDialog):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # Header (Red Enterprise Theme)
+        # Header
         header = QFrame()
         header.setFixedHeight(64)
-        header.setStyleSheet("background-color: #dc2626; border-bottom: 2px solid #b91c1c;")
+        header.setStyleSheet("background-color: #147da8; border-bottom: 2px solid #0b5275;")
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(24, 0, 24, 0)
 
@@ -45,7 +46,7 @@ class ManualDialog(QDialog):
         header_layout.addStretch()
 
         sub_lbl = QLabel("ศูนย์รวมวิธีใช้งานและแก้ไขปัญหาเบื้องต้น")
-        sub_lbl.setStyleSheet("font-size: 13px; color: #fee2e2;")
+        sub_lbl.setStyleSheet("font-size: 13px; color: #e3f1f7;")
         header_layout.addWidget(sub_lbl)
 
         main_layout.addWidget(header)
@@ -73,14 +74,14 @@ class ManualDialog(QDialog):
                 border-left: 4px solid transparent;
             }
             QListWidget::item:hover {
-                background-color: #fef2f2;
-                color: #dc2626;
+                background-color: #eaf3f8;
+                color: #0b5e83;
             }
             QListWidget::item:selected {
-                background-color: #fee2e2;
-                color: #b91c1c;
+                background-color: #dcecf4;
+                color: #0b5e83;
                 font-weight: 800;
-                border-left: 4px solid #dc2626;
+                border-left: 4px solid #147da8;
             }
         """)
 
@@ -148,6 +149,7 @@ class ManualDialog(QDialog):
         # Navigation connection
         self.nav_list.currentRowChanged.connect(self.stack.setCurrentIndex)
         self.nav_list.setCurrentRow(initial_step)
+        apply_pos_theme(self)
 
     def _create_scrollable_container(self):
         scroll = QScrollArea()

@@ -1,3 +1,4 @@
+from ui.theme import apply_pos_theme
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QFrame, QRadioButton, QButtonGroup, QMessageBox, QWidget
@@ -25,6 +26,7 @@ class DiscountDialog(QDialog):
         self.setFixedWidth(440)
         self.setModal(True)
         self.init_ui()
+        apply_pos_theme(self)
 
     def init_ui(self):
         self.setStyleSheet("""

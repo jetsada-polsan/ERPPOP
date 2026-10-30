@@ -1,3 +1,4 @@
+from ui.theme import apply_pos_theme
 import os
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
@@ -43,6 +44,7 @@ class IdleTimeoutDialog(QDialog):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_timer)
         self.timer.start(1000)
+        apply_pos_theme(self)
 
     def update_timer(self):
         self.countdown -= 1
@@ -86,6 +88,7 @@ class PaymentDialog(QDialog):
 
         self.init_ui()
         self.update_displays()
+        apply_pos_theme(self)
 
     def init_ui(self):
         main_layout = QHBoxLayout(self)

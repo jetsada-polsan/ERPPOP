@@ -1,3 +1,4 @@
+from ui.theme import apply_pos_theme
 import requests
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
@@ -38,7 +39,7 @@ class ScaleWeightDialog(QDialog):
                 padding: 10px; font-size: 15px; color: #0f172a;
             }
             QLineEdit:focus, QComboBox:focus, QDoubleSpinBox:focus {
-                border-color: #0d9488;
+                border-color: #147da8;
             }
             QComboBox {
                 background-color: #ffffff;
@@ -48,9 +49,9 @@ class ScaleWeightDialog(QDialog):
             QComboBox QAbstractItemView {
                 background-color: #ffffff;
                 color: #0f172a;
-                selection-background-color: #0d9488;
+                selection-background-color: #147da8;
                 selection-color: #ffffff;
-                border: 2px solid #0d9488;
+                border: 2px solid #147da8;
                 outline: none;
                 font-size: 14px;
                 padding: 4px;
@@ -62,11 +63,11 @@ class ScaleWeightDialog(QDialog):
                 border-bottom: 1px solid #f1f5f9;
             }
             QComboBox QAbstractItemView::item:hover {
-                background-color: #ccfbf1;
-                color: #0f766e;
+                background-color: #e3f1f7;
+                color: #0b5e83;
             }
             QComboBox QAbstractItemView::item:selected {
-                background-color: #0d9488;
+                background-color: #147da8;
                 color: #ffffff;
                 font-weight: bold;
             }
@@ -74,6 +75,7 @@ class ScaleWeightDialog(QDialog):
 
         self.setup_ui()
         self.load_products()
+        apply_pos_theme(self)
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
@@ -82,14 +84,14 @@ class ScaleWeightDialog(QDialog):
 
         # Header Box
         header_frame = QFrame()
-        header_frame.setStyleSheet("background: linear-gradient(135deg, #0d9488 0%, #115e59 100%); border-radius: 10px; padding: 12px;")
+        header_frame.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #147da8, stop:1 #0b5275); border-radius: 12px; padding: 12px;")
         h_layout = QVBoxLayout(header_frame)
         h_layout.setContentsMargins(10, 8, 10, 8)
 
         title_lbl = QLabel("ขายสินค้าชั่งน้ำหนัก (กิโลกรัม)")
         title_lbl.setStyleSheet("color: white; font-size: 18px; font-weight: bold;")
         sub_lbl = QLabel("ยิงฉลากเครื่องชั่งเพื่อใส่น้ำหนักอัตโนมัติ หรือสแกนสินค้าแล้วระบุกิโลกรัม")
-        sub_lbl.setStyleSheet("color: #ccfbf1; font-size: 13px;")
+        sub_lbl.setStyleSheet("color: #e3f1f7; font-size: 13px;")
         h_layout.addWidget(title_lbl)
         h_layout.addWidget(sub_lbl)
         layout.addWidget(header_frame)
@@ -97,10 +99,10 @@ class ScaleWeightDialog(QDialog):
         # 1. Barcode / QR Scan Field (Default Focused)
         scan_box = QVBoxLayout()
         scan_lbl = QLabel("สแกนบาร์โค้ด / QR สินค้า หรือพิมพ์รหัส:")
-        scan_lbl.setStyleSheet("font-weight: bold; color: #0f766e;")
+        scan_lbl.setStyleSheet("font-weight: bold; color: #0b5e83;")
         self.scan_input = QLineEdit()
         self.scan_input.setPlaceholderText("ยิงบาร์โค้ด / QR หรือ SKU ที่นี่แล้วกด Enter...")
-        self.scan_input.setStyleSheet("border: 2px dashed #0d9488; background: #f0fdfa; font-weight: bold;")
+        self.scan_input.setStyleSheet("QLineEdit { border: 2px dashed #147da8; background: #edf7fb; font-weight: bold; } QLineEdit:focus { border: 2px solid #0b5e83; background: white; }")
         self.scan_input.returnPressed.connect(self.on_scan_barcode)
         scan_box.addWidget(scan_lbl)
         scan_box.addWidget(self.scan_input)
@@ -120,12 +122,12 @@ class ScaleWeightDialog(QDialog):
 
         # Product Info Banner
         self.info_card = QFrame()
-        self.info_card.setStyleSheet("background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px;")
+        self.info_card.setStyleSheet("background: white; border: 1px solid #d8e5ed; border-radius: 12px; padding: 10px;")
         info_layout = QHBoxLayout(self.info_card)
         self.prod_name_lbl = QLabel("กรุณาเลือกหรือสแกนสินค้า")
         self.prod_name_lbl.setStyleSheet("font-weight: bold; font-size: 15px; color: #0f172a;")
         self.prod_price_lbl = QLabel("฿0.00 / กก.")
-        self.prod_price_lbl.setStyleSheet("font-weight: bold; font-size: 16px; color: #b91c1c;")
+        self.prod_price_lbl.setStyleSheet("font-weight: bold; font-size: 16px; color: #0b5e83;")
         info_layout.addWidget(self.prod_name_lbl, 1)
         info_layout.addWidget(self.prod_price_lbl, 0)
         layout.addWidget(self.info_card)
@@ -133,7 +135,7 @@ class ScaleWeightDialog(QDialog):
         # 3. Weight Input Field (กิโลกรัม)
         weight_box = QVBoxLayout()
         self.weight_lbl = QLabel("น้ำหนักสินค้า (กิโลกรัม):")
-        self.weight_lbl.setStyleSheet("font-weight: bold; font-size: 15px; color: #0d9488;")
+        self.weight_lbl.setStyleSheet("font-weight: bold; font-size: 15px; color: #0b5e83;")
 
         weight_row = QHBoxLayout()
         self.weight_input = QDoubleSpinBox()
@@ -158,7 +160,7 @@ class ScaleWeightDialog(QDialog):
         self.quick_weight_buttons = []
         for q_label, q_val in [("0.5 กก.", 0.5), ("1.0 กก.", 1.0), ("1.5 กก.", 1.5), ("2.0 กก.", 2.0)]:
             btn = QPushButton(q_label)
-            btn.setStyleSheet("background: #e2e8f0; color: #334155; border-radius: 6px; padding: 6px; font-weight: bold;")
+            btn.setStyleSheet("background: #e8f1f6; color: #29465b; border: 1px solid #d5e3eb; border-radius: 8px; padding: 8px; font-weight: bold;")
             btn.clicked.connect(lambda checked=False, v=q_val: self.weight_input.setValue(v))
             quick_row.addWidget(btn)
             self.quick_weight_buttons.append(btn)
@@ -166,12 +168,12 @@ class ScaleWeightDialog(QDialog):
 
         # Calculated Total Price Display
         total_frame = QFrame()
-        total_frame.setStyleSheet("background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px;")
+        total_frame.setStyleSheet("background: #eaf3f8; border: 1px solid #cfe2ed; border-radius: 12px; padding: 12px;")
         tot_layout = QHBoxLayout(total_frame)
         tot_label = QLabel("รวมเป็นเงิน:")
-        tot_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #991b1b;")
+        tot_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #29465b;")
         self.calc_total_lbl = QLabel("฿0.00")
-        self.calc_total_lbl.setStyleSheet("font-size: 24px; font-weight: bold; color: #b91c1c;")
+        self.calc_total_lbl.setStyleSheet("font-size: 26px; font-weight: bold; color: #0b5275;")
         tot_layout.addWidget(tot_label)
         tot_layout.addStretch()
         tot_layout.addWidget(self.calc_total_lbl)
@@ -180,11 +182,11 @@ class ScaleWeightDialog(QDialog):
         # Action Buttons
         btn_row = QHBoxLayout()
         cancel_btn = QPushButton("ยกเลิก")
-        cancel_btn.setStyleSheet("background: #e2e8f0; color: #475569; border-radius: 8px; padding: 12px; font-weight: bold; font-size: 15px;")
+        cancel_btn.setStyleSheet("background: #ffffff; color: #526578; border: 1px solid #d5e0e8; border-radius: 9px; padding: 12px; font-weight: bold; font-size: 15px;")
         cancel_btn.clicked.connect(self.reject)
 
         self.submit_btn = QPushButton("เพิ่มลงตะกร้าสินค้า (Enter)")
-        self.submit_btn.setStyleSheet("background: #0d9488; color: white; border-radius: 8px; padding: 12px; font-weight: bold; font-size: 16px;")
+        self.submit_btn.setStyleSheet("background: #147da8; color: white; border: none; border-radius: 9px; padding: 12px; font-weight: bold; font-size: 16px;")
         self.submit_btn.clicked.connect(self.on_submit)
 
         btn_row.addWidget(cancel_btn, 1)

@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from ui.theme import apply_pos_theme
 from PySide6.QtWidgets import (QGraphicsDropShadowEffect, QDialog, QHBoxLayout, QVBoxLayout, QFrame,
 
                                QFormLayout, QComboBox, QLineEdit, QTextEdit, QSpinBox,
@@ -618,6 +619,7 @@ class ReceiptSettingsDialog(QDialog):
         btn_layout.addWidget(test_btn)
         btn_layout.addWidget(save_btn)
         main_layout.addLayout(btn_layout)
+        apply_pos_theme(self)
 
     def save_and_test(self):
         self.save_settings(and_test=True)
@@ -696,6 +698,7 @@ class ReceiptDialog(QDialog):
         self.receipt_data = receipt_data or {}
 
         self.init_ui()
+        apply_pos_theme(self)
 
 
 
@@ -1069,6 +1072,7 @@ class ShiftReportDialog(QDialog):
 
         self.shift_data = shift_data or {}
         self.init_ui()
+        apply_pos_theme(self)
 
     def init_ui(self):
         main_layout = QVBoxLayout(self)
