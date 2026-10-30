@@ -1369,6 +1369,7 @@ pending
 - Commit: `21a8078`
 - ทำอะไร: แก้ backdrop โมดัลยกเลิกเอกสารให้ใช้ `d-flex` เฉพาะตอนเปิด เพื่อไม่ให้ Bootstrap บังคับแสดงทับคำสั่งซ่อนจาก Alpine; เพิ่ม regression test ตรวจคลาสและปุ่มปิด
 - ทดสอบ: `php -d memory_limit=512M vendor/bin/phpunit tests/Feature/DocumentVoidTest.php` ผ่าน 9 tests / 52 assertions; `php -d memory_limit=1G vendor/bin/phpunit` ผ่าน 638 tests (637 passed, 1 skipped), 4,425 assertions, incomplete 6; `vendor/bin/pint --dirty` และ `git diff --check` ผ่าน
-- ยังไม่ทดสอบ/ความเสี่ยง: ยืนยันสาเหตุจาก markup และ computed CSS บน production; ยังไม่ได้ deploy จึงยังไม่เปลี่ยนพฤติกรรมบน production
-- Deploy: ยังไม่ deploy
-- งานถัดไป: deploy ตามขั้นตอน `docs/OPERATIONS.md` เมื่อเจ้าของสั่ง แล้วตรวจปุ่มปิดโมดัลบน production โดยไม่ส่งคำสั่งยกเลิกเอกสาร
+- ยังไม่ทดสอบ/ความเสี่ยง: ไม่มีสำหรับการปิดโมดัล; ไม่ได้กดยกเลิกเอกสารและเอกสาร production ยังคงเดิม
+- Deploy: GitHub Actions Deploy ERP run `40997413458` (#93) สำเร็จบน production ที่ commit `95a14f67f5765667f429ccb039593f395249d267`; test, asset build, deploy และ `php artisan erp:health` ผ่าน
+- ตรวจหลัง deploy: เปิด `/sales/4` และทดสอบเปิดโมดัลแล้วกด “ปิด”; โมดัลหายไปและยังแสดงใบขาย `DSB00120261030001` ตามเดิม
+- งานถัดไป: ไม่มี
