@@ -1,3 +1,11 @@
+## Handoff - 2026-10-30 (Codex: นำ POS Central มาเตรียมเป็น candidate)
+- Commit: `12750a085f1ae223cf62f33fc2c66fa7e2024176`
+- ทำอะไร: นำ upstream `nongpee321/posCentral` commit `000a924b` มาไว้ที่ `apps/pos-central` โดยคง `apps/pos-python` เป็นตัวหลัก; ปรับเชื่อม Laravel API ให้ไม่สร้างสินค้า/ไม่เดาสาขา แก้การยืนยัน QR/โอน การสแกนหน่วยบรรจุ และ worker ปิดสะอาด; แก้ฝั่ง ERP ให้ป้ายชั่งแบบกรัมแปลงเป็นกิโลกรัมก่อนคำนวณราคาและตรวจซ้ำก่อน checkout.
+- ทดสอบ: candidate `pytest -q` ผ่าน 27 tests; `compileall` ผ่าน; POS หลักผ่าน 244 tests; `php -d memory_limit=1G vendor/bin/phpunit` ผ่าน 651 tests (650 passed, 1 skipped, 6 incomplete; 4,543 assertions); Pint และ `git diff --check` ผ่าน.
+- ข้อจำกัดการตรวจ: `php -d memory_limit=1G artisan test` ยังล้มใน child process ที่จำกัด memory 128 MB ระหว่าง `ReportExportTest`; รัน PHPUnit ตรงด้วย memory 1 GB ผ่าน. `php artisan erp:health` รายงานฐานข้อมูล local มี migration ค้าง 25 รายการและยังไม่พบ backup; ไม่ได้รัน migration หรือเปลี่ยนข้อมูล.
+- ความเสี่ยง/งานถัดไป: ยังไม่ใช่ตัวแทนพร้อมตัดสลับ — POS หลักมีคิว shift open, sale void, cash movement, shift close และ auth events ซึ่ง candidate ยังไม่ซิงก์ครบ; SQLite path/schema ต่างกันและยังไม่มี migration ของคิว/ตัวตนออฟไลน์; candidate ยังใช้ Float. ต้องทำ parity + migration และทดสอบ installer/เครื่อง Windows/เครื่องชั่งจริงก่อนเปลี่ยน release path.
+- Deploy: ยังไม่ deploy.
+
 # Handoff - 2026-10-28 (Codex: เจ้าของให้สคริปต์อ่าน Token เดิมเอง)
 - Commit implementation: `ccb9873`; ต่อจาก smoke guards `0fff401`
 - คำสั่งล่าสุดของเจ้าของเปลี่ยนเฉพาะขั้น Token: อนุญาตให้อ่าน Token ที่มีอยู่แล้วมาใช้แทนการให้เจ้าของกรอก; PIN ยังให้เจ้าของกรอกเองแบบซ่อนตัวอักษร ห้ามตั้ง/เดา PIN หรือออก/หมุน Token ใหม่

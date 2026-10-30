@@ -64,6 +64,8 @@
 - POS รองรับโหมดเลือกพนักงานตามอุปกรณ์ในช่วงทดสอบ แต่ก่อนเปิดใช้งานจริงต้องทบทวน PIN/สิทธิ์และการยืนยันตัวตน.
 - `apps/pos-central` เป็น candidate ที่นำมาจาก `nongpee321/posCentral` (upstream commit `000a924b`) เมื่อ 2026-10-30; ยังไม่ใช่แอปหลักและ release/installer ยังชี้ `apps/pos-python`.
 - candidate ใช้ SQLite schema, path เก็บข้อมูล และชนิดตัวเลขต่างจาก POS หลัก; ยังไม่มี migration ที่รักษาบิล/กะ/เงินเข้าออกที่ค้างส่งหรือข้อมูลยืนยันตัวตนออฟไลน์ จึงห้ามสลับตัวติดตั้งจนกว่าจะทำ migration และตรวจ parity ครบ.
+- POS หลักมีคิว `shift_open`, `sale`, `sale_void`, `cash_movement`, `shift_close` และ auth events; candidate ตอนนี้ sync เฉพาะ `sale_checkout`. ต้องพอร์ต/แปลงทุก event และคง idempotency ก่อน cutover.
+- candidate ยังใช้ `Float` กับยอด/ปริมาณ; ERP ตรวจราคาขายซ้ำ แต่ต้องตรวจความแม่นยำเงินสด/ปัดเศษและเปลี่ยนเป็น Decimal หรือพิสูจน์ความเท่ากันก่อนเปิดใช้.
 - ป้ายชั่งที่ profile กำหนด `value_type=weight` เก็บค่าบนฉลากเป็นกรัม; API/checkout ต้องตีความเป็นกิโลกรัมก่อนคิดราคาและตัดสต๊อก.
 
 ## Web POS ขายออฟไลน์
