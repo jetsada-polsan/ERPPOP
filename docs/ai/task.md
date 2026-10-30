@@ -1,3 +1,10 @@
+## Handoff - 2026-10-30 (Codex: รีเซ็ตล็อกอิน ERP+POS และ UAT ผ่าน API)
+- Commit implementation: `991a497`
+- ทำอะไร: รวมปุ่มผู้ดูแลให้รีเซ็ตรหัส ERP และ PIN POS ในครั้งเดียวสำหรับผู้ขาย; รหัสใหม่ใช้ได้ทันที ไม่บังคับเปลี่ยนซ้ำ, ถอนการยืนยันคนขายเดิมจากอุปกรณ์ทุกเครื่อง, แสดงข้อมูลให้คัดลอกครั้งเดียว; ผู้ใช้ที่ไม่ขาย POS รีเซ็ตเฉพาะ ERP. การเพิ่ม/แก้รหัสผ่านโดยแอดมินก็เข้าใช้ได้ทันที. อัปเดต POS Central README ตามคำสั่งเจ้าของให้ใช้ Production ERP API ในช่วง UAT และจดเลขเอกสารเพื่อเคลียร์ผ่าน ERP ก่อนวันขาย.
+- ทดสอบ: `php -d memory_limit=1G vendor/bin/phpunit` ผ่าน 652 tests (651 passed, 1 skipped, 6 incomplete; 4,567 assertions); Pint, PHP lint และ `git diff --check` ผ่าน. ทดสอบ reset ครอบคลุม ERP login, PIN POS login, ถอน verified cashier และ audit.
+- ยังไม่ทดสอบ/ความเสี่ยง: `php artisan test` ติดข้อจำกัด child process 128 MB ใน `ReportExportTest` (full PHPUnit ตรงผ่าน); Python ในเครื่องไม่มี pytest/PySide6 จึงยังไม่ได้รัน POS Central tests/build รอบนี้. ไม่มี migration และยังไม่ได้สร้าง/รีเซ็ตรหัสหรือบิล production.
+- Deploy: ยังไม่ deploy; ต้องตรวจ backup/migration readiness ก่อนปล่อย ERP และ build UAT Windows เพื่อทดสอบบนเครื่อง POS.
+
 ## Handoff - 2026-10-30 (Codex: นำ POS Central มาเตรียมเป็น candidate)
 - Commit: `12750a085f1ae223cf62f33fc2c66fa7e2024176`
 - ทำอะไร: นำ upstream `nongpee321/posCentral` commit `000a924b` มาไว้ที่ `apps/pos-central` โดยคง `apps/pos-python` เป็นตัวหลัก; ปรับเชื่อม Laravel API ให้ไม่สร้างสินค้า/ไม่เดาสาขา แก้การยืนยัน QR/โอน การสแกนหน่วยบรรจุ และ worker ปิดสะอาด; แก้ฝั่ง ERP ให้ป้ายชั่งแบบกรัมแปลงเป็นกิโลกรัมก่อนคำนวณราคาและตรวจซ้ำก่อน checkout.
