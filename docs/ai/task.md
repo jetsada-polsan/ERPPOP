@@ -1416,5 +1416,5 @@ pending
 - ทำอะไร: เปลี่ยนรหัส ERP ชั่วคราวที่ออกตอนผู้ดูแลรีเซ็ตรหัส ให้สุ่มเลข 6 หลักด้วย `random_int`; รหัสยังเก็บเป็น hash, ไม่ลง audit log และบังคับผู้ใช้เปลี่ยนรหัสหลังเข้าใช้ครั้งแรก; PIN POS ไม่เปลี่ยน
 - ทดสอบ: `php -d memory_limit=1G vendor/bin/phpunit` ผ่าน 650 tests (649 ผ่าน, 1 skipped), 4,538 assertions, incomplete 6; `vendor/bin/pint --dirty` ผ่าน
 - ยังไม่ทดสอบ/ความเสี่ยง: ไม่ได้รีเซ็ตรหัสบัญชี production; รหัส 6 หลักมีชุดค่าที่เป็นไปได้น้อยกว่ารหัสยาว แต่หน้า login จำกัดการลองผิด 5 ครั้งต่อนาทีต่อ username และ IP และบังคับเปลี่ยนเมื่อเข้าได้
-- Deploy: ยังไม่ deploy
-- งานถัดไป: push commit และ deploy เฉพาะเมื่อเจ้าของสั่ง
+- Deploy: GitHub Actions `Deploy ERP` production run `41004046336` สำเร็จบน `main` ที่ commit `fe7b6d35171f30f80c18916b1aac82dd33594f46`; test job และ deploy job ผ่าน รวม asset build, upload และ `scripts/deploy.sh`; health check หลัง deploy ผ่าน (migration up to date, backup 0.4 ชั่วโมง, storage ผ่าน, queue failed jobs 0)
+- งานถัดไป: หากต้องการรหัสใหม่ ให้ผู้ดูแลกดรีเซ็ตรหัส ERP ของบัญชีเป้าหมายเองหลัง deploy; งานนี้ไม่ได้รีเซ็ตรหัสบัญชี production
