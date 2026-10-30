@@ -1402,3 +1402,11 @@ pending
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ตรวจภาพใน browser หลังแก้; แท็บ Chrome ปัจจุบันอยู่ที่ใบปรับปรุงสต็อก production จึงไม่ได้คลิกหรือบันทึกข้อมูลจริง; ไม่มี migration และไม่ได้แก้ข้อมูล production
 - Deploy: ยังไม่ deploy; การส่ง `Deploy ERP` ไป production ถูก auto-review ปฏิเสธเพราะเป็นการปล่อยโค้ดที่อาจกระทบระบบจริง และยังต้องการคำสั่งอนุมัติโดยตรงสำหรับการเปลี่ยนแปลงรอบนี้
 - งานถัดไป: deploy เมื่อเจ้าของสั่ง แล้วตรวจเปิดตัวเลือกสินค้าจากใบจองและหน้าเอกสารอื่นว่าหน้าต่างอยู่ด้านหน้าและผลค้นหาตอบสนองทันที
+
+## Handoff - 2026-10-30 (Codex: จัดหน้าใบส่งของให้เป็น A5 แนวนอนจริง)
+- Commit: `ee5dbde` (`Fix delivery note A5 landscape layout`)
+- ทำอะไร: แก้ CSS กลางที่บังคับหน้าตัวอย่างเป็น A4 แนวตั้ง ทั้งที่ `@page` กำหนด A5 landscape; แยกหน้าใบส่งของให้แสดงกรอบ 210×148 มม., ลดระยะ/ตัวอักษรให้ข้อมูลและยอดรวมพอดี และ override ขนาดจริงตอนพิมพ์
+- ทดสอบ: `php artisan test --filter=PrintablePageSizeTest` ผ่าน 3 tests / 11 assertions; `php -d memory_limit=1G vendor/bin/phpunit` ผ่าน 650 tests (649 ผ่าน, 1 skipped), 4,540 assertions, incomplete 6; `vendor/bin/pint --dirty`, `php artisan view:clear`, `php artisan view:cache`, `git diff --check` ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: ไม่ได้ทดลองพิมพ์กับเครื่องพิมพ์จริง; ทดสอบขนาดจาก CSS และ regression test; ไม่ได้แก้หรือสร้างเอกสาร production
+- Deploy: ยังไม่ deploy
+- งานถัดไป: deploy เมื่อเจ้าของสั่ง แล้วตรวจตัวอย่างใบส่งของบน Chrome และในหน้าต่างพิมพ์ว่าเลือก A5 แนวนอนและยอดไม่ล้น
