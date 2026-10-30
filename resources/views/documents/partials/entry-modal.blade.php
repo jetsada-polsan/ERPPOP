@@ -30,6 +30,13 @@
 
         <form method="post" action="{{ $action }}" @submit="onSubmit">
             @csrf
+            @if(($formMethod ?? 'POST') !== 'POST')
+                @method($formMethod)
+            @endif
+            @isset($fulfillmentType)
+                <input type="hidden" name="fulfillment_type" value="{{ $fulfillmentType }}">
+                <input type="hidden" name="delivery_due_at" value="{{ $deliveryDueAt }}">
+            @endisset
             <div class="doc-body">
                 <div class="doc-head-grid">
                     <div class="doc-card doc-card-pad">
@@ -141,14 +148,14 @@
                             <summary>รายละเอียดเพิ่มเติม</summary>
                             <div class="doc-field mt-2">
                                 <label>หมายเหตุ</label>
-                                <input type="text" name="remark" class="doc-input" placeholder="{{ $remarkPlaceholder ?? 'เช่น เลขอ้างอิง เงื่อนไข หรือหมายเหตุภายใน' }}">
+                                <input type="text" name="remark" value="{{ old('remark', $initialRemark ?? '') }}" class="doc-input" placeholder="{{ $remarkPlaceholder ?? 'เช่น เลขอ้างอิง เงื่อนไข หรือหมายเหตุภายใน' }}">
                             </div>
                         </details>
                     </div>
 
                     <div class="doc-card doc-card-pad">
-                        <div class="doc-meta-line"><span>วันที่เอกสาร</span><strong>{{ now()->thaiDate() }}</strong></div>
-                        <div class="doc-meta-line"><span>เลขที่</span><strong>ระบบออกให้อัตโนมัติ</strong></div>
+                        <div class="doc-meta-line"><span>วันที่เอกสาร</span><strong>{{ $documentDateLabel ?? now()->thaiDate() }}</strong></div>
+                        <div class="doc-meta-line"><span>เลขที่</span><strong>{{ $documentNumberLabel ?? 'BK + สาขา + วันที่ + ลำดับ (ออกให้อัตโนมัติ)' }}</strong></div>
                         <div class="doc-meta-line"><span>จำนวนรายการ</span><strong><span x-text="items.length"></span> รายการ</strong></div>
                         <div class="doc-meta-line"><span>จำนวนรวม</span><strong><span x-text="money(totalQty)"></span> ชิ้น</strong></div>
                         <div class="doc-meta-total">

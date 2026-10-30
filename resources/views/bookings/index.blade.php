@@ -27,6 +27,7 @@
     defaultSalesUserName: @js($bookingDefaults['sales_user_name']),
     defaultSalesAreaId: @js($bookingDefaults['sales_area_id']),
     salesUserFromParty: false,
+    salesAreaFromParty: true,
     showStock: true,
     salesAreas: @js($salesAreas->map(fn ($area) => [
         'id' => $area->id,
@@ -152,6 +153,9 @@
                                 </td>
                                 <td class="text-end">
                                     <a href="{{ route('bookings.show', $booking) }}" class="btn btn-sm btn-light border">ดู</a>
+                                    @if($booking->status === 'pending' && $booking->delivery_status === 'pending')
+                                        <a href="{{ route('bookings.edit', $booking) }}" class="btn btn-sm btn-outline-primary">แก้ไข</a>
+                                    @endif
                                 </td>
                             </tr>
                         @empty

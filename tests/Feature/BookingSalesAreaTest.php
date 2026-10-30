@@ -10,6 +10,7 @@ use App\Models\Permission;
 use App\Models\Product;
 use App\Models\ProductUnit;
 use App\Models\Role;
+use App\Models\SaleBooking;
 use App\Models\SalesArea;
 use App\Models\StockBalance;
 use App\Models\User;
@@ -107,6 +108,47 @@ class BookingSalesAreaTest extends TestCase
             'sales_user_id' => $user->id,
             'status' => 'pending',
         ]);
+    }
+
+    public function test_booking_can_use_the_legacy_unassigned_sales_area_choice(): void
+    {
+        [$branch, $customer, $product] = $this->masters('NOAREA');
+        $area = SalesArea::create([
+            'code' => 'ROUTE-DEFAULT', 'name' => 'สายตั้งต้นของผู้ใช้',
+            'area_type' => 'route', 'branch_id' => $branch->id, 'is_active' => true,
+        ]);
+        $user = User::factory()->create([
+            'username' => 'booking_no_area_uat', 'branch_id' => $branch->id,
+            'sales_area_id' => $area->id,
+        ]);
+
+        $this->withoutMiddleware(ErpAuthorize::class)->actingAs($user)
+            ->post(route('bookings.store'), [
+                'customer_id' => $customer->id,
+                'branch_id' => $branch->id,
+                'sales_area_id' => null,
+                'sales_user_id' => $user->id,
+                'items' => [['product_id' => $product->id, 'qty' => 1, 'unit_price' => 100]],
+            ])->assertRedirect();
+
+        $this->assertDatabaseHas('documents', [
+            'branch_id' => $branch->id,
+            'customer_id' => $customer->id,
+            'sales_area_id' => null,
+        ]);
+    }
+
+    public function test_booking_form_keeps_new_number_series_and_top_right_validation_toasts(): void
+    {
+        $user = User::factory()->create(['username' => 'booking_form_toast_uat']);
+
+        $this->withoutMiddleware(ErpAuthorize::class)->actingAs($user)
+            ->get(route('bookings.index'))
+            ->assertOk()
+            ->assertSee('BK + สาขา + วันที่ + ลำดับ (ออกให้อัตโนมัติ)')
+            ->assertSee("window.erpToast('warning', title", false)
+            ->assertSee("position: 'top-end'", false)
+            ->assertSee('salesAreaFromParty: true', false);
     }
 
     public function test_booking_ignores_customer_ownership_and_lets_the_creator_book_for_themselves(): void
@@ -248,6 +290,120 @@ class BookingSalesAreaTest extends TestCase
         $this->assertDatabaseHas('stock_balances', [
             'product_id' => $product->id,
             'reserved_qty' => 4,
+        ]);
+    }
+
+    public function test_pending_booking_edit_keeps_new_number_and_moves_reservations_to_the_new_lines(): void
+    {
+        [$branch, $customer, $product] = $this->masters('EDIT');
+        $otherCustomer = Customer::create([
+            'code' => 'CUS-EDIT-2', 'name_th' => 'ลูกค้าทดสอบแก้ไข 2',
+            'branch_id' => $branch->id, 'is_active' => true,
+        ]);
+        $otherProduct = Product::create([
+            'sku_code' => 'SKU-EDIT-2', 'name_th' => 'สินค้าแก้ไข 2',
+            'base_unit_id' => $product->base_unit_id, 'default_price' => 0, 'is_active' => true,
+        ]);
+        StockBalance::create([
+            'product_id' => $otherProduct->id,
+            'warehouse_location_id' => $branch->default_warehouse_location_id,
+            'on_hand_qty' => 20,
+            'reserved_qty' => 0,
+        ]);
+        $area = SalesArea::create([
+            'code' => 'EDIT-ROUTE', 'name' => 'สายแก้ไข', 'area_type' => 'route',
+            'branch_id' => $branch->id, 'is_active' => true,
+        ]);
+        $user = User::factory()->create(['username' => 'booking_edit_uat', 'branch_id' => $branch->id]);
+
+        $this->withoutMiddleware(ErpAuthorize::class)->actingAs($user)
+            ->post(route('bookings.store'), [
+                'customer_id' => $customer->id,
+                'branch_id' => $branch->id,
+                'sales_user_id' => $user->id,
+                'items' => [['product_id' => $product->id, 'qty' => 3, 'unit_price' => 10]],
+            ])->assertRedirect();
+
+        $booking = SaleBooking::with('document')->latest('id')->firstOrFail();
+        $originalNumber = $booking->document->doc_number;
+        $this->get(route('bookings.edit', $booking))
+            ->assertOk()
+            ->assertSee($originalNumber)
+            ->assertSee('name="_method" value="PUT"', false)
+            ->assertSee('SKUEDIT');
+
+        $this->put(route('bookings.update', $booking), [
+            'customer_id' => $otherCustomer->id,
+            'branch_id' => $branch->id,
+            'sales_area_id' => $area->id,
+            'sales_user_id' => $user->id,
+            'items' => [['product_id' => $otherProduct->id, 'qty' => 6, 'unit_price' => 20]],
+        ])->assertRedirect(route('bookings.show', $booking));
+
+        $booking->refresh();
+        $booking->load('document');
+        $this->assertSame($originalNumber, $booking->document->doc_number);
+        $this->assertSame($otherCustomer->id, $booking->document->customer_id);
+        $this->assertSame($area->id, $booking->document->sales_area_id);
+        $this->assertSame('120.00000000', (string) $booking->document->total_amount);
+        $this->assertDatabaseHas('stock_balances', [
+            'product_id' => $product->id,
+            'warehouse_location_id' => $branch->default_warehouse_location_id,
+            'reserved_qty' => 0,
+        ]);
+        $this->assertDatabaseHas('stock_balances', [
+            'product_id' => $otherProduct->id,
+            'warehouse_location_id' => $branch->default_warehouse_location_id,
+            'reserved_qty' => 6,
+        ]);
+        $this->assertDatabaseHas('stock_document_items', [
+            'stock_document_id' => $booking->document->stockDocument->id,
+            'product_id' => $otherProduct->id,
+            'qty' => 6,
+            'unit_price' => 20,
+        ]);
+
+        $this->post(route('bookings.store'), [
+            'customer_id' => $customer->id,
+            'branch_id' => $branch->id,
+            'sales_user_id' => $user->id,
+            'items' => [['product_id' => $product->id, 'qty' => 1, 'unit_price' => 10]],
+        ])->assertRedirect();
+        $this->assertDatabaseHas('documents', [
+            'branch_id' => $branch->id,
+            'doc_number' => 'BK'.$branch->code.now()->format('Ymd').'002',
+        ]);
+    }
+
+    public function test_booking_edit_that_exceeds_available_stock_keeps_the_existing_booking_and_reservation(): void
+    {
+        [$branch, $customer, $product] = $this->masters('EDITSTOCK');
+        $user = User::factory()->create(['username' => 'booking_edit_stock_uat', 'branch_id' => $branch->id]);
+        $this->withoutMiddleware(ErpAuthorize::class)->actingAs($user)
+            ->post(route('bookings.store'), [
+                'customer_id' => $customer->id,
+                'branch_id' => $branch->id,
+                'sales_user_id' => $user->id,
+                'items' => [['product_id' => $product->id, 'qty' => 3, 'unit_price' => 10]],
+            ])->assertRedirect();
+
+        $booking = SaleBooking::with('document.stockDocument.items')->latest('id')->firstOrFail();
+        StockBalance::where('product_id', $product->id)
+            ->where('warehouse_location_id', $branch->default_warehouse_location_id)
+            ->update(['on_hand_qty' => 5]);
+
+        $this->from(route('bookings.edit', $booking))->put(route('bookings.update', $booking), [
+            'customer_id' => $customer->id,
+            'branch_id' => $branch->id,
+            'sales_user_id' => $user->id,
+            'items' => [['product_id' => $product->id, 'qty' => 6, 'unit_price' => 10]],
+        ])->assertRedirect(route('bookings.edit', $booking))->assertSessionHas('error');
+
+        $this->assertSame('3.00000000', (string) $booking->fresh()->document->stockDocument->items->sole()->qty);
+        $this->assertDatabaseHas('stock_balances', [
+            'product_id' => $product->id,
+            'warehouse_location_id' => $branch->default_warehouse_location_id,
+            'reserved_qty' => 3,
         ]);
     }
 

@@ -81,6 +81,11 @@ $isOverdue = $isDelivery && ! $deliveryDone && $booking->delivery_due_at && $boo
             <a href="{{ route('documents.delivery-note', $booking->document) }}" target="_blank" class="btn btn-light border px-3">
                 <i class="bi bi-truck me-1"></i> ใบส่งของชั่วคราว (A5)
             </a>
+            @if($isPending && $booking->delivery_status === 'pending')
+                <a href="{{ route('bookings.edit', $booking) }}" class="btn btn-outline-primary px-3">
+                    <i class="bi bi-pencil-square me-1"></i> แก้ไขใบจอง
+                </a>
+            @endif
             @if($isPending)
             <form method="post" action="{{ route('bookings.convert', $booking) }}" id="convert-form" class="d-flex flex-column gap-2 align-items-end">
                 @csrf

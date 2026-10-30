@@ -126,18 +126,32 @@
 <script>
 function docEntryPage(config) {
     return {
-        modalOpen: false,
+        modalOpen: Boolean(config.openInitially),
         config,
-        partyQuery: '',
-        partyId: '',
+        partyQuery: config.initialPartyQuery || '',
+        partyId: config.initialPartyId ? String(config.initialPartyId) : '',
         partyResults: [],
         sourceDocNumber: '',
         sourceInfo: '',
-        branchId: config.defaultBranchId ? String(config.defaultBranchId) : '',
-        salesAreaId: config.defaultSalesAreaId ? String(config.defaultSalesAreaId) : '',
-        salesUserId: config.defaultSalesUserId ? String(config.defaultSalesUserId) : '',
+        branchId: (config.initialBranchId || config.defaultBranchId) ? String(config.initialBranchId || config.defaultBranchId) : '',
+        salesAreaId: (config.initialSalesAreaId || config.defaultSalesAreaId) ? String(config.initialSalesAreaId || config.defaultSalesAreaId) : '',
+        salesUserId: (config.initialSalesUserId || config.defaultSalesUserId) ? String(config.initialSalesUserId || config.defaultSalesUserId) : '',
         salesUserName: config.defaultSalesUserName || '',
-        items: [{ product_id: '', productQuery: '', qty: 1, unit_price: 0, unit_name: '', is_scale: false, scale_plu: '', lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, on_hand_qty: null, reserved_qty: null, available_qty: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [], results: [] }],
+        items: config.initialItems?.length ? config.initialItems.map(item => ({
+            product_id: item.product_id,
+            productQuery: item.product_query || '',
+            qty: Number(item.qty) || 1,
+            unit_price: Number(item.unit_price) || 0,
+            unit_name: item.unit_name || 'หน่วยฐาน',
+            is_scale: Boolean(item.is_scale),
+            scale_plu: item.scale_plu || '',
+            lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false,
+            shelf_life_days: null, on_hand_qty: null, reserved_qty: null, available_qty: null,
+            source_stock_lot_id: '', return_disposition: 'quarantine', lots: [], results: [],
+        })) : [{ product_id: '', productQuery: '', qty: 1, unit_price: 0, unit_name: '', is_scale: false, scale_plu: '', lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, on_hand_qty: null, reserved_qty: null, available_qty: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [], results: [] }],
+        init() {
+            if (this.config.openInitially) this.$nextTick(() => this.onBranchChanged());
+        },
         openModal() {
             this.modalOpen = true;
             this.$nextTick(() => {
@@ -160,7 +174,11 @@ function docEntryPage(config) {
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
                 this.sourceInfo = '';
-                window.erpPopup?.('warning', 'ไม่พบใบขาย', data.message || `ไม่พบใบขายเลขที่ ${docNumber}`);
+                if (window.erpToast) {
+                    window.erpToast('warning', 'ไม่พบใบขาย', { text: data.message || `ไม่พบใบขายเลขที่ ${docNumber}`, timer: 4000 });
+                } else {
+                    Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title: 'ไม่พบใบขาย', text: data.message || `ไม่พบใบขายเลขที่ ${docNumber}`, timer: 4000, showConfirmButton: false });
+                }
                 return;
             }
             if (data.branch_id) { this.branchId = String(data.branch_id); }
@@ -196,6 +214,10 @@ function docEntryPage(config) {
                 this.salesAreaId = party.sales_area_id
                     ? String(party.sales_area_id)
                     : String(this.config.defaultSalesAreaId || '');
+            }
+            if (this.config.salesAreaFromParty && party.sales_area_id) {
+                this.salesAreaId = String(party.sales_area_id);
+                this.onSalesAreaChanged();
             }
             this.partyResults = [];
         },
@@ -265,12 +287,16 @@ function docEntryPage(config) {
         onSubmit(event) {
             if (this.config.partyRequired && !this.partyId) {
                 event.preventDefault();
-                Swal.fire({ icon: 'warning', title: `เลือก${this.config.partyLabel}ก่อน` });
+                const title = `เลือก${this.config.partyLabel}ก่อน`;
+                if (window.erpToast) window.erpToast('warning', title);
+                else Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title, timer: 2200, showConfirmButton: false });
                 return;
             }
             if (this.items.some(item => !item.product_id)) {
                 event.preventDefault();
-                Swal.fire({ icon: 'warning', title: 'เลือกสินค้าให้ครบทุกแถว' });
+                const title = 'เลือกสินค้าให้ครบทุกแถว';
+                if (window.erpToast) window.erpToast('warning', title);
+                else Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title, timer: 2200, showConfirmButton: false });
                 return;
             }
             if (this.config.showStock) {
@@ -278,11 +304,10 @@ function docEntryPage(config) {
                     && Number(item.qty) > Number(item.available_qty) + 0.00000001);
                 if (unavailable) {
                     event.preventDefault();
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'จำนวนจองเกินสินค้าพร้อมจอง',
-                        text: `${unavailable.productQuery} เหลือพร้อมจอง ${this.money(unavailable.available_qty)} กรุณาปรับจำนวนก่อนบันทึก`,
-                    });
+                    const title = 'จำนวนจองเกินสินค้าพร้อมจอง';
+                    const text = `${unavailable.productQuery} เหลือพร้อมจอง ${this.money(unavailable.available_qty)} กรุณาปรับจำนวนก่อนบันทึก`;
+                    if (window.erpToast) window.erpToast('warning', title, { text, timer: 4000 });
+                    else Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title, text, timer: 4000, showConfirmButton: false });
                 }
             }
         },

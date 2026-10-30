@@ -122,7 +122,9 @@ class BookingController extends Controller
 
         $data['sales_user_id'] = $assignee->id;
         $data['salesman_id'] = ($assignee->salesman ?: $assignee->posCashierProfile)?->id;
-        $data['sales_area_id'] = $data['sales_area_id'] ?? $assignee->sales_area_id;
+        $data['sales_area_id'] = array_key_exists('sales_area_id', $data)
+            ? $data['sales_area_id']
+            : $assignee->sales_area_id;
 
         if (! empty($data['sales_area_id'])) {
             $area = SalesArea::where('is_active', true)->where('area_type', 'route')->findOrFail($data['sales_area_id']);
@@ -144,6 +146,118 @@ class BookingController extends Controller
 
         return redirect()->route('bookings.show', $document->saleBooking)
             ->with('success', "สร้างใบจอง {$document->doc_number} แล้ว กันสต๊อกเรียบร้อย");
+    }
+
+    public function edit(Request $request, SaleBooking $booking): View|RedirectResponse
+    {
+        if ($booking->status !== SaleBooking::STATUS_PENDING
+            || $booking->delivery_status !== SaleBooking::DELIVERY_PENDING) {
+            return redirect()->route('bookings.show', $booking)
+                ->with('error', 'แก้ไขได้เฉพาะใบจองที่ยังไม่แปลงเป็นใบขายและยังไม่มีการส่งสินค้า');
+        }
+
+        $booking->load([
+            'document.customer', 'document.branch', 'document.salesUser', 'document.salesArea',
+            'document.stockDocument.items.product.baseUnit', 'document.stockDocument.items.product.barcodes',
+        ]);
+        $currentUser = $request->user();
+        $branches = Branch::orderBy('code')->get();
+        $salesUsers = User::where(function ($query) use ($currentUser, $booking) {
+            $query->where('is_active', true)->where(function ($available) use ($currentUser, $booking) {
+                $available->whereHas('roles.permissions', fn ($permission) => $permission->whereIn('code', ['sales.manage', 'sales.assign']))
+                    ->orWhereHas('branchRoles.permissions', fn ($permission) => $permission->whereIn('code', ['sales.manage', 'sales.assign']));
+                if ($currentUser) {
+                    $available->orWhere('id', $currentUser->id);
+                }
+                if ($booking->sales_user_id) {
+                    $available->orWhere('id', $booking->sales_user_id);
+                }
+            });
+        })->orderBy('username')->get(['id', 'username', 'name']);
+        $salesAreas = SalesArea::with('branch')
+            ->where('is_active', true)->where('area_type', 'route')->orderBy('code')->get();
+
+        $document = $booking->document;
+        $initialItems = $document->stockDocument?->items->map(fn ($item) => [
+            'product_id' => $item->product_id,
+            'product_query' => $item->product->sku_code.' - '.$item->product->name_th,
+            'qty' => (float) $item->qty,
+            'unit_price' => (float) $item->unit_price,
+            'unit_name' => $item->product->baseUnit?->displayLabel() ?? 'หน่วยฐาน',
+            'is_scale' => $item->product->barcodes->contains(fn ($barcode) => preg_match('/^80[01][0-9]{3}$/', (string) $barcode->barcode) === 1)
+                || preg_match('/ชั่ง|ซั่ง/u', (string) $item->product->name_th) === 1,
+        ])->values() ?? collect();
+
+        $initialBooking = [
+            'number' => $document->doc_number,
+            'date' => $document->doc_date->thaiDate(),
+            'branch_id' => $document->branch_id,
+            'customer_id' => $document->customer_id,
+            'customer_query' => $document->customer->code.' - '.$document->customer->name_th,
+            'sales_area_id' => $document->sales_area_id,
+            'sales_user_id' => $document->sales_user_id,
+            'sales_user_name' => $document->salesUser?->name,
+            'remark' => $document->remark,
+            'fulfillment_type' => $booking->fulfillment_type,
+            'delivery_due_at' => $booking->delivery_due_at?->format('Y-m-d H:i:s'),
+            'items' => $initialItems,
+        ];
+
+        return view('bookings.edit', compact('booking', 'branches', 'salesUsers', 'salesAreas', 'initialBooking'));
+    }
+
+    public function update(Request $request, SaleBooking $booking, BookingService $service): RedirectResponse
+    {
+        $data = $request->validate([
+            'customer_id' => ['required', 'integer', 'exists:customers,id'],
+            'branch_id' => ['required', 'integer', 'exists:branches,id'],
+            'sales_area_id' => ['nullable', 'integer', 'exists:sales_areas,id'],
+            'sales_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'remark' => ['nullable', 'string', 'max:1000'],
+            'fulfillment_type' => ['nullable', 'in:pickup,delivery'],
+            'delivery_due_at' => ['nullable', 'required_if:fulfillment_type,delivery', 'date'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
+            'items.*.qty' => ['required', 'numeric', 'min:0.0001'],
+            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $user = $request->user()->loadMissing('salesArea');
+        $canAssign = $user->hasPermission('sales.assign');
+        $assigneeId = (int) ($data['sales_user_id'] ?? $user->id);
+        if ($assigneeId !== (int) $user->id && ! $canAssign) {
+            return back()->withInput()->with('error', 'การมอบใบจองให้ผู้ใช้อื่นต้องมีสิทธิ์กำหนดผู้รับผิดชอบ');
+        }
+        $assignee = User::where('is_active', true)->with(['salesman', 'posCashierProfile'])->findOrFail($assigneeId);
+        if (! $assignee->canAccessBranch((int) $data['branch_id'])) {
+            return back()->withInput()->with('error', 'ผู้รับผิดชอบที่เลือกไม่มีสิทธิ์ทำงานในสาขาของใบจอง');
+        }
+
+        $data['sales_user_id'] = $assignee->id;
+        $data['salesman_id'] = ($assignee->salesman ?: $assignee->posCashierProfile)?->id;
+        $data['sales_area_id'] = array_key_exists('sales_area_id', $data)
+            ? $data['sales_area_id']
+            : $assignee->sales_area_id;
+        if (! empty($data['sales_area_id'])) {
+            $area = SalesArea::where('is_active', true)->where('area_type', 'route')->findOrFail($data['sales_area_id']);
+            if ($area->branch_id && (int) $area->branch_id !== (int) $data['branch_id']) {
+                return back()->withInput()->with('error', 'สาขาในใบจองไม่ตรงกับสาขาที่ผูกไว้ในสายการขาย');
+            }
+            $data['document_book_id'] = $area->document_book_id;
+        }
+
+        if (! $user->canAccessBranch((int) $data['branch_id']) && ! $canAssign) {
+            return back()->withInput()->with('error', 'ผู้ใช้นี้แก้ไขใบจองได้เฉพาะสาขาประจำของตนเอง');
+        }
+
+        try {
+            $document = $service->update($booking, $data);
+        } catch (RuntimeException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('bookings.show', $booking)
+            ->with('success', "แก้ไขใบจอง {$document->doc_number} แล้ว อัปเดตยอดจองสต๊อกเรียบร้อย");
     }
 
     public function show(SaleBooking $booking): View
