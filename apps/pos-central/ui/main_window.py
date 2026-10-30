@@ -3369,13 +3369,20 @@ class MainWindow(QMainWindow):
 
         from ui.scale_weight_dialog import ScaleWeightDialog
 
-        dialog = ScaleWeightDialog(self, db_path=self.db_path)
+        dialog = ScaleWeightDialog(self, db_path=self.db_path, api_config=self.config)
 
         if dialog.exec() == QDialog.Accepted:
 
             if dialog.selected_product and dialog.entered_weight > 0:
 
-                self.add_to_cart(dialog.selected_product, qty=dialog.entered_weight, is_scale=True)
+                self.add_to_cart(
+                    dialog.selected_product,
+                    qty=dialog.entered_weight,
+                    is_scale=True,
+                    source_barcode=dialog.source_barcode,
+                    barcode_type=dialog.barcode_type,
+                    price_override=dialog.price_override,
+                )
 
 
 

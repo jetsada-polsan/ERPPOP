@@ -1,11 +1,11 @@
-import traceback
+import requests
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QComboBox, QMessageBox, QFrame, QDoubleSpinBox
 )
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QFont
-from database.models import init_db, Product
+from database.models import init_db, Product, ProductBarcode
+from services.scale_service import ScaleBarcodeParser
 
 class ScaleWeightDialog(QDialog):
     """
@@ -15,12 +15,18 @@ class ScaleWeightDialog(QDialog):
     - ใส่จำนวนกิโลกรัม (กก.) ทศนิยม 3 ตำแหน่ง
     - คำนวณราคาและส่งเข้าตะกร้าสินค้า
     """
-    def __init__(self, parent=None, db_path="pos.db"):
+    def __init__(self, parent=None, db_path="pos.db", api_config=None):
         super().__init__(parent)
         self.parent_window = parent
         self.db_path = db_path
+        self.api_config = api_config or {}
         self.selected_product = None
         self.entered_weight = 1.000
+        self.source_barcode = None
+        self.barcode_type = None
+        self.price_override = None
+        self._selecting_scanned_product = False
+        self._scale_label_weight_locked = False
 
         self.setWindowTitle("สินค้าชั่งน้ำหนัก (สแกนบาร์โค้ด/QR และระบุกิโลกรัม)")
         self.setFixedWidth(520)
@@ -82,7 +88,7 @@ class ScaleWeightDialog(QDialog):
 
         title_lbl = QLabel("ขายสินค้าชั่งน้ำหนัก (กิโลกรัม)")
         title_lbl.setStyleSheet("color: white; font-size: 18px; font-weight: bold;")
-        sub_lbl = QLabel("ยิงบาร์โค้ด / QR สินค้า หรือเลือกรายการ แล้วระบุกิโลกรัม")
+        sub_lbl = QLabel("ยิงฉลากเครื่องชั่งเพื่อใส่น้ำหนักอัตโนมัติ หรือสแกนสินค้าแล้วระบุกิโลกรัม")
         sub_lbl.setStyleSheet("color: #ccfbf1; font-size: 13px;")
         h_layout.addWidget(title_lbl)
         h_layout.addWidget(sub_lbl)
@@ -126,13 +132,13 @@ class ScaleWeightDialog(QDialog):
 
         # 3. Weight Input Field (กิโลกรัม)
         weight_box = QVBoxLayout()
-        weight_lbl = QLabel("น้ำหนักสินค้า (กิโลกรัม):")
-        weight_lbl.setStyleSheet("font-weight: bold; font-size: 15px; color: #0d9488;")
+        self.weight_lbl = QLabel("น้ำหนักสินค้า (กิโลกรัม):")
+        self.weight_lbl.setStyleSheet("font-weight: bold; font-size: 15px; color: #0d9488;")
 
         weight_row = QHBoxLayout()
         self.weight_input = QDoubleSpinBox()
         self.weight_input.setDecimals(3)
-        self.weight_input.setRange(0.001, 999.000)
+        self.weight_input.setRange(0.001, 999999.999)
         self.weight_input.setSingleStep(0.100)
         self.weight_input.setValue(1.000)
         self.weight_input.setStyleSheet("font-size: 22px; font-weight: bold; color: #0f172a; height: 50px;")
@@ -143,17 +149,19 @@ class ScaleWeightDialog(QDialog):
 
         weight_row.addWidget(self.weight_input, 1)
         weight_row.addWidget(kg_unit_lbl)
-        weight_box.addWidget(weight_lbl)
+        weight_box.addWidget(self.weight_lbl)
         weight_box.addLayout(weight_row)
         layout.addLayout(weight_box)
 
         # Quick Weight Buttons (+100g, +250g, +500g, +1kg)
         quick_row = QHBoxLayout()
+        self.quick_weight_buttons = []
         for q_label, q_val in [("0.5 กก.", 0.5), ("1.0 กก.", 1.0), ("1.5 กก.", 1.5), ("2.0 กก.", 2.0)]:
             btn = QPushButton(q_label)
             btn.setStyleSheet("background: #e2e8f0; color: #334155; border-radius: 6px; padding: 6px; font-weight: bold;")
             btn.clicked.connect(lambda checked=False, v=q_val: self.weight_input.setValue(v))
             quick_row.addWidget(btn)
+            self.quick_weight_buttons.append(btn)
         layout.addLayout(quick_row)
 
         # Calculated Total Price Display
@@ -204,15 +212,23 @@ class ScaleWeightDialog(QDialog):
                 price = p.pos_price or p.default_price or 0.0
                 self.prod_combo.addItem(f"{p.sku_code} - {p.name_th} (฿{price:,.2f}/กก.)", p.id)
 
-            if self.products_list:
-                self.selected_product = self.products_list[0]
-                self.update_product_info()
+            self._selecting_scanned_product = True
+            self.prod_combo.setCurrentIndex(-1)
+            self._selecting_scanned_product = False
+            self.selected_product = None
+            self.update_product_info()
         finally:
             session.close()
 
     def on_product_combo_changed(self, idx):
         if hasattr(self, 'products_list') and 0 <= idx < len(self.products_list):
             self.selected_product = self.products_list[idx]
+            if not self._selecting_scanned_product:
+                self.source_barcode = None
+                self.barcode_type = None
+                self.price_override = None
+                self._set_scale_label_weight_locked(False)
+                self.weight_input.setValue(1.000)
             self.update_product_info()
 
     def update_product_info(self):
@@ -222,8 +238,10 @@ class ScaleWeightDialog(QDialog):
             self.update_calc_total()
             return
 
-        price = float(self.selected_product.pos_price or self.selected_product.default_price or 0.0)
-        self.prod_name_lbl.setText(f"{self.selected_product.name_th}")
+        price = self._product_value(self.selected_product, 'pos_price') or self._product_value(self.selected_product, 'default_price') or 0.0
+        price = float(self.price_override if self.price_override is not None else price)
+        name = self._product_value(self.selected_product, 'name_th') or 'สินค้า'
+        self.prod_name_lbl.setText(str(name))
         self.prod_price_lbl.setText(f"฿{price:,.2f} / กก.")
         self.update_calc_total()
 
@@ -231,7 +249,8 @@ class ScaleWeightDialog(QDialog):
         if not self.selected_product:
             self.calc_total_lbl.setText("฿0.00")
             return
-        price = float(self.selected_product.pos_price or self.selected_product.default_price or 0.0)
+        price = self._product_value(self.selected_product, 'pos_price') or self._product_value(self.selected_product, 'default_price') or 0.0
+        price = float(self.price_override if self.price_override is not None else price)
         weight = float(self.weight_input.value())
         total = price * weight
         self.calc_total_lbl.setText(f"฿{total:,.2f}")
@@ -243,30 +262,182 @@ class ScaleWeightDialog(QDialog):
 
         session = init_db(f"sqlite:///{self.db_path}")
         try:
-            # 1. ลองค้นหาตรงตาม Barcode หรือ SKU
-            prod = session.query(Product).filter(
-                (Product.barcode == code) |
-                (Product.sku_code == code) |
-                (Product.sku_code.endswith(code))
-            ).first()
+            api_result = self._scan_with_erp(code)
+            if api_result is not None and not isinstance(api_result, dict):
+                QMessageBox.warning(self, 'สแกนสินค้าไม่สำเร็จ', 'ERP ส่งรูปแบบผลสแกนไม่ถูกต้อง')
+                self._clear_selection()
+                self.scan_input.selectAll()
+                return
+            if api_result and api_result.get('error'):
+                self._clear_selection()
+                self.scan_input.selectAll()
+                return
+            if api_result is not None:
+                product_data = api_result.get('product')
+                if not isinstance(product_data, dict):
+                    QMessageBox.warning(self, 'สแกนสินค้าไม่สำเร็จ', 'ERP ส่งผลสแกนที่ไม่มีข้อมูลสินค้า')
+                    self._clear_selection()
+                    self.scan_input.selectAll()
+                    return
 
-            if prod:
-                self.selected_product = prod
-                # เลื่อน combo ให้ตรง
-                for i in range(self.prod_combo.count()):
-                    if self.prod_combo.itemData(i) == prod.id:
-                        self.prod_combo.setCurrentIndex(i)
-                        break
-                self.update_product_info()
-                self.scan_input.clear()
-                # Focus ไปที่ช่องใส่น้ำหนัก
-                self.weight_input.setFocus()
-                self.weight_input.selectAll()
+                product = session.query(Product).filter_by(id=product_data.get('id')).first()
+                # Product rows can be absent from a stale local cache while ERP is online.
+                self._select_product(product or product_data)
+                self.source_barcode = api_result.get('barcode') or code
+                self.barcode_type = api_result.get('barcode_type')
+                self.price_override = product_data.get('pos_price')
+                if api_result.get('mode') == 'scale':
+                    try:
+                        qty = float(api_result.get('qty') or 0)
+                    except (TypeError, ValueError):
+                        qty = 0
+                    if qty < 0.001 or qty > 999999.999:
+                        QMessageBox.warning(self, 'น้ำหนักจากฉลากไม่ถูกต้อง', 'น้ำหนักจากฉลากอยู่นอกช่วงที่รองรับ')
+                        self._clear_selection()
+                        self.scan_input.selectAll()
+                        return
+                    self.weight_input.setValue(qty)
+                    self._set_scale_label_weight_locked(True)
+                else:
+                    # A plain product code only chooses the item; manual kg entry
+                    # must not be mistaken for a package/unit barcode at checkout.
+                    self.source_barcode = None
+                    self.barcode_type = None
+                    self.weight_input.setValue(1.000)
+                    self._set_scale_label_weight_locked(False)
+                self._finish_scan()
+                return
+
+            # Offline: decode scale labels with the same ERP-synced profiles used by
+            # the main scan field, then fall back to an exact local product barcode.
+            scale_data = ScaleBarcodeParser.parse(code, session)
+            if scale_data:
+                item_code = scale_data['item_code']
+                product = session.query(Product).filter(
+                    (Product.sku_code == item_code) | (Product.barcode == item_code)
+                ).first()
+                if product is None:
+                    cached = session.query(ProductBarcode).filter_by(barcode=item_code).first()
+                    if cached:
+                        product = session.query(Product).filter_by(id=cached.product_id).first()
+                if product is None:
+                    QMessageBox.warning(self, 'ไม่พบสินค้า', f"ไม่พบสินค้าสำหรับ PLU เครื่องชั่ง: '{item_code}'")
+                    self._clear_selection()
+                    self.scan_input.selectAll()
+                    return
+                qty = float(scale_data['weight'])
+                if qty < 0.001 or qty > 999999.999:
+                    QMessageBox.warning(self, 'น้ำหนักจากฉลากไม่ถูกต้อง', 'น้ำหนักจากฉลากอยู่นอกช่วงที่รองรับ')
+                    self._clear_selection()
+                    self.scan_input.selectAll()
+                    return
+                self._select_product(product)
+                self.source_barcode = scale_data['raw_barcode']
+                self.barcode_type = scale_data['barcode_type']
+                self.price_override = scale_data['price'] / qty
+                self.weight_input.setValue(qty)
+                self._set_scale_label_weight_locked(True)
+                self._finish_scan()
+                return
+
+            cached_barcode = session.query(ProductBarcode).filter_by(barcode=code).first()
+            if cached_barcode:
+                product = session.query(Product).filter_by(id=cached_barcode.product_id).first()
+            else:
+                product = session.query(Product).filter(
+                    (Product.barcode == code) |
+                    (Product.sku_code == code) |
+                    (Product.sku_code.endswith(code))
+                ).first()
+
+            if product:
+                self._select_product(product)
+                self.source_barcode = None
+                self.barcode_type = None
+                self.price_override = None
+                self.weight_input.setValue(1.000)
+                self._set_scale_label_weight_locked(False)
+                self._finish_scan()
             else:
                 QMessageBox.warning(self, "ไม่พบสินค้า", f"ไม่พบสินค้าที่มีรหัสหรือบาร์โค้ด: '{code}'")
+                self._clear_selection()
                 self.scan_input.selectAll()
         finally:
             session.close()
+
+    @staticmethod
+    def _product_value(product, key):
+        return product.get(key) if isinstance(product, dict) else getattr(product, key, None)
+
+    def _scan_with_erp(self, code):
+        token = self.api_config.get('pos_token')
+        branch_id = self.api_config.get('branch_id')
+        api_url = str(self.api_config.get('api_url') or '').rstrip('/')
+        if not token or not branch_id or not api_url:
+            return None
+
+        try:
+            response = requests.post(
+                f'{api_url}/api/pos/scan',
+                headers={'Authorization': f'Bearer {token}', 'Accept': 'application/json'},
+                json={'branch_id': branch_id, 'barcode': code, 'source': 'desktop'},
+                timeout=4,
+            )
+        except requests.exceptions.RequestException:
+            return None
+
+        if response.status_code == 200:
+            try:
+                return response.json()
+            except ValueError as error:
+                QMessageBox.warning(self, 'สแกนสินค้าไม่สำเร็จ', f'อ่านผลจาก ERP ไม่ได้: {error}')
+                return {'error': True}
+        if response.status_code < 500:
+            try:
+                message = response.json().get('message') or 'ERP ไม่อนุมัติบาร์โค้ดนี้'
+            except (ValueError, AttributeError):
+                message = 'ERP ไม่อนุมัติบาร์โค้ดนี้'
+            QMessageBox.warning(self, 'สแกนสินค้าไม่สำเร็จ', message)
+            return {'error': True}
+        return None
+
+    def _select_product(self, product):
+        self._selecting_scanned_product = True
+        self.selected_product = product
+        product_id = self._product_value(product, 'id')
+        for i in range(self.prod_combo.count()):
+            if self.prod_combo.itemData(i) == product_id:
+                self.prod_combo.setCurrentIndex(i)
+                break
+        self._selecting_scanned_product = False
+        self.update_product_info()
+
+    def _clear_selection(self):
+        self._selecting_scanned_product = True
+        self.prod_combo.setCurrentIndex(-1)
+        self._selecting_scanned_product = False
+        self.selected_product = None
+        self.source_barcode = None
+        self.barcode_type = None
+        self.price_override = None
+        self._set_scale_label_weight_locked(False)
+        self.weight_input.setValue(1.000)
+        self.update_product_info()
+
+    def _set_scale_label_weight_locked(self, locked):
+        self._scale_label_weight_locked = bool(locked)
+        self.weight_input.setEnabled(not self._scale_label_weight_locked)
+        self.weight_lbl.setText(
+            'น้ำหนักตามฉลากเครื่องชั่ง (ยืนยันจาก ERP):' if self._scale_label_weight_locked
+            else 'น้ำหนักสินค้า (กิโลกรัม):'
+        )
+        for button in self.quick_weight_buttons:
+            button.setEnabled(not self._scale_label_weight_locked)
+
+    def _finish_scan(self):
+        self.scan_input.clear()
+        self.weight_input.setFocus()
+        self.weight_input.selectAll()
 
     def on_submit(self):
         if not self.selected_product:
