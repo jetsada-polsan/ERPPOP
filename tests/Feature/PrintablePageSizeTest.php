@@ -56,7 +56,19 @@ class PrintablePageSizeTest extends TestCase
         $contents = file_get_contents($this->viewPath().'/delivery-note.blade.php');
 
         // ใบส่งของพิมพ์ทุกวันบนกระดาษ A5 ที่ซื้อมาเป็นรีม เปลี่ยนเป็น A4 คือพิมพ์ผิดทั้งกอง
-        $this->assertMatchesRegularExpression('/@page\s*\{[^}]*size:\s*A5/i', $contents);
+        $this->assertMatchesRegularExpression('/@page\s*\{[^}]*size:\s*A5\s+landscape/i', $contents);
+        $this->assertStringContainsString('<div class="page delivery-note-page">', $contents);
+
+        // The shared print theme styles .page as A4; the A5 overrides must come after it.
+        $themePosition = strpos($contents, "@include('documents.partials.print-theme')");
+        $overridePosition = strpos($contents, '.page.delivery-note-page .doc-head');
+        $this->assertNotFalse($themePosition);
+        $this->assertNotFalse($overridePosition);
+        $this->assertGreaterThan($themePosition, $overridePosition);
+        $this->assertStringContainsString('width: min(210mm, calc(100vw - 32px)) !important;', $contents);
+        $this->assertStringContainsString('min-height: 148mm !important;', $contents);
+        $this->assertStringContainsString('min-height: 0 !important;', $contents);
+        $this->assertStringContainsString('padding: 4mm !important;', $contents);
     }
 
     public function test_the_till_receipt_stays_on_the_thermal_roll(): void

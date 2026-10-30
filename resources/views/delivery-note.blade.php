@@ -43,6 +43,50 @@
         .sign .line { border-top: 1.5px dashed #111; margin-bottom: 1.5mm; }
         @media print { body { background: #fff; } .no-print { display: none; } .page { margin: 0; box-shadow: none; width: auto; } }
         @include('documents.partials.print-theme')
+
+        /* The shared print theme defaults .page to A4. Keep this slip A5 landscape on screen and paper. */
+        .page.delivery-note-page .doc-head { gap: 4mm !important; margin-bottom: 8px !important; padding-bottom: 2mm !important; }
+        .page.delivery-note-page .company .name { font-size: 12px !important; }
+        .page.delivery-note-page .company .sub { font-size: 8.5px !important; line-height: 1.25 !important; }
+        .page.delivery-note-page .doc-meta { font-size: 8.5px !important; }
+        .page.delivery-note-page .doc-meta b { min-width: 11mm !important; }
+        .page.delivery-note-page .info-row { display: grid !important; grid-template-columns: 55mm minmax(0, 1fr) !important; gap: 2mm !important; margin: 2mm 0 !important; }
+        .page.delivery-note-page .info-box { padding: 1.5mm 2mm !important; border-radius: 2mm !important; font-size: 8.5px !important; }
+        .page.delivery-note-page .info-box.left { width: auto !important; min-width: 0 !important; }
+        .page.delivery-note-page .info-box b { min-width: 16mm !important; }
+        .page.delivery-note-page table.items { margin-top: 1mm !important; }
+        .page.delivery-note-page table.items th,
+        .page.delivery-note-page table.items td { padding: 1mm 1.2mm !important; font-size: 8.5px !important; }
+        .page.delivery-note-page .qc-row { display: grid !important; grid-template-columns: minmax(0, 1fr) 50mm !important; gap: 2mm !important; margin-top: 1.5mm !important; padding-top: 1.5mm !important; }
+        .page.delivery-note-page .qc-left { font-size: 8px !important; }
+        .page.delivery-note-page .qc-item { gap: 1mm !important; margin-right: 1mm !important; font-size: 8px !important; }
+        .page.delivery-note-page .qc-box { width: 3.5mm !important; height: 3.5mm !important; }
+        .page.delivery-note-page .totals { width: 50mm !important; min-width: 0 !important; font-size: 8px !important; }
+        .page.delivery-note-page .totals .row { gap: 1mm !important; margin-bottom: 1mm !important; }
+        .page.delivery-note-page .totals .val { min-width: 17mm !important; padding: .5mm 1mm !important; }
+        .page.delivery-note-page .sign-row { gap: 4mm !important; margin-top: 8mm !important; }
+        .page.delivery-note-page .sign { width: auto !important; font-size: 8.5px !important; }
+        @media screen {
+            body:not(.layout-fixed) .page.delivery-note-page {
+                width: min(210mm, calc(100vw - 32px)) !important;
+                min-height: 148mm !important;
+                margin: 8px auto 18px !important;
+                padding: 7mm !important;
+                overflow: visible !important;
+                zoom: 1 !important;
+            }
+        }
+        @media print {
+            .page.delivery-note-page {
+                width: auto !important;
+                height: auto !important;
+                min-height: 0 !important;
+                margin: 0 !important;
+                padding: 4mm !important;
+                overflow: visible !important;
+                zoom: 1 !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -52,7 +96,7 @@
     <a href="javascript:history.back()">← กลับ</a>
 </div>
 
-<div class="page">
+<div class="page delivery-note-page">
     <div class="doc-head">
         <div class="logo-box">
             @if($logo = \App\Models\AppSetting::logoUrl())
