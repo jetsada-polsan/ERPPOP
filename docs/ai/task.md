@@ -1459,3 +1459,11 @@ pending
 - ทดสอบ: POS Central `28 passed`; local Laravel + SQLite E2E ได้ใบเสร็จ `CSUAT20261030001`, สแกน `UAT-BC-0001`, แล้ว `uat:reconcile` ผ่าน GL/ต้นทุน/สต๊อก; POS Python E2E เดิมผ่าน 10/10 เงื่อนไขและได้ reconcile ผ่านหลัง candidate; PHPUnit `651 tests` (650 ผ่าน, 1 skipped), 4,543 assertions, incomplete 6; workflow YAML, PHP lint และ `git diff --check` ผ่าน
 - ข้อมูล/ความเสี่ยง: การขายทดสอบทั้งหมดอยู่ใน SQLite ชั่วคราว ไม่มีบิลหรือกะทดสอบถูกสร้างใน production; ยังไม่ได้ deploy หรือเปลี่ยน installer/release ซึ่งยังชี้ `apps/pos-python`; candidate ยังไม่มี migration คิว/กะออฟไลน์จาก POS หลักและยัง sync event น้อยกว่า จึงใช้เป็นตัวทดสอบแยกก่อน
 - งานถัดไป: ให้ Windows UAT workflow build ZIP artifact แล้วเจ้าของเปิด POS Central และกรอก Device Token/PIN เองเพื่อทดลองขายผ่าน ERP ตามแผน UAT; ยังไม่สลับ installer ใช้งานจริงจนกว่าจะทบทวนข้อมูลค้างและส่วนต่าง flow
+
+## Handoff - 2026-10-30 (Codex: สิทธิ์ทุกสาขาใน POS Workbench)
+- Commit: `479962e` (`Honor all-branch access in POS workbench`)
+- ทำอะไร: หน้าเครื่องมือ POS ใช้ `reports.all_branches` ปลดล็อกตัวเลือกสาขาและเปิดดูทุกสาขาเป็นค่าเริ่มต้นสำหรับผู้มีสิทธิ์ (รวม IT/GM); ผู้ใช้สาขายังถูกล็อกสาขาเดิม และผู้ใช้ที่ไม่กำหนดสาขา/ไม่มีสิทธิ์จะไม่เห็นบิลข้ามสาขา
+- ทดสอบ: `php -d memory_limit=1G vendor/bin/phpunit` ผ่าน 655 tests (654 passed, 1 skipped), 4,585 assertions, incomplete 6; `vendor/bin/pint --dirty`, PHP lint และ `git diff --check` ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ตรวจหน้า production หลัง deploy; ทดสอบ role scope และการกรองสาขาบน SQLite tests เท่านั้น; ไม่ได้แก้ข้อมูล production
+- Deploy: ยังไม่ deploy
+- งานถัดไป: deploy ตาม `docs/OPERATIONS.md` เมื่อเจ้าของสั่ง แล้วเปิด POS Workbench ด้วยบัญชี IT เพื่อตรวจว่าตัวเลือก “ทุกสาขา” แสดงบิลจากสาขาต่าง ๆ
