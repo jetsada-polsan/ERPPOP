@@ -13,7 +13,8 @@
 
 ## Deploy และงานถัดไป
 - ยังไม่ deploy และไม่ได้แตะข้อมูล production; `docs/servers.md` เป็นไฟล์ untracked เดิมและไม่ได้รวมใน commit
-- รอผล CI หลัง push; การทดสอบรอบนี้ใช้ SQLite in-memory ยังไม่ได้ทดสอบ PostgreSQL หรืออุปกรณ์หน้าร้านจริง
+- PostgreSQL UAT [run 41076076617](https://github.com/jetsada-polsan/ERPPOP/actions/runs/41076076617) ผ่านครบ: PHP suite, ยิงพร้อมกัน 30 process สร้างเลขเอกสาร, ขายพร้อมกัน 30 process และ reconcile stock/COGS/GL/sales_postings
+- ยังไม่ได้ทดสอบอุปกรณ์หน้าร้านจริง
 
 # Handoff — 2026-10-30 (Codex: regression audit ERP และ POS ทั้งระบบ)
 
