@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\Salesman;
 use App\Models\StockBalance;
 use App\Models\Supplier;
+use App\Models\WarehouseLocation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -60,16 +61,25 @@ class SearchController extends Controller
 
     public function products(Request $request): JsonResponse
     {
-        $this->authorizeAny($request, ['sales.manage', 'purchasing.manage', 'stock.manage', 'stock.request', 'masterdata.manage']);
+        $permissions = ['sales.manage', 'purchasing.manage', 'stock.manage', 'stock.request', 'masterdata.manage'];
+        $data = $request->validate([
+            'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
+        ]);
+        $branchId = isset($data['branch_id']) ? (int) $data['branch_id'] : null;
+        $this->authorizeAny($request, $permissions, $branchId);
+        $includeLots = $request->boolean('include_lots') && $branchId !== null;
+        if ($includeLots) {
+            $this->authorizeAny($request, ['stock.manage', 'stock.request'], $branchId);
+        }
         $q = trim((string) $request->query('q', ''));
         $search = mb_strtolower($q);
         $productId = $request->integer('product_id') ?: null;
-        $branchId = $request->integer('branch_id') ?: null;
 
         $products = Product::query()
             ->with(['baseUnit:id,name,qty_per_base_unit', 'barcodes' => fn ($query) => $query
                 ->where('is_active', true)->orderBy('id')])
-            ->when($request->boolean('include_lots'), fn ($query) => $query->with(['stockLots' => fn ($lots) => $lots
+            ->when($includeLots, fn ($query) => $query->with(['stockLots' => fn ($lots) => $lots
+                ->whereHas('warehouseLocation.warehouse', fn ($warehouse) => $warehouse->where('branch_id', $branchId))
                 ->whereHas('movements', fn ($movement) => $movement->whereIn('movement_type', ['out', 'transfer_out']))
                 ->orderByDesc('received_date')->limit(50)]))
             ->where('is_active', true)
@@ -90,7 +100,7 @@ class SearchController extends Controller
             )
             ->orderBy('name_th')
             ->limit(20)
-            ->get(['id', 'sku_code', 'name_th', 'base_unit_id', 'default_price', 'average_cost', 'tracks_expiry', 'shelf_life_days']);
+            ->get(['id', 'sku_code', 'name_th', 'base_unit_id', 'default_price', 'tracks_expiry', 'shelf_life_days']);
 
         $locationId = $branchId
             ? Branch::whereKey($branchId)->value('default_warehouse_location_id')
@@ -102,7 +112,7 @@ class SearchController extends Controller
                 ->keyBy('product_id')
             : collect();
 
-        $products = $products->map(function (Product $product) use ($request, $locationId, $stockByProduct) {
+        $products = $products->map(function (Product $product) use ($includeLots, $locationId, $stockByProduct) {
             $stock = $stockByProduct->get($product->id);
 
             return [
@@ -110,7 +120,6 @@ class SearchController extends Controller
                 'sku_code' => $product->sku_code,
                 'name_th' => $product->name_th,
                 'default_price' => (float) ($product->default_price ?? 0),
-                'average_cost' => (float) ($product->average_cost ?? 0),
                 'tracks_expiry' => $product->tracks_expiry,
                 'shelf_life_days' => $product->shelf_life_days,
                 'unit_name' => $product->baseUnit?->displayLabel() ?? '-',
@@ -125,7 +134,7 @@ class SearchController extends Controller
                 'available_qty' => $locationId
                     ? max(0, (float) ($stock?->on_hand_qty ?? 0) - (float) ($stock?->reserved_qty ?? 0))
                     : null,
-                'lots' => $request->boolean('include_lots') ? $product->stockLots->map(fn ($lot) => [
+                'lots' => $includeLots ? $product->stockLots->map(fn ($lot) => [
                     'id' => $lot->id, 'lot_number' => $lot->lot_number,
                     'expiry_date' => $lot->expiry_date?->toDateString(),
                     'remaining_qty' => (float) $lot->remaining_qty,
@@ -189,11 +198,18 @@ class SearchController extends Controller
     // for a product at a specific location right after it's picked.
     public function stockBalance(Request $request): JsonResponse
     {
-        $this->authorizeAny($request, ['stock.manage', 'stock.request']);
         $data = $request->validate([
             'product_id' => ['required', 'integer'],
-            'warehouse_location_id' => ['required', 'integer'],
+            'warehouse_location_id' => ['required', 'integer', 'exists:warehouse_locations,id'],
         ]);
+        $location = WarehouseLocation::with('warehouse:id,branch_id')->findOrFail($data['warehouse_location_id']);
+        $branchId = $location->warehouse?->branch_id;
+        $this->authorizeAny(
+            $request,
+            ['stock.manage', 'stock.request'],
+            $branchId ? (int) $branchId : null,
+            $branchId === null,
+        );
 
         $onHandQty = (float) (StockBalance::where('product_id', $data['product_id'])
             ->where('warehouse_location_id', $data['warehouse_location_id'])
@@ -204,10 +220,26 @@ class SearchController extends Controller
 
     // มีสิทธิ์ใดสิทธิ์หนึ่งในกลุ่มก็พอ - ดู docblock บนสุดของคลาสว่าทำไมเช็คแบบนี้แทน
     // RoutePermissions ปกติ (ซึ่งรองรับได้แค่สิทธิ์เดียวต่อ route name)
-    private function authorizeAny(Request $request, array $permissions): void
+    private function authorizeAny(Request $request, array $permissions, ?int $branchId = null, bool $requireGlobalScope = false): void
     {
         $user = $request->user();
-        $ok = $user && collect($permissions)->contains(fn (string $permission) => $user->hasPermission($permission));
-        abort_unless($ok, 403, 'ไม่มีสิทธิ์ค้นหาข้อมูลนี้');
+        $allowed = $user
+            ? collect($permissions)->filter(fn (string $permission) => $user->hasPermission($permission))
+            : collect();
+        abort_unless($allowed->isNotEmpty(), 403, 'ไม่มีสิทธิ์ค้นหาข้อมูลนี้');
+
+        if ($branchId !== null) {
+            abort_unless(
+                $allowed->contains(fn (string $permission) => $user->canAccessBranch($branchId, $permission)),
+                403,
+                'ไม่มีสิทธิ์ค้นหาข้อมูลในสาขานี้',
+            );
+        } elseif ($requireGlobalScope) {
+            abort_unless(
+                $user->branch_id === null && ! $user->branchRoles()->exists(),
+                403,
+                'ไม่มีสิทธิ์ค้นหาข้อมูลส่วนกลาง',
+            );
+        }
     }
 }

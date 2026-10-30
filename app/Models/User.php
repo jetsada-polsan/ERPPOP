@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
 
 #[Fillable(['branch_id', 'salesman_id', 'sales_area_id', 'username', 'name', 'email', 'phone', 'position', 'password', 'is_active', 'must_change_password', 'mfa_secret', 'mfa_enabled_at', 'password_changed_at'])]
 #[Hidden(['password', 'remember_token', 'mfa_secret'])]
@@ -82,18 +83,10 @@ class User extends Authenticatable
     /** Device branch is authoritative. Explicit assignments win; branch_id is migration fallback. */
     public function canAccessBranch(int $branchId, ?string $permission = null): bool
     {
-        $activeAssignments = $this->branchRoles()
-            ->wherePivot('is_active', true)
-            ->where(fn ($roles) => $roles
-                ->whereNull('user_branch_roles.effective_from')
-                ->orWhere('user_branch_roles.effective_from', '<=', now()))
-            ->where(fn ($roles) => $roles
-                ->whereNull('user_branch_roles.effective_to')
-                ->orWhere('user_branch_roles.effective_to', '>', now()));
-
-        // Once an administrator has assigned branches explicitly, that list is the
-        // boundary. Do not fall back to a global role and accidentally open every branch.
-        if (! $activeAssignments->exists()) {
+        // An explicit assignment remains the boundary even when every assignment
+        // is inactive, not yet effective, or expired. Otherwise a global role can
+        // accidentally restore access to every branch after the assignment ends.
+        if (! $this->branchRoles()->exists()) {
             return ($this->branch_id === null || (int) $this->branch_id === $branchId)
                 && ($permission === null || $this->hasPermission($permission));
         }
@@ -151,7 +144,7 @@ class User extends Authenticatable
         return $this->roles()->whereHas('permissions', fn ($permissions) => $permissions->where('code', $code))->exists();
     }
 
-    /** @return \Illuminate\Support\Collection<int, Role> */
+    /** @return Collection<int, Role> */
     private function activeBranchRoles()
     {
         return $this->branchRoles()
