@@ -3,21 +3,22 @@
 @section('page-title', 'การผลิต')
 @section('page-subtitle', 'สูตรผลิต ใบสั่งผลิต และสถานะงานผลิต')
 @section('content')
-<div x-data="{ openRecipe: null }" x-init="const m = location.hash.match(/^#recipe-(\d+)/); if (m) openRecipe = parseInt(m[1])" x-cloak>
+<div x-data="productionPage()" x-init="const m = location.hash.match(/^#recipe-(\d+)/); if (m) openRecipe = parseInt(m[1])" x-cloak>
 <div class="row g-3 mb-3">
     <div class="col-12 col-xl-5">
         <div class="content-card p-4 h-100">
             <h2 class="h5 fw-bold mb-3">เพิ่มสูตรผลิต / แปรรูป</h2>
-            <form method="post" action="{{ route('production.recipes.store') }}" class="row g-3">
+            <form method="post" action="{{ route('production.recipes.store') }}" class="row g-3" @submit="validateProductForm($event, 0)">
                 @csrf
                 <div class="col-md-4"><label class="form-label small text-muted">รหัสสูตร</label><input name="code" required class="form-control"></div>
                 <div class="col-md-8"><label class="form-label small text-muted">ชื่อสูตร</label><input name="name" required class="form-control"></div>
                 <div class="col-12">
                     <label class="form-label small text-muted">สินค้าสำเร็จรูป</label>
-                    <select name="finished_product_id" x-ref="finishedProduct" required class="form-select">
-                        <option value="">-- เลือกสินค้า --</option>
-                        @foreach($products as $product)<option value="{{ $product->id }}">{{ $product->sku_code }} - {{ $product->name_th }}</option>@endforeach
-                    </select>
+                    <input type="hidden" name="finished_product_id" x-model="items[0].product_id">
+                    <button type="button" class="selected-product" :class="{ empty: !items[0].product_id }" @click="openProductPicker(0)">
+                        <template x-if="!items[0].product_id"><span class="selected-empty"><i class="bi bi-search"></i> ค้นหาและเลือกสินค้าสำเร็จรูป</span></template>
+                        <template x-if="items[0].product_id"><span class="selected-product-grid"><b class="selected-code" x-text="items[0].sku_code"></b><span class="selected-copy"><strong x-text="items[0].name_th"></strong><small x-text="items[0].unit_name || 'หน่วยฐาน'"></small></span><span class="selected-change">เปลี่ยน</span></span></template>
+                    </button>
                 </div>
                 <div class="col-md-4"><label class="form-label small text-muted">จำนวนที่ได้</label><input type="number" step="0.0001" min="0.0001" name="output_qty" value="1" required class="form-control"></div>
                 <div class="col-md-8"><label class="form-label small text-muted">หมายเหตุ</label><input name="note" class="form-control"></div>
@@ -31,7 +32,7 @@
     <div class="col-12 col-xl-7">
         <div class="content-card p-4 h-100">
             <h2 class="h5 fw-bold mb-3">เปิดใบสั่งผลิต</h2>
-            <form method="post" action="{{ route('production.orders.store') }}" class="row g-3">
+            <form method="post" action="{{ route('production.orders.store') }}" class="row g-3" @submit="validateProductForm($event, 1)">
                 @csrf
                 <div class="col-md-4"><label class="form-label small text-muted">เลขที่เอกสาร</label><input name="doc_no" value="PD{{ now()->format('ymdHis') }}" required class="form-control"></div>
                 <div class="col-md-4"><label class="form-label small text-muted">วันที่</label><input type="date" name="doc_date" value="{{ now()->toDateString() }}" required class="form-control"></div>
@@ -39,18 +40,18 @@
                 <div class="col-md-6">
                     <label class="form-label small text-muted">สูตรผลิต</label>
                     {{-- เลือกสูตรแล้วเติมสินค้าสำเร็จรูปของสูตรให้ (ข้อ 14) --}}
-                    <select name="production_recipe_id" class="form-select"
-                        @change="const p = $event.target.selectedOptions[0]?.dataset.product; if (p) $refs.finishedProduct.value = p">
+                    <select name="production_recipe_id" class="form-select" @change="selectRecipeForOrder($event)">
                         <option value="">-- ไม่ระบุ --</option>
-                        @foreach($recipes as $recipe)<option value="{{ $recipe->id }}" data-product="{{ $recipe->finished_product_id }}">{{ $recipe->code }} - {{ $recipe->name }}</option>@endforeach
+                        @foreach($recipes as $recipe)<option value="{{ $recipe->id }}" data-product="{{ $recipe->finished_product_id }}" data-sku="{{ $recipe->finishedProduct?->sku_code }}" data-name="{{ $recipe->finishedProduct?->name_th }}">{{ $recipe->code }} - {{ $recipe->name }}</option>@endforeach
                     </select>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label small text-muted">สินค้าสำเร็จรูป</label>
-                    <select name="finished_product_id" x-ref="finishedProduct" required class="form-select">
-                        <option value="">-- เลือกสินค้า --</option>
-                        @foreach($products as $product)<option value="{{ $product->id }}">{{ $product->sku_code }} - {{ $product->name_th }}</option>@endforeach
-                    </select>
+                    <input type="hidden" name="finished_product_id" x-model="items[1].product_id">
+                    <button type="button" class="selected-product" :class="{ empty: !items[1].product_id }" @click="openProductPicker(1)">
+                        <template x-if="!items[1].product_id"><span class="selected-empty"><i class="bi bi-search"></i> ค้นหาและเลือกสินค้าสำเร็จรูป</span></template>
+                        <template x-if="items[1].product_id"><span class="selected-product-grid"><b class="selected-code" x-text="items[1].sku_code"></b><span class="selected-copy"><strong x-text="items[1].name_th"></strong><small x-text="items[1].unit_name || 'หน่วยฐาน'"></small></span><span class="selected-change">เปลี่ยน</span></span></template>
+                    </button>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label small text-muted">สาขา</label>
@@ -207,38 +208,17 @@
                 </table>
             </div>
 
-            <div class="recipe-add-panel" x-data="{ query: '', productId: '', open: false, results: [], timer: null,
-                search() {
-                    this.productId = '';
-                    clearTimeout(this.timer);
-                    const q = this.query.trim();
-                    if (!q) { this.results = []; this.open = false; return; }
-                    this.timer = setTimeout(async () => {
-                        try {
-                            const response = await fetch(`{{ route('search.products') }}?q=${encodeURIComponent(q)}`);
-                            const products = response.ok ? await response.json() : [];
-                            this.results = products.filter(p => Number(p.id) !== {{ (int) $recipe->finished_product_id }}).slice(0, 8);
-                            this.open = true;
-                        } catch (_) { this.results = []; this.open = false; }
-                    }, 200);
-                },
-                pick(p) { this.productId = p.id; this.query = p.sku_code + ' - ' + p.name_th; this.open = false; }
-            }">
+            <div class="recipe-add-panel" x-data="recipeIngredientPage({{ (int) $recipe->finished_product_id }})">
                 <div class="recipe-add-panel-title"><i class="bi bi-plus-circle-fill me-1"></i>เพิ่มวัตถุดิบ</div>
-                <form method="post" action="{{ route('production.recipes.items.store', $recipe) }}" class="row g-2 align-items-end">
+                <form method="post" action="{{ route('production.recipes.items.store', $recipe) }}" class="row g-2 align-items-end" @submit="validateIngredient($event)">
                     @csrf
                     <div class="col-12 col-md-6 position-relative">
                         <label class="form-label small text-muted">วัตถุดิบ</label>
-                        <input type="hidden" name="product_id" x-model="productId">
-                        <input type="text" x-model="query" @input="search()" @focus="open = results.length > 0"
-                            placeholder="ค้นหารหัส/ชื่อสินค้า" class="form-control form-control-sm" autocomplete="off" required>
-                        <div class="typeahead-list" x-show="open && results.length" @click.outside="open = false" x-transition>
-                            <template x-for="p in results" :key="p.id">
-                                <button type="button" class="typeahead-item" @click="pick(p)">
-                                    <span class="fw-semibold" x-text="p.sku_code"></span><span x-text="p.name_th"></span>
-                                </button>
-                            </template>
-                        </div>
+                        <input type="hidden" name="product_id" x-model="items[0].product_id">
+                        <button type="button" class="selected-product" :class="{ empty: !items[0].product_id }" @click="openProductPicker(0)">
+                            <template x-if="!items[0].product_id"><span class="selected-empty"><i class="bi bi-search"></i> ค้นหาและเลือกวัตถุดิบ</span></template>
+                            <template x-if="items[0].product_id"><span class="selected-product-grid"><b class="selected-code" x-text="items[0].sku_code"></b><span class="selected-copy"><strong x-text="items[0].name_th"></strong><small x-text="items[0].unit_name || 'หน่วยฐาน'"></small></span><span class="selected-change">เปลี่ยน</span></span></template>
+                        </button>
                     </div>
                     <div class="col-6 col-md-3">
                         <label class="form-label small text-muted">จำนวน/รอบ</label>
@@ -251,11 +231,13 @@
                         <input type="text" name="scrap_policy" class="form-control form-control-sm" placeholder="เงื่อนไขของเสีย (ไม่บังคับ) เช่น หัก 5%">
                     </div>
                 </form>
+                @include('partials.product-picker')
             </div>
         </div>
     </div>
 </div>
 @endforeach
+@include('partials.product-picker')
 </div>
 
 @endsection
@@ -296,4 +278,50 @@
     }
     .recipe-bom-modal .typeahead-item:hover { background: var(--erp-primary-soft); }
 </style>
+@endpush
+
+@push('scripts')
+<script>
+    function productionItem() {
+        return { product_id: '', sku_code: '', name_th: '', unit_name: '', barcode: '' };
+    }
+
+    function productionPage() {
+        return {
+            ...erpProductPicker(),
+            openRecipe: null,
+            items: [productionItem(), productionItem()],
+            selectRecipeForOrder(event) {
+                const option = event.target.selectedOptions[0];
+                const productId = option?.dataset.product || '';
+                this.items[1] = productionItem();
+                if (productId) Object.assign(this.items[1], {
+                    product_id: productId,
+                    sku_code: option.dataset.sku || '',
+                    name_th: option.dataset.name || '',
+                });
+            },
+            validateProductForm(event, index) {
+                if (this.items[index].product_id) return;
+                event.preventDefault();
+                if (window.erpToast) window.erpToast('warning', 'กรุณาเลือกสินค้าก่อนบันทึก');
+                else Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title: 'กรุณาเลือกสินค้าก่อนบันทึก', timer: 2200, showConfirmButton: false });
+            },
+        };
+    }
+
+    function recipeIngredientPage(finishedProductId) {
+        return {
+            ...erpProductPicker(),
+            items: [productionItem()],
+            filterPickerProduct(product) { return Number(product.id) !== Number(finishedProductId); },
+            validateIngredient(event) {
+                if (this.items[0].product_id) return;
+                event.preventDefault();
+                if (window.erpToast) window.erpToast('warning', 'กรุณาเลือกวัตถุดิบก่อนเพิ่ม');
+                else Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title: 'กรุณาเลือกวัตถุดิบก่อนเพิ่ม', timer: 2200, showConfirmButton: false });
+            },
+        };
+    }
+</script>
 @endpush

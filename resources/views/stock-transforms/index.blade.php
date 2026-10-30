@@ -148,16 +148,12 @@
                             <tbody>
                                 <template x-for="(item, index) in rawItems" :key="'r' + index">
                                     <tr>
-                                        <td class="position-relative">
-                                            <input type="text" x-model="item.productQuery" @input.debounce.300ms="searchProducts(item)" placeholder="ค้นหารหัส/ชื่อสินค้า" class="form-control" autocomplete="off">
+                                        <td>
+                                            <button type="button" class="selected-product" :class="{ empty: !item.product_id }" @click="openProductPicker(index, 'raw')">
+                                                <template x-if="!item.product_id"><span class="selected-empty"><i class="bi bi-search"></i> ค้นหาและเลือกสินค้า</span></template>
+                                                <template x-if="item.product_id"><span class="selected-product-grid"><b class="selected-code" x-text="item.sku_code || ''"></b><span class="selected-copy"><strong x-text="item.name_th || item.productQuery"></strong><small x-text="item.unit_name || 'หน่วยฐาน'"></small></span><span class="selected-change">เปลี่ยน</span></span></template>
+                                            </button>
                                             <input type="hidden" :name="`raw_items[${index}][product_id]`" x-model="item.product_id">
-                                            <div class="typeahead-list" x-show="item.results.length" x-transition>
-                                                <template x-for="product in item.results" :key="product.id">
-                                                    <button type="button" class="typeahead-item" @click="selectProduct(item, product)">
-                                                        <span class="fw-semibold" x-text="product.sku_code"></span><span x-text="product.name_th"></span>
-                                                    </button>
-                                                </template>
-                                            </div>
                                         </td>
                                         <td><input type="number" step="0.0001" min="0.0001" :name="`raw_items[${index}][qty]`" x-model.number="item.qty" @input="syncInputWeight()" required class="form-control text-end"></td>
                                         <td class="text-end" x-text="money(item.average_cost)"></td>
@@ -180,16 +176,12 @@
                             <tbody>
                                 <template x-for="(item, index) in outputItems" :key="'o' + index">
                                     <tr>
-                                        <td class="position-relative">
-                                            <input type="text" x-model="item.productQuery" @input.debounce.300ms="searchProducts(item)" placeholder="ค้นหารหัส/ชื่อสินค้า" class="form-control" autocomplete="off">
+                                        <td>
+                                            <button type="button" class="selected-product" :class="{ empty: !item.product_id }" @click="openProductPicker(index, 'output')">
+                                                <template x-if="!item.product_id"><span class="selected-empty"><i class="bi bi-search"></i> ค้นหาและเลือกสินค้า</span></template>
+                                                <template x-if="item.product_id"><span class="selected-product-grid"><b class="selected-code" x-text="item.sku_code || ''"></b><span class="selected-copy"><strong x-text="item.name_th || item.productQuery"></strong><small x-text="item.unit_name || 'หน่วยฐาน'"></small></span><span class="selected-change">เปลี่ยน</span></span></template>
+                                            </button>
                                             <input type="hidden" :name="`output_items[${index}][product_id]`" x-model="item.product_id">
-                                            <div class="typeahead-list" x-show="item.results.length" x-transition>
-                                                <template x-for="product in item.results" :key="product.id">
-                                                    <button type="button" class="typeahead-item" @click="selectProduct(item, product)">
-                                                        <span class="fw-semibold" x-text="product.sku_code"></span><span x-text="product.name_th"></span>
-                                                    </button>
-                                                </template>
-                                            </div>
                                         </td>
                                         <td><input type="number" step="0.0001" min="0.0001" :name="`output_items[${index}][qty]`" x-model.number="item.qty" required class="form-control text-end"><input type="hidden" :name="`output_items[${index}][percent]`" value="100"></td>
                                         <td class="text-end fw-semibold text-success" x-text="outputUnitCost(item)"></td>
@@ -208,6 +200,7 @@
             </form>
         </div>
     </div>
+    @include('partials.product-picker')
 </div>
 @endsection
 
@@ -230,6 +223,7 @@
 <script>
     function transformPage() {
         return {
+            ...erpProductPicker(),
             modalOpen: false,
             rawItems: [{ product_id: '', productQuery: '', qty: 1, average_cost: 0, results: [] }],
             outputItems: [{ product_id: '', productQuery: '', qty: 1, percent: null, results: [] }],
@@ -238,6 +232,15 @@
             recipes: @json($recipes),
             selectedRecipeId: '',
             selectedRecipe: null,
+
+            getPickerItem(index, context) {
+                return context === 'output' ? this.outputItems[index] : this.rawItems[index];
+            },
+            onProductPicked(index, product, context) {
+                const item = context === 'output' ? this.outputItems[index] : this.rawItems[index];
+                item.productQuery = `${product.sku_code} - ${product.name_th}`;
+                item.average_cost = Number(product.average_cost) || 0;
+            },
 
             addRaw() { this.rawItems.push({ product_id: '', productQuery: '', qty: 1, average_cost: 0, results: [] }); this.syncInputWeight(); },
             syncInputWeight() { this.inputWeight = Math.round(this.rawItems.reduce((s, i) => s + (Number(i.qty) || 0), 0) * 10000) / 10000; },
@@ -280,19 +283,6 @@
 
             money(v) { return Number(v || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
             weight(v) { return Number(v || 0).toLocaleString('th-TH', { minimumFractionDigits: 3, maximumFractionDigits: 4 }); },
-
-            async searchProducts(item) {
-                if (item.productQuery.length < 1) { item.results = []; item.product_id = ''; return; }
-                const response = await fetch(`{{ route('search.products') }}?q=${encodeURIComponent(item.productQuery)}`);
-                item.results = await response.json();
-            },
-
-            selectProduct(item, product) {
-                item.product_id = product.id;
-                item.productQuery = `${product.sku_code} - ${product.name_th}`;
-                item.results = [];
-                item.average_cost = Number(product.average_cost) || 0;
-            },
 
             onSubmit(event) {
                 if (this.rawItems.some(i => !i.product_id) || this.outputItems.some(i => !i.product_id)) {

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Product;
 use App\Models\Promotion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,9 +12,8 @@ class PromotionController extends Controller
     public function index(): View
     {
         $promotions = Promotion::with('product')->orderByDesc('starts_at')->orderBy('code')->paginate(50);
-        $products = Product::where('is_active', true)->orderBy('sku_code')->limit(300)->get();
 
-        return view('promotions.index', compact('promotions', 'products'));
+        return view('promotions.index', compact('promotions'));
     }
 
     public function store(Request $request): RedirectResponse

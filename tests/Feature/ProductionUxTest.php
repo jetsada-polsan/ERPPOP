@@ -63,7 +63,8 @@ class ProductionUxTest extends TestCase
         $this->withoutMiddleware(ErpAuthorize::class)->actingAs(User::factory()->create())
             ->get(route('production.index'))->assertOk()
             ->assertSee('data-product="'.$order->finished_product_id.'"', false)
-            ->assertSee('x-ref="finishedProduct"', false)
+            ->assertSee('openProductPicker(1)', false)
+            ->assertSee('name="finished_product_id" x-model="items[1].product_id"', false)
             ->assertSee('วางแผน');
     }
 

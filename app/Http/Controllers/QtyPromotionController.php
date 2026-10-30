@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
-use App\Models\Product;
 use App\Models\QtyPromotion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,10 +14,9 @@ class QtyPromotionController extends Controller
     {
         $promotions = QtyPromotion::with(['product', 'freeProduct', 'branch'])
             ->orderByDesc('id')->paginate(50);
-        $products = Product::where('is_active', true)->orderBy('sku_code')->limit(300)->get(['id', 'sku_code', 'name_th']);
         $branches = Branch::orderBy('code')->get(['id', 'code', 'name_th']);
 
-        return view('qty-promotions.index', compact('promotions', 'products', 'branches'));
+        return view('qty-promotions.index', compact('promotions', 'branches'));
     }
 
     public function store(Request $request): RedirectResponse

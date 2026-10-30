@@ -14,7 +14,7 @@
 <div class="d-flex justify-content-between align-items-center mb-3"><a href="{{ route('ocr.documents.index') }}" class="small text-decoration-none"><i class="bi bi-arrow-left me-1"></i>กลับรายการ OCR</a><span class="ocr-status">{{ $document->status }}</span></div>
 @if(session('success'))<div class="alert alert-success"><i class="bi bi-check-circle me-2"></i>{{ session('success') }}</div>@endif
 @if($errors->any())<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>{{ $errors->first() }}</div>@endif
-<div class="ocr-review">
+<div class="ocr-review" x-data="{ ...erpProductPicker(), items: @js($document->lines->map(fn ($line) => ['product_id' => $line->matched_product_id, 'sku_code' => $line->matchedProduct?->sku_code ?? '', 'name_th' => $line->matchedProduct?->name_th ?? '', 'unit_name' => 'หน่วยฐาน', 'barcode' => ''])->values()) }" x-cloak>
     <section class="ocr-box">
         <div class="d-flex justify-content-between align-items-center mb-2"><strong>เอกสารต้นฉบับ</strong><a href="{{ route('ocr.documents.file',$document) }}" target="_blank" class="btn btn-sm btn-light border"><i class="bi bi-box-arrow-up-right"></i></a></div>
         <div class="ocr-doc-preview">
@@ -43,7 +43,7 @@
                 <div><label class="form-label small">ยอดก่อน VAT</label><input type="number" step="0.01" min="0" name="net_amount" class="form-control form-control-sm" value="{{ $document->net_amount }}"></div>
             </div>
             <div class="ocr-line-wrap mb-3"><table class="ocr-line-table"><thead><tr><th>#</th><th>สินค้า</th><th>รหัส</th><th>Barcode</th><th>จำนวน</th><th>หน่วย</th><th>ราคา/หน่วย</th><th>ส่วนลด</th><th>รวม</th><th>จับคู่</th></tr></thead><tbody>
-            @forelse($document->lines as $line)
+            @forelse($document->lines as $index => $line)
             <tr>
                 <td>{{ $line->line_no }}</td>
                 <td><div class="small fw-semibold">{{ $line->extracted_product_name ?: '-' }}</div><input name="lines[{{ $line->id }}][extracted_product_name]" class="form-control form-control-sm" value="{{ $line->extracted_product_name }}"></td>
@@ -54,7 +54,7 @@
                 <td><input type="number" step="0.0001" min="0" name="lines[{{ $line->id }}][extracted_unit_price]" class="form-control form-control-sm" value="{{ $line->extracted_unit_price }}"></td>
                 <td><input type="number" step="0.0001" min="0" name="lines[{{ $line->id }}][extracted_discount]" class="form-control form-control-sm" value="{{ $line->extracted_discount }}"></td>
                 <td><input type="number" step="0.0001" min="0" name="lines[{{ $line->id }}][extracted_line_total]" class="form-control form-control-sm" value="{{ $line->extracted_line_total }}"></td>
-                <td><select name="lines[{{ $line->id }}][matched_product_id]" class="form-select form-select-sm product-select"><option value="">เลือกสินค้า</option>@foreach($products as $product)<option value="{{ $product->id }}" @selected($line->matched_product_id===$product->id)>{{ $product->sku_code }} · {{ $product->name_th }}</option>@endforeach</select><div class="small mt-1 text-{{ $line->match_status==='matched'?'success':'danger' }}">{{ $line->match_status }}</div></td>
+                <td><input type="hidden" name="lines[{{ $line->id }}][matched_product_id]" x-model="items[{{ $index }}].product_id"><button type="button" class="selected-product" :class="{ empty: !items[{{ $index }}].product_id }" @click="openProductPicker({{ $index }})"><template x-if="!items[{{ $index }}].product_id"><span class="selected-empty"><i class="bi bi-search"></i> เลือกสินค้า</span></template><template x-if="items[{{ $index }}].product_id"><span class="selected-product-grid"><b class="selected-code" x-text="items[{{ $index }}].sku_code"></b><span class="selected-copy"><strong x-text="items[{{ $index }}].name_th"></strong><small x-text="items[{{ $index }}].unit_name || 'หน่วยฐาน'"></small></span><span class="selected-change">เปลี่ยน</span></span></template></button><div class="small mt-1 text-{{ $line->match_status==='matched'?'success':'danger' }}">{{ $line->match_status }}</div></td>
             </tr>
             @empty<tr><td colspan="10" class="text-center text-muted py-4">ยังไม่พบรายการจาก OCR กรุณาแก้ไข/เพิ่มด้วยข้อมูลจริงก่อน Approve</td></tr>@endforelse
             </tbody></table></div>
@@ -68,5 +68,6 @@
             @if($document->status==='posted')<a class="btn btn-light border" href="{{ route('purchases.show',$document->postedDocument) }}">เปิดใบซื้อที่โพสต์แล้ว</a>@endif
         </div></div>
     </section>
+@include('partials.product-picker')
 </div>
 @endsection

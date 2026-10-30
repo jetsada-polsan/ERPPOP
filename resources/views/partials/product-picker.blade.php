@@ -133,13 +133,15 @@
             pickerResults: [],
             pickerLoading: false,
             pickerActiveIndex: 0,
+            pickerContext: null,
 
             money(value) {
                 return Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             },
 
-            openProductPicker(index) {
+            openProductPicker(index, context = null) {
                 this.pickerIndex = index;
+                this.pickerContext = context;
                 this.pickerQuery = '';
                 this.pickerResults = [];
                 this.pickerActiveIndex = 0;
@@ -153,6 +155,7 @@
             closeProductPicker() {
                 this.pickerOpen = false;
                 this.pickerIndex = null;
+                this.pickerContext = null;
                 this.pickerQuery = '';
                 this.pickerResults = [];
                 this.pickerActiveIndex = 0;
@@ -162,8 +165,13 @@
                 if (! this.pickerOpen) return;
                 this.pickerLoading = true;
                 try {
-                    const response = await fetch(`${searchUrl}?q=${encodeURIComponent(this.pickerQuery.trim())}`);
-                    this.pickerResults = response.ok ? await response.json() : [];
+                    const params = new URLSearchParams({ q: this.pickerQuery.trim() });
+                    if (typeof this.pickerSearchParams === 'function') this.pickerSearchParams(params);
+                    const response = await fetch(`${searchUrl}?${params.toString()}`);
+                    const products = response.ok ? await response.json() : [];
+                    this.pickerResults = typeof this.filterPickerProduct === 'function'
+                        ? products.filter(product => this.filterPickerProduct(product))
+                        : products;
                 } catch (error) {
                     this.pickerResults = [];
                 } finally {
@@ -190,9 +198,13 @@
 
             selectPickerProduct(product) {
                 const index = this.pickerIndex;
-                if (index === null || ! this.items[index]) return;
+                const context = this.pickerContext;
+                if (index === null) return;
+                const item = typeof this.getPickerItem === 'function'
+                    ? this.getPickerItem(index, context)
+                    : this.items?.[index];
+                if (!item) return;
 
-                const item = this.items[index];
                 item.product_id = product.id;
                 item.sku_code = product.sku_code || '';
                 item.name_th = product.name_th || '';
@@ -202,7 +214,7 @@
                 this.closeProductPicker();
 
                 if (typeof this.onProductPicked === 'function') {
-                    this.onProductPicked(index, product);
+                    this.onProductPicked(index, product, context);
                 }
             },
         };

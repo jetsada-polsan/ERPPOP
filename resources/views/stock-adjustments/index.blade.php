@@ -117,18 +117,12 @@
                                 <tbody>
                                     <template x-for="(item, index) in items" :key="index">
                                         <tr>
-                                            <td class="position-relative">
-                                                <input type="text" x-model="item.productQuery" @input.debounce.300ms="searchProducts(index)"
-                                                    placeholder="ค้นหารหัส/ชื่อสินค้า" class="form-control" autocomplete="off">
+                                            <td>
+                                                <button type="button" class="selected-product" :class="{ empty: !item.product_id }" @click="openProductPicker(index)">
+                                                    <template x-if="!item.product_id"><span class="selected-empty"><i class="bi bi-search"></i> ค้นหาและเลือกสินค้า</span></template>
+                                                    <template x-if="item.product_id"><span class="selected-product-grid"><b class="selected-code" x-text="item.sku_code"></b><span class="selected-copy"><strong x-text="item.name_th || item.productQuery"></strong><small x-text="item.unit_name || 'หน่วยฐาน'"></small></span><span class="selected-change">เปลี่ยน</span></span></template>
+                                                </button>
                                                 <input type="hidden" :name="`items[${index}][product_id]`" x-model="item.product_id">
-                                                <div class="typeahead-list" x-show="item.results.length" x-transition>
-                                                    <template x-for="product in item.results" :key="product.id">
-                                                        <button type="button" class="typeahead-item" @click="selectProduct(index, product)">
-                                                            <span class="fw-semibold" x-text="product.sku_code"></span>
-                                                            <span x-text="product.name_th"></span>
-                                                        </button>
-                                                    </template>
-                                                </div>
                                             </td>
                                             <td class="text-end" x-text="item.systemQty"></td>
                                             <td>
@@ -157,6 +151,7 @@
                 </form>
             </div>
         </div>
+        @include('partials.product-picker')
     </div>
 @endsection
 
@@ -195,6 +190,7 @@
 <script>
     function stockAdjustmentPage() {
         return {
+            ...erpProductPicker(),
             modalOpen: false,
             locationId: '',
             items: [{ product_id: '', productQuery: '', counted_qty: 0, systemQty: 0, results: [] }],
@@ -208,20 +204,8 @@
             onLocationChange() {
                 this.items.forEach((item, index) => this.refreshSystemQty(index));
             },
-            async searchProducts(index) {
-                const query = this.items[index].productQuery;
-                if (query.length < 1) {
-                    this.items[index].results = [];
-                    this.items[index].product_id = '';
-                    return;
-                }
-                const response = await fetch(`{{ route('search.products') }}?q=${encodeURIComponent(query)}`);
-                this.items[index].results = await response.json();
-            },
-            async selectProduct(index, product) {
-                this.items[index].product_id = product.id;
+            async onProductPicked(index, product) {
                 this.items[index].productQuery = `${product.sku_code} - ${product.name_th}`;
-                this.items[index].results = [];
                 await this.refreshSystemQty(index);
             },
             async refreshSystemQty(index) {

@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\Branch;
-use App\Models\Product;
 use App\Models\ProductionOrder;
 use App\Models\ProductionRecipe;
 use App\Models\ProductionRecipeItem;
@@ -20,11 +19,10 @@ class ProductionController extends Controller
     {
         $recipes = ProductionRecipe::with(['finishedProduct', 'items.product'])->withCount('items')->orderBy('code')->paginate(25, ['*'], 'recipes_page');
         $orders = ProductionOrder::with(['recipe', 'finishedProduct', 'branch', 'warehouseLocation'])->orderByDesc('doc_date')->paginate(25, ['*'], 'orders_page');
-        $products = Product::where('is_active', true)->orderBy('sku_code')->limit(300)->get();
         $branches = Branch::where('is_active', true)->orderBy('code')->get();
         $locations = WarehouseLocation::with('warehouse')->orderBy('code')->get();
 
-        return view('production.index', compact('recipes', 'orders', 'products', 'branches', 'locations'));
+        return view('production.index', compact('recipes', 'orders', 'branches', 'locations'));
     }
 
     public function storeRecipe(Request $request): RedirectResponse

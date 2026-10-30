@@ -126,6 +126,7 @@
 <script>
 function docEntryPage(config) {
     return {
+        ...erpProductPicker(),
         modalOpen: Boolean(config.openInitially),
         config,
         partyQuery: config.initialPartyQuery || '',
@@ -139,6 +140,9 @@ function docEntryPage(config) {
         salesUserName: config.defaultSalesUserName || '',
         items: config.initialItems?.length ? config.initialItems.map(item => ({
             product_id: item.product_id,
+            sku_code: item.sku_code || '',
+            name_th: item.name_th || '',
+            barcode: item.barcode || '',
             productQuery: item.product_query || '',
             qty: Number(item.qty) || 1,
             unit_price: Number(item.unit_price) || 0,
@@ -147,8 +151,8 @@ function docEntryPage(config) {
             scale_plu: item.scale_plu || '',
             lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false,
             shelf_life_days: null, on_hand_qty: null, reserved_qty: null, available_qty: null,
-            source_stock_lot_id: '', return_disposition: 'quarantine', lots: [], results: [],
-        })) : [{ product_id: '', productQuery: '', qty: 1, unit_price: 0, unit_name: '', is_scale: false, scale_plu: '', lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, on_hand_qty: null, reserved_qty: null, available_qty: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [], results: [] }],
+            source_stock_lot_id: '', return_disposition: 'quarantine', lots: [],
+        })) : [{ product_id: '', sku_code: '', name_th: '', barcode: '', productQuery: '', qty: 1, unit_price: 0, unit_name: '', is_scale: false, scale_plu: '', lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, on_hand_qty: null, reserved_qty: null, available_qty: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [] }],
         init() {
             if (this.config.openInitially) this.$nextTick(() => this.onBranchChanged());
         },
@@ -187,10 +191,11 @@ function docEntryPage(config) {
             const lines = (data.lines || []).filter(line => line.returnable > 0);
             this.items = lines.map(line => ({
                 product_id: line.product_id, productQuery: `${line.sku_code} - ${line.name_th}`,
+                sku_code: line.sku_code, name_th: line.name_th,
                 qty: line.returnable, unit_price: line.unit_price, unit_name: '', is_scale: false, scale_plu: '',
                 lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null,
                 on_hand_qty: null, reserved_qty: null, available_qty: null, source_stock_lot_id: '',
-                return_disposition: 'quarantine', lots: [], results: [],
+                return_disposition: 'quarantine', lots: [],
             }));
             this.sourceInfo = lines.length
                 ? `ใบขาย ${data.doc_number}: คืนได้อีก ${lines.length} รายการ (แก้จำนวนลงได้ ห้ามเกินที่แสดง)`
@@ -239,13 +244,11 @@ function docEntryPage(config) {
                 this.onBranchChanged();
             }
         },
-        addItem() { this.items.push({ product_id: '', productQuery: '', qty: 1, unit_price: 0, unit_name: '', is_scale: false, scale_plu: '', lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, on_hand_qty: null, reserved_qty: null, available_qty: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [], results: [] }); },
+        addItem() { this.items.push({ product_id: '', sku_code: '', name_th: '', barcode: '', productQuery: '', qty: 1, unit_price: 0, unit_name: '', is_scale: false, scale_plu: '', lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, on_hand_qty: null, reserved_qty: null, available_qty: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [] }); },
         removeItem(index) { this.items.splice(index, 1); },
-        async searchProducts(index) {
-            const query = this.items[index].productQuery;
-            if (query.length < 1) { this.items[index].results = []; this.items[index].product_id = ''; return; }
-            const response = await fetch(`{{ route('search.products') }}?q=${encodeURIComponent(query)}&include_lots=${this.config.returnLots ? 1 : 0}&branch_id=${encodeURIComponent(this.branchId || '')}`);
-            this.items[index].results = await response.json();
+        pickerSearchParams(params) {
+            params.set('include_lots', this.config.returnLots ? '1' : '0');
+            params.set('branch_id', this.branchId || '');
         },
         async refreshProductStock(index) {
             const item = this.items[index];
@@ -259,9 +262,12 @@ function docEntryPage(config) {
             item.reserved_qty = product.reserved_qty;
             item.available_qty = product.available_qty;
         },
-        selectProduct(index, product) {
+        onProductPicked(index, product) {
             this.items[index].product_id = product.id;
             this.items[index].productQuery = `${product.sku_code} - ${product.name_th}`;
+            this.items[index].sku_code = product.sku_code || '';
+            this.items[index].name_th = product.name_th || '';
+            this.items[index].barcode = product.barcode || '';
             this.items[index].unit_price = Number(product.default_price || 0);
             this.items[index].unit_name = product.unit_name || 'หน่วยฐาน';
             this.items[index].is_scale = Boolean(product.is_scale);
@@ -272,7 +278,6 @@ function docEntryPage(config) {
             this.items[index].reserved_qty = product.reserved_qty;
             this.items[index].available_qty = product.available_qty;
             this.items[index].lots = product.lots || [];
-            this.items[index].results = [];
         },
         calculateExpiry(index) {
             const item = this.items[index];

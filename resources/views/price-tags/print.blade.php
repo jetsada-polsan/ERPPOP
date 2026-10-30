@@ -15,17 +15,11 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-md-6 position-relative">
-                <label class="form-label small text-muted">ค้นหาสินค้า</label>
-                <input type="text" x-model="query" @input.debounce.300ms="search()"
-                    placeholder="รหัส / ชื่อสินค้า" class="form-control" autocomplete="off">
-                <div x-show="results.length" style="position:absolute;z-index:100;left:0;right:0;top:100%;background:#fff;border:1px solid var(--erp-border);border-radius:10px;box-shadow:0 8px 24px rgba(15,23,42,.12);padding:6px;max-height:240px;overflow-y:auto">
-                    <template x-for="p in results" :key="p.id">
-                        <div @click="addProduct(p)" style="padding:8px 12px;cursor:pointer;border-radius:7px;font-size:13px" @mouseenter="$el.style.background='var(--erp-surface-2)'" @mouseleave="$el.style.background=''">
-                            <span class="fw-semibold" x-text="p.sku_code"></span> — <span x-text="p.name_th"></span>
-                        </div>
-                    </template>
-                </div>
+            <div class="col-md-6">
+                <label class="form-label small text-muted">เพิ่มสินค้า</label>
+                <button type="button" class="selected-product empty" @click="startProductPick()">
+                    <span class="selected-empty"><i class="bi bi-search"></i> ค้นหาและเลือกสินค้าเพื่อพิมพ์ป้าย</span>
+                </button>
             </div>
             <div class="col-md-2">
                 <button type="button" class="btn btn-primary w-100" :disabled="!templateId || items.length === 0" @click="generate()">
@@ -41,7 +35,7 @@
             <table class="table align-middle">
                 <thead><tr><th>รหัส</th><th>ชื่อสินค้า</th><th style="width:120px" class="text-end">จำนวนป้าย</th><th></th></tr></thead>
                 <tbody>
-                    <template x-for="(item, idx) in items" :key="item.product_id">
+                <template x-for="(item, idx) in items" :key="item.product_id">
                         <tr>
                             <td class="fw-semibold" x-text="item.sku_code"></td>
                             <td x-text="item.name_th"></td>
@@ -65,6 +59,7 @@
             </span>
         </template>
     </form>
+@include('partials.product-picker')
 </div>
 @endsection
 
@@ -74,22 +69,24 @@
 <script>
 function priceTagPrint() {
     return {
+        ...erpProductPicker(),
         templateId: '',
-        query: '', results: [],
         items: [],
+        productDraft: null,
 
-        async search() {
-            if (!this.query) { this.results = []; return; }
-            const r = await fetch(`{{ route('price-tags.search-products') }}?q=${encodeURIComponent(this.query)}`);
-            this.results = await r.json();
+        startProductPick() {
+            this.productDraft = { product_id: '', sku_code: '', name_th: '', unit_name: '', barcode: '' };
+            this.openProductPicker(0, 'add');
         },
-
-        addProduct(p) {
-            if (!this.items.find(i => i.product_id === p.id)) {
-                this.items.push({ product_id: p.id, sku_code: p.sku_code, name_th: p.name_th, qty: 1 });
+        getPickerItem(index, context) {
+            return context === 'add' ? this.productDraft : this.items[index];
+        },
+        onProductPicked(index, product, context) {
+            if (context !== 'add') return;
+            if (!this.items.some(item => String(item.product_id) === String(product.id))) {
+                this.items.push({ ...this.productDraft, qty: 1 });
             }
-            this.query = '';
-            this.results = [];
+            this.productDraft = null;
         },
 
         generate() {

@@ -189,27 +189,20 @@
                                 <template x-for="(item, index) in items" :key="index">
                                     <tr>
                                         <td class="row-no" x-text="index + 1"></td>
-                                        <td style="position: relative;">
-                                            <input type="text" x-model="item.productQuery" @input.debounce.250ms="searchProducts(index)"
-                                                   placeholder="ยิงบาร์โค้ด / ค้นหารหัส / ชื่อสินค้า" class="doc-input" autocomplete="off">
-                                            <input type="hidden" :name="`items[${index}][product_id]`" x-model="item.product_id">
-                                            <div class="doc-typeahead" x-show="item.results.length" x-transition>
-                                                <template x-for="product in item.results" :key="product.id">
-                                                    <button type="button" class="doc-option" @click="selectProduct(index, product)">
-                                                        <span class="doc-code" x-text="product.sku_code"></span>
-                                                        <span>
-                                                            <span x-text="product.name_th"></span>
-                                                            <small x-show="product.is_scale" class="d-block text-success fw-bold">
-                                                                ชั่ง <span x-text="product.unit_name || 'หน่วยฐาน'"></span><span x-show="product.scale_plu"> · PLU <span x-text="product.scale_plu"></span></span>
-                                                            </small>
-                                                            <small x-show="config.showStock && product.available_qty !== null" class="d-block stock-hint">
-                                                                มี <span x-text="money(product.on_hand_qty)"></span> · จองแล้ว <span x-text="money(product.reserved_qty)"></span> · พร้อมจอง <span x-text="money(product.available_qty)"></span>
-                                                            </small>
-                                                        </span>
-                                                        <strong class="text-success" x-text="'฿' + money(product.default_price)"></strong>
-                                                    </button>
+                                        <td>
+                                            <button type="button" class="selected-product" :class="{ empty: !item.product_id }" @click="openProductPicker(index)">
+                                                <template x-if="!item.product_id">
+                                                    <span class="selected-empty"><i class="bi bi-search"></i> ค้นหาและเลือกสินค้า</span>
                                                 </template>
-                                            </div>
+                                                <template x-if="item.product_id">
+                                                    <span class="selected-product-grid">
+                                                        <b class="selected-code" x-text="item.sku_code || ''"></b>
+                                                        <span class="selected-copy"><strong x-text="item.name_th || item.productQuery"></strong><small x-text="(item.unit_name || 'หน่วยฐาน') + (item.barcode ? ' · ' + item.barcode : '')"></small></span>
+                                                        <span class="selected-change">เปลี่ยน</span>
+                                                    </span>
+                                                </template>
+                                            </button>
+                                            <input type="hidden" :name="`items[${index}][product_id]`" x-model="item.product_id">
                                             <div x-show="config.showStock && item.product_id && item.available_qty !== null" class="stock-hint mt-1">
                                                 คงเหลือ <span x-text="money(item.on_hand_qty)"></span> · จองแล้ว <span x-text="money(item.reserved_qty)"></span> · พร้อมจอง <strong x-text="money(item.available_qty)"></strong>
                                             </div>
@@ -270,3 +263,4 @@
         </form>
     </div>
 </div>
+@include('partials.product-picker')

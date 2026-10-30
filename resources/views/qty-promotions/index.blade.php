@@ -3,9 +3,9 @@
 @section('page-title', 'แคมเปญซื้อครบ')
 @section('page-subtitle', 'ซื้อครบได้ของแถม ลดราคา หรือกำหนดราคารวมเป็นชุด เช่น 3 ชิ้น 100 บาท')
 @section('content')
-<div class="content-card p-4 mb-3" x-data="{ type: 'free_item' }">
+<div class="content-card p-4 mb-3" x-data="qtyPromotionProductPage()">
     <h2 class="h5 fw-bold mb-3">สร้างแคมเปญ</h2>
-    <form method="post" action="{{ route('qty-promotions.store') }}" class="row g-3">
+    <form method="post" action="{{ route('qty-promotions.store') }}" class="row g-3" @submit="validateProducts($event)">
         @csrf
         <div class="col-md-2"><label class="form-label small text-muted">รหัส</label><input name="code" required class="form-control"></div>
         <div class="col-md-4"><label class="form-label small text-muted">ชื่อแคมเปญ</label><input name="name" required class="form-control" placeholder="เช่น ปลาหมึกซื้อ 1 แถม 1"></div>
@@ -29,12 +29,11 @@
 
         <div class="col-md-5">
             <label class="form-label small text-muted">สินค้าที่ต้องซื้อ</label>
-            <select name="product_id" required class="form-select">
-                <option value="">-- เลือกสินค้า --</option>
-                @foreach($products as $product)
-                    <option value="{{ $product->id }}">{{ $product->sku_code }} - {{ $product->name_th }}</option>
-                @endforeach
-            </select>
+            <input type="hidden" name="product_id" x-model="items[0].product_id">
+            <button type="button" class="selected-product" :class="{ empty: !items[0].product_id }" @click="openProductPicker(0)">
+                <template x-if="!items[0].product_id"><span class="selected-empty"><i class="bi bi-search"></i> ค้นหาและเลือกสินค้า</span></template>
+                <template x-if="items[0].product_id"><span class="selected-product-grid"><b class="selected-code" x-text="items[0].sku_code"></b><span class="selected-copy"><strong x-text="items[0].name_th"></strong><small x-text="items[0].unit_name || 'หน่วยฐาน'"></small></span><span class="selected-change">เปลี่ยน</span></span></template>
+            </button>
         </div>
         <div class="col-md-2"><label class="form-label small text-muted">ซื้อครบ (จำนวน)</label><input type="number" step="0.0001" min="0.0001" name="min_qty" required class="form-control" value="1"></div>
 
@@ -42,12 +41,11 @@
             <label class="form-label small text-muted">ของแถม (เลือกตัวเดียวกัน = ซื้อ 1 แถม 1)</label>
             <div class="row g-2">
                 <div class="col-8">
-                    <select name="free_product_id" class="form-select">
-                        <option value="">-- เลือกของแถม --</option>
-                        @foreach($products as $product)
-                            <option value="{{ $product->id }}">{{ $product->sku_code }} - {{ $product->name_th }}</option>
-                        @endforeach
-                    </select>
+                    <input type="hidden" name="free_product_id" x-model="items[1].product_id">
+                    <button type="button" class="selected-product" :class="{ empty: !items[1].product_id }" @click="openProductPicker(1)">
+                        <template x-if="!items[1].product_id"><span class="selected-empty"><i class="bi bi-search"></i> ค้นหาและเลือกของแถม</span></template>
+                        <template x-if="items[1].product_id"><span class="selected-product-grid"><b class="selected-code" x-text="items[1].sku_code"></b><span class="selected-copy"><strong x-text="items[1].name_th"></strong><small x-text="items[1].unit_name || 'หน่วยฐาน'"></small></span><span class="selected-change">เปลี่ยน</span></span></template>
+                    </button>
                 </div>
                 <div class="col-4"><input type="number" step="0.0001" min="0.0001" name="free_qty" class="form-control" placeholder="จำนวนแถม" value="1"></div>
             </div>
@@ -79,6 +77,7 @@
         <div class="col-md-2 d-flex align-items-end"><button class="btn btn-primary w-100">สร้างแคมเปญ</button></div>
         <div class="col-12"><input name="note" class="form-control" placeholder="หมายเหตุ / เงื่อนไขเพิ่มเติม"></div>
     </form>
+    @include('partials.product-picker')
 </div>
 
 <div class="content-card p-4">
@@ -109,3 +108,29 @@
 @endsection
 
 @push('head')<style>[x-cloak]{display:none!important}</style>@endpush
+
+@push('scripts')
+<script>
+function qtyPromotionProductPage() {
+    return {
+        ...erpProductPicker(),
+        type: 'free_item',
+        items: [
+            { product_id: '', sku_code: '', name_th: '', unit_name: '' },
+            { product_id: '', sku_code: '', name_th: '', unit_name: '' },
+        ],
+        validateProducts(event) {
+            if (! this.items[0].product_id) {
+                event.preventDefault();
+                this.openProductPicker(0);
+                window.erpToast?.('เลือกสินค้าที่ต้องซื้อก่อนบันทึกแคมเปญ', 'warning');
+            } else if (this.type === 'free_item' && ! this.items[1].product_id) {
+                event.preventDefault();
+                this.openProductPicker(1);
+                window.erpToast?.('เลือกสินค้าแถมก่อนบันทึกแคมเปญ', 'warning');
+            }
+        },
+    };
+}
+</script>
+@endpush

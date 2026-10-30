@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use App\Models\OcrDocument;
-use App\Models\Product;
 use App\Models\Supplier;
 use App\Services\OCR\GoodsReceiptDraftService;
 use App\Services\OCR\OcrDocumentService;
@@ -77,7 +76,6 @@ class OcrDocumentController extends Controller
             'document' => $document,
             'branches' => Branch::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name_th']),
             'suppliers' => Supplier::where('is_active', true)->orderBy('code')->limit(500)->get(['id', 'code', 'name_th']),
-            'products' => Product::with('baseUnit')->where('is_active', true)->orderBy('name_th')->limit(1000)->get(['id', 'sku_code', 'name_th', 'base_unit_id']),
             'duplicateWarning' => $service->duplicateWarning($document),
             'totalMismatchWarning' => $service->totalMismatchWarning($document),
         ]);

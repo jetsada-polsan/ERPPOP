@@ -50,18 +50,12 @@
             <div class="content-card p-4">
                 <h3 class="h6 fw-bold mb-3">เพิ่ม / แก้ไขราคาสินค้า</h3>
                 <div class="row g-3 align-items-end mb-0">
-                    <div class="col-md-5 position-relative">
+                    <div class="col-md-5">
                         <label class="form-label text-muted small">ค้นหาสินค้า</label>
-                        <input type="text" x-model="newProductQuery" @input.debounce.300ms="searchNewProduct()"
-                            placeholder="รหัส / ชื่อสินค้า" class="form-control" autocomplete="off">
-                        <div x-show="newResults.length" style="position:absolute;z-index:100;left:0;right:0;top:100%;background:#fff;border:1px solid var(--erp-border);border-radius:10px;box-shadow:0 8px 24px rgba(15,23,42,.12);padding:6px;max-height:240px;overflow-y:auto">
-                            <template x-for="p in newResults" :key="p.id">
-                                <div @click="selectNewProduct(p)" style="padding:8px 12px;cursor:pointer;border-radius:7px;font-size:13px" @mouseenter="$el.style.background='var(--erp-surface-2)'" @mouseleave="$el.style.background=''">
-                                    <span class="fw-semibold" x-text="p.sku_code"></span> — <span x-text="p.name_th"></span>
-                                    <span class="text-muted ms-2" x-text="'฿' + Number(p.default_price).toFixed(2)"></span>
-                                </div>
-                            </template>
-                        </div>
+                        <button type="button" class="selected-product" :class="{ empty: !items[0].product_id }" @click="openProductPicker(0)">
+                            <template x-if="!items[0].product_id"><span class="selected-empty"><i class="bi bi-search"></i> ค้นหาและเลือกสินค้า</span></template>
+                            <template x-if="items[0].product_id"><span class="selected-product-grid"><b class="selected-code" x-text="items[0].sku_code"></b><span class="selected-copy"><strong x-text="items[0].name_th"></strong><small x-text="items[0].unit_name || 'หน่วยฐาน'"></small></span><span class="selected-change">เปลี่ยน</span></span></template>
+                        </button>
                     </div>
                     <div class="col-md-2">
                         <label class="form-label text-muted small">หน่วยนับ</label>
@@ -137,6 +131,7 @@
         </div>
         <div class="mt-3">{{ $productPrices->links() }}</div>
     </div>
+@include('partials.product-picker')
 </div>
 @endsection
 
@@ -146,28 +141,24 @@
 <script>
 function priceTableShow() {
     return {
+        ...erpProductPicker(),
+        items: [{ product_id: '', sku_code: '', name_th: '', unit_name: '', barcode: '' }],
         newProductQuery: '', newProductId: null, newProductName: '',
         newUnitId: '', newPrice: 0, newCost: 0,
-        newResults: [], saveMsg: '',
+        saveMsg: '',
 
-        async searchNewProduct() {
-            if (!this.newProductQuery) { this.newResults = []; this.newProductId = null; this.newProductName = ''; return; }
-            const r = await fetch(`{{ route('price-tables.search-products', $priceTable) }}?q=${encodeURIComponent(this.newProductQuery)}`);
-            this.newResults = await r.json();
-        },
-
-        selectNewProduct(p) {
+        onProductPicked(index, p) {
             this.newProductId = p.id;
             this.newProductName = p.sku_code + ' ' + p.name_th;
             this.newProductQuery = p.sku_code + ' - ' + p.name_th;
             this.newPrice = Number(p.default_price) || 0;
-            this.newResults = [];
         },
 
         editExisting(productId, sku, name, unitId, price, cost) {
             this.newProductId = productId;
             this.newProductName = sku + ' ' + name;
             this.newProductQuery = sku + ' - ' + name;
+            Object.assign(this.items[0], { product_id: productId, sku_code: sku, name_th: name });
             this.newUnitId = unitId ? String(unitId) : '';
             this.newPrice = Number(price);
             this.newCost = Number(cost);
