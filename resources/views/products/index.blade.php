@@ -12,10 +12,11 @@
                     <label>ค้นหาสินค้า</label>
                     <div class="input-group">
                         <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
-                        <input type="text" name="q" value="{{ $q }}" class="form-control" placeholder="รหัส ชื่อ หรือบาร์โค้ด" autocomplete="off" @keydown.enter.prevent="$refs.filterForm.requestSubmit()">
+                        <input type="text" name="q" value="{{ $q }}" class="form-control" placeholder="รหัส ชื่อ หรือบาร์โค้ด" autocomplete="off" aria-describedby="product-search-hint" @input.debounce.500ms="$refs.filterForm.requestSubmit()" @keydown.enter.prevent="$refs.filterForm.requestSubmit()">
                         <button type="submit" class="btn btn-outline-primary" aria-label="ค้นหาสินค้า"><i class="bi bi-search me-1"></i>ค้นหา</button>
                         <input type="hidden" name="status" value="{{ $status }}">
                     </div>
+                    <small id="product-search-hint" class="text-muted">ค้นหาอัตโนมัติหลังหยุดพิมพ์ 0.5 วินาที</small>
                 </div>
                 <div class="product-filter-field">
                     <label>ประเภทสินค้า</label>
@@ -64,7 +65,7 @@
                 <table class="table align-middle product-table mb-0">
                     <thead>
                         <tr>
-                            <th>รหัส</th><th>ชื่อสินค้า</th><th>หมวด</th><th>ยี่ห้อ</th>
+                            <th>รหัส</th><th>บาร์โค้ด</th><th>ชื่อสินค้า</th><th>หมวด</th><th>ยี่ห้อ</th>
                             <th>หน่วยหลัก</th><th class="text-end">ราคาเริ่มต้น</th><th>สถานะ</th><th></th>
                         </tr>
                     </thead>
@@ -72,6 +73,13 @@
                         @forelse($products as $product)
                             <tr>
                                 <td class="fw-semibold">{{ $product->sku_code }}</td>
+                                <td class="product-barcode-cell">
+                                    @forelse($product->barcodes as $barcode)
+                                        <span class="barcode-chip {{ $barcode->is_active ? '' : 'is-inactive' }}" title="{{ $barcode->is_active ? 'บาร์โค้ดใช้งาน' : 'บาร์โค้ดปิดใช้งาน' }}">{{ $barcode->barcode }}</span>
+                                    @empty
+                                        <span class="text-muted">-</span>
+                                    @endforelse
+                                </td>
                                 <td>{{ $product->name_th }}</td>
                                 <td>{{ $product->category?->name_th ?? '-' }}</td>
                                 <td>{{ $product->brand?->name_th ?? '-' }}</td>
@@ -88,7 +96,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="py-5 text-center text-muted">ไม่พบสินค้า</td>
+                                <td colspan="9" class="py-5 text-center text-muted">ไม่พบสินค้า</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -289,6 +297,9 @@
     .product-table tbody td { padding:7px 10px; border-color:var(--erp-success-soft); color:var(--erp-text); vertical-align:middle; line-height:1.2; }
     .product-table tbody tr { transition:background-color .15s ease; }
     .product-table tbody tr:hover { background:var(--erp-surface-2); }
+    .product-barcode-cell { min-width:140px; }
+    .barcode-chip { display:inline-block; margin:1px 3px 1px 0; padding:3px 6px; border:1px solid #cbdcf5; border-radius:5px; background:#f3f7ff; color:#234b88; font:600 10px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace; white-space:nowrap; }
+    .barcode-chip.is-inactive { border-color:#e5e7eb; background:#f3f4f6; color:#6b7280; text-decoration:line-through; }
     .product-table .badge { border-radius:5px; padding:3px 6px; font-size:9px; font-weight:700; }
     .product-table tbody .btn-primary { min-width:58px; min-height:27px; border-radius:6px; font-size:9px; font-weight:700; padding:3px 7px; box-shadow:none; }
     .product-pagination { padding:12px 14px 4px; border-top:1px solid var(--erp-surface-2); }

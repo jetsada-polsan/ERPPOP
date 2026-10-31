@@ -67,6 +67,33 @@ class ProductCatalogFilterTest extends TestCase
             ->assertOk()
             ->assertSee('100พลัส เกรปเบอรี่ 370 มล.')
             ->assertSee('8851952143282')
+            ->assertSee('<th>บาร์โค้ด</th>', false)
+            ->assertSee('@input.debounce.500ms="$refs.filterForm.requestSubmit()"', false)
             ->assertSee('placeholder="รหัส ชื่อ หรือบาร์โค้ด"', false);
+    }
+
+    public function test_product_search_matches_sku_thai_and_english_names_and_shows_all_barcodes(): void
+    {
+        $unit = ProductUnit::create(['code' => 'EA', 'name' => 'ชิ้น', 'qty_per_base_unit' => 1]);
+        $product = Product::create([
+            'sku_code' => '777123', 'name_th' => 'น้ำผลไม้ทดสอบ', 'name_en' => 'Demo Juice',
+            'base_unit_id' => $unit->id, 'default_price' => 20, 'is_active' => true,
+        ]);
+        foreach ([['8850000000123', true], ['OLD-777123', false]] as [$barcode, $isActive]) {
+            ProductBarcode::create([
+                'product_id' => $product->id, 'barcode' => $barcode,
+                'barcode_type' => 'CUSTOM', 'unit_id' => $unit->id, 'unit_factor' => 1,
+                'price' => 20, 'is_active' => $isActive,
+            ]);
+        }
+        $user = $this->manager();
+
+        foreach (['777123', 'น้ำผลไม้ทดสอบ', 'Demo Juice', 'OLD-777123'] as $term) {
+            $this->actingAs($user)->get('/products?q='.urlencode($term).'&status=all')
+                ->assertOk()
+                ->assertSee('น้ำผลไม้ทดสอบ')
+                ->assertSee('8850000000123')
+                ->assertSee('OLD-777123');
+        }
     }
 }

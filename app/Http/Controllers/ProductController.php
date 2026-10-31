@@ -48,6 +48,7 @@ class ProductController extends Controller
         $productScope = Product::query()->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
             ->where('sku_code', $searchOperator, "%{$q}%")
             ->orWhere('name_th', $searchOperator, "%{$q}%")
+            ->orWhere('name_en', $searchOperator, "%{$q}%")
             ->orWhereHas('barcodes', fn ($barcode) => $barcode->where('barcode', 'like', "%{$q}%"))
         ));
         $counts = [
@@ -57,7 +58,7 @@ class ProductController extends Controller
         ];
 
         $products = (clone $productScope)
-            ->with(['category', 'brand', 'baseUnit'])
+            ->with(['category', 'brand', 'baseUnit', 'barcodes:id,product_id,barcode,is_active'])
             ->when($status !== 'all', fn ($query) => $query->where('is_active', $status === 'active'))
             ->when($categoryId, fn ($query) => $query->where('product_category_id', $categoryId))
             ->when($productType === 'scale', fn ($query) => $query->whereHas('barcodes', fn ($b) => $b
