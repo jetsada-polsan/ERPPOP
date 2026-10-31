@@ -103,7 +103,7 @@ class PermissionMatrixTest extends TestCase
             foreach (Permission::query()->orderBy('code')->pluck('code') as $code) {
                 $expected = in_array($code, $assigned, true)
                     || ($code === 'pos.use' && in_array('pos.sell', $assigned, true))
-                    || ($isFullSystemAdmin && ! in_array($code, self::NON_BYPASS, true));
+                    || $isFullSystemAdmin;
 
                 $this->assertSame(
                     $expected,

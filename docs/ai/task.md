@@ -1795,3 +1795,7 @@ pending
 - ทดสอบ: PHPUnit เต็ม 694 tests / 5,895 assertions ผ่านโดยไม่มี failure (1 skipped, 6 incomplete เดิม); ชุดเจาะจง Report/Export/Governance รอบสุดท้าย 22 tests / 180 assertions ผ่าน; StockBalanceReportTest 8 tests / 107 assertions; Node report-search 5 tests ผ่าน (debounce, cursor, stale response, IME, retry, pagination); Pint, PHP/JS syntax, workflow YAML, `git diff --check` ผ่าน; ถอด controller ที่แก้ออกแล้ว regression test รายการนอกหน้าแรกล้มเหลวจริง จากนั้นคืนโค้ดแก้กลับ
 - Deploy: กำลังเตรียม deploy ตามคำสั่งเจ้าของเดิม "ถ้าผ่านก็ deploy เลย"; รอ PostgreSQL CI, backup/restore check และตรวจหน้าจอจริงหลัง deploy
 - ขอบเขต/ความเสี่ยง: ไม่มี migration และไม่มีการแก้รหัส/บาร์โค้ด/ราคา/ต้นทุน/สต๊อก/GL; ใบปรับ 102204 `AJB00120261031003` ยังรออนุมัติอยู่ ณ การสร้างเอกสารรอบก่อน รายงานนี้ไม่ทำให้ยอดเพิ่มเอง; รายงานคงเหลือยังอ่านยอดปัจจุบันตามเดิม
+
+## Handoff - 2026-10-31 (Claude: IT สิทธิ์เต็ม)
+- ทำอะไร: เจ้าของสั่งให้ผู้ถือ users.manage + settings.manage แบบ global ผ่านทุกสิทธิ์ รวมสิทธิ์ควบคุมภายในเดิม; กติกาผู้สร้างอนุมัติเอกสารตัวเองไม่ได้ยังอยู่
+- ความเสี่ยง: GM และ IT_MGR ได้ผลเหมือนกัน; deploy รอเจ้าของ

@@ -12,7 +12,7 @@ class ItPosUatAccessTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_manager_can_run_the_pos_sales_flow_without_price_override_approvals(): void
+    public function test_it_manager_can_run_the_full_pos_flow(): void
     {
         $user = User::factory()->create(['username' => 'it_pos_uat']);
         $user->roles()->attach(Role::where('code', 'IT_MGR')->firstOrFail());
@@ -25,7 +25,7 @@ class ItPosUatAccessTest extends TestCase
         $this->assertSame('pos.sell', RoutePermissions::resolve('pos.shift.open'));
         $this->assertSame('pos.sell', RoutePermissions::resolve('pos.shift.close'));
         $this->assertSame('pos.sell', RoutePermissions::resolve('pos.shift.cash-movement'));
-        $this->assertFalse($user->hasPermission('pos.discount.override'));
-        $this->assertFalse($user->hasPermission('pos.sell_below_cost'));
+        $this->assertTrue($user->hasPermission('pos.discount.override'));
+        $this->assertTrue($user->hasPermission('pos.sell_below_cost'));
     }
 }

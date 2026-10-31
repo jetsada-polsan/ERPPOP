@@ -237,11 +237,15 @@ class User extends Authenticatable
             return true;
         }
 
+        // เจ้าของสั่งให้ IT ทำได้ทุกอย่าง: ผู้ดูแลแบบ global ผ่านทุกสิทธิ์ รวมอนุมัติและควบคุมภายใน
+        if ($this->hasGlobalPermission('users.manage') && $this->hasGlobalPermission('settings.manage')) {
+            return true;
+        }
+
         if (in_array($code, self::NON_BYPASS_PERMISSIONS, true)) {
             return false;
         }
 
-        // System admins เข้าดู/ทดสอบทุกโมดูลได้ ยกเว้นสิทธิ์ควบคุมภายในข้างบน
         return in_array('users.manage', $codes, true)
             && in_array('settings.manage', $codes, true);
     }
