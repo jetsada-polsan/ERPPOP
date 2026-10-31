@@ -68,7 +68,7 @@ class ProductCatalogFilterTest extends TestCase
             ->assertSee('100พลัส เกรปเบอรี่ 370 มล.')
             ->assertSee('8851952143282')
             ->assertSee('<th>บาร์โค้ด</th>', false)
-            ->assertSee('@input.debounce.500ms="$refs.filterForm.requestSubmit()"', false)
+            ->assertSee('@input.debounce.1200ms="$refs.filterForm.requestSubmit()"', false)
             ->assertSee('placeholder="รหัส ชื่อ หรือบาร์โค้ด"', false);
     }
 

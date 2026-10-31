@@ -12,7 +12,7 @@
                     <label>ค้นหาสินค้า</label>
                     <div class="input-group">
                         <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
-                        <input type="text" name="q" value="{{ $q }}" class="form-control" placeholder="รหัส ชื่อ หรือบาร์โค้ด" autocomplete="off" aria-describedby="product-search-hint" @input.debounce.500ms="$refs.filterForm.requestSubmit()" @keydown.enter.prevent="$refs.filterForm.requestSubmit()">
+                        <input type="text" name="q" value="{{ $q }}" class="form-control" placeholder="รหัส ชื่อ หรือบาร์โค้ด" autocomplete="off" aria-describedby="product-search-hint" @input.debounce.1200ms="$refs.filterForm.requestSubmit()" @keydown.enter.prevent="$refs.filterForm.requestSubmit()">
                         <button type="submit" class="btn btn-outline-primary" aria-label="ค้นหาสินค้า"><i class="bi bi-search me-1"></i>ค้นหา</button>
                         <input type="hidden" name="status" value="{{ $status }}">
                     </div>
