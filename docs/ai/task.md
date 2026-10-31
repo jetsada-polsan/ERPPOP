@@ -1,3 +1,25 @@
+# Handoff — 2026-10-31 (แก้สิทธิ์เครื่อง POS และยอดส่วนลด ERP)
+
+## Commit
+`9a2f8a9c677577731a1a41f44f9f62c1d3a99ea0` — `Correct POS device access and discount reporting`
+
+## ทำอะไรไป
+- `/api/pos/ping` ใช้สาขาจากเครื่องก่อน และ fallback ไปสาขาบัญชีเมื่อ token ยังไม่ได้ผูกสาขา ให้ตรงกับข้อมูลที่ ping ส่งคืน
+- ยืนยันขอบเขตสิทธิ์เดิม: `pos.use` เปิดดู POS, `pos.sell` เปิดกะ/ขาย; `IT_MGR` ใช้เครื่องข้ามสาขาได้โดยไม่ต้องเพิ่มบทบาท GM ส่วนผู้จัดการสาขาที่มีเพียงสิทธิ์ดูยังขายไม่ได้ ต้องใช้บัญชีผู้ขายที่มี `pos.sell`
+- ให้ `PosPricingGuard` ส่งสรุปยอดที่คำนวณจากราคาฝั่ง ERP และส่วนลดที่ตรวจสอบแล้ว; ใบรับ POS เก็บยอดก่อนลด/ส่วนลด/สุทธิ และหน้าเครื่องมือ POS แสดงทั้งสามยอด
+- ข้อความแจ้งสิทธิ์บนหน้า POS ระบุ `CASHIER` หรือ `IT_MGR` ตามหน้าที่ แทนการแนะนำให้เพิ่มผู้จัดการทั่วไป
+
+## ทดสอบไปแล้วแค่ไหน
+- `php -d memory_limit=1G vendor/bin/phpunit`: 670 tests, 669 passed, 1 skipped, 6 incomplete, 5,700 assertions
+- ชุดเฉพาะสิทธิ์/checkout/report: 40 tests, 1,197 assertions ผ่าน
+- Pint และ `git diff --check` ผ่าน
+- `php artisan test` ใช้ memory limit เริ่มต้น 128MB แล้วล้มที่ `ReportExportTest` ขณะตรวจ MIME ของไฟล์ XLSX; รัน PHPUnit โดยตรงพร้อม 1GB แล้วผ่านครบ
+
+## ความเสี่ยง/งานถัดไป
+- ยังไม่ได้ deploy: `Deploy ERP` เป็น workflow manual และ session นี้ไม่มี GitHub CLI token ที่ใช้ได้/เครื่องมือ dispatch workflow; production check, backup drill และ post-deploy health จึงยังไม่ทำ
+- ก่อนทดสอบกับ POS จริง ให้รัน Production check แล้ว dispatch `Deploy ERP` เลือก `production`; หลัง deploy ให้ยืนยัน `erp:health` และทดสอบเครื่องที่ผูก role `IT_MGR` หรือบัญชีแคชเชียร์ที่มี `pos.sell`
+- `docs/servers.md` เป็นไฟล์ untracked เดิมและไม่ได้แก้หรือรวมใน commit
+
 # Handoff — 2026-10-30 (Codex: ตรวจ matrix สิทธิ์ทุก role และ route)
 
 ## Commit
