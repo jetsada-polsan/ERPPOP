@@ -15,9 +15,14 @@
 - Pint และ `git diff --check` ผ่าน
 - `php artisan test` ใช้ memory limit เริ่มต้น 128MB แล้วล้มที่ `ReportExportTest` ขณะตรวจ MIME ของไฟล์ XLSX; รัน PHPUnit โดยตรงพร้อม 1GB แล้วผ่านครบ
 
+## Deploy รอบนี้
+- เจ้าของสั่ง `deploy`; ก่อน deploy รัน Production check #9 บน commit `d7ec7bf` ผ่าน: backup `erp-db-20261031-102916.sql.gz` (804 KB), restore drill ผ่านและลบทิ้ง, health `ok`, migrations pending `0`
+- Snapshot อ่านอย่างเดียว: POS วันนี้ 6 บิล, offline needs review `0`, desktop rejects วันนี้ `0`; ไม่มีการสร้างหรือแก้บิลจาก check
+- ปรับ `.github/workflows/deploy.yml` ให้รัน `php -d memory_limit=1G vendor/bin/phpunit` โดยตรง เพราะ `artisan test` spawn PHPUnit ใหม่และชน memory limit 128MB แม้ parent process ใช้ 1GB; คำสั่งตรงรันครบ 670 tests ผ่าน
+- ขั้นถัดไป: commit/push การปรับ workflow แล้ว dispatch `Deploy ERP` เลือก `production`; ตรวจผล workflow และ production health หลัง deploy ก่อนรายงานผล
+
 ## ความเสี่ยง/งานถัดไป
-- ยังไม่ได้ deploy: `Deploy ERP` เป็น workflow manual และ session นี้ไม่มี GitHub CLI token ที่ใช้ได้/เครื่องมือ dispatch workflow; production check, backup drill และ post-deploy health จึงยังไม่ทำ
-- ก่อนทดสอบกับ POS จริง ให้รัน Production check แล้ว dispatch `Deploy ERP` เลือก `production`; หลัง deploy ให้ยืนยัน `erp:health` และทดสอบเครื่องที่ผูก role `IT_MGR` หรือบัญชีแคชเชียร์ที่มี `pos.sell`
+- หลัง deploy ให้ยืนยัน `erp:health` และทดสอบเครื่องที่ผูก role `IT_MGR` หรือบัญชีแคชเชียร์ที่มี `pos.sell`
 - `docs/servers.md` เป็นไฟล์ untracked เดิมและไม่ได้แก้หรือรวมใน commit
 
 # Handoff — 2026-10-30 (Codex: ตรวจ matrix สิทธิ์ทุก role และ route)
