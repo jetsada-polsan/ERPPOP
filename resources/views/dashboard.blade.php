@@ -55,7 +55,7 @@
         <div class="alert border-0 rounded-4 shadow-sm mb-4 d-flex align-items-center gap-2"
              style="background:var(--erp-primary-soft);color:var(--erp-primary)">
             <i class="bi bi-shop"></i>
-            <span class="small fw-semibold">แสดงข้อมูลเฉพาะสาขาของคุณ: {{ $scopeBranchName }}</span>
+            <span class="small fw-semibold">ขอบเขตข้อมูลตามสิทธิ์: {{ $scopeBranchName }}</span>
         </div>
     @endif
 

@@ -38,7 +38,7 @@
             <button type="submit" class="od-btn od-btn-primary">แสดงผล</button>
         </form>
         @if ($scopeBranchName)
-            <span class="od-scope"><i class="bi bi-shop"></i>{{ $scopeBranchName }}</span>
+            <span class="od-scope"><i class="bi bi-shop"></i>ขอบเขตข้อมูล: {{ $scopeBranchName }}</span>
         @endif
     </div>
 </div>
@@ -188,7 +188,7 @@
 
 <div class="od-row2">
     <section class="od-card">
-        <header><h3>บิลขายล่าสุด</h3><span class="od-meta">POS ทุกสาขา</span></header>
+        <header><h3>บิลขายล่าสุด</h3><span class="od-meta">POS ตามขอบเขตสิทธิ์</span></header>
         <div class="table-responsive">
             <table class="table align-middle mb-0">
                 <thead><tr>

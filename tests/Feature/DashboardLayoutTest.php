@@ -3,10 +3,14 @@
 namespace Tests\Feature;
 
 use App\Models\AppSetting;
+use App\Models\Branch;
 use App\Models\Permission;
+use App\Models\PosReceipt;
+use App\Models\PosTerminal;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -53,7 +57,7 @@ class DashboardLayoutTest extends TestCase
             ->getContent();
 
         $this->assertStringContainsString("position: 'top-end'", $html);
-        $this->assertStringContainsString("{ timer: 2200 }", $html);
+        $this->assertStringContainsString('{ timer: 2200 }', $html);
         $this->assertStringContainsString('.erp-swal-toast.swal2-show', $html);
         $this->assertStringContainsString('animation-duration: 180ms', $html);
     }
@@ -84,6 +88,104 @@ class DashboardLayoutTest extends TestCase
         $this->assertEquals($classic->total_sales, $odoo->total_sales);
         $this->assertEquals($classic->receipt_count, $odoo->receipt_count);
         $this->assertEquals($classic->gross_profit, $odoo->gross_profit);
+    }
+
+    public function test_dashboard_aggregates_all_branches_for_global_report_users(): void
+    {
+        [$headOffice, $branch] = $this->branches();
+        $this->sale($headOffice, 'POS-HQ-01', 100);
+        $this->sale($branch, 'POS-BR-01', 250);
+        $viewer = $this->userWithPermissions('DASH_ALL_BRANCHES', ['dashboard.view', 'reports.view', 'reports.all_branches'], $headOffice);
+        $this->assertTrue($viewer->hasPermission('reports.view'));
+        $this->assertTrue($viewer->hasPermission('reports.all_branches'));
+
+        $response = $this->actingAs($viewer)->get(route('dashboard'));
+
+        $response->assertOk();
+        $this->assertSame(350.0, (float) $response->viewData('summary')->total_sales);
+        $this->assertCount(2, $response->viewData('byBranch'));
+        $this->assertSame('รวมทุกสาขา', $response->viewData('scopeBranchName'));
+    }
+
+    public function test_multi_branch_manager_sees_only_assigned_branches_on_dashboard(): void
+    {
+        [$home, $assigned, $unassigned] = $this->branches();
+        $this->sale($home, 'POS-HOME-01', 100);
+        $this->sale($assigned, 'POS-ASSIGNED-01', 250);
+        $this->sale($unassigned, 'POS-OTHER-01', 900);
+        $viewer = $this->userWithPermissions('DASH_MULTI_BRANCH', ['dashboard.view', 'reports.view'], $home);
+        foreach ([$home, $assigned] as $branch) {
+            DB::table('user_branch_roles')->insert([
+                'user_id' => $viewer->id,
+                'branch_id' => $branch->id,
+                'role_id' => $viewer->roles()->firstOrFail()->id,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $response = $this->actingAs($viewer)->get(route('dashboard'));
+
+        $response->assertOk();
+        $this->assertSame(350.0, (float) $response->viewData('summary')->total_sales);
+        $this->assertCount(2, $response->viewData('byBranch'));
+        $this->assertStringContainsString($home->name_th, $response->viewData('scopeBranchName'));
+        $this->assertStringContainsString($assigned->name_th, $response->viewData('scopeBranchName'));
+        $this->assertStringNotContainsString($unassigned->name_th, $response->viewData('scopeBranchName'));
+    }
+
+    public function test_dashboard_hides_business_figures_from_users_without_report_permission(): void
+    {
+        [$home] = $this->branches();
+        $this->sale($home, 'POS-NO-REPORT-01', 100);
+        $viewer = $this->userWithPermissions('DASH_NO_REPORT', ['dashboard.view'], $home);
+
+        $response = $this->actingAs($viewer)->get(route('dashboard'));
+
+        $response->assertOk();
+        $this->assertSame(0.0, (float) $response->viewData('summary')->total_sales);
+        $this->assertCount(0, $response->viewData('byBranch'));
+        $this->assertSame('ไม่มีสาขาที่ได้รับสิทธิ์', $response->viewData('scopeBranchName'));
+    }
+
+    /** @return array<int, Branch> */
+    private function branches(): array
+    {
+        return collect([['HQ', 'สำนักงานใหญ่'], ['B001', 'สาขาอำนาจ'], ['B002', 'สาขาอุบล']])
+            ->map(fn (array $data) => Branch::create(['code' => $data[0], 'name_th' => $data[1], 'is_active' => true]))
+            ->all();
+    }
+
+    private function sale(Branch $branch, string $receiptNo, float $amount): void
+    {
+        $terminal = PosTerminal::create([
+            'branch_id' => $branch->id,
+            'code' => 'T-'.$receiptNo,
+            'name' => 'เครื่อง '.$receiptNo,
+        ]);
+        PosReceipt::create([
+            'pos_terminal_id' => $terminal->id,
+            'receipt_no' => $receiptNo,
+            'receipt_date' => now(),
+            'gross_sales' => $amount,
+            'net_sales' => $amount,
+            'status' => 'completed',
+        ]);
+    }
+
+    /** @param array<int, string> $permissionCodes */
+    private function userWithPermissions(string $roleCode, array $permissionCodes, Branch $home): User
+    {
+        $permissions = collect($permissionCodes)->map(fn (string $code) => Permission::firstOrCreate(
+            ['code' => $code], ['name' => $code]
+        ));
+        $role = Role::create(['code' => $roleCode, 'name' => $roleCode]);
+        $role->permissions()->attach($permissions->pluck('id'));
+        $user = User::factory()->create(['branch_id' => $home->id, 'must_change_password' => false]);
+        $user->roles()->attach($role->id);
+
+        return $user->fresh();
     }
 
     /**
@@ -118,9 +220,9 @@ class DashboardLayoutTest extends TestCase
 
         $this->assertStringContainsString('function showGroup(target, link)', $html);
         $this->assertStringContainsString('showGroup(target, link);', $html);
-        $this->assertStringContainsString("erp:select-section", $html);
+        $this->assertStringContainsString('erp:select-section', $html);
         $this->assertStringContainsString('var navLinks = Array.prototype.slice.call(document.querySelectorAll(\'.odn-nav-link\'));', $html);
-        $this->assertStringNotContainsString("if (!input) { return; }", $html);
+        $this->assertStringNotContainsString('if (!input) { return; }', $html);
     }
 
     /**

@@ -130,3 +130,9 @@
 
 - `operations.*` (รวม Backup/restore drill/reset MFA) และ `database-structure.*` ใช้สิทธิ์คำนวณ `system.admin`: ต้องถือ **global** `users.manage` และ `settings.manage` ทั้งคู่ ไม่ให้ settings operator หรือบทบาทสาขาเข้าถึงข้อมูล/คำสั่งดูแลระบบส่วนกลาง
 - รายงานรับ UAT 14 ข้อและงานที่ยังรอข้อมูลจริง: `docs/uat/2026-10-27-menu-readiness.md`; `erp:uat-readiness --dry-run` อ่านอย่างเดียว, `erp:remove-test-price-tag --dry-run` ตรวจเฉพาะ TEST01 / TEST-Claude ก่อนลบจริงพร้อม audit ห้ามใช้ยอดเอกสาร 150–200 เป็นเกณฑ์ลบธุรกรรม
+
+## Dashboard และขอบเขตสาขา — 2026-10-31
+
+- Dashboard หลักรวมยอดบริษัทและ breakdown ตามสาขาสำหรับผู้มี `reports.all_branches`; ผู้ใช้อื่นต้องมี `reports.view` และเห็นเฉพาะสาขาที่มีบทบาทรายสาขาใช้งานอยู่ โดยใช้ `users.branch_id` เป็น fallback เมื่อยังไม่มีรายการ `user_branch_roles` เท่านั้น; ไม่มี `reports.view` ให้เห็น dashboard shell แต่ไม่เห็นข้อมูลธุรกิจ
+- ผู้จัดการหลายสาขาเลือกสาขาเพิ่มในหน้าผู้ใช้ได้ Dashboard รวมยอดเฉพาะสาขาที่มอบหมายและ breakdown เฉพาะสาขาเหล่านั้น; ห้ามใช้การมี `branch_id` อย่างเดียวเป็นข้อสรุปว่าผู้ใช้นั้นเห็นได้เพียงสาขาเดียว
+- ขอบเขตเดียวกันต้องครอบคลุมยอดขาย, POS, ลูกหนี้, จัดซื้อ และข้อมูลคลังบน Dashboard; บทบาท GM, IT_MGR, ACC_MGR และ EXECUTIVE ปัจจุบันมี `reports.all_branches` ใน permission matrix

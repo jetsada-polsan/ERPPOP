@@ -37,6 +37,38 @@ class User extends Authenticatable
         return $this->branch_id;
     }
 
+    /**
+     * Branches available to this user for reports and dashboards.
+     * A null scope is intentionally handled by the caller as "all branches";
+     * this method returns only explicitly assigned branches for scoped users.
+     *
+     * @return Collection<int, int>
+     */
+    public function reportBranchIds(): Collection
+    {
+        if (! $this->hasPermission('reports.view')) {
+            return collect();
+        }
+
+        if (! $this->branchRoles()->exists()) {
+            return $this->branch_id ? collect([(int) $this->branch_id]) : collect();
+        }
+
+        return $this->branchRoles()
+            ->wherePivot('is_active', true)
+            ->where(fn ($roles) => $roles
+                ->whereNull('user_branch_roles.effective_from')
+                ->orWhere('user_branch_roles.effective_from', '<=', now()))
+            ->where(fn ($roles) => $roles
+                ->whereNull('user_branch_roles.effective_to')
+                ->orWhere('user_branch_roles.effective_to', '>', now()))
+            ->whereHas('permissions', fn ($permissions) => $permissions->where('code', 'reports.view'))
+            ->distinct()
+            ->pluck('user_branch_roles.branch_id')
+            ->map(fn ($branchId) => (int) $branchId)
+            ->values();
+    }
+
     public function salesman(): BelongsTo
     {
         return $this->belongsTo(Salesman::class);

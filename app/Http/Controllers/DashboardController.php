@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AppSetting;
 use App\Models\Branch;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -14,20 +15,29 @@ class DashboardController extends Controller
         $to = $request->filled('to') ? Carbon::parse($request->input('to')) : now();
         $from = $request->filled('from') ? Carbon::parse($request->input('from')) : $to->copy()->subDays(6);
 
-        // Branch-scoped visibility: users bound to a branch (แคชเชียร์/พนักงานสาขา)
-        // เห็นเฉพาะยอดขายสาขาตัวเอง; ส่วนกลาง/ผู้บริหาร (branch_id = null) เห็นทุกสาขา.
-        $branchId = auth()->user()?->branchScopeId();
-        $scopeBranchName = $branchId ? Branch::whereKey($branchId)->value('name_th') : null;
+        // Global report permission means company-wide totals. Other users see
+        // only branches explicitly assigned to their report-capable roles.
+        $user = auth()->user();
+        $branchIds = [];
+        if ($user?->hasPermission('reports.view')) {
+            $branchIds = $user->hasPermission('reports.all_branches') ? null : $user->reportBranchIds()->all();
+        }
+        $scopeBranchName = $branchIds === null
+            ? 'รวมทุกสาขา'
+            : Branch::whereIn('id', $branchIds)->orderBy('code')->pluck('name_th')->implode(', ');
+        if ($scopeBranchName === '') {
+            $scopeBranchName = 'ไม่มีสาขาที่ได้รับสิทธิ์';
+        }
 
         // pos_receipts ผูกสาขาผ่าน pos_terminals.branch_id
         $receiptBranchScope = fn ($query, string $receiptAlias) => $query
             ->join('pos_terminals as _bt', '_bt.id', '=', "{$receiptAlias}.pos_terminal_id")
-            ->where('_bt.branch_id', $branchId);
+            ->whereIn('_bt.branch_id', $branchIds);
 
         // Dashboard ผู้บริหารอ่าน ledger กลาง: POS และขายหลังบ้านอยู่คนละตาราง
         // ได้ แต่หนึ่งการขายปรากฏครั้งเดียวใน sales_postings.
         $salesSummary = fn (Carbon $rangeFrom, Carbon $rangeTo) => DB::table('sales_postings')
-            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            ->when($branchIds !== null, fn ($q) => $q->whereIn('branch_id', $branchIds))
             ->whereBetween('sale_date', [$rangeFrom->toDateString(), $rangeTo->toDateString()])
             ->selectRaw('count(*) as receipt_count, coalesce(sum(net_sales),0) as total_sales, coalesce(sum(gross_sales),0) as total_gross, coalesce(sum(discount_amount),0) as total_discount, coalesce(sum(cogs_amount),0) as total_cogs, coalesce(sum(gross_profit),0) as gross_profit')
             ->first();
@@ -47,7 +57,7 @@ class DashboardController extends Controller
 
         $posTerminalSummary = DB::table('pos_receipts as r')
             ->join('pos_terminals as t', 't.id', '=', 'r.pos_terminal_id')
-            ->when($branchId, fn ($q) => $q->where('t.branch_id', $branchId))
+            ->when($branchIds !== null, fn ($q) => $q->whereIn('t.branch_id', $branchIds))
             ->whereBetween('r.receipt_date', [$from->startOfDay(), $to->copy()->endOfDay()])
             ->groupBy('t.id', 't.code', 't.name')
             ->orderByDesc(DB::raw('sum(r.net_sales)'))
@@ -56,7 +66,7 @@ class DashboardController extends Controller
             ->get();
 
         $salesDocumentSummary = DB::table('sales_postings')
-            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            ->when($branchIds !== null, fn ($q) => $q->whereIn('branch_id', $branchIds))
             ->whereBetween('sale_date', [$from->toDateString(), $to->toDateString()])
             ->groupBy('channel')
             ->orderByDesc(DB::raw('sum(net_sales)'))
@@ -66,13 +76,13 @@ class DashboardController extends Controller
 
         $itemCount = DB::table('pos_receipt_items as i')
             ->join('pos_receipts as r', 'r.id', '=', 'i.pos_receipt_id')
-            ->when($branchId, fn ($q) => $receiptBranchScope($q, 'r'))
+            ->when($branchIds !== null, fn ($q) => $receiptBranchScope($q, 'r'))
             ->whereBetween('r.receipt_date', [$from->startOfDay(), $to->copy()->endOfDay()])
             ->sum('i.qty');
 
         $byBranch = DB::table('sales_postings as s')
             ->join('branches as b', 'b.id', '=', 's.branch_id')
-            ->when($branchId, fn ($q) => $q->where('b.id', $branchId))
+            ->when($branchIds !== null, fn ($q) => $q->whereIn('b.id', $branchIds))
             ->whereBetween('s.sale_date', [$from->toDateString(), $to->toDateString()])
             ->groupBy('b.id', 'b.code', 'b.name_th')
             ->orderByDesc(DB::raw('sum(s.net_sales)'))
@@ -80,7 +90,7 @@ class DashboardController extends Controller
             ->get();
 
         $dailySales = DB::table('sales_postings')
-            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            ->when($branchIds !== null, fn ($q) => $q->whereIn('branch_id', $branchIds))
             ->whereBetween('sale_date', [$from->toDateString(), $to->toDateString()])
             ->selectRaw('sale_date, sum(net_sales) as total_sales, count(*) as receipt_count')
             ->groupBy('sale_date')
@@ -89,7 +99,7 @@ class DashboardController extends Controller
 
         $receivables = DB::table('customer_open_items as oi')
             ->join('documents as d', 'd.id', '=', 'oi.document_id')
-            ->when($branchId, fn ($q) => $q->where('d.branch_id', $branchId))
+            ->when($branchIds !== null, fn ($q) => $q->whereIn('d.branch_id', $branchIds))
             ->whereIn('oi.status', ['open', 'partial'])
             ->selectRaw('count(*) as open_count, coalesce(sum(oi.balance_amount), 0) as open_amount, coalesce(sum(case when oi.due_date < current_date then oi.balance_amount else 0 end), 0) as overdue_amount')
             ->first();
@@ -97,7 +107,7 @@ class DashboardController extends Controller
         $topProducts = DB::table('pos_receipt_items as i')
             ->join('pos_receipts as r', 'r.id', '=', 'i.pos_receipt_id')
             ->join('products as p', 'p.id', '=', 'i.product_id')
-            ->when($branchId, fn ($q) => $receiptBranchScope($q, 'r'))
+            ->when($branchIds !== null, fn ($q) => $receiptBranchScope($q, 'r'))
             ->whereBetween('r.receipt_date', [$from->startOfDay(), $to->copy()->endOfDay()])
             ->groupBy('p.id', 'p.sku_code', 'p.name_th')
             ->orderByDesc(DB::raw('sum(i.net_amount)'))
@@ -108,6 +118,8 @@ class DashboardController extends Controller
         $lowStock = DB::table('stock_balances as sb')
             ->join('products as p', 'p.id', '=', 'sb.product_id')
             ->join('warehouse_locations as wl', 'wl.id', '=', 'sb.warehouse_location_id')
+            ->join('warehouses as w', 'w.id', '=', 'wl.warehouse_id')
+            ->when($branchIds !== null, fn ($q) => $q->whereIn('w.branch_id', $branchIds))
             ->orderBy('sb.on_hand_qty')
             ->select('p.sku_code', 'p.name_th', 'wl.name as location_name', 'sb.on_hand_qty')
             ->limit(20)
@@ -117,7 +129,7 @@ class DashboardController extends Controller
             ->join('products as p', 'p.id', '=', 'sl.product_id')
             ->join('warehouse_locations as wl', 'wl.id', '=', 'sl.warehouse_location_id')
             ->join('warehouses as w', 'w.id', '=', 'wl.warehouse_id')
-            ->when($branchId, fn ($query) => $query->where('w.branch_id', $branchId))
+            ->when($branchIds !== null, fn ($query) => $query->whereIn('w.branch_id', $branchIds))
             ->where('p.tracks_expiry', true)->where('sl.remaining_qty', '>', 0)
             ->orderByRaw('CASE WHEN sl.expiry_date IS NULL THEN 0 ELSE 1 END')->orderBy('sl.expiry_date')
             ->get(['p.sku_code', 'p.name_th', 'sl.lot_number', 'sl.expiry_date', 'sl.remaining_qty', 'sl.quality_status', 'p.expiry_warning_days'])
@@ -132,7 +144,7 @@ class DashboardController extends Controller
 
         // ── ข้อมูลเพิ่มสำหรับแผงควบคุมแบบ Odoo ───────────────────────────
         // คิดเฉพาะตอนใช้ layout นี้ ไม่ให้ layout เดิมช้าลงเพราะ query ที่ไม่ได้ใช้
-        $odooLayout = \App\Models\AppSetting::get('erp_layout', 'classic') === 'odoo';
+        $odooLayout = AppSetting::get('erp_layout', 'classic') === 'odoo';
         $openReceipts = 0;
         $poPending = 0;
         $poOverdue = 0;
@@ -143,13 +155,13 @@ class DashboardController extends Controller
         if ($odooLayout) {
             $receiptScope = fn ($q) => $q
                 ->join('pos_terminals as t', 't.id', '=', 'r.pos_terminal_id')
-                ->when($branchId, fn ($qq) => $qq->where('t.branch_id', $branchId));
+                ->when($branchIds !== null, fn ($qq) => $qq->whereIn('t.branch_id', $branchIds));
 
             $openReceipts = (int) $receiptScope(DB::table('pos_receipts as r'))
                 ->where('r.status', 'open')->count();
 
             $poBase = fn () => DB::table('purchase_orders')
-                ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+                ->when($branchIds !== null, fn ($q) => $q->whereIn('branch_id', $branchIds))
                 ->whereIn('status', ['approved', 'ordered']);
             $poPending = (int) $poBase()->count();
             // เลยกำหนดรับแล้ว — ของไม่เข้าตามนัดคือสิ่งที่ต้องโทรตามวันนี้
@@ -176,7 +188,7 @@ class DashboardController extends Controller
                 ->leftJoin('branches as b', 'b.id', '=', 's.branch_id')
                 ->leftJoin('pos_terminals as t', 't.id', '=', 's.pos_terminal_id')
                 ->leftJoin('users as u', 'u.id', '=', 's.cashier_id')
-                ->when($branchId, fn ($q) => $q->where('s.branch_id', $branchId))
+                ->when($branchIds !== null, fn ($q) => $q->whereIn('s.branch_id', $branchIds))
                 ->whereNotNull('s.closed_at')
                 ->orderByDesc('s.closed_at')->limit(6)
                 ->get([
