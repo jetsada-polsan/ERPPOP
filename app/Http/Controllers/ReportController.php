@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ReportDefinition;
+use App\Services\Reports\StockBalanceReport;
 use App\Support\SqlDialect;
 use App\Support\XlsxWriter;
 use Carbon\Carbon;
@@ -67,6 +68,8 @@ class ReportController extends Controller
             'branch_id' => $requestedBranch,
             'q' => trim((string) $request->input('q', '')),
             'per_page' => $perPage,
+            'page' => max(1, $request->integer('page', 1)),
+            'paginate' => ! $printMode,
         ];
 
         // ส่งออกทั้งรายงาน ไม่ใช่เท่าที่แสดงบนจอ — per_page เป็น LIMIT ของ query
@@ -74,7 +77,7 @@ class ReportController extends Controller
         if (in_array($request->input('export'), ['csv', 'xlsx'], true)) {
             abort_unless($user === null || $user->hasPermission('reports.export'), 403, 'ไม่มีสิทธิ์ส่งออกรายงาน');
 
-            $result = $this->runReport($category, $report, $from, $to, ['per_page' => self::EXPORT_ROW_CAP] + $filters);
+            $result = $this->runReport($category, $report, $from, $to, ['per_page' => self::EXPORT_ROW_CAP, 'paginate' => false] + $filters);
 
             return $request->input('export') === 'xlsx'
                 ? $this->downloadXlsx($category, $report, $result)
@@ -704,13 +707,7 @@ class ReportController extends Controller
                 ['label' => 'เกินวงเงิน', 'key' => 'over_limit_amount', 'type' => 'money', 'class' => 'text-end'],
             ], $this->arOverCreditLimit($filters)),
 
-            'stock_balance' => $this->tableResult('สินค้าคงเหลือ', [
-                ['label' => 'รหัส', 'key' => 'sku_code'],
-                ['label' => 'สินค้า', 'key' => 'name_th'],
-                ['label' => 'คลัง/ที่เก็บ', 'key' => 'location_name'],
-                ['label' => 'คงเหลือ', 'key' => 'on_hand_qty', 'type' => 'number', 'class' => 'text-end'],
-                ['label' => 'จอง', 'key' => 'reserved_qty', 'type' => 'number', 'class' => 'text-end'],
-            ], $this->stockBalance($filters)),
+            'stock_balance' => app(StockBalanceReport::class)->run($filters),
 
             'stock_by_branch' => $this->tableResult('สต็อกตามสาขา', [
                 ['label' => 'สาขา', 'key' => 'branch_name'],

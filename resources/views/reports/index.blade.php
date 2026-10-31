@@ -233,7 +233,7 @@
 
     {{-- แผงขวา: แถบเครื่องมือ + ผลรายงาน --}}
     <div class="rpt-main">
-        <form method="get" id="rform">
+        <form method="get" id="rform" @if($selectedReport === 'stock_balance') data-live-report @endif>
             <input type="hidden" name="category" value="{{ $selectedCategory }}">
             <input type="hidden" name="report" value="{{ $selectedReport }}">
 
@@ -244,11 +244,11 @@
                 </div>
                 <div class="flow-head-actions">
                     @if($canExport)
-                    <button type="button" class="flow-action-btn" onclick="exportCsv()">
+                    <button type="button" class="flow-action-btn" onclick="exportXlsx()">
                         <i class="bi bi-download"></i> ดาวน์โหลด Excel
                     </button>
                     @endif
-                    <button type="button" class="flow-action-btn" onclick="window.print()">
+                    <button type="button" class="flow-action-btn" onclick="printA4()">
                         <i class="bi bi-printer"></i> พิมพ์รายงาน
                     </button>
                 </div>
@@ -304,7 +304,7 @@
                         <button type="button" class="rpt-btn-export" onclick="exportCsv()"><i class="bi bi-download me-1"></i>CSV</button>
                         <button type="button" class="rpt-btn-export" onclick="printA4()"><i class="bi bi-printer me-1"></i>พิมพ์ A4</button>
                     @endif
-                    <button type="button" class="rpt-btn-print" onclick="window.print()"><i class="bi bi-printer me-1"></i>พิมพ์</button>
+                    <button type="button" class="rpt-btn-print" onclick="printA4()"><i class="bi bi-printer me-1"></i>พิมพ์</button>
                 </div>
             </div>
 
@@ -318,6 +318,7 @@
                 $summaryMoney = $summaryMoneyKey ? collect($result['rows'])->sum(fn ($row) => (float) data_get($row, $summaryMoneyKey)) : 0;
                 $summaryVat = collect($result['rows'])->sum(fn ($row) => (float) data_get($row, 'vat_amount'));
             @endphp
+            <div data-report-result>
             <div class="rpt-print-header">
                 <div class="d-flex gap-3 align-items-start">
                     @if($printLogo = \App\Models\AppSetting::logoUrl())
@@ -351,8 +352,10 @@
                         </dl>
                     </div>
                     <div class="flow-report-totals">
+                        @if($selectedReport !== 'stock_balance')
                         <div><span>ยอดรวมทั้งสิ้น</span><strong>{{ number_format($summaryMoney, 2) }}</strong></div>
                         <div><span>ภาษีมูลค่าเพิ่ม</span><strong>{{ number_format($summaryVat, 2) }}</strong></div>
+                        @endif
                         <div><span>สาขา</span><strong>{{ $printBranch->name_th ?? 'ทุกสาขา' }}</strong></div>
                     </div>
                 </div>
@@ -379,19 +382,35 @@
                             </select>
                             แถว
                         </label>
-                        <div class="erp-search">
+                        <div class="erp-search d-flex align-items-center gap-2">
                             <i class="bi bi-search erp-search-icon"></i>
-                            <input type="text" name="q" value="{{ $filters['q'] }}" placeholder="ค้นหา..." class="form-control form-control-sm ps-5">
+                            <input type="text" name="q" value="{{ $filters['q'] }}" placeholder="{{ $selectedReport === 'stock_balance' ? 'ชื่อ รหัส หรือบาร์โค้ด' : 'ค้นหา...' }}" aria-label="ค้นหาในรายงาน" autocomplete="off" class="form-control form-control-sm ps-5">
+                            <button type="submit" class="btn btn-sm btn-primary">ค้นหา</button>
                         </div>
                         <span class="badge text-bg-light border">{{ number_format($result['total']) }} รายการ</span>
                     </div>
                 </div>
+
+                @if($selectedReport === 'stock_balance')
+                    <div class="small text-muted px-4 pb-2 no-print" role="status" data-report-search-status>
+                        ค้นหาอัตโนมัติหลังหยุดพิมพ์ 0.5 วินาที · รวมสินค้าที่ยอดเป็นศูนย์ · ใบปรับยอดมีผลหลังอนุมัติ
+                    </div>
+                @endif
 
                 @include('reports.partials.result-table', [
                     'columns' => $displayColumns,
                     'rows' => $result['rows'],
                     'empty' => 'ไม่พบข้อมูลตามเงื่อนไขที่เลือก',
                 ])
+                @if($pagination = $result['pagination'] ?? null)
+                    <div class="px-4 py-3 no-print" data-report-pagination>
+                        <div class="small text-muted mb-2">
+                            แสดง {{ number_format($pagination->firstItem() ?? 0) }}–{{ number_format($pagination->lastItem() ?? 0) }} จาก {{ number_format($pagination->total()) }} รายการ
+                        </div>
+                        {{ $pagination->links('pagination::bootstrap-5') }}
+                    </div>
+                @endif
+            </div>
             </div>
         </form>
     </div>
@@ -865,6 +884,7 @@ function selectReport(value) {
 // เพราะหน้าจอถือข้อมูลแค่ 25 แถว เอาจาก DOM จะได้ไฟล์ที่ดูครบแต่ไม่ครบ
 function reportUrlWith(params) {
     const url = new URL(window.location.href);
+    url.search = new URLSearchParams(new FormData(document.getElementById('rform'))).toString();
     Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
     return url.toString();
 }
@@ -886,4 +906,7 @@ function printA4() {
 window.addEventListener('load', () => window.print());
 @endif
 </script>
+@if($selectedReport === 'stock_balance' && ! $printMode)
+<script src="{{ asset('report-search.js') }}"></script>
+@endif
 @endpush

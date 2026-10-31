@@ -19,6 +19,9 @@
                         @endphp
                         <td class="{{ $column['class'] ?? '' }}">
                             @switch($column['type'] ?? 'text')
+                                @case('quantity')
+                                    {{ rtrim(rtrim(number_format((float) $value, \App\Support\DecimalMath::QUANTITY_SCALE), '0'), '.') }}
+                                    @break
                                 @case('money')
                                     {{ number_format((float) $value, 2) }}
                                     @break

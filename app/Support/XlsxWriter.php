@@ -99,7 +99,7 @@ class XlsxWriter
             return '';
         }
 
-        if (in_array($type, ['money', 'number'], true) && is_numeric($value)) {
+        if (in_array($type, ['money', 'number', 'quantity'], true) && is_numeric($value)) {
             return sprintf('<c r="%s" s="%d"><v>%s</v></c>',
                 $reference, $type === 'money' ? self::STYLE_MONEY : self::STYLE_DEFAULT, (float) $value);
         }

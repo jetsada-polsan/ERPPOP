@@ -26,6 +26,11 @@ jobs:
       - run: composer install --prefer-dist --no-interaction
       - name: Test all routes and workflows before deployment
         run: php -d memory_limit=1G vendor/bin/phpunit
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test report search interactions
+        run: node --test tests/js/report-search.test.cjs
 
   deploy:
     needs: test
