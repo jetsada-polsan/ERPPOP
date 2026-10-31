@@ -235,18 +235,13 @@ class ProvisioningService:
             raise RuntimeError("รูปแบบข้อมูลแคชเชียร์จาก ERP ไม่ถูกต้อง")
         seen: list[int] = []
         upserted = 0
-        assigned_user_id = self._get_setting("device_user_id")
-        assigned_user_id = int(assigned_user_id) if assigned_user_id is not None else None
         with self.db:
             for row in rows:
                 server_id = row.get("id")
                 code = row.get("code")
                 user_id = row.get("user_id")
-                # เครื่องที่ผูก user รับเฉพาะคนขายของเครื่องนี้ กับหัวหน้า (ไว้อนุมัติลดราคา/ยกเลิกบิล)
-                is_manager = str(row.get("role") or "").lower() in {"manager", "supervisor"}
-                if not server_id or not code or (
-                    assigned_user_id is not None and int(user_id or 0) != assigned_user_id and not is_manager
-                ):
+                # ERP ส่งเฉพาะคนที่มีสิทธิ์ขายในสาขาของเครื่อง จึงรับทุกคนที่ส่งมา
+                if not server_id or not code:
                     continue
                 self._upsert_cashier(
                     int(server_id),

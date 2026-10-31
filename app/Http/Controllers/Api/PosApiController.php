@@ -363,14 +363,6 @@ class PosApiController extends Controller
             ->with(['user.roles:id,code', 'user.branchRoles.permissions', 'user.posCredential'])
             ->where('is_active', true)
             ->whereNotNull('user_id')
-            // เครื่องที่ผูก user: แสดงคนขายของเครื่องนั้น + หัวหน้า (GM/BRANCH_MGR) ไว้อนุมัติลดราคา/ยกเลิกบิล
-            // เดิมกรองเหลือแค่ user ของเครื่อง หัวหน้าเลยไม่มีในเครื่องและอนุมัติอะไรไม่ได้
-            ->when($assignedUserId, fn ($query) => $query->where(fn ($who) => $who
-                ->where('user_id', $assignedUserId)
-                ->orWhereHas('user', fn ($manager) => $manager
-                    ->whereHas('roles', fn ($role) => $role->whereIn('code', ['GM', 'BRANCH_MGR']))
-                    // หัวหน้าของสาขานี้ (หรือส่วนกลางที่ไม่ผูกสาขา) เท่านั้น
-                    ->where(fn ($home) => $home->whereNull('branch_id')->when($branchId, fn ($b) => $b->orWhere('branch_id', $branchId))))))
             ->whereHas('user', function ($user) use ($branchId, $assignedUserId) {
                 $user->where('is_active', true);
 
@@ -409,10 +401,11 @@ class PosApiController extends Controller
                 };
 
                 $user->where(function ($access) use ($branchAccess, $assignedUserId) {
-                    // A global POS seller is allowed here only when an admin explicitly
-                    // bound that user to this device during token issuance.
+                    // Token ระบุเครื่องและสาขาเท่านั้น: คนที่มีสิทธิ์ขายในสาขานี้เข้าเครื่องไหนก็ได้
+                    // user ที่ผูกตอนออก Token ยังใช้เครื่องนี้ได้ แม้เป็นผู้ขายส่วนกลาง
                     if ($assignedUserId) {
-                        $access->whereHas('roles.permissions', fn ($permission) => $permission->where('code', 'pos.sell'));
+                        $access->where(fn ($bound) => $bound->whereKey($assignedUserId)
+                            ->whereHas('roles.permissions', fn ($permission) => $permission->where('code', 'pos.sell')));
                         $access->orWhere($branchAccess);
 
                         return;

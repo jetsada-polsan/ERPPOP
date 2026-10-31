@@ -152,7 +152,7 @@ class ProvisioningTest(unittest.TestCase):
         users = {r["server_id"]: r["user_id"] for r in self.db.execute("SELECT server_id, user_id FROM local_cashiers WHERE server_id IS NOT NULL")}
         self.assertEqual(users, {42: 501, 43: 502})
 
-    def test_a_bound_till_keeps_its_own_cashier_and_the_managers_and_drops_stale_ones(self) -> None:
+    def test_a_till_keeps_everyone_the_erp_sends_and_drops_stale_ones(self) -> None:
         # ติดตั้งรอบก่อนเคยมีคนขายสาขาเก่า ค้างอยู่ในเครื่อง
         self.svc.pull_cashiers(3)
         self.db.execute("INSERT OR REPLACE INTO device_settings (key, value, updated_at) VALUES ('device_user_id', '601', datetime('now'))")
@@ -165,7 +165,7 @@ class ProvisioningTest(unittest.TestCase):
         self.svc.pull_cashiers(3)
 
         active = {r["code"] for r in self.db.execute("SELECT code FROM local_cashiers WHERE active = 1 AND server_id IS NOT NULL")}
-        self.assertEqual(active, {"b001", "amnat"}, "เครื่อง 1 เห็นแค่คนขายของตัวเองกับหัวหน้า คนขายสาขาเก่าต้องหายไป")
+        self.assertEqual(active, {"b001", "amnat", "b001-2"}, "คนขายทุกคนของสาขาเข้าเครื่องนี้ได้ คนขายสาขาเก่าต้องหายไป")
 
     def test_store_credential_writes_pbkdf2_fields(self) -> None:
         self.svc.pull_cashiers(3)

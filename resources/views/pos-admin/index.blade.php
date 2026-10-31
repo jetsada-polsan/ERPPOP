@@ -215,7 +215,7 @@
     <div x-show="tab === 'cashiers'" x-cloak>
         <div class="pa-card" data-testid="pos-cashiers">
             <h2>คนขายและ PIN</h2>
-            <div class="small text-muted mb-2">แคชเชียร์ 1 รหัสต่อเครื่อง · หัวหน้าใช้อนุมัติลดราคา/ยกเลิกบิล · กด ออก PIN ชั่วคราว แล้วบอกพนักงาน เครื่องจะให้เปลี่ยนเองตอนล็อกอินครั้งแรก</div>
+            <div class="small text-muted mb-2">คนที่มีสิทธิ์สาขาเข้าเครื่องไหนในสาขาก็ได้ · หัวหน้าใช้อนุมัติลดราคา/ยกเลิกบิล · กด ออก PIN ชั่วคราว แล้วบอกพนักงาน เครื่องจะให้เปลี่ยนเองตอนล็อกอินครั้งแรก</div>
             <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
                     <thead><tr><th>สาขา</th><th>รหัส</th><th>ชื่อ</th><th>PIN</th><th class="text-end"></th></tr></thead>

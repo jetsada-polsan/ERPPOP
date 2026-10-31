@@ -7,11 +7,11 @@ use App\Http\Controllers\PosController;
 use App\Models\AppSetting;
 use App\Models\AuditLog;
 use App\Models\Branch;
+use App\Models\Permission;
 use App\Models\PosDevice;
 use App\Models\PosHeldBill;
 use App\Models\PosShift;
 use App\Models\PosTerminal;
-use App\Models\Permission;
 use App\Models\Product;
 use App\Models\ProductUnit;
 use App\Models\Role;
@@ -156,7 +156,7 @@ class PosCashierIdentityTest extends TestCase
         $this->assertSame(422, app(PosApiController::class)->cashierLogin($otherRequest)->getStatusCode());
     }
 
-    public function test_device_uses_its_assigned_user_when_another_cashier_shares_a_pin(): void
+    public function test_shared_pin_on_a_device_asks_who_is_selling(): void
     {
         [$branch, $alice] = $this->branchWithCashier('DUPPIN', 'ALICE');
         $bob = Salesman::create([
@@ -175,15 +175,13 @@ class PosCashierIdentityTest extends TestCase
 
         $response = app(PosApiController::class)->cashierLogin($request);
 
-        $this->assertTrue($response->getData(true)['success']);
-        $this->assertSame($alice->id, (int) $response->getData(true)['cashier']['id']);
-        $this->assertSame($alice->id, (int) $device->fresh()->active_cashier_id);
+        $this->assertTrue($response->getData(true)['selection_required']);
+        $this->assertNull($device->fresh()->active_cashier_id);
 
-        $other = Request::create('/api/pos/cashier/login', 'POST', [
-            'pin' => '482165', 'cashier_id' => $bob->id,
-        ]);
-        $other->attributes->set('pos_device', $device);
-        $this->assertSame(422, app(PosApiController::class)->cashierLogin($other)->getStatusCode());
+        $chosen = Request::create('/api/pos/cashier/login', 'POST', ['pin' => '482165', 'cashier_id' => $bob->id]);
+        $chosen->attributes->set('pos_device', $device);
+        $this->assertTrue(app(PosApiController::class)->cashierLogin($chosen)->getData(true)['success']);
+        $this->assertSame($bob->id, (int) $device->fresh()->active_cashier_id);
     }
 
     public function test_explicitly_bound_global_pos_user_is_available_on_that_device(): void

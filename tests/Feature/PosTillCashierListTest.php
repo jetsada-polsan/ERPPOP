@@ -14,14 +14,14 @@ use Illuminate\Http\Request;
 use Tests\TestCase;
 
 /**
- * เครื่องที่ผูกกับแคชเชียร์เครื่อง 1 ต้องเห็นแคชเชียร์ของตัวเอง + หัวหน้าสาขา
+ * ทุกเครื่องในสาขาต้องเห็นคนขายทุกคนที่มีสิทธิ์ในสาขานั้น ไม่เห็นคนสาขาอื่น
  * (เดิมเห็นแค่ user ที่ผูก หัวหน้าเลยอนุมัติลดราคาไม่ได้ และแคชเชียร์ที่ไม่ผูก user มองไม่เห็นเลย)
  */
 class PosTillCashierListTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_a_till_lists_its_own_cashier_and_the_branch_manager_only(): void
+    public function test_a_till_lists_every_cashier_of_its_branch_only(): void
     {
         Role::firstOrCreate(['code' => 'BRANCH_MGR'], ['name' => 'ผู้จัดการสาขา'])->permissions()->syncWithoutDetaching([Permission::firstOrCreate(['code' => 'pos.sell'], ['name' => 'ขาย'])->id]);
         Role::firstOrCreate(['code' => 'CASHIER'], ['name' => 'แคชเชียร์'])->permissions()->syncWithoutDetaching([Permission::firstOrCreate(['code' => 'pos.sell'], ['name' => 'ขาย'])->id]);
@@ -41,7 +41,7 @@ class PosTillCashierListTest extends TestCase
 
         $rows = collect(app(PosApiController::class)->cashiers($request)->getData(true)['cashiers']);
 
-        $this->assertEqualsCanonicalizing(['b901', 'b901mgr'], $rows->pluck('code')->all());
+        $this->assertEqualsCanonicalizing(['b901', 'b901-2', 'b901mgr'], $rows->pluck('code')->all());
         $this->assertSame('manager', $rows->firstWhere('code', 'b901mgr')['role']);
         $this->assertSame('cashier', $rows->firstWhere('code', 'b901')['role']);
     }
