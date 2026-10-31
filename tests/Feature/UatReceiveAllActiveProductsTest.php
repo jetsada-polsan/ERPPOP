@@ -49,6 +49,69 @@ class UatReceiveAllActiveProductsTest extends TestCase
         $this->assertSame(2.0, (float) StockBalance::first()->on_hand_qty);
     }
 
+    public function test_fixed_quantity_mode_previews_an_additional_base_quantity_per_active_product(): void
+    {
+        [$branch, , $product] = $this->masters();
+        StockBalance::create([
+            'product_id' => $product->id,
+            'warehouse_location_id' => $branch->default_warehouse_location_id,
+            'on_hand_qty' => 7,
+            'reserved_qty' => 0,
+        ]);
+
+        $this->artisan('erp:uat-receive-all-active-products', [
+            '--reference' => 'UAT-QTY-EACH-10',
+            '--qty-each' => '10',
+        ])
+            ->expectsOutputToContain('รับเพิ่ม 10.0000 หน่วยฐานต่อสินค้า')
+            ->expectsOutputToContain('จำนวนรับเพิ่มตามคำสั่ง: 10.0000 หน่วยฐาน')
+            ->expectsOutputToContain('฿100.00')
+            ->assertExitCode(0);
+
+        $this->assertSame(0, Document::count());
+        $this->assertSame(0, DB::table('stock_movements')->count());
+        $this->assertSame(7.0, (float) StockBalance::first()->on_hand_qty);
+    }
+
+    public function test_fixed_quantity_mode_receives_the_requested_quantity_and_posts_purchase_ledgers(): void
+    {
+        [$branch, , $product, $actor] = $this->masters();
+        StockBalance::create([
+            'product_id' => $product->id,
+            'warehouse_location_id' => $branch->default_warehouse_location_id,
+            'on_hand_qty' => 7,
+            'reserved_qty' => 0,
+        ]);
+
+        $this->artisan('erp:uat-receive-all-active-products', [
+            '--reference' => 'UAT-QTY-EACH-EXECUTE',
+            '--qty-each' => '10',
+            '--execute' => true,
+            '--actor' => $actor->username,
+            '--confirm' => 'RECEIVE-ALL-ACTIVE-PRODUCTS',
+            '--max-total' => '100.00',
+        ])->expectsOutputToContain('รับสินค้าแล้ว:')->assertExitCode(0);
+
+        $purchase = Document::where('reference', 'UAT-QTY-EACH-EXECUTE')->firstOrFail();
+        $this->assertSame(100.0, (float) $purchase->total_amount);
+        $this->assertSame(1, $purchase->total_items);
+        $this->assertSame(17.0, (float) StockBalance::first()->fresh()->on_hand_qty);
+        $this->assertSame(1, SupplierLedger::where('document_id', $purchase->id)->count());
+        $this->assertGreaterThan(0, DB::table('gl_journals')->where('document_id', $purchase->id)->count());
+    }
+
+    public function test_fixed_quantity_mode_refuses_zero_quantity(): void
+    {
+        $this->masters();
+
+        $this->artisan('erp:uat-receive-all-active-products', [
+            '--reference' => 'UAT-QTY-EACH-ZERO',
+            '--qty-each' => '0',
+        ])->expectsOutputToContain('--qty-each ต้องเป็นจำนวนหน่วยฐานที่มากกว่า 0')->assertExitCode(1);
+
+        $this->assertSame(0, Document::count());
+    }
+
     public function test_execute_respects_the_amount_cap_at_document_precision(): void
     {
         [$branch, , $coveredProduct, $actor] = $this->masters();

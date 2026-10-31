@@ -21,6 +21,7 @@ class UatReceiveAllActiveProducts extends Command
     protected $signature = 'erp:uat-receive-all-active-products
         {--branch=B001 : รหัสสาขารับสินค้า}
         {--supplier=UAT-POS-TEST : รหัสผู้ขายสำหรับเอกสาร UAT}
+        {--qty-each= : Optional additional base-unit quantity to receive per active product}
         {--actor= : username ของผู้ดูแลระบบผู้บันทึกเอกสาร (จำเป็นเมื่อ --execute)}
         {--reference= : เลขอ้างอิง UAT ที่ไม่ซ้ำ (ค่าเริ่มต้นสร้างจากสาขาและวันที่)}
         {--lots= : CSV lot metadata: sku_code,expiry_date,manufacture_date,lot_number}
@@ -28,7 +29,7 @@ class UatReceiveAllActiveProducts extends Command
         {--max-total= : เพดานยอดซื้อรวม (บาท) จำเป็นเมื่อ --execute}
         {--confirm= : ต้องระบุ RECEIVE-ALL-ACTIVE-PRODUCTS เพื่อยืนยันการบันทึกจริง}';
 
-    protected $description = 'Preview or receive only the stock shortfall needed to sell every active product unit once for UAT';
+    protected $description = 'Preview or receive stock for every active product for UAT';
 
     public function handle(PurchaseService $purchases): int
     {
@@ -59,6 +60,15 @@ class UatReceiveAllActiveProducts extends Command
             $products = Product::query()->where('is_active', true)
                 ->with(['baseUnit', 'barcodes' => fn ($query) => $query->where('is_active', true)->with('unit')])
                 ->orderBy('sku_code')->get();
+            $qtyEach = $this->option('qty-each');
+            if ($qtyEach !== null && $qtyEach !== '') {
+                if (! is_numeric($qtyEach) || DecimalMath::compare($qtyEach, 0) <= 0) {
+                    throw new RuntimeException('--qty-each ต้องเป็นจำนวนหน่วยฐานที่มากกว่า 0');
+                }
+                $qtyEach = DecimalMath::round($qtyEach, DecimalMath::QUANTITY_SCALE);
+            } else {
+                $qtyEach = null;
+            }
             $productIds = $products->modelKeys();
             $locationId = (int) $branch->default_warehouse_location_id;
             $balances = StockBalance::query()->where('warehouse_location_id', $locationId)
@@ -76,7 +86,7 @@ class UatReceiveAllActiveProducts extends Command
             $estimatedTotal = '0';
 
             foreach ($products as $product) {
-                $targetQty = $this->targetBaseQuantity($product);
+                $targetQty = $qtyEach ?? $this->targetBaseQuantity($product);
                 $targetTotalQty = DecimalMath::add($targetTotalQty, $targetQty, DecimalMath::QUANTITY_SCALE);
                 $balance = $balances->get($product->id);
                 $onHand = $balance?->on_hand_qty ?? 0;
@@ -97,13 +107,20 @@ class UatReceiveAllActiveProducts extends Command
                 $availableByLots = DecimalMath::add($usableLotQty, $untrackedLotQty, DecimalMath::QUANTITY_SCALE);
                 $available = DecimalMath::compare($availableByBalance, $availableByLots) < 0 ? $availableByBalance : $availableByLots;
                 $currentAvailableQty = DecimalMath::add($currentAvailableQty, $available, DecimalMath::QUANTITY_SCALE);
-                $shortfall = DecimalMath::compare($targetQty, $available) > 0
-                    ? DecimalMath::subtract($targetQty, $available, DecimalMath::QUANTITY_SCALE)
-                    : '0';
+                $shortfall = $qtyEach !== null
+                    ? $qtyEach
+                    : (DecimalMath::compare($targetQty, $available) > 0
+                        ? DecimalMath::subtract($targetQty, $available, DecimalMath::QUANTITY_SCALE)
+                        : '0');
                 if (DecimalMath::compare($shortfall, 0) <= 0) {
                     $alreadyCovered++;
 
                     continue;
+                }
+
+                $lotInfo = $lotMetadata[$product->sku_code] ?? null;
+                if ($product->tracks_expiry && empty($lotInfo['expiry_date'])) {
+                    $missingLotData[] = $product->sku_code.' '.$product->name_th;
                 }
 
                 $unitCost = DecimalMath::compare($product->last_purchase_cost ?? 0, 0) > 0
@@ -117,10 +134,6 @@ class UatReceiveAllActiveProducts extends Command
 
                 $lineAmount = DecimalMath::multiply($shortfall, $unitCost);
                 $estimatedTotal = DecimalMath::add($estimatedTotal, $lineAmount);
-                $lotInfo = $lotMetadata[$product->sku_code] ?? null;
-                if ($product->tracks_expiry && empty($lotInfo['expiry_date'])) {
-                    $missingLotData[] = $product->sku_code.' '.$product->name_th;
-                }
 
                 $items[] = [
                     'product_id' => (int) $product->id,
@@ -138,11 +151,20 @@ class UatReceiveAllActiveProducts extends Command
             $this->line("สาขา: {$branch->code} — {$branch->name_th}");
             $this->line("ผู้ขาย: {$supplier->code} — {$supplier->name_th}");
             $this->line("อ้างอิง: {$reference}");
-            $this->line('นโยบาย: สินค้าเปิดใช้ทั้งหมด, เติมเฉพาะยอดขาดให้ขายได้ 1 ครั้งต่อหน่วยขายที่มี barcode; ซื้อเชื่อ, ไม่เคลมภาษีซื้อ, ใช้ทุนรับเข้าล่าสุดหรือทุนเฉลี่ย');
+            $policy = $qtyEach !== null
+                ? 'สินค้าเปิดใช้ทั้งหมด, รับเพิ่ม '.number_format((float) $qtyEach, 4).' หน่วยฐานต่อสินค้า'
+                : 'สินค้าเปิดใช้ทั้งหมด, เติมเฉพาะยอดขาดให้ขายได้ 1 ครั้งต่อหน่วยขายที่มี barcode';
+            $this->line('นโยบาย: '.$policy.'; ซื้อเชื่อ, ไม่เคลมภาษีซื้อ, ใช้ทุนรับเข้าล่าสุดหรือทุนเฉลี่ย');
             $this->line('สินค้าเปิดใช้: '.number_format($products->count()));
             $this->line('สินค้าในคลังที่มีของขายได้พอแล้ว: '.number_format($alreadyCovered));
             $this->line('บรรทัดที่จะรับเพิ่ม: '.number_format(count($items)));
-            $this->line('เป้าหมายรวม: '.number_format((float) $targetTotalQty, 4).' หน่วยฐาน; มีของขายได้แล้ว '.number_format((float) $currentAvailableQty, 4));
+            if ($qtyEach === null) {
+                $this->line('เป้าหมายรวม: '.number_format((float) $targetTotalQty, 4)
+                    .' หน่วยฐาน; มีของขายได้แล้ว '.number_format((float) $currentAvailableQty, 4));
+            } else {
+                $this->line('จำนวนรับเพิ่มตามคำสั่ง: '.number_format((float) $targetTotalQty, 4)
+                    .' หน่วยฐาน; ปัจจุบันมีของขายได้แล้ว '.number_format((float) $currentAvailableQty, 4));
+            }
             $this->line('จำนวนรับเพิ่ม: '.number_format((float) DecimalMath::sum(array_column($items, 'qty'), DecimalMath::QUANTITY_SCALE), 4).' หน่วยฐาน');
             // Documents retain four decimal places; use that stored precision for the cap.
             $estimatedDocumentTotal = DecimalMath::round($estimatedTotal, DecimalMath::MONEY_SCALE);

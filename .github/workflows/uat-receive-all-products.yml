@@ -19,6 +19,11 @@ on:
         required: true
         type: string
         default: UAT-POS-TEST
+      qty_each:
+        description: Optional additional base-unit quantity to receive per active product
+        required: false
+        type: string
+        default: ''
       actor:
         description: Active system-admin username for document audit
         required: true
@@ -55,6 +60,7 @@ jobs:
           MODE: ${{ inputs.mode }}
           BRANCH: ${{ inputs.branch }}
           SUPPLIER: ${{ inputs.supplier }}
+          QTY_EACH: ${{ inputs.qty_each }}
           ACTOR: ${{ inputs.actor }}
           MAX_TOTAL: ${{ inputs.max_total }}
           REFERENCE: ${{ inputs.reference }}
@@ -67,6 +73,7 @@ jobs:
           [[ "$MODE" == "preview" || "$MODE" == "receive" ]]
           [[ "$BRANCH" =~ ^[A-Za-z0-9-]{1,20}$ ]]
           [[ "$SUPPLIER" =~ ^[A-Za-z0-9-]{1,40}$ ]]
+          [[ "$QTY_EACH" =~ ^$|^[0-9]+([.][0-9]{1,4})?$ ]]
           [[ "$ACTOR" =~ ^[A-Za-z0-9._-]{1,80}$ ]]
           [[ "$REFERENCE" =~ ^[A-Za-z0-9._-]{0,100}$ ]]
           [[ "$LOTS_PATH" =~ ^[A-Za-z0-9_./-]{0,240}$ ]]
@@ -81,6 +88,7 @@ jobs:
           fi
 
           args=(php artisan erp:uat-receive-all-active-products "--branch=$BRANCH" "--supplier=$SUPPLIER")
+          [[ -z "$QTY_EACH" ]] || args+=("--qty-each=$QTY_EACH")
           [[ -z "$REFERENCE" ]] || args+=("--reference=$REFERENCE")
           [[ -z "$LOTS_PATH" ]] || args+=("--lots=$LOTS_PATH")
           if [[ "$MODE" == "receive" ]]; then
