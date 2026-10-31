@@ -1,6 +1,6 @@
 import pytest
 from sync_worker import SyncWorker
-from database.models import init_db
+from database.models import QtyPromotion, init_db
 
 def test_sync_worker_offline_detection(tmp_path):
     db_path = str(tmp_path / "sync_test.db")
@@ -103,100 +103,6 @@ def test_auto_heal_invalid_branch(tmp_path):
     session.close()
 
 
-def test_auto_heal_discount_fields(tmp_path):
-    import json
-    from database.models import Sale, Outbox, Product
-    db_path = str(tmp_path / "discount_heal.db")
-    session = init_db(f"sqlite:///{db_path}")
-
-    prod = Product(
-        id=35801,
-        sku_code="104150",
-        barcode="104150",
-        name_th="Test Chicken",
-        default_price=110.0,
-        pos_price=110.0,
-        is_active=True
-    )
-    sale = Sale(
-        local_sale_id="sale-disc-1",
-        doc_number="003401254878",
-        branch_id=34,
-        total_amount=100.0,
-        received_amount=100.0,
-        payment_method="cash",
-        idempotency_key="offline-receipt-sale-disc-1",
-        status="failed",
-        sync_error="ราคาหรือส่วนลดเปลี่ยนจากข้อมูลบนเซิร์ฟเวอร์"
-    )
-    payload = {
-        "local_sale_id": "sale-disc-1",
-        "branch_id": 34,
-        "shift_id": 13,
-        "cashier_id": 173,
-        "method": "cash",
-        "cash_received": 100.0,
-        "change_amount": 0.0,
-        "discount_amount": 0.0,
-        "manual_discount_amount": 0.0,
-        "items": [{"product_id": 35801, "qty": 1.0, "unit_price": 100.0}]
-    }
-    outbox = Outbox(
-        aggregate_id="sale-disc-1",
-        event_type="sale_checkout",
-        idempotency_key="offline-receipt-sale-disc-1",
-        payload_json=json.dumps(payload),
-        status="failed",
-        last_error="ราคาหรือส่วนลดเปลี่ยนจากข้อมูลบนเซิร์ฟเวอร์",
-        payload_prepared=True
-    )
-    session.add(prod)
-    session.add(sale)
-    session.add(outbox)
-    session.commit()
-    session.close()
-
-    worker = SyncWorker(db_path, "http://localhost:8000", "test_token")
-    worker._resolve_branch_and_cashier = lambda sess: (34, 173)
-
-    posted_payloads = []
-    class MockCheckoutResponse:
-        status_code = 200
-        def json(self):
-            return {"status": "success", "receipt_id": 501, "receipt_no": "REC-002"}
-        def raise_for_status(self):
-            pass
-
-    def mock_post(url, json=None, headers=None, timeout=None):
-        posted_payloads.append(json)
-        return MockCheckoutResponse()
-
-    class MockShiftResponse:
-        status_code = 200
-        def json(self):
-            return {"shift": {"id": 13, "branch_id": 34, "cashier_id": 173}}
-        def raise_for_status(self):
-            pass
-
-    import unittest.mock as mock
-    with mock.patch("requests.get", return_value=MockShiftResponse()), \
-         mock.patch("requests.post", side_effect=mock_post):
-        ok, msg = worker._sync_outbox_sales()
-        assert ok is True
-
-    assert len(posted_payloads) == 1
-    sent = posted_payloads[0]
-    # Unit price restored to catalog 110.0
-    assert sent["items"][0]["unit_price"] == 110.0
-    # manual_discount_amount must be 0.0 so manager approval is never required
-    assert sent["manual_discount_amount"] == 0.0
-    # discount_amount equals discount (110 - 100 = 10)
-    assert sent["discount_amount"] == 10.0
-    # cash_received equals gross total 110.0
-    assert sent["cash_received"] == 110.0
-    # change_amount equals 10.0
-    assert sent["change_amount"] == 10.0
-
 def test_offline_shift_close_sync(tmp_path):
     import json
     from database.models import PosShift, Outbox
@@ -269,3 +175,87 @@ def test_offline_shift_close_sync(tmp_path):
     assert updated_outbox.status == 'synced'
     assert worker.get_pending_count() == 0
     session.close()
+def test_sync_worker_refreshes_and_removes_expired_quantity_promotions(tmp_path, monkeypatch):
+    db_path = str(tmp_path / "sync_promotions.db")
+    session = init_db(f"sqlite:///{db_path}")
+    worker = SyncWorker(db_path, "https://erp.example.test", "test_token")
+    worker.config["branch_id"] = 6
+
+    class Response:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return self.payload
+
+    responses = iter([
+        Response([{
+            "id": 12,
+            "name": "ซื้อ 3 ลด 10%",
+            "promo_type": "discount",
+            "product_id": 101,
+            "min_qty": 3,
+            "discount_type": "percent",
+            "discount_value": "10.00",
+            "starts_date": "2026-10-01",
+            "ends_date": "2026-10-31",
+        }]),
+        Response([]),
+    ])
+    monkeypatch.setattr("sync_worker.requests.get", lambda *args, **kwargs: next(responses))
+
+    try:
+        assert worker._sync_promotions(session, {"Accept": "application/json"}) is True
+        promotion = session.query(QtyPromotion).one()
+        assert promotion.server_id == 12
+        assert promotion.min_qty == "3"
+        assert promotion.discount_value == "10.00"
+        assert worker._sync_promotions(session, {"Accept": "application/json"}) is True
+        assert session.query(QtyPromotion).count() == 0
+    finally:
+        session.close()
+
+
+def test_retry_keeps_discount_and_paid_amount(tmp_path, monkeypatch):
+    import json
+    from database.models import Sale, Outbox
+    import sync_worker as module
+
+    db_path = str(tmp_path / "discount.db")
+    session = init_db(f"sqlite:///{db_path}")
+    sale = Sale(local_sale_id="S70", doc_number="S70", branch_id=1, status="failed",
+                idempotency_key="key-70", total_amount=60, discount_amount=10)
+    payload = {"branch_id": 1, "shift_id": 1, "cashier_id": 9, "method": "cash", "cash_received": 60,
+               "items": [{"product_id": 1, "qty": 1, "unit_price": 70}]}
+    session.add(sale)
+    session.add(Outbox(aggregate_id="S70", event_type="sale_checkout", idempotency_key="key-70",
+                       payload_json=json.dumps(payload), status="failed", payload_prepared=True))
+    session.commit()
+    session.close()
+
+    sent = []
+
+    class Response:
+        status_code = 200
+        text = ""
+
+        def json(self):
+            return {"shift": {"id": 1, "branch_id": 1, "cashier_id": 9}, "receipt_id": 1, "receipt_no": "R70"}
+
+        def raise_for_status(self):
+            pass
+
+    monkeypatch.setattr(module.requests, "get", lambda *a, **k: Response())
+    monkeypatch.setattr(module.requests, "post", lambda url, json=None, **k: sent.append(json) or Response())
+    worker = SyncWorker(db_path, "http://localhost:8000", "t")
+    worker._resolve_branch_and_cashier = lambda sess: (1, 9)
+    worker._sync_outbox_sales()
+
+    bill = [p for p in sent if "items" in p][-1]
+    assert bill["items"][0]["unit_price"] == 70
+    assert bill["manual_discount_amount"] == 10
+    assert bill["discount_approved_by"]
+    assert bill["cash_received"] == 60

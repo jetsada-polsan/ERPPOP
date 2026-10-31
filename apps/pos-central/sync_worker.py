@@ -16,7 +16,7 @@ import threading
 
 from database.models import (
 
-    init_db, Product, ProductBarcode, Category, Sale, SaleItem, Payment, Outbox, SyncLog, PosShift
+    init_db, Product, ProductBarcode, QtyPromotion, Category, Sale, SaleItem, Payment, Outbox, SyncLog, PosShift, ScaleProfile
 
 )
 
@@ -42,7 +42,7 @@ class SyncWorker(QThread):
 
         self.db_path = db_path
 
-        self.api_url = api_url.rstrip('/') if api_url else 'http://localhost:8000'
+        self.api_url = api_url.rstrip('/') if api_url else 'https://erp.popstarcenter.com'
 
         self.pos_token = pos_token
 
@@ -491,7 +491,7 @@ class SyncWorker(QThread):
 
             if getattr(self, '_last_products_hash', None) == current_hash and not changed:
 
-                return False
+                return self._sync_promotions(session, headers)
 
             self._last_products_hash = current_hash
 
@@ -630,7 +630,9 @@ class SyncWorker(QThread):
 
             session.commit()
 
-            return changed
+            promotions_changed = self._sync_promotions(session, headers)
+
+            return changed or promotions_changed
 
         except Exception as e:
 
@@ -665,6 +667,67 @@ class SyncWorker(QThread):
         finally:
 
             session.close()
+
+
+    def _sync_promotions(self, session, headers):
+        """Refresh the branch's quantity promos so offline checkout matches ERP."""
+        response = requests.get(
+            f'{self.api_url}/api/pos/promotions',
+            headers=headers,
+            params={'branch_id': self.config.get('branch_id') or 0},
+            timeout=30,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        rows = payload.get('promotions', []) if isinstance(payload, dict) else payload
+        if not isinstance(rows, list):
+            raise ValueError('ERP ส่งข้อมูลโปร POS ไม่ถูกต้อง')
+
+        normalized = []
+        for row in rows:
+            if not isinstance(row, dict) or not row.get('id') or not row.get('product_id'):
+                continue
+            normalized.append({
+                'server_id': int(row['id']),
+                'name': str(row.get('name') or ''),
+                'promo_type': str(row.get('promo_type') or ''),
+                'product_id': int(row['product_id']),
+                'min_qty': str(row.get('min_qty') or '0'),
+                'free_product_id': int(row['free_product_id']) if row.get('free_product_id') else None,
+                'free_qty': str(row.get('free_qty') or '0'),
+                'discount_type': row.get('discount_type'),
+                'discount_value': str(row.get('discount_value') or '0'),
+                'bundle_price': str(row.get('bundle_price') or '0'),
+                'starts_date': str(row.get('starts_date')) if row.get('starts_date') else None,
+                'ends_date': str(row.get('ends_date')) if row.get('ends_date') else None,
+            })
+        normalized.sort(key=lambda item: item['server_id'])
+
+        fields = tuple(normalized[0].keys()) if normalized else (
+            'server_id', 'name', 'promo_type', 'product_id', 'min_qty', 'free_product_id',
+            'free_qty', 'discount_type', 'discount_value', 'bundle_price', 'starts_date', 'ends_date',
+        )
+        existing = [
+            {field: getattr(row, field) for field in fields}
+            for row in session.query(QtyPromotion).order_by(QtyPromotion.server_id).all()
+        ]
+        if existing == normalized:
+            return False
+
+        session.query(QtyPromotion).delete(synchronize_session=False)
+        session.add_all([QtyPromotion(**row) for row in normalized])
+        session.commit()
+        return True
+
+
+
+    def _hold_for_review(self, session, entry, sale, reason):
+        entry.status = 'needs_review'
+        entry.last_error = reason
+        if sale:
+            sale.status = 'needs_review'
+            sale.sync_error = reason
+        session.commit()
 
     def _sync_outbox_sales(self):
 
@@ -883,6 +946,8 @@ class SyncWorker(QThread):
 
                         "manual_discount_amount": float(getattr(sale, 'discount_amount', 0.0) or 0.0),
 
+                        "discount_approved_by": f"คนขาย {sale.cashier_name}" if getattr(sale, 'cashier_name', None) else None,
+
                         "is_offline_sync": True,
 
                         "items": [
@@ -1011,54 +1076,16 @@ class SyncWorker(QThread):
                 # Ensure offline sync flag is present
                 payload['is_offline_sync'] = True
 
-                # Auto-heal discount and items if bill had discount or was rejected by manager approval / pricing / shortfall
-                sale_total = float(sale.total_amount if sale else (payload.get('cash_received') or 0.0))
-                payload_items = payload.get('items') or []
-                gross_sum_raw = sum(float(i.get('qty', 0) or 0) * float(i.get('unit_price', 0) or 0) for i in payload_items)
-                has_price_reduction = (sale_total > 0 and gross_sum_raw > sale_total + 0.01)
-                needs_discount_healing = (
-                    payload_items
-                    and (
-                        has_price_reduction
-                        or payload.get('manual_discount_amount', 0) > 0
-                        or payload.get('discount_amount', 0) > 0
-                        or (sale and getattr(sale, 'discount_amount', 0.0) and float(sale.discount_amount) > 0)
-                        or (entry.last_error and any(err in entry.last_error for err in ('ส่วนลดพิเศษ', 'สิทธิ์อนุมัติ', 'ไม่ครบ', 'ราคาหรือส่วนลดเปลี่ยน')))
-                        or (sale and sale.sync_error and any(err in sale.sync_error for err in ('ส่วนลดพิเศษ', 'สิทธิ์อนุมัติ', 'ไม่ครบ', 'ราคาหรือส่วนลดเปลี่ยน')))
-                    )
-                )
-
-                if needs_discount_healing:
-                    # Ensure items have standard catalog prices so PosPricingGuard passes with 0 discrepancy
-                    for it in payload_items:
-                        prod_id = it.get('product_id')
-                        if prod_id:
-                            prod_record = session.query(Product).filter_by(id=prod_id).first()
-                            if prod_record:
-                                cat_price = float(prod_record.pos_price or prod_record.default_price or it.get('unit_price', 0.0))
-                                if cat_price > 0 and abs(float(it.get('unit_price', 0.0)) - cat_price) > 0.01:
-                                    it['unit_price'] = cat_price
-
-                    gross_sum = sum(float(i.get('qty', 0) or 0) * float(i.get('unit_price', 0) or 0) for i in payload_items)
-                    discount_val = max(0.0, round(gross_sum - sale_total, 2)) if (sale_total > 0 and gross_sum > sale_total) else float(payload.get('discount_amount') or (getattr(sale, 'discount_amount', 0.0) if sale else 0.0) or 0.0)
-
-                    # Update discount fields: manual_discount_amount must be 0 so manager permission is never required
-                    payload['discount_amount'] = discount_val
-                    payload['manual_discount_amount'] = 0.0
-
-                    # Fix cash payments: PosPaymentValidator requires cash_received >= gross sum
-                    if payload.get('method') == 'cash':
-                        orig_received = float(payload.get('cash_received') or 0.0)
-                        if orig_received < gross_sum:
-                            payload['cash_received'] = gross_sum
-                            payload['change_amount'] = max(0.0, round(gross_sum - sale_total, 2))
-
-                    # Fix mixed payments: cash_amount + transfer_amount == gross_sum
-                    if payload.get('method') == 'mixed' and gross_sum > 0:
-                        cur_mix_sum = float(payload.get('cash_amount') or 0.0) + float(payload.get('transfer_amount') or 0.0)
-                        diff = round(gross_sum - cur_mix_sum, 2)
-                        if abs(diff) > 0.01:
-                            payload['cash_amount'] = round(float(payload.get('cash_amount') or 0.0) + diff, 2)
+                # ส่งยอดตามใบเสร็จเสมอ retry ห้ามเปลี่ยนราคา ส่วนลด หรือยอดรับเงิน
+                discount = float(getattr(sale, 'discount_amount', 0) or 0) if sale else float(payload.get('manual_discount_amount') or 0)
+                if discount > 0:
+                    payload['manual_discount_amount'] = discount
+                    payload['discount_amount'] = discount
+                    payload['discount_approved_by'] = payload.get('discount_approved_by') or f"คนขาย {payload.get('cashier_id')}"
+                    gross = sum(float(i.get('qty', 0) or 0) * float(i.get('unit_price', 0) or 0) for i in payload.get('items') or [])
+                    if sale and abs(gross - discount - float(sale.total_amount or 0)) > 0.01:
+                        self._hold_for_review(session, entry, sale, 'ยอดบิล ส่วนลด และใบเสร็จไม่ตรงกัน')
+                        continue
 
                 # If transfer or mixed, ensure transfer validation fields are present
                 if payload.get('method') in ('transfer', 'mixed'):
@@ -1119,6 +1146,12 @@ class SyncWorker(QThread):
                         session.add(log)
 
                     elif 400 <= checkout_response.status_code < 500:
+
+                        if float(payload.get('manual_discount_amount') or 0) > 0:
+                            # ห้าม retry เป็นราคาเต็ม ต้องให้คนตรวจบิลนี้ก่อน
+                            self._hold_for_review(session, entry, sale, checkout_response.text)
+                            failed_count += 1
+                            continue
 
                         entry.status = 'failed'
 
