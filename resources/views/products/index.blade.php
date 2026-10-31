@@ -13,10 +13,10 @@
                     <div class="input-group">
                         <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
                         <input type="text" name="q" value="{{ $q }}" class="form-control" placeholder="รหัส ชื่อ หรือบาร์โค้ด" autocomplete="off" aria-describedby="product-search-hint" @input.debounce.1200ms="$refs.filterForm.requestSubmit()" @keydown.enter.prevent="$refs.filterForm.requestSubmit()">
-                        <button type="submit" class="btn btn-outline-primary" aria-label="ค้นหาสินค้า"><i class="bi bi-search me-1"></i>ค้นหา</button>
+                        <button type="submit" class="btn btn-primary px-4 fw-semibold text-nowrap" aria-label="ค้นหาสินค้า">ค้นหา</button>
                         <input type="hidden" name="status" value="{{ $status }}">
                     </div>
-                    <small id="product-search-hint" class="text-muted">ค้นหาอัตโนมัติหลังหยุดพิมพ์ 0.5 วินาที</small>
+                    <small id="product-search-hint" class="text-muted">พิมพ์แล้วรอ 1 วินาที ระบบจะค้นให้เอง หรือกดปุ่มค้นหา</small>
                 </div>
                 <div class="product-filter-field">
                     <label>ประเภทสินค้า</label>
