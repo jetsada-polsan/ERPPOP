@@ -1614,3 +1614,11 @@ pending
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ตรวจหน้า production หลัง deploy; ทดสอบ role scope และการกรองสาขาบน SQLite tests เท่านั้น; ไม่ได้แก้ข้อมูล production
 - Deploy: ยังไม่ deploy
 - งานถัดไป: deploy ตาม `docs/OPERATIONS.md` เมื่อเจ้าของสั่ง แล้วเปิด POS Workbench ด้วยบัญชี IT เพื่อตรวจว่าตัวเลือก “ทุกสาขา” แสดงบิลจากสาขาต่าง ๆ
+
+## Handoff - 2026-10-31 (Codex: Dashboard รวมยอดและจำกัดตามสิทธิ์สาขา)
+- Commit: `bcbfea3` (`Fix dashboard branch visibility`)
+- ทำอะไร: Dashboard ใช้ `reports.all_branches` แสดงยอดรวมบริษัทและยอดแยกสาขา; ผู้จัดการหลายสาขาเห็นยอดรวมเฉพาะสาขาที่เลือกใน `user_branch_roles`; ผู้ไม่มี `reports.view` เห็นเพียงโครงหน้า ไม่มีข้อมูลธุรกิจ; จำกัดยอดขาย POS ลูกหนี้ จัดซื้อ และคลังตามขอบเขตเดียวกัน; ปรับคำอธิบายขอบเขตบน Dashboard และช่องกำหนดสาขา
+- ทดสอบ: `php -d memory_limit=512M vendor/bin/phpunit` ผ่าน 673 tests (672 passed, 1 skipped), 5,716 assertions, incomplete 6; `DashboardLayoutTest` ผ่าน 15 tests / 60 assertions; `vendor/bin/pint --dirty`, `php artisan view:cache` และ `git diff --check` ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: `php artisan erp:health` ในเครื่อง dev รายงาน migration ค้าง 25 รายการและไม่พบไฟล์ backup; ไม่ได้รัน migration หรือแตะข้อมูล production; ยังไม่ได้ยืนยันภาพ Dashboard บน production หลังแก้
+- Deploy: ยังไม่ deploy
+- งานถัดไป: deploy ตาม `docs/OPERATIONS.md` เมื่อเจ้าของสั่ง แล้วตรวจด้วยบัญชี IT/GM, ผู้จัดการหลายสาขา และบัญชีที่ไม่มี `reports.view` ว่ายอดรวมและการจำกัดสาขาตรงตามสิทธิ์
