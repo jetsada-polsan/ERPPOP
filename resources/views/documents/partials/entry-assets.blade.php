@@ -111,6 +111,15 @@
     .doc-btn { min-width:84px; height:29px; border:1px solid #888; border-radius:0; padding:3px 12px; background:linear-gradient(#fff,#ddd); color:#111; font-size:11px; font-weight:700; }
     .doc-btn-primary { min-width:125px; border-color:#777; background:linear-gradient(#fff,#d7d7d7); color:#111; }
     .doc-btn-primary:hover,.doc-btn-secondary:hover { background:#dceeff; color:#111; }
+    .doc-modal { width:min(1500px,calc(100vw - 32px)); height:calc(100dvh - 32px); }
+    .doc-body { overflow-y:auto; }
+    .doc-table-wrap, .doc-items { overflow-x:auto; }
+    @media (max-width: 768px) {
+        .doc-modal { width:100vw; height:100dvh; border-radius:0; }
+        .doc-head-grid { grid-template-columns:1fr; }
+        .doc-fields > * { grid-column:1 / -1 !important; }
+        .doc-table { min-width:640px; }
+    }
     @media (max-width: 980px) {
         .doc-head-grid { grid-template-columns: 1fr; }
         .doc-fields { grid-template-columns: repeat(6, 1fr); }

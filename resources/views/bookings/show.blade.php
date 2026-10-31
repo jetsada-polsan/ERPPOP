@@ -89,7 +89,7 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
             <div class="text-muted small mt-1">{{ $booking->document->remark }}</div>
             @endif
         </div>
-        <div class="d-flex align-items-center gap-2">
+        <div class="booking-actions">
             <span class="badge {{ $statusColor[$booking->status] ?? 'text-bg-light' }} fs-6 px-3 py-2">
                 {{ $statusLabel[$booking->status] ?? $booking->status }}
             </span>
@@ -102,7 +102,7 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
                 </a>
             @endif
             @if($isPending && $canConvert)
-            <form method="post" action="{{ route('bookings.convert', $booking) }}" id="convert-form" class="d-flex flex-column gap-2 align-items-end">
+            <form method="post" action="{{ route('bookings.convert', $booking) }}" id="convert-form" class="booking-convert d-flex flex-column gap-2 align-items-end">
                 @csrf
                 @if($creditSaleBooks->count() > 1)
                 <div class="doc-book-picker">
@@ -217,6 +217,16 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
 .flow-sub { font-size:11px;font-weight:400;color:var(--erp-muted);margin-top:2px; }
 .flow-line { flex:1;height:2px;background:var(--erp-border);min-width:40px;margin:0 8px;position:relative;top:-10px; }
 .flow-line.done { background:var(--erp-success-ink); }
+.booking-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; max-width: 100%; }
+.booking-actions > .btn, .booking-actions > .badge { min-height: 42px; display: inline-flex; align-items: center; }
+.booking-convert { align-items: center !important; flex-wrap: wrap; gap: 8px; margin: 0; }
+.booking-convert .doc-book-picker { min-width: 0; padding: 0; border: 0; background: none; box-shadow: none; }
+.booking-convert .doc-book-label { display: none; }
+.booking-convert .form-select { min-height: 42px; max-width: 240px; }
+@media (max-width: 768px) {
+    .booking-actions, .booking-convert { width: 100%; justify-content: stretch; }
+    .booking-actions > *, .booking-convert > *, .booking-convert .form-select { flex: 1 1 100%; width: 100%; max-width: none; justify-content: center; }
+}
 .doc-book-picker { min-width: 280px; border: 1px solid var(--erp-border); background: var(--erp-surface-2); border-radius: 12px; padding: 8px 10px; }
 .doc-book-label { font-size: 11px; font-weight: 800; color: #2563eb; margin-bottom: 4px; }
 </style>
