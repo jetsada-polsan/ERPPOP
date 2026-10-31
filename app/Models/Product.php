@@ -101,4 +101,21 @@ class Product extends Model
             'maximum_stock' => 'decimal:8',
         ];
     }
+
+    /** จัดบาร์โค้ดตามหน่วยขายสำหรับตารางสินค้า; หน่วยตัวคูณมากกว่า 1 ที่ไม่รู้จักชื่อนับเป็นแพ็ค */
+    public function barcodesByPackaging(): array
+    {
+        $groups = ['case' => [], 'pack' => [], 'unit' => []];
+        foreach ($this->barcodes as $barcode) {
+            $name = (string) $barcode->unit?->name;
+            $group = match (true) {
+                (bool) preg_match('/ลัง|กล่อง|carton|case/iu', $name) => 'case',
+                (bool) preg_match('/แพ็ค|แพค|ห่อ|แถว|pack/iu', $name), (float) $barcode->unit_factor > 1 => 'pack',
+                default => 'unit',
+            };
+            $groups[$group][] = $barcode;
+        }
+
+        return $groups;
+    }
 }

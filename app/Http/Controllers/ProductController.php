@@ -58,7 +58,7 @@ class ProductController extends Controller
         ];
 
         $products = (clone $productScope)
-            ->with(['category', 'brand', 'baseUnit', 'barcodes:id,product_id,barcode,is_active'])
+            ->with(['category', 'brand', 'baseUnit', 'barcodes:id,product_id,unit_id,barcode,unit_factor,is_active', 'barcodes.unit:id,name'])
             ->when($status !== 'all', fn ($query) => $query->where('is_active', $status === 'active'))
             ->when($categoryId, fn ($query) => $query->where('product_category_id', $categoryId))
             ->when($productType === 'scale', fn ($query) => $query->whereHas('barcodes', fn ($b) => $b

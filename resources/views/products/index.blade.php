@@ -20,14 +20,14 @@
                 </div>
                 <div class="product-filter-field">
                     <label>ประเภทสินค้า</label>
-                <select name="category_id" class="form-select" style="max-width:240px" @change="$refs.filterForm.requestSubmit()">
+                <select name="category_id" class="form-select" @change="$refs.filterForm.requestSubmit()">
                     <option value="">ทุกหมวดสินค้า</option>
                     @foreach($categories as $category)
                         <option value="{{ $category->id }}" @selected($categoryId === $category->id)>{{ $category->name_th }}</option>
                     @endforeach
                 </select>
                 </div>
-                <div class="product-filter-field" style="min-width:190px">
+                <div class="product-filter-field">
                     <label>รูปแบบการขาย</label>
                     <select name="product_type" class="form-select" @change="$refs.filterForm.requestSubmit()">
                         <option value="">สินค้าทั้งหมด</option>
@@ -65,7 +65,7 @@
                 <table class="table align-middle product-table mb-0">
                     <thead>
                         <tr>
-                            <th>รหัส</th><th>บาร์โค้ด</th><th>ชื่อสินค้า</th><th>หมวด</th><th>ยี่ห้อ</th>
+                            <th>รหัส</th><th>บาร์ลัง</th><th>บาร์แพ็ค</th><th>บาร์หน่วยย่อย</th><th>ชื่อสินค้า</th><th>หมวด</th><th>ยี่ห้อ</th>
                             <th>หน่วยหลัก</th><th class="text-end">ราคาเริ่มต้น</th><th>สถานะ</th><th></th>
                         </tr>
                     </thead>
@@ -73,13 +73,15 @@
                         @forelse($products as $product)
                             <tr>
                                 <td class="fw-semibold">{{ $product->sku_code }}</td>
-                                <td class="product-barcode-cell">
-                                    @forelse($product->barcodes as $barcode)
-                                        <span class="barcode-chip {{ $barcode->is_active ? '' : 'is-inactive' }}" title="{{ $barcode->is_active ? 'บาร์โค้ดใช้งาน' : 'บาร์โค้ดปิดใช้งาน' }}">{{ $barcode->barcode }}</span>
-                                    @empty
-                                        <span class="text-muted">-</span>
-                                    @endforelse
-                                </td>
+                                @foreach($product->barcodesByPackaging() as $barcodes)
+                                    <td class="product-barcode-cell">
+                                        @forelse($barcodes as $barcode)
+                                            <span class="barcode-chip {{ $barcode->is_active ? '' : 'is-inactive' }}" title="{{ $barcode->is_active ? 'บาร์โค้ดใช้งาน' : 'บาร์โค้ดปิดใช้งาน' }}">{{ $barcode->barcode }}</span>
+                                        @empty
+                                            <span class="text-muted">-</span>
+                                        @endforelse
+                                    </td>
+                                @endforeach
                                 <td>{{ $product->name_th }}</td>
                                 <td>{{ $product->category?->name_th ?? '-' }}</td>
                                 <td>{{ $product->brand?->name_th ?? '-' }}</td>
@@ -96,7 +98,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="py-5 text-center text-muted">ไม่พบสินค้า</td>
+                                <td colspan="11" class="py-5 text-center text-muted">ไม่พบสินค้า</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -306,7 +308,18 @@
     .product-table .badge { border-radius:5px; padding:3px 6px; font-size:9px; font-weight:700; }
     .product-table tbody .btn-primary { min-width:58px; min-height:27px; border-radius:6px; font-size:9px; font-weight:700; padding:3px 7px; box-shadow:none; }
     .product-pagination { padding:12px 14px 4px; border-top:1px solid var(--erp-surface-2); }
-    @media(max-width:1200px){.product-toolbar{align-items:stretch;flex-direction:column}.product-actions{justify-content:flex-end}.product-filter-field.search-field{width:min(280px,100%)}}
+    .product-filter-bar { display:grid; grid-template-columns:minmax(300px,2fr) minmax(170px,1fr) minmax(170px,1fr) auto; }
+    .product-filter-field { min-width:0; }
+    .product-filter-field.search-field { width:100%; }
+    .product-filter-field label { font-size:12px; }
+    .product-filter-field .form-control,.product-filter-field .form-select,.product-filter-field .input-group-text,.product-filter-bar .btn,.product-actions .btn { min-height:40px; height:40px; font-size:14px; }
+    .product-filter-field small { font-size:11px; }
+    .product-table { font-size:14px; }
+    .product-table thead th { font-size:13px; }
+    .product-barcode-cell { min-width:128px; }
+    .barcode-chip { display:block; width:max-content; margin:2px 0; padding:4px 8px; font-size:14px; }
+    .product-table tbody .btn-primary { min-width:72px; min-height:36px; font-size:14px; padding:6px 12px; }
+    @media(max-width:1200px){.product-filter-bar{grid-template-columns:1fr 1fr}.search-field{grid-column:1 / -1}.product-toolbar{align-items:stretch;flex-direction:column}.product-actions{justify-content:flex-end}.product-filter-field.search-field{width:min(280px,100%)}}
     @media(max-width:720px){.product-toolbar{padding:10px}.product-filter-bar,.product-filter-field,.product-filter-field.search-field{width:100%}.product-filter-field{min-width:0}.product-filter-bar .btn{flex:1}.product-actions{display:grid;grid-template-columns:1fr 1fr}.product-actions .btn{display:flex;align-items:center;justify-content:center}.product-table thead th,.product-table tbody td{padding:9px 10px}.product-popup-backdrop{padding:0}.product-popup-window{width:100vw;height:100vh;border:0;border-radius:0}}
     @media(max-width:720px){.scale-plu-summary{align-items:flex-start;flex-wrap:wrap}.scale-plu-summary .btn{width:100%;margin-left:0!important}}
 </style>
