@@ -240,6 +240,15 @@ class SystemSettingController extends Controller
         abort_unless($salesman->is_active, 422, 'รหัสคนขายนี้ปิดใช้งานอยู่');
         $data = $request->validate(['pin' => ['required', 'digits:4']], ['pin.digits' => 'PIN ต้องเป็นตัวเลข 4 หลัก']);
 
+        // เครื่องรู้ตัวคนขายจาก PIN อย่างเดียว PIN ในสาขาเดียวกันจึงซ้ำกันไม่ได้
+        $taken = Salesman::with('user.posCredential')->where('is_active', true)->where('branch_id', $salesman->branch_id)
+            ->whereKeyNot($salesman->id)->get()
+            ->first(fn (Salesman $other) => collect([$other->user?->posCredential?->pin_hash, $other->pos_pin_hash])
+                ->filter()->contains(fn ($hash) => Hash::check($data['pin'], $hash)));
+        if ($taken) {
+            return back()->with('error', "PIN นี้ซ้ำกับ {$taken->code} เลือกเลขอื่น");
+        }
+
         DB::transaction(function () use ($salesman, $data) {
             $salesman->setPin($data['pin'], false);
             if ($salesman->user) {

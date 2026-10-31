@@ -1718,3 +1718,7 @@ pending
 - ทำอะไร: พิมพ์ Windows queue ด้วย QPainter ตัวหนา Tahoma และวัดความกว้างจริง แทน Courier ที่ไม่มีอักษรไทย
 - ทดสอบ: pos-python unit tests ผ่าน; ยังไม่ได้พิมพ์จริง
 - Deploy: รอเจ้าของออกรุ่น POS ถัดไป
+
+## Handoff - 2026-10-31 (Claude: เปิดกะด้วย PIN อย่างเดียว)
+- ทำอะไร: POS โหมด PIN ถามแค่ PIN แล้วรู้ตัวคนขาย; PIN ซ้ำออนไลน์ให้เลือกชื่อ, ออฟไลน์ปฏิเสธ; `/pos-admin` กันตั้ง PIN ซ้ำในสาขา
+- ทดสอบ: phpunit ผ่าน 682 tests (681 passed, 1 skipped), incomplete 6; pos-python unit tests ผ่าน; ยังไม่ได้ทดสอบเครื่องจริง

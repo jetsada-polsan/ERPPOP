@@ -72,6 +72,10 @@ class PosAdminReassignTest extends TestCase
         $this->actingAs($admin)->post(route('settings.pos-cashiers.set-pin', $cashier), ['pin' => '12a4'])->assertSessionHasErrors('pin');
         $this->actingAs($admin)->post(route('settings.pos-cashiers.set-pin', $cashier), ['pin' => '4827'])->assertRedirect();
 
+        $other = $this->cashier('C2', $branch);
+        $this->actingAs($admin)->post(route('settings.pos-cashiers.set-pin', $other), ['pin' => '4827']);
+        $this->assertNull($other->fresh()->pos_pin_hash);
+
         $this->assertTrue(Hash::check('4827', $cashier->fresh()->user->posCredential->pin_hash));
         $this->assertFalse((bool) $cashier->fresh()->must_change_pin);
         $this->assertFalse((bool) $cashier->fresh()->user->posCredential->force_pin_change);

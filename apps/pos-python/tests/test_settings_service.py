@@ -100,3 +100,22 @@ class Ean13LeadingZeroTest(unittest.TestCase):
 
         self.assertEqual(pos.lookup_barcode("850123456789")["barcode"], "0850123456789")
         self.assertIsNone(pos.lookup_barcode("999999999999"))
+
+
+class FindCashierByPinTest(unittest.TestCase):
+    def test_pin_identifies_one_seller_only(self) -> None:
+        import tempfile
+        from pathlib import Path
+
+        from pos_python.database import connect
+        from pos_python.services import PosService, pin_hash
+
+        db = connect(Path(tempfile.mkdtemp()) / "pin.db")
+        for code, pin in (("a", "1111"), ("b", "2222"), ("c", "2222")):
+            db.execute("INSERT INTO local_cashiers (code, name, pin_hash, active, synced_at, offline_valid_until) VALUES (?, ?, ?, 1, 'now', '2999-01-01T00:00:00+00:00')",
+                       (code, code, pin_hash(pin)))
+        pos = PosService(db)
+
+        self.assertEqual(pos.find_cashier_by_pin("1111")["code"], "a")
+        self.assertIsNone(pos.find_cashier_by_pin("2222"))
+        self.assertIsNone(pos.find_cashier_by_pin("9999"))

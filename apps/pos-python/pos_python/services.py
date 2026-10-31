@@ -221,12 +221,20 @@ class PosService:
         """ERP สั่งโหมดเลือกชื่อไม่ใช้ PIN เท่านั้นถึงข้ามได้ ค่าอื่นหรือยังไม่รู้ค่าต้องถาม PIN"""
         return self._setting("cashier_login_mode") != "selection"
 
+    def find_cashier_by_pin(self, pin: str) -> sqlite3.Row | None:
+        """หาคนขายจาก PIN อย่างเดียวตอนออฟไลน์; ตรงหลายคนถือว่าไม่รู้ว่าใคร"""
+        rows = self.db.execute(
+            "SELECT code FROM local_cashiers WHERE active = 1 AND revoked_at IS NULL AND is_seller = 1"
+        ).fetchall()
+        matches = [r.cashier for r in (self.login_offline(row["code"], pin, audit=False) for row in rows) if r.cashier is not None]
+        return matches[0] if len(matches) == 1 else None
+
     def login(self, cashier_code: str, pin: str) -> sqlite3.Row | None:
         """Compatibility wrapper for older callers; records the same offline audit event."""
         return self.login_offline(cashier_code, pin).cashier
 
     def login_offline(self, cashier_code: str, pin: str, *, terminal_code: str | None = None,
-                      branch_code: str | None = None) -> OfflineLoginResult:
+                      branch_code: str | None = None, audit: bool = True) -> OfflineLoginResult:
         """Authenticate solely with SQLite, never requiring the ERP to be reachable.
 
         The last verified credential remains usable through offline_valid_until even
@@ -266,7 +274,8 @@ class PosService:
             result = OfflineLoginResult(row)
         else:
             result = OfflineLoginResult(None, "PIN ไม่ถูกต้อง")
-        self.record_auth_event(cashier_code, "offline_login", result.success, result.reason, terminal_code, branch_code)
+        if audit or result.success:
+            self.record_auth_event(cashier_code, "offline_login", result.success, result.reason, terminal_code, branch_code)
         return result
 
     def _verify_credential_history(self, cashier_id: int, pin: str) -> bool:

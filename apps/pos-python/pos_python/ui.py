@@ -4672,6 +4672,67 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.reset_mode_buttons()
             self.refresh_order()
 
+        def pin_login(self):
+            """ใส่ PIN อย่างเดียว ระบบรู้เองว่าใคร ทั้งออนไลน์และออฟไลน์"""
+            pin, confirmed = QInputDialog.getText(self, "เริ่มขาย", "ใส่ PIN คนขาย", QLineEdit.Password)
+            pin = pin.strip()
+            if not confirmed or not pin:
+                return None
+            if online is None or not online.online:
+                cashier = service.find_cashier_by_pin(pin)
+                if cashier is None:
+                    QMessageBox.warning(self, "เข้าใช้งานไม่ได้", "PIN ไม่ถูกต้อง หรือคนนี้ยังไม่เคยล็อกอินออนไลน์ที่เครื่องนี้")
+                return cashier
+            try:
+                selected = online.provisioning.online_cashier_login(pin)
+                if selected.get("selection_required"):
+                    # PIN ซ้ำจากข้อมูลเก่า: ให้เลือกชื่อ กันบิลเข้าผิดคน
+                    people = selected["cashiers"]
+                    name, confirmed = QInputDialog.getItem(
+                        self, "PIN ซ้ำกัน", "เลือกชื่อคนขาย", [str(p["name"]) for p in people], 0, False
+                    )
+                    if not confirmed:
+                        return None
+                    chosen = next(p for p in people if str(p["name"]) == name)
+                    selected = online.provisioning.online_cashier_login(pin, cashier_server_id=int(chosen["id"]))
+                online.worker.wake()
+            except Exception as error:
+                if "network:" not in str(error):
+                    QMessageBox.warning(self, "เข้าใช้งานไม่ได้", str(error))
+                    return None
+                online.online = False
+                return service.find_cashier_by_pin(pin)
+            return service.db.execute(
+                "SELECT * FROM local_cashiers WHERE id = ?", (int(selected["local_cashier_id"]),)
+            ).fetchone()
+
+        def pick_seller(self):
+            try:
+                seller = SellerSelectionDialog()
+                # Some Windows POS setups keep the on-screen keyboard above the
+                # parent window. Show and raise the seller prompt before exec().
+                seller.show()
+                seller.raise_()
+                seller.activateWindow()
+                app.processEvents()
+                seller_result = seller.exec()
+            except Exception as error:
+                QMessageBox.critical(
+                    self,
+                    "เปิดหน้าต่างเลือกคนขายไม่ได้",
+                    f"POS เปิดหน้าต่างเริ่มขายไม่สำเร็จ: {error}\n\n"
+                    "กรุณาถ่ายภาพข้อความนี้ส่งให้ฝ่าย IT",
+                )
+                return None
+            if seller_result != QDialog.Accepted or seller.cashier is None:
+                QMessageBox.information(
+                    self,
+                    "ยังไม่ได้เปิดกะ",
+                    "กรุณาเลือกชื่อคนขายก่อน แล้วจึงใส่เงินทอนต้นกะเพื่อเปิดกะขาย",
+                )
+                return None
+            return seller.cashier
+
         def ensure_sale_session(self) -> bool:
             """เลือกคนขาย ยืนยัน PIN ตามโหมดของ ERP แล้วเปิดกะเมื่อเริ่มขาย"""
             if self.cashier is not None and self.shift_id is not None:
@@ -4689,40 +4750,11 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                         return False
                 return True
 
-            try:
-                seller = SellerSelectionDialog()
-                # Some Windows POS setups keep the on-screen keyboard above the
-                # parent window. Show and raise the seller prompt before exec().
-                seller.show()
-                seller.raise_()
-                seller.activateWindow()
-                app.processEvents()
-                seller_result = seller.exec()
-            except Exception as error:
-                QMessageBox.critical(
-                    self,
-                    "เปิดหน้าต่างเลือกคนขายไม่ได้",
-                    f"POS เปิดหน้าต่างเริ่มขายไม่สำเร็จ: {error}\n\n"
-                    "กรุณาถ่ายภาพข้อความนี้ส่งให้ฝ่าย IT",
-                )
+            cashier = self.pin_login() if service.requires_cashier_pin() else self.pick_seller()
+            if cashier is None:
                 return False
-            if seller_result != QDialog.Accepted or seller.cashier is None:
-                QMessageBox.information(
-                    self,
-                    "ยังไม่ได้เปิดกะ",
-                    "กรุณาเลือกชื่อคนขายก่อน แล้วจึงใส่เงินทอนต้นกะเพื่อเปิดกะขาย",
-                )
-                return False
-            cashier = seller.cashier
-            pin = None
-            if service.requires_cashier_pin():
-                pin, confirmed = QInputDialog.getText(
-                    self, "ยืนยันคนขาย", f"PIN ของ {cashier['name'] or cashier['code']}", QLineEdit.Password
-                )
-                if not confirmed or not pin.strip():
-                    return False
 
-            if online is not None and online.online:
+            if not service.requires_cashier_pin() and online is not None and online.online:
                 if not cashier["server_id"]:
                     QMessageBox.warning(
                         self,
@@ -4731,25 +4763,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     )
                     return False
                 try:
-                    if pin is None:
-                        selected = online.provisioning.select_cashier(
-                            str(cashier["code"]), int(cashier["server_id"])
-                        )
-                    else:
-                        selected = online.provisioning.online_cashier_login(
-                            pin, cashier_server_id=int(cashier["server_id"])
-                        )
-                    if selected.get("selection_required"):
-                        QMessageBox.warning(self, "เลือกคนขายไม่ได้", "กรุณาเลือกชื่อคนขายใหม่")
-                        return False
-                    if selected.get("must_change_pin") and pin is not None:
-                        new_pin, confirmed = QInputDialog.getText(
-                            self, "ตั้ง PIN ใหม่", "PIN นี้เป็น PIN ชั่วคราว ตั้ง PIN ใหม่ (ตัวเลข 4 หลักขึ้นไป)", QLineEdit.Password
-                        )
-                        if not confirmed or not new_pin.strip():
-                            QMessageBox.information(self, "ยังไม่ได้เปิดกะ", "ต้องตั้ง PIN ใหม่ก่อนเริ่มขาย")
-                            return False
-                        online.provisioning.change_cashier_pin(str(selected["cashier"]["code"]), pin, new_pin)
+                    selected = online.provisioning.select_cashier(
+                        str(cashier["code"]), int(cashier["server_id"])
+                    )
                     local_id = selected.get("local_cashier_id")
                     if local_id:
                         cashier = service.db.execute(
@@ -4768,13 +4784,6 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                             )
                         QMessageBox.warning(self, "เลือกคนขายไม่ได้", message)
                         return False
-
-            if pin is not None and (online is None or not online.online):
-                offline = service.login_offline(str(cashier["code"]), pin)
-                if offline.cashier is None:
-                    QMessageBox.warning(self, "เข้าใช้งานไม่ได้", offline.reason or "PIN ไม่ถูกต้อง")
-                    return False
-                cashier = offline.cashier
 
             existing_shift = service.db.execute(
                 "SELECT id, cashier_id, opening_cash FROM shifts WHERE terminal_id = ? AND status = 'open'",

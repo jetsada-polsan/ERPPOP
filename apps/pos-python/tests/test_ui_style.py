@@ -168,7 +168,6 @@ class UiStyleTest(unittest.TestCase):
         self.assertNotIn("online.provisioning.open_server_shift", session)
         self.assertIn("กำลังยืนยันกะกับ ERP", session)
         self.assertIn("Qt.WindowStaysOnTopHint", source)
-        self.assertIn("เปิดหน้าต่างเลือกคนขายไม่ได้", session)
 
     def test_seller_selection_dialog_is_raised_above_windows_osk(self) -> None:
         source = inspect.getsource(run_ui)
