@@ -1,3 +1,25 @@
+# Handoff — 2026-10-31 (ค้นหาสินค้าด้วยบาร์โค้ดและเทียบทะเบียน BPlus)
+
+## Commit
+- `a110746` — `Search products by barcode without auto-refresh`
+
+## ทำอะไรไป
+- หน้า `/products` ค้นหาได้ด้วย SKU, ชื่อ และบาร์โค้ด; กด Enter หรือปุ่มค้นหาเพื่อส่งคำค้น ไม่มี full-page refresh อัตโนมัติระหว่างพิมพ์
+- เพิ่ม regression test สำหรับค้นหาด้วยบาร์โค้ด
+- เทียบแค็ตตาล็อก BPlus กับ ERP แบบอ่านอย่างเดียวและทำรายงาน `outputs/01a17cae-92e2-7d10-8969-5e71afd637de/product-reconciliation.xlsx` ในเครื่อง รายงานไม่ได้ commit เพราะมีข้อมูลต้นทุน
+- พบ SKU BPlus 4,201 รายการ, ERP 4,057, ขาดใน ERP 144 (ในนั้น BPlus เปิดใช้ 91); บาร์โค้ดเดิม 10,685, จับคู่ SKU+barcode ได้ 8,998, ไม่พบ exact match 1,687 (103 รายการเป็นบาร์โค้ดและ SKU ที่เปิดใช้ทั้งคู่)
+- ราคาขายที่เทียบได้ 7,656 คู่ ต่าง 7 คู่; ไม่มีการแก้ SKU, barcode หรือราคาขาย
+- ต้นทุน BPlus (`SKU_STD_COST`, `SKU_LAST_UCCOST`) และ ERP (`average_cost`, `last_purchase_cost`) แสดงในรายงานพร้อมหน่วยและตัวคูณ: เทียบฐานหน่วยตรง 1,605 SKU; standard-vs-average มีค่าทั้งคู่และหน่วยตรง 1,317 คู่ โดยต่างเกิน 0.01 จำนวน 27 คู่; last-cost เทียบตรงได้ 8 คู่และต่างเกิน 0.01 จำนวน 1 คู่ จึงยังไม่เขียน/นำเข้าต้นทุนอัตโนมัติ
+- อ่าน BPlus ด้วย SELECT เท่านั้น; อ่าน ERP ใน read-only transaction แล้ว rollback; ไม่มีการเขียนข้อมูล production และไม่ได้ deploy
+
+## ทดสอบ
+- `ProductCatalogFilterTest`: 2 tests / 16 assertions ผ่าน
+- PHP suite after rebase on latest `origin/main`: 680 tests, 679 passed, 1 skipped, 6 incomplete, 5,739 assertions
+- Pint และ `git diff --check` ผ่าน
+
+## งานถัดไป
+- หากจะนำต้นทุนเข้า ERP ให้กำหนดนโยบายว่าจะใช้ standard cost หรือ last cost และตรวจการแปลงหน่วย/ต้นทุน 28 รายการต่างเกิน 0.01 ก่อน; ห้ามเปลี่ยนบาร์โค้ดหรือราคาขายตามขอบเขตรอบนี้
+
 # Handoff — 2026-10-31 (แก้สิทธิ์เครื่อง POS และยอดส่วนลด ERP)
 
 ## Commit
