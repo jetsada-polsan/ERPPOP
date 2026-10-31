@@ -65,7 +65,7 @@
                 <table class="table align-middle product-table mb-0">
                     <thead>
                         <tr>
-                            <th>รหัส</th><th>บาร์ลัง</th><th>บาร์แพ็ค</th><th>บาร์หน่วยย่อย</th><th>ชื่อสินค้า</th><th>หมวด</th><th>ยี่ห้อ</th>
+                            <th>รหัส</th><th>บาร์โค้ด / หน่วย</th><th>ชื่อสินค้า</th><th>หมวด</th><th>ยี่ห้อ</th>
                             <th>หน่วยหลัก</th><th class="text-end">ราคาเริ่มต้น</th><th>สถานะ</th><th></th>
                         </tr>
                     </thead>
@@ -73,15 +73,16 @@
                         @forelse($products as $product)
                             <tr>
                                 <td class="fw-semibold">{{ $product->sku_code }}</td>
-                                @foreach($product->barcodesByPackaging() as $barcodes)
-                                    <td class="product-barcode-cell">
-                                        @forelse($barcodes as $barcode)
+                                <td class="product-barcode-cell">
+                                    @forelse($product->barcodes as $barcode)
+                                        <div class="barcode-line">
                                             <span class="barcode-chip {{ $barcode->is_active ? '' : 'is-inactive' }}" title="{{ $barcode->is_active ? 'บาร์โค้ดใช้งาน' : 'บาร์โค้ดปิดใช้งาน' }}">{{ $barcode->barcode }}</span>
-                                        @empty
-                                            <span class="text-muted">-</span>
-                                        @endforelse
-                                    </td>
-                                @endforeach
+                                            <span class="barcode-unit">{{ $barcode->unit?->name ?? $product->baseUnit?->name ?? '-' }}</span>
+                                        </div>
+                                    @empty
+                                        <span class="text-muted">-</span>
+                                    @endforelse
+                                </td>
                                 <td>{{ $product->name_th }}</td>
                                 <td>{{ $product->category?->name_th ?? '-' }}</td>
                                 <td>{{ $product->brand?->name_th ?? '-' }}</td>
@@ -98,7 +99,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="11" class="py-5 text-center text-muted">ไม่พบสินค้า</td>
+                                <td colspan="9" class="py-5 text-center text-muted">ไม่พบสินค้า</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -316,7 +317,9 @@
     .product-filter-field small { font-size:11px; }
     .product-table { font-size:14px; }
     .product-table thead th { font-size:13px; }
-    .product-barcode-cell { min-width:128px; }
+    .product-barcode-cell { min-width:250px; }
+    .barcode-line { display:flex; align-items:center; gap:8px; }
+    .barcode-unit { color:var(--erp-muted); font-size:13px; white-space:nowrap; }
     .barcode-chip { display:block; width:max-content; margin:2px 0; padding:4px 8px; font-size:14px; }
     .product-table tbody .btn-primary { min-width:72px; min-height:36px; font-size:14px; padding:6px 12px; }
     @media(max-width:1200px){.product-filter-bar{grid-template-columns:1fr 1fr}.search-field{grid-column:1 / -1}.product-toolbar{align-items:stretch;flex-direction:column}.product-actions{justify-content:flex-end}.product-filter-field.search-field{width:min(280px,100%)}}
