@@ -1675,3 +1675,8 @@ pending
 - ทำอะไร: เพิ่มบาร์โค้ดในค้นหา Flash Sale, ตารางราคา, ป้ายราคา และ grid POS Python; ต่อจาก `a110746` ของหน้า products
 - ทดสอบ: phpunit และ pos-python unit tests ผ่าน; หน้า ERP ที่ใช้ `ilike` ไม่มีเทสต์ SQLite ครอบคลุม
 - Deploy: รอเจ้าของสั่ง พร้อม POS รุ่นถัดไป
+
+## Handoff - 2026-10-31 (Claude: ตั้งค่า POS ไม่ใช้รหัส, รายชื่อคนขาย, อนุมัติด้วย PIN หัวหน้า)
+- ทำอะไร: เจ้าของสั่งเปิดตั้งค่า POS โดยไม่ใช้ PIN; หน้าเปิดกะแสดง `is_seller` (CASHIER/SALES/BRANCH_MGR); ส่วนลด/แก้ราคาให้หัวหน้าเลือกชื่อใส่ PIN ผ่าน `/api/pos/approver/verify` หรือ credential ออฟไลน์ แทน Local IT PIN
+- ทดสอบ: phpunit ผ่าน 681 tests (680 passed, 1 skipped), incomplete 6; pos-python unit tests ผ่าน; ยังไม่ได้ทดสอบหน้าจอจริง
+- ความเสี่ยง: ใครที่หน้าเครื่องแก้ Token/ตั้งค่าได้; ต้อง deploy ERP พร้อม POS รุ่นใหม่

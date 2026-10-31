@@ -15,6 +15,7 @@ Route::prefix('pos')->middleware('pos.device')->name('api.pos.')->group(function
     Route::get('/ping', [PosApiController::class, 'ping'])->name('ping');
     Route::get('/cashiers', [PosApiController::class, 'cashiers'])->name('cashiers');
     Route::post('/cashier/login', [PosApiController::class, 'cashierLogin'])->name('cashier.login');
+    Route::post('/approver/verify', [PosApiController::class, 'verifyApprover'])->name('approver.verify');
     Route::post('/cashier/pin', [PosApiController::class, 'changeCashierPin'])->name('cashier.pin');
     Route::post('/auth-events', [PosApiController::class, 'authEvents'])->name('auth-events');
     Route::post('/admin/authorize', [PosApiController::class, 'authorizeAdmin'])->name('admin.authorize');

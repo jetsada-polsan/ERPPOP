@@ -243,7 +243,7 @@ class ProvisioningService:
                 # ERP ส่งเฉพาะคนที่มีสิทธิ์ขายในสาขาของเครื่อง จึงรับทุกคนที่ส่งมา
                 if not server_id or not code:
                     continue
-                self._upsert_cashier(
+                local_id = self._upsert_cashier(
                     int(server_id),
                     str(code),
                     str(row.get("name") or code),
@@ -252,6 +252,8 @@ class ProvisioningService:
                     str(row.get("role") or "cashier"),
                     bool(row.get("must_change_pin") or row.get("force_pin_change")),
                 )
+                self.db.execute("UPDATE local_cashiers SET is_seller = ? WHERE id = ?",
+                                (int(bool(row.get("is_seller", True))), local_id))
                 seen.append(int(server_id))
                 upserted += 1
             if seen:
@@ -383,6 +385,14 @@ class ProvisioningService:
             cashier_code=cashier_code,
             cashier_server_id=cashier_server_id,
         )
+
+    def verify_approver(self, cashier_server_id: int, pin: str, reason: str) -> None:
+        """ยืนยัน PIN หัวหน้ากับ ERP โดยไม่เปลี่ยนคนขายที่ล็อกอินบนเครื่อง"""
+        response = self.api.post("/api/pos/approver/verify", {
+            "cashier_id": int(cashier_server_id), "pin": normalize_pin(pin), "reason": reason,
+        })
+        if not response.get("success", False):
+            raise RuntimeError(response.get("message", "อนุมัติไม่สำเร็จ"))
 
     def authorize_admin(self, username: str, password: str) -> dict:
         response = self.api.post("/api/pos/admin/authorize", {

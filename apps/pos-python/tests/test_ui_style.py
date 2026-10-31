@@ -102,11 +102,11 @@ class UiStyleTest(unittest.TestCase):
         self.assertIn('quantity, ok = Decimal("1"), True', add_product)
         self.assertNotIn("QInputDialog.getInt", add_product)
 
-    def test_settings_remain_it_protected_without_seller_login(self) -> None:
+    def test_settings_open_without_a_pin(self) -> None:
         source = inspect.getsource(run_ui)
         settings = source[source.index("        def open_settings(self) -> None", source.index("class PosWindow")):]
-        self.assertIn("has_local_it_pin", settings)
-        self.assertIn("AdminAuthDialog", settings)
+        self.assertNotIn("has_local_it_pin", settings)
+        self.assertIn("SettingsDialog(self, self.last_sale_id).exec()", settings)
 
     def test_pos_dialogs_are_compact_and_have_a_close_path(self) -> None:
         source = inspect.getsource(run_ui)

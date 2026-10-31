@@ -327,7 +327,7 @@ class PermissionMatrixTest extends TestCase
             }
         }
 
-        $this->assertSame(24, $posCount);
+        $this->assertSame(25, $posCount);
         $this->assertSame(6, $memberCount);
         $this->assertSame(9, $ocrCount);
         $this->assertSame('api.line.webhook', Route::getRoutes()->getByName('api.line.webhook')->getName());

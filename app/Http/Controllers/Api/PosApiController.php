@@ -156,6 +156,29 @@ class PosApiController extends Controller
         return response()->json(['success' => true, 'cashiers' => $cashiers]);
     }
 
+    /** ยืนยัน PIN หัวหน้าเพื่ออนุมัติรายการ โดยไม่เปลี่ยนคนขายที่ล็อกอินอยู่บนเครื่อง */
+    public function verifyApprover(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'cashier_id' => ['required', 'integer'],
+            'pin' => ['required', 'string', 'regex:/^\d{4,20}$/'],
+            'reason' => ['nullable', 'string', 'max:200'],
+        ]);
+        $device = $request->attributes->get('pos_device');
+        $branchId = $device?->branch_id ?: $request->user()?->branch_id;
+        $approver = $this->cashierCandidates($branchId, null, $device?->user_id)->find($data['cashier_id']);
+        if (! $approver || $this->cashierRole($approver) !== 'manager' || ! $this->pinMatches($approver, $data['pin'])) {
+            return response()->json(['success' => false, 'message' => 'PIN ไม่ถูกต้องหรือไม่มีสิทธิ์อนุมัติ'], 422);
+        }
+        AuditLog::create([
+            'user_id' => $approver->user_id, 'branch_id' => $branchId, 'action' => 'pos_approver_verified',
+            'table_name' => 'salesmen', 'record_id' => $approver->id,
+            'new_values' => ['reason' => $data['reason'] ?? null, 'terminal' => $device?->terminal_code],
+        ]);
+
+        return response()->json(['success' => true, 'approver' => ['id' => $approver->id, 'name' => $approver->user?->name ?? $approver->name]]);
+    }
+
     public function authorizeAdmin(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -339,8 +362,17 @@ class PosApiController extends Controller
             'legacy_cashier_id' => $cashier->id,
             'credential_version' => $this->credentialVersion($cashier),
             'role' => $this->cashierRole($cashier),
+            'is_seller' => $this->isSeller($cashier),
             'must_change_pin' => $this->mustChangePin($cashier),
         ];
+    }
+
+    /** หน้าเปิดกะแสดงเฉพาะคนหน้าร้าน ผู้ดูแลที่มี pos.sell ยังอยู่ในเครื่องไว้อนุมัติเท่านั้น */
+    private function isSeller(Salesman $cashier): bool
+    {
+        $roles = $cashier->user?->roles?->pluck('code')->all() ?? [];
+
+        return (bool) array_intersect($roles, ['CASHIER', 'SALES', 'BRANCH_MGR']);
     }
 
     private function cashierRole(Salesman $cashier): string

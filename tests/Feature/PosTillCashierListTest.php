@@ -45,4 +45,30 @@ class PosTillCashierListTest extends TestCase
         $this->assertSame('manager', $rows->firstWhere('code', 'b901mgr')['role']);
         $this->assertSame('cashier', $rows->firstWhere('code', 'b901')['role']);
     }
+
+    public function test_only_a_manager_pin_approves_and_the_active_cashier_stays(): void
+    {
+        Role::firstOrCreate(['code' => 'BRANCH_MGR'], ['name' => 'ผู้จัดการสาขา'])->permissions()->syncWithoutDetaching([Permission::firstOrCreate(['code' => 'pos.sell'], ['name' => 'ขาย'])->id]);
+        Role::firstOrCreate(['code' => 'CASHIER'], ['name' => 'แคชเชียร์'])->permissions()->syncWithoutDetaching([Permission::firstOrCreate(['code' => 'pos.sell'], ['name' => 'ขาย'])->id]);
+        $branch = Branch::create(['code' => 'B903', 'name_th' => 'สาขาทดสอบ', 'is_active' => true]);
+        User::factory()->create(['username' => 'b903mgr', 'branch_id' => $branch->id]);
+        $this->artisan('erp:setup-branch-pos-staff', ['branch' => 'B903', '--user' => 'b903mgr', '--cashier' => ['b903'], '--manager' => 'm903'])->assertSuccessful();
+        $manager = Salesman::where('code', 'M903')->sole();
+        $cashier = Salesman::where('code', 'B903')->sole();
+        $manager->setPin('482165', false);
+        $cashier->setPin('731904', false);
+        $device = PosDevice::create(['name' => 'เครื่อง 1', 'user_id' => $cashier->user_id, 'branch_id' => $branch->id, 'terminal_code' => 'POS-B903-01', 'token_hash' => hash('sha256', 'a'), 'active_cashier_id' => $cashier->id]);
+
+        $call = function (Salesman $who, string $pin) use ($device) {
+            $request = Request::create('/api/pos/approver/verify', 'POST', ['cashier_id' => $who->id, 'pin' => $pin]);
+            $request->attributes->set('pos_device', $device);
+
+            return app(PosApiController::class)->verifyApprover($request)->getStatusCode();
+        };
+
+        $this->assertSame(422, $call($manager, '000000'));
+        $this->assertSame(422, $call($cashier, '731904'));
+        $this->assertSame(200, $call($manager, '482165'));
+        $this->assertSame($cashier->id, (int) $device->fresh()->active_cashier_id);
+    }
 }
