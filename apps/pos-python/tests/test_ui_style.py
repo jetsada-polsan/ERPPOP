@@ -150,7 +150,7 @@ class UiStyleTest(unittest.TestCase):
         self.assertIn("ปิดกะเดิม", source)
         self.assertIn("self.resize(440, 500)", source)
         self.assertIn("self.resize(440, 500)", source)
-        self.assertIn("#shiftKeypad QPushButton { min-height: 58px", STYLE)
+        self.assertIn("#shiftKeypad QPushButton { min-height: 40px", STYLE)
 
     def test_windows_font_is_selected_by_qt_and_build_version_is_visible(self) -> None:
         source = inspect.getsource(run_ui)
