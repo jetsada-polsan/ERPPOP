@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\Branch;
+use App\Models\PosPriceSchedule;
 use App\Models\PriceChange;
 use App\Models\PriceTable;
 use App\Models\Product;
@@ -13,8 +14,6 @@ use App\Models\ProductCategory;
 use App\Models\ProductDepartment;
 use App\Models\ProductPrice;
 use App\Models\ProductSupplier;
-use App\Models\PosPriceSchedule;
-use App\Support\BarcodePolicy;
 use App\Models\ProductUnit;
 use App\Models\RecallCase;
 use App\Models\RecallContact;
@@ -25,12 +24,13 @@ use App\Models\Supplier;
 use App\Models\SupplierPriceSchedule;
 use App\Services\Inventory\ProductCostHistoryService;
 use App\Services\ProductSkuAllocator;
+use App\Support\BarcodePolicy;
 use App\Support\DecimalMath;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -44,9 +44,11 @@ class ProductController extends Controller
         $status = in_array($request->query('status'), ['active', 'inactive'], true)
             ? (string) $request->query('status')
             : 'all';
+        $searchOperator = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
         $productScope = Product::query()->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
-            ->where('sku_code', 'ilike', "%{$q}%")
-            ->orWhere('name_th', 'ilike', "%{$q}%")
+            ->where('sku_code', $searchOperator, "%{$q}%")
+            ->orWhere('name_th', $searchOperator, "%{$q}%")
+            ->orWhereHas('barcodes', fn ($barcode) => $barcode->where('barcode', 'like', "%{$q}%"))
         ));
         $counts = [
             'all' => (clone $productScope)->count(),

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Permission;
 use App\Models\Product;
+use App\Models\ProductBarcode;
 use App\Models\ProductCategory;
 use App\Models\ProductUnit;
 use App\Models\Role;
@@ -45,5 +46,27 @@ class ProductCatalogFilterTest extends TestCase
         $this->actingAs($user)->get('/products?status=all&category_id='.$category->id)
             ->assertOk()->assertSee('สินค้าใช้งาน')->assertSee('สินค้าพักไว้')
             ->assertSee('สินค้าทั้งหมด')->assertSee('กำลังใช้งาน')->assertSee('ไม่ใช้งาน / พักไว้');
+    }
+
+    public function test_product_page_can_find_a_product_by_its_existing_barcode(): void
+    {
+        $unit = ProductUnit::create(['code' => 'EA', 'name' => 'ชิ้น', 'qty_per_base_unit' => 1]);
+        $product = Product::create([
+            'sku_code' => '301261', 'name_th' => '100พลัส เกรปเบอรี่ 370 มล.',
+            'base_unit_id' => $unit->id, 'default_price' => 20, 'average_cost' => 12,
+            'is_active' => true,
+        ]);
+        ProductBarcode::create([
+            'product_id' => $product->id, 'barcode' => '8851952143282',
+            'barcode_type' => 'CUSTOM', 'unit_id' => $unit->id, 'unit_factor' => 1,
+            'price' => 10, 'is_active' => true,
+        ]);
+
+        $this->actingAs($this->manager())
+            ->get('/products?q=8851952143282&status=all')
+            ->assertOk()
+            ->assertSee('100พลัส เกรปเบอรี่ 370 มล.')
+            ->assertSee('8851952143282')
+            ->assertSee('placeholder="รหัส ชื่อ หรือบาร์โค้ด"', false);
     }
 }
