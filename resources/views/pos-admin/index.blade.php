@@ -156,6 +156,15 @@
                             </td>
                             <td class="text-end text-nowrap">
                                 @if($row['active'])
+                                    <form method="post" action="{{ route('pos-admin.devices.assign', $d) }}" class="d-inline-flex gap-1 mb-1">
+                                        @csrf
+                                        <select name="user_id" class="form-select form-select-sm" style="width:auto" aria-label="คนประจำเครื่อง">
+                                            @foreach(collect($branches)->firstWhere('branch.id', $d->branch_id)['cashier_list'] ?? [] as $person)
+                                                @if($person->user_id)<option value="{{ $person->user_id }}" @selected($person->user_id === $d->user_id)>{{ $person->code }} {{ $person->name }}</option>@endif
+                                            @endforeach
+                                        </select>
+                                        <button class="btn btn-sm btn-outline-success">เปลี่ยนคน</button>
+                                    </form>
                                     <form method="post" action="{{ route('settings.pos-token.rotate') }}" class="d-inline" onsubmit="return confirm('ออก Token ใหม่ให้ {{ addslashes($d->name) }}? Token เดิมใช้ไม่ได้ทันที ต้องวาง Token ใหม่ที่เครื่อง')">
                                         @csrf
                                         <input type="hidden" name="pos_device_id" value="{{ $d->id }}">
@@ -223,7 +232,14 @@
                                     @elseif($cashier->must_change_pin)<span class="badge text-bg-info">รอเปลี่ยนครั้งแรก</span>
                                     @else<span class="badge text-bg-success">ตั้งแล้ว</span>@endif
                                 </td>
-                                <td class="text-end">
+                                <td class="text-end text-nowrap">
+                                    <form method="post" action="{{ route('pos-admin.cashiers.move', $cashier) }}" class="d-inline-flex gap-1" onsubmit="return confirm('ย้าย {{ $cashier->code }} ไปสาขาที่เลือก?')">
+                                        @csrf
+                                        <select name="branch_id" class="form-select form-select-sm" style="width:auto" aria-label="ย้ายไปสาขา">
+                                            @foreach($allBranches as $target)<option value="{{ $target->id }}" @selected($target->id === $cashier->branch_id)>{{ $target->code }}</option>@endforeach
+                                        </select>
+                                        <button class="btn btn-sm btn-outline-success">ย้ายสาขา</button>
+                                    </form>
                                     <form method="post" action="{{ route('settings.pos-cashiers.reset-pin', $cashier) }}" class="d-inline" onsubmit="return confirm('ออก PIN ชั่วคราวให้ {{ $cashier->code }}? PIN เดิมใช้ไม่ได้ทันที')">
                                         @csrf
                                         <button class="btn btn-sm btn-outline-primary"><i class="bi bi-key me-1"></i>ออก PIN ชั่วคราว</button>

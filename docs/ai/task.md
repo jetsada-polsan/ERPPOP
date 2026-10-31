@@ -1627,3 +1627,8 @@ pending
 - ทำอะไร: สต๊อกบน Dashboard ใช้เจ้าของคลังจาก `default_warehouse_location_id` เมื่อ `warehouses.branch_id` เป็น NULL; ทุกสาขาต้องมาจาก global `reports.all_branches` หรือ system admin (`canSeeAllReportBranches()`); รายงาน, Executive Dashboard และ POS Workbench ใช้สาขาที่มอบหมายจริงผ่าน `resolveReportBranch()` เลือกได้ทีละสาขาในขอบเขตสิทธิ์
 - ทดสอบ: `php -d memory_limit=512M vendor/bin/phpunit` ผ่าน 678 tests (677 passed, 1 skipped), incomplete 6; ถอด scope สต๊อกแล้วเทสต์แดงจริง; `P0ReportFiguresTest` เลิกใช้ static user ข้ามเทสต์
 - ยังไม่ทดสอบ: PostgreSQL จริงและหน้าจอ production; `addBranchRoles()` ยังไม่ได้แก้เรื่อง role เก่าในสาขาเสริม
+
+## Handoff - 2026-10-31 (Claude: เปลี่ยนคนประจำเครื่องและย้ายสาขาจากหน้าเว็บ)
+- ทำอะไร: `/pos-admin` เพิ่ม "เปลี่ยนคน" ต่อเครื่อง (ไม่ต้องออก Token ใหม่) และ "ย้ายสาขา" ต่อคนขาย ทั้งสองอย่างกันกะที่เปิดอยู่และบันทึก audit
+- ทดสอบ: phpunit เต็มชุดผ่าน; `PosAdminReassignTest` 3 tests; ยังไม่ได้ทดสอบกับเครื่อง POS จริง
+- Deploy: รอเจ้าของสั่ง

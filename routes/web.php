@@ -106,6 +106,8 @@ Route::get('/download/pos/latest.json', [PosReleaseController::class, 'latest'])
 Route::get('/download/pos/releases/{filename}', [PosReleaseController::class, 'download'])->name('pos.release.download');
 Route::get('/download/python-pos', [SystemSettingController::class, 'downloadPythonPos'])->name('python-pos.download');
 Route::get('/pos-admin', [PosAdminController::class, 'index'])->name('pos-admin.index');
+Route::post('/pos-admin/devices/{device}/assign', [PosAdminController::class, 'assignDevice'])->name('pos-admin.devices.assign');
+Route::post('/pos-admin/cashiers/{salesman}/move', [PosAdminController::class, 'moveCashier'])->name('pos-admin.cashiers.move');
 Route::get('/password/change', [AuthController::class, 'showChangePassword'])->name('password.change');
 Route::post('/password/change', [AuthController::class, 'updatePassword'])->name('password.update');
 Route::get('/security/mfa', [AuthController::class, 'showMfaSetup'])->name('mfa.setup');
