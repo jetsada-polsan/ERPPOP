@@ -9,17 +9,23 @@ from pos_python.printers import installed_printer_names
 
 
 class InstalledPrintersTest(unittest.TestCase):
-    def test_qt6_uses_the_python_safe_qtextdocument_print_method(self) -> None:
+    def test_receipt_print_is_bold_and_measured_per_line(self) -> None:
         source = inspect.getsource(printers.print_text_to_windows_queue)
-        self.assertIn('getattr(document, "print_", None)', source)
-        self.assertIn('getattr(document, "print", None)', source)
-        self.assertIn('setDefaultFont(QFont("Courier New"', source)
+        self.assertIn("QFont.Weight.Bold", source)
+        self.assertIn("horizontalAdvance", source)
         self.assertIn("QPrinterInfo.availablePrinters()", source)
         self.assertIn("QPrinter(printer_info, QPrinter.PrinterMode.HighResolution)", source)
         self.assertNotIn("setPageMargins(", source)
-        self.assertNotIn("QPrinter.Unit.Millimeter", source)
-        self.assertIn("document.setDocumentMargin(0)", source)
         self.assertIn("paper_width_mm", source)
+
+    def test_receipt_lines_are_laid_out_by_kind(self) -> None:
+        from pos_python.printers import classify_lines
+
+        rows = classify_lines("      POPSTAR\n-----\nรวมสุทธิ          158.00\nหมายเหตุ")
+        self.assertEqual(rows, [
+            ("center", "POPSTAR", ""), ("rule", "", ""),
+            ("columns", "รวมสุทธิ", "158.00"), ("left", "หมายเหตุ", ""),
+        ])
 
     def test_windows_queues_are_sorted_and_deduplicated(self) -> None:
         class PrinterInfo:

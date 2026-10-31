@@ -67,7 +67,8 @@ def print_text_to_windows_queue(text: str, printer_name: str, *, paper_width_mm:
         raise ValueError("ยังไม่ได้เลือกเครื่องพิมพ์ Windows")
 
     try:
-        from PySide6.QtGui import QFont, QTextDocument, QTextOption
+        from PySide6.QtCore import Qt
+        from PySide6.QtGui import QColor, QFont, QPainter
         from PySide6.QtPrintSupport import QPrinter, QPrinterInfo
     except ImportError as error:
         raise RuntimeError("รุ่นนี้ยังไม่มี Qt PrintSupport") from error
@@ -87,23 +88,60 @@ def print_text_to_windows_queue(text: str, printer_name: str, *, paper_width_mm:
 
     if paper_width_mm not in (58, 80):
         paper_width_mm = 80
-    # Keep the text renderer deterministic. The Windows queue supplies the
-    # continuous-paper height, while the document font controls readable 58/80mm
-    # columns instead of falling back to a tiny proportional default.
-    # Do not call QPagedPaintDevice.setPageMargins here. PySide6 exposes
-    # incompatible overloads across supported Windows builds and can raise
-    # before the job reaches the spooler. The installed thermal-driver profile
-    # owns its physical margins; QTextDocument still removes its own margin.
-    document = QTextDocument()
-    document.setDocumentMargin(0)
-    document.setDefaultFont(QFont("Courier New", 9 if paper_width_mm == 80 else 8))
-    text_option = QTextOption()
-    text_option.setWrapMode(QTextOption.WrapMode.NoWrap)
-    document.setDefaultTextOption(text_option)
-    document.setPlainText(text)
-    # Qt exposes QTextDocument::print as print_ in PySide6 because print is a
-    # Python keyword. Keep the fallback for bindings that expose the C++ name.
-    send_to_printer = getattr(document, "print_", None) or getattr(document, "print", None)
-    if send_to_printer is None:
-        raise RuntimeError("PySide6 รุ่นนี้ไม่รองรับการส่งเอกสารไปเครื่องพิมพ์")
-    send_to_printer(printer)
+    # เทอร์มอลไม่มีเกรย์สเกล ตัวบางจึงจาง และ Courier New ไม่มีอักษรไทย Qt สลับฟอนต์เองทำให้
+    # เว้นวรรคจัดกึ่งกลางคลาดเคลื่อน จึงวาดเองด้วยตัวหนาแล้ววัดความกว้างจริงทีละบรรทัด
+    # ไม่เรียก setPageMargins: PySide6 แต่ละรุ่นมี overload ไม่ตรงกันและพังก่อนถึง spooler
+    painter = QPainter()
+    if not painter.begin(printer):
+        raise RuntimeError(f"เปิดงานพิมพ์ไม่ได้: {selected}")
+    try:
+        body = QFont("Tahoma", 10 if paper_width_mm == 80 else 9, QFont.Weight.Bold)
+        code = QFont("Courier New", 8, QFont.Weight.Bold)
+        page = printer.pageRect(QPrinter.Unit.DevicePixel)
+        width = int(page.width())
+        painter.setPen(QColor("black"))
+        painter.setFont(body)
+        y = 0
+        for kind, left, right in classify_lines(text):
+            painter.setFont(code if kind == "code" else body)
+            metrics = painter.fontMetrics()
+            height = metrics.height()
+            if y + height > page.height():
+                printer.newPage()
+                y = 0
+            if kind == "rule":
+                pen = painter.pen()
+                pen.setWidth(max(2, int(printer.resolution() / 100)))
+                painter.setPen(pen)
+                painter.drawLine(0, y + height // 2, width, y + height // 2)
+            elif kind in ("center", "code"):
+                shown = metrics.elidedText(left, Qt.TextElideMode.ElideRight, width)
+                painter.drawText(max(0, (width - metrics.horizontalAdvance(shown)) // 2), y + metrics.ascent(), shown)
+            else:
+                room = width - metrics.horizontalAdvance(right) - metrics.averageCharWidth()
+                painter.drawText(0, y + metrics.ascent(), metrics.elidedText(left, Qt.TextElideMode.ElideRight, max(0, room)))
+                painter.drawText(width - metrics.horizontalAdvance(right), y + metrics.ascent(), right)
+            y += height
+    finally:
+        painter.end()
+
+
+def classify_lines(text: str) -> list[tuple[str, str, str]]:
+    """แปลงบรรทัดใบเสร็จแบบเว้นวรรคเป็น (ชนิด, ซ้าย, ขวา) เพื่อวาดด้วยฟอนต์ความกว้างไม่คงที่"""
+    rows: list[tuple[str, str, str]] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            rows.append(("blank", "", ""))
+        elif set(stripped) <= set("-="):
+            rows.append(("rule", "", ""))
+        elif set(stripped) & set("█▀▄"):
+            rows.append(("code", line.rstrip(), ""))
+        elif line[0] == " ":
+            rows.append(("center", stripped, ""))
+        elif "  " in stripped:
+            left, _, right = stripped.rpartition("  ")
+            rows.append(("columns", left.rstrip(), right.strip()))
+        else:
+            rows.append(("left", stripped, ""))
+    return rows
