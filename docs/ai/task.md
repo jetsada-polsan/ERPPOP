@@ -1,8 +1,8 @@
 # Handoff — 2026-10-31 (เขียนทุนซื้อล่าสุดกลับ ERP และตรวจส่วนลด POS)
 
 ## Commit
-- ฐานโค้ดที่ตรวจ: `650c7d6` (`main` หลัง fast-forward)
-- ไม่มีการแก้ source code หรือ deploy; บันทึกผลตรวจและข้อมูลที่เปลี่ยนใน handoff นี้
+- Deploy production จาก `58069af` ผ่าน GitHub Actions run `#109` (`41187776749`)
+- งานนี้แก้ handoff เท่านั้น ไม่มีการแก้ source code
 
 ## ทำอะไรไป
 - เขียน `last_purchase_cost` และ `last_purchase_cost_at` จากคิว BPlus ให้ ERP 1,380 SKU ใน transaction เดียว
@@ -15,12 +15,15 @@
 ## ทดสอบ
 - `PosWebCheckoutRealTest` และ `PosWorkbenchTest`: 9 tests / 61 assertions ผ่าน
 - `apps/pos-python/tests/test_sync_service.py`: 12 tests ผ่าน
+- GitHub Actions: `php -d memory_limit=1G vendor/bin/phpunit` ผ่าน 682 tests (681 passed, 1 skipped, 6 incomplete); pnpm install/build ผ่าน
+- Production `php artisan erp:health` ก่อนและหลัง deploy ผ่าน: DB, migrations, backup, ขาย-GL, ตรวจนับ, storage และ queue
+- `php artisan test` บนเครื่อง dev ใช้หน่วยความจำ subprocess 128MB จนล้มใน XLSX export; คำสั่งเดียวกับ workflow ที่กำหนด 1GB ผ่านครบ
 - Writeback เป็น transaction และตรวจยืนยันทุกค่า; ไม่มี SKU/บาร์โค้ด/ราคา/ทุนเฉลี่ยเปลี่ยน
 
 ## ความเสี่ยง/งานถัดไป
 - ให้บัญชี/เจ้าของตรวจหลักฐานของ 5 บิลเก่าก่อนตัดสินใจแก้เอกสารหรือคืนเงิน; ห้ามปรับยอดย้อนหลังจากค่า discount อย่างเดียว เพราะยอดรับเงินจริงยังเต็มราคา
-- ทดสอบส่วนลดหนึ่งบิลจริงหลังอัปเดต POS ได้เมื่อมีการขาย/ทดสอบที่อนุมัติ; รอบนี้ไม่สร้างบิลทดสอบ Production
-- ไม่ deploy ในงานนี้
+- ยังต้องยืนยันส่วนลดด้วยบิลขายหลังแก้ไข; รอบนี้ไม่สร้างบิลทดสอบ Production
+- deploy production สำเร็จ; run `41187776749` จบ `success`
 
 ---
 
