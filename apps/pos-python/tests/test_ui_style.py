@@ -102,6 +102,13 @@ class UiStyleTest(unittest.TestCase):
         self.assertIn('quantity, ok = Decimal("1"), True', add_product)
         self.assertNotIn("QInputDialog.getInt", add_product)
 
+    def test_weight_prompt_uses_arabic_digits_and_skips_scale_labels(self) -> None:
+        source = inspect.getsource(run_ui)
+        self.assertIn("QLocale.setDefault(QLocale.c())", source)
+        self.assertIn('product["barcode_type"] == "SCALE_PLU"', source)
+        label = source[source.index("if decode_scale_label(service.db, scanned)"):source.index("def finish_scan")]
+        self.assertNotIn("ask_weight", label)
+
     def test_settings_open_without_a_pin(self) -> None:
         source = inspect.getsource(run_ui)
         settings = source[source.index("        def open_settings(self) -> None", source.index("class PosWindow")):]

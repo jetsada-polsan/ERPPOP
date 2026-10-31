@@ -387,6 +387,9 @@ PRODUCT_TILE_COLUMNS = 4
 
 
 def run_ui(service: PosService, online=None, data_dir=None, app=None):
+    # Windows ภาษาไทยทำให้ช่องตัวเลขแสดงเลขไทย POS ใช้เลขอารบิกเสมอ
+    from PySide6.QtCore import QLocale
+    QLocale.setDefault(QLocale.c())
     # เครื่องที่ผูก ERP แล้วใช้ branch/terminal จริงจาก ping; เครื่อง demo ใช้ค่าเดิม
     branch_id = int(online.branch_id) if (online is not None and online.branch_id) else 1
     terminal_id = (online.terminal_id if (online is not None and online.terminal_id) else "PY-TEST-01")
@@ -1780,6 +1783,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 (int(product["id"]),),
             ).fetchone() is not None
 
+        def ask_weight(self, name: str, price: Decimal) -> tuple[float, bool]:
+            return QInputDialog.getDouble(
+                self, "กรอกน้ำหนัก", f"{name}\nราคาต่อกิโลกรัม {price:,.2f} บาท\nน้ำหนัก (กิโลกรัม)",
+                0.001, 0.001, 999999.999, 3,
+            )
+
         def add_product_row(self, product) -> None:
             price, price_version = service.effective_price(int(product["id"]), product["price"] or 0)
             if price <= 0:
@@ -1787,10 +1796,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 return
 
             if self.is_scale_product(product):
-                quantity, ok = QInputDialog.getDouble(
-                    self, "กรอกน้ำหนัก", f"{product['name']}\nราคาต่อกิโลกรัม {price:,.2f} บาท\nน้ำหนัก (กิโลกรัม)",
-                    0.001, 0.001, 999999.999, 3,
-                )
+                quantity, ok = self.ask_weight(product["name"], price)
             else:
                 # การเลือกการ์ดสินค้าปกติเท่ากับยิงสินค้า 1 หน่วย
                 # ถ้าต้องการหลายชิ้นให้กด + ในรายการขายหลังเพิ่มแล้ว
@@ -1818,10 +1824,17 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 except ValueError as error:
                     QMessageBox.warning(self, "หน่วยขาย", str(error))
                     return
+                # รหัส PLU ไม่มีน้ำหนักในตัว ต่างจากป้ายชั่งที่อ่านน้ำหนักได้เลย
+                quantity = cart_line.qty
+                if product["barcode_type"] == "SCALE_PLU":
+                    weight, ok = self.ask_weight(product["name"], cart_line.unit_price)
+                    if not ok:
+                        return
+                    quantity = Decimal(str(weight))
                 self.order.add_product(OrderLine(
                     product_id=int(product["id"]), name=product["name"],
                     unit_name=product["barcode_unit_name"] or product["unit_name"],
-                    qty=cart_line.qty, unit_price=cart_line.unit_price, price_version=cart_line.price_version,
+                    qty=quantity, unit_price=cart_line.unit_price, price_version=cart_line.price_version,
                     is_vat=bool(product["is_vat"]), barcode=scanned, source_barcode=scanned,
                     barcode_type=product["barcode_type"],
                 ))
