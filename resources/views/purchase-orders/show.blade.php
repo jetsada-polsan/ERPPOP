@@ -45,7 +45,7 @@
 
             <div class="ms-auto d-flex gap-2">
                 @if($purchaseOrder->status === 'requested')
-                    @if(auth()->user()->hasPermission('purchasing.approve') && ($purchaseOrder->requested_by !== auth()->id() || auth()->user()->hasPermission('system.admin')))
+                    @if(auth()->user()->hasPermission('purchasing.approve') && (($purchaseOrder->requested_by !== auth()->id() || auth()->user()->hasPermission('system.admin')) || auth()->user()->hasPermission('system.admin')))
                     <form method="post" action="{{ route('purchase-orders.approve', $purchaseOrder) }}" onsubmit="return confirm('อนุมัติใบขอซื้อนี้?')">@csrf<button class="btn btn-info text-white"><i class="bi bi-check2-circle me-1"></i>อนุมัติ</button></form>
                     @else
                     <span class="badge text-bg-light border align-self-center">รอผู้อนุมัติคนอื่น</span>
