@@ -79,3 +79,24 @@ class ProductGridBarcodeSearchTest(unittest.TestCase):
 
         self.assertEqual([r["sku"] for r in product_grid(db, search="8850123456789")], ["100001"])
         self.assertEqual(product_grid(db, search="9999999999999"), [])
+
+
+class Ean13LeadingZeroTest(unittest.TestCase):
+    def test_scan_without_the_leading_zero_finds_the_product(self) -> None:
+        import tempfile
+        from pathlib import Path
+
+        from pos_python.database import connect
+        from pos_python.services import PosService
+
+        db = connect(Path(tempfile.mkdtemp()) / "ean.db")
+        columns = list(db.execute("PRAGMA table_info(products)"))
+        required = [c["name"] for c in columns if c["notnull"] and c["dflt_value"] is None and not c["pk"]]
+        values = {n: "x" for n in required} | {"sku": "100001", "name": "นม", "active": 1}
+        db.execute(f"INSERT INTO products ({','.join(values)}) VALUES ({','.join('?' * len(values))})", tuple(values.values()))
+        pid = db.execute("SELECT id FROM products").fetchone()["id"]
+        db.execute("INSERT INTO product_barcodes (barcode, product_id, synced_at) VALUES ('0850123456789', ?, 'now')", (pid,))
+        pos = PosService(db)
+
+        self.assertEqual(pos.lookup_barcode("850123456789")["barcode"], "0850123456789")
+        self.assertIsNone(pos.lookup_barcode("999999999999"))

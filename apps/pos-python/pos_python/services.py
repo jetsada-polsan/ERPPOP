@@ -530,7 +530,25 @@ class PosService:
                       b.unit_id AS barcode_unit_id, b.unit_name AS barcode_unit_name
             FROM product_barcodes b JOIN products p ON p.id = b.product_id
             WHERE b.barcode = ? AND p.active = 1""", (barcode,)
-        ).fetchone()
+        ).fetchone() or self._lookup_barcode_alias(barcode)
+
+    def _lookup_barcode_alias(self, barcode: str) -> sqlite3.Row | None:
+        """เครื่องยิงบางรุ่นตัด 0 หน้า EAN-13 ออก (UPC-A 12 หลัก) หรือเติมกลับเกินมา"""
+        aliases = []
+        if barcode.isdigit() and len(barcode) == 12:
+            aliases.append("0" + barcode)
+        if barcode.isdigit() and len(barcode) == 13 and barcode.startswith("0"):
+            aliases.append(barcode[1:])
+        for alias in aliases:
+            row = self.db.execute(
+                """SELECT p.*, b.barcode, b.barcode_type, b.unit_factor, b.price AS barcode_price,
+                          b.unit_id AS barcode_unit_id, b.unit_name AS barcode_unit_name
+                FROM product_barcodes b JOIN products p ON p.id = b.product_id
+                WHERE b.barcode = ? AND p.active = 1""", (alias,)
+            ).fetchone()
+            if row:
+                return row
+        return None
 
     def barcode_cart_line(self, barcode: str) -> CartLine | None:
         """Price a registered selling unit; retain its barcode for ERP stock conversion."""
@@ -558,7 +576,7 @@ class PosService:
             raise ValueError("ยังไม่มีราคาหน่วยขายนี้")
         return CartLine(
             product_id=int(product["id"]), qty=Decimal("1"), unit_price=price,
-            barcode=barcode, source_barcode=barcode, barcode_type=product["barcode_type"],
+            barcode=product["barcode"], source_barcode=barcode, barcode_type=product["barcode_type"],
             price_version=version,
         )
 
