@@ -205,7 +205,7 @@
     <div x-show="tab === 'cashiers'" x-cloak>
         <div class="pa-card" data-testid="pos-cashiers">
             <h2>คนขายและ PIN</h2>
-            <div class="small text-muted mb-2">คนที่มีสิทธิ์สาขาเข้าเครื่องไหนในสาขาก็ได้ · หัวหน้าใช้อนุมัติลดราคา/ยกเลิกบิล · กด ออก PIN ชั่วคราว แล้วบอกพนักงาน เครื่องจะให้เปลี่ยนเองตอนล็อกอินครั้งแรก</div>
+            <div class="small text-muted mb-2">คนที่มีสิทธิ์สาขาเข้าเครื่องไหนในสาขาก็ได้ · หัวหน้าใช้อนุมัติลดราคา/ยกเลิกบิล · ตั้ง PIN 4 หลักแล้วบอกพนักงาน ใช้ได้ทันที</div>
             <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
                     <thead><tr><th>สาขา</th><th>รหัส</th><th>ชื่อ</th><th>PIN</th><th class="text-end"></th></tr></thead>
@@ -230,9 +230,10 @@
                                         </select>
                                         <button class="btn btn-sm btn-outline-success">ย้ายสาขา</button>
                                     </form>
-                                    <form method="post" action="{{ route('settings.pos-cashiers.reset-pin', $cashier) }}" class="d-inline" onsubmit="return confirm('ออก PIN ชั่วคราวให้ {{ $cashier->code }}? PIN เดิมใช้ไม่ได้ทันที')">
+                                    <form method="post" action="{{ route('settings.pos-cashiers.set-pin', $cashier) }}" class="d-inline-flex gap-1">
                                         @csrf
-                                        <button class="btn btn-sm btn-outline-primary"><i class="bi bi-key me-1"></i>ออก PIN ชั่วคราว</button>
+                                        <input type="password" name="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required autocomplete="new-password" class="form-control form-control-sm" style="width:80px" placeholder="4 หลัก" aria-label="PIN ใหม่ของ {{ $cashier->code }}">
+                                        <button class="btn btn-sm btn-outline-primary"><i class="bi bi-key me-1"></i>ตั้ง PIN</button>
                                     </form>
                                 </td>
                             </tr>

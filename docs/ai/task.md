@@ -1680,3 +1680,7 @@ pending
 - ทำอะไร: เจ้าของสั่งเปิดตั้งค่า POS โดยไม่ใช้ PIN; หน้าเปิดกะแสดง `is_seller` (CASHIER/SALES/BRANCH_MGR); ส่วนลด/แก้ราคาให้หัวหน้าเลือกชื่อใส่ PIN ผ่าน `/api/pos/approver/verify` หรือ credential ออฟไลน์ แทน Local IT PIN
 - ทดสอบ: phpunit ผ่าน 681 tests (680 passed, 1 skipped), incomplete 6; pos-python unit tests ผ่าน; ยังไม่ได้ทดสอบหน้าจอจริง
 - ความเสี่ยง: ใครที่หน้าเครื่องแก้ Token/ตั้งค่าได้; ต้อง deploy ERP พร้อม POS รุ่นใหม่
+
+## Handoff - 2026-10-31 (Claude: ตั้ง PIN หลังบ้าน และค้นสินค้าที่ POS)
+- ทำอะไร: `/pos-admin` ให้ผู้ดูแลตั้ง PIN 4 หลักที่ใช้ได้ทันที; POS Enter แล้วค้นชื่อ/รหัส/บาร์โค้ด เจอรายการเดียวเพิ่มเข้าบิล; เลขอารบิกและถามน้ำหนักเฉพาะสินค้าที่ไม่มีป้ายชั่ง
+- ทดสอบ: phpunit ผ่าน 682 tests (681 passed, 1 skipped), incomplete 6; pos-python unit tests ผ่าน; ยังไม่ได้ทดสอบเครื่องจริง

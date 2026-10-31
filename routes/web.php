@@ -740,6 +740,7 @@ Route::prefix('settings')->name('settings.')->group(function () {
     Route::post('/pos-token', [SystemSettingController::class, 'issuePosToken'])->name('pos-token.issue');
     Route::post('/pos-token/rotate', [SystemSettingController::class, 'rotatePosToken'])->name('pos-token.rotate');
     Route::delete('/pos-token', [SystemSettingController::class, 'deletePosDevice'])->name('pos-token.delete');
+    Route::post('/pos-cashiers/{salesman}/set-pin', [SystemSettingController::class, 'setCashierPin'])->name('pos-cashiers.set-pin');
     Route::post('/pos-cashiers/{salesman}/reset-pin', [SystemSettingController::class, 'resetCashierPin'])->name('pos-cashiers.reset-pin');
     Route::post('/pos-terminal/hardware', [SystemSettingController::class, 'updatePosTerminalHardware'])->name('pos-terminal.hardware');
     Route::post('/pos-release', [SystemSettingController::class, 'publishPosRelease'])->name('pos-release.publish');

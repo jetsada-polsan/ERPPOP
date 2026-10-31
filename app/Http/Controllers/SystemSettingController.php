@@ -234,6 +234,30 @@ class SystemSettingController extends Controller
             ->with('cashier_pin_result', ['code' => $salesman->code, 'name' => $salesman->name, 'pin' => $temporary]);
     }
 
+    /** ผู้ดูแลตั้ง PIN 4 หลักแล้วแจ้งพนักงานเอง ใช้ได้ทันทีโดยไม่ต้องเปลี่ยนที่เครื่อง */
+    public function setCashierPin(Request $request, Salesman $salesman): RedirectResponse
+    {
+        abort_unless($salesman->is_active, 422, 'รหัสคนขายนี้ปิดใช้งานอยู่');
+        $data = $request->validate(['pin' => ['required', 'digits:4']], ['pin.digits' => 'PIN ต้องเป็นตัวเลข 4 หลัก']);
+
+        DB::transaction(function () use ($salesman, $data) {
+            $salesman->setPin($data['pin'], false);
+            if ($salesman->user) {
+                UserPosCredential::firstOrCreate(['user_id' => $salesman->user_id])->setPin($data['pin'], false);
+            }
+            PosDevice::where('active_cashier_id', $salesman->id)->update([
+                'active_cashier_id' => null, 'active_cashier_user_id' => null, 'cashier_verified_at' => null,
+            ]);
+            AuditLog::create([
+                'user_id' => auth()->id(), 'branch_id' => $salesman->branch_id, 'action' => 'cashier_pin_set',
+                'table_name' => 'salesmen', 'record_id' => $salesman->id,
+                'new_values' => ['code' => $salesman->code, 'must_change_pin' => false],
+            ]);
+        });
+
+        return redirect()->route('pos-admin.index')->with('success', "ตั้ง PIN ของ {$salesman->code} แล้ว");
+    }
+
     private function uniqueTemporaryPin(Salesman $salesman): string
     {
         $hashes = Salesman::whereKeyNot($salesman->id)->whereNotNull('pos_pin_hash')->pluck('pos_pin_hash')

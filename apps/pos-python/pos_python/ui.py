@@ -1859,7 +1859,13 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 self.finish_scan()
                 return
 
-            QMessageBox.warning(self, "ไม่พบสินค้า", f"ไม่พบบาร์โค้ด {scanned}")
+            # ไม่ใช่บาร์โค้ดเต็ม: เจอคนเดียวเพิ่มเลย เจอหลายรายการให้เลือกจากการ์ดที่กรองแล้ว
+            matches = product_grid(service.db, search=scanned, limit=2)
+            if len(matches) == 1:
+                self.add_product_row(matches[0])
+                self.finish_scan()
+            elif not matches:
+                QMessageBox.warning(self, "ไม่พบสินค้า", f"ไม่พบสินค้า {scanned}")
 
         def finish_scan(self) -> None:
             self.scan.clear()

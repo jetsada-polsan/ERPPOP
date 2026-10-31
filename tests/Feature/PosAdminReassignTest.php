@@ -10,6 +10,7 @@ use App\Models\Salesman;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class PosAdminReassignTest extends TestCase
@@ -60,5 +61,19 @@ class PosAdminReassignTest extends TestCase
         $this->assertSame($b->id, $user->branch_id);
         $this->assertTrue($user->canUsePosDevice($b->id) || $user->canAccessBranch($b->id, 'pos.sell'));
         $this->assertFalse($user->canAccessBranch($a->id, 'pos.sell'));
+    }
+
+    public function test_admin_sets_a_ready_to_use_four_digit_pin(): void
+    {
+        $branch = Branch::create(['code' => 'A', 'name_th' => 'A', 'is_active' => true]);
+        $cashier = $this->cashier('C1', $branch);
+        $admin = $this->admin();
+
+        $this->actingAs($admin)->post(route('settings.pos-cashiers.set-pin', $cashier), ['pin' => '12a4'])->assertSessionHasErrors('pin');
+        $this->actingAs($admin)->post(route('settings.pos-cashiers.set-pin', $cashier), ['pin' => '4827'])->assertRedirect();
+
+        $this->assertTrue(Hash::check('4827', $cashier->fresh()->user->posCredential->pin_hash));
+        $this->assertFalse((bool) $cashier->fresh()->must_change_pin);
+        $this->assertFalse((bool) $cashier->fresh()->user->posCredential->force_pin_change);
     }
 }
