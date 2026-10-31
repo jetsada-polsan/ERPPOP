@@ -286,7 +286,7 @@ class ManagementControlController extends Controller
             $row = DB::table('payroll_runs')->where('id', $run)->lockForUpdate()->first();
             abort_if($row === null, 404);
             abort_unless($row->status === 'draft', 422, 'สถานะไม่ถูกต้อง (ต้องเป็น draft)');
-            abort_if($row->created_by === $request->user()->id, 403, 'ผู้จัดทำไม่สามารถอนุมัติงวดของตนเอง');
+            abort_if($row->created_by === $request->user()->id && ! auth()->user()?->hasPermission('system.admin'), 403, 'ผู้จัดทำไม่สามารถอนุมัติงวดของตนเอง');
             abort_if(DB::table('payroll_items')->where('payroll_run_id', $run)->doesntExist(), 422, 'ไม่มีรายการพนักงานในงวดนี้');
 
             DB::table('payroll_runs')->where('id', $run)->update([
@@ -380,7 +380,7 @@ class ManagementControlController extends Controller
             $locked = DB::table('budgets')->where('id', $budget)->lockForUpdate()->first();
             abort_if($locked === null, 404);
             abort_unless($locked->status === 'draft', 422, 'สถานะไม่ถูกต้อง (ต้องเป็น draft)');
-            abort_if($locked->created_by === $request->user()->id, 403, 'ผู้จัดทำไม่สามารถอนุมัติงบของตนเอง');
+            abort_if($locked->created_by === $request->user()->id && ! auth()->user()?->hasPermission('system.admin'), 403, 'ผู้จัดทำไม่สามารถอนุมัติงบของตนเอง');
 
             DB::table('budgets')->where('id', $budget)->update([
                 'status' => 'approved', 'approved_by' => $request->user()->id, 'approved_at' => now(), 'updated_at' => now(),

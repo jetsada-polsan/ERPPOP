@@ -121,7 +121,7 @@ class PurchaseOrderController extends Controller
     public function approve(PurchaseOrder $purchaseOrder): RedirectResponse
     {
         abort_unless($purchaseOrder->status === 'requested', 422, 'สถานะไม่ถูกต้อง');
-        abort_if($purchaseOrder->requested_by === Auth::id(), 403, 'ผู้ขอซื้อไม่สามารถอนุมัติรายการของตนเอง');
+        abort_if($purchaseOrder->requested_by === Auth::id() && ! Auth::user()?->hasPermission('system.admin'), 403, 'ผู้ขอซื้อไม่สามารถอนุมัติรายการของตนเอง');
         try {
             DB::transaction(function () use ($purchaseOrder) {
                 $locked = PurchaseOrder::whereKey($purchaseOrder->id)->lockForUpdate()->firstOrFail();

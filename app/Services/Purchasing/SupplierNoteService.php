@@ -72,8 +72,9 @@ class SupplierNoteService
             $doc = Document::whereKey($document->id)->lockForUpdate()->firstOrFail();
             app(\App\Services\Documents\ApprovalPolicyService::class)->authorize($doc->documentType->code, $doc->total_amount,
                 (int) $doc->branch_id, $doc->created_by, $actor, 'finance.note.approve');
-            if ($doc->status !== 'pending_approval' || (int) $doc->created_by === (int) $actor->id
-                || ($actor->branch_id && (int) $actor->branch_id !== (int) $doc->branch_id)) {
+            if ($doc->status !== 'pending_approval' || (! $actor->hasPermission('system.admin')
+                && ((int) $doc->created_by === (int) $actor->id
+                || ($actor->branch_id && (int) $actor->branch_id !== (int) $doc->branch_id)))) {
                 throw new RuntimeException('สถานะหรือผู้อนุมัติไม่ถูกต้อง');
             }
             $note = DB::table('supplier_notes')->where('document_id', $doc->id)->firstOrFail();

@@ -80,7 +80,7 @@ class StockAdjustmentController extends Controller
     {
         abort_unless($stockAdjustment->status === 'pending_approval', 422);
         $data = $request->validate(['reason' => ['required', 'string', 'max:500']]);
-        abort_if($stockAdjustment->created_by === auth()->id(), 403, 'ผู้สร้างไม่สามารถปฏิเสธรายการตนเอง');
+        abort_if($stockAdjustment->created_by === auth()->id() && ! auth()->user()?->hasPermission('system.admin'), 403, 'ผู้สร้างไม่สามารถปฏิเสธรายการตนเอง');
         $stockAdjustment->update([
             'status' => 'rejected',
             'remark' => trim(($stockAdjustment->remark ? $stockAdjustment->remark.' | ' : '').'ไม่อนุมัติ: '.$data['reason']),

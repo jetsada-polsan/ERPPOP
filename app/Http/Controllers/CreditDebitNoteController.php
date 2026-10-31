@@ -133,7 +133,7 @@ class CreditDebitNoteController extends Controller
     public function reject(Request $request, Document $note): RedirectResponse
     {
         abort_unless($note->status === 'pending_approval', 422);
-        abort_if($note->created_by === auth()->id(), 403, 'ผู้สร้างไม่สามารถปฏิเสธรายการตนเอง');
+        abort_if($note->created_by === auth()->id() && ! auth()->user()?->hasPermission('system.admin'), 403, 'ผู้สร้างไม่สามารถปฏิเสธรายการตนเอง');
         $data = $request->validate(['reason' => ['required', 'string', 'max:500']]);
         $note->update(['status' => 'rejected', 'remark' => trim($note->remark.' | ไม่อนุมัติ: '.$data['reason'])]);
 

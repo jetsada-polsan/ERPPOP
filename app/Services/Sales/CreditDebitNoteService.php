@@ -164,7 +164,7 @@ class CreditDebitNoteService
 
     public function approveCredit(Document $document): Document
     {
-        if ($document->created_by && $document->created_by === auth()->id()) {
+        if ($document->created_by && $document->created_by === auth()->id() && ! auth()->user()?->hasPermission('system.admin')) {
             throw new RuntimeException('ผู้สร้างใบลดหนี้ไม่สามารถอนุมัติรายการของตนเอง');
         }
 

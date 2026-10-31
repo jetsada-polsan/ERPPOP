@@ -56,7 +56,7 @@ class SupplierNoteController extends Controller
             $locked = Document::whereKey($note->id)->lockForUpdate()->firstOrFail();
             abort_unless(DB::table('supplier_notes')->where('document_id', $locked->id)->exists(), 404);
             abort_unless($locked->status === 'pending_approval', 422);
-            abort_if((int) $locked->created_by === (int) $request->user()->id, 403);
+            abort_if((int) $locked->created_by === (int) $request->user()->id && ! auth()->user()?->hasPermission('system.admin'), 403);
             abort_if($request->user()->branch_id && (int) $request->user()->branch_id !== (int) $locked->branch_id, 403);
             $locked->update(['status' => 'rejected', 'approval_note' => $data['reason'], 'approved_by' => $request->user()->id, 'approved_at' => now()]);
         });

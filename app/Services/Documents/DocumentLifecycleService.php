@@ -35,7 +35,7 @@ final class DocumentLifecycleService
         if ($document->status !== 'pending_approval') {
             throw new RuntimeException('เอกสารนี้ยังไม่อยู่ในสถานะรออนุมัติ');
         }
-        if ((int) $document->submitted_by === $userId) {
+        if ((int) $document->submitted_by === $userId && ! auth()->user()?->hasPermission('system.admin')) {
             throw new RuntimeException('ผู้ส่งตรวจไม่สามารถอนุมัติเอกสารของตนเองได้');
         }
 

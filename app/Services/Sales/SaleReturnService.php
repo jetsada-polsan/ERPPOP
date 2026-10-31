@@ -272,7 +272,7 @@ class SaleReturnService
             if ($locked->documentType->code !== 'SALE_RETURN' || $locked->status !== 'pending_approval') {
                 throw new RuntimeException('เอกสารนี้ไม่ใช่ใบรับคืนที่รออนุมัติ');
             }
-            if ((int) $locked->created_by === $userId) {
+            if ((int) $locked->created_by === $userId && ! auth()->user()?->hasPermission('system.admin')) {
                 throw new RuntimeException('ผู้สร้างใบรับคืนไม่สามารถอนุมัติรายการของตนเอง');
             }
             $actor = User::findOrFail($userId);

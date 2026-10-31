@@ -121,7 +121,7 @@ class StockIssueService
 
     public function approveDamage(Document $document): Document
     {
-        if ($document->created_by && $document->created_by === auth()->id()) {
+        if ($document->created_by && $document->created_by === auth()->id() && ! auth()->user()?->hasPermission('system.admin')) {
             throw new RuntimeException('ผู้สร้างใบตัดชำรุดไม่สามารถอนุมัติรายการของตนเอง');
         }
 

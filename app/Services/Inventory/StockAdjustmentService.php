@@ -108,7 +108,7 @@ class StockAdjustmentService
         if ($document->status !== 'pending_approval') {
             throw new RuntimeException('เอกสารนี้ไม่ได้อยู่ในสถานะรออนุมัติ');
         }
-        if ($document->created_by && $document->created_by === auth()->id()) {
+        if ($document->created_by && $document->created_by === auth()->id() && ! auth()->user()?->hasPermission('system.admin')) {
             throw new RuntimeException('ผู้สร้างใบปรับสต๊อกไม่สามารถอนุมัติรายการของตนเอง');
         }
 

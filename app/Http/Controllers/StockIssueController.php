@@ -104,7 +104,7 @@ class StockIssueController extends Controller
     public function reject(Request $request, Document $stockIssue): RedirectResponse
     {
         abort_unless($stockIssue->status === 'pending_approval', 422);
-        abort_if($stockIssue->created_by === auth()->id(), 403, 'ผู้สร้างไม่สามารถปฏิเสธรายการตนเอง');
+        abort_if($stockIssue->created_by === auth()->id() && ! auth()->user()?->hasPermission('system.admin'), 403, 'ผู้สร้างไม่สามารถปฏิเสธรายการตนเอง');
         $data = $request->validate(['reason' => ['required', 'string', 'max:500']]);
         $stockIssue->update(['status' => 'rejected', 'remark' => trim(($stockIssue->remark ? $stockIssue->remark.' | ' : '').'ไม่อนุมัติ: '.$data['reason'])]);
 

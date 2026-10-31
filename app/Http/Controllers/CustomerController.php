@@ -112,7 +112,7 @@ class CustomerController extends Controller
     public function approveCreditLimit(Request $request, Customer $customer): RedirectResponse
     {
         abort_unless($customer->credit_limit_requested_by !== null, 422, 'ไม่มีคำขอเปลี่ยนวงเงินเครดิตค้างอยู่');
-        abort_if($customer->credit_limit_requested_by === $request->user()->id, 403, 'ผู้ขอไม่สามารถอนุมัติรายการของตนเอง');
+        abort_if($customer->credit_limit_requested_by === $request->user()->id && ! auth()->user()?->hasPermission('system.admin'), 403, 'ผู้ขอไม่สามารถอนุมัติรายการของตนเอง');
 
         $oldLimit = $customer->credit_limit;
         $customer->update([
@@ -133,7 +133,7 @@ class CustomerController extends Controller
     public function rejectCreditLimit(Request $request, Customer $customer): RedirectResponse
     {
         abort_unless($customer->credit_limit_requested_by !== null, 422, 'ไม่มีคำขอเปลี่ยนวงเงินเครดิตค้างอยู่');
-        abort_if($customer->credit_limit_requested_by === $request->user()->id, 403, 'ผู้ขอไม่สามารถปฏิเสธรายการของตนเอง');
+        abort_if($customer->credit_limit_requested_by === $request->user()->id && ! auth()->user()?->hasPermission('system.admin'), 403, 'ผู้ขอไม่สามารถปฏิเสธรายการของตนเอง');
         $data = $request->validate(['reason' => ['required', 'string', 'max:500']]);
 
         $rejectedLimit = $customer->pending_credit_limit;
