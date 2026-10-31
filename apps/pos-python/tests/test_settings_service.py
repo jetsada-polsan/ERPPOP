@@ -59,3 +59,23 @@ class CashierPinModeTest(unittest.TestCase):
         for mode, expected in (("pin", True), ("selection", False)):
             db.execute("INSERT OR REPLACE INTO device_settings (key, value, updated_at) VALUES ('cashier_login_mode', ?, datetime('now'))", (f'"{mode}"',))
             self.assertEqual(pos.requires_cashier_pin(), expected)
+
+
+class ProductGridBarcodeSearchTest(unittest.TestCase):
+    def test_grid_finds_a_product_by_its_13_digit_barcode(self) -> None:
+        import tempfile
+        from pathlib import Path
+
+        from pos_python.database import connect
+        from pos_python.order import product_grid
+
+        db = connect(Path(tempfile.mkdtemp()) / "grid.db")
+        columns = {r["name"]: r for r in db.execute("PRAGMA table_info(products)")}
+        required = [n for n, r in columns.items() if r["notnull"] and r["dflt_value"] is None and not r["pk"]]
+        values = {n: "x" for n in required} | {"sku": "100001", "name": "น้ำดื่ม", "active": 1}
+        db.execute(f"INSERT INTO products ({','.join(values)}) VALUES ({','.join('?' * len(values))})", tuple(values.values()))
+        product_id = db.execute("SELECT id FROM products").fetchone()["id"]
+        db.execute("INSERT INTO product_barcodes (barcode, product_id, synced_at) VALUES ('8850123456789', ?, 'now')", (product_id,))
+
+        self.assertEqual([r["sku"] for r in product_grid(db, search="8850123456789")], ["100001"])
+        self.assertEqual(product_grid(db, search="9999999999999"), [])

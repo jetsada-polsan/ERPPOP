@@ -10,6 +10,7 @@ use App\Models\ProductPrice;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class PriceTagController extends Controller
@@ -69,6 +70,7 @@ class PriceTagController extends Controller
             ->when($q, fn ($query) => $query->where(fn ($w) => $w
                 ->where('sku_code', 'ilike', "%{$q}%")
                 ->orWhere('name_th', 'ilike', "%{$q}%")
+                ->orWhereIn('id', DB::table('product_barcodes')->select('product_id')->where('is_active', true)->where('barcode', 'like', "%{$q}%"))
             ))
             ->orderBy('sku_code')
             ->limit(20)

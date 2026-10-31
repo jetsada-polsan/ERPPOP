@@ -1749,8 +1749,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             # Extra products remain available by scrolling inside this panel.
             row_height = layout_metrics["card"]
             term = self.scan.text().strip()
-            # ตัวเลขล้วนคือกำลังยิงบาร์โค้ด ไม่ใช่ค้นหา — อย่าให้ตารางกระพริบระหว่างสแกน
-            search = "" if term.isdigit() else term
+            # ค้นได้ทั้งชื่อ รหัส และบาร์โค้ด ตัวเลขสั้นยังไม่กรอง กันตารางกระพริบระหว่างเริ่มยิงสแกน
+            search = "" if term.isdigit() and len(term) < 4 else term
             for index, product in enumerate(product_grid(service.db, category=self.category, search=search)):
                 price, _ = service.effective_price(int(product["id"]), product["price"] or 0)
                 sku = str(product["sku"] or "").strip()

@@ -9,6 +9,7 @@ use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class FlashSaleController extends Controller
@@ -40,6 +41,7 @@ class FlashSaleController extends Controller
             ->when($q, fn ($query) => $query->where(fn ($w) => $w
                 ->where('products.sku_code', 'ilike', "%{$q}%")
                 ->orWhere('products.name_th', 'ilike', "%{$q}%")
+                ->orWhereIn('products.id', DB::table('product_barcodes')->select('product_id')->where('is_active', true)->where('barcode', 'like', "%{$q}%"))
             ))
             ->orderBy('products.sku_code')
             ->select('flash_sale_items.*')
@@ -93,6 +95,7 @@ class FlashSaleController extends Controller
             ->when($q, fn ($query) => $query->where(fn ($w) => $w
                 ->where('sku_code', 'ilike', "%{$q}%")
                 ->orWhere('name_th', 'ilike', "%{$q}%")
+                ->orWhereIn('id', DB::table('product_barcodes')->select('product_id')->where('is_active', true)->where('barcode', 'like', "%{$q}%"))
                 ->orWhereHas('barcodes', fn ($b) => $b->where('barcode', 'ilike', "%{$q}%"))
             ))
             ->orderBy('sku_code')

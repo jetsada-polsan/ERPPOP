@@ -14,6 +14,7 @@ use App\Support\DecimalMath;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class PriceTableController extends Controller
@@ -84,6 +85,7 @@ class PriceTableController extends Controller
             ->when($q, fn ($query) => $query->where(fn ($w) => $w
                 ->where('products.sku_code', 'ilike', "%{$q}%")
                 ->orWhere('products.name_th', 'ilike', "%{$q}%")
+                ->orWhereIn('products.id', DB::table('product_barcodes')->select('product_id')->where('is_active', true)->where('barcode', 'like', "%{$q}%"))
             ))
             ->orderBy('products.sku_code')
             ->select('product_prices.*')
@@ -178,6 +180,7 @@ class PriceTableController extends Controller
             ->when($q, fn ($query) => $query->where(fn ($w) => $w
                 ->where('sku_code', 'ilike', "%{$q}%")
                 ->orWhere('name_th', 'ilike', "%{$q}%")
+                ->orWhereIn('id', DB::table('product_barcodes')->select('product_id')->where('is_active', true)->where('barcode', 'like', "%{$q}%"))
             ))
             ->orderBy('sku_code')
             ->limit(20)

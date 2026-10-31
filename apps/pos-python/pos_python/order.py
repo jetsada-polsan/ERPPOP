@@ -232,8 +232,8 @@ def product_grid(db: sqlite3.Connection, *, category: str = ALL_CATEGORIES, sear
 
     term = search.strip()
     if term:
-        sql += " AND (name LIKE ? OR sku LIKE ?)"
-        params.extend([f"%{term}%", f"%{term}%"])
+        sql += " AND (name LIKE ? OR sku LIKE ? OR id IN (SELECT product_id FROM product_barcodes WHERE barcode LIKE ?))"
+        params.extend([f"%{term}%", f"%{term}%", f"%{term}%"])
 
     sql += " ORDER BY name LIMIT ?"
     params.append(limit)
