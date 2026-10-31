@@ -1,3 +1,23 @@
+# Handoff — 2026-10-31 (แสดงบาร์โค้ดและค้นหาสินค้าอัตโนมัติ)
+
+## Commit
+- `a58769d` — `Show product barcodes and auto-search catalog`
+
+## ทำอะไรไป
+- ตารางสินค้าแสดงบาร์โค้ดทุกชุดของสินค้า; บาร์โค้ดที่ปิดใช้งานแสดงสีจางและขีดฆ่า โดยไม่มีการแก้รหัสหรือบาร์โค้ดในข้อมูล
+- ค้นหาได้จาก SKU, ชื่อไทย, ชื่ออังกฤษ และบาร์โค้ด; ค้นหาอัตโนมัติหลังหยุดพิมพ์ 0.5 วินาที และยังกด Enter/ปุ่มค้นหาได้
+- โหลดบาร์โค้ดของสินค้าในหน้าเดียวกันแบบ eager load เพื่อไม่ยิง query แยกต่อแถว
+
+## ทดสอบไปแล้วแค่ไหน
+- `php -d memory_limit=1G vendor/bin/phpunit --filter ProductCatalogFilterTest`: 3 tests / 34 assertions ผ่าน
+- `php -d memory_limit=1G vendor/bin/phpunit`: 683 tests (682 ผ่าน, 1 skipped), 5,771 assertions; incomplete 6
+- `vendor/bin/pint --test app/Http/Controllers/ProductController.php tests/Feature/ProductCatalogFilterTest.php` และ `git diff --check` ผ่าน
+- `php artisan erp:health` ในเครื่อง dev: ฐานข้อมูล, ขาย-GL, ตรวจนับ, storage และ queue ผ่าน; migration ค้าง 25 รายการและไม่พบไฟล์ backup ใน local environment
+
+## ความเสี่ยง/งานถัดไป
+- ยังไม่ได้ deploy; ไม่มี migration หรือการแก้ข้อมูล production ในงานนี้
+- ส่งขึ้น `main` แล้ว; deploy เมื่อเจ้าของสั่งตาม `docs/OPERATIONS.md` จากนั้นตรวจค้นหา SKU/ชื่อ/บาร์โค้ดและการแสดงบาร์โค้ดบนหน้า production
+
 # Handoff — 2026-10-31 (เขียนทุนซื้อล่าสุดกลับ ERP และตรวจส่วนลด POS)
 
 ## Commit
