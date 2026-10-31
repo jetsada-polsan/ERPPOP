@@ -33,8 +33,8 @@ Thumbs.db
 Desktop.ini
 
 # Local SQLite databases (active user data in runtime)
-pos.db
-pos.db-journal
 pos_offline.db
 pos.db-shm
 pos.db-wal
+
+release_dist/

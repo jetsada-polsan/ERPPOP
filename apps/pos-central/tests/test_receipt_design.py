@@ -9,21 +9,12 @@ from ui.receipt_dialog import (
 
 
 def test_receipt_helper_formatters():
-    assert _format_receipt_qty(0.27) == "0.27"
-    assert _format_receipt_qty(0.37) == "0.37"
-    assert _format_receipt_qty("0.12345678") == "0.12345678"
+    assert _format_receipt_qty(0.27) == "0.2 **"
+    assert _format_receipt_qty(0.37) == "0.3 **"
     assert _format_receipt_qty(2) == "2"
     assert _format_total_qty(0.64) == "0.64"
-    assert _format_total_qty("0.12345678") == "0.12345678"
     assert _format_total_qty(2.0) == "2"
     assert _receipt_date_label("2026-10-26 16:04:00") == "26/10/2569 16:04"
-
-
-def test_included_vat_uses_half_up_satang_rounding():
-    from decimal import Decimal
-    from services.money import included_vat
-
-    assert included_vat("0.08", 7) == Decimal("0.01")
 
 
 def test_no_satang_rounding_calculation():
@@ -40,11 +31,11 @@ def test_receipt_dialog_matches_reference_slip(qtbot):
     receipt_data = {
         "doc_number": "000201254756",
         "date": "2026-10-26 16:04:00",
-        "total": 59.18,
-        "satang_discount": 0.00,
+        "total": 59.00,
+        "satang_discount": 0.18,
         "discount_amount": 0.00,
         "payment_method": "cash",
-        "cash_received": 59.18,
+        "cash_received": 59.00,
         "change_amount": 0.00,
         "cashier": "01",
         "items": [
@@ -57,7 +48,7 @@ def test_receipt_dialog_matches_reference_slip(qtbot):
     plain = dlg.receipt_text.toPlainText()
     assert "POP STAR SHOP" in plain
     assert "ใบรับเงิน" in plain
-    assert "0.27 ตับไก่" in plain
+    assert "0.2 ** ตับไก่" in plain
     assert "24.03#" in plain
     assert "35.15#" in plain
     assert "ลดจากปัดเศษสตางค์" not in plain
@@ -75,7 +66,7 @@ def test_receipt_dialog_matches_reference_slip(qtbot):
 
 def test_version_string_and_receipt_jumbo_sizing(qtbot):
     from ui.token_dialog import VERSION_STRING
-    assert VERSION_STRING == "1.2.9"
+    assert VERSION_STRING == "1.2.21"
 
     dlg = ReceiptDialog(None, {
         "doc_number": "POS-0001-20260417100516-247",
@@ -118,3 +109,4 @@ def test_receipt_settings_dialog_copies_and_printer(qtbot, monkeypatch):
     dlg.save_settings(and_test=False)
 
     assert dlg.config['receipt_copies'] == 3
+

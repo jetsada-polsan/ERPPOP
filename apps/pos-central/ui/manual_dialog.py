@@ -1,10 +1,9 @@
-from ui.theme import apply_pos_theme
 import os
 import sys
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap, QIcon, QFont
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
     QListWidget, QListWidgetItem, QStackedWidget, QWidget,
     QScrollArea, QFrame
 )
@@ -18,7 +17,7 @@ def get_asset_path(filename: str) -> str:
 
 class ManualDialog(QDialog):
     """
-    Shared PopCentral POS visual system for the in-app user manual.
+    Modern Red & White Enterprise User Manual Dialog
     for PopCentral POS Desktop Application.
     """
     def __init__(self, parent=None, initial_step=0):
@@ -32,10 +31,10 @@ class ManualDialog(QDialog):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # Header
+        # Header (Red Enterprise Theme)
         header = QFrame()
         header.setFixedHeight(64)
-        header.setStyleSheet("background-color: #147da8; border-bottom: 2px solid #0b5275;")
+        header.setStyleSheet("background-color: #dc2626; border-bottom: 2px solid #b91c1c;")
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(24, 0, 24, 0)
 
@@ -46,7 +45,7 @@ class ManualDialog(QDialog):
         header_layout.addStretch()
 
         sub_lbl = QLabel("ศูนย์รวมวิธีใช้งานและแก้ไขปัญหาเบื้องต้น")
-        sub_lbl.setStyleSheet("font-size: 13px; color: #e3f1f7;")
+        sub_lbl.setStyleSheet("font-size: 13px; color: #fee2e2;")
         header_layout.addWidget(sub_lbl)
 
         main_layout.addWidget(header)
@@ -74,14 +73,14 @@ class ManualDialog(QDialog):
                 border-left: 4px solid transparent;
             }
             QListWidget::item:hover {
-                background-color: #eaf3f8;
-                color: #0b5e83;
+                background-color: #fef2f2;
+                color: #dc2626;
             }
             QListWidget::item:selected {
-                background-color: #dcecf4;
-                color: #0b5e83;
+                background-color: #fee2e2;
+                color: #b91c1c;
                 font-weight: 800;
-                border-left: 4px solid #147da8;
+                border-left: 4px solid #dc2626;
             }
         """)
 
@@ -149,7 +148,6 @@ class ManualDialog(QDialog):
         # Navigation connection
         self.nav_list.currentRowChanged.connect(self.stack.setCurrentIndex)
         self.nav_list.setCurrentRow(initial_step)
-        apply_pos_theme(self)
 
     def _create_scrollable_container(self):
         scroll = QScrollArea()
@@ -395,7 +393,7 @@ class ManualDialog(QDialog):
         layout.addWidget(title)
 
         faq_items = [
-            ("อินเทอร์เน็ตหลุด / ออฟไลน์ ยังขายได้ไหม?",
+            ("อินเทอร์เน็ตหลุด / ออฟไลน์ ยังขายได้ไหม?", 
              "<b>ขายได้ตามปกติ 100%!</b> ระบบมีระบบ Local Database ในตัว สามารถยิงบาร์โค้ด พิมพ์ใบเสร็จ และรับเงินสดได้ตามปกติ เมื่อเน็ตกลับมา ระบบจะซิงค์บิลขึ้นระบบคลาวด์ให้อัตโนมัติ"),
             ("เข้าสู่ระบบแจ้งเตือน 'PIN / รหัสผ่านไม่ถูกต้อง' ทำอย่างไร?",
              "ให้ตรวจสอบว่าคุณได้รับสิทธิ์แคชเชียร์ในสาขานี้แล้วหรือยัง โดยสามารถแจ้ง Admin ตรวจสอบได้ที่หน้าเว็บ ERP เมนูตั้งค่าผู้ใช้งาน"),

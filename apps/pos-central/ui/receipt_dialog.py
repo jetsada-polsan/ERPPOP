@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from ui.theme import apply_pos_theme
 from PySide6.QtWidgets import (QGraphicsDropShadowEffect, QDialog, QHBoxLayout, QVBoxLayout, QFrame,
 
                                QFormLayout, QComboBox, QLineEdit, QTextEdit, QSpinBox,
@@ -18,9 +17,8 @@ import os
 import json
 import html
 import sys
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 from datetime import datetime
-from services.money import included_vat, money
 
 def _receipt_amount(value):
     return Decimal(str(value or 0))
@@ -46,13 +44,15 @@ def _receipt_date_label(value):
     return date.strftime('%d/%m/') + f'{thai_year:04d} ' + date.strftime('%H:%M')
 
 def _format_receipt_qty(qty_value):
-    qty_dec = _receipt_amount(qty_value).quantize(Decimal('0.00000001'), rounding=ROUND_HALF_UP).normalize()
+    from decimal import ROUND_FLOOR
+    qty_dec = _receipt_amount(qty_value)
     if qty_dec == int(qty_dec):
         return f"{int(qty_dec)}"
-    return format(qty_dec, 'f').rstrip('0').rstrip('.')
+    first_dec = (qty_dec * Decimal('10')).to_integral_value(rounding=ROUND_FLOOR) / Decimal('10')
+    return f"{first_dec:.1f} **"
 
 def _format_total_qty(qty_value):
-    qty_dec = _receipt_amount(qty_value).quantize(Decimal('0.00000001'), rounding=ROUND_HALF_UP).normalize()
+    qty_dec = _receipt_amount(qty_value).quantize(Decimal('0.001')).normalize()
     if qty_dec == int(qty_dec):
         return f"{int(qty_dec)}"
     text = f"{qty_dec:f}"
@@ -198,7 +198,7 @@ def print_escpos_receipt(printer_name, receipt_data, config):
 
             return text.encode('cp874', errors='replace')
 
-
+    
 
     header_text = config.get('receipt_header', '')
 
@@ -206,7 +206,7 @@ def print_escpos_receipt(printer_name, receipt_data, config):
 
         header_text = "บริษัท ป๊อปสตาร์ฟู้ดส์ เทรดดิ้ง จำกัด\n480 ถนนวารินชำราบ-ศรีสะเกษ ม.1 ต.แสนสุข\nอ.วารินชำราบ จ.อุบลราชธานี 34190\nโทร. 061-935-4497 | Line: @popstarshop"
 
-
+        
 
     footer_text = config.get('receipt_footer', '')
 
@@ -224,12 +224,12 @@ def print_escpos_receipt(printer_name, receipt_data, config):
 
     total_amount = receipt_data.get('total', 0.0)
 
-
+    
 
     pm = receipt_data.get('payment_method', 'cash')
     method_str = _payment_method_label(pm)
 
-
+    
 
     is_full_tax = receipt_data.get('is_full_tax', False)
 
@@ -239,7 +239,7 @@ def print_escpos_receipt(printer_name, receipt_data, config):
 
     cust_addr = receipt_data.get('customer_address', '') or ''
 
-
+    
 
     ESC = b'\x1b'
 
@@ -266,17 +266,23 @@ def print_escpos_receipt(printer_name, receipt_data, config):
     OPEN_DRAWER_1 = ESC + b'p\x00\x19\xfa'
     OPEN_DRAWER_2 = ESC + b'p\x01\x19\xfa'
 
-
+    
 
     cmds = bytearray()
 
     cmds += INIT
-    cmds += FONT_SMALL
 
+    # Auto-kick cash drawer on printing receipt for cash or split payment
+    pm_code = str(receipt_data.get('payment_method', '')).lower()
+    if pm_code in ['cash', 'split', 'mixed', 'เงินสด', 'ผสม (split)', 'ผสม'] or config.get('open_drawer_on_print', True):
+        cmds += get_drawer_kick_commands()
+
+    cmds += FONT_SMALL
+    
     cmds += ALIGN_CENTER
 
     cmds += _escpos_logo()
-
+    
     cmds += BOLD_ON
     for line in header_text.split('\n'):
 
@@ -284,9 +290,9 @@ def print_escpos_receipt(printer_name, receipt_data, config):
     cmds += BOLD_OFF
     cmds += enc("ใบกำกับภาษีอย่างย่อ") + LINE_FEED
 
+        
 
-
-
+    
 
     cmds += ALIGN_LEFT
     if is_full_tax:
@@ -294,7 +300,7 @@ def print_escpos_receipt(printer_name, receipt_data, config):
         cmds += enc(f"เลขผู้เสียภาษี: {cust_tax}") + LINE_FEED
         cmds += enc(f"ที่อยู่: {cust_addr}") + LINE_FEED
         cmds += enc("-" * 48) + LINE_FEED
-
+        
     cmds += enc(f"สาขา: {branch}    แคชเชียร์: {cashier}") + LINE_FEED
     cmds += enc(f"เลขที่: {receipt_no}") + LINE_FEED
     cmds += ALIGN_RIGHT
@@ -311,21 +317,19 @@ def print_escpos_receipt(printer_name, receipt_data, config):
         padding = max(1, 48 - len(name_text) - len(total_text))
         cmds += enc(name_text + " " * padding + total_text) + LINE_FEED
         cmds += enc(f"  {qty} x {price:,.2f}") + LINE_FEED
-
+    
     cmds += enc('-' * 48) + LINE_FEED
-
-    subtotal = float(receipt_data.get('subtotal', 0.0) or 0.0)
-    if subtotal == 0 and receipt_data.get('items'):
-        subtotal = sum(float(it.get('total', 0.0)) for it in receipt_data.get('items', []))
+    
+    subtotal = sum(float(it.get('total', 0.0)) for it in receipt_data.get('items', []))
     discount = float(receipt_data.get('discount_amount', 0.0))
     if discount > 0:
         cmds += enc(f"รวมเป็นเงิน: {subtotal:,.2f}") + LINE_FEED
         cmds += enc(f"ส่วนลด: -{discount:,.2f}") + LINE_FEED
         cmds += enc('-' * 48) + LINE_FEED
-
+    
     vat_rate = _receipt_amount(receipt_data.get('vat_rate', 7))
     net_amount = _receipt_amount(total_amount)
-    vat_amount = included_vat(net_amount, vat_rate)
+    vat_amount = net_amount * vat_rate / (Decimal('100') + vat_rate) if vat_rate else Decimal('0')
     before_vat = net_amount - vat_amount
     cmds += enc(f"มูลค่าสินค้า (ก่อน VAT) {before_vat:,.2f}") + LINE_FEED
     cmds += enc(f"ภาษีมูลค่าเพิ่ม {vat_rate}% {vat_amount:,.2f}") + LINE_FEED
@@ -340,7 +344,7 @@ def print_escpos_receipt(printer_name, receipt_data, config):
     cmds += enc(f'ชำระโดย: {method_str}') + LINE_FEED
     cmds += enc('-' * 48) + LINE_FEED
 
-
+    
 
     cmds += BOLD_ON
 
@@ -354,7 +358,7 @@ def print_escpos_receipt(printer_name, receipt_data, config):
 
     cmds += CUT_PAPER
 
-
+    
 
     try:
 
@@ -388,71 +392,50 @@ def print_escpos_receipt(printer_name, receipt_data, config):
 
         raise Exception(f"ไม่สามารถส่งข้อมูลไปที่เครื่องพิมพ์ '{printer_name}' ได้: {str(e)}")
 
+def get_drawer_kick_commands():
+    ESC = b'\x1b'
+    DLE = b'\x10'
+    cmds = bytearray()
+    cmds += ESC + b'@'                    # Initialize printer
+    cmds += ESC + b'p\x00\x19\xfa'        # Pin 2 standard ESC/POS pulse (50ms on / 500ms off)
+    cmds += ESC + b'p\x01\x19\xfa'        # Pin 5 standard ESC/POS pulse (50ms on / 500ms off)
+    cmds += ESC + b'p\x00\x32\x32'        # Pin 2 pulse variant (50ms on / 50ms off)
+    cmds += ESC + b'p\x01\x32\x32'        # Pin 5 pulse variant (50ms on / 50ms off)
+    cmds += DLE + b'\x14\x01\x00\x05'    # DLE DC4 real-time pulse (Pin 2)
+    cmds += DLE + b'\x14\x01\x01\x05'    # DLE DC4 real-time pulse (Pin 5)
+    cmds += b'\x07'                       # BEL (Star / generic pulse)
+    return bytes(cmds)
+
 def open_cash_drawer(printer_name):
-
     try:
-
         import win32print
-
     except ImportError:
-
         raise Exception("Cannot import win32print")
 
-
-
     if not printer_name:
-
         raise Exception("No printer configured")
 
-
-
-    ESC = b''
-
-    INIT = ESC + b'@'
-
-    OPEN_DRAWER_1 = ESC + b'p\x00\x19\xfa'
-
-    OPEN_DRAWER_2 = ESC + b'p\x01\x19\xfa'
-
-
-
-    cmds = bytearray()
-
-    cmds += INIT
-    cmds += OPEN_DRAWER_1
-    cmds += OPEN_DRAWER_2
-
-
+    cmds = get_drawer_kick_commands()
 
     try:
-
         hPrinter = win32print.OpenPrinter(printer_name)
-
         try:
-
-            win32print.StartDocPrinter(hPrinter, 1, ("OpenDrawer", None, "RAW"))
-
+            win32print.StartDocPrinter(hPrinter, 1, ("PopCentralPOS OpenDrawer", None, "RAW"))
             win32print.StartPagePrinter(hPrinter)
-
             win32print.WritePrinter(hPrinter, bytes(cmds))
-
             win32print.EndPagePrinter(hPrinter)
-
             win32print.EndDocPrinter(hPrinter)
-
         finally:
-
             win32print.ClosePrinter(hPrinter)
-
+        return True
     except Exception as e:
-
         raise Exception(f"Failed to open drawer: {str(e)}")
 
 class ReceiptSettingsDialog(QDialog):
     def __init__(self, parent=None, config=None, receipt_data=None):
         super().__init__(parent)
         self.setWindowTitle("ตั้งค่าเครื่องพิมพ์ใบเสร็จ")
-        self.setFixedSize(480, 360)
+        self.setFixedSize(540, 370)
         self.setStyleSheet("""
             QDialog {
                 background-color: #ffffff;
@@ -616,11 +599,33 @@ class ReceiptSettingsDialog(QDialog):
         """)
         save_btn.clicked.connect(lambda: self.save_settings(and_test=False))
 
+        drawer_test_btn = QPushButton("ทดสอบเปิดลิ้นชัก")
+        drawer_test_btn.setFixedHeight(42)
+        drawer_test_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #fff7ed; border: 1px solid #fdba74; color: #c2410c;
+                font-size: 13px; font-weight: bold; border-radius: 8px; padding: 0 14px;
+            }
+            QPushButton:hover { background-color: #ffedd5; }
+        """)
+        drawer_test_btn.clicked.connect(self.test_drawer)
+
         btn_layout.addWidget(cancel_btn)
+        btn_layout.addWidget(drawer_test_btn)
         btn_layout.addWidget(test_btn)
         btn_layout.addWidget(save_btn)
         main_layout.addLayout(btn_layout)
-        apply_pos_theme(self)
+
+    def test_drawer(self):
+        printer_name = self.printer_combo.currentText().strip()
+        if printer_name == "--- กรุณาเลือกเครื่องพิมพ์ ---" or not printer_name:
+            QMessageBox.warning(self, "แจ้งเตือน", "กรุณาเลือกเครื่องพิมพ์ก่อนทดสอบเปิดลิ้นชัก")
+            return
+        try:
+            open_cash_drawer(printer_name)
+            QMessageBox.information(self, "สำเร็จ", f"ส่งคำสั่งเปิดลิ้นชักไปยังเครื่องพิมพ์ '{printer_name}' เรียบร้อยแล้ว")
+        except Exception as e:
+            QMessageBox.critical(self, "ข้อผิดพลาด", f"ไม่สามารถเปิดลิ้นชักได้:\n{str(e)}")
 
     def save_and_test(self):
         self.save_settings(and_test=True)
@@ -694,20 +699,19 @@ class ReceiptDialog(QDialog):
 
         self.setStyleSheet("background-color: #f3f4f6; color: #111827; font-family: Tahoma, sans-serif;")
 
-
+        
 
         self.receipt_data = receipt_data or {}
 
         self.init_ui()
-        apply_pos_theme(self)
 
-
+        
 
     def init_ui(self):
 
         main_layout = QVBoxLayout(self)
 
-
+        
 
         paper = QFrame()
 
@@ -717,7 +721,7 @@ class ReceiptDialog(QDialog):
         self.paper_layout.setContentsMargins(18, 16, 18, 16)
         self.paper_layout.setSpacing(8)
 
-
+        
 
         self.receipt_text = QTextEdit()
 
@@ -731,11 +735,11 @@ class ReceiptDialog(QDialog):
 
         self.paper_layout.addWidget(self.receipt_text)
 
-
+        
 
         self.update_receipt_ui(self.config)
 
-
+        
 
         # Auto-open drawer if cash or split
 
@@ -755,28 +759,24 @@ class ReceiptDialog(QDialog):
 
                     pass
 
-
+        
 
         top_btns = QHBoxLayout()
 
         print_btn = QPushButton("🖨️ พิมพ์")
-
         print_btn.setStyleSheet("QPushButton { background-color: #10b981; color: white; border: none; border-radius: 8px; padding: 10px; font-weight: bold; font-size: 14px; } QPushButton:hover { background-color: #059669; }")
-
         print_btn.clicked.connect(self.print_receipt)
 
-
+        drawer_btn = QPushButton("💵 ลิ้นชัก")
+        drawer_btn.setStyleSheet("QPushButton { background-color: #f8fafc; color: #1e293b; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; font-weight: bold; font-size: 14px; } QPushButton:hover { background-color: #e2e8f0; }")
+        drawer_btn.clicked.connect(self.manual_open_drawer)
 
         settings_btn = QPushButton("⚙️ ตั้งค่า")
-
         settings_btn.setStyleSheet("QPushButton { background-color: white; border: 1px solid #d1d5db; border-radius: 8px; padding: 10px; font-weight: bold; } QPushButton:hover { background-color: #f3f4f6; }")
-
         settings_btn.clicked.connect(self.open_settings)
 
-
-
         top_btns.addWidget(print_btn)
-
+        top_btns.addWidget(drawer_btn)
         top_btns.addWidget(settings_btn)
 
         self.paper_layout.addLayout(top_btns)
@@ -789,7 +789,7 @@ class ReceiptDialog(QDialog):
 
         self.paper_layout.addWidget(new_bill_btn)
 
-
+        
 
         main_layout.addWidget(paper)
         self.adjustSize()
@@ -862,28 +862,17 @@ class ReceiptDialog(QDialog):
         date_str = self.receipt_data.get('date', '-')
 
         items_list = self.receipt_data.get('items', [])
-        items_sum = sum((_receipt_amount(it.get('total', 0)) for it in items_list), Decimal('0.00')).quantize(
-            Decimal('0.01'), rounding=ROUND_HALF_UP
-        )
-        manual_discount = _receipt_amount(self.receipt_data.get('discount_amount', 0)).quantize(
-            Decimal('0.01'), rounding=ROUND_HALF_UP
-        )
+        items_sum = sum((_receipt_amount(it.get('total', 0)) for it in items_list), Decimal('0.00')).quantize(Decimal('0.01'))
+        manual_discount = _receipt_amount(self.receipt_data.get('discount_amount', 0)).quantize(Decimal('0.01'))
 
-        if self.receipt_data.get('total') is not None:
-            total_amount = max(
-                Decimal('0.00'),
-                _receipt_amount(self.receipt_data.get('total')),
-            ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-        elif items_sum > Decimal('0.00'):
-            total_amount = max(Decimal('0.00'), items_sum - manual_discount).quantize(
-                Decimal('0.01'), rounding=ROUND_HALF_UP
-            )
+        if items_sum > Decimal('0.00'):
+            total_amount = max(Decimal('0.00'), items_sum - manual_discount).quantize(Decimal('0.01'))
         else:
             total_amount = _receipt_amount(self.receipt_data.get('total', 0)).quantize(Decimal('0.01'))
         satang_discount = Decimal('0.00')
 
         vat_rate = _receipt_amount(self.receipt_data.get('vat_rate', 7))
-        vat_amount = included_vat(total_amount, vat_rate)
+        vat_amount = total_amount * vat_rate / (Decimal('100') + vat_rate) if vat_rate else Decimal('0')
         before_vat = total_amount - vat_amount
 
         safe = lambda value: html.escape(str(value or ''))
@@ -1038,12 +1027,23 @@ class ReceiptDialog(QDialog):
 
             return
 
+        # Require PIN to open drawer
+        from ui.drawer_pin_dialog import DrawerPinDialog
+        pin_dialog = DrawerPinDialog(
+            self,
+            api_url=config.get('api_url', ''),
+            pos_token=config.get('pos_token', ''),
+            cashier_code=config.get('cashier_code') or config.get('cashier_username', ''),
+            offline_auth=config.get('offline_auth'),
+            active_pin=getattr(parent_window, '_active_cashier_pin', '') if parent_window else ''
+        )
+        if pin_dialog.exec() != QDialog.Accepted:
+            return
+
         try:
-
             open_cash_drawer(printer_name)
-
+            QMessageBox.information(self, "สำเร็จ", f"ส่งคำสั่งเปิดลิ้นชักไปยังเครื่องพิมพ์ '{printer_name}' เรียบร้อยแล้ว")
         except Exception as e:
-
             QMessageBox.critical(self, "Error", f"ไม่สามารถเปิดลิ้นชักได้:\n{str(e)}")
 
     def print_receipt(self):
@@ -1081,10 +1081,9 @@ class ShiftReportDialog(QDialog):
         self.setMinimumHeight(400)
         self.setMaximumHeight(780)
         self.setStyleSheet("background-color: #f1f5f9; color: #0f172a; font-family: 'Sarabun', Tahoma, sans-serif;")
-
+        
         self.shift_data = shift_data or {}
         self.init_ui()
-        apply_pos_theme(self)
 
     def init_ui(self):
         main_layout = QVBoxLayout(self)
@@ -1219,17 +1218,18 @@ class ShiftReportDialog(QDialog):
         closed_at = str(shift.get('closed_at') or '-') if status != 'open' else 'ยังไม่ปิด'
 
         opening_cash = float(shift.get('opening_cash') or 0.0)
-        cash_sales = money(shift.get('cash_sales') or 0.0)
-        transfer_sales = money(shift.get('transfer_sales') or 0.0)
-        card_sales = money(shift.get('card_sales') or 0.0)
-        cheque_sales = money(shift.get('cheque_sales') or 0.0)
-        total_sales = money(cash_sales + transfer_sales + card_sales + cheque_sales)
-        expected_cash = float(shift.get('expected_cash') or (money(opening_cash) + cash_sales))
+        cash_sales = float(shift.get('cash_sales') or 0.0)
+        transfer_sales = float(shift.get('transfer_sales') or 0.0)
+        card_sales = float(shift.get('card_sales') or 0.0)
+        gross_sales = cash_sales + transfer_sales + card_sales
+        total_sales = gross_sales
+        expected_cash = float(shift.get('expected_cash') or (opening_cash + cash_sales))
         counted_cash = shift.get('counted_cash')
         cash_difference = shift.get('cash_difference')
         receipt_count = int(shift.get('receipt_count') or 0)
 
-        vat_amount = included_vat(total_sales, 7)
+        # VAT calculation (approx 7% included)
+        vat_amount = round(total_sales * 7 / 107, 2)
         before_vat = total_sales - vat_amount
 
         now_str = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
@@ -1289,7 +1289,6 @@ class ShiftReportDialog(QDialog):
                 <tr><td style="padding: 2px 0;">เงินสด (Cash)</td><td align="right" style="font-weight: 800;">{cash_sales:,.2f}</td></tr>
                 <tr><td style="padding: 2px 0;">โอนเงิน / PromptPay</td><td align="right" style="font-weight: 800;">{transfer_sales:,.2f}</td></tr>
                 <tr><td style="padding: 2px 0;">บัตรเครดิต</td><td align="right" style="font-weight: 800;">{card_sales:,.2f}</td></tr>
-                <tr><td style="padding: 2px 0;">เช็ค</td><td align="right" style="font-weight: 800;">{cheque_sales:,.2f}</td></tr>
                 <tr style="font-weight: 900;"><td style="padding: 4px 0;">รวมยอดชำระ</td><td align="right" style="padding: 4px 0;">{total_sales:,.2f}</td></tr>
             </table>
             <div class="rule"></div>
@@ -1342,28 +1341,22 @@ class ShiftReportDialog(QDialog):
             QMessageBox.warning(self, "แจ้งเตือน", "ยังไม่ได้ตั้งค่าเครื่องพิมพ์ในระบบ")
             return
 
-        offline_auth = config.get('offline_auth')
-        cashier_name = config.get('cashier_name', '')
-        if not offline_auth or cashier_name == 'Unknown' or not cashier_name:
-            QMessageBox.warning(self, "แจ้งเตือน", "กรุณาเข้าสู่ระบบแคชเชียร์ก่อนทำการเปิดลิ้นชัก (Login Required)")
-            return
-
-        from PySide6.QtWidgets import QInputDialog, QLineEdit
-        pwd, ok = QInputDialog.getText(
+        # Require PIN to open drawer
+        from ui.drawer_pin_dialog import DrawerPinDialog
+        pin_dialog = DrawerPinDialog(
             self,
-            "ยืนยันตัวตน",
-            f"เปิดลิ้นชักสำหรับ {cashier_name}\nกรุณาใส่รหัสผ่าน/PIN ของคุณ:",
-            QLineEdit.Password
+            api_url=config.get('api_url', ''),
+            pos_token=config.get('pos_token', ''),
+            cashier_code=config.get('cashier_code') or config.get('cashier_username', ''),
+            offline_auth=config.get('offline_auth'),
+            active_pin=getattr(parent_window, '_active_cashier_pin', '') if parent_window else ''
         )
-        if not ok:
-            return
-        from services.offline_auth import verify_offline_login
-        if not verify_offline_login(offline_auth, offline_auth.get('code'), pwd):
-            QMessageBox.warning(self, "ข้อผิดพลาด", "รหัสผ่านไม่ถูกต้อง!")
+        if pin_dialog.exec() != QDialog.Accepted:
             return
 
         try:
             open_cash_drawer(printer_name)
+            QMessageBox.information(self, "สำเร็จ", f"ส่งคำสั่งเปิดลิ้นชักไปยังเครื่องพิมพ์ '{printer_name}' เรียบร้อยแล้ว")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"ไม่สามารถเปิดลิ้นชักได้:\n{str(e)}")
 

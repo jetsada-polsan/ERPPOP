@@ -1,7 +1,6 @@
-from ui.theme import apply_pos_theme
 import os
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
+    QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
     QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox
 )
 from PySide6.QtCore import Qt
@@ -73,7 +72,6 @@ class HeldBillsDialog(QDialog):
         btn_layout.addStretch()
         btn_layout.addWidget(close_btn)
         layout.addLayout(btn_layout)
-        apply_pos_theme(self)
 
     def populate_table(self):
         self.table.setRowCount(0)

@@ -1,4 +1,3 @@
-from ui.theme import apply_pos_theme
 import os
 import sys
 import requests
@@ -11,16 +10,16 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont, QIcon, QPixmap
 from urllib.parse import urlsplit
 
-VERSION_STRING = "1.2.9"
+VERSION_STRING = "1.2.21"
 
 class PosTokenLoginDialog(QDialog):
     """
     หน้าต่างเข้าสู่ระบบจุดขาย (POS Terminal Authentication)
-    หน้าผูกเครื่องและเข้าสู่ระบบในรูปแบบเดียวกับหน้าขาย PopCentral POS
+    ธีมสีแดง-ขาว (Signature Pop Star Red & White) คมชัด สวยงาม ทรงพลัง ระดับ Commercial POS
     """
-    def __init__(self, parent=None, api_url="https://erp.popstarcenter.com", default_token="", default_username="", cached_offline_auth=None):
+    def __init__(self, parent=None, api_url="http://localhost:8000", default_token="", default_username="", cached_offline_auth=None):
         super().__init__(parent)
-        self.api_url = (api_url or "https://erp.popstarcenter.com").rstrip("/")
+        self.api_url = (api_url or "http://localhost:8000").rstrip("/")
         self.token = default_token.strip()
         self.username = default_username.strip()
         self.verified_device = None
@@ -125,16 +124,15 @@ class PosTokenLoginDialog(QDialog):
         """)
 
         self.init_ui()
-        apply_pos_theme(self)
 
     def init_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # 1. Top brand header
+        # 1. Top Red Header Bar
         top_header = QWidget()
-        top_header.setStyleSheet("background-color: #147da8; border-top-left-radius: 0px; border-top-right-radius: 0px;")
+        top_header.setStyleSheet("background-color: #dc2626; border-top-left-radius: 0px; border-top-right-radius: 0px;")
         top_layout = QVBoxLayout(top_header)
         top_layout.setContentsMargins(30, 24, 30, 22)
         top_layout.setSpacing(4)
@@ -146,7 +144,7 @@ class PosTokenLoginDialog(QDialog):
         else:
             base_dir = os.path.dirname(os.path.dirname(__file__))
         logo_path = os.path.join(base_dir, 'assets', 'logo.png')
-
+        
         if os.path.exists(logo_path):
             logo_lbl = QLabel()
             logo_lbl.setAlignment(Qt.AlignCenter)
@@ -161,7 +159,7 @@ class PosTokenLoginDialog(QDialog):
 
         title = QLabel(f"POS SYSTEM (v{VERSION_STRING})")
         title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet("font-size: 13px; font-weight: 700; color: #e3f1f7; letter-spacing: 1.5px; margin-top: 2px;")
+        title.setStyleSheet("font-size: 13px; font-weight: 700; color: #fee2e2; letter-spacing: 1.5px; margin-top: 2px;")
         top_layout.addWidget(title)
 
         layout.addWidget(top_header)
@@ -192,7 +190,7 @@ class PosTokenLoginDialog(QDialog):
                 background-color: #f9fafb;
             }
             QLineEdit:focus {
-                border-color: #147da8;
+                border-color: #dc2626;
                 background-color: #ffffff;
             }
         """)
@@ -218,7 +216,7 @@ class PosTokenLoginDialog(QDialog):
                 background-color: #f9fafb;
             }
             QLineEdit:focus {
-                border-color: #147da8;
+                border-color: #dc2626;
                 background-color: #ffffff;
             }
         """)
@@ -246,7 +244,7 @@ class PosTokenLoginDialog(QDialog):
                 background-color: #f9fafb;
             }
             QLineEdit:focus {
-                border-color: #147da8;
+                border-color: #dc2626;
                 background-color: #ffffff;
             }
         """)
@@ -318,7 +316,7 @@ class PosTokenLoginDialog(QDialog):
         self.login_btn.setFixedHeight(44)
         self.login_btn.setStyleSheet("""
             QPushButton {
-                background-color: #147da8;
+                background-color: #dc2626;
                 color: #ffffff;
                 font-size: 15px;
                 font-weight: 800;
@@ -327,7 +325,7 @@ class PosTokenLoginDialog(QDialog):
                 letter-spacing: 0.5px;
             }
             QPushButton:hover {
-                background-color: #0b5e83;
+                background-color: #b91c1c;
             }
             QPushButton:pressed {
                 background-color: #991b1b;
@@ -343,16 +341,16 @@ class PosTokenLoginDialog(QDialog):
         guide_btn.setFixedSize(80, 44)
         guide_btn.setStyleSheet("""
             QPushButton {
-                background-color: #eaf3f8;
-                color: #0b5e83;
+                background-color: #fef2f2;
+                color: #dc2626;
                 font-weight: 700;
                 border: 1px solid #fecaca;
                 border-radius: 6px;
                 font-size: 13px;
             }
             QPushButton:hover {
-                background-color: #dcecf4;
-                color: #0b5275;
+                background-color: #fee2e2;
+                color: #b91c1c;
             }
         """)
         guide_btn.clicked.connect(self.show_quick_guide)

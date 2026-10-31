@@ -1,4 +1,3 @@
-from ui.theme import apply_pos_theme
 import os
 import sys
 from PySide6.QtWidgets import QFrame, QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QSpacerItem, QSizePolicy
@@ -11,15 +10,15 @@ class HelpDialog(QDialog):
         self.setWindowTitle("คู่มือการใช้งานระบบขายหน้าร้าน (JET POS)")
         self.resize(900, 650)
         self.setStyleSheet("background-color: white;")
-
+        
         self.current_step = 1
         self.total_steps = 5
-
+        
         if getattr(sys, 'frozen', False):
             self.base_path = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
         else:
             self.base_path = os.path.dirname(os.path.dirname(__file__))
-
+            
         self.image_files = {
             1: 'pos_step1.png',
             2: 'pos_step2.png',
@@ -27,36 +26,35 @@ class HelpDialog(QDialog):
             4: 'pos_step4.png',
             5: 'pos_step5.png',
         }
-
+        
         self.setup_ui()
         self.update_view()
-        apply_pos_theme(self)
-
+        
     def setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-
+        
         # Header
         header = QFrame()
-        header.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #147da8, stop:1 #0b5275);")
+        header.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #b91c1c, stop:1 #7f1d1d);")
         header.setFixedHeight(50)
         header_layout = QHBoxLayout(header)
-
+        
         self.title_label = QLabel()
         self.title_label.setStyleSheet("color: white; font-size: 16px; font-weight: bold;")
         header_layout.addWidget(self.title_label)
         layout.addWidget(header)
-
+        
         # Image
         self.img_label = QLabel()
         self.img_label.setAlignment(Qt.AlignCenter)
         self.img_label.setStyleSheet("background-color: #f8fafc;")
         layout.addWidget(self.img_label, 1) # stretch=1
-
+        
 
         # Description
         self.desc_label = QLabel()
-        self.desc_label.setStyleSheet("background-color: #eaf3f8; border: 1px solid #cfe2ed; border-radius: 12px; padding: 15px; font-size: 14px; color: #334155; margin: 10px 15px;")
+        self.desc_label.setStyleSheet("background-color: #fef2f2; border: 2px solid #b91c1c; border-radius: 12px; padding: 15px; font-size: 14px; color: #334155; margin: 10px 15px;")
         self.desc_label.setWordWrap(True)
         self.desc_label.setTextFormat(Qt.RichText)
         layout.addWidget(self.desc_label)
@@ -66,7 +64,7 @@ class HelpDialog(QDialog):
         footer.setStyleSheet("background-color: #f1f5f9; border-top: 1px solid #cbd5e1;")
         footer_layout = QHBoxLayout(footer)
         footer_layout.setContentsMargins(15, 10, 15, 10)
-
+        
         self.btn_prev = QPushButton("◀ กลับ")
         self.btn_prev.setFixedSize(120, 40)
         self.btn_prev.setStyleSheet("""
@@ -74,7 +72,7 @@ class HelpDialog(QDialog):
             QPushButton:hover { background-color: #e2e8f0; }
         """)
         self.btn_prev.clicked.connect(self.prev_step)
-
+        
         self.btn_next = QPushButton("ถัดไป ▶")
         self.btn_next.setFixedSize(120, 40)
         self.btn_next.setStyleSheet("""
@@ -82,7 +80,7 @@ class HelpDialog(QDialog):
             QPushButton:hover { background-color: #2563eb; }
         """)
         self.btn_next.clicked.connect(self.next_step)
-
+        
         self.btn_finish = QPushButton("เริ่มใช้งานเลย")
         self.btn_finish.setFixedSize(140, 40)
         self.btn_finish.setStyleSheet("""
@@ -90,15 +88,15 @@ class HelpDialog(QDialog):
             QPushButton:hover { background-color: #059669; }
         """)
         self.btn_finish.clicked.connect(self.accept)
-
+        
         spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
-
+        
         footer_layout.addWidget(self.btn_prev)
         footer_layout.addItem(spacer)
         footer_layout.addWidget(self.btn_next)
         footer_layout.addWidget(self.btn_finish)
         layout.addWidget(footer)
-
+        
     def update_view(self):
 
         descriptions = {
@@ -151,10 +149,10 @@ class HelpDialog(QDialog):
         self.desc_label.setText(descriptions.get(self.current_step, ''))
 
         self.title_label.setText(f" วิธีใช้งานระบบขายหน้าร้าน (JET POS) - ขั้นตอนที่ {self.current_step}/{self.total_steps}")
-
+        
         img_filename = self.image_files.get(self.current_step)
         img_path = os.path.join(self.base_path, 'assets', 'manual', img_filename)
-
+        
         if os.path.exists(img_path):
             pixmap = QPixmap(img_path)
             # scale to fit label (which expands to fill dialog)
@@ -163,21 +161,21 @@ class HelpDialog(QDialog):
         else:
             self.img_label.setText("ไม่พบรูปภาพประกอบ")
             self.img_label.setPixmap(QPixmap())
-
+            
         self.btn_prev.setVisible(self.current_step > 1)
-
+        
         if self.current_step < self.total_steps:
             self.btn_next.show()
             self.btn_finish.hide()
         else:
             self.btn_next.hide()
             self.btn_finish.show()
-
+            
     def next_step(self):
         if self.current_step < self.total_steps:
             self.current_step += 1
             self.update_view()
-
+            
     def prev_step(self):
         if self.current_step > 1:
             self.current_step -= 1
