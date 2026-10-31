@@ -44,9 +44,9 @@ class User extends Authenticatable
      *
      * @return Collection<int, int>
      */
-    public function reportBranchIds(): Collection
+    public function reportBranchIds(?string $permission = 'reports.view'): Collection
     {
-        if (! $this->hasPermission('reports.view')) {
+        if ($permission !== null && ! $this->hasPermission($permission)) {
             return collect();
         }
 
@@ -62,11 +62,26 @@ class User extends Authenticatable
             ->where(fn ($roles) => $roles
                 ->whereNull('user_branch_roles.effective_to')
                 ->orWhere('user_branch_roles.effective_to', '>', now()))
-            ->whereHas('permissions', fn ($permissions) => $permissions->where('code', 'reports.view'))
+            ->when($permission !== null, fn ($roles) => $roles
+                ->whereHas('permissions', fn ($permissions) => $permissions->where('code', $permission)))
             ->distinct()
             ->pluck('user_branch_roles.branch_id')
             ->map(fn ($branchId) => (int) $branchId)
             ->values();
+    }
+
+    /** A branch-level role never widens to company-wide figures; only a global grant does. */
+    public function canSeeAllReportBranches(): bool
+    {
+        return $this->hasGlobalPermission('reports.all_branches') || $this->hasPermission('system.admin');
+    }
+
+    /** The requested branch when assigned, else the first assigned one; null when none is assigned. */
+    public function resolveReportBranch(mixed $requested): ?int
+    {
+        $allowed = $this->reportBranchIds(null);
+
+        return $allowed->contains((int) $requested) ? (int) $requested : $allowed->sort()->first();
     }
 
     public function salesman(): BelongsTo

@@ -8,15 +8,14 @@ use App\Support\XlsxWriter;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
     /** สาขาที่ไม่มีอยู่จริง ใช้กรองให้ได้ผลลัพธ์ว่างเมื่อผู้ใช้ยังไม่ผูกสาขาและไม่มีสิทธิ์ข้ามสาขา */
     private const NO_BRANCH_SENTINEL = '-1';
-
 
     public function index(Request $request)
     {
@@ -52,12 +51,13 @@ class ReportController extends Controller
         // การเห็นข้ามสาขาเป็นสิทธิ์แยกต่างหาก (reports.all_branches) ไม่ใช่แค่ค่าเริ่มต้นของ filter
         // ไม่มีสิทธิ์ = ล็อกไว้ที่สาขาตัวเองเสมอ ส่งพารามิเตอร์อะไรมาก็ไม่หลุด
         $user = auth()->user();
-        $canSeeAllBranches = $user === null || $user->hasPermission('reports.all_branches');
+        $canSeeAllBranches = $user === null || $user->canSeeAllReportBranches();
         $requestedBranch = $request->input('branch_id');
         if (! $canSeeAllBranches) {
             // ไม่มีสาขาและไม่มีสิทธิ์ข้ามสาขา = ยังกรองอะไรไม่ได้ ให้ผลลัพธ์ว่างแทนที่จะเผยทุกสาขา
             // ใช้ -1 ไม่ใช่ 0 เพราะ applyBranch() เช็คด้วย empty() ซึ่งมองว่า '0' คือ "ไม่กรอง"
-            $requestedBranch = $user->branch_id === null ? self::NO_BRANCH_SENTINEL : (string) $user->branch_id;
+            $assignedBranch = $user->resolveReportBranch($requestedBranch);
+            $requestedBranch = $assignedBranch === null ? self::NO_BRANCH_SENTINEL : (string) $assignedBranch;
         } elseif ($requestedBranch === null && ($userBranch = $user?->branch_id)) {
             $requestedBranch = (string) $userBranch;
         } elseif ($requestedBranch === 'all') {
@@ -93,8 +93,10 @@ class ReportController extends Controller
             'printRowCap' => self::PRINT_ROW_CAP,
             'canSeeAllBranches' => $canSeeAllBranches,
             'canExport' => $user === null || $user->hasPermission('reports.export'),
-            'branchLocked' => ! $canSeeAllBranches && $user?->branch_id === null,
-            'branches' => DB::table('branches')->orderBy('code')->get(['id', 'code', 'name_th']),
+            'branchLocked' => ! $canSeeAllBranches && $user->reportBranchIds(null)->isEmpty(),
+            'branches' => DB::table('branches')
+                ->when(! $canSeeAllBranches, fn ($query) => $query->whereIn('id', $user->reportBranchIds(null)->all()))
+                ->orderBy('code')->get(['id', 'code', 'name_th']),
             'result' => $this->runReport($category, $report, $from, $to, $filters),
         ]);
     }
@@ -140,7 +142,7 @@ class ReportController extends Controller
         $rows = collect($result['rows'] ?? []);
         $filename = sprintf('%s-%s-%s.csv', $category, $report, now()->format('Ymd-His'));
 
-        return response()->streamDownload(function () use ($columns, $rows, $result) {
+        return response()->streamDownload(function () use ($columns, $rows) {
             $handle = fopen('php://output', 'wb');
             fwrite($handle, "\xEF\xBB\xBF");   // BOM ให้ Excel อ่านภาษาไทยออก
 
@@ -1033,8 +1035,8 @@ class ReportController extends Controller
             ->join('suppliers as s', 's.id', '=', 'oi.supplier_id')
             ->whereIn('oi.status', ['open', 'partial'])
             ->orderBy('oi.due_date')->orderBy('oi.document_date')
-            ->selectRaw("s.name_th as supplier_name, oi.document_no, oi.document_date, oi.due_date,
-                oi.original_amount, oi.paid_amount, oi.balance_amount")
+            ->selectRaw('s.name_th as supplier_name, oi.document_no, oi.document_date, oi.due_date,
+                oi.original_amount, oi.paid_amount, oi.balance_amount')
             ->limit($filters['per_page'])
             ->get()
             ->map(function ($row) {

@@ -288,7 +288,7 @@
                 <a href="{{ request()->fullUrlWithQuery(['from'=>now()->startOfMonth()->toDateString(),'to'=>now()->toDateString()]) }}" class="rpt-shortcut">เดือนนี้</a>
 
                 {{-- ไม่มีสิทธิ์ reports.all_branches = เลือกสาขาไม่ได้ ล็อกไว้ที่สาขาตัวเอง --}}
-                <select name="branch_id" class="rpt-select" onchange="this.form.submit()" @disabled(! $canSeeAllBranches)>
+                <select name="branch_id" class="rpt-select" onchange="this.form.submit()" @disabled(! $canSeeAllBranches && $branches->count() < 2)>
                     @if($canSeeAllBranches)
                         <option value="all" @selected($filters['branch_id'] === null)>ทุกสาขา</option>
                     @endif

@@ -20,7 +20,7 @@ class DashboardController extends Controller
         $user = auth()->user();
         $branchIds = [];
         if ($user?->hasPermission('reports.view')) {
-            $branchIds = $user->hasPermission('reports.all_branches') ? null : $user->reportBranchIds()->all();
+            $branchIds = $user->canSeeAllReportBranches() ? null : $user->reportBranchIds()->all();
         }
         $scopeBranchName = $branchIds === null
             ? 'รวมทุกสาขา'
@@ -28,6 +28,9 @@ class DashboardController extends Controller
         if ($scopeBranchName === '') {
             $scopeBranchName = 'ไม่มีสาขาที่ได้รับสิทธิ์';
         }
+
+        // คลังเก่าไม่มี branch_id: เจ้าของคลังดูจาก default_warehouse_location_id ของสาขา
+        $locationBranchScope = fn ($query) => $query->whereIn(DB::raw('coalesce(w.branch_id, (select min(owner.id) from branches owner where owner.default_warehouse_location_id = wl.id))'), $branchIds);
 
         // pos_receipts ผูกสาขาผ่าน pos_terminals.branch_id
         $receiptBranchScope = fn ($query, string $receiptAlias) => $query
@@ -119,7 +122,7 @@ class DashboardController extends Controller
             ->join('products as p', 'p.id', '=', 'sb.product_id')
             ->join('warehouse_locations as wl', 'wl.id', '=', 'sb.warehouse_location_id')
             ->join('warehouses as w', 'w.id', '=', 'wl.warehouse_id')
-            ->when($branchIds !== null, fn ($q) => $q->whereIn('w.branch_id', $branchIds))
+            ->when($branchIds !== null, $locationBranchScope)
             ->orderBy('sb.on_hand_qty')
             ->select('p.sku_code', 'p.name_th', 'wl.name as location_name', 'sb.on_hand_qty')
             ->limit(20)
@@ -129,7 +132,7 @@ class DashboardController extends Controller
             ->join('products as p', 'p.id', '=', 'sl.product_id')
             ->join('warehouse_locations as wl', 'wl.id', '=', 'sl.warehouse_location_id')
             ->join('warehouses as w', 'w.id', '=', 'wl.warehouse_id')
-            ->when($branchIds !== null, fn ($query) => $query->whereIn('w.branch_id', $branchIds))
+            ->when($branchIds !== null, $locationBranchScope)
             ->where('p.tracks_expiry', true)->where('sl.remaining_qty', '>', 0)
             ->orderByRaw('CASE WHEN sl.expiry_date IS NULL THEN 0 ELSE 1 END')->orderBy('sl.expiry_date')
             ->get(['p.sku_code', 'p.name_th', 'sl.lot_number', 'sl.expiry_date', 'sl.remaining_qty', 'sl.quality_status', 'p.expiry_warning_days'])

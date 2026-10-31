@@ -64,8 +64,8 @@ class BplusOperationController extends Controller
             'Asia/Bangkok'
         )->toDateString();
         $user = $request->user();
-        $canSeeAllBranches = $user?->hasPermission('reports.all_branches') ?? false;
-        $lockedBranchId = $canSeeAllBranches ? null : $user?->branchScopeId();
+        $canSeeAllBranches = $user?->canSeeAllReportBranches() ?? false;
+        $lockedBranchId = $canSeeAllBranches ? null : $user?->resolveReportBranch($request->query('branch_id'));
         $requestedBranchId = $request->query('branch_id');
         if ($canSeeAllBranches && ! in_array($requestedBranchId, [null, '', 'all'], true)) {
             $request->validate(['branch_id' => ['required', 'integer', 'exists:branches,id']]);
@@ -75,10 +75,8 @@ class BplusOperationController extends Controller
             : $lockedBranchId;
 
         $branches = Branch::query()
-            ->when(! $canSeeAllBranches, function ($query) use ($lockedBranchId) {
-                return $lockedBranchId
-                    ? $query->whereKey($lockedBranchId)
-                    : $query->whereRaw('1 = 0');
+            ->when(! $canSeeAllBranches, function ($query) use ($user) {
+                return $query->whereIn('id', $user?->reportBranchIds(null)->all() ?? []);
             })
             ->orderBy('code')
             ->get();

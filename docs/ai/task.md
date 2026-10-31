@@ -1622,3 +1622,8 @@ pending
 - ยังไม่ทดสอบ/ความเสี่ยง: `php artisan erp:health` ในเครื่อง dev รายงาน migration ค้าง 25 รายการและไม่พบไฟล์ backup; ไม่ได้รัน migration หรือแตะข้อมูล production; ยังไม่ได้ยืนยันภาพ Dashboard บน production หลังแก้
 - Deploy: ยังไม่ deploy
 - งานถัดไป: deploy ตาม `docs/OPERATIONS.md` เมื่อเจ้าของสั่ง แล้วตรวจด้วยบัญชี IT/GM, ผู้จัดการหลายสาขา และบัญชีที่ไม่มี `reports.view` ว่ายอดรวมและการจำกัดสาขาตรงตามสิทธิ์
+
+## Handoff - 2026-10-31 (Claude: แก้ผลตรวจ Dashboard และขอบเขตสาขา)
+- ทำอะไร: สต๊อกบน Dashboard ใช้เจ้าของคลังจาก `default_warehouse_location_id` เมื่อ `warehouses.branch_id` เป็น NULL; ทุกสาขาต้องมาจาก global `reports.all_branches` หรือ system admin (`canSeeAllReportBranches()`); รายงาน, Executive Dashboard และ POS Workbench ใช้สาขาที่มอบหมายจริงผ่าน `resolveReportBranch()` เลือกได้ทีละสาขาในขอบเขตสิทธิ์
+- ทดสอบ: `php -d memory_limit=512M vendor/bin/phpunit` ผ่าน 678 tests (677 passed, 1 skipped), incomplete 6; ถอด scope สต๊อกแล้วเทสต์แดงจริง; `P0ReportFiguresTest` เลิกใช้ static user ข้ามเทสต์
+- ยังไม่ทดสอบ: PostgreSQL จริงและหน้าจอ production; `addBranchRoles()` ยังไม่ได้แก้เรื่อง role เก่าในสาขาเสริม

@@ -71,8 +71,8 @@ class ExecutiveDashboardController extends Controller
     private function scopedBranchId(Request $request): ?int
     {
         $user = auth()->user();
-        if ($user && ! $user->hasPermission('reports.all_branches')) {
-            return $user->branch_id ? (int) $user->branch_id : -1;
+        if ($user && ! $user->canSeeAllReportBranches()) {
+            return $user->resolveReportBranch($request->input('branch_id')) ?? -1;
         }
 
         $requested = $request->input('branch_id');
@@ -214,6 +214,7 @@ class ExecutiveDashboardController extends Controller
             ->map(function ($row): array {
                 $sales = (float) $row->sales;
                 $profit = $sales - (float) $row->cost;
+
                 return ['sku' => $row->sku_code, 'name' => $row->name, 'sales' => round($sales, 2), 'profit' => round($profit, 2), 'margin' => $sales > 0 ? round($profit / $sales * 100, 1) : 0.0, 'qty' => round((float) $row->qty, 2)];
             })
             ->filter(fn (array $row): bool => $row['margin'] < 10)

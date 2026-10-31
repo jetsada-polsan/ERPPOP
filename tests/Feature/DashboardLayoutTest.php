@@ -149,6 +149,85 @@ class DashboardLayoutTest extends TestCase
         $this->assertSame('ไม่มีสาขาที่ได้รับสิทธิ์', $response->viewData('scopeBranchName'));
     }
 
+    public function test_revoked_or_out_of_date_assignments_hide_the_home_branch(): void
+    {
+        [$home, $other] = $this->branches();
+        $this->sale($home, 'POS-HOME-02', 100);
+        $this->sale($other, 'POS-OTHER-02', 250);
+        $viewer = $this->userWithPermissions('DASH_REVOKED', ['dashboard.view', 'reports.view'], $home);
+        $roleId = $viewer->roles()->firstOrFail()->id;
+        $row = ['user_id' => $viewer->id, 'role_id' => $roleId, 'created_at' => now(), 'updated_at' => now()];
+        DB::table('user_branch_roles')->insert([
+            $row + ['branch_id' => $home->id, 'is_active' => false, 'effective_from' => null, 'effective_to' => null],
+            $row + ['branch_id' => $other->id, 'is_active' => true, 'effective_from' => null, 'effective_to' => now()->subDay()],
+        ]);
+        $this->assertSame(0.0, (float) $this->actingAs($viewer)->get(route('dashboard'))->viewData('summary')->total_sales);
+
+        DB::table('user_branch_roles')->where('branch_id', $other->id)
+            ->update(['effective_from' => now()->addDay(), 'effective_to' => null]);
+        $this->assertSame(0.0, (float) $this->actingAs($viewer->fresh())->get(route('dashboard'))->viewData('summary')->total_sales);
+    }
+
+    public function test_home_branch_is_the_fallback_without_assignments_and_role_needs_report_permission(): void
+    {
+        [$home, $other] = $this->branches();
+        $this->sale($home, 'POS-HOME-03', 100);
+        $this->sale($other, 'POS-OTHER-03', 250);
+        $viewer = $this->userWithPermissions('DASH_HOME', ['dashboard.view', 'reports.view'], $home);
+        $this->assertSame(100.0, (float) $this->actingAs($viewer)->get(route('dashboard'))->viewData('summary')->total_sales);
+
+        $posOnly = Role::create(['code' => 'DASH_POS_ONLY', 'name' => 'x']);
+        DB::table('user_branch_roles')->insert(['user_id' => $viewer->id, 'branch_id' => $other->id, 'role_id' => $posOnly->id, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $this->assertSame([], $viewer->fresh()->reportBranchIds()->all());
+    }
+
+    public function test_branch_level_all_branches_role_stays_inside_its_assignment(): void
+    {
+        [$home, $other] = $this->branches();
+        $this->sale($home, 'POS-HOME-04', 100);
+        $this->sale($other, 'POS-OTHER-04', 250);
+        $viewer = $this->userWithPermissions('DASH_LOCAL_ALL', ['dashboard.view', 'reports.view', 'reports.all_branches'], $home);
+        $role = $viewer->roles()->firstOrFail();
+        $viewer->roles()->detach();
+        DB::table('user_branch_roles')->insert(['user_id' => $viewer->id, 'branch_id' => $home->id, 'role_id' => $role->id, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
+
+        $this->assertSame(100.0, (float) $this->actingAs($viewer->fresh())->get(route('dashboard'))->viewData('summary')->total_sales);
+    }
+
+    public function test_stock_receivables_and_odoo_panels_follow_branch_scope(): void
+    {
+        [$home, $other] = $this->branches();
+        $unit = DB::table('product_units')->insertGetId(['code' => 'U', 'name' => 'u', 'qty_per_base_unit' => 1]);
+        $product = DB::table('products')->insertGetId(['sku_code' => 'S1', 'name_th' => 'p', 'base_unit_id' => $unit, 'is_active' => true]);
+        foreach ([$home, $other] as $branch) {
+            $warehouse = DB::table('warehouses')->insertGetId(['branch_id' => null, 'code' => 'W'.$branch->id, 'name' => 'w']);
+            $location = DB::table('warehouse_locations')->insertGetId(['warehouse_id' => $warehouse, 'code' => 'M', 'name' => 'คลัง'.$branch->code]);
+            $branch->update(['default_warehouse_location_id' => $location]);
+            DB::table('stock_balances')->insert(['product_id' => $product, 'warehouse_location_id' => $location, 'on_hand_qty' => 1]);
+        }
+        $this->sale($home, 'POS-HOME-05', 100);
+        $this->sale($other, 'POS-OTHER-05', 250);
+        AppSetting::set('erp_layout', 'odoo');
+        $viewer = $this->userWithPermissions('DASH_STOCK', ['dashboard.view', 'reports.view'], $home);
+
+        $response = $this->actingAs($viewer)->get(route('dashboard'));
+
+        $this->assertSame(['คลังHQ'], $response->viewData('lowStock')->pluck('location_name')->all());
+        $this->assertSame(['POS-HOME-05'], $response->viewData('recentReceipts')->pluck('receipt_no')->all());
+    }
+
+    public function test_reports_and_executive_scope_use_assigned_branches(): void
+    {
+        [$home, $assigned, $unassigned] = $this->branches();
+        $viewer = $this->userWithPermissions('DASH_RESOLVE', ['dashboard.view', 'reports.view'], $home);
+        $roleId = $viewer->roles()->firstOrFail()->id;
+        DB::table('user_branch_roles')->insert(['user_id' => $viewer->id, 'branch_id' => $assigned->id, 'role_id' => $roleId, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
+
+        $this->assertSame($assigned->id, $viewer->fresh()->resolveReportBranch($assigned->id));
+        $this->assertSame($assigned->id, $viewer->fresh()->resolveReportBranch($unassigned->id));
+        $this->assertSame($assigned->id, $viewer->fresh()->resolveReportBranch(null));
+    }
+
     /** @return array<int, Branch> */
     private function branches(): array
     {

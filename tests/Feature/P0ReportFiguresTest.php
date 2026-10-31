@@ -7,10 +7,15 @@ use App\Models\Customer;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\Permission;
+use App\Models\Product;
+use App\Models\ProductUnit;
 use App\Models\ReportDefinition;
 use App\Models\Role;
 use App\Models\Supplier;
 use App\Models\User;
+use App\Models\Warehouse;
+use App\Models\WarehouseLocation;
+use App\Services\Sales\CashSaleService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -133,7 +138,7 @@ class P0ReportFiguresTest extends TestCase
         $branch = $this->sellingBranch();
         $product = $this->sellableProduct($branch);
 
-        app(\App\Services\Sales\CashSaleService::class)->create([
+        app(CashSaleService::class)->create([
             'branch_id' => $branch->id,
             'items' => [
                 ['product_id' => $product, 'qty' => 2, 'unit_price' => 150],
@@ -160,8 +165,8 @@ class P0ReportFiguresTest extends TestCase
     private function sellingBranch(): Branch
     {
         $branch = Branch::firstOrCreate(['code' => 'SELL'], ['name_th' => 'สาขาขาย', 'is_active' => true]);
-        $warehouse = \App\Models\Warehouse::firstOrCreate(['code' => 'WH-SELL'], ['name' => 'คลังขาย', 'branch_id' => $branch->id]);
-        $location = \App\Models\WarehouseLocation::firstOrCreate(
+        $warehouse = Warehouse::firstOrCreate(['code' => 'WH-SELL'], ['name' => 'คลังขาย', 'branch_id' => $branch->id]);
+        $location = WarehouseLocation::firstOrCreate(
             ['code' => 'SELL-MAIN'], ['warehouse_id' => $warehouse->id, 'name' => 'พื้นที่ขาย'],
         );
         $branch->update(['default_warehouse_location_id' => $location->id]);
@@ -172,8 +177,8 @@ class P0ReportFiguresTest extends TestCase
     private function sellableProduct(Branch $branch): int
     {
         DocumentType::firstOrCreate(['code' => 'CASH_SALE'], ['name_th' => 'ใบขายสด']);
-        $unit = \App\Models\ProductUnit::firstOrCreate(['code' => 'EA-RPT'], ['name' => 'ชิ้น', 'qty_per_base_unit' => 1]);
-        $product = \App\Models\Product::create([
+        $unit = ProductUnit::firstOrCreate(['code' => 'EA-RPT'], ['name' => 'ชิ้น', 'qty_per_base_unit' => 1]);
+        $product = Product::create([
             'sku_code' => 'RPT-1', 'name_th' => 'สินค้ารายงาน', 'base_unit_id' => $unit->id,
             'default_price' => 150, 'average_cost' => 90, 'is_vat' => false, 'is_active' => true,
             'negative_stock_policy' => 'allow',
@@ -259,8 +264,7 @@ class P0ReportFiguresTest extends TestCase
 
     private function reportUser(): User
     {
-        static $user = null;
-        if ($user) {
+        if ($user = User::where('username', 'p0_figures')->first()) {
             return $user;
         }
         $user = User::factory()->create(['username' => 'p0_figures', 'is_active' => true, 'must_change_password' => false]);
