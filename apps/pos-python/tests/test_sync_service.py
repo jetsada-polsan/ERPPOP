@@ -107,6 +107,34 @@ class SyncServiceTest(unittest.TestCase):
         self.assertEqual(payload["discount_approved_by"], "ผู้จัดการ ก")
         self.assertEqual(payload["cash_received"], "80.00")
 
+    def test_retry_after_a_failed_request_keeps_the_discount_and_paid_amount(self) -> None:
+        # บิล 70 ลด 10 request แรกเน็ตหลุด รอบ retry ต้องส่งยอดเดิมทุกตัว ห้ามกลับเป็นราคาเต็ม
+        class FlakyApi(FakeApi):
+            def post(self, path, payload, *, idempotency_key=None):
+                self.calls.append((path, dict(payload), idempotency_key))
+                if len(self.calls) == 1:
+                    raise RuntimeError("network: timeout")
+                return self.response
+
+        self.pos.checkout(document_no="PY-0070", branch_id=1, terminal_id="HQ-01", shift_id=self.shift_id, cashier_id=77,
+            lines=[CartLine(1, Decimal("1"), Decimal("70"), discount=Decimal("10"))],
+            payment_method="cash", paid_amount=Decimal("60"), sale_uuid="sale-70", adjustment_approved_by="คนขาย Tester")
+        self.pos.bind_server_shift(self.shift_id, 500)
+        api = FlakyApi()
+        sync = SyncService(self.db, api)
+
+        with self.assertRaises(RuntimeError):
+            sync.sync_sale("sale-70")
+        sync.sync_sale("sale-70")
+
+        first, second = api.calls[0], api.calls[1]
+        self.assertEqual(first[1], second[1])
+        self.assertEqual(second[2], "sale-70")
+        self.assertEqual(second[1]["manual_discount_amount"], "10.00")
+        self.assertEqual(second[1]["discount_approved_by"], "คนขาย Tester")
+        self.assertEqual(second[1]["cash_received"], "60.00")
+        self.assertEqual(self.db.execute("SELECT status FROM sync_outbox WHERE aggregate_uuid = 'sale-70'").fetchone()[0], "synced")
+
     def test_a_lowered_price_is_sent_with_its_discount_from_the_list_price(self) -> None:
         self.pos.checkout(document_no="PY-0003", branch_id=1, terminal_id="HQ-01", shift_id=self.shift_id, cashier_id=77,
             lines=[CartLine(1, Decimal("3"), Decimal("20"), list_price=Decimal("25"))],
