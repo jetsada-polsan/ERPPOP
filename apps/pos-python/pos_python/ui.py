@@ -444,8 +444,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.setMinimumWidth(480)
             form = QFormLayout(self)
             hint = QLabel(
-                "เลือกชื่อคนขาย แล้วใส่เงินทอนเพื่อเปิดกะ\n"
-                "ไม่ต้องกรอกรหัสหรือ PIN"
+                "เลือกชื่อคนขาย ใส่ PIN แล้วใส่เงินทอนเพื่อเปิดกะ"
+                if service.requires_cashier_pin()
+                else "เลือกชื่อคนขาย แล้วใส่เงินทอนเพื่อเปิดกะ\nไม่ต้องกรอกรหัสหรือ PIN"
             )
             hint.setWordWrap(True)
             self.cashier_select = QComboBox()
@@ -491,7 +492,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
             if rows:
                 mode = "เชื่อมต่อ ERP แล้ว" if online is not None and online.online else "โหมดออฟไลน์"
-                message = f"{mode} · เลือกได้ {len(rows)} คน · ไม่ต้องใช้ PIN"
+                message = f"{mode} · เลือกได้ {len(rows)} คน"
                 if sync_error:
                     message += f"\nใช้รายชื่อที่แคชไว้: {sync_error}"
             else:
@@ -1982,7 +1983,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.refresh_order()
 
         def ensure_sale_session(self) -> bool:
-            """เลือกคนขายและเปิดกะเมื่อเริ่มขาย โดยไม่ถาม PIN."""
+            """เลือกคนขาย ยืนยัน PIN ตามโหมดของ ERP แล้วเปิดกะเมื่อเริ่มขาย"""
             if self.cashier is not None and self.shift_id is not None:
                 if online is not None and online.online:
                     server_shift = service.db.execute(
@@ -2023,6 +2024,13 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 )
                 return False
             cashier = seller.cashier
+            pin = None
+            if service.requires_cashier_pin():
+                pin, confirmed = QInputDialog.getText(
+                    self, "ยืนยันคนขาย", f"PIN ของ {cashier['name'] or cashier['code']}", QLineEdit.Password
+                )
+                if not confirmed or not pin.strip():
+                    return False
 
             if online is not None and online.online:
                 if not cashier["server_id"]:
@@ -2033,11 +2041,14 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     )
                     return False
                 try:
-                    # The API call uses the device token and the selected server id;
-                    # no cashier code or PIN is requested from the operator.
-                    selected = online.provisioning.select_cashier(
-                        str(cashier["code"]), int(cashier["server_id"])
-                    )
+                    if pin is None:
+                        selected = online.provisioning.select_cashier(
+                            str(cashier["code"]), int(cashier["server_id"])
+                        )
+                    else:
+                        selected = online.provisioning.online_cashier_login(
+                            pin, cashier_server_id=int(cashier["server_id"])
+                        )
                     local_id = selected.get("local_cashier_id")
                     if local_id:
                         cashier = service.db.execute(
@@ -2056,6 +2067,13 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                             )
                         QMessageBox.warning(self, "เลือกคนขายไม่ได้", message)
                         return False
+
+            if pin is not None and (online is None or not online.online):
+                offline = service.login_offline(str(cashier["code"]), pin)
+                if offline.cashier is None:
+                    QMessageBox.warning(self, "เข้าใช้งานไม่ได้", offline.reason or "PIN ไม่ถูกต้อง")
+                    return False
+                cashier = offline.cashier
 
             existing_shift = service.db.execute(
                 "SELECT id, cashier_id, opening_cash FROM shifts WHERE terminal_id = ? AND status = 'open'",

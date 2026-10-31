@@ -217,6 +217,10 @@ class PosService:
             pending_sync_count=int(pending),
         )
 
+    def requires_cashier_pin(self) -> bool:
+        """ERP สั่งโหมดเลือกชื่อไม่ใช้ PIN เท่านั้นถึงข้ามได้ ค่าอื่นหรือยังไม่รู้ค่าต้องถาม PIN"""
+        return self._setting("cashier_login_mode") != "selection"
+
     def login(self, cashier_code: str, pin: str) -> sqlite3.Row | None:
         """Compatibility wrapper for older callers; records the same offline audit event."""
         return self.login_offline(cashier_code, pin).cashier

@@ -125,7 +125,8 @@ class UiStyleTest(unittest.TestCase):
         source = inspect.getsource(run_ui)
         self.assertIn("online.provisioning.select_cashier(", source)
         self.assertIn('int(cashier["server_id"])', source)
-        self.assertNotIn("online_cashier_login", source)
+        self.assertIn("service.requires_cashier_pin()", source)
+        self.assertIn("online_cashier_login", source)
 
     def test_opening_shift_requests_and_reuses_opening_cash(self) -> None:
         source = inspect.getsource(run_ui)

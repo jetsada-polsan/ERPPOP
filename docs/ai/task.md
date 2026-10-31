@@ -1638,3 +1638,8 @@ pending
 - ทดสอบ: phpunit ผ่าน 681 tests (680 passed, 1 skipped), incomplete 6; pos-python unit tests ผ่าน; ยังไม่ได้ทดสอบเครื่องจริง
 - ความเสี่ยง: PIN ซ้ำในสาขาจะให้เลือกชื่อ; เครื่องต้องอัปเดตแอปถึงจะเห็นทุกคน
 - Deploy: รอเจ้าของสั่ง พร้อมออกตัวติดตั้ง POS ใหม่
+
+## Handoff - 2026-10-31 (Claude: POS ถาม PIN ตอนเลือกคนขาย)
+- ปัญหา: แอปส่งเลือกชื่อโดยไม่มี PIN แต่ production ตั้ง `pos_passwordless_login=0` จึงได้ 422 "กรุณาระบุ PIN"
+- แก้: หน้าเริ่มขายถาม PIN ตาม `cashier_login_mode` ทั้งออนไลน์และออฟไลน์
+- ทดสอบ: pos-python unit tests ผ่าน; ยังไม่ได้ทดสอบหน้าจอจริง

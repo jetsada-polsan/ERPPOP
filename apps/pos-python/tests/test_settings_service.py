@@ -43,3 +43,19 @@ class SettingsServiceTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CashierPinModeTest(unittest.TestCase):
+    def test_pin_is_required_unless_erp_says_selection(self) -> None:
+        import tempfile
+        from pathlib import Path
+
+        from pos_python.database import connect
+        from pos_python.services import PosService
+
+        db = connect(Path(tempfile.mkdtemp()) / "pin.db")
+        pos = PosService(db)
+        self.assertTrue(pos.requires_cashier_pin())
+        for mode, expected in (("pin", True), ("selection", False)):
+            db.execute("INSERT OR REPLACE INTO device_settings (key, value, updated_at) VALUES ('cashier_login_mode', ?, datetime('now'))", (f'"{mode}"',))
+            self.assertEqual(pos.requires_cashier_pin(), expected)
