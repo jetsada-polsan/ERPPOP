@@ -1771,3 +1771,10 @@ pending
 ## Handoff - 2026-10-31 (Claude: เปิดกะด้วย PIN อย่างเดียว)
 - ทำอะไร: POS โหมด PIN ถามแค่ PIN แล้วรู้ตัวคนขาย; PIN ซ้ำออนไลน์ให้เลือกชื่อ, ออฟไลน์ปฏิเสธ; `/pos-admin` กันตั้ง PIN ซ้ำในสาขา
 - ทดสอบ: phpunit ผ่าน 682 tests (681 passed, 1 skipped), incomplete 6; pos-python unit tests ผ่าน; ยังไม่ได้ทดสอบเครื่องจริง
+
+## Handoff - 2026-10-31 (Codex: รับสต๊อก UAT จำนวนคงที่ต่อสินค้า)
+- Commit: `b77fac7` (`Allow fixed-quantity UAT stock receipts`)
+- ทำอะไร: เพิ่ม `--qty-each` ในคำสั่งและ GitHub Actions UAT ให้ preview/รับเพิ่มจำนวนหน่วยฐานที่ระบุต่อสินค้า active แต่ละรายการ; ค่าเริ่มต้นเดิมยังเติมเฉพาะจำนวนขาด; โหมดบันทึกจริงยังคงต้องใช้ actor, เพดานยอด, คำยืนยัน และ lot/วันหมดอายุครบ
+- ทดสอบ: `php artisan test --filter=UatReceiveAllActiveProductsTest` ผ่าน 9 tests / 61 assertions; PHPUnit เต็มผ่าน 685 tests, 5,788 assertions (1 skipped, 6 incomplete); POS Python 253 tests ผ่าน; Pint, YAML parse และ `git diff --check` ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้รัน preview บน production สำหรับ `--qty-each=10`; ไม่มีการสร้างใบซื้อหรือเปลี่ยนสต๊อก production
+- Deploy: ยังไม่ deploy
