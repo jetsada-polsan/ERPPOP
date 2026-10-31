@@ -12,9 +12,14 @@
 - Pint และ `git diff --check` ผ่าน
 
 ## Deploy และงานถัดไป
-- ยังไม่ deploy และไม่ได้แตะข้อมูล production; `docs/servers.md` เป็นไฟล์ untracked เดิมและไม่ได้รวมใน commit
+- `docs/servers.md` เป็นไฟล์ untracked เดิมและไม่ได้รวมใน commit; production check ใช้ฐาน restore drill แยกและลบทิ้งหลังตรวจเสร็จ
 - PostgreSQL UAT [run 41076076617](https://github.com/jetsada-polsan/ERPPOP/actions/runs/41076076617) ผ่านครบ: PHP suite, ยิงพร้อมกัน 30 process สร้างเลขเอกสาร, ขายพร้อมกัน 30 process และ reconcile stock/COGS/GL/sales_postings
 - ยังไม่ได้ทดสอบอุปกรณ์หน้าร้านจริง
+
+## Deploy production — 2026-10-30
+- Production check [run 41078569501](https://github.com/jetsada-polsan/ERPPOP/actions/runs/41078569501): backup `erp-db-20261030-221252.sql.gz` ขนาด 800 KB, restore drill ผ่านและจำนวนแถว 8 ตารางตรงกัน, ฐาน drill ถูกลบ, health ผ่าน, migrations pending 0, failed queue 0
+- Deploy ERP [run 41078964196](https://github.com/jetsada-polsan/ERPPOP/actions/runs/41078964196) บน release commit `72dc05f52cd79a60d29f26ed8f23a590b726fdbf`: test และ frontend build ผ่าน, deploy สำเร็จ, `Nothing to migrate`, `erp:health` ผ่าน และแอปกลับมา live
+- ยังไม่มี `rclone` และไฟล์ offsite backup config บน production; backup ปัจจุบันเป็น local-only และควรตั้งค่า/ทดสอบ DR แยกต่างหาก
 
 # Handoff — 2026-10-30 (Codex: regression audit ERP และ POS ทั้งระบบ)
 
