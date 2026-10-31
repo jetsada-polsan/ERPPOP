@@ -1776,5 +1776,6 @@ pending
 - Commit: `b77fac7` (`Allow fixed-quantity UAT stock receipts`)
 - ทำอะไร: เพิ่ม `--qty-each` ในคำสั่งและ GitHub Actions UAT ให้ preview/รับเพิ่มจำนวนหน่วยฐานที่ระบุต่อสินค้า active แต่ละรายการ; ค่าเริ่มต้นเดิมยังเติมเฉพาะจำนวนขาด; โหมดบันทึกจริงยังคงต้องใช้ actor, เพดานยอด, คำยืนยัน และ lot/วันหมดอายุครบ
 - ทดสอบ: `php artisan test --filter=UatReceiveAllActiveProductsTest` ผ่าน 9 tests / 61 assertions; PHPUnit เต็มผ่าน 685 tests, 5,788 assertions (1 skipped, 6 incomplete); POS Python 253 tests ผ่าน; Pint, YAML parse และ `git diff --check` ผ่าน
-- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้รัน preview บน production สำหรับ `--qty-each=10`; ไม่มีการสร้างใบซื้อหรือเปลี่ยนสต๊อก production
-- Deploy: ยังไม่ deploy
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้บันทึกรับสินค้าจริง; preview เป็นใบซื้อเชื่อและจะเพิ่มเจ้าหนี้/GL ตามยอดทุนที่คำนวณได้ จึงยังต้องกำหนดเพดานยอดก่อน execute
+- Deploy: GitHub Actions `Deploy ERP` run `41192385887` (#110) ผ่านบน production, commit `4a4494e638e4ba85ab7f31febf47ba331877cc48`; health ผ่านครบ (DB, migration, backup 3.3 ชม., sales-GL, stock count, storage, queue)
+- Production preview: GitHub Actions `UAT receive all active products` run `41192596510` (#3) ผ่านแบบ dry-run; B001 / `UAT-POS-TEST`, เพิ่ม 10 หน่วยฐานให้ active SKU 1,623 รายการ รวม 16,230 หน่วย; ปัจจุบันมีของขายได้รวม 794 หน่วย; ประมาณยอดใบซื้อเชื่อ/AP ฿1,506,995.30; ไม่พบ warning ต้นทุนหรือ lot metadata ขาด; preview ไม่เปลี่ยนสต๊อก
