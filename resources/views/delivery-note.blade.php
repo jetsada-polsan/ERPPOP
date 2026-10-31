@@ -87,6 +87,7 @@
                 zoom: 1 !important;
             }
         }
+        .page + .page { page-break-before: always; }
     </style>
 </head>
 <body>
@@ -96,7 +97,9 @@
     <a href="javascript:history.back()">← กลับ</a>
 </div>
 
+@foreach($typeCode === 'BOOKING' ? ['สำหรับพนักงาน (นำกลับ)', 'สำหรับลูกค้า'] : [null] as $copyLabel)
 <div class="page delivery-note-page">
+    @if($copyLabel)<div style="text-align:right;font-size:10px;font-weight:700">{{ $copyLabel }}</div>@endif
     <div class="doc-head">
         <div class="logo-box">
             @if($logo = \App\Models\AppSetting::logoUrl())
@@ -185,5 +188,6 @@
         <div class="sign"><div class="line"></div>ผู้ขาย</div>
     </div>
 </div>
+@endforeach
 </body>
 </html>

@@ -40,6 +40,7 @@ class DeliveryNoteController extends Controller
         return view('delivery-note', [
             'document' => $document,
             'title' => self::TITLES[$typeCode] ?? 'ใบส่งของ',
+            'typeCode' => $typeCode,
             'paymentLabel' => self::PAYMENT_LABELS[$typeCode] ?? '-',
         ]);
     }

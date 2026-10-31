@@ -94,7 +94,7 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
                 {{ $statusLabel[$booking->status] ?? $booking->status }}
             </span>
             <a href="{{ route('documents.delivery-note', $booking->document) }}" target="_blank" class="btn btn-light border px-3" title="เอกสารประกอบการจัดของ ไม่ตัดสต๊อกและไม่ใช่ใบขาย">
-                <i class="bi bi-truck me-1"></i> ใบส่งของชั่วคราว (A5)
+                <i class="bi bi-truck me-1"></i> ใบส่งของชั่วคราว 2 ใบ
             </a>
             @if($canEdit)
                 <a href="{{ route('bookings.edit', $booking) }}" class="btn btn-outline-primary px-3">

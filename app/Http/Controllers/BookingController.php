@@ -18,6 +18,41 @@ use RuntimeException;
 
 class BookingController extends Controller
 {
+    /** ใบรวมจองต่อวัน แยกสาขาและสาย: หน้าแรกไว้จัดของ หน้าสองไว้ติ๊กส่งบัญชี */
+    public function summary(Request $request): View
+    {
+        $date = $request->date('date')?->toDateString() ?? now()->toDateString();
+        $branchId = $request->integer('branch_id') ?: null;
+        $salesAreaId = $request->integer('sales_area_id') ?: null;
+
+        $bookings = SaleBooking::with(['document.customer', 'document.branch', 'document.salesArea', 'document.stockDocument.items.product.baseUnit'])
+            ->where('status', 'pending')
+            ->when($salesAreaId, fn ($query) => $query->where('sales_area_id', $salesAreaId))
+            ->whereHas('document', fn ($d) => $d->whereDate('doc_date', $date)
+                ->when($branchId, fn ($q) => $q->where('branch_id', $branchId)))
+            ->get();
+
+        $groups = $bookings->groupBy(fn (SaleBooking $booking) => $booking->document->branch_id.'-'.$booking->sales_area_id)
+            ->map(function ($rows) {
+                $document = $rows->first()->document;
+                $lines = $rows->flatMap(fn (SaleBooking $booking) => $booking->document->stockDocument?->items ?? collect())
+                    ->groupBy('product_id')
+                    ->map(fn ($items) => (object) ['product' => $items->first()->product, 'qty' => $items->sum('qty')])
+                    ->sortBy(fn ($line) => $line->product?->sku_code)->values();
+
+                return (object) [
+                    'branch' => $document->branch, 'area' => $document->salesArea,
+                    'lines' => $lines, 'bookings' => $rows->sortBy(fn ($row) => $row->document->doc_number)->values(),
+                ];
+            })->values();
+
+        return view('bookings.summary', [
+            'date' => $date, 'groups' => $groups, 'branchId' => $branchId, 'salesAreaId' => $salesAreaId,
+            'branches' => Branch::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name_th']),
+            'salesAreas' => SalesArea::orderBy('code')->get(['id', 'code', 'name']),
+        ]);
+    }
+
     public function index(Request $request): View
     {
         $q = trim((string) $request->query('q', ''));
