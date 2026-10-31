@@ -13,7 +13,7 @@
                     <div class="input-group">
                         <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
                         <input type="text" name="q" value="{{ $q }}" class="form-control" placeholder="รหัส ชื่อ หรือบาร์โค้ด" autocomplete="off" aria-describedby="product-search-hint" @input.debounce.1200ms="$refs.filterForm.requestSubmit()" @keydown.enter.prevent="$refs.filterForm.requestSubmit()">
-                        <button type="submit" class="btn btn-primary px-4 fw-semibold text-nowrap" aria-label="ค้นหาสินค้า">ค้นหา</button>
+                        <button type="submit" class="btn btn-primary fw-semibold text-nowrap" aria-label="ค้นหาสินค้า">ค้นหา</button>
                         <input type="hidden" name="status" value="{{ $status }}">
                     </div>
                     <small id="product-search-hint" class="text-muted">พิมพ์แล้วรอ 1 วินาที ระบบจะค้นให้เอง หรือกดปุ่มค้นหา</small>
@@ -279,7 +279,10 @@
     .product-toolbar { display:flex; align-items:flex-end; justify-content:space-between; gap:9px; padding:9px 10px; border:1px solid var(--product-border); border-radius:10px; background:rgba(255,255,255,.88); box-shadow:0 3px 10px rgba(15,51,74,.04); }
     .product-filter-bar { display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap; flex:1 1 auto; }
     .product-filter-field { display:grid; gap:2px; min-width:150px; }
-    .product-filter-field.search-field { width:min(250px,100%); }
+    .product-filter-field.search-field { width:min(360px,100%); }
+    .search-field .input-group { flex-wrap:nowrap; }
+    .search-field .input-group .form-control { min-width:0; }
+    .search-field .input-group .btn { flex:0 0 auto; padding:0 14px; margin-left:0; }
     .product-filter-field label { margin:0; color:var(--erp-muted); font-size:9px; line-height:1.1; font-weight:700; }
     .product-filter-field .form-control,.product-filter-field .form-select,.product-filter-field .input-group-text { min-height:32px; height:32px; border-color:var(--erp-border); font-size:11px; padding-top:3px; padding-bottom:3px; }
     .product-filter-field .form-select { max-width:none!important; }
