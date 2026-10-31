@@ -19,10 +19,13 @@
 - เจ้าของสั่ง `deploy`; ก่อน deploy รัน Production check #9 บน commit `d7ec7bf` ผ่าน: backup `erp-db-20261031-102916.sql.gz` (804 KB), restore drill ผ่านและลบทิ้ง, health `ok`, migrations pending `0`
 - Snapshot อ่านอย่างเดียว: POS วันนี้ 6 บิล, offline needs review `0`, desktop rejects วันนี้ `0`; ไม่มีการสร้างหรือแก้บิลจาก check
 - ปรับ `.github/workflows/deploy.yml` ให้รัน `php -d memory_limit=1G vendor/bin/phpunit` โดยตรง เพราะ `artisan test` spawn PHPUnit ใหม่และชน memory limit 128MB แม้ parent process ใช้ 1GB; คำสั่งตรงรันครบ 670 tests ผ่าน
-- ขั้นถัดไป: commit/push การปรับ workflow แล้ว dispatch `Deploy ERP` เลือก `production`; ตรวจผล workflow และ production health หลัง deploy ก่อนรายงานผล
+- Deploy ERP [run #101](https://github.com/jetsada-polsan/ERPPOP/actions/runs/41164725214) บน commit `f760f989a27d7f81cd003c5d14ecfc24a62dea5b` สำเร็จ: เทสต์ 670 รายการ (669 ผ่าน, 1 skipped, 6 incomplete; 5,700 assertions), build frontend และ deploy script ผ่าน
+- Production check หลัง deploy [run #10](https://github.com/jetsada-polsan/ERPPOP/actions/runs/41164972015) ผ่าน: backup `erp-db-20261031-103452.sql.gz` (804 KB), restore drill PostgreSQL ผ่านและลบฐานทดสอบแล้ว, counts ตรงกัน, `health=ok`, migrations pending `0`, failed queue `0`
+- Snapshot หลัง deploy แบบอ่านอย่างเดียว: POS วันนี้ 6 บิล, offline needs review `0`, desktop rejects วันนี้ `0`; ไม่มีการสร้างหรือแก้บิลจาก check
 
 ## ความเสี่ยง/งานถัดไป
-- หลัง deploy ให้ยืนยัน `erp:health` และทดสอบเครื่องที่ผูก role `IT_MGR` หรือบัญชีแคชเชียร์ที่มี `pos.sell`
+- เครื่อง POS ใช้งานได้ตามรายงานของทีม; ยังต้องทดสอบบัญชีจริงตามบทบาท โดย `IT_MGR` เข้าเครื่องข้ามสาขาได้ ส่วนการเปิดกะ/ขายต้องใช้ผู้ขายที่มี `pos.sell` (ไม่จำเป็นต้องเพิ่ม GM ให้ IT)
+- GitHub แจ้งเตือนว่า actions/checkout@v4 และ webfactory/ssh-agent@v0.9.0 จะถูกบังคับใช้ Node.js 24 แทน Node.js 20; ไม่กระทบผล deploy รอบนี้ แต่ควรอัปเดต actions ก่อนการเปลี่ยน runtime รอบหน้า
 - `docs/servers.md` เป็นไฟล์ untracked เดิมและไม่ได้แก้หรือรวมใน commit
 
 # Handoff — 2026-10-30 (Codex: ตรวจ matrix สิทธิ์ทุก role และ route)
