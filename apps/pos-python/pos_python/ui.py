@@ -386,6 +386,18 @@ NUMPAD_KEYS = [
 PRODUCT_TILE_COLUMNS = 4
 
 
+def parse_weight(text: str) -> float:
+    """รับน้ำหนักเป็นกิโลกรัม แปลงเลขไทยที่พิมพ์มาเป็นเลขอารบิก"""
+    cleaned = text.strip().translate(str.maketrans("๐๑๒๓๔๕๖๗๘๙", "0123456789"))
+    try:
+        weight = round(float(cleaned), 3)
+    except ValueError:
+        raise ValueError("กรอกน้ำหนักเป็นตัวเลข เช่น 1.250") from None
+    if not 0.001 <= weight <= 999999.999:
+        raise ValueError("น้ำหนักต้องมากกว่า 0")
+    return weight
+
+
 def run_ui(service: PosService, online=None, data_dir=None, app=None):
     # Windows ภาษาไทยทำให้ช่องตัวเลขแสดงเลขไทย POS ใช้เลขอารบิกเสมอ
     from PySide6.QtCore import QLocale
@@ -1784,10 +1796,29 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             ).fetchone() is not None
 
         def ask_weight(self, name: str, price: Decimal) -> tuple[float, bool]:
-            return QInputDialog.getDouble(
-                self, "กรอกน้ำหนัก", f"{name}\nราคาต่อกิโลกรัม {price:,.2f} บาท\nน้ำหนัก (กิโลกรัม)",
-                0.001, 0.001, 999999.999, 3,
-            )
+            # ใช้ช่องข้อความแทน spin box เพราะ Windows ภาษาไทยแสดง spin box เป็นเลขไทย
+            dialog = QDialog(self)
+            dialog.setWindowTitle("กรอกน้ำหนัก")
+            form = QFormLayout(dialog)
+            form.addRow(QLabel(f"{name}\nราคาต่อกิโลกรัม {price:,.2f} บาท"))
+            entry = QLineEdit()
+            entry.setPlaceholderText("0.000")
+            entry.setInputMethodHints(Qt.ImhFormattedNumbersOnly)
+            form.addRow("น้ำหนัก (กิโลกรัม)", entry)
+            buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            buttons.accepted.connect(dialog.accept)
+            buttons.rejected.connect(dialog.reject)
+            form.addRow(buttons)
+            entry.returnPressed.connect(dialog.accept)
+            entry.setFocus()
+            while dialog.exec() == QDialog.Accepted:
+                try:
+                    weight = parse_weight(entry.text())
+                except ValueError as error:
+                    QMessageBox.warning(self, "น้ำหนักไม่ถูกต้อง", str(error))
+                    continue
+                return weight, True
+            return 0.0, False
 
         def add_product_row(self, product) -> None:
             price, price_version = service.effective_price(int(product["id"]), product["price"] or 0)

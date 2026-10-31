@@ -18,6 +18,17 @@ class InstalledPrintersTest(unittest.TestCase):
         self.assertNotIn("setPageMargins(", source)
         self.assertIn("paper_width_mm", source)
 
+    def test_weight_accepts_thai_digits_and_rejects_nonsense(self) -> None:
+        from pos_python.ui import parse_weight
+
+        self.assertEqual(parse_weight("๑.๒๕"), 1.25)
+        with self.assertRaises(ValueError):
+            parse_weight("0")
+
+    def test_receipt_stays_inside_the_printable_width(self) -> None:
+        source = inspect.getsource(printers.print_text_to_windows_queue)
+        self.assertIn("printable_mm = 72 if paper_width_mm == 80 else 48", source)
+
     def test_receipt_lines_are_laid_out_by_kind(self) -> None:
         from pos_python.printers import classify_lines
 

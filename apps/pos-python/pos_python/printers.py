@@ -98,7 +98,9 @@ def print_text_to_windows_queue(text: str, printer_name: str, *, paper_width_mm:
         body = QFont("Tahoma", 10 if paper_width_mm == 80 else 9, QFont.Weight.Bold)
         code = QFont("Courier New", 8, QFont.Weight.Bold)
         page = printer.pageRect(QPrinter.Unit.DevicePixel)
-        width = int(page.width())
+        # Driver บางตัวรายงานหน้ากว้างเต็มกระดาษ แต่หัวพิมพ์พิมพ์ได้แค่ 72/48 มม. ขวาจึงตกขอบ
+        printable_mm = 72 if paper_width_mm == 80 else 48
+        width = min(int(page.width()), int(printable_mm * printer.resolution() / 25.4))
         painter.setPen(QColor("black"))
         painter.setFont(body)
         y = 0
