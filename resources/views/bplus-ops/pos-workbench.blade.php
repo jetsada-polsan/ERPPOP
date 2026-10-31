@@ -121,6 +121,8 @@
                         <th>วันที่ขาย</th>
                         <th>สาขา</th>
                         <th>เครื่อง</th>
+                        <th class="text-end">ยอดก่อนลด</th>
+                        <th class="text-end">ส่วนลด</th>
                         <th class="text-end">ยอดสุทธิ</th>
                     </tr>
                 </thead>
@@ -131,11 +133,13 @@
                             <td>{{ $receipt->receipt_date?->thaiDate(true) }}</td>
                             <td>{{ $receipt->terminal?->branch?->name_th ?? $receipt->shift?->branch?->name_th ?? '-' }}</td>
                             <td><span class="pos-chip">{{ $receipt->terminal?->code ?? '-' }}</span></td>
+                            <td class="text-end">{{ number_format((float) $receipt->gross_sales, 2) }}</td>
+                            <td class="text-end text-danger">{{ number_format((float) $receipt->discount_amount, 2) }}</td>
                             <td class="text-end fw-bold">{{ number_format((float) $receipt->net_sales, 2) }}</td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="text-center text-muted py-5">ยังไม่มีบิล POS ตามวันที่/สาขาที่เลือก</td>
+                            <td colspan="7" class="text-center text-muted py-5">ยังไม่มีบิล POS ตามวันที่/สาขาที่เลือก</td>
                         </tr>
                     @endforelse
                 </tbody>

@@ -49,6 +49,31 @@ class PosDeviceConnectionTest extends TestCase
             ->assertJsonPath('branch_id', $branch->id);
     }
 
+    public function test_branch_scoped_seller_can_use_only_the_assigned_branch_when_device_branch_is_unset(): void
+    {
+        $branch = $this->branch('SCOPED');
+        $otherBranch = $this->branch('OTHER');
+        $user = User::factory()->create([
+            'username' => 'scopedpos_'.uniqid(),
+            'branch_id' => $branch->id,
+        ]);
+        $permission = Permission::firstOrCreate(['code' => 'pos.sell'], ['name' => 'pos.sell']);
+        $role = Role::create(['code' => 'POS_BRANCH_'.uniqid(), 'name' => 'Branch POS Seller']);
+        $role->permissions()->attach($permission->id);
+        $user->branchRoles()->attach($role->id, ['branch_id' => $branch->id, 'is_active' => true]);
+        [, $fallbackToken] = PosDevice::issue([
+            'name' => 'เครื่องใช้สาขาจากบัญชี', 'user_id' => $user->id, 'branch_id' => null,
+        ]);
+        [, $otherToken] = PosDevice::issue([
+            'name' => 'เครื่องคนละสาขา', 'user_id' => $user->id, 'branch_id' => $otherBranch->id,
+        ]);
+
+        $this->withToken($fallbackToken)->getJson('/api/pos/ping')
+            ->assertOk()
+            ->assertJsonPath('branch_id', $branch->id);
+        $this->withToken($otherToken)->getJson('/api/pos/ping')->assertForbidden();
+    }
+
     public function test_ping_returns_no_branch_when_neither_device_nor_user_has_one(): void
     {
         $user = $this->cashierUser(null);
@@ -67,6 +92,37 @@ class PosDeviceConnectionTest extends TestCase
         [, $token] = PosDevice::issue(['name' => 'POS ไม่มีสิทธิ์', 'user_id' => $user->id, 'branch_id' => $branch->id]);
 
         $this->withToken($token)->getJson('/api/pos/ping')->assertStatus(403);
+    }
+
+    public function test_branch_manager_view_permission_does_not_grant_selling_device_access(): void
+    {
+        $ownBranch = $this->branch('OWNBR');
+        $user = User::factory()->create([
+            'username' => 'branchmgr_'.uniqid(),
+            'branch_id' => $ownBranch->id,
+        ]);
+        $user->roles()->attach(Role::where('code', 'BRANCH_MGR')->firstOrFail()->id);
+        [, $token] = PosDevice::issue([
+            'name' => 'เครื่องสาขาผู้จัดการ', 'user_id' => $user->id, 'branch_id' => $ownBranch->id,
+        ]);
+
+        // ผู้จัดการเปิดดู POS ได้ แต่ถ้าจะขายต้องผูกเครื่องกับบัญชีผู้ขาย
+        // การใส่ GM เพื่อข้ามข้อกำหนดนี้จะให้สิทธิ์กว้างเกินความจำเป็น
+        $this->withToken($token)->getJson('/api/pos/ping')->assertForbidden();
+    }
+
+    public function test_it_manager_can_use_pos_devices_across_branches_without_general_manager_role(): void
+    {
+        $branch = $this->branch('GMTEST');
+        $user = User::factory()->create(['username' => 'itpos_'.uniqid(), 'branch_id' => null]);
+        $user->roles()->attach(Role::where('code', 'IT_MGR')->firstOrFail()->id);
+        [, $token] = PosDevice::issue([
+            'name' => 'เครื่องทดสอบ IT', 'user_id' => $user->id, 'branch_id' => $branch->id,
+        ]);
+
+        $this->withToken($token)->getJson('/api/pos/ping')
+            ->assertOk()
+            ->assertJsonPath('branch_id', $branch->id);
     }
 
     public function test_revoked_or_unknown_token_cannot_connect(): void

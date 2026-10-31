@@ -12,7 +12,7 @@ class RoutePermissions
 {
     private const MAP = [
         // POS + งานหน้าร้าน: เห็นหน้า POS = pos.use (แคชเชียร์/ผจก.สาขา/ผู้บริหาร)
-        // แต่เปิดกะ+คิดเงิน = pos.sell (แคชเชียร์เท่านั้น) - longest prefix ชนะ
+        // เปิดกะ+คิดเงินต้องมี pos.sell; สิทธิ์นี้แยกจากการดูหน้า POS - longest prefix ชนะ
         'pos.' => 'pos.use',
         'pos-admin.' => 'settings.manage',
         'pos.control' => 'reports.view',

@@ -142,6 +142,35 @@ class PosWorkbenchTest extends TestCase
                 && ! $receipts->contains('id', $otherReceipt->id));
     }
 
+    public function test_pos_workbench_displays_pre_discount_discount_and_net_totals(): void
+    {
+        $branch = Branch::create(['code' => 'WB-DISC', 'name_th' => 'สาขาทดสอบส่วนลด', 'is_active' => true]);
+        $terminal = PosTerminal::create([
+            'branch_id' => $branch->id,
+            'code' => 'T-WB-DISC',
+            'name' => 'POS ส่วนลด',
+        ]);
+        PosReceipt::create([
+            'pos_terminal_id' => $terminal->id,
+            'receipt_no' => 'WB-DISC-001',
+            'receipt_date' => now('Asia/Bangkok'),
+            'gross_sales' => 120,
+            'discount_amount' => 20,
+            'net_sales' => 100,
+            'status' => 'completed',
+        ]);
+        $user = $this->userWithPermissions(['pos.use'], $branch->id);
+
+        $this->actingAs($user)->get(route('bplus.pos-workbench'))
+            ->assertOk()
+            ->assertSee('ยอดก่อนลด')
+            ->assertSee('ส่วนลด')
+            ->assertSee('ยอดสุทธิ')
+            ->assertSee('120.00')
+            ->assertSee('20.00')
+            ->assertSee('100.00');
+    }
+
     public function test_user_without_branch_or_all_branch_permission_does_not_see_every_branch(): void
     {
         $branch = Branch::create(['code' => 'B001', 'name_th' => 'สาขาทดสอบ', 'is_active' => true]);

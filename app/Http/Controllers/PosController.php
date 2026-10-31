@@ -91,7 +91,7 @@ class PosController extends Controller
         $qrConfig = QrPaymentConfig::where('is_active', true)->with('bankAccount')->first();
         $pointValueBaht = $points->pointValueBaht();
 
-        // แคชเชียร์เท่านั้นที่เปิดกะ/คิดเงินได้ - ผจก.สาขา/ผู้บริหารเปิดดูได้อย่างเดียว
+        // เปิดกะ/คิดเงินได้เฉพาะบัญชีที่ได้รับ pos.sell; pos.use ใช้เปิดดูหน้า POS เท่านั้น
         $authUser = auth()->user();
         $canSell = (bool) $authUser?->hasPermission('pos.sell');
         $canVoid = (bool) $authUser?->hasPermission('pos.void');
@@ -107,7 +107,7 @@ class PosController extends Controller
 
         // เหตุผลที่เปิดกะไม่ได้ แสดงบนหน้าแทนปุ่มที่กดแล้วไม่เกิดอะไร (ข้อ 13)
         $shiftBlocker = match (true) {
-            ! $canSell => 'บัญชีนี้เปิดดูได้อย่างเดียว ไม่มีสิทธิ์ขาย (pos.sell) — ให้ผู้ดูแลเพิ่มบทบาทแคชเชียร์',
+            ! $canSell => 'บัญชีนี้เปิดดูได้อย่างเดียว ไม่มีสิทธิ์ขาย (pos.sell) — ให้ผู้ดูแลตรวจบทบาท CASHIER หรือ IT_MGR ตามหน้าที่',
             ! $lockedCashier => 'บัญชีนี้ยังไม่ได้ผูกกับแคชเชียร์ — ให้ผู้ดูแลผูกที่หน้าผู้ใช้ก่อนเปิดกะ',
             $lockedBranch && ! $lockedBranch->hasDefaultWarehouse() => "สาขา {$lockedBranch->name_th} ยังไม่มีคลังเริ่มต้น — ตั้งคลังก่อนเปิดกะ",
             default => null,
@@ -1085,7 +1085,9 @@ class PosController extends Controller
             $data['items'] = $pricingGuard->resolveScaleLines($data['items'], (int) $data['branch_id']);
             // ผู้อนุมัติส่วนลดจากหน้าร้านเชื่อได้เฉพาะเครื่อง POS ที่ผูก token แล้ว หน้าเว็บยังต้องมีสิทธิ์เหมือนเดิม
             $counterApprover = $request->attributes->get('pos_device') ? ($data['discount_approved_by'] ?? null) : null;
-            $pricingGuard->validate($data, auth()->user(), $counterApprover);
+            $priceSummary = null;
+            $pricingGuard->validate($data, auth()->user(), $counterApprover, $priceSummary);
+            $data['_validated_price_summary'] = $priceSummary;
             $data['items'] = $pricingGuard->normalizeItems($data['items']);
             $paymentValidator->validate($data);
         } catch (RuntimeException $e) {
@@ -1452,10 +1454,13 @@ class PosController extends Controller
     private function recordPosReceipt(PosShift $shift, string $receiptNo, array $data, int $documentId): PosReceipt
     {
         $items = collect($data['items']);
-        $gross = round($items->sum(fn ($item) => (float) $item['qty'] * (float) $item['unit_price']), 2);
-        $discount = round((float) ($data['discount_amount'] ?? 0), 2);
+        // The pricing guard derives totals from server prices and verified discounts;
+        // POS-supplied totals are informational and never drive receipt reporting.
+        $summary = $data['_validated_price_summary'] ?? null;
+        $net = (float) ($summary['net_sales'] ?? round($items->sum(fn ($item) => (float) $item['qty'] * (float) $item['unit_price']), 2));
+        $discount = (float) ($summary['discount_amount'] ?? 0);
+        $gross = (float) ($summary['gross_sales'] ?? round($net + $discount, 2));
         $vat = round((float) ($data['vat_amount'] ?? 0), 2);
-        $net = round($gross, 2);
 
         $receipt = PosReceipt::create([
             'pos_terminal_id' => $shift->pos_terminal_id,

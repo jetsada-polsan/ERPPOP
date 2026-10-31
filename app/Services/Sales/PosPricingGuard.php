@@ -104,7 +104,7 @@ class PosPricingGuard
      *                                          เงินถูกเก็บจากลูกค้าไปแล้วตอนบิลมาถึง การปฏิเสธจะทำให้บิลค้างในเครื่อง
      *                                          ตลอดไป จึงบันทึกตามพร้อมชื่อผู้อนุมัติแทนการปฏิเสธ
      */
-    public function validate(array $data, User $user, ?string $offlineApprovedBy = null): float
+    public function validate(array $data, User $user, ?string $offlineApprovedBy = null, ?array &$summary = null): float
     {
         $approvedAtCounter = filled($offlineApprovedBy);
         $items = collect($data['items']);
@@ -167,9 +167,10 @@ class PosPricingGuard
             ];
         });
 
-        $expected = DecimalMath::round(DecimalMath::sum($serverLines->map(
+        $gross = DecimalMath::round(DecimalMath::sum($serverLines->map(
             fn ($line) => DecimalMath::multiply($line['qty'], $line['unit_price'])
         )), DecimalMath::DISPLAY_MONEY_SCALE);
+        $expected = $gross;
         $qtyPromotionDiscount = $this->qtyPromotionDiscount($serverLines, (int) $data['branch_id']);
 
         $manualDiscount = DecimalMath::round($data['manual_discount_amount'] ?? 0, DecimalMath::DISPLAY_MONEY_SCALE);
@@ -204,6 +205,10 @@ class PosPricingGuard
             $vatRate = (float) (DB::table('vat_rates')->where('effective_from', '<=', now()->toDateString())
                 ->where(fn ($query) => $query->whereNull('effective_to')->orWhere('effective_to', '>=', now()->toDateString()))
                 ->orderByDesc('effective_from')->value('rate_percent') ?? 7);
+            $gross = DecimalMath::round(
+                DecimalMath::divide(DecimalMath::multiply($gross, DecimalMath::add(100, $vatRate)), 100),
+                DecimalMath::DISPLAY_MONEY_SCALE,
+            );
             $expected = DecimalMath::round(
                 DecimalMath::divide(DecimalMath::multiply($expected, DecimalMath::add(100, $vatRate)), 100),
                 DecimalMath::DISPLAY_MONEY_SCALE,
@@ -216,6 +221,16 @@ class PosPricingGuard
         if (DecimalMath::compare(DecimalMath::absoluteDifference($submitted, $expected, 2), '0.02') > 0) {
             throw new RuntimeException('ราคาหรือส่วนลดเปลี่ยนจากข้อมูลบนเซิร์ฟเวอร์ กรุณาโหลดสินค้าใหม่แล้วคิดเงินอีกครั้ง');
         }
+
+        $discount = DecimalMath::subtract($gross, $submitted, DecimalMath::DISPLAY_MONEY_SCALE);
+        if (DecimalMath::compare($discount, 0) < 0) {
+            $discount = '0.00';
+        }
+        $summary = [
+            'gross_sales' => (float) $gross,
+            'discount_amount' => (float) $discount,
+            'net_sales' => (float) $submitted,
+        ];
 
         $cost = DecimalMath::round(DecimalMath::sum($items->map(
             fn ($item) => DecimalMath::multiply($item['qty'], $products[(int) $item['product_id']]->average_cost)

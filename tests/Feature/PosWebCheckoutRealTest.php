@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Http\Middleware\ErpAuthorize;
+use App\Models\Permission;
 use App\Models\PosOfflineSale;
 use App\Models\PosShift;
 use App\Models\PosTerminal;
+use App\Models\Role;
 use App\Models\Salesman;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -75,6 +77,31 @@ class PosWebCheckoutRealTest extends TestCase
         $this->assertNotNull($sale->receipt_no);
         $this->assertSame(1, DB::table('pos_receipts')->count());
         $this->assertStringContainsString('ขายออฟไลน์', (string) DB::table('documents')->latest('id')->value('remark'));
+        $this->assertReconciles();
+    }
+
+    public function test_checkout_records_manual_discount_separately_from_net_sales(): void
+    {
+        $permission = Permission::firstOrCreate(['code' => 'pos.discount.override'], ['name' => 'pos.discount.override']);
+        $role = Role::create(['code' => 'WEB_DISCOUNT_'.uniqid(), 'name' => 'Web discount approver']);
+        $role->permissions()->attach($permission->id);
+        auth()->user()->roles()->attach($role->id);
+
+        $price = (float) DB::table('products')->where('id', $this->productId)->value('default_price');
+        $payload = $this->payload();
+        $payload['items'][0]['unit_price'] = $price - 10;
+        $payload['cash_received'] = ($price - 10) * 2;
+        $payload['manual_discount_amount'] = 20;
+
+        $this->postJson(route('pos.checkout'), $payload)
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $receipt = DB::table('pos_receipts')->sole();
+        $this->assertEquals($price * 2, (float) $receipt->gross_sales);
+        $this->assertEquals(20, (float) $receipt->discount_amount);
+        $this->assertEquals(($price - 10) * 2, (float) $receipt->net_sales);
+        $this->assertEquals(($price - 10) * 2, (float) DB::table('documents')->where('id', $receipt->document_id)->value('total_amount'));
         $this->assertReconciles();
     }
 
