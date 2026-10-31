@@ -97,7 +97,6 @@
                                         <input type="hidden" name="pos_branch_id" value="{{ $row['branch']->id }}">
                                         <input type="hidden" name="pos_user_id" value="{{ $row['device_user']->id }}">
                                         <button class="btn btn-sm btn-primary text-nowrap"><i class="bi bi-plus-lg me-1"></i>เพิ่มเครื่อง</button>
-                                        <div class="small text-muted">ผูกกับ {{ $row['device_user']->posCashierProfile?->code ?? $row['device_user']->username }}</div>
                                     </form>
                                 @else
                                     <span class="small text-muted">{{ $row['has_warehouse'] ? 'แคชเชียร์ทุกรหัสมีเครื่องแล้ว — เพิ่มรหัสด้วย erp:setup-branch-pos-staff' : 'ตั้งคลังก่อน' }}</span>
@@ -156,15 +155,6 @@
                             </td>
                             <td class="text-end text-nowrap">
                                 @if($row['active'])
-                                    <form method="post" action="{{ route('pos-admin.devices.assign', $d) }}" class="d-inline-flex gap-1 mb-1">
-                                        @csrf
-                                        <select name="user_id" class="form-select form-select-sm" style="width:auto" aria-label="คนประจำเครื่อง">
-                                            @foreach(collect($branches)->firstWhere('branch.id', $d->branch_id)['cashier_list'] ?? [] as $person)
-                                                @if($person->user_id)<option value="{{ $person->user_id }}" @selected($person->user_id === $d->user_id)>{{ $person->code }} {{ $person->name }}</option>@endif
-                                            @endforeach
-                                        </select>
-                                        <button class="btn btn-sm btn-outline-success">เปลี่ยนคน</button>
-                                    </form>
                                     <form method="post" action="{{ route('settings.pos-token.rotate') }}" class="d-inline" onsubmit="return confirm('ออก Token ใหม่ให้ {{ addslashes($d->name) }}? Token เดิมใช้ไม่ได้ทันที ต้องวาง Token ใหม่ที่เครื่อง')">
                                         @csrf
                                         <input type="hidden" name="pos_device_id" value="{{ $d->id }}">

@@ -2049,6 +2049,17 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                         selected = online.provisioning.online_cashier_login(
                             pin, cashier_server_id=int(cashier["server_id"])
                         )
+                    if selected.get("selection_required"):
+                        QMessageBox.warning(self, "เลือกคนขายไม่ได้", "กรุณาเลือกชื่อคนขายใหม่")
+                        return False
+                    if selected.get("must_change_pin") and pin is not None:
+                        new_pin, confirmed = QInputDialog.getText(
+                            self, "ตั้ง PIN ใหม่", "PIN นี้เป็น PIN ชั่วคราว ตั้ง PIN ใหม่ (ตัวเลข 4 หลักขึ้นไป)", QLineEdit.Password
+                        )
+                        if not confirmed or not new_pin.strip():
+                            QMessageBox.information(self, "ยังไม่ได้เปิดกะ", "ต้องตั้ง PIN ใหม่ก่อนเริ่มขาย")
+                            return False
+                        online.provisioning.change_cashier_pin(str(selected["cashier"]["code"]), pin, new_pin)
                     local_id = selected.get("local_cashier_id")
                     if local_id:
                         cashier = service.db.execute(

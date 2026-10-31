@@ -30,13 +30,10 @@ class PosAdminOverview
                 $devices = PosDevice::where('branch_id', $branch->id)->whereNull('revoked_at')->get(['id', 'last_seen_at']);
                 $cashiers = Salesman::with('user.posCredential')->where('branch_id', $branch->id)->where('is_active', true)->orderBy('code')->get();
                 $withPin = $cashiers->filter(fn (Salesman $s) => $this->hasPin($s));
-                // เครื่องใหม่ผูกกับแคชเชียร์เครื่องถัดไปที่ยังไม่มีเครื่อง (b001, b001-2, ...) ไม่ใช่หัวหน้า
-                // เพราะเครื่องแสดงเฉพาะคนขายของ user ที่ผูก + หัวหน้า
-                $bound = PosDevice::where('branch_id', $branch->id)->whereNull('revoked_at')->pluck('user_id')->all();
+                // ทุกเครื่องต้องมี user ภายในสำหรับ API แต่คนขายมาจาก PIN จึงใช้ซ้ำกันได้ ไม่ต้องให้ผู้ดูแลเลือก
                 $deviceUser = User::where('branch_id', $branch->id)->where('is_active', true)
                     ->whereHas('posCashierProfile', fn ($q) => $q->where('is_active', true))
                     ->whereDoesntHave('roles', fn ($q) => $q->whereIn('code', ['GM', 'BRANCH_MGR']))
-                    ->whereNotIn('id', $bound)
                     ->with(['roles.permissions', 'branchRoles.permissions', 'posCashierProfile'])
                     ->get()->sortBy(fn (User $user) => $user->posCashierProfile?->code)->values()
                     ->first(fn (User $user) => $user->canUsePosDevice($branch->id));
