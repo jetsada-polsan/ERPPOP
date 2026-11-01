@@ -53,6 +53,33 @@ fn d_drive_path() -> PathBuf {
     PathBuf::from(r"D:\POPSTAR-POS\data")
 }
 
+fn storage_config_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    Ok(app.path().app_data_dir().map_err(|error| error.to_string())?.join("storage-root.txt"))
+}
+
+fn configured_storage_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let config = storage_config_path(app)?;
+    if let Ok(value) = fs::read_to_string(config) {
+        let path = PathBuf::from(value.trim());
+        if path.is_absolute() && !path.as_os_str().is_empty() {
+            return Ok(path);
+        }
+    }
+    Ok(d_drive_path())
+}
+
+#[tauri::command]
+fn set_storage_folder(app: tauri::AppHandle, folder: String) -> Result<(), String> {
+    let path = PathBuf::from(folder.trim());
+    if !path.is_absolute() || path.as_os_str().is_empty() {
+        return Err("โฟลเดอร์ข้อมูลต้องเป็น path เต็ม เช่น D:\\POPSTAR-POS\\data".to_string());
+    }
+    fs::create_dir_all(&path).map_err(|error| format!("สร้างโฟลเดอร์ข้อมูลไม่ได้: {}", error))?;
+    let config = storage_config_path(&app)?;
+    if let Some(parent) = config.parent() { fs::create_dir_all(parent).map_err(|error| error.to_string())?; }
+    fs::write(config, path.to_string_lossy().as_bytes()).map_err(|error| error.to_string())
+}
+
 #[cfg(windows)]
 fn is_directory_link(path: &PathBuf) -> bool {
     fs::symlink_metadata(path).map(|metadata| metadata.file_type().is_symlink()).unwrap_or(false)
@@ -86,9 +113,9 @@ fn prepare_local_storage(app: tauri::AppHandle) -> Result<StorageStatus, String>
 
     #[cfg(windows)]
     {
-        let target_root = d_drive_path();
-        if !PathBuf::from(r"D:\").is_dir() {
-            return Ok(StorageStatus { location: "c-fallback".to_string(), database_path: database.to_string_lossy().to_string(), warning: Some("ไม่พบไดรฟ์ D: ฐานข้อมูลยังอยู่ที่ C: และควรติดตั้งไดรฟ์ข้อมูลก่อนเริ่มขาย".to_string()) });
+        let target_root = configured_storage_path(&app)?;
+        if !target_root.exists() && !target_root.parent().map(|parent| parent.exists()).unwrap_or(false) {
+            return Ok(StorageStatus { location: "c-fallback".to_string(), database_path: database.to_string_lossy().to_string(), warning: Some("ยังไม่ได้ตั้งโฟลเดอร์ข้อมูล จึงใช้ฐานข้อมูลบนเครื่องชั่วคราว".to_string()) });
         }
         fs::create_dir_all(&target_root).map_err(|error| format!("สร้างโฟลเดอร์ข้อมูล D: ไม่ได้: {}", error))?;
         if is_directory_link(&app_config) {
@@ -174,7 +201,7 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_sql::Builder::default().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![save_device_token, read_device_token, prepare_local_storage, backup_local_database, next_backup_path, restore_latest_database])
+        .invoke_handler(tauri::generate_handler![save_device_token, read_device_token, set_storage_folder, prepare_local_storage, backup_local_database, next_backup_path, restore_latest_database])
         .run(tauri::generate_context!())
         .expect("failed to run POPSTAR POS");
 }

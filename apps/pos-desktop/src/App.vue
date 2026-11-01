@@ -47,6 +47,7 @@ const busy = ref(false)
 const modal = ref<'cashier' | 'selectCashier' | 'changePin' | 'shift' | 'closeShift' | 'payment' | 'settings' | 'holdBill' | 'heldBills' | 'history' | 'guide' | null>(null)
 const setupUrl = ref('https://erp.popstarcenter.com')
 const setupToken = ref('')
+const storageFolder = ref('D:\\POPSTAR-POS\\data')
 const setupError = ref('')   // ค้างไว้จนกว่าจะลองเชื่อมใหม่ ต่างจาก toast ที่หายใน 6 วิ
 const cashierPin = ref('')
 const pendingCashier = ref<Cashier | null>(null)
@@ -319,6 +320,7 @@ async function configure() {
   busy.value = true
   setupError.value = ''
   try {
+    if (isTauri()) await invoke('set_storage_folder', { folder: storageFolder.value.trim() })
     const connected = await connect(setupUrl.value, setupToken.value.trim())
     setupUrl.value = connected.serverUrl
     profile.value = connected
@@ -774,6 +776,8 @@ onUnmounted(() => {
         <small class="setup-hint">ที่อยู่ ERP ปัจจุบันคือ https://erp.popstarcenter.com หากเชื่อมต่อไม่ได้ ให้ตรวจอินเทอร์เน็ตและ Device Token</small>
         <p v-if="setupError" class="setup-error">{{ setupError }}</p>
         <label>Device Token<textarea v-model="setupToken" required rows="3" placeholder="วาง Token จาก ERP > ตั้งค่า > ดาวน์โหลด POS"></textarea></label>
+        <label>โฟลเดอร์เก็บข้อมูล POS<input v-model="storageFolder" required placeholder="D:\\POPSTAR-POS\\data"></label>
+        <small class="setup-hint">แนะนำให้เลือกไดรฟ์ D: หรือโฟลเดอร์ข้อมูลที่สำรองได้ ระบบจะเก็บ SQLite, บิลออฟไลน์ และคิวซิงก์ไว้ที่นี่</small>
         <small class="setup-hint">Token ใช้ผูกเครื่องกับสาขา ไม่ควรนำไปใส่ใน GitHub หรือส่งต่อให้พนักงาน</small>
         <div class="modal-actions"><button type="button" class="secondary" @click="modal = null">ปิด</button><button class="primary" :disabled="busy">{{ busy ? 'กำลังตรวจสอบ...' : 'เชื่อมต่อเครื่อง' }}</button></div>
         <div class="local-diagnostics">
