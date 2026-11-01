@@ -110,6 +110,21 @@ class CashTransferScreenTest extends TestCase
         $this->assertSame('delivered', $job->fresh()->status);
     }
 
+    public function test_accounting_review_is_restricted_and_requires_a_converted_booking(): void
+    {
+        [$user] = $this->financeUser('CTS6', extra: ['sales.manage']);
+        $booking = $this->booking('CTS6B', $user, delivery: false);
+
+        $this->actingAs($user)->post(route('bookings.accounting-review', $booking), [
+            'status' => 'approved',
+        ])->assertStatus(422);
+
+        $unauthorized = User::factory()->create(['is_active' => true, 'must_change_password' => false]);
+        $this->actingAs($unauthorized)->post(route('bookings.accounting-review', $booking), [
+            'status' => 'approved',
+        ])->assertForbidden();
+    }
+
     private function booking(string $suffix, User $user, bool $delivery): SaleBooking
     {
         DocumentType::firstOrCreate(['code' => DocumentType::BOOKING], ['name_th' => 'ใบจอง']);
