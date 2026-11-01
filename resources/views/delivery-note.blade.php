@@ -59,9 +59,11 @@
         .page.delivery-note-page table.items td { padding: 1mm 1.2mm !important; font-size: 8.5px !important; }
         .page.delivery-note-page .qc-row { display: grid !important; grid-template-columns: minmax(0, 1fr) 50mm !important; gap: 2mm !important; margin-top: 1.5mm !important; padding-top: 1.5mm !important; }
         .page.delivery-note-page .qc-left { font-size: 8px !important; }
+        .page.delivery-note-page .qc-left { min-width: 0 !important; overflow: hidden !important; }
         .page.delivery-note-page .qc-item { gap: 1mm !important; margin-right: 1mm !important; font-size: 8px !important; }
         .page.delivery-note-page .qc-box { width: 3.5mm !important; height: 3.5mm !important; }
-        .page.delivery-note-page .totals { width: 50mm !important; min-width: 0 !important; font-size: 8px !important; }
+        .page.delivery-note-page .totals { width: 50mm !important; max-width: 50mm !important; min-width: 0 !important; overflow: hidden !important; font-size: 8px !important; }
+        .page.delivery-note-page .totals .row span:first-child { min-width: 0 !important; white-space: nowrap !important; }
         .page.delivery-note-page .totals .row { gap: 1mm !important; margin-bottom: 1mm !important; }
         .page.delivery-note-page .totals .val { min-width: 17mm !important; padding: .5mm 1mm !important; }
         .page.delivery-note-page .sign-row { gap: 4mm !important; margin-top: 8mm !important; }

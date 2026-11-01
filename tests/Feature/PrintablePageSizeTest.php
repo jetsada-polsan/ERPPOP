@@ -58,6 +58,7 @@ class PrintablePageSizeTest extends TestCase
         // ใบส่งของพิมพ์ทุกวันบนกระดาษ A5 ที่ซื้อมาเป็นรีม เปลี่ยนเป็น A4 คือพิมพ์ผิดทั้งกอง
         $this->assertMatchesRegularExpression('/@page\s*\{[^}]*size:\s*A5\s+landscape/i', $contents);
         $this->assertStringContainsString('<div class="page delivery-note-page">', $contents);
+        $this->assertStringContainsString('max-width: 50mm !important', $contents);
 
         // The shared print theme styles .page as A4; the A5 overrides must come after it.
         $themePosition = strpos($contents, "@include('documents.partials.print-theme')");
