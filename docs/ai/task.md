@@ -1967,3 +1967,22 @@ pending
 ## ความเสี่ยง/งานถัดไป
 - ต้องเลือกโลโก้นี้ใน Settings หรือกำหนดค่า `logo_path` หลัง deploy จึงจะแสดงทั่วระบบ
 - หากต้องเปลี่ยนชื่อบริษัทบนเอกสาร ต้องยืนยันชื่อไทย/อังกฤษ เลขภาษี และที่อยู่ก่อนแก้ข้อมูลกิจการ
+
+# Handoff — 2026-11-01 (วาง installer Vue/Tauri ในหน้า POS Admin)
+
+## Commit
+- รอ commit หลังทดสอบ
+
+## ทำอะไรไป
+- เพิ่มลิงก์ดาวน์โหลด Vue/Tauri installer รุ่นล่าสุดไว้ข้าง Python installer ในหน้า `/pos-admin`
+- เปลี่ยน `/download/pos` ให้ดาวน์โหลดไฟล์ Vue/Tauri จาก manifest ล่าสุดจริง
+- ซ่อนเมนู `เปิด POS ขาย` ของ Web POS จาก navigation โดยไม่ลบ route/โค้ดเดิม
+- คง Python installer ไว้สำหรับเครื่องเดิมและการ rollback
+
+## ทดสอบไปแล้วแค่ไหน
+- GitHub Actions Vue/Tauri release `41319998812`: checks, Windows native build และ publish ผ่านทั้งหมด
+- รอตรวจ PHP lint/feature tests ก่อน commit
+
+## ความเสี่ยง/งานถัดไป
+- Web POS ยังเปิดได้จาก URL โดยตรง แต่ไม่แสดงในเมนู
+- ต้องทดสอบดาวน์โหลดจากบัญชี IT หลัง deploy และติดตั้งบน Windows จริง

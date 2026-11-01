@@ -301,11 +301,18 @@
             <div class="pa-step"><span class="pa-step-no">1</span><div class="flex-grow-1">
                 <div class="fw-semibold">ดาวน์โหลดโปรแกรมที่เครื่องร้าน</div>
                 <div class="small text-muted">Windows อาจขึ้น SmartScreen ให้กด More info → Run anyway</div>
-                @if($installer)
-                    <a href="{{ route('python-pos.download') }}" class="btn btn-primary btn-sm mt-2"><i class="bi bi-download me-1"></i>ดาวน์โหลดรุ่น {{ $installer['version'] }}</a>
-                @else
-                    <div class="small text-danger mt-1">ยังไม่มีไฟล์ติดตั้งบนเซิร์ฟเวอร์</div>
-                @endif
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    @if($vueInstaller)
+                        <a href="{{ route('pos.download') }}" class="btn btn-primary btn-sm"><i class="bi bi-download me-1"></i>Vue/Tauri รุ่น {{ data_get($vueInstaller, 'version') }}</a>
+                    @endif
+                    @if($installer)
+                        <a href="{{ route('python-pos.download') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-1"></i>Python รุ่น {{ $installer['version'] }}</a>
+                    @endif
+                    @if(! $vueInstaller && ! $installer)
+                        <div class="small text-danger">ยังไม่มีไฟล์ติดตั้งบนเซิร์ฟเวอร์</div>
+                    @endif
+                </div>
+                <div class="small text-muted mt-2">แนะนำ Vue/Tauri สำหรับตัวติดตั้งรุ่นใหม่; Python คงไว้สำหรับเครื่องเดิม</div>
             </div></div>
             <div class="pa-step"><span class="pa-step-no">2</span><div>
                 <div class="fw-semibold">กด เพิ่มเครื่อง ที่แท็บ ภาพรวมสาขา</div>

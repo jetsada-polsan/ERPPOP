@@ -10,6 +10,7 @@ use App\Models\PosTerminal;
 use App\Models\Salesman;
 use App\Services\Pos\PosAdminOverview;
 use App\Support\PythonPosInstaller;
+use App\Support\PosReleaseManifest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,7 +23,7 @@ use RuntimeException;
  */
 class PosAdminController extends Controller
 {
-    public function index(PosAdminOverview $overview): View
+    public function index(PosAdminOverview $overview, PosReleaseManifest $releases): View
     {
         return view('pos-admin.index', [
             'branches' => $overview->branches(),
@@ -32,6 +33,7 @@ class PosAdminController extends Controller
             'allBranches' => Branch::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name_th']),
             'terminals' => PosTerminal::with('branch:id,code,name_th')->orderBy('code')->get(),
             'installer' => PythonPosInstaller::current(),
+            'vueInstaller' => $releases->current(),
             'pinMode' => AppSetting::get('pos_passwordless_login') === '1' ? 'selection' : 'pin',
             'onlineMinutes' => PosAdminOverview::ONLINE_MINUTES,
         ]);

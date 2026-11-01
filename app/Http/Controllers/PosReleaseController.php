@@ -8,6 +8,17 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class PosReleaseController extends Controller
 {
+    public function downloadLatest(): BinaryFileResponse
+    {
+        $manifest = app(PosReleaseManifest::class)->current();
+        $url = data_get($manifest, 'platforms.windows-x86_64.url');
+        $filename = is_string($url) ? basename((string) parse_url($url, PHP_URL_PATH)) : '';
+
+        abort_unless($filename !== '' && $filename !== 'latest.json', 404, 'ยังไม่มี POS รุ่นติดตั้ง');
+
+        return $this->download($filename);
+    }
+
     public function latest(): JsonResponse
     {
         $manifest = app(PosReleaseManifest::class)->current();

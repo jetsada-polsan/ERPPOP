@@ -61,7 +61,6 @@ class ErpMenu
                 'label' => 'POS / หน้าร้าน',
                 'displayLabel' => 'POS / หน้าร้าน',
                 'items' => [
-                    ['label' => 'เปิด POS ขาย', 'route' => 'pos.index', 'pattern' => 'pos.index', 'icon' => 'bi-display', 'tone' => 'cyan', 'target' => '_blank'],
                     ['label' => 'ศูนย์ควบคุม POS', 'route' => 'pos.control', 'pattern' => 'pos.control', 'icon' => 'bi-cash-coin', 'tone' => 'red'],
                     ['label' => 'จัดการเครื่อง POS', 'route' => 'pos-admin.index', 'pattern' => 'pos-admin.*', 'icon' => 'bi-pc-display', 'tone' => 'blue'],
                     ['label' => 'เครื่องมือ POS', 'route' => 'bplus.pos-workbench', 'pattern' => 'bplus.pos-workbench', 'icon' => 'bi-window-stack', 'tone' => 'blue'],
