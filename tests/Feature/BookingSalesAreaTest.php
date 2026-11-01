@@ -29,7 +29,7 @@ class BookingSalesAreaTest extends TestCase
     {
         [$branch, $customer, $product] = $this->masters('BP');
         $route = SalesArea::with('documentBook')
-            ->where('code', 'B11')
+            ->whereNotNull('document_book_id')->orderBy('id')
             ->firstOrFail();
         $user = User::factory()->create([
             'username' => 'booking_bplus_route_uat',
@@ -58,7 +58,7 @@ class BookingSalesAreaTest extends TestCase
             'sales_user_id' => $user->id,
             'document_book_id' => $route->document_book_id,
             // ข้อ 16: ใบจองใช้รูปแบบ สาขา-ปีเดือน/ลำดับ เหมือนเอกสารอื่น (เดิม B01)
-            'doc_number' => $branch->code.'-'.(now()->year + 543).now()->format('m').'/001',
+            'doc_number' => $route->code.'-'.(now()->year + 543).now()->format('m').'/001',
             'total_amount' => 270,
         ]);
         // ผู้รับผิดชอบใบจองไม่ผูก user กับลูกค้าอีกต่อไป: ลูกค้ายังไม่มีเจ้าของ

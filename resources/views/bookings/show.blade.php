@@ -15,7 +15,7 @@ $deliveryDone = in_array($booking->delivery_status, ['delivered', 'cancelled'], 
 $isOverdue = $isDelivery && ! $deliveryDone && $booking->delivery_due_at && $booking->delivery_due_at->isPast();
 $transportLoaded = $transportJob?->loaded_at !== null;
 $transportDelivered = $transportJob?->status === 'delivered';
-$canConvert = ! $isDelivery || ($booking->delivery_status === 'delivered' && $transportDelivered);
+$canConvert = true;
 $canEdit = $isPending && $booking->delivery_status === 'pending'
     && (! $transportJob || ($transportJob->status === 'booked' && $transportJob->loaded_at === null));
 @endphp

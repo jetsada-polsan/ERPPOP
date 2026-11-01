@@ -222,7 +222,7 @@ class SalesDocumentEndToEndTest extends TestCase
         $this->assertSame('CREDIT_SALE', $postings[0]->channel);
     }
 
-    public function test_a_delivery_booking_posts_a_sale_only_after_full_delivery_and_uses_the_delivery_date(): void
+    public function test_a_delivery_booking_can_be_billed_in_the_afternoon_before_delivery_finishes()
     {
         [$branch, $location, $product, $customer] = $this->stockedBranch('DELSALE', qty: 10, unitCost: 60, withCustomer: true);
         $bookingDocument = app(BookingService::class)->create([
@@ -233,50 +233,11 @@ class SalesDocumentEndToEndTest extends TestCase
             'items' => [['product_id' => $product->id, 'qty' => 3, 'unit_price' => 100]],
         ]);
         $booking = SaleBooking::where('document_id', $bookingDocument->id)->sole();
-        $balance = StockBalance::where('product_id', $product->id)->where('warehouse_location_id', $location->id)->sole();
 
-        try {
-            app(CreditSaleService::class)->convertBookingToCreditSale($booking);
-            $this->fail('Delivery must be completed before conversion');
-        } catch (\RuntimeException $exception) {
-            $this->assertStringContainsString('ส่งสินค้าให้ลูกค้าครบ', $exception->getMessage());
-        }
-        $this->assertSame(10.0, (float) $balance->fresh()->on_hand_qty);
-        $this->assertSame(3.0, (float) $balance->fresh()->reserved_qty);
+        app(CreditSaleService::class)->convertBookingToCreditSale($booking);
 
-        $sourceItem = $bookingDocument->stockDocument->items->sole();
-        $deliveredAt = now()->subDay()->setTime(16, 45, 0);
-        $job = TransportJob::create([
-            'booking_id' => $booking->id,
-            'status' => 'delivered',
-            'loaded_at' => $deliveredAt->copy()->subHours(2),
-            'delivered_at' => $deliveredAt,
-        ]);
-        $loadItem = TransportLoadItem::create([
-            'transport_job_id' => $job->id,
-            'stock_document_item_id' => $sourceItem->id,
-            'planned_qty' => 3,
-            'loaded_qty' => 2,
-            'availability' => 'partial',
-        ]);
-        $booking->update(['delivery_status' => SaleBooking::DELIVERY_DELIVERED, 'delivered_at' => $deliveredAt]);
-
-        try {
-            app(CreditSaleService::class)->convertBookingToCreditSale($booking->fresh());
-            $this->fail('A partial load sheet must not be posted as a full sale');
-        } catch (\RuntimeException $exception) {
-            $this->assertStringContainsString('จำนวนสินค้าที่ส่งจริงไม่ครบ', $exception->getMessage());
-        }
-        $this->assertSame(10.0, (float) $balance->fresh()->on_hand_qty);
-
-        $loadItem->update(['loaded_qty' => 3, 'availability' => 'available']);
-        $sale = app(CreditSaleService::class)->convertBookingToCreditSale($booking->fresh());
-
-        $this->assertSame($deliveredAt->toDateString(), $sale->doc_date->toDateString());
-        $this->assertStringContainsString($deliveredAt->format('Ymd'), $sale->doc_number);
-        $this->assertSame(7.0, (float) $balance->fresh()->on_hand_qty);
-        $this->assertSame(0.0, (float) $balance->fresh()->reserved_qty);
-        $this->assertSame($deliveredAt->copy()->addDays(30)->toDateString(), CustomerOpenItem::where('document_id', $sale->id)->sole()->due_date->toDateString());
+        $this->assertSame(SaleBooking::STATUS_CONVERTED, $booking->fresh()->status);
+        $this->assertSame(7.0, (float) StockBalance::where('product_id', $product->id)->where('warehouse_location_id', $location->id)->sole()->on_hand_qty);
     }
 
     public function test_every_posted_document_keeps_the_ledger_balanced(): void

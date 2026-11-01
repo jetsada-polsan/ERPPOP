@@ -96,9 +96,7 @@ class BookingService
                 'document_type_id' => $documentType->id,
                 'document_book_id' => $documentBook?->id,
                 'branch_id' => $branch->id,
-                'doc_number' => $documentBook
-                    ? $this->numbers->nextInBook($documentBook, $branch->id)
-                    : $this->numbers->next(DocumentType::BOOKING, $branch->id),
+                'doc_number' => $this->numbers->nextBooking($branch->id, null, $data['sales_area_id'] ?? null),
                 'doc_date' => now()->toDateString(),
                 'salesman_id' => $data['salesman_id'] ?? null,
                 'sales_user_id' => $data['sales_user_id'] ?? null,

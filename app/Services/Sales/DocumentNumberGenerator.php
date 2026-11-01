@@ -4,6 +4,7 @@ namespace App\Services\Sales;
 
 use App\Models\Branch;
 use App\Models\DocumentBook;
+use App\Models\SalesArea;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -69,14 +70,16 @@ class DocumentNumberGenerator
      * ใบจองใช้รูปแบบเล่มเดิม: สาขา + วันที่ + ลำดับ (เดิม B01, B02 นับรวมทั้งบริษัท — ข้อ 16)
      * ทุกเล่มใบจองของสาขาใช้ตัวนับเดียวกัน เพราะ prefix เดียวกัน แยกตัวนับตามเล่มจะได้เลขซ้ำ
      */
-    private function nextBooking(int $branchId, ?string $date = null): string
+    public function nextBooking(int $branchId, ?string $date = null, ?int $salesAreaId = null): string
     {
         // รูปแบบเดิมของ BPlus: เล่ม-ปีพ.ศ.เดือน/ลำดับ เช่น B001-256911/001 เริ่ม 001 ใหม่ทุกเดือน
-        $branchCode = Branch::whereKey($branchId)->value('code') ?? (string) $branchId;
+        // เล่มคือสายการขาย ถ้าไม่มีสายใช้รหัสสาขา
+        $areaCode = $salesAreaId ? SalesArea::whereKey($salesAreaId)->value('code') : null;
+        $branchCode = $areaCode ?? Branch::whereKey($branchId)->value('code') ?? (string) $branchId;
         $day = $date ? Carbon::parse($date) : now();
         $period = ($day->year + 543).$day->format('m');
 
-        return sprintf('%s-%s/%03d', $branchCode, $period, $this->nextSequence('BOOKING:'.$branchId, $period));
+        return sprintf('%s-%s/%03d', $branchCode, $period, $this->nextSequence('BOOKING:'.$branchCode, $period));
     }
 
     // ตารางที่ออกเลขเอง ไม่ได้อยู่ใน documents — ใช้ตัวนับชุดเดียวกันเพื่อไม่ให้ซ้ำ
