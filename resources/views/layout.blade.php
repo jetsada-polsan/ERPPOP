@@ -1366,6 +1366,8 @@
         }
 
         @media print { .app-content{padding:0}.content-card,.card{box-shadow:none}.table-responsive{overflow:visible!important} }
+            /* แจ้งเตือนต้องอยู่เหนือหน้าต่างเอกสารเสมอ ไม่งั้นผู้ใช้เห็นเป็นกดแล้วนิ่ง */
+        .swal2-container { z-index: 6000 !important; }
     </style>
 </head>
 <body class="layout-fixed sidebar-expand-lg {{ request()->boolean('popup') ? 'erp-popup-page' : '' }} {{ request()->routeIs(['bookings.*','cash-sales.*','sales.*','purchases.*','purchase-orders.*','sale-returns.*','credit-debit-notes.*','stock-issues.*','stock-transfers.*','stock-transforms.*','stock-adjustments.*','stock-counts.*']) ? 'erp-classic-document-page' : '' }}">
