@@ -383,8 +383,12 @@
         <div class="glow-a" aria-hidden="true"></div>
         <div class="glow-b" aria-hidden="true"></div>
         <div class="story-brand">
-            <img src="{{ asset('images/logo-jet-erp-mark.svg') }}" alt="PopCentral">
-            PopCentral
+            @if($logo = \App\Models\AppSetting::logoUrl())
+                <img src="{{ $logo }}" alt="{{ \App\Models\AppSetting::company('name_th') }}">
+            @else
+                <img src="{{ asset('images/logo-jet-erp-mark.svg') }}" alt="PopCentral">
+            @endif
+            {{ \App\Models\AppSetting::company('name_th') ?: 'PopCentral' }}
         </div>
         <div class="story-content">
             <div class="story-kicker">แพลตฟอร์มบริหารงานธุรกิจ</div>
@@ -406,7 +410,7 @@
         </div>
         <div class="story-foot">
             <i class="bi bi-shield-check"></i>
-            PopCentral · สร้างเพื่อการดำเนินงานของ POPSTAR
+            {{ \App\Models\AppSetting::company('name_th') ?: 'PopCentral' }} · แพลตฟอร์มบริหารงานธุรกิจ
         </div>
     </section>
 

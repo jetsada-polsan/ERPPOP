@@ -1,3 +1,22 @@
+# Handoff — 2026-11-01 (เปิดใช้แบรนด์ Meaw Foods)
+
+## Commit
+รอ commit หลังตรวจและทดสอบ
+
+## ทำอะไรไป
+- เปิดใช้ชื่อแบรนด์ `เหมียวฟู๊ด / Meaw Foods` และโลโก้ที่ติดตั้งไว้ ผ่าน migration แบบ key-value โดยไม่ลบหรือแก้ธุรกรรมเดิม
+- ปรับ login, ERP header/sidebar, favicon และจุดแสดงเอกสารให้ใช้โลโก้/ชื่อแบรนด์ปัจจุบันแทนค่าที่ hardcode
+- คงโครงสร้าง single-brand เดิมไว้ตามคำสั่ง เพื่อขยาย multi-brand ภายหลัง
+
+## ทดสอบไปแล้วแค่ไหน
+- `php -d memory_limit=1G vendor/bin/phpunit --filter='SystemSetting|ReceiptTemplate|MemberPortal|PrintablePageSize'`: 9 tests / 34 assertions ผ่าน
+- `php -d memory_limit=1G vendor/bin/phpunit`: 698 tests, 697 ผ่าน, 1 skipped, 6 incomplete, 5,903 assertions
+- `git diff --check` และ PHP syntax check ผ่าน
+
+## ความเสี่ยง/งานถัดไป
+- ยังไม่ deploy production; migration จะเปลี่ยนเฉพาะค่า branding และไม่แตะ tax/address/ยอดขาย
+- หากต้องเปิดใช้บน production ให้ owner สั่ง deploy แล้วตรวจ login, sidebar, ใบส่งของ และ POS receipt อีกครั้ง
+
 # Handoff — 2026-10-31 (แสดงบาร์โค้ดและค้นหาสินค้าอัตโนมัติ)
 
 ## Commit

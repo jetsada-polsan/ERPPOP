@@ -14,9 +14,12 @@
         'slate' => 'menu-icon-slate',
         'amber' => 'menu-icon-amber',
     ];
-    $faviconUrl = asset('images/logo-jet-erp-mark.svg').'?v='.filemtime(public_path('images/logo-jet-erp-mark.svg'));
+    $fallbackFavicon = asset('images/logo-jet-erp-mark.svg').'?v='.filemtime(public_path('images/logo-jet-erp-mark.svg'));
     $companyName = \App\Models\AppSetting::company('name_th') ?: 'กิจการของคุณ';
     $companyLogo = \App\Models\AppSetting::logoUrl();
+    $faviconUrl = \App\Models\AppSetting::get('favicon_path')
+        ? asset(\App\Models\AppSetting::get('favicon_path')).'?v='.filemtime(public_path(\App\Models\AppSetting::get('favicon_path')))
+        : ($companyLogo ?: $fallbackFavicon);
     $erpTheme = in_array(\App\Models\AppSetting::get('erp_theme', 'ocean'), ['ocean', 'navy', 'emerald', 'slate', 'clear'], true)
         ? \App\Models\AppSetting::get('erp_theme', 'ocean') : 'ocean';
     $erpLayout = in_array(\App\Models\AppSetting::get('erp_layout', 'classic'), ['classic', 'odoo'], true)
@@ -1413,7 +1416,7 @@
             <a href="{{ route('apps.launcher') }}" class="odn-apps" title="รวมโมดูลทั้งหมด" aria-label="รวมโมดูลทั้งหมด">
                 <i class="bi bi-grid-3x3-gap-fill"></i>
             </a>
-            <a href="{{ route('dashboard') }}" class="odn-brand">PopCentral</a>
+            <a href="{{ route('dashboard') }}" class="odn-brand">{{ $companyName }}</a>
             <nav class="odn-nav" aria-label="หมวดเมนู">
                 @foreach ($menuSections as $i => $section)
                     <a href="#odn-grp-{{ $i }}" class="odn-nav-link {{ $i === $activeSection ? 'on' : '' }}"
@@ -1613,10 +1616,10 @@
             <div class="fa-rail">
                 {{-- โลโก้ = ตรา PopCentral (เครื่องบินเจ็ท) — ตัว J แดงใช้เฉพาะ favicon --}}
                 <a href="{{ route('dashboard') }}" class="fa-rail-logo" title="หน้าแรก">
-                    @if(is_file(public_path('images/logo-jet-erp-mark.svg')))
-                        <img src="{{ asset('images/logo-jet-erp-mark.svg') }}" alt="PopCentral logo">
-                    @elseif($appLogo)
+                    @if($appLogo)
                         <img src="{{ $appLogo }}" alt="logo">
+                    @elseif(is_file(public_path('images/logo-jet-erp-mark.svg')))
+                        <img src="{{ asset('images/logo-jet-erp-mark.svg') }}" alt="PopCentral logo">
                     @else
                         <span>ป</span>
                     @endif
