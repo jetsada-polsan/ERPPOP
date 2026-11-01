@@ -303,7 +303,7 @@
                 <div class="small text-muted">Windows อาจขึ้น SmartScreen ให้กด More info → Run anyway</div>
                 <div class="d-flex flex-wrap gap-2 mt-2">
                     @if($vueInstaller)
-                        <a href="{{ route('pos.download') }}" class="btn btn-primary btn-sm"><i class="bi bi-download me-1"></i>Vue/Tauri รุ่น {{ data_get($vueInstaller, 'version') }}</a>
+                        <a href="{{ data_get($vueInstaller, 'platforms.windows-x86_64.url', route('pos.download')) }}" download class="btn btn-primary btn-sm"><i class="bi bi-download me-1"></i>Vue/Tauri รุ่น {{ data_get($vueInstaller, 'version') }}</a>
                     @endif
                     @if($installer)
                         <a href="{{ route('python-pos.download') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-1"></i>Python รุ่น {{ $installer['version'] }}</a>
