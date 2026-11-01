@@ -96,7 +96,8 @@ class AppLauncherTest extends TestCase
 
         $this->assertContains('ใบเสนอราคา', $sales);
         $this->assertContains('ใบขายสด', $sales);
-        $this->assertContains('เปิด POS ขาย', $pos);
+        $this->assertNotContains('เปิด POS ขาย', $pos);
+        $this->assertContains('จัดการเครื่อง POS', $pos);
         $this->assertContains('ศูนย์ควบคุม POS', $pos);
         $this->assertContains('ส่งข้อมูลไป POS', $pos);
         $this->assertNotContains('เปิด POS ขาย', $sales);
@@ -113,7 +114,7 @@ class AppLauncherTest extends TestCase
 
         $this->assertNotNull($posSection);
         $this->assertSame('POS / หน้าร้าน', $posSection['title']);
-        $this->assertContains('เปิด POS ขาย', array_column($posSection['items'], 'label'));
+        $this->assertNotContains('เปิด POS ขาย', array_column($posSection['items'], 'label'));
         $this->assertContains('ส่งข้อมูลไป POS', array_column($posSection['items'], 'label'));
     }
 

@@ -93,7 +93,7 @@ class PosWorkbenchTest extends TestCase
             ->assertDontSee(route('pos.download'), false);
     }
 
-    public function test_legacy_pos_download_url_redirects_to_python_pos(): void
+    public function test_pos_download_url_falls_back_to_python_without_a_local_release(): void
     {
         $this->get(route('pos.download'))
             ->assertRedirect(route('python-pos.download'));

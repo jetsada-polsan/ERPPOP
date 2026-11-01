@@ -5,16 +5,19 @@ namespace App\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use App\Support\PosReleaseManifest;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 class PosReleaseController extends Controller
 {
-    public function downloadLatest(): BinaryFileResponse
+    public function downloadLatest(): Response
     {
         $manifest = app(PosReleaseManifest::class)->current();
         $url = data_get($manifest, 'platforms.windows-x86_64.url');
         $filename = is_string($url) ? basename((string) parse_url($url, PHP_URL_PATH)) : '';
 
-        abort_unless($filename !== '' && $filename !== 'latest.json', 404, 'ยังไม่มี POS รุ่นติดตั้ง');
+        if ($filename === '' || $filename === 'latest.json' || ! is_file(storage_path('app/pos-releases/'.$filename))) {
+            return redirect()->route('python-pos.download');
+        }
 
         return $this->download($filename);
     }
