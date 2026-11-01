@@ -7,7 +7,7 @@
 | | |
 |---|---|
 | รุ่น | **1.5.0** เผยแพร่แล้ว 2026-08-23 |
-| ดาวน์โหลด | http://27.254.143.219/download/pos/releases/POPSTAR-POS-1.5.0.exe |
+| ดาวน์โหลด | https://erp.popstarcenter.com/download/pos/releases/POPSTAR-POS-1.5.0.exe |
 | SHA-256 | `2d381eb69f5d19c488b734a78a6d6ea14477494cea8097d913f48cc04d9b1db1` |
 | บังคับอัปเดต | **ไม่** — เครื่องจะขึ้นให้เลือก ไม่บังคับ จนกว่า UAT นี้จะผ่าน |
 

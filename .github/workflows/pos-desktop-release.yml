@@ -91,7 +91,7 @@ jobs:
           VERSION: ${{ inputs.version }}
           NOTES: ${{ inputs.notes }}
           MANDATORY: ${{ inputs.mandatory }}
-          APP_URL: http://27.254.143.219
+          APP_URL: https://erp.popstarcenter.com
         run: |
           $bundle = 'apps/pos-desktop/src-tauri/target/release/bundle/nsis'
           $installer = Get-ChildItem -Path $bundle -Filter '*.exe' | Select-Object -First 1

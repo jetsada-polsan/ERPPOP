@@ -2042,3 +2042,19 @@ pending
 
 ## ความเสี่ยง/งานถัดไป
 - ต้องเผยแพร่ installer รุ่นถัดไปแทน binary เดิมที่ยังอยู่บนเครื่องร้าน
+
+# Handoff — 2026-11-01 (บังคับ HTTPS ใน POS release)
+
+## Commit
+- รอ commit หลังทดสอบ
+
+## ทำอะไรไป
+- เปลี่ยน workflow สร้าง manifest ให้สร้างลิงก์ installer เป็น `https://erp.popstarcenter.com`
+- เปลี่ยน Tauri updater endpoint เป็น HTTPS โดเมนจริง
+- ปรับเอกสาร UAT ไม่ให้ชี้ไป IP/HTTP เดิม
+
+## ทดสอบไปแล้วแค่ไหน
+- ตรวจทุกจุดที่สร้างลิงก์ release แล้ว ไม่พบ workflow ที่ยังสร้าง URL IP เดิม
+
+## ความเสี่ยง/งานถัดไป
+- ต้อง build/release รุ่นใหม่จึงจะเขียน `latest.json` ชุดใหม่บนเซิร์ฟเวอร์

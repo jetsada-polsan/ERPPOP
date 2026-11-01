@@ -38,7 +38,7 @@
   "plugins": {
     "sql": {},
     "updater": {
-      "endpoints": ["http://27.254.143.219/download/pos/latest.json"],
+      "endpoints": ["https://erp.popstarcenter.com/download/pos/latest.json"],
       "pubkey": "__TAURI_UPDATER_PUBLIC_KEY__",
       "dangerousInsecureTransportProtocol": true
     }
