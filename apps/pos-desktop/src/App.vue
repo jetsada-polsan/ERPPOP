@@ -691,6 +691,7 @@ onUnmounted(() => {
       </div>
       <div class="top-actions">
         <button class="status" :class="connectionClass" :title="catalogSyncError || 'ตรวจการเชื่อมต่อ ERP และซิงก์ข้อมูล'" @click="syncAll"><Wifi v-if="profile && online"/><CloudOff v-else/><span>{{ connectionLabel }}</span></button>
+        <button v-if="cashier && !shift" class="shift-action" title="เปิดกะขาย" @click="modal = 'shift'"><Banknote/><span>เปิดกะ</span></button>
         <button class="icon-button" title="ซิงก์ข้อมูล" @click="syncAll"><RefreshCw :class="{ spin: syncing }"/></button>
         <button class="icon-button" title="คู่มือการใช้งาน POS" @click="openGuide"><CircleHelp/></button>
         <button class="icon-button" title="ประวัติการขายย้อนหลัง" @click="openHistory"><History/></button>
@@ -798,7 +799,7 @@ onUnmounted(() => {
       </form>
 
       <form v-else-if="modal === 'cashier'" class="modal compact" @submit.prevent="loginCashier">
-        <div class="modal-head"><div><UserRound/><span><strong>เข้าใช้งานแคชเชียร์</strong><small>{{ profile?.branchName }}</small></span></div></div>
+        <div class="modal-head"><div><UserRound/><span><strong>เข้าใช้งานแคชเชียร์</strong><small>{{ profile?.branchName }}</small></span></div><button type="button" @click="modal = null"><X/></button></div>
         <template v-if="profile?.cashierLoginMode === 'selection'">
           <small class="setup-hint">เครื่องนี้ผูกสาขา {{ profile?.branchName }} แล้ว เลือกชื่อผู้ปฏิบัติงานเพื่อเริ่มขาย</small>
           <button class="primary" :disabled="busy">เลือกชื่อพนักงาน</button>
@@ -811,7 +812,7 @@ onUnmounted(() => {
       </form>
 
       <section v-else-if="modal === 'selectCashier'" class="modal compact">
-        <div class="modal-head"><div><UserRound/><span><strong>เลือกชื่อพนักงาน</strong><small>PIN เริ่มต้นนี้ใช้ร่วมกัน กรุณาเลือกชื่อผู้ปฏิบัติงานจริง</small></span></div></div>
+        <div class="modal-head"><div><UserRound/><span><strong>เลือกชื่อพนักงาน</strong><small>PIN เริ่มต้นนี้ใช้ร่วมกัน กรุณาเลือกชื่อผู้ปฏิบัติงานจริง</small></span></div><button type="button" @click="modal = null"><X/></button></div>
         <div class="held-list">
           <button v-for="choice in cashierChoices" :key="choice.id" type="button" :disabled="busy" @click="selectCashier(choice)">
             <span><strong>{{ choice.name }}</strong><small>{{ choice.code }}</small></span><ChevronRight/>
@@ -821,14 +822,14 @@ onUnmounted(() => {
       </section>
 
       <form v-else-if="modal === 'changePin'" class="modal compact" @submit.prevent="changePin">
-        <div class="modal-head"><div><UserRound/><span><strong>ตั้ง PIN ของคุณเอง</strong><small>PIN ที่ได้รับมาเป็นค่าเริ่มต้น ต้องเปลี่ยนก่อนเริ่มขาย</small></span></div></div>
+        <div class="modal-head"><div><UserRound/><span><strong>ตั้ง PIN ของคุณเอง</strong><small>PIN ที่ได้รับมาเป็นค่าเริ่มต้น ต้องเปลี่ยนก่อนเริ่มขาย</small></span></div><button type="button" @click="modal = null"><X/></button></div>
         <label>PIN ใหม่<input v-model="newPin" required type="password" inputmode="numeric" pattern="\d{4,20}" minlength="4" maxlength="20" autofocus autocomplete="new-password"></label>
         <label>ยืนยัน PIN ใหม่<input v-model="confirmPin" required type="password" inputmode="numeric" pattern="\d{4,20}" minlength="4" maxlength="20" autocomplete="new-password"></label>
         <button class="primary" :disabled="busy">{{ busy ? 'กำลังบันทึก...' : 'บันทึก PIN แล้วเริ่มงาน' }}</button>
       </form>
 
       <form v-else-if="modal === 'shift'" class="modal compact" @submit.prevent="openShift">
-        <div class="modal-head"><div><Banknote/><span><strong>เปิดกะขาย</strong><small>{{ cashier?.name }} · {{ profile?.branchName }}</small></span></div></div>
+        <div class="modal-head"><div><Banknote/><span><strong>เปิดกะขาย</strong><small>{{ cashier?.name }} · {{ profile?.branchName }}</small></span></div><button type="button" @click="modal = null"><X/></button></div>
         <label>เงินทอนเริ่มต้น<input v-model.number="openingCash" type="number" min="0" step="0.01" autofocus required></label>
         <button class="primary" :disabled="busy">ยืนยันเปิดกะ</button>
       </form>
