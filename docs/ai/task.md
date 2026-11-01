@@ -2024,3 +2024,21 @@ pending
 ## ความเสี่ยง/งานถัดไป
 - ต้องสร้าง Windows native installer รุ่นใหม่ แล้วเผยแพร่แทนรุ่นเดิม
 - หลังติดตั้งรุ่นใหม่ ให้เชื่อมต่อด้วย `https://erp.popstarcenter.com` และทดสอบ ping/catalog/sync
+
+# Handoff — 2026-11-01 (ปรับหน้าเชื่อมต่อ POS)
+
+## Commit
+- รอ commit หลังทดสอบ
+
+## ทำอะไรไป
+- เปลี่ยนค่าเริ่มต้นและข้อความแนะนำให้ใช้ `https://erp.popstarcenter.com`
+- เพิ่มปุ่ม `ปิด` และปุ่ม `X` ให้ modal ตั้งค่าเครื่องปิดได้ แม้ยังเชื่อมต่อไม่สำเร็จ
+- เพิ่ม layout ปุ่มใน modal ให้ใช้งานได้บนจอ Windows
+- ตั้ง source version เป็น `1.4.4` เพื่อไม่ให้ build ใหม่แสดงค่าเก่า
+
+## ทดสอบไปแล้วแค่ไหน
+- Vue/Tauri unit tests: 31 tests ผ่าน
+- Vue typecheck และ production web build ผ่าน
+
+## ความเสี่ยง/งานถัดไป
+- ต้องเผยแพร่ installer รุ่นถัดไปแทน binary เดิมที่ยังอยู่บนเครื่องร้าน

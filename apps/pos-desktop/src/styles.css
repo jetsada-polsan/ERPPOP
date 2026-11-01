@@ -254,6 +254,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .modal-head > button svg { width: 19px; }
 .modal label { display: flex; flex-direction: column; gap: 6px; margin-top: 13px; color: #52616e; font-size: 10px; font-weight: 800; }
 .modal .secondary { width: 100%; margin-top: 10px; padding: 11px; border: 1px solid #0788b5; border-radius: 6px; background: #fff; color: #0788b5; font-weight: 800; }
+.modal-actions { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; margin-top: 10px; }
+.modal-actions button { margin-top: 0 !important; }
 .held-list { display: flex; max-height: 420px; flex-direction: column; gap: 7px; overflow: auto; }
 .held-list > button { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; border: 1px solid #d6e0e6; border-radius: 6px; background: #fff; color: #233846; text-align: left; }
 .held-list > button:hover { border-color: #0788b5; background: #eef8fb; }

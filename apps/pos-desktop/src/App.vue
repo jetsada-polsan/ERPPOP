@@ -45,7 +45,7 @@ const error = ref('')
 const notice = ref('')
 const busy = ref(false)
 const modal = ref<'cashier' | 'selectCashier' | 'changePin' | 'shift' | 'closeShift' | 'payment' | 'settings' | 'holdBill' | 'heldBills' | 'history' | 'guide' | null>(null)
-const setupUrl = ref('http://27.254.143.219')
+const setupUrl = ref('https://erp.popstarcenter.com')
 const setupToken = ref('')
 const setupError = ref('')   // ค้างไว้จนกว่าจะลองเชื่อมใหม่ ต่างจาก toast ที่หายใน 6 วิ
 const cashierPin = ref('')
@@ -767,13 +767,13 @@ onUnmounted(() => {
         <button type="button" class="primary" @click="modal = null">เข้าใจแล้ว</button>
       </section>
       <form v-if="modal === 'settings'" class="modal" @submit.prevent="configure">
-        <div class="modal-head"><div><Settings/><span><strong>ตั้งค่าเครื่อง POS</strong><small>เชื่อมเครื่องนี้กับ ERP เพียงครั้งแรก</small></span></div><button v-if="profile" type="button" @click="modal = null"><X/></button></div>
-        <label>ที่อยู่เซิร์ฟเวอร์<input v-model="setupUrl" required placeholder="http://27.254.143.219"></label>
-        <small class="setup-hint">ใส่ที่อยู่ตามที่ผู้ดูแลระบบแจ้งเท่านั้น (ปัจจุบันคือ http://27.254.143.219) — แอปรุ่นนี้อนุญาตให้ต่อได้เฉพาะที่อยู่นั้น ยังไม่เปิด HTTPS</small>
+        <div class="modal-head"><div><Settings/><span><strong>ตั้งค่าเครื่อง POS</strong><small>เชื่อมเครื่องนี้กับ ERP เพียงครั้งแรก</small></span></div><button type="button" @click="modal = null"><X/></button></div>
+        <label>ที่อยู่เซิร์ฟเวอร์<input v-model="setupUrl" required placeholder="https://erp.popstarcenter.com"></label>
+        <small class="setup-hint">ที่อยู่ ERP ปัจจุบันคือ https://erp.popstarcenter.com หากเชื่อมต่อไม่ได้ ให้ตรวจอินเทอร์เน็ตและ Device Token</small>
         <p v-if="setupError" class="setup-error">{{ setupError }}</p>
         <label>Device Token<textarea v-model="setupToken" required rows="3" placeholder="วาง Token จาก ERP > ตั้งค่า > ดาวน์โหลด POS"></textarea></label>
         <small class="setup-hint">Token ใช้ผูกเครื่องกับสาขา ไม่ควรนำไปใส่ใน GitHub หรือส่งต่อให้พนักงาน</small>
-        <button class="primary" :disabled="busy">{{ busy ? 'กำลังตรวจสอบ...' : 'เชื่อมต่อเครื่อง' }}</button>
+        <div class="modal-actions"><button type="button" class="secondary" @click="modal = null">ปิด</button><button class="primary" :disabled="busy">{{ busy ? 'กำลังตรวจสอบ...' : 'เชื่อมต่อเครื่อง' }}</button></div>
         <div class="local-diagnostics">
           <div class="diagnostic-head"><span><strong>สุขภาพ POS Local</strong><small>ตรวจ SQLite และคิวบิลในเครื่องนี้</small></span><button type="button" class="icon-button" title="ตรวจใหม่" :disabled="localHealthBusy" @click="inspectLocalDb"><RefreshCw :class="{ spin: localHealthBusy }"/></button></div>
           <div v-if="storageStatus" class="storage-status" :class="storageStatus.location === 'd-drive' ? 'storage-ok' : 'storage-warning'"><strong>{{ storageStatus.location === 'd-drive' ? 'ข้อมูลอยู่ไดรฟ์ D:' : 'ข้อมูลยังอยู่ไดรฟ์ C:' }}</strong><small>{{ storageStatus.database_path }}</small></div>
