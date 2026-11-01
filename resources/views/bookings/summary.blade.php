@@ -1,66 +1,26 @@
-<!doctype html>
-<html lang="th">
-<head>
-    <meta charset="utf-8">
-    <title>ใบรวมจอง {{ $date }}</title>
-    <style>
-        @page { size: A4; margin: 10mm; }
-        body { font-family: Tahoma, sans-serif; font-size: 13px; color: #000; margin: 0; }
-        .bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 12px; background: #eef2f7; }
-        .bar select, .bar input, .bar button, .bar a { height: 36px; font-size: 14px; }
-        .sheet { padding: 12mm; page-break-after: always; }
-        h1 { font-size: 18px; margin: 0 0 4px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-        th, td { border: 1px solid #000; padding: 6px; }
-        .num { text-align: right; }
-        .tick { width: 56px; text-align: center; }
-        .bill { margin-top: 14px; break-inside: avoid; }
-        @media print { .bar { display: none; } .sheet { padding: 0; } }
-    </style>
-</head>
-<body>
-<form method="get" class="bar">
-    <input type="date" name="date" value="{{ $date }}">
-    <select name="branch_id"><option value="">ทุกสาขา</option>@foreach($branches as $b)<option value="{{ $b->id }}" @selected($branchId === $b->id)>{{ $b->code }} {{ $b->name_th }}</option>@endforeach</select>
-    <select name="sales_area_id"><option value="">ทุกสาย</option>@foreach($salesAreas as $a)<option value="{{ $a->id }}" @selected($salesAreaId === $a->id)>{{ $a->code }} {{ $a->name }}</option>@endforeach</select>
-    <button>แสดง</button>
-    <button type="button" onclick="window.print()">พิมพ์</button>
-    <a href="{{ route('bookings.index') }}">กลับ</a>
-</form>
-@forelse($groups as $group)
-    <section class="sheet">
-        <h1>ใบรวมจอง: เช็คขึ้นของทีละบิล</h1>
-        <div>วันที่ {{ $date }} · {{ $group->branch?->name_th }} · สาย {{ $group->area?->name ?? 'ไม่ระบุ' }} · {{ $group->bookings->count() }} ใบ</div>
-        @foreach($group->bookings as $booking)
-            <div class="bill">
-                <strong>{{ $booking->document->doc_number }}</strong> · {{ $booking->document->customer?->code }} {{ $booking->document->customer?->name_th }}
-                <table>
-                    <thead><tr><th>#</th><th>สินค้า</th><th>หน่วย</th><th class="num">จำนวน</th><th class="num">ราคา</th><th class="num">รวม</th><th class="tick">ขึ้นแล้ว</th></tr></thead>
-                    <tbody>
-                    @foreach($booking->document->stockDocument?->items ?? [] as $item)
-                        <tr><td>{{ $loop->iteration }}</td><td>{{ $item->product?->name_th }}</td><td>{{ $item->product?->baseUnit?->name }}</td><td class="num">{{ number_format((float) $item->qty, 2) }}</td><td class="num">{{ number_format((float) $item->unit_price, 2) }}</td><td class="num">{{ number_format((float) $item->qty * (float) $item->unit_price, 2) }}</td><td class="tick">☐</td></tr>
-                    @endforeach
-                        <tr><td colspan="5" class="num"><strong>รวม</strong></td><td class="num"><strong>{{ number_format((float) $booking->document->total_amount, 2) }}</strong></td><td></td></tr>
-                    </tbody>
-                </table>
-            </div>
-        @endforeach
-    </section>
-    <section class="sheet">
-        <h1>ใบเช็คส่งของประจำสาย: ส่งบัญชีตัดยอด</h1>
-        <div>วันที่ {{ $date }} · {{ $group->branch?->name_th }} · สาย {{ $group->area?->name ?? 'ไม่ระบุ' }}</div>
-        <table>
-            <thead><tr><th>เลขที่ใบจอง</th><th>ลูกค้า</th><th class="num">ยอด</th><th class="tick">ส่งครบ</th><th class="tick">ไม่ส่ง</th><th>หมายเหตุ</th></tr></thead>
-            <tbody>
-            @foreach($group->bookings as $booking)
-                <tr><td>{{ $booking->document->doc_number }}</td><td>{{ $booking->document->customer?->name_th }}</td><td class="num">{{ number_format((float) $booking->document->total_amount, 2) }}</td><td class="tick">☐</td><td class="tick">☐</td><td></td></tr>
-            @endforeach
-            </tbody>
-        </table>
-        <p style="margin-top:32px">ผู้ส่งของ ____________________ &nbsp; ผู้ตรวจรับ (บัญชี) ____________________</p>
-    </section>
-@empty
-    <p style="padding:16px">ไม่มีใบจองค้างของวันที่เลือก</p>
-@endforelse
-</body>
-</html>
+@extends('layout')
+
+@section('content')
+<div class="summary-page">
+    <form class="summary-toolbar no-print" method="get">
+        <div class="summary-heading"><span class="summary-icon"><i class="bi bi-clipboard2-check"></i></span><div><h1>ใบรวมจอง</h1><p>ตรวจสินค้าและส่งบัญชีตัดยอด</p></div></div>
+        <label>วันที่<input type="date" name="date" value="{{ $date->toDateString() }}"></label>
+        <label>สาขา<select name="branch_id"><option value="">ทุกสาขา</option>@foreach($branches as $branch)<option value="{{ $branch->id }}" @selected($branchId === $branch->id)>{{ $branch->code }} {{ $branch->name_th }}</option>@endforeach</select></label>
+        <label>สายขาย<select name="sales_area_id"><option value="">ทุกสาย</option>@foreach($salesAreas as $area)<option value="{{ $area->id }}" @selected($salesAreaId === $area->id)>{{ $area->code }} {{ $area->name }}</option>@endforeach</select></label>
+        <button class="btn btn-primary"><i class="bi bi-search me-1"></i>แสดง</button><button type="button" class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>พิมพ์</button><a class="btn btn-link" href="{{ route('bookings.index') }}">กลับ</a>
+    </form>
+    <div class="summary-meta"><div><strong>ใบรวมจอง: เช็คสินค้า</strong><span>{{ $date->format('d/m/Y') }} · {{ $branches->firstWhere('id', $branchId)?->name_th ?? 'ทุกสาขา' }} · {{ $salesAreas->firstWhere('id', $salesAreaId)?->name ?? 'ทุกสาย' }}</span></div><b>{{ $bookings->count() }} ใบจอง</b></div>
+    <section class="summary-card"><div class="section-title"><i class="bi bi-box-seam"></i><div><h2>รายการสินค้าที่ต้องเตรียม</h2><small>รวมจำนวนจากใบจองตามตัวกรอง</small></div><span>{{ $items->count() }} รายการ</span></div>
+    <div class="table-wrap"><table class="summary-table"><thead><tr><th>รหัส</th><th>สินค้า</th><th class="text-end">รวม</th><th>หน่วย</th><th class="check-col">เช็ค</th></tr></thead><tbody>
+        @forelse($items as $item)<tr><td>{{ $item->sku_code }}</td><td>{{ $item->name_th }}</td><td class="text-end">{{ number_format((float) $item->total_qty, 2) }}</td><td>{{ $item->unit_name }}</td><td>□</td></tr>@empty<tr><td colspan="5" class="text-center">ไม่พบรายการ</td></tr>@endforelse
+    </tbody></table></div></section>
+    <section class="summary-card"><div class="section-title"><i class="bi bi-truck"></i><div><h2>ใบเช็คส่งของประจำสาย</h2><small>ส่งบัญชีตัดยอดหลังตรวจส่งสินค้า</small></div><span>{{ $bookings->count() }} รายการ</span></div><div class="table-wrap"><table class="summary-table"><thead><tr><th>เลขที่ใบจอง</th><th>ลูกค้า</th><th class="text-end">ยอด</th><th>ส่งครบ</th><th>ไม่ส่ง</th><th>หมายเหตุ</th></tr></thead><tbody>
+        @forelse($bookings as $booking)<tr><td>{{ $booking->doc_number }}</td><td>{{ $booking->customer_name }}</td><td class="text-end">{{ number_format((float) $booking->total_amount, 2) }}</td><td>□</td><td>□</td><td></td></tr>@empty<tr><td colspan="6" class="text-center">ไม่พบใบจอง</td></tr>@endforelse
+    </tbody></table></div></section><div class="signatures">ผู้ส่งของ <span></span> ผู้ตรวจรับ (บัญชี) <span></span></div>
+</div>
+<style>
+.summary-page{max-width:1500px;margin:auto;padding:22px;color:#243447}.summary-toolbar{display:flex;align-items:end;gap:10px;padding:14px 16px;background:#fff;border:1px solid #dce7ef;border-radius:14px;box-shadow:0 5px 18px #17324d0d}.summary-heading{display:flex;align-items:center;gap:10px;margin-right:auto}.summary-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:#e8f2ff;color:#1464c4;font-size:20px}.summary-heading h1{font-size:18px;margin:0;color:#123b63}.summary-heading p,.section-title small{margin:2px 0 0;color:#7a8b9b;font-size:11px}.summary-toolbar label{display:grid;gap:4px;color:#63778a;font-size:10px;font-weight:700}.summary-toolbar input,.summary-toolbar select{height:36px;min-width:150px;border:1px solid #d4e0ea;border-radius:8px;padding:0 9px;color:#243447;background:#fbfdff}.summary-toolbar .btn{height:36px;border-radius:8px;font-size:12px}.summary-meta{display:flex;justify-content:space-between;align-items:center;padding:22px 4px 12px}.summary-meta strong{display:block;font-size:20px;color:#123b63}.summary-meta span{font-size:12px;color:#76899a}.summary-meta b,.section-title>span{padding:6px 10px;border-radius:20px;background:#eaf4ff;color:#1464c4;font-size:11px}.summary-card{margin-bottom:16px;overflow:hidden;background:#fff;border:1px solid #dce7ef;border-radius:14px;box-shadow:0 4px 16px #17324d0a}.section-title{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid #e8eef3}.section-title>i{font-size:20px;color:#2878c9}.section-title h2{margin:0;font-size:14px;color:#1d486e}.section-title>span{margin-left:auto}.table-wrap{overflow:auto}.summary-table{width:100%;border-collapse:collapse;font-size:12px}.summary-table th{background:#f4f8fb;color:#607589;font-size:10px;text-transform:uppercase;letter-spacing:.02em}.summary-table th,.summary-table td{padding:11px 14px;border-bottom:1px solid #edf2f5}.summary-table tbody tr:hover{background:#f8fbfe}.summary-table td:first-child{font-weight:700;color:#1765a8}.check-col{width:70px}.signatures{padding:20px 4px;color:#5e7183;font-size:12px}.signatures span{display:inline-block;width:170px;margin:0 18px;border-bottom:1px solid #9aabba;vertical-align:middle}
+@media(max-width:1000px){.summary-toolbar{flex-wrap:wrap}.summary-heading{width:100%}.summary-toolbar label{flex:1}.summary-toolbar input,.summary-toolbar select{width:100%;min-width:0}}@media(max-width:600px){.summary-page{padding:10px}.summary-toolbar label{width:100%;flex:auto}.summary-toolbar .btn,.summary-toolbar a{flex:1;text-align:center}.summary-meta{align-items:flex-start;gap:10px}.summary-meta strong{font-size:16px}}
+@media print{.no-print{display:none!important}.summary-page{padding:0;max-width:none}.summary-card{box-shadow:none;border-color:#222}.summary-table th{background:#eee!important;color:#111}.summary-meta{padding-top:0}.signatures{page-break-inside:avoid}}
+</style>
+@endsection

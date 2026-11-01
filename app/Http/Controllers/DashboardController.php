@@ -134,16 +134,25 @@ class DashboardController extends Controller
             ->join('warehouses as w', 'w.id', '=', 'wl.warehouse_id')
             ->when($branchIds !== null, $locationBranchScope)
             ->where('p.tracks_expiry', true)->where('sl.remaining_qty', '>', 0)
+            ->where(function ($query) {
+                $query->where('sl.quality_status', '!=', 'available')
+                    ->orWhereNull('sl.expiry_date');
+
+                if (DB::connection()->getDriverName() === 'pgsql') {
+                    $query->orWhereRaw("sl.expiry_date <= current_date + (p.expiry_warning_days * interval '1 day')");
+                } else {
+                    $query->orWhereRaw("date(sl.expiry_date) <= date('now', '+' || p.expiry_warning_days || ' days')");
+                }
+            })
             ->orderByRaw('CASE WHEN sl.expiry_date IS NULL THEN 0 ELSE 1 END')->orderBy('sl.expiry_date')
+            ->limit(20)
             ->get(['p.sku_code', 'p.name_th', 'sl.lot_number', 'sl.expiry_date', 'sl.remaining_qty', 'sl.quality_status', 'p.expiry_warning_days'])
             ->map(function ($lot) {
                 $lot->days_left = $lot->expiry_date ? today()->diffInDays(Carbon::parse($lot->expiry_date), false) : null;
 
                 return $lot;
             })
-            ->filter(fn ($lot) => $lot->quality_status !== 'available'
-                || $lot->days_left === null || $lot->days_left <= (int) $lot->expiry_warning_days)
-            ->take(20)->values();
+            ->values();
 
         // ── ข้อมูลเพิ่มสำหรับแผงควบคุมแบบ Odoo ───────────────────────────
         // คิดเฉพาะตอนใช้ layout นี้ ไม่ให้ layout เดิมช้าลงเพราะ query ที่ไม่ได้ใช้

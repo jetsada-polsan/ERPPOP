@@ -256,6 +256,7 @@ Route::get('/search/stock-balance', [SearchController::class, 'stockBalance'])->
 // pending booking into a real credit sale (see SaleController for the result).
 Route::prefix('bookings')->name('bookings.')->group(function () {
     Route::get('/', [BookingController::class, 'index'])->name('index');
+    Route::get('/summary', [BookingController::class, 'summary'])->name('summary');
     Route::get('/create', [BookingController::class, 'create'])->name('create');
     Route::get('/summary', [BookingController::class, 'summary'])->name('summary');
     Route::post('/', [BookingController::class, 'store'])->name('store');

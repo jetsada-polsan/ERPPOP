@@ -106,7 +106,7 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
                 @csrf
                 @if($creditSaleBooks->isNotEmpty())
                 <div class="doc-book-picker">
-                    <div class="doc-book-label">เล่มใบขายเชื่อ</div>
+                    <div class="doc-book-label">เล่มเอกสาร DS / DSN</div>
                 <select name="document_book_id" class="form-select" style="width:auto" title="เล่มเอกสารขายเชื่อ">
                     @foreach($creditSaleBooks as $book)
                         <option value="{{ $book->id }}" @selected($book->is_default)>{{ $book->code }} - {{ $book->no_vat ? 'ไม่มีภาษี' : 'มีภาษี' }} ({{ number_format($book->documents_count) }} ใบ)</option>

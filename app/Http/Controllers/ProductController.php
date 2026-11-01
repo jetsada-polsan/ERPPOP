@@ -68,12 +68,7 @@ class ProductController extends Controller
             ->paginate(30)
             ->withQueryString();
 
-        $maxScalePlu = ProductBarcode::where('is_active', true)
-            ->where('barcode', 'like', '800%')
-            ->pluck('barcode')
-            ->filter(fn ($barcode) => preg_match('/^800[0-9]{3}$/', (string) $barcode) === 1)
-            ->map(fn ($barcode) => (int) $barcode)
-            ->max();
+        $maxScalePlu = $this->maxScalePlu();
         $nextScalePlu = str_pad((string) (($maxScalePlu ?: 800000) + 1), 6, '0', STR_PAD_LEFT);
 
         return view('products.index', [
@@ -154,11 +149,7 @@ class ProductController extends Controller
             ->orderByDesc('effective_from')->value('rate_percent') ?? 7);
 
         // เลข PLU เครื่องชั่งถัดไป (รันต่อจากรหัสสูงสุดในช่วง 800xxx +1) — DB-agnostic
-        $maxScalePlu = ProductBarcode::where('barcode', 'like', '800%')
-            ->pluck('barcode')
-            ->filter(fn ($b) => preg_match('/^800[0-9]{3}$/', (string) $b) === 1)
-            ->map(fn ($b) => (int) $b)
-            ->max();
+        $maxScalePlu = $this->maxScalePlu();
         $nextScalePlu = str_pad((string) (($maxScalePlu ?: 800000) + 1), 6, '0', STR_PAD_LEFT);
 
         $legacyUnitIds = collect([$product->base_unit_id])
@@ -185,6 +176,19 @@ class ProductController extends Controller
             'suppliers' => Supplier::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name_th']),
             'branches' => Branch::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name_th']),
         ]);
+    }
+
+    private function maxScalePlu(): ?int
+    {
+        $barcode = ProductBarcode::query()
+            ->where('barcode', 'like', '800%')
+            ->whereRaw('length(barcode) = 6')
+            ->orderByDesc('barcode')
+            ->value('barcode');
+
+        return preg_match('/^800[0-9]{3}$/', (string) $barcode) === 1
+            ? (int) $barcode
+            : null;
     }
 
     public function storePosPriceSchedule(Request $request, Product $product): RedirectResponse
