@@ -112,8 +112,6 @@
     .doc-btn-primary { min-width:125px; border-color:#777; background:linear-gradient(#fff,#d7d7d7); color:#111; }
     .doc-btn-primary:hover,.doc-btn-secondary:hover { background:#dceeff; color:#111; }
     .doc-modal { width:min(1500px,calc(100vw - 32px)); height:calc(100dvh - 32px); }
-    .doc-body { overflow-y:auto; }
-    .doc-table-wrap, .doc-items { overflow-x:auto; }
     @media (max-width: 768px) {
         .doc-modal { width:100vw; height:100dvh; border-radius:0; }
         .doc-head-grid { grid-template-columns:1fr; }
