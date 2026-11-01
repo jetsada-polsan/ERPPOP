@@ -3,11 +3,11 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    @php($faviconUrl = asset('images/logo-jet-erp-mark.svg').'?v='.filemtime(public_path('images/logo-jet-erp-mark.svg')))
+    @php($faviconUrl = \App\Models\AppSetting::logoUrl() ?: asset('images/logo-jet-erp-mark.svg').'?v='.filemtime(public_path('images/logo-jet-erp-mark.svg')))
     <link rel="icon" href="{{ $faviconUrl }}">
     <link rel="shortcut icon" href="{{ $faviconUrl }}">
     <link rel="apple-touch-icon" href="{{ $faviconUrl }}">
-    <title>เข้าสู่ระบบ - PopCentral</title>
+    <title>เข้าสู่ระบบ - {{ \App\Models\AppSetting::company('name_th') ?: 'PopCentral' }}</title>
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700;800&display=swap');
@@ -419,7 +419,7 @@
                 <div class="brand-text">{{ \App\Models\AppSetting::company('name_th') }}</div>
             @endif
         </div>
-        <div class="subtitle">เข้าสู่ระบบศูนย์กลางการทำงานของ PopCentral</div>
+        <div class="subtitle">เข้าสู่ระบบศูนย์กลางการทำงานของ {{ \App\Models\AppSetting::company('name_th') ?: 'PopCentral' }}</div>
 
         @if($errors->any())
             <div class="alert-error"><i class="bi bi-exclamation-triangle-fill"></i><span>{{ $errors->first() }}</span></div>
