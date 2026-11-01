@@ -184,8 +184,17 @@
                         @endforeach
                     </div>
 
-                    <label class="form-label small text-muted">หรืออัปโหลดโลโก้ใหม่ (png / jpg / webp / svg ไม่เกิน 4MB)</label>
-                    <input type="file" name="logo_file" accept=".png,.jpg,.jpeg,.webp,.svg" class="form-control" style="max-width:420px">
+                    <div class="logo-upload-box">
+                        <div>
+                            <div class="set-title">นำเข้าโลโก้จากเครื่อง</div>
+                            <div class="set-desc">รองรับ PNG, JPG, WEBP หรือ SVG ขนาดไม่เกิน 4MB</div>
+                        </div>
+                        <label for="logo-file" class="btn btn-outline-primary mb-0">
+                            <i class="bi bi-upload me-1"></i>อัปโหลดโลโก้
+                        </label>
+                        <input id="logo-file" type="file" name="logo_file" accept=".png,.jpg,.jpeg,.webp,.svg" class="visually-hidden">
+                        <span id="logo-file-name" class="small text-muted">ยังไม่ได้เลือกไฟล์</span>
+                    </div>
                 </div>
             </div>
 
@@ -301,6 +310,12 @@ async function copyPosToken(text) {
     }
 }
 </script>
+<script>
+document.getElementById('logo-file')?.addEventListener('change', function () {
+    const label = document.getElementById('logo-file-name');
+    if (label) label.textContent = this.files?.[0]?.name || 'ยังไม่ได้เลือกไฟล์';
+});
+</script>
 @endsection
 
 @push('head')
@@ -349,6 +364,8 @@ async function copyPosToken(text) {
     .logo-thumb-text { font-size: 24px; font-weight: 900; color: var(--erp-primary-dark); }
     .logo-thumb-text span { color: var(--erp-success-ink); }
     .logo-caption { font-size: 11px; color: #7d97ac; margin-top: 6px; word-break: break-all; }
+    .logo-upload-box { display:flex; align-items:center; gap:14px; flex-wrap:wrap; max-width:720px; padding:14px; border:1px dashed var(--erp-primary); border-radius:10px; background:var(--erp-primary-soft); }
+    .logo-upload-box > div:first-child { min-width:240px; flex:1; }
     .pos-step { display: flex; gap: 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--erp-border); }
     .pos-step:first-of-type { border-top: 0; }
     .pos-step-no { flex: 0 0 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: var(--erp-primary); color: #fff; font-weight: 800; }
