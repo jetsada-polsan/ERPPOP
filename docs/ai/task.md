@@ -1934,7 +1934,7 @@ pending
 # Handoff — 2026-11-01 (แสดงเวลาใบขายสด)
 
 ## Commit
-- รอ commit หลังตรวจงาน
+- `08ca0fb` — Add MPM Food Group logo preset
 
 ## ทำอะไรไป
 - เพิ่มคอลัมน์เวลาในรายการใบขายสด โดยใช้ `created_at` และแสดงรูปแบบ `HH:mm:ss`
@@ -1961,7 +1961,8 @@ pending
 
 ## ทดสอบไปแล้วแค่ไหน
 - ตรวจไฟล์ JPEG สำเร็จ ขนาด 1254x1254
-- `git diff --check` รอตรวจหลัง staging
+- `git diff --check` ผ่าน
+- Deploy workflow `41320929936` ผ่านทั้ง test และ production deploy
 
 ## ความเสี่ยง/งานถัดไป
 - ต้องเลือกโลโก้นี้ใน Settings หรือกำหนดค่า `logo_path` หลัง deploy จึงจะแสดงทั่วระบบ
