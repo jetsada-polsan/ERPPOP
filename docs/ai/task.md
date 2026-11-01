@@ -1,3 +1,22 @@
+# Handoff — 2026-11-01 (แก้เล่มใบจอง โลโก้ และเมนูขายติดลบ)
+
+## Commit
+- รอ commit หลังตรวจและทดสอบ
+
+## ทำอะไรไป
+- ซ่อนเล่มใบจอง legacy `BOOKING-TMP-*` จากหน้าสมุดเอกสาร โดยไม่ลบเอกสารหรือประวัติเดิม
+- เพิ่มเมนูตรง `นโยบายขายติดลบ` ในหมวดตั้งค่าระบบ; ยังคุมการแก้ไขเฉพาะบทบาท `IT_MGR`
+- ปิดการแก้ไขตัวเลือกสาขาสำหรับผู้ใช้ที่ไม่มีสิทธิ์ IT และขยายโลโก้บน rail ให้แสดงผลอ่านง่ายขึ้น
+
+## ทดสอบไปแล้วแค่ไหน
+- `php -d memory_limit=1G vendor/bin/phpunit --filter='NegativeStockPolicy|DocumentBook'`: 10 tests / 48 assertions ผ่าน
+- `php -d memory_limit=1G vendor/bin/phpunit`: 698 tests, 697 ผ่าน, 1 skipped, 6 incomplete, 5,903 assertions
+- `git diff --check` และ PHP syntax check ผ่าน
+
+## ความเสี่ยง/งานถัดไป
+- ยังไม่ deploy; migration เปลี่ยนสถานะเล่ม `BOOKING-TMP-*` เป็นปิดใช้งาน ไม่ลบข้อมูล
+- ตรวจหน้า `/document-books`, `/settings/stock-policies`, dashboard และใบพิมพ์หลัง deploy
+
 # Handoff — 2026-11-01 (เปิดใช้แบรนด์ Meaw Foods)
 
 ## Commit

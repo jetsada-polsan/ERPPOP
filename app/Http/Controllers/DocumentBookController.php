@@ -16,6 +16,7 @@ class DocumentBookController extends Controller
     public function index(): View
     {
         $books = DocumentBook::with('documentType')->withCount('documents')
+            ->where('is_active', true)
             ->orderBy('document_type_id')->orderByDesc('is_default')->orderBy('code')->get();
 
         $types = DocumentType::whereIn('code', self::BOOKABLE_TYPES)->get();

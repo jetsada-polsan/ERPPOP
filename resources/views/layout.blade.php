@@ -650,18 +650,18 @@
         }
 
         .fa-rail-logo {
-            width: 44px; height: 44px;
+            width: 64px; height: 64px;
             border-radius: 14px;
             display: grid; place-items: center;
             margin-bottom: 10px;
             overflow: hidden;
-            flex: 0 0 44px;
+            flex: 0 0 64px;
             box-shadow: 0 10px 24px rgba(0,40,80,.22);
             transition: transform .15s;
         }
         .fa-rail-logo:hover { transform: scale(1.06); }
-        .fa-rail-logo img { width: 44px; height: 44px; object-fit: contain; }
-        .fa-rail-logo span { font-weight: 900; color: var(--fa-blue-deep); font-size: 15px; background: #fff; width: 44px; height: 44px; display: grid; place-items: center; }
+        .fa-rail-logo img { width: 64px; height: 64px; object-fit: contain; }
+        .fa-rail-logo span { font-weight: 900; color: var(--fa-blue-deep); font-size: 15px; background: #fff; width: 64px; height: 64px; display: grid; place-items: center; }
 
         .fa-rail-btn {
             width: 58px;

@@ -155,6 +155,7 @@ class ErpMenu
                     ['label' => 'ยานพาหนะ / ขนส่ง', 'route' => 'fleet.index', 'pattern' => 'fleet.*', 'icon' => 'bi-truck', 'tone' => 'orange'],
                     ['label' => 'ตั้งค่าระบบ', 'route' => 'settings.index', 'pattern' => 'settings.*', 'icon' => 'bi-gear-fill', 'tone' => 'slate'],
                     ['label' => 'ตั้งค่า Workflow เอกสาร', 'route' => 'settings.workflows', 'pattern' => 'settings.workflows*', 'icon' => 'bi-diagram-3-fill', 'tone' => 'red'],
+                    ['label' => 'นโยบายขายติดลบ', 'route' => 'settings.stock-policies', 'pattern' => 'settings.stock-policies', 'icon' => 'bi-sliders2-vertical', 'tone' => 'amber'],
                     ['label' => 'Backup / Security', 'route' => 'operations.index', 'pattern' => 'operations.*', 'icon' => 'bi-shield-lock-fill', 'tone' => 'red'],
                     ['label' => 'โครงสร้างฐานข้อมูล', 'route' => 'database-structure.index', 'pattern' => 'database-structure.*', 'icon' => 'bi-database-fill-gear', 'tone' => 'cyan'],
                     ['label' => 'สมุดเอกสาร', 'route' => 'document-books.index', 'pattern' => 'document-books.*', 'icon' => 'bi-journals', 'tone' => 'indigo'],

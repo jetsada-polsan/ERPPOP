@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'นโยบายสต๊อกติดลบ - POPSTAR ERP')
+@section('title', 'นโยบายสต๊อกติดลบ - เหมียวฟู๊ด')
 @section('page-title', 'นโยบายสต๊อกติดลบ')
 @section('page-subtitle', 'ตั้งค่าทุกสินค้า รายหมวด และรายสาขา')
 
@@ -81,7 +81,7 @@
                                 @endif
                             </td>
                             <td>
-                                <select name="policies[{{ $branch->id }}]" class="form-select form-select-sm">
+                            <select name="policies[{{ $branch->id }}]" class="form-select form-select-sm" @disabled(!$canManageNegativeStock)>
                                     <option value="allow" @selected($branch->negative_stock_policy !== 'block')>ยอมให้ติดลบ (เตือนอย่างเดียว)</option>
                                     <option value="block" @selected($branch->negative_stock_policy === 'block')>ห้ามขายติดลบ</option>
                                 </select>
