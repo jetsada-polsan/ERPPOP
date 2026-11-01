@@ -78,6 +78,15 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      - name: Verify installer version
+        shell: pwsh
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          $installer = Get-ChildItem -Path 'apps/pos-desktop/src-tauri/target/release/bundle/nsis' -Filter '*.exe' | Select-Object -First 1
+          if ($null -eq $installer) { throw 'Missing Windows installer' }
+          $fileVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($installer.FullName).FileVersion
+          if (-not $fileVersion.StartsWith("$env:VERSION.")) { throw "Installer version $fileVersion does not match requested $env:VERSION" }
       - uses: actions/upload-artifact@v4
         with:
           name: POPSTAR-POS-${{ inputs.version }}

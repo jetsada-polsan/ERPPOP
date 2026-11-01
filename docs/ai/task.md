@@ -2058,3 +2058,19 @@ pending
 
 ## ความเสี่ยง/งานถัดไป
 - ต้อง build/release รุ่นใหม่จึงจะเขียน `latest.json` ชุดใหม่บนเซิร์ฟเวอร์
+
+# Handoff — 2026-11-01 (ตรวจ version installer ให้ตรงป้ายดาวน์โหลด)
+
+## Commit
+- รอ commit หลังทดสอบ
+
+## ทำอะไรไป
+- ทำให้ `package.json`, `Cargo.toml` และ `tauri.conf.json` ใช้ version ฐานเดียวกัน
+- เพิ่มขั้นตอน CI ตรวจ Windows installer metadata ว่าตรงกับ version ที่สั่ง build ก่อน publish
+
+## ทดสอบไปแล้วแค่ไหน
+- `git diff --check` ผ่าน
+- ต้องยืนยันด้วย native Windows build รุ่นถัดไป
+
+## ความเสี่ยง/งานถัดไป
+- รุ่นที่มีอยู่บนเครื่องอาจยังเป็น binary เก่า ต้องติดตั้ง installer รุ่นใหม่ทับ
