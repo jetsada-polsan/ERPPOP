@@ -8,6 +8,7 @@ $statusLabel = ['pending' => 'รอดำเนินการ', 'converted_to_
 $statusColor = ['pending' => 'text-bg-warning', 'converted_to_sale' => 'text-bg-success', 'cancelled' => 'text-bg-secondary'];
 $isPending = $booking->status === 'pending';
 $isConverted = $booking->status === 'converted_to_sale';
+$accountingReviewLabel = ['pending' => 'รอตรวจบัญชี', 'approved' => 'บัญชีตรวจแล้ว', 'rejected' => 'ตีกลับแก้ไข'];
 $isDelivery = $booking->fulfillment_type === 'delivery';
 $deliveryLabel = ['pending' => 'ยังไม่ส่ง', 'partial' => 'ส่งบางส่วน', 'delivered' => 'ส่งครบแล้ว', 'cancelled' => 'ยกเลิกการส่ง'];
 $deliveryColor = ['pending' => 'text-bg-warning', 'partial' => 'text-bg-info', 'delivered' => 'text-bg-success', 'cancelled' => 'text-bg-secondary'];
@@ -132,6 +133,14 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
         </div>
     </div>
 </div>
+
+@if($isConverted)
+<div class="content-card p-4 mb-4">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2"><div><h3 class="h6 fw-bold mb-1"><i class="bi bi-calculator me-1"></i>ตรวจบัญชี</h3><div class="small text-muted">ตรวจใบส่งของ ใบขาย DS/DSN ลูกหนี้ และรายการลงบัญชี</div></div><span class="badge {{ $booking->accounting_review_status === 'approved' ? 'text-bg-success' : ($booking->accounting_review_status === 'rejected' ? 'text-bg-danger' : 'text-bg-warning') }}">{{ $accountingReviewLabel[$booking->accounting_review_status] ?? 'รอตรวจบัญชี' }}</span></div>
+    @if($booking->accounting_reviewed_at)<div class="small text-muted mt-2">ตรวจแล้วเมื่อ {{ $booking->accounting_reviewed_at->format('d/m/Y H:i') }}{{ $booking->accounting_review_note ? ' · '.$booking->accounting_review_note : '' }}</div>@endif
+    @if(auth()->user()->hasPermission('finance.manage'))<form method="post" action="{{ route('bookings.accounting-review', $booking) }}" class="d-flex gap-2 mt-3 flex-wrap">@csrf<select name="status" class="form-select" style="max-width:180px"><option value="approved">บัญชีตรวจแล้ว</option><option value="rejected">ตีกลับแก้ไข</option></select><input name="note" class="form-control" placeholder="หมายเหตุการตรวจ (ถ้ามี)"><button class="btn btn-primary">บันทึกผลตรวจ</button></form>@endif
+</div>
+@endif
 
 {{-- Items --}}
 @if($isDelivery)

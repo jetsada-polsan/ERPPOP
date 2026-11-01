@@ -264,6 +264,7 @@ Route::prefix('bookings')->name('bookings.')->group(function () {
     Route::get('/{booking}', [BookingController::class, 'show'])->name('show');
     Route::post('/{booking}/convert', [BookingController::class, 'convert'])->name('convert');
     Route::post('/{booking}/delivery', [BookingController::class, 'recordDelivery'])->name('delivery');
+    Route::post('/{booking}/accounting-review', [BookingController::class, 'accountingReview'])->name('accounting-review');
 });
 
 // Cash sale (ใบขายสด): direct stock-out without booking or AR.

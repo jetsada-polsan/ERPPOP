@@ -373,4 +373,13 @@ class BookingController extends Controller
             default => 'ยกเลิกการส่งของใบจองนี้แล้ว',
         });
     }
+
+    public function accountingReview(Request $request, SaleBooking $booking): RedirectResponse
+    {
+        abort_unless($request->user()->hasPermission('finance.manage'), 403);
+        abort_unless($booking->status === SaleBooking::STATUS_CONVERTED && $booking->confirmed_document_id, 422, 'ต้องแปลงเป็นใบขายก่อนจึงจะตรวจบัญชีได้');
+        $data = $request->validate(['status' => ['required', 'in:approved,rejected'], 'note' => ['nullable', 'string', 'max:1000']]);
+        $booking->update(['accounting_review_status' => $data['status'], 'accounting_reviewed_by' => $request->user()->id, 'accounting_reviewed_at' => now(), 'accounting_review_note' => $data['note'] ?? null]);
+        return back()->with('success', $data['status'] === 'approved' ? 'ตรวจบัญชีผ่านแล้ว' : 'ตีกลับเอกสารให้แก้ไขแล้ว');
+    }
 }
