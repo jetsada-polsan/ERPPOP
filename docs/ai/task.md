@@ -1,7 +1,7 @@
 # Handoff — 2026-11-01 (ลบเล่มใบจอง TMP ที่ว่างและเตรียม deploy)
 
 ## Commit
-- รอ commit หลังตรวจและทดสอบ
+- `cd2f8f8` — `Remove empty legacy booking books`
 
 ## ทำอะไรไป
 - ลบเล่มใบจอง legacy `BOOKING-TMP-*` เฉพาะรายการที่ไม่มีเอกสารผูกอยู่; รายการที่มีประวัติจะคงไว้แต่ปิดใช้งาน
@@ -14,7 +14,8 @@
 - `git diff --check` และ PHP syntax check ผ่าน
 
 ## ความเสี่ยง/งานถัดไป
-- ยังไม่ deploy; migration เปลี่ยนสถานะเล่ม `BOOKING-TMP-*` เป็นปิดใช้งาน ไม่ลบข้อมูล
+- Deploy Production สำเร็จผ่าน GitHub Actions run `41315819875`; tests, build, upload และ deploy script ผ่าน
+- migration ลบเฉพาะเล่ม `BOOKING-TMP-*` ที่ไม่มีเอกสารผูก และปิดใช้งานตัวที่มีประวัติ ไม่ลบเอกสารย้อนหลัง
 - ตรวจหน้า `/document-books`, `/settings/stock-policies`, dashboard และใบพิมพ์หลัง deploy
 
 # Handoff — 2026-11-01 (เปิดใช้แบรนด์ Meaw Foods)
