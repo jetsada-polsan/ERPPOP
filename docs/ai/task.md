@@ -2081,3 +2081,10 @@ pending
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ทดสอบอัปโหลดไฟล์จริงบน production และยังไม่ได้ตรวจทุก workflow ของเอกสารแต่ละประเภทแบบ end-to-end
 - Deploy: ยังไม่ deploy
 - งานถัดไป: ให้เจ้าของตรวจหน้า Settings และสั่ง deploy เมื่อพร้อม
+
+# Handoff - 2026-11-01 (POS fallback เมื่อ junction ใช้งานไม่ได้)
+- Commit: `pending`
+- ทำอะไร: แก้ `prepare_local_storage` ให้สร้าง junction ไปไดรฟ์ D แบบไม่บล็อกการขาย; หาก Windows สร้าง junction ไม่ได้ จะคืนกลับโฟลเดอร์เดิมและใช้ SQLite บนเครื่องต่อ ทำให้ปุ่มคิดเงินไม่ค้างที่ “ตรวจฐานข้อมูล”
+- ทดสอบ: `git diff --check` ผ่าน; เครื่อง dev ไม่มี `cargo` จึงยังไม่ได้รัน Rust build แบบ native
+- Deploy: ยังไม่ deploy
+- งานถัดไป: ให้ GitHub Actions สร้าง Windows installer รุ่นใหม่ แล้วทดสอบเปิดกะ/คิดเงินจริงบนเครื่อง Windows

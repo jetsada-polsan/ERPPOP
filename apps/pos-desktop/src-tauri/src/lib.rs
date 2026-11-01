@@ -131,12 +131,26 @@ fn prepare_local_storage(app: tauri::AppHandle) -> Result<StorageStatus, String>
             }
         }
 
-        if app_config.exists() {
-            let legacy_dir = app_config.with_file_name(format!("th.co.popstar.pos.c-backup-{}", stamp()?));
-            fs::rename(&app_config, &legacy_dir).map_err(|error| format!("เก็บโฟลเดอร์ฐานข้อมูลเดิมไว้ไม่ได้: {}", error))?;
+        let legacy_dir = if app_config.exists() {
+            let backup = app_config.with_file_name(format!("th.co.popstar.pos.c-backup-{}", stamp()?));
+            fs::rename(&app_config, &backup).map_err(|error| format!("เก็บโฟลเดอร์ฐานข้อมูลเดิมไว้ไม่ได้: {}", error))?;
+            Some(backup)
+        } else {
+            None
+        };
+        match create_directory_junction(&app_config, &target_root) {
+            Ok(()) => Ok(StorageStatus { location: "d-drive".to_string(), database_path: target_database.to_string_lossy().to_string(), warning: None }),
+            Err(error) => {
+                if let Some(backup) = legacy_dir {
+                    let _ = fs::rename(backup, &app_config);
+                }
+                Ok(StorageStatus {
+                    location: "c-fallback".to_string(),
+                    database_path: database.to_string_lossy().to_string(),
+                    warning: Some(format!("เชื่อมโฟลเดอร์ข้อมูลไปยังไดรฟ์ที่เลือกไม่ได้ จึงใช้ฐานข้อมูลเดิมบนเครื่องชั่วคราว: {}", error)),
+                })
+            },
         }
-        create_directory_junction(&app_config, &target_root)?;
-        Ok(StorageStatus { location: "d-drive".to_string(), database_path: target_database.to_string_lossy().to_string(), warning: None })
     }
 }
 
