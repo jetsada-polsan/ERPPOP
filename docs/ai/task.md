@@ -1829,3 +1829,10 @@ pending
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้รัน PHPUnit ทั้งชุด และยังไม่ได้ deploy; ควรทดสอบกับ PostgreSQL/ข้อมูลจริงก่อนเปิดใช้
 - Deploy: ยังไม่ deploy
 - งานถัดไป: ตรวจหน้า settings ด้วยบัญชี IT และบัญชีทั่วไป แล้วค่อย commit/push/deploy เมื่อเจ้าของสั่ง
+
+# Handoff — 2026-11-01 (แก้ PostgreSQL UAT ชน memory limit)
+- Commit: ยังไม่ commit
+- ทำอะไร: ปรับ PostgreSQL UAT ให้รัน PHPUnit ด้วย `memory_limit=1G`; log เดิมจบด้วย `Premature end of PHP process` ระหว่าง `BookingDeliveryDueTest` ก่อนถึง assertion failure
+- ทดสอบ: ยังรอ GitHub Actions PostgreSQL UAT รอบใหม่
+- Deploy: รอบก่อนยังไม่ deploy เพราะ UAT run `41282634443` ล้มเหลว
+- งานถัดไป: push workflow fix แล้วรอ UAT และ Deploy ERP ใหม่

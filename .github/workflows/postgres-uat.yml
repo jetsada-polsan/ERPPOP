@@ -57,7 +57,7 @@ jobs:
       # ทุกครั้งที่ส่ง --configuration มาให้ ต่อให้เทสต์ผ่านหมด งานนี้จึงแดงมาตลอด
       # ทั้งที่ชุดเทสต์เขียว
       - name: ชุดเทสต์ทั้งหมดบน PostgreSQL
-        run: ./vendor/bin/phpunit --configuration=phpunit.pgsql.xml
+        run: php -d memory_limit=1G ./vendor/bin/phpunit --configuration=phpunit.pgsql.xml
 
       - name: เตรียมฐานสำหรับทดสอบการยิงพร้อมกัน
         run: |
