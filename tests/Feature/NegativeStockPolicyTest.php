@@ -8,6 +8,7 @@ use App\Models\ChartOfAccount;
 use App\Models\DocumentType;
 use App\Models\Product;
 use App\Models\ProductUnit;
+use App\Models\Role;
 use App\Models\StockBalance;
 use App\Models\User;
 use App\Models\Warehouse;
@@ -77,12 +78,27 @@ class NegativeStockPolicyTest extends TestCase
 
         $this->post('/settings/stock-policies', [
             'policies' => [$branch->id => 'block', $other->id => 'allow'],
+            'global_policy' => 'allow',
         ])->assertRedirect(route('settings.stock-policies'));
 
         $this->assertSame('block', $branch->fresh()->negative_stock_policy);
         $this->assertSame('allow', $other->fresh()->negative_stock_policy);
         $this->assertFalse($branch->fresh()->allowsNegativeStock());
         $this->assertTrue($other->fresh()->allowsNegativeStock());
+    }
+
+    public function test_non_it_user_cannot_change_negative_stock_policy(): void
+    {
+        [$branch] = $this->masters();
+        $this->actingAs(User::factory()->create(['username' => 'ordinary_user']));
+        $this->withoutMiddleware(ErpAuthorize::class);
+
+        $this->post('/settings/stock-policies', [
+            'policies' => [$branch->id => 'block'],
+            'global_policy' => 'block',
+        ])->assertForbidden();
+
+        $this->assertSame('allow', $branch->fresh()->negative_stock_policy);
     }
 
     public function test_report_lists_negative_stock_and_dry_run_changes_nothing(): void
@@ -243,7 +259,9 @@ class NegativeStockPolicyTest extends TestCase
 
     private function signIn(): void
     {
-        $this->actingAs(User::factory()->create(['username' => 'policy_tester']));
+        $user = User::factory()->create(['username' => 'policy_tester']);
+        $user->roles()->attach(Role::where('code', 'IT_MGR')->firstOrFail());
+        $this->actingAs($user);
         $this->withoutMiddleware(ErpAuthorize::class);
     }
 }

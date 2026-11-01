@@ -28,7 +28,7 @@
             <button type="button" @click="closeModal()"><i class="bi bi-x-circle"></i><span>ปิด</span></button>
         </div>
 
-        <form method="post" action="{{ $action }}" @submit="onSubmit">
+        <form method="post" action="{{ $action }}" novalidate @submit="onSubmit">
             @csrf
             @if(($formMethod ?? 'POST') !== 'POST')
                 @method($formMethod)
@@ -229,7 +229,7 @@
                                             @endif
                                         </td>
                                         <td>
-                                            <input type="number" step="0.0001" min="0.0001" :name="`items[${index}][qty]`" x-model.number="item.qty" required class="doc-input text-end" :title="item.is_scale ? 'น้ำหนักจริง เช่น 2.3500 กก.' : 'จำนวนสินค้า'"><small x-show="item.is_scale" class="d-block text-end text-success fw-bold" x-text="item.unit_name || 'หน่วยฐาน'"></small>
+                                            <input type="number" :step="item.is_scale ? '0.0001' : '1'" :min="item.is_scale ? '0.0001' : '1'" :name="`items[${index}][qty]`" x-model.number="item.qty" required class="doc-input text-end" :title="item.is_scale ? 'น้ำหนักจริง เช่น 2.3500 กก.' : 'จำนวนเต็มตามหน่วยขาย เช่น 1 แพ็ค'"><small class="d-block text-end text-success fw-bold" x-text="item.is_scale ? (item.unit_name || 'หน่วยฐาน') : (item.unit_name || 'หน่วยขาย')"></small>
                                         </td>
                                         <td>
                                             <input type="number" step="0.01" min="0" :name="`items[${index}][unit_price]`" x-model.number="item.unit_price" required class="doc-input text-end" :title="item.is_scale ? 'ราคาขายต่อ ' + (item.unit_name || 'หน่วยฐาน') : 'ราคาต่อหน่วย'"><small x-show="item.is_scale" class="d-block text-end text-success fw-bold">/หน่วยชั่ง</small>

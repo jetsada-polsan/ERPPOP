@@ -1,8 +1,8 @@
 @extends('layout')
 
 @section('title', 'นโยบายสต๊อกติดลบ - POPSTAR ERP')
-@section('page-title', 'นโยบายสต๊อกติดลบรายสาขา')
-@section('page-subtitle', 'กำหนดว่าสาขาไหน "ห้ามขายติดลบ" และสาขาไหน "ยอมให้ติดลบ"')
+@section('page-title', 'นโยบายสต๊อกติดลบ')
+@section('page-subtitle', 'ตั้งค่าทุกสินค้า รายหมวด และรายสาขา')
 
 @section('content')
 <div class="content-card p-4">
@@ -16,8 +16,40 @@
         </div>
     </div>
 
+    @unless($canManageNegativeStock)
+        <div class="alert alert-warning">หน้านี้ดูได้ แต่การเปลี่ยนค่าทำได้เฉพาะผู้ดูแลระบบ IT</div>
+    @endunless
     <form method="post" action="{{ route('settings.stock-policies.update') }}">
         @csrf
+        <h5 class="mb-3">ค่ากลางสำหรับทุกสินค้า</h5>
+        <div class="row mb-4">
+            <div class="col-md-5">
+                <select name="global_policy" class="form-select" @disabled(!$canManageNegativeStock)>
+                    <option value="allow" @selected($globalPolicy === 'allow')>อนุญาตให้ขายติดลบ</option>
+                    <option value="block" @selected($globalPolicy === 'block')>ห้ามขายติดลบ</option>
+                </select>
+            </div>
+        </div>
+        <h5 class="mb-3">ข้อยกเว้นรายประเภทสินค้า</h5>
+        <div class="table-responsive mb-4">
+            <table class="table align-middle">
+                <thead><tr><th>รหัส</th><th>ประเภทสินค้า</th><th style="width:260px">นโยบาย</th></tr></thead>
+                <tbody>
+                @forelse($categories as $category)
+                    <tr>
+                        <td>{{ $category->code }}</td><td>{{ $category->name_th }}</td>
+                        <td><select name="category_policies[{{ $category->id }}]" class="form-select form-select-sm" @disabled(!$canManageNegativeStock)>
+                            <option value="inherit" @selected(!isset($categoryPolicies[$category->id]))>ใช้ค่ากลาง</option>
+                            <option value="allow" @selected(($categoryPolicies[$category->id] ?? null) === 'allow')>อนุญาตให้ขายติดลบ</option>
+                            <option value="block" @selected(($categoryPolicies[$category->id] ?? null) === 'block')>ห้ามขายติดลบ</option>
+                        </select></td>
+                    </tr>
+                @empty
+                    <tr><td colspan="3" class="text-center text-muted">ยังไม่มีประเภทสินค้า</td></tr>
+                @endforelse
+                </tbody>
+            </table>
+        </div>
         <div class="table-responsive">
             <table class="table align-middle">
                 <thead>
@@ -63,7 +95,7 @@
         </div>
 
         <div class="d-flex justify-content-end mt-3">
-            <button type="submit" class="btn btn-primary px-4">
+            <button type="submit" class="btn btn-primary px-4" @disabled(!$canManageNegativeStock)>
                 <i class="bi bi-check2-circle me-1"></i> บันทึกนโยบาย
             </button>
         </div>

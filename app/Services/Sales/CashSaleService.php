@@ -12,6 +12,7 @@ use App\Services\Accounting\GlPostingService;
 use App\Services\Accounting\CashBookPostingService;
 use App\Services\Inventory\CostingService;
 use App\Services\Inventory\FifoStockService;
+use App\Services\Inventory\NegativeStockPolicyService;
 use App\Support\DecimalMath;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -29,6 +30,7 @@ class CashSaleService
         private readonly FifoStockService $fifo,
         private readonly CostingService $costing,
         private readonly CashBookPostingService $cashBook,
+        private readonly NegativeStockPolicyService $negativeStockPolicy,
     ) {}
 
     /**
@@ -90,7 +92,8 @@ class CashSaleService
                     // และ flag ที่ส่งมากับรายการก็เปิดให้ติดลบไม่ได้
                     allowNegative: $branch->allowsNegativeStock()
                         && (bool) ($data['allow_negative_stock'] ?? false)
-                        && ($policies[$productId] ?? 'allow') === 'allow',
+                        && $this->negativeStockPolicy->policyFor($products->get($productId)) === 'allow'
+                    && ($policies[$productId] ?? 'allow') === 'allow',
                 );
                 $unitCost = $this->costing->unitCostFromAllocations($allocations, $qty, $fallbackCost);
 

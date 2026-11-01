@@ -3,6 +3,7 @@
 namespace App\Services\Sales;
 
 use App\Models\AppSetting;
+use App\Models\Branch;
 use App\Models\CustomerOpenItem;
 use App\Models\Document;
 use App\Models\DocumentBook;
@@ -16,6 +17,7 @@ use App\Services\Accounting\AccountingPeriodGuard;
 use App\Services\Accounting\GlPostingService;
 use App\Services\Inventory\CostingService;
 use App\Services\Inventory\FifoStockService;
+use App\Services\Inventory\NegativeStockPolicyService;
 use App\Support\DecimalMath;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -39,6 +41,7 @@ class CreditSaleService
         private readonly FifoStockService $fifo,
         private readonly CostingService $costing,
         private readonly AccountingPeriodGuard $periods,
+        private readonly NegativeStockPolicyService $negativeStockPolicy,
     ) {}
 
     public function convertBookingToCreditSale(SaleBooking $booking, ?DocumentBook $book = null): Document
@@ -95,6 +98,7 @@ class CreditSaleService
 
             $seq = 1;
             $products = Product::whereIn('id', $sourceItems->pluck('product_id')->unique())->get()->keyBy('id');
+            $branch = Branch::findOrFail($bookingDocument->branch_id);
             foreach ($sourceItems as $item) {
                 $productId = (int) $item->product_id;
                 $qty = $item->qty;
@@ -106,7 +110,15 @@ class CreditSaleService
                 );
                 // ตัด FIFO lot จริงก่อน แล้วคิดต้นทุนขายจาก Lot ที่ถูกตัดจริง (ดู CashSaleService)
                 $balance->decrement('reserved_qty', $qty);
-                $allocations = $this->fifo->issue($productId, (int) $item->warehouse_location_id, $qty, $saleDocument->id);
+                $allocations = $this->fifo->issue(
+                    $productId,
+                    (int) $item->warehouse_location_id,
+                    $qty,
+                    $saleDocument->id,
+                    allowNegative: $branch->allowsNegativeStock()
+                        && $this->negativeStockPolicy->policyFor($products->get($productId)) === 'allow'
+                        && ($products->get($productId)?->negative_stock_policy ?? 'allow') === 'allow',
+                );
                 $unitCost = $this->costing->unitCostFromAllocations($allocations, $qty, $fallbackCost);
 
                 StockDocumentItem::create([

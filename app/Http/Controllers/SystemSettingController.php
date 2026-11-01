@@ -11,6 +11,7 @@ use App\Models\Salesman;
 use App\Models\User;
 use App\Models\UserPosCredential;
 use App\Services\Accounting\OpeningBalanceService;
+use App\Services\Inventory\NegativeStockPolicyService;
 use App\Support\PosLayout;
 use App\Support\PosReleaseManifest;
 use App\Support\PosTerminalCode;
@@ -127,14 +128,23 @@ class SystemSettingController extends Controller
         return view('settings.stock-policies', [
             'branches' => Branch::with('defaultWarehouseLocation')->orderBy('code')->get(),
             'negativeCounts' => $this->negativeStockCountsByBranch(),
+            'globalPolicy' => app(NegativeStockPolicyService::class)->globalPolicy(),
+            'categoryPolicies' => app(NegativeStockPolicyService::class)->categoryPolicies(),
+            'categories' => \App\Models\ProductCategory::orderBy('code')->orderBy('name_th')->get(),
+            'canManageNegativeStock' => auth()->user()?->roles()->where('code', 'IT_MGR')->exists() === true,
         ]);
     }
 
     public function updateStockPolicies(Request $request): RedirectResponse
     {
+        abort_unless($request->user()?->roles()->where('code', 'IT_MGR')->exists(), 403, 'เฉพาะผู้ดูแลระบบ IT เท่านั้นที่เปลี่ยนนโยบายนี้ได้');
+
         $data = $request->validate([
             'policies' => ['required', 'array'],
             'policies.*' => ['required', 'in:block,allow'],
+            'global_policy' => ['required', 'in:block,allow'],
+            'category_policies' => ['nullable', 'array'],
+            'category_policies.*' => ['nullable', 'in:inherit,block,allow'],
         ]);
 
         $branches = Branch::whereIn('id', array_keys($data['policies']))->get();
@@ -142,8 +152,14 @@ class SystemSettingController extends Controller
             $branch->update(['negative_stock_policy' => $data['policies'][$branch->id]]);
         }
 
+        $categoryPolicies = collect($data['category_policies'] ?? [])
+            ->filter(fn ($policy) => $policy !== 'inherit')
+            ->mapWithKeys(fn ($policy, $categoryId) => [(int) $categoryId => $policy])
+            ->all();
+        app(NegativeStockPolicyService::class)->save($data['global_policy'], $categoryPolicies);
+
         return redirect()->route('settings.stock-policies')
-            ->with('success', "บันทึกนโยบายสต๊อกติดลบ {$branches->count()} สาขาแล้ว");
+            ->with('success', "บันทึกนโยบายสต๊อกติดลบ {$branches->count()} สาขา พร้อมค่ากลางและรายหมวดแล้ว");
     }
 
     /**
