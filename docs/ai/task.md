@@ -1,7 +1,7 @@
 # Handoff — 2026-11-01 (เปิดใช้แบรนด์ Meaw Foods)
 
 ## Commit
-รอ commit หลังตรวจและทดสอบ
+- `09e7bfb` — `Activate Meaw Foods branding`
 
 ## ทำอะไรไป
 - เปิดใช้ชื่อแบรนด์ `เหมียวฟู๊ด / Meaw Foods` และโลโก้ที่ติดตั้งไว้ ผ่าน migration แบบ key-value โดยไม่ลบหรือแก้ธุรกรรมเดิม
@@ -14,8 +14,9 @@
 - `git diff --check` และ PHP syntax check ผ่าน
 
 ## ความเสี่ยง/งานถัดไป
-- ยังไม่ deploy production; migration จะเปลี่ยนเฉพาะค่า branding และไม่แตะ tax/address/ยอดขาย
-- หากต้องเปิดใช้บน production ให้ owner สั่ง deploy แล้วตรวจ login, sidebar, ใบส่งของ และ POS receipt อีกครั้ง
+- Deploy Production สำเร็จผ่าน GitHub Actions run `41312221640`; เทสต์, frontend build, upload และ deploy script ผ่าน
+- migration จะเปลี่ยนเฉพาะค่า branding และไม่แตะ tax/address/ยอดขาย
+- ควรตรวจหน้า login, sidebar, ใบส่งของ และ POS receipt บน browser หลัง cache หมดอายุ
 
 # Handoff — 2026-10-31 (แสดงบาร์โค้ดและค้นหาสินค้าอัตโนมัติ)
 
