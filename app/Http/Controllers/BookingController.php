@@ -22,14 +22,14 @@ class BookingController extends Controller
     /** ใบรวมจองต่อวัน แยกสาขาและสาย: หน้าแรกไว้จัดของ หน้าสองไว้ติ๊กส่งบัญชี */
     public function summary(Request $request): View
     {
-        $date = $request->date('date')?->toDateString() ?? now()->toDateString();
+        $date = $request->date('date') ?: now()->startOfDay();
         $branchId = $request->integer('branch_id') ?: null;
         $salesAreaId = $request->integer('sales_area_id') ?: null;
 
         $bookings = SaleBooking::with(['document.customer', 'document.branch', 'document.salesArea', 'document.stockDocument.items.product.baseUnit'])
             ->where('status', 'pending')
             ->when($salesAreaId, fn ($query) => $query->where('sales_area_id', $salesAreaId))
-            ->whereHas('document', fn ($d) => $d->whereDate('doc_date', $date)
+            ->whereHas('document', fn ($d) => $d->whereDate('doc_date', $date->toDateString())
                 ->when($branchId, fn ($q) => $q->where('branch_id', $branchId)))
             ->get();
 
@@ -47,8 +47,22 @@ class BookingController extends Controller
                 ];
             })->values();
 
+        $items = $groups->flatMap(fn ($group) => $group->lines)
+            ->groupBy(fn ($line) => $line->product?->id)
+            ->map(fn ($lines) => (object) [
+                'sku_code' => $lines->first()->product?->sku_code,
+                'name_th' => $lines->first()->product?->name_th,
+                'total_qty' => $lines->sum('qty'),
+                'unit_name' => $lines->first()->product?->baseUnit?->name ?? '-',
+            ])->sortBy('sku_code')->values();
+        $bookingRows = $bookings->flatMap(fn ($booking) => [(object) [
+            'doc_number' => $booking->document->doc_number,
+            'customer_name' => $booking->document->customer?->name_th,
+            'total_amount' => $booking->document->total_amount,
+        ]])->values();
+
         return view('bookings.summary', [
-            'date' => $date, 'groups' => $groups, 'branchId' => $branchId, 'salesAreaId' => $salesAreaId,
+            'date' => $date, 'items' => $items, 'bookings' => $bookingRows, 'branchId' => $branchId, 'salesAreaId' => $salesAreaId,
             'branches' => Branch::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name_th']),
             'salesAreas' => SalesArea::orderBy('code')->get(['id', 'code', 'name']),
         ]);
