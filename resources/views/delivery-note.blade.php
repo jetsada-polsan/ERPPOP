@@ -182,6 +182,9 @@
         </div>
     </div>
 
+    @if($typeCode === 'BOOKING')
+    <div style="display:flex;gap:6mm;margin:2mm 0;font-size:10px"><b>Final QC</b><span>☐ ได้รับจำนวนตามที่สั่ง</span><span>☐ ชนิดสินค้าตรงตามที่สั่ง</span><span>☐ บรรจุภัณฑ์ไม่ชำรุด</span></div>
+    @endif
     <div class="sign-row">
         <div class="sign"><div class="line"></div>ผู้รับสินค้า</div>
         <div class="sign"><div class="line"></div>ผู้ส่งสินค้า</div>

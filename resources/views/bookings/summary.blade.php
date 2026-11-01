@@ -13,7 +13,8 @@
         table { width: 100%; border-collapse: collapse; margin-top: 8px; }
         th, td { border: 1px solid #000; padding: 6px; }
         .num { text-align: right; }
-        .tick { width: 42px; text-align: center; }
+        .tick { width: 56px; text-align: center; }
+        .bill { margin-top: 14px; break-inside: avoid; }
         @media print { .bar { display: none; } .sheet { padding: 0; } }
     </style>
 </head>
@@ -28,16 +29,22 @@
 </form>
 @forelse($groups as $group)
     <section class="sheet">
-        <h1>ใบรวมจอง: เช็คสินค้า</h1>
+        <h1>ใบรวมจอง: เช็คขึ้นของทีละบิล</h1>
         <div>วันที่ {{ $date }} · {{ $group->branch?->name_th }} · สาย {{ $group->area?->name ?? 'ไม่ระบุ' }} · {{ $group->bookings->count() }} ใบ</div>
-        <table>
-            <thead><tr><th>รหัส</th><th>สินค้า</th><th class="num">รวม</th><th>หน่วย</th><th class="tick">เช็ค</th></tr></thead>
-            <tbody>
-            @foreach($group->lines as $line)
-                <tr><td>{{ $line->product?->sku_code }}</td><td>{{ $line->product?->name_th }}</td><td class="num">{{ number_format((float) $line->qty, 2) }}</td><td>{{ $line->product?->baseUnit?->name }}</td><td class="tick">☐</td></tr>
-            @endforeach
-            </tbody>
-        </table>
+        @foreach($group->bookings as $booking)
+            <div class="bill">
+                <strong>{{ $booking->document->doc_number }}</strong> · {{ $booking->document->customer?->code }} {{ $booking->document->customer?->name_th }}
+                <table>
+                    <thead><tr><th>#</th><th>สินค้า</th><th>หน่วย</th><th class="num">จำนวน</th><th class="num">ราคา</th><th class="num">รวม</th><th class="tick">ขึ้นแล้ว</th></tr></thead>
+                    <tbody>
+                    @foreach($booking->document->stockDocument?->items ?? [] as $item)
+                        <tr><td>{{ $loop->iteration }}</td><td>{{ $item->product?->name_th }}</td><td>{{ $item->product?->baseUnit?->name }}</td><td class="num">{{ number_format((float) $item->qty, 2) }}</td><td class="num">{{ number_format((float) $item->unit_price, 2) }}</td><td class="num">{{ number_format((float) $item->qty * (float) $item->unit_price, 2) }}</td><td class="tick">☐</td></tr>
+                    @endforeach
+                        <tr><td colspan="5" class="num"><strong>รวม</strong></td><td class="num"><strong>{{ number_format((float) $booking->document->total_amount, 2) }}</strong></td><td></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        @endforeach
     </section>
     <section class="sheet">
         <h1>ใบเช็คส่งของประจำสาย: ส่งบัญชีตัดยอด</h1>
