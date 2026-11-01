@@ -128,46 +128,6 @@ class BookingController extends Controller
         return redirect()->route('bookings.index');
     }
 
-    public function summary(Request $request): View
-    {
-        $date = $request->date('date') ?: now()->startOfDay();
-        $branchId = $request->integer('branch_id') ?: null;
-        $salesAreaId = $request->integer('sales_area_id') ?: null;
-
-        $bookingScope = SaleBooking::query()
-            ->whereDate('documents.doc_date', $date->toDateString())
-            ->join('documents', 'documents.id', '=', 'sale_bookings.document_id')
-            ->where('documents.status', '!=', 'cancelled')
-            ->when($branchId, fn ($q) => $q->where('documents.branch_id', $branchId))
-            ->when($salesAreaId, fn ($q) => $q->where('sale_bookings.sales_area_id', $salesAreaId));
-
-        $items = (clone $bookingScope)
-            ->join('stock_documents', 'stock_documents.document_id', '=', 'documents.id')
-            ->join('stock_document_items', 'stock_document_items.stock_document_id', '=', 'stock_documents.id')
-            ->join('products', 'products.id', '=', 'stock_document_items.product_id')
-            ->leftJoin('product_units', 'product_units.id', '=', 'stock_document_items.unit_id')
-            ->groupBy('products.id', 'products.sku_code', 'products.name_th', 'product_units.name')
-            ->orderBy('products.sku_code')
-            ->selectRaw('products.sku_code, products.name_th, sum(stock_document_items.qty) as total_qty, coalesce(product_units.name, \'-\') as unit_name')
-            ->get();
-
-        $bookings = (clone $bookingScope)
-            ->join('customers', 'customers.id', '=', 'documents.customer_id')
-            ->leftJoin('sales_areas', 'sales_areas.id', '=', 'sale_bookings.sales_area_id')
-            ->orderBy('documents.doc_number')
-            ->get(['sale_bookings.id', 'documents.doc_number', 'customers.name_th as customer_name', 'documents.total_amount', 'sales_areas.name as sales_area_name', 'sale_bookings.delivery_status']);
-
-        return view('bookings.summary', [
-            'date' => $date,
-            'branchId' => $branchId,
-            'salesAreaId' => $salesAreaId,
-            'items' => $items,
-            'bookings' => $bookings,
-            'branches' => Branch::orderBy('code')->get(['id', 'code', 'name_th']),
-            'salesAreas' => SalesArea::where('is_active', true)->where('area_type', 'route')->orderBy('code')->get(['id', 'code', 'name']),
-        ]);
-    }
-
     public function store(Request $request, BookingService $service): RedirectResponse
     {
         $data = $request->validate([
