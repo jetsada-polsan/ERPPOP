@@ -466,7 +466,7 @@ class SystemSettingController extends Controller
     {
         $data = $request->validate([
             'logo_choice' => ['nullable', 'string', 'max:255'],
-            'logo_file' => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp,svg', 'max:4096'],
+            'logo_file' => ['nullable', 'file', 'mimes:png,jpg,jpeg,webp,svg', 'max:4096'],
             'company_name_th' => ['required', 'string', 'max:200'],
             'company_name_en' => ['nullable', 'string', 'max:200'],
             'company_tax_id' => ['nullable', 'string', 'max:30'],
@@ -482,7 +482,8 @@ class SystemSettingController extends Controller
             'erp_layout' => ['nullable', 'in:classic,odoo'],
         ], [
             'company_name_th.required' => 'กรุณาระบุชื่อบริษัท',
-            'logo_file.image' => 'ไฟล์โลโก้ต้องเป็นรูปภาพ (png/jpg/webp/svg)',
+            'logo_file.file' => 'ไม่สามารถอ่านไฟล์โลโก้ที่อัปโหลดได้',
+            'logo_file.mimes' => 'ไฟล์โลโก้ต้องเป็น png, jpg, webp หรือ svg',
             'logo_file.max' => 'ไฟล์โลโก้ต้องไม่เกิน 4MB',
             'vat_rate.required' => 'กรุณาระบุอัตราภาษีมูลค่าเพิ่ม',
             'credit_days.required' => 'กรุณาระบุจำนวนวันเครดิต',
@@ -491,7 +492,13 @@ class SystemSettingController extends Controller
         // Uploaded file wins over a preset pick
         if ($request->hasFile('logo_file')) {
             $file = $request->file('logo_file');
-            $name = 'custom-'.now()->format('YmdHis').'.'.strtolower($file->getClientOriginalExtension());
+            if (!$file->isValid()) {
+                return back()->withErrors(['logo_file' => 'อัปโหลดโลโก้ไม่สำเร็จ กรุณาเลือกไฟล์ใหม่'])->withInput();
+            }
+
+            $directory = public_path('images/logos');
+            File::ensureDirectoryExists($directory);
+            $name = 'custom-'.now()->format('YmdHisv').'-'.Str::lower(Str::random(8)).'.'.strtolower($file->getClientOriginalExtension());
             $file->move(public_path('images/logos'), $name);
             AppSetting::set('logo_path', 'images/logos/'.$name);
         } elseif ($request->filled('logo_choice')) {

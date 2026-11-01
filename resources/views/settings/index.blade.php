@@ -20,7 +20,7 @@
 @endif
 
 <form method="post" action="{{ route('settings.update') }}" enctype="multipart/form-data"
-      x-data="{ tab: @js(request()->query('tab') === 'pos-download' ||  $errors->has('pos_version') || $errors->has('pos_installer') ? 'pos-download' : 'func'), choice: @js($currentLogo ?? '__none__'), theme: @js($erpTheme), layout: @js($erpLayout), copied: false, menuOrder: @js($menuOrder), moveMenu(i, d) { const n=i+d; if(n<0 || n>=this.menuOrder.length) return; const a=[...this.menuOrder]; [a[i],a[n]]=[a[n],a[i]]; this.menuOrder=a; } }">
+      x-data="{ tab: @js(request()->query('tab') === 'pos-download' ||  $errors->has('pos_version') || $errors->has('pos_installer') ? 'pos-download' : ($errors->has('logo_file') ? 'logo' : 'func')), choice: @js($currentLogo ?? '__none__'), theme: @js($erpTheme), layout: @js($erpLayout), copied: false, menuOrder: @js($menuOrder), moveMenu(i, d) { const n=i+d; if(n<0 || n>=this.menuOrder.length) return; const a=[...this.menuOrder]; [a[i],a[n]]=[a[n],a[i]]; this.menuOrder=a; } }">
     @csrf
     <input type="hidden" name="menu_order" :value="JSON.stringify(menuOrder)">
 
