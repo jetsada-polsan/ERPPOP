@@ -1971,7 +1971,7 @@ pending
 # Handoff — 2026-11-01 (วาง installer Vue/Tauri ในหน้า POS Admin)
 
 ## Commit
-- รอ commit หลังทดสอบ
+- `7e378bc` — Align POS installer fallback and hidden web menu
 
 ## ทำอะไรไป
 - เพิ่มลิงก์ดาวน์โหลด Vue/Tauri installer รุ่นล่าสุดไว้ข้าง Python installer ในหน้า `/pos-admin`
@@ -1981,7 +1981,9 @@ pending
 
 ## ทดสอบไปแล้วแค่ไหน
 - GitHub Actions Vue/Tauri release `41319998812`: checks, Windows native build และ publish ผ่านทั้งหมด
-- รอตรวจ PHP lint/feature tests ก่อน commit
+- PHP lint ผ่าน
+- `AppLauncherTest` และ `PosWorkbenchTest`: 14 tests, 80 assertions ผ่าน
+- Deploy workflow `41321568368` ผ่านทั้ง test และ production deploy
 
 ## ความเสี่ยง/งานถัดไป
 - Web POS ยังเปิดได้จาก URL โดยตรง แต่ไม่แสดงในเมนู
