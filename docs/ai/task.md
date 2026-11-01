@@ -1836,3 +1836,20 @@ pending
 - ทดสอบ: ยังรอ GitHub Actions PostgreSQL UAT รอบใหม่
 - Deploy: รอบก่อนยังไม่ deploy เพราะ UAT run `41282634443` ล้มเหลว
 - งานถัดไป: push workflow fix แล้วรอ UAT และ Deploy ERP ใหม่
+# Handoff — 2026-11-01 (แก้เส้นทางใบรวมจองซ้ำ)
+
+## Commit
+- รอ commit หลัง push งานรอบนี้
+
+## ทำอะไรไป
+- ลบ route `GET /bookings/summary` ที่ประกาศซ้ำ ทำให้หน้ารายงานใบรวมจองมี route เดียวและไม่เกิดความกำกวมตอน resolve route
+- ตรวจระบบ B Plus ผ่าน AnyDesk แบบอ่านอย่างเดียว ยืนยันโครงสร้างใบจอง → ใบส่งของชั่วคราว → DS/DSN และพบว่าระบบ ERP มีเล่ม DS/DSN กับ `no_vat` อยู่แล้ว จึงไม่บล็อกข้อมูลเก่าที่สินค้ายังไม่มีการกำหนดภาษีรายสินค้า
+
+## ทดสอบไปแล้วแค่ไหน
+- `php artisan test --filter='Booking|QuotationConversion|NoVatBook'`: 42 tests / 213 assertions ผ่าน
+- `git diff --check` ผ่าน
+- Full `php artisan test` ในเครื่อง dev ยังชน memory limit 128MB ที่ `ReportExportTest` ระหว่างตรวจ MIME ของ XLSX; ไม่ใช่ failure จากการแก้รอบนี้
+
+## ความเสี่ยง/งานถัดไป
+- งานนี้ยังไม่เพิ่มการแยกรายการ DS/DSN อัตโนมัติในใบเดียวกัน; ปัจจุบันเลือกเล่ม DS/DSN ตอนแปลงใบจองได้ และ migration `no_vat` มีอยู่แล้ว
+- ต้องรอ workflow PostgreSQL UAT และ production check ก่อนถือว่า deploy สำเร็จ
