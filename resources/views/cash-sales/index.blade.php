@@ -34,6 +34,7 @@
                         <tr>
                             <th>เลขที่</th>
                             <th>วันที่</th>
+                            <th>เวลา</th>
                             <th>สาขา</th>
                             <th>ลูกค้า</th>
                             <th class="text-end">ยอดรวม</th>
@@ -45,6 +46,7 @@
                             <tr>
                                 <td class="fw-semibold">{{ $sale->doc_number }}</td>
                                 <td>{{ $sale->doc_date->thaiDate() }}</td>
+                                <td>{{ $sale->created_at?->format('H:i:s') ?? '-' }}</td>
                                 <td>{{ $sale->branch->name_th }}</td>
                                 <td>{{ $sale->customer?->name_th ?? 'ลูกค้าเงินสด' }}</td>
                                 <td class="text-end">{{ number_format($sale->total_amount, 2) }}</td>
@@ -53,7 +55,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="6" class="doc-empty">ยังไม่มีใบขายสด</td></tr>
+                            <tr><td colspan="7" class="doc-empty">ยังไม่มีใบขายสด</td></tr>
                         @endforelse
                     </tbody>
                 </table>
