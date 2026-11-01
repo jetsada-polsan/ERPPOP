@@ -82,6 +82,21 @@
         .settings-link i { width:22px; color:var(--red); text-align:center; font-size:15px; }
         .settings-link small { display:block; margin-top:2px; color:var(--muted); font-size:10px; font-weight:500; }
         .settings-link:hover { border-color:#e2a4aa; background:#fff7f7; }
+        .price-check-modal { position:fixed; inset:0; z-index:31; display:grid; place-items:center; padding:16px; background:rgba(15,23,42,.55); }
+        .price-check-modal[hidden] { display:none; }
+        .price-check-box { width:min(620px, calc(100vw - 28px)); border:1px solid var(--line); border-radius:12px; background:#fff; box-shadow:0 24px 70px rgba(15,23,42,.25); overflow:hidden; }
+        .price-check-head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border-bottom:1px solid #edf1f4; }
+        .price-check-form { display:flex; gap:8px; padding:14px; }
+        .price-check-form input { flex:1; min-width:0; height:42px; padding:0 11px; border:1px solid var(--line); border-radius:7px; outline:0; }
+        .price-check-form input:focus { border-color:var(--red); box-shadow:0 0 0 3px #c923361c; }
+        .price-check-form button { border:0; border-radius:7px; padding:0 14px; background:var(--red); color:#fff; font-weight:800; cursor:pointer; }
+        .price-check-hint { margin:0 14px 10px; color:var(--muted); font-size:11px; }
+        .price-check-results { max-height:390px; overflow:auto; padding:0 14px 14px; }
+        .price-check-result { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:11px 0; border-top:1px solid #edf1f4; }
+        .price-check-result strong { display:block; font-size:13px; }
+        .price-check-result small { display:block; margin-top:3px; color:var(--muted); }
+        .price-check-result b { color:var(--red-dark); font-size:18px; white-space:nowrap; }
+        .price-check-empty { padding:24px 0; color:var(--muted); text-align:center; font-size:12px; }
         @media (max-width:700px) { .terminal { display:none; } .preview-badge span { display:none; } .pos-stage { padding:6px; } .topbar { gap:6px; padding:0 8px; } .topbar-action span { display:none; } .topbar-action.icon-only { display:inline-flex; } .statusbar span:last-child { display:none; } }
     </style>
 </head>
@@ -98,6 +113,7 @@
         <div class="terminal"><i class="bi bi-display"></i>@if($runtime['show_terminal'])<span>เครื่อง <b>POS001</b></span>@endif @if($runtime['show_branch'])<span>สาขา <b>B001</b></span>@endif @if($runtime['show_seller'])<span>แคชเชียร์ <b>{{ auth()->user()?->name ?? 'Demo Cashier' }}</b></span>@endif</div>
         <div class="top-spacer"></div>
         <div class="preview-badge"><i class="bi bi-eye"></i><span>ตัวอย่างจาก Build รุ่น {{ $publishedVersion }}</span></div>
+        <button class="topbar-action" type="button" data-open-price-check title="ค้นหาราคาโดยไม่เปิดกะ"><i class="bi bi-tag"></i><span>เช็กราคา</span></button>
         @if(auth()->user()?->hasPermission('settings.manage'))
             <button class="topbar-action icon-only" type="button" data-open-pos-settings title="ตั้งค่า POS" aria-label="ตั้งค่า POS"><i class="bi bi-sliders2"></i></button>
         @endif
@@ -129,6 +145,21 @@
             </div>
         </div>
     @endif
+
+    <div class="price-check-modal" id="priceCheckModal" hidden role="dialog" aria-modal="true" aria-labelledby="priceCheckTitle">
+        <div class="price-check-box">
+            <div class="price-check-head">
+                <strong id="priceCheckTitle"><i class="bi bi-tag me-2" style="color:var(--red)"></i>เช็กราคา</strong>
+                <button class="settings-close" type="button" data-close-price-check title="ปิด" aria-label="ปิดหน้าต่างเช็กราคา"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <form class="price-check-form" id="priceCheckForm">
+                <input id="priceCheckInput" autocomplete="off" inputmode="search" placeholder="สแกนบาร์โค้ด หรือค้นหาชื่อ / SKU" aria-label="สแกนบาร์โค้ด หรือค้นหาสินค้า">
+                <button type="submit"><i class="bi bi-search"></i> ค้นหา</button>
+            </form>
+            <p class="price-check-hint">ใช้เครื่องสแกนบาร์โค้ดได้ทันที เครื่องสแกนจะส่งรหัสและกด Enter ให้เอง · โหมดนี้ไม่สร้างบิล</p>
+            <div class="price-check-results" id="priceCheckResults"><div class="price-check-empty">พิมพ์รหัสหรือชื่อสินค้าเพื่อดูราคา</div></div>
+        </div>
+    </div>
 
     <main class="pos-stage">
         <div class="pos-canvas">
@@ -186,6 +217,45 @@
         document.querySelector('[data-open-pos-settings]')?.addEventListener('click', () => { modal.hidden = false; document.querySelector('[data-close-pos-settings]')?.focus(); });
         modal.querySelectorAll('[data-close-pos-settings]').forEach((element) => element.addEventListener('click', close));
         modal.addEventListener('click', (event) => { if (event.target === modal) close(); });
+        document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !modal.hidden) close(); });
+    })();
+
+    (() => {
+        const modal = document.getElementById('priceCheckModal');
+        const form = document.getElementById('priceCheckForm');
+        const input = document.getElementById('priceCheckInput');
+        const results = document.getElementById('priceCheckResults');
+        if (!modal || !form || !input || !results) return;
+        const close = () => { modal.hidden = true; };
+        const money = (value) => `฿${Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const render = (items) => {
+            if (!items.length) {
+                results.innerHTML = '<div class="price-check-empty">ไม่พบสินค้าที่ตรงกัน</div>';
+                return;
+            }
+            results.innerHTML = items.map((item) => {
+                const code = item.matched_barcode?.barcode || item.sku_code || '';
+                const source = item.is_promotion ? 'ราคาพิเศษ' : (item.price_source === 'scheduled_price' ? 'ราคาตามช่วงเวลา' : 'ราคาปัจจุบัน');
+                return `<div class="price-check-result"><div><strong>${escapeHtml(item.name_th || '')}</strong><small>${escapeHtml(code)} · ${source}</small></div><b>${money(item.pos_price ?? item.default_price)}</b></div>`;
+            }).join('');
+        };
+        const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char]);
+        const lookup = async () => {
+            const query = input.value.trim();
+            if (!query) { results.innerHTML = '<div class="price-check-empty">พิมพ์รหัสหรือชื่อสินค้าเพื่อดูราคา</div>'; return; }
+            results.innerHTML = '<div class="price-check-empty">กำลังค้นหา...</div>';
+            try {
+                const response = await fetch(`{{ route('pos.products') }}?q=${encodeURIComponent(query)}` , { headers: { Accept: 'application/json' } });
+                if (!response.ok) throw new Error('lookup_failed');
+                render(await response.json());
+            } catch (error) {
+                results.innerHTML = '<div class="price-check-empty">เช็กราคาไม่ได้ชั่วคราว กรุณาลองใหม่</div>';
+            }
+        };
+        document.querySelector('[data-open-price-check]')?.addEventListener('click', () => { modal.hidden = false; input.value = ''; results.innerHTML = '<div class="price-check-empty">พิมพ์รหัสหรือชื่อสินค้าเพื่อดูราคา</div>'; input.focus(); });
+        document.querySelector('[data-close-price-check]')?.addEventListener('click', close);
+        modal.addEventListener('click', (event) => { if (event.target === modal) close(); });
+        form.addEventListener('submit', (event) => { event.preventDefault(); lookup(); });
         document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !modal.hidden) close(); });
     })();
 </script>
