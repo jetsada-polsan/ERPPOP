@@ -22,7 +22,7 @@
       "resizable": true
     }],
     "security": {
-      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: data: http://27.254.143.219 https://27.254.143.219; connect-src ipc: http://ipc.localhost http://27.254.143.219 https://27.254.143.219"
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: data: http://27.254.143.219 https://27.254.143.219 http://erp.popstarcenter.com https://erp.popstarcenter.com; connect-src ipc: http://ipc.localhost http://27.254.143.219 https://27.254.143.219 http://erp.popstarcenter.com https://erp.popstarcenter.com"
     }
   },
   "bundle": {

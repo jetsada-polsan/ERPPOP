@@ -6,7 +6,12 @@
   "permissions": [
     "core:default",
     "http:default",
-    { "identifier": "http:allow-fetch", "allow": [{ "url": "http://27.254.143.219/**" }, { "url": "https://27.254.143.219/**" }] },
+    { "identifier": "http:allow-fetch", "allow": [
+      { "url": "http://27.254.143.219/**" },
+      { "url": "https://27.254.143.219/**" },
+      { "url": "https://erp.popstarcenter.com/**" },
+      { "url": "http://erp.popstarcenter.com/**" }
+    ] },
     "sql:default",
     "sql:allow-execute",
     "sql:allow-select",

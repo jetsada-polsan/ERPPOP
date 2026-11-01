@@ -2006,3 +2006,21 @@ pending
 
 ## ความเสี่ยง/งานถัดไป
 - ต้อง deploy production และทดสอบเลือกไฟล์โลโก้จริงจากหน้า Settings
+
+# Handoff — 2026-11-01 (แก้ Vue/Tauri ERP URL scope)
+
+## Commit
+- รอ commit หลังทดสอบ
+
+## ทำอะไรไป
+- เพิ่ม `erp.popstarcenter.com` ใน Tauri HTTP allowlist ทั้ง HTTP/HTTPS
+- เพิ่มโดเมนจริงใน CSP `connect-src` และ `img-src`
+- แก้สาเหตุที่ installer รุ่นเดิมปฏิเสธการเชื่อมต่อด้วยข้อความ `url not allowed on the configured scope`
+
+## ทดสอบไปแล้วแค่ไหน
+- Vue/Tauri unit tests: 31 tests ผ่าน
+- Vue typecheck และ production web build ผ่าน
+
+## ความเสี่ยง/งานถัดไป
+- ต้องสร้าง Windows native installer รุ่นใหม่ แล้วเผยแพร่แทนรุ่นเดิม
+- หลังติดตั้งรุ่นใหม่ ให้เชื่อมต่อด้วย `https://erp.popstarcenter.com` และทดสอบ ping/catalog/sync
