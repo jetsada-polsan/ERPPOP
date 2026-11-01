@@ -104,12 +104,12 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
             @if($isPending && $canConvert)
             <form method="post" action="{{ route('bookings.convert', $booking) }}" id="convert-form" class="booking-convert d-flex flex-column gap-2 align-items-end">
                 @csrf
-                @if($creditSaleBooks->count() > 1)
+                @if($creditSaleBooks->isNotEmpty())
                 <div class="doc-book-picker">
                     <div class="doc-book-label">เล่มใบขายเชื่อ</div>
                 <select name="document_book_id" class="form-select" style="width:auto" title="เล่มเอกสารขายเชื่อ">
                     @foreach($creditSaleBooks as $book)
-                        <option value="{{ $book->id }}" @selected($book->is_default)>{{ $book->code }} - {{ $book->name }} ({{ number_format($book->documents_count) }} ใบ)</option>
+                        <option value="{{ $book->id }}" @selected($book->is_default)>{{ $book->code }} - {{ $book->no_vat ? 'ไม่มีภาษี' : 'มีภาษี' }} ({{ number_format($book->documents_count) }} ใบ)</option>
                     @endforeach
                 </select>
                 </div>

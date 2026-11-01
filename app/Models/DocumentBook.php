@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['code', 'name', 'document_type_id', 'prefix', 'is_default', 'is_active'])]
+#[Fillable(['code', 'name', 'document_type_id', 'prefix', 'is_default', 'is_active', 'no_vat'])]
 class DocumentBook extends Model
 {
     public function documentType(): BelongsTo
