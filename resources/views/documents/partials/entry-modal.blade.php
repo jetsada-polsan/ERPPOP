@@ -155,7 +155,7 @@
 
                     <div class="doc-card doc-card-pad">
                         <div class="doc-meta-line"><span>วันที่เอกสาร</span><strong>{{ $documentDateLabel ?? now()->thaiDate() }}</strong></div>
-                        <div class="doc-meta-line"><span>เลขที่</span><strong>{{ $documentNumberLabel ?? 'BK + สาขา + วันที่ + ลำดับ (ออกให้อัตโนมัติ)' }}</strong></div>
+                        <div class="doc-meta-line"><span>เลขที่</span><strong>{{ $documentNumberLabel ?? 'สาขา-ปีเดือน/ลำดับ (ออกให้อัตโนมัติ)' }}</strong></div>
                         <div class="doc-meta-line"><span>จำนวนรายการ</span><strong><span x-text="items.length"></span> รายการ</strong></div>
                         <div class="doc-meta-line"><span>จำนวนรวม</span><strong><span x-text="money(totalQty)"></span> ชิ้น</strong></div>
                         <div class="doc-meta-total">

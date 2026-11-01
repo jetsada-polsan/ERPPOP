@@ -11,7 +11,7 @@ use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 /**
- * ข้อ 16: เลขใบจองต้องเป็น BK + สาขา + วันที่ + ลำดับ นับแยกสาขา เหมือนเอกสารอื่น
+ * ข้อ 16: เลขใบจองต้องเป็น สาขา-ปีเดือน/ลำดับ นับแยกสาขา เหมือนเอกสารอื่น
  * ทุกเล่มใบจองของสาขาใช้ตัวนับเดียวกัน ไม่งั้นได้เลขซ้ำ
  */
 class BookingNumberFormatTest extends TestCase
@@ -28,9 +28,9 @@ class BookingNumberFormatTest extends TestCase
         $bookB = DocumentBook::create(['code' => 'BN', 'name' => 'ใบจองสายเหนือ', 'document_type_id' => $type->id, 'prefix' => 'BN', 'is_default' => false, 'is_active' => true]);
         $numbers = app(DocumentNumberGenerator::class);
 
-        $this->assertSame('BKB00120261105001', $numbers->next('BOOKING', $amnat->id));
-        $this->assertSame('BKB00120261105002', $numbers->nextInBook($bookA, $amnat->id));
-        $this->assertSame('BKB00120261105003', $numbers->nextInBook($bookB, $amnat->id));
-        $this->assertSame('BKB00220261105001', $numbers->next('BOOKING', $other->id));
+        $this->assertSame('B001-256911/001', $numbers->next('BOOKING', $amnat->id));
+        $this->assertSame('B001-256911/002', $numbers->nextInBook($bookA, $amnat->id));
+        $this->assertSame('B001-256911/003', $numbers->nextInBook($bookB, $amnat->id));
+        $this->assertSame('B002-256911/001', $numbers->next('BOOKING', $other->id));
     }
 }

@@ -57,8 +57,8 @@ class BookingSalesAreaTest extends TestCase
             'sales_area_id' => $route->id,
             'sales_user_id' => $user->id,
             'document_book_id' => $route->document_book_id,
-            // ข้อ 16: ใบจองใช้รูปแบบ BK + สาขา + วันที่ + ลำดับ เหมือนเอกสารอื่น (เดิม B01)
-            'doc_number' => 'BK'.$branch->code.now()->format('Ymd').'001',
+            // ข้อ 16: ใบจองใช้รูปแบบ สาขา-ปีเดือน/ลำดับ เหมือนเอกสารอื่น (เดิม B01)
+            'doc_number' => $branch->code.'-'.(now()->year + 543).now()->format('m').'/001',
             'total_amount' => 270,
         ]);
         // ผู้รับผิดชอบใบจองไม่ผูก user กับลูกค้าอีกต่อไป: ลูกค้ายังไม่มีเจ้าของ
@@ -147,7 +147,7 @@ class BookingSalesAreaTest extends TestCase
         $this->withoutMiddleware(ErpAuthorize::class)->actingAs($user)
             ->get(route('bookings.index'))
             ->assertOk()
-            ->assertSee('BK + สาขา + วันที่ + ลำดับ (ออกให้อัตโนมัติ)')
+            ->assertSee('สาขา-ปีเดือน/ลำดับ (ออกให้อัตโนมัติ)')
             ->assertSee("window.erpToast('warning', title", false)
             ->assertSee("position: 'top-end'", false)
             ->assertSee('salesAreaFromParty: true', false);
@@ -373,7 +373,7 @@ class BookingSalesAreaTest extends TestCase
         ])->assertRedirect();
         $this->assertDatabaseHas('documents', [
             'branch_id' => $branch->id,
-            'doc_number' => 'BK'.$branch->code.now()->format('Ymd').'002',
+            'doc_number' => $branch->code.'-'.(now()->year + 543).now()->format('m').'/002',
         ]);
     }
 

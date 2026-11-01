@@ -66,12 +66,17 @@ class DocumentNumberGenerator
     }
 
     /**
-     * ใบจองใช้รูปแบบเดียวกับเอกสารอื่น: BK + สาขา + วันที่ + ลำดับ (เดิม B01, B02 นับรวมทั้งบริษัท — ข้อ 16)
+     * ใบจองใช้รูปแบบเล่มเดิม: สาขา + วันที่ + ลำดับ (เดิม B01, B02 นับรวมทั้งบริษัท — ข้อ 16)
      * ทุกเล่มใบจองของสาขาใช้ตัวนับเดียวกัน เพราะ prefix เดียวกัน แยกตัวนับตามเล่มจะได้เลขซ้ำ
      */
     private function nextBooking(int $branchId, ?string $date = null): string
     {
-        return $this->format(self::PREFIXES['BOOKING'], $branchId, 'BOOKING:'.$branchId, $date);
+        // รูปแบบเดิมของ BPlus: เล่ม-ปีพ.ศ.เดือน/ลำดับ เช่น B001-256911/001 เริ่ม 001 ใหม่ทุกเดือน
+        $branchCode = Branch::whereKey($branchId)->value('code') ?? (string) $branchId;
+        $day = $date ? Carbon::parse($date) : now();
+        $period = ($day->year + 543).$day->format('m');
+
+        return sprintf('%s-%s/%03d', $branchCode, $period, $this->nextSequence('BOOKING:'.$branchId, $period));
     }
 
     // ตารางที่ออกเลขเอง ไม่ได้อยู่ใน documents — ใช้ตัวนับชุดเดียวกันเพื่อไม่ให้ซ้ำ
