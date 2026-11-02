@@ -1,0 +1,36 @@
+name: Classify barcodes
+
+# preview = แสดงยอดอย่างเดียว ไม่บันทึก, apply = backup ก่อนแล้วจัดประเภทจริง
+# แตะเฉพาะแถว CUSTOM เปลี่ยนแค่ป้ายประเภท ไม่แก้เลขบาร์โค้ด SKU ราคา หรือหน่วย
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: preview or apply
+        required: true
+        type: choice
+        options: [preview, apply]
+        default: preview
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+      - run: ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+      - name: Run on the server
+        env:
+          MODE: ${{ inputs.mode }}
+        run: |
+          if [ "$MODE" = apply ]; then
+            CMD="php artisan erp:backup && php artisan erp:classify-barcodes --apply --report=storage/app/barcode-classify.csv"
+          else
+            CMD="php artisan erp:classify-barcodes --report=storage/app/barcode-classify.csv && head -n 40 storage/app/barcode-classify.csv"
+          fi
+          ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "cd '${{ vars.APP_DIR }}' && $CMD"
