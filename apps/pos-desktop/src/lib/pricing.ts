@@ -38,7 +38,7 @@ export function promotionActive(promotion: QtyPromotion, now = new Date()) {
   return (!startsAt || startsAt <= now) && (!endsAt || endsAt >= now)
 }
 
-export function priceCart(cart: CartLine[], allPromotions: QtyPromotion[], vatRate = 7, now = new Date()): CartPricing {
+export function priceCart(cart: CartLine[], allPromotions: QtyPromotion[], vatRate = 7, now = new Date(), billDiscount = 0): CartPricing {
   const promotions = allPromotions.filter((promotion) => promotionActive(promotion, now))
   const lines = cart.map((line) => ({
     line,
@@ -70,7 +70,8 @@ export function priceCart(cart: CartLine[], allPromotions: QtyPromotion[], vatRa
   }
 
   promoDiscount = roundMoney(Math.min(subtotal, promoDiscount))
-  const total = roundMoney(Math.max(0, subtotal - promoDiscount))
+  const manualDiscount = roundMoney(Math.min(subtotal - promoDiscount, Math.max(0, num(billDiscount))))
+  const total = roundMoney(Math.max(0, subtotal - promoDiscount - manualDiscount))
   const rate = Math.max(0, num(vatRate))
   const vat = roundMoney(total * rate / (100 + rate))
   const beforeVat = roundMoney(total - vat)
@@ -97,7 +98,7 @@ export function priceCart(cart: CartLine[], allPromotions: QtyPromotion[], vatRa
     }
   }
 
-  return { subtotal, promoDiscount, total, vat, beforeVat, items }
+  return { subtotal, promoDiscount, manualDiscount, total, vat, beforeVat, items }
 }
 
 export function checkoutPayloadWithPricing(payload: CheckoutPayload, pricing: CartPricing): CheckoutPayload {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, CircleHelp, Cloud, CloudOff, CreditCard, FileText, FolderOpen, History, LogOut, Minus, PackageSearch, PauseCircle, Plus, Printer, QrCode, ReceiptText, RefreshCw, ScanLine, Search, Settings, ShoppingCart, Trash2, UserRound, Wifi, X } from 'lucide-vue-next'
 import { check } from '@tauri-apps/plugin-updater'
 import { invoke, isTauri } from '@tauri-apps/api/core'
@@ -96,7 +96,16 @@ const connectionLabel = computed(() => {
   return catalogSyncError.value ? 'ซิงก์ข้อมูลไม่ครบ' : 'ออนไลน์'
 })
 const connectionClass = computed(() => profile.value && online.value ? 'online' : 'offline')
-const pricing = computed(() => priceCart(cart.value, promotions.value, profile.value?.vatRate || 7))
+const billDiscount = ref(0)
+const pricing = computed(() => priceCart(cart.value, promotions.value, profile.value?.vatRate || 7, new Date(), billDiscount.value))
+// เปิดโปรแกรมแล้วขึ้นช่อง PIN ทันที และครบ 4 หลักเข้าใช้งานเลย
+const stopAskingPin = watch(profile, (value) => {
+  if (value && !cashier.value && !modal.value) modal.value = 'cashier'
+  if (value) stopAskingPin()
+})
+watch(cashierPin, (value) => {
+  if (modal.value === 'cashier' && /^\d{4}$/.test(value) && !busy.value) loginCashier()
+})
 const subtotal = computed(() => pricing.value.total)
 const totalQty = computed(() => cart.value.reduce((sum, line) => sum + Number(line.qty), 0))
 const vat = computed(() => pricing.value.vat)
@@ -174,7 +183,10 @@ function scan() {
   // การตีความอยู่ใน lib/barcode.ts เพื่อให้เทสต์ได้โดยไม่ต้องยกทั้งหน้าจอขึ้นมา
   const resolved = resolveScan(code, products.value)
 
-  if (resolved.kind === 'not-found') return flash(`ไม่พบรหัส ${code}`)
+  if (resolved.kind === 'not-found') {
+    if (filteredProducts.value.length === 1) return addProduct(filteredProducts.value[0])
+    return flash(filteredProducts.value.length ? `พบ ${filteredProducts.value.length} รายการ กดเลือกสินค้า` : `ไม่พบรหัส ${code}`)
+  }
   if (resolved.kind === 'scale-unknown') return flash(`ไม่พบสินค้าชั่งรหัส ${resolved.plu}`)
 
   if (resolved.kind === 'exact') {
@@ -481,6 +493,7 @@ async function holdBill() {
       payload: { cart: cart.value },
     })
     cart.value = []
+    billDiscount.value = 0
     modal.value = null
     flash('พักบิลไว้ส่วนกลางแล้ว')
   } catch (e) { showError(e) } finally { busy.value = false }
@@ -560,6 +573,10 @@ async function checkout() {
     cash_received: paymentMethod.value === 'cash' ? cashReceived.value : undefined,
     change_amount: paymentMethod.value === 'cash' ? change.value : undefined,
     vat_mode: 'included' as const,
+    ...(pricing.value.manualDiscount > 0 ? {
+      manual_discount_amount: pricing.value.manualDiscount,
+      discount_approved_by: `คนขาย ${cashier.value.name}`,
+    } : {}),
     items: pricing.value.items,
   }
   const queueItem: QueueItem = { id, payload, status: 'pending', attempts: 0, createdAt: new Date().toISOString() }
@@ -574,6 +591,7 @@ async function checkout() {
       console.warn('บันทึกประวัติ POS ไม่สำเร็จ แต่บิลยังอยู่ในคิวซิงก์', historyError)
     }
     cart.value = []
+    billDiscount.value = 0
     modal.value = null
     await refreshQueue()
     let receiptNo = id.split(':').pop()!.slice(0, 8).toUpperCase()
@@ -748,6 +766,7 @@ onUnmounted(() => {
           </div>
           <div v-if="!cart.length" class="cart-empty"><span><ShoppingCart/></span><strong>ยังไม่มีรายการขาย</strong><small>สแกนสินค้าเพื่อเริ่มบิล</small></div>
         </div>
+        <label class="bill-discount">ส่วนลดท้ายบิล (บาท)<input v-model.number="billDiscount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></label>
         <div class="totals"><div><span>ยอดก่อนภาษี</span><b>฿{{ money(subtotal - vat) }}</b></div><div><span>VAT {{ profile?.vatRate || 7 }}%</span><b>฿{{ money(vat) }}</b></div><div class="grand"><span>ยอดสุทธิ</span><b>฿{{ money(subtotal) }}</b></div></div>
         <button class="pay-button" :disabled="!cart.length || busy || !storageReady" @click="openPayment"><Banknote/><span><small>{{ storageReady ? 'รับชำระ' : 'รอพื้นที่ข้อมูล' }}</small><strong>{{ storageReady ? 'ชำระเงิน' : 'ตรวจฐานข้อมูล' }}</strong></span><ChevronRight/></button>
         <div class="queue-bar" :class="{ warning: pendingCount }"><Cloud v-if="pendingCount"/><CheckCircle2 v-else/><span>{{ pendingCount ? `รอส่งขึ้น ERP ${pendingCount} บิล` : 'บิลทั้งหมดส่งขึ้น ERP แล้ว' }}</span></div>

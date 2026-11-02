@@ -69,6 +69,16 @@ describe('POS Desktop pricing UAT', () => {
   })
 })
 
+describe('bill discount', () => {
+  it('reduces the payable total without changing line prices', () => {
+    const line = { id: 1, pos_price: 70, qty: 1 } as unknown as CartLine
+    const pricing = priceCart([line], [], 7, new Date(), 10)
+    expect(pricing.manualDiscount).toBe(10)
+    expect(pricing.total).toBe(60)
+    expect(pricing.items[0].unit_price).toBe(70)
+  })
+})
+
 describe('promotion time window', () => {
   const promotion = { id: 1, code: 'P', name: 'x', promo_type: 'bundle_price', product_id: 1, min_qty: 3, bundle_price: 100,
     starts_at: '2026-11-02T05:00:00Z', ends_at: '2026-11-03T05:00:00Z' } as const
