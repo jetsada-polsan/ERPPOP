@@ -125,6 +125,21 @@ class InternalBarcodeGeneratorTest extends TestCase
         $this->assertSame($product->base_unit_id, $found[0]['matched_barcode']['unit_id']);
     }
 
+    public function test_scanner_that_drops_the_leading_zero_still_finds_the_product(): void
+    {
+        $branch = Branch::create(['code' => 'BZ', 'name_th' => 'สาขา', 'is_active' => true]);
+        $product = $this->product('102399');
+        app(InternalBarcodeGenerator::class)->generate($product);
+        $this->actingAs($this->manager());
+
+        $request = Request::create('/pos/products', 'GET', ['branch_id' => $branch->id, 'q' => '000001023992', 'exact' => 1, 'lookup' => 'barcode']);
+        $this->app->instance('request', $request);
+        $found = app(PosController::class)->products($request)->getData(true);
+
+        $this->assertSame($product->id, $found[0]['id']);
+        $this->assertSame('0000001023992', $found[0]['matched_barcode']['barcode']);
+    }
+
     public function test_generated_barcode_with_sales_can_be_disabled_but_not_deleted(): void
     {
         $user = $this->manager();

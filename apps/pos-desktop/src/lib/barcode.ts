@@ -86,6 +86,18 @@ export function resolveScan(code: string, products: Product[]): ScanResolution {
     }
   }
 
+  // เครื่องยิงบางรุ่นตัด 0 หน้า EAN-13 ออกเหลือ 12 หลัก (อ่านเป็น UPC-A)
+  // หาแบบเติม 0 คืน หลังจากหาค่าตรงตัวครบทุกสินค้าแล้วเท่านั้น
+  if (/^\d{12}$/.test(scanned)) {
+    const padded = '0' + scanned
+    for (const product of products) {
+      const matched = findBarcode(product, padded)
+      if (matched) {
+        return { kind: 'exact', product, barcode: matched.barcode, barcodeType: normalizeBarcodeType(matched.barcode_type) }
+      }
+    }
+  }
+
   const scale = decodeScaleLabel(scanned)
   if (!scale) return { kind: 'not-found' }
 

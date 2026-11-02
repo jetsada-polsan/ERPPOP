@@ -288,15 +288,19 @@ class PosController extends Controller
         $branchTableId = null;
         $priceTableIds = array_values(array_filter([$defaultTableId]));
 
+        // เครื่องยิงบางรุ่นตัด 0 หน้า EAN-13 ออกเหลือ 12 หลัก (อ่านเป็น UPC-A) ให้หาแบบเติม 0 คืนด้วย
+        // ค่าที่ตรงตัวยังมาก่อนเสมอ ดูตอนเลือก matchedBarcode ด้านล่าง
+        $scanCodes = $q !== '' && ctype_digit($q) && strlen($q) === 12 ? [$q, '0'.$q] : [$q];
+
         $products = Product::where('is_active', true)
             ->with(['barcodes' => fn ($query) => $query->where('is_active', true)->with('unit')])
             ->when($categoryId, fn ($query) => $query->where('product_category_id', $categoryId))
             ->when($q !== '' && $exact && $lookup === 'barcode', fn ($query) => $query
-                ->whereHas('barcodes', fn ($barcodeQuery) => $barcodeQuery->where('is_active', true)->where('barcode', $q)))
+                ->whereHas('barcodes', fn ($barcodeQuery) => $barcodeQuery->where('is_active', true)->whereIn('barcode', $scanCodes)))
             ->when($q !== '' && $exact && $lookup === 'sku', fn ($query) => $query->where('sku_code', $q))
             ->when($q !== '' && $exact && $lookup === 'mixed', fn ($query) => $query->where(fn ($w) => $w
                 ->where('sku_code', $q)
-                ->orWhereHas('barcodes', fn ($barcodeQuery) => $barcodeQuery->where('is_active', true)->where('barcode', $q))))
+                ->orWhereHas('barcodes', fn ($barcodeQuery) => $barcodeQuery->where('is_active', true)->whereIn('barcode', $scanCodes))))
             ->when($q !== '' && ! $exact, fn ($query) => $query->where(fn ($w) => $w
                 ->where('sku_code', 'ilike', "%{$q}%")
                 ->orWhere('name_th', 'ilike', "%{$q}%")
@@ -327,10 +331,15 @@ class PosController extends Controller
         // ตัวคูณหน่วย (id -> qty_per_base_unit) ใช้เลือก "ราคาหน่วยฐาน" เมื่อไม่มีราคา unit_id=null
         $unitFactors = ProductUnit::pluck('qty_per_base_unit', 'id');
 
-        $products = $products->map(function ($p) use ($priceRows, $q, $exact, $lookup, $branchTableId, $defaultTableId, $unitFactors) {
-            $matchedBarcode = $exact && $lookup !== 'sku' && $q !== ''
-                ? $p->barcodes->first(fn ($barcode) => $barcode->barcode === $q)
-                : null;
+        $products = $products->map(function ($p) use ($priceRows, $q, $exact, $lookup, $branchTableId, $defaultTableId, $unitFactors, $scanCodes) {
+            $matchedBarcode = null;
+            if ($exact && $lookup !== 'sku' && $q !== '') {
+                foreach ($scanCodes as $code) {
+                    if ($matchedBarcode = $p->barcodes->first(fn ($barcode) => $barcode->barcode === $code)) {
+                        break;
+                    }
+                }
+            }
             $scalePlu = $p->barcodes->first(fn ($barcode) => $barcode->barcode_type === BarcodePolicy::SCALE_PLU || $this->isScalePlu($barcode->barcode))?->barcode
                 ?? ($this->isScalePlu($p->sku_code) ? $p->sku_code : null);
 

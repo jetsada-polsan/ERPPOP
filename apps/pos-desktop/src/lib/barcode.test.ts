@@ -120,3 +120,20 @@ describe('ป้ายเครื่องชั่ง', () => {
     expect(result.plu).toBe('800999')
   })
 })
+
+describe('เครื่องยิงตัด 0 หน้า', () => {
+  it('ยิงได้ 12 หลักก็หาบาร์โค้ด 13 หลักที่ขึ้นต้น 0 เจอ', () => {
+    const result = resolveScan('000001023992', [product(1, '102399', [['0000001023992', 'INTERNAL_13']])])
+    expect(result.kind).toBe('exact')
+    if (result.kind !== 'exact') return
+    expect(result.barcode).toBe('0000001023992')
+  })
+
+  it('รหัส 12 หลักที่ลงทะเบียนไว้ตรงตัวต้องมาก่อน', () => {
+    const result = resolveScan('000001023992', [
+      product(1, 'A', [['0000001023992', 'INTERNAL_13']]),
+      product(2, 'B', [['000001023992', 'CUSTOM']]),
+    ])
+    expect(result.kind === 'exact' && result.product.id).toBe(2)
+  })
+})
