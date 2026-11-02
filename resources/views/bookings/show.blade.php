@@ -102,6 +102,12 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
                     <i class="bi bi-pencil-square me-1"></i> แก้ไขใบจอง
                 </a>
             @endif
+            @if($isPending)
+                <form method="post" action="{{ route('bookings.cancel', $booking) }}" onsubmit="return confirm('ยกเลิกใบจองนี้? ยอดจองจะคืนให้สต๊อก')">
+                    @csrf
+                    <button class="btn btn-outline-danger">ยกเลิกใบจอง</button>
+                </form>
+            @endif
             @if($isPending && $canConvert)
             <form method="post" action="{{ route('bookings.convert', $booking) }}" id="convert-form" class="booking-convert d-flex flex-column gap-2 align-items-end">
                 @csrf

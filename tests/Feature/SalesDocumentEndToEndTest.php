@@ -222,6 +222,23 @@ class SalesDocumentEndToEndTest extends TestCase
         $this->assertSame('CREDIT_SALE', $postings[0]->channel);
     }
 
+    public function test_cancelling_a_pending_booking_releases_its_reservation(): void
+    {
+        [$branch, $location, $product, $customer] = $this->stockedBranch('CANBK', qty: 10, unitCost: 60, withCustomer: true);
+        $document = app(BookingService::class)->create(['branch_id' => $branch->id, 'customer_id' => $customer->id,
+            'items' => [['product_id' => $product->id, 'qty' => 4, 'unit_price' => 100]]]);
+        $booking = SaleBooking::where('document_id', $document->id)->sole();
+        $balance = StockBalance::where('product_id', $product->id)->where('warehouse_location_id', $location->id)->sole();
+        $this->assertSame(4.0, (float) $balance->reserved_qty);
+
+        app(BookingService::class)->cancel($booking, 'ลูกค้ายกเลิก', null);
+
+        $this->assertSame(0.0, (float) $balance->fresh()->reserved_qty);
+        $this->assertSame(SaleBooking::STATUS_CANCELLED, $booking->fresh()->status);
+        $this->expectException(\RuntimeException::class);
+        app(BookingService::class)->cancel($booking->fresh(), null, null);
+    }
+
     public function test_a_delivery_booking_can_be_billed_in_the_afternoon_before_delivery_finishes()
     {
         [$branch, $location, $product, $customer] = $this->stockedBranch('DELSALE', qty: 10, unitCost: 60, withCustomer: true);

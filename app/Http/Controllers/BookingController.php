@@ -331,6 +331,18 @@ class BookingController extends Controller
         return view('bookings.show', compact('booking', 'creditSaleBooks', 'transportJob'));
     }
 
+    public function cancel(Request $request, SaleBooking $booking, BookingService $service): RedirectResponse
+    {
+        $data = $request->validate(['reason' => ['nullable', 'string', 'max:200']]);
+        try {
+            $service->cancel($booking, $data['reason'] ?? null, $request->user()?->id);
+        } catch (\RuntimeException $error) {
+            return back()->with('error', $error->getMessage());
+        }
+
+        return redirect()->route('bookings.show', $booking)->with('success', 'ยกเลิกใบจองแล้ว คืนยอดจองให้สต๊อก');
+    }
+
     public function convert(Request $request, SaleBooking $booking, CreditSaleService $service): RedirectResponse
     {
         $data = $request->validate([

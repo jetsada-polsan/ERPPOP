@@ -42,6 +42,46 @@ class EmployeeController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $data = $this->validated($request);
+
+        $employee = DB::transaction(function () use ($data) {
+            // Serialize code generation so concurrent submissions cannot choose the same EMP number.
+            DB::table('employees')->orderBy('id')->lockForUpdate()->get(['id']);
+            $data['employee_code'] = $this->nextEmployeeCode();
+
+            return Employee::create($data);
+        });
+
+        return redirect()->route('employees.index')
+            ->with('success', "เพิ่มพนักงาน {$employee->employee_code} - {$employee->full_name} แล้ว");
+    }
+
+    // เลขพนักงานใหม่ใช้ชุด POP001, POP002, ... ต่อจากข้อมูลเดิมที่แปลงแล้ว
+    private function nextEmployeeCode(): string
+    {
+        $max = DB::table('employees')->where('employee_code', 'like', 'POP%')
+            ->pluck('employee_code')
+            ->reduce(function (int $max, string $code): int {
+                return preg_match('/^POP(\d+)$/', $code, $matches)
+                    ? max($max, (int) $matches[1])
+                    : $max;
+            }, 0);
+
+        return 'POP'.str_pad((string) ($max + 1), 3, '0', STR_PAD_LEFT);
+    }
+
+    public function update(Request $request, Employee $employee): RedirectResponse
+    {
+        $old = $employee->only(['full_name', 'status', 'branch_id', 'position']);
+        $employee->update($this->validated($request));
+        \App\Models\AuditLog::create(['user_id' => $request->user()?->id, 'action' => 'employee_updated', 'table_name' => 'employees',
+            'record_id' => $employee->id, 'old_values' => $old, 'new_values' => $employee->only(array_keys($old))]);
+
+        return redirect()->route('employees.index')->with('success', "บันทึก {$employee->employee_code} แล้ว");
+    }
+
+    private function validated(Request $request): array
+    {
         $data = $request->validate([
             'full_name' => ['required', 'string', 'max:200'],
             'nickname' => ['nullable', 'string', 'max:100'],
@@ -72,29 +112,7 @@ class EmployeeController extends Controller
         unset($data['department_other']);
         $data['social_security_enabled'] = $request->boolean('social_security_enabled', true);
 
-        $employee = DB::transaction(function () use ($data) {
-            // Serialize code generation so concurrent submissions cannot choose the same EMP number.
-            DB::table('employees')->orderBy('id')->lockForUpdate()->get(['id']);
-            $data['employee_code'] = $this->nextEmployeeCode();
 
-            return Employee::create($data);
-        });
-
-        return redirect()->route('employees.index')
-            ->with('success', "เพิ่มพนักงาน {$employee->employee_code} - {$employee->full_name} แล้ว");
-    }
-
-    // เลขพนักงานใหม่ใช้ชุด POP001, POP002, ... ต่อจากข้อมูลเดิมที่แปลงแล้ว
-    private function nextEmployeeCode(): string
-    {
-        $max = DB::table('employees')->where('employee_code', 'like', 'POP%')
-            ->pluck('employee_code')
-            ->reduce(function (int $max, string $code): int {
-                return preg_match('/^POP(\d+)$/', $code, $matches)
-                    ? max($max, (int) $matches[1])
-                    : $max;
-            }, 0);
-
-        return 'POP'.str_pad((string) ($max + 1), 3, '0', STR_PAD_LEFT);
+        return $data;
     }
 }

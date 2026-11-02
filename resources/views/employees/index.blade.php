@@ -4,7 +4,7 @@
 @section('page-subtitle', 'ข้อมูลบุคลากรจริง แยกจากบัญชีผู้ใช้และสิทธิ์เข้า ERP')
 
 @section('content')
-<div x-data="{ addOpen: {{ $errors->any() ? 'true' : 'false' }} }" x-cloak>
+<div x-data="{ addOpen: {{ $errors->any() ? 'true' : 'false' }}, editAction: '' }" x-cloak>
 <div class="employee-summary mb-3">
     <div><span>พนักงานทั้งหมด</span><strong>{{ number_format($summary['total']) }}</strong></div>
     <div><span>ผูกสาขาแล้ว</span><strong>{{ number_format($summary['linked_branch']) }}</strong></div>
@@ -27,7 +27,7 @@
 <div class="content-card employee-card">
     <div class="table-responsive">
         <table class="table employee-table align-middle">
-            <thead><tr><th>รหัส</th><th>ชื่อ-นามสกุล</th><th>ชื่อเล่น</th><th>แผนก / ตำแหน่ง</th><th>สาขา</th><th>โทรศัพท์</th><th>เลขบัตร (ปกปิด)</th><th>บัญชี ERP</th></tr></thead>
+            <thead><tr><th>รหัส</th><th>ชื่อ-นามสกุล</th><th>ชื่อเล่น</th><th>แผนก / ตำแหน่ง</th><th>สาขา</th><th>โทรศัพท์</th><th>เลขบัตร (ปกปิด)</th><th>บัญชี ERP</th><th></th></tr></thead>
             <tbody>
             @forelse($employees as $employee)
                 <tr>
@@ -39,8 +39,9 @@
                     <td>{{ $employee->phone ?: '-' }}</td>
                     <td class="mono">{{ $employee->maskedNationalId() }}</td>
                     <td>@if($employee->user)<span class="user-linked"><i class="bi bi-check-circle-fill"></i> {{ $employee->user->username }}</span>@else<span class="text-muted">ยังไม่มีบัญชี</span>@endif</td>
+                    <td><button type="button" class="btn btn-sm btn-light border" @click="editAction = @js(route('employees.update', $employee)); addOpen = true; $nextTick(() => { const data = @js($employee->only(['full_name','nickname','phone','alt_phone','branch_id','position','employment_type','wage_type','wage_amount','monthly_salary','status','remark'])); for (const [key, value] of Object.entries(data)) { const field = $refs.employeeForm.elements[key]; if (field) field.value = value ?? '' } })">แก้ไข</button></td>
                 </tr>
-            @empty<tr><td colspan="8" class="text-center text-muted py-5">ไม่พบข้อมูลพนักงาน</td></tr>@endforelse
+            @empty<tr><td colspan="9" class="text-center text-muted py-5">ไม่พบข้อมูลพนักงาน</td></tr>@endforelse
             </tbody>
         </table>
     </div>
@@ -58,8 +59,9 @@
             </div>
             <button type="button" class="btn btn-light rounded-circle" @click="addOpen = false"><i class="bi bi-x-lg"></i></button>
         </div>
-        <form method="post" action="{{ route('employees.store') }}">
+        <form method="post" :action="editAction || @js(route('employees.store'))" x-ref="employeeForm">
             @csrf
+            <template x-if="editAction"><input type="hidden" name="_method" value="PUT"></template>
             <div class="modal-body px-4 pb-2 row g-3">
                 <div class="col-md-5">
                     <label class="form-label small text-muted">ชื่อ-นามสกุล *</label>

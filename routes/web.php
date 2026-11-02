@@ -123,6 +123,7 @@ Route::get('/', function () {
 })->name('portal');
 Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
 Route::post('/employees', [EmployeeController::class, 'store'])->name('employees.store');
+Route::put('/employees/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
 Route::prefix('fleet')->name('fleet.')->group(function () {
     Route::get('/', [FleetController::class, 'index'])->name('index');
     Route::get('/report', [FleetController::class, 'report'])->name('report');
@@ -263,6 +264,7 @@ Route::prefix('bookings')->name('bookings.')->group(function () {
     Route::put('/{booking}', [BookingController::class, 'update'])->name('update');
     Route::get('/{booking}', [BookingController::class, 'show'])->name('show');
     Route::post('/{booking}/convert', [BookingController::class, 'convert'])->name('convert');
+    Route::post('/{booking}/cancel', [BookingController::class, 'cancel'])->name('cancel');
     Route::post('/{booking}/delivery', [BookingController::class, 'recordDelivery'])->name('delivery');
     Route::post('/{booking}/accounting-review', [BookingController::class, 'accountingReview'])->name('accounting-review');
 });

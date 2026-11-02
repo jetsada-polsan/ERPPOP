@@ -40,4 +40,18 @@ class EmployeeCreationTest extends TestCase
             'full_name' => 'พนักงานคนถัดไป',
         ]);
     }
+
+    public function test_employee_can_be_edited(): void
+    {
+        $this->withoutMiddleware();
+        $this->post(route('employees.store'), ['full_name' => 'ก่อนแก้', 'status' => 'Active']);
+        $employee = \App\Models\Employee::where('full_name', 'ก่อนแก้')->sole();
+
+        $user = \App\Models\User::factory()->create(['is_active' => true, 'must_change_password' => false]);
+        $user->roles()->attach(\App\Models\Role::where('code', 'GM')->value('id'));
+        $this->withMiddleware()->actingAs($user)->put(route('employees.update', $employee), ['full_name' => 'หลังแก้', 'status' => 'Resigned'])->assertRedirect(route('employees.index'));
+
+        $this->assertSame('หลังแก้', $employee->fresh()->full_name);
+        $this->assertSame('Resigned', $employee->fresh()->status);
+    }
 }

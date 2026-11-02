@@ -157,6 +157,29 @@ class BookingService
      * Edit a pending booking without changing its document number or recording
      * stock movements. The reservation is moved atomically with the document.
      */
+    /** ยกเลิกใบจองที่ยังไม่ออกบิล คืนยอดจองให้สต๊อก ไม่แตะบัญชีเพราะใบจองไม่ลงบัญชี */
+    public function cancel(SaleBooking $booking, ?string $reason, ?int $userId): void
+    {
+        DB::transaction(function () use ($booking, $reason, $userId) {
+            $locked = SaleBooking::whereKey($booking->id)->lockForUpdate()->firstOrFail();
+            if ($locked->status !== SaleBooking::STATUS_PENDING) {
+                throw new RuntimeException('ยกเลิกได้เฉพาะใบจองที่ยังไม่ออกบิล');
+            }
+            foreach ($locked->document->stockDocument?->items ?? [] as $item) {
+                $balance = StockBalance::where('product_id', $item->product_id)
+                    ->where('warehouse_location_id', $item->warehouse_location_id)->lockForUpdate()->first();
+                if ($balance) {
+                    $balance->update(['reserved_qty' => max(0, (float) DecimalMath::subtract($balance->reserved_qty, $item->qty, DecimalMath::QUANTITY_SCALE))]);
+                }
+            }
+            $locked->update(['status' => SaleBooking::STATUS_CANCELLED]);
+            $locked->document->update(['status' => 'cancelled']);
+            TransportJob::where('booking_id', $locked->id)->update(['status' => 'cancelled']);
+            \App\Models\AuditLog::create(['user_id' => $userId, 'branch_id' => $locked->document->branch_id, 'action' => 'booking_cancelled',
+                'table_name' => 'sale_bookings', 'record_id' => $locked->id, 'new_values' => ['reason' => $reason]]);
+        });
+    }
+
     public function update(SaleBooking $booking, array $data): Document
     {
         if (empty($data['items'])) {
