@@ -394,6 +394,7 @@ Route::prefix('products')->name('products.')->group(function () {
     Route::put('/recall-contacts/{recallContact}', [ProductController::class, 'updateRecallContact'])->name('recall-contacts.update');
     Route::post('/{product}/barcodes', [ProductController::class, 'addBarcode'])->name('barcodes.store');
     Route::put('/{product}/barcodes/{productBarcode}', [ProductController::class, 'updateBarcode'])->name('barcodes.update');
+    Route::post('/{product}/barcodes/generate', [ProductController::class, 'generateBarcode'])->name('barcodes.generate');
     Route::delete('/{product}/barcodes/{productBarcode}', [ProductController::class, 'destroyBarcode'])->name('barcodes.destroy');
     Route::post('/{product}/prices', [ProductController::class, 'upsertPrice'])->name('prices.upsert');
     Route::post('/{product}/pos-price-schedules', [ProductController::class, 'storePosPriceSchedule'])->name('pos-price-schedules.store');

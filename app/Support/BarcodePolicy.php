@@ -40,7 +40,7 @@ class BarcodePolicy
 
     public const LABELS = [
         self::EAN13_STANDARD => 'EAN-13 มาตรฐาน (GS1)',
-        self::INTERNAL_13 => 'รหัส 13 หลักภายใน',
+        self::INTERNAL_13 => 'Internal EAN-13 (ใช้ภายในบริษัท)',
         self::SCALE_WEIGHT => 'บาร์โค้ดเครื่องชั่ง',
         self::SCALE_PLU => 'PLU เครื่องชั่ง (6 หลัก)',
         self::CUSTOM => 'รหัสภายใน (Internal)',

@@ -7,9 +7,21 @@
 <div class="content-card p-4 barcode-full-table">
     <div class="d-flex align-items-center justify-content-between mb-1">
         <h3 class="h6 fw-bold mb-0">บาร์โค้ด</h3>
-        <button type="button" class="btn btn-sm btn-light border" @click="barcodeOpen = true"><i class="bi bi-plus-lg me-1"></i> เพิ่ม</button>
+        <div class="d-flex gap-2">
+            <form method="post" action="{{ route('products.barcodes.generate', $product) }}">@csrf
+                <input type="hidden" name="popup" value="{{ request()->boolean('popup') ? 1 : 0 }}">
+                <button class="btn btn-sm btn-primary"><i class="bi bi-upc me-1"></i> สร้างบาร์โค้ดภายใน 13 หลัก</button></form>
+            <button type="button" class="btn btn-sm btn-light border" @click="barcodeOpen = true"><i class="bi bi-plus-lg me-1"></i> เพิ่ม</button>
+        </div>
     </div>
     <div class="small text-muted mb-3">บาร์โค้ดคือรหัสที่ยิงขาย แยกจาก SKU · ยิงแต่ละตัวจะขายตามหน่วย ตัวคูณ และราคาที่ผูกไว้</div>
+    @php $generated = $product->barcodes->firstWhere('source', \App\Services\Inventory\InternalBarcodeGenerator::FROM_SKU); @endphp
+    @if($generated)
+        <div class="alert alert-light border small py-2 mb-3">
+            <strong>SKU {{ $product->sku_code }} → {{ $generated->barcode }}</strong><br>
+            บาร์โค้ดนี้สร้างจาก SKU สำหรับใช้ภายในบริษัท ไม่ใช่ EAN จากผู้ผลิต
+        </div>
+    @endif
     <div class="table-responsive">
         <table class="table align-middle table-sm mb-0">
             <thead><tr><th>บาร์โค้ด</th><th>ประเภท</th><th>หน่วย</th><th class="text-end">ตัวคูณ</th><th class="text-end">ราคา</th><th>สถานะ</th><th>แก้ไขล่าสุด</th><th></th></tr></thead>
@@ -26,7 +38,7 @@
                     @endphp
                     <tr class="{{ $barcode->is_active ? '' : 'text-muted' }}">
                         <td class="font-monospace fw-semibold">{{ $barcode->barcode }}</td>
-                        <td><span class="barcode-badge is-{{ $group }}" title="{{ \App\Support\BarcodePolicy::LABELS[$barcode->barcode_type] ?? $barcode->barcode_type }}">{{ $groupLabels[$group] }}</span></td>
+                        <td><span class="barcode-badge is-{{ $group }}" title="{{ \App\Support\BarcodePolicy::LABELS[$barcode->barcode_type] ?? $barcode->barcode_type }}">{{ $barcode->barcode_type === \App\Support\BarcodePolicy::INTERNAL_13 ? 'Internal EAN-13' : $groupLabels[$group] }}</span>@if($barcode->source === \App\Services\Inventory\InternalBarcodeGenerator::FROM_SKU) <span class="barcode-badge is-sku">สร้างจาก SKU</span>@endif</td>
                         <td>{{ $barcode->unit?->displayLabel() ?? '-' }}</td>
                         <td class="text-end">{{ $factor($barcode->unit_factor) }}</td>
                         <td class="text-end">{{ $barcode->price !== null ? number_format((float) $barcode->price, 2) : 'ใช้ราคาหลัก' }}</td>

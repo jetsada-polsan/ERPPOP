@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['product_id', 'barcode', 'barcode_type', 'type_note', 'unit_id', 'unit_factor', 'price', 'is_active', 'scale_barcode_profile_id'])]
+#[Fillable(['product_id', 'barcode', 'barcode_type', 'type_note', 'unit_id', 'unit_factor', 'price', 'is_active', 'scale_barcode_profile_id', 'source'])]
 class ProductBarcode extends Model
 {
     public function product(): BelongsTo

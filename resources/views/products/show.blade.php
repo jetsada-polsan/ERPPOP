@@ -811,19 +811,19 @@
                                     @foreach($scaleProfiles as $profile)<option value="{{ $profile->id }}">{{ $profile->code }} {{ $profile->name }}</option>@endforeach
                                 </select>
                                 <div class="form-text" x-show="barcodeMode === 'auto_ean13'">
-                                    เลขที่สร้างอัตโนมัติเป็นรหัสภายในร้าน (ช่วง 299) ไม่ใช่ EAN-13 ที่ได้รับจัดสรรจาก GS1
+                                    สร้างจาก SKU (เติม 0 ให้ครบ 12 หลัก + check digit) สำหรับใช้ภายในบริษัท ไม่ใช่ EAN จากผู้ผลิต · SKU มีตัวอักษรหรือเลขซ้ำจะใช้เลขรันช่วง 299
                                 </div>
                             </div>
                             <div class="col-12">
                                 <label class="form-label text-muted small">บาร์โค้ด</label>
                                 <input type="text" name="barcode" class="form-control" x-ref="bcInput" x-model="barcodeValue"
                                     :required="barcodeMode === 'manual'" :readonly="barcodeMode === 'auto_ean13'"
-                                    :placeholder="barcodeMode === 'auto_ean13' ? 'ระบบจะสร้างเลข EAN-13 เมื่อบันทึก' : 'ยิงหรือพิมพ์บาร์โค้ด'">
+                                    :placeholder="barcodeMode === 'auto_ean13' ? 'ระบบจะสร้างบาร์โค้ดภายในจาก SKU เมื่อบันทึก' : 'ยิงหรือพิมพ์บาร์โค้ด'">
                                 <div class="small mt-2" x-show="barcodeMode === 'manual' && barcodeValue.length > 0" x-text="barcodeHint()"
                                     :class="barcodeOk() ? 'text-success' : 'text-danger'"></div>
                                 <div class="d-grid gap-2 mt-2" style="grid-template-columns:1fr 1fr">
                                     <button type="button" class="btn btn-sm btn-primary" @click="barcodeMode='auto_ean13'; barcodeValue=''">
-                                        <i class="bi bi-upc-scan me-1"></i> สร้าง EAN-13 อัตโนมัติ
+                                        <i class="bi bi-upc-scan me-1"></i> สร้างบาร์โค้ดภายใน 13 หลัก
                                     </button>
                                     <button type="button" class="btn btn-sm btn-light border"
                                         @click="barcodeMode='manual'; barcodeType='SCALE_PLU'; barcodeValue=''; $nextTick(() => $refs.bcInput.focus())">
@@ -913,6 +913,7 @@
     .barcode-badge.is-internal { background:#eef4ff; color:#2f55a4; border-color:#cddcfb; }
     .barcode-badge.is-ean13 { background:#e8f7ee; color:#1d7a46; border-color:#bfe6cf; }
     .barcode-badge.is-scale { background:#fff4e5; color:#a35b00; border-color:#f6d7a7; }
+    .barcode-badge.is-sku { background:#fff; color:#2f55a4; border-color:#2f55a4; border-style:dashed; }
     .barcode-badge.is-legacy { background:#f1f3f5; color:#5b6670; border-color:#dde2e6; }
     .bplus-setup {
         padding: 0;

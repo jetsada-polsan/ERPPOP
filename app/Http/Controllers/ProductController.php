@@ -24,6 +24,7 @@ use App\Models\Supplier;
 use App\Models\SupplierPriceSchedule;
 use App\Services\Inventory\ProductCostHistoryService;
 use App\Services\ProductSkuAllocator;
+use App\Services\Inventory\InternalBarcodeGenerator;
 use App\Support\BarcodePolicy;
 use App\Support\DecimalMath;
 use Illuminate\Http\JsonResponse;
@@ -101,7 +102,11 @@ class ProductController extends Controller
                 // SKU เป็นเลขควบคุมของระบบ ไม่รับค่าที่ส่งมาจากฟอร์มเพื่อกันการข้ามลำดับ.
                 $data['sku_code'] = $skuAllocator->nextForCategory((int) $data['product_category_id']);
 
-                return Product::create($data);
+                $product = Product::create($data);
+                // สินค้าใหม่ยังไม่มีบาร์โค้ด จึงสร้างบาร์โค้ดภายในจาก SKU ให้ทันที
+                app(InternalBarcodeGenerator::class)->generate($product);
+
+                return $product;
             });
         } catch (\RuntimeException $exception) {
             // เช่นหมวดสินค้ายกเลิกใช้/รหัสในหมวดเต็มแล้ว - เงื่อนไขทางธุรกิจ ไม่ใช่ข้อผิดพลาดของระบบ
@@ -426,16 +431,12 @@ class ProductController extends Controller
             return back()->withInput()->withErrors(['barcode' => $failure]);
         }
 
+        if ($auto && app(InternalBarcodeGenerator::class)->hasGenerated($product)) {
+            return back()->withErrors(['barcode' => 'สินค้านี้มีบาร์โค้ดภายในที่ระบบสร้างไว้แล้ว']);
+        }
         if ($auto) {
-            DB::transaction(function () use ($product, $data): void {
-                // กันเลขชนกันกรณีผู้ใช้หลายคนกดสร้างพร้อมกัน
-                DB::statement('SELECT pg_advisory_xact_lock(299013)');
-                $data['barcode'] = $this->nextInternalEan13();
-                // เลขช่วง 299 เป็นรหัสที่ร้านตั้งเอง ไม่ใช่ของที่ได้รับจัดสรรจาก GS1
-                // จึงติดป้ายเป็นรหัสภายใน ไม่ใช่ EAN-13 มาตรฐาน
-                $data['barcode_type'] = BarcodePolicy::INTERNAL_13;
-                $product->barcodes()->create($data + ['is_active' => true]);
-            });
+            // เลขที่ระบบสร้างเป็นรหัสภายในบริษัท ไม่ใช่ EAN ที่ได้รับจัดสรรจาก GS1
+            app(InternalBarcodeGenerator::class)->generate($product, (int) $data['unit_id'], (float) $data['unit_factor']);
         } else {
             $product->barcodes()->create($data + ['is_active' => true]);
         }
@@ -497,37 +498,18 @@ class ProductController extends Controller
             || DB::table('stock_document_items')->where('product_id', $barcode->product_id)->exists();
     }
 
-    /** สร้าง EAN-13 ภายในร้าน ช่วง 299 + running 9 หลัก + check digit */
-    private function nextInternalEan13(): string
+    /** ปุ่ม "สร้างบาร์โค้ดภายใน 13 หลัก": สร้างจาก SKU ไม่แตะบาร์โค้ดเดิม */
+    public function generateBarcode(Request $request, Product $product, InternalBarcodeGenerator $generator): RedirectResponse
     {
-        $last = ProductBarcode::query()
-            ->where('barcode', 'like', '299%')
-            ->whereRaw('LENGTH(barcode) = 13')
-            ->orderByDesc('barcode')
-            ->lockForUpdate()
-            ->value('barcode');
-
-        $sequence = $last ? ((int) substr((string) $last, 3, 9)) + 1 : 1;
-        while ($sequence <= 999999999) {
-            $body = '299'.str_pad((string) $sequence, 9, '0', STR_PAD_LEFT);
-            $barcode = $body.$this->ean13CheckDigit($body);
-            if (! ProductBarcode::where('barcode', $barcode)->exists()) {
-                return $barcode;
-            }
-            $sequence++;
+        $back = redirect()->route('products.show', ['product' => $product, 'popup' => $request->boolean('popup') ? 1 : null]);
+        if ($generator->hasGenerated($product)) {
+            return $back->withErrors(['barcode' => 'สินค้านี้มีบาร์โค้ดภายในที่ระบบสร้างไว้แล้ว']);
         }
+        $barcode = $generator->generate($product);
+        AuditLog::create(['user_id' => $request->user()?->id, 'action' => 'barcode_generated', 'table_name' => 'product_barcodes',
+            'record_id' => $barcode->id, 'old_values' => null, 'new_values' => $barcode->only(['barcode', 'barcode_type', 'source'])]);
 
-        throw new \RuntimeException('เลขบาร์โค้ด EAN-13 ภายในร้านเต็มแล้ว');
-    }
-
-    private function ean13CheckDigit(string $body): int
-    {
-        $sum = 0;
-        foreach (str_split($body) as $index => $digit) {
-            $sum += ((int) $digit) * ($index % 2 === 0 ? 1 : 3);
-        }
-
-        return (10 - ($sum % 10)) % 10;
+        return $back->with('success', "สร้างบาร์โค้ดภายใน {$barcode->barcode} แล้ว");
     }
 
     public function updateBarcode(Request $request, Product $product, ProductBarcode $productBarcode): RedirectResponse
