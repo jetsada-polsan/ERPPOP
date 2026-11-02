@@ -120,6 +120,7 @@
         .camwrap video { width: 100%; border-radius: 12px; background: #000; }
         .camwrap #qr-video { max-height: 60vh; object-fit: cover; }
     </style>
+@include('partials.select-arrow')
 </head>
 <body>
 @php $lockedBranch = $branches->count() === 1 ? $branches->first() : null; @endphp

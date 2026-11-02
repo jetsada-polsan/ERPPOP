@@ -46,6 +46,7 @@
             .label { border: 1px solid #cbd5e1; }
         }
     </style>
+@include('partials.select-arrow')
 </head>
 <body onload="window.print()">
     <div class="toolbar">

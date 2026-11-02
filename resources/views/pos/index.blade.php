@@ -1839,6 +1839,7 @@
             .product-card .product-price { font-size: 13px; }
         }
     </style>
+@include('partials.select-arrow')
 </head>
 <body class="{{ $canSell ? 'sales-mode' : 'view-only' }}" x-data="posApp()" x-init="init()" x-effect="publishVueState()">
 <div class="pos-wrap">
