@@ -12,6 +12,7 @@ export type PricedLine = {
 export type CartPricing = {
   subtotal: number
   promoDiscount: number
+  manualDiscount: number
   total: number
   vat: number
   beforeVat: number
