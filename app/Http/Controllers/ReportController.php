@@ -721,6 +721,8 @@ class ReportController extends Controller
                 ['label' => 'สินค้า', 'key' => 'name_th'],
                 ['label' => 'คลัง/ที่เก็บ', 'key' => 'location_name'],
                 ['label' => 'คงเหลือ', 'key' => 'on_hand_qty', 'type' => 'number', 'class' => 'text-end'],
+                ['label' => 'ราคาต่อหน่วย', 'key' => 'unit_price', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'มูลค่าคงเหลือ', 'key' => 'stock_value', 'type' => 'money', 'class' => 'text-end'],
             ], $this->stockAlerts($filters)),
 
             'expiring_stock' => $this->tableResult('Lot ใกล้หมดอายุ / หมดอายุ', [
@@ -2247,7 +2249,20 @@ class ReportController extends Controller
 
     private function stockAlerts(array $filters): Collection
     {
-        return $this->stockBalance($filters)->sortBy('on_hand_qty')->values();
+        $query = DB::table('stock_balances as sb')
+            ->join('products as p', 'p.id', '=', 'sb.product_id')
+            ->join('warehouse_locations as wl', 'wl.id', '=', 'sb.warehouse_location_id')
+            ->join('warehouses as w', 'w.id', '=', 'wl.warehouse_id')
+            ->leftJoin('branches as b', 'b.id', '=', DB::raw($this->branchByLocationSub('sb.warehouse_location_id')))
+            ->where('sb.on_hand_qty', '<', 0);
+        $this->applyBranch($query, $filters, 'b.id');
+        $this->applySearch($query, $filters, ['p.sku_code', 'p.name_th', 'w.name', 'wl.name']);
+
+        return $query->orderBy('sb.on_hand_qty')->selectRaw("p.sku_code, p.name_th,
+            concat(coalesce(b.name_th, w.name), ' / ', coalesce(wl.name, wl.code)) as location_name,
+            sb.on_hand_qty, coalesce(p.default_price, 0) as unit_price,
+            sb.on_hand_qty * coalesce(p.default_price, 0) as stock_value")
+            ->limit($filters['per_page'])->get();
     }
 
     private function expiringStock(array $filters): Collection

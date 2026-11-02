@@ -2120,3 +2120,10 @@ pending
 - ทดสอบ: PHP lint, `git diff --check`, PosInstallPageTest และ PosBuildCenterTest ผ่าน 13 tests / 56 assertions
 - Deploy: รอ deploy production
 - งานถัดไป: ทดสอบเลือกไฟล์และกดนำเข้าโลโก้จริงหลัง deploy
+
+# Handoff - 2026-11-02 (แก้รายงานติดลบและมูลค่าสินค้าคงเหลือ)
+- Commit: `pending`
+- ทำอะไร: รายงาน `สต็อกต่ำ / ติดลบ` แสดงเฉพาะยอดติดลบจริง และเพิ่มราคาต่อหน่วยกับมูลค่าคงเหลือ; รายงาน `สินค้าคงเหลือ` เพิ่มสองคอลัมน์เดียวกันโดยคำนวณจาก `default_price`
+- ทดสอบ: PHP lint, `git diff --check`, `P0ReportFiguresTest` ผ่าน 6 tests / 32 assertions
+- Deploy: ยังไม่ deploy
+- งานถัดไป: ตรวจรายงานจริงและ deploy เมื่อเจ้าของอนุมัติ

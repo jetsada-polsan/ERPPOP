@@ -41,7 +41,9 @@ class StockBalanceReport
         $query->orderBy('p.sku_code')->orderBy('p.id')->orderBy('wl.id')
             ->selectRaw("p.id as product_id, p.sku_code, p.name_th, coalesce(u.name, '-') as unit_name,
                 concat(coalesce(b.name_th, w.name), ' / ', coalesce(wl.name, wl.code)) as location_name,
-                coalesce(sb.on_hand_qty, 0) as on_hand_qty, coalesce(sb.reserved_qty, 0) as reserved_qty");
+                coalesce(sb.on_hand_qty, 0) as on_hand_qty, coalesce(sb.reserved_qty, 0) as reserved_qty,
+                coalesce(p.default_price, 0) as unit_price,
+                coalesce(sb.on_hand_qty, 0) * coalesce(p.default_price, 0) as stock_value");
 
         $pagination = ($filters['paginate'] ?? false)
             ? $query->paginate($filters['per_page'], ['*'], 'page', $filters['page'])->withQueryString()
@@ -63,6 +65,8 @@ class StockBalanceReport
                 ['label' => 'คลัง/ที่เก็บ', 'key' => 'location_name'],
                 ['label' => 'คงเหลือ', 'key' => 'on_hand_qty', 'type' => 'quantity', 'class' => 'text-end'],
                 ['label' => 'จอง', 'key' => 'reserved_qty', 'type' => 'quantity', 'class' => 'text-end'],
+                ['label' => 'ราคาต่อหน่วย', 'key' => 'unit_price', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'มูลค่าคงเหลือ', 'key' => 'stock_value', 'type' => 'money', 'class' => 'text-end'],
             ],
             'rows' => $rows,
             'total' => $pagination?->total() ?? $rows->count(),
