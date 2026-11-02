@@ -69,7 +69,7 @@
                     <label>เริ่มแนะนำระบายก่อนหมดอายุ (วัน)<input type="number" min="0" max="3650" name="clearance_warning_days" value="{{ $product->clearance_warning_days }}"></label>
                     <label>ส่วนลดระบายที่แนะนำ (%)<input type="number" step="0.01" min="0" max="100" name="clearance_discount_percent" value="{{ $product->clearance_discount_percent }}"></label>
                     <label>เมื่อ Lot หมดอายุ<select name="expiry_sale_policy"><option value="block" @selected($product->expiry_sale_policy==='block')>ห้ามขาย/ห้ามใช้</option><option value="allow" @selected($product->expiry_sale_policy==='allow')>เตือนแต่อนุญาต</option></select></label>
-                    <div class="compact-checks wide"><label><input type="checkbox" name="is_active" value="1" @checked($product->is_active)> ใช้งาน</label><label><input type="checkbox" name="is_vat" value="1" @checked($product->is_vat)> คิด VAT</label><label><input type="checkbox" name="tracks_expiry" value="1" @checked($product->tracks_expiry)> ควบคุม Lot/หมดอายุ</label></div>
+                    <div class="compact-checks wide"><label class="compact-status-check"><input type="checkbox" name="is_active" value="1" @checked($product->is_active)> <strong>สถานะสินค้า: {{ $product->is_active ? 'ใช้งาน' : 'ไม่ใช้งาน' }}</strong></label><label><input type="checkbox" name="is_vat" value="1" @checked($product->is_vat)> คิด VAT</label><label><input type="checkbox" name="tracks_expiry" value="1" @checked($product->tracks_expiry)> ควบคุม Lot/หมดอายุ</label></div>
                     <div class="compact-save wide"><button><i class="bi bi-check-lg"></i> บันทึก</button></div>
                 </form>
             </div>
@@ -887,6 +887,7 @@
     .compact-form textarea { resize:vertical; }
     .compact-checks { display:flex; gap:22px; padding:8px 0; border-top:1px solid #bbb; }
     .compact-checks label { display:flex; gap:5px; }
+    .compact-status-check { padding:7px 10px; border:1px solid #cbd5e1; border-radius:5px; background:#f8fafc; }
     .compact-save { display:flex; justify-content:flex-end; }
     .compact-save button,.compact-section-head button { min-width:104px; min-height:34px; padding:6px 12px; border:1px solid #1677b8; border-radius:5px; background:#1677b8; color:#fff; font-weight:700; }
     .compact-section-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }

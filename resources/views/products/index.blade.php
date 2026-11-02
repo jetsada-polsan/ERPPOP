@@ -14,7 +14,6 @@
                         <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
                         <input type="text" name="q" value="{{ $q }}" class="form-control" placeholder="รหัส ชื่อ หรือบาร์โค้ด" autocomplete="off" aria-describedby="product-search-hint" @input.debounce.1200ms="$refs.filterForm.requestSubmit()" @keydown.enter.prevent="$refs.filterForm.requestSubmit()">
                         <button type="submit" class="btn btn-primary fw-semibold text-nowrap" aria-label="ค้นหาสินค้า">ค้นหา</button>
-                        <input type="hidden" name="status" value="{{ $status }}">
                     </div>
                     <small id="product-search-hint" class="text-muted">พิมพ์แล้วรอ 1 วินาที ระบบจะค้นให้เอง หรือกดปุ่มค้นหา</small>
                 </div>
@@ -29,9 +28,17 @@
                 </div>
                 <div class="product-filter-field">
                     <label>รูปแบบการขาย</label>
-                    <select name="product_type" class="form-select" @change="$refs.filterForm.requestSubmit()">
+                <select name="product_type" class="form-select" @change="$refs.filterForm.requestSubmit()">
                         <option value="">สินค้าทั้งหมด</option>
                         <option value="scale" @selected($productType === 'scale')>สินค้าชั่งน้ำหนัก</option>
+                </select>
+                </div>
+                <div class="product-filter-field">
+                    <label>สถานะสินค้า</label>
+                    <select name="status" class="form-select" @change="$refs.filterForm.requestSubmit()">
+                        <option value="all" @selected($status === 'all')>ทุกสถานะ</option>
+                        <option value="active" @selected($status === 'active')>ใช้งาน</option>
+                        <option value="inactive" @selected($status === 'inactive')>ไม่ใช้งาน / พักไว้</option>
                     </select>
                 </div>
                 @if($q !== '' || $categoryId || $productType)<a href="{{ route('products.index') }}" class="btn btn-light border align-self-end">ล้าง</a>@endif
