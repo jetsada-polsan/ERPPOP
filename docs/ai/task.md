@@ -2277,3 +2277,15 @@ pending
 - `php artisan test --filter='StockBalanceReportTest|ReportSmokeTest' --no-coverage`: 10 tests ผ่าน, 1 skipped
 - `php artisan view:cache` ผ่าน
 - `git diff --check` ผ่าน
+
+# Handoff — 2026-11-02 (พิมพ์เฉพาะหน้าปัจจุบัน)
+
+## ทำอะไรไป
+- แก้โหมดพิมพ์ไม่ให้เปลี่ยน `per_page` เป็น 2,000 แถว
+- พิมพ์ตาม `page` และ `per_page` เดียวกับหน้าจอทุกเอกสาร
+- คง export CSV/XLSX ให้ดึงข้อมูลครบทั้งรายงานเหมือนเดิม
+
+## ทดสอบ
+- `php artisan test --filter='StockBalanceReportTest|ReportSmokeTest' --no-coverage`: 10 tests ผ่าน, 1 skipped
+- `php artisan view:cache` ผ่าน
+- `git diff --check` ผ่าน

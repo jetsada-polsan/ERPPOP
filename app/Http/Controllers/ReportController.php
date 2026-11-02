@@ -44,11 +44,7 @@ class ReportController extends Controller
         if (! in_array($perPage, [10, 25, 50, 100], true)) {
             $perPage = 25;
         }
-        // หน้าจอแสดงทีละ 25 แถว แต่กระดาษต้องได้ทั้งรายงาน
-        // พิมพ์จากหน้าจอตรง ๆ จะได้แค่ที่เห็น ซึ่งดูเหมือนรายงานครบทั้งที่ไม่ครบ
-        if ($printMode) {
-            $perPage = self::PRINT_ROW_CAP;
-        }
+        // พิมพ์เฉพาะหน้าปัจจุบันตามตัวกรองเดียวกับหน้าจอ ไม่ดึงทั้งรายงาน
         $user = auth()->user();
         $canSeeAllBranches = $user === null || $user->canSeeAllReportBranches();
         $requestedBranch = $request->input('branch_id');
@@ -65,7 +61,7 @@ class ReportController extends Controller
             'q' => trim((string) $request->input('q', '')),
             'per_page' => $perPage,
             'page' => max(1, $request->integer('page', 1)),
-            'paginate' => ! $printMode,
+            'paginate' => true,
         ];
 
         // ส่งออกทั้งรายงาน ไม่ใช่เท่าที่แสดงบนจอ — per_page เป็น LIMIT ของ query

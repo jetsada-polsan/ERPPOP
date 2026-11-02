@@ -153,7 +153,7 @@ class StockBalanceReportTest extends TestCase
         $this->assertTrue($result['rows']->contains(fn ($row) => str_contains($row->location_name, 'ตู้แช่ B001')));
     }
 
-    public function test_csv_and_print_include_every_matching_row_even_when_opened_from_page_two(): void
+    public function test_csv_includes_every_matching_row_but_print_keeps_current_page(): void
     {
         $branch = $this->branch('B001');
         for ($i = 1; $i <= 31; $i++) {
@@ -167,8 +167,9 @@ class StockBalanceReportTest extends TestCase
         $this->assertStringContainsString('000031', $csv);
 
         $result = $this->report($branch, $parameters + ['print' => 1])->assertOk()->viewData('result');
-        $this->assertCount(31, $result['rows']);
-        $this->assertNull($result['pagination']);
+        $this->assertCount(10, $result['rows']);
+        $this->assertSame(31, $result['pagination']->total());
+        $this->assertSame(2, $result['pagination']->currentPage());
     }
 
     public function test_xlsx_preserves_leading_zero_barcodes_as_text_and_quantities_as_numbers(): void
