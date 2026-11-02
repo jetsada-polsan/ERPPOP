@@ -2265,3 +2265,15 @@ pending
 
 ## งานถัดไป
 - Deploy production เมื่อเจ้าของสั่ง
+
+# Handoff — 2026-11-02 (จัดรูปแบบรายงานสต็อกต่ำสำหรับพิมพ์)
+
+## ทำอะไรไป
+- เอาคอลัมน์คลัง/ที่เก็บออกจากรายงานสต็อกต่ำ เพื่อไม่ให้ข้อความล้นหน้ากระดาษ
+- คงชื่อสินค้าและข้อมูลจำนวน/ราคา/มูลค่าไว้ในตาราง
+- คงชื่อสาขาไว้เฉพาะหัวเอกสารด้านบน
+
+## ทดสอบ
+- `php artisan test --filter='StockBalanceReportTest|ReportSmokeTest' --no-coverage`: 10 tests ผ่าน, 1 skipped
+- `php artisan view:cache` ผ่าน
+- `git diff --check` ผ่าน
