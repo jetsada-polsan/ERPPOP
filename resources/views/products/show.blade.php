@@ -78,7 +78,7 @@
             </div>
             <div class="compact-body" x-show="compactTab==='barcode'">
                 <div class="compact-section-head"><strong>รหัสสินค้า / บาร์โค้ด</strong><button @click="barcodeOpen=true">+ เพิ่มรหัส</button></div>
-                <table class="compact-table compact-edit-table"><thead><tr><th>บาร์โค้ด</th><th>ประเภท</th><th>หน่วย</th><th class="num">ตัวคูณ</th><th class="num">ราคา</th><th>สถานะ</th><th></th></tr></thead><tbody>@forelse($product->barcodes as $barcode)<tr class="{{ $barcode->is_active ? '' : 'barcode-disabled' }}"><td><input form="barcode-{{ $barcode->id }}" name="barcode" value="{{ $barcode->barcode }}" required></td><td><select form="barcode-{{ $barcode->id }}" name="barcode_type" required>@foreach(\App\Support\BarcodePolicy::LABELS as $typeValue => $typeLabel)<option value="{{ $typeValue }}" @selected($typeValue===$barcode->barcode_type)>{{ $typeLabel }}</option>@endforeach</select></td><td><select form="barcode-{{ $barcode->id }}" name="unit_id" required>@foreach($units as $unit)<option value="{{ $unit->id }}" @selected($unit->id===$barcode->unit_id)>{{ $unit->displayLabel() }}</option>@endforeach</select></td><td><input form="barcode-{{ $barcode->id }}" class="num" type="number" step="0.0001" min="0.0001" name="unit_factor" value="{{ number_format((float) $barcode->unit_factor, 4, '.', '') }}" required></td><td><input form="barcode-{{ $barcode->id }}" class="num" type="number" step="0.01" min="0" name="price" value="{{ $barcode->price === null ? '' : number_format((float) $barcode->price, 2, '.', '') }}"></td><td><input form="barcode-{{ $barcode->id }}" type="hidden" name="is_active" value="0"><label class="barcode-state {{ $barcode->is_active ? 'is-on' : 'is-off' }}"><input form="barcode-{{ $barcode->id }}" type="checkbox" name="is_active" value="1" @checked($barcode->is_active)><span>{{ $barcode->is_active ? 'ใช้งาน' : 'ปิดใช้งาน' }}</span></label></td><td><form id="barcode-{{ $barcode->id }}" method="post" action="{{ route('products.barcodes.update', [$product, $barcode]) }}">@csrf @method('PUT')<input type="hidden" name="popup" value="1"><button class="compact-row-save"><i class="bi bi-check-lg"></i> บันทึก</button></form></td></tr>@empty<tr><td colspan="7">ยังไม่มีบาร์โค้ด</td></tr>@endforelse</tbody></table>
+                <table class="compact-table compact-edit-table"><thead><tr><th>บาร์โค้ด</th><th>ประเภท</th><th>หน่วย</th><th class="num">ตัวคูณ</th><th class="num">ราคา</th><th>สถานะ</th><th></th></tr></thead><tbody>@forelse($product->barcodes as $barcode)<tr class="{{ $barcode->is_active ? '' : 'barcode-disabled' }}"><td><input form="barcode-{{ $barcode->id }}" name="barcode" value="{{ $barcode->barcode }}" required></td><td><select form="barcode-{{ $barcode->id }}" name="barcode_type" required>@foreach(\App\Support\BarcodePolicy::LABELS as $typeValue => $typeLabel)<option value="{{ $typeValue }}" @selected($typeValue===$barcode->barcode_type)>{{ $typeLabel }}</option>@endforeach</select></td><td><select form="barcode-{{ $barcode->id }}" name="unit_id" required>@foreach($units as $unit)<option value="{{ $unit->id }}" @selected($unit->id===$barcode->unit_id)>{{ $unit->displayLabel() }}</option>@endforeach</select></td><td><input form="barcode-{{ $barcode->id }}" class="num" type="number" step="0.0001" min="0.0001" name="unit_factor" value="{{ rtrim(rtrim(number_format((float) $barcode->unit_factor, 4, '.', ''), '0'), '.') }}" required></td><td><input form="barcode-{{ $barcode->id }}" class="num" type="number" step="0.01" min="0" name="price" value="{{ $barcode->price === null ? '' : number_format((float) $barcode->price, 2, '.', '') }}"></td><td><input form="barcode-{{ $barcode->id }}" type="hidden" name="is_active" value="0"><label class="barcode-state {{ $barcode->is_active ? 'is-on' : 'is-off' }}"><input form="barcode-{{ $barcode->id }}" type="checkbox" name="is_active" value="1" @checked($barcode->is_active)><span>{{ $barcode->is_active ? 'ใช้งาน' : 'ปิดใช้งาน' }}</span></label></td><td><form id="barcode-{{ $barcode->id }}" method="post" action="{{ route('products.barcodes.update', [$product, $barcode]) }}">@csrf @method('PUT')<input type="hidden" name="popup" value="1"><button class="compact-row-save"><i class="bi bi-check-lg"></i> บันทึก</button></form></td></tr>@empty<tr><td colspan="7">ยังไม่มีบาร์โค้ด</td></tr>@endforelse</tbody></table>
             </div>
             <div class="compact-body" x-show="compactTab==='stock'">
                 <div class="compact-cost-grid">
@@ -445,7 +445,7 @@
                                 <div class="barcode-row is-plu">
                                     <div>
                                         <div class="barcode-code">{{ $barcode->barcode }}</div>
-                                        <div class="barcode-note">{{ $barcode->unit?->cleanName() ?? '-' }} · ตัวคูณ {{ number_format((float) $barcode->unit_factor, 4) }}</div>
+                                        <div class="barcode-note">{{ $barcode->unit?->cleanName() ?? '-' }} · ตัวคูณ {{ rtrim(rtrim(number_format((float) $barcode->unit_factor, 4, '.', ''), '0'), '.') }}</div>
                                     </div>
                                     <div class="barcode-price">{{ $barcode->price !== null ? '฿'.number_format($barcode->price, 2) : 'ใช้ราคาหลัก' }}</div>
                                 </div>
@@ -465,7 +465,7 @@
                                 <div class="barcode-row">
                                     <div>
                                         <div class="barcode-code">{{ $barcode->barcode }}</div>
-                                        <div class="barcode-note">{{ $barcode->unit?->cleanName() ?? '-' }} · ตัวคูณ {{ number_format((float) $barcode->unit_factor, 4) }}</div>
+                                        <div class="barcode-note">{{ $barcode->unit?->cleanName() ?? '-' }} · ตัวคูณ {{ rtrim(rtrim(number_format((float) $barcode->unit_factor, 4, '.', ''), '0'), '.') }}</div>
                                     </div>
                                     <div class="barcode-price">{{ $barcode->price !== null ? '฿'.number_format($barcode->price, 2) : 'ใช้ราคาหลัก' }}</div>
                                 </div>
@@ -486,7 +486,7 @@
                                     <div class="barcode-row">
                                         <div>
                                             <div class="barcode-code">{{ $barcode->barcode }}</div>
-                                            <div class="barcode-note">{{ $barcode->unit?->cleanName() ?? '-' }} · ตัวคูณ {{ number_format((float) $barcode->unit_factor, 4) }}</div>
+                                            <div class="barcode-note">{{ $barcode->unit?->cleanName() ?? '-' }} · ตัวคูณ {{ rtrim(rtrim(number_format((float) $barcode->unit_factor, 4, '.', ''), '0'), '.') }}</div>
                                         </div>
                                         <div class="barcode-price">{{ $barcode->price !== null ? '฿'.number_format($barcode->price, 2) : 'ใช้ราคาหลัก' }}</div>
                                     </div>
