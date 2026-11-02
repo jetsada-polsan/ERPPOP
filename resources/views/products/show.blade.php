@@ -880,10 +880,10 @@
     .compact-tabs button { min-height:34px; min-width:132px; padding:6px 12px; border:1px solid #d6dce3; border-bottom:0; border-radius:6px 6px 0 0; background:#e8eef5; color:#475569; font-size:12px; font-weight:700; }
     .compact-tabs button.active { position:relative; top:1px; background:#fff; color:#0f5f93; }
     .compact-body { height:calc(100vh - 138px); overflow:auto; padding:14px; background:#fff; }
-    .compact-form { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px 9px; max-width:100%; padding:9px; border:1px solid #aaa; background:#eee; }
-    .compact-form label { display:grid; grid-template-columns:90px minmax(0,1fr); align-items:center; gap:7px; margin:0; white-space:nowrap; }
+    .compact-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px 18px; max-width:100%; padding:18px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; box-shadow:0 3px 14px rgba(15,23,42,.05); }
+    .compact-form label { display:grid; gap:5px; margin:0; color:#475569; font-size:12px; font-weight:700; }
     .compact-form label.wide,.compact-form .wide { grid-column:span 3; }
-    .compact-form input:not([type=checkbox]),.compact-form select,.compact-form textarea { width:100%; min-height:21px; padding:1px 4px; border:1px solid #8f9499; border-radius:0; background:#fff; font:10px Tahoma,"Noto Sans Thai",sans-serif; }
+    .compact-form input:not([type=checkbox]),.compact-form select,.compact-form textarea { width:100%; min-height:36px; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#fff; font:13px Tahoma,"Noto Sans Thai",sans-serif; }
     .compact-form textarea { resize:vertical; }
     .compact-checks { display:flex; gap:22px; padding:8px 0; border-top:1px solid #bbb; }
     .compact-checks label { display:flex; gap:5px; }
@@ -908,7 +908,7 @@
     .compact-row-save { min-width:76px; min-height:32px; white-space:nowrap; padding:5px 10px; border:1px solid #1677b8; border-radius:5px; background:#1677b8; color:#fff; font:700 12px Tahoma,"Noto Sans Thai",sans-serif; }
     .compact-columns { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
     body.erp-popup-page .booking-modal { width:min(520px,calc(100vw - 30px)) !important; border-radius:3px; font-size:12px; }
-    @media(max-width:700px){.compact-form{grid-template-columns:1fr}.compact-form label.wide,.compact-form .wide{grid-column:span 1}.compact-columns{grid-template-columns:1fr}.compact-form label{grid-template-columns:105px minmax(0,1fr)}}
+    @media(max-width:700px){.compact-form{grid-template-columns:1fr}.compact-form label.wide,.compact-form .wide{grid-column:span 1}.compact-columns{grid-template-columns:1fr}}
     [x-cloak] { display: none !important; }
     .legacy-product-summary,
     .barcode-badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11.5px; font-weight:600; border:1px solid transparent; white-space:nowrap; }

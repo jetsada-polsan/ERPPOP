@@ -1432,7 +1432,7 @@
             }
             $appLogo = $companyLogo;
         @endphp
-@if ($erpLayout === 'odoo')
+@if ($erpLayout === 'odoo' && !request()->boolean('popup'))
         {{-- แถบบนแบบ Odoo: ปุ่มโมดูล + ชื่อระบบ + เมนูหมวด
              ใช้ $menuSections ชุดเดียวกับเมนูข้าง จะได้ไม่มีวันหลุดจากกัน --}}
         <div class="odn-topbar no-print">
