@@ -1,3 +1,17 @@
+# Handoff — 2026-11-02 (แก้สีหน้า Executive Dashboard)
+
+## ทำอะไรไป
+- แก้หน้า `/executive` ที่จางเพราะอ้าง CSS variable `--erp-info` ซึ่งไม่มีการประกาศ
+- เปลี่ยนการ์ด KPI, เส้นกราฟ, จุดกราฟ, แถบยอดขาย และข้อความเน้น ไปใช้สีหลักของธีมที่มีอยู่จริง
+
+## ทดสอบไปแล้วแค่ไหน
+- `php artisan view:cache` ผ่าน
+- Executive, layout และ POS install tests: 21 tests / 100 assertions ผ่าน
+- `git diff --check` ผ่าน
+
+## งานถัดไป
+- Deploy production และตรวจหน้า Executive หลัง cache clear
+
 # Handoff — 2026-11-02 (ใช้โลโก้ MPM และชื่อระบบ JET ERP)
 
 ## ทำอะไรไป

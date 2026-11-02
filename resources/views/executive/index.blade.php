@@ -156,7 +156,7 @@
 
     .exec-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px; }
     .exec-kpi { background: #fff; border: 1px solid var(--erp-border); border-radius: 14px; padding: 16px 18px; }
-    .exec-kpi-lead { background: linear-gradient(135deg, var(--erp-info), var(--erp-info)); border-color: transparent; }
+    .exec-kpi-lead { background: linear-gradient(135deg, var(--erp-primary-ink), var(--erp-primary-dark)); border-color: transparent; }
     .exec-kpi-lead .exec-kpi-label, .exec-kpi-lead .exec-kpi-foot { color: rgba(255,255,255,.82); }
     .exec-kpi-lead .exec-kpi-value { color: #fff; }
     .exec-kpi-label { display: block; font-size: 12.5px; color: var(--erp-muted); font-weight: 600; }
@@ -174,25 +174,25 @@
 
     .exec-chart { width: 100%; height: 220px; }
     .exec-area { fill: rgba(15,118,110,.12); stroke: none; }
-    .exec-line { fill: none; stroke: var(--erp-info); stroke-width: 2.5; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-    .exec-point { fill: var(--erp-info); }
+    .exec-line { fill: none; stroke: var(--erp-primary-ink); stroke-width: 2.5; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+    .exec-point { fill: var(--erp-primary-ink); }
     .exec-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--erp-muted); margin-top: 4px; }
 
     .exec-bar-row { display: grid; grid-template-columns: 150px 1fr 110px; align-items: center; gap: 10px; margin-bottom: 9px; font-size: 13px; }
-    .exec-bar-name b { color: var(--erp-info); }
+    .exec-bar-name b { color: var(--erp-primary-ink); }
     .exec-bar-track { background: var(--erp-surface-2); border-radius: 999px; height: 12px; overflow: hidden; }
-    .exec-bar-fill { display: block; height: 100%; background: linear-gradient(90deg, #14b8a6, var(--erp-info)); border-radius: 999px; }
+    .exec-bar-fill { display: block; height: 100%; background: linear-gradient(90deg, #14b8a6, var(--erp-primary-ink)); border-radius: 999px; }
     .exec-bar-value { text-align: right; font-weight: 700; color: var(--erp-text); }
 
     .exec-channels { display: grid; gap: 10px; }
     .exec-channel { display: grid; grid-template-columns: 1fr auto 64px; gap: 10px; align-items: baseline; font-size: 13.5px; }
     .exec-channel-value { font-weight: 700; color: var(--erp-text); }
-    .exec-channel-share { text-align: right; color: var(--erp-info); font-weight: 700; }
+    .exec-channel-share { text-align: right; color: var(--erp-primary-ink); font-weight: 700; }
 
     .exec-top { list-style: none; margin: 0; padding: 0; }
     .exec-top li { display: grid; grid-template-columns: 1fr 96px 110px; gap: 8px; padding: 8px 0; border-bottom: 1px dashed var(--erp-border); font-size: 13px; }
     .exec-top li:last-child { border-bottom: 0; }
-    .exec-top-name b { color: var(--erp-info); }
+    .exec-top-name b { color: var(--erp-primary-ink); }
     .exec-top-qty { text-align: right; color: var(--erp-muted); }
     .exec-top-amount { text-align: right; font-weight: 700; }
 
@@ -206,7 +206,7 @@
     .exec-profit-alerts { display: grid; gap: 6px; }
     .exec-profit-row { display: grid; grid-template-columns: 1fr 110px 130px 70px; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px dashed var(--erp-border); font-size: 13px; }
     .exec-profit-row:last-child { border-bottom: 0; }
-    .exec-profit-row b { color: var(--erp-info); }
+    .exec-profit-row b { color: var(--erp-primary-ink); }
     .exec-profit-row > span:nth-child(n+2) { text-align: right; color: var(--erp-muted); }
     .exec-profit-row strong { text-align: right; }
     .exec-low-margin { color: #b45309; }
@@ -217,7 +217,7 @@
         .app-sidebar, .app-header, .no-print { display: none !important; }
         .exec-shell { padding: 0; max-width: none; }
         .exec-card, .exec-kpi { break-inside: avoid; box-shadow: none; }
-        .exec-kpi-lead { background: var(--erp-info) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .exec-kpi-lead { background: var(--erp-primary-ink) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
     @media (max-width: 1100px) {
         .exec-kpis, .exec-attention { grid-template-columns: repeat(2, 1fr); }
