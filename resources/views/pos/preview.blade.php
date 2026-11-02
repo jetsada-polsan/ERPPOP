@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>ตัวอย่าง MPM Food Group POS รุ่น {{ $publishedVersion }}</title>
+    <title>ตัวอย่าง JET POS รุ่น {{ $publishedVersion }}</title>
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     <style>
         :root {

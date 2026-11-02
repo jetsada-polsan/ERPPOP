@@ -69,7 +69,7 @@
         <div class="head">
             <div style="display:flex; gap:12px">
                 @if($logo = \App\Models\AppSetting::logoUrl())
-                    <img src="{{ $logo }}" alt="" style="max-height:58px;max-width:140px;object-fit:contain">
+                    <img src="{{ $logo }}" alt="" style="max-height:84px;max-width:220px;object-fit:contain">
                 @endif
                 <div>
                     <div class="co-name">{{ \App\Models\AppSetting::company('name_th') }} (สำนักงานใหญ่)</div>

@@ -35,7 +35,7 @@
     @if(session('pos_token'))
         <div class="pa-card pa-token" data-testid="pos-token-result">
             <h2><i class="bi bi-key-fill me-1 text-success"></i>Token ของ {{ session('pos_device_name') }}</h2>
-            <div class="small text-muted mb-2">ไปที่เครื่องร้าน เปิด MPM Food Group POS → ใส่ ERP <code>{{ request()->getSchemeAndHttpHost() }}</code> → วาง Token นี้ · แสดงครั้งเดียว ห้ามส่งในแชท</div>
+            <div class="small text-muted mb-2">ไปที่เครื่องร้าน เปิด JET POS → ใส่ ERP <code>{{ request()->getSchemeAndHttpHost() }}</code> → วาง Token นี้ · แสดงครั้งเดียว ห้ามส่งในแชท</div>
             <div class="d-flex gap-2 flex-wrap">
                 <input id="new-pos-token" class="form-control font-monospace flex-grow-1" readonly value="{{ session('pos_token') }}" style="min-width:240px">
                 <button type="button" class="btn btn-success" @click="copyPosToken(document.getElementById('new-pos-token').value).then(ok => copied = ok)">

@@ -39,8 +39,8 @@
         <h1>ศูนย์รวมระบบงาน</h1>
         <p>เลือกพื้นที่ทำงานที่ต้องการ ระบบแต่ละส่วนจะแยกสิทธิ์และหน้าที่ออกจากกันอย่างชัดเจน</p>
     </section>
-    <section class="pos-download" aria-label="ดาวน์โหลด MPM Food Group POS">
-        <div><strong>MPM Food Group POS</strong><span>โปรแกรม POS สำหรับเครื่องแคชเชียร์ เปิดกะ ขายสินค้า รับชำระ และทำงานออฟไลน์</span></div>
+    <section class="pos-download" aria-label="ดาวน์โหลด JET POS">
+        <div><strong>JET POS</strong><span>โปรแกรม POS สำหรับเครื่องแคชเชียร์ เปิดกะ ขายสินค้า รับชำระ และทำงานออฟไลน์</span></div>
         <a href="https://erp.popstarcenter.com/download/python-pos">ดาวน์โหลด POS →</a>
     </section>
     <section class="grid" aria-label="ระบบที่ใช้งาน">

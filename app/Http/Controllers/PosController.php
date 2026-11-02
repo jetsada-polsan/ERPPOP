@@ -61,7 +61,7 @@ class PosController extends Controller
             return $this->preview();
         }
 
-        // ขั้น cutover: ย้ายการขายไปแอปเดสก์ท็อป MPM Food Group POS แล้ว ปิดหน้าขายเว็บด้วย
+        // ขั้น cutover: ย้ายการขายไปแอปเดสก์ท็อป JET POS แล้ว ปิดหน้าขายเว็บด้วย
         // flag ได้ ดีฟอลต์ 'sell' = ขายได้ตามเดิม (ยังไม่เปลี่ยนอะไร) ตั้ง 'redirect'
         // เมื่อพร้อม เพื่อให้ /pos เหลือหน้าสถานะ + ลิงก์ดาวน์โหลดแอป
         if ($webMode === 'redirect') {

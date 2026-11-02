@@ -83,7 +83,7 @@
             <div>
                 <h1>POS Designer</h1>
                 <p>
-                    ออกแบบหน้าขาย แล้ว Build เป็น layout ให้ MPM Food Group POS
+                    ออกแบบหน้าขาย แล้ว Build เป็น layout ให้ JET POS
                     @if($publishedVersion > 0)
                         — ใช้งานอยู่รุ่น <strong>{{ $publishedVersion }}</strong>@if($publishedAt) ({{ \Illuminate\Support\Carbon::parse($publishedAt)->timezone('Asia/Bangkok')->format('d/m/Y H:i') }})@endif
                     @else
@@ -182,7 +182,7 @@
 
                     <div class="runtime-preview">
                         <div class="bar">
-                            <span>MPM Food Group POS</span>
+                            <span>JET POS</span>
                             <template x-if="runtime.show_branch"><span class="chip">สาขา B001</span></template>
                             <template x-if="runtime.show_terminal"><span class="chip">POS001</span></template>
                             <template x-if="runtime.show_seller"><span class="chip">คนขาย</span></template>

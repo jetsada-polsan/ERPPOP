@@ -24,7 +24,7 @@
     <div class="bill-head">
         <div class="d-flex gap-3 align-items-start">
             @if($logo = \App\Models\AppSetting::logoUrl())
-                <img src="{{ $logo }}" alt="" style="max-height:56px;max-width:150px;object-fit:contain">
+                <img src="{{ $logo }}" alt="" style="max-height:84px;max-width:220px;object-fit:contain">
             @endif
             <div>
                 <div class="fw-bold" style="font-size:16px">{{ \App\Models\AppSetting::company('name_th') }}</div>

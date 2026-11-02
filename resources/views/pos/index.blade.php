@@ -1291,7 +1291,7 @@
             .pos-actionbar { grid-template-columns: 1fr 1fr; }
         }
 
-        /* ── MPM Food Group POS popup system ───────────────── */
+        /* ── JET POS popup system ───────────────── */
         .pos-swal-popup {
             width: min(430px, calc(100vw - 28px)) !important;
             padding: 0 !important;
@@ -1847,7 +1847,7 @@
     <div class="pos-topbar">
         @if($posLogo = \App\Models\AppSetting::logoUrl())
             <div class="pos-logo" style="display:flex;align-items:center;gap:6px;min-width:0">
-                <img src="{{ $posLogo }}" alt="logo" style="max-height:34px;max-width:120px;object-fit:contain">
+                <img src="{{ $posLogo }}" alt="logo" style="max-height:56px;max-width:190px;object-fit:contain">
                 <span style="font-size:11px;font-weight:800;color:#0f766e;-webkit-text-fill-color:#0f766e">JET POS</span>
             </div>
         @else
@@ -2535,7 +2535,7 @@
     <div class="receipt-box" x-transition :style="'--receipt-screen-width:' + receiptScreenWidth + ';--receipt-print-width:' + receiptPaperWidth">
         {{-- หัว: ชื่อ+เลขภาษีผู้ขาย (มาตรา 86/6 ข้อ 2) --}}
         @if($logo = \App\Models\AppSetting::logoUrl())
-            <img src="{{ $logo }}" alt="" style="max-height:42px;max-width:130px;object-fit:contain;margin-bottom:4px">
+            <img src="{{ $logo }}" alt="" style="max-height:64px;max-width:190px;object-fit:contain;margin-bottom:4px">
         @else
             <div class="receipt-logo">pop<span>star</span></div>
         @endif
@@ -2821,7 +2821,7 @@
     </div>
 
 <script>
-/* ── MPM Food Group POS popup helpers. All Swal.fire() calls inherit this skin. ── */
+/* ── JET POS popup helpers. All Swal.fire() calls inherit this skin. ── */
 (function () {
     if (!window.Swal || window.Swal.__popstarPosPatched) return;
 

@@ -200,7 +200,7 @@
             background: var(--surface);
         }
         .brand { text-align: center; margin-bottom: 6px; }
-        .brand img { max-height: clamp(42px, 4vw, 50px); max-width: min(180px, 70%); object-fit: contain; }
+        .brand img { max-height: clamp(84px, 9vw, 120px); max-width: min(320px, 85%); object-fit: contain; }
         .brand-text { font-size: clamp(21px, 2.2vw, 27px); font-weight: 800; color: var(--ink); }
         .subtitle {
             text-align: center;

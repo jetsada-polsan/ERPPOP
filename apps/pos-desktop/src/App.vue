@@ -759,7 +759,7 @@ onUnmounted(() => {
 
     <div v-if="modal" class="modal-backdrop">
       <section v-if="modal === 'guide'" class="modal guide-modal">
-        <div class="modal-head"><div><CircleHelp/><span><strong>คู่มือ MPM Food Group POS</strong><small>ขั้นตอนใช้งานและแก้ปัญหาเบื้องต้น</small></span></div><button type="button" @click="modal = null"><X/></button></div>
+        <div class="modal-head"><div><CircleHelp/><span><strong>คู่มือ JET POS</strong><small>ขั้นตอนใช้งานและแก้ปัญหาเบื้องต้น</small></span></div><button type="button" @click="modal = null"><X/></button></div>
         <div class="guide-grid">
           <article><b>เริ่มขาย</b><span>ตั้งค่าเครื่องครั้งแรก → เข้าแคชเชียร์ → เปิดกะ → สแกนสินค้า → รับชำระ</span></article>
           <article><b>เน็ตหลุด</b><span>ขายต่อได้ตามปกติ บิลจะเก็บในเครื่องและส่งขึ้น ERP อัตโนมัติเมื่อออนไลน์</span></article>

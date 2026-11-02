@@ -93,7 +93,7 @@
     <div class="doc-header">
         <div class="company-block">
             @if($docLogo = \App\Models\AppSetting::logoUrl())
-                <img src="{{ $docLogo }}" alt="logo" style="max-height:56px;max-width:150px;object-fit:contain;margin-bottom:4px">
+                <img src="{{ $docLogo }}" alt="logo" style="max-height:84px;max-width:220px;object-fit:contain;margin-bottom:4px">
             @else
                 <div class="logo">pop<span>star</span></div>
             @endif

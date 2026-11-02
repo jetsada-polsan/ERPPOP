@@ -395,7 +395,7 @@
             margin:0; padding:10px 14px; overflow:hidden; text-decoration:none;
             color:var(--erp-primary-dark); font-weight:700; font-size:13px;
             border-bottom:1px solid var(--erp-border); background:var(--erp-surface); }
-        .odn-side-brand img { max-width:136px; max-height:36px; width:auto; height:auto; object-fit:contain; }
+        .odn-side-brand img { max-width:210px; max-height:60px; width:auto; height:auto; object-fit:contain; }
 
         /* ── หัวหมวด ──────────────────────────────────────────────── */
         .odn-grp { border-bottom:0; }
@@ -729,7 +729,7 @@
         html.subnav-collapsed .fa-subnav { display: none; }
 
         .fa-subnav-brand { height:48px; display:flex; align-items:center; justify-content:center; margin:0 4px 6px; padding:4px 6px; overflow:hidden; }
-        .fa-subnav-brand img { display:block; width:auto!important; max-width:108px!important; height:auto!important; max-height:38px!important; object-fit:contain; }
+        .fa-subnav-brand img { display:block; width:auto!important; max-width:190px!important; height:auto!important; max-height:38px!important; object-fit:contain; }
         .fa-subnav-brand .brand-logo { font-size: 22px; font-weight: 900; color: var(--erp-primary-dark); }
         .fa-subnav-brand .brand-logo span { color: var(--fa-green); }
 
@@ -1310,7 +1310,7 @@
             .fa-rail-btn-label { font-size: 11px; max-width: 64px; }
             .fa-subnav { padding: 14px 12px 22px; }
             .fa-subnav-brand { height: 54px; }
-            .fa-subnav-brand img { max-width: 124px!important; max-height: 44px!important; }
+            .fa-subnav-brand img { max-width: 190px!important; max-height: 68px!important; }
             .fa-subnav-title { font-size: 17px; padding: 6px 10px 10px; }
             .fa-subnav-link { gap: 11px; padding: 9px 10px; font-size: 15px; margin-bottom: 2px; }
             .fa-subnav-link i { font-size: 15px; width: 18px; }

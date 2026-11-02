@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>MPM Food Group POS — ย้ายไปแอปเดสก์ท็อป</title>
+    <title>JET POS — ย้ายไปแอปเดสก์ท็อป</title>
     <style>
         :root{ --ink:#1d3b52; --muted:#627481; --brand:#147db5; --brand-dark:#0f4c75;
                --soft:#eef4f9; --line:#dbe7ef; --canvas:#f3f7fb; --surface:#fff; }
@@ -27,14 +27,14 @@
     <div class="card">
         <div class="mark">★</div>
         <h1>หน้าขายย้ายไปแอปเดสก์ท็อปแล้ว</h1>
-        <p>การขายหน้าร้านใช้ผ่าน <strong>MPM Food Group POS</strong> (โปรแกรมเดสก์ท็อป Windows)
+        <p>การขายหน้าร้านใช้ผ่าน <strong>JET POS</strong> (โปรแกรมเดสก์ท็อป Windows)
            ซึ่งขายต่อได้แม้เน็ตหลุด แล้วส่งบิลขึ้น ERP ให้อัตโนมัติ</p>
         <ol class="steps">
             <li>ดาวน์โหลดและติดตั้งแอปบนเครื่องแคชเชียร์</li>
             <li>เปิด <strong>ตั้งค่า → การ Sync และ API</strong> ในแอป</li>
             <li>กรอกที่อยู่ ERP และ device token ที่ได้จากผู้ดูแลระบบ แล้วเปิดโปรแกรมใหม่</li>
         </ol>
-        <a class="btn" href="{{ route('python-pos.download') }}">ดาวน์โหลด MPM Food Group POS</a>
+        <a class="btn" href="{{ route('python-pos.download') }}">ดาวน์โหลด JET POS</a>
         <div><a class="back" href="{{ url('/dashboard') }}">← กลับหน้าหลัก</a></div>
     </div>
 </body>
