@@ -46,6 +46,7 @@
                                 </td>
                                 <td class="text-end">
                                     <a href="{{ route('suppliers.show', $supplier) }}" class="btn btn-sm btn-light border">ดู</a>
+                                    @include('partials.safe-delete', ['type' => 'suppliers', 'id' => $supplier->id])
                                 </td>
                             </tr>
                         @empty

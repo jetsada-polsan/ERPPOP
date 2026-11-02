@@ -39,6 +39,8 @@ class RoutePermissions
         'documents.void' => 'documents.void',
         'document-books.' => 'settings.manage',
         'customers.' => 'sales.manage',
+        // ตรวจสิทธิ์ตามชนิดข้อมูลใน controller อีกชั้น
+        'master-data.destroy' => 'masterdata.manage',
         'crm.' => 'sales.manage',
         'customers.credit-limit.approve' => 'finance.credit.approve',
         'customers.credit-limit.reject' => 'finance.credit.approve',

@@ -78,6 +78,7 @@
                                 </td>
                                 <td class="text-end">
                                     <a href="{{ route('customers.show', $customer) }}" class="btn btn-sm {{ $needsName ? 'btn-warning' : 'btn-light border' }}">{{ $needsName ? 'แก้ไขชื่อ' : 'ดู' }}</a>
+                                    @include('partials.safe-delete', ['type' => 'customers', 'id' => $customer->id])
                                 </td>
                             </tr>
                         @empty
