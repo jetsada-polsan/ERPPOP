@@ -870,16 +870,16 @@
     body.erp-popup-page .container-fluid { max-width:none !important; padding:0 !important; }
     body.erp-popup-page div[x-data="productShow()"] > :not(.compact-product-window):not(.booking-modal-backdrop) { display:none !important; }
     body.erp-popup-page { background:#ececec; }
-    .compact-product-window { min-height:calc(100vh - 10px); border:1px solid #8d9297; background:#ececec; color:#151515; font:10px Tahoma,"Noto Sans Thai",sans-serif; }
-    .compact-menu { height:24px; display:flex; align-items:center; justify-content:flex-end; padding:0 9px; border-bottom:1px solid #aaa; background:var(--erp-primary-soft); }
-    .compact-tools { height:38px; display:flex; align-items:stretch; gap:1px; padding:2px 5px; border-bottom:1px solid #aaa; background:var(--erp-border); }
-    .compact-tools button { min-width:72px; border:1px solid transparent; background:transparent; font-size:9px; }
-    .compact-tools button:hover { border-color:#9aa0a6; background:var(--erp-surface-2); }
-    .compact-tools i { display:block; color:var(--erp-primary-ink); font-size:13px; }
-    .compact-tabs { display:flex; gap:1px; padding:4px 7px 0; border-bottom:1px solid #8d9298; background:#ddd; }
-    .compact-tabs button { padding:3px 8px; border:1px solid #999; border-bottom:0; background:var(--erp-border); font-size:9px; }
-    .compact-tabs button.active { position:relative; top:1px; background:#fff; color:var(--erp-danger); font-weight:700; }
-    .compact-body { height:calc(100vh - 101px); overflow:auto; padding:8px; background:var(--erp-primary-soft); }
+    .compact-product-window { min-height:calc(100vh - 10px); border:1px solid #d6dce3; background:#f8fafc; color:#172033; font:13px Tahoma,"Noto Sans Thai",sans-serif; }
+    .compact-menu { height:34px; display:flex; align-items:center; justify-content:flex-start; padding:0 14px; border-bottom:1px solid #d6dce3; background:#fff; font-size:14px; }
+    .compact-tools { height:52px; display:flex; align-items:stretch; gap:6px; padding:7px 10px; border-bottom:1px solid #d6dce3; background:#fff; }
+    .compact-tools button { min-width:104px; border:1px solid #d6dce3; border-radius:6px; background:#fff; color:#334155; font-size:12px; font-weight:700; }
+    .compact-tools button:hover { border-color:#1677b8; color:#0f5f93; background:#f0f8ff; }
+    .compact-tools i { display:block; color:var(--erp-primary-ink); font-size:16px; }
+    .compact-tabs { display:flex; gap:4px; padding:8px 10px 0; border-bottom:1px solid #d6dce3; background:#f1f5f9; }
+    .compact-tabs button { min-height:34px; min-width:132px; padding:6px 12px; border:1px solid #d6dce3; border-bottom:0; border-radius:6px 6px 0 0; background:#e8eef5; color:#475569; font-size:12px; font-weight:700; }
+    .compact-tabs button.active { position:relative; top:1px; background:#fff; color:#0f5f93; }
+    .compact-body { height:calc(100vh - 138px); overflow:auto; padding:14px; background:#fff; }
     .compact-form { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px 9px; max-width:100%; padding:9px; border:1px solid #aaa; background:#eee; }
     .compact-form label { display:grid; grid-template-columns:90px minmax(0,1fr); align-items:center; gap:7px; margin:0; white-space:nowrap; }
     .compact-form label.wide,.compact-form .wide { grid-column:span 3; }
@@ -888,7 +888,7 @@
     .compact-checks { display:flex; gap:22px; padding:8px 0; border-top:1px solid #bbb; }
     .compact-checks label { display:flex; gap:5px; }
     .compact-save { display:flex; justify-content:flex-end; }
-    .compact-save button,.compact-section-head button { min-width:86px; padding:5px 12px; border:1px solid #888; background:linear-gradient(#fff,#ddd); font-weight:700; }
+    .compact-save button,.compact-section-head button { min-width:104px; min-height:34px; padding:6px 12px; border:1px solid #1677b8; border-radius:5px; background:#1677b8; color:#fff; font-weight:700; }
     .compact-section-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
     .compact-table { width:100%; border-collapse:collapse; background:#fff; }
     .compact-table th,.compact-table td { padding:3px 5px; border:1px solid #aeb3b7; text-align:left; }
@@ -896,14 +896,15 @@
     .compact-table tr:nth-child(even) td { background:var(--erp-surface-2); }
     .compact-table .num { text-align:right; }
     .compact-table .code { color:var(--erp-primary-dark); font-weight:700; }
-    .compact-edit-table input,.compact-edit-table select { width:100%; min-height:23px; padding:1px 4px; border:1px solid #92979c; border-radius:0; background:#fff; font:11px Tahoma,"Noto Sans Thai",sans-serif; }
-    .compact-edit-table td { padding:3px; }
+    .compact-edit-table input,.compact-edit-table select { width:100%; min-height:32px; padding:4px 7px; border:1px solid #cbd5e1; border-radius:5px; background:#fff; font:13px Tahoma,"Noto Sans Thai",sans-serif; }
+    .compact-edit-table th { padding:8px 7px; background:#f1f5f9; color:#334155; font-size:12px; white-space:nowrap; }
+    .compact-edit-table td { padding:5px; vertical-align:middle; }
     .compact-edit-table tr.barcode-disabled td { background:var(--erp-primary-soft); color:var(--erp-muted); }
     .barcode-state { display:inline-flex; align-items:center; gap:4px; margin:0; padding:2px 6px; border-radius:3px; white-space:nowrap; font-weight:700; cursor:pointer; }
     .barcode-state.is-on { background:var(--erp-success-soft); color:#166534; }
     .barcode-state.is-off { background:var(--erp-border); color:#4b5563; }
     .barcode-state input { width:auto; min-height:0; margin:0; }
-    .compact-row-save { white-space:nowrap; padding:3px 8px; border:1px solid #888; background:linear-gradient(#fff,#ddd); font:700 11px Tahoma,"Noto Sans Thai",sans-serif; }
+    .compact-row-save { min-width:76px; min-height:32px; white-space:nowrap; padding:5px 10px; border:1px solid #1677b8; border-radius:5px; background:#1677b8; color:#fff; font:700 12px Tahoma,"Noto Sans Thai",sans-serif; }
     .compact-columns { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
     body.erp-popup-page .booking-modal { width:min(520px,calc(100vw - 30px)) !important; border-radius:3px; font-size:12px; }
     @media(max-width:700px){.compact-form{grid-template-columns:1fr}.compact-form label.wide,.compact-form .wide{grid-column:span 1}.compact-columns{grid-template-columns:1fr}.compact-form label{grid-template-columns:105px minmax(0,1fr)}}
