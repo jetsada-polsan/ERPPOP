@@ -24,7 +24,7 @@
                             <td class="text-end">
                                 <button type="button" class="btn btn-sm btn-light border"
                                     @click="openEdit({{ $loc->id }}, {{ $loc->warehouse_id }}, '{{ $loc->code }}', '{{ addslashes($loc->name) }}')">แก้ไข</button>
-                            </td>
+                            @include('partials.safe-delete', ['type' => 'warehouse-locations', 'id' => $loc->id])</td>
                         </tr>
                         @empty
                         <tr><td colspan="4" class="py-5 text-center text-muted">ยังไม่มีคลัง</td></tr>

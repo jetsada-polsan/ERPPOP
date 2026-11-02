@@ -20,6 +20,13 @@ final class SafeDelete
         'product-units' => ['product_units', ['unit_id', 'base_unit_id'], 'masterdata.manage'],
         'promotions' => ['promotions', ['promotion_id'], 'masterdata.manage'],
         'qty-promotions' => ['qty_promotions', ['qty_promotion_id'], 'masterdata.manage'],
+        'price-tables' => ['price_tables', ['price_table_id'], 'masterdata.manage'],
+        'bank-accounts' => ['bank_accounts', ['bank_account_id'], 'finance.manage'],
+        'chart-of-accounts' => ['chart_of_accounts', ['account_id', 'chart_of_account_id', 'gl_account_id', 'expense_account_id'], 'finance.manage'],
+        'document-books' => ['document_books', ['document_book_id'], 'settings.manage'],
+        'warehouse-locations' => ['warehouse_locations', ['warehouse_location_id', 'from_warehouse_location_id', 'to_warehouse_location_id', 'default_warehouse_location_id'], 'masterdata.manage'],
+        'discount-cards' => ['discount_cards', ['discount_card_id'], 'masterdata.manage'],
+        'member-points' => ['member_point_rules', ['member_point_rule_id'], 'masterdata.manage'],
     ];
 
     /** @return array<int, string> ตารางที่ยังอ้างแถวนี้อยู่ */

@@ -69,7 +69,7 @@
                                         @click="openEdit({{ $account->id }}, '{{ $account->code }}', '{{ addslashes($account->name_th) }}', '{{ addslashes($account->name_en ?? '') }}', '{{ $typeKey }}', '{{ $account->default_role }}')">
                                         แก้ไข
                                     </button>
-                                </td>
+                                @include('partials.safe-delete', ['type' => 'chart-of-accounts', 'id' => $account->id])</td>
                             </tr>
                             @empty
                             <tr><td colspan="5" class="text-center text-muted py-3">ยังไม่มีบัญชีในหมวดนี้</td></tr>

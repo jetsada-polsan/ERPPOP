@@ -70,7 +70,7 @@
                             <td class="text-end">
                                 <button type="button" class="btn btn-sm btn-light border"
                                     @click="openEdit({{ $acc->id }}, '{{ addslashes($acc->bank_name) }}', '{{ $acc->account_no }}', '{{ addslashes($acc->account_name ?? '') }}', {{ $acc->branch_id ?? 'null' }}, {{ $acc->chart_of_account_id ?? 'null' }})">แก้ไข</button>
-                            </td>
+                            @include('partials.safe-delete', ['type' => 'bank-accounts', 'id' => $acc->id])</td>
                         </tr>
                         @empty
                         <tr><td colspan="6" class="py-5 text-center text-muted">ยังไม่มีบัญชีธนาคาร — กด “เพิ่มบัญชี” แล้วกรอกบัญชีจริงของบริษัทก่อนใช้งานรับโอน ฝาก/ถอน และเช็ค</td></tr>

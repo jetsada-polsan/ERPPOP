@@ -106,7 +106,7 @@
                                     @click="openEdit({{ $t->id }}, '{{ $t->code }}', '{{ addslashes($t->name) }}', '{{ addslashes($t->description ?? '') }}', {{ $t->is_default ? 'true' : 'false' }}, {{ $t->is_active ? 'true' : 'false' }})">
                                     แก้ไข
                                 </button>
-                            </td>
+                            @include('partials.safe-delete', ['type' => 'price-tables', 'id' => $t->id])</td>
                         </tr>
                         @empty
                         <tr><td colspan="7" class="py-5 text-center text-muted">ยังไม่มีตารางราคา — กด "เพิ่มตารางราคา" เพื่อสร้าง</td></tr>

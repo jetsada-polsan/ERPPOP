@@ -69,7 +69,7 @@
                         @endif
                     </td>
                     <td class="small">{{ $rule->starts_date?->thaiDate() ?? 'ไม่กำหนด' }} - {{ $rule->ends_date?->thaiDate() ?? 'ไม่กำหนด' }}</td>
-                    <td><span class="badge {{ $rule->is_active ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $rule->is_active ? 'ใช้งาน' : 'ปิด' }}</span></td>
+                    <td><span class="badge {{ $rule->is_active ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $rule->is_active ? 'ใช้งาน' : 'ปิด' }}</span>@include('partials.safe-delete', ['type' => 'member-points', 'id' => $rule->id])</td>
                 </tr>
             @empty
                 <tr><td colspan="6" class="text-center text-muted py-5">ยังไม่มีกติกาแต้ม</td></tr>

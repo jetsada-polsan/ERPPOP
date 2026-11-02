@@ -95,7 +95,7 @@
                     <td class="small">{{ $promo->freeProduct ? $promo->freeProduct->sku_code.' '.$promo->freeProduct->name_th : '-' }}</td>
                     <td class="small">{{ $promo->branch?->name_th ?? 'ทุกสาขา' }}</td>
                     <td class="small">{{ $promo->starts_at?->format('d/m/Y H:i') ?? 'ไม่กำหนด' }} - {{ $promo->ends_at?->format('d/m/Y H:i') ?? 'ไม่กำหนด' }}</td>
-                    <td><span class="badge {{ $promo->is_active ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $promo->is_active ? 'ใช้งาน' : 'ปิด' }}</span></td>
+                    <td><span class="badge {{ $promo->is_active ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $promo->is_active ? 'ใช้งาน' : 'ปิด' }}</span>@include('partials.safe-delete', ['type' => 'qty-promotions', 'id' => $promo->id])</td>
                 </tr>
             @empty
                 <tr><td colspan="8" class="text-center text-muted py-5">ยังไม่มีแคมเปญซื้อครบ</td></tr>

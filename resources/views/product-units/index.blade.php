@@ -36,7 +36,7 @@
                                     @click="openEdit({{ $unit->id }}, '{{ $unit->code }}', '{{ addslashes($unit->name) }}', {{ $unit->qty_per_base_unit }})">
                                     แก้ไข
                                 </button>
-                            </td>
+                            @include('partials.safe-delete', ['type' => 'product-units', 'id' => $unit->id])</td>
                         </tr>
                         @empty
                         <tr><td colspan="5" class="py-5 text-center text-muted">ยังไม่มีหน่วยนับ</td></tr>

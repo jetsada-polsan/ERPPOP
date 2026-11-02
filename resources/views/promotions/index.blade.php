@@ -45,7 +45,7 @@
                     <td>{{ $promotion->starts_at?->thaiDate() ?? '-' }} - {{ $promotion->ends_at?->thaiDate() ?? '-' }}</td>
                     <td>{{ $promotion->product?->sku_code ?? 'ทุกสินค้า' }}</td>
                     <td>{{ $promotion->discount_percent ? number_format($promotion->discount_percent, 2).'%' : number_format((float) $promotion->discount_amount, 2).' บาท' }}</td>
-                    <td><span class="badge {{ $promotion->is_active ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $promotion->is_active ? 'ใช้งาน' : 'ปิด' }}</span></td>
+                    <td><span class="badge {{ $promotion->is_active ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $promotion->is_active ? 'ใช้งาน' : 'ปิด' }}</span>@include('partials.safe-delete', ['type' => 'promotions', 'id' => $promotion->id])</td>
                 </tr>
             @empty
                 <tr><td colspan="7" class="text-center text-muted py-5">ยังไม่มีโปรโมชั่น</td></tr>

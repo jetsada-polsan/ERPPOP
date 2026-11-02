@@ -47,7 +47,7 @@
                     <td class="text-end">{{ number_format($book->documents_count) }}</td>
                     <td>@if($book->is_default)<span class="badge text-bg-primary">เล่มหลัก</span>@endif</td>
                     <td><span class="badge {{ $book->is_active ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $book->is_active ? 'ใช้งาน' : 'ปิด' }}</span></td>
-                    <td class="text-end"><button type="button" class="btn btn-sm btn-light border" @click="edit = !edit"><span x-text="edit ? 'ยกเลิก' : 'แก้ไข'"></span></button></td>
+                    <td class="text-end"><button type="button" class="btn btn-sm btn-light border" @click="edit = !edit"><span x-text="edit ? 'ยกเลิก' : 'แก้ไข'"></span></button>@include('partials.safe-delete', ['type' => 'document-books', 'id' => $book->id])</td>
                 </tr>
             @endforeach
             </tbody>

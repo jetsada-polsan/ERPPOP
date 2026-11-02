@@ -56,7 +56,7 @@
                     <td>{{ $card->min_amount ? number_format($card->min_amount, 2) : '-' }}</td>
                     <td>{{ $card->used_count }}{{ $card->usage_limit ? ' / '.$card->usage_limit : '' }}</td>
                     <td>{{ $card->ends_date?->thaiDate() ?? 'ไม่มีกำหนด' }}</td>
-                    <td><span class="badge {{ $card->is_active ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $card->is_active ? 'ใช้งาน' : 'ปิด' }}</span></td>
+                    <td><span class="badge {{ $card->is_active ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $card->is_active ? 'ใช้งาน' : 'ปิด' }}</span>@include('partials.safe-delete', ['type' => 'discount-cards', 'id' => $card->id])</td>
                 </tr>
             @empty
                 <tr><td colspan="8" class="text-center text-muted py-5">ยังไม่มีบัตรส่วนลด</td></tr>
