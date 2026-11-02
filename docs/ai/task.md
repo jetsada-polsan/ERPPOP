@@ -2220,6 +2220,21 @@ pending
 ## Deploy
 - รอ deploy production เมื่อเจ้าของสั่ง
 
+# Handoff — 2026-11-02 (ล็อกรายงานไว้สาขาอำนาจเจริญ)
+
+## ทำอะไรไป
+- ตัดตัวเลือกสาขาและตัวเลือกทุกสาขาออกจากหน้ารายงาน
+- บังคับรายงานทุกตัวใช้สาขา `B001 - สาขาอำนาจเจริญ`
+- ไม่รับค่า `branch_id` จาก URL เพื่อป้องกันการดึงข้อมูลสาขาเดิมหรือสาขาอื่น
+
+## ทดสอบ
+- `php artisan test --filter=StockBalanceReportTest --no-coverage`: 9 tests / 106 assertions ผ่าน
+- `php artisan view:cache` ผ่าน
+- `git diff --check` ผ่าน
+
+## Deploy
+- รอ deploy production เมื่อเจ้าของสั่ง
+
 # Handoff — 2026-11-02 (ปรับ popup แฟ้มสินค้าแบบ minimal)
 
 ## ทำอะไรไป

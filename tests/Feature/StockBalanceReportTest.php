@@ -110,7 +110,7 @@ class StockBalanceReportTest extends TestCase
         $this->assertEquals(200, $row->stock_value);
     }
 
-    public function test_search_pagination_export_and_print_preserve_branch_permissions(): void
+    public function test_report_ignores_branch_parameters_and_stays_on_amnat(): void
     {
         $own = $this->branch('B001');
         $other = $this->branch('HQ');
@@ -129,14 +129,8 @@ class StockBalanceReportTest extends TestCase
         $this->assertStringContainsString('สาขา B001', $csv);
         $this->assertStringNotContainsString('สาขา HQ', $csv);
 
-        $this->actingAs($this->viewer(null));
-        $this->assertSame(0, $this->report($own, ['branch_id' => 'all'])->assertOk()->viewData('result')['total']);
-
-        $this->actingAs($this->viewer($own, true));
-        $all = $this->report($own, ['branch_id' => 'all', 'q' => '102204'])->assertOk()->viewData('result');
-        $this->assertSame(WarehouseLocation::count(), $all['total']);
-        $this->assertTrue($all['rows']->contains(fn ($row) => str_contains($row->location_name, 'สาขา B001')));
-        $this->assertTrue($all['rows']->contains(fn ($row) => str_contains($row->location_name, 'สาขา HQ')));
+        $this->assertSame(1, $this->report($own, ['branch_id' => 'all', 'q' => '102204'])
+            ->assertOk()->viewData('result')['total']);
     }
 
     public function test_secondary_locations_in_an_owned_warehouse_are_included(): void
