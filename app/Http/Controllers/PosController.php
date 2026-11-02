@@ -843,6 +843,9 @@ class PosController extends Controller
             return response()->json(['success' => false, 'message' => 'พักบิลได้เฉพาะกะที่กำลังเปิดของตนเอง'], 422);
         }
 
+        // validated() เก็บเฉพาะ id/qty ใน cart ต้องใช้ payload เต็มไม่งั้นเรียกบิลกลับแล้วไม่มีชื่อและราคา
+        $data['payload'] = $request->input('payload');
+
         $bill = DB::transaction(function () use ($data, $branchId, $cashierId, $shift) {
             return PosHeldBill::create([
                 'hold_no' => $this->nextHoldNo($branchId),

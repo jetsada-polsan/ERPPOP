@@ -516,7 +516,8 @@ async function resumeHeldBill(id: number) {
   busy.value = true
   try {
     const bill = await api.resumeHeldBill(id)
-    cart.value = bill.cart || []
+    // บิลที่พักจากรุ่นก่อนเหลือแค่รหัสกับจำนวน เติมชื่อและราคาจากสินค้าในเครื่อง
+    cart.value = (bill.cart || []).map((line) => ({ ...products.value.find((product) => product.id === line.id), ...line }))
     heldBills.value = heldBills.value.filter((item) => item.id !== id)
     modal.value = null
     flash(`เรียกบิล ${bill.hold_no} แล้ว`)
