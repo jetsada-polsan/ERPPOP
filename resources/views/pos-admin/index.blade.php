@@ -155,6 +155,11 @@
                             </td>
                             <td class="text-end text-nowrap">
                                 @if($row['active'])
+                                    <span class="me-2">รหัสเครื่อง <strong class="font-monospace fs-6">{{ $d->pair_code }}</strong></span>
+                                    <form method="post" action="{{ route('pos-admin.devices.pair-code', $d) }}" class="d-inline" onsubmit="return confirm('เปลี่ยนรหัสเครื่องนี้?')">
+                                        @csrf
+                                        <button class="btn btn-sm btn-outline-secondary">เปลี่ยนรหัส</button>
+                                    </form>
                                     <form method="post" action="{{ route('settings.pos-token.rotate') }}" class="d-inline" onsubmit="return confirm('ออก Token ใหม่ให้ {{ addslashes($d->name) }}? Token เดิมใช้ไม่ได้ทันที ต้องวาง Token ใหม่ที่เครื่อง')">
                                         @csrf
                                         <input type="hidden" name="pos_device_id" value="{{ $d->id }}">

@@ -4,7 +4,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, CircleHelp, Cloud, CloudOff, CreditCard, FileText, FolderOpen, History, LogOut, Minus, PackageSearch, PauseCircle, Plus, Printer, QrCode, ReceiptText, RefreshCw, ScanLine, Search, Settings, ShoppingCart, Trash2, UserRound, Wifi, X } from 'lucide-vue-next'
 import { check } from '@tauri-apps/plugin-updater'
 import { invoke, isTauri } from '@tauri-apps/api/core'
-import { api, connect, PosUnreachableError, setServerUrl } from './lib/api'
+import { api, connect, pairDevice, PosUnreachableError, setServerUrl } from './lib/api'
 import { backupTo, closeLocalDb, enqueue, loadOfflineCashiers, loadOfflineCashiersByPin, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceOfflineCashiers, replaceProducts, replacePromotions, saleHistory, saveOfflineCredential, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth } from './lib/db'
 import { productAtSaleTime } from './lib/catalog'
 import { resolveScan, type BarcodeType } from './lib/barcode'
@@ -49,6 +49,7 @@ const busy = ref(false)
 const modal = ref<'cashier' | 'selectCashier' | 'changePin' | 'shift' | 'closeShift' | 'payment' | 'settings' | 'holdBill' | 'heldBills' | 'history' | 'guide' | null>(null)
 const setupUrl = ref('https://erp.popstarcenter.com')
 const setupToken = ref('')
+const pairCode = ref('')
 const storageFolder = ref('D:\\POPSTAR-POS\\data')
 const setupError = ref('')   // ค้างไว้จนกว่าจะลองเชื่อมใหม่ ต่างจาก toast ที่หายใน 6 วิ
 const cashierPin = ref('')
@@ -337,7 +338,14 @@ async function configure() {
   setupError.value = ''
   try {
     if (isTauri()) await invoke('set_storage_folder', { folder: storageFolder.value.trim() })
-    const connected = await connect(setupUrl.value, setupToken.value.trim())
+    const paired = pairCode.value.trim() ? await pairDevice(setupUrl.value, pairCode.value.trim()) : null
+    const token = paired?.token || setupToken.value.trim()
+    if (!token) throw new Error('กรุณาใส่รหัสประจำเครื่องจากหน้า จัดการเครื่อง POS')
+    const previousTerminal = profile.value?.terminalCode
+    if (paired && pendingCount.value && previousTerminal && previousTerminal !== paired.terminalCode) {
+      throw new Error(`มีบิลค้างของเครื่อง ${previousTerminal} ส่งบิลให้ครบก่อนเปลี่ยนเครื่อง`)
+    }
+    const connected = await connect(setupUrl.value, token)
     setupUrl.value = connected.serverUrl
     profile.value = connected
     await saveProfile(connected)
@@ -815,7 +823,8 @@ onUnmounted(() => {
         <label>ที่อยู่เซิร์ฟเวอร์<input v-model="setupUrl" required placeholder="https://erp.popstarcenter.com"></label>
         <small class="setup-hint">ที่อยู่ ERP ปัจจุบันคือ https://erp.popstarcenter.com หากเชื่อมต่อไม่ได้ ให้ตรวจอินเทอร์เน็ตและ Device Token</small>
         <p v-if="setupError" class="setup-error">{{ setupError }}</p>
-        <label>Device Token<textarea v-model="setupToken" required rows="3" placeholder="วาง Token จาก ERP > ตั้งค่า > ดาวน์โหลด POS"></textarea></label>
+        <label>รหัสประจำเครื่อง (ดูจากหลังบ้าน จัดการเครื่อง POS)<input v-model="pairCode" inputmode="numeric" maxlength="8" placeholder="8 หลัก"></label>
+        <details><summary>ใช้ Device Token แทน</summary>        <label>Device Token<textarea v-model="setupToken" rows="3" placeholder="วาง Token จาก ERP > ตั้งค่า > ดาวน์โหลด POS"></textarea></label></details>
         <label>โฟลเดอร์เก็บข้อมูล POS<input v-model="storageFolder" required placeholder="D:\\POPSTAR-POS\\data"></label>
         <small class="setup-hint">แนะนำให้เลือกไดรฟ์ D: หรือโฟลเดอร์ข้อมูลที่สำรองได้ ระบบจะเก็บ SQLite, บิลออฟไลน์ และคิวซิงก์ไว้ที่นี่</small>
         <small class="setup-hint">Token ใช้ผูกเครื่องกับสาขา ไม่ควรนำไปใส่ใน GitHub หรือส่งต่อให้พนักงาน</small>

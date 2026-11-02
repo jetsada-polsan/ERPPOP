@@ -17,7 +17,7 @@ class PosDevice extends Model
     protected $fillable = [
         'name', 'user_id', 'branch_id', 'terminal_code',
         'token_hash', 'token_encrypted', 'last_seen_at', 'last_ip', 'revoked_at',
-        'active_cashier_id', 'active_cashier_user_id', 'cashier_verified_at',
+        'active_cashier_id', 'active_cashier_user_id', 'cashier_verified_at', 'pair_code',
     ];
 
     protected $casts = [
@@ -80,6 +80,21 @@ class PosDevice extends Model
         }
 
         return (int) $this->active_cashier_id;
+    }
+
+    /** รหัสประจำเครื่อง 8 หลัก แอดมินเปิดดูได้ตลอด ใช้แทนการวาง Token */
+    public static function newPairCode(): string
+    {
+        do {
+            $code = str_pad((string) random_int(0, 99999999), 8, '0', STR_PAD_LEFT);
+        } while (self::where('pair_code', $code)->exists());
+
+        return $code;
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(fn (self $device) => $device->pair_code ??= self::newPairCode());
     }
 
     public static function hashToken(string $token): string

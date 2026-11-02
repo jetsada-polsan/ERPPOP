@@ -21,6 +21,19 @@ async function token(): Promise<string> {
   return invoke<string>('read_device_token')
 }
 
+/** แลกรหัสประจำเครื่องเป็น Device Token */
+export async function pairDevice(serverUrl: string, code: string) {
+  const response = await tauriFetch(`${normalizeServerUrl(serverUrl)}/api/pos/pair`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ code }),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok || !data.token) throw new Error(data.message || 'รหัสประจำเครื่องไม่ถูกต้อง')
+
+  return { token: data.token as string, terminalCode: data.terminal_code as string }
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const secret = await token()
   const endpoint = `${baseUrl}/api/pos${path}`

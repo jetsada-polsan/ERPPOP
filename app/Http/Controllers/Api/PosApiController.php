@@ -156,6 +156,22 @@ class PosApiController extends Controller
         return response()->json(['success' => true, 'cashiers' => $cashiers]);
     }
 
+    /** แลกรหัสประจำเครื่องเป็น Token ของเครื่องนั้น ไม่ต้องวาง Token เอง */
+    public function pair(Request $request): JsonResponse
+    {
+        $data = $request->validate(['code' => ['required', 'digits:8']]);
+        $device = PosDevice::where('pair_code', $data['code'])->whereNull('revoked_at')->first();
+        if (! $device?->token_encrypted) {
+            return response()->json(['success' => false, 'message' => 'รหัสประจำเครื่องไม่ถูกต้อง'], 422);
+        }
+        AuditLog::create([
+            'user_id' => $device->user_id, 'branch_id' => $device->branch_id, 'action' => 'pos_device_paired',
+            'table_name' => 'pos_devices', 'record_id' => $device->id, 'new_values' => ['ip' => $request->ip()],
+        ]);
+
+        return response()->json(['success' => true, 'token' => $device->token_encrypted, 'terminal_code' => $device->terminal_code]);
+    }
+
     /** ยืนยัน PIN หัวหน้าเพื่ออนุมัติรายการ โดยไม่เปลี่ยนคนขายที่ล็อกอินอยู่บนเครื่อง */
     public function verifyApprover(Request $request): JsonResponse
     {

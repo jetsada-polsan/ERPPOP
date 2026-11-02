@@ -39,6 +39,13 @@ class PosAdminController extends Controller
         ]);
     }
 
+    public function newPairCode(PosDevice $device): RedirectResponse
+    {
+        $device->update(['pair_code' => PosDevice::newPairCode()]);
+
+        return back()->with('success', "เปลี่ยนรหัสของ {$device->name} แล้ว");
+    }
+
     /** ย้ายคนขายไปสาขาใหม่: เปลี่ยนสาขาหลัก ปิดสิทธิ์สาขาเดิม และให้บทบาทเดิมที่สาขาใหม่ */
     public function moveCashier(Request $request, Salesman $salesman): RedirectResponse
     {

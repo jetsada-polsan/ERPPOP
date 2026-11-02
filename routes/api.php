@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Route;
 
 // API สำหรับ POS desktop (Tauri) — auth ด้วย Bearer device token (AuthenticatePosDevice)
 // ไม่ใช้ session/CSRF. ตรรกะขาย/กะ ใช้ร่วมกับ PosController เดิม (device login แทน cashier user)
+Route::post('/pos/pair', [PosApiController::class, 'pair'])->middleware('throttle:5,1')->name('api.device-pair');
+
 Route::prefix('pos')->middleware('pos.device')->name('api.pos.')->group(function () {
     Route::get('/ping', [PosApiController::class, 'ping'])->name('ping');
     Route::get('/cashiers', [PosApiController::class, 'cashiers'])->name('cashiers');
