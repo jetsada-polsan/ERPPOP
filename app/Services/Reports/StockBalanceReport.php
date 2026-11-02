@@ -42,8 +42,14 @@ class StockBalanceReport
             ->selectRaw("p.id as product_id, p.sku_code, p.name_th, coalesce(u.name, '-') as unit_name,
                 concat(coalesce(b.name_th, w.name), ' / ', coalesce(wl.name, wl.code)) as location_name,
                 coalesce(sb.on_hand_qty, 0) as on_hand_qty, coalesce(sb.reserved_qty, 0) as reserved_qty,
-                coalesce(p.default_price, 0) as unit_price,
-                coalesce(sb.on_hand_qty, 0) * coalesce(p.default_price, 0) as stock_value");
+                coalesce((select pb.price from product_barcodes pb
+                    where pb.product_id = p.id and pb.unit_id = p.base_unit_id
+                        and pb.unit_factor = 1 and pb.price > 0 and pb.is_active = true
+                    order by pb.id asc limit 1), p.default_price, 0) as unit_price,
+                coalesce(sb.on_hand_qty, 0) * coalesce((select pb.price from product_barcodes pb
+                    where pb.product_id = p.id and pb.unit_id = p.base_unit_id
+                        and pb.unit_factor = 1 and pb.price > 0 and pb.is_active = true
+                    order by pb.id asc limit 1), p.default_price, 0) as stock_value");
 
         $pagination = ($filters['paginate'] ?? false)
             ? $query->paginate($filters['per_page'], ['*'], 'page', $filters['page'])->withQueryString()

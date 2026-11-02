@@ -83,6 +83,33 @@ class StockBalanceReportTest extends TestCase
         $this->assertDatabaseCount('stock_balances', 2);
     }
 
+    public function test_report_uses_active_base_unit_barcode_price_for_stock_value(): void
+    {
+        $branch = $this->branch('B001');
+        $product = $this->product('301261');
+        $product->update(['default_price' => 20]);
+        ProductBarcode::create([
+            'product_id' => $product->id,
+            'unit_id' => $product->base_unit_id,
+            'barcode' => '8851952143282',
+            'unit_factor' => 1,
+            'price' => 10,
+            'is_active' => true,
+        ]);
+        DB::table('stock_balances')->insert([
+            'product_id' => $product->id,
+            'warehouse_location_id' => $branch->default_warehouse_location_id,
+            'on_hand_qty' => 20,
+            'reserved_qty' => 0,
+        ]);
+
+        $row = $this->actingAs($this->viewer($branch))->report($branch, ['q' => '301261'])
+            ->assertOk()->viewData('result')['rows']->sole();
+
+        $this->assertEquals(10, $row->unit_price);
+        $this->assertEquals(200, $row->stock_value);
+    }
+
     public function test_search_pagination_export_and_print_preserve_branch_permissions(): void
     {
         $own = $this->branch('B001');
