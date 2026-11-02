@@ -331,7 +331,7 @@ class PosController extends Controller
             $matchedBarcode = $exact && $lookup !== 'sku' && $q !== ''
                 ? $p->barcodes->first(fn ($barcode) => $barcode->barcode === $q)
                 : null;
-            $scalePlu = $p->barcodes->first(fn ($barcode) => $this->isScalePlu($barcode->barcode))?->barcode
+            $scalePlu = $p->barcodes->first(fn ($barcode) => $barcode->barcode_type === BarcodePolicy::SCALE_PLU || $this->isScalePlu($barcode->barcode))?->barcode
                 ?? ($this->isScalePlu($p->sku_code) ? $p->sku_code : null);
 
             $p->scale_plu = $scalePlu;

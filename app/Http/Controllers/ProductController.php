@@ -160,6 +160,7 @@ class ProductController extends Controller
 
         return view('products.show', [
             'product' => $product,
+            'scaleProfiles' => DB::table('scale_barcode_profiles')->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']),
             'units' => ProductUnit::orderBy('name')->get()
                 ->filter(fn (ProductUnit $unit) => ! $unit->isCorrupted() || $legacyUnitIds->contains($unit->id))
                 ->values(),
@@ -415,12 +416,13 @@ class ProductController extends Controller
             'unit_id' => ['required', 'integer', 'exists:product_units,id'],
             'unit_factor' => ['required', 'numeric', 'min:0.0001'],
             'price' => ['nullable', 'numeric', 'min:0'],
-        ]);
+            'scale_barcode_profile_id' => ['nullable', 'integer', 'exists:scale_barcode_profiles,id'],
+        ], self::BARCODE_MESSAGES);
 
         $auto = $request->input('barcode_mode') === 'auto_ean13';
         unset($data['barcode_mode']);
 
-        if (! $auto && ($failure = $this->barcodeRuleFailure($data['barcode_type'], $data['barcode']))) {
+        if (! $auto && ($failure = $this->barcodeRuleFailure($data['barcode_type'], $data['barcode'], $data['scale_barcode_profile_id'] ?? null))) {
             return back()->withInput()->withErrors(['barcode' => $failure]);
         }
 
@@ -445,11 +447,54 @@ class ProductController extends Controller
     }
 
     /** คืนข้อความถ้าบาร์โค้ดผิดกฎของประเภทนั้น ไม่ผิดคืน null */
-    private function barcodeRuleFailure(string $type, ?string $barcode): ?string
+    private function barcodeRuleFailure(string $type, ?string $barcode, ?int $scaleProfileId = null): ?string
     {
         $checked = app(BarcodePolicy::class)->check($type, (string) $barcode);
+        if ($type === BarcodePolicy::SCALE_PLU && ! $scaleProfileId) {
+            $checked['errors'][] = 'PLU เครื่องชั่งต้องเลือกโปรไฟล์เครื่องชั่ง';
+        }
 
-        return $checked['ok'] ? null : implode(' · ', $checked['errors']);
+        return $checked['errors'] === [] ? null : implode(' · ', $checked['errors']);
+    }
+
+    private const BARCODE_MESSAGES = [
+        'barcode.required' => 'กรุณากรอกบาร์โค้ด',
+        'barcode.unique' => 'บาร์โค้ดนี้มีอยู่แล้วในสินค้าอื่น',
+        'barcode.max' => 'บาร์โค้ดยาวเกิน 50 ตัวอักษร',
+        'unit_id.required' => 'กรุณาเลือกหน่วย',
+        'unit_factor.required' => 'กรุณากรอกตัวคูณ',
+        'unit_factor.min' => 'ตัวคูณต้องมากกว่า 0',
+        'price.min' => 'ราคาติดลบไม่ได้',
+        'scale_barcode_profile_id.exists' => 'ไม่พบโปรไฟล์เครื่องชั่งที่เลือก',
+    ];
+
+    /** ลบได้เฉพาะบาร์โค้ดที่ไม่เคยขาย ถ้ามีประวัติให้ปิดใช้งานแทน */
+    public function destroyBarcode(Request $request, Product $product, ProductBarcode $productBarcode): RedirectResponse
+    {
+        abort_unless($productBarcode->product_id === $product->id, 404);
+        $back = redirect()->route('products.show', ['product' => $product, 'popup' => $request->boolean('popup') ? 1 : null]);
+
+        if ($this->barcodeHasSales($productBarcode)) {
+            return $back->withErrors(['barcode' => "บาร์โค้ด {$productBarcode->barcode} มีประวัติขายแล้ว ลบไม่ได้ ให้ปิดใช้งานแทน"]);
+        }
+
+        DB::transaction(function () use ($request, $productBarcode): void {
+            AuditLog::create(['user_id' => $request->user()?->id, 'action' => 'barcode_deleted', 'table_name' => 'product_barcodes',
+                'record_id' => $productBarcode->id, 'old_values' => $productBarcode->toArray(), 'new_values' => null]);
+            $productBarcode->delete();
+        });
+
+        return $back->with('success', 'ลบบาร์โค้ดแล้ว');
+    }
+
+    /**
+     * บรรทัดขาย POS ไม่ได้เก็บบาร์โค้ดที่ยิง จึงถือว่าบาร์โค้ดมีประวัติเมื่อสินค้านั้นเคยขาย
+     * หรือมีในเอกสารคลัง/ขาย
+     */
+    private function barcodeHasSales(ProductBarcode $barcode): bool
+    {
+        return DB::table('pos_receipt_items')->where('product_id', $barcode->product_id)->exists()
+            || DB::table('stock_document_items')->where('product_id', $barcode->product_id)->exists();
     }
 
     /** สร้าง EAN-13 ภายในร้าน ช่วง 299 + running 9 หลัก + check digit */
@@ -496,15 +541,19 @@ class ProductController extends Controller
             'unit_factor' => ['required', 'numeric', 'min:0.0001'],
             'price' => ['nullable', 'numeric', 'min:0'],
             'is_active' => ['required', 'boolean'],
-        ]);
+            'scale_barcode_profile_id' => ['nullable', 'integer', 'exists:scale_barcode_profiles,id'],
+        ], self::BARCODE_MESSAGES);
 
-        if ($failure = $this->barcodeRuleFailure($data['barcode_type'], $data['barcode'])) {
+        if ($failure = $this->barcodeRuleFailure($data['barcode_type'], $data['barcode'], $data['scale_barcode_profile_id'] ?? null)) {
             return back()->withInput()->withErrors(['barcode' => $failure]);
         }
 
         // บันทึกค่าที่ผู้ใช้กรอกตามนั้น ไม่แก้ให้เองแม้จะรู้ว่าควรเป็นเลขอะไร
         // ของที่พิมพ์ติดสินค้าไปแล้วไม่ได้เปลี่ยนตามค่าในฐาน
+        $old = $productBarcode->only(array_keys($data));
         $productBarcode->update($data);
+        AuditLog::create(['user_id' => $request->user()?->id, 'action' => 'barcode_updated', 'table_name' => 'product_barcodes',
+            'record_id' => $productBarcode->id, 'old_values' => $old, 'new_values' => $data]);
 
         return redirect()->route('products.show', [
             'product' => $product,

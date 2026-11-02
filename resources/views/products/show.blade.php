@@ -78,7 +78,7 @@
             </div>
             <div class="compact-body" x-show="compactTab==='barcode'">
                 <div class="compact-section-head"><strong>รหัสสินค้า / บาร์โค้ด</strong><button @click="barcodeOpen=true">+ เพิ่มรหัส</button></div>
-                <table class="compact-table compact-edit-table"><thead><tr><th>บาร์โค้ด</th><th>ประเภท</th><th>หน่วย</th><th class="num">ตัวคูณ</th><th class="num">ราคา</th><th>สถานะ</th><th></th></tr></thead><tbody>@forelse($product->barcodes as $barcode)<tr class="{{ $barcode->is_active ? '' : 'barcode-disabled' }}"><td><input form="barcode-{{ $barcode->id }}" name="barcode" value="{{ $barcode->barcode }}" required></td><td><select form="barcode-{{ $barcode->id }}" name="barcode_type" required>@foreach(\App\Support\BarcodePolicy::LABELS as $typeValue => $typeLabel)<option value="{{ $typeValue }}" @selected($typeValue===$barcode->barcode_type)>{{ $typeLabel }}</option>@endforeach</select></td><td><select form="barcode-{{ $barcode->id }}" name="unit_id" required>@foreach($units as $unit)<option value="{{ $unit->id }}" @selected($unit->id===$barcode->unit_id)>{{ $unit->displayLabel() }}</option>@endforeach</select></td><td><input form="barcode-{{ $barcode->id }}" class="num" type="number" step="0.0001" min="0.0001" name="unit_factor" value="{{ rtrim(rtrim(number_format((float) $barcode->unit_factor, 4, '.', ''), '0'), '.') }}" required></td><td><input form="barcode-{{ $barcode->id }}" class="num" type="number" step="0.01" min="0" name="price" value="{{ $barcode->price === null ? '' : number_format((float) $barcode->price, 2, '.', '') }}"></td><td><input form="barcode-{{ $barcode->id }}" type="hidden" name="is_active" value="0"><label class="barcode-state {{ $barcode->is_active ? 'is-on' : 'is-off' }}"><input form="barcode-{{ $barcode->id }}" type="checkbox" name="is_active" value="1" @checked($barcode->is_active)><span>{{ $barcode->is_active ? 'ใช้งาน' : 'ปิดใช้งาน' }}</span></label></td><td><form id="barcode-{{ $barcode->id }}" method="post" action="{{ route('products.barcodes.update', [$product, $barcode]) }}">@csrf @method('PUT')<input type="hidden" name="popup" value="1"><button class="compact-row-save"><i class="bi bi-check-lg"></i> บันทึก</button></form></td></tr>@empty<tr><td colspan="7">ยังไม่มีบาร์โค้ด</td></tr>@endforelse</tbody></table>
+                <table class="compact-table compact-edit-table"><thead><tr><th>บาร์โค้ด</th><th>ประเภท</th><th>หน่วย</th><th class="num">ตัวคูณ</th><th class="num">ราคา</th><th>สถานะ</th><th>แก้ไขล่าสุด</th><th></th></tr></thead><tbody>@forelse($product->barcodes as $barcode)<tr class="{{ $barcode->is_active ? '' : 'barcode-disabled' }}"><td><input form="barcode-{{ $barcode->id }}" name="barcode" value="{{ $barcode->barcode }}" required></td><td><select form="barcode-{{ $barcode->id }}" name="barcode_type" required>@foreach(\App\Support\BarcodePolicy::LABELS as $typeValue => $typeLabel)<option value="{{ $typeValue }}" @selected($typeValue===$barcode->barcode_type)>{{ $typeLabel }}</option>@endforeach</select>@if($barcode->barcode_type === 'SCALE_PLU')<select form="barcode-{{ $barcode->id }}" name="scale_barcode_profile_id"><option value="">โปรไฟล์เครื่องชั่ง</option>@foreach($scaleProfiles as $profile)<option value="{{ $profile->id }}" @selected($profile->id === $barcode->scale_barcode_profile_id)>{{ $profile->code }}</option>@endforeach</select>@endif</td><td><select form="barcode-{{ $barcode->id }}" name="unit_id" required>@foreach($units as $unit)<option value="{{ $unit->id }}" @selected($unit->id===$barcode->unit_id)>{{ $unit->displayLabel() }}</option>@endforeach</select></td><td><input form="barcode-{{ $barcode->id }}" class="num" type="number" step="0.0001" min="0.0001" name="unit_factor" value="{{ rtrim(rtrim(number_format((float) $barcode->unit_factor, 4, '.', ''), '0'), '.') }}" required></td><td><input form="barcode-{{ $barcode->id }}" class="num" type="number" step="0.01" min="0" name="price" value="{{ $barcode->price === null ? '' : number_format((float) $barcode->price, 2, '.', '') }}"></td><td><input form="barcode-{{ $barcode->id }}" type="hidden" name="is_active" value="0"><label class="barcode-state {{ $barcode->is_active ? 'is-on' : 'is-off' }}"><input form="barcode-{{ $barcode->id }}" type="checkbox" name="is_active" value="1" @checked($barcode->is_active)><span>{{ $barcode->is_active ? 'ใช้งาน' : 'ปิดใช้งาน' }}</span></label></td><td>{{ $barcode->updated_at?->format('d/m/y H:i') ?? '-' }}</td><td><form id="barcode-{{ $barcode->id }}" method="post" action="{{ route('products.barcodes.update', [$product, $barcode]) }}">@csrf @method('PUT')<input type="hidden" name="popup" value="1"><button class="compact-row-save"><i class="bi bi-check-lg"></i> บันทึก</button></form><form method="post" action="{{ route('products.barcodes.destroy', [$product, $barcode]) }}" onsubmit="return confirm('ลบบาร์โค้ดนี้? ถ้ามีประวัติขาย ระบบจะไม่ให้ลบ ให้ปิดใช้งานแทน')">@csrf @method('DELETE')<input type="hidden" name="popup" value="1"><button class="compact-row-save" title="ลบ"><i class="bi bi-trash3"></i></button></form></td></tr>@empty<tr><td colspan="8">ยังไม่มีบาร์โค้ด</td></tr>@endforelse</tbody></table>
             </div>
             <div class="compact-body" x-show="compactTab==='stock'">
                 <div class="compact-cost-grid">
@@ -156,6 +156,11 @@
             </div>
 
             <div class="product-identity-grid">
+                <div class="identity-card">
+                    <div class="identity-label">รหัสสินค้า (SKU)</div>
+                    <div class="identity-value small">{{ $product->sku_code }}</div>
+                    <div class="identity-help">ใช้อ้างอิงสินค้าในระบบ ไม่ใช่บาร์โค้ดที่ยิงขาย</div>
+                </div>
                 <div class="identity-card primary">
                     <div class="identity-label">รหัสสินค้า 6 หลัก</div>
                     <div class="identity-value">{{ $primaryPlu ?? '-' }}</div>
@@ -496,32 +501,7 @@
                     @endif
                 </div>
 
-                <div class="content-card p-4 legacy-barcode-table">
-                    <div class="d-flex align-items-center justify-content-between mb-3">
-                        <h3 class="h6 fw-bold mb-0">บาร์โค้ด</h3>
-                        <button type="button" class="btn btn-sm btn-light border" @click="barcodeOpen = true">
-                            <i class="bi bi-plus-lg me-1"></i> เพิ่ม
-                        </button>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table align-middle table-sm">
-                            <thead>
-                                <tr><th>บาร์โค้ด</th><th>หน่วย</th><th class="text-end">ราคา</th></tr>
-                            </thead>
-                            <tbody>
-                                @forelse($product->barcodes as $barcode)
-                                <tr>
-                                    <td>{{ $barcode->barcode }}</td>
-                                    <td>{{ $barcode->unit?->displayLabel() ?? '-' }}</td>
-                                    <td class="text-end">{{ $barcode->price !== null ? number_format($barcode->price, 2) : '-' }}</td>
-                                </tr>
-                                @empty
-                                <tr><td colspan="3" class="text-center text-muted py-3">ยังไม่มีบาร์โค้ด</td></tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                @include('products.partials.barcode-table')
             </div>
         </div>
 
@@ -826,6 +806,10 @@
                                         <option value="{{ $value }}">{{ $label }}</option>
                                     @endforeach
                                 </select>
+                                <select name="scale_barcode_profile_id" class="form-select mt-2" x-show="barcodeType === 'SCALE_PLU'" :disabled="barcodeType !== 'SCALE_PLU'">
+                                    <option value="">เลือกโปรไฟล์เครื่องชั่ง</option>
+                                    @foreach($scaleProfiles as $profile)<option value="{{ $profile->id }}">{{ $profile->code }} {{ $profile->name }}</option>@endforeach
+                                </select>
                                 <div class="form-text" x-show="barcodeMode === 'auto_ean13'">
                                     เลขที่สร้างอัตโนมัติเป็นรหัสภายในร้าน (ช่วง 299) ไม่ใช่ EAN-13 ที่ได้รับจัดสรรจาก GS1
                                 </div>
@@ -925,7 +909,11 @@
     @media(max-width:700px){.compact-form{grid-template-columns:1fr}.compact-form label.wide,.compact-form .wide{grid-column:span 1}.compact-columns{grid-template-columns:1fr}.compact-form label{grid-template-columns:105px minmax(0,1fr)}}
     [x-cloak] { display: none !important; }
     .legacy-product-summary,
-    .legacy-barcode-table { display: none !important; }
+    .barcode-badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11.5px; font-weight:600; border:1px solid transparent; white-space:nowrap; }
+    .barcode-badge.is-internal { background:#eef4ff; color:#2f55a4; border-color:#cddcfb; }
+    .barcode-badge.is-ean13 { background:#e8f7ee; color:#1d7a46; border-color:#bfe6cf; }
+    .barcode-badge.is-scale { background:#fff4e5; color:#a35b00; border-color:#f6d7a7; }
+    .barcode-badge.is-legacy { background:#f1f3f5; color:#5b6670; border-color:#dde2e6; }
     .bplus-setup {
         padding: 0;
         overflow: hidden;
@@ -1112,7 +1100,7 @@
     .product-status.is-on { background: var(--erp-success-soft); color: var(--erp-success-ink); }
     .product-status.is-off { background: var(--erp-border); color: var(--erp-text); }
     .product-soft-pill { background: var(--erp-surface-2); color: var(--erp-text); }
-    .product-identity-grid { display: grid; grid-template-columns: 1.1fr 1fr .72fr; gap: 10px; }
+    .product-identity-grid { display: grid; grid-template-columns: .9fr 1.1fr 1fr .72fr; gap: 10px; }
     .identity-card {
         border: 1px solid var(--erp-border);
         border-radius: 10px;
@@ -1773,6 +1761,10 @@
                 for (let i = 0; i < 12; i++) sum += Number(value[i]) * (i % 2 === 0 ? 1 : 3);
                 return (10 - (sum % 10)) % 10;
             },
+            barcodeEdit: null,
+            openBarcodeEdit(row) { this.barcodeEdit = { ...row }; },
+            okFor(type, raw) { const keep = [this.barcodeType, this.barcodeValue]; this.barcodeType = type; this.barcodeValue = raw || ''; const ok = this.barcodeOk(); [this.barcodeType, this.barcodeValue] = keep; return ok; },
+            hintFor(type, raw) { const keep = [this.barcodeType, this.barcodeValue]; this.barcodeType = type; this.barcodeValue = raw || ''; const hint = this.barcodeHint(); [this.barcodeType, this.barcodeValue] = keep; return hint; },
             barcodeOk() {
                 const value = this.barcodeValue.trim();
                 if (value === '') return false;
@@ -1806,7 +1798,8 @@
                 if (this.barcodeType === 'SCALE_PLU') {
                     return /^801\d{3}$/.test(value) ? 'PLU เครื่องชั่งถูกต้อง: ฉลาก EAN-13 จะอ้างอิงเลขนี้' : 'ต้องเป็นเลข 801 ตามด้วย 3 หลัก เช่น 801001';
                 }
-                return 'รับได้ทุกรูปแบบ';
+                if (this.barcodeType === 'LEGACY') return 'Legacy / BPlus: เก็บตามจริง ไม่ตรวจรูปแบบ';
+                return 'รหัสภายใน: รับความยาวตามจริง ไม่บังคับกฎ EAN-13';
             },
         };
     }
