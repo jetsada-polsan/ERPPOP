@@ -62,7 +62,8 @@ class BookingController extends Controller
         ]])->values();
 
         return view('bookings.summary', [
-            'date' => $date, 'items' => $items, 'bookings' => $bookingRows, 'branchId' => $branchId, 'salesAreaId' => $salesAreaId,
+            'date' => $date, 'items' => $items, 'bookings' => $bookingRows,
+            'bills' => $bookings->sortBy(fn (SaleBooking $booking) => $booking->document->doc_number)->values(), 'branchId' => $branchId, 'salesAreaId' => $salesAreaId,
             'branches' => Branch::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name_th']),
             'salesAreas' => SalesArea::orderBy('code')->get(['id', 'code', 'name']),
         ]);

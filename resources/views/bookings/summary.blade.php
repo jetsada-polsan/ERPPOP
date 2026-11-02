@@ -10,6 +10,21 @@
         <button class="btn btn-primary"><i class="bi bi-search me-1"></i>แสดง</button><button type="button" class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>พิมพ์</button><a class="btn btn-link" href="{{ route('bookings.index') }}">กลับ</a>
     </form>
     <div class="summary-meta"><div><strong>ใบรวมจอง: เช็คสินค้า</strong><span>{{ $date->format('d/m/Y') }} · {{ $branches->firstWhere('id', $branchId)?->name_th ?? 'ทุกสาขา' }} · {{ $salesAreas->firstWhere('id', $salesAreaId)?->name ?? 'ทุกสาย' }}</span></div><b>{{ $bookings->count() }} ใบจอง</b></div>
+    <section class="summary-card">
+        <div class="section-title"><i class="bi bi-clipboard2-check"></i><div><h2>ใบขึ้นของ ทีละบิล</h2><small>ติ๊กขึ้นได้หรือไม่ได้ ถ้าไม่ครบใส่จำนวนจริง แล้วนำไปแก้ใบจอง</small></div><span>{{ $bills->count() }} บิล</span></div>
+        @forelse($bills as $booking)
+            <div class="load-bill">
+                <div class="load-bill-head"><strong>{{ $booking->document->doc_number }}</strong><span>{{ $booking->document->customer?->code }} {{ $booking->document->customer?->name_th }}</span><strong>฿{{ number_format((float) $booking->document->total_amount, 2) }}</strong></div>
+                <table class="summary-table"><thead><tr><th>#</th><th>สินค้า</th><th>หน่วย</th><th class="text-end">จอง</th><th class="check-col">ขึ้นได้</th><th class="check-col">ไม่ได้</th><th>จำนวนจริง</th></tr></thead><tbody>
+                    @foreach($booking->document->stockDocument?->items ?? [] as $item)
+                        <tr><td>{{ $loop->iteration }}</td><td>{{ $item->product?->sku_code }} {{ $item->product?->name_th }}</td><td>{{ $item->product?->baseUnit?->name }}</td><td class="text-end">{{ number_format((float) $item->qty, 2) }}</td><td>□</td><td>□</td><td></td></tr>
+                    @endforeach
+                </tbody></table>
+            </div>
+        @empty
+            <p class="text-center text-muted p-3 mb-0">ไม่มีใบจองค้าง</p>
+        @endforelse
+    </section>
     <section class="summary-card"><div class="section-title"><i class="bi bi-box-seam"></i><div><h2>รายการสินค้าที่ต้องเตรียม</h2><small>รวมจำนวนจากใบจองตามตัวกรอง</small></div><span>{{ $items->count() }} รายการ</span></div>
     <div class="table-wrap"><table class="summary-table"><thead><tr><th>รหัส</th><th>สินค้า</th><th class="text-end">รวม</th><th>หน่วย</th><th class="check-col">เช็ค</th></tr></thead><tbody>
         @forelse($items as $item)<tr><td>{{ $item->sku_code }}</td><td>{{ $item->name_th }}</td><td class="text-end">{{ number_format((float) $item->total_qty, 2) }}</td><td>{{ $item->unit_name }}</td><td>□</td></tr>@empty<tr><td colspan="5" class="text-center">ไม่มีใบจองค้าง</td></tr>@endforelse
@@ -23,5 +38,6 @@
 @media(max-width:1000px){.summary-toolbar{flex-wrap:wrap}.summary-heading{width:100%}.summary-toolbar label{flex:1}.summary-toolbar input,.summary-toolbar select{width:100%;min-width:0}}@media(max-width:600px){.summary-page{padding:10px}.summary-toolbar label{width:100%;flex:auto}.summary-toolbar .btn,.summary-toolbar a{flex:1;text-align:center}.summary-meta{align-items:flex-start;gap:10px}.summary-meta strong{font-size:16px}}
 @media print{.no-print{display:none!important}.summary-page{padding:0;max-width:none}.summary-card{box-shadow:none;border-color:#222}.summary-table th{background:#eee!important;color:#111}.summary-meta{padding-top:0}.signatures{page-break-inside:avoid}}
 @page{size:A4;margin:12mm}
+.load-bill{margin:12px 14px;break-inside:avoid}.load-bill-head{display:flex;gap:14px;align-items:center;margin-bottom:4px;font-size:14px}.load-bill-head span{flex:1}
 </style>
 @endsection
