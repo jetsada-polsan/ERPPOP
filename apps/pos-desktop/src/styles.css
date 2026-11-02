@@ -520,3 +520,15 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
   .print-payment { display: flex; flex-direction: column; }
   .provisional-note { margin-top: 2mm; padding: 2mm; border: 1px solid #000; text-align: center; font-size: 8pt; }
 }
+
+/* โลโก้บริษัทและตัวหนังสือในหน้าต่างเด้ง ต้องอ่านชัดบนจอ Windows */
+.brand-logo { height: 46px; width: auto; max-width: 120px; object-fit: contain; background: #fff; border-radius: 6px; padding: 2px; }
+.modal { color: #111c26; font-size: 18px; }
+.modal-head strong { font-size: 24px; color: #111c26; }
+.modal-head small { font-size: 15px; color: #3d4a55; }
+.modal label { font-size: 18px; color: #1d2933; }
+.modal input, .modal select, .modal textarea { min-height: 50px; font-size: 20px; color: #111c26; }
+.modal button { font-size: 18px; }
+.modal .setup-hint, .modal small { font-size: 15px; color: #3d4a55; }
+.bill-discount { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 16px; font-weight: 700; }
+.bill-discount input { width: 130px; min-height: 42px; font-size: 18px; text-align: right; }

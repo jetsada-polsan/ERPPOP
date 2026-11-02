@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import mpmLogo from './assets/mpm-logo.jpg'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, CircleHelp, Cloud, CloudOff, CreditCard, FileText, FolderOpen, History, LogOut, Minus, PackageSearch, PauseCircle, Plus, Printer, QrCode, ReceiptText, RefreshCw, ScanLine, Search, Settings, ShoppingCart, Trash2, UserRound, Wifi, X } from 'lucide-vue-next'
 import { check } from '@tauri-apps/plugin-updater'
@@ -720,7 +721,7 @@ onUnmounted(() => {
 <template>
   <main class="app-shell">
     <header class="topbar">
-      <div class="brand"><span class="brand-mark">J</span><div><strong>JET POS</strong><small>POINT OF SALE</small></div></div>
+      <div class="brand"><img class="brand-logo" :src="mpmLogo" alt="MPM Food Group"><div><strong>JET POS</strong><small>POINT OF SALE</small></div></div>
       <div class="terminal-context">
         <div><span>สาขา / เครื่อง</span><strong>{{ profile?.branchName || 'ยังไม่ได้ตั้งค่าเครื่อง' }}</strong><small>{{ profile?.terminalCode || 'POS' }}</small></div>
         <div><span>กะขาย</span><strong>{{ shift?.shift_no || 'ยังไม่เปิดกะ' }}</strong><small>{{ cashier?.name || 'ยังไม่เข้าแคชเชียร์' }}</small></div>
