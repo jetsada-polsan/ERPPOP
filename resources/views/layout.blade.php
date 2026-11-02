@@ -392,11 +392,11 @@
             scrollbar-width: thin; padding: 0 0 24px;
         }
         /* ── แบรนด์บนสุดของเมนู ───────────────────────────────────── */
-        .odn-side-brand { display:flex; align-items:center; justify-content:center; height:56px;
+        .odn-side-brand { display:flex; align-items:center; justify-content:center; height:76px; box-sizing:border-box; padding:8px 10px;
             margin:0; padding:10px 14px; overflow:hidden; text-decoration:none;
             color:var(--erp-primary-dark); font-weight:700; font-size:13px;
             border-bottom:1px solid var(--erp-border); background:var(--erp-surface); }
-        .odn-side-brand img { max-width:210px; max-height:60px; width:auto; height:auto; object-fit:contain; }
+        .odn-side-brand img { max-width:100%; max-height:58px; width:auto; height:auto; object-fit:contain; }
 
         /* ── หัวหมวด ──────────────────────────────────────────────── */
         .odn-grp { border-bottom:0; }
@@ -738,8 +738,8 @@
         }
         html.subnav-collapsed .fa-subnav { display: none; }
 
-        .fa-subnav-brand { height:56px; display:flex; align-items:center; justify-content:center; gap:7px; margin:0 4px 8px; padding:8px 6px; overflow:hidden; }
-        .fa-subnav-brand img { display:block; width:150px!important; height:42px!important; max-width:150px!important; max-height:42px!important; object-fit:cover; object-position:center 28%; }
+        .fa-subnav-brand { height:76px; box-sizing:border-box; display:flex; align-items:center; justify-content:center; margin:0 4px 8px; padding:8px 6px; overflow:hidden; }
+        .fa-subnav-brand img { display:block; width:auto!important; height:auto!important; max-width:100%!important; max-height:58px!important; object-fit:contain; }
         .fa-subnav-system-name { color:var(--erp-primary-dark); font-size:15px; font-weight:900; letter-spacing:-.02em; white-space:nowrap; }
         .fa-subnav-brand .brand-logo { font-size: 22px; font-weight: 900; color: var(--erp-primary-dark); }
         .fa-subnav-brand .brand-logo span { color: var(--fa-green); }
@@ -1320,8 +1320,8 @@
             .fa-rail-btn i { font-size: 21px; }
             .fa-rail-btn-label { font-size: 11px; max-width: 64px; }
             .fa-subnav { padding: 14px 12px 22px; }
-            .fa-subnav-brand { height: 56px; }
-            .fa-subnav-brand img { width: 130px!important; height: 38px!important; max-width: 130px!important; max-height: 38px!important; }
+            .fa-subnav-brand { height: 76px; }
+            .fa-subnav-brand img { max-width: 100%!important; max-height: 58px!important; }
             .fa-subnav-title { font-size: 17px; padding: 6px 10px 10px; }
             .fa-subnav-link { gap: 11px; padding: 9px 10px; font-size: 15px; margin-bottom: 2px; }
             .fa-subnav-link i { font-size: 15px; width: 18px; }
