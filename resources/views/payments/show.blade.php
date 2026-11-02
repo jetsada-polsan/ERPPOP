@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', "{$payment->doc_number} - PopCentral")
+@section('title', "{$payment->doc_number} - MPM Food Group")
 @section('page-title', $payment->documentType->name_th)
 @section('page-subtitle', $payment->doc_number)
 @section('content')

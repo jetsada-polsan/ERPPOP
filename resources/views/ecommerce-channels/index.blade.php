@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'E-Commerce - PopCentral')
+@section('title', 'E-Commerce - MPM Food Group')
 @section('page-title', 'E-Commerce')
 @section('page-subtitle', 'ช่องทางขายออนไลน์ Lazada, Shopee, LINE MyShop, TikTok Shop')
 @section('content')

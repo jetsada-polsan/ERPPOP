@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', "{$document->documentType->name_th} {$document->doc_number} - PopCentral")
+@section('title', "{$document->documentType->name_th} {$document->doc_number} - MPM Food Group")
 @section('page-title', $document->documentType->name_th)
 @section('page-subtitle', $document->doc_number)
 

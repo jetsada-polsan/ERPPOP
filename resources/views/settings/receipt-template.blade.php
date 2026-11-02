@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'ออกแบบใบเสร็จ POS - PopCentral')
+@section('title', 'ออกแบบใบเสร็จ POS - MPM Food Group')
 @section('page-title', 'ออกแบบใบเสร็จ POS')
 @section('page-subtitle', 'จัดรูปแบบใบเสร็จสำหรับเครื่องแคชเชียร์')
 

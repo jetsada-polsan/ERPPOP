@@ -80,7 +80,7 @@
     .selected-copy small { color:var(--erp-muted,#6b8294); font-size:11px; }
     .selected-change { color:var(--erp-primary-ink,var(--erp-primary,#1585c0)); font-size:11px; font-weight:600; text-align:right; }
 
-    /* หน้าต่างเลือกสินค้า - ใช้ตัวแปรธีมเดียวกับหน้าอื่นของ PopCentral */
+    /* หน้าต่างเลือกสินค้า - ใช้ตัวแปรธีมเดียวกับหน้าอื่นของ MPM Food Group */
     /* Teleport to body prevents parent modal/transform stacking contexts from covering the picker. */
     .product-picker-backdrop { position:fixed; inset:0; z-index:10000; padding:24px; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.45); backdrop-filter:blur(2px); }
     .product-picker { width:min(920px,100%); height:min(640px,calc(100vh - 48px)); display:flex; flex-direction:column; overflow:hidden; background:var(--erp-surface,#fff); border:1px solid var(--erp-border,#dbe7ef); border-radius:16px; box-shadow:0 24px 70px rgba(15,23,42,.28); font-family:var(--erp-font-family,inherit); color:var(--erp-text,var(--erp-ink,#1d3b52)); }

@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'ราคาเครื่องชั่ง - PopCentral')
+@section('title', 'ราคาเครื่องชั่ง - MPM Food Group')
 @section('page-title', 'ราคาสินค้าเครื่องชั่ง')
 @section('page-subtitle', 'ราคา/กก. ของสินค้าขายชั่งทั้งหมด — ต้องตั้งให้ตรงกับเครื่องชั่งเสมอ')
 

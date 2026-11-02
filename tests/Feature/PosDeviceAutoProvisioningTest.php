@@ -44,7 +44,7 @@ class PosDeviceAutoProvisioningTest extends TestCase
         $this->assertSame($branch->id, $device->branch_id);
         $this->assertSame($cashier->id, $device->user_id);
         $this->assertSame('POS-B001-01', $device->terminal_code);
-        $this->assertSame('PopCentral POS POS-B001-01', $device->name);
+        $this->assertSame('MPM Food Group POS POS-B001-01', $device->name);
     }
 
     public function test_admin_choice_wins_when_multiple_users_can_sell(): void

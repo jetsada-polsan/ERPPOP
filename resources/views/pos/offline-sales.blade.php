@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'บิลขายออฟไลน์ - PopCentral')
+@section('title', 'บิลขายออฟไลน์ - MPM Food Group')
 @section('page-title', 'บิลขายออฟไลน์ (Web POS)')
 @section('page-subtitle', 'บิลที่ขายตอนเน็ต/Host ล่ม แล้วระบบลงบัญชีอัตโนมัติไม่ได้ ต้องตรวจก่อน')
 

@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'ใบเสนอราคา - PopCentral')
+@section('title', 'ใบเสนอราคา - MPM Food Group')
 @section('page-title', 'ใบเสนอราคา')
 @section('page-subtitle', 'เสนอราคาสินค้าให้ลูกค้า พิมพ์ได้ และแปลงเป็นใบจองเมื่อลูกค้าตอบรับ')
 @section('content')

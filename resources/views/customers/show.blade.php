@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', "{$customer->code} - ลูกค้า - PopCentral")
+@section('title', "{$customer->code} - ลูกค้า - MPM Food Group")
 @section('page-title', 'รายละเอียดลูกค้า')
 @section('page-subtitle', $customer->code)
 

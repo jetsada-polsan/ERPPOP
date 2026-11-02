@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'ลูกค้าสัมพันธ์ - PopCentral')
+@section('title', 'ลูกค้าสัมพันธ์ - MPM Food Group')
 @section('page-title', 'ลูกค้าสัมพันธ์')
 @section('page-subtitle', 'Customer 360 · ลูกค้า งานขาย และยอดค้างชำระในที่เดียว')
 

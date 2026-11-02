@@ -183,7 +183,7 @@
     $dateParams = ['from' => $from, 'to' => $to, 'branch_id' => $filters['branch_id']];
 @endphp
 
-@section('title', 'รายงาน - PopCentral')
+@section('title', 'รายงาน - MPM Food Group')
 @section('page-title', 'รายงาน')
 @section('page-subtitle', 'เลือกรายงานจากแผงซ้าย - ค่าเริ่มต้นแสดงข้อมูลของวันนี้')
 

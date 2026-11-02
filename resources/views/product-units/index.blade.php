@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'หน่วยนับ - PopCentral')
+@section('title', 'หน่วยนับ - MPM Food Group')
 @section('page-title', 'หน่วยนับสินค้า')
 @section('page-subtitle', 'จัดการหน่วยนับและตัวคูณเทียบหน่วยฐาน')
 

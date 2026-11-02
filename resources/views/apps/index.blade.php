@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'PopCentral · รวมโมดูลทั้งหมด')
+@section('title', 'MPM Food Group · รวมโมดูลทั้งหมด')
 @section('page-title', 'รวมโมดูลทั้งหมด')
 @section('page-subtitle', 'เลือกโมดูลที่ต้องการเข้าใช้งาน')
 

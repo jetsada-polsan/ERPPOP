@@ -14,7 +14,7 @@
         'slate' => 'menu-icon-slate',
         'amber' => 'menu-icon-amber',
     ];
-    $fallbackFavicon = asset('images/logo-jet-erp-mark.svg').'?v='.filemtime(public_path('images/logo-jet-erp-mark.svg'));
+    $fallbackFavicon = asset('images/logos/mpm-food-group.jpg').'?v='.filemtime(public_path('images/logos/mpm-food-group.jpg'));
     $companyName = \App\Models\AppSetting::company('name_th') ?: 'กิจการของคุณ';
     $companyLogo = \App\Models\AppSetting::logoUrl();
     $faviconUrl = \App\Models\AppSetting::get('favicon_path')
@@ -33,7 +33,7 @@
     <link rel="icon" href="{{ $faviconUrl }}">
     <link rel="shortcut icon" href="{{ $faviconUrl }}">
     <link rel="apple-touch-icon" href="{{ $faviconUrl }}">
-    <title>{{ trim($__env->yieldContent('title', 'PopCentral')) }}</title>
+    <title>{{ trim($__env->yieldContent('title', 'MPM Food Group')) }}</title>
 
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     <link rel="stylesheet" href="{{ asset('vendor/adminlte/css/adminlte.min.css') }}">
@@ -1439,7 +1439,7 @@
                         <div class="d-flex align-items-center">
                             <span class="page-title-icon"><i class="bi bi-bar-chart-line-fill"></i></span>
                             <div>
-                                <h1 class="fw-bold mb-0">@yield('page-title', trim($__env->yieldContent('title', 'PopCentral')))</h1>
+                                <h1 class="fw-bold mb-0">@yield('page-title', trim($__env->yieldContent('title', 'MPM Food Group')))</h1>
                                 <div class="text-muted small">@yield('page-subtitle', 'ภาพรวมธุรกิจ สต็อก และงานที่ต้องจัดการ')</div>
                             </div>
                         </div>
@@ -1614,12 +1614,12 @@
         <aside class="app-sidebar" x-data="{ sec: {{ $activeSection }} }">
             {{-- ชั้น 1: rail ไอคอนโมดูล --}}
             <div class="fa-rail">
-                {{-- โลโก้ = ตรา PopCentral (เครื่องบินเจ็ท) — ตัว J แดงใช้เฉพาะ favicon --}}
+                {{-- โลโก้ = ตรา MPM Food Group (เครื่องบินเจ็ท) — ตัว J แดงใช้เฉพาะ favicon --}}
                 <a href="{{ route('dashboard') }}" class="fa-rail-logo" title="หน้าแรก">
                     @if($appLogo)
                         <img src="{{ $appLogo }}" alt="logo">
-                    @elseif(is_file(public_path('images/logo-jet-erp-mark.svg')))
-                        <img src="{{ asset('images/logo-jet-erp-mark.svg') }}" alt="PopCentral logo">
+                    @elseif(is_file(public_path('images/logos/mpm-food-group.jpg')))
+                        <img src="{{ asset('images/logos/mpm-food-group.jpg') }}" alt="MPM Food Group logo">
                     @else
                         <span>ป</span>
                     @endif

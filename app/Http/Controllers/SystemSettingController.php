@@ -299,11 +299,11 @@ class SystemSettingController extends Controller
         abort(500, 'สร้าง PIN ที่ไม่ซ้ำไม่ได้ กรุณาลองใหม่');
     }
 
-    /** Download the tested PopCentral POS installer without requiring GitHub access on a cashier PC. */
+    /** Download the tested MPM Food Group POS installer without requiring GitHub access on a cashier PC. */
     public function downloadPythonPos()
     {
         $installer = $this->currentPythonPosInstaller();
-        abort_unless($installer, 404, 'ยังไม่มีไฟล์ติดตั้ง PopCentral POS รุ่นทดสอบ');
+        abort_unless($installer, 404, 'ยังไม่มีไฟล์ติดตั้ง MPM Food Group POS รุ่นทดสอบ');
 
         return response()->download($installer['path'], $installer['filename'], [
             'Content-Type' => 'application/vnd.microsoft.portable-executable',
@@ -350,7 +350,7 @@ class SystemSettingController extends Controller
         File::put($temporary, json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
         File::move($temporary, $directory.'/latest.json');
 
-        return redirect()->route('settings.index')->with('success', 'เผยแพร่ PopCentral POS รุ่น '.$data['pos_version'].' แล้ว เครื่องสาขาจะตรวจพบอัตโนมัติ');
+        return redirect()->route('settings.index')->with('success', 'เผยแพร่ MPM Food Group POS รุ่น '.$data['pos_version'].' แล้ว เครื่องสาขาจะตรวจพบอัตโนมัติ');
     }
 
     private function currentPosRelease(): ?array
@@ -387,7 +387,7 @@ class SystemSettingController extends Controller
                 }
 
                 $terminalCode = PosTerminalCode::next($branch);
-                $name = trim((string) ($data['pos_device_name'] ?? '')) ?: "PopCentral POS {$terminalCode}";
+                $name = trim((string) ($data['pos_device_name'] ?? '')) ?: "MPM Food Group POS {$terminalCode}";
 
                 return PosDevice::issue([
                     'name' => $name,

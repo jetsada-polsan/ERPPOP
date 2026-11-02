@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>ตัวอย่าง PopCentral POS รุ่น {{ $publishedVersion }}</title>
+    <title>ตัวอย่าง MPM Food Group POS รุ่น {{ $publishedVersion }}</title>
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     <style>
         :root {
@@ -109,7 +109,7 @@
 @endphp
 <div class="preview-shell">
     <header class="topbar">
-        <div class="brand">PopCentral <span>POS</span></div>
+        <div class="brand">MPM Food Group <span>POS</span></div>
         <div class="terminal"><i class="bi bi-display"></i>@if($runtime['show_terminal'])<span>เครื่อง <b>POS001</b></span>@endif @if($runtime['show_branch'])<span>สาขา <b>B001</b></span>@endif @if($runtime['show_seller'])<span>แคชเชียร์ <b>{{ auth()->user()?->name ?? 'Demo Cashier' }}</b></span>@endif</div>
         <div class="top-spacer"></div>
         <div class="preview-badge"><i class="bi bi-eye"></i><span>ตัวอย่างจาก Build รุ่น {{ $publishedVersion }}</span></div>

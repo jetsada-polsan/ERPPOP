@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', "ปรับต้นทุนซื้อย้อนหลัง {$purchase->doc_number} - PopCentral")
+@section('title', "ปรับต้นทุนซื้อย้อนหลัง {$purchase->doc_number} - MPM Food Group")
 @section('page-title', 'ปรับต้นทุนซื้อย้อนหลัง')
 @section('page-subtitle', $purchase->doc_number)
 

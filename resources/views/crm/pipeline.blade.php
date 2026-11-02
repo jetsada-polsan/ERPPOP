@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'Pipeline งานขาย - PopCentral')
+@section('title', 'Pipeline งานขาย - MPM Food Group')
 @section('page-title', 'Pipeline งานขาย')
 @section('page-subtitle', 'มองเห็นโอกาสการขายตั้งแต่เริ่มติดต่อจนปิดการขาย')
 

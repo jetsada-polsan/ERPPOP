@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'ศูนย์ควบคุม POS - PopCentral')
+@section('title', 'ศูนย์ควบคุม POS - MPM Food Group')
 @section('page-title', 'ศูนย์ควบคุม POS')
 @section('page-subtitle', 'ตรวจยอดขาย ปิดกะ เงินสด และ QR/โอนก่อนส่งให้การเงิน')
 

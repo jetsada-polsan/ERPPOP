@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'ซัพพลายเออร์ - PopCentral')
+@section('title', 'ซัพพลายเออร์ - MPM Food Group')
 @section('page-title', 'ซัพพลายเออร์')
 @section('page-subtitle', 'ทะเบียนซัพพลายเออร์และยอดเจ้าหนี้ (AP)')
 

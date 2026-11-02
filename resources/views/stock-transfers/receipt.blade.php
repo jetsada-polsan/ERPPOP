@@ -1,7 +1,7 @@
 <?php /* resources/views/stock-transfers/receipt.blade.php */ ?>
 @extends('layout')
 
-@section('title', 'ตรวจรับสินค้าโอนย้าย ' . $transfer->doc_number . ' - PopCentral')
+@section('title', 'ตรวจรับสินค้าโอนย้าย ' . $transfer->doc_number . ' - MPM Food Group')
 @section('page-title', 'ตรวจรับสินค้าโอนย้ายด้วยสแกน')
 @section('page-subtitle', $transfer->doc_number . ' · เทียบยอดที่สแกนได้จริงกับยอดในใบโอนย้าย ไม่กระทบสต๊อกที่โอนไปแล้ว')
 

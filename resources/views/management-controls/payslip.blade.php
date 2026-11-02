@@ -17,7 +17,7 @@
 <div class="content-card p-4 mx-auto" style="max-width:640px">
     <div class="d-flex justify-content-between align-items-start border-bottom pb-3 mb-3">
         <div>
-            <div class="h5 fw-bold mb-0">POPSTAR SHOP</div>
+            <div class="h5 fw-bold mb-0">MPM Food Group</div>
             <div class="text-muted small">สลิปเงินเดือน / Payslip</div>
         </div>
         <div class="text-end">

@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', "ใบแปรรูป {$document->doc_number} - PopCentral")
+@section('title', "ใบแปรรูป {$document->doc_number} - MPM Food Group")
 @section('page-title', 'แปรรูปสินค้า / บันทึกสูญเสีย')
 @section('page-subtitle', $document->doc_number)
 

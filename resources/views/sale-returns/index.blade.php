@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'ใบรับคืนสินค้า - PopCentral')
+@section('title', 'ใบรับคืนสินค้า - MPM Food Group')
 @section('page-title', 'ใบรับคืนสินค้า')
 @section('page-subtitle', 'รับสินค้าคืนเข้าสต็อก และลดมูลค่าขายตามเอกสาร')
 

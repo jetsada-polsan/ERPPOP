@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'สมาชิก - PopCentral')
+@section('title', 'สมาชิก - MPM Food Group')
 @section('page-title', 'สมาชิก')
 @section('page-subtitle', 'แฟ้มสมาชิก คะแนนสะสม ประเภทสมาชิก และสาขาที่ดูแล')
 @section('content')

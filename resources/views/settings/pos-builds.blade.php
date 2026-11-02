@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'POS Build Center - PopCentral')
+@section('title', 'POS Build Center - MPM Food Group')
 @section('page-title', 'POS Build Center')
 @section('page-subtitle', 'สร้าง ทดสอบ และเผยแพร่โปรแกรม POS โดยไม่ต้องใช้คำสั่ง')
 

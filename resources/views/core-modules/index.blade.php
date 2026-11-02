@@ -2,7 +2,7 @@
 
 @section('title', 'คู่มือ PopStar 4M')
 @section('page-title', 'คู่มือ PopStar 4M')
-@section('page-subtitle', 'ระบบงาน คน เงิน สินค้า และการบริหารของ PopStar Shop')
+@section('page-subtitle', 'ระบบงาน คน เงิน สินค้า และการบริหารของ MPM Food Group')
 
 @push('head')
 <style>

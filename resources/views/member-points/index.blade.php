@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'แต้มสมาชิก - PopCentral')
+@section('title', 'แต้มสมาชิก - MPM Food Group')
 @section('page-title', 'แต้มสมาชิก')
 @section('page-subtitle', 'ตั้งกติกาแต้มทอง แคมเปญแต้มทวีคูณ และดูประวัติแต้ม')
 @section('content')

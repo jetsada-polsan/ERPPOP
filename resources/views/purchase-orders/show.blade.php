@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', "ใบขอซื้อ {$purchaseOrder->doc_number} - PopCentral")
+@section('title', "ใบขอซื้อ {$purchaseOrder->doc_number} - MPM Food Group")
 @section('page-title', 'ใบขอซื้อ / ใบสั่งซื้อ ' . $purchaseOrder->doc_number)
 @section('page-subtitle', $purchaseOrder->statusLabel())
 @section('content')

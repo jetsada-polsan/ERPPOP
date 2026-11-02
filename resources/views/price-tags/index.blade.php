@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'ป้ายราคา - PopCentral')
+@section('title', 'ป้ายราคา - MPM Food Group')
 @section('page-title', 'ป้ายราคา')
 @section('page-subtitle', 'กำหนดรูปแบบป้ายราคาและพิมพ์ป้ายสำหรับสินค้า')
 @section('content')

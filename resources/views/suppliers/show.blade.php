@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', "{$supplier->code} - ซัพพลายเออร์ - PopCentral")
+@section('title', "{$supplier->code} - ซัพพลายเออร์ - MPM Food Group")
 @section('page-title', 'รายละเอียดซัพพลายเออร์')
 @section('page-subtitle', $supplier->code)
 

@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'ศูนย์ควบคุมบริหาร - PopCentral')
+@section('title', 'ศูนย์ควบคุมบริหาร - MPM Food Group')
 @section('page-title', 'ศูนย์ควบคุมบริหาร')
 @section('page-subtitle', 'Budget · Payroll · Purchase Plan · E-Commerce · Profit · Monitoring')
 

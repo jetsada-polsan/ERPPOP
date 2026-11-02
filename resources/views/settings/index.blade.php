@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'การตั้งค่า - PopCentral')
+@section('title', 'การตั้งค่า - MPM Food Group')
 @section('page-title', 'การตั้งค่า')
 @section('page-subtitle', 'ตั้งค่าเอกสาร ข้อมูลกิจการ ภาษี และการรับชำระ')
 @section('content')
@@ -56,7 +56,7 @@
         <div class="set-main">
             <div class="d-flex align-items-center justify-content-between mb-3">
                 <h2 class="h4 fw-bold mb-0" style="color:var(--erp-primary-dark)"
-                    x-text="{ func: 'ฟังก์ชั่นเอกสาร', numbering: 'เลขรันเอกสาร', logo: 'โลโก้และตราประทับ', note: 'หมายเหตุเอกสาร', company: 'ข้อมูลกิจการ', menu: 'จัดลำดับเมนูหลัก', theme: 'ปรับธีมระบบ', payment: 'ข้อมูลการรับชำระ', accounting: 'บันทึกบัญชี', 'pos-download': 'ตั้งค่า PopCentral POS' }[tab]"></h2>
+                    x-text="{ func: 'ฟังก์ชั่นเอกสาร', numbering: 'เลขรันเอกสาร', logo: 'โลโก้และตราประทับ', note: 'หมายเหตุเอกสาร', company: 'ข้อมูลกิจการ', menu: 'จัดลำดับเมนูหลัก', theme: 'ปรับธีมระบบ', payment: 'ข้อมูลการรับชำระ', accounting: 'บันทึกบัญชี', 'pos-download': 'ตั้งค่า MPM Food Group POS' }[tab]"></h2>
                 <button x-show="tab !== 'pos-download' && tab !== 'theme'" type="submit" class="btn btn-success px-4"><i class="bi bi-check-lg me-1"></i>บันทึกข้อมูล</button>
                 <button x-show="tab === 'theme'" type="submit" form="layout-form" class="btn btn-success px-4"><i class="bi bi-check-lg me-1"></i>บันทึก Layout</button>
             </div>
@@ -138,7 +138,7 @@
                     <div class="set-title mt-4">รูปแบบหน้าหลังบ้าน</div>
                     <div class="set-desc mb-3">เปลี่ยนเฉพาะ Layout และสี ไม่กระทบข้อมูลขาย สต๊อก บัญชี หรือสิทธิ์</div>
                     <div class="theme-choice-grid">
-                        <label class="theme-choice" :class="layout === 'classic' && 'active'"><input form="layout-form" type="radio" name="erp_layout" value="classic" x-model="layout"><span class="theme-preview" style="--preview-primary:#1585c0;--preview-deep:#0f4c75;--preview-bg:#eef4f9"><i></i><b></b></span><strong>แบบเดิม PopCentral</strong></label>
+                        <label class="theme-choice" :class="layout === 'classic' && 'active'"><input form="layout-form" type="radio" name="erp_layout" value="classic" x-model="layout"><span class="theme-preview" style="--preview-primary:#1585c0;--preview-deep:#0f4c75;--preview-bg:#eef4f9"><i></i><b></b></span><strong>แบบเดิม MPM Food Group</strong></label>
                         <label class="theme-choice" :class="layout === 'odoo' && 'active'"><input form="layout-form" type="radio" name="erp_layout" value="odoo" x-model="layout"><span class="theme-preview" style="--preview-primary:#714b67;--preview-deep:#493047;--preview-bg:#f7f7f7"><i></i><b></b></span><strong>แบบ Odoo</strong></label>
                     </div>
                 </div>

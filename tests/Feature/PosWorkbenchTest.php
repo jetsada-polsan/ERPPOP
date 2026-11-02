@@ -79,7 +79,7 @@ class PosWorkbenchTest extends TestCase
         $response = $this->actingAs($this->posUser())->get(route('bplus.pos-workbench'));
 
         $response->assertOk()
-            ->assertSee('PopCentral Python POS')
+            ->assertSee('MPM Food Group Python POS')
             ->assertSee('Python + PySide6')
             ->assertSee('Local SQLite')
             ->assertSee('ช่องทางดาวน์โหลดปลอดภัยด้วย HTTPS')

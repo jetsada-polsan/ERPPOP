@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'งบการเงิน - PopCentral')
+@section('title', 'งบการเงิน - MPM Food Group')
 @section('page-title', 'งบการเงิน')
 @section('page-subtitle', 'งบทดลอง งบกำไรขาดทุน และงบแสดงฐานะการเงิน จากการลงบัญชีอัตโนมัติ')
 @section('content')

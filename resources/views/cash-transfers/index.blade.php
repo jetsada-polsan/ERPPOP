@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'ฝาก/ถอนเงินสด - PopCentral')
+@section('title', 'ฝาก/ถอนเงินสด - MPM Food Group')
 @section('page-title', 'ฝาก/ถอนเงินสดกับธนาคาร')
 @section('page-subtitle', 'ทุกรายการเข้าสมุดเงินสดและลงบัญชีอัตโนมัติ')
 

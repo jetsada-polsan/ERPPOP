@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="icon" type="image/png" href="{{ asset('images/logo-jet-j-red.png') }}?v={{ filemtime(public_path('images/logo-jet-j-red.png')) }}">
-    <title>คลังมือถือ — PopCentral</title>
+    <title>คลังมือถือ — MPM Food Group</title>
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     <script defer src="{{ asset('vendor/alpinejs/alpine.min.js') }}"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
@@ -125,7 +125,7 @@
 @php $lockedBranch = $branches->count() === 1 ? $branches->first() : null; @endphp
 <div x-data="whApp()" x-init="init()">
     <header class="topbar">
-        <img src="{{ asset('images/logo-jet-erp-mark.svg') }}" alt="logo">
+        <img src="{{ asset('images/logos/mpm-food-group.jpg') }}" alt="logo">
         <div class="tt">
             <b>คลังมือถือ</b>
             <span><span x-text="branchName()"></span> · {{ auth()->user()->name ?? auth()->user()->username ?? '' }}</span>

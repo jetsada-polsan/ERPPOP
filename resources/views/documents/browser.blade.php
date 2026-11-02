@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'เอกสารย้อนหลัง - PopCentral')
+@section('title', 'เอกสารย้อนหลัง - MPM Food Group')
 @section('page-title', 'เอกสารย้อนหลัง')
 @section('page-subtitle', 'ดูเอกสารทุกใบย้อนหลัง แยกประเภท ปี เดือน และกรองรายวันได้เหมือนระบบเดิม')
 @section('content')

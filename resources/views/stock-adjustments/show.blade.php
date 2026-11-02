@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', "ใบปรับปรุงสต็อก {$adjustment->doc_number} - PopCentral")
+@section('title', "ใบปรับปรุงสต็อก {$adjustment->doc_number} - MPM Food Group")
 @section('page-title', 'รายละเอียดใบปรับปรุงสต็อก')
 @section('page-subtitle', $adjustment->doc_number)
 

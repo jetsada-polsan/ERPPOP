@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'งวดบัญชี - PopCentral')
+@section('title', 'งวดบัญชี - MPM Food Group')
 @section('page-title', 'งวดบัญชีและการปิดงวด')
 @section('page-subtitle', 'ควบคุมการบันทึก แก้ไข ยกเลิก และลบเอกสารย้อนหลัง')
 

@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title','ภาษีไทยและ E-Tax - PopCentral')
+@section('title','ภาษีไทยและ E-Tax - MPM Food Group')
 @section('page-title','ศูนย์ภาษีไทยและ E-Tax')
 @section('page-subtitle','จัดทำ ตรวจทาน บันทึกการยื่น ภ.พ.30/ภ.ง.ด.3/53 และติดตาม E-Tax')
 @push('head')<style>[x-cloak]{display:none!important}.tax-shell{display:grid;gap:12px}.tax-panel{background:#fff;border:1px solid var(--erp-border);border-radius:7px;padding:14px}.tax-filter{display:flex;gap:9px;align-items:end;flex-wrap:wrap}.tax-tabs{display:flex;gap:5px;border-bottom:1px solid var(--erp-border);padding-bottom:8px}.tax-tab{border:0;background:var(--erp-primary-soft);color:var(--erp-muted);border-radius:6px;padding:8px 12px;font-weight:800}.tax-tab.active{background:var(--erp-primary-dark);color:#fff}.tax-note{padding:10px;border-left:3px solid var(--erp-warning-ink);background:var(--erp-warning-soft);color:var(--erp-warning-ink);font-size:11px}.tax-actions{display:flex;gap:5px;flex-wrap:wrap}.tax-actions form{display:flex;gap:5px}.tax-actions input,.tax-actions select{height:30px;font-size:11px;border:1px solid var(--erp-border);border-radius:5px;padding:0 6px}@media(max-width:640px){.tax-filter>*{width:100%}}</style>@endpush

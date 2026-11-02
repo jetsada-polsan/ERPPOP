@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'สร้างใบจ่ายชำระเจ้าหนี้ - PopCentral')
+@section('title', 'สร้างใบจ่ายชำระเจ้าหนี้ - MPM Food Group')
 @section('page-title', 'สร้างใบจ่ายชำระเจ้าหนี้')
 @section('page-subtitle', 'ติ๊กใบซื้อที่จะจ่าย แก้ยอดได้ถ้าจ่ายบางส่วน')
 

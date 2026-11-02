@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'ใบเพิ่ม/ลดหนี้ - PopCentral')
+@section('title', 'ใบเพิ่ม/ลดหนี้ - MPM Food Group')
 @section('page-title', 'ใบเพิ่มหนี้ / ใบลดหนี้')
 @section('page-subtitle', 'ปรับยอดหนี้ลูกค้าแบบการเงิน (ไม่กระทบสต๊อก) - ต่างจากใบรับคืนสินค้าที่คืนของจริง')
 @section('content')

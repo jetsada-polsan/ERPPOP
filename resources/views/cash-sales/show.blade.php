@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', "ใบขายสด {$sale->doc_number} - PopCentral")
+@section('title', "ใบขายสด {$sale->doc_number} - MPM Food Group")
 @section('page-title', 'รายละเอียดใบขายสด')
 @section('page-subtitle', $sale->doc_number)
 @section('content')

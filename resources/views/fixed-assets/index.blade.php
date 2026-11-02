@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'ทะเบียนทรัพย์สิน - PopCentral')
+@section('title', 'ทะเบียนทรัพย์สิน - MPM Food Group')
 @section('page-title', 'ทะเบียนทรัพย์สิน / ค่าเสื่อมราคา')
 @section('page-subtitle', 'บันทึกทรัพย์สินถาวรและคิดค่าเสื่อมราคาแบบเส้นตรงรายเดือน')
 @section('content')

@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'ผังบัญชี - PopCentral')
+@section('title', 'ผังบัญชี - MPM Food Group')
 @section('page-title', 'ผังบัญชี')
 @section('page-subtitle', 'รายการบัญชีแยกประเภท สำหรับใช้อ้างอิงในระบบบัญชีต่อไป')
 

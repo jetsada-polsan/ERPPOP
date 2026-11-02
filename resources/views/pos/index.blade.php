@@ -12,8 +12,8 @@
     <title>JET POS — {{ \App\Models\AppSetting::company('name_th') }}</title>
     <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
     <link rel="icon" type="image/svg+xml" href="{{ asset('pos-icon.svg') }}">
-    <link rel="icon" href="{{ asset('images/logo-jet-erp-mark.svg') }}?v={{ filemtime(public_path('images/logo-jet-erp-mark.svg')) }}">
-    <link rel="apple-touch-icon" href="{{ asset('images/logo-jet-erp-mark.svg') }}?v={{ filemtime(public_path('images/logo-jet-erp-mark.svg')) }}">
+    <link rel="icon" href="{{ asset('images/logos/mpm-food-group.jpg') }}?v={{ filemtime(public_path('images/logos/mpm-food-group.jpg')) }}">
+    <link rel="apple-touch-icon" href="{{ asset('images/logos/mpm-food-group.jpg') }}?v={{ filemtime(public_path('images/logos/mpm-food-group.jpg')) }}">
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     @vite('resources/css/pos-shared.css')
     <script src="{{ asset('vendor/sweetalert2/sweetalert2.all.min.js') }}"></script>
@@ -1291,7 +1291,7 @@
             .pos-actionbar { grid-template-columns: 1fr 1fr; }
         }
 
-        /* ── PopCentral POS popup system ───────────────── */
+        /* ── MPM Food Group POS popup system ───────────────── */
         .pos-swal-popup {
             width: min(430px, calc(100vw - 28px)) !important;
             padding: 0 !important;
@@ -2821,7 +2821,7 @@
     </div>
 
 <script>
-/* ── PopCentral POS popup helpers. All Swal.fire() calls inherit this skin. ── */
+/* ── MPM Food Group POS popup helpers. All Swal.fire() calls inherit this skin. ── */
 (function () {
     if (!window.Swal || window.Swal.__popstarPosPatched) return;
 
@@ -2961,7 +2961,7 @@ function buildPromptPayPayload(promptPayId, amount) {
 
     payload +=
         tlv('58', 'TH') +
-        tlv('59', @js(strtoupper(\App\Models\AppSetting::company('name_en') ?: 'PopCentral'))) +
+        tlv('59', @js(strtoupper(\App\Models\AppSetting::company('name_en') ?: 'MPM Food Group'))) +
         tlv('60', 'BANGKOK') +
         '6304';
 

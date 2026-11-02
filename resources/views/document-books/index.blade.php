@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'สมุดเอกสาร - PopCentral')
+@section('title', 'สมุดเอกสาร - MPM Food Group')
 @section('page-title', 'สมุดเอกสาร')
 @section('page-subtitle', 'แยกเอกสารประเภทเดียวเป็นหลายเล่ม แต่ละเล่มมีเลขรันของตัวเอง (เช่น DS / DSN เหมือน BPlus)')
 @section('content')

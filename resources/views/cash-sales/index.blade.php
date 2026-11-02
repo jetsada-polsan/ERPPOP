@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'ใบขายสด - PopCentral')
+@section('title', 'ใบขายสด - MPM Food Group')
 @section('page-title', 'ใบขายสด')
 @section('page-subtitle', 'คีย์ขายหลังบ้านแบบสั้น ตัดสต็อกทันทีหลังบันทึก')
 

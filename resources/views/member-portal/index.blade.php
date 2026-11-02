@@ -9,7 +9,7 @@
     </style>
 </head>
 <body><main class="shell">
-  <div class="top"><div><div class="brand"><img src="{{ \App\Models\AppSetting::logoUrl() ?: asset('images/logo-jet-erp-mark.svg') }}" alt="โลโก้แบรนด์"> <span>{{ \App\Models\AppSetting::company('name_th') ?: 'POPSTAR' }} MEMBER</span></div><div class="muted">สิทธิประโยชน์ของคุณ</div></div><button class="logout" id="logout">ออก</button></div>
+  <div class="top"><div><div class="brand"><img src="{{ \App\Models\AppSetting::logoUrl() ?: asset('images/logos/mpm-food-group.jpg') }}" alt="โลโก้แบรนด์"> <span>{{ \App\Models\AppSetting::company('name_th') ?: 'POPSTAR' }} MEMBER</span></div><div class="muted">สิทธิประโยชน์ของคุณ</div></div><button class="logout" id="logout">ออก</button></div>
   <div id="app" class="loading">กำลังตรวจสอบสมาชิก...</div>
 </main><nav class="nav"><button class="active" data-tab="points">⭐<br>แต้ม</button><button data-tab="coupons">🎟️<br>คูปอง</button><button data-tab="rewards">🎁<br>รางวัล</button><button data-tab="purchases">🧾<br>ซื้อ</button></nav>
 <script>

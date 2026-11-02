@@ -1,7 +1,7 @@
 @extends('layout')
 
-@section('title', 'PopCentral Flow')
-@section('page-title', 'PopCentral Flow')
+@section('title', 'MPM Food Group Flow')
+@section('page-title', 'MPM Food Group Flow')
 @section('page-subtitle', 'เมนู ERP แบบใช้งานง่าย อิงลำดับงานจาก BPlus')
 
 @push('head')
@@ -509,7 +509,7 @@
         </div>
 
         <div class="flow-footer">
-            <span>PopCentral Flow · อิงลำดับงาน BPlus</span>
+            <span>MPM Food Group Flow · อิงลำดับงาน BPlus</span>
             <span>{{ count($flowModules) }} โมดูล · {{ $totalItems }} งาน</span>
         </div>
     </section>

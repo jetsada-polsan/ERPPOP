@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'จ่ายชำระเจ้าหนี้ - PopCentral')
+@section('title', 'จ่ายชำระเจ้าหนี้ - MPM Food Group')
 @section('page-title', 'จ่ายชำระเจ้าหนี้')
 @section('page-subtitle', 'เลือกใบซื้อค้างจ่ายได้หลายใบ จ่ายด้วยเงินสด โอน หรือเช็ค และหัก ณ ที่จ่ายได้')
 

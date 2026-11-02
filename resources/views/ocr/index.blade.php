@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'OCR รับสินค้า - PopCentral')
+@section('title', 'OCR รับสินค้า - MPM Food Group')
 @section('page-title', 'OCR รับสินค้า')
 @section('page-subtitle', 'อ่านเอกสารซื้อเป็น Draft ให้คนตรวจ ก่อนรับเข้าสต็อกจริง')
 

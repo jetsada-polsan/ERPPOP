@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'ตรวจ OCR Draft - PopCentral')
+@section('title', 'ตรวจ OCR Draft - MPM Food Group')
 @section('page-title', 'ตรวจ OCR Draft')
 @section('page-subtitle', $document->original_file_name.' · '.$document->status)
 

@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'POS Designer - PopCentral')
+@section('title', 'POS Designer - MPM Food Group')
 @section('content')
 <style>
     .posd { --ink:#172033; --muted:#718096; --line:#dce4ee; --blue:#2563eb; background:#f4f7fb; min-height:calc(100vh - 70px); padding:24px; }
@@ -83,7 +83,7 @@
             <div>
                 <h1>POS Designer</h1>
                 <p>
-                    ออกแบบหน้าขาย แล้ว Build เป็น layout ให้ PopCentral POS
+                    ออกแบบหน้าขาย แล้ว Build เป็น layout ให้ MPM Food Group POS
                     @if($publishedVersion > 0)
                         — ใช้งานอยู่รุ่น <strong>{{ $publishedVersion }}</strong>@if($publishedAt) ({{ \Illuminate\Support\Carbon::parse($publishedAt)->timezone('Asia/Bangkok')->format('d/m/Y H:i') }})@endif
                     @else
@@ -182,7 +182,7 @@
 
                     <div class="runtime-preview">
                         <div class="bar">
-                            <span>PopCentral POS</span>
+                            <span>MPM Food Group POS</span>
                             <template x-if="runtime.show_branch"><span class="chip">สาขา B001</span></template>
                             <template x-if="runtime.show_terminal"><span class="chip">POS001</span></template>
                             <template x-if="runtime.show_seller"><span class="chip">คนขาย</span></template>

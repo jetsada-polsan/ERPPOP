@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'สินค้า - PopCentral')
+@section('title', 'สินค้า - MPM Food Group')
 @section('page-title', 'สินค้า / บริการ')
 @section('page-subtitle', 'ทะเบียนสินค้า หน่วยนับ บาร์โค้ด และราคาเริ่มต้น')
 

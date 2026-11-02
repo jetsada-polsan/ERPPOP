@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'แก้ไขป้ายราคา - PopCentral')
+@section('title', 'แก้ไขป้ายราคา - MPM Food Group')
 @section('page-title', 'แก้ไขป้ายราคา')
 @section('content')
 <div class="content-card p-4">

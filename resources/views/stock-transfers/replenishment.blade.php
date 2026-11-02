@@ -1,7 +1,7 @@
 <?php /* resources/views/stock-transfers/replenishment.blade.php */ ?>
 @extends('layout')
 
-@section('title', 'แนะนำเติมสินค้าระหว่างสาขา - PopCentral')
+@section('title', 'แนะนำเติมสินค้าระหว่างสาขา - MPM Food Group')
 @section('page-title', 'แนะนำเติมสินค้าระหว่างสาขา')
 @section('page-subtitle', 'คำนวณจาก Min/Max ต่อสาขา + ยอดขายย้อนหลัง — เลือกรายการที่ต้องการแล้วสร้างเป็นใบขอโอน รอผู้มีสิทธิ์อนุมัติเหมือนใบขอโอนปกติ')
 

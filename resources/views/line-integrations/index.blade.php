@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'LINE / Messaging API - PopCentral')
+@section('title', 'LINE / Messaging API - MPM Food Group')
 @section('page-title', 'LINE / Messaging API')
 @section('page-subtitle', 'ตั้งค่าช่องทางแจ้งเตือนแทน LINE Notify เดิม')
 @section('content')

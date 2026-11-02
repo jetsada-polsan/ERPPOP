@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'ตรวจนับสต็อก - PopCentral')
+@section('title', 'ตรวจนับสต็อก - MPM Food Group')
 @section('page-title', 'ตรวจนับ / ปรับปรุงสต็อก')
 @section('page-subtitle', 'เทียบยอดนับจริงกับยอดในระบบ แล้วบันทึกส่วนต่างเป็นใบปรับปรุงสต็อก')
 

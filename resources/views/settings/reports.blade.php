@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'เปิด/ปิดรายงาน - PopCentral')
+@section('title', 'เปิด/ปิดรายงาน - MPM Food Group')
 @section('page-title', 'ทะเบียนรายงาน')
 @section('page-subtitle', 'เปิดหรือปิดรายงานที่แสดงในเมนู โดยไม่ลบรายงานหรือประวัติ')
 

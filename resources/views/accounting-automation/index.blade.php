@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'บัญชีครบวงจร - PopCentral')
+@section('title', 'บัญชีครบวงจร - MPM Food Group')
 @section('page-title', 'ศูนย์บัญชีครบวงจร')
 @section('page-subtitle', 'รวม bank reconcile, ภาษี/E-Tax, audit trail, recurring documents และ OCR/AI import queue')
 

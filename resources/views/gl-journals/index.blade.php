@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'สมุดรายวันทั่วไป - PopCentral')
+@section('title', 'สมุดรายวันทั่วไป - MPM Food Group')
 @section('page-title', 'สมุดรายวันทั่วไป')
 @section('page-subtitle', 'รายการลงบัญชีอัตโนมัติจากการรับ/จ่ายชำระหนี้')
 

@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title','ผังองค์กร - PopCentral')
+@section('title','ผังองค์กร - MPM Food Group')
 @section('page-title','ผังองค์กรและสายบังคับบัญชา')
 @section('page-subtitle','แยกหน่วยงาน สาขา ผู้รับผิดชอบ และสังกัดพนักงานออกจากกัน')
 

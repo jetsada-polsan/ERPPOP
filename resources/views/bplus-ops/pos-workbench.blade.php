@@ -18,12 +18,12 @@
         <div class="pos-install-icon"><i class="bi bi-windows"></i></div>
         <div class="pos-install-copy">
             <div class="pos-install-title">
-                <strong>PopCentral Python POS</strong>
+                <strong>MPM Food Group Python POS</strong>
                 @if($pythonPosInstaller)
                     <span class="pos-version-badge">รุ่น {{ $pythonPosInstaller['version'] }}</span>
                 @endif
             </div>
-            <span>Windows · Python + PySide6 · Local SQLite · ขายออฟไลน์ได้ และ Sync ยอดขึ้น PopCentral เมื่อออนไลน์</span>
+            <span>Windows · Python + PySide6 · Local SQLite · ขายออฟไลน์ได้ และ Sync ยอดขึ้น MPM Food Group เมื่อออนไลน์</span>
             @if($pythonPosInstaller)
                 <small class="pos-install-meta">ไฟล์ {{ $pythonPosInstaller['filename'] }} · {{ number_format($pythonPosInstaller['size_bytes'] / 1048576, 1) }} MB · อัปเดต {{ \Illuminate\Support\Carbon::createFromTimestamp($pythonPosInstaller['updated_at'])->timezone('Asia/Bangkok')->format('d/m/Y H:i') }}</small>
             @else

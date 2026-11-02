@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', "ใบรับคืน {$saleReturn->doc_number} - PopCentral")
+@section('title', "ใบรับคืน {$saleReturn->doc_number} - MPM Food Group")
 @section('page-title', 'รายละเอียดใบรับคืนสินค้า')
 @section('page-subtitle', $saleReturn->doc_number)
 @section('content')

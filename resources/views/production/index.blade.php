@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'การผลิต - PopCentral')
+@section('title', 'การผลิต - MPM Food Group')
 @section('page-title', 'การผลิต')
 @section('page-subtitle', 'สูตรผลิต ใบสั่งผลิต และสถานะงานผลิต')
 @section('content')

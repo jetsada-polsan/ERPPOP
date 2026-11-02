@@ -6,7 +6,7 @@ use App\Models\AppSetting;
 use Illuminate\Console\Command;
 
 /**
- * สลับโหมดหน้าขายเว็บ /pos — ใช้ตอน cutover ไปแอปเดสก์ท็อป PopCentral POS
+ * สลับโหมดหน้าขายเว็บ /pos — ใช้ตอน cutover ไปแอปเดสก์ท็อป MPM Food Group POS
  *
  *   php artisan pos:web-mode sell       ขายได้ตามเดิม (ดีฟอลต์)
  *   php artisan pos:web-mode preview    แสดง layout ที่ Build แบบไม่บันทึกยอด

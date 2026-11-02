@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'บัญชีธนาคาร - PopCentral')
+@section('title', 'บัญชีธนาคาร - MPM Food Group')
 @section('page-title', 'บัญชีธนาคาร')
 @section('page-subtitle', 'ทะเบียนบัญชีธนาคารบริษัท สำหรับรับโอนและอ้างอิงในเอกสารชำระ')
 @section('content')

@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', "แก้ไขใบจอง {$booking->document->doc_number} - PopCentral")
+@section('title', "แก้ไขใบจอง {$booking->document->doc_number} - MPM Food Group")
 @section('page-title', 'แก้ไขใบจอง / ขายเชื่อ')
 @section('page-subtitle', "แก้ไขข้อมูลใบจอง {$booking->document->doc_number} โดยคงเลขที่เอกสารเดิม")
 

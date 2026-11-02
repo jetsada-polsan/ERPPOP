@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>PopStar Center</title>
+    <title>MPM Food Group</title>
     <style>
         :root { color-scheme: light; --ink:#17212b; --muted:#667482; --line:#dfe6eb; --brand:#0d6f79; --brand-dark:#07515b; --surface:#fff; --page:#f4f7f8; }
         * { box-sizing:border-box; }
@@ -32,15 +32,15 @@
 <body>
 <main class="shell">
     <header>
-        <div class="brand"><span class="mark">P</span><span>PopStar Center</span></div>
+        <div class="brand"><span class="mark">P</span><span>MPM Food Group</span></div>
         <a class="login" href="https://erp.popstarcenter.com/login">เข้าสู่ ERP</a>
     </header>
     <section class="intro">
         <h1>ศูนย์รวมระบบงาน</h1>
         <p>เลือกพื้นที่ทำงานที่ต้องการ ระบบแต่ละส่วนจะแยกสิทธิ์และหน้าที่ออกจากกันอย่างชัดเจน</p>
     </section>
-    <section class="pos-download" aria-label="ดาวน์โหลด PopCentral POS">
-        <div><strong>PopCentral POS</strong><span>โปรแกรม POS สำหรับเครื่องแคชเชียร์ เปิดกะ ขายสินค้า รับชำระ และทำงานออฟไลน์</span></div>
+    <section class="pos-download" aria-label="ดาวน์โหลด MPM Food Group POS">
+        <div><strong>MPM Food Group POS</strong><span>โปรแกรม POS สำหรับเครื่องแคชเชียร์ เปิดกะ ขายสินค้า รับชำระ และทำงานออฟไลน์</span></div>
         <a href="https://erp.popstarcenter.com/download/python-pos">ดาวน์โหลด POS →</a>
     </section>
     <section class="grid" aria-label="ระบบที่ใช้งาน">
@@ -50,7 +50,7 @@
         <article class="card"><h2>TempLog Pro</h2><p>บันทึกและตรวจสอบ Log สำหรับงานหลังบ้าน</p><a href="https://popstarcenter.com/templog/login.php">เข้าสู่ TempLog →</a></article>
         <article class="card"><h2>เว็บไซต์สินค้า</h2><p>รายการอาหารแช่แข็งและข้อมูลหน้าร้าน PopStar Foods</p><a href="https://popstarshops.com/">เปิดเว็บไซต์สินค้า →</a></article>
     </section>
-    <footer>PopStar Center © {{ now()->year }}</footer>
+    <footer>MPM Food Group © {{ now()->year }}</footer>
 </main>
 </body>
 </html>

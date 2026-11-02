@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'ผู้ใช้และสิทธิ์ - PopCentral')
+@section('title', 'ผู้ใช้และสิทธิ์ - MPM Food Group')
 @section('page-title', 'ผู้ใช้และสิทธิ์')
 @section('page-subtitle', 'จัดการผู้ใช้ บทบาท และสิทธิ์การใช้งานตามแบบฉบับ BPlus')
 @section('content')

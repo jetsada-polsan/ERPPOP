@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', $stockCount->doc_number . ' - ตรวจนับสินค้า - PopCentral')
+@section('title', $stockCount->doc_number . ' - ตรวจนับสินค้า - MPM Food Group')
 @section('page-title', 'ใบตรวจนับสินค้า ' . $stockCount->doc_number)
 @section('page-subtitle', $stockCount->branch->name_th . ' · ' . $stockCount->warehouseLocation->name . ' · เปิดใบ ' . $stockCount->created_at->thaiDate(true))
 

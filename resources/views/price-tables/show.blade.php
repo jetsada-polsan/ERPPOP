@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', $priceTable->name . ' - ตารางราคา - PopCentral')
+@section('title', $priceTable->name . ' - ตารางราคา - MPM Food Group')
 @section('page-title', 'ตารางราคา: ' . $priceTable->name)
 @section('page-subtitle', 'แก้ไขราคาสินค้าและกำหนดสาขาที่ใช้ตารางนี้')
 

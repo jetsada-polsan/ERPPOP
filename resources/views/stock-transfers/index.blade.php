@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'โอนย้ายสต็อก - PopCentral')
+@section('title', 'โอนย้ายสต็อก - MPM Food Group')
 @section('page-title', 'โอนย้ายสต็อก')
 @section('page-subtitle', 'ย้ายสินค้าระหว่างคลัง/ตู้ขาย โดยไม่กระทบยอดขายหรือยอดซื้อ')
 

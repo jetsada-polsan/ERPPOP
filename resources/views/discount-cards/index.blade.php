@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'บัตรส่วนลด - PopCentral')
+@section('title', 'บัตรส่วนลด - MPM Food Group')
 @section('page-title', 'บัตรส่วนลด')
 @section('page-subtitle', 'ออกบัตรส่วนลดสำหรับใช้ตัดยอดที่หน้าร้าน POS')
 @section('content')

@@ -1,6 +1,6 @@
 @extends('layout')
 
-@section('title', 'อัปโหลด OCR - PopCentral')
+@section('title', 'อัปโหลด OCR - MPM Food Group')
 @section('page-title', 'อัปโหลดเอกสาร OCR')
 @section('page-subtitle', 'เอกสารจะถูกสร้างเป็น Draft และยังไม่กระทบสต็อกหรือบัญชี')
 

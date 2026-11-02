@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'ราคานาทีทอง - PopCentral')
+@section('title', 'ราคานาทีทอง - MPM Food Group')
 @section('page-title', 'ราคานาทีทอง')
 @section('page-subtitle', 'ตั้งแคมเปญลดราคาพิเศษชั่วคราวสำหรับสินค้าที่เลือกไว้')
 @section('content')

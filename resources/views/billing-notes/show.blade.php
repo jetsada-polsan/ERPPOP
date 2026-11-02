@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', "ใบวางบิล {$note->doc_number} - PopCentral")
+@section('title', "ใบวางบิล {$note->doc_number} - MPM Food Group")
 @section('page-title', 'ใบวางบิล ' . $note->doc_number)
 @section('page-subtitle', $note->customer->name_th)
 @section('content')

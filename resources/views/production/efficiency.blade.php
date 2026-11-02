@@ -1,5 +1,5 @@
 @extends('layout')
-@section('title', 'ประสิทธิภาพการผลิต - PopCentral')
+@section('title', 'ประสิทธิภาพการผลิต - MPM Food Group')
 @section('page-title', 'รายงานประสิทธิภาพการผลิต')
 @section('page-subtitle', 'เทียบแผนกับจริง: ใบสั่งผลิตตามสูตร และสรุป yield/ต้นทุนงานแปรรูปชั่งน้ำหนัก')
 @section('content')

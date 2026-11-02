@@ -35,7 +35,7 @@
     <button type="button" onclick="window.close()">ปิด</button>
 </div>
 <main class="report">
-    <h1>POPSTAR SHOP</h1>
+    <h1>MPM Food Group</h1>
     <div class="subtitle">รายงานปิดกะ (Z Report)</div>
 
     <div class="line"><span>เลขกะ</span><strong>{{ $shift->shift_no }}</strong></div>
