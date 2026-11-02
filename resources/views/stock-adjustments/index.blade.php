@@ -31,6 +31,7 @@
                             <th>สาขา</th>
                             <th class="text-end">จำนวนรายการ</th>
                             <th class="text-end">ผลต่างรวม</th>
+                            <th>สถานะ</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -42,13 +43,14 @@
                                 <td>{{ $adjustment->branch->name_th }}</td>
                                 <td class="text-end">{{ $adjustment->stockDocument?->total_items ?? 0 }}</td>
                                 <td class="text-end">{{ number_format($adjustment->stockDocument?->total_qty ?? 0, 2) }}</td>
+                                <td>@include('partials.doc-status', ['status' => $adjustment->status])</td>
                                 <td class="text-end">
                                     <a href="{{ route('stock-adjustments.show', $adjustment) }}" class="btn btn-sm btn-light border">ดู</a>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="py-5 text-center text-muted">ยังไม่มีรายการปรับปรุงสต็อก</td>
+                                <td colspan="7" class="py-5 text-center text-muted">ยังไม่มีรายการปรับปรุงสต็อก</td>
                             </tr>
                         @endforelse
                     </tbody>

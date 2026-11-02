@@ -33,7 +33,7 @@
                         <th>เลขที่</th><th>วันที่</th><th>สาขา</th>
                         @if($type === 'requisition_return')<th>อ้างอิงใบเบิก</th>@endif
                         <th>หมายเหตุ</th>
-                        <th class="text-end">จำนวนรวม</th><th></th>
+                        <th class="text-end">จำนวนรวม</th><th>สถานะ</th><th></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -45,10 +45,11 @@
                             @if($type === 'requisition_return')<td class="small">{{ $doc->reference ?? '-' }}</td>@endif
                             <td class="small text-muted">{{ $doc->remark ?? '-' }}</td>
                             <td class="text-end">{{ number_format($doc->stockDocument?->total_qty ?? 0, 2) }}</td>
+                            <td>@include('partials.doc-status', ['status' => $doc->status])</td>
                             <td class="text-end"><a href="{{ route('stock-issues.show', $doc) }}" class="btn btn-sm btn-light border">ดู</a></td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="py-5 text-center text-muted">ยังไม่มี{{ $typeLabels[$type] }}</td></tr>
+                        <tr><td colspan="8" class="py-5 text-center text-muted">ยังไม่มี{{ $typeLabels[$type] }}</td></tr>
                     @endforelse
                 </tbody>
             </table>

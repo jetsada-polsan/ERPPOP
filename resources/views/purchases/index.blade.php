@@ -38,6 +38,7 @@
                             <th>สาขา</th>
                             <th>ซัพพลายเออร์</th>
                             <th class="text-end">ยอดรวม</th>
+                            <th>สถานะ</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -49,12 +50,13 @@
                                 <td>{{ $purchase->branch->name_th }}</td>
                                 <td>{{ $purchase->supplier->name_th }}</td>
                                 <td class="text-end">{{ number_format($purchase->total_amount, 2) }}</td>
+                                <td>@include('partials.doc-status', ['status' => $purchase->status])</td>
                                 <td class="text-end">
                                     <a href="{{ route('purchases.show', $purchase) }}" class="btn btn-sm btn-light border">ดู</a>
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="6" class="doc-empty">ยังไม่มีใบซื้อ</td></tr>
+                            <tr><td colspan="7" class="doc-empty">ยังไม่มีใบซื้อ</td></tr>
                         @endforelse
                     </tbody>
                 </table>

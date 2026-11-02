@@ -37,6 +37,7 @@
                             <th>สาขา</th>
                             <th>ลูกค้า</th>
                             <th class="text-end">ยอดรวม</th>
+                            <th>สถานะ</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -48,12 +49,13 @@
                                 <td>{{ $ret->branch->name_th }}</td>
                                 <td>{{ $ret->customer?->name_th ?? '-' }}</td>
                                 <td class="text-end">{{ number_format($ret->total_amount, 2) }}</td>
+                                <td>@include('partials.doc-status', ['status' => $ret->status])</td>
                                 <td class="text-end">
                                     <a href="{{ route('sale-returns.show', $ret) }}" class="btn btn-sm btn-light border">ดู</a>
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="6" class="doc-empty">ยังไม่มีใบรับคืน</td></tr>
+                            <tr><td colspan="7" class="doc-empty">ยังไม่มีใบรับคืน</td></tr>
                         @endforelse
                     </tbody>
                 </table>
