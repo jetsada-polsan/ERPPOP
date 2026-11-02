@@ -613,6 +613,15 @@
             text-rendering: optimizeLegibility;
         }
 
+        button, input, select, textarea {
+            font-family: inherit;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: inherit;
+            line-height: 1.35;
+        }
+
         .app-wrapper { background: transparent; }
 
         /* ── Header ───────────────────────────── */
@@ -1409,7 +1418,7 @@
                     }
                 }
             }
-            $appLogo = asset('images/logos/logo-jet-erp-mark.svg');
+            $appLogo = $companyLogo;
         @endphp
 @if ($erpLayout === 'odoo')
         {{-- แถบบนแบบ Odoo: ปุ่มโมดูล + ชื่อระบบ + เมนูหมวด
