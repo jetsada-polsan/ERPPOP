@@ -2099,3 +2099,10 @@ pending
 - ทดสอบ: `php -l app/Http/Controllers/SystemSettingController.php`; `PosInstallPageTest.php` และ `PosBuildCenterTest.php` ผ่าน 13 tests / 56 assertions
 - Deploy: ยังไม่ deploy
 - งานถัดไป: commit/push แล้ว deploy production จาก workflow ที่เจ้าของอนุมัติ จากนั้นเปิด `/settings` และทดสอบอัปโหลดโลโก้จริง
+
+# Handoff - 2026-11-02 (เพิ่มปุ่มนำเข้าโลโก้โดยตรง)
+- Commit: `pending`
+- ทำอะไร: ยกเลิกการ submit อัตโนมัติทันทีที่เลือกไฟล์ และเพิ่มปุ่ม `นำเข้าและบันทึกโลโก้` ให้เลือกไฟล์ก่อนแล้วค่อยส่งฟอร์มอย่างชัดเจน
+- ทดสอบ: `git diff --check` และ PHP lint ผ่าน
+- Deploy: ยังไม่ deploy
+- งานถัดไป: deploy แล้วทดสอบเลือกไฟล์โลโก้และกดปุ่มนำเข้าจากหน้า Settings จริง
