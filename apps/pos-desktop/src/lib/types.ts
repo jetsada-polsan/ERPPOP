@@ -110,6 +110,8 @@ export interface QtyPromotion {
   discount_type?: 'percent' | 'baht' | null
   discount_value?: number | null
   bundle_price?: number | null
+  starts_at?: string | null
+  ends_at?: string | null
   free_product?: Pick<Product, 'id' | 'sku_code' | 'name_th'> | null
 }
 

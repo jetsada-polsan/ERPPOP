@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'code', 'name', 'promo_type', 'product_id', 'min_qty', 'free_product_id',
     'free_qty', 'discount_type', 'discount_value', 'bundle_price', 'branch_id',
-    'starts_date', 'ends_date', 'note', 'is_active',
+    'starts_date', 'ends_date', 'starts_at', 'ends_at', 'note', 'is_active',
 ])]
 class QtyPromotion extends Model
 {
@@ -31,11 +31,32 @@ class QtyPromotion extends Model
 
     public function scopeRunningToday(Builder $query): Builder
     {
-        $today = now()->toDateString();
+        return $this->scopeNotEnded($query)
+            ->where(fn ($w) => $w->whereNull('starts_at')->orWhere('starts_at', '<=', now()));
+    }
 
+    /** รวมโปรที่ยังไม่เริ่ม ให้เครื่อง POS เก็บไว้ใช้ตอนออฟไลน์เมื่อถึงเวลา */
+    public function scopeNotEnded(Builder $query): Builder
+    {
         return $query->where('is_active', true)
-            ->where(fn ($w) => $w->whereNull('starts_date')->orWhere('starts_date', '<=', $today))
-            ->where(fn ($w) => $w->whereNull('ends_date')->orWhere('ends_date', '>=', $today));
+            ->where(fn ($w) => $w->whereNull('ends_at')->orWhere('ends_at', '>=', now()));
+    }
+
+    /** เก็บวันที่ไว้คู่กับเวลา POS รุ่นเก่าและรายงานเดิมยังอ่านวันที่ */
+    protected static function booted(): void
+    {
+        static::saving(function (self $promotion) {
+            if ($promotion->starts_at) {
+                $promotion->starts_date = $promotion->starts_at->toDateString();
+            } elseif ($promotion->starts_date) {
+                $promotion->starts_at = $promotion->starts_date->copy()->startOfDay();
+            }
+            if ($promotion->ends_at) {
+                $promotion->ends_date = $promotion->ends_at->toDateString();
+            } elseif ($promotion->ends_date) {
+                $promotion->ends_at = $promotion->ends_date->copy()->endOfDay();
+            }
+        });
     }
 
     // Human label like "ซื้อ 2 แถม 1" or "ซื้อ 2 ลด 50%"
@@ -68,6 +89,8 @@ class QtyPromotion extends Model
             'bundle_price' => 'decimal:4',
             'starts_date' => 'date',
             'ends_date' => 'date',
+            'starts_at' => 'datetime',
+            'ends_at' => 'datetime',
             'is_active' => 'boolean',
         ];
     }

@@ -71,8 +71,8 @@
             <div class="form-text">เช่น ซื้อครบ 3 ชิ้น ราคา 100 บาท ส่วนที่เกินคิดราคาปกติ</div>
         </div>
 
-        <div class="col-md-2"><label class="form-label small text-muted">วันที่เริ่ม</label><input type="date" name="starts_date" class="form-control"></div>
-        <div class="col-md-2"><label class="form-label small text-muted">วันที่สิ้นสุด</label><input type="date" name="ends_date" class="form-control"></div>
+        <div class="col-md-2"><label class="form-label small text-muted">เริ่ม (วันและเวลา)</label><input type="datetime-local" name="starts_at" class="form-control"></div>
+        <div class="col-md-2"><label class="form-label small text-muted">สิ้นสุด (วันและเวลา)</label><input type="datetime-local" name="ends_at" class="form-control"></div>
         <div class="col-md-2 d-flex align-items-end"><div class="form-check mb-2"><input type="checkbox" name="is_active" value="1" checked class="form-check-input" id="promoActive"><label class="form-check-label" for="promoActive">ใช้งาน</label></div></div>
         <div class="col-md-2 d-flex align-items-end"><button class="btn btn-primary w-100">สร้างแคมเปญ</button></div>
         <div class="col-12"><input name="note" class="form-control" placeholder="หมายเหตุ / เงื่อนไขเพิ่มเติม"></div>
@@ -94,7 +94,7 @@
                     <td><span class="badge {{ $promo->promo_type === 'free_item' ? 'text-bg-success' : ($promo->promo_type === 'bundle_price' ? 'text-bg-primary' : 'text-bg-warning') }}">{{ $promo->label() }}</span></td>
                     <td class="small">{{ $promo->freeProduct ? $promo->freeProduct->sku_code.' '.$promo->freeProduct->name_th : '-' }}</td>
                     <td class="small">{{ $promo->branch?->name_th ?? 'ทุกสาขา' }}</td>
-                    <td class="small">{{ $promo->starts_date?->thaiDate() ?? 'ไม่กำหนด' }} - {{ $promo->ends_date?->thaiDate() ?? 'ไม่กำหนด' }}</td>
+                    <td class="small">{{ $promo->starts_at?->format('d/m/Y H:i') ?? 'ไม่กำหนด' }} - {{ $promo->ends_at?->format('d/m/Y H:i') ?? 'ไม่กำหนด' }}</td>
                     <td><span class="badge {{ $promo->is_active ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $promo->is_active ? 'ใช้งาน' : 'ปิด' }}</span></td>
                 </tr>
             @empty

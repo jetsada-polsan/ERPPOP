@@ -2088,3 +2088,7 @@ pending
 - ทดสอบ: `git diff --check` ผ่าน; เครื่อง dev ไม่มี `cargo` จึงยังไม่ได้รัน Rust build แบบ native
 - Deploy: ยังไม่ deploy
 - งานถัดไป: ให้ GitHub Actions สร้าง Windows installer รุ่นใหม่ แล้วทดสอบเปิดกะ/คิดเงินจริงบนเครื่อง Windows
+
+## Handoff - 2026-11-02 (Claude: เวลาเริ่ม-สิ้นสุดโปรตามจำนวน)
+- ทำอะไร: เพิ่ม `qty_promotions.starts_at/ends_at`; ERP และ POS Tauri เช็กตามเวลาจริง; POS รุ่นใหม่ดึงโปรล่วงหน้าไว้ใช้ออฟไลน์ด้วย `include_upcoming=1`; pos-python ยังอ่านแค่วันที่
+- ทดสอบ: phpunit ผ่าน; Vue test รอ CI; ต้อง migrate

@@ -30,7 +30,16 @@ function num(value: unknown): number {
   return Number(value) || 0
 }
 
-export function priceCart(cart: CartLine[], promotions: QtyPromotion[], vatRate = 7): CartPricing {
+/** โปรมีผลตามเวลาขายจริง ใช้ได้ทั้งออนไลน์และออฟไลน์จากข้อมูลที่ sync ไว้ */
+export function promotionActive(promotion: QtyPromotion, now = new Date()) {
+  const startsAt = promotion.starts_at ? new Date(promotion.starts_at) : null
+  const endsAt = promotion.ends_at ? new Date(promotion.ends_at) : null
+
+  return (!startsAt || startsAt <= now) && (!endsAt || endsAt >= now)
+}
+
+export function priceCart(cart: CartLine[], allPromotions: QtyPromotion[], vatRate = 7, now = new Date()): CartPricing {
+  const promotions = allPromotions.filter((promotion) => promotionActive(promotion, now))
   const lines = cart.map((line) => ({
     line,
     qty: Math.max(0, num(line.qty)),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkoutPayloadWithPricing, priceCart } from './pricing'
+import { checkoutPayloadWithPricing, priceCart, promotionActive } from './pricing'
 import type { CartLine, CheckoutPayload, QtyPromotion } from './types'
 
 const product = (id: number, price: number): CartLine => ({
@@ -66,5 +66,16 @@ describe('POS Desktop pricing UAT', () => {
 
     expect(checkoutPayloadWithPricing(payload, pricing).items).toEqual(pricing.items)
     expect(checkoutPayloadWithPricing(payload, pricing).branch_id).toBe(1)
+  })
+})
+
+describe('promotion time window', () => {
+  const promotion = { id: 1, code: 'P', name: 'x', promo_type: 'bundle_price', product_id: 1, min_qty: 3, bundle_price: 100,
+    starts_at: '2026-11-02T05:00:00Z', ends_at: '2026-11-03T05:00:00Z' } as const
+
+  it('applies only between the start and end time', () => {
+    expect(promotionActive(promotion, new Date('2026-11-02T04:59:00Z'))).toBe(false)
+    expect(promotionActive(promotion, new Date('2026-11-02T05:00:00Z'))).toBe(true)
+    expect(promotionActive(promotion, new Date('2026-11-03T05:01:00Z'))).toBe(false)
   })
 })

@@ -56,8 +56,8 @@ class QtyPromotionController extends Controller
             'discount_value' => $discountValueRules,
             'bundle_price' => ['nullable', 'required_if:promo_type,bundle_price', 'numeric', 'min:0'],
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
-            'starts_date' => ['nullable', 'date'],
-            'ends_date' => ['nullable', 'date', 'after_or_equal:starts_date'],
+            'starts_at' => ['nullable', 'date'],
+            'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
             'note' => ['nullable', 'string', 'max:2000'],
             'is_active' => ['nullable', 'boolean'],
         ]);
