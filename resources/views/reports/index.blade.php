@@ -279,9 +279,15 @@
                 <a href="{{ request()->fullUrlWithQuery(['from'=>now()->subDays(6)->toDateString(),'to'=>now()->toDateString()]) }}" class="rpt-shortcut">7 วัน</a>
                 <a href="{{ request()->fullUrlWithQuery(['from'=>now()->startOfMonth()->toDateString(),'to'=>now()->toDateString()]) }}" class="rpt-shortcut">เดือนนี้</a>
 
-                @if($branch = $branches->first())
-                    <span class="rpt-select" aria-label="สาขา">{{ $branch->code }} - {{ $branch->name_th }}</span>
-                @endif
+                {{-- ไม่มีสิทธิ์ reports.all_branches = เลือกสาขาไม่ได้ ล็อกไว้ที่สาขาตัวเอง --}}
+                <select name="branch_id" class="rpt-select" onchange="this.form.submit()" @disabled(! $canSeeAllBranches && $branches->count() < 2)>
+                    @if($canSeeAllBranches)
+                        <option value="all" @selected($filters['branch_id'] === null)>ทุกสาขา</option>
+                    @endif
+                    @foreach($branches as $b)
+                        <option value="{{ $b->id }}" @selected((string) $filters['branch_id'] === (string) $b->id)>{{ $b->code }} - {{ $b->name_th }}</option>
+                    @endforeach
+                </select>
                 <button type="submit" class="rpt-btn-filter"><i class="bi bi-funnel-fill me-1"></i>กรอง</button>
 
                 <div class="ms-auto d-flex gap-2">

@@ -15,9 +15,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportController extends Controller
 {
-    private const REPORT_BRANCH_CODE = 'B001';
-
-    /** สาขาที่ไม่มีอยู่จริง ใช้กรองให้ได้ผลลัพธ์ว่างเมื่อยังไม่มีสาขาหลัก */
+    /** สาขาที่ไม่มีอยู่จริง ใช้กรองให้ได้ผลลัพธ์ว่างเมื่อผู้ใช้ยังไม่ผูกสาขาและไม่มีสิทธิ์ข้ามสาขา */
     private const NO_BRANCH_SENTINEL = '-1';
 
     public function index(Request $request)
@@ -52,9 +50,16 @@ class ReportController extends Controller
             $perPage = self::PRINT_ROW_CAP;
         }
         $user = auth()->user();
-        $requestedBranch = DB::table('branches')->where('code', self::REPORT_BRANCH_CODE)->value('id')
-            ?? DB::table('branches')->where('is_active', true)->orderBy('id')->value('id');
-        $requestedBranch = $requestedBranch === null ? self::NO_BRANCH_SENTINEL : (string) $requestedBranch;
+        $canSeeAllBranches = $user === null || $user->canSeeAllReportBranches();
+        $requestedBranch = $request->input('branch_id');
+        if (! $canSeeAllBranches) {
+            $assignedBranch = $user->resolveReportBranch($requestedBranch);
+            $requestedBranch = $assignedBranch === null ? self::NO_BRANCH_SENTINEL : (string) $assignedBranch;
+        } elseif ($requestedBranch === null && ($userBranch = $user?->branch_id)) {
+            $requestedBranch = (string) $userBranch;
+        } elseif ($requestedBranch === 'all') {
+            $requestedBranch = null;
+        }
         $filters = [
             'branch_id' => $requestedBranch,
             'q' => trim((string) $request->input('q', '')),
@@ -85,9 +90,11 @@ class ReportController extends Controller
             'perPage' => $perPage,
             'printMode' => $printMode,
             'printRowCap' => self::PRINT_ROW_CAP,
+            'canSeeAllBranches' => $canSeeAllBranches,
             'canExport' => $user === null || $user->hasPermission('reports.export'),
+            'branchLocked' => ! $canSeeAllBranches && $user->reportBranchIds(null)->isEmpty(),
             'branches' => DB::table('branches')
-                ->where('code', self::REPORT_BRANCH_CODE)
+                ->when(! $canSeeAllBranches, fn ($query) => $query->whereIn('id', $user->reportBranchIds(null)->all()))
                 ->orderBy('code')->get(['id', 'code', 'name_th']),
             'result' => $this->runReport($category, $report, $from, $to, $filters),
         ]);
