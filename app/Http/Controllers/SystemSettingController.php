@@ -499,11 +499,17 @@ class SystemSettingController extends Controller
                 return back()->withErrors(['logo_file' => 'อัปโหลดโลโก้ไม่สำเร็จ กรุณาเลือกไฟล์ใหม่'])->withInput();
             }
 
-            $directory = public_path('images/logos');
-            File::ensureDirectoryExists($directory);
-            $name = 'custom-'.now()->format('YmdHisv').'-'.Str::lower(Str::random(8)).'.'.strtolower($file->getClientOriginalExtension());
-            $file->move(public_path('images/logos'), $name);
-            AppSetting::set('logo_path', 'images/logos/'.$name);
+            try {
+                $directory = public_path('images/logos');
+                File::ensureDirectoryExists($directory);
+                $name = 'custom-'.now()->format('YmdHisv').'-'.Str::lower(Str::random(8)).'.'.strtolower($file->getClientOriginalExtension());
+                $file->move($directory, $name);
+                AppSetting::set('logo_path', 'images/logos/'.$name);
+            } catch (\Throwable $error) {
+                report($error);
+
+                return back()->withErrors(['logo_file' => 'อัปโหลดโลโก้ไม่ได้: กรุณาตรวจสอบสิทธิ์เขียนโฟลเดอร์ storage/public ของระบบ'])->withInput();
+            }
         } elseif ($request->filled('logo_choice')) {
             if ($data['logo_choice'] === '__none__') {
                 AppSetting::set('logo_path', null);

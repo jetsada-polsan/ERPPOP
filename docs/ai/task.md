@@ -2106,3 +2106,10 @@ pending
 - ทดสอบ: `git diff --check` และ PHP lint ผ่าน
 - Deploy: ยังไม่ deploy
 - งานถัดไป: deploy แล้วทดสอบเลือกไฟล์โลโก้และกดปุ่มนำเข้าจากหน้า Settings จริง
+
+# Handoff - 2026-11-02 (กัน upload logo เป็น 500)
+- Commit: `pending`
+- ทำอะไร: ครอบการสร้างโฟลเดอร์/ย้ายไฟล์/บันทึกค่าโลโก้ด้วย error handling เพื่อไม่ให้ permission หรือ filesystem error กลายเป็นหน้า 500; ส่งกลับหน้า Settings พร้อมข้อความแก้ไขได้
+- ทดสอบ: PHP lint และ feature tests ที่เกี่ยวข้องต้องรันก่อน deploy
+- Deploy: รอ deploy
+- งานถัดไป: deploy แล้วทดลองอัปโหลดไฟล์จริงบน production
