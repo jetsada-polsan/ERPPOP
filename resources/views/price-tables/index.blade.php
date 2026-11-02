@@ -131,7 +131,7 @@
                         <div class="row g-3">
                             <div class="col-5">
                                 <label class="form-label text-muted small">รหัส</label>
-                                <input type="text" name="code" x-model="code" required class="form-control">
+                                <input placeholder="เว้นว่างได้ ระบบรันให้" type="text" name="code" x-model="code" class="form-control">
                             </div>
                             <div class="col-7">
                                 <label class="form-label text-muted small">ชื่อตารางราคา</label>

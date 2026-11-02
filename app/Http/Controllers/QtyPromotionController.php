@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Branch;
 use App\Models\QtyPromotion;
 use Illuminate\Http\RedirectResponse;
+use App\Support\AutoCode;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -21,6 +22,7 @@ class QtyPromotionController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        AutoCode::fill($request, 'qty_promotions', 'QP');
         $data = $this->validatePromotion($request);
         QtyPromotion::create($data);
 

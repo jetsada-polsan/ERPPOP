@@ -6,6 +6,7 @@ use App\Models\MemberPointRule;
 use App\Models\MemberPointTransaction;
 use App\Services\Sales\MemberPointService;
 use Illuminate\Http\RedirectResponse;
+use App\Support\AutoCode;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -23,6 +24,7 @@ class MemberPointController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        AutoCode::fill($request, 'member_point_rules', 'MP');
         $data = $this->validateRule($request);
         MemberPointRule::create($data);
 

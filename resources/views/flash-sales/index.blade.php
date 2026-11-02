@@ -7,7 +7,7 @@
     <h2 class="h5 fw-bold mb-3">สร้างแคมเปญนาทีทอง</h2>
     <form method="post" action="{{ route('flash-sales.store') }}" class="row g-3">
         @csrf
-        <div class="col-md-2"><label class="form-label small text-muted">รหัส</label><input name="code" required class="form-control" value="{{ old('code') }}"></div>
+        <div class="col-md-2"><label class="form-label small text-muted">รหัส</label><input placeholder="เว้นว่างได้ ระบบรันให้" name="code" class="form-control" value="{{ old('code') }}"></div>
         <div class="col-md-3"><label class="form-label small text-muted">ชื่อกลุ่มนาทีทอง</label><input name="name" required class="form-control" placeholder="เช่น นาทีทองวาริน / นาทีทองปลาดุก" value="{{ old('name') }}"></div>
         <div class="col-md-3">
             <label class="form-label small text-muted">สาขา</label>

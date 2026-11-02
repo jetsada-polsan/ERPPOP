@@ -8,6 +8,7 @@ use App\Models\FlashSaleItem;
 use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use App\Support\AutoCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -25,6 +26,7 @@ class FlashSaleController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        AutoCode::fill($request, 'flash_sales', 'FS');
         $data = $this->validateFlashSale($request);
         $flashSale = FlashSale::create($data);
 

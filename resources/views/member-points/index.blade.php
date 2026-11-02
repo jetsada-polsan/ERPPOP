@@ -29,7 +29,7 @@
             <h3 class="h6 fw-bold mb-3">เพิ่มกติกาแต้ม</h3>
             <form method="post" action="{{ route('member-points.store') }}" class="row g-2">
                 @csrf
-                <div class="col-md-3"><label class="form-label small text-muted">รหัส</label><input name="code" required class="form-control form-control-sm"></div>
+                <div class="col-md-3"><label class="form-label small text-muted">รหัส</label><input placeholder="เว้นว่างได้ ระบบรันให้" name="code" class="form-control form-control-sm"></div>
                 <div class="col-md-5"><label class="form-label small text-muted">ชื่อ</label><input name="name" required class="form-control form-control-sm" placeholder="เช่น แต้มทองปกติ / ทวีคูณสงกรานต์"></div>
                 <div class="col-md-4">
                     <label class="form-label small text-muted">ประเภท</label>

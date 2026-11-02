@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Promotion;
 use Illuminate\Http\RedirectResponse;
+use App\Support\AutoCode;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -18,6 +19,7 @@ class PromotionController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        AutoCode::fill($request, 'promotions', 'PM');
         $data = $this->validatePromotion($request);
         Promotion::create($data);
 

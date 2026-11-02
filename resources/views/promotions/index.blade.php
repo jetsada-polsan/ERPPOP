@@ -7,7 +7,7 @@
     <h2 class="h5 fw-bold mb-3">เพิ่มโปรโมชั่น</h2>
     <form method="post" action="{{ route('promotions.store') }}" class="row g-3">
         @csrf
-        <div class="col-md-2"><label class="form-label small text-muted">รหัส</label><input name="code" required class="form-control"></div>
+        <div class="col-md-2"><label class="form-label small text-muted">รหัส</label><input placeholder="เว้นว่างได้ ระบบรันให้" name="code" class="form-control"></div>
         <div class="col-md-3"><label class="form-label small text-muted">ชื่อ</label><input name="name" required class="form-control"></div>
         <div class="col-md-2"><label class="form-label small text-muted">ประเภท</label><select name="promotion_type" class="form-select"><option value="discount">ส่วนลด</option><option value="coupon">คูปอง</option><option value="free_item">ของแถม</option><option value="member_points">แต้มสมาชิก</option></select></div>
         <div class="col-md-2"><label class="form-label small text-muted">เริ่ม</label><input type="date" name="starts_at" class="form-control"></div>

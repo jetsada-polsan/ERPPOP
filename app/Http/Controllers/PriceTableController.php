@@ -13,6 +13,7 @@ use App\Models\Promotion;
 use App\Support\DecimalMath;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use App\Support\AutoCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -55,6 +56,7 @@ class PriceTableController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        AutoCode::fill($request, 'price_tables', 'PT');
         $data = $request->validate([
             'code' => ['required', 'string', 'max:30', 'unique:price_tables,code'],
             'name' => ['required', 'string', 'max:150'],

@@ -7,7 +7,7 @@
     <h2 class="h5 fw-bold mb-3">สร้างแคมเปญ</h2>
     <form method="post" action="{{ route('qty-promotions.store') }}" class="row g-3" @submit="validateProducts($event)">
         @csrf
-        <div class="col-md-2"><label class="form-label small text-muted">รหัส</label><input name="code" required class="form-control"></div>
+        <div class="col-md-2"><label class="form-label small text-muted">รหัส</label><input placeholder="เว้นว่างได้ ระบบรันให้" name="code" class="form-control"></div>
         <div class="col-md-4"><label class="form-label small text-muted">ชื่อแคมเปญ</label><input name="name" required class="form-control" placeholder="เช่น ปลาหมึกซื้อ 1 แถม 1"></div>
         <div class="col-md-3">
             <label class="form-label small text-muted">ประเภทแคมเปญ</label>
