@@ -9,7 +9,7 @@ on:
         description: preview or apply
         required: true
         type: choice
-        options: [preview, apply]
+        options: [preview, apply, report]
         default: preview
 
 permissions:
@@ -30,6 +30,9 @@ jobs:
         run: |
           if [ "$MODE" = apply ]; then
             CMD="php artisan erp:backup && php artisan erp:classify-barcodes --apply --report=storage/app/barcode-classify.csv"
+          elif [ "$MODE" = report ]; then
+            # อ่านอย่างเดียว: รายงานของรอบล่าสุด
+            CMD="wc -l storage/app/barcode-classify.csv && head -n 80 storage/app/barcode-classify.csv"
           else
             CMD="php artisan erp:classify-barcodes --report=storage/app/barcode-classify.csv && head -n 40 storage/app/barcode-classify.csv"
           fi
