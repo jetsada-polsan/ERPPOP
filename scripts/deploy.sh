@@ -32,6 +32,7 @@ for retired in "${RETIRED_PATHS[@]}"; do
 done
 composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
 php artisan migrate --force
+php artisan storage:link || true
 php artisan optimize:clear
 php artisan config:cache
 php artisan route:cache

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 
 #[Fillable(['key', 'value'])]
 class AppSetting extends Model
@@ -40,9 +41,16 @@ class AppSetting extends Model
         }
 
         // version param กันเบราว์เซอร์แคชรูปเก่าเมื่อไฟล์ถูกแก้ทับชื่อเดิม
-        $file = public_path($path);
+        if (str_starts_with($path, 'storage/')) {
+            $storagePath = substr($path, strlen('storage/'));
+            $file = Storage::disk('public')->path($storagePath);
+            $url = asset($path);
+        } else {
+            $file = public_path($path);
+            $url = asset($path);
+        }
         $version = is_file($file) ? filemtime($file) : 0;
 
-        return asset($path).'?v='.$version;
+        return $url.'?v='.$version;
     }
 }

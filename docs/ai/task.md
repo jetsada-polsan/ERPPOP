@@ -2113,3 +2113,10 @@ pending
 - ทดสอบ: PHP lint และ feature tests ที่เกี่ยวข้องต้องรันก่อน deploy
 - Deploy: รอ deploy
 - งานถัดไป: deploy แล้วทดลองอัปโหลดไฟล์จริงบน production
+
+# Handoff - 2026-11-02 (ย้ายโลโก้ custom ไป Laravel public storage)
+- Commit: `pending`
+- ทำอะไร: แก้สิทธิ์อัปโหลดถาวรโดยเก็บโลโก้ custom ใน `storage/app/public/images/logos`, สร้าง storage link ตอน deploy และปรับ `AppSetting::logoUrl()` ให้สร้าง URL/ตรวจเวลาไฟล์จาก storage ได้
+- ทดสอบ: PHP lint, `git diff --check`, PosInstallPageTest และ PosBuildCenterTest ผ่าน 13 tests / 56 assertions
+- Deploy: รอ deploy production
+- งานถัดไป: ทดสอบเลือกไฟล์และกดนำเข้าโลโก้จริงหลัง deploy

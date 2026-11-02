@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -500,11 +501,13 @@ class SystemSettingController extends Controller
             }
 
             try {
-                $directory = public_path('images/logos');
-                File::ensureDirectoryExists($directory);
+                $directory = 'images/logos';
+                Storage::disk('public')->makeDirectory($directory);
                 $name = 'custom-'.now()->format('YmdHisv').'-'.Str::lower(Str::random(8)).'.'.strtolower($file->getClientOriginalExtension());
-                $file->move($directory, $name);
-                AppSetting::set('logo_path', 'images/logos/'.$name);
+                if (! Storage::disk('public')->putFileAs($directory, $file, $name)) {
+                    throw new \RuntimeException('จัดเก็บไฟล์โลโก้ลง storage ไม่สำเร็จ');
+                }
+                AppSetting::set('logo_path', 'storage/images/logos/'.$name);
             } catch (\Throwable $error) {
                 report($error);
 
