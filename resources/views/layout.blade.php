@@ -16,6 +16,7 @@
     ];
     $fallbackFavicon = asset('images/logos/mpm-food-group.jpg').'?v='.filemtime(public_path('images/logos/mpm-food-group.jpg'));
     $companyName = \App\Models\AppSetting::company('name_th') ?: 'กิจการของคุณ';
+    $systemName = 'JET ERP';
     $companyLogo = \App\Models\AppSetting::logoUrl();
     $faviconUrl = \App\Models\AppSetting::get('favicon_path')
         ? asset(\App\Models\AppSetting::get('favicon_path')).'?v='.filemtime(public_path(\App\Models\AppSetting::get('favicon_path')))
@@ -730,6 +731,7 @@
 
         .fa-subnav-brand { height:48px; display:flex; align-items:center; justify-content:center; margin:0 4px 6px; padding:4px 6px; overflow:hidden; }
         .fa-subnav-brand img { display:block; width:auto!important; max-width:190px!important; height:auto!important; max-height:68px!important; object-fit:contain; }
+        .fa-subnav-system-name { color:var(--erp-primary-dark); font-size:15px; font-weight:900; letter-spacing:-.02em; white-space:nowrap; }
         .fa-subnav-brand .brand-logo { font-size: 22px; font-weight: 900; color: var(--erp-primary-dark); }
         .fa-subnav-brand .brand-logo span { color: var(--fa-green); }
 
@@ -1407,7 +1409,7 @@
                     }
                 }
             }
-            $appLogo = $companyLogo;
+            $appLogo = asset('images/logos/logo-jet-erp-mark.svg');
         @endphp
 @if ($erpLayout === 'odoo')
         {{-- แถบบนแบบ Odoo: ปุ่มโมดูล + ชื่อระบบ + เมนูหมวด
@@ -1416,7 +1418,7 @@
             <a href="{{ route('apps.launcher') }}" class="odn-apps" title="รวมโมดูลทั้งหมด" aria-label="รวมโมดูลทั้งหมด">
                 <i class="bi bi-grid-3x3-gap-fill"></i>
             </a>
-            <a href="{{ route('dashboard') }}" class="odn-brand">{{ $companyName }}</a>
+            <a href="{{ route('dashboard') }}" class="odn-brand">{{ $systemName }}</a>
             <nav class="odn-nav" aria-label="หมวดเมนู">
                 @foreach ($menuSections as $i => $section)
                     <a href="#odn-grp-{{ $i }}" class="odn-nav-link {{ $i === $activeSection ? 'on' : '' }}"
@@ -1575,8 +1577,8 @@
         {{-- เมนูข้างแบบ Odoo: ทุกหมวดกางพร้อมกัน พับได้ทีละหมวด --}}
         <aside class="app-sidebar odn-side" id="odn-side">
             <a href="{{ route('dashboard') }}" class="odn-side-brand">
-                @if($appLogo)<img src="{{ $appLogo }}" alt="{{ $companyName }}">
-                @else<span>{{ $companyName }}</span>@endif
+                @if($appLogo)<img src="{{ $appLogo }}" alt="{{ $systemName }}">
+                @else<span>{{ $systemName }}</span>@endif
             </a>
             @foreach ($menuSections as $i => $section)
                 <div class="odn-grp {{ $i === $activeSection ? 'is-visible' : '' }}" id="odn-grp-{{ $i }}" data-sec="{{ $i }}">
@@ -1637,8 +1639,8 @@
             {{-- ชั้น 2: แผงเมนูย่อยของโมดูลที่เลือก --}}
             <div class="fa-subnav">
                 <a href="{{ route('dashboard') }}" class="fa-subnav-brand text-decoration-none">
-                    @if($appLogo)<img src="{{ $appLogo }}" alt="{{ $companyName }}">
-                    @else<div class="brand-logo" style="font-size:14px">{{ $companyName }}</div>@endif
+                    @if($appLogo)<img src="{{ $appLogo }}" alt="{{ $systemName }}"><span class="fa-subnav-system-name">{{ $systemName }}</span>
+                    @else<div class="brand-logo" style="font-size:14px">{{ $systemName }}</div>@endif
                 </a>
                 @foreach($menuSections as $i => $section)
                     <div x-show="sec === {{ $i }}" @if($i !== $activeSection) x-cloak @endif>
