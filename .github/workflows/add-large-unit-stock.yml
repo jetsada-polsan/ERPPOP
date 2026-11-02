@@ -1,0 +1,42 @@
+name: Add large unit stock
+
+# ไม่แก้ยอดสต๊อกทันที: mode=create สร้างใบปรับสต๊อกรออนุมัติหลัง backup
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: preview or create
+        required: true
+        type: choice
+        options: [preview, create]
+        default: preview
+      branch:
+        description: Branch code of the warehouse
+        required: true
+        type: string
+        default: HQ
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+      - run: ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+      - name: Run on the server
+        env:
+          BRANCH: ${{ inputs.branch }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          case "$BRANCH" in *[!A-Za-z0-9-]*|"") echo "invalid branch"; exit 1;; esac
+          if [ "$MODE" = create ]; then
+            CMD="php artisan erp:backup && php artisan erp:add-large-unit-stock --branch=$BRANCH --force"
+          else
+            CMD="php artisan erp:add-large-unit-stock --branch=$BRANCH --dry-run"
+          fi
+          ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "cd '${{ vars.APP_DIR }}' && $CMD"
