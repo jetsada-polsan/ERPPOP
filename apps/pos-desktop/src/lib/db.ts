@@ -308,7 +308,7 @@ export async function localDbHealth(): Promise<LocalDbHealth> {
     integrity: integrityRows[0]?.integrity_check || 'unknown',
     products: Number((await conn.select<Array<{ count: number }>>('SELECT COUNT(*) AS count FROM products'))[0]?.count || 0),
     pending: countBy('pending') + countBy('syncing'),
-    failed: countBy('failed'),
+    failed: countBy('failed') + countBy('needs_review'),
     synced: countBy('synced'),
     lastProductSyncAt: productSync[0]?.synced_at || null,
     sizeBytes: Number(pageCount[0]?.page_count || 0) * Number(pageSize[0]?.page_size || 0),

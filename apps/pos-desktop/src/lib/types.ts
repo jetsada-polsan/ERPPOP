@@ -154,7 +154,7 @@ export interface CheckoutPayload {
 export interface QueueItem {
   id: string
   payload: CheckoutPayload
-  status: 'pending' | 'syncing' | 'synced' | 'failed'
+  status: 'pending' | 'syncing' | 'synced' | 'failed' | 'needs_review'
   attempts: number
   error?: string
   receiptNo?: string
@@ -164,7 +164,7 @@ export interface QueueItem {
 export interface LocalSaleHistory {
   id: string
   receiptNo: string
-  status: 'pending' | 'syncing' | 'synced' | 'failed'
+  status: 'pending' | 'syncing' | 'synced' | 'failed' | 'needs_review'
   total: number
   method: PaymentMethod
   paid: number

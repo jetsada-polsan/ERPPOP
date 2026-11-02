@@ -49,13 +49,24 @@ describe('POS Desktop sync UAT', () => {
 
   it('stops after a failed request and leaves later bills for the next retry', async () => {
     vi.mocked(queueItems).mockResolvedValue([queueItem('first'), queueItem('second')])
-    vi.mocked(api.checkout).mockRejectedValue(new Error('offline'))
+    vi.mocked(api.checkout).mockRejectedValue(Object.assign(new Error('offline'), { name: 'PosUnreachableError' }))
 
     await syncCheckoutQueue()
 
     expect(api.checkout).toHaveBeenCalledTimes(1)
     expect(markQueue).toHaveBeenNthCalledWith(1, 'first', 'syncing')
     expect(markQueue).toHaveBeenNthCalledWith(2, 'first', 'failed', 'offline')
+  })
+
+  it('holds a rejected bill for review and keeps sending the next bills', async () => {
+    vi.mocked(queueItems).mockResolvedValue([queueItem('first'), queueItem('second')])
+    vi.mocked(api.checkout).mockRejectedValueOnce(new Error('ราคาไม่ตรง')).mockResolvedValueOnce({ receipt_no: 'R2' })
+
+    await syncCheckoutQueue()
+
+    expect(api.checkout).toHaveBeenCalledTimes(2)
+    expect(markQueue).toHaveBeenCalledWith('first', 'needs_review', 'ราคาไม่ตรง')
+    expect(markQueue).toHaveBeenCalledWith('second', 'synced', undefined, 'R2')
   })
 
   it('does not run two sync loops at the same time', async () => {

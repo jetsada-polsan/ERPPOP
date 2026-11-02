@@ -16,8 +16,13 @@ export async function syncCheckoutQueue(onChange?: () => void) {
         const response = await api.checkout(item.id, repairDiscountedPayload(item.payload))
         await markQueue(item.id, 'synced', undefined, response.receipt_no)
       } catch (error) {
-        await markQueue(item.id, 'failed', error instanceof Error ? error.message : String(error))
-        break
+        const message = error instanceof Error ? error.message : String(error)
+        if ((error as Error)?.name === 'PosUnreachableError') {
+          await markQueue(item.id, 'failed', message)
+          break
+        }
+        // ERP ปฏิเสธบิลนี้ เก็บไว้ตรวจแล้วส่งใบถัดไป ไม่ให้บิลเดียวบล็อกทั้งคิว
+        await markQueue(item.id, 'needs_review', message)
       }
       onChange?.()
     }
