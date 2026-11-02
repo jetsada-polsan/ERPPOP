@@ -2092,3 +2092,10 @@ pending
 ## Handoff - 2026-11-02 (Claude: เวลาเริ่ม-สิ้นสุดโปรตามจำนวน)
 - ทำอะไร: เพิ่ม `qty_promotions.starts_at/ends_at`; ERP และ POS Tauri เช็กตามเวลาจริง; POS รุ่นใหม่ดึงโปรล่วงหน้าไว้ใช้ออฟไลน์ด้วย `include_upcoming=1`; pos-python ยังอ่านแค่วันที่
 - ทดสอบ: phpunit ผ่าน; Vue test รอ CI; ต้อง migrate
+
+# Handoff - 2026-11-02 (ป้องกันหน้า Settings ล้มจาก VAT table)
+- Commit: `pending`
+- ทำอะไร: ป้องกัน `SystemSettingController` เรียก `vat_rates` โดยตรงเมื่อ migration ยังไม่อยู่บน production ทำให้ `/settings` ล้ม 500; หน้าใช้ VAT 7% เป็นค่าเริ่มต้น และการบันทึกจะไม่เขียน VAT จนกว่าตารางพร้อม
+- ทดสอบ: `php -l app/Http/Controllers/SystemSettingController.php`; `PosInstallPageTest.php` และ `PosBuildCenterTest.php` ผ่าน 13 tests / 56 assertions
+- Deploy: ยังไม่ deploy
+- งานถัดไป: commit/push แล้ว deploy production จาก workflow ที่เจ้าของอนุมัติ จากนั้นเปิด `/settings` และทดสอบอัปโหลดโลโก้จริง

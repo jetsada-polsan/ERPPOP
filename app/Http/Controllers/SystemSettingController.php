@@ -21,6 +21,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -188,11 +189,13 @@ class SystemSettingController extends Controller
             : collect();
 
         // อัตรา VAT ที่มีผลวันนี้ (ไม่มีแถว = 7)
-        $vatRate = DB::table('vat_rates')
-            ->where('effective_from', '<=', now()->toDateString())
-            ->where(fn ($w) => $w->whereNull('effective_to')->orWhere('effective_to', '>=', now()->toDateString()))
-            ->orderByDesc('effective_from')
-            ->value('rate_percent') ?? 7.0;
+        $vatRate = Schema::hasTable('vat_rates')
+            ? DB::table('vat_rates')
+                ->where('effective_from', '<=', now()->toDateString())
+                ->where(fn ($w) => $w->whereNull('effective_to')->orWhere('effective_to', '>=', now()->toDateString()))
+                ->orderByDesc('effective_from')
+                ->value('rate_percent') ?? 7.0
+            : 7.0;
 
         return view('settings.index', [
             'presets' => $presets,
@@ -533,13 +536,15 @@ class SystemSettingController extends Controller
 
         // อัตรา VAT เปลี่ยน: ปิดแถวเดิม (มีผลถึงเมื่อวาน) + เปิดแถวใหม่มีผลวันนี้
         // GlPostingService/รายงานภาษี อ่านจากตารางนี้อยู่แล้ว
-        $currentRate = DB::table('vat_rates')
-            ->where('effective_from', '<=', now()->toDateString())
-            ->where(fn ($w) => $w->whereNull('effective_to')->orWhere('effective_to', '>=', now()->toDateString()))
-            ->orderByDesc('effective_from')
-            ->first();
+        $currentRate = Schema::hasTable('vat_rates')
+            ? DB::table('vat_rates')
+                ->where('effective_from', '<=', now()->toDateString())
+                ->where(fn ($w) => $w->whereNull('effective_to')->orWhere('effective_to', '>=', now()->toDateString()))
+                ->orderByDesc('effective_from')
+                ->first()
+            : null;
 
-        if (! $currentRate || abs((float) $currentRate->rate_percent - (float) $data['vat_rate']) > 0.001) {
+        if (Schema::hasTable('vat_rates') && (! $currentRate || abs((float) $currentRate->rate_percent - (float) $data['vat_rate']) > 0.001)) {
             if ($currentRate && $currentRate->effective_from === now()->toDateString()) {
                 // เปลี่ยนซ้ำภายในวันเดียว: แก้แถวเดิมแทน
                 DB::table('vat_rates')->where('id', $currentRate->id)->update(['rate_percent' => $data['vat_rate']]);
