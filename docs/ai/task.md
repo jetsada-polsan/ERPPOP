@@ -2127,3 +2127,10 @@ pending
 - ทดสอบ: PHP lint, `git diff --check`, `P0ReportFiguresTest` ผ่าน 6 tests / 32 assertions
 - Deploy: ยังไม่ deploy
 - งานถัดไป: ตรวจรายงานจริงและ deploy เมื่อเจ้าของอนุมัติ
+
+# Handoff - 2026-11-02 (เพิ่มมูลค่ารายงานสต็อกตามสาขา)
+- Commit: `pending`
+- ทำอะไร: เพิ่มคอลัมน์ `มูลค่าคงเหลือ` ในรายงานสต็อกตามสาขา โดยรวมจำนวนคงเหลือคูณราคาสินค้า
+- ทดสอบ: รัน PHP lint, `git diff --check` และชุดรายงานก่อน deploy
+- Deploy: รอ deploy
+- งานถัดไป: ตรวจผลรายงานตามสาขาหลัง deploy

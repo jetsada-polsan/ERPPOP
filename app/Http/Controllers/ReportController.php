@@ -714,6 +714,7 @@ class ReportController extends Controller
                 ['label' => 'รายการสินค้า', 'key' => 'product_count', 'type' => 'number', 'class' => 'text-end'],
                 ['label' => 'คงเหลือรวม', 'key' => 'on_hand_qty', 'type' => 'number', 'class' => 'text-end'],
                 ['label' => 'จองรวม', 'key' => 'reserved_qty', 'type' => 'number', 'class' => 'text-end'],
+                ['label' => 'มูลค่าคงเหลือ', 'key' => 'stock_value', 'type' => 'money', 'class' => 'text-end'],
             ], $this->stockByBranch($filters)),
 
             'stock_alerts' => $this->tableResult('สต็อกต่ำ / ติดลบ', [
@@ -2242,7 +2243,7 @@ class ReportController extends Controller
         return $query
             ->groupBy('b.id', 'b.code', 'b.name_th', 'wl.name', 'wl.code')
             ->orderBy('b.code')
-            ->selectRaw("concat(coalesce(b.code, '-'), ' ', coalesce(b.name_th, wl.name, 'คลังกลาง/ตู้')) as branch_name, count(distinct sb.product_id) as product_count, sum(sb.on_hand_qty) as on_hand_qty, sum(sb.reserved_qty) as reserved_qty")
+            ->selectRaw("concat(coalesce(b.code, '-'), ' ', coalesce(b.name_th, wl.name, 'คลังกลาง/ตู้')) as branch_name, count(distinct sb.product_id) as product_count, sum(sb.on_hand_qty) as on_hand_qty, sum(sb.reserved_qty) as reserved_qty, sum(sb.on_hand_qty * coalesce(p.default_price, 0)) as stock_value")
             ->limit($filters['per_page'])
             ->get();
     }
