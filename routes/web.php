@@ -134,6 +134,7 @@ Route::prefix('fleet')->name('fleet.')->group(function () {
     Route::post('/board/{booking}', [FleetController::class, 'updateBoard'])->name('board.update');
     Route::post('/board/{booking}/payment', [FleetController::class, 'collectPayment'])->name('board.payment');
     Route::post('/vehicles', [FleetController::class, 'vehicle'])->name('vehicles.store');
+    Route::put('/vehicles/{vehicle}', [FleetController::class, 'updateVehicle'])->name('vehicles.update');
     Route::post('/trips', [FleetController::class, 'trip'])->name('trips.store');
     Route::post('/repairs', [FleetController::class, 'repair'])->name('repairs.store');
 });
@@ -529,6 +530,12 @@ Route::prefix('sales-areas')->name('sales-areas.')->group(function () {
     Route::put('/{salesArea}', [SalesAreaController::class, 'update'])->name('update');
 });
 
+Route::prefix('basic-master')->name('basic-master.')->group(function () {
+    Route::get('/{type}', [\App\Http\Controllers\BasicMasterController::class, 'index'])->name('index');
+    Route::post('/{type}', [\App\Http\Controllers\BasicMasterController::class, 'store'])->name('store');
+    Route::put('/{type}/{id}', [\App\Http\Controllers\BasicMasterController::class, 'update'])->whereNumber('id')->name('update');
+});
+
 Route::prefix('warehouse-locations')->name('warehouse-locations.')->group(function () {
     Route::get('/', [WarehouseLocationController::class, 'index'])->name('index');
     Route::post('/', [WarehouseLocationController::class, 'store'])->name('store');
@@ -776,6 +783,7 @@ Route::prefix('bplus')->name('bplus.')->group(function () {
     Route::post('/cash-books', [BplusOperationController::class, 'storeCashBook'])->name('cash-books.store');
     Route::get('/tax', [BplusOperationController::class, 'tax'])->name('tax');
     Route::post('/vat-rates', [BplusOperationController::class, 'storeVatRate'])->name('vat-rates.store');
+    Route::put('/vat-rates/{vatRate}', [BplusOperationController::class, 'closeVatRate'])->name('vat-rates.close');
     Route::get('/qr-payments', [BplusOperationController::class, 'qrPayments'])->name('qr-payments');
     Route::post('/qr-payments', [BplusOperationController::class, 'storeQrPayment'])->name('qr-payments.store');
     Route::put('/qr-payments/{qrPaymentConfig}', [BplusOperationController::class, 'updateQrPayment'])->name('qr-payments.update');

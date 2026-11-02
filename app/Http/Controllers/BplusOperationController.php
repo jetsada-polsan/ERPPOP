@@ -283,6 +283,20 @@ class BplusOperationController extends Controller
         return redirect()->route('bplus.tax')->with('success', 'บันทึกอัตราภาษีแล้ว');
     }
 
+    /** ปิดอัตราภาษีด้วยวันสิ้นสุด ไม่แก้อัตราหรือวันเริ่ม เพราะเอกสารเก่าคำนวณจากค่านั้นไปแล้ว */
+    public function closeVatRate(Request $request, VatRate $vatRate): RedirectResponse
+    {
+        $data = $request->validate([
+            'effective_to' => ['required', 'date', 'after_or_equal:'.$vatRate->effective_from->toDateString()],
+        ]);
+        $old = ['effective_to' => $vatRate->effective_to?->toDateString()];
+        $vatRate->update($data);
+        \App\Models\AuditLog::create(['user_id' => $request->user()?->id, 'action' => 'vat_rate_closed', 'table_name' => 'vat_rates',
+            'record_id' => $vatRate->id, 'old_values' => $old, 'new_values' => $data]);
+
+        return redirect()->route('bplus.tax')->with('success', 'ปิดอัตราภาษีแล้ว');
+    }
+
     public function qrPayments(): View
     {
         return view('bplus-ops.qr-payments', [

@@ -69,6 +69,7 @@ class RoutePermissions
         'stock-transforms.' => 'stock.manage',
         'production.' => 'stock.manage',
         'warehouse-locations.' => 'stock.manage',
+        'basic-master.' => 'masterdata.manage',
 
         // จัดซื้อ
         'purchases.' => 'purchasing.manage',

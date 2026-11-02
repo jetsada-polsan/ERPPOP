@@ -27,6 +27,9 @@ final class SafeDelete
         'warehouse-locations' => ['warehouse_locations', ['warehouse_location_id', 'from_warehouse_location_id', 'to_warehouse_location_id', 'default_warehouse_location_id'], 'masterdata.manage'],
         'discount-cards' => ['discount_cards', ['discount_card_id'], 'masterdata.manage'],
         'member-points' => ['member_point_rules', ['member_point_rule_id'], 'masterdata.manage'],
+        'product-categories' => ['product_categories', ['product_category_id'], 'masterdata.manage'],
+        'branches' => ['branches', ['branch_id'], 'masterdata.manage'],
+        'warehouses' => ['warehouses', ['warehouse_id'], 'masterdata.manage'],
     ];
 
     /** @return array<int, string> ตารางที่ยังอ้างแถวนี้อยู่ */

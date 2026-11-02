@@ -116,6 +116,7 @@ class ErpMenu
                     ['label' => 'ผู้จำหน่าย / เจ้าหนี้', 'route' => 'suppliers.index', 'pattern' => 'suppliers.*', 'icon' => 'bi-buildings-fill', 'tone' => 'pink'],
                     ['label' => 'สมาชิก', 'route' => 'members.index', 'pattern' => 'members.*', 'icon' => 'bi-person-vcard-fill', 'tone' => 'indigo'],
                     ['label' => 'คลังสินค้า', 'route' => 'warehouse-locations.index', 'pattern' => 'warehouse-locations.*', 'icon' => 'bi-archive-fill', 'tone' => 'teal'],
+                    ['label' => 'หมวดสินค้า / สาขา / คลัง', 'route' => 'basic-master.index', 'params' => ['type' => 'product-categories'], 'pattern' => 'basic-master.*', 'icon' => 'bi-diagram-3-fill', 'tone' => 'blue'],
                     ['label' => 'ตารางราคา', 'route' => 'price-tables.index', 'pattern' => 'price-tables.*', 'icon' => 'bi-tags-fill', 'tone' => 'red'],
                     ['label' => 'ราคาเครื่องชั่ง', 'route' => 'scale-prices.index', 'pattern' => 'scale-prices.*', 'icon' => 'bi-speedometer2', 'tone' => 'teal'],
                     ['label' => 'โปรโมชั่น', 'route' => 'promotions.index', 'pattern' => 'promotions.*', 'icon' => 'bi-gift-fill', 'tone' => 'amber'],

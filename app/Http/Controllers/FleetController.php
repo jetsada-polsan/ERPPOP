@@ -246,6 +246,18 @@ class FleetController extends Controller
         return back()->with('success', 'เพิ่มรถเข้าทะเบียนแล้ว');
     }
 
+    /** แก้ข้อมูลทะเบียนรถ เลขไมล์ไม่ให้แก้ตรงนี้ เพราะเดินจากบันทึกการวิ่งและการซ่อม */
+    public function updateVehicle(Request $request, FleetVehicle $vehicle): RedirectResponse
+    {
+        $data = $request->validate(['branch_id' => 'nullable|exists:branches,id', 'registration' => 'required|max:30|unique:fleet_vehicles,registration,'.$vehicle->id, 'vehicle_type' => 'required|max:80', 'brand' => 'nullable|max:80', 'model' => 'nullable|max:80', 'status' => 'required|in:active,inactive']);
+        $old = $vehicle->only(array_keys($data));
+        $vehicle->update($data);
+        \App\Models\AuditLog::create(['user_id' => $request->user()?->id, 'action' => 'vehicle_updated', 'table_name' => 'fleet_vehicles',
+            'record_id' => $vehicle->id, 'old_values' => $old, 'new_values' => $data]);
+
+        return back()->with('success', "บันทึกรถ {$vehicle->registration} แล้ว");
+    }
+
     public function trip(Request $request): RedirectResponse
     {
         $data = $request->validate(['vehicle_id' => 'required|exists:fleet_vehicles,id', 'trip_date' => 'required|date', 'odometer_start' => 'required|integer|min:0', 'odometer_end' => 'required|integer|gte:odometer_start', 'route' => 'required|max:255', 'fuel_liters' => 'nullable|numeric|min:0', 'fuel_cost' => 'nullable|numeric|min:0']);
