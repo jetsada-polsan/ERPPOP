@@ -6,6 +6,7 @@ use App\Models\Branch;
 use App\Models\Supplier;
 use App\Models\SupplierLedger;
 use Illuminate\Http\RedirectResponse;
+use App\Support\AutoCode;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -45,6 +46,7 @@ class SupplierController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        AutoCode::fill($request, 'suppliers', 'SU');
         $data = $this->validateSupplier($request);
 
         $supplier = Supplier::create($data);

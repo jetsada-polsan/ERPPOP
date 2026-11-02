@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Salesman;
 use Illuminate\Http\RedirectResponse;
+use App\Support\AutoCode;
 use Illuminate\Http\Request;
 
 class SalesmanController extends Controller
@@ -18,6 +19,7 @@ class SalesmanController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        AutoCode::fill($request, 'salesmen', 'SM');
         $data = $this->validateSalesman($request);
 
         Salesman::create($data);

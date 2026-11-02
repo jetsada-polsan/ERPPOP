@@ -192,7 +192,7 @@
                         <label for="logo-file" class="btn btn-outline-primary mb-0">
                             <i class="bi bi-upload me-1"></i>อัปโหลดโลโก้
                         </label>
-                        <input id="logo-file" type="file" name="logo_file" accept=".png,.jpg,.jpeg,.webp,.svg" class="visually-hidden">
+                        <input id="logo-file" type="file" name="logo_file" accept=".png,.jpg,.jpeg,.webp,.svg" class="visually-hidden" onchange="if (this.files.length) this.form.submit()">
                         <span id="logo-file-name" class="small text-muted">ยังไม่ได้เลือกไฟล์</span>
                     </div>
                 </div>

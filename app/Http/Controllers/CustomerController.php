@@ -8,6 +8,7 @@ use App\Models\Customer;
 use App\Models\SalesArea;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use App\Support\AutoCode;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -54,6 +55,7 @@ class CustomerController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        AutoCode::fill($request, 'customers', 'CU');
         $data = $this->applySalesAssignment($request, $this->validateCustomer($request));
 
         $customer = Customer::create($data);

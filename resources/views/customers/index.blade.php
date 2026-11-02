@@ -103,7 +103,7 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label text-muted small">รหัสลูกค้า</label>
-                                <input type="text" name="code" required class="form-control">
+                                <input placeholder="เว้นว่างได้ ระบบรันให้" type="text" name="code" class="form-control">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label text-muted small">สาขา</label>

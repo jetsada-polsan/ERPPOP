@@ -6,6 +6,7 @@ use App\Models\DocumentBook;
 use App\Models\DocumentType;
 use App\Models\SalesArea;
 use Illuminate\Http\RedirectResponse;
+use App\Support\AutoCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -13,6 +14,7 @@ class SalesAreaController extends Controller
 {
     public function store(Request $request): RedirectResponse
     {
+        AutoCode::fill($request, 'sales_areas', 'SA');
         $data = $this->validateArea($request);
         DB::transaction(function () use ($data) {
             $data['document_book_id'] = $this->syncBookingBook($data);
