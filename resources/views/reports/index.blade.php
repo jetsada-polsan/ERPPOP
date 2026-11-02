@@ -240,7 +240,7 @@
             <div class="flow-report-head no-print">
                 <div>
                     <div class="flow-eyebrow">{{ $categoryMeta[$selectedCategory]['label'] ?? $catalog[$selectedCategory]['title'] ?? 'รายงาน' }}</div>
-                    <h1>{{ $reportLabels[$selectedReport] ?? $result['title'] }}</h1>
+                    <h1 style="font-size:20px;font-weight:700;margin:0">{{ $reportLabels[$selectedReport] ?? $result['title'] }}</h1>
                 </div>
                 <div class="flow-head-actions">
                     @if($canExport)
@@ -867,6 +867,12 @@
         .flow-report-summary, .rpt-panel-title { padding-left: 14px; padding-right: 14px; }
         .erp-search { min-width: 100%; }
     }
+    /* ลดหัวข้อซ้ำ: ชื่อรายงานเป็นจุดเด่นเดียว ส่วนอื่นเป็นข้อมูลรอง */
+    .app-header h1 { font-size: 18px !important; font-weight: 700; }
+    .rpt-toolbar ~ * .rpt-panel-title .fw-bold.fs-5, .rpt-panel-title .fw-bold.fs-5 { display: none; }
+    .rpt-select, .rpt-date-input { font-size: 14px; }
+    .rpt-panel-title { font-size: 14px; }
+    h1 { line-height: 1.25; }
 </style>
 @endpush
 
