@@ -1757,7 +1757,7 @@
                 position: 'top-end',
                 icon,
                 title,
-                timer: icon === 'error' ? 5200 : 2200,
+                timer: icon === 'error' ? 4000 : 1200,
                 showConfirmButton: false,
                 ...options,
             });
@@ -1858,11 +1858,11 @@
     <script>
         @if(session('success_popup'))
         erpPopup('success', 'สำเร็จ', @json(session('success')), {
-            timer: 4200,
+            timer: 1500,
             timerProgressBar: true,
         });
         @else
-        erpToast('success', @json(session('success')), { timer: 2200 });
+        erpToast('success', @json(session('success')), { timer: 1200 });
         @endif
     </script>
     @endif

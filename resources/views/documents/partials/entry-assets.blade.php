@@ -296,7 +296,9 @@ function docEntryPage(config) {
         get totalQty() { return this.items.reduce((sum, item) => sum + (Number(item.qty) || 0), 0); },
         get totalAmount() { return this.items.reduce((sum, item) => sum + (Number(item.qty) || 0) * (Number(item.unit_price) || 0), 0); },
         money(value) { return Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+        submitting: false,
         onSubmit(event) {
+            if (this.submitting) { event.preventDefault(); return; }
             if (this.config.partyRequired && !this.partyId) {
                 event.preventDefault();
                 const title = `เลือก${this.config.partyLabel}ก่อน`;
@@ -311,17 +313,8 @@ function docEntryPage(config) {
                 else Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title, timer: 2200, showConfirmButton: false });
                 return;
             }
-            if (this.config.showStock) {
-                const unavailable = this.items.find(item => item.available_qty !== null
-                    && Number(item.qty) > Number(item.available_qty) + 0.00000001);
-                if (unavailable) {
-                    event.preventDefault();
-                    const title = 'จำนวนจองเกินสินค้าพร้อมจอง';
-                    const text = `${unavailable.productQuery} เหลือพร้อมจอง ${this.money(unavailable.available_qty)} กรุณาปรับจำนวนก่อนบันทึก`;
-                    if (window.erpToast) window.erpToast('warning', title, { text, timer: 4000 });
-                    else Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title, text, timer: 4000, showConfirmButton: false });
-                }
-            }
+            // จำนวนเกินสต๊อกให้ ERP ตัดสินตามนโยบายสาขา หน้าจอแค่แจ้งเตือน ไม่บล็อกปุ่มบันทึก
+            this.submitting = true;
         },
     };
 }

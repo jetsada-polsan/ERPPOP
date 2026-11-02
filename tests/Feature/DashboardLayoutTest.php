@@ -57,7 +57,7 @@ class DashboardLayoutTest extends TestCase
             ->getContent();
 
         $this->assertStringContainsString("position: 'top-end'", $html);
-        $this->assertStringContainsString('{ timer: 2200 }', $html);
+        $this->assertStringContainsString('{ timer: 1200 }', $html);
         $this->assertStringContainsString('.erp-swal-toast.swal2-show', $html);
         $this->assertStringContainsString('animation-duration: 180ms', $html);
     }

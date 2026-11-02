@@ -244,6 +244,9 @@
                                 </template>
                             </tbody>
                         </table>
+                        <button type="button" class="doc-add mt-2 ms-2 mb-2" @click="addItem()">
+                            <i class="bi bi-plus-lg me-1"></i> เพิ่มสินค้า
+                        </button>
                     </div>
                 </div>
             </div>
@@ -255,7 +258,7 @@
                 </div>
                 <div class="doc-actions">
                     <button type="button" class="doc-btn doc-btn-secondary" @click="closeModal()">ยกเลิก</button>
-                    <button type="submit" class="doc-btn {{ $submitClass }}">
+                    <button type="submit" class="doc-btn {{ $submitClass }}" :disabled="submitting">
                         <i class="bi bi-check2-circle me-1"></i> {{ $submitLabel ?? 'บันทึก' }}
                     </button>
                 </div>
