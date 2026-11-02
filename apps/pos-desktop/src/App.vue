@@ -41,6 +41,7 @@ const online = ref(navigator.onLine)
 const syncing = ref(false)
 const catalogSyncError = ref('')
 const pendingCount = ref(0)
+const queueError = ref('')
 const error = ref('')
 const notice = ref('')
 const busy = ref(false)
@@ -213,7 +214,9 @@ function scan() {
 }
 
 async function refreshQueue() {
-  pendingCount.value = (await queueItems()).filter((item) => item.status !== 'synced').length
+  const waiting = (await queueItems()).filter((item) => item.status !== 'synced')
+  pendingCount.value = waiting.length
+  queueError.value = waiting.find((item) => item.error)?.error?.slice(0, 160) || ''
 }
 
 async function syncAll() {
@@ -436,6 +439,18 @@ async function changePin() {
     await startCashierSession(authenticatedCashier)
     flash('เปลี่ยน PIN เรียบร้อย')
   } catch (e) { showError(e) } finally { busy.value = false }
+}
+
+// ออกจากระบบแค่เปลี่ยนคนขาย กะยังอยู่ที่ ERP คนเดิมใส่ PIN แล้วขายต่อได้
+async function logoutCashier() {
+  if (cart.value.length && !window.confirm('ยังมีสินค้าในบิล ออกจากระบบแล้วบิลนี้จะหาย ยืนยันไหม')) return
+  cart.value = []
+  billDiscount.value = 0
+  cashier.value = null
+  shift.value = null
+  await saveSession(null, null)
+  cashierPin.value = ''
+  modal.value = 'cashier'
 }
 
 async function startCashierSession(next: Cashier) {
@@ -705,7 +720,7 @@ onUnmounted(() => {
 <template>
   <main class="app-shell">
     <header class="topbar">
-      <div class="brand"><span class="brand-mark">P</span><div><strong>POPSTAR</strong><small>POINT OF SALE</small></div></div>
+      <div class="brand"><span class="brand-mark">J</span><div><strong>JET POS</strong><small>POINT OF SALE</small></div></div>
       <div class="terminal-context">
         <div><span>สาขา / เครื่อง</span><strong>{{ profile?.branchName || 'ยังไม่ได้ตั้งค่าเครื่อง' }}</strong><small>{{ profile?.terminalCode || 'POS' }}</small></div>
         <div><span>กะขาย</span><strong>{{ shift?.shift_no || 'ยังไม่เปิดกะ' }}</strong><small>{{ cashier?.name || 'ยังไม่เข้าแคชเชียร์' }}</small></div>
@@ -713,6 +728,7 @@ onUnmounted(() => {
       <div class="top-actions">
         <button class="status" :class="connectionClass" :title="catalogSyncError || 'ตรวจการเชื่อมต่อ ERP และซิงก์ข้อมูล'" @click="syncAll"><Wifi v-if="profile && online"/><CloudOff v-else/><span>{{ connectionLabel }}</span></button>
         <button v-if="cashier && !shift" class="shift-action" title="เปิดกะขาย" @click="modal = 'shift'"><Banknote/><span>เปิดกะ</span></button>
+        <button class="shift-action" :title="cashier ? 'ออกจากระบบ' : 'เข้าสู่ระบบ'" @click="cashier ? logoutCashier() : (modal = 'cashier')"><LogOut/><span>{{ cashier ? 'ออกจากระบบ' : 'เข้าสู่ระบบ' }}</span></button>
         <button class="icon-button" title="ซิงก์ข้อมูล" @click="syncAll"><RefreshCw :class="{ spin: syncing }"/></button>
         <button class="icon-button" title="คู่มือการใช้งาน POS" @click="openGuide"><CircleHelp/></button>
         <button class="icon-button" title="ประวัติการขายย้อนหลัง" @click="openHistory"><History/></button>
@@ -772,7 +788,7 @@ onUnmounted(() => {
         <label class="bill-discount">ส่วนลดท้ายบิล (บาท)<input v-model.number="billDiscount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></label>
         <div class="totals"><div><span>ยอดก่อนภาษี</span><b>฿{{ money(subtotal - vat) }}</b></div><div><span>VAT {{ profile?.vatRate || 7 }}%</span><b>฿{{ money(vat) }}</b></div><div class="grand"><span>ยอดสุทธิ</span><b>฿{{ money(subtotal) }}</b></div></div>
         <button class="pay-button" :disabled="!cart.length || busy || !storageReady" @click="openPayment"><Banknote/><span><small>{{ storageReady ? 'รับชำระ' : 'รอพื้นที่ข้อมูล' }}</small><strong>{{ storageReady ? 'ชำระเงิน' : 'ตรวจฐานข้อมูล' }}</strong></span><ChevronRight/></button>
-        <div class="queue-bar" :class="{ warning: pendingCount }"><Cloud v-if="pendingCount"/><CheckCircle2 v-else/><span>{{ pendingCount ? `รอส่งขึ้น ERP ${pendingCount} บิล` : 'บิลทั้งหมดส่งขึ้น ERP แล้ว' }}</span></div>
+        <div class="queue-bar" :class="{ warning: pendingCount }"><Cloud v-if="pendingCount"/><CheckCircle2 v-else/><span>{{ pendingCount ? `รอส่งขึ้น ERP ${pendingCount} บิล${queueError ? ` · ${queueError}` : ''}` : 'บิลทั้งหมดส่งขึ้น ERP แล้ว' }}</span></div>
       </aside>
     </section>
 
