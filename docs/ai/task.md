@@ -2175,3 +2175,19 @@ pending
 - ทดสอบ: รัน PHP lint, `git diff --check` และชุดรายงานก่อน deploy
 - Deploy: รอ deploy
 - งานถัดไป: ตรวจผลรายงานตามสาขาหลัง deploy
+# Handoff — 2026-11-02 (เพิ่ม Stock Card รายละเอียด)
+
+## ทำอะไรไป
+- เพิ่มรายงานใหม่ `inventory.stock_card_detail` แยกจากรายงานเคลื่อนไหวสินค้าเดิม
+- แสดงวันที่/เวลา, สินค้า, คลัง, Lot, เอกสาร, ประเภท, ยอดก่อน, รับเข้า, จ่ายออก, ยอดหลัง, ทุนต่อหน่วย และผู้ทำรายการ
+- คำนวณยอดก่อน/หลังจาก movement ย้อนหลังจริง ไม่เริ่มนับใหม่เฉพาะช่วงวันที่ที่เลือก
+- เพิ่ม migration ให้รายงานโผล่ในเมนูสินค้าและสต็อก พร้อมใช้ตัวกรองสาขาและค้นหาเดิม
+
+## ทดสอบไปแล้วแค่ไหน
+- `php artisan test --filter='ReportGovernanceTest|StockBalanceReportTest' --no-coverage`: 16 tests / 165 assertions ผ่าน
+- PHP syntax check และ `git diff --check` ผ่าน
+- `git pull origin main` ทำไม่ได้ในสภาพแวดล้อมนี้เพราะสิทธิ์เปิด `.git/FETCH_HEAD` ถูกปฏิเสธ
+
+## งานถัดไป
+- รัน migration และเปิดตรวจรายงานจริงบน production หลัง deploy ตามคำสั่งเจ้าของ
+- ทดสอบรายการรับเข้า/ขาย/โอน/คืน/ปรับ และตรวจยอดก่อน-หลังกับ Stock Balance

@@ -747,6 +747,22 @@ class ReportController extends Controller
                 ['label' => 'จำนวน', 'key' => 'qty', 'type' => 'number', 'class' => 'text-end'],
             ], $this->stockMovements($from, $to, $filters)),
 
+            'stock_card_detail' => $this->tableResult('Stock Card รายละเอียด', [
+                ['label' => 'วันที่', 'key' => 'movement_date'],
+                ['label' => 'เวลา', 'key' => 'movement_time'],
+                ['label' => 'สินค้า', 'key' => 'product_name'],
+                ['label' => 'คลัง / ที่เก็บ', 'key' => 'location_name'],
+                ['label' => 'Lot', 'key' => 'lot_number'],
+                ['label' => 'เอกสาร', 'key' => 'doc_number'],
+                ['label' => 'ประเภท', 'key' => 'movement_type', 'type' => 'badge'],
+                ['label' => 'ยอดก่อน', 'key' => 'balance_before', 'type' => 'number', 'class' => 'text-end'],
+                ['label' => 'รับเข้า', 'key' => 'qty_in', 'type' => 'number', 'class' => 'text-end'],
+                ['label' => 'จ่ายออก', 'key' => 'qty_out', 'type' => 'number', 'class' => 'text-end'],
+                ['label' => 'ยอดหลัง', 'key' => 'balance_after', 'type' => 'number', 'class' => 'text-end'],
+                ['label' => 'ทุน/หน่วย', 'key' => 'unit_cost', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'ผู้ทำรายการ', 'key' => 'created_by_name'],
+            ], $this->stockCardDetail($from, $to, $filters)),
+
             'documents_summary' => $this->tableResult('สรุปเอกสาร', [
                 ['label' => 'ประเภทเอกสาร', 'key' => 'document_type'],
                 ['label' => 'จำนวนเอกสาร', 'key' => 'document_count', 'type' => 'number', 'class' => 'text-end'],
@@ -2327,6 +2343,57 @@ class ReportController extends Controller
             ->selectRaw("sm.movement_date, concat(p.sku_code, ' ', p.name_th) as product_name, concat(w.name, ' / ', coalesce(wl.name, wl.code)) as location_name, sm.movement_type, sm.qty")
             ->limit($filters['per_page'])
             ->get();
+    }
+
+    private function stockCardDetail(Carbon $from, Carbon $to, array $filters): Collection
+    {
+        $inTypes = "('in','transfer_in','return_in','transform_in','adjust_in','void_in','opening')";
+        $query = DB::table('stock_movements as sm')
+            ->join('products as p', 'p.id', '=', 'sm.product_id')
+            ->join('warehouse_locations as wl', 'wl.id', '=', 'sm.warehouse_location_id')
+            ->join('warehouses as w', 'w.id', '=', 'wl.warehouse_id')
+            ->leftJoin('stock_lots as sl', 'sl.id', '=', 'sm.stock_lot_id')
+            ->leftJoin('documents as d', 'd.id', '=', 'sm.document_id')
+            ->leftJoin('users as u', 'u.id', '=', 'd.created_by')
+            ->leftJoin('branches as b', 'b.id', '=', DB::raw($this->branchByLocationSub('sm.warehouse_location_id')))
+            ->whereBetween('sm.movement_date', [$from->toDateString(), $to->toDateString()]);
+
+        $this->applyBranch($query, $filters, 'b.id');
+        $this->applySearch($query, $filters, ['p.sku_code', 'p.name_th', 'sm.movement_type', 'd.doc_number', 'sl.lot_number']);
+
+        $signedQty = "case when sm.movement_type in {$inTypes} then sm.qty else -sm.qty end";
+        $priorBalance = "coalesce((select sum(case when sm0.movement_type in {$inTypes} then sm0.qty else -sm0.qty end)
+            from stock_movements sm0
+            where sm0.product_id = sm.product_id
+              and sm0.warehouse_location_id = sm.warehouse_location_id
+              and (sm0.movement_date < sm.movement_date
+                   or (sm0.movement_date = sm.movement_date and sm0.created_at < sm.created_at)
+                   or (sm0.movement_date = sm.movement_date and sm0.created_at = sm.created_at and sm0.id < sm.id))), 0)";
+
+        return $query
+            ->orderBy('sm.movement_date')->orderBy('sm.created_at')->orderBy('sm.id')
+            ->selectRaw("sm.movement_date, sm.created_at as movement_time,
+                concat(p.sku_code, ' ', p.name_th) as product_name,
+                concat(w.name, ' / ', coalesce(wl.name, wl.code)) as location_name,
+                coalesce(sl.lot_number, '-') as lot_number,
+                coalesce(d.doc_number, '-') as doc_number,
+                sm.movement_type,
+                {$priorBalance} as balance_before,
+                case when sm.movement_type in {$inTypes} then sm.qty else 0 end as qty_in,
+                case when sm.movement_type in {$inTypes} then 0 else sm.qty end as qty_out,
+                {$priorBalance} + {$signedQty} as balance_after,
+                coalesce(sl.unit_cost, 0) as unit_cost,
+                coalesce(u.name, '-') as created_by_name")
+            ->limit($filters['per_page'])
+            ->get()
+            ->map(function ($row) {
+                $row->balance_before = (float) $row->balance_before;
+                $row->balance_after = (float) $row->balance_after;
+                $row->qty_in = (float) $row->qty_in;
+                $row->qty_out = (float) $row->qty_out;
+                $row->unit_cost = (float) $row->unit_cost;
+                return $row;
+            });
     }
 
     private function documentColumns(): array
