@@ -80,7 +80,7 @@ export function priceCart(cart: CartLine[], allPromotions: QtyPromotion[], vatRa
   const items: PricedLine[] = lines.map(({ line, qty, gross }) => ({
     product_id: line.id,
     qty,
-    unit_price: roundUnitPrice(Math.max(0, gross - (baseTotal ? promoDiscount * gross / baseTotal : 0)) / (qty || 1)),
+    unit_price: roundUnitPrice(Math.max(0, gross - (baseTotal ? (promoDiscount + manualDiscount) * gross / baseTotal : 0)) / (qty || 1)),
     barcode: line.scannedBarcode,
     // ส่งประเภทที่เครื่องใช้ตีความไปด้วย เซิร์ฟเวอร์จะได้ตรวจซ้ำได้ว่าเข้าใจตรงกัน
     // ไม่ใช่มาเดาเองจากรูปร่างตัวเลขตอนรับบิลเข้า
@@ -100,6 +100,21 @@ export function priceCart(cart: CartLine[], allPromotions: QtyPromotion[], vatRa
   }
 
   return { subtotal, promoDiscount, manualDiscount, total, vat, beforeVat, items }
+}
+
+/** บิลในคิวจากรุ่น 1.5.5-1.5.6 ส่งราคาเต็มพร้อมส่วนลด ERP จึงปฏิเสธ ปรับเป็นราคาสุทธิก่อนส่งซ้ำ */
+export function repairDiscountedPayload(payload: CheckoutPayload): CheckoutPayload {
+  const discount = num(payload.manual_discount_amount)
+  if (discount <= 0 || payload.net_items) return payload
+  const sum = payload.items.reduce((total, item) => total + num(item.qty) * num(item.unit_price), 0)
+  if (sum <= 0) return payload
+  const factor = Math.max(0, sum - discount) / sum
+
+  return {
+    ...payload,
+    net_items: true,
+    items: payload.items.map((item) => ({ ...item, unit_price: roundUnitPrice(num(item.unit_price) * factor) })),
+  }
 }
 
 export function checkoutPayloadWithPricing(payload: CheckoutPayload, pricing: CartPricing): CheckoutPayload {

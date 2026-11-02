@@ -60,7 +60,7 @@ const countedCash = ref(0)
 const paymentMethod = ref<PaymentMethod>('cash')
 const cashReceived = ref(0)
 const paymentRef = ref('')
-const lastReceipt = ref<{ no: string; items: CartLine[]; total: number; method: PaymentMethod; paid: number; change: number; printedAt: string; provisional: boolean } | null>(null)
+const lastReceipt = ref<{ no: string; items: CartLine[]; discount?: number; total: number; method: PaymentMethod; paid: number; change: number; printedAt: string; provisional: boolean } | null>(null)
 const heldBills = ref<HeldBill[]>([])
 const holdLabel = ref('')
 const cashDropAmount = ref(0)
@@ -563,6 +563,7 @@ async function checkout() {
   const id = `${profile.value.terminalCode || 'POS'}:SALE:${crypto.randomUUID()}`
   const soldItems = cart.value.map((line) => ({ ...line }))
   const soldTotal = subtotal.value
+  const soldDiscount = pricing.value.manualDiscount
   const soldChange = change.value
   const payload = {
     branch_id: profile.value.branchId,
@@ -576,6 +577,7 @@ async function checkout() {
     vat_mode: 'included' as const,
     ...(pricing.value.manualDiscount > 0 ? {
       manual_discount_amount: pricing.value.manualDiscount,
+      net_items: true,
       discount_approved_by: `คนขาย ${cashier.value.name}`,
     } : {}),
     items: pricing.value.items,
@@ -607,7 +609,7 @@ async function checkout() {
       }
       else flash('เก็บบิลในเครื่องแล้ว ระบบจะส่งซ้ำอัตโนมัติ')
     } else flash('ออฟไลน์: เก็บบิลในเครื่องแล้ว ระบบจะส่งเมื่ออินเทอร์เน็ตกลับมา')
-    lastReceipt.value = { no: receiptNo, items: soldItems, total: soldTotal, method: paymentMethod.value, paid: cashReceived.value, change: soldChange, printedAt: new Date().toLocaleString('th-TH'), provisional }
+    lastReceipt.value = { no: receiptNo, items: soldItems, discount: soldDiscount, total: soldTotal, method: paymentMethod.value, paid: cashReceived.value, change: soldChange, printedAt: new Date().toLocaleString('th-TH'), provisional }
     if (profile.value.hardwareProfile?.auto_print) {
       window.setTimeout(() => printLastReceipt(), 150)
     }
@@ -940,7 +942,8 @@ onUnmounted(() => {
           <tbody><tr v-for="line in lastReceipt.items" :key="`${block.id}-${line.id}-${line.scannedBarcode || ''}`"><td><span v-if="block.show_sku">{{ line.sku_code }} </span>{{ line.name_th }}<small v-if="block.show_unit_price">{{ money(line.pos_price) }} / หน่วย</small></td><td>{{ line.qty }}</td><td>{{ money(line.qty * line.pos_price) }}</td></tr></tbody>
         </table>
         <div v-else-if="block.type === 'tax-summary'" class="print-row"><span>มูลค่าก่อนภาษี / VAT {{ profile?.vatRate || 7 }}%</span><b>{{ money(lastReceipt.total - receiptVat) }} / {{ money(receiptVat) }}</b></div>
-        <div v-else-if="block.type === 'totals'" class="print-row print-total"><span>รวมสุทธิ</span><strong>{{ money(lastReceipt.total) }} บาท</strong></div>
+        <div v-else-if="block.type === 'totals' && lastReceipt.discount" class="print-row"><span>ส่วนลดท้ายบิล</span><b>-฿{{ money(lastReceipt.discount) }}</b></div>
+        <div v-if="block.type === 'totals'" class="print-row print-total"><span>รวมสุทธิ</span><strong>{{ money(lastReceipt.total) }} บาท</strong></div>
         <div v-else-if="block.type === 'payment'" class="print-payment"><span>ชำระโดย {{ paymentName(lastReceipt.method) }}</span><span v-if="lastReceipt.method === 'cash'">รับเงิน {{ money(lastReceipt.paid) }} · เงินทอน {{ money(lastReceipt.change) }}</span></div>
         <template v-else-if="block.type === 'custom' || block.type === 'footer'">{{ block.text }}</template>
       </div>

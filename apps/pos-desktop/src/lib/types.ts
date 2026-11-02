@@ -146,6 +146,7 @@ export interface CheckoutPayload {
   change_amount?: number
   manual_discount_amount?: number
   discount_approved_by?: string
+  net_items?: boolean
   vat_mode: 'included'
   items: Array<{ product_id: number; qty: number; unit_price: number; barcode?: string; barcode_type?: BarcodeType }>
 }

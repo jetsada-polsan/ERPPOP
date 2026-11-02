@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkoutPayloadWithPricing, priceCart, promotionActive } from './pricing'
+import { checkoutPayloadWithPricing, priceCart, promotionActive, repairDiscountedPayload } from './pricing'
 import type { CartLine, CheckoutPayload, QtyPromotion } from './types'
 
 const product = (id: number, price: number): CartLine => ({
@@ -75,7 +75,13 @@ describe('bill discount', () => {
     const pricing = priceCart([line], [], 7, new Date(), 10)
     expect(pricing.manualDiscount).toBe(10)
     expect(pricing.total).toBe(60)
-    expect(pricing.items[0].unit_price).toBe(70)
+    expect(pricing.items[0].unit_price).toBe(60)
+  })
+
+  it('repairs queued bills that still carry the full price', () => {
+    const payload = { manual_discount_amount: 10, items: [{ product_id: 1, qty: 1, unit_price: 70 }] } as unknown as CheckoutPayload
+    expect(repairDiscountedPayload(payload).items[0].unit_price).toBe(60)
+    expect(repairDiscountedPayload(repairDiscountedPayload(payload)).items[0].unit_price).toBe(60)
   })
 })
 

@@ -1,3 +1,4 @@
+import { repairDiscountedPayload } from './pricing'
 import { api } from './api'
 import { markQueue, queueItems } from './db'
 
@@ -12,7 +13,7 @@ export async function syncCheckoutQueue(onChange?: () => void) {
       await markQueue(item.id, 'syncing')
       onChange?.()
       try {
-        const response = await api.checkout(item.id, item.payload)
+        const response = await api.checkout(item.id, repairDiscountedPayload(item.payload))
         await markQueue(item.id, 'synced', undefined, response.receipt_no)
       } catch (error) {
         await markQueue(item.id, 'failed', error instanceof Error ? error.message : String(error))
