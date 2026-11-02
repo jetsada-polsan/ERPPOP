@@ -73,15 +73,25 @@ export async function loadSession(): Promise<{ cashier: Cashier | null; shift: S
  * ไม่ใช่ตารางว่าง (เคยทำให้เครื่องสาขาไม่มีสินค้าเลยหลังซิงก์สะดุด)
  * และเร็วกว่าเดิมมากเพราะ commit ครั้งเดียวแทนหนึ่ง commit ต่อหนึ่งแถว
  */
-async function inTransaction(conn: Database, work: () => Promise<void>) {
-  await conn.execute('BEGIN')
-  try {
-    await work()
-    await conn.execute('COMMIT')
-  } catch (error) {
-    await conn.execute('ROLLBACK').catch(() => undefined)
-    throw error
-  }
+let writeQueue: Promise<unknown> = Promise.resolve()
+
+/**
+ * plugin-sql ใช้ connection pool ส่วน BEGIN กับคำสั่งถัดไปอาจอยู่คนละ connection
+ * ธุรกรรมจึงค้างและขึ้น database is locked เลยเรียงงานเขียนชุดใหญ่ทีละงาน
+ * ถ้าต้องการความครบทั้งชุด ให้รวมคำสั่งไว้ใน execute เดียวเหมือน swap ของสินค้า
+ */
+function inTransaction(_conn: Database, work: () => Promise<void>) {
+  const run = writeQueue.then(work, work)
+  writeQueue = run.catch(() => undefined)
+
+  return run
+}
+
+function chunks<T>(items: T[], size: number) {
+  const parts: T[][] = []
+  for (let index = 0; index < items.length; index += size) parts.push(items.slice(index, index + size))
+
+  return parts
 }
 
 /** Cache public cashier data; credential is only written after a successful online PIN check. */
@@ -147,17 +157,38 @@ export async function replaceProducts(products: Product[]) {
   const conn = await connection()
   const syncedAt = new Date().toISOString()
   await inTransaction(conn, async () => {
-    await conn.execute('DELETE FROM products')
-    await conn.execute('DELETE FROM product_barcodes')
-    for (const product of products) {
-      await conn.execute('INSERT INTO products (id, data, synced_at) VALUES (?, ?, ?)', [product.id, JSON.stringify(product), syncedAt])
-      for (const row of product.barcodes || []) {
-        await conn.execute(
-          'INSERT OR REPLACE INTO product_barcodes (barcode, product_id, barcode_type, unit_id, unit_factor, price, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [row.barcode, product.id, normalizeBarcodeType(row.barcode_type), row.unit_id ?? null, Number(row.unit_factor || 1), row.price ?? null, syncedAt],
-        )
-      }
+    // เขียนลงตารางพักก่อน ถ้าเน็ตหรือเครื่องหยุดกลางทาง สินค้าเดิมยังขายได้ครบ
+    await conn.execute('CREATE TABLE IF NOT EXISTS products_staging (id INTEGER PRIMARY KEY, data TEXT NOT NULL, synced_at TEXT NOT NULL)')
+    await conn.execute(`CREATE TABLE IF NOT EXISTS product_barcodes_staging (
+      barcode TEXT PRIMARY KEY, product_id INTEGER NOT NULL, barcode_type TEXT, unit_id INTEGER,
+      unit_factor REAL, price REAL, synced_at TEXT NOT NULL
+    )`)
+    await conn.execute('DELETE FROM products_staging')
+    await conn.execute('DELETE FROM product_barcodes_staging')
+    for (const part of chunks(products, 200)) {
+      await conn.execute(
+        `INSERT INTO products_staging (id, data, synced_at) VALUES ${part.map(() => '(?, ?, ?)').join(', ')}`,
+        part.flatMap((product) => [product.id, JSON.stringify(product), syncedAt]),
+      )
     }
+    const barcodes = products.flatMap((product) => (product.barcodes || []).map((row) => [
+      row.barcode, product.id, normalizeBarcodeType(row.barcode_type), row.unit_id ?? null,
+      Number(row.unit_factor || 1), row.price ?? null, syncedAt,
+    ]))
+    for (const part of chunks(barcodes, 200)) {
+      await conn.execute(
+        `INSERT OR REPLACE INTO product_barcodes_staging (barcode, product_id, barcode_type, unit_id, unit_factor, price, synced_at)
+         VALUES ${part.map(() => '(?, ?, ?, ?, ?, ?, ?)').join(', ')}`,
+        part.flat(),
+      )
+    }
+    await conn.execute(`BEGIN IMMEDIATE;
+      DELETE FROM products;
+      DELETE FROM product_barcodes;
+      INSERT INTO products (id, data, synced_at) SELECT id, data, synced_at FROM products_staging;
+      INSERT INTO product_barcodes (barcode, product_id, barcode_type, unit_id, unit_factor, price, synced_at)
+        SELECT barcode, product_id, barcode_type, unit_id, unit_factor, price, synced_at FROM product_barcodes_staging;
+      COMMIT;`)
   })
 }
 
