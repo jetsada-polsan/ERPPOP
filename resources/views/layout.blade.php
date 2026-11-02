@@ -1380,6 +1380,17 @@
         }
 
         @media print { .app-content{padding:0}.content-card,.card{box-shadow:none}.table-responsive{overflow:visible!important} }
+        /* พิมพ์เฉพาะเนื้อเอกสาร ไม่เอาเมนูและปุ่มของเว็บ */
+        .erp-print-head { display:none; }
+        @media print {
+            .odn-topbar, .app-header, .app-sidebar, .app-footer, .no-print, .btn, form .form-select, .swal2-container { display:none !important; }
+            html, body, .app-wrapper, .app-main, .app-content { display:block !important; width:100% !important; margin:0 !important; padding:0 !important; background:#fff !important; }
+            .erp-print-head { display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:10px; font-size:13px; }
+            .erp-print-head img { max-height:48px; }
+            table { font-size:12px; }
+            tr { break-inside:avoid; }
+            * { color:#000 !important; box-shadow:none !important; }
+        }
             /* แจ้งเตือนต้องอยู่เหนือหน้าต่างเอกสารเสมอ ไม่งั้นผู้ใช้เห็นเป็นกดแล้วนิ่ง */
         .swal2-container { z-index: 6000 !important; }
     </style>
@@ -1684,6 +1695,10 @@
         </button>
 
         <main class="app-main">
+            <div class="erp-print-head">
+                <div>@if(\App\Models\AppSetting::logoUrl())<img src="{{ \App\Models\AppSetting::logoUrl() }}" alt="">@endif</div>
+                <div><strong>{{ \App\Models\AppSetting::company('name_th') }}</strong> · @yield('page-title') · {{ now()->format('d/m/Y H:i') }}</div>
+            </div>
             <div class="app-content">
                 <div class="container-fluid px-0">
                     @yield('content')
