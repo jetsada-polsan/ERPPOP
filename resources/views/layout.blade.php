@@ -729,7 +729,7 @@
         html.subnav-collapsed .fa-subnav { display: none; }
 
         .fa-subnav-brand { height:48px; display:flex; align-items:center; justify-content:center; margin:0 4px 6px; padding:4px 6px; overflow:hidden; }
-        .fa-subnav-brand img { display:block; width:auto!important; max-width:190px!important; height:auto!important; max-height:38px!important; object-fit:contain; }
+        .fa-subnav-brand img { display:block; width:auto!important; max-width:190px!important; height:auto!important; max-height:68px!important; object-fit:contain; }
         .fa-subnav-brand .brand-logo { font-size: 22px; font-weight: 900; color: var(--erp-primary-dark); }
         .fa-subnav-brand .brand-logo span { color: var(--fa-green); }
 
