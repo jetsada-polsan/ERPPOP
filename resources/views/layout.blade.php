@@ -393,7 +393,7 @@
         }
         /* ── แบรนด์บนสุดของเมนู ───────────────────────────────────── */
         .odn-side-brand { display:flex; align-items:center; justify-content:center; height:76px; box-sizing:border-box; padding:8px 10px;
-            margin:0; padding:10px 14px; overflow:hidden; text-decoration:none;
+            margin:0; overflow:hidden; text-decoration:none;
             color:var(--erp-primary-dark); font-weight:700; font-size:13px;
             border-bottom:1px solid var(--erp-border); background:var(--erp-surface); }
         .odn-side-brand img { max-width:100%; max-height:58px; width:auto; height:auto; object-fit:contain; }
