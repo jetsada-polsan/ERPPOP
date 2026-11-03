@@ -670,7 +670,12 @@ async function checkout() {
   if (paymentMethod.value === 'cash' && cashReceived.value < subtotal.value) { showError('ยอดเงินสดที่รับไม่ครบ'); return }
   if (paymentMethod.value === 'mixed' && !(cashReceived.value > 0 && cashReceived.value < subtotal.value)) { showError('จ่ายผสม: เงินสดต้องมากกว่า 0 และน้อยกว่ายอดบิล ที่เหลือเป็นยอดโอน'); return }
   const id = `${profile.value.terminalCode || 'POS'}:SALE:${crypto.randomUUID()}`
-  const soldItems = cart.value.map((line) => ({ ...line }))
+  // ของแถมพิมพ์ในใบเสร็จด้วย ราคา 0
+  const freeLines = pricing.value.freeItems.map((free) => ({
+    ...(products.value.find((product) => product.id === free.product_id) ?? { id: free.product_id, sku_code: free.sku_code, barcodes: [] }),
+    name_th: `${free.name_th} (แถม)`, pos_price: 0, qty: free.qty,
+  }) as CartLine)
+  const soldItems = [...cart.value.map((line) => ({ ...line })), ...freeLines]
   const soldTotal = subtotal.value
   const soldDiscount = pricing.value.manualDiscount
   const soldChange = change.value
@@ -879,10 +884,17 @@ onUnmounted(() => {
             <b>฿{{ money(line.pos_price * line.qty) }}</b>
             <button class="delete" title="ลบรายการ" @click="cart.splice(index, 1)"><Trash2/></button>
           </div>
+          <div v-for="free in pricing.freeItems" :key="`free-${free.product_id}`" class="cart-line free-line">
+            <span class="line-seq">แถม</span>
+            <div class="line-info"><strong>{{ free.name_th }}</strong><span>{{ free.sku_code }} · {{ free.promotion }}</span></div>
+            <div class="qty-control"><span>× {{ free.qty }}</span></div>
+            <b>฿0.00</b>
+            <span></span>
+          </div>
           <div v-if="!cart.length" class="cart-empty"><span><ShoppingCart/></span><strong>ยังไม่มีรายการขาย</strong><small>สแกนสินค้าเพื่อเริ่มบิล</small></div>
         </div>
         <label class="bill-discount">ส่วนลดท้ายบิล (บาท)<input v-model.number="billDiscount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></label>
-        <div class="totals"><div><span>ยอดก่อนภาษี</span><b>฿{{ money(subtotal - vat) }}</b></div><div><span>VAT {{ profile?.vatRate || 7 }}%</span><b>฿{{ money(vat) }}</b></div><div class="grand"><span>ยอดสุทธิ</span><b>฿{{ money(subtotal) }}</b></div></div>
+        <div class="totals"><div v-if="pricing.promoDiscount > 0" class="promo-row"><span>ส่วนลดโปรโมชั่น</span><b>-฿{{ money(pricing.promoDiscount) }}</b></div><div><span>ยอดก่อนภาษี</span><b>฿{{ money(subtotal - vat) }}</b></div><div><span>VAT {{ profile?.vatRate || 7 }}%</span><b>฿{{ money(vat) }}</b></div><div class="grand"><span>ยอดสุทธิ</span><b>฿{{ money(subtotal) }}</b></div></div>
         <button class="pay-button" :disabled="!cart.length || busy || !storageReady" @click="openPayment"><Banknote/><span><small>{{ storageReady ? 'รับชำระ' : 'รอพื้นที่ข้อมูล' }}</small><strong>{{ storageReady ? 'ชำระเงิน' : 'ตรวจฐานข้อมูล' }}</strong></span><ChevronRight/></button>
         <div class="queue-bar" :class="{ warning: pendingCount }"><Cloud v-if="pendingCount"/><CheckCircle2 v-else/><span>{{ pendingCount ? `รอส่งขึ้น ERP ${pendingCount} บิล${queueError ? ` · ${queueError}` : ''}` : 'บิลทั้งหมดส่งขึ้น ERP แล้ว' }}</span></div>
       </aside>

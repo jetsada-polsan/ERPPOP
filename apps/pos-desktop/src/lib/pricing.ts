@@ -17,6 +17,8 @@ export type CartPricing = {
   vat: number
   beforeVat: number
   items: PricedLine[]
+  /** ของแถมที่ส่งเข้า ERP ราคา 0 แสดงในตะกร้าและใบเสร็จด้วย ไม่งั้นแคชเชียร์ไม่รู้ว่าต้องหยิบให้ลูกค้า */
+  freeItems: Array<{ product_id: number; sku_code: string; name_th: string; qty: number; promotion: string }>
 }
 
 function roundMoney(value: number): number {
@@ -87,6 +89,7 @@ export function priceCart(cart: CartLine[], allPromotions: QtyPromotion[], vatRa
     barcode_type: line.scannedBarcodeType,
   }))
 
+  const freeItems: CartPricing['freeItems'] = []
   for (const promotion of promotions) {
     if (promotion.promo_type !== 'free_item' || !promotion.free_product_id || !promotion.free_product) continue
     const matchedQuantity = lines
@@ -96,10 +99,11 @@ export function priceCart(cart: CartLine[], allPromotions: QtyPromotion[], vatRa
     const freeQty = sets * Math.max(0, num(promotion.free_qty))
     if (freeQty > 0) {
       items.push({ product_id: promotion.free_product_id, qty: freeQty, unit_price: 0 })
+      freeItems.push({ product_id: promotion.free_product_id, sku_code: promotion.free_product.sku_code, name_th: promotion.free_product.name_th, qty: freeQty, promotion: promotion.name })
     }
   }
 
-  return { subtotal, promoDiscount, manualDiscount, total, vat, beforeVat, items }
+  return { subtotal, promoDiscount, manualDiscount, total, vat, beforeVat, items, freeItems }
 }
 
 /** บิลในคิวจากรุ่น 1.5.5-1.5.6 ส่งราคาเต็มพร้อมส่วนลด ERP จึงปฏิเสธ ปรับเป็นราคาสุทธิก่อนส่งซ้ำ */
