@@ -1,0 +1,52 @@
+name: Void POS test sales
+
+# ยกเลิกบิล POS ที่ขายทดสอบก่อนเปิดร้าน แบบเดียวกับปุ่มยกเลิกบิล (คืนสต็อก กลับรายการบัญชี)
+# preview = แสดงรายการอย่างเดียว, apply = backup ก่อนแล้วยกเลิกจริง
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: preview or apply
+        required: true
+        type: choice
+        options: [preview, apply]
+        default: preview
+      before:
+        description: ยกเลิกบิลที่ขายก่อนวันนี้ (YYYY-MM-DD)
+        required: true
+        default: '2026-11-05'
+      branches:
+        description: รหัสสาขาคั่นด้วยช่องว่าง
+        required: true
+        default: 'B001 HQ'
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+      - run: ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+      - name: Run on the server
+        env:
+          MODE: ${{ inputs.mode }}
+          BEFORE: ${{ inputs.before }}
+          BRANCHES: ${{ inputs.branches }}
+        run: |
+          [[ "$BEFORE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { echo "before ต้องเป็น YYYY-MM-DD"; exit 1; }
+          ARGS="--before=$BEFORE"
+          for code in $BRANCHES; do
+            [[ "$code" =~ ^[A-Za-z0-9]+$ ]] || { echo "รหัสสาขาไม่ถูกต้อง: $code"; exit 1; }
+            ARGS="$ARGS --branch=$code"
+          done
+          if [ "$MODE" = apply ]; then
+            CMD="php artisan erp:backup && php artisan erp:void-pos-test-sales $ARGS --apply"
+          else
+            CMD="php artisan erp:void-pos-test-sales $ARGS"
+          fi
+          ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "cd '${{ vars.APP_DIR }}' && $CMD"
