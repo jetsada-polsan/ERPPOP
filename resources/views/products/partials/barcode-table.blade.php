@@ -8,18 +8,21 @@
     <div class="d-flex align-items-center justify-content-between mb-1">
         <h3 class="h6 fw-bold mb-0">บาร์โค้ด</h3>
         <div class="d-flex gap-2">
-            <form method="post" action="{{ route('products.barcodes.generate', $product) }}">@csrf
+            <form method="post" action="{{ route('products.barcodes.generate', $product) }}" class="d-flex gap-1">@csrf
                 <input type="hidden" name="popup" value="{{ request()->boolean('popup') ? 1 : 0 }}">
-                <button class="btn btn-sm btn-primary"><i class="bi bi-upc me-1"></i> สร้างบาร์โค้ดภายใน 13 หลัก</button></form>
+                <select name="unit_id" class="form-select form-select-sm" style="width:auto" title="หน่วยของบาร์โค้ด">
+                    @foreach($units as $unit)<option value="{{ $unit->id }}" @selected($unit->id === $product->base_unit_id)>{{ $unit->displayLabel() }}</option>@endforeach
+                </select>
+                <button class="btn btn-sm btn-primary text-nowrap"><i class="bi bi-upc me-1"></i> สร้างบาร์โค้ดภายใน 13 หลัก</button></form>
             <button type="button" class="btn btn-sm btn-light border" @click="barcodeOpen = true"><i class="bi bi-plus-lg me-1"></i> เพิ่ม</button>
         </div>
     </div>
     <div class="small text-muted mb-3">บาร์โค้ดคือรหัสที่ยิงขาย แยกจาก SKU · ยิงแต่ละตัวจะขายตามหน่วย ตัวคูณ และราคาที่ผูกไว้</div>
-    @php $generated = $product->barcodes->firstWhere('source', \App\Services\Inventory\InternalBarcodeGenerator::FROM_SKU); @endphp
-    @if($generated)
+    @php $generated = $product->barcodes->where('source', \App\Services\Inventory\InternalBarcodeGenerator::FROM_SKU); @endphp
+    @if($generated->isNotEmpty())
         <div class="alert alert-light border small py-2 mb-3">
-            <strong>SKU {{ $product->sku_code }} → {{ $generated->barcode }}</strong><br>
-            บาร์โค้ดนี้สร้างจาก SKU สำหรับใช้ภายในบริษัท ไม่ใช่ EAN จากผู้ผลิต
+            @foreach($generated as $row)<strong>SKU {{ $product->sku_code }} → {{ $row->barcode }}</strong> <span class="text-muted">({{ $row->unit?->displayLabel() }})</span><br>@endforeach
+            บาร์โค้ดนี้สร้างจาก SKU สำหรับใช้ภายในบริษัท ไม่ใช่ EAN จากผู้ผลิต · หน่วยฐาน = 0 เติมครบ 12 หลัก, หน่วยใหญ่ = SKU + 000000
         </div>
     @endif
     <div class="table-responsive">

@@ -35,6 +35,37 @@ class InternalBarcodeGeneratorTest extends TestCase
         $this->assertSame(InternalBarcodeGenerator::FROM_SKU, $barcode->source);
     }
 
+    public function test_pack_unit_uses_sku_plus_zeros_like_the_store_labels(): void
+    {
+        $generator = app(InternalBarcodeGenerator::class);
+        $this->assertSame('1010010000005', $generator->packFromSku('101001', 0), 'ตรงกับป้ายหิ้วของ POPSTAR');
+
+        $product = $this->product('101001');
+        $pack = ProductUnit::create(['code' => 'H25', 'name' => 'หิ้ว', 'qty_per_base_unit' => 25]);
+        $this->actingAs($this->manager())->post(route('products.barcodes.generate', $product), ['unit_id' => $pack->id])->assertSessionHasNoErrors();
+        $this->actingAs($this->manager())->post(route('products.barcodes.generate', $product))->assertSessionHasNoErrors();
+        $this->actingAs($this->manager())->post(route('products.barcodes.generate', $product), ['unit_id' => $pack->id])->assertSessionHasErrors('barcode');
+
+        $packBarcode = $product->barcodes()->where('unit_id', $pack->id)->sole();
+        $this->assertSame('1010010000005', $packBarcode->barcode);
+        $this->assertSame(25.0, (float) $packBarcode->unit_factor);
+        $this->assertSame('0000001010015', $product->barcodes()->where('unit_id', $product->base_unit_id)->value('barcode'));
+    }
+
+    public function test_new_sku_skips_numbers_whose_barcode_is_already_on_an_old_label(): void
+    {
+        $unit = ProductUnit::firstOrCreate(['code' => 'EA-GEN'], ['name' => 'ชิ้น', 'qty_per_base_unit' => 1]);
+        $category = ProductCategory::create(['code' => '105', 'name_th' => 'หมวดทดสอบ']);
+        // ป้ายเก่าของสินค้าที่ย้ายหมวดไปแล้ว ยังฝังเลข 105001 อยู่
+        $moved = $this->product('104250');
+        ProductBarcode::create(['product_id' => $moved->id, 'barcode' => app(InternalBarcodeGenerator::class)->fromSku('105001'),
+            'barcode_type' => BarcodePolicy::CUSTOM, 'unit_id' => $unit->id, 'unit_factor' => 1, 'is_active' => true]);
+
+        $sku = app(\App\Services\ProductSkuAllocator::class)->nextForCategory($category->id);
+
+        $this->assertSame('105002', $sku, 'ข้าม 105001 เพราะบาร์โค้ดของเลขนี้อยู่บนป้ายสินค้าอื่น');
+    }
+
     public function test_leading_zeros_of_the_sku_are_kept(): void
     {
         $code = app(InternalBarcodeGenerator::class)->fromSku('000123');

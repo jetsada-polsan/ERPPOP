@@ -11,9 +11,10 @@ use RuntimeException;
 /**
  * บาร์โค้ดภายใน 13 หลักสำหรับใช้ในบริษัท ไม่ใช่ EAN ที่ได้จากผู้ผลิต
  *
- * SKU ที่เป็นตัวเลขไม่เกิน 12 หลัก: เติม 0 ข้างหน้าให้ครบ 12 แล้วต่อ check digit
- * เช่น 102399 -> 0000001023992 ถ้าเลขนั้นถูกใช้ไปแล้ว หรือ SKU มีตัวอักษร/ยาวเกิน
- * ให้ใช้เลขรันช่วง 299 แทน
+ * รูปแบบเดียวกับป้ายของร้าน:
+ *   หน่วยฐาน  = 0 เติมหน้าให้ครบ 12 หลัก + check digit   เช่น 102399 -> 0000001023992
+ *   หน่วยใหญ่ = SKU + ลำดับเติม 0 ให้ครบ 12 หลัก + check digit  เช่น 101001 หิ้ว -> 1010010000005
+ * ถ้าเลขนั้นถูกใช้ไปแล้ว หรือ SKU มีตัวอักษร/ยาวเกิน ให้ใช้เลขรันช่วง 299 แทน
  */
 class InternalBarcodeGenerator
 {
@@ -33,10 +34,23 @@ class InternalBarcodeGenerator
         return $body.$this->policy->checkDigit($body);
     }
 
-    /** สินค้านี้มีบาร์โค้ดที่ระบบสร้างให้อยู่แล้วหรือยัง */
-    public function hasGenerated(Product $product): bool
+    /** หน่วยใหญ่ลำดับที่ $sequence: SKU + ลำดับเติม 0 ให้ครบ 12 หลัก + check digit */
+    public function packFromSku(string $sku, int $sequence): ?string
     {
-        return $product->barcodes()->whereIn('source', [self::FROM_SKU, self::SEQUENCE])->exists();
+        $tail = 12 - strlen($sku);
+        if ($sku === '' || ! ctype_digit($sku) || $tail < 1 || strlen((string) $sequence) > $tail) {
+            return null;
+        }
+        $body = $sku.str_pad((string) $sequence, $tail, '0', STR_PAD_LEFT);
+
+        return $body.$this->policy->checkDigit($body);
+    }
+
+    /** สินค้านี้มีบาร์โค้ดที่ระบบสร้างให้ในหน่วยนี้แล้วหรือยัง (ไม่ระบุหน่วย = หน่วยใดก็ได้) */
+    public function hasGenerated(Product $product, ?int $unitId = null): bool
+    {
+        return $product->barcodes()->whereIn('source', [self::FROM_SKU, self::SEQUENCE])
+            ->when($unitId, fn ($query) => $query->where('unit_id', $unitId))->exists();
     }
 
     /** สร้างบาร์โค้ดภายในให้สินค้า ไม่แตะบาร์โค้ดเดิมของสินค้า */
@@ -48,7 +62,24 @@ class InternalBarcodeGenerator
                 DB::statement('SELECT pg_advisory_xact_lock(299013)');
             }
 
-            $barcode = $this->fromSku((string) $product->sku_code);
+            $unitId ??= $product->base_unit_id;
+            $sku = (string) $product->sku_code;
+            if ((int) $unitId === (int) $product->base_unit_id) {
+                $barcode = $this->fromSku($sku);
+            } else {
+                // หน่วยใหญ่: หาลำดับแรกที่ยังว่าง 0, 1, 2, ...
+                $barcode = null;
+                for ($sequence = 0; $sequence < 1000; $sequence++) {
+                    $candidate = $this->packFromSku($sku, $sequence);
+                    if ($candidate === null) {
+                        break;
+                    }
+                    if (! ProductBarcode::where('barcode', $candidate)->exists()) {
+                        $barcode = $candidate;
+                        break;
+                    }
+                }
+            }
             $source = self::FROM_SKU;
             if ($barcode === null || ProductBarcode::where('barcode', $barcode)->exists()) {
                 $barcode = $this->nextSequence();
@@ -57,7 +88,7 @@ class InternalBarcodeGenerator
 
             return $product->barcodes()->create([
                 'barcode' => $barcode, 'barcode_type' => BarcodePolicy::INTERNAL_13, 'source' => $source,
-                'unit_id' => $unitId ?? $product->base_unit_id, 'unit_factor' => $unitFactor, 'is_active' => true,
+                'unit_id' => $unitId, 'unit_factor' => $unitFactor, 'is_active' => true,
             ]);
         });
     }

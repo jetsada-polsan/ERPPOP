@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use Illuminate\Support\Facades\DB;
+use App\Models\ProductBarcode;
+use App\Services\Inventory\InternalBarcodeGenerator;
 use RuntimeException;
 
 /**
@@ -39,12 +41,24 @@ class ProductSkuAllocator
                 }
             });
 
+        // ข้าม SKU ที่บาร์โค้ดของมันมีอยู่แล้ว: ป้ายเก่าของ BPlus ฝังเลข SKU เดิมก่อนย้ายหมวด
+        // ถ้าใช้เลขซ้ำ บาร์โค้ดที่สร้างจาก SKU จะไปชนป้ายของสินค้าอื่น
         $next = $highest + 1;
+        while ($next <= (10 ** $digits) - 1 && $this->barcodeTaken($prefix.str_pad((string) $next, $digits, '0', STR_PAD_LEFT))) {
+            $next++;
+        }
         if ($next > (10 ** $digits) - 1) {
             throw new RuntimeException("รหัสประเภท {$code} เต็มแล้ว กรุณาเพิ่มประเภทย่อยก่อนเพิ่มสินค้า");
         }
 
         return $prefix.str_pad((string) $next, $digits, '0', STR_PAD_LEFT);
+    }
+
+    private function barcodeTaken(string $sku): bool
+    {
+        $generator = app(InternalBarcodeGenerator::class);
+
+        return ProductBarcode::whereIn('barcode', array_filter([$generator->fromSku($sku), $generator->packFromSku($sku, 0)]))->exists();
     }
 
     /** @return array{0:string,1:int} */

@@ -502,10 +502,17 @@ class ProductController extends Controller
     public function generateBarcode(Request $request, Product $product, InternalBarcodeGenerator $generator): RedirectResponse
     {
         $back = redirect()->route('products.show', ['product' => $product, 'popup' => $request->boolean('popup') ? 1 : null]);
-        if ($generator->hasGenerated($product)) {
-            return $back->withErrors(['barcode' => 'สินค้านี้มีบาร์โค้ดภายในที่ระบบสร้างไว้แล้ว']);
+        $data = $request->validate([
+            'unit_id' => ['nullable', 'integer', 'exists:product_units,id'],
+            'unit_factor' => ['nullable', 'numeric', 'min:0.0001'],
+        ], self::BARCODE_MESSAGES);
+        $unitId = (int) ($data['unit_id'] ?? $product->base_unit_id);
+        if ($generator->hasGenerated($product, $unitId)) {
+            return $back->withErrors(['barcode' => 'หน่วยนี้มีบาร์โค้ดภายในที่ระบบสร้างไว้แล้ว']);
         }
-        $barcode = $generator->generate($product);
+        // ตัวคูณ: ที่กรอกมา > ตัวคูณของหน่วยนั้น > 1
+        $factor = (float) ($data['unit_factor'] ?? ProductUnit::whereKey($unitId)->value('qty_per_base_unit') ?? 1);
+        $barcode = $generator->generate($product, $unitId, $unitId === (int) $product->base_unit_id ? 1 : $factor);
         AuditLog::create(['user_id' => $request->user()?->id, 'action' => 'barcode_generated', 'table_name' => 'product_barcodes',
             'record_id' => $barcode->id, 'old_values' => null, 'new_values' => $barcode->only(['barcode', 'barcode_type', 'source'])]);
 
