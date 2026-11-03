@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\StockBalance;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
+use App\Models\WarehouseLocation;
 use App\Services\Sales\DocumentNumberGenerator;
 use App\Services\Accounting\GlPostingService;
 use App\Support\DecimalMath;
@@ -39,6 +40,14 @@ class StockAdjustmentService
         }
 
         $locationId = (int) $data['warehouse_location_id'];
+
+        $locationBelongsToBranch = WarehouseLocation::query()
+            ->whereKey($locationId)
+            ->whereHas('warehouse', fn ($warehouse) => $warehouse->where('branch_id', $data['branch_id']))
+            ->exists();
+        if (! $locationBelongsToBranch) {
+            throw new RuntimeException('ตำแหน่งเก็บต้องอยู่ในสาขาเดียวกับใบปรับสต๊อก');
+        }
 
         $systemQtyByProduct = StockBalance::whereIn('product_id', collect($data['items'])->pluck('product_id'))
             ->where('warehouse_location_id', $locationId)

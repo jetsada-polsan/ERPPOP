@@ -2332,3 +2332,19 @@ pending
 
 ## งานถัดไป
 - Push commit แล้วรอเจ้าของสั่ง deploy เพื่อเปิด Chrome print preview บน production ตรวจฉบับจริงอีกครั้ง
+
+# Handoff — 2026-11-03 (ตรวจรับสินค้าและตรวจนับสต๊อก)
+
+## ทำอะไรไป
+- ตรวจ flow รับสินค้าอิสระ, รับ PO แบบบางส่วน, ตรวจรับโอน, ตรวจนับสต๊อก และการอนุมัติใบปรับ
+- ยืนยันว่า PO ถูก lock, กันรับเกินยอดค้าง และรับแต่ละครั้งสร้างใบซื้อ/ล็อต/GL ผ่าน service กลาง; ตรวจรับโอนเป็นหลักฐานแยก ไม่ทำให้สต๊อกซ้ำ
+- แก้ service กลางให้ตำแหน่งเก็บต้องเป็นของสาขาเดียวกับใบตรวจนับและใบปรับสต๊อก
+- กันการเปิดใบตรวจนับซ้อนในตำแหน่งเดียวกันขณะที่ใบเดิมยังนับ/รอตรวจ/รอใบปรับ และ lock ใบตอน Post เพื่อกันสร้างใบปรับซ้ำจากการกดพร้อมกัน
+
+## ทดสอบ
+- `php artisan test --filter='InventoryApprovalAndCloseTest|PurchaseOrderPartialReceiptTest|InventoryFlowEndToEndTest|StaleStockCountAlertTest' --no-coverage`: 16 tests / 67 assertions ผ่าน
+- `php artisan view:cache` ผ่าน
+- `git diff --check` ผ่าน
+
+## ความเสี่ยง/งานถัดไป
+- ยังไม่ deploy; หลัง deploy ควร UAT รับ PO บางส่วน, สแกนตรวจรับ และตรวจนับ 1 ตำแหน่งแบบจบถึงอนุมัติ โดยใช้ข้อมูลทดสอบเท่านั้น
