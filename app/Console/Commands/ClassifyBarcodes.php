@@ -83,6 +83,11 @@ class ClassifyBarcodes extends Command
         if ($barcode === $sku || (ctype_digit($barcode) && strlen($barcode) < 13)) {
             return BarcodePolicy::CUSTOM;
         }
+        // ป้ายหน่วยใหญ่ของร้าน: SKU ตามด้วย 0 แล้ว check digit เช่น 101001 -> 1010010000005
+        if ($policy->isValidEan13($barcode) && $sku !== '' && str_starts_with($barcode, $sku)
+            && trim(substr($barcode, strlen($sku), 12 - strlen($sku)), '0') === '') {
+            return BarcodePolicy::INTERNAL_13;
+        }
         if ($policy->isValidEan13($barcode) && ! in_array($barcode[0], ['0', '2'], true)) {
             return BarcodePolicy::EAN13_STANDARD;
         }

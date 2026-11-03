@@ -74,6 +74,7 @@ class BarcodeSkuSeparationTest extends TestCase
         // ป้ายภายในของร้านที่ขึ้นต้น 0 ไม่ใช่ EAN ผู้ผลิต แม้ check digit จะถูก
         $this->assertSame(BarcodePolicy::INTERNAL_13, ClassifyBarcodes::classify('0000001022049', '102204', app(BarcodePolicy::class)));
         $this->assertSame(BarcodePolicy::EAN13_STANDARD, ClassifyBarcodes::classify('8850000000003', 'X', app(BarcodePolicy::class)));
+        $this->assertSame(BarcodePolicy::INTERNAL_13, ClassifyBarcodes::classify('1030120000009', '103012', app(BarcodePolicy::class)), 'ป้ายหน่วยใหญ่ SKU+000000');
     }
 
     public function test_scale_plu_needs_a_scale_profile(): void
