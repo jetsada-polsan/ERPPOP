@@ -785,6 +785,11 @@ async function start() {
 function networkUp() { online.value = true; void syncAll() }
 function networkDown() { online.value = false }
 function handleShortcut(event: KeyboardEvent) {
+  // หน้าใส่ PIN: กดตัวเลขจากคีย์บอร์ดได้เสมอ แม้เพิ่งกดแป้นบนจอ (ช่อง PIN จริงซ่อนอยู่)
+  if (modal.value === 'cashier' && profile.value?.cashierLoginMode !== 'selection' && document.activeElement?.tagName !== 'INPUT') {
+    if (/^\d$/.test(event.key)) { event.preventDefault(); cashierPin.value = (cashierPin.value + event.key).slice(0, 20); return }
+    if (event.key === 'Backspace') { event.preventDefault(); cashierPin.value = cashierPin.value.slice(0, -1); return }
+  }
   if (event.key === 'F8' && !modal.value) {
     event.preventDefault()
     scanner.value?.focus()
@@ -953,9 +958,17 @@ onUnmounted(() => {
           <button class="primary" :disabled="busy">เลือกชื่อพนักงาน</button>
         </template>
         <template v-else>
-          <label>PIN ของพนักงาน<input v-model="cashierPin" required autofocus type="password" inputmode="numeric" pattern="\d{4,20}" minlength="4" maxlength="20" autocomplete="current-password"></label>
-          <small class="setup-hint">เครื่องนี้ผูกสาขา {{ profile?.branchName }} แล้ว ระบบจะระบุผู้ใช้จาก PIN โดยอัตโนมัติ</small>
-          <button class="primary" :disabled="busy">เข้าใช้งาน</button>
+          <strong class="pin-title">ใส่ PIN ของคุณ</strong>
+          <input v-model="cashierPin" class="pin-input-hidden" required autofocus type="password" inputmode="numeric" pattern="\d{4,20}" minlength="4" maxlength="20" autocomplete="current-password" aria-label="PIN ของพนักงาน">
+          <div class="pin-dots"><span v-for="n in Math.max(4, cashierPin.length)" :key="n" :class="{ filled: n <= cashierPin.length }"></span></div>
+          <div class="pin-pad">
+            <button v-for="digit in ['1','2','3','4','5','6','7','8','9']" :key="digit" type="button" :disabled="busy" @click="cashierPin = (cashierPin + digit).slice(0, 20)">{{ digit }}</button>
+            <button type="button" class="pin-action" :disabled="busy" @click="cashierPin = ''">ล้าง</button>
+            <button type="button" :disabled="busy" @click="cashierPin = (cashierPin + '0').slice(0, 20)">0</button>
+            <button type="button" class="pin-action" :disabled="busy" @click="cashierPin = cashierPin.slice(0, -1)">ลบ</button>
+          </div>
+          <small class="setup-hint">PIN 4 หลักเข้าระบบทันที · พิมพ์จากคีย์บอร์ดได้ · สาขา {{ profile?.branchName }}</small>
+          <button class="primary" :disabled="busy || cashierPin.length < 4">{{ busy ? 'กำลังเข้าใช้งาน...' : 'เข้าใช้งาน' }}</button>
         </template>
       </form>
 
