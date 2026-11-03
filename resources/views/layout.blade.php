@@ -1143,6 +1143,51 @@
             background: var(--erp-surface-2);
             border-top: 1px solid var(--erp-border) !important;
         }
+
+        /* ===== มาตรฐานหน้าต่างแก้ไข (popup) ทุกหน้า =====
+           หน้าเดิมฝังความกว้าง 460–720px ไว้เอง ขนาดจึงไม่เท่ากัน ตัดสินที่นี่ที่เดียว:
+           - ฟอร์มทั่วไป 760px · มีตารางรายการในหน้าต่าง 1180px · จอเล็กกว่า 640px เต็มจอ
+           - สูงไม่เกินจอ เลื่อนเฉพาะเนื้อหา หัวและปุ่มบันทึกติดอยู่เสมอ */
+        html body .booking-modal-backdrop {
+            position: fixed !important; inset: 0 !important; z-index: 2000 !important;
+            display: flex; align-items: center !important; justify-content: center !important;
+            padding: 24px 16px !important;
+        }
+        html body .booking-modal {
+            width: min(760px, calc(100vw - 32px)) !important;
+            max-width: none !important;
+            max-height: calc(100dvh - 48px) !important;
+            overflow: auto !important;
+            overscroll-behavior: contain;
+            background: var(--erp-surface, #fff) !important;
+            border-radius: 14px !important;
+            display: block;
+        }
+        html body .booking-modal:has(table) { width: min(1180px, calc(100vw - 32px)) !important; }
+        html body .booking-modal .modal-header {
+            position: sticky; top: 0; z-index: 3;
+            display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 12px;
+            padding: 16px 22px !important; margin: 0 !important;
+            background: var(--erp-surface, #fff) !important; border-bottom: 1px solid var(--erp-border, #dbe7ef) !important;
+        }
+        html body .booking-modal .modal-header :is(h1, h2, h3, h4, h5, .modal-title) { margin: 0 !important; font-size: 18px !important; font-weight: 800 !important; line-height: 1.35; }
+        html body .booking-modal .modal-header .btn:last-child { flex: none; width: 38px; height: 38px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; }
+        html body .booking-modal .modal-body { padding: 20px 22px !important; }
+        html body .booking-modal .modal-body .form-label { font-size: 14px !important; font-weight: 600; color: var(--erp-text, #1d3b52) !important; margin-bottom: 6px; }
+        html body .booking-modal .modal-body :is(.form-control, .form-select) { min-height: 42px; font-size: 15px; }
+        html body .booking-modal .modal-body textarea.form-control { min-height: 84px; }
+        html body .booking-modal .modal-footer {
+            position: sticky; bottom: 0; z-index: 3;
+            display: flex !important; justify-content: flex-end !important; align-items: center; gap: 10px !important;
+            padding: 14px 22px !important; margin: 0 !important;
+            background: var(--erp-surface-2, #f6f9fb) !important; border-top: 1px solid var(--erp-border, #dbe7ef) !important;
+        }
+        html body .booking-modal .modal-footer .btn { min-width: 112px; min-height: 42px; font-weight: 700; border-radius: 8px; }
+        @media (max-width: 640px) {
+            html body .booking-modal-backdrop { padding: 0 !important; align-items: stretch !important; }
+            html body .booking-modal, html body .booking-modal:has(table) { width: 100vw !important; max-height: 100dvh !important; height: 100dvh; border-radius: 0 !important; }
+            html body .booking-modal .modal-footer .btn { flex: 1; }
+        }
     </style>
     @stack('head')
     {{-- Page-specific styles must be emitted in the document head. --}}
