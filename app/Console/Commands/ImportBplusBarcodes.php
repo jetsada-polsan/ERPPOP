@@ -53,10 +53,12 @@ class ImportBplusBarcodes extends Command
                 $owner === $product->id
                     ? $plan['match'][] = $row
                     : $plan['conflict'][] = $row + ['reason' => 'ERP ผูกบาร์โค้ดนี้กับสินค้าอื่น ('.($products->firstWhere('id', $owner)?->sku_code ?? $owner).')'];
-            } elseif (! ($unit = $this->unitFor($row, $units))) {
-                $plan['no_unit'][] = $row + ['reason' => 'หาหน่วย "'.$row['unit_name'].'" ตัวคูณ '.$row['unit_factor'].' ใน ERP ไม่เจอ'];
+            } elseif (($packSize = $this->packSizeInName($row['unit_name'])) !== null && abs($packSize - $row['unit_factor']) > 0.0001) {
+                $plan['no_unit'][] = $row + ['reason' => 'ชื่อหน่วย "'.$row['unit_name'].'" บอก '.$packSize.' แต่ BPlus ขายตัวคูณ '.$row['unit_factor']];
             } else {
-                $plan['add'][] = $row + ['product_id' => $product->id, 'unit_id' => $unit->id, 'type' => $this->typeFor($row, $policy)];
+                // ERP เก็บตัวคูณไว้ที่บาร์โค้ด หน่วยระบุด้วยชื่ออย่างเดียว ไม่มีหน่วยชื่อนี้ = สร้างตอนบันทึก
+                $unit = $units->first(fn (ProductUnit $unit) => trim((string) $unit->name) === $row['unit_name']);
+                $plan['add'][] = $row + ['product_id' => $product->id, 'unit_id' => $unit?->id, 'type' => $this->typeFor($row, $policy)];
             }
         }
 
@@ -65,7 +67,8 @@ class ImportBplusBarcodes extends Command
             ['ขาดใน ERP (จะเพิ่ม)', count($plan['add'])],
             ['ผูกคนละสินค้า (ต้องตรวจ)', count($plan['conflict'])],
             ['ไม่พบสินค้าใน ERP', count($plan['no_product'])],
-            ['หาหน่วยไม่เจอ (ต้องตรวจ)', count($plan['no_unit'])],
+            ['ตัวคูณขัดกับชื่อหน่วย (ต้องตรวจ)', count($plan['no_unit'])],
+            ['หน่วยใหม่ที่จะสร้าง', collect($plan['add'])->whereNull('unit_id')->pluck('unit_name')->unique()->count()],
             ['พิมพ์ SKU ตรง ๆ (ข้าม)', count($plan['sku'])],
             ['ไม่ใช่บาร์โค้ด (ข้าม)', count($plan['skip'])],
         ]);
@@ -87,9 +90,10 @@ class ImportBplusBarcodes extends Command
                 if (ProductBarcode::where('barcode', $row['barcode'])->exists()) {
                     continue;
                 }
+                $unitId = $row['unit_id'] ?? $this->unitNamed($row['unit_name'])->id;
                 ProductBarcode::create([
                     'product_id' => $row['product_id'], 'barcode' => $row['barcode'], 'barcode_type' => $row['type'],
-                    'unit_id' => $row['unit_id'], 'unit_factor' => $row['unit_factor'], 'is_active' => true, 'source' => 'bplus',
+                    'unit_id' => $unitId, 'unit_factor' => $row['unit_factor'], 'is_active' => true, 'source' => 'bplus',
                 ]);
                 $added++;
             }
@@ -136,15 +140,19 @@ class ImportBplusBarcodes extends Command
             && strlen(ltrim($barcode, '0')) > 1;
     }
 
-    private function unitFor(array $row, $units): ?ProductUnit
+    /** ตัวเลขขนาดบรรจุท้ายชื่อหน่วย เช่น "กล่องx12", "กล่อง x 20", "หิ้ว*25" ไม่มี = null */
+    private function packSizeInName(string $name): ?float
     {
-        $named = $units->filter(fn (ProductUnit $unit) => trim((string) $unit->name) === $row['unit_name']);
-        $sameFactor = $named->filter(fn (ProductUnit $unit) => abs((float) $unit->qty_per_base_unit - $row['unit_factor']) < 0.0001);
+        return preg_match('/[x*×]\s*(\d+(?:\.\d+)?)\s*\.?\s*$/iu', $name, $match) === 1 ? (float) $match[1] : null;
+    }
 
-        // ชื่อตรงแต่ตัวคูณไม่ตรง (เช่น "กล่อง*12" ตัวคูณ 1) ไม่เดา ส่งให้คนตรวจ
-        return $sameFactor->first()
-            ?? $units->first(fn (ProductUnit $unit) => $unit->cleanName() === $row['unit_name']
-                && abs((float) $unit->qty_per_base_unit - $row['unit_factor']) < 0.0001);
+    /** หน่วยใช้ชื่อเป็นตัวระบุ เหมือน erp:apply-unit-export */
+    private function unitNamed(string $name): ProductUnit
+    {
+        $name = mb_substr($name, 0, 100);
+
+        return ProductUnit::where('name', $name)->first()
+            ?? ProductUnit::create(['code' => 'U'.substr(md5($name), 0, 10), 'name' => $name, 'qty_per_base_unit' => 1]);
     }
 
     private function typeFor(array $row, BarcodePolicy $policy): string

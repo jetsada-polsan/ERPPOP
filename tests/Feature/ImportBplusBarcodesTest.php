@@ -31,7 +31,8 @@ class ImportBplusBarcodesTest extends TestCase
             ."106080,1060800000005,กระสอบX20,20,30,2026-10-01\n"   // ขาด ต้องเพิ่ม
             ."106080,1060800000005,แพ็ค,1,2,2026-01-01\n"          // ซ้ำ บิลน้อยกว่า ไม่เลือก
             ."106080,0000001052503,แพ็ค,1,9,2026-10-01\n"          // ERP ผูกกับสินค้าอื่น
-            ."106080,8850000000003,ลัง,12,3,2026-10-01\n"          // หาหน่วยไม่เจอ
+            ."106080,8850000000003,ลัง,12,3,2026-10-01\n"          // ERP ยังไม่มีหน่วย "ลัง" = สร้างให้ ตัวคูณอยู่ที่บาร์โค้ด
+            ."106080,1051090000004,กล่อง x 20,10,3,2026-10-01\n"   // ชื่อบอก 20 แต่ขาย 10 = ต้องตรวจ
             ."999999,0000009999993,แพ็ค,1,1,2026-10-01\n"          // ไม่มีสินค้าใน ERP
             ."106080,106080,แพ็ค,1,40,2026-10-01\n"                // พิมพ์ SKU ไม่ใช่บาร์โค้ด
             ."102007,-,แพ็ค,1,1,2026-10-01\n"
@@ -40,8 +41,8 @@ class ImportBplusBarcodesTest extends TestCase
 
         $this->artisan('erp:import-bplus-barcodes', ['file' => $file])
             ->expectsTable(['กลุ่ม', 'จำนวน'], [
-                ['ตรงกันแล้ว', 1], ['ขาดใน ERP (จะเพิ่ม)', 1], ['ผูกคนละสินค้า (ต้องตรวจ)', 1],
-                ['ไม่พบสินค้าใน ERP', 1], ['หาหน่วยไม่เจอ (ต้องตรวจ)', 1], ['พิมพ์ SKU ตรง ๆ (ข้าม)', 1], ['ไม่ใช่บาร์โค้ด (ข้าม)', 3],
+                ['ตรงกันแล้ว', 1], ['ขาดใน ERP (จะเพิ่ม)', 2], ['ผูกคนละสินค้า (ต้องตรวจ)', 1],
+                ['ไม่พบสินค้าใน ERP', 1], ['ตัวคูณขัดกับชื่อหน่วย (ต้องตรวจ)', 1], ['หน่วยใหม่ที่จะสร้าง', 1], ['พิมพ์ SKU ตรง ๆ (ข้าม)', 1], ['ไม่ใช่บาร์โค้ด (ข้าม)', 3],
             ])->assertSuccessful();
         $this->assertSame(2, ProductBarcode::count(), 'preview ต้องไม่บันทึก');
 
@@ -51,7 +52,10 @@ class ImportBplusBarcodesTest extends TestCase
         $this->assertSame([$squid->id, $sack->id, 20.0, 'bplus'], [$added->product_id, $added->unit_id, (float) $added->unit_factor, $added->source]);
         $this->assertSame($other->id, ProductBarcode::where('barcode', '0000001052503')->value('product_id'), 'ห้ามย้ายบาร์โค้ดของสินค้าอื่น');
         $this->assertSame(BarcodePolicy::CUSTOM, $existing->fresh()->barcode_type, 'ห้ามแก้ของเดิม');
-        $this->assertSame(3, ProductBarcode::count());
+        $case = ProductBarcode::where('barcode', '8850000000003')->sole();
+        $this->assertSame(['ลัง', 12.0], [$case->unit->name, (float) $case->unit_factor], 'สร้างหน่วยตามชื่อ ตัวคูณเก็บที่บาร์โค้ด');
+        $this->assertNull(ProductBarcode::where('barcode', '1051090000004')->first(), 'ตัวคูณขัดกับชื่อ ห้ามนำเข้า');
+        $this->assertSame(4, ProductBarcode::count());
         unlink($file);
     }
 
