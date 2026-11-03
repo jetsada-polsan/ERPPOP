@@ -17,9 +17,18 @@
                 <tr>
                     <td>{{ $line->stockItem->product->sku_code }} · {{ $line->stockItem->product->name_th }}</td>
                     <td>{{ number_format($line->planned_qty, 4) }} {{ $line->stockItem->product->baseUnit?->cleanName() }}</td>
-                    <td><select name="items[{{ $line->id }}][availability]" class="form-select" @disabled(!$editable)><option value="available" @selected(old("items.{$line->id}.availability", $line->availability) === 'available')>มีครบ</option><option value="partial" @selected(old("items.{$line->id}.availability", $line->availability) === 'partial')>มีบางส่วน (ต้องแก้ใบจองก่อน)</option><option value="unavailable" @selected(old("items.{$line->id}.availability", $line->availability) === 'unavailable')>ไม่มี (ต้องแก้ใบจองก่อน)</option></select></td>
-                    <td><input name="items[{{ $line->id }}][loaded_qty]" type="number" step="0.0001" min="0" max="{{ $line->planned_qty }}" value="{{ old("items.{$line->id}.loaded_qty", $line->availability === 'pending' ? $line->planned_qty : $line->loaded_qty) }}" class="form-control" required @disabled(!$editable)></td>
-                    <td><input name="items[{{ $line->id }}][note]" value="{{ old("items.{$line->id}.note", $line->note) }}" class="form-control" placeholder="หมายเหตุ" @disabled(!$editable)></td>
+                    <td>
+                        <select name="items[{{ $line->id }}][availability]" class="form-select" @disabled(!$editable)><option value="available" @selected(old("items.{$line->id}.availability", $line->availability) === 'available')>มีครบ</option><option value="partial" @selected(old("items.{$line->id}.availability", $line->availability) === 'partial')>มีบางส่วน (ต้องแก้ใบจองก่อน)</option><option value="unavailable" @selected(old("items.{$line->id}.availability", $line->availability) === 'unavailable')>ไม่มี (ต้องแก้ใบจองก่อน)</option></select>
+                        <span class="print-value">{{ ['available' => 'มีครบ', 'partial' => 'มีบางส่วน', 'unavailable' => 'ไม่มี', 'pending' => 'รอตรวจ'][$line->availability] ?? $line->availability }}</span>
+                    </td>
+                    <td>
+                        <input name="items[{{ $line->id }}][loaded_qty]" type="number" step="0.0001" min="0" max="{{ $line->planned_qty }}" value="{{ old("items.{$line->id}.loaded_qty", $line->availability === 'pending' ? $line->planned_qty : $line->loaded_qty) }}" class="form-control" required @disabled(!$editable)>
+                        <span class="print-value">{{ number_format((float) old("items.{$line->id}.loaded_qty", $line->availability === 'pending' ? $line->planned_qty : $line->loaded_qty), 4) }}</span>
+                    </td>
+                    <td>
+                        <input name="items[{{ $line->id }}][note]" value="{{ old("items.{$line->id}.note", $line->note) }}" class="form-control" placeholder="หมายเหตุ" @disabled(!$editable)>
+                        <span class="print-value">{{ old("items.{$line->id}.note", $line->note) ?: '-' }}</span>
+                    </td>
                 </tr>
             @empty<tr><td colspan="5" class="text-center">ไม่พบรายการสินค้า</td></tr>@endforelse
         </tbody></table></div>
@@ -27,3 +36,19 @@
     </form>
 </div></div>
 @endsection
+
+@push('head')
+<style>
+    .print-value { display: none; }
+    @media print {
+        @page { size: A4 portrait; margin: 12mm; }
+        .app-header, .app-sidebar, .btn, .alert, a, select, input { display: none !important; }
+        .print-value { display: inline !important; }
+        .app-main { margin: 0 !important; padding: 0 !important; }
+        .card { border: 0 !important; box-shadow: none !important; }
+        .table thead { display: table-header-group; }
+        .table tr { break-inside: avoid; page-break-inside: avoid; }
+        .table td, .table th { padding: 6px !important; }
+    }
+</style>
+@endpush
