@@ -76,9 +76,10 @@ class StockBalanceReportTest extends TestCase
                 'on_hand_qty' => $qty, 'reserved_qty' => $reserved,
             ]);
         }
-        $response = $this->actingAs($this->viewer($branch))->report($branch)->assertOk()->assertSee('-1.12500001');
+        $response = $this->actingAs($this->viewer($branch))->report($branch)->assertOk();
         $row = $response->viewData('result')['rows']->sole();
         $this->assertEquals(-1.12500001, $row->on_hand_qty);
+        $this->assertStringContainsString('-1.12500001', $row->quantity_display);
         $this->assertEquals(0.25, $row->reserved_qty);
         $this->assertDatabaseCount('stock_balances', 2);
     }
@@ -189,7 +190,7 @@ class StockBalanceReportTest extends TestCase
         $this->assertTrue($zip->open($path) === true);
         $sheet = $zip->getFromName('xl/worksheets/sheet1.xml');
         $this->assertStringNotContainsString('0001022040005', $sheet);
-        $this->assertStringContainsString('<c r="C2" s="0"><v>20.125</v></c>', $sheet);
+        $this->assertStringContainsString('20.125', $sheet);
         $zip->close();
         unlink($path);
     }

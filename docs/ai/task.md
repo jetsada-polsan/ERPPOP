@@ -21,6 +21,18 @@
 - `php artisan view:cache` ผ่าน
 - `git diff --check` ผ่าน
 
+# Handoff — 2026-11-03 (แสดงหน่วยใหญ่และหน่วยย่อยในจำนวนคงเหลือ)
+
+## ทำอะไรไป
+- คงรายงานไว้ 3 คอลัมน์: รหัส, ชื่อ, จำนวน
+- แปลงจำนวนหน่วยฐานเป็นรูปแบบหน่วยใหญ่และหน่วยย่อย เช่น `2 ลัง 3 ชิ้น`
+- ใช้ตัวคูณหน่วยใหญ่ที่มากที่สุดของสินค้า โดยไม่แก้ยอดสต็อกจริง
+
+## ทดสอบ
+- `php artisan test --filter='StockBalanceReportTest|ReportSmokeTest' --no-coverage`: 10 tests ผ่าน, 1 skipped
+- `php artisan view:cache` ผ่าน
+- `git diff --check` ผ่าน
+
 ## งานถัดไป
 - Deploy production และตรวจหน้า Executive หลัง cache clear
 
