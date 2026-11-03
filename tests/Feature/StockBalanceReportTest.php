@@ -76,7 +76,7 @@ class StockBalanceReportTest extends TestCase
                 'on_hand_qty' => $qty, 'reserved_qty' => $reserved,
             ]);
         }
-        $response = $this->actingAs($this->viewer($branch))->report($branch)->assertOk()->assertSee('-1.12500001')->assertSee('0.25');
+        $response = $this->actingAs($this->viewer($branch))->report($branch)->assertOk()->assertSee('-1.12500001');
         $row = $response->viewData('result')['rows']->sole();
         $this->assertEquals(-1.12500001, $row->on_hand_qty);
         $this->assertEquals(0.25, $row->reserved_qty);
@@ -126,7 +126,8 @@ class StockBalanceReportTest extends TestCase
             $this->assertSame(1, $result['total']);
         }
         $csv = $this->report($own, $parameters + ['export' => 'csv'])->assertOk()->streamedContent();
-        $this->assertStringContainsString('สาขา B001', $csv);
+        $this->assertStringContainsString("รหัส,ชื่อ,จำนวน", $csv);
+        $this->assertStringNotContainsString('สาขา B001', $csv);
         $this->assertStringNotContainsString('สาขา HQ', $csv);
 
         $this->actingAs($this->viewer(null));
@@ -187,8 +188,8 @@ class StockBalanceReportTest extends TestCase
         $zip = new \ZipArchive;
         $this->assertTrue($zip->open($path) === true);
         $sheet = $zip->getFromName('xl/worksheets/sheet1.xml');
-        $this->assertStringContainsString('0001022040005', $sheet);
-        $this->assertStringContainsString('<c r="F2" s="0"><v>20.125</v></c>', $sheet);
+        $this->assertStringNotContainsString('0001022040005', $sheet);
+        $this->assertStringContainsString('<c r="C2" s="0"><v>20.125</v></c>', $sheet);
         $zip->close();
         unlink($path);
     }

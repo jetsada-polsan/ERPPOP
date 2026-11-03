@@ -9,6 +9,18 @@
 - Executive, layout และ POS install tests: 21 tests / 100 assertions ผ่าน
 - `git diff --check` ผ่าน
 
+# Handoff — 2026-11-03 (ย่อคอลัมน์รายงานสินค้าคงเหลือ)
+
+## ทำอะไรไป
+- ปรับรายงานสินค้าคงเหลือให้แสดงเฉพาะ รหัส, ชื่อ, จำนวน
+- ใช้ชุดคอลัมน์เดียวกันกับหน้าจอ, พิมพ์, CSV และ XLSX
+- คงข้อมูลสาขาไว้ที่หัวเอกสาร ไม่แสดงซ้ำในแต่ละแถว
+
+## ทดสอบ
+- `php artisan test --filter='StockBalanceReportTest|ReportSmokeTest' --no-coverage`: 10 tests ผ่าน, 1 skipped
+- `php artisan view:cache` ผ่าน
+- `git diff --check` ผ่าน
+
 ## งานถัดไป
 - Deploy production และตรวจหน้า Executive หลัง cache clear
 
