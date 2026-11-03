@@ -2348,3 +2348,17 @@ pending
 
 ## ความเสี่ยง/งานถัดไป
 - ยังไม่ deploy; หลัง deploy ควร UAT รับ PO บางส่วน, สแกนตรวจรับ และตรวจนับ 1 ตำแหน่งแบบจบถึงอนุมัติ โดยใช้ข้อมูลทดสอบเท่านั้น
+
+# Handoff — 2026-11-03 (Rollback shared document print regression)
+
+## ทำอะไรไป
+- ถอน CSS ส่วนกลางที่เพิ่มใน `documents.partials.print-theme` รอบมาตรฐานงานพิมพ์ เพราะกระทบใบเสนอราคา/ใบจองหลายหน้าและทำให้ Chrome พิมพ์ต่อหน้าแรกไม่ได้
+- คงการแก้เฉพาะหน้า reports, ใบขึ้นของ และสลิปเงินเดือนไว้ เพราะไม่ใช้ shared document theme นี้
+
+## ทดสอบ
+- `php artisan test --filter='PrintablePageSizeTest' --no-coverage`: 3 tests / 12 assertions ผ่าน
+- `php artisan view:cache` ผ่าน
+- `git diff --check` ผ่าน
+
+## ความเสี่ยง/งานถัดไป
+- ยังไม่ deploy; ต้องเปิด print preview ของใบเสนอราคา/ใบจองที่มีหลายรายการบน production หลัง deploy เพื่อยืนยันจำนวนหน้าจริง
