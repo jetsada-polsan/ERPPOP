@@ -60,46 +60,18 @@ class StockBalanceReport
         foreach ($rows as $row) {
             $row->barcodes = ($barcodes->get($row->product_id) ?? collect())->pluck('barcode')->unique()->implode(', ');
         }
-        $unitOptions = DB::table('product_barcodes as pb')
-            ->leftJoin('product_units as pu', 'pu.id', '=', 'pb.unit_id')
-            ->whereIn('pb.product_id', $rows->pluck('product_id'))
-            ->where('pb.is_active', true)
-            ->where('pb.unit_factor', '>', 1)
-            ->orderByDesc('pb.unit_factor')
-            ->get(['pb.product_id', 'pb.unit_factor', 'pu.name as large_unit_name'])
-            ->groupBy('product_id');
-        foreach ($rows as $row) {
-            $option = $unitOptions->get($row->product_id)?->first();
-            $quantity = (float) $row->on_hand_qty;
-            if (! $option) {
-                $row->quantity_display = $this->formatQuantity($quantity).' '.($row->unit_name ?: 'หน่วย');
-                continue;
-            }
-
-            $factor = (float) $option->unit_factor;
-            $largeQuantity = $quantity >= 0 ? floor($quantity / $factor) : ceil($quantity / $factor);
-            $smallQuantity = $quantity - ($largeQuantity * $factor);
-            $smallLabel = $row->unit_name ?: 'หน่วยย่อย';
-            $largeLabel = $option->large_unit_name ?: 'หน่วยใหญ่';
-            $row->quantity_display = $this->formatQuantity($largeQuantity).' '.$largeLabel
-                .' '.$this->formatQuantity($smallQuantity).' '.$smallLabel;
-        }
+        app(StockQuantityFormatter::class)->format($rows);
 
         return [
             'title' => 'สินค้าคงเหลือ',
             'columns' => [
                 ['label' => 'รหัส', 'key' => 'sku_code'],
                 ['label' => 'ชื่อ', 'key' => 'name_th'],
-                ['label' => 'จำนวน', 'key' => 'quantity_display', 'class' => 'text-end'],
+                ['label' => 'คงเหลือ (หน่วยหลัก / ย่อย)', 'key' => 'quantity_display', 'class' => 'text-end'],
             ],
             'rows' => $rows,
             'total' => $pagination?->total() ?? $rows->count(),
             'pagination' => $pagination,
         ];
-    }
-
-    private function formatQuantity(float $quantity): string
-    {
-        return rtrim(rtrim(number_format($quantity, 8, '.', ''), '0'), '.');
     }
 }

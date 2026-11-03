@@ -76,10 +76,9 @@ class BookingService
                 $availableRaw = DecimalMath::subtract($onHand, $reserved, DecimalMath::QUANTITY_SCALE);
                 $available = DecimalMath::compare($availableRaw, 0) < 0 ? '0' : $availableRaw;
                 if (DecimalMath::compare($requestedQty, $available) > 0) {
-                    $product = Product::find($productId);
-                    throw new RuntimeException(sprintf(
-                        'สินค้า %s มีพร้อมจอง %s แต่ขอจอง %s (มีอยู่ %s, จองแล้ว %s)',
-                        $product?->sku_code ?? $productId,
+                    throw new RuntimeException($this->availabilityError(
+                        Product::with('baseUnit')->find($productId),
+                        $productId,
                         $available,
                         $requestedQty,
                         $onHand,
@@ -267,10 +266,9 @@ class BookingService
                 $requested = $newByBalance->get($key, '0');
                 if (DecimalMath::compare($requested, $available) > 0) {
                     $productId = explode(':', $key, 2)[0];
-                    $product = Product::find($productId);
-                    throw new RuntimeException(sprintf(
-                        'สินค้า %s มีพร้อมจอง %s แต่ขอจอง %s',
-                        $product?->sku_code ?? $productId,
+                    throw new RuntimeException($this->availabilityError(
+                        Product::with('baseUnit')->find($productId),
+                        $productId,
                         $available,
                         $requested,
                     ));
@@ -331,5 +329,61 @@ class BookingService
 
             return $document->fresh();
         });
+    }
+
+    private function availabilityError(
+        ?Product $product,
+        int|string $productId,
+        mixed $available,
+        mixed $requested,
+        mixed $onHand = null,
+        mixed $reserved = null,
+    ): string {
+        $unit = $product?->baseUnit?->cleanName() ?: 'หน่วย';
+        $isWeight = $this->isWeightProduct($product, $unit);
+        $message = sprintf(
+            'สินค้า %s พร้อมจอง %s %s แต่ขอจอง %s %s',
+            $product?->sku_code ?? $productId,
+            $this->formatQuantity($available, $isWeight),
+            $unit,
+            $this->formatQuantity($requested, $isWeight),
+            $unit,
+        );
+
+        if ($onHand === null || $reserved === null) {
+            return $message;
+        }
+
+        return sprintf(
+            '%s (มีอยู่ %s %s, จองแล้ว %s %s)',
+            $message,
+            $this->formatQuantity($onHand, $isWeight),
+            $unit,
+            $this->formatQuantity($reserved, $isWeight),
+            $unit,
+        );
+    }
+
+    private function isWeightProduct(?Product $product, string $unit): bool
+    {
+        return preg_match('/กก\.?|กิโล|kg|กรัม|gram|ลิตร|liter|ml/i', $unit) === 1
+            || preg_match('/ชั่ง|ซั่ง/u', (string) $product?->name_th) === 1
+            || $product?->barcodes->contains(
+                fn ($barcode) => preg_match('/^80[01][0-9]{3}$/', (string) $barcode->barcode) === 1,
+            );
+    }
+
+    private function formatQuantity(mixed $quantity, bool $isWeight): string
+    {
+        $value = (float) $quantity;
+        if ($isWeight) {
+            return number_format($value, 2, '.', '');
+        }
+
+        if (abs($value - round($value)) < 0.00000001) {
+            return number_format($value, 0, '.', '');
+        }
+
+        return rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
     }
 }

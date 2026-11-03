@@ -288,6 +288,10 @@ class BookingSalesAreaTest extends TestCase
             ]);
 
         $response->assertRedirect(route('bookings.index'))->assertSessionHas('error');
+        $response->assertSessionHas('error', fn (string $message) => $message === sprintf(
+            'สินค้า %s พร้อมจอง 6 ชิ้น แต่ขอจอง 7 ชิ้น (มีอยู่ 10 ชิ้น, จองแล้ว 4 ชิ้น)',
+            $product->sku_code,
+        ));
         $this->assertDatabaseCount('documents', 0);
         $this->assertDatabaseHas('stock_balances', [
             'product_id' => $product->id,

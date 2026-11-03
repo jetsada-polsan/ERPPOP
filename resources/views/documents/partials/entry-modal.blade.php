@@ -204,7 +204,7 @@
                                             </button>
                                             <input type="hidden" :name="`items[${index}][product_id]`" x-model="item.product_id">
                                             <div x-show="config.showStock && item.product_id && item.available_qty !== null" class="stock-hint mt-1">
-                                                คงเหลือ <span x-text="money(item.on_hand_qty)"></span> · จองแล้ว <span x-text="money(item.reserved_qty)"></span> · พร้อมจอง <strong x-text="money(item.available_qty)"></strong>
+                                                คงเหลือ <span x-text="formatQuantity(item, item.on_hand_qty)"></span> <span x-text="item.unit_name || 'หน่วย'"></span> · จองแล้ว <span x-text="formatQuantity(item, item.reserved_qty)"></span> <span x-text="item.unit_name || 'หน่วย'"></span> · พร้อมจอง <strong x-text="formatQuantity(item, item.available_qty)"></strong> <span x-text="item.unit_name || 'หน่วย'"></span>
                                             </div>
                                             @if($showLotFields)
                                             <div x-show="item.product_id" class="d-flex gap-1 align-items-center flex-wrap mt-1">
@@ -229,7 +229,12 @@
                                             @endif
                                         </td>
                                         <td>
-                                            <input type="number" :step="item.is_scale ? '0.0001' : '1'" :min="item.is_scale ? '0.0001' : '1'" :name="`items[${index}][qty]`" x-model.number="item.qty" required class="doc-input text-end" :title="item.is_scale ? 'น้ำหนักจริง เช่น 2.3500 กก.' : 'จำนวนเต็มตามหน่วยขาย เช่น 1 แพ็ค'"><small class="d-block text-end text-success fw-bold" x-text="item.is_scale ? (item.unit_name || 'หน่วยฐาน') : (item.unit_name || 'หน่วยขาย')"></small>
+                                            <div class="qty-control">
+                                                <button type="button" class="qty-step" @click="adjustQty(index, -1)" :aria-label="'ลดจำนวน ' + (item.unit_name || '')">−</button>
+                                                <input type="number" :step="item.is_scale ? '0.01' : '1'" :min="item.is_scale ? '0.01' : '1'" :name="`items[${index}][qty]`" x-model.number="item.qty" required class="doc-input text-end" :title="item.is_scale ? 'น้ำหนักจริง เพิ่ม/ลดทีละ 0.01 เช่น 2.35 กก.' : 'จำนวนเต็มตามหน่วยขาย เพิ่ม/ลดทีละ 1 เช่น 1 แพ็ค'">
+                                                <button type="button" class="qty-step" @click="adjustQty(index, 1)" :aria-label="'เพิ่มจำนวน ' + (item.unit_name || '')">+</button>
+                                            </div>
+                                            <small class="d-block text-end text-success fw-bold" x-text="item.is_scale ? (item.unit_name || 'หน่วยชั่ง') + ' · ละ 0.01' : (item.unit_name || 'หน่วยขาย') + ' · ละ 1'"></small>
                                         </td>
                                         <td>
                                             <input type="number" step="0.01" min="0" :name="`items[${index}][unit_price]`" x-model.number="item.unit_price" required class="doc-input text-end" :title="item.is_scale ? 'ราคาขายต่อ ' + (item.unit_name || 'หน่วยฐาน') : 'ราคาต่อหน่วย'"><small x-show="item.is_scale" class="d-block text-end text-success fw-bold">/หน่วยชั่ง</small>

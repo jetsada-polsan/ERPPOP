@@ -36,6 +36,23 @@
 ## งานถัดไป
 - Deploy production และตรวจหน้า Executive หลัง cache clear
 
+# Handoff — 2026-11-03 (มาตรฐานพิมพ์เอกสารและหน่วยคงเหลือ)
+
+## ทำอะไรไป
+- ปรับธีมพิมพ์ร่วมของเอกสาร A4 ให้ตารางไม่ถูก `overflow` ตัดหลังหน้าแรก, หัวตารางซ้ำทุกหน้า และแถว/ลายเซ็นไม่แตกกลางหน้า
+- เอาความสูงหน้ากระดาษที่บังคับไว้และมุมตกแต่งออกเฉพาะตอนพิมพ์ เพื่อไม่สร้างหน้าว่างและไม่กินพื้นที่หัวเอกสาร
+- ไม่ประกาศ `@page` ในธีมร่วม จึงคง A5 ใบส่งของและกระดาษความร้อน 80mm ของ Z Report ตามแม่แบบของแต่ละเอกสาร
+- ย้ายการแสดงยอดสต๊อกเป็น `StockQuantityFormatter` กลาง: รายงานสินค้าคงเหลือและสต๊อกต่ำ/ติดลบแสดง `หน่วยหลัก + หน่วยย่อย` จาก pack ใหญ่ที่สุด เช่น `2 ลัง 3 ชิ้น`
+
+## ทดสอบ
+- `php artisan view:cache` ผ่าน
+- `php artisan test --filter='QuotationConversionTest|BookingDeliveryAndCashTransferTest|SalesDocumentEndToEndTest|PrintablePageSizeTest|StockBalanceReportTest' --no-coverage`: 40 tests / 303 assertions ผ่าน
+- `git diff --check` ผ่าน
+
+## งานถัดไป
+- ยังไม่ได้ deploy; ต้องเปิด Chrome print preview เอกสารหลายหน้าอย่างน้อยใบเสนอราคา, ใบจอง/ขาย, ใบส่งของ A5 และรายงานสต๊อก ก่อนสั่งพิมพ์จริง
+- ระบบหลักเป็น Laravel multi-page; Vue ใช้เฉพาะ POS/launcher จึงไม่สามารถปิดวงกลมของ Chrome ได้ ต้อง profile response/query และค่อยวาง navigation layer แบบ Turbo/Inertia หากต้องการเปลี่ยนประสบการณ์ทั้งระบบ
+
 # Handoff — 2026-11-02 (ใช้โลโก้ MPM และชื่อระบบ JET ERP)
 
 ## ทำอะไรไป
@@ -2362,3 +2379,20 @@ pending
 
 ## ความเสี่ยง/งานถัดไป
 - ยังไม่ deploy; ต้องเปิด print preview ของใบเสนอราคา/ใบจองที่มีหลายรายการบน production หลัง deploy เพื่อยืนยันจำนวนหน้าจริง
+
+# Handoff — 2026-11-03 (จำนวนใบจองตามหน่วยขาย)
+
+## ทำอะไรไป
+- แก้ข้อความสต๊อกพร้อมจองไม่พอให้แสดงรหัสสินค้า จำนวน และหน่วยขายที่อ่านได้ โดยไม่ปล่อยเลขทศนิยม 8 ตำแหน่งจากฐานข้อมูล
+- สินค้าชั่งแสดงและปรับจำนวนทีละ `0.01`; สินค้านับเป็นแพ็ก/ชิ้นปรับทีละ `1`.
+- เพิ่มปุ่ม `−` / `+` ที่ช่องจำนวน และปรับ hint คงเหลือ/จองแล้ว/พร้อมจองให้แสดงหน่วยทุกค่า.
+- คงกฎธุรกิจเดิม: หลังล้างระบบยอดคงเหลือเป็นศูนย์ จึงกันการสร้างใบจองจนกว่าจะรับเข้าหรือลงยอดยกมา.
+
+## ทดสอบ
+- `php artisan test --filter=BookingSalesAreaTest --no-coverage`: 11 tests / 73 assertions ผ่าน
+- `php artisan test --filter='BookingDeliveryAndCashTransferTest|SalesDocumentEndToEndTest' --no-coverage`: 19 tests / 139 assertions ผ่าน
+- `php artisan view:cache` ผ่าน
+- `git diff --check` ผ่าน
+
+## งานถัดไป
+- ยังไม่ deploy; หลัง deploy ให้ UAT สินค้าแพ็ก 1 รายการและสินค้าชั่ง 1 รายการบนหน้าใบจอง โดยต้องมีสต๊อกเริ่มต้นก่อนจอง.
