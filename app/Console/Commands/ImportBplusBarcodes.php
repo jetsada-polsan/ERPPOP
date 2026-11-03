@@ -38,10 +38,13 @@ class ImportBplusBarcodes extends Command
         $existing = ProductBarcode::query()->get(['barcode', 'product_id'])->pluck('product_id', 'barcode');
         $units = ProductUnit::query()->get(['id', 'name', 'qty_per_base_unit']);
 
-        $plan = ['match' => [], 'add' => [], 'conflict' => [], 'no_product' => [], 'no_unit' => [], 'skip' => []];
+        $plan = ['match' => [], 'add' => [], 'conflict' => [], 'no_product' => [], 'no_unit' => [], 'sku' => [], 'skip' => []];
         foreach ($rows as $row) {
             $product = $byLegacy->get($row['sku_code']) ?? $bySku->get($row['sku_code']);
-            if (! $this->looksLikeBarcode($row['barcode'])) {
+            if ($row['barcode'] === $row['sku_code']) {
+                // พิมพ์ SKU ตอนขาย ไม่ใช่ป้ายบาร์โค้ด POS ค้นด้วย SKU ได้อยู่แล้ว
+                $plan['sku'][] = $row + ['reason' => 'พิมพ์ SKU ไม่ใช่บาร์โค้ด'];
+            } elseif (! $this->looksLikeBarcode($row['barcode'])) {
                 $plan['skip'][] = $row + ['reason' => 'ไม่ใช่บาร์โค้ด'];
             } elseif (! $product) {
                 $plan['no_product'][] = $row + ['reason' => 'ไม่พบสินค้าใน ERP'];
@@ -63,6 +66,7 @@ class ImportBplusBarcodes extends Command
             ['ผูกคนละสินค้า (ต้องตรวจ)', count($plan['conflict'])],
             ['ไม่พบสินค้าใน ERP', count($plan['no_product'])],
             ['หาหน่วยไม่เจอ (ต้องตรวจ)', count($plan['no_unit'])],
+            ['พิมพ์ SKU ตรง ๆ (ข้าม)', count($plan['sku'])],
             ['ไม่ใช่บาร์โค้ด (ข้าม)', count($plan['skip'])],
         ]);
 
@@ -135,7 +139,8 @@ class ImportBplusBarcodes extends Command
         $named = $units->filter(fn (ProductUnit $unit) => trim((string) $unit->name) === $row['unit_name']);
         $sameFactor = $named->filter(fn (ProductUnit $unit) => abs((float) $unit->qty_per_base_unit - $row['unit_factor']) < 0.0001);
 
-        return $sameFactor->first() ?? ($named->count() === 1 ? $named->first() : null)
+        // ชื่อตรงแต่ตัวคูณไม่ตรง (เช่น "กล่อง*12" ตัวคูณ 1) ไม่เดา ส่งให้คนตรวจ
+        return $sameFactor->first()
             ?? $units->first(fn (ProductUnit $unit) => $unit->cleanName() === $row['unit_name']
                 && abs((float) $unit->qty_per_base_unit - $row['unit_factor']) < 0.0001);
     }
@@ -159,7 +164,7 @@ class ImportBplusBarcodes extends Command
         fwrite($handle, "\xEF\xBB\xBF");
         fputcsv($handle, ['group', 'sku_code', 'barcode', 'unit_name', 'unit_factor', 'lines', 'note']);
         foreach ($plan as $group => $rows) {
-            if ($group === 'match') {
+            if ($group === 'match' || $group === 'sku') {
                 continue;
             }
             foreach ($rows as $row) {
