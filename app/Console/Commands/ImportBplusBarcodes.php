@@ -128,10 +128,12 @@ class ImportBplusBarcodes extends Command
         return array_values($best);
     }
 
-    /** SKU ที่พิมพ์ตรง ๆ ถือเป็นการค้นด้วยรหัสสินค้า ไม่ใช่บาร์โค้ด และค่าขยะอย่าง - หรือ 0 */
+    /** ค่าขยะอย่าง -, 000000, 0000000000001 และรหัสที่ BPlus ต่อท้าย CC (ยกเลิกแล้ว) */
     private function looksLikeBarcode(string $barcode): bool
     {
-        return preg_match('/^[0-9A-Za-z]{6,24}$/', $barcode) === 1;
+        return preg_match('/^[0-9A-Za-z]{6,24}$/', $barcode) === 1
+            && ! str_ends_with(strtoupper($barcode), 'CC')
+            && strlen(ltrim($barcode, '0')) > 1;
     }
 
     private function unitFor(array $row, $units): ?ProductUnit

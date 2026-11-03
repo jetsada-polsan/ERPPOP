@@ -71,6 +71,9 @@ class BarcodeSkuSeparationTest extends TestCase
 
         $this->assertSame('0000002080789', ProductBarcode::where('product_id', $product->id)->value('barcode'));
         $this->assertSame(BarcodePolicy::LEGACY, ClassifyBarcodes::classify('A-0012', 'C1', app(BarcodePolicy::class)));
+        // ป้ายภายในของร้านที่ขึ้นต้น 0 ไม่ใช่ EAN ผู้ผลิต แม้ check digit จะถูก
+        $this->assertSame(BarcodePolicy::INTERNAL_13, ClassifyBarcodes::classify('0000001022049', '102204', app(BarcodePolicy::class)));
+        $this->assertSame(BarcodePolicy::EAN13_STANDARD, ClassifyBarcodes::classify('8850000000003', 'X', app(BarcodePolicy::class)));
     }
 
     public function test_scale_plu_needs_a_scale_profile(): void

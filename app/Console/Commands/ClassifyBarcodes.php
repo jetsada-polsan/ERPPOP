@@ -76,15 +76,18 @@ class ClassifyBarcodes extends Command
 
     /**
      * รหัสสั้นหรือเท่ากับ SKU = รหัสภายใน, EAN-13 ที่ผ่าน check digit = EAN-13
-     * (เว้นเลขขึ้นต้น 2 ซึ่ง GS1 กันไว้ให้ร้านใช้เอง), ที่เหลือ = Legacy
+     * (เว้นเลขขึ้นต้น 0 ซึ่งร้านใช้ทำป้ายภายในจาก SKU และ 2 ที่ GS1 กันไว้ให้ร้าน), ที่เหลือ = Legacy
      */
     public static function classify(string $barcode, string $sku, BarcodePolicy $policy): string
     {
         if ($barcode === $sku || (ctype_digit($barcode) && strlen($barcode) < 13)) {
             return BarcodePolicy::CUSTOM;
         }
-        if ($policy->isValidEan13($barcode) && $barcode[0] !== '2') {
+        if ($policy->isValidEan13($barcode) && ! in_array($barcode[0], ['0', '2'], true)) {
             return BarcodePolicy::EAN13_STANDARD;
+        }
+        if ($policy->isValidEan13($barcode) && $barcode[0] === '0') {
+            return BarcodePolicy::INTERNAL_13;
         }
 
         return BarcodePolicy::LEGACY;
