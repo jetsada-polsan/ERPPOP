@@ -58,7 +58,7 @@ class ProductSkuAllocator
     {
         $generator = app(InternalBarcodeGenerator::class);
 
-        return ProductBarcode::whereIn('barcode', array_filter([$generator->fromSku($sku), $generator->packFromSku($sku, 0)]))->exists();
+        return ProductBarcode::whereIn('barcode', array_filter([$sku, $generator->fromSku($sku), $generator->packFromSku($sku, 0)]))->exists();
     }
 
     /** @return array{0:string,1:int} */
