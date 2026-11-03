@@ -15,7 +15,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class QtyPromotion extends Model
 {
     /** โปรต่อสินค้า (ดูจำนวนที่ซื้อ) กับโปรต่อบิล (ดูยอดซื้อทั้งบิล) */
-    public const BILL_TYPES = ['bill_discount', 'bill_free_item'];
+    public const BILL_TYPES = ['bill_discount', 'bill_free_item', 'bill_addon'];
+
+    /** โปรซื้อคละ: หยิบสินค้าไหนในกลุ่มก็นับรวม */
+    public const MIX_TYPES = ['mix_bundle', 'mix_free'];
+
+    public function groupProducts(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Product::class, 'qty_promotion_products', 'qty_promotion_id', 'product_id');
+    }
 
     public function isBillLevel(): bool
     {
@@ -72,6 +80,15 @@ class QtyPromotion extends Model
     {
         $min = rtrim(rtrim(number_format((float) $this->min_qty, 2), '0'), '.');
         $amount = number_format((float) $this->min_amount);
+        if ($this->promo_type === 'mix_bundle') {
+            return "ซื้อคละ {$min} ชิ้น ".rtrim(rtrim(number_format((float) $this->bundle_price, 2), '0'), '.').' บาท';
+        }
+        if ($this->promo_type === 'mix_free') {
+            return "ซื้อคละ {$min} แถม ".rtrim(rtrim(number_format((float) $this->free_qty, 2), '0'), '.');
+        }
+        if ($this->promo_type === 'bill_addon') {
+            return "ยอดครบ {$amount} บาท แลกซื้อ ".rtrim(rtrim(number_format((float) $this->bundle_price, 2), '0'), '.').' บาท';
+        }
         if ($this->promo_type === 'bill_free_item') {
             $free = rtrim(rtrim(number_format((float) $this->free_qty, 2), '0'), '.');
 

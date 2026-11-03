@@ -114,7 +114,9 @@ export interface QtyPromotion {
   id: number
   code: string
   name: string
-  promo_type: 'free_item' | 'discount' | 'bundle_price' | 'bill_discount' | 'bill_free_item'
+  promo_type: 'free_item' | 'discount' | 'bundle_price' | 'mix_bundle' | 'mix_free' | 'bill_discount' | 'bill_free_item' | 'bill_addon'
+  /** สินค้าในกลุ่มของโปรซื้อคละ */
+  product_ids?: number[]
   /** โปรต่อบิลไม่มีสินค้าที่ต้องซื้อ */
   product_id: number | null
   min_qty: number

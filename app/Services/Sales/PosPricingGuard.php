@@ -383,10 +383,36 @@ class PosPricingGuard
         $promotions = QtyPromotion::runningToday()
             ->where(fn ($query) => $query->whereNull('branch_id')->orWhere('branch_id', $branchId))
             // เครื่องที่ไม่ได้บอกว่ารู้จักโปรต่อบิล ไม่คิดโปรต่อบิลให้ ยอดจะได้ตรงกับเครื่อง
-            ->when(! $billPromotions, fn ($query) => $query->whereNotIn('promo_type', QtyPromotion::BILL_TYPES))
+            ->when(! $billPromotions, fn ($query) => $query->whereNotIn('promo_type', [...QtyPromotion::BILL_TYPES, ...QtyPromotion::MIX_TYPES]))
+            ->with('groupProducts:products.id')
             ->get();
         $billPromotionList = $promotions->filter(fn (QtyPromotion $promotion) => $promotion->isBillLevel());
-        foreach ($promotions->reject(fn (QtyPromotion $promotion) => $promotion->isBillLevel()) as $promotion) {
+
+        // ซื้อคละ: แตกเป็นราคาต่อชิ้นของสินค้าในกลุ่ม เรียงแพงไปถูก (คิดแบบเดียวกับเครื่อง POS)
+        foreach ($promotions->whereIn('promo_type', QtyPromotion::MIX_TYPES) as $promotion) {
+            $group = $promotion->groupProducts->pluck('id')->map(fn ($id) => (int) $id)->all();
+            $units = [];
+            foreach ($lines as $line) {
+                if (in_array((int) $line['product_id'], $group, true) && (float) $line['unit_price'] > 0) {
+                    for ($i = 0; $i < (int) floor((float) $line['qty']); $i++) {
+                        $units[] = (float) $line['unit_price'];
+                    }
+                }
+            }
+            rsort($units);
+            $need = (int) (float) $promotion->min_qty;
+            if ($promotion->promo_type === 'mix_bundle' && $need > 0) {
+                $sets = intdiv(count($units), $need);
+                $discount += max(0, array_sum(array_slice($units, 0, $sets * $need)) - $sets * (float) $promotion->bundle_price);
+            } elseif ($promotion->promo_type === 'mix_free' && $need > 0) {
+                // ซื้อ N แถม F: ทุก N+F ชิ้น ชิ้นที่ถูกที่สุด F ชิ้นฟรี
+                $free = (int) (float) $promotion->free_qty;
+                $sets = intdiv(count($units), $need + $free);
+                $discount += array_sum(array_slice(array_reverse($units), 0, $sets * $free));
+            }
+        }
+
+        foreach ($promotions->reject(fn (QtyPromotion $promotion) => $promotion->isBillLevel() || in_array($promotion->promo_type, QtyPromotion::MIX_TYPES, true)) as $promotion) {
             $trigger = $lines->firstWhere('product_id', (int) $promotion->product_id);
             if (! $trigger || (float) $promotion->min_qty <= 0) {
                 continue;
@@ -422,6 +448,21 @@ class PosPricingGuard
         }
         $paid = $lines->sum(fn ($line) => (float) $line['qty'] * (float) $line['unit_price']) - $giftValue - $discount;
         foreach ($billPromotionList as $promotion) {
+            if ($promotion->promo_type === 'bill_addon') {
+                // แลกซื้อ: ยอดซื้อ (ไม่นับตัวที่แลก) ถึงขั้นต่ำ ตัวที่แลกได้ราคาพิเศษตามจำนวนที่กำหนด
+                $addon = $lines->firstWhere('product_id', (int) $promotion->product_id);
+                if (! $addon) {
+                    continue;
+                }
+                $addonValue = (float) $addon['qty'] * (float) $addon['unit_price'];
+                if ($paid - $addonValue + 0.0001 < (float) $promotion->min_amount) {
+                    continue;
+                }
+                $qty = min((float) $addon['qty'], (float) ($promotion->free_qty ?? 1));
+                $discount += max(0, $qty * ((float) $addon['unit_price'] - (float) $promotion->bundle_price));
+
+                continue;
+            }
             if ($paid + 0.0001 < (float) $promotion->min_amount) {
                 continue;
             }

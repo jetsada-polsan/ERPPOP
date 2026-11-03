@@ -117,3 +117,23 @@ describe('bill promotions', () => {
     expect(result.freeItems[0]).toMatchObject({ name_th: 'น้ำ', qty: 1 })
   })
 })
+
+describe('mix and add-on promotions', () => {
+  it('prices any three from the group at the set price', () => {
+    const mix: QtyPromotion = { id: 20, code: 'MIX3', name: 'คละ 3 ชิ้น 100', promo_type: 'mix_bundle', product_id: null, product_ids: [1, 2], min_qty: 3, bundle_price: 100 }
+    const result = priceCart([{ ...product(1, 40), qty: 2 }, { ...product(2, 35), qty: 2 }], [mix])
+    // 40+40+35 = 115 -> 100 (ลด 15) ชิ้นที่ 4 ราคาปกติ 35
+    expect(result.total).toBe(135)
+  })
+
+  it('gives the cheapest item free for buy three get one from the group', () => {
+    const mix: QtyPromotion = { id: 21, code: 'MIXF', name: 'คละ 3 แถม 1', promo_type: 'mix_free', product_id: null, product_ids: [1, 2], min_qty: 3, free_qty: 1 }
+    expect(priceCart([{ ...product(1, 40), qty: 3 }, { ...product(2, 30), qty: 1 }], [mix]).total).toBe(120)
+  })
+
+  it('sells the add-on at the special price once the rest of the bill reaches the minimum', () => {
+    const addon: QtyPromotion = { id: 22, code: 'ADD', name: 'ครบ 300 แลกซื้อ 19', promo_type: 'bill_addon', product_id: 2, min_qty: 1, min_amount: 300, bundle_price: 19, free_qty: 1 }
+    expect(priceCart([{ ...product(1, 100), qty: 3 }, { ...product(2, 50), qty: 2 }], [addon]).total).toBe(369)
+    expect(priceCart([{ ...product(1, 100), qty: 2 }, { ...product(2, 50), qty: 1 }], [addon]).total).toBe(250)
+  })
+})

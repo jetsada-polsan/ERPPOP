@@ -261,6 +261,30 @@ class PosPricingGuardTest extends TestCase
         $this->assertSame(940.0, app(PosPricingGuard::class)->validate($payload, $user));
     }
 
+    public function test_server_prices_mix_sets_and_add_on_purchases_like_the_till(): void
+    {
+        [$user, $branch, $product] = $this->masters();
+        $second = Product::create([
+            'sku_code' => 'P-2', 'name_th' => 'สินค้าสอง', 'base_unit_id' => $product->base_unit_id,
+            'default_price' => 50, 'average_cost' => 10, 'is_vat' => true, 'is_active' => true, 'negative_stock_policy' => 'block',
+        ]);
+        ProductPrice::create(['product_id' => $second->id, 'price_table_id' => PriceTable::value('id'), 'price' => 50, 'is_active' => true]);
+        $line = fn ($id, $qty, $price) => ['product_id' => $id, 'qty' => $qty, 'unit_price' => $price];
+
+        $mix = QtyPromotion::create(['code' => 'MIX', 'name' => 'คละ 3 ชิ้น 200', 'promo_type' => 'mix_bundle', 'min_qty' => 3, 'bundle_price' => 200, 'is_active' => true]);
+        $mix->groupProducts()->sync([$product->id, $second->id]);
+        // 100+100+50 = 250 -> 200 ลด 50 ทั้งบิล 2x100 + 2x50 = 300 -> 250
+        $payload = ['branch_id' => $branch->id, 'vat_mode' => 'included', 'bill_promotions' => true, 'items' => [$line($product->id, 2, 87.5), $line($second->id, 2, 37.5)]];
+        $this->assertSame(250.0, app(PosPricingGuard::class)->validate($payload, $user));
+        $mix->delete();
+
+        QtyPromotion::create(['code' => 'ADD', 'name' => 'ครบ 300 แลกซื้อ 20', 'promo_type' => 'bill_addon', 'product_id' => $second->id,
+            'min_qty' => 1, 'min_amount' => 300, 'bundle_price' => 20, 'free_qty' => 1, 'is_active' => true]);
+        // 3x100 + 1x50 -> ตัวแลกเหลือ 20 รวม 320
+        $payload = ['branch_id' => $branch->id, 'vat_mode' => 'included', 'bill_promotions' => true, 'items' => [$line($product->id, 3, 100 - 30 * 300 / 350 / 3), $line($second->id, 1, 50 - 30 * 50 / 350)]];
+        $this->assertSame(320.0, app(PosPricingGuard::class)->validate($payload, $user));
+    }
+
     private function masters(): array
     {
         $user = User::factory()->create(['username' => 'pricing_tester_'.uniqid()]);

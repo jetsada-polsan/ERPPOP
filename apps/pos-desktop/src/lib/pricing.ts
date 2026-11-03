@@ -72,10 +72,40 @@ export function priceCart(cart: CartLine[], allPromotions: QtyPromotion[], vatRa
     promoDiscount += Math.min(base, Math.max(0, discount))
   }
 
+  // ซื้อคละ: แตกเป็นราคาต่อชิ้นในกลุ่ม เรียงแพงไปถูก (คิดแบบเดียวกับ PosPricingGuard)
+  for (const promotion of promotions) {
+    if (promotion.promo_type !== 'mix_bundle' && promotion.promo_type !== 'mix_free') continue
+    const group = new Set(promotion.product_ids || [])
+    const units: number[] = []
+    for (const item of lines) {
+      if (!group.has(item.line.id) || !(num(item.line.pos_price) > 0)) continue
+      for (let i = 0; i < Math.floor(item.qty); i++) units.push(num(item.line.pos_price))
+    }
+    units.sort((a, b) => b - a)
+    const need = Math.floor(num(promotion.min_qty))
+    if (need <= 0) continue
+    if (promotion.promo_type === 'mix_bundle') {
+      const sets = Math.floor(units.length / need)
+      promoDiscount += Math.max(0, units.slice(0, sets * need).reduce((sum, value) => sum + value, 0) - sets * num(promotion.bundle_price))
+    } else {
+      const free = Math.floor(num(promotion.free_qty))
+      const sets = Math.floor(units.length / (need + free))
+      promoDiscount += units.slice().reverse().slice(0, sets * free).reduce((sum, value) => sum + value, 0)
+    }
+  }
+
   // โปรต่อบิล: ยอดหลังโปรต่อสินค้าต้องถึงขั้นต่ำ (คิดแบบเดียวกับ PosPricingGuard)
   const paid = subtotal - promoDiscount
   const billGifts: QtyPromotion[] = []
   for (const promotion of promotions) {
+    if (promotion.promo_type === 'bill_addon') {
+      // แลกซื้อ: ยอดซื้อไม่นับตัวที่แลก ต้องถึงขั้นต่ำ ตัวที่แลกได้ราคาพิเศษตามจำนวนที่กำหนด
+      const addon = lines.find((item) => item.line.id === promotion.product_id)
+      if (!addon || paid - addon.gross + 0.0001 < num(promotion.min_amount)) continue
+      const qty = Math.min(addon.qty, num(promotion.free_qty ?? 1) || 1)
+      promoDiscount += Math.max(0, qty * (num(addon.line.pos_price) - num(promotion.bundle_price)))
+      continue
+    }
     if (promotion.promo_type !== 'bill_discount' && promotion.promo_type !== 'bill_free_item') continue
     if (paid + 0.0001 < num(promotion.min_amount)) continue
     if (promotion.promo_type === 'bill_free_item') { billGifts.push(promotion); continue }

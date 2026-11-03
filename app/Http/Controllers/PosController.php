@@ -230,17 +230,24 @@ class PosController extends Controller
     {
         $branchId = $this->enforcedBranchId((int) $request->query('branch_id', 0));
 
-        $promotions = QtyPromotion::with('freeProduct:id,sku_code,name_th')
+        $promotions = QtyPromotion::with(['freeProduct:id,sku_code,name_th', 'product:id,sku_code,name_th', 'groupProducts:products.id'])
             ->when($request->boolean('include_upcoming'), fn ($q) => $q->notEnded(), fn ($q) => $q->runningToday())
             ->where(fn ($w) => $w->whereNull('branch_id')->orWhere('branch_id', $branchId))
             // POS รุ่นก่อน 1.6.5 ไม่รู้จักโปรต่อบิล ส่งไปแล้วยอดจะไม่ตรงกับที่เซิร์ฟเวอร์คิด
-            ->when(! $request->boolean('bill_promotions'), fn ($q) => $q->whereNotIn('promo_type', QtyPromotion::BILL_TYPES))
+            ->when(! $request->boolean('bill_promotions'), fn ($q) => $q->whereNotIn('promo_type', [...QtyPromotion::BILL_TYPES, ...QtyPromotion::MIX_TYPES]))
             // วันเริ่ม/สิ้นสุดส่งไปด้วย เครื่อง POS ที่ออฟไลน์ข้ามวันจะได้ไม่ใช้โปรที่หมดแล้ว
             ->get(['id', 'code', 'name', 'promo_type', 'product_id', 'min_qty', 'min_amount',
                 'free_product_id', 'free_qty', 'discount_type', 'discount_value', 'max_discount', 'bundle_price',
                 'starts_date', 'ends_date', 'starts_at', 'ends_at']);
 
-        return response()->json($promotions);
+        // ซื้อคละ: ส่งรหัสสินค้าในกลุ่มไปด้วย เครื่องจะได้นับรวมได้แม้ออฟไลน์
+        return response()->json($promotions->map(function (QtyPromotion $promotion) {
+            $row = $promotion->toArray();
+            $row['product_ids'] = $promotion->groupProducts->pluck('id')->map(fn ($id) => (int) $id)->values();
+            unset($row['group_products']);
+
+            return $row;
+        }));
     }
 
     // Member lookup for attaching a member to the bill (สะสม/แลกแต้ม)
