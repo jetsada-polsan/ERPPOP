@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ReportDefinition;
 use App\Services\Reports\StockBalanceReport;
+use App\Services\Reports\StockQuantityFormatter;
 use App\Support\SqlDialect;
 use App\Support\XlsxWriter;
 use Carbon\Carbon;
@@ -712,7 +713,7 @@ class ReportController extends Controller
             'stock_alerts' => $this->tableResult('สต็อกต่ำ / ติดลบ', [
                 ['label' => 'รหัส', 'key' => 'sku_code'],
                 ['label' => 'สินค้า', 'key' => 'name_th'],
-                ['label' => 'คงเหลือ', 'key' => 'on_hand_qty', 'type' => 'number', 'class' => 'text-end'],
+                ['label' => 'คงเหลือ (หน่วยหลัก / ย่อย)', 'key' => 'quantity_display', 'class' => 'text-end'],
                 ['label' => 'ราคาต่อหน่วย', 'key' => 'unit_price', 'type' => 'money', 'class' => 'text-end'],
                 ['label' => 'มูลค่าคงเหลือ', 'key' => 'stock_value', 'type' => 'money', 'class' => 'text-end'],
             ], $this->stockAlerts($filters)),
@@ -2266,11 +2267,14 @@ class ReportController extends Controller
         $this->applyBranch($query, $filters, 'b.id');
         $this->applySearch($query, $filters, ['p.sku_code', 'p.name_th', 'w.name', 'wl.name']);
 
-        return $query->orderBy('sb.on_hand_qty')->selectRaw("p.sku_code, p.name_th,
+        $rows = $query->orderBy('sb.on_hand_qty')->selectRaw("p.id as product_id, p.sku_code, p.name_th,
             concat(coalesce(b.name_th, w.name), ' / ', coalesce(wl.name, wl.code)) as location_name,
-            sb.on_hand_qty, coalesce(p.default_price, 0) as unit_price,
+            sb.on_hand_qty, coalesce(base_unit.name, '-') as unit_name, coalesce(p.default_price, 0) as unit_price,
             sb.on_hand_qty * coalesce(p.default_price, 0) as stock_value")
+            ->leftJoin('product_units as base_unit', 'base_unit.id', '=', 'p.base_unit_id')
             ->limit($filters['per_page'])->get();
+
+        return app(StockQuantityFormatter::class)->format($rows);
     }
 
     private function expiringStock(array $filters): Collection
@@ -2383,6 +2387,7 @@ class ReportController extends Controller
                 $row->qty_in = (float) $row->qty_in;
                 $row->qty_out = (float) $row->qty_out;
                 $row->unit_cost = (float) $row->unit_cost;
+
                 return $row;
             });
     }

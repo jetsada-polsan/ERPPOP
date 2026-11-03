@@ -418,7 +418,14 @@
         }
 
         @media print {
-            body { background: #fff !important; }
+            html,
+            body {
+                width: auto !important;
+                height: auto !important;
+                background: #fff !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
             .toolbar,
             .no-print { display: none !important; }
             .sheet,
@@ -426,10 +433,58 @@
             .print-sheet {
                 margin: 0 !important;
                 width: auto !important;
-                min-height: 297mm !important;
+                min-height: 0 !important;
+                height: auto !important;
+                box-sizing: border-box !important;
                 box-shadow: none !important;
                 padding: 14mm 13mm !important;
                 overflow: visible !important;
                 zoom: 1 !important;
             }
+
+            /* Decorative screen-only corner must never consume printable area. */
+            .sheet::before,
+            .sheet::after,
+            .page::before,
+            .page::after,
+            .print-sheet::before,
+            .print-sheet::after { display: none !important; }
+
+            /* Bootstrap responsive tables clip overflowing rows unless reset for paper. */
+            .table-responsive,
+            .table-wrap,
+            .content-card,
+            main,
+            .app-main {
+                max-height: none !important;
+                overflow: visible !important;
+            }
+
+            .sheet table thead,
+            .page table thead,
+            .print-sheet table thead { display: table-header-group !important; }
+
+            .sheet table tfoot,
+            .page table tfoot,
+            .print-sheet table tfoot { display: table-footer-group !important; }
+
+            .sheet table tr,
+            .page table tr,
+            .print-sheet table tr,
+            .totals,
+            .totals-block,
+            .qc-row,
+            .signs,
+            .signatures,
+            .sign-row,
+            .bill-sign {
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
+
+            .doc-title,
+            .doc-title-block { white-space: nowrap !important; }
+
+            .doc-title h1,
+            .doc-title-block .doc-type { font-size: 22px !important; }
         }

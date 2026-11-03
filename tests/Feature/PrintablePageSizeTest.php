@@ -80,6 +80,17 @@ class PrintablePageSizeTest extends TestCase
             'ใบสรุปกะออกทางเครื่องพิมพ์ความร้อน 80mm ไม่ใช่กระดาษ A4');
     }
 
+    public function test_shared_document_theme_allows_rows_to_flow_across_print_pages(): void
+    {
+        $contents = file_get_contents($this->viewPath().'/documents/partials/print-theme.blade.php');
+
+        $this->assertStringContainsString('min-height: 0 !important;', $contents);
+        $this->assertStringContainsString('.table-responsive,', $contents);
+        $this->assertStringContainsString('overflow: visible !important;', $contents);
+        $this->assertStringContainsString('display: table-header-group !important;', $contents);
+        $this->assertStringContainsString('white-space: nowrap !important;', $contents);
+    }
+
     /** @return array<string, string> */
     private function bladeFiles(): array
     {
