@@ -15,6 +15,7 @@ use App\Models\WarehouseLocation;
 use App\Services\Inventory\FifoStockService;
 use App\Services\Inventory\InventoryCostCloseService;
 use App\Services\Inventory\StockAdjustmentService;
+use App\Services\Inventory\StockCountService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +25,46 @@ use Tests\TestCase;
 class InventoryApprovalAndCloseTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_stock_adjustment_rejects_a_location_from_another_branch(): void
+    {
+        [$branch, , $product] = $this->masters();
+        $otherBranch = Branch::create(['code' => 'B002', 'name_th' => 'สาขา 2', 'is_active' => true]);
+        $otherWarehouse = Warehouse::create(['branch_id' => $otherBranch->id, 'code' => 'WH-B002', 'name' => 'คลัง 2']);
+        $otherLocation = WarehouseLocation::create(['warehouse_id' => $otherWarehouse->id, 'code' => 'MAIN', 'name' => 'พื้นที่หลัก']);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('ตำแหน่งเก็บต้องอยู่ในสาขาเดียวกับใบปรับสต๊อก');
+
+        app(StockAdjustmentService::class)->create([
+            'branch_id' => $branch->id,
+            'warehouse_location_id' => $otherLocation->id,
+            'items' => [['product_id' => $product->id, 'counted_qty' => 1]],
+        ]);
+    }
+
+    public function test_stock_count_rejects_cross_branch_or_duplicate_open_sheet(): void
+    {
+        [$branch, $location, $product] = $this->masters();
+        $otherBranch = Branch::create(['code' => 'B002', 'name_th' => 'สาขา 2', 'is_active' => true]);
+        $otherWarehouse = Warehouse::create(['branch_id' => $otherBranch->id, 'code' => 'WH-B002', 'name' => 'คลัง 2']);
+        $otherLocation = WarehouseLocation::create(['warehouse_id' => $otherWarehouse->id, 'code' => 'MAIN', 'name' => 'พื้นที่หลัก']);
+        StockBalance::create(['product_id' => $product->id, 'warehouse_location_id' => $location->id, 'on_hand_qty' => 1, 'reserved_qty' => 0]);
+        $counts = app(StockCountService::class);
+
+        try {
+            $counts->create(['branch_id' => $branch->id, 'warehouse_location_id' => $otherLocation->id, 'count_mode' => 'partial']);
+            $this->fail('ต้องปฏิเสธตำแหน่งเก็บต่างสาขา');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('ตำแหน่งเก็บต้องอยู่ในสาขาเดียวกับใบตรวจนับ', $exception->getMessage());
+        }
+
+        $counts->create(['branch_id' => $branch->id, 'warehouse_location_id' => $location->id, 'count_mode' => 'partial']);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('ตำแหน่งเก็บนี้มีใบตรวจนับที่ยังไม่ปิดอยู่');
+        $counts->create(['branch_id' => $branch->id, 'warehouse_location_id' => $location->id, 'count_mode' => 'partial']);
+    }
 
     public function test_stock_adjustment_does_not_change_stock_until_another_user_approves(): void
     {

@@ -418,15 +418,7 @@
         }
 
         @media print {
-            @page { size: A4 portrait; margin: 10mm; }
-
-            html,
-            body {
-                background: #fff !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-
+            body { background: #fff !important; }
             .toolbar,
             .no-print { display: none !important; }
             .sheet,
@@ -434,29 +426,10 @@
             .print-sheet {
                 margin: 0 !important;
                 width: auto !important;
-                min-height: 0 !important;
+                min-height: 297mm !important;
                 box-shadow: none !important;
                 padding: 14mm 13mm !important;
                 overflow: visible !important;
                 zoom: 1 !important;
-            }
-
-            table.items thead,
-            .print-sheet table thead { display: table-header-group !important; }
-
-            table.items tfoot,
-            .print-sheet table tfoot { display: table-footer-group !important; }
-
-            table.items tr,
-            .print-sheet table tr,
-            .totals,
-            .totals-block,
-            .qc-row,
-            .signs,
-            .signatures,
-            .sign-row,
-            .bill-sign {
-                break-inside: avoid;
-                page-break-inside: avoid;
             }
         }
