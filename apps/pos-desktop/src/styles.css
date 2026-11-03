@@ -615,3 +615,4 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .primary:hover { background: var(--desk-navy); }
 .modal-head { border-bottom: 1px solid var(--desk-border); }
 .topbar .status.offline { border-color: #fecaca; color: #fecaca; background: rgba(201, 33, 45, .35); }
+.history-fix { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; margin-top: 10px; } .history-fix .primary { margin-top: 0; height: 42px; padding: 0 14px; width: auto; }

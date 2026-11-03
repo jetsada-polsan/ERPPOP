@@ -5,7 +5,7 @@ import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, CircleHelp, Cloud,
 import { check } from '@tauri-apps/plugin-updater'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { api, connect, pairDevice, PosUnreachableError, setServerUrl } from './lib/api'
-import { backupTo, closeLocalDb, enqueue, loadOfflineCashiers, loadOfflineCashiersByPin, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceOfflineCashiers, replaceProducts, replacePromotions, saleHistory, saveOfflineCredential, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth, markSaleVoided, saveAppState, loadAppState } from './lib/db'
+import { backupTo, closeLocalDb, enqueue, loadOfflineCashiers, loadOfflineCashiersByPin, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceOfflineCashiers, replaceProducts, replacePromotions, saleHistory, saveOfflineCredential, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth, markSaleVoided, saveAppState, loadAppState, patchQueuePayload } from './lib/db'
 import { productAtSaleTime } from './lib/catalog'
 import { resolveScan, type BarcodeType } from './lib/barcode'
 import { priceCart } from './lib/pricing'
@@ -260,6 +260,22 @@ async function submitVoid() {
     voidApproverPin.value = ''
     busy.value = false
   }
+}
+
+const fixLast4 = ref('')
+/** บิลโอนที่ส่งไม่ผ่านเพราะไม่มีเลขท้ายบัญชี (เครื่องรุ่นก่อน 1.7.2) ใส่เลขแล้วส่งใหม่ได้ */
+async function resendWithLast4() {
+  const sale = selectedHistory.value
+  if (!sale || !/^\d{4}$/.test(fixLast4.value)) return flash('ใส่เลขท้ายบัญชี 4 หลัก')
+  busy.value = true
+  try {
+    await patchQueuePayload(sale.id, { transfer_account_last4: fixLast4.value })
+    fixLast4.value = ''
+    await syncCheckoutQueue(refreshQueue)
+    await refreshHistory()
+    selectedHistory.value = saleHistoryRows.value.find((row) => row.id === sale.id) || null
+    flash(selectedHistory.value?.status === 'synced' ? `ส่งบิล ${selectedHistory.value.receiptNo} เข้า ERP แล้ว` : 'ยังส่งไม่ผ่าน ดูข้อความที่แถบล่าง')
+  } catch (e) { showError(e) } finally { busy.value = false }
 }
 
 async function findMember() {
@@ -1154,6 +1170,10 @@ onUnmounted(() => {
           <div v-for="line in selectedHistory.items" :key="`${selectedHistory.id}-${line.id}-${line.scannedBarcode || ''}`" class="history-item"><span>{{ line.name_th }} × {{ line.qty }}</span><b>฿{{ money(line.qty * line.pos_price) }}</b></div>
           <div class="history-detail-total"><span>ยอดสุทธิ</span><strong>฿{{ money(selectedHistory.total) }}</strong></div>
           <small v-if="selectedHistory.status !== 'synced'" class="history-warning">บิลนี้ยังไม่ยืนยันเลขที่จาก ERP จะแสดงเป็นรายการชั่วคราวจนกว่าจะซิงก์สำเร็จ</small>
+          <form v-if="selectedHistory.status !== 'synced' && selectedHistory.status !== 'void' && (selectedHistory.method === 'transfer' || selectedHistory.method === 'mixed')" class="history-fix" @submit.prevent="resendWithLast4">
+            <label>เลขท้ายบัญชีผู้โอน 4 หลัก<input v-model="fixLast4" required inputmode="numeric" pattern="\d{4}" maxlength="4" placeholder="ดูจากสลิป"></label>
+            <button class="primary" :disabled="busy">ส่งบิลนี้ใหม่</button>
+          </form>
         </div>
       </section>
 

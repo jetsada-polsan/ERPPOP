@@ -251,6 +251,15 @@ export async function queueItems(): Promise<QueueItem[]> {
   return rows.map((row) => ({ id: row.id, payload: JSON.parse(row.payload), status: row.status, attempts: row.attempts, error: row.error, receiptNo: row.receipt_no, createdAt: row.created_at }))
 }
 
+/** แก้ข้อมูลบิลที่ ERP ยังไม่รับ (เช่น ลืมเลขท้ายบัญชีผู้โอน) แล้วให้ส่งใหม่ ไม่แตะรายการสินค้าและยอด */
+export async function patchQueuePayload(id: string, patch: Record<string, unknown>) {
+  const conn = await connection()
+  const rows = await conn.select<Array<{ payload: string }>>('SELECT payload FROM checkout_queue WHERE id = ?', [id])
+  if (!rows[0]) return
+  const payload = { ...JSON.parse(rows[0].payload), ...patch }
+  await conn.execute("UPDATE checkout_queue SET payload = ?, status = 'pending', error = NULL WHERE id = ? AND status <> 'synced'", [JSON.stringify(payload), id])
+}
+
 export async function markQueue(id: string, status: QueueItem['status'], error?: string, receiptNo?: string) {
   const conn = await connection()
   await conn.execute(
