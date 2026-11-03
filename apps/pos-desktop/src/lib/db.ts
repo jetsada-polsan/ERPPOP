@@ -42,7 +42,7 @@ async function connection() {
 
   // ลบเฉพาะบิลที่ส่งขึ้นเซิร์ฟเวอร์แล้ว บิลที่ยังค้างต้องเก็บไว้ให้เห็นจนกว่าจะส่งสำเร็จ
   // และต้องเทียบผ่าน datetime() เพราะ printed_at เก็บเป็น ISO-8601 (มี T กับ Z) เทียบสตริงตรงๆ ไม่ตรงรูปแบบกัน
-  await db.execute("DELETE FROM pos_sale_history WHERE status = 'synced' AND datetime(printed_at) < datetime('now', '-90 days')")
+  await db.execute("DELETE FROM pos_sale_history WHERE status IN ('synced', 'void') AND datetime(printed_at) < datetime('now', '-90 days')")
   return db
 }
 
@@ -249,6 +249,12 @@ export async function markQueue(id: string, status: QueueItem['status'], error?:
     `UPDATE pos_sale_history SET status = ?, error = ?, receipt_no = COALESCE(?, receipt_no), synced_at = CASE WHEN ? = 'synced' THEN datetime('now') ELSE synced_at END WHERE id = ?`,
     [status, error || null, receiptNo || null, status, id],
   )
+}
+
+/** บิลที่ยกเลิกใน ERP แล้ว ไม่นับเป็นยอดขายบนเครื่องอีก */
+export async function markSaleVoided(id: string) {
+  const conn = await connection()
+  await conn.execute("UPDATE pos_sale_history SET status = 'void' WHERE id = ?", [id])
 }
 
 export async function saveSaleHistory(sale: LocalSaleHistory) {

@@ -177,7 +177,7 @@ export interface QueueItem {
 export interface LocalSaleHistory {
   id: string
   receiptNo: string
-  status: 'pending' | 'syncing' | 'synced' | 'failed' | 'needs_review'
+  status: 'pending' | 'syncing' | 'synced' | 'failed' | 'needs_review' | 'void'
   total: number
   method: PaymentMethod
   paid: number

@@ -5,7 +5,7 @@ import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, CircleHelp, Cloud,
 import { check } from '@tauri-apps/plugin-updater'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { api, connect, pairDevice, PosUnreachableError, setServerUrl } from './lib/api'
-import { backupTo, closeLocalDb, enqueue, loadOfflineCashiers, loadOfflineCashiersByPin, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceOfflineCashiers, replaceProducts, replacePromotions, saleHistory, saveOfflineCredential, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth } from './lib/db'
+import { backupTo, closeLocalDb, enqueue, loadOfflineCashiers, loadOfflineCashiersByPin, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceOfflineCashiers, replaceProducts, replacePromotions, saleHistory, saveOfflineCredential, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth, markSaleVoided } from './lib/db'
 import { productAtSaleTime } from './lib/catalog'
 import { resolveScan, type BarcodeType } from './lib/barcode'
 import { priceCart } from './lib/pricing'
@@ -128,7 +128,7 @@ const vat = computed(() => pricing.value.vat)
 const change = computed(() => Math.max(0, cashReceived.value - subtotal.value))
 const todayLocalSales = computed(() => {
   const today = new Date().toLocaleDateString('en-CA')
-  return recentSales.value.filter((sale) => sale.status !== 'failed' && new Date(sale.printedAt).toLocaleDateString('en-CA') === today)
+  return recentSales.value.filter((sale) => sale.status !== 'failed' && sale.status !== 'void' && new Date(sale.printedAt).toLocaleDateString('en-CA') === today)
 })
 const todayLocalTotal = computed(() => todayLocalSales.value.reduce((sum, sale) => sum + sale.total, 0))
 const todayLocalAverage = computed(() => todayLocalSales.value.length ? todayLocalTotal.value / todayLocalSales.value.length : 0)
@@ -158,7 +158,7 @@ function errorText(value: unknown) { return value instanceof Error ? value.messa
 function showError(value: unknown) { error.value = errorText(value); window.setTimeout(() => { error.value = '' }, 6000) }
 function receiptBlockClasses(block: ReceiptBlock) { return [`align-${block.align}`, `size-${block.size}`, { 'is-bold': block.bold }] }
 function paymentName(method: PaymentMethod) { return ({ cash: 'เงินสด', transfer: 'โอน/QR', credit_card: 'บัตรเครดิต', cheque: 'เช็ค', mixed: 'เงินสด+โอน' })[method] }
-function historyStatus(status: LocalSaleHistory['status']) { return ({ pending: 'รอส่ง', syncing: 'กำลังส่ง', synced: 'ส่งแล้ว', failed: 'ส่งไม่สำเร็จ', needs_review: 'รอตรวจสอบ' })[status] }
+function historyStatus(status: LocalSaleHistory['status']) { return ({ pending: 'รอส่ง', syncing: 'กำลังส่ง', synced: 'ส่งแล้ว', failed: 'ส่งไม่สำเร็จ', needs_review: 'รอตรวจสอบ', void: 'ยกเลิกแล้ว' })[status] }
 function historyReceipt(sale: LocalSaleHistory) {
   lastReceipt.value = { no: sale.receiptNo, items: sale.items, total: sale.total, method: sale.method, paid: sale.paid, change: sale.change, printedAt: new Date(sale.printedAt).toLocaleString('th-TH'), provisional: sale.status !== 'synced' }
   selectedHistory.value = sale
@@ -222,6 +222,9 @@ async function submitVoid() {
     if (voidMode.value === 'void') {
       const result = await api.voidReceipt({ ...approval, shift_id: shift.value.id })
       flash(result.message || `ยกเลิกบิล ${sale.receiptNo} แล้ว`)
+      await markSaleVoided(sale.id)
+      sale.status = 'void'
+      await refreshLocalSales()
     } else {
       const items = sale.items
         .map((line, index) => ({ product_id: line.id, qty: Number(returnQty.value[index] || 0) }))

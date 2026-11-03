@@ -1455,7 +1455,11 @@ class PosController extends Controller
     {
         $rawBranchCode = $shift->branch?->code ?? Branch::find($shift->branch_id)?->code ?? sprintf('%04d', $shift->branch_id);
         $branchCode = substr(preg_replace('/[^A-Za-z0-9]/', '', (string) $rawBranchCode) ?: sprintf('%04d', $shift->branch_id), 0, 8);
-        $prefix = 'CS'.$branchCode.now()->format('Ymd');
+        // เลขเครื่องอยู่ในเลขบิล เดิมทุกเครื่องในสาขารันชุดเดียวกัน (CSB00120261103003 ซ้ำข้ามเครื่อง)
+        $terminalCode = (string) ($shift->terminal?->code ?? PosTerminal::find($shift->pos_terminal_id)?->code ?? '');
+        $terminal = preg_match('/-(\d+)$/', $terminalCode, $match) ? $match[1]
+            : (substr(preg_replace('/[^A-Za-z0-9]/', '', $terminalCode), 0, 3) ?: (string) $shift->pos_terminal_id);
+        $prefix = 'CS'.$branchCode.'-'.$terminal.'-'.now()->format('Ymd').'-';
         $lastReceiptNo = PosReceipt::where('pos_terminal_id', $shift->pos_terminal_id)
             ->where('receipt_no', 'like', $prefix.'%')
             ->orderByDesc('receipt_no')
