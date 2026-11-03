@@ -87,6 +87,9 @@ export interface Product {
   is_flash_sale?: boolean
   margin_percent?: number
   margin_warning?: boolean
+  /** สินค้าชั่ง: เลือกจากการค้นหาแล้วต้องใส่น้ำหนัก */
+  is_scale?: boolean
+  scale_plu?: string | null
   barcodes: Barcode[]
 }
 

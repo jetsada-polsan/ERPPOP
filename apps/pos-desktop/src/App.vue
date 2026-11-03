@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import mpmLogo from './assets/mpm-logo.jpg'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, CircleHelp, Cloud, CloudOff, CreditCard, FileText, FolderOpen, History, LogOut, Minus, PackageSearch, PauseCircle, Plus, Printer, QrCode, ReceiptText, RefreshCw, ScanLine, Search, Settings, ShoppingCart, Trash2, UserRound, Wifi, X } from 'lucide-vue-next'
+import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, CircleHelp, Cloud, CloudOff, CreditCard, FileText, FolderOpen, History, LogOut, Minus, PackageSearch, PauseCircle, Plus, Printer, QrCode, ReceiptText, RefreshCw, Scale, ScanLine, Search, Settings, ShoppingCart, Trash2, UserRound, Wifi, X } from 'lucide-vue-next'
 import { check } from '@tauri-apps/plugin-updater'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { api, connect, pairDevice, PosUnreachableError, setServerUrl } from './lib/api'
@@ -46,7 +46,7 @@ const queueError = ref('')
 const error = ref('')
 const notice = ref('')
 const busy = ref(false)
-const modal = ref<'cashier' | 'selectCashier' | 'changePin' | 'shift' | 'closeShift' | 'payment' | 'settings' | 'holdBill' | 'heldBills' | 'history' | 'guide' | null>(null)
+const modal = ref<'cashier' | 'selectCashier' | 'changePin' | 'shift' | 'closeShift' | 'payment' | 'settings' | 'holdBill' | 'heldBills' | 'history' | 'guide' | 'weight' | null>(null)
 const setupUrl = ref('https://erp.popstarcenter.com')
 const setupToken = ref('')
 const pairCode = ref('')
@@ -67,6 +67,9 @@ const lastReceipt = ref<{ no: string; items: CartLine[]; discount?: number; tota
 const heldBills = ref<HeldBill[]>([])
 const holdLabel = ref('')
 const cashDropAmount = ref(0)
+// สินค้าชั่งที่เลือกจากการค้นหา/พิมพ์ SKU ต้องใส่น้ำหนักก่อน (ป้ายตาชั่งมีราคาในตัวแล้ว ไม่ต้องถาม)
+const weighProduct = ref<Product | null>(null)
+const weighQty = ref<number | null>(null)
 const cashDropReference = ref('')
 const localHealth = ref<LocalDbHealth | null>(null)
 const localHealthBusy = ref(false)
@@ -161,10 +164,29 @@ async function refreshHistory() { saleHistoryRows.value = await saleHistory(hist
 async function refreshLocalSales() { recentSales.value = await saleHistory(30) }
 
 function addProduct(product: Product, barcode?: string, barcodeType?: BarcodeType) {
+  if (product.is_scale && (!barcode || barcode === product.sku_code || barcode === product.scale_plu)) {
+    weighProduct.value = productAtSaleTime(product, new Date(), barcode)
+    weighQty.value = null
+    search.value = ''
+    modal.value = 'weight'
+    return
+  }
   const existing = cart.value.find((line) => line.id === product.id && line.scannedBarcode === barcode)
   if (existing) existing.qty = Number((existing.qty + 1).toFixed(4))
   else cart.value.push({ ...product, qty: 1, scannedBarcode: barcode, scannedBarcodeType: barcodeType })
   search.value = ''
+  nextTick(() => scanner.value?.focus())
+}
+
+function addWeighed() {
+  const product = weighProduct.value
+  const qty = Number(weighQty.value)
+  if (!product || !(qty > 0)) return flash('ใส่น้ำหนักมากกว่า 0')
+  if (!(Number(product.pos_price) > 0)) return flash(`สินค้าชั่ง ${product.sku_code} ยังไม่ได้ตั้งราคาต่อหน่วย`)
+  // ชั่งหนึ่งครั้ง = หนึ่งบรรทัด ไม่รวมกับถุงก่อนหน้า เหมือนยิงป้ายตาชั่ง
+  cart.value.push({ ...product, qty: Number(qty.toFixed(4)) })
+  modal.value = null
+  weighProduct.value = null
   nextTick(() => scanner.value?.focus())
 }
 
@@ -889,6 +911,13 @@ onUnmounted(() => {
         <label v-if="cashDropAmount > 0">เลขอ้างอิง / ซองเงิน<input v-model="cashDropReference"></label>
         <button v-if="cashDropAmount > 0" type="button" class="secondary" :disabled="busy" @click="recordCashDrop">บันทึกนำส่งเงิน</button>
         <button class="primary" :disabled="busy || pendingCount > 0">ยืนยันปิดกะ</button>
+      </form>
+
+      <form v-else-if="modal === 'weight' && weighProduct" class="modal compact" @submit.prevent="addWeighed">
+        <div class="modal-head"><div><Scale/><span><strong>{{ weighProduct.name_th }}</strong><small>{{ weighProduct.sku_code }} · ฿{{ money(weighProduct.pos_price) }} ต่อหน่วย</small></span></div><button type="button" @click="modal = null"><X/></button></div>
+        <label>น้ำหนัก<input v-model.number="weighQty" type="number" min="0.001" step="0.001" inputmode="decimal" required autofocus placeholder="เช่น 0.350"></label>
+        <div class="payment-total"><span>ราคา</span><strong>฿{{ money(Number(weighQty || 0) * Number(weighProduct.pos_price)) }}</strong></div>
+        <button class="primary">ใส่ตะกร้า</button>
       </form>
 
       <form v-else-if="modal === 'holdBill'" class="modal compact" @submit.prevent="holdBill">
