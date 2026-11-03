@@ -9,7 +9,7 @@ on:
         description: preview or apply
         required: true
         type: choice
-        options: [preview, apply, report]
+        options: [preview, apply, report, legacy]
         default: preview
 
 permissions:
@@ -35,5 +35,14 @@ jobs:
             CMD="wc -l storage/app/barcode-classify.csv && head -n 80 storage/app/barcode-classify.csv"
           else
             CMD="php artisan erp:classify-barcodes --report=storage/app/barcode-classify.csv && head -n 40 storage/app/barcode-classify.csv"
+          fi
+          if [ "$MODE" = legacy ]; then
+            # อ่านอย่างเดียว: บาร์โค้ดที่เป็น LEGACY พร้อม SKU ชื่อสินค้า และวันที่
+            ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "cd '${{ vars.APP_DIR }}' && php artisan tinker" <<'PHP'
+          $rows = DB::table('product_barcodes as b')->join('products as p', 'p.id', '=', 'b.product_id')->where('b.barcode_type', 'LEGACY')->orderBy('b.id')->get(['b.id', 'b.barcode', 'p.sku_code', 'p.name_th', 'b.source', 'b.created_at', 'b.updated_at']);
+          echo 'LEGACY rows: '.$rows->count().PHP_EOL;
+          foreach ($rows as $r) { echo implode(' | ', [$r->id, $r->barcode, $r->sku_code, $r->name_th, $r->source, $r->created_at, $r->updated_at]).PHP_EOL; }
+          PHP
+            exit 0
           fi
           ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "cd '${{ vars.APP_DIR }}' && $CMD"
