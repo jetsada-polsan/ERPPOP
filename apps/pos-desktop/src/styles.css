@@ -289,6 +289,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .history-detail-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .history-detail-head strong { font-size: 14px; }
 .history-detail-head .secondary { width: auto; display: inline-flex; align-items: center; gap: 5px; margin-top: 0; padding: 8px 10px; }
+.history-actions { display: inline-flex; gap: 6px; }
+.history-detail-head .history-actions svg { width: 15px; }
+.member-field small { display: block; margin-top: 4px; color: #1f7a4d; font-size: 12px; }
+.return-line { display: grid; grid-template-columns: 1fr 90px; align-items: center; gap: 8px; font-size: 12px; }
 .history-item, .history-detail-total { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 5px 0; color: #52616e; font-size: 11px; }
 .history-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .history-item b { flex: none; }

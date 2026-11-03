@@ -54,7 +54,16 @@ export interface Cashier {
   code: string
   name: string
   branch_id?: number
+  role?: 'manager' | 'cashier'
   offline_credential?: OfflineCredential
+}
+
+export interface Member {
+  id: number
+  member_code: string
+  name: string
+  phone?: string | null
+  points?: number
 }
 export interface Shift {
   id: number
@@ -143,6 +152,7 @@ export interface CheckoutPayload {
   method: PaymentMethod
   payment_ref?: string
   payment_confirmed: boolean
+  member_id?: number
   cash_received?: number
   cash_amount?: number
   transfer_amount?: number

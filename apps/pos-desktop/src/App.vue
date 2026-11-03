@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import mpmLogo from './assets/mpm-logo.jpg'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, CircleHelp, Cloud, CloudOff, CreditCard, FileText, FolderOpen, History, LogOut, Minus, PackageSearch, PauseCircle, Plus, Printer, QrCode, ReceiptText, RefreshCw, Scale, ScanLine, Search, Settings, ShoppingCart, Trash2, UserRound, Wifi, X } from 'lucide-vue-next'
+import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, CircleHelp, Cloud, CloudOff, CreditCard, FileText, FolderOpen, History, LogOut, Minus, PackageSearch, PauseCircle, Plus, Printer, QrCode, ReceiptText, RefreshCw, RotateCcw, Scale, ScanLine, Search, Settings, ShoppingCart, Trash2, UserRound, Wifi, X } from 'lucide-vue-next'
 import { check } from '@tauri-apps/plugin-updater'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { api, connect, pairDevice, PosUnreachableError, setServerUrl } from './lib/api'
@@ -10,7 +10,7 @@ import { productAtSaleTime } from './lib/catalog'
 import { resolveScan, type BarcodeType } from './lib/barcode'
 import { priceCart } from './lib/pricing'
 import { syncCheckoutQueue } from './lib/sync'
-import type { CartLine, Cashier, DeviceProfile, HeldBill, LocalSaleHistory, LocalStorageStatus, PaymentMethod, Product, QtyPromotion, QueueItem, ReceiptBlock, ReceiptTemplate, Shift } from './lib/types'
+import type { Member, CartLine, Cashier, DeviceProfile, HeldBill, LocalSaleHistory, LocalStorageStatus, PaymentMethod, Product, QtyPromotion, QueueItem, ReceiptBlock, ReceiptTemplate, Shift } from './lib/types'
 
 const DEFAULT_RECEIPT_TEMPLATE: ReceiptTemplate = {
   paper_width: 80,
@@ -46,7 +46,7 @@ const queueError = ref('')
 const error = ref('')
 const notice = ref('')
 const busy = ref(false)
-const modal = ref<'cashier' | 'selectCashier' | 'changePin' | 'shift' | 'closeShift' | 'payment' | 'settings' | 'holdBill' | 'heldBills' | 'history' | 'guide' | 'weight' | null>(null)
+const modal = ref<'cashier' | 'selectCashier' | 'changePin' | 'shift' | 'closeShift' | 'payment' | 'settings' | 'holdBill' | 'heldBills' | 'history' | 'guide' | 'weight' | 'void' | null>(null)
 const setupUrl = ref('https://erp.popstarcenter.com')
 const setupToken = ref('')
 const pairCode = ref('')
@@ -67,6 +67,16 @@ const lastReceipt = ref<{ no: string; items: CartLine[]; discount?: number; tota
 const heldBills = ref<HeldBill[]>([])
 const holdLabel = ref('')
 const cashDropAmount = ref(0)
+// ยกเลิกบิล / รับคืน ต้องให้หัวหน้าใส่ PIN เซิร์ฟเวอร์ตรวจซ้ำทุกครั้ง
+const voidMode = ref<'void' | 'return'>('void')
+const voidReason = ref('')
+const voidApproverId = ref<number | null>(null)
+const voidApproverPin = ref('')
+const managers = ref<Cashier[]>([])
+const returnQty = ref<Record<string, number>>({})
+// สมาชิก: ค้นด้วยเบอร์โทรหรือรหัสตอนรับชำระ (ต้องออนไลน์)
+const memberQuery = ref('')
+const member = ref<Member | null>(null)
 // สินค้าชั่งที่เลือกจากการค้นหา/พิมพ์ SKU ต้องใส่น้ำหนักก่อน (ป้ายตาชั่งมีราคาในตัวแล้ว ไม่ต้องถาม)
 const weighProduct = ref<Product | null>(null)
 const weighQty = ref<number | null>(null)
@@ -188,6 +198,53 @@ function addWeighed() {
   modal.value = null
   weighProduct.value = null
   nextTick(() => scanner.value?.focus())
+}
+
+async function openVoid(mode: 'void' | 'return') {
+  if (!selectedHistory.value || selectedHistory.value.status !== 'synced') return flash('บิลนี้ยังไม่ส่งเข้า ERP ยกเลิกหรือคืนไม่ได้')
+  if (!navigator.onLine) return flash('ต้องออนไลน์ก่อนถึงจะยกเลิกหรือคืนสินค้าได้')
+  try { managers.value = (await api.cashiers()).filter((row) => row.role === 'manager') } catch (e) { return showError(e) }
+  if (!managers.value.length) return flash('สาขานี้ยังไม่มีหัวหน้าที่อนุมัติได้')
+  voidMode.value = mode
+  voidReason.value = ''
+  voidApproverId.value = managers.value.length === 1 ? managers.value[0].id : null
+  voidApproverPin.value = ''
+  returnQty.value = {}
+  modal.value = 'void'
+}
+
+async function submitVoid() {
+  const sale = selectedHistory.value
+  if (!sale || !shift.value || !voidApproverId.value) return
+  const approval = { receipt_no: sale.receiptNo, reason: voidReason.value.trim(), approver_id: voidApproverId.value, approver_pin: voidApproverPin.value, terminal_code: profile.value?.terminalCode || undefined }
+  busy.value = true
+  try {
+    if (voidMode.value === 'void') {
+      const result = await api.voidReceipt({ ...approval, shift_id: shift.value.id })
+      flash(result.message || `ยกเลิกบิล ${sale.receiptNo} แล้ว`)
+    } else {
+      const items = sale.items
+        .map((line, index) => ({ product_id: line.id, qty: Number(returnQty.value[index] || 0) }))
+        .filter((line) => line.qty > 0)
+      if (!items.length) { flash('ใส่จำนวนที่คืนอย่างน้อย 1 รายการ'); return }
+      const result = await api.returnReceipt({ ...approval, shift_id: shift.value.id, refund_method: 'cash', items })
+      flash(`${result.message} (${result.return_no})`)
+    }
+    modal.value = null
+  } catch (e) { showError(e) } finally {
+    voidApproverPin.value = ''
+    busy.value = false
+  }
+}
+
+async function findMember() {
+  const q = memberQuery.value.trim()
+  if (!q) { member.value = null; return }
+  try {
+    const rows = await api.searchMembers(q)
+    member.value = rows[0] || null
+    if (!member.value) flash(`ไม่พบสมาชิก ${q}`)
+  } catch (e) { showError(e) }
 }
 
 function repriceCartForCurrentSchedule() {
@@ -540,6 +597,8 @@ async function holdBill() {
     })
     cart.value = []
     billDiscount.value = 0
+    member.value = null
+    memberQuery.value = ''
     modal.value = null
     flash('พักบิลไว้ส่วนกลางแล้ว')
   } catch (e) { showError(e) } finally { busy.value = false }
@@ -606,6 +665,7 @@ async function checkout() {
   if (!profile.value || !cashier.value || !shift.value || !cart.value.length) return
   repriceCartForCurrentSchedule()
   if (paymentMethod.value === 'cash' && cashReceived.value < subtotal.value) { showError('ยอดเงินสดที่รับไม่ครบ'); return }
+  if (paymentMethod.value === 'mixed' && !(cashReceived.value > 0 && cashReceived.value < subtotal.value)) { showError('จ่ายผสม: เงินสดต้องมากกว่า 0 และน้อยกว่ายอดบิล ที่เหลือเป็นยอดโอน'); return }
   const id = `${profile.value.terminalCode || 'POS'}:SALE:${crypto.randomUUID()}`
   const soldItems = cart.value.map((line) => ({ ...line }))
   const soldTotal = subtotal.value
@@ -618,8 +678,10 @@ async function checkout() {
     method: paymentMethod.value,
     payment_ref: paymentRef.value || undefined,
     payment_confirmed: paymentMethod.value !== 'cash',
-    cash_received: paymentMethod.value === 'cash' ? cashReceived.value : undefined,
-    change_amount: paymentMethod.value === 'cash' ? change.value : undefined,
+    cash_received: paymentMethod.value === 'cash' || paymentMethod.value === 'mixed' ? cashReceived.value : undefined,
+    change_amount: paymentMethod.value === 'cash' ? change.value : paymentMethod.value === 'mixed' ? 0 : undefined,
+    ...(paymentMethod.value === 'mixed' ? { cash_amount: cashReceived.value, transfer_amount: Number((subtotal.value - cashReceived.value).toFixed(2)) } : {}),
+    ...(member.value ? { member_id: member.value.id } : {}),
     vat_mode: 'included' as const,
     ...(pricing.value.manualDiscount > 0 ? {
       manual_discount_amount: pricing.value.manualDiscount,
@@ -913,6 +975,17 @@ onUnmounted(() => {
         <button class="primary" :disabled="busy || pendingCount > 0">ยืนยันปิดกะ</button>
       </form>
 
+      <form v-else-if="modal === 'void' && selectedHistory" class="modal compact" @submit.prevent="submitVoid">
+        <div class="modal-head"><div><RotateCcw/><span><strong>{{ voidMode === 'void' ? 'ยกเลิกบิล' : 'รับคืนสินค้า' }} {{ selectedHistory.receiptNo }}</strong><small>{{ voidMode === 'void' ? 'ยกเลิกได้เฉพาะบิลวันนี้ในกะที่เปิดอยู่' : 'ใบรับคืนต้องอนุมัติใน ERP ก่อนคืนเงิน' }}</small></span></div><button type="button" @click="modal = null"><X/></button></div>
+        <template v-if="voidMode === 'return'">
+          <label v-for="(line, index) in selectedHistory.items" :key="`ret-${index}`" class="return-line">{{ line.name_th }} (ขาย {{ line.qty }})<input v-model.number="returnQty[index]" type="number" min="0" :max="line.qty" step="any" placeholder="0"></label>
+        </template>
+        <label>เหตุผล<input v-model="voidReason" required maxlength="500" autofocus></label>
+        <label>หัวหน้าที่อนุมัติ<select v-model.number="voidApproverId" required><option v-for="row in managers" :key="row.id" :value="row.id">{{ row.name }}</option></select></label>
+        <label>PIN หัวหน้า<input v-model="voidApproverPin" type="password" inputmode="numeric" required pattern="\d{4,20}" autocomplete="off"></label>
+        <button class="primary danger-action" :disabled="busy">{{ voidMode === 'void' ? 'ยืนยันยกเลิกบิล' : 'บันทึกรับคืน' }}</button>
+      </form>
+
       <form v-else-if="modal === 'weight' && weighProduct" class="modal compact" @submit.prevent="addWeighed">
         <div class="modal-head"><div><Scale/><span><strong>{{ weighProduct.name_th }}</strong><small>{{ weighProduct.sku_code }} · ฿{{ money(weighProduct.pos_price) }} ต่อหน่วย</small></span></div><button type="button" @click="modal = null"><X/></button></div>
         <label>น้ำหนัก<input v-model.number="weighQty" type="number" min="0.001" step="0.001" inputmode="decimal" required autofocus placeholder="เช่น 0.350"></label>
@@ -952,7 +1025,7 @@ onUnmounted(() => {
           <div v-if="!saleHistoryRows.length" class="empty-state history-empty"><History/><strong>ยังไม่มีประวัติในช่วงเวลานี้</strong><span>บิลที่ชำระแล้วจะถูกเก็บไว้ในเครื่องอัตโนมัติ</span></div>
         </div>
         <div v-if="selectedHistory" class="history-detail">
-          <div class="history-detail-head"><strong>{{ selectedHistory.receiptNo }}</strong><button type="button" class="secondary" @click="printLastReceipt"><Printer/>พิมพ์ซ้ำ</button></div>
+          <div class="history-detail-head"><strong>{{ selectedHistory.receiptNo }}</strong><span class="history-actions"><button type="button" class="secondary" @click="printLastReceipt"><Printer/>พิมพ์ซ้ำ</button><button v-if="selectedHistory.status === 'synced'" type="button" class="secondary" @click="openVoid('return')"><RotateCcw/>คืนสินค้า</button><button v-if="selectedHistory.status === 'synced'" type="button" class="secondary danger-action" @click="openVoid('void')"><X/>ยกเลิกบิล</button></span></div>
           <div v-for="line in selectedHistory.items" :key="`${selectedHistory.id}-${line.id}-${line.scannedBarcode || ''}`" class="history-item"><span>{{ line.name_th }} × {{ line.qty }}</span><b>฿{{ money(line.qty * line.pos_price) }}</b></div>
           <div class="history-detail-total"><span>ยอดสุทธิ</span><strong>฿{{ money(selectedHistory.total) }}</strong></div>
           <small v-if="selectedHistory.status !== 'synced'" class="history-warning">บิลนี้ยังไม่ยืนยันเลขที่จาก ERP จะแสดงเป็นรายการชั่วคราวจนกว่าจะซิงก์สำเร็จ</small>
@@ -962,12 +1035,21 @@ onUnmounted(() => {
       <form v-else-if="modal === 'payment'" class="modal payment-modal" @submit.prevent="checkout">
         <div class="modal-head"><div><Banknote/><span><strong>รับชำระเงิน</strong><small>{{ cart.length }} รายการ · {{ totalQty }} ชิ้น</small></span></div><button type="button" @click="modal = null"><X/></button></div>
         <div class="payment-total"><span>ยอดที่ต้องชำระ</span><strong>฿{{ money(subtotal) }}</strong></div>
-        <div class="payment-methods"><button v-for="method in (['cash','transfer','credit_card','cheque'] as PaymentMethod[])" :key="method" type="button" :class="{ active: paymentMethod === method }" @click="paymentMethod = method"><Banknote v-if="method === 'cash'"/><QrCode v-else-if="method === 'transfer'"/><CreditCard v-else-if="method === 'credit_card'"/><FileText v-else/>{{ ({cash:'เงินสด',transfer:'โอน/QR',credit_card:'บัตรเครดิต',cheque:'เช็ค'} as any)[method] }}</button></div>
+        <div class="payment-methods"><button v-for="method in (['cash','transfer','mixed','credit_card','cheque'] as PaymentMethod[])" :key="method" type="button" :class="{ active: paymentMethod === method }" @click="paymentMethod = method"><Banknote v-if="method === 'cash'"/><QrCode v-else-if="method === 'transfer' || method === 'mixed'"/><CreditCard v-else-if="method === 'credit_card'"/><FileText v-else/>{{ ({cash:'เงินสด',transfer:'โอน/QR',mixed:'เงินสด+โอน',credit_card:'บัตรเครดิต',cheque:'เช็ค'} as any)[method] }}</button></div>
         <template v-if="paymentMethod === 'cash'">
           <label class="payment-field">รับเงินสด<input v-model.number="cashReceived" type="number" min="0" step="0.01" autofocus></label>
           <div class="tender-grid"><button type="button" @click="setQuickCash('exact')">รับพอดี</button><button type="button" :disabled="subtotal > 100" @click="setQuickCash(100)">100</button><button type="button" :disabled="subtotal > 500" @click="setQuickCash(500)">500</button><button type="button" :disabled="subtotal > 1000" @click="setQuickCash(1000)">1,000</button></div>
         </template>
+        <template v-else-if="paymentMethod === 'mixed'">
+          <label class="payment-field">เงินสด<input v-model.number="cashReceived" type="number" min="0" step="0.01" autofocus></label>
+          <div class="change"><span>ยอดโอน</span><strong>฿{{ money(Math.max(0, subtotal - cashReceived)) }}</strong></div>
+          <label class="payment-field">เลขอ้างอิงการโอน<input v-model="paymentRef" required></label>
+        </template>
         <label v-else class="payment-field">เลขอ้างอิงการชำระ<input v-model="paymentRef" required autofocus></label>
+        <div class="member-field">
+          <label class="payment-field">สมาชิก (เบอร์โทร/รหัส)<input v-model="memberQuery" inputmode="tel" placeholder="ไม่ใส่ก็ได้" @keydown.enter.prevent="findMember" @blur="findMember"></label>
+          <small v-if="member">{{ member.name }} · {{ member.member_code }}<template v-if="member.points != null"> · {{ member.points }} แต้ม</template></small>
+        </div>
         <div v-if="paymentMethod === 'cash'" class="change"><span>เงินทอน</span><strong>฿{{ money(change) }}</strong></div>
         <button class="primary pay-confirm" :disabled="busy"><CheckCircle2/>{{ online ? 'ยืนยันและออกบิล' : 'ยืนยันบิลออฟไลน์' }}</button>
       </form>
