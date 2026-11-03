@@ -301,6 +301,13 @@ async function refreshQueue() {
   const waiting = (await queueItems()).filter((item) => item.status !== 'synced')
   pendingCount.value = waiting.length
   queueError.value = waiting.find((item) => item.error)?.error?.slice(0, 160) || ''
+  // ERP ไม่รับบิลเพราะยืนยันตัวแคชเชียร์ไม่ตรง/หมดอายุ: ให้ใส่ PIN ใหม่ทันที ไม่ปล่อยบิลค้างทั้งกะ
+  // บิลในคิวกับสินค้าในตะกร้ายังอยู่ ใส่ PIN แล้วระบบส่งซ้ำเอง
+  if (cashier.value && !modal.value && /รหัสพนักงานขาย|ยืนยัน PIN|ยืนยันตัวตน/.test(queueError.value)) {
+    cashierPin.value = ''
+    modal.value = 'cashier'
+    flash('ERP ขอให้ยืนยัน PIN อีกครั้ง บิลที่ค้างจะส่งให้หลังเข้าระบบ')
+  }
 }
 
 async function syncAll() {

@@ -551,3 +551,5 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .pin-pad .pin-action { font-size: 16px; color: #52616e; }
 .pin-input-hidden { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
 .pin-title { display: block; text-align: center; font-size: 20px; margin-top: 6px; }
+/* ตัวหนังสือใหญ่ขึ้นแล้ว หัวหน้าจอห้ามตัดบรรทัด */
+.brand small, .brand strong, .shift-action span, .topbar button span { white-space: nowrap; }
