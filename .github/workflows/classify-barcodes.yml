@@ -9,7 +9,7 @@ on:
         description: preview or apply
         required: true
         type: choice
-        options: [preview, apply, report, legacy]
+        options: [preview, apply, report, legacy, before]
         default: preview
 
 permissions:
@@ -35,6 +35,27 @@ jobs:
             CMD="wc -l storage/app/barcode-classify.csv && head -n 80 storage/app/barcode-classify.csv"
           else
             CMD="php artisan erp:classify-barcodes --report=storage/app/barcode-classify.csv && head -n 40 storage/app/barcode-classify.csv"
+          fi
+          if [ "$MODE" = before ]; then
+            # อ่านอย่างเดียว: ประเภทของแถว LEGACY ตอนนี้ ใน backup ที่สำรองไว้ก่อนบันทึก
+            ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "cd '${{ vars.APP_DIR }}' && bash -s" <<'SH'
+          set -e
+          f=storage/app/backups/erp-db-20261102-163031.sql.gz
+          ls -la "$f"
+          zcat "$f" | awk '/^COPY public.product_barcodes /{print; on=1; next} on && $0=="\\."{exit} on' > /tmp/pb-before.tsv
+          head -1 /tmp/pb-before.tsv
+          echo "rows in backup: $(($(wc -l < /tmp/pb-before.tsv) - 1))"
+          php artisan tinker --execute="echo DB::table('product_barcodes')->where('barcode_type','LEGACY')->pluck('id')->implode(PHP_EOL);" > /tmp/pb-legacy-ids.txt
+          echo "legacy now: $(wc -l < /tmp/pb-legacy-ids.txt)"
+          col=$(head -1 /tmp/pb-before.tsv | sed 's/.*(//; s/).*//' | tr ',' '\n' | sed 's/ //g' | grep -n '^barcode_type$' | cut -d: -f1)
+          echo "barcode_type column: $col"
+          echo "types before of rows that are LEGACY now:"
+          tail -n +2 /tmp/pb-before.tsv | awk -F'\t' -v c="$col" 'NR==FNR{ids[$1]=1; next} ($1 in ids){print $c}' /tmp/pb-legacy-ids.txt - | sort | uniq -c
+          echo "all types in backup:"
+          tail -n +2 /tmp/pb-before.tsv | awk -F'\t' -v c="$col" '{print $c}' | sort | uniq -c
+          rm -f /tmp/pb-before.tsv /tmp/pb-legacy-ids.txt
+          SH
+            exit 0
           fi
           if [ "$MODE" = legacy ]; then
             # อ่านอย่างเดียว: บาร์โค้ดที่เป็น LEGACY พร้อม SKU ชื่อสินค้า และวันที่
