@@ -558,3 +558,60 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .close-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
 .close-actions .primary { grid-column: 1 / -1; margin-top: 0; }
 .link-button { display: block; margin: 10px auto 0; border: 0; background: none; color: #52616e; font-size: 13px; text-decoration: underline; }
+
+/* ===== หน้าตาแบบโปรแกรม Desktop (ตาม JET POS Python รุ่นเดิม) =====
+   แถบบนน้ำเงินเข้ม · ตะกร้าเป็นตารางมีหัวคอลัมน์ · กล่องยอดรวมน้ำเงินเข้มตัวเลขใหญ่ */
+:root {
+  --desk-navy: #0f4c75;
+  --desk-blue: #1585c0;
+  --desk-blue-ink: #147db5;
+  --desk-soft: #eef4f9;
+  --desk-bg: #f3f7fb;
+  --desk-border: #dbe7ef;
+  --desk-text: #1d3b52;
+  --primary: #147db5;
+  --primary-strong: #0f4c75;
+  --canvas: #f3f7fb;
+}
+.app-shell { background: var(--desk-bg); }
+.topbar { height: 64px; background: var(--desk-navy); border-bottom: 3px solid var(--desk-blue); box-shadow: none; color: #fff; }
+.topbar .brand { color: #fff; }
+.topbar .brand-logo { background: #fff; border-radius: 6px; padding: 2px; }
+.topbar .brand strong, .topbar .brand small { color: #fff; }
+.topbar .brand small { opacity: .75; }
+.topbar .terminal-context span, .topbar .terminal-context small { color: rgba(255, 255, 255, .72); }
+.topbar .terminal-context strong { color: #fff; }
+.topbar .icon-button, .topbar .shift-action, .topbar .status {
+  background: rgba(255, 255, 255, .1); border: 1px solid rgba(255, 255, 255, .35); color: #fff; border-radius: 7px;
+}
+.topbar .icon-button:hover, .topbar .shift-action:hover, .topbar .status:hover { background: rgba(255, 255, 255, .22); border-color: #fff; color: #fff; }
+.topbar .status.online, .topbar .status.ok { border-color: #bbf7d0; color: #bbf7d0; background: rgba(20, 122, 85, .35); }
+
+.catalog { background: var(--desk-bg); }
+.product-tile { border-radius: 7px; border-color: var(--desk-border); }
+.product-tile:hover { border-color: var(--desk-blue); background: var(--desk-soft); box-shadow: none; transform: none; }
+
+.cart-panel { border-left: 1px solid var(--desk-border); box-shadow: none; }
+.cart-title { height: 52px; background: var(--desk-navy); color: #fff; border-bottom: 0; }
+.cart-title small, .cart-title > span, .cart-title > div > span { color: rgba(255, 255, 255, .8); }
+.cart-title strong { color: #fff; }
+.cart-title .icon-button { background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .4); color: #fff; }
+.cart-columns {
+  display: grid; grid-template-columns: 22px minmax(0, 1fr) auto 82px 27px; gap: 8px; padding: 6px 13px;
+  background: var(--desk-soft); border-bottom: 1px solid var(--desk-border); color: var(--desk-text); font-size: 13px; font-weight: 800;
+}
+.cart-columns span:nth-child(4) { text-align: right; }
+.cart-line { min-height: 54px; border-bottom: 1px solid var(--desk-border); }
+.cart-line:nth-child(even) { background: #fafcfe; }
+
+.totals { background: var(--desk-navy); color: #fff; border-top: 0; }
+.totals > div { color: rgba(255, 255, 255, .8); }
+.totals .grand { border-top-color: rgba(255, 255, 255, .25); color: #fff; }
+.totals .grand b { color: #fff; font-size: 34px; }
+.totals .promo-row { color: #bbf7d0; }
+.pay-button { margin: 10px 14px; background: #158662; box-shadow: none; }
+.pay-button:hover { background: #0f6b4e; }
+.primary { background: var(--desk-blue-ink); }
+.primary:hover { background: var(--desk-navy); }
+.modal-head { border-bottom: 1px solid var(--desk-border); }
+.topbar .status.offline { border-color: #fecaca; color: #fecaca; background: rgba(201, 33, 45, .35); }

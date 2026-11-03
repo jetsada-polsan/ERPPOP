@@ -940,6 +940,7 @@ onUnmounted(() => {
           <span><small>ยอดขาย</small><strong>฿{{ money(todayLocalTotal) }}</strong></span>
           <span><small>เฉลี่ย/บิล</small><strong>฿{{ money(todayLocalAverage) }}</strong></span>
         </div>
+        <div v-if="cart.length" class="cart-columns"><span>#</span><span>สินค้า</span><span>จำนวน</span><span>รวม</span><span></span></div>
         <div class="cart-lines">
           <div v-for="(line, index) in cart" :key="`${line.id}-${line.scannedBarcode || ''}`" class="cart-line">
             <span class="line-seq">{{ index + 1 }}</span>
