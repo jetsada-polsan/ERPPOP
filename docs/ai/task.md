@@ -2313,3 +2313,22 @@ pending
 - `php artisan test --filter='StockBalanceReportTest|ReportSmokeTest' --no-coverage`: 10 tests ผ่าน, 1 skipped
 - `php artisan view:cache` ผ่าน
 - `git diff --check` ผ่าน
+
+# Handoff — 2026-11-03 (มาตรฐานงานพิมพ์รายงานและเอกสาร)
+
+## ทำอะไรไป
+- ตรวจเส้นทางงานพิมพ์ของรายงาน เอกสาร A4/A5 ใบขึ้นของ และสลิปเงินเดือน โดยคงใบเสร็จความร้อน/ฉลากตามขนาดเฉพาะของเดิม
+- แก้สาเหตุหน้าว่างท้ายเอกสาร: shared print theme เคยบังคับความสูง A4 เต็ม 297mm ทั้งที่ `@page` มีขอบกระดาษ
+- กำหนดมาตรฐาน A4, หัวตารางซ้ำทุกหน้า และห้ามแยกแถวลายเซ็น/ยอดรวมกลางหน้าให้เอกสารมาตรฐาน
+- โหมดพิมพ์รายงานซ่อนหัว panel ที่ซ้ำกับหัวเอกสาร และยกเลิก scroll/max-height ของตารางเพื่อไม่ให้ข้อมูลถูกตัด
+- ใบขึ้นของพิมพ์ค่าจริงแทน select/input และสลิปเงินเดือนใช้ระยะขอบ/ตารางที่ปลอดภัยกับ A4
+
+## ทดสอบ
+- `php artisan view:cache` ผ่าน
+- `php -d memory_limit=1G vendor/bin/phpunit tests/Feature/PrintablePageSizeTest.php`: 3 tests / 12 assertions ผ่าน
+- `php -d memory_limit=1G vendor/bin/phpunit --filter='ReportSmokeTest|StockBalanceReportTest'`: 10 passed, 1 skipped / 113 assertions
+- `git diff --check` ผ่าน
+- หมายเหตุ: `artisan test` spawn child process ที่กลับไปใช้ memory 128MB; full PHPUnit runner ถูกเริ่มด้วย 1GB แต่ CLI session นี้ตัดการรอผลก่อนมี output จึงไม่ใช้เป็นผลยืนยัน
+
+## งานถัดไป
+- Push commit แล้วรอเจ้าของสั่ง deploy เพื่อเปิด Chrome print preview บน production ตรวจฉบับจริงอีกครั้ง

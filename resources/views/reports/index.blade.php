@@ -820,7 +820,8 @@
         margin: 12mm 10mm 14mm;
     }
     @media print {
-        .app-sidebar, .app-header, .flow-rail, .no-print { display: none !important; }
+        .app-sidebar, .app-header, .flow-rail, .no-print, .rpt-panel-title { display: none !important; }
+        html, body { background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         /* หัวตารางต้องซ้ำทุกหน้า ไม่งั้นหน้าที่ 2 เป็นต้นไปจะเป็นตัวเลขลอย ๆ ไม่มีชื่อคอลัมน์ */
         .report-data-table thead { display: table-header-group; }
         .report-data-table tfoot { display: table-footer-group; }
@@ -829,8 +830,18 @@
         .report-data-table th, .report-data-table td { padding: 3px 5px; }
         .rpt-print-header { page-break-after: avoid; }
         a[href]::after { content: none !important; }   /* ไม่ต้องพ่น URL ต่อท้ายลิงก์ */
-        .flow-report-shell, .rpt-shell { display: block; margin: 0; }
-        .content-card { border: none; box-shadow: none; }
+        .flow-report-shell, .rpt-shell { display: block; min-height: 0 !important; margin: 0; }
+        .rpt-main { padding: 0 !important; }
+        .content-card { border: none; box-shadow: none; overflow: visible !important; }
+        .report-table-wrap {
+            max-height: none !important;
+            overflow: visible !important;
+            padding: 0 !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+        }
+        .report-data-table { border-collapse: collapse !important; }
         .rpt-print-header {
             display: flex;
             justify-content: space-between;

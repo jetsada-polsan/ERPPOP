@@ -63,9 +63,11 @@
 @push('head')
 <style>
     @media print {
+        @page { size: A4 portrait; margin: 14mm; }
         .app-header, .app-sidebar, .payslip-actions { display: none !important; }
-        .app-main { margin: 0 !important; }
-        .content-card { box-shadow: none !important; border: 1px solid #ccc !important; }
+        .app-main { margin: 0 !important; padding: 0 !important; }
+        .content-card { max-width: none !important; box-shadow: none !important; border: 1px solid #94a3b8 !important; }
+        .content-card table tr { break-inside: avoid; page-break-inside: avoid; }
     }
 </style>
 @endpush
