@@ -48,6 +48,12 @@
     .doc-table .price { width: 130px; }
     .doc-table .sum { width: 135px; }
     .doc-table .del { width: 42px; text-align: center; }
+    .qty-control { display: flex; align-items: stretch; }
+    .qty-control .doc-input { min-width: 0; border-radius: 0; }
+    .qty-step { width: 30px; border: 1px solid #cfd8e6; background: #f8fafc; color: #0f766e; font-weight: 900; }
+    .qty-step:first-child { border-radius: 7px 0 0 7px; }
+    .qty-step:last-child { border-radius: 0 7px 7px 0; }
+    .qty-step:hover { background: #dff7f3; }
     .doc-line-total { color: #059669; font-weight: 950; text-align: right; padding-top: 7px; }
     .doc-delete { border: 0; background: #fff1f2; color: #e11d48; width: 30px; height: 30px; border-radius: 7px; }
     .doc-details { margin-top: 10px; }
@@ -102,6 +108,7 @@
     .doc-table .price { width:112px; }
     .doc-table .sum { width:120px; }
     .doc-table .del { width:34px; }
+    .qty-step { border-color:#8f969c; background:linear-gradient(#fff,#ddd); color:#111; }
     .doc-line-total { padding-top:6px; color:#111; font-weight:700; }
     .doc-delete { width:25px; height:25px; border:1px solid #aaa; border-radius:0; background:#eee; color:#b91c1c; }
     .doc-typeahead { top:calc(100% + 1px); border:1px solid #777; border-radius:0; padding:0; box-shadow:4px 6px 18px rgba(0,0,0,.22); }
@@ -253,6 +260,19 @@ function docEntryPage(config) {
         },
         addItem() { this.items.push({ product_id: '', sku_code: '', name_th: '', barcode: '', productQuery: '', qty: 1, unit_price: 0, unit_name: '', is_scale: false, scale_plu: '', lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, on_hand_qty: null, reserved_qty: null, available_qty: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [] }); },
         removeItem(index) { this.items.splice(index, 1); },
+        quantityStep(item) { return item.is_scale ? 0.01 : 1; },
+        adjustQty(index, direction) {
+            const item = this.items[index];
+            const step = this.quantityStep(item);
+            const next = Math.max(step, (Number(item.qty) || 0) + (step * direction));
+            item.qty = Number(next.toFixed(item.is_scale ? 2 : 0));
+        },
+        formatQuantity(item, value) {
+            const quantity = Number(value || 0);
+            return item.is_scale
+                ? quantity.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                : quantity.toLocaleString('th-TH', { maximumFractionDigits: 2 });
+        },
         pickerSearchParams(params) {
             params.set('include_lots', this.config.returnLots ? '1' : '0');
             params.set('branch_id', this.branchId || '');
