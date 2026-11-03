@@ -64,6 +64,8 @@ const countedCash = ref(0)
 const paymentMethod = ref<PaymentMethod>('cash')
 const cashReceived = ref(0)
 const paymentRef = ref('')
+// ERP บังคับเลขท้ายบัญชีผู้โอน 4 หลักทุกบิลโอน/จ่ายผสม ใช้จับคู่กับ statement
+const transferLast4 = ref('')
 const lastReceipt = ref<{ no: string; items: CartLine[]; discount?: number; total: number; method: PaymentMethod; paid: number; change: number; printedAt: string; provisional: boolean } | null>(null)
 const heldBills = ref<HeldBill[]>([])
 const holdLabel = ref('')
@@ -644,6 +646,7 @@ async function holdBill() {
     billDiscount.value = 0
     member.value = null
     memberQuery.value = ''
+    transferLast4.value = ''
     modal.value = null
     flash('พักบิลไว้ส่วนกลางแล้ว')
   } catch (e) { showError(e) } finally { busy.value = false }
@@ -698,6 +701,9 @@ function openPayment() {
   if (!cashier.value) { modal.value = 'cashier'; return }
   if (!shift.value) { modal.value = 'shift'; return }
   repriceCartForCurrentSchedule()
+  // เลขอ้างอิงของบิลก่อนห้ามติดมาบิลใหม่
+  paymentRef.value = ''
+  transferLast4.value = ''
   cashReceived.value = subtotal.value
   modal.value = 'payment'
 }
@@ -710,6 +716,7 @@ async function checkout() {
   if (!profile.value || !cashier.value || !shift.value || !cart.value.length) return
   repriceCartForCurrentSchedule()
   if (paymentMethod.value === 'cash' && cashReceived.value < subtotal.value) { showError('ยอดเงินสดที่รับไม่ครบ'); return }
+  if ((paymentMethod.value === 'transfer' || paymentMethod.value === 'mixed') && !/^\d{4}$/.test(transferLast4.value)) { showError('ใส่เลขท้ายบัญชีผู้โอน 4 หลัก (ดูจากสลิป)'); return }
   if (paymentMethod.value === 'mixed' && !(cashReceived.value > 0 && cashReceived.value < subtotal.value)) { showError('จ่ายผสม: เงินสดต้องมากกว่า 0 และน้อยกว่ายอดบิล ที่เหลือเป็นยอดโอน'); return }
   const id = `${profile.value.terminalCode || 'POS'}:SALE:${crypto.randomUUID()}`
   // ของแถมพิมพ์ในใบเสร็จด้วย ราคา 0
@@ -727,6 +734,7 @@ async function checkout() {
     cashier_id: cashier.value.id,
     method: paymentMethod.value,
     payment_ref: paymentRef.value || undefined,
+    ...(paymentMethod.value === 'transfer' || paymentMethod.value === 'mixed' ? { transfer_account_last4: transferLast4.value } : {}),
     payment_confirmed: paymentMethod.value !== 'cash',
     cash_received: paymentMethod.value === 'cash' || paymentMethod.value === 'mixed' ? cashReceived.value : undefined,
     change_amount: paymentMethod.value === 'cash' ? change.value : paymentMethod.value === 'mixed' ? 0 : undefined,
@@ -1150,6 +1158,7 @@ onUnmounted(() => {
           <label class="payment-field">เลขอ้างอิงการโอน<input v-model="paymentRef" required></label>
         </template>
         <label v-else class="payment-field">เลขอ้างอิงการชำระ<input v-model="paymentRef" required autofocus></label>
+        <label v-if="paymentMethod === 'transfer' || paymentMethod === 'mixed'" class="payment-field">เลขท้ายบัญชีผู้โอน 4 หลัก (ดูจากสลิป)<input v-model="transferLast4" required inputmode="numeric" pattern="\d{4}" maxlength="4" placeholder="เช่น 1234"></label>
         <div class="member-field">
           <label class="payment-field">สมาชิก (เบอร์โทร/รหัส)<input v-model="memberQuery" inputmode="tel" placeholder="ไม่ใส่ก็ได้" @keydown.enter.prevent="findMember" @blur="findMember"></label>
           <small v-if="member">{{ member.name }} · {{ member.member_code }}<template v-if="member.points != null"> · {{ member.points }} แต้ม</template></small>

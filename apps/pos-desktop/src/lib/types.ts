@@ -156,6 +156,7 @@ export interface CheckoutPayload {
   cashier_id: number
   method: PaymentMethod
   payment_ref?: string
+  transfer_account_last4?: string
   payment_confirmed: boolean
   member_id?: number
   /** บอกเซิร์ฟเวอร์ว่าเครื่องนี้คิดโปรต่อบิลแล้ว */
