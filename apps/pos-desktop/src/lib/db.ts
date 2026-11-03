@@ -62,6 +62,18 @@ export async function saveSession(cashier: Cashier | null, shift: Shift | null) 
   await conn.execute('INSERT OR REPLACE INTO app_state (key, value) VALUES (?, ?)', ['session', JSON.stringify({ cashier, shift })])
 }
 
+/** ค่าเล็ก ๆ ที่ต้องรอดตอนแอปปิด/ไฟดับ เช่น ตะกร้าที่ยังไม่ชำระ */
+export async function saveAppState(key: string, value: string) {
+  const conn = await connection()
+  await conn.execute('INSERT OR REPLACE INTO app_state (key, value) VALUES (?, ?)', [key, value])
+}
+
+export async function loadAppState(key: string): Promise<string | null> {
+  const conn = await connection()
+  const rows = await conn.select<Array<{ value: string }>>('SELECT value FROM app_state WHERE key = ?', [key])
+  return rows[0]?.value ?? null
+}
+
 export async function loadSession(): Promise<{ cashier: Cashier | null; shift: Shift | null }> {
   const conn = await connection()
   const rows = await conn.select<Array<{ value: string }>>('SELECT value FROM app_state WHERE key = ?', ['session'])

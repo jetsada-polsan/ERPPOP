@@ -553,3 +553,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .pin-title { display: block; text-align: center; font-size: 20px; margin-top: 6px; }
 /* ตัวหนังสือใหญ่ขึ้นแล้ว หัวหน้าจอห้ามตัดบรรทัด */
 .brand small, .brand strong, .shift-action span, .topbar button span { white-space: nowrap; }
+.print-copy { display: block; margin-top: 2px; font-size: 13px; font-weight: 800; }
+.close-notes { margin: 14px 0 4px; padding-left: 18px; color: #3d4a55; font-size: 15px; line-height: 1.6; }
+.close-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+.close-actions .primary { grid-column: 1 / -1; margin-top: 0; }
+.link-button { display: block; margin: 10px auto 0; border: 0; background: none; color: #52616e; font-size: 13px; text-decoration: underline; }

@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import mpmLogo from './assets/mpm-logo.jpg'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, CircleHelp, Cloud, CloudOff, CreditCard, FileText, FolderOpen, History, LogOut, Minus, PackageSearch, PauseCircle, Plus, Printer, QrCode, ReceiptText, RefreshCw, RotateCcw, Scale, ScanLine, Search, Settings, ShoppingCart, Trash2, UserRound, Wifi, X } from 'lucide-vue-next'
+import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, CircleHelp, Cloud, CloudOff, CreditCard, FileText, FolderOpen, History, Lock, LogOut, Minus, PackageSearch, PauseCircle, Plus, Printer, QrCode, ReceiptText, RefreshCw, RotateCcw, Scale, ScanLine, Search, Settings, ShoppingCart, Trash2, UserRound, Wifi, X } from 'lucide-vue-next'
 import { check } from '@tauri-apps/plugin-updater'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { api, connect, pairDevice, PosUnreachableError, setServerUrl } from './lib/api'
-import { backupTo, closeLocalDb, enqueue, loadOfflineCashiers, loadOfflineCashiersByPin, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceOfflineCashiers, replaceProducts, replacePromotions, saleHistory, saveOfflineCredential, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth, markSaleVoided } from './lib/db'
+import { backupTo, closeLocalDb, enqueue, loadOfflineCashiers, loadOfflineCashiersByPin, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceOfflineCashiers, replaceProducts, replacePromotions, saleHistory, saveOfflineCredential, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth, markSaleVoided, saveAppState, loadAppState } from './lib/db'
 import { productAtSaleTime } from './lib/catalog'
 import { resolveScan, type BarcodeType } from './lib/barcode'
 import { priceCart } from './lib/pricing'
 import { syncCheckoutQueue } from './lib/sync'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import type { Member, CartLine, Cashier, DeviceProfile, HeldBill, LocalSaleHistory, LocalStorageStatus, PaymentMethod, Product, QtyPromotion, QueueItem, ReceiptBlock, ReceiptTemplate, Shift } from './lib/types'
 
 const DEFAULT_RECEIPT_TEMPLATE: ReceiptTemplate = {
@@ -46,7 +47,7 @@ const queueError = ref('')
 const error = ref('')
 const notice = ref('')
 const busy = ref(false)
-const modal = ref<'cashier' | 'selectCashier' | 'changePin' | 'shift' | 'closeShift' | 'payment' | 'settings' | 'holdBill' | 'heldBills' | 'history' | 'guide' | 'weight' | 'void' | null>(null)
+const modal = ref<'cashier' | 'selectCashier' | 'changePin' | 'shift' | 'closeShift' | 'payment' | 'settings' | 'holdBill' | 'heldBills' | 'history' | 'guide' | 'weight' | 'void' | 'closeApp' | null>(null)
 const setupUrl = ref('https://erp.popstarcenter.com')
 const setupToken = ref('')
 const pairCode = ref('')
@@ -152,7 +153,26 @@ const receiptVat = computed(() => {
 })
 
 function money(value: number) { return new Intl.NumberFormat('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value) }
-function printLastReceipt() { window.print() }
+// ใบที่กำลังพิมพ์ (ต้นฉบับ/สำเนา) แสดงบนหัวใบเสร็จ
+const printCopyLabel = ref('')
+/** จำนวนใบตามวิธีจ่าย: เงินสด/บัตร 2 ใบ (ลูกค้า+ร้าน), โอน 3 ใบ (+สำเนาตรวจยอดโอน) */
+function receiptCopies(method: PaymentMethod): string[] {
+  const base = Math.max(1, Number(profile.value?.hardwareProfile?.print_copies || 2))
+  const labels = ['ต้นฉบับ (ลูกค้า)', 'สำเนา (ร้าน)'].slice(0, base)
+  while (labels.length < base) labels.push(`สำเนา ${labels.length}`)
+  if (method === 'transfer' || method === 'mixed') labels.push('สำเนาตรวจยอดโอน (บัญชี)')
+  return labels
+}
+async function printLastReceipt(labels: string[] = ['สำเนา (พิมพ์ซ้ำ)']) {
+  // เครื่องติดตั้งเปิด --kiosk-printing ไว้ print() จะส่งเข้าเครื่องพิมพ์หลักทันทีไม่ถามซ้ำ
+  for (const label of labels) {
+    printCopyLabel.value = label
+    await nextTick()
+    window.print()
+    await new Promise((resolve) => window.setTimeout(resolve, 300))
+  }
+  printCopyLabel.value = ''
+}
 function flash(message: string) { notice.value = message; window.setTimeout(() => { notice.value = '' }, 3500) }
 function errorText(value: unknown) { return value instanceof Error ? value.message : String(value) }
 function showError(value: unknown) { error.value = errorText(value); window.setTimeout(() => { error.value = '' }, 6000) }
@@ -249,6 +269,9 @@ async function findMember() {
     if (!member.value) flash(`ไม่พบสมาชิก ${q}`)
   } catch (e) { showError(e) }
 }
+
+async function persistCart() { await saveAppState('cart', JSON.stringify({ cart: cart.value, billDiscount: billDiscount.value })) }
+watch([cart, billDiscount], () => { void persistCart().catch(() => undefined) }, { deep: true })
 
 function repriceCartForCurrentSchedule() {
   const now = new Date()
@@ -540,6 +563,18 @@ async function changePin() {
 }
 
 // ออกจากระบบแค่เปลี่ยนคนขาย กะยังอยู่ที่ ERP คนเดิมใส่ PIN แล้วขายต่อได้
+/** ล็อกหน้าจอ: พักหรือเปลี่ยนคน กะยังเปิด ตะกร้ายังอยู่ ใส่ PIN แล้วขายต่อ */
+function lockScreen() {
+  cashierPin.value = ''
+  modal.value = 'cashier'
+}
+
+async function confirmCloseApp() {
+  // ตะกร้าเก็บในเครื่องอยู่แล้ว ปิดแล้วเปิดใหม่ของกลับมา บิลที่ชำระแล้วอยู่ในคิวส่ง ERP
+  await persistCart().catch(() => undefined)
+  if (isTauri()) await getCurrentWindow().destroy()
+}
+
 async function logoutCashier() {
   if (cart.value.length && !window.confirm('ยังมีสินค้าในบิล ออกจากระบบแล้วบิลนี้จะหาย ยืนยันไหม')) return
   cart.value = []
@@ -734,8 +769,10 @@ async function checkout() {
       else flash('เก็บบิลในเครื่องแล้ว ระบบจะส่งซ้ำอัตโนมัติ')
     } else flash('ออฟไลน์: เก็บบิลในเครื่องแล้ว ระบบจะส่งเมื่ออินเทอร์เน็ตกลับมา')
     lastReceipt.value = { no: receiptNo, items: soldItems, discount: soldDiscount, total: soldTotal, method: paymentMethod.value, paid: cashReceived.value, change: soldChange, printedAt: new Date().toLocaleString('th-TH'), provisional }
-    if (profile.value.hardwareProfile?.auto_print) {
-      window.setTimeout(() => printLastReceipt(), 150)
+    // พิมพ์เองทุกบิลเป็นค่าเริ่มต้น ปิดได้ที่ฮาร์ดแวร์ของเครื่องใน ERP (auto_print = false)
+    if (profile.value.hardwareProfile?.auto_print !== false) {
+      const copies = receiptCopies(paymentMethod.value)
+      window.setTimeout(() => { void printLastReceipt(copies) }, 150)
     }
   } catch (e) {
     await markQueue(id, 'failed', e instanceof Error ? e.message : String(e)).catch(() => undefined)
@@ -784,7 +821,13 @@ async function start() {
   await refreshQueue()
   if (!profile.value) { modal.value = 'settings'; await inspectLocalDb(); return }
   setServerUrl(profile.value.serverUrl)
-  modal.value = cashier.value && shift.value ? null : 'cashier'
+  // เปิดแอปใหม่ (ปิดไป/ไฟดับ/แอปค้าง) ต้องใส่ PIN ทุกครั้ง ERP จะได้รู้ว่าใครขายจริง
+  // ตะกร้าที่ยังไม่ชำระกลับมาเหมือนเดิม
+  try {
+    const savedCart = JSON.parse((await loadAppState('cart')) || 'null')
+    if (Array.isArray(savedCart?.cart)) { cart.value = savedCart.cart; billDiscount.value = Number(savedCart.billDiscount || 0) }
+  } catch { /* ตะกร้าเสียหาย เริ่มใหม่ */ }
+  modal.value = 'cashier'
   void syncAll()
   void checkUpdate()
 }
@@ -806,13 +849,20 @@ function handleShortcut(event: KeyboardEvent) {
     openPayment()
   }
   // ตั้งค่าครั้งแรกกับตั้ง PIN ใหม่ กด Escape ข้ามไม่ได้ ต้องทำให้จบก่อน
-  const locked = modal.value === 'changePin' || (modal.value === 'settings' && !profile.value)
+  const locked = modal.value === 'changePin' || modal.value === 'cashier' || (modal.value === 'settings' && !profile.value)
   if (event.key === 'Escape' && modal.value && !locked) {
     modal.value = null
     nextTick(() => scanner.value?.focus())
   }
 }
 onMounted(() => {
+  // กดกากบาท: ถามก่อนเสมอ ป้องกันปิดกลางบิล (ย่อหน้าต่างไปทำอย่างอื่นได้ตามปกติ)
+  if (isTauri()) {
+    void getCurrentWindow().onCloseRequested((event) => {
+      event.preventDefault()
+      modal.value = 'closeApp'
+    })
+  }
   window.addEventListener('online', networkUp)
   window.addEventListener('offline', networkDown)
   window.addEventListener('keydown', handleShortcut)
@@ -842,11 +892,12 @@ onUnmounted(() => {
       <div class="top-actions">
         <button class="status" :class="connectionClass" :title="catalogSyncError || 'ตรวจการเชื่อมต่อ ERP และซิงก์ข้อมูล'" @click="syncAll"><Wifi v-if="profile && online"/><CloudOff v-else/><span>{{ connectionLabel }}</span></button>
         <button v-if="cashier && !shift" class="shift-action" title="เปิดกะขาย" @click="modal = 'shift'"><Banknote/><span>เปิดกะ</span></button>
+        <button v-if="cashier" class="icon-button" title="ล็อกหน้าจอ (พัก/เปลี่ยนคน)" @click="lockScreen"><Lock/></button>
         <button class="shift-action" :title="cashier ? 'ออกจากระบบ' : 'เข้าสู่ระบบ'" @click="cashier ? logoutCashier() : (modal = 'cashier')"><LogOut/><span>{{ cashier ? 'ออกจากระบบ' : 'เข้าสู่ระบบ' }}</span></button>
         <button class="icon-button" title="ซิงก์ข้อมูล" @click="syncAll"><RefreshCw :class="{ spin: syncing }"/></button>
         <button class="icon-button" title="คู่มือการใช้งาน POS" @click="openGuide"><CircleHelp/></button>
         <button class="icon-button" title="ประวัติการขายย้อนหลัง" @click="openHistory"><History/></button>
-        <button v-if="lastReceipt" class="icon-button" title="พิมพ์บิลล่าสุด" @click="printLastReceipt"><Printer/></button>
+        <button v-if="lastReceipt" class="icon-button" title="พิมพ์บิลล่าสุด" @click="printLastReceipt()"><Printer/></button>
         <button class="icon-button" title="เรียกบิลพักส่วนกลาง" @click="openHeldBills"><FolderOpen/></button>
         <button v-if="shift" class="icon-button" title="ปิดกะขาย" @click="countedCash = shift.expected_cash; modal = 'closeShift'"><LogOut/></button>
         <button class="icon-button" title="ตั้งค่าเครื่อง" @click="openSettings"><Settings/></button>
@@ -959,7 +1010,7 @@ onUnmounted(() => {
       </form>
 
       <form v-else-if="modal === 'cashier'" class="modal compact" @submit.prevent="loginCashier">
-        <div class="modal-head"><div><UserRound/><span><strong>เข้าใช้งานแคชเชียร์</strong><small>{{ profile?.branchName }}</small></span></div><button type="button" @click="modal = null"><X/></button></div>
+        <div class="modal-head"><div><UserRound/><span><strong>เข้าใช้งานแคชเชียร์</strong><small>{{ profile?.branchName }} · {{ profile?.terminalCode }}</small></span></div></div>
         <template v-if="profile?.cashierLoginMode === 'selection'">
           <small class="setup-hint">เครื่องนี้ผูกสาขา {{ profile?.branchName }} แล้ว เลือกชื่อผู้ปฏิบัติงานเพื่อเริ่มขาย</small>
           <button class="primary" :disabled="busy">เลือกชื่อพนักงาน</button>
@@ -976,6 +1027,7 @@ onUnmounted(() => {
           </div>
           <small class="setup-hint">PIN 4 หลักเข้าระบบทันที · พิมพ์จากคีย์บอร์ดได้ · สาขา {{ profile?.branchName }}</small>
           <button class="primary" :disabled="busy || cashierPin.length < 4">{{ busy ? 'กำลังเข้าใช้งาน...' : 'เข้าใช้งาน' }}</button>
+          <button type="button" class="link-button" @click="openSettings">ตั้งค่าเครื่อง (ผู้ดูแล)</button>
         </template>
       </form>
 
@@ -1010,6 +1062,21 @@ onUnmounted(() => {
         <button v-if="cashDropAmount > 0" type="button" class="secondary" :disabled="busy" @click="recordCashDrop">บันทึกนำส่งเงิน</button>
         <button class="primary" :disabled="busy || pendingCount > 0">ยืนยันปิดกะ</button>
       </form>
+
+      <section v-else-if="modal === 'closeApp'" class="modal compact">
+        <div class="modal-head"><div><LogOut/><span><strong>ปิดโปรแกรม JET POS</strong><small>{{ shift ? `กะ ${shift.shift_no} ยังเปิดอยู่` : 'ไม่มีกะเปิด' }}</small></span></div><button type="button" @click="modal = null"><X/></button></div>
+        <ul class="close-notes">
+          <li v-if="cart.length">ตะกร้ามี {{ cart.length }} รายการ เก็บไว้ในเครื่อง เปิดใหม่แล้วกลับมาเหมือนเดิม</li>
+          <li v-if="pendingCount">มีบิลรอส่ง ERP {{ pendingCount }} บิล จะส่งต่อเมื่อเปิดโปรแกรมใหม่</li>
+          <li v-if="shift">กะยังเปิดอยู่ ถ้าเลิกงานให้กด “ปิดกะ” แทน</li>
+          <li>เปิดใหม่ต้องใส่ PIN อีกครั้ง</li>
+        </ul>
+        <div class="close-actions">
+          <button type="button" class="secondary" @click="modal = null">กลับไปขายต่อ</button>
+          <button type="button" class="secondary" @click="lockScreen">ล็อกหน้าจอแทน</button>
+          <button type="button" class="primary danger-action" @click="confirmCloseApp">ปิดโปรแกรม</button>
+        </div>
+      </section>
 
       <form v-else-if="modal === 'void' && selectedHistory" class="modal compact" @submit.prevent="submitVoid">
         <div class="modal-head"><div><RotateCcw/><span><strong>{{ voidMode === 'void' ? 'ยกเลิกบิล' : 'รับคืนสินค้า' }} {{ selectedHistory.receiptNo }}</strong><small>{{ voidMode === 'void' ? 'ยกเลิกได้เฉพาะบิลวันนี้ในกะที่เปิดอยู่' : 'ใบรับคืนต้องอนุมัติใน ERP ก่อนคืนเงิน' }}</small></span></div><button type="button" @click="modal = null"><X/></button></div>
@@ -1061,7 +1128,7 @@ onUnmounted(() => {
           <div v-if="!saleHistoryRows.length" class="empty-state history-empty"><History/><strong>ยังไม่มีประวัติในช่วงเวลานี้</strong><span>บิลที่ชำระแล้วจะถูกเก็บไว้ในเครื่องอัตโนมัติ</span></div>
         </div>
         <div v-if="selectedHistory" class="history-detail">
-          <div class="history-detail-head"><strong>{{ selectedHistory.receiptNo }}</strong><span class="history-actions"><button type="button" class="secondary" @click="printLastReceipt"><Printer/>พิมพ์ซ้ำ</button><button v-if="selectedHistory.status === 'synced'" type="button" class="secondary" @click="openVoid('return')"><RotateCcw/>คืนสินค้า</button><button v-if="selectedHistory.status === 'synced'" type="button" class="secondary danger-action" @click="openVoid('void')"><X/>ยกเลิกบิล</button></span></div>
+          <div class="history-detail-head"><strong>{{ selectedHistory.receiptNo }}</strong><span class="history-actions"><button type="button" class="secondary" @click="printLastReceipt()"><Printer/>พิมพ์ซ้ำ</button><button v-if="selectedHistory.status === 'synced'" type="button" class="secondary" @click="openVoid('return')"><RotateCcw/>คืนสินค้า</button><button v-if="selectedHistory.status === 'synced'" type="button" class="secondary danger-action" @click="openVoid('void')"><X/>ยกเลิกบิล</button></span></div>
           <div v-for="line in selectedHistory.items" :key="`${selectedHistory.id}-${line.id}-${line.scannedBarcode || ''}`" class="history-item"><span>{{ line.name_th }} × {{ line.qty }}</span><b>฿{{ money(line.qty * line.pos_price) }}</b></div>
           <div class="history-detail-total"><span>ยอดสุทธิ</span><strong>฿{{ money(selectedHistory.total) }}</strong></div>
           <small v-if="selectedHistory.status !== 'synced'" class="history-warning">บิลนี้ยังไม่ยืนยันเลขที่จาก ERP จะแสดงเป็นรายการชั่วคราวจนกว่าจะซิงก์สำเร็จ</small>
@@ -1105,6 +1172,7 @@ onUnmounted(() => {
         </template>
         <template v-else-if="block.type === 'title'">
           {{ lastReceipt.provisional ? 'ใบรับรายการชั่วคราว' : 'ใบเสร็จรับเงิน/ใบกำกับภาษีอย่างย่อ' }}
+          <small v-if="printCopyLabel" class="print-copy">{{ printCopyLabel }}</small>
         </template>
         <template v-else-if="block.type === 'meta'">
           <div class="print-meta"><span><b>เลขที่</b><em>{{ lastReceipt.no }}</em></span><span><b>วันที่</b><em>{{ lastReceipt.printedAt }}</em></span><span><b>สาขา</b><em>{{ profile?.branchName }}</em></span><span><b>แคชเชียร์</b><em>{{ cashier?.name }}</em></span></div>
