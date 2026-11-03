@@ -95,3 +95,25 @@ describe('promotion time window', () => {
     expect(promotionActive(promotion, new Date('2026-11-03T05:01:00Z'))).toBe(false)
   })
 })
+
+describe('bill promotions', () => {
+  const billOff: QtyPromotion = { id: 9, code: 'B1000', name: 'ครบ 1000 ลด 50', promo_type: 'bill_discount', product_id: null, min_qty: 1, min_amount: 1000, discount_type: 'baht', discount_value: 50 }
+
+  it('takes a bill discount once the bill reaches the minimum', () => {
+    expect(priceCart([{ ...product(1, 100), qty: 10 }], [billOff]).total).toBe(950)
+    expect(priceCart([{ ...product(1, 100), qty: 9 }], [billOff]).total).toBe(900)
+  })
+
+  it('caps a percent bill discount', () => {
+    const pct: QtyPromotion = { ...billOff, discount_type: 'percent', discount_value: 10, max_discount: 60, min_amount: 500 }
+    expect(priceCart([{ ...product(1, 100), qty: 10 }], [pct]).total).toBe(940)
+  })
+
+  it('adds a bill gift at zero price and lists it for the cashier', () => {
+    const gift: QtyPromotion = { id: 10, code: 'G500', name: 'ครบ 500 แถมน้ำ', promo_type: 'bill_free_item', product_id: null, min_qty: 1, min_amount: 500, free_product_id: 2, free_qty: 1, free_product: { id: 2, sku_code: '2', name_th: 'น้ำ' } }
+    const result = priceCart([{ ...product(1, 100), qty: 5 }], [gift])
+    expect(result.total).toBe(500)
+    expect(result.items).toContainEqual({ product_id: 2, qty: 1, unit_price: 0 })
+    expect(result.freeItems[0]).toMatchObject({ name_th: 'น้ำ', qty: 1 })
+  })
+})

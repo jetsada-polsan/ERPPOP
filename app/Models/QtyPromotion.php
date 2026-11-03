@@ -8,12 +8,20 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'code', 'name', 'promo_type', 'product_id', 'min_qty', 'free_product_id',
-    'free_qty', 'discount_type', 'discount_value', 'bundle_price', 'branch_id',
+    'code', 'name', 'promo_type', 'product_id', 'min_qty', 'min_amount', 'free_product_id',
+    'free_qty', 'discount_type', 'discount_value', 'max_discount', 'bundle_price', 'branch_id',
     'starts_date', 'ends_date', 'starts_at', 'ends_at', 'note', 'is_active',
 ])]
 class QtyPromotion extends Model
 {
+    /** โปรต่อสินค้า (ดูจำนวนที่ซื้อ) กับโปรต่อบิล (ดูยอดซื้อทั้งบิล) */
+    public const BILL_TYPES = ['bill_discount', 'bill_free_item'];
+
+    public function isBillLevel(): bool
+    {
+        return in_array($this->promo_type, self::BILL_TYPES, true);
+    }
+
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
@@ -63,6 +71,17 @@ class QtyPromotion extends Model
     public function label(): string
     {
         $min = rtrim(rtrim(number_format((float) $this->min_qty, 2), '0'), '.');
+        $amount = number_format((float) $this->min_amount);
+        if ($this->promo_type === 'bill_free_item') {
+            $free = rtrim(rtrim(number_format((float) $this->free_qty, 2), '0'), '.');
+
+            return "ยอดครบ {$amount} บาท แถม {$free}";
+        }
+        if ($this->promo_type === 'bill_discount') {
+            $value = rtrim(rtrim(number_format((float) $this->discount_value, 2), '0'), '.');
+
+            return "ยอดครบ {$amount} บาท ลด {$value}".($this->discount_type === 'percent' ? '%' : ' บาท');
+        }
         if ($this->promo_type === 'free_item') {
             $free = rtrim(rtrim(number_format((float) $this->free_qty, 2), '0'), '.');
 
@@ -86,6 +105,8 @@ class QtyPromotion extends Model
             'min_qty' => 'decimal:8',
             'free_qty' => 'decimal:8',
             'discount_value' => 'decimal:4',
+            'min_amount' => 'decimal:2',
+            'max_discount' => 'decimal:2',
             'bundle_price' => 'decimal:4',
             'starts_date' => 'date',
             'ends_date' => 'date',

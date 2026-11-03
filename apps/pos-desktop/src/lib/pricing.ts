@@ -72,6 +72,18 @@ export function priceCart(cart: CartLine[], allPromotions: QtyPromotion[], vatRa
     promoDiscount += Math.min(base, Math.max(0, discount))
   }
 
+  // โปรต่อบิล: ยอดหลังโปรต่อสินค้าต้องถึงขั้นต่ำ (คิดแบบเดียวกับ PosPricingGuard)
+  const paid = subtotal - promoDiscount
+  const billGifts: QtyPromotion[] = []
+  for (const promotion of promotions) {
+    if (promotion.promo_type !== 'bill_discount' && promotion.promo_type !== 'bill_free_item') continue
+    if (paid + 0.0001 < num(promotion.min_amount)) continue
+    if (promotion.promo_type === 'bill_free_item') { billGifts.push(promotion); continue }
+    let discount = promotion.discount_type === 'percent' ? paid * num(promotion.discount_value) / 100 : num(promotion.discount_value)
+    if (promotion.max_discount != null) discount = Math.min(discount, num(promotion.max_discount))
+    promoDiscount += Math.min(paid, Math.max(0, discount))
+  }
+
   promoDiscount = roundMoney(Math.min(subtotal, promoDiscount))
   const manualDiscount = roundMoney(Math.min(subtotal - promoDiscount, Math.max(0, num(billDiscount))))
   const total = roundMoney(Math.max(0, subtotal - promoDiscount - manualDiscount))
@@ -101,6 +113,14 @@ export function priceCart(cart: CartLine[], allPromotions: QtyPromotion[], vatRa
       items.push({ product_id: promotion.free_product_id, qty: freeQty, unit_price: 0 })
       freeItems.push({ product_id: promotion.free_product_id, sku_code: promotion.free_product.sku_code, name_th: promotion.free_product.name_th, qty: freeQty, promotion: promotion.name })
     }
+  }
+
+  for (const promotion of billGifts) {
+    if (!promotion.free_product_id || !promotion.free_product) continue
+    const freeQty = Math.max(0, num(promotion.free_qty))
+    if (freeQty <= 0) continue
+    items.push({ product_id: promotion.free_product_id, qty: freeQty, unit_price: 0 })
+    freeItems.push({ product_id: promotion.free_product_id, sku_code: promotion.free_product.sku_code, name_th: promotion.free_product.name_th, qty: freeQty, promotion: promotion.name })
   }
 
   return { subtotal, promoDiscount, manualDiscount, total, vat, beforeVat, items, freeItems }

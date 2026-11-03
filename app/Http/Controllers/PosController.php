@@ -233,9 +233,11 @@ class PosController extends Controller
         $promotions = QtyPromotion::with('freeProduct:id,sku_code,name_th')
             ->when($request->boolean('include_upcoming'), fn ($q) => $q->notEnded(), fn ($q) => $q->runningToday())
             ->where(fn ($w) => $w->whereNull('branch_id')->orWhere('branch_id', $branchId))
+            // POS รุ่นก่อน 1.6.5 ไม่รู้จักโปรต่อบิล ส่งไปแล้วยอดจะไม่ตรงกับที่เซิร์ฟเวอร์คิด
+            ->when(! $request->boolean('bill_promotions'), fn ($q) => $q->whereNotIn('promo_type', QtyPromotion::BILL_TYPES))
             // วันเริ่ม/สิ้นสุดส่งไปด้วย เครื่อง POS ที่ออฟไลน์ข้ามวันจะได้ไม่ใช้โปรที่หมดแล้ว
-            ->get(['id', 'code', 'name', 'promo_type', 'product_id', 'min_qty',
-                'free_product_id', 'free_qty', 'discount_type', 'discount_value', 'bundle_price',
+            ->get(['id', 'code', 'name', 'promo_type', 'product_id', 'min_qty', 'min_amount',
+                'free_product_id', 'free_qty', 'discount_type', 'discount_value', 'max_discount', 'bundle_price',
                 'starts_date', 'ends_date', 'starts_at', 'ends_at']);
 
         return response()->json($promotions);
@@ -1056,6 +1058,7 @@ class PosController extends Controller
             'manual_discount_amount' => ['nullable', 'numeric', 'min:0'],
             'discount_approved_by' => ['nullable', 'string', 'max:120'],
             'discount_card_code' => ['nullable', 'string', 'max:30'],
+            'bill_promotions' => ['nullable', 'boolean'],
             // บิลที่ Web POS ขายตอนออฟไลน์: เวลาที่ขายจริง (ส่งผ่าน PosOfflineSaleController เท่านั้น)
             'offline_sold_at' => ['nullable', 'date'],
             'offline_uuid' => ['nullable', 'uuid'],

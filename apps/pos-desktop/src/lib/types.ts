@@ -114,9 +114,12 @@ export interface QtyPromotion {
   id: number
   code: string
   name: string
-  promo_type: 'free_item' | 'discount' | 'bundle_price'
-  product_id: number
+  promo_type: 'free_item' | 'discount' | 'bundle_price' | 'bill_discount' | 'bill_free_item'
+  /** โปรต่อบิลไม่มีสินค้าที่ต้องซื้อ */
+  product_id: number | null
   min_qty: number
+  min_amount?: number | null
+  max_discount?: number | null
   free_product_id?: number | null
   free_qty?: number | null
   discount_type?: 'percent' | 'baht' | null
@@ -153,6 +156,8 @@ export interface CheckoutPayload {
   payment_ref?: string
   payment_confirmed: boolean
   member_id?: number
+  /** บอกเซิร์ฟเวอร์ว่าเครื่องนี้คิดโปรต่อบิลแล้ว */
+  bill_promotions?: boolean
   cash_received?: number
   cash_amount?: number
   transfer_amount?: number

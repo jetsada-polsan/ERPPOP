@@ -224,6 +224,43 @@ class PosPricingGuardTest extends TestCase
     }
 
     /** @return array{User,Branch,Product} */
+    public function test_server_applies_a_bill_discount_only_when_the_bill_reaches_the_minimum(): void
+    {
+        [$user, $branch, $product] = $this->masters();
+        $promotion = QtyPromotion::create([
+            'code' => 'BILL1000', 'name' => 'ครบ 1,000 ลด 50', 'promo_type' => 'bill_discount',
+            'min_qty' => 1, 'min_amount' => 1000, 'discount_type' => 'baht', 'discount_value' => 50, 'is_active' => true,
+        ]);
+        $this->assertSame('ยอดครบ 1,000 บาท ลด 50 บาท', $promotion->label());
+
+        $payload = $this->payload($branch, $product, 95) + ['bill_promotions' => true];
+        $payload['items'][0]['qty'] = 10;
+        $this->assertSame(950.0, app(PosPricingGuard::class)->validate($payload, $user));
+
+        // 9 ชิ้น = 900 ไม่ถึงขั้นต่ำ ราคาเต็ม
+        $payload = $this->payload($branch, $product, 100) + ['bill_promotions' => true];
+        $payload['items'][0]['qty'] = 9;
+        $this->assertSame(900.0, app(PosPricingGuard::class)->validate($payload, $user));
+
+        // เครื่องรุ่นเก่าไม่ส่ง bill_promotions จะไม่ได้ส่วนลดต่อบิล ยอดยังตรงกับเครื่อง
+        $payload = $this->payload($branch, $product, 100);
+        $payload['items'][0]['qty'] = 10;
+        $this->assertSame(1000.0, app(PosPricingGuard::class)->validate($payload, $user));
+    }
+
+    public function test_server_caps_a_percent_bill_discount(): void
+    {
+        [$user, $branch, $product] = $this->masters();
+        QtyPromotion::create([
+            'code' => 'BILLPCT', 'name' => 'ครบ 500 ลด 10% สูงสุด 60', 'promo_type' => 'bill_discount',
+            'min_qty' => 1, 'min_amount' => 500, 'discount_type' => 'percent', 'discount_value' => 10, 'max_discount' => 60, 'is_active' => true,
+        ]);
+
+        $payload = $this->payload($branch, $product, 94) + ['bill_promotions' => true];
+        $payload['items'][0]['qty'] = 10;
+        $this->assertSame(940.0, app(PosPricingGuard::class)->validate($payload, $user));
+    }
+
     private function masters(): array
     {
         $user = User::factory()->create(['username' => 'pricing_tester_'.uniqid()]);

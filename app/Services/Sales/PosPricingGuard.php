@@ -171,7 +171,7 @@ class PosPricingGuard
             fn ($line) => DecimalMath::multiply($line['qty'], $line['unit_price'])
         )), DecimalMath::DISPLAY_MONEY_SCALE);
         $expected = $gross;
-        $qtyPromotionDiscount = $this->qtyPromotionDiscount($serverLines, (int) $data['branch_id']);
+        $qtyPromotionDiscount = $this->qtyPromotionDiscount($serverLines, (int) $data['branch_id'], (bool) ($data['bill_promotions'] ?? false));
 
         $manualDiscount = DecimalMath::round($data['manual_discount_amount'] ?? 0, DecimalMath::DISPLAY_MONEY_SCALE);
         if (DecimalMath::compare($manualDiscount, 0) > 0) {
@@ -377,12 +377,16 @@ class PosPricingGuard
         );
     }
 
-    private function qtyPromotionDiscount($lines, int $branchId): float
+    private function qtyPromotionDiscount($lines, int $branchId, bool $billPromotions = false): float
     {
         $discount = 0.0;
         $promotions = QtyPromotion::runningToday()
-            ->where(fn ($query) => $query->whereNull('branch_id')->orWhere('branch_id', $branchId))->get();
-        foreach ($promotions as $promotion) {
+            ->where(fn ($query) => $query->whereNull('branch_id')->orWhere('branch_id', $branchId))
+            // เครื่องที่ไม่ได้บอกว่ารู้จักโปรต่อบิล ไม่คิดโปรต่อบิลให้ ยอดจะได้ตรงกับเครื่อง
+            ->when(! $billPromotions, fn ($query) => $query->whereNotIn('promo_type', QtyPromotion::BILL_TYPES))
+            ->get();
+        $billPromotionList = $promotions->filter(fn (QtyPromotion $promotion) => $promotion->isBillLevel());
+        foreach ($promotions->reject(fn (QtyPromotion $promotion) => $promotion->isBillLevel()) as $promotion) {
             $trigger = $lines->firstWhere('product_id', (int) $promotion->product_id);
             if (! $trigger || (float) $promotion->min_qty <= 0) {
                 continue;
@@ -404,6 +408,35 @@ class PosPricingGuard
                 if ($gift) {
                     $freeQty = min((float) $gift['qty'], $sets * (float) $promotion->free_qty);
                     $discount += $freeQty * (float) $gift['unit_price'];
+                }
+            }
+        }
+
+        // โปรต่อบิล: ยอดที่จ่ายจริงหลังโปรต่อสินค้า (ไม่นับมูลค่าของแถมต่อบิล) ต้องถึงขั้นต่ำ
+        $giftValue = 0.0;
+        foreach ($billPromotionList->where('promo_type', 'bill_free_item') as $promotion) {
+            $gift = $lines->firstWhere('product_id', (int) $promotion->free_product_id);
+            if ($gift) {
+                $giftValue += min((float) $gift['qty'], (float) $promotion->free_qty) * (float) $gift['unit_price'];
+            }
+        }
+        $paid = $lines->sum(fn ($line) => (float) $line['qty'] * (float) $line['unit_price']) - $giftValue - $discount;
+        foreach ($billPromotionList as $promotion) {
+            if ($paid + 0.0001 < (float) $promotion->min_amount) {
+                continue;
+            }
+            if ($promotion->promo_type === 'bill_discount') {
+                $billDiscount = $promotion->discount_type === 'percent'
+                    ? $paid * (float) $promotion->discount_value / 100
+                    : (float) $promotion->discount_value;
+                if ($promotion->max_discount !== null) {
+                    $billDiscount = min($billDiscount, (float) $promotion->max_discount);
+                }
+                $discount += min($paid, $billDiscount);
+            } else {
+                $gift = $lines->firstWhere('product_id', (int) $promotion->free_product_id);
+                if ($gift) {
+                    $discount += min((float) $gift['qty'], (float) $promotion->free_qty) * (float) $gift['unit_price'];
                 }
             }
         }
