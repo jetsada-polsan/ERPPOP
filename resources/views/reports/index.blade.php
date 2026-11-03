@@ -254,6 +254,14 @@
                 </div>
             </div>
 
+            @if($branchLocked)
+                <div class="alert alert-warning no-print py-2 px-3 mb-3" style="font-size:13px">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    บัญชีนี้ยังไม่ได้สังกัดสาขา และไม่มีสิทธิ์ดูรายงานข้ามสาขา จึงยังไม่มีข้อมูลให้แสดง —
+                    ให้ผู้ดูแลระบบกำหนดสาขาให้ หรือให้สิทธิ์ <code>reports.all_branches</code>
+                </div>
+            @endif
+
             <div class="rpt-toolbar no-print mb-3">
                 <label class="rpt-report-picker">
                     <span>รายงานหลัก</span>

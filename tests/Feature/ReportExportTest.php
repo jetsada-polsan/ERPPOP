@@ -48,15 +48,15 @@ class ReportExportTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_print_mode_renders_the_page_and_asks_for_more_rows_than_the_screen(): void
+    /** เจ้าของสั่ง 2026-11-02: พิมพ์เฉพาะหน้าปัจจุบันตามหน้าจอ ส่วนข้อมูลครบใช้ export */
+    public function test_print_mode_prints_the_current_page_like_the_screen(): void
     {
         $response = $this->actingAs($this->exporter())
-            ->get('/reports?category=sales&report=daily_sales&print=1');
+            ->get('/reports?category=sales&report=daily_sales&print=1&per_page=50');
 
         $response->assertOk();
         $this->assertTrue($response->viewData('printMode'));
-        $this->assertGreaterThan(100, $response->viewData('perPage'),
-            'กระดาษต้องได้มากกว่าที่หน้าจอแสดง ไม่งั้นพิมพ์ออกมาแล้วข้อมูลขาด');
+        $this->assertSame(50, $response->viewData('perPage'));
     }
 
     public function test_xlsx_export_downloads_a_real_spreadsheet(): void
