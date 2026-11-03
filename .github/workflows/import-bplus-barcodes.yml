@@ -32,6 +32,6 @@ jobs:
           if [ "$MODE" = apply ]; then
             CMD="php artisan erp:backup && php artisan erp:import-bplus-barcodes $ARGS --apply"
           else
-            CMD="php artisan erp:import-bplus-barcodes $ARGS && echo && head -n 60 storage/app/bplus-barcodes-report.csv"
+            CMD="php artisan erp:import-bplus-barcodes $ARGS && echo && head -n 200 storage/app/bplus-barcodes-report.csv"
           fi
           ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "cd '${{ vars.APP_DIR }}' && $CMD"
