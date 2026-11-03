@@ -1170,6 +1170,7 @@ onUnmounted(() => {
           <div v-for="line in selectedHistory.items" :key="`${selectedHistory.id}-${line.id}-${line.scannedBarcode || ''}`" class="history-item"><span>{{ line.name_th }} × {{ line.qty }}</span><b>฿{{ money(line.qty * line.pos_price) }}</b></div>
           <div class="history-detail-total"><span>ยอดสุทธิ</span><strong>฿{{ money(selectedHistory.total) }}</strong></div>
           <small v-if="selectedHistory.status !== 'synced'" class="history-warning">บิลนี้ยังไม่ยืนยันเลขที่จาก ERP จะแสดงเป็นรายการชั่วคราวจนกว่าจะซิงก์สำเร็จ</small>
+          <small v-if="selectedHistory.error && selectedHistory.status !== 'synced'" class="history-error">ERP ตอบกลับ: {{ selectedHistory.error }}</small>
           <form v-if="selectedHistory.status !== 'synced' && selectedHistory.status !== 'void' && (selectedHistory.method === 'transfer' || selectedHistory.method === 'mixed')" class="history-fix" @submit.prevent="resendWithLast4">
             <label>เลขท้ายบัญชีผู้โอน 4 หลัก<input v-model="fixLast4" required inputmode="numeric" pattern="\d{4}" maxlength="4" placeholder="ดูจากสลิป"></label>
             <button class="primary" :disabled="busy">ส่งบิลนี้ใหม่</button>
