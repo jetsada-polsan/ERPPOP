@@ -1074,7 +1074,7 @@ onUnmounted(() => {
       <div v-for="block in receiptTemplate.blocks" :key="block.id" class="print-block" :class="[receiptBlockClasses(block), `type-${block.type}`]">
         <template v-if="block.type === 'logo'">
           <img v-if="profile?.company.logo_url" class="print-logo" :src="profile.company.logo_url" alt="">
-          <strong v-else class="print-brand">POPSTAR</strong>
+          <strong v-else class="print-brand">{{ profile?.company?.name || 'JET POS' }}</strong>
         </template>
         <template v-else-if="block.type === 'company'">
           <strong>{{ profile?.company.name || 'MPM Food Group' }}</strong>
