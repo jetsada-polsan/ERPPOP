@@ -769,6 +769,35 @@ class PosApiController extends Controller
         return array_map(fn ($item) => $this->canonicalize($item), $value);
     }
 
+    /**
+     * หัวหน้าที่ใส่ PIN อนุมัติบนเครื่อง POS (ยกเลิกบิล / รับคืน) ใช้กฎเดียวกับ verifyApprover
+     * ตั้งเป็น attribute ฝั่งเซิร์ฟเวอร์เท่านั้น client ส่งค่านี้มาเองไม่ได้
+     */
+    private function approveWithPin(Request $request, string $action): ?JsonResponse
+    {
+        if (! $request->filled('approver_id')) {
+            return null;
+        }
+        $data = $request->validate([
+            'approver_id' => ['required', 'integer'],
+            'approver_pin' => ['required', 'string', 'regex:/^\d{4,20}$/'],
+        ]);
+        $device = $request->attributes->get('pos_device');
+        $branchId = $device?->branch_id ?: $request->user()?->branch_id;
+        $approver = $this->cashierCandidates($branchId, null, $device?->user_id)->find($data['approver_id']);
+        if (! $approver || $this->cashierRole($approver) !== 'manager' || ! $this->pinMatches($approver, $data['approver_pin'])) {
+            return response()->json(['success' => false, 'message' => 'PIN ไม่ถูกต้องหรือไม่มีสิทธิ์อนุมัติ'], 422);
+        }
+        $request->attributes->set('pos_approver', $approver);
+        AuditLog::create([
+            'user_id' => $approver->user_id, 'branch_id' => $branchId, 'action' => 'pos_approver_verified',
+            'table_name' => 'salesmen', 'record_id' => $approver->id,
+            'new_values' => ['reason' => $action.' '.$request->input('receipt_no'), 'terminal' => $device?->terminal_code],
+        ]);
+
+        return null;
+    }
+
     public function voidReceipt(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -777,6 +806,9 @@ class PosApiController extends Controller
             'shift_id' => ['required', 'integer', 'exists:pos_shifts,id'],
             'reason' => ['required', 'string', 'max:500'],
         ]);
+        if ($denied = $this->approveWithPin($request, 'void')) {
+            return $denied;
+        }
 
         $receipt = PosReceipt::with(['shift', 'terminal'])
             ->where('receipt_no', $data['receipt_no'])
@@ -804,7 +836,10 @@ class PosApiController extends Controller
 
     public function returnReceipt(Request $request, SaleReturnService $service): JsonResponse
     {
-        if (! auth()->user()?->hasPermission('pos.void')) {
+        if ($denied = $this->approveWithPin($request, 'return')) {
+            return $denied;
+        }
+        if (! $request->attributes->get('pos_approver') && ! auth()->user()?->hasPermission('pos.void')) {
             return response()->json(['success' => false, 'message' => 'เฉพาะผู้จัดการสาขาที่รับคืนสินค้า POS ได้'], 403);
         }
 
@@ -963,6 +998,7 @@ class PosApiController extends Controller
                         'refund_method' => $data['refund_method'],
                         'total_amount' => $totalAmount,
                         'reason' => $data['reason'],
+                        'approved_by' => request()->attributes->get('pos_approver')?->name,
                     ], JSON_UNESCAPED_UNICODE),
                     'created_at' => now(),
                 ]);

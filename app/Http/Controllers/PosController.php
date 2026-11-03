@@ -1252,7 +1252,9 @@ class PosController extends Controller
 
     public function voidReceipt(Request $request, PosReceipt $receipt, GlPostingService $glPosting, MemberPointService $points): JsonResponse
     {
-        if (! auth()->user()?->hasPermission('pos.void')) {
+        // หัวหน้าใส่ PIN บนเครื่อง POS (PosApiController::approveWithPin) หรือ user ที่มีสิทธิ์ยกเลิก
+        $approver = $request->attributes->get('pos_approver');
+        if (! $approver && ! auth()->user()?->hasPermission('pos.void')) {
             return response()->json(['success' => false, 'message' => 'เฉพาะผู้จัดการหรือ IT เท่านั้นที่ยกเลิกบิลได้'], 403);
         }
 
@@ -1284,7 +1286,7 @@ class PosController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($receipt, $data, $glPosting, $points) {
+            DB::transaction(function () use ($receipt, $data, $glPosting, $points, $approver) {
                 $receipt = PosReceipt::with(['terminal', 'shift', 'member'])
                     ->whereKey($receipt->id)
                     ->lockForUpdate()
@@ -1353,6 +1355,7 @@ class PosController extends Controller
                         'voided_at' => now()->toDateTimeString(),
                         'voided_by' => auth()->id(),
                         'void_reason' => $data['reason'],
+                        'approved_by' => $approver?->name,
                     ], JSON_UNESCAPED_UNICODE),
                     'created_at' => now(),
                 ]);
