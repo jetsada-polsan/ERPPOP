@@ -274,14 +274,14 @@ class PosPricingGuardTest extends TestCase
         $mix = QtyPromotion::create(['code' => 'MIX', 'name' => 'คละ 3 ชิ้น 200', 'promo_type' => 'mix_bundle', 'min_qty' => 3, 'bundle_price' => 200, 'is_active' => true]);
         $mix->groupProducts()->sync([$product->id, $second->id]);
         // 100+100+50 = 250 -> 200 ลด 50 ทั้งบิล 2x100 + 2x50 = 300 -> 250
-        $payload = ['branch_id' => $branch->id, 'vat_mode' => 'included', 'bill_promotions' => true, 'items' => [$line($product->id, 2, 87.5), $line($second->id, 2, 37.5)]];
+        $payload = ['branch_id' => $branch->id, 'vat_mode' => 'included', 'bill_promotions' => true, 'mix_promotions' => true, 'items' => [$line($product->id, 2, 87.5), $line($second->id, 2, 37.5)]];
         $this->assertSame(250.0, app(PosPricingGuard::class)->validate($payload, $user));
         $mix->delete();
 
         QtyPromotion::create(['code' => 'ADD', 'name' => 'ครบ 300 แลกซื้อ 20', 'promo_type' => 'bill_addon', 'product_id' => $second->id,
             'min_qty' => 1, 'min_amount' => 300, 'bundle_price' => 20, 'free_qty' => 1, 'is_active' => true]);
         // 3x100 + 1x50 -> ตัวแลกเหลือ 20 รวม 320
-        $payload = ['branch_id' => $branch->id, 'vat_mode' => 'included', 'bill_promotions' => true, 'items' => [$line($product->id, 3, 100 - 30 * 300 / 350 / 3), $line($second->id, 1, 50 - 30 * 50 / 350)]];
+        $payload = ['branch_id' => $branch->id, 'vat_mode' => 'included', 'bill_promotions' => true, 'mix_promotions' => true, 'items' => [$line($product->id, 3, 100 - 30 * 300 / 350 / 3), $line($second->id, 1, 50 - 30 * 50 / 350)]];
         $this->assertSame(320.0, app(PosPricingGuard::class)->validate($payload, $user));
     }
 

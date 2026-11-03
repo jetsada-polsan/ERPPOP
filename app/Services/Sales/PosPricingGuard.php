@@ -171,7 +171,7 @@ class PosPricingGuard
             fn ($line) => DecimalMath::multiply($line['qty'], $line['unit_price'])
         )), DecimalMath::DISPLAY_MONEY_SCALE);
         $expected = $gross;
-        $qtyPromotionDiscount = $this->qtyPromotionDiscount($serverLines, (int) $data['branch_id'], (bool) ($data['bill_promotions'] ?? false));
+        $qtyPromotionDiscount = $this->qtyPromotionDiscount($serverLines, (int) $data['branch_id'], (bool) ($data['bill_promotions'] ?? false), (bool) ($data['mix_promotions'] ?? false));
 
         $manualDiscount = DecimalMath::round($data['manual_discount_amount'] ?? 0, DecimalMath::DISPLAY_MONEY_SCALE);
         if (DecimalMath::compare($manualDiscount, 0) > 0) {
@@ -377,13 +377,14 @@ class PosPricingGuard
         );
     }
 
-    private function qtyPromotionDiscount($lines, int $branchId, bool $billPromotions = false): float
+    private function qtyPromotionDiscount($lines, int $branchId, bool $billPromotions = false, bool $mixPromotions = false): float
     {
         $discount = 0.0;
         $promotions = QtyPromotion::runningToday()
             ->where(fn ($query) => $query->whereNull('branch_id')->orWhere('branch_id', $branchId))
             // เครื่องที่ไม่ได้บอกว่ารู้จักโปรต่อบิล ไม่คิดโปรต่อบิลให้ ยอดจะได้ตรงกับเครื่อง
-            ->when(! $billPromotions, fn ($query) => $query->whereNotIn('promo_type', [...QtyPromotion::BILL_TYPES, ...QtyPromotion::MIX_TYPES]))
+            ->when(! $billPromotions, fn ($query) => $query->whereNotIn('promo_type', QtyPromotion::BILL_TYPES))
+            ->when(! $mixPromotions, fn ($query) => $query->whereNotIn('promo_type', [...QtyPromotion::MIX_TYPES, 'bill_addon']))
             ->with('groupProducts:products.id')
             ->get();
         $billPromotionList = $promotions->filter(fn (QtyPromotion $promotion) => $promotion->isBillLevel());

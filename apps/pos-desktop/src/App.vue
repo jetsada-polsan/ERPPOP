@@ -749,6 +749,7 @@ async function checkout() {
     ...(paymentMethod.value === 'mixed' ? { cash_amount: cashReceived.value, transfer_amount: Number((subtotal.value - cashReceived.value).toFixed(2)) } : {}),
     ...(member.value ? { member_id: member.value.id } : {}),
     bill_promotions: true,
+    mix_promotions: true,
     vat_mode: 'included' as const,
     ...(pricing.value.manualDiscount > 0 ? {
       manual_discount_amount: pricing.value.manualDiscount,

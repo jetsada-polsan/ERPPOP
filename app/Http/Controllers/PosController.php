@@ -234,7 +234,9 @@ class PosController extends Controller
             ->when($request->boolean('include_upcoming'), fn ($q) => $q->notEnded(), fn ($q) => $q->runningToday())
             ->where(fn ($w) => $w->whereNull('branch_id')->orWhere('branch_id', $branchId))
             // POS รุ่นก่อน 1.6.5 ไม่รู้จักโปรต่อบิล ส่งไปแล้วยอดจะไม่ตรงกับที่เซิร์ฟเวอร์คิด
-            ->when(! $request->boolean('bill_promotions'), fn ($q) => $q->whereNotIn('promo_type', [...QtyPromotion::BILL_TYPES, ...QtyPromotion::MIX_TYPES]))
+            ->when(! $request->boolean('bill_promotions'), fn ($q) => $q->whereNotIn('promo_type', QtyPromotion::BILL_TYPES))
+            // ซื้อคละ/แลกซื้อมีตั้งแต่ JET POS 1.7.1 เครื่องรุ่นก่อนไม่ได้รับ ยอดจะได้ตรงกับเซิร์ฟเวอร์
+            ->when(! $request->boolean('mix_promotions'), fn ($q) => $q->whereNotIn('promo_type', [...QtyPromotion::MIX_TYPES, 'bill_addon']))
             // วันเริ่ม/สิ้นสุดส่งไปด้วย เครื่อง POS ที่ออฟไลน์ข้ามวันจะได้ไม่ใช้โปรที่หมดแล้ว
             ->get(['id', 'code', 'name', 'promo_type', 'product_id', 'min_qty', 'min_amount',
                 'free_product_id', 'free_qty', 'discount_type', 'discount_value', 'max_discount', 'bundle_price',
@@ -1066,6 +1068,7 @@ class PosController extends Controller
             'discount_approved_by' => ['nullable', 'string', 'max:120'],
             'discount_card_code' => ['nullable', 'string', 'max:30'],
             'bill_promotions' => ['nullable', 'boolean'],
+            'mix_promotions' => ['nullable', 'boolean'],
             // บิลที่ Web POS ขายตอนออฟไลน์: เวลาที่ขายจริง (ส่งผ่าน PosOfflineSaleController เท่านั้น)
             'offline_sold_at' => ['nullable', 'date'],
             'offline_uuid' => ['nullable', 'uuid'],

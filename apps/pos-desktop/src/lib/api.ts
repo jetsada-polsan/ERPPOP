@@ -83,7 +83,7 @@ export const api = {
   cashierLogin: (pin: string, cashierId?: number, code?: string) => request<{ cashier?: Cashier; cashiers?: Cashier[]; selection_required?: boolean; must_change_pin?: boolean; offline_credential?: Cashier['offline_credential'] }>('/cashier/login', { method: 'POST', body: JSON.stringify({ pin, ...(cashierId ? { cashier_id: cashierId } : {}), ...(code ? { code } : {}) }) }),
   changeCashierPin: (code: string, currentPin: string, newPin: string) => request<{ message: string }>('/cashier/pin', { method: 'POST', body: JSON.stringify({ code, current_pin: currentPin, new_pin: newPin }) }),
   products: (branchId: number) => request<Product[]>(`/products?all=1&branch_id=${branchId}`),
-  promotions: (branchId: number) => request<QtyPromotion[]>(`/promotions?branch_id=${branchId}&include_upcoming=1&bill_promotions=1`),
+  promotions: (branchId: number) => request<QtyPromotion[]>(`/promotions?branch_id=${branchId}&include_upcoming=1&bill_promotions=1&mix_promotions=1`),
   activeShift: async (branchId: number, cashierId: number) => (await request<{ shift: Shift | null }>(`/shift?branch_id=${branchId}&cashier_id=${cashierId}`)).shift,
   openShift: async (branchId: number, cashierId: number, openingCash: number) => (await request<{ shift: Shift }>('/shift/open', { method: 'POST', body: JSON.stringify({ branch_id: branchId, cashier_id: cashierId, opening_cash: openingCash }) })).shift,
   closeShift: async (shiftId: number, countedCash: number) => (await request<{ shift: Shift }>('/shift/close', { method: 'POST', body: JSON.stringify({ shift_id: shiftId, counted_cash: countedCash }) })).shift,

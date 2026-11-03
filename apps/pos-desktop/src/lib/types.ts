@@ -161,6 +161,7 @@ export interface CheckoutPayload {
   member_id?: number
   /** บอกเซิร์ฟเวอร์ว่าเครื่องนี้คิดโปรต่อบิลแล้ว */
   bill_promotions?: boolean
+  mix_promotions?: boolean
   cash_received?: number
   cash_amount?: number
   transfer_amount?: number
