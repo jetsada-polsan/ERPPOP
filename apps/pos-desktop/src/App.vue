@@ -565,8 +565,15 @@ async function changePin() {
 }
 
 // ออกจากระบบแค่เปลี่ยนคนขาย กะยังอยู่ที่ ERP คนเดิมใส่ PIN แล้วขายต่อได้
+// ล็อกอยู่ = ต้องใส่ PIN ก่อนเท่านั้น ปิดหน้าต่างอื่น (ตั้งค่า/ปิดโปรแกรม) แล้วต้องกลับมาหน้า PIN
+const screenLocked = ref(false)
+watch(modal, (value) => { if (screenLocked.value && value === null) modal.value = 'cashier' })
+let modalBeforeClose: typeof modal.value = null
+function cancelCloseApp() { modal.value = modalBeforeClose; modalBeforeClose = null }
+
 /** ล็อกหน้าจอ: พักหรือเปลี่ยนคน กะยังเปิด ตะกร้ายังอยู่ ใส่ PIN แล้วขายต่อ */
 function lockScreen() {
+  screenLocked.value = true
   cashierPin.value = ''
   modal.value = 'cashier'
 }
@@ -589,6 +596,7 @@ async function logoutCashier() {
 }
 
 async function startCashierSession(next: Cashier) {
+  screenLocked.value = false
   cashier.value = next
   if (navigator.onLine) {
     shift.value = await api.activeShift(profile.value!.branchId, next.id)
@@ -835,6 +843,7 @@ async function start() {
     const savedCart = JSON.parse((await loadAppState('cart')) || 'null')
     if (Array.isArray(savedCart?.cart)) { cart.value = savedCart.cart; billDiscount.value = Number(savedCart.billDiscount || 0) }
   } catch { /* ตะกร้าเสียหาย เริ่มใหม่ */ }
+  screenLocked.value = true
   modal.value = 'cashier'
   void syncAll()
   void checkUpdate()
@@ -858,6 +867,7 @@ function handleShortcut(event: KeyboardEvent) {
   }
   // ตั้งค่าครั้งแรกกับตั้ง PIN ใหม่ กด Escape ข้ามไม่ได้ ต้องทำให้จบก่อน
   const locked = modal.value === 'changePin' || modal.value === 'cashier' || (modal.value === 'settings' && !profile.value)
+  if (event.key === 'Escape' && modal.value === 'closeApp') { event.preventDefault(); cancelCloseApp(); return }
   if (event.key === 'Escape' && modal.value && !locked) {
     modal.value = null
     nextTick(() => scanner.value?.focus())
@@ -868,6 +878,8 @@ onMounted(() => {
   if (isTauri()) {
     void getCurrentWindow().onCloseRequested((event) => {
       event.preventDefault()
+      // จำหน้าต่างเดิมไว้ กด "กลับ" แล้วต้องกลับไปที่เดิม (หน้าล็อกต้องยังล็อกอยู่)
+      modalBeforeClose = modal.value === 'closeApp' ? modalBeforeClose : modal.value
       modal.value = 'closeApp'
     })
   }
@@ -1073,7 +1085,7 @@ onUnmounted(() => {
       </form>
 
       <section v-else-if="modal === 'closeApp'" class="modal compact">
-        <div class="modal-head"><div><LogOut/><span><strong>ปิดโปรแกรม JET POS</strong><small>{{ shift ? `กะ ${shift.shift_no} ยังเปิดอยู่` : 'ไม่มีกะเปิด' }}</small></span></div><button type="button" @click="modal = null"><X/></button></div>
+        <div class="modal-head"><div><LogOut/><span><strong>ปิดโปรแกรม JET POS</strong><small>{{ shift ? `กะ ${shift.shift_no} ยังเปิดอยู่` : 'ไม่มีกะเปิด' }}</small></span></div><button type="button" @click="cancelCloseApp"><X/></button></div>
         <ul class="close-notes">
           <li v-if="cart.length">ตะกร้ามี {{ cart.length }} รายการ เก็บไว้ในเครื่อง เปิดใหม่แล้วกลับมาเหมือนเดิม</li>
           <li v-if="pendingCount">มีบิลรอส่ง ERP {{ pendingCount }} บิล จะส่งต่อเมื่อเปิดโปรแกรมใหม่</li>
@@ -1081,7 +1093,7 @@ onUnmounted(() => {
           <li>เปิดใหม่ต้องใส่ PIN อีกครั้ง</li>
         </ul>
         <div class="close-actions">
-          <button type="button" class="secondary" @click="modal = null">กลับไปขายต่อ</button>
+          <button type="button" class="secondary" @click="cancelCloseApp">กลับไปขายต่อ</button>
           <button type="button" class="secondary" @click="lockScreen">ล็อกหน้าจอแทน</button>
           <button type="button" class="primary danger-action" @click="confirmCloseApp">ปิดโปรแกรม</button>
         </div>
