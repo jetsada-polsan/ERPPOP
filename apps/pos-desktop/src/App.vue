@@ -536,7 +536,11 @@ async function loginCashier() {
       return
     }
     await startCashierSession(authenticatedCashier)
-  } catch (e) { showError(e) } finally { busy.value = false }
+  } catch (e) {
+    // PIN ผิด: ล้างช่องให้ใส่ใหม่ได้ทันที ไม่ต้องกดลบทีละหลัก
+    cashierPin.value = ''
+    showError(e)
+  } finally { busy.value = false }
 }
 
 async function selectCashier(next: Cashier) {
