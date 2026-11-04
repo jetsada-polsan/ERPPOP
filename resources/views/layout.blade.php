@@ -691,7 +691,7 @@
         }
         .fa-rail-btn i { font-size: 18px; line-height: 1; }
         .fa-rail-btn-label {
-            font-size: 9.5px;
+            font-size: 10.5px;
             font-weight: 800;
             line-height: 1.15;
             letter-spacing: .01em;
@@ -1251,7 +1251,7 @@
         .btn-lg:not(.rounded-circle) { min-height:42px; padding:8px 16px; font-size:var(--ui-font-md); }
         .btn.rounded-pill { padding-left:12px!important; padding-right:12px!important; }
 
-        .form-label { margin-bottom:4px; color:var(--erp-muted); font-size:var(--ui-font-sm); font-weight:700; }
+        .form-label { margin-bottom:4px; color:var(--erp-ink); font-size:var(--ui-font-sm); font-weight:700; }
         .form-control,.form-select,.input-group-text { min-height:var(--ui-control-h); padding:5px 8px; border-radius:var(--ui-radius); border-color:var(--erp-border); font-size:var(--ui-font-md); line-height:1.2; }
         textarea.form-control { min-height:64px; }
         .form-control-sm,.form-select-sm { min-height:31px; padding:4px 8px; font-size:var(--ui-font-sm); }
@@ -1270,18 +1270,21 @@
         .table > tbody > tr:nth-child(even) > td { background:var(--erp-surface-2); }
         .table > tbody > tr:hover > td { background:var(--erp-primary-soft); }
         .table-sm > thead > tr > th,.table-sm > tbody > tr > td { padding:5px 7px; }
-        .badge { padding:4px 7px; border-radius:6px; font-size:var(--ui-font-xs); line-height:1; }
+        .badge { padding:4px 7px; border-radius:6px; font-size:var(--ui-font-xs); line-height:1.15; }
+        /* อ่านง่าย: ตัวหนังสือรองไม่เล็กกว่า 12px และไม่จางจนอ่านไม่ออกบนจอหน้าร้าน */
+        .text-muted { color:#5b6b78 !important; }
+        body:not(.erp-popup-page) .table > tbody > tr > td { line-height:1.45; }
 
         .alert { padding:9px 11px; border-radius:10px; font-size:var(--ui-font-md); border:1px solid rgba(148,163,184,.2); }
-        .pagination { --bs-pagination-padding-x:.6rem; --bs-pagination-padding-y:.28rem; --bs-pagination-font-size:11px; }
+        .pagination { --bs-pagination-padding-x:.6rem; --bs-pagination-padding-y:.28rem; --bs-pagination-font-size:var(--ui-font-sm); }
         .dropdown-menu { padding:5px; border-radius:8px; font-size:var(--ui-font-md); }
         .dropdown-item { padding:6px 8px; border-radius:5px; }
 
         @media (max-width: 991.98px) {
             :root {
-                --ui-font-xs: calc(11px * var(--ui-scale));
-                --ui-font-sm: calc(12px * var(--ui-scale));
-                --ui-font-md: calc(13px * var(--ui-scale));
+                --ui-font-xs: calc(12px * var(--ui-scale));
+                --ui-font-sm: calc(13px * var(--ui-scale));
+                --ui-font-md: calc(14px * var(--ui-scale));
                 --ui-font-lg: calc(16px * var(--ui-scale));
                 --ui-font-xl: calc(20px * var(--ui-scale));
                 --ui-control-h: calc(34px * var(--ui-scale));
