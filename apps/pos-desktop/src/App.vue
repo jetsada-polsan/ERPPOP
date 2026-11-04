@@ -172,13 +172,26 @@ function receiptCopies(method: PaymentMethod): string[] {
   if (method === 'transfer' || method === 'mixed') labels.push('สำเนาตรวจยอดโอน (บัญชี)')
   return labels
 }
+/**
+ * สั่งพิมพ์แล้วรอจนเบราว์เซอร์แจ้งว่าพิมพ์เสร็จ (afterprint) ค่อยทำต่อ
+ * ห้ามถอดเนื้อหาออกก่อน: เครื่องพิมพ์ที่ช้าหรือ Print to PDF ที่ถามชื่อไฟล์จะพิมพ์ไม่ออก (Print failed)
+ */
+function printAndWait(): Promise<void> {
+  return new Promise((resolve) => {
+    let done = false
+    const finish = () => { if (done) return; done = true; window.removeEventListener('afterprint', finish); window.setTimeout(resolve, 200) }
+    window.addEventListener('afterprint', finish)
+    window.setTimeout(finish, 120000)
+    window.print()
+  })
+}
+
 async function printLastReceipt(labels: string[] = ['สำเนา (พิมพ์ซ้ำ)']) {
   // เครื่องติดตั้งเปิด --kiosk-printing ไว้ print() จะส่งเข้าเครื่องพิมพ์หลักทันทีไม่ถามซ้ำ
   for (const label of labels) {
     printCopyLabel.value = label
     await nextTick()
-    window.print()
-    await new Promise((resolve) => window.setTimeout(resolve, 300))
+    await printAndWait()
   }
   printCopyLabel.value = ''
 }
@@ -727,9 +740,19 @@ async function printZReport() {
   if (!lastZReport.value) return flash('ยังไม่มี Z Report ในเครื่อง ปิดกะก่อน')
   printingZ.value = true
   await nextTick()
-  window.print()
-  await new Promise((resolve) => window.setTimeout(resolve, 300))
+  await printAndWait()
   printingZ.value = false
+}
+
+/** ยอดเงินที่ควรมีของกะต้องมาจาก ERP ล่าสุด ค่าในเครื่องเป็นค่าตอนเปิดกะ ยังไม่รวมยอดขาย */
+async function openCloseShift() {
+  if (!shift.value || !profile.value || !cashier.value) return
+  try {
+    const live = await api.activeShift(profile.value.branchId, cashier.value.id)
+    if (live) { shift.value = live; await saveSession(cashier.value, live) }
+  } catch { /* ออฟไลน์: ใช้ค่าในเครื่องไปก่อน */ }
+  countedCash.value = shift.value?.expected_cash ?? 0
+  modal.value = 'closeShift'
 }
 
 async function closeShift() {
@@ -1037,7 +1060,7 @@ onUnmounted(() => {
         <button class="icon-button" title="ประวัติการขายย้อนหลัง" @click="openHistory"><History/></button>
         <button v-if="lastReceipt" class="icon-button" title="พิมพ์บิลล่าสุด" @click="printLastReceipt()"><Printer/></button>
         <button class="icon-button" title="เรียกบิลพักส่วนกลาง" @click="openHeldBills"><FolderOpen/></button>
-        <button v-if="shift" class="icon-button" title="ปิดกะขาย" @click="countedCash = shift.expected_cash; modal = 'closeShift'"><LogOut/></button>
+        <button v-if="shift" class="icon-button" title="ปิดกะขาย" @click="openCloseShift"><LogOut/></button>
         <button class="icon-button" title="ตั้งค่าเครื่อง" @click="openSettings"><Settings/></button>
       </div>
     </header>
