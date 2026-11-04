@@ -138,6 +138,27 @@ export interface CartLine extends Product {
   /** ส่งขึ้นเซิร์ฟเวอร์ไปด้วย เพื่อให้ตรวจซ้ำได้ว่าตีความบาร์โค้ดตรงกัน */
   scannedBarcodeType?: BarcodeType
 }
+/** ข้อมูลปิดกะที่ ERP ส่งกลับ ใช้พิมพ์ Z Report บนเครื่อง */
+export interface ZReport {
+  shift_no: string
+  branch_name?: string
+  cashier_name?: string
+  opened_at?: string
+  closed_at?: string
+  opening_cash: number
+  cash_sales: number
+  transfer_sales: number
+  card_sales: number
+  cheque_sales: number
+  cash_in: number
+  cash_drops: number
+  cash_payouts: number
+  expected_cash: number
+  counted_cash: number | null
+  cash_difference: number | null
+  receipt_count: number
+}
+
 export interface HeldBill {
   id: number
   hold_no: string

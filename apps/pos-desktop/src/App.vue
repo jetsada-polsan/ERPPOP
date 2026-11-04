@@ -11,7 +11,7 @@ import { resolveScan, type BarcodeType } from './lib/barcode'
 import { priceCart } from './lib/pricing'
 import { syncCheckoutQueue } from './lib/sync'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import type { Member, CartLine, Cashier, DeviceProfile, HeldBill, LocalSaleHistory, LocalStorageStatus, PaymentMethod, Product, QtyPromotion, QueueItem, ReceiptBlock, ReceiptTemplate, Shift } from './lib/types'
+import type { ZReport, Member, CartLine, Cashier, DeviceProfile, HeldBill, LocalSaleHistory, LocalStorageStatus, PaymentMethod, Product, QtyPromotion, QueueItem, ReceiptBlock, ReceiptTemplate, Shift } from './lib/types'
 
 const DEFAULT_RECEIPT_TEMPLATE: ReceiptTemplate = {
   paper_width: 80,
@@ -718,13 +718,31 @@ async function openShift() {
   } catch (e) { showError(e) } finally { busy.value = false }
 }
 
+const lastZReport = ref<ZReport | null>(null)
+const printingZ = ref(false)
+async function printZReport() {
+  if (!lastZReport.value) {
+    try { lastZReport.value = JSON.parse((await loadAppState('last_z_report')) || 'null') } catch { /* ไม่มี */ }
+  }
+  if (!lastZReport.value) return flash('ยังไม่มี Z Report ในเครื่อง ปิดกะก่อน')
+  printingZ.value = true
+  await nextTick()
+  window.print()
+  await new Promise((resolve) => window.setTimeout(resolve, 300))
+  printingZ.value = false
+}
+
 async function closeShift() {
   if (!shift.value) return
   if (pendingCount.value) { showError('ต้องส่งบิลค้างขึ้น ERP ให้ครบก่อนปิดกะ'); return }
   busy.value = true
   try {
-    await api.closeShift(shift.value.id, countedCash.value)
+    const closed = await api.closeShift(shift.value.id, countedCash.value)
     shift.value = null
+    // Z Report: เก็บไว้พิมพ์ซ้ำได้ แล้วพิมพ์ทันที (เครื่องพิมพ์หลักของ Windows)
+    lastZReport.value = closed
+    await saveAppState('last_z_report', JSON.stringify(closed)).catch(() => undefined)
+    void printZReport()
     await saveSession(cashier.value, null)
     modal.value = 'shift'
     flash('ปิดกะเรียบร้อยแล้ว')
@@ -1173,6 +1191,7 @@ onUnmounted(() => {
         <div class="modal-head"><div><Banknote/><span><strong>เปิดกะขาย</strong><small>{{ cashier?.name }} · {{ profile?.branchName }}</small></span></div><button type="button" @click="modal = null"><X/></button></div>
         <label>เงินทอนเริ่มต้น<input v-model.number="openingCash" type="number" min="0" step="0.01" autofocus required></label>
         <button class="primary" :disabled="busy">ยืนยันเปิดกะ</button>
+        <button type="button" class="link-button" @click="printZReport">พิมพ์ Z Report กะล่าสุดซ้ำ</button>
       </form>
 
       <form v-else-if="modal === 'closeShift'" class="modal compact" @submit.prevent="closeShift">
@@ -1293,7 +1312,39 @@ onUnmounted(() => {
       </form>
     </div>
 
-    <section v-if="lastReceipt" class="print-receipt" :class="receiptTemplate.paper_width === 58 ? 'paper-58' : 'paper-80'">
+    <section v-if="printingZ && lastZReport" class="print-receipt print-z" :class="receiptTemplate.paper_width === 58 ? 'paper-58' : 'paper-80'">
+      <div class="print-block align-center size-large is-bold">{{ profile?.company?.name || 'JET POS' }}</div>
+      <div class="print-block type-title align-center is-bold">รายงานปิดกะ (Z Report)</div>
+      <div class="print-meta print-block size-small">
+        <span><b>เลขกะ</b><em>{{ lastZReport.shift_no }}</em></span>
+        <span><b>สาขา / เครื่อง</b><em>{{ lastZReport.branch_name || profile?.branchName }} · {{ profile?.terminalCode }}</em></span>
+        <span><b>แคชเชียร์</b><em>{{ lastZReport.cashier_name }}</em></span>
+        <span><b>เปิดกะ</b><em>{{ lastZReport.opened_at }}</em></span>
+        <span><b>ปิดกะ</b><em>{{ lastZReport.closed_at }}</em></span>
+        <span><b>จำนวนบิล</b><em>{{ lastZReport.receipt_count }}</em></span>
+      </div>
+      <div class="print-divider"></div>
+      <div class="print-meta print-block size-small">
+        <span><b>เงินสด</b><em>{{ money(lastZReport.cash_sales) }}</em></span>
+        <span><b>โอน / QR</b><em>{{ money(lastZReport.transfer_sales) }}</em></span>
+        <span><b>บัตรเครดิต</b><em>{{ money(lastZReport.card_sales) }}</em></span>
+        <span><b>เช็ค</b><em>{{ money(lastZReport.cheque_sales) }}</em></span>
+        <span><b>รวมยอดขาย</b><em>{{ money(lastZReport.cash_sales + lastZReport.transfer_sales + lastZReport.card_sales + lastZReport.cheque_sales) }}</em></span>
+      </div>
+      <div class="print-divider"></div>
+      <div class="print-meta print-block size-small">
+        <span><b>เงินทอนตั้งต้น</b><em>{{ money(lastZReport.opening_cash) }}</em></span>
+        <span><b>เงินเข้าลิ้นชัก</b><em>{{ money(lastZReport.cash_in) }}</em></span>
+        <span><b>นำส่งเงิน</b><em>-{{ money(lastZReport.cash_drops) }}</em></span>
+        <span><b>เบิกจ่าย</b><em>-{{ money(lastZReport.cash_payouts) }}</em></span>
+        <span><b>เงินสดที่ควรมี</b><em>{{ money(lastZReport.expected_cash) }}</em></span>
+        <span><b>เงินสดนับจริง</b><em>{{ money(lastZReport.counted_cash ?? 0) }}</em></span>
+        <span class="is-bold"><b>เงินขาด / เกิน</b><em>{{ money(lastZReport.cash_difference ?? 0) }}</em></span>
+      </div>
+      <div class="print-divider"></div>
+      <div class="print-block align-center size-small">แคชเชียร์ ........................ &nbsp; ผู้ตรวจ ........................</div>
+    </section>
+    <section v-else-if="lastReceipt" class="print-receipt" :class="receiptTemplate.paper_width === 58 ? 'paper-58' : 'paper-80'">
       <div v-for="block in receiptTemplate.blocks" :key="block.id" class="print-block" :class="[receiptBlockClasses(block), `type-${block.type}`]">
         <template v-if="block.type === 'logo'">
           <img v-if="profile?.company.logo_url" class="print-logo" :src="profile.company.logo_url" alt="">

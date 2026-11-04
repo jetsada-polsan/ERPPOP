@@ -1,7 +1,7 @@
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http'
 import { invoke } from '@tauri-apps/api/core'
 import { normalizeServerUrl } from './server-url'
-import type { Cashier, CheckoutPayload, DeviceProfile, HeldBill, Member, Product, QtyPromotion, Shift } from './types'
+import type { Cashier, CheckoutPayload, DeviceProfile, HeldBill, Member, Product, QtyPromotion, Shift, ZReport } from './types'
 
 let baseUrl = ''
 
@@ -86,7 +86,7 @@ export const api = {
   promotions: (branchId: number) => request<QtyPromotion[]>(`/promotions?branch_id=${branchId}&include_upcoming=1&bill_promotions=1&mix_promotions=1`),
   activeShift: async (branchId: number, cashierId: number) => (await request<{ shift: Shift | null }>(`/shift?branch_id=${branchId}&cashier_id=${cashierId}`)).shift,
   openShift: async (branchId: number, cashierId: number, openingCash: number) => (await request<{ shift: Shift }>('/shift/open', { method: 'POST', body: JSON.stringify({ branch_id: branchId, cashier_id: cashierId, opening_cash: openingCash }) })).shift,
-  closeShift: async (shiftId: number, countedCash: number) => (await request<{ shift: Shift }>('/shift/close', { method: 'POST', body: JSON.stringify({ shift_id: shiftId, counted_cash: countedCash }) })).shift,
+  closeShift: async (shiftId: number, countedCash: number) => (await request<{ shift: Shift & ZReport }>('/shift/close', { method: 'POST', body: JSON.stringify({ shift_id: shiftId, counted_cash: countedCash }) })).shift,
   heldBills: async (branchId: number, cashierId: number) => (await request<{ held_bills: HeldBill[] }>(`/held-bills?branch_id=${branchId}&cashier_id=${cashierId}`)).held_bills,
   holdBill: (payload: Record<string, unknown>) => request<{ held_bill_id: number; message: string }>('/held-bills', { method: 'POST', body: JSON.stringify(payload) }),
   resumeHeldBill: async (id: number) => (await request<{ held_bill: HeldBill }>(`/held-bills/${id}/resume`, { method: 'POST' })).held_bill,
