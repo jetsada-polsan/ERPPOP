@@ -1,6 +1,14 @@
 # Handoff — 2026-11-02 (แก้สีหน้า Executive Dashboard)
 
 ## Handoff - 2026-11-04
+- Commit: pending — fix Python POS UAT product-card rendering
+- ทำอะไร: แก้หน้าจอที่ตรวจจากเครื่อง BK Server แล้วพบแท็ก HTML (`<div>`, `<b>`, `<span>`) หลุดเป็นข้อความในปุ่มสินค้าและหัว/รายการตะกร้า โดยเปลี่ยนเป็นข้อความ Qt ปกติและกำหนด style ของวิดเจ็ตโดยตรง
+- ทดสอบ: `PYTHONPATH=apps/jet-pos-python python3 -m unittest discover -s apps/jet-pos-python/tests -v` ผ่าน 25 tests; `QT_QPA_PLATFORM=offscreen` เปิด `PosWindow` ผ่าน; `git diff --check` ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: ต้อง build Windows installer และติดตั้งทับบน BK Server เพื่อตรวจหน้าจอจริงก่อนทำรายการขาย; ห้ามถือว่า feature parity กับ Vue POS ครบจากการทดสอบนี้
+- Deploy: ไม่ deploy ERP; workflow UAT จะ publish เฉพาะ installer แยกเมื่อ push branch
+- งานถัดไป: ดาวน์โหลด installer รุ่นใหม่, ตรวจหน้า setup/product/cart/payment บน Windows และขอผู้ใช้กรอก Device Token/PIN เองก่อนทดสอบกับ ERP
+
+## Handoff - 2026-11-04
 - Commit: pending — Python POS UAT follow-up
 - ทำอะไร: เพิ่ม Activation Code pairing, cache credential สำหรับยืนยัน PIN แบบออฟไลน์โดยไม่เก็บ PIN ดิบ, บังคับใช้ออฟไลน์เฉพาะแคชเชียร์/กะเดิมที่ ERP เคยยืนยัน, ประวัติขายและ backup SQLite, พร้อม flow UI สำหรับสินค้า/โปรโมชัน/พักบิล/ชำระ/ใบเสร็จ/ปิดกะ/คืน/ยกเลิก
 - ทดสอบ: `QT_QPA_PLATFORM=offscreen` UI smoke ผ่าน และ `python3 -m unittest discover -s tests -v` ผ่าน 25 tests

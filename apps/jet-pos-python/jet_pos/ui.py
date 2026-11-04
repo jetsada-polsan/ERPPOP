@@ -348,7 +348,7 @@ class PosWindow(QMainWindow):
         panel.setStyleSheet("QFrame{background:white;border:1px solid #d5e1e8;border-radius:10px;} QLabel{border:0;}")
         box = QVBoxLayout(panel)
         heading = QHBoxLayout()
-        title = QLabel("<b>รายการสินค้า</b><br><span style='color:#748794'>เลือกหรือสแกนเพื่อขาย</span>")
+        title = QLabel("รายการสินค้า\nเลือกหรือสแกนเพื่อขาย")
         title.setStyleSheet("font-size:15px;")
         heading.addWidget(title)
         heading.addStretch()
@@ -378,7 +378,7 @@ class PosWindow(QMainWindow):
         panel.setStyleSheet("QFrame{background:white;border:1px solid #d5e1e8;border-radius:10px;} QLabel{border:0;}")
         box = QVBoxLayout(panel)
         header = QHBoxLayout()
-        heading = QLabel("บิลปัจจุบัน\n<b>รายการขาย</b>")
+        heading = QLabel("บิลปัจจุบัน\nรายการขาย")
         heading.setStyleSheet("font-size:16px;color:#075b86;")
         header.addWidget(heading)
         header.addStretch()
@@ -413,9 +413,14 @@ class PosWindow(QMainWindow):
         for index, product in enumerate(products):
             card = QPushButton()
             card.setMinimumHeight(138)
-            stock_class = "#c53d37" if product.stock_qty <= 0 else "#168553"
-            card.setText(f"<div style='text-align:left'><span style='color:#75838f;font-size:12px'>{product.sku_code}</span><br><b style='font-size:13px'>{product.name_th}</b><br><br><span style='color:{stock_class};font-size:12px'>● คงเหลือ {product.stock_qty} {product.unit_name}</span> <span style='color:#075b86;font-size:16px;font-weight:800'>฿{product.pos_price:.2f}</span></div>")
-            card.setStyleSheet("QPushButton{text-align:left;padding:12px;background:#fff;border:1px solid #d7e4eb;border-radius:8px;color:#1b4059;} QPushButton:hover{border:2px solid #1596cb;background:#effbff;}")
+            stock = f"● คงเหลือ {product.stock_qty} {product.unit_name}"
+            card.setText(f"{product.sku_code}\n{product.name_th}\n\n{stock}     ฿{product.pos_price:.2f}")
+            stock_color = "#c53d37" if product.stock_qty <= 0 else "#168553"
+            card.setStyleSheet(
+                "QPushButton{text-align:left;padding:12px;background:#fff;border:1px solid #d7e4eb;"
+                f"border-radius:8px;color:#1b4059;}} QPushButton:hover{{border:2px solid #1596cb;background:#effbff;}}"
+                f"QPushButton{{selection-color:{stock_color};}}"
+            )
             card.clicked.connect(lambda _, item=product: self._add_to_cart(item))
             self._grid.addWidget(card, index // 4, index % 4)
 
@@ -985,7 +990,8 @@ class PosWindow(QMainWindow):
             row = QFrame()
             row.setStyleSheet("QFrame{background:#f7fafb;border:1px solid #e1ebef;border-radius:6px;padding:4px;}")
             layout = QHBoxLayout(row)
-            description = QLabel(f"<b>{product.sku_code}</b>  {product.name_th}<br><span style='color:#697b88'>จำนวน {item.qty.normalize()} {product.unit_name}</span>")
+            description = QLabel(f"{product.sku_code}  {product.name_th}\nจำนวน {item.qty.normalize()} {product.unit_name}")
+            description.setStyleSheet("font-weight:700;color:#1b4059;")
             layout.addWidget(description, 1)
             edit = QPushButton("แก้จำนวน")
             edit.clicked.connect(lambda _, key=(product.id, item.barcode, item.barcode_type): self._edit_cart_quantity(key))
@@ -996,7 +1002,9 @@ class PosWindow(QMainWindow):
             layout.addWidget(edit); layout.addWidget(remove); layout.addWidget(amount)
             self._cart_body.addWidget(row)
         if pricing.promo_discount > 0:
-            self._cart_body.addWidget(QLabel(f"<span style='color:#168553'><b>ส่วนลดโปรโมชั่น</b> -฿{pricing.promo_discount:.2f}</span>"))
+            discount = QLabel(f"ส่วนลดโปรโมชั่น  -฿{pricing.promo_discount:.2f}")
+            discount.setStyleSheet("color:#168553;font-weight:800;")
+            self._cart_body.addWidget(discount)
         self._cart_body.addStretch()
         quantity = sum((line.qty for line in self._cart), Decimal("0"))
         self._total.setText(f"฿{pricing.total:.2f}"); self._items.setText(f"{len(grouped)} รายการ · {quantity.normalize()} ชิ้น")
