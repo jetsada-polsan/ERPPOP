@@ -122,8 +122,15 @@ const stopAskingPin = watch(profile, (value) => {
   if (value && !cashier.value && !modal.value) modal.value = 'cashier'
   if (value) stopAskingPin()
 })
+// PIN มี 4–20 หลัก (PIN ชั่วคราวจาก ERP มี 6 หลัก) ห้ามส่งทันทีที่ครบ 4 หลัก
+// ส่งเองเมื่อหยุดพิมพ์ 0.9 วินาทีหลังครบ 4 หลักขึ้นไป หรือกดปุ่มเข้าใช้งาน
+let pinTimer: number | undefined
 watch(cashierPin, (value) => {
-  if (modal.value === 'cashier' && /^\d{4}$/.test(value) && !busy.value) loginCashier()
+  window.clearTimeout(pinTimer)
+  if (modal.value !== 'cashier' || busy.value || !/^\d{4,20}$/.test(value)) return
+  pinTimer = window.setTimeout(() => {
+    if (modal.value === 'cashier' && !busy.value && cashierPin.value === value) loginCashier()
+  }, 900)
 })
 const subtotal = computed(() => pricing.value.total)
 const totalQty = computed(() => cart.value.reduce((sum, line) => sum + Number(line.qty), 0))
@@ -1067,7 +1074,7 @@ onUnmounted(() => {
             <button type="button" :disabled="busy" @click="cashierPin = (cashierPin + '0').slice(0, 20)">0</button>
             <button type="button" class="pin-action" :disabled="busy" @click="cashierPin = cashierPin.slice(0, -1)">ลบ</button>
           </div>
-          <small class="setup-hint">PIN 4 หลักเข้าระบบทันที · พิมพ์จากคีย์บอร์ดได้ · สาขา {{ profile?.branchName }}</small>
+          <small class="setup-hint">ใส่ PIN ครบแล้วรอสักครู่ หรือกดเข้าใช้งาน · พิมพ์จากคีย์บอร์ดได้ · สาขา {{ profile?.branchName }}</small>
           <button class="primary" :disabled="busy || cashierPin.length < 4">{{ busy ? 'กำลังเข้าใช้งาน...' : 'เข้าใช้งาน' }}</button>
           <button type="button" class="link-button" @click="openSettings">ตั้งค่าเครื่อง (ผู้ดูแล)</button>
         </template>
