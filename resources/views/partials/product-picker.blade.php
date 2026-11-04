@@ -36,7 +36,7 @@
                 @keydown.arrow-up.prevent="movePickerActive(-1)"
                 @keydown.home.prevent="movePickerActive(-9999)"
                 @keydown.end.prevent="movePickerActive(9999)"
-                placeholder="พิมพ์รหัส ชื่อ หรือยิงบาร์โค้ด..." autocomplete="off">
+                placeholder="พิมพ์รหัส ชื่อ หรือยิงบาร์โค้ด..." autocomplete="off" data-scan>
             <button type="button" x-show="pickerQuery" @click="pickerQuery=''; searchPickerProducts(); $refs.productPickerSearch.focus()">ล้าง</button>
         </div>
         <div class="product-picker-body" x-ref="productPickerBody">

@@ -2178,5 +2178,6 @@
     });
 })();
 </script>
+@include('partials.camera-scan')
 </body>
 </html>
