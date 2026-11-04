@@ -2,8 +2,7 @@
 name = "jet-pos-python-uat"
 version = "0.1.0"
 description = "Isolated PySide6 POS UAT candidate for JET ERP"
-requires-python = ">=3.11"
+requires-python = ">=3.9"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-
