@@ -2,7 +2,7 @@
 
 ## Handoff - 2026-11-04
 - Commit: pending — fix Python POS UAT product-card rendering
-- ทำอะไร: แก้หน้าจอที่ตรวจจากเครื่อง BK Server แล้วพบแท็ก HTML (`<div>`, `<b>`, `<span>`) หลุดเป็นข้อความในปุ่มสินค้าและหัว/รายการตะกร้า โดยเปลี่ยนเป็นข้อความ Qt ปกติและกำหนด style ของวิดเจ็ตโดยตรง
+- ทำอะไร: แก้หน้าจอที่ตรวจจากเครื่อง BK Server แล้วพบแท็ก HTML (`<div>`, `<b>`, `<span>`) หลุดเป็นข้อความในปุ่มสินค้าและหัว/รายการตะกร้า โดยเปลี่ยนเป็นข้อความ Qt ปกติและกำหนด style ของวิดเจ็ตโดยตรง; ลด toolbar ที่กว้างเกินจอเป็นคำสั่งหลัก 6 ปุ่ม และเมนู `เพิ่มเติม` สำหรับคำสั่งรอง เพื่อให้ catalog กับตะกร้าอยู่ใน viewport เดียวบนจอ 1366px
 - ทดสอบ: `PYTHONPATH=apps/jet-pos-python python3 -m unittest discover -s apps/jet-pos-python/tests -v` ผ่าน 25 tests; `QT_QPA_PLATFORM=offscreen` เปิด `PosWindow` ผ่าน; `git diff --check` ผ่าน
 - ยังไม่ทดสอบ/ความเสี่ยง: ต้อง build Windows installer และติดตั้งทับบน BK Server เพื่อตรวจหน้าจอจริงก่อนทำรายการขาย; ห้ามถือว่า feature parity กับ Vue POS ครบจากการทดสอบนี้
 - Deploy: ไม่ deploy ERP; workflow UAT จะ publish เฉพาะ installer แยกเมื่อ push branch

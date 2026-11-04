@@ -8,7 +8,7 @@ from uuid import uuid4
 from PySide6.QtCore import QStandardPaths, Qt, QSettings
 from PySide6.QtGui import QKeySequence, QShortcut, QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
-from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFormLayout, QFrame, QGridLayout, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton, QScrollArea, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFormLayout, QFrame, QGridLayout, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMainWindow, QMenu, QMessageBox, QPushButton, QScrollArea, QVBoxLayout, QWidget
 
 from .api import PosApiClient, PosApiError, pair_device
 from .local_store import LocalStore
@@ -308,38 +308,34 @@ class PosWindow(QMainWindow):
         row.addStretch()
         self._sync_label.setStyleSheet("padding:10px 16px;border:1px solid #55c9ad;border-radius:7px;background:#08745f;font-weight:800;")
         row.addWidget(self._sync_label)
-        shift = QPushButton("▣ เข้ากะ")
-        shift.clicked.connect(self._open_shift)
-        change_pin = QPushButton("⌁ เปลี่ยน PIN")
-        change_pin.clicked.connect(self._change_cashier_pin)
-        close_shift = QPushButton("▤ ปิดกะ / Z")
-        close_shift.clicked.connect(self._close_shift)
-        hold_bill = QPushButton("▣ พักบิล")
-        hold_bill.clicked.connect(self._hold_bill)
-        resume_bill = QPushButton("▤ เรียกบิล")
-        resume_bill.clicked.connect(self._resume_held_bill)
-        print_receipt = QPushButton("🖨 พิมพ์บิลล่าสุด")
-        print_receipt.clicked.connect(self._print_last_receipt)
-        member = QPushButton("♙ สมาชิก")
-        member.clicked.connect(self._select_member)
-        cash_movement = QPushButton("฿ เงินสดกะ")
-        cash_movement.clicked.connect(self._cash_movement)
-        void_receipt = QPushButton("↶ ยกเลิกบิล")
-        void_receipt.clicked.connect(self._void_receipt)
-        return_receipt = QPushButton("↩ คืนสินค้า")
-        return_receipt.clicked.connect(self._return_receipt)
-        diagnostics = QPushButton("ⓘ สุขภาพเครื่อง")
-        diagnostics.clicked.connect(self._show_diagnostics)
-        backup = QPushButton("▣ สำรองข้อมูล")
-        backup.clicked.connect(self._backup_local_data)
-        sync = QPushButton("↻ โหลดสินค้า")
-        sync.clicked.connect(self._load_catalog)
-        sync_queue = QPushButton("⟳ ส่งบิลค้าง")
-        sync_queue.clicked.connect(self._sync_queue)
-        settings = QPushButton("⚙ ตั้งค่า")
-        settings.clicked.connect(self._open_settings)
-        for button in (shift, change_pin, close_shift, cash_movement, void_receipt, return_receipt, hold_bill, resume_bill, print_receipt, member, diagnostics, backup, sync, sync_queue, settings):
+        def command(label: str, handler) -> QPushButton:
+            button = QPushButton(label)
+            button.clicked.connect(handler)
             button.setStyleSheet("QPushButton{padding:10px 14px;color:white;background:#075b86;border:1px solid #62a9ca;border-radius:7px;font-weight:800;} QPushButton:hover{background:#0b6b99;}")
+            return button
+
+        shift = command("▣ เข้ากะ", self._open_shift)
+        close_shift = command("▤ ปิดกะ / Z", self._close_shift)
+        hold_bill = command("▣ พักบิล", self._hold_bill)
+        resume_bill = command("▤ เรียกบิล", self._resume_held_bill)
+        print_receipt = command("🖨 พิมพ์บิล", self._print_last_receipt)
+        settings = command("⚙ ตั้งค่า", self._open_settings)
+        more = command("เพิ่มเติม ▾", lambda: None)
+        menu = QMenu(more)
+        for label, handler in (
+            ("เปลี่ยน PIN", self._change_cashier_pin),
+            ("สมาชิก", self._select_member),
+            ("เงินสดกะ", self._cash_movement),
+            ("ยกเลิกบิล", self._void_receipt),
+            ("คืนสินค้า", self._return_receipt),
+            ("สุขภาพเครื่อง", self._show_diagnostics),
+            ("สำรองข้อมูล", self._backup_local_data),
+            ("โหลดสินค้า", self._load_catalog),
+            ("ส่งบิลค้าง", self._sync_queue),
+        ):
+            menu.addAction(label, handler)
+        more.setMenu(menu)
+        for button in (shift, close_shift, hold_bill, resume_bill, print_receipt, settings, more):
             row.addWidget(button)
         return bar
 
