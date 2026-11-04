@@ -56,7 +56,14 @@ class OfflineQueueTest(unittest.TestCase):
         self.assertEqual(row["status"], "needs_review")
         self.assertIn("price differs", row["error"])
 
+    def test_checkout_lookup_keeps_the_sync_result(self) -> None:
+        self.store.queue_checkout({"items": []}, "sale-004")
+        self.store.mark_synced("sale-004", "POS-0004")
+        checkout = self.store.checkout("sale-004")
+        self.assertIsNotNone(checkout)
+        self.assertEqual(checkout.status, "synced")
+        self.assertEqual(checkout.receipt_no, "POS-0004")
+
 
 if __name__ == "__main__":
     unittest.main()
-

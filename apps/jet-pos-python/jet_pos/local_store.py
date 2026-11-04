@@ -69,6 +69,15 @@ class LocalStore:
             for row in rows
         ]
 
+    def checkout(self, idempotency_key: str) -> QueuedCheckout | None:
+        row = self.connection.execute(
+            "SELECT idempotency_key, payload_json, status, attempts, error, receipt_no FROM checkout_queue WHERE idempotency_key = ?",
+            (idempotency_key,),
+        ).fetchone()
+        if row is None:
+            return None
+        return QueuedCheckout(row["idempotency_key"], json.loads(row["payload_json"]), row["status"], row["attempts"], row["error"], row["receipt_no"])
+
     def mark_syncing(self, idempotency_key: str) -> None:
         with self.connection:
             self.connection.execute(
@@ -91,4 +100,3 @@ class LocalStore:
                 "UPDATE checkout_queue SET status = ?, error = ?, updated_at = CURRENT_TIMESTAMP WHERE idempotency_key = ?",
                 (status, error, idempotency_key),
             )
-

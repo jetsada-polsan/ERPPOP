@@ -24,6 +24,8 @@ class Product:
     sku_code: str
     name_th: str
     pos_price: Money
+    stock_qty: Decimal = Decimal("0")
+    unit_name: str = "ชิ้น"
 
 
 @dataclass(frozen=True)
@@ -79,4 +81,3 @@ class CartPricing:
     before_vat: Money
     items: tuple[PricedItem, ...] = field(default_factory=tuple)
     free_items: tuple[FreeItem, ...] = field(default_factory=tuple)
-
