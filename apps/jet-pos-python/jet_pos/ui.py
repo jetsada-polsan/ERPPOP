@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from uuid import uuid4
@@ -7,9 +8,9 @@ from uuid import uuid4
 from PySide6.QtCore import QStandardPaths, Qt, QSettings
 from PySide6.QtGui import QKeySequence, QShortcut, QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
-from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFormLayout, QFrame, QGridLayout, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton, QScrollArea, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFormLayout, QFrame, QGridLayout, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton, QScrollArea, QVBoxLayout, QWidget
 
-from .api import PosApiClient, PosApiError
+from .api import PosApiClient, PosApiError, pair_device
 from .local_store import LocalStore
 from .models import CartLine, Product, Promotion
 from .payments import Payment
@@ -53,8 +54,11 @@ class SettingsDialog(QDialog):
         self.token = QLineEdit(str(self._settings.value("device_token", "")))
         self.token.setEchoMode(QLineEdit.EchoMode.Password)
         self.token.setPlaceholderText("Device Token ของเครื่องทดสอบ")
+        self.pair_code = QLineEdit()
+        self.pair_code.setPlaceholderText("Activation Code จากหน้าจัดการเครื่อง POS")
         form.addRow("ERP URL", self.server)
         form.addRow("Device Token", self.token)
+        form.addRow("Activation Code", self.pair_code)
         layout.addLayout(form)
         self.production = QCheckBox("อนุมัติให้เครื่อง UAT นี้เชื่อม Production เพื่อทดสอบขายจริง")
         self.production.setChecked(self._settings.value("allow_production", False, bool))
@@ -63,6 +67,8 @@ class SettingsDialog(QDialog):
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
         actions = QHBoxLayout()
+        pair = QPushButton("จับคู่เครื่อง")
+        pair.clicked.connect(self._pair)
         test = QPushButton("ทดสอบการเชื่อมต่อ")
         test.clicked.connect(self._test_connection)
         save = QPushButton("บันทึกและโหลดสินค้า")
@@ -70,6 +76,7 @@ class SettingsDialog(QDialog):
         save.clicked.connect(self._save)
         cancel = QPushButton("ยกเลิก")
         cancel.clicked.connect(self.reject)
+        actions.addWidget(pair)
         actions.addWidget(test)
         actions.addStretch()
         actions.addWidget(cancel)
@@ -85,6 +92,17 @@ class SettingsDialog(QDialog):
             device = profile.get("device", {})
             name = device.get("name", "เครื่องทดสอบ") if isinstance(device, dict) else "เครื่องทดสอบ"
             self.status.setText(f"เชื่อมต่อสำเร็จ: {name}")
+            self.status.setStyleSheet("color:#16794d;font-weight:700;")
+        except (ValueError, PosApiError) as error:
+            self.status.setText(str(error))
+            self.status.setStyleSheet("color:#b42318;font-weight:700;")
+
+    def _pair(self) -> None:
+        try:
+            paired = pair_device(self.server.text(), self.pair_code.text(), self.production.isChecked())
+            self.token.setText(str(paired["token"]))
+            terminal = str(paired.get("terminal_code") or "")
+            self.status.setText(f"จับคู่เครื่องสำเร็จ {terminal}; กดบันทึกเพื่อเริ่มใช้งาน")
             self.status.setStyleSheet("color:#16794d;font-weight:700;")
         except (ValueError, PosApiError) as error:
             self.status.setText(str(error))
@@ -292,6 +310,8 @@ class PosWindow(QMainWindow):
         row.addWidget(self._sync_label)
         shift = QPushButton("▣ เข้ากะ")
         shift.clicked.connect(self._open_shift)
+        change_pin = QPushButton("⌁ เปลี่ยน PIN")
+        change_pin.clicked.connect(self._change_cashier_pin)
         close_shift = QPushButton("▤ ปิดกะ / Z")
         close_shift.clicked.connect(self._close_shift)
         hold_bill = QPushButton("▣ พักบิล")
@@ -308,13 +328,17 @@ class PosWindow(QMainWindow):
         void_receipt.clicked.connect(self._void_receipt)
         return_receipt = QPushButton("↩ คืนสินค้า")
         return_receipt.clicked.connect(self._return_receipt)
+        diagnostics = QPushButton("ⓘ สุขภาพเครื่อง")
+        diagnostics.clicked.connect(self._show_diagnostics)
+        backup = QPushButton("▣ สำรองข้อมูล")
+        backup.clicked.connect(self._backup_local_data)
         sync = QPushButton("↻ โหลดสินค้า")
         sync.clicked.connect(self._load_catalog)
         sync_queue = QPushButton("⟳ ส่งบิลค้าง")
         sync_queue.clicked.connect(self._sync_queue)
         settings = QPushButton("⚙ ตั้งค่า")
         settings.clicked.connect(self._open_settings)
-        for button in (shift, close_shift, cash_movement, void_receipt, return_receipt, hold_bill, resume_bill, print_receipt, member, sync, sync_queue, settings):
+        for button in (shift, change_pin, close_shift, cash_movement, void_receipt, return_receipt, hold_bill, resume_bill, print_receipt, member, diagnostics, backup, sync, sync_queue, settings):
             button.setStyleSheet("QPushButton{padding:10px 14px;color:white;background:#075b86;border:1px solid #62a9ca;border-radius:7px;font-weight:800;} QPushButton:hover{background:#0b6b99;}")
             row.addWidget(button)
         return bar
@@ -466,10 +490,11 @@ class PosWindow(QMainWindow):
         )
 
     def _open_shift(self) -> None:
+        pin, accepted = QInputDialog.getText(self, "เข้าแคชเชียร์", "PIN คนขาย", QLineEdit.EchoMode.Password)
+        if not accepted or not pin:
+            return
         try:
             profile = self._client().ping()
-            pin, accepted = QInputDialog.getText(self, "เข้าแคชเชียร์", "PIN คนขาย", QLineEdit.EchoMode.Password)
-            if not accepted or not pin: return
             login = self._client().post("/cashier/login", {"pin": pin})
             if isinstance(login, dict) and login.get("selection_required") and isinstance(login.get("cashiers"), list):
                 candidates = [candidate for candidate in login["cashiers"] if isinstance(candidate, dict)]
@@ -481,6 +506,9 @@ class PosWindow(QMainWindow):
                 login = self._client().post("/cashier/login", {"pin": pin, "cashier_id": int(cashier["id"])})
             if not isinstance(login, dict) or not isinstance(login.get("cashier"), dict): raise PosApiError("ไม่พบแคชเชียร์จาก ERP")
             self._cashier = login["cashier"]
+            credential = login.get("offline_credential")
+            if isinstance(credential, dict):
+                self._store.cache_offline_cashier(self._cashier, credential)
             branch_id, cashier_id = int(profile.get("branch_id") or 0), int(self._cashier.get("id") or 0)
             active = self._client().get(f"/shift?branch_id={branch_id}&cashier_id={cashier_id}")
             shift = active.get("shift") if isinstance(active, dict) else None
@@ -491,11 +519,42 @@ class PosWindow(QMainWindow):
                 shift = opened.get("shift") if isinstance(opened, dict) else None
             if not isinstance(shift, dict): raise PosApiError("เปิดกะไม่สำเร็จ")
             self._profile, self._shift = profile, shift
+            self._settings.setValue("active_profile", json.dumps(self._profile, ensure_ascii=False))
+            self._settings.setValue("active_cashier", json.dumps(self._cashier, ensure_ascii=False))
+            self._settings.setValue("active_shift", json.dumps(self._shift, ensure_ascii=False))
             if self._pay_button: self._pay_button.setEnabled(bool(self._cart))
             self._sync_label.setText(f"● เปิดกะ {shift.get('shift_no', '')}")
             QMessageBox.information(self, "พร้อมขาย", f"เข้าแคชเชียร์ {self._cashier.get('name', '')} แล้ว")
         except (ValueError, PosApiError) as error:
-            QMessageBox.warning(self, "เปิดกะไม่สำเร็จ", str(error))
+            self._open_offline_shift(pin, str(error))
+
+    def _open_offline_shift(self, pin: str, online_error: str) -> None:
+        matches = self._store.offline_cashiers_by_pin(pin)
+        if not matches:
+            QMessageBox.warning(self, "เข้าออฟไลน์ไม่ได้", f"{online_error}\nไม่พบ PIN ที่เคยยืนยันบนเครื่องนี้")
+            return
+        cashier = matches[0]
+        if len(matches) > 1:
+            labels = [f"{candidate['code']}: {candidate['name']}" for candidate in matches]
+            selected, accepted = QInputDialog.getItem(self, "เลือกแคชเชียร์ออฟไลน์", "PIN นี้ใช้ได้มากกว่าหนึ่งคน", labels, 0, False)
+            if not accepted:
+                return
+            cashier = matches[labels.index(selected)]
+        try:
+            profile = json.loads(str(self._settings.value("active_profile", "")))
+            previous_cashier = json.loads(str(self._settings.value("active_cashier", "")))
+            shift = json.loads(str(self._settings.value("active_shift", "")))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            QMessageBox.warning(self, "เข้าออฟไลน์ไม่ได้", "เครื่องนี้ยังไม่มีข้อมูลกะที่ยืนยันออนไลน์ กรุณาเชื่อม ERP และเปิดกะก่อน")
+            return
+        if not isinstance(profile, dict) or not isinstance(previous_cashier, dict) or not isinstance(shift, dict) or int(previous_cashier.get("id") or 0) != int(cashier["id"]):
+            QMessageBox.warning(self, "เข้าออฟไลน์ไม่ได้", "ต้องใช้แคชเชียร์และกะเดิมที่เปิดไว้ตอนยังเชื่อม ERP")
+            return
+        self._profile, self._cashier, self._shift = profile, cashier, shift
+        if self._pay_button:
+            self._pay_button.setEnabled(bool(self._cart))
+        self._sync_label.setText(f"● ออฟไลน์ · กะ {shift.get('shift_no', '')}")
+        QMessageBox.information(self, "พร้อมขายออฟไลน์", "บิลจะเก็บในเครื่องและส่งขึ้น ERP เมื่อเชื่อมต่อได้")
 
     def _sync_queue(self) -> None:
         try:
@@ -505,6 +564,52 @@ class PosWindow(QMainWindow):
             QMessageBox.information(self, "ซิงก์บิล", f"ส่งบิลสำเร็จ {synced} บิล\nค้างส่ง {pending} บิล")
         except (ValueError, PosApiError) as error:
             QMessageBox.warning(self, "ส่งบิลค้างไม่สำเร็จ", str(error))
+
+    def _show_diagnostics(self) -> None:
+        health = self._store.health()
+        history = self._store.recent_sales(10)
+        latest = history[0].receipt_no if history else "ยังไม่มี"
+        QMessageBox.information(self, "สุขภาพข้อมูลเครื่อง", "\n".join((
+            f"ฐานข้อมูล: {health['integrity']}",
+            f"บิลค้างส่ง: {health['queued']}",
+            f"บิลรอตรวจสอบ: {health['review']}",
+            f"บิลซิงก์แล้ว: {health['synced']}",
+            f"บิลล่าสุด: {latest}",
+        )))
+
+    def _backup_local_data(self) -> None:
+        default = str(Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DocumentsLocation)) / "jet-pos-python-backup.sqlite")
+        destination, _ = QFileDialog.getSaveFileName(self, "สำรองข้อมูล POS", default, "SQLite Database (*.sqlite)")
+        if not destination:
+            return
+        try:
+            self._store.backup_to(Path(destination))
+            QMessageBox.information(self, "สำรองข้อมูลแล้ว", f"บันทึกไฟล์สำรองที่\n{destination}")
+        except OSError as error:
+            QMessageBox.warning(self, "สำรองข้อมูลไม่สำเร็จ", str(error))
+
+    def _change_cashier_pin(self) -> None:
+        if not self._cashier:
+            QMessageBox.information(self, "เปลี่ยน PIN", "เข้าแคชเชียร์ก่อนเปลี่ยน PIN")
+            return
+        code = str(self._cashier.get("code") or "")
+        if not code:
+            QMessageBox.warning(self, "เปลี่ยน PIN ไม่สำเร็จ", "ไม่พบรหัสแคชเชียร์")
+            return
+        current, accepted = QInputDialog.getText(self, "เปลี่ยน PIN", "PIN ปัจจุบัน", QLineEdit.EchoMode.Password)
+        if not accepted or not current:
+            return
+        new_pin, accepted = QInputDialog.getText(self, "เปลี่ยน PIN", "PIN ใหม่ (4-20 หลัก)", QLineEdit.EchoMode.Password)
+        if not accepted or not new_pin:
+            return
+        if not new_pin.isdigit() or not 4 <= len(new_pin) <= 20:
+            QMessageBox.warning(self, "PIN ไม่ถูกต้อง", "PIN ใหม่ต้องเป็นตัวเลข 4-20 หลัก")
+            return
+        try:
+            result = self._client().post("/cashier/pin", {"code": code, "current_pin": current, "new_pin": new_pin})
+            QMessageBox.information(self, "เปลี่ยน PIN แล้ว", str(result.get("message") if isinstance(result, dict) else "เรียบร้อย"))
+        except (ValueError, PosApiError) as error:
+            QMessageBox.warning(self, "เปลี่ยน PIN ไม่สำเร็จ", str(error))
 
     def _close_shift(self) -> None:
         if not self._shift:
@@ -534,6 +639,9 @@ class PosWindow(QMainWindow):
             QMessageBox.information(self, "ปิดกะสำเร็จ", report)
             self._print_z_report(report)
             self._shift = {}
+            self._settings.remove("active_cashier")
+            self._settings.remove("active_shift")
+            self._settings.remove("active_profile")
             if self._pay_button:
                 self._pay_button.setEnabled(False)
             self._sync_label.setText("● ปิดกะแล้ว")
@@ -747,6 +855,7 @@ class PosWindow(QMainWindow):
         payload = {"branch_id": int(self._profile["branch_id"]), "shift_id": int(self._shift["id"]), "cashier_id": int(self._cashier["id"]), **payment_fields, **({"member_id": int(self._member["id"])} if self._member and self._member.get("id") else {}), "bill_promotions": True, "mix_promotions": True, "vat_mode": "included", "items": [{"product_id": item.product_id, "qty": float(item.qty), "unit_price": float(item.unit_price), **({"barcode": item.barcode} if item.barcode else {}), **({"barcode_type": item.barcode_type} if item.barcode_type else {})} for item in pricing.items]}
         key = str(uuid4())
         self._store.queue_checkout(payload, key)
+        self._store.save_sale(key, payload, float(pricing.total))
         try:
             sync_pending_checkouts(self._store, self._client())
             queued = self._store.checkout(key)

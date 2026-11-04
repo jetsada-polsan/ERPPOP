@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from jet_pos.api import PosApiClient
+from jet_pos.api import PosApiClient, pair_device
 
 
 class PosApiClientTest(unittest.TestCase):
@@ -24,6 +24,17 @@ class PosApiClientTest(unittest.TestCase):
 
         client = PosApiClient("http://127.0.0.1:8000", "device-token", transport)
         self.assertEqual(client.search_members("A & B")[0]["id"], 4)
+
+    def test_pair_device_posts_without_a_bearer_token(self) -> None:
+        def transport(method, url, headers, body):
+            self.assertEqual(method, "POST")
+            self.assertTrue(url.endswith("/api/pos/pair"))
+            self.assertNotIn("Authorization", headers)
+            self.assertEqual(json.loads(body), {"code": "PAIR-001"})
+            return 200, b'{"token":"new-device-token","terminal_code":"POS-01"}'
+
+        paired = pair_device("http://127.0.0.1:8000", "PAIR-001", transport=transport)
+        self.assertEqual(paired["terminal_code"], "POS-01")
 
 
 if __name__ == "__main__":

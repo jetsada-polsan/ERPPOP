@@ -1,4 +1,5 @@
 import json
+import sqlite3
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -63,6 +64,25 @@ class OfflineQueueTest(unittest.TestCase):
         self.assertIsNotNone(checkout)
         self.assertEqual(checkout.status, "synced")
         self.assertEqual(checkout.receipt_no, "POS-0004")
+
+    def test_history_tracks_a_queued_sale_and_sync_result(self) -> None:
+        payload = {"method": "cash", "items": [{"product_id": 1}]}
+        self.store.queue_checkout(payload, "sale-005")
+        self.store.save_sale("sale-005", payload, 20.0)
+        self.store.mark_synced("sale-005", "POS-0005")
+        sale = self.store.recent_sales()[0]
+        self.assertEqual(sale.receipt_no, "POS-0005")
+        self.assertEqual(sale.status, "synced")
+
+    def test_backup_creates_a_readable_database(self) -> None:
+        target = Path(self.temporary_directory.name) / "backup" / "pos.sqlite"
+        self.store.queue_checkout({"items": []}, "sale-006")
+        self.store.backup_to(target)
+        copy = sqlite3.connect(target)
+        try:
+            self.assertEqual(copy.execute("SELECT COUNT(*) FROM checkout_queue").fetchone()[0], 1)
+        finally:
+            copy.close()
 
 
 if __name__ == "__main__":

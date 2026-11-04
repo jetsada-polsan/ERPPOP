@@ -1,6 +1,13 @@
 # Handoff — 2026-11-02 (แก้สีหน้า Executive Dashboard)
 
 ## Handoff - 2026-11-04
+- Commit: pending — Python POS UAT follow-up
+- ทำอะไร: เพิ่ม Activation Code pairing, cache credential สำหรับยืนยัน PIN แบบออฟไลน์โดยไม่เก็บ PIN ดิบ, บังคับใช้ออฟไลน์เฉพาะแคชเชียร์/กะเดิมที่ ERP เคยยืนยัน, ประวัติขายและ backup SQLite, พร้อม flow UI สำหรับสินค้า/โปรโมชัน/พักบิล/ชำระ/ใบเสร็จ/ปิดกะ/คืน/ยกเลิก
+- ทดสอบ: `QT_QPA_PLATFORM=offscreen` UI smoke ผ่าน และ `python3 -m unittest discover -s tests -v` ผ่าน 25 tests
+- สถานะ: รอ push เพื่อให้ workflow `jet-pos-python-uat.yml` build/publish installer UAT รุ่นใหม่
+- ความเสี่ยง: ยังไม่ผ่าน parity UAT 50 บิลและ offline 20 บิล; installer นี้ใช้เพื่อทดสอบเท่านั้น ไม่ใช่ตัวแทน Vue POS ในการใช้งานจริง
+
+## Handoff - 2026-11-04
 - Commit: `e738e0c` — `Add separate JET Python POS download channel`
 - ทำอะไร: เพิ่มช่องทาง installer แยกของ `apps/jet-pos-python` ที่ `/download/jet-pos-python` และปุ่ม `JET POS Python UAT` วางข้าง Vue/Tauri กับ Python เดิมใน `/pos-admin` โดยแยกโฟลเดอร์ release เป็น `storage/app/jet-pos-python-releases` จึงไม่ปะปนกับ POS เดิม
 - สถานะ: หากยังไม่มีไฟล์ `JET-POS-Python-UAT-<version>.exe` บนเซิร์ฟเวอร์ จะแสดงปุ่ม disabled `รอทดสอบ`; เมื่อวางไฟล์ที่ผ่าน UAT แล้วจะเปลี่ยนเป็นปุ่มดาวน์โหลดอัตโนมัติ

@@ -46,6 +46,26 @@ def default_transport(method: str, url: str, headers: dict[str, str], body: byte
         raise PosApiError("ERP is unreachable") from error
 
 
+def pair_device(server_url: str, code: str, allow_production: bool = False, transport: Transport = default_transport) -> dict[str, object]:
+    normalized = safe_server_url(server_url, allow_production=allow_production)
+    pair_code = code.strip()
+    if not pair_code:
+        raise ValueError("กรอกรหัสติดตั้งเครื่อง POS")
+    status, raw = transport(
+        "POST", f"{normalized}/api/pos/pair",
+        {"Content-Type": "application/json", "Accept": "application/json"},
+        json.dumps({"code": pair_code}, ensure_ascii=False).encode("utf-8"),
+    )
+    try:
+        decoded = json.loads(raw.decode("utf-8") or "{}")
+    except json.JSONDecodeError as error:
+        raise PosApiError("ERP returned an invalid pairing response", status) from error
+    if status >= 400 or not isinstance(decoded, dict) or not decoded.get("token"):
+        message = decoded.get("message") if isinstance(decoded, dict) else None
+        raise PosApiError(str(message or "รหัสติดตั้งเครื่องไม่ถูกต้อง"), status)
+    return decoded
+
+
 @dataclass
 class PosApiClient:
     server_url: str
