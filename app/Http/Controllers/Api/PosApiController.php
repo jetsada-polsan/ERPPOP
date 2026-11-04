@@ -395,7 +395,7 @@ class PosApiController extends Controller
     {
         $roles = $cashier->user?->roles?->pluck('code')->all() ?? [];
 
-        return array_intersect($roles, ['GM', 'BRANCH_MGR']) ? 'manager' : 'cashier';
+        return array_intersect($roles, ['GM', 'BRANCH_MGR', 'IT_MGR']) ? 'manager' : 'cashier';
     }
 
     private function credentialVersion(Salesman $cashier): ?string
