@@ -10,6 +10,7 @@
 - งานถัดไป: ทำ Python POS ให้ครบ API/event, printer, shift, payment และ offline parity ตาม `docs/ai/python-pos-brief.md`; รัน 50 บิล parity + 20 บิล offline ก่อนอนุมัติ installer
 - หมายเหตุ deploy: workflow production `41804987520` ถูกหยุดที่ test ก่อนขึ้น production เพราะ `PermissionMatrixTest` ยังไม่ได้ลงทะเบียน route download ใหม่; แก้ matrix แล้วและ full suite ผ่านในเครื่องก่อน retry
 - Deploy: production สำเร็จผ่าน GitHub Actions run `41805639194` ที่ commit `d134d4c`; full test, frontend build, upload และ `scripts/deploy.sh` ผ่านแล้ว
+- Installer UAT: GitHub Actions run `41806471427` build/test/publish สำเร็จ; ดาวน์โหลดได้จาก `https://erp.popstarcenter.com/download/jet-pos-python` เป็น `JET-POS-Python-UAT-0.1.1.exe` (49,179,131 bytes) ในช่อง release แยก
 
 ## ทำอะไรไป
 - แก้หน้า `/executive` ที่จางเพราะอ้าง CSS variable `--erp-info` ซึ่งไม่มีการประกาศ
