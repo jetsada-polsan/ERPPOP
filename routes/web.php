@@ -103,6 +103,7 @@ Route::get('/download/pos', [PosReleaseController::class, 'downloadLatest'])->na
 Route::get('/download/pos/latest.json', [PosReleaseController::class, 'latest'])->name('pos.release.latest');
 Route::get('/download/pos/releases/{filename}', [PosReleaseController::class, 'download'])->name('pos.release.download');
 Route::get('/download/python-pos', [SystemSettingController::class, 'downloadPythonPos'])->name('python-pos.download');
+Route::get('/download/jet-pos-python', [SystemSettingController::class, 'downloadJetPythonPos'])->name('jet-python-pos.download');
 Route::get('/pos-admin', [PosAdminController::class, 'index'])->name('pos-admin.index');
 Route::delete('/master-data/{type}/{id}', [\App\Http\Controllers\MasterDataDeleteController::class, 'destroy'])->whereNumber('id')->name('master-data.destroy');
 Route::post('/pos-admin/devices/{device}/pair-code', [PosAdminController::class, 'newPairCode'])->name('pos-admin.devices.pair-code');

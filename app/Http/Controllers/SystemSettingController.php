@@ -15,6 +15,7 @@ use App\Services\Inventory\NegativeStockPolicyService;
 use App\Support\PosLayout;
 use App\Support\PosReleaseManifest;
 use App\Support\PosTerminalCode;
+use App\Support\JetPosPythonInstaller;
 use App\Support\PythonPosInstaller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -305,6 +306,18 @@ class SystemSettingController extends Controller
     {
         $installer = $this->currentPythonPosInstaller();
         abort_unless($installer, 404, 'ยังไม่มีไฟล์ติดตั้ง JET POS รุ่นทดสอบ');
+
+        return response()->download($installer['path'], $installer['filename'], [
+            'Content-Type' => 'application/vnd.microsoft.portable-executable',
+            'Cache-Control' => 'no-cache, must-revalidate',
+        ]);
+    }
+
+    /** Download the isolated JET POS Python UAT installer after it has passed its UAT gate. */
+    public function downloadJetPythonPos()
+    {
+        $installer = JetPosPythonInstaller::current();
+        abort_unless($installer, 404, 'ยังไม่มีไฟล์ติดตั้ง JET POS Python UAT ที่ผ่านการทดสอบ');
 
         return response()->download($installer['path'], $installer['filename'], [
             'Content-Type' => 'application/vnd.microsoft.portable-executable',

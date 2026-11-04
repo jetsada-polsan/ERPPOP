@@ -9,6 +9,7 @@ use App\Models\PosDevice;
 use App\Models\PosTerminal;
 use App\Models\Salesman;
 use App\Services\Pos\PosAdminOverview;
+use App\Support\JetPosPythonInstaller;
 use App\Support\PythonPosInstaller;
 use App\Support\PosReleaseManifest;
 use Illuminate\Http\RedirectResponse;
@@ -33,6 +34,7 @@ class PosAdminController extends Controller
             'allBranches' => Branch::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name_th']),
             'terminals' => PosTerminal::with('branch:id,code,name_th')->orderBy('code')->get(),
             'installer' => PythonPosInstaller::current(),
+            'jetPythonInstaller' => JetPosPythonInstaller::current(),
             'vueInstaller' => $releases->current(),
             'pinMode' => AppSetting::get('pos_passwordless_login') === '1' ? 'selection' : 'pin',
             'onlineMinutes' => PosAdminOverview::ONLINE_MINUTES,
