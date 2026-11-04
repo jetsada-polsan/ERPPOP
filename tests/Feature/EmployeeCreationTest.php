@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\Employee;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -53,5 +52,15 @@ class EmployeeCreationTest extends TestCase
 
         $this->assertSame('หลังแก้', $employee->fresh()->full_name);
         $this->assertSame('Resigned', $employee->fresh()->status);
+    }
+
+    public function test_employee_index_renders_the_edit_flow_with_the_update_route(): void
+    {
+        $this->withoutMiddleware();
+        $this->get(route('employees.index'))
+            ->assertOk()
+            ->assertSee('openEdit(', false)
+            ->assertSee(':action="editAction ||', false)
+            ->assertSee('แก้ไขข้อมูลพนักงาน');
     }
 }
