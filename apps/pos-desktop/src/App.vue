@@ -5,7 +5,7 @@ import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, CircleHelp, Cloud,
 import { check } from '@tauri-apps/plugin-updater'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { api, connect, pairDevice, PosUnreachableError, setServerUrl } from './lib/api'
-import { backupTo, closeLocalDb, enqueue, loadOfflineCashiers, loadOfflineCashiersByPin, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceOfflineCashiers, replaceProducts, replacePromotions, saleHistory, saveOfflineCredential, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth, markSaleVoided, saveAppState, loadAppState, patchQueuePayload, discardQueuedSale } from './lib/db'
+import { backupTo, closeLocalDb, enqueue, loadOfflineCashiers, loadOfflineCashiersByPin, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceOfflineCashiers, replaceProducts, replacePromotions, saleHistory, saveOfflineCredential, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth, markSaleVoided, saveAppState, loadAppState, patchQueuePayload, discardQueuedSale, clearUnsentSales } from './lib/db'
 import { productAtSaleTime } from './lib/catalog'
 import { resolveScan, type BarcodeType } from './lib/barcode'
 import { priceCart } from './lib/pricing'
@@ -311,6 +311,20 @@ async function discardStuckSale() {
   } catch (e) { showError(e) } finally { discardPin.value = ''; busy.value = false }
 }
 
+/** ล้างบิลค้างทั้งหมดในเครื่อง: สำรอง SQLite ก่อนเสมอ แล้วถามยืนยันด้วยการพิมพ์คำว่า ล้าง */
+async function clearStuckSales() {
+  if (!pendingCount.value) return flash('ไม่มีบิลค้างในเครื่อง')
+  const answer = window.prompt(`บิลที่ยังไม่ได้ส่ง ERP ${pendingCount.value} บิลจะถูกล้างออกจากเครื่อง และจะไม่ถูกนับในยอดขาย\nพิมพ์คำว่า ล้าง เพื่อยืนยัน`)
+  if (answer?.trim() !== 'ล้าง') return flash('ยกเลิกแล้ว ไม่ได้ล้างบิล')
+  try {
+    // สำรองไม่สำเร็จ = ไม่ล้าง ข้อมูลขายต้องย้อนกลับได้เสมอ
+    if (!(await backupLocalDb())) return
+    const cleared = await clearUnsentSales()
+    await refreshQueue(); await refreshLocalSales()
+    flash(`ล้างบิลค้าง ${cleared} บิลแล้ว (สำรองข้อมูลไว้ก่อนล้าง) เริ่มขายใหม่ได้`)
+  } catch (e) { showError(e) }
+}
+
 async function findMember() {
   const q = memberQuery.value.trim()
   if (!q) { member.value = null; return }
@@ -461,8 +475,8 @@ async function inspectLocalDb() {
   }
 }
 
-async function backupLocalDb() {
-  if (!isTauri()) return showError('ฟังก์ชัน Backup POS ใช้ได้ในโปรแกรม Windows เท่านั้น')
+async function backupLocalDb(): Promise<boolean> {
+  if (!isTauri()) { showError('ฟังก์ชัน Backup POS ใช้ได้ในโปรแกรม Windows เท่านั้น'); return false }
   localBackupBusy.value = true
   try {
     // ไม่ต้องปิดฐานก่อน VACUUM INTO อ่านสถานะที่สอดคล้องกันได้ทั้งที่ยังเปิดอยู่
@@ -470,8 +484,10 @@ async function backupLocalDb() {
     await backupTo(path)
     flash(`สำรองข้อมูล POS แล้ว: ${path}`)
     await inspectLocalDb()
+    return true
   } catch (e) {
     showError(`สำรองข้อมูลไม่สำเร็จ: ${e instanceof Error ? e.message : String(e)}`)
+    return false
   } finally {
     localBackupBusy.value = false
   }
@@ -1079,7 +1095,7 @@ onUnmounted(() => {
           </div>
           <p v-if="localHealth" class="diagnostic-meta">ซิงก์สินค้าล่าสุด: {{ localHealth.lastProductSyncAt ? new Date(localHealth.lastProductSyncAt).toLocaleString('th-TH') : 'ยังไม่เคยซิงก์' }} · SQLite {{ (localHealth.sizeBytes / 1024).toFixed(1) }} KB</p>
           <p v-else class="diagnostic-meta">กดตรวจใหม่เพื่ออ่านสถานะ SQLite</p>
-          <div class="diagnostic-actions"><button type="button" class="secondary" :disabled="localBackupBusy" @click="backupLocalDb">{{ localBackupBusy ? 'กำลังสำรอง...' : 'สำรอง SQLite' }}</button><button type="button" class="secondary danger-action" :disabled="localRestoreBusy || !localHealth || localHealth.pending > 0 || localHealth.failed > 0" @click="restoreLocalDb">{{ localRestoreBusy ? 'กำลังกู้คืน...' : 'กู้คืน Backup ล่าสุด' }}</button></div>
+          <div class="diagnostic-actions"><button type="button" class="secondary" :disabled="localBackupBusy" @click="backupLocalDb()">{{ localBackupBusy ? 'กำลังสำรอง...' : 'สำรอง SQLite' }}</button><button type="button" class="secondary danger-action" :disabled="!pendingCount" @click="clearStuckSales">ล้างบิลค้าง {{ pendingCount }} บิล</button><button type="button" class="secondary danger-action" :disabled="localRestoreBusy || !localHealth || localHealth.pending > 0 || localHealth.failed > 0" @click="restoreLocalDb">{{ localRestoreBusy ? 'กำลังกู้คืน...' : 'กู้คืน Backup ล่าสุด' }}</button></div>
           <small class="diagnostic-note">Restore จะสร้างไฟล์ pre-restore ก่อนเสมอ และล็อกเมื่อมีบิลค้าง/ล้มเหลว</small>
         </div>
       </form>

@@ -280,6 +280,15 @@ export async function discardQueuedSale(id: string, reason: string) {
   await conn.execute("UPDATE pos_sale_history SET status = 'void', error = ? WHERE id = ?", ['ยกเลิกออกจากคิว: ' + reason, id])
 }
 
+/** เริ่มขายใหม่: ล้างบิลที่ยังไม่ได้ส่ง ERP ออกจากคิว (ผู้เรียกต้องสำรองก่อน) บิลที่ส่งแล้วไม่แตะ */
+export async function clearUnsentSales(): Promise<number> {
+  const conn = await connection()
+  const rows = await conn.select<Array<{ n: number }>>("SELECT COUNT(*) AS n FROM checkout_queue WHERE status <> 'synced'")
+  await conn.execute("UPDATE pos_sale_history SET status = 'void', error = 'ล้างออกจากเครื่องเพื่อเริ่มขายใหม่' WHERE status <> 'synced'")
+  await conn.execute("UPDATE checkout_queue SET status = 'synced', error = 'ล้างออกจากเครื่องเพื่อเริ่มขายใหม่' WHERE status <> 'synced'")
+  return Number(rows[0]?.n || 0)
+}
+
 export async function markSaleVoided(id: string) {
   const conn = await connection()
   await conn.execute("UPDATE pos_sale_history SET status = 'void' WHERE id = ?", [id])
