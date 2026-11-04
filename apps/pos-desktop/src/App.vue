@@ -442,6 +442,7 @@ async function syncAll() {
       await replaceProducts(fresh)
       await replacePromotions(freshPromotions)
       await replaceOfflineCashiers(freshCashiers)
+      await reconcileShiftWithErp()
       await syncCheckoutQueue(refreshQueue)
       await refreshQueue()
       catalogSyncError.value = ''
@@ -677,12 +678,41 @@ async function startCashierSession(next: Cashier) {
   cashierPin.value = ''
 }
 
+/**
+ * กะในเครื่องต้องเป็นกะที่ยังเปิดอยู่ใน ERP (ถูกปิดจากหลังบ้าน หรือถูกล้างข้อมูลไปแล้ว)
+ * ไม่ตรง = ปิดกะในเครื่องแล้วให้เปิดกะใหม่ ไม่งั้นขายต่อแล้วทุกบิลจะส่งเข้า ERP ไม่ได้
+ */
+async function reconcileShiftWithErp() {
+  if (!profile.value || !cashier.value || !shift.value) return
+  const live = await api.activeShift(profile.value.branchId, cashier.value.id)
+  if (live?.id === shift.value.id) return
+  const stale = shift.value.shift_no
+  shift.value = live
+  await saveSession(cashier.value, live)
+  if (!live) {
+    flash(`กะ ${stale} ไม่ได้เปิดอยู่ใน ERP แล้ว กรุณาเปิดกะใหม่`)
+    if (!modal.value) modal.value = 'shift'
+  }
+}
+
+/** บิลวันนี้ที่ค้างเพราะกะเดิมไม่มีแล้ว ย้ายเข้ากะที่เพิ่งเปิดแล้วส่งใหม่ (บิลวันก่อนไม่ย้าย ยอดกะเก่าจะได้ไม่ปน) */
+async function moveStrandedSalesToShift(shiftId: number) {
+  const today = new Date().toDateString()
+  for (const item of await queueItems()) {
+    if (item.status === 'synced' || !/เปิดกะ/.test(item.error || '')) continue
+    if (new Date(item.createdAt).toDateString() !== today) continue
+    await patchQueuePayload(item.id, { shift_id: shiftId })
+  }
+}
+
 async function openShift() {
   if (!cashier.value || !profile.value) return
   busy.value = true
   try {
     shift.value = await api.openShift(profile.value.branchId, cashier.value.id, openingCash.value)
     await saveSession(cashier.value, shift.value)
+    await moveStrandedSalesToShift(shift.value.id)
+    void syncCheckoutQueue(refreshQueue)
     modal.value = null
     flash(`เปิดกะ ${shift.value.shift_no} แล้ว`)
   } catch (e) { showError(e) } finally { busy.value = false }
