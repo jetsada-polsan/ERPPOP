@@ -1,5 +1,14 @@
 # Handoff — 2026-11-02 (แก้สีหน้า Executive Dashboard)
 
+## Handoff - 2026-11-04
+- Commit: `e738e0c` — `Add separate JET Python POS download channel`
+- ทำอะไร: เพิ่มช่องทาง installer แยกของ `apps/jet-pos-python` ที่ `/download/jet-pos-python` และปุ่ม `JET POS Python UAT` วางข้าง Vue/Tauri กับ Python เดิมใน `/pos-admin` โดยแยกโฟลเดอร์ release เป็น `storage/app/jet-pos-python-releases` จึงไม่ปะปนกับ POS เดิม
+- สถานะ: หากยังไม่มีไฟล์ `JET-POS-Python-UAT-<version>.exe` บนเซิร์ฟเวอร์ จะแสดงปุ่ม disabled `รอทดสอบ`; เมื่อวางไฟล์ที่ผ่าน UAT แล้วจะเปลี่ยนเป็นปุ่มดาวน์โหลดอัตโนมัติ
+- ทดสอบ: `php artisan test tests/Feature/PosReleaseTest.php tests/Feature/PosInstallPageTest.php` ผ่าน 12 tests / 43 assertions, `php -l` ไฟล์ PHP ที่แก้ และ `git diff --check` ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: workflow build อยู่ใน branch `codex/jet-pos-python`; GitHub จะกด `workflow_dispatch` ได้เมื่อ workflow อยู่ default branch เท่านั้น จึงยังไม่มี installer ให้ดาวน์โหลด และห้ามใช้ Python UAT ขายจริง
+- Deploy: ยังไม่ deploy ตามขอบเขต UAT
+- งานถัดไป: ทำ Python POS ให้ครบ API/event, printer, shift, payment และ offline parity ตาม `docs/ai/python-pos-brief.md`; รัน 50 บิล parity + 20 บิล offline ก่อนอนุมัติ installer
+
 ## ทำอะไรไป
 - แก้หน้า `/executive` ที่จางเพราะอ้าง CSS variable `--erp-info` ซึ่งไม่มีการประกาศ
 - เปลี่ยนการ์ด KPI, เส้นกราฟ, จุดกราฟ, แถบยอดขาย และข้อความเน้น ไปใช้สีหลักของธีมที่มีอยู่จริง
