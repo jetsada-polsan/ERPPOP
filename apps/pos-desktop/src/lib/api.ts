@@ -91,6 +91,7 @@ export const api = {
   holdBill: (payload: Record<string, unknown>) => request<{ held_bill_id: number; message: string }>('/held-bills', { method: 'POST', body: JSON.stringify(payload) }),
   resumeHeldBill: async (id: number) => (await request<{ held_bill: HeldBill }>(`/held-bills/${id}/resume`, { method: 'POST' })).held_bill,
   cashMovement: (payload: Record<string, unknown>) => request<{ shift: Shift; message: string }>('/shift/cash-movement', { method: 'POST', body: JSON.stringify(payload) }),
+  verifyApprover: (payload: { cashier_id: number; pin: string; reason: string }) => request<{ approver: { id: number; name: string } }>('/approver/verify', { method: 'POST', body: JSON.stringify(payload) }),
   voidReceipt: (payload: { receipt_no: string; shift_id: number; reason: string; approver_id: number; approver_pin: string; terminal_code?: string }) => request<{ message: string }>('/receipt/void', { method: 'POST', body: JSON.stringify(payload) }),
   returnReceipt: (payload: { receipt_no: string; shift_id?: number; reason: string; refund_method: 'cash' | 'transfer'; items: Array<{ product_id: number; qty: number }>; approver_id: number; approver_pin: string; terminal_code?: string }) => request<{ message: string; return_no: string; total_amount: number }>('/receipt/return', { method: 'POST', body: JSON.stringify(payload) }),
   searchMembers: (q: string) => request<Member[]>(`/members/search?q=${encodeURIComponent(q)}`),

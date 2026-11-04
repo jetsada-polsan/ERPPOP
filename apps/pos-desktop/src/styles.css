@@ -617,3 +617,4 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .topbar .status.offline { border-color: #fecaca; color: #fecaca; background: rgba(201, 33, 45, .35); }
 .history-fix { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; margin-top: 10px; } .history-fix .primary { margin-top: 0; height: 42px; padding: 0 14px; width: auto; }
 .history-error { display: block; margin-top: 6px; padding: 8px 10px; border-left: 4px solid #c9212d; background: #fff1ef; color: #a23832; font-size: 14px; } .history-list { max-height: 240px; }
+.history-discard { margin-top: 8px; width: 100%; }

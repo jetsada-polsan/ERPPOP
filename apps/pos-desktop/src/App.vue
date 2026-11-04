@@ -5,7 +5,7 @@ import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, CircleHelp, Cloud,
 import { check } from '@tauri-apps/plugin-updater'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { api, connect, pairDevice, PosUnreachableError, setServerUrl } from './lib/api'
-import { backupTo, closeLocalDb, enqueue, loadOfflineCashiers, loadOfflineCashiersByPin, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceOfflineCashiers, replaceProducts, replacePromotions, saleHistory, saveOfflineCredential, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth, markSaleVoided, saveAppState, loadAppState, patchQueuePayload } from './lib/db'
+import { backupTo, closeLocalDb, enqueue, loadOfflineCashiers, loadOfflineCashiersByPin, loadProducts, loadProfile, loadPromotions, loadSession, localDbHealth, markQueue, queueItems, replaceOfflineCashiers, replaceProducts, replacePromotions, saleHistory, saveOfflineCredential, saveProfile, saveSaleHistory, saveSession, type LocalDbHealth, markSaleVoided, saveAppState, loadAppState, patchQueuePayload, discardQueuedSale } from './lib/db'
 import { productAtSaleTime } from './lib/catalog'
 import { resolveScan, type BarcodeType } from './lib/barcode'
 import { priceCart } from './lib/pricing'
@@ -191,6 +191,7 @@ function historyStatus(status: LocalSaleHistory['status']) { return ({ pending: 
 function historyReceipt(sale: LocalSaleHistory) {
   lastReceipt.value = { no: sale.receiptNo, items: sale.items, total: sale.total, method: sale.method, paid: sale.paid, change: sale.change, printedAt: new Date(sale.printedAt).toLocaleString('th-TH'), provisional: sale.status !== 'synced' }
   selectedHistory.value = sale
+  discardOpen.value = false
 }
 async function openHistory() {
   try {
@@ -283,6 +284,31 @@ async function resendWithLast4() {
     selectedHistory.value = saleHistoryRows.value.find((row) => row.id === sale.id) || null
     flash(selectedHistory.value?.status === 'synced' ? `ส่งบิล ${selectedHistory.value.receiptNo} เข้า ERP แล้ว` : 'ยังส่งไม่ผ่าน ดูข้อความที่แถบล่าง')
   } catch (e) { showError(e) } finally { busy.value = false }
+}
+
+const discardOpen = ref(false)
+const discardApproverId = ref<number | null>(null)
+const discardPin = ref('')
+async function openDiscard() {
+  try { managers.value = (await api.cashiers()).filter((row) => row.role === 'manager') } catch (e) { return showError(e) }
+  discardApproverId.value = managers.value.length === 1 ? managers.value[0].id : null
+  discardPin.value = ''
+  discardOpen.value = true
+}
+/** บิลค้างที่ ERP ไม่รับแล้ว: หัวหน้าใส่ PIN อนุมัติ แล้วเอาออกจากคิว (บันทึกเหตุผลไว้ในเครื่อง) */
+async function discardStuckSale() {
+  const sale = selectedHistory.value
+  if (!sale || !discardApproverId.value) return
+  busy.value = true
+  try {
+    const result = await api.verifyApprover({ cashier_id: discardApproverId.value, pin: discardPin.value, reason: `ยกเลิกบิลค้าง ${sale.receiptNo}: ${sale.error || ''}`.slice(0, 200) })
+    await discardQueuedSale(sale.id, `${result.approver.name} อนุมัติ · ${sale.error || ''}`)
+    discardOpen.value = false
+    await refreshQueue()
+    await refreshHistory()
+    selectedHistory.value = saleHistoryRows.value.find((row) => row.id === sale.id) || null
+    flash(`เอาบิล ${sale.receiptNo} ออกจากคิวแล้ว`)
+  } catch (e) { showError(e) } finally { discardPin.value = ''; busy.value = false }
 }
 
 async function findMember() {
@@ -1182,6 +1208,14 @@ onUnmounted(() => {
           <div class="history-detail-total"><span>ยอดสุทธิ</span><strong>฿{{ money(selectedHistory.total) }}</strong></div>
           <small v-if="selectedHistory.status !== 'synced'" class="history-warning">บิลนี้ยังไม่ยืนยันเลขที่จาก ERP จะแสดงเป็นรายการชั่วคราวจนกว่าจะซิงก์สำเร็จ</small>
           <small v-if="selectedHistory.error && selectedHistory.status !== 'synced'" class="history-error">ERP ตอบกลับ: {{ selectedHistory.error }}</small>
+          <template v-if="selectedHistory.status === 'needs_review' || selectedHistory.status === 'failed'">
+            <button v-if="!discardOpen" type="button" class="secondary danger-action history-discard" @click="openDiscard">ยกเลิกบิลนี้ออกจากคิว (หัวหน้าอนุมัติ)</button>
+            <form v-else class="history-fix" @submit.prevent="discardStuckSale">
+              <label>หัวหน้า<select v-model.number="discardApproverId" required><option v-for="row in managers" :key="row.id" :value="row.id">{{ row.name }}</option></select></label>
+              <label>PIN หัวหน้า<input v-model="discardPin" type="password" inputmode="numeric" required pattern="\d{4,20}" autocomplete="off"></label>
+              <button class="primary danger-action" :disabled="busy">ยืนยันยกเลิก</button>
+            </form>
+          </template>
           <form v-if="selectedHistory.status !== 'synced' && selectedHistory.status !== 'void' && (selectedHistory.method === 'transfer' || selectedHistory.method === 'mixed')" class="history-fix" @submit.prevent="resendWithLast4">
             <label>เลขท้ายบัญชีผู้โอน 4 หลัก<input v-model="fixLast4" required inputmode="numeric" pattern="\d{4}" maxlength="4" placeholder="ดูจากสลิป"></label>
             <button class="primary" :disabled="busy">ส่งบิลนี้ใหม่</button>

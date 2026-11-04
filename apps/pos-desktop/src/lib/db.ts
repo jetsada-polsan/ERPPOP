@@ -273,6 +273,13 @@ export async function markQueue(id: string, status: QueueItem['status'], error?:
 }
 
 /** บิลที่ยกเลิกใน ERP แล้ว ไม่นับเป็นยอดขายบนเครื่องอีก */
+/** บิลที่ ERP ไม่มีวันรับแล้ว (เช่น กะของบิลปิดไปแล้ว) หัวหน้าอนุมัติให้เอาออกจากคิว ไม่ส่งอีก */
+export async function discardQueuedSale(id: string, reason: string) {
+  const conn = await connection()
+  await conn.execute("UPDATE checkout_queue SET status = 'synced', error = ? WHERE id = ? AND status <> 'synced'", ['ยกเลิกออกจากคิว: ' + reason, id])
+  await conn.execute("UPDATE pos_sale_history SET status = 'void', error = ? WHERE id = ?", ['ยกเลิกออกจากคิว: ' + reason, id])
+}
+
 export async function markSaleVoided(id: string) {
   const conn = await connection()
   await conn.execute("UPDATE pos_sale_history SET status = 'void' WHERE id = ?", [id])
