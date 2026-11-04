@@ -16,7 +16,6 @@
     .erp-scan-view video, .erp-scan-view #erp-scan-fallback { width:100%; height:100%; object-fit:cover; }
     .erp-scan-view::after { content:""; position:absolute; left:12%; right:12%; top:35%; bottom:35%; border:3px solid #22c55e; border-radius:10px; pointer-events:none; }
     .erp-scan-box footer { padding:10px 16px; font-size:14px; color:#5b6b78; }
-    @media print { .erp-scan-btn, .erp-scan-sheet { display:none !important; } }
 </style>
 <script>
 (function () {

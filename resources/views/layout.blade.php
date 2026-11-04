@@ -1446,7 +1446,7 @@
                 height:auto !important; max-height:none !important; overflow:visible !important; position:static !important;
             }
             .app-wrapper, .app-main { display:block !important; }
-            .fa-rail, .odn-side, .erp-display-panel, .toast-container, [role="tooltip"] { display:none !important; }
+            .fa-rail, .odn-side, .erp-display-panel, .toast-container, [role="tooltip"], .erp-scan-btn, .erp-scan-sheet { display:none !important; }
             /* หัวตารางซ้ำทุกหน้า ตัวเลขไม่ถูกตัดครึ่งแถว */
             thead { display:table-header-group; }
             tfoot { display:table-footer-group; }
