@@ -8,6 +8,7 @@
 - ยังไม่ทดสอบ/ความเสี่ยง: workflow build อยู่ใน branch `codex/jet-pos-python`; GitHub จะกด `workflow_dispatch` ได้เมื่อ workflow อยู่ default branch เท่านั้น จึงยังไม่มี installer ให้ดาวน์โหลด และห้ามใช้ Python UAT ขายจริง
 - Deploy: ยังไม่ deploy ตามขอบเขต UAT
 - งานถัดไป: ทำ Python POS ให้ครบ API/event, printer, shift, payment และ offline parity ตาม `docs/ai/python-pos-brief.md`; รัน 50 บิล parity + 20 บิล offline ก่อนอนุมัติ installer
+- หมายเหตุ deploy: workflow production `41804987520` ถูกหยุดที่ test ก่อนขึ้น production เพราะ `PermissionMatrixTest` ยังไม่ได้ลงทะเบียน route download ใหม่; แก้ matrix แล้วและ full suite ผ่านในเครื่องก่อน retry
 
 ## ทำอะไรไป
 - แก้หน้า `/executive` ที่จางเพราะอ้าง CSS variable `--erp-info` ซึ่งไม่มีการประกาศ
