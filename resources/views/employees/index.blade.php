@@ -4,7 +4,7 @@
 @section('page-subtitle', 'ข้อมูลบุคลากรจริง แยกจากบัญชีผู้ใช้และสิทธิ์เข้า ERP')
 
 @section('content')
-<div x-data="{ addOpen: {{ $errors->any() ? 'true' : 'false' }}, editAction: '' }" x-cloak>
+<div x-data="employeeDirectory()" x-cloak>
 <div class="employee-summary mb-3">
     <div><span>พนักงานทั้งหมด</span><strong>{{ number_format($summary['total']) }}</strong></div>
     <div><span>ผูกสาขาแล้ว</span><strong>{{ number_format($summary['linked_branch']) }}</strong></div>
@@ -21,7 +21,7 @@
 </form>
 
 <div class="d-flex justify-content-end mb-3">
-    <button type="button" class="btn btn-success rounded-pill px-4" @click="addOpen = true"><i class="bi bi-person-plus-fill me-1"></i>เพิ่มพนักงาน</button>
+    <button type="button" class="btn btn-success rounded-pill px-4" @click="openCreate()"><i class="bi bi-person-plus-fill me-1"></i>เพิ่มพนักงาน</button>
 </div>
 
 <div class="content-card employee-card">
@@ -39,7 +39,7 @@
                     <td>{{ $employee->phone ?: '-' }}</td>
                     <td class="mono">{{ $employee->maskedNationalId() }}</td>
                     <td>@if($employee->user)<span class="user-linked"><i class="bi bi-check-circle-fill"></i> {{ $employee->user->username }}</span>@else<span class="text-muted">ยังไม่มีบัญชี</span>@endif</td>
-                    <td><button type="button" class="btn btn-sm btn-light border" @click="editAction = @js(route('employees.update', $employee)); addOpen = true; $nextTick(() => { const data = @js($employee->only(['full_name','nickname','phone','alt_phone','branch_id','position','employment_type','wage_type','wage_amount','monthly_salary','status','remark'])); for (const [key, value] of Object.entries(data)) { const field = $refs.employeeForm.elements[key]; if (field) field.value = value ?? '' } })">แก้ไข</button></td>
+                    <td><button type="button" class="btn btn-sm btn-light border" @click="openEdit(@js(route('employees.update', $employee)), @js($employee->only(['full_name', 'nickname', 'gender', 'phone', 'alt_phone', 'national_id', 'nationality', 'birth_date_raw', 'address', 'branch_id', 'department', 'position', 'employment_type', 'wage_type', 'wage_amount', 'monthly_salary', 'start_date_raw', 'status', 'social_security_enabled', 'remark'])))">แก้ไข</button></td>
                 </tr>
             @empty<tr><td colspan="9" class="text-center text-muted py-5">ไม่พบข้อมูลพนักงาน</td></tr>@endforelse
             </tbody>
@@ -48,14 +48,14 @@
     <div class="p-3 border-top">{{ $employees->links() }}</div>
 </div>
 
-{{-- โมดัลเพิ่มพนักงานใหม่ --}}
+{{-- โมดัลเพิ่ม/แก้ไขพนักงาน --}}
 <div class="booking-modal-backdrop" x-show="addOpen" x-transition.opacity @keydown.escape.window="addOpen = false" @click.self="addOpen = false">
     <div class="booking-modal" style="width:min(820px,100%)" @click.outside="addOpen = false"
-        x-data="{ deptChoice: @js(old('department', '')) }">
+        >
         <div class="modal-header border-0 px-4 pt-4 pb-2">
             <div>
-                <h3 class="h5 fw-bold mb-1">เพิ่มพนักงานใหม่</h3>
-                <div class="text-muted small">รหัสพนักงาน (POP001, POP002, ...) รันเลขให้อัตโนมัติ ไม่ต้องกรอกเอง</div>
+                <h3 class="h5 fw-bold mb-1" x-text="isEditing ? 'แก้ไขข้อมูลพนักงาน' : 'เพิ่มพนักงานใหม่'"></h3>
+                <div class="text-muted small" x-text="isEditing ? 'แก้ไขข้อมูลพนักงานเดิม รหัสพนักงานจะไม่เปลี่ยน' : 'รหัสพนักงาน (POP001, POP002, ...) รันเลขให้อัตโนมัติ ไม่ต้องกรอกเอง'"></div>
             </div>
             <button type="button" class="btn btn-light rounded-circle" @click="addOpen = false"><i class="bi bi-x-lg"></i></button>
         </div>
@@ -177,7 +177,7 @@
             </div>
             <div class="modal-footer border-0 px-4 pb-4 pt-2">
                 <button type="button" class="btn btn-light border px-4" @click="addOpen = false">ยกเลิก</button>
-                <button type="submit" class="btn btn-success px-4"><i class="bi bi-check2-circle me-1"></i>บันทึกพนักงานใหม่</button>
+                <button type="submit" class="btn btn-success px-4"><i class="bi bi-check2-circle me-1"></i><span x-text="isEditing ? 'บันทึกการแก้ไข' : 'บันทึกพนักงานใหม่'"></span></button>
             </div>
         </form>
     </div>
@@ -191,4 +191,38 @@
 .booking-modal { max-height: calc(100vh - 48px); overflow: auto; background: #fff; border-radius: 18px; box-shadow: 0 24px 80px rgba(15,23,42,.24); }
 .employee-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.employee-summary div{padding:12px 14px;border:1px solid var(--erp-border);border-radius:9px;background:#fff;box-shadow:0 3px 10px rgba(15,23,42,.04)}.employee-summary span{display:block;color:var(--erp-muted);font-size:10.5px}.employee-summary strong{display:block;margin-top:3px;color:var(--erp-text);font-size:21px}.employee-filter{display:grid;grid-template-columns:minmax(260px,1fr) 210px 230px auto auto;gap:8px}.employee-card{overflow:hidden}.employee-table thead th{background:var(--erp-primary-soft);color:var(--erp-primary-dark)}.employee-table td{font-size:11.5px}.employee-table td small{display:block;color:#7a8c9c;font-size:9.5px!important;margin-top:2px}.employee-table .code{color:var(--erp-primary-ink);font-weight:800}.mono{font-family:Consolas,monospace}.branch-ok,.user-linked{color:var(--erp-success-ink);font-weight:700}.branch-wait{display:inline-block;padding:2px 5px;border-radius:4px;background:var(--erp-danger-soft);color:var(--erp-danger);font-size:9.5px;font-weight:700}@media(max-width:1000px){.employee-summary{grid-template-columns:1fr 1fr}.employee-filter{grid-template-columns:1fr 1fr}.employee-filter .input-group{grid-column:1/-1}}@media(max-width:600px){.employee-summary,.employee-filter{grid-template-columns:1fr}}
 </style>
+@endpush
+
+@push('scripts')
+<script>
+function employeeDirectory() {
+    return {
+        addOpen: {{ isset($errors) && $errors->any() ? 'true' : 'false' }},
+        editAction: '',
+        deptChoice: @js(old('department', '')),
+        get isEditing() { return this.editAction !== ''; },
+        openCreate() {
+            this.editAction = '';
+            this.deptChoice = '';
+            this.addOpen = true;
+            this.$nextTick(() => this.$refs.employeeForm.reset());
+        },
+        openEdit(action, employee) {
+            this.editAction = action;
+            this.deptChoice = employee.department || '';
+            this.addOpen = true;
+            this.$nextTick(() => {
+                const form = this.$refs.employeeForm;
+                form.reset();
+                Object.entries(employee).forEach(([key, value]) => {
+                    if (key === 'social_security_enabled') return;
+                    const field = form.elements.namedItem(key);
+                    if (field && !Array.isArray(field)) field.value = value ?? '';
+                });
+                form.querySelector('input[type="checkbox"][name="social_security_enabled"]').checked = Boolean(employee.social_security_enabled);
+            });
+        },
+    };
+}
+</script>
 @endpush

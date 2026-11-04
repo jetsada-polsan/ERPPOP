@@ -1188,6 +1188,73 @@
             html body .booking-modal, html body .booking-modal:has(table) { width: 100vw !important; max-height: 100dvh !important; height: 100dvh; border-radius: 0 !important; }
             html body .booking-modal .modal-footer .btn { flex: 1; }
         }
+        :is(
+            .doc-modal,
+            .billing-modal,
+            .cd-modal,
+            .po-modal,
+            .qt-modal,
+            .account-modal,
+            .user-form-modal,
+            .org-modal,
+            .recipe-bom-modal
+        ) {
+            width: calc(100vw - 32px) !important;
+            max-width: none !important;
+            height: calc(100dvh - 32px) !important;
+            max-height: none !important;
+            margin: 0 !important;
+            border-radius: 12px !important;
+            overflow: auto !important;
+            overscroll-behavior: contain;
+        }
+        :is(
+            .doc-modal-backdrop,
+            .billing-backdrop,
+            .cd-backdrop,
+            .po-backdrop,
+            .qt-backdrop,
+            .account-modal-backdrop,
+            .user-form-backdrop
+        ) {
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 16px !important;
+        }
+        .doc-modal {
+            overflow: hidden !important;
+        }
+        .doc-modal .doc-body {
+            overscroll-behavior: contain;
+        }
+        @media (max-width: 767.98px) {
+            :is(
+                .doc-modal,
+                .billing-modal,
+                .cd-modal,
+                .po-modal,
+                .qt-modal,
+                .account-modal,
+                .user-form-modal,
+                .org-modal,
+                .recipe-bom-modal
+            ) {
+                width: 100vw !important;
+                height: 100dvh !important;
+                border-radius: 0 !important;
+            }
+            :is(
+                .doc-modal-backdrop,
+                .billing-backdrop,
+                .cd-backdrop,
+                .po-backdrop,
+                .qt-backdrop,
+                .account-modal-backdrop,
+                .user-form-backdrop
+            ) {
+                padding: 0 !important;
+            }
+        }
     </style>
     @stack('head')
     {{-- Page-specific styles must be emitted in the document head. --}}
