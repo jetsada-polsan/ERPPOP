@@ -1435,7 +1435,44 @@
             table { font-size:12px; }
             tr { break-inside:avoid; }
             * { color:#000 !important; box-shadow:none !important; }
+            /* ออกแค่หน้าแรก: กล่องของหน้าเว็บล็อกความสูงเท่าจอ (100vh) และซ่อนส่วนที่ล้น
+               ตอนพิมพ์ปลดทุกชั้นให้ยาวตามเนื้อหา เบราว์เซอร์จะได้แบ่งหน้าเองได้ */
+            html, body { height:auto !important; min-height:0 !important; overflow:visible !important; }
+            .app-wrapper, .app-main, .app-content, .app-content > *, main, .container-fluid, .content-card, .card, .card-body,
+            .table-responsive, .tab-content, .tab-pane, [class*="-wrap"], [class*="-scroll"], [class*="-panel"] {
+                height:auto !important; max-height:none !important; overflow:visible !important; position:static !important;
+            }
+            .app-wrapper, .app-main { display:block !important; }
+            .fa-rail, .odn-side, .erp-display-panel, .toast-container, [role="tooltip"] { display:none !important; }
+            /* หัวตารางซ้ำทุกหน้า ตัวเลขไม่ถูกตัดครึ่งแถว */
+            thead { display:table-header-group; }
+            tfoot { display:table-footer-group; }
+            table { width:100% !important; page-break-inside:auto; border-collapse:collapse; }
+            /* ตัดบรรทัดเฉพาะที่ช่องว่าง รหัสสินค้า/เลขเอกสารไม่ถูกหักกลางคำ */
+            td, th { white-space:normal !important; word-break:normal !important; overflow-wrap:normal !important; }
+            /* เบราว์เซอร์บางตัวพิมพ์ URL ต่อท้ายลิงก์ อ่านยากและไม่มีประโยชน์บนกระดาษ */
+            a[href]::after { content:none !important; }
+            a { text-decoration:none !important; }
+            /* ช่องค้นหา/ตัวกรองเป็นของหน้าจอ บนกระดาษเหลือแต่ผลลัพธ์ */
+            form input:not([type=hidden]), form select, form textarea, .input-group, .form-text, .form-label, .pagination,
+            .page-link, [x-cloak], .dropdown-menu, .modal, .booking-modal-backdrop { display:none !important; }
+            h1, h2, h3, h4, .card-header { break-after:avoid; }
+            .content-card, .card { border:0 !important; break-inside:auto; }
+            img, svg, canvas { max-width:100% !important; }
+            /* กระดาษ A4 แคบกว่าจุดตัด md/lg ของ Bootstrap คอลัมน์เลยพับเป็นแถวยาว คงสัดส่วนไว้เหมือนบนจอ */
+            .row { display:flex !important; flex-wrap:wrap !important; }
+            .col-md-2,.col-lg-2,.col-xl-2 { flex:0 0 16.666% !important; max-width:16.666% !important; }
+            .col-md-3,.col-lg-3,.col-xl-3 { flex:0 0 25% !important; max-width:25% !important; }
+            .col-md-4,.col-lg-4,.col-xl-4 { flex:0 0 33.333% !important; max-width:33.333% !important; }
+            .col-md-5,.col-lg-5 { flex:0 0 41.666% !important; max-width:41.666% !important; }
+            .col-md-6,.col-lg-6,.col-xl-6 { flex:0 0 50% !important; max-width:50% !important; }
+            .col-md-7,.col-lg-7 { flex:0 0 58.333% !important; max-width:58.333% !important; }
+            .col-md-8,.col-lg-8,.col-xl-8 { flex:0 0 66.666% !important; max-width:66.666% !important; }
+            .col-md-9,.col-lg-9 { flex:0 0 75% !important; max-width:75% !important; }
+            table td, table th { padding:4px 6px !important; }
         }
+        /* ขนาดกระดาษมาตรฐานของหน้าที่พิมพ์จากเว็บ (เอกสารที่มีขนาดเฉพาะประกาศ @page ของตัวเองทับได้) */
+        @page { size: A4; margin: 10mm; }
             /* แจ้งเตือนต้องอยู่เหนือหน้าต่างเอกสารเสมอ ไม่งั้นผู้ใช้เห็นเป็นกดแล้วนิ่ง */
         .swal2-container { z-index: 6000 !important; }
     </style>
