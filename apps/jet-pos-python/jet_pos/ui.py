@@ -8,7 +8,7 @@ from uuid import uuid4
 from PySide6.QtCore import QStandardPaths, Qt, QSettings
 from PySide6.QtGui import QKeySequence, QShortcut, QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
-from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFormLayout, QFrame, QGridLayout, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMainWindow, QMenu, QMessageBox, QPushButton, QScrollArea, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFormLayout, QFrame, QGridLayout, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMainWindow, QMenu, QMessageBox, QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget
 
 from .api import PosApiClient, PosApiError, pair_device
 from .local_store import LocalStore
@@ -345,6 +345,8 @@ class PosWindow(QMainWindow):
         self._cart_body = QVBoxLayout()
         self._sync_label = QLabel("● โหมดตัวอย่าง UAT")
         self._catalog_count = QLabel("")
+        self._context_label = QLabel()
+        self._shift_summary = QLabel()
         self._grid = QGridLayout()
         self._grid.setHorizontalSpacing(10)
         self._grid.setVerticalSpacing(10)
@@ -358,6 +360,7 @@ class PosWindow(QMainWindow):
         self._pay_button: QPushButton | None = None
         self._last_receipt: dict[str, object] | None = None
         self._build()
+        self._refresh_session_ui()
         QShortcut(QKeySequence("F8"), self, activated=self._focus_search)
         QShortcut(QKeySequence("F4"), self, activated=self._checkout)
         QShortcut(QKeySequence("Ctrl+L"), self, activated=self._confirm_clear_cart)
@@ -395,9 +398,8 @@ class PosWindow(QMainWindow):
         brand = QLabel("MPM  |  JET POS\nPOINT OF SALE")
         brand.setStyleSheet("font-size:18px;font-weight:800;")
         row.addWidget(brand)
-        context = QLabel("สาขา / เครื่อง\nUAT · JET-POS-PYTHON")
-        context.setStyleSheet("padding-left:25px;border-left:1px solid #62a9ca;font-weight:700;")
-        row.addWidget(context)
+        self._context_label.setStyleSheet("padding-left:25px;border-left:1px solid #62a9ca;font-weight:700;")
+        row.addWidget(self._context_label)
         row.addStretch()
         self._sync_label.setStyleSheet("padding:10px 16px;border:1px solid #55c9ad;border-radius:7px;background:#08745f;font-weight:800;")
         row.addWidget(self._sync_label)
@@ -479,10 +481,9 @@ class PosWindow(QMainWindow):
         clear_cart.clicked.connect(self._confirm_clear_cart)
         header.addWidget(clear_cart)
         box.addLayout(header)
-        shift = QLabel("กะที่เปิดบนเครื่อง  9 บิล       ยอดขาย  ฿2,140.75       เฉลี่ย/บิล  ฿237.86")
-        shift.setWordWrap(True)
-        shift.setStyleSheet("padding:10px;background:#fff8f8;border:1px solid #f0dadd;border-radius:7px;color:#596b78;")
-        box.addWidget(shift)
+        self._shift_summary.setWordWrap(True)
+        self._shift_summary.setStyleSheet("padding:10px;background:#fff8f8;border:1px solid #f0dadd;border-radius:7px;color:#596b78;")
+        box.addWidget(self._shift_summary)
         quick_actions = QGridLayout()
         quick_actions.setHorizontalSpacing(8)
         quick_actions.setVerticalSpacing(8)
@@ -514,7 +515,7 @@ class PosWindow(QMainWindow):
         total_layout.addWidget(self._total); box.addWidget(total_box)
         pay = QPushButton("▣  รับชำระเงิน  ›"); pay.setEnabled(False); pay.clicked.connect(self._checkout)
         pay.setMinimumHeight(76)
-        pay.setStyleSheet("QPushButton{min-height:76px;padding:17px;background:#b3c0c8;color:white;border:0;border-radius:8px;font-size:21px;font-weight:800;}")
+        pay.setStyleSheet("QPushButton{min-height:76px;padding:17px;background:#087faf;color:white;border:0;border-radius:8px;font-size:21px;font-weight:800;} QPushButton:disabled{background:#b3c0c8;color:#eef4f6;}")
         box.addWidget(pay)
         self._pay_button = pay
         return panel
@@ -528,6 +529,7 @@ class PosWindow(QMainWindow):
             card = QPushButton()
             card.setFixedHeight(96)
             card.setMinimumWidth(0)
+            card.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
             stock = f"● คงเหลือ {product.stock_qty} {product.unit_name}"
             name = product.name_th if len(product.name_th) <= 38 else f"{product.name_th[:37]}…"
             card.setText(f"{product.sku_code}\n{name}\n{stock}   ฿{product.pos_price:.2f}")
@@ -598,6 +600,7 @@ class PosWindow(QMainWindow):
             )
             self._render_products(self._products)
             self._sync_label.setText(f"● ซิงก์สินค้า/โปรฯ แล้ว ({len(self._promotions)} โปรฯ)")
+            self._refresh_session_ui()
         except (ValueError, PosApiError) as error:
             self._sync_label.setText("● ซิงก์ไม่สำเร็จ")
             QMessageBox.warning(self, "โหลดสินค้าไม่สำเร็จ", str(error))
@@ -608,6 +611,27 @@ class PosWindow(QMainWindow):
             str(self._settings.value("device_token", "")),
             allow_production=self._settings.value("allow_production", False, bool),
         )
+
+    def _refresh_session_ui(self) -> None:
+        """Keep the touch surface honest about whether this machine can sell."""
+        device = self._profile.get("device", {}) if isinstance(self._profile.get("device"), dict) else {}
+        branch = self._profile.get("branch", {}) if isinstance(self._profile.get("branch"), dict) else {}
+        branch_name = str(branch.get("name") or self._profile.get("branch_name") or "ยังไม่เชื่อมสาขา")
+        terminal = str(device.get("terminal_code") or device.get("code") or "JET-POS-PYTHON")
+        self._context_label.setText(f"สาขา / เครื่อง\n{branch_name} · {terminal}")
+
+        if not self._shift:
+            self._shift_summary.setText("ยังไม่เปิดกะ · กด “เข้ากะ” แล้วกรอก PIN คนขายเพื่อเริ่มขาย")
+            self._shift_summary.setStyleSheet("padding:10px;background:#fff8f8;border:1px solid #f0dadd;border-radius:7px;color:#8c4853;font-weight:700;")
+        else:
+            shift_no = str(self._shift.get("shift_no") or "กะปัจจุบัน")
+            cashier = str(self._cashier.get("name") or self._cashier.get("code") or "แคชเชียร์")
+            expected_cash = Decimal(str(self._shift.get("expected_cash") or 0))
+            self._shift_summary.setText(f"เปิดกะ {shift_no} · {cashier} · เงินสดตามระบบ ฿{expected_cash:.2f}")
+            self._shift_summary.setStyleSheet("padding:10px;background:#edf9f4;border:1px solid #b8e3d0;border-radius:7px;color:#176c4a;font-weight:700;")
+
+        if self._pay_button:
+            self._pay_button.setEnabled(bool(self._shift and self._cart))
 
     def _open_shift(self) -> None:
         pin_dialog = TouchKeypadDialog("เข้าแคชเชียร์", "กรอก PIN คนขาย แล้วกดยืนยัน", self, secret=True)
@@ -655,7 +679,7 @@ class PosWindow(QMainWindow):
             self._settings.setValue("active_profile", json.dumps(self._profile, ensure_ascii=False))
             self._settings.setValue("active_cashier", json.dumps(self._cashier, ensure_ascii=False))
             self._settings.setValue("active_shift", json.dumps(self._shift, ensure_ascii=False))
-            if self._pay_button: self._pay_button.setEnabled(bool(self._cart))
+            self._refresh_session_ui()
             self._sync_label.setText(f"● เปิดกะ {shift.get('shift_no', '')}")
             QMessageBox.information(self, "พร้อมขาย", f"เข้าแคชเชียร์ {self._cashier.get('name', '')} แล้ว")
         except (ValueError, PosApiError) as error:
@@ -687,8 +711,7 @@ class PosWindow(QMainWindow):
             QMessageBox.warning(self, "เข้าออฟไลน์ไม่ได้", "ต้องใช้แคชเชียร์และกะเดิมที่เปิดไว้ตอนยังเชื่อม ERP")
             return
         self._profile, self._cashier, self._shift = profile, cashier, shift
-        if self._pay_button:
-            self._pay_button.setEnabled(bool(self._cart))
+        self._refresh_session_ui()
         self._sync_label.setText(f"● ออฟไลน์ · กะ {shift.get('shift_no', '')}")
         QMessageBox.information(self, "พร้อมขายออฟไลน์", "บิลจะเก็บในเครื่องและส่งขึ้น ERP เมื่อเชื่อมต่อได้")
 
@@ -789,8 +812,7 @@ class PosWindow(QMainWindow):
             self._settings.remove("active_cashier")
             self._settings.remove("active_shift")
             self._settings.remove("active_profile")
-            if self._pay_button:
-                self._pay_button.setEnabled(False)
+            self._refresh_session_ui()
             self._sync_label.setText("● ปิดกะแล้ว")
         except (ValueError, PosApiError) as error:
             QMessageBox.warning(self, "ปิดกะไม่สำเร็จ", str(error))
@@ -816,6 +838,7 @@ class PosWindow(QMainWindow):
             shift = result.get("shift") if isinstance(result, dict) else None
             if isinstance(shift, dict):
                 self._shift = shift
+                self._refresh_session_ui()
             QMessageBox.information(self, "บันทึกรายการเงินสดแล้ว", str(result.get("message") if isinstance(result, dict) else "เรียบร้อย"))
         except (ValueError, PosApiError) as error:
             QMessageBox.warning(self, "บันทึกรายการเงินสดไม่สำเร็จ", str(error))
@@ -1108,7 +1131,7 @@ class PosWindow(QMainWindow):
             child = self._cart_body.takeAt(0)
             if child.widget(): child.widget().deleteLater()
         self._empty_cart(); self._total.setText("฿0.00"); self._items.setText("0 รายการ · 0 ชิ้น")
-        if self._pay_button: self._pay_button.setEnabled(False)
+        self._refresh_session_ui()
 
     def _confirm_clear_cart(self) -> None:
         if not self._cart:
@@ -1152,7 +1175,7 @@ class PosWindow(QMainWindow):
         self._cart_body.addStretch()
         quantity = sum((line.qty for line in self._cart), Decimal("0"))
         self._total.setText(f"฿{pricing.total:.2f}"); self._items.setText(f"{len(grouped)} รายการ · {quantity.normalize()} ชิ้น")
-        if self._pay_button: self._pay_button.setEnabled(bool(self._shift))
+        self._refresh_session_ui()
 
     def _edit_cart_quantity(self, key: tuple[int, str | None, str | None]) -> None:
         matching = [line for line in self._cart if (line.product.id, line.barcode, line.barcode_type) == key]

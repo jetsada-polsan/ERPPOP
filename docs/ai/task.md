@@ -1,6 +1,14 @@
 # Handoff — 2026-11-02 (แก้สีหน้า Executive Dashboard)
 
 ## Handoff - 2026-11-05
+- Commit: pending — make Python POS touch state truthful
+- ทำอะไร: ทำหัวสาขา/เครื่องและแถบกะแสดงข้อมูลจริงแทนตัวเลขตัวอย่าง, ปุ่มรับชำระเปิดเฉพาะเมื่อมีทั้งกะที่เปิดจริงและรายการสินค้า, และกำหนด size policy ของการ์ดสินค้าให้ย่อเข้ากริดได้โดยไม่เกิด horizontal overflow บนจอ POS
+- ทดสอบ: `PYTHONPATH=apps/jet-pos-python python3 -m unittest discover -s apps/jet-pos-python/tests -v` ผ่าน 25 tests; `QT_QPA_PLATFORM=offscreen` smoke สร้าง `PosWindow`, ตรวจ state ปิดกะ/เปิดกะและปุ่มรับชำระ ผ่าน; `git diff --check` ผ่าน
+- UAT เครื่อง BK Server: ดาวน์โหลด `JET-POS-Python-UAT-0.1.7.exe` แล้ว แต่ Windows SmartScreen บล็อกการเริ่มติดตั้ง; ต้องให้เจ้าของกด More info → Run anyway เอง ห้าม agent ข้ามหน้าคำเตือน
+- Deploy: ไม่ deploy ERP/ไม่สร้างบิลจริง; รอ push branch เพื่อ build installer UAT รุ่นใหม่
+- งานถัดไป: ติดตั้งรุ่นใหม่บน BK Server, ให้เจ้าของกรอก PIN เองเพื่อทดสอบเปิดกะ, แล้วเก็บข้อความ ERP จริงหากเปิดกะไม่สำเร็จ ก่อนยิงบิลทดสอบ
+
+## Handoff - 2026-11-05
 - Commit: pending — compact Python POS product grid
 - ทำอะไร: จากการตรวจบน BK Server พบการ์ดสินค้าสูง/กว้างเกินและชื่อยาวบังคับให้กริดล้นจอ; ปรับเป็นกริด 4 คอลัมน์, การ์ดสูง 96px, ตัดชื่อที่ยาวด้วย `…`, ซ่อน horizontal scroll ของ catalog และลด spacing ให้ใกล้ Vue POS
 - ทดสอบ: `PYTHONPATH=apps/jet-pos-python python3 -m unittest discover -s apps/jet-pos-python/tests -v` ผ่าน 25 tests; `QT_QPA_PLATFORM=offscreen` UI smoke ผ่าน; `git diff --check` ผ่าน
