@@ -1,3 +1,66 @@
+## Handoff - 2026-11-05 (Codex: Python POS campaigns → local Laravel E2E)
+- Branch: `claude/pos-python-settings-popup`; base `490137b`; commits `22e2349` (isolated runner), `63fa278` (VAT fix + regression), `ba47843` (boundary/mixed/safety coverage), `ca7fb36` (gift assertions/form-header test). Commit เอกสารดู git log หัวข้อนี้
+- Git: `git pull origin main` ใน workspace เดิมถูก sandbox ปฏิเสธเพราะ `.git` ชี้ metadata นอกพื้นที่เขียน; clone `--no-hardlinks` ไป `/private/tmp/pos-campaign-work`, คง branch ชื่อเดิมและ origin GitHub เดิม แล้ว pull main สำเร็จ (Already up to date). Commit/push จากสำเนานี้; source ที่แก้คงอยู่ใน workspace เดิม แต่ HEAD/index เดิมยังเป็น `490137b` จึงห้าม commit ซ้ำจาก worktree เก่า ให้รับจาก remote branch/สำเนาดังกล่าว
+- ทำอะไร: ทำตาม `docs/ai/codex-pos-python-campaign-e2e.md`; เพิ่ม `apps/pos-python/e2e/pos_campaigns_to_laravel.py` และ README.md. Composer install ผ่าน, สร้าง `.env`/SQLite แยกใน temporary scratch, migrate + seed UAT fixture เดิม, สุ่ม password/PIN/device token สำหรับ DB ทดสอบในขณะรันแล้วลบทิ้ง; ไม่ใช้ credentials จริงและไม่บันทึก plaintext ลงไฟล์/report
+- Route หลังบ้าน: login HTTP จริงด้วย user ที่มี `masterdata.manage`, ผ่าน session/CSRF/ErpAuthorize และ `POST /qty-promotions`/validation จริงทุกแคมเปญ; ไม่ disable middleware/ไม่เรียก controller ตรง. ปิดโปรจาก scenario ก่อนหน้าด้วย SQL เฉพาะ DB fixture เพื่อแยกเคส. ทดสอบครบ 8 แบบ รวม discount baht/percent และ bill_discount baht/percent+max_discount, โปรหมดอายุ/อนาคต/ปิด/ต่างสาขา
+- POS: `ProvisioningService.ping/sync_down/pull_promotions/online_cashier_login/open_server_shift` เรียก HTTP API จริง; คำนวณด้วย `Order`, บันทึก local-first ด้วย `PosService.checkout`, ส่งด้วย `SyncService`. ERP รับ 41 บิลและเป็น completed/synced ทุกบิล; อีก 1 เคสไม่มีผู้อนุมัติถูกปฏิเสธก่อนเข้าคิว. ตรวจ net/discount/VAT ด้วย Decimal cents, จำนวน/รหัสสินค้า/จำนวนแถว/ของแถมราคา 0 และ transfer last4. มี expected discount แยกจากสูตร production สำหรับ boundary ทั้ง 30 บิล และ expected gift quantity
+- พบและแก้เฉพาะ Python: เดิม `SyncService.sync_sale` ไม่ส่ง `vat_amount` ทำให้ ERP บันทึก VAT 0 ขณะที่ POS คิด 9.81 ในบิลแรก. เพิ่ม `vat_amount` จาก snapshot `sales.vat_total` และ `vat_mode=included`; retry ส่งค่าเดิม. เพิ่ม regression test ที่พิสูจน์แดงก่อนแก้ (`KeyError: vat_amount`) และผ่านหลังแก้; ไม่แก้ PHP application/test/migration ใด ๆ
+- ผล firstWhere: สินค้าเดียวกันแยก 2 บรรทัด จำนวน 2+7 (ขั้นต่ำ 3) ไม่ได้ลด แม้รวมได้ 9; จำนวน 3+6 ลดเพียงชุดจากบรรทัดแรก 15 บาท ไม่ใช่ 45 บาท. Python/ERP ตรงกันทั้งสองบิล; Order ใน UI อาจรวมสินค้าปกติ แต่ E2E ตั้งแยกบรรทัดโดยตรงเพื่อพิสูจน์ semantics
+- การเทียบส่วนลดของแถม: POS แสดงของแถมราคา 0 จึงไม่รวมมูลค่าของแถมใน subtotal/display discount; ERP ใช้ราคา catalog เป็น gross แล้วลดมูลค่าของแถม. คอลัมน์ POS ด้านล่างเพิ่มมูลค่าของแถมกลับในส่วนลดเพื่อเทียบความหมายเดียวกับ ERP; ยอดลูกค้าจ่ายเหมือนกันโดยไม่ปรับยอดสุทธิ
+- ทดสอบ: `QT_QPA_PLATFORM=offscreen PYTHONPATH=apps/pos-python /private/tmp/pos-parity-env/bin/python -m pytest apps/pos-python/tests -q` **294 passed / 5.48s**; E2E คำสั่งใน README **42/42 ผ่าน** (41 บิลรับ + 1 ปฏิเสธที่คาดไว้); `git diff --check` ผ่าน. ทุกครั้งที่รัน Qt/pytest ตั้ง offscreen
+- Laravel: `php -d memory_limit=1G artisan test` เริ่มแล้ว process ลูกหยุดเพราะ memory limit 128MB; รัน `APP_ENV=testing DB_CONNECTION=sqlite DB_DATABASE=:memory: DB_URL='' php -d memory_limit=1G vendor/bin/phpunit` ต่อจบ exit 0, runner รายงาน `tests=753, passed=751, assertions=6199, skipped=2, incomplete=6, duration_ms=19693` (บันทึก counters ตาม output จริง ไม่ตีความ skipped/incomplete ว่าผ่าน). ไม่แก้ Vue/Tauri จึงไม่รัน vue-tsc
+- ความปลอดภัย: runner สร้าง loopback URL เอง ไม่อ่าน POS_E2E_URL/TOKEN/PIN, ปิด proxy, ปฏิเสธ request/redirect ออกนอก literal `http://127.0.0.1`; pytest ตรวจปลายทาง public/domain/IP/credentials/lookalike ถูกบล็อกโดยไม่มี network request. Server/DB ทดสอบถูกปิดและลบทิ้ง. ไม่เรียก production แม้แต่ health/ping และไม่เรียก legacy
+- ยังไม่ทดสอบ/ความเสี่ยง: SQLite/HTTP ในเครื่องไม่แทน PostgreSQL หรือ Windows/hardware UAT; ไม่ได้ตรวจ printer/QR bank settlement จริง. ตรวจ VAT ที่ header receipt ตาม snapshot POS; ไม่ได้เปลี่ยน PHP การกระจาย VAT ต่อแถว (ERP เดิมบันทึก item VAT เป็น 0). โปรแกรมไม่แก้สูตรส่วนลด ERP หรือเพิ่ม approval policy ใหม่
+- Deploy: **ยังไม่ deploy** และไม่เรียก production ทุกกรณี
+- งานถัดไป: เจ้าของ/agent ถัดไปใช้ branch ที่ push แล้วเพื่อ review; UAT/build/deploy ต้องได้รับคำสั่งแยกตาม workflow
+
+ตารางผลรอบสุดท้าย (บาท; แต่ละช่องเรียง **สุทธิ / ส่วนลด / VAT**, receipt references อยู่เฉพาะ DB ทดสอบที่ลบทิ้งแล้ว):
+
+| แคมเปญ / บิล | ยอด POS | ยอด ERP | ผ่าน? |
+| --- | ---: | ---: | --- |
+| free_item/exact | 150.00 / 20.00 / 9.81 | 150.00 / 20.00 / 9.81 | ผ่าน |
+| free_item/below | 100.00 / 0.00 / 6.54 | 100.00 / 0.00 / 6.54 | ผ่าน |
+| free_item/multiple | 450.00 / 60.00 / 29.44 | 450.00 / 60.00 / 29.44 | ผ่าน |
+| bundle_price/exact | 120.00 / 30.00 / 7.85 | 120.00 / 30.00 / 7.85 | ผ่าน |
+| bundle_price/below | 100.00 / 0.00 / 6.54 | 100.00 / 0.00 / 6.54 | ผ่าน |
+| bundle_price/multiple | 360.00 / 90.00 / 23.55 | 360.00 / 90.00 / 23.55 | ผ่าน |
+| discount-baht/exact | 135.00 / 15.00 / 8.83 | 135.00 / 15.00 / 8.83 | ผ่าน |
+| discount-baht/below | 100.00 / 0.00 / 6.54 | 100.00 / 0.00 / 6.54 | ผ่าน |
+| discount-baht/multiple | 405.00 / 45.00 / 26.50 | 405.00 / 45.00 / 26.50 | ผ่าน |
+| discount-percent/exact | 131.25 / 18.75 / 8.59 | 131.25 / 18.75 / 8.59 | ผ่าน |
+| discount-percent/below | 100.00 / 0.00 / 6.54 | 100.00 / 0.00 / 6.54 | ผ่าน |
+| discount-percent/multiple | 393.75 / 56.25 / 25.76 | 393.75 / 56.25 / 25.76 | ผ่าน |
+| mix_bundle/exact | 120.00 / 20.00 / 7.85 | 120.00 / 20.00 / 7.85 | ผ่าน |
+| mix_bundle/below | 90.00 / 0.00 / 5.89 | 90.00 / 0.00 / 5.89 | ผ่าน |
+| mix_bundle/multiple | 360.00 / 80.00 / 23.55 | 360.00 / 80.00 / 23.55 | ผ่าน |
+| mix_free/exact | 100.00 / 40.00 / 6.54 | 100.00 / 40.00 / 6.54 | ผ่าน |
+| mix_free/below | 90.00 / 0.00 / 5.89 | 90.00 / 0.00 / 5.89 | ผ่าน |
+| mix_free/multiple | 300.00 / 140.00 / 19.63 | 300.00 / 140.00 / 19.63 | ผ่าน |
+| bill_discount-percent/exact | 120.00 / 30.00 / 7.85 | 120.00 / 30.00 / 7.85 | ผ่าน |
+| bill_discount-percent/below | 149.00 / 0.00 / 9.75 | 149.00 / 0.00 / 9.75 | ผ่าน |
+| bill_discount-percent/multiple | 415.00 / 35.00 / 27.15 | 415.00 / 35.00 / 27.15 | ผ่าน |
+| bill_discount-baht/exact | 133.00 / 17.00 / 8.70 | 133.00 / 17.00 / 8.70 | ผ่าน |
+| bill_discount-baht/below | 149.00 / 0.00 / 9.75 | 149.00 / 0.00 / 9.75 | ผ่าน |
+| bill_discount-baht/multiple | 433.00 / 17.00 / 28.33 | 433.00 / 17.00 / 28.33 | ผ่าน |
+| bill_free_item/exact | 150.00 / 20.00 / 9.81 | 150.00 / 20.00 / 9.81 | ผ่าน |
+| bill_free_item/below | 149.00 / 0.00 / 9.75 | 149.00 / 0.00 / 9.75 | ผ่าน |
+| bill_free_item/multiple | 450.00 / 20.00 / 29.44 | 450.00 / 20.00 / 29.44 | ผ่าน |
+| bill_addon/exact | 160.00 / 30.00 / 10.47 | 160.00 / 30.00 / 10.47 | ผ่าน |
+| bill_addon/below | 189.00 / 0.00 / 12.36 | 189.00 / 0.00 / 12.36 | ผ่าน |
+| bill_addon/multiple | 460.00 / 30.00 / 30.09 | 460.00 / 30.00 / 30.09 | ผ่าน |
+| mixed-vat-rounding | 218.12 / 18.88 / 14.27 | 218.12 / 18.88 / 14.27 | ผ่าน |
+| item+bill | 190.00 / 50.00 / 12.43 | 190.00 / 50.00 / 12.43 | ผ่าน |
+| item+bill+manual-approved | 182.87 / 57.13 / 11.96 | 182.87 / 57.13 / 11.96 | ผ่าน |
+| item+bill+manual-unapproved | ปฏิเสธก่อนออกบิล | ไม่ส่ง | ผ่าน (ไม่มีผู้อนุมัติ) |
+| duplicate-first-below | 450.00 / 0.00 / 29.44 | 450.00 / 0.00 / 29.44 | ผ่าน |
+| duplicate-first-exact | 435.00 / 15.00 / 28.46 | 435.00 / 15.00 / 28.46 | ผ่าน |
+| addon-excludes-self | 189.00 / 0.00 / 12.36 | 189.00 / 0.00 / 12.36 | ผ่าน |
+| percent-cap | 415.00 / 35.00 / 27.15 | 415.00 / 35.00 / 27.15 | ผ่าน |
+| expired | 450.00 / 0.00 / 29.44 | 450.00 / 0.00 / 29.44 | ผ่าน |
+| future | 450.00 / 0.00 / 29.44 | 450.00 / 0.00 / 29.44 | ผ่าน |
+| disabled | 450.00 / 0.00 / 29.44 | 450.00 / 0.00 / 29.44 | ผ่าน |
+| other-branch | 450.00 / 0.00 / 29.44 | 450.00 / 0.00 / 29.44 | ผ่าน |
+
 ## Handoff - 2026-11-05 (Codex: Python POS touch popups)
 - Branch: `claude/pos-python-settings-popup`; base `514b5d0`; commits `aedfd81` (shared touch controls / popup flows), `6c940f0` (guards, central held bills, tests / capture tool); commit ภาพและ handoff ดู git log หัวข้อนี้
 - Git: worktree เดิมเขียน metadata นอก sandbox ไม่ได้ (`FETCH_HEAD: Operation not permitted`); clone `--no-hardlinks` ไป `/private/tmp/pos-popups-work` โดยคง branch ชื่อเดิมและ origin GitHub เดิม แล้ว `git pull origin main` สำเร็จ (Already up to date). แก้ source ใน workspace นี้และคัดลอกเฉพาะไฟล์งานไป commit/push จากสำเนา. HEAD/index ของ workspace เดิมยังอยู่ `514b5d0`; อย่า commit ไฟล์งานนี้ซ้ำจาก metadata เดิม ให้รับงานต่อจาก remote branch หรือสำเนาข้างต้น.
