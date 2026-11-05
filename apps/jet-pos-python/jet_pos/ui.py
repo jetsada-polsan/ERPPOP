@@ -351,7 +351,7 @@ class PosWindow(QMainWindow):
         self._grid.setHorizontalSpacing(10)
         self._grid.setVerticalSpacing(10)
         self._grid.setContentsMargins(0, 0, 0, 0)
-        for column in range(4):
+        for column in range(3):
             self._grid.setColumnStretch(column, 1)
         self._profile: dict[str, object] = {}
         self._cashier: dict[str, object] = {}
@@ -452,7 +452,7 @@ class PosWindow(QMainWindow):
         self._search.textChanged.connect(self._filter_products)
         self._search.returnPressed.connect(self._scan_or_add_search)
         box.addWidget(self._search)
-        quick = QLabel("ขายบ่อยบนเครื่องนี้     เลือกสินค้าหรือกด “โหลดสินค้า” หลังตั้งค่า UAT")
+        quick = QLabel("ขายบ่อยบนเครื่องนี้ · แตะสินค้าเพื่อเพิ่มลงบิล")
         quick.setStyleSheet("background:#fff8f8;color:#8c4853;padding:11px;border:1px solid #efd5d9;border-radius:7px;font-weight:700;")
         box.addWidget(quick)
         grid_widget = QWidget()
@@ -484,27 +484,6 @@ class PosWindow(QMainWindow):
         self._shift_summary.setWordWrap(True)
         self._shift_summary.setStyleSheet("padding:10px;background:#fff8f8;border:1px solid #f0dadd;border-radius:7px;color:#596b78;")
         box.addWidget(self._shift_summary)
-        quick_actions = QGridLayout()
-        quick_actions.setHorizontalSpacing(8)
-        quick_actions.setVerticalSpacing(8)
-        for index, (label, handler, primary) in enumerate((
-            ("▣ เข้ากะ", self._open_shift, True),
-            ("▣ พักบิล", self._hold_bill, False),
-            ("▤ เรียกบิล", self._resume_held_bill, False),
-            ("฿ เงินสดกะ", self._cash_movement, False),
-            ("🖨 พิมพ์บิล", self._print_last_receipt, False),
-            ("⚙ ตั้งค่า", self._open_settings, False),
-        )):
-            button = QPushButton(label)
-            button.setMinimumHeight(58)
-            button.clicked.connect(handler)
-            button.setStyleSheet(
-                "QPushButton{min-height:58px;border:0;border-radius:8px;padding:8px;font-size:15px;font-weight:800;"
-                f"background:{'#087faf' if primary else '#eaf2f6'};color:{'white' if primary else '#16445c'};}}"
-                "QPushButton:hover{background:#d9edf6;}"
-            )
-            quick_actions.addWidget(button, index // 3, index % 3)
-        box.addLayout(quick_actions)
         cart = QWidget(); cart.setLayout(self._cart_body)
         cart_scroll = QScrollArea(); cart_scroll.setWidgetResizable(True); cart_scroll.setWidget(cart); cart_scroll.setStyleSheet("border:0;")
         box.addWidget(cart_scroll, 1)
@@ -527,19 +506,19 @@ class PosWindow(QMainWindow):
         self._catalog_count.setText(f"{len(products)} สินค้าในเครื่อง")
         for index, product in enumerate(products):
             card = QPushButton()
-            card.setFixedHeight(96)
+            card.setFixedHeight(118)
             card.setMinimumWidth(0)
             card.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
             stock = f"● คงเหลือ {product.stock_qty} {product.unit_name}"
-            name = product.name_th if len(product.name_th) <= 38 else f"{product.name_th[:37]}…"
-            card.setText(f"{product.sku_code}\n{name}\n{stock}   ฿{product.pos_price:.2f}")
+            name = product.name_th if len(product.name_th) <= 42 else f"{product.name_th[:41]}…"
+            card.setText(f"{product.sku_code}\n{name}\n\n{stock}                 ฿{product.pos_price:.2f}")
             card.setStyleSheet(
-                "QPushButton{text-align:left;padding:9px;background:#fff;border:1px solid #d7e4eb;"
-                "border-radius:8px;color:#1b4059;font-size:12px;}"
+                "QPushButton{text-align:left;padding:12px;background:#fff;border:1px solid #d7e4eb;"
+                "border-radius:8px;color:#1b4059;font-size:13px;font-weight:700;}"
                 "QPushButton:hover{border:2px solid #1596cb;background:#effbff;}"
             )
             card.clicked.connect(lambda _, item=product: self._add_to_cart(item))
-            self._grid.addWidget(card, index // 4, index % 4)
+            self._grid.addWidget(card, index // 3, index % 3)
 
     def _filter_products(self, query: str) -> None:
         search = query.strip().lower()

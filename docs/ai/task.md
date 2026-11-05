@@ -1,6 +1,13 @@
 # Handoff — 2026-11-02 (แก้สีหน้า Executive Dashboard)
 
 ## Handoff - 2026-11-05
+- Commit: pending — simplify Python POS checkout panel
+- ทำอะไร: ตามการตรวจหน้าจอ BK Server เอาปุ่มซ้ำ 6 ปุ่มออกจากฝั่งบิลทั้งหมด โดยใช้คำสั่งบน header เพียงชุดเดียว; ฝั่งสินค้าเปลี่ยนเป็นกริด 3 คอลัมน์ การ์ดสูงพอดีสำหรับจอสัมผัส และจัดรหัส/ชื่อ/คงเหลือ/ราคาให้เหมือน Vue POS
+- ทดสอบ: `PYTHONPATH=apps/jet-pos-python python3 -m unittest discover -s apps/jet-pos-python/tests -v` ผ่าน 25 tests; `QT_QPA_PLATFORM=offscreen` UI smoke ตรวจจำนวน 3 คอลัมน์/ปุ่มรับชำระ/สถานะกะ ผ่าน; `git diff --check` ผ่าน
+- ยังไม่ทดสอบ: เปิดกะบนเครื่อง BK Server ปัจจุบัน ERP ตอบ `PIN ไม่ถูกต้อง`; ต้องออก PIN คนขายที่ถูกต้องใน ERP ก่อนจึงทดสอบ shift/checkout จริงได้
+- Deploy: ไม่ deploy ERP; push branch เพื่อ build/publish UAT installer แยก
+
+## Handoff - 2026-11-05
 - Commit: pending — make Python POS touch state truthful
 - ทำอะไร: ทำหัวสาขา/เครื่องและแถบกะแสดงข้อมูลจริงแทนตัวเลขตัวอย่าง, ปุ่มรับชำระเปิดเฉพาะเมื่อมีทั้งกะที่เปิดจริงและรายการสินค้า, และกำหนด size policy ของการ์ดสินค้าให้ย่อเข้ากริดได้โดยไม่เกิด horizontal overflow บนจอ POS
 - ทดสอบ: `PYTHONPATH=apps/jet-pos-python python3 -m unittest discover -s apps/jet-pos-python/tests -v` ผ่าน 25 tests; `QT_QPA_PLATFORM=offscreen` smoke สร้าง `PosWindow`, ตรวจ state ปิดกะ/เปิดกะและปุ่มรับชำระ ผ่าน; `git diff --check` ผ่าน
