@@ -33,6 +33,8 @@ with TemporaryDirectory() as folder:
     window = run_ui(PosService(db), app=app, data_dir=Path(folder))
     window.showNormal()
     window.resize(1024, 768)
+    window.locked = False
+    window.pages.setCurrentIndex(0)
     window.ensure_sale_session = lambda: True
     window.order.add_product(OrderLine(1, 'น้ำปลา', 'ขวด', D(3), D(40)))
     window.order.bill_discount = D(10)
@@ -99,6 +101,7 @@ with TemporaryDirectory() as folder:
     PosService(db).close_shift(shift_id=shift_id, counted_cash=D(1000))
     with patch.object(TouchDialog, 'exec', lambda dialog: capture(dialog, 'z-report')):
         window.show_z_report()
+    window._allow_close = True
     window.close()
     db.close()
 print('Preview geometry:', results)

@@ -71,6 +71,11 @@
 - 2026-10-30 เจ้าของชี้แจงให้ POS Central ใช้ Production ERP API ระหว่าง UAT ได้ และจะเคลียร์รายการทดสอบก่อนวันขาย; ใบเสร็จจาก API production เป็นเอกสารจริงที่กระทบยอดขาย/สต๊อก/GL จึงต้องจดเลขเอกสารและใช้ขั้นตอน ERP ที่ตรวจสอบย้อนหลังได้. คำสั่งนี้ยังไม่ได้สร้างรายการ production จาก Codex ในรอบเอกสารนี้.
 - ป้ายชั่งที่ profile กำหนด `value_type=weight` เก็บค่าบนฉลากเป็นกรัม; API/checkout ต้องตีความเป็นกิโลกรัมก่อนคิดราคาและตัดสต๊อก.
 
+## Python POS session — 2026-11-05
+
+- Python POS ใช้ชื่อ JET POS/โลโก้ MPM; เปิดใหม่หรือย่อแล้วกลับมาต้องเริ่มหน้าล็อก. ล็อกไม่ปิดกะและไม่ล้างตะกร้า; ออกงานนับเงิน/ปิดกะ/พิมพ์ Z แล้วล็อก. คนอื่นรับกะเดิมไม่ได้จนกว่าจะปิดหรือส่งมอบตามขั้นตอนเดิม
+- ทุกทางปิดแอปผ่าน touch popup เดียวกันและต้องยืนยันเพิ่มเมื่อมีตะกร้า/คิวค้าง; snapshot ตะกร้าคงอยู่ข้าม process. Windows installer คงชื่อไฟล์ `PopCentral-POS-UAT-*-setup.exe` และ install path เดิม. ภาพ offscreen 1024×768: `docs/ai/pos-python-shots/session/`; ยังไม่ deploy และยังรอ Windows/hardware UAT
+
 ## Web POS ขายออฟไลน์
 
 - Web POS เป็น PWA ขายสำรองตอนเน็ต/Host ล่ม: IndexedDB (`public/pos-offline.js`) + Service Worker (`public/pos-sw.js`)
