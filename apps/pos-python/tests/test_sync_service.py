@@ -52,6 +52,23 @@ class SyncServiceTest(unittest.TestCase):
         self.assertEqual((payload["items"][0]["barcode"], payload["items"][0]["barcode_type"]), ("8001230125503", "SCALE_WEIGHT"))
         self.assertEqual(self.db.execute("SELECT status FROM sync_outbox").fetchone()[0], "synced")
 
+    def test_campaign_sale_sends_persisted_inclusive_vat_on_retry(self) -> None:
+        self.db.execute("UPDATE products SET is_vat=1 WHERE id=1")
+        self.db.commit()
+        self.pos.checkout(document_no="VAT-PROMO", branch_id=1, terminal_id="HQ-01",
+            shift_id=self.shift_id, cashier_id=77,
+            lines=[CartLine(1, Decimal("3"), Decimal("50"), promo_discount=Decimal("18.75"))],
+            payment_method="cash", paid_amount=Decimal("131.25"), sale_uuid="vat-promo")
+        self.pos.bind_server_shift(self.shift_id, 500)
+        api = FakeApi()
+        sync = SyncService(self.db, api)
+        sync.sync_sale("vat-promo")
+        sync.sync_sale("vat-promo")
+        for _, payload, _ in api.calls:
+            self.assertEqual(payload["vat_amount"], "8.59")
+            self.assertEqual(payload["vat_mode"], "included")
+            self.assertNotIn("manual_discount_amount", payload)
+
     def test_syncs_an_offline_shift_before_sales_are_uploaded(self) -> None:
         api = FakeApi({"success": True, "shift": {"id": 501}})
         self.pos.queue_shift_open(self.shift_id)
