@@ -8,6 +8,7 @@ use App\Models\Permission;
 use App\Models\PriceTable;
 use App\Models\Product;
 use App\Models\ProductBarcode;
+use App\Models\ProductPrice;
 use App\Models\ProductUnit;
 use App\Models\Role;
 use App\Models\User;
@@ -153,7 +154,7 @@ class ScalePluPageTest extends TestCase
         $this->barcode($this->product('100001'), '801003');
         $this->actingAs($this->manager());
         $this->post('/scale-prices/import/save', ['confirmed' => 1])->assertSessionHasErrors('csv');
-        foreach (["801003,100\n999999,10", "801003,100\n801003,200", '801003,-1', '801003,12.345', '801003,=1+1', ''] as $csv) {
+        foreach (["801003,100\n999999,10", "801003,100\n801003,200", '801003,-1', '801003,12.345', '801003,99999.99', '801003,=1+1', ''] as $csv) {
             $this->post('/scale-prices/import/preview', ['csv' => $csv])->assertSessionHasErrors('csv');
         }
         $this->assertDatabaseCount('scale_plu_settings', 0);
@@ -175,5 +176,52 @@ class ScalePluPageTest extends TestCase
         }
         $this->post('/scale-prices/test-label', ['branch_id' => $branch->id, 'label' => '8010030059407'])->assertSessionHas('scale_label_result.error');
         $this->assertDatabaseCount('pos_receipts', 0);
+    }
+
+    public function test_non_scale_imported_ean_is_excluded_and_disabled_barcode_is_visible(): void
+    {
+        $imported = $this->product('100001');
+        $imported->update(['name_th' => 'สินค้านำเข้า']);
+        $this->barcode($imported, '8001234567890');
+        $p = $this->product('100002');
+        $barcode = $this->barcode($p, '801003');
+        $barcode->update(['is_active' => false, 'barcode_type' => 'CUSTOM']);
+        $row = app(ScalePluPage::class)->rows()->sole();
+        $this->assertSame('801003', $row['plu']);
+        $this->assertContains('barcode_inactive', $row['issues']);
+        $this->assertContains('type', $row['issues']);
+    }
+
+    public function test_invalid_replacement_csv_discards_previous_preview(): void
+    {
+        $this->barcode($this->product('100001'), '801003');
+        $this->actingAs($this->manager());
+        $this->post('/scale-prices/import/preview', ['csv' => '801003,100'])->assertSessionHas('scale_import_preview');
+        $this->post('/scale-prices/import/preview', ['csv' => '801003,invalid'])->assertSessionHasErrors('csv')->assertSessionMissing('scale_import_preview');
+        $this->post('/scale-prices/import/save', ['confirmed' => 1])->assertSessionHasErrors('csv');
+        $this->assertDatabaseCount('scale_plu_settings', 0);
+    }
+
+    public function test_label_preview_warns_for_mismatch_missing_product_and_disabled_profile(): void
+    {
+        $branch = Branch::create(['code' => 'PLU', 'name_th' => 'ทดสอบ', 'is_active' => true]);
+        $p = $this->product('100001', true, 89);
+        $this->barcode($p, '801004');
+        $table = PriceTable::create(['code' => 'PLU', 'name' => 'หลัก', 'is_default' => true, 'is_active' => true]);
+        ProductPrice::create(['product_id' => $p->id, 'price_table_id' => $table->id, 'unit_id' => null, 'price' => 90, 'is_active' => true]);
+        DB::table('scale_plu_settings')->insert(['barcode' => '801004', 'scale_price' => 100]);
+        $this->actingAs($this->manager());
+        $payload = ['branch_id' => $branch->id, 'label' => '8010040132007'];
+        $this->post('/scale-prices/test-label', $payload)->assertSessionHasNoErrors();
+        $result = session('scale_label_result');
+        $this->assertTrue($result['mismatch']);
+        $this->assertEquals(90, $result['erp_price']);
+        $this->assertEqualsWithDelta(132 / 90, $result['qty'], 0.00000001);
+        $this->get('/scale-prices')->assertOk()->assertSee('น้ำหนักจากป้ายราคาจะเพี้ยน');
+        $p->update(['is_active' => false]);
+        $this->post('/scale-prices/test-label', $payload)->assertSessionHas('scale_label_result.error', 'ไม่พบสินค้าเปิดใช้งานใน POS');
+        $this->assertNull(session('scale_label_result.qty'));
+        DB::table('scale_barcode_profiles')->where('prefix', '801')->update(['is_active' => false]);
+        $this->post('/scale-prices/test-label', $payload)->assertSessionHas('scale_label_result.error', 'ไม่ตรง profile ที่เปิดใช้ หรือ check digit ไม่ถูกต้อง');
     }
 }

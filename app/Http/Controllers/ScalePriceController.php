@@ -119,7 +119,7 @@ class ScalePriceController extends Controller
             $plu = trim($fields[0] ?? '');
             $price = trim($fields[1] ?? '');
             if (count($fields) !== 2 || ! ScalePluPage::isPlu($plu) || ! preg_match('/^\d{1,5}(\.\d{1,2})?$/D', $price)
-                || isset($preview[$plu]) || ! ProductBarcode::where('barcode', $plu)->exists()) {
+                || (float) $price > 99999 || isset($preview[$plu]) || ! ProductBarcode::where('barcode', $plu)->exists()) {
                 fclose($stream);
                 throw ValidationException::withMessages(['csv' => "แถว {$line}: ต้องเป็น PLU เดิมที่ลงทะเบียน, ราคา 0–99999 ทศนิยมไม่เกิน 2 ตำแหน่ง และไม่ซ้ำ"]);
             }
