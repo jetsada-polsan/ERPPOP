@@ -1,122 +1,118 @@
 @extends('layout')
-@section('title', 'ราคาเครื่องชั่ง - MPM Food Group')
-@section('page-title', 'ราคาสินค้าเครื่องชั่ง')
-@section('page-subtitle', 'ราคา/กก. ของสินค้าขายชั่งทั้งหมด — ต้องตั้งให้ตรงกับเครื่องชั่งเสมอ')
-
+@section('title', 'ตั้งค่า PLU เครื่องชั่ง')
+@section('page-title', 'ตั้งค่า PLU เครื่องชั่ง')
+@section('page-subtitle', 'ตรวจรหัสลูก ราคา และทดสอบป้ายก่อนขาย')
 @section('content')
-<div x-data="{ q: '', onlyUnpriced: false, pq: '', results: [], loading: false,
-    async doSearch() {
-        if (this.pq.trim().length < 1) { this.results = []; return; }
-        this.loading = true;
-        try {
-            const r = await fetch('{{ route('search.products') }}?q=' + encodeURIComponent(this.pq));
-            this.results = await r.json();
-        } catch (e) { this.results = []; }
-        this.loading = false;
-    } }">
-    <div class="content-card p-4">
-        {{-- PLU เครื่องชั่งเป็นรหัสลูกจากแฟ้มสินค้าเดิม ไม่สร้างซ้ำจากหน้านี้ --}}
-        <div class="mb-3 p-3 rounded" style="background:var(--erp-surface-2);border:1px solid #99f6e4">
-            <div class="fw-bold"><i class="bi bi-upc-scan me-1"></i> PLU เครื่องชั่งมาจากแฟ้มสินค้าเดิม</div>
-            <div class="text-muted small mt-1">รหัส `801xxx` เป็นรหัสลูกของสินค้าและเครื่องชั่ง ระบบนี้แสดงและใช้ตามที่ผูกไว้เท่านั้น ไม่สร้างเลขใหม่ ไม่รันเลขทับ และไม่แก้ฉลากเดิม</div>
-            <a href="{{ route('products.index') }}" class="btn btn-sm btn-outline-primary mt-2"><i class="bi bi-box-seam me-1"></i> ตรวจสอบ PLU ที่แฟ้มสินค้า</a>
+<div x-data="{ ...erpProductPicker(), q: '', tab: 'problem', issue: '', moving: null, items: [{}],
+    onProductPicked(i,p) { this.items[0].product_id=p.id; },
+    showRow(el) { return (!this.q || el.dataset.search.includes(this.q.toLowerCase())) && (!this.issue || JSON.parse(el.dataset.issues).includes(this.issue)) && (this.tab === 'all' || (this.tab === 'problem' ? el.dataset.problem === '1' : el.dataset.problem === '0')); }
+}">
+    <div class="content-card p-3 mb-3">
+        <p class="mb-2">PLU 800xxx/801xxx ต้องเป็นรหัสลูกใต้ SKU จริง ราคา ERP และเครื่องชั่งต้องเท่ากัน เพราะ POS คำนวณน้ำหนักจากราคารวม ÷ ราคา/กก.</p>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            @foreach($issues as $key => $label)
+                <button type="button" class="btn btn-sm border" :class="issue === '{{ $key }}' ? 'btn-primary' : 'btn-light'" @click="issue = issue === '{{ $key }}' ? '' : '{{ $key }}'; tab='all'">{{ $label }} <b>{{ $counts[$key] }}</b></button>
+            @endforeach
         </div>
-
-        <div class="list-toolbar mb-3">
-            <div class="list-toolbar-left">
-                <h3 class="h6 fw-bold mb-0">สินค้าเครื่องชั่ง (PLU ช่วงเลข 8)</h3>
-                <input type="text" x-model="q" class="form-control form-control-sm" style="max-width:260px"
-                       placeholder="กรอง PLU / รหัส / ชื่อ...">
-            </div>
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-                <span class="text-muted small">{{ $products->count() }} รายการ</span>
-                @if($notPriced > 0)
-                    <span class="badge text-bg-warning">ยังไม่ตั้งราคา {{ $notPriced }}</span>
-                @endif
-                <div class="form-check form-switch mb-0">
-                    <input class="form-check-input" type="checkbox" id="onlyUnpriced" x-model="onlyUnpriced">
-                    <label class="form-check-label small" for="onlyUnpriced">เฉพาะที่ยังไม่ตั้งราคา</label>
-                </div>
-                <a href="{{ route('scale-prices.export') }}" class="btn btn-sm btn-light border">
-                    <i class="bi bi-download me-1"></i> CSV ตั้งเครื่องชั่ง
-                </a>
-            </div>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <input class="form-control" style="max-width:320px" x-model="q" placeholder="ค้นหา PLU / SKU / ชื่อ" aria-label="ค้นหา PLU SKU ชื่อ">
+            <template x-for="t in [{id:'problem',name:'มีปัญหา'},{id:'all',name:'ทั้งหมด'},{id:'normal',name:'ปกติ'}]">
+                <button type="button" class="btn btn-sm" :class="tab === t.id ? 'btn-primary' : 'btn-light border'" @click="tab=t.id;issue=''" x-text="t.name"></button>
+            </template>
+            <button type="button" class="btn btn-sm btn-light border" @click="q=''; issue=''; tab='all'">ล้างตัวกรอง</button>
+            <a class="btn btn-sm btn-outline-primary" href="{{ route('scale-prices.export') }}">ส่งออก CSV</a>
+            <span class="small text-muted">{{ $rows->count() }} แถว · รายการไม่มี PLU และยังไม่ตรวจราคาเป็นข้อมูล ไม่ใช่ข้อผิดพลาด</span>
         </div>
-
-        <div class="alert alert-info py-2 px-3 small mb-3">
-            <i class="bi bi-info-circle me-1"></i>
-            ป้ายเครื่องชั่งฝัง "ราคารวม" — POS คำนวณน้ำหนักย้อนกลับจากราคา/กก. ในหน้านี้
-            ดังนั้น <b>ราคาที่นี่กับที่ตั้งในเครื่องชั่งต้องเท่ากันเสมอ</b> (แก้ที่นี่แล้วไปแก้ที่เครื่องชั่งด้วย)
-            · แถวสีเหลือง = ราคายังไม่ถูกตั้ง (ค้างจาก BPlus)
+    </div>
+    <div class="content-card p-3 mb-3">
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead><tr><th>PLU</th><th>SKU แม่ / ชื่อ / สถานะ</th><th>ราคา ERP/กก.</th><th>ราคาเครื่องชั่ง/กก.</th><th>ปัญหา / วิธีแก้</th><th>จัดการ</th></tr></thead>
+                <tbody>
+                @forelse($rows as $i => $row)
+                    @php($p = $row['product'])
+                    <tr x-show="showRow($el)" data-search="{{ mb_strtolower(($row['plu'] ?? '').' '.$p->sku_code.' '.$p->name_th) }}" data-issues="{{ json_encode($row['issues']) }}" data-problem="{{ $row['has_problem'] ? '1' : '0' }}">
+                        <td class="fw-bold">{{ $row['plu'] ?? 'ยังไม่มี PLU' }}</td>
+                        <td style="min-width:180px"><a href="{{ route('products.show', $p) }}">{{ $p->sku_code }} · {{ $p->name_th }}</a><br><span class="badge {{ $p->is_active ? 'text-bg-success' : 'text-bg-danger' }}">{{ $p->is_active ? 'เปิดใช้งาน' : 'ปิดใช้งาน' }}</span>
+                        @foreach($overrides[$p->id] ?? [] as $override)
+                            <div class="small text-warning">ราคาเฉพาะ {{ $override->name }}: {{ number_format($override->price, 2) }} · แก้ที่ตารางราคา</div>
+                        @endforeach
+                        </td>
+                        <td><input form="price-{{ $i }}" class="form-control form-control-sm" style="min-width:110px" type="number" name="prices[{{ $p->id }}]" value="{{ old('prices.'.$p->id, number_format($row['price'], 2, '.', '')) }}" step="0.01" min="0" max="99999" aria-label="ราคา ERP {{ $p->sku_code }}"></td>
+                        <td>
+                            @if($row['plu'])
+                            <input form="price-{{ $i }}" class="form-control form-control-sm" style="min-width:110px" type="number" name="scale_prices[{{ $row['plu'] }}]" value="{{ old('scale_prices.'.$row['plu'], $row['scale_price']) }}" step="0.01" min="0" max="99999" placeholder="ยังไม่ตรวจ" aria-label="ราคาเครื่องชั่ง {{ $row['plu'] }}">
+                            @else — @endif
+                        </td>
+                        <td style="min-width:220px">
+                            @forelse($row['issues'] as $key)
+                                <div class="mb-1"><span class="badge {{ in_array($key, ['missing','unchecked']) ? 'text-bg-info' : (in_array($key, ['duplicate','inactive','sku_plu','mismatch']) ? 'text-bg-danger' : 'text-bg-warning') }}" style="white-space:normal;text-align:left">{{ $issues[$key] }}</span></div>
+                            @empty <span class="badge text-bg-success">ปกติ</span> @endforelse
+                        </td>
+                        <td style="min-width:130px">
+                            <form id="price-{{ $i }}" method="post" action="{{ route('scale-prices.update') }}">@csrf<button class="btn btn-sm btn-success">บันทึกราคา</button></form>
+                            @if($row['barcode'])
+                            <button type="button" class="btn btn-sm btn-outline-primary mt-1" @click="moving={{ json_encode(['id' => $row['barcode']->id, 'from' => $p->id, 'plu' => $row['plu'], 'sku' => $p->sku_code], JSON_HEX_APOS | JSON_HEX_QUOT) }}; items=[{}]">ย้าย PLU / ยืนยัน SKU</button>
+                            @endif
+                        </td>
+                    </tr>
+                @empty <tr><td colspan="6">ยังไม่มีรายการเครื่องชั่ง</td></tr> @endforelse
+                </tbody>
+            </table>
         </div>
-
-        <form method="post" action="{{ route('scale-prices.update') }}">
-            @csrf
-            <div class="table-responsive">
-                <table class="table align-middle">
-                    <thead>
-                        <tr>
-                            <th style="width:120px">PLU เครื่องชั่ง</th>
-                            <th style="width:110px">รหัสสินค้า</th>
-                            <th>ชื่อสินค้า</th>
-                            <th class="text-end" style="width:170px">ราคา/กก. (ตารางหลัก)</th>
-                            <th style="width:210px">Override รายสาขา</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($products as $p)
-                            @php
-                                $current = (float) ($prices[$p->id] ?? $p->default_price ?? 0);
-                                $isPlaceholder = $current <= 1;
-                            @endphp
-                            <tr x-show="(!q || $el.dataset.s.includes(q.toLowerCase())) && (!onlyUnpriced || $el.dataset.ph === '1')"
-                                data-s="{{ strtolower(($p->scale_plu ?? '') . ' ' . $p->sku_code . ' ' . $p->name_th) }}"
-                                data-ph="{{ $isPlaceholder ? '1' : '0' }}"
-                                @if($isPlaceholder) style="background:var(--erp-warning-soft)" @endif>
-                                <td class="fw-bold">
-                                    @if($p->scale_plu)
-                                        <span class="badge text-bg-primary" style="font-size:13px">{{ $p->scale_plu }}</span>
-                                    @else
-                                        <a href="{{ route('products.show', $p) }}" class="small" title="ยังไม่มี PLU — ไปเพิ่มบาร์โค้ด 800xxx ที่หน้าสินค้า">+ เพิ่ม PLU</a>
-                                    @endif
-                                </td>
-                                <td class="text-muted">{{ $p->sku_code }}</td>
-                                <td>
-                                    <a href="{{ route('products.show', $p) }}" class="text-decoration-none text-body">{{ $p->name_th }}</a>
-                                    @if($isPlaceholder)<span class="badge text-bg-warning ms-1">ยังไม่ตั้งราคา</span>@endif
-                                </td>
-                                <td class="text-end">
-                                    <div class="input-group input-group-sm justify-content-end" style="max-width:150px;margin-left:auto">
-                                        <span class="input-group-text">฿</span>
-                                        <input type="number" name="prices[{{ $p->id }}]" value="{{ number_format($current, 2, '.', '') }}"
-                                               step="0.01" min="0" max="99999" class="form-control text-end fw-bold">
-                                    </div>
-                                </td>
-                                <td class="small">
-                                    @if($overrides->has($p->id))
-                                        @foreach($overrides[$p->id] as $ov)
-                                            <span class="badge text-bg-warning" title="สาขาที่ใช้ตารางนี้จะเห็นราคานี้แทน — ไปแก้ที่หน้าตารางราคา">
-                                                {{ $ov->name }}: ฿{{ number_format($ov->price, 2) }}
-                                            </span>
-                                        @endforeach
-                                    @else
-                                        <span class="text-muted">—</span>
-                                    @endif
-                                </td>
-                            </tr>
-                        @empty
-                            <tr><td colspan="5" class="text-center text-muted py-5">ยังไม่มีสินค้าเครื่องชั่ง — ลงทะเบียน PLU 800xxx ที่หน้าสินค้า</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="d-flex justify-content-end gap-2 mt-2">
-                <button type="submit" class="btn btn-success px-4">
-                    <i class="bi bi-check-lg me-1"></i> บันทึกราคาทั้งหมด
-                </button>
-            </div>
+    </div>
+    <div class="content-card p-3 mb-3" x-show="moving" x-cloak>
+        <h3 class="h6">ย้าย PLU เดิม <span x-text="moving?.plu"></span> จาก SKU <span x-text="moving?.sku"></span></h3>
+        <form method="post" action="{{ route('scale-prices.move') }}">@csrf
+            <input type="hidden" name="barcode_id" :value="moving?.id"><input type="hidden" name="from_product_id" :value="moving?.from"><input type="hidden" name="product_id" :value="items[0]?.product_id">
+            <button type="button" class="btn btn-outline-primary mb-2" @click="openProductPicker(0)">เลือก SKU จริงที่เปิดใช้งาน</button>
+            <p x-text="(items[0]?.sku_code || '') + ' ' + (items[0]?.name_th || '')"></p>
+            <label class="d-block mb-2"><input type="checkbox" name="confirmed" value="1" required> ยืนยันตรวจชื่อบนป้ายตรงกับ SKU ใหม่แล้ว (คงเลข PLU เดิม)</label>
+            <button class="btn btn-primary" :disabled="!items[0]?.product_id">ยืนยันย้าย PLU</button>
+            <button type="button" class="btn btn-light" @click="moving=null">ยกเลิก</button>
         </form>
+    </div>
+    @include('partials.product-picker')
+    <div class="row g-3">
+        <section class="col-lg-6"><div class="content-card p-3 h-100">
+            <h3 class="h6">นำเข้าราคาเครื่องชั่ง</h3>
+            <p class="small text-muted">วางหรืออัปโหลด CSV สองคอลัมน์ PLU,ราคา/กก. มีหัวตารางได้ · ตรวจตัวอย่างก่อนบันทึก</p>
+            <form method="post" action="{{ route('scale-prices.import-preview') }}" enctype="multipart/form-data">@csrf
+                <textarea class="form-control mb-2" name="csv" rows="4" placeholder="PLU,ราคา/กก.&#10;801003,100.00">{{ old('csv') }}</textarea>
+                <input class="form-control mb-2" type="file" name="file" accept=".csv,text/csv" aria-label="ไฟล์ราคา CSV">
+                <button class="btn btn-outline-primary">ดูตัวอย่าง</button>
+            </form>
+            @if($preview)
+            <div class="table-responsive mt-3"><table class="table table-sm"><thead><tr><th>PLU</th><th>ราคาเครื่องชั่งเดิม</th><th>ราคาใหม่/กก.</th></tr></thead><tbody>
+            @foreach($preview as $r)<tr><td>{{ $r['plu'] }}</td><td>{{ $r['old'] ?? 'ยังไม่ตรวจ' }}</td><td>{{ $r['price'] }}</td></tr>@endforeach
+            </tbody></table></div>
+            <form method="post" action="{{ route('scale-prices.import-save') }}">@csrf
+                <label><input type="checkbox" name="confirmed" value="1" required> ยืนยันบันทึกราคาเครื่องชั่ง {{ count($preview) }} รายการ</label>
+                <button class="btn btn-success">บันทึกที่ตรวจแล้ว</button>
+            </form>
+            @endif
+        </div></section>
+        <section class="col-lg-6"><div class="content-card p-3 h-100">
+            <h3 class="h6">ทดสอบป้าย</h3>
+            <form method="post" action="{{ route('scale-prices.test-label') }}">@csrf
+                <label class="form-label">สาขา (ราคาเดียวกับ POS)</label>
+                <select class="form-select mb-2" name="branch_id" required>@foreach($branches as $branch)<option value="{{ $branch->id }}" @selected(old('branch_id', auth()->user()->branch_id) == $branch->id)>{{ $branch->name_th }}</option>@endforeach</select>
+                <input class="form-control mb-2" name="label" value="{{ old('label') }}" inputmode="numeric" pattern="[0-9]{13}" maxlength="13" required placeholder="บาร์โค้ดป้าย 13 หลัก" aria-label="บาร์โค้ดป้าย 13 หลัก">
+                <button class="btn btn-outline-primary">ทดสอบป้าย</button>
+            </form>
+            @if($labelResult)
+                <div class="mt-3" role="status">
+                    @if($labelResult['error'] ?? null)<p class="text-danger">{{ $labelResult['error'] }}</p>@endif
+                    @if(isset($labelResult['plu']))
+                        <p>Profile: {{ $labelResult['profile'] }} · PLU: <b>{{ $labelResult['plu'] }}</b><br>ผ่านการถอดรหัสตาม profile และกติกา check digit ที่ตั้งไว้</p>
+                        <p>สินค้า: {{ $labelResult['product']['name_th'] ?? 'ไม่พบ' }}<br>ราคา ERP/กก.: {{ number_format($labelResult['erp_price'], 2) }}<br>
+                        {{ $labelResult['value_type'] === 'price' ? 'ราคารวม: '.number_format($labelResult['price'], 2).' บาท' : 'ป้ายน้ำหนัก' }}<br>น้ำหนักที่ POS ได้: {{ $labelResult['qty'] !== null ? number_format($labelResult['qty'], 8).' กก.' : 'คำนวณไม่ได้' }}</p>
+                        @if($labelResult['mismatch'])<p class="text-danger fw-bold">ราคาเครื่องชั่ง {{ $labelResult['scale_price'] }} ไม่ตรงกับ ERP — น้ำหนักจากป้ายราคาจะเพี้ยน กรุณาตั้งราคาให้ตรงกัน</p>
+                        @elseif($labelResult['scale_price'] === null)<p class="text-warning">ยังไม่ระบุราคาเครื่องชั่ง จึงยังยืนยันความถูกต้องของน้ำหนักไม่ได้</p>@endif
+                    @endif
+                </div>
+            @endif
+        </div></section>
     </div>
 </div>
 @endsection

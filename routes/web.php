@@ -669,6 +669,10 @@ Route::prefix('scale-prices')->name('scale-prices.')->group(function () {
     Route::post('/', [ScalePriceController::class, 'update'])->name('update');
     Route::post('/attach', [ScalePriceController::class, 'attachPlu'])->name('attach');
     Route::get('/export', [ScalePriceController::class, 'export'])->name('export');
+    Route::post('/move', [ScalePriceController::class, 'move'])->name('move');
+    Route::post('/import/preview', [ScalePriceController::class, 'importPreview'])->name('import-preview');
+    Route::post('/import/save', [ScalePriceController::class, 'importSave'])->name('import-save');
+    Route::post('/test-label', [ScalePriceController::class, 'testLabel'])->name('test-label');
 });
 
 Route::prefix('promotions')->name('promotions.')->group(function () {
