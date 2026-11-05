@@ -70,7 +70,11 @@ export interface Shift {
   shift_no: string
   status: 'open' | 'closed'
   opening_cash: number
-  expected_cash: number
+  expected_cash?: number
+  carried_float?: number | null
+  default_float?: number
+  blind_count?: boolean
+  cash_warning?: boolean
   receipt_count: number
 }
 
@@ -140,6 +144,15 @@ export interface CartLine extends Product {
 }
 /** ข้อมูลปิดกะที่ ERP ส่งกลับ ใช้พิมพ์ Z Report บนเครื่อง */
 export interface ZReport {
+  carried_float?: number | null
+  opening_variance?: number | null
+  opening_note?: string | null
+  float_kept?: number | null
+  deposit_amount?: number | null
+  deposit_reference?: string | null
+  void_count?: number
+  return_count?: number
+  discount_total?: number
   shift_no: string
   branch_name?: string
   cashier_name?: string

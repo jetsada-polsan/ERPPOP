@@ -130,8 +130,9 @@ class PosRetailControlTest extends TestCase
             'reason' => 'นำส่งรอบบ่าย',
         ]))->getData(true);
 
-        $this->assertEquals(700.0, $response['shift']['expected_cash']);
-        $this->assertEquals(300.0, $response['shift']['cash_drops']);
+        $this->assertArrayNotHasKey('expected_cash', $response['shift']);
+        $this->assertArrayNotHasKey('cash_drops', $response['shift']);
+        $this->assertEquals(700.0, $shift->fresh()->expected_cash);
         $this->assertDatabaseHas('pos_cash_movements', [
             'pos_shift_id' => $shift->id,
             'movement_type' => 'drop',

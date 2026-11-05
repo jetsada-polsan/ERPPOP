@@ -143,3 +143,9 @@
 - คลังใช้สาขาที่กำหนดคลังหลักก่อน และใช้ `warehouses.branch_id` เป็น fallback สำหรับตำแหน่งเก็บอื่นในคลังที่ระบุเจ้าของ; สิทธิ์สาขายังคำนวณจาก `ReportController` ห้ามให้คำค้น/เปลี่ยนหน้า/ส่งออกข้ามขอบเขตสิทธิ์
 - ช่องค้นหารายงานนี้รอหยุดพิมพ์ 500 ms แล้วอัปเดตผลโดยคงโฟกัส/เคอร์เซอร์; ยกเลิกคำขอเก่าและไม่ให้ผลเก่าทับคำค้นใหม่; เลขบาร์โค้ดยังคงเป็นข้อความและยอดจำนวนแสดงตามความละเอียด 8 ตำแหน่งของระบบ
 - รายงานนี้อ่านยอดคงเหลือปัจจุบัน; ใบปรับสต๊อก `pending_approval` ยังไม่เพิ่มยอดจริง ต้องให้ผู้มีสิทธิ์อีกคนอนุมัติตามขั้นตอนเดิม
+
+## Shift float branch work - 2026-11-05 (uncommitted, not deployed)
+
+- ERP + Vue changes remain on `claude/shift-float`. Python has not changed; adjust it before using the new blind API, which omits expected cash and its components for cashiers. API specification and limitations are at the top of `docs/ai/task.md`.
+- Per-terminal carry comes from the latest closed shift's float_kept; legacy null falls back to terminal policy, while zero remains zero. An opening discrepancy requires a reason. Deposit=counted minus float kept is calculated by ERP and never added as new revenue. Opening variance is a separate cashbook adjustment, posted once at close.
+- Git metadata is outside this workspace's writable roots: pull/add were denied. No new commit or push exists; do not assume this working tree has reached remote or production.

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\PosController;
 use App\Http\Middleware\ErpAuthorize;
 use App\Models\Permission;
 use App\Models\PosOfflineSale;
@@ -11,6 +12,7 @@ use App\Models\Role;
 use App\Models\Salesman;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -102,6 +104,33 @@ class PosWebCheckoutRealTest extends TestCase
         $this->assertEquals(20, (float) $receipt->discount_amount);
         $this->assertEquals(($price - 10) * 2, (float) $receipt->net_sales);
         $this->assertEquals(($price - 10) * 2, (float) DB::table('documents')->where('id', $receipt->document_id)->value('total_amount'));
+        $this->assertReconciles();
+    }
+
+    public function test_float_and_deposit_do_not_duplicate_real_sales_or_cashbook_across_shifts(): void
+    {
+        $this->shift->update(['opening_cash' => 2000, 'carried_float' => 2000, 'opening_variance' => 0]);
+        $this->postJson(route('pos.checkout'), $this->payload())->assertOk()->assertJsonPath('success', true);
+        $cashSales = (float) DB::table('pos_payments')->where('method', 'cash')->sum('amount');
+        $request = Request::create('/pos/shift/close', 'POST', [
+            'shift_id' => $this->shift->id, 'counted_cash' => 2000 + $cashSales, 'float_kept' => 2000,
+        ]);
+        $this->app->instance('request', $request);
+        $closed = app(PosController::class)->closeShift($request)->getData(true)['shift'];
+        $this->assertEquals($cashSales, $closed['deposit_amount']);
+        $this->assertEquals($cashSales, DB::table('cash_books')->sum('cash_in'));
+        $this->assertReconciles();
+
+        $next = PosShift::create(['branch_id' => $this->branchId, 'pos_terminal_id' => $this->shift->pos_terminal_id,
+            'cashier_id' => $this->shift->cashier_id, 'shift_no' => 'WEB-SHIFT-2', 'opened_at' => now(),
+            'opening_cash' => 2000, 'carried_float' => 2000, 'opening_variance' => 0, 'status' => 'open']);
+        $request = Request::create('/pos/shift/close', 'POST', [
+            'shift_id' => $next->id, 'counted_cash' => 2000, 'float_kept' => 2000,
+        ]);
+        $this->app->instance('request', $request);
+        app(PosController::class)->closeShift($request);
+        $this->assertEquals($cashSales, DB::table('cash_books')->sum('cash_in'));
+        $this->assertEquals(1, DB::table('cash_books')->count());
         $this->assertReconciles();
     }
 

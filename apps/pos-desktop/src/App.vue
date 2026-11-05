@@ -60,7 +60,38 @@ const offlineSelection = ref(false)
 const newPin = ref('')
 const confirmPin = ref('')
 const openingCash = ref(0)
-const countedCash = ref(0)
+const countedCash = ref<number | ''>('')
+const openingNote = ref('')
+const carriedFloat = ref<number | null>(null)
+const floatKept = ref(0)
+const depositReference = ref('')
+const closePreview = ref<ZReport | null>(null)
+const denominationValues = [1000, 500, 100, 50, 20, 10, 5, 2, 1, 0.50, 0.25]
+const denominationCounts = ref<number[]>(denominationValues.map(() => 0))
+const zCopies = ['ใบนำส่ง', 'ใบเก็บ']
+function totalDenominations() {
+  countedCash.value = denominationValues.reduce((sum, value, i) => sum + Math.round(value * 100) * (denominationCounts.value[i] || 0), 0) / 100
+}
+watch([countedCash, floatKept, depositReference], () => { closePreview.value = null })
+watch(countedCash, (value) => {
+  if (value !== '' && value >= 0) floatKept.value = Math.min(value, shift.value?.default_float ?? 0)
+})
+watch(modal, async (value) => {
+  if (value !== 'shift' || !profile.value || !cashier.value) return
+  carriedFloat.value = null
+  openingNote.value = ''
+  try {
+    const settings = await api.shiftSettings(profile.value.branchId, cashier.value.id)
+    // null = no recorded float from the previous shift (first shift on this till): suggest the
+    // till's default float and do not ask for a variance reason, since nothing was handed over.
+    if (settings.carried_float != null) {
+      carriedFloat.value = settings.carried_float
+      openingCash.value = settings.carried_float
+    } else if (settings.default_float != null) {
+      openingCash.value = settings.default_float
+    }
+  } catch (e) { showError(e) }
+})
 const paymentMethod = ref<PaymentMethod>('cash')
 const cashReceived = ref(0)
 const paymentRef = ref('')
@@ -161,6 +192,7 @@ const receiptVat = computed(() => {
   return (lastReceipt.value?.total || 0) * rate / (100 + rate)
 })
 
+function optionalMoney(value?: number | null) { return value == null ? '-' : money(value) }
 function money(value: number) { return new Intl.NumberFormat('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value) }
 // ใบที่กำลังพิมพ์ (ต้นฉบับ/สำเนา) แสดงบนหัวใบเสร็จ
 const printCopyLabel = ref('')
@@ -698,7 +730,11 @@ async function startCashierSession(next: Cashier) {
 async function reconcileShiftWithErp() {
   if (!profile.value || !cashier.value || !shift.value) return
   const live = await api.activeShift(profile.value.branchId, cashier.value.id)
-  if (live?.id === shift.value.id) return
+  if (live?.id === shift.value.id) {
+    shift.value = live
+    await saveSession(cashier.value, live)
+    return
+  }
   const stale = shift.value.shift_no
   shift.value = live
   await saveSession(cashier.value, live)
@@ -722,7 +758,7 @@ async function openShift() {
   if (!cashier.value || !profile.value) return
   busy.value = true
   try {
-    shift.value = await api.openShift(profile.value.branchId, cashier.value.id, openingCash.value)
+    shift.value = await api.openShift(profile.value.branchId, cashier.value.id, openingCash.value, openingNote.value)
     await saveSession(cashier.value, shift.value)
     await moveStrandedSalesToShift(shift.value.id)
     void syncCheckoutQueue(refreshQueue)
@@ -750,17 +786,32 @@ async function openCloseShift() {
   try {
     const live = await api.activeShift(profile.value.branchId, cashier.value.id)
     if (live) { shift.value = live; await saveSession(cashier.value, live) }
-  } catch { /* ออฟไลน์: ใช้ค่าในเครื่องไปก่อน */ }
-  countedCash.value = shift.value?.expected_cash ?? 0
+  } catch (e) { showError(e); return }
+  countedCash.value = ''
+  floatKept.value = shift.value?.default_float ?? 0
+  depositReference.value = ''
+  closePreview.value = null
+  denominationCounts.value = denominationValues.map(() => 0)
   modal.value = 'closeShift'
 }
 
+async function previewCloseShift() {
+  if (!shift.value || countedCash.value === '') return
+  busy.value = true
+  try {
+    closePreview.value = await api.closeShift(shift.value.id, countedCash.value, {
+      preview: true, float_kept: floatKept.value, deposit_reference: depositReference.value,
+    })
+  } catch (e) { showError(e) } finally { busy.value = false }
+}
+
 async function closeShift() {
-  if (!shift.value) return
+  if (!shift.value || countedCash.value === '') return
+  if (shift.value.default_float !== undefined && !closePreview.value) { showError('ตรวจยอดก่อนยืนยันปิดกะ'); return }
   if (pendingCount.value) { showError('ต้องส่งบิลค้างขึ้น ERP ให้ครบก่อนปิดกะ'); return }
   busy.value = true
   try {
-    const closed = await api.closeShift(shift.value.id, countedCash.value)
+    const closed = await api.closeShift(shift.value.id, countedCash.value, shift.value.default_float === undefined ? {} : { float_kept: floatKept.value, deposit_reference: depositReference.value })
     shift.value = null
     // Z Report: เก็บไว้พิมพ์ซ้ำได้ แล้วพิมพ์ทันที (เครื่องพิมพ์หลักของ Windows)
     lastZReport.value = closed
@@ -837,7 +888,8 @@ async function recordCashDrop() {
       reason: 'นำส่งเงินระหว่างกะ',
     })
     shift.value = result.shift
-    countedCash.value = shift.value.expected_cash
+    countedCash.value = ''
+    closePreview.value = null
     cashDropAmount.value = 0
     cashDropReference.value = ''
     flash(result.message)
@@ -917,6 +969,7 @@ async function checkout() {
     let provisional = true
     if (navigator.onLine) {
       await syncCheckoutQueue(refreshQueue)
+      await reconcileShiftWithErp().catch(() => undefined)
       const result = (await queueItems()).find((item) => item.id === id)
       if (result?.status === 'synced') {
         receiptNo = result.receiptNo || receiptNo
@@ -1044,6 +1097,7 @@ onUnmounted(() => {
 
 <template>
   <main class="app-shell">
+    <div v-if="shift?.cash_warning" role="alert" style="background:#fff4cf;color:#854d0e;padding:8px">เงินสดในลิ้นชักเกินเกณฑ์ ควรนำส่งเงิน</div>
     <header class="topbar">
       <div class="brand"><img class="brand-logo" :src="mpmLogo" alt="MPM Food Group"><div><strong>JET POS</strong><small>POINT OF SALE</small></div></div>
       <div class="terminal-context">
@@ -1212,6 +1266,8 @@ onUnmounted(() => {
 
       <form v-else-if="modal === 'shift'" class="modal compact" @submit.prevent="openShift">
         <div class="modal-head"><div><Banknote/><span><strong>เปิดกะขาย</strong><small>{{ cashier?.name }} · {{ profile?.branchName }}</small></span></div><button type="button" @click="modal = null"><X/></button></div>
+        <p v-if="carriedFloat !== null">เงินทอนยกมา {{ money(carriedFloat) }}</p>
+        <label v-if="carriedFloat !== null && openingCash !== carriedFloat">เหตุผลยอดรับกะต่างจากยกมา<input v-model="openingNote" required maxlength="500"></label>
         <label>เงินทอนเริ่มต้น<input v-model.number="openingCash" type="number" min="0" step="0.01" autofocus required></label>
         <button class="primary" :disabled="busy">ยืนยันเปิดกะ</button>
         <button type="button" class="link-button" @click="printZReport">พิมพ์ Z Report กะล่าสุดซ้ำ</button>
@@ -1219,11 +1275,29 @@ onUnmounted(() => {
 
       <form v-else-if="modal === 'closeShift'" class="modal compact" @submit.prevent="closeShift">
         <div class="modal-head"><div><LogOut/><span><strong>ปิดกะขาย</strong><small>{{ shift?.shift_no }} · {{ pendingCount ? `มี ${pendingCount} บิลรอส่ง` : 'บิลส่งครบแล้ว' }}</small></span></div><button type="button" @click="modal = null"><X/></button></div>
+        <p v-if="shift?.cash_warning" class="error">เงินสดเกินเกณฑ์ ควรนำส่งเงิน</p>
+        <p v-if="shift?.blind_count === false && shift?.expected_cash !== undefined">เงินที่ควรมี {{ money(shift.expected_cash) }}</p>
+        <details><summary>ช่วยนับธนบัตร / เหรียญ</summary>
+          <label v-for="(value, i) in denominationValues" :key="value">{{ money(value) }} ×
+            <input v-model.number="denominationCounts[i]" type="number" min="0" max="1000000" step="1" @input="totalDenominations">
+          </label>
+        </details>
         <label>เงินสดที่นับได้จริง<input v-model.number="countedCash" type="number" min="0" step="0.01" autofocus required></label>
+        <template v-if="shift?.default_float !== undefined">
+          <label>เงินทอนเก็บในลิ้นชัก<input v-model.number="floatKept" type="number" min="0" :max="countedCash === '' ? undefined : countedCash" step="0.01" required></label>
+          <button v-if="countedCash !== '' && countedCash < (shift.default_float ?? 0)" type="button" class="secondary" @click="floatKept = Number(countedCash)">เงินไม่ถึง float: เก็บเท่าที่มี</button>
+          <label>เลขซองเงินนำส่ง<input v-model="depositReference" maxlength="80"></label>
+          <button type="button" class="secondary" :disabled="busy || countedCash === '' || pendingCount > 0" @click="previewCloseShift">ตรวจยอดที่นับ</button>
+          <div v-if="closePreview">
+            <p>เงินที่ควรมี {{ money(closePreview.expected_cash) }}</p>
+            <p :style="{ color: (closePreview.cash_difference ?? 0) < 0 ? '#b91c1c' : '#15803d' }">ส่วนต่าง {{ money(closePreview.cash_difference ?? 0) }}</p>
+            <p>เงินนำส่ง {{ money(closePreview.deposit_amount ?? 0) }}</p>
+          </div>
+        </template>
         <label>นำส่งเงินระหว่างกะ<input v-model.number="cashDropAmount" type="number" min="0" step="0.01" placeholder="0.00"></label>
         <label v-if="cashDropAmount > 0">เลขอ้างอิง / ซองเงิน<input v-model="cashDropReference"></label>
         <button v-if="cashDropAmount > 0" type="button" class="secondary" :disabled="busy" @click="recordCashDrop">บันทึกนำส่งเงิน</button>
-        <button class="primary" :disabled="busy || pendingCount > 0">ยืนยันปิดกะ</button>
+        <button class="primary" :disabled="busy || pendingCount > 0 || (shift?.default_float !== undefined && !closePreview)">ยืนยันปิดกะ</button>
       </form>
 
       <section v-else-if="modal === 'closeApp'" class="modal compact">
@@ -1335,9 +1409,9 @@ onUnmounted(() => {
       </form>
     </div>
 
-    <section v-if="printingZ && lastZReport" class="print-receipt print-z" :class="receiptTemplate.paper_width === 58 ? 'paper-58' : 'paper-80'">
+    <template v-if="printingZ && lastZReport"><section v-for="copy in zCopies" :key="copy" class="print-receipt print-z" :style="{ breakAfter: copy === zCopies[0] ? 'page' : 'auto' }" :class="receiptTemplate.paper_width === 58 ? 'paper-58' : 'paper-80'">
       <div class="print-block align-center size-large is-bold">{{ profile?.company?.name || 'JET POS' }}</div>
-      <div class="print-block type-title align-center is-bold">รายงานปิดกะ (Z Report)</div>
+      <div class="print-block type-title align-center is-bold">รายงานปิดกะ (Z Report) · {{ copy }}</div>
       <div class="print-meta print-block size-small">
         <span><b>เลขกะ</b><em>{{ lastZReport.shift_no }}</em></span>
         <span><b>สาขา / เครื่อง</b><em>{{ lastZReport.branch_name || profile?.branchName }} · {{ profile?.terminalCode }}</em></span>
@@ -1356,6 +1430,14 @@ onUnmounted(() => {
       </div>
       <div class="print-divider"></div>
       <div class="print-meta print-block size-small">
+        <span><b>ยกเลิก / รับคืน</b><em>{{ lastZReport.void_count ?? '-' }} / {{ lastZReport.return_count ?? '-' }}</em></span>
+        <span><b>ส่วนลดรวม</b><em>{{ optionalMoney(lastZReport.discount_total) }}</em></span>
+        <span><b>เงินทอนยกมา</b><em>{{ optionalMoney(lastZReport.carried_float) }}</em></span>
+        <span><b>ส่วนต่างตอนรับกะ</b><em>{{ optionalMoney(lastZReport.opening_variance) }}</em></span>
+        <span><b>เหตุผลรับกะ</b><em>{{ lastZReport.opening_note || '-' }}</em></span>
+        <span><b>เงินนำส่งปิดกะ</b><em>{{ optionalMoney(lastZReport.deposit_amount) }}</em></span>
+        <span><b>เลขซอง</b><em>{{ lastZReport.deposit_reference || '-' }}</em></span>
+        <span><b>เงินทอนเก็บในลิ้นชัก</b><em>{{ optionalMoney(lastZReport.float_kept) }}</em></span>
         <span><b>เงินทอนตั้งต้น</b><em>{{ money(lastZReport.opening_cash) }}</em></span>
         <span><b>เงินเข้าลิ้นชัก</b><em>{{ money(lastZReport.cash_in) }}</em></span>
         <span><b>นำส่งเงิน</b><em>-{{ money(lastZReport.cash_drops) }}</em></span>
@@ -1365,8 +1447,8 @@ onUnmounted(() => {
         <span class="is-bold"><b>เงินขาด / เกิน</b><em>{{ money(lastZReport.cash_difference ?? 0) }}</em></span>
       </div>
       <div class="print-divider"></div>
-      <div class="print-block align-center size-small">แคชเชียร์ ........................ &nbsp; ผู้ตรวจ ........................</div>
-    </section>
+      <div class="print-block align-center size-small">ผู้ส่ง ........................ &nbsp; ผู้รับ (หัวหน้า) ........................</div>
+    </section></template>
     <section v-else-if="lastReceipt" class="print-receipt" :class="receiptTemplate.paper_width === 58 ? 'paper-58' : 'paper-80'">
       <div v-for="block in receiptTemplate.blocks" :key="block.id" class="print-block" :class="[receiptBlockClasses(block), `type-${block.type}`]">
         <template v-if="block.type === 'logo'">
