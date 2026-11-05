@@ -145,7 +145,7 @@ def test_wrong_cashier_cannot_take_over_open_shift(scene):
 
 def test_ui_has_no_native_message_or_input_dialogs():
     from pos_python import ui
-    source=Path(ui.__file__).read_text()
+    source=Path(ui.__file__).read_text(encoding="utf-8")
     assert 'QMessageBox.' not in source and 'QInputDialog.' not in source
 
 
