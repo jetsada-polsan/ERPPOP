@@ -1,3 +1,38 @@
+## Handoff - 2026-11-05 (Codex: Python POS touch popups)
+- Branch: `claude/pos-python-settings-popup`; base `514b5d0`; commits `aedfd81` (shared touch controls / popup flows), `6c940f0` (guards, central held bills, tests / capture tool); commit ภาพและ handoff ดู git log หัวข้อนี้
+- Git: worktree เดิมเขียน metadata นอก sandbox ไม่ได้ (`FETCH_HEAD: Operation not permitted`); clone `--no-hardlinks` ไป `/private/tmp/pos-popups-work` โดยคง branch ชื่อเดิมและ origin GitHub เดิม แล้ว `git pull origin main` สำเร็จ (Already up to date). แก้ source ใน workspace นี้และคัดลอกเฉพาะไฟล์งานไป commit/push จากสำเนา. HEAD/index ของ workspace เดิมยังอยู่ `514b5d0`; อย่า commit ไฟล์งานนี้ซ้ำจาก metadata เดิม ให้รับงานต่อจาก remote branch หรือสำเนาข้างต้น.
+- ทำอะไร: ทำตาม `docs/ai/codex-pos-python-popups.md`; เพิ่ม `TouchDialog`, `NumPad`, `PinPad`, `ValueDialog`, `TextDialog`, `ChoiceDialog` ใช้ร่วมกัน; การ์ดขอบมน/header แบรนด์/บรรทัดรอง/×/backdrop มืด, แป้นจริง ≥64×64 ตัวเลข 24px, ปุ่มยืนยัน ≥56px. เปิดกะและรับเงินใช้ปุ่มยืนยันเต็มคอลัมน์; สีอ้าง PALETTE. Payment สรุป/โปร ≥16px และระยะห่างเพิ่ม, ขนาด 980×744.
+- PIN: ตัวเลข ASCII 4–20 หลัก, dots/ล้าง/ลบ, พิมพ์คีย์บอร์ดได้, ปุ่มยืนยันใช้ได้เมื่อครบ 4 หลัก; duplicate PIN เลือกชื่อโดย server ID. เปลี่ยน PIN เป็นสองขั้นพร้อมยืนยันตรงกันและเรียก API เดิมเมื่อ ERP บังคับเปลี่ยน; ไม่บันทึก PIN ลงคิว/ฐานข้อมูลจาก UI.
+- ปิดกะ: ดึง active shift จาก ERP ตรวจ server shift ID และใช้ `expected_cash` ล่าสุดเป็นค่าเริ่ม; หากดึงไม่ได้ใช้สรุปในเครื่องพร้อมแจ้งสถานะ. แสดงนับจริงและเกิน/ขาดตามสี. นำส่งเงินเป็นขั้นจำนวนเงินด้วย numpad → เหตุผล/เลขอ้างอิง → บันทึก, ใช้ local-first UUID/outbox เดิมและส่งเลขอ้างอิงถึง API; กลับมาหน้าปิดกะแล้วโหลด expected ใหม่. ปิดไม่ได้เมื่อมีบิล pending/failed ทั้งที่ปุ่ม/accept และ service (ตรวจซ้ำก่อนเปลี่ยนสถานะกะ).
+- บิลพัก: ออนไลน์และมีกะที่ ERP ยืนยันแล้วใช้ `/api/pos/held-bills` และ `/resume`; ส่ง server product/cashier/shift IDs, snapshot เก็บส่วนลดและแปลง product ID กลับเป็น local ก่อนเรียกคืน (ตรวจสินค้าครบก่อน consume บิล). บิลจาก Vue ใช้ cart เดิมได้. ออฟไลน์ยังพัก/เรียกในเครื่องได้และรองรับรายการ JSON แบบเก่า; เลือกบิลจากรายการแทน pop เงียบ ๆ. API ล้มเหลวไม่ล้างตะกร้า.
+- ประวัติ: เลือกบิลในเครื่อง → รายละเอียด → ยกเลิก/รับคืน. ต้องออนไลน์ มีกะ ERP และบิลมี server receipt; เลือกหัวหน้า/PIN ผ่าน API เดิม. ยกเลิกเฉพาะบิลวันนี้ในกะปัจจุบันที่ยังไม่ void. รับคืนกรอกจำนวนทีละรายการด้วย numpad ไม่เกินขาย; ส่ง server product IDs และไม่ทำเครื่องหมายบิลเป็น void. PIN ไม่เข้าคิวและถูกลบออกจาก payload หลัง request; ERP เป็นผู้ตรวจสิทธิ์และอนุมัติคืนเงินขั้นสุดท้าย.
+- Z Report: หลังปิดกะแสดงรายงานและพิมพ์อัตโนมัติเมื่อเลือก Windows printer แล้ว; เปิดกะมีปุ่มพิมพ์รายงานกะล่าสุดซ้ำ. จำ response ปิดกะจาก ERP เพื่อแสดง expected/count เมื่อ shift ID ตรง; fallback ในเครื่องแสดงป้ายชัดเจน. ปิดโปรแกรมแสดงจำนวนตะกร้า/คิว/กะ พร้อมกลับไปขาย/ล็อกหน้าจอ/ปิด; draft และคิวคงอยู่ตาม persistence เดิม.
+- เงินทอนส่งข้ามกะ: **ไม่พบการยกเงินทอนอัตโนมัติใน Vue/ERP**: Vue `openShift()` ส่ง `openingCash` ที่กรอก; `PosController::openShift()` รับ `opening_cash` และตั้ง expected เท่าค่านี้ ไม่ดึงยอดกะก่อน จึงคงการกรอกใหม่ใน Python.
+
+| Vue modal | Python dialog / flow | สถานะ |
+| --- | --- | --- |
+| cashier | ValueDialog + PinPad → pin_login | dots/แป้น/คีย์บอร์ด/ยืนยัน ≥4 หลัก |
+| selectCashier | SellerSelectionDialog / ChoiceDialog | โหมดเลือกชื่อ + PIN ซ้ำผูก server ID |
+| changePin | ValueDialog + PinPad สองขั้น | ค่าใหม่/ยืนยันตรงกัน/API เดิม |
+| shift | OpeningShiftDialog + NumPad | เงินทอน/เปิดกะ/พิมพ์ Z ซ้ำ |
+| closeShift | CloseShiftDialog + ValueDialog/TextDialog นำส่ง | ERP expected/นับจริง/ส่วนต่าง/นำส่ง/เลขอ้างอิง/บล็อกบิลค้าง |
+| closeApp | TouchDialog ใน closeEvent | แสดง draft/คิว/กะ, กลับไปขาย/ล็อก/ปิด |
+| void | TextDialog → ChoiceDialog → ValueDialog(PinPad) | เหตุผล/หัวหน้า/PIN/receipt void API |
+| return | TextDialog → ChoiceDialog → ValueDialog(จำนวน/PIN) | จำนวนคืน/หัวหน้า/PIN/receipt return API; ต้องอนุมัติ ERP ก่อนคืนเงิน |
+| weight | ValueDialog + NumPad | ทศนิยม/ตรวจน้ำหนักเดิม; ป้ายชั่งยังล็อกจำนวน |
+| holdBill | TextDialog | ตั้งชื่อ/ส่วนกลางเมื่อออนไลน์; local fallback |
+| heldBills | ChoiceDialog | เลือกบิลส่วนกลางหรือในเครื่อง; รักษาส่วนลด |
+| history | ChoiceDialog → TouchDialog รายละเอียด | ประวัติในเครื่อง/เปิดใบเสร็จ/ยกเลิก/รับคืน |
+| payment | PaymentDialog + NumPad + ValueDialog เลขท้าย | เงินสด/QR เดิม, สรุปอ่านง่าย/แป้นร่วม/ยืนยันเงินเข้ายังบังคับ |
+| Z report | TouchDialog ใน show_z_report | สรุป/พิมพ์เมื่อปิด/เรียกพิมพ์ซ้ำ |
+
+- ทดสอบ: `QT_QPA_PLATFORM=offscreen PYTHONPATH=apps/pos-python /private/tmp/pos-parity-env/bin/python -m pytest apps/pos-python/tests -q` ผ่าน **286 tests / 6.02s** (เดิม 278 + ใหม่ 8). ครอบคลุม PIN ใส่/ลบ/ล้าง/คีย์บอร์ดผิดชนิด, decimal/selection, ERP expected ID, เกิน/ขาด, pending/failed และตรวจซ้ำที่ service, cash drop API/เลขอ้างอิง/UUID, return server IDs/ไม่เก็บ PIN, central hold/restore/discount, geometry/ขนาดปุ่ม. เทสต์ UI cleanup Qt widgets ด้วย deferred delete ก่อนปิด DB เพื่อไม่ให้หน้าต่างจากเคสก่อนค้างใน event loop.
+- ภาพ: `QT_QPA_PLATFORM=offscreen PYTHONPATH=apps/pos-python /private/tmp/pos-parity-env/bin/python apps/pos-python/tools/capture_parity.py` ผ่าน; **17 ภาพ** ใน `docs/ai/pos-python-shots/popups/`, ทุกภาพ 1024×768 (รวม existing shift และสองขั้นนำส่งเงิน). ตรวจภาพจริง opening/payment/closeShift/Z และ contact sheet ทุกภาพแล้ว; bounds ของ dialog และปุ่มตรวจด้วย Qt. ภาพ PIN/void/return/changePin แสดงขั้นกรอก PIN ของ flow; ไม่ได้กรอก credentials จริง. ภาพใช้ SQLite ชั่วคราว ไม่ต่อ production.
+- ตรวจเพิ่ม: `git diff --check` ผ่าน. `php artisan test` เริ่มไม่ได้เพราะไม่มี `vendor/autoload.php`; ไม่แก้ PHP หรือ `apps/pos-desktop/` จึงไม่ได้รัน vue-tsc. ไม่เรียก CI/build/install รอบนี้.
+- ยังไม่ทดสอบ/ความเสี่ยง: ต้อง UAT Windows ร้านจริง 1024×768, ทัชสกรีน/คีย์บอร์ด/เครื่องชั่ง/สแกนเนอร์/เครื่องพิมพ์, ERP acceptance โดยสิทธิ์จริงของคนขาย/หัวหน้า, ข้ามเครื่องเรียกบิลพักและกรณีเครือข่ายขาดหลัง API รับสำเร็จ, ปิดกะ/คืนบางส่วนหลายครั้ง/ปิดโปรแกรมแล้วเปิดใหม่. Fake API และ offscreen ไม่แทน hardware/ERP UAT. หน้าชำระเงินยังใช้ช่องทางเงินสด/QR ตาม Python เดิม; ไม่ได้เพิ่มระบบ split/card/cheque ในรอบ popup นี้.
+- Deploy: **ยังไม่ deploy**; ไม่สร้าง PIN/password/device token ให้ใคร และไม่สร้างธุรกรรม production.
+- งานถัดไป: รับ source จาก remote branch แล้วให้เจ้าของสั่ง Windows UAT build/install เพื่อตรวจรายการข้างต้นก่อนปล่อยใช้งาน.
+
 ## Handoff - 2026-11-05 (Codex: Python POS promotion/payment parity)
 - Branch: `claude/pos-python-settings-popup`; base `8721e55`; commits `1e22fae` (pricing/catalog/migration), `a31a6b9` (touch payment/pairing/persistence/tests); commit ภาพ/handoff ดู git log หัวข้อนี้
 - Git: sandbox ไม่อนุญาตเขียน metadata ของ worktree เดิม จึง clone แบบ `--no-hardlinks` ไป `/private/tmp/pos-parity-copy` บน branch ชื่อเดิม, ตั้ง origin เป็น GitHub เดิม และ `git pull origin main` สำเร็จ (Already up to date). แก้ไฟล์ใน workspace เดิมแล้วใช้ Git metadata ของสำเนาสำหรับ commit/push; HEAD/index ของ worktree เดิมจึงยังอยู่ base เดิม (อย่า commit ไฟล์ซ้ำจาก worktree นี้). ก่อนรับงานต่อให้ใช้สำเนานี้หรือ worktree ใหม่จาก remote branch.
