@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+from contextlib import closing, ExitStack
 import http.cookiejar
 import json
 import os
@@ -26,7 +27,7 @@ import time
 from decimal import Decimal
 from pathlib import Path
 from urllib.parse import urlencode, urlsplit
-from urllib.request import HTTPCookieProcessor, HTTPRedirectHandler, Request, build_opener
+from urllib.request import HTTPCookieProcessor, HTTPRedirectHandler, HTTPHandler, HTTPSHandler, ProxyHandler, Request, build_opener, install_opener
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'apps/pos-python'))
@@ -46,6 +47,14 @@ def local_url(url):
     return url
 
 
+class LoopbackOnly(HTTPHandler, HTTPSHandler):
+    def http_request(self, request):
+        local_url(request.full_url)
+        return super().http_request(request)
+
+    https_request = http_request
+
+
 class NoExternalRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         local_url(newurl)
@@ -54,14 +63,16 @@ class NoExternalRedirect(HTTPRedirectHandler):
 
 def run(report):
     results = []
-    with tempfile.TemporaryDirectory(prefix='pos-campaigns-') as folder:
+    with tempfile.TemporaryDirectory(prefix='pos-campaigns-') as folder, ExitStack() as cleanup:
+        # Disable proxies and reject off-machine requests/redirects, including API calls.
+        install_opener(build_opener(ProxyHandler({}), LoopbackOnly(), NoExternalRedirect()))
         scratch = Path(folder)
         erp_path = scratch / 'erp.sqlite'
         erp_path.touch()
         env = {**os.environ, 'APP_ENV': 'testing', 'APP_DEBUG': 'false',
                'APP_KEY': 'base64:' + base64.b64encode(secrets.token_bytes(32)).decode(),
                'DB_CONNECTION': 'sqlite', 'DB_DATABASE': str(erp_path),
-               'DB_URL': '', 'SESSION_DRIVER': 'file', 'CACHE_STORE': 'array',
+               'DB_URL': '', 'SESSION_DRIVER': 'database', 'CACHE_STORE': 'array',
                'QUEUE_CONNECTION': 'sync', 'MAIL_MAILER': 'array',
                'BCRYPT_ROUNDS': '4', 'QT_QPA_PLATFORM': 'offscreen',
                'APP_CONFIG_CACHE': str(scratch / 'config.php')}
@@ -98,7 +109,7 @@ def run(report):
             [, $token]=App\Models\PosDevice::issue(['name'=>'Campaign E2E','user_id'=>$user->id,
                 'branch_id'=>$branch->id,'terminal_code'=>$terminal->code]);
             $ids=App\Models\Product::where('sku_code','like','UAT-SKU-%')->orderBy('sku_code')->limit(4)->pluck('id')->all();
-            foreach ($ids as $i=>$id) { App\Models\Product::findOrFail($id)->update(['default_price'=>[50,40,20,1][$i]]); }
+            foreach ($ids as $i=>$id) { App\Models\Product::findOrFail($id)->update(['default_price'=>[50,40,20,1][$i], 'is_vat'=>[true,false,false,true][$i]]); }
             $other=App\Models\Branch::create(['code'=>'CAMP-OTHER','name_th'=>'Other test branch','is_active'=>true]);
             echo json_encode(compact('password','pin','token','ids')+['branch'=>$branch->id,'other'=>$other->id]);
         ''')
@@ -113,7 +124,7 @@ def run(report):
                                        str(ROOT / 'vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php')],
                                       cwd=ROOT / 'public', env=env, stdout=log, stderr=log)
             try:
-                browser = build_opener(HTTPCookieProcessor(http.cookiejar.CookieJar()), NoExternalRedirect())
+                browser = build_opener(ProxyHandler({}), LoopbackOnly(), HTTPCookieProcessor(http.cookiejar.CookieJar()), NoExternalRedirect())
                 def web(path, fields=None):
                     req = Request(base + path, data=urlencode(fields, doseq=True).encode() if fields is not None else None)
                     with browser.open(req, timeout=20) as response:
@@ -131,16 +142,15 @@ def run(report):
                 csrf_match = re.search(r'name="_token"\s+value="([^"]+)"', html)
                 assert csrf_match, html[:1500]
                 csrf = csrf_match.group(1)
-                # Do not follow login's dashboard redirect (unrelated asset rendering).
                 web('/login', {'_token': csrf, 'username': 'campaign_e2e', 'password': fixture['password']})
                 html, url = web('/qty-promotions')
                 assert url.endswith('/qty-promotions'), 'Backoffice login/permission failed'
                 csrf_match = re.search(r'name="_token"\s+value="([^"]+)"', html)
                 assert csrf_match, html[:1500]
                 csrf = csrf_match.group(1)
-                erp = sqlite3.connect(erp_path)
+                erp = cleanup.enter_context(closing(sqlite3.connect(erp_path)))
                 erp.row_factory = sqlite3.Row
-                db = connect(scratch / 'pos.sqlite')
+                db = cleanup.enter_context(closing(connect(scratch / 'pos.sqlite')))
                 api = LaravelPosClient(base, fixture['token'])
                 prov, pos, sync = ProvisioningService(db, api), PosService(db), SyncService(db, api)
                 branch = fixture['branch']
@@ -157,14 +167,14 @@ def run(report):
 
                 def campaigns(specs):
                     nonlocal counter
-                    # Retire previous test campaigns through the actual update route.
+                    # Retire prior scenarios only inside this disposable fixture database.
                     for row in erp.execute('SELECT id,code,name,promo_type FROM qty_promotions WHERE is_active=1').fetchall():
                         # Isolation between cases is fixture housekeeping, not campaign creation.
                         erp.execute('UPDATE qty_promotions SET is_active=0 WHERE id=?', (row['id'],))
                     erp.commit()
                     for spec in specs:
                         counter += 1
-                        fields = {'_token': csrf, 'code': f'CAMP-{counter}', 'name': f'Campaign {counter}', 'is_active': 1, **spec}
+                        fields = {'_token': csrf, 'code': f'CAMP-{counter}', 'name': f'Campaign {counter}', 'is_active': 1, 'branch_id': branch, **spec}
                         if 'product_ids' in fields:
                             fields['product_ids[]'] = fields.pop('product_ids')
                         web('/qty-promotions', fields)
@@ -186,9 +196,10 @@ def run(report):
                             payment_method=method, paid_amount=order.grand_total(), payment_confirmed=method=='transfer',
                             transfer_account_last4='6789' if method=='transfer' else None,
                             adjustment_approved_by='Campaign supervisor' if approved else None)
-                    except ValueError:
+                    except ValueError as error:
                         if approved or Decimal(manual) <= 0:
                             raise
+                        assert "ผู้อนุมัติ" in str(error), str(error)
                         assert before == pos.pending_sync_count()
                         results.append({'case': name, 'ok': True, 'rejected': True})
                         return
@@ -198,11 +209,14 @@ def run(report):
                     receipt = erp.execute('SELECT * FROM pos_receipts WHERE receipt_no=?', (updated['server_receipt_no'],)).fetchone()
                     errors = [dict(r) for r in db.execute('SELECT status,last_error FROM sync_outbox WHERE aggregate_uuid=?', (sale['sale_uuid'],))]
                     assert receipt, f'{name}: ERP rejected: {errors}'
+                    assert updated['sync_status'] == 'synced' and receipt['status'] == 'completed'
                     # ERP gross includes catalog value of gifts, while POS displays gifts at zero.
                     gift_value = sum((Decimal(str(p.free_price))*q for p,q in order.pricing()[4]), Decimal(0))
                     pos_discount = money(Decimal(sale['discount_total']) + gift_value)
                     actual = {'net': str(money(receipt['net_sales'])), 'discount': str(money(receipt['discount_amount'])), 'vat': str(money(receipt['vat_amount']))}
                     expected = {'net': str(money(sale['grand_total'])), 'discount': str(pos_discount), 'vat': str(money(sale['vat_total']))}
+                    assert money(order.grand_total()) == money(sale['grand_total'])
+                    assert money(order.vat_total(pos.vat_rate())) == money(sale['vat_total'])
                     ok = actual == expected
                     items = erp.execute('SELECT * FROM pos_receipt_items WHERE pos_receipt_id=? ORDER BY seq', (receipt['id'],)).fetchall()
                     assert len(items) == len(cart), f'{name}: missing ERP items'
@@ -232,20 +246,32 @@ def run(report):
                     ('bill_free_item', {'min_amount':150,'free_product_id':gift,'free_qty':1}),
                     ('bill_addon', {'min_amount':150,'product_id':gift,'bundle_price':5,'free_qty':2}),
                 ]
+                # Independent arithmetic expectations (display discount excludes zero-price gifts).
+                discounts = {
+                    'free_item': [0,0,0], 'bundle_price': [30,0,90],
+                    'discount-baht': [15,0,45], 'discount-percent': ['18.75',0,'56.25'],
+                    'mix_bundle': [20,0,80], 'mix_free': [40,0,140],
+                    'bill_discount-percent': [30,0,35], 'bill_discount-baht': [17,0,17],
+                    'bill_free_item': [0,0,0], 'bill_addon': [30,0,30],
+                }
                 specs_by_name = {}
                 for name, fields in definitions:
                     spec = {'promo_type':name, **fields}
                     specs_by_name[name] = spec
                     is_bill = name.startswith('bill_')
-                    for tag, q in [('exact',3), ('below',2), ('multiple',9)]:
+                    for case_index, (tag, q) in enumerate([('exact',3), ('below',2), ('multiple',9)]):
                         basket = [(0,q)]
+                        if name in ('mix_bundle', 'mix_free'):
+                            basket = [(0,q-1),(1,1)]
                         if is_bill and tag == 'below':
                             basket = [(0,2),(3,49)]  # 149: one baht below 150
                         if name == 'bill_addon':
                             basket += [(2,2)]
-                        sell(f'{name}/{tag}', [spec], basket, method='transfer' if tag=='multiple' else 'cash')
+                        sell(f'{name}/{tag}', [spec], basket, method='transfer' if tag=='multiple' else 'cash',
+                             expected_discount=discounts[name][case_index])
                 item = specs_by_name['discount-baht']
                 bill = specs_by_name['bill_discount-percent']
+                sell('mixed-vat-rounding', [specs_by_name['discount-percent']], [(0,3),(1,2),(3,7)], manual='0.13')
                 sell('item+bill', [item,bill], [(0,4),(1,1)])
                 sell('item+bill+manual-approved', [item,bill], [(0,4),(1,1)], manual='7.13')
                 sell('item+bill+manual-unapproved', [item,bill], [(0,4),(1,1)], manual='7.13', approved=False)
@@ -257,8 +283,6 @@ def run(report):
                                    ('future',{'starts_at':'2099-01-01','ends_at':'2100-01-01'}),
                                    ('disabled',{'is_active':0}), ('other-branch',{'branch_id':fixture['other']})]:
                     sell(tag, [{**item, **extra}], [(0,9)], expected_discount=0)
-                db.close()
-                erp.close()
             finally:
                 server.terminate()
                 server.wait(timeout=10)
