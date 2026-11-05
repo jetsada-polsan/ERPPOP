@@ -24,6 +24,14 @@
 # Handoff — 2026-11-02 (แก้สีหน้า Executive Dashboard)
 
 ## Handoff - 2026-11-05
+- Branch / source: `claude/pos-python-settings-popup` / `apps/pos-python` (PopCentral POS) เท่านั้น; ไม่แตะ `apps/pos-desktop` และไม่ deploy production
+- Build UAT: GitHub Actions run `41984806803` สำเร็จ; artifact `PopCentral-POS-UAT-0.1.0-dev` พร้อมดาวน์โหลดจาก GitHub Actions (178,173,903 bytes, ยังไม่หมดอายุ)
+- ทดสอบ: `cd apps/pos-python && QT_QPA_PLATFORM=offscreen PYTHONPATH=. python3 -m unittest discover -s tests -v` ผ่าน 253 tests / 4.641s; ครอบคลุม shift, สแกน barcode/ตาชั่ง, จำนวน, ส่วนลด, ชำระเงิน, ใบเสร็จ, print queue, offline queue/sync และ UI style
+- หน้าจอ 1024x768: source/test ยืนยัน minimum `960x600` และจำกัดฝั่งบิลแบบ responsive ที่ 400-520px เพื่อเหลือพื้นที่ product grid; ยังต้องตรวจด้วยตาบน Windows installer รุ่นนี้ก่อนประกาศผ่าน UAT
+- Windows UAT: เริ่มตรวจเครื่อง BK Server แล้ว แต่เครื่องกำลังเปิด `JET POS Python — UAT` รุ่นเดิม (ไม่ใช่ artifact `PopCentral-POS-UAT-0.1.0-dev`) และหน้าจอถูกสลับระหว่างการควบคุม จึงยังไม่สามารถยืนยัน flow เปิดกะ → ขาย → scan → แก้จำนวน/ส่วนลด → รับเงิน → พิมพ์ → ปิดกะ ได้อย่างปลอดภัย
+- ขั้นตอนถัดไป: ดาวน์โหลด/ติดตั้ง artifact ข้างต้นบน Windows test machine, ให้เจ้าของกรอก PIN เองหากต้องเชื่อม ERP, และใช้ข้อมูล UAT/offline เท่านั้นก่อนทดสอบ checkout/print; ห้ามสร้างบิลหรือเปิด/ปิดกะบน production โดยไม่ได้รับอนุมัติยืนยันเฉพาะจุด
+
+## Handoff - 2026-11-05
 - Commit: pending — compact POS touch keypad
 - ทำอะไร: ลด pop-up แป้นตัวเลขของ JET POS Python จากขั้นต่ำ 560×620 เป็น 480×540, ลดปุ่มจาก 72px เป็น 58px, ลด font/margin/spacing เพื่อไม่บังหน้าขาย แต่ยังใหญ่พอสำหรับจอสัมผัส
 - ทดสอบ: `PYTHONPATH=apps/jet-pos-python python3 -m unittest discover -s apps/jet-pos-python/tests -v` ผ่าน 25 tests; `QT_QPA_PLATFORM=offscreen` สร้าง `TouchKeypadDialog` และตรวจขนาดใหม่ผ่าน; `git diff --check` ผ่าน
