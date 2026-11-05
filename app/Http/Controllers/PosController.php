@@ -1223,7 +1223,7 @@ class PosController extends Controller
                     'source' => 'pos',
                 ]);
 
-                $receipt = $this->recordPosReceipt($shift, $this->nextPosReceiptNo($shift), $data, $document->id);
+                $receipt = $this->recordPosReceipt($shift, $this->nextPosReceiptNo($shift), $data, $document);
 
                 if ($discountCard) {
                     $lockedCard = DiscountCard::whereKey($discountCard->id)->lockForUpdate()->first();
@@ -1483,8 +1483,9 @@ class PosController extends Controller
         return $prefix.sprintf('%03d', $sequence);
     }
 
-    private function recordPosReceipt(PosShift $shift, string $receiptNo, array $data, int $documentId): PosReceipt
+    private function recordPosReceipt(PosShift $shift, string $receiptNo, array $data, Document $document): PosReceipt
     {
+        $documentId = $document->id;
         $items = collect($data['items']);
         // The pricing guard derives totals from server prices and verified discounts;
         // POS-supplied totals are informational and never drive receipt reporting.
@@ -1492,7 +1493,10 @@ class PosController extends Controller
         $net = (float) ($summary['net_sales'] ?? round($items->sum(fn ($item) => (float) $item['qty'] * (float) $item['unit_price']), 2));
         $discount = (float) ($summary['discount_amount'] ?? 0);
         $gross = (float) ($summary['gross_sales'] ?? round($net + $discount, 2));
-        $vat = round((float) ($data['vat_amount'] ?? 0), 2);
+        // VAT comes from the posted cash-sale document (GL salesBreakdown: per-product is_vat,
+        // no-VAT books). The POS never sends it reliably, so its vat_amount is ignored here.
+        $vat = round((float) $document->vat_amount, 2);
+        $lineVat = $document->stockDocument?->items()->orderBy('seq')->pluck('vat_amount')->values() ?? collect();
 
         $receipt = PosReceipt::create([
             'pos_terminal_id' => $shift->pos_terminal_id,
@@ -1519,7 +1523,7 @@ class PosController extends Controller
                 'qty' => $item['qty'],
                 'unit_price' => $item['unit_price'],
                 'discount_amount' => 0,
-                'vat_amount' => 0,
+                'vat_amount' => round((float) ($lineVat[$index] ?? 0), 4),
                 'net_amount' => $lineNet,
             ]);
         }
