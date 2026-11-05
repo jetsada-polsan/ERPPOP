@@ -103,7 +103,7 @@ class ProvisioningService:
 
     def pull_promotions(self, branch_id: int) -> dict[str, int]:
         """โปรซื้อครบจำนวนของสาขานี้ — ERP หักโปรเองทุกบิล เครื่องต้องรู้โปรชุดเดียวกัน"""
-        response = self.api.get(f"/api/pos/promotions?branch_id={int(branch_id)}")
+        response = self.api.get(f"/api/pos/promotions?branch_id={int(branch_id)}&include_upcoming=1&bill_promotions=1&mix_promotions=1")
         rows = response.get("promotions") if isinstance(response, dict) else response
         if not isinstance(rows, list):
             raise RuntimeError("รูปแบบข้อมูลโปรโมชั่นจาก ERP ไม่ถูกต้อง")

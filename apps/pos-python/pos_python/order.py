@@ -7,10 +7,12 @@
 from __future__ import annotations
 
 import sqlite3
+import json
+from dataclasses import asdict
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 
-from .promotions import QtyPromotion, promotion_discounts
+from .promotions import QtyPromotion, promotion_discounts, promotion_active
 from .services import CartLine, money, vat_from_inclusive
 
 QTY = "qty"
@@ -59,6 +61,8 @@ class Order:
     # โปรซื้อครบจำนวนที่ใช้ได้วันนี้ (โหลดจากเครื่อง) ERP หักเองทุกบิล เครื่องจึงต้องหักให้ตรง
     promotions: list[QtyPromotion] = field(default_factory=list)
 
+    bill_discount: Decimal = Decimal("0")
+
     # ---------- การเพิ่มสินค้า ----------
 
     def add_product(self, line: OrderLine) -> None:
@@ -100,6 +104,7 @@ class Order:
 
     def clear(self) -> None:
         self.lines = []
+        self.bill_discount = Decimal("0")
         self.adjustment_approved_by = None
         self.mode = QTY
         self.select(None)
@@ -164,48 +169,121 @@ class Order:
 
     # ---------- ยอดรวม ----------
 
+    def pricing(self):
+        promotions = [p for p in self.promotions if promotion_active(p)]
+        # Append gifts with their catalog price for the ERP calculation, then
+        # persist/submit them at zero. Never merge them with paid cart rows.
+        gifts = []
+        for p in promotions:
+            if p.promo_type != "free_item" or not p.free_product_id:
+                continue
+            trigger = next((line for line in self.lines if line.product_id == p.product_id), None)
+            qty = (trigger.qty // p.min_qty) * p.free_qty if trigger and p.min_qty > 0 else Decimal("0")
+            if qty > 0:
+                gifts.append((p, qty))
+        def gift_lines(entries):
+            return [OrderLine(p.free_product_id, p.free_name or "ของแถม", "ชิ้น", qty, p.free_price) for p, qty in entries]
+        working = self.lines + gift_lines(gifts)
+        base_discount = sum(promotion_discounts(working, [p for p in promotions if not p.promo_type.startswith("bill_")], rounded=False).values(), Decimal("0"))
+        paid = sum((line.qty * line.list_price for line in working), Decimal("0")) - base_discount
+        for p in promotions:
+            if p.promo_type == "bill_free_item":
+                gift = next((line for line in working if line.product_id == p.free_product_id), None)
+                if gift:
+                    paid -= min(gift.qty, p.free_qty) * gift.list_price
+        for p in promotions:
+            if p.promo_type == "bill_free_item" and p.free_product_id and paid + Decimal("0.0001") >= p.min_amount and p.free_qty > 0:
+                gifts.append((p, p.free_qty))
+        working = self.lines + gift_lines(gifts)
+        breakdown = []
+        discounts = promotion_discounts(working, promotions, rounded=False, breakdown=breakdown)
+        gross = sum((line.qty * line.list_price for line in working), Decimal("0"))
+        expected = money(gross - sum(discounts.values(), Decimal("0")))
+        listed = sum((line.qty * line.list_price for line in self.lines), Decimal("0"))
+        promo = money(min(listed, max(Decimal("0"), listed - expected)))
+        # Proportionate allocation keeps every line nonnegative, including mix
+        # discounts larger than the first matching row and multiple promotions.
+        available = [max(Decimal("0"), line.total) for line in self.lines]
+        base = sum(available, Decimal("0"))
+        promo = min(promo, base)
+        manual = money(min(max(Decimal("0"), self.bill_discount), max(Decimal("0"), base - promo)))
+        def allocate(amount, weights):
+            total = sum(weights, Decimal("0"))
+            remaining = amount
+            result = {}
+            for i, weight in enumerate(weights):
+                share = min(weight, remaining, money(amount * weight / total)) if total else Decimal("0")
+                result[i] = share
+                remaining -= share
+            # Cent rounding remainder goes to rows with capacity.
+            for i, weight in enumerate(weights):
+                extra = min(weight - result[i], remaining)
+                result[i] += extra
+                remaining -= extra
+            return result
+        allocation = allocate(promo, available)
+        manual_allocation = allocate(manual, [v - allocation[i] for i, v in enumerate(available)])
+        return promo, manual, allocation, manual_allocation, gifts, breakdown
+
     def promotion_by_line(self) -> dict[int, Decimal]:
-        return promotion_discounts(self.lines, self.promotions) if self.promotions else {}
+        return self.pricing()[2]
 
     def promotion_total(self) -> Decimal:
-        return money(sum(self.promotion_by_line().values(), Decimal("0")))
+        return self.pricing()[0]
+
+    def manual_bill_discount(self) -> Decimal:
+        return self.pricing()[1]
+
+    def free_items(self) -> list[OrderLine]:
+        return [OrderLine(p.free_product_id, f"{p.free_name or 'ของแถม'} · {p.name}", "ชิ้น", qty, Decimal("0"), list_price=Decimal("0")) for p, qty in self.pricing()[4]]
 
     def subtotal(self) -> Decimal:
         return money(sum((money(line.qty * line.unit_price) for line in self.lines), Decimal("0")))
 
     def discount_total(self) -> Decimal:
         manual = money(sum((money(line.discount) for line in self.lines), Decimal("0")))
-        return money(manual + self.promotion_total())
+        return money(manual + self.promotion_total() + self.manual_bill_discount())
 
     def grand_total(self) -> Decimal:
         return money(self.subtotal() - self.discount_total())
 
     def vat_total(self, rate: Decimal) -> Decimal:
-        promo = self.promotion_by_line()
-        vatable = sum((line.total - promo.get(index, Decimal("0"))
-                       for index, line in enumerate(self.lines) if line.is_vat), Decimal("0"))
-        return vat_from_inclusive(money(vatable), rate)
+        return vat_from_inclusive(money(sum((line.qty * line.unit_price - line.discount - line.promo_discount
+            for line, original in zip(self.to_cart_lines(), self.lines) if original.is_vat), Decimal("0"))), rate)
 
     def adjustment_total(self) -> Decimal:
-        """ส่วนลดทั้งหมดที่คนกดเอง (ลดราคา + ส่วนลดท้ายบรรทัด) เทียบกับราคาตั้ง"""
         listed = money(sum((money(line.qty * line.list_price) for line in self.lines), Decimal("0")))
-        # ส่วนลดโปรไม่นับ เพราะ ERP คิดเอง ไม่ใช่คนหน้าร้านให้
         return money(listed - self.grand_total() - self.promotion_total())
+
+    def snapshot(self) -> str:
+        return json.dumps({"lines": [asdict(line) for line in self.lines],
+            "bill_discount": str(self.bill_discount), "adjustment_approved_by": self.adjustment_approved_by}, default=str, ensure_ascii=False)
+
+    @classmethod
+    def restore(cls, raw: str):
+        data = json.loads(raw)
+        lines = []
+        for values in data.get("lines", []):
+            for key in ("qty", "unit_price", "discount", "list_price"):
+                if values.get(key) is not None:
+                    values[key] = Decimal(values[key])
+            lines.append(OrderLine(**values))
+        return cls(lines=lines, bill_discount=Decimal(data.get("bill_discount", "0")),
+                   adjustment_approved_by=data.get("adjustment_approved_by"))
 
     def change_for(self, paid: Decimal) -> Decimal:
         return money(max(Decimal("0"), money(paid) - self.grand_total()))
 
     def to_cart_lines(self) -> list[CartLine]:
-        promo = self.promotion_by_line()
-        return [
-            CartLine(
-                product_id=line.product_id, qty=line.qty, unit_price=line.unit_price,
-                discount=line.discount, barcode=line.barcode, source_barcode=line.source_barcode,
-                barcode_type=line.barcode_type, price_version=line.price_version, list_price=line.list_price,
-                promo_discount=promo.get(index, Decimal("0")),
-            )
-            for index, line in enumerate(self.lines)
-        ]
+        _, _, promo, manual, _, _ = self.pricing()
+        return [CartLine(
+            product_id=line.product_id, qty=line.qty, unit_price=line.unit_price,
+            discount=line.discount + manual.get(index, Decimal("0")), barcode=line.barcode, source_barcode=line.source_barcode,
+            barcode_type=line.barcode_type, price_version=line.price_version, list_price=line.list_price,
+            promo_discount=promo.get(index, Decimal("0")),
+        ) for index, line in enumerate(self.lines)] + [CartLine(
+            product_id=line.product_id, qty=line.qty, unit_price=Decimal("0"), list_price=Decimal("0"))
+            for line in self.free_items()]
 
 
 # ---------- ตารางสินค้าฝั่งขวา ----------

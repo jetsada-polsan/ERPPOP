@@ -316,6 +316,17 @@ ADDED_COLUMNS: list[tuple[str, str, str]] = [
 
 # ยูนีคเฉพาะแถวที่มี server_id — กันแคชเชียร์คนเดียวถูก sync ลงซ้ำสองแถว
 # ใช้ partial index เพราะ ALTER TABLE ADD COLUMN เติม UNIQUE ให้ไม่ได้
+ADDED_COLUMNS.extend([
+    ("qty_promotions", "product_ids", "TEXT NOT NULL DEFAULT '[]'"),
+    ("qty_promotions", "min_amount", "TEXT NOT NULL DEFAULT '0'"),
+    ("qty_promotions", "max_discount", "TEXT"),
+    ("qty_promotions", "free_sku", "TEXT"),
+    ("qty_promotions", "free_name", "TEXT"),
+    ("qty_promotions", "free_price", "TEXT NOT NULL DEFAULT '0'"),
+    ("qty_promotions", "starts_at", "TEXT"),
+    ("qty_promotions", "ends_at", "TEXT"),
+])
+
 ADDED_INDEXES: list[str] = [
     "CREATE UNIQUE INDEX IF NOT EXISTS ux_local_cashiers_server_id ON local_cashiers(server_id) WHERE server_id IS NOT NULL",
     "CREATE UNIQUE INDEX IF NOT EXISTS ux_local_cashiers_user_id ON local_cashiers(user_id) WHERE user_id IS NOT NULL",
