@@ -317,6 +317,10 @@ ADDED_COLUMNS: list[tuple[str, str, str]] = [
 # ยูนีคเฉพาะแถวที่มี server_id — กันแคชเชียร์คนเดียวถูก sync ลงซ้ำสองแถว
 # ใช้ partial index เพราะ ALTER TABLE ADD COLUMN เติม UNIQUE ให้ไม่ได้
 ADDED_COLUMNS.extend([
+    # Old queued sales were priced without bill/mix rules. Preserve their
+    # checkout contract when upgrading an offline terminal.
+    ("sales", "bill_promotions", "INTEGER NOT NULL DEFAULT 0"),
+    ("sales", "mix_promotions", "INTEGER NOT NULL DEFAULT 0"),
     ("qty_promotions", "product_ids", "TEXT NOT NULL DEFAULT '[]'"),
     ("qty_promotions", "min_amount", "TEXT NOT NULL DEFAULT '0'"),
     ("qty_promotions", "max_discount", "TEXT"),

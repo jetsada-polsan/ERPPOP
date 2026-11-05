@@ -48,9 +48,9 @@ jobs:
           cache: pip
           cache-dependency-path: apps/pos-python/requirements-build.txt
       - name: Install dependencies
-        run: python -m pip install --upgrade pip -r requirements-build.txt
+        run: python -m pip install --upgrade pip -r requirements-build.txt -r requirements-test.txt
       - name: Run core and scale tests
-        run: python -m unittest discover -s tests -v
+        run: python -m pytest -q
       - name: Stamp application version
         shell: pwsh
         env:

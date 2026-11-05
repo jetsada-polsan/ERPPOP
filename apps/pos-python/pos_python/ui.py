@@ -155,11 +155,11 @@ def normalize_pos_layout(value) -> dict:
     return normalized
 
 
-def run_pairing_wizard(data_dir, app) -> bool:
+def build_pairing_dialog(data_dir, app):
     """Pair a new terminal before showing the seller selection screen."""
     try:
         from PySide6.QtCore import Qt
-        from PySide6.QtWidgets import QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit, QMessageBox
+        from PySide6.QtWidgets import QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit, QMessageBox, QVBoxLayout, QHBoxLayout, QPushButton, QFrame
     except ImportError as error:
         raise RuntimeError("ยังไม่ได้ติดตั้ง PySide6") from error
 
@@ -168,11 +168,19 @@ def run_pairing_wizard(data_dir, app) -> bool:
     dialog = QDialog()
     dialog.setWindowTitle("เชื่อมต่อ PopCentral POS")
     dialog.setWindowFlag(Qt.WindowCloseButtonHint, True)
-    dialog.setMinimumWidth(420)
-    dialog.resize(460, 260)
-    form = QFormLayout(dialog)
+    dialog.setObjectName("settingsBackdrop")
+    dialog.resize(720, 540)
+    dialog.setStyleSheet(STYLE)
+    outer = QVBoxLayout(dialog)
+    outer.setContentsMargins(20, 20, 20, 20)
+    card = QFrame()
+    card.setObjectName("settingsPopup")
+    outer.addWidget(card)
+    form = QFormLayout(card)
+    form.setContentsMargins(28, 24, 28, 24)
+    form.setSpacing(18)
     title = QLabel("ตั้งค่าเครื่องครั้งแรก")
-    title.setStyleSheet("font-size:20px;font-weight:800")
+    title.setStyleSheet(f"font-size:24px;font-weight:800;background:{PALETTE['primary_dark']};color:{PALETTE['surface']};padding:16px;border-radius:12px;")
     hint = QLabel(
         "1. ที่ ERP: POS / หน้าร้าน → จัดการเครื่อง POS → กด เพิ่มเครื่อง ที่สาขานี้\n"
         "2. คัดลอก Token ที่ขึ้นบนสุดของหน้า แล้ววางด้านล่าง\n"
@@ -187,10 +195,26 @@ def run_pairing_wizard(data_dir, app) -> bool:
     token.setPlaceholderText("วาง Token ที่คัดลอกจาก ERP")
     token.setEchoMode(QLineEdit.Password)
     form.addRow("ที่อยู่ ERP", server)
-    form.addRow("Token", token)
+    token.setObjectName("pairingToken")
+    token.setMinimumHeight(56)
+    server.setMinimumHeight(56)
+    controls = QHBoxLayout()
+    controls.addWidget(token, 1)
+    show = QPushButton("แสดง")
+    show.setCheckable(True)
+    show.toggled.connect(lambda on: token.setEchoMode(QLineEdit.Normal if on else QLineEdit.Password))
+    paste = QPushButton("วาง")
+    paste.clicked.connect(lambda: (token.clear(), token.setText(app.clipboard().text().strip())))
+    for button in (show, paste):
+        button.setMinimumHeight(56)
+        controls.addWidget(button)
+    form.addRow("Token", controls)
     buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
     buttons.button(QDialogButtonBox.Ok).setText("ตรวจสอบและเริ่มใช้งาน")
     buttons.button(QDialogButtonBox.Cancel).setText("ปิด")
+    buttons.button(QDialogButtonBox.Ok).setObjectName("primary")
+    for button in buttons.buttons():
+        button.setMinimumHeight(56)
     form.addRow(buttons)
 
     def pair() -> None:
@@ -217,7 +241,12 @@ def run_pairing_wizard(data_dir, app) -> bool:
 
     buttons.accepted.connect(pair)
     buttons.rejected.connect(dialog.reject)
-    result = dialog.exec() == QDialog.Accepted
+    return dialog
+
+
+def run_pairing_wizard(data_dir, app) -> bool:
+    dialog = build_pairing_dialog(data_dir, app)
+    result = dialog.exec() == dialog.Accepted
     app.processEvents()
     return result
 
@@ -786,13 +815,31 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.qr_config = _cached_json_setting(service.db, "qr_payment") or {}
             self.setWindowTitle("รับชำระเงิน")
             self.setWindowFlag(Qt.WindowCloseButtonHint, True)
-            self.setMinimumWidth(440)
-            self.resize(480, 560)
-            layout = QVBoxLayout(self)
+            self.setMinimumSize(940, 660)
+            self.resize(980, 700)
+            self.setStyleSheet(f"QPushButton {{ min-height:56px; font-size:18px; }} QLineEdit {{ min-height:56px; font-size:22px; }}")
+            outer = QHBoxLayout(self)
+            summary = QVBoxLayout()
+            summary.setSpacing(10)
+            outer.addLayout(summary, 1)
+            layout = QVBoxLayout()
+            layout.setSpacing(8)
+            outer.addLayout(layout, 1)
+            summary.addWidget(QLabel(f"ยอดสินค้า  {order.subtotal():,.2f} บาท"))
+            self.promo_summary = QLabel()
+            self.promo_summary.setWordWrap(True)
+            summary.addWidget(self.promo_summary)
+            summary.addWidget(QLabel("ส่วนลดท้ายบิล (บาท) · แตะเพื่อใช้แป้นตัวเลข"))
+            self.bill_discount = QLineEdit(str(order.bill_discount))
+            self.bill_discount.setObjectName("billDiscount")
+            self.bill_discount.textChanged.connect(self.discount_changed)
+            summary.addWidget(self.bill_discount)
+            self.keypad_target = self.amount if hasattr(self, "amount") else self.bill_discount
+            summary.addStretch(1)
 
             self.due = QLabel(f"ยอดชำระ {order.grand_total():,.2f} บาท")
             self.due.setStyleSheet("font-size:22px;font-weight:800;color:%s;" % PALETTE["text"])
-            layout.addWidget(self.due)
+            summary.addWidget(self.due)
 
             methods = QHBoxLayout()
             self.cash_method = QPushButton("เงินสด")
@@ -837,10 +884,19 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             exact.clicked.connect(lambda: self.amount.setText(str(order.grand_total())))
             quick.addWidget(exact)
             layout.addWidget(self.quick_host)
+            self.keypad = QWidget()
+            keys = QGridLayout(self.keypad)
+            keys.setContentsMargins(0, 0, 0, 0)
+            for i, key in enumerate(("7", "8", "9", "4", "5", "6", "1", "2", "3", "ล้าง", "0", ".")):
+                button = QPushButton(key)
+                button.clicked.connect(lambda _, value=key: self.keypress(value))
+                keys.addWidget(button, i // 3, i % 3)
+            layout.addWidget(self.keypad)
+            app.focusChanged.connect(self.target_changed)
 
             self.change = QLabel()
             self.change.setStyleSheet("font-size:18px;font-weight:700;color:%s;" % PALETTE["success"])
-            layout.addWidget(self.change)
+            summary.addWidget(self.change)
 
             self.qr_box = QWidget()
             qr_layout = QVBoxLayout(self.qr_box)
@@ -859,10 +915,55 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             layout.addWidget(self.qr_box)
 
             buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            buttons.button(QDialogButtonBox.Ok).setText("รับเงิน / ออกบิล")
+            buttons.button(QDialogButtonBox.Ok).setObjectName("primary")
+            buttons.button(QDialogButtonBox.Cancel).setText("กลับ")
             buttons.accepted.connect(self.confirm)
             buttons.rejected.connect(self.reject)
             layout.addWidget(buttons)
+            self.keypad_target = self.amount
+            self.refresh_discount_summary()
             self.refresh_change()
+
+        def target_changed(self, old, new):
+            if new in (self.amount, self.bill_discount, self.transfer_account_last4):
+                self.keypad_target = new
+
+        def keypress(self, key):
+            field = self.keypad_target
+            if key == "ล้าง":
+                field.clear()
+            elif key != "." or "." not in field.text():
+                field.insert(key)
+
+        def refresh_discount_summary(self):
+            gift_names = {p.name or p.promo_type for p in self.order.promotions if p.promo_type in ("free_item", "bill_free_item")}
+            names = [f"{name}  −{money(amount):,.2f}" for name, amount in self.order.pricing()[5] if name not in gift_names]
+            gifts = [f"แถม {line.name} × {line.qty}  ฿0" for line in self.order.free_items()]
+            self.promo_summary.setText(f"ส่วนลดโปร  {self.order.promotion_total():,.2f} บาท\n" + " · ".join(names) + "\n" + "\n".join(gifts))
+            self.due.setText(f"ยอดสุทธิ  {self.order.grand_total():,.2f} บาท")
+            self.due.setStyleSheet(f"font-size:30px;font-weight:800;color:{PALETTE['primary_dark']};")
+
+        def discount_changed(self):
+            try:
+                value = Decimal(self.bill_discount.text() or "0")
+                if not value.is_finite() or value < 0:
+                    return
+            except InvalidOperation:
+                return
+            parent = self.parent()
+            if value > 0 and parent is not None and not parent.approve_adjustment():
+                return
+            self.order.bill_discount = value
+            self.refresh_discount_summary()
+            if self.payment_method == "transfer":
+                self.transfer_confirmed.setChecked(False)
+                self.set_payment_method("transfer")
+            else:
+                self.amount.setText(str(self.order.grand_total()))
+                self.refresh_change()
+            if parent is not None:
+                parent.refresh_order(keep_selection=True)
 
         def _confirm_transfer_checkbox(self, checked: bool) -> None:
             """Checkbox เป็นหลักฐานการตรวจเงิน ส่วนปุ่ม OK เป็น action ออกบิล"""
@@ -879,6 +980,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.cash_label.setVisible(not transfer)
             self.amount.setVisible(not transfer)
             self.quick_host.setVisible(not transfer)
+            self.keypad.setVisible(not transfer)
             self.transfer_account_label.setVisible(transfer)
             self.transfer_account_last4.setVisible(transfer)
             self.qr_box.setVisible(transfer)
@@ -887,7 +989,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     self.qr_payload = promptpay_payload(
                         str(self.qr_config["merchant_ref"]), self.order.grand_total()
                     )
-                    self.qr_image.setPixmap(_qr_pixmap(self.qr_payload, 250))
+                    self.qr_image.setPixmap(_qr_pixmap(self.qr_payload, 170))
                 except (ValueError, RuntimeError) as error:
                     QMessageBox.warning(self, "สร้าง QR ไม่สำเร็จ", str(error))
                     self.payment_method = "cash"
@@ -1203,7 +1305,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             current = load_device_config(data_dir)
             self.server_url = QLineEdit(current.server_url if current else "https://erp.popstarcenter.com")
             self.server_url.setPlaceholderText("https://erp.popstarcenter.com")
-            self.device_token = QLineEdit(current.device_token if current else "")
+            self.device_token = QLineEdit()
             self.device_token.setPlaceholderText("วาง Token ที่คัดลอกจาก ERP")
             self.device_token.setEchoMode(QLineEdit.Password)
             show = QCheckBox("แสดง Token")
@@ -1211,6 +1313,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             form.addRow("ที่อยู่ ERP", self.server_url)
             form.addRow("Token", self.device_token)
             form.addRow("", show)
+            paste = QPushButton("วาง Token")
+            paste.clicked.connect(lambda: (self.device_token.clear(), self.device_token.setText(app.clipboard().text().strip())))
+            form.addRow("", paste)
             outer.addLayout(form)
             save = QPushButton("ทดสอบและบันทึก")
             save.setObjectName("primary")
@@ -1525,7 +1630,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         def __init__(self, cashier=None):
             super().__init__()
             self.cashier = cashier
-            self.order = Order()
+            saved = SettingsService(service.db).get_device_setting("current_order", None)
+            self.order = Order.restore(saved) if saved else Order()
             self.category = ALL_CATEGORIES
             self.shift_id: int | None = None
             self.opening_cash: Decimal | None = None
@@ -1722,6 +1828,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             clear_header.setObjectName("cartTitleButton")
             clear_header.clicked.connect(self.clear_order)
             head_layout.addWidget(clear_header)
+            hold = QPushButton("พัก")
+            hold.clicked.connect(self.hold_order)
+            recall = QPushButton("เรียก")
+            recall.clicked.connect(self.recall_order)
+            head_layout.addWidget(hold)
+            head_layout.addWidget(recall)
             layout.addWidget(head)
 
             pulse = QWidget()
@@ -2200,6 +2312,27 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.order.remove_selected()
             self.refresh_order()
 
+        def hold_order(self):
+            if not self.order.lines:
+                return
+            settings = SettingsService(service.db)
+            held = settings.get_device_setting("held_orders", [])
+            held.append(self.order.snapshot())
+            settings.set_device_setting("held_orders", held)
+            self.order.clear()
+            self.refresh_order()
+
+        def recall_order(self):
+            if self.order.lines:
+                QMessageBox.information(self, "เรียกบิล", "พักหรือล้างบิลปัจจุบันก่อน")
+                return
+            settings = SettingsService(service.db)
+            held = settings.get_device_setting("held_orders", [])
+            if held:
+                self.order = Order.restore(held.pop())
+                settings.set_device_setting("held_orders", held)
+                self.refresh_order()
+
         def clear_order(self) -> None:
             if self.order.lines and QMessageBox.question(
                 self, "ล้างบิล", "ล้างรายการทั้งบิลใช่หรือไม่"
@@ -2216,6 +2349,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 return
             dialog = PaymentDialog(self, self.order)
             if dialog.exec() != QDialog.Accepted:
+                self.refresh_order(keep_selection=True)
                 return
 
             try:
@@ -2230,6 +2364,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     payment_confirmed=dialog.payment_method == "transfer" and dialog.transfer_confirmed.isChecked(),
                     transfer_account_last4=dialog.transfer_account_last4.text().strip() or None,
                     adjustment_approved_by=self.order.adjustment_approved_by,
+                    clear_current_order=True,
                 )
                 if online is not None:
                     online.worker.wake()  # ส่งบิลขึ้น ERP ทันที ไม่รอรอบถัดไป
@@ -2650,6 +2785,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             selected = self.order.selected_index
             self.table.blockSignals(True)
             self.table.setRowCount(0)
+            SettingsService(service.db).set_device_setting("current_order", self.order.snapshot())
             promo = self.order.promotion_by_line()
             for index, line in enumerate(self.order.lines):
                 row = self.table.rowCount()
@@ -2692,6 +2828,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 delete.setToolTip("ลบรายการ")
                 delete.clicked.connect(lambda _, i=index: self.delete_line(i))
                 self.table.setCellWidget(row, 4, delete)
+            for gift in self.order.free_items():
+                row = self.table.rowCount()
+                self.table.insertRow(row)
+                self.table.setItem(row, 1, QTableWidgetItem(f"ของแถม {gift.name}"))
+                self.table.setItem(row, 2, QTableWidgetItem(str(gift.qty)))
+                self.table.setItem(row, 3, QTableWidgetItem("฿0.00"))
             if selected is not None and selected < self.table.rowCount():
                 self.table.selectRow(selected)
             self.table.blockSignals(False)

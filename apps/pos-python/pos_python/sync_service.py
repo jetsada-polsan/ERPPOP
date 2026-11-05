@@ -317,7 +317,7 @@ class SyncService:
         if not payment:
             return self._failed(sale_uuid, "ไม่พบข้อมูลชำระเงิน")
         payload = {
-            "bill_promotions": True, "mix_promotions": True,
+            "bill_promotions": bool(sale["bill_promotions"]), "mix_promotions": bool(sale["mix_promotions"]),
             "branch_id": sale["branch_id"], "shift_id": sale["server_shift_id"], "cashier_id": sale["server_cashier_id"],
             "method": payment["method"], "payment_ref": payment["reference"],
             "transfer_account_last4": payment["transfer_account_last4"],

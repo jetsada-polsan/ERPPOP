@@ -182,13 +182,19 @@ class Order:
             if qty > 0:
                 gifts.append((p, qty))
         def gift_lines(entries):
-            return [OrderLine(p.free_product_id, p.free_name or "ของแถม", "ชิ้น", qty, p.free_price) for p, qty in entries]
+            grouped = {}
+            for p, qty in entries:
+                if p.free_product_id in grouped:
+                    grouped[p.free_product_id].qty += qty
+                else:
+                    grouped[p.free_product_id] = OrderLine(p.free_product_id, p.free_name or "ของแถม", "ชิ้น", qty, p.free_price)
+            return list(grouped.values())
         working = self.lines + gift_lines(gifts)
         base_discount = sum(promotion_discounts(working, [p for p in promotions if not p.promo_type.startswith("bill_")], rounded=False).values(), Decimal("0"))
         paid = sum((line.qty * line.list_price for line in working), Decimal("0")) - base_discount
         for p in promotions:
             if p.promo_type == "bill_free_item":
-                gift = next((line for line in working if line.product_id == p.free_product_id), None)
+                gift = next((line for line in self.lines if line.product_id == p.free_product_id), None)
                 if gift:
                     paid -= min(gift.qty, p.free_qty) * gift.list_price
         for p in promotions:
@@ -235,7 +241,14 @@ class Order:
         return self.pricing()[1]
 
     def free_items(self) -> list[OrderLine]:
-        return [OrderLine(p.free_product_id, f"{p.free_name or 'ของแถม'} · {p.name}", "ชิ้น", qty, Decimal("0"), list_price=Decimal("0")) for p, qty in self.pricing()[4]]
+        grouped = {}
+        for p, qty in self.pricing()[4]:
+            if p.free_product_id in grouped:
+                grouped[p.free_product_id].qty += qty
+                grouped[p.free_product_id].name += f" / {p.name}"
+            else:
+                grouped[p.free_product_id] = OrderLine(p.free_product_id, f"{p.free_name or 'ของแถม'} · {p.name}", "ชิ้น", qty, Decimal("0"), list_price=Decimal("0"))
+        return list(grouped.values())
 
     def subtotal(self) -> Decimal:
         return money(sum((money(line.qty * line.unit_price) for line in self.lines), Decimal("0")))

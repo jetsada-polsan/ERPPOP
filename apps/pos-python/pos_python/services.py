@@ -623,7 +623,8 @@ class PosService:
                  cashier_id: int, lines: list[CartLine], payment_method: str, paid_amount: Decimal,
                  sale_uuid: str | None = None, payment_reference: str | None = None,
                  qr_payload: str | None = None, payment_confirmed: bool = False,
-                 transfer_account_last4: str | None = None, adjustment_approved_by: str | None = None) -> int:
+                 transfer_account_last4: str | None = None, adjustment_approved_by: str | None = None,
+                 clear_current_order: bool = False) -> int:
         if not lines:
             raise ValueError("ต้องมีสินค้าอย่างน้อยหนึ่งรายการ")
         validate_cart_lines(lines)
@@ -666,8 +667,8 @@ class PosService:
             cursor = self.db.execute(
                 """INSERT INTO sales (sale_uuid, document_no, branch_id, terminal_id, shift_id, cashier_id,
                 sale_datetime, subtotal, discount_total, vat_total, grand_total, payment_status, created_at,
-                adjustment_approved_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?)""",
+                adjustment_approved_by, bill_promotions, mix_promotions)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, 1, 1)""",
                 (sale_uuid, document_no, branch_id, terminal_id, shift_id, cashier_id, self._now(), str(subtotal),
                  str(discount), str(vat_total), str(grand_total), self._now(), approver if adjustment > 0 else None),
             )
@@ -706,6 +707,10 @@ class PosService:
                 "INSERT INTO sync_outbox (aggregate_type, aggregate_uuid, payload, priority, created_at) VALUES ('sale', ?, ?, 2, ?)",
                 (sale_uuid, payload, self._now()),
             )
+            if clear_current_order:
+                # Clearing the recoverable draft belongs to the same commit as
+                # the paid sale, so a crash before printing cannot revive it.
+                self.db.execute("DELETE FROM device_settings WHERE key = 'current_order'")
         return sale_id
 
     def void_sale(self, sale_id: int, *, cashier_id: int, reason: str) -> None:

@@ -61,6 +61,13 @@ class LaravelPosClient:
                 return json.loads(response.read().decode("utf-8"))
         except HTTPError as error:
             body = error.read().decode("utf-8", errors="replace")
-            raise LaravelApiError(f"HTTP {error.code}: {body}") from error
+            try:
+                detail = json.loads(body)
+                message = detail.get("message") or detail.get("error") or "ERP ปฏิเสธคำขอ"
+            except (ValueError, AttributeError):
+                message = "ERP ปฏิเสธคำขอ"
+            if error.code == 401:
+                message = "Token ไม่ถูกต้องหรือหมดอายุ กรุณาคัดลอก Token ของเครื่องนี้จาก ERP แล้ววางใหม่"
+            raise LaravelApiError(f"HTTP {error.code}: {message}") from error
         except URLError as error:
             raise LaravelApiError(f"network: {error.reason}") from error
