@@ -1,6 +1,13 @@
 # Handoff — 2026-11-02 (แก้สีหน้า Executive Dashboard)
 
 ## Handoff - 2026-11-05
+- Commit: pending — prevent unusable POS cashier PINs
+- ทำอะไร: พบว่า ERP สามารถออก/ตั้ง PIN ให้รหัสคนขายที่ไม่ผูกบัญชี ERP หรือไม่มีสิทธิ์ `pos.sell` ในสาขาเครื่อง ทำให้ Python POS ได้ข้อความรวมว่า `PIN ไม่ถูกต้อง` แม้ PIN เพิ่งออก; เพิ่มการตรวจสิทธิ์ก่อนออก/ตั้ง PIN, หน้า จัดการเครื่อง POS แสดง `ไม่มีสิทธิ์ POS/สาขา`, ปิดช่องตั้ง PIN ของรหัสนั้น และนับความพร้อมเฉพาะคนขายที่เข้าเครื่องได้จริง
+- ทดสอบ: `php artisan test --filter='PosInstallPageTest|PosCashierIdentityTest|PosPinChangeTest'` ผ่าน 31 tests / 112 assertions; `PYTHONPATH=apps/jet-pos-python python3 -m unittest discover -s apps/jet-pos-python/tests -v` ผ่าน 25 tests; `git diff --check` ผ่าน
+- วิธีแก้เครื่องที่ใช้งานอยู่: เปิด ERP → จัดการเครื่อง POS → คนขาย & PIN; ถ้าเห็นป้ายแดง ให้ผูกบัญชี ERP ของคนขาย, เปิดบัญชี และให้สิทธิ์ `pos.sell` ในสาขาเดียวกับเครื่อง (`B001` สำหรับ `POS-B001-01`) ก่อนตั้ง PIN ใหม่ แล้วเปิดกะ
+- Deploy: ยังไม่ deploy ERP หรือทดสอบขายจริง
+
+## Handoff - 2026-11-05
 - Commit: pending — simplify Python POS checkout panel
 - ทำอะไร: ตามการตรวจหน้าจอ BK Server เอาปุ่มซ้ำ 6 ปุ่มออกจากฝั่งบิลทั้งหมด โดยใช้คำสั่งบน header เพียงชุดเดียว; ฝั่งสินค้าเปลี่ยนเป็นกริด 3 คอลัมน์ การ์ดสูงพอดีสำหรับจอสัมผัส และจัดรหัส/ชื่อ/คงเหลือ/ราคาให้เหมือน Vue POS
 - ทดสอบ: `PYTHONPATH=apps/jet-pos-python python3 -m unittest discover -s apps/jet-pos-python/tests -v` ผ่าน 25 tests; `QT_QPA_PLATFORM=offscreen` UI smoke ตรวจจำนวน 3 คอลัมน์/ปุ่มรับชำระ/สถานะกะ ผ่าน; `git diff --check` ผ่าน

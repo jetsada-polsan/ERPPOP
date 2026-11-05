@@ -233,6 +233,7 @@ class SystemSettingController extends Controller
     public function resetCashierPin(Salesman $salesman): RedirectResponse
     {
         abort_unless($salesman->is_active, 422, 'รหัสคนขายนี้ปิดใช้งานอยู่');
+        $this->ensureCashierCanUsePos($salesman);
         $temporary = $this->uniqueTemporaryPin($salesman);
 
         DB::transaction(function () use ($salesman, $temporary) {
@@ -259,6 +260,7 @@ class SystemSettingController extends Controller
     public function setCashierPin(Request $request, Salesman $salesman): RedirectResponse
     {
         abort_unless($salesman->is_active, 422, 'รหัสคนขายนี้ปิดใช้งานอยู่');
+        $this->ensureCashierCanUsePos($salesman);
         $data = $request->validate(['pin' => ['required', 'digits:4']], ['pin.digits' => 'PIN ต้องเป็นตัวเลข 4 หลัก']);
 
         // เครื่องรู้ตัวคนขายจาก PIN อย่างเดียว PIN ในสาขาเดียวกันจึงซ้ำกันไม่ได้
@@ -286,6 +288,16 @@ class SystemSettingController extends Controller
         });
 
         return redirect()->route('pos-admin.index')->with('success', "ตั้ง PIN ของ {$salesman->code} แล้ว");
+    }
+
+    /** Never issue a PIN that the device-login endpoint will reject. */
+    private function ensureCashierCanUsePos(Salesman $salesman): void
+    {
+        $salesman->loadMissing('user.branchRoles.permissions', 'user.roles.permissions');
+        $user = $salesman->user;
+
+        abort_unless($user && $user->is_active, 422, "ออก PIN POS ไม่ได้: {$salesman->code} ยังไม่ผูกบัญชี ERP ที่เปิดใช้งาน");
+        abort_unless($user->canUsePosDevice($salesman->branch_id), 422, "ออก PIN POS ไม่ได้: {$salesman->code} ไม่มีสิทธิ์ขาย POS ในสาขานี้");
     }
 
     private function uniqueTemporaryPin(Salesman $salesman): string

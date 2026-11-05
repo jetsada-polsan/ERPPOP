@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\PosController;
+use App\Http\Controllers\SystemSettingController;
 use App\Http\Middleware\ErpAuthorize;
 use App\Models\AppSetting;
 use App\Models\AuditLog;
@@ -19,6 +20,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 /**
@@ -31,7 +33,8 @@ class PosInstallPageTest extends TestCase
     public function test_a_branch_without_a_connected_device_is_shown_as_not_ready_with_the_next_step(): void
     {
         $branch = $this->branch();
-        Salesman::create(['branch_id' => $branch->id, 'code' => 'B901', 'name' => 'แคชเชียร์', 'is_active' => true, 'pos_pin_hash' => bcrypt('482917')]);
+        $cashier = $this->posCashier($branch, 'B901');
+        $cashier->update(['pos_pin_hash' => bcrypt('482917')]);
 
         $this->page()
             ->assertSee('data-testid="pos-readiness"', false)
@@ -61,7 +64,7 @@ class PosInstallPageTest extends TestCase
     public function test_back_office_issues_a_temporary_pin_for_a_till_cashier_shown_once(): void
     {
         $branch = $this->branch();
-        $cashier = Salesman::create(['branch_id' => $branch->id, 'code' => 'B901-2', 'name' => 'แคชเชียร์ เครื่อง 2', 'is_active' => true]);
+        $cashier = $this->posCashier($branch, 'B901-2');
         $this->page()->assertSee('data-testid="pos-cashiers"', false)->assertSee('B901-2')->assertSee('ยังไม่ตั้ง');
 
         $response = $this->post(route('settings.pos-cashiers.reset-pin', $cashier))
@@ -75,10 +78,21 @@ class PosInstallPageTest extends TestCase
         $this->assertTrue(AuditLog::where('action', 'cashier_pin_reset')->where('record_id', $cashier->id)->exists());
     }
 
+    public function test_back_office_refuses_to_issue_a_pin_for_a_cashier_without_pos_access(): void
+    {
+        $branch = $this->branch();
+        $cashier = Salesman::create(['branch_id' => $branch->id, 'code' => 'B901-NO-POS', 'name' => 'ไม่มีสิทธิ์ POS', 'is_active' => true]);
+
+        $this->expectException(HttpException::class);
+
+        app(SystemSettingController::class)->resetCashierPin($cashier);
+    }
+
     public function test_a_manager_linked_to_a_user_gets_the_pin_on_the_user_credential_too(): void
     {
         $branch = $this->branch();
         $user = User::factory()->create(['username' => 'b901_mgr', 'branch_id' => $branch->id]);
+        $this->grantPosSell($user);
         $manager = Salesman::create(['branch_id' => $branch->id, 'user_id' => $user->id, 'code' => 'M901', 'name' => 'หัวหน้า', 'is_active' => true]);
         $this->page();
 
@@ -161,5 +175,27 @@ class PosInstallPageTest extends TestCase
         $branch->update(['default_warehouse_location_id' => WarehouseLocation::create(['warehouse_id' => $warehouse->id, 'code' => 'M', 'name' => 'หลัก'])->id]);
 
         return $branch;
+    }
+
+    private function posCashier(Branch $branch, string $code): Salesman
+    {
+        $user = User::factory()->create(['username' => strtolower($code).'_'.uniqid(), 'branch_id' => $branch->id]);
+        $this->grantPosSell($user);
+
+        return Salesman::create([
+            'branch_id' => $branch->id,
+            'user_id' => $user->id,
+            'code' => $code,
+            'name' => 'แคชเชียร์ '.$code,
+            'is_active' => true,
+        ]);
+    }
+
+    private function grantPosSell(User $user): void
+    {
+        $role = Role::firstOrCreate(['code' => 'PI_POS_SELL'], ['name' => 'ขาย POS']);
+        $permission = Permission::firstOrCreate(['code' => 'pos.sell'], ['name' => 'ขาย']);
+        $role->permissions()->syncWithoutDetaching([$permission->id]);
+        $user->roles()->syncWithoutDetaching([$role->id]);
     }
 }
