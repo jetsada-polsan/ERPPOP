@@ -372,8 +372,8 @@ class PosWindow(QMainWindow):
         content = QHBoxLayout()
         content.setContentsMargins(18, 18, 18, 0)
         content.setSpacing(18)
-        content.addWidget(self._catalog(), 2)
-        content.addWidget(self._basket(), 1)
+        content.addWidget(self._catalog(), 3)
+        content.addWidget(self._basket(), 2)
         layout.addLayout(content, 1)
         self.setCentralWidget(root)
         self.setStyleSheet("""
@@ -388,7 +388,7 @@ class PosWindow(QMainWindow):
 
     def _header(self) -> QWidget:
         bar = QFrame()
-        bar.setFixedHeight(86)
+        bar.setFixedHeight(98)
         bar.setStyleSheet("background:#075b86;color:white;")
         row = QHBoxLayout(bar)
         row.setContentsMargins(25, 12, 25, 12)
@@ -404,7 +404,8 @@ class PosWindow(QMainWindow):
         def command(label: str, handler) -> QPushButton:
             button = QPushButton(label)
             button.clicked.connect(handler)
-            button.setStyleSheet("QPushButton{padding:10px 14px;color:white;background:#075b86;border:1px solid #62a9ca;border-radius:7px;font-weight:800;} QPushButton:hover{background:#0b6b99;}")
+            button.setMinimumHeight(58)
+            button.setStyleSheet("QPushButton{min-height:58px;padding:10px 16px;color:white;background:#075b86;border:1px solid #62a9ca;border-radius:8px;font-size:16px;font-weight:800;} QPushButton:hover{background:#0b6b99;}")
             return button
 
         shift = command("▣ เข้ากะ", self._open_shift)
@@ -482,6 +483,27 @@ class PosWindow(QMainWindow):
         shift.setWordWrap(True)
         shift.setStyleSheet("padding:10px;background:#fff8f8;border:1px solid #f0dadd;border-radius:7px;color:#596b78;")
         box.addWidget(shift)
+        quick_actions = QGridLayout()
+        quick_actions.setHorizontalSpacing(8)
+        quick_actions.setVerticalSpacing(8)
+        for index, (label, handler, primary) in enumerate((
+            ("▣ เข้ากะ", self._open_shift, True),
+            ("▣ พักบิล", self._hold_bill, False),
+            ("▤ เรียกบิล", self._resume_held_bill, False),
+            ("฿ เงินสดกะ", self._cash_movement, False),
+            ("🖨 พิมพ์บิล", self._print_last_receipt, False),
+            ("⚙ ตั้งค่า", self._open_settings, False),
+        )):
+            button = QPushButton(label)
+            button.setMinimumHeight(58)
+            button.clicked.connect(handler)
+            button.setStyleSheet(
+                "QPushButton{min-height:58px;border:0;border-radius:8px;padding:8px;font-size:15px;font-weight:800;"
+                f"background:{'#087faf' if primary else '#eaf2f6'};color:{'white' if primary else '#16445c'};}}"
+                "QPushButton:hover{background:#d9edf6;}"
+            )
+            quick_actions.addWidget(button, index // 3, index % 3)
+        box.addLayout(quick_actions)
         cart = QWidget(); cart.setLayout(self._cart_body)
         cart_scroll = QScrollArea(); cart_scroll.setWidgetResizable(True); cart_scroll.setWidget(cart); cart_scroll.setStyleSheet("border:0;")
         box.addWidget(cart_scroll, 1)
@@ -491,7 +513,8 @@ class PosWindow(QMainWindow):
         self._total.setAlignment(Qt.AlignmentFlag.AlignRight); self._total.setStyleSheet("font-size:36px;font-weight:900;color:white;")
         total_layout.addWidget(self._total); box.addWidget(total_box)
         pay = QPushButton("▣  รับชำระเงิน  ›"); pay.setEnabled(False); pay.clicked.connect(self._checkout)
-        pay.setStyleSheet("QPushButton{padding:17px;background:#b3c0c8;color:white;border:0;border-radius:7px;font-size:17px;font-weight:800;}")
+        pay.setMinimumHeight(76)
+        pay.setStyleSheet("QPushButton{min-height:76px;padding:17px;background:#b3c0c8;color:white;border:0;border-radius:8px;font-size:21px;font-weight:800;}")
         box.addWidget(pay)
         self._pay_button = pay
         return panel
@@ -1107,14 +1130,16 @@ class PosWindow(QMainWindow):
         for item in grouped.values():
             product = item.product
             row = QFrame()
-            row.setStyleSheet("QFrame{background:#f7fafb;border:1px solid #e1ebef;border-radius:6px;padding:4px;}")
+            row.setStyleSheet("QFrame{background:#f7fafb;border:1px solid #e1ebef;border-radius:8px;padding:6px;}")
             layout = QHBoxLayout(row)
             description = QLabel(f"{product.sku_code}  {product.name_th}\nจำนวน {item.qty.normalize()} {product.unit_name}")
             description.setStyleSheet("font-weight:700;color:#1b4059;")
             layout.addWidget(description, 1)
             edit = QPushButton("แก้จำนวน")
+            edit.setMinimumHeight(48)
             edit.clicked.connect(lambda _, key=(product.id, item.barcode, item.barcode_type): self._edit_cart_quantity(key))
             remove = QPushButton("ลบ")
+            remove.setMinimumHeight(48)
             remove.clicked.connect(lambda _, key=(product.id, item.barcode, item.barcode_type): self._remove_cart_line(key))
             amount = QLabel(f"฿{product.pos_price * item.qty:.2f}")
             amount.setStyleSheet("font-weight:800;color:#075b86;")

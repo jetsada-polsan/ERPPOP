@@ -2446,3 +2446,9 @@ pending
 - ความปลอดภัย: ยังคงใช้ API/PIN/กฎราคา/โปรโมชั่น/คิว sync เดิมของ ERP; การเชื่อม production ต้องเปิดตัวเลือกบนเครื่องโดยผู้ใช้ และไม่มีการสร้างบิลในการทดสอบนี้
 - ทดสอบ: `PYTHONPATH=apps/jet-pos-python python3 -m unittest discover -s apps/jet-pos-python/tests -v` ผ่าน 25 tests; UI smoke ด้วย `QT_QPA_PLATFORM=offscreen` ผ่าน; `git diff --check` ผ่าน
 - งานถัดไป: Build UAT, ติดตั้งบนเครื่อง UAT แล้วตรวจหน้าจอ PIN/เปิดกะด้วย PIN ที่เจ้าของกรอกเอง ก่อนสร้างบิลทดสอบจริง
+
+## Handoff - 2026-11-05 (JET POS Python sales workspace)
+- ทำอะไร: ขยายพื้นที่บิลจากหนึ่งในสามเป็นสองในห้าของหน้าจอ และเพิ่มแผงปุ่ม POS แบบตารางขนาดใหญ่สำหรับเข้ากะ, พัก/เรียกบิล, เงินสดกะ, พิมพ์บิล และตั้งค่า
+- ทำอะไร: ขยายปุ่ม toolbar, ปุ่มแก้จำนวน/ลบ และปุ่มรับชำระ เพื่อรองรับหน้าจอสัมผัสโดยไม่ย้อนกลับไปใช้ UI legacy
+- ทดสอบ: `PYTHONPATH=apps/jet-pos-python python3 -m unittest discover -s apps/jet-pos-python/tests -v` ผ่าน 25 tests; UI smoke ผ่าน; `git diff --check` ผ่าน
+- งานถัดไป: Build/install UAT และให้เจ้าของกรอก PIN บนเครื่องจริงเพื่อเก็บ error เปิดกะจาก ERP หากยังไม่ผ่าน
