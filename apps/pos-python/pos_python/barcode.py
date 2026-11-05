@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import sqlite3
 from dataclasses import dataclass
 from decimal import Decimal
@@ -111,3 +112,19 @@ def scale_cart_line(db: sqlite3.Connection, code: str) -> CartLine:
         product_id=int(product["id"]), qty=qty, unit_price=unit_price,
         barcode=label.plu, source_barcode=code.strip(), barcode_type="SCALE_WEIGHT", price_version="scale-label",
     )
+
+
+_SCALE_PLU = re.compile(r"80[01]\d{3}")
+_SCALE_NAME = re.compile("\u0e0a\u0e31\u0e48\u0e07|\u0e0b\u0e31\u0e48\u0e07")  # "ชั่ง" or the common misspelling "ซั่ง"
+
+
+def is_scale_product(db: sqlite3.Connection, product_id: int, name: str | None, sku: str | None) -> bool:
+    """Same rule as ERP PosController (is_scale): a scale PLU barcode or SKU (800/801xxx),
+    or a name containing ชั่ง/ซั่ง. Selling a per-kg item as 1 unit without asking the weight
+    charges the wrong amount, so this must never be looser or stricter than ERP."""
+    if _SCALE_NAME.search(str(name or "")) or _SCALE_PLU.fullmatch(str(sku or "")):
+        return True
+    for row in db.execute("SELECT barcode, barcode_type FROM product_barcodes WHERE product_id = ?", (int(product_id),)):
+        if row[1] in ("SCALE_PLU", "SCALE_WEIGHT") or _SCALE_PLU.fullmatch(str(row[0] or "")):
+            return True
+    return False

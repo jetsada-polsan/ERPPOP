@@ -103,3 +103,29 @@ class ScaleProfileTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ScaleProductRuleTest(unittest.TestCase):
+    """เหมือน ERP is_scale: ห้ามขายสินค้าต่อกิโลเป็น 1 ชิ้นโดยไม่ถามน้ำหนัก"""
+
+    def setUp(self) -> None:
+        import sqlite3
+        self.db = sqlite3.connect(":memory:")
+        self.db.execute("CREATE TABLE product_barcodes (product_id INTEGER, barcode TEXT, barcode_type TEXT)")
+
+    def test_names_with_either_spelling_of_weigh_prompt_for_weight(self) -> None:
+        from pos_python.barcode import is_scale_product
+        self.assertTrue(is_scale_product(self.db, 1, "ปอดหมูสด ชั่ง กก", "X1"))
+        self.assertTrue(is_scale_product(self.db, 1, "ปอดหมูสด ซั่ง กก", "X1"))
+
+    def test_scale_plu_sku_or_barcode_value_prompts_for_weight(self) -> None:
+        from pos_python.barcode import is_scale_product
+        self.assertTrue(is_scale_product(self.db, 1, "ปอดหมู", "801003"))
+        self.db.execute("INSERT INTO product_barcodes VALUES (2, '800123', 'EAN13')")
+        self.assertTrue(is_scale_product(self.db, 2, "ตับหมู", "A2"))
+
+    def test_ordinary_items_are_not_weighed_even_if_the_name_mentions_weight(self) -> None:
+        from pos_python.barcode import is_scale_product
+        self.db.execute("INSERT INTO product_barcodes VALUES (3, '8850000000017', 'EAN13')")
+        self.assertFalse(is_scale_product(self.db, 3, "ผงซักฟอก น้ำหนัก 500 กรัม", "203053"))
+        self.assertFalse(is_scale_product(self.db, 3, "น้ำดื่ม", "8010030"))

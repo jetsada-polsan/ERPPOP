@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from string import Template
 
-from .barcode import decode_scale_label, load_scale_profiles, scale_cart_line
+from .barcode import decode_scale_label, is_scale_product, load_scale_profiles, scale_cart_line
 from .build_info import APP_VERSION
 from .api_client import LaravelPosClient
 from . import device_status
@@ -2239,15 +2239,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             dialog.exec()
 
         def is_scale_product(self, product) -> bool:
-            name = str(product["name"] or "")
-            sku = str(product["sku"] or "")
-            if re.search(r"ชั่ง|น้ำหนัก", name) or re.fullmatch(r"80[01]\d{3}", sku):
-                return True
-            return service.db.execute(
-                """SELECT 1 FROM product_barcodes
-                   WHERE product_id = ? AND barcode_type IN ('SCALE_PLU', 'SCALE_WEIGHT') LIMIT 1""",
-                (int(product["id"]),),
-            ).fetchone() is not None
+            return is_scale_product(service.db, int(product["id"]), product["name"], product["sku"])
 
         def ask_weight(self, name: str, price: Decimal) -> tuple[float, bool]:
             while True:
