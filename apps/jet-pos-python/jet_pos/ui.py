@@ -258,6 +258,11 @@ class PosWindow(QMainWindow):
         self._sync_label = QLabel("● โหมดตัวอย่าง UAT")
         self._catalog_count = QLabel("")
         self._grid = QGridLayout()
+        self._grid.setHorizontalSpacing(10)
+        self._grid.setVerticalSpacing(10)
+        self._grid.setContentsMargins(0, 0, 0, 0)
+        for column in range(4):
+            self._grid.setColumnStretch(column, 1)
         self._profile: dict[str, object] = {}
         self._cashier: dict[str, object] = {}
         self._shift: dict[str, object] = {}
@@ -360,9 +365,11 @@ class PosWindow(QMainWindow):
         quick.setStyleSheet("background:#fff8f8;color:#8c4853;padding:11px;border:1px solid #efd5d9;border-radius:7px;font-weight:700;")
         box.addWidget(quick)
         grid_widget = QWidget()
+        grid_widget.setMinimumWidth(0)
         grid_widget.setLayout(self._grid)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setWidget(grid_widget)
         scroll.setStyleSheet("border:0;")
         box.addWidget(scroll, 1)
@@ -408,14 +415,15 @@ class PosWindow(QMainWindow):
         self._catalog_count.setText(f"{len(products)} สินค้าในเครื่อง")
         for index, product in enumerate(products):
             card = QPushButton()
-            card.setMinimumHeight(138)
+            card.setFixedHeight(96)
+            card.setMinimumWidth(0)
             stock = f"● คงเหลือ {product.stock_qty} {product.unit_name}"
-            card.setText(f"{product.sku_code}\n{product.name_th}\n\n{stock}     ฿{product.pos_price:.2f}")
-            stock_color = "#c53d37" if product.stock_qty <= 0 else "#168553"
+            name = product.name_th if len(product.name_th) <= 38 else f"{product.name_th[:37]}…"
+            card.setText(f"{product.sku_code}\n{name}\n{stock}   ฿{product.pos_price:.2f}")
             card.setStyleSheet(
-                "QPushButton{text-align:left;padding:12px;background:#fff;border:1px solid #d7e4eb;"
-                f"border-radius:8px;color:#1b4059;}} QPushButton:hover{{border:2px solid #1596cb;background:#effbff;}}"
-                f"QPushButton{{selection-color:{stock_color};}}"
+                "QPushButton{text-align:left;padding:9px;background:#fff;border:1px solid #d7e4eb;"
+                "border-radius:8px;color:#1b4059;font-size:12px;}"
+                "QPushButton:hover{border:2px solid #1596cb;background:#effbff;}"
             )
             card.clicked.connect(lambda _, item=product: self._add_to_cart(item))
             self._grid.addWidget(card, index // 4, index % 4)

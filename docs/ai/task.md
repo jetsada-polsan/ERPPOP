@@ -1,5 +1,12 @@
 # Handoff — 2026-11-02 (แก้สีหน้า Executive Dashboard)
 
+## Handoff - 2026-11-05
+- Commit: pending — compact Python POS product grid
+- ทำอะไร: จากการตรวจบน BK Server พบการ์ดสินค้าสูง/กว้างเกินและชื่อยาวบังคับให้กริดล้นจอ; ปรับเป็นกริด 4 คอลัมน์, การ์ดสูง 96px, ตัดชื่อที่ยาวด้วย `…`, ซ่อน horizontal scroll ของ catalog และลด spacing ให้ใกล้ Vue POS
+- ทดสอบ: `PYTHONPATH=apps/jet-pos-python python3 -m unittest discover -s apps/jet-pos-python/tests -v` ผ่าน 25 tests; `QT_QPA_PLATFORM=offscreen` UI smoke ผ่าน; `git diff --check` ผ่าน
+- Deploy: ไม่ deploy ERP; push branch เพื่อ build/publish installer UAT แยก
+- งานถัดไป: ติดตั้ง UAT ใหม่บน BK Server แล้วตรวจ card density/search/cart; การทดสอบ checkout จริงต้องให้เจ้าของกรอก Token/PIN เองและยืนยันก่อนสร้างบิล
+
 ## Handoff - 2026-11-04
 - Commit: pending — fix Python POS UAT product-card rendering
 - ทำอะไร: แก้หน้าจอที่ตรวจจากเครื่อง BK Server แล้วพบแท็ก HTML (`<div>`, `<b>`, `<span>`) หลุดเป็นข้อความในปุ่มสินค้าและหัว/รายการตะกร้า โดยเปลี่ยนเป็นข้อความ Qt ปกติและกำหนด style ของวิดเจ็ตโดยตรง; ลด toolbar ที่กว้างเกินจอเป็นคำสั่งหลัก 6 ปุ่ม และเมนู `เพิ่มเติม` สำหรับคำสั่งรอง เพื่อให้ catalog กับตะกร้าอยู่ใน viewport เดียวบนจอ 1366px
