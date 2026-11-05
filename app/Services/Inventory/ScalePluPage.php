@@ -32,8 +32,8 @@ class ScalePluPage
     {
         $products = Product::with(['barcodes', 'baseUnit'])
             ->where(fn ($q) => $q->where('name_th', 'like', '%ชั่ง%')->orWhere('name_th', 'like', '%ซั่ง%')
-                ->orWhereHas('barcodes', fn ($b) => $b->where('barcode', 'like', '800%')->orWhere('barcode', 'like', '801%')))->get()
-            ->filter(fn ($p) => str_contains($p->name_th, 'ชั่ง') || str_contains($p->name_th, 'ซั่ง') || $p->barcodes->contains(fn ($b) => self::isPlu($b->barcode)));
+                ->orWhere('sku_code', 'like', '800%')->orWhere('sku_code', 'like', '801%')->orWhereHas('barcodes', fn ($b) => $b->where('barcode', 'like', '800%')->orWhere('barcode', 'like', '801%')))->get()
+            ->filter(fn ($p) => self::isPlu($p->sku_code) || str_contains($p->name_th, 'ชั่ง') || str_contains($p->name_th, 'ซั่ง') || $p->barcodes->contains(fn ($b) => self::isPlu($b->barcode)));
         $prices = ProductPrice::where('price_table_id', PriceTable::where('is_default', true)->value('id'))
             ->whereNull('unit_id')->where('is_active', true)->pluck('price', 'product_id');
         $settings = DB::table('scale_plu_settings')->pluck('scale_price', 'barcode');

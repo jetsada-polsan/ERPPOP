@@ -10,6 +10,7 @@ use App\Models\ProductBarcode;
 use App\Models\ProductPrice;
 use App\Services\Inventory\ScaleBarcodeService;
 use App\Services\Inventory\ScalePluPage;
+use App\Services\Inventory\ScalePluRenumber;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -24,6 +25,9 @@ class ScalePriceController extends Controller
             'counts' => collect(ScalePluPage::ISSUES)->map(fn ($label, $key) => $rows->filter(fn ($r) => in_array($key, $r['issues']))->count()),
             'overrides' => ProductPrice::join('price_tables', 'price_tables.id', '=', 'product_prices.price_table_id')->where('price_tables.is_default', false)->where('product_prices.is_active', true)->whereNull('unit_id')->get(['product_prices.product_id', 'price_tables.name', 'product_prices.price'])->groupBy('product_id'),
             'branches' => Branch::when(auth()->user()?->branch_id, fn ($q, $id) => $q->whereKey($id))->orderBy('name_th')->get(),
+            'candidates' => app(ScalePluRenumber::class)->candidates(),
+            'plans' => DB::table('scale_plu_plans')->orderByDesc('id')->limit(50)->get(),
+            'plan' => request('plan') ? app(ScalePluRenumber::class)->plan((int) request('plan')) : null,
             'preview' => session('scale_import_preview', []), 'labelResult' => session('scale_label_result')]);
     }
 
@@ -32,7 +36,7 @@ class ScalePriceController extends Controller
         $data = $request->validate(['product_id' => ['required', 'integer', 'exists:products,id']]);
         $product = Product::findOrFail($data['product_id']);
 
-        return redirect()->route('scale-prices.index')->withErrors(['product_id' => "{$product->name_th}: ห้ามสร้าง PLU อัตโนมัติ — ใช้รหัสจากเครื่องชั่งเดิมเท่านั้น"]);
+        return redirect()->route('scale-prices.index')->withErrors(['product_id' => "{$product->name_th}: สร้าง PLU ได้เฉพาะผ่านแผนรันเลขที่ผู้ใช้ยืนยัน กรุณาเปิดแท็บแผนรันเลขใหม่"]);
     }
 
     public function update(Request $request, ScalePluPage $page)

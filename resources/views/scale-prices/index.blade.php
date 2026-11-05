@@ -4,9 +4,19 @@
 @section('page-subtitle', 'ตรวจรหัสลูก ราคา และทดสอบป้ายก่อนขาย')
 @section('content')
 <div x-data="{ ...erpProductPicker(), q: '', tab: 'problem', issue: '', moving: null, items: [{}],
-    onProductPicked(i,p) { this.items[0].product_id=p.id; },
+    section: @js(request('section', 'audit')), inactive: false, planDirty: false, targetSource: null,
+    onProductPicked(i,p) { this.items[0]=p; this.items[0].product_id=p.id; if(this.targetSource) { document.getElementById('target-'+this.targetSource).value=p.id; document.getElementById('target-label-'+this.targetSource).textContent=p.sku_code+' '+p.name_th; } },
     showRow(el) { return (!this.q || el.dataset.search.includes(this.q.toLowerCase())) && (!this.issue || JSON.parse(el.dataset.issues).includes(this.issue)) && (this.tab === 'all' || (this.tab === 'problem' ? el.dataset.problem === '1' : el.dataset.problem === '0')); }
 }">
+    <nav class="d-flex gap-2 flex-wrap mb-3" aria-label="จัดการ PLU">
+        <button type="button" class="btn border" :class="section==='audit' ? 'btn-primary' : 'btn-light'" @click="section='audit'">ตรวจสินค้าชั่ง</button>
+        <button type="button" class="btn border" :class="section==='plan' ? 'btn-primary' : 'btn-light'" @click="section='plan'">แผนรันเลขใหม่</button>
+        <button type="button" class="btn border" :class="section==='current' ? 'btn-primary' : 'btn-light'" @click="section='current'">PLU ปัจจุบัน</button>
+    </nav>
+    @include('scale-prices.renumber')
+    <div x-show="section==='current'">
+    <form id="all-prices" method="post" action="{{ route('scale-prices.update') }}">@csrf</form>
+    <button form="all-prices" class="btn btn-success mb-3">บันทึกทั้งหมด</button>
     <div class="content-card p-3 mb-3">
         <p class="mb-2">PLU 800xxx/801xxx ต้องเป็นรหัสลูกใต้ SKU จริง ราคา ERP และเครื่องชั่งต้องเท่ากัน เพราะ POS คำนวณน้ำหนักจากราคารวม ÷ ราคา/กก.</p>
         <div class="d-flex flex-wrap gap-2 mb-3">
@@ -31,17 +41,18 @@
                 <tbody>
                 @forelse($rows as $i => $row)
                     @php($p = $row['product'])
-                    <tr x-show="showRow($el)" data-search="{{ mb_strtolower(($row['plu'] ?? '').' '.$p->sku_code.' '.$p->name_th) }}" data-issues="{{ json_encode($row['issues']) }}" data-problem="{{ $row['has_problem'] ? '1' : '0' }}">
+                    @php($firstPriceRow = $rows->search(fn ($r) => $r['product']->id === $p->id) === $i)
+                    <tr @input="$el.classList.add('table-warning')" x-show="showRow($el)" data-search="{{ mb_strtolower(($row['plu'] ?? '').' '.$p->sku_code.' '.$p->name_th) }}" data-issues="{{ json_encode($row['issues']) }}" data-problem="{{ $row['has_problem'] ? '1' : '0' }}">
                         <td class="fw-bold">{{ $row['plu'] ?? 'ยังไม่มี PLU' }}</td>
                         <td style="min-width:180px"><a href="{{ route('products.show', $p) }}">{{ $p->sku_code }} · {{ $p->name_th }}</a><br><span class="badge {{ $p->is_active ? 'text-bg-success' : 'text-bg-danger' }}">{{ $p->is_active ? 'เปิดใช้งาน' : 'ปิดใช้งาน' }}</span>
                         @foreach($overrides[$p->id] ?? [] as $override)
                             <div class="small text-warning">ราคาเฉพาะ {{ $override->name }}: {{ number_format($override->price, 2) }} · แก้ที่ตารางราคา</div>
                         @endforeach
                         </td>
-                        <td><input form="price-{{ $i }}" class="form-control form-control-sm" style="min-width:110px" type="number" name="prices[{{ $p->id }}]" value="{{ old('prices.'.$p->id, number_format($row['price'], 2, '.', '')) }}" step="0.01" min="0" max="99999" aria-label="ราคา ERP {{ $p->sku_code }}"></td>
+                        <td><input form="all-prices" class="form-control form-control-sm" style="min-width:110px" type="number" :disabled="{{ $firstPriceRow ? 'false' : 'true' }}" name="prices[{{ $p->id }}]" value="{{ old('prices.'.$p->id, number_format($row['price'], 2, '.', '')) }}" step="0.01" min="0" max="99999" aria-label="ราคา ERP {{ $p->sku_code }}"></td>
                         <td>
                             @if($row['plu'])
-                            <input form="price-{{ $i }}" class="form-control form-control-sm" style="min-width:110px" type="number" name="scale_prices[{{ $row['plu'] }}]" value="{{ old('scale_prices.'.$row['plu'], $row['scale_price']) }}" step="0.01" min="0" max="99999" placeholder="ยังไม่ตรวจ" aria-label="ราคาเครื่องชั่ง {{ $row['plu'] }}">
+                            <input form="all-prices" class="form-control form-control-sm" style="min-width:110px" type="number" name="scale_prices[{{ $row['plu'] }}]" value="{{ old('scale_prices.'.$row['plu'], $row['scale_price']) }}" step="0.01" min="0" max="99999" placeholder="ยังไม่ตรวจ" aria-label="ราคาเครื่องชั่ง {{ $row['plu'] }}">
                             @else — @endif
                         </td>
                         <td style="min-width:220px">
@@ -50,9 +61,9 @@
                             @empty <span class="badge text-bg-success">ปกติ</span> @endforelse
                         </td>
                         <td style="min-width:130px">
-                            <form id="price-{{ $i }}" method="post" action="{{ route('scale-prices.update') }}">@csrf<button class="btn btn-sm btn-success">บันทึกราคา</button></form>
+
                             @if($row['barcode'])
-                            <button type="button" class="btn btn-sm btn-outline-primary mt-1" @click="moving={{ json_encode(['id' => $row['barcode']->id, 'from' => $p->id, 'plu' => $row['plu'], 'sku' => $p->sku_code], JSON_HEX_APOS | JSON_HEX_QUOT) }}; items=[{}]">ย้าย PLU / ยืนยัน SKU</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary mt-1" @click="targetSource=null; moving={{ json_encode(['id' => $row['barcode']->id, 'from' => $p->id, 'plu' => $row['plu'], 'sku' => $p->sku_code], JSON_HEX_APOS | JSON_HEX_QUOT) }}; items=[{}]">ย้าย PLU / ยืนยัน SKU</button>
                             @endif
                         </td>
                     </tr>
@@ -72,7 +83,7 @@
             <button type="button" class="btn btn-light" @click="moving=null">ยกเลิก</button>
         </form>
     </div>
-    @include('partials.product-picker')
+
     <div class="row g-3">
         <section class="col-lg-6"><div class="content-card p-3 h-100">
             <h3 class="h6">นำเข้าราคาเครื่องชั่ง</h3>
@@ -114,5 +125,7 @@
             @endif
         </div></section>
     </div>
+</div>
+@include('partials.product-picker')
 </div>
 @endsection
