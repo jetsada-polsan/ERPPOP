@@ -94,7 +94,7 @@ class ScalePluRenumber
             if ($price > 9999.99) {
                 $this->fail('ราคาเกิน 9999.99 บาท ป้าย POPSTAR-801 รองรับไม่พอ');
             }
-            $warnings = array_values(array_filter($r['warnings'], fn ($w) => $w !== 'ต้องผูกกับ SKU จริงก่อน'));
+            $warnings = array_values(array_filter($r['warnings'], fn ($w) => ! in_array($w, ['ต้องผูกกับ SKU จริงก่อน', 'ยังไม่ตั้งราคา'])));
             if ($price <= 1 && ! in_array('ยังไม่ตั้งราคา', $warnings)) {
                 $warnings[] = 'ยังไม่ตั้งราคา';
             }
@@ -206,7 +206,8 @@ class ScalePluRenumber
             $ids = array_unique(array_merge(array_column($plan->rows, 'source_id'), array_column($plan->rows, 'product_id')));
             $before = ProductBarcode::whereIn('product_id', $ids)->lockForUpdate()->get()->filter(fn ($b) => ScalePluPage::isPlu($b->barcode));
             foreach ($plan->rows as $r) {
-                if (ProductBarcode::where('barcode', $r['plu'])->whereNotIn('product_id', $ids)->exists()) {
+                if (ProductBarcode::where('barcode', $r['plu'])->whereNotIn('product_id', $ids)->exists()
+                    || Product::where('sku_code', $r['plu'])->where('is_active', true)->whereNotIn('id', $ids)->exists()) {
                     $this->fail('เลขถูกใช้โดยสินค้าอื่น กรุณาแก้เลข');
                 }
                 $barcodeService = app(ScaleBarcodeService::class);

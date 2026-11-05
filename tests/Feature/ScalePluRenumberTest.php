@@ -68,7 +68,7 @@ class ScalePluRenumberTest extends TestCase
     public function test_candidates_include_sku_only_aliases_inactive_unpriced_and_normalized_duplicate_names(): void
     {
         $this->manager();
-        $a = $this->product('A', '** ข้าว ชั่ง กก');
+        $a = $this->product('A', '** ข้าว ชั่ง   กก');
         $b = $this->product('B', 'ข้าว (ชั่งน้ำหนัก)', 1);
         $alias = $this->product('800123', 'ชื่อไม่มีคำชั่ง');
         $inactive = $this->product('D', 'ซั่งเก่า', 89, false);
@@ -149,6 +149,7 @@ class ScalePluRenumberTest extends TestCase
         $csv = $this->get("/scale-prices/plans/$id/export")->assertOk()->getContent();
         $this->assertStringContainsString('801001,001,01001,ข้าวชั่ง,89.00,8', $csv);
         $barcode = app(ScaleBarcodeService::class)->fromTotalPrice('801001', 89);
+        $this->assertSame('8010010089003', $barcode); // Independent EAN-13 reference vector.
         $this->get("/scale-prices/plans/$id/labels")->assertOk()->assertSee($barcode)->assertSee('<svg', false)->assertSee('1.000 กก.');
         $decoded = app(ScaleBarcodeService::class)->decode($barcode);
         $this->assertSame('POPSTAR-801', $decoded['profile']);
@@ -160,11 +161,14 @@ class ScalePluRenumberTest extends TestCase
         // Authenticate through the actual device API middleware; no production device/token involved.
         $device = PosDevice::create(['name' => 'fixture', 'user_id' => $user->id, 'branch_id' => $branch->id, 'token_hash' => hash('sha256', 'renumber-test-fixture')]);
         $this->withToken('renumber-test-fixture')->getJson('/api/pos/products?all=1')->assertOk()->assertJsonFragment(['scale_plu' => '801001']);
+        $this->withToken('renumber-test-fixture')->getJson('/api/pos/products?q=800999&exact=1&lookup=mixed')->assertOk()->assertExactJson([]);
         $this->post("/scale-prices/plans/$id/rollback", ['confirmed' => 1])->assertSessionHasNoErrors();
         $this->assertTrue($old->fresh()->is_active);
         $this->assertFalse($disabled->fresh()->is_active);
         $this->assertDatabaseHas('product_barcodes', ['barcode' => '801001', 'is_active' => false]);
         $this->assertDatabaseMissing('scale_plu_settings', ['barcode' => '801001']);
+        $this->withToken('renumber-test-fixture')->getJson('/api/pos/products?q=801001&exact=1&lookup=barcode')->assertOk()->assertExactJson([]);
+        $this->withToken('renumber-test-fixture')->getJson('/api/pos/products?q=800999&exact=1&lookup=barcode')->assertOk()->assertJsonFragment(['scale_plu' => '800999']);
         $this->assertDatabaseHas('audit_logs', ['action' => 'scale_plu_plan_rolled_back']);
         $this->get("/scale-prices/plans/$id/export")->assertStatus(409);
         $this->post("/scale-prices/plans/$id/rollback", ['confirmed' => 1])->assertSessionHasErrors('plan');
@@ -180,8 +184,8 @@ class ScalePluRenumberTest extends TestCase
         ProductPrice::create(['price_table_id' => $table->id, 'product_id' => $target->id, 'price' => 123, 'is_active' => true]);
         $id = $this->preview([$alias->id => $target->id]);
         $this->assertEquals(123, app(ScalePluRenumber::class)->plan($id)->rows[0]['price']);
-        $this->apply($id, false)->assertSessionHasErrors('plan');
-        $this->apply($id)->assertSessionHasNoErrors();
+        $this->assertNotContains('ยังไม่ตั้งราคา', app(ScalePluRenumber::class)->plan($id)->rows[0]['warnings']);
+        $this->apply($id, false)->assertSessionHasNoErrors();
         $this->assertFalse($alias->fresh()->is_active);
         $this->assertFalse($old->fresh()->is_active);
         $this->assertDatabaseHas('product_barcodes', ['product_id' => $target->id, 'barcode' => '801001', 'is_active' => true]);
@@ -237,6 +241,73 @@ class ScalePluRenumberTest extends TestCase
         $this->assertSame($b->id, $old->fresh()->product_id);
         $this->assertTrue($old->fresh()->is_active);
         $this->assertDatabaseHas('scale_plu_settings', ['barcode' => '801001', 'scale_price' => 77]);
+    }
+
+    public function test_bulk_prices_update_both_skus_and_stale_plan_is_invalidated(): void
+    {
+        $this->manager();
+        $a = $this->product('A');
+        $b = $this->product('B');
+        $this->code($a, '800111');
+        $this->code($b, '800112');
+        $table = PriceTable::create(['code' => 'REN', 'name' => 'หลัก', 'is_default' => true, 'is_active' => true]);
+        $id = $this->preview([$a->id => $a->id, $b->id => $b->id]);
+        $this->post('/scale-prices', ['prices' => [$a->id => 100.5, $b->id => 123], 'scale_prices' => ['800111' => 100.5, '800112' => 123]])->assertSessionHasNoErrors();
+        foreach ([$a->id => 100.5, $b->id => 123] as $product => $price) {
+            $this->assertDatabaseHas('product_prices', ['price_table_id' => $table->id, 'product_id' => $product, 'price' => $price]);
+        }
+        $this->assertDatabaseHas('scale_plu_settings', ['barcode' => '800111', 'scale_price' => 100.5]);
+        $this->assertDatabaseHas('scale_plu_settings', ['barcode' => '800112', 'scale_price' => 123]);
+        $this->apply($id)->assertSessionHasErrors('plan');
+    }
+
+    public function test_price_flags_require_acceptance_but_popstar_label_overflow_is_rejected(): void
+    {
+        $this->manager();
+        $p = $this->product('P', price: 1);
+        $id = $this->preview([$p->id => $p->id]);
+        $this->apply($id, false)->assertSessionHasErrors('plan');
+        $this->apply($id)->assertSessionHasNoErrors();
+        $expensive = $this->product('X', price: 10000);
+        $this->post('/scale-prices/plans', ['selected' => [$expensive->id => $expensive->id]])->assertSessionHasErrors('plan');
+    }
+
+    public function test_old_revision_after_edit_and_disabled_decoder_profile_cannot_apply(): void
+    {
+        $this->manager();
+        $p = $this->product('P');
+        $id = $this->preview([$p->id => $p->id]);
+        $oldRevision = hash('sha256', json_encode(app(ScalePluRenumber::class)->plan($id)->rows));
+        $this->post("/scale-prices/plans/$id/edit", ['numbers' => [$p->id => '801099']])->assertSessionHasNoErrors();
+        $this->post("/scale-prices/plans/$id/apply", ['confirmed' => 1, 'accept_warnings' => 1, 'revision' => $oldRevision])->assertSessionHasErrors('plan');
+        DB::table('scale_barcode_profiles')->where('code', 'POPSTAR-801')->update(['is_active' => false]);
+        $id = $this->preview([$p->id => $p->id]);
+        $this->apply($id)->assertSessionHasErrors('plan');
+        $this->assertDatabaseCount('product_barcodes', 0);
+    }
+
+    public function test_active_plu_sku_outside_plan_blocks_number_even_without_barcode(): void
+    {
+        $this->manager();
+        $p = $this->product('P');
+        $this->product('801001', 'ตัวแทน');
+        $id = $this->preview([$p->id => $p->id]);
+        $this->apply($id)->assertSessionHasErrors('plan');
+        $this->assertDatabaseCount('product_barcodes', 0);
+    }
+
+    public function test_rollback_refuses_to_overwrite_later_scale_price_changes(): void
+    {
+        $this->manager();
+        $p = $this->product('P');
+        $old = $this->code($p, '800111');
+        $id = $this->preview([$p->id => $p->id]);
+        $this->apply($id)->assertSessionHasNoErrors();
+        DB::table('scale_plu_settings')->where('barcode', '801001')->update(['scale_price' => 200]);
+        $this->post("/scale-prices/plans/$id/rollback", ['confirmed' => 1])->assertSessionHasErrors('plan');
+        $this->assertFalse($old->fresh()->is_active);
+        $this->assertDatabaseHas('scale_plu_settings', ['barcode' => '801001', 'scale_price' => 200]);
+        $this->assertDatabaseHas('scale_plu_plans', ['id' => $id, 'status' => 'applied']);
     }
 
     public function test_all_plan_routes_require_masterdata_permission(): void
