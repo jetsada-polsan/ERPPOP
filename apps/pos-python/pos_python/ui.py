@@ -35,6 +35,15 @@ PALETTE = {
     "primary_soft": "#eef4f9",
     "success": "#158662",       # เงินทอน — ความหมาย ไม่ใช่สีแบรนด์
     "success_light": "#bbf7d0",
+    "success_soft": "#eef9f4",   # แถบคิวบิลด้านล่าง
+    "success_muted": "#9fc9b9",  # ปุ่มรับเงินตอนยังไม่มีรายการ
+    "danger_light": "#fecaca",
+    "success_dark": "#0f6b4e",  # หน้าขายแบบ JET POS
+    "primary_pressed": "#dcebf6",
+    "pulse_line": "#eadde0",
+    "row_alt": "#fafcfe",
+    "pulse_bg": "#fcf7f8",
+    "danger_soft": "#fff1ef",   # ป้ายออฟไลน์บนแถบน้ำเงินเข้ม
     "warning": "#d98b00",
     "warning_soft": "#fdf4e3",
     "warning_ink": "#9c6400",   # บนพื้นเหลืองอ่อน 4.54:1
@@ -335,6 +344,72 @@ QHeaderView::section { background: $primary_soft; border: 0; border-bottom: 1px 
 #shiftAmount { font-size: 24px; font-weight: 800; padding: 8px 12px; }
 #shiftSummary { background: $primary_soft; border: 1px solid $border; border-radius: 7px; padding: 12px 14px; font-size: 17px; font-weight: 700; }
 #shiftKeypad QPushButton { min-height: 40px; font-size: 18px; font-weight: 700; }
+
+/* ===== หน้าขายแบบ JET POS (Vue) — วางท้ายสุดให้ทับกฎเก่า ===== */
+QWidget#jetTopbar { background: $primary_dark; border-bottom: 3px solid $primary; }
+#jetTopbar QLabel { background: transparent; color: $surface; }
+#jetBrand { font-size: 18px; font-weight: 800; }
+#jetTopbar QLabel#jetTagline { font-size: 10px; font-weight: 800; color: rgba(255,255,255,.72); }
+QWidget#jetContext { background: transparent; border-left: 1px solid rgba(255,255,255,.22); }
+#jetTopbar QLabel#jetContextCaption { font-size: 11px; font-weight: 800; color: rgba(255,255,255,.7); }
+#jetContextValue { font-size: 13px; font-weight: 700; }
+#jetTopbar QLabel#jetStatus { padding: 6px 10px; border-radius: 7px; font-size: 12px; font-weight: 800;
+             border: 1px solid $danger_light; color: $danger_light; background: rgba(201,33,45,.35); }
+#jetTopbar QLabel#jetStatus[online="true"] { border-color: $success_light; color: $success_light; background: rgba(20,122,85,.35); }
+QPushButton#jetTopButton { background: rgba(255,255,255,.10); color: $surface; border: 1px solid rgba(255,255,255,.35);
+                           border-radius: 7px; padding: 4px 10px; font-size: 13px; font-weight: 700; }
+QPushButton#jetTopButton:hover { background: rgba(255,255,255,.22); border-color: $surface; }
+
+QWidget#catalog { background: $bg; }
+#catalog QLabel { background: transparent; }
+#sectionCaption { color: $muted; font-size: 12px; font-weight: 800; }
+#sectionTitle { color: $text; font-size: 15px; font-weight: 800; }
+#catalogCount { color: $primary; font-size: 14px; font-weight: 800; }
+QLineEdit#searchRow { background: $surface; border: 1px solid $border; border-radius: 8px; padding: 0 14px; font-size: 15px; font-weight: 600; }
+QLineEdit#searchRow:focus { border: 2px solid $primary; }
+QScrollArea#productScroll, QWidget#productGrid { background: $bg; border: 0; }
+QPushButton#productTile { background: $surface; border: 1px solid $border; border-radius: 8px; padding: 0; text-align: left; }
+QPushButton#productTile:hover { background: $primary_soft; border-color: $primary; }
+QPushButton#productTile:pressed { background: $primary_pressed; }
+#productTile QLabel { background: transparent; }
+#productCode { color: $muted; font-size: 12px; }
+#productName { color: $text; font-size: 13px; font-weight: 700; }
+#productUnit { color: $muted; font-size: 12px; }
+#productPrice { color: $primary_dark; font-size: 16px; font-weight: 800; }
+
+QWidget#cartPanel { background: $surface; border-left: 1px solid $border; }
+QWidget#cartTitle { background: $primary_dark; }
+#cartTitle QLabel { background: transparent; color: $surface; }
+#cartTitle QLabel#cartTitleSmall { font-size: 11px; font-weight: 700; color: rgba(255,255,255,.8); }
+#cartTitleMain { font-size: 15px; font-weight: 800; }
+QPushButton#cartTitleButton { background: rgba(255,255,255,.12); color: $surface; border: 1px solid rgba(255,255,255,.4); border-radius: 7px; padding: 4px 12px; }
+QWidget#shiftPulse { background: $pulse_bg; border-bottom: 1px solid $border; }
+QWidget#pulseCell { background: transparent; border-right: 1px solid $pulse_line; }
+#pulseCell QLabel { background: transparent; }
+#pulseCaption { color: $muted; font-size: 11px; font-weight: 700; }
+#pulseValue { color: $text; font-size: 13px; font-weight: 800; }
+QTableWidget#cartTable { background: $surface; alternate-background-color: $row_alt; border: 0; font-size: 13px;
+                         selection-background-color: $primary_soft; selection-color: $text; }
+QTableWidget#cartTable::item { border-bottom: 1px solid $border; padding: 2px 4px; }
+#cartTable QHeaderView::section { background: $primary_soft; color: $text; border: 0; border-bottom: 1px solid $border;
+                                  padding: 5px 4px; font-size: 13px; font-weight: 800; }
+#cartTable QWidget { background: transparent; }
+QPushButton#qtyButton { background: $surface; border: 1px solid $border; border-radius: 6px; padding: 0; font-size: 17px; font-weight: 800; }
+QPushButton#qtyButton:hover { border-color: $primary; background: $primary_soft; }
+#qtyValue { font-size: 14px; font-weight: 800; }
+#cartTable QPushButton#voidBtn { background: transparent; border: 0; color: $danger; font-size: 15px; font-weight: 800; padding: 0; }
+#cartTable QPushButton#voidBtn:hover { background: $danger_soft; border-radius: 6px; }
+#cartEmpty { background: $surface; color: $muted; font-size: 14px; }
+QPushButton#cartSecondary { background: $surface; border: 1px solid $border; border-radius: 7px; padding: 8px; font-size: 13px; }
+QWidget#totalBox { background: $primary_dark; padding: 0; }
+#totalBox QLabel { background: transparent; color: rgba(255,255,255,.85); font-size: 13px; }
+#totalBox QLabel#grandTotal { color: $surface; font-size: 34px; font-weight: 800; }
+QPushButton#payBtn { background: $success; border: 0; border-radius: 8px; color: $surface; font-size: 18px; font-weight: 800; padding: 10px; }
+QPushButton#payBtn:hover { background: $success_dark; }
+QPushButton#payBtn:disabled { background: $success_muted; }
+#queueBar { background: $success_soft; color: $success; font-size: 12px; font-weight: 700; padding: 6px 14px; border-top: 1px solid $border; }
+QPushButton#keypadKey { font-size: 20px; font-weight: 700; }
+
 """)
 
 def _layout_px(css: dict, name: str, fallback: int) -> int:
@@ -1475,24 +1550,24 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             product_panel = self.build_product_panel()
             # The web designer controls pane order, while the splitter keeps both
             # panes usable on 14-15 inch POS screens instead of squeezing buttons.
+            # แบบ JET POS: สินค้าซ้าย บิลขวา ลำดับและสัดส่วนยังตามที่ออกแบบไว้ใน ERP
+            # บิลกว้างไม่เกิน 520px จอ 1024 จะได้เหลือที่ให้การ์ดสินค้า
             order_x = self._layout_x("cart", 8)
             product_x = self._layout_x("product_grid", 1)
             splitter = QSplitter(Qt.Horizontal)
             splitter.setObjectName("primarySplitter")
             splitter.setChildrenCollapsible(False)
-            splitter.setHandleWidth(6)
+            splitter.setHandleWidth(1)
             if order_x < product_x:
                 first, second = order_panel, product_panel
-                first.setMinimumWidth(360)
-                second.setMinimumWidth(360)
             else:
                 first, second = product_panel, order_panel
-                first.setMinimumWidth(360)
-                second.setMinimumWidth(360)
+            first.setMinimumWidth(360)
+            second.setMinimumWidth(360)
+            order_panel.setMaximumWidth(520)
+            self.order_panel = order_panel
             splitter.addWidget(first)
             splitter.addWidget(second)
-            # Keep the same product/cart ratio as the Web POS. The designer owns
-            # the ratio; the minimum widths above only protect touch controls.
             first_is_product = first is product_panel
             first_ratio = layout_runtime["product_width"] if first_is_product else layout_runtime["cart_width"]
             second_ratio = layout_runtime["cart_width"] if first_is_product else layout_runtime["product_width"]
@@ -1515,6 +1590,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         def resizeEvent(self, event) -> None:
             """Keep the working area usable on common 14-15 inch POS screens."""
             super().resizeEvent(event)
+            # จอ 1024 บิลกว้าง ~440 จอใหญ่ขยายได้ถึง 520 การ์ดสินค้าจะได้ไม่ตัดชื่อ
+            if getattr(self, "order_panel", None) is not None:
+                self.order_panel.setMaximumWidth(max(400, min(520, int(self.width() * 0.43))))
             compact = self.width() <= 1450 or self.height() <= 900
             mode_changed = self.property("compact") != compact
             if mode_changed:
@@ -1533,135 +1611,269 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 self.refresh_products()
 
         def build_runtime_topbar(self) -> QWidget:
-            """Compact context bar matching the Web POS and honoring designer toggles."""
+            """แถบบนแบบ JET POS: ชื่อร้าน · สาขา/เครื่อง · กะ · ปุ่มลัดด้านขวา"""
             bar = QWidget()
-            bar.setObjectName("brandBar")
+            bar.setObjectName("jetTopbar")
+            bar.setFixedHeight(58)
             layout = QHBoxLayout(bar)
-            layout.setContentsMargins(10, 4, 10, 4)
+            layout.setContentsMargins(14, 6, 10, 6)
             layout.setSpacing(6)
 
-            name = QLabel("PopCentral Web POS")
-            name.setObjectName("brandName")
-            layout.addWidget(name)
+            brand = QVBoxLayout()
+            brand.setSpacing(0)
+            name = QLabel("JET POS")
+            name.setObjectName("jetBrand")
+            tagline = QLabel("POINT OF SALE")
+            tagline.setObjectName("jetTagline")
+            brand.addWidget(name)
+            brand.addWidget(tagline)
+            layout.addLayout(brand)
 
             branch_name = (online.profile.get("branch_name") if online is not None else None) or service._setting("branch_name") or f"สาขา {branch_id}"
-            context = [
-                ("show_branch", "สาขา", branch_name),
-                ("show_terminal", "เครื่อง", terminal_id),
-                ("show_seller", "คนขาย", "ยังไม่เลือก"),
-                ("show_shift", "กะ", "ยังไม่เปิดกะ"),
-            ]
             self.runtime_context = {}
-            for key, label, value in context:
-                chip = QLabel(f"{label} {value}")
-                chip.setObjectName("runtimeChip")
-                chip.setProperty("contextKey", key)
-                chip.setVisible(bool(layout_runtime.get(key, True)))
-                layout.addWidget(chip)
-                self.runtime_context[key] = chip
+            for key, caption, value, detail in [
+                ("show_branch", "สาขา / เครื่อง", branch_name, terminal_id),
+                ("show_shift", "กะขาย", "ยังไม่เปิดกะ", "ยังไม่เลือกคนขาย"),
+            ]:
+                block = QWidget()
+                block.setObjectName("jetContext")
+                block_layout = QVBoxLayout(block)
+                block_layout.setContentsMargins(14, 0, 14, 0)
+                block_layout.setSpacing(0)
+                head = QLabel(caption)
+                head.setObjectName("jetContextCaption")
+                main = QLabel(f"{value}  ·  {detail}")
+                main.setObjectName("jetContextValue")
+                block_layout.addWidget(head)
+                block_layout.addWidget(main)
+                block.setVisible(bool(layout_runtime.get(key, True)))
+                layout.addWidget(block)
+                self.runtime_context[key] = main
 
             layout.addStretch(1)
 
-            self.auth_button = QPushButton("เลือกคนขายแล้ว")
-            self.auth_button.setObjectName("headerAction")
-            self.auth_button.setToolTip("เลือกคนขายและเปิดกะขาย")
-            self.auth_button.clicked.connect(self.ensure_sale_session)
-            layout.addWidget(self.auth_button)
+            self.connection_chip = QLabel("ออฟไลน์")
+            self.connection_chip.setObjectName("jetStatus")
+            layout.addWidget(self.connection_chip)
 
-            # ปุ่มใหญ่มีคำกำกับ — เดิมเป็น ⚙ กว้าง 36px กดด้วยนิ้วบนจอสัมผัสยาก
-            self.settings_button = QPushButton("ตั้งค่า / กะ ▾")
-            self.settings_button.setObjectName("menuAction")
-            self.settings_button.setMinimumSize(132, 40)
-            self.settings_button.setToolTip("ตั้งค่า POS · ยอดวันนี้ · เงินสด · ปิดกะ (Ctrl+Alt+S เปิดตั้งค่า)")
-            settings_menu = QMenu(self.settings_button)
-            settings_menu.setObjectName("bigMenu")
-            settings_menu.addAction("ตั้งค่า POS", self.open_settings)
-            settings_menu.addSeparator()
-            settings_menu.addAction("ยอดวันนี้", self.show_daily_sales)
-            settings_menu.addAction("เงินสด", self.record_cash_movement)
-            settings_menu.addAction("ปิดกะ", self.close_current_shift)
-            self.settings_button.setMenu(settings_menu)
+            # ปุ่มคำสั้นๆ กดด้วยนิ้วได้ ไม่ซ่อนในเมนู
+            self.auth_button = self._top_button("เปิดกะ", "เลือกคนขายและเปิดกะขาย", self.ensure_sale_session)
+            layout.addWidget(self.auth_button)
+            for label, tip, action in [
+                ("ยอดวันนี้", "ยอดขายวันนี้ของเครื่องนี้", self.show_daily_sales),
+                ("เงินสด", "นำเงินเข้า/ออกลิ้นชัก", self.record_cash_movement),
+                ("บิลล่าสุด", "ดูและพิมพ์ใบเสร็จล่าสุดซ้ำ", self.show_last_receipt),
+                ("ปิดกะ", "นับเงินและปิดกะขาย", self.close_current_shift),
+            ]:
+                layout.addWidget(self._top_button(label, tip, action))
+            self.settings_button = self._top_button("⚙ ตั้งค่า", "ตั้งค่าเครื่อง POS (Ctrl+Alt+S)", self.open_settings)
             layout.addWidget(self.settings_button)
             return bar
 
+        def _top_button(self, label: str, tip: str, action) -> QPushButton:
+            button = QPushButton(label)
+            button.setObjectName("jetTopButton")
+            button.setToolTip(tip)
+            button.setMinimumHeight(40)
+            button.setCursor(Qt.PointingHandCursor)
+            button.clicked.connect(action)
+            return button
+
         def refresh_runtime_context(self) -> None:
-            """Refresh small context chips after selecting a cashier or closing a shift."""
             if not getattr(self, "runtime_context", None):
                 return
-            cashier_name = self.cashier["name"] if self.cashier is not None else "ยังไม่เลือก"
-            shift_text = f"เปิดอยู่ #{self.shift_id}" if self.shift_id is not None else "ยังไม่เปิดกะ"
-            self.runtime_context["show_seller"].setText(f"คนขาย {cashier_name}")
-            self.runtime_context["show_shift"].setText(f"กะ {shift_text}")
-            self.runtime_context["show_shift"].setProperty("shiftOpen", "true" if self.shift_id is not None else "false")
-            self.runtime_context["show_shift"].style().unpolish(self.runtime_context["show_shift"])
-            self.runtime_context["show_shift"].style().polish(self.runtime_context["show_shift"])
+            cashier_name = self.cashier["name"] if self.cashier is not None else "ยังไม่เลือกคนขาย"
+            shift_text = f"กะ #{self.shift_id}" if self.shift_id is not None else "ยังไม่เปิดกะ"
+            self.runtime_context["show_shift"].setText(f"{shift_text}  ·  {cashier_name}")
             if getattr(self, "auth_button", None) is not None:
-                self.auth_button.setText(
-                    f"คนขาย: {cashier_name}" if self.cashier is not None else "เลือกคนขายแล้ว"
-                )
+                self.auth_button.setText(cashier_name if self.cashier is not None else "เปิดกะ")
+            if getattr(self, "connection_chip", None) is not None:
+                connected = online is not None and bool(getattr(online.worker, "online", online.online))
+                self.connection_chip.setText("● ออนไลน์" if connected else "● ออฟไลน์")
+                self.connection_chip.setProperty("online", "true" if connected else "false")
+                self.connection_chip.style().unpolish(self.connection_chip)
+                self.connection_chip.style().polish(self.connection_chip)
 
         # ---------- พื้นที่บิล ----------
 
         def build_order_panel(self) -> QWidget:
             panel = QWidget()
-            panel.setObjectName("orderPanel")
+            panel.setObjectName("cartPanel")
             layout = QVBoxLayout(panel)
             layout.setContentsMargins(0, 0, 0, 0)
             layout.setSpacing(0)
 
             head = QWidget()
-            head.setObjectName("orderHead")
-            head_layout = QVBoxLayout(head)
-            head_layout.setContentsMargins(10, 6, 10, 6)
-            head_layout.setSpacing(4)
-            title_row = QHBoxLayout()
-            title = QLabel("รายการขาย")
-            title_row.addWidget(title)
-            title_row.addStretch(1)
-            clear_header = QPushButton("ล้างรายการ")
-            clear_header.setObjectName("headerAction")
+            head.setObjectName("cartTitle")
+            head.setFixedHeight(48)
+            head_layout = QHBoxLayout(head)
+            head_layout.setContentsMargins(14, 4, 10, 4)
+            titles = QVBoxLayout()
+            titles.setSpacing(0)
+            small = QLabel("บิลปัจจุบัน")
+            small.setObjectName("cartTitleSmall")
+            self.cart_title = QLabel("รายการขาย")
+            self.cart_title.setObjectName("cartTitleMain")
+            titles.addWidget(small)
+            titles.addWidget(self.cart_title)
+            head_layout.addLayout(titles)
+            head_layout.addStretch(1)
+            clear_header = QPushButton("ล้างบิล")
+            clear_header.setObjectName("cartTitleButton")
             clear_header.clicked.connect(self.clear_order)
-            title_row.addWidget(clear_header)
-            head_layout.addLayout(title_row)
-
-            self.cashier_label = QLabel(f"รายการขาย · ยังไม่ได้เริ่มขาย · v{APP_VERSION}")
-            self.cashier_label.setWordWrap(True)
-            self.cashier_label.setVisible(False)
-            head_layout.addWidget(self.cashier_label)
+            head_layout.addWidget(clear_header)
             layout.addWidget(head)
 
-            self.table = QTableWidget(0, 4)
-            self.table.setHorizontalHeaderLabels(["สินค้า", "จำนวน", "ราคา", "รวม"])
+            pulse = QWidget()
+            pulse.setObjectName("shiftPulse")
+            pulse_layout = QHBoxLayout(pulse)
+            pulse_layout.setContentsMargins(0, 0, 0, 0)
+            pulse_layout.setSpacing(0)
+            self.pulse_values = []
+            for caption in ("บิลวันนี้บนเครื่อง", "ยอดขาย", "เฉลี่ย/บิล"):
+                cell = QWidget()
+                cell.setObjectName("pulseCell")
+                cell_layout = QVBoxLayout(cell)
+                cell_layout.setContentsMargins(12, 5, 12, 5)
+                cell_layout.setSpacing(0)
+                label = QLabel(caption)
+                label.setObjectName("pulseCaption")
+                value = QLabel("-")
+                value.setObjectName("pulseValue")
+                cell_layout.addWidget(label)
+                cell_layout.addWidget(value)
+                pulse_layout.addWidget(cell, 1)
+                self.pulse_values.append(value)
+            layout.addWidget(pulse)
+
+            # เก็บไว้ให้โค้ดเดิมที่เขียนข้อความสถานะคนขายใช้ได้ แต่ไม่แสดงบนจอ
+            self.cashier_label = QLabel()
+            self.cashier_label.setVisible(False)
+            layout.addWidget(self.cashier_label)
+
+            self.table = QTableWidget(0, 5)
+            self.table.setObjectName("cartTable")
+            self.table.setHorizontalHeaderLabels(["#", "สินค้า", "จำนวน", "รวม", ""])
             self.table.verticalHeader().setVisible(False)
+            self.table.setShowGrid(False)
+            self.table.setAlternatingRowColors(True)
+            self.table.setWordWrap(True)
             self.table.setSelectionBehavior(QTableWidget.SelectRows)
+            self.table.setSelectionMode(QTableWidget.SingleSelection)
             self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-            self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-            for column in (1, 2, 3):
-                self.table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeToContents)
+            self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            header = self.table.horizontalHeader()
+            header.setSectionResizeMode(0, QHeaderView.Fixed)
+            header.setSectionResizeMode(1, QHeaderView.Stretch)
+            header.setSectionResizeMode(2, QHeaderView.Fixed)
+            header.setSectionResizeMode(3, QHeaderView.Fixed)
+            header.setSectionResizeMode(4, QHeaderView.Fixed)
+            self.table.setColumnWidth(0, 30)
+            self.table.setColumnWidth(2, 118)
+            self.table.setColumnWidth(3, 86)
+            self.table.setColumnWidth(4, 40)
+            self.table.verticalHeader().setDefaultSectionSize(54)
             self.table.itemSelectionChanged.connect(self.on_line_selected)
+            self.table.cellDoubleClicked.connect(lambda *_: self.open_line_editor())
             layout.addWidget(self.table, 1)
+
+            self.cart_empty = QLabel("ยังไม่มีรายการขาย\nสแกนบาร์โค้ดหรือแตะสินค้าทางซ้าย")
+            self.cart_empty.setObjectName("cartEmpty")
+            self.cart_empty.setAlignment(Qt.AlignCenter)
+            layout.addWidget(self.cart_empty, 1)
+
+            edit_row = QHBoxLayout()
+            edit_row.setContentsMargins(12, 6, 12, 6)
+            edit_row.setSpacing(6)
+            self.edit_line_button = QPushButton("แก้จำนวน / ราคา / ส่วนลด")
+            self.edit_line_button.setObjectName("cartSecondary")
+            self.edit_line_button.clicked.connect(self.open_line_editor)
+            edit_row.addWidget(self.edit_line_button, 1)
+            layout.addLayout(edit_row)
 
             totals = QWidget()
             totals.setObjectName("totalBox")
             totals_layout = QVBoxLayout(totals)
+            totals_layout.setContentsMargins(16, 8, 16, 8)
+            totals_layout.setSpacing(2)
             self.subtotal_label = QLabel()
             self.subtotal_label.setObjectName("totalLabel")
             self.vat_label = QLabel()
             self.vat_label.setObjectName("vatLine")
+            grand_row = QHBoxLayout()
+            grand_caption = QLabel("ยอดสุทธิ")
+            grand_caption.setObjectName("totalLabel")
             self.grand_label = QLabel()
             self.grand_label.setObjectName("grandTotal")
-            self.grand_label.setAlignment(Qt.AlignRight)
+            self.grand_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            grand_row.addWidget(grand_caption)
+            grand_row.addStretch(1)
+            grand_row.addWidget(self.grand_label)
             totals_layout.addWidget(self.subtotal_label)
             totals_layout.addWidget(self.vat_label)
-            totals_layout.addWidget(self.grand_label)
+            totals_layout.addLayout(grand_row)
             layout.addWidget(totals)
 
-            layout.addWidget(self.build_numpad())
+            self.pay_button = QPushButton("รับชำระเงิน   F12")
+            self.pay_button.setObjectName("payBtn")
+            self.pay_button.setMinimumHeight(54)
+            self.pay_button.clicked.connect(self.pay)
+            pay_wrap = QHBoxLayout()
+            pay_wrap.setContentsMargins(12, 8, 12, 6)
+            pay_wrap.addWidget(self.pay_button)
+            layout.addLayout(pay_wrap)
+            self.pay_shortcut = QShortcut(QKeySequence("F12"), self)
+            self.pay_shortcut.activated.connect(self.pay)
 
             self.status = QLabel()
-            self.status.setObjectName("statusBar")
+            self.status.setObjectName("queueBar")
             layout.addWidget(self.status)
+
+            # ปุ่มตัวเลขย้ายไปอยู่ใน popup แก้รายการ หน้าขายจะได้มีที่ให้รายการสินค้า
+            self.line_editor = QDialog(self)
+            self.line_editor.setWindowTitle("แก้รายการ")
+            editor_layout = QVBoxLayout(self.line_editor)
+            self.line_editor_title = QLabel()
+            self.line_editor_title.setObjectName("cardTitle")
+            self.line_editor_title.setWordWrap(True)
+            editor_layout.addWidget(self.line_editor_title)
+            editor_layout.addWidget(self.build_numpad())
+            done = QPushButton("เสร็จ")
+            done.setObjectName("payBtn")
+            done.setMinimumHeight(44)
+            done.clicked.connect(self.line_editor.accept)
+            editor_layout.addWidget(done)
             return panel
+
+        def open_line_editor(self) -> None:
+            line = self.order.selected
+            if line is None:
+                QMessageBox.information(self, "แก้รายการ", "แตะเลือกรายการในบิลก่อน")
+                return
+            self.line_editor_title.setText(f"{line.name}\nเลือกโหมด แล้วกดตัวเลข")
+            self.line_editor.setMinimumWidth(380)
+            self.line_editor.exec()
+            self.refresh_order(keep_selection=True)
+
+        def change_line_qty(self, index: int, delta: int) -> None:
+            if not (0 <= index < len(self.order.lines)):
+                return
+            line = self.order.lines[index]
+            if line.locked_qty:
+                return
+            if line.qty + delta <= 0:
+                self.order.lines.pop(index)
+                self.order.select(len(self.order.lines) - 1 if self.order.lines else None)
+            else:
+                line.qty += delta
+                self.order.select(index)
+            self.refresh_order()
+
+        def delete_line(self, index: int) -> None:
+            if 0 <= index < len(self.order.lines):
+                self.order.select(index)
+                self.order.remove_selected()
+                self.refresh_order()
 
         def _layout_x(self, component_type: str, fallback: int) -> int:
             return next((int(item.get("x", fallback)) for item in layout_config.get("components", [])
@@ -1671,12 +1883,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             box = QWidget()
             box.setObjectName("saleKeypad")
             grid = QGridLayout(box)
-            grid.setSpacing(3)
+            grid.setSpacing(6)
 
             self.mode_group = QButtonGroup(box)
             for column, (mode, label) in enumerate([(QTY, "จำนวน"), (PRICE, "ราคา"), (DISCOUNT, "ส่วนลด")]):
                 button = QPushButton(label)
-                button.setMinimumHeight(28)
+                button.setMinimumHeight(44)
                 button.setCheckable(True)
                 button.setChecked(mode == QTY)
                 button.clicked.connect(lambda _, value=mode: self.set_mode(value))
@@ -1686,67 +1898,46 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             for row, keys in enumerate(NUMPAD_KEYS, start=1):
                 for column, key in enumerate(keys):
                     button = QPushButton("⌫" if key == "backspace" else key)
-                    button.setMinimumHeight(28)
+                    button.setMinimumHeight(52)
+                    button.setObjectName("keypadKey")
                     button.clicked.connect(lambda _, value=key: self.press(value))
                     grid.addWidget(button, row, column)
-
-            # ไม่มีปุ่ม +/− แล้ว บิลขายติดลบ ERP ไม่รับ คืนของต้องทำเป็นใบรับคืน
-            remove = QPushButton("ลบรายการ")
-            remove.setMinimumHeight(28)
-            remove.setObjectName("voidBtn")
-            remove.clicked.connect(self.remove_line)
-            grid.addWidget(remove, 5, 0, 1, 2)
-
-            receipt = QPushButton("ดูใบเสร็จล่าสุด")
-            receipt.setMinimumHeight(28)
-            receipt.clicked.connect(self.show_last_receipt)
-            grid.addWidget(receipt, 5, 2)
-
-            clear = QPushButton("ล้างบิล")
-            clear.setMinimumHeight(32)
-            clear.clicked.connect(self.clear_order)
-            grid.addWidget(clear, 6, 0)
-
-            pay = QPushButton("รับชำระเงิน")
-            pay.setMinimumHeight(34)
-            pay.setObjectName("payBtn")
-            pay.clicked.connect(self.pay)
-            grid.addWidget(pay, 6, 1, 1, 2)
             return box
 
         # ---------- พื้นที่สินค้า ----------
 
         def build_product_panel(self) -> QWidget:
             panel = QWidget()
-            panel.setObjectName("productPanel")
+            panel.setObjectName("catalog")
             layout = QVBoxLayout(panel)
-            layout.setContentsMargins(14, 12, 14, 12)
-            layout.setSpacing(10)
+            layout.setContentsMargins(14, 10, 14, 10)
+            layout.setSpacing(8)
 
-            product_head = QWidget()
-            product_head.setObjectName("productHead")
-            product_head_layout = QHBoxLayout(product_head)
-            product_head_layout.setContentsMargins(10, 7, 10, 7)
-            product_title = QLabel("สินค้า")
-            product_title.setObjectName("productTitle")
-            product_hint = QLabel("โหลดทีละ 100 รายการ · ค้นหาเพิ่มได้")
-            product_hint.setObjectName("productHint")
-            product_head_layout.addWidget(product_title)
-            product_head_layout.addStretch(1)
-            product_head_layout.addWidget(product_hint)
-            refresh = QPushButton("รีเฟรช")
-            refresh.setMaximumWidth(78)
-            refresh.clicked.connect(self.refresh_products)
-            product_head_layout.addWidget(refresh)
-            layout.addWidget(product_head)
+            heading = QHBoxLayout()
+            titles = QVBoxLayout()
+            titles.setSpacing(0)
+            caption = QLabel("รายการสินค้า")
+            caption.setObjectName("sectionCaption")
+            title = QLabel("เลือกหรือสแกนเพื่อขาย")
+            title.setObjectName("sectionTitle")
+            titles.addWidget(caption)
+            titles.addWidget(title)
+            heading.addLayout(titles)
+            heading.addStretch(1)
+            self.catalog_count = QLabel()
+            self.catalog_count.setObjectName("catalogCount")
+            heading.addWidget(self.catalog_count)
+            layout.addLayout(heading)
 
             self.scan = QLineEdit()
-            self.scan.setPlaceholderText("สแกนบาร์โค้ด หรือค้นหาชื่อสินค้า / SKU")
+            self.scan.setObjectName("searchRow")
+            self.scan.setPlaceholderText("⌕  สแกนบาร์โค้ด หรือค้นหาชื่อสินค้า")
+            self.scan.setMinimumHeight(46)
             self.scan.returnPressed.connect(self.on_scan)
             self.scan.textChanged.connect(self.refresh_products)
             layout.addWidget(self.scan)
 
-            self.scan_hint = QLabel("สแกนแล้วกด Enter เพื่อเพิ่มอัตโนมัติ · สินค้าปกติเข้า 1 ชิ้น · สินค้าชั่งเท่านั้นที่กรอกน้ำหนักเองได้")
+            self.scan_hint = QLabel("สแกนแล้วกด Enter เพิ่มลงบิล · สินค้าชั่งกรอกน้ำหนักเอง")
             self.scan_hint.setObjectName("scanHint")
             layout.addWidget(self.scan_hint)
 
@@ -1757,6 +1948,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             layout.addWidget(self.category_host)
 
             self.grid_host = QWidget()
+            self.grid_host.setObjectName("productGrid")
             self.grid = QGridLayout(self.grid_host)
             self.grid.setContentsMargins(0, 0, 0, 0)
             # การ์ดเรียงชิดบน ไม่ยืดแถวจนเหลือช่องว่างกลางจอ
@@ -1764,6 +1956,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.product_scroll = QScrollArea()
             self.product_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
             self.product_scroll.setObjectName("productScroll")
+            self.product_scroll.setFrameShape(QFrame.NoFrame)
             self.product_scroll.setWidgetResizable(True)
             self.product_scroll.setWidget(self.grid_host)
             layout.addWidget(self.product_scroll, 1)
@@ -1778,7 +1971,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             if available <= 0:
                 return max(2, min(8, configured))
             gap = layout_metrics["gap"]
-            minimum_tile = 100 if self.property("compact") else 110
+            minimum_tile = 140 if self.property("compact") else 150
             max_fit = max(2, (available + gap) // (minimum_tile + gap))
             return max(2, min(8, configured, max_fit))
 
@@ -1809,26 +2002,49 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             # them to fill the viewport made the product buttons dominate the
             # screen and left too little room for the customer-facing bill.
             # Extra products remain available by scrolling inside this panel.
-            row_height = layout_metrics["card"]
+            row_height = max(96, layout_metrics["card"])
             term = self.scan.text().strip()
             # ค้นได้ทั้งชื่อ รหัส และบาร์โค้ด ตัวเลขสั้นยังไม่กรอง กันตารางกระพริบระหว่างเริ่มยิงสแกน
             search = "" if term.isdigit() and len(term) < 4 else term
+            shown = 0
             for index, product in enumerate(product_grid(service.db, category=self.category, search=search)):
                 price, _ = service.effective_price(int(product["id"]), product["price"] or 0)
                 sku = str(product["sku"] or "").strip()
                 unit = str(product["unit_name"] or "หน่วย")
-                tile = QToolButton()
-                tile.setObjectName("tile")
-                tile.setToolButtonStyle(Qt.ToolButtonTextOnly)
-                tile.setText(f"{product['name']}\n{price:,.2f} ฿ / {unit}" + (f"\n{sku}" if sku else ""))
+                tile = QPushButton()
+                tile.setObjectName("productTile")
+                tile.setCursor(Qt.PointingHandCursor)
                 tile.setToolTip(str(product["name"] or ""))
+                tile_layout = QVBoxLayout(tile)
+                tile_layout.setContentsMargins(10, 8, 10, 8)
+                tile_layout.setSpacing(2)
+                code = QLabel(sku or "-")
+                code.setObjectName("productCode")
+                title = QLabel(str(product["name"] or ""))
+                title.setObjectName("productName")
+                title.setWordWrap(True)
+                bottom = QHBoxLayout()
+                unit_label = QLabel(unit)
+                unit_label.setObjectName("productUnit")
+                price_label = QLabel(f"฿{price:,.2f}")
+                price_label.setObjectName("productPrice")
+                bottom.addWidget(unit_label)
+                bottom.addStretch(1)
+                bottom.addWidget(price_label)
+                tile_layout.addWidget(code)
+                tile_layout.addWidget(title, 1)
+                tile_layout.addLayout(bottom)
+                for label in (code, title, unit_label, price_label):
+                    label.setAttribute(Qt.WA_TransparentForMouseEvents)
                 # กว้างตามคอลัมน์ ห้ามตั้งความกว้างขั้นต่ำจากจอเดิม ไม่งั้นการ์ดล้นจนมีแถบเลื่อนแนวนอน
                 tile.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
                 tile.setFixedHeight(row_height)
                 tile.clicked.connect(lambda _, row=product: self.add_product_row(row))
+                shown += 1
                 self.grid.addWidget(tile, index // columns, index % columns)
             for column in range(max(PRODUCT_TILE_COLUMNS, columns)):
                 self.grid.setColumnStretch(column, 1 if column < columns else 0)
+            self.catalog_count.setText(f"{shown} รายการ")
 
         # ---------- การกระทำ ----------
 
@@ -2439,13 +2655,43 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 row = self.table.rowCount()
                 self.table.insertRow(row)
                 name = line.name if not line.locked_qty else f"{line.name}  (ชั่ง)"
+                detail = f"฿{line.unit_price:,.2f} / {line.unit_name}"
                 if promo.get(index):
-                    name = f"{name}  (โปร -{promo[index]:,.2f})"
-                for column, value in enumerate([
-                    name, f"{line.qty:,.3f}".rstrip("0").rstrip("."),
-                    f"{line.unit_price:,.2f}", f"{line.total - promo.get(index, 0):,.2f}",
-                ]):
-                    self.table.setItem(row, column, QTableWidgetItem(str(value)))
+                    detail += f" · โปร -{promo[index]:,.2f}"
+                if line.discount:
+                    detail += f" · ลด {line.discount:,.2f}"
+                seq = QTableWidgetItem(str(index + 1))
+                seq.setTextAlignment(Qt.AlignCenter)
+                self.table.setItem(row, 0, seq)
+                self.table.setItem(row, 1, QTableWidgetItem(f"{name}\n{detail}"))
+                qty_box = QWidget()
+                qty_layout = QHBoxLayout(qty_box)
+                qty_layout.setContentsMargins(2, 0, 2, 0)
+                qty_layout.setSpacing(2)
+                minus = QPushButton("−")
+                plus = QPushButton("+")
+                qty_text = QLabel(f"{line.qty:,.3f}".rstrip("0").rstrip("."))
+                qty_text.setObjectName("qtyValue")
+                qty_text.setAlignment(Qt.AlignCenter)
+                for button in (minus, plus):
+                    button.setObjectName("qtyButton")
+                    button.setFixedSize(34, 34)
+                    button.setEnabled(not line.locked_qty)
+                minus.clicked.connect(lambda _, i=index: self.change_line_qty(i, -1))
+                plus.clicked.connect(lambda _, i=index: self.change_line_qty(i, 1))
+                qty_layout.addWidget(minus)
+                qty_layout.addWidget(qty_text, 1)
+                qty_layout.addWidget(plus)
+                self.table.setCellWidget(row, 2, qty_box)
+                total = QTableWidgetItem(f"฿{line.total - promo.get(index, 0):,.2f}")
+                total.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                self.table.setItem(row, 3, total)
+                delete = QPushButton("✕")
+                delete.setObjectName("voidBtn")
+                delete.setFixedSize(32, 32)
+                delete.setToolTip("ลบรายการ")
+                delete.clicked.connect(lambda _, i=index: self.delete_line(i))
+                self.table.setCellWidget(row, 4, delete)
             if selected is not None and selected < self.table.rowCount():
                 self.table.selectRow(selected)
             self.table.blockSignals(False)
@@ -2453,11 +2699,26 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 self.order.select(selected)
 
             rate = service.vat_rate()
+            has_lines = bool(self.order.lines)
+            self.table.setVisible(has_lines)
+            self.cart_empty.setVisible(not has_lines)
+            self.edit_line_button.setEnabled(has_lines)
+            self.pay_button.setEnabled(has_lines)
+            self.cart_title.setText(f"รายการขาย · {len(self.order.lines)} รายการ" if has_lines else "รายการขาย")
             self.subtotal_label.setText(
-                f"รวมสินค้า {self.order.subtotal():,.2f}    ส่วนลด {self.order.discount_total():,.2f}"
+                f"รวมสินค้า ฿{self.order.subtotal():,.2f}      ส่วนลด ฿{self.order.discount_total():,.2f}"
             )
-            self.vat_label.setText(f"รวม VAT {rate:g}% แล้ว {self.order.vat_total(rate):,.2f} บาท")
-            self.grand_label.setText(f"{self.order.grand_total():,.2f} ฿")
+            self.vat_label.setText(f"รวม VAT {rate:g}% แล้ว ฿{self.order.vat_total(rate):,.2f}")
+            self.grand_label.setText(f"฿{self.order.grand_total():,.2f}")
+            try:
+                summary = service.daily_sales_summary()
+                bills = summary.transaction_count - summary.void_count
+                average = summary.grand_total / bills if bills else Decimal("0")
+                for label, text in zip(self.pulse_values, (f"{bills} บิล", f"฿{summary.grand_total:,.2f}", f"฿{average:,.2f}")):
+                    label.setText(text)
+            except Exception:  # noqa: BLE001 - ตัวเลขสรุปเป็นของประกอบ ห้ามทำให้หน้าขายพัง
+                pass
+            self.refresh_runtime_context()
             if online is not None:
                 pending = getattr(online.worker, "pending", None)
                 pending = pending if pending is not None else service.pending_sync_count()
@@ -2465,13 +2726,13 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 self.status.setText(
                     f"{f'กะ {self.shift_id}' if self.shift_id else 'พร้อมใช้งาน · ยังไม่ได้เริ่มขาย'} · "
                     f"{f'เงินทอนต้นกะ {self.opening_cash:,.2f} บาท · ' if self.opening_cash is not None else ''}"
-                    f"{link} · บิลรอส่ง {pending} ใบ · โหมด {self.order.mode}"
+                    f"{link} · บิลรอส่ง {pending} ใบ"
                 )
             else:
                 self.status.setText(
                     f"{f'กะ {self.shift_id}' if self.shift_id else 'พร้อมใช้งาน · ยังไม่ได้เริ่มขาย'} · "
                     f"{f'เงินทอนต้นกะ {self.opening_cash:,.2f} บาท · ' if self.opening_cash is not None else ''}"
-                    f"บิลรอส่ง {service.pending_sync_count()} ใบ · โหมด {self.order.mode}"
+                    f"บิลรอส่ง {service.pending_sync_count()} ใบ"
                 )
 
     if app is None:

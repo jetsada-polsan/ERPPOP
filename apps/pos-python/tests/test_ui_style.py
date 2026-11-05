@@ -202,8 +202,8 @@ class UiStyleTest(unittest.TestCase):
         self.assertIn("QSplitter(Qt.Horizontal)", source)
         self.assertIn("first.setMinimumWidth(360)", source)
         self.assertIn("second.setMinimumWidth(360)", source)
-        self.assertIn("head_layout = QVBoxLayout(head)", source)
-        self.assertIn("button.setMinimumHeight(28)", source)
+        # แบบ JET POS: บิลกว้างไม่เกิน 520 ให้จอ 1024 เหลือที่ให้การ์ดสินค้า
+        self.assertIn("order_panel.setMaximumWidth(520)", source)
 
     def test_checkout_uses_a_durable_document_sequence(self) -> None:
         source = inspect.getsource(run_ui)
