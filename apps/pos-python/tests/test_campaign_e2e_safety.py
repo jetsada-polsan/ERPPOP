@@ -1,7 +1,7 @@
 """Keep the campaign acceptance runner's HTTP traffic inside the local machine."""
 import importlib.util
 from pathlib import Path
-from urllib.request import Request
+from urllib.request import Request, build_opener
 
 import pytest
 
@@ -25,5 +25,8 @@ def test_runner_refuses_external_requests_and_redirects(url):
 
 
 def test_runner_allows_literal_loopback():
-    request = Request('http://127.0.0.1:8123/api/pos/promotions')
-    assert campaign.LoopbackOnly().http_request(request) is request
+    request = Request('http://127.0.0.1:8123/qty-promotions', data=b'name=Test')
+    handler = campaign.LoopbackOnly()
+    build_opener(handler)  # Attach urllib's normal opener context; no request is sent.
+    assert handler.http_request(request) is request
+    assert request.get_header('Content-type') == 'application/x-www-form-urlencoded'

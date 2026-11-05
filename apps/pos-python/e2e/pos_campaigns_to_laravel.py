@@ -183,12 +183,14 @@ def run(report):
                     prov.pull_promotions(branch)
                     return active_promotions(db)
 
-                def sell(name, specs, basket, manual='0', approved=True, method='cash', expected_discount=None):
+                def sell(name, specs, basket, manual='0', approved=True, method='cash', expected_discount=None, expected_gifts=None):
                     promos = campaigns(specs)
                     lines = [OrderLine(p['id'], p['name'], p['unit_name'], Decimal(str(q)), Decimal(p['price']),
                                        is_vat=bool(p['is_vat'])) for index, q in basket for p in [products[index]]]
                     order = Order(lines=lines, promotions=promos, bill_discount=Decimal(manual))
                     cart = order.to_cart_lines()
+                    if expected_gifts is not None:
+                        assert sum((line.qty for line in cart if line.product_id == products[2]['id'] and line.unit_price == 0), Decimal(0)) == expected_gifts, f'{name}: missing/extra gifts'
                     before = pos.pending_sync_count()
                     try:
                         sale_id = pos.checkout(document_no=pos.next_document_no('CAMP-E2E'), branch_id=branch,
@@ -268,7 +270,8 @@ def run(report):
                         if name == 'bill_addon':
                             basket += [(2,2)]
                         sell(f'{name}/{tag}', [spec], basket, method='transfer' if tag=='multiple' else 'cash',
-                             expected_discount=discounts[name][case_index])
+                             expected_discount=discounts[name][case_index],
+                             expected_gifts=([1,0,3] if name=='free_item' else [1,0,1] if name=='bill_free_item' else [None]*3)[case_index])
                 item = specs_by_name['discount-baht']
                 bill = specs_by_name['bill_discount-percent']
                 sell('mixed-vat-rounding', [specs_by_name['discount-percent']], [(0,3),(1,2),(3,7)], manual='0.13')
