@@ -28,9 +28,14 @@ def test_touch_payment_hold_recall_and_restart(tmp_path):
         window.order.bill_discount = D(10)
         window.order.adjustment_approved_by = 'ผู้อนุมัติ UAT'
         window.refresh_order()
-        window.hold_order()
+        with patch("pos_python.touch_dialogs.TextDialog.exec", return_value=QDialog.Accepted):
+            window.hold_order()
         assert window.order.bill_discount == 0
-        window.recall_order()
+        def choose_latest(dialog):
+            dialog.choice = 0
+            return QDialog.Accepted
+        with patch("pos_python.touch_dialogs.ChoiceDialog.exec", choose_latest):
+            window.recall_order()
         assert window.order.bill_discount == 10
         assert window.order.adjustment_approved_by == 'ผู้อนุมัติ UAT'
         assert window.order.grand_total() == 90

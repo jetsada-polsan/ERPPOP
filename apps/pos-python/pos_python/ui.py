@@ -570,16 +570,19 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         painter.end()
         return QPixmap.fromImage(image)
 
-    class SellerSelectionDialog(QDialog):
+    from .touch_dialogs import TouchDialog, NumPad, PinPad, ValueDialog, ChoiceDialog, TextDialog
+
+    class SellerSelectionDialog(TouchDialog):
         def __init__(self):
-            super().__init__()
+            super().__init__(title="เลือกคนขาย", subtitle="เลือกชื่อเพื่อเริ่มขาย")
             self.cashier = None
             self.setWindowTitle(f"PopCentral POS v{APP_VERSION} — เลือกคนขาย")
             self.setWindowFlag(Qt.WindowCloseButtonHint, True)
             self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
             self.setWindowModality(Qt.WindowModal)
             self.setMinimumWidth(480)
-            form = QFormLayout(self)
+            form = QFormLayout()
+            self.body.addLayout(form)
             hint = QLabel(
                 "เลือกชื่อคนขาย ใส่ PIN แล้วใส่เงินทอนเพื่อเปิดกะ"
                 if service.requires_cashier_pin()
@@ -652,20 +655,20 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 return
             self.accept()
 
-    class OpeningShiftDialog(QDialog):
+    class OpeningShiftDialog(TouchDialog):
         """หน้าต่างเปิดกะที่ไม่ถูก On-Screen Keyboard บัง และกดยอดเงินทอนได้ง่าย"""
 
         def __init__(self, parent):
-            super().__init__(parent)
+            super().__init__(parent, "เปิดกะขาย", "เตรียมเงินทอนก่อนเริ่มขาย")
             self.opening_cash = Decimal("0.00")
             self.setWindowTitle("เปิดกะขาย")
             self.setWindowFlag(Qt.WindowCloseButtonHint, True)
             self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
             self.setWindowModality(Qt.WindowModal)
             self.setMinimumWidth(400)
-            self.resize(440, 500)
+            self.resize(480, 700)
 
-            layout = QVBoxLayout(self)
+            layout = self.body
             title = QLabel("ใส่เงินทอนก่อนเปิดกะ")
             title.setStyleSheet("font-size:24px;font-weight:800")
             hint = QLabel("ใส่เงินสดที่เตรียมไว้ในลิ้นชักก่อนเริ่มขาย")
@@ -688,21 +691,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.summary.setAlignment(Qt.AlignCenter)
             layout.addWidget(self.summary)
 
-            keypad = QWidget()
-            keypad.setObjectName("shiftKeypad")
-            grid = QGridLayout(keypad)
-            grid.setContentsMargins(0, 0, 0, 0)
-            grid.setSpacing(7)
-            keys = [["7", "8", "9"], ["4", "5", "6"], ["1", "2", "3"], ["ล้าง", "0", "⌫"]]
-            for row, values in enumerate(keys):
-                for column, key in enumerate(values):
-                    button = QPushButton(key)
-                    button.clicked.connect(lambda _, value=key: self.press(value))
-                    grid.addWidget(button, row, column)
-            decimal = QPushButton("จุดทศนิยม")
-            decimal.clicked.connect(lambda: self.press("."))
-            grid.addWidget(decimal, 4, 0, 1, 3)
-            layout.addWidget(keypad)
+            self.pad = NumPad(self.amount)
+            layout.addWidget(self.pad)
 
             buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
             buttons.button(QDialogButtonBox.Ok).setText("เปิดกะขาย")
@@ -715,6 +705,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             # Put focus on the amount immediately so a touch keyboard or keypad
             # can be used without an extra click before opening the shift.
             self.amount.setFocus()
+            reprint = QPushButton("พิมพ์ Z Report กะล่าสุดซ้ำ")
+            reprint.clicked.connect(parent.show_z_report)
+            layout.addWidget(reprint)
 
         def showEvent(self, event) -> None:
             super().showEvent(event)
@@ -759,11 +752,11 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.opening_cash = value
             self.accept()
 
-    class ExistingShiftDialog(QDialog):
+    class ExistingShiftDialog(TouchDialog):
         """Make an open shift explicit instead of silently skipping opening cash."""
 
         def __init__(self, parent, shift):
-            super().__init__(parent)
+            super().__init__(parent, "พบกะเดิม", "เลือกทำกะต่อหรือปิดกะ")
             self.close_existing = False
             self.setWindowTitle("พบกะที่ยังเปิดอยู่")
             self.setWindowFlag(Qt.WindowCloseButtonHint, True)
@@ -771,7 +764,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.setWindowModality(Qt.WindowModal)
             self.setMinimumWidth(420)
 
-            layout = QVBoxLayout(self)
+            layout = self.body
             title = QLabel("เครื่องนี้มีกะเดิมที่ยังไม่ได้ปิด")
             title.setStyleSheet("font-size:19px;font-weight:800")
             detail = QLabel(
@@ -804,11 +797,11 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.close_existing = True
             self.accept()
 
-    class PaymentDialog(QDialog):
+    class PaymentDialog(TouchDialog):
         """หน้าชำระเงิน — เงินทอนคำนวณสด ๆ ระหว่างพิมพ์ ไม่ต้องคิดในหัว"""
 
         def __init__(self, parent, order: Order):
-            super().__init__(parent)
+            super().__init__(parent, "ชำระเงิน", "ตรวจยอดและยืนยันรับชำระ")
             self.order = order
             self.payment_method = "cash"
             self.qr_payload: str | None = None
@@ -817,8 +810,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.setWindowFlag(Qt.WindowCloseButtonHint, True)
             self.setMinimumSize(940, 660)
             self.resize(980, 700)
-            self.setStyleSheet(f"QPushButton {{ min-height:56px; font-size:18px; }} QLineEdit {{ min-height:56px; font-size:22px; }}")
-            outer = QHBoxLayout(self)
+            self.setStyleSheet(f"QLabel {{ font-size:16px; padding:3px; }} QPushButton {{ min-height:56px; font-size:18px; }} QLineEdit {{ min-height:56px; font-size:22px; }}")
+            outer = QHBoxLayout()
+            self.body.addLayout(outer)
             summary = QVBoxLayout()
             summary.setSpacing(10)
             outer.addLayout(summary, 1)
@@ -1591,12 +1585,56 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             layout.addWidget(table)
             return box
 
-    class AdminAuthDialog(QDialog):
+    class CloseShiftDialog(TouchDialog):
+        def __init__(self, parent, expected):
+            super().__init__(parent, "ปิดกะขาย", "ตรวจเงินสดและส่งบิลค้างก่อนปิดกะ")
+            self.expected = expected
+            self.expected_label = QLabel()
+            self.body.addWidget(self.expected_label)
+            self.amount = QLineEdit(str(expected))
+            self.body.addWidget(self.amount)
+            self.difference = QLabel()
+            self.body.addWidget(self.difference)
+            self.note = QLineEdit()
+            self.note.setPlaceholderText("หมายเหตุ")
+            self.body.addWidget(self.note)
+            self.pad = NumPad(self.amount)
+            self.body.addWidget(self.pad)
+            self.drop = QPushButton("นำส่งเงินระหว่างกะ")
+            self.drop.clicked.connect(self.record_drop)
+            self.body.addWidget(self.drop)
+            self.submit = self.confirm("ปิดกะขาย")
+            self.amount.textChanged.connect(self.refresh)
+            self.refresh()
+            self.amount.selectAll()
+
+        def record_drop(self):
+            self.parent().record_cash_movement(drop_only=True)
+            self.expected = self.parent().expected_shift_cash()
+            self.amount.setText(str(self.expected))
+            self.refresh()
+
+        def refresh(self):
+            self.expected_label.setText(f"เงินสดที่ควรมี {self.expected:,.2f} บาท")
+            try:
+                counted = money(self.amount.text())
+                delta = counted - self.expected
+                self.difference.setText(f"{'เกิน' if delta > 0 else 'ขาด' if delta < 0 else 'พอดี'} {abs(delta):,.2f} บาท")
+                self.difference.setStyleSheet(f"color:{PALETTE['danger'] if delta < 0 else PALETTE['success']}")
+                valid = counted.is_finite() and counted >= 0
+            except (InvalidOperation, ValueError):
+                valid = False
+            pending = service.db.execute("SELECT count(*) FROM sales WHERE shift_id = ? AND sync_status != 'synced'", (self.parent().shift_id,)).fetchone()[0]
+            self.submit.setEnabled(valid and not pending)
+            if pending:
+                self.difference.setText(f"ต้องส่งบิลค้าง {pending} ใบขึ้น ERP ก่อนปิดกะ")
+
+    class AdminAuthDialog(TouchDialog):
         def __init__(self, parent):
             super().__init__(parent)
             self.setWindowTitle("ยืนยันผู้ดูแลก่อนตั้งค่า POS")
             self.setMinimumWidth(390)
-            layout = QVBoxLayout(self)
+            layout = self.body
             hint = QLabel("เมนูตั้งค่าใช้ได้เฉพาะผู้ดูแลที่มีสิทธิ์ตั้งค่า POS")
             hint.setWordWrap(True)
             layout.addWidget(hint)
@@ -1766,8 +1804,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.auth_button = self._top_button("เปิดกะ", "เลือกคนขายและเปิดกะขาย", self.ensure_sale_session)
             layout.addWidget(self.auth_button)
             for label, tip, action in [
-                ("ยอดวันนี้", "ยอดขายวันนี้ของเครื่องนี้", self.show_daily_sales),
-                ("เงินสด", "นำเงินเข้า/ออกลิ้นชัก", self.record_cash_movement),
+                ("ประวัติ", "ประวัติบิลบนเครื่องนี้", self.show_history),
+                ("เงินสด", "นำเงินเข้า/ออกลิ้นชัก", lambda: self.record_cash_movement()),
                 ("บิลล่าสุด", "ดูและพิมพ์ใบเสร็จล่าสุดซ้ำ", self.show_last_receipt),
                 ("ปิดกะ", "นับเงินและปิดกะขาย", self.close_current_shift),
             ]:
@@ -2160,6 +2198,42 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
         # ---------- การกระทำ ----------
 
+        def closeEvent(self, event):
+            if event.spontaneous():
+                dialog = TouchDialog(self, "ปิดโปรแกรม JET POS", "กะและบิลค้างจะเก็บไว้ในเครื่อง")
+                dialog.body.addWidget(QLabel(f"ตะกร้า {len(self.order.lines)} รายการ · คิวรอส่ง {service.pending_sync_count()} รายการ"))
+                dialog.body.addWidget(QLabel("กะยังเปิดอยู่ ให้ปิดกะก่อนเลิกงาน" if self.shift_id else "ไม่มีกะเปิด"))
+                dialog.confirm("กลับไปขายต่อ", dialog.reject)
+                dialog.confirm("ปิดโปรแกรม")
+                if dialog.exec() != QDialog.Accepted:
+                    event.ignore()
+                    return
+            super().closeEvent(event)
+
+        def show_z_report(self):
+            row = service.db.execute("SELECT id FROM shifts WHERE status = 'closed' ORDER BY closed_at DESC LIMIT 1").fetchone()
+            if not row:
+                QMessageBox.information(self, "Z Report", "ยังไม่มีกะที่ปิดแล้ว")
+                return
+            report = service.shift_cash_summary(row['id'])
+            dialog = TouchDialog(self, "Z Report", f"สรุปกะ {row['id']} · ปิดกะแล้ว")
+            text = '\n'.join(f'{label} {value:,.2f} บาท' for label, value in [
+                ('เงินทอนต้นกะ', report.opening_cash), ('ขายเงินสด', report.cash_sales),
+                ('นำส่งเงิน', report.drops), ('เงินสดที่ควรมี', report.expected_cash),
+                ('เงินสดนับจริง', report.counted_cash or Decimal(0)), ('ส่วนต่าง', report.cash_difference or Decimal(0))])
+            dialog.body.addWidget(QLabel(text))
+            def print_report():
+                from .printers import print_text_to_windows_queue
+                try:
+                    profile = SettingsService(service.db).get_device_setting('windows_printer_queue', '')
+                    if not profile:
+                        raise ValueError('เลือกเครื่องพิมพ์ในหน้าตั้งค่าก่อน')
+                    print_text_to_windows_queue('Z Report\n' + text, str(profile))
+                except Exception as error:
+                    QMessageBox.warning(dialog, "พิมพ์ไม่ได้", str(error))
+            dialog.confirm("พิมพ์ Z Report ซ้ำ", print_report)
+            dialog.exec()
+
         def is_scale_product(self, product) -> bool:
             name = str(product["name"] or "")
             sku = str(product["sku"] or "")
@@ -2172,29 +2246,14 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             ).fetchone() is not None
 
         def ask_weight(self, name: str, price: Decimal) -> tuple[float, bool]:
-            # ใช้ช่องข้อความแทน spin box เพราะ Windows ภาษาไทยแสดง spin box เป็นเลขไทย
-            dialog = QDialog(self)
-            dialog.setWindowTitle("กรอกน้ำหนัก")
-            form = QFormLayout(dialog)
-            form.addRow(QLabel(f"{name}\nราคาต่อกิโลกรัม {price:,.2f} บาท"))
-            entry = QLineEdit()
-            entry.setPlaceholderText("0.000")
-            entry.setInputMethodHints(Qt.ImhFormattedNumbersOnly)
-            form.addRow("น้ำหนัก (กิโลกรัม)", entry)
-            buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-            buttons.accepted.connect(dialog.accept)
-            buttons.rejected.connect(dialog.reject)
-            form.addRow(buttons)
-            entry.returnPressed.connect(dialog.accept)
-            entry.setFocus()
-            while dialog.exec() == QDialog.Accepted:
+            while True:
+                value, ok = ValueDialog.get_value(self, "กรอกน้ำหนัก", f"{name} · {price:,.2f} บาท/กก.")
+                if not ok:
+                    return 0.0, False
                 try:
-                    weight = parse_weight(entry.text())
+                    return parse_weight(value), True
                 except ValueError as error:
                     QMessageBox.warning(self, "น้ำหนักไม่ถูกต้อง", str(error))
-                    continue
-                return weight, True
-            return 0.0, False
 
         def add_product_row(self, product) -> None:
             price, price_version = service.effective_price(int(product["id"]), product["price"] or 0)
@@ -2317,7 +2376,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 return
             settings = SettingsService(service.db)
             held = settings.get_device_setting("held_orders", [])
-            held.append(self.order.snapshot())
+            dialog = TextDialog(self, "พักบิล", "ตั้งชื่อบิลเพื่อเรียกกลับ", "บิลพัก")
+            if dialog.exec() != QDialog.Accepted:
+                return
+            snapshot = {"snapshot": self.order.snapshot()}
+            snapshot['hold_label'] = dialog.entry.text().strip() or 'บิลพัก'
+            held.append(snapshot)
             settings.set_device_setting("held_orders", held)
             self.order.clear()
             self.refresh_order()
@@ -2329,7 +2393,11 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             settings = SettingsService(service.db)
             held = settings.get_device_setting("held_orders", [])
             if held:
-                self.order = Order.restore(held.pop())
+                picker = ChoiceDialog(self, "บิลพัก", [(item.get('hold_label', f'บิล {i+1}') if isinstance(item, dict) else f'บิล {i+1}', i) for i, item in reversed(list(enumerate(held)))])
+                if picker.exec() != QDialog.Accepted:
+                    return
+                selected = held.pop(picker.choice)
+                self.order = Order.restore(selected["snapshot"] if isinstance(selected, dict) else selected)
                 settings.set_device_setting("held_orders", held)
                 self.refresh_order()
 
@@ -2406,9 +2474,23 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.reset_mode_buttons()
             self.refresh_order()
 
+        def change_cashier_pin(self, code, current_pin):
+            while True:
+                new_pin, ok = ValueDialog.get_value(self, "เปลี่ยน PIN", "เลือก PIN ใหม่ด้วยตนเอง", pin=True)
+                if not ok:
+                    return False
+                confirmation, ok = ValueDialog.get_value(self, "ยืนยัน PIN ใหม่", "ใส่ PIN ใหม่อีกครั้ง", pin=True)
+                if not ok:
+                    return False
+                if new_pin != confirmation:
+                    QMessageBox.warning(self, "PIN ไม่ตรงกัน", "ใส่ PIN ใหม่ให้ตรงกันทั้งสองครั้ง")
+                    continue
+                online.provisioning.change_cashier_pin(str(code), current_pin, new_pin)
+                return True
+
         def pin_login(self):
             """ใส่ PIN อย่างเดียว ระบบรู้เองว่าใคร ทั้งออนไลน์และออฟไลน์"""
-            pin, confirmed = QInputDialog.getText(self, "เริ่มขาย", "ใส่ PIN คนขาย", QLineEdit.Password)
+            pin, confirmed = ValueDialog.get_value(self, "เริ่มขาย", "ใส่ PIN คนขาย", pin=True)
             pin = pin.strip()
             if not confirmed or not pin:
                 return None
@@ -2429,6 +2511,10 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                         return None
                     chosen = next(p for p in people if str(p["name"]) == name)
                     selected = online.provisioning.online_cashier_login(pin, cashier_server_id=int(chosen["id"]))
+                if selected.get("must_change_pin"):
+                    changed = self.change_cashier_pin(selected['cashier']['code'], pin)
+                    if not changed:
+                        return None
                 online.worker.wake()
             except Exception as error:
                 if "network:" not in str(error):
@@ -2443,6 +2529,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         def pick_seller(self):
             try:
                 seller = SellerSelectionDialog()
+                seller.setParent(self, seller.windowFlags())
                 # Some Windows POS setups keep the on-screen keyboard above the
                 # parent window. Show and raise the seller prompt before exec().
                 seller.show()
@@ -2599,24 +2686,35 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.refresh_order(keep_selection=True)
             return True
 
-        def record_cash_movement(self) -> None:
+        def record_cash_movement(self, drop_only=False) -> None:
             if self.shift_id is None:
                 QMessageBox.information(self, "ยังไม่มีกะขาย", "เริ่มขายและเปิดกะก่อนบันทึกรายการเงินสด")
                 return
             from PySide6.QtWidgets import QInputDialog
             labels = {"เงินเข้าลิ้นชัก": "cash_in", "นำส่งเงิน": "drop", "เบิกจ่าย": "payout"}
-            label, ok = QInputDialog.getItem(self, "รายการเงินสด", "ประเภท", list(labels), 0, False)
-            if not ok:
+            if drop_only:
+                label = "นำส่งเงิน"
+            else:
+                picker = ChoiceDialog(self, "รายการเงินสด", [(label, label) for label in labels])
+                if picker.exec() != QDialog.Accepted:
+                    return
+                label = picker.choice
+            value, ok = ValueDialog.get_value(self, "รายการเงินสด", "จำนวนเงิน (บาท)")
+            if not ok or money(value) <= 0:
                 return
-            value, ok = QInputDialog.getDouble(self, "รายการเงินสด", "จำนวนเงิน (บาท)", 0.00, 0.01, 999999999.99, 2)
-            if not ok:
+            details = TextDialog(self, "รายการเงินสด", "เหตุผล", "นำส่งเงินระหว่างกะ" if drop_only else "")
+            reference = QLineEdit()
+            reference.setPlaceholderText("เลขอ้างอิง (ถ้ามี)")
+            details.body.insertWidget(2, reference)
+            if details.exec() != QDialog.Accepted:
                 return
-            reason, ok = QInputDialog.getText(self, "รายการเงินสด", "เหตุผล")
-            if not ok or not reason.strip():
+            reason = details.entry.text().strip()
+            if not reason:
                 return
+            reference_no = reference.text().strip() or None
             try:
                 movement_uuid = service.record_cash_movement(
-                    shift_id=self.shift_id, movement_type=labels[label], amount=money(str(value)), reason=reason.strip()
+                    shift_id=self.shift_id, movement_type=labels[label], amount=money(str(value)), reason=reason.strip(), reference_no=reference_no
                 )
             except Exception as error:
                 QMessageBox.warning(self, "บันทึกไม่สำเร็จ", str(error))
@@ -2628,7 +2726,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 try:
                     online.provisioning.record_server_cash_movement(
                         server_shift_id=int(local["server_id"]), movement_type=labels[label],
-                        amount=value, reason=reason.strip(), movement_uuid=movement_uuid,
+                        amount=value, reason=reason.strip(), reference_no=reference_no, movement_uuid=movement_uuid,
                     )
                     service.db.execute(
                         "UPDATE cash_movements SET sync_status = 'synced' WHERE movement_uuid = ?", (movement_uuid,)
@@ -2643,21 +2741,30 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             summary = service.shift_cash_summary(self.shift_id)
             self.status.setText(f"ยอดในลิ้นชักที่ควรมี {summary.expected_cash:,.2f} บาท")
 
+        def expected_shift_cash(self):
+            local = service.db.execute("SELECT server_id FROM shifts WHERE id = ?", (self.shift_id,)).fetchone()
+            expected = service.shift_cash_summary(self.shift_id).expected_cash
+            if online is not None and online.online and local and local['server_id'] and self.cashier:
+                try:
+                    response = online.provisioning.api.get(f"/api/pos/shift?branch_id={branch_id}&cashier_id={int(self.cashier['server_id'])}")
+                    live = response.get('shift')
+                    if live and int(live['id']) == int(local['server_id']):
+                        expected = money(str(live['expected_cash']))
+                except Exception as error:
+                    self.status.setText(f"ใช้ยอดในเครื่อง · ดึงยอด ERP ไม่สำเร็จ: {error}")
+            return expected
+
         def close_current_shift(self) -> None:
             if self.shift_id is None:
                 QMessageBox.information(self, "ยังไม่มีกะขาย", "ยังไม่มีกะที่เปิดอยู่")
                 return
             from PySide6.QtWidgets import QInputDialog
             summary = service.shift_cash_summary(self.shift_id)
-            counted, ok = QInputDialog.getDouble(
-                self, "ปิดกะขาย", f"เงินสดนับจริง (ควรมี {summary.expected_cash:,.2f} บาท)",
-                float(summary.expected_cash), 0.00, 999999999.99, 2,
-            )
-            if not ok:
+            dialog = CloseShiftDialog(self, self.expected_shift_cash())
+            if dialog.exec() != QDialog.Accepted:
                 return
-            note, ok = QInputDialog.getText(self, "ปิดกะขาย", "หมายเหตุ (ถ้ามี)")
-            if not ok:
-                return
+            counted = dialog.amount.text()
+            note = dialog.note.text()
             local_shift = service.db.execute("SELECT uuid, server_id FROM shifts WHERE id = ?", (self.shift_id,)).fetchone()
             try:
                 closed = service.close_shift(shift_id=self.shift_id, counted_cash=money(str(counted)), closing_note=note.strip())
@@ -2678,6 +2785,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     service.db.commit()
                 except Exception as error:
                     QMessageBox.warning(self, "ปิดกะในเครื่องแล้ว", f"ERP ยังไม่รับการปิดกะ: {error}\nระบบจะลองส่งให้อัตโนมัติ")
+            self.show_z_report()
             difference = closed.cash_difference or Decimal("0")
             QMessageBox.information(self, "ปิดกะแล้ว", f"ยอดที่ควรมี {closed.expected_cash:,.2f} บาท\nส่วนต่าง {difference:,.2f} บาท")
             self.cashier = None
@@ -2699,11 +2807,10 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             if self.last_sale_id is None:
                 QMessageBox.information(self, "ใบเสร็จ", "ยังไม่มีบิลในกะนี้")
                 return
-            dialog = QDialog(self)
-            dialog.setWindowTitle("ใบเสร็จล่าสุด")
+            dialog = TouchDialog(self, "ใบเสร็จล่าสุด", "ตรวจสอบและพิมพ์ใบเสร็จ")
             dialog.setWindowFlag(Qt.WindowCloseButtonHint, True)
             dialog.setMinimumWidth(420)
-            layout = QVBoxLayout(dialog)
+            layout = dialog.body
             body = QLabel(receipt_for(service.db, self.last_sale_id))
             body.setStyleSheet("background:%s;padding:16px;font-family:'Menlo','Courier New';font-size:12px;" % PALETTE["surface"])
             layout.addWidget(body)
@@ -2712,15 +2819,80 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             layout.addWidget(close)
             dialog.exec()
 
+        def show_history(self):
+            rows = service.db.execute("SELECT id, document_no, grand_total, sync_status, is_void FROM sales ORDER BY id DESC LIMIT 100").fetchall()
+            picker = ChoiceDialog(self, "ประวัติบิล", [(f"{r['document_no']} · {r['grand_total']} · {r['sync_status']}" + (' · ยกเลิก' if r['is_void'] else ''), r['id']) for r in rows])
+            if picker.exec() != QDialog.Accepted:
+                return
+            sale_id = picker.choice
+            dialog = TouchDialog(self, "รายละเอียดบิล", "เลือกพิมพ์ ยกเลิก หรือรับคืน")
+            body = QLabel(receipt_for(service.db, sale_id))
+            scroll = QScrollArea()
+            scroll.setWidget(body)
+            scroll.setWidgetResizable(True)
+            dialog.body.addWidget(scroll)
+            dialog.resize(560, 700)
+            dialog.confirm("ยกเลิกบิล", lambda: self.receipt_action(sale_id, False))
+            dialog.confirm("รับคืนสินค้า", lambda: self.receipt_action(sale_id, True))
+            dialog.exec()
+
+        def receipt_action(self, sale_id, is_return):
+            sale = service.db.execute("SELECT * FROM sales WHERE id = ?", (sale_id,)).fetchone()
+            local_shift = service.db.execute("SELECT server_id FROM shifts WHERE id = ?", (self.shift_id,)).fetchone()
+            if not online or not online.online or not local_shift or not local_shift['server_id'] or not sale['server_receipt_no']:
+                QMessageBox.warning(self, "ต้องออนไลน์", "ต้องมีกะเปิดและบิลส่ง ERP สำเร็จก่อน")
+                return
+            if not is_return and (sale['shift_id'] != self.shift_id or sale['is_void']):
+                QMessageBox.warning(self, "ยกเลิกไม่ได้", "ยกเลิกได้เฉพาะบิลที่ยังไม่ยกเลิกในกะปัจจุบัน")
+                return
+            title = 'รับคืนสินค้า' if is_return else 'ยกเลิกบิล'
+            details = TextDialog(self, title, 'เหตุผล · รับคืนต้องอนุมัติใน ERP ก่อนคืนเงิน')
+            if details.exec() != QDialog.Accepted or not details.entry.text().strip():
+                return
+            managers = service.db.execute("SELECT server_id, name FROM local_cashiers WHERE active = 1 AND revoked_at IS NULL AND role = 'manager' AND server_id IS NOT NULL").fetchall()
+            picker = ChoiceDialog(self, "หัวหน้าที่อนุมัติ", [(r['name'], r['server_id']) for r in managers])
+            if picker.exec() != QDialog.Accepted:
+                return
+            items = []
+            if is_return:
+                lines = service.db.execute("SELECT i.qty, p.server_id, p.name FROM sale_items i JOIN products p ON p.id = i.product_id WHERE i.sale_id = ?", (sale_id,)).fetchall()
+                for line in lines:
+                    qty, ok = ValueDialog.get_value(self, title, f"{line['name']} · สูงสุด {line['qty']}", '0')
+                    if not ok:
+                        return
+                    if Decimal(qty) > Decimal(line['qty']):
+                        QMessageBox.warning(self, title, "จำนวนคืนเกินจำนวนขาย")
+                        return
+                    if Decimal(qty) > 0:
+                        items.append(dict(product_id=line['server_id'], qty=qty))
+                if not items:
+                    return
+            pin, ok = ValueDialog.get_value(self, title, "PIN หัวหน้า", pin=True)
+            if not ok:
+                return
+            payload = dict(receipt_no=sale['server_receipt_no'], shift_id=local_shift['server_id'], reason=details.entry.text().strip(), approver_id=picker.choice, approver_pin=pin, terminal_code=terminal_id)
+            if is_return:
+                payload.update(refund_method='cash', items=items)
+            try:
+                result = online.provisioning.api.post('/api/pos/receipt/' + ('return' if is_return else 'void'), payload)
+                if not is_return:
+                    with service.db:
+                        service.db.execute("UPDATE sales SET is_void = 1, void_reason = ?, voided_at = ? WHERE id = ?", (payload['reason'], service._now(), sale_id))
+                QMessageBox.information(self, title, result.get('message') or 'บันทึกแล้ว')
+            except Exception as error:
+                QMessageBox.warning(self, title, str(error))
+            finally:
+                payload.pop('approver_pin', None)
+                pin = ''
+
         def show_daily_sales(self) -> None:
             """Show the local terminal's sales without requiring a web server."""
             summary = service.daily_sales_summary()
-            dialog = QDialog(self)
-            dialog.setWindowTitle("ยอดขายวันนี้ · เครื่องนี้")
+            dialog = TouchDialog(self, "ยอดขายวันนี้ · เครื่องนี้", "สรุปจากฐานข้อมูลในเครื่อง")
             dialog.setWindowFlag(Qt.WindowCloseButtonHint, True)
             dialog.setMinimumWidth(520)
             dialog.resize(560, 560)
-            layout = QVBoxLayout(dialog)
+            layout = dialog.body
 
             title = QLabel(f"สรุปยอดวันที่ {summary.report_date.strftime('%d/%m/%Y')} · ข้อมูลจาก SQLite เครื่องนี้")
             title.setObjectName("cardTitle")
