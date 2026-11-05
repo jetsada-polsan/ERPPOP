@@ -121,6 +121,60 @@ class SettingsDialog(QDialog):
         self.accept()
 
 
+class TouchKeypadDialog(QDialog):
+    def __init__(self, title: str, hint: str, parent: QWidget, *, secret: bool = False, initial: str = "", allow_decimal: bool = False) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setModal(True)
+        self.setMinimumSize(560, 620)
+        self.setStyleSheet("""
+            QDialog { background:#f3f6f8; }
+            QLabel#touchTitle { color:#075b86; font-size:25px; font-weight:900; }
+            QLabel#touchHint { color:#687b88; font-size:15px; }
+            QLineEdit#touchValue { min-height:66px; padding:0 20px; border:2px solid #9ac4d6; border-radius:10px; background:white; color:#113f58; font-size:30px; font-weight:800; text-align:right; }
+            QPushButton#key { min-height:72px; border:1px solid #c8d8e0; border-radius:10px; background:white; color:#173f56; font-size:25px; font-weight:900; }
+            QPushButton#key:hover { background:#e8f6fb; border-color:#1596cb; }
+            QPushButton#danger { min-height:72px; border:1px solid #e4abb0; border-radius:10px; background:#fff4f4; color:#b42318; font-size:20px; font-weight:900; }
+            QPushButton#confirm { min-height:72px; border:0; border-radius:10px; background:#087faf; color:white; font-size:20px; font-weight:900; }
+            QPushButton#confirm:hover { background:#075b86; }
+        """)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(28, 28, 28, 28)
+        layout.setSpacing(14)
+        heading = QLabel(title); heading.setObjectName("touchTitle")
+        note = QLabel(hint); note.setObjectName("touchHint"); note.setWordWrap(True)
+        self.value = QLineEdit(initial); self.value.setObjectName("touchValue"); self.value.setReadOnly(True)
+        if secret:
+            self.value.setEchoMode(QLineEdit.EchoMode.Password)
+        layout.addWidget(heading); layout.addWidget(note); layout.addWidget(self.value)
+        keys = QGridLayout(); keys.setSpacing(10)
+        key_labels = ("1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "⌫", "ล้าง") if allow_decimal else ("1", "2", "3", "4", "5", "6", "7", "8", "9", "ล้าง", "0", "⌫")
+        for index, text in enumerate(key_labels):
+            button = QPushButton(text)
+            button.setObjectName("danger" if text in {"ล้าง", "⌫"} else "key")
+            button.clicked.connect(lambda _, key=text: self._press(key))
+            keys.addWidget(button, index // 3, index % 3)
+        layout.addLayout(keys)
+        actions = QHBoxLayout()
+        cancel = QPushButton("ยกเลิก"); cancel.setObjectName("danger"); cancel.clicked.connect(self.reject)
+        confirm = QPushButton("ยืนยัน"); confirm.setObjectName("confirm"); confirm.clicked.connect(self.accept)
+        actions.addWidget(cancel); actions.addWidget(confirm)
+        layout.addLayout(actions)
+
+    def _press(self, key: str) -> None:
+        if key == "ล้าง":
+            self.value.clear()
+        elif key == "⌫":
+            self.value.setText(self.value.text()[:-1])
+        else:
+            if key == "." and "." in self.value.text():
+                return
+            self.value.setText(f"{self.value.text()}{key}")
+
+    def text(self) -> str:
+        return self.value.text().strip()
+
+
 class PaymentDialog(QDialog):
     def __init__(self, total: Decimal, parent: QWidget) -> None:
         super().__init__(parent)
@@ -148,6 +202,10 @@ class PaymentDialog(QDialog):
         form.addRow("เลขท้ายบัญชีผู้โอน", self.last4)
         form.addRow("เลขอ้างอิง", self.reference)
         layout.addLayout(form)
+        keypad = QPushButton("⌨ ใช้แป้นตัวเลข")
+        keypad.setMinimumHeight(56)
+        keypad.clicked.connect(self._open_keypad)
+        layout.addWidget(keypad)
         self.help = QLabel("")
         self.help.setStyleSheet("color:#697b88;")
         self.help.setWordWrap(True)
@@ -182,6 +240,23 @@ class PaymentDialog(QDialog):
             self.transfer_amount.blockSignals(True)
             self.transfer_amount.setValue(max(0, float(self.total) - self.cash_amount.value()))
             self.transfer_amount.blockSignals(False)
+
+    def _open_keypad(self) -> None:
+        method = str(self.method.currentData())
+        if method == "cash":
+            dialog = TouchKeypadDialog("รับเงินสด", "ใส่จำนวนเงินสดที่ลูกค้าชำระ", self, initial=f"{self.cash_received.value():.2f}", allow_decimal=True)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                try: self.cash_received.setValue(float(Decimal(dialog.text() or "0")))
+                except InvalidOperation: QMessageBox.warning(self, "จำนวนเงินไม่ถูกต้อง", "กรุณาใส่จำนวนเงินให้ถูกต้อง")
+        elif method == "mixed":
+            dialog = TouchKeypadDialog("เงินสดในบิลผสม", "ใส่เงินสด ส่วนที่เหลือจะเป็นยอดโอน", self, initial=f"{self.cash_amount.value():.2f}", allow_decimal=True)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                try: self.cash_amount.setValue(float(Decimal(dialog.text() or "0")))
+                except InvalidOperation: QMessageBox.warning(self, "จำนวนเงินไม่ถูกต้อง", "กรุณาใส่จำนวนเงินให้ถูกต้อง")
+        elif method == "transfer":
+            dialog = TouchKeypadDialog("เลขท้ายบัญชีผู้โอน", "ใส่ 4 หลักตามสลิป", self, initial=self.last4.text())
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                self.last4.setText(dialog.text()[:4])
 
     def payment(self) -> Payment:
         return Payment(
@@ -221,11 +296,24 @@ class CashMovementDialog(QDialog):
         form.addRow("เลขอ้างอิง", self.reference)
         form.addRow("เหตุผล", self.reason)
         layout.addLayout(form)
+        keypad = QPushButton("⌨ ใส่จำนวนด้วยแป้นตัวเลข")
+        keypad.setMinimumHeight(56)
+        keypad.clicked.connect(self._open_keypad)
+        layout.addWidget(keypad)
         actions = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel | QDialogButtonBox.StandardButton.Ok)
         actions.button(QDialogButtonBox.StandardButton.Ok).setText("บันทึก")
         actions.accepted.connect(self._confirm)
         actions.rejected.connect(self.reject)
         layout.addWidget(actions)
+
+    def _open_keypad(self) -> None:
+        dialog = TouchKeypadDialog("เงินสดระหว่างกะ", "ใส่จำนวนเงิน (บาท)", self, initial=f"{self.amount.value():.2f}", allow_decimal=True)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            self.amount.setValue(float(Decimal(dialog.text() or "0")))
+        except InvalidOperation:
+            QMessageBox.warning(self, "จำนวนเงินไม่ถูกต้อง", "กรุณาใส่จำนวนเงินให้ถูกต้อง")
 
     def _confirm(self) -> None:
         if not self.reason.text().strip():
@@ -499,8 +587,12 @@ class PosWindow(QMainWindow):
         )
 
     def _open_shift(self) -> None:
-        pin, accepted = QInputDialog.getText(self, "เข้าแคชเชียร์", "PIN คนขาย", QLineEdit.EchoMode.Password)
-        if not accepted or not pin:
+        pin_dialog = TouchKeypadDialog("เข้าแคชเชียร์", "กรอก PIN คนขาย แล้วกดยืนยัน", self, secret=True)
+        if pin_dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        pin = pin_dialog.text()
+        if not pin:
+            QMessageBox.warning(self, "กรอก PIN", "กรุณากรอก PIN คนขาย")
             return
         try:
             profile = self._client().ping()
@@ -522,9 +614,18 @@ class PosWindow(QMainWindow):
             active = self._client().get(f"/shift?branch_id={branch_id}&cashier_id={cashier_id}")
             shift = active.get("shift") if isinstance(active, dict) else None
             if not isinstance(shift, dict):
-                opening, accepted = QInputDialog.getDouble(self, "เปิดกะ", "เงินทอนเริ่มต้น", 0, 0, 10000000, 2)
-                if not accepted: return
-                opened = self._client().post("/shift/open", {"branch_id": branch_id, "cashier_id": cashier_id, "opening_cash": opening})
+                opening_dialog = TouchKeypadDialog("เปิดกะขาย", "ใส่เงินทอนเริ่มต้น (บาท) แล้วกดยืนยัน", self, initial="0", allow_decimal=True)
+                if opening_dialog.exec() != QDialog.DialogCode.Accepted:
+                    return
+                try:
+                    opening = Decimal(opening_dialog.text() or "0")
+                except InvalidOperation:
+                    QMessageBox.warning(self, "จำนวนเงินไม่ถูกต้อง", "กรุณาใส่ตัวเลขเงินทอนเริ่มต้น")
+                    return
+                if opening < 0:
+                    QMessageBox.warning(self, "จำนวนเงินไม่ถูกต้อง", "เงินทอนเริ่มต้นต้องไม่ติดลบ")
+                    return
+                opened = self._client().post("/shift/open", {"branch_id": branch_id, "cashier_id": cashier_id, "opening_cash": float(opening)})
                 shift = opened.get("shift") if isinstance(opened, dict) else None
             if not isinstance(shift, dict): raise PosApiError("เปิดกะไม่สำเร็จ")
             self._profile, self._shift = profile, shift
@@ -535,6 +636,9 @@ class PosWindow(QMainWindow):
             self._sync_label.setText(f"● เปิดกะ {shift.get('shift_no', '')}")
             QMessageBox.information(self, "พร้อมขาย", f"เข้าแคชเชียร์ {self._cashier.get('name', '')} แล้ว")
         except (ValueError, PosApiError) as error:
+            if isinstance(error, PosApiError) and error.status_code is not None:
+                QMessageBox.warning(self, "เข้า/เปิดกะไม่สำเร็จ", str(error))
+                return
             self._open_offline_shift(pin, str(error))
 
     def _open_offline_shift(self, pin: str, online_error: str) -> None:
@@ -628,10 +732,21 @@ class PosWindow(QMainWindow):
             if self._store.pending_checkouts():
                 QMessageBox.warning(self, "ยังปิดกะไม่ได้", "ยังมีบิลค้างส่ง ERP กรุณาส่งบิลค้างให้สำเร็จก่อน")
                 return
-            counted, accepted = QInputDialog.getDouble(self, "ปิดกะ", "ยอดเงินสดที่นับได้", float(self._shift.get("expected_cash") or 0), 0, 10_000_000, 2)
-            if not accepted:
+            counted_dialog = TouchKeypadDialog(
+                "ปิดกะ / Z", "ใส่ยอดเงินสดที่นับได้ (บาท)", self,
+                initial=f"{Decimal(str(self._shift.get('expected_cash') or 0)):.2f}", allow_decimal=True,
+            )
+            if counted_dialog.exec() != QDialog.DialogCode.Accepted:
                 return
-            result = self._client().post("/shift/close", {"shift_id": int(self._shift["id"]), "counted_cash": counted})
+            try:
+                counted = Decimal(counted_dialog.text() or "0")
+            except InvalidOperation:
+                QMessageBox.warning(self, "จำนวนเงินไม่ถูกต้อง", "กรุณาใส่ยอดเงินสดให้ถูกต้อง")
+                return
+            if counted < 0:
+                QMessageBox.warning(self, "จำนวนเงินไม่ถูกต้อง", "ยอดเงินสดต้องไม่ติดลบ")
+                return
+            result = self._client().post("/shift/close", {"shift_id": int(self._shift["id"]), "counted_cash": float(counted)})
             shift = result.get("shift") if isinstance(result, dict) else None
             if not isinstance(shift, dict):
                 raise PosApiError("ERP ไม่ได้ส่งผลปิดกะกลับมา")
@@ -1019,11 +1134,22 @@ class PosWindow(QMainWindow):
         if not matching:
             return
         current = sum((line.qty for line in matching), Decimal("0"))
-        qty, accepted = QInputDialog.getDouble(self, "แก้จำนวน", f"จำนวน {matching[0].product.unit_name}", float(current), 0.0001, 10_000_000, 4)
-        if not accepted:
+        dialog = TouchKeypadDialog(
+            "แก้จำนวนสินค้า", f"จำนวน {matching[0].product.unit_name}", self,
+            initial=str(current.normalize()), allow_decimal=True,
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            qty = Decimal(dialog.text())
+        except InvalidOperation:
+            QMessageBox.warning(self, "จำนวนไม่ถูกต้อง", "กรุณาใส่จำนวนให้ถูกต้อง")
+            return
+        if qty <= 0:
+            QMessageBox.warning(self, "จำนวนไม่ถูกต้อง", "จำนวนต้องมากกว่า 0")
             return
         self._cart = [line for line in self._cart if (line.product.id, line.barcode, line.barcode_type) != key]
-        self._cart.append(CartLine(matching[0].product, Decimal(str(qty)), matching[0].barcode, matching[0].barcode_type))
+        self._cart.append(CartLine(matching[0].product, qty, matching[0].barcode, matching[0].barcode_type))
         self._render_cart()
 
     def _remove_cart_line(self, key: tuple[int, str | None, str | None]) -> None:

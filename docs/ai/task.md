@@ -2439,3 +2439,10 @@ pending
 - ยังไม่ทดสอบ/ความเสี่ยง: ต้องตรวจด้วย browser หลัง deploy ว่าแต่ละ popup มีการเลื่อนและปุ่ม footer ตามหน้าจอจริง; งานนี้ไม่แตะ print CSS หรือข้อมูล production
 - Deploy: ยังไม่ deploy
 - งานถัดไป: รอเจ้าของสั่ง deploy แล้ว UAT popup หลักบน production
+
+## Handoff - 2026-11-05 (JET POS Python touch flow)
+- ทำอะไร: เพิ่ม `TouchKeypadDialog` สำหรับ PIN คนขาย, เงินทอนเปิดกะ, แก้จำนวนสินค้า, รับเงิน และปิดกะ/Z ให้แตะจอได้โดยไม่ต้องพึ่งคีย์บอร์ด
+- ทำอะไร: เพิ่ม keypad ให้รายการเงินสดระหว่างกะ และแสดงข้อผิดพลาดจาก API ตอนเข้า/เปิดกะโดยตรง แทนการสลับไปออฟไลน์เมื่อ ERP ตอบ error
+- ความปลอดภัย: ยังคงใช้ API/PIN/กฎราคา/โปรโมชั่น/คิว sync เดิมของ ERP; การเชื่อม production ต้องเปิดตัวเลือกบนเครื่องโดยผู้ใช้ และไม่มีการสร้างบิลในการทดสอบนี้
+- ทดสอบ: `PYTHONPATH=apps/jet-pos-python python3 -m unittest discover -s apps/jet-pos-python/tests -v` ผ่าน 25 tests; UI smoke ด้วย `QT_QPA_PLATFORM=offscreen` ผ่าน; `git diff --check` ผ่าน
+- งานถัดไป: Build UAT, ติดตั้งบนเครื่อง UAT แล้วตรวจหน้าจอ PIN/เปิดกะด้วย PIN ที่เจ้าของกรอกเอง ก่อนสร้างบิลทดสอบจริง
