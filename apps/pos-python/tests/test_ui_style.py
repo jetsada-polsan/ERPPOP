@@ -117,7 +117,9 @@ class UiStyleTest(unittest.TestCase):
 
     def test_pos_dialogs_are_compact_and_have_a_close_path(self) -> None:
         source = inspect.getsource(run_ui)
-        self.assertIn("self.setMinimumSize(860, 560)", source)
+        # หน้าตั้งค่าเป็น popup ลอยกลางจอ ไม่มีกรอบหน้าต่าง จึงต้องมีปุ่ม × ของตัวเอง
+        self.assertIn("self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)", source)
+        self.assertIn("#settingsPopup", STYLE)
         self.assertIn("self.setWindowFlag(Qt.WindowCloseButtonHint, True)", source)
         self.assertIn("close_button.clicked.connect(self.reject)", source)
         self.assertIn("QToolButton#dialogClose", STYLE)

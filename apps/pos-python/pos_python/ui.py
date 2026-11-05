@@ -239,6 +239,24 @@ QSplitter::handle:hover { background: $primary; }
 #cardHint, #muted { color: $muted; font-size: 13px; }
 #note { border-left: 4px solid $warning; background: $warning_soft; color: $warning_ink; font-size: 13px; padding: 12px; }
 
+/* หน้าตั้งค่าแบบ popup: ฉากหลังโปร่ง การ์ดขาวขอบมน หัวสีเข้ม */
+QDialog#settingsBackdrop { background: transparent; }
+#settingsPopup { background: $surface; border: 1px solid $border; border-radius: 16px; }
+#settingsPopup QLabel, #settingsPopup QCheckBox, #settingsPopup QScrollArea, #settingsPopup QScrollArea > QWidget > QWidget { background: transparent; }
+#settingsPopup #card > QWidget { background: transparent; }
+#settingsPopup QCheckBox::indicator { width: 18px; height: 18px; border: 1px solid $border; border-radius: 4px; background: $surface; }
+#settingsPopup QCheckBox::indicator:checked { background: $primary; border-color: $primary; }
+QWidget#settingsBody { background: $surface; border-bottom-right-radius: 16px; }
+QWidget#settingsHeader { background: $primary_dark; border-top-left-radius: 16px; border-top-right-radius: 16px; }
+#settingsTitle { color: $surface; font-size: 18px; font-weight: 800; }
+#settingsSubtitle { color: rgba(255,255,255,.72); font-size: 12.5px; }
+QWidget#settingsMenu { background: $bg; border-right: 1px solid $border; border-bottom-left-radius: 16px; }
+#settingsPopup #card { background: $surface; }
+#settingsPopup QLineEdit, #settingsPopup QComboBox { background: $surface; }
+#settingsPopup QPushButton { background: $surface; }
+#settingsPopup QPushButton#navItem { background: transparent; }
+#settingsPopup QPushButton#navItem:checked { background: $surface; }
+
 /* เมนูซ้ายของหน้าตั้งค่า — ตัวที่เลือกอยู่มีขีดฟ้าหน้าเหมือนในภาพร่าง */
 #navItem { background: transparent; border: 0; border-left: 4px solid transparent; border-radius: 0;
            text-align: left; padding: 12px 14px; color: $text; font-size: 14.5px; }
@@ -415,7 +433,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         from PySide6.QtWidgets import (
             QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGridLayout, QInputDialog,
             QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton, QMenu,
-            QFrame, QScrollArea, QSplitter, QTableWidget, QTableWidgetItem, QToolButton, QVBoxLayout, QWidget,
+            QFrame, QGraphicsDropShadowEffect, QScrollArea, QSizePolicy, QSplitter, QTableWidget, QTableWidgetItem, QToolButton, QVBoxLayout, QWidget,
         )
     except ImportError as error:
         raise RuntimeError("ยังไม่ได้ติดตั้ง PySide6: python3 -m pip install -r requirements.txt") from error
@@ -852,11 +870,32 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             super().__init__(parent)
             self.sample_sale_id = sample_sale_id
             self.setWindowTitle("ตั้งค่า POS")
-            self.setWindowFlag(Qt.WindowCloseButtonHint, True)
-            self.setMinimumSize(860, 560)
-            self.resize(960, 620)
+            self.setObjectName("settingsBackdrop")
+            # popup ลอยกลางจอ: พื้นหลังโปร่งแสงทับหน้าขาย การ์ดขอบมนอยู่ตรงกลาง
+            self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
+            self.setAttribute(Qt.WA_TranslucentBackground)
+            self.setModal(True)
+            host = parent.window() if parent is not None else None
+            if host is not None:
+                self.setGeometry(host.geometry())
+            else:
+                self.resize(1100, 720)
 
-            outer = QVBoxLayout(self)
+            backdrop = QVBoxLayout(self)
+            backdrop.setContentsMargins(32, 32, 32, 32)
+            card = QFrame()
+            card.setObjectName("settingsPopup")
+            width = min(980, max(720, self.width() - 64))
+            height = min(660, max(520, self.height() - 64))
+            card.setFixedSize(width, height)
+            shadow = QGraphicsDropShadowEffect(card)
+            shadow.setBlurRadius(48)
+            shadow.setOffset(0, 12)
+            shadow.setColor(QColor(15, 23, 42, 110))
+            card.setGraphicsEffect(shadow)
+            backdrop.addWidget(card, 0, Qt.AlignCenter)
+
+            outer = QVBoxLayout(card)
             outer.setContentsMargins(0, 0, 0, 0)
             outer.setSpacing(0)
             outer.addWidget(self.brand_bar())
@@ -870,7 +909,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.pages.setContentsMargins(0, 12, 0, 12)
             self.pages.setSpacing(2)
             menu = QWidget()
-            menu.setObjectName("card")
+            menu.setObjectName("settingsMenu")
             menu.setLayout(self.pages)
             menu.setFixedWidth(255)
             shell.addWidget(menu)
@@ -879,14 +918,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.body.setContentsMargins(20, 18, 20, 18)
             body_host = QWidget()
             body_host.setLayout(self.body)
+            body_host.setObjectName("settingsBody")
             shell.addWidget(body_host, 1)
-            footer = QHBoxLayout()
-            footer.addStretch(1)
-            close_button = QPushButton("× ปิดหน้าต่าง")
-            close_button.setToolTip("ปิดหน้าต่างตั้งค่า")
-            close_button.clicked.connect(self.reject)
-            footer.addWidget(close_button)
-            outer.addLayout(footer)
 
             self.sections = {
                 "สถานะเครื่อง": self.status_section,
@@ -902,6 +935,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.pages.addWidget(heading)
 
             group = QButtonGroup(self)
+            self.nav_buttons = {}
             for index, name in enumerate(self.sections):
                 button = QPushButton(name)
                 button.setObjectName("navItem")
@@ -909,6 +943,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 button.setChecked(index == 0)
                 button.clicked.connect(lambda _, value=name: self.show_section(value))
                 group.addButton(button)
+                self.nav_buttons[name] = button
                 self.pages.addWidget(button)
             self.pages.addStretch(1)
             note = QLabel("การตั้งค่าอุปกรณ์เป็น local เฉพาะเครื่องนี้\nไม่ถูกทับด้วย sync ERP")
@@ -922,30 +957,41 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
         def brand_bar(self) -> QWidget:
             bar = QWidget()
-            bar.setObjectName("brandBar")
+            bar.setObjectName("settingsHeader")
             layout = QHBoxLayout(bar)
-            layout.setContentsMargins(18, 0, 18, 0)
-            mark = QLabel("★")
-            mark.setObjectName("brandMark")
-            name = QLabel("PopCentral POS")
-            name.setObjectName("brandName")
+            layout.setContentsMargins(24, 14, 14, 14)
+            titles = QVBoxLayout()
+            titles.setSpacing(2)
+            name = QLabel("ตั้งค่าเครื่อง POS")
+            name.setObjectName("settingsTitle")
             current = self.current_status()
-            right = QLabel(f"{current.branch} · {current.terminal} · ตั้งค่าเครื่องนี้")
-            right.setObjectName("brandRight")
+            where = " · ".join(v for v in (current.branch, current.terminal) if v and v.strip("-· "))
+            right = QLabel(where or "เครื่องนี้ยังไม่ได้ผูกกับ ERP")
+            right.setObjectName("settingsSubtitle")
+            titles.addWidget(name)
+            titles.addWidget(right)
+            mark = QWidget()
+            right = QWidget()
             close_button = QToolButton()
             close_button.setObjectName("dialogClose")
             close_button.setText("×")
             close_button.setToolTip("ปิดหน้าต่างตั้งค่า")
             close_button.setAutoRaise(True)
             close_button.clicked.connect(self.reject)
-            layout.addWidget(mark)
-            layout.addWidget(name)
+            layout.addLayout(titles)
             layout.addStretch(1)
-            layout.addWidget(right)
             layout.addWidget(close_button)
             return bar
 
+        def paintEvent(self, event) -> None:
+            # ทำให้หน้าขายด้านหลังมืดลง ให้รู้ว่ากำลังอยู่ในหน้าตั้งค่า
+            painter = QPainter(self)
+            painter.fillRect(self.rect(), QColor(15, 23, 42, 120))
+            painter.end()
+
         def show_section(self, name: str) -> None:
+            if name in getattr(self, "nav_buttons", {}):
+                self.nav_buttons[name].setChecked(True)
             while self.body.count():
                 item = self.body.takeAt(0)
                 widget = item.widget()
@@ -1713,7 +1759,10 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.grid_host = QWidget()
             self.grid = QGridLayout(self.grid_host)
             self.grid.setContentsMargins(0, 0, 0, 0)
+            # การ์ดเรียงชิดบน ไม่ยืดแถวจนเหลือช่องว่างกลางจอ
+            self.grid.setAlignment(Qt.AlignTop)
             self.product_scroll = QScrollArea()
+            self.product_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
             self.product_scroll.setObjectName("productScroll")
             self.product_scroll.setWidgetResizable(True)
             self.product_scroll.setWidget(self.grid_host)
@@ -1756,8 +1805,6 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self._product_columns = columns
             self.grid.setHorizontalSpacing(layout_metrics["gap"])
             self.grid.setVerticalSpacing(layout_metrics["gap"])
-            available = max(self.grid_host.width(), columns * 80 + (columns - 1) * layout_metrics["gap"])
-            tile_width = max(80, (available - (columns - 1) * layout_metrics["gap"]) // columns)
             # Keep product cards at the published compact height. Stretching
             # them to fill the viewport made the product buttons dominate the
             # screen and left too little room for the customer-facing bill.
@@ -1775,8 +1822,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 tile.setToolButtonStyle(Qt.ToolButtonTextOnly)
                 tile.setText(f"{product['name']}\n{price:,.2f} ฿ / {unit}" + (f"\n{sku}" if sku else ""))
                 tile.setToolTip(str(product["name"] or ""))
-                tile.setMinimumSize(QSize(tile_width, row_height))
-                tile.setMaximumHeight(row_height)
+                # กว้างตามคอลัมน์ ห้ามตั้งความกว้างขั้นต่ำจากจอเดิม ไม่งั้นการ์ดล้นจนมีแถบเลื่อนแนวนอน
+                tile.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+                tile.setFixedHeight(row_height)
                 tile.clicked.connect(lambda _, row=product: self.add_product_row(row))
                 self.grid.addWidget(tile, index // columns, index % columns)
             for column in range(max(PRODUCT_TILE_COLUMNS, columns)):
