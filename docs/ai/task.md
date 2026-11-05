@@ -1,11 +1,12 @@
 ## Handoff - 2026-11-05 (Codex: approved Python POS settings popup UAT)
-- Commit: source ที่ทดสอบ/build `87ca3de2fe76696d8d33b8c022249ab8926b32ca`; commit ส่งมอบดู git log ของหัวข้อนี้
+- Commit: บันทึก handoff เริ่มต้น `c1717e3`; source ที่ทดสอบ/build `87ca3de2fe76696d8d33b8c022249ab8926b32ca`; commit ส่งมอบดู git log ของหัวข้อนี้
 - ทำอะไร: ทำตาม `docs/ai/codex-pos-python-handoff.md` บน branch `claude/pos-python-settings-popup`; ไม่ต้องแก้ source หลังเทสต์ผ่าน ใช้ workflow `pos-python-windows-uat.yml` สำหรับ `apps/pos-python` โดยตรง (ไม่ใช่ `jet-pos-python-uat.yml` ซึ่ง build อีกแอป)
 - Git: worktree เดิมเขียน Git metadata ไม่ได้เพราะ sandbox; clone local ไป `/private/tmp/pos-python-codex-uat`, เปลี่ยน origin เป็น GitHub เดิม, `git pull origin main` สำเร็จ (Already up to date), ตรวจ remote branch ตรงกับ source ก่อนทำงาน; commit/push จากสำเนานี้
 - ทดสอบ: `cd apps/pos-python && QT_QPA_PLATFORM=offscreen python3 -m unittest discover -s tests` ผ่าน 253 tests (4.700s); offscreen UI smoke ใช้ SQLite ชั่วคราวเปล่า ไม่สร้าง credentials เปิดหน้าขายและ resize 1024×768 ผ่าน พร้อมตรวจภาพหน้าจอ; ไม่ใช่ Windows UAT
 - Laravel: `php artisan test` เริ่มไม่ได้เพราะไม่มี `vendor/autoload.php`; ไม่ได้แก้ ERP/PHP ในงานนี้
 - Build: version `0.1.0-uat.20261105`, `source_ref` เป็น source SHA เต็มข้างต้น, `publish=false`, `build_id=codex-settings-popup-20261105`; workflow https://github.com/jetsada-polsan/ERPPOP/actions/runs/41985915890
-- ผล build/ตัวติดตั้ง: รอผล workflow
+- ผล build/ตัวติดตั้ง: workflow สำเร็จ; Windows Python 3.12 ผ่าน 253 tests (50.562s), PyInstaller build, EXE `--self-check`, Inno Setup และตรวจ installer MZ/ขนาด ผ่านทั้งหมด; publish skipped
+- ตัวติดตั้ง: `PopCentral-POS-UAT-0.1.0-uat.20261105-setup.exe` (178,678,030 bytes); artifact https://github.com/jetsada-polsan/ERPPOP/actions/runs/41985915890/artifacts/13395474247 (ต้องล็อกอิน GitHub และอยู่ภายใต้อายุเก็บ artifact)
 - รอบแรก https://github.com/jetsada-polsan/ERPPOP/actions/runs/41985777307 ล้มเหลวที่ checkout เพราะส่ง SHA ย่อ; สั่งรอบใหม่ด้วย SHA เต็มแล้ว (ยังไม่ถึงขั้น build ในรอบแรก)
 - ยังไม่ทดสอบ/ความเสี่ยง: เครื่องทำงานเป็น macOS ไม่มีเครื่อง Windows/เครื่องพิมพ์/สแกนเนอร์ที่เชื่อมต่อสำหรับ UAT; ยังไม่ได้ติดตั้ง EXE หรือทำธุรกรรมจริง การ build บน Windows runner ไม่ทดแทน UAT
 - Deploy: ไม่ deploy production; ปิด publish จึงไม่อัปโหลดตัวติดตั้งขึ้น ERP; ไม่แตะ `apps/pos-desktop`; ไม่สร้าง PIN/password/device token ให้ใคร
