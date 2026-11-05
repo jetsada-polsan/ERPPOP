@@ -46,6 +46,9 @@ class TouchDialog(QDialog):
             self._backdrop.setStyleSheet('background:rgba(%d,%d,%d,150);' % rgb)
             self._backdrop.show()
             self._backdrop.raise_()
+        if hasattr(self, '_backdrop'):
+            self._backdrop.show()
+            self._backdrop.raise_()
         super().showEvent(event)
 
     def hideEvent(self, event):

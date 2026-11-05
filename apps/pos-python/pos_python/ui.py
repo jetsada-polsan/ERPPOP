@@ -1683,10 +1683,13 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             shell.setContentsMargins(0, 0, 0, 0)
             shell.setSpacing(0)
             shell.addWidget(self.build_runtime_topbar())
-            tools = QHBoxLayout()
+            tool_bar = QWidget()
+            tool_bar.setStyleSheet(f"background:{PALETTE['primary_dark']};")
+            tools = QHBoxLayout(tool_bar)
+            tools.setContentsMargins(8, 0, 8, 0)
             for label, action in [("ประวัติบิล", self.show_history), ("เงินสดระหว่างกะ", self.record_cash_movement), ("ใบเสร็จล่าสุด", self.show_last_receipt)]:
                 tools.addWidget(self._top_button(label, label, action))
-            shell.addLayout(tools)
+            shell.addWidget(tool_bar)
             columns = QHBoxLayout()
             columns.setContentsMargins(0, 0, 0, 0)
             columns.setSpacing(0)
@@ -1738,6 +1741,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             lock.addWidget(self.lock_status)
             self.start_button = QPushButton("เข้างาน")
             self.start_button.setMinimumHeight(84)
+            self.start_button.setStyleSheet(f"background:{PALETTE['primary']}; color:white; font-size:28px; font-weight:800;")
             self.start_button.clicked.connect(self.start_work)
             lock.addWidget(self.start_button)
             settings = QPushButton("⚙ ตั้งค่าเครื่อง")
@@ -1753,6 +1757,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.pages.setCurrentWidget(self.lock_page)
             self.setCentralWidget(self.pages)
 
+            self.pay_shortcut.setEnabled(False)
             self.refresh_products()
             self.refresh_order()
             # ราคาที่มีผลตามเวลาอาจเปลี่ยนระหว่างเปิดโปรแกรม จึงวาดปุ่มสินค้า
@@ -2232,6 +2237,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         def lock_session(self):
             SettingsService(service.db).set_device_setting("current_order", self.order.snapshot())
             self.locked = True
+            self.pay_shortcut.setEnabled(False)
             self.cashier = None
             self.shift_id = None
             self.opening_cash = None
@@ -2794,6 +2800,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.setWindowTitle(f"JET POS v{APP_VERSION} — {self.cashier['name']} · Layout {layout_version}")
             self.refresh_order(keep_selection=True)
             self.locked = False
+            self.pay_shortcut.setEnabled(True)
             self.pages.setCurrentIndex(0)
             return True
 

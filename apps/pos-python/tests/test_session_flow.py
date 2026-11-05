@@ -1,4 +1,7 @@
 """Session lifecycle against a real temporary SQLite database; no credentials provisioned."""
+import os
+import subprocess
+import sys
 from decimal import Decimal as D
 from pathlib import Path
 from unittest.mock import patch
@@ -43,14 +46,17 @@ def enter(w, db):
 def test_enter_pin_then_open_shift_and_resume_without_prompt(scene):
     db, service, w = scene
     assert w.locked and w.pages.currentWidget() is w.lock_page
+    assert not w.pay_shortcut.isEnabled()
     enter(w, db)
     assert not w.locked and w.shift_id and w.cashier['id'] == 1
+    assert w.pay_shortcut.isEnabled()
     assert w.opening_cash == D(500)
     shift = w.shift_id
     w.order.add_product(OrderLine(1,'สินค้า','ชิ้น',D(9),D(10)))
     w.refresh_order()
     w.auth_button.click()
     assert w.locked and w.cashier is None
+    assert not w.pay_shortcut.isEnabled()
     assert db.execute('SELECT status FROM shifts WHERE id=?',(shift,)).fetchone()[0] == 'open'
     assert w.order.grand_total() == 90
     with patch.object(w, 'pin_login', return_value=db.execute('SELECT * FROM local_cashiers WHERE id=1').fetchone()), patch.object(w.dialog_types['opening'], 'exec', side_effect=AssertionError('must resume')):
@@ -141,3 +147,44 @@ def test_ui_has_no_native_message_or_input_dialogs():
     from pos_python import ui
     source=Path(ui.__file__).read_text()
     assert 'QMessageBox.' not in source and 'QInputDialog.' not in source
+
+
+def test_restart_new_process_restores_nine_items_and_1430_total(scene, tmp_path):
+    db, service, w = scene
+    w.order.add_product(OrderLine(1, 'สินค้า', 'ชิ้น', D(8), D(150)))
+    w.order.add_product(OrderLine(1, 'สินค้าอีกหน่วย', 'แพ็ค', D(1), D(230)))
+    with patch.object(TouchDialog, 'exec', lambda dialog: QDialog.Accepted):
+        assert w.close()
+    code = """
+import sys
+from decimal import Decimal
+from pathlib import Path
+from PySide6.QtWidgets import QApplication
+from pos_python.database import connect
+from pos_python.services import PosService
+from pos_python.ui import run_ui
+app=QApplication([])
+db=connect(Path(sys.argv[1]))
+w=run_ui(PosService(db),app=app)
+assert w.locked and w.cashier is None and w.shift_id is None
+assert sum(line.qty for line in w.order.lines)==9
+assert w.order.grand_total()==Decimal('1430')
+w._allow_close=True
+w.close()
+print('restored 9 items / 1430.00 on locked screen')
+"""
+    result = subprocess.run([sys.executable, '-c', code, str(tmp_path/'session.db')], env={**os.environ, 'QT_QPA_PLATFORM':'offscreen'}, text=True, capture_output=True, timeout=30)
+    assert result.returncode==0, result.stderr
+    assert 'restored 9 items / 1430.00' in result.stdout
+
+
+def test_z_auto_prints_to_configured_queue_with_local_summary(scene):
+    from pos_python.settings_service import SettingsService
+    db, service, w=scene
+    enter(w,db)
+    service.close_shift(shift_id=w.shift_id,counted_cash=D(500))
+    SettingsService(db).set_device_setting('windows_printer_queue','TEST-QUEUE')
+    with patch('pos_python.printers.print_text_to_windows_queue') as printer, patch.object(TouchDialog,'exec',lambda dialog: QDialog.Rejected):
+        w.show_z_report(auto_print=True)
+    text,queue=printer.call_args.args
+    assert queue=='TEST-QUEUE' and 'Z Report' in text and '500.00' in text
