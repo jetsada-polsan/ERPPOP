@@ -633,6 +633,15 @@ class PosWindow(QMainWindow):
                 login = self._client().post("/cashier/login", {"pin": pin, "cashier_id": int(cashier["id"])})
             if not isinstance(login, dict) or not isinstance(login.get("cashier"), dict): raise PosApiError("ไม่พบแคชเชียร์จาก ERP")
             self._cashier = login["cashier"]
+            if login.get("must_change_pin"):
+                updated_pin = self._change_temporary_pin(pin)
+                if not updated_pin:
+                    return
+                pin = updated_pin
+                login = self._client().post("/cashier/login", {"pin": pin})
+                if not isinstance(login, dict) or not isinstance(login.get("cashier"), dict) or login.get("must_change_pin"):
+                    raise PosApiError("เปลี่ยน PIN แล้ว แต่ ERP ยังไม่ยืนยันแคชเชียร์")
+                self._cashier = login["cashier"]
             credential = login.get("offline_credential")
             if isinstance(credential, dict):
                 self._store.cache_offline_cashier(self._cashier, credential)
@@ -666,6 +675,38 @@ class PosWindow(QMainWindow):
                 QMessageBox.warning(self, "เข้า/เปิดกะไม่สำเร็จ", str(error))
                 return
             self._open_offline_shift(pin, str(error))
+
+    def _change_temporary_pin(self, temporary_pin: str) -> str | None:
+        """Finish the first-login PIN change before attempting to open a shift."""
+        new_pin_dialog = TouchKeypadDialog(
+            "ตั้ง PIN ใหม่",
+            "PIN นี้เป็นรหัสชั่วคราว กรุณาตั้ง PIN ใหม่ 4-20 หลัก",
+            self,
+            secret=True,
+        )
+        if new_pin_dialog.exec() != QDialog.DialogCode.Accepted:
+            return None
+        new_pin = new_pin_dialog.text()
+        if not new_pin.isdigit() or not 4 <= len(new_pin) <= 20:
+            QMessageBox.warning(self, "PIN ไม่ถูกต้อง", "PIN ใหม่ต้องเป็นตัวเลข 4-20 หลัก")
+            return None
+
+        confirm_dialog = TouchKeypadDialog("ยืนยัน PIN ใหม่", "กรอก PIN ใหม่ซ้ำอีกครั้ง", self, secret=True)
+        if confirm_dialog.exec() != QDialog.DialogCode.Accepted:
+            return None
+        if new_pin != confirm_dialog.text():
+            QMessageBox.warning(self, "PIN ไม่ตรงกัน", "กรุณาตั้ง PIN ใหม่อีกครั้ง")
+            return None
+
+        code = str(self._cashier.get("code") or "")
+        if not code:
+            raise PosApiError("ERP ไม่ได้ส่งรหัสแคชเชียร์กลับมา")
+        self._client().post("/cashier/pin", {
+            "code": code,
+            "current_pin": temporary_pin,
+            "new_pin": new_pin,
+        })
+        return new_pin
 
     def _open_offline_shift(self, pin: str, online_error: str) -> None:
         matches = self._store.offline_cashiers_by_pin(pin)

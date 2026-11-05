@@ -1,6 +1,13 @@
 # Handoff — 2026-11-02 (แก้สีหน้า Executive Dashboard)
 
 ## Handoff - 2026-11-05
+- Commit: pending — complete temporary POS PIN change before opening a shift
+- ทำอะไร: แก้ JET POS Python ที่ login ด้วย PIN ชั่วคราวสำเร็จ แต่พยายามเปิดกะต่อทั้งที่ ERP บังคับเปลี่ยน PIN และยังไม่ยืนยันตัวตนเครื่อง ทำให้เปิดกะไม่สำเร็จ; ตอนนี้แอปจะเด้งแป้นใหญ่ให้ตั้ง PIN ใหม่และกรอกยืนยันซ้ำ, ส่งเปลี่ยน PIN ไป ERP, login ใหม่ แล้วจึงเปิดกะ
+- ทดสอบ: `php artisan test --filter=PosCashierIdentityTest` ผ่าน 15 tests / 48 assertions (รวม regression test PIN ชั่วคราว → เปลี่ยน PIN → device verified → login ใหม่); `PYTHONPATH=apps/jet-pos-python python3 -m unittest discover -s apps/jet-pos-python/tests -v` ผ่าน 25 tests; `git diff --check` ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: `php artisan test` ทั้งชุดหยุดที่ `PrintablePageSizeTest` เพราะ PHPUnit บังคับ memory limit 128MB ในเครื่อง dev; ไม่เกี่ยวกับ POS patch นี้. ต้อง build/install Python POS รุ่นใหม่และให้ผู้ใช้กรอก PIN เองเพื่อทดสอบเปิดกะจริง
+- Deploy: ยังไม่ deploy; การแก้มีผลเมื่อสร้าง/ติดตั้ง JET POS Python UAT รุ่นใหม่เท่านั้น ไม่ต้อง deploy ERP
+
+## Handoff - 2026-11-05
 - Commit: pending — compact POS touch keypad
 - ทำอะไร: ลด pop-up แป้นตัวเลขของ JET POS Python จากขั้นต่ำ 560×620 เป็น 480×540, ลดปุ่มจาก 72px เป็น 58px, ลด font/margin/spacing เพื่อไม่บังหน้าขาย แต่ยังใหญ่พอสำหรับจอสัมผัส
 - ทดสอบ: `PYTHONPATH=apps/jet-pos-python python3 -m unittest discover -s apps/jet-pos-python/tests -v` ผ่าน 25 tests; `QT_QPA_PLATFORM=offscreen` สร้าง `TouchKeypadDialog` และตรวจขนาดใหม่ผ่าน; `git diff --check` ผ่าน
