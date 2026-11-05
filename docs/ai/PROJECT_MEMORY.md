@@ -148,3 +148,15 @@
 - คลังใช้สาขาที่กำหนดคลังหลักก่อน และใช้ `warehouses.branch_id` เป็น fallback สำหรับตำแหน่งเก็บอื่นในคลังที่ระบุเจ้าของ; สิทธิ์สาขายังคำนวณจาก `ReportController` ห้ามให้คำค้น/เปลี่ยนหน้า/ส่งออกข้ามขอบเขตสิทธิ์
 - ช่องค้นหารายงานนี้รอหยุดพิมพ์ 500 ms แล้วอัปเดตผลโดยคงโฟกัส/เคอร์เซอร์; ยกเลิกคำขอเก่าและไม่ให้ผลเก่าทับคำค้นใหม่; เลขบาร์โค้ดยังคงเป็นข้อความและยอดจำนวนแสดงตามความละเอียด 8 ตำแหน่งของระบบ
 - รายงานนี้อ่านยอดคงเหลือปัจจุบัน; ใบปรับสต๊อก `pending_approval` ยังไม่เพิ่มยอดจริง ต้องให้ผู้มีสิทธิ์อีกคนอนุมัติตามขั้นตอนเดิม
+
+## Python POS drawer float — workspace changes 2026-11-05
+
+- เพิ่ม client สำหรับ carried/default float, opening reason, blind preview/final close และ Z สองใบตาม `docs/ai/shift-float-api-for-python.md`; capability ต้องมี default_float และ carried_float ก่อนส่ง preview. ไม่ส่ง preview ไป ERP เก่า
+- Runtime ที่มี ERP ต้องออนไลน์ตอนปิดกะ; float close ใช้ ERP ก่อนอัปเดต local และไม่เข้าคิวปิดซ้ำ. คำขอปิดไม่ทราบผลจะเก็บ `uncertain_float_close` และกันเริ่มขายข้าม restart; ผู้ดูแลต้องตรวจ ERP/กระทบยอด local ก่อนล้าง flag ไม่เดาว่าปิดสำเร็จหรือ retry เอง
+- งานนี้ยังเป็นไฟล์ใน workspace branch `claude/pos-python-settings-popup` (base `4a1da62`): Git metadata ถูก sandbox ปฏิเสธ จึงยัง commit/push ไม่ได้. ไม่ได้ deploy; รายละเอียดเทสต์/ข้อจำกัดใน handoff ล่าสุด
+
+## Python POS close-shift workspace — 2026-11-05
+
+- Float close เปลี่ยนเป็น workspace 1024×768 สี่ขั้น blind count → ERP preview → เงินทอน/เงินนำส่งปิดกะ → ยืนยัน+Z. รายการนำส่งระหว่างกะมีหน้าเดียวในเมนูเงินสด ไม่เปิดจากหน้าปิดกะ; เปลี่ยนข้อมูลต้อง preview ใหม่เสมอ
+- TouchDialog ซ่อน dialog เดิมชั่วคราวก่อนแสดงหน้าใหม่และคืนหน้าหลังเสร็จ; minimize ยกเลิกทั้ง dialog ที่แสดงและที่ถูกซ่อน เพื่อไม่ให้คืน popup หลังล็อก
+- Python 338 tests ผ่าน พร้อมภาพทุกขั้น; งาน/brief ยังอยู่ใน workspace โดยไม่มี commit เพิ่ม เพราะ Git metadata ถูก sandbox ปฏิเสธที่ FETCH_HEAD/index.lock. รายละเอียดและลำดับ commit ที่ต้องทำต่ออยู่ใน handoff ล่าสุด; ยังไม่ deploy

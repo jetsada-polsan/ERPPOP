@@ -386,7 +386,7 @@ class PosService:
         self.db.commit()
         return int(cursor.lastrowid)
 
-    def queue_shift_open(self, shift_id: int) -> None:
+    def queue_shift_open(self, shift_id: int, opening_note: str = "") -> None:
         """Queue an offline shift so it is opened on ERP before its sales."""
         shift = self.db.execute(
             """SELECT s.*, c.server_id AS cashier_server_id
@@ -400,7 +400,7 @@ class PosService:
         aggregate_uuid = f"shift:{shift['uuid']}:open"
         payload = json.dumps({
             "shift_uuid": shift["uuid"], "branch_id": shift["branch_id"],
-            "cashier_server_id": shift["cashier_server_id"],
+            "cashier_server_id": shift["cashier_server_id"], "opening_note": opening_note,
             "opening_cash": str(money(shift["opening_cash"])),
         }, ensure_ascii=False)
         with self.db:

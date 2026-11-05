@@ -204,7 +204,7 @@ class SyncService:
         try:
             response = self.api.post("/api/pos/shift/open", {
                 "branch_id": int(event["branch_id"]), "cashier_id": cashier_id,
-                "opening_cash": str(money(shift["opening_cash"])),
+                "opening_cash": str(money(shift["opening_cash"])), "opening_note": event.get("opening_note", ""),
             }, idempotency_key=aggregate_uuid)
         except Exception as error:
             return self._failed_outbox(aggregate_uuid, str(error))

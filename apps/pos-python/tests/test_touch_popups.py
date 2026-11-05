@@ -92,12 +92,14 @@ def test_closing_difference_blocks_pending_sale_and_uses_erp(scene):
 def test_cash_drop_keeps_reference_and_api_uuid(scene):
     app, db, service, window, api = scene
     def fill_details(dialog):
-        dialog.entry.setText('นำส่งเงินระหว่างกะ')
-        for field in dialog.findChildren(type(dialog.entry)):
-            if field.placeholderText().startswith('เลขอ้างอิง'):
-                field.setText('BAG-01')
+        from PySide6.QtWidgets import QLineEdit
+        fields = dialog.findChildren(QLineEdit)
+        fields[0].setText('25')
+        fields[1].setText('BAG-01')
+        fields[2].setText('นำส่งเงินระหว่างกะ')
         return QDialog.Accepted
-    with patch.object(ValueDialog, 'get_value', return_value=('25',True)), patch.object(TextDialog, 'exec', fill_details):
+    from pos_python.touch_dialogs import TouchDialog
+    with patch.object(TouchDialog, 'exec', fill_details):
         window.record_cash_movement(drop_only=True)
     row = db.execute('SELECT * FROM cash_movements').fetchone()
     assert row['reference_no'] == 'BAG-01'

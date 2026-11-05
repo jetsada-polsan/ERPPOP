@@ -4,7 +4,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QRegularExpressionValidator
 from PySide6.QtCore import QRegularExpression
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QFrame, QLabel, QPushButton, QLineEdit, QWidget)
+    QFrame, QLabel, QPushButton, QLineEdit, QWidget, QApplication)
 
 
 class TouchDialog(QDialog):
@@ -37,6 +37,15 @@ class TouchDialog(QDialog):
         self.body.addWidget(header)
 
     def showEvent(self, event):
+        # Temporarily replace any existing touch workspace, including unrelated
+        # top-level dialogs. Restore it after this child completes.
+        if not getattr(self, '_restoring', False):
+            self._replaced = [w for w in QApplication.topLevelWidgets()
+                              if isinstance(w, QDialog) and w is not self and w.isVisible()]
+            for dialog in self._replaced:
+                dialog._being_replaced = True
+                dialog.hide()
+                dialog._being_replaced = False
         parent = self.parentWidget()
         if parent is not None and not hasattr(self, '_backdrop'):
             from .ui import PALETTE
@@ -55,6 +64,14 @@ class TouchDialog(QDialog):
         if hasattr(self, '_backdrop'):
             self._backdrop.hide()
         super().hideEvent(event)
+        if getattr(self, '_being_replaced', False):
+            return
+        replaced, self._replaced = getattr(self, '_replaced', []), []
+        for dialog in replaced:
+            if not getattr(dialog, '_suppress_restore', False):
+                dialog._restoring = True
+                dialog.show()
+                dialog._restoring = False
 
     def confirm(self, text='ยืนยัน', callback=None):
         button = QPushButton(text)
