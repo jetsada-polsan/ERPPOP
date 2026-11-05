@@ -1,3 +1,26 @@
+## Handoff - 2026-11-05 (Codex: approved Python POS settings popup UAT)
+- Commit: source ที่ทดสอบ/build `87ca3de2fe76696d8d33b8c022249ab8926b32ca`; commit ส่งมอบดู git log ของหัวข้อนี้
+- ทำอะไร: ทำตาม `docs/ai/codex-pos-python-handoff.md` บน branch `claude/pos-python-settings-popup`; ไม่ต้องแก้ source หลังเทสต์ผ่าน ใช้ workflow `pos-python-windows-uat.yml` สำหรับ `apps/pos-python` โดยตรง (ไม่ใช่ `jet-pos-python-uat.yml` ซึ่ง build อีกแอป)
+- Git: worktree เดิมเขียน Git metadata ไม่ได้เพราะ sandbox; clone local ไป `/private/tmp/pos-python-codex-uat`, เปลี่ยน origin เป็น GitHub เดิม, `git pull origin main` สำเร็จ (Already up to date), ตรวจ remote branch ตรงกับ source ก่อนทำงาน; commit/push จากสำเนานี้
+- ทดสอบ: `cd apps/pos-python && QT_QPA_PLATFORM=offscreen python3 -m unittest discover -s tests` ผ่าน 253 tests (4.700s); offscreen UI smoke ใช้ SQLite ชั่วคราวเปล่า ไม่สร้าง credentials เปิดหน้าขายและ resize 1024×768 ผ่าน พร้อมตรวจภาพหน้าจอ; ไม่ใช่ Windows UAT
+- Laravel: `php artisan test` เริ่มไม่ได้เพราะไม่มี `vendor/autoload.php`; ไม่ได้แก้ ERP/PHP ในงานนี้
+- Build: version `0.1.0-uat.20261105`, `source_ref` เป็น source SHA เต็มข้างต้น, `publish=false`, `build_id=codex-settings-popup-20261105`; workflow https://github.com/jetsada-polsan/ERPPOP/actions/runs/41985915890
+- ผล build/ตัวติดตั้ง: รอผล workflow
+- รอบแรก https://github.com/jetsada-polsan/ERPPOP/actions/runs/41985777307 ล้มเหลวที่ checkout เพราะส่ง SHA ย่อ; สั่งรอบใหม่ด้วย SHA เต็มแล้ว (ยังไม่ถึงขั้น build ในรอบแรก)
+- ยังไม่ทดสอบ/ความเสี่ยง: เครื่องทำงานเป็น macOS ไม่มีเครื่อง Windows/เครื่องพิมพ์/สแกนเนอร์ที่เชื่อมต่อสำหรับ UAT; ยังไม่ได้ติดตั้ง EXE หรือทำธุรกรรมจริง การ build บน Windows runner ไม่ทดแทน UAT
+- Deploy: ไม่ deploy production; ปิด publish จึงไม่อัปโหลดตัวติดตั้งขึ้น ERP; ไม่แตะ `apps/pos-desktop`; ไม่สร้าง PIN/password/device token ให้ใคร
+- งานถัดไป: ดาวน์โหลด artifact ของ workflow ไปเครื่อง Windows ตั้งจอ 1024×768 ใช้ข้อมูล/สิทธิ์ที่เจ้าของเตรียมและให้เจ้าของกรอก credentials เอง แล้วตรวจรายการด้านล่าง บันทึกเลขบิล/ผลพิมพ์และ reconciliation ก่อนยอมรับ UAT
+
+### Windows UAT ที่ยังค้าง (ทั้งหมดไม่ได้รันบนเครื่องจริง)
+- [ ] ติดตั้ง UAT แยกจาก Vue POS แล้วเปิดแอป ตรวจหน้าขายและ settings popup ว่าปุ่มครบ ไม่ล้นจอ 1024×768
+- [ ] เปิดกะด้วยคนขายที่เจ้าของยืนยัน ตรวจเงินทอนต้นกะและตัวตน/สาขา/เครื่อง
+- [ ] สแกนสินค้าจริง ตรวจสินค้า หน่วย จำนวน และราคาเทียบ ERP
+- [ ] แก้จำนวนด้วย − / + และ popup; ลบรายการ แล้วตรวจยอดรวม
+- [ ] ใช้ส่วนลดที่สิทธิ์อนุญาต ตรวจยอดสุทธิ/ภาษีและกฎราคาของ ERP
+- [ ] รับเงินด้วย F12 ตรวจเงินรับ/เงินทอน บิล local-first และสถานะคิว sync ไม่ซ้ำ
+- [ ] พิมพ์ใบเสร็จด้วยเครื่องพิมพ์จริง ตรวจภาษาไทย ยอด เลขบิล และพิมพ์ซ้ำไม่สร้างบิลใหม่
+- [ ] ปิดกะ ตรวจยอดขาย เงินสด เงินเคลื่อนไหว ผลต่าง และรายงานปิดกะเทียบใบเสร็จ
+
 # Handoff — 2026-11-02 (แก้สีหน้า Executive Dashboard)
 
 ## Handoff - 2026-11-05
