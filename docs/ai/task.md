@@ -1,6 +1,13 @@
 # Handoff — 2026-11-02 (แก้สีหน้า Executive Dashboard)
 
 ## Handoff - 2026-11-05
+- Commit: pending — one-step POS cashier enablement
+- ทำอะไร: เพิ่มปุ่ม `เปิดใช้ POS` ใน จัดการเครื่อง POS → คนขาย & PIN สำหรับคนขายที่มีบัญชี ERP แล้วแต่ยังไม่มีสิทธิ์ขาย; ปุ่มเดียวเพิ่ม role `CASHIER` แบบจำกัดเฉพาะสาขาของคนขาย, เปิดสิทธิ์ `pos.sell`, ถอนการยืนยันเครื่องเดิม และบันทึก audit จากนั้นตั้ง PIN ได้ทันที โดยไม่ให้สิทธิ์ข้ามสาขา
+- ทดสอบ: `php artisan test --filter='PosAdminReassignTest|PosInstallPageTest|PosCashierIdentityTest|PosPinChangeTest'` ผ่าน 34 tests / 128 assertions; `php artisan route:list --name=pos-admin.cashiers.enable`, `php artisan view:cache`, และ `git diff --check` ผ่าน
+- วิธีใช้หลัง deploy: หน้า จัดการเครื่อง POS → คนขาย & PIN → แถวป้ายแดง → `เปิดใช้ POS` → `ตั้ง PIN` → POS กดเข้ากะและกรอก PIN; หากขึ้น `ผูกบัญชี ERP ก่อน` ต้องผูก user ให้พนักงานครั้งเดียวก่อน
+- Deploy: ยังไม่ deploy ERP
+
+## Handoff - 2026-11-05
 - Commit: pending — prevent unusable POS cashier PINs
 - ทำอะไร: พบว่า ERP สามารถออก/ตั้ง PIN ให้รหัสคนขายที่ไม่ผูกบัญชี ERP หรือไม่มีสิทธิ์ `pos.sell` ในสาขาเครื่อง ทำให้ Python POS ได้ข้อความรวมว่า `PIN ไม่ถูกต้อง` แม้ PIN เพิ่งออก; เพิ่มการตรวจสิทธิ์ก่อนออก/ตั้ง PIN, หน้า จัดการเครื่อง POS แสดง `ไม่มีสิทธิ์ POS/สาขา`, ปิดช่องตั้ง PIN ของรหัสนั้น และนับความพร้อมเฉพาะคนขายที่เข้าเครื่องได้จริง
 - ทดสอบ: `php artisan test --filter='PosInstallPageTest|PosCashierIdentityTest|PosPinChangeTest'` ผ่าน 31 tests / 112 assertions; `PYTHONPATH=apps/jet-pos-python python3 -m unittest discover -s apps/jet-pos-python/tests -v` ผ่าน 25 tests; `git diff --check` ผ่าน

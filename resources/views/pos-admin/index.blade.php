@@ -244,6 +244,16 @@
                                         <input type="password" name="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required autocomplete="new-password" class="form-control form-control-sm" style="width:80px" placeholder="4 หลัก" aria-label="PIN ใหม่ของ {{ $cashier->code }}" @disabled(! $eligible)>
                                         <button class="btn btn-sm btn-outline-primary" @disabled(! $eligible) title="{{ $eligible ? '' : 'เพิ่มสิทธิ์ pos.sell และผูกสาขาให้บัญชี ERP ก่อน' }}"><i class="bi bi-key me-1"></i>ตั้ง PIN</button>
                                     </form>
+                                    @if(! $eligible)
+                                        @if($cashier->user)
+                                            <form method="post" action="{{ route('pos-admin.cashiers.enable', $cashier) }}" class="d-inline">
+                                                @csrf
+                                                <button class="btn btn-sm btn-primary"><i class="bi bi-check-circle me-1"></i>เปิดใช้ POS</button>
+                                            </form>
+                                        @else
+                                            <span class="small text-danger">ผูกบัญชี ERP ก่อน</span>
+                                        @endif
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach

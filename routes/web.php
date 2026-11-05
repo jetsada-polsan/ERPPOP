@@ -108,6 +108,7 @@ Route::get('/pos-admin', [PosAdminController::class, 'index'])->name('pos-admin.
 Route::delete('/master-data/{type}/{id}', [\App\Http\Controllers\MasterDataDeleteController::class, 'destroy'])->whereNumber('id')->name('master-data.destroy');
 Route::post('/pos-admin/devices/{device}/pair-code', [PosAdminController::class, 'newPairCode'])->name('pos-admin.devices.pair-code');
 Route::post('/pos-admin/cashiers/{salesman}/move', [PosAdminController::class, 'moveCashier'])->name('pos-admin.cashiers.move');
+Route::post('/pos-admin/cashiers/{salesman}/enable', [PosAdminController::class, 'enableCashier'])->name('pos-admin.cashiers.enable');
 Route::get('/password/change', [AuthController::class, 'showChangePassword'])->name('password.change');
 Route::post('/password/change', [AuthController::class, 'updatePassword'])->name('password.update');
 Route::get('/security/mfa', [AuthController::class, 'showMfaSetup'])->name('mfa.setup');
