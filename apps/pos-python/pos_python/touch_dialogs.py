@@ -4,7 +4,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QRegularExpressionValidator
 from PySide6.QtCore import QRegularExpression
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QFrame, QLabel, QPushButton, QLineEdit, QWidget, QGraphicsOpacityEffect)
+    QFrame, QLabel, QPushButton, QLineEdit, QWidget)
 
 
 class TouchDialog(QDialog):
@@ -31,9 +31,27 @@ class TouchDialog(QDialog):
         row.addWidget(caption, 1)
         close = QPushButton('×')
         close.setFixedWidth(64)
+        close.setAutoDefault(False)
         close.clicked.connect(self.reject)
         row.addWidget(close)
         self.body.addWidget(header)
+
+    def showEvent(self, event):
+        parent = self.parentWidget()
+        if parent is not None and not hasattr(self, '_backdrop'):
+            from .ui import PALETTE
+            self._backdrop = QWidget(parent.window())
+            self._backdrop.setGeometry(parent.window().rect())
+            rgb = tuple(int(PALETTE['text'][i:i+2], 16) for i in (1,3,5))
+            self._backdrop.setStyleSheet('background:rgba(%d,%d,%d,150);' % rgb)
+            self._backdrop.show()
+            self._backdrop.raise_()
+        super().showEvent(event)
+
+    def hideEvent(self, event):
+        if hasattr(self, '_backdrop'):
+            self._backdrop.hide()
+        super().hideEvent(event)
 
     def confirm(self, text='ยืนยัน', callback=None):
         button = QPushButton(text)
@@ -50,16 +68,15 @@ class NumPad(QWidget):
         self.pin = pin
         grid = QGridLayout(self)
         grid.setContentsMargins(0, 0, 0, 0)
-        keys = ['1','2','3','4','5','6','7','8','9','ล้าง','0','⌫']
-        if not pin:
-            keys += ['.']
+        keys = ['1','2','3','4','5','6','7','8','9','ล้าง' if pin else '.','0','⌫']
         for i, key in enumerate(keys):
             button = QPushButton(key)
             button.setMinimumSize(64, 64)
-            button.setStyleSheet('font-size:24px; padding:0;')
+            button.setStyleSheet('font-size:24px; padding:0; min-height:64px; min-width:64px;')
             button.setFocusPolicy(Qt.NoFocus)
+            button.setAutoDefault(False)
             button.clicked.connect(lambda checked=False, k=key: self.press(k))
-            grid.addWidget(button, i // 3, i % 3, 1, 3 if key == '.' else 1)
+            grid.addWidget(button, i // 3, i % 3)
 
     def press(self, key):
         if key == 'ล้าง':

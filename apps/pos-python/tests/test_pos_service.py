@@ -61,6 +61,10 @@ class PosServiceTest(unittest.TestCase):
 
         summary = self.service.shift_cash_summary(self.shift_id)
         self.assertEqual(summary.expected_cash, Decimal("140.00"))
+        with self.assertRaisesRegex(ValueError, "ต้องส่งบิลค้าง"):
+            self.service.close_shift(shift_id=self.shift_id, counted_cash=Decimal("139"))
+        self.db.execute("UPDATE sales SET sync_status = 'synced'")
+        self.db.commit()
         closed = self.service.close_shift(shift_id=self.shift_id, counted_cash=Decimal("139"), closing_note="ขาด 1 บาท")
         self.assertEqual(closed.cash_difference, Decimal("-1.00"))
         self.assertEqual(self.db.execute("SELECT status FROM shifts WHERE id = ?", (self.shift_id,)).fetchone()[0], "closed")

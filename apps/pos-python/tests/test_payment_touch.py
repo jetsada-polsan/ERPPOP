@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pytest
 pytest.importorskip('PySide6')
+from PySide6.QtCore import QEvent
 from PySide6.QtWidgets import QApplication, QDialog, QPushButton, QLineEdit
 
 from pos_python.database import connect
@@ -32,7 +33,7 @@ def test_touch_payment_hold_recall_and_restart(tmp_path):
             window.hold_order()
         assert window.order.bill_discount == 0
         def choose_latest(dialog):
-            dialog.choice = 0
+            dialog.choice = ("local", 0)
             return QDialog.Accepted
         with patch("pos_python.touch_dialogs.ChoiceDialog.exec", choose_latest):
             window.recall_order()
@@ -70,8 +71,11 @@ def test_touch_payment_hold_recall_and_restart(tmp_path):
         assert restarted.order.bill_discount == 25
         assert restarted.order.grand_total() == 75
         restarted.close()
+        restarted.deleteLater()
     finally:
         window.close()
+        window.deleteLater()
+        app.sendPostedEvents(None, QEvent.DeferredDelete)
         db.close()
 
 
