@@ -66,14 +66,14 @@ def test_touch_payment_hold_recall_and_restart(tmp_path):
             window.pay()
         assert len(seen) == 1
         saved = SettingsService(db).get_device_setting('current_order')
-        window.close()
+        window._allow_close = True; window.close()
         restarted = run_ui(PosService(db), app=app, data_dir=tmp_path)
         assert restarted.order.bill_discount == 25
         assert restarted.order.grand_total() == 75
-        restarted.close()
+        restarted._allow_close = True; restarted.close()
         restarted.deleteLater()
     finally:
-        window.close()
+        window._allow_close = True; window.close()
         window.deleteLater()
         app.sendPostedEvents(None, QEvent.DeferredDelete)
         db.close()

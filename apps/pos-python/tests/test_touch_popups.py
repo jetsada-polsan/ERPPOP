@@ -36,7 +36,7 @@ def scene(tmp_path):
     window.shift_id = shift
     window.cashier = db.execute('SELECT * FROM local_cashiers WHERE id=1').fetchone()
     yield app, db, service, window, api
-    window.close();window.deleteLater()
+    window._allow_close = True; window.close();window.deleteLater()
     app.sendPostedEvents(None, QEvent.DeferredDelete)
     db.close()
 
@@ -124,7 +124,7 @@ def test_compact_popups_fit_and_have_large_keys(scene):
 
 def test_return_sends_server_ids_and_approval_without_storing_pin(scene):
     from pos_python.touch_dialogs import ChoiceDialog
-    from PySide6.QtWidgets import QMessageBox
+    from pos_python.touch_dialogs import TouchMessage
     app, db, service, window, api = scene
     db.execute('UPDATE products SET server_id=42 WHERE id=1')
     db.execute("INSERT INTO local_cashiers(id,server_id,code,name,pin_hash,synced_at,role) VALUES(2,77,'MANAGER','หัวหน้า','',?,'manager')", (now(),))
@@ -138,7 +138,7 @@ def test_return_sends_server_ids_and_approval_without_storing_pin(scene):
         dialog.choice=77
         return QDialog.Accepted
     # Transient simulated input only, never a provisioned credential.
-    with patch.object(TextDialog,'exec',fill_reason), patch.object(ChoiceDialog,'exec',choose), patch.object(ValueDialog,'get_value',side_effect=[('0.5',True),('9876',True)]), patch.object(QMessageBox,'information'):
+    with patch.object(TextDialog,'exec',fill_reason), patch.object(ChoiceDialog,'exec',choose), patch.object(ValueDialog,'get_value',side_effect=[('0.5',True),('9876',True)]), patch.object(TouchMessage,'information'):
         window.receipt_action(sale_id,True)
     path, payload=api.post.call_args.args
     assert path=='/api/pos/receipt/return'

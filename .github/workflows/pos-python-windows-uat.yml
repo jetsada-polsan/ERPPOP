@@ -35,6 +35,8 @@ permissions:
 jobs:
   test-and-package:
     runs-on: windows-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
     defaults:
       run:
         working-directory: apps/pos-python
@@ -72,6 +74,8 @@ jobs:
         run: >-
           pyinstaller --noconfirm --clean --windowed
           --name PopCentral-POS
+          --icon pos_python/assets/icon.ico
+          --add-data "pos_python/assets;pos_python/assets"
           --collect-all PySide6
           main.py
       - name: Smoke test packaged application

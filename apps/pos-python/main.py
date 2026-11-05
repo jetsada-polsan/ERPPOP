@@ -133,7 +133,11 @@ def create_application():
     except ImportError as error:
         raise RuntimeError("ยังไม่ได้ติดตั้ง PySide6") from error
 
-    return QApplication.instance() or QApplication(sys.argv)
+    from pos_python.branding import app_icon
+    app = QApplication.instance() or QApplication(sys.argv)
+    app.setWindowIcon(app_icon())
+    app.setApplicationDisplayName("JET POS")
+    return app
 
 
 def self_check() -> None:
@@ -145,7 +149,7 @@ def self_check() -> None:
     from pos_python.build_info import APP_VERSION
 
     if not isinstance(APP_VERSION, str) or not APP_VERSION.strip():
-        raise RuntimeError("ไม่มีข้อมูลรุ่นของ PopCentral POS ในไฟล์ที่ build")
+        raise RuntimeError("ไม่มีข้อมูลรุ่นของ JET POS ในไฟล์ที่ build")
 
 
 def launch_ui(app):
@@ -170,7 +174,7 @@ def launch_ui(app):
 
             QMessageBox.critical(
                 None,
-                "เปิด PopCentral POS ไม่สำเร็จ",
+                "เปิด JET POS ไม่สำเร็จ",
                 f"โปรแกรมเริ่มต้นไม่ได้: {error}\n\n"
                 f"กรุณาส่งไฟล์นี้ให้ฝ่าย IT:\n{log_path}",
             )

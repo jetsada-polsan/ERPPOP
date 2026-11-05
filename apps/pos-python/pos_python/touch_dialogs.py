@@ -104,6 +104,9 @@ class ValueDialog(TouchDialog):
         self.entry.setValidator(QRegularExpressionValidator(QRegularExpression('[0-9]{0,20}' if pin else '[0-9]{0,12}(\\.[0-9]{0,3})?'), self.entry))
         if pin:
             self.entry.setEchoMode(QLineEdit.Password)
+        if pin:
+            from .branding import logo_label
+            self.body.addWidget(logo_label(height=48))
         self.body.addWidget(self.entry)
         self.dots = QLabel('○ ○ ○ ○') if pin else None
         if self.dots:
@@ -161,3 +164,36 @@ class TextDialog(TouchDialog):
         self.entry = QLineEdit(value)
         self.body.addWidget(self.entry)
         self.confirm()
+
+
+class TouchMessage:
+    """Short touch notices and explicit confirmations with safe keyboard defaults."""
+    Yes = 1
+    No = 0
+
+    @staticmethod
+    def information(parent, title, text):
+        dialog = TouchDialog(parent, title)
+        label = QLabel(text)
+        label.setWordWrap(True)
+        label.setMaximumWidth(700)
+        dialog.body.addWidget(label)
+        dialog.confirm('ตกลง').setDefault(True)
+        return dialog.exec()
+
+    warning = information
+    critical = information
+
+    @staticmethod
+    def question(parent, title, text):
+        dialog = TouchDialog(parent, title)
+        label = QLabel(text)
+        label.setWordWrap(True)
+        label.setMaximumWidth(700)
+        dialog.body.addWidget(label)
+        cancel = dialog.confirm('กลับ', dialog.reject)
+        cancel.setDefault(True)
+        cancel.setFocus()
+        confirm = dialog.confirm('ยืนยัน')
+        confirm.setAutoDefault(False)
+        return TouchMessage.Yes if dialog.exec() == QDialog.Accepted else TouchMessage.No

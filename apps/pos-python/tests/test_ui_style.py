@@ -147,7 +147,7 @@ class UiStyleTest(unittest.TestCase):
         self.assertIn("service.open_shift(", session)
         self.assertIn("opening_dialog.opening_cash", session)
         self.assertNotIn('opening_cash=Decimal("0")', session)
-        self.assertIn("ExistingShiftDialog(self, existing_shift)", session)
+        self.assertNotIn("ExistingShiftDialog(self, existing_shift)", session)
         self.assertIn("ทำกะเดิมต่อ", source)
         self.assertIn("ปิดกะเดิม", source)
         self.assertIn("self.resize(480, 700)", source)
