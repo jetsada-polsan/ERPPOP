@@ -1,6 +1,12 @@
 # Handoff — 2026-11-02 (แก้สีหน้า Executive Dashboard)
 
 ## Handoff - 2026-11-05
+- Commit: pending — compact POS touch keypad
+- ทำอะไร: ลด pop-up แป้นตัวเลขของ JET POS Python จากขั้นต่ำ 560×620 เป็น 480×540, ลดปุ่มจาก 72px เป็น 58px, ลด font/margin/spacing เพื่อไม่บังหน้าขาย แต่ยังใหญ่พอสำหรับจอสัมผัส
+- ทดสอบ: `PYTHONPATH=apps/jet-pos-python python3 -m unittest discover -s apps/jet-pos-python/tests -v` ผ่าน 25 tests; `QT_QPA_PLATFORM=offscreen` สร้าง `TouchKeypadDialog` และตรวจขนาดใหม่ผ่าน; `git diff --check` ผ่าน
+- Deploy: ยังไม่ deploy; ต้อง build installer รุ่นใหม่หลัง push ก่อนเห็นผลบนเครื่อง POS
+
+## Handoff - 2026-11-05
 - Commit: pending — one-step POS cashier enablement
 - ทำอะไร: เพิ่มปุ่ม `เปิดใช้ POS` ใน จัดการเครื่อง POS → คนขาย & PIN สำหรับคนขายที่มีบัญชี ERP แล้วแต่ยังไม่มีสิทธิ์ขาย; ปุ่มเดียวเพิ่ม role `CASHIER` แบบจำกัดเฉพาะสาขาของคนขาย, เปิดสิทธิ์ `pos.sell`, ถอนการยืนยันเครื่องเดิม และบันทึก audit จากนั้นตั้ง PIN ได้ทันที โดยไม่ให้สิทธิ์ข้ามสาขา
 - ทดสอบ: `php artisan test --filter='PosAdminReassignTest|PosInstallPageTest|PosCashierIdentityTest|PosPinChangeTest'` ผ่าน 34 tests / 128 assertions; `php artisan route:list --name=pos-admin.cashiers.enable`, `php artisan view:cache`, และ `git diff --check` ผ่าน

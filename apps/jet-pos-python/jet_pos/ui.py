@@ -126,28 +126,28 @@ class TouchKeypadDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setModal(True)
-        self.setMinimumSize(560, 620)
+        self.setMinimumSize(480, 540)
         self.setStyleSheet("""
             QDialog { background:#f3f6f8; }
-            QLabel#touchTitle { color:#075b86; font-size:25px; font-weight:900; }
-            QLabel#touchHint { color:#687b88; font-size:15px; }
-            QLineEdit#touchValue { min-height:66px; padding:0 20px; border:2px solid #9ac4d6; border-radius:10px; background:white; color:#113f58; font-size:30px; font-weight:800; text-align:right; }
-            QPushButton#key { min-height:72px; border:1px solid #c8d8e0; border-radius:10px; background:white; color:#173f56; font-size:25px; font-weight:900; }
+            QLabel#touchTitle { color:#075b86; font-size:22px; font-weight:900; }
+            QLabel#touchHint { color:#687b88; font-size:14px; }
+            QLineEdit#touchValue { min-height:56px; padding:0 16px; border:2px solid #9ac4d6; border-radius:10px; background:white; color:#113f58; font-size:26px; font-weight:800; text-align:right; }
+            QPushButton#key { min-height:58px; border:1px solid #c8d8e0; border-radius:10px; background:white; color:#173f56; font-size:21px; font-weight:900; }
             QPushButton#key:hover { background:#e8f6fb; border-color:#1596cb; }
-            QPushButton#danger { min-height:72px; border:1px solid #e4abb0; border-radius:10px; background:#fff4f4; color:#b42318; font-size:20px; font-weight:900; }
-            QPushButton#confirm { min-height:72px; border:0; border-radius:10px; background:#087faf; color:white; font-size:20px; font-weight:900; }
+            QPushButton#danger { min-height:58px; border:1px solid #e4abb0; border-radius:10px; background:#fff4f4; color:#b42318; font-size:18px; font-weight:900; }
+            QPushButton#confirm { min-height:58px; border:0; border-radius:10px; background:#087faf; color:white; font-size:18px; font-weight:900; }
             QPushButton#confirm:hover { background:#075b86; }
         """)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(28, 28, 28, 28)
-        layout.setSpacing(14)
+        layout.setContentsMargins(22, 22, 22, 22)
+        layout.setSpacing(10)
         heading = QLabel(title); heading.setObjectName("touchTitle")
         note = QLabel(hint); note.setObjectName("touchHint"); note.setWordWrap(True)
         self.value = QLineEdit(initial); self.value.setObjectName("touchValue"); self.value.setReadOnly(True)
         if secret:
             self.value.setEchoMode(QLineEdit.EchoMode.Password)
         layout.addWidget(heading); layout.addWidget(note); layout.addWidget(self.value)
-        keys = QGridLayout(); keys.setSpacing(10)
+        keys = QGridLayout(); keys.setSpacing(8)
         key_labels = ("1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "⌫", "ล้าง") if allow_decimal else ("1", "2", "3", "4", "5", "6", "7", "8", "9", "ล้าง", "0", "⌫")
         for index, text in enumerate(key_labels):
             button = QPushButton(text)
