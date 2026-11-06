@@ -1,3 +1,13 @@
+# Handoff — 2026-11-06 (Product popup UI — deployed production)
+
+## Deploy status
+- Source branch: `codex/modern-product-popups`; deployed commit `716e017` through GitHub Actions run `42160773994` to **production** on owner approval.
+- Workflow completed successfully: full PHP suite, report-search interaction test, `pnpm install --frozen-lockfile`, frontend build, manifest verification, release upload, and server `scripts/deploy.sh` all passed.
+- Scope is presentation-only: modernized the product edit and add-product popup shell, tabs, form/table surfaces, and responsive layout. No routes, data fields, validation, conditions, or business logic changed.
+- Local verification before deployment: `git diff --check`, `php artisan view:cache`, and product/barcode/scale PLU feature tests passed (`25 tests`, `177 assertions`).
+
+---
+
 # Handoff — 2026-11-06 (P0 money integrity — workspace only)
 
 ## Commit / ขอบเขต
