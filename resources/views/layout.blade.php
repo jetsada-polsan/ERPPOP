@@ -1593,6 +1593,7 @@
             }
             $appLogo = $companyLogo;
         @endphp
+@if (!request()->boolean('popup'))
 @if ($erpLayout === 'odoo' && !request()->boolean('popup'))
         {{-- แถบบนแบบ Odoo: ปุ่มโมดูล + ชื่อระบบ + เมนูหมวด
              ใช้ $menuSections ชุดเดียวกับเมนูข้าง จะได้ไม่มีวันหลุดจากกัน --}}
@@ -1855,6 +1856,7 @@
             onclick="document.documentElement.classList.toggle('subnav-collapsed'); localStorage.setItem('erp-subnav', document.documentElement.classList.contains('subnav-collapsed') ? 'closed' : 'open')">
             <i class="bi" id="fa-collapse-icon"></i>
         </button>
+@endif
 
         <main class="app-main">
             <div class="erp-print-head">
@@ -1876,6 +1878,7 @@
             const root = document.documentElement;
             if (localStorage.getItem('erp-subnav') === 'closed') root.classList.add('subnav-collapsed');
             const icon = document.getElementById('fa-collapse-icon');
+            if (!icon) return;
             const sync = () => icon.className = 'bi ' + (root.classList.contains('subnav-collapsed') ? 'bi-chevron-right' : 'bi-chevron-left');
             sync();
             new MutationObserver(sync).observe(root, { attributes: true, attributeFilter: ['class'] });

@@ -1,3 +1,19 @@
+# Handoff — 2026-11-06 (Product popup chrome removal — pending deploy)
+
+## Commit / scope
+- Branch: `codex/modern-product-popups`.
+- Fixed the product-popup shell only: when a request has `popup=1`, `resources/views/layout.blade.php` now omits the ERP top navigation, sidebar, mobile backdrop, and navigation collapse button from the rendered DOM. The iframe therefore contains only the product popup's own header, tabs, fields, and controls.
+- Added the matching null guard for the existing collapse-button script, because the button is intentionally absent in popup mode.
+- No routes, actions, data, validations, permissions, or product/business conditions changed.
+
+## Verification
+- `git diff --check` passed.
+- `php artisan view:clear && php artisan view:cache` passed.
+- `php artisan test tests/Feature/ProductCatalogFilterTest.php tests/Feature/BarcodePolicyTest.php tests/Feature/ScalePluPageTest.php --no-coverage` passed: 25 tests, 177 assertions.
+- **Pending deployment:** this correction has not been deployed yet.
+
+---
+
 # Handoff — 2026-11-06 (Product popup UI — deployed production)
 
 ## Deploy status
