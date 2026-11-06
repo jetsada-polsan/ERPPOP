@@ -235,25 +235,14 @@ def test_rounding_allocations_never_overdraw_small_line():
 def test_promotion_stays_active_on_its_last_local_day(tmp_path):
     """Production ERP sends ends_date for 6 Nov (Bangkok) as UTC midnight 2026-11-05T17:00Z.
     Comparing that text made every promotion vanish on its last day."""
-    import os, time as _time
-    old_tz = os.environ.get('TZ')
-    os.environ['TZ'] = 'Asia/Bangkok'
-    _time.tzset()
-    try:
-        db = connect(tmp_path / 'tz.db')
-        db.execute("INSERT INTO products(id,server_id,sku,name,unit_name,price,updated_at) VALUES (1,37965,'208078','ฝาโดม','แถว','20',?)", (now(),))
-        row = dict(id=11, name='TEST-UAT 1', promo_type='discount', product_id=37965, min_qty=2, discount_type='baht',
-                   discount_value=5, starts_date=None, ends_date='2026-11-05T17:00:00.000000Z',
-                   starts_at=None, ends_at='2026-11-06T16:59:00.000000Z')
-        assert replace_promotions(db, [row]) == 1
-        bangkok = timezone(timedelta(hours=7))
-        assert len(active_promotions(db, datetime(2026, 11, 6, 9, 45, tzinfo=bangkok))) == 1
-        assert len(active_promotions(db, datetime(2026, 11, 6, 23, 58, tzinfo=bangkok))) == 1
-        assert len(active_promotions(db, datetime(2026, 11, 7, 0, 1, tzinfo=bangkok))) == 0
-        db.close()
-    finally:
-        if old_tz is None:
-            os.environ.pop('TZ', None)
-        else:
-            os.environ['TZ'] = old_tz
-        _time.tzset()
+    db = connect(tmp_path / 'tz.db')
+    db.execute("INSERT INTO products(id,server_id,sku,name,unit_name,price,updated_at) VALUES (1,37965,'208078','ฝาโดม','แถว','20',?)", (now(),))
+    row = dict(id=11, name='TEST-UAT 1', promo_type='discount', product_id=37965, min_qty=2, discount_type='baht',
+               discount_value=5, starts_date=None, ends_date='2026-11-05T17:00:00.000000Z',
+               starts_at=None, ends_at='2026-11-06T16:59:00.000000Z')
+    assert replace_promotions(db, [row]) == 1
+    bangkok = timezone(timedelta(hours=7))
+    assert len(active_promotions(db, datetime(2026, 11, 6, 9, 45, tzinfo=bangkok))) == 1
+    assert len(active_promotions(db, datetime(2026, 11, 6, 23, 58, tzinfo=bangkok))) == 1
+    assert len(active_promotions(db, datetime(2026, 11, 7, 0, 1, tzinfo=bangkok))) == 0
+    db.close()
