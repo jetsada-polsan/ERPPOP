@@ -77,7 +77,7 @@
                             <td class="fw-semibold">{{ $row['branch']->code }} {{ $row['branch']->name_th }}</td>
                             <td>{!! $row['has_warehouse'] ? '<i class="bi bi-check-circle-fill text-success"></i>' : '<span class="text-danger">ยังไม่มี</span>' !!}</td>
                             <td>{{ $row['devices'] }} @if($row['devices'] > $row['online_devices'])<span class="small text-muted">(ยังไม่เคยต่อ {{ $row['devices'] - $row['online_devices'] }})</span>@endif</td>
-                            <td>{{ $row['cashiers_with_pin'] }} / {{ $row['cashiers'] }}</td>
+                            <td>{{ $row['cashiers_with_pin'] }} / {{ $row['eligible_cashiers'] }} <span class="small text-muted">(ทั้งหมด {{ $row['cashiers'] }})</span></td>
                             <td>
                                 @if($ready)
                                     <span class="badge text-bg-success">พร้อมขาย</span>
@@ -156,17 +156,17 @@
                             <td class="text-end text-nowrap">
                                 @if($row['active'])
                                     <span class="me-2">รหัสเครื่อง <strong class="font-monospace fs-6">{{ $d->pair_code }}</strong></span>
-                                    <form method="post" action="{{ route('pos-admin.devices.pair-code', $d) }}" class="d-inline" onsubmit="return confirm('เปลี่ยนรหัสเครื่องนี้?')">
+                                    <form method="post" action="{{ route('pos-admin.devices.pair-code', $d) }}" class="d-inline" data-confirm="เปลี่ยนรหัสเครื่องนี้?">
                                         @csrf
                                         <button class="btn btn-sm btn-outline-secondary">เปลี่ยนรหัส</button>
                                     </form>
-                                    <form method="post" action="{{ route('settings.pos-token.rotate') }}" class="d-inline" onsubmit="return confirm('ออก Token ใหม่ให้ {{ addslashes($d->name) }}? Token เดิมใช้ไม่ได้ทันที ต้องวาง Token ใหม่ที่เครื่อง')">
+                                    <form method="post" action="{{ route('settings.pos-token.rotate') }}" class="d-inline" data-confirm="ออก Token ใหม่ให้ {{ addslashes($d->name) }}? Token เดิมใช้ไม่ได้ทันที ต้องวาง Token ใหม่ที่เครื่อง">
                                         @csrf
                                         <input type="hidden" name="pos_device_id" value="{{ $d->id }}">
                                         <button class="btn btn-sm btn-outline-primary" title="ออก Token ใหม่"><i class="bi bi-arrow-repeat"></i> Token ใหม่</button>
                                     </form>
                                 @endif
-                                <form method="post" action="{{ route('settings.pos-token.delete') }}" class="d-inline" onsubmit="return confirm('ลบเครื่อง {{ addslashes($d->name) }}? เครื่องนี้จะเชื่อม ERP ไม่ได้อีก')">
+                                <form method="post" action="{{ route('settings.pos-token.delete') }}" class="d-inline" data-confirm="ลบเครื่อง {{ addslashes($d->name) }}? เครื่องนี้จะเชื่อม ERP ไม่ได้อีก">
                                     @csrf @method('DELETE')
                                     <input type="hidden" name="pos_device_id" value="{{ $d->id }}">
                                     <button class="btn btn-sm btn-outline-danger" title="ลบเครื่อง"><i class="bi bi-trash3"></i></button>
@@ -217,18 +217,22 @@
                     <tbody>
                     @foreach($branches as $row)
                         @foreach($row['cashier_list'] as $cashier)
-                            @php $hasPin = $overview->hasPin($cashier); @endphp
+                            @php
+                                $eligible = $overview->canUsePos($cashier, $row['branch']->id);
+                                $hasPin = $overview->hasPin($cashier);
+                            @endphp
                             <tr>
                                 <td>{{ $row['branch']->code }}</td>
                                 <td class="fw-semibold">{{ $cashier->code }}</td>
                                 <td>{{ $cashier->name }}</td>
                                 <td>
-                                    @if(! $hasPin)<span class="badge text-bg-warning">ยังไม่ตั้ง</span>
+                                    @if(! $eligible)<span class="badge text-bg-danger">ไม่มีสิทธิ์ POS/สาขา</span>
+                                    @elseif(! $hasPin)<span class="badge text-bg-warning">ยังไม่ตั้ง</span>
                                     @elseif($cashier->must_change_pin)<span class="badge text-bg-info">รอเปลี่ยนครั้งแรก</span>
                                     @else<span class="badge text-bg-success">ตั้งแล้ว</span>@endif
                                 </td>
                                 <td class="text-end text-nowrap">
-                                    <form method="post" action="{{ route('pos-admin.cashiers.move', $cashier) }}" class="d-inline-flex gap-1" onsubmit="return confirm('ย้าย {{ $cashier->code }} ไปสาขาที่เลือก?')">
+                                    <form method="post" action="{{ route('pos-admin.cashiers.move', $cashier) }}" class="d-inline-flex gap-1" data-confirm="ย้าย {{ $cashier->code }} ไปสาขาที่เลือก?">
                                         @csrf
                                         <select name="branch_id" class="form-select form-select-sm" style="width:auto" aria-label="ย้ายไปสาขา">
                                             @foreach($allBranches as $target)<option value="{{ $target->id }}" @selected($target->id === $cashier->branch_id)>{{ $target->code }}</option>@endforeach
@@ -237,9 +241,19 @@
                                     </form>
                                     <form method="post" action="{{ route('settings.pos-cashiers.set-pin', $cashier) }}" class="d-inline-flex gap-1">
                                         @csrf
-                                        <input type="password" name="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required autocomplete="new-password" class="form-control form-control-sm" style="width:80px" placeholder="4 หลัก" aria-label="PIN ใหม่ของ {{ $cashier->code }}">
-                                        <button class="btn btn-sm btn-outline-primary"><i class="bi bi-key me-1"></i>ตั้ง PIN</button>
+                                        <input type="password" name="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required autocomplete="new-password" class="form-control form-control-sm" style="width:80px" placeholder="4 หลัก" aria-label="PIN ใหม่ของ {{ $cashier->code }}" @disabled(! $eligible)>
+                                        <button class="btn btn-sm btn-outline-primary" @disabled(! $eligible) title="{{ $eligible ? '' : 'เพิ่มสิทธิ์ pos.sell และผูกสาขาให้บัญชี ERP ก่อน' }}"><i class="bi bi-key me-1"></i>ตั้ง PIN</button>
                                     </form>
+                                    @if(! $eligible)
+                                        @if($cashier->user)
+                                            <form method="post" action="{{ route('pos-admin.cashiers.enable', $cashier) }}" class="d-inline">
+                                                @csrf
+                                                <button class="btn btn-sm btn-primary"><i class="bi bi-check-circle me-1"></i>เปิดใช้ POS</button>
+                                            </form>
+                                        @else
+                                            <span class="small text-danger">ผูกบัญชี ERP ก่อน</span>
+                                        @endif
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach
@@ -261,6 +275,15 @@
                         'scanner_mode' => 'keyboard', 'scale_mode' => 'keyboard', 'customer_display' => 'none',
                         'cash_drawer_enabled' => false, 'auto_print' => false, 'print_copies' => 1], $terminal->hardware_profile ?? []);
                 @endphp
+                <form method="post" action="{{ route('pos-admin.terminals.float', $terminal) }}" class="border rounded-2 p-3 mb-3">
+                    @csrf
+                    <strong>{{ $terminal->code }} · นโยบายลิ้นชัก</strong>
+                    <label>เงินทอนประจำลิ้นชัก <input name="default_float" type="number" min="0" step="0.01" required value="{{ $terminal->default_float }}"></label>
+                    <label>เตือนเงินสดเกิน <input name="cash_warning_threshold" type="number" min="0" step="0.01" required value="{{ $terminal->cash_warning_threshold }}"></label>
+                    <input type="hidden" name="blind_count" value="0">
+                    <label><input type="checkbox" name="blind_count" value="1" @checked($terminal->blind_count)> นับแบบไม่เห็นยอด</label>
+                    <button class="btn btn-primary btn-sm">บันทึกนโยบาย</button>
+                </form>
                 <form method="post" action="{{ route('settings.pos-terminal.hardware') }}" class="border rounded-2 p-3 mb-3">
                     @csrf
                     <input type="hidden" name="pos_terminal_id" value="{{ $terminal->id }}">
@@ -313,11 +336,16 @@
                     @if($installer)
                         <a href="{{ route('python-pos.download') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-1"></i>Python รุ่น {{ $installer['version'] }}</a>
                     @endif
+                    @if($jetPythonInstaller)
+                        <a href="{{ route('jet-python-pos.download') }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-download me-1"></i>JET POS Python UAT {{ $jetPythonInstaller['version'] }}</a>
+                    @else
+                        <button type="button" class="btn btn-outline-primary btn-sm" disabled title="รอผ่าน UAT และอัปโหลดไฟล์ติดตั้งก่อนเปิดดาวน์โหลด"><i class="bi bi-hourglass-split me-1"></i>JET POS Python UAT (รอทดสอบ)</button>
+                    @endif
                     @if(! $vueInstaller && ! $installer)
                         <div class="small text-danger">ยังไม่มีไฟล์ติดตั้งบนเซิร์ฟเวอร์</div>
                     @endif
                 </div>
-                <div class="small text-muted mt-2">แนะนำ Vue/Tauri สำหรับตัวติดตั้งรุ่นใหม่; Python คงไว้สำหรับเครื่องเดิม</div>
+                <div class="small text-muted mt-2">Vue/Tauri คือเครื่องขายจริงปัจจุบัน · Python รุ่นเดิมคงไว้สำหรับเครื่องเดิม · JET POS Python UAT แยกทดสอบ ยังไม่ใช้ขายจริงจนกว่าจะผ่านเกณฑ์ UAT</div>
             </div></div>
             <div class="pa-step"><span class="pa-step-no">2</span><div>
                 <div class="fw-semibold">กด เพิ่มเครื่อง ที่แท็บ ภาพรวมสาขา</div>

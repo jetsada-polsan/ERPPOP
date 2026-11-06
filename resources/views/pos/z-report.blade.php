@@ -24,7 +24,8 @@
         @media print {
             body { background: #fff; }
             .toolbar { display: none; }
-            .report { margin: 0; box-shadow: none; }
+            .report { margin: 0; box-shadow: none; break-after: page; }
+            .report:last-child { break-after: auto; }
             @page { size: 80mm auto; margin: 0; }
         }
     </style>
@@ -34,7 +35,9 @@
     <button type="button" onclick="window.print()">พิมพ์ Z Report</button>
     <button type="button" onclick="window.close()">ปิด</button>
 </div>
+@foreach(['ใบนำส่ง', 'ใบเก็บ'] as $copy)
 <main class="report">
+    <div class="subtitle">{{ $copy }}</div>
     <h1>MPM Food Group</h1>
     <div class="subtitle">รายงานปิดกะ (Z Report)</div>
 
@@ -48,6 +51,9 @@
     <section class="section">
         <div class="section-title">ยอดขายตามช่องทาง</div>
         <div class="line"><span>จำนวนบิลสุทธิ</span><strong>{{ number_format($totals['receipt_count']) }}</strong></div>
+        <div class="line"><span>จำนวนยกเลิก</span><strong>{{ $shift->receipts()->where('status', 'void')->count() }}</strong></div>
+        <div class="line"><span>จำนวนรับคืน</span><strong>{{ DB::table('pos_receipt_returns')->where('pos_shift_id', $shift->id)->where('status', 'completed')->count() }}</strong></div>
+        <div class="line"><span>ส่วนลดรวม</span><strong>{{ number_format($shift->receipts()->where('status', 'completed')->sum('discount_amount'), 2) }}</strong></div>
         <div class="line"><span>เงินสดสุทธิ</span><strong>{{ number_format($totals['cash'], 2) }}</strong></div>
         <div class="line"><span>QR / โอน</span><strong>{{ number_format($totals['transfer'], 2) }}</strong></div>
         <div class="line"><span>บัตรเครดิต</span><strong>{{ number_format($totals['credit_card'], 2) }}</strong></div>
@@ -56,6 +62,12 @@
 
     <section class="section">
         <div class="section-title">กระทบยอดเงินสด</div>
+        <div class="line"><span>เงินทอนยกมา</span><strong>{{ $shift->carried_float === null ? '-' : number_format($shift->carried_float, 2) }}</strong></div>
+        <div class="line"><span>ส่วนต่างตอนรับกะ</span><strong>{{ $shift->opening_variance === null ? '-' : number_format($shift->opening_variance, 2) }}</strong></div>
+        <div class="line"><span>เหตุผลตอนรับกะ</span><strong>{{ $shift->opening_note ?? '-' }}</strong></div>
+        <div class="line"><span>เงินนำส่งปิดกะ</span><strong>{{ $shift->deposit_amount === null ? '-' : number_format($shift->deposit_amount, 2) }}</strong></div>
+        <div class="line"><span>เลขซอง</span><strong>{{ $shift->deposit_reference ?? '-' }}</strong></div>
+        <div class="line"><span>เงินทอนเก็บในลิ้นชัก</span><strong>{{ $shift->float_kept === null ? '-' : number_format($shift->float_kept, 2) }}</strong></div>
         <div class="line"><span>เงินทอนตั้งต้น</span><strong>{{ number_format($shift->opening_cash, 2) }}</strong></div>
         <div class="line"><span>เงินสดขายสุทธิ</span><strong>{{ number_format($totals['cash'], 2) }}</strong></div>
         <div class="line"><span>เงินเพิ่มเข้าลิ้นชัก</span><strong>{{ number_format($cashMovements['cash_in'], 2) }}</strong></div>
@@ -87,9 +99,10 @@
     @endif
 
     <div class="signatures">
-        <div class="signature">แคชเชียร์</div>
-        <div class="signature">ผู้ตรวจสอบ</div>
+        <div class="signature">ผู้ส่ง</div>
+        <div class="signature">ผู้รับ (หัวหน้า)</div>
     </div>
 </main>
+@endforeach
 </body>
 </html>

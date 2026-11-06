@@ -1,0 +1,28 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const { JSDOM } = require(process.env.JSDOM_MODULE || 'jsdom');
+(async () => {
+    const dom = new JSDOM('<form data-confirm="Confirm"><button name="save">Save</button><button name="reset" value="1" data-confirm="Reset">Reset</button></form>', { runScripts: 'outside-only' });
+    const w = dom.window;
+    let approved = false, prompts = 0;
+    w.erpConfirm = async () => { prompts++; return { isConfirmed: approved }; };
+    w.confirm = () => { throw Error('Native confirm used'); };
+    w.eval(fs.readFileSync('resources/views/components/confirm-action.blade.php', 'utf8').replace(/<\/?script>/g, ''));
+    const form = w.document.querySelector('form');
+    const saved = [];
+    form.addEventListener('submit', event => { event.preventDefault(); saved.push(event.submitter.name); });
+    const flush = () => new Promise(resolve => setImmediate(resolve));
+    form.requestSubmit(form.querySelector('[name="save"]'));
+    await flush();
+    assert.deepEqual(saved, [], 'Cancel never submits');
+    approved = true;
+    form.requestSubmit(form.querySelector('[name="save"]'));
+    await flush();
+    assert.deepEqual(saved, ['save']);
+    form.requestSubmit(form.querySelector('[name="reset"]'));
+    await flush();
+    assert.deepEqual(saved, ['save', 'reset'], 'Confirmed form keeps submitter and submits once');
+    assert.equal(prompts, 3);
+    w.close();
+    console.log('Passed confirmation DOM cancel, submit-once, submitter and no-native-dialog checks');
+})().catch(e => { console.error(e); process.exit(1); });

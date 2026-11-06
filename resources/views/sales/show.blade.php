@@ -134,7 +134,7 @@ $isPartial = $openItem && $openItem->status === 'partial';
                 <div class="d-flex justify-content-between"><dt class="fw-normal text-muted">สถานะ</dt>
                     <dd class="mb-0">
                         <span class="badge {{ ['open'=>'text-bg-warning','partial'=>'text-bg-info','paid'=>'text-bg-success'][$openItem->status] ?? 'text-bg-light' }}">
-                            {{ ['open'=>'ค้างชำระ','partial'=>'ชำระบางส่วน','paid'=>'ชำระแล้ว'][$openItem->status] ?? $openItem->status }}
+                            {{ ['open'=>'ค้างชำระ','partial'=>'ชำระบางส่วน','paid'=>'ชำระแล้ว'][$openItem->status] ?? \App\Support\DocumentStatus::label($openItem->status) }}
                         </span>
                     </dd>
                 </div>

@@ -44,6 +44,11 @@ class SaleReturnService
      */
     public function create(array $data): Document
     {
+        return DB::transaction(fn () => $this->createLocked($data));
+    }
+
+    private function createLocked(array $data): Document
+    {
         if (empty($data['items'])) {
             throw new RuntimeException('ต้องมีรายการสินค้าอย่างน้อย 1 รายการ');
         }
@@ -76,6 +81,7 @@ class SaleReturnService
         }
 
         if ($source) {
+            $source = Document::whereKey($source->id)->lockForUpdate()->firstOrFail();
             if ((int) $source->branch_id !== (int) $branch->id) {
                 throw new RuntimeException("ใบขาย {$source->doc_number} ไม่ได้ขายที่สาขานี้");
             }
@@ -87,6 +93,9 @@ class SaleReturnService
             }
             // ใบขายเชื่อ: ผูกลูกหนี้ใบนั้นให้อัตโนมัติ approve() จะไปลดยอดถูกใบ
             $openItem ??= CustomerOpenItem::where('document_id', $source->id)->first();
+            $this->assertAmount($source, DecimalMath::sum(collect($data['items'])->map(
+                fn ($item) => DecimalMath::multiply($item['qty'], $item['unit_price']),
+            )));
             $this->assertReturnable($source, $data['items']);
         }
 
@@ -102,6 +111,9 @@ class SaleReturnService
             $totalAmount = DecimalMath::sum(
                 $items->map(fn ($item) => DecimalMath::multiply($item['qty'], $item['unit_price'])),
             );
+            if ($source) {
+                $this->assertAmount($source, $totalAmount);
+            }
             $originalCosts = $openItem?->document?->stockDocument?->items
                 ?->keyBy('product_id') ?? collect();
             $currentCosts = Product::whereIn('id', $items->pluck('product_id'))
@@ -209,7 +221,7 @@ class SaleReturnService
             ->selectRaw('stock_document_items.product_id as product_id, sum(stock_document_items.qty) as returned_qty')
             ->pluck('returned_qty', 'product_id');
 
-        return $sold->map(function ($row) use ($returned) {
+        $lines = $sold->map(function ($row) use ($returned) {
             $back = (float) ($returned[$row->product_id] ?? 0);
 
             return [
@@ -222,6 +234,26 @@ class SaleReturnService
                 'returnable' => max(0.0, round((float) $row->sold - $back, 4)),
             ];
         })->keyBy('product_id');
+        $budget = app(SaleCreditLimit::class)->remaining($sale);
+        $proposed = DecimalMath::sum($lines->map(fn ($line) => DecimalMath::multiply($line['returnable'], $line['unit_price'])));
+        if (DecimalMath::compare($proposed, $budget) > 0) {
+            $ratio = DecimalMath::of($budget)->dividedBy(DecimalMath::of($proposed), 16, \Brick\Math\RoundingMode::Down);
+            $lines = $lines->map(function ($line) use ($ratio) {
+                $line['unit_price'] = (float) DecimalMath::of($line['unit_price'])->multipliedBy($ratio)->toScale(4, \Brick\Math\RoundingMode::Down)->__toString();
+                return $line;
+            });
+        }
+        return $lines;
+    }
+
+    private function assertAmount(Document $sale, string $amount, ?int $exceptId = null): void
+    {
+        $remaining = app(SaleCreditLimit::class)->remaining($sale, $exceptId);
+        if (DecimalMath::compare($amount, $remaining) > 0) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'items' => 'ยอดรับคืนเกินมูลค่าที่คืนได้ เหลือ '.$remaining.' บาท',
+            ]);
+        }
     }
 
     /** จำนวนคืนต่อสินค้าต้องไม่เกิน ขาย - คืนไปแล้ว และสินค้าต้องอยู่ในใบขาย */
@@ -265,7 +297,16 @@ class SaleReturnService
             throw new RuntimeException('ไม่มีสิทธิ์อนุมัติใบรับคืน');
         }
         return DB::transaction(function () use ($document, $userId): Document {
+            $source = $document->source_document_id
+                ? Document::whereKey($document->source_document_id)->lockForUpdate()->firstOrFail()
+                : ($document->reference ? $this->findSourceSale($document->reference) : null);
+            if ($source && ! $document->source_document_id) {
+                $source = Document::whereKey($source->id)->lockForUpdate()->firstOrFail();
+            }
             $locked = Document::whereKey($document->id)->lockForUpdate()->firstOrFail();
+            if ($source) {
+                $this->assertAmount($source, (string) $locked->total_amount, $locked->id);
+            }
             $locked->load(['documentType', 'stockDocument.items.sourceStockLot']);
             app(\App\Services\Documents\ApprovalPolicyService::class)->authorize('SALE_RETURN', $locked->total_amount,
                 (int) $locked->branch_id, $locked->created_by, User::findOrFail($userId), 'finance.note.approve');

@@ -35,7 +35,7 @@
                     <div>#{{ $item['product_id'] ?? '?' }} × {{ $item['qty'] ?? '?' }} @ {{ number_format((float) ($item['unit_price'] ?? 0), 2) }}</div>
                 @endforeach
             </small></td>
-            <td><span class="badge {{ $sale->status === 'needs_review' ? 'bg-warning text-dark' : ($sale->status === 'posted' ? 'bg-success' : 'bg-secondary') }}">{{ $labels[$sale->status] ?? $sale->status }}</span></td>
+            <td><span class="badge {{ $sale->status === 'needs_review' ? 'bg-warning text-dark' : ($sale->status === 'posted' ? 'bg-success' : 'bg-secondary') }}">{{ $labels[$sale->status] ?? \App\Support\DocumentStatus::label($sale->status) }}</span></td>
             <td style="max-width:320px"><small style="white-space:pre-line">{{ $sale->receipt_no ? 'บิล '.$sale->receipt_no."\n" : '' }}{{ $sale->review_reason }}</small></td>
             <td class="text-nowrap">
                 @if($sale->status === 'needs_review' && $sale->source !== 'desktop')

@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'branch_id', 'pos_terminal_id', 'cashier_id', 'cashier_user_id', 'shift_no', 'opened_at', 'closed_at',
     'opening_cash', 'cash_sales', 'transfer_sales', 'card_sales', 'cheque_sales',
     'expected_cash', 'counted_cash', 'cash_difference', 'receipt_count', 'status',
-    'opening_note', 'closing_note',
+    'opening_note', 'closing_note', 'carried_float', 'opening_variance', 'float_kept', 'deposit_amount', 'deposit_reference',
 ])]
 class PosShift extends Model
 {
@@ -48,6 +48,10 @@ class PosShift extends Model
     protected function casts(): array
     {
         return [
+            'carried_float' => 'decimal:2',
+            'opening_variance' => 'decimal:2',
+            'float_kept' => 'decimal:2',
+            'deposit_amount' => 'decimal:2',
             'opened_at' => 'datetime',
             'closed_at' => 'datetime',
             'opening_cash' => 'decimal:4',

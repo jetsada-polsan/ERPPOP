@@ -7,8 +7,11 @@ use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\PosDevice;
 use App\Models\PosTerminal;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\Salesman;
 use App\Services\Pos\PosAdminOverview;
+use App\Support\JetPosPythonInstaller;
 use App\Support\PythonPosInstaller;
 use App\Support\PosReleaseManifest;
 use Illuminate\Http\RedirectResponse;
@@ -33,10 +36,29 @@ class PosAdminController extends Controller
             'allBranches' => Branch::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name_th']),
             'terminals' => PosTerminal::with('branch:id,code,name_th')->orderBy('code')->get(),
             'installer' => PythonPosInstaller::current(),
+            'jetPythonInstaller' => JetPosPythonInstaller::current(),
             'vueInstaller' => $releases->current(),
             'pinMode' => AppSetting::get('pos_passwordless_login') === '1' ? 'selection' : 'pin',
             'onlineMinutes' => PosAdminOverview::ONLINE_MINUTES,
         ]);
+    }
+
+    public function updateFloat(Request $request, PosTerminal $terminal): RedirectResponse
+    {
+        $data = $request->validate([
+            'default_float' => ['required', 'numeric', 'min:0', 'max:999999999999.99', 'decimal:0,2'],
+            'cash_warning_threshold' => ['required', 'numeric', 'min:0', 'max:999999999999.99', 'decimal:0,2'],
+            'blind_count' => ['required', 'boolean'],
+        ]);
+        $old = $terminal->only(array_keys($data));
+        DB::transaction(function () use ($terminal, $data, $old) {
+            $terminal->update($data);
+            AuditLog::create(['user_id' => auth()->id(), 'branch_id' => $terminal->branch_id,
+                'action' => 'pos_float_policy_updated', 'table_name' => 'pos_terminals', 'record_id' => $terminal->id,
+                'old_values' => $old, 'new_values' => $data]);
+        });
+
+        return back()->with('success', 'บันทึกนโยบายลิ้นชักแล้ว');
     }
 
     public function newPairCode(PosDevice $device): RedirectResponse
@@ -44,6 +66,47 @@ class PosAdminController extends Controller
         $device->update(['pair_code' => PosDevice::newPairCode()]);
 
         return back()->with('success', "เปลี่ยนรหัสของ {$device->name} แล้ว");
+    }
+
+    /** Enable an existing cashier for exactly their POS branch in one admin action. */
+    public function enableCashier(Salesman $salesman): RedirectResponse
+    {
+        $salesman->loadMissing('user');
+        $user = $salesman->user;
+        if (! $salesman->is_active || ! $user?->is_active) {
+            return back()->with('error', "เปิดใช้ POS ไม่ได้: {$salesman->code} หรือบัญชี ERP ถูกปิดใช้งาน");
+        }
+
+        DB::transaction(function () use ($salesman, $user) {
+            $permission = Permission::firstOrCreate(['code' => 'pos.sell'], ['name' => 'ขาย POS']);
+            $role = Role::firstOrCreate(['code' => 'CASHIER'], ['name' => 'แคชเชียร์']);
+            $role->permissions()->syncWithoutDetaching([$permission->id]);
+
+            DB::table('user_branch_roles')->updateOrInsert([
+                'user_id' => $user->id,
+                'branch_id' => $salesman->branch_id,
+                'role_id' => $role->id,
+            ], [
+                'is_active' => true,
+                'effective_from' => null,
+                'effective_to' => null,
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]);
+            PosDevice::where('active_cashier_id', $salesman->id)->update([
+                'active_cashier_id' => null, 'active_cashier_user_id' => null, 'cashier_verified_at' => null,
+            ]);
+            AuditLog::create([
+                'user_id' => auth()->id(),
+                'branch_id' => $salesman->branch_id,
+                'action' => 'pos_cashier_enabled',
+                'table_name' => 'salesmen',
+                'record_id' => $salesman->id,
+                'new_values' => ['user_id' => $user->id, 'role' => 'CASHIER'],
+            ]);
+        });
+
+        return back()->with('success', "เปิดใช้ POS ให้ {$salesman->code} แล้ว — ตั้ง PIN ได้ทันที");
     }
 
     /** ย้ายคนขายไปสาขาใหม่: เปลี่ยนสาขาหลัก ปิดสิทธิ์สาขาเดิม และให้บทบาทเดิมที่สาขาใหม่ */

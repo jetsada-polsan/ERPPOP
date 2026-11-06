@@ -80,7 +80,7 @@
                     <div class="row g-3 mb-4">
                         <div class="col-lg-4">
                             <label class="form-label text-muted small">สาขา</label>
-                            <select name="branch_id" required class="form-select">
+                            <select name="branch_id" x-model="branchId" required class="form-select">
                                 @include('partials.branch-options', ['branches' => $branches])
                             </select>
                         </div>
@@ -196,9 +196,9 @@
     function stockIssuePage() {
         return {
             ...erpProductPicker(),
+            ...erpStockPreview(@js($branches), '{{ route('search.stock-balance') }}'),
 
             modalOpen: false,
-            locationId: '',
             items: [stockIssueItem()],
 
             addItem() {
@@ -212,14 +212,15 @@
             },
 
             async refreshOnHandQty(index) {
-                const item = this.items[index];
-                if (! item?.product_id || ! this.locationId) return;
-                const response = await fetch(`{{ route('search.stock-balance') }}?product_id=${item.product_id}&warehouse_location_id=${this.locationId}`);
-                const data = await response.json();
-                item.onHandQty = Number(data.on_hand_qty || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 });
+                await this.previewStock(this.items[index]);
             },
 
             onSubmit(event) {
+                if (!this.stockPreviewReady()) {
+                    event.preventDefault();
+                    window.erpToast?.('warning', 'กรุณารอข้อมูลสต๊อก หรือเลือกคลังและสินค้าใหม่');
+                    return;
+                }
                 const form = event.target;
                 const problems = [];
 

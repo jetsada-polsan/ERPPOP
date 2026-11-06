@@ -77,7 +77,7 @@
                         <div class="row g-3 mb-4">
                             <div class="col-lg-6">
                                 <label class="form-label text-muted small">สาขา</label>
-                                <select name="branch_id" required class="form-select">
+                                <select name="branch_id" x-model="branchId" required class="form-select">
                                     @foreach($branches as $branch)
                                         <option value="{{ $branch->id }}">{{ $branch->code }} - {{ $branch->name_th }}</option>
                                     @endforeach
@@ -126,10 +126,10 @@
                                                 </button>
                                                 <input type="hidden" :name="`items[${index}][product_id]`" x-model="item.product_id">
                                             </td>
-                                            <td class="text-end" x-text="item.systemQty"></td>
+                                            <td class="text-end" x-text="item.previewReady ? item.systemQty : '—'"></td>
                                             <td>
                                                 <input type="number" step="0.0001" min="0" :name="`items[${index}][counted_qty]`"
-                                                    x-model.number="item.counted_qty" required class="form-control text-end">
+                                                    x-model.number="item.counted_qty" :disabled="!item.previewReady" required class="form-control text-end">
                                             </td>
                                             <td class="text-end fw-semibold" :class="diffClass(index)" x-text="diffLabel(index)"></td>
                                             <td class="text-end">
@@ -193,39 +193,32 @@
     function stockAdjustmentPage() {
         return {
             ...erpProductPicker(),
+            ...erpStockPreview(@js($branches), '{{ route('search.stock-balance') }}'),
             modalOpen: false,
-            locationId: '',
-            items: [{ product_id: '', productQuery: '', counted_qty: 0, systemQty: 0, results: [] }],
+            items: [{ product_id: '', productQuery: '', counted_qty: 0, systemQty: null, results: [] }],
 
             openModal() { this.modalOpen = true; },
             closeModal() { this.modalOpen = false; },
             addItem() {
-                this.items.push({ product_id: '', productQuery: '', counted_qty: 0, systemQty: 0, results: [] });
+                this.items.push({ product_id: '', productQuery: '', counted_qty: 0, systemQty: null, results: [] });
             },
             removeItem(index) { this.items.splice(index, 1); },
-            onLocationChange() {
-                this.items.forEach((item, index) => this.refreshSystemQty(index));
-            },
+            onLocationChange() {},
             async onProductPicked(index, product) {
                 this.items[index].productQuery = `${product.sku_code} - ${product.name_th}`;
                 await this.refreshSystemQty(index);
             },
             async refreshSystemQty(index) {
                 const item = this.items[index];
-                if (!item.product_id || !this.locationId) {
-                    item.systemQty = 0;
-                    return;
-                }
-                const response = await fetch(`{{ route('search.stock-balance') }}?product_id=${item.product_id}&warehouse_location_id=${this.locationId}`);
-                const data = await response.json();
-                item.systemQty = Number(data.on_hand_qty || 0);
-                item.counted_qty = item.systemQty;
+                await this.previewStock(item);
+                if (item.previewReady) item.counted_qty = item.systemQty;
             },
             diff(index) {
                 const item = this.items[index];
                 return (Number(item.counted_qty) || 0) - (Number(item.systemQty) || 0);
             },
             diffLabel(index) {
+                if (!this.items[index].previewReady) return '—';
                 const diff = this.diff(index);
                 const formatted = diff.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 return diff > 0 ? `+${formatted}` : formatted;
@@ -237,6 +230,11 @@
                 return 'text-muted';
             },
             onSubmit(event) {
+                if (!this.stockPreviewReady()) {
+                    event.preventDefault();
+                    window.erpToast?.('warning', 'กรุณารอข้อมูลสต๊อก หรือเลือกคลังและสินค้าใหม่');
+                    return;
+                }
                 if (!this.locationId) {
                     event.preventDefault();
                     Swal.fire({ icon: 'warning', title: 'กรุณาเลือกคลังที่ตรวจนับ' });

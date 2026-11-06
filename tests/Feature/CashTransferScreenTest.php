@@ -58,10 +58,28 @@ class CashTransferScreenTest extends TestCase
             'bank_account_id' => $bank->id,
             'amount' => 1000,
             'transfer_date' => '2026-08-23',
-        ])->assertRedirect();
+        ])->assertForbidden();
 
-        // ต้องถูกบังคับกลับมาเป็นสาขาของตัวเอง
-        $this->assertSame($branch->id, (int) Document::sole()->branch_id);
+        $this->assertSame(0, Document::count());
+    }
+
+    public function test_global_and_multiple_branch_users_can_choose_the_cash_branch(): void
+    {
+        [$user, $branch, $bank] = $this->financeUser('MULTI');
+        $other = Branch::create(['code' => 'MULTI-OTHER', 'name_th' => 'สาขาอื่น', 'is_active' => true]);
+        $role = $user->roles()->first();
+        $user->branchRoles()->attach($role->id, ['branch_id' => $branch->id, 'is_active' => true]);
+        $user->branchRoles()->attach($role->id, ['branch_id' => $other->id, 'is_active' => true]);
+        $this->actingAs($user->fresh())->get(route('cash-transfers.index'))->assertOk()
+            ->assertViewHas('defaultBranchId', null)->assertViewHas('branches', fn ($b) => $b->contains('id', $branch->id) && $b->contains('id', $other->id));
+        $this->post(route('cash-transfers.store'), [
+            'type' => 'CASH_WITHDRAWAL', 'branch_id' => $other->id, 'bank_account_id' => $bank->id,
+            'amount' => '100.01', 'transfer_date' => '2026-08-23',
+        ])->assertRedirect(route('cash-transfers.index'));
+        $this->assertSame($other->id, (int) Document::sole()->branch_id);
+        $role->permissions()->attach(Permission::firstOrCreate(['code' => 'reports.all_branches'], ['name' => 'ทุกสาขา'])->id);
+        $this->actingAs($user->fresh())->get(route('cash-transfers.index'))->assertOk()
+            ->assertViewHas('branches', fn ($b) => $b->contains('id', $branch->id) && $b->contains('id', $other->id));
     }
 
     public function test_the_screen_refuses_a_zero_amount(): void

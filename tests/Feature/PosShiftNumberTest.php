@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Controllers\PosController;
 use App\Models\Branch;
 use App\Models\Permission;
+use App\Models\PosDevice;
 use App\Models\PosShift;
 use App\Models\PosTerminal;
 use App\Models\Role;
@@ -72,8 +73,12 @@ class PosShiftNumberTest extends TestCase
         $this->actingAs($user->fresh());
 
         $request = Request::create('/pos/shift/open', 'POST', [
-            'branch_id' => $branch->id, 'cashier_id' => $cashier->id, 'opening_cash' => 1000,
+            'branch_id' => $branch->id, 'cashier_id' => $cashier->id, 'opening_cash' => 1000, 'opening_note' => 'รับเงินจริงทดสอบเลขกะ',
         ]);
+        $device = PosDevice::create(['name' => $code, 'user_id' => $user->id, 'branch_id' => $branch->id,
+            'terminal_code' => 'NUMBER-'.$code, 'token_hash' => hash('sha256', 'number-'.$code),
+            'active_cashier_id' => $cashier->id, 'cashier_verified_at' => now()]);
+        $request->attributes->set('pos_device', $device);
         $this->app->instance('request', $request);
 
         return app(PosController::class)->openShift($request);

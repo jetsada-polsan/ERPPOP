@@ -1,5 +1,14 @@
 # POPSTAR ERP/POS - ความจำกลางของทีม AI
 
+## P0 money integrity — 2026-11-06 (workspace only)
+
+- งานบน `claude/p0-money-integrity` ยังไม่ commit/push เพราะ Git metadata นอก workspace เขียนไม่ได้; ไม่ deploy/ไม่แตะ production. รายละเอียดและตารางส่งมอบครบ 6 ข้ออยู่หัว `docs/ai/task.md`.
+- ใบโอนใหม่อนุมัติเข้า location/lot ระหว่างทาง (ขายไม่ได้) ก่อนตรวจรับเข้าปลายทาง; ขาด/เสียหายสร้างใบตัดชำรุดรออนุมัติและคงมูลค่าไว้จนอนุมัติ. ใบเก่า `transit_location_id=NULL` ลงปลายทางแล้ว ห้ามโอนซ้ำ.
+- GL ใช้ component batches + fingerprint + reversal แบบ append-only ใต้ document lock; ห้ามกลับไปลบ journal เมื่อ repost. POS ลง GL หลังสร้าง pos_payments ตามช่องทางจริง; non-cash ที่ยังไม่ผูก role ใช้บัญชีพัก `pos_clearing`. การ match statement ไม่เคลียร์ GL บัญชีพักเอง.
+- Purchase cost adjustment เป็น valuation correction: inventory/COGS กับ purchase_cost_clear โดยตาม source_lot_id ทั้ง family รวมของโอน/ระหว่างทาง; ไม่เปลี่ยน AP/VAT/ใบซื้อเดิม. เปลี่ยนราคาตกลงผู้ขายต้องใช้ supplier note แยก. Historical adjustments ที่เคยไม่มี GL ต้องตรวจบัญชีก่อนซ่อม ไม่ backfill จากการเดา.
+- ERP รวม qty สินค้าเดียวกันก่อนคิดโปรและรับคิวเก่าที่ส่วนลดน้อยกว่าภายในเพดาน algorithm เดิม; Python promotions.py ต้องปรับใน branch แยก. รายงานภาษีกรอง active แต่คง tax dates เดิม; WHT supplier ใช้ paid_on ส่วนค่าใช้จ่ายใช้ expense_date ซึ่งต้องให้ผู้สอบบัญชียืนยัน.
+- Suite สุดท้าย 837 tests ไม่มี failure/error (2 skipped, 6 incomplete เดิม), mutation checks 8 จุดแดงจริงแล้วคืนโค้ดครบ. PostgreSQL ตรวจ DDL เท่านั้น ยังไม่ได้ execute/concurrency test บน PostgreSQL จริง.
+
 > อ่านไฟล์นี้ก่อนเริ่มงานทุกครั้ง ไม่ว่าจะเป็น Codex, Claude หรือ agent อื่น
 > แก้ไขเมื่อมีการตัดสินใจเชิงระบบ, deploy, เปลี่ยน flow หรือพบความเสี่ยงใหม่
 
@@ -143,3 +152,24 @@
 - คลังใช้สาขาที่กำหนดคลังหลักก่อน และใช้ `warehouses.branch_id` เป็น fallback สำหรับตำแหน่งเก็บอื่นในคลังที่ระบุเจ้าของ; สิทธิ์สาขายังคำนวณจาก `ReportController` ห้ามให้คำค้น/เปลี่ยนหน้า/ส่งออกข้ามขอบเขตสิทธิ์
 - ช่องค้นหารายงานนี้รอหยุดพิมพ์ 500 ms แล้วอัปเดตผลโดยคงโฟกัส/เคอร์เซอร์; ยกเลิกคำขอเก่าและไม่ให้ผลเก่าทับคำค้นใหม่; เลขบาร์โค้ดยังคงเป็นข้อความและยอดจำนวนแสดงตามความละเอียด 8 ตำแหน่งของระบบ
 - รายงานนี้อ่านยอดคงเหลือปัจจุบัน; ใบปรับสต๊อก `pending_approval` ยังไม่เพิ่มยอดจริง ต้องให้ผู้มีสิทธิ์อีกคนอนุมัติตามขั้นตอนเดิม
+
+## Shift float - 2026-11-05 (PR #3, not deployed)
+
+- ERP + Vue on `claude/shift-float`; Python POS client is on `claude/pos-python-settings-popup` (0.8.6) and never sends `preview` to an ERP without float support.
+- Carried float = the latest closed shift's recorded `float_kept` for that terminal. A legacy/first shift (no recorded float) has carried_float null: no reason demanded and no opening variance booked, so go-live cannot create a fake shortage.
+
+## แผนเลขเครื่องชั่ง — 2026-11-05
+
+- สร้าง PLU ใหม่ได้เฉพาะ `scale-prices.plans.*`: preview ที่เก็บในฐานข้อมูล → ตรวจ/แก้เลขและล็อก → ผู้มี `masterdata.manage` ยืนยัน apply; จัดหมวดและ SKU เริ่ม 801001 ช่วงอนุญาต 801000–801999 หนึ่งเลขต่อ SKU จริงที่ active.
+- `scale_plu_plans` เก็บรายการและ before/after สำหรับ audit/rollback; guard row กันแผน apply/rollback ซ้อน และ fingerprint ปฏิเสธแผนเมื่อ catalog/ราคา/profile เปลี่ยนหลัง preview. Rollback ปฏิเสธหากบาร์โค้ด/สินค้าแทน/ราคาเครื่องชั่งเปลี่ยนหลัง apply เพื่อไม่ทับงานภายหลัง.
+- Apply ปิด PLU 800/801 เดิมที่เกี่ยวข้อง เก็บแถวเดิมไว้ และปิด SKU ตัวแทนเลข PLU ที่ย้ายไป SKU จริง เพื่อไม่ให้ POS fallback ค้น SKU เดิม; rollback คืนสถานะเดิมและปิดเลขที่สร้างใหม่. หากเลขใหม่มีแถวอยู่แล้วในสินค้าที่อยู่ในชุดแผน จะใช้แถวนั้นภายใต้ unique barcode และเก็บเจ้าของ/สถานะเดิมใน snapshot; ไม่ลบประวัติ.
+- เลขที่นำกลับมาใช้ไม่สามารถแยกป้ายเก่าออกจากป้ายใหม่ด้วย EAN-13 ได้ ต้องเก็บป้ายเก่าออกทั้งหมดก่อนเปลี่ยนเครื่องชั่ง และยืนยันคำเตือนเลขเคยใช้. เลขของสินค้าอื่นที่อยู่นอกแผนห้ามทับ; เลขใหม่อาจแก้รายแถวก่อนใช้.
+- CSV ตั้งเครื่องชั่ง/HTML ป้าย 1.000 กก. ใช้ราคาตอนสร้างแผนและ profile POPSTAR-801 แบบราคา; ส่งทั้ง PLU 6 หลัก, รหัสท้าย 3 หลัก, รหัสป้าย 5 หลัก และ flag 8. ต้องคงศูนย์นำหน้า และตรวจราคา ERP/เครื่องชั่ง/โปรโมชันก่อนขาย. ยังไม่ deploy หรือแตะ production ในงานรอบนี้.
+
+## ERP UAT bugs — 2026-11-06 (workspace only, not deployed)
+
+- ใบรับคืนและใบลดหนี้ลูกค้าใช้วงเงินร่วม `SaleCreditLimit`: ยอดขายต้นทางลบเอกสาร `SALE_RETURN`/`CREDIT_NOTE` ที่ยังไม่ถูกยกเลิก/ปฏิเสธ/void รวมรายการรออนุมัติด้วย; การชำระหนี้ไม่ใช่การคืนสินค้า จึงไม่หักยอดชำระออกจากเพดานนี้. ตรวจด้วย DecimalMath และ lock ใบขายต้นทางใน transaction ก่อนสร้าง/อนุมัติทั้งสอง flow. ห้ามกลับไปใช้จำนวนสินค้าหรือยอดลูกหนี้ค้างเป็นเพดานคืนเงินอย่างเดียว.
+- AP allocation เก็บ `supplier_open_item_id`; เลขอ้างอิงอ่าน `supplierOpenItem.document_no` (fallback `sourceDocument.doc_number`) ไม่ใช่ความสัมพันธ์ลูกหนี้ `openItem.document`.
+- Supplier notes และ cash transfers ใช้สิทธิ์ทุกสาขาหรือ active branch assignments ตาม permission ของงาน; ห้ามบังคับด้วย `users.branch_id` อย่างเดียว. Branch assignment ที่หมดอายุ/ปิดแล้วไม่ขยายสิทธิ์กลับเป็นทุกสาขา.
+- Preview สต๊อกโหลดตามสาขา/ตำแหน่งเก็บที่เลือกหรือคลังหลักของสาขา; ทุนที่แสดงเป็น `products.average_cost` จริงของระบบเพื่อประมาณการ ไม่ใช่ต้นทุน FIFO ที่จะลงบัญชีตอนตัด Lot. Preview ไม่เขียนสต๊อก; ถ้าโหลดไม่สำเร็จไม่แสดง 0 แทนผลล้มเหลวและไม่ให้ส่งฟอร์ม.
+- งานรอบนี้อยู่บน `claude/erp-uat-bugs`; pull/stage/commit ถูก filesystem ปฏิเสธเพราะ metadata อยู่นอก workspace. ไฟล์ยังไม่ commit/push, ไม่มี migration, ไม่แตะ production. ดูตารางงาน/ผลทดสอบใน handoff ล่าสุดของ `docs/ai/task.md`.

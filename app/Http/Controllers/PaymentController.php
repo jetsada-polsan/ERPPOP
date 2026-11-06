@@ -115,6 +115,7 @@ class PaymentController extends Controller
             'documentType',
             'paymentDocument.lines',
             'paymentDocument.allocations.openItem.document',
+            'paymentDocument.allocations.supplierOpenItem.sourceDocument',
         ]);
 
         return view('payments.show', compact('payment'));
@@ -127,6 +128,7 @@ class PaymentController extends Controller
             'branch', 'customer', 'supplier', 'documentType',
             'paymentDocument.lines',
             'paymentDocument.allocations.openItem.document',
+            'paymentDocument.allocations.supplierOpenItem.sourceDocument',
         ]);
 
         abort_unless(in_array($payment->documentType->code, ['RECEIPT', 'PAYMENT_VOUCHER'], true), 404);

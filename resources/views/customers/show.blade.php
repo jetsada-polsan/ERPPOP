@@ -149,7 +149,7 @@
                                     <td>{{ $item->document->doc_date->thaiDate() }}</td>
                                     <td class="text-end">{{ number_format($item->net_amount, 2) }}</td>
                                     <td class="text-end">{{ number_format($item->balance_amount, 2) }}</td>
-                                    <td><span class="badge text-bg-light border">{{ $item->status }}</span></td>
+                                    <td><span class="badge text-bg-light border">{{ \App\Support\DocumentStatus::label($item->status) }}</span></td>
                                 </tr>
                                 @empty
                                 <tr><td colspan="5" class="text-center text-muted py-3">ยังไม่มีรายการ</td></tr>

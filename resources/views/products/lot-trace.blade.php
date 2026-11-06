@@ -85,7 +85,7 @@
 
     @foreach($stockLot->recallCases->sortByDesc('id') as $case)
     <div class="content-card p-4 mb-4">
-        <div class="d-flex justify-content-between"><h3 class="h6 fw-bold">{{ $case->case_no }} · {{ $case->reason }}</h3><span class="badge text-bg-danger">{{ $case->severity }} / {{ $case->status }}</span></div>
+        <div class="d-flex justify-content-between"><h3 class="h6 fw-bold">{{ $case->case_no }} · {{ $case->reason }}</h3><span class="badge text-bg-danger">{{ $case->severity }} / {{ \App\Support\DocumentStatus::label($case->status) }}</span></div>
         <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>เอกสารขาย</th><th>สาขา</th><th>ลูกค้า</th><th class="text-end">จำนวน</th><th>ติดตาม</th></tr></thead><tbody>
         @forelse($case->contacts as $contact)<tr>
             <td>{{ $contact->document?->doc_number ?? '-' }}</td><td>{{ $contact->branch?->name_th ?? '-' }}</td>

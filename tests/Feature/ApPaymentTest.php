@@ -70,6 +70,24 @@ class ApPaymentTest extends TestCase
         $this->assertSame(1000.0, $this->paymentSide($payment, ChartOfAccount::ROLE_CASH, 'credit'));
     }
 
+    public function test_supplier_payment_screen_and_print_show_the_stored_purchase_reference(): void
+    {
+        [$branch, $supplier, $product] = $this->masters();
+        $purchase = $this->creditPurchase($branch, $supplier, $product, 1000);
+        $item = $this->openItem($purchase);
+        $item->update(['document_no' => 'SUP-INVOICE-REF-007']);
+        $this->signIn();
+        $this->post(route('ap-payments.store'), [
+            'supplier_id' => $supplier->id, 'branch_id' => $branch->id, 'method' => 'cash',
+            'items' => [['supplier_open_item_id' => $item->id, 'amount' => 400]],
+        ])->assertRedirect();
+        $payment = Document::whereHas('documentType', fn ($q) => $q->where('code', 'PAYMENT_VOUCHER'))->sole();
+        $this->get(route('payments.show', $payment))->assertOk()->assertSee('SUP-INVOICE-REF-007');
+        $this->get(route('payments.print', $payment))->assertOk()->assertSee('SUP-INVOICE-REF-007')->assertSee('400.00')->assertSee('600.00');
+        $item->update(['source_document_id' => null]); // imported AP still has its supplier reference
+        $this->get(route('payments.show', $payment))->assertOk()->assertSee('SUP-INVOICE-REF-007');
+    }
+
     public function test_a_partial_payment_leaves_the_purchase_partly_open(): void
     {
         [$branch, $supplier, $product] = $this->masters();

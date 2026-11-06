@@ -13,7 +13,7 @@
             </div>
             <div class="d-flex gap-2 align-items-center">
                 @if($saleReturn->status === 'pending_approval' && auth()->user()->hasPermission('finance.note.approve') && (int) $saleReturn->created_by !== (int) auth()->id())
-                    <form method="post" action="{{ route('sale-returns.approve', $saleReturn) }}" onsubmit="return confirm('ยืนยันอนุมัติใบรับคืน ปรับสต๊อกและบัญชีหรือไม่?')">
+                    <form method="post" action="{{ route('sale-returns.approve', $saleReturn) }}" data-confirm="ยืนยันอนุมัติใบรับคืน ปรับสต๊อกและบัญชีหรือไม่?">
                         @csrf
                         <button class="btn btn-success px-3"><i class="bi bi-check2-circle me-1"></i> อนุมัติ</button>
                     </form>

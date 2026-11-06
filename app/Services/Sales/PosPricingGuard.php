@@ -14,6 +14,7 @@ use App\Models\QtyPromotion;
 use App\Models\User;
 use App\Services\Inventory\ScaleBarcodeService;
 use App\Support\DecimalMath;
+use Brick\Math\RoundingMode;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -173,6 +174,12 @@ class PosPricingGuard
         $expected = $gross;
         $qtyPromotionDiscount = $this->qtyPromotionDiscount($serverLines, (int) $data['branch_id'], (bool) ($data['bill_promotions'] ?? false), (bool) ($data['mix_promotions'] ?? false));
 
+        $legacyPromotionDiscount = $this->qtyPromotionDiscount($serverLines, (int) $data['branch_id'], (bool) ($data['bill_promotions'] ?? false), (bool) ($data['mix_promotions'] ?? false), false);
+        $legacyExtra = DecimalMath::subtract($qtyPromotionDiscount, $legacyPromotionDiscount, 2);
+        if (DecimalMath::compare($legacyExtra, 0) < 0) {
+            $legacyExtra = '0.00';
+        }
+
         $manualDiscount = DecimalMath::round($data['manual_discount_amount'] ?? 0, DecimalMath::DISPLAY_MONEY_SCALE);
         if (DecimalMath::compare($manualDiscount, 0) > 0) {
             if (! $approvedAtCounter && ! $user->hasPermission('pos.discount.override')) {
@@ -205,6 +212,7 @@ class PosPricingGuard
             $vatRate = (float) (DB::table('vat_rates')->where('effective_from', '<=', now()->toDateString())
                 ->where(fn ($query) => $query->whereNull('effective_to')->orWhere('effective_to', '>=', now()->toDateString()))
                 ->orderByDesc('effective_from')->value('rate_percent') ?? 7);
+            $legacyExtra = DecimalMath::divide(DecimalMath::multiply($legacyExtra, DecimalMath::add(100, $vatRate)), 100, 2);
             $gross = DecimalMath::round(
                 DecimalMath::divide(DecimalMath::multiply($gross, DecimalMath::add(100, $vatRate)), 100),
                 DecimalMath::DISPLAY_MONEY_SCALE,
@@ -218,7 +226,12 @@ class PosPricingGuard
         $submitted = DecimalMath::round(DecimalMath::sum($items->map(
             fn ($item) => DecimalMath::multiply($item['qty'], $item['unit_price'])
         )), DecimalMath::DISPLAY_MONEY_SCALE);
-        if (DecimalMath::compare(DecimalMath::absoluteDifference($submitted, $expected, 2), '0.02') > 0) {
+        $legacyUpper = DecimalMath::add($expected, $legacyExtra, 2);
+        if (DecimalMath::compare(DecimalMath::absoluteDifference($submitted, $expected, 2), '0.02') > 0
+            && ! (DecimalMath::compare($legacyExtra, 0) > 0
+                && DecimalMath::compare($submitted, $expected) >= 0
+                && DecimalMath::compare($submitted, $legacyUpper) <= 0
+                && DecimalMath::compare($submitted, $gross) <= 0)) {
             throw new RuntimeException('ราคาหรือส่วนลดเปลี่ยนจากข้อมูลบนเซิร์ฟเวอร์ กรุณาโหลดสินค้าใหม่แล้วคิดเงินอีกครั้ง');
         }
 
@@ -377,112 +390,116 @@ class PosPricingGuard
         );
     }
 
-    private function qtyPromotionDiscount($lines, int $branchId, bool $billPromotions = false, bool $mixPromotions = false): float
+    private function qtyPromotionDiscount($lines, int $branchId, bool $billPromotions = false, bool $mixPromotions = false, bool $aggregate = true): float
     {
-        $discount = 0.0;
+        if ($aggregate) {
+            // Prices originate from server masters, never submitted cashier prices.
+            $lines = $lines->groupBy('product_id')->map(function ($rows) {
+                $first = $rows->first();
+                $first['qty'] = DecimalMath::sum($rows->pluck('qty'));
+
+                return $first;
+            })->values();
+        }
+        $min = fn ($a, $b) => DecimalMath::compare($a, $b) <= 0 ? $a : $b;
+        $positive = fn ($value) => DecimalMath::compare($value, 0) > 0 ? $value : '0';
+        $floor = fn ($qty, $need) => (int) (string) DecimalMath::of($qty)->dividedBy(DecimalMath::of($need), 0, RoundingMode::Down);
+        $discount = '0';
         $promotions = QtyPromotion::runningToday()
             ->where(fn ($query) => $query->whereNull('branch_id')->orWhere('branch_id', $branchId))
-            // เครื่องที่ไม่ได้บอกว่ารู้จักโปรต่อบิล ไม่คิดโปรต่อบิลให้ ยอดจะได้ตรงกับเครื่อง
             ->when(! $billPromotions, fn ($query) => $query->whereNotIn('promo_type', QtyPromotion::BILL_TYPES))
             ->when(! $mixPromotions, fn ($query) => $query->whereNotIn('promo_type', [...QtyPromotion::MIX_TYPES, 'bill_addon']))
-            ->with('groupProducts:products.id')
-            ->get();
+            ->with('groupProducts:products.id')->get();
         $billPromotionList = $promotions->filter(fn (QtyPromotion $promotion) => $promotion->isBillLevel());
-
-        // ซื้อคละ: แตกเป็นราคาต่อชิ้นของสินค้าในกลุ่ม เรียงแพงไปถูก (คิดแบบเดียวกับเครื่อง POS)
         foreach ($promotions->whereIn('promo_type', QtyPromotion::MIX_TYPES) as $promotion) {
             $group = $promotion->groupProducts->pluck('id')->map(fn ($id) => (int) $id)->all();
             $units = [];
             foreach ($lines as $line) {
-                if (in_array((int) $line['product_id'], $group, true) && (float) $line['unit_price'] > 0) {
-                    for ($i = 0; $i < (int) floor((float) $line['qty']); $i++) {
-                        $units[] = (float) $line['unit_price'];
+                if (in_array((int) $line['product_id'], $group, true) && DecimalMath::compare($line['unit_price'], 0) > 0) {
+                    for ($i = 0; $i < $floor($line['qty'], 1); $i++) {
+                        $units[] = $line['unit_price'];
                     }
                 }
             }
-            rsort($units);
-            $need = (int) (float) $promotion->min_qty;
+            usort($units, fn ($a, $b) => DecimalMath::compare($b, $a));
+            $need = $floor($promotion->min_qty, 1);
             if ($promotion->promo_type === 'mix_bundle' && $need > 0) {
                 $sets = intdiv(count($units), $need);
-                $discount += max(0, array_sum(array_slice($units, 0, $sets * $need)) - $sets * (float) $promotion->bundle_price);
+                $discount = DecimalMath::add($discount, $positive(DecimalMath::subtract(
+                    DecimalMath::sum(array_slice($units, 0, $sets * $need)), DecimalMath::multiply($sets, $promotion->bundle_price))));
             } elseif ($promotion->promo_type === 'mix_free' && $need > 0) {
-                // ซื้อ N แถม F: ทุก N+F ชิ้น ชิ้นที่ถูกที่สุด F ชิ้นฟรี
-                $free = (int) (float) $promotion->free_qty;
+                $free = $floor($promotion->free_qty, 1);
                 $sets = intdiv(count($units), $need + $free);
-                $discount += array_sum(array_slice(array_reverse($units), 0, $sets * $free));
+                $discount = DecimalMath::add($discount, DecimalMath::sum(array_slice(array_reverse($units), 0, $sets * $free)));
             }
         }
-
-        foreach ($promotions->reject(fn (QtyPromotion $promotion) => $promotion->isBillLevel() || in_array($promotion->promo_type, QtyPromotion::MIX_TYPES, true)) as $promotion) {
+        foreach ($promotions->reject(fn ($p) => $p->isBillLevel() || in_array($p->promo_type, QtyPromotion::MIX_TYPES, true)) as $promotion) {
             $trigger = $lines->firstWhere('product_id', (int) $promotion->product_id);
-            if (! $trigger || (float) $promotion->min_qty <= 0) {
+            if (! $trigger || DecimalMath::compare($promotion->min_qty, 0) <= 0) {
                 continue;
             }
-            $sets = floor((float) $trigger['qty'] / (float) $promotion->min_qty);
+            $sets = $floor($trigger['qty'], $promotion->min_qty);
             if ($sets <= 0) {
                 continue;
             }
             if ($promotion->promo_type === 'discount') {
-                $discount += $promotion->discount_type === 'percent'
-                    ? $sets * (float) $promotion->min_qty * (float) $trigger['unit_price'] * (float) $promotion->discount_value / 100
-                    : $sets * (float) $promotion->discount_value;
+                $amount = $promotion->discount_type === 'percent'
+                    ? DecimalMath::divide(DecimalMath::multiply(DecimalMath::multiply(DecimalMath::multiply($sets, $promotion->min_qty), $trigger['unit_price']), $promotion->discount_value), 100)
+                    : DecimalMath::multiply($sets, $promotion->discount_value);
+                $discount = DecimalMath::add($discount, $amount);
             } elseif ($promotion->promo_type === 'bundle_price') {
-                $normalSetTotal = $sets * (float) $promotion->min_qty * (float) $trigger['unit_price'];
-                $bundleSetTotal = $sets * (float) $promotion->bundle_price;
-                $discount += max(0, $normalSetTotal - $bundleSetTotal);
+                $normal = DecimalMath::multiply(DecimalMath::multiply($sets, $promotion->min_qty), $trigger['unit_price']);
+                $discount = DecimalMath::add($discount, $positive(DecimalMath::subtract($normal, DecimalMath::multiply($sets, $promotion->bundle_price))));
             } elseif ($promotion->promo_type === 'free_item') {
                 $gift = $lines->firstWhere('product_id', (int) $promotion->free_product_id);
                 if ($gift) {
-                    $freeQty = min((float) $gift['qty'], $sets * (float) $promotion->free_qty);
-                    $discount += $freeQty * (float) $gift['unit_price'];
+                    $freeQty = $min($gift['qty'], DecimalMath::multiply($sets, $promotion->free_qty));
+                    $discount = DecimalMath::add($discount, DecimalMath::multiply($freeQty, $gift['unit_price']));
                 }
             }
         }
-
-        // โปรต่อบิล: ยอดที่จ่ายจริงหลังโปรต่อสินค้า (ไม่นับมูลค่าของแถมต่อบิล) ต้องถึงขั้นต่ำ
-        $giftValue = 0.0;
+        $giftValue = '0';
         foreach ($billPromotionList->where('promo_type', 'bill_free_item') as $promotion) {
             $gift = $lines->firstWhere('product_id', (int) $promotion->free_product_id);
             if ($gift) {
-                $giftValue += min((float) $gift['qty'], (float) $promotion->free_qty) * (float) $gift['unit_price'];
+                $giftValue = DecimalMath::add($giftValue, DecimalMath::multiply($min($gift['qty'], $promotion->free_qty), $gift['unit_price']));
             }
         }
-        $paid = $lines->sum(fn ($line) => (float) $line['qty'] * (float) $line['unit_price']) - $giftValue - $discount;
+        $paid = DecimalMath::subtract(DecimalMath::subtract(DecimalMath::sum($lines->map(fn ($line) => DecimalMath::multiply($line['qty'], $line['unit_price']))), $giftValue), $discount);
         foreach ($billPromotionList as $promotion) {
             if ($promotion->promo_type === 'bill_addon') {
-                // แลกซื้อ: ยอดซื้อ (ไม่นับตัวที่แลก) ถึงขั้นต่ำ ตัวที่แลกได้ราคาพิเศษตามจำนวนที่กำหนด
                 $addon = $lines->firstWhere('product_id', (int) $promotion->product_id);
                 if (! $addon) {
                     continue;
                 }
-                $addonValue = (float) $addon['qty'] * (float) $addon['unit_price'];
-                if ($paid - $addonValue + 0.0001 < (float) $promotion->min_amount) {
+                $addonValue = DecimalMath::multiply($addon['qty'], $addon['unit_price']);
+                if (DecimalMath::compare(DecimalMath::subtract($paid, $addonValue), $promotion->min_amount) < 0) {
                     continue;
                 }
-                $qty = min((float) $addon['qty'], (float) ($promotion->free_qty ?? 1));
-                $discount += max(0, $qty * ((float) $addon['unit_price'] - (float) $promotion->bundle_price));
+                $qty = $min($addon['qty'], $promotion->free_qty ?? 1);
+                $discount = DecimalMath::add($discount, $positive(DecimalMath::multiply($qty, DecimalMath::subtract($addon['unit_price'], $promotion->bundle_price))));
 
                 continue;
             }
-            if ($paid + 0.0001 < (float) $promotion->min_amount) {
+            if (DecimalMath::compare($paid, $promotion->min_amount) < 0) {
                 continue;
             }
             if ($promotion->promo_type === 'bill_discount') {
-                $billDiscount = $promotion->discount_type === 'percent'
-                    ? $paid * (float) $promotion->discount_value / 100
-                    : (float) $promotion->discount_value;
+                $amount = $promotion->discount_type === 'percent'
+                    ? DecimalMath::divide(DecimalMath::multiply($paid, $promotion->discount_value), 100)
+                    : $promotion->discount_value;
                 if ($promotion->max_discount !== null) {
-                    $billDiscount = min($billDiscount, (float) $promotion->max_discount);
+                    $amount = $min($amount, $promotion->max_discount);
                 }
-                $discount += min($paid, $billDiscount);
+                $discount = DecimalMath::add($discount, $min($paid, $amount));
             } else {
                 $gift = $lines->firstWhere('product_id', (int) $promotion->free_product_id);
                 if ($gift) {
-                    $discount += min((float) $gift['qty'], (float) $promotion->free_qty) * (float) $gift['unit_price'];
+                    $discount = DecimalMath::add($discount, DecimalMath::multiply($min($gift['qty'], $promotion->free_qty), $gift['unit_price']));
                 }
             }
         }
 
-        return round($discount, 2);
+        return (float) DecimalMath::round($discount, 2);
     }
 }

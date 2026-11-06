@@ -200,22 +200,27 @@ class SearchController extends Controller
     {
         $data = $request->validate([
             'product_id' => ['required', 'integer'],
-            'warehouse_location_id' => ['required', 'integer', 'exists:warehouse_locations,id'],
+            'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
+            'warehouse_location_id' => ['nullable', 'integer', 'exists:warehouse_locations,id'],
         ]);
-        $location = WarehouseLocation::with('warehouse:id,branch_id')->findOrFail($data['warehouse_location_id']);
-        $branchId = $location->warehouse?->branch_id;
-        $this->authorizeAny(
-            $request,
-            ['stock.manage', 'stock.request'],
-            $branchId ? (int) $branchId : null,
-            $branchId === null,
-        );
-
-        $onHandQty = (float) (StockBalance::where('product_id', $data['product_id'])
-            ->where('warehouse_location_id', $data['warehouse_location_id'])
-            ->value('on_hand_qty') ?? 0);
-
-        return response()->json(['on_hand_qty' => $onHandQty]);
+        $branch = ! empty($data['branch_id']) ? \App\Models\Branch::findOrFail($data['branch_id']) : null;
+        $locationId = $data['warehouse_location_id'] ?? $branch?->default_warehouse_location_id;
+        abort_unless($locationId, 422, 'กรุณาเลือกตำแหน่งเก็บหรือกำหนดคลังหลักของสาขา');
+        $location = WarehouseLocation::with('warehouse:id,branch_id')->findOrFail($locationId);
+        $owner = \App\Models\Branch::where('default_warehouse_location_id', $location->id)->first();
+        $branchId = $owner?->id ?? $location->warehouse?->branch_id;
+        abort_if($branch && (int) $branchId !== (int) $branch->id, 422, 'ตำแหน่งเก็บไม่ตรงกับสาขา');
+        $this->authorizeAny($request, ['stock.manage', 'stock.request'], $branchId ? (int) $branchId : null, $branchId === null);
+        $balance = StockBalance::where('product_id', $data['product_id'])->where('warehouse_location_id', $location->id)->first();
+        $product = Product::find($data['product_id']);
+        return response()->json([
+            'warehouse_location_id' => $location->id,
+            'on_hand_qty' => (float) ($balance?->on_hand_qty ?? 0),
+            'reserved_qty' => (float) ($balance?->reserved_qty ?? 0),
+            'average_cost' => ($branchId
+                ? $request->user()->canAccessBranch((int) $branchId, 'stock.manage')
+                : $request->user()->hasGlobalPermission('stock.manage')) ? (float) ($product?->average_cost ?? 0) : null,
+        ]);
     }
 
     // มีสิทธิ์ใดสิทธิ์หนึ่งในกลุ่มก็พอ - ดู docblock บนสุดของคลาสว่าทำไมเช็คแบบนี้แทน

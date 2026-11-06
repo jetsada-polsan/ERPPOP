@@ -4,7 +4,7 @@
         <div>
             <strong>สถานะเอกสาร</strong>
             <span class="badge ms-2 {{ ['draft'=>'text-bg-secondary','pending_approval'=>'text-bg-warning','approved'=>'text-bg-success','rejected'=>'text-bg-danger','active'=>'text-bg-success'][$sale->status] ?? 'text-bg-light' }}">
-                {{ ['draft'=>'ร่าง','pending_approval'=>'รอตรวจ','approved'=>'อนุมัติแล้ว','rejected'=>'ตีกลับ','active'=>'ยืนยันแล้ว'][$sale->status] ?? $sale->status }}
+                {{ ['draft'=>'ร่าง','pending_approval'=>'รอตรวจ','approved'=>'อนุมัติแล้ว','rejected'=>'ตีกลับ','active'=>'ยืนยันแล้ว'][$sale->status] ?? \App\Support\DocumentStatus::label($sale->status) }}
             </span>
             @if($sale->approval_note)<span class="text-muted small ms-2">{{ $sale->approval_note }}</span>@endif
         </div>

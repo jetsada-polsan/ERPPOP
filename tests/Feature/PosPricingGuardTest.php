@@ -15,12 +15,74 @@ use App\Models\User;
 use App\Services\Sales\PosPricingGuard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
 use Tests\TestCase;
 
 class PosPricingGuardTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_split_product_lines_share_promotion_quantity_and_accept_older_less_discounted_queue(): void
+    {
+        [$user, $branch, $product] = $this->masters();
+        QtyPromotion::create(['code' => 'P0-SPLIT', 'name' => '3 ลด 30', 'promo_type' => 'discount',
+            'product_id' => $product->id, 'min_qty' => 3, 'discount_type' => 'amount', 'discount_value' => 30, 'is_active' => true]);
+        $payload = $this->payload($branch, $product, 92.5);
+        $payload['items'][0]['qty'] = 2;
+        $payload['items'][] = $payload['items'][0];
+        try {
+            $this->assertSame(370.0, app(PosPricingGuard::class)->validate($payload, $user));
+        } catch (RuntimeException $e) {
+            $this->fail('Legitimate combined-quantity promotion rejected: '.$e->getMessage());
+        }
+        foreach ($payload['items'] as &$line) {
+            $line['unit_price'] = 100;
+        }
+        unset($line);
+        $this->assertSame(400.0, app(PosPricingGuard::class)->validate($payload, $user), 'old first-line-only promotion queue remains postable');
+        foreach ($payload['items'] as &$line) {
+            $line['unit_price'] = 90;
+        }
+        unset($line);
+        $this->expectException(RuntimeException::class);
+        app(PosPricingGuard::class)->validate($payload, $user);
+    }
+
+    public static function p0PromotionTypes(): array
+    {
+        return [
+            'discount' => ['discount', 870], 'bundle' => ['bundle_price', 850],
+            'free' => ['free_item', 400], 'bill discount' => ['bill_discount', 870],
+            'bill free' => ['bill_free_item', 400], 'mixed bundle' => ['mix_bundle', 850],
+            'mixed free' => ['mix_free', 800], 'add on' => ['bill_addon', 820],
+        ];
+    }
+
+    #[DataProvider('p0PromotionTypes')]
+    public function test_all_eight_promotion_types_with_split_product_lines(string $type, int $expected): void
+    {
+        [$user, $branch, $product] = $this->masters();
+        $second = Product::create(['sku_code' => 'P0-SECOND', 'name_th' => 'second', 'base_unit_id' => $product->base_unit_id,
+            'default_price' => 500, 'is_active' => true]);
+        $promo = QtyPromotion::create(['code' => 'P0-EIGHT', 'name' => $type, 'promo_type' => $type,
+            'product_id' => $product->id, 'min_qty' => 3,
+            'discount_type' => 'amount', 'discount_value' => 30,
+            'bundle_price' => $type === 'bill_addon' ? 20 : 250,
+            'free_product_id' => $second->id, 'free_qty' => 1,
+            'min_amount' => $type === 'bill_free_item' ? 400 : ($type === 'bill_addon' ? 500 : 900),
+            'is_active' => true]);
+        if (in_array($type, ['mix_bundle', 'mix_free'], true)) {
+            $promo->groupProducts()->attach($product->id);
+        }
+        $payload = $this->payload($branch, $product, 100 * $expected / 900);
+        $payload['bill_promotions'] = true;
+        $payload['mix_promotions'] = true;
+        $payload['items'][0]['qty'] = 2;
+        $payload['items'][] = $payload['items'][0];
+        $payload['items'][] = ['product_id' => $second->id, 'qty' => 1, 'unit_price' => 500 * $expected / 900];
+        $this->assertSame((float) $expected, app(PosPricingGuard::class)->validate($payload, $user));
+    }
 
     public function test_server_rejects_a_client_price_that_does_not_match_master_price(): void
     {

@@ -395,7 +395,7 @@ class PosApiController extends Controller
     {
         $roles = $cashier->user?->roles?->pluck('code')->all() ?? [];
 
-        return array_intersect($roles, ['GM', 'BRANCH_MGR']) ? 'manager' : 'cashier';
+        return array_intersect($roles, ['GM', 'BRANCH_MGR', 'IT_MGR']) ? 'manager' : 'cashier';
     }
 
     private function credentialVersion(Salesman $cashier): ?string
@@ -856,6 +856,10 @@ class PosApiController extends Controller
 
         try {
             $result = DB::transaction(function () use ($data, $service) {
+                // Same lock order as void/checkout: drawer shift before receipt.
+                if (! empty($data['shift_id'])) {
+                    DB::table('pos_shifts')->where('id', $data['shift_id'])->lockForUpdate()->first();
+                }
                 $receipt = PosReceipt::with(['terminal', 'shift', 'items'])
                     ->where('receipt_no', $data['receipt_no'])
                     ->when($data['terminal_code'] ?? null, fn ($query, $terminalCode) => $query
@@ -882,7 +886,7 @@ class PosApiController extends Controller
                 // กะที่จะหักเงินคืน ต้องเป็นกะที่ "เปิดอยู่" และเป็น "สาขาเดียวกับบิล" เท่านั้น
                 // (กันส่ง shift_id มั่วไปลดยอดเงินสดของกะอื่น/สาขาอื่น — refreshShiftTotals เขียนทับยอดกะนั้น)
                 if (! empty($data['shift_id'])) {
-                    $refundShift = DB::table('pos_shifts')->where('id', $data['shift_id'])->first();
+                    $refundShift = DB::table('pos_shifts')->where('id', $data['shift_id'])->lockForUpdate()->first();
                     if (! $refundShift || $refundShift->status !== 'open' || (int) $refundShift->branch_id !== (int) $branchId) {
                         throw new RuntimeException('กะสำหรับคืนเงินไม่ถูกต้อง ต้องเป็นกะที่เปิดอยู่ของสาขานี้');
                     }
@@ -1051,7 +1055,10 @@ class PosApiController extends Controller
         DB::table('pos_shifts')->where('id', $shiftId)->update([
             'cash_sales' => $cash,
             'transfer_sales' => $transfer,
-            'expected_cash' => round((float) $shift->opening_cash + $cash, 2),
+            'expected_cash' => (float) DecimalMath::sum([$shift->opening_cash, $cash,
+                DB::table('pos_cash_movements')->where('pos_shift_id', $shiftId)->where('movement_type', 'cash_in')->sum('amount'),
+                -DB::table('pos_cash_movements')->where('pos_shift_id', $shiftId)->whereIn('movement_type', ['drop', 'payout'])->sum('amount'),
+            ], 2),
             'updated_at' => now(),
         ]);
     }

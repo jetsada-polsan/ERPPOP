@@ -17,7 +17,7 @@ class ErpAuthorize
 {
     private const PUBLIC_ROUTES = [
         'login', 'login.attempt', 'logout', 'pos.download', 'python-pos.download',
-        'pos.release.latest', 'pos.release.download',
+        'pos.release.latest', 'pos.release.download', 'jet-python-pos.download',
         'mfa.challenge', 'mfa.verify', 'portal', 'member.portal',
     ];
 

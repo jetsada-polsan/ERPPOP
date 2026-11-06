@@ -74,7 +74,7 @@
 
 <div class="content-card overflow-hidden mt-3">
     <div class="px-3 py-2 border-bottom"><strong class="small">ประวัติแผนจัดซื้อ</strong></div>
-    <div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr><th>เลขแผน</th><th>สินค้า</th><th>ผู้จำหน่าย</th><th class="text-end">เสนอซื้อ</th><th>สถานะ</th></tr></thead><tbody>@forelse($plans as $plan)<tr><td class="fw-semibold">{{ $plan->plan_no }}</td><td>{{ $plan->product?->sku_code }}</td><td>{{ $plan->supplier?->name_th ?? '-' }}</td><td class="text-end">{{ number_format((float)$plan->suggested_qty, 4) }}</td><td><span class="badge text-bg-light border">{{ $plan->status }}</span></td></tr>@empty<tr><td colspan="5" class="text-center text-muted py-4">ยังไม่มีประวัติแผน</td></tr>@endforelse</tbody></table></div>
+    <div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr><th>เลขแผน</th><th>สินค้า</th><th>ผู้จำหน่าย</th><th class="text-end">เสนอซื้อ</th><th>สถานะ</th></tr></thead><tbody>@forelse($plans as $plan)<tr><td class="fw-semibold">{{ $plan->plan_no }}</td><td>{{ $plan->product?->sku_code }}</td><td>{{ $plan->supplier?->name_th ?? '-' }}</td><td class="text-end">{{ number_format((float)$plan->suggested_qty, 4) }}</td><td><span class="badge text-bg-light border">{{ \App\Support\DocumentStatus::label($plan->status) }}</span></td></tr>@empty<tr><td colspan="5" class="text-center text-muted py-4">ยังไม่มีประวัติแผน</td></tr>@endforelse</tbody></table></div>
     <div class="p-3 border-top">{{ $plans->links() }}</div>
 </div>
 @endsection

@@ -24,7 +24,8 @@
             </div>
             <div class="text-end">
                 <span class="badge text-bg-success fs-6 px-3 py-2 d-inline-block mb-2">โอนย้ายสำเร็จ</span>
-                @if($transfer->status === 'active')
+                @if($transfer->status === 'in_transit')<span class="badge text-bg-info">ระหว่างทาง</span>@endif
+                @if(in_array($transfer->status, ['active', 'in_transit'], true))
                     <div>
                         @if(! $receipt)
                             <a href="{{ route('stock-transfers.receipt.create', $transfer) }}" class="btn btn-sm btn-outline-primary">

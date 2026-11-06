@@ -21,7 +21,7 @@
     <h2 class="h5 fw-bold mb-3">รายการงาน POS</h2>
     <div class="table-responsive"><table class="table align-middle">
         <thead><tr><th>เลขงาน</th><th>ประเภท</th><th>สาขา</th><th>เครื่อง</th><th>ช่วงวันที่</th><th>สถานะ</th></tr></thead>
-        <tbody>@forelse($jobs as $job)<tr><td class="fw-semibold">{{ $job->job_no }}</td><td>{{ $job->job_type }}</td><td>{{ $job->branch?->name_th ?? 'ทุกสาขา' }}</td><td>{{ $job->terminal?->code ?? 'ทุกเครื่อง' }}</td><td>{{ $job->from_date?->thaiDate() ?? '-' }} - {{ $job->to_date?->thaiDate() ?? '-' }}</td><td><span class="badge text-bg-light border">{{ $job->status }}</span></td></tr>@empty<tr><td colspan="6" class="text-center text-muted py-5">ยังไม่มีงาน</td></tr>@endforelse</tbody>
+        <tbody>@forelse($jobs as $job)<tr><td class="fw-semibold">{{ $job->job_no }}</td><td>{{ $job->job_type }}</td><td>{{ $job->branch?->name_th ?? 'ทุกสาขา' }}</td><td>{{ $job->terminal?->code ?? 'ทุกเครื่อง' }}</td><td>{{ $job->from_date?->thaiDate() ?? '-' }} - {{ $job->to_date?->thaiDate() ?? '-' }}</td><td><span class="badge text-bg-light border">{{ \App\Support\DocumentStatus::label($job->status) }}</span></td></tr>@empty<tr><td colspan="6" class="text-center text-muted py-5">ยังไม่มีงาน</td></tr>@endforelse</tbody>
     </table></div>
     {{ $jobs->links() }}
 </div>

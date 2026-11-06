@@ -19,7 +19,7 @@ class ApprovalPolicyService
         if ($makerId && $makerId === $actor->id && ! $actor->hasPermission('system.admin')) {
             throw new RuntimeException('ผู้สร้างไม่สามารถอนุมัติเอกสารของตนเอง');
         }
-        if ($actor->branch_id && (int) $actor->branch_id !== $branchId && ! $actor->hasPermission('system.admin')) {
+        if (! $actor->canSeeAllReportBranches() && ! $actor->canAccessBranch($branchId, $basePermission)) {
             throw new RuntimeException('ไม่สามารถอนุมัติเอกสารต่างสาขา');
         }
         $rules = DB::table('approval_rules')->where('document_type', $type)->where('is_active', true)

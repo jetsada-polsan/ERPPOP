@@ -8,8 +8,8 @@ use App\Models\DocumentType;
 use App\Models\Product;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
-use App\Services\Accounting\GlPostingService;
 use App\Services\Accounting\CashBookPostingService;
+use App\Services\Accounting\GlPostingService;
 use App\Services\Inventory\CostingService;
 use App\Services\Inventory\FifoStockService;
 use App\Services\Inventory\NegativeStockPolicyService;
@@ -109,7 +109,11 @@ class CashSaleService
                 ]);
             }
 
-            $this->glPosting->postCashSale($document);
+            if (($data['source'] ?? null) !== 'pos') {
+                $this->glPosting->postCashSale($document);
+            } else {
+                $this->glPosting->prepareSaleTax($document);
+            }
 
             // บิล POS ลงสมุดเงินสดตอน "ปิดกะ" ครั้งเดียว (ตอนนั้นเงินถูกนับจริง)
             // ถ้าลงที่นี่ด้วยจะกลายเป็นนับเงินสดซ้ำ เพราะทุกบิล POS สร้างเอกสารขายสดผูกไว้

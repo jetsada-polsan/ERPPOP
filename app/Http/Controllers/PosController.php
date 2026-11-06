@@ -49,6 +49,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use RuntimeException;
 
@@ -715,9 +716,13 @@ class PosController extends Controller
 
         $branchId = $this->enforcedBranchId((int) $data['branch_id']);
         $cashierId = $this->enforcedCashierId(isset($data['cashier_id']) ? (int) $data['cashier_id'] : null);
+        if (! $cashierId && request()->attributes->get('pos_device')) {
+            return response()->json(['success' => false, 'message' => 'กรุณายืนยันแคชเชียร์ก่อน'], 403);
+        }
         $shift = $this->findOpenShift($branchId, $cashierId);
 
-        return response()->json(['shift' => $shift ? $this->shiftPayload($shift) : null]);
+        return response()->json(['shift' => $shift ? $this->shiftPayload($shift) : null,
+            ...$this->floatSettings($this->terminalForBranch($branchId, request()->attributes->get('pos_device')))]);
     }
 
     public function openShift(Request $request): JsonResponse
@@ -725,7 +730,7 @@ class PosController extends Controller
         $data = $request->validate([
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
             'cashier_id' => ['required', 'integer', 'exists:salesmen,id'],
-            'opening_cash' => ['required', 'numeric', 'min:0'],
+            'opening_cash' => ['required', 'numeric', 'min:0', 'max:999999999999.99', 'decimal:0,2'],
             'opening_note' => ['nullable', 'string', 'max:500'],
         ]);
 
@@ -743,19 +748,27 @@ class PosController extends Controller
 
         $terminal = $this->terminalForBranch((int) $data['branch_id'], request()->attributes->get('pos_device'));
 
-        // เลขกะต้องออกใน transaction เดียวกับการสร้าง (lockForUpdate ใน nextShiftNo)
-        $shift = DB::transaction(fn () => PosShift::create([
-            'branch_id' => $data['branch_id'],
-            'pos_terminal_id' => $terminal->id,
-            'cashier_id' => $data['cashier_id'],
-            'cashier_user_id' => $this->cashierUserId($data['cashier_id']),
-            'shift_no' => $this->nextShiftNo((int) $data['branch_id']),
-            'opened_at' => now(),
-            'opening_cash' => $data['opening_cash'],
-            'expected_cash' => $data['opening_cash'],
-            'status' => 'open',
-            'opening_note' => $data['opening_note'] ?? null,
-        ]));
+        $shift = DB::transaction(function () use ($terminal, $data) {
+            $terminal = PosTerminal::whereKey($terminal->id)->lockForUpdate()->firstOrFail();
+            // A physical device has one drawer. Serialize opening/closing on the terminal row.
+            if ($terminal->shifts()->where('status', 'open')->exists()) {
+                throw ValidationException::withMessages(['shift_id' => 'เครื่องนี้ยังมีกะเปิดอยู่ ต้องปิดกะเดิมก่อน']);
+            }
+            $carried = $this->carriedFloat($terminal);
+            $variance = $carried === null ? null : DecimalMath::subtract($data['opening_cash'], $carried, 2);
+            if ($variance !== null && DecimalMath::compare($variance, 0) !== 0 && trim($data['opening_note'] ?? '') === '') {
+                throw ValidationException::withMessages(['opening_note' => 'ยอดรับกะต่างจากเงินยกมา ต้องระบุเหตุผล']);
+            }
+
+            return PosShift::create([
+                'branch_id' => $data['branch_id'], 'pos_terminal_id' => $terminal->id,
+                'cashier_id' => $data['cashier_id'], 'cashier_user_id' => $this->cashierUserId($data['cashier_id']),
+                'shift_no' => $this->nextShiftNo((int) $data['branch_id']), 'opened_at' => now(),
+                'opening_cash' => $data['opening_cash'], 'expected_cash' => $data['opening_cash'],
+                'carried_float' => $carried, 'opening_variance' => $variance,
+                'status' => 'open', 'opening_note' => $data['opening_note'] ?? null,
+            ]);
+        });
 
         return response()->json(['success' => true, 'shift' => $this->shiftPayload($shift)]);
     }
@@ -767,7 +780,10 @@ class PosController extends Controller
 
         $data = $request->validate([
             'shift_id' => ['required', 'integer', 'exists:pos_shifts,id'],
-            'counted_cash' => ['required', 'numeric', 'min:0'],
+            'counted_cash' => ['required', 'numeric', 'min:0', 'max:999999999999.99', 'decimal:0,2'],
+            'float_kept' => ['nullable', 'numeric', 'min:0', 'max:999999999999.99', 'decimal:0,2'],
+            'deposit_reference' => ['nullable', 'string', 'max:80'],
+            'preview' => ['sometimes', 'boolean'],
             'closing_note' => ['nullable', 'string', 'max:500'],
         ]);
 
@@ -777,36 +793,50 @@ class PosController extends Controller
         }
         $branchId = $this->enforcedBranchId((int) $shift->branch_id);
         $cashierId = $this->enforcedCashierId((int) $shift->cashier_id);
-        if ($branchId !== (int) $shift->branch_id || $cashierId !== (int) $shift->cashier_id) {
+        if ($branchId !== (int) $shift->branch_id || $cashierId !== (int) $shift->cashier_id || ! $this->ownsShiftTerminal($shift)) {
             return response()->json(['success' => false, 'message' => 'ปิดกะได้เฉพาะกะของตนเองในสาขานี้'], 403);
         }
 
-        $totals = $this->calculateShiftTotals($shift);
-        $expectedCash = $this->expectedCash($shift, $totals);
-        $countedCash = round((float) $data['counted_cash'], 2);
+        return DB::transaction(function () use ($shift, $data, $cashBook) {
+            PosTerminal::whereKey($shift->pos_terminal_id)->lockForUpdate()->firstOrFail();
+            $shift = PosShift::whereKey($shift->id)->lockForUpdate()->firstOrFail();
+            if ($shift->status !== 'open') {
+                return response()->json(['success' => false, 'message' => 'กะนี้ปิดไปแล้ว'], 422);
+            }
+            $totals = $this->calculateShiftTotals($shift);
+            $expectedCash = $this->expectedCash($shift, $totals);
+            $countedCash = DecimalMath::round($data['counted_cash'], 2);
+            $defaultFloat = $shift->terminal->default_float ?? 2000;
+            $kept = $data['float_kept'] ?? (DecimalMath::compare($countedCash, $defaultFloat) < 0 ? $countedCash : $defaultFloat);
+            if (DecimalMath::compare($kept, $countedCash) > 0) {
+                throw ValidationException::withMessages(['float_kept' => 'เงินทอนเก็บต้องไม่เกินยอดนับ']);
+            }
+            $values = [
+                'cash_sales' => $totals['cash'], 'transfer_sales' => $totals['transfer'],
+                'card_sales' => $totals['credit_card'], 'cheque_sales' => $totals['cheque'],
+                'expected_cash' => $expectedCash, 'counted_cash' => $countedCash,
+                'cash_difference' => DecimalMath::subtract($countedCash, $expectedCash, 2),
+                'float_kept' => $kept, 'deposit_amount' => DecimalMath::subtract($countedCash, $kept, 2),
+                'deposit_reference' => $data['deposit_reference'] ?? null,
+                'receipt_count' => $totals['receipt_count'], 'closing_note' => $data['closing_note'] ?? null,
+            ];
+            if ($data['preview'] ?? false) {
+                // A submitted count reveals reconciliation without persisting or closing the shift.
+                $previewValues = $values;
+                foreach (['cash_sales', 'transfer_sales', 'card_sales', 'cheque_sales', 'expected_cash', 'counted_cash', 'cash_difference', 'float_kept', 'deposit_amount'] as $key) {
+                    $previewValues[$key] = (float) $previewValues[$key];
+                }
 
-        $shift->update([
-            'closed_at' => now(),
-            'cash_sales' => $totals['cash'],
-            'transfer_sales' => $totals['transfer'],
-            'card_sales' => $totals['credit_card'],
-            'cheque_sales' => $totals['cheque'],
-            'expected_cash' => $expectedCash,
-            'counted_cash' => $countedCash,
-            'cash_difference' => round($countedCash - $expectedCash, 2),
-            'receipt_count' => $totals['receipt_count'],
-            'status' => 'closed',
-            'closing_note' => $data['closing_note'] ?? null,
-        ]);
+                return response()->json(['success' => true, 'preview' => true,
+                    'shift' => [...$this->shiftPayload($shift), ...$previewValues],
+                    'low_float' => DecimalMath::compare($countedCash, $defaultFloat) < 0]);
+            }
+            $shift->update([...$values, 'closed_at' => now(), 'status' => 'closed']);
+            $cashBook->postShiftClose($shift, $totals['cash'], $values['cash_difference']);
 
-        // เงินสดของกะเข้าสมุดเงินสดตอนนี้ครั้งเดียว (idempotent ตาม shift id) — กดปิดซ้ำไม่ลงซ้ำ
-        $cashBook->postShiftClose($shift->fresh(), (float) $totals['cash'], round($countedCash - $expectedCash, 2));
-
-        return response()->json([
-            'success' => true,
-            'shift' => $this->shiftPayload($shift->fresh()),
-            'report_url' => route('pos.shift.z-report', $shift),
-        ]);
+            return response()->json(['success' => true, 'shift' => $this->shiftPayload($shift->fresh()),
+                'report_url' => route('pos.shift.z-report', $shift)]);
+        });
     }
 
     public function heldBills(Request $request): JsonResponse
@@ -922,7 +952,7 @@ class PosController extends Controller
         $data = $request->validate([
             'shift_id' => ['required', 'integer', 'exists:pos_shifts,id'],
             'movement_type' => ['required', 'in:cash_in,drop,payout'],
-            'amount' => ['required', 'numeric', 'gt:0'],
+            'amount' => ['required', 'numeric', 'gt:0', 'max:999999999999.99', 'decimal:0,2'],
             'reference_no' => ['nullable', 'string', 'max:80'],
             'reason' => ['required', 'string', 'max:500'],
         ]);
@@ -932,34 +962,42 @@ class PosController extends Controller
         }
         $branchId = $this->enforcedBranchId((int) $shift->branch_id);
         $cashierId = $this->enforcedCashierId((int) $shift->cashier_id);
-        if ($branchId !== (int) $shift->branch_id || $cashierId !== (int) $shift->cashier_id) {
+        if ($branchId !== (int) $shift->branch_id || $cashierId !== (int) $shift->cashier_id || ! $this->ownsShiftTerminal($shift)) {
             return response()->json(['success' => false, 'message' => 'บันทึกเงินเข้าออกได้เฉพาะกะของตนเอง'], 403);
         }
         if ($data['movement_type'] !== 'drop' && ! auth()->user()?->hasPermission('pos.cash.manage')) {
             return response()->json(['success' => false, 'message' => 'เงินเพิ่มหรือเบิกจ่ายต้องให้ผู้จัดการอนุมัติ'], 403);
         }
 
-        PosCashMovement::create([
-            ...$data,
-            'pos_shift_id' => $shift->id,
-            'created_by' => auth()->id(),
-            'approved_by' => auth()->user()?->hasPermission('pos.cash.manage') ? auth()->id() : null,
-            'approved_at' => auth()->user()?->hasPermission('pos.cash.manage') ? now() : null,
-        ]);
-        $totals = $this->calculateShiftTotals($shift);
-        $shift->update(['expected_cash' => $this->expectedCash($shift, $totals)]);
+        return DB::transaction(function () use ($shift, $data) {
+            $shift = PosShift::whereKey($shift->id)->lockForUpdate()->firstOrFail();
+            if ($shift->status !== 'open') {
+                throw ValidationException::withMessages(['shift_id' => 'กะนี้ปิดแล้ว']);
+            }
+            PosCashMovement::create([
+                ...$data,
+                'pos_shift_id' => $shift->id,
+                'created_by' => auth()->id(),
+                'approved_by' => auth()->user()?->hasPermission('pos.cash.manage') ? auth()->id() : null,
+                'approved_at' => auth()->user()?->hasPermission('pos.cash.manage') ? now() : null,
+            ]);
+            $totals = $this->calculateShiftTotals($shift);
+            $shift->update(['expected_cash' => $this->expectedCash($shift, $totals)]);
 
-        return response()->json([
-            'success' => true,
-            'message' => $data['movement_type'] === 'drop' ? 'บันทึกนำส่งเงินแล้ว' : 'บันทึกรายการเงินสดแล้ว',
-            'shift' => $this->shiftPayload($shift->fresh()),
-        ]);
+            return response()->json([
+                'success' => true,
+                'message' => $data['movement_type'] === 'drop' ? 'บันทึกนำส่งเงินแล้ว' : 'บันทึกรายการเงินสดแล้ว',
+                'shift' => $this->shiftPayload($shift->fresh()),
+            ]);
+        });
     }
 
     public function zReport(Request $request, PosShift $shift): View
     {
         $branchId = $this->enforcedBranchId((int) $shift->branch_id);
         abort_unless($branchId === (int) $shift->branch_id || auth()->user()?->hasPermission('reports.view'), 403);
+        abort_unless($this->ownsShiftTerminal($shift), 403);
+        abort_if($shift->status === 'open' && $this->isBlindCashier($shift), 403);
         $shift->load([
             'branch', 'cashier', 'cashierUser', 'terminal',
             'cashMovements' => fn ($query) => $query->with(['creator:id,name', 'approver:id,name'])->orderBy('id'),
@@ -1213,6 +1251,10 @@ class PosController extends Controller
                 $redeemPoints,
                 $clientBillUuid,
             ) {
+                $shift = PosShift::whereKey($shift->id)->lockForUpdate()->firstOrFail();
+                if ($shift->status !== 'open' || ! $this->ownsShiftTerminal($shift)) {
+                    throw new RuntimeException('กะนี้ปิดแล้วหรือไม่ใช่กะของเครื่องนี้');
+                }
                 $document = $service->create([
                     'branch_id' => $data['branch_id'],
                     'customer_id' => $data['customer_id'] ?? null,
@@ -1223,7 +1265,8 @@ class PosController extends Controller
                     'source' => 'pos',
                 ]);
 
-                $receipt = $this->recordPosReceipt($shift, $this->nextPosReceiptNo($shift), $data, $document->id);
+                $receipt = $this->recordPosReceipt($shift, $this->nextPosReceiptNo($shift), $data, $document);
+                app(GlPostingService::class)->postCashSale($document);
 
                 if ($discountCard) {
                     $lockedCard = DiscountCard::whereKey($discountCard->id)->lockForUpdate()->first();
@@ -1300,6 +1343,10 @@ class PosController extends Controller
 
         try {
             DB::transaction(function () use ($receipt, $data, $glPosting, $points, $approver) {
+                $lockedShift = PosShift::whereKey($receipt->pos_shift_id)->lockForUpdate()->firstOrFail();
+                if ($lockedShift->status !== 'open') {
+                    throw new RuntimeException('กะนี้ปิดแล้ว ให้ใช้รับคืนสินค้า');
+                }
                 $receipt = PosReceipt::with(['terminal', 'shift', 'member'])
                     ->whereKey($receipt->id)
                     ->lockForUpdate()
@@ -1401,6 +1448,7 @@ class PosController extends Controller
         return PosShift::with(['branch', 'terminal', 'cashier'])
             ->where('branch_id', $branchId)
             ->where('status', 'open')
+            ->when(request()->attributes->get('pos_device')?->terminal_code, fn ($query, $code) => $query->whereHas('terminal', fn ($terminal) => $terminal->where('code', $code)))
             ->when($cashierId, fn ($query) => $query->where('cashier_id', $cashierId))
             ->orderByDesc('opened_at')
             ->first();
@@ -1483,8 +1531,9 @@ class PosController extends Controller
         return $prefix.sprintf('%03d', $sequence);
     }
 
-    private function recordPosReceipt(PosShift $shift, string $receiptNo, array $data, int $documentId): PosReceipt
+    private function recordPosReceipt(PosShift $shift, string $receiptNo, array $data, Document $document): PosReceipt
     {
+        $documentId = $document->id;
         $items = collect($data['items']);
         // The pricing guard derives totals from server prices and verified discounts;
         // POS-supplied totals are informational and never drive receipt reporting.
@@ -1492,7 +1541,10 @@ class PosController extends Controller
         $net = (float) ($summary['net_sales'] ?? round($items->sum(fn ($item) => (float) $item['qty'] * (float) $item['unit_price']), 2));
         $discount = (float) ($summary['discount_amount'] ?? 0);
         $gross = (float) ($summary['gross_sales'] ?? round($net + $discount, 2));
-        $vat = round((float) ($data['vat_amount'] ?? 0), 2);
+        // VAT comes from the posted cash-sale document (GL salesBreakdown: per-product is_vat,
+        // no-VAT books). The POS never sends it reliably, so its vat_amount is ignored here.
+        $vat = round((float) $document->vat_amount, 2);
+        $lineVat = $document->stockDocument?->items()->orderBy('seq')->pluck('vat_amount')->values() ?? collect();
 
         $receipt = PosReceipt::create([
             'pos_terminal_id' => $shift->pos_terminal_id,
@@ -1519,15 +1571,15 @@ class PosController extends Controller
                 'qty' => $item['qty'],
                 'unit_price' => $item['unit_price'],
                 'discount_amount' => 0,
-                'vat_amount' => 0,
+                'vat_amount' => round((float) ($lineVat[$index] ?? 0), 4),
                 'net_amount' => $lineNet,
             ]);
         }
 
         if ($data['method'] === 'mixed') {
             // จ่ายผสม: แยก 2 แถวตามช่องทาง — ยอดกะ/รายงานรวมจาก pos_payments จึงเข้าช่องถูกเอง
-            $cashPart = round((float) ($data['cash_amount'] ?? 0), 2);
-            $transferPart = round($net - $cashPart, 2); // ผูกกับยอดบิลจริง กันเศษปัดไม่ลงตัว
+            $cashPart = DecimalMath::round($data['cash_amount'] ?? 0, 2);
+            $transferPart = DecimalMath::subtract($net, $cashPart, 2); // ผูกกับยอดบิลจริง กันเศษปัดไม่ลงตัว
             PosPayment::create([
                 'pos_receipt_id' => $receipt->id,
                 'method' => 'cash',
@@ -1582,34 +1634,26 @@ class PosController extends Controller
     {
         $payments = PosPayment::query()
             ->join('pos_receipts', 'pos_receipts.id', '=', 'pos_payments.pos_receipt_id')
-            ->where('pos_receipts.pos_shift_id', $shift->id)
-            ->where('pos_receipts.status', 'completed')
-            ->selectRaw('pos_payments.method, sum(pos_payments.amount) as total')
-            ->groupBy('pos_payments.method')
-            ->pluck('total', 'method');
-
-        $returns = DB::table('pos_receipt_returns')
-            ->where('pos_shift_id', $shift->id)
-            ->where('status', 'completed')
-            ->selectRaw('refund_method, sum(total_amount) as total')
-            ->groupBy('refund_method')
-            ->pluck('total', 'refund_method');
+            ->where('pos_receipts.pos_shift_id', $shift->id)->where('pos_receipts.status', 'completed')
+            ->get(['pos_payments.method', 'pos_payments.amount'])->groupBy('method')
+            ->map(fn ($rows) => DecimalMath::sum($rows->pluck('amount'), 4));
+        $returns = DB::table('pos_receipt_returns')->where('pos_shift_id', $shift->id)->where('status', 'completed')
+            ->get(['refund_method', 'total_amount'])->groupBy('refund_method')
+            ->map(fn ($rows) => DecimalMath::sum($rows->pluck('total_amount'), 4));
 
         return [
-            'cash' => round((float) ($payments['cash'] ?? 0) - (float) ($returns['cash'] ?? 0), 2),
-            'transfer' => round((float) ($payments['transfer'] ?? 0) - (float) ($returns['transfer'] ?? 0), 2),
-            'credit_card' => round((float) ($payments['credit_card'] ?? 0), 2),
-            'cheque' => round((float) ($payments['cheque'] ?? 0), 2),
+            'cash' => DecimalMath::subtract($payments['cash'] ?? 0, $returns['cash'] ?? 0, 2),
+            'transfer' => DecimalMath::subtract(DecimalMath::sum([$payments['transfer'] ?? 0, $payments['qr'] ?? 0, $payments['bank'] ?? 0], 4), $returns['transfer'] ?? 0, 2),
+            'credit_card' => DecimalMath::round($payments['credit_card'] ?? 0, 2),
+            'cheque' => DecimalMath::round($payments['cheque'] ?? 0, 2),
             'receipt_count' => PosReceipt::where('pos_shift_id', $shift->id)->where('status', 'completed')->count(),
         ];
     }
 
     private function cashMovementTotals(PosShift $shift): array
     {
-        $rows = PosCashMovement::where('pos_shift_id', $shift->id)
-            ->selectRaw('movement_type, sum(amount) as total')
-            ->groupBy('movement_type')
-            ->pluck('total', 'movement_type');
+        $rows = PosCashMovement::where('pos_shift_id', $shift->id)->get(['movement_type', 'amount'])
+            ->groupBy('movement_type')->map(fn ($items) => DecimalMath::sum($items->pluck('amount'), 2));
 
         return [
             'cash_in' => round((float) ($rows['cash_in'] ?? 0), 2),
@@ -1618,19 +1662,15 @@ class PosController extends Controller
         ];
     }
 
-    private function expectedCash(PosShift $shift, ?array $sales = null): float
+    private function expectedCash(PosShift $shift, ?array $sales = null): string
     {
         $sales ??= $this->calculateShiftTotals($shift);
         $cash = $this->cashMovementTotals($shift);
 
-        return round(
-            (float) $shift->opening_cash
-            + $sales['cash']
-            + $cash['cash_in']
-            - $cash['drop']
-            - $cash['payout'],
-            2,
-        );
+        return DecimalMath::sum([
+            $shift->opening_cash, $sales['cash'], $cash['cash_in'],
+            DecimalMath::subtract(0, $cash['drop']), DecimalMath::subtract(0, $cash['payout']),
+        ], 2);
     }
 
     private function shiftPayload(PosShift $shift): array
@@ -1638,7 +1678,18 @@ class PosController extends Controller
         $shift->loadMissing(['branch', 'cashier', 'cashierUser', 'terminal']);
         $movements = $this->cashMovementTotals($shift);
 
-        return [
+        $payload = [
+            ...$this->floatSettings($shift->terminal),
+            'carried_float' => $shift->carried_float !== null ? (float) $shift->carried_float : null,
+            'opening_variance' => $shift->opening_variance !== null ? (float) $shift->opening_variance : null,
+            'opening_note' => $shift->opening_note,
+            'float_kept' => $shift->float_kept !== null ? (float) $shift->float_kept : null,
+            'deposit_amount' => $shift->deposit_amount !== null ? (float) $shift->deposit_amount : null,
+            'deposit_reference' => $shift->deposit_reference,
+            'void_count' => PosReceipt::where('pos_shift_id', $shift->id)->where('status', 'void')->count(),
+            'return_count' => DB::table('pos_receipt_returns')->where('pos_shift_id', $shift->id)->where('status', 'completed')->count(),
+            'discount_total' => (float) PosReceipt::where('pos_shift_id', $shift->id)->where('status', 'completed')->sum('discount_amount'),
+            'cash_warning' => DecimalMath::compare($this->expectedCash($shift), $shift->terminal->cash_warning_threshold ?? 10000) > 0,
             'id' => $shift->id,
             'shift_no' => $shift->shift_no,
             'status' => $shift->status,
@@ -1655,7 +1706,7 @@ class PosController extends Controller
             'transfer_sales' => (float) $shift->transfer_sales,
             'card_sales' => (float) $shift->card_sales,
             'cheque_sales' => (float) $shift->cheque_sales,
-            'expected_cash' => (float) $shift->expected_cash,
+            'expected_cash' => (float) ($shift->status === 'open' ? $this->expectedCash($shift) : $shift->expected_cash),
             'counted_cash' => $shift->counted_cash !== null ? (float) $shift->counted_cash : null,
             'cash_difference' => $shift->cash_difference !== null ? (float) $shift->cash_difference : null,
             'receipt_count' => (int) $shift->receipt_count,
@@ -1663,6 +1714,52 @@ class PosController extends Controller
             'cash_drops' => $movements['drop'],
             'cash_payouts' => $movements['payout'],
             'z_report_url' => route('pos.shift.z-report', $shift),
+        ];
+        if ($shift->status === 'open' && $this->isBlindCashier($shift)) {
+            foreach (['expected_cash', 'cash_sales', 'transfer_sales', 'card_sales', 'cheque_sales', 'cash_in', 'cash_drops', 'cash_payouts'] as $key) {
+                unset($payload[$key]);
+            }
+        }
+
+        return $payload;
+    }
+
+    private function ownsShiftTerminal(PosShift $shift): bool
+    {
+        $device = request()->attributes->get('pos_device');
+
+        return ! $device || ($device->terminal_code && $shift->terminal?->code === $device->terminal_code);
+    }
+
+    private function isBlindCashier(PosShift $shift): bool
+    {
+        $device = request()->attributes->get('pos_device');
+        $user = $device ? Salesman::find($device->verifiedCashierId())?->user : auth()->user();
+
+        return ($shift->terminal->blind_count ?? true) && ! $user?->hasPermission('pos.cash.manage');
+    }
+
+    /**
+     * Cash the previous shift of this drawer recorded as left behind, or null when nobody recorded it
+     * (first shift on the till, or shifts closed before float tracking existed). Unknown custody must
+     * never become a cash-book shortage or overage, so callers only compare against a recorded figure.
+     */
+    private function carriedFloat(PosTerminal $terminal): ?string
+    {
+        $previous = $terminal->shifts()->where('status', 'closed')
+            ->orderByRaw('CASE WHEN closed_at IS NULL THEN 1 ELSE 0 END')
+            ->orderByDesc('closed_at')->orderByDesc('id')->first();
+
+        return $previous?->float_kept !== null ? DecimalMath::round($previous->float_kept, 2) : null;
+    }
+
+    private function floatSettings(PosTerminal $terminal): array
+    {
+        return [
+            'default_float' => (float) ($terminal->default_float ?? 2000),
+            'carried_float' => ($carried = $this->carriedFloat($terminal)) === null ? null : (float) $carried,
+            'cash_warning_threshold' => (float) ($terminal->cash_warning_threshold ?? 10000),
+            'blind_count' => $terminal->blind_count ?? true,
         ];
     }
 

@@ -123,17 +123,17 @@
                                 </form>
                             @endif
                             @if(in_array($cheque->status, ['deposited', 'issued'], true))
-                                <form method="post" action="{{ route('cheques.clear', $cheque) }}" class="d-inline" onsubmit="return confirm('ยืนยันเช็คผ่าน/ตัดบัญชีแล้ว?')">
+                                <form method="post" action="{{ route('cheques.clear', $cheque) }}" class="d-inline" data-confirm="ยืนยันเช็คผ่าน/ตัดบัญชีแล้ว?">
                                     @csrf<button class="btn btn-sm btn-success">ผ่านแล้ว</button>
                                 </form>
                             @endif
                             @if($cheque->direction === 'in' && ! $cheque->isFinal())
-                                <form method="post" action="{{ route('cheques.bounce', $cheque) }}" class="d-inline" onsubmit="return confirm('บันทึกเช็คคืน/เด้ง? ต้องติดตามหนี้จากลูกค้าต่อ')">
+                                <form method="post" action="{{ route('cheques.bounce', $cheque) }}" class="d-inline" data-confirm="บันทึกเช็คคืน/เด้ง? ต้องติดตามหนี้จากลูกค้าต่อ">
                                     @csrf<button class="btn btn-sm btn-outline-danger">เช็คคืน</button>
                                 </form>
                             @endif
                             @if(! $cheque->isFinal())
-                                <form method="post" action="{{ route('cheques.cancel', $cheque) }}" class="d-inline" onsubmit="return confirm('ยกเลิกเช็คใบนี้?')">
+                                <form method="post" action="{{ route('cheques.cancel', $cheque) }}" class="d-inline" data-confirm="ยกเลิกเช็คใบนี้?">
                                     @csrf<button class="btn btn-sm btn-light border text-muted">ยกเลิก</button>
                                 </form>
                             @endif

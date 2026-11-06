@@ -9,6 +9,7 @@ use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
 use App\Services\Accounting\GlPostingService;
 use App\Services\Sales\DocumentNumberGenerator;
+use App\Support\DecimalMath;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -87,7 +88,7 @@ class StockIssueService
 
             $stockDocument = StockDocument::create([
                 'document_id' => $document->id,
-                'total_qty' => $items->sum('qty'),
+                'total_qty' => DecimalMath::sum($items->pluck('qty')),
                 'total_items' => $items->count(),
             ]);
 
@@ -131,18 +132,18 @@ class StockIssueService
             if ($locked->documentType->code !== 'STOCK_DAMAGE' || $locked->status !== 'pending_approval') {
                 throw new RuntimeException('เอกสารนี้ไม่ใช่ใบตัดชำรุดที่รออนุมัติ');
             }
-            $writeOffValue = 0.0;
+            $writeOffValue = '0';
             foreach ($locked->stockDocument->items as $item) {
-                $allocations = $this->fifo->issue((int) $item->product_id, (int) $item->warehouse_location_id, (float) $item->qty,
-                    $locked->id, 'out', allowExpired: true, allowRestricted: true);
-                $writeOffValue += (float) $allocations->sum(
-                    fn (array $allocation) => (float) $allocation['qty'] * (float) $allocation['lot']->unit_cost
-                );
+                $allocations = $this->fifo->issue((int) $item->product_id, (int) $item->warehouse_location_id, $item->qty,
+                    $locked->id, 'out', allowExpired: true, allowRestricted: true, allowInTransit: true);
+                $writeOffValue = DecimalMath::add($writeOffValue, DecimalMath::sum($allocations->map(
+                    fn (array $allocation) => DecimalMath::multiply($allocation['qty'], $allocation['lot']->unit_cost)
+                )));
             }
             $locked->update(['status' => 'active']);
 
             // ของที่ตัดทิ้งหายจากสต๊อกจริง บัญชีต้องรู้ด้วย
-            $this->glPosting->postInventoryAdjustment($locked, -$writeOffValue, 'ตัดชำรุดสินค้า');
+            $this->glPosting->postInventoryAdjustment($locked, DecimalMath::subtract(0, $writeOffValue), 'ตัดชำรุดสินค้า');
 
             return $locked->fresh();
         });

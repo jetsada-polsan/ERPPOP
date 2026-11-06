@@ -479,6 +479,15 @@
         .edp-reset { font:inherit; font-size:12px; background:none; border:0; color:#c62828; cursor:pointer; padding:0; }
         .edp-reset:hover { text-decoration:underline; }
         .edp-saved { font-size:11.5px; color:#158662; font-weight:600; }
+        .app-header > .container-fluid { flex-wrap: wrap; gap: 8px 16px; padding-top: 10px; padding-bottom: 10px; }
+        .app-header .erp-page-heading { flex: 1 1 320px; min-width: 0; }
+        .app-header .erp-page-title { min-width: 0; flex: 1; }
+        .app-header .erp-page-title > div > div { min-width: 0; }
+        .app-header .erp-page-title h1, .app-header .erp-page-title .text-muted { overflow-wrap: anywhere; white-space: normal; }
+        .app-header .page-title-icon { flex-shrink: 0; }
+        .app-header .odn-search { flex: 1 1 240px; min-width: 0; max-width: 100%; }
+        .app-main { min-width: 0; }
+
         @media print { .erp-display-panel { display:none !important; } }
 
         html[data-layout="odoo"] .fa-collapse-btn { display:none; }
@@ -1603,14 +1612,14 @@
 @endif
         <nav class="app-header navbar navbar-expand bg-white">
             <div class="container-fluid px-4">
-                <ul class="navbar-nav align-items-center">
+                <ul class="navbar-nav align-items-center erp-page-heading">
                     <li class="nav-item">
                         <a class="nav-link fs-4" href="#" role="button" aria-label="Toggle sidebar"
                             onclick="event.preventDefault(); document.documentElement.classList.toggle('mobile-sidebar-open')">
                             <i class="bi bi-list"></i>
                         </a>
                     </li>
-                    <li class="nav-item d-none d-md-block ms-2">
+                    <li class="nav-item ms-2 erp-page-title">
                         <div class="d-flex align-items-center">
                             <span class="page-title-icon"><i class="bi bi-bar-chart-line-fill"></i></span>
                             <div>
@@ -1972,28 +1981,6 @@
             return true;
         };
 
-        // ── ยืนยันก่อน submit แบบสวย (Swal) แทน confirm() ของ browser ──
-        // ดักได้ทั้ง form[data-confirm="..."] และของเดิม onsubmit="return confirm('...')"
-        document.addEventListener('submit', function (e) {
-            const form = e.target;
-            if (!(form instanceof HTMLFormElement) || !window.erpConfirm) return;
-            let msg = form.dataset.confirm;
-            if (!msg) {
-                const os = form.getAttribute('onsubmit');
-                if (os && os.indexOf('confirm(') !== -1) {
-                    const m = os.match(/confirm\(\s*['"]([\s\S]*?)['"]\s*\)/);
-                    if (m) { msg = m[1]; }
-                }
-            }
-            if (!msg) return;
-            e.preventDefault();
-            e.stopImmediatePropagation();
-            window.erpConfirm(msg, form.dataset.confirmText || '', {
-                confirmButtonText: form.dataset.confirmOk || 'ยืนยัน',
-                icon: form.dataset.confirmIcon || 'warning',
-            }).then(function (r) { if (r.isConfirmed) { form.submit(); } });
-        }, true);
-
         // กระดิ่งแจ้งเตือนตามหน้าที่ (header) - โหลดตอนเปิดหน้า + รีเฟรชตอนกดกระดิ่ง
         function notifyBell() {
             return {
@@ -2012,6 +1999,8 @@
             };
         }
     </script>
+    <script src="{{ asset('stock-preview.js') }}"></script>
+    <x-confirm-action />
     @stack('scripts')
 
     @if(isset($errors) && $errors->any())
