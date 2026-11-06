@@ -1,7 +1,7 @@
 """Touch workspace navigation and replacement regressions."""
 from unittest.mock import patch
 from PySide6.QtCore import QPoint
-from PySide6.QtWidgets import QApplication, QPushButton
+from PySide6.QtWidgets import QApplication, QDialog, QPushButton
 from pos_python.touch_dialogs import TouchDialog, ValueDialog
 from pos_python.shift_float import FloatClose
 from test_shift_float import POLICY, report
@@ -24,6 +24,18 @@ def test_touch_dialog_replaces_and_restores_previous(scene):
     second.reject(); app.processEvents()
     assert first.isVisible()
     first.reject()
+
+
+def test_touch_dialog_never_leaves_a_visible_backdrop_after_close(scene):
+    app, _, _, window, _ = scene
+    dialog = TouchDialog(window)
+    dialog.show()
+    app.processEvents()
+    assert dialog._backdrop.isVisible()
+    dialog.done(QDialog.DialogCode.Accepted)
+    app.processEvents()
+    assert not dialog.isVisible()
+    assert not dialog._backdrop.isVisible()
 
 
 def test_wizard_steps_geometry_blind_and_repreview(scene):

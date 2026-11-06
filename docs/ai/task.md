@@ -2733,3 +2733,10 @@ pending
 - ข้อจำกัดยังคงเดิม: PHP checkout นี้ใช้ firstWhere และ cashierRole รองรับ GM/BRANCH_MGR ยังไม่รวม IT_MGR จึงยังยืนยัน integration aggregate/IT admin ไม่ได้ใน repo นี้ ตาม brief ห้ามแก้ PHP. ต้อง ERP รุ่นที่รวม PR #6 และรองรับ IT_MGR ก่อน UAT รวมระบบ; ไม่ยกระดับ role เอง. สินค้า 104011 หน่วยกิโลกรัมยังยึด is_scale เดิม รอเจ้าของตัดสินใจ
 - Deploy: ยังไม่ deploy; รอ Windows/touch/printer hardware UAT
 - ผล Python รอบสุดท้ายหลังแก้ทั้งหมด: QT_QPA_PLATFORM=offscreen PYTHONPATH=apps/pos-python /private/tmp/pos-parity-env/bin/python -m pytest apps/pos-python/tests -q → **400 passed in 31.14s**, exit 0; git diff --check ผ่าน. ทุก Qt invocation ในรอบนี้ตั้ง offscreen
+## Handoff - 2026-11-06 (Python POS: clear stuck dialog backdrop)
+- Branch: `claude/pos-python-settings-popup`
+- ทำอะไร: แก้ popup ของ `apps/pos-python` ที่หลังยกเลิกบิลอาจเหลือ overlay สีเทาทับทั้งหน้าจอ โดยให้ `TouchDialog` ซ่อน backdrop ทั้ง `finished`, `done`, `hideEvent` และ `closeEvent`; ยก dialog ขึ้นเหนือ backdrop ทุกครั้งเพื่อไม่ให้แผ่นเทาทับตัว popup
+- Compatibility: เปลี่ยน runtime ทุกจุดจาก `QDialog.Accepted` เป็น `QDialog.DialogCode.Accepted` ซึ่งเป็น enum ของ PySide6 รุ่น Windows ที่ใช้จริง ป้องกัน error `QDialog object has no attribute 'Accepted'` ระหว่างเปิด/ปิด popup
+- ทดสอบ: `QT_QPA_PLATFORM=offscreen PYTHONPATH=apps/pos-python /private/tmp/pos-parity-env/bin/python -m pytest apps/pos-python/tests/test_close_shift_wizard.py apps/pos-python/tests/test_touch_popups.py apps/pos-python/tests/test_polish_089.py -q` ผ่าน **36 passed**; เพิ่ม regression ยืนยันว่า popup ที่ปิดแล้วไม่เหลือ backdrop แสดงอยู่; `git diff --check` ผ่าน
+- Suite เต็ม: เริ่ม `pytest apps/pos-python/tests -q --disable-warnings` แล้วแสดงผลผ่านถึงช่วงท้าย แต่คำสั่งเกิน timeout 30 วินาทีของ session นี้ จึงยังไม่บันทึกว่า suite เต็มผ่าน
+- Deploy: **ยังไม่ deploy production** ตาม handoff UAT; ต้อง build UAT installer ใหม่และติดตั้งทับบนเครื่องทดสอบก่อนลองยกเลิกบิลอีกครั้ง

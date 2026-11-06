@@ -35,6 +35,12 @@ class TouchDialog(QDialog):
         close.clicked.connect(self.reject)
         row.addWidget(close)
         self.body.addWidget(header)
+        self.finished.connect(lambda _result: self._hide_backdrop())
+
+    def _hide_backdrop(self):
+        backdrop = getattr(self, '_backdrop', None)
+        if backdrop is not None:
+            backdrop.hide()
 
     def showEvent(self, event):
         # Temporarily replace any existing touch workspace, including unrelated
@@ -55,14 +61,14 @@ class TouchDialog(QDialog):
             self._backdrop.setStyleSheet('background:rgba(%d,%d,%d,150);' % rgb)
             self._backdrop.show()
             self._backdrop.raise_()
+        super().showEvent(event)
         if hasattr(self, '_backdrop'):
             self._backdrop.show()
             self._backdrop.raise_()
-        super().showEvent(event)
+            self.raise_()
 
     def hideEvent(self, event):
-        if hasattr(self, '_backdrop'):
-            self._backdrop.hide()
+        self._hide_backdrop()
         super().hideEvent(event)
         if getattr(self, '_being_replaced', False):
             return
@@ -72,6 +78,14 @@ class TouchDialog(QDialog):
                 dialog._restoring = True
                 dialog.show()
                 dialog._restoring = False
+
+    def done(self, result):
+        self._hide_backdrop()
+        super().done(result)
+
+    def closeEvent(self, event):
+        self._hide_backdrop()
+        super().closeEvent(event)
 
     def confirm(self, text='ยืนยัน', callback=None):
         button = QPushButton(text)
@@ -153,7 +167,7 @@ class ValueDialog(TouchDialog):
     @classmethod
     def get_value(cls, parent, title, subtitle, value='', pin=False):
         dialog = cls(parent, title, subtitle, value, pin)
-        accepted = dialog.exec() == QDialog.Accepted
+        accepted = dialog.exec() == QDialog.DialogCode.Accepted
         value = dialog.entry.text() if accepted else ''
         if pin:
             dialog.entry.clear()
@@ -231,4 +245,4 @@ class TouchMessage:
         cancel.setFocus()
         confirm = dialog.confirm('ยืนยัน')
         confirm.setAutoDefault(False)
-        return TouchMessage.Yes if dialog.exec() == QDialog.Accepted else TouchMessage.No
+        return TouchMessage.Yes if dialog.exec() == QDialog.DialogCode.Accepted else TouchMessage.No

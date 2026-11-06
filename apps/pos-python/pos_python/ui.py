@@ -2539,7 +2539,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
         def closeEvent(self, event):
             if not self._allow_close:
-                if self.build_close_dialog().exec() != QDialog.Accepted:
+                if self.build_close_dialog().exec() != QDialog.DialogCode.Accepted:
                     event.ignore()
                     return
             SettingsService(service.db).set_device_setting("current_order", self.order.snapshot())
@@ -2735,7 +2735,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             settings = SettingsService(service.db)
             held = settings.get_device_setting("held_orders", [])
             dialog = TextDialog(self, "พักบิล", "ตั้งชื่อบิลเพื่อเรียกกลับ", "บิลพัก")
-            if dialog.exec() != QDialog.Accepted:
+            if dialog.exec() != QDialog.DialogCode.Accepted:
                 return
             snapshot = {"snapshot": self.order.snapshot()}
             snapshot['hold_label'] = dialog.entry.text().strip() or 'บิลพัก'
@@ -2785,7 +2785,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 TouchMessage.information(self, 'บิลพัก', 'ยังไม่มีบิลพัก')
                 return
             picker = ChoiceDialog(self, 'บิลพัก', choices)
-            if picker.exec() != QDialog.Accepted:
+            if picker.exec() != QDialog.DialogCode.Accepted:
                 return
             kind, index = picker.choice
             if kind == 'local':
@@ -2835,7 +2835,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             if not self.ensure_sale_session():
                 return
             dialog = PaymentDialog(self, self.order)
-            if dialog.exec() != QDialog.Accepted:
+            if dialog.exec() != QDialog.DialogCode.Accepted:
                 self.refresh_order(keep_selection=True)
                 return
 
@@ -2924,7 +2924,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     # PIN ซ้ำจากข้อมูลเก่า: ให้เลือกชื่อ กันบิลเข้าผิดคน
                     people = selected["cashiers"]
                     picker = ChoiceDialog(self, "PIN ซ้ำกัน", [(str(p['name']), p) for p in people])
-                    if picker.exec() != QDialog.Accepted:
+                    if picker.exec() != QDialog.DialogCode.Accepted:
                         return None
                     chosen = picker.choice
                     selected = online.provisioning.online_cashier_login(pin, cashier_server_id=int(chosen["id"]))
@@ -2962,7 +2962,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     "กรุณาถ่ายภาพข้อความนี้ส่งให้ฝ่าย IT",
                 )
                 return None
-            if seller_result != QDialog.Accepted or seller.cashier is None:
+            if seller_result != QDialog.DialogCode.Accepted or seller.cashier is None:
                 TouchMessage.information(
                     self,
                     "ยังไม่ได้เปิดกะ",
@@ -3053,7 +3053,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 opening_dialog.raise_()
                 opening_dialog.activateWindow()
                 app.processEvents()
-                if opening_dialog.exec() != QDialog.Accepted:
+                if opening_dialog.exec() != QDialog.DialogCode.Accepted:
                     return False
                 opening_cash = opening_dialog.opening_cash
 
@@ -3107,7 +3107,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 label = "นำส่งเงินระหว่างกะ"
             else:
                 picker = ChoiceDialog(self, "รายการเงินสด", [(label, label) for label in labels])
-                if picker.exec() != QDialog.Accepted:
+                if picker.exec() != QDialog.DialogCode.Accepted:
                     return
                 label = picker.choice
             details = TouchDialog(self, label, "จำนวนเงิน · เลขซอง · เหตุผล")
@@ -3134,7 +3134,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 except ValueError as error:
                     error_label.setText(str(error))
             details.confirm('ยืนยัน', confirm_movement)
-            if details.exec() != QDialog.Accepted:
+            if details.exec() != QDialog.DialogCode.Accepted:
                 return
             value = str(cash(amount.text()))
             reason = reason_field.text().strip()
@@ -3205,7 +3205,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 return
             protocol = FloatClose(online.provisioning.api, policy, int(local['server_id']))
             dialog = FloatCloseDialog(self, protocol, policy)
-            if dialog.exec() != QDialog.Accepted:
+            if dialog.exec() != QDialog.DialogCode.Accepted:
                 return
             try:
                 SettingsService(service.db).set_device_setting('uncertain_float_close', dict(local_id=self.shift_id, server_id=local['server_id']))
@@ -3245,7 +3245,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     return
                 return self.close_float_shift(policy)
             dialog = CloseShiftDialog(self, self.expected_shift_cash())
-            if dialog.exec() != QDialog.Accepted:
+            if dialog.exec() != QDialog.DialogCode.Accepted:
                 return
             counted = dialog.amount.text()
             note = dialog.note.text()
@@ -3308,7 +3308,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         def show_history(self):
             rows = service.db.execute("SELECT id, document_no, server_receipt_no, grand_total, sync_status, is_void FROM sales ORDER BY id DESC").fetchall()
             picker = ChoiceDialog(self, "ประวัติบิล · เลือกบิลเพื่อยกเลิก/รับคืน", [(f"{r['document_no']} · {r['server_receipt_no'] or ''} · {r['grand_total']} · {sale_status_label(r['sync_status'])}" + (' · ยกเลิก' if r['is_void'] else ''), r['id']) for r in rows], searchable=True)
-            if picker.exec() != QDialog.Accepted:
+            if picker.exec() != QDialog.DialogCode.Accepted:
                 return
             sale_id = picker.choice
             dialog = TouchDialog(self, "รายละเอียดบิล", "เลือกยกเลิกบิล หรือรับคืนสินค้า")
@@ -3346,14 +3346,14 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             details.entry.setMaxLength(500)
             details.body.insertLayout(1, reasons)
             details.resize(900, 380)
-            if details.exec() != QDialog.Accepted or not details.entry.text().strip():
+            if details.exec() != QDialog.DialogCode.Accepted or not details.entry.text().strip():
                 return
             managers = service.db.execute("SELECT server_id, name FROM local_cashiers WHERE active = 1 AND revoked_at IS NULL AND role = 'manager' AND server_id IS NOT NULL").fetchall()
             if not managers:
                 TouchMessage.warning(self, title, "ยังไม่มีรายชื่อหัวหน้า ให้ผู้ดูแลโหลดรายชื่อพนักงานใหม่ แล้วลองอีกครั้ง")
                 return
             picker = ChoiceDialog(self, "หัวหน้าที่อนุมัติ", [(r['name'], r['server_id']) for r in managers])
-            if picker.exec() != QDialog.Accepted:
+            if picker.exec() != QDialog.DialogCode.Accepted:
                 return
             items = []
             if is_return:
