@@ -118,7 +118,55 @@
     .doc-btn { min-width:84px; height:29px; border:1px solid #888; border-radius:0; padding:3px 12px; background:linear-gradient(#fff,#ddd); color:#111; font-size:11px; font-weight:700; }
     .doc-btn-primary { min-width:125px; border-color:#777; background:linear-gradient(#fff,#d7d7d7); color:#111; }
     .doc-btn-primary:hover,.doc-btn-secondary:hover { background:#dceeff; color:#111; }
-    .doc-modal { width:min(1500px,calc(100vw - 32px)); height:calc(100dvh - 32px); }
+    /* Popup กลางสำหรับเอกสาร: ใช้สัดส่วนและระยะห่างเดียวกับแฟ้มสินค้า */
+    .doc-modal-backdrop { padding:16px; background:rgba(15,35,54,.58)!important; backdrop-filter:blur(4px)!important; }
+    .doc-modal { width:min(1280px,calc(100vw - 32px)); height:min(850px,calc(100dvh - 32px)); border:1px solid rgba(255,255,255,.72)!important; border-radius:22px!important; background:#f7fafc!important; box-shadow:0 30px 100px rgba(5,29,49,.38)!important; color:#172033; font:14px/1.45 Tahoma,"Noto Sans Thai",sans-serif; }
+    .doc-titlebar { flex:0 0 64px; height:64px; padding:0 20px 0 26px; border-bottom:1px solid #dbe7ef; background:linear-gradient(120deg,#fff,#edf8fb); }
+    .doc-title { font-size:18px; font-weight:800; color:#19344d; }
+    .doc-subtitle { display:block; margin-top:2px; color:#667b8d; font-size:12px; }
+    .doc-close { width:40px; height:40px; border:1px solid #d6e3eb; border-radius:11px; background:#fff; color:#506779; }
+    .doc-close:hover { background:#fff5f5; border-color:#fecaca; color:#b91c1c; }
+    .doc-commandbar { flex:0 0 72px; display:flex; align-items:center; gap:10px; padding:10px 24px; border-bottom:1px solid #dbe7ef; background:#fff; }
+    .doc-commandbar button { width:auto; min-width:124px; min-height:50px; display:flex; align-items:center; justify-content:center; gap:8px; border:1px solid #d5e2eb; border-radius:12px; background:#fff; color:#486074; font-size:13px; font-weight:800; }
+    .doc-commandbar button:hover { border-color:#8bc8e8; color:var(--erp-primary-dark); background:#f0f9fe; }
+    .doc-commandbar i { color:inherit; font-size:18px; line-height:1; }
+    .doc-modal form { min-height:0; flex:1; }
+    .doc-body { min-height:0; flex:1; padding:18px 24px 20px; background:#f7fafc; }
+    .doc-head-grid { gap:14px; margin-bottom:14px; }
+    .doc-card { border:1px solid #dbe7ef; border-radius:14px; background:#fff; box-shadow:0 6px 18px rgba(15,56,88,.04); }
+    .doc-card-pad { padding:16px; }
+    .doc-fields { gap:12px 14px; }
+    .doc-field { gap:5px; }
+    .doc-field label { color:#41566a; font-size:12px; font-weight:800; }
+    .doc-input,.doc-select { min-height:38px; height:auto; border:1px solid #c6d7e3; border-radius:9px; padding:7px 10px; font-size:13px; }
+    .doc-input:focus,.doc-select:focus { border-color:var(--erp-primary); box-shadow:0 0 0 3px rgba(26,145,204,.14); }
+    .doc-details { margin-top:12px; }
+    .doc-details summary { color:#647789; font-size:12px; }
+    .doc-meta-line { margin-bottom:8px; }
+    .doc-meta-line span { color:#647789; font-size:12px; }
+    .doc-meta-line strong { font-size:13px; color:#253d53; }
+    .doc-meta-total { margin-top:10px; padding-top:10px; border-top:1px dashed #dbe7ef; }
+    .doc-total-label { color:#41566a; font-size:13px; }
+    .doc-total-value { color:var(--erp-primary-dark); font-size:25px; font-weight:900; }
+    .doc-items-head { padding:10px 12px; border-bottom:1px solid #dbe7ef; background:#f8fbfd; }
+    .doc-items-head strong { color:#243c53; font-size:13px; }
+    .doc-add { border:1px solid #b9dae8; border-radius:9px; padding:6px 11px; background:#eff9fd; color:#087f9c; font-size:12px; }
+    .doc-table { overflow:hidden; border-radius:12px; }
+    .doc-table th { padding:8px; border-right:0; border-bottom:1px solid #dbe7ef; background:#eff7fb; color:#486074; font-size:11px; }
+    .doc-table td { padding:7px 8px; border-right:0; border-bottom:1px solid #e6eef3; background:#fff; font-size:12px; }
+    .doc-table tbody tr:nth-child(even) td { background:#fbfdfe; }
+    .qty-step { border-color:#c6d7e3; background:#f7fafc; color:#087f9c; }
+    .doc-line-total { padding-top:9px; color:#087f9c; font-weight:900; }
+    .doc-delete { width:30px; height:30px; border:0; border-radius:8px; background:#fff1f2; color:#e11d48; }
+    .doc-typeahead { top:calc(100% + 4px); border:1px solid #dbe7ef; border-radius:10px; padding:4px; box-shadow:0 14px 36px rgba(15,23,42,.16); }
+    .doc-option { border-radius:7px; padding:7px 8px; font-size:12px; }
+    .doc-footer { flex:0 0 64px; padding:10px 24px; border-top:1px solid #dbe7ef; background:#fbfdfe; }
+    .doc-footer .doc-total-value { font-size:22px; }
+    .doc-actions { gap:10px; }
+    .doc-btn { min-width:108px; height:42px; border:1px solid #d6e3eb; border-radius:10px; padding:8px 15px; background:#fff; color:#41566a; font-size:13px; font-weight:800; }
+    .doc-btn-primary { min-width:150px; border:0; background:linear-gradient(135deg,var(--erp-primary),#14b8a6); color:#fff; box-shadow:0 6px 14px rgba(12,125,180,.2); }
+    .doc-btn-primary:hover { background:linear-gradient(135deg,var(--erp-primary-dark),#0d9488); color:#fff; }
+    .doc-btn-secondary:hover { background:#f0f9fe; border-color:#8bc8e8; color:var(--erp-primary-dark); }
     @media (max-width: 768px) {
         .doc-modal { width:100vw; height:100dvh; border-radius:0; }
         .doc-head-grid { grid-template-columns:1fr; }

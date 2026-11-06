@@ -1,4 +1,19 @@
-# Handoff — 2026-11-06 (Product popup compact desktop layout — pending deploy)
+# Handoff — 2026-11-06 (Central document popup UI — pending deploy)
+
+## Scope
+- Branch: `codex/modern-product-popups`.
+- Reworked the shared document-entry popup skin to use the same centered, modern popup system as the product form: a bounded desktop frame, clear title area, spaced command buttons, rounded form cards, readable item table, and sticky-looking footer actions.
+- This shared component is used by create/edit document flows for bookings, cash sales, purchases, and sale returns. It preserves every existing field, endpoint, submit handler, validation, stock rule, price rule, and lifecycle condition.
+
+## Verification
+- `git diff --check` passed.
+- `php artisan view:clear && php artisan view:cache` passed.
+- `php artisan test tests/Feature/SaleReturnSourceTest.php tests/Feature/BookingSalesAreaTest.php tests/Feature/NegativeStockPolicyTest.php --no-coverage` passed: 34 tests, 183 assertions.
+- **Pending deployment:** this UI-only shared-popup refinement has not been deployed yet.
+
+---
+
+# Handoff — 2026-11-06 (Product popup compact desktop layout — deployed production)
 
 ## Scope
 - Branch: `codex/modern-product-popups`.
@@ -10,7 +25,7 @@
 - `git diff --check` passed.
 - `php artisan view:clear && php artisan view:cache` passed.
 - `php artisan test tests/Feature/ProductCatalogFilterTest.php tests/Feature/BarcodePolicyTest.php tests/Feature/ScalePluPageTest.php --no-coverage` passed: 25 tests, 177 assertions.
-- **Pending deployment:** this visual correction has not been deployed yet.
+- Deployed through GitHub Actions run `42180174696`; workflow completed successfully.
 
 ---
 
