@@ -161,8 +161,8 @@ class PosServiceTest(unittest.TestCase):
         self.assertEqual(summary.payments, (("cash", Decimal("25.00")),))
         self.assertEqual(summary.pending_sync_count, 1)
 
-    def test_transfer_requires_money_received_confirmation(self) -> None:
-        with self.assertRaisesRegex(ValueError, "ตรวจเงินเข้า"):
+    def test_transfer_requires_a_four_digit_sender_account(self) -> None:
+        with self.assertRaisesRegex(ValueError, "4 หลัก"):
             self.service.checkout(
                 document_no="T-QR-NO-MONEY", branch_id=1, terminal_id="TEST-01", shift_id=self.shift_id,
                 cashier_id=1, lines=[CartLine(1, Decimal("1"), Decimal("25"))],

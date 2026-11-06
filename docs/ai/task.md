@@ -2747,3 +2747,8 @@ pending
 - หน้าจอ: เปลี่ยนปุ่ม `ล็อก/สลับคนขาย` เป็น `ล็อกหน้าจอ` เพื่อสื่อว่าเป็นการพักเครื่อง ไม่ใช่สลับกะ; เปลี่ยน `ออกงาน` เป็น `ปิดกะ`; ประวัติบิลใช้สองบรรทัด ตัดเลขยาวกลางข้อความ และปิด horizontal scroll
 - ทดสอบ: `QT_QPA_PLATFORM=offscreen PYTHONPATH=apps/pos-python /private/tmp/pos-parity-env/bin/python -m pytest apps/pos-python/tests/test_payments.py apps/pos-python/tests/test_payment_touch.py apps/pos-python/tests/test_touch_popups.py apps/pos-python/tests/test_close_shift_wizard.py -q` ผ่าน **47 passed**; `git diff --check` ผ่าน
 - Deploy: **ยังไม่ deploy production**; ต้อง build/install UAT ใหม่ก่อนตรวจบน Windows 1024×768
+## Handoff - 2026-11-06 (Python POS: UAT build follow-up)
+- แก้ test เดิม 2 จุดที่ยังบังคับให้ POS แสดง checkbox ตรวจยอดโอน ซึ่งไม่ตรง flow ใหม่; เปลี่ยนเป็นตรวจว่าการโอนต้องมีเลขท้ายบัญชีผู้โอน 4 หลัก และไม่มีข้อความ/handler checkbox ซ้ำซ้อน
+- ทดสอบ: `QT_QPA_PLATFORM=offscreen PYTHONPATH=apps/pos-python /private/tmp/pos-parity-env/bin/python -m pytest apps/pos-python/tests/test_pos_service.py apps/pos-python/tests/test_ui_style.py apps/pos-python/tests/test_payments.py -q` ผ่าน **76 passed**; `git diff --check` ผ่าน
+- CI ก่อนแก้: GitHub Actions run `42189856059` ล้มเฉพาะ test เก่าทั้ง 2 จุด ไม่ได้ build installer; commit ถัดไปต้อง trigger Windows UAT build ใหม่
+- Deploy: **ยังไม่ deploy production**

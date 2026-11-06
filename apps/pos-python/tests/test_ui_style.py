@@ -183,14 +183,13 @@ class UiStyleTest(unittest.TestCase):
         self.assertNotIn("กรอก PIN", source)
         self.assertNotIn("cashier_login_mode", source)
 
-    def test_transfer_requires_visible_money_received_confirmation(self) -> None:
+    def test_transfer_uses_only_the_required_four_digit_sender_account(self) -> None:
         source = inspect.getsource(run_ui)
         self.assertIn("self.method_buttons", source)
-        self.assertIn("ตรวจสอบแล้วว่าเงินเข้าบัญชีครบตามยอด", source)
         self.assertIn("validate_payment(self.payment_method", source)
-        self.assertIn("self.transfer_confirmed.toggled.connect(self._confirm_transfer_checkbox)", source)
         self.assertIn("เลขท้ายบัญชีผู้โอน (4 หลัก)", source)
         self.assertIn("self.transfer_account_last4.text()", source)
+        self.assertNotIn("ตรวจสอบแล้วว่าเงินเข้าบัญชีครบตามยอด", source)
 
     def test_pos_layout_adapts_to_small_pos_displays(self) -> None:
         source = inspect.getsource(run_ui)
