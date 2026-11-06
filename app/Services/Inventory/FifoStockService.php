@@ -4,6 +4,7 @@ namespace App\Services\Inventory;
 
 use App\Models\Product;
 use App\Models\StockBalance;
+use App\Models\StockDocument;
 use App\Models\StockLot;
 use App\Models\StockMovement;
 use App\Support\DecimalMath;
@@ -36,8 +37,11 @@ class FifoStockService
     }
 
     /** @return Collection<int, array{lot:StockLot,qty:string}> */
-    public function issue(int $productId, int $locationId, int|float|string $qty, ?int $documentId, string $movementType = 'out', ?string $movementDate = null, bool $allowNegative = false, bool $allowExpired = false, bool $allowRestricted = false): Collection
+    public function issue(int $productId, int $locationId, int|float|string $qty, ?int $documentId, string $movementType = 'out', ?string $movementDate = null, bool $allowNegative = false, bool $allowExpired = false, bool $allowRestricted = false, bool $allowInTransit = false): Collection
     {
+        if (! $allowInTransit && StockDocument::where('transit_location_id', $locationId)->exists()) {
+            throw new RuntimeException('สินค้าระหว่างทางยังไม่พร้อมขายหรือเบิก');
+        }
         $balance = $this->balance($productId, $locationId);
         // Reservations belong to open bookings and must remain unavailable to other issues.
         $balance = StockBalance::whereKey($balance->id)->lockForUpdate()->firstOrFail();
@@ -57,6 +61,9 @@ class FifoStockService
         $lotsQuery = StockLot::where('product_id', $productId)
             ->where('warehouse_location_id', $locationId)
             ->where('remaining_qty', '>', 0);
+        if (! $allowInTransit) {
+            $lotsQuery->where('quality_status', '!=', 'in_transit');
+        }
         if (! $allowRestricted) {
             $lotsQuery->where('quality_status', 'available');
             $usable = (clone $lotsQuery)->sum('remaining_qty');

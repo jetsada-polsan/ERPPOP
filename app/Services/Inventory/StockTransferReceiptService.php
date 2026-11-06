@@ -10,16 +10,9 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
-/**
- * ตรวจรับสินค้าโอนย้ายด้วยการสแกนบาร์โค้ดที่ปลายทาง - เทียบจำนวนที่สแกนจริงกับ
- * จำนวนในใบโอนย้าย (ที่อนุมัติ/ตัดสต๊อกไปแล้วผ่าน StockTransferService::approve())
- * เพื่อจับความผิดพลาดระหว่างขนส่ง/หยิบของผิด
- *
- * เจตนา: เป็นชั้นหลักฐาน/ควบคุมเพิ่มเติมเท่านั้น "ไม่" แก้ไข stock_balances เอง
- * เพราะการแก้สต๊อกอัตโนมัติจากการสแกน (ซึ่งพนักงานคนเดียวทำได้) เสี่ยงเกินไปสำหรับ
- * ข้อมูลที่กระทบยอดคงคลัง/ต้นทุน - พบส่วนต่างจริงต้องให้พนักงานไปสร้าง "ใบปรับสต๊อก"
- * (stock-adjustments) แยกต่างหากตามขั้นตอนปกติ ซึ่งมีผู้อนุมัติอีกคนตรวจซ้ำ
- * (segregation of duties เดียวกับที่ใช้ทั้งระบบ)
+/** Receives transit stock once; short/damaged quantities remain in transit
+ * until the separately created damage document is approved. Legacy transfers
+ * (no transit_location_id) retain the original evidence-only behavior.
  */
 class StockTransferReceiptService
 {
@@ -31,16 +24,20 @@ class StockTransferReceiptService
         if ($document->documentType?->code !== 'STOCK_TRANSFER') {
             throw new RuntimeException('ไม่ใช่เอกสารโอนย้ายสต็อก');
         }
-        if ($document->status !== 'active') {
+        if (! in_array($document->status, ['active', 'in_transit'], true)) {
             throw new RuntimeException('ต้องเป็นใบโอนย้ายที่อนุมัติ/โอนสต๊อกแล้วเท่านั้นถึงจะตรวจรับได้');
         }
 
-        $existing = StockTransferReceipt::where('document_id', $document->id)->first();
-        if ($existing) {
-            return $existing;
-        }
-
         return DB::transaction(function () use ($document) {
+            $document = Document::whereKey($document->id)->lockForUpdate()->firstOrFail();
+            if (! in_array($document->status, ['active', 'in_transit'], true)) {
+                throw new RuntimeException('เอกสารโอนไม่อยู่ในสถานะตรวจรับ');
+            }
+            $existing = StockTransferReceipt::where('document_id', $document->id)->first();
+            if ($existing) {
+                return $existing;
+            }
+
             $receipt = StockTransferReceipt::create([
                 'document_id' => $document->id,
                 'status' => 'checking',
@@ -75,18 +72,21 @@ class StockTransferReceiptService
      */
     public function saveScans(StockTransferReceipt $receipt, array $rows): int
     {
-        if (! $receipt->isEditable()) {
-            throw new RuntimeException('ใบนี้ยืนยันปิดแล้ว แก้ไขไม่ได้');
-        }
+        return DB::transaction(function () use ($receipt, $rows) {
+            $receipt = StockTransferReceipt::whereKey($receipt->id)->lockForUpdate()->firstOrFail();
+            if (! $receipt->isEditable()) {
+                throw new RuntimeException('ใบนี้ยืนยันปิดแล้ว แก้ไขไม่ได้');
+            }
 
-        $updated = 0;
-        foreach ($rows as $row) {
-            $updated += StockTransferReceiptItem::where('stock_transfer_receipt_id', $receipt->id)
-                ->where('id', $row['id'])
-                ->update(['scanned_qty' => $row['scanned_qty'] ?? null]);
-        }
+            $updated = 0;
+            foreach ($rows as $row) {
+                $updated += StockTransferReceiptItem::where('stock_transfer_receipt_id', $receipt->id)
+                    ->where('id', $row['id'])
+                    ->update(['scanned_qty' => $row['scanned_qty'] ?? null]);
+            }
 
-        return $updated;
+            return $updated;
+        });
     }
 
     /**
@@ -97,24 +97,70 @@ class StockTransferReceiptService
      */
     public function complete(StockTransferReceipt $receipt, ?string $note = null): Collection
     {
-        if (! $receipt->isEditable()) {
-            throw new RuntimeException('ใบนี้ยืนยันปิดแล้ว');
-        }
+        return DB::transaction(function () use ($receipt, $note) {
+            $document = Document::whereKey($receipt->document_id)->lockForUpdate()->firstOrFail();
+            $receipt = StockTransferReceipt::whereKey($receipt->id)->lockForUpdate()->firstOrFail();
+            if (! $receipt->isEditable()) {
+                throw new RuntimeException('ใบนี้ยืนยันปิดแล้ว');
+            }
 
-        $items = $receipt->items()->with('product:id,sku_code')->get();
-        $unscanned = $items->filter(fn ($i) => $i->scanned_qty === null);
-        if ($unscanned->isNotEmpty()) {
-            $skus = $unscanned->map(fn ($i) => $i->product->sku_code)->implode(', ');
-            throw new RuntimeException("ยังสแกน/กรอกไม่ครบ ({$unscanned->count()} รายการ): {$skus}");
-        }
+            $items = $receipt->items()->with('product:id,sku_code')->get();
+            $unscanned = $items->filter(fn ($i) => $i->scanned_qty === null);
+            if ($unscanned->isNotEmpty()) {
+                $skus = $unscanned->map(fn ($i) => $i->product->sku_code)->implode(', ');
+                throw new RuntimeException("ยังสแกน/กรอกไม่ครบ ({$unscanned->count()} รายการ): {$skus}");
+            }
 
-        $receipt->update([
-            'status' => 'completed',
-            'confirmed_by' => auth()->id(),
-            'confirmed_at' => now(),
-            'note' => $note,
-        ]);
+            $stock = $document->stockDocument;
+            // NULL marks legacy transfers whose destination was already credited. Never move them again.
+            if ($stock->transit_location_id) {
+                $fifo = app(FifoStockService::class);
+                $damage = [];
+                foreach ($items as $item) {
+                    if (DecimalMath::compare($item->scanned_qty, 0) < 0 || DecimalMath::compare($item->scanned_qty, $item->expected_qty) > 0) {
+                        throw new RuntimeException('ยอดตรวจรับต้องอยู่ระหว่าง 0 ถึงจำนวนที่ส่ง');
+                    }
+                    $missing = DecimalMath::subtract($item->expected_qty, $item->scanned_qty);
+                    if (DecimalMath::compare($missing, 0) > 0) {
+                        if (! filled($note)) {
+                            throw new RuntimeException('รับไม่ครบ/เสียหายต้องระบุหลักฐานและเหตุผลในหมายเหตุ');
+                        }
+                        $damage[] = ['product_id' => $item->product_id, 'qty' => $missing];
+                    }
+                    if (DecimalMath::compare($item->scanned_qty, 0) <= 0) {
+                        continue;
+                    }
+                    $allocations = $fifo->issue($item->product_id, $stock->transit_location_id, $item->scanned_qty,
+                        $document->id, 'transfer_out', allowExpired: true, allowRestricted: true, allowInTransit: true);
+                    foreach ($allocations as $allocation) {
+                        $lot = $allocation['lot'];
+                        $source = $lot->sourceLot;
+                        $received = $fifo->receive($item->product_id, $stock->to_warehouse_location_id, $allocation['qty'],
+                            $document->id, 'transfer_in', $lot->lot_number, now()->toDateString(),
+                            $lot->expiry_date?->toDateString(), $lot->unit_cost, $lot->manufacture_date?->toDateString());
+                        $received->update(['source_lot_id' => $lot->id, 'received_date' => $lot->received_date, 'quality_status' => $source?->quality_status ?? 'available',
+                            'quality_reason' => $source?->quality_reason]);
+                    }
+                }
+                if ($damage !== []) {
+                    $evidence = app(StockIssueService::class)->create([
+                        'type' => 'damage', 'branch_id' => $document->branch_id,
+                        'warehouse_location_id' => $stock->transit_location_id,
+                        'reference' => $document->doc_number, 'remark' => $note, 'items' => $damage,
+                    ]);
+                    $note .= ' | ใบผลต่างรออนุมัติ '.$evidence->doc_number;
+                }
+                $document->update(['status' => 'active']);
+            }
 
-        return $items->filter(fn ($i) => DecimalMath::compare($i->scanned_qty, $i->expected_qty) !== 0)->values();
+            $receipt->update([
+                'status' => 'completed',
+                'confirmed_by' => auth()->id(),
+                'confirmed_at' => now(),
+                'note' => $note,
+            ]);
+
+            return $items->filter(fn ($i) => DecimalMath::compare($i->scanned_qty, $i->expected_qty) !== 0)->values();
+        });
     }
 }

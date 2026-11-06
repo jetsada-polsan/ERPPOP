@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['document_id', 'to_warehouse_location_id', 'total_qty', 'total_items', 'refer_reference', 'refer_person'])]
+#[Fillable(['document_id', 'transit_location_id', 'to_warehouse_location_id', 'total_qty', 'total_items', 'refer_reference', 'refer_person'])]
 class StockDocument extends Model
 {
     const UPDATED_AT = null;

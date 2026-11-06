@@ -11,9 +11,10 @@
 
     <div class="alert alert-warning small mb-3">
         <i class="bi bi-exclamation-triangle-fill me-1"></i>
-        การปรับที่นี่แก้เฉพาะ <strong>มูลค่าสต๊อกคงเหลือ</strong> ของสินค้า (ต้นทุน Lot + ต้นทุนเฉลี่ยสินค้า) เท่านั้น
-        <strong>ไม่แก้</strong> ยอดในใบซื้อเดิม ยอดหนี้เจ้าหนี้ หรือบัญชี GL ที่โพสต์ไปแล้ว และ<strong>ไม่ย้อนแก้ต้นทุนขาย</strong>ของสินค้าที่ตัดสต๊อกออกไปแล้ว
-        ถ้าจำนวนคงเหลือของ Lot เหลือน้อยกว่าที่ซื้อมา ระบบจะแสดง "มูลค่าผลต่างส่วนที่ตัดไปแล้ว" ไว้ให้บัญชีพิจารณาปรับผ่าน journal แยกเอง
+        ปรับต้นทุน Lot และต้นทุนเฉลี่ย พร้อมลง GL ส่วนคงเหลือเข้าบัญชีสินค้าคงเหลือ และส่วนที่ตัดไปแล้วเข้าต้นทุนขาย
+        อีกฝั่งเป็นบัญชีพักผลต่างต้นทุนซื้อรอยืนยันเอกสารผู้ขาย โดยเก็บรายการเดิมไว้ทั้งหมด รวม Lot ที่โอนไปสาขาอื่นหรืออยู่ระหว่างทาง
+        ไม่แก้ยอดใบซื้อเดิม ภาษี หรือหนี้เจ้าหนี้ หากราคาที่ตกลงกับผู้ขายเปลี่ยน ต้องใช้ใบเพิ่ม/ลดหนี้ผู้ขายแยกต่างหาก
+
     </div>
 
     <div class="content-card p-4 mb-4">
@@ -47,7 +48,7 @@
                                 <td>{{ $item->product->name_th }}</td>
                                 <td class="text-end">{{ number_format((float) $lot->initial_qty, 4) }}</td>
                                 <td class="text-end">
-                                    {{ number_format((float) $lot->remaining_qty, 4) }}
+                                    {{ number_format((float) $row['remaining_qty'], 4) }}
                                     @if($row['partially_consumed'])
                                         <span class="badge text-bg-warning ms-1">ตัดออกไปแล้วบางส่วน</span>
                                     @endif
@@ -88,7 +89,7 @@
                         <th>วันที่</th><th>สินค้า</th>
                         <th class="text-end">ต้นทุนเดิม</th><th class="text-end">ต้นทุนใหม่</th>
                         <th class="text-end">คงเหลือที่ปรับ</th><th class="text-end">ตัดไปแล้ว</th>
-                        <th class="text-end">มูลค่าผลต่างส่วนที่ตัดไปแล้ว</th>
+                        <th class="text-end">ผลต่างส่วนที่ตัดไปแล้วก่อนปัดเศษ</th>
                         <th>เหตุผล</th><th>ผู้ปรับ</th>
                     </tr>
                 </thead>

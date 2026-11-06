@@ -1,5 +1,14 @@
 # POPSTAR ERP/POS - ความจำกลางของทีม AI
 
+## P0 money integrity — 2026-11-06 (workspace only)
+
+- งานบน `claude/p0-money-integrity` ยังไม่ commit/push เพราะ Git metadata นอก workspace เขียนไม่ได้; ไม่ deploy/ไม่แตะ production. รายละเอียดและตารางส่งมอบครบ 6 ข้ออยู่หัว `docs/ai/task.md`.
+- ใบโอนใหม่อนุมัติเข้า location/lot ระหว่างทาง (ขายไม่ได้) ก่อนตรวจรับเข้าปลายทาง; ขาด/เสียหายสร้างใบตัดชำรุดรออนุมัติและคงมูลค่าไว้จนอนุมัติ. ใบเก่า `transit_location_id=NULL` ลงปลายทางแล้ว ห้ามโอนซ้ำ.
+- GL ใช้ component batches + fingerprint + reversal แบบ append-only ใต้ document lock; ห้ามกลับไปลบ journal เมื่อ repost. POS ลง GL หลังสร้าง pos_payments ตามช่องทางจริง; non-cash ที่ยังไม่ผูก role ใช้บัญชีพัก `pos_clearing`. การ match statement ไม่เคลียร์ GL บัญชีพักเอง.
+- Purchase cost adjustment เป็น valuation correction: inventory/COGS กับ purchase_cost_clear โดยตาม source_lot_id ทั้ง family รวมของโอน/ระหว่างทาง; ไม่เปลี่ยน AP/VAT/ใบซื้อเดิม. เปลี่ยนราคาตกลงผู้ขายต้องใช้ supplier note แยก. Historical adjustments ที่เคยไม่มี GL ต้องตรวจบัญชีก่อนซ่อม ไม่ backfill จากการเดา.
+- ERP รวม qty สินค้าเดียวกันก่อนคิดโปรและรับคิวเก่าที่ส่วนลดน้อยกว่าภายในเพดาน algorithm เดิม; Python promotions.py ต้องปรับใน branch แยก. รายงานภาษีกรอง active แต่คง tax dates เดิม; WHT supplier ใช้ paid_on ส่วนค่าใช้จ่ายใช้ expense_date ซึ่งต้องให้ผู้สอบบัญชียืนยัน.
+- Suite สุดท้าย 837 tests ไม่มี failure/error (2 skipped, 6 incomplete เดิม), mutation checks 8 จุดแดงจริงแล้วคืนโค้ดครบ. PostgreSQL ตรวจ DDL เท่านั้น ยังไม่ได้ execute/concurrency test บน PostgreSQL จริง.
+
 > อ่านไฟล์นี้ก่อนเริ่มงานทุกครั้ง ไม่ว่าจะเป็น Codex, Claude หรือ agent อื่น
 > แก้ไขเมื่อมีการตัดสินใจเชิงระบบ, deploy, เปลี่ยน flow หรือพบความเสี่ยงใหม่
 

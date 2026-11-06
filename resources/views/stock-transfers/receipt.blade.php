@@ -129,6 +129,7 @@
 function stockTransferReceiptSheet() {
     return {
         items: @json($itemsJson),
+        transitMode: @json((bool) $transfer->stockDocument?->transit_location_id),
         scanCode: '', lastRow: null, history: [], dirty: false, saving: false, note: '',
 
         init() { this.$nextTick(() => this.$refs.scanBox?.focus()); },
@@ -211,14 +212,21 @@ function stockTransferReceiptSheet() {
                 return; // ปิดใบต้องครบทุกรายการ - ระบบฝั่งเซิร์ฟเวอร์บังคับเช่นกัน
             }
             if (this.dirty) await this.saveAll();
+            if (this.dirty || this.saving) return;
             const diffs = this.items.filter(i => this.hasDiff(i));
             if (diffs.length > 0) {
                 const result = await Swal.fire({
                     icon: 'warning', title: `พบยอดไม่ตรง ${diffs.length} รายการ`,
-                    html: 'ยืนยันปิดการตรวจรับ? ระบบจะบันทึกไว้เป็นหลักฐาน ไม่ได้แก้สต๊อกให้อัตโนมัติ - ถ้าใช่จริงต้องไปสร้างใบปรับสต๊อกแยกต่างหากภายหลัง',
+                    html: this.transitMode
+                        ? 'ระบบย้ายจำนวนที่ตรวจรับเข้าปลายทาง ส่วนขาด/เสียหายสร้างใบตัดชำรุดรออนุมัติ โดยยังเก็บสต๊อกไว้ระหว่างทาง'
+                        : 'ใบโอนเก่าลงสต๊อกแล้ว ระบบบันทึกผลตรวจเป็นหลักฐาน หากพบส่วนต่างจริงให้สร้างใบปรับสต๊อกตามขั้นตอน',
+                    input: 'textarea', inputLabel: 'เหตุผลและเลขอ้างอิงหลักฐานรับขาด/เสียหาย',
+                    inputValidator: (value) => this.transitMode && !value?.trim() ? 'กรุณาระบุเหตุผลและหลักฐาน' : undefined,
                     showCancelButton: true, confirmButtonText: 'ยืนยันปิด', cancelButtonText: 'ยกเลิก', reverseButtons: true,
                 });
                 if (!result.isConfirmed) return;
+                this.note = (result.value || '').trim();
+                await this.$nextTick();
             }
             formEl.submit();
         },

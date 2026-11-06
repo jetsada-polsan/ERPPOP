@@ -1,3 +1,76 @@
+# Handoff — 2026-11-06 (P0 money integrity — workspace only)
+
+## Commit / ขอบเขต
+- Branch ปัจจุบัน `claude/p0-money-integrity`; base HEAD `659cbc5`. ไม่เปลี่ยน branch และเริ่มจาก working tree สะอาด.
+- **ยังไม่มี commit/push ใหม่**: `git pull origin main` ถูกปฏิเสธการเขียน `FETCH_HEAD`; `git add` สำหรับข้อ 1 ถูกปฏิเสธ `index.lock` (`Operation not permitted`). Git metadata อยู่ภายนอกพื้นที่ที่ workspace เขียนได้ จึงไม่พยายามข้ามสิทธิ์หรือ push HEAD เก่าทดแทนงานใหม่. ไฟล์ที่แก้และไฟล์ใหม่ทั้งหมดอยู่ใน workspace นี้ตามคำสั่งเจ้าของ.
+- **ไม่ deploy ไม่แตะ production** ไม่มีการรัน migration/คำสั่งซ่อมบนฐานข้อมูลถาวร. Database tests ใช้ SQLite `:memory:` ตาม phpunit.xml; PostgreSQL ตรวจเฉพาะ DDL compilation โดย callback จะ throw หากพยายามเชื่อมฐานจริง.
+- ไม่แก้ `apps/pos-python`, Vue, API request/response contract, installer, release, credentials หรือข้อมูลธุรกรรมเก่าใน migration.
+
+## ตารางส่งมอบครบ 6 ข้อ
+
+| ข้อ | ไฟล์หลัก | เทสต์ / ผล | ผลกระทบข้อมูลเก่า | คำสั่งซ่อม |
+| --- | --- | --- | --- | --- |
+| 1 โอนระหว่างทาง | `StockTransferService`, `StockTransferReceiptService`, `FifoStockService`, `StockIssueService`, `StockDocument`, `StockTransferReceiptController`, views `stock-transfers/*`; migration `2026_11_06_100001_add_transfer_transit_location.php` | `InventoryFlowEndToEndTest`; P0 tests partial receipt, legacy receipt, transferred cost; ผ่าน | `transit_location_id=NULL` คงพฤติกรรมใบโอนเก่าที่เพิ่มปลายทางแล้ว ไม่โอนซ้ำเมื่อสแกนรับ; ใบใหม่ใช้ in_transit | ไม่มี backfill ใบโอนเก่า |
+| 2 GL append-only | `GlPostingService`, `GlJournal`; migration `2026_11_06_100002_create_gl_posting_batches.php` | P0 tests repost/retry/void, open/closed periods, same-day statements, sales COGS idempotency; DocumentVoid/SalesAdjustment/InventoryLedger tests เดิมผ่าน | ไม่ลบ/แก้ journal เก่า; batch/reversal references เป็น nullable; รับ legacy unbatched main/COGS ได้ | ไม่จำเป็นสำหรับ journal ที่ถูกต้อง; ประวัติที่เคยถูกลบก่อนแก้ไม่สามารถสร้างคืนจากการเดา |
+| 3 POS วิธีชำระ | `CashSaleService`, `PosController`, `GlPostingService`, `ChartOfAccount`, command `PosSettlementReclassify` | `PosWebCheckoutRealTest` ช่องทาง cash/transfer/card/cheque/mixed, close cashbook once, legacy repair dry-run/apply/retry; ผ่าน | บิลเก่าคงเดิมจนใช้คำสั่งซ่อม; เก็บยอดรายได้ VAT COGS และ original journal เดิมครบ | `php artisan erp:pos-settlement-reclassify` (dry-run); เพิ่ม `--apply` จึงเขียน; จำกัดด้วย `--from=YYYY-MM-DD` / `--receipt-id=ID` ได้ |
+| 4 ปรับต้นทุนซื้อ | `PurchaseCostAdjustmentService`, `PurchaseCostAdjustmentController`, view `purchases/cost-adjustments/create` | P0 tests reconciliation เพิ่ม/ลดทุน, transferred lots, half-cent boundary; ผ่าน | ไม่แก้ใบซื้อ/AP/VAT หรือ FIFO cost snapshot ของบิลเก่า; บันทึก GL ผลต่างใหม่เฉพาะการปรับครั้งใหม่; audit ก่อนแก้ที่ไม่ได้ลง GL ยังต้องตรวจบัญชีแยก | ไม่มี auto-backfill เพราะข้อมูลเก่าอาจนับของที่โอนเป็น consumed และต้องกระทบยอดจริงก่อน ห้ามเดาลง GL |
+| 5 โปรหลายบรรทัด | `PosPricingGuard`; `PosPricingGuardTest` | 2+2 ครบ 3, legacy less-discounted queue, underpayment rejection, data provider ครบ 8 ประเภท + เทสต์เดิม; ผ่าน | ยอมรับบิลคิวเก่าที่ส่วนลดน้อยกว่าสิทธิ์ใหม่ ภายในเพดานส่วนต่างที่คำนวณจาก algorithm เดิม ไม่เพิ่มช่องให้ขายต่ำกว่าสิทธิ์ | ไม่มีแก้ยอดบิลเก่า; Python ต้องปรับใน branch อื่น |
+| 6 ตรวจภาษี | `TaxComplianceService`; P0 tax filing/e-Tax tests | exclude draft/pending/rejected/cancelled/void purchases/sales และ cancelled/draft expense VAT/WHT; ผ่าน | ไม่เปลี่ยนกฎหรือวันที่รับรู้; รายงาน/ไฟล์ภาษีที่สร้างไว้แล้วไม่ถูกเขียนทับ | ให้บัญชีตรวจแล้วสร้างรายงานงวดนั้นใหม่ ไม่แก้ยอดยื่นเก่าอัตโนมัติ |
+
+## รายละเอียดควบคุมเงิน/สต๊อก
+- ข้อ 1: อนุมัติ lock เอกสารแล้วตรวจ pending ภายใน transaction; reject ตรวจใต้ lock เช่นกัน. โอนตรงใช้ flow เดียวกัน. แยก location ระหว่างทางต่อใบโอน โดย lot มี `quality_status=in_transit`; FIFO ปฏิเสธ location นี้แม้เปิด negative stock/allowRestricted. เก็บ source_lot_id, unit_cost, lot number, received date, expiry/manufacture dates เดิม; movement date เป็นวันที่เคลื่อนไหวจริง.
+- ตรวจรับ lock เอกสารและใบตรวจรับ ย้ายเฉพาะจำนวนสแกนเข้าปลายทาง; รับเกินใบส่งถูกปฏิเสธ. รับขาด/เสียหายต้องมีหมายเหตุอ้างอิงหลักฐาน และสร้างใบ STOCK_DAMAGE `pending_approval` แยกอัตโนมัติ. ส่วนขาดยังอยู่ระหว่างทางด้วยต้นทุนเดิม จนอนุมัติใบตัดชำรุดตาม segregation of duties เดิม จึงตัดสต๊อกและ GL. ไม่ตัดขาดหายเงียบ. UI แยกใบเก่า/ใหม่, แสดงระหว่างทาง/ปุ่มตรวจรับ และไม่ยืนยันหาก sync scans ล้มเหลว. ตรวจสิทธิ์ปลายทางก่อนสร้างใบตรวจรับ.
+- ไม่มี role บัญชีสินค้าระหว่างทางแยกในผังบัญชีปัจจุบัน จึงคงมูลค่าภายใต้ role `inventory` เดิม (subledger แยก location/lot ระหว่างทางและยังรวมมูลค่านี้). การโอนไม่เปลี่ยนสินทรัพย์รวม ไม่สร้างรายได้/COGS. จะใช้บัญชี inventory-in-transit แยกต้องกำหนดนโยบาย/role และกระทบยอดรายสาขาเพิ่มเติมก่อนใช้งาน.
+- ข้อ 2: component main/COGS แยก batches; fingerprint จาก account/debit/credit ที่รวมด้วย DecimalMath ภายใต้ document lock. เหมือนเดิมไม่ลงซ้ำ; เปลี่ยนยอด append reversal ของชุดก่อนและชุดใหม่. ยกเลิกกลับ net ของทุกชุด รวม cost-adjustment components; ไม่ลบ journal. ยอดเคลื่อนไหว Dr/Cr รวมเพิ่มตาม audit trail แต่ยอดสุทธิรายบัญชี/งบหักล้างถูกต้อง. GL วันที่ชนิด DATE เก็บ `Y-m-d` ชัดเจน ป้องกัน SQLite report ตกหล่นรายการวันสุดท้าย.
+- รอบแรกลงตาม doc_date ที่ต้องเปิด; repost ที่มีชุดเดิมและ reversal ใช้วันนี้ และ AccountingPeriodGuard ต้องผ่าน. วันนี้ปิดให้ปฏิเสธ ไม่เลือกงวดในอนาคตเอง. Payment reversals เดิมเพิ่ม transaction/row lock/period guard ด้วย. DocumentVoidService ยังบังคับนโยบายเดิมที่ไม่ให้ void เอกสารในงวดเดิมที่ปิด; งานนี้ไม่เปิดทางข้าม guard นั้น.
+- ข้อ 3: บิล POS เตรียม VAT ก่อนทำ receipt แต่ลง GL หลัง pos_payments เกิด ใน transaction เดียวกัน; เงินสดใช้ role `cash`; non-cash ใช้ `pos_transfer`, `pos_card`, `pos_cheque`. ให้บัญชีผูก role เหล่านี้กับธนาคาร/บัญชีพักโอน, ลูกหนี้บัตร, เช็ครับตามนโยบายจริง.
+- ถ้ายังไม่ผูก non-cash role ใช้ role `pos_clearing`; ถ้าไม่มีจะสร้างบัญชี asset รหัสเชิงชื่อ `POS-CLEARING` พร้อม role นี้ใน transaction ของบิล ไม่ hardcode เลขบัญชีและไม่ลงเงินสดแทน พร้อม warning log ระบุ method/document. หากรหัสนี้ถูกบัญชีอื่นใช้แล้วแต่ไม่ใช่ role clearing ให้ปฏิเสธอย่างชัดเจนแทนลงผิดบัญชี. บัญชีพักต้องให้ฝ่ายบัญชีกระทบยอดและโอนไปธนาคาร/ลูกหนี้เฉพาะช่องทางภายหลัง ไม่ใช่รายได้ใหม่.
+- CashBookPostingService::postShiftClose (`app/Services/Accounting/CashBookPostingService.php:93`) ยังลงเฉพาะยอดเงินสดจากกะครั้งเดียว ไม่ลงรายบิลซ้ำ. bank reconciliation ของ `pos_payments` ยังจับ source_type/source_id เดิม (`MonthlyAccountingController::incomeMatch`); ไม่สร้าง payment/revenue ใหม่และไม่ได้โพสต์ GL อีกครั้งตอน match. การ match อย่างเดียวไม่ใช่การเคลียร์ยอดบัญชีพัก.
+- คำสั่งซ่อมข้อ 3 default read-only จริง รวมไม่สร้าง master clearing ใน dry-run; ใช้เฉพาะ completed receipt/active document, ตรวจยอด payment กับเอกสารและ GL เดิม. --apply append reversal+replacement เฉพาะ main; ไม่คำนวณ VAT ปัจจุบันย้อนหลัง ไม่แตะ receipt, stock, COGS หรือ cashbook. ทำซ้ำไม่เพิ่มรายการ. งวดปัจจุบันปิด/ยอดเดิมไม่ตรงให้รายงาน failure และข้ามใบนั้นโดย rollback.
+- ข้อ 4 เป็น **valuation correction** ตามขอบเขตเดิม ไม่ใช่การแก้ราคาตกลงกับผู้ขาย: contra คือ role `purchase_cost_clear` (บัญชีพัก liability รอยืนยันเอกสารผู้ขาย; หากยังไม่ผูกจะสร้าง `COST-CLEARING` พร้อม role นี้ใน transaction ไม่ใช้บัญชีค่าใช้จ่ายผลต่างสต๊อกแทน); ส่วนคงเหลือ Dr/Cr inventory, ส่วนที่ตัดไปแล้ว Dr/Cr COGS. หากเป็นการเปลี่ยนยอดหนี้จริงต้องสร้างใบเพิ่ม/ลดหนี้ผู้ขายแยก ไม่แก้ AP จากหน้าปรับทุน. หาก mapping ไม่ครบ rollback lot/average/audit/GL ทั้งชุด.
+- ปรับทุนตาม lot family ผ่าน source_lot_id รวมของโอนไปแล้ว/ระหว่างทาง; ไม่ถือการโอนเป็นยอดขาย. lock product/balances/lots และตรวจสถานะใบซื้อ/งวดต้นทุน/งวดบัญชี. มูลค่า GL คำนวณส่วนต่างของยอดมูลค่าก่อนและหลังปัดสตางค์ ไม่ใช่ปัด delta อย่างเดียว (0.004 → 0.005 ต้องเพิ่ม 0.01); ส่วน COGS รับเศษปัดที่เหลือเพื่อให้ debit=credit. คอลัมน์ audit `unconfirmed_variance_amount` เดิมยังเก็บค่าผลต่างก่อนปัดตามสูตร ไม่ใช่ตัวพิสูจน์ว่า GL เคยลงหรือยัง; ดู posting batch ประกอบ.
+- ข้อ 5 รวม qty ตาม product_id ก่อนคิดโปรโดยราคาเป็นราคาฐานจาก server masters เสมอ ใช้ DecimalMath คำนวณโปรทั้ง 8 แบบ. สำหรับคิวเก่าคำนวณสิทธิ์แบบ first-line เดิมควบคู่ ให้รับยอดตั้งแต่ entitlement ใหม่ถึง legacy amount ที่พิสูจน์ได้และไม่เกิน gross; ไม่ใช้ราคาที่ cashier ส่งมาเป็นราคาฐาน. คง tolerance การปัดเศษเดิม 0.02 ของ API เพื่อ compatibility ไม่เพิ่ม tolerance ขายต่ำกว่าสิทธิ์ใหม่.
+- **Python follow-up ที่บังคับจด:** `apps/pos-python/pos_python/promotions.py` บน branch `claude/pos-python-settings-popup` ต้องรวม qty สินค้าเดียวกันและตรวจ parity ทั้ง 8 แบบตาม ERP/Vue; ไม่แก้ Python ใน branch นี้.
+
+## Audit จุดรับรู้ภาษีปัจจุบัน (เป็นข้อเท็จจริงจากโค้ด ไม่ใช่การรับรองกฎหมายภาษี)
+- VAT ขาย: PP30 เลือก CASH_SALE/CREDIT_SALE/SALE_RETURN/CREDIT_NOTE/DEBIT_NOTE ที่ active ด้วย **documents.doc_date**; ใบรับคืน/ลดหนี้กลับเครื่องหมาย (`app/Services/Accounting/TaxComplianceService.php:89`). e-Tax เลือก active cash/credit sales ด้วย doc_date เช่นกัน (`:40`).
+- VAT ซื้อ: PURCHASE active + claim_input_vat ใช้ **documents.doc_date** (`TaxComplianceService.php:99`), ไม่ใช้วันรับใบกำกับภาษีแยก. Supplier credit/debit notes ใช้ doc_date และกลับเครื่องหมายตาม kind (`:112`).
+- VAT ค่าใช้จ่าย: ใช้ **branch_expenses.expense_date** (`TaxComplianceService.php:105`), แม้มี tax_invoice_date ใน schema. เพิ่มกรองเอกสารแม่ active; ไม่เปลี่ยนวันรับรู้.
+- WHT เจ้าหนี้: ใช้ **supplier_withholdings.paid_on** และ payment_documents active (`TaxComplianceService.php:123`).
+- WHT ค่าใช้จ่าย: ใช้ **branch_expenses.expense_date** (`TaxComplianceService.php:132`) ไม่ใช่ paid_on; เพิ่มกรองเอกสารแม่ active โดยไม่เดากฎใหม่.
+- ต้องให้ผู้สอบบัญชียืนยัน: tax point สินค้า/บริการ/เงินล่วงหน้า, VAT ซื้อเมื่อใบกำกับมาทีหลัง/ข้ามงวด, VAT expense_date เทียบ tax_invoice_date, WHT expense_date เทียบวันจ่ายจริง/การจ่ายบางส่วน, วันที่ใบเพิ่มลดหนี้/คืนและการแก้แบบที่ยื่นแล้ว, การใช้อัตรา VAT ปัจจุบันใน salesBreakdown เมื่อบันทึกย้อนหลัง. ไม่เปลี่ยนข้อเหล่านี้ในงานนี้.
+
+## การทดสอบจริง
+- `php -d memory_limit=2G vendor/bin/phpunit`: **837 tests; runner รายงาน 835 passed, 7,051 assertions, 2 skipped, 6 incomplete; ไม่มี failure/error**. skipped/incomplete เป็นรายการเดิมของโครงการ ไม่ได้เพิ่มเพื่อหลบเทสต์.
+- `php vendor/bin/pint <เฉพาะ PHP ที่แก้/เพิ่ม>` ผ่าน; `git diff --check` ผ่าน.
+- `APP_ENV=testing DB_CONNECTION=sqlite DB_DATABASE=:memory: DB_URL= CACHE_STORE=array php artisan view:cache` ผ่าน (Blade compiled ทั้งหมด โดยไม่ใช้ฐานถาวร).
+- PostgreSQL migration up/down DDL compilation ผ่านพร้อม callback ที่ห้ามเชื่อมต่อ; migration เพิ่มเฉพาะ schema ไม่มี INSERT/UPDATE/DELETE ข้อมูลเก่า. ไม่มี psql/initdb ในเครื่อง จึงยังไม่ execute PostgreSQL จริง.
+- New P0 integration suite ครอบคลุม transfer partial/legacy, cost descendant/cent reconciliation, GL retry/reversal/period/financial statements และ tax statuses. POS real checkout tests ครบ 5 วิธีชำระและ repair idempotency; promotions มี data provider ครบ 8 ประเภท.
+
+### Mutation checks (คืนโค้ดครบแล้วก่อนรัน suite สุดท้าย)
+
+| ถอด/ทำให้ตัวแก้เสีย | เทสต์ที่แดงจริง | สิ่งที่จับได้ |
+| --- | --- | --- |
+| ข้าม pending guard ตอนอนุมัติโอน | InventoryFlowEndToEndTest | retry ไม่ถูกปฏิเสธด้วยสถานะ pending ตามที่กำหนด |
+| กลับไป delete GL ก่อนโพสต์ | P0 GL repost test | journal เดิมหาย จำนวนและประวัติไม่ตรง |
+| บังคับทุก payment ใช้ cash | POS actual payment channels test | expected non-cash Dr 102.00 กลายเป็น 0.00 |
+| ไม่ลง GL ตอนปรับทุน | P0 cost reconciliation test | inventory 60.00 แทน 72.06 |
+| ไม่ aggregate qty ก่อนโปร | split product promotion test | บิลถูกสิทธิ์ 370.00 ถูกปฏิเสธ |
+| คืน purchase tax filter เป็น != cancelled | P0 tax status test | draft/rejected/void ถูกนับใน PP30 |
+| เอา DATE format GL ออก | P0 sales repost financial statement test | รายได้วันสุดท้ายเป็น 0 แทน 84.04 ใน SQLite |
+| ปัด delta ทุนแทน before/after valuation | P0 half-cent boundary test | inventory 0.00 แทน 0.01 |
+
+ทุก mutation จบด้วย PHPUnit exit 1 จาก assertion failure; คืนไฟล์ด้วย finally แล้ว suite สุดท้ายผ่าน. ไม่เก็บโค้ด mutation ไว้ใน application.
+
+## ความเสี่ยง / งานถัดไป / Deploy
+- ยังไม่ได้ execute migration หรือทดสอบ concurrency บน PostgreSQL จริง; SQLite ไม่พิสูจน์ row-level locks. ต้องทดสอบในฐาน PostgreSQL ทดสอบแยกก่อนปล่อยจริง รวม approve/receipt/repost พร้อมกันและ rollback.
+- ยังไม่ได้ browser UAT/สแกนเครื่องจริงสำหรับ flow ตรวจรับใหม่; Blade compilation และ integration tests ผ่าน.
+- ไม่ซ่อม historic purchase-cost adjustments ที่ขาด GL อัตโนมัติ; ตรวจยอดก่อน/หลังและประวัติการโอนกับบัญชีก่อนลงรายการปรับ. POS reclassification ก็ต้องตรวจ dry-run ก่อน --apply.
+- เมื่อเปิด workspace ที่เขียน Git metadata ได้ ให้ pull/reconcile origin/main โดยรักษา branch/ไฟล์นี้ ทดสอบ แล้ว commit แยก 6 ข้อตามตาราง (GL service มี hunks หลายข้อ ต้อง stage แยก), push branch นี้หลังเทสต์ผ่าน. ห้าม stage .claude/.codex/credentials.
+- **Deploy: ยังไม่ deploy และไม่มีสิทธิ์ deploy จากคำสั่งนี้**. ต้องมีคำสั่งใหม่จากเจ้าของและทำตาม docs/OPERATIONS.md.
+
+---
+
 # Handoff — 2026-11-05 (Shift float / blind count — ERP + Vue)
 
 ## Commit

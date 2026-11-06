@@ -15,7 +15,7 @@ use RuntimeException;
 
 /**
  * ตรวจรับสินค้าโอนย้ายด้วยการสแกนบาร์โค้ดที่ปลายทาง (เสริมจาก StockTransferController
- * ไม่แทนที่ - ไม่แตะสถานะ/สต๊อกของใบโอนย้ายเดิมเลย)
+ * รับจากสถานะระหว่างทางเข้าสต๊อกปลายทาง)
  * ดู App\Services\Inventory\StockTransferReceiptService สำหรับตรรกะ/เหตุผลเชิงธุรกิจ
  */
 class StockTransferReceiptController extends Controller
@@ -24,6 +24,7 @@ class StockTransferReceiptController extends Controller
     {
         $this->assertTransfer($stockTransfer);
 
+        $this->authorizeBranch($stockTransfer);
         try {
             $receipt = $service->openOrGet($stockTransfer);
         } catch (RuntimeException $e) {
@@ -109,8 +110,12 @@ class StockTransferReceiptController extends Controller
 
         $lines = $mismatches->map(fn ($i) => "{$i->product->sku_code} (สแกนได้ {$i->scanned_qty} / ในใบ {$i->expected_qty})")->implode(' | ');
 
+        $next = $stockTransfer->stockDocument?->transit_location_id
+            ? 'ตรวจหมายเหตุใบตรวจรับและใบตัดชำรุดรออนุมัติ'
+            : 'ใบโอนเก่าลงสต๊อกแล้ว หากพบส่วนต่างจริงให้สร้างใบปรับสต๊อกตามขั้นตอน';
+
         return redirect()->route('stock-transfers.show', $stockTransfer)
-            ->with('success', "บันทึกการตรวจรับแล้ว แต่พบยอดไม่ตรง {$mismatches->count()} รายการ - ถ้ายืนยันว่าใช่จริงให้ไปสร้างใบปรับสต๊อกแยกต่างหาก: {$lines}");
+            ->with('success', "บันทึกการตรวจรับแล้ว แต่พบยอดไม่ตรง {$mismatches->count()} รายการ {$next}: {$lines}");
     }
 
     private function assertTransfer(Document $document): void
@@ -123,9 +128,9 @@ class StockTransferReceiptController extends Controller
     private function authorizeBranch(Document $document): void
     {
         $user = auth()->user();
-        if ($user?->hasPermission('stock.manage')) {
+        if ($user?->hasGlobalPermission('stock.manage')) {
             return;
         }
-        abort_unless($user && $user->branchScopeId() === $document->branch_id, 403, 'ตรวจรับได้เฉพาะพนักงานสาขาปลายทางของใบนี้');
+        abort_unless($user && $user->canAccessBranch((int) $document->stockDocument?->toWarehouseLocation?->warehouse?->branch_id, 'stock.view'), 403, 'ตรวจรับได้เฉพาะพนักงานสาขาปลายทางของใบนี้');
     }
 }
