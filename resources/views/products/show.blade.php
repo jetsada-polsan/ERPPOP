@@ -876,19 +876,19 @@
     body.erp-popup-page div[x-data="productShow()"] > :not(.compact-product-window):not(.booking-modal-backdrop) { display:none !important; }
     body.erp-popup-page { background:linear-gradient(145deg,#e8f1f8,#f8fbfe 48%,#e4f4f3); }
     .compact-product-window { min-height:100vh; background:#f7fafc; color:#172033; font:14px/1.45 Tahoma,"Noto Sans Thai",sans-serif; }
-    .compact-menu { min-height:68px; display:flex; align-items:center; padding:0 28px; border-bottom:1px solid #dbe7ef; background:linear-gradient(120deg,#fff,#f1f8fc); color:#132c43; font-size:20px; letter-spacing:.01em; }
-    .compact-menu strong::before { content:""; display:inline-block; width:10px; height:30px; margin:0 12px -8px 0; border-radius:999px; background:linear-gradient(180deg,var(--erp-primary),#14b8a6); }
-    .compact-tools { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; min-height:96px; padding:18px 32px; border-bottom:1px solid #dbe7ef; background:#fff; }
-    .compact-tools button { min-height:60px; display:flex; align-items:center; justify-content:center; gap:10px; border:1px solid #d5e2eb; border-radius:13px; background:#fff; color:#486074; font-size:14px; font-weight:800; transition:background .16s ease,border-color .16s ease,box-shadow .16s ease,transform .16s ease; }
+    .compact-menu { min-height:58px; display:flex; align-items:center; padding:0 24px; border-bottom:1px solid #dbe7ef; background:linear-gradient(120deg,#fff,#f1f8fc); color:#132c43; font-size:18px; letter-spacing:.01em; }
+    .compact-menu strong::before { content:""; display:inline-block; width:8px; height:26px; margin:0 10px -7px 0; border-radius:999px; background:linear-gradient(180deg,var(--erp-primary),#14b8a6); }
+    .compact-tools { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; min-height:76px; padding:12px 24px; border-bottom:1px solid #dbe7ef; background:#fff; }
+    .compact-tools button { min-height:52px; display:flex; align-items:center; justify-content:center; gap:9px; border:1px solid #d5e2eb; border-radius:12px; background:#fff; color:#486074; font-size:13px; font-weight:800; transition:background .16s ease,border-color .16s ease,box-shadow .16s ease,transform .16s ease; }
     .compact-tools button:hover { border-color:#8bc8e8; color:var(--erp-primary-dark); background:#f0f9fe; transform:translateY(-1px); }
     .compact-tools button.active { border-color:var(--erp-primary); color:#fff; background:linear-gradient(135deg,var(--erp-primary),#14b8a6); box-shadow:0 8px 18px rgba(12,125,180,.22); }
-    .compact-tools i { color:inherit; font-size:22px; }
+    .compact-tools i { color:inherit; font-size:19px; }
     .compact-tabs { display:none; }
-    .compact-body { height:calc(100vh - 168px); overflow:auto; padding:28px 32px 36px; background:#f7fafc; }
-    .compact-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px 24px; max-width:1180px; margin:0 auto; padding:28px; border:1px solid #dbe7ef; border-radius:18px; background:#fff; box-shadow:0 14px 36px rgba(15,56,88,.08); }
-    .compact-form label { display:grid; gap:7px; margin:0; color:#41566a; font-size:12px; font-weight:800; }
+    .compact-body { height:calc(100vh - 134px); overflow:auto; padding:18px 24px 24px; background:#f7fafc; }
+    .compact-form { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px 18px; max-width:1180px; margin:0 auto; padding:20px; border:1px solid #dbe7ef; border-radius:16px; background:#fff; box-shadow:0 14px 36px rgba(15,56,88,.08); }
+    .compact-form label { display:grid; gap:5px; margin:0; color:#41566a; font-size:12px; font-weight:800; }
     .compact-form label.wide,.compact-form .wide { grid-column:span 3; }
-    .compact-form input:not([type=checkbox]),.compact-form select,.compact-form textarea { width:100%; min-height:42px; padding:8px 11px; border:1px solid #c6d7e3; border-radius:9px; background:#fff; font:14px Tahoma,"Noto Sans Thai",sans-serif; }
+    .compact-form input:not([type=checkbox]),.compact-form select,.compact-form textarea { width:100%; min-height:38px; padding:7px 10px; border:1px solid #c6d7e3; border-radius:9px; background:#fff; font:14px Tahoma,"Noto Sans Thai",sans-serif; }
     .compact-form input:focus,.compact-form select:focus,.compact-form textarea:focus,.compact-edit-table input:focus,.compact-edit-table select:focus { border-color:var(--erp-primary); outline:0; box-shadow:0 0 0 3px rgba(26,145,204,.14); }
     .compact-form textarea { resize:vertical; }
     .compact-checks { display:flex; gap:22px; padding:14px; border:1px solid #dbe7ef; border-radius:12px; background:#f7fafc; }

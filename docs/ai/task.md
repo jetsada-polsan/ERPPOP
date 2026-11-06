@@ -1,4 +1,20 @@
-# Handoff — 2026-11-06 (Product popup top-gap removal — pending deploy)
+# Handoff — 2026-11-06 (Product popup compact desktop layout — pending deploy)
+
+## Scope
+- Branch: `codex/modern-product-popups`.
+- Reduced the product-popup frame to a comfortable desktop size (1280×850 maximum), while retaining safe viewport margins and button spacing.
+- Reduced title/tool area heights and form padding. The detail form now uses three desktop columns, which keeps more product controls in view and reduces vertical scrolling without removing or changing any fields.
+- No routes, requests, validation, permissions, data, conditions, or business rules changed.
+
+## Verification
+- `git diff --check` passed.
+- `php artisan view:clear && php artisan view:cache` passed.
+- `php artisan test tests/Feature/ProductCatalogFilterTest.php tests/Feature/BarcodePolicyTest.php tests/Feature/ScalePluPageTest.php --no-coverage` passed: 25 tests, 177 assertions.
+- **Pending deployment:** this visual correction has not been deployed yet.
+
+---
+
+# Handoff — 2026-11-06 (Product popup top-gap removal — deployed production)
 
 ## Scope
 - Branch: `codex/modern-product-popups`.
@@ -9,7 +25,7 @@
 - `git diff --check` passed.
 - `php artisan view:clear && php artisan view:cache` passed.
 - `php artisan test tests/Feature/ProductCatalogFilterTest.php tests/Feature/BarcodePolicyTest.php tests/Feature/ScalePluPageTest.php --no-coverage` passed: 25 tests, 177 assertions.
-- **Pending deployment:** this visual correction has not been deployed yet.
+- Deployed through GitHub Actions run `42179399900`; workflow completed successfully.
 
 ---
 
