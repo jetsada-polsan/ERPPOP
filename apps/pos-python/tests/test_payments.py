@@ -72,7 +72,7 @@ def test_invalid_mixed_cash(cash):
 def test_last4_required(method,last4):
     with pytest.raises(ValueError): validate_payment(method,100,100,30,last4,True,'REF')
 
-@pytest.mark.parametrize('method', ['transfer','mixed','credit_card','cheque'])
+@pytest.mark.parametrize('method', ['mixed','credit_card','cheque'])
 def test_reference_required(method):
     with pytest.raises(ValueError): validate_payment(method,100,100,30,'0042',True,' ')
 
@@ -80,9 +80,9 @@ def test_decimal_rounding_and_unknown_method():
     assert validate_payment('mixed','100.05','100.05','30.025','0042',True,'REF')[1][1]==D('70.02')
     with pytest.raises(ValueError): validate_payment('cash',100,99)
     with pytest.raises(ValueError): validate_payment('unknown',100,100)
-    with pytest.raises(ValueError): validate_payment('mixed',100,100,30,'0042',False,'REF')
+    assert validate_payment('transfer',100,100,0,'0042',False,None)[0][0] == 'transfer'
 
-@pytest.mark.parametrize('method', ['cash','transfer','mixed','credit_card','cheque'])
+@pytest.mark.parametrize('method', ['cash','transfer'])
 def test_touch_payment_page(scene,method):
     db,pos,shift=scene
     w=run_ui(pos,app=APP); w.showNormal();w.resize(1024,768)
@@ -90,7 +90,7 @@ def test_touch_payment_page(scene,method):
     dialog=w.dialog_types['payment'](w,w.order)
     dialog.set_payment_method(method); dialog.show(); APP.processEvents()
     assert dialog.width()<=1024 and dialog.height()<=768
-    assert len(dialog.method_buttons)==5
+    assert set(dialog.method_buttons) == {'cash', 'transfer'}
     for button in dialog.method_buttons.values():
         assert button.isVisible() and button.height()>=50
         assert dialog.rect().contains(button.mapTo(dialog,button.rect().bottomRight()))
@@ -100,10 +100,8 @@ def test_touch_payment_page(scene,method):
     for field in (dialog.payment_reference,dialog.transfer_account_last4):
         if field.isVisible():
             assert dialog.rect().contains(field.mapTo(dialog,field.rect().bottomRight()))
-    dialog.payment_reference.setText('REF');dialog.transfer_account_last4.setText('0042')
-    if method=='mixed': dialog.amount.setText('30.02')
-    dialog.transfer_confirmed.setChecked(True)
-    dialog.confirm(); assert dialog.result()==QDialog.Accepted
+    dialog.transfer_account_last4.setText('0042')
+    dialog.confirm(); assert dialog.result()==QDialog.DialogCode.Accepted
     w._allow_close=True;w.close();w.deleteLater();APP.processEvents()
 
 def test_offline_restart_preserves_mixed_payload(scene):

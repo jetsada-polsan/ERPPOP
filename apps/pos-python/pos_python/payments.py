@@ -17,12 +17,11 @@ def validate_payment(method, total, paid, cash=None, last4=None, confirmed=False
     if paid < total:
         raise ValueError("ยอดชำระไม่พอ")
     if method in ("transfer", "mixed"):
-        if not confirmed:
-            raise ValueError("กรุณาตรวจเงินเข้าก่อนออกบิล")
+        # Completing the payment action is the cashier acknowledgement; a second
+        # checkbox added no data to ERP and slowed down the touch flow.
         if not re.fullmatch(r"[0-9]{4}", str(last4 or "")):
             raise ValueError("เลขท้ายบัญชีผู้โอนต้องเป็นตัวเลข 4 หลัก")
-    # Vue requires the common reference for every non-cash method.
-    if method != "cash" and not str(reference or "").strip():
+    if method in ("mixed", "credit_card", "cheque") and not str(reference or "").strip():
         raise ValueError("กรอกเลขอ้างอิงการชำระ")
     if len(str(reference or "")) > 80:
         raise ValueError("เลขอ้างอิงยาวเกิน 80 ตัวอักษร")

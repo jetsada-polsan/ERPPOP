@@ -180,6 +180,7 @@ class ChoiceDialog(TouchDialog):
         self.choice = None
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         host = QWidget()
         rows = QVBoxLayout(host)
         self.search = None
@@ -191,6 +192,8 @@ class ChoiceDialog(TouchDialog):
             self.body.addWidget(self.search)
         for label, value in choices:
             button = QPushButton(str(label))
+            button.setMinimumHeight(72)
+            button.setStyleSheet('text-align:left; padding:10px 14px;')
             button.clicked.connect(lambda checked=False, v=value: self.choose(v))
             rows.addWidget(button)
             self.choice_buttons.append(button)

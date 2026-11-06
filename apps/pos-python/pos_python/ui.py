@@ -856,12 +856,11 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.due.setStyleSheet("font-size:22px;font-weight:800;color:%s;" % PALETTE["text"])
             summary.addWidget(self.due)
 
-            from .payments import LABELS
             methods = QHBoxLayout()
             self.method_buttons = {}
             method_group = QButtonGroup(self)
             method_group.setExclusive(True)
-            for index, (method, label) in enumerate(LABELS.items()):
+            for method, label in (("cash", "เงินสด"), ("transfer", "โอน / QR")):
                 button = QPushButton(label)
                 button.setCheckable(True)
                 button.setChecked(method == "cash")
@@ -926,13 +925,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.qr_account.setWordWrap(True)
             self.qr_image = QLabel()
             self.qr_image.setAlignment(Qt.AlignCenter)
-            self.transfer_confirmed = QCheckBox("ตรวจสอบแล้วว่าเงินเข้าบัญชีครบตามยอด")
-            self.transfer_confirmed.setStyleSheet("font-size:16px;font-weight:700")
-            self.transfer_confirmed.toggled.connect(self._confirm_transfer_checkbox)
+            self.transfer_confirmed = QCheckBox()
+            self.transfer_confirmed.setChecked(True)
             qr_layout.addWidget(self.qr_account)
             layout.insertWidget(3, self.qr_image)
             self.qr_image.hide()
-            qr_layout.addWidget(self.transfer_confirmed)
+            self.transfer_confirmed.hide()
             self.qr_box.hide()
             summary.addWidget(self.qr_box)
 
@@ -986,7 +984,6 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.order.bill_discount = value
             self.refresh_discount_summary()
             if self.payment_method == "transfer":
-                self.transfer_confirmed.setChecked(False)
                 self.set_payment_method("transfer")
             else:
                 self.amount.setText(str(self.order.grand_total()))
@@ -994,26 +991,21 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             if parent is not None:
                 parent.refresh_order(keep_selection=True)
 
-        def _confirm_transfer_checkbox(self, checked: bool) -> None:
-            """Checkbox เป็นหลักฐานการตรวจเงิน ส่วนปุ่ม OK เป็น action ออกบิล"""
-            if checked and self.payment_method == "transfer":
-                self.transfer_account_last4.setFocus()
-
         def set_payment_method(self, method: str) -> None:
             self.payment_method = method
             self.method_buttons[method].setChecked(True)
-            transfer = method in ("transfer", "mixed")
-            cash = method in ("cash", "mixed")
-            self.cash_label.setText("เงินสดส่วนที่รับ" if method == "mixed" else "เงินที่รับมา")
+            transfer = method == "transfer"
+            cash = method == "cash"
+            self.cash_label.setText("เงินที่รับมา")
             for widget in (self.cash_label, self.amount, self.quick_host, self.keypad):
                 widget.setVisible(cash)
             for widget in (self.transfer_account_label, self.transfer_account_last4, self.qr_box):
                 widget.setVisible(transfer)
             self.keypad.show()
             self.last4_touch.hide()
-            self.reference_label.setVisible(method != "cash")
-            self.payment_reference.setVisible(method != "cash")
-            self.transfer_confirmed.setChecked(False)
+            self.reference_label.hide()
+            self.payment_reference.hide()
+            self.transfer_confirmed.setChecked(True)
             self.qr_payload = None
             self.qr_image.hide()
             self.qr_account.setText("ตรวจยอดโอนเข้าบัญชีจากสลิป")
@@ -1053,8 +1045,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             from .payments import validate_payment
             try:
                 validate_payment(self.payment_method, self.order.grand_total(), self.tendered(),
-                                 self.amount.text() or "0", self.transfer_account_last4.text(),
-                                 self.transfer_confirmed.isChecked(), self.payment_reference.text())
+                                 self.amount.text() or "0", self.transfer_account_last4.text(), True, None)
             except (InvalidOperation, ValueError) as error:
                 self.change.setText(str(error))
                 return
@@ -2079,9 +2070,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.connection_chip.setObjectName("jetStatus")
             layout.addWidget(self.connection_chip)
 
-            self.auth_button = self._top_button("🔒 ล็อก/สลับคนขาย", "ล็อกโดยเก็บกะและตะกร้า", self.lock_session)
+            self.auth_button = self._top_button("🔒 ล็อกหน้าจอ", "พักหน้าจอชั่วคราวโดยเก็บกะและตะกร้า", self.lock_session)
             layout.addWidget(self.auth_button)
-            layout.addWidget(self._top_button("ออกงาน", "นับเงิน ปิดกะ และพิมพ์ Z", self.close_current_shift))
+            layout.addWidget(self._top_button("ปิดกะ", "นับเงิน ปิดกะ และพิมพ์ Z", self.close_current_shift))
             layout.addWidget(self._top_button("⏻ ปิดโปรแกรม", "เก็บตะกร้าก่อนปิด", self.close))
             self.settings_button = self._top_button("⚙", "ตั้งค่าเครื่อง POS", self.open_settings)
             layout.addWidget(self.settings_button)
@@ -2103,7 +2094,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             shift_text = f"กะ #{self.shift_id}" if self.shift_id is not None else "ยังไม่เปิดกะ"
             self.runtime_context["show_shift"].setText(f"{shift_text}\n{cashier_name}")
             if getattr(self, "auth_button", None) is not None:
-                self.auth_button.setText("🔒 ล็อก/สลับคนขาย")
+                self.auth_button.setText("🔒 ล็อกหน้าจอ")
             if getattr(self, "connection_chip", None) is not None:
                 connected = online is not None and bool(getattr(online.worker, "online", online.online))
                 self.connection_chip.setText("● ออนไลน์" if connected else "● ออฟไลน์")
@@ -3087,7 +3078,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 f"บิลปัจจุบัน · {self.cashier['name']} · เงินทอนต้นกะ {opening_cash:,.2f} บาท"
             )
             self.refresh_runtime_context()
-            self.auth_button.setText("🔒 ล็อก/สลับคนขาย")
+            self.auth_button.setText("🔒 ล็อกหน้าจอ")
             self.auth_button.setEnabled(True)
             layout_version = layout_config.get("layout_version", layout_config.get("version", 1))
             self.setWindowTitle(f"JET POS v{APP_VERSION} — {self.cashier['name']} · Layout {layout_version}")
@@ -3102,14 +3093,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             if self.shift_id is None:
                 TouchMessage.information(self, "ยังไม่มีกะขาย", "เริ่มขายและเปิดกะก่อนบันทึกรายการเงินสด")
                 return
-            labels = {"เงินเข้าลิ้นชัก": "cash_in", "นำส่งเงินระหว่างกะ": "drop", "เบิกจ่าย": "payout"}
-            if drop_only:
-                label = "นำส่งเงินระหว่างกะ"
-            else:
-                picker = ChoiceDialog(self, "รายการเงินสด", [(label, label) for label in labels])
-                if picker.exec() != QDialog.DialogCode.Accepted:
-                    return
-                label = picker.choice
+            labels = {"นำส่งเงินระหว่างกะ": "drop"}
+            label = "นำส่งเงินระหว่างกะ"
             details = TouchDialog(self, label, "จำนวนเงิน · เลขซอง · เหตุผล")
             details.resize(940, 700)
             columns = QHBoxLayout()
@@ -3307,7 +3292,14 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
         def show_history(self):
             rows = service.db.execute("SELECT id, document_no, server_receipt_no, grand_total, sync_status, is_void FROM sales ORDER BY id DESC").fetchall()
-            picker = ChoiceDialog(self, "ประวัติบิล · เลือกบิลเพื่อยกเลิก/รับคืน", [(f"{r['document_no']} · {r['server_receipt_no'] or ''} · {r['grand_total']} · {sale_status_label(r['sync_status'])}" + (' · ยกเลิก' if r['is_void'] else ''), r['id']) for r in rows], searchable=True)
+            choices = []
+            for row in rows:
+                receipt_no = str(row['server_receipt_no'] or row['document_no'])
+                if len(receipt_no) > 32:
+                    receipt_no = f"{receipt_no[:15]}…{receipt_no[-12:]}"
+                status = sale_status_label(row['sync_status']) + (' · ยกเลิกแล้ว' if row['is_void'] else '')
+                choices.append((f"{receipt_no}\nยอด {money(row['grand_total']):,.2f} บาท · {status}", row['id']))
+            picker = ChoiceDialog(self, "ประวัติบิล · เลือกบิลเพื่อยกเลิก/รับคืน", choices, searchable=True)
             if picker.exec() != QDialog.DialogCode.Accepted:
                 return
             sale_id = picker.choice

@@ -2740,3 +2740,10 @@ pending
 - ทดสอบ: `QT_QPA_PLATFORM=offscreen PYTHONPATH=apps/pos-python /private/tmp/pos-parity-env/bin/python -m pytest apps/pos-python/tests/test_close_shift_wizard.py apps/pos-python/tests/test_touch_popups.py apps/pos-python/tests/test_polish_089.py -q` ผ่าน **36 passed**; เพิ่ม regression ยืนยันว่า popup ที่ปิดแล้วไม่เหลือ backdrop แสดงอยู่; `git diff --check` ผ่าน
 - Suite เต็ม: เริ่ม `pytest apps/pos-python/tests -q --disable-warnings` แล้วแสดงผลผ่านถึงช่วงท้าย แต่คำสั่งเกิน timeout 30 วินาทีของ session นี้ จึงยังไม่บันทึกว่า suite เต็มผ่าน
 - Deploy: **ยังไม่ deploy production** ตาม handoff UAT; ต้อง build UAT installer ใหม่และติดตั้งทับบนเครื่องทดสอบก่อนลองยกเลิกบิลอีกครั้ง
+## Handoff - 2026-11-06 (Python POS: simplified cashier flow)
+- Branch: `claude/pos-python-settings-popup`
+- ชำระเงิน: หน้าขายแสดงเฉพาะ `เงินสด` และ `โอน / QR`; โอนใช้เพียงเลขท้ายบัญชีผู้โอน 4 หลัก, ตัด checkbox ตรวจยอดและช่องเลขอ้างอิงที่ซ้ำซ้อนออก การกด `รับเงิน / ออกบิล` เป็นคำยืนยันของแคชเชียร์เอง โดยยังส่งเลขท้าย 4 หลักตามสัญญา ERP
+- เงินสดระหว่างกะ: ตัดเมนูเลือกหลายประเภทออกจากหน้าขาย เหลือบันทึก `นำส่งเงินระหว่างกะ` โดยตรง; ไม่เปลี่ยน API หรือยอดเงินที่บันทึก
+- หน้าจอ: เปลี่ยนปุ่ม `ล็อก/สลับคนขาย` เป็น `ล็อกหน้าจอ` เพื่อสื่อว่าเป็นการพักเครื่อง ไม่ใช่สลับกะ; เปลี่ยน `ออกงาน` เป็น `ปิดกะ`; ประวัติบิลใช้สองบรรทัด ตัดเลขยาวกลางข้อความ และปิด horizontal scroll
+- ทดสอบ: `QT_QPA_PLATFORM=offscreen PYTHONPATH=apps/pos-python /private/tmp/pos-parity-env/bin/python -m pytest apps/pos-python/tests/test_payments.py apps/pos-python/tests/test_payment_touch.py apps/pos-python/tests/test_touch_popups.py apps/pos-python/tests/test_close_shift_wizard.py -q` ผ่าน **47 passed**; `git diff --check` ผ่าน
+- Deploy: **ยังไม่ deploy production**; ต้อง build/install UAT ใหม่ก่อนตรวจบน Windows 1024×768
