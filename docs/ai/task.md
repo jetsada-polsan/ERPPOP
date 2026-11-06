@@ -2405,3 +2405,11 @@ pending
 - ยังไม่ทดสอบ/ความเสี่ยง: ต้องตรวจด้วย browser หลัง deploy ว่าแต่ละ popup มีการเลื่อนและปุ่ม footer ตามหน้าจอจริง; งานนี้ไม่แตะ print CSS หรือข้อมูล production
 - Deploy: ยังไม่ deploy
 - งานถัดไป: รอเจ้าของสั่ง deploy แล้ว UAT popup หลักบน production
+## Handoff - 2026-11-06 (Codex: แยกหน่วยหลัก/หน่วยย่อยในรายงานสต็อก)
+- Commit: `e350a99`
+- ทำอะไร: แยกคอลัมน์ยอดคงเหลือของรายงาน `สินค้าคงเหลือ` และ `สต็อกต่ำ / ติดลบ` เป็น `หน่วยหลัก` กับ `หน่วยย่อย` จาก pack ที่ใช้งานจริง; ใช้ข้อมูลเดียวกันในหน้าจอ, CSV และ XLSX และคง `quantity_display` เดิมไว้เพื่อไม่กระทบจุดเรียกอื่น
+- พิมพ์รายงาน: บังคับ `<thead>` เป็น `table-header-group !important` เพื่อให้หัวคอลัมน์ซ้ำทุกหน้ากระดาษ
+- ทดสอบ: `APP_ENV=testing DB_CONNECTION=sqlite DB_DATABASE=:memory: DB_URL='' php -d memory_limit=1G vendor/bin/phpunit` ผ่าน 751 tests (ผ่าน 749, skipped 2, incomplete 6); `node --test tests/js/report-search.test.cjs` ผ่าน 5/5; `php artisan view:cache` ผ่าน; `git diff --check` ผ่าน
+- Deploy: รอ push และ workflow production; หลัง deploy ต้องตรวจหน้า `/reports?category=inventory&report=stock_alerts` และพิมพ์ตัวอย่างจาก production
+- งานถัดไป: ตรวจผลบน production ว่าคอลัมน์และหัวซ้ำแสดงจริง โดยไม่แตะฐานข้อมูล
+
