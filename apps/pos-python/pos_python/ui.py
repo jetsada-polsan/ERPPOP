@@ -2905,9 +2905,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
         def pin_login(self):
             """ใส่ PIN อย่างเดียว ระบบรู้เองว่าใคร ทั้งออนไลน์และออฟไลน์"""
-            pin, confirmed = ValueDialog.get_value(self, "เริ่มขาย", "ใส่รหัส PIN ของคุณ (4 หลัก)", pin=True)
+            pin, confirmed = ValueDialog.get_value(self, "เริ่มขาย", "ใส่รหัส PIN ของคุณ (4 หลัก)", pin=True, auto_pin=True)
             pin = pin.strip()
-            if not confirmed or not pin:
+            if not confirmed or len(pin) != 4 or not pin.isascii() or not pin.isdigit():
                 return None
             if online is None or not online.online:
                 cashier = service.find_cashier_by_pin(pin)
