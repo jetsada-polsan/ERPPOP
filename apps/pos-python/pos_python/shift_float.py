@@ -15,7 +15,7 @@ def cash(value, *, signed=False):
 class FloatClose:
     def __init__(self, api, policy, shift_id):
         if not supports_float(policy):
-            raise ValueError('ERP รุ่นเก่าไม่รองรับ preview')
+            raise ValueError('ERP รุ่นเก่ายังตรวจยอดก่อนปิดกะไม่ได้ ให้ผู้ดูแลอัปเดต ERP ก่อน')
         self.api, self.policy, self.shift_id = api, policy, shift_id
         self.preview = None
         self.payload = None

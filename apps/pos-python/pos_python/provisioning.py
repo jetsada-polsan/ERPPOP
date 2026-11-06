@@ -348,7 +348,12 @@ class ProvisioningService:
             payload["code"] = cashier_code
         if cashier_server_id is not None:
             payload["cashier_id"] = int(cashier_server_id)
-        response = self.api.post("/api/pos/cashier/login", payload)
+        try:
+            response = self.api.post("/api/pos/cashier/login", payload)
+        finally:
+            payload.pop("pin", None)
+            pin = None
+            normalized_pin = ''
         if not response.get("success", False):
             raise RuntimeError(response.get("message", "PIN ไม่ถูกต้อง"))
         if response.get("selection_required"):
@@ -388,9 +393,12 @@ class ProvisioningService:
 
     def verify_approver(self, cashier_server_id: int, pin: str, reason: str) -> None:
         """ยืนยัน PIN หัวหน้ากับ ERP โดยไม่เปลี่ยนคนขายที่ล็อกอินบนเครื่อง"""
-        response = self.api.post("/api/pos/approver/verify", {
-            "cashier_id": int(cashier_server_id), "pin": normalize_pin(pin), "reason": reason,
-        })
+        payload = {"cashier_id": int(cashier_server_id), "pin": normalize_pin(pin), "reason": reason}
+        try:
+            response = self.api.post("/api/pos/approver/verify", payload)
+        finally:
+            payload.pop("pin", None)
+            pin = ''
         if not response.get("success", False):
             raise RuntimeError(response.get("message", "อนุมัติไม่สำเร็จ"))
 
@@ -411,11 +419,13 @@ class ProvisioningService:
                 or not new_pin.isascii() or not new_pin.isdigit()
                 or not 4 <= len(current_pin) <= 20 or not 4 <= len(new_pin) <= 20):
             raise ValueError("PIN ต้องเป็นตัวเลข 4-20 หลัก")
-        response = self.api.post("/api/pos/cashier/pin", {
-            "code": code,
-            "current_pin": current_pin,
-            "new_pin": new_pin,
-        })
+        payload = {"code": code, "current_pin": current_pin, "new_pin": new_pin}
+        try:
+            response = self.api.post("/api/pos/cashier/pin", payload)
+        finally:
+            payload.pop("current_pin", None)
+            payload.pop("new_pin", None)
+            current_pin = new_pin = ''
         if not response.get("success", False):
             raise RuntimeError(response.get("message", "เปลี่ยน PIN ไม่สำเร็จ"))
 

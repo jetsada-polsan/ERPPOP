@@ -525,6 +525,31 @@ def parse_weight(text: str) -> float:
     return weight
 
 
+def cashier_error(error):
+    text = str(error)
+    if re.search(r"token|sync|preview|payload|outbox|server_id|https?://|traceback|sql|authorization", text, re.I) or not re.search(r"[ก-๙]", text):
+        return "ทำรายการไม่สำเร็จ ตรวจการเชื่อมต่อแล้วลองใหม่ หากยังไม่ได้ให้ผู้ดูแลตรวจที่หน้าตั้งค่าเครื่อง"
+    return text
+
+
+def sale_status_label(status):
+    return {"synced": "ส่งแล้ว", "pending": "รอส่ง", "failed": "ส่งไม่สำเร็จ"}.get(status, "รอส่ง")
+
+
+def receipt_action_problem(sale, shift, online):
+    if not shift:
+        return "ต้องเปิดกะก่อนจึงยกเลิกบิลหรือรับคืนสินค้าได้ กดเข้างานแล้วเปิดกะก่อน"
+    if sale['is_void']:
+        return "บิลนี้ยกเลิกแล้ว ให้เลือกบิลอื่น"
+    if not online:
+        return "ต้องต่ออินเทอร์เน็ตก่อน ตรวจการเชื่อมต่อแล้วลองอีกครั้ง"
+    if not shift['server_id']:
+        return "กะนี้ยังส่ง ERP ไม่สำเร็จ รอให้ส่งข้อมูลแล้วลองอีกครั้ง"
+    if not sale['server_receipt_no'] or sale['sync_status'] != 'synced':
+        return "บิลนี้ยังส่ง ERP ไม่สำเร็จ รอให้ส่งบิลแล้วลองอีกครั้ง หากยังไม่ได้ให้ผู้ดูแลตรวจรายการรอส่ง"
+    return None
+
+
 def run_ui(service: PosService, online=None, data_dir=None, app=None):
     # Windows ภาษาไทยทำให้ช่องตัวเลขแสดงเลขไทย POS ใช้เลขอารบิกเสมอ
     from PySide6.QtCore import QLocale
@@ -641,11 +666,11 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 mode = "เชื่อมต่อ ERP แล้ว" if online is not None and online.online else "โหมดออฟไลน์"
                 message = f"{mode} · เลือกได้ {len(rows)} คน"
                 if sync_error:
-                    message += f"\nใช้รายชื่อที่แคชไว้: {sync_error}"
+                    message += "\nโหลดรายชื่อใหม่ไม่ได้ ใช้รายชื่อที่มีในเครื่องก่อน หรือตรวจการเชื่อมต่อแล้วกดอัปเดตรายชื่อ"
             else:
                 message = "ยังไม่พบรายชื่อคนขาย · กดอัปเดตรายชื่อหรือตรวจการผูกเครื่องกับ ERP"
                 if sync_error:
-                    message += f"\n{sync_error}"
+                    message += "\nตรวจการเชื่อมต่อแล้วกดอัปเดตรายชื่ออีกครั้ง"
             self.connection_status.setText(message)
 
         def choose(self) -> None:
@@ -666,7 +691,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         """หน้าต่างเปิดกะที่ไม่ถูก On-Screen Keyboard บัง และกดยอดเงินทอนได้ง่าย"""
 
         def __init__(self, parent):
-            super().__init__(parent, "เปิดกะขาย", "ใส่เงินทอนก่อนเปิดกะ")
+            super().__init__(parent, "เปิดกะขาย", "เปิดกะ: นับเงินในลิ้นชักแล้วใส่ยอด")
             self.opening_cash = Decimal("0.00")
             self.policy = getattr(parent, "shift_policy", {})
             self.opening_note = ""
@@ -1588,7 +1613,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
     class CloseShiftDialog(TouchDialog):
         def __init__(self, parent, expected):
-            super().__init__(parent, "ปิดกะขาย", "ตรวจเงินสดและส่งบิลค้างก่อนปิดกะ")
+            super().__init__(parent, "ปิดกะขาย", "ปิดกะ: นับเงินในลิ้นชักทั้งหมด แล้วส่งบิลค้างให้ครบ")
             self.body.setSpacing(8)
             self.expected = expected
             self.expected_label = QLabel()
@@ -1631,7 +1656,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
     class FloatCloseDialog(TouchDialog):
         """One full-window workspace; all monetary previews remain server authoritative."""
         def __init__(self, parent, protocol, policy):
-            super().__init__(parent, "ปิดกะขาย", "① นับเงิน → ② ตรวจยอด → ③ แยกเงินทอน/นำส่ง → ④ ยืนยัน+พิมพ์ Z")
+            super().__init__(parent, "ปิดกะขาย", "ปิดกะ: นับเงินในลิ้นชักทั้งหมด → ตรวจยอด → แยกเงิน → ยืนยันและพิมพ์ใบปิดกะ")
             self.setFixedSize(1024, 768)
             self.protocol = protocol
             self.kept_edited = False
@@ -1790,7 +1815,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 self.next.setEnabled(True)
             except ValueError as error:
                 self.invalidate()
-                self.error.setText(str(error))
+                self.error.setText(cashier_error(error))
                 self.next.setEnabled(False)
 
         def inspect(self):
@@ -1811,7 +1836,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 return True
             except Exception as error:
                 self.invalidate()
-                self.error.setText(str(error))
+                self.error.setText(cashier_error(error))
                 return False
 
         def navigate(self, index):
@@ -1868,7 +1893,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     self.username.text().strip(), self.password.text()
                 )
             except Exception as error:
-                TouchMessage.warning(self, "ยืนยันไม่สำเร็จ", str(error))
+                TouchMessage.warning(self, "ยืนยันไม่สำเร็จ", cashier_error(error))
                 return
             self.accept()
 
@@ -2337,7 +2362,16 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.scan.setMinimumHeight(46)
             self.scan.returnPressed.connect(self.on_scan)
             self.scan.textChanged.connect(self.refresh_products)
-            layout.addWidget(self.scan)
+            search_row = QHBoxLayout()
+            search_row.addWidget(self.scan, 1)
+            self.clear_search = QPushButton("×")
+            self.clear_search.setObjectName("clearSearch")
+            self.clear_search.setAccessibleName("ล้างช่องค้นหาสินค้า")
+            self.clear_search.setFixedSize(56, 56)
+            self.clear_search.setStyleSheet("font-size:28px;font-weight:800;")
+            self.clear_search.clicked.connect(self.clear_product_search)
+            search_row.addWidget(self.clear_search)
+            layout.addLayout(search_row)
 
             self.scan_hint = QLabel("สแกนแล้วกด Enter เพิ่มลงบิล · สินค้าชั่งกรอกน้ำหนักเอง")
             self.scan_hint.setObjectName("scanHint")
@@ -2394,7 +2428,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
         def refresh_products(self) -> None:
             while self.grid.count():
-                self.grid.takeAt(0).widget().deleteLater()
+                old_tile = self.grid.takeAt(0).widget()
+                old_tile.hide()
+                old_tile.deleteLater()
 
             columns = self._product_columns_for_width()
             self._product_columns = columns
@@ -2513,10 +2549,10 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         def show_z_report(self, auto_print=False):
             row = service.db.execute("SELECT * FROM shifts WHERE status = 'closed' ORDER BY closed_at DESC LIMIT 1").fetchone()
             if not row:
-                TouchMessage.information(self, "Z Report", "ยังไม่มีกะที่ปิดแล้ว")
+                TouchMessage.information(self, "ใบปิดกะ", "ยังไม่มีกะที่ปิดแล้ว")
                 return
             report = service.shift_cash_summary(row['id'])
-            dialog = TouchDialog(self, "Z Report", f"สรุปกะ {row['id']} · ปิดกะแล้ว")
+            dialog = TouchDialog(self, "ใบปิดกะ", f"สรุปกะ {row['id']} · ปิดกะแล้ว")
             saved = SettingsService(service.db).get_device_setting('last_z_report', {})
             authoritative = isinstance(saved, dict) and saved.get('id') is not None and row['server_id'] is not None and int(saved['id']) == int(row['server_id'])
             expected = money(str(saved['expected_cash'])) if authoritative and saved.get('expected_cash') is not None else report.expected_cash
@@ -2553,7 +2589,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     for copy in (1, 2):
                         print_text_to_windows_queue(f'Z Report · ใบที่ {copy}/2\n' + text, str(profile))
                 except Exception as error:
-                    TouchMessage.warning(dialog, "พิมพ์ไม่ได้", str(error))
+                    TouchMessage.warning(dialog, "พิมพ์ไม่ได้", cashier_error(error))
             dialog.confirm("พิมพ์ Z Report ซ้ำ", print_report)
             if auto_print and SettingsService(service.db).get_device_setting("windows_printer_queue", ""):
                 print_report()
@@ -2570,7 +2606,11 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 try:
                     return parse_weight(value), True
                 except ValueError as error:
-                    TouchMessage.warning(self, "น้ำหนักไม่ถูกต้อง", str(error))
+                    TouchMessage.warning(self, "น้ำหนักไม่ถูกต้อง", cashier_error(error))
+
+        def clear_product_search(self) -> None:
+            self.scan.clear()
+            self.scan.setFocus()
 
         def add_product_row(self, product) -> None:
             price, price_version = service.effective_price(int(product["id"]), product["price"] or 0)
@@ -2592,6 +2632,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 qty=Decimal(str(quantity)), unit_price=price, is_vat=bool(product["is_vat"]), price_version=price_version,
             ))
             self.refresh_order()
+            self.clear_product_search()
 
         def on_scan(self) -> None:
             scanned = self.scan.text().strip()
@@ -2605,7 +2646,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 try:
                     cart_line = service.barcode_cart_line(scanned)
                 except ValueError as error:
-                    TouchMessage.warning(self, "หน่วยขาย", str(error))
+                    TouchMessage.warning(self, "หน่วยขาย", cashier_error(error))
                     return
                 # รหัส PLU ไม่มีน้ำหนักในตัว ต่างจากป้ายชั่งที่อ่านน้ำหนักได้เลย
                 quantity = cart_line.qty
@@ -2628,7 +2669,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 try:
                     cart_line = scale_cart_line(service.db, scanned)
                 except ValueError as error:
-                    TouchMessage.warning(self, "ป้ายเครื่องชั่ง", str(error))
+                    TouchMessage.warning(self, "ป้ายเครื่องชั่ง", cashier_error(error))
                     return
                 detail = service.db.execute(
                     "SELECT name, unit_name, is_vat FROM products WHERE id = ?", (cart_line.product_id,)
@@ -2719,7 +2760,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     self.refresh_order()
                     return
                 except Exception as error:
-                    TouchMessage.warning(self, 'พักบิลไม่ได้', str(error))
+                    TouchMessage.warning(self, 'พักบิลไม่ได้', cashier_error(error))
                     return
             held.append(snapshot)
             settings.set_device_setting("held_orders", held)
@@ -2737,7 +2778,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 try:
                     remote = online.provisioning.api.get(f"/api/pos/held-bills?branch_id={branch_id}&cashier_id={int(self.cashier['server_id'])}").get('held_bills', [])
                 except Exception as error:
-                    TouchMessage.warning(self, 'โหลดบิลพักส่วนกลางไม่ได้', str(error))
+                    TouchMessage.warning(self, 'โหลดบิลพักส่วนกลางไม่ได้', cashier_error(error))
             choices = [(f"เครื่องนี้ · {item.get('hold_label', f'บิล {i+1}') if isinstance(item, dict) else f'บิล {i+1}'}", ('local', i)) for i, item in reversed(list(enumerate(held)))]
             choices += [(f"ส่วนกลาง · {item.get('label') or item.get('hold_no')} · {item.get('total_amount', '')}", ('remote', i)) for i, item in enumerate(remote)]
             if not choices:
@@ -2775,7 +2816,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                         raise ValueError(result.get('message') or 'เรียกบิลไม่ได้')
                     self.order = restored
                 except Exception as error:
-                    TouchMessage.warning(self, 'เรียกบิลไม่ได้', str(error))
+                    TouchMessage.warning(self, 'เรียกบิลไม่ได้', cashier_error(error))
                     return
             self.refresh_order()
 
@@ -2816,7 +2857,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 if online is not None:
                     online.worker.wake()  # ส่งบิลขึ้น ERP ทันที ไม่รอรอบถัดไป
             except Exception as error:
-                TouchMessage.critical(self, "บันทึกบิลไม่สำเร็จ", str(error))
+                TouchMessage.critical(self, "บันทึกบิลไม่สำเร็จ", cashier_error(error))
                 return
 
             self.last_sale_id = sale_id
@@ -2844,7 +2885,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                         try:
                             open_cash_drawer(printer_name)
                         except Exception as error:
-                            TouchMessage.warning(self, "เปิดลิ้นชักไม่สำเร็จ", str(error))
+                            TouchMessage.warning(self, "เปิดลิ้นชักไม่สำเร็จ", cashier_error(error))
             detail = (f"เงินทอน {self.order.change_for(dialog.tendered()):,.2f} บาท"
                       if dialog.payment_method == "cash" else f"รับชำระ{dialog.method_buttons[dialog.payment_method].text()}แล้ว")
             TouchMessage.information(self, "รับชำระแล้ว", f"บิล {document_no}\n{detail}")
@@ -2868,14 +2909,14 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
         def pin_login(self):
             """ใส่ PIN อย่างเดียว ระบบรู้เองว่าใคร ทั้งออนไลน์และออฟไลน์"""
-            pin, confirmed = ValueDialog.get_value(self, "เริ่มขาย", "ใส่ PIN คนขาย", pin=True)
+            pin, confirmed = ValueDialog.get_value(self, "เริ่มขาย", "ใส่รหัส PIN ของคุณ (4 หลัก)", pin=True)
             pin = pin.strip()
             if not confirmed or not pin:
                 return None
             if online is None or not online.online:
                 cashier = service.find_cashier_by_pin(pin)
                 if cashier is None:
-                    TouchMessage.warning(self, "เข้าใช้งานไม่ได้", "PIN ไม่ถูกต้อง หรือคนนี้ยังไม่เคยล็อกอินออนไลน์ที่เครื่องนี้")
+                    TouchMessage.warning(self, "เข้าใช้งานไม่ได้", "PIN ไม่ถูก ลองใหม่ หากยังไม่ได้ให้ต่ออินเทอร์เน็ตแล้วเข้าขายอีกครั้ง")
                 return cashier
             try:
                 selected = online.provisioning.online_cashier_login(pin)
@@ -2894,7 +2935,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 online.worker.wake()
             except Exception as error:
                 if "network:" not in str(error):
-                    TouchMessage.warning(self, "เข้าใช้งานไม่ได้", str(error))
+                    TouchMessage.warning(self, "เข้าใช้งานไม่ได้", "PIN ไม่ถูกหรือยังเข้าใช้งานไม่ได้ ลองใหม่ หากยังไม่ได้ให้ผู้ดูแลตรวจสิทธิ์และการเชื่อมต่อ")
                     return None
                 online.online = False
                 return service.find_cashier_by_pin(pin)
@@ -3002,7 +3043,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     self.shift_policy = online.provisioning.api.get(
                         f"/api/pos/shift?branch_id={branch_id}&cashier_id={int(cashier['server_id'])}")
                 except Exception as error:
-                    TouchMessage.warning(self, "เริ่มขายไม่ได้", f"อ่านนโยบายกะไม่ได้: {error}")
+                    TouchMessage.warning(self, "เริ่มขายไม่ได้", f"อ่านนโยบายกะไม่ได้: {cashier_error(error)}")
                     return False
             if not existing_shift:
                 # Use our own numeric dialog: Qt's static getDouble dialog can be
@@ -3021,7 +3062,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     branch_id, terminal_id, int(cashier["id"]), opening_cash
                 )
             except Exception as error:
-                TouchMessage.warning(self, "เริ่มขายไม่ได้", str(error))
+                TouchMessage.warning(self, "เริ่มขายไม่ได้", cashier_error(error))
                 return False
 
             self.cashier = cashier
@@ -3103,7 +3144,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     shift_id=self.shift_id, movement_type=labels[label], amount=money(str(value)), reason=reason.strip(), reference_no=reference_no
                 )
             except Exception as error:
-                TouchMessage.warning(self, "บันทึกไม่สำเร็จ", str(error))
+                TouchMessage.warning(self, "บันทึกไม่สำเร็จ", cashier_error(error))
                 return
             local = service.db.execute(
                 "SELECT server_id FROM shifts WHERE id = ?", (self.shift_id,)
@@ -3123,7 +3164,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     )
                     service.db.commit()
                 except Exception as error:
-                    TouchMessage.warning(self, "บันทึกในเครื่องแล้ว", f"ERP ยังไม่รับรายการนี้: {error}\nระบบจะลองส่งให้อัตโนมัติ")
+                    TouchMessage.warning(self, "บันทึกในเครื่องแล้ว", f"ERP ยังไม่รับรายการนี้: {cashier_error(error)}\nระบบจะลองส่งให้อัตโนมัติ")
             self.status.setText("บันทึกรายการเงินสดแล้ว")
             self.refresh_cash_warning()
 
@@ -3177,7 +3218,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 SettingsService(service.db).set_device_setting('last_z_report', saved)
                 SettingsService(service.db).set_device_setting('uncertain_float_close', None)
             except Exception as error:
-                TouchMessage.warning(self, "ตรวจสถานะกะ ERP ก่อนทำต่อ", str(error))
+                TouchMessage.warning(self, "ตรวจสถานะกะ ERP ก่อนทำต่อ", cashier_error(error))
                 self.lock_session()
                 return
             self.show_z_report(auto_print=True)
@@ -3196,7 +3237,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     policy = online.provisioning.api.get(f"/api/pos/shift?branch_id={branch_id}&cashier_id={int(self.cashier['server_id'])}")
                     self.shift_policy = policy
                 except Exception as error:
-                    TouchMessage.warning(self, "ปิดกะไม่ได้", f"ต้องต่อเน็ตและอ่านสถานะ ERP ก่อนปิดกะ: {error}")
+                    TouchMessage.warning(self, "ปิดกะไม่ได้", f"ต้องต่อเน็ตและอ่านสถานะ ERP ก่อนปิดกะ: {cashier_error(error)}")
                     return
             if supports_float(policy):
                 if online is None or not online.online:
@@ -3212,7 +3253,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             try:
                 closed = service.close_shift(shift_id=self.shift_id, counted_cash=money(str(counted)), closing_note=note.strip())
             except Exception as error:
-                TouchMessage.warning(self, "ปิดกะไม่ได้", str(error))
+                TouchMessage.warning(self, "ปิดกะไม่ได้", cashier_error(error))
                 return
             if online is not None and online.online and local_shift and local_shift["server_id"]:
                 aggregate_uuid = f"shift:{local_shift['uuid']}:close"
@@ -3228,7 +3269,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     )
                     service.db.commit()
                 except Exception as error:
-                    TouchMessage.warning(self, "ปิดกะในเครื่องแล้ว", f"ERP ยังไม่รับการปิดกะ: {error}\nระบบจะลองส่งให้อัตโนมัติ")
+                    TouchMessage.warning(self, "ปิดกะในเครื่องแล้ว", f"ERP ยังไม่รับการปิดกะ: {cashier_error(error)}\nระบบจะลองส่งให้อัตโนมัติ")
             self.show_z_report(auto_print=True)
             difference = closed.cash_difference or Decimal("0")
             TouchMessage.information(self, "ปิดกะแล้ว", f"ยอดที่ควรมี {closed.expected_cash:,.2f} บาท\nส่วนต่าง {difference:,.2f} บาท")
@@ -3265,37 +3306,52 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             dialog.exec()
 
         def show_history(self):
-            rows = service.db.execute("SELECT id, document_no, grand_total, sync_status, is_void FROM sales ORDER BY id DESC LIMIT 100").fetchall()
-            picker = ChoiceDialog(self, "ประวัติบิล", [(f"{r['document_no']} · {r['grand_total']} · {r['sync_status']}" + (' · ยกเลิก' if r['is_void'] else ''), r['id']) for r in rows])
+            rows = service.db.execute("SELECT id, document_no, server_receipt_no, grand_total, sync_status, is_void FROM sales ORDER BY id DESC").fetchall()
+            picker = ChoiceDialog(self, "ประวัติบิล · เลือกบิลเพื่อยกเลิก/รับคืน", [(f"{r['document_no']} · {r['server_receipt_no'] or ''} · {r['grand_total']} · {sale_status_label(r['sync_status'])}" + (' · ยกเลิก' if r['is_void'] else ''), r['id']) for r in rows], searchable=True)
             if picker.exec() != QDialog.Accepted:
                 return
             sale_id = picker.choice
-            dialog = TouchDialog(self, "รายละเอียดบิล", "เลือกพิมพ์ ยกเลิก หรือรับคืน")
+            dialog = TouchDialog(self, "รายละเอียดบิล", "เลือกยกเลิกบิล หรือรับคืนสินค้า")
             body = QLabel(receipt_for(service.db, sale_id))
             scroll = QScrollArea()
             scroll.setWidget(body)
             scroll.setWidgetResizable(True)
             dialog.body.addWidget(scroll)
             dialog.resize(560, 700)
-            dialog.confirm("ยกเลิกบิล", lambda: self.receipt_action(sale_id, False))
+            void_button = dialog.confirm("ยกเลิกบิล", lambda: self.receipt_action(sale_id, False))
+            void_button.setStyleSheet(f"background:{PALETTE['danger']};color:white;font-weight:800;")
             dialog.confirm("รับคืนสินค้า", lambda: self.receipt_action(sale_id, True))
             dialog.exec()
 
         def receipt_action(self, sale_id, is_return):
             sale = service.db.execute("SELECT * FROM sales WHERE id = ?", (sale_id,)).fetchone()
             local_shift = service.db.execute("SELECT server_id FROM shifts WHERE id = ?", (self.shift_id,)).fetchone()
-            if not online or not online.online or not local_shift or not local_shift['server_id'] or not sale['server_receipt_no']:
-                TouchMessage.warning(self, "ต้องออนไลน์", "ต้องมีกะเปิดและบิลส่ง ERP สำเร็จก่อน")
+            title = 'รับคืนสินค้า' if is_return else 'ยกเลิกบิล'
+            problem = receipt_action_problem(sale, local_shift, bool(online and online.online))
+            if problem:
+                TouchMessage.warning(self, title, problem)
                 return
             is_today = service.db.execute("SELECT date(sale_datetime, '+7 hours') = date(?, '+7 hours') FROM sales WHERE id = ?", (service._now(), sale_id)).fetchone()[0]
             if not is_return and (sale['shift_id'] != self.shift_id or sale['is_void'] or not is_today):
-                TouchMessage.warning(self, "ยกเลิกไม่ได้", "ยกเลิกได้เฉพาะบิลที่ยังไม่ยกเลิกในกะปัจจุบัน")
+                TouchMessage.warning(self, "ยกเลิกไม่ได้", "ยกเลิกได้เฉพาะบิลวันนี้ในกะนี้ที่ยังไม่ยกเลิก หากเป็นบิลเก่าให้เลือกรับคืนสินค้า")
                 return
             title = 'รับคืนสินค้า' if is_return else 'ยกเลิกบิล'
             details = TextDialog(self, title, 'เหตุผล · รับคืนต้องอนุมัติใน ERP ก่อนคืนเงิน')
+            reasons = QHBoxLayout()
+            for reason in ("ลูกค้าเปลี่ยนใจ", "คิดสินค้าผิด", "ชำระเงินผิด"):
+                button = QPushButton(reason)
+                button.setMinimumHeight(56)
+                button.clicked.connect(lambda checked=False, text=reason: details.entry.setText(text))
+                reasons.addWidget(button)
+            details.entry.setMaxLength(500)
+            details.body.insertLayout(1, reasons)
+            details.resize(900, 380)
             if details.exec() != QDialog.Accepted or not details.entry.text().strip():
                 return
             managers = service.db.execute("SELECT server_id, name FROM local_cashiers WHERE active = 1 AND revoked_at IS NULL AND role = 'manager' AND server_id IS NOT NULL").fetchall()
+            if not managers:
+                TouchMessage.warning(self, title, "ยังไม่มีรายชื่อหัวหน้า ให้ผู้ดูแลโหลดรายชื่อพนักงานใหม่ แล้วลองอีกครั้ง")
+                return
             picker = ChoiceDialog(self, "หัวหน้าที่อนุมัติ", [(r['name'], r['server_id']) for r in managers])
             if picker.exec() != QDialog.Accepted:
                 return
@@ -3313,22 +3369,33 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                         items.append(dict(product_id=line['server_id'], qty=qty))
                 if not items:
                     return
-            pin, ok = ValueDialog.get_value(self, title, "PIN หัวหน้า", pin=True)
+            pin, ok = ValueDialog.get_value(self, title, "หัวหน้าใส่รหัส PIN เพื่ออนุมัติ", pin=True)
             if not ok:
                 return
             payload = dict(receipt_no=sale['server_receipt_no'], shift_id=local_shift['server_id'], reason=details.entry.text().strip(), approver_id=picker.choice, approver_pin=pin, terminal_code=terminal_id)
             if is_return:
                 payload.update(refund_method='cash', items=items)
             try:
-                result = online.provisioning.api.post('/api/pos/receipt/' + ('return' if is_return else 'void'), payload)
+                try:
+                    online.provisioning.verify_approver(picker.choice, pin, payload['reason'][:200])
+                except Exception:
+                    payload.pop('approver_pin', None)
+                    pin = ''
+                    TouchMessage.warning(self, title, 'อนุมัติไม่สำเร็จ ให้หัวหน้าลอง PIN ใหม่และตรวจการเชื่อมต่อ หากยังไม่ได้ให้ผู้ดูแลตรวจสิทธิ์หัวหน้า')
+                    return
+                try:
+                    result = online.provisioning.api.post('/api/pos/receipt/' + ('return' if is_return else 'void'), payload)
+                finally:
+                    payload.pop('approver_pin', None)
+                    pin = ''
                 if result.get('success') is False:
                     raise ValueError(result.get('message') or 'ERP ไม่รับรายการ')
                 if not is_return:
                     with service.db:
                         service.db.execute("UPDATE sales SET is_void = 1, void_reason = ?, voided_at = ? WHERE id = ?", (payload['reason'], service._now(), sale_id))
-                TouchMessage.information(self, title, result.get('message') or 'บันทึกแล้ว')
+                TouchMessage.information(self, title, 'ส่งคำขอคืนสินค้าแล้ว ให้หัวหน้าอนุมัติใน ERP ก่อนคืนเงิน' if is_return else 'ยกเลิกบิลแล้ว')
             except Exception as error:
-                TouchMessage.warning(self, title, str(error))
+                TouchMessage.warning(self, title, "ยังยืนยันผลไม่ได้ ให้ผู้ดูแลตรวจบิลใน ERP ก่อนทำซ้ำ เพื่อไม่ให้ยกเลิกหรือรับคืนซ้ำ")
             finally:
                 payload.pop('approver_pin', None)
                 pin = ''
@@ -3347,7 +3414,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             layout.addWidget(title)
             status = QLabel(
                 f"{summary.transaction_count} บิล · ยกเลิก {summary.void_count} บิล · "
-                f"รอ sync {summary.pending_sync_count} บิล"
+                f"บิลรอส่ง {summary.pending_sync_count} บิล"
             )
             status.setObjectName("cardHint")
             layout.addWidget(status)
@@ -3381,16 +3448,20 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 (summary.report_date.isoformat(),),
             ).fetchall()
             recent = QTableWidget(len(rows), 4)
-            recent.setHorizontalHeaderLabels(["บิลล่าสุด", "เวลา", "ยอด", "Sync"])
+            recent.setHorizontalHeaderLabels(["บิลล่าสุด", "เวลา", "ยอด", "การส่งบิล"])
             recent.verticalHeader().setVisible(False)
             recent.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
             for row_number, sale in enumerate(rows):
                 for column, value in enumerate([
                     sale["document_no"], str(sale["sale_datetime"])[11:16],
-                    f"{Decimal(str(sale['grand_total'])):,.2f}", sale["sync_status"],
+                    f"{Decimal(str(sale['grand_total'])):,.2f}", sale_status_label(sale["sync_status"]),
                 ]):
                     recent.setItem(row_number, column, QTableWidgetItem(str(value)))
             layout.addWidget(recent)
+            receipt_actions = QPushButton("ยกเลิกบิล / รับคืนสินค้า")
+            receipt_actions.setMinimumHeight(56)
+            receipt_actions.clicked.connect(self.show_history)
+            layout.addWidget(receipt_actions)
 
             close = QDialogButtonBox(QDialogButtonBox.Close)
             close.rejected.connect(dialog.reject)
@@ -3452,7 +3523,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 row = self.table.rowCount()
                 self.table.insertRow(row)
                 self.table.setItem(row, 1, QTableWidgetItem(f"ของแถม {gift.name}"))
-                self.table.setItem(row, 2, QTableWidgetItem(str(gift.qty)))
+                self.table.setItem(row, 2, QTableWidgetItem(format(gift.qty.normalize(), "f")))
                 self.table.setItem(row, 3, QTableWidgetItem("฿0.00"))
             if selected is not None and selected < self.table.rowCount():
                 self.table.selectRow(selected)

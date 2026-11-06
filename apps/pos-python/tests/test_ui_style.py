@@ -142,7 +142,7 @@ class UiStyleTest(unittest.TestCase):
         start = source.index("def ensure_sale_session")
         session = source[start:source.index("def open_settings", start)]
         self.assertIn("class OpeningShiftDialog", source)
-        self.assertIn('"ใส่เงินทอนก่อนเปิดกะ"', source)
+        self.assertIn('"เปิดกะ: นับเงินในลิ้นชักแล้วใส่ยอด"', source)
         self.assertIn("OpeningShiftDialog(self)", session)
         self.assertIn("service.open_shift(", session)
         self.assertIn("opening_dialog.opening_cash", session)

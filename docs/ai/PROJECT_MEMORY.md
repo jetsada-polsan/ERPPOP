@@ -167,3 +167,14 @@
 - Local ยอดกะ/ลิ้นชัก/Z แยกส่วนผสมและรวมด้วย Decimal; ใบเสร็จไทย 2 ใบ และ 3 ใบเมื่อมีโอน. หน้าชำระ 5 ปุ่มใน workspace เดียว 1024×768; ภาพใน docs/ai/pos-python-shots/payments/
 - Python 375 tests ผ่าน, mutation 3 จุดตรวจพบจริง; Laravel PHPUnit memory 1GB exit 0 (751 passed, skipped 2, incomplete 6). ยังไม่มี HTTP E2E ทั้ง 5 เพราะต้องไม่สร้าง credential; ต้อง UAT Windows/hardware จริง
 - งานอยู่ใน workspace branch claude/pos-python-settings-popup base e0fb0ab; pull/stage ถูก sandbox ปฏิเสธ FETCH_HEAD/index.lock จึงไม่มี commit/push. เก็บไฟล์ตามคำสั่งเจ้าของ; รายละเอียดและลำดับ commit ใน handoff ล่าสุด. ยังไม่ deploy
+
+## Python POS polish 0.8.9 workspace — 2026-11-06
+
+- ช่องค้นหามี × 56×56/คืน focus/ล้างหลังเลือกสินค้า; ประวัติมี void สีแดง เหตุผล preset+พิมพ์เองและ verify หัวหน้าก่อน void/return. Cashier status/error ใช้ข้อความไทย; จำนวนของแถมตัดศูนย์ท้าย. โปรสินค้าเดียวกันรวม qty ทุกบรรทัด รวมจำนวน free_item ที่ Order สร้าง ใช้ Decimal/list_price เดิม
+- PHP checkout นี้ยังเป็น firstWhere และ cashierRole ยังไม่รวม IT_MGR; ไม่แก้ PHP ตามขอบเขต. ต้องตรวจ ERP aggregate PR #6/สิทธิ์ก่อนใช้งานร่วมกัน. หน่วยกิโลกรัมอย่างเดียว (104011) ยังคงไม่ถามน้ำหนักตาม is_scale เดิม รอเจ้าของตัดสินใจ
+- Python 397 tests ผ่าน, mutation 5 จุดแดงจริง, ภาพ offscreen 1024×768 แปดใบใน docs/ai/pos-python-shots/089/. Pull/stage ถูก sandbox ปฏิเสธ FETCH_HEAD/index.lock; ไฟล์คงอยู่บน branch claude/pos-python-settings-popup base 2eb8bcf ยัง commit/push ไม่ได้. ไม่ deploy; รายละเอียดใน handoff ล่าสุด
+
+## Python POS void 0.8.9 continuation — 2026-11-06
+
+- ประวัติบิลค้นเลข local/ERP ได้ รวมบิลเกิน 100 รายการ; shared PIN dialog ล้าง entry หลังรับ/ยกเลิก และ provisioning ล้าง PIN request dict หลังส่งทั้ง success/failure. รายชื่ออนุมัติใช้ active ERP role manager ที่ไม่ revoked เท่านั้น
+- งานยังเป็น workspace ตามคำสั่งเจ้าของไม่มี commit/push. ข้อจำกัด ERP aggregate/IT_MGR และสินค้า kg-only เดิมยังรอตัดสินใจ/ERP รุ่นที่รองรับ รายละเอียดผลตรวจใน handoff ล่าสุด

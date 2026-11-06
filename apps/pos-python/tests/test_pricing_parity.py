@@ -1,4 +1,4 @@
-"""Vue pricing UAT fixtures, plus ERP firstWhere and persisted checkout parity."""
+"""Vue pricing UAT fixtures, ERP aggregate quantity and persisted checkout parity."""
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal as D
 from io import BytesIO
@@ -109,11 +109,11 @@ def test_combined_product_bill_manual_proportional_and_approval():
     assert cart[0].promo_discount == D('21.82')
 
 
-def test_erp_first_line_quantity_even_for_duplicate_scale_lines():
+def test_erp_aggregates_quantity_even_for_duplicate_scale_lines():
     order = total([line(price=40, qty=2), line(price=40, qty=2)], [promo('bundle_price', min_qty=3, bundle_price=100)])
-    assert order.promotion_total() == 0  # Vue aggregates to four; ERP firstWhere sees two.
+    assert order.promotion_total() == 20
     order.promotions = [promo('free_item', min_qty=3, free_product_id=2, free_qty=1)]
-    assert order.free_items() == []
+    assert order.free_items()[0].qty == 1
 
 
 def test_bill_threshold_is_after_product_promos_and_before_manual():

@@ -154,10 +154,13 @@ class ValueDialog(TouchDialog):
     def get_value(cls, parent, title, subtitle, value='', pin=False):
         dialog = cls(parent, title, subtitle, value, pin)
         accepted = dialog.exec() == QDialog.Accepted
-        return dialog.entry.text(), accepted
+        value = dialog.entry.text() if accepted else ''
+        if pin:
+            dialog.entry.clear()
+        return value, accepted
 
 class ChoiceDialog(TouchDialog):
-    def __init__(self, parent, title, choices):
+    def __init__(self, parent, title, choices, searchable=False):
         super().__init__(parent, title, 'เลือกรายการที่ต้องการ')
         from PySide6.QtWidgets import QScrollArea
         self.choice = None
@@ -165,13 +168,25 @@ class ChoiceDialog(TouchDialog):
         scroll.setWidgetResizable(True)
         host = QWidget()
         rows = QVBoxLayout(host)
+        self.search = None
+        self.choice_buttons = []
+        if searchable:
+            self.search = QLineEdit()
+            self.search.setPlaceholderText('ค้นเลขบิล')
+            self.search.textChanged.connect(self.filter_choices)
+            self.body.addWidget(self.search)
         for label, value in choices:
             button = QPushButton(str(label))
             button.clicked.connect(lambda checked=False, v=value: self.choose(v))
             rows.addWidget(button)
+            self.choice_buttons.append(button)
         scroll.setWidget(host)
         self.body.addWidget(scroll)
         self.resize(520, 600)
+
+    def filter_choices(self, text):
+        for button in self.choice_buttons:
+            button.setVisible(text.strip().casefold() in button.text().casefold())
 
     def choose(self, value):
         self.choice = value

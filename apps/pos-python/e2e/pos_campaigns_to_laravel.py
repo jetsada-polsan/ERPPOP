@@ -278,8 +278,8 @@ def run(report):
                 sell('item+bill', [item,bill], [(0,4),(1,1)])
                 sell('item+bill+manual-approved', [item,bill], [(0,4),(1,1)], manual='7.13')
                 sell('item+bill+manual-unapproved', [item,bill], [(0,4),(1,1)], manual='7.13', approved=False)
-                sell('duplicate-first-below', [item], [(0,2),(0,7)], expected_discount=0)
-                sell('duplicate-first-exact', [item], [(0,3),(0,6)], expected_discount=15)
+                sell('duplicate-aggregate-below', [item], [(0,2),(0,7)], expected_discount=45)
+                sell('duplicate-aggregate-exact', [item], [(0,3),(0,6)], expected_discount=45)
                 sell('addon-excludes-self', [specs_by_name['bill_addon']], [(0,2),(3,49),(2,2)], expected_discount=0)
                 sell('percent-cap', [bill], [(0,9)], expected_discount=35)
                 for tag, extra in [('expired',{'starts_at':'2000-01-01','ends_at':'2001-01-01'}),

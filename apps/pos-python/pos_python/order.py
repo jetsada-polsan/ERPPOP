@@ -177,8 +177,8 @@ class Order:
         for p in promotions:
             if p.promo_type != "free_item" or not p.free_product_id:
                 continue
-            trigger = next((line for line in self.lines if line.product_id == p.product_id), None)
-            qty = (trigger.qty // p.min_qty) * p.free_qty if trigger and p.min_qty > 0 else Decimal("0")
+            quantity = sum((line.qty for line in self.lines if line.product_id == p.product_id), Decimal("0"))
+            qty = (quantity // p.min_qty) * p.free_qty if p.min_qty > 0 else Decimal("0")
             if qty > 0:
                 gifts.append((p, qty))
         def gift_lines(entries):

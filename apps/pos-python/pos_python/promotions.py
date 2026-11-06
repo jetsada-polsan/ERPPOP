@@ -2,7 +2,7 @@
 
 ERP หักส่วนลดโปรเองทุกบิล (PosPricingGuard::qtyPromotionDiscount) แล้วเทียบกับยอดที่เครื่องส่งมา
 ถ้าเครื่องไม่หักด้วย ยอดไม่ตรง บิลถูกปฏิเสธทั้งที่เก็บเงินลูกค้าไปแล้ว — สูตรที่นี่จึงลอกจาก ERP ตรงๆ:
-- ใช้บรรทัดแรกของสินค้านั้นในบิลเป็นตัวตั้ง (ERP ใช้ firstWhere)
+- รวมจำนวนทุกบรรทัดของสินค้านั้นตาม ERP aggregate
 - ใช้ราคาตั้ง ไม่ใช่ราคาที่แคชเชียร์แก้
 - จำนวนชุด = ปัดลง(จำนวน / ขั้นต่ำ)
 ส่วนลดโปรไม่ต้องมีคนอนุมัติ เพราะ ERP คิดเองจากโปรที่ตั้งไว้ ไม่ใช่คนหน้าร้านกำหนด
@@ -90,7 +90,8 @@ def promotion_discounts(lines: list[PromoLine], promotions: Iterable[QtyPromotio
         if trigger_index is None or promotion.min_qty <= 0:
             continue
         trigger = lines[trigger_index]
-        sets = (trigger.qty / promotion.min_qty).to_integral_value(rounding=ROUND_FLOOR)
+        quantity = sum((line.qty for line in lines if line.product_id == promotion.product_id), Decimal("0"))
+        sets = (quantity / promotion.min_qty).to_integral_value(rounding=ROUND_FLOOR)
         if sets <= 0:
             continue
         target, amount = trigger_index, Decimal("0")

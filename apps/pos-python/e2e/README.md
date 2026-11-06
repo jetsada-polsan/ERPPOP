@@ -44,3 +44,9 @@ The JSON report contains receipt references and totals, never credentials.
 The script exits nonzero on any failure and stops its local server in `finally`.
 The other E2E scripts in this directory have different destination policies;
 these loopback guarantees apply specifically to `pos_campaigns_to_laravel.py`.
+
+The campaign runner now expects ERP PR #6 aggregate quantities across duplicate
+product rows. An ERP checkout still using firstWhere will fail those scenarios.
+Do not run it to verify 0.8.9 until the ERP implementation matches. The runner
+creates temporary credentials, so do not invoke it under a no-credential-creation
+instruction.
