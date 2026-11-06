@@ -276,6 +276,7 @@ function addWeighed() {
 }
 
 async function openVoid(mode: 'void' | 'return') {
+  if (!shift.value) return flash('ต้องเปิดกะก่อนถึงจะยกเลิกหรือคืนสินค้าได้')
   if (!selectedHistory.value || selectedHistory.value.status !== 'synced') return flash('บิลนี้ยังไม่ส่งเข้า ERP ยกเลิกหรือคืนไม่ได้')
   if (!navigator.onLine) return flash('ต้องออนไลน์ก่อนถึงจะยกเลิกหรือคืนสินค้าได้')
   try { managers.value = (await api.cashiers()).filter((row) => row.role === 'manager') } catch (e) { return showError(e) }
@@ -290,7 +291,9 @@ async function openVoid(mode: 'void' | 'return') {
 
 async function submitVoid() {
   const sale = selectedHistory.value
-  if (!sale || !shift.value || !voidApproverId.value) return
+  if (!sale) return
+  if (!shift.value) return flash('ต้องเปิดกะก่อนถึงจะยกเลิกหรือคืนสินค้าได้')
+  if (!voidApproverId.value) return flash('เลือกหัวหน้าที่อนุมัติก่อน')
   const approval = { receipt_no: sale.receiptNo, reason: voidReason.value.trim(), approver_id: voidApproverId.value, approver_pin: voidApproverPin.value, terminal_code: profile.value?.terminalCode || undefined }
   busy.value = true
   try {

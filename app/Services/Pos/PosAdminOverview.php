@@ -28,8 +28,10 @@ class PosAdminOverview
             ->get(['id', 'code', 'name_th', 'default_warehouse_location_id'])
             ->map(function (Branch $branch) {
                 $devices = PosDevice::where('branch_id', $branch->id)->whereNull('revoked_at')->get(['id', 'last_seen_at']);
-                $cashiers = Salesman::with('user.posCredential')->where('branch_id', $branch->id)->where('is_active', true)->orderBy('code')->get();
-                $withPin = $cashiers->filter(fn (Salesman $s) => $this->hasPin($s));
+                $cashiers = Salesman::with(['user.posCredential', 'user.roles.permissions', 'user.branchRoles.permissions'])
+                    ->where('branch_id', $branch->id)->where('is_active', true)->orderBy('code')->get();
+                $eligibleCashiers = $cashiers->filter(fn (Salesman $s) => $this->canUsePos($s, $branch->id));
+                $withPin = $eligibleCashiers->filter(fn (Salesman $s) => $this->hasPin($s));
                 // ทุกเครื่องต้องมี user ภายในสำหรับ API แต่คนขายมาจาก PIN จึงใช้ซ้ำกันได้ ไม่ต้องให้ผู้ดูแลเลือก
                 $deviceUser = User::where('branch_id', $branch->id)->where('is_active', true)
                     ->whereHas('posCashierProfile', fn ($q) => $q->where('is_active', true))
@@ -42,6 +44,7 @@ class PosAdminOverview
                     'branch' => $branch,
                     'device_user' => $deviceUser,
                     'cashier_list' => $cashiers,
+                    'eligible_cashiers' => $eligibleCashiers->count(),
                     'devices' => $devices->count(),
                     'online_devices' => $devices->whereNotNull('last_seen_at')->count(),
                     'last_seen' => $devices->max('last_seen_at'),
@@ -120,6 +123,11 @@ class PosAdminOverview
     public function hasPin(Salesman $salesman): bool
     {
         return filled($salesman->user?->posCredential?->pin_hash) || filled($salesman->pos_pin_hash);
+    }
+
+    public function canUsePos(Salesman $salesman, int $branchId): bool
+    {
+        return (bool) ($salesman->user?->is_active && $salesman->user->canUsePosDevice($branchId));
     }
 
     private function count(string $table, int $deviceId, callable $scope): int

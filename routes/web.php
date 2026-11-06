@@ -107,10 +107,12 @@ Route::get('/download/pos/latest.json', [PosReleaseController::class, 'latest'])
 Route::get('/download/pos/releases/{filename}', [PosReleaseController::class, 'download'])->name('pos.release.download');
 Route::get('/download/python-pos', [SystemSettingController::class, 'downloadPythonPos'])->name('python-pos.download');
 Route::post('/pos-admin/terminals/{terminal}/float', [PosAdminController::class, 'updateFloat'])->name('pos-admin.terminals.float');
+Route::get('/download/jet-pos-python', [SystemSettingController::class, 'downloadJetPythonPos'])->name('jet-python-pos.download');
 Route::get('/pos-admin', [PosAdminController::class, 'index'])->name('pos-admin.index');
 Route::delete('/master-data/{type}/{id}', [MasterDataDeleteController::class, 'destroy'])->whereNumber('id')->name('master-data.destroy');
 Route::post('/pos-admin/devices/{device}/pair-code', [PosAdminController::class, 'newPairCode'])->name('pos-admin.devices.pair-code');
 Route::post('/pos-admin/cashiers/{salesman}/move', [PosAdminController::class, 'moveCashier'])->name('pos-admin.cashiers.move');
+Route::post('/pos-admin/cashiers/{salesman}/enable', [PosAdminController::class, 'enableCashier'])->name('pos-admin.cashiers.enable');
 Route::get('/password/change', [AuthController::class, 'showChangePassword'])->name('password.change');
 Route::post('/password/change', [AuthController::class, 'updatePassword'])->name('password.update');
 Route::get('/security/mfa', [AuthController::class, 'showMfaSetup'])->name('mfa.setup');

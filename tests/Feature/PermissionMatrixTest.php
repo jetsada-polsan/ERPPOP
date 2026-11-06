@@ -46,13 +46,13 @@ class PermissionMatrixTest extends TestCase
     private const UNMAPPED_ROUTE_EXCEPTIONS = [
         'apps.launcher', 'dashboard', 'login', 'login.attempt', 'logout', 'member.liff', 'member.portal',
         'mfa.challenge', 'mfa.disable', 'mfa.enable', 'mfa.setup', 'mfa.verify', 'notifications.index',
-        'password.change', 'password.update', 'portal', 'python-pos.download', 'search.branches',
+        'password.change', 'password.update', 'portal', 'python-pos.download', 'jet-python-pos.download', 'search.branches',
         'search.customers', 'search.products', 'search.salesmen', 'search.stock-balance', 'search.suppliers',
     ];
 
     /** @var array<int, string> */
     private const PUBLIC_ROUTES = [
-        'login', 'login.attempt', 'logout', 'pos.download', 'python-pos.download',
+        'login', 'login.attempt', 'logout', 'pos.download', 'python-pos.download', 'jet-python-pos.download',
         'pos.release.latest', 'pos.release.download', 'mfa.challenge', 'mfa.verify', 'portal', 'member.portal',
     ];
 
