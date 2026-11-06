@@ -2752,3 +2752,12 @@ pending
 - ทดสอบ: `QT_QPA_PLATFORM=offscreen PYTHONPATH=apps/pos-python /private/tmp/pos-parity-env/bin/python -m pytest apps/pos-python/tests/test_pos_service.py apps/pos-python/tests/test_ui_style.py apps/pos-python/tests/test_payments.py -q` ผ่าน **76 passed**; `git diff --check` ผ่าน
 - CI ก่อนแก้: GitHub Actions run `42189856059` ล้มเฉพาะ test เก่าทั้ง 2 จุด ไม่ได้ build installer; commit ถัดไปต้อง trigger Windows UAT build ใหม่
 - Deploy: **ยังไม่ deploy production**
+
+## Handoff - 2026-11-06 (Codex — Windows UAT build recovery)
+- Branch/source: `claude/pos-python-settings-popup` @ `48493c3`
+- ทำอะไร: ตรวจ log ของ run `42189856059` พบว่า fail จาก assertion เก่าที่บังคับข้อความ/checkbox ยืนยันเงินเข้า; source และ test ปัจจุบันใช้ flow โอนแบบเลขท้ายบัญชี 4 หลักแล้ว
+- ทดสอบ local: `pytest` ผ่าน **397 tests**; `git diff --check` ผ่าน
+- Windows UAT: run `42214670350` ผ่านครบทั้ง dependency install, tests, version stamp, PyInstaller, packaged self-check, Inno Setup, installer verification และ upload artifact
+- Artifact: `PopCentral-POS-UAT-0.9.0` ขนาดประมาณ 178.8 MB; `publish=false` จึงยังไม่เผยแพร่หน้าโหลดและไม่สร้างธุรกรรม production
+- Deploy: ยังไม่ deploy และยังไม่ publish
+- งานถัดไป: ดาวน์โหลด artifact ไปติดตั้งบน Windows UAT จริง ตรวจจอ 1024×768, touch, scanner, scale และ printer ก่อนเจ้าของสั่ง publish/release
