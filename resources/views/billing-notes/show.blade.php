@@ -7,11 +7,11 @@
     <a href="{{ route('billing-notes.index') }}" class="btn btn-light border"><i class="bi bi-arrow-left me-1"></i>กลับ</a>
     <button onclick="window.print()" class="btn btn-primary"><i class="bi bi-printer me-1"></i>พิมพ์ใบวางบิล</button>
     @if($note->status === 'open')
-        <form method="post" action="{{ route('billing-notes.status', $note) }}" class="ms-auto" onsubmit="return confirm('ทำเครื่องหมายว่าเก็บเงินครบแล้ว?')">
+        <form method="post" action="{{ route('billing-notes.status', $note) }}" class="ms-auto" data-confirm="ทำเครื่องหมายว่าเก็บเงินครบแล้ว?">
             @csrf <input type="hidden" name="status" value="collected">
             <button class="btn btn-success"><i class="bi bi-check2-circle me-1"></i>เก็บเงินแล้ว</button>
         </form>
-        <form method="post" action="{{ route('billing-notes.status', $note) }}" onsubmit="return confirm('ยกเลิกใบวางบิลนี้?')">
+        <form method="post" action="{{ route('billing-notes.status', $note) }}" data-confirm="ยกเลิกใบวางบิลนี้?">
             @csrf <input type="hidden" name="status" value="cancelled">
             <button class="btn btn-light border text-danger">ยกเลิก</button>
         </form>

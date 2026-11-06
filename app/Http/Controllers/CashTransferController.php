@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\BankAccount;
+use App\Support\FinanceBranches;
 use App\Models\Branch;
 use App\Models\Document;
 use App\Services\Accounting\CashTransferService;
@@ -21,17 +22,18 @@ class CashTransferController extends Controller
 {
     public function index(Request $request): View
     {
-        $branchId = $request->user()?->branch_id;
+        $branches = FinanceBranches::available($request->user());
+        $branchId = $branches->count() === 1 ? (int) $branches->first()->id : null;
 
         return view('cash-transfers.index', [
             'transfers' => Document::query()
                 ->with(['branch', 'documentType'])
                 ->whereHas('documentType', fn ($query) => $query->whereIn('code', [CashTransferService::DEPOSIT, CashTransferService::WITHDRAWAL]))
                 // ผู้ใช้ที่สังกัดสาขาเห็นเฉพาะสาขาตัวเอง เหมือนกติกาของรายงาน
-                ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
+                ->whereIn('branch_id', $branches->pluck('id'))
                 ->orderByDesc('doc_date')->orderByDesc('id')
                 ->paginate(25),
-            'branches' => Branch::orderBy('code')->get(),
+            'branches' => $branches,
             'bankAccounts' => BankAccount::orderBy('bank_name')->get(),
             'defaultBranchId' => $branchId,
         ]);
@@ -49,10 +51,7 @@ class CashTransferController extends Controller
             'remark' => ['nullable', 'string', 'max:500'],
         ]);
 
-        // สาขาที่ user สังกัดชนะค่าที่ส่งมา — คนสาขาหนึ่งบันทึกเงินสดของอีกสาขาไม่ได้
-        if ($branchId = $request->user()?->branch_id) {
-            $data['branch_id'] = $branchId;
-        }
+        abort_unless(FinanceBranches::allows($request->user(), (int) $data['branch_id']), 403);
 
         try {
             $document = $service->create($data['type'], $data);

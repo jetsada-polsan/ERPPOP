@@ -32,7 +32,7 @@ class SaleReturnController extends Controller
         return view('sale-returns.index', compact('returns', 'branches', 'q'));
     }
 
-    public function store(Request $request, SaleReturnService $service): RedirectResponse
+    public function store(Request $request, SaleReturnService $service): RedirectResponse|JsonResponse
     {
         $data = $request->validate([
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
@@ -58,6 +58,8 @@ class SaleReturnController extends Controller
 
         try {
             $document = $service->create($data);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => $e->getMessage(), 'errors' => $e->errors()], 422);
         } catch (RuntimeException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
@@ -82,6 +84,7 @@ class SaleReturnController extends Controller
             'branch_id' => $sale->branch_id,
             'customer_id' => $sale->customer_id,
             'customer_name' => $sale->customer?->name_th,
+            'refundable_amount' => app(\App\Services\Sales\SaleCreditLimit::class)->remaining($sale),
             'lines' => $service->returnableLines($sale)->values(),
         ]);
     }
@@ -93,10 +96,12 @@ class SaleReturnController extends Controller
         return view('sale-returns.show', ['saleReturn' => $saleReturn]);
     }
 
-    public function approve(Document $saleReturn, SaleReturnService $service): RedirectResponse
+    public function approve(Document $saleReturn, SaleReturnService $service): RedirectResponse|JsonResponse
     {
         try {
             $service->approve($saleReturn, (int) auth()->id());
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => $e->getMessage(), 'errors' => $e->errors()], 422);
         } catch (RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }

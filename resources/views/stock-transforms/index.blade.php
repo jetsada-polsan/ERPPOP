@@ -81,7 +81,7 @@
                     <div class="row g-3 mb-4">
                         <div class="col-lg-4">
                             <label class="form-label text-muted small">สาขา</label>
-                            <select name="branch_id" required class="form-select">
+                            <select name="branch_id" x-model="branchId" required class="form-select">
                                 @foreach($branches as $branch)
                                     <option value="{{ $branch->id }}">{{ $branch->code }} - {{ $branch->name_th }}</option>
                                 @endforeach
@@ -89,7 +89,7 @@
                         </div>
                         <div class="col-lg-4">
                             <label class="form-label text-muted small">ตำแหน่งเก็บ (ไม่เลือก = คลังหลักสาขา)</label>
-                            <select name="warehouse_location_id" class="form-select">
+                            <select name="warehouse_location_id" x-model="locationId" class="form-select">
                                 <option value="">-- คลังหลักของสาขา --</option>
                                 @foreach($locations as $location)
                                     <option value="{{ $location->id }}">{{ $location->code }} - {{ $location->name }}</option>
@@ -144,7 +144,7 @@
                     </div>
                     <div class="table-responsive booking-items-table mb-2">
                         <table class="table align-middle">
-                            <thead><tr><th style="min-width:280px">สินค้า</th><th class="text-end" style="width:110px">ใช้จริง</th><th class="text-end" style="width:130px">ทุนเฉลี่ย</th><th class="text-end" style="width:120px">ต้นทุนรวม</th><th style="width:44px"></th></tr></thead>
+                            <thead><tr><th style="min-width:280px">สินค้า</th><th class="text-end" style="width:110px">ใช้จริง</th><th class="text-end" style="width:130px">ทุนเฉลี่ยระบบ</th><th class="text-end" style="width:120px">ต้นทุนรวม</th><th style="width:44px"></th></tr></thead>
                             <tbody>
                                 <template x-for="(item, index) in rawItems" :key="'r' + index">
                                     <tr>
@@ -156,8 +156,8 @@
                                             <input type="hidden" :name="`raw_items[${index}][product_id]`" x-model="item.product_id">
                                         </td>
                                         <td><input type="number" step="0.0001" min="0.0001" :name="`raw_items[${index}][qty]`" x-model.number="item.qty" @input="syncInputWeight()" required class="form-control text-end"></td>
-                                        <td class="text-end" x-text="money(item.average_cost)"></td>
-                                        <td class="text-end fw-semibold" x-text="money(item.qty * item.average_cost)"></td>
+                                        <td class="text-end" x-text="item.previewReady ? money(item.average_cost) : '—'"></td>
+                                        <td class="text-end fw-semibold" x-text="item.previewReady ? money(item.qty * item.average_cost) : '—'"></td>
                                         <td class="text-end"><button type="button" class="btn btn-sm btn-light text-danger" @click="rawItems.splice(index, 1); syncInputWeight()" x-show="rawItems.length > 1"><i class="bi bi-trash"></i></button></td>
                                     </tr>
                                 </template>
@@ -224,6 +224,7 @@
     function transformPage() {
         return {
             ...erpProductPicker(),
+            ...erpStockPreview(@js($branches), '{{ route('search.stock-balance') }}'),
             modalOpen: false,
             rawItems: [{ product_id: '', productQuery: '', qty: 1, average_cost: 0, results: [] }],
             outputItems: [{ product_id: '', productQuery: '', qty: 1, percent: null, results: [] }],
@@ -239,7 +240,7 @@
             onProductPicked(index, product, context) {
                 const item = context === 'output' ? this.outputItems[index] : this.rawItems[index];
                 item.productQuery = `${product.sku_code} - ${product.name_th}`;
-                item.average_cost = Number(product.average_cost) || 0;
+                if (context !== 'output') this.previewStock(item);
             },
 
             addRaw() { this.rawItems.push({ product_id: '', productQuery: '', qty: 1, average_cost: 0, results: [] }); this.syncInputWeight(); },
@@ -258,17 +259,19 @@
                     product_id: recipe.finished_product_id, productQuery: recipe.finished_product_label,
                     qty: recipe.output_qty, percent: 100, results: [],
                 }];
+                this.rawItems.forEach(item => this.previewStock(item));
                 this.syncInputWeight();
             },
 
             get rawTotal() {
+                if (!this.stockPreviewReady()) return null;
                 return this.rawItems.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.average_cost) || 0), 0);
             },
             get outputWeight() { return Number(this.outputItems[0]?.qty) || 0; },
             get lossWeight() { return Math.max(0, this.inputWeight - this.outputWeight); },
             get expectedLossWeight() { return Math.max(0, this.inputWeight * (Number(this.expectedLossPercent) || 0) / 100); },
             get abnormalLossWeight() { return Math.max(0, this.lossWeight - this.expectedLossWeight); },
-            get lossCost() { return this.inputWeight > 0 ? this.rawTotal * this.lossWeight / this.inputWeight : 0; },
+            get lossCost() { if (!this.stockPreviewReady()) return null; return this.inputWeight > 0 ? this.rawTotal * this.lossWeight / this.inputWeight : 0; },
 
             outputUnitCost(item) {
                 const qty = Number(item.qty) || 0;
@@ -281,10 +284,15 @@
                 return this.inputWeight > 0 ? this.money(output * 100 / this.inputWeight) + '%' : '-';
             },
 
-            money(v) { return Number(v || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+            money(v) { if (v === null) return '—'; return Number(v || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
             weight(v) { return Number(v || 0).toLocaleString('th-TH', { minimumFractionDigits: 3, maximumFractionDigits: 4 }); },
 
             onSubmit(event) {
+                if (!this.stockPreviewReady()) {
+                    event.preventDefault();
+                    window.erpToast?.('warning', 'กรุณารอข้อมูลสต๊อก หรือเลือกคลังและสินค้าใหม่');
+                    return;
+                }
                 if (this.rawItems.some(i => !i.product_id) || this.outputItems.some(i => !i.product_id)) {
                     event.preventDefault();
                     Swal.fire({ icon: 'warning', title: 'กรุณาเลือกสินค้าให้ครบทุกแถว' });

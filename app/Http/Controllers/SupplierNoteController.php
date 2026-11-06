@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ChartOfAccount;
+use App\Support\FinanceBranches;
 use App\Models\Document;
 use App\Models\SupplierOpenItem;
 use App\Services\Purchasing\SupplierNoteService;
@@ -14,11 +15,15 @@ class SupplierNoteController extends Controller
 {
     public function index(Request $request)
     {
-        $branch = $request->user()->branch_id;
+        $branches = FinanceBranches::available($request->user(), 'purchasing.manage');
+        $branch = $request->integer('branch_id') ?: null;
+        abort_if($branch && ! $branches->contains('id', $branch), 403);
+        $allowedIds = $branch ? [$branch] : $branches->pluck('id')->all();
         return view('supplier-notes.index', [
             'notes' => Document::with('supplier')->whereHas('documentType', fn ($q) => $q->whereIn('code', ['SUPPLIER_CREDIT_NOTE', 'SUPPLIER_DEBIT_NOTE']))
-                ->when($branch, fn ($q) => $q->where('branch_id', $branch))->latest('id')->paginate(30),
-            'items' => SupplierOpenItem::with('supplier')->whereHas('sourceDocument', fn ($q) => $q->where('status', 'active')->when($branch, fn ($q) => $q->where('branch_id', $branch)))->orderByDesc('id')->limit(500)->get(),
+                ->whereIn('branch_id', $allowedIds)->latest('id')->paginate(30)->withQueryString(),
+            'items' => SupplierOpenItem::with('supplier')->whereHas('sourceDocument', fn ($q) => $q->where('status', 'active')->whereIn('branch_id', $allowedIds))->orderByDesc('id')->limit(500)->get(),
+            'branches' => $branches, 'selectedBranchId' => $branch,
             'accounts' => ChartOfAccount::where('account_type', 'expense')->orderBy('code')->get(),
         ]);
     }
@@ -57,7 +62,7 @@ class SupplierNoteController extends Controller
             abort_unless(DB::table('supplier_notes')->where('document_id', $locked->id)->exists(), 404);
             abort_unless($locked->status === 'pending_approval', 422);
             abort_if((int) $locked->created_by === (int) $request->user()->id && ! auth()->user()?->hasPermission('system.admin'), 403);
-            abort_if($request->user()->branch_id && (int) $request->user()->branch_id !== (int) $locked->branch_id, 403);
+            abort_unless(FinanceBranches::allows($request->user(), (int) $locked->branch_id, 'purchasing.manage'), 403);
             $locked->update(['status' => 'rejected', 'approval_note' => $data['reason'], 'approved_by' => $request->user()->id, 'approved_at' => now()]);
         });
         return back()->with('success', 'ปฏิเสธเอกสารแล้ว');

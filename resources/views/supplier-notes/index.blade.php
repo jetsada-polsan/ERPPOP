@@ -2,6 +2,13 @@
 @section('title', 'ใบเพิ่ม/ลดหนี้ผู้ขาย')
 @section('page-title', 'ใบเพิ่ม/ลดหนี้ผู้ขาย')
 @section('content')
+<form method="get" class="mb-3">
+    <label for="note-branch" class="form-label">สาขา</label>
+    <select id="note-branch" name="branch_id" class="form-select" onchange="this.form.submit()">
+        <option value="">ทุกสาขาที่มีสิทธิ์</option>
+        @foreach($branches as $branch)<option value="{{ $branch->id }}" @selected($selectedBranchId == $branch->id)>{{ $branch->code }} - {{ $branch->name_th }}</option>@endforeach
+    </select>
+</form>
 <form method="post" action="{{ route('supplier-notes.store') }}" class="row g-3 mb-4">
     @csrf
     <div class="col-md-3"><label class="form-label" for="kind">ประเภท</label><select id="kind" name="kind" class="form-select"><option value="credit">ใบลดหนี้ผู้ขาย</option><option value="debit">ใบเพิ่มหนี้ผู้ขาย</option></select></div>
@@ -14,7 +21,7 @@
 </form>
 <div class="table-responsive"><table class="table align-middle"><thead><tr><th>เอกสาร</th><th>ผู้ขาย</th><th>อ้างอิง</th><th>ยอดเงิน</th><th>สถานะ</th><th>อนุมัติ</th></tr></thead><tbody>
 @foreach($notes as $note)
-<tr><td>{{ $note->doc_number }}</td><td>{{ $note->supplier?->name_th }}</td><td>{{ $note->reference }}</td><td>{{ number_format($note->total_amount, 2) }}</td><td>{{ ['pending_approval'=>'รออนุมัติ','active'=>'อนุมัติแล้ว','rejected'=>'ไม่อนุมัติ'][$note->status] ?? $note->status }}</td><td>
+<tr><td>{{ $note->doc_number }}</td><td>{{ $note->supplier?->name_th }}</td><td>{{ $note->reference }}</td><td>{{ number_format($note->total_amount, 2) }}</td><td>{{ ['pending_approval'=>'รออนุมัติ','active'=>'อนุมัติแล้ว','rejected'=>'ไม่อนุมัติ'][$note->status] ?? \App\Support\DocumentStatus::label($note->status) }}</td><td>
 @if($note->status === 'pending_approval' && auth()->user()->hasPermission('finance.note.approve') && (int)$note->created_by !== (int)auth()->id())
 <form method="post" action="{{ route('supplier-notes.approve', $note) }}">@csrf<button class="btn btn-sm btn-success"><i class="bi bi-check2"></i> อนุมัติ</button></form>
 <form method="post" action="{{ route('supplier-notes.reject', $note) }}" class="d-flex gap-2 mt-2">@csrf<input name="reason" class="form-control form-control-sm" aria-label="เหตุผลไม่อนุมัติ" required maxlength="1000"><button class="btn btn-sm btn-outline-danger">ไม่อนุมัติ</button></form>

@@ -29,6 +29,13 @@ class PaymentAllocation extends Model
         return $this->belongsTo(SupplierOpenItem::class, 'supplier_open_item_id');
     }
 
+    public function referenceNumber(): string
+    {
+        return $this->supplier_open_item_id
+            ? ($this->supplierOpenItem?->document_no ?: $this->supplierOpenItem?->sourceDocument?->doc_number ?? '-')
+            : ($this->openItem?->document?->doc_number ?? '-');
+    }
+
     protected function casts(): array
     {
         return [

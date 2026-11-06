@@ -92,7 +92,7 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
         </div>
         <div class="booking-actions">
             <span class="badge {{ $statusColor[$booking->status] ?? 'text-bg-light' }} fs-6 px-3 py-2">
-                {{ $statusLabel[$booking->status] ?? $booking->status }}
+                {{ $statusLabel[$booking->status] ?? \App\Support\DocumentStatus::label($booking->status) }}
             </span>
             <a href="{{ route('documents.delivery-note', $booking->document) }}" target="_blank" class="btn btn-light border px-3" title="เอกสารประกอบการจัดของ ไม่ตัดสต๊อกและไม่ใช่ใบขาย">
                 <i class="bi bi-truck me-1"></i> ใบส่งของชั่วคราว 2 ใบ
@@ -103,7 +103,7 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
                 </a>
             @endif
             @if($isPending)
-                <form method="post" action="{{ route('bookings.cancel', $booking) }}" onsubmit="return confirm('ยกเลิกใบจองนี้? ยอดจองจะคืนให้สต๊อก')">
+                <form method="post" action="{{ route('bookings.cancel', $booking) }}" data-confirm="ยกเลิกใบจองนี้? ยอดจองจะคืนให้สต๊อก">
                     @csrf
                     <button class="btn btn-outline-danger">ยกเลิกใบจอง</button>
                 </form>
@@ -188,7 +188,7 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
             @endif
         </div>
         @if($transportJob)
-            <div class="small text-muted mt-2">สถานะขนส่ง: {{ ['booked'=>'รอจัดของ','loaded'=>'ขึ้นรถแล้ว','in_transit'=>'กำลังส่ง','delivered'=>'ส่งครบแล้ว','paid'=>'รับเงินแล้ว','cancelled'=>'ยกเลิก'][$transportJob->status] ?? $transportJob->status }}</div>
+            <div class="small text-muted mt-2">สถานะขนส่ง: {{ ['booked'=>'รอจัดของ','loaded'=>'ขึ้นรถแล้ว','in_transit'=>'กำลังส่ง','delivered'=>'ส่งครบแล้ว','paid'=>'รับเงินแล้ว','cancelled'=>'ยกเลิก'][$transportJob->status] ?? \App\Support\DocumentStatus::label($transportJob->status) }}</div>
         @endif
     @endif
 </div>

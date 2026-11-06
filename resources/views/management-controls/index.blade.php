@@ -135,7 +135,7 @@
                             <td>{{ $plan->product?->sku_code }} {{ $plan->product?->name_th }}</td>
                             <td>{{ $plan->supplier?->name_th ?? '—' }}</td>
                             <td class="text-end">{{ number_format($plan->suggested_qty, 4) }}</td>
-                            <td><span class="od-pill wait">{{ $plan->status }}</span></td>
+                            <td><span class="od-pill wait">{{ \App\Support\DocumentStatus::label($plan->status) }}</span></td>
                         </tr>
                     @empty
                         <tr><td colspan="5" class="text-center text-muted py-4">ยังไม่มีแผน — กด “สร้างคำแนะนำใหม่” เพื่อคำนวณจาก Min/Max</td></tr>
@@ -236,7 +236,7 @@
                             <td class="text-end">{{ $money($run->gross_amount) }}</td>
                             <td class="text-end">{{ $money($run->deduction_amount) }}</td>
                             <td class="text-end fw-bold">{{ $money($run->net_amount) }}</td>
-                            <td><span class="od-pill {{ ['draft' => 'wait', 'approved' => 'wait', 'paid' => 'ok'][$run->status] ?? 'wait' }}">{{ ['draft' => 'ร่าง', 'approved' => 'อนุมัติแล้ว', 'paid' => 'จ่ายแล้ว'][$run->status] ?? $run->status }}</span></td>
+                            <td><span class="od-pill {{ ['draft' => 'wait', 'approved' => 'wait', 'paid' => 'ok'][$run->status] ?? 'wait' }}">{{ ['draft' => 'ร่าง', 'approved' => 'อนุมัติแล้ว', 'paid' => 'จ่ายแล้ว'][$run->status] ?? \App\Support\DocumentStatus::label($run->status) }}</span></td>
                             <td class="text-end"><a href="{{ route('management-controls.payroll.show', $run->id) }}" class="od-btn">ตรวจ / อนุมัติ</a></td>
                         </tr>
                     @empty
@@ -282,7 +282,7 @@
                             <td>{{ $order->channel_name }}</td>
                             <td>{{ $order->external_order_id }}</td>
                             <td>{{ $order->customer_name ?: '—' }}</td>
-                            <td><span class="od-pill wait">{{ $order->status }}</span></td>
+                            <td><span class="od-pill wait">{{ \App\Support\DocumentStatus::label($order->status) }}</span></td>
                             <td class="text-end">{{ $money($order->total_amount) }}</td>
                         </tr>
                     @empty
@@ -309,7 +309,7 @@
                             <td>{{ $event->detected_at }}</td>
                             <td>{{ $event->check_code }}</td>
                             <td><span class="od-pill {{ in_array($event->severity, ['critical', 'error'], true) ? 'fail' : 'wait' }}">{{ $event->severity }}</span></td>
-                            <td>{{ $event->status }}</td>
+                            <td>{{ \App\Support\DocumentStatus::label($event->status) }}</td>
                             <td>{{ $event->message }}</td>
                         </tr>
                     @empty

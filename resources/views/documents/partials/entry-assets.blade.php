@@ -212,7 +212,7 @@ function docEntryPage(config) {
                 return_disposition: 'quarantine', lots: [],
             }));
             this.sourceInfo = lines.length
-                ? `ใบขาย ${data.doc_number}: คืนได้อีก ${lines.length} รายการ (แก้จำนวนลงได้ ห้ามเกินที่แสดง)`
+                ? `ใบขาย ${data.doc_number}: คืนได้อีก ${lines.length} รายการ · วงเงินคืน ${Number(data.refundable_amount).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} บาท (ห้ามเกินวงเงิน)`
                 : `ใบขาย ${data.doc_number} คืนครบทุกรายการแล้ว`;
             if (!this.items.length) this.addItem();
         },

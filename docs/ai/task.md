@@ -2525,3 +2525,48 @@ pending
 - Deploy: ยังไม่ deploy, ไม่ติดต่อ production, ไม่รัน migration กับฐานใช้งานจริง; ไม่อ่าน/ไม่ stage/ไม่ commit `docs/ai/scale-plu-prod.txt` ซึ่งยังเป็น untracked.
 - Git environment: metadata worktree ต้นฉบับยังอยู่นอก writable roots และ pull ถูก OS ปฏิเสธเช่นรอบแรก. ใช้ `--git-dir=/private/tmp/plu-git-work/.git --work-tree=<workspace>` ที่มี branch รอบแรกครบ; pull origin main สำเร็จ Already up to date. Commit/push branch เดิมผ่าน metadata นี้เท่านั้น. Metadata ต้นฉบับยังแสดง HEAD เก่า จึงห้าม checkout/reset ทับไฟล์; ให้ผู้ดูแล reconcile กับ remote หลังตรวจงานค้าง.
 - งานถัดไป: ตรวจรับ branch บน remote; UAT PostgreSQL แยก, browser 1024/picker/บันทึกรวม, CSV ตั้งเครื่องชั่งและสแกนฉลากจริง. รอคำสั่งเจ้าของก่อน deploy ตาม OPERATIONS.
+
+# Handoff — 2026-11-06 — ERP UAT bugs 1–9
+
+## Commit
+- Branch ปัจจุบัน: `claude/erp-uat-bugs`; base/HEAD `dbc2706`.
+- **ยังไม่มี commit หรือ push ใหม่**: `git pull origin main` เขียน `FETCH_HEAD` ไม่ได้ และ `git add` เขียน `index.lock` ไม่ได้ (`Operation not permitted`). Git metadata อยู่ที่ `/Users/jetsadapolsan/Documents/Codex/2026-07-18/sites-plugin-sites-openai-bundled/outputs/jeterp/.git/worktrees/bugs` นอก writable workspace. คง branch เดิมและเก็บไฟล์ทั้งหมดไว้ใน workspace ตามคำสั่งเจ้าของ; ไม่ย้าย metadata และไม่ force/reset.
+- เมื่อรับ workspace ในสภาพแวดล้อมที่เขียน Git ได้ ให้ review diff และแยก commit ทีละบั๊กตามตาราง ทดสอบแล้วจึง push branch นี้. `layout.blade.php` มีงานร่วมข้อ 1/5/6 และ views บางไฟล์มีงานร่วมข้อ 1/3 จึงต้อง stage hunks แยกข้อ.
+
+## ทำอะไรไป
+
+| บั๊ก | ไฟล์หลักที่แก้ | เทสต์/หลักฐาน |
+|---|---|---|
+| 1. native confirm | `resources/views/components/confirm-action.blade.php`, `layout.blade.php` และ 26 views ที่มี native confirm เดิม (42 จุด) | `UatConfirmationTest`; DOM test ยืนยัน cancel ไม่ส่งฟอร์ม, ยืนยันส่งครั้งเดียว, รักษา submitter/reset และไม่เรียก native confirm |
+| 2. คืนเงินเกินหลังลดหนี้ | `SaleCreditLimit`, `SaleReturnService`, `CreditDebitNoteService`, controllers ที่เกี่ยว, `documents/partials/entry-assets.blade.php` | `SaleReturnSourceTest`, `CreditNoteOnPaidSaleTest`: บิล 20 ลดหนี้ 5 เสนอ 15; ส่ง 15.01 ตอบ 422; pending reserve, rejected/cancelled release; คืนก่อนลดหนี้ก็นับวงเงินร่วม; เกินตอนอนุมัติไม่เขียนสต๊อก/GL |
+| 3. status ดิบ | `app/Support/DocumentStatus.php`, `partials/doc-status.blade.php`, views ที่แสดงค่า status ดิบ/ใช้ raw fallback | `UatDocumentStatusTest`; ป้ายไทยกลาง โดยไม่เปลี่ยนค่า status ในฐานข้อมูล, CSS classes หรือค่า form |
+| 4. AP อ้างอิงเป็น - | `PaymentAllocation::referenceNumber()`, `PaymentController`, `payments/show.blade.php`, `payments/print.blade.php` | `ApPaymentTest`: ใช้ `supplier_open_items.document_no` จริง ทั้งดู/พิมพ์และ imported AP ไม่มี source; ใบพิมพ์ใช้ `allocated_amount` และยอดค้าง AP ที่ถูกฝั่ง |
+| 5. preview สต๊อก/ทุน | `SearchController::stockBalance`, `public/stock-preview.js`, `layout.blade.php`, views `stock-adjustments`, `stock-issues`, `stock-transforms` | `UatStockPreviewTest`, `PermissionMatrixTest`, Node stock-preview test: คลังเลือก/คลังหลัก, ต้นทุนจริง, ไม่สร้าง balance, ไม่อ่านข้ามสาขา, ผลเก่าไม่ทับผลใหม่, error ไม่กลายเป็น 0/ไม่ให้ submit |
+| 6. header ทับชื่อหน้า | `layout.blade.php` ให้หัวข้อและเครื่องมือแบ่งพื้นที่และห่อบรรทัดได้ | `UatResponsiveLayoutTest`, `UatLocalVisualFixtureTest` render หน้าใบเสนอราคา/วางบิลทั้ง classic/odoo; ยังไม่ผ่าน visual browser QA ตามข้อจำกัดด้านล่าง |
+| 7. supplier note source หาย/สาขา | `SupplierNoteController`, `SupplierNoteService`, `FinanceBranches`, `ApprovalPolicyService`, `supplier-notes/index.blade.php` | `UatSupplierBranchTest`: home B001 + สิทธิ์ทุกสาขาเห็น HQ, กรองสาขาได้, branch-only ถูกปฏิเสธข้ามสาขา, active หลายสาขาและ revoked assignment, approval scope |
+| 8. โอนเงินสดล็อก B001 | `CashTransferController`, `FinanceBranches` (view เดิมปลดล็อกเมื่อมีหลายตัวเลือก) | `CashTransferScreenTest`: หลายสาขาเลือกสาขาจริงได้, สาขาเดียวคงล็อก, ส่งสาขาที่ไม่มีสิทธิ์ตอบ 403 และไม่สร้างเอกสาร |
+| 9. PLU ล้น ≤1024 | `scale-prices/index.blade.php`: แถวเป็นการ์ดติดป้ายคอลัมน์บนจอแคบและห่อข้อความ | `UatResponsiveLayoutTest` ตรวจครบ 6 คอลัมน์รวมปัญหา; fixture render ทั้งสอง layout; ยังไม่ผ่าน visual browser QA |
+
+- ไม่มี migration และไม่เปลี่ยนข้อมูล production/บัญชีธนาคาร/PIN/token.
+- การคำนวณเพดานใช้ decimal รวมจากแต่ละเอกสาร ไม่ใช้ SQLite floating SUM; lock ใบขายต้นทางเป็นจุดร่วมเพื่อ serialize การสร้าง/อนุมัติใบลดหนี้และใบรับคืน. ราคาที่เสนอปัดลงเพื่อไม่เสนอเงินเกินเพดาน; server ตรวจเพดานอีกครั้งเสมอ.
+- ทุนใน preview คือทุนเฉลี่ยระบบ ไม่ใช่ยอด FIFO สุดท้าย; service เดิมยังคำนวณต้นทุนจริงตอนตัด Lot. ต้นทุนส่งเฉพาะผู้มี `stock.manage`; ผู้ใช้ `stock.request` เห็นยอดสต๊อกได้แต่ไม่ได้ต้นทุนเพิ่ม.
+
+## ทดสอบไปแล้วแค่ไหน
+- Baseline ก่อนแก้: `php -d memory_limit=2G vendor/bin/phpunit` — 791 tests, ไม่พบ failure/error, skipped 2 / incomplete 6 ที่มีอยู่เดิม.
+- หลังแก้: ดูผลรอบสุดท้ายด้านล่าง.
+- ถอดตัวแก้ชั่วคราวโดยอ่านไฟล์เดิมจาก `git show HEAD:<path>` แล้วรัน regression เฉพาะข้อ: **แดงครบ 9/9 ข้อ**; restore ตัวแก้ด้วย `finally` แล้ว. ไม่ใช้ checkout/reset และไม่แตะไฟล์ผู้อื่น.
+- `node tests/browser/erp-uat-stock-preview.cjs` — ผ่าน: ค่าจริง, เปลี่ยน branch/location, stale response, lookup failure และบล็อกส่งเมื่อข้อมูลไม่พร้อม.
+- `JSDOM_MODULE=/tmp/erp-uat-tools/node_modules/jsdom node tests/browser/erp-uat-confirmation-dom.cjs` — ผ่าน: cancel/confirm, ส่งครั้งเดียว, รักษา submitter และไม่เรียก native confirm. jsdom ติดตั้งเฉพาะ `/tmp` ไม่เพิ่ม dependency ของโปรเจกต์.
+- `git diff --check` — ผ่าน.
+
+## ความเสี่ยง/งานถัดไป
+- Browser QA จริง **ยังรันไม่ได้**: Chromium ใน sandbox จบด้วย SIGABRT/EPERM และ CUA แจ้ง browser access host unavailable. จึงยังไม่ได้ตรวจภาพ/วัด geometry จริงของข้อ 6/9; ไม่อ้างว่าผ่าน screenshot QA.
+- เตรียม `tests/browser/erp-uat-layout.cjs` ตรวจ 375/768/1024/1440 ทั้ง classic/odoo (24 combinations) และ `erp-uat-confirmation.cjs` ไว้สำหรับเครื่องที่เปิด Chromium ได้. Export fixtures ด้วย `ERP_UAT_SNAPSHOT_DIR=/tmp/erp-uat-preview php -d memory_limit=2G vendor/bin/phpunit --filter UatLocalVisualFixtureTest`, serve snapshots บน localhost:8876 พร้อม assets `public/vendor` และ `public/stock-preview.js`, แล้วรัน Node script โดยตั้ง `PLAYWRIGHT_MODULE`/`CHROMIUM_PATH` ตามเครื่อง. Script บล็อก request ที่ไม่ใช่ localhost จึงไม่ยิง production.
+- PHPUnit ใช้ SQLite in-memory; ไม่ได้รัน PostgreSQL หรือทดสอบ concurrent transactions บน PostgreSQL จริง. การ lock ใช้ Eloquent `lockForUpdate` ภายใน transaction ไม่มี SQL เฉพาะ SQLite/ไม่มี migration.
+- Deploy: **ยังไม่ deploy และไม่แตะ production**. ห้าม deploy จนเจ้าของสั่งตาม `docs/OPERATIONS.md`.
+
+## ผลตรวจรอบส่งมอบ
+- `php -d memory_limit=2G vendor/bin/phpunit` — **ผ่าน**: 810 tests, 808 passed, 6,909 assertions, ไม่มี failure/error; skipped 2 / incomplete 6 เป็นเงื่อนไขเดิมของชุดทดสอบ.
+- รัน Node stock-preview และ jsdom confirmation หลังแก้ล่าสุดแล้วผ่านทั้งคู่; browser scripts ผ่าน syntax check แต่ยังรัน Chromium จริงไม่ได้.
+- `git diff --check` ผ่าน; คง branch `claude/erp-uat-bugs`, ไม่มี migration/credentials/agent state ในชุดแก้.
+- ไฟล์ใน workspace ยังไม่ commit/push ตามข้อจำกัด Git ที่ระบุข้างต้น; ห้ามตีความว่า remote หรือ production มีตัวแก้แล้ว.

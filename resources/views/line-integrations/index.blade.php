@@ -35,7 +35,7 @@
                 <td>{{ $account->member?->customer?->code ?: '-' }} {{ $account->member?->customer?->name_th }}</td>
                 <td><code>{{ \Illuminate\Support\Str::mask($account->line_user_id, '*', 4) }}</code></td>
                 <td>{{ $account->linked_at?->format('d/m/Y H:i') ?: '-' }}</td>
-                <td class="text-end"><form method="post" action="{{ route('line-integrations.members.unlink', $account) }}" onsubmit="return confirm('ยืนยันปลดผูกสมาชิกคนนี้?')">@csrf @method('DELETE')<button class="btn btn-sm btn-outline-danger">ปลดผูก</button></form></td>
+                <td class="text-end"><form method="post" action="{{ route('line-integrations.members.unlink', $account) }}" data-confirm="ยืนยันปลดผูกสมาชิกคนนี้?">@csrf @method('DELETE')<button class="btn btn-sm btn-outline-danger">ปลดผูก</button></form></td>
             </tr>
         @empty
             <tr><td colspan="5" class="text-center text-muted py-4">ยังไม่มีสมาชิกที่ผูก LINE</td></tr>

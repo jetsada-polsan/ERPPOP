@@ -36,31 +36,31 @@
     </div>
     <div class="content-card p-3 mb-3">
         <div class="table-responsive">
-            <table class="table align-middle">
+            <table class="table align-middle scale-plu-table">
                 <thead><tr><th>PLU</th><th>SKU แม่ / ชื่อ / สถานะ</th><th>ราคา ERP/กก.</th><th>ราคาเครื่องชั่ง/กก.</th><th>ปัญหา / วิธีแก้</th><th>จัดการ</th></tr></thead>
                 <tbody>
                 @forelse($rows as $i => $row)
                     @php($p = $row['product'])
                     @php($firstPriceRow = $rows->search(fn ($r) => $r['product']->id === $p->id) === $i)
                     <tr @input="$el.classList.add('table-warning')" x-show="showRow($el)" data-search="{{ mb_strtolower(($row['plu'] ?? '').' '.$p->sku_code.' '.$p->name_th) }}" data-issues="{{ json_encode($row['issues']) }}" data-problem="{{ $row['has_problem'] ? '1' : '0' }}">
-                        <td class="fw-bold">{{ $row['plu'] ?? 'ยังไม่มี PLU' }}</td>
-                        <td style="min-width:180px"><a href="{{ route('products.show', $p) }}">{{ $p->sku_code }} · {{ $p->name_th }}</a><br><span class="badge {{ $p->is_active ? 'text-bg-success' : 'text-bg-danger' }}">{{ $p->is_active ? 'เปิดใช้งาน' : 'ปิดใช้งาน' }}</span>
+                        <td data-label="PLU" class="fw-bold">{{ $row['plu'] ?? 'ยังไม่มี PLU' }}</td>
+                        <td data-label="SKU / ชื่อ / สถานะ" style="min-width:180px"><a href="{{ route('products.show', $p) }}">{{ $p->sku_code }} · {{ $p->name_th }}</a><br><span class="badge {{ $p->is_active ? 'text-bg-success' : 'text-bg-danger' }}">{{ $p->is_active ? 'เปิดใช้งาน' : 'ปิดใช้งาน' }}</span>
                         @foreach($overrides[$p->id] ?? [] as $override)
                             <div class="small text-warning">ราคาเฉพาะ {{ $override->name }}: {{ number_format($override->price, 2) }} · แก้ที่ตารางราคา</div>
                         @endforeach
                         </td>
-                        <td><input form="all-prices" class="form-control form-control-sm" style="min-width:110px" type="number" :disabled="{{ $firstPriceRow ? 'false' : 'true' }}" name="prices[{{ $p->id }}]" value="{{ old('prices.'.$p->id, number_format($row['price'], 2, '.', '')) }}" step="0.01" min="0" max="99999" aria-label="ราคา ERP {{ $p->sku_code }}"></td>
-                        <td>
+                        <td data-label="ราคา ERP/กก."><input form="all-prices" class="form-control form-control-sm" style="min-width:110px" type="number" :disabled="{{ $firstPriceRow ? 'false' : 'true' }}" name="prices[{{ $p->id }}]" value="{{ old('prices.'.$p->id, number_format($row['price'], 2, '.', '')) }}" step="0.01" min="0" max="99999" aria-label="ราคา ERP {{ $p->sku_code }}"></td>
+                        <td data-label="ราคาเครื่องชั่ง/กก.">
                             @if($row['plu'])
                             <input form="all-prices" class="form-control form-control-sm" style="min-width:110px" type="number" name="scale_prices[{{ $row['plu'] }}]" value="{{ old('scale_prices.'.$row['plu'], $row['scale_price']) }}" step="0.01" min="0" max="99999" placeholder="ยังไม่ตรวจ" aria-label="ราคาเครื่องชั่ง {{ $row['plu'] }}">
                             @else — @endif
                         </td>
-                        <td style="min-width:220px">
+                        <td data-label="ปัญหา / วิธีแก้" style="min-width:220px">
                             @forelse($row['issues'] as $key)
                                 <div class="mb-1"><span class="badge {{ in_array($key, ['missing','unchecked']) ? 'text-bg-info' : (in_array($key, ['duplicate','inactive','sku_plu','mismatch']) ? 'text-bg-danger' : 'text-bg-warning') }}" style="white-space:normal;text-align:left">{{ $issues[$key] }}</span></div>
                             @empty <span class="badge text-bg-success">ปกติ</span> @endforelse
                         </td>
-                        <td style="min-width:130px">
+                        <td data-label="จัดการ" style="min-width:130px">
 
                             @if($row['barcode'])
                             <button type="button" class="btn btn-sm btn-outline-primary mt-1" @click="targetSource=null; moving={{ json_encode(['id' => $row['barcode']->id, 'from' => $p->id, 'plu' => $row['plu'], 'sku' => $p->sku_code], JSON_HEX_APOS | JSON_HEX_QUOT) }}; items=[{}]">ย้าย PLU / ยืนยัน SKU</button>
@@ -129,3 +129,16 @@
 @include('partials.product-picker')
 </div>
 @endsection
+
+@push('head')
+<style>
+@media screen and (max-width: 1024px) {
+    .scale-plu-table, .scale-plu-table tbody { display: block; width: 100%; }
+    .scale-plu-table thead { display: none; }
+    .scale-plu-table tbody > tr { display: block; margin-bottom: 16px; border: 1px solid var(--erp-border); border-radius: 8px; padding: 8px; }
+    .scale-plu-table tbody > tr > td { display: block; width: 100%; min-width: 0 !important; white-space: normal; overflow-wrap: anywhere; border: 0; }
+    .scale-plu-table td[data-label]::before { content: attr(data-label); display: block; font-weight: 700; font-size: 12px; color: var(--erp-muted); margin-bottom: 4px; }
+    .scale-plu-table input, .scale-plu-table button { min-width: 0 !important; max-width: 100%; white-space: normal; }
+}
+</style>
+@endpush

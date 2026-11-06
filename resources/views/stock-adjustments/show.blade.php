@@ -23,7 +23,7 @@
             </div>
             <div class="d-flex gap-2 align-items-center">
                 <span class="badge {{ $adjustment->status === 'active' ? 'text-bg-success' : ($adjustment->status === 'rejected' ? 'text-bg-danger' : 'text-bg-warning') }} fs-6 px-3 py-2">
-                    {{ ['active' => 'ปรับปรุงสำเร็จ', 'pending_approval' => 'รออนุมัติ', 'rejected' => 'ไม่อนุมัติ'][$adjustment->status] ?? $adjustment->status }}
+                    {{ ['active' => 'ปรับปรุงสำเร็จ', 'pending_approval' => 'รออนุมัติ', 'rejected' => 'ไม่อนุมัติ'][$adjustment->status] ?? \App\Support\DocumentStatus::label($adjustment->status) }}
                 </span>
                 @if($adjustment->status === 'pending_approval' && auth()->user()->hasPermission('stock.adjust.approve') && ($adjustment->created_by !== auth()->id() || auth()->user()->hasPermission('system.admin')))
                     <form method="post" action="{{ route('stock-adjustments.approve', $adjustment) }}">@csrf<button class="btn btn-success"><i class="bi bi-check2-circle me-1"></i>อนุมัติและปรับยอด</button></form>

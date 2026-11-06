@@ -64,8 +64,7 @@
                             <td style="font-size:12px">{{ $definition->frequency }}</td>
                             <td style="font-size:12px">{{ $definition->priority ?? '—' }}</td>
                             <td>
-                                <span class="badge {{ $definition->status === 'available' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary' }}">
-                                    {{ $definition->status }}
+                                <span class="badge {{ $definition->status === 'available' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary' }}">{{ \App\Support\DocumentStatus::label($definition->status) }}
                                 </span>
                             </td>
                             <td class="text-end">

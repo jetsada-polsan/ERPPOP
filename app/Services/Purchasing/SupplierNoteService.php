@@ -25,7 +25,7 @@ class SupplierNoteService
         return DB::transaction(function () use ($data, $actor) {
             $item = SupplierOpenItem::findOrFail($data['supplier_open_item_id']);
             $source = $item->sourceDocument;
-            if (! $source || $source->status !== 'active' || ($actor->branch_id && (int) $actor->branch_id !== (int) $source->branch_id)) {
+            if (! $source || $source->status !== 'active' || ! \App\Support\FinanceBranches::allows($actor, (int) $source->branch_id, 'purchasing.manage')) {
                 throw new RuntimeException('ใบซื้ออ้างอิงไม่พร้อมใช้งานหรืออยู่ต่างสาขา');
             }
             if (! in_array($data['kind'], ['credit', 'debit'], true)) {
@@ -74,7 +74,7 @@ class SupplierNoteService
                 (int) $doc->branch_id, $doc->created_by, $actor, 'finance.note.approve');
             if ($doc->status !== 'pending_approval' || (! $actor->hasPermission('system.admin')
                 && ((int) $doc->created_by === (int) $actor->id
-                || ($actor->branch_id && (int) $actor->branch_id !== (int) $doc->branch_id)))) {
+                || ! \App\Support\FinanceBranches::allows($actor, (int) $doc->branch_id, 'purchasing.manage')))) {
                 throw new RuntimeException('สถานะหรือผู้อนุมัติไม่ถูกต้อง');
             }
             $note = DB::table('supplier_notes')->where('document_id', $doc->id)->firstOrFail();

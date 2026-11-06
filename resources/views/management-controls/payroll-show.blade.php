@@ -5,7 +5,7 @@
 
 @section('content')
 @php
-    $statusLabel = ['draft' => 'ร่าง (แก้ไขได้)', 'approved' => 'อนุมัติแล้ว', 'paid' => 'จ่ายแล้ว'][$run->status] ?? $run->status;
+    $statusLabel = ['draft' => 'ร่าง (แก้ไขได้)', 'approved' => 'อนุมัติแล้ว', 'paid' => 'จ่ายแล้ว'][$run->status] ?? \App\Support\DocumentStatus::label($run->status);
     $statusClass = ['draft' => 'text-bg-warning', 'approved' => 'text-bg-info', 'paid' => 'text-bg-success'][$run->status] ?? 'text-bg-secondary';
     $editable = $run->status === 'draft';
 @endphp
@@ -28,12 +28,12 @@
                 <span class="badge {{ $statusClass }} fs-6 px-3 py-2">{{ $statusLabel }}</span>
                 @if($run->status === 'draft' && $canApprove)
                     <form method="post" action="{{ route('management-controls.payroll.approve', $run->id) }}"
-                          onsubmit="return confirm('อนุมัติงวดนี้? หลังอนุมัติจะแก้ไขรายการหักไม่ได้')">
+                          data-confirm="อนุมัติงวดนี้? หลังอนุมัติจะแก้ไขรายการหักไม่ได้">
                         @csrf<button class="btn btn-info"><i class="bi bi-check2-circle me-1"></i>อนุมัติ</button>
                     </form>
                 @elseif($run->status === 'approved' && $canApprove)
                     <form method="post" action="{{ route('management-controls.payroll.pay', $run->id) }}"
-                          onsubmit="return confirm('ยืนยันว่าจ่ายเงินเดือนงวดนี้แล้ว?')">
+                          data-confirm="ยืนยันว่าจ่ายเงินเดือนงวดนี้แล้ว?">
                         @csrf<button class="btn btn-success"><i class="bi bi-cash-stack me-1"></i>บันทึกจ่ายแล้ว</button>
                     </form>
                 @endif

@@ -11,7 +11,7 @@
 @endpush
 
 @section('content')
-<div class="d-flex justify-content-between align-items-center mb-3"><a href="{{ route('ocr.documents.index') }}" class="small text-decoration-none"><i class="bi bi-arrow-left me-1"></i>กลับรายการ OCR</a><span class="ocr-status">{{ $document->status }}</span></div>
+<div class="d-flex justify-content-between align-items-center mb-3"><a href="{{ route('ocr.documents.index') }}" class="small text-decoration-none"><i class="bi bi-arrow-left me-1"></i>กลับรายการ OCR</a><span class="ocr-status">{{ \App\Support\DocumentStatus::label($document->status) }}</span></div>
 @if(session('success'))<div class="alert alert-success"><i class="bi bi-check-circle me-2"></i>{{ session('success') }}</div>@endif
 @if($errors->any())<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>{{ $errors->first() }}</div>@endif
 <div class="ocr-review" x-data="{ ...erpProductPicker(), items: @js($document->lines->map(fn ($line) => ['product_id' => $line->matched_product_id, 'sku_code' => $line->matchedProduct?->sku_code ?? '', 'name_th' => $line->matchedProduct?->name_th ?? '', 'unit_name' => 'หน่วยฐาน', 'barcode' => ''])->values()) }" x-cloak>
@@ -63,8 +63,8 @@
         </form>
         <hr>
         <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap"><div><strong>ขั้นตอนถัดไป</strong><div class="small text-muted">Approve จะยังไม่กระทบสต็อก ต้องกดโพสต์อีกครั้ง</div></div><div class="ocr-actions">
-            @if(!in_array($document->status,['posted','rejected']))<form method="post" action="{{ route('ocr.documents.approve',$document) }}">@csrf<button class="btn btn-success"><i class="bi bi-check2-circle me-1"></i>Approve Draft</button></form><form method="post" action="{{ route('ocr.documents.reject',$document) }}">@csrf<button class="btn btn-outline-danger" onclick="return confirm('ตีกลับเอกสารนี้?')"><i class="bi bi-x-circle me-1"></i>Reject</button></form>@endif
-            @if($document->status==='approved')<form method="post" action="{{ route('ocr.documents.post',$document) }}">@csrf<button class="btn btn-primary" onclick="return confirm('ยืนยันโพสต์รับสินค้าเข้าสต็อก?')"><i class="bi bi-box-arrow-in-down me-1"></i>โพสต์รับสินค้า</button></form>@endif
+            @if(!in_array($document->status,['posted','rejected']))<form method="post" action="{{ route('ocr.documents.approve',$document) }}">@csrf<button class="btn btn-success"><i class="bi bi-check2-circle me-1"></i>Approve Draft</button></form><form method="post" action="{{ route('ocr.documents.reject',$document) }}">@csrf<button class="btn btn-outline-danger" data-confirm="ตีกลับเอกสารนี้?"><i class="bi bi-x-circle me-1"></i>Reject</button></form>@endif
+            @if($document->status==='approved')<form method="post" action="{{ route('ocr.documents.post',$document) }}">@csrf<button class="btn btn-primary" data-confirm="ยืนยันโพสต์รับสินค้าเข้าสต็อก?"><i class="bi bi-box-arrow-in-down me-1"></i>โพสต์รับสินค้า</button></form>@endif
             @if($document->status==='posted')<a class="btn btn-light border" href="{{ route('purchases.show',$document->postedDocument) }}">เปิดใบซื้อที่โพสต์แล้ว</a>@endif
         </div></div>
     </section>

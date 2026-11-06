@@ -25,7 +25,7 @@
         </form>
 
         {{-- คิดค่าเสื่อมทั้งงวด --}}
-        <form method="post" action="{{ route('fixed-assets.depreciate') }}" class="d-flex gap-1 align-items-center" onsubmit="return confirm('คิดค่าเสื่อมของทรัพย์สินที่ใช้งานอยู่ทั้งหมดสำหรับงวดนี้?')">
+        <form method="post" action="{{ route('fixed-assets.depreciate') }}" class="d-flex gap-1 align-items-center" data-confirm="คิดค่าเสื่อมของทรัพย์สินที่ใช้งานอยู่ทั้งหมดสำหรับงวดนี้?">
             @csrf
             <input type="month" name="period" value="{{ $currentPeriod }}" class="form-control form-control-sm" style="width:150px" required>
             <button class="btn btn-sm btn-warning text-nowrap"><i class="bi bi-calculator me-1"></i>คิดค่าเสื่อมงวดนี้</button>

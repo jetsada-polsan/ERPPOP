@@ -8,6 +8,7 @@ use App\Models\CustomerOpenItem;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Services\Accounting\GlPostingService;
+use App\Support\DecimalMath;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -33,9 +34,14 @@ class CreditDebitNoteService
      */
     public function create(array $data): Document
     {
+        return DB::transaction(fn () => $this->createLocked($data));
+    }
+
+    private function createLocked(array $data): Document
+    {
         $isCredit = $data['type'] === 'credit';
         $typeCode = $isCredit ? 'CREDIT_NOTE' : 'DEBIT_NOTE';
-        $amount = round((float) $data['amount'], 2);
+        $amount = DecimalMath::round($data['amount'], 2);
 
         if ($amount <= 0) {
             throw new RuntimeException('จำนวนเงินต้องมากกว่า 0');
@@ -58,8 +64,9 @@ class CreditDebitNoteService
             if (! $openItem) {
                 throw new RuntimeException('ใบลดหนี้ต้องอ้างอิงใบขายเชื่อ');
             }
+            Document::whereKey($openItem->document_id)->lockForUpdate()->firstOrFail();
             $creditable = $this->creditableAmount($openItem);
-            if ($amount > $creditable + 0.01) {
+            if (DecimalMath::compare($amount, $creditable) > 0) {
                 throw new RuntimeException(sprintf(
                     'ยอดลดหนี้เกินมูลค่าที่ลดได้ของเอกสาร %s (ลดได้อีก %s บาท)',
                     $openItem->document->doc_number,
@@ -147,19 +154,12 @@ class CreditDebitNoteService
     }
 
     /**
-     * มูลค่าที่ยังลดหนี้ได้ของใบขายหนึ่งใบ = มูลค่าสุทธิหลังลดหนี้ที่อนุมัติแล้ว (net_amount)
-     * หักใบลดหนี้ที่ยังรออนุมัติ เพื่อกันลดซ้ำซ้อนระหว่างรอ
+     * วงเงินร่วมจากยอดขายต้นทาง หักใบลดหนี้และใบรับคืนทั้งที่อนุมัติและรออนุมัติ
+     * ไม่หักยอดชำระ เพราะการชำระหนี้ไม่ใช่การคืนหรือลดมูลค่าขาย
      */
-    public function creditableAmount(CustomerOpenItem $openItem, ?int $exceptNoteId = null): float
+    public function creditableAmount(CustomerOpenItem $openItem, ?int $exceptNoteId = null): string
     {
-        $pending = (float) Document::whereHas('documentType', fn ($q) => $q->where('code', 'CREDIT_NOTE'))
-            ->where('status', 'pending_approval')
-            ->where('customer_id', $openItem->customer_id)
-            ->where('reference', $openItem->document?->doc_number)
-            ->when($exceptNoteId, fn ($q) => $q->whereKeyNot($exceptNoteId))
-            ->sum('total_amount');
-
-        return max(0.0, round((float) $openItem->net_amount - $pending, 2));
+        return app(SaleCreditLimit::class)->remaining($openItem->document, $exceptNoteId);
     }
 
     public function approveCredit(Document $document): Document
@@ -169,6 +169,7 @@ class CreditDebitNoteService
         }
 
         return DB::transaction(function () use ($document): Document {
+            Document::where('doc_number', $document->reference)->lockForUpdate()->firstOrFail();
             $locked = Document::whereKey($document->id)->lockForUpdate()->firstOrFail();
             $locked->load('documentType');
             if ($locked->documentType->code !== 'CREDIT_NOTE' || $locked->status !== 'pending_approval') {
@@ -176,8 +177,8 @@ class CreditDebitNoteService
             }
             $sourceDocumentId = Document::where('doc_number', $locked->reference)->value('id');
             $openItem = CustomerOpenItem::where('customer_id', $locked->customer_id)->where('document_id', $sourceDocumentId)->lockForUpdate()->first();
-            $amount = (float) $locked->total_amount;
-            if (! $openItem || $amount > $this->creditableAmount($openItem, $locked->id) + 0.01) {
+            $amount = (string) $locked->total_amount;
+            if (! $openItem || DecimalMath::compare($amount, $this->creditableAmount($openItem, $locked->id)) > 0) {
                 throw new RuntimeException('มูลค่าที่ลดได้ของเอกสารต้นทางเปลี่ยนไป กรุณาตรวจใบลดหนี้ใหม่');
             }
 
