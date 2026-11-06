@@ -2,6 +2,7 @@
     <table class="table report-data-table align-middle mb-0">
         <thead>
             <tr>
+                <th>ลำดับ</th>
                 @foreach($columns as $column)
                     <th class="{{ $column['class'] ?? '' }}">
                         {{ $column['label'] }}
@@ -13,6 +14,7 @@
         <tbody>
             @forelse($rows as $row)
                 <tr>
+                    <td>{{ ($rowOffset ?? 0) + $loop->iteration }}</td>
                     @foreach($columns as $column)
                         @php
                             $value = data_get($row, $column['key']);
@@ -39,7 +41,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="{{ count($columns) }}" class="report-empty-cell">
+                    <td colspan="{{ count($columns) + 1 }}" class="report-empty-cell">
                         <div class="report-empty-state">
                             <i class="bi bi-file-earmark-text"></i>
                             <strong>{{ $empty }}</strong>

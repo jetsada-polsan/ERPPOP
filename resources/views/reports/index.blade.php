@@ -402,8 +402,12 @@
                 @include('reports.partials.result-table', [
                     'columns' => $displayColumns,
                     'rows' => $result['rows'],
+                    'rowOffset' => ($result['pagination'] ?? null)?->firstItem() ? $result['pagination']->firstItem() - 1 : 0,
                     'empty' => 'ไม่พบข้อมูลตามเงื่อนไขที่เลือก',
                 ])
+                @if($printMode && count($result['rows']) >= $printRowCap)
+                    <p>รายงานแสดงได้สูงสุด {{ number_format($printRowCap) }} รายการต่อครั้ง ข้อมูลอาจไม่ครบ กรุณาแบ่งช่วงวันที่หรือเงื่อนไขก่อนพิมพ์</p>
+                @endif
                 @if($pagination = $result['pagination'] ?? null)
                     <div class="px-4 py-3 no-print" data-report-pagination>
                         <div class="small text-muted mb-2">

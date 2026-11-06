@@ -1,3 +1,9 @@
+# Handoff — 2026-11-06 (Codex: report numbering and print pages)
+
+- เพิ่มคอลัมน์ลำดับรายงาน และพิมพ์รายการตามตัวกรองทั้งหมดสูงสุด 2,000 รายการ พร้อมเตือนหากอาจเกินเพดาน; หัวตารางซ้ำในแต่ละหน้ากระดาษ
+- ทดสอบ StockBalanceReportTest และ ReportSmokeTest: 12 ผ่าน 1 skipped; git diff --check ผ่าน
+- Deploy: ยังไม่ deploy; ต้องตรวจ preview หลายหน้าจริงก่อนยืนยันผล
+
 # Handoff — 2026-11-06 (Codex: remove duplicate report print header)
 
 ## Commit

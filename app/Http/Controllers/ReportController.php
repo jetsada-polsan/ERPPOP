@@ -45,7 +45,6 @@ class ReportController extends Controller
         if (! in_array($perPage, [10, 25, 50, 100], true)) {
             $perPage = 25;
         }
-        // พิมพ์เฉพาะหน้าปัจจุบันตามตัวกรองเดียวกับหน้าจอ ไม่ดึงทั้งรายงาน
         $user = auth()->user();
         $canSeeAllBranches = $user === null || $user->canSeeAllReportBranches();
         $requestedBranch = $request->input('branch_id');
@@ -77,6 +76,8 @@ class ReportController extends Controller
                 : $this->streamCsv($category, $report, $result);
         }
 
+        $reportFilters = $printMode ? ['per_page' => self::PRINT_ROW_CAP, 'paginate' => false, 'page' => 1] + $filters : $filters;
+
         return view('reports.index', [
             'catalog' => $catalog,
             'selectedCategory' => $category,
@@ -93,7 +94,7 @@ class ReportController extends Controller
             'branches' => DB::table('branches')
                 ->when(! $canSeeAllBranches, fn ($query) => $query->whereIn('id', $user->reportBranchIds(null)->all()))
                 ->orderBy('code')->get(['id', 'code', 'name_th']),
-            'result' => $this->runReport($category, $report, $from, $to, $filters),
+            'result' => $this->runReport($category, $report, $from, $to, $reportFilters),
         ]);
     }
 
