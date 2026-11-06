@@ -7,6 +7,7 @@ use App\Http\Controllers\AppLauncherController;
 use App\Http\Controllers\ApprovalRuleController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BankAccountController;
+use App\Http\Controllers\BasicMasterController;
 use App\Http\Controllers\BillingNoteController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\BplusOperationController;
@@ -38,6 +39,7 @@ use App\Http\Controllers\GlJournalController;
 use App\Http\Controllers\LineIntegrationController;
 use App\Http\Controllers\ManagementControlController;
 use App\Http\Controllers\ManualController;
+use App\Http\Controllers\MasterDataDeleteController;
 use App\Http\Controllers\MasterDataSetupController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\MemberPointController;
@@ -74,6 +76,7 @@ use App\Http\Controllers\SaleController;
 use App\Http\Controllers\SaleReturnController;
 use App\Http\Controllers\SalesAreaController;
 use App\Http\Controllers\SalesmanController;
+use App\Http\Controllers\ScalePluPlanController;
 use App\Http\Controllers\ScalePriceController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\StockAdjustmentController;
@@ -105,7 +108,7 @@ Route::get('/download/pos/releases/{filename}', [PosReleaseController::class, 'd
 Route::get('/download/python-pos', [SystemSettingController::class, 'downloadPythonPos'])->name('python-pos.download');
 Route::post('/pos-admin/terminals/{terminal}/float', [PosAdminController::class, 'updateFloat'])->name('pos-admin.terminals.float');
 Route::get('/pos-admin', [PosAdminController::class, 'index'])->name('pos-admin.index');
-Route::delete('/master-data/{type}/{id}', [\App\Http\Controllers\MasterDataDeleteController::class, 'destroy'])->whereNumber('id')->name('master-data.destroy');
+Route::delete('/master-data/{type}/{id}', [MasterDataDeleteController::class, 'destroy'])->whereNumber('id')->name('master-data.destroy');
 Route::post('/pos-admin/devices/{device}/pair-code', [PosAdminController::class, 'newPairCode'])->name('pos-admin.devices.pair-code');
 Route::post('/pos-admin/cashiers/{salesman}/move', [PosAdminController::class, 'moveCashier'])->name('pos-admin.cashiers.move');
 Route::get('/password/change', [AuthController::class, 'showChangePassword'])->name('password.change');
@@ -534,9 +537,9 @@ Route::prefix('sales-areas')->name('sales-areas.')->group(function () {
 });
 
 Route::prefix('basic-master')->name('basic-master.')->group(function () {
-    Route::get('/{type}', [\App\Http\Controllers\BasicMasterController::class, 'index'])->name('index');
-    Route::post('/{type}', [\App\Http\Controllers\BasicMasterController::class, 'store'])->name('store');
-    Route::put('/{type}/{id}', [\App\Http\Controllers\BasicMasterController::class, 'update'])->whereNumber('id')->name('update');
+    Route::get('/{type}', [BasicMasterController::class, 'index'])->name('index');
+    Route::post('/{type}', [BasicMasterController::class, 'store'])->name('store');
+    Route::put('/{type}/{id}', [BasicMasterController::class, 'update'])->whereNumber('id')->name('update');
 });
 
 Route::prefix('warehouse-locations')->name('warehouse-locations.')->group(function () {
@@ -666,10 +669,20 @@ Route::prefix('price-tables')->name('price-tables.')->group(function () {
 // ราคาเครื่องชั่ง: หน้าเดียวจบสำหรับราคา/กก. ของสินค้าชั่ง (PLU 800xxx)
 // ต้องตั้งให้ตรงกับเครื่องชั่งเสมอ — POS คำนวณน้ำหนักย้อนกลับจากราคานี้
 Route::prefix('scale-prices')->name('scale-prices.')->group(function () {
+    Route::post('/plans', [ScalePluPlanController::class, 'preview'])->name('plans.preview');
+    Route::post('/plans/{plan}/edit', [ScalePluPlanController::class, 'edit'])->name('plans.edit');
+    Route::post('/plans/{plan}/apply', [ScalePluPlanController::class, 'apply'])->name('plans.apply');
+    Route::post('/plans/{plan}/rollback', [ScalePluPlanController::class, 'rollback'])->name('plans.rollback');
+    Route::get('/plans/{plan}/export', [ScalePluPlanController::class, 'export'])->name('plans.export');
+    Route::get('/plans/{plan}/labels', [ScalePluPlanController::class, 'labels'])->name('plans.labels');
     Route::get('/', [ScalePriceController::class, 'index'])->name('index');
     Route::post('/', [ScalePriceController::class, 'update'])->name('update');
     Route::post('/attach', [ScalePriceController::class, 'attachPlu'])->name('attach');
     Route::get('/export', [ScalePriceController::class, 'export'])->name('export');
+    Route::post('/move', [ScalePriceController::class, 'move'])->name('move');
+    Route::post('/import/preview', [ScalePriceController::class, 'importPreview'])->name('import-preview');
+    Route::post('/import/save', [ScalePriceController::class, 'importSave'])->name('import-save');
+    Route::post('/test-label', [ScalePriceController::class, 'testLabel'])->name('test-label');
 });
 
 Route::prefix('promotions')->name('promotions.')->group(function () {

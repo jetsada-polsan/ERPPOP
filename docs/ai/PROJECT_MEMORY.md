@@ -144,8 +144,15 @@
 - ช่องค้นหารายงานนี้รอหยุดพิมพ์ 500 ms แล้วอัปเดตผลโดยคงโฟกัส/เคอร์เซอร์; ยกเลิกคำขอเก่าและไม่ให้ผลเก่าทับคำค้นใหม่; เลขบาร์โค้ดยังคงเป็นข้อความและยอดจำนวนแสดงตามความละเอียด 8 ตำแหน่งของระบบ
 - รายงานนี้อ่านยอดคงเหลือปัจจุบัน; ใบปรับสต๊อก `pending_approval` ยังไม่เพิ่มยอดจริง ต้องให้ผู้มีสิทธิ์อีกคนอนุมัติตามขั้นตอนเดิม
 
-## Shift float branch work - 2026-11-05 (uncommitted, not deployed)
+## Shift float - 2026-11-05 (PR #3, not deployed)
 
-- ERP + Vue changes remain on `claude/shift-float`. Python has not changed; adjust it before using the new blind API, which omits expected cash and its components for cashiers. API specification and limitations are at the top of `docs/ai/task.md`.
-- Per-terminal carry comes from the latest closed shift's float_kept; legacy null falls back to terminal policy, while zero remains zero. An opening discrepancy requires a reason. Deposit=counted minus float kept is calculated by ERP and never added as new revenue. Opening variance is a separate cashbook adjustment, posted once at close.
-- Git metadata is outside this workspace's writable roots: pull/add were denied. No new commit or push exists; do not assume this working tree has reached remote or production.
+- ERP + Vue on `claude/shift-float`; Python POS client is on `claude/pos-python-settings-popup` (0.8.6) and never sends `preview` to an ERP without float support.
+- Carried float = the latest closed shift's recorded `float_kept` for that terminal. A legacy/first shift (no recorded float) has carried_float null: no reason demanded and no opening variance booked, so go-live cannot create a fake shortage.
+
+## แผนเลขเครื่องชั่ง — 2026-11-05
+
+- สร้าง PLU ใหม่ได้เฉพาะ `scale-prices.plans.*`: preview ที่เก็บในฐานข้อมูล → ตรวจ/แก้เลขและล็อก → ผู้มี `masterdata.manage` ยืนยัน apply; จัดหมวดและ SKU เริ่ม 801001 ช่วงอนุญาต 801000–801999 หนึ่งเลขต่อ SKU จริงที่ active.
+- `scale_plu_plans` เก็บรายการและ before/after สำหรับ audit/rollback; guard row กันแผน apply/rollback ซ้อน และ fingerprint ปฏิเสธแผนเมื่อ catalog/ราคา/profile เปลี่ยนหลัง preview. Rollback ปฏิเสธหากบาร์โค้ด/สินค้าแทน/ราคาเครื่องชั่งเปลี่ยนหลัง apply เพื่อไม่ทับงานภายหลัง.
+- Apply ปิด PLU 800/801 เดิมที่เกี่ยวข้อง เก็บแถวเดิมไว้ และปิด SKU ตัวแทนเลข PLU ที่ย้ายไป SKU จริง เพื่อไม่ให้ POS fallback ค้น SKU เดิม; rollback คืนสถานะเดิมและปิดเลขที่สร้างใหม่. หากเลขใหม่มีแถวอยู่แล้วในสินค้าที่อยู่ในชุดแผน จะใช้แถวนั้นภายใต้ unique barcode และเก็บเจ้าของ/สถานะเดิมใน snapshot; ไม่ลบประวัติ.
+- เลขที่นำกลับมาใช้ไม่สามารถแยกป้ายเก่าออกจากป้ายใหม่ด้วย EAN-13 ได้ ต้องเก็บป้ายเก่าออกทั้งหมดก่อนเปลี่ยนเครื่องชั่ง และยืนยันคำเตือนเลขเคยใช้. เลขของสินค้าอื่นที่อยู่นอกแผนห้ามทับ; เลขใหม่อาจแก้รายแถวก่อนใช้.
+- CSV ตั้งเครื่องชั่ง/HTML ป้าย 1.000 กก. ใช้ราคาตอนสร้างแผนและ profile POPSTAR-801 แบบราคา; ส่งทั้ง PLU 6 หลัก, รหัสท้าย 3 หลัก, รหัสป้าย 5 หลัก และ flag 8. ต้องคงศูนย์นำหน้า และตรวจราคา ERP/เครื่องชั่ง/โปรโมชันก่อนขาย. ยังไม่ deploy หรือแตะ production ในงานรอบนี้.

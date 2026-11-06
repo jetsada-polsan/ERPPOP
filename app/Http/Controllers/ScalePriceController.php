@@ -2,185 +2,210 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
+use App\Models\Branch;
 use App\Models\PriceTable;
 use App\Models\Product;
+use App\Models\ProductBarcode;
 use App\Models\ProductPrice;
-use Illuminate\Http\RedirectResponse;
+use App\Services\Inventory\ScaleBarcodeService;
+use App\Services\Inventory\ScalePluPage;
+use App\Services\Inventory\ScalePluRenumber;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
-use Illuminate\View\View;
+use Illuminate\Validation\ValidationException;
 
-/**
- * ราคาสินค้าเครื่องชั่ง — หน้าเดียวจบสำหรับสินค้าขายชั่งน้ำหนักทั้งหมด
- *
- * กติกา PLU เครื่องชั่ง (ช่วงเลข 8): รหัส 800xxx/801xxx ผูกกับสินค้าเป็น
- * "บาร์โค้ด" (ไม่แตะ sku เดิม — ETL/BPlus ไม่พัง) เครื่องชั่งพิมพ์ป้าย
- * PLU(6)+ราคารวม(6,÷100)+check(1) แล้ว POS คำนวณน้ำหนักย้อนกลับจากราคา/กก.
- * → ราคาที่ตั้งหน้านี้ (ตารางหลัก) จึง "ต้องตรงกับราคาที่ตั้งในเครื่องชั่ง" เสมอ
- *
- * สินค้าโผล่หน้านี้เมื่อ: มี PLU 80xxxx ลงทะเบียนไว้ หรือชื่อมีคำว่า ชั่ง/ซั่ง
- */
 class ScalePriceController extends Controller
 {
-    private const PLU_REGEX = '^80[01][0-9]{3}$';
-
-    public function index(): View
+    public function index(ScalePluPage $page)
     {
-        $defaultTable = PriceTable::where('is_default', true)->first();
-        $products = $this->scaleProducts();
+        $rows = $page->rows();
 
-        // ราคาปัจจุบันจากตารางหลัก (แถวราคาฐาน unit_id = null)
-        $prices = $defaultTable
-            ? ProductPrice::where('price_table_id', $defaultTable->id)
-                ->whereIn('product_id', $products->pluck('id'))
-                ->whereNull('unit_id')
-                ->where('is_active', true)
-                ->pluck('price', 'product_id')
-            : collect();
-
-        // ราคา override รายสาขา (ตารางอื่นที่ไม่ใช่ตารางหลัก) — เตือนให้รู้ว่าตั้งที่นี่แล้วสาขานั้นยังไม่เปลี่ยน
-        $overrides = ProductPrice::query()
-            ->join('price_tables', 'price_tables.id', '=', 'product_prices.price_table_id')
-            ->whereIn('product_prices.product_id', $products->pluck('id'))
-            ->whereNull('product_prices.unit_id')
-            ->where('product_prices.is_active', true)
-            ->where('price_tables.is_default', false)
-            ->get(['product_prices.product_id', 'price_tables.name', 'product_prices.price'])
-            ->groupBy('product_id');
-
-        // จำนวนที่ยังไม่ตั้งราคา (ราคา <= 1 = placeholder ค้างจาก BPlus)
-        $notPriced = $products->filter(function ($p) use ($prices) {
-            $current = (float) ($prices[$p->id] ?? $p->default_price ?? 0);
-
-            return $current <= 1;
-        })->count();
-
-        return view('scale-prices.index', [
-            'products' => $products,
-            'prices' => $prices,
-            'overrides' => $overrides,
-            'defaultTable' => $defaultTable,
-            'notPriced' => $notPriced,
-        ]);
+        return view('scale-prices.index', ['rows' => $rows, 'issues' => ScalePluPage::ISSUES,
+            'counts' => collect(ScalePluPage::ISSUES)->map(fn ($label, $key) => $rows->filter(fn ($r) => in_array($key, $r['issues']))->count()),
+            'overrides' => ProductPrice::join('price_tables', 'price_tables.id', '=', 'product_prices.price_table_id')->where('price_tables.is_default', false)->where('product_prices.is_active', true)->whereNull('unit_id')->get(['product_prices.product_id', 'price_tables.name', 'product_prices.price'])->groupBy('product_id'),
+            'branches' => Branch::when(auth()->user()?->branch_id, fn ($q, $id) => $q->whereKey($id))->orderBy('name_th')->get(),
+            'candidates' => app(ScalePluRenumber::class)->candidates(),
+            'plans' => DB::table('scale_plu_plans')->orderByDesc('id')->limit(50)->get(),
+            'plan' => request('plan') ? app(ScalePluRenumber::class)->plan((int) request('plan')) : null,
+            'preview' => session('scale_import_preview', []), 'labelResult' => session('scale_label_result')]);
     }
 
-    /**
-     * PLU เครื่องชั่งเป็นรหัสลูกที่มาจากสินค้า/เครื่องชั่งเดิม จึงห้ามสร้างเลขเอง.
-     * เก็บ route ไว้เพื่อกันหน้าเก่าที่อาจส่ง form เข้ามา แต่ไม่เขียนข้อมูล.
-     */
-    public function attachPlu(Request $request): RedirectResponse
+    public function attachPlu(Request $request)
     {
-        $data = $request->validate([
-            'product_id' => ['required', 'integer', 'exists:products,id'],
-        ]);
+        $data = $request->validate(['product_id' => ['required', 'integer', 'exists:products,id']]);
         $product = Product::findOrFail($data['product_id']);
 
-        return redirect()->route('scale-prices.index')
-            ->withErrors(['product_id' => "{$product->name_th}: ห้ามสร้าง PLU อัตโนมัติ — ใช้รหัส 801xxx ที่ผูกในแฟ้มสินค้า/เครื่องชั่งเดิมเท่านั้น"]);
+        return redirect()->route('scale-prices.index')->withErrors(['product_id' => "{$product->name_th}: สร้าง PLU ได้เฉพาะผ่านแผนรันเลขที่ผู้ใช้ยืนยัน กรุณาเปิดแท็บแผนรันเลขใหม่"]);
     }
 
-    /** บันทึกราคา/กก. ทั้งหน้า ลงตารางหลัก (อัปเดตเฉพาะตัวที่เปลี่ยนจริง) */
-    public function update(Request $request): RedirectResponse
+    public function update(Request $request, ScalePluPage $page)
     {
         $data = $request->validate([
-            'prices' => ['required', 'array'],
-            'prices.*' => ['nullable', 'numeric', 'min:0', 'max:99999'],
+            'prices' => ['sometimes', 'array'], 'prices.*' => ['nullable', 'numeric', 'min:0', 'max:99999', 'decimal:0,2'],
+            'scale_prices' => ['sometimes', 'array'], 'scale_prices.*' => ['nullable', 'numeric', 'min:0', 'max:99999', 'decimal:0,2'],
         ]);
+        DB::transaction(function () use ($data, $page) {
+            $rows = $page->rows();
+            $tableId = PriceTable::where('is_default', true)->value('id');
+            foreach ($data['prices'] ?? [] as $id => $price) {
+                if ($price === null || ! $rows->contains(fn ($r) => $r['product']->id === (int) $id)) {
+                    continue;
+                }
+                if (! $tableId) {
+                    throw ValidationException::withMessages(['prices' => 'ยังไม่มีตารางราคาหลัก']);
+                }
+                $row = ProductPrice::firstOrNew(['product_id' => $id, 'price_table_id' => $tableId, 'unit_id' => null]);
+                $old = $row->toArray();
+                $row->fill(['price' => $price, 'is_active' => true]);
+                if ($row->isDirty()) {
+                    $row->save();
+                    $this->audit('scale_erp_price', 'product_prices', $row->id, $old, $row->toArray());
+                }
+            }
+            foreach ($data['scale_prices'] ?? [] as $plu => $price) {
+                $plu = (string) $plu;
+                if (! $rows->contains('plu', $plu)) {
+                    throw ValidationException::withMessages(['scale_prices' => 'PLU ไม่ได้ลงทะเบียน']);
+                }
+                $this->saveScalePrice($plu, $price);
+            }
+        });
 
-        $tableId = PriceTable::where('is_default', true)->value('id');
-        if (! $tableId) {
-            return back()->withErrors(['prices' => 'ยังไม่มีตารางราคาหลัก (default) ในระบบ']);
-        }
+        return redirect()->route('scale-prices.index')->with('success', 'บันทึกราคาแล้ว — ตั้งราคา ERP และเครื่องชั่งให้ตรงกันเสมอ');
+    }
 
-        $validIds = $this->scaleProducts()->pluck('id')->all();
-        $changed = 0;
+    public function move(Request $request)
+    {
+        $data = $request->validate(['barcode_id' => ['required', 'integer'], 'product_id' => ['required', 'integer'],
+            'from_product_id' => ['required', 'integer'], 'confirmed' => ['accepted']]);
+        DB::transaction(function () use ($data) {
+            $barcode = ProductBarcode::lockForUpdate()->findOrFail($data['barcode_id']);
+            $target = Product::lockForUpdate()->findOrFail($data['product_id']);
+            if (! ScalePluPage::isPlu($barcode->barcode) || ! $target->is_active || ScalePluPage::isPlu($target->sku_code)) {
+                throw ValidationException::withMessages(['product_id' => 'ต้องเลือก SKU จริงที่เปิดใช้งาน และใช้ PLU เดิมเท่านั้น']);
+            }
+            if ($barcode->product_id !== (int) $data['from_product_id']) {
+                throw ValidationException::withMessages(['barcode_id' => 'PLU ถูกย้ายแล้ว กรุณาโหลดหน้าใหม่']);
+            }
+            $old = $barcode->toArray();
+            $barcode->product_id = $target->id;
+            $barcode->barcode_type = 'SCALE_PLU';
+            // หน่วยชั่งต้องอ้างอิงหน่วยของ SKU ใหม่ ไม่พกหน่วย/ราคาของสินค้าเก่าไปด้วย
+            $barcode->unit_id = $target->base_unit_id;
+            $barcode->unit_factor = 1;
+            $barcode->price = null;
+            $barcode->save();
+            $this->audit('scale_plu_moved', 'product_barcodes', $barcode->id, $old, $barcode->toArray());
+        });
 
-        foreach ($data['prices'] as $productId => $price) {
-            if ($price === null || $price === '' || ! in_array((int) $productId, $validIds, true)) {
+        return redirect()->route('scale-prices.index')->with('success', 'ย้าย PLU เดิมแล้ว กรุณาซิงก์สินค้า POS ใหม่');
+    }
+
+    public function importPreview(Request $request)
+    {
+        $request->session()->forget('scale_import_preview');
+        $request->validate(['csv' => ['nullable', 'string', 'max:200000'], 'file' => ['nullable', 'file', 'max:200']]);
+        $text = $request->file('file') ? file_get_contents($request->file('file')->getRealPath()) : (string) $request->input('csv');
+        $stream = fopen('php://temp', 'r+');
+        fwrite($stream, preg_replace('/^\xEF\xBB\xBF/', '', $text));
+        rewind($stream);
+        $preview = [];
+        $line = 0;
+        while (($fields = fgetcsv($stream, 0, ',', '"', '')) !== false) {
+            $line++;
+            if ($fields === [null]) {
                 continue;
             }
-            $price = round((float) $price, 2);
-
-            $row = ProductPrice::firstOrNew([
-                'product_id' => (int) $productId,
-                'price_table_id' => $tableId,
-                'unit_id' => null,
-            ]);
-            if (! $row->exists || (float) $row->price !== $price || ! $row->is_active) {
-                $row->price = $price;
-                $row->is_active = true;
-                $row->save();
-                $changed++;
+            if ($line === 1 && strtoupper(trim($fields[0])) === 'PLU') {
+                continue;
             }
+            $plu = trim($fields[0] ?? '');
+            $price = trim($fields[1] ?? '');
+            if (count($fields) !== 2 || ! ScalePluPage::isPlu($plu) || ! preg_match('/^\d{1,5}(\.\d{1,2})?$/D', $price)
+                || (float) $price > 99999 || isset($preview[$plu]) || ! ProductBarcode::where('barcode', $plu)->exists()) {
+                fclose($stream);
+                throw ValidationException::withMessages(['csv' => "แถว {$line}: ต้องเป็น PLU เดิมที่ลงทะเบียน, ราคา 0–99999 ทศนิยมไม่เกิน 2 ตำแหน่ง และไม่ซ้ำ"]);
+            }
+            $preview[$plu] = ['plu' => $plu, 'price' => $price, 'old' => DB::table('scale_plu_settings')->where('barcode', $plu)->value('scale_price')];
+        }
+        fclose($stream);
+        if (! $preview) {
+            throw ValidationException::withMessages(['csv' => 'ไม่พบข้อมูลราคาใน CSV']);
+        }
+        $request->session()->put('scale_import_preview', $preview);
+
+        return redirect()->route('scale-prices.index');
+    }
+
+    public function importSave(Request $request)
+    {
+        $request->validate(['confirmed' => ['accepted']]);
+        $preview = $request->session()->get('scale_import_preview', []);
+        if (! $preview) {
+            throw ValidationException::withMessages(['csv' => 'กรุณาดูตัวอย่าง CSV ก่อนบันทึก']);
+        }
+        DB::transaction(function () use ($preview) {
+            foreach ($preview as $row) {
+                if (! ProductBarcode::where('barcode', $row['plu'])->exists()) {
+                    throw ValidationException::withMessages(['csv' => 'PLU เปลี่ยนไป กรุณานำเข้าใหม่']);
+                }
+                $this->saveScalePrice($row['plu'], $row['price']);
+            }
+        });
+        $request->session()->forget('scale_import_preview');
+
+        return redirect()->route('scale-prices.index')->with('success', 'นำเข้าราคาเครื่องชั่งแล้ว');
+    }
+
+    public function testLabel(Request $request, ScaleBarcodeService $decoder)
+    {
+        $data = $request->validate(['label' => ['required', 'regex:/^\d{13}$/D'], 'branch_id' => ['required', 'integer', 'exists:branches,id']]);
+        $decoded = $decoder->decode($data['label']);
+        $result = ['error' => 'ไม่ตรง profile ที่เปิดใช้ หรือ check digit ไม่ถูกต้อง'];
+        if ($decoded) {
+            // ใช้ catalog/ราคาเดียวกับ POS รวมราคาเฉพาะสาขาและโปรโมชั่น โดยไม่สร้าง scan log หรือบิล
+            $pos = app(PosController::class);
+            $lookup = fn ($kind) => $pos->products(Request::create('/pos/products', 'GET', ['branch_id' => $data['branch_id'], 'q' => $decoded['plu'], 'exact' => 1, 'lookup' => $kind]))->getData(true);
+            $product = ($lookup('barcode') ?: $lookup('sku'))[0] ?? null;
+            $price = (float) ($product['pos_price'] ?? 0);
+            $scale = DB::table('scale_plu_settings')->where('barcode', $decoded['plu'])->value('scale_price');
+            $result = $decoded + ['product' => $product, 'erp_price' => $price,
+                'qty' => $price > 0 ? ($decoded['weight_kg'] ?? $decoded['price'] / $price) : null,
+                'scale_price' => $scale, 'mismatch' => $scale !== null && round((float) $scale * 100) !== round($price * 100),
+                'error' => ! $product ? 'ไม่พบสินค้าเปิดใช้งานใน POS' : ($price <= 0 ? 'ยังไม่ได้ตั้งราคาขาย' : null)];
         }
 
-        return redirect()->route('scale-prices.index')
-            ->with('success', $changed > 0 ? "บันทึกราคาแล้ว {$changed} รายการ — อย่าลืมตั้งราคาเดียวกันที่เครื่องชั่ง" : 'ไม่มีรายการที่เปลี่ยนแปลง');
+        return redirect()->route('scale-prices.index')->with('scale_label_result', $result);
     }
 
-    /** CSV สำหรับตั้งเครื่องชั่ง: PLU, ชื่อ, ราคา/กก. ปัจจุบัน */
-    public function export(): Response
+    public function export(ScalePluPage $page)
     {
-        $defaultTableId = PriceTable::where('is_default', true)->value('id');
-        $products = $this->scaleProducts();
-        $prices = $defaultTableId
-            ? ProductPrice::where('price_table_id', $defaultTableId)
-                ->whereIn('product_id', $products->pluck('id'))
-                ->whereNull('unit_id')->where('is_active', true)
-                ->pluck('price', 'product_id')
-            : collect();
-
-        $csv = "\xEF\xBB\xBF" . "PLU ตั้งเครื่องชั่ง,ชื่อสินค้า,ราคา/กก.,รหัสสินค้าในระบบ\n";
-        foreach ($products as $p) {
-            $price = (float) ($prices[$p->id] ?? $p->default_price ?? 0);
-            $row = [$p->scale_plu ?? '-', $p->name_th, number_format($price, 2, '.', ''), $p->sku_code];
-            $csv .= '"' . implode('","', array_map(fn ($v) => str_replace('"', '""', (string) $v), $row)) . '"' . "\n";
+        $stream = fopen('php://temp', 'r+');
+        fwrite($stream, "\xEF\xBB\xBF");
+        fputcsv($stream, ['PLU ตั้งเครื่องชั่ง', 'ชื่อสินค้า', 'ราคา/กก.', 'รหัสสินค้าในระบบ', 'ราคาเครื่องชั่ง/กก.', 'ปัญหา'], ',', '"', '');
+        foreach ($page->rows() as $r) {
+            $fields = [$r['plu'] ?? '-', $r['product']->name_th, $r['price'], $r['product']->sku_code, $r['scale_price'], implode(' / ', array_map(fn ($key) => ScalePluPage::ISSUES[$key], $r['issues']))];
+            fputcsv($stream, array_map(fn ($v) => preg_match('/^[=+@\-\t\r]/', (string) $v) ? "'".$v : $v, $fields), ',', '"', '');
         }
+        rewind($stream);
+        $csv = stream_get_contents($stream);
+        fclose($stream);
 
-        return response($csv, 200, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="scale-plu-' . now()->format('Ymd') . '.csv"',
-        ]);
+        return response($csv, 200, ['Content-Type' => 'text/csv; charset=UTF-8', 'Content-Disposition' => 'attachment; filename="scale-plu-'.now()->format('Ymd').'.csv"']);
     }
 
-    /** สินค้าเครื่องชั่งทั้งหมด พร้อม attribute scale_plu (เรียงตาม PLU ก่อน แล้วค่อยตัวที่ยังไม่มี PLU) */
-    private function scaleProducts()
+    private function saveScalePrice(string $plu, $price): void
     {
-        $products = Product::where('is_active', true)
-            ->where(fn ($w) => $w
-                ->where('name_th', 'like', '%ชั่ง%')
-                ->orWhere('name_th', 'like', '%ซั่ง%')
-                ->orWhereHas('barcodes', fn ($b) => $this->possibleScaleBarcodes($b->where('is_active', true))))
-            ->with(['barcodes' => fn ($q) => $this->possibleScaleBarcodes($q->where('is_active', true))])
-            ->get(['id', 'sku_code', 'name_th', 'default_price']);
-
-        return $products
-            ->map(function ($p) {
-                $p->scale_plu = $p->barcodes->first(fn ($b) => $this->isScalePlu($b->barcode))?->barcode
-                    ?? ($this->isScalePlu($p->sku_code) ? $p->sku_code : null);
-
-                return $p;
-            })
-            ->filter(fn ($p) => $p->scale_plu || $this->productHasScaleName($p->name_th))
-            ->sortBy([['scale_plu', 'asc'], ['sku_code', 'asc']])
-            ->values();
+        $old = DB::table('scale_plu_settings')->where('barcode', $plu)->first();
+        DB::table('scale_plu_settings')->updateOrInsert(['barcode' => $plu], ['scale_price' => $price, 'updated_by' => auth()->id(), 'created_at' => $old?->created_at ?? now(), 'updated_at' => now()]);
+        $new = DB::table('scale_plu_settings')->where('barcode', $plu)->first();
+        $this->audit('scale_price_saved', 'scale_plu_settings', $new->id, (array) $old, (array) $new);
     }
 
-    private function possibleScaleBarcodes($query)
+    private function audit(string $action, string $table, int $id, array $old, array $new): void
     {
-        return $query->where(fn ($w) => $w
-            ->where('barcode', 'like', '800%')
-            ->orWhere('barcode', 'like', '801%'));
-    }
-
-    private function isScalePlu(?string $value): bool
-    {
-        return is_string($value) && preg_match('/' . self::PLU_REGEX . '/', $value) === 1;
-    }
-
-    private function productHasScaleName(?string $name): bool
-    {
-        return is_string($name) && preg_match('/\x{0E0A}\x{0E31}\x{0E48}\x{0E07}|\x{0E0B}\x{0E31}\x{0E48}\x{0E07}/u', $name) === 1;
+        AuditLog::create(['user_id' => auth()->id(), 'branch_id' => auth()->user()?->branch_id, 'action' => $action,
+            'table_name' => $table, 'record_id' => $id, 'old_values' => $old, 'new_values' => $new]);
     }
 }
