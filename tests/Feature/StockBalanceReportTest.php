@@ -174,6 +174,20 @@ class StockBalanceReportTest extends TestCase
         $this->assertSame(2, $result['pagination']->currentPage());
     }
 
+    public function test_print_report_uses_one_report_header_without_the_shared_layout_header(): void
+    {
+        $branch = $this->branch('B001');
+        $this->product('102204');
+
+        $content = $this->actingAs($this->viewer($branch))
+            ->report($branch, ['print' => 1])
+            ->assertOk()
+            ->getContent();
+
+        $this->assertSame(0, substr_count($content, 'class="erp-print-head"'));
+        $this->assertSame(1, substr_count($content, 'class="rpt-print-header"'));
+    }
+
     public function test_xlsx_preserves_leading_zero_barcodes_as_text_and_quantities_as_numbers(): void
     {
         $branch = $this->branch('B001');

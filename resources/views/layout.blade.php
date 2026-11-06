@@ -1857,10 +1857,12 @@
         </button>
 
         <main class="app-main">
-            <div class="erp-print-head">
-                <div>@if(\App\Models\AppSetting::logoUrl())<img src="{{ \App\Models\AppSetting::logoUrl() }}" alt="">@endif</div>
-                <div><strong>{{ \App\Models\AppSetting::company('name_th') }}</strong> · @yield('page-title') · {{ now()->format('d/m/Y H:i') }}</div>
-            </div>
+            @unless(request()->routeIs('reports.index'))
+                <div class="erp-print-head">
+                    <div>@if(\App\Models\AppSetting::logoUrl())<img src="{{ \App\Models\AppSetting::logoUrl() }}" alt="">@endif</div>
+                    <div><strong>{{ \App\Models\AppSetting::company('name_th') }}</strong> · @yield('page-title') · {{ now()->format('d/m/Y H:i') }}</div>
+                </div>
+            @endunless
             <div class="app-content">
                 <div class="container-fluid px-0">
                     @yield('content')
