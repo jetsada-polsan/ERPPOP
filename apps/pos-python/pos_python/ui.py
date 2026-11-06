@@ -251,7 +251,12 @@ def build_pairing_dialog(data_dir, app):
 
 def run_pairing_wizard(data_dir, app) -> bool:
     dialog = build_pairing_dialog(data_dir, app)
-    result = dialog.exec() == dialog.Accepted
+    # PySide6 exposes the result enum on QDialog.DialogCode, not on the
+    # instance.  A fresh installation always enters this path before a
+    # device config exists, so using ``dialog.Accepted`` made first launch
+    # fail before the user could paste the ERP token.
+    from PySide6.QtWidgets import QDialog
+    result = dialog.exec() == QDialog.DialogCode.Accepted
     app.processEvents()
     return result
 

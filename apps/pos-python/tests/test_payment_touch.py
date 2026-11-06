@@ -13,7 +13,7 @@ from pos_python.database import connect
 from pos_python.order import OrderLine
 from pos_python.services import PosService, now
 from pos_python.settings_service import SettingsService
-from pos_python.ui import run_ui, build_pairing_dialog
+from pos_python.ui import run_ui, build_pairing_dialog, run_pairing_wizard
 
 
 def test_touch_payment_hold_recall_and_restart(tmp_path):
@@ -101,3 +101,14 @@ def test_pairing_starts_blank_and_replaces_clipboard_text(tmp_path):
     finally:
         dialog.close()
         app.clipboard().setText(previous)
+
+
+def test_pairing_wizard_uses_pyside6_dialog_code_on_first_launch(tmp_path):
+    app = QApplication.instance() or QApplication([])
+
+    class RejectedPairingDialog:
+        def exec(self):
+            return QDialog.DialogCode.Rejected
+
+    with patch("pos_python.ui.build_pairing_dialog", return_value=RejectedPairingDialog()):
+        assert run_pairing_wizard(tmp_path, app) is False
