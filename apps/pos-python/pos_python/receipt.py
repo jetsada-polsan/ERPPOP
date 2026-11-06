@@ -72,10 +72,10 @@ def render(db: sqlite3.Connection, sale_id: int, *, company: dict | None = None,
         FROM sale_items WHERE sale_id = ? ORDER BY id""",
         (sale_id,),
     ).fetchall()
-    payment = db.execute(
+    payments = db.execute(
         """SELECT method, amount, change_amount, reference, qr_payload, transfer_account_last4
-           FROM payments WHERE sale_id = ? ORDER BY id LIMIT 1""", (sale_id,)
-    ).fetchone()
+           FROM payments WHERE sale_id = ? ORDER BY id""", (sale_id,)
+    ).fetchall()
     cashier = db.execute("SELECT code FROM local_cashiers WHERE id = ?", (sale["cashier_id"],)).fetchone()
 
     company = company or {}
@@ -111,10 +111,14 @@ def render(db: sqlite3.Connection, sale_id: int, *, company: dict | None = None,
     lines.append(columns("มูลค่าก่อน VAT", f"{money(sale['grand_total']) - vat:,.2f}", width))
     lines.append(columns("ภาษีมูลค่าเพิ่ม", f"{vat:,.2f}", width))
 
-    if payment:
+    if len(payments) == 2:
+        lines.append(centre("ชำระเงินสด+โอน", width))
+    for payment in payments:
         received = money(payment["amount"])
         change = money(payment["change_amount"] or 0)
-        lines.append(columns("เงินสดรับ" if payment["method"] == "cash" else "โอนเงิน / QR", f"{received:,.2f}", width))
+        lines.append(columns({"cash":"เงินสดรับ", "transfer":"โอนเงิน / QR", "credit_card":"บัตรเครดิต", "cheque":"เช็ค"}[payment["method"]], f"{received:,.2f}", width))
+        if payment["reference"]:
+            lines.append(columns("เลขอ้างอิง", str(payment["reference"]), width))
         if change > 0:
             lines.append(columns("เงินทอน", f"{change:,.2f}", width))
         if payment["method"] == "transfer" and payment["qr_payload"]:

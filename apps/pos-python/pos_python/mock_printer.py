@@ -61,7 +61,14 @@ def print_receipt(db: sqlite3.Connection, sale_id: int, receipts_dir: Path) -> P
 
     receipts_dir.mkdir(parents=True, exist_ok=True)
     output = receipts_dir / f"{sale['document_no']}.txt"
-    output.write_text(receipt_for(db, sale_id) + "\n", encoding="utf-8")
+    output.write_text("\n\f\n".join(receipt_copies(db, sale_id)) + "\n", encoding="utf-8")
     db.execute("UPDATE print_jobs SET status = 'printed', attempts = attempts + 1 WHERE sale_id = ?", (sale_id,))
     db.commit()
     return output
+
+
+def receipt_copies(db, sale_id):
+    text = receipt_for(db, sale_id)
+    transfer = db.execute("SELECT 1 FROM payments WHERE sale_id=? AND method='transfer'", (sale_id,)).fetchone()
+    labels = ["ลูกค้า", "สำเนาร้าน"] + (["สำเนาตรวจยอดโอน"] if transfer else [])
+    return [f"{label} · ใบที่ {i}/{len(labels)}\n{text}" for i, label in enumerate(labels, 1)]

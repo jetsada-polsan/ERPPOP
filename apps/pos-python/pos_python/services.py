@@ -411,23 +411,26 @@ class PosService:
                 (aggregate_uuid, payload, self._now()),
             )
 
+    def shift_payment_totals(self, shift_id: int) -> dict[str, Decimal]:
+        rows = self.db.execute("""SELECT p.* FROM payments p JOIN sales s ON s.id=p.sale_id
+            WHERE s.shift_id=? AND s.is_void=0""", (shift_id,)).fetchall()
+        totals = {method: Decimal("0.00") for method in ("cash", "transfer", "credit_card", "cheque")}
+        for row in rows:
+            totals[row["method"]] += Decimal(row["amount"]) - Decimal(row["change_amount"] or "0")
+        return totals
+
     def shift_cash_summary(self, shift_id: int) -> ShiftCashSummary:
         """Calculate the drawer balance from local sales and cash movements."""
         shift = self.db.execute("SELECT * FROM shifts WHERE id = ?", (shift_id,)).fetchone()
         if not shift:
             raise ValueError("ไม่พบกะที่ระบุ")
-        sales = self.db.execute(
-            """SELECT coalesce(sum(p.amount - coalesce(p.change_amount, '0')), 0) AS total
-               FROM payments p JOIN sales s ON s.id = p.sale_id
-               WHERE s.shift_id = ? AND s.is_void = 0 AND p.method = 'cash'""", (shift_id,)
-        ).fetchone()
-        movements = self.db.execute(
-            """SELECT movement_type, coalesce(sum(amount), 0) AS total
-               FROM cash_movements WHERE shift_id = ? GROUP BY movement_type""", (shift_id,)
-        ).fetchall()
-        totals = {str(row["movement_type"]): money(row["total"]) for row in movements}
+        cash_sales = self.shift_payment_totals(shift_id).get("cash", Decimal("0.00"))
+        movements = self.db.execute("SELECT movement_type, amount FROM cash_movements WHERE shift_id = ?", (shift_id,)).fetchall()
+        totals = {}
+        for row in movements:
+            kind = row["movement_type"]
+            totals[kind] = totals.get(kind, Decimal(0)) + Decimal(row["amount"])
         opening = money(shift["opening_cash"])
-        cash_sales = money(sales["total"])
         cash_in = totals.get("cash_in", Decimal("0"))
         drops = totals.get("drop", Decimal("0"))
         payouts = totals.get("payout", Decimal("0"))
@@ -626,7 +629,7 @@ class PosService:
                  sale_uuid: str | None = None, payment_reference: str | None = None,
                  qr_payload: str | None = None, payment_confirmed: bool = False,
                  transfer_account_last4: str | None = None, adjustment_approved_by: str | None = None,
-                 clear_current_order: bool = False) -> int:
+                 clear_current_order: bool = False, cash_amount: Decimal | None = None) -> int:
         if not lines:
             raise ValueError("ต้องมีสินค้าอย่างน้อยหนึ่งรายการ")
         validate_cart_lines(lines)
@@ -658,13 +661,9 @@ class PosService:
             if flag and int(flag["is_vat"]):
                 vatable += money(line.qty * line.unit_price - line.discount - line.promo_discount)
         vat_total = vat_from_inclusive(vatable, rate)
-        if money(paid_amount) < grand_total:
-            raise ValueError("ยอดชำระไม่พอ")
-        if payment_method == "transfer" and not payment_confirmed:
-            raise ValueError("กรุณาตรวจเงินเข้าก่อนออกบิล")
-        if payment_method == "transfer" and transfer_account_last4 is not None:
-            if not re.fullmatch(r"\d{4}", str(transfer_account_last4)):
-                raise ValueError("เลขท้ายบัญชีผู้โอนต้องเป็นตัวเลข 4 หลัก")
+        from .payments import validate_payment
+        parts = validate_payment(payment_method, grand_total, paid_amount, cash_amount,
+                                 transfer_account_last4, payment_confirmed, payment_reference)
         with self.db:
             cursor = self.db.execute(
                 """INSERT INTO sales (sale_uuid, document_no, branch_id, terminal_id, shift_id, cashier_id,
@@ -690,15 +689,16 @@ class PosService:
                 )
             # เก็บทั้งเงินที่รับมาและเงินทอน — บันทึกแต่ยอดรับอย่างเดียว
             # แล้วยอดเงินสดที่ควรมีในลิ้นชักจะเกินจริงเท่ากับเงินทอนที่จ่ายออกไป
-            change = money(paid_amount) - grand_total if payment_method == "cash" else Decimal("0")
-            self.db.execute(
-                """INSERT INTO payments
-                   (sale_id, method, amount, change_amount, reference, qr_payload, confirmed_at,
-                    transfer_account_last4)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (sale_id, payment_method, str(money(paid_amount)), str(change), payment_reference,
-                 qr_payload, self._now() if payment_confirmed else None, transfer_account_last4),
-            )
+            for method, amount, change in parts:
+                self.db.execute(
+                    """INSERT INTO payments
+                       (sale_id, method, amount, change_amount, reference, qr_payload, confirmed_at,
+                        transfer_account_last4) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (sale_id, method, str(amount), str(change), payment_reference,
+                     qr_payload if method == "transfer" else None,
+                     self._now() if payment_confirmed else None,
+                     transfer_account_last4 if method == "transfer" else None),
+                )
             self.db.execute("INSERT INTO print_jobs (sale_id, created_at) VALUES (?, ?)", (sale_id, self._now()))
             payload = json.dumps({
                 "sale_uuid": sale_uuid, "document_no": document_no,

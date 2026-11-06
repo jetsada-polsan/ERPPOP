@@ -99,7 +99,7 @@ class SyncServiceTest(unittest.TestCase):
             document_no="PY-QR-0001", branch_id=1, terminal_id="HQ-01", shift_id=self.shift_id,
             cashier_id=77, lines=[CartLine(1, Decimal("1"), Decimal("125.50"))],
             payment_method="transfer", paid_amount=Decimal("125.50"), sale_uuid=sale_uuid,
-            payment_reference="QR-HQ", qr_payload="PROMPTPAY", payment_confirmed=True,
+            payment_reference="QR-HQ", qr_payload="PROMPTPAY", payment_confirmed=True, transfer_account_last4="4821",
         )
         self.pos.bind_server_shift(self.shift_id, 500)
         api = FakeApi()

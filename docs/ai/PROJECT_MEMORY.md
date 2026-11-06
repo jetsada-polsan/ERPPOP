@@ -160,3 +160,10 @@
 - Float close เปลี่ยนเป็น workspace 1024×768 สี่ขั้น blind count → ERP preview → เงินทอน/เงินนำส่งปิดกะ → ยืนยัน+Z. รายการนำส่งระหว่างกะมีหน้าเดียวในเมนูเงินสด ไม่เปิดจากหน้าปิดกะ; เปลี่ยนข้อมูลต้อง preview ใหม่เสมอ
 - TouchDialog ซ่อน dialog เดิมชั่วคราวก่อนแสดงหน้าใหม่และคืนหน้าหลังเสร็จ; minimize ยกเลิกทั้ง dialog ที่แสดงและที่ถูกซ่อน เพื่อไม่ให้คืน popup หลังล็อก
 - Python 338 tests ผ่าน พร้อมภาพทุกขั้น; งาน/brief ยังอยู่ใน workspace โดยไม่มี commit เพิ่ม เพราะ Git metadata ถูก sandbox ปฏิเสธที่ FETCH_HEAD/index.lock. รายละเอียดและลำดับ commit ที่ต้องทำต่ออยู่ใน handoff ล่าสุด; ยังไม่ deploy
+
+## Python POS payments workspace — 2026-11-06
+
+- รองรับ 5 วิธีใน Python: cash/transfer/mixed/credit_card/cheque; ใช้ payment_ref ร่วมตาม Vue/ERP, โอนและผสมบังคับ last4 + ยืนยันเงินเข้า. ใช้ Decimal cents; mixed เก็บสองแถว cash+transfer ใน payments transaction เดิม และประกอบ API method=mixed ตอน sync; ไม่มี schema migration
+- Local ยอดกะ/ลิ้นชัก/Z แยกส่วนผสมและรวมด้วย Decimal; ใบเสร็จไทย 2 ใบ และ 3 ใบเมื่อมีโอน. หน้าชำระ 5 ปุ่มใน workspace เดียว 1024×768; ภาพใน docs/ai/pos-python-shots/payments/
+- Python 375 tests ผ่าน, mutation 3 จุดตรวจพบจริง; Laravel PHPUnit memory 1GB exit 0 (751 passed, skipped 2, incomplete 6). ยังไม่มี HTTP E2E ทั้ง 5 เพราะต้องไม่สร้าง credential; ต้อง UAT Windows/hardware จริง
+- งานอยู่ใน workspace branch claude/pos-python-settings-popup base e0fb0ab; pull/stage ถูก sandbox ปฏิเสธ FETCH_HEAD/index.lock จึงไม่มี commit/push. เก็บไฟล์ตามคำสั่งเจ้าของ; รายละเอียดและลำดับ commit ใน handoff ล่าสุด. ยังไม่ deploy

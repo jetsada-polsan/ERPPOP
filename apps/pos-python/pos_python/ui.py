@@ -17,7 +17,7 @@ from .build_info import APP_VERSION
 from .shift_float import cash, supports_float, FloatClose, z_float_text
 from .api_client import LaravelPosClient
 from . import device_status
-from .mock_printer import active_paper_width, company_details, receipt_for
+from .mock_printer import active_paper_width, company_details, receipt_for, receipt_copies
 from .order import ALL_CATEGORIES, DISCOUNT, PRICE, QTY, Order, OrderLine, categories, product_grid
 from .config import DeviceConfig, load_device_config, normalize_server_url, save_device_config
 from .printers import installed_printer_names, open_cash_drawer, print_text_to_windows_queue
@@ -805,11 +805,11 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.setWindowFlag(Qt.WindowCloseButtonHint, True)
             self.setMinimumSize(940, 660)
             self.resize(980, 744)
-            self.setStyleSheet(self.styleSheet() + f"QLabel {{ font-size:16px; padding:3px; }} QPushButton {{ min-height:56px; font-size:18px; }} QLineEdit {{ min-height:56px; font-size:22px; }}")
+            self.setStyleSheet(self.styleSheet() + f"QLabel {{ font-size:15px; padding:0px; }} QPushButton {{ min-height:56px; font-size:18px; }} QLineEdit {{ min-height:44px; font-size:22px; }}")
             outer = QHBoxLayout()
             self.body.addLayout(outer)
             summary = QVBoxLayout()
-            summary.setSpacing(10)
+            summary.setSpacing(4)
             outer.addLayout(summary, 1)
             layout = QVBoxLayout()
             layout.setSpacing(8)
@@ -817,6 +817,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             summary.addWidget(QLabel(f"ยอดสินค้า  {order.subtotal():,.2f} บาท"))
             self.promo_summary = QLabel()
             self.promo_summary.setWordWrap(True)
+            self.promo_summary.setMaximumHeight(40)
             summary.addWidget(self.promo_summary)
             summary.addWidget(QLabel("ส่วนลดท้ายบิล (บาท) · แตะเพื่อใช้แป้นตัวเลข"))
             self.bill_discount = QLineEdit(str(order.bill_discount))
@@ -830,21 +831,29 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.due.setStyleSheet("font-size:22px;font-weight:800;color:%s;" % PALETTE["text"])
             summary.addWidget(self.due)
 
+            from .payments import LABELS
             methods = QHBoxLayout()
-            self.cash_method = QPushButton("เงินสด")
-            self.cash_method.setCheckable(True)
-            self.cash_method.setChecked(True)
-            self.cash_method.clicked.connect(lambda: self.set_payment_method("cash"))
-            self.transfer_method = QPushButton("โอน / QR")
-            self.transfer_method.setCheckable(True)
-            self.transfer_method.clicked.connect(lambda: self.set_payment_method("transfer"))
+            self.method_buttons = {}
             method_group = QButtonGroup(self)
             method_group.setExclusive(True)
-            method_group.addButton(self.cash_method)
-            method_group.addButton(self.transfer_method)
-            methods.addWidget(self.cash_method)
-            methods.addWidget(self.transfer_method)
-            layout.addLayout(methods)
+            for index, (method, label) in enumerate(LABELS.items()):
+                button = QPushButton(label)
+                button.setCheckable(True)
+                button.setChecked(method == "cash")
+                button.clicked.connect(lambda _, m=method: self.set_payment_method(m))
+                method_group.addButton(button)
+                self.method_buttons[method] = button
+                methods.addWidget(button)
+            self.cash_method = self.method_buttons["cash"]
+            self.transfer_method = self.method_buttons["transfer"]
+            self.body.insertLayout(1, methods)
+            self.reference_label = QLabel("เลขอ้างอิงการชำระ / เลขเช็ค")
+            self.payment_reference = QLineEdit()
+            self.payment_reference.setMaxLength(80)
+            summary.addWidget(self.reference_label)
+            summary.addWidget(self.payment_reference)
+            self.reference_label.hide()
+            self.payment_reference.hide()
 
             self.cash_label = QLabel("เงินที่รับมา")
             self.amount = QLineEdit(str(order.grand_total()))
@@ -859,12 +868,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.transfer_account_last4.setInputMethodHints(Qt.ImhDigitsOnly)
             self.transfer_account_label.hide()
             self.transfer_account_last4.hide()
-            layout.addWidget(self.transfer_account_label)
-            layout.addWidget(self.transfer_account_last4)
+            summary.addWidget(self.transfer_account_label)
+            summary.addWidget(self.transfer_account_last4)
             self.last4_touch = QPushButton("ใส่เลขท้ายบัญชีด้วยแป้นบนจอ")
             self.last4_touch.clicked.connect(self.enter_last4)
             self.last4_touch.hide()
-            layout.addWidget(self.last4_touch)
+            summary.addWidget(self.last4_touch)
 
             self.quick_host = QWidget()
             quick = QHBoxLayout(self.quick_host)
@@ -896,10 +905,11 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.transfer_confirmed.setStyleSheet("font-size:16px;font-weight:700")
             self.transfer_confirmed.toggled.connect(self._confirm_transfer_checkbox)
             qr_layout.addWidget(self.qr_account)
-            qr_layout.addWidget(self.qr_image)
+            layout.insertWidget(3, self.qr_image)
+            self.qr_image.hide()
             qr_layout.addWidget(self.transfer_confirmed)
             self.qr_box.hide()
-            layout.addWidget(self.qr_box)
+            summary.addWidget(self.qr_box)
 
             submit = QPushButton("รับเงิน / ออกบิล")
             submit.setObjectName("primary")
@@ -922,7 +932,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 self.transfer_account_last4.setText(value)
 
         def target_changed(self, old, new):
-            if new in (self.amount, self.bill_discount, self.transfer_account_last4):
+            if new in (self.amount, self.bill_discount, self.transfer_account_last4, self.payment_reference):
                 self.keypad_target = new
                 self.keypad.target = new
 
@@ -965,47 +975,35 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 self.transfer_account_last4.setFocus()
 
         def set_payment_method(self, method: str) -> None:
-            if method == "transfer" and not self.qr_config.get("merchant_ref"):
-                TouchMessage.warning(self, "ยังไม่ได้ตั้ง QR", "ให้ IT ตั้งบัญชี PromptPay ใน ERP แล้ว Sync เครื่อง POS ก่อน")
-                self.cash_method.setChecked(True)
-                return
             self.payment_method = method
-            transfer = method == "transfer"
-            self.cash_label.setVisible(not transfer)
-            self.amount.setVisible(not transfer)
-            self.quick_host.setVisible(not transfer)
-            self.keypad.setVisible(not transfer)
-            self.last4_touch.setVisible(transfer)
-            self.transfer_account_label.setVisible(transfer)
-            self.transfer_account_last4.setVisible(transfer)
-            self.qr_box.setVisible(transfer)
-            if transfer:
+            self.method_buttons[method].setChecked(True)
+            transfer = method in ("transfer", "mixed")
+            cash = method in ("cash", "mixed")
+            self.cash_label.setText("เงินสดส่วนที่รับ" if method == "mixed" else "เงินที่รับมา")
+            for widget in (self.cash_label, self.amount, self.quick_host, self.keypad):
+                widget.setVisible(cash)
+            for widget in (self.transfer_account_label, self.transfer_account_last4, self.qr_box):
+                widget.setVisible(transfer)
+            self.keypad.show()
+            self.last4_touch.hide()
+            self.reference_label.setVisible(method != "cash")
+            self.payment_reference.setVisible(method != "cash")
+            self.transfer_confirmed.setChecked(False)
+            self.qr_payload = None
+            self.qr_image.hide()
+            self.qr_account.setText("ตรวจยอดโอนเข้าบัญชีจากสลิป")
+            if method == "transfer" and self.qr_config.get("merchant_ref"):
                 try:
-                    self.qr_payload = promptpay_payload(
-                        str(self.qr_config["merchant_ref"]), self.order.grand_total()
-                    )
-                    self.qr_image.setPixmap(_qr_pixmap(self.qr_payload, 170))
+                    self.qr_payload = promptpay_payload(str(self.qr_config["merchant_ref"]), self.order.grand_total())
+                    self.qr_image.setPixmap(_qr_pixmap(self.qr_payload, 110))
+                    self.qr_image.show()
                 except (ValueError, RuntimeError) as error:
-                    TouchMessage.warning(self, "สร้าง QR ไม่สำเร็จ", str(error))
-                    self.payment_method = "cash"
-                    self.cash_method.setChecked(True)
-                    self.set_payment_method("cash")
-                    return
-                account = " · ".join(filter(None, [
-                    self.qr_config.get("bank_name"), self.qr_config.get("account_name"),
-                ]))
-                self.qr_account.setText(
-                    f"สแกนชำระ {self.order.grand_total():,.2f} บาท\n{account or self.qr_config.get('name', 'PromptPay')}"
-                )
-                self.change.setText("รอตรวจสอบเงินเข้า")
-                self.change.setStyleSheet("font-size:18px;font-weight:700;color:%s;" % PALETTE["warning_ink"])
-            else:
-                self.qr_payload = None
-                self.transfer_confirmed.setChecked(False)
-                self.refresh_change()
+                    self.qr_payload = None
+                    self.qr_account.setText(f"สร้าง QR ไม่ได้: {error} · โอนด้วยบัญชีแล้วตรวจสลิป")
+            self.refresh_change()
 
         def tendered(self) -> Decimal:
-            if self.payment_method == "transfer":
+            if self.payment_method != "cash":
                 return self.order.grand_total()
             try:
                 return money(self.amount.text() or "0")
@@ -1013,25 +1011,27 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 return Decimal("0")
 
         def refresh_change(self):
-            paid = self.tendered()
-            if paid < self.order.grand_total():
-                self.change.setText(f"ยังขาดอีก {self.order.grand_total() - paid:,.2f} บาท")
-                self.change.setStyleSheet("font-size:18px;font-weight:700;color:%s;" % PALETTE["danger"])
+            if self.payment_method == "mixed":
+                try:
+                    cash = money(self.amount.text() or "0")
+                    self.change.setText(f"ยอดโอน {self.order.grand_total() - cash:,.2f} บาท")
+                except (InvalidOperation, ValueError):
+                    self.change.setText("ยอดเงินไม่ถูกต้อง")
+                self.transfer_confirmed.setChecked(False)
+            elif self.payment_method == "cash":
+                paid = self.tendered()
+                self.change.setText(f"เงินทอน {paid - self.order.grand_total():,.2f} บาท")
             else:
-                self.change.setText(f"เงินทอน {self.order.change_for(paid):,.2f} บาท")
-                self.change.setStyleSheet("font-size:18px;font-weight:700;color:%s;" % PALETTE["success"])
+                self.change.setText(f"รับชำระ {self.order.grand_total():,.2f} บาท")
 
         def confirm(self):
-            if self.payment_method == "transfer":
-                if not self.transfer_confirmed.isChecked():
-                    TouchMessage.warning(self, "ยังไม่ยืนยันเงินเข้า", "ตรวจรายการเงินเข้าก่อน แล้วทำเครื่องหมายยืนยัน")
-                    return
-                if not re.fullmatch(r"\d{4}", self.transfer_account_last4.text().strip()):
-                    TouchMessage.warning(self, "ข้อมูลโอนไม่ครบ", "กรอกเลขท้ายบัญชีผู้โอนให้ครบ 4 หลัก")
-                    self.transfer_account_last4.setFocus()
-                    return
-            if self.tendered() < self.order.grand_total():
-                TouchMessage.warning(self, "ยอดชำระไม่พอ", "รับเงินมาน้อยกว่ายอดที่ต้องชำระ")
+            from .payments import validate_payment
+            try:
+                validate_payment(self.payment_method, self.order.grand_total(), self.tendered(),
+                                 self.amount.text() or "0", self.transfer_account_last4.text(),
+                                 self.transfer_confirmed.isChecked(), self.payment_reference.text())
+            except (InvalidOperation, ValueError) as error:
+                self.change.setText(str(error))
                 return
             self.accept()
 
@@ -2530,7 +2530,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 ('เงินสดที่ควรมี', expected), ('เงินสดนับจริง', counted), ('ส่วนต่าง', counted-expected)])
             if authoritative and saved.get('float_kept') is not None:
                 text = f'กะ ERP {saved["id"]}\nเปิด {opened}\nปิด {ended}\nยืนยันจาก ERP'
-            text += '\n' + z_float_text(saved if authoritative else {})
+            if not authoritative:
+                from .payments import LABELS
+                text += "\n" + "\n".join(f"{LABELS[method]} {amount:,.2f} บาท" for method, amount in service.shift_payment_totals(row['id']).items())
+            local_totals = service.shift_payment_totals(row['id'])
+            local_payment_fields = dict(zip(('cash_sales', 'transfer_sales', 'card_sales', 'cheque_sales'), (local_totals[k] for k in ('cash', 'transfer', 'credit_card', 'cheque'))))
+            text += '\n' + z_float_text(saved if authoritative else local_payment_fields)
             dialog.body.addWidget(logo_label(height=64))
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
@@ -2800,9 +2805,10 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     branch_id=branch_id, terminal_id=terminal_id, shift_id=self.shift_id,
                     cashier_id=int(self.cashier["id"]), lines=self.order.to_cart_lines(),
                     payment_method=dialog.payment_method, paid_amount=dialog.tendered(),
-                    payment_reference=str(dialog.qr_config.get("code") or "") or None,
+                    payment_reference=dialog.payment_reference.text().strip() or None,
+                    cash_amount=money(dialog.amount.text() or "0") if dialog.payment_method == "mixed" else None,
                     qr_payload=dialog.qr_payload,
-                    payment_confirmed=dialog.payment_method == "transfer" and dialog.transfer_confirmed.isChecked(),
+                    payment_confirmed=dialog.payment_method not in ("transfer", "mixed", "cash") or dialog.transfer_confirmed.isChecked(),
                     transfer_account_last4=dialog.transfer_account_last4.text().strip() or None,
                     adjustment_approved_by=self.order.adjustment_approved_by,
                     clear_current_order=True,
@@ -2817,10 +2823,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             printer_name = str(SettingsService(service.db).get_device_setting("windows_printer_queue", "") or "")
             if printer_name:
                 try:
-                    print_text_to_windows_queue(
-                        receipt_for(service.db, sale_id), printer_name,
-                        paper_width_mm=active_paper_width(service.db),
-                    )
+                    for copy in receipt_copies(service.db, sale_id):
+                        print_text_to_windows_queue(copy, printer_name,
+                            paper_width_mm=active_paper_width(service.db))
                     service.db.execute(
                         "UPDATE print_jobs SET status = 'printed', attempts = attempts + 1, last_error = NULL WHERE sale_id = ?",
                         (sale_id,),
@@ -2835,13 +2840,13 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     )
                     service.db.commit()
                 else:
-                    if dialog.payment_method == "cash" and SettingsService(service.db).get_device_setting("cash_drawer_enabled", "1") == "1":
+                    if dialog.payment_method in ("cash", "mixed") and SettingsService(service.db).get_device_setting("cash_drawer_enabled", "1") == "1":
                         try:
                             open_cash_drawer(printer_name)
                         except Exception as error:
                             TouchMessage.warning(self, "เปิดลิ้นชักไม่สำเร็จ", str(error))
             detail = (f"เงินทอน {self.order.change_for(dialog.tendered()):,.2f} บาท"
-                      if dialog.payment_method == "cash" else "รับชำระผ่านโอน / QR แล้ว")
+                      if dialog.payment_method == "cash" else f"รับชำระ{dialog.method_buttons[dialog.payment_method].text()}แล้ว")
             TouchMessage.information(self, "รับชำระแล้ว", f"บิล {document_no}\n{detail}")
             self.order.clear()
             self.reset_mode_buttons()

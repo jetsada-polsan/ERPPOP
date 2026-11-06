@@ -185,12 +185,12 @@ class UiStyleTest(unittest.TestCase):
 
     def test_transfer_requires_visible_money_received_confirmation(self) -> None:
         source = inspect.getsource(run_ui)
-        self.assertIn("โอน / QR", source)
+        self.assertIn("self.method_buttons", source)
         self.assertIn("ตรวจสอบแล้วว่าเงินเข้าบัญชีครบตามยอด", source)
-        self.assertIn("not self.transfer_confirmed.isChecked()", source)
+        self.assertIn("validate_payment(self.payment_method", source)
         self.assertIn("self.transfer_confirmed.toggled.connect(self._confirm_transfer_checkbox)", source)
         self.assertIn("เลขท้ายบัญชีผู้โอน (4 หลัก)", source)
-        self.assertIn("not re.fullmatch(r\"\\d{4}\"", source)
+        self.assertIn("self.transfer_account_last4.text()", source)
 
     def test_pos_layout_adapts_to_small_pos_displays(self) -> None:
         source = inspect.getsource(run_ui)

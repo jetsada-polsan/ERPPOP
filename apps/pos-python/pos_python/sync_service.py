@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .payments import payload_fields
+
 import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -310,21 +312,18 @@ class SyncService:
         ).fetchall()
         if any(not item["server_product_id"] for item in lines):
             return self._failed(sale_uuid, "มีสินค้า local ที่ยังไม่มี server_id: ต้อง sync catalog ก่อน")
-        payment = self.db.execute(
-            "SELECT method, amount, reference, confirmed_at, transfer_account_last4 FROM payments WHERE sale_id = ? ORDER BY id LIMIT 1",
+        payments = self.db.execute(
+            "SELECT * FROM payments WHERE sale_id = ? ORDER BY id",
             (sale["id"],),
-        ).fetchone()
-        if not payment:
+        ).fetchall()
+        if not payments:
             return self._failed(sale_uuid, "ไม่พบข้อมูลชำระเงิน")
         payload = {
             # Receipt reporting reads these fields; the outbox snapshot must survive retries.
             "vat_amount": str(money(sale["vat_total"])), "vat_mode": "included",
             "bill_promotions": bool(sale["bill_promotions"]), "mix_promotions": bool(sale["mix_promotions"]),
             "branch_id": sale["branch_id"], "shift_id": sale["server_shift_id"], "cashier_id": sale["server_cashier_id"],
-            "method": payment["method"], "payment_ref": payment["reference"],
-            "transfer_account_last4": payment["transfer_account_last4"],
-            "payment_confirmed": payment["method"] != "transfer" or bool(payment["confirmed_at"]),
-            "cash_received": payment["amount"] if payment["method"] == "cash" else None,
+            **payload_fields(payments),
             "items": [{
                 "product_id": item["server_product_id"], "qty": item["qty"], "unit_price": net_unit_price(item),
                 # Server re-parses the raw one-time scale label, protecting price/quantity at both ends.

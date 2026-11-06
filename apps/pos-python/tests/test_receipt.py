@@ -131,7 +131,7 @@ class ReceiptContentTest(unittest.TestCase):
             document_no="PS-HQ-QR-0001", branch_id=1, terminal_id="POS-01", shift_id=self.shift_id,
             cashier_id=1, lines=[CartLine(product_id=2, qty=Decimal("1"), unit_price=Decimal("25"))],
             payment_method="transfer", paid_amount=Decimal("25"), payment_reference="QR-HQ",
-            qr_payload=payload, payment_confirmed=True,
+            qr_payload=payload, payment_confirmed=True, transfer_account_last4="4821",
         )
         lines = render(self.db, sale_id, company=COMPANY, paper_width_mm=58)
         text = "\n".join(lines)
