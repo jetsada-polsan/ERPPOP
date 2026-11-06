@@ -2785,3 +2785,9 @@ pending
 - ความปลอดภัย: ไม่ reset ทั้ง repo, ไม่แตะฐานข้อมูล, ไม่รัน migration, ไม่ลบงานอื่น; backup อยู่บน server ที่ `resources/views/products/index.blade.php.pre-products-route-fix-20261106-1945` และ `resources/views/products/index.blade.php.pre-products-view-restore-20261106-1948`
 - Deploy: **hotfix เฉพาะหน้า Products เสร็จแล้ว**; full repository deploy ยังไม่ทำเพราะ working tree production มีงานค้างจำนวนมาก
 - งานถัดไป: ตรวจ/รวมงานค้างบน production ให้เป็น commit ที่ตรวจ test แล้วก่อนทำ full deploy; ห้ามใช้ `git reset --hard` เพื่อแก้ความสะอาดของ working tree
+
+## Handoff - 2026-11-06 (Codex: remove identified Products redesign artifacts)
+- ทำอะไร: ลบเฉพาะไฟล์ redesign/backup ของหน้า Products ที่ระบุได้ว่าเป็นชุดที่ทำให้ 500 (`index.blade.php.pre-products-route-fix-20261106-1945` และ `index.blade.php.pre-products-view-restore-20261106-1948`)
+- คงไว้: `resources/views/products/index.blade.php` ที่กู้จาก `HEAD` และตรวจแล้วไม่มี route `units.index`, `products.create` หรือ `scale.index`
+- ขอบเขต: ไม่ลบเหมารวมไฟล์ค้างอื่นประมาณ 784 รายการ เพราะไม่มีหลักฐานว่าเป็นของ Gemini/Antigravity และอาจเป็นงานของผู้ใช้อื่น; ไม่แตะฐานข้อมูล
+- Deploy: **ลบ artifacts ที่ระบุได้แล้ว**; หน้า Products ที่ใช้งานจริงยังคงอยู่
