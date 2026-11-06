@@ -2761,3 +2761,11 @@ pending
 - Artifact: `PopCentral-POS-UAT-0.9.0` ขนาดประมาณ 178.8 MB; `publish=false` จึงยังไม่เผยแพร่หน้าโหลดและไม่สร้างธุรกรรม production
 - Deploy: ยังไม่ deploy และยังไม่ publish
 - งานถัดไป: ดาวน์โหลด artifact ไปติดตั้งบน Windows UAT จริง ตรวจจอ 1024×768, touch, scanner, scale และ printer ก่อนเจ้าของสั่ง publish/release
+
+## Handoff - 2026-11-06 (Codex: fix first-launch pairing crash)
+- Commit: `1be701e`
+- ทำอะไร: แก้ `run_pairing_wizard()` ของ `apps/pos-python` ที่เรียก `dialog.Accepted` จาก instance ซึ่งไม่มีใน PySide6 ทำให้เครื่องติดตั้งใหม่ล้มก่อนแสดงหน้าวาง Token/เชื่อม ERP; เปลี่ยนเป็น `QDialog.DialogCode.Accepted` และเพิ่ม regression test เส้นทางเปิดครั้งแรก
+- ทดสอบ: `QT_QPA_PLATFORM=offscreen PYTHONPATH=apps/pos-python /private/tmp/pos-parity-env/bin/python -m pytest -q apps/pos-python/tests` ผ่าน **398 passed**; compileall ด้วย isolated pycache ผ่าน; `git diff --check` ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ติดตั้ง artifact ใหม่บน Windows จริง และยังไม่ได้ทดสอบ HTTP กับ ERP production ด้วย credential ของเจ้าของ
+- Deploy: **ยังไม่ deploy / ไม่ publish**
+- งานถัดไป: push branch นี้และสั่ง Windows UAT build ใหม่จาก commit `1be701e`; ติดตั้งทับเครื่องทดสอบ แล้วลองเปิดเครื่องใหม่ที่ยังไม่มี `pos-config.json` จากนั้นวาง Token และกดตรวจสอบ
