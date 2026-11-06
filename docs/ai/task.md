@@ -1,3 +1,25 @@
+# Handoff — 2026-11-06 (Codex: remove duplicate report print header)
+
+## Commit
+- `a575125` — `Remove duplicate shared header from printed reports`
+
+## ทำอะไรไป
+- ซ่อนหัวพิมพ์กลาง `.erp-print-head` ของ layout เฉพาะ route `reports.index` เพื่อไม่ให้ซ้ำกับหัวรายงาน `.rpt-print-header`
+- คงหัวรายงานที่มีโลโก้ บริษัท ชื่อรายงาน ช่วงวันที่ สาขา และเวลาพิมพ์ไว้ 1 ชุด
+- ไม่แตะฐานข้อมูล ไม่เปลี่ยนข้อมูลรายงาน และไม่กระทบหน้าพิมพ์เอกสารอื่น
+
+## ทดสอบ
+- `APP_ENV=testing DB_CONNECTION=sqlite DB_DATABASE=:memory: DB_URL='' php -d memory_limit=1G vendor/bin/phpunit --no-coverage` ผ่าน 837 tests, skipped 2, incomplete 6, 7,066 assertions
+- `node --test tests/js/report-search.test.cjs` ผ่าน 5/5
+- `APP_ENV=testing DB_CONNECTION=sqlite DB_DATABASE=:memory: DB_URL='' php artisan view:cache` ผ่าน
+- `git diff --check` ผ่าน
+
+## Deploy
+- รอ push และ GitHub Actions production deploy หลังเจ้าของยืนยันรอบนี้
+
+## งานถัดไป
+- ตรวจ preview ใบเสร็จ POS/รายงานบน production ว่าเหลือหัวรายงานชุดเดียว
+
 # Handoff — 2026-11-06 (P0 money integrity — workspace only)
 
 ## Commit / ขอบเขต
