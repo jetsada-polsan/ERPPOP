@@ -80,4 +80,19 @@ class PosAdminReassignTest extends TestCase
         $this->assertFalse((bool) $cashier->fresh()->must_change_pin);
         $this->assertFalse((bool) $cashier->fresh()->user->posCredential->force_pin_change);
     }
+
+    public function test_admin_can_enable_an_existing_cashier_for_its_branch_in_one_step(): void
+    {
+        $branch = Branch::create(['code' => 'ENABLE', 'name_th' => 'เปิดใช้ POS', 'is_active' => true]);
+        $user = User::factory()->create(['branch_id' => $branch->id, 'is_active' => true, 'must_change_password' => false]);
+        $cashier = Salesman::create(['code' => 'ENABLE-1', 'name' => 'แคชเชียร์', 'branch_id' => $branch->id, 'user_id' => $user->id, 'is_active' => true]);
+
+        $this->actingAs($this->admin())
+            ->post(route('pos-admin.cashiers.enable', $cashier))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertTrue($user->fresh()->canUsePosDevice($branch->id));
+        $this->assertDatabaseHas('user_branch_roles', ['user_id' => $user->id, 'branch_id' => $branch->id, 'is_active' => true]);
+    }
 }

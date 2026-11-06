@@ -1,0 +1,93 @@
+name: Build JET POS Python UAT
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: UAT version shown in the installer artifact
+        required: true
+        default: 0.1.0
+      publish:
+        description: Publish the tested UAT installer to the separate ERP download channel
+        required: false
+        type: boolean
+        default: false
+  push:
+    branches: [codex/jet-pos-python]
+    paths:
+      - apps/jet-pos-python/**
+      - .github/workflows/jet-pos-python-uat.yml
+
+permissions:
+  contents: read
+
+env:
+  UAT_VERSION: ${{ inputs.version || format('0.1.{0}', github.run_number) }}
+
+jobs:
+  build-windows-installer:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: apps/jet-pos-python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python POS dependencies
+        run: python -m pip install --upgrade pip -r requirements.txt
+      - name: Run isolated UAT core tests
+        run: python -m unittest discover -s tests -v
+      - name: Build Windows executable
+        shell: pwsh
+        run: >-
+          pyinstaller --noconfirm --clean --windowed --onefile
+          --name "JET-POS-Python-UAT-$env:UAT_VERSION"
+          --paths . main.py
+      - name: Upload separate Python POS installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: JET-POS-Python-UAT-${{ env.UAT_VERSION }}-windows
+          path: apps/jet-pos-python/dist/JET-POS-Python-UAT-${{ env.UAT_VERSION }}.exe
+          if-no-files-found: error
+
+  publish:
+    if: ${{ github.event_name == 'push' || inputs.publish }}
+    needs: build-windows-installer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: JET-POS-Python-UAT-${{ env.UAT_VERSION }}-windows
+          path: release
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.POS_RELEASE_SSH_KEY }}
+      - run: ssh-keyscan -H "${{ secrets.POS_RELEASE_HOST }}" >> ~/.ssh/known_hosts
+      - name: Publish isolated JET POS Python UAT installer
+        env:
+          POS_RELEASE_USER: ${{ secrets.POS_RELEASE_USER }}
+          POS_RELEASE_HOST: ${{ secrets.POS_RELEASE_HOST }}
+          BASE_URL: https://erp.popstarcenter.com
+        run: |
+          target="JET-POS-Python-UAT-${UAT_VERSION}.exe"
+          installer="release/${target}"
+          test -f "$installer"
+          local_bytes="$(wc -c < "$installer" | tr -d ' ')"
+          remote_tmp=".${target}.next-${GITHUB_RUN_ID}"
+          sftp -q -b - "$POS_RELEASE_USER@$POS_RELEASE_HOST" > sftp-publish.log <<SFTP
+          -mkdir ../jet-pos-python-releases
+          cd ../jet-pos-python-releases
+          put $installer $remote_tmp
+          ls -l $remote_tmp
+          -rm ${target}.previous.exe
+          -rename $target ${target}.previous.exe
+          rename $remote_tmp $target
+          ls -l $target
+          SFTP
+          cat sftp-publish.log
+          awk -v bytes="$local_bytes" '$5 == bytes { found=1 } END { exit found ? 0 : 1 }' sftp-publish.log
+          code="$(curl -s -o /dev/null -w '%{http_code}' -I "$BASE_URL/download/jet-pos-python" || true)"
+          echo "GET /download/jet-pos-python -> $code"
+          [ "$code" = "200" ]

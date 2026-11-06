@@ -17,6 +17,7 @@ use App\Models\ProductUnit;
 use App\Models\Role;
 use App\Models\Salesman;
 use App\Models\User;
+use App\Models\UserPosCredential;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -65,6 +66,39 @@ class PosCashierIdentityTest extends TestCase
 
         $this->assertTrue($response->getData(true)['success']);
         $this->assertSame($alice->user->username, $response->getData(true)['cashier']['code']);
+    }
+
+    public function test_temporary_pin_requires_a_change_before_the_device_can_open_a_shift(): void
+    {
+        [$branch, $cashier, $user] = $this->branchWithCashier('TEMP-PIN', 'ALICE');
+        $cashier->setPin('654321', true);
+        UserPosCredential::firstOrCreate(['user_id' => $user->id])->setPin('654321', true);
+        $device = $this->device($branch, $cashier);
+
+        $login = Request::create('/api/pos/cashier/login', 'POST', ['pin' => '654321']);
+        $login->attributes->set('pos_device', $device);
+        $payload = app(PosApiController::class)->cashierLogin($login)->getData(true);
+
+        $this->assertTrue($payload['success']);
+        $this->assertTrue($payload['must_change_pin']);
+        $this->assertNull($device->fresh()->active_cashier_id);
+
+        $change = Request::create('/api/pos/cashier/pin', 'POST', [
+            'code' => $user->username,
+            'current_pin' => '654321',
+            'new_pin' => '482165',
+        ]);
+        $change->attributes->set('pos_device', $device);
+        $this->assertTrue(app(PosApiController::class)->changeCashierPin($change)->getData(true)['success']);
+
+        $this->assertFalse($cashier->fresh()->must_change_pin);
+        $this->assertNotNull($device->fresh()->cashier_verified_at);
+
+        $relogin = Request::create('/api/pos/cashier/login', 'POST', ['pin' => '482165']);
+        $relogin->attributes->set('pos_device', $device->fresh());
+        $result = app(PosApiController::class)->cashierLogin($relogin)->getData(true);
+        $this->assertFalse($result['must_change_pin']);
+        $this->assertNotEmpty($result['offline_credential']);
     }
 
     public function test_login_accepts_the_username_of_the_user_linked_to_the_cashier(): void
