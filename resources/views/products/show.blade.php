@@ -34,10 +34,10 @@
         <section class="compact-product-window">
             <div class="compact-menu"><strong>สินค้า-{{ $product->sku_code }}</strong></div>
             <div class="compact-tools">
-                <button type="button" @click="compactTab='detail'"><i class="bi bi-card-checklist"></i> รายละเอียด</button>
-                <button type="button" @click="compactTab='price'"><i class="bi bi-tags"></i> ราคาขาย</button>
-                <button type="button" @click="compactTab='barcode'"><i class="bi bi-upc-scan"></i> บาร์โค้ด</button>
-                <button type="button" @click="compactTab='stock'"><i class="bi bi-boxes"></i> สต๊อก</button>
+                <button type="button" :class="compactTab==='detail' && 'active'" @click="compactTab='detail'"><i class="bi bi-card-checklist"></i> รายละเอียด</button>
+                <button type="button" :class="compactTab==='price' && 'active'" @click="compactTab='price'"><i class="bi bi-tags"></i> ราคาขาย</button>
+                <button type="button" :class="compactTab==='barcode' && 'active'" @click="compactTab='barcode'"><i class="bi bi-upc-scan"></i> บาร์โค้ด</button>
+                <button type="button" :class="compactTab==='stock' && 'active'" @click="compactTab='stock'"><i class="bi bi-boxes"></i> สต๊อก</button>
             </div>
             <nav class="compact-tabs">
                 <button :class="compactTab==='detail' && 'active'" @click="compactTab='detail'">รายละเอียด</button>
@@ -869,46 +869,51 @@
     body.erp-popup-page .app-content { padding:5px !important; }
     body.erp-popup-page .container-fluid { max-width:none !important; padding:0 !important; }
     body.erp-popup-page div[x-data="productShow()"] > :not(.compact-product-window):not(.booking-modal-backdrop) { display:none !important; }
-    body.erp-popup-page { background:#ececec; }
-    .compact-product-window { min-height:calc(100vh - 10px); border:1px solid #d6dce3; background:#f8fafc; color:#172033; font:13px Tahoma,"Noto Sans Thai",sans-serif; }
-    .compact-menu { height:34px; display:flex; align-items:center; justify-content:flex-start; padding:0 14px; border-bottom:1px solid #d6dce3; background:#fff; font-size:14px; }
-    .compact-tools { height:52px; display:flex; align-items:stretch; gap:6px; padding:7px 10px; border-bottom:1px solid #d6dce3; background:#fff; }
-    .compact-tools button { min-width:104px; border:1px solid #d6dce3; border-radius:6px; background:#fff; color:#334155; font-size:12px; font-weight:700; }
-    .compact-tools button:hover { border-color:#1677b8; color:#0f5f93; background:#f0f8ff; }
-    .compact-tools i { display:block; color:var(--erp-primary-ink); font-size:16px; }
-    .compact-tabs { display:flex; gap:4px; padding:8px 10px 0; border-bottom:1px solid #d6dce3; background:#f1f5f9; }
-    .compact-tabs button { min-height:34px; min-width:132px; padding:6px 12px; border:1px solid #d6dce3; border-bottom:0; border-radius:6px 6px 0 0; background:#e8eef5; color:#475569; font-size:12px; font-weight:700; }
-    .compact-tabs button.active { position:relative; top:1px; background:#fff; color:#0f5f93; }
-    .compact-body { height:calc(100vh - 138px); overflow:auto; padding:14px; background:#fff; }
-    .compact-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px 18px; max-width:100%; padding:18px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; box-shadow:0 3px 14px rgba(15,23,42,.05); }
-    .compact-form label { display:grid; gap:5px; margin:0; color:#475569; font-size:12px; font-weight:700; }
+    body.erp-popup-page { background:linear-gradient(145deg,#e8f1f8,#f8fbfe 48%,#e4f4f3); }
+    .compact-product-window { min-height:100vh; background:#f7fafc; color:#172033; font:14px/1.45 Tahoma,"Noto Sans Thai",sans-serif; }
+    .compact-menu { min-height:68px; display:flex; align-items:center; padding:0 28px; border-bottom:1px solid #dbe7ef; background:linear-gradient(120deg,#fff,#f1f8fc); color:#132c43; font-size:20px; letter-spacing:.01em; }
+    .compact-menu strong::before { content:""; display:inline-block; width:10px; height:30px; margin:0 12px -8px 0; border-radius:999px; background:linear-gradient(180deg,var(--erp-primary),#14b8a6); }
+    .compact-tools { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; min-height:86px; padding:14px 28px; border-bottom:1px solid #dbe7ef; background:#fff; }
+    .compact-tools button { min-height:56px; display:flex; align-items:center; justify-content:center; gap:9px; border:1px solid #d5e2eb; border-radius:12px; background:#fff; color:#486074; font-size:14px; font-weight:800; transition:background .16s ease,border-color .16s ease,box-shadow .16s ease,transform .16s ease; }
+    .compact-tools button:hover { border-color:#8bc8e8; color:var(--erp-primary-dark); background:#f0f9fe; transform:translateY(-1px); }
+    .compact-tools button.active { border-color:var(--erp-primary); color:#fff; background:linear-gradient(135deg,var(--erp-primary),#14b8a6); box-shadow:0 8px 18px rgba(12,125,180,.22); }
+    .compact-tools i { color:inherit; font-size:22px; }
+    .compact-tabs { display:none; }
+    .compact-body { height:calc(100vh - 154px); overflow:auto; padding:24px 28px 32px; background:#f7fafc; }
+    .compact-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px 20px; max-width:1080px; margin:0 auto; padding:24px; border:1px solid #dbe7ef; border-radius:18px; background:#fff; box-shadow:0 14px 36px rgba(15,56,88,.08); }
+    .compact-form label { display:grid; gap:7px; margin:0; color:#41566a; font-size:12px; font-weight:800; }
     .compact-form label.wide,.compact-form .wide { grid-column:span 3; }
-    .compact-form input:not([type=checkbox]),.compact-form select,.compact-form textarea { width:100%; min-height:36px; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#fff; font:13px Tahoma,"Noto Sans Thai",sans-serif; }
+    .compact-form input:not([type=checkbox]),.compact-form select,.compact-form textarea { width:100%; min-height:42px; padding:8px 11px; border:1px solid #c6d7e3; border-radius:9px; background:#fff; font:14px Tahoma,"Noto Sans Thai",sans-serif; }
+    .compact-form input:focus,.compact-form select:focus,.compact-form textarea:focus,.compact-edit-table input:focus,.compact-edit-table select:focus { border-color:var(--erp-primary); outline:0; box-shadow:0 0 0 3px rgba(26,145,204,.14); }
     .compact-form textarea { resize:vertical; }
-    .compact-checks { display:flex; gap:22px; padding:8px 0; border-top:1px solid #bbb; }
+    .compact-checks { display:flex; gap:22px; padding:14px; border:1px solid #dbe7ef; border-radius:12px; background:#f7fafc; }
     .compact-checks label { display:flex; gap:5px; }
-    .compact-status-check { padding:7px 10px; border:1px solid #cbd5e1; border-radius:5px; background:#f8fafc; }
+    .compact-status-check { padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; }
     .compact-save { display:flex; justify-content:flex-end; }
-    .compact-save button,.compact-section-head button { min-width:104px; min-height:34px; padding:6px 12px; border:1px solid #1677b8; border-radius:5px; background:#1677b8; color:#fff; font-weight:700; }
-    .compact-section-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
-    .compact-table { width:100%; border-collapse:collapse; background:#fff; }
-    .compact-table th,.compact-table td { padding:3px 5px; border:1px solid #aeb3b7; text-align:left; }
-    .compact-table th { background:linear-gradient(#f5f5f5,var(--erp-border)); font-weight:700; }
-    .compact-table tr:nth-child(even) td { background:var(--erp-surface-2); }
+    .compact-save button,.compact-section-head button { min-width:118px; min-height:42px; padding:8px 14px; border:0; border-radius:9px; background:linear-gradient(135deg,var(--erp-primary),#14b8a6); color:#fff; font-weight:800; box-shadow:0 6px 14px rgba(12,125,180,.2); }
+    .compact-section-head { display:flex; align-items:center; justify-content:space-between; max-width:1200px; margin:0 auto 14px; color:#243c53; }
+    .compact-table { width:100%; max-width:1200px; margin:0 auto; border-collapse:separate; border-spacing:0; overflow:hidden; border:1px solid #d8e4ec; border-radius:14px; background:#fff; box-shadow:0 8px 24px rgba(15,56,88,.05); }
+    .compact-table th,.compact-table td { padding:10px 12px; border:0; border-bottom:1px solid #e6eef3; text-align:left; }
+    .compact-table th { background:#eff7fb; color:#3b5265; font-weight:800; }
+    .compact-table tr:nth-child(even) td { background:#fbfdfe; }
     .compact-table .num { text-align:right; }
     .compact-table .code { color:var(--erp-primary-dark); font-weight:700; }
-    .compact-edit-table input,.compact-edit-table select { width:100%; min-height:32px; padding:4px 7px; border:1px solid #cbd5e1; border-radius:5px; background:#fff; font:13px Tahoma,"Noto Sans Thai",sans-serif; }
-    .compact-edit-table th { padding:8px 7px; background:#f1f5f9; color:#334155; font-size:12px; white-space:nowrap; }
-    .compact-edit-table td { padding:5px; vertical-align:middle; }
+    .compact-edit-table input,.compact-edit-table select { width:100%; min-height:38px; padding:6px 8px; border:1px solid #cbdbe5; border-radius:8px; background:#fff; font:13px Tahoma,"Noto Sans Thai",sans-serif; }
+    .compact-edit-table th { padding:11px 10px; background:#eff7fb; color:#3b5265; font-size:12px; white-space:nowrap; }
+    .compact-edit-table td { padding:9px 10px; vertical-align:middle; }
     .compact-edit-table tr.barcode-disabled td { background:var(--erp-primary-soft); color:var(--erp-muted); }
     .barcode-state { display:inline-flex; align-items:center; gap:4px; margin:0; padding:2px 6px; border-radius:3px; white-space:nowrap; font-weight:700; cursor:pointer; }
     .barcode-state.is-on { background:var(--erp-success-soft); color:#166534; }
     .barcode-state.is-off { background:var(--erp-border); color:#4b5563; }
     .barcode-state input { width:auto; min-height:0; margin:0; }
-    .compact-row-save { min-width:76px; min-height:32px; white-space:nowrap; padding:5px 10px; border:1px solid #1677b8; border-radius:5px; background:#1677b8; color:#fff; font:700 12px Tahoma,"Noto Sans Thai",sans-serif; }
+    .compact-row-save { min-width:86px; min-height:38px; white-space:nowrap; padding:6px 10px; border:0; border-radius:8px; background:var(--erp-primary); color:#fff; font:700 12px Tahoma,"Noto Sans Thai",sans-serif; }
     .compact-columns { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-    body.erp-popup-page .booking-modal { width:min(520px,calc(100vw - 30px)) !important; border-radius:3px; font-size:12px; }
-    @media(max-width:700px){.compact-form{grid-template-columns:1fr}.compact-form label.wide,.compact-form .wide{grid-column:span 1}.compact-columns{grid-template-columns:1fr}}
+    body.erp-popup-page .booking-modal { width:min(560px,calc(100vw - 32px)) !important; overflow:hidden; border:1px solid #dbe7ef; border-radius:18px; font-size:14px; box-shadow:0 24px 60px rgba(15,56,88,.22); }
+    body.erp-popup-page .booking-modal .modal-header { padding:22px 24px 14px !important; border-bottom:1px solid #e5edf2 !important; background:linear-gradient(120deg,#fff,#f3fafc); }
+    body.erp-popup-page .booking-modal .modal-body { padding:22px 24px !important; }
+    body.erp-popup-page .booking-modal .modal-footer { padding:14px 24px 22px !important; border-top:1px solid #e5edf2 !important; background:#fbfdfe; }
+    body.erp-popup-page .booking-modal .btn { min-height:40px; border-radius:9px; font-weight:800; }
+    @media(max-width:700px){.compact-tools{grid-template-columns:repeat(2,minmax(0,1fr));padding:12px}.compact-body{padding:16px}.compact-form{grid-template-columns:1fr;padding:18px}.compact-form label.wide,.compact-form .wide{grid-column:span 1}.compact-columns{grid-template-columns:1fr}.compact-menu{min-height:58px;padding:0 18px}.compact-menu strong{font-size:17px}}
     [x-cloak] { display: none !important; }
     .legacy-product-summary,
     .barcode-badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11.5px; font-weight:600; border:1px solid transparent; white-space:nowrap; }

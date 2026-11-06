@@ -2649,6 +2649,13 @@ pending
 
 # Handoff — 2026-11-02 (แก้สีหน้า Executive Dashboard)
 
+## Handoff - 2026-11-06
+- Commit: pending — modern product popups
+- ทำอะไร: ปรับเฉพาะ UI ของ popup แฟ้มสินค้าและ dialog ภายใน (กำหนดราคา, แก้ไขสินค้า, เพิ่มบาร์โค้ด) ให้เป็น card/modal สมัยใหม่: overlay blur, header/close button, card tab เดียว, form/table ที่อ่านง่าย, focus state และ responsive สำหรับมือถือ; ไม่เปลี่ยน field, validation, event, route, form action หรือเงื่อนไขธุรกิจ
+- ทดสอบ: `php artisan view:cache` ผ่าน; `php artisan test tests/Feature/ProductCatalogFilterTest.php tests/Feature/BarcodePolicyTest.php tests/Feature/ScalePluPageTest.php --no-coverage` ผ่าน 25 tests / 177 assertions; `git diff --check` ผ่าน
+- Deploy: ยังไม่ deploy
+- งานถัดไป: review ภาพจริงผ่าน branch นี้ก่อน merge/deploy
+
 ## Handoff - 2026-11-05
 - Commit: pending — complete temporary POS PIN change before opening a shift
 - ทำอะไร: แก้ JET POS Python ที่ login ด้วย PIN ชั่วคราวสำเร็จ แต่พยายามเปิดกะต่อทั้งที่ ERP บังคับเปลี่ยน PIN และยังไม่ยืนยันตัวตนเครื่อง ทำให้เปิดกะไม่สำเร็จ; ตอนนี้แอปจะเด้งแป้นใหญ่ให้ตั้ง PIN ใหม่และกรอกยืนยันซ้ำ, ส่งเปลี่ยน PIN ไป ERP, login ใหม่ แล้วจึงเปิดกะ

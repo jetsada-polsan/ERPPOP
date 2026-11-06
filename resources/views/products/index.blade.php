@@ -277,14 +277,20 @@
     }
     .booking-modal {
         width: min(1120px, 100%); max-height: calc(100vh - 48px); overflow: auto;
-        background: #fff; border-radius: 18px; box-shadow: 0 24px 80px rgba(15, 23, 42, .24);
+        background: #fff; border:1px solid #dbe7ef; border-radius:20px; box-shadow:0 28px 88px rgba(15, 56, 88, .28);
     }
-    .product-popup-backdrop { position:fixed; inset:0; z-index:1950; display:flex; align-items:center; justify-content:center; padding:12px; background:rgba(15,23,42,.48); }
-    .product-popup-window { width:min(760px,calc(100vw - 24px)); height:min(540px,calc(100vh - 24px)); display:flex; flex-direction:column; overflow:hidden; border:1px solid #777d83; border-radius:2px; background:#ececec; box-shadow:0 18px 52px rgba(15,23,42,.3); }
-    .product-popup-titlebar { min-height:32px; display:flex; align-items:center; justify-content:space-between; padding:0 4px 0 9px; color:#111827; background:#f5f5f5; border-bottom:1px solid #9da2a7; font:700 12px Tahoma,"Noto Sans Thai",sans-serif; }
-    .product-popup-titlebar button { width:28px; height:27px; display:grid; place-items:center; border:0; border-radius:0; color:#374151; background:transparent; }
-    .product-popup-titlebar button:hover { color:#b91c1c; background:#fee2e2; }
-    .product-popup-window iframe { width:100%; height:100%; flex:1 1 auto; border:0; background:#eef5f9; }
+    .booking-modal .modal-header { background:linear-gradient(120deg,#fff,#f2f9fc); border-bottom:1px solid #e4edf2 !important; }
+    .booking-modal .modal-footer { background:#fbfdfe; border-top:1px solid #e4edf2 !important; }
+    .booking-modal .btn { min-height:42px; border-radius:10px; font-weight:800; }
+    .product-popup-backdrop { position:fixed; inset:0; z-index:1950; display:flex; align-items:center; justify-content:center; padding:24px; background:rgba(15,35,54,.58); backdrop-filter:blur(4px); }
+    .product-popup-window { width:min(1240px,calc(100vw - 48px)); height:min(840px,calc(100vh - 48px)); display:flex; flex-direction:column; overflow:hidden; border:1px solid rgba(255,255,255,.72); border-radius:22px; background:#f7fafc; box-shadow:0 30px 100px rgba(5,29,49,.38); }
+    .product-popup-titlebar { min-height:66px; display:flex; align-items:center; justify-content:space-between; padding:0 16px 0 24px; color:#19344d; background:linear-gradient(120deg,#fff,#edf8fb); border-bottom:1px solid #dbe7ef; font:800 17px Tahoma,"Noto Sans Thai",sans-serif; }
+    .product-popup-titlebar > div { display:flex; align-items:center; gap:4px; }
+    .product-popup-titlebar > div i { display:grid; place-items:center; width:34px; height:34px; margin:0 !important; border-radius:10px; color:#fff; background:linear-gradient(135deg,var(--erp-primary),#14b8a6); font-size:17px; }
+    .product-popup-titlebar button { width:40px; height:40px; display:grid; place-items:center; border:1px solid #d6e3eb; border-radius:11px; color:#506779; background:#fff; transition:.16s ease; }
+    .product-popup-titlebar button:hover { border-color:#fecaca; color:#b91c1c; background:#fff5f5; transform:rotate(2deg); }
+    .product-popup-window iframe { width:100%; height:100%; flex:1 1 auto; border:0; background:#f7fafc; }
+    @media(max-width:720px){.product-popup-backdrop{padding:10px}.product-popup-window{width:100%;height:calc(100vh - 20px);border-radius:16px}.product-popup-titlebar{min-height:58px;padding-left:16px;font-size:16px}}
     .product-page { --product-border:var(--erp-border); --product-ink:var(--erp-text); }
     .product-toolbar { display:flex; align-items:flex-end; justify-content:space-between; gap:9px; padding:9px 10px; border:1px solid var(--product-border); border-radius:10px; background:rgba(255,255,255,.88); box-shadow:0 3px 10px rgba(15,51,74,.04); }
     .product-filter-bar { display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap; flex:1 1 auto; }
