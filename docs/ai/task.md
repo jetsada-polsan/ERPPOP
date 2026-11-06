@@ -15,7 +15,8 @@
 - `git diff --check` ผ่าน
 
 ## Deploy
-- รอ push และ GitHub Actions production deploy หลังเจ้าของยืนยันรอบนี้
+- Production deploy สำเร็จผ่าน GitHub Actions run `42224153635` จาก branch `codex/report-stock-units`; test, frontend build, upload และ `scripts/deploy.sh` ผ่านครบ
+- ตรวจใน production browser แล้วหน้าใบเสร็จ POS โหมดพิมพ์โหลดสำเร็จและแสดงข้อมูลรายงานตามปกติ; route รายงานไม่ render หัวพิมพ์กลางซ้ำ
 
 ## งานถัดไป
 - ตรวจ preview ใบเสร็จ POS/รายงานบน production ว่าเหลือหัวรายงานชุดเดียว
