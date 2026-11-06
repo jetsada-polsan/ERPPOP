@@ -192,14 +192,26 @@ def replace_promotions(db: sqlite3.Connection, rows: list[dict]) -> int:
     return saved
 
 
+def _local_day(value) -> date | None:
+    """Calendar day of an ERP date value in the shop's local time zone."""
+    if value in (None, ""):
+        return None
+    text = str(value).strip()
+    if len(text) == 10:
+        return date.fromisoformat(text)
+    parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    return (parsed.astimezone() if parsed.tzinfo else parsed).date()
+
+
 def active_promotions(db: sqlite3.Connection, today: date | datetime | None = None) -> list[QtyPromotion]:
     moment = today if isinstance(today, datetime) else datetime.combine(today, time.min).astimezone() if today else datetime.now().astimezone()
-    day = moment.date().isoformat()
-    rows = db.execute(
-        """SELECT * FROM qty_promotions
-           WHERE (starts_date IS NULL OR substr(starts_date, 1, 10) <= ?)
-             AND (ends_date IS NULL OR substr(ends_date, 1, 10) >= ?)
-           ORDER BY id""", (day, day)).fetchall()
+    day = moment.date()
+    # ERP sends date-only columns serialised as UTC midnight (Bangkok 6 Nov arrives as
+    # "2026-11-05T17:00:00Z"), so comparing the raw text lost a promotion's last day and
+    # started it a day early. Convert to the shop's local date before comparing.
+    rows = [row for row in db.execute("SELECT * FROM qty_promotions ORDER BY id").fetchall()
+            if (_local_day(row["starts_date"]) is None or _local_day(row["starts_date"]) <= day)
+            and (_local_day(row["ends_date"]) is None or _local_day(row["ends_date"]) >= day)]
     result = [QtyPromotion(
         product_id=int(row["product_id"]), promo_type=str(row["promo_type"]), min_qty=_dec(row["min_qty"]),
         free_product_id=row["free_product_id"], free_qty=_dec(row["free_qty"]), discount_type=row["discount_type"],
