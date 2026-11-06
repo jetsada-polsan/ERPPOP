@@ -95,7 +95,7 @@
                 <a class="posd-btn secondary" href="{{ route('pos.preview') }}" target="_blank" rel="noopener"><i class="bi bi-display me-1"></i> ดูหน้าที่ Build แล้ว</a>
                 <a class="posd-btn secondary" href="{{ route('settings.pos-builds.index') }}"><i class="bi bi-box-seam me-1"></i> Build โปรแกรม</a>
                 <button class="posd-btn ghost" type="submit" name="reset" value="1" formnovalidate
-                        onclick="return confirm('คืนค่าแบบร่างกลับเป็นค่าเริ่มต้น? ค่าที่ Publish ไปแล้วจะยังไม่เปลี่ยนจนกว่าจะกด Build &amp; Publish อีกครั้ง')">
+                        data-confirm="คืนค่าแบบร่างกลับเป็นค่าเริ่มต้น? ค่าที่ Publish ไปแล้วจะยังไม่เปลี่ยนจนกว่าจะกด Build &amp; Publish อีกครั้ง">
                     คืนค่าเริ่มต้น
                 </button>
                 <button class="posd-btn secondary" type="submit" :disabled="errors.length > 0">บันทึกแบบร่าง</button>

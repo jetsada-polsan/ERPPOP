@@ -84,7 +84,7 @@ class CreditDebitNoteController extends Controller
                 'id' => $item->id,
                 'doc_number' => $item->document->doc_number,
                 'balance_amount' => (float) $item->balance_amount,
-                'creditable_amount' => $service->creditableAmount($item),
+                'creditable_amount' => (float) $service->creditableAmount($item),
                 'is_paid' => (float) $item->balance_amount <= 0.01,
             ])
             ->values();

@@ -81,7 +81,7 @@
                 </form>
                 @else
                 @if($stockCount->status === 'review')
-                <form method="post" action="{{ route('stock-counts.post', $stockCount) }}" onsubmit="return confirm('ยืนยันปรับสต็อกจริงตาม Scope นี้? การทำงานนี้ย้อนกลับอัตโนมัติไม่ได้')">@csrf
+                <form method="post" action="{{ route('stock-counts.post', $stockCount) }}" data-confirm="ยืนยันปรับสต็อกจริงตาม Scope นี้? การทำงานนี้ย้อนกลับอัตโนมัติไม่ได้">@csrf
                     <button class="btn btn-success btn-sm"><i class="bi bi-shield-check me-1"></i>Manager ยืนยันปรับสต็อกจริง</button>
                 </form>
                 @else

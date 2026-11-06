@@ -51,10 +51,10 @@
             @foreach($payment->paymentDocument->allocations as $i => $alloc)
             <tr>
                 <td class="c">{{ $i + 1 }}</td>
-                <td>{{ $alloc->openItem?->document?->doc_number ?? '-' }}</td>
-                <td>{{ $alloc->openItem?->due_date ? \Illuminate\Support\Carbon::parse($alloc->openItem->due_date)->thaiDate() : '-' }}</td>
-                <td class="r">{{ number_format((float) ($alloc->amount ?? 0), 2) }}</td>
-                <td class="r">{{ number_format((float) ($alloc->openItem?->balance_amount ?? 0), 2) }}</td>
+                <td>{{ $alloc->referenceNumber() }}</td>
+                <td>{{ ($alloc->supplierOpenItem ?? $alloc->openItem)?->due_date ? \Illuminate\Support\Carbon::parse(($alloc->supplierOpenItem ?? $alloc->openItem)->due_date)->thaiDate() : '-' }}</td>
+                <td class="r">{{ number_format((float) ($alloc->allocated_amount ?? 0), 2) }}</td>
+                <td class="r">{{ number_format((float) (($alloc->supplierOpenItem ?? $alloc->openItem)?->balance_amount ?? 0), 2) }}</td>
             </tr>
             @endforeach
         </tbody>

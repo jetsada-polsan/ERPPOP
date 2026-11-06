@@ -128,7 +128,7 @@
                                 @click="editExisting({{ $item->product_id }}, '{{ addslashes($item->product->sku_code) }}', '{{ addslashes($item->product->name_th) }}', {{ $item->flash_price }}, {{ $item->max_qty_per_bill ?? 'null' }})">
                                 แก้ไข
                             </button>
-                            <form method="post" action="{{ route('flash-sales.items.destroy', [$flashSale, $item]) }}" class="d-inline" onsubmit="return confirm('ลบสินค้านี้ออกจากแคมเปญ?')">
+                            <form method="post" action="{{ route('flash-sales.items.destroy', [$flashSale, $item]) }}" class="d-inline" data-confirm="ลบสินค้านี้ออกจากแคมเปญ?">
                                 @csrf @method('DELETE')
                                 <button class="btn btn-sm btn-light border text-danger"><i class="bi bi-trash3"></i></button>
                             </form>

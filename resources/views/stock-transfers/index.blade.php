@@ -51,7 +51,7 @@
                                     @elseif($transfer->status === 'rejected')
                                         <span class="badge text-bg-danger">ปฏิเสธ</span>
                                     @else
-                                        <span class="badge text-bg-secondary">{{ $transfer->status }}</span>
+                                        <span class="badge text-bg-secondary">{{ \App\Support\DocumentStatus::label($transfer->status) }}</span>
                                     @endif
                                     @if($transfer->createdBy)
                                         <div class="text-muted small">ขอโดย {{ $transfer->createdBy->name }}</div>
@@ -59,11 +59,11 @@
                                 </td>
                                 <td class="text-end text-nowrap">
                                     @if($transfer->status === 'pending')
-                                        <form method="post" action="{{ route('stock-transfers.approve', $transfer) }}" class="d-inline" onsubmit="return confirm('อนุมัติและโอนสต็อกใบนี้?')">
+                                        <form method="post" action="{{ route('stock-transfers.approve', $transfer) }}" class="d-inline" data-confirm="อนุมัติและโอนสต็อกใบนี้?">
                                             @csrf
                                             <button class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i> อนุมัติ</button>
                                         </form>
-                                        <form method="post" action="{{ route('stock-transfers.reject', $transfer) }}" class="d-inline" onsubmit="return confirm('ปฏิเสธคำขอนี้?')">
+                                        <form method="post" action="{{ route('stock-transfers.reject', $transfer) }}" class="d-inline" data-confirm="ปฏิเสธคำขอนี้?">
                                             @csrf
                                             <button class="btn btn-sm btn-light text-danger border">ปฏิเสธ</button>
                                         </form>

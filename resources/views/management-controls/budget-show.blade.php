@@ -26,7 +26,7 @@
             </span>
             @if($budget->status === 'draft' && $canApprove)
                 <form method="post" action="{{ route('management-controls.budgets.approve', $budget->id) }}"
-                      onsubmit="return confirm('อนุมัติงบประมาณนี้?')">
+                      data-confirm="อนุมัติงบประมาณนี้?">
                     @csrf<button class="btn btn-success"><i class="bi bi-check2-circle me-1"></i>อนุมัติงบ</button>
                 </form>
             @endif

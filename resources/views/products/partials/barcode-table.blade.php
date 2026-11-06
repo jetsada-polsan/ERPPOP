@@ -49,7 +49,7 @@
                         <td class="small text-muted text-nowrap">{{ $barcode->updated_at?->format('d/m/Y H:i') ?? '-' }}</td>
                         <td class="text-end text-nowrap">
                             <button type="button" class="btn btn-sm btn-light border" @click='openBarcodeEdit(@json($editRow))'>แก้ไข</button>
-                            <form method="post" action="{{ route('products.barcodes.destroy', [$product, $barcode]) }}" class="d-inline" onsubmit="return confirm('ลบบาร์โค้ด {{ $barcode->barcode }}? ถ้ามีประวัติขาย ระบบจะไม่ให้ลบ ให้ปิดใช้งานแทน')">
+                            <form method="post" action="{{ route('products.barcodes.destroy', [$product, $barcode]) }}" class="d-inline" data-confirm="ลบบาร์โค้ด {{ $barcode->barcode }}? ถ้ามีประวัติขาย ระบบจะไม่ให้ลบ ให้ปิดใช้งานแทน">
                                 @csrf @method('DELETE')
                                 <input type="hidden" name="popup" value="{{ request()->boolean('popup') ? 1 : 0 }}">
                                 <button class="btn btn-sm btn-outline-danger" title="ลบ"><i class="bi bi-trash3"></i></button>

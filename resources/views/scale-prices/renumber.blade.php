@@ -37,7 +37,7 @@
     <h2 class="h5">แผนรันเลขใหม่</h2>
     <p>สร้างแผนจากแท็บตรวจสินค้าชั่ง แก้เลขแล้วกดบันทึกตัวอย่างก่อนใช้แผน ล็อกเลขเพื่อคงเลขนั้นเมื่อเรียงใหม่</p>
     <div class="d-flex gap-2 flex-wrap mb-3">@foreach($plans as $history)
-        <a class="btn btn-sm border" href="{{ route('scale-prices.index', ['plan'=>$history->id, 'section'=>'plan']) }}">ชุด {{ $history->id }} · {{ ['preview'=>'ตัวอย่าง','applied'=>'ใช้แล้ว','rolled_back'=>'ยกเลิกแล้ว'][$history->status] ?? $history->status }}</a>
+        <a class="btn btn-sm border" href="{{ route('scale-prices.index', ['plan'=>$history->id, 'section'=>'plan']) }}">ชุด {{ $history->id }} · {{ ['preview'=>'ตัวอย่าง','applied'=>'ใช้แล้ว','rolled_back'=>'ยกเลิกแล้ว'][$history->status] ?? \App\Support\DocumentStatus::label($history->status) }}</a>
     @endforeach</div>
     @if($plan)
     <input x-model="q" class="form-control mb-3" style="max-width:320px" placeholder="ค้นหาในแผน" aria-label="ค้นหาในแผน">

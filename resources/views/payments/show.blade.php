@@ -18,7 +18,7 @@
                 <a href="{{ route('payments.print', $payment) }}" target="_blank" class="btn btn-primary px-3">
                     <i class="bi bi-receipt me-1"></i> {{ $payment->documentType->code === 'RECEIPT' ? 'ใบเสร็จรับเงิน (A4)' : 'ใบสำคัญจ่าย (A4)' }}
                 </a>
-                <span class="badge text-bg-success fs-6 px-3 py-2">{{ $payment->paymentDocument?->status }}</span>
+                <span class="badge text-bg-success fs-6 px-3 py-2">{{ \App\Support\DocumentStatus::label($payment->paymentDocument?->status) }}</span>
                 @include('documents._void-action', ['doc' => $payment])
             </div>
         </div>
@@ -53,7 +53,7 @@
                     <tbody>
                         @foreach($payment->paymentDocument->allocations as $alloc)
                         <tr>
-                            <td>{{ $alloc->openItem?->document?->doc_number ?? '-' }}</td>
+                            <td>{{ $alloc->referenceNumber() }}</td>
                             <td class="text-end">{{ number_format($alloc->allocated_amount, 2) }}</td>
                         </tr>
                         @endforeach

@@ -63,13 +63,14 @@ class SaleReturnSourceTest extends TestCase
         $sale = $this->cashSale($branch, $product, 3, $customer);
         $this->signIn();
 
-        $this->post(route('sale-returns.store'), $this->payload($branch, $product, 5, source: $sale->doc_number))
-            ->assertRedirect();
+        $this->postJson(route('sale-returns.store'), $this->payload($branch, $product, 5, source: $sale->doc_number))
+            ->assertUnprocessable()->assertJsonValidationErrors('items');
 
-        $error = (string) session('error');
-        $this->assertStringContainsString('รับคืนเกินจำนวนที่ขาย', $error);
-        $this->assertStringContainsString('คืนได้อีก 3', $error);
-        $this->assertStringContainsString('จะคืน 5', $error);
+        // Even a low requested price cannot bypass the independent quantity limit.
+        $payload = $this->payload($branch, $product, 5, source: $sale->doc_number);
+        $payload['items'][0]['unit_price'] = 10;
+        $this->post(route('sale-returns.store'), $payload)->assertRedirect();
+        $this->assertStringContainsString('รับคืนเกินจำนวนที่ขาย', (string) session('error'));
         $this->assertSame(0, $this->returns()->count());
     }
 
@@ -81,9 +82,7 @@ class SaleReturnSourceTest extends TestCase
 
         // คืนครั้งแรก 2 ชิ้น (ยังรออนุมัติ) -> เหลือคืนได้ 1
         $this->post(route('sale-returns.store'), $this->payload($branch, $product, 2, source: $sale->doc_number))->assertRedirect();
-        $this->post(route('sale-returns.store'), $this->payload($branch, $product, 2, source: $sale->doc_number))->assertRedirect();
-
-        $this->assertStringContainsString('คืนได้อีก 1 (ขาย 3 คืนไปแล้ว 2)', (string) session('error'));
+        $this->postJson(route('sale-returns.store'), $this->payload($branch, $product, 2, source: $sale->doc_number))->assertUnprocessable()->assertJsonValidationErrors('items');
         $this->assertSame(1, $this->returns()->count());
 
         // ใบที่ถูกปฏิเสธไม่นับเป็นคืนไปแล้ว
@@ -174,6 +173,82 @@ class SaleReturnSourceTest extends TestCase
         $this->get(route('sale-returns.index'))->assertOk()
             ->assertSee('ใบขายต้นทาง (ขายสด / ขายเชื่อ)')
             ->assertSee('name="source_doc_number"', escape: false);
+    }
+
+    public function test_credit_notes_and_pending_returns_share_the_sale_value_limit(): void
+    {
+        [$branch, $product, $customer] = $this->masters();
+        $sale = app(CashSaleService::class)->create([
+            'branch_id' => $branch->id, 'customer_id' => $customer->id,
+            'items' => [['product_id' => $product->id, 'qty' => 1, 'unit_price' => 20]],
+        ]);
+        $this->signIn();
+        $type = DocumentType::firstOrCreate(['code' => 'CREDIT_NOTE'], ['name_th' => 'ใบลดหนี้']);
+        $note = Document::create([
+            'document_type_id' => $type->id, 'branch_id' => $branch->id,
+            'doc_number' => 'CN-LIMIT', 'doc_date' => now(), 'customer_id' => $customer->id,
+            'reference' => $sale->doc_number, 'status' => 'active', 'total_amount' => '5.00',
+        ]);
+        $this->getJson(route('sale-returns.source', ['doc_number' => $sale->doc_number]))
+            ->assertOk()->assertJsonPath('refundable_amount', '15.00000000')->assertJsonPath('lines.0.unit_price', 15);
+        $payload = $this->payload($branch, $product, 1, source: $sale->doc_number);
+        $payload['items'][0]['unit_price'] = '15.01';
+        $this->postJson(route('sale-returns.store'), $payload)->assertUnprocessable()->assertJsonValidationErrors('items');
+        $this->assertSame(0, $this->returns()->count());
+        $payload['items'][0]['qty'] = '0.5';
+        $payload['items'][0]['unit_price'] = '20';
+        $this->postJson(route('sale-returns.store'), $payload)->assertRedirect(); // reserve 10
+        $payload['items'][0]['unit_price'] = '10.01'; // 5.005 > remaining 5
+        $this->postJson(route('sale-returns.store'), $payload)->assertUnprocessable();
+        $this->assertSame(1, $this->returns()->count());
+        $note->update(['status' => 'rejected']);
+        $this->getJson(route('sale-returns.source', ['doc_number' => $sale->doc_number]))
+            ->assertOk()->assertJsonPath('refundable_amount', '10.00000000');
+    }
+
+    public function test_pending_credit_reserves_value_and_cancelled_credits_release_it(): void
+    {
+        [$branch, $product, $customer] = $this->masters();
+        $sale = $this->cashSale($branch, $product, 1, $customer);
+        $this->signIn();
+        $type = DocumentType::firstOrCreate(['code' => 'CREDIT_NOTE'], ['name_th' => 'ใบลดหนี้']);
+        $note = Document::create([
+            'document_type_id' => $type->id, 'branch_id' => $branch->id, 'doc_number' => 'CN-PENDING',
+            'doc_date' => now(), 'customer_id' => $customer->id, 'source_document_id' => $sale->id,
+            'status' => 'pending_approval', 'total_amount' => '100',
+        ]);
+        $this->getJson(route('sale-returns.source', ['doc_number' => $sale->doc_number]))
+            ->assertOk()->assertJsonPath('refundable_amount', '0.00000000')->assertJsonPath('lines.0.unit_price', 0);
+        $note->update(['status' => 'cancelled']);
+        $this->getJson(route('sale-returns.source', ['doc_number' => $sale->doc_number]))
+            ->assertOk()->assertJsonPath('refundable_amount', '100.00000000');
+    }
+
+    public function test_approval_rechecks_the_credit_budget_before_stock_or_accounting_changes(): void
+    {
+        [$branch, $product, $customer] = $this->masters();
+        $sale = $this->cashSale($branch, $product, 1, $customer);
+        $this->signIn();
+        $payload = $this->payload($branch, $product, 1, source: $sale->doc_number);
+        $payload['items'][0]['unit_price'] = '75';
+        $this->post(route('sale-returns.store'), $payload)->assertRedirect();
+        $return = $this->returns()->sole();
+        $type = DocumentType::firstOrCreate(['code' => 'CREDIT_NOTE'], ['name_th' => 'ใบลดหนี้']);
+        Document::create(['document_type_id' => $type->id, 'branch_id' => $branch->id, 'doc_number' => 'CN-LEGACY-OVERLAP',
+            'doc_date' => now(), 'customer_id' => $customer->id, 'reference' => $sale->doc_number,
+            'status' => 'active', 'total_amount' => '25.01']);
+        $this->signIn(['finance.note.approve']);
+        $beforeStock = \App\Models\StockBalance::pluck('on_hand_qty', 'id')->all();
+        $beforeGl = \App\Models\GlJournal::count();
+        try {
+            app(\App\Services\Sales\SaleReturnService::class)->approve($return, auth()->id());
+            $this->fail('Approval must recheck remaining sale value');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->assertArrayHasKey('items', $e->errors());
+        }
+        $this->assertSame('pending_approval', $return->fresh()->status);
+        $this->assertSame($beforeStock, \App\Models\StockBalance::pluck('on_hand_qty', 'id')->all());
+        $this->assertSame($beforeGl, \App\Models\GlJournal::count());
     }
 
     private function payload(Branch $branch, Product $product, float $qty, ?Customer $customer = null, ?string $source = null): array

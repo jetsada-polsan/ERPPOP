@@ -100,7 +100,7 @@
                         <td>{{ $period->note ?: '-' }}</td>
                         <td class="text-end">
                             @if ($period->isClosed())
-                                <form method="post" action="{{ route('accounting-periods.reopen', $period) }}" class="d-inline" onsubmit="return confirm('เปิดงวดนี้อีกครั้งหรือไม่? เอกสารย้อนหลังจะกลับมาแก้ไขได้')">@csrf<button class="period-action open-action" title="เปิดงวด"><i class="bi bi-unlock"></i></button></form>
+                                <form method="post" action="{{ route('accounting-periods.reopen', $period) }}" class="d-inline" data-confirm="เปิดงวดนี้อีกครั้งหรือไม่? เอกสารย้อนหลังจะกลับมาแก้ไขได้">@csrf<button class="period-action open-action" title="เปิดงวด"><i class="bi bi-unlock"></i></button></form>
                             @else
                                 @php($blocked=collect($readiness[$period->id]??[])->contains('status','block'))
                                 <button type="button" class="period-action close-action" title="{{ $blocked?'ต้องแก้รายการใน checklist ให้ผ่านก่อน':'ปิดงวด' }}" @disabled($blocked) @click="closeId={{ $period->id }};closeName={{ Js::from($period->name) }};closeAction={{ Js::from(route('accounting-periods.close', $period)) }}"><i class="bi bi-lock"></i></button>

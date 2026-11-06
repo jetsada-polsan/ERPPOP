@@ -46,7 +46,7 @@
             <div class="ms-auto d-flex gap-2">
                 @if($purchaseOrder->status === 'requested')
                     @if(auth()->user()->hasPermission('purchasing.approve') && (($purchaseOrder->requested_by !== auth()->id() || auth()->user()->hasPermission('system.admin')) || auth()->user()->hasPermission('system.admin')))
-                    <form method="post" action="{{ route('purchase-orders.approve', $purchaseOrder) }}" onsubmit="return confirm('อนุมัติใบขอซื้อนี้?')">@csrf<button class="btn btn-info text-white"><i class="bi bi-check2-circle me-1"></i>อนุมัติ</button></form>
+                    <form method="post" action="{{ route('purchase-orders.approve', $purchaseOrder) }}" data-confirm="อนุมัติใบขอซื้อนี้?">@csrf<button class="btn btn-info text-white"><i class="bi bi-check2-circle me-1"></i>อนุมัติ</button></form>
                     @else
                     <span class="badge text-bg-light border align-self-center">รอผู้อนุมัติคนอื่น</span>
                     @endif
@@ -56,7 +56,7 @@
                     <button type="button" class="btn btn-success" @click="receiveOpen = true"><i class="bi bi-box-arrow-in-down me-1"></i>{{ $purchaseOrder->status === 'partially_received' ? 'รับของรอบถัดไป' : 'รับของเข้าคลัง' }}</button>
                 @endif
                 @if(!in_array($purchaseOrder->status, ['partially_received', 'received', 'cancelled']))
-                    <form method="post" action="{{ route('purchase-orders.cancel', $purchaseOrder) }}" onsubmit="return confirm('ยกเลิกใบขอซื้อนี้?')">@csrf<button class="btn btn-light border text-danger">ยกเลิก</button></form>
+                    <form method="post" action="{{ route('purchase-orders.cancel', $purchaseOrder) }}" data-confirm="ยกเลิกใบขอซื้อนี้?">@csrf<button class="btn btn-light border text-danger">ยกเลิก</button></form>
                 @endif
                 @if(in_array($purchaseOrder->status, ['ordered', 'partially_received', 'received']))
                     <a href="{{ route('purchase-orders.print', $purchaseOrder) }}" target="_blank" class="btn btn-primary"><i class="bi bi-printer me-1"></i>พิมพ์ใบสั่งซื้อ (A4)</a>
@@ -311,7 +311,7 @@
                 </div>
                 <div class="d-flex justify-content-end gap-2 px-4 pb-4">
                     <button type="button" class="btn btn-light border" @click="receiveOpen = false">ยกเลิก</button>
-                    <button class="btn btn-success" onclick="return confirm('ยืนยันรับสินค้าเข้าคลังและสร้างเจ้าหนี้?')"><i class="bi bi-check2-circle me-1"></i>ยืนยันรับสินค้า</button>
+                    <button class="btn btn-success" data-confirm="ยืนยันรับสินค้าเข้าคลังและสร้างเจ้าหนี้?"><i class="bi bi-check2-circle me-1"></i>ยืนยันรับสินค้า</button>
                 </div>
             </form>
         </div>

@@ -149,7 +149,7 @@
                                 <td class="text-end fw-semibold">{{ number_format($booking->document->total_amount, 2) }}</td>
                                 <td>
                                     <span class="badge {{ $statusColor[$booking->status] ?? 'text-bg-light' }}">
-                                        {{ $statusLabel[$booking->status] ?? $booking->status }}
+                                        {{ $statusLabel[$booking->status] ?? \App\Support\DocumentStatus::label($booking->status) }}
                                     </span>
                                 </td>
                                 <td class="text-end">

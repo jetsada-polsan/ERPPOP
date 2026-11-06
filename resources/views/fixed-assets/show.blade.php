@@ -30,7 +30,7 @@
             <div class="text-muted small">มูลค่าตามบัญชีคงเหลือ</div>
             <div class="display-6 fw-bold text-success">฿{{ number_format($asset->bookValue(), 2) }}</div>
             @if($asset->status !== 'disposed')
-                <form method="post" action="{{ route('fixed-assets.dispose', $asset) }}" class="mt-3" onsubmit="return confirm('จำหน่าย/ตัดทรัพย์สินนี้ออกจากทะเบียน?')">
+                <form method="post" action="{{ route('fixed-assets.dispose', $asset) }}" class="mt-3" data-confirm="จำหน่าย/ตัดทรัพย์สินนี้ออกจากทะเบียน?">
                     @csrf<button class="btn btn-outline-dark btn-sm"><i class="bi bi-x-octagon me-1"></i>จำหน่าย/ตัดออก</button>
                 </form>
             @else

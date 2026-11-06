@@ -71,7 +71,7 @@
                     <input name="reason" required class="form-control" placeholder="เช่น กรอกราคาผิดตอนรับของ / ใบแจ้งหนี้จริงราคาต่างจากที่บันทึกไว้">
                 </div>
                 <div class="col-md-3">
-                    <button class="btn btn-warning w-100" onclick="return confirm('ยืนยันปรับต้นทุน? การปรับนี้กระทบมูลค่าสต๊อกคงเหลือของสินค้าทันที')">
+                    <button class="btn btn-warning w-100" data-confirm="ยืนยันปรับต้นทุน? การปรับนี้กระทบมูลค่าสต๊อกคงเหลือของสินค้าทันที">
                         <i class="bi bi-pencil-square me-1"></i>บันทึกการปรับต้นทุน
                     </button>
                 </div>

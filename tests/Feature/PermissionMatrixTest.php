@@ -388,7 +388,7 @@ class PermissionMatrixTest extends TestCase
                 'warehouse_location_id' => $ownLocation->id,
             ]))
             ->assertOk()
-            ->assertExactJson(['on_hand_qty' => 12]);
+            ->assertExactJson(['on_hand_qty' => 12, 'reserved_qty' => 2, 'warehouse_location_id' => $ownLocation->id, 'average_cost' => 123.45]);
 
         $this->actingAs($branchManager)
             ->getJson(route('search.stock-balance', [

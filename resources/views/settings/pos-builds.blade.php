@@ -91,7 +91,7 @@
                 <tr>
                     <td><strong>{{ $build->version }}</strong><div class="small text-muted">{{ $build->channel }}</div></td>
                     <td><code>{{ $build->source_ref }}</code>@if($build->commit_sha)<div class="small text-muted">{{ substr($build->commit_sha, 0, 8) }}</div>@endif</td>
-                    <td><span class="build-status {{ $build->status }}"><i class="bi {{ $build->status === 'success' ? 'bi-check-circle-fill' : ($build->status === 'in_progress' ? 'bi-arrow-repeat' : ($build->status === 'queued' ? 'bi-hourglass-split' : 'bi-x-circle-fill')) }}"></i>{{ ['queued'=>'รอคิว','in_progress'=>'กำลัง Build','success'=>'สำเร็จ','failed'=>'ล้มเหลว','cancelled'=>'ยกเลิก'][$build->status] ?? $build->status }}</span>@if($build->failure_message)<div class="small text-danger mt-1">{{ $build->failure_message }}</div>@endif</td>
+                    <td><span class="build-status {{ $build->status }}"><i class="bi {{ $build->status === 'success' ? 'bi-check-circle-fill' : ($build->status === 'in_progress' ? 'bi-arrow-repeat' : ($build->status === 'queued' ? 'bi-hourglass-split' : 'bi-x-circle-fill')) }}"></i>{{ ['queued'=>'รอคิว','in_progress'=>'กำลัง Build','success'=>'สำเร็จ','failed'=>'ล้มเหลว','cancelled'=>'ยกเลิก'][$build->status] ?? \App\Support\DocumentStatus::label($build->status) }}</span>@if($build->failure_message)<div class="small text-danger mt-1">{{ $build->failure_message }}</div>@endif</td>
                     <td>{{ $build->requester?->name ?? '-' }}</td>
                     <td class="small">{{ $build->created_at->timezone('Asia/Bangkok')->format('d/m/Y H:i') }}</td>
                     <td><div class="d-flex gap-2">

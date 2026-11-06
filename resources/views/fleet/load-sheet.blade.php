@@ -6,7 +6,7 @@
 <div class="card"><div class="card-body">
     <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
         <div><h2 class="h5 mb-1">{{ $job->booking->document->doc_number }} · {{ $job->booking->document->customer?->name_th }}</h2><div class="text-muted small">ใบส่งของชั่วคราวใช้ตรวจ/แนบเอกสารเท่านั้น ไม่ใช่ใบขาย</div></div>
-        <span class="badge text-bg-info">{{ ['booked'=>'รอจัดของ','loaded'=>'ขึ้นรถแล้ว','in_transit'=>'กำลังส่ง','delivered'=>'ส่งครบแล้ว','paid'=>'รับเงินแล้ว','cancelled'=>'ยกเลิก'][$job->status] ?? $job->status }}</span>
+        <span class="badge text-bg-info">{{ ['booked'=>'รอจัดของ','loaded'=>'ขึ้นรถแล้ว','in_transit'=>'กำลังส่ง','delivered'=>'ส่งครบแล้ว','paid'=>'รับเงินแล้ว','cancelled'=>'ยกเลิก'][$job->status] ?? \App\Support\DocumentStatus::label($job->status) }}</span>
     </div>
     @unless($editable)
         <div class="alert alert-info">ยืนยันขึ้นรถแล้ว ใบขึ้นของนี้แก้ไขไม่ได้ หากจำนวนไม่ตรงให้ติดต่อผู้ดูแลก่อนออกใบขาย</div>

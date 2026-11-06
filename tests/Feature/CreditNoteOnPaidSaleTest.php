@@ -46,6 +46,19 @@ class CreditNoteOnPaidSaleTest extends TestCase
         $this->assertSame(0.0, $this->gl($note, ChartOfAccount::ROLE_CASH, 'credit'));
     }
 
+    public function test_a_sale_return_reserves_value_before_a_credit_note_can_be_created(): void
+    {
+        [$customer, $item, $branch] = $this->creditSale(200, paid: 0);
+        $type = DocumentType::firstOrCreate(['code' => 'SALE_RETURN'], ['name_th' => 'คืน']);
+        Document::create(['document_type_id' => $type->id, 'branch_id' => $branch->id, 'doc_number' => 'RET-CREDIT-LIMIT',
+            'doc_date' => now(), 'customer_id' => $customer->id, 'source_document_id' => $item->document_id,
+            'status' => 'pending_approval', 'total_amount' => '20.00']);
+        $this->assertEquals(180, app(CreditDebitNoteService::class)->creditableAmount($item));
+        $this->expectException(RuntimeException::class);
+        app(CreditDebitNoteService::class)->create(['type' => 'credit', 'customer_id' => $customer->id,
+            'branch_id' => $branch->id, 'amount' => '180.01', 'reason' => 'เกินหนึ่งสตางค์', 'open_item_id' => $item->id]);
+    }
+
     public function test_a_fully_paid_sale_can_be_credited_as_a_cash_refund(): void
     {
         [$customer, $item, $branch] = $this->creditSale(200, paid: 200);

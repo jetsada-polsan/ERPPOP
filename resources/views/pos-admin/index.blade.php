@@ -156,17 +156,17 @@
                             <td class="text-end text-nowrap">
                                 @if($row['active'])
                                     <span class="me-2">รหัสเครื่อง <strong class="font-monospace fs-6">{{ $d->pair_code }}</strong></span>
-                                    <form method="post" action="{{ route('pos-admin.devices.pair-code', $d) }}" class="d-inline" onsubmit="return confirm('เปลี่ยนรหัสเครื่องนี้?')">
+                                    <form method="post" action="{{ route('pos-admin.devices.pair-code', $d) }}" class="d-inline" data-confirm="เปลี่ยนรหัสเครื่องนี้?">
                                         @csrf
                                         <button class="btn btn-sm btn-outline-secondary">เปลี่ยนรหัส</button>
                                     </form>
-                                    <form method="post" action="{{ route('settings.pos-token.rotate') }}" class="d-inline" onsubmit="return confirm('ออก Token ใหม่ให้ {{ addslashes($d->name) }}? Token เดิมใช้ไม่ได้ทันที ต้องวาง Token ใหม่ที่เครื่อง')">
+                                    <form method="post" action="{{ route('settings.pos-token.rotate') }}" class="d-inline" data-confirm="ออก Token ใหม่ให้ {{ addslashes($d->name) }}? Token เดิมใช้ไม่ได้ทันที ต้องวาง Token ใหม่ที่เครื่อง">
                                         @csrf
                                         <input type="hidden" name="pos_device_id" value="{{ $d->id }}">
                                         <button class="btn btn-sm btn-outline-primary" title="ออก Token ใหม่"><i class="bi bi-arrow-repeat"></i> Token ใหม่</button>
                                     </form>
                                 @endif
-                                <form method="post" action="{{ route('settings.pos-token.delete') }}" class="d-inline" onsubmit="return confirm('ลบเครื่อง {{ addslashes($d->name) }}? เครื่องนี้จะเชื่อม ERP ไม่ได้อีก')">
+                                <form method="post" action="{{ route('settings.pos-token.delete') }}" class="d-inline" data-confirm="ลบเครื่อง {{ addslashes($d->name) }}? เครื่องนี้จะเชื่อม ERP ไม่ได้อีก">
                                     @csrf @method('DELETE')
                                     <input type="hidden" name="pos_device_id" value="{{ $d->id }}">
                                     <button class="btn btn-sm btn-outline-danger" title="ลบเครื่อง"><i class="bi bi-trash3"></i></button>
@@ -232,7 +232,7 @@
                                     @else<span class="badge text-bg-success">ตั้งแล้ว</span>@endif
                                 </td>
                                 <td class="text-end text-nowrap">
-                                    <form method="post" action="{{ route('pos-admin.cashiers.move', $cashier) }}" class="d-inline-flex gap-1" onsubmit="return confirm('ย้าย {{ $cashier->code }} ไปสาขาที่เลือก?')">
+                                    <form method="post" action="{{ route('pos-admin.cashiers.move', $cashier) }}" class="d-inline-flex gap-1" data-confirm="ย้าย {{ $cashier->code }} ไปสาขาที่เลือก?">
                                         @csrf
                                         <select name="branch_id" class="form-select form-select-sm" style="width:auto" aria-label="ย้ายไปสาขา">
                                             @foreach($allBranches as $target)<option value="{{ $target->id }}" @selected($target->id === $cashier->branch_id)>{{ $target->code }}</option>@endforeach
