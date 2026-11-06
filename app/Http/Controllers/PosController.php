@@ -1266,6 +1266,7 @@ class PosController extends Controller
                 ]);
 
                 $receipt = $this->recordPosReceipt($shift, $this->nextPosReceiptNo($shift), $data, $document);
+                app(GlPostingService::class)->postCashSale($document);
 
                 if ($discountCard) {
                     $lockedCard = DiscountCard::whereKey($discountCard->id)->lockForUpdate()->first();
@@ -1577,8 +1578,8 @@ class PosController extends Controller
 
         if ($data['method'] === 'mixed') {
             // จ่ายผสม: แยก 2 แถวตามช่องทาง — ยอดกะ/รายงานรวมจาก pos_payments จึงเข้าช่องถูกเอง
-            $cashPart = round((float) ($data['cash_amount'] ?? 0), 2);
-            $transferPart = round($net - $cashPart, 2); // ผูกกับยอดบิลจริง กันเศษปัดไม่ลงตัว
+            $cashPart = DecimalMath::round($data['cash_amount'] ?? 0, 2);
+            $transferPart = DecimalMath::subtract($net, $cashPart, 2); // ผูกกับยอดบิลจริง กันเศษปัดไม่ลงตัว
             PosPayment::create([
                 'pos_receipt_id' => $receipt->id,
                 'method' => 'cash',

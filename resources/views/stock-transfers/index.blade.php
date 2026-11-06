@@ -46,6 +46,8 @@
                                 <td>
                                     @if($transfer->status === 'pending')
                                         <span class="badge text-bg-warning">รออนุมัติ</span>
+                                    @elseif($transfer->status === 'in_transit')
+                                        <span class="badge text-bg-info">ระหว่างทาง</span>
                                     @elseif($transfer->status === 'active')
                                         <span class="badge text-bg-success">โอนแล้ว</span>
                                     @elseif($transfer->status === 'rejected')

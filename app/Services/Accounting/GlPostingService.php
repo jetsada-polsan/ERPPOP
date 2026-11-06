@@ -8,16 +8,13 @@ use App\Models\Document;
 use App\Models\GlJournal;
 use App\Models\PaymentDocument;
 use App\Services\Inventory\CostingService;
+use App\Support\DecimalMath;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
-/**
- * Posts double-entry GL journal lines (gl_journals, legacy: TRANPAYJ) for a
- * payment_document. The schema only journals payments (not sales/purchases/
- * stock - there's no account linkage on those tables), so this is intentionally
- * narrow: receipt = debit cash, credit AR; payment voucher = debit AP, credit
- * cash. Missing account mappings are fatal so an operational document can never
- * be committed without its required accounting entry.
+/** Append-only double-entry posting. Document-level locks serialize retries;
+ * component batches retain originals and append reversals when values change.
  */
 class GlPostingService
 {
@@ -58,22 +55,27 @@ class GlPostingService
      */
     public function reverseCustomerReceipt(PaymentDocument $paymentDocument, string $remark): void
     {
-        $lines = GlJournal::where('payment_document_id', $paymentDocument->id)
-            ->where('remark', 'not like', 'เช็คคืน:%')->get();
-        if ($lines->isEmpty() || GlJournal::where('payment_document_id', $paymentDocument->id)
-            ->where('remark', 'like', 'เช็คคืน:%')->exists()) {
-            return;
-        }
-        foreach ($lines as $line) {
-            GlJournal::create([
-                'payment_document_id' => $paymentDocument->id,
-                'account_id' => $line->account_id,
-                'debit' => (float) $line->credit,
-                'credit' => (float) $line->debit,
-                'remark' => 'เช็คคืน: '.$remark,
-                'entry_date' => now()->toDateString(),
-            ]);
-        }
+        DB::transaction(function () use ($paymentDocument, $remark) {
+            $paymentDocument = PaymentDocument::whereKey($paymentDocument->id)->lockForUpdate()->firstOrFail();
+            app(AccountingPeriodGuard::class)->assertOpen(now()->toDateString(), $paymentDocument->branch_id);
+            $lines = GlJournal::where('payment_document_id', $paymentDocument->id)
+                ->where('remark', 'not like', 'เช็คคืน:%')->get();
+            if ($lines->isEmpty() || GlJournal::where('payment_document_id', $paymentDocument->id)
+                ->where('remark', 'like', 'เช็คคืน:%')->exists()) {
+                return;
+            }
+            foreach ($lines as $line) {
+                GlJournal::create([
+                    'payment_document_id' => $paymentDocument->id,
+                    'account_id' => $line->account_id,
+                    'debit' => $line->credit,
+                    'credit' => $line->debit,
+                    'remark' => 'เช็คคืน: '.$remark,
+                    'entry_date' => now()->toDateString(),
+                ]);
+            }
+
+        });
     }
 
     /**
@@ -82,22 +84,27 @@ class GlPostingService
      */
     public function reversePaymentDocument(PaymentDocument $paymentDocument, string $remark): void
     {
-        $lines = GlJournal::where('payment_document_id', $paymentDocument->id)
-            ->where('remark', 'not like', 'VOID REVERSAL:%')->get();
-        if ($lines->isEmpty() || GlJournal::where('payment_document_id', $paymentDocument->id)
-            ->where('remark', 'like', 'VOID REVERSAL:%')->exists()) {
-            return;
-        }
-        foreach ($lines as $line) {
-            GlJournal::create([
-                'payment_document_id' => $paymentDocument->id,
-                'account_id' => $line->account_id,
-                'debit' => (float) $line->credit,
-                'credit' => (float) $line->debit,
-                'remark' => 'VOID REVERSAL: '.$remark,
-                'entry_date' => now()->toDateString(),
-            ]);
-        }
+        DB::transaction(function () use ($paymentDocument, $remark) {
+            $paymentDocument = PaymentDocument::whereKey($paymentDocument->id)->lockForUpdate()->firstOrFail();
+            app(AccountingPeriodGuard::class)->assertOpen(now()->toDateString(), $paymentDocument->branch_id);
+            $lines = GlJournal::where('payment_document_id', $paymentDocument->id)
+                ->where('remark', 'not like', 'VOID REVERSAL:%')->get();
+            if ($lines->isEmpty() || GlJournal::where('payment_document_id', $paymentDocument->id)
+                ->where('remark', 'like', 'VOID REVERSAL:%')->exists()) {
+                return;
+            }
+            foreach ($lines as $line) {
+                GlJournal::create([
+                    'payment_document_id' => $paymentDocument->id,
+                    'account_id' => $line->account_id,
+                    'debit' => $line->credit,
+                    'credit' => $line->debit,
+                    'remark' => 'VOID REVERSAL: '.$remark,
+                    'entry_date' => now()->toDateString(),
+                ]);
+            }
+
+        });
     }
 
     public function postSupplierPayment(PaymentDocument $paymentDocument, float $amount, string $entryDate, string $remark, float $withholding = 0, string $method = 'cash', ?int $bankAccountId = null): void
@@ -122,7 +129,7 @@ class GlPostingService
             'payment_document_id' => $paymentDocument->id,
             'account_id' => $cashAccount->id,
             'debit' => 0,
-            'credit' => round($amount - $withholding, 2),
+            'credit' => DecimalMath::subtract($amount, $withholding, 2),
             'remark' => $remark,
             'entry_date' => $entryDate,
         ]);
@@ -151,27 +158,27 @@ class GlPostingService
         // เล่มไม่มีภาษี (DSN, CSN) และใบรับคืนของบิลเล่มนั้นไม่คิด VAT ทั้งใบ
         $noVat = (bool) ($document->documentBook?->no_vat || $document->sourceDocument?->documentBook?->no_vat);
         $rate = $noVat ? 0.0 : $this->vatRate();
-        $subtotal = 0.0;
-        $vat = 0.0;
+        $subtotal = '0';
+        $vat = '0';
 
         foreach ($document->stockDocument?->items ?? [] as $item) {
-            $gross = abs((float) $item->qty * (float) $item->unit_price);
+            $gross = (string) DecimalMath::of(DecimalMath::multiply($item->qty, $item->unit_price))->abs();
             if ($item->product?->is_vat && $rate > 0) {
-                $base = round($gross * 100 / (100 + $rate), 4);
-                $lineVat = round($gross - $base, 4);
-                $subtotal += $base;
-                $vat += $lineVat;
+                $base = DecimalMath::divide(DecimalMath::multiply($gross, 100), DecimalMath::add(100, $rate), 4);
+                $lineVat = DecimalMath::subtract($gross, $base, 4);
+                $subtotal = DecimalMath::add($subtotal, $base);
+                $vat = DecimalMath::add($vat, $lineVat);
                 $item->update(['vat_amount' => $lineVat]);
             } else {
-                $subtotal += $gross;
+                $subtotal = DecimalMath::add($subtotal, $gross);
                 $item->update(['vat_amount' => 0]);
             }
         }
 
-        $total = round($subtotal + $vat, 2);
-        $subtotal = round($subtotal, 2);
+        $total = DecimalMath::add($subtotal, $vat, 2);
+        $subtotal = DecimalMath::round($subtotal, 2);
 
-        return ['subtotal' => $subtotal, 'vat' => round($total - $subtotal, 2), 'total' => $total];
+        return ['subtotal' => $subtotal, 'vat' => DecimalMath::subtract($total, $subtotal, 2), 'total' => $total];
     }
 
     private function role(string $role): ?ChartOfAccount
@@ -179,12 +186,6 @@ class GlPostingService
         return ChartOfAccount::where('default_role', $role)->first();
     }
 
-    /**
-     * สร้างคู่ debit/credit ให้ครบ - ถ้าบัญชี role ไหนยังไม่ได้ตั้งจะข้ามทั้งชุด
-     * (เอกสารยังบันทึกได้ปกติ นักบัญชีแค่ยังไม่เห็นใน GL จนกว่าจะตั้งผังบัญชี)
-     *
-     * @param  array<int, array{role:string, debit?:float, credit?:float}>  $lines
-     */
     /**
      * บัญชี GL ของเงินฝากธนาคารสำหรับสาขาหนึ่ง
      *
@@ -213,7 +214,7 @@ class GlPostingService
     {
         $resolved = [];
         foreach ($lines as $line) {
-            if (($line['debit'] ?? 0) == 0.0 && ($line['credit'] ?? 0) == 0.0) {
+            if (DecimalMath::compare($line['debit'] ?? 0, 0) === 0 && DecimalMath::compare($line['credit'] ?? 0, 0) === 0) {
                 continue;
             }
             // เงินเข้า/ออกธนาคารลงบัญชีของสาขาเอกสาร (ถ้าสาขาตั้งไว้)
@@ -223,25 +224,81 @@ class GlPostingService
             if (! $account) {
                 throw new RuntimeException("ยังไม่ได้ผูกบัญชีเริ่มต้น [{$line['role']}] ไม่สามารถบันทึกเอกสารโดยไม่ลง GL ได้");
             }
-            $resolved[] = [$account->id, round($line['debit'] ?? 0, 2), round($line['credit'] ?? 0, 2)];
+            $resolved[] = [$account->id, DecimalMath::round($line['debit'] ?? 0, 2), DecimalMath::round($line['credit'] ?? 0, 2)];
         }
 
-        // ล้างรายการเดิมของเอกสารนี้ก่อน (กันโพสต์ซ้ำ)
-        GlJournal::where('document_id', $document->id)->delete();
+        $this->postResolved($document, $resolved, $remark);
+    }
 
-        foreach ($resolved as [$accountId, $debit, $credit]) {
-            if ($debit == 0.0 && $credit == 0.0) {
-                continue;
+    /** Append-only replacement of one accounting component; document row serializes concurrent retries. */
+    public function postResolved(Document $document, array $resolved, string $remark, string $component = 'main', ?string $postingDate = null): void
+    {
+        DB::transaction(function () use ($document, $resolved, $remark, $component, $postingDate) {
+            $document = Document::whereKey($document->id)->lockForUpdate()->firstOrFail();
+            $canonical = collect($resolved)->groupBy(fn ($line) => $line[0])->map(fn ($rows, $id) => [
+                (int) $id, DecimalMath::sum($rows->pluck(1), 2), DecimalMath::sum($rows->pluck(2), 2),
+            ])->sortKeys()->values()->all();
+            if (DecimalMath::compare(DecimalMath::sum(array_column($canonical, 1)), DecimalMath::sum(array_column($canonical, 2))) !== 0) {
+                throw new RuntimeException('GL debit/credit ไม่สมดุล');
             }
-            GlJournal::create([
-                'document_id' => $document->id,
-                'account_id' => $accountId,
-                'debit' => $debit,
-                'credit' => $credit,
-                'remark' => $remark,
-                'entry_date' => $document->doc_date->toDateString(),
+            foreach ($canonical as [$accountId, $debit, $credit]) {
+                if (DecimalMath::compare($debit, 0) < 0 || DecimalMath::compare($credit, 0) < 0) {
+                    throw new RuntimeException('GL ต้องไม่มียอดเดบิตหรือเครดิตติดลบ');
+                }
+            }
+            $fingerprint = hash('sha256', json_encode($canonical));
+            $latest = DB::table('gl_posting_batches')->where('document_id', $document->id)
+                ->where('component', $component)->orderByDesc('id')->first();
+            if (in_array($document->status, ['cancelled', 'void'], true)
+                || GlJournal::where('document_id', $document->id)->where('remark', 'like', 'VOID REVERSAL:%')->exists()
+                || DB::table('gl_posting_batches')->where('document_id', $document->id)->where('component', 'void')->exists()) {
+                throw new RuntimeException('เอกสารกลับรายการแล้ว ไม่สามารถลงบัญชีใหม่');
+            }
+            if ($latest && $latest->fingerprint === $fingerprint) {
+                return;
+            }
+            $old = $latest
+                ? GlJournal::where('posting_batch_id', $latest->id)->whereNull('reversal_of_id')->get()
+                : GlJournal::where('document_id', $document->id)->whereNull('posting_batch_id')
+                    ->whereNull('reversal_of_id')
+                    ->where(function ($q) use ($component) {
+                        if ($component === 'cogs') {
+                            $q->where('remark', 'like', 'ต้นทุนขาย %')->orWhere('remark', 'like', 'กลับต้นทุนขาย %');
+                        } elseif ($component === 'main') {
+                            $q->where('remark', 'not like', 'ต้นทุนขาย %')->where('remark', 'not like', 'กลับต้นทุนขาย %');
+                        } else {
+                            $q->whereRaw('1 = 0');
+                        }
+                    })->get();
+            // Replacement and reversals use today's open period; first posting uses document date.
+            $date = $postingDate ?? (($latest || $old->isNotEmpty()) ? now()->toDateString() : $document->doc_date->toDateString());
+            app(AccountingPeriodGuard::class)->assertOpen($date, $document->branch_id);
+            $batchId = DB::table('gl_posting_batches')->insertGetId([
+                'document_id' => $document->id, 'component' => $component, 'fingerprint' => $fingerprint,
+                'entry_date' => $date, 'created_at' => now(),
             ]);
-        }
+            foreach ($old as $line) {
+                // Existing legacy reversals must not be reversed twice.
+                if (GlJournal::where('reversal_of_id', $line->id)->exists()) {
+                    continue;
+                }
+                GlJournal::create([
+                    'document_id' => $document->id, 'posting_batch_id' => $batchId, 'reversal_of_id' => $line->id,
+                    'account_id' => $line->account_id, 'debit' => $line->credit, 'credit' => $line->debit,
+                    'remark' => 'REPOST REVERSAL: '.$remark, 'entry_date' => $date,
+                ]);
+            }
+            foreach ($canonical as [$accountId, $debit, $credit]) {
+                if (DecimalMath::compare($debit, 0) === 0 && DecimalMath::compare($credit, 0) === 0) {
+                    continue;
+                }
+                GlJournal::create([
+                    'document_id' => $document->id, 'posting_batch_id' => $batchId,
+                    'account_id' => $accountId, 'debit' => $debit, 'credit' => $credit,
+                    'remark' => $remark, 'entry_date' => $date,
+                ]);
+            }
+        });
     }
 
     // ต้นทุนขาย: ขาย = Dr ต้นทุนขาย / Cr สินค้าคงเหลือ; รับคืน (reverse) = ตรงข้าม
@@ -249,10 +306,12 @@ class GlPostingService
     private function appendCogs(Document $document, string $remark, bool $reverse = false): void
     {
         $cogs = app(CostingService::class)->cogsForDocument($document);
-        if ($cogs <= 0) {
+
+        if (DecimalMath::compare($cogs, 0) <= 0) {
+            $this->postResolved($document, [], 'ต้นทุนขาย '.$remark, 'cogs');
+
             return;
         }
-
         $cogsAccount = $this->role(ChartOfAccount::ROLE_COGS);
         $inventoryAccount = $this->role(ChartOfAccount::ROLE_INVENTORY);
         if (! $cogsAccount || ! $inventoryAccount) {
@@ -263,44 +322,151 @@ class GlPostingService
         [$cogsDr, $cogsCr, $invDr, $invCr] = $reverse ? [0, $cogs, $cogs, 0] : [$cogs, 0, 0, $cogs];
         $label = ($reverse ? 'กลับต้นทุนขาย ' : 'ต้นทุนขาย ').$remark;
 
-        GlJournal::create([
-            'document_id' => $document->id, 'account_id' => $cogsAccount->id,
-            'debit' => $cogsDr, 'credit' => $cogsCr, 'remark' => $label,
-            'entry_date' => $document->doc_date->toDateString(),
-        ]);
-        GlJournal::create([
-            'document_id' => $document->id, 'account_id' => $inventoryAccount->id,
-            'debit' => $invDr, 'credit' => $invCr, 'remark' => $label,
-            'entry_date' => $document->doc_date->toDateString(),
-        ]);
+        $this->postResolved($document, [
+            [$cogsAccount->id, $cogsDr, $cogsCr], [$inventoryAccount->id, $invDr, $invCr],
+        ], $label, 'cogs');
     }
 
     // ขายเชื่อ: Dr ลูกหนี้ / Cr รายได้ + ภาษีขาย (ราคารวม VAT) + ต้นทุนขาย
     public function postCreditSale(Document $document): void
     {
+        DB::transaction(function () use ($document) {
+            $document = Document::whereKey($document->id)->lockForUpdate()->firstOrFail();
+            $amounts = $this->salesBreakdown($document);
+            $total = $document->total_amount;
+            $document->update(['subtotal_amount' => $amounts['subtotal'], 'vat_amount' => $amounts['vat']]);
+            $this->postDocument($document, [
+                ['role' => ChartOfAccount::ROLE_AR, 'debit' => $total],
+                ['role' => ChartOfAccount::ROLE_SALES_REVENUE, 'credit' => $amounts['subtotal']],
+                ['role' => ChartOfAccount::ROLE_VAT_OUTPUT, 'credit' => $amounts['vat']],
+            ], 'ขายเชื่อ '.$document->doc_number);
+            $this->appendCogs($document, $document->doc_number);
+
+        });
+    }
+
+    public function prepareSaleTax(Document $document): void
+    {
         $amounts = $this->salesBreakdown($document);
-        $total = (float) $document->total_amount;
         $document->update(['subtotal_amount' => $amounts['subtotal'], 'vat_amount' => $amounts['vat']]);
-        $this->postDocument($document, [
-            ['role' => ChartOfAccount::ROLE_AR, 'debit' => $total],
-            ['role' => ChartOfAccount::ROLE_SALES_REVENUE, 'credit' => $amounts['subtotal']],
-            ['role' => ChartOfAccount::ROLE_VAT_OUTPUT, 'credit' => $amounts['vat']],
-        ], 'ขายเชื่อ '.$document->doc_number);
-        $this->appendCogs($document, $document->doc_number);
     }
 
     // ขายสด: Dr เงินสด / Cr รายได้ + ภาษีขาย + ต้นทุนขาย
     public function postCashSale(Document $document): void
     {
-        $amounts = $this->salesBreakdown($document);
-        $total = (float) $document->total_amount;
-        $document->update(['subtotal_amount' => $amounts['subtotal'], 'vat_amount' => $amounts['vat']]);
-        $this->postDocument($document, [
-            ['role' => ChartOfAccount::ROLE_CASH, 'debit' => $total],
-            ['role' => ChartOfAccount::ROLE_SALES_REVENUE, 'credit' => $amounts['subtotal']],
-            ['role' => ChartOfAccount::ROLE_VAT_OUTPUT, 'credit' => $amounts['vat']],
-        ], 'ขายสด '.$document->doc_number);
-        $this->appendCogs($document, $document->doc_number);
+        DB::transaction(function () use ($document) {
+            $document = Document::whereKey($document->id)->lockForUpdate()->firstOrFail();
+            $amounts = $this->salesBreakdown($document);
+            $total = $document->total_amount;
+            $document->update(['subtotal_amount' => $amounts['subtotal'], 'vat_amount' => $amounts['vat']]);
+            $receipt = DB::table('pos_receipts')->where('document_id', $document->id)->first();
+            if ($receipt) {
+                $settlement = $this->posSettlementLines($document, $receipt->id);
+                $revenue = $this->role(ChartOfAccount::ROLE_SALES_REVENUE);
+                $vat = $this->role(ChartOfAccount::ROLE_VAT_OUTPUT);
+                if (! $revenue || (DecimalMath::compare($amounts['vat'], 0) > 0 && ! $vat)) {
+                    throw new RuntimeException('ผังบัญชีรายได้/ภาษีขายไม่ครบ');
+                }
+                $settlement[] = [$revenue->id, 0, $amounts['subtotal']];
+                if ($vat) {
+                    $settlement[] = [$vat->id, 0, $amounts['vat']];
+                }
+                $this->postResolved($document, $settlement, 'ขาย POS '.$document->doc_number);
+            } else {
+                $this->postDocument($document, [
+                    ['role' => ChartOfAccount::ROLE_CASH, 'debit' => $total],
+                    ['role' => ChartOfAccount::ROLE_SALES_REVENUE, 'credit' => $amounts['subtotal']],
+                    ['role' => ChartOfAccount::ROLE_VAT_OUTPUT, 'credit' => $amounts['vat']],
+                ], 'ขายสด '.$document->doc_number);
+            }
+            $this->appendCogs($document, $document->doc_number);
+
+        });
+    }
+
+    public function posSettlementLines(Document $document, int $receiptId, bool $createClearing = true): array
+    {
+        $payments = DB::table('pos_payments')->where('pos_receipt_id', $receiptId)->orderBy('id')->get();
+        if ($payments->isEmpty() || DecimalMath::compare(DecimalMath::sum($payments->pluck('amount'), 2), DecimalMath::round($document->total_amount, 2)) !== 0) {
+            throw new RuntimeException('ยอดชำระ POS ไม่ตรงยอดเอกสาร ไม่สามารถลงบัญชีได้');
+        }
+
+        return $payments->map(function ($payment) use ($document, $createClearing) {
+            if (DecimalMath::compare($payment->amount, 0) < 0) {
+                throw new RuntimeException('ยอดชำระติดลบ');
+            }
+            $role = match ($payment->method) {
+                'cash' => ChartOfAccount::ROLE_CASH,
+                'transfer', 'qr' => ChartOfAccount::ROLE_POS_TRANSFER,
+                'credit_card' => ChartOfAccount::ROLE_POS_CARD,
+                'cheque' => ChartOfAccount::ROLE_POS_CHEQUE,
+                default => throw new RuntimeException('ไม่รู้จักช่องทางชำระ POS'),
+            };
+            $account = $this->role($role);
+            if (! $account && $role !== ChartOfAccount::ROLE_CASH) {
+                // Separate outstanding settlements from cash/bank until finance reconciles them.
+                $account = $this->role(ChartOfAccount::ROLE_POS_CLEARING);
+                if (! $account && ! $createClearing) {
+                    $account = new ChartOfAccount(['default_role' => ChartOfAccount::ROLE_POS_CLEARING]);
+                    $account->id = -1; // read-only preview of a not-yet-created clearing account
+                }
+                $account ??= ChartOfAccount::firstOrCreate(['code' => 'POS-CLEARING'], [
+                    'name_th' => 'พักรับชำระ POS รอกระทบยอด', 'account_type' => 'asset',
+                    'default_role' => ChartOfAccount::ROLE_POS_CLEARING,
+                ]);
+                if ($account->default_role !== ChartOfAccount::ROLE_POS_CLEARING) {
+                    throw new RuntimeException('รหัส POS-CLEARING ถูกใช้งานอื่น กรุณาผูกบัญชีพัก POS');
+                }
+                if ($createClearing) {
+                    Log::warning('POS settlement uses clearing', ['method' => $payment->method, 'document_id' => $document->id]);
+                }
+            }
+            if (! $account) {
+                throw new RuntimeException('ยังไม่ได้ผูกบัญชีเงินสด');
+            }
+
+            return [$account->id, DecimalMath::round($payment->amount, 2), '0.00'];
+        })->all();
+    }
+
+    /** Historical reclassification preserves posted tax/revenue and COGS, never recalculates VAT. */
+    public function reclassifyPosSettlement(Document $document, int $receiptId, bool $apply): bool
+    {
+        return DB::transaction(function () use ($document, $receiptId, $apply) {
+            $document = Document::whereKey($document->id)->lockForUpdate()->firstOrFail();
+            $receipt = DB::table('pos_receipts')->where('id', $receiptId)->where('document_id', $document->id)
+                ->where('status', 'completed')->first();
+            if (! $receipt || $document->status !== 'active') {
+                throw new RuntimeException('จัดประเภทได้เฉพาะบิล POS ที่เสร็จสมบูรณ์และยังไม่ยกเลิก');
+            }
+            $query = GlJournal::where('gl_journals.document_id', $document->id)
+                ->leftJoin('gl_posting_batches as b', 'b.id', '=', 'gl_journals.posting_batch_id')
+                ->where(fn ($q) => $q->where('b.component', 'main')->orWhere(fn ($legacy) => $legacy->whereNull('posting_batch_id')
+                    ->where('remark', 'not like', 'ต้นทุนขาย %')->where('remark', 'not like', 'กลับต้นทุนขาย %')));
+            $old = $query->get(['gl_journals.*']);
+            if ($old->isEmpty()) {
+                throw new RuntimeException('ไม่มี GL เดิมให้จัดประเภทใหม่');
+            }
+            $lines = $this->posSettlementLines($document, $receiptId, $apply);
+            $net = $old->groupBy('account_id')->map(fn ($group) => DecimalMath::subtract(
+                DecimalMath::sum($group->pluck('debit')), DecimalMath::sum($group->pluck('credit')), 2));
+            foreach ($net as $id => $value) {
+                if (DecimalMath::compare($value, 0) < 0) {
+                    $lines[] = [(int) $id, 0, DecimalMath::subtract(0, $value, 2)];
+                }
+            }
+            if (DecimalMath::compare(DecimalMath::sum(array_column($lines, 1)), DecimalMath::sum(array_column($lines, 2))) !== 0) {
+                throw new RuntimeException('GL รายได้เดิมไม่ตรงบิล ต้องตรวจสอบด้วยนักบัญชี');
+            }
+            $target = collect($lines)->groupBy(fn ($l) => $l[0])->map(fn ($group) => DecimalMath::subtract(
+                DecimalMath::sum($group->pluck(1)), DecimalMath::sum($group->pluck(2)), 2));
+            $changed = $net->keys()->merge($target->keys())->unique()->contains(fn ($id) => DecimalMath::compare($net[$id] ?? 0, $target[$id] ?? 0) !== 0);
+            if ($apply && $changed) {
+                $this->postResolved($document, $lines, 'จัดประเภทวิธีชำระ POS '.$document->doc_number);
+            }
+
+            return $changed;
+        });
     }
 
     /**
@@ -310,14 +476,14 @@ class GlPostingService
      *
      * @param  float  $valueChange  บวก = มูลค่าสต๊อกเพิ่ม, ลบ = ลดลง
      */
-    public function postInventoryAdjustment(Document $document, float $valueChange, string $label): void
+    public function postInventoryAdjustment(Document $document, int|float|string $valueChange, string $label): void
     {
-        $amount = round(abs($valueChange), 2);
-        if ($amount < 0.01) {
+        $amount = DecimalMath::round((string) DecimalMath::of($valueChange)->abs(), 2);
+        if (DecimalMath::compare($amount, '0.01') < 0) {
             return;
         }
 
-        $this->postDocument($document, $valueChange > 0
+        $this->postDocument($document, DecimalMath::compare($valueChange, 0) > 0
             ? [
                 ['role' => ChartOfAccount::ROLE_INVENTORY, 'debit' => $amount],
                 ['role' => ChartOfAccount::ROLE_INVENTORY_ADJUSTMENT, 'credit' => $amount],
@@ -344,39 +510,44 @@ class GlPostingService
 
     public function reverseDocument(Document $document, string $remark): void
     {
-        $lines = GlJournal::where('document_id', $document->id)
-            ->where('remark', 'not like', 'VOID REVERSAL:%')
-            ->get();
-
-        if ($lines->isEmpty()) {
-            return;
-        }
-
-        $alreadyReversed = GlJournal::where('document_id', $document->id)
-            ->where('remark', 'like', 'VOID REVERSAL:%')
-            ->exists();
-        if ($alreadyReversed) {
-            return;
-        }
-
-        foreach ($lines as $line) {
-            GlJournal::create([
-                'document_id' => $document->id,
-                'account_id' => $line->account_id,
-                'debit' => (float) $line->credit,
-                'credit' => (float) $line->debit,
-                'remark' => 'VOID REVERSAL: '.$remark,
-                'entry_date' => now()->toDateString(),
+        DB::transaction(function () use ($document, $remark) {
+            $document = Document::whereKey($document->id)->lockForUpdate()->firstOrFail();
+            if (DB::table('gl_posting_batches')->where('document_id', $document->id)->where('component', 'void')->exists()
+                || GlJournal::where('document_id', $document->id)->where('remark', 'like', 'VOID REVERSAL:%')->exists()) {
+                return;
+            }
+            $date = now()->toDateString();
+            app(AccountingPeriodGuard::class)->assertOpen($date, $document->branch_id);
+            $lines = GlJournal::where('document_id', $document->id)->get();
+            if ($lines->isEmpty()) {
+                return;
+            }
+            $batchId = DB::table('gl_posting_batches')->insertGetId([
+                'document_id' => $document->id, 'component' => 'void', 'fingerprint' => hash('sha256', 'void'),
+                'entry_date' => $date, 'created_at' => now(),
             ]);
-        }
+            // Reverse net balance by account, including earlier replacement reversals.
+            foreach ($lines->groupBy('account_id') as $accountId => $group) {
+                $net = DecimalMath::subtract(DecimalMath::sum($group->pluck('debit')), DecimalMath::sum($group->pluck('credit')), 2);
+                if (DecimalMath::compare($net, 0) === 0) {
+                    continue;
+                }
+                GlJournal::create([
+                    'document_id' => $document->id, 'posting_batch_id' => $batchId, 'account_id' => $accountId,
+                    'debit' => DecimalMath::compare($net, 0) < 0 ? DecimalMath::subtract(0, $net, 2) : 0,
+                    'credit' => DecimalMath::compare($net, 0) > 0 ? $net : 0,
+                    'remark' => 'VOID REVERSAL: '.$remark, 'entry_date' => $date,
+                ]);
+            }
+        });
     }
 
     // ซื้อ: Dr สินค้าคงเหลือ + ภาษีซื้อ / Cr เจ้าหนี้ (เครดิต) หรือเงินสด
     public function postPurchase(Document $document, bool $isCredit = true): void
     {
-        $total = (float) $document->total_amount;
-        $base = (float) ($document->subtotal_amount ?? $total);
-        $vat = (float) ($document->vat_amount ?? 0);
+        $total = $document->total_amount;
+        $base = $document->subtotal_amount ?? $total;
+        $vat = $document->vat_amount ?? 0;
         $this->postDocument($document, [
             ['role' => ChartOfAccount::ROLE_INVENTORY, 'debit' => $base],
             ['role' => ChartOfAccount::ROLE_VAT_INPUT, 'debit' => $vat],
@@ -403,7 +574,7 @@ class GlPostingService
             throw new RuntimeException('ผังบัญชีสำหรับค่าใช้จ่าย ภาษีซื้อ ธนาคาร หรือภาษีหัก ณ ที่จ่ายยังตั้งค่าไม่ครบ');
         }
 
-        $paidAmount = round($baseAmount + $vatAmount - $withholdingAmount, 2);
+        $paidAmount = DecimalMath::subtract(DecimalMath::add($baseAmount, $vatAmount), $withholdingAmount, 2);
         $lines = [[$expenseAccount->id, $baseAmount, 0]];
         if ($vatAmount > 0) {
             $lines[] = [$vatAccount->id, $vatAmount, 0];
@@ -413,16 +584,7 @@ class GlPostingService
             $lines[] = [$withholdingAccount->id, 0, $withholdingAmount];
         }
 
-        foreach ($lines as [$accountId, $debit, $credit]) {
-            GlJournal::create([
-                'document_id' => $document->id,
-                'account_id' => $accountId,
-                'debit' => round($debit, 2),
-                'credit' => round($credit, 2),
-                'remark' => 'ค่าใช้จ่าย '.$document->doc_number,
-                'entry_date' => $document->doc_date->toDateString(),
-            ]);
-        }
+        $this->postResolved($document, $lines, 'ค่าใช้จ่าย '.$document->doc_number);
     }
 
     // รับคืนสินค้า: Dr รับคืน + ภาษีขาย(กลับ) / Cr ลูกหนี้ (ขายเชื่อ) หรือเงินสด
@@ -431,16 +593,20 @@ class GlPostingService
     // และเก็บยอดไว้ในเอกสารให้รายงานภาษีขายหักยอดรับคืนได้
     public function postSaleReturn(Document $document, bool $againstAr = true, string $refundMethod = 'cash'): void
     {
-        $total = (float) $document->total_amount;
-        $amounts = $this->salesBreakdown($document);
-        $vat = round($total - $amounts['subtotal'], 2);
-        $document->update(['subtotal_amount' => $amounts['subtotal'], 'vat_amount' => $vat]);
-        $this->postDocument($document, [
-            ['role' => ChartOfAccount::ROLE_SALES_RETURN, 'debit' => $amounts['subtotal']],
-            ['role' => ChartOfAccount::ROLE_VAT_OUTPUT, 'debit' => $vat],
-            ['role' => $againstAr ? ChartOfAccount::ROLE_AR : ($refundMethod === 'transfer' ? ChartOfAccount::ROLE_BANK : ChartOfAccount::ROLE_CASH), 'credit' => $total],
-        ], 'รับคืนสินค้า '.$document->doc_number);
-        $this->appendCogs($document, $document->doc_number, reverse: true);
+        DB::transaction(function () use ($document, $againstAr, $refundMethod) {
+            $document = Document::whereKey($document->id)->lockForUpdate()->firstOrFail();
+            $total = $document->total_amount;
+            $amounts = $this->salesBreakdown($document);
+            $vat = DecimalMath::subtract($total, $amounts['subtotal'], 2);
+            $document->update(['subtotal_amount' => $amounts['subtotal'], 'vat_amount' => $vat]);
+            $this->postDocument($document, [
+                ['role' => ChartOfAccount::ROLE_SALES_RETURN, 'debit' => $amounts['subtotal']],
+                ['role' => ChartOfAccount::ROLE_VAT_OUTPUT, 'debit' => $vat],
+                ['role' => $againstAr ? ChartOfAccount::ROLE_AR : ($refundMethod === 'transfer' ? ChartOfAccount::ROLE_BANK : ChartOfAccount::ROLE_CASH), 'credit' => $total],
+            ], 'รับคืนสินค้า '.$document->doc_number);
+            $this->appendCogs($document, $document->doc_number, reverse: true);
+
+        });
     }
 
     // ใบลดหนี้: Dr รับคืน/ส่วนลด + ภาษีขาย(กลับ) / Cr ลูกหนี้
@@ -452,13 +618,13 @@ class GlPostingService
      */
     public function postCreditNote(Document $document, float $refund = 0.0): void
     {
-        $total = (float) $document->total_amount;
-        $refund = round(max(0.0, min($refund, $total)), 2);
+        $total = $document->total_amount;
+        $refund = DecimalMath::round(DecimalMath::compare($refund, 0) < 0 ? 0 : (DecimalMath::compare($refund, $total) > 0 ? $total : $refund), 2);
         ['base' => $base, 'vat' => $vat] = $this->noteBreakdown($document);
         $this->postDocument($document, [
             ['role' => ChartOfAccount::ROLE_SALES_RETURN, 'debit' => $base],
             ['role' => ChartOfAccount::ROLE_VAT_OUTPUT, 'debit' => $vat],
-            ['role' => ChartOfAccount::ROLE_AR, 'credit' => round($total - $refund, 2)],
+            ['role' => ChartOfAccount::ROLE_AR, 'credit' => DecimalMath::subtract($total, $refund, 2)],
             ['role' => ChartOfAccount::ROLE_CASH, 'credit' => $refund],
         ], 'ใบลดหนี้ '.$document->doc_number);
     }
@@ -466,7 +632,7 @@ class GlPostingService
     // ใบเพิ่มหนี้: Dr ลูกหนี้ / Cr รายได้ + ภาษีขาย
     public function postDebitNote(Document $document): void
     {
-        $total = (float) $document->total_amount;
+        $total = $document->total_amount;
         ['base' => $base, 'vat' => $vat] = $this->noteBreakdown($document);
         $this->postDocument($document, [
             ['role' => ChartOfAccount::ROLE_AR, 'debit' => $total],
@@ -484,23 +650,23 @@ class GlPostingService
      */
     private function noteBreakdown(Document $document): array
     {
-        $total = round((float) $document->total_amount, 2);
+        $total = DecimalMath::round($document->total_amount, 2);
         $source = $document->reference
             ? Document::where('doc_number', $document->reference)->where('id', '!=', $document->id)->first()
             : null;
 
-        if ($source && (float) $source->total_amount > 0) {
-            if ($source->subtotal_amount === null && (float) $source->vat_amount == 0.0) {
+        if ($source && DecimalMath::compare($source->total_amount, 0) > 0) {
+            if ($source->subtotal_amount === null && DecimalMath::compare($source->vat_amount, 0) === 0) {
                 // ใบขายเก่าที่ยังไม่เคยแยก VAT ไว้ — คำนวณจากรายการสินค้าของใบนั้น
                 $breakdown = $this->salesBreakdown($source);
                 $source->update(['subtotal_amount' => $breakdown['subtotal'], 'vat_amount' => $breakdown['vat']]);
             }
-            $vat = round($total * (float) $source->vat_amount / (float) $source->total_amount, 2);
+            $vat = DecimalMath::divide(DecimalMath::multiply($total, $source->vat_amount), $source->total_amount, 2);
         } else {
             $rate = $this->vatRate();
-            $vat = $rate > 0 ? round($total - round($total * 100 / (100 + $rate), 2), 2) : 0.0;
+            $vat = $rate > 0 ? DecimalMath::subtract($total, DecimalMath::divide(DecimalMath::multiply($total, 100), DecimalMath::add(100, $rate), 2), 2) : '0.00';
         }
-        $base = round($total - $vat, 2);
+        $base = DecimalMath::subtract($total, $vat, 2);
         $document->update(['subtotal_amount' => $base, 'vat_amount' => $vat]);
 
         return ['base' => $base, 'vat' => $vat];
@@ -518,7 +684,7 @@ class GlPostingService
         if (! $expense || ! $accumulated) {
             throw new RuntimeException('ยังไม่ได้ผูกบัญชีค่าเสื่อมราคาและค่าเสื่อมราคาสะสมในผังบัญชี คิดค่าเสื่อมโดยไม่ลงบัญชีไม่ได้');
         }
-        $amount = round($amount, 2);
+        $amount = DecimalMath::round($amount, 2);
         $remark = 'ค่าเสื่อมราคา '.$assetCode.' งวด '.substr($periodEnd, 0, 7);
         GlJournal::create(['account_id' => $expense->id, 'debit' => $amount, 'credit' => 0, 'remark' => $remark, 'entry_date' => $periodEnd]);
         GlJournal::create(['account_id' => $accumulated->id, 'debit' => 0, 'credit' => $amount, 'remark' => $remark, 'entry_date' => $periodEnd]);

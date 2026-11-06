@@ -6,10 +6,12 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['payment_document_id', 'document_id', 'account_id', 'debit', 'credit', 'remark', 'entry_date'])]
+#[Fillable(['posting_batch_id', 'reversal_of_id', 'payment_document_id', 'document_id', 'account_id', 'debit', 'credit', 'remark', 'entry_date'])]
 class GlJournal extends Model
 {
     public $timestamps = false;
+
+    protected $dateFormat = 'Y-m-d';
 
     public function paymentDocument(): BelongsTo
     {

@@ -7,6 +7,7 @@ use App\Models\DocumentType;
 use App\Models\StockBalance;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
+use App\Models\WarehouseLocation;
 use App\Services\Sales\DocumentNumberGenerator;
 use App\Support\DecimalMath;
 use App\Support\StockShortage;
@@ -42,13 +43,17 @@ class StockTransferService
     }
 
     /**
-     * อนุมัติใบขอโอน = ตัดสต๊อกต้นทาง + เพิ่มปลายทางจริง แล้วเปลี่ยนสถานะเป็น active.
+     * อนุมัติใบขอโอน = ย้ายต้นทางเข้าระหว่างทาง ปลายทางยังขายไม่ได้จนกว่าจะตรวจรับ.
      */
     public function approve(Document $document): Document
     {
         return DB::transaction(function () use ($document) {
+            $document = Document::whereKey($document->id)->lockForUpdate()->firstOrFail();
+            if ($document->documentType?->code !== 'STOCK_TRANSFER' || $document->status !== 'pending') {
+                throw new RuntimeException('อนุมัติได้เฉพาะใบโอนที่รออนุมัติเท่านั้น');
+            }
             $this->applyStockMovements($document);
-            $document->update(['status' => 'active']);
+            $document->update(['status' => 'in_transit']);
 
             return $document->fresh();
         });
@@ -59,13 +64,15 @@ class StockTransferService
      */
     public function reject(Document $document, ?string $reason = null): Document
     {
-        $remark = $document->remark;
-        if ($reason !== null && trim($reason) !== '') {
-            $remark = trim(($remark ? $remark.' | ' : '').'ปฏิเสธ: '.trim($reason));
-        }
-        $document->update(['status' => 'rejected', 'remark' => $remark]);
+        return DB::transaction(function () use ($document, $reason) {
+            $document = Document::whereKey($document->id)->lockForUpdate()->firstOrFail();
+            if ($document->status !== 'pending') {
+                throw new RuntimeException('ปฏิเสธได้เฉพาะใบโอนที่รออนุมัติ');
+            }
+            $document->update(['status' => 'rejected', 'remark' => trim(($document->remark ?? '').' | ปฏิเสธ: '.($reason ?? ''))]);
 
-        return $document->fresh();
+            return $document->fresh();
+        });
     }
 
     /**
@@ -76,10 +83,9 @@ class StockTransferService
     public function create(array $data): Document
     {
         return DB::transaction(function () use ($data) {
-            $document = $this->buildDocument($data, 'active');
-            $this->applyStockMovements($document);
+            $document = $this->buildDocument($data, 'pending');
 
-            return $document->fresh();
+            return $this->approve($document);
         });
     }
 
@@ -90,6 +96,9 @@ class StockTransferService
     {
         $fromLocationId = (int) $data['from_warehouse_location_id'];
         $toLocationId = (int) $data['to_warehouse_location_id'];
+        if (StockDocument::whereIn('transit_location_id', [$fromLocationId, $toLocationId])->exists()) {
+            throw new RuntimeException('ห้ามใช้คลังระหว่างทางเป็นต้นทางหรือปลายทางใบโอนใหม่');
+        }
         if ($fromLocationId === $toLocationId) {
             throw new RuntimeException('ต้นทางและปลายทางต้องไม่ใช่คลังเดียวกัน');
         }
@@ -145,8 +154,14 @@ class StockTransferService
             throw new RuntimeException('ไม่พบรายละเอียดใบโอน');
         }
 
-        $toLocationId = (int) $stockDocument->to_warehouse_location_id;
         $items = $stockDocument->items;
+        $source = WarehouseLocation::findOrFail($items->first()?->warehouse_location_id);
+        $transit = WarehouseLocation::create([
+            'warehouse_id' => $source->warehouse_id, 'code' => 'TR-'.$document->id,
+            'name' => 'ระหว่างทาง '.$document->doc_number,
+        ]);
+        $stockDocument->update(['transit_location_id' => $transit->id]);
+        $toLocationId = $transit->id;
         if ($items->isEmpty()) {
             throw new RuntimeException('ไม่มีรายการสินค้า');
         }
@@ -183,8 +198,9 @@ class StockTransferService
                 );
                 $receivedLot->update([
                     'source_lot_id' => $sourceLot->id,
-                    'quality_status' => $sourceLot->quality_status,
-                    'quality_reason' => $sourceLot->quality_reason,
+                    'received_date' => $sourceLot->received_date,
+                    'quality_status' => 'in_transit',
+                    'quality_reason' => 'ระหว่างทาง '.$document->doc_number,
                 ]);
             }
         }

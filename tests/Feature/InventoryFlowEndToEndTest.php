@@ -8,10 +8,12 @@ use App\Models\Product;
 use App\Models\ProductUnit;
 use App\Models\Role;
 use App\Models\StockBalance;
+use App\Models\StockLot;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseLocation;
+use App\Services\Inventory\FifoStockService;
 use App\Services\Inventory\StockAdjustmentService;
 use App\Services\Inventory\StockIssueService;
 use App\Services\Inventory\StockTransferReceiptService;
@@ -61,11 +63,39 @@ class InventoryFlowEndToEndTest extends TestCase
         app(StockTransferService::class)->approve($transfer);
         $this->assertSame(12.0, $this->onHand($product, $hqLocation), 'อนุมัติโอนแล้วตัดต้นทาง');
 
+        $this->assertSame('in_transit', $transfer->fresh()->status);
+        $this->assertSame(0.0, $this->onHand($product, $shopLocation));
+        $before = DB::table('stock_movements')->count();
+        try {
+            app(StockTransferService::class)->approve($transfer); // stale pending instance
+            $this->fail('duplicate approval accepted');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('รออนุมัติ', $e->getMessage());
+        }
+        $this->assertSame($before, DB::table('stock_movements')->count());
+        $transitId = $transfer->fresh()->stockDocument->transit_location_id;
+        $this->assertNotNull($transitId);
+        try {
+            DB::transaction(fn () => app(FifoStockService::class)->issue(
+                $product->id, $transitId, 1, null, allowRestricted: true));
+            $this->fail('transit stock was sold');
+        } catch (\RuntimeException $e) {
+            $this->assertNotEmpty($e->getMessage());
+        }
         $receipts = app(StockTransferReceiptService::class);
         $receipt = $receipts->openOrGet($transfer->fresh());
         $receipts->saveScans($receipt, $receipt->items->map(fn ($item) => ['id' => $item->id, 'scanned_qty' => 8])->all());
         $receipts->complete($receipt->fresh());
         $this->assertSame(8.0, $this->onHand($product, $shopLocation), 'ปลายทางรับครบ');
+
+        $this->assertSame('active', $transfer->fresh()->status);
+        $this->assertSame(StockLot::where('warehouse_location_id', $hqLocation->id)->first()->unit_cost, StockLot::where('warehouse_location_id', $shopLocation->id)->first()->unit_cost);
+        try {
+            $receipts->complete($receipt); // stale checking instance
+            $this->fail('duplicate receipt accepted');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('ปิดแล้ว', $e->getMessage());
+        }
 
         $issue = app(StockIssueService::class)->create(['type' => 'requisition', 'branch_id' => $shop->id, 'warehouse_location_id' => $shopLocation->id,
             'purpose' => 'office', 'reference' => null, 'remark' => null, 'items' => [['product_id' => $product->id, 'qty' => 2]]]);

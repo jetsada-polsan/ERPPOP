@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Document;
 use App\Models\PurchaseCostAdjustment;
-use App\Support\DecimalMath;
 use App\Services\Inventory\PurchaseCostAdjustmentService;
+use App\Support\DecimalMath;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -34,7 +34,7 @@ class PurchaseCostAdjustmentController extends Controller
             ->get();
 
         $rows = $rows->map(fn ($row) => $row + [
-            'partially_consumed' => DecimalMath::compare($row['lot']->remaining_qty, $row['lot']->initial_qty) !== 0,
+            'partially_consumed' => DecimalMath::compare($row['remaining_qty'], $row['lot']->initial_qty) !== 0,
         ]);
 
         return view('purchases.cost-adjustments.create', [

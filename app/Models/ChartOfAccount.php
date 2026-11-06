@@ -24,6 +24,16 @@ class ChartOfAccount extends Model
 
     public const ROLE_BANK = 'bank';
 
+    public const ROLE_POS_CLEARING = 'pos_clearing';
+
+    public const ROLE_POS_TRANSFER = 'pos_transfer';
+
+    public const ROLE_POS_CARD = 'pos_card';
+
+    public const ROLE_POS_CHEQUE = 'pos_cheque';
+
+    public const ROLE_PURCHASE_COST_CLEARING = 'purchase_cost_clear';
+
     public const ROLE_AR = 'ar';
 
     public const ROLE_AP = 'ap';
@@ -59,6 +69,11 @@ class ChartOfAccount extends Model
     public const ROLE_ACCUMULATED_DEPRECIATION = 'accum_depreciation';
 
     public const ROLES = [
+        self::ROLE_PURCHASE_COST_CLEARING => 'พักผลต่างต้นทุนซื้อรอยืนยันเอกสารผู้ขาย',
+        self::ROLE_POS_CLEARING => 'บัญชีพักรับชำระ POS รอกระทบยอด',
+        self::ROLE_POS_TRANSFER => 'บัญชีรับโอน/QR POS',
+        self::ROLE_POS_CARD => 'ลูกหนี้บัตร/บัญชีพักบัตร POS',
+        self::ROLE_POS_CHEQUE => 'เช็ครับ/บัญชีพักเช็ค POS',
         self::ROLE_CASH => 'บัญชีเงินสด/รับจ่ายเริ่มต้น',
         self::ROLE_BANK => 'บัญชีเงินฝากธนาคารเริ่มต้น',
         self::ROLE_AR => 'บัญชีลูกหนี้การค้าเริ่มต้น',

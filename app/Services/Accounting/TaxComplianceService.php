@@ -6,6 +6,7 @@ use App\Models\AppSetting;
 use App\Models\Document;
 use App\Models\ETaxDocument;
 use App\Models\TaxFilingRun;
+use App\Support\DecimalMath;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -19,8 +20,8 @@ class TaxComplianceService
     {
         [$from, $to] = $this->range($period);
         $rows = $this->rows($from, $to, $branchId, $form);
-        $taxable = round($rows->sum(fn ($row) => (float) $row['taxable_amount']), 2);
-        $tax = round($rows->sum(fn ($row) => (float) $row['tax_amount']), 2);
+        $taxable = DecimalMath::sum($rows->pluck('taxable_amount'), 2);
+        $tax = DecimalMath::sum($rows->pluck('tax_amount'), 2);
         $path = 'tax-filings/'.$period.'/POPSTAR-'.$form.'-'.$period.'-'.($branchId ?: 'ALL').'-'.now()->format('YmdHis').'.csv';
         Storage::disk('local')->put($path, $this->csv($rows));
 
@@ -37,7 +38,7 @@ class TaxComplianceService
         [$from, $to] = $this->range($period);
         $documents = Document::with(['documentType', 'branch', 'customer'])
             ->whereBetween('doc_date', [$from, $to])
-            ->where('status', '!=', 'cancelled')->where('total_amount', '>', 0)
+            ->where('status', 'active')->where('total_amount', '>', 0)
             ->whereHas('documentType', fn ($q) => $q->whereIn('code', ['CASH_SALE', 'CREDIT_SALE']))
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))->get();
         $count = 0;
@@ -91,19 +92,20 @@ class TaxComplianceService
                 ->map(function ($r) {
                     $sign = in_array($r->type_code, ['SALE_RETURN', 'CREDIT_NOTE'], true) ? -1 : 1;
 
-                    return ['category' => 'OUTPUT', 'date' => $r->doc_date, 'document_no' => $r->doc_number, 'branch' => $r->branch_code, 'party' => $r->party_name, 'tax_id' => $r->tax_id, 'taxable_amount' => $sign * (float) $r->subtotal_amount, 'tax_amount' => $sign * (float) $r->vat_amount];
+                    return ['category' => 'OUTPUT', 'date' => $r->doc_date, 'document_no' => $r->doc_number, 'branch' => $r->branch_code, 'party' => $r->party_name, 'tax_id' => $r->tax_id, 'taxable_amount' => DecimalMath::multiply($sign, $r->subtotal_amount, 2), 'tax_amount' => DecimalMath::multiply($sign, $r->vat_amount, 2)];
                 });
             $purchases = DB::table('documents as d')->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
                 ->leftJoin('suppliers as s', 's.id', '=', 'd.supplier_id')->leftJoin('branches as b', 'b.id', '=', 'd.branch_id')
                 ->whereBetween('d.doc_date', [$from, $to])->where('dt.code', 'PURCHASE')->where('d.claim_input_vat', true)
-                ->where('d.status', '!=', 'cancelled')->when($branchId, fn ($q) => $q->where('d.branch_id', $branchId))
+                ->where('d.status', 'active')->when($branchId, fn ($q) => $q->where('d.branch_id', $branchId))
                 ->get(['d.doc_date', 'd.doc_number', 'b.code as branch_code', 's.name_th as party_name', 's.tax_id', 'd.subtotal_amount', 'd.vat_amount'])
-                ->map(fn ($r) => ['category' => 'INPUT', 'date' => $r->doc_date, 'document_no' => $r->doc_number, 'branch' => $r->branch_code, 'party' => $r->party_name, 'tax_id' => $r->tax_id, 'taxable_amount' => -(float) $r->subtotal_amount, 'tax_amount' => -(float) $r->vat_amount]);
-            $expenses = DB::table('branch_expenses as e')->leftJoin('branches as b', 'b.id', '=', 'e.branch_id')
+                ->map(fn ($r) => ['category' => 'INPUT', 'date' => $r->doc_date, 'document_no' => $r->doc_number, 'branch' => $r->branch_code, 'party' => $r->party_name, 'tax_id' => $r->tax_id, 'taxable_amount' => DecimalMath::subtract(0, $r->subtotal_amount, 2), 'tax_amount' => DecimalMath::subtract(0, $r->vat_amount, 2)]);
+            $expenses = DB::table('branch_expenses as e')->join('documents as ed', 'ed.id', '=', 'e.document_id')
+                ->where('ed.status', 'active')->leftJoin('branches as b', 'b.id', '=', 'e.branch_id')
                 ->whereBetween('e.expense_date', [$from, $to])->where('e.vat_amount', '>', 0)
                 ->when($branchId, fn ($q) => $q->where('e.branch_id', $branchId))
                 ->get(['e.expense_date', 'e.tax_invoice_no', 'b.code as branch_code', 'e.supplier_name', 'e.supplier_tax_id', 'e.base_amount', 'e.vat_amount'])
-                ->map(fn ($r) => ['category' => 'INPUT', 'date' => $r->expense_date, 'document_no' => $r->tax_invoice_no, 'branch' => $r->branch_code, 'party' => $r->supplier_name, 'tax_id' => $r->supplier_tax_id, 'taxable_amount' => -(float) $r->base_amount, 'tax_amount' => -(float) $r->vat_amount]);
+                ->map(fn ($r) => ['category' => 'INPUT', 'date' => $r->expense_date, 'document_no' => $r->tax_invoice_no, 'branch' => $r->branch_code, 'party' => $r->supplier_name, 'tax_id' => $r->supplier_tax_id, 'taxable_amount' => DecimalMath::subtract(0, $r->base_amount, 2), 'tax_amount' => DecimalMath::subtract(0, $r->vat_amount, 2)]);
 
             $notes = DB::table('supplier_notes as n')->join('documents as d', 'd.id', '=', 'n.document_id')
                 ->join('suppliers as s', 's.id', '=', 'd.supplier_id')->join('branches as b', 'b.id', '=', 'd.branch_id')
@@ -111,8 +113,9 @@ class TaxComplianceService
                 ->when($branchId, fn ($q) => $q->where('d.branch_id', $branchId))
                 ->get(['d.doc_date', 'd.doc_number', 'b.code as branch_code', 's.name_th', 's.tax_id', 'n.kind', 'n.base_amount', 'n.vat_amount'])
                 ->map(fn ($r) => ['category' => 'INPUT', 'date' => $r->doc_date, 'document_no' => $r->doc_number, 'branch' => $r->branch_code,
-                    'party' => $r->name_th, 'tax_id' => $r->tax_id, 'taxable_amount' => ($r->kind === 'credit' ? 1 : -1) * (float) $r->base_amount,
-                    'tax_amount' => ($r->kind === 'credit' ? 1 : -1) * (float) $r->vat_amount]);
+                    'party' => $r->name_th, 'tax_id' => $r->tax_id, 'taxable_amount' => DecimalMath::multiply($r->kind === 'credit' ? 1 : -1, $r->base_amount, 2),
+                    'tax_amount' => DecimalMath::multiply($r->kind === 'credit' ? 1 : -1, $r->vat_amount, 2)]);
+
             return $sales->concat($purchases)->concat($expenses)->concat($notes)->values();
         }
 
@@ -122,12 +125,14 @@ class TaxComplianceService
             ->when($branchId, fn ($q) => $q->where('p.branch_id', $branchId))
             ->get(['w.*', 'b.code as branch_code'])
             ->map(fn ($r) => ['category' => $form, 'date' => $r->paid_on, 'document_no' => $r->certificate_no, 'branch' => $r->branch_code,
-                'party' => $r->supplier_name, 'tax_id' => $r->supplier_tax_id, 'taxable_amount' => (float) $r->base_amount, 'tax_amount' => (float) $r->tax_amount]);
-        return DB::table('branch_expenses as e')->leftJoin('branches as b', 'b.id', '=', 'e.branch_id')
+                'party' => $r->supplier_name, 'tax_id' => $r->supplier_tax_id, 'taxable_amount' => $r->base_amount, 'tax_amount' => $r->tax_amount]);
+
+        return DB::table('branch_expenses as e')->join('documents as ed', 'ed.id', '=', 'e.document_id')
+            ->where('ed.status', 'active')->leftJoin('branches as b', 'b.id', '=', 'e.branch_id')
             ->whereBetween('e.expense_date', [$from, $to])->where('e.withholding_form', $form)->where('e.withholding_amount', '>', 0)
             ->when($branchId, fn ($q) => $q->where('e.branch_id', $branchId))
             ->get(['e.expense_date', 'e.payment_reference', 'b.code as branch_code', 'e.supplier_name', 'e.supplier_tax_id', 'e.base_amount', 'e.withholding_amount'])
-            ->map(fn ($r) => ['category' => $form, 'date' => $r->expense_date, 'document_no' => $r->payment_reference, 'branch' => $r->branch_code, 'party' => $r->supplier_name, 'tax_id' => $r->supplier_tax_id, 'taxable_amount' => (float) $r->base_amount, 'tax_amount' => (float) $r->withholding_amount])->concat($supplierRows)->values();
+            ->map(fn ($r) => ['category' => $form, 'date' => $r->expense_date, 'document_no' => $r->payment_reference, 'branch' => $r->branch_code, 'party' => $r->supplier_name, 'tax_id' => $r->supplier_tax_id, 'taxable_amount' => $r->base_amount, 'tax_amount' => $r->withholding_amount])->concat($supplierRows)->values();
     }
 
     private function csv(Collection $rows): string

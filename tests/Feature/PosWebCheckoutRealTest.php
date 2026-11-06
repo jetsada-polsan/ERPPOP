@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Http\Controllers\PosController;
 use App\Http\Middleware\ErpAuthorize;
+use App\Models\ChartOfAccount;
 use App\Models\Permission;
 use App\Models\PosOfflineSale;
 use App\Models\PosShift;
@@ -11,6 +12,7 @@ use App\Models\PosTerminal;
 use App\Models\Role;
 use App\Models\Salesman;
 use App\Models\User;
+use App\Support\DecimalMath;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
@@ -191,6 +193,70 @@ class PosWebCheckoutRealTest extends TestCase
 
         // Running again changes nothing.
         $this->artisan('erp:pos-receipt-vat-backfill', ['--apply' => true])->expectsOutputToContain('บิล 0 ใบ')->assertSuccessful();
+    }
+
+    public function test_gl_debits_actual_payment_channels_and_cashbook_posts_only_cash_once(): void
+    {
+        $roles = ['transfer' => 'pos_transfer', 'credit_card' => 'pos_card', 'cheque' => 'pos_cheque'];
+        foreach ($roles as $method => $role) {
+            ChartOfAccount::create(['code' => 'P0-'.$method, 'name_th' => $method, 'account_type' => 'asset', 'default_role' => $role]);
+        }
+        $cashId = DB::table('chart_of_accounts')->where('default_role', 'cash')->value('id');
+        $cashTotal = '0';
+        foreach (['cash', 'transfer', 'credit_card', 'cheque', 'mixed'] as $method) {
+            $payload = $this->payload();
+            $payload['method'] = $method;
+            $payload['payment_confirmed'] = true;
+            $payload['transfer_account_last4'] = '1234';
+            $payload['cash_amount'] = '10.01';
+            $payload['transfer_amount'] = DecimalMath::subtract($payload['cash_received'], '10.01', 2);
+            $response = $this->postJson(route('pos.checkout'), $payload)->assertOk()->assertJsonPath('success', true);
+            $receipt = DB::table('pos_receipts')->where('id', $response->json('receipt_id'))->first();
+            $main = DB::table('gl_journals as g')->join('gl_posting_batches as b', 'b.id', '=', 'g.posting_batch_id')
+                ->where('g.document_id', $receipt->document_id)->where('b.component', 'main')->get(['g.*']);
+            foreach (DB::table('pos_payments')->where('pos_receipt_id', $receipt->id)->get() as $payment) {
+                $id = $payment->method === 'cash' ? $cashId : DB::table('chart_of_accounts')->where('default_role', $roles[$payment->method])->value('id');
+                $this->assertSame(DecimalMath::round($payment->amount, 2), DecimalMath::sum($main->where('account_id', $id)->pluck('debit'), 2));
+                if ($payment->method === 'cash') {
+                    $cashTotal = DecimalMath::add($cashTotal, $payment->amount, 2);
+                }
+            }
+        }
+        $this->assertSame(0, DB::table('cash_books')->count());
+        $request = Request::create('/pos/shift/close', 'POST', ['shift_id' => $this->shift->id, 'counted_cash' => $cashTotal]);
+        $this->app->instance('request', $request);
+        app(PosController::class)->closeShift($request);
+        $this->assertSame($cashTotal, DecimalMath::sum(DB::table('cash_books')->pluck('cash_in'), 2));
+        $this->assertReconciles();
+    }
+
+    public function test_reclassification_dry_run_is_read_only_and_apply_preserves_legacy_gl_and_tax(): void
+    {
+        $payload = $this->payload();
+        $this->postJson(route('pos.checkout'), $payload)->assertOk(); // legacy-style cash debit
+        $receipt = DB::table('pos_receipts')->sole();
+        DB::table('pos_payments')->where('pos_receipt_id', $receipt->id)->update(['method' => 'credit_card']);
+        // Remove batch linkage to exercise the pre-migration accounting format.
+        DB::table('gl_journals')->where('document_id', $receipt->document_id)->update(['posting_batch_id' => null]);
+        DB::table('gl_posting_batches')->where('document_id', $receipt->document_id)->delete();
+        $original = DB::table('gl_journals')->orderBy('id')->get()->toJson();
+        $document = DB::table('documents')->where('id', $receipt->document_id)->first();
+        $accounts = DB::table('chart_of_accounts')->count();
+        $this->artisan('erp:pos-settlement-reclassify')->assertSuccessful();
+        $this->assertSame($original, DB::table('gl_journals')->orderBy('id')->get()->toJson());
+        $this->assertSame($accounts, DB::table('chart_of_accounts')->count(), 'dry run must not create clearing master');
+        $ids = DB::table('gl_journals')->pluck('id')->all();
+        $this->artisan('erp:pos-settlement-reclassify', ['--apply' => true])->assertSuccessful();
+        $this->assertSame($original, DB::table('gl_journals')->whereIn('id', $ids)->orderBy('id')->get()->toJson());
+        $count = DB::table('gl_journals')->count();
+        $this->assertGreaterThan(count($ids), $count);
+        $this->assertSame($document->vat_amount, DB::table('documents')->where('id', $receipt->document_id)->value('vat_amount'));
+        $cashId = DB::table('chart_of_accounts')->where('default_role', 'cash')->value('id');
+        $cashRows = DB::table('gl_journals')->where('account_id', $cashId)->get();
+        $this->assertSame('0.00', DecimalMath::subtract(DecimalMath::sum($cashRows->pluck('debit')), DecimalMath::sum($cashRows->pluck('credit')), 2));
+        $this->assertDatabaseHas('chart_of_accounts', ['default_role' => 'pos_clearing']);
+        $this->artisan('erp:pos-settlement-reclassify', ['--apply' => true])->assertSuccessful();
+        $this->assertSame($count, DB::table('gl_journals')->count());
     }
 
     private function payload(): array
