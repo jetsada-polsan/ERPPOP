@@ -9,7 +9,7 @@
 - `git diff --check` passed.
 - `php artisan view:clear && php artisan view:cache` passed.
 - `php artisan test tests/Feature/SaleReturnSourceTest.php tests/Feature/BookingSalesAreaTest.php tests/Feature/NegativeStockPolicyTest.php --no-coverage` passed: 34 tests, 183 assertions.
-- **Pending deployment:** this UI-only shared-popup refinement has not been deployed yet.
+- Deployed through GitHub Actions run `42181655593`; workflow completed successfully.
 
 ---
 
