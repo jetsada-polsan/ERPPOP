@@ -9,8 +9,8 @@ use App\Models\PosDevice;
 use App\Models\PosTerminal;
 use App\Models\Salesman;
 use App\Services\Pos\PosAdminOverview;
-use App\Support\PythonPosInstaller;
 use App\Support\PosReleaseManifest;
+use App\Support\PythonPosInstaller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -37,6 +37,24 @@ class PosAdminController extends Controller
             'pinMode' => AppSetting::get('pos_passwordless_login') === '1' ? 'selection' : 'pin',
             'onlineMinutes' => PosAdminOverview::ONLINE_MINUTES,
         ]);
+    }
+
+    public function updateFloat(Request $request, PosTerminal $terminal): RedirectResponse
+    {
+        $data = $request->validate([
+            'default_float' => ['required', 'numeric', 'min:0', 'max:999999999999.99', 'decimal:0,2'],
+            'cash_warning_threshold' => ['required', 'numeric', 'min:0', 'max:999999999999.99', 'decimal:0,2'],
+            'blind_count' => ['required', 'boolean'],
+        ]);
+        $old = $terminal->only(array_keys($data));
+        DB::transaction(function () use ($terminal, $data, $old) {
+            $terminal->update($data);
+            AuditLog::create(['user_id' => auth()->id(), 'branch_id' => $terminal->branch_id,
+                'action' => 'pos_float_policy_updated', 'table_name' => 'pos_terminals', 'record_id' => $terminal->id,
+                'old_values' => $old, 'new_values' => $data]);
+        });
+
+        return back()->with('success', 'บันทึกนโยบายลิ้นชักแล้ว');
     }
 
     public function newPairCode(PosDevice $device): RedirectResponse

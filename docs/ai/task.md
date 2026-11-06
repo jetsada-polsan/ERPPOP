@@ -1,3 +1,93 @@
+# Handoff — 2026-11-05 (Shift float / blind count — ERP + Vue)
+
+## Commit
+- Branch: `claude/shift-float`; base HEAD `53d114c`.
+- **ยัง commit/push ไม่ได้**: `git pull origin main` ถูกปฏิเสธตอนเขียน `FETCH_HEAD`; `git add` ถูกปฏิเสธตอนสร้าง `index.lock` เพราะ Git metadata ของ worktree อยู่ใน `/Users/jetsadapolsan/Documents/Codex/2026-07-18/sites-plugin-sites-openai-bundled/outputs/jeterp/.git/worktrees/shift` ซึ่งอยู่นอกขอบเขตที่ workspace นี้เขียนได้ (`Operation not permitted`). ไม่เปลี่ยน branch และไม่พยายามเขียนข้ามสิทธิ์.
+- งานทั้งหมดเป็น working-tree changes ยังไม่มี commit ใหม่ ห้ามถือว่าส่งขึ้น remote แล้ว.
+- `apps/pos-desktop/node_modules` เป็น untracked ที่มีอยู่ก่อนเริ่มงาน ไม่ได้แก้หรือ stage.
+
+## ทำอะไรไป
+- Migration เพิ่มเฉพาะ default/nullable columns: terminal `default_float=2000`, `cash_warning_threshold=10000`, `blind_count=true`; shift `carried_float`, `opening_variance`, `float_kept`, `deposit_amount`, `deposit_reference`. ไม่ backfill หรือแก้ธุรกรรมเก่า.
+- เพิ่มนโยบายลิ้นชักในหน้า POS admin แท็บฮาร์ดแวร์ ใช้ `settings.manage` เดิม พร้อม audit log; validation รับเงินไม่เกินสองทศนิยม.
+- เปิดกะอ่าน float ของกะปิดล่าสุดของเครื่องเดียวกัน (ค่า 0 เป็นค่าจริง); กะเก่าที่ไม่มีข้อมูล float ใช้นโยบายเครื่อง ไม่เดายอดจาก counted_cash; ผลต่าง opening_cash ต้องมีเหตุผล เก็บส่วนต่างเป็น snapshot.
+- เครื่องหนึ่งมีกะเปิดได้ครั้งเดียว; lock terminal ตอนรับ/ส่งเงินกะ และ lock shift ตอนปิด/ขาย/เงินเข้าออก/ยกเลิก/รับคืน เพื่อไม่ให้ยอดเงินเปลี่ยนหลังปิดกะ. API ตรวจเครื่องเจ้าของกะด้วย.
+- เปิดโหมด blind โดย default: ไม่คืน expected หรือยอดองค์ประกอบให้แคชเชียร์ระหว่างกะ; manager ใช้สิทธิ์ของ user ที่ผูกคนยืนยัน PIN ไม่ใช้สิทธิ์เจ้าของ Device Token. Z ของกะที่ยังเปิดอยู่ถูกบล็อกสำหรับ blind cashier.
+- ปิดกะมี preview หลังส่งยอดนับ; preview ไม่เขียนกะหรือสมุดเงินสด. ERP คำนวณ expected, difference, deposit เองทุกครั้ง ไม่เชื่อ expected/deposit ที่ client ส่ง.
+- ค่าเริ่ม float_kept=min(counted_cash, default_float); รับค่าแก้ได้แต่ต้องไม่เกินยอดนับ; counted < float แสดงเตือนและเก็บเท่าที่มี.
+- คำนวณยอดรับกะ/ปิดกะ/ผลต่าง/เงินนำส่งด้วย DecimalMath; การรวม payments/returns/cash movements ไม่ใช้ SQLite floating-point SUM เป็นฐานของการกระทบยอด. สมุดเงินสดบวก/ลบ running balance ด้วย DecimalMath ด้วย.
+- ปิดกะกับ post cashbook อยู่ transaction เดียวกัน; post ล้ม rollback ปิดกะ. ยอดขายเงินสดลงครั้งเดียวตามเดิม; opening variance เป็นรายการปรับเงินสดแยก `pos_opening_variance:<shift id>`; float/carried/deposit เป็นการเก็บ/ส่งเงินภายใน ไม่ใช่ยอดขายใหม่ ไม่ลงรายได้ซ้ำ. เงินนำส่งระหว่างกะคง flow เดิม.
+- แก้ expected_cash cache หลังรับคืนให้รวม cash_in/drop/payout ด้วย.
+- Vue มีเหตุผลรับกะ, ตัวช่วยนับธนบัตร/เหรียญ, ยอดนับเริ่มว่าง, preview ผลต่างสี, float_kept, เลขซอง และเตือนเงินสดเกินเกณฑ์. ตรวจยอดจาก ERP ก่อนยืนยัน และไม่ใช้ expected มาเติมยอดนับ.
+- Z ทั้ง ERP และ Vue มี 2 ใบ (ใบนำส่ง/ใบเก็บ), ยอดตามวิธีจ่าย, จำนวนบิล/void/return, ส่วนลด, carried/opening variance/note, cash movements, expected/count/difference, deposit/reference, float_kept และช่องผู้ส่ง/ผู้รับหัวหน้า.
+- Vue ตรวจ capability จาก `default_float` ที่มีใน shift; ERP รุ่นเก่าที่ไม่มีข้อมูลนี้จะใช้ close เดิม ไม่ส่ง preview ไปให้ ERP เก่า (ป้องกัน preview กลายเป็นปิดจริง). ไม่แก้ Python POS, installer, version หรือ release.
+
+## สเปก API สำหรับ Python POS รอบถัดไป
+ทุก endpoint ใช้ Device Token เดิมและ cashier session ที่ยืนยัน PIN แล้ว. ตัวตน/สาขา/เครื่องถูกบังคับจาก server อย่าเชื่อค่าที่ Python เก็บเอง. เงินเป็น JSON number เพื่อรองรับ client เดิม; Python ต้องใช้ `Decimal(str(value))` และส่งเป็น decimal string ได้ ห้ามใช้ binary float คำนวณหรือส่งยอดคาดหวังแทน ERP.
+
+### 1. ก่อนเปิดกะ — GET `/api/pos/shift?branch_id=<id>&cashier_id=<salesman id>`
+```json
+{
+  "shift": null,
+  "default_float": 2000,
+  "carried_float": 2000,
+  "cash_warning_threshold": 10000,
+  "blind_count": true
+}
+```
+- `shift` เป็น object ถ้ามีกะเปิดของคนและเครื่องนี้; field ระดับบนใช้เตรียมรับกะครั้งถัดไป.
+- ถ้าไม่เคยมีกะปิด หรือกะเก่าล่าสุดไม่มี float_kept ใช้ default_float; ถ้า float_kept=0 คืน 0.
+- กะใหม่บันทึก carried_float ณ ตอนเปิดไว้ถาวร. อย่านำค่าของกะที่ปิดทีหลังไปแทน snapshot.
+- ระหว่างกะ blind cashier ไม่มี `expected_cash`, `cash_sales`, `transfer_sales`, `card_sales`, `cheque_sales`, `cash_in`, `cash_drops`, `cash_payouts` ใน shift. อย่าเติมเป็นศูนย์แล้วแสดงให้ผู้ใช้เข้าใจผิด.
+- Manager (`pos.cash.manage` ของคนที่ยืนยัน PIN) หรือเครื่องปิด blind เห็นยอดได้. `cash_warning` เป็น boolean จาก ERP ไม่ใช่การให้ client คำนวณยอดลิ้นชัก.
+
+### 2. รับกะ — POST `/api/pos/shift/open`
+```json
+{"branch_id":1,"cashier_id":2,"opening_cash":"1950.00","opening_note":"รับเงินจริงขาด 50"}
+```
+- opening_cash คือยอดนับจริง. ถ้าต่างจาก carried_float แม้ 0.01 ต้องมี opening_note ที่ไม่ใช่ whitespace มิฉะนั้น 422.
+- client ส่ง carried_float/opening_variance มาไม่มีผล. response `shift` มี carried_float, opening_variance, opening_note และนโยบายเครื่อง.
+- เครื่องที่ยังมีกะเปิดของคนอื่นตอบ 422; เปิดซ้ำกะตนที่ยังเปิดคืนกะเดิม.
+
+### 3. นับและตรวจยอด — POST `/api/pos/shift/close`
+```json
+{"shift_id":123,"counted_cash":"15432.75","float_kept":"2000.00","deposit_reference":"BAG-001","preview":true}
+```
+- counted_cash ต้องมี, 0 ขึ้นไป, ทศนิยม 0–2 ตำแหน่ง; ปฏิเสธเศษสตางค์แทนการปัด input โดยเงียบ.
+- float_kept optional; ค่าเริ่ม min(counted_cash, default_float); ถ้ามีต้อง 0 ≤ float_kept ≤ counted_cash. เกินยอดนับตอบ 422.
+- deposit_reference optional string ไม่เกิน 80 ตัวอักษร; closing_note optional ไม่เกิน 500.
+- response `preview:true`, `low_float:<boolean>` และ `shift` มี cash_sales/transfer_sales/card_sales/cheque_sales, expected_cash, counted_cash, cash_difference, float_kept, deposit_amount, deposit_reference ที่ ERP คำนวณ.
+- สูตร expected = opening_cash + cash_sales(net of cash refunds) + cash_in − cash_drops − cash_payouts; difference=counted−expected; deposit=counted−float_kept.
+- preview ไม่ persist จำนวนเงิน/ปิดกะ/ลงสมุดเงินสด. Python ต้องซ่อน expected ก่อนรับยอดนับจริง และเรียก preview หลังนับเท่านั้น. ยอดนับ/เงินเก็บ/เลขซองเปลี่ยนให้ทิ้ง preview เก่าและขอใหม่.
+
+### 4. ยืนยันปิดกะ — POST endpoint เดิม
+ส่งข้อมูลนับ/float/เลขซองเดิมโดย omit `preview` หรือ `preview:false`. ERP คำนวณใหม่ภายใน transaction; อย่าส่ง expected/deposit จาก client เป็นแหล่งความจริง. response `success:true`, `shift.status:"closed"`, `report_url`; shift มีข้อมูลครบพิมพ์ Z และ `z_report_url`.
+- ปิดแล้วเรียกซ้ำตอบ 422 และไม่ลงบัญชีซ้ำ. ถ้าขาด response ให้ตรวจสถานะก่อนส่งงานต่อ ห้ามสร้างกะทดแทนโดยเดายอด.
+- หลังปิดเก็บ `float_kept` เป็น carry ของกะถัดไปของเครื่องนี้. ยอดนับน้อยกว่า default เตือนผู้ใช้และ deposit=0 เมื่อเก็บทั้งหมด.
+- ปิดจากต่างเครื่อง/ต่างคน/ต่างสาขาตอบ 403.
+
+### 5. Z print และ backward compatibility
+- Z payload เพิ่ม `carried_float`, `opening_variance`, `opening_note`, `float_kept`, `deposit_amount`, `deposit_reference`, `void_count`, `return_count`, `discount_total` นอกเหนือจากยอดเดิม.
+- พิมพ์สองใบชัดเจนและเซ็นผู้ส่ง/ผู้รับ (หัวหน้า); ข้อมูลกะเก่าที่ field เป็น null ให้แสดงว่าไม่มีข้อมูล อย่าเดายอดเป็น float ใหม่.
+- ถ้า API รุ่นเก่าไม่มี `default_float`/`carried_float` อย่าเรียก preview เพราะรุ่นเก่าจะละเลย preview และปิดกะจริง. ให้ fallback flow เดิมชัดเจน.
+
+## ทดสอบไปแล้วแค่ไหน
+- `php -d memory_limit=2G vendor/bin/phpunit`: 762 tests, 760 passed, 2 skipped, 6 incomplete, 6,275 assertions; no failures/errors.
+- New float suite: 11 tests / 75 assertions, including real HTTP device authentication, permission checks, decimal cents, preview without persistence, cross-terminal isolation, rollback and PostgreSQL DDL compilation.
+- Real checkout integration closes two shifts and verifies cashbook sales are posted once; `uat:reconcile` passes.
+- `git diff --check` passes.
+- Mutation checks: เปลี่ยน deposit เป็น 0 / ยกเลิก blind filtering / ยกเลิก required opening reason ทีละจุด → เทสต์แดงทั้งสาม (exit 1) แล้วคืนโค้ดครบ.
+- `vue-tsc --noEmit` ผ่าน; `vitest run` เริ่มไม่ได้เพราะ Rollup native library ต่าง Team ID กับ Node ของ Codex. ไม่รัน `vite build` ตามข้อกำหนด.
+- ตรวจ PostgreSQL DDL ผ่าน grammar แบบ pretend โดยบังคับ connection callback ให้ throw ถ้ามีการต่อฐานจริง. ไม่มี PostgreSQL server ในเครื่อง จึงยังไม่ได้ execute migration บน PostgreSQL จริง.
+- ไม่ได้ภาพหน้าจอ Vue หรือทดสอบเครื่องพิมพ์ Windows จริง; ต้องตรวจ print preview 2 ใบและ UI บนเครื่องทดสอบก่อนใช้งาน.
+
+## Deploy / งานถัดไป
+- **ไม่ deploy, ไม่ release, ไม่แตะ production**, ไม่รัน migration บนฐานข้อมูลถาวร. ทุก database test ใช้ SQLite in-memory.
+- ต้องเปิด workspace ที่เขียน Git metadata ของ worktree นี้ได้ จากนั้น pull/reconcile main โดยรักษา branch เดิมและ working changes, commit เป็นขั้น แล้วทดสอบ/push `claude/shift-float`. อย่า stage node_modules, .claude, .codex หรือ credentials.
+- แนะนำแยก commit: (1) schema/models + ERP controls/accounting/tests; (2) Vue UI/API/types + Z/Admin views/routes; (3) handoff/memory. ทุกขั้นใช้ชื่อไฟล์ชัดเจน ไม่ `git add .`.
+- Python ใช้สเปกด้านบนทำใน branch อื่นตามโจทย์. ยังไม่ควรเปิดใช้ blind API กับ Python รุ่นเดิมที่สมมติว่า expected_cash มีทุกครั้ง โดยไม่ปรับ client ก่อน.
+
+---
+
 # Handoff — 2026-11-02 (แก้สีหน้า Executive Dashboard)
 
 ## ทำอะไรไป
@@ -2405,3 +2495,33 @@ pending
 - ยังไม่ทดสอบ/ความเสี่ยง: ต้องตรวจด้วย browser หลัง deploy ว่าแต่ละ popup มีการเลื่อนและปุ่ม footer ตามหน้าจอจริง; งานนี้ไม่แตะ print CSS หรือข้อมูล production
 - Deploy: ยังไม่ deploy
 - งานถัดไป: รอเจ้าของสั่ง deploy แล้ว UAT popup หลักบน production
+
+## Handoff - 2026-11-05 — หน้าตั้งค่า PLU เครื่องชั่ง
+- Commit: `41b6126` (หน้าจอ/API/diagnostics/migration/เทสต์), `a3665a5` (ขอบเขตราคา CSV และเทสต์กรณีพิเศษ); branch `claude/scale-plu-page`
+- ทำอะไร: หนึ่งแถวต่อ PLU 800xxx/801xxx ที่ลงทะเบียน รวม barcode/SKU ปิดใช้งาน; เพิ่มสินค้าชั่ง/ซั่งที่ไม่มี PLU; ตรวจ SKU เป็นเลข PLU, SKU ปิด, SKU หลาย PLU, PLU ซ้ำ, ราคาไม่ตรง, ราคายังไม่ตั้ง พร้อม badge ไทยและวิธีแก้; มีการ์ดจำนวนกดกรอง, ค้นหา, แท็บมีปัญหา/ทั้งหมด/ปกติ (default มีปัญหา), และคงคำเตือนราคา override เดิม
+- ทำอะไร: แก้ราคา ERP ต่อแถวและราคาเครื่องชั่ง; เก็บราคาเครื่องชั่งแยกใน `scale_plu_settings` ไม่เพิ่ม/เปลี่ยนคอลัมน์ ETL/BPlus; CSV วางข้อความ/อัปโหลด → preview → ยืนยันบันทึก ตรวจ PLU เดิม/รหัสซ้ำ/ช่วงราคา และล้าง preview เก่าเมื่อไฟล์ใหม่ผิด; export เดิมเพิ่มราคาเครื่องชั่งและปัญหา พร้อมกันสูตร CSV
+- ทำอะไร: ย้าย barcode เดิมด้วย shared product picker, ยืนยันก่อนย้าย, กัน SKU ปิด/เลข PLU เป็น SKU เป้าหมาย/คำขอจากเจ้าของเดิมที่ล้าสมัย; ตั้งชนิด SCALE_PLU และหน่วยฐานของสินค้าใหม่ (ตัวคูณ 1, ล้างราคา override จากสินค้าเก่า), ไม่สร้างเลข PLU, ไม่เปลี่ยน SKU/บาร์โค้ดอื่นของสินค้าเดิม; บันทึก before/after audit ใน transaction; ทุก route ใช้ `masterdata.manage` จาก route map เดิม
+- ทำอะไร: ทดสอบป้าย 13 หลักใช้ `ScaleBarcodeService` และ catalog/ราคา `PosController::products` เดียวกับ POS ตามสาขา รวม fallback SKU; แสดง profile, ผลตรวจตามกติกา check digit, PLU, ราคารวม, สินค้า, น้ำหนัก และคำเตือนราคาไม่ตรง/ยังไม่ตรวจ; ไม่สร้างบิลหรือ scan log
+- ทดสอบ: `php -d memory_limit=2G vendor/bin/phpunit` ผ่าน 759, skipped 2 จาก 761 tests, 6 incomplete / 6,308 assertions; `php artisan test --filter 'ScalePlu|ScaleBarcodeProfile' --no-coverage` ผ่าน 21 tests / 151 assertions; `php artisan view:cache`, Pint ของ PHP ที่แก้ และ `git diff --check` ผ่าน
+- ทดสอบ: ป้ายจริง `8010030059406` → PLU 801003 / 59.40 และ `8010040132007` → PLU 801004 / 132.00; ตรวจน้ำหนักตามราคา POS และ check digit ที่ผิด/ปิด profile/สินค้าไม่ active; fixture PLU ซ้ำจำลอง schema legacy ที่ไม่มี unique เฉพาะในเทสต์ ไม่ถอด constraint ของแอปจริง
+- ทดสอบ: Mutation checks 4 จุด: ปิดผล diagnostics, ถอดการ save ย้าย barcode, ปิด save ราคาเครื่องชั่ง, ปิด decoder — เทสต์แดงครบ จากนั้นคืนโค้ดเดิมและรัน full suite ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: migration ใช้ Schema Builder/decimal/nullable FK/unique ที่รองรับ SQLite และ PostgreSQL; รันจริงด้วย SQLite ในเทสต์ ยังไม่มี PostgreSQL local สำหรับยืนยัน migration จริง; ยังต้อง UAT เครื่องชั่ง/ฉลากจริง และหน้าจอเล็กใน browser (พยายามเปิด local fixture แล้ว แต่ CUA แจ้ง `The browser access host is unavailable` จึงไม่มี screenshot)
+- Deploy: ยังไม่ deploy และไม่ติดต่อ production; อ่านเฉพาะ snapshot `docs/ai/scale-plu-prod.txt` ในเครื่อง ซึ่งคงเป็น untracked และไม่อยู่ใน commit
+- Git environment: metadata worktree ต้นฉบับอยู่ภายนอก writable roots (`.../jeterp/.git/worktrees/plu`) ทำให้ `git pull origin main` ถูก OS ปฏิเสธ; ใช้ Git metadata ชั่วคราว `/private/tmp/plu-git-work/.git` กับ work-tree เดิมและชื่อ branch เดิมแทน จากนั้น pull origin main สำเร็จ (Already up to date). Commit/push ใช้ metadata ชั่วคราวนี้เท่านั้น; metadata ต้นฉบับยังอยู่ที่ HEAD เก่า จึงอาจแสดงไฟล์งานเหมือนยังไม่ commit ทั้งที่ branch บน remote มี commit แล้ว
+- งานถัดไป: ตรวจรับ branch บน remote; ก่อนใช้ git metadata ต้นฉบับต่อ ให้ผู้ดูแล reconcile metadata กับ remote หลังตรวจว่าไม่มีงานอื่นเพิ่ม (ไฟล์งานใน workspace เป็นฉบับใหม่แล้ว; ห้าม checkout/reset --hard ทับไฟล์). รอคำสั่งเจ้าของก่อน deploy/migrate ตาม OPERATIONS; หลังได้รับอนุญาตจึง UAT และซิงก์ catalog POS ใหม่หลังย้ายรหัส
+
+## Handoff - 2026-11-05 — แผนรัน PLU รอบ 2
+- Commit: `577bf0e` (แผน/หน้าจอ/CSV/ป้าย/rollback และ brief), `79e2c5e` (กัน SKU ชน, ราคาปลายทาง, regression tests, ความจำทีม); branch ปัจจุบัน `claude/scale-plu-page`; commit เอกสาร handoff นี้ตามหลังสอง commit ดังกล่าว
+- ทำอะไร: อ่านและ commit `docs/ai/codex-scale-plu-renumber.md`; ทำต่อจากงาน PLU รอบแรกโดยไม่ทับงานอื่น. หน้าเดียวมีตรวจสินค้าชั่ง/แผนรันเลขใหม่/PLU ปัจจุบัน; รวม SKU เลข PLU ที่ไม่มี barcode, แยกสินค้า inactive, ตรวจชื่อซ้ำหลังตัดข้อความและช่องว่าง, ราคา ≤1 และ picker ผูก SKU ตัวแทนกับ SKU จริง active.
+- ทำอะไร: เลือกรายการ → เก็บ preview ในฐานข้อมูล → เรียงหมวดและ SKU เริ่ม 801001; แก้เลขรายแถว, ล็อกและเรียงใหม่ข้ามเลขล็อก; กันเลขซ้ำ/นอกช่วง 801000–801999/หลายรายการต่อ SKU; คำเตือนต้องยอมรับ และ apply ต้องยืนยันพร้อมสิทธิ์ masterdata.manage. Revision กันใช้แผนคนละตัวอย่างกับที่เห็น, fingerprint กัน catalog/ราคา/ตารางราคาหลัก/profile เปลี่ยนหลัง preview.
+- ทำอะไร: transaction ปิดเลขเก่าทั้ง active/inactive โดยไม่ลบแถว, ตั้ง SCALE_PLU/หน่วยฐาน/ตัวคูณ 1 ใต้ SKU จริง, เก็บราคาเครื่องชั่งตามแผน, snapshot และ audit ผู้ทำ/เวลา/เลขเดิม→ใหม่. Guard row serialize แผน. SKU ตัวแทนที่ย้ายถูกปิดเพื่อไม่ให้ POS fallback SKU เดิม; คืนสถานะเมื่อ rollback. ตรวจไม่ชน barcode หรือ SKU active นอกแผน.
+- ทำอะไร: เก็บประวัติชุดแผน, rollback คืนเจ้าของ/สถานะเลขเดิมและราคาเครื่องชั่งเดิม ปิดแถวใหม่แทนลบ; ถ้ามีการแก้บาร์โค้ด/สินค้าแทน/ราคาเครื่องชั่งหลัง apply ให้ปฏิเสธเพื่อไม่ทับงานใหม่. CSV มี PLU 6 หลัก/ท้าย 3 หลัก/รหัสป้าย 5 หลัก/ชื่อสั้น/ราคา/flag 8 พร้อมกันสูตร CSV; HTML ป้ายทดสอบ 1.000 กก. มี EAN-13 และหน้าพิมพ์ A4. ราคาจากตอน preview และต้องเปิด POPSTAR-801 แบบราคาให้ถอดตรงก่อน apply.
+- ทำอะไร: แก้ราคา ERP/เครื่องชั่ง inline แล้วบันทึกทั้งหมด, แถวแก้เป็นสีเหลือง, ค้นหา/กรองและ table-responsive; เปลี่ยน attachPlu ให้แนะนำสร้างเลขผ่านแผนที่ยืนยันเท่านั้น ไม่สร้างจาก attach โดยตรง.
+- ทดสอบ: `php -d memory_limit=2G vendor/bin/phpunit` ผ่าน 774, skipped 2 จากทั้งหมด 776 tests, 6 incomplete / 6,502 assertions; หลังเพิ่ม assertions ท้ายสุด รัน `php artisan test --filter='ScalePlu|ScaleBarcodeProfile' --no-coverage` ผ่าน 36 tests / 331 assertions. `php artisan view:cache`, Pint ของ PHP ที่แก้, `git diff --check` ผ่าน.
+- ทดสอบ: API จริง `/api/pos/products` ผ่าน device middleware ด้วย fixture เฉพาะใน SQLite in-memory คืน scale_plu ใหม่, เลขเก่าที่ไม่ reuse หาไม่พบหลัง apply, rollback คืนเลขเก่าและเลขใหม่หาไม่พบ. ตรวจ reference EAN `8010010089003`, profile POPSTAR-801, ราคา 89 บาท = 1.000 กก., check digit ผิดถูกปฏิเสธ; ไม่สร้างบิลหรือออก credential จริง.
+- ทดสอบ: Mutation checks 5 จุด (จัดกลุ่ม SKU ตัวแทน, กันเลขซ้ำ, ปิดเลขเก่า, save เลขใหม่, rollback เลขเดิม) ถอดทีละจุดแล้วเทสต์แดงครบ จากนั้นคืนโค้ดและทดสอบผ่าน. Artisan full suite หยุดเพราะ subprocess ใช้ memory 128 MB จึงใช้ PHPUnit โดยตรงด้วย 2 GB; full suite รอบแรกพบหน้าป้ายขาด @page และแก้ A4 แล้ว full suite ผ่าน.
+- ยังไม่ทดสอบ/ความเสี่ยง: ไม่มี PostgreSQL local จึงยังไม่ได้รัน migration กับ PostgreSQL จริง; ทบทวน migration ใช้ Schema Builder, JSON, nullable และ row locks ที่รองรับทั้งสองฐานข้อมูล และรัน migration จริงผ่าน SQLite test suite. Browser host ไม่พร้อม (`The browser access host is unavailable`) จึงยังไม่มี visual/UAT ที่จอ 1024 หรือเครื่องชั่ง/สแกนเนอร์จริง; โครงตารางเลื่อนแนวนอนได้ แต่ต้องยืนยันภาพและ picker ใน browser ก่อนใช้งานจริง.
+- ยังไม่ทดสอบ/ความเสี่ยง: EAN ไม่บอกว่าเป็นป้ายรุ่นเก่าหรือใหม่ หากเลขถูก reuse ป้ายเก่ายังยิงติด/ชี้ SKU ใหม่ได้ จึงแจ้งเตือนรายแถวและก่อน apply พร้อมบังคับยอมรับ; ต้องเก็บป้ายเก่าออกทั้งหมด ตั้งเครื่องชั่ง และซิงก์ POS ก่อนขาย. Unique barcode ทำให้เลขที่มีอยู่ในชุดแผนต้องใช้แถวเดิม (before/after เก็บครบ) ไม่สร้างแถวซ้ำ. ป้ายทดสอบ/CSV ใช้ราคาตอนสร้างแผน; โปรโมชันหรือราคาเปลี่ยนต้องตรวจใหม่. สินค้า/เลขที่ไม่ได้เลือกไม่ถูก renumber.
+- Deploy: ยังไม่ deploy, ไม่ติดต่อ production, ไม่รัน migration กับฐานใช้งานจริง; ไม่อ่าน/ไม่ stage/ไม่ commit `docs/ai/scale-plu-prod.txt` ซึ่งยังเป็น untracked.
+- Git environment: metadata worktree ต้นฉบับยังอยู่นอก writable roots และ pull ถูก OS ปฏิเสธเช่นรอบแรก. ใช้ `--git-dir=/private/tmp/plu-git-work/.git --work-tree=<workspace>` ที่มี branch รอบแรกครบ; pull origin main สำเร็จ Already up to date. Commit/push branch เดิมผ่าน metadata นี้เท่านั้น. Metadata ต้นฉบับยังแสดง HEAD เก่า จึงห้าม checkout/reset ทับไฟล์; ให้ผู้ดูแล reconcile กับ remote หลังตรวจงานค้าง.
+- งานถัดไป: ตรวจรับ branch บน remote; UAT PostgreSQL แยก, browser 1024/picker/บันทึกรวม, CSV ตั้งเครื่องชั่งและสแกนฉลากจริง. รอคำสั่งเจ้าของก่อน deploy ตาม OPERATIONS.

@@ -261,6 +261,15 @@
                         'scanner_mode' => 'keyboard', 'scale_mode' => 'keyboard', 'customer_display' => 'none',
                         'cash_drawer_enabled' => false, 'auto_print' => false, 'print_copies' => 1], $terminal->hardware_profile ?? []);
                 @endphp
+                <form method="post" action="{{ route('pos-admin.terminals.float', $terminal) }}" class="border rounded-2 p-3 mb-3">
+                    @csrf
+                    <strong>{{ $terminal->code }} · นโยบายลิ้นชัก</strong>
+                    <label>เงินทอนประจำลิ้นชัก <input name="default_float" type="number" min="0" step="0.01" required value="{{ $terminal->default_float }}"></label>
+                    <label>เตือนเงินสดเกิน <input name="cash_warning_threshold" type="number" min="0" step="0.01" required value="{{ $terminal->cash_warning_threshold }}"></label>
+                    <input type="hidden" name="blind_count" value="0">
+                    <label><input type="checkbox" name="blind_count" value="1" @checked($terminal->blind_count)> นับแบบไม่เห็นยอด</label>
+                    <button class="btn btn-primary btn-sm">บันทึกนโยบาย</button>
+                </form>
                 <form method="post" action="{{ route('settings.pos-terminal.hardware') }}" class="border rounded-2 p-3 mb-3">
                     @csrf
                     <input type="hidden" name="pos_terminal_id" value="{{ $terminal->id }}">

@@ -23,11 +23,19 @@ use InvalidArgumentException;
 class CashBookPostingService
 {
     public const SOURCE_POS_SHIFT_CASH = 'pos_shift_cash';
+
+    public const SOURCE_POS_OPENING_VARIANCE = 'pos_opening_variance';
+
     public const SOURCE_POS_SHIFT_VARIANCE = 'pos_shift_variance';
+
     public const SOURCE_CASH_SALE = 'cash_sale';
+
     public const SOURCE_CUSTOMER_PAYMENT = 'customer_payment';
+
     public const SOURCE_EXPENSE = 'expense';
+
     public const SOURCE_BANK_TRANSFER = 'bank_transfer';
+
     public const SOURCE_ADJUSTMENT = 'adjustment';
 
     /**
@@ -37,15 +45,15 @@ class CashBookPostingService
      */
     public function post(array $entry): CashBook
     {
-        $cashIn = round((float) ($entry['cash_in'] ?? 0), 4);
-        $cashOut = round((float) ($entry['cash_out'] ?? 0), 4);
-        if ($cashIn < 0 || $cashOut < 0) {
+        $cashIn = DecimalMath::round($entry['cash_in'] ?? 0, 4);
+        $cashOut = DecimalMath::round($entry['cash_out'] ?? 0, 4);
+        if (DecimalMath::compare($cashIn, 0) < 0 || DecimalMath::compare($cashOut, 0) < 0) {
             throw new InvalidArgumentException('สมุดเงินสดรับค่าติดลบไม่ได้ ให้สลับข้างรับ/จ่ายแทน');
         }
-        if ($cashIn > 0 && $cashOut > 0) {
+        if (DecimalMath::compare($cashIn, 0) > 0 && DecimalMath::compare($cashOut, 0) > 0) {
             throw new InvalidArgumentException('หนึ่งรายการต้องเป็นรับหรือจ่ายอย่างใดอย่างหนึ่ง');
         }
-        if ($cashIn === 0.0 && $cashOut === 0.0) {
+        if (DecimalMath::compare($cashIn, 0) === 0 && DecimalMath::compare($cashOut, 0) === 0) {
             throw new InvalidArgumentException('รายการสมุดเงินสดต้องมียอดรับหรือจ่าย');
         }
 
@@ -56,7 +64,7 @@ class CashBookPostingService
             }
 
             // ล็อกแถวล่าสุดของสาขาไว้ก่อนอ่านยอดยกมา ไม่งั้นสองรายการพร้อมกันจะได้ยอดยกมาเท่ากัน
-            $previousBalance = (float) (CashBook::where('branch_id', $entry['branch_id'])
+            $previousBalance = (CashBook::where('branch_id', $entry['branch_id'])
                 ->orderByDesc('id')
                 ->lockForUpdate()
                 ->value('running_balance') ?? 0);
@@ -67,7 +75,7 @@ class CashBookPostingService
                 'description' => $entry['description'],
                 'cash_in' => $cashIn,
                 'cash_out' => $cashOut,
-                'running_balance' => DecimalMath::add($previousBalance, $cashIn - $cashOut),
+                'running_balance' => DecimalMath::add($previousBalance, DecimalMath::subtract($cashIn, $cashOut, 4), 4),
                 'source_type' => $entry['source_type'],
                 'source_id' => $entry['source_id'] ?? null,
                 'source_key' => $entry['source_key'],
@@ -82,17 +90,32 @@ class CashBookPostingService
     }
 
     /** ปิดกะ POS: เงินสดที่ขายได้ในกะ + ผลต่างเงินสดขาด/เกิน แยกเป็นคนละบรรทัดให้ตรวจได้ */
-    public function postShiftClose(PosShift $shift, float $cashSales, float $cashDifference): void
+    public function postShiftClose(PosShift $shift, float|string $cashSales, float|string $cashDifference): void
     {
         $date = ($shift->closed_at ?? now())->toDateString();
 
-        if (abs($cashSales) > 0.0001) {
+        // Opening shortages/overages are custody adjustments, never sales or new float income.
+        // Only a variance against a recorded carried float is real; null means custody was unknown.
+        $openingVariance = $shift->carried_float === null ? '0' : ($shift->opening_variance ?? '0');
+        if (DecimalMath::compare($openingVariance, 0) !== 0) {
+            $this->post([
+                'branch_id' => $shift->branch_id, 'entry_date' => $date,
+                'description' => 'ส่วนต่างรับกะ '.$shift->shift_no,
+                'cash_in' => (DecimalMath::compare($openingVariance, 0) > 0 ? $openingVariance : 0), 'cash_out' => (DecimalMath::compare($openingVariance, 0) < 0 ? DecimalMath::subtract(0, $openingVariance, 4) : 0),
+                'source_type' => self::SOURCE_POS_OPENING_VARIANCE, 'source_id' => $shift->id,
+                'source_key' => self::SOURCE_POS_OPENING_VARIANCE.':'.$shift->id,
+                'pos_terminal_id' => $shift->pos_terminal_id, 'pos_shift_id' => $shift->id,
+                'reason' => $shift->opening_note,
+            ]);
+        }
+
+        if (DecimalMath::compare($cashSales, 0) !== 0) {
             $this->post([
                 'branch_id' => $shift->branch_id,
                 'entry_date' => $date,
                 'description' => 'เงินสดจากการขาย POS กะ '.$shift->shift_no,
-                'cash_in' => max($cashSales, 0),
-                'cash_out' => max(-$cashSales, 0),
+                'cash_in' => (DecimalMath::compare($cashSales, 0) > 0 ? $cashSales : 0),
+                'cash_out' => (DecimalMath::compare($cashSales, 0) < 0 ? DecimalMath::subtract(0, $cashSales, 4) : 0),
                 'source_type' => self::SOURCE_POS_SHIFT_CASH,
                 'source_id' => $shift->id,
                 'source_key' => self::SOURCE_POS_SHIFT_CASH.':'.$shift->id,
@@ -101,13 +124,13 @@ class CashBookPostingService
             ]);
         }
 
-        if (abs($cashDifference) > 0.0001) {
+        if (DecimalMath::compare($cashDifference, 0) !== 0) {
             $this->post([
                 'branch_id' => $shift->branch_id,
                 'entry_date' => $date,
                 'description' => ($cashDifference > 0 ? 'เงินสดเกิน' : 'เงินสดขาด').' กะ '.$shift->shift_no,
-                'cash_in' => max($cashDifference, 0),
-                'cash_out' => max(-$cashDifference, 0),
+                'cash_in' => (DecimalMath::compare($cashDifference, 0) > 0 ? $cashDifference : 0),
+                'cash_out' => (DecimalMath::compare($cashDifference, 0) < 0 ? DecimalMath::subtract(0, $cashDifference, 4) : 0),
                 'source_type' => self::SOURCE_POS_SHIFT_VARIANCE,
                 'source_id' => $shift->id,
                 'source_key' => self::SOURCE_POS_SHIFT_VARIANCE.':'.$shift->id,

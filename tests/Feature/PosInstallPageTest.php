@@ -137,7 +137,7 @@ class PosInstallPageTest extends TestCase
         $user->roles()->attach($role->id);
         $device = PosDevice::create(['name' => 'เครื่อง 2', 'user_id' => $user->id, 'branch_id' => $branch->id, 'terminal_code' => 'POS-B901-02', 'token_hash' => hash('sha256', 'b')]);
         $this->actingAs($user->fresh());
-        $request = Request::create('/api/pos/shift/open', 'POST', ['branch_id' => $branch->id, 'cashier_id' => $cashier->id, 'opening_cash' => 500]);
+        $request = Request::create('/api/pos/shift/open', 'POST', ['branch_id' => $branch->id, 'cashier_id' => $cashier->id, 'opening_cash' => 500, 'opening_note' => 'รับเงินจริงทดสอบเครื่อง']);
         $request->attributes->set('pos_device', $device);
         $this->app->instance('request', $request);
 
