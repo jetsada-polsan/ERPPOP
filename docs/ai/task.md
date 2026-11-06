@@ -2777,3 +2777,11 @@ pending
 - หลักฐานเพิ่มเติม: production `/var/www/jeterp` มีไฟล์เปลี่ยน/ใหม่ค้างประมาณ 783 รายการ จึง **ห้าม reset/restore ทั้ง repo** เพราะอาจทับงานอื่น; ยังไม่ได้แก้ไฟล์ production, ยังไม่ได้แตะฐานข้อมูล และยังไม่ได้ deploy
 - ทดสอบ source ที่ถูกต้อง: `APP_ENV=testing DB_CONNECTION=sqlite DB_DATABASE=:memory: DB_URL='' php -d memory_limit=1G vendor/bin/phpunit --filter ProductCatalogFilterTest` ผ่าน **3 tests / 34 assertions**
 - งานถัดไป: เจ้าของอนุมัติให้แก้ production เฉพาะ `resources/views/products/index.blade.php` หรือ deploy commit ที่สะอาด แล้วตรวจ `/products` ด้วยบัญชีจริง; ห้ามใช้ `git reset --hard` บน server
+
+## Handoff - 2026-11-06 (Codex: production Products hotfix deployed)
+- Commit: source เดิมที่ tracked ของ production (`HEAD`); ไม่มีการ deploy ทั้ง repo เพราะ production มีงานค้าง 783 ไฟล์
+- ทำอะไร: สำรอง view redesign ที่พังไว้ 2 ไฟล์ แล้วกู้เฉพาะ `resources/views/products/index.blade.php` จาก `HEAD` ซึ่งใช้ route ที่มีจริง (`product-units.index`, `products.*`, `scale-prices.index`); ล้าง compiled views ด้วย `php artisan view:clear`
+- ตรวจผลจริง: รีโหลด session ที่ล็อกอินอยู่แล้วหน้า `https://erp.popstarcenter.com/products` กลับมาเป็นหน้า “สินค้า - POPSTAR ERP” แสดงตัวกรอง รายการสินค้า และปุ่มจัดการหน่วยนับได้ตามปกติ
+- ความปลอดภัย: ไม่ reset ทั้ง repo, ไม่แตะฐานข้อมูล, ไม่รัน migration, ไม่ลบงานอื่น; backup อยู่บน server ที่ `resources/views/products/index.blade.php.pre-products-route-fix-20261106-1945` และ `resources/views/products/index.blade.php.pre-products-view-restore-20261106-1948`
+- Deploy: **hotfix เฉพาะหน้า Products เสร็จแล้ว**; full repository deploy ยังไม่ทำเพราะ working tree production มีงานค้างจำนวนมาก
+- งานถัดไป: ตรวจ/รวมงานค้างบน production ให้เป็น commit ที่ตรวจ test แล้วก่อนทำ full deploy; ห้ามใช้ `git reset --hard` เพื่อแก้ความสะอาดของ working tree
