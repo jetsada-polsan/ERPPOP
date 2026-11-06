@@ -77,7 +77,7 @@
                             <td class="fw-semibold">{{ $row['branch']->code }} {{ $row['branch']->name_th }}</td>
                             <td>{!! $row['has_warehouse'] ? '<i class="bi bi-check-circle-fill text-success"></i>' : '<span class="text-danger">ยังไม่มี</span>' !!}</td>
                             <td>{{ $row['devices'] }} @if($row['devices'] > $row['online_devices'])<span class="small text-muted">(ยังไม่เคยต่อ {{ $row['devices'] - $row['online_devices'] }})</span>@endif</td>
-                            <td>{{ $row['cashiers_with_pin'] }} / {{ $row['cashiers'] }}</td>
+                            <td>{{ $row['cashiers_with_pin'] }} / {{ $row['eligible_cashiers'] }} <span class="small text-muted">(ทั้งหมด {{ $row['cashiers'] }})</span></td>
                             <td>
                                 @if($ready)
                                     <span class="badge text-bg-success">พร้อมขาย</span>
@@ -217,13 +217,17 @@
                     <tbody>
                     @foreach($branches as $row)
                         @foreach($row['cashier_list'] as $cashier)
-                            @php $hasPin = $overview->hasPin($cashier); @endphp
+                            @php
+                                $eligible = $overview->canUsePos($cashier, $row['branch']->id);
+                                $hasPin = $overview->hasPin($cashier);
+                            @endphp
                             <tr>
                                 <td>{{ $row['branch']->code }}</td>
                                 <td class="fw-semibold">{{ $cashier->code }}</td>
                                 <td>{{ $cashier->name }}</td>
                                 <td>
-                                    @if(! $hasPin)<span class="badge text-bg-warning">ยังไม่ตั้ง</span>
+                                    @if(! $eligible)<span class="badge text-bg-danger">ไม่มีสิทธิ์ POS/สาขา</span>
+                                    @elseif(! $hasPin)<span class="badge text-bg-warning">ยังไม่ตั้ง</span>
                                     @elseif($cashier->must_change_pin)<span class="badge text-bg-info">รอเปลี่ยนครั้งแรก</span>
                                     @else<span class="badge text-bg-success">ตั้งแล้ว</span>@endif
                                 </td>
@@ -237,9 +241,19 @@
                                     </form>
                                     <form method="post" action="{{ route('settings.pos-cashiers.set-pin', $cashier) }}" class="d-inline-flex gap-1">
                                         @csrf
-                                        <input type="password" name="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required autocomplete="new-password" class="form-control form-control-sm" style="width:80px" placeholder="4 หลัก" aria-label="PIN ใหม่ของ {{ $cashier->code }}">
-                                        <button class="btn btn-sm btn-outline-primary"><i class="bi bi-key me-1"></i>ตั้ง PIN</button>
+                                        <input type="password" name="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required autocomplete="new-password" class="form-control form-control-sm" style="width:80px" placeholder="4 หลัก" aria-label="PIN ใหม่ของ {{ $cashier->code }}" @disabled(! $eligible)>
+                                        <button class="btn btn-sm btn-outline-primary" @disabled(! $eligible) title="{{ $eligible ? '' : 'เพิ่มสิทธิ์ pos.sell และผูกสาขาให้บัญชี ERP ก่อน' }}"><i class="bi bi-key me-1"></i>ตั้ง PIN</button>
                                     </form>
+                                    @if(! $eligible)
+                                        @if($cashier->user)
+                                            <form method="post" action="{{ route('pos-admin.cashiers.enable', $cashier) }}" class="d-inline">
+                                                @csrf
+                                                <button class="btn btn-sm btn-primary"><i class="bi bi-check-circle me-1"></i>เปิดใช้ POS</button>
+                                            </form>
+                                        @else
+                                            <span class="small text-danger">ผูกบัญชี ERP ก่อน</span>
+                                        @endif
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach
@@ -322,11 +336,16 @@
                     @if($installer)
                         <a href="{{ route('python-pos.download') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-1"></i>Python รุ่น {{ $installer['version'] }}</a>
                     @endif
+                    @if($jetPythonInstaller)
+                        <a href="{{ route('jet-python-pos.download') }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-download me-1"></i>JET POS Python UAT {{ $jetPythonInstaller['version'] }}</a>
+                    @else
+                        <button type="button" class="btn btn-outline-primary btn-sm" disabled title="รอผ่าน UAT และอัปโหลดไฟล์ติดตั้งก่อนเปิดดาวน์โหลด"><i class="bi bi-hourglass-split me-1"></i>JET POS Python UAT (รอทดสอบ)</button>
+                    @endif
                     @if(! $vueInstaller && ! $installer)
                         <div class="small text-danger">ยังไม่มีไฟล์ติดตั้งบนเซิร์ฟเวอร์</div>
                     @endif
                 </div>
-                <div class="small text-muted mt-2">แนะนำ Vue/Tauri สำหรับตัวติดตั้งรุ่นใหม่; Python คงไว้สำหรับเครื่องเดิม</div>
+                <div class="small text-muted mt-2">Vue/Tauri คือเครื่องขายจริงปัจจุบัน · Python รุ่นเดิมคงไว้สำหรับเครื่องเดิม · JET POS Python UAT แยกทดสอบ ยังไม่ใช้ขายจริงจนกว่าจะผ่านเกณฑ์ UAT</div>
             </div></div>
             <div class="pa-step"><span class="pa-step-no">2</span><div>
                 <div class="fw-semibold">กด เพิ่มเครื่อง ที่แท็บ ภาพรวมสาขา</div>
