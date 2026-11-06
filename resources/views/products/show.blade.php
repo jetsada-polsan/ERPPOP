@@ -865,9 +865,14 @@
 <style>
     body.erp-popup-page .app-header,
     body.erp-popup-page .app-sidebar { display:none !important; }
-    body.erp-popup-page .app-main { margin:0 !important; min-height:100vh; }
-    body.erp-popup-page .app-content { padding:5px !important; }
-    body.erp-popup-page .container-fluid { max-width:none !important; padding:0 !important; }
+    body.erp-popup-page,
+    body.erp-popup-page .app-wrapper,
+    body.erp-popup-page .app-main,
+    body.erp-popup-page .app-content,
+    body.erp-popup-page .container-fluid { margin:0 !important; padding:0 !important; }
+    body.erp-popup-page .app-main { display:block !important; min-height:100vh; }
+    body.erp-popup-page .app-content { min-height:0 !important; }
+    body.erp-popup-page .container-fluid { max-width:none !important; }
     body.erp-popup-page div[x-data="productShow()"] > :not(.compact-product-window):not(.booking-modal-backdrop) { display:none !important; }
     body.erp-popup-page { background:linear-gradient(145deg,#e8f1f8,#f8fbfe 48%,#e4f4f3); }
     .compact-product-window { min-height:100vh; background:#f7fafc; color:#172033; font:14px/1.45 Tahoma,"Noto Sans Thai",sans-serif; }

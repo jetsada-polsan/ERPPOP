@@ -1,4 +1,19 @@
-# Handoff — 2026-11-06 (Product popup sizing and button spacing — pending deploy)
+# Handoff — 2026-11-06 (Product popup top-gap removal — pending deploy)
+
+## Scope
+- Branch: `codex/modern-product-popups`.
+- Removed inherited full-page wrapper margins and padding inside the product popup iframe. The product header now starts immediately below the popup title bar; the popup continues to show only product-specific controls.
+- No routes, fields, requests, validation, product conditions, permissions, or business rules changed.
+
+## Verification
+- `git diff --check` passed.
+- `php artisan view:clear && php artisan view:cache` passed.
+- `php artisan test tests/Feature/ProductCatalogFilterTest.php tests/Feature/BarcodePolicyTest.php tests/Feature/ScalePluPageTest.php --no-coverage` passed: 25 tests, 177 assertions.
+- **Pending deployment:** this visual correction has not been deployed yet.
+
+---
+
+# Handoff — 2026-11-06 (Product popup sizing and button spacing — deployed production)
 
 ## Scope
 - Branch: `codex/modern-product-popups`.
@@ -9,11 +24,11 @@
 - `git diff --check` passed.
 - `php artisan view:clear && php artisan view:cache` passed.
 - `php artisan test tests/Feature/ProductCatalogFilterTest.php tests/Feature/BarcodePolicyTest.php tests/Feature/ScalePluPageTest.php --no-coverage` passed: 25 tests, 177 assertions.
-- **Pending deployment:** this visual refinement has not been deployed yet.
+- Deployed through GitHub Actions run `42178352970`; workflow completed successfully.
 
 ---
 
-# Handoff — 2026-11-06 (Product popup chrome removal — pending deploy)
+# Handoff — 2026-11-06 (Product popup chrome removal — deployed production)
 
 ## Commit / scope
 - Branch: `codex/modern-product-popups`.
@@ -25,7 +40,7 @@
 - `git diff --check` passed.
 - `php artisan view:clear && php artisan view:cache` passed.
 - `php artisan test tests/Feature/ProductCatalogFilterTest.php tests/Feature/BarcodePolicyTest.php tests/Feature/ScalePluPageTest.php --no-coverage` passed: 25 tests, 177 assertions.
-- **Pending deployment:** this correction has not been deployed yet.
+- Deployed through GitHub Actions run `42177580875`; workflow completed successfully.
 
 ---
 
