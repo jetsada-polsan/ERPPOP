@@ -127,7 +127,7 @@ class StockBalanceReportTest extends TestCase
             $this->assertSame(1, $result['total']);
         }
         $csv = $this->report($own, $parameters + ['export' => 'csv'])->assertOk()->streamedContent();
-        $this->assertStringContainsString('รหัส,ชื่อ,"คงเหลือ (หน่วยหลัก / ย่อย)"', $csv);
+        $this->assertStringContainsString('รหัส,ชื่อ,หน่วยหลัก,หน่วยย่อย', $csv);
         $this->assertStringNotContainsString('สาขา B001', $csv);
         $this->assertStringNotContainsString('สาขา HQ', $csv);
 
@@ -193,6 +193,45 @@ class StockBalanceReportTest extends TestCase
         $this->assertStringContainsString('20.125', $sheet);
         $zip->close();
         unlink($path);
+    }
+
+    public function test_stock_quantity_is_split_into_main_and_sub_units_in_reports_and_exports(): void
+    {
+        $branch = $this->branch('B001');
+        $baseUnit = ProductUnit::firstOrCreate(['code' => 'PCS-RPT'], ['name' => 'ชิ้น', 'qty_per_base_unit' => 1]);
+        $largeUnit = ProductUnit::firstOrCreate(['code' => 'BOX-RPT'], ['name' => 'ลัง', 'qty_per_base_unit' => 10]);
+        $product = $this->product('102204');
+        $product->update(['base_unit_id' => $baseUnit->id]);
+        ProductBarcode::create([
+            'product_id' => $product->id,
+            'unit_id' => $largeUnit->id,
+            'barcode' => '0001022040005',
+            'unit_factor' => 10,
+            'price' => 100,
+            'is_active' => true,
+        ]);
+        DB::table('stock_balances')->insert([
+            'product_id' => $product->id,
+            'warehouse_location_id' => $branch->default_warehouse_location_id,
+            'on_hand_qty' => 23,
+            'reserved_qty' => 0,
+        ]);
+        $this->actingAs($this->viewer($branch));
+
+        $response = $this->report($branch, ['q' => '102204'])->assertOk();
+        $result = $response->viewData('result');
+        $row = $result['rows']->sole();
+
+        $this->assertSame('2 ลัง', $row->large_quantity_display);
+        $this->assertSame('3 ชิ้น', $row->small_quantity_display);
+        $this->assertSame(['large_quantity_display', 'small_quantity_display'], collect($result['columns'])->slice(2, 2)->pluck('key')->all());
+        $this->assertStringContainsString('หน่วยหลัก', $response->getContent());
+        $this->assertStringContainsString('หน่วยย่อย', $response->getContent());
+        $this->assertStringContainsString('display: table-header-group !important', $response->getContent());
+
+        $csv = $this->report($branch, ['q' => '102204', 'export' => 'csv'])->assertOk()->streamedContent();
+        $this->assertStringContainsString('รหัส,ชื่อ,หน่วยหลัก,หน่วยย่อย', $csv);
+        $this->assertStringContainsString('"2 ลัง","3 ชิ้น"', $csv);
     }
 
     public function test_search_treats_percent_and_underscore_as_literal_product_text(): void

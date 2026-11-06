@@ -67,7 +67,8 @@ class StockBalanceReport
             'columns' => [
                 ['label' => 'รหัส', 'key' => 'sku_code'],
                 ['label' => 'ชื่อ', 'key' => 'name_th'],
-                ['label' => 'คงเหลือ (หน่วยหลัก / ย่อย)', 'key' => 'quantity_display', 'class' => 'text-end'],
+                ['label' => 'หน่วยหลัก', 'key' => 'large_quantity_display', 'class' => 'text-end'],
+                ['label' => 'หน่วยย่อย', 'key' => 'small_quantity_display', 'class' => 'text-end'],
             ],
             'rows' => $rows,
             'total' => $pagination?->total() ?? $rows->count(),

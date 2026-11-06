@@ -32,7 +32,13 @@ class StockQuantityFormatter
             $smallLabel = $row->unit_name ?: 'หน่วยย่อย';
 
             if (! $option) {
-                $row->quantity_display = $this->number($quantity).' '.$smallLabel;
+                $row->large_quantity = null;
+                $row->large_unit_name = null;
+                $row->small_quantity = $quantity;
+                $row->small_unit_name = $smallLabel;
+                $row->large_quantity_display = '-';
+                $row->small_quantity_display = $this->number($quantity).' '.$smallLabel;
+                $row->quantity_display = $row->small_quantity_display;
 
                 return;
             }
@@ -41,8 +47,13 @@ class StockQuantityFormatter
             $largeQuantity = $quantity >= 0 ? floor($quantity / $factor) : ceil($quantity / $factor);
             $smallQuantity = $quantity - ($largeQuantity * $factor);
             $largeLabel = $option->large_unit_name ?: 'หน่วยหลัก';
-            $row->quantity_display = $this->number($largeQuantity).' '.$largeLabel
-                .' '.$this->number($smallQuantity).' '.$smallLabel;
+            $row->large_quantity = $largeQuantity;
+            $row->large_unit_name = $largeLabel;
+            $row->small_quantity = $smallQuantity;
+            $row->small_unit_name = $smallLabel;
+            $row->large_quantity_display = $this->number($largeQuantity).' '.$largeLabel;
+            $row->small_quantity_display = $this->number($smallQuantity).' '.$smallLabel;
+            $row->quantity_display = $row->large_quantity_display.' '.$row->small_quantity_display;
         });
     }
 

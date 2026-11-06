@@ -713,7 +713,8 @@ class ReportController extends Controller
             'stock_alerts' => $this->tableResult('สต็อกต่ำ / ติดลบ', [
                 ['label' => 'รหัส', 'key' => 'sku_code'],
                 ['label' => 'สินค้า', 'key' => 'name_th'],
-                ['label' => 'คงเหลือ (หน่วยหลัก / ย่อย)', 'key' => 'quantity_display', 'class' => 'text-end'],
+                ['label' => 'หน่วยหลัก', 'key' => 'large_quantity_display', 'class' => 'text-end'],
+                ['label' => 'หน่วยย่อย', 'key' => 'small_quantity_display', 'class' => 'text-end'],
                 ['label' => 'ราคาต่อหน่วย', 'key' => 'unit_price', 'type' => 'money', 'class' => 'text-end'],
                 ['label' => 'มูลค่าคงเหลือ', 'key' => 'stock_value', 'type' => 'money', 'class' => 'text-end'],
             ], $this->stockAlerts($filters)),

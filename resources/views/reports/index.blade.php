@@ -128,6 +128,8 @@
         'name_th' => 'สินค้า',
         'product_name' => 'สินค้า',
         'location_name' => 'คลัง / ที่เก็บ',
+        'large_quantity_display' => 'หน่วยหลัก',
+        'small_quantity_display' => 'หน่วยย่อย',
         'from_location' => 'ต้นทาง',
         'to_location' => 'ปลายทาง',
         'branch_name' => 'สาขา',
@@ -823,7 +825,7 @@
         .app-sidebar, .app-header, .flow-rail, .no-print, .rpt-panel-title { display: none !important; }
         html, body { background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         /* หัวตารางต้องซ้ำทุกหน้า ไม่งั้นหน้าที่ 2 เป็นต้นไปจะเป็นตัวเลขลอย ๆ ไม่มีชื่อคอลัมน์ */
-        .report-data-table thead { display: table-header-group; }
+        .report-data-table thead { display: table-header-group !important; }
         .report-data-table tfoot { display: table-footer-group; }
         .report-data-table tr { page-break-inside: avoid; break-inside: avoid; }
         .report-data-table { width: 100%; font-size: 10.5px; }
