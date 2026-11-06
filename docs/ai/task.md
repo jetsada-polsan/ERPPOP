@@ -2769,3 +2769,11 @@ pending
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ติดตั้ง artifact ใหม่บน Windows จริง และยังไม่ได้ทดสอบ HTTP กับ ERP production ด้วย credential ของเจ้าของ
 - Deploy: **ยังไม่ deploy / ไม่ publish**
 - งานถัดไป: push branch นี้และสั่ง Windows UAT build ใหม่จาก commit `1be701e`; ติดตั้งทับเครื่องทดสอบ แล้วลองเปิดเครื่องใหม่ที่ยังไม่มี `pos-config.json` จากนั้นวาง Token และกดตรวจสอบ
+
+## Handoff - 2026-11-06 (Codex: diagnose production Products 500)
+- Commit: เอกสารนี้อยู่ใน commit ถัดจาก `501bd8f`
+- พบจาก production log แบบอ่านอย่างเดียว: `/products` ตอบ 500 เวลา 19:20–19:21 เพราะ `Route [units.index] not defined` ที่ `resources/views/products/index.blade.php:29`
+- สาเหตุ: ไฟล์ view บน production ถูกแก้ค้างใน working tree วันนี้และเรียก route `units.index` แต่ route ที่มีจริงคือ `product-units.index`; source ที่ tracked ใน workspace ใช้ `product-units.index` ถูกต้องอยู่แล้ว
+- หลักฐานเพิ่มเติม: production `/var/www/jeterp` มีไฟล์เปลี่ยน/ใหม่ค้างประมาณ 783 รายการ จึง **ห้าม reset/restore ทั้ง repo** เพราะอาจทับงานอื่น; ยังไม่ได้แก้ไฟล์ production, ยังไม่ได้แตะฐานข้อมูล และยังไม่ได้ deploy
+- ทดสอบ source ที่ถูกต้อง: `APP_ENV=testing DB_CONNECTION=sqlite DB_DATABASE=:memory: DB_URL='' php -d memory_limit=1G vendor/bin/phpunit --filter ProductCatalogFilterTest` ผ่าน **3 tests / 34 assertions**
+- งานถัดไป: เจ้าของอนุมัติให้แก้ production เฉพาะ `resources/views/products/index.blade.php` หรือ deploy commit ที่สะอาด แล้วตรวจ `/products` ด้วยบัญชีจริง; ห้ามใช้ `git reset --hard` บน server
