@@ -1,3 +1,18 @@
+# Handoff — 2026-11-06 (Product popup sizing and button spacing — pending deploy)
+
+## Scope
+- Branch: `codex/modern-product-popups`.
+- UI-only refinement of the product popup: increased the popup frame from 1240×840 to 1360×900 maximum while retaining safe viewport margins; enlarged the title bar slightly.
+- Added deliberate spacing between popup toolbar buttons, dialog footer buttons, and row action buttons. Increased the content width and breathing room without changing any field, condition, request, validation, route, or business rule.
+
+## Verification
+- `git diff --check` passed.
+- `php artisan view:clear && php artisan view:cache` passed.
+- `php artisan test tests/Feature/ProductCatalogFilterTest.php tests/Feature/BarcodePolicyTest.php tests/Feature/ScalePluPageTest.php --no-coverage` passed: 25 tests, 177 assertions.
+- **Pending deployment:** this visual refinement has not been deployed yet.
+
+---
+
 # Handoff — 2026-11-06 (Product popup chrome removal — pending deploy)
 
 ## Commit / scope

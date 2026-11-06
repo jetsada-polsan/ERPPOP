@@ -280,12 +280,12 @@
         background: #fff; border:1px solid #dbe7ef; border-radius:20px; box-shadow:0 28px 88px rgba(15, 56, 88, .28);
     }
     .booking-modal .modal-header { background:linear-gradient(120deg,#fff,#f2f9fc); border-bottom:1px solid #e4edf2 !important; }
-    .booking-modal .modal-footer { background:#fbfdfe; border-top:1px solid #e4edf2 !important; }
+    .booking-modal .modal-footer { gap:10px; background:#fbfdfe; border-top:1px solid #e4edf2 !important; }
     .booking-modal .btn { min-height:42px; border-radius:10px; font-weight:800; }
-    .product-popup-backdrop { position:fixed; inset:0; z-index:1950; display:flex; align-items:center; justify-content:center; padding:24px; background:rgba(15,35,54,.58); backdrop-filter:blur(4px); }
-    .product-popup-window { width:min(1240px,calc(100vw - 48px)); height:min(840px,calc(100vh - 48px)); display:flex; flex-direction:column; overflow:hidden; border:1px solid rgba(255,255,255,.72); border-radius:22px; background:#f7fafc; box-shadow:0 30px 100px rgba(5,29,49,.38); }
-    .product-popup-titlebar { min-height:66px; display:flex; align-items:center; justify-content:space-between; padding:0 16px 0 24px; color:#19344d; background:linear-gradient(120deg,#fff,#edf8fb); border-bottom:1px solid #dbe7ef; font:800 17px Tahoma,"Noto Sans Thai",sans-serif; }
-    .product-popup-titlebar > div { display:flex; align-items:center; gap:4px; }
+    .product-popup-backdrop { position:fixed; inset:0; z-index:1950; display:flex; align-items:center; justify-content:center; padding:16px; background:rgba(15,35,54,.58); backdrop-filter:blur(4px); }
+    .product-popup-window { width:min(1360px,calc(100vw - 32px)); height:min(900px,calc(100vh - 32px)); display:flex; flex-direction:column; overflow:hidden; border:1px solid rgba(255,255,255,.72); border-radius:24px; background:#f7fafc; box-shadow:0 30px 100px rgba(5,29,49,.38); }
+    .product-popup-titlebar { min-height:72px; display:flex; align-items:center; justify-content:space-between; padding:0 20px 0 30px; color:#19344d; background:linear-gradient(120deg,#fff,#edf8fb); border-bottom:1px solid #dbe7ef; font:800 18px Tahoma,"Noto Sans Thai",sans-serif; }
+    .product-popup-titlebar > div { display:flex; align-items:center; gap:10px; }
     .product-popup-titlebar > div i { display:grid; place-items:center; width:34px; height:34px; margin:0 !important; border-radius:10px; color:#fff; background:linear-gradient(135deg,var(--erp-primary),#14b8a6); font-size:17px; }
     .product-popup-titlebar button { width:40px; height:40px; display:grid; place-items:center; border:1px solid #d6e3eb; border-radius:11px; color:#506779; background:#fff; transition:.16s ease; }
     .product-popup-titlebar button:hover { border-color:#fecaca; color:#b91c1c; background:#fff5f5; transform:rotate(2deg); }
