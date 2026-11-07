@@ -46,7 +46,8 @@
         </form>
     </div>
 
-    <div class="content-card pos-users-panel p-3 mb-3" x-data="{ quick: '' }">
+    <details class="content-card pos-users-panel p-3 mb-3" x-data="{ quick: '' }">
+        <summary class="fw-bold mb-2">ผู้ใช้สำหรับ POS — กดเพื่อดูรายการ</summary>
         <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-2">
             <div>
                 <h2 class="h5 fw-bold mb-1"><i class="bi bi-shop-window me-2" style="color:var(--erp-primary)"></i>ผู้ใช้สำหรับ POS</h2>
@@ -79,7 +80,7 @@
                 <div class="text-muted small py-3">ยังไม่มีผู้ใช้ที่มีสิทธิ์ขาย POS</div>
             @endforelse
         </div>
-    </div>
+    </details>
 
     <div class="user-form-backdrop" x-show="formOpen" x-transition.opacity @keydown.escape.window="resetForm()" style="display:none">
     <div class="user-form-modal" @click.outside="resetForm()" x-transition>
@@ -243,9 +244,14 @@
                         <td class="small">{{ $user->branch?->name_th ?? 'ส่วนกลาง' }}</td>
                         <td class="small">{{ $user->salesArea ? $user->salesArea->code.' - '.$user->salesArea->name : '-' }}</td>
                         <td>
-                            @foreach($user->roles as $role)
+                            @foreach($user->roles->take(2) as $role)
                                 <span class="badge text-bg-primary">{{ $role->name }}</span>
                             @endforeach
+                            @if($user->roles->count() > 2)
+                                <details class="small mt-1"><summary>อีก {{ $user->roles->count() - 2 }} บทบาท</summary>
+                                    {{ $user->roles->skip(2)->pluck('name')->join(', ') }}
+                                </details>
+                            @endif
                             <div class="mt-1">
                                 @if($user->hasPermission('pos.use'))
                                     <span class="badge text-bg-light border">เปิด POS</span>
@@ -270,10 +276,15 @@
                                 @click="editUser({{ json_encode(['id' => $user->id, 'username' => $user->username, 'name' => $user->name, 'email' => $user->email, 'phone' => $user->phone, 'position' => $user->position, 'branch_id' => $user->branch_id, 'branch_ids' => $user->branchRoles->pluck('pivot.branch_id')->unique()->values(), 'sales_area_id' => $user->sales_area_id, 'role_ids' => $user->roles->pluck('id'), 'is_active' => $user->is_active]) }})">
                                 <i class="bi bi-pencil me-1"></i>แก้ไข
                             </button>
-                            <button type="button" class="btn btn-sm btn-outline-warning"
+                            <button type="button" class="btn btn-sm btn-outline-warning text-nowrap"
                                 @click="openReset({{ $user->id }}, @js($user->username), @js($user->name), {{ $user->hasPermission('pos.sell') ? 'true' : 'false' }})">
                                 <i class="bi bi-arrow-repeat me-1"></i>{{ $user->hasPermission('pos.sell') ? 'รีเซ็ต ERP + POS' : 'รีเซ็ตรหัส ERP' }}
                             </button>
+                            @if($user->hasPermission('pos.sell'))
+                                <form method="post" action="{{ route('users.reset-password', $user) }}" class="d-inline" onsubmit="return confirm('รีเซ็ตรหัส ERP ของผู้ใช้นี้ โดยคง PIN POS เดิม?')">
+                                    @csrf <button class="btn btn-sm btn-light border text-nowrap">รีเซ็ตเฉพาะ ERP</button>
+                                </form>
+                            @endif
                         </td>
                     </tr>
                 @empty
