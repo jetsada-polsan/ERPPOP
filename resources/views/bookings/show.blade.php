@@ -116,7 +116,7 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
                     <div class="doc-book-label">เล่มเอกสาร DS / DSN</div>
                 <select name="document_book_id" class="form-select" style="width:auto" title="เล่มเอกสารขายเชื่อ">
                     @foreach($creditSaleBooks as $book)
-                        <option value="{{ $book->id }}" @selected($book->is_default)>{{ $book->code }} - {{ $book->no_vat ? 'ไม่มีภาษี' : 'มีภาษี' }} ({{ number_format($book->documents_count) }} ใบ)</option>
+                        <option value="{{ $book->id }}" @selected($book->is_default)>{{ $book->code }} - {{ $book->no_vat ? 'เล่มไม่คำนวณ VAT' : 'คำนวณ VAT ตามสินค้า' }} ({{ number_format($book->documents_count) }} ใบ)</option>
                     @endforeach
                 </select>
                 </div>

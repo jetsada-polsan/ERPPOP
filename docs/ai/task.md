@@ -1,3 +1,9 @@
+# Handoff — 2026-11-07 (Codex: DS / DSN investigation)
+
+- ตรวจ Business Plus ผ่าน AnyDesk: DS/DSN เป็นเล่มขายเชื่อคู่ อ้างใบจองเดียวกันและแยกรายการ; พบ DS มียอดยกเว้น VAT. แก้คำอธิบายตัวเลือกเล่มในใบจองให้ตรง logic ปัจจุบัน และบันทึกจุดเชื่อมที่ต้องแก้ใน sales-delivery gap
+- PHPUnit NoVatBookTest|BookingDeliveryAndCashTransferTest ผ่าน 12 tests; Blade view cache และ diff check ผ่าน
+- ยังไม่ได้สร้าง split conversion, เงื่อนไขลูกค้า/ผู้จำหน่าย หรือใบส่งรวมตามสาย และยังไม่ deploy. ต้องปรับยอด Fleet/Report/returns/บัญชีให้รองรับหลายบิลก่อนใช้จริง
+
 # Handoff — 2026-11-07 (Codex: user page)
 
 - ย่อส่วนผู้ใช้ POS และบทบาทเพื่อให้ตารางอ่านง่าย เพิ่มทางเลือกรีเซ็ตรหัส ERP อย่างเดียวโดยคง PIN POS ผ่าน endpoint เดิม
