@@ -167,15 +167,12 @@ class FleetController extends Controller
                 }
 
                 if ($data['status'] === 'paid' && ! $job->payment_document_id) {
-                    $document = $booking->confirmedDocument;
-                    abort_unless($document, 422, 'ต้องออกใบขายหลังส่งครบก่อนรับเงิน');
-                    $open = $document->openItem;
-                    abort_unless($open, 422, 'ไม่พบยอดลูกหนี้ของใบขายนี้');
+                    $allocationData = $this->bookingPaymentAllocations($booking, (float) $data['paid_amount']);
                     $receipt = $payments->create([
-                        'customer_id' => $document->customer_id,
-                        'branch_id' => $document->branch_id,
+                        'customer_id' => $allocationData['customer_id'],
+                        'branch_id' => $allocationData['branch_id'],
                         'method' => $data['payment_method'],
-                        'allocations' => [['customer_open_item_id' => $open->id, 'amount' => $data['paid_amount']]],
+                        'allocations' => $allocationData['allocations'],
                     ]);
                     $data['payment_document_id'] = $receipt->id;
                     $data['paid_at'] = now();
@@ -207,12 +204,9 @@ class FleetController extends Controller
     public function collectPayment(Request $request, SaleBooking $booking, CustomerPaymentService $payments): RedirectResponse
     {
         $data = $request->validate(['method' => 'required|in:cash,transfer', 'amount' => 'required|numeric|min:0.01', 'transfer_last4' => ['nullable', 'digits:4', 'required_if:method,transfer']]);
-        $document = $booking->confirmedDocument;
-        abort_unless($document, 422, 'ใบจองต้องแปลงเป็นใบขายก่อนรับเงิน');
-        $open = $document->openItem;
-        abort_unless($open, 422, 'ไม่พบยอดลูกหนี้ของใบขายนี้');
         try {
-            $receipt = $payments->create(['customer_id' => $document->customer_id, 'branch_id' => $document->branch_id, 'method' => $data['method'], 'allocations' => [['customer_open_item_id' => $open->id, 'amount' => $data['amount']]]]);
+            $allocationData = $this->bookingPaymentAllocations($booking, (float) $data['amount']);
+            $receipt = $payments->create(['customer_id' => $allocationData['customer_id'], 'branch_id' => $allocationData['branch_id'], 'method' => $data['method'], 'allocations' => $allocationData['allocations']]);
         } catch (RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }
@@ -220,6 +214,38 @@ class FleetController extends Controller
         $job->update(['status' => 'paid', 'paid_at' => now(), 'payment_method' => $data['method'], 'paid_amount' => $data['amount'], 'transfer_last4' => $data['transfer_last4'] ?? null, 'payment_document_id' => $receipt->id, 'updated_by' => auth()->id()]);
 
         return back()->with('success', "รับเงินและตัดลูกหนี้แล้ว {$receipt->doc_number}");
+    }
+
+    /** @return array{customer_id:int,branch_id:int,allocations:array<int,array{customer_open_item_id:int,amount:float}>} */
+    private function bookingPaymentAllocations(SaleBooking $booking, float $amount): array
+    {
+        $documents = $booking->salesDocuments()->with('openItem')->orderBy('id')->get();
+        if ($documents->isEmpty() && $booking->confirmedDocument()->exists()) {
+            $documents->push($booking->confirmedDocument()->with('openItem')->first());
+        }
+        abort_if($documents->isEmpty(), 422, 'ใบจองต้องแปลงเป็นใบขายก่อนรับเงิน');
+
+        $remaining = round($amount, 2);
+        $allocations = [];
+        foreach ($documents as $document) {
+            $open = $document->openItem;
+            if (! $open || (float) $open->balance_amount <= 0) {
+                continue;
+            }
+            $allocated = min(round((float) $open->balance_amount, 2), $remaining);
+            if ($allocated > 0) {
+                $allocations[] = ['customer_open_item_id' => $open->id, 'amount' => $allocated];
+                $remaining = round($remaining - $allocated, 2);
+            }
+            if ($remaining <= 0) {
+                break;
+            }
+        }
+        abort_if($remaining > 0.01, 422, 'ยอดรับเงินเกินยอดลูกหนี้คงเหลือของใบขายจากใบจองนี้');
+
+        $first = $documents->first();
+
+        return ['customer_id' => $first->customer_id, 'branch_id' => $first->branch_id, 'allocations' => $allocations];
     }
 
     public function index(): View

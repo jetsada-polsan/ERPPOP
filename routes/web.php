@@ -270,6 +270,8 @@ Route::prefix('bookings')->name('bookings.')->group(function () {
     Route::get('/{booking}/edit', [BookingController::class, 'edit'])->name('edit');
     Route::put('/{booking}', [BookingController::class, 'update'])->name('update');
     Route::get('/{booking}', [BookingController::class, 'show'])->name('show');
+    Route::post('/{booking}/convert/preview', [BookingController::class, 'previewConvert'])->name('convert.preview');
+    Route::post('/{booking}/convert/preview/cancel', [BookingController::class, 'cancelConvertPreview'])->name('convert.preview.cancel');
     Route::post('/{booking}/convert', [BookingController::class, 'convert'])->name('convert');
     Route::post('/{booking}/cancel', [BookingController::class, 'cancel'])->name('cancel');
     Route::post('/{booking}/delivery', [BookingController::class, 'recordDelivery'])->name('delivery');

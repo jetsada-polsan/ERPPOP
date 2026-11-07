@@ -1703,21 +1703,31 @@ class ReportController extends Controller
     // ยอดขายตามใบจอง: ทุกใบจองในช่วง + ใบขายเชื่อที่แปลงแล้ว (BPlus: รายงานใบจอง)
     private function salesByBooking(Carbon $from, Carbon $to, array $filters): Collection
     {
+        $creditSaleTypeIds = DB::table('document_types')->where('code', 'CREDIT_SALE')->select('id');
+        $documentNumberList = DB::connection()->getDriverName() === 'pgsql'
+            ? "string_agg(doc_number, ', ')"
+            : "group_concat(doc_number, ', ')";
+        $splitSales = DB::table('documents')
+            ->whereIn('document_type_id', $creditSaleTypeIds)
+            ->whereNotNull('source_document_id')
+            ->groupBy('source_document_id')
+            ->selectRaw("source_document_id, {$documentNumberList} as doc_number, sum(total_amount) as total_amount");
         $query = DB::table('sale_bookings as sb')
             ->join('documents as d', 'd.id', '=', 'sb.document_id')
             ->leftJoin('documents as sd', 'sd.id', '=', 'sb.confirmed_document_id')
+            ->leftJoinSub($splitSales, 'split_sales', fn ($join) => $join->on('split_sales.source_document_id', '=', 'sb.document_id'))
             ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')
             ->leftJoin('salesmen as s', 's.id', '=', 'd.salesman_id')
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
 
         $this->applyBranch($query, $filters, 'd.branch_id');
-        $this->applySearch($query, $filters, ['d.doc_number', 'sd.doc_number', 'c.code', 'c.name_th', 's.name']);
+        $this->applySearch($query, $filters, ['d.doc_number', 'sd.doc_number', 'split_sales.doc_number', 'c.code', 'c.name_th', 's.name']);
 
         $statusLabels = ['pending' => 'รอแปลงขาย', 'converted_to_sale' => 'แปลงขายแล้ว', 'cancelled' => 'ยกเลิก'];
 
         return $query
             ->orderByDesc('d.doc_date')->orderByDesc('d.id')
-            ->selectRaw("d.doc_number as booking_no, d.doc_date, coalesce(c.name_th, '-') as customer_name, coalesce(s.name, '-') as salesman_name, sb.status, coalesce(sd.doc_number, '-') as sale_doc_no, coalesce(sd.total_amount, d.total_amount) as total_amount")
+            ->selectRaw("d.doc_number as booking_no, d.doc_date, coalesce(c.name_th, '-') as customer_name, coalesce(s.name, '-') as salesman_name, sb.status, coalesce(split_sales.doc_number, sd.doc_number, '-') as sale_doc_no, coalesce(split_sales.total_amount, sd.total_amount, d.total_amount) as total_amount")
             ->limit($filters['per_page'])
             ->get()
             ->map(function ($row) use ($statusLabels) {

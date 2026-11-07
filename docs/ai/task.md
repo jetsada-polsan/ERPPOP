@@ -5232,3 +5232,21 @@ pending
 - ทำอะไร: ขยายปุ่ม toolbar, ปุ่มแก้จำนวน/ลบ และปุ่มรับชำระ เพื่อรองรับหน้าจอสัมผัสโดยไม่ย้อนกลับไปใช้ UI legacy
 - ทดสอบ: `PYTHONPATH=apps/jet-pos-python python3 -m unittest discover -s apps/jet-pos-python/tests -v` ผ่าน 25 tests; UI smoke ผ่าน; `git diff --check` ผ่าน
 - งานถัดไป: Build/install UAT และให้เจ้าของกรอก PIN บนเครื่องจริงเพื่อเก็บ error เปิดกะจาก ERP หากยังไม่ผ่าน
+
+# Handoff — 2026-11-08 (Codex: DS/DSN booking conversion)
+
+## ทำอะไรไป
+- เพิ่มหน้าจัดสรรสินค้าในใบจองไปยังเล่มขายเชื่อแต่ละเล่ม DS/DSN พร้อม preview ยอดและรายการก่อนยืนยัน; preview เก็บบน session มีอายุ 10 นาทีและ token ยืนยัน
+- สร้างใบขายหลายใบใน transaction เดียว แต่ละใบอ้างใบจอง ตัดสต๊อกและตั้งลูกหนี้/GL แยกใบ; มี audit log และป้องกันยืนยันซ้ำ/จัดสรรไม่ครบ/ยอดไม่ตรง
+- ปรับ GL ให้ใบขายอิงการตั้ง VAT ของเล่มขาย ไม่รับ no-VAT จากเล่มใบจอง; ใบรับคืนยังอิงเล่มขายต้นทาง
+- ปรับหน้าใบขายให้ย้อนกลับไปใบจองได้, รับชำระข้ามลูกหนี้หลายใบจากใบจองเดียวกัน, และรวมยอด/เลขใบขายทั้งหมดในรายงานขายตามใบจอง
+
+## ทดสอบ
+- `php -d memory_limit=2G vendor/bin/phpunit`: 843 tests, 841 passed, 2 skipped, 6 incomplete; 7,124 assertions
+- `node --test tests/js/report-search.test.cjs`: 5 passed
+- PHP lint ไฟล์ที่แก้, `php artisan view:cache`, และ `git diff --check` ผ่าน
+- Feature test ครอบคลุม VAT/non-VAT, preview/confirm, รับชำระข้ามเอกสาร, กันแปลงซ้ำ, จัดสรรไม่ครบ และ rollback เมื่อสร้างใบที่สองไม่สำเร็จ
+
+## ขอบเขต/งานถัดไป
+- VAT ที่ใช้แยกบิลอิงสถานะ VAT ของสินค้า (`products.is_vat`) และเล่มเอกสาร (`document_books.no_vat`); ยังไม่มี tax code/default VAT mode ระดับลูกค้าและผู้จำหน่ายใน master data จึงยังไม่ทำ override จากคู่ค้า
+- Deploy ผ่าน workflow production แล้ว ให้ตรวจ UAT จากหน้าใบจองจริง, เลือกสินค้าคิด VAT/ยกเว้น VAT, ตรวจ DS/DSN, stock ledger, GL, AR, รับชำระ, รับคืน และรายงาน

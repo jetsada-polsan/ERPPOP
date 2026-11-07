@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'document_id', 'salesman_id', 'sales_user_id', 'sales_area_id', 'status', 'confirmed_at', 'confirmed_document_id',
@@ -64,6 +65,13 @@ class SaleBooking extends Model
     public function confirmedDocument(): BelongsTo
     {
         return $this->belongsTo(Document::class, 'confirmed_document_id');
+    }
+
+    /** Credit-sale documents generated from this booking (including DS/DSN splits). */
+    public function salesDocuments(): HasMany
+    {
+        return $this->hasMany(Document::class, 'source_document_id', 'document_id')
+            ->whereHas('documentType', fn ($query) => $query->where('code', 'CREDIT_SALE'));
     }
 
     protected function casts(): array

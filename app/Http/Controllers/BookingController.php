@@ -15,6 +15,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use RuntimeException;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 
 class BookingController extends Controller
@@ -316,11 +317,12 @@ class BookingController extends Controller
             ->with('success', "แก้ไขใบจอง {$document->doc_number} แล้ว อัปเดตยอดจองสต๊อกเรียบร้อย");
     }
 
-    public function show(SaleBooking $booking): View
+    public function show(Request $request, SaleBooking $booking): View
     {
         $booking->load([
             'document.customer', 'document.branch', 'document.salesUser', 'document.salesArea',
             'document.stockDocument.items.product.baseUnit', 'document.stockDocument.items.product.barcodes', 'confirmedDocument',
+            'salesDocuments.documentBook',
         ]);
 
         $creditSaleBooks = DocumentBook::withCount('documents')
@@ -328,7 +330,13 @@ class BookingController extends Controller
             ->where('is_active', true)->orderByDesc('is_default')->orderBy('id')->get();
         $transportJob = TransportJob::where('booking_id', $booking->id)->first();
 
-        return view('bookings.show', compact('booking', 'creditSaleBooks', 'transportJob'));
+        $convertPreview = $request->session()->get($this->conversionPreviewKey($booking));
+        if ($convertPreview && ($convertPreview['expires_at'] ?? 0) < time()) {
+            $request->session()->forget($this->conversionPreviewKey($booking));
+            $convertPreview = null;
+        }
+
+        return view('bookings.show', compact('booking', 'creditSaleBooks', 'transportJob', 'convertPreview'));
     }
 
     public function cancel(Request $request, SaleBooking $booking, BookingService $service): RedirectResponse
@@ -343,27 +351,85 @@ class BookingController extends Controller
         return redirect()->route('bookings.show', $booking)->with('success', 'ยกเลิกใบจองแล้ว คืนยอดจองให้สต๊อก');
     }
 
-    public function convert(Request $request, SaleBooking $booking, CreditSaleService $service): RedirectResponse
+    public function previewConvert(Request $request, SaleBooking $booking, CreditSaleService $service): RedirectResponse
     {
         $data = $request->validate([
-            'document_book_id' => ['nullable', 'integer', 'exists:document_books,id'],
+            'split' => ['nullable', 'boolean'],
+            'document_book_id' => ['nullable', 'integer'],
+            'item_book_ids' => ['required_if:split,1', 'array', 'min:1'],
+            'item_book_ids.*' => ['required_if:split,1', 'integer'],
         ]);
 
-        $book = null;
-        if (! empty($data['document_book_id'])) {
-            $book = DocumentBook::whereHas('documentType', fn ($q) => $q->where('code', 'CREDIT_SALE'))
-                ->where('is_active', true)
-                ->findOrFail($data['document_book_id']);
-        }
-
+        $items = $booking->document()->with('stockDocument.items')->firstOrFail()->stockDocument?->items ?? collect();
+        $assignments = $request->boolean('split')
+            ? $data['item_book_ids']
+            : $items->mapWithKeys(fn ($item) => [$item->id => $data['document_book_id'] ?? 0])->all();
         try {
-            $saleDocument = $service->convertBookingToCreditSale($booking, $book);
+            $summary = $service->previewBookingToCreditSales($booking, $assignments);
         } catch (RuntimeException $e) {
             return redirect()->route('bookings.show', $booking)->with('error', $e->getMessage());
         }
 
-        return redirect()->route('sales.show', $saleDocument)
-            ->with('success', "แปลงใบจองเป็นใบขายเชื่อ {$saleDocument->doc_number} แล้ว ตัดสต๊อกและตั้งลูกหนี้เรียบร้อย");
+        $groups = [];
+        foreach ($summary['groups'] as $group) {
+            $groups[] = [
+                'book_id' => $group['book']->exists ? $group['book']->id : null,
+                'book_code' => $group['book']->code,
+                'no_vat' => $group['book']->no_vat,
+                'total' => $group['total'],
+                'items' => $group['items']->map(fn ($item) => [
+                    'sku' => $item->product->sku_code,
+                    'name' => $item->product->name_th,
+                    'qty' => $item->qty,
+                    'unit_price' => $item->unit_price,
+                    'total' => \App\Support\DecimalMath::multiply($item->qty, $item->unit_price),
+                    'is_vat' => (bool) $item->product->is_vat,
+                ])->values()->all(),
+            ];
+        }
+        $preview = [
+            'token' => Str::random(48),
+            'expires_at' => time() + 600,
+            'assignments' => $assignments,
+            'source_total' => $summary['source_total'],
+            'target_total' => $summary['target_total'],
+            'groups' => $groups,
+        ];
+        $request->session()->put($this->conversionPreviewKey($booking), $preview);
+
+        return redirect()->route('bookings.show', $booking)->with('success', 'ตรวจสอบตัวอย่างใบขายก่อนยืนยัน');
+    }
+
+    public function cancelConvertPreview(Request $request, SaleBooking $booking): RedirectResponse
+    {
+        $request->session()->forget($this->conversionPreviewKey($booking));
+
+        return redirect()->route('bookings.show', $booking);
+    }
+
+    public function convert(Request $request, SaleBooking $booking, CreditSaleService $service): RedirectResponse
+    {
+        $data = $request->validate(['preview_token' => ['required', 'string']]);
+        $preview = $request->session()->get($this->conversionPreviewKey($booking));
+        if (! $preview || ($preview['expires_at'] ?? 0) < time() || ! hash_equals($preview['token'], $data['preview_token'])) {
+            $request->session()->forget($this->conversionPreviewKey($booking));
+            return redirect()->route('bookings.show', $booking)->with('error', 'ตัวอย่างหมดอายุหรือไม่ตรง กรุณาตรวจสอบรายการและดูตัวอย่างใหม่');
+        }
+
+        try {
+            $sales = $service->splitBookingToCreditSales($booking, $preview['assignments']);
+        } catch (RuntimeException $e) {
+            return redirect()->route('bookings.show', $booking)->with('error', $e->getMessage());
+        }
+        $request->session()->forget($this->conversionPreviewKey($booking));
+
+        return redirect()->route('bookings.show', $booking)
+            ->with('success', 'สร้างใบขายเชื่อ '. $sales->pluck('doc_number')->implode(' และ ').' แล้ว ตัดสต๊อกและตั้งลูกหนี้เรียบร้อย');
+    }
+
+    private function conversionPreviewKey(SaleBooking $booking): string
+    {
+        return 'booking-conversion-preview-'.$booking->id;
     }
 
     /** บันทึกผลการส่งของ — ส่งบางส่วน ส่งครบ หรือยกเลิกการส่ง */

@@ -6,10 +6,12 @@ use App\Models\Branch;
 use App\Models\ChartOfAccount;
 use App\Models\Customer;
 use App\Models\CustomerOpenItem;
+use App\Models\PaymentAllocation;
 use App\Models\Document;
 use App\Models\DocumentBook;
 use App\Models\DocumentType;
 use App\Models\GlJournal;
+use App\Http\Middleware\ErpAuthorize;
 use App\Models\Permission;
 use App\Models\Product;
 use App\Models\ProductUnit;
@@ -28,6 +30,7 @@ use App\Services\Purchasing\SupplierNoteService;
 use App\Services\Sales\BookingService;
 use App\Services\Sales\CashSaleService;
 use App\Services\Sales\CreditSaleService;
+use App\Services\Sales\CustomerPaymentService;
 use App\Services\Sales\SaleReturnService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -226,14 +229,24 @@ class SalesDocumentEndToEndTest extends TestCase
     public function test_split_booking_creates_two_balanced_sales_once_and_rolls_back_on_failure(): void
     {
         [$branch, $location, $product, $customer] = $this->stockedBranch('SPLIT', 10, 60, true);
+        $actor = User::factory()->create();
         $type = DocumentType::where('code', DocumentType::CREDIT_SALE)->sole();
         $ds = DocumentBook::create(['code' => 'DS-TEST', 'name' => 'DS', 'prefix' => 'DS', 'document_type_id' => $type->id, 'is_active' => true, 'no_vat' => false]);
         $dsn = DocumentBook::create(['code' => 'DSN-TEST', 'name' => 'DSN', 'prefix' => 'DSN', 'document_type_id' => $type->id, 'is_active' => true, 'no_vat' => true]);
+        $vatProduct = Product::create([
+            'sku_code' => 'SKUVATSPLIT', 'name_th' => 'สินค้าทดสอบคิด VAT', 'base_unit_id' => $product->base_unit_id,
+            'default_price' => 80, 'average_cost' => 0, 'is_vat' => true, 'is_active' => true, 'negative_stock_policy' => 'block',
+        ]);
+        app(PurchaseService::class)->create([
+            'branch_id' => $branch->id, 'supplier_id' => Supplier::where('code', 'SUPSPLIT')->sole()->id,
+            'is_credit' => true, 'prices_include_vat' => false,
+            'items' => [['product_id' => $vatProduct->id, 'qty' => 4, 'unit_price' => 60]],
+        ]);
         $document = app(BookingService::class)->create([
             'branch_id' => $branch->id, 'customer_id' => $customer->id,
             'items' => [
                 ['product_id' => $product->id, 'qty' => 2, 'unit_price' => 100],
-                ['product_id' => $product->id, 'qty' => 1, 'unit_price' => 80],
+                ['product_id' => $vatProduct->id, 'qty' => 1, 'unit_price' => 80],
             ],
         ]);
         $booking = $document->saleBooking;
@@ -248,18 +261,59 @@ class SalesDocumentEndToEndTest extends TestCase
             $this->assertSame(0, Document::where('source_document_id', $document->id)->count());
             $this->assertSame(10.0, (float) StockBalance::where('product_id', $product->id)->where('warehouse_location_id', $location->id)->sole()->on_hand_qty);
         }
-        $sales = $service->splitBookingToCreditSales($booking, [$items[0]->id => $ds->id, $items[1]->id => $dsn->id]);
+        DB::table('stock_lots')->where('product_id', $vatProduct->id)->where('warehouse_location_id', $location->id)->update(['remaining_qty' => 0]);
+        DB::table('stock_balances')->where('product_id', $vatProduct->id)->where('warehouse_location_id', $location->id)->update(['on_hand_qty' => 0]);
+        try {
+            $service->splitBookingToCreditSales($booking, [$items[0]->id => $dsn->id, $items[1]->id => $ds->id]);
+            $this->fail('A FIFO failure in the second sale must roll back the first sale too');
+        } catch (\RuntimeException $error) {
+            $this->assertSame(SaleBooking::STATUS_PENDING, $booking->fresh()->status);
+            $this->assertSame(0, Document::where('source_document_id', $document->id)->count());
+            $this->assertSame(10.0, (float) StockBalance::where('product_id', $product->id)->where('warehouse_location_id', $location->id)->sole()->on_hand_qty);
+            $this->assertSame(2.0, (float) StockBalance::where('product_id', $product->id)->where('warehouse_location_id', $location->id)->sole()->reserved_qty);
+        }
+        DB::table('stock_lots')->where('product_id', $vatProduct->id)->where('warehouse_location_id', $location->id)->update(['remaining_qty' => 4]);
+        DB::table('stock_balances')->where('product_id', $vatProduct->id)->where('warehouse_location_id', $location->id)->update(['on_hand_qty' => 4]);
+        $this->withoutMiddleware(ErpAuthorize::class)->actingAs($actor);
+        $this->get(route('bookings.show', $booking))->assertOk()->assertSee('แยก DS / DSN ตามรายการสินค้า');
+        $this->post(route('bookings.convert.preview', $booking), [
+            'split' => '1', 'item_book_ids' => [$items[0]->id => $dsn->id, $items[1]->id => $ds->id],
+        ])->assertRedirect(route('bookings.show', $booking));
+        $preview = session('booking-conversion-preview-'.$booking->id);
+        $this->assertNotNull($preview);
+        $this->get(route('bookings.show', $booking))->assertOk()->assertSee('ตัวอย่างใบขายก่อนยืนยัน')->assertSee('DSN-TEST')->assertSee('DS-TEST');
+        $this->post(route('bookings.convert', $booking), ['preview_token' => $preview['token']])
+            ->assertRedirect(route('bookings.show', $booking))
+            ->assertSessionHas('success');
+        $sales = $booking->salesDocuments()->get();
         $this->assertCount(2, $sales);
         $this->assertSame(280.0, (float) $sales->sum('total_amount'));
         $this->assertSame(280.0, (float) CustomerOpenItem::whereIn('document_id', $sales->pluck('id')->all())->sum('balance_amount'));
-        $this->assertSame(7.0, (float) StockBalance::where('product_id', $product->id)->where('warehouse_location_id', $location->id)->sole()->on_hand_qty);
+        $this->assertSame(8.0, (float) StockBalance::where('product_id', $product->id)->where('warehouse_location_id', $location->id)->sole()->on_hand_qty);
         $this->assertSame(0.0, (float) StockBalance::where('product_id', $product->id)->where('warehouse_location_id', $location->id)->sole()->reserved_qty);
         foreach ($sales as $sale) {
             $this->assertSame($document->id, (int) $sale->source_document_id);
             $this->assertGlBalanced($sale);
         }
+        $this->assertSame(0.0, (float) $sales->firstWhere('document_book_id', $dsn->id)->vat_amount);
+        $this->assertSame(5.23, round((float) $sales->firstWhere('document_book_id', $ds->id)->vat_amount, 2));
+        $this->assertSame(2, $booking->salesDocuments()->count());
+        $this->assertDatabaseHas('audit_logs', ['table_name' => 'sale_bookings', 'record_id' => $booking->id, 'action' => 'booking_converted_split']);
+        $openItems = CustomerOpenItem::whereIn('document_id', $sales->pluck('id')->all())->orderBy('document_id')->get();
+        DocumentType::firstOrCreate(['code' => 'RECEIPT'], ['name_th' => 'ใบเสร็จรับเงิน']);
+        $receipt = app(CustomerPaymentService::class)->create([
+            'customer_id' => $customer->id,
+            'branch_id' => $branch->id,
+            'method' => 'cash',
+            'allocations' => [
+                ['customer_open_item_id' => $openItems[0]->id, 'amount' => 10],
+                ['customer_open_item_id' => $openItems[1]->id, 'amount' => 20],
+            ],
+        ]);
+        $this->assertSame(2, PaymentAllocation::where('payment_document_id', $receipt->paymentDocument->id)->count());
+        $this->assertSame(30.0, (float) $receipt->total_amount);
         $this->expectException(\RuntimeException::class);
-        $service->splitBookingToCreditSales($booking, [$items[0]->id => $ds->id, $items[1]->id => $dsn->id]);
+        $service->splitBookingToCreditSales($booking, [$items[0]->id => $dsn->id, $items[1]->id => $ds->id]);
     }
 
     public function test_cancelling_a_pending_booking_releases_its_reservation(): void

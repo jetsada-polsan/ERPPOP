@@ -3,6 +3,7 @@
 namespace App\Services\Sales;
 
 use App\Models\AppSetting;
+use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\CustomerOpenItem;
 use App\Models\Document;
@@ -35,6 +36,38 @@ class CreditSaleService
 {
     private const DEFAULT_CREDIT_DAYS = 30;
 
+    /** Validate and summarize an explicit per-line credit-sale allocation without writing data. */
+    public function previewBookingToCreditSales(SaleBooking $booking, array $assignments): array
+    {
+        if ($booking->status !== SaleBooking::STATUS_PENDING) {
+            throw new RuntimeException('ใบจองนี้ถูกใช้ไปแล้ว');
+        }
+        $source = $booking->document()->with('documentBook', 'stockDocument.items.product')->firstOrFail();
+        $items = $source->stockDocument?->items ?? collect();
+        $books = DocumentBook::whereHas('documentType', fn ($q) => $q->where('code', DocumentType::CREDIT_SALE))
+            ->where('is_active', true)->whereIn('id', array_values($assignments))->get()->keyBy('id');
+        if (in_array(0, array_map('intval', array_values($assignments)), true) && $books->isEmpty()) {
+            $hasConfiguredBook = DocumentBook::whereHas('documentType', fn ($q) => $q->where('code', DocumentType::CREDIT_SALE))
+                ->where('is_active', true)->exists();
+            if ($hasConfiguredBook) {
+                throw new RuntimeException('กรุณาเลือกเล่มขายเชื่อที่เปิดใช้งาน');
+            }
+            $books->put(0, $this->unbookedCreditSaleBook());
+        }
+        $plan = app(BookingSplitPlan::class)->prepare($items, $assignments, $books);
+        if ($source->documentBook?->no_vat && $items->contains(fn ($item) => $item->product?->is_vat)) {
+            throw new RuntimeException('เล่มใบจองไม่คำนวณ VAT แต่มีสินค้าที่คิด VAT กรุณาตรวจสอบการตั้งค่า');
+        }
+
+        $sourceTotal = DecimalMath::sum($items->map(fn ($item) => DecimalMath::multiply($item->qty, $item->unit_price)));
+        $targetTotal = DecimalMath::sum(collect($plan)->pluck('total'));
+        if (DecimalMath::compare($sourceTotal, $targetTotal) !== 0) {
+            throw new RuntimeException('ยอดรวมใบขายไม่ตรงกับใบจอง กรุณาตรวจสอบรายการก่อนยืนยัน');
+        }
+
+        return ['source_total' => $sourceTotal, 'target_total' => $targetTotal, 'groups' => $plan];
+    }
+
     public function __construct(
         private readonly DocumentNumberGenerator $numbers,
         private readonly GlPostingService $glPosting,
@@ -54,13 +87,8 @@ class CreditSaleService
             }
             $source = $locked->document()->with('stockDocument.items.product')->firstOrFail();
             $items = $source->stockDocument?->items ?? collect();
-            $books = DocumentBook::whereHas('documentType', fn ($q) => $q->where('code', DocumentType::CREDIT_SALE))
-                ->where('is_active', true)->whereIn('id', array_values($assignments))->get()->keyBy('id');
-            $plan = app(BookingSplitPlan::class)->prepare($items, $assignments, $books);
-            // GL also inherits no_vat from the source document; never silently suppress VAT.
-            if ($source->documentBook?->no_vat && $items->contains(fn ($item) => $item->product?->is_vat)) {
-                throw new RuntimeException('เล่มใบจองไม่คำนวณ VAT แต่มีสินค้าที่คิด VAT กรุณาตรวจสอบการตั้งค่า');
-            }
+            $summary = $this->previewBookingToCreditSales($locked, $assignments);
+            $plan = $summary['groups'];
             $sales = collect();
             foreach ($plan as $group) {
                 $sales->push($this->createSaleForItems($locked, $source, $group['items'], $group['book']));
@@ -69,6 +97,27 @@ class CreditSaleService
                 'status' => SaleBooking::STATUS_CONVERTED,
                 'confirmed_at' => now(),
                 'confirmed_document_id' => $sales->first()->id,
+            ]);
+            AuditLog::create([
+                'user_id' => auth()->id(),
+                'branch_id' => $source->branch_id,
+                'action' => 'booking_converted_split',
+                'table_name' => 'sale_bookings',
+                'record_id' => $locked->id,
+                'old_values' => ['status' => SaleBooking::STATUS_PENDING],
+                'new_values' => [
+                    'status' => SaleBooking::STATUS_CONVERTED,
+                    'source_document_id' => $source->id,
+                    'source_total' => $summary['source_total'],
+                    'target_total' => $summary['target_total'],
+                    'sales' => $sales->map(fn (Document $sale) => [
+                        'document_id' => $sale->id,
+                        'doc_number' => $sale->doc_number,
+                        'document_book_id' => $sale->document_book_id,
+                        'total_amount' => $sale->total_amount,
+                        'vat_amount' => $sale->vat_amount,
+                    ])->all(),
+                ],
             ]);
             return $sales;
         });
@@ -86,9 +135,9 @@ class CreditSaleService
 
         $saleDocument = Document::create([
             'document_type_id' => $documentType->id,
-            'document_book_id' => $book?->id,
+            'document_book_id' => $book->exists ? $book->id : null,
             'branch_id' => $bookingDocument->branch_id,
-            'doc_number' => $book
+            'doc_number' => $book->exists
                 ? $this->numbers->nextInBook($book, $bookingDocument->branch_id, $saleDate)
                 : $this->numbers->next(DocumentType::CREDIT_SALE, $bookingDocument->branch_id, $saleDate),
             'doc_date' => $saleDate,
@@ -163,6 +212,17 @@ class CreditSaleService
 
         $this->glPosting->postCreditSale($saleDocument);
         return $saleDocument->fresh();
+    }
+
+    private function unbookedCreditSaleBook(): DocumentBook
+    {
+        $book = new DocumentBook;
+        $book->id = 0;
+        $book->code = 'AUTO';
+        $book->is_active = true;
+        $book->no_vat = false;
+
+        return $book;
     }
 
     public function convertBookingToCreditSale(SaleBooking $booking, ?DocumentBook $book = null): Document

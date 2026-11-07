@@ -155,8 +155,11 @@ class GlPostingService
     private function salesBreakdown(Document $document): array
     {
         $document->loadMissing('stockDocument.items.product');
-        // เล่มไม่มีภาษี (DSN, CSN) และใบรับคืนของบิลเล่มนั้นไม่คิด VAT ทั้งใบ
-        $noVat = (bool) ($document->documentBook?->no_vat || $document->sourceDocument?->documentBook?->no_vat);
+        // เล่มไม่มีภาษี (DSN, CSN); ใบรับคืนสืบทอดนโยบาย VAT จากบิลต้นทาง
+        // ใบขายเชื่อที่อ้างใบจองให้ยึดเล่มของใบขายเอง ไม่ใช่เล่มของใบจอง
+        $isSaleReturn = $document->documentType?->code === 'SALE_RETURN';
+        $noVat = (bool) ($document->documentBook?->no_vat
+            || ($isSaleReturn && $document->sourceDocument?->documentBook?->no_vat));
         $rate = $noVat ? 0.0 : $this->vatRate();
         $subtotal = '0';
         $vat = '0';

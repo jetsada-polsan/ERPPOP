@@ -78,7 +78,15 @@ class ErpJourneyUatTest extends TestCase
         $bookingId = (int) DB::table('sale_bookings')->latest('id')->value('id');
         $this->assertEqualsWithDelta($onHandBefore, $this->onHand($productId), 0.0001, 'ใบจองต้องไม่ตัดสต๊อก');
 
-        $this->post(route('bookings.convert', $bookingId))->assertSessionHasNoErrors()->assertRedirect();
+        $bookingDocumentId = (int) DB::table('sale_bookings')->where('id', $bookingId)->value('document_id');
+        $bookId = (int) DB::table('document_books as db')->join('document_types as dt', 'dt.id', '=', 'db.document_type_id')
+            ->where('dt.code', 'CREDIT_SALE')->where('db.is_active', true)->orderByDesc('db.is_default')->value('db.id');
+        $this->post(route('bookings.convert.preview', $bookingId), ['document_book_id' => $bookId])
+            ->assertSessionHasNoErrors()->assertRedirect();
+        $preview = session('booking-conversion-preview-'.$bookingId);
+        $this->assertNotNull($preview);
+        $this->post(route('bookings.convert', $bookingId), ['preview_token' => $preview['token']])
+            ->assertSessionHasNoErrors()->assertRedirect();
         $this->assertEqualsWithDelta($onHandBefore - 10, $this->onHand($productId), 0.0001, 'ขายเชื่อต้องตัดสต๊อก');
 
         $openItem = DB::table('customer_open_items')->where('customer_id', $customerId)->first();

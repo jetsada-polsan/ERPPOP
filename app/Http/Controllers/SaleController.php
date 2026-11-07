@@ -16,7 +16,9 @@ class SaleController extends Controller
             'stockDocument.items.product.baseUnit', 'stockDocument.items.product.barcodes', 'openItem', 'posReceipt.payments',
         ]);
 
-        $booking = SaleBooking::where('confirmed_document_id', $sale->id)->first();
+        $booking = SaleBooking::where('confirmed_document_id', $sale->id)
+            ->when($sale->source_document_id, fn ($query, $sourceId) => $query->orWhere('document_id', $sourceId))
+            ->first();
         $branches = Branch::orderBy('code')->get();
 
         return view('sales.show', ['sale' => $sale, 'booking' => $booking, 'branches' => $branches]);

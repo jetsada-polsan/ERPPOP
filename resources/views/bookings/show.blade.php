@@ -17,6 +17,7 @@ $isOverdue = $isDelivery && ! $deliveryDone && $booking->delivery_due_at && $boo
 $transportLoaded = $transportJob?->loaded_at !== null;
 $transportDelivered = $transportJob?->status === 'delivered';
 $canConvert = true;
+$convertPreview = $convertPreview ?? null;
 $canEdit = $isPending && $booking->delivery_status === 'pending'
     && (! $transportJob || ($transportJob->status === 'booked' && $transportJob->loaded_at === null));
 @endphp
@@ -108,33 +109,87 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
                     <button class="btn btn-outline-danger">ยกเลิกใบจอง</button>
                 </form>
             @endif
-            @if($isPending && $canConvert)
-            <form method="post" action="{{ route('bookings.convert', $booking) }}" id="convert-form" class="booking-convert d-flex flex-column gap-2 align-items-end">
+            @if($isPending && $canConvert && $convertPreview)
+            <div class="conversion-preview w-100">
+                <h3 class="h6 fw-bold mb-2">ตัวอย่างใบขายก่อนยืนยัน</h3>
+                <div class="small mb-2">ยอดใบจอง {{ number_format((float) $convertPreview['source_total'], 2) }} บาท · ยอดรวมใบขาย {{ number_format((float) $convertPreview['target_total'], 2) }} บาท</div>
+                @foreach($convertPreview['groups'] as $group)
+                    <div class="border rounded-3 p-2 mb-2">
+                        <div class="fw-semibold">{{ $group['book_code'] }} · {{ $group['no_vat'] ? 'ไม่คิด VAT' : 'คิด VAT ตามสถานะสินค้า' }} · {{ number_format((float) $group['total'], 2) }} บาท</div>
+                        <div class="small text-muted">{{ collect($group['items'])->map(fn ($item) => $item['sku'].' '.$item['name'].' × '.$item['qty'].' = '.number_format((float) $item['total'], 2))->implode(' · ') }}</div>
+                    </div>
+                @endforeach
+                <div class="d-flex gap-2 justify-content-end flex-wrap">
+                    <form method="post" action="{{ route('bookings.convert.preview.cancel', $booking) }}">@csrf<button class="btn btn-outline-secondary">กลับไปแก้รายการ</button></form>
+                    <form method="post" action="{{ route('bookings.convert', $booking) }}">@csrf<input type="hidden" name="preview_token" value="{{ $convertPreview['token'] }}"><button class="btn btn-success"><i class="bi bi-check2-circle me-1"></i>ยืนยันสร้างใบขาย</button></form>
+                </div>
+                <div class="text-muted small text-end mt-2">ตัวอย่างนี้หมดอายุใน 10 นาที</div>
+            </div>
+            @elseif($isPending && $canConvert)
+            <form method="post" action="{{ route('bookings.convert.preview', $booking) }}" id="convert-form" class="booking-convert d-flex flex-column gap-2 align-items-end">
                 @csrf
                 @if($creditSaleBooks->isNotEmpty())
                 <div class="doc-book-picker">
                     <div class="doc-book-label">เล่มเอกสาร DS / DSN</div>
-                <select name="document_book_id" class="form-select" style="width:auto" title="เล่มเอกสารขายเชื่อ">
+                <select name="document_book_id" id="single-book" class="form-select" style="width:auto" title="เล่มเอกสารขายเชื่อ">
                     @foreach($creditSaleBooks as $book)
                         <option value="{{ $book->id }}" @selected($book->is_default)>{{ $book->code }} - {{ $book->no_vat ? 'เล่มไม่คำนวณ VAT' : 'คำนวณ VAT ตามสินค้า' }} ({{ number_format($book->documents_count) }} ใบ)</option>
                     @endforeach
                 </select>
                 </div>
+                <label class="form-check small text-start align-self-start mb-1">
+                    <input class="form-check-input" type="checkbox" name="split" value="1" id="split-booking">
+                    <span class="form-check-label fw-semibold">แยก DS / DSN ตามรายการสินค้า</span>
+                </label>
+                <div id="split-booking-items" class="split-booking-items w-100" hidden>
+                    <div class="small text-muted mb-2">เลือกเล่มขายเชื่อให้แต่ละรายการ ระบบจะสร้างใบขายตามเล่มที่เลือกและตั้งลูกหนี้แยกตามใบ</div>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead><tr><th>สินค้า</th><th class="text-end">จำนวน</th><th>ภาษี / เล่มขาย</th></tr></thead>
+                            <tbody>
+                            @foreach($booking->document->stockDocument->items as $item)
+                                @php
+                                    $matchingBook = $creditSaleBooks->first(fn ($book) => (bool) $book->no_vat === ! (bool) $item->product->is_vat)
+                                        ?? $creditSaleBooks->firstWhere('is_default', true)
+                                        ?? $creditSaleBooks->first();
+                                @endphp
+                                <tr>
+                                    <td>{{ $item->product->sku_code }} · {{ $item->product->name_th }}</td>
+                                    <td class="text-end">{{ number_format($item->qty, 2) }}</td>
+                                    <td>
+                                        <select name="item_book_ids[{{ $item->id }}]" class="form-select form-select-sm split-book-select" disabled required>
+                                            @foreach($creditSaleBooks as $book)
+                                                <option value="{{ $book->id }}" @selected($matchingBook && $matchingBook->id === $book->id)>{{ $book->code }} · {{ $book->no_vat ? 'ไม่คิด VAT' : 'คิด VAT ตามสินค้า' }}</option>
+                                            @endforeach
+                                        </select>
+                                    </td>
+                                </tr>
+                            @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
                 @endif
-                <button type="button"
-                    onclick="Swal.fire({ title:'แปลงเป็นใบขาย?', text:'จะตัดสต็อกและตั้งลูกหนี้ทันที{{ $isDelivery ? ' โดยใช้วันที่ส่งจริง' : '' }}', icon:'warning', showCancelButton:true, confirmButtonText:'ยืนยัน', cancelButtonText:'ยกเลิก', confirmButtonColor:'var(--erp-success-ink)' }).then(r => r.isConfirmed && document.getElementById('convert-form').submit())"
-                    class="btn btn-success px-4">
-                    <i class="bi bi-arrow-right-circle me-1"></i> แปลงเป็นใบขาย
+                <button type="submit" class="btn btn-success px-4">
+                    <i class="bi bi-eye me-1"></i> ดูตัวอย่างใบขาย
                 </button>
             </form>
             @elseif($isPending && $isDelivery)
                 <button class="btn btn-outline-secondary px-4" disabled title="ต้องตรวจของ ขึ้นรถ และบันทึกส่งครบก่อน">
                     <i class="bi bi-hourglass-split me-1"></i> รอส่งครบก่อนออกใบขาย
                 </button>
-            @elseif($isConverted && $booking->confirmedDocument)
+            @elseif($isConverted && ($booking->salesDocuments->isNotEmpty() || $booking->confirmedDocument))
+            <div class="d-flex flex-wrap gap-2">
+            @forelse($booking->salesDocuments as $sale)
+            <a href="{{ route('sales.show', $sale) }}" class="btn btn-outline-success px-4">
+                <i class="bi bi-receipt-cutoff me-1"></i> ดูใบขาย {{ $sale->doc_number }}
+            </a>
+            @empty
             <a href="{{ route('sales.show', $booking->confirmedDocument) }}" class="btn btn-outline-success px-4">
                 <i class="bi bi-receipt-cutoff me-1"></i> ดูใบขาย {{ $booking->confirmedDocument->doc_number }}
             </a>
+            @endforelse
+            </div>
             @endif
         </div>
     </div>
@@ -244,5 +299,22 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
 }
 .doc-book-picker { min-width: 280px; border: 1px solid var(--erp-border); background: var(--erp-surface-2); border-radius: 12px; padding: 8px 10px; }
 .doc-book-label { font-size: 11px; font-weight: 800; color: #2563eb; margin-bottom: 4px; }
+.split-booking-items { max-height: 42vh; overflow: auto; border: 1px solid var(--erp-border); border-radius: 10px; padding: 10px; text-align: left; }
 </style>
+@endpush
+
+@push('scripts')
+<script>
+(() => {
+    const toggle = document.getElementById('split-booking');
+    const items = document.getElementById('split-booking-items');
+    const singleBook = document.getElementById('single-book');
+    if (!toggle || !items) return;
+    toggle.addEventListener('change', () => {
+        items.hidden = !toggle.checked;
+        if (singleBook) singleBook.disabled = toggle.checked;
+        items.querySelectorAll('.split-book-select').forEach(select => select.disabled = !toggle.checked);
+    });
+})();
+</script>
 @endpush
