@@ -5249,4 +5249,5 @@ pending
 
 ## ขอบเขต/งานถัดไป
 - VAT ที่ใช้แยกบิลอิงสถานะ VAT ของสินค้า (`products.is_vat`) และเล่มเอกสาร (`document_books.no_vat`); ยังไม่มี tax code/default VAT mode ระดับลูกค้าและผู้จำหน่ายใน master data จึงยังไม่ทำ override จากคู่ค้า
-- Deploy ผ่าน workflow production แล้ว ให้ตรวจ UAT จากหน้าใบจองจริง, เลือกสินค้าคิด VAT/ยกเว้น VAT, ตรวจ DS/DSN, stock ledger, GL, AR, รับชำระ, รับคืน และรายงาน
+- Deploy production สำเร็จผ่าน [GitHub Actions run 42397198437](https://github.com/jetsada-polsan/ERPPOP/actions/runs/42397198437); migration ปัจจุบัน, health checks ฐานข้อมูล/GL/backup/queue ผ่าน และ URL `/bookings` ตอบ HTTP 302 ตาม auth gate
+- UAT ต่อ: จากหน้าใบจองจริง เลือกสินค้าคิด VAT/ยกเว้น VAT, ตรวจ DS/DSN, stock ledger, GL, AR, รับชำระ, รับคืน และรายงาน
