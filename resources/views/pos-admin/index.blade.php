@@ -267,14 +267,10 @@
     {{-- ฮาร์ดแวร์ต่อเครื่อง --}}
     <div x-show="tab === 'hardware'" x-cloak>
         <div class="pa-card">
-            <h2>ฮาร์ดแวร์แต่ละจุดขาย</h2>
-            <div class="small text-muted mb-3">เครื่องรับค่าชุดนี้ตอนต่อออนไลน์ · จุดขายถูกสร้างเมื่อเครื่องเปิดกะครั้งแรก</div>
+            <h2>นโยบายลิ้นชักแต่ละจุดขาย</h2>
+            <div class="small text-muted mb-3">ตั้งเงินทอนและการนับเงินสำหรับแต่ละเครื่องที่นี่ · จุดขายปรากฏเมื่อเปิดกะครั้งแรก</div>
+            <div class="alert alert-info">ตั้งค่าเครื่องพิมพ์ Windows ขนาดกระดาษ และลิ้นชักเงินที่โปรแกรม POS: ตั้งค่าเครื่อง → เครื่องพิมพ์และใบเสร็จ · เครื่องสแกนแบบคีย์บอร์ดและบาร์โค้ดเครื่องชั่งใช้งานผ่านช่องสแกนสินค้า</div>
             @forelse($terminals as $terminal)
-                @php
-                    $hw = array_merge(['printer_driver' => 'browser', 'printer_name' => '', 'printer_address' => '', 'paper_width' => '80mm',
-                        'scanner_mode' => 'keyboard', 'scale_mode' => 'keyboard', 'customer_display' => 'none',
-                        'cash_drawer_enabled' => false, 'auto_print' => false, 'print_copies' => 1], $terminal->hardware_profile ?? []);
-                @endphp
                 <form method="post" action="{{ route('pos-admin.terminals.float', $terminal) }}" class="border rounded-2 p-3 mb-3">
                     @csrf
                     <strong>{{ $terminal->code }} · นโยบายลิ้นชัก</strong>
@@ -283,38 +279,6 @@
                     <input type="hidden" name="blind_count" value="0">
                     <label><input type="checkbox" name="blind_count" value="1" @checked($terminal->blind_count)> นับแบบไม่เห็นยอด</label>
                     <button class="btn btn-primary btn-sm">บันทึกนโยบาย</button>
-                </form>
-                <form method="post" action="{{ route('settings.pos-terminal.hardware') }}" class="border rounded-2 p-3 mb-3">
-                    @csrf
-                    <input type="hidden" name="pos_terminal_id" value="{{ $terminal->id }}">
-                    <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
-                        <div><strong>{{ $terminal->code }}</strong> · {{ $terminal->name }} <span class="small text-muted">{{ $terminal->branch?->code }}</span></div>
-                        <button class="btn btn-primary btn-sm"><i class="bi bi-check-lg me-1"></i>บันทึก</button>
-                    </div>
-                    <div class="row g-2">
-                        <div class="col-6 col-md-3"><label class="form-label small">เครื่องพิมพ์</label><select name="hardware[{{ $terminal->id }}][printer_driver]" class="form-select form-select-sm">
-                            @foreach(['browser' => 'พิมพ์ผ่านระบบ', 'windows' => 'Windows Printer', 'escpos_usb' => 'ESC/POS USB', 'escpos_network' => 'ESC/POS Network'] as $v => $l)<option value="{{ $v }}" @selected($hw['printer_driver'] === $v)>{{ $l }}</option>@endforeach
-                        </select></div>
-                        <div class="col-6 col-md-3"><label class="form-label small">ชื่อเครื่องพิมพ์</label><input name="hardware[{{ $terminal->id }}][printer_name]" value="{{ $hw['printer_name'] }}" class="form-control form-control-sm" placeholder="POS-80"></div>
-                        <div class="col-6 col-md-3"><label class="form-label small">IP / USB</label><input name="hardware[{{ $terminal->id }}][printer_address]" value="{{ $hw['printer_address'] }}" class="form-control form-control-sm" placeholder="192.168.1.20:9100"></div>
-                        <div class="col-6 col-md-3"><label class="form-label small">กระดาษ</label><select name="hardware[{{ $terminal->id }}][paper_width]" class="form-select form-select-sm">
-                            @foreach(['80mm' => '80 มม.', '58mm' => '58 มม.'] as $v => $l)<option value="{{ $v }}" @selected($hw['paper_width'] === $v)>{{ $l }}</option>@endforeach
-                        </select></div>
-                        <div class="col-6 col-md-3"><label class="form-label small">เครื่องสแกน</label><select name="hardware[{{ $terminal->id }}][scanner_mode]" class="form-select form-select-sm">
-                            @foreach(['keyboard' => 'Keyboard', 'serial' => 'Serial'] as $v => $l)<option value="{{ $v }}" @selected($hw['scanner_mode'] === $v)>{{ $l }}</option>@endforeach
-                        </select></div>
-                        <div class="col-6 col-md-3"><label class="form-label small">เครื่องชั่ง</label><select name="hardware[{{ $terminal->id }}][scale_mode]" class="form-select form-select-sm">
-                            @foreach(['none' => 'ไม่ใช้', 'keyboard' => 'Barcode', 'serial' => 'Serial'] as $v => $l)<option value="{{ $v }}" @selected($hw['scale_mode'] === $v)>{{ $l }}</option>@endforeach
-                        </select></div>
-                        <div class="col-6 col-md-3"><label class="form-label small">จอลูกค้า</label><select name="hardware[{{ $terminal->id }}][customer_display]" class="form-select form-select-sm">
-                            @foreach(['none' => 'ไม่ใช้', 'browser' => 'หน้าจอ 2', 'serial' => 'Serial', 'network' => 'Network'] as $v => $l)<option value="{{ $v }}" @selected($hw['customer_display'] === $v)>{{ $l }}</option>@endforeach
-                        </select></div>
-                        <div class="col-6 col-md-3"><label class="form-label small">สำเนา</label><input type="number" min="1" max="3" name="hardware[{{ $terminal->id }}][print_copies]" value="{{ $hw['print_copies'] }}" class="form-control form-control-sm"></div>
-                        <div class="col-12 d-flex gap-3">
-                            <label class="form-check small"><input type="checkbox" name="hardware[{{ $terminal->id }}][cash_drawer_enabled]" value="1" @checked($hw['cash_drawer_enabled']) class="form-check-input"> ลิ้นชักเงิน</label>
-                            <label class="form-check small"><input type="checkbox" name="hardware[{{ $terminal->id }}][auto_print]" value="1" @checked($hw['auto_print']) class="form-check-input"> พิมพ์อัตโนมัติ</label>
-                        </div>
-                    </div>
                 </form>
             @empty
                 <div class="small text-muted">ยังไม่มีจุดขาย — จะขึ้นเองเมื่อเครื่องเปิดกะครั้งแรก</div>
