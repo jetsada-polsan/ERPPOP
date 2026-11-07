@@ -534,6 +534,7 @@ Route::prefix('salesmen')->name('salesmen.')->group(function () {
     Route::get('/', [SalesmanController::class, 'index'])->name('index');
 });
 Route::prefix('sales-areas')->name('sales-areas.')->group(function () {
+    Route::get('/', [SalesAreaController::class, 'index'])->name('index');
     Route::post('/', [SalesAreaController::class, 'store'])->name('store');
     Route::put('/{salesArea}', [SalesAreaController::class, 'update'])->name('update');
 });

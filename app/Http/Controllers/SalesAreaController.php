@@ -5,23 +5,36 @@ namespace App\Http\Controllers;
 use App\Models\DocumentBook;
 use App\Models\DocumentType;
 use App\Models\SalesArea;
+use App\Models\Branch;
 use Illuminate\Http\RedirectResponse;
-use App\Support\AutoCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class SalesAreaController extends Controller
 {
+    public function index()
+    {
+        return view('sales-areas.index', [
+            'areas' => SalesArea::with('branch')->where('area_type', 'route')->orderBy('code')->get(),
+            'branches' => Branch::orderBy('code')->get(),
+        ]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
-        AutoCode::fill($request, 'sales_areas', 'SA');
+        if (trim((string) $request->input('code')) === '') {
+            $max = SalesArea::pluck('code')->reduce(function ($max, $code) {
+                return preg_match('/^B(\d+)$/i', $code, $matches) ? max($max, (int) $matches[1]) : $max;
+            }, 0);
+            $request->merge(['code' => sprintf('B%03d', $max + 1)]);
+        }
         $data = $this->validateArea($request);
         DB::transaction(function () use ($data) {
             $data['document_book_id'] = $this->syncBookingBook($data);
             SalesArea::create($data);
         });
 
-        return redirect()->route('users.index')->with('success', "เพิ่มสายการขาย {$data['code']} แล้ว");
+        return redirect()->route('sales-areas.index')->with('success', "เพิ่มสายการขาย {$data['code']} แล้ว");
     }
 
     public function update(Request $request, SalesArea $salesArea): RedirectResponse
@@ -32,7 +45,7 @@ class SalesAreaController extends Controller
             $salesArea->update($data);
         });
 
-        return redirect()->route('users.index')->with('success', 'บันทึกสายการขายแล้ว');
+        return redirect()->route('sales-areas.index')->with('success', 'บันทึกสายการขายแล้ว');
     }
 
     private function validateArea(Request $request, ?int $ignoreId = null): array
@@ -43,6 +56,12 @@ class SalesAreaController extends Controller
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
             'is_active' => ['nullable', 'boolean'],
         ]);
+        $bookingTypeId = DocumentType::where('code', DocumentType::BOOKING)->value('id');
+        $currentBookId = $ignoreId ? SalesArea::whereKey($ignoreId)->value('document_book_id') : null;
+        if (DocumentBook::where('document_type_id', $bookingTypeId)->where('code', $data['code'])
+            ->when($currentBookId, fn ($query) => $query->where('id', '!=', $currentBookId))->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['code' => 'รหัสนี้มีเล่มใบจองอยู่แล้ว กรุณาใช้รหัสอื่น']);
+        }
         $data['area_type'] = 'route';
         $data['branch_id'] = $data['branch_id'] ?? null;
         $data['is_active'] = $request->boolean('is_active', true);

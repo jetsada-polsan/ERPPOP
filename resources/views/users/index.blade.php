@@ -173,6 +173,7 @@
                             @endforeach
                         </select>
                     </div>
+                    <a href="{{ route('sales-areas.index') }}" class="small">จัดการสายการขาย / สายส่ง</a>
                 </div>
                 <div class="col-12">
                     <label class="form-label small text-muted d-flex align-items-center flex-wrap gap-1">
