@@ -330,22 +330,13 @@
                 <div class="fw-semibold">ดาวน์โหลดโปรแกรมที่เครื่องร้าน</div>
                 <div class="small text-muted">Windows อาจขึ้น SmartScreen ให้กด More info → Run anyway</div>
                 <div class="d-flex flex-wrap gap-2 mt-2">
-                    @if($vueInstaller)
-                        <a href="{{ data_get($vueInstaller, 'platforms.windows-x86_64.url', route('pos.download')) }}" download class="btn btn-primary btn-sm"><i class="bi bi-download me-1"></i>Vue/Tauri รุ่น {{ data_get($vueInstaller, 'version') }}</a>
-                    @endif
                     @if($installer)
-                        <a href="{{ route('python-pos.download') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-1"></i>Python รุ่น {{ $installer['version'] }}</a>
-                    @endif
-                    @if($jetPythonInstaller)
-                        <a href="{{ route('jet-python-pos.download') }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-download me-1"></i>JET POS Python UAT {{ $jetPythonInstaller['version'] }}</a>
+                        <a href="{{ route('python-pos.download') }}" class="btn btn-primary btn-sm"><i class="bi bi-download me-1"></i>ดาวน์โหลด Python POS รุ่น {{ $installer['version'] }}</a>
                     @else
-                        <button type="button" class="btn btn-outline-primary btn-sm" disabled title="รอผ่าน UAT และอัปโหลดไฟล์ติดตั้งก่อนเปิดดาวน์โหลด"><i class="bi bi-hourglass-split me-1"></i>JET POS Python UAT (รอทดสอบ)</button>
-                    @endif
-                    @if(! $vueInstaller && ! $installer)
-                        <div class="small text-danger">ยังไม่มีไฟล์ติดตั้งบนเซิร์ฟเวอร์</div>
+                        <div class="small text-danger">ยังไม่มีไฟล์ติดตั้ง Python POS บนเซิร์ฟเวอร์</div>
                     @endif
                 </div>
-                <div class="small text-muted mt-2">Vue/Tauri คือเครื่องขายจริงปัจจุบัน · Python รุ่นเดิมคงไว้สำหรับเครื่องเดิม · JET POS Python UAT แยกทดสอบ ยังไม่ใช้ขายจริงจนกว่าจะผ่านเกณฑ์ UAT</div>
+                <div class="small text-muted mt-2">รุ่น UAT สำหรับทดสอบบนเครื่อง Windows ก่อนใช้งานขายจริง</div>
             </div></div>
             <div class="pa-step"><span class="pa-step-no">2</span><div>
                 <div class="fw-semibold">กด เพิ่มเครื่อง ที่แท็บ ภาพรวมสาขา</div>
