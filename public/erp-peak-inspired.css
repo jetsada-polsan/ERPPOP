@@ -53,4 +53,44 @@
     .app-content :is(a, button, input, select, textarea):focus-visible {
         outline: 3px solid #655ce0; outline-offset: 2px;
     }
+
+    /* Document entry and shared dialogs retain their existing scrolling and actions. */
+    html body .doc-modal-backdrop, html body .booking-modal-backdrop { background: rgba(27, 31, 50, .58) !important; }
+    html body .doc-modal, html body .booking-modal,
+    html body .po-modal, html body .cd-modal, html body .modal-content {
+        background: #fff !important; color: #383d60 !important;
+        border: 1px solid #e0e3ed !important; border-radius: 10px !important;
+        box-shadow: 0 18px 50px rgba(24, 29, 55, .24) !important;
+        font-family: "Sarabun", "Noto Sans Thai", "Segoe UI", Tahoma, sans-serif !important;
+    }
+    html body .doc-modal :is(.doc-titlebar, .doc-commandbar, .doc-body, .doc-footer),
+    html body :is(.booking-modal, .po-modal, .cd-modal) :is(.modal-header, .modal-body, .modal-footer),
+    html body .modal-content :is(.modal-header, .modal-body, .modal-footer) {
+        background: #fff !important; border-color: #e6e8f0 !important; color: #383d60 !important;
+    }
+    html body .doc-modal .doc-titlebar { min-height: 56px; padding: 10px 20px; }
+    html body .doc-modal .doc-title,
+    html body :is(.booking-modal, .po-modal, .cd-modal, .modal-content) .modal-header :is(h1, h2, h3, h4, h5, .modal-title) {
+        color: #383d60 !important; font-size: 18px !important; font-weight: 700 !important;
+    }
+    html body .doc-modal :is(.doc-card, .doc-card-pad) { background: #fff !important; border-color: #e4e6f0 !important; border-radius: 8px !important; }
+    html body .doc-modal :is(.doc-input, .doc-select),
+    html body :is(.booking-modal, .po-modal, .cd-modal, .modal-content) :is(.form-control, .form-select) {
+        background: #fff !important; border-color: #d9ddec !important; border-radius: 7px !important; color: #383d60 !important;
+    }
+    html body .doc-modal :is(.doc-input, .doc-select):focus,
+    html body :is(.booking-modal, .po-modal, .cd-modal, .modal-content) :is(.form-control, .form-select):focus {
+        border-color: #7066e9 !important; box-shadow: 0 0 0 3px rgba(112, 102, 233, .15) !important;
+    }
+    html body .doc-modal .doc-commandbar button { color: #5d55d4; border-color: #e3e5ef; }
+    html body .doc-modal .doc-commandbar i { color: #7066e9; }
+    html body .doc-modal .doc-btn { border-radius: 999px; border: 1px solid #d9ddec; background: #fff; color: #555a78; }
+    html body .doc-modal .doc-btn-primary { background: #7066e9; border-color: #7066e9; color: #fff; }
+    html body .doc-modal .doc-btn-primary:hover { background: #5d53cf; color: #fff; }
+    html body :is(.booking-modal, .po-modal, .cd-modal, .modal-content) .modal-footer .btn:not(.rounded-circle) { border-radius: 999px !important; }
+    html body .doc-modal :is(th, td) { border-color: #e5e8f1; }
+    html body .doc-modal th { background: #f4f5fb; color: #525879; }
+    @media (max-width: 767.98px) {
+        html body .doc-modal, html body .booking-modal { border-radius: 0 !important; }
+    }
 }

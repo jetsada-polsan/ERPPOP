@@ -4,6 +4,12 @@
 - ทดสอบ StockBalanceReportTest และ ReportSmokeTest: 12 ผ่าน 1 skipped; git diff --check ผ่าน
 - Deploy: ยังไม่ deploy; ต้องตรวจ preview หลายหน้าจริงก่อนยืนยันผล
 
+# Handoff — 2026-11-07 (Codex: PEAK-inspired popups)
+
+- ปรับ popup กลางและ popup คีย์เอกสารให้พื้นขาว หัวเรียบ ปุ่มโค้งโทนม่วง และช่องกรอกเส้นอ่อน; คงขนาดและโครงสร้างเลื่อนเดิม
+- PHPUnit filter UatResponsiveLayoutTest|Booking|Document ผ่าน 78 tests (incomplete 3), Blade view cache และ diff check ผ่าน
+- ยังไม่ได้ตรวจ visual ทุกหน้าและอุปกรณ์จริง; ยังไม่ deploy
+
 # Handoff — 2026-11-07 (Codex: PEAK-inspired buttons)
 
 - แก้ธีมกลางให้ปุ่มหลักม่วงและปุ่มยืนยันฟ้าเขียวแสดงจริง แม้ CSS layout เดิมใช้ !important; ปรับปุ่มรอง กลุ่มปุ่ม และไอคอนเฉพาะ screen
