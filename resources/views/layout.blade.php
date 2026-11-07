@@ -1556,6 +1556,7 @@
         .swal2-container { z-index: 6000 !important; }
     </style>
 @include('partials.select-arrow')
+<link rel="stylesheet" href="{{ asset('erp-peak-inspired.css') }}?v={{ filemtime(public_path('erp-peak-inspired.css')) }}">
 </head>
 <body class="layout-fixed sidebar-expand-lg {{ request()->boolean('popup') ? 'erp-popup-page' : '' }} {{ request()->routeIs(['bookings.*','cash-sales.*','sales.*','purchases.*','purchase-orders.*','sale-returns.*','credit-debit-notes.*','stock-issues.*','stock-transfers.*','stock-transforms.*','stock-adjustments.*','stock-counts.*']) ? 'erp-classic-document-page' : '' }}">
     <div class="app-wrapper">

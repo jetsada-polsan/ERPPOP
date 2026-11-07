@@ -1,3 +1,10 @@
+# Handoff — 2026-11-07 (Codex: PEAK-inspired back-office theme)
+
+- ปรับ CSS ส่วนกลางของหน้าหลังบ้าน: แถบไล่สีม่วง–ฟ้า, พื้นหลังอ่อน, การ์ด, ปุ่ม, ช่องกรอก และสถานะ focus; จำกัด CSS เฉพาะหน้าจอเพื่อคงรูปแบบพิมพ์
+- PHPUnit ผ่าน 835, skipped 2, incomplete 6; Blade view cache และ git diff --check ผ่าน
+- ยังไม่ได้ตรวจหน้าจอจริงทุกโมดูลหรือ responsive ผ่าน browser และยังไม่ deploy; หน้าเฉพาะที่มี CSS ของตัวเองอาจต้องปรับเพิ่มเติม
+- Branch `codex/erp-peak-inspired-ui` ตั้งจาก main; ก่อน deploy ต้องรวมงานที่อยู่ production branch อื่นและตรวจความต่างของ production เพื่อหลีกเลี่ยงทับงานเดิม
+
 # Handoff — 2026-11-06 (P0 money integrity — workspace only)
 
 ## Commit / ขอบเขต
