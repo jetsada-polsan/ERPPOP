@@ -4,6 +4,11 @@
 - ทดสอบ StockBalanceReportTest และ ReportSmokeTest: 12 ผ่าน 1 skipped; git diff --check ผ่าน
 - Deploy: ยังไม่ deploy; ต้องตรวจ preview หลายหน้าจริงก่อนยืนยันผล
 
+# Handoff — 2026-11-07 (Codex: PEAK-inspired buttons)
+
+- แก้ธีมกลางให้ปุ่มหลักม่วงและปุ่มยืนยันฟ้าเขียวแสดงจริง แม้ CSS layout เดิมใช้ !important; ปรับปุ่มรอง กลุ่มปุ่ม และไอคอนเฉพาะ screen
+- ทดสอบ Blade view cache และ git diff --check ผ่าน; ยังไม่ได้ตรวจ visual ทุกหน้าและยังไม่ deploy
+
 # Handoff — 2026-11-07 (Codex: theme and POS 0.9.2 publish)
 
 - ERP production deploy `42336628481` สำเร็จจาก branch `codex/erp-theme-production`; เพิ่มปุ่มดาวน์โหลด Python POS รุ่นปัจจุบันที่หน้าติดตั้งเครื่อง

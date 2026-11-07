@@ -19,16 +19,31 @@
         border-radius: 12px; border-color: #e1e5f0;
         box-shadow: 0 3px 12px rgba(48, 61, 106, .07);
     }
-    .app-content .btn { border-radius: 999px; font-weight: 600; }
-    .app-content .btn-primary {
+    .app-content .btn { border-radius: 999px; font-weight: 600; transition: background-color .16s, border-color .16s, box-shadow .16s; }
+    .app-content .btn-group > .btn { border-radius: 0; }
+    .app-content .btn-group > .btn:first-child { border-radius: 999px 0 0 999px; }
+    .app-content .btn-group > .btn:last-child { border-radius: 0 999px 999px 0; }
+    html[data-layout] .app-content .btn-primary {
         --bs-btn-bg: #7066e9; --bs-btn-border-color: #7066e9;
         --bs-btn-hover-bg: #5d53cf; --bs-btn-hover-border-color: #5d53cf;
         --bs-btn-active-bg: #5148b8; --bs-btn-active-border-color: #5148b8;
+        background: #7066e9 !important; border-color: #7066e9 !important;
+        color: #fff !important; box-shadow: 0 3px 8px rgba(99, 88, 210, .16);
     }
-    .app-content .btn-success {
+    html[data-layout] .app-content .btn-primary:hover,
+    html[data-layout] .app-content .btn-primary:focus-visible { background: #5d53cf !important; border-color: #5d53cf !important; }
+    html[data-layout] .app-content .btn-success {
         --bs-btn-bg: #20a7ad; --bs-btn-border-color: #20a7ad;
         --bs-btn-hover-bg: #168b92; --bs-btn-hover-border-color: #168b92;
+        background: #23adb4 !important; border-color: #23adb4 !important;
+        color: #fff !important; box-shadow: 0 3px 8px rgba(20, 135, 142, .16);
     }
+    html[data-layout] .app-content .btn-success:hover,
+    html[data-layout] .app-content .btn-success:focus-visible { background: #168b92 !important; border-color: #168b92 !important; }
+    html[data-layout] .app-content .btn-outline-primary { color: #5d55d4; border-color: #7b73e8; background: #fff; }
+    html[data-layout] .app-content .btn-outline-primary:hover { color: #fff; background: #665cdb; border-color: #665cdb; }
+    .app-content .btn-light, .app-content .btn-outline-secondary { background: #fff; border-color: #d9ddec; color: #555a78; }
+    .app-content .btn i, .app-header button i { vertical-align: -.1em; }
     .app-content .form-control, .app-content .form-select {
         border-radius: 8px; border-color: #d9ddec; color: #343a59;
     }
