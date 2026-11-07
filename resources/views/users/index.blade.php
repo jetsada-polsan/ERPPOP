@@ -281,9 +281,7 @@
                                 <i class="bi bi-arrow-repeat me-1"></i>{{ $user->hasPermission('pos.sell') ? 'รีเซ็ต ERP + POS' : 'รีเซ็ตรหัส ERP' }}
                             </button>
                             @if($user->hasPermission('pos.sell'))
-                                <form method="post" action="{{ route('users.reset-password', $user) }}" class="d-inline" onsubmit="return confirm('รีเซ็ตรหัส ERP ของผู้ใช้นี้ โดยคง PIN POS เดิม?')">
-                                    @csrf <button class="btn btn-sm btn-light border text-nowrap">รีเซ็ตเฉพาะ ERP</button>
-                                </form>
+                                <button type="button" class="btn btn-sm btn-light border text-nowrap" @click="openReset({{ $user->id }}, @js($user->username), @js($user->name), false, true)">รีเซ็ตเฉพาะ ERP</button>
                             @endif
                         </td>
                     </tr>
@@ -429,7 +427,7 @@
 function userPage() {
     return {
         editId: null, editUsername: '', formOpen: false, roleError: false,
-        resetOpen: false, resetId: null, resetUsername: '', resetName: '', resetHasPos: false,
+        resetOpen: false, resetId: null, resetUsername: '', resetName: '', resetHasPos: false, resetPasswordOnly: false,
         resultOpen: {{ $resetResult ? 'true' : 'false' }},
         resultType: @js(data_get($resetResult, 'type', 'password')),
         resultUsername: @js(data_get($resetResult, 'username', '')),
@@ -470,11 +468,12 @@ function userPage() {
             this.roleError = false;
             this.form = { username: '', name: '', email: '', phone: '', position: '', branch_id: '', branch_ids: [], sales_area_id: '', role_ids: [], is_active: true };
         },
-        openReset(id, username, name, hasPos) {
+        openReset(id, username, name, hasPos, passwordOnly = false) {
             this.resetId = id;
             this.resetUsername = username;
             this.resetName = name || '';
             this.resetHasPos = !!hasPos;
+            this.resetPasswordOnly = passwordOnly;
             this.resetOpen = true;
         },
         copyResult(value) {
@@ -483,7 +482,7 @@ function userPage() {
                 .catch(() => {});
         },
         get resetAction() {
-            return `{{ url('users') }}/${this.resetId}/reset-login`;
+            return `{{ url('users') }}/${this.resetId}/${this.resetPasswordOnly ? 'reset-password' : 'reset-login'}`;
         },
     };
 }
