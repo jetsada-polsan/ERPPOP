@@ -4,6 +4,13 @@
 - ทดสอบ StockBalanceReportTest และ ReportSmokeTest: 12 ผ่าน 1 skipped; git diff --check ผ่าน
 - Deploy: ยังไม่ deploy; ต้องตรวจ preview หลายหน้าจริงก่อนยืนยันผล
 
+# Handoff — 2026-11-07 (Codex: theme and POS 0.9.2 publish)
+
+- ERP production deploy `42336628481` สำเร็จจาก branch `codex/erp-theme-production`; เพิ่มปุ่มดาวน์โหลด Python POS รุ่นปัจจุบันที่หน้าติดตั้งเครื่อง
+- POS UAT 0.9.2 build และ publish สำเร็จใน workflow `42336468644`, source `a404c50f30d70ce793b8682a2c9e0eb4b680ddde`; HEAD `https://erp.popstarcenter.com/download/python-pos` ตอบ 200 และชื่อ `PopCentral-POS-UAT-0.9.2-setup.exe`, 179251156 bytes
+- รุ่นนี้กรอก PIN แคชเชียร์ 4 หลักแล้วส่งตรวจอัตโนมัติ; ออนไลน์ยังตรวจผ่าน ERP ไม่ใช่ SQLite-first; ต้อง UAT บนเครื่องจริงก่อนประกาศพร้อมขาย
+- Browser session หมดอายุ จึงยังไม่ได้ตรวจภาพปุ่มและธีมบนหน้าหลังบ้านหลัง deploy
+
 # Handoff — 2026-11-07 (Codex: PEAK-inspired back-office theme)
 
 - เพิ่มธีมหลังบ้านโทนม่วง–ฟ้าและปรับปุ่ม ฟอนต์ การ์ด ช่องกรอก ใช้เฉพาะจอ คงรูปแบบพิมพ์เดิม
