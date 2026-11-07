@@ -1,0 +1,41 @@
+/* Back-office screen styling. Print documents keep their own templates. */
+@media screen {
+    body { font-family: "Sarabun", "Noto Sans Thai", "Segoe UI", Tahoma, sans-serif; color: #343a59; }
+    html[data-layout="odoo"] .odn-topbar {
+        background: linear-gradient(105deg, #7066ed 0%, #568fe9 54%, #32c3c4 100%);
+        box-shadow: 0 3px 14px rgba(70, 82, 150, .16);
+    }
+    html[data-layout="odoo"] .odn-nav-link { border-radius: 9px; font-weight: 600; }
+    html[data-layout="odoo"] .odn-nav-link.on { color: #514fba; }
+    html[data-layout="odoo"] .app-main,
+    html[data-layout="odoo"] .app-content { background: #f1f4fc; }
+    html[data-layout="odoo"] .app-header { background: #fff !important; border-color: #e4e6f1; }
+    html[data-layout="odoo"] .app-header h1 { color: #3d4268; }
+    html[data-layout="odoo"] .app-sidebar.odn-side { background: #fff !important; border-color: #e4e6f1; }
+    html[data-layout="odoo"] .odn-item { border-radius: 10px; }
+    html[data-layout="odoo"] .odn-item.active { background: #eeefff; color: #5149be; }
+    html[data-layout="odoo"] .odn-item-ico { border-radius: 10px; }
+    .app-content .content-card, .app-content .card {
+        border-radius: 12px; border-color: #e1e5f0;
+        box-shadow: 0 3px 12px rgba(48, 61, 106, .07);
+    }
+    .app-content .btn { border-radius: 999px; font-weight: 600; }
+    .app-content .btn-primary {
+        --bs-btn-bg: #7066e9; --bs-btn-border-color: #7066e9;
+        --bs-btn-hover-bg: #5d53cf; --bs-btn-hover-border-color: #5d53cf;
+        --bs-btn-active-bg: #5148b8; --bs-btn-active-border-color: #5148b8;
+    }
+    .app-content .btn-success {
+        --bs-btn-bg: #20a7ad; --bs-btn-border-color: #20a7ad;
+        --bs-btn-hover-bg: #168b92; --bs-btn-hover-border-color: #168b92;
+    }
+    .app-content .form-control, .app-content .form-select {
+        border-radius: 8px; border-color: #d9ddec; color: #343a59;
+    }
+    .app-content .form-control:focus, .app-content .form-select:focus {
+        border-color: #7772ee; box-shadow: 0 0 0 3px rgba(112, 102, 233, .15);
+    }
+    .app-content :is(a, button, input, select, textarea):focus-visible {
+        outline: 3px solid #655ce0; outline-offset: 2px;
+    }
+}

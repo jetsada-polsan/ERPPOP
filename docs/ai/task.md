@@ -4,6 +4,12 @@
 - ทดสอบ StockBalanceReportTest และ ReportSmokeTest: 12 ผ่าน 1 skipped; git diff --check ผ่าน
 - Deploy: ยังไม่ deploy; ต้องตรวจ preview หลายหน้าจริงก่อนยืนยันผล
 
+# Handoff — 2026-11-07 (Codex: PEAK-inspired back-office theme)
+
+- เพิ่มธีมหลังบ้านโทนม่วง–ฟ้าและปรับปุ่ม ฟอนต์ การ์ด ช่องกรอก ใช้เฉพาะจอ คงรูปแบบพิมพ์เดิม
+- รวมบนฐาน production report branch เพื่อรักษารายงานที่ deploy แล้ว; ทดสอบเต็ม 835 ผ่าน 2 skipped 6 incomplete บน branch ต้นทาง
+- ยังต้องตรวจหน้าจอจริงหลายโมดูลและหน้าจอเล็กหลัง deploy
+
 # Handoff — 2026-11-06 (Codex: remove duplicate report print header)
 
 ## Commit
