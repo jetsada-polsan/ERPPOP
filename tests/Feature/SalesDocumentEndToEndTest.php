@@ -7,6 +7,7 @@ use App\Models\ChartOfAccount;
 use App\Models\Customer;
 use App\Models\CustomerOpenItem;
 use App\Models\Document;
+use App\Models\DocumentBook;
 use App\Models\DocumentType;
 use App\Models\GlJournal;
 use App\Models\Permission;
@@ -220,6 +221,45 @@ class SalesDocumentEndToEndTest extends TestCase
         $postings = DB::table('sales_postings')->where('document_id', $saleDocument->id)->get();
         $this->assertCount(1, $postings);
         $this->assertSame('CREDIT_SALE', $postings[0]->channel);
+    }
+
+    public function test_split_booking_creates_two_balanced_sales_once_and_rolls_back_on_failure(): void
+    {
+        [$branch, $location, $product, $customer] = $this->stockedBranch('SPLIT', 10, 60, true);
+        $type = DocumentType::where('code', DocumentType::CREDIT_SALE)->sole();
+        $ds = DocumentBook::create(['code' => 'DS-TEST', 'name' => 'DS', 'prefix' => 'DS', 'document_type_id' => $type->id, 'is_active' => true, 'no_vat' => false]);
+        $dsn = DocumentBook::create(['code' => 'DSN-TEST', 'name' => 'DSN', 'prefix' => 'DSN', 'document_type_id' => $type->id, 'is_active' => true, 'no_vat' => true]);
+        $document = app(BookingService::class)->create([
+            'branch_id' => $branch->id, 'customer_id' => $customer->id,
+            'items' => [
+                ['product_id' => $product->id, 'qty' => 2, 'unit_price' => 100],
+                ['product_id' => $product->id, 'qty' => 1, 'unit_price' => 80],
+            ],
+        ]);
+        $booking = $document->saleBooking;
+        $items = $document->stockDocument->items->sortBy('seq')->values();
+        $this->assertCount(2, $items);
+        $service = app(CreditSaleService::class);
+        try {
+            $service->splitBookingToCreditSales($booking, [$items[0]->id => $ds->id]);
+            $this->fail('Incomplete allocation must fail');
+        } catch (\RuntimeException $error) {
+            $this->assertSame(SaleBooking::STATUS_PENDING, $booking->fresh()->status);
+            $this->assertSame(0, Document::where('source_document_id', $document->id)->count());
+            $this->assertSame(10.0, (float) StockBalance::where('product_id', $product->id)->where('warehouse_location_id', $location->id)->sole()->on_hand_qty);
+        }
+        $sales = $service->splitBookingToCreditSales($booking, [$items[0]->id => $ds->id, $items[1]->id => $dsn->id]);
+        $this->assertCount(2, $sales);
+        $this->assertSame(280.0, (float) $sales->sum('total_amount'));
+        $this->assertSame(280.0, (float) CustomerOpenItem::whereIn('document_id', $sales->pluck('id')->all())->sum('balance_amount'));
+        $this->assertSame(7.0, (float) StockBalance::where('product_id', $product->id)->where('warehouse_location_id', $location->id)->sole()->on_hand_qty);
+        $this->assertSame(0.0, (float) StockBalance::where('product_id', $product->id)->where('warehouse_location_id', $location->id)->sole()->reserved_qty);
+        foreach ($sales as $sale) {
+            $this->assertSame($document->id, (int) $sale->source_document_id);
+            $this->assertGlBalanced($sale);
+        }
+        $this->expectException(\RuntimeException::class);
+        $service->splitBookingToCreditSales($booking, [$items[0]->id => $ds->id, $items[1]->id => $dsn->id]);
     }
 
     public function test_cancelling_a_pending_booking_releases_its_reservation(): void

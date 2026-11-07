@@ -1,3 +1,9 @@
+# Handoff — 2026-11-07 (Codex: split credit-sale service)
+
+- เพิ่ม service แยกใบจองเป็นใบขายเชื่อหลายใบใน transaction เดียว ล็อกใบจอง อ้างเอกสารต้นทาง ตัดสต็อก ตั้งลูกหนี้และ GL รายใบ และป้องกันแปลงซ้ำ; ยังไม่เปิดใช้งานผ่าน UI
+- ทดสอบ BookingSplitPlanTest และ SalesDocumentEndToEndTest ผ่าน 12 tests 111 assertions บน SQLite; ยังไม่ได้ทดสอบ PostgreSQL หรือกรณีใบที่สองผิดพลาดหลังสร้างใบแรก
+- สำคัญ: ยังต้องเชื่อม UI และแก้ Fleet/รายงาน/คืนสินค้าให้รองรับหลายใบ ตรวจ VAT snapshot และเงื่อนไขลูกค้า/เจ้าหนี้ รวมถึงทดสอบ UAT ก่อน deploy/ใช้งานจริง
+
 # Handoff — 2026-11-07 (Codex: booking split preparation)
 
 - เพิ่ม BookingSplitPlan สำหรับตรวจจัดสรรรายการทุกแถวไปเล่มที่เปิดใช้งาน รวมยอด Decimal และกันรายการ VAT ไปเล่ม no_vat; ยังไม่ได้เชื่อม UI หรือสร้างเอกสาร
