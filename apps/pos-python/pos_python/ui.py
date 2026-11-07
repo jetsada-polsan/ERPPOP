@@ -3027,7 +3027,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 (terminal_id,),
             ).fetchone()
             if existing_shift and int(existing_shift["cashier_id"]) != int(cashier["id"]):
-                TouchMessage.warning(self, "เริ่มขายไม่ได้", "เครื่องนี้มีกะของแคชเชียร์คนอื่นเปิดอยู่ ต้องปิดกะหรือส่งมอบกะก่อน")
+                owner = service.db.execute("SELECT name FROM local_cashiers WHERE id = ?", (existing_shift["cashier_id"],)).fetchone()
+                owner_name = str(owner["name"] or "ไม่ทราบชื่อ") if owner else "ไม่ทราบชื่อ"
+                TouchMessage.warning(self, "เริ่มขายไม่ได้", f"กะนี้เปิดโดย {owner_name}\nให้เจ้าของกะใช้ PIN ของตนเข้าเพื่อปิดกะก่อน หรือให้ผู้จัดการดำเนินการส่งมอบกะตามขั้นตอน")
                 return False
 
             if existing_shift:

@@ -163,6 +163,20 @@ def test_upgrade_old_promotion_table_and_id_mapping(tmp_path):
     db.close()
 
 
+def test_upgrade_preserves_existing_promotion_column_with_different_case(tmp_path):
+    import sqlite3
+    path = tmp_path / 'legacy.db'
+    db = sqlite3.connect(path)
+    db.execute('CREATE TABLE qty_promotions (id INTEGER PRIMARY KEY, MAX_DISCOUNT TEXT)')
+    db.execute("INSERT INTO qty_promotions (MAX_DISCOUNT) VALUES ('35')")
+    db.commit()
+    db.close()
+    for _ in range(2):
+        db = connect(path)
+        assert db.execute('SELECT max_discount FROM qty_promotions').fetchone()[0] == '35'
+        db.close()
+
+
 def test_checkout_queue_receipt_gifts_manual_approval_and_retry(tmp_path):
     db = connect(tmp_path / 'local.db')
     # No credentials are created for this isolated till fixture.
