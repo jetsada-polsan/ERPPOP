@@ -1,3 +1,9 @@
+# Handoff — 2026-11-07 (Codex: booking split preparation)
+
+- เพิ่ม BookingSplitPlan สำหรับตรวจจัดสรรรายการทุกแถวไปเล่มที่เปิดใช้งาน รวมยอด Decimal และกันรายการ VAT ไปเล่ม no_vat; ยังไม่ได้เชื่อม UI หรือสร้างเอกสาร
+- PHPUnit BookingSplitPlanTest ผ่าน 3 tests; ยังไม่ได้รันทดสอบทั้งระบบหรือ deploy
+- ต้องต่อ transaction สร้างบิลและ snapshot ภาษี เชื่อมหลายเอกสารกับใบจอง ปรับ UI/บัญชี/รายงาน/ขนส่ง/คืนสินค้า และทดสอบ SQLite/PostgreSQL ก่อนใช้จริง
+
 # Handoff — 2026-11-07 (Codex: DS / DSN investigation)
 
 - ตรวจ Business Plus ผ่าน AnyDesk: DS/DSN เป็นเล่มขายเชื่อคู่ อ้างใบจองเดียวกันและแยกรายการ; พบ DS มียอดยกเว้น VAT. แก้คำอธิบายตัวเลือกเล่มในใบจองให้ตรง logic ปัจจุบัน และบันทึกจุดเชื่อมที่ต้องแก้ใน sales-delivery gap
