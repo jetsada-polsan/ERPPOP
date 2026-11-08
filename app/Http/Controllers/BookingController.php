@@ -342,8 +342,13 @@ class BookingController extends Controller
 
     public function convert(Request $request, SaleBooking $booking, CreditSaleService $service): RedirectResponse
     {
+        $data = $request->validate([
+            'vat_applicable' => ['sometimes', 'array'],
+            'vat_applicable.*' => ['required', 'boolean'],
+        ]);
+
         try {
-            $saleDocuments = $service->convertBookingToCreditSalesByVat($booking);
+            $saleDocuments = $service->convertBookingToCreditSalesByVat($booking, $data['vat_applicable'] ?? []);
         } catch (RuntimeException $e) {
             return redirect()->route('bookings.show', $booking)->with('error', $e->getMessage());
         }

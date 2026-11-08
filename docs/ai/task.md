@@ -5172,3 +5172,11 @@ pending
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ UAT ด้วยบัญชีจริงบน browser; ก่อนใช้งานจริงควรตรวจเล่ม DS/DSN ที่เปิดใช้งานและรายการจริงด้วยการคอนเฟิร์มตัวอย่างที่ได้รับอนุญาต
 - Deploy: GitHub Actions `Deploy ERP` run [#223](https://github.com/jetsada-polsan/ERPPOP/actions/runs/42498574542) บน commit `5990ba7` สำเร็จ; test job ผ่านใน 1m 47s และ production deploy ผ่านใน 33s
 - งานถัดไป: UAT บนระบบหลังล็อกอินด้วยใบจองทดสอบที่ได้รับอนุญาต ตรวจว่ารายการ VAT/non-VAT ไปคนละ DS/DSN และใบส่งของยังคงเป็นใบเดียว
+
+## Handoff - 2026-11-08 (เลือก DS/DSN แยกรายการก่อนคอนเฟิร์ม)
+- Commit: รอ commit
+- ทำอะไร: เพิ่มตัวเลือก DS · คิด VAT / DSN · ไม่คิด VAT ในแต่ละบรรทัดบนหน้าแสดงใบจอง; ค่าเริ่มต้นตาม VAT ของสินค้าและเปลี่ยนได้ก่อนคอนเฟิร์ม ระบบรวมสินค้าเป็นเอกสารตามตัวเลือกและสร้างเฉพาะกลุ่มที่มีสินค้า
+- ทำอะไร: บันทึก VAT ที่เลือกในบรรทัดใบขายและให้ GL คำนวณภาษีตามค่านั้น; ใบจองและใบส่งของเดิมยังคงเอกสารเดียว, ตัดจอง/สต๊อกและสร้างลูกหนี้/GL ใน transaction เดียว
+- ทดสอบ: `php artisan test --filter='SalesDocumentEndToEndTest|QuotationConversionTest|BookingDeliveryAndCashTransferTest' --no-coverage`: 29 tests / 205 assertions ผ่าน; `php -d memory_limit=1G vendor/bin/phpunit --no-coverage`: 844 tests, 842 passed, 2 skipped, 6 incomplete / 7,100 assertions; `php artisan view:cache`, `vendor/bin/pint --dirty` และ `git diff --check` ผ่าน. `php artisan test --no-coverage` เริ่ม worker ที่ memory 128 MB แล้วหมดหน่วยความจำ; full PHPUnit rerun ด้วย 1 GB ผ่าน
+- ความเสี่ยง/งานถัดไป: ยังไม่ได้ deploy; migration เพิ่ม nullable `vat_applicable` บนรายการสต๊อก รันได้ด้วย Schema Builder สำหรับ SQLite/PostgreSQL; production ต้องรัน migration ก่อนใช้ selector. ตรวจหน้า production หลัง deploy แบบอ่านอย่างเดียว; ห้ามคอนเฟิร์ม booking จริงโดยไม่มีเอกสารทดสอบที่อนุญาต เพราะจะสร้างใบขาย, ตัดสต๊อก และตั้งลูกหนี้
+- Deploy: รอ push และ Deploy ERP workflow production

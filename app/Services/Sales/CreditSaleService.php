@@ -48,23 +48,23 @@ class CreditSaleService
     public function convertBookingToCreditSale(SaleBooking $booking): Document
     {
         // Preserve the legacy single-document return contract for internal callers;
-        // actual conversion now follows each product's VAT master status.
+        // actual conversion defaults each line to its product VAT master status.
         return $this->convertBookingToCreditSalesByVat($booking)->firstOrFail();
     }
 
     /**
      * Confirm a booking as one or two credit-sale documents, assigning each line
-     * to DS or DSN from the product's VAT master flag. Stock and reservations are
-     * consumed once inside the same transaction; the delivery note remains the
-     * original single booking document.
+     * to DS or DSN from the submitted per-line VAT selection, defaulting to the
+     * product's VAT master flag. Stock and reservations are consumed once inside
+     * the same transaction; the delivery note remains the original single booking.
      *
      * @return Collection<int, Document>
      */
-    public function convertBookingToCreditSalesByVat(SaleBooking $booking): Collection
+    public function convertBookingToCreditSalesByVat(SaleBooking $booking, array $vatSelections = []): Collection
     {
         $documentType = DocumentType::where('code', DocumentType::CREDIT_SALE)->firstOrFail();
 
-        return DB::transaction(function () use ($booking, $documentType) {
+        return DB::transaction(function () use ($booking, $documentType, $vatSelections) {
             $lockedBooking = SaleBooking::whereKey($booking->id)->lockForUpdate()->firstOrFail();
             if ($lockedBooking->status !== SaleBooking::STATUS_PENDING) {
                 throw new RuntimeException("ใบจองนี้ถูกใช้ไปแล้ว (สถานะปัจจุบัน: {$lockedBooking->status})");
@@ -83,7 +83,25 @@ class CreditSaleService
                 throw new RuntimeException('พบสินค้าที่ถูกลบหรือไม่มีข้อมูล VAT ไม่สามารถยืนยันใบจองได้');
             }
 
-            $groups = $sourceItems->groupBy(fn ($item) => $products->get((int) $item->product_id)->is_vat ? 'taxable' : 'no_vat');
+            $bookingItemIds = $sourceItems->pluck('id')->map(fn ($id) => (string) $id)->all();
+            if (array_diff(array_map('strval', array_keys($vatSelections)), $bookingItemIds)) {
+                throw new RuntimeException('พบรายการ VAT ที่ไม่ตรงกับสินค้าในใบจอง กรุณาโหลดหน้าใหม่');
+            }
+            foreach ($vatSelections as $selection) {
+                if (! in_array($selection, [true, false, 1, 0, '1', '0'], true)) {
+                    throw new RuntimeException('ค่าเลือก VAT ไม่ถูกต้อง');
+                }
+            }
+
+            $vatApplicableByItem = [];
+            $groups = $sourceItems->groupBy(function ($item) use ($products, $vatSelections, &$vatApplicableByItem) {
+                $vatApplicable = array_key_exists((string) $item->id, $vatSelections)
+                    ? filter_var($vatSelections[(string) $item->id], FILTER_VALIDATE_BOOLEAN)
+                    : (bool) $products->get((int) $item->product_id)->is_vat;
+                $vatApplicableByItem[(int) $item->id] = $vatApplicable;
+
+                return $vatApplicable ? 'taxable' : 'no_vat';
+            });
             $books = DocumentBook::where('document_type_id', $documentType->id)
                 ->where('is_active', true)
                 ->orderByDesc('is_default')->orderBy('id')->get();
@@ -157,6 +175,7 @@ class CreditSaleService
                         'unit_price' => $item->unit_price,
                         'unit_cost' => $unitCost,
                         'cost_amount' => DecimalMath::multiply($qty, $unitCost),
+                        'vat_applicable' => $vatApplicableByItem[(int) $item->id],
                     ]);
                 }
 

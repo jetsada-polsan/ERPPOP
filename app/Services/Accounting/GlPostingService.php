@@ -163,7 +163,8 @@ class GlPostingService
 
         foreach ($document->stockDocument?->items ?? [] as $item) {
             $gross = (string) DecimalMath::of(DecimalMath::multiply($item->qty, $item->unit_price))->abs();
-            if ($item->product?->is_vat && $rate > 0) {
+            $vatApplicable = $item->vat_applicable ?? $item->product?->is_vat;
+            if ($vatApplicable && $rate > 0) {
                 $base = DecimalMath::divide(DecimalMath::multiply($gross, 100), DecimalMath::add(100, $rate), 4);
                 $lineVat = DecimalMath::subtract($gross, $base, 4);
                 $subtotal = DecimalMath::add($subtotal, $base);

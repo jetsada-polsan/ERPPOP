@@ -113,14 +113,35 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
                 </form>
             @endif
             @if($isPending && $canConvert)
-            <form method="post" action="{{ route('bookings.convert', $booking) }}" id="convert-form" class="booking-convert d-flex flex-column gap-2 align-items-end">
+            <form method="post" action="{{ route('bookings.convert', $booking) }}" id="convert-form" class="booking-convert d-flex flex-column gap-2 align-items-stretch">
                 @csrf
                 <div class="doc-book-picker">
-                    <div class="doc-book-label">ระบบแยกใบขาย DS / DSN ให้อัตโนมัติตามสถานะ VAT ของสินค้า</div>
-                    <div class="small text-muted">ใบส่งของยังเป็นใบเดียว; สต๊อกและลูกหนี้จะบันทึกแยกตามแต่ละใบขาย</div>
+                    <div class="doc-book-label">เลือกรายการที่จะออก DS หรือ DSN</div>
+                    <div class="small text-muted">ค่าเริ่มต้นอิงสถานะ VAT ของสินค้า เปลี่ยนได้รายรายการก่อนยืนยัน · ใบส่งของยังเป็นใบเดียว</div>
+                    <div class="table-responsive mt-2">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead><tr><th>รหัส / สินค้า</th><th class="text-end">จำนวน</th><th style="min-width:190px">เล่มขาย</th></tr></thead>
+                            <tbody>
+                                @foreach($booking->document->stockDocument->items as $item)
+                                    @php($vatByDefault = (bool) $item->product->is_vat)
+                                    <tr>
+                                        <td><span class="fw-semibold">{{ $item->product->sku_code }}</span> · {{ $item->product->name_th }}</td>
+                                        <td class="text-end">{{ number_format($item->qty, 2) }}</td>
+                                        <td>
+                                            <select name="vat_applicable[{{ $item->id }}]" class="form-select form-select-sm" aria-label="เลือกเล่มขาย {{ $item->product->name_th }}">
+                                                <option value="1" @selected($vatByDefault)>DS · คิด VAT</option>
+                                                <option value="0" @selected(! $vatByDefault)>DSN · ไม่คิด VAT</option>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="small text-muted mt-2">ระบบจะแยกรายการตามตัวเลือก สร้างเฉพาะเล่มที่มีสินค้า และบันทึกสต็อก/ลูกหนี้/บัญชีตามแต่ละใบขาย</div>
                 </div>
                 <button type="button"
-                    onclick="Swal.fire({ title:'แปลงเป็นใบขาย?', text:'จะตัดสต็อกและตั้งลูกหนี้ทันที{{ $isDelivery ? ' โดยใช้วันที่ส่งจริง' : '' }}', icon:'warning', showCancelButton:true, confirmButtonText:'ยืนยัน', cancelButtonText:'ยกเลิก', confirmButtonColor:'var(--erp-success-ink)' }).then(r => r.isConfirmed && document.getElementById('convert-form').submit())"
+                    onclick="Swal.fire({ title:'แปลงเป็นใบขาย?', text:'จะสร้างใบ DS/DSN ตามตัวเลือก ตัดสต็อกและตั้งลูกหนี้ทันที{{ $isDelivery ? ' โดยใช้วันที่ส่งจริง' : '' }}', icon:'warning', showCancelButton:true, confirmButtonText:'ยืนยัน', cancelButtonText:'ยกเลิก', confirmButtonColor:'var(--erp-success-ink)' }).then(r => r.isConfirmed && document.getElementById('convert-form').submit())"
                     class="btn btn-success px-4">
                     <i class="bi bi-arrow-right-circle me-1"></i> แปลงเป็นใบขาย
                 </button>
@@ -240,9 +261,9 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
 .flow-line.done { background:var(--erp-success-ink); }
 .booking-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; max-width: 100%; }
 .booking-actions > .btn, .booking-actions > .badge { min-height: 42px; display: inline-flex; align-items: center; }
-.booking-convert { align-items: center !important; flex-wrap: wrap; gap: 8px; margin: 0; }
+.booking-convert { align-items: stretch !important; flex-wrap: wrap; gap: 8px; margin: 0; width: min(100%, 760px); }
 .booking-convert .doc-book-picker { min-width: 0; padding: 0; border: 0; background: none; box-shadow: none; }
-.booking-convert .doc-book-label { display: none; }
+.booking-convert .doc-book-label { display: block; }
 .booking-convert .form-select { min-height: 42px; max-width: 240px; }
 @media (max-width: 768px) {
     .booking-actions, .booking-convert { width: 100%; justify-content: stretch; }

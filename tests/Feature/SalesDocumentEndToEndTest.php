@@ -274,6 +274,57 @@ class SalesDocumentEndToEndTest extends TestCase
         }
     }
 
+    public function test_booking_confirmation_uses_per_line_vat_selection_instead_of_product_default(): void
+    {
+        [$branch, , $nonVatProduct, $customer] = $this->stockedBranch('DSDSN-OVERRIDE', 10, 60, true);
+        $vatProduct = Product::create([
+            'sku_code' => 'SKU-DSDSN-OVERRIDE-VAT', 'name_th' => 'สินค้าคิด VAT ตามค่าเริ่มต้น',
+            'base_unit_id' => $nonVatProduct->base_unit_id, 'default_price' => 100,
+            'average_cost' => 60, 'is_vat' => true, 'is_active' => true,
+            'negative_stock_policy' => 'block',
+        ]);
+        $supplier = Supplier::where('code', 'SUPDSDSN-OVERRIDE')->sole();
+        app(PurchaseService::class)->create([
+            'branch_id' => $branch->id, 'supplier_id' => $supplier->id, 'is_credit' => true,
+            'prices_include_vat' => false,
+            'items' => [['product_id' => $vatProduct->id, 'qty' => 5, 'unit_price' => 60]],
+        ]);
+
+        $bookingDocument = app(BookingService::class)->create([
+            'branch_id' => $branch->id, 'customer_id' => $customer->id,
+            'items' => [
+                ['product_id' => $nonVatProduct->id, 'qty' => 2, 'unit_price' => 100],
+                ['product_id' => $vatProduct->id, 'qty' => 3, 'unit_price' => 100],
+            ],
+        ]);
+        $booking = SaleBooking::where('document_id', $bookingDocument->id)->sole();
+        $itemIds = $bookingDocument->stockDocument->items()->orderBy('seq')->pluck('id')->all();
+
+        // Reverse both product defaults: no-VAT master item to DS, VAT master item to DSN.
+        $sales = app(CreditSaleService::class)->convertBookingToCreditSalesByVat($booking, [
+            $itemIds[0] => true,
+            $itemIds[1] => false,
+        ]);
+
+        $this->assertCount(2, $sales);
+        $ds = $sales->first(fn (Document $sale) => ! $sale->documentBook->no_vat);
+        $dsn = $sales->first(fn (Document $sale) => $sale->documentBook->no_vat);
+        $this->assertNotNull($ds);
+        $this->assertNotNull($dsn);
+        $this->assertSame(200.0, (float) $ds->total_amount);
+        $this->assertSame(13.08, round((float) $ds->fresh()->vat_amount, 2));
+        $this->assertSame(300.0, (float) $dsn->total_amount);
+        $this->assertSame(0.0, (float) $dsn->fresh()->vat_amount);
+        $saleVatSelections = $sales->flatMap(fn (Document $sale) => $sale->stockDocument->items()->orderBy('seq')->pluck('vat_applicable'))
+            ->map(fn ($value) => (bool) $value)->all();
+        sort($saleVatSelections);
+        $this->assertSame([false, true], $saleVatSelections);
+        $this->assertSame(2, CustomerOpenItem::whereIn('document_id', $sales->pluck('id'))->count());
+        foreach ($sales as $sale) {
+            $this->assertGlBalanced($sale);
+        }
+    }
+
     public function test_cancelling_a_pending_booking_releases_its_reservation(): void
     {
         [$branch, $location, $product, $customer] = $this->stockedBranch('CANBK', qty: 10, unitCost: 60, withCustomer: true);
