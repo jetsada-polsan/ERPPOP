@@ -9,6 +9,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['code', 'name_th', 'name_en', 'tax_id', 'tax_branch', 'is_active'])]
 class Supplier extends Model
 {
+    public function tradeAgreements(): HasMany
+    {
+        return $this->hasMany(TradeAgreement::class);
+    }
+
     public function addresses(): HasMany
     {
         return $this->hasMany(SupplierAddress::class);

@@ -207,7 +207,11 @@ class QuotationController extends Controller
                 ]);
                 $booking = $bookingDocument->saleBooking;
 
-                $sale = $target === 'sale' ? $sales->convertBookingToCreditSale($booking) : null;
+                $hasTradeAgreement = $target === 'sale'
+                    && $bookingDocument->customer?->tradeAgreements()->effectiveOn(now()->toDateString())->exists();
+                $sale = $target === 'sale' && ! $hasTradeAgreement
+                    ? $sales->convertBookingToCreditSale($booking)
+                    : null;
 
                 $quotation->update(['status' => 'accepted', 'converted_booking_id' => $booking->id]);
 
@@ -223,7 +227,7 @@ class QuotationController extends Controller
         }
 
         return redirect()->route('bookings.show', $booking)
-            ->with('success', "แปลงใบเสนอราคา {$quotation->doc_number} เป็นใบจองแล้ว");
+            ->with('success', "แปลงใบเสนอราคา {$quotation->doc_number} เป็นใบจองแล้ว".($target === 'sale' ? ' กรุณาตรวจข้อตกลงและยอดภาษีก่อนยืนยันสร้างใบขาย' : ''));
     }
 
     /** รหัสลูกค้าใหม่ที่ยังไม่ซ้ำ สำหรับลูกค้าที่สร้างจากใบเสนอราคา */

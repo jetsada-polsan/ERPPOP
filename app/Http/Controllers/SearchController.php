@@ -151,9 +151,13 @@ class SearchController extends Controller
 
         $suppliers = Supplier::query()
             ->where('is_active', true)
+            ->when($request->boolean('with_trade_agreements'), fn ($query) => $query->with([
+                'tradeAgreements' => fn ($agreements) => $agreements->effectiveOn(now()->toDateString())
+                    ->select('id', 'supplier_id', 'name', 'vat_mode', 'prices_include_vat', 'payment_terms', 'credit_days'),
+            ]))
             ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
-                ->where('code', 'ilike', "%{$q}%")
-                ->orWhere('name_th', 'ilike', "%{$q}%")
+                ->whereLike('code', "%{$q}%")
+                ->orWhereLike('name_th', "%{$q}%")
             ))
             ->orderBy('name_th')
             ->limit(20)

@@ -115,7 +115,9 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
                 <div class="small mb-2">ยอดใบจอง {{ number_format((float) $convertPreview['source_total'], 2) }} บาท · ยอดรวมใบขาย {{ number_format((float) $convertPreview['target_total'], 2) }} บาท</div>
                 @foreach($convertPreview['groups'] as $group)
                     <div class="border rounded-3 p-2 mb-2">
-                        <div class="fw-semibold">{{ $group['book_code'] }} · {{ $group['no_vat'] ? 'ไม่คิด VAT' : 'คิด VAT ตามสถานะสินค้า' }} · {{ number_format((float) $group['total'], 2) }} บาท</div>
+                        <div class="fw-semibold">{{ $group['book_code'] }} · {{ \App\Models\TradeAgreement::VAT_MODES[$group['tax']['vat_mode']] }} · {{ number_format((float) $group['total'], 2) }} บาท</div>
+                        <div class="small">ข้อตกลง {{ $group['tax']['agreement_name'] ?? 'ใช้ค่าเล่มเอกสาร' }} · ราคาต้นทาง{{ $group['tax']['prices_include_vat'] ? 'รวม VAT แล้ว' : 'ยังไม่รวม VAT' }}@if($group['tax']['payment_terms']) · {{ $group['tax']['payment_terms'] }}@endif @if($group['tax']['credit_days'] !== null) · เครดิต {{ $group['tax']['credit_days'] }} วัน@endif</div>
+                        <div class="small">ฐาน VAT {{ number_format((float) $group['tax']['taxable_base'], 2) }} · ยอดไม่มี VAT {{ number_format((float) $group['tax']['exempt_amount'], 2) }} · VAT {{ number_format((float) $group['tax']['vat_amount'], 2) }} บาท</div>
                         <div class="small text-muted">{{ collect($group['items'])->map(fn ($item) => $item['sku'].' '.$item['name'].' × '.$item['qty'].' = '.number_format((float) $item['total'], 2))->implode(' · ') }}</div>
                     </div>
                 @endforeach
@@ -133,12 +135,12 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
                     <div class="doc-book-label">เล่มเอกสาร DS / DSN</div>
                 <select name="document_book_id" id="single-book" class="form-select" style="width:auto" title="เล่มเอกสารขายเชื่อ">
                     @foreach($creditSaleBooks as $book)
-                        <option value="{{ $book->id }}" @selected($book->is_default)>{{ $book->code }} - {{ $book->no_vat ? 'เล่มไม่คำนวณ VAT' : 'คำนวณ VAT ตามสินค้า' }} ({{ number_format($book->documents_count) }} ใบ)</option>
+                        <option value="{{ $book->id }}" @selected(old('document_book_id', $creditSaleBooks->first()->id) == $book->id)>{{ $book->code }} - {{ $book->no_vat ? 'เล่มไม่คำนวณ VAT' : 'คำนวณ VAT ตามสินค้า' }} ({{ number_format($book->documents_count) }} ใบ)</option>
                     @endforeach
                 </select>
                 </div>
                 <label class="form-check small text-start align-self-start mb-1">
-                    <input class="form-check-input" type="checkbox" name="split" value="1" id="split-booking">
+                    <input class="form-check-input" type="checkbox" name="split" value="1" id="split-booking" @checked(old('split'))>
                     <span class="form-check-label fw-semibold">แยก DS / DSN ตามรายการสินค้า</span>
                 </label>
                 <div id="split-booking-items" class="split-booking-items w-100" hidden>
@@ -159,7 +161,7 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
                                     <td>
                                         <select name="item_book_ids[{{ $item->id }}]" class="form-select form-select-sm split-book-select" disabled required>
                                             @foreach($creditSaleBooks as $book)
-                                                <option value="{{ $book->id }}" @selected($matchingBook && $matchingBook->id === $book->id)>{{ $book->code }} · {{ $book->no_vat ? 'ไม่คิด VAT' : 'คิด VAT ตามสินค้า' }}</option>
+                                                <option value="{{ $book->id }}" @selected(old('item_book_ids.'.$item->id, $matchingBook?->id) == $book->id)>{{ $book->code }} · {{ $book->no_vat ? 'ไม่คิด VAT' : 'คิด VAT ตามสินค้า' }}</option>
                                             @endforeach
                                         </select>
                                     </td>
@@ -169,6 +171,23 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
                         </table>
                     </div>
                 </div>
+                @if($tradeAgreements->isNotEmpty())
+                <details class="w-100 border rounded p-2">
+                    <summary>ข้อตกลงภาษีของลูกค้าแยกตามเล่ม</summary>
+                    @foreach($creditSaleBooks as $book)
+                        @php($options = $tradeAgreements->filter(fn ($agreement) => $agreement->fitsSaleBook($book)))
+                        @if($options->isNotEmpty())
+                        <label class="form-label small mt-2" for="trade-agreement-{{ $book->id }}">{{ $book->code }}</label>
+                        <select id="trade-agreement-{{ $book->id }}" name="agreement_ids[{{ $book->id }}]" class="form-select form-select-sm">
+                            <option value="">อัตโนมัติ · {{ $options->first()->name }}</option>
+                            @foreach($options as $agreement)
+                                <option value="{{ $agreement->id }}" @selected(old('agreement_ids.'.$book->id) == $agreement->id)>{{ $agreement->name }} · {{ \App\Models\TradeAgreement::VAT_MODES[$agreement->vat_mode] }}</option>
+                            @endforeach
+                        </select>
+                        @endif
+                    @endforeach
+                </details>
+                @endif
                 @endif
                 <button type="submit" class="btn btn-success px-4">
                     <i class="bi bi-eye me-1"></i> ดูตัวอย่างใบขาย
@@ -310,11 +329,13 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
     const items = document.getElementById('split-booking-items');
     const singleBook = document.getElementById('single-book');
     if (!toggle || !items) return;
-    toggle.addEventListener('change', () => {
+    const syncSplit = () => {
         items.hidden = !toggle.checked;
         if (singleBook) singleBook.disabled = toggle.checked;
         items.querySelectorAll('.split-book-select').forEach(select => select.disabled = !toggle.checked);
-    });
+    };
+    toggle.addEventListener('change', syncSplit);
+    syncSplit();
 })();
 </script>
 @endpush

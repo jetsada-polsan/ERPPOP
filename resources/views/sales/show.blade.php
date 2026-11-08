@@ -50,10 +50,13 @@ $isPartial = $openItem && $openItem->status === 'partial';
             <div class="fw-semibold mt-1">{{ $sale->customer->name_th }}
                 <span class="text-muted fw-normal">({{ $sale->customer->code }})</span>
             </div>
+            @if($tax = $sale->trade_tax)
+                <div class="text-muted small">{{ $tax['agreement_name'] ?? 'ใช้ค่าเล่มเอกสาร' }} · {{ \App\Models\TradeAgreement::VAT_MODES[$tax['vat_mode']] }} · VAT {{ number_format((float) $tax['vat_amount'], 2) }} บาท</div>
+            @endif
         </div>
         <div class="d-flex gap-2 flex-wrap">
             <a href="{{ route('documents.tax-invoice', $sale) }}" target="_blank" class="btn btn-primary px-3">
-                <i class="bi bi-receipt me-1"></i> ใบกำกับภาษี (A4)
+                <i class="bi bi-receipt me-1"></i> {{ ($sale->trade_tax['vat_mode'] ?? null) === 'none' || $sale->documentBook?->no_vat ? 'ใบแจ้งหนี้ / ใบส่งของ (A4)' : 'ใบกำกับภาษี (A4)' }}
             </a>
             <a href="{{ route('documents.delivery-note', $sale) }}" target="_blank" class="btn btn-light border px-3">
                 <i class="bi bi-truck me-1"></i> ใบส่งของ (A5)

@@ -328,15 +328,17 @@ class BookingController extends Controller
         $creditSaleBooks = DocumentBook::withCount('documents')
             ->whereHas('documentType', fn ($q) => $q->where('code', 'CREDIT_SALE'))
             ->where('is_active', true)->orderByDesc('is_default')->orderBy('id')->get();
+        $saleDate = $booking->delivered_at?->toDateString() ?? now()->toDateString();
+        $tradeAgreements = $booking->document->customer?->tradeAgreements()->effectiveOn($saleDate)->get() ?? collect();
         $transportJob = TransportJob::where('booking_id', $booking->id)->first();
 
         $convertPreview = $request->session()->get($this->conversionPreviewKey($booking));
-        if ($convertPreview && ($convertPreview['expires_at'] ?? 0) < time()) {
+        if ($convertPreview && (! isset($convertPreview['fingerprint']) || $convertPreview['expires_at'] < time())) {
             $request->session()->forget($this->conversionPreviewKey($booking));
             $convertPreview = null;
         }
 
-        return view('bookings.show', compact('booking', 'creditSaleBooks', 'transportJob', 'convertPreview'));
+        return view('bookings.show', compact('booking', 'creditSaleBooks', 'transportJob', 'convertPreview', 'tradeAgreements'));
     }
 
     public function cancel(Request $request, SaleBooking $booking, BookingService $service): RedirectResponse
@@ -358,14 +360,17 @@ class BookingController extends Controller
             'document_book_id' => ['nullable', 'integer'],
             'item_book_ids' => ['required_if:split,1', 'array', 'min:1'],
             'item_book_ids.*' => ['required_if:split,1', 'integer'],
+            'agreement_ids' => ['nullable', 'array'],
+            'agreement_ids.*' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $items = $booking->document()->with('stockDocument.items')->firstOrFail()->stockDocument?->items ?? collect();
         $assignments = $request->boolean('split')
             ? $data['item_book_ids']
             : $items->mapWithKeys(fn ($item) => [$item->id => $data['document_book_id'] ?? 0])->all();
+        $agreementIds = $data['agreement_ids'] ?? [];
         try {
-            $summary = $service->previewBookingToCreditSales($booking, $assignments);
+            $summary = $service->previewBookingToCreditSales($booking, $assignments, $agreementIds);
         } catch (RuntimeException $e) {
             return redirect()->route('bookings.show', $booking)->with('error', $e->getMessage());
         }
@@ -375,14 +380,13 @@ class BookingController extends Controller
             $groups[] = [
                 'book_id' => $group['book']->exists ? $group['book']->id : null,
                 'book_code' => $group['book']->code,
-                'no_vat' => $group['book']->no_vat,
+                'tax' => $group['tax'],
                 'total' => $group['total'],
                 'items' => $group['items']->map(fn ($item) => [
                     'sku' => $item->product->sku_code,
                     'name' => $item->product->name_th,
                     'qty' => $item->qty,
-                    'unit_price' => $item->unit_price,
-                    'total' => \App\Support\DecimalMath::multiply($item->qty, $item->unit_price),
+                    'total' => $group['lines'][$item->id]['gross'],
                     'is_vat' => (bool) $item->product->is_vat,
                 ])->values()->all(),
             ];
@@ -391,6 +395,8 @@ class BookingController extends Controller
             'token' => Str::random(48),
             'expires_at' => time() + 600,
             'assignments' => $assignments,
+            'agreement_ids' => $agreementIds,
+            'fingerprint' => $summary['fingerprint'],
             'source_total' => $summary['source_total'],
             'target_total' => $summary['target_total'],
             'groups' => $groups,
@@ -402,22 +408,26 @@ class BookingController extends Controller
 
     public function cancelConvertPreview(Request $request, SaleBooking $booking): RedirectResponse
     {
-        $request->session()->forget($this->conversionPreviewKey($booking));
-
-        return redirect()->route('bookings.show', $booking);
+        $preview = $request->session()->pull($this->conversionPreviewKey($booking));
+        return redirect()->route('bookings.show', $booking)->withInput([
+            'split' => count(array_unique($preview['assignments'] ?? [])) > 1,
+            'document_book_id' => collect($preview['assignments'] ?? [])->first(),
+            'item_book_ids' => $preview['assignments'] ?? [],
+            'agreement_ids' => $preview['agreement_ids'] ?? [],
+        ]);
     }
 
     public function convert(Request $request, SaleBooking $booking, CreditSaleService $service): RedirectResponse
     {
         $data = $request->validate(['preview_token' => ['required', 'string']]);
         $preview = $request->session()->get($this->conversionPreviewKey($booking));
-        if (! $preview || ($preview['expires_at'] ?? 0) < time() || ! hash_equals($preview['token'], $data['preview_token'])) {
+        if (! isset($preview['fingerprint']) || ($preview['expires_at'] ?? 0) < time() || ! hash_equals($preview['token'], $data['preview_token'])) {
             $request->session()->forget($this->conversionPreviewKey($booking));
             return redirect()->route('bookings.show', $booking)->with('error', 'ตัวอย่างหมดอายุหรือไม่ตรง กรุณาตรวจสอบรายการและดูตัวอย่างใหม่');
         }
 
         try {
-            $sales = $service->splitBookingToCreditSales($booking, $preview['assignments']);
+            $sales = $service->splitBookingToCreditSales($booking, $preview['assignments'], $preview['agreement_ids'], $preview['fingerprint']);
         } catch (RuntimeException $e) {
             return redirect()->route('bookings.show', $booking)->with('error', $e->getMessage());
         }

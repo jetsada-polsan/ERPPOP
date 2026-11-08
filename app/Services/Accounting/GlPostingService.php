@@ -160,13 +160,21 @@ class GlPostingService
         $isSaleReturn = $document->documentType?->code === 'SALE_RETURN';
         $noVat = (bool) ($document->documentBook?->no_vat
             || ($isSaleReturn && $document->sourceDocument?->documentBook?->no_vat));
-        $rate = $noVat ? 0.0 : $this->vatRate();
+        $sourceTax = $isSaleReturn ? $document->sourceDocument?->trade_tax : null;
+        $rate = $sourceTax['vat_rate'] ?? ($noVat ? 0.0 : $this->vatRate());
+        $exempt = '0';
         $subtotal = '0';
         $vat = '0';
 
         foreach ($document->stockDocument?->items ?? [] as $item) {
             $gross = (string) DecimalMath::of(DecimalMath::multiply($item->qty, $item->unit_price))->abs();
-            if ($item->product?->is_vat && $rate > 0) {
+            $taxable = $sourceTax
+                ? ! in_array($item->product_id, $sourceTax['exempt_product_ids'], true)
+                : (bool) $item->product?->is_vat;
+            if ($sourceTax && ! $taxable) {
+                $exempt = DecimalMath::add($exempt, $gross);
+            }
+            if ($taxable && $rate > 0) {
                 $base = DecimalMath::divide(DecimalMath::multiply($gross, 100), DecimalMath::add(100, $rate), 4);
                 $lineVat = DecimalMath::subtract($gross, $base, 4);
                 $subtotal = DecimalMath::add($subtotal, $base);
@@ -181,7 +189,16 @@ class GlPostingService
         $total = DecimalMath::add($subtotal, $vat, 2);
         $subtotal = DecimalMath::round($subtotal, 2);
 
-        return ['subtotal' => $subtotal, 'vat' => DecimalMath::subtract($total, $subtotal, 2), 'total' => $total];
+        $vat = DecimalMath::subtract($total, $subtotal, 2);
+        if ($sourceTax) {
+            $document->trade_tax = array_replace($sourceTax, [
+                'taxable_base' => DecimalMath::subtract($subtotal, DecimalMath::round($exempt, 2), 2),
+                'exempt_amount' => DecimalMath::round($exempt, 2),
+                'vat_amount' => $vat,
+            ]);
+        }
+
+        return ['subtotal' => $subtotal, 'vat' => $vat, 'total' => $total];
     }
 
     private function role(string $role): ?ChartOfAccount
@@ -335,7 +352,9 @@ class GlPostingService
     {
         DB::transaction(function () use ($document) {
             $document = Document::whereKey($document->id)->lockForUpdate()->firstOrFail();
-            $amounts = $this->salesBreakdown($document);
+            $amounts = $document->trade_tax
+                ? ['subtotal' => $document->subtotal_amount, 'vat' => $document->vat_amount]
+                : $this->salesBreakdown($document);
             $total = $document->total_amount;
             $document->update(['subtotal_amount' => $amounts['subtotal'], 'vat_amount' => $amounts['vat']]);
             $this->postDocument($document, [

@@ -22,6 +22,9 @@
                     ราคาที่กรอก: {{ $purchase->prices_include_vat ? 'รวม VAT' : 'ยังไม่รวม VAT' }}
                     &middot; ภาษีซื้อ: {{ $purchase->claim_input_vat ? 'ใช้สิทธิ์ภาษีซื้อ' : 'รวมเป็นต้นทุน' }}
                 </div>
+                @if($tax = $purchase->trade_tax)
+                    <div class="text-muted small">{{ $tax['agreement_name'] }} · {{ \App\Models\TradeAgreement::VAT_MODES[$tax['vat_mode']] }} · VAT ตามใบซื้อ {{ number_format((float) $tax['vat_amount'], 2) }} บาท</div>
+                @endif
                 @if($purchase->remark)
                 <div class="text-muted small mt-1">หมายเหตุ: {{ $purchase->remark }}</div>
                 @endif

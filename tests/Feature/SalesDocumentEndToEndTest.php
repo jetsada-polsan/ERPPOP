@@ -275,10 +275,30 @@ class SalesDocumentEndToEndTest extends TestCase
         DB::table('stock_lots')->where('product_id', $vatProduct->id)->where('warehouse_location_id', $location->id)->update(['remaining_qty' => 4]);
         DB::table('stock_balances')->where('product_id', $vatProduct->id)->where('warehouse_location_id', $location->id)->update(['on_hand_qty' => 4]);
         $this->withoutMiddleware(ErpAuthorize::class)->actingAs($actor);
-        $this->get(route('bookings.show', $booking))->assertOk()->assertSee('แยก DS / DSN ตามรายการสินค้า');
-        $this->post(route('bookings.convert.preview', $booking), [
-            'split' => '1', 'item_book_ids' => [$items[0]->id => $dsn->id, $items[1]->id => $ds->id],
-        ])->assertRedirect(route('bookings.show', $booking));
+        $this->post(route('customers.trade-agreements.store', $customer), [
+            'name' => 'เงินสด', 'vat_mode' => 'standard', 'prices_include_vat' => '0',
+            'payment_terms' => 'เงินสด', 'credit_days' => '0', 'is_default' => '1', 'is_active' => '1',
+            'starts_on' => now()->subDay()->toDateString(), 'ends_on' => now()->addDay()->toDateString(),
+        ])->assertSessionHasNoErrors()->assertSessionHas('success');
+        $standard = $customer->tradeAgreements()->sole();
+        $zero = $customer->tradeAgreements()->create(['name' => 'ส่งออก', 'vat_mode' => 'zero', 'prices_include_vat' => false]);
+        $none = $customer->tradeAgreements()->create(['name' => 'N-เงินสด', 'vat_mode' => 'none', 'prices_include_vat' => true]);
+        $this->put(route('customers.trade-agreements.update', [$customer, $none->id]), [
+            'name' => $none->name, 'vat_mode' => 'none', 'prices_include_vat' => '1', 'is_default' => '1', 'is_active' => '1',
+        ])->assertSessionHasNoErrors()->assertSessionHas('success');
+        $this->assertFalse($standard->fresh()->is_default);
+        $assignments = [$items[0]->id => $dsn->id, $items[1]->id => $ds->id];
+        $zeroPreview = $service->previewBookingToCreditSales($booking, $assignments, [$ds->id => $zero->id]);
+        $this->assertSame('0.00', collect($zeroPreview['groups'])->first(fn ($group) => $group['book']->id === $ds->id)['tax']['vat_amount']);
+        $this->get(route('bookings.show', $booking))->assertOk()->assertSee('ข้อตกลงภาษีของลูกค้าแยกตามเล่ม');
+        $request = ['split' => '1', 'item_book_ids' => $assignments, 'agreement_ids' => [$ds->id => $standard->id]];
+        $this->post(route('bookings.convert.preview', $booking), $request)->assertRedirect(route('bookings.show', $booking));
+        $stale = session('booking-conversion-preview-'.$booking->id);
+        $standard->update(['credit_days' => 1]);
+        $this->post(route('bookings.convert', $booking), ['preview_token' => $stale['token']])->assertSessionHas('error');
+        $this->assertSame(0, $booking->salesDocuments()->count());
+        $standard->update(['credit_days' => 0]);
+        $this->post(route('bookings.convert.preview', $booking), $request)->assertRedirect(route('bookings.show', $booking));
         $preview = session('booking-conversion-preview-'.$booking->id);
         $this->assertNotNull($preview);
         $this->get(route('bookings.show', $booking))->assertOk()->assertSee('ตัวอย่างใบขายก่อนยืนยัน')->assertSee('DSN-TEST')->assertSee('DS-TEST');
@@ -287,16 +307,23 @@ class SalesDocumentEndToEndTest extends TestCase
             ->assertSessionHas('success');
         $sales = $booking->salesDocuments()->get();
         $this->assertCount(2, $sales);
-        $this->assertSame(280.0, (float) $sales->sum('total_amount'));
-        $this->assertSame(280.0, (float) CustomerOpenItem::whereIn('document_id', $sales->pluck('id')->all())->sum('balance_amount'));
+        $this->assertSame(285.6, (float) $sales->sum('total_amount'));
+        $this->assertSame(285.6, (float) CustomerOpenItem::whereIn('document_id', $sales->pluck('id')->all())->sum('balance_amount'));
         $this->assertSame(8.0, (float) StockBalance::where('product_id', $product->id)->where('warehouse_location_id', $location->id)->sole()->on_hand_qty);
         $this->assertSame(0.0, (float) StockBalance::where('product_id', $product->id)->where('warehouse_location_id', $location->id)->sole()->reserved_qty);
         foreach ($sales as $sale) {
             $this->assertSame($document->id, (int) $sale->source_document_id);
             $this->assertGlBalanced($sale);
         }
-        $this->assertSame(0.0, (float) $sales->firstWhere('document_book_id', $dsn->id)->vat_amount);
-        $this->assertSame(5.23, round((float) $sales->firstWhere('document_book_id', $ds->id)->vat_amount, 2));
+        $nonVatSale = $sales->firstWhere('document_book_id', $dsn->id);
+        $vatSale = $sales->firstWhere('document_book_id', $ds->id);
+        $this->assertSame(0.0, (float) $nonVatSale->vat_amount);
+        $this->assertSame('200.00', $nonVatSale->trade_tax['exempt_amount']);
+        $this->assertSame(5.60, (float) $vatSale->vat_amount);
+        $this->assertSame('80.00', $vatSale->trade_tax['taxable_base']);
+        $this->assertSame($vatSale->doc_date->toDateString(), $vatSale->openItem->due_date->toDateString());
+        $this->get(route('documents.tax-invoice', $nonVatSale))->assertOk()->assertViewHas('vatAmount', 0)->assertSee('ใบแจ้งหนี้ / ใบส่งของ');
+        $this->get(route('documents.tax-invoice', $vatSale))->assertOk()->assertViewHas('vatAmount', 5.6);
         $this->assertSame(2, $booking->salesDocuments()->count());
         $this->assertDatabaseHas('audit_logs', ['table_name' => 'sale_bookings', 'record_id' => $booking->id, 'action' => 'booking_converted_split']);
         $openItems = CustomerOpenItem::whereIn('document_id', $sales->pluck('id')->all())->orderBy('document_id')->get();
@@ -314,6 +341,50 @@ class SalesDocumentEndToEndTest extends TestCase
         $this->assertSame(30.0, (float) $receipt->total_amount);
         $this->expectException(\RuntimeException::class);
         $service->splitBookingToCreditSales($booking, [$items[0]->id => $dsn->id, $items[1]->id => $ds->id]);
+    }
+
+    public function test_supplier_agreement_sets_purchase_tax_and_keeps_the_original_terms(): void
+    {
+        [$branch, , $product] = $this->stockedBranch('TAXAP', 4, 100);
+        $product->update(['is_vat' => true]);
+        $supplier = Supplier::where('code', 'SUPTAXAP')->sole();
+        $this->withoutMiddleware(ErpAuthorize::class)->actingAs(User::factory()->create());
+        $this->post(route('suppliers.trade-agreements.store', $supplier), [
+            'name' => 'N-เงินสด', 'vat_mode' => 'none', 'prices_include_vat' => '0', 'payment_terms' => 'เงินสด',
+            'credit_days' => '10', 'is_active' => '1', 'is_default' => '1',
+        ])->assertSessionHasNoErrors()->assertSessionHas('success');
+        $none = $supplier->tradeAgreements()->sole();
+        $zero = $supplier->tradeAgreements()->create(['name' => 'อัตราศูนย์', 'vat_mode' => 'zero', 'prices_include_vat' => false]);
+        $standard = $supplier->tradeAgreements()->create(['name' => 'VAT ปกติ', 'vat_mode' => 'standard', 'prices_include_vat' => false]);
+        $this->getJson(route('search.suppliers', ['q' => $supplier->code, 'with_trade_agreements' => 1]))
+            ->assertOk()->assertJsonPath('0.trade_agreements.0.id', $none->id);
+        $this->get(route('purchases.index'))->assertOk()->assertSee('ข้อตกลงผู้จำหน่าย');
+
+        $payload = ['branch_id' => $branch->id, 'supplier_id' => $supplier->id, 'is_credit' => '1', 'claim_input_vat' => '1',
+            'items' => [['product_id' => $product->id, 'qty' => 1, 'unit_price' => 100]]];
+        foreach ([null, $zero->id, $standard->id] as $agreementId) {
+            $this->post(route('purchases.store'), $payload + ['trade_agreement_id' => $agreementId])
+                ->assertSessionHasNoErrors()->assertSessionHas('success');
+        }
+
+        [$exemptPurchase, $zeroPurchase, $standardPurchase] = Document::where('supplier_id', $supplier->id)
+            ->whereNotNull('trade_tax')->orderBy('id')->get()->all();
+        $this->assertSame('none', $exemptPurchase->trade_tax['vat_mode']);
+        $this->assertSame('100.00', $exemptPurchase->trade_tax['exempt_amount']);
+        $this->assertFalse($exemptPurchase->claim_input_vat);
+        $this->assertSame('zero', $zeroPurchase->trade_tax['vat_mode']);
+        $this->assertSame('100.00', $zeroPurchase->trade_tax['taxable_base']);
+        $this->assertSame('0.00', $zeroPurchase->trade_tax['vat_amount']);
+        $this->assertSame(107.0, (float) $standardPurchase->total_amount);
+        $this->assertSame(7.0, (float) $standardPurchase->vat_amount);
+        $this->assertGlBalanced($standardPurchase);
+        $payable = SupplierOpenItem::where('source_document_id', $exemptPurchase->id)->sole();
+        $this->assertSame('เงินสด', $payable->payment_terms);
+        $this->assertSame(now()->addDays(10)->toDateString(), $payable->due_date->toDateString());
+        $none->update(['is_active' => false, 'name' => 'แก้ทีหลัง']);
+        $this->get(route('purchases.show', $exemptPurchase))->assertOk()->assertSee('N-เงินสด');
+        $this->post(route('purchases.store'), $payload + ['trade_agreement_id' => $none->id])->assertSessionHas('error');
+        $this->assertSame(3, Document::where('supplier_id', $supplier->id)->whereNotNull('trade_tax')->count());
     }
 
     public function test_cancelling_a_pending_booking_releases_its_reservation(): void

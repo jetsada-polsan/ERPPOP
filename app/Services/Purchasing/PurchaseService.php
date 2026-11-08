@@ -9,12 +9,15 @@ use App\Models\Product;
 use App\Models\ProductSupplier;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
+use App\Models\Supplier;
 use App\Models\SupplierLedger;
+use App\Models\TradeAgreement;
 use App\Services\Accounting\GlPostingService;
 use App\Services\Inventory\CostingService;
 use App\Services\Inventory\FifoStockService;
 use App\Services\Sales\DocumentNumberGenerator;
 use App\Support\DecimalMath;
+use App\Support\TradeTax;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -78,11 +81,26 @@ class PurchaseService
 
                 return $item;
             });
-            $vatRate = (float) (DB::table('vat_rates')
-                ->where('effective_from', '<=', now()->toDateString())
-                ->where(fn ($q) => $q->whereNull('effective_to')->orWhere('effective_to', '>=', now()->toDateString()))
-                ->orderByDesc('effective_from')->value('rate_percent') ?? 7);
-            $calculated = $items->map(function (array $item) use ($products, $pricesIncludeVat, $claimInputVat, $vatRate): array {
+            $docDate = $data['doc_date'] ?? now()->toDateString();
+            $vatRate = TradeAgreement::standardRate($docDate);
+            $tradeTax = null;
+            if (array_key_exists('trade_agreement_id', $data)) {
+                $supplier = Supplier::findOrFail($data['supplier_id']);
+                $agreements = $supplier->tradeAgreements()->effectiveOn($docDate);
+                $selectedId = $data['trade_agreement_id'];
+                $agreement = $selectedId ? $agreements->whereKey($selectedId)->first() : $agreements->first();
+                if ($selectedId && ! $agreement) {
+                    throw new RuntimeException('ข้อตกลงที่เลือกใช้ไม่ได้กับผู้จำหน่ายหรือวันที่เอกสาร');
+                }
+
+                if ($agreement) {
+                    $tradeTax = $agreement->taxSnapshot($vatRate);
+                    $pricesIncludeVat = $tradeTax['prices_include_vat'];
+                    $vatRate = $tradeTax['vat_rate'];
+                    $claimInputVat = $tradeTax['vat_mode'] === 'standard' && $claimInputVat;
+                }
+            }
+            $calculated = $items->map(function (array $item) use ($products, $pricesIncludeVat, $claimInputVat, $vatRate, $tradeTax): array {
                 $product = $products->get((int) $item['product_id']);
                 $qty = $item['qty'];
                 $enteredPrice = $item['unit_price'];
@@ -93,6 +111,8 @@ class PurchaseService
                         ? DecimalMath::subtract(DecimalMath::multiply($qty, $enteredPrice), $costAmount)
                         : DecimalMath::divide(DecimalMath::multiply($costAmount, $vatRate), 100))
                     : '0.00000000';
+                $taxable = $product->is_vat && ($tradeTax['vat_mode'] ?? 'standard') !== 'none';
+                $invoice = TradeTax::line($qty, $enteredPrice, $pricesIncludeVat, $taxable ? $vatRate : '0');
                 $invoiceAmount = $product->is_vat && ! $pricesIncludeVat
                     ? DecimalMath::divide(
                         DecimalMath::multiply(DecimalMath::multiply($qty, $enteredPrice), DecimalMath::add(100, $vatRate)),
@@ -105,6 +125,9 @@ class PurchaseService
                     '_cost_amount' => $costAmount,
                     '_vat_amount' => $vatAmount,
                     '_invoice_amount' => $invoiceAmount,
+                    '_tax_base' => $taxable ? $invoice['base'] : '0',
+                    '_invoice_vat' => $invoice['vat'],
+                    '_exempt_amount' => $taxable ? '0' : $invoiceAmount,
                 ];
             });
             $totalQty = DecimalMath::sum($calculated->pluck('qty'), DecimalMath::QUANTITY_SCALE);
@@ -114,11 +137,19 @@ class PurchaseService
                 ? DecimalMath::subtract($totalAmount, $subtotalAmount)
                 : '0.00000000';
 
+            if ($tradeTax) {
+                $tradeTax += [
+                    'taxable_base' => DecimalMath::sum($calculated->pluck('_tax_base'), 2),
+                    'exempt_amount' => DecimalMath::sum($calculated->pluck('_exempt_amount'), 2),
+                    'vat_amount' => DecimalMath::sum($calculated->pluck('_invoice_vat'), 2),
+                ];
+            }
+
             $document = Document::create([
                 'document_type_id' => $documentType->id,
                 'branch_id' => $branch->id,
-                'doc_number' => $this->numbers->next('PURCHASE', $branch->id),
-                'doc_date' => $data['doc_date'] ?? now()->toDateString(),
+                'doc_number' => $this->numbers->next('PURCHASE', $branch->id, $docDate),
+                'doc_date' => $docDate,
                 'supplier_id' => $data['supplier_id'],
                 'reference' => $data['reference'] ?? null,
                 'status' => 'active',
@@ -126,6 +157,7 @@ class PurchaseService
                 'total_amount' => $totalAmount,
                 'subtotal_amount' => $subtotalAmount,
                 'vat_amount' => $vatAmount,
+                'trade_tax' => $tradeTax,
                 'prices_include_vat' => $pricesIncludeVat,
                 'claim_input_vat' => $claimInputVat,
                 'remark' => $data['remark'] ?? null,
@@ -189,8 +221,10 @@ class PurchaseService
                 $this->openItems->openFromPurchase(
                     $document,
                     (float) $totalAmount,
-                    $data['payment_terms'] ?? null,
-                    $data['due_date'] ?? null,
+                    $data['payment_terms'] ?? $tradeTax['payment_terms'] ?? null,
+                    $data['due_date'] ?? (isset($tradeTax['credit_days'])
+                        ? Carbon::parse($docDate)->addDays($tradeTax['credit_days'])->toDateString()
+                        : null),
                 );
             }
 

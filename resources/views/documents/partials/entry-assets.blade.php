@@ -146,6 +146,16 @@ function docEntryPage(config) {
         partyQuery: config.initialPartyQuery || '',
         partyId: config.initialPartyId ? String(config.initialPartyId) : '',
         partyResults: [],
+        tradeAgreements: [],
+        tradeAgreementId: '',
+        get tradeAgreement() {
+            return this.tradeAgreements.find(agreement => String(agreement.id) === this.tradeAgreementId);
+        },
+        resetTradeAgreement() {
+            this.partyId = '';
+            this.tradeAgreements = [];
+            this.tradeAgreementId = '';
+        },
         sourceDocNumber: '',
         sourceInfo: '',
         branchId: (config.initialBranchId || config.defaultBranchId) ? String(config.initialBranchId || config.defaultBranchId) : '',
@@ -219,11 +229,16 @@ function docEntryPage(config) {
         async searchParty() {
             if (this.partyQuery.length < 1) { this.partyResults = []; this.partyId = ''; return; }
             const url = this.config.partyType === 'supplier' ? '{{ route('search.suppliers') }}' : '{{ route('search.customers') }}';
-            const response = await fetch(`${url}?q=${encodeURIComponent(this.partyQuery)}`);
-            this.partyResults = await response.json();
+            const query = this.partyQuery;
+            const tax = this.config.showPurchaseTaxMode ? '&with_trade_agreements=1' : '';
+            const response = await fetch(`${url}?q=${encodeURIComponent(query)}${tax}`);
+            const results = await response.json();
+            if (this.partyQuery === query) this.partyResults = results;
         },
         selectParty(party) {
             this.partyId = party.id;
+            this.tradeAgreements = party.trade_agreements || [];
+            this.tradeAgreementId = String(this.tradeAgreements[0]?.id || '');
             this.partyQuery = `${party.code} - ${party.name_th}`;
             if (this.config.salesUserFromParty !== false) {
                 this.salesUserId = party.sales_user_id

@@ -37,6 +37,7 @@ class PurchaseController extends Controller
         $data = $request->validate([
             'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
+            'trade_agreement_id' => ['nullable', 'integer', 'min:1'],
             'is_credit' => ['nullable', 'boolean'],
             'prices_include_vat' => ['nullable', 'boolean'],
             'claim_input_vat' => ['nullable', 'boolean'],
@@ -49,6 +50,7 @@ class PurchaseController extends Controller
             'items.*.manufacture_date' => ['nullable', 'date'],
             'items.*.expiry_date' => ['nullable', 'date'],
         ]);
+        $data['trade_agreement_id'] ??= null;
         $data['is_credit'] = $request->boolean('is_credit', true);
         $data['prices_include_vat'] = $request->boolean('prices_include_vat', true);
         $data['claim_input_vat'] = $request->boolean('claim_input_vat');

@@ -57,15 +57,14 @@ class DeliveryNoteController extends Controller
         abort_unless(in_array($document->documentType->code, ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN'], true), 404, 'ออกใบกำกับภาษีได้เฉพาะใบขายสด/ขายเชื่อ/รับคืน');
         abort_unless($document->stockDocument !== null, 404, 'เอกสารนี้ไม่มีรายการสินค้า');
 
-        // ราคาในระบบรวม VAT: ถอดฐานภาษีออกจากยอดรวม
-        $vatRate = (float) (\Illuminate\Support\Facades\DB::table('vat_rates')
-            ->where('effective_from', '<=', $document->doc_date->toDateString())
-            ->where(fn ($w) => $w->whereNull('effective_to')->orWhere('effective_to', '>=', $document->doc_date->toDateString()))
-            ->orderByDesc('effective_from')
-            ->value('rate_percent') ?? 7.0);
-
+        $tax = $document->trade_tax;
+        $noVat = $tax ? $tax['vat_mode'] === 'none' : (bool) ($document->documentBook?->no_vat
+            || ($document->documentType->code === 'SALE_RETURN' && $document->sourceDocument?->documentBook?->no_vat));
+        $vatRate = $noVat ? 0 : (float) ($tax['vat_rate'] ?? \App\Models\TradeAgreement::standardRate($document->doc_date->toDateString()));
         $total = (float) $document->total_amount;
-        $base = round($total * 100 / (100 + $vatRate), 2);
+        $base = (float) ($tax['taxable_base'] ?? ($noVat ? 0 : $document->subtotal_amount ?? round($total * 100 / (100 + $vatRate), 2)));
+        $exempt = (float) ($tax['exempt_amount'] ?? ($noVat ? $total : 0));
+        $vat = $noVat ? 0 : (float) ($document->subtotal_amount !== null ? $document->vat_amount : round($total - $base - $exempt, 2));
 
         // เครดิต/ครบกำหนด (ขายเชื่อ)
         $openItem = \App\Models\CustomerOpenItem::where('document_id', $document->id)->first();
@@ -74,15 +73,16 @@ class DeliveryNoteController extends Controller
             'document' => $document,
             'vatRate' => $vatRate,
             'baseAmount' => $base,
-            'vatAmount' => round($total - $base, 2),
+            'vatAmount' => $vat,
+            'exemptAmount' => $exempt,
             'total' => $total,
             'totalText' => \App\Support\ThaiBaht::text($total),
             'dueDate' => $openItem?->due_date,
             'isCopy' => request()->boolean('copy'),
             'isCredit' => $document->documentType->code === 'CREDIT_SALE',
-            'docTitle' => $document->documentType->code === 'SALE_RETURN' ? 'ใบรับคืนสินค้า / ใบลดหนี้' : 'ใบกำกับภาษี',
+            'docTitle' => $document->documentType->code === 'SALE_RETURN' ? 'ใบรับคืนสินค้า / ใบลดหนี้' : ($noVat ? 'ใบแจ้งหนี้ / ใบส่งของ' : 'ใบกำกับภาษี'),
             'docSub' => match ($document->documentType->code) {
-                'CREDIT_SALE' => 'ใบส่งของ / ใบแจ้งหนี้',
+                'CREDIT_SALE' => $noVat ? '' : 'ใบส่งของ / ใบแจ้งหนี้',
                 'SALE_RETURN' => 'อ้างอิงใบกำกับภาษีเดิม',
                 default => 'ใบเสร็จรับเงิน',
             },

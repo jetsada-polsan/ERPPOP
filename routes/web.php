@@ -512,6 +512,8 @@ Route::prefix('customers')->name('customers.')->group(function () {
     Route::post('/', [CustomerController::class, 'store'])->name('store');
     Route::get('/{customer}', [CustomerController::class, 'show'])->name('show');
     Route::put('/{customer}', [CustomerController::class, 'update'])->name('update');
+    Route::post('/{customer}/trade-agreements', [\App\Http\Controllers\TradeAgreementController::class, 'customer'])->name('trade-agreements.store');
+    Route::put('/{customer}/trade-agreements/{agreement}', [\App\Http\Controllers\TradeAgreementController::class, 'customer'])->whereNumber('agreement')->name('trade-agreements.update');
     Route::post('/{customer}/addresses', [CustomerController::class, 'addAddress'])->name('addresses.store');
     Route::post('/{customer}/contacts', [CustomerController::class, 'addContact'])->name('contacts.store');
     Route::post('/{customer}/payments', [PaymentController::class, 'storeCustomerPayment'])->name('payments.store');
@@ -527,6 +529,8 @@ Route::prefix('suppliers')->name('suppliers.')->group(function () {
     Route::post('/', [SupplierController::class, 'store'])->name('store');
     Route::get('/{supplier}', [SupplierController::class, 'show'])->name('show');
     Route::put('/{supplier}', [SupplierController::class, 'update'])->name('update');
+    Route::post('/{supplier}/trade-agreements', [\App\Http\Controllers\TradeAgreementController::class, 'supplier'])->name('trade-agreements.store');
+    Route::put('/{supplier}/trade-agreements/{agreement}', [\App\Http\Controllers\TradeAgreementController::class, 'supplier'])->whereNumber('agreement')->name('trade-agreements.update');
     Route::post('/{supplier}/addresses', [SupplierController::class, 'addAddress'])->name('addresses.store');
     Route::post('/{supplier}/payments', [PaymentController::class, 'storeSupplierPayment'])->name('payments.store');
 });

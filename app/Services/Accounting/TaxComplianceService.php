@@ -88,18 +88,22 @@ class TaxComplianceService
                 ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')->leftJoin('branches as b', 'b.id', '=', 'd.branch_id')
                 ->whereBetween('d.doc_date', [$from, $to])->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN', 'CREDIT_NOTE', 'DEBIT_NOTE'])
                 ->where('d.status', 'active')->when($branchId, fn ($q) => $q->where('d.branch_id', $branchId))
-                ->get(['d.doc_date', 'd.doc_number', 'dt.code as type_code', 'b.code as branch_code', 'c.name_th as party_name', 'c.tax_id', 'd.subtotal_amount', 'd.vat_amount'])
+                ->get(['d.doc_date', 'd.doc_number', 'dt.code as type_code', 'b.code as branch_code', 'c.name_th as party_name', 'c.tax_id', 'd.subtotal_amount', 'd.vat_amount', 'd.trade_tax'])
                 ->map(function ($r) {
                     $sign = in_array($r->type_code, ['SALE_RETURN', 'CREDIT_NOTE'], true) ? -1 : 1;
 
-                    return ['category' => 'OUTPUT', 'date' => $r->doc_date, 'document_no' => $r->doc_number, 'branch' => $r->branch_code, 'party' => $r->party_name, 'tax_id' => $r->tax_id, 'taxable_amount' => DecimalMath::multiply($sign, $r->subtotal_amount, 2), 'tax_amount' => DecimalMath::multiply($sign, $r->vat_amount, 2)];
+                    $tax = json_decode($r->trade_tax ?? 'null', true);
+                    return ['category' => 'OUTPUT', 'date' => $r->doc_date, 'document_no' => $r->doc_number, 'branch' => $r->branch_code, 'party' => $r->party_name, 'tax_id' => $r->tax_id, 'taxable_amount' => DecimalMath::multiply($sign, $tax['taxable_base'] ?? $r->subtotal_amount, 2), 'tax_amount' => DecimalMath::multiply($sign, $r->vat_amount, 2)];
                 });
             $purchases = DB::table('documents as d')->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
                 ->leftJoin('suppliers as s', 's.id', '=', 'd.supplier_id')->leftJoin('branches as b', 'b.id', '=', 'd.branch_id')
                 ->whereBetween('d.doc_date', [$from, $to])->where('dt.code', 'PURCHASE')->where('d.claim_input_vat', true)
                 ->where('d.status', 'active')->when($branchId, fn ($q) => $q->where('d.branch_id', $branchId))
-                ->get(['d.doc_date', 'd.doc_number', 'b.code as branch_code', 's.name_th as party_name', 's.tax_id', 'd.subtotal_amount', 'd.vat_amount'])
-                ->map(fn ($r) => ['category' => 'INPUT', 'date' => $r->doc_date, 'document_no' => $r->doc_number, 'branch' => $r->branch_code, 'party' => $r->party_name, 'tax_id' => $r->tax_id, 'taxable_amount' => DecimalMath::subtract(0, $r->subtotal_amount, 2), 'tax_amount' => DecimalMath::subtract(0, $r->vat_amount, 2)]);
+                ->get(['d.doc_date', 'd.doc_number', 'b.code as branch_code', 's.name_th as party_name', 's.tax_id', 'd.subtotal_amount', 'd.vat_amount', 'd.trade_tax'])
+                ->map(function ($r) {
+                    $tax = json_decode($r->trade_tax ?? 'null', true);
+                    return ['category' => 'INPUT', 'date' => $r->doc_date, 'document_no' => $r->doc_number, 'branch' => $r->branch_code, 'party' => $r->party_name, 'tax_id' => $r->tax_id, 'taxable_amount' => DecimalMath::subtract(0, $tax['taxable_base'] ?? $r->subtotal_amount, 2), 'tax_amount' => DecimalMath::subtract(0, $r->vat_amount, 2)];
+                });
             $expenses = DB::table('branch_expenses as e')->join('documents as ed', 'ed.id', '=', 'e.document_id')
                 ->where('ed.status', 'active')->leftJoin('branches as b', 'b.id', '=', 'e.branch_id')
                 ->whereBetween('e.expense_date', [$from, $to])->where('e.vat_amount', '>', 0)

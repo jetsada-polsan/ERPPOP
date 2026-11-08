@@ -5,7 +5,7 @@
 @section('page-subtitle', 'คีย์รับสินค้าเข้า ใช้เฉพาะข้อมูลจำเป็นก่อนต่อบัญชีเต็มระบบ')
 
 @section('content')
-<div x-data="docEntryPage({ partyType: 'supplier', partyLabel: 'ซัพพลายเออร์', partyRequired: true })" x-cloak>
+<div x-data="docEntryPage({ partyType: 'supplier', partyLabel: 'ซัพพลายเออร์', partyRequired: true, showPurchaseTaxMode: true })" x-cloak>
     <div class="doc-shell">
         <div class="doc-tabs">
             <a href="{{ route('bookings.index') }}" class="doc-tab">ใบจอง / ขายเชื่อ</a>

@@ -10,6 +10,8 @@
             <i class="bi bi-arrow-left me-1"></i> กลับไปรายการซัพพลายเออร์
         </a>
 
+        <a href="#trade-agreements" class="btn btn-light border mb-3 ms-2">ข้อตกลงซื้อขาย</a>
+
         <div class="content-card p-4 mb-4">
             <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
                 <div>
@@ -204,6 +206,7 @@
             </div>
         </div>
     </div>
+    @include('trade-agreements.panel', ['party' => $supplier, 'routePrefix' => 'suppliers'])
 @endsection
 
 @push('head')

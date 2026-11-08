@@ -13,6 +13,11 @@ class Customer extends Model
 {
     use SoftDeletes;
 
+    public function tradeAgreements(): HasMany
+    {
+        return $this->hasMany(TradeAgreement::class);
+    }
+
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);

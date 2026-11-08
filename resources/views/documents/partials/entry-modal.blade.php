@@ -61,14 +61,15 @@
                             @if($showPurchaseTaxMode)
                                 <div class="doc-field" style="grid-column: span 4;">
                                     <label>ราคาซื้อที่กรอก</label>
-                                    <select name="prices_include_vat" class="doc-select">
+                                    <input type="text" class="doc-input" x-show="tradeAgreement" readonly :value="tradeAgreement?.prices_include_vat ? 'รวม VAT แล้ว' : 'ยังไม่รวม VAT'">
+                                    <select name="prices_include_vat" class="doc-select" x-show="!tradeAgreement" :disabled="!!tradeAgreement">
                                         <option value="1">รวม VAT แล้ว</option>
                                         <option value="0">ยังไม่รวม VAT</option>
                                     </select>
                                 </div>
                                 <div class="doc-field" style="grid-column: span 4;">
                                     <label>สิทธิ์ภาษีซื้อ</label>
-                                    <select name="claim_input_vat" class="doc-select" required>
+                                    <select name="claim_input_vat" class="doc-select" :disabled="tradeAgreement && tradeAgreement.vat_mode !== 'standard'" :required="!tradeAgreement || tradeAgreement.vat_mode === 'standard'">
                                         <option value="" selected disabled>เลือกตามเอกสารที่ได้รับ</option>
                                         <option value="1">มีใบกำกับภาษี ใช้ภาษีซื้อ</option>
                                         <option value="0">ไม่มีสิทธิ์ขอคืน รวม VAT เป็นต้นทุน</option>
@@ -111,7 +112,7 @@
                             @if($showParty)
                                 <div class="doc-field" style="grid-column: span {{ $showCreditType || $showSalesman ? 5 : 8 }};">
                                     <label>@if($partyRequired)<span class="required">*</span>@endif {{ $partyLabel }}</label>
-                                    <input type="text" x-model="partyQuery" @input.debounce.250ms="searchParty()"
+                                    <input type="text" x-model="partyQuery" @if($showPurchaseTaxMode) @input="resetTradeAgreement()" @endif @input.debounce.250ms="searchParty()"
                                            placeholder="ค้นหารหัส / ชื่อ{{ $partyLabel }}" class="doc-input" autocomplete="off">
                                     <input type="hidden" name="{{ $partyType === 'supplier' ? 'supplier_id' : 'customer_id' }}" x-model="partyId" @if($partyRequired) required @endif>
                                     <div class="doc-typeahead" x-show="partyResults.length" x-transition>
@@ -122,6 +123,18 @@
                                             </button>
                                         </template>
                                     </div>
+                                </div>
+                            @endif
+
+                            @if($showPurchaseTaxMode)
+                                <div class="doc-field" style="grid-column: span 4;" x-show="tradeAgreements.length">
+                                    <label for="purchase-agreement">ข้อตกลงผู้จำหน่าย</label>
+                                    <select id="purchase-agreement" name="trade_agreement_id" class="doc-select" x-model="tradeAgreementId">
+                                        <template x-for="agreement in tradeAgreements" :key="agreement.id">
+                                            <option :value="String(agreement.id)" x-text="agreement.name + ' · ' + ({standard: 'อัตราทั่วไป', zero: 'อัตราศูนย์', none: 'ไม่มี VAT'})[agreement.vat_mode]"></option>
+                                        </template>
+                                    </select>
+                                    <small class="text-muted" x-show="tradeAgreement?.credit_days != null" x-text="'เครดิต ' + tradeAgreement?.credit_days + ' วัน'"></small>
                                 </div>
                             @endif
 

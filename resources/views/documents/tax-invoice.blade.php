@@ -147,6 +147,9 @@
             <div class="baht-text">({{ $totalText }})</div>
             <div class="sum">
                 <div class="sum-row"><span>ราคาไม่รวมภาษีมูลค่าเพิ่ม</span><span>{{ number_format($baseAmount, 2) }} บาท</span></div>
+                @if($exemptAmount > 0)
+                    <div class="sum-row"><span>ยอดไม่มี VAT</span><span>{{ number_format($exemptAmount, 2) }} บาท</span></div>
+                @endif
                 <div class="sum-row"><span>ภาษีมูลค่าเพิ่ม {{ rtrim(rtrim(number_format($vatRate, 2), '0'), '.') }}%</span><span>{{ number_format($vatAmount, 2) }} บาท</span></div>
                 <div class="sum-row grand"><span>จำนวนเงินรวมทั้งสิ้น</span><span>{{ number_format($total, 2) }} บาท</span></div>
             </div>

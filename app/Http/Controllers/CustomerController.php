@@ -237,7 +237,7 @@ class CustomerController extends Controller
         return SalesArea::where('area_type', 'route')->where('is_active', true)->orderBy('code')->get();
     }
 
-    private function assertCustomerVisible(User $user, Customer $customer): void
+    public function assertCustomerVisible(User $user, Customer $customer): void
     {
         if ($user->branch_id && ! $user->hasPermission('reports.all_branches')
             && $customer->branch_id !== $user->branch_id

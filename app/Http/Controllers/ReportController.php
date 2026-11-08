@@ -310,6 +310,7 @@ class ReportController extends Controller
                 ['label' => 'ชื่อผู้ซื้อ', 'key' => 'party_name'],
                 ['label' => 'เลขผู้เสียภาษี', 'key' => 'tax_id'],
                 ['label' => 'มูลค่าฐานภาษี', 'key' => 'base_amount', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'ยอดไม่มี VAT', 'key' => 'exempt_amount', 'type' => 'money', 'class' => 'text-end'],
                 ['label' => 'ภาษีมูลค่าเพิ่ม', 'key' => 'vat_amount', 'type' => 'money', 'class' => 'text-end'],
                 ['label' => 'รวม', 'key' => 'total_amount', 'type' => 'money', 'class' => 'text-end'],
             ], $this->vatSales($fromStart, $toEnd, $filters)),
@@ -320,6 +321,7 @@ class ReportController extends Controller
                 ['label' => 'ชื่อผู้ขาย', 'key' => 'party_name'],
                 ['label' => 'เลขผู้เสียภาษี', 'key' => 'tax_id'],
                 ['label' => 'มูลค่าฐานภาษี', 'key' => 'base_amount', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'ยอดไม่มี VAT', 'key' => 'exempt_amount', 'type' => 'money', 'class' => 'text-end'],
                 ['label' => 'ภาษีมูลค่าเพิ่ม', 'key' => 'vat_amount', 'type' => 'money', 'class' => 'text-end'],
                 ['label' => 'รวม', 'key' => 'total_amount', 'type' => 'money', 'class' => 'text-end'],
             ], $this->vatPurchase($fromStart, $toEnd, $filters)),
@@ -1242,6 +1244,9 @@ class ReportController extends Controller
         $docQuery = DB::table('documents as d')
             ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
             ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')
+            ->leftJoin('document_books as book', 'book.id', '=', 'd.document_book_id')
+            ->leftJoin('documents as source', 'source.id', '=', 'd.source_document_id')
+            ->leftJoin('document_books as source_book', 'source_book.id', '=', 'source.document_book_id')
             ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN'])
             ->where('d.status', 'active')
             ->whereNull('d.cancelled_at')
@@ -1252,11 +1257,16 @@ class ReportController extends Controller
 
         $docRows = $docQuery->selectRaw(
             "d.doc_date, d.doc_number, dt.code as doc_code,
-             COALESCE(c.name_th, 'ลูกค้าทั่วไป') as party_name, c.tax_id, d.total_amount"
+             COALESCE(c.name_th, 'ลูกค้าทั่วไป') as party_name, c.tax_id, d.total_amount, d.subtotal_amount, d.vat_amount, d.trade_tax,
+             book.no_vat, source_book.no_vat as source_no_vat"
         )->get()->map(function ($r) use ($rate) {
             $sign = $r->doc_code === 'SALE_RETURN' ? -1 : 1;
             $total = $sign * (float) $r->total_amount;
-            $base = round($total * 100 / (100 + $rate), 2);
+            $tax = json_decode($r->trade_tax ?? 'null', true);
+            $noVat = $r->no_vat || ($sign < 0 && $r->source_no_vat);
+            $base = $sign * (float) ($tax['taxable_base'] ?? ($noVat ? 0 : $r->subtotal_amount ?? round(abs($total) * 100 / (100 + $rate), 2)));
+            $exempt = $sign * (float) ($tax['exempt_amount'] ?? ($noVat ? abs($total) : 0));
+            $vat = $noVat ? 0 : ($r->subtotal_amount !== null ? $sign * (float) $r->vat_amount : round($total - $base - $exempt, 2));
 
             return [
                 'doc_date' => \Illuminate\Support\Carbon::parse($r->doc_date)->thaiDate(),
@@ -1265,7 +1275,8 @@ class ReportController extends Controller
                 'party_name' => $r->party_name.($sign < 0 ? ' (รับคืน/ลดหนี้)' : ''),
                 'tax_id' => $r->tax_id ?? '-',
                 'base_amount' => $base,
-                'vat_amount' => round($total - $base, 2),
+                'vat_amount' => $vat,
+                'exempt_amount' => $exempt,
                 'total_amount' => $total,
             ];
         });
@@ -1292,6 +1303,7 @@ class ReportController extends Controller
                     'tax_id' => '-',
                     'base_amount' => round($total - $vat, 2),
                     'vat_amount' => $vat,
+                    'exempt_amount' => 0,
                     'total_amount' => $total,
                 ];
             });
@@ -1314,10 +1326,11 @@ class ReportController extends Controller
         $this->applySearch($query, $filters, ['d.doc_number', 's.name_th']);
 
         $rows = $query->selectRaw(
-            "d.doc_date, d.doc_number, COALESCE(s.name_th, '-') as party_name, s.tax_id, d.total_amount"
+            "d.doc_date, d.doc_number, COALESCE(s.name_th, '-') as party_name, s.tax_id, d.total_amount, d.trade_tax"
         )->get()->map(function ($r) use ($rate) {
             $total = (float) $r->total_amount;
-            $base = round($total * 100 / (100 + $rate), 2);
+            $tax = json_decode($r->trade_tax ?? 'null', true);
+            $base = (float) ($tax['taxable_base'] ?? round($total * 100 / (100 + $rate), 2));
 
             return [
                 'doc_date' => \Illuminate\Support\Carbon::parse($r->doc_date)->thaiDate(),
@@ -1326,7 +1339,8 @@ class ReportController extends Controller
                 'party_name' => $r->party_name,
                 'tax_id' => $r->tax_id ?? '-',
                 'base_amount' => $base,
-                'vat_amount' => round($total - $base, 2),
+                'vat_amount' => (float) ($tax['vat_amount'] ?? round($total - $base, 2)),
+                'exempt_amount' => (float) ($tax['exempt_amount'] ?? 0),
                 'total_amount' => $total,
             ];
         });
@@ -1351,6 +1365,7 @@ class ReportController extends Controller
                 'tax_id' => '',
                 'base_amount' => round($rows->sum('base_amount'), 2),
                 'vat_amount' => round($rows->sum('vat_amount'), 2),
+                'exempt_amount' => round($rows->sum('exempt_amount'), 2),
                 'total_amount' => round($rows->sum('total_amount'), 2),
             ]);
         }

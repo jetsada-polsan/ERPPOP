@@ -14,12 +14,14 @@ use App\Models\SaleBooking;
 use App\Models\StockBalance;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
+use App\Models\TradeAgreement;
 use App\Services\Accounting\AccountingPeriodGuard;
 use App\Services\Accounting\GlPostingService;
 use App\Services\Inventory\CostingService;
 use App\Services\Inventory\FifoStockService;
 use App\Services\Inventory\NegativeStockPolicyService;
 use App\Support\DecimalMath;
+use App\Support\TradeTax;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -37,7 +39,7 @@ class CreditSaleService
     private const DEFAULT_CREDIT_DAYS = 30;
 
     /** Validate and summarize an explicit per-line credit-sale allocation without writing data. */
-    public function previewBookingToCreditSales(SaleBooking $booking, array $assignments): array
+    public function previewBookingToCreditSales(SaleBooking $booking, array $assignments, array $agreementIds = []): array
     {
         if ($booking->status !== SaleBooking::STATUS_PENDING) {
             throw new RuntimeException('ใบจองนี้ถูกใช้ไปแล้ว');
@@ -60,12 +62,53 @@ class CreditSaleService
         }
 
         $sourceTotal = DecimalMath::sum($items->map(fn ($item) => DecimalMath::multiply($item->qty, $item->unit_price)));
-        $targetTotal = DecimalMath::sum(collect($plan)->pluck('total'));
-        if (DecimalMath::compare($sourceTotal, $targetTotal) !== 0) {
-            throw new RuntimeException('ยอดรวมใบขายไม่ตรงกับใบจอง กรุณาตรวจสอบรายการก่อนยืนยัน');
-        }
+        $saleDate = $booking->delivered_at?->toDateString() ?? now()->toDateString();
+        $agreements = $source->customer?->tradeAgreements()->effectiveOn($saleDate)->get() ?? collect();
+        $rate = TradeAgreement::standardRate($saleDate);
 
-        return ['source_total' => $sourceTotal, 'target_total' => $targetTotal, 'groups' => $plan];
+        foreach ($plan as &$group) {
+            $book = $group['book'];
+            $compatible = $agreements->filter(fn (TradeAgreement $agreement) => $agreement->fitsSaleBook($book));
+            $selectedId = $agreementIds[$book->id] ?? null;
+            $agreement = $selectedId ? $compatible->firstWhere('id', $selectedId) : $compatible->first();
+            if ($selectedId && ! $agreement) {
+                throw new RuntimeException('ข้อตกลงที่เลือกใช้ไม่ได้กับลูกค้า วันที่ หรือเล่ม '.$book->code);
+            }
+
+            $tax = $agreement?->taxSnapshot($rate) ?? [
+                'agreement_id' => null,
+                'agreement_name' => null,
+                'vat_mode' => $book->no_vat ? 'none' : 'standard',
+                'vat_rate' => $book->no_vat ? '0' : $rate,
+                'prices_include_vat' => true,
+                'payment_terms' => null,
+                'credit_days' => null,
+            ];
+            $lines = $group['items']->mapWithKeys(function ($item) use ($tax) {
+                $taxable = $tax['vat_mode'] !== 'none' && $item->product->is_vat;
+                return [$item->id => TradeTax::line($item->qty, $item->unit_price, $tax['prices_include_vat'], $taxable ? $tax['vat_rate'] : '0')
+                    + ['taxable' => (bool) $taxable]];
+            });
+            $group['total'] = DecimalMath::sum($lines->pluck('gross'));
+            $subtotal = DecimalMath::sum($lines->pluck('base'), 2);
+            $group['tax'] = $tax + [
+                'taxable_base' => DecimalMath::subtract($subtotal, DecimalMath::sum($lines->where('taxable', false)->pluck('gross'), 2), 2),
+                'exempt_amount' => DecimalMath::sum($lines->where('taxable', false)->pluck('gross'), 2),
+                'exempt_product_ids' => $group['items']->filter(fn ($item) => ! $lines[$item->id]['taxable'])->pluck('product_id')->unique()->values()->all(),
+                'vat_amount' => DecimalMath::subtract(DecimalMath::round($group['total'], 2), $subtotal, 2),
+            ];
+            $group['subtotal'] = $subtotal;
+            $group['lines'] = $lines;
+        }
+        unset($group);
+
+        $targetTotal = DecimalMath::sum(collect($plan)->map(fn ($group) => DecimalMath::round($group['total'], 2)), 2);
+        $fingerprint = hash('sha256', serialize([$saleDate, $sourceTotal, collect($plan)->map(fn ($group) => [
+            $group['book']->id, $group['book']->code, $group['tax'], $group['lines']->all(),
+            $group['items']->map(fn ($item) => [$item->id, $item->product_id, $item->qty, $item->unit_price, $item->warehouse_location_id])->all(),
+        ])->all()]));
+
+        return ['source_total' => $sourceTotal, 'target_total' => $targetTotal, 'groups' => $plan, 'fingerprint' => $fingerprint];
     }
 
     public function __construct(
@@ -78,20 +121,22 @@ class CreditSaleService
     ) {}
 
     /** @return \Illuminate\Support\Collection<int, Document> */
-    public function splitBookingToCreditSales(SaleBooking $booking, array $assignments): \Illuminate\Support\Collection
+    public function splitBookingToCreditSales(SaleBooking $booking, array $assignments, array $agreementIds = [], ?string $expectedFingerprint = null): \Illuminate\Support\Collection
     {
-        return DB::transaction(function () use ($booking, $assignments) {
+        return DB::transaction(function () use ($booking, $assignments, $agreementIds, $expectedFingerprint) {
             $locked = SaleBooking::whereKey($booking->id)->lockForUpdate()->firstOrFail();
             if ($locked->status !== SaleBooking::STATUS_PENDING) {
                 throw new RuntimeException('ใบจองนี้ถูกใช้ไปแล้ว');
             }
-            $source = $locked->document()->with('stockDocument.items.product')->firstOrFail();
-            $items = $source->stockDocument?->items ?? collect();
-            $summary = $this->previewBookingToCreditSales($locked, $assignments);
+            $source = $locked->document()->firstOrFail();
+            $summary = $this->previewBookingToCreditSales($locked, $assignments, $agreementIds);
+            if ($expectedFingerprint !== null && ! hash_equals($expectedFingerprint, $summary['fingerprint'])) {
+                throw new RuntimeException('ข้อมูลใบจองหรือข้อตกลงเปลี่ยน กรุณากลับไปดูตัวอย่างใหม่');
+            }
             $plan = $summary['groups'];
             $sales = collect();
             foreach ($plan as $group) {
-                $sales->push($this->createSaleForItems($locked, $source, $group['items'], $group['book']));
+                $sales->push($this->createSaleForItems($locked, $source, $group));
             }
             $locked->update([
                 'status' => SaleBooking::STATUS_CONVERTED,
@@ -123,15 +168,16 @@ class CreditSaleService
         });
     }
 
-    private function createSaleForItems(SaleBooking $lockedBooking, Document $bookingDocument, \Illuminate\Support\Collection $sourceItems, DocumentBook $book): Document
+    private function createSaleForItems(SaleBooking $lockedBooking, Document $bookingDocument, array $group): Document
     {
         $documentType = DocumentType::where('code', DocumentType::CREDIT_SALE)->firstOrFail();
         $saleDate = $lockedBooking->delivered_at?->toDateString() ?? now()->toDateString();
         $this->periods->assertOpen($saleDate, $bookingDocument->branch_id);
+        $book = $group['book'];
+        $sourceItems = $group['items'];
         $totalQty = DecimalMath::sum($sourceItems->pluck('qty'), DecimalMath::QUANTITY_SCALE);
-        $totalAmount = DecimalMath::sum(
-            $sourceItems->map(fn ($item) => DecimalMath::multiply($item->qty, $item->unit_price)),
-        );
+        $totalAmount = $group['total'];
+        $tax = $group['tax'];
 
         $saleDocument = Document::create([
             'document_type_id' => $documentType->id,
@@ -150,6 +196,9 @@ class CreditSaleService
             'status' => 'active',
             'total_items' => $sourceItems->count(),
             'total_amount' => $totalAmount,
+            'subtotal_amount' => $group['subtotal'],
+            'vat_amount' => $tax['vat_amount'],
+            'trade_tax' => $tax,
         ]);
 
         $stockDocument = StockDocument::create([
@@ -190,7 +239,8 @@ class CreditSaleService
                 'product_id' => $productId,
                 'warehouse_location_id' => $item->warehouse_location_id,
                 'qty' => $qty,
-                'unit_price' => $item->unit_price,
+                'unit_price' => $group['lines'][$item->id]['gross_unit'],
+                'vat_amount' => $group['lines'][$item->id]['vat'],
                 'unit_cost' => $unitCost,
                 'cost_amount' => DecimalMath::multiply($qty, $unitCost),
             ]);
@@ -202,10 +252,11 @@ class CreditSaleService
             'salesman_id' => $bookingDocument->salesman_id,
             'sales_user_id' => $bookingDocument->sales_user_id,
             'gross_amount' => $totalAmount,
+            'vat_amount' => $tax['vat_amount'],
             'net_amount' => $totalAmount,
             'balance_amount' => $totalAmount,
             'due_date' => Carbon::parse($saleDate)
-                ->addDays((int) (AppSetting::get('default_credit_days') ?: self::DEFAULT_CREDIT_DAYS))
+                ->addDays($tax['credit_days'] ?? (int) (AppSetting::get('default_credit_days') ?: self::DEFAULT_CREDIT_DAYS))
                 ->toDateString(),
             'status' => CustomerOpenItem::STATUS_OPEN,
         ]);
