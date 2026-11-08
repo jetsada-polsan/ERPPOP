@@ -66,7 +66,7 @@ class CashTransferScreenTest extends TestCase
     public function test_global_and_multiple_branch_users_can_choose_the_cash_branch(): void
     {
         [$user, $branch, $bank] = $this->financeUser('MULTI');
-        $other = Branch::create(['code' => 'MULTI-OTHER', 'name_th' => 'สาขาอื่น', 'is_active' => true]);
+        $other = Branch::create(['code' => 'M-OTHER', 'name_th' => 'สาขาอื่น', 'is_active' => true]);
         $role = $user->roles()->first();
         $user->branchRoles()->attach($role->id, ['branch_id' => $branch->id, 'is_active' => true]);
         $user->branchRoles()->attach($role->id, ['branch_id' => $other->id, 'is_active' => true]);
