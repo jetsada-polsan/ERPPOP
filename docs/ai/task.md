@@ -5164,11 +5164,11 @@ pending
 - งานถัดไป: Build/install UAT และให้เจ้าของกรอก PIN บนเครื่องจริงเพื่อเก็บ error เปิดกะจาก ERP หากยังไม่ผ่าน
 
 ## Handoff - 2026-11-08 (แยกใบขายเชื่อตาม VAT สินค้า)
-- Commit: รอ commit/push
+- Commit: `31b7ac4`
 - ทำอะไร: ยืนยันใบจองแล้วแยกสินค้าตาม `products.is_vat` ไป DS/DSN อัตโนมัติ สร้างใบเฉพาะกลุ่มที่มีรายการ และผูกทุกใบกลับใบจองเดียวผ่าน `sale_booking_documents`; ใบส่งของยังอิงใบจองใบเดียว
 - ทำอะไร: ตัดจอง/FIFO สต็อก เปิดลูกหนี้ และลง GL ต่อใบขายภายใน transaction เดียว; ปรับหน้าใบจองให้เปิดดูบิลทุกใบ, หน้าใบขายย้อนกลับหาใบจองได้, รายงานยอดขายตามใบจองรวมเลขที่/ยอดทุกใบ และ reset transactions ล้างตารางความสัมพันธ์
 - Migration: สร้างตารางเชื่อมและเพิ่ม DS/DSN หากยังไม่มี โดยไม่แก้เล่มที่มีอยู่; SQLite migration ผ่านในชุดทดสอบ, DDL ใช้ Schema Builder/foreign keys ที่รองรับ PostgreSQL
-- ทดสอบ: `php artisan test --filter='Quotation|SalesDocumentEndToEndTest|BookingDeliveryAndCashTransferTest|SaleReturnSourceTest|DocumentVoidTest' --no-coverage` ผ่าน 50 tests / 306 assertions; integration suite เพิ่มเติม 28 tests / 205 assertions; `php -d memory_limit=1G vendor/bin/phpunit --no-coverage` ผ่าน 843 tests (841 passed, 2 skipped, 6 incomplete) / 7,087 assertions; `php artisan view:cache`, Pint และ `git diff --check` ผ่าน
+- ทดสอบ: `php artisan test --filter='Quotation|SalesDocumentEndToEndTest|BookingDeliveryAndCashTransferTest|SaleReturnSourceTest|DocumentVoidTest' --no-coverage` ผ่าน 50 tests / 306 assertions; integration suite เพิ่มเติม 28 tests / 205 assertions; `php -d memory_limit=1G vendor/bin/phpunit --no-coverage` ผ่าน 843 tests (841 passed, 2 skipped, 6 incomplete) / 7,087 assertions; `ReportSmokeTest|StockBalanceReportTest` ผ่าน 10 tests / 113 assertions (1 skipped); `php artisan view:cache`, Pint และ `git diff --check` ผ่าน
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ UAT ด้วยบัญชีจริงบน browser; ต้องตรวจเล่ม DS/DSN ที่เปิดใช้งานและรายการจริงก่อนทดสอบคอนเฟิร์ม
 - Deploy: ยังไม่ deploy
-- งานถัดไป: commit/push branch, รอ CI, จากนั้น dispatch Deploy ERP production ตามคำสั่งเจ้าของและตรวจ health หลัง deploy
+- งานถัดไป: push branch, รอ CI, จากนั้น dispatch Deploy ERP production ตามคำสั่งเจ้าของและตรวจ health หลัง deploy
