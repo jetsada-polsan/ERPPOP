@@ -5169,6 +5169,6 @@ pending
 - ทำอะไร: ตัดจอง/FIFO สต็อก เปิดลูกหนี้ และลง GL ต่อใบขายภายใน transaction เดียว; ปรับหน้าใบจองให้เปิดดูบิลทุกใบ, หน้าใบขายย้อนกลับหาใบจองได้, รายงานยอดขายตามใบจองรวมเลขที่/ยอดทุกใบ และ reset transactions ล้างตารางความสัมพันธ์
 - Migration: สร้างตารางเชื่อมและเพิ่ม DS/DSN หากยังไม่มี โดยไม่แก้เล่มที่มีอยู่; SQLite migration ผ่านในชุดทดสอบ, DDL ใช้ Schema Builder/foreign keys ที่รองรับ PostgreSQL
 - ทดสอบ: `php artisan test --filter='Quotation|SalesDocumentEndToEndTest|BookingDeliveryAndCashTransferTest|SaleReturnSourceTest|DocumentVoidTest' --no-coverage` ผ่าน 50 tests / 306 assertions; integration suite เพิ่มเติม 28 tests / 205 assertions; `php -d memory_limit=1G vendor/bin/phpunit --no-coverage` ผ่าน 843 tests (841 passed, 2 skipped, 6 incomplete) / 7,087 assertions; `ReportSmokeTest|StockBalanceReportTest` ผ่าน 10 tests / 113 assertions (1 skipped); `php artisan view:cache`, Pint และ `git diff --check` ผ่าน
-- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ UAT ด้วยบัญชีจริงบน browser; ต้องตรวจเล่ม DS/DSN ที่เปิดใช้งานและรายการจริงก่อนทดสอบคอนเฟิร์ม
-- Deploy: ยังไม่ deploy
-- งานถัดไป: push branch, รอ CI, จากนั้น dispatch Deploy ERP production ตามคำสั่งเจ้าของและตรวจ health หลัง deploy
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ UAT ด้วยบัญชีจริงบน browser; ก่อนใช้งานจริงควรตรวจเล่ม DS/DSN ที่เปิดใช้งานและรายการจริงด้วยการคอนเฟิร์มตัวอย่างที่ได้รับอนุญาต
+- Deploy: GitHub Actions `Deploy ERP` run [#223](https://github.com/jetsada-polsan/ERPPOP/actions/runs/42498574542) บน commit `5990ba7` สำเร็จ; test job ผ่านใน 1m 47s และ production deploy ผ่านใน 33s
+- งานถัดไป: UAT บนระบบหลังล็อกอินด้วยใบจองทดสอบที่ได้รับอนุญาต ตรวจว่ารายการ VAT/non-VAT ไปคนละ DS/DSN และใบส่งของยังคงเป็นใบเดียว
