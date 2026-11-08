@@ -324,6 +324,22 @@ class SalesDocumentEndToEndTest extends TestCase
         $this->assertSame($vatSale->doc_date->toDateString(), $vatSale->openItem->due_date->toDateString());
         $this->get(route('documents.tax-invoice', $nonVatSale))->assertOk()->assertViewHas('vatAmount', 0)->assertSee('ใบแจ้งหนี้ / ใบส่งของ');
         $this->get(route('documents.tax-invoice', $vatSale))->assertOk()->assertViewHas('vatAmount', 5.6);
+        $reportRole = Role::create(['code' => 'TRADE_TAX_REPORT', 'name' => 'Trade tax report']);
+        foreach (['settings.manage', 'reports.all_branches'] as $code) {
+            $reportRole->permissions()->attach(Permission::firstOrCreate(['code' => $code], ['name' => $code]));
+        }
+        $actor->roles()->attach($reportRole);
+        $this->actingAs($actor->fresh());
+        $ds->update(['no_vat' => true]);
+        \App\Models\ReportDefinition::where('code', 'tax.vat_sales')->update(['enabled' => true, 'status' => 'available']);
+        $report = $this->get('/reports?'.http_build_query([
+            'category' => 'tax', 'report' => 'vat_sales', 'branch_id' => 'all',
+            'from' => $vatSale->doc_date->toDateString(), 'to' => $vatSale->doc_date->copy()->addDay()->toDateString(),
+        ]))
+            ->assertOk()->assertViewHas('selectedReport', 'vat_sales');
+        $rows = collect($report->viewData('result')['rows']);
+        $this->assertSame(5.6, $rows->firstWhere('doc_number', $vatSale->doc_number)['vat_amount']);
+        $this->assertSame(200.0, $rows->firstWhere('doc_number', $nonVatSale->doc_number)['exempt_amount']);
         $this->assertSame(2, $booking->salesDocuments()->count());
         $this->assertDatabaseHas('audit_logs', ['table_name' => 'sale_bookings', 'record_id' => $booking->id, 'action' => 'booking_converted_split']);
         $openItems = CustomerOpenItem::whereIn('document_id', $sales->pluck('id')->all())->orderBy('document_id')->get();

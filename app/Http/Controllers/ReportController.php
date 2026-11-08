@@ -1263,7 +1263,7 @@ class ReportController extends Controller
             $sign = $r->doc_code === 'SALE_RETURN' ? -1 : 1;
             $total = $sign * (float) $r->total_amount;
             $tax = json_decode($r->trade_tax ?? 'null', true);
-            $noVat = $r->no_vat || ($sign < 0 && $r->source_no_vat);
+            $noVat = $tax ? $tax['vat_mode'] === 'none' : ($r->no_vat || ($sign < 0 && $r->source_no_vat));
             $base = $sign * (float) ($tax['taxable_base'] ?? ($noVat ? 0 : $r->subtotal_amount ?? round(abs($total) * 100 / (100 + $rate), 2)));
             $exempt = $sign * (float) ($tax['exempt_amount'] ?? ($noVat ? abs($total) : 0));
             $vat = $noVat ? 0 : ($r->subtotal_amount !== null ? $sign * (float) $r->vat_amount : round($total - $base - $exempt, 2));
