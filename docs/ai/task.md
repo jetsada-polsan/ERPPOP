@@ -14,7 +14,7 @@
 - `vendor/bin/pint --dirty`, `php artisan view:cache`, `php artisan view:clear`, `git diff --check` — ผ่าน.
 
 ## ความเสี่ยง/งานถัดไป
-- Production deploy ผ่าน workflow `Deploy ERP`; Run #221 ถูกยกเลิกก่อน deploy หลังเลือก environment ไม่ตรง, Run #222 ถูก dispatch โดยเลือก `production` ชัดเจนและกำลังตรวจผล.
+- Production deploy ผ่าน workflow `Deploy ERP` สำเร็จ Run #222 (commit `3df8609`, production, 2m 1s); Run #221 ที่ใช้ค่า staging ถูกยกเลิกก่อน deploy.
 - ยังไม่ได้แก้/นำเข้าข้อมูลจริงหรือสร้างใบตรวจนับ production; หลัง deploy ควร UAT export/import แยกสาขาโดยใช้ไฟล์ทดลองและตรวจจำนวนสินค้าครบ.
 
 # Handoff — 2026-11-06 (P0 money integrity — workspace only)
