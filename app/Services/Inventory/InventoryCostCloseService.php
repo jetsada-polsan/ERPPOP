@@ -4,7 +4,9 @@ namespace App\Services\Inventory;
 
 use App\Models\InventoryCostClose;
 use App\Models\InventoryCostClosePeriod;
+use App\Models\Document;
 use App\Models\Product;
+use App\Models\StockCount;
 use App\Support\DecimalMath;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -20,12 +22,14 @@ class InventoryCostCloseService
             throw new RuntimeException('ยังไม่สามารถปิดต้นทุนงวดที่ยังไม่สิ้นสุด');
         }
 
-        $periodRow = InventoryCostClosePeriod::firstOrCreate(['period' => $period], ['status' => 'open']);
-        if ($periodRow->isClosed()) {
-            throw new RuntimeException('งวดนี้ปิดต้นทุนไปแล้ว ต้องเปิดงวดก่อน (--reopen) ถึงจะปิดซ้ำได้');
-        }
+        return DB::transaction(function () use ($period, $from, $to, $userId): int {
+            $periodRow = InventoryCostClosePeriod::firstOrCreate(['period' => $period], ['status' => 'open']);
+            $periodRow = InventoryCostClosePeriod::query()->whereKey($periodRow->id)->lockForUpdate()->firstOrFail();
+            if ($periodRow->isClosed()) {
+                throw new RuntimeException('งวดนี้ปิดต้นทุนไปแล้ว ต้องเปิดงวดก่อน (--reopen) ถึงจะปิดซ้ำได้');
+            }
+            $this->assertReadyToClose($from->toDateString(), $to->toDateString());
 
-        return DB::transaction(function () use ($period, $from, $to, $userId, $periodRow): int {
             $count = 0;
             Product::where('is_active', true)->orderBy('id')->chunkById(500, function ($products) use ($period, $from, $to, $userId, &$count): void {
                 $ids = $products->pluck('id');
@@ -73,6 +77,55 @@ class InventoryCostCloseService
         }
 
         $periodRow->update(['status' => 'open', 'closed_by' => null, 'closed_at' => null]);
+    }
+
+    private function assertReadyToClose(string $from, string $to): void
+    {
+        $unfinishedCounts = StockCount::query()
+            ->whereDate('count_date', '>=', $from)
+            ->whereDate('count_date', '<=', $to)
+            ->whereIn('status', ['counting', 'review', 'pending_adjustment'])
+            ->orderBy('doc_number')
+            ->pluck('doc_number');
+        if ($unfinishedCounts->isNotEmpty()) {
+            throw new RuntimeException('ยังปิดต้นทุนไม่ได้ มีใบตรวจนับค้างในงวดนี้: '.$unfinishedCounts->take(5)->implode(', '));
+        }
+
+        $locationsToVerify = DB::table('stock_balances')->distinct()->pluck('warehouse_location_id')
+            ->merge(DB::table('stock_movements')->whereBetween('movement_date', [$from, $to])->distinct()->pluck('warehouse_location_id'))
+            ->unique()->values();
+        $catalogProductCount = DB::table('products')->whereNull('deleted_at')->count();
+        $missingCountLocations = [];
+        foreach ($locationsToVerify as $locationId) {
+            $hasCompleteCount = DB::table('stock_counts')
+                ->join('stock_count_items', 'stock_count_items.stock_count_id', '=', 'stock_counts.id')
+                ->where('stock_counts.warehouse_location_id', $locationId)
+                ->whereDate('stock_counts.count_date', '>=', $from)
+                ->whereDate('stock_counts.count_date', '<=', $to)
+                ->where('stock_counts.status', 'posted')
+                ->where('stock_counts.count_mode', 'full_zero_missing')
+                ->where('stock_counts.product_scope', 'all')
+                ->whereNotNull('stock_count_items.counted_qty')
+                ->groupBy('stock_counts.id')
+                ->havingRaw('COUNT(DISTINCT stock_count_items.product_id) = ?', [$catalogProductCount])
+                ->exists();
+            if (! $hasCompleteCount) {
+                $missingCountLocations[] = (string) DB::table('warehouse_locations')->where('id', $locationId)->value('code');
+            }
+        }
+        if ($missingCountLocations !== []) {
+            throw new RuntimeException('ยังปิดต้นทุนไม่ได้ ต้องมีใบตรวจนับเต็มที่กรอกครบและยืนยันแล้วสำหรับคลัง: '.implode(', ', array_slice($missingCountLocations, 0, 5)));
+        }
+
+        $pendingStockDocuments = Document::query()
+            ->whereBetween('doc_date', [$from, $to])
+            ->where('status', 'pending_approval')
+            ->whereHas('documentType', fn ($query) => $query->where('affects_stock', true))
+            ->orderBy('doc_number')
+            ->pluck('doc_number');
+        if ($pendingStockDocuments->isNotEmpty()) {
+            throw new RuntimeException('ยังปิดต้นทุนไม่ได้ มีเอกสารสต็อกรออนุมัติ: '.$pendingStockDocuments->take(5)->implode(', '));
+        }
     }
 
     private function lotBalances(array $productIds, string $to)

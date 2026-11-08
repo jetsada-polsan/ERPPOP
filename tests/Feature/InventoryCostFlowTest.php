@@ -12,6 +12,7 @@ use App\Models\ProductionOrder;
 use App\Models\ProductionRecipe;
 use App\Models\ProductUnit;
 use App\Models\StockDocumentItem;
+use App\Models\StockCount;
 use App\Models\Supplier;
 use App\Models\QtyPromotion;
 use App\Models\User;
@@ -224,6 +225,7 @@ class InventoryCostFlowTest extends TestCase
         ]);
 
         $this->travelTo('2026-07-01 10:00:00');
+        $this->recordFullCountsForPeriod('2026-06');
         app(InventoryCostCloseService::class)->close('2026-06');
         $history = app(ProductCostHistoryService::class)
             ->history($product->fresh(), 3)
@@ -493,5 +495,29 @@ class InventoryCostFlowTest extends TestCase
         ]);
 
         return [$branch->fresh(), $supplier, $vatProduct, $nonVatProduct];
+    }
+
+    private function recordFullCountsForPeriod(string $period): void
+    {
+        [$year, $month] = explode('-', $period);
+        $countDate = \Carbon\Carbon::createFromDate((int) $year, (int) $month, 1)->endOfMonth()->toDateString();
+        $locationIds = DB::table('stock_balances')->distinct()->pluck('warehouse_location_id')
+            ->merge(DB::table('stock_movements')->whereBetween('movement_date', [$period.'-01', $countDate])->distinct()->pluck('warehouse_location_id'))
+            ->unique();
+        foreach ($locationIds as $locationId) {
+            $location = WarehouseLocation::findOrFail($locationId);
+            $count = StockCount::create([
+                'doc_number' => 'TEST-'.$period.'-'.$locationId.'-'.\Illuminate\Support\Str::random(8),
+                'branch_id' => $location->warehouse->branch_id,
+                'warehouse_location_id' => $locationId,
+                'status' => 'posted', 'count_mode' => 'full_zero_missing',
+                'count_date' => $countDate, 'product_scope' => 'all',
+            ]);
+            foreach (Product::query()->get(['id']) as $product) {
+                $qty = DB::table('stock_balances')->where('warehouse_location_id', $locationId)
+                    ->where('product_id', $product->id)->value('on_hand_qty') ?? 0;
+                $count->items()->create(['product_id' => $product->id, 'system_qty' => $qty, 'counted_qty' => $qty]);
+            }
+        }
     }
 }

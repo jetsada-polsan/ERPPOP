@@ -9,9 +9,11 @@ use App\Models\InventoryCostClose;
 use App\Models\Product;
 use App\Models\ProductUnit;
 use App\Models\StockBalance;
+use App\Models\StockCount;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseLocation;
+use App\Http\Controllers\StockCountController;
 use App\Services\Inventory\FifoStockService;
 use App\Services\Inventory\InventoryCostCloseService;
 use App\Services\Inventory\StockAdjustmentService;
@@ -20,6 +22,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class InventoryApprovalAndCloseTest extends TestCase
@@ -64,6 +69,168 @@ class InventoryApprovalAndCloseTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('ตำแหน่งเก็บนี้มีใบตรวจนับที่ยังไม่ปิดอยู่');
         $counts->create(['branch_id' => $branch->id, 'warehouse_location_id' => $location->id, 'count_mode' => 'partial']);
+    }
+
+    public function test_full_catalog_stock_count_includes_zero_balance_and_inactive_products_by_scope(): void
+    {
+        [$branch, $location, $activeProduct] = $this->masters();
+        $inactiveProduct = Product::create([
+            'sku_code' => 'SKU-OFF', 'name_th' => 'สินค้าปิดใช้งาน', 'base_unit_id' => $activeProduct->base_unit_id,
+            'average_cost' => 0, 'is_active' => false, 'is_vat' => false, 'negative_stock_policy' => 'block',
+        ]);
+        $this->assertSame(2, Product::query()->count());
+
+        $count = app(StockCountService::class)->create([
+            'branch_id' => $branch->id, 'warehouse_location_id' => $location->id,
+            'count_mode' => 'full_zero_missing', 'product_scope' => 'all',
+        ]);
+
+        $this->assertSame(2, $count->items()->count());
+        $this->assertSame(0.0, (float) $count->items()->where('product_id', $activeProduct->id)->value('system_qty'));
+        $this->assertSame(0.0, (float) $count->items()->where('product_id', $inactiveProduct->id)->value('system_qty'));
+        $this->assertSame('all', $count->product_scope);
+    }
+
+    public function test_full_stock_count_cannot_submit_with_uncounted_items(): void
+    {
+        [$branch, $location] = $this->masters();
+        $count = app(StockCountService::class)->create([
+            'branch_id' => $branch->id, 'warehouse_location_id' => $location->id,
+            'count_mode' => 'full_zero_missing', 'product_scope' => 'active',
+        ]);
+        $count->update(['status' => 'review']);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('ต้องกรอกหรือ import จำนวนจริงให้ครบทุกสินค้า');
+        app(StockCountService::class)->post($count);
+    }
+
+    public function test_stock_count_import_rejects_a_csv_missing_catalog_rows_without_partial_updates(): void
+    {
+        [$branch, $location, $product] = $this->masters();
+        Product::create([
+            'sku_code' => 'SKU-2', 'name_th' => 'สินค้าอีกตัว', 'base_unit_id' => $product->base_unit_id,
+            'average_cost' => 0, 'is_active' => true, 'is_vat' => false, 'negative_stock_policy' => 'block',
+        ]);
+        $count = app(StockCountService::class)->create([
+            'branch_id' => $branch->id, 'warehouse_location_id' => $location->id,
+            'count_mode' => 'full_zero_missing', 'product_scope' => 'active',
+        ]);
+        $item = $count->items()->where('product_id', $product->id)->firstOrFail();
+        $csv = implode("\n", [
+            "ใบตรวจนับ,{$count->doc_number},สาขา,HQ,ตำแหน่งเก็บ,MAIN",
+            'รหัสสินค้า,ชื่อสินค้า,หน่วย,จำนวนตามระบบ,จำนวนนับจริง,หมายเหตุ,รหัสอ้างอิง',
+            "{$product->sku_code},สินค้าทดสอบ,ชิ้น,0,5,,{$item->id}",
+        ]);
+        $request = Request::create('/stock-counts/'.$count->id.'/import', 'POST', [], [], [
+            'file' => UploadedFile::fake()->createWithContent('stock-count.csv', $csv),
+        ]);
+
+        try {
+            app(StockCountController::class)->import($request, $count);
+            $this->fail('ไฟล์ที่ขาดรายการต้องถูกปฏิเสธ');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString('ไฟล์มีรายการไม่ครบ', $exception->errors()['file'][0] ?? '');
+        }
+
+        $this->assertNull($count->items()->where('product_id', $product->id)->value('counted_qty'));
+    }
+
+    public function test_stock_count_import_accepts_a_complete_csv_and_saves_all_quantities(): void
+    {
+        [$branch, $location, $product] = $this->masters();
+        $second = Product::create([
+            'sku_code' => 'SKU-2', 'name_th' => 'สินค้าอีกตัว', 'base_unit_id' => $product->base_unit_id,
+            'average_cost' => 0, 'is_active' => true, 'is_vat' => false, 'negative_stock_policy' => 'block',
+        ]);
+        $count = app(StockCountService::class)->create([
+            'branch_id' => $branch->id, 'warehouse_location_id' => $location->id,
+            'count_mode' => 'full_zero_missing', 'product_scope' => 'active',
+        ]);
+        $items = $count->items()->with('product')->get();
+        $rows = $items->map(fn ($item) => implode(',', [
+            $item->product->sku_code, $item->product->name_th, 'ชิ้น', $item->system_qty,
+            $item->product_id === $product->id ? '5' : '0', '', $item->id,
+        ]))->all();
+        $csv = implode("\n", [
+            "ใบตรวจนับ,{$count->doc_number},สาขา,HQ,ตำแหน่งเก็บ,MAIN",
+            'รหัสสินค้า,ชื่อสินค้า,หน่วย,จำนวนตามระบบ,จำนวนนับจริง,หมายเหตุ,รหัสอ้างอิง',
+            ...$rows,
+        ]);
+        $request = Request::create('/stock-counts/'.$count->id.'/import', 'POST', [], [], [
+            'file' => UploadedFile::fake()->createWithContent('stock-count.csv', $csv),
+        ]);
+
+        app(StockCountController::class)->import($request, $count);
+
+        $this->assertSame(5.0, (float) $count->items()->where('product_id', $product->id)->value('counted_qty'));
+        $this->assertSame(0.0, (float) $count->items()->where('product_id', $second->id)->value('counted_qty'));
+    }
+
+    public function test_cost_close_is_blocked_while_a_count_sheet_in_the_period_is_open(): void
+    {
+        $this->travelTo('2026-08-31 18:00:00');
+        [$branch, $location] = $this->masters();
+        app(StockCountService::class)->create([
+            'branch_id' => $branch->id, 'warehouse_location_id' => $location->id,
+            'count_mode' => 'full_zero_missing', 'product_scope' => 'active',
+        ]);
+        $this->assertDatabaseHas('stock_counts', ['status' => 'counting', 'count_date' => '2026-08-31 00:00:00']);
+        $this->travelTo('2026-09-01 08:00:00');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('ยังปิดต้นทุนไม่ได้ มีใบตรวจนับค้างในงวดนี้');
+        app(InventoryCostCloseService::class)->close('2026-08');
+    }
+
+    public function test_cost_close_requires_a_complete_full_catalog_count_for_stock_locations(): void
+    {
+        [$branch, $location, $product] = $this->masters();
+        StockBalance::create(['product_id' => $product->id, 'warehouse_location_id' => $location->id, 'on_hand_qty' => 0, 'reserved_qty' => 0]);
+        $this->travelTo('2026-09-01 08:00:00');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('ต้องมีใบตรวจนับเต็มที่กรอกครบและยืนยันแล้วสำหรับคลัง: MAIN');
+        app(InventoryCostCloseService::class)->close('2026-08');
+    }
+
+    public function test_closed_inventory_period_blocks_backdated_stock_document_creation(): void
+    {
+        $this->travelTo('2026-09-01 08:00:00');
+        [$branch] = $this->masters();
+        $this->closePeriodWithFullCounts('2026-08');
+        $type = DocumentType::create(['code' => 'CASH_SALE', 'name_th' => 'ขายสด', 'affects_stock' => true]);
+
+        try {
+            Document::create([
+                'document_type_id' => $type->id, 'branch_id' => $branch->id,
+                'doc_number' => 'CS-CLOSED-PERIOD', 'doc_date' => '2026-08-20', 'status' => 'draft',
+            ]);
+            $this->fail('เอกสารสต็อกย้อนหลังในงวดปิดต้องถูกปฏิเสธ');
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $this->assertStringContainsString('งวดที่ปิดต้นทุนสินค้าแล้ว', $exception->errors()['doc_date'][0] ?? '');
+        }
+
+        $this->assertDatabaseMissing('documents', ['doc_number' => 'CS-CLOSED-PERIOD']);
+    }
+
+    public function test_closed_inventory_period_blocks_edits_to_existing_stock_documents(): void
+    {
+        $this->travelTo('2026-09-01 08:00:00');
+        [$branch] = $this->masters();
+        $type = DocumentType::create(['code' => 'CASH_SALE', 'name_th' => 'ขายสด', 'affects_stock' => true]);
+        $document = Document::create([
+            'document_type_id' => $type->id, 'branch_id' => $branch->id,
+            'doc_number' => 'CS-EDIT-CLOSED', 'doc_date' => '2026-08-20', 'status' => 'active',
+        ]);
+        app(InventoryCostCloseService::class)->close('2026-08');
+
+        try {
+            $document->update(['remark' => 'แก้ย้อนหลัง']);
+            $this->fail('เอกสารสต็อกในงวดปิดต้องแก้ไม่ได้');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString('งวดที่ปิดต้นทุนสินค้าแล้ว', $exception->errors()['doc_date'][0] ?? '');
+        }
     }
 
     public function test_stock_adjustment_does_not_change_stock_until_another_user_approves(): void
@@ -133,7 +300,7 @@ class InventoryApprovalAndCloseTest extends TestCase
         app(StockAdjustmentService::class)->approve($document);
 
         $this->travelTo('2026-09-01 10:00:00');
-        app(InventoryCostCloseService::class)->close('2026-08');
+        $this->closePeriodWithFullCounts('2026-08');
         $close = InventoryCostClose::where('period', '2026-08')->where('product_id', $product->id)->firstOrFail();
 
         $this->assertSame(4.0, (float) $close->issued_qty);
@@ -205,7 +372,7 @@ class InventoryApprovalAndCloseTest extends TestCase
         $fifo->issue($product->id, $location->id, 2, null, movementDate: '2026-06-15');
         $fifo->receive($product->id, $location->id, 9, null, receivedDate: '2026-07-01', unitCost: 99);
 
-        app(InventoryCostCloseService::class)->close('2026-06');
+        $this->closePeriodWithFullCounts('2026-06');
         $close = InventoryCostClose::where('period', '2026-06')->where('product_id', $product->id)->firstOrFail();
         $this->assertSame(5.0, (float) $close->opening_qty);
         $this->assertSame(3.0, (float) $close->received_qty);
@@ -226,7 +393,7 @@ class InventoryApprovalAndCloseTest extends TestCase
         $fifo = app(FifoStockService::class);
         $fifo->receive($product->id, $location->id, 4, null, receivedDate: '2026-06-10', unitCost: 25);
 
-        app(InventoryCostCloseService::class)->close('2026-06');
+        $this->closePeriodWithFullCounts('2026-06');
 
         $close = InventoryCostClose::where('period', '2026-06')->where('product_id', $product->id)->firstOrFail();
         $this->assertSame(4.0, (float) $close->received_qty);
@@ -260,7 +427,7 @@ class InventoryApprovalAndCloseTest extends TestCase
         ]);
 
         $this->travelTo('2026-09-01 10:00:00');
-        app(InventoryCostCloseService::class)->close('2026-08');
+        $this->closePeriodWithFullCounts('2026-08');
         $close = InventoryCostClose::where('period', '2026-08')->where('product_id', $product->id)->firstOrFail();
         $this->assertSame(14.0, (float) $close->received_qty);
         $this->assertSame(4.0, (float) $close->issued_qty);
@@ -313,5 +480,50 @@ class InventoryApprovalAndCloseTest extends TestCase
         ]);
 
         return [$branch->fresh(), $location, $product];
+    }
+
+    private function closePeriodWithFullCounts(string $period): void
+    {
+        [$year, $month] = explode('-', $period);
+        $countDate = \Carbon\Carbon::createFromDate((int) $year, (int) $month, 1)->endOfMonth()->toDateString();
+        $locationIds = DB::table('stock_balances')->distinct()->pluck('warehouse_location_id')
+            ->merge(DB::table('stock_movements')->whereBetween('movement_date', [$period.'-01', $countDate])->distinct()->pluck('warehouse_location_id'))
+            ->unique();
+        foreach ($locationIds as $locationId) {
+            $warehouse = WarehouseLocation::findOrFail($locationId)->warehouse;
+            $count = StockCount::create([
+                'doc_number' => 'TEST-'.$period.'-'.$locationId.'-'.\Illuminate\Support\Str::random(8),
+                'branch_id' => $warehouse->branch_id,
+                'warehouse_location_id' => $locationId,
+                'status' => 'posted',
+                'count_mode' => 'full_zero_missing',
+                'count_date' => $countDate,
+                'product_scope' => 'all',
+            ]);
+            $products = Product::query()->get(['id']);
+            foreach ($products as $catalogProduct) {
+                $systemQty = DB::table('stock_balances')->where('warehouse_location_id', $locationId)
+                    ->where('product_id', $catalogProduct->id)->value('on_hand_qty') ?? 0;
+                $count->items()->create([
+                    'product_id' => $catalogProduct->id,
+                    'system_qty' => $systemQty,
+                    'counted_qty' => $systemQty,
+                ]);
+            }
+        }
+
+        $this->assertSame($locationIds->count(), DB::table('stock_counts')
+            ->join('stock_count_items', 'stock_count_items.stock_count_id', '=', 'stock_counts.id')
+            ->whereDate('stock_counts.count_date', '>=', $period.'-01')
+            ->whereDate('stock_counts.count_date', '<=', $countDate)
+            ->where('stock_counts.status', 'posted')
+            ->where('stock_counts.count_mode', 'full_zero_missing')
+            ->where('stock_counts.product_scope', 'all')
+            ->whereNotNull('stock_count_items.counted_qty')
+            ->groupBy('stock_counts.id')
+            ->havingRaw('COUNT(DISTINCT stock_count_items.product_id) = ?', [Product::query()->count()])
+            ->get()->count());
+
+        app(InventoryCostCloseService::class)->close($period);
     }
 }

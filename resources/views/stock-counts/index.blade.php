@@ -42,13 +42,21 @@
             <label class="form-label small text-muted">โหมดการนับ</label>
             <select name="count_mode" class="form-select" required>
                 <option value="partial">นับบางส่วน (ปลอดภัย)</option>
-                <option value="full_zero_missing">นับเต็ม — รายการไม่ได้นับเป็น 0</option>
+                <option value="full_zero_missing">นับเต็ม — ต้องกรอกครบทุกสินค้า</option>
             </select>
         </div>
-        <div class="col-md-2"><label class="form-label small text-muted">หมายเหตุ</label><input name="note" class="form-control" value="{{ old('note') }}" placeholder="เช่น ตรวจนับสิ้นเดือน"></div>
-        <div class="col-md-2 d-flex align-items-end"><button class="btn btn-primary w-100"><i class="bi bi-clipboard-plus me-1"></i>เปิดใบตรวจนับ</button></div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted">กลุ่มสินค้า</label>
+            <select name="product_scope" class="form-select" required>
+                <option value="active" @selected(old('product_scope', 'active') === 'active')>สินค้าใช้งาน</option>
+                <option value="inactive" @selected(old('product_scope') === 'inactive')>สินค้าไม่ใช้งาน</option>
+                <option value="all" @selected(old('product_scope') === 'all')>ทั้งหมด</option>
+            </select>
+        </div>
+        <div class="col-md-1"><label class="form-label small text-muted">หมายเหตุ</label><input name="note" class="form-control" value="{{ old('note') }}" placeholder="เช่น สิ้นเดือน"></div>
+        <div class="col-md-1 d-flex align-items-end"><button class="btn btn-primary w-100"><i class="bi bi-clipboard-plus me-1"></i>เปิด</button></div>
     </form>
-    <p class="text-muted small mb-0 mt-2">ระบบจะดึงสินค้าทุกตัวที่มีสต๊อกในตำแหน่งเก็บนั้นมาเป็นรายการตรวจนับ พร้อมยอดตามระบบ ณ ตอนเปิดใบ</p>
+    <p class="text-muted small mb-0 mt-2">ระบบจะสร้างรายการจากแคตตาล็อกตามกลุ่มที่เลือก รวมสินค้าที่สต๊อกเป็นศูนย์ พร้อมยอดตามระบบ ณ ตอนเปิดใบ</p>
 </div>
 
 <div class="content-card p-4">

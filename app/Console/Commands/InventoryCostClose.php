@@ -6,12 +6,14 @@ use App\Models\AuditLog;
 use App\Models\InventoryCostClosePeriod;
 use App\Services\Inventory\InventoryCostCloseService;
 use Illuminate\Console\Command;
+use RuntimeException;
 use Throwable;
 
 class InventoryCostClose extends Command
 {
     protected $signature = 'erp:inventory-cost-close {period : Accounting period YYYY-MM}
         {--reopen : Reopen an already-closed period instead of closing it}
+        {--reason= : Required audit reason when reopening a closed period}
         {--user= : user id recorded as closed_by and in the audit log}';
 
     protected $description = 'Freeze month-end inventory quantities, average cost, and ending value';
@@ -23,8 +25,12 @@ class InventoryCostClose extends Command
 
         try {
             if ($this->option('reopen')) {
+                $reason = trim((string) $this->option('reason'));
+                if ($reason === '') {
+                    throw new RuntimeException('ต้องระบุ --reason เพื่อเปิดงวดที่ปิดแล้ว');
+                }
                 $service->reopen($period);
-                $this->audit($period, 'reopen', $userId, ['status' => 'closed'], ['status' => 'open']);
+                $this->audit($period, 'reopen', $userId, ['status' => 'closed'], ['status' => 'open', 'reason' => $reason]);
                 $this->info("เปิดงวดต้นทุนสินค้า {$period} แล้ว — บันทึกสต๊อกย้อนหลังในงวดนี้ได้อีกครั้ง");
 
                 return self::SUCCESS;

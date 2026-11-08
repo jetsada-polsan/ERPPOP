@@ -5143,3 +5143,14 @@ pending
 - ทำอะไร: ขยายปุ่ม toolbar, ปุ่มแก้จำนวน/ลบ และปุ่มรับชำระ เพื่อรองรับหน้าจอสัมผัสโดยไม่ย้อนกลับไปใช้ UI legacy
 - ทดสอบ: `PYTHONPATH=apps/jet-pos-python python3 -m unittest discover -s apps/jet-pos-python/tests -v` ผ่าน 25 tests; UI smoke ผ่าน; `git diff --check` ผ่าน
 - งานถัดไป: Build/install UAT และให้เจ้าของกรอก PIN บนเครื่องจริงเพื่อเก็บ error เปิดกะจาก ERP หากยังไม่ผ่าน
+
+## Handoff - 2026-11-08 (stock count completeness and inventory period lock)
+- Branch: `codex/stock-count-period-lock`
+- ทำอะไร: ใบตรวจนับเลือกสินค้าใช้งาน/ไม่ใช้งาน/ทั้งหมดได้ และสร้างแถวจากแคตตาล็อกครบแม้ยอดเป็นศูนย์; โหมดนับเต็มบังคับกรอกทุก SKU; CSV export มีรหัสอ้างอิงต่อแถวและ import ตรวจหัวตาราง, SKU/รหัสอ้างอิง, ซ้ำ, ค่าติดลบ, แถวหาย ก่อนบันทึกแบบ atomic
+- ทำอะไร: เก็บวันที่และขอบเขตสินค้าในใบตรวจนับ; ปรับสต็อกลงวันที่ตรวจนับ; ปิดต้นทุนไม่ได้ถ้าใบตรวจนับในงวดค้าง, เอกสารสต็อกรออนุมัติ, หรือคลังที่มีข้อมูลคงเหลือ/เคลื่อนไหวไม่มีใบตรวจนับเต็มของทุกสินค้าในแคตตาล็อกที่นับครบและยืนยันแล้ว
+- ทำอะไร: ล็อกการสร้าง/แก้/ลบเอกสารสต็อก, รายการเอกสารสต็อก และ stock movements ที่ลงวันที่ในงวดปิด; การเปิดงวดใหม่ต้องมี `--reason=` และบันทึกเหตุผล audit
+- Migration: `2026_11_08_000001_add_scope_and_count_date_to_stock_counts` เพิ่ม `count_date` และ `product_scope`; SQLite migration ผ่านใน test suite, production PostgreSQL ให้ workflow migrate
+- ทดสอบ: `php -d memory_limit=1G vendor/bin/phpunit --no-coverage` ผ่าน 845 tests / 7,075 assertions (2 skipped, 6 incomplete); `php artisan view:cache` ผ่าน; `git diff --check` ผ่าน
+- Deploy: รอ push branch และสั่ง workflow `Deploy ERP` environment `production`; deploy ได้รับอนุญาตจากเจ้าของในแชตนี้
+- ข้อจำกัด/UAT: การตรวจนับเต็มบังคับทุกคลังที่มีแถว stock balance หรือ movement ในเดือน; ผู้ใช้ต้องเลือก “ทั้งหมด”, export, กรอกตัวเลขทุกรายการ (ใส่ 0 เมื่อไม่มี), import, submit/approve ให้สถานะ posted ก่อนปิดต้นทุน
+- งานถัดไป: push, deploy ผ่าน GitHub Actions production และตรวจ health หลัง deploy โดยไม่สร้าง/ลบข้อมูลธุรกิจจริง

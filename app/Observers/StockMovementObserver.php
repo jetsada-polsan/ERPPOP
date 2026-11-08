@@ -14,6 +14,12 @@ class StockMovementObserver
         $this->guard->assertOpen($movement->movement_date);
     }
 
+    public function updating(StockMovement $movement): void
+    {
+        $this->guard->assertOpen($movement->getOriginal('movement_date'));
+        $this->guard->assertOpen($movement->movement_date);
+    }
+
     public function deleting(StockMovement $movement): void
     {
         $this->guard->assertOpen($movement->movement_date);

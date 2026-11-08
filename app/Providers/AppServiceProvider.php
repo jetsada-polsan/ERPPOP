@@ -5,9 +5,11 @@ namespace App\Providers;
 use App\Models\Document;
 use App\Models\GlJournal;
 use App\Models\StockMovement;
+use App\Models\StockDocumentItem;
 use App\Observers\DocumentObserver;
 use App\Observers\GlJournalObserver;
 use App\Observers\StockMovementObserver;
+use App\Observers\StockDocumentItemObserver;
 use App\Services\OCR\MockOcrEngine;
 use App\Services\OCR\OcrEngineInterface;
 use Carbon\CarbonImmutable;
@@ -32,6 +34,7 @@ class AppServiceProvider extends ServiceProvider
         Document::observe(DocumentObserver::class);
         GlJournal::observe(GlJournalObserver::class);
         StockMovement::observe(StockMovementObserver::class);
+        StockDocumentItem::observe(StockDocumentItemObserver::class);
 
         Carbon::setLocale('th');
 

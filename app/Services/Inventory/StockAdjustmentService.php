@@ -31,7 +31,7 @@ class StockAdjustmentService
     ) {}
 
     /**
-     * @param  array{branch_id:int, warehouse_location_id:int, remark:?string, items: array<int, array{product_id:int, counted_qty:float, unit_cost?:float}>}  $data
+     * @param  array{branch_id:int, warehouse_location_id:int, remark:?string, doc_date?:string, items: array<int, array{product_id:int, counted_qty:float, unit_cost?:float}>}  $data
      */
     public function create(array $data): Document
     {
@@ -80,7 +80,7 @@ class StockAdjustmentService
                 'document_type_id' => $documentType->id,
                 'branch_id' => $data['branch_id'],
                 'doc_number' => $this->numbers->next('STOCK_ADJUSTMENT', $data['branch_id']),
-                'doc_date' => now()->toDateString(),
+                'doc_date' => $data['doc_date'] ?? now()->toDateString(),
                 'status' => 'pending_approval',
                 'total_items' => $diffs->count(),
                 'total_amount' => 0,

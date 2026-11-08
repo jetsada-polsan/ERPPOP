@@ -11,6 +11,8 @@ use App\Services\Inventory\StockCountService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -36,6 +38,7 @@ class StockCountController extends Controller
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
             'warehouse_location_id' => ['nullable', 'integer', 'exists:warehouse_locations,id'],
             'count_mode' => ['required', 'in:partial,full_zero_missing'],
+            'product_scope' => ['required', 'in:active,inactive,all'],
             'note' => ['nullable', 'string', 'max:2000'],
         ]);
 
@@ -121,6 +124,9 @@ class StockCountController extends Controller
     {
         abort_unless($stockCount->isEditable(), 422, 'ใบนี้ส่งตรวจแล้ว');
         abort_if($stockCount->items()->whereNotNull('counted_qty')->doesntExist(), 422, 'ยังไม่มีรายการนับจริง');
+        if ($stockCount->count_mode === 'full_zero_missing') {
+            abort_if($stockCount->items()->whereNull('counted_qty')->exists(), 422, 'โหมดนับเต็มต้องกรอกจำนวนจริงให้ครบทุกสินค้า รวมรายการที่นับได้ 0');
+        }
         $stockCount->update(['status' => 'review', 'submitted_by' => $request->user()?->id, 'submitted_at' => now()]);
 
         return back()->with('success', 'ส่งใบตรวจนับให้หัวหน้าตรวจสอบแล้ว ยังไม่กระทบสต็อกจริง');
@@ -135,6 +141,7 @@ class StockCountController extends Controller
             ->leftJoin('product_units', 'product_units.id', '=', 'products.base_unit_id')
             ->orderBy('products.sku_code')
             ->get([
+                'stock_count_items.id as item_reference',
                 'products.sku_code', 'products.name_th',
                 'product_units.name as unit_name',
                 'stock_count_items.system_qty', 'stock_count_items.counted_qty',
@@ -144,20 +151,20 @@ class StockCountController extends Controller
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF");
             fputcsv($out, ['ใบตรวจนับ', $stockCount->doc_number, 'สาขา', $stockCount->branch->name_th, 'ตำแหน่งเก็บ', $stockCount->warehouseLocation->name]);
-            fputcsv($out, ['รหัสสินค้า', 'ชื่อสินค้า', 'หน่วย', 'จำนวนตามระบบ', 'จำนวนนับจริง', 'หมายเหตุ']);
+            fputcsv($out, ['รหัสสินค้า', 'ชื่อสินค้า', 'หน่วย', 'จำนวนตามระบบ', 'จำนวนนับจริง', 'หมายเหตุ', 'รหัสอ้างอิง']);
             foreach ($items as $i) {
                 fputcsv($out, [
                     $i->sku_code, $i->name_th, $i->unit_name ?? '-',
                     (float) $i->system_qty,
                     $i->counted_qty !== null ? (float) $i->counted_qty : '',
-                    '',
+                    '', $i->item_reference,
                 ]);
             }
             fclose($out);
         }, $stockCount->doc_number.'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
-    // Import the filled CSV back: matches by รหัสสินค้า, fills counted qty
+    // Import the filled CSV back and reject incomplete or ambiguous files atomically.
     public function import(Request $request, StockCount $stockCount): RedirectResponse
     {
         abort_unless($stockCount->isEditable(), 422, 'ใบนี้ปรับปรุงแล้ว แก้ไขไม่ได้');
@@ -167,41 +174,87 @@ class StockCountController extends Controller
             ['file.mimes' => 'รองรับไฟล์ .csv เท่านั้น (ใน Excel ใช้ Save As > CSV UTF-8)'],
         );
 
-        $itemIdBySku = StockCountItem::where('stock_count_id', $stockCount->id)
+        $items = StockCountItem::where('stock_count_id', $stockCount->id)
             ->join('products', 'products.id', '=', 'stock_count_items.product_id')
-            ->pluck('stock_count_items.id', 'products.sku_code');
-
-        $updated = 0;
-        $skipped = [];
+            ->get(['stock_count_items.id', 'products.sku_code']);
+        $itemById = $items->keyBy(fn ($item) => (string) $item->id);
+        $itemIdBySku = $items->pluck('id', 'sku_code');
+        $seen = [];
+        $updates = [];
+        $errors = [];
         $fh = fopen($request->file('file')->getRealPath(), 'r');
-        $rowNo = 0;
+        if ($fh === false) {
+            throw ValidationException::withMessages(['file' => 'อ่านไฟล์ CSV ไม่สำเร็จ']);
+        }
+
+        fgetcsv($fh); // metadata row
+        $header = fgetcsv($fh);
+        $expectedHeader = ['รหัสสินค้า', 'ชื่อสินค้า', 'หน่วย', 'จำนวนตามระบบ', 'จำนวนนับจริง', 'หมายเหตุ'];
+        if (! is_array($header) || array_slice($header, 0, 6) !== $expectedHeader) {
+            fclose($fh);
+            throw ValidationException::withMessages(['file' => 'รูปแบบไฟล์ไม่ตรงกับไฟล์ Export ใบตรวจนับนี้']);
+        }
+
+        $rowNo = 2;
         while (($row = fgetcsv($fh)) !== false) {
             $rowNo++;
             $sku = trim((string) ($row[0] ?? ''));
             $sku = preg_replace('/^\xEF\xBB\xBF/', '', $sku);
             $counted = trim((string) ($row[4] ?? ''));
+            $itemReference = trim((string) ($row[6] ?? ''));
 
-            // Skip header/meta rows and rows without a counted value
-            if ($sku === '' || ! isset($itemIdBySku[$sku])) {
-                if ($sku !== '' && $rowNo > 2) {
-                    $skipped[] = $sku;
+            if ($sku === '' && $counted === '' && $itemReference === '') {
+                continue;
+            }
+            $item = $itemReference !== '' ? $itemById->get($itemReference) : null;
+            $itemId = $item?->id ?? ($itemIdBySku[$sku] ?? null);
+            if (! $itemId || ($itemReference !== '' && $item && $sku !== '' && $item->sku_code !== $sku)) {
+                $errors[] = "แถว {$rowNo}: ไม่พบรหัสสินค้า/รหัสอ้างอิงในใบนี้";
+                continue;
+            }
+            if (isset($seen[$itemId])) {
+                $errors[] = "แถว {$rowNo}: สินค้าซ้ำ ({$sku})";
+                continue;
+            }
+            $seen[$itemId] = true;
+
+            if ($counted === '') {
+                if ($stockCount->count_mode === 'full_zero_missing') {
+                    $errors[] = "แถว {$rowNo}: โหมดนับเต็มต้องระบุจำนวนจริง (ใส่ 0 หากไม่มีสินค้า)";
                 }
-
-                continue;
-            }
-            if ($counted === '' || ! is_numeric(str_replace(',', '', $counted))) {
                 continue;
             }
 
-            StockCountItem::whereKey($itemIdBySku[$sku])
-                ->update(['counted_qty' => (float) str_replace(',', '', $counted)]);
-            $updated++;
+            $normalized = str_replace(',', '', $counted);
+            if (! is_numeric($normalized) || (float) $normalized < 0) {
+                $errors[] = "แถว {$rowNo}: จำนวนต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป";
+                continue;
+            }
+            $updates[$itemId] = (float) $normalized;
         }
         fclose($fh);
 
-        $msg = "Import สำเร็จ อัปเดตยอดนับ {$updated} รายการ";
-        if ($skipped !== []) {
-            $msg .= ' (ไม่พบรหัสในใบนี้ '.count($skipped).' รายการ เช่น '.implode(', ', array_slice($skipped, 0, 5)).')';
+        $missing = $items->filter(fn ($item) => ! isset($seen[$item->id]));
+        if ($missing->isNotEmpty()) {
+            $errors[] = 'ไฟล์มีรายการไม่ครบ '.number_format($missing->count()).' รายการ';
+        }
+        if ($errors !== []) {
+            throw ValidationException::withMessages(['file' => implode(' · ', array_slice($errors, 0, 8))]);
+        }
+
+        DB::transaction(function () use ($updates, $stockCount): void {
+            $locked = StockCount::whereKey($stockCount->id)->lockForUpdate()->firstOrFail();
+            abort_unless($locked->isEditable(), 422, 'ใบนี้ปรับปรุงแล้ว แก้ไขไม่ได้');
+            foreach ($updates as $id => $counted) {
+                StockCountItem::where('stock_count_id', $locked->id)->whereKey($id)
+                    ->update(['counted_qty' => $counted]);
+            }
+        });
+
+        $blankCount = $items->count() - count($updates);
+        $msg = 'Import สำเร็จ อัปเดตยอดนับ '.number_format(count($updates)).' รายการ';
+        if ($blankCount > 0) {
+            $msg .= ' · เว้นว่าง '.number_format($blankCount).' รายการ (โหมดนับบางส่วน)';
         }
 
         return redirect()->route('stock-counts.show', $stockCount)->with('success', $msg);

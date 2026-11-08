@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['doc_number', 'branch_id', 'warehouse_location_id', 'status', 'count_mode', 'submitted_by', 'submitted_at', 'confirmed_by', 'confirmed_at', 'posted_document_id', 'note'])]
+#[Fillable(['doc_number', 'branch_id', 'warehouse_location_id', 'status', 'count_mode', 'count_date', 'product_scope', 'submitted_by', 'submitted_at', 'confirmed_by', 'confirmed_at', 'posted_document_id', 'note'])]
 class StockCount extends Model
 {
     public function branch(): BelongsTo
@@ -37,7 +37,7 @@ class StockCount extends Model
 
     protected function casts(): array
     {
-        return ['submitted_at' => 'datetime', 'confirmed_at' => 'datetime'];
+        return ['count_date' => 'date', 'submitted_at' => 'datetime', 'confirmed_at' => 'datetime'];
     }
 
     /** วันที่ใบตรวจนับค้างสถานะกำลังนับได้ก่อนแจ้งเตือน (ข้อ 18) */

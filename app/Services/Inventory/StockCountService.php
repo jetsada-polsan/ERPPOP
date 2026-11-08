@@ -4,7 +4,6 @@ namespace App\Services\Inventory;
 
 use App\Models\Branch;
 use App\Models\Document;
-use App\Models\StockBalance;
 use App\Models\StockCount;
 use App\Models\StockCountItem;
 use App\Models\WarehouseLocation;
@@ -26,7 +25,7 @@ class StockCountService
     ) {}
 
     /**
-     * @param  array{branch_id:int, warehouse_location_id:?int, note:?string}  $data
+     * @param  array{branch_id:int, warehouse_location_id:?int, product_scope?:string, note:?string}  $data
      */
     public function create(array $data): StockCount
     {
@@ -52,25 +51,34 @@ class StockCountService
                 'warehouse_location_id' => $locationId,
                 'status' => 'counting',
                 'count_mode' => $data['count_mode'] ?? 'partial',
+                'product_scope' => $data['product_scope'] ?? 'active',
+                'count_date' => now()->toDateString(),
                 'note' => $data['note'] ?? null,
             ]);
 
-            // Snapshot ยอดระบบ ณ ตอนเปิดใบ: ทุกสินค้า active ที่มีแถวสต๊อกในตำแหน่งนี้
-            $rows = StockBalance::where('warehouse_location_id', $locationId)
-                ->join('products', 'products.id', '=', 'stock_balances.product_id')
-                ->where('products.is_active', true)
+            // Snapshot the selected product catalog, including products with no balance row.
+            $products = DB::table('products')
+                ->leftJoin('stock_balances', function ($join) use ($locationId): void {
+                    $join->on('stock_balances.product_id', '=', 'products.id')
+                        ->where('stock_balances.warehouse_location_id', '=', $locationId);
+                })
+                ->whereNull('products.deleted_at')
+                ->when(($data['product_scope'] ?? 'active') === 'active', fn ($q) => $q->where('products.is_active', true))
+                ->when(($data['product_scope'] ?? 'active') === 'inactive', fn ($q) => $q->where('products.is_active', false))
                 ->orderBy('products.sku_code')
-                ->get(['stock_balances.product_id', 'stock_balances.on_hand_qty'])
+                ->get(['products.id as product_id', 'stock_balances.on_hand_qty']);
+
+            $rows = $products
                 ->map(fn ($b) => [
                     'stock_count_id' => $count->id,
                     'product_id' => $b->product_id,
-                    'system_qty' => DecimalMath::round($b->on_hand_qty, DecimalMath::QUANTITY_SCALE),
+                    'system_qty' => DecimalMath::round($b->on_hand_qty ?? 0, DecimalMath::QUANTITY_SCALE),
                     'counted_qty' => null,
                     'note' => null,
                 ]);
 
             if ($rows->isEmpty()) {
-                throw new RuntimeException('ตำแหน่งเก็บนี้ยังไม่มีข้อมูลสต๊อกให้ตรวจนับ');
+                throw new RuntimeException('ไม่พบสินค้าในขอบเขตที่เลือกสำหรับตรวจนับ');
             }
 
             foreach ($rows->chunk(500) as $chunk) {
@@ -93,9 +101,10 @@ class StockCountService
                 throw new RuntimeException('ใบตรวจนับต้องอยู่ในสถานะรอตรวจก่อนยืนยัน');
             }
 
-            $counted = $locked->count_mode === 'full_zero_missing'
-                ? $locked->items()->get()->each(fn ($item) => $item->counted_qty ??= 0)
-                : $locked->items()->whereNotNull('counted_qty')->get();
+            $counted = $locked->items()->whereNotNull('counted_qty')->get();
+            if ($locked->count_mode === 'full_zero_missing' && $locked->items()->whereNull('counted_qty')->exists()) {
+                throw new RuntimeException('โหมดนับเต็มต้องกรอกหรือ import จำนวนจริงให้ครบทุกสินค้า รวมรายการที่นับได้ 0');
+            }
             if ($counted->isEmpty()) {
                 throw new RuntimeException('ยังไม่มียอดนับจริงในใบนี้ กรอกหรือ import ยอดก่อนปรับปรุง');
             }
@@ -111,6 +120,7 @@ class StockCountService
             $document = $this->adjustments->create([
                 'branch_id' => $locked->branch_id,
                 'warehouse_location_id' => $locked->warehouse_location_id,
+                'doc_date' => $locked->count_date,
                 'remark' => 'ปรับปรุงจากใบตรวจนับ '.$locked->doc_number.($remark ? ' | '.$remark : ''),
                 'items' => $diffItems->map(fn ($i) => [
                     'product_id' => $i->product_id,
