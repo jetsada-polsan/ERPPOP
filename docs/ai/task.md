@@ -1,3 +1,22 @@
+# Handoff — 2026-11-08 (stock count export and print readability)
+
+## Commit
+`3df86092d5d879a34aa670146599709f372e10ca` on `codex/stock-count-print-20261108` (pushed to origin).
+
+## ทำอะไรไป
+- ใบตรวจนับ export ใช้สินค้าทั้งหมดของคลัง/สาขาที่ระบุ รวม inactive และยอดศูนย์ พร้อมตัวกรองสถานะ/หมวด, ลำดับรายการ, หน่วยใหญ่/ย่อยและตัวคูณ.
+- CSV แยกยอดระบบและช่องนับหน่วยใหญ่/ย่อย; import ตรวจเอกสาร/สาขา/คลัง/ตัวคูณ และบันทึกเฉพาะรายการที่ใส่ยอดนับ โดยไม่เปลี่ยนสินค้าอื่น.
+- ปรับตัวพิมพ์ใบส่งของชั่วคราวและใบรวมจองให้อ่านง่ายขึ้น และจัดหัวเอกสารไม่ให้สามเหลี่ยมมุมสีทับข้อความ.
+
+## ทดสอบไปแล้วแค่ไหน
+- `php -d memory_limit=1G vendor/bin/phpunit --filter='InventoryApprovalAndCloseTest|PrintablePageSizeTest' --no-coverage` — ผ่าน 21 tests, 75 assertions.
+- `php -d memory_limit=1G vendor/bin/phpunit --no-coverage` — ผ่าน 840 tests, 2 skipped, 6 incomplete, 7,069 assertions.
+- `vendor/bin/pint --dirty`, `php artisan view:cache`, `php artisan view:clear`, `git diff --check` — ผ่าน.
+
+## ความเสี่ยง/งานถัดไป
+- Production deploy ผ่าน workflow `Deploy ERP`; Run #221 ถูกยกเลิกก่อน deploy หลังเลือก environment ไม่ตรง, Run #222 ถูก dispatch โดยเลือก `production` ชัดเจนและกำลังตรวจผล.
+- ยังไม่ได้แก้/นำเข้าข้อมูลจริงหรือสร้างใบตรวจนับ production; หลัง deploy ควร UAT export/import แยกสาขาโดยใช้ไฟล์ทดลองและตรวจจำนวนสินค้าครบ.
+
 # Handoff — 2026-11-06 (P0 money integrity — workspace only)
 
 ## Commit / ขอบเขต
