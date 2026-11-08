@@ -4,13 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use App\Models\ProductBarcode;
+use App\Models\ProductCategory;
 use App\Models\StockCount;
 use App\Models\StockCountItem;
 use App\Models\WarehouseLocation;
 use App\Services\Inventory\StockCountService;
+use App\Support\DecimalMath;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -93,7 +96,9 @@ class StockCountController extends Controller
             'counted' => $i->counted_qty !== null ? (float) $i->counted_qty : null,
         ])->values();
 
-        return view('stock-counts.show', compact('stockCount', 'itemsJson'));
+        $categories = ProductCategory::query()->orderBy('name_th')->get(['id', 'name_th']);
+
+        return view('stock-counts.show', compact('stockCount', 'itemsJson', 'categories'));
     }
 
     // Bulk save typed counts: { items: [{id, counted}] }
@@ -127,30 +132,50 @@ class StockCountController extends Controller
     }
 
     // CSV export (UTF-8 BOM so Excel opens Thai correctly) for offline counting
-    public function export(StockCount $stockCount): StreamedResponse
+    public function export(Request $request, StockCount $stockCount, StockCountService $service): StreamedResponse
     {
+        $filters = $request->validate([
+            'active' => ['nullable', 'in:all,1,0'],
+            'category_id' => ['nullable', 'integer', 'exists:product_categories,id'],
+        ]);
+        $service->addMissingCatalogItems($stockCount);
         $stockCount->load(['branch', 'warehouseLocation']);
         $items = StockCountItem::where('stock_count_id', $stockCount->id)
             ->join('products', 'products.id', '=', 'stock_count_items.product_id')
             ->leftJoin('product_units', 'product_units.id', '=', 'products.base_unit_id')
+            ->when(($filters['active'] ?? 'all') !== 'all', fn ($query) => $query->where('products.is_active', (bool) $filters['active']))
+            ->when(isset($filters['category_id']), fn ($query) => $query->where('products.product_category_id', $filters['category_id']))
             ->orderBy('products.sku_code')
             ->get([
-                'products.sku_code', 'products.name_th',
-                'product_units.name as unit_name',
-                'stock_count_items.system_qty', 'stock_count_items.counted_qty',
+                'products.id as product_id', 'products.sku_code', 'products.name_th',
+                'product_units.name as unit_name', 'stock_count_items.system_qty', 'stock_count_items.counted_qty',
             ]);
+        $unitOptions = DB::table('product_barcodes as pb')
+            ->leftJoin('product_units as pu', 'pu.id', '=', 'pb.unit_id')
+            ->whereIn('pb.product_id', $items->pluck('product_id')->unique())
+            ->where('pb.is_active', true)->where('pb.unit_factor', '>', 1)
+            ->orderByDesc('pb.unit_factor')->orderBy('pb.id')
+            ->get(['pb.product_id', 'pb.unit_factor', 'pu.name as large_unit_name'])->groupBy('product_id');
 
-        return response()->streamDownload(function () use ($stockCount, $items) {
+        return response()->streamDownload(function () use ($stockCount, $items, $unitOptions) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF");
             fputcsv($out, ['ใบตรวจนับ', $stockCount->doc_number, 'สาขา', $stockCount->branch->name_th, 'ตำแหน่งเก็บ', $stockCount->warehouseLocation->name]);
-            fputcsv($out, ['รหัสสินค้า', 'ชื่อสินค้า', 'หน่วย', 'จำนวนตามระบบ', 'จำนวนนับจริง', 'หมายเหตุ']);
-            foreach ($items as $i) {
+            fputcsv($out, ['ลำดับ', 'รหัสสินค้า', 'ชื่อสินค้า', 'หน่วยหลัก', 'ตัวคูณเป็นหน่วยย่อย', 'จำนวนตามระบบ (หน่วยหลัก)', 'หน่วยย่อย', 'จำนวนตามระบบ (หน่วยย่อย)', 'นับจริง (หน่วยหลัก)', 'นับจริง (หน่วยย่อย)', 'หมายเหตุ']);
+            foreach ($items as $index => $item) {
+                $option = $unitOptions->get($item->product_id)?->first();
+                $factor = (float) ($option->unit_factor ?? 1);
+                $systemQty = (float) $item->system_qty;
+                $mainQty = $option ? ($systemQty >= 0 ? floor($systemQty / $factor) : ceil($systemQty / $factor)) : 0;
+                $subQty = $option ? $systemQty - ($mainQty * $factor) : $systemQty;
+                $mainUnit = trim((string) preg_replace('/\s*[x*×]\s*\d+(?:\.\d+)?$/u', '', $option?->large_unit_name ?: '-'));
+                $countedQty = $item->counted_qty !== null ? (float) $item->counted_qty : null;
+                $countedMain = $countedQty !== null && $option ? ($countedQty >= 0 ? floor($countedQty / $factor) : ceil($countedQty / $factor)) : null;
+                $countedSub = $countedQty === null ? '' : $this->csvQuantity($option ? $countedQty - ($countedMain * $factor) : $countedQty);
                 fputcsv($out, [
-                    $i->sku_code, $i->name_th, $i->unit_name ?? '-',
-                    (float) $i->system_qty,
-                    $i->counted_qty !== null ? (float) $i->counted_qty : '',
-                    '',
+                    $index + 1, $item->sku_code, $item->name_th, $mainUnit, $option ? $option->unit_factor : 1,
+                    $option ? $this->csvQuantity($mainQty) : '', $item->unit_name ?? '-', $this->csvQuantity($subQty),
+                    $countedMain !== null ? $this->csvQuantity($countedMain) : '', $countedSub, '',
                 ]);
             }
             fclose($out);
@@ -158,7 +183,7 @@ class StockCountController extends Controller
     }
 
     // Import the filled CSV back: matches by รหัสสินค้า, fills counted qty
-    public function import(Request $request, StockCount $stockCount): RedirectResponse
+    public function import(Request $request, StockCount $stockCount, StockCountService $service): RedirectResponse
     {
         abort_unless($stockCount->isEditable(), 422, 'ใบนี้ปรับปรุงแล้ว แก้ไขไม่ได้');
 
@@ -167,19 +192,52 @@ class StockCountController extends Controller
             ['file.mimes' => 'รองรับไฟล์ .csv เท่านั้น (ใน Excel ใช้ Save As > CSV UTF-8)'],
         );
 
-        $itemIdBySku = StockCountItem::where('stock_count_id', $stockCount->id)
-            ->join('products', 'products.id', '=', 'stock_count_items.product_id')
-            ->pluck('stock_count_items.id', 'products.sku_code');
+        $stockCount->loadMissing(['branch', 'warehouseLocation']);
+        $metaHandle = fopen($request->file('file')->getRealPath(), 'r');
+        $metadata = fgetcsv($metaHandle) ?: [];
+        fclose($metaHandle);
+        $metadata = array_map(fn ($value) => trim((string) $value), $metadata);
+        $metadata[0] = preg_replace('/^\xEF\xBB\xBF/', '', $metadata[0] ?? '');
+        $branchLabel = array_search('สาขา', $metadata, true);
+        $locationLabel = array_search('ตำแหน่งเก็บ', $metadata, true);
+        if ($branchLabel !== false || $locationLabel !== false) {
+            $sameDocument = ($metadata[0] ?? null) === 'ใบตรวจนับ' && ($metadata[1] ?? null) === $stockCount->doc_number;
+            $sameBranch = $branchLabel !== false && ($metadata[$branchLabel + 1] ?? null) === $stockCount->branch->name_th;
+            $sameLocation = $locationLabel !== false && ($metadata[$locationLabel + 1] ?? null) === $stockCount->warehouseLocation->name;
+            if (! $sameDocument || ! $sameBranch || ! $sameLocation) {
+                return back()->withErrors(['file' => 'ไฟล์นี้เป็นของใบตรวจนับ/สาขา/ตำแหน่งเก็บอื่น กรุณาใช้ไฟล์ที่ส่งออกจากใบนี้']);
+            }
+        }
 
-        $updated = 0;
+        $service->addMissingCatalogItems($stockCount);
+        $itemRecords = StockCountItem::where('stock_count_id', $stockCount->id)
+            ->join('products', 'products.id', '=', 'stock_count_items.product_id')
+            ->get(['stock_count_items.id as item_id', 'products.id as product_id', 'products.sku_code'])
+            ->keyBy('sku_code');
+        $itemIdBySku = $itemRecords->map(fn ($item) => $item->item_id);
+        $packFactorByProduct = DB::table('product_barcodes')->whereIn('product_id', $itemRecords->pluck('product_id')->unique())
+            ->where('is_active', true)->where('unit_factor', '>', 1)->orderByDesc('unit_factor')->orderBy('id')
+            ->get(['product_id', 'unit_factor'])->groupBy('product_id')
+            ->map(fn ($options) => (string) $options->first()->unit_factor);
+
+        $countedBySku = [];
         $skipped = [];
+        $invalid = [];
+        $header = [];
         $fh = fopen($request->file('file')->getRealPath(), 'r');
         $rowNo = 0;
         while (($row = fgetcsv($fh)) !== false) {
             $rowNo++;
             $sku = trim((string) ($row[0] ?? ''));
             $sku = preg_replace('/^\xEF\xBB\xBF/', '', $sku);
-            $counted = trim((string) ($row[4] ?? ''));
+            if ($rowNo === 2) {
+                $header = array_flip(array_map(fn ($value) => trim((string) $value), $row));
+            }
+            $skuIndex = $header['รหัสสินค้า'] ?? 0;
+            $sku = trim((string) ($row[$skuIndex] ?? $sku));
+            $sku = preg_replace('/^\xEF\xBB\xBF/', '', $sku);
+            $hasSplitCount = isset($header['นับจริง (หน่วยหลัก)'], $header['นับจริง (หน่วยย่อย)'], $header['ตัวคูณเป็นหน่วยย่อย']);
+            $counted = trim((string) ($row[$header['จำนวนนับจริง'] ?? 4] ?? ''));
 
             // Skip header/meta rows and rows without a counted value
             if ($sku === '' || ! isset($itemIdBySku[$sku])) {
@@ -189,22 +247,72 @@ class StockCountController extends Controller
 
                 continue;
             }
-            if ($counted === '' || ! is_numeric(str_replace(',', '', $counted))) {
+            if ($hasSplitCount) {
+                $mainCount = str_replace(',', '', trim((string) ($row[$header['นับจริง (หน่วยหลัก)']] ?? '')));
+                $subCount = str_replace(',', '', trim((string) ($row[$header['นับจริง (หน่วยย่อย)']] ?? '')));
+                if ($mainCount === '' && $subCount === '') {
+                    continue;
+                }
+                $factor = str_replace(',', '', trim((string) ($row[$header['ตัวคูณเป็นหน่วยย่อย']] ?? '')));
+                $item = $itemRecords->get($sku);
+                $currentFactor = $packFactorByProduct->get($item->product_id ?? 0, '1');
+                if (($mainCount !== '' && (! is_numeric($mainCount) || (float) $mainCount < 0))
+                    || ($subCount !== '' && (! is_numeric($subCount) || (float) $subCount < 0))
+                    || ! is_numeric($factor) || (float) $factor <= 0 || DecimalMath::compare($factor, $currentFactor) !== 0) {
+                    $invalid[] = $sku;
+
+                    continue;
+                }
+                $countedBySku[$sku] = (float) DecimalMath::add(
+                    DecimalMath::multiply($mainCount === '' ? '0' : $mainCount, $currentFactor, DecimalMath::QUANTITY_SCALE),
+                    $subCount === '' ? '0' : $subCount,
+                    DecimalMath::QUANTITY_SCALE,
+                );
+
                 continue;
             }
+            $counted = str_replace(',', '', $counted);
+            if ($counted === '') {
+                continue;
+            }
+            if (! is_numeric($counted) || (float) $counted < 0) {
+                $invalid[] = $sku;
 
-            StockCountItem::whereKey($itemIdBySku[$sku])
-                ->update(['counted_qty' => (float) str_replace(',', '', $counted)]);
-            $updated++;
+                continue;
+            }
+            $countedBySku[$sku] = (float) $counted;
         }
         fclose($fh);
 
-        $msg = "Import สำเร็จ อัปเดตยอดนับ {$updated} รายการ";
+        if ($invalid !== []) {
+            return back()->withErrors(['file' => 'จำนวนต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป ตรวจรหัสสินค้า: '.implode(', ', array_slice($invalid, 0, 5))]);
+        }
+        if ($countedBySku === []) {
+            return back()->withErrors(['file' => 'ไม่พบรหัสสินค้าในใบนี้ที่มีจำนวนนับจริง กรุณาตรวจไฟล์ก่อนนำเข้า']);
+        }
+        $updated = DB::transaction(function () use ($stockCount, $countedBySku, $itemIdBySku) {
+            $lockedCount = StockCount::query()->whereKey($stockCount->id)->lockForUpdate()->firstOrFail();
+            abort_unless($lockedCount->isEditable(), 422, 'ใบนี้ปรับปรุงแล้ว แก้ไขไม่ได้');
+            StockCountItem::where('stock_count_id', $lockedCount->id)->update(['counted_qty' => null]);
+            $lockedCount->update(['count_mode' => 'partial']);
+            foreach ($countedBySku as $sku => $counted) {
+                StockCountItem::where('stock_count_id', $lockedCount->id)->whereKey($itemIdBySku[$sku])->update(['counted_qty' => $counted]);
+            }
+
+            return count($countedBySku);
+        });
+
+        $msg = "Import สำเร็จ {$updated} รายการ — ใช้เฉพาะรหัสที่มีจำนวนในไฟล์ สินค้าอื่นไม่ถูกปรับ";
         if ($skipped !== []) {
             $msg .= ' (ไม่พบรหัสในใบนี้ '.count($skipped).' รายการ เช่น '.implode(', ', array_slice($skipped, 0, 5)).')';
         }
 
         return redirect()->route('stock-counts.show', $stockCount)->with('success', $msg);
+    }
+
+    private function csvQuantity(float|int $value): string
+    {
+        return rtrim(rtrim(number_format((float) $value, DecimalMath::QUANTITY_SCALE, '.', ''), '0'), '.');
     }
 
     // Post differences as a stock adjustment document

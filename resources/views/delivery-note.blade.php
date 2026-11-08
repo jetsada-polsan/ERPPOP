@@ -46,28 +46,31 @@
 
         /* The shared print theme defaults .page to A4. Keep this slip A5 landscape on screen and paper. */
         .page.delivery-note-page .doc-head { gap: 4mm !important; margin-bottom: 8px !important; padding-bottom: 2mm !important; }
-        .page.delivery-note-page .company .name { font-size: 12px !important; }
-        .page.delivery-note-page .company .sub { font-size: 8.5px !important; line-height: 1.25 !important; }
-        .page.delivery-note-page .doc-meta { font-size: 8.5px !important; }
+        .page.delivery-note-page .company .name { font-size: 14px !important; }
+        .page.delivery-note-page .company .sub { font-size: 11px !important; line-height: 1.3 !important; }
+        .page.delivery-note-page .copy-label { text-align: right; font-size: 11px; font-weight: 700; }
+        .page.delivery-note-page .doc-meta { max-width: 48mm !important; margin-right: 17mm !important; padding-right: 0 !important; white-space: normal !important; font-size: 10.5px !important; line-height: 1.35 !important; }
         .page.delivery-note-page .doc-meta b { min-width: 11mm !important; }
-        .page.delivery-note-page .info-row { display: grid !important; grid-template-columns: 55mm minmax(0, 1fr) !important; gap: 2mm !important; margin: 2mm 0 !important; }
-        .page.delivery-note-page .info-box { padding: 1.5mm 2mm !important; border-radius: 2mm !important; font-size: 8.5px !important; }
+        .page.delivery-note-page .info-row { display: grid !important; grid-template-columns: 55mm minmax(0, 1fr) !important; gap: 2mm !important; margin: 2.5mm 0 !important; }
+        .page.delivery-note-page .info-box { padding: 1.7mm 2mm !important; border-radius: 2mm !important; font-size: 11px !important; line-height: 1.35 !important; }
         .page.delivery-note-page .info-box.left { width: auto !important; min-width: 0 !important; }
         .page.delivery-note-page .info-box b { min-width: 16mm !important; }
         .page.delivery-note-page table.items { margin-top: 1mm !important; }
         .page.delivery-note-page table.items th,
-        .page.delivery-note-page table.items td { padding: 1mm 1.2mm !important; font-size: 8.5px !important; }
-        .page.delivery-note-page .qc-row { display: grid !important; grid-template-columns: minmax(0, 1fr) 50mm !important; gap: 2mm !important; margin-top: 1.5mm !important; padding-top: 1.5mm !important; }
-        .page.delivery-note-page .qc-left { font-size: 8px !important; }
+        .page.delivery-note-page table.items td { padding: 1.2mm 1.3mm !important; font-size: 11px !important; line-height: 1.3 !important; }
+        .page.delivery-note-page .qc-row { display: grid !important; grid-template-columns: minmax(0, 1fr) 50mm !important; gap: 2mm !important; margin-top: 2mm !important; padding-top: 2mm !important; }
+        .page.delivery-note-page .qc-left { font-size: 10.5px !important; }
         .page.delivery-note-page .qc-left { min-width: 0 !important; overflow: hidden !important; }
-        .page.delivery-note-page .qc-item { gap: 1mm !important; margin-right: 1mm !important; font-size: 8px !important; }
-        .page.delivery-note-page .qc-box { width: 3.5mm !important; height: 3.5mm !important; }
-        .page.delivery-note-page .totals { width: 50mm !important; max-width: 50mm !important; min-width: 0 !important; overflow: hidden !important; font-size: 8px !important; }
+        .page.delivery-note-page .qc-item { gap: 1mm !important; margin-right: 1mm !important; font-size: 10px !important; }
+        .page.delivery-note-page .qc-box { width: 3.8mm !important; height: 3.8mm !important; }
+        .page.delivery-note-page .totals { width: 50mm !important; max-width: 50mm !important; min-width: 0 !important; overflow: hidden !important; font-size: 10px !important; }
         .page.delivery-note-page .totals .row span:first-child { min-width: 0 !important; white-space: nowrap !important; }
         .page.delivery-note-page .totals .row { gap: 1mm !important; margin-bottom: 1mm !important; }
-        .page.delivery-note-page .totals .val { min-width: 17mm !important; padding: .5mm 1mm !important; }
+        .page.delivery-note-page .totals .val { min-width: 17mm !important; padding: .7mm 1mm !important; }
         .page.delivery-note-page .sign-row { gap: 4mm !important; margin-top: 8mm !important; }
-        .page.delivery-note-page .sign { width: auto !important; font-size: 8.5px !important; }
+        .page.delivery-note-page .sign { width: auto !important; font-size: 10px !important; }
+        .page.delivery-note-page::before { border-top-width: 18mm !important; border-left-width: 18mm !important; }
+        .page.delivery-note-page::after { top: 4mm !important; right: 3.5mm !important; font-size: 15px !important; }
         @media screen {
             body:not(.layout-fixed) .page.delivery-note-page {
                 width: min(210mm, calc(100vw - 32px)) !important;
@@ -101,7 +104,7 @@
 
 @foreach($typeCode === 'BOOKING' ? ['สำหรับพนักงาน (นำกลับ)', 'สำหรับลูกค้า'] : [null] as $copyLabel)
 <div class="page delivery-note-page">
-    @if($copyLabel)<div style="text-align:right;font-size:10px;font-weight:700">{{ $copyLabel }}</div>@endif
+    @if($copyLabel)<div class="copy-label">{{ $copyLabel }}</div>@endif
     <div class="doc-head">
         <div class="logo-box">
             @if($logo = \App\Models\AppSetting::logoUrl())

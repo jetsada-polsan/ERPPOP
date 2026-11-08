@@ -62,9 +62,15 @@
             <span class="badge text-bg-warning">ต่าง <span x-text="diffCount.toLocaleString()"></span></span>
 
             <div class="ms-auto d-flex gap-2 flex-wrap">
-                <a href="{{ route('stock-counts.export', $stockCount) }}" class="btn btn-outline-success btn-sm">
-                    <i class="bi bi-file-earmark-excel me-1"></i>Export Excel (CSV)
-                </a>
+                <form method="get" action="{{ route('stock-counts.export', $stockCount) }}" class="d-flex gap-1 align-items-center flex-wrap">
+                    <select name="active" class="form-select form-select-sm" aria-label="สถานะสินค้า" style="width:auto">
+                        <option value="all">สินค้าทุกสถานะ</option><option value="1">ใช้งาน</option><option value="0">ไม่ใช้งาน</option>
+                    </select>
+                    <select name="category_id" class="form-select form-select-sm" aria-label="หมวดสินค้า" style="width:auto">
+                        <option value="">ทุกหมวด</option>@foreach($categories as $category)<option value="{{ $category->id }}">{{ $category->name_th }}</option>@endforeach
+                    </select>
+                    <button class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-excel me-1"></i>Export CSV</button>
+                </form>
                 @if($stockCount->isEditable())
                 <form method="post" action="{{ route('stock-counts.import', $stockCount) }}" enctype="multipart/form-data" class="d-flex gap-1">
                     @csrf
@@ -94,6 +100,9 @@
                 @endif
             </div>
         </div>
+        @if($stockCount->isEditable())
+        <div class="small text-muted mt-2">Export เฉพาะสาขา/คลังตามหัวใบ เลือกสถานะหรือหมวดสินค้าได้ · CSV มีลำดับและแยกหน่วยใหญ่/หน่วยย่อย · Import จับคู่รหัสสินค้าและรวมยอดกลับเป็นหน่วยฐาน ใช้เฉพาะรายการที่กรอกยอด สินค้านอกไฟล์ไม่ถูกปรับ</div>
+        @endif
     </div>
 
     {{-- Entry grid --}}
