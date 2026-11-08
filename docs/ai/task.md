@@ -5145,6 +5145,7 @@ pending
 - งานถัดไป: Build/install UAT และให้เจ้าของกรอก PIN บนเครื่องจริงเพื่อเก็บ error เปิดกะจาก ERP หากยังไม่ผ่าน
 
 ## Handoff - 2026-11-08 (Codex: ขยายตัวพิมพ์เอกสารส่งของและใบรวมจอง)
+- Commit: `d2b6063`
 - Branch: `codex/print-document-readability` สร้างจาก `origin/main` ล่าสุด (`1653b49`); นำเข้าเฉพาะการเปลี่ยนแปลงสองแม่แบบพิมพ์ ไม่รวม POS changes จาก branch เก่า
 - ทำอะไร: ปรับ typography เฉพาะ print ของใบส่งของ A5 และใบรวมจอง A4 ให้อ่านง่ายขึ้น; ให้หัวตารางซ้ำบนหน้าถัดไปและป้องกันแถวตารางแตกข้ามหน้า
 - ตรวจ: `git diff --check` ผ่าน; ยังไม่ได้เปิด print preview ใน browser. workflow deploy จะรัน PHPUnit, report search test และ build assets ก่อน deploy
