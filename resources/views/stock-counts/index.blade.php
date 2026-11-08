@@ -41,14 +41,14 @@
         <div class="col-md-2">
             <label class="form-label small text-muted">โหมดการนับ</label>
             <select name="count_mode" class="form-select" required>
-                <option value="partial">นับบางส่วน (ปลอดภัย)</option>
+                <option value="partial">นับบางส่วน (ยอดว่างไม่เปลี่ยนสต็อก)</option>
                 <option value="full_zero_missing">นับเต็ม — รายการไม่ได้นับเป็น 0</option>
             </select>
         </div>
         <div class="col-md-2"><label class="form-label small text-muted">หมายเหตุ</label><input name="note" class="form-control" value="{{ old('note') }}" placeholder="เช่น ตรวจนับสิ้นเดือน"></div>
         <div class="col-md-2 d-flex align-items-end"><button class="btn btn-primary w-100"><i class="bi bi-clipboard-plus me-1"></i>เปิดใบตรวจนับ</button></div>
     </form>
-    <p class="text-muted small mb-0 mt-2">ระบบจะดึงสินค้าทุกตัวที่มีสต๊อกในตำแหน่งเก็บนั้นมาเป็นรายการตรวจนับ พร้อมยอดตามระบบ ณ ตอนเปิดใบ</p>
+    <p class="text-muted small mb-0 mt-2">ระบบจะใส่สินค้าทุกตัวในทะเบียน ทั้งที่ใช้งานและปิดใช้งาน รวมถึงยอดศูนย์ พร้อมยอดตามระบบ ณ ตอนเปิดใบ</p>
 </div>
 
 <div class="content-card p-4">

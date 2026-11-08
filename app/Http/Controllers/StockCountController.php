@@ -127,8 +127,10 @@ class StockCountController extends Controller
     }
 
     // CSV export (UTF-8 BOM so Excel opens Thai correctly) for offline counting
-    public function export(StockCount $stockCount): StreamedResponse
+    public function export(StockCount $stockCount, StockCountService $service): StreamedResponse
     {
+        // ใบที่เปิดไว้ก่อนแก้ระบบจะถูกเติมรายการสินค้าที่ยังขาดก่อนดาวน์โหลด
+        $service->addMissingCatalogItems($stockCount);
         $stockCount->load(['branch', 'warehouseLocation']);
         $items = StockCountItem::where('stock_count_id', $stockCount->id)
             ->join('products', 'products.id', '=', 'stock_count_items.product_id')

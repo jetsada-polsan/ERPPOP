@@ -4,7 +4,6 @@ namespace App\Services\Inventory;
 
 use App\Models\Branch;
 use App\Models\Document;
-use App\Models\StockBalance;
 use App\Models\StockCount;
 use App\Models\StockCountItem;
 use App\Models\WarehouseLocation;
@@ -55,22 +54,25 @@ class StockCountService
                 'note' => $data['note'] ?? null,
             ]);
 
-            // Snapshot ยอดระบบ ณ ตอนเปิดใบ: ทุกสินค้า active ที่มีแถวสต๊อกในตำแหน่งนี้
-            $rows = StockBalance::where('warehouse_location_id', $locationId)
-                ->join('products', 'products.id', '=', 'stock_balances.product_id')
-                ->where('products.is_active', true)
-                ->orderBy('products.sku_code')
-                ->get(['stock_balances.product_id', 'stock_balances.on_hand_qty'])
+            // Snapshot สินค้าทุกตัวจากทะเบียน รวม inactive และสินค้ายอดศูนย์
+            // การนับบางส่วนจะเว้นยอดว่างไว้โดยไม่ปรับสต็อก ส่วนการนับเต็มจะตีความยอดว่างเป็นศูนย์
+            $rows = DB::table('products as p')
+                ->leftJoin('stock_balances as sb', fn ($join) => $join
+                    ->on('sb.product_id', '=', 'p.id')
+                    ->where('sb.warehouse_location_id', '=', $locationId))
+                ->whereNull('p.deleted_at')
+                ->orderBy('p.sku_code')
+                ->get(['p.id as product_id', 'sb.on_hand_qty'])
                 ->map(fn ($b) => [
                     'stock_count_id' => $count->id,
                     'product_id' => $b->product_id,
-                    'system_qty' => DecimalMath::round($b->on_hand_qty, DecimalMath::QUANTITY_SCALE),
+                    'system_qty' => DecimalMath::round($b->on_hand_qty ?? 0, DecimalMath::QUANTITY_SCALE),
                     'counted_qty' => null,
                     'note' => null,
                 ]);
 
             if ($rows->isEmpty()) {
-                throw new RuntimeException('ตำแหน่งเก็บนี้ยังไม่มีข้อมูลสต๊อกให้ตรวจนับ');
+                throw new RuntimeException('ยังไม่มีสินค้าในทะเบียนให้ตรวจนับ');
             }
 
             foreach ($rows->chunk(500) as $chunk) {
@@ -78,6 +80,39 @@ class StockCountService
             }
 
             return $count;
+        });
+    }
+
+    /** เติมสินค้าที่ขาดในใบเก่าที่ยังแก้ไขได้ เพื่อให้ export/import ครบทั้งทะเบียน */
+    public function addMissingCatalogItems(StockCount $count): int
+    {
+        if (! $count->isEditable()) {
+            return 0;
+        }
+
+        return DB::transaction(function () use ($count) {
+            $existingIds = StockCountItem::where('stock_count_id', $count->id)->pluck('product_id');
+            $rows = DB::table('products as p')
+                ->leftJoin('stock_balances as sb', fn ($join) => $join
+                    ->on('sb.product_id', '=', 'p.id')
+                    ->where('sb.warehouse_location_id', '=', $count->warehouse_location_id))
+                ->whereNull('p.deleted_at')
+                ->whereNotIn('p.id', $existingIds)
+                ->orderBy('p.sku_code')
+                ->get(['p.id as product_id', 'sb.on_hand_qty'])
+                ->map(fn ($product) => [
+                    'stock_count_id' => $count->id,
+                    'product_id' => $product->product_id,
+                    'system_qty' => DecimalMath::round($product->on_hand_qty ?? 0, DecimalMath::QUANTITY_SCALE),
+                    'counted_qty' => null,
+                    'note' => null,
+                ]);
+
+            foreach ($rows->chunk(500) as $chunk) {
+                StockCountItem::insert($chunk->values()->all());
+            }
+
+            return $rows->count();
         });
     }
 

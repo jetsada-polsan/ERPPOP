@@ -2,10 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Models\Branch;
 use App\Models\Permission;
+use App\Models\Product;
+use App\Models\ProductUnit;
 use App\Models\ReportDefinition;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\Warehouse;
+use App\Models\WarehouseLocation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -48,15 +53,30 @@ class ReportExportTest extends TestCase
             ->assertForbidden();
     }
 
-    /** เจ้าของสั่ง 2026-11-02: พิมพ์เฉพาะหน้าปัจจุบันตามหน้าจอ ส่วนข้อมูลครบใช้ export */
-    public function test_print_mode_prints_the_current_page_like_the_screen(): void
+    public function test_print_mode_ignores_screen_pagination_and_loads_all_report_rows(): void
     {
+        $branch = Branch::create(['code' => 'B001', 'name_th' => 'สาขาทดสอบ', 'is_active' => true]);
+        $warehouse = Warehouse::create(['branch_id' => $branch->id, 'code' => 'WH1', 'name' => 'คลังทดสอบ']);
+        $location = WarehouseLocation::create(['warehouse_id' => $warehouse->id, 'code' => 'MAIN', 'name' => 'พื้นที่หลัก']);
+        $branch->update(['default_warehouse_location_id' => $location->id]);
+        $unit = ProductUnit::create(['code' => 'EA', 'name' => 'ชิ้น', 'qty_per_base_unit' => 1]);
+        foreach (range(1, 30) as $number) {
+            Product::create([
+                'sku_code' => sprintf('SKU-%03d', $number), 'name_th' => 'สินค้า '.$number,
+                'base_unit_id' => $unit->id, 'is_active' => true, 'is_vat' => false,
+            ]);
+        }
+
+        ReportDefinition::where('code', 'inventory.stock_balance')->update(['enabled' => true, 'status' => 'available']);
+
         $response = $this->actingAs($this->exporter())
-            ->get('/reports?category=sales&report=daily_sales&print=1&per_page=50');
+            ->get('/reports?category=inventory&report=stock_balance&print=1&per_page=10');
 
         $response->assertOk();
         $this->assertTrue($response->viewData('printMode'));
-        $this->assertSame(50, $response->viewData('perPage'));
+        $this->assertSame(50001, $response->viewData('filters')['per_page']);
+        $this->assertFalse($response->viewData('printTruncated'));
+        $this->assertGreaterThan(25, count($response->viewData('result')['rows']));
     }
 
     public function test_xlsx_export_downloads_a_real_spreadsheet(): void
@@ -86,7 +106,7 @@ class ReportExportTest extends TestCase
 
     private function exporter(): User
     {
-        return $this->userWith(['reports.view', 'reports.export', 'reports.all_branches']);
+        return $this->userWith(['reports.view', 'reports.export', 'reports.all_branches', 'stock.manage']);
     }
 
     /** @param  array<int, string>  $codes */

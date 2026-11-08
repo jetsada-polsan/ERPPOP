@@ -45,7 +45,6 @@ class ReportController extends Controller
         if (! in_array($perPage, [10, 25, 50, 100], true)) {
             $perPage = 25;
         }
-        // พิมพ์เฉพาะหน้าปัจจุบันตามตัวกรองเดียวกับหน้าจอ ไม่ดึงทั้งรายงาน
         $user = auth()->user();
         $canSeeAllBranches = $user === null || $user->canSeeAllReportBranches();
         $requestedBranch = $request->input('branch_id');
@@ -65,6 +64,13 @@ class ReportController extends Controller
             'paginate' => true,
         ];
 
+        if ($printMode) {
+            // พิมพ์ทั้งรายงาน ไม่ผูกกับหน้า/จำนวนแถวที่แสดงบนจอ; ดึงเพิ่มหนึ่งแถวเพื่อตรวจจับการชนเพดาน
+            $filters['per_page'] = self::PRINT_ROW_CAP + 1;
+            $filters['page'] = 1;
+            $filters['paginate'] = false;
+        }
+
         // ส่งออกทั้งรายงาน ไม่ใช่เท่าที่แสดงบนจอ — per_page เป็น LIMIT ของ query
         // ถ้าใช้ค่าเดียวกับหน้าจอ คนกดออกไฟล์ภาษีขายจะได้ข้อมูลไม่ครบโดยไม่รู้ตัว
         if (in_array($request->input('export'), ['csv', 'xlsx'], true)) {
@@ -77,6 +83,13 @@ class ReportController extends Controller
                 : $this->streamCsv($category, $report, $result);
         }
 
+        $result = $this->runReport($category, $report, $from, $to, $filters);
+        $printTruncated = $printMode && collect($result['rows'])->count() > self::PRINT_ROW_CAP;
+        if ($printTruncated) {
+            $result['rows'] = collect($result['rows'])->take(self::PRINT_ROW_CAP)->values();
+            $result['total'] = max((int) ($result['total'] ?? 0), self::PRINT_ROW_CAP + 1);
+        }
+
         return view('reports.index', [
             'catalog' => $catalog,
             'selectedCategory' => $category,
@@ -87,13 +100,14 @@ class ReportController extends Controller
             'perPage' => $perPage,
             'printMode' => $printMode,
             'printRowCap' => self::PRINT_ROW_CAP,
+            'printTruncated' => $printTruncated,
             'canSeeAllBranches' => $canSeeAllBranches,
             'canExport' => $user === null || $user->hasPermission('reports.export'),
             'branchLocked' => ! $canSeeAllBranches && $user->reportBranchIds(null)->isEmpty(),
             'branches' => DB::table('branches')
                 ->when(! $canSeeAllBranches, fn ($query) => $query->whereIn('id', $user->reportBranchIds(null)->all()))
                 ->orderBy('code')->get(['id', 'code', 'name_th']),
-            'result' => $this->runReport($category, $report, $from, $to, $filters),
+            'result' => $result,
         ]);
     }
 
@@ -105,8 +119,8 @@ class ReportController extends Controller
      */
     private const EXPORT_ROW_CAP = 50000;
 
-    /** เพดานแถวตอนสั่งพิมพ์ — สูงกว่าหน้าจอ แต่ไม่ถึงขั้นพิมพ์พันหน้าโดยไม่ตั้งใจ */
-    private const PRINT_ROW_CAP = 2000;
+    /** เพดานความปลอดภัยตอนพิมพ์; ต้องสูงพอสำหรับรายงานสินค้าทั้งทะเบียน */
+    private const PRINT_ROW_CAP = 50000;
 
     /**
      * ส่งออกเป็น .xlsx จริง ไม่ใช่ CSV เปลี่ยนนามสกุล

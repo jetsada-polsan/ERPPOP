@@ -341,6 +341,12 @@
                 </div>
             </div>
 
+            @if($printMode && ($printTruncated ?? false))
+                <div class="alert alert-warning py-2" role="alert">
+                    พิมพ์ได้ {{ number_format($printRowCap) }} รายการแรกจากรายงานนี้ ผลลัพธ์เกินเพดานการพิมพ์ กรุณาใช้ดาวน์โหลด Excel/CSV เพื่อรับข้อมูลทั้งหมด
+                </div>
+            @endif
+
             <div class="content-card overflow-hidden">
                 <div class="flow-report-summary no-print">
                     <div class="flow-report-meta">

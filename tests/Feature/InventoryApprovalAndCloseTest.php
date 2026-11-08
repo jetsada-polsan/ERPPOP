@@ -66,6 +66,40 @@ class InventoryApprovalAndCloseTest extends TestCase
         $counts->create(['branch_id' => $branch->id, 'warehouse_location_id' => $location->id, 'count_mode' => 'partial']);
     }
 
+    public function test_stock_count_includes_inactive_and_zero_balance_catalog_products(): void
+    {
+        [$branch, $location, $product] = $this->masters();
+        $inactive = Product::create([
+            'sku_code' => 'SKU-2', 'name_th' => 'สินค้าปิดใช้งาน', 'base_unit_id' => $product->base_unit_id,
+            'average_cost' => 0, 'is_active' => false, 'is_vat' => false, 'negative_stock_policy' => 'block',
+        ]);
+        StockBalance::create(['product_id' => $product->id, 'warehouse_location_id' => $location->id, 'on_hand_qty' => 4, 'reserved_qty' => 0]);
+
+        $count = app(StockCountService::class)->create([
+            'branch_id' => $branch->id, 'warehouse_location_id' => $location->id, 'count_mode' => 'full_zero_missing',
+        ]);
+
+        $this->assertDatabaseCount('stock_count_items', 2);
+        $this->assertDatabaseHas('stock_count_items', ['stock_count_id' => $count->id, 'product_id' => $inactive->id, 'system_qty' => 0]);
+    }
+
+    public function test_export_backfills_missing_products_for_an_existing_editable_count(): void
+    {
+        [$branch, $location, $product] = $this->masters();
+        $count = app(StockCountService::class)->create([
+            'branch_id' => $branch->id, 'warehouse_location_id' => $location->id, 'count_mode' => 'partial',
+        ]);
+        $additional = Product::create([
+            'sku_code' => 'SKU-2', 'name_th' => 'สินค้าเพิ่มภายหลัง', 'base_unit_id' => $product->base_unit_id,
+            'average_cost' => 0, 'is_active' => true, 'is_vat' => false, 'negative_stock_policy' => 'block',
+        ]);
+
+        $added = app(StockCountService::class)->addMissingCatalogItems($count);
+
+        $this->assertSame(1, $added);
+        $this->assertDatabaseHas('stock_count_items', ['stock_count_id' => $count->id, 'product_id' => $additional->id, 'system_qty' => 0]);
+    }
+
     public function test_stock_adjustment_does_not_change_stock_until_another_user_approves(): void
     {
         [$branch, $location, $product] = $this->masters();
