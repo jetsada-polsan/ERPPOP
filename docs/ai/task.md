@@ -5151,6 +5151,6 @@ pending
 - ทำอะไร: ล็อกการสร้าง/แก้/ลบเอกสารสต็อก, รายการเอกสารสต็อก และ stock movements ที่ลงวันที่ในงวดปิด; การเปิดงวดใหม่ต้องมี `--reason=` และบันทึกเหตุผล audit
 - Migration: `2026_11_08_000001_add_scope_and_count_date_to_stock_counts` เพิ่ม `count_date` และ `product_scope`; SQLite migration ผ่านใน test suite, production PostgreSQL ให้ workflow migrate
 - ทดสอบ: `php -d memory_limit=1G vendor/bin/phpunit --no-coverage` ผ่าน 845 tests / 7,075 assertions (2 skipped, 6 incomplete); `php artisan view:cache` ผ่าน; `git diff --check` ผ่าน
-- Deploy: รอ push branch และสั่ง workflow `Deploy ERP` environment `production`; deploy ได้รับอนุญาตจากเจ้าของในแชตนี้
+- Deploy: push branch แล้ว (`7942cb5`); ยังไม่ได้รัน workflow `Deploy ERP` เพราะ GitHub บังคับให้เจ้าของยืนยัน 2FA ที่เพิ่งตั้งค่าในหน้า Actions ก่อน; deploy production ได้รับอนุญาตจากเจ้าของในแชตนี้
 - ข้อจำกัด/UAT: การตรวจนับเต็มบังคับทุกคลังที่มีแถว stock balance หรือ movement ในเดือน; ผู้ใช้ต้องเลือก “ทั้งหมด”, export, กรอกตัวเลขทุกรายการ (ใส่ 0 เมื่อไม่มี), import, submit/approve ให้สถานะ posted ก่อนปิดต้นทุน
-- งานถัดไป: push, deploy ผ่าน GitHub Actions production และตรวจ health หลัง deploy โดยไม่สร้าง/ลบข้อมูลธุรกิจจริง
+- งานถัดไป: ให้เจ้าของยืนยัน 2FA ใน Chrome แล้วสั่ง workflow `Deploy ERP` environment `production`; ตรวจ health หลัง deploy โดยไม่สร้าง/ลบข้อมูลธุรกิจจริง
