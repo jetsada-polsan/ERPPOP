@@ -7,6 +7,7 @@ use App\Models\Branch;
 use App\Models\ChartOfAccount;
 use App\Models\Customer;
 use App\Models\CustomerOpenItem;
+use App\Models\DocumentBook;
 use App\Models\DocumentType;
 use App\Models\Product;
 use App\Models\ProductUnit;
@@ -88,6 +89,13 @@ class PaymentBankAccountChoiceTest extends TestCase
     {
         foreach ([['PURCHASE', 'in'], ['CREDIT_SALE', 'out'], ['BOOKING', 'none'], ['RECEIPT', 'none'], ['PAYMENT_VOUCHER', 'none']] as [$code, $effect]) {
             DocumentType::firstOrCreate(['code' => $code], ['name_th' => $code, 'stock_effect' => $effect]);
+        }
+        $creditSaleType = DocumentType::where('code', 'CREDIT_SALE')->sole();
+        foreach ([['DS', false, true], ['DSN', true, false]] as [$code, $noVat, $default]) {
+            DocumentBook::firstOrCreate(
+                ['document_type_id' => $creditSaleType->id, 'code' => $code],
+                ['name' => $code, 'prefix' => $code, 'no_vat' => $noVat, 'is_default' => $default, 'is_active' => true],
+            );
         }
         $this->actingAs(User::factory()->create(['username' => 'bank_choice']));
         $branch = Branch::create(['code' => 'BK', 'name_th' => 'สาขาธนาคาร', 'is_active' => true]);

@@ -20,6 +20,7 @@ use App\Services\Inventory\FifoStockService;
 use App\Services\Inventory\NegativeStockPolicyService;
 use App\Support\DecimalMath;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -44,14 +45,27 @@ class CreditSaleService
         private readonly NegativeStockPolicyService $negativeStockPolicy,
     ) {}
 
-    public function convertBookingToCreditSale(SaleBooking $booking, ?DocumentBook $book = null): Document
+    public function convertBookingToCreditSale(SaleBooking $booking): Document
+    {
+        // Preserve the legacy single-document return contract for internal callers;
+        // actual conversion now follows each product's VAT master status.
+        return $this->convertBookingToCreditSalesByVat($booking)->firstOrFail();
+    }
+
+    /**
+     * Confirm a booking as one or two credit-sale documents, assigning each line
+     * to DS or DSN from the product's VAT master flag. Stock and reservations are
+     * consumed once inside the same transaction; the delivery note remains the
+     * original single booking document.
+     *
+     * @return Collection<int, Document>
+     */
+    public function convertBookingToCreditSalesByVat(SaleBooking $booking): Collection
     {
         $documentType = DocumentType::where('code', DocumentType::CREDIT_SALE)->firstOrFail();
-        $book ??= DocumentBook::defaultFor(DocumentType::CREDIT_SALE);
 
-        return DB::transaction(function () use ($booking, $documentType, $book) {
+        return DB::transaction(function () use ($booking, $documentType) {
             $lockedBooking = SaleBooking::whereKey($booking->id)->lockForUpdate()->firstOrFail();
-
             if ($lockedBooking->status !== SaleBooking::STATUS_PENDING) {
                 throw new RuntimeException("ใบจองนี้ถูกใช้ไปแล้ว (สถานะปัจจุบัน: {$lockedBooking->status})");
             }
@@ -62,100 +76,123 @@ class CreditSaleService
                 throw new RuntimeException('ใบจองนี้ไม่มีรายการสินค้า');
             }
 
-            // คอนเฟิร์มบิลตอนบ่าย ระหว่างรถยังส่งของอยู่ได้ ตัดสต๊อกและตั้งลูกหนี้ตอนนี้
             $saleDate = $lockedBooking->delivered_at?->toDateString() ?? now()->toDateString();
             $this->periods->assertOpen($saleDate, $bookingDocument->branch_id);
-
-            $totalQty = DecimalMath::sum($sourceItems->pluck('qty'), DecimalMath::QUANTITY_SCALE);
-            $totalAmount = DecimalMath::sum(
-                $sourceItems->map(fn ($item) => DecimalMath::multiply($item->qty, $item->unit_price)),
-            );
-
-            $saleDocument = Document::create([
-                'document_type_id' => $documentType->id,
-                'document_book_id' => $book?->id,
-                'branch_id' => $bookingDocument->branch_id,
-                'doc_number' => $book
-                    ? $this->numbers->nextInBook($book, $bookingDocument->branch_id, $saleDate)
-                    : $this->numbers->next(DocumentType::CREDIT_SALE, $bookingDocument->branch_id, $saleDate),
-                'doc_date' => $saleDate,
-                'salesman_id' => $bookingDocument->salesman_id,
-                'sales_user_id' => $bookingDocument->sales_user_id,
-                'sales_area_id' => $bookingDocument->sales_area_id,
-                'customer_id' => $bookingDocument->customer_id,
-                'reference' => $bookingDocument->doc_number,
-                'status' => 'active',
-                'total_items' => $sourceItems->count(),
-                'total_amount' => $totalAmount,
-            ]);
-
-            $stockDocument = StockDocument::create([
-                'document_id' => $saleDocument->id,
-                'total_qty' => $totalQty,
-                'total_items' => $sourceItems->count(),
-                'refer_reference' => $bookingDocument->doc_number,
-            ]);
-
-            $seq = 1;
             $products = Product::whereIn('id', $sourceItems->pluck('product_id')->unique())->get()->keyBy('id');
-            $branch = Branch::findOrFail($bookingDocument->branch_id);
-            foreach ($sourceItems as $item) {
-                $productId = (int) $item->product_id;
-                $qty = $item->qty;
-                $fallbackCost = $products->get($productId)?->average_cost ?? 0;
-
-                $balance = StockBalance::firstOrCreate(
-                    ['product_id' => $productId, 'warehouse_location_id' => $item->warehouse_location_id],
-                    ['on_hand_qty' => 0, 'reserved_qty' => 0]
-                );
-                // ตัด FIFO lot จริงก่อน แล้วคิดต้นทุนขายจาก Lot ที่ถูกตัดจริง (ดู CashSaleService)
-                $balance->decrement('reserved_qty', $qty);
-                $allocations = $this->fifo->issue(
-                    $productId,
-                    (int) $item->warehouse_location_id,
-                    $qty,
-                    $saleDocument->id,
-                    allowNegative: $branch->allowsNegativeStock()
-                        && $this->negativeStockPolicy->policyFor($products->get($productId)) === 'allow'
-                        && ($products->get($productId)?->negative_stock_policy ?? 'allow') === 'allow',
-                );
-                $unitCost = $this->costing->unitCostFromAllocations($allocations, $qty, $fallbackCost);
-
-                StockDocumentItem::create([
-                    'stock_document_id' => $stockDocument->id,
-                    'seq' => $seq++,
-                    'product_id' => $productId,
-                    'warehouse_location_id' => $item->warehouse_location_id,
-                    'qty' => $qty,
-                    'unit_price' => $item->unit_price,
-                    'unit_cost' => $unitCost,
-                    'cost_amount' => DecimalMath::multiply($qty, $unitCost),
-                ]);
+            if ($products->count() !== $sourceItems->pluck('product_id')->unique()->count()) {
+                throw new RuntimeException('พบสินค้าที่ถูกลบหรือไม่มีข้อมูล VAT ไม่สามารถยืนยันใบจองได้');
             }
 
-            CustomerOpenItem::create([
-                'customer_id' => $bookingDocument->customer_id,
-                'document_id' => $saleDocument->id,
-                'salesman_id' => $bookingDocument->salesman_id,
-                'sales_user_id' => $bookingDocument->sales_user_id,
-                'gross_amount' => $totalAmount,
-                'net_amount' => $totalAmount,
-                'balance_amount' => $totalAmount,
-                'due_date' => Carbon::parse($saleDate)
-                    ->addDays((int) (AppSetting::get('default_credit_days') ?: self::DEFAULT_CREDIT_DAYS))
-                    ->toDateString(),
-                'status' => CustomerOpenItem::STATUS_OPEN,
-            ]);
+            $groups = $sourceItems->groupBy(fn ($item) => $products->get((int) $item->product_id)->is_vat ? 'taxable' : 'no_vat');
+            $books = DocumentBook::where('document_type_id', $documentType->id)
+                ->where('is_active', true)
+                ->orderByDesc('is_default')->orderBy('id')->get();
+            $created = collect();
+            $branch = Branch::findOrFail($bookingDocument->branch_id);
 
+            foreach (['taxable', 'no_vat'] as $vatGroup) {
+                $items = $groups->get($vatGroup, collect());
+                if ($items->isEmpty()) {
+                    continue;
+                }
+
+                $noVat = $vatGroup === 'no_vat';
+                $book = $books->first(fn (DocumentBook $candidate) => (bool) $candidate->no_vat === $noVat);
+                if (! $book) {
+                    $label = $noVat ? 'DSN (เล่มไม่มีภาษี)' : 'DS (เล่มปกติ)';
+                    throw new RuntimeException("ยังไม่มีเล่ม {$label} ที่เปิดใช้งาน กรุณาตั้งค่าเล่มเอกสารก่อนยืนยัน");
+                }
+
+                $totalQty = DecimalMath::sum($items->pluck('qty'), DecimalMath::QUANTITY_SCALE);
+                $totalAmount = DecimalMath::sum($items->map(fn ($item) => DecimalMath::multiply($item->qty, $item->unit_price)));
+                $saleDocument = Document::create([
+                    'document_type_id' => $documentType->id,
+                    'document_book_id' => $book->id,
+                    'branch_id' => $bookingDocument->branch_id,
+                    'doc_number' => $this->numbers->nextInBook($book, $bookingDocument->branch_id, $saleDate),
+                    'doc_date' => $saleDate,
+                    'salesman_id' => $bookingDocument->salesman_id,
+                    'sales_user_id' => $bookingDocument->sales_user_id,
+                    'sales_area_id' => $bookingDocument->sales_area_id,
+                    'customer_id' => $bookingDocument->customer_id,
+                    'reference' => $bookingDocument->doc_number,
+                    'status' => 'active',
+                    'total_items' => $items->count(),
+                    'total_amount' => $totalAmount,
+                ]);
+
+                $stockDocument = StockDocument::create([
+                    'document_id' => $saleDocument->id,
+                    'total_qty' => $totalQty,
+                    'total_items' => $items->count(),
+                    'refer_reference' => $bookingDocument->doc_number,
+                ]);
+
+                $seq = 1;
+                foreach ($items as $item) {
+                    $productId = (int) $item->product_id;
+                    $qty = $item->qty;
+                    $product = $products->get($productId);
+                    $balance = StockBalance::firstOrCreate(
+                        ['product_id' => $productId, 'warehouse_location_id' => $item->warehouse_location_id],
+                        ['on_hand_qty' => 0, 'reserved_qty' => 0]
+                    );
+                    $balance->decrement('reserved_qty', $qty);
+                    $allocations = $this->fifo->issue(
+                        $productId,
+                        (int) $item->warehouse_location_id,
+                        $qty,
+                        $saleDocument->id,
+                        allowNegative: $branch->allowsNegativeStock()
+                            && $this->negativeStockPolicy->policyFor($product) === 'allow'
+                            && ($product->negative_stock_policy ?? 'allow') === 'allow',
+                    );
+                    $unitCost = $this->costing->unitCostFromAllocations($allocations, $qty, $product->average_cost ?? 0);
+                    StockDocumentItem::create([
+                        'stock_document_id' => $stockDocument->id,
+                        'seq' => $seq++,
+                        'product_id' => $productId,
+                        'warehouse_location_id' => $item->warehouse_location_id,
+                        'qty' => $qty,
+                        'unit_price' => $item->unit_price,
+                        'unit_cost' => $unitCost,
+                        'cost_amount' => DecimalMath::multiply($qty, $unitCost),
+                    ]);
+                }
+
+                CustomerOpenItem::create([
+                    'customer_id' => $bookingDocument->customer_id,
+                    'document_id' => $saleDocument->id,
+                    'salesman_id' => $bookingDocument->salesman_id,
+                    'sales_user_id' => $bookingDocument->sales_user_id,
+                    'gross_amount' => $totalAmount,
+                    'net_amount' => $totalAmount,
+                    'balance_amount' => $totalAmount,
+                    'due_date' => Carbon::parse($saleDate)
+                        ->addDays((int) (AppSetting::get('default_credit_days') ?: self::DEFAULT_CREDIT_DAYS))
+                        ->toDateString(),
+                    'status' => CustomerOpenItem::STATUS_OPEN,
+                ]);
+
+                $this->glPosting->postCreditSale($saleDocument);
+                $created->push($saleDocument->fresh(['documentBook']));
+            }
+
+            $primary = $created->first(fn (Document $document) => ! $document->documentBook?->no_vat) ?? $created->first();
             $lockedBooking->update([
                 'status' => SaleBooking::STATUS_CONVERTED,
                 'confirmed_at' => now(),
-                'confirmed_document_id' => $saleDocument->id,
+                'confirmed_document_id' => $primary->id,
             ]);
+            foreach ($created as $document) {
+                DB::table('sale_booking_documents')->insert([
+                    'sale_booking_id' => $lockedBooking->id,
+                    'document_id' => $document->id,
+                    'vat_group' => (bool) $document->documentBook?->no_vat ? 'no_vat' : 'taxable',
+                ]);
+            }
 
-            $this->glPosting->postCreditSale($saleDocument);
-
-            return $saleDocument->fresh();
+            return $created;
         });
     }
 }

@@ -31,6 +31,6 @@ class DocumentBook extends Model
 
     protected function casts(): array
     {
-        return ['is_default' => 'boolean', 'is_active' => 'boolean'];
+        return ['is_default' => 'boolean', 'is_active' => 'boolean', 'no_vat' => 'boolean'];
     }
 }

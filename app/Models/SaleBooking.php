@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 #[Fillable([
     'document_id', 'salesman_id', 'sales_user_id', 'sales_area_id', 'status', 'confirmed_at', 'confirmed_document_id',
@@ -64,6 +65,12 @@ class SaleBooking extends Model
     public function confirmedDocument(): BelongsTo
     {
         return $this->belongsTo(Document::class, 'confirmed_document_id');
+    }
+
+    public function confirmedDocuments(): BelongsToMany
+    {
+        return $this->belongsToMany(Document::class, 'sale_booking_documents')
+            ->withPivot('vat_group');
     }
 
     protected function casts(): array

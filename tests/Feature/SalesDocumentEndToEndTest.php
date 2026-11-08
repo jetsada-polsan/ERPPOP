@@ -7,6 +7,7 @@ use App\Models\ChartOfAccount;
 use App\Models\Customer;
 use App\Models\CustomerOpenItem;
 use App\Models\Document;
+use App\Models\DocumentBook;
 use App\Models\DocumentType;
 use App\Models\GlJournal;
 use App\Models\Permission;
@@ -17,8 +18,6 @@ use App\Models\SaleBooking;
 use App\Models\StockBalance;
 use App\Models\Supplier;
 use App\Models\SupplierOpenItem;
-use App\Models\TransportJob;
-use App\Models\TransportLoadItem;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseLocation;
@@ -222,6 +221,59 @@ class SalesDocumentEndToEndTest extends TestCase
         $this->assertSame('CREDIT_SALE', $postings[0]->channel);
     }
 
+    public function test_booking_confirmation_splits_taxable_and_non_taxable_products_into_ds_and_dsn_once(): void
+    {
+        [$branch, $location, $nonVatProduct, $customer] = $this->stockedBranch('DSDSN', 10, 60, true);
+        $vatProduct = Product::create([
+            'sku_code' => 'SKU-DSDSN-VAT', 'name_th' => 'สินค้าคิด VAT',
+            'base_unit_id' => $nonVatProduct->base_unit_id, 'default_price' => 100,
+            'average_cost' => 60, 'is_vat' => true, 'is_active' => true,
+            'negative_stock_policy' => 'block',
+        ]);
+        $supplier = Supplier::where('code', 'SUPDSDSN')->sole();
+        app(PurchaseService::class)->create([
+            'branch_id' => $branch->id, 'supplier_id' => $supplier->id, 'is_credit' => true,
+            'prices_include_vat' => false,
+            'items' => [['product_id' => $vatProduct->id, 'qty' => 5, 'unit_price' => 60]],
+        ]);
+
+        $bookingDocument = app(BookingService::class)->create([
+            'branch_id' => $branch->id, 'customer_id' => $customer->id,
+            'items' => [
+                ['product_id' => $nonVatProduct->id, 'qty' => 2, 'unit_price' => 100],
+                ['product_id' => $vatProduct->id, 'qty' => 3, 'unit_price' => 100],
+            ],
+        ]);
+        $booking = SaleBooking::where('document_id', $bookingDocument->id)->sole();
+        $sales = app(CreditSaleService::class)->convertBookingToCreditSalesByVat($booking);
+
+        $this->assertCount(2, $sales);
+        $ds = $sales->first(fn (Document $sale) => ! $sale->documentBook->no_vat);
+        $dsn = $sales->first(fn (Document $sale) => $sale->documentBook->no_vat);
+        $this->assertNotNull($ds);
+        $this->assertNotNull($dsn);
+        $this->assertSame(300.0, (float) $ds->total_amount);
+        $this->assertSame(200.0, (float) $dsn->total_amount);
+        $this->assertSame(19.63, round((float) $ds->fresh()->vat_amount, 2));
+        $this->assertSame(0.0, (float) $dsn->fresh()->vat_amount);
+        $this->assertSame(2, $booking->fresh()->confirmedDocuments()->count());
+        $this->assertSame($ds->id, (int) $booking->fresh()->confirmed_document_id);
+
+        $this->assertDatabaseHas('stock_balances', [
+            'product_id' => $nonVatProduct->id, 'warehouse_location_id' => $location->id,
+            'on_hand_qty' => 8, 'reserved_qty' => 0,
+        ]);
+        $this->assertDatabaseHas('stock_balances', [
+            'product_id' => $vatProduct->id, 'warehouse_location_id' => $location->id,
+            'on_hand_qty' => 2, 'reserved_qty' => 0,
+        ]);
+        $this->assertSame(2, CustomerOpenItem::whereIn('document_id', $sales->pluck('id'))->count());
+        foreach ($sales as $sale) {
+            $this->assertGlBalanced($sale);
+            $this->assertSame(1, DB::table('sales_postings')->where('document_id', $sale->id)->count());
+        }
+    }
+
     public function test_cancelling_a_pending_booking_releases_its_reservation(): void
     {
         [$branch, $location, $product, $customer] = $this->stockedBranch('CANBK', qty: 10, unitCost: 60, withCustomer: true);
@@ -308,6 +360,13 @@ class SalesDocumentEndToEndTest extends TestCase
         DocumentType::firstOrCreate(['code' => 'CASH_SALE'], ['name_th' => 'ใบขายสด', 'stock_effect' => 'out']);
         DocumentType::firstOrCreate(['code' => 'CREDIT_SALE'], ['name_th' => 'ใบขายเชื่อ', 'stock_effect' => 'out']);
         DocumentType::firstOrCreate(['code' => 'BOOKING'], ['name_th' => 'ใบจอง', 'stock_effect' => 'none']);
+        $creditSaleType = DocumentType::where('code', 'CREDIT_SALE')->sole();
+        foreach ([['DS', false, true], ['DSN', true, false]] as [$code, $noVat, $default]) {
+            DocumentBook::firstOrCreate(
+                ['document_type_id' => $creditSaleType->id, 'code' => $code],
+                ['name' => $code, 'prefix' => $code, 'no_vat' => $noVat, 'is_default' => $default, 'is_active' => true],
+            );
+        }
 
         $branch = Branch::create(['code' => $suffix, 'name_th' => 'สาขา '.$suffix, 'is_active' => true]);
         $warehouse = Warehouse::create(['branch_id' => $branch->id, 'code' => 'WH'.$suffix, 'name' => 'คลัง']);

@@ -17,6 +17,10 @@ $isOverdue = $isDelivery && ! $deliveryDone && $booking->delivery_due_at && $boo
 $transportLoaded = $transportJob?->loaded_at !== null;
 $transportDelivered = $transportJob?->status === 'delivered';
 $canConvert = true;
+$confirmedSales = $booking->confirmedDocuments;
+$confirmedSaleNumbers = $confirmedSales->isNotEmpty()
+    ? $confirmedSales->pluck('doc_number')->implode(' / ')
+    : ($booking->confirmedDocument?->doc_number ?? null);
 $canEdit = $isPending && $booking->delivery_status === 'pending'
     && (! $transportJob || ($transportJob->status === 'booked' && $transportJob->loaded_at === null));
 @endphp
@@ -55,7 +59,7 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
             <div class="flow-step {{ $isConverted ? 'done' : 'pending' }}">
                 <div class="flow-dot"><i class="bi bi-receipt-cutoff"></i></div>
                 <div class="flow-label">ใบขาย / ลูกหนี้
-                    <div class="flow-sub">{{ $isConverted && $booking->confirmedDocument ? $booking->confirmedDocument->doc_number : 'หลังส่งครบ' }}</div>
+                    <div class="flow-sub">{{ $isConverted ? ($confirmedSaleNumbers ?: 'ออกใบขายแล้ว') : 'หลังส่งครบ' }}</div>
                 </div>
             </div>
         @else
@@ -63,7 +67,7 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
             <div class="flow-step {{ $isConverted ? 'done' : 'pending' }}">
                 <div class="flow-dot"><i class="bi bi-receipt-cutoff"></i></div>
                 <div class="flow-label">ใบขาย / ลูกหนี้
-                    <div class="flow-sub">{{ $isConverted && $booking->confirmedDocument ? $booking->confirmedDocument->doc_number : 'รับเองที่สาขา' }}</div>
+                    <div class="flow-sub">{{ $isConverted ? ($confirmedSaleNumbers ?: 'ออกใบขายแล้ว') : 'รับเองที่สาขา' }}</div>
                 </div>
             </div>
             <div class="flow-line"></div>
@@ -111,16 +115,10 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
             @if($isPending && $canConvert)
             <form method="post" action="{{ route('bookings.convert', $booking) }}" id="convert-form" class="booking-convert d-flex flex-column gap-2 align-items-end">
                 @csrf
-                @if($creditSaleBooks->isNotEmpty())
                 <div class="doc-book-picker">
-                    <div class="doc-book-label">เล่มเอกสาร DS / DSN</div>
-                <select name="document_book_id" class="form-select" style="width:auto" title="เล่มเอกสารขายเชื่อ">
-                    @foreach($creditSaleBooks as $book)
-                        <option value="{{ $book->id }}" @selected($book->is_default)>{{ $book->code }} - {{ $book->no_vat ? 'ไม่มีภาษี' : 'มีภาษี' }} ({{ number_format($book->documents_count) }} ใบ)</option>
-                    @endforeach
-                </select>
+                    <div class="doc-book-label">ระบบแยกใบขาย DS / DSN ให้อัตโนมัติตามสถานะ VAT ของสินค้า</div>
+                    <div class="small text-muted">ใบส่งของยังเป็นใบเดียว; สต๊อกและลูกหนี้จะบันทึกแยกตามแต่ละใบขาย</div>
                 </div>
-                @endif
                 <button type="button"
                     onclick="Swal.fire({ title:'แปลงเป็นใบขาย?', text:'จะตัดสต็อกและตั้งลูกหนี้ทันที{{ $isDelivery ? ' โดยใช้วันที่ส่งจริง' : '' }}', icon:'warning', showCancelButton:true, confirmButtonText:'ยืนยัน', cancelButtonText:'ยกเลิก', confirmButtonColor:'var(--erp-success-ink)' }).then(r => r.isConfirmed && document.getElementById('convert-form').submit())"
                     class="btn btn-success px-4">
@@ -131,10 +129,18 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
                 <button class="btn btn-outline-secondary px-4" disabled title="ต้องตรวจของ ขึ้นรถ และบันทึกส่งครบก่อน">
                     <i class="bi bi-hourglass-split me-1"></i> รอส่งครบก่อนออกใบขาย
                 </button>
-            @elseif($isConverted && $booking->confirmedDocument)
-            <a href="{{ route('sales.show', $booking->confirmedDocument) }}" class="btn btn-outline-success px-4">
-                <i class="bi bi-receipt-cutoff me-1"></i> ดูใบขาย {{ $booking->confirmedDocument->doc_number }}
-            </a>
+            @elseif($isConverted && ($confirmedSales->isNotEmpty() || $booking->confirmedDocument))
+            <div class="d-flex flex-wrap gap-2">
+                @forelse($confirmedSales as $saleDocument)
+                    <a href="{{ route('sales.show', $saleDocument) }}" class="btn btn-outline-success px-4">
+                        <i class="bi bi-receipt-cutoff me-1"></i> ดูใบขาย {{ $saleDocument->doc_number }}
+                    </a>
+                @empty
+                    <a href="{{ route('sales.show', $booking->confirmedDocument) }}" class="btn btn-outline-success px-4">
+                        <i class="bi bi-receipt-cutoff me-1"></i> ดูใบขาย {{ $booking->confirmedDocument->doc_number }}
+                    </a>
+                @endforelse
+            </div>
             @endif
         </div>
     </div>

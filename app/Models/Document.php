@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
@@ -89,6 +90,12 @@ class Document extends Model
     public function saleBooking(): HasOne
     {
         return $this->hasOne(SaleBooking::class);
+    }
+
+    public function sourceBookings(): BelongsToMany
+    {
+        return $this->belongsToMany(SaleBooking::class, 'sale_booking_documents')
+            ->withPivot('vat_group');
     }
 
     public function openItem(): HasOne

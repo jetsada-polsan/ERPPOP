@@ -15,7 +15,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use RuntimeException;
-use Illuminate\Support\Facades\DB;
 
 class BookingController extends Controller
 {
@@ -320,15 +319,13 @@ class BookingController extends Controller
     {
         $booking->load([
             'document.customer', 'document.branch', 'document.salesUser', 'document.salesArea',
-            'document.stockDocument.items.product.baseUnit', 'document.stockDocument.items.product.barcodes', 'confirmedDocument',
+            'document.stockDocument.items.product.baseUnit', 'document.stockDocument.items.product.barcodes',
+            'confirmedDocument', 'confirmedDocuments.documentBook',
         ]);
 
-        $creditSaleBooks = DocumentBook::withCount('documents')
-            ->whereHas('documentType', fn ($q) => $q->where('code', 'CREDIT_SALE'))
-            ->where('is_active', true)->orderByDesc('is_default')->orderBy('id')->get();
         $transportJob = TransportJob::where('booking_id', $booking->id)->first();
 
-        return view('bookings.show', compact('booking', 'creditSaleBooks', 'transportJob'));
+        return view('bookings.show', compact('booking', 'transportJob'));
     }
 
     public function cancel(Request $request, SaleBooking $booking, BookingService $service): RedirectResponse
@@ -336,7 +333,7 @@ class BookingController extends Controller
         $data = $request->validate(['reason' => ['nullable', 'string', 'max:200']]);
         try {
             $service->cancel($booking, $data['reason'] ?? null, $request->user()?->id);
-        } catch (\RuntimeException $error) {
+        } catch (RuntimeException $error) {
             return back()->with('error', $error->getMessage());
         }
 
@@ -345,25 +342,14 @@ class BookingController extends Controller
 
     public function convert(Request $request, SaleBooking $booking, CreditSaleService $service): RedirectResponse
     {
-        $data = $request->validate([
-            'document_book_id' => ['nullable', 'integer', 'exists:document_books,id'],
-        ]);
-
-        $book = null;
-        if (! empty($data['document_book_id'])) {
-            $book = DocumentBook::whereHas('documentType', fn ($q) => $q->where('code', 'CREDIT_SALE'))
-                ->where('is_active', true)
-                ->findOrFail($data['document_book_id']);
-        }
-
         try {
-            $saleDocument = $service->convertBookingToCreditSale($booking, $book);
+            $saleDocuments = $service->convertBookingToCreditSalesByVat($booking);
         } catch (RuntimeException $e) {
             return redirect()->route('bookings.show', $booking)->with('error', $e->getMessage());
         }
 
-        return redirect()->route('sales.show', $saleDocument)
-            ->with('success', "แปลงใบจองเป็นใบขายเชื่อ {$saleDocument->doc_number} แล้ว ตัดสต๊อกและตั้งลูกหนี้เรียบร้อย");
+        return redirect()->route('bookings.show', $booking)
+            ->with('success', 'แยกใบขายเชื่อตาม VAT ของสินค้าแล้ว: '.$saleDocuments->pluck('doc_number')->implode(' / ').' ตัดสต๊อกและตั้งลูกหนี้ครบแล้ว');
     }
 
     /** บันทึกผลการส่งของ — ส่งบางส่วน ส่งครบ หรือยกเลิกการส่ง */
@@ -393,6 +379,7 @@ class BookingController extends Controller
         abort_unless($booking->status === SaleBooking::STATUS_CONVERTED && $booking->confirmed_document_id, 422, 'ต้องแปลงเป็นใบขายก่อนจึงจะตรวจบัญชีได้');
         $data = $request->validate(['status' => ['required', 'in:approved,rejected'], 'note' => ['nullable', 'string', 'max:1000']]);
         $booking->update(['accounting_review_status' => $data['status'], 'accounting_reviewed_by' => $request->user()->id, 'accounting_reviewed_at' => now(), 'accounting_review_note' => $data['note'] ?? null]);
+
         return back()->with('success', $data['status'] === 'approved' ? 'ตรวจบัญชีผ่านแล้ว' : 'ตีกลับเอกสารให้แก้ไขแล้ว');
     }
 }

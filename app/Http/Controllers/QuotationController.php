@@ -182,7 +182,7 @@ class QuotationController extends Controller
         $quotation->loadMissing('items');
 
         try {
-            [$booking, $sale] = DB::transaction(function () use ($quotation, $data, $target, $bookings, $sales) {
+            [$booking, $saleDocuments] = DB::transaction(function () use ($quotation, $data, $target, $bookings, $sales) {
                 if (! $quotation->customer_id) {
                     $customerId = $data['customer_id'] ?? Customer::create([
                         'code' => $data['new_customer_code'] ?: $this->nextCustomerCode(),
@@ -207,19 +207,19 @@ class QuotationController extends Controller
                 ]);
                 $booking = $bookingDocument->saleBooking;
 
-                $sale = $target === 'sale' ? $sales->convertBookingToCreditSale($booking) : null;
+                $saleDocuments = $target === 'sale' ? $sales->convertBookingToCreditSalesByVat($booking) : null;
 
                 $quotation->update(['status' => 'accepted', 'converted_booking_id' => $booking->id]);
 
-                return [$booking, $sale];
+                return [$booking, $saleDocuments];
             });
         } catch (RuntimeException $e) {
             return back()->withErrors(['convert' => $e->getMessage()]);
         }
 
-        if ($sale) {
-            return redirect()->route('sales.show', $sale)
-                ->with('success', "แปลงใบเสนอราคา {$quotation->doc_number} เป็นใบขายเชื่อ {$sale->doc_number} แล้ว");
+        if ($saleDocuments) {
+            return redirect()->route('sales.show', $saleDocuments->first())
+                ->with('success', "แปลงใบเสนอราคา {$quotation->doc_number} และแยกใบขายตาม VAT แล้ว: ".$saleDocuments->pluck('doc_number')->implode(' / '));
         }
 
         return redirect()->route('bookings.show', $booking)

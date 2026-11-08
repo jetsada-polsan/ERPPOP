@@ -6,11 +6,14 @@ use App\Http\Middleware\ErpAuthorize;
 use App\Models\Branch;
 use App\Models\Customer;
 use App\Models\Document;
+use App\Models\DocumentBook;
 use App\Models\DocumentType;
+use App\Models\GlJournal;
 use App\Models\Permission;
 use App\Models\Product;
 use App\Models\ProductUnit;
 use App\Models\Role;
+use App\Models\StockBalance;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Warehouse;
@@ -19,7 +22,9 @@ use App\Services\Purchasing\PurchaseService;
 use App\Services\Sales\BookingService;
 use App\Services\Sales\CashSaleService;
 use App\Services\Sales\CreditSaleService;
+use App\Services\Sales\SaleReturnService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 /**
@@ -238,17 +243,17 @@ class SaleReturnSourceTest extends TestCase
             'doc_date' => now(), 'customer_id' => $customer->id, 'reference' => $sale->doc_number,
             'status' => 'active', 'total_amount' => '25.01']);
         $this->signIn(['finance.note.approve']);
-        $beforeStock = \App\Models\StockBalance::pluck('on_hand_qty', 'id')->all();
-        $beforeGl = \App\Models\GlJournal::count();
+        $beforeStock = StockBalance::pluck('on_hand_qty', 'id')->all();
+        $beforeGl = GlJournal::count();
         try {
-            app(\App\Services\Sales\SaleReturnService::class)->approve($return, auth()->id());
+            app(SaleReturnService::class)->approve($return, auth()->id());
             $this->fail('Approval must recheck remaining sale value');
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             $this->assertArrayHasKey('items', $e->errors());
         }
         $this->assertSame('pending_approval', $return->fresh()->status);
-        $this->assertSame($beforeStock, \App\Models\StockBalance::pluck('on_hand_qty', 'id')->all());
-        $this->assertSame($beforeGl, \App\Models\GlJournal::count());
+        $this->assertSame($beforeStock, StockBalance::pluck('on_hand_qty', 'id')->all());
+        $this->assertSame($beforeGl, GlJournal::count());
     }
 
     private function payload(Branch $branch, Product $product, float $qty, ?Customer $customer = null, ?string $source = null): array
@@ -279,6 +284,13 @@ class SaleReturnSourceTest extends TestCase
     {
         foreach ([['PURCHASE', 'in'], ['CASH_SALE', 'out'], ['CREDIT_SALE', 'out'], ['BOOKING', 'none'], ['SALE_RETURN', 'in']] as [$code, $effect]) {
             DocumentType::firstOrCreate(['code' => $code], ['name_th' => $code, 'stock_effect' => $effect]);
+        }
+        $creditSaleType = DocumentType::where('code', 'CREDIT_SALE')->sole();
+        foreach ([['DS', false, true], ['DSN', true, false]] as [$code, $noVat, $default]) {
+            DocumentBook::firstOrCreate(
+                ['document_type_id' => $creditSaleType->id, 'code' => $code],
+                ['name' => $code, 'prefix' => $code, 'no_vat' => $noVat, 'is_default' => $default, 'is_active' => true],
+            );
         }
         $branch = Branch::create(['code' => 'RS', 'name_th' => 'สาขารับคืน', 'is_active' => true]);
         $warehouse = Warehouse::create(['branch_id' => $branch->id, 'code' => 'WH-RS', 'name' => 'คลัง']);

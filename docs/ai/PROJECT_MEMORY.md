@@ -173,3 +173,10 @@
 - Supplier notes และ cash transfers ใช้สิทธิ์ทุกสาขาหรือ active branch assignments ตาม permission ของงาน; ห้ามบังคับด้วย `users.branch_id` อย่างเดียว. Branch assignment ที่หมดอายุ/ปิดแล้วไม่ขยายสิทธิ์กลับเป็นทุกสาขา.
 - Preview สต๊อกโหลดตามสาขา/ตำแหน่งเก็บที่เลือกหรือคลังหลักของสาขา; ทุนที่แสดงเป็น `products.average_cost` จริงของระบบเพื่อประมาณการ ไม่ใช่ต้นทุน FIFO ที่จะลงบัญชีตอนตัด Lot. Preview ไม่เขียนสต๊อก; ถ้าโหลดไม่สำเร็จไม่แสดง 0 แทนผลล้มเหลวและไม่ให้ส่งฟอร์ม.
 - งานรอบนี้อยู่บน `claude/erp-uat-bugs`; pull/stage/commit ถูก filesystem ปฏิเสธเพราะ metadata อยู่นอก workspace. ไฟล์ยังไม่ commit/push, ไม่มี migration, ไม่แตะ production. ดูตารางงาน/ผลทดสอบใน handoff ล่าสุดของ `docs/ai/task.md`.
+
+## ยืนยันใบจองแยก DS/DSN ตาม VAT สินค้า — 2026-11-08
+
+- ตอนคอนเฟิร์มใบจอง ระบบจัดบรรทัดจาก `products.is_vat`: กลุ่มคิด VAT ออก DS และกลุ่มไม่คิด VAT ออก DSN; ไม่ให้ผู้ใช้เลือกเล่มรวมรายการผิดกลุ่ม. สร้างเฉพาะเอกสารของกลุ่มที่มีสินค้า.
+- ใบขายทุกใบอ้างใบจองเดียวกันผ่าน `sale_booking_documents`; `sale_bookings.confirmed_document_id` คงชี้ DS เป็น primary (หรือ DSN เมื่อมีเฉพาะกลุ่มไม่คิด VAT) เพื่อ backward compatibility. ใบส่งของพิมพ์ยังใช้เอกสารใบจองเดียว.
+- ตัด reservation/FIFO stock, เปิด AR และลง GL ต่อแต่ละกลุ่มใน transaction เดียว; หากสร้างหรือ post ใบใดไม่ผ่าน ให้ rollback ทั้งชุด. รายงานยอดขายตามใบจองรวมเลขที่และยอดจากทุกใบที่ผูก.
+- Migration สร้างตารางเชื่อมและเติม DS/DSN เมื่อยังไม่มี; reset transactions ต้องล้างตารางเชื่อมก่อนลบใบจอง. ดูผล deploy และ UAT ใน handoff ล่าสุดของ `docs/ai/task.md`.

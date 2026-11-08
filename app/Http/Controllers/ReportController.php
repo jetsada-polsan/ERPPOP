@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ReportDefinition;
 use App\Services\Reports\StockBalanceReport;
 use App\Services\Reports\StockQuantityFormatter;
+use App\Support\DecimalMath;
 use App\Support\SqlDialect;
 use App\Support\XlsxWriter;
 use Carbon\Carbon;
@@ -1713,16 +1714,28 @@ class ReportController extends Controller
 
         $statusLabels = ['pending' => 'รอแปลงขาย', 'converted_to_sale' => 'แปลงขายแล้ว', 'cancelled' => 'ยกเลิก'];
 
-        return $query
+        $rows = $query
             ->orderByDesc('d.doc_date')->orderByDesc('d.id')
-            ->selectRaw("d.doc_number as booking_no, d.doc_date, coalesce(c.name_th, '-') as customer_name, coalesce(s.name, '-') as salesman_name, sb.status, coalesce(sd.doc_number, '-') as sale_doc_no, coalesce(sd.total_amount, d.total_amount) as total_amount")
+            ->selectRaw("sb.id as booking_id, d.doc_number as booking_no, d.doc_date, coalesce(c.name_th, '-') as customer_name, coalesce(s.name, '-') as salesman_name, sb.status, coalesce(sd.doc_number, '-') as sale_doc_no, coalesce(sd.total_amount, d.total_amount) as total_amount")
             ->limit($filters['per_page'])
-            ->get()
-            ->map(function ($row) use ($statusLabels) {
-                $row->status = $statusLabels[$row->status] ?? $row->status;
+            ->get();
+        $linkedSales = DB::table('sale_booking_documents as sbd')
+            ->join('documents as sd', 'sd.id', '=', 'sbd.document_id')
+            ->whereIn('sbd.sale_booking_id', $rows->pluck('booking_id'))
+            ->select('sbd.sale_booking_id', 'sd.doc_number', 'sd.total_amount')
+            ->orderBy('sd.doc_number')->get()->groupBy('sale_booking_id');
 
-                return $row;
-            });
+        return $rows->map(function ($row) use ($statusLabels, $linkedSales) {
+            $linked = $linkedSales->get($row->booking_id, collect());
+            if ($linked->isNotEmpty()) {
+                $row->sale_doc_no = $linked->pluck('doc_number')->implode(' / ');
+                $row->total_amount = DecimalMath::sum($linked->pluck('total_amount'), DecimalMath::DISPLAY_MONEY_SCALE);
+            }
+            $row->status = $statusLabels[$row->status] ?? $row->status;
+            unset($row->booking_id);
+
+            return $row;
+        });
     }
 
     // ใบขาย-รับคืน ตามเอกสาร (BPlus G): ขายสด/ขายเชื่อ/รับคืนรวมตารางเดียว คืนติดลบ

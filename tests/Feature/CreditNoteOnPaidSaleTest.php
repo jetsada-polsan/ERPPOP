@@ -8,6 +8,7 @@ use App\Models\ChartOfAccount;
 use App\Models\Customer;
 use App\Models\CustomerOpenItem;
 use App\Models\Document;
+use App\Models\DocumentBook;
 use App\Models\DocumentType;
 use App\Models\Product;
 use App\Models\ProductUnit;
@@ -138,6 +139,13 @@ class CreditNoteOnPaidSaleTest extends TestCase
     {
         foreach ([['PURCHASE', 'in'], ['CREDIT_SALE', 'out'], ['BOOKING', 'none'], ['CREDIT_NOTE', 'none'], ['DEBIT_NOTE', 'none']] as [$code, $effect]) {
             DocumentType::firstOrCreate(['code' => $code], ['name_th' => $code, 'stock_effect' => $effect]);
+        }
+        $creditSaleType = DocumentType::where('code', 'CREDIT_SALE')->sole();
+        foreach ([['DS', false, true], ['DSN', true, false]] as [$code, $noVat, $default]) {
+            DocumentBook::firstOrCreate(
+                ['document_type_id' => $creditSaleType->id, 'code' => $code],
+                ['name' => $code, 'prefix' => $code, 'no_vat' => $noVat, 'is_default' => $default, 'is_active' => true],
+            );
         }
         $branch = Branch::create(['code' => 'CN', 'name_th' => 'สาขาลดหนี้', 'is_active' => true]);
         $warehouse = Warehouse::create(['branch_id' => $branch->id, 'code' => 'WH-CN', 'name' => 'คลัง']);

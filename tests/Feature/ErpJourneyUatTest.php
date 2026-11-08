@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Http\Middleware\ErpAuthorize;
+use App\Models\DocumentBook;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -30,6 +31,13 @@ class ErpJourneyUatTest extends TestCase
         ob_start();
         require base_path('tools/staging/seed_uat_data.php');
         ob_end_clean();
+        $creditSaleTypeId = (int) DB::table('document_types')->where('code', 'CREDIT_SALE')->value('id');
+        foreach ([['DS', false, true], ['DSN', true, false]] as [$code, $noVat, $default]) {
+            DocumentBook::firstOrCreate(
+                ['document_type_id' => $creditSaleTypeId, 'code' => $code],
+                ['name' => $code, 'prefix' => $code, 'no_vat' => $noVat, 'is_default' => $default, 'is_active' => true],
+            );
+        }
         $this->branchId = (int) DB::table('branches')->where('code', 'UAT')->value('id');
         $this->locationId = (int) DB::table('warehouse_locations')->where('code', 'UAT-MAIN')->value('id');
         $this->withoutMiddleware(ErpAuthorize::class);
