@@ -1,3 +1,22 @@
+# Handoff — 2026-11-08 (Codex: ข้อตกลงภาษีคู่ค้าและ DS/DSN)
+
+## Commit และ Deploy
+- โค้ด production: `24ad16e` — `Keep historical VAT totals after document book edits`; push อยู่บน `codex/erp-theme-production`
+- Deploy production สำเร็จ: GitHub Actions `42437282918` (ทดสอบ, build assets, upload และ `scripts/deploy.sh` ผ่าน)
+- ตรวจ preflight ก่อน deploy: backup และ restore drill ผ่าน, `erp:health` ผ่าน, ไม่มี migration ค้าง
+
+## สิ่งที่ส่งมอบ
+- เพิ่มข้อตกลงซื้อขายแยกตามลูกค้า/ผู้จำหน่าย กำหนดสถานะ VAT, ฐานราคา, เครดิต/กำหนดชำระ, วันที่มีผล, เปิดใช้งานและค่าเริ่มต้น; ตรวจสิทธิ์เจ้าของและบันทึก audit
+- ใบจองแสดงตัวอย่าง VAT และแบ่งรายการเป็น DS/DSN โดยยึดข้อตกลงที่ใช้ได้ร่วมกับกฎ VAT ของสินค้าและเล่มเอกสาร; revalidate ก่อนบันทึกและสร้างเอกสาร/ลูกหนี้แบบ atomic พร้อม snapshot VAT
+- ใบขายต่อจากใบเสนอราคาและใบซื้อรับตรงใช้ข้อตกลงของคู่ค้า; ประวัติพิมพ์ ใบคืน และรายงานภาษีอ่าน snapshot เดิมเพื่อคงยอดเดิม
+- ยังไม่ได้ import ข้อตกลงที่ตั้งไว้ใน BPlus มาเป็นข้อมูล production; ต้องบันทึกข้อตกลงของคู่ค้าใน ERP ก่อนใช้งาน. PO/OCR คงเงื่อนไขเดิมในรอบนี้ และยังไม่ได้สร้างธุรกรรมขายจริงใน production
+
+## การตรวจสอบ
+- SQLite full suite: 844 tests ไม่มี failure; 2 skipped, 6 incomplete; 7,180 assertions
+- PostgreSQL UAT workflow `42437285061` สำเร็จหลังแก้ fixture ทดสอบที่ใช้รหัสสาขาเกินความยาวคอลัมน์; baseline `main` มี failure เดียวกันก่อนแก้ fixture
+- Node report tests 5/5, focused VAT/sales scenarios 17/17; `view:cache` และ `git diff --check` ผ่าน
+- ตรวจ production หลัง deploy: หน้าแก้ข้อตกลงลูกค้า/ผู้จำหน่ายและตัวอย่างใบขายโหลดได้; preview ใบจองเดิมแสดงยอดฐาน/VAT/รวมถูกต้อง; ย้อนกลับโดยไม่บันทึกบิลหรือแก้ข้อมูลจริง
+
 # Handoff — 2026-11-07 (Codex: split credit-sale service)
 
 - เพิ่ม service แยกใบจองเป็นใบขายเชื่อหลายใบใน transaction เดียว ล็อกใบจอง อ้างเอกสารต้นทาง ตัดสต็อก ตั้งลูกหนี้และ GL รายใบ และป้องกันแปลงซ้ำ; ยังไม่เปิดใช้งานผ่าน UI
