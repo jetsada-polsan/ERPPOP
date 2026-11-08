@@ -3,6 +3,7 @@
 ## Commit และ Deploy
 - โค้ด production: `24ad16e` — `Keep historical VAT totals after document book edits`; push อยู่บน `codex/erp-theme-production`
 - Deploy production สำเร็จ: GitHub Actions `42437282918` (ทดสอบ, build assets, upload และ `scripts/deploy.sh` ผ่าน)
+- Follow-up ใบส่งของรวม DS/DSN: `d4894e5` deploy สำเร็จผ่าน `42459263570`; PostgreSQL UAT `42458910902` ผ่านก่อน deploy
 - ตรวจ preflight ก่อน deploy: backup และ restore drill ผ่าน, `erp:health` ผ่าน, ไม่มี migration ค้าง
 
 ## สิ่งที่ส่งมอบ
@@ -18,7 +19,7 @@
 - ตรวจ production หลัง deploy: หน้าแก้ข้อตกลงลูกค้า/ผู้จำหน่ายและตัวอย่างใบขายโหลดได้; preview ใบจองเดิมแสดงยอดฐาน/VAT/รวมถูกต้อง; ย้อนกลับโดยไม่บันทึกบิลหรือแก้ข้อมูลจริง
 - งานต่อจากข้อเสนอแนะเจ้าของ: ปรับปุ่มใบส่งของจาก DS/DSN ให้พิมพ์จากใบจองต้นทาง รวมสินค้าทุกบรรทัดไว้ในใบส่งของฉบับเดียว และแสดงเลขอ้างอิงใบขายทั้งหมด; เป็นเอกสารจัดส่งแบบอ่านอย่างเดียว ไม่ตัดสต็อกซ้ำ
 - Regression `SalesDocumentEndToEndTest` ตรวจใบส่งของจาก DSN มีสินค้าทั้งสองกลุ่มและอ้างอิง DS/DSN; SQLite full suite ผ่าน 844 tests (842 ผ่าน, 2 skipped, 6 incomplete), 7,189 assertions; Blade cache, PHP lint และ diff check ผ่าน
-- **การ deploy follow-up ใบส่งของยัง pending**; ต้อง push และรัน deploy workflow แยกจาก deploy VAT ข้างต้น
+- ตรวจ route production เพิ่มเติมจาก browser ที่เปิดได้: ระบบพาไปหน้า login จึงยืนยันเฉพาะผล deploy จาก workflow; ไม่ได้ยืนยันหน้าพิมพ์ด้วยบิลจริงใน production
 
 # Handoff — 2026-11-07 (Codex: split credit-sale service)
 
