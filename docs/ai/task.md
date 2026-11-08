@@ -5143,3 +5143,10 @@ pending
 - ทำอะไร: ขยายปุ่ม toolbar, ปุ่มแก้จำนวน/ลบ และปุ่มรับชำระ เพื่อรองรับหน้าจอสัมผัสโดยไม่ย้อนกลับไปใช้ UI legacy
 - ทดสอบ: `PYTHONPATH=apps/jet-pos-python python3 -m unittest discover -s apps/jet-pos-python/tests -v` ผ่าน 25 tests; UI smoke ผ่าน; `git diff --check` ผ่าน
 - งานถัดไป: Build/install UAT และให้เจ้าของกรอก PIN บนเครื่องจริงเพื่อเก็บ error เปิดกะจาก ERP หากยังไม่ผ่าน
+
+## Handoff - 2026-11-08 (Codex: ขยายตัวพิมพ์เอกสารส่งของและใบรวมจอง)
+- Branch: `codex/print-document-readability` สร้างจาก `origin/main` ล่าสุด (`1653b49`); นำเข้าเฉพาะการเปลี่ยนแปลงสองแม่แบบพิมพ์ ไม่รวม POS changes จาก branch เก่า
+- ทำอะไร: ปรับ typography เฉพาะ print ของใบส่งของ A5 และใบรวมจอง A4 ให้อ่านง่ายขึ้น; ให้หัวตารางซ้ำบนหน้าถัดไปและป้องกันแถวตารางแตกข้ามหน้า
+- ตรวจ: `git diff --check` ผ่าน; ยังไม่ได้เปิด print preview ใน browser. workflow deploy จะรัน PHPUnit, report search test และ build assets ก่อน deploy
+- Deploy: รอ push branch แล้ว trigger `Deploy ERP` production; ต้องผ่าน GitHub environment reviewer ตาม `docs/OPERATIONS.md`
+- งานถัดไป: รอ workflow ผล test/deploy และยืนยัน health check

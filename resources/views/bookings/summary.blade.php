@@ -39,5 +39,25 @@
 @media print{.no-print{display:none!important}.summary-page{padding:0;max-width:none}.summary-card{box-shadow:none;border-color:#222}.summary-table th{background:#eee!important;color:#111}.summary-meta{padding-top:0}.signatures{page-break-inside:avoid}}
 @page{size:A4;margin:12mm}
 .load-bill{margin:12px 14px;break-inside:avoid}.load-bill-head{display:flex;gap:14px;align-items:center;margin-bottom:4px;font-size:14px}.load-bill-head span{flex:1}
+@media print {
+    .summary-page { font-family: 'Sarabun', 'Noto Sans Thai', Tahoma, sans-serif; font-size: 11pt; color: #111; }
+    .summary-card { overflow: visible; box-shadow: none; border-color: #555; break-inside: auto; }
+    .summary-meta { padding: 8mm 1mm 4mm; }
+    .summary-meta strong { font-size: 17pt; }
+    .summary-meta span { font-size: 10.5pt; color: #333; }
+    .summary-meta b, .section-title > span { font-size: 10.5pt; }
+    .section-title { padding: 4mm 3mm; background: #f1f1f1 !important; }
+    .section-title h2 { font-size: 13pt; color: #111; }
+    .section-title small { font-size: 10pt; color: #333; }
+    .summary-table { font-size: 11pt; }
+    .summary-table th { font-size: 10.5pt; color: #111; background: #e9e9e9 !important; }
+    .summary-table th, .summary-table td { padding: 2.2mm 2.5mm; }
+    .summary-table td { font-size: 11pt; color: #111; }
+    .load-bill { margin: 3mm 3mm 5mm; }
+    .load-bill-head { font-size: 11.5pt; }
+    .signatures { font-size: 11pt; color: #111; }
+    .summary-table thead { display: table-header-group; }
+    .summary-table tr { break-inside: avoid; page-break-inside: avoid; }
+}
 </style>
 @endsection

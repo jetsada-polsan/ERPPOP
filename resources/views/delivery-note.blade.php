@@ -88,6 +88,22 @@
                 overflow: visible !important;
                 zoom: 1 !important;
             }
+            .page.delivery-note-page { font-size: 10pt !important; line-height: 1.3 !important; }
+            .page.delivery-note-page .doc-title { font-size: 15pt !important; }
+            .page.delivery-note-page .company .name { font-size: 11pt !important; }
+            .page.delivery-note-page .company .sub,
+            .page.delivery-note-page .doc-meta { font-size: 9.5pt !important; line-height: 1.3 !important; }
+            .page.delivery-note-page .info-box { font-size: 9.5pt !important; line-height: 1.3 !important; padding: 2mm 2.5mm !important; }
+            .page.delivery-note-page .info-box b { min-width: 17mm !important; }
+            .page.delivery-note-page table.items th,
+            .page.delivery-note-page table.items td { font-size: 9.5pt !important; padding: 1.5mm 1.5mm !important; line-height: 1.25 !important; }
+            .page.delivery-note-page .qc-left,
+            .page.delivery-note-page .qc-item,
+            .page.delivery-note-page .totals { font-size: 9pt !important; line-height: 1.3 !important; }
+            .page.delivery-note-page .sign { font-size: 9.5pt !important; }
+            .page.delivery-note-page .copy-label { font-size: 9.5pt !important; }
+            .page.delivery-note-page table.items thead { display: table-header-group; }
+            .page.delivery-note-page table.items tr { break-inside: avoid; page-break-inside: avoid; }
         }
         .page + .page { page-break-before: always; }
     </style>
@@ -101,7 +117,7 @@
 
 @foreach($typeCode === 'BOOKING' ? ['สำหรับพนักงาน (นำกลับ)', 'สำหรับลูกค้า'] : [null] as $copyLabel)
 <div class="page delivery-note-page">
-    @if($copyLabel)<div style="text-align:right;font-size:10px;font-weight:700">{{ $copyLabel }}</div>@endif
+    @if($copyLabel)<div class="copy-label" style="text-align:right;font-size:10px;font-weight:700">{{ $copyLabel }}</div>@endif
     <div class="doc-head">
         <div class="logo-box">
             @if($logo = \App\Models\AppSetting::logoUrl())
