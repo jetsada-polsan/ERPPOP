@@ -16,6 +16,9 @@
 - PostgreSQL UAT workflow `42437285061` สำเร็จหลังแก้ fixture ทดสอบที่ใช้รหัสสาขาเกินความยาวคอลัมน์; baseline `main` มี failure เดียวกันก่อนแก้ fixture
 - Node report tests 5/5, focused VAT/sales scenarios 17/17; `view:cache` และ `git diff --check` ผ่าน
 - ตรวจ production หลัง deploy: หน้าแก้ข้อตกลงลูกค้า/ผู้จำหน่ายและตัวอย่างใบขายโหลดได้; preview ใบจองเดิมแสดงยอดฐาน/VAT/รวมถูกต้อง; ย้อนกลับโดยไม่บันทึกบิลหรือแก้ข้อมูลจริง
+- งานต่อจากข้อเสนอแนะเจ้าของ: ปรับปุ่มใบส่งของจาก DS/DSN ให้พิมพ์จากใบจองต้นทาง รวมสินค้าทุกบรรทัดไว้ในใบส่งของฉบับเดียว และแสดงเลขอ้างอิงใบขายทั้งหมด; เป็นเอกสารจัดส่งแบบอ่านอย่างเดียว ไม่ตัดสต็อกซ้ำ
+- Regression `SalesDocumentEndToEndTest` ตรวจใบส่งของจาก DSN มีสินค้าทั้งสองกลุ่มและอ้างอิง DS/DSN; SQLite full suite ผ่าน 844 tests (842 ผ่าน, 2 skipped, 6 incomplete), 7,189 assertions; Blade cache, PHP lint และ diff check ผ่าน
+- **การ deploy follow-up ใบส่งของยัง pending**; ต้อง push และรัน deploy workflow แยกจาก deploy VAT ข้างต้น
 
 # Handoff — 2026-11-07 (Codex: split credit-sale service)
 

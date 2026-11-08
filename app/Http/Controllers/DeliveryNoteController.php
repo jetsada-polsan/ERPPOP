@@ -26,6 +26,20 @@ class DeliveryNoteController extends Controller
 
     public function show(Document $document): View
     {
+        $document->load('documentType');
+
+        // DS/DSN are separate accounting documents, but goods from the same
+        // booking leave the warehouse together. Always print from the booking
+        // source so the consolidated slip contains each booked line once.
+        $sourceBooking = $document->documentType->code === 'CREDIT_SALE'
+            ? $document->sourceDocument()->with('saleBooking')->first()
+            : ($document->saleBooking ? $document : null);
+        $booking = $sourceBooking?->saleBooking;
+
+        if ($booking !== null) {
+            $document = $sourceBooking;
+        }
+
         $document->load([
             'documentType', 'branch', 'salesman',
             'customer.addresses',
@@ -36,12 +50,15 @@ class DeliveryNoteController extends Controller
         abort_unless($document->stockDocument !== null, 404, 'เอกสารนี้ไม่มีรายการสินค้า');
 
         $typeCode = $document->documentType->code;
+        $deliveryReferences = $booking?->salesDocuments()->orderBy('id')->pluck('doc_number') ?? collect();
+        $isConvertedBooking = $typeCode === 'BOOKING' && $deliveryReferences->isNotEmpty();
 
         return view('delivery-note', [
             'document' => $document,
-            'title' => self::TITLES[$typeCode] ?? 'ใบส่งของ',
+            'title' => $isConvertedBooking ? 'ใบส่งของ' : (self::TITLES[$typeCode] ?? 'ใบส่งของ'),
             'typeCode' => $typeCode,
-            'paymentLabel' => self::PAYMENT_LABELS[$typeCode] ?? '-',
+            'paymentLabel' => $isConvertedBooking ? 'ส่งสินค้าตามใบขาย' : (self::PAYMENT_LABELS[$typeCode] ?? '-'),
+            'deliveryReferences' => $deliveryReferences,
         ]);
     }
 

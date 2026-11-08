@@ -317,6 +317,15 @@ class SalesDocumentEndToEndTest extends TestCase
         }
         $nonVatSale = $sales->firstWhere('document_book_id', $dsn->id);
         $vatSale = $sales->firstWhere('document_book_id', $ds->id);
+        $this->get(route('documents.delivery-note', $nonVatSale))->assertOk()
+            ->assertViewHas('document', fn (Document $printed) => $printed->is($document))
+            ->assertViewHas('deliveryReferences', fn ($references) => $references->all() === $sales->pluck('doc_number')->all())
+            ->assertSee('ใบส่งของ')
+            ->assertDontSee('ใบส่งของชั่วคราว')
+            ->assertSee($vatSale->doc_number)
+            ->assertSee($nonVatSale->doc_number)
+            ->assertSee($product->name_th)
+            ->assertSee($vatProduct->name_th);
         $this->assertSame(0.0, (float) $nonVatSale->vat_amount);
         $this->assertSame('200.00', $nonVatSale->trade_tax['exempt_amount']);
         $this->assertSame(5.60, (float) $vatSale->vat_amount);

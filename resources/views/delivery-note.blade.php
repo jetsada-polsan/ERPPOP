@@ -137,6 +137,9 @@
                 &nbsp;&nbsp;<b>ชื่อลูกค้า</b> {{ $document->customer?->name_th ?? 'ลูกค้าทั่วไป' }}
             </div>
             <div><b>ที่อยู่</b> {{ $document->customer?->addresses?->first()?->address_line ?? '-' }}</div>
+            @if($deliveryReferences->isNotEmpty())
+            <div><b>อ้างอิงใบขาย</b> {{ $deliveryReferences->implode(', ') }}</div>
+            @endif
         </div>
     </div>
 
