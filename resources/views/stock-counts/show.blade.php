@@ -62,11 +62,25 @@
             <span class="badge text-bg-warning">ต่าง <span x-text="diffCount.toLocaleString()"></span></span>
 
             <div class="ms-auto d-flex gap-2 flex-wrap">
-                <a href="{{ route('stock-counts.export', $stockCount) }}" class="btn btn-outline-success btn-sm">
-                    <i class="bi bi-file-earmark-excel me-1"></i>Export Excel (CSV)
-                </a>
+                <form method="get" action="{{ route('stock-counts.export', $stockCount) }}" class="d-flex gap-1 align-items-center flex-wrap">
+                    <select name="active" class="form-select form-select-sm" aria-label="สถานะสินค้า" style="width:auto">
+                        <option value="all">สินค้าทุกสถานะ</option>
+                        <option value="1">เฉพาะสินค้าใช้งาน</option>
+                        <option value="0">เฉพาะสินค้าไม่ใช้งาน</option>
+                    </select>
+                    <select name="category_id" class="form-select form-select-sm" aria-label="หมวดสินค้า" style="width:auto">
+                        <option value="">ทุกหมวดสินค้า</option>
+                        @foreach($categories as $category)
+                            <option value="{{ $category->id }}">{{ $category->name_th }}</option>
+                        @endforeach
+                    </select>
+                    <button class="btn btn-outline-success btn-sm text-nowrap">
+                        <i class="bi bi-file-earmark-excel me-1"></i>Export CSV
+                    </button>
+                </form>
                 @if($stockCount->isEditable())
-                <form method="post" action="{{ route('stock-counts.import', $stockCount) }}" enctype="multipart/form-data" class="d-flex gap-1">
+                <form method="post" action="{{ route('stock-counts.import', $stockCount) }}" enctype="multipart/form-data" class="d-flex gap-1"
+                    data-confirm="นำเข้าครั้งนี้จะแทนยอดนับในใบด้วยรายการที่มีจำนวนในไฟล์เท่านั้น สินค้าที่ไม่มีในไฟล์จะไม่ถูกปรับสต็อก ต้องการดำเนินการต่อหรือไม่?">
                     @csrf
                     <input type="file" name="file" accept=".csv" required class="form-control form-control-sm" style="max-width:220px">
                     <button class="btn btn-outline-primary btn-sm text-nowrap"><i class="bi bi-upload me-1"></i>Import</button>
@@ -94,6 +108,9 @@
                 @endif
             </div>
         </div>
+        @if($stockCount->isEditable())
+        <div class="small text-muted mt-2">Export เลือกได้ตามสถานะและหมวดสินค้า · Import จะใช้เฉพาะรหัสที่มีจำนวนนับในไฟล์ และยอดนั้นใช้แทนยอดคงเหลือปัจจุบันเมื่ออนุมัติ สินค้าที่ไม่อยู่ในไฟล์จะไม่ถูกปรับ</div>
+        @endif
     </div>
 
     {{-- Entry grid --}}

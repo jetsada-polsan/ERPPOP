@@ -2,13 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\StockCountController;
 use App\Models\Branch;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\InventoryCostClose;
 use App\Models\Product;
+use App\Models\ProductCategory;
 use App\Models\ProductUnit;
 use App\Models\StockBalance;
+use App\Models\StockCountItem;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseLocation;
@@ -17,6 +20,8 @@ use App\Services\Inventory\InventoryCostCloseService;
 use App\Services\Inventory\StockAdjustmentService;
 use App\Services\Inventory\StockCountService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -98,6 +103,74 @@ class InventoryApprovalAndCloseTest extends TestCase
 
         $this->assertSame(1, $added);
         $this->assertDatabaseHas('stock_count_items', ['stock_count_id' => $count->id, 'product_id' => $additional->id, 'system_qty' => 0]);
+    }
+
+    public function test_stock_count_export_can_filter_by_active_status_and_category(): void
+    {
+        [$branch, $location, $active] = $this->masters();
+        $category = ProductCategory::create(['code' => 'CAT1', 'name_th' => 'หมวดหนึ่ง']);
+        $otherCategory = ProductCategory::create(['code' => 'CAT2', 'name_th' => 'หมวดสอง']);
+        $active->update(['product_category_id' => $category->id]);
+        $inactive = Product::create([
+            'sku_code' => 'SKU-2', 'name_th' => 'สินค้าไม่ใช้งาน', 'base_unit_id' => $active->base_unit_id,
+            'product_category_id' => $category->id, 'average_cost' => 0, 'is_active' => false,
+            'is_vat' => false, 'negative_stock_policy' => 'block',
+        ]);
+        $other = Product::create([
+            'sku_code' => 'SKU-3', 'name_th' => 'อีกหมวด', 'base_unit_id' => $active->base_unit_id,
+            'product_category_id' => $otherCategory->id, 'average_cost' => 0, 'is_active' => true,
+            'is_vat' => false, 'negative_stock_policy' => 'block',
+        ]);
+        $count = app(StockCountService::class)->create([
+            'branch_id' => $branch->id, 'warehouse_location_id' => $location->id, 'count_mode' => 'partial',
+        ]);
+
+        $request = Request::create('/stock-counts/'.$count->id.'/export', 'GET', [
+            'active' => '1', 'category_id' => $category->id,
+        ]);
+        $response = app(StockCountController::class)->export($request, $count, app(StockCountService::class));
+        ob_start();
+        $response->sendContent();
+        $csv = ob_get_clean();
+
+        $this->assertStringContainsString($active->sku_code, $csv);
+        $this->assertStringNotContainsString($inactive->sku_code, $csv);
+        $this->assertStringNotContainsString($other->sku_code, $csv);
+    }
+
+    public function test_filtered_csv_import_replaces_sheet_scope_and_only_posts_imported_products(): void
+    {
+        [$branch, $location, $first] = $this->masters();
+        $second = Product::create([
+            'sku_code' => 'SKU-2', 'name_th' => 'สินค้าตัวที่สอง', 'base_unit_id' => $first->base_unit_id,
+            'average_cost' => 10, 'is_active' => true, 'is_vat' => false, 'negative_stock_policy' => 'block',
+        ]);
+        StockBalance::create(['product_id' => $first->id, 'warehouse_location_id' => $location->id, 'on_hand_qty' => 5, 'reserved_qty' => 0]);
+        StockBalance::create(['product_id' => $second->id, 'warehouse_location_id' => $location->id, 'on_hand_qty' => 8, 'reserved_qty' => 0]);
+        $count = app(StockCountService::class)->create([
+            'branch_id' => $branch->id, 'warehouse_location_id' => $location->id, 'count_mode' => 'full_zero_missing',
+        ]);
+        StockCountItem::where('stock_count_id', $count->id)->where('product_id', $first->id)->update(['counted_qty' => 4]);
+        $csv = "\xEF\xBB\xBFใบตรวจนับ,TEST\nรหัสสินค้า,ชื่อสินค้า,หน่วย,จำนวนตามระบบ,จำนวนนับจริง,หมายเหตุ\nSKU-2,สินค้าตัวที่สอง,ชิ้น,8,2,\n";
+        $file = UploadedFile::fake()->createWithContent('count.csv', $csv);
+        $request = Request::create('/stock-counts/'.$count->id.'/import', 'POST', [], [], ['file' => $file]);
+
+        app(StockCountController::class)->import($request, $count, app(StockCountService::class));
+
+        $count->refresh();
+        $this->assertSame('partial', $count->count_mode);
+        $this->assertNull(StockCountItem::where('stock_count_id', $count->id)->where('product_id', $first->id)->value('counted_qty'));
+        $this->assertSame(2.0, (float) StockCountItem::where('stock_count_id', $count->id)->where('product_id', $second->id)->value('counted_qty'));
+
+        DocumentType::create(['code' => 'STOCK_ADJUSTMENT', 'name_th' => 'ใบปรับสต๊อก']);
+        $count->update(['status' => 'review']);
+        $adjustment = app(StockCountService::class)->post($count);
+        $items = $adjustment->stockDocument->items;
+        $this->assertCount(1, $items);
+        $this->assertSame((int) $second->id, (int) $items->first()->product_id);
+        $this->assertSame(8.0, (float) $items->first()->system_qty);
+        $this->assertSame(2.0, (float) $items->first()->counted_qty);
+        $this->assertSame(-6.0, (float) $items->first()->qty);
     }
 
     public function test_stock_adjustment_does_not_change_stock_until_another_user_approves(): void

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use App\Models\ProductBarcode;
+use App\Models\ProductCategory;
 use App\Models\StockCount;
 use App\Models\StockCountItem;
 use App\Models\WarehouseLocation;
@@ -11,6 +12,7 @@ use App\Services\Inventory\StockCountService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -93,7 +95,9 @@ class StockCountController extends Controller
             'counted' => $i->counted_qty !== null ? (float) $i->counted_qty : null,
         ])->values();
 
-        return view('stock-counts.show', compact('stockCount', 'itemsJson'));
+        $categories = ProductCategory::query()->orderBy('name_th')->get(['id', 'name_th']);
+
+        return view('stock-counts.show', compact('stockCount', 'itemsJson', 'categories'));
     }
 
     // Bulk save typed counts: { items: [{id, counted}] }
@@ -127,14 +131,21 @@ class StockCountController extends Controller
     }
 
     // CSV export (UTF-8 BOM so Excel opens Thai correctly) for offline counting
-    public function export(StockCount $stockCount, StockCountService $service): StreamedResponse
+    public function export(Request $request, StockCount $stockCount, StockCountService $service): StreamedResponse
     {
+        $filters = $request->validate([
+            'active' => ['nullable', 'in:all,1,0'],
+            'category_id' => ['nullable', 'integer', 'exists:product_categories,id'],
+        ]);
+
         // ใบที่เปิดไว้ก่อนแก้ระบบจะถูกเติมรายการสินค้าที่ยังขาดก่อนดาวน์โหลด
         $service->addMissingCatalogItems($stockCount);
         $stockCount->load(['branch', 'warehouseLocation']);
         $items = StockCountItem::where('stock_count_id', $stockCount->id)
             ->join('products', 'products.id', '=', 'stock_count_items.product_id')
             ->leftJoin('product_units', 'product_units.id', '=', 'products.base_unit_id')
+            ->when(($filters['active'] ?? 'all') !== 'all', fn ($query) => $query->where('products.is_active', (bool) $filters['active']))
+            ->when(isset($filters['category_id']), fn ($query) => $query->where('products.product_category_id', $filters['category_id']))
             ->orderBy('products.sku_code')
             ->get([
                 'products.sku_code', 'products.name_th',
@@ -160,7 +171,7 @@ class StockCountController extends Controller
     }
 
     // Import the filled CSV back: matches by รหัสสินค้า, fills counted qty
-    public function import(Request $request, StockCount $stockCount): RedirectResponse
+    public function import(Request $request, StockCount $stockCount, StockCountService $service): RedirectResponse
     {
         abort_unless($stockCount->isEditable(), 422, 'ใบนี้ปรับปรุงแล้ว แก้ไขไม่ได้');
 
@@ -169,12 +180,15 @@ class StockCountController extends Controller
             ['file.mimes' => 'รองรับไฟล์ .csv เท่านั้น (ใน Excel ใช้ Save As > CSV UTF-8)'],
         );
 
+        // ใบเก่าที่สร้างก่อนเก็บสินค้าในทะเบียนครบ ให้ SKU ในไฟล์กรองได้เหมือนใบใหม่
+        $service->addMissingCatalogItems($stockCount);
         $itemIdBySku = StockCountItem::where('stock_count_id', $stockCount->id)
             ->join('products', 'products.id', '=', 'stock_count_items.product_id')
             ->pluck('stock_count_items.id', 'products.sku_code');
 
-        $updated = 0;
+        $countedBySku = [];
         $skipped = [];
+        $invalid = [];
         $fh = fopen($request->file('file')->getRealPath(), 'r');
         $rowNo = 0;
         while (($row = fgetcsv($fh)) !== false) {
@@ -191,17 +205,47 @@ class StockCountController extends Controller
 
                 continue;
             }
-            if ($counted === '' || ! is_numeric(str_replace(',', '', $counted))) {
+            if ($counted === '') {
+                continue;
+            }
+            $counted = str_replace(',', '', $counted);
+            if (! is_numeric($counted) || (float) $counted < 0) {
+                $invalid[] = $sku;
+
                 continue;
             }
 
-            StockCountItem::whereKey($itemIdBySku[$sku])
-                ->update(['counted_qty' => (float) str_replace(',', '', $counted)]);
-            $updated++;
+            $countedBySku[$sku] = (float) $counted;
         }
         fclose($fh);
 
-        $msg = "Import สำเร็จ อัปเดตยอดนับ {$updated} รายการ";
+        if ($invalid !== []) {
+            return back()->withErrors(['file' => 'จำนวนต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป ตรวจรหัสสินค้า: '.implode(', ', array_slice($invalid, 0, 5))]);
+        }
+        if ($countedBySku === []) {
+            return back()->withErrors(['file' => 'ไม่พบรหัสสินค้าในใบนี้ที่มีจำนวนนับจริง กรุณาตรวจไฟล์ก่อนนำเข้า']);
+        }
+
+        $updated = DB::transaction(function () use ($stockCount, $countedBySku, $itemIdBySku) {
+            $lockedCount = StockCount::query()->whereKey($stockCount->id)->lockForUpdate()->firstOrFail();
+            abort_unless($lockedCount->isEditable(), 422, 'ใบนี้ปรับปรุงแล้ว แก้ไขไม่ได้');
+
+            // Import replaces the sheet's count scope: only explicit quantities in this file
+            // participate. This prevents full_zero_missing from zeroing products omitted by
+            // a filtered export, and avoids carrying stale manually-entered counts into posting.
+            StockCountItem::where('stock_count_id', $lockedCount->id)->update(['counted_qty' => null]);
+            $lockedCount->update(['count_mode' => 'partial']);
+
+            foreach ($countedBySku as $sku => $counted) {
+                StockCountItem::where('stock_count_id', $lockedCount->id)
+                    ->whereKey($itemIdBySku[$sku])
+                    ->update(['counted_qty' => $counted]);
+            }
+
+            return count($countedBySku);
+        });
+
+        $msg = "Import สำเร็จ {$updated} รายการ — ใช้เฉพาะรหัสที่มีจำนวนนับในไฟล์ สินค้าอื่นไม่ถูกปรับ";
         if ($skipped !== []) {
             $msg .= ' (ไม่พบรหัสในใบนี้ '.count($skipped).' รายการ เช่น '.implode(', ', array_slice($skipped, 0, 5)).')';
         }
