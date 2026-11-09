@@ -34,7 +34,7 @@
     <link rel="icon" href="{{ $faviconUrl }}">
     <link rel="shortcut icon" href="{{ $faviconUrl }}">
     <link rel="apple-touch-icon" href="{{ $faviconUrl }}">
-    <title>{{ trim($__env->yieldContent('title', 'MPM Food Group')) }}</title>
+    <title>{{ trim($__env->yieldContent('title', 'หน้าหลัก')) }} · JET ERP</title>
 
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     <link rel="stylesheet" href="{{ asset('vendor/adminlte/css/adminlte.min.css') }}">

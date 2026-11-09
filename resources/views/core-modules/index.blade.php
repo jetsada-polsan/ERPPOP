@@ -1,7 +1,7 @@
 @extends('layout')
 
-@section('title', 'คู่มือ PopStar 4M')
-@section('page-title', 'คู่มือ PopStar 4M')
+@section('title', 'คู่มือ JET ERP')
+@section('page-title', 'คู่มือ JET ERP')
 @section('page-subtitle', 'ระบบงาน คน เงิน สินค้า และการบริหารของ MPM Food Group')
 
 @push('head')
@@ -242,7 +242,7 @@
 }">
     <section class="manual-panel manual-header">
         <div>
-            <div class="manual-eyebrow">PopStar 4M ERP Handbook</div>
+            <div class="manual-eyebrow">JET ERP Handbook</div>
             <h1 class="manual-title">คู่มือการทำงาน ERP แบบครบวงจร</h1>
             <p class="manual-lead">จุดอ้างอิงกลางสำหรับงานขาย ซื้อ คลัง ผลิต การเงิน บัญชี และการบริหาร แบ่งระบบตาม MAN, MONEY, MATERIAL และ MANAGEMENT พร้อมเส้นทางข้อมูลและรายการที่ยังต้องพัฒนา</p>
         </div>
