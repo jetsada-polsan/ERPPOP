@@ -119,8 +119,8 @@ class StockCountController extends Controller
 
     public function submit(Request $request, StockCount $stockCount): RedirectResponse
     {
-        abort_unless($stockCount->isEditable(), 422, 'ใบนี้ส่งตรวจแล้ว');
-        abort_if($stockCount->items()->whereNotNull('counted_qty')->doesntExist(), 422, 'ยังไม่มีรายการนับจริง');
+        abort_unless($stockCount->isEditable(), 422, 'ใบตรวจนับนี้ส่งตรวจไปแล้ว รอหัวหน้ายืนยันปรับสต็อก');
+        abort_if($stockCount->items()->whereNotNull('counted_qty')->doesntExist(), 422, 'ยังไม่มีรายการที่นับจริง กรอกจำนวนนับอย่างน้อย 1 รายการแล้วกด Sync ก่อนส่งตรวจ');
         $stockCount->update(['status' => 'review', 'submitted_by' => $request->user()?->id, 'submitted_at' => now()]);
 
         return back()->with('success', 'ส่งใบตรวจนับให้หัวหน้าตรวจสอบแล้ว ยังไม่กระทบสต็อกจริง');
