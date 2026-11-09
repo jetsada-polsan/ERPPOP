@@ -327,7 +327,7 @@ class SalesDocumentEndToEndTest extends TestCase
         $booking = SaleBooking::where('document_id', $bookingDocument->id)->sole();
         $this->withoutMiddleware(\App\Http\Middleware\ErpAuthorize::class)->actingAs(User::factory()->create())
             ->get(route('bookings.show', $booking))->assertOk()
-            ->assertSee('ตรวจและแปลงเป็นใบขาย')
+            ->assertSee(route('bookings.bill', $booking), false)
             ->assertDontSee('name="document_book_id"', false);
         app(CreditSaleService::class)->convertBookingToCreditSale($booking);
 
@@ -405,6 +405,103 @@ class SalesDocumentEndToEndTest extends TestCase
         $this->assertSame($dsn->id, $sales->first()->document_book_id);
         $this->assertSame(round((float) $bookingDocument->total_amount, 2), round((float) $sales->first()->total_amount, 2));
         $this->assertGlBalanced($sales->first());
+    }
+
+    /** แบบ BPlus "อ่านจาก": แก้จำนวน/ราคาได้ ออกบิลไม่ครบได้ ส่วนที่เหลือค้างในใบจองและยังกันสต๊อก */
+    public function test_editable_billing_bills_part_of_a_booking_and_keeps_the_rest_reserved(): void
+    {
+        [$branch, $location, $product, $customer] = $this->stockedBranch('PART', qty: 10, unitCost: 60, withCustomer: true);
+        $bookingDocument = app(BookingService::class)->create([
+            'branch_id' => $branch->id, 'customer_id' => $customer->id,
+            'items' => [['product_id' => $product->id, 'qty' => 5, 'unit_price' => 100]],
+        ]);
+        $booking = SaleBooking::where('document_id', $bookingDocument->id)->sole();
+        $itemId = $bookingDocument->stockDocument->items()->value('id');
+        $staff = User::factory()->create(['is_active' => true, 'must_change_password' => false]);
+        $web = $this->withoutMiddleware(\App\Http\Middleware\ErpAuthorize::class)->actingAs($staff);
+
+        $web->get(route('bookings.bill', $booking))->assertOk()->assertSee('ออกใบขายจากใบจอง');
+
+        // ราคาเช็กต่ำกว่าทุน: ตอบแค่ true/false ไม่มีตัวเลขทุน
+        $check = $web->postJson(route('bookings.price-check', $booking), ['prices' => [$itemId => 50]])->assertOk();
+        $this->assertTrue($check->json("below_cost.$itemId"));
+        $this->assertStringNotContainsString('60', $check->getContent());
+
+        // พนักงานทั่วไปบันทึกราคาต่ำกว่าทุนไม่ได้
+        $web->post(route('bookings.bill.store', $booking), ['bills' => ['DSN' => ['lines' => [['booking_item_id' => $itemId, 'qty' => 2, 'unit_price' => 50]]]]])
+            ->assertSessionHas('error');
+        $this->assertSame(0, Document::where('source_document_id', $bookingDocument->id)->count());
+
+        // จำนวนเกินยอดค้างไม่ได้
+        $web->post(route('bookings.bill.store', $booking), ['bills' => ['DSN' => ['lines' => [['booking_item_id' => $itemId, 'qty' => 6, 'unit_price' => 120]]]]])
+            ->assertSessionHas('error');
+
+        // ออก 2 จาก 5 ราคาที่เซลล์ต่อรองใหม่ 120 + เครดิต 15 วัน
+        $web->post(route('bookings.bill.store', $booking), ['bills' => ['DSN' => [
+            'credit_days' => 15, 'remark' => 'ลูกค้าขอรับก่อน 2',
+            'lines' => [['booking_item_id' => $itemId, 'qty' => 2, 'unit_price' => 120]],
+        ]]])->assertRedirect(route('bookings.show', $booking));
+
+        $first = Document::where('source_document_id', $bookingDocument->id)->sole();
+        $this->assertSame(240.0, (float) $first->total_amount);
+        $this->assertSame('ลูกค้าขอรับก่อน 2', $first->remark);
+        $this->assertSame(now()->addDays(15)->toDateString(), CustomerOpenItem::where('document_id', $first->id)->sole()->due_date->toDateString());
+        $this->assertGlBalanced($first);
+        $this->assertSame(SaleBooking::STATUS_PENDING, $booking->fresh()->status, 'ยังค้าง 3 ใบจองต้องยังเปิดอยู่');
+        $balance = StockBalance::where('product_id', $product->id)->where('warehouse_location_id', $location->id)->sole();
+        $this->assertSame(8.0, (float) $balance->on_hand_qty);
+        $this->assertSame(3.0, (float) $balance->reserved_qty, 'ส่วนค้างยังกันสต๊อก');
+
+        // ใบจองที่ออกบิลไปบางส่วน ยกเลิก/แก้ไม่ได้
+        $this->expectsCancelToFail($booking);
+
+        // รอบสอง: ออกที่เหลือ 3 → ใบจองจบ
+        $web->post(route('bookings.bill.store', $booking), ['bills' => ['DSN' => ['lines' => [['booking_item_id' => $itemId, 'qty' => 3, 'unit_price' => 100]]]]])
+            ->assertRedirect(route('bookings.show', $booking));
+        $this->assertSame(SaleBooking::STATUS_CONVERTED, $booking->fresh()->status);
+        $this->assertSame(0.0, (float) $balance->fresh()->reserved_qty);
+        $this->assertSame(5.0, (float) $balance->fresh()->on_hand_qty);
+        $this->assertSame(2, Document::where('source_document_id', $bookingDocument->id)->where('status', 'active')->count());
+
+        // ผู้จัดการถอย Confirm: ยกเลิกทั้ง 2 บิล สต๊อกกลับมากันไว้ครบ 5
+        app(BookingService::class)->revertConfirmation($booking->fresh(), 'ทดสอบ', $staff->id);
+        $this->assertSame(SaleBooking::STATUS_PENDING, $booking->fresh()->status);
+        $this->assertSame(10.0, (float) $balance->fresh()->on_hand_qty);
+        $this->assertSame(5.0, (float) $balance->fresh()->reserved_qty);
+        $this->assertSame(0.0, (float) $bookingDocument->stockDocument->items()->value('billed_qty'));
+    }
+
+    public function test_a_manager_may_bill_below_cost_and_close_the_remainder(): void
+    {
+        [$branch, $location, $product, $customer] = $this->stockedBranch('MGRB', qty: 10, unitCost: 60, withCustomer: true);
+        $bookingDocument = app(BookingService::class)->create([
+            'branch_id' => $branch->id, 'customer_id' => $customer->id,
+            'items' => [['product_id' => $product->id, 'qty' => 4, 'unit_price' => 100]],
+        ]);
+        $booking = SaleBooking::where('document_id', $bookingDocument->id)->sole();
+        $itemId = $bookingDocument->stockDocument->items()->value('id');
+        $manager = User::factory()->create(['is_active' => true, 'must_change_password' => false]);
+        $manager->roles()->attach(\App\Models\Role::where('code', 'GM')->value('id'));
+        $web = $this->withoutMiddleware(\App\Http\Middleware\ErpAuthorize::class)->actingAs($manager);
+
+        $web->post(route('bookings.bill.store', $booking), ['bills' => ['DSN' => ['lines' => [['booking_item_id' => $itemId, 'qty' => 1, 'unit_price' => 50]]]]])
+            ->assertRedirect(route('bookings.show', $booking));
+        $this->assertSame(50.0, (float) Document::where('source_document_id', $bookingDocument->id)->sole()->total_amount);
+
+        $web->post(route('bookings.close-remainder', $booking))->assertRedirect(route('bookings.show', $booking));
+        $this->assertSame(SaleBooking::STATUS_CONVERTED, $booking->fresh()->status);
+        $balance = StockBalance::where('product_id', $product->id)->where('warehouse_location_id', $location->id)->sole();
+        $this->assertSame(0.0, (float) $balance->reserved_qty, 'ปิดยอดค้างแล้วต้องคืนสต๊อกที่กัน');
+        $this->assertSame(9.0, (float) $balance->on_hand_qty);
+    }
+
+    private function expectsCancelToFail(SaleBooking $booking): void
+    {
+        try {
+            app(BookingService::class)->cancel($booking->fresh(), 'x', null);
+            $this->fail('ใบจองที่ออกบิลบางส่วนต้องยกเลิกไม่ได้');
+        } catch (\RuntimeException) {
+        }
     }
 
     public function test_a_short_booking_needs_a_manager_to_confirm_in_erp_before_billing_and_may_go_negative(): void

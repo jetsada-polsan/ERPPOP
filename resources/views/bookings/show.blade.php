@@ -17,7 +17,11 @@ $isOverdue = $isDelivery && ! $deliveryDone && $booking->delivery_due_at && $boo
 $transportLoaded = $transportJob?->loaded_at !== null;
 $transportDelivered = $transportJob?->status === 'delivered';
 $canConvert = true;
-$canEdit = $isPending && $booking->delivery_status === 'pending'
+$bookingLines = $booking->document->stockDocument?->items ?? collect();
+$billedAny = $bookingLines->contains(fn ($i) => (float) ($i->billed_qty ?? 0) > 0);
+$remainingLines = $bookingLines->filter(fn ($i) => (float) $i->qty - (float) ($i->billed_qty ?? 0) > 0.00001);
+$activeSales = $booking->saleDocuments()->where('status', 'active')->get();
+$canEdit = $isPending && ! $billedAny && $booking->delivery_status === 'pending'
     && (! $transportJob || ($transportJob->status === 'booked' && $transportJob->loaded_at === null));
 @endphp
 
@@ -40,12 +44,33 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
 </div>
 @endif
 
-@if($booking->status === \App\Models\SaleBooking::STATUS_CONVERTED && auth()->user()?->hasPermission('documents.void'))
+@if($activeSales->isNotEmpty() && auth()->user()?->hasPermission('documents.void'))
 <form method="post" action="{{ route('bookings.revert-confirm', $booking) }}" class="content-card p-3 mb-3 d-flex flex-wrap gap-2 align-items-center" data-confirm="ถอย Confirm? ใบขาย DS/DSN จะถูกยกเลิก คืนสต๊อก ปิดลูกหนี้ และใบจองกลับไปแก้ไขได้">@csrf
     <span class="fw-bold">ผู้จัดการ: ถอย Confirm</span>
     <input type="text" name="reason" required maxlength="500" class="form-control" style="max-width:360px" placeholder="เหตุผล เช่น ลูกค้าเปลี่ยนรายการ">
     <button class="btn btn-outline-danger"><i class="bi bi-arrow-counterclockwise me-1"></i>ถอย Confirm</button>
 </form>
+@endif
+
+@if($activeSales->isNotEmpty())
+<div class="content-card p-3 mb-3">
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+        <span class="fw-bold">ใบขายที่ออกแล้ว:</span>
+        @foreach($activeSales as $sale)
+            <a href="{{ route('sales.show', $sale) }}" class="btn btn-sm btn-outline-success">{{ $sale->doc_number }} · {{ number_format((float) $sale->total_amount, 2) }}</a>
+        @endforeach
+        @if($remainingLines->isNotEmpty() && $isPending)
+            <span class="badge text-bg-warning fs-6 ms-2">ค้างส่ง {{ $remainingLines->count() }} รายการ</span>
+        @elseif($booking->remainder_closed_at)
+            <span class="badge text-bg-secondary ms-2">ปิดยอดค้างแล้ว</span>
+        @endif
+    </div>
+    @if($remainingLines->isNotEmpty() && $isPending)
+    <div class="small text-muted mt-2">ค้าง:
+        @foreach($remainingLines as $line){{ $line->product?->name_th }} {{ rtrim(rtrim(number_format((float) $line->qty - (float) $line->billed_qty, 4), '0'), '.') }}@if(! $loop->last), @endif @endforeach
+    </div>
+    @endif
+</div>
 @endif
 
 {{-- Flow status bar --}}
@@ -131,75 +156,15 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
                 </form>
             @endif
             @if($isPending && $canConvert)
-            @php
-                $bookingItems = $booking->document->stockDocument?->items ?? collect();
-                $dsBook = $creditSaleBooks->first(fn ($b) => $b->code === 'DS') ?? $creditSaleBooks->first(fn ($b) => ! $b->no_vat);
-                $dsnBook = $creditSaleBooks->first(fn ($b) => $b->code === 'DSN') ?? $creditSaleBooks->first(fn ($b) => $b->no_vat);
-                $convertLines = $bookingItems->sortBy('id')->values()->map(fn ($i) => [
-                    'id' => $i->id,
-                    'name' => $i->product?->name_th ?? '-',
-                    'sku' => $i->product?->sku_code ?? '',
-                    'qty' => (float) $i->qty,
-                    'amount' => round((float) $i->qty * (float) $i->unit_price, 2),
-                    'isVat' => (bool) $i->product?->is_vat,
-                    'book' => $i->product?->is_vat ? 'DS' : 'DSN',
-                ]);
-            @endphp
-            <form method="post" action="{{ route('bookings.convert', $booking) }}" id="convert-form" class="booking-convert"
-                  x-data="{ open: false, lines: @js($convertLines), total(code) { return this.lines.filter(l => l.book === code).reduce((s, l) => s + l.amount, 0) }, count(code) { return this.lines.filter(l => l.book === code).length }, fmt(n) { return n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) } }">
+            <a href="{{ route('bookings.bill', $booking) }}" class="btn btn-success px-4" data-testid="bill-open">
+                <i class="bi bi-receipt me-1"></i> {{ $billedAny ? 'ออกใบขายยอดค้าง' : 'ออกใบขาย' }}
+            </a>
+            @if($billedAny && auth()->user()?->hasPermission('documents.void'))
+            <form method="post" action="{{ route('bookings.close-remainder', $booking) }}" data-confirm="ปิดยอดค้าง? รายการที่ยังไม่ได้ออกบิลจะไม่ออกบิลแล้ว และคืนสต๊อกที่กันไว้">
                 @csrf
-                <template x-for="line in lines" :key="line.id">
-                    <input type="hidden" :name="`lines[${line.id}]`" :value="line.book">
-                </template>
-                <button type="button" class="btn btn-success px-4" @click="open = true" data-testid="convert-open">
-                    <i class="bi bi-clipboard-check me-1"></i> ตรวจและแปลงเป็นใบขาย
-                </button>
-
-                <div class="booking-modal-backdrop" x-show="open" x-cloak x-transition.opacity @keydown.escape.window="open = false" style="z-index:3000">
-                    <div class="booking-modal" @click.outside="open = false" style="width:min(900px,100%)">
-                        <div class="modal-header border-0 px-4 pt-4 pb-2">
-                            <div>
-                                <h3 class="h4 fw-bold mb-1">ตรวจรายการก่อนออกใบขายเชื่อ</h3>
-                                <div class="text-muted">เลือกเล่มของแต่ละรายการ ระบบตั้งค่าเริ่มต้นจาก VAT ของสินค้า แก้ได้ก่อนกดยืนยัน</div>
-                            </div>
-                            <button type="button" class="btn btn-light rounded-circle" @click="open = false"><i class="bi bi-x-lg"></i></button>
-                        </div>
-                        <div class="modal-body px-4 pb-3">
-                            <table class="table align-middle mb-3">
-                                <thead><tr><th>สินค้า</th><th class="text-end">จำนวน</th><th class="text-end">จำนวนเงิน</th><th class="text-center" style="width:230px">ออกในเล่ม</th></tr></thead>
-                                <tbody>
-                                    <template x-for="line in lines" :key="line.id">
-                                        <tr>
-                                            <td><div class="fw-semibold" x-text="line.name"></div><div class="text-muted small"><span x-text="line.sku"></span> · <span x-text="line.isVat ? 'สินค้ามี VAT' : 'สินค้าไม่มี VAT'"></span></div></td>
-                                            <td class="text-end" x-text="fmt(line.qty)"></td>
-                                            <td class="text-end" x-text="fmt(line.amount)"></td>
-                                            <td class="text-center">
-                                                <div class="btn-group" role="group">
-                                                    <button type="button" class="btn" :class="line.book === 'DS' ? 'btn-primary' : 'btn-outline-primary'" @click="line.book = 'DS'">{{ $dsBook?->code ?? 'DS' }} มี VAT</button>
-                                                    <button type="button" class="btn" :class="line.book === 'DSN' ? 'btn-secondary' : 'btn-outline-secondary'" @click="line.book = 'DSN'">{{ $dsnBook?->code ?? 'DSN' }} ไม่มี VAT</button>
-                                                </div>
-                                                <div class="small text-warning-emphasis mt-1" x-show="line.isVat !== (line.book === 'DS')">ต่างจากค่าเริ่มต้นของสินค้า</div>
-                                            </td>
-                                        </tr>
-                                    </template>
-                                </tbody>
-                            </table>
-                            <div class="d-flex flex-wrap gap-3 justify-content-end fs-6">
-                                <div x-show="count('DS') > 0"><span class="badge text-bg-primary">{{ $dsBook?->code ?? 'DS' }}</span> <span x-text="count('DS')"></span> รายการ ฿<b x-text="fmt(total('DS'))"></b></div>
-                                <div x-show="count('DSN') > 0"><span class="badge text-bg-secondary">{{ $dsnBook?->code ?? 'DSN' }}</span> <span x-text="count('DSN')"></span> รายการ ฿<b x-text="fmt(total('DSN'))"></b></div>
-                            </div>
-                            @if(! $dsBook || ! $dsnBook)
-                                <div class="text-danger mt-2">ยังไม่มีเล่มขายเชื่อ{{ ! $dsBook ? 'มีภาษี' : 'ไม่มีภาษี' }} — ตั้งค่าที่ สมุดเอกสาร</div>
-                            @endif
-                            <div class="alert alert-warning mt-3 mb-0">กดยืนยันแล้ว ระบบจะ<b>ตัดสต็อกและตั้งลูกหนี้ทันที</b>{{ $isDelivery ? ' โดยใช้วันที่ส่งจริง' : '' }} ถ้าผิดต้องให้ผู้จัดการถอย Confirm</div>
-                        </div>
-                        <div class="modal-footer border-0 px-4 pb-4">
-                            <button type="button" class="btn btn-light border px-4" @click="open = false">กลับไปตรวจ</button>
-                            <button type="submit" class="btn btn-success px-4"><i class="bi bi-check2-circle me-1"></i> ยืนยันออกใบขาย</button>
-                        </div>
-                    </div>
-                </div>
+                <button class="btn btn-outline-secondary">ปิดยอดค้าง</button>
             </form>
+            @endif
             @elseif($isPending && $isDelivery)
                 <button class="btn btn-outline-secondary px-4" disabled title="ต้องตรวจของ ขึ้นรถ และบันทึกส่งครบก่อน">
                     <i class="bi bi-hourglass-split me-1"></i> รอส่งครบก่อนออกใบขาย

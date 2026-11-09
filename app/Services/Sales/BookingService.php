@@ -175,27 +175,35 @@ class BookingService
     {
         DB::transaction(function () use ($booking, $reason, $userId) {
             $locked = SaleBooking::whereKey($booking->id)->lockForUpdate()->firstOrFail();
-            if ($locked->status !== SaleBooking::STATUS_CONVERTED) {
+            $sales = $locked->saleDocuments()->where('status', 'active')->get();
+            if ($sales->isEmpty() || ! in_array($locked->status, [SaleBooking::STATUS_CONVERTED, SaleBooking::STATUS_PENDING], true)) {
                 throw new RuntimeException('ถอยได้เฉพาะใบจองที่ Confirm ออกใบขายแล้ว');
             }
-            $sales = $locked->saleDocuments()->where('status', 'active')->get();
+            $wasClosed = $locked->remainder_closed_at !== null;
+            $oldStatus = $locked->status;
             foreach ($sales as $sale) {
                 app(\App\Services\Accounting\DocumentVoidService::class)->void($sale, 'ถอย Confirm ใบจอง: '.$reason, $userId);
             }
 
             $items = $locked->document()->with('stockDocument.items')->firstOrFail()->stockDocument?->items ?? collect();
             foreach ($items as $item) {
-                $balance = StockBalance::where('product_id', $item->product_id)
-                    ->where('warehouse_location_id', $item->warehouse_location_id)->lockForUpdate()->first()
-                    ?? StockBalance::create(['product_id' => $item->product_id, 'warehouse_location_id' => $item->warehouse_location_id, 'on_hand_qty' => 0, 'reserved_qty' => 0]);
-                $balance->increment('reserved_qty', $item->qty);
+                // ส่วนที่ยังค้าง (ไม่ได้ออกบิล) ยังกันสต๊อกอยู่แล้ว ยกเว้นผู้จัดการปิดยอดค้างไปแล้ว
+                $reReserve = $wasClosed ? $item->qty : ($item->billed_qty ?? 0);
+                if (DecimalMath::compare($reReserve, 0) > 0) {
+                    $balance = StockBalance::where('product_id', $item->product_id)
+                        ->where('warehouse_location_id', $item->warehouse_location_id)->lockForUpdate()->first()
+                        ?? StockBalance::create(['product_id' => $item->product_id, 'warehouse_location_id' => $item->warehouse_location_id, 'on_hand_qty' => 0, 'reserved_qty' => 0]);
+                    $balance->increment('reserved_qty', $reReserve);
+                }
+                $item->update(['billed_qty' => 0]);
             }
 
-            $locked->update(['status' => SaleBooking::STATUS_PENDING, 'confirmed_at' => null, 'confirmed_document_id' => null]);
+            $locked->update(['status' => SaleBooking::STATUS_PENDING, 'confirmed_at' => null, 'confirmed_document_id' => null,
+                'remainder_closed_at' => null, 'remainder_closed_by' => null]);
             DB::table('audit_logs')->insert([
                 'user_id' => $userId, 'branch_id' => $locked->document->branch_id, 'action' => 'revert_confirm',
                 'table_name' => 'sale_bookings', 'record_id' => $locked->id,
-                'old_values' => json_encode(['status' => SaleBooking::STATUS_CONVERTED, 'sales' => $sales->pluck('doc_number')], JSON_UNESCAPED_UNICODE),
+                'old_values' => json_encode(['status' => $oldStatus, 'sales' => $sales->pluck('doc_number')], JSON_UNESCAPED_UNICODE),
                 'new_values' => json_encode(['status' => SaleBooking::STATUS_PENDING, 'reason' => $reason], JSON_UNESCAPED_UNICODE),
                 'created_at' => now(),
             ]);
@@ -208,6 +216,9 @@ class BookingService
             $locked = SaleBooking::whereKey($booking->id)->lockForUpdate()->firstOrFail();
             if ($locked->status !== SaleBooking::STATUS_PENDING) {
                 throw new RuntimeException('ยกเลิกได้เฉพาะใบจองที่ยังไม่ออกบิล');
+            }
+            if (($locked->document->stockDocument?->items ?? collect())->contains(fn ($i) => DecimalMath::compare($i->billed_qty ?? 0, 0) > 0)) {
+                throw new RuntimeException('ใบจองนี้ออกบิลไปบางส่วนแล้ว ยกเลิกไม่ได้ ให้ผู้จัดการปิดยอดค้าง หรือถอย Confirm');
             }
             foreach ($locked->document->stockDocument?->items ?? [] as $item) {
                 $balance = StockBalance::where('product_id', $item->product_id)
@@ -226,6 +237,9 @@ class BookingService
 
     public function update(SaleBooking $booking, array $data): Document
     {
+        if (($booking->document->stockDocument?->items ?? collect())->contains(fn ($i) => DecimalMath::compare($i->billed_qty ?? 0, 0) > 0)) {
+            throw new RuntimeException('ใบจองนี้ออกบิลไปบางส่วนแล้ว แก้ไขไม่ได้ ให้ผู้จัดการถอย Confirm ก่อน');
+        }
         if (empty($data['items'])) {
             throw new RuntimeException('ต้องมีรายการสินค้าอย่างน้อย 1 รายการ');
         }
