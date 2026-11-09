@@ -366,6 +366,11 @@
             max-width: 48px !important; max-height: 34px !important;
             object-fit: contain; display: block;
         }
+        .odn-sysname {
+            flex: none; padding: 0 16px; font-size: 12px; font-weight: 800; letter-spacing: .6px;
+            color: #94a3b8; white-space: nowrap; user-select: none;
+        }
+        @media (max-width: 1100px) { .odn-sysname { display: none; } }
         .odn-brand-text {
             font-weight: 800; font-size: 14px; color: var(--erp-primary-dark, #0f4c75);
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -1710,7 +1715,6 @@
                     @if($appLogo)
                         <span class="odn-logo-box"><img src="{{ $appLogo }}" alt="{{ $systemName }}"></span>
                     @endif
-                    <span class="odn-brand-text">{{ $systemName }}</span>
                 </a>
             </div>
             <nav class="odn-nav" aria-label="หมวดเมนู">
@@ -1719,6 +1723,7 @@
                        data-sec="{{ $i }}"><i class="bi {{ $railIcons[$section['label']] ?? 'bi-grid-fill' }}"></i><span>{{ $section['displayLabel'] ?? $section['label'] }}</span></a>
                 @endforeach
             </nav>
+            <span class="odn-sysname" aria-hidden="true">{{ $systemName }}</span>
         </div>
 @endif
         <nav class="app-header navbar navbar-expand bg-white">

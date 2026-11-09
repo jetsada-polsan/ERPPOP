@@ -7,7 +7,7 @@
     <link rel="icon" href="{{ $faviconUrl }}">
     <link rel="shortcut icon" href="{{ $faviconUrl }}">
     <link rel="apple-touch-icon" href="{{ $faviconUrl }}">
-    <title>เข้าสู่ระบบ - {{ \App\Models\AppSetting::company('name_th') ?: 'MPM Food Group' }}</title>
+    <title>เข้าสู่ระบบ JET ERP - {{ \App\Models\AppSetting::company('name_th') ?: 'MPM Food Group' }}</title>
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700;800&display=swap');
@@ -391,7 +391,7 @@
             {{ \App\Models\AppSetting::company('name_th') ?: 'MPM Food Group' }}
         </div>
         <div class="story-content">
-            <div class="story-kicker">แพลตฟอร์มบริหารงานธุรกิจ</div>
+            <div class="story-kicker">JET ERP · แพลตฟอร์มบริหารงานธุรกิจ</div>
             <h1 class="story-title">บริหารยอดขาย สต๊อก และต้นทุน ในที่เดียว แบบเรียลไทม์</h1>
             <p class="story-copy">เชื่อมทุกสาขา หน้าร้าน และคลังสินค้าไว้ในระบบเดียว พร้อมข้อมูลที่แม่นยำสำหรับการตัดสินใจทุกวัน</p>
             <div class="story-panel">
