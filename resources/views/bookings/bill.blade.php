@@ -19,7 +19,7 @@
         @csrf
         <div class="row g-3">
             @foreach(['DS' => ['ใบขายเชื่อ DS', 'มี VAT', 'primary'], 'DSN' => ['N-ใบขายเชื่อ DSN', 'ไม่มี VAT', 'secondary']] as $code => [$title, $vatLabel, $tone])
-            <div class="col-xl-6">
+            <div class="col-12">
                 <div class="card border-0 shadow-sm h-100 bill-card bill-{{ strtolower($code) }}">
                     <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
                         <div class="fs-5 fw-bold">{{ $title }} <span class="badge text-bg-{{ $tone }} ms-1">{{ $vatLabel }}</span></div>
@@ -33,26 +33,27 @@
                             </div>
                             <div class="col-sm-8">
                                 <label class="form-label">หมายเหตุ</label>
-                                <input type="text" maxlength="500" name="bills[{{ $code }}][remark]" value="{{ old("bills.$code.remark", 'อ้างถึงใบจองสินค้า #'.$booking->document->doc_number) }}" class="form-control">
+                                <input type="text" name="bills[{{ $code }}][remark]" value="{{ old("bills.$code.remark", 'อ้างถึงใบจองสินค้า #'.$booking->document->doc_number) }}" class="form-control">
                             </div>
                         </div>
                         <div class="table-responsive">
                             <table class="table align-middle mb-0">
                                 <thead><tr>
                                     <th>สินค้า</th>
-                                    <th class="text-end" style="width:120px">จำนวน</th>
-                                    <th class="text-end" style="width:130px">ราคา/หน่วย</th>
-                                    <th class="text-end" style="width:120px">จำนวนเงิน</th>
-                                    <th style="width:90px"></th>
+                                    <th class="text-end" style="width:110px">ค้าง</th>
+                                    <th class="text-end" style="width:130px">จำนวน</th>
+                                    <th class="text-end" style="width:150px">ราคา/หน่วย</th>
+                                    <th class="text-end" style="width:140px">จำนวนเงิน</th>
+                                    <th style="width:110px"></th>
                                 </tr></thead>
                                 <tbody>
                                     <template x-for="(line, idx) in lines" :key="line.id">
                                         <tr x-show="line.book === '{{ $code }}'" :class="line.belowCost && line.qty > 0 ? 'bill-below-cost' : ''">
                                             <td>
-                                                <div class="fw-semibold" x-text="line.name"></div>
-                                                <div class="small text-muted"><span x-text="line.sku"></span> · ค้าง <span x-text="fmt(line.remaining)"></span> <span x-text="line.unit"></span></div>
-                                                <div class="small fw-bold text-danger" x-show="line.belowCost && line.qty > 0">ราคาที่ขายต่ำกว่าทุน</div>
+                                                <div class="fw-semibold"><span class="text-muted me-2" x-text="line.sku"></span><span x-text="line.name"></span></div>
+                                                <div class="fw-bold text-danger" x-show="line.belowCost && line.qty > 0"><i class="bi bi-exclamation-triangle-fill me-1"></i>ราคาที่ขายต่ำกว่าทุน</div>
                                             </td>
+                                            <td class="text-end text-muted text-nowrap"><span x-text="fmt(line.remaining)"></span> <span x-text="line.unit"></span></td>
                                             <td>
                                                 <input type="number" step="0.0001" min="0" :max="line.remaining" class="form-control text-end" x-model.number="line.qty"
                                                        :class="line.qty > line.remaining ? 'is-invalid' : ''"
@@ -72,7 +73,7 @@
                                             </td>
                                         </tr>
                                     </template>
-                                    <tr x-show="count('{{ $code }}') === 0"><td colspan="5" class="text-center text-muted py-4">ไม่มีรายการในใบนี้ ระบบจะไม่ออกใบนี้</td></tr>
+                                    <tr x-show="count('{{ $code }}') === 0"><td colspan="6" class="text-center text-muted py-4">ไม่มีรายการในใบนี้ ระบบจะไม่ออกใบนี้</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -105,7 +106,9 @@
 <style>
     .bill-page .table td, .bill-page .table th { font-size: 15px; }
     .bill-page .form-control { font-size: 15px; }
-    .bill-page tr.bill-below-cost > td { background: #fef2f2 !important; }
+    html body .bill-page .table > tbody > tr.bill-below-cost > td { background: #fee2e2 !important; }
+    html body .bill-page .table > tbody > tr.bill-below-cost > td:first-child { box-shadow: inset 4px 0 0 #dc2626; }
+    html body .bill-page .table > tbody > tr.bill-below-cost input.is-invalid { border-color: #dc2626 !important; background: #fff !important; }
     .bill-page .bill-ds .card-header { border-top: 4px solid var(--erp-primary, #1585c0); }
     .bill-page .bill-dsn .card-header { border-top: 4px solid #64748b; }
 </style>
