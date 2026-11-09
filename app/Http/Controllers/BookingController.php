@@ -381,6 +381,97 @@ class BookingController extends Controller
             ->with('success', 'ยืนยันแล้ว ออกใบขายได้ สต๊อกจะติดลบชั่วคราวจนกว่าจะรับเข้าหรือปรับยอด');
     }
 
+    /** หน้าออกใบขายจากใบจอง: แยกใบ DS/DSN แก้จำนวน ราคา หัวบิลได้ก่อนบันทึก */
+    public function billForm(Request $request, SaleBooking $booking): View|RedirectResponse
+    {
+        abort_unless($request->user()->canAccessBranch((int) $booking->document->branch_id), 403);
+        if ($booking->status !== SaleBooking::STATUS_PENDING) {
+            return redirect()->route('bookings.show', $booking)->with('error', 'ใบจองนี้ออกบิลครบหรือปิดไปแล้ว');
+        }
+        $booking->load(['document.customer', 'document.branch', 'document.salesUser', 'document.stockDocument.items.product.baseUnit']);
+        $lines = ($booking->document->stockDocument?->items ?? collect())->sortBy('id')->values()
+            ->map(function ($item) {
+                $remaining = round((float) $item->qty - (float) ($item->billed_qty ?? 0), 4);
+
+                return [
+                    'id' => $item->id,
+                    'productId' => $item->product_id,
+                    'sku' => $item->product?->sku_code ?? '',
+                    'name' => $item->product?->name_th ?? '-',
+                    'unit' => $item->product?->baseUnit?->name ?? '',
+                    'isVat' => (bool) $item->product?->is_vat,
+                    'booked' => (float) $item->qty,
+                    'remaining' => $remaining,
+                    'qty' => $remaining,
+                    'price' => (float) $item->unit_price,
+                    'book' => $item->product?->is_vat ? 'DS' : 'DSN',
+                    'belowCost' => false,
+                ];
+            })->filter(fn ($l) => $l['remaining'] > 0)->values();
+        $creditDays = (int) ($booking->document->customer?->credit_days ?? 0) ?: (int) (\App\Models\AppSetting::get('default_credit_days') ?: 30);
+
+        return view('bookings.bill', [
+            'booking' => $booking,
+            'lines' => $lines,
+            'creditDays' => $creditDays,
+            'canApproveBelowCost' => $request->user()->hasPermission('sales.price_below_cost'),
+        ]);
+    }
+
+    public function storeBill(Request $request, SaleBooking $booking, CreditSaleService $service): RedirectResponse
+    {
+        abort_unless($request->user()->canAccessBranch((int) $booking->document->branch_id), 403);
+        $data = $request->validate([
+            'bills' => ['required', 'array'],
+            'bills.*.credit_days' => ['nullable', 'integer', 'min:0', 'max:365'],
+            'bills.*.remark' => ['nullable', 'string', 'max:500'],
+            'bills.*.lines' => ['nullable', 'array'],
+            'bills.*.lines.*.booking_item_id' => ['required', 'integer'],
+            'bills.*.lines.*.qty' => ['required', 'numeric', 'min:0'],
+            'bills.*.lines.*.unit_price' => ['required', 'numeric', 'min:0'],
+        ]);
+        try {
+            $sales = $service->billFromBooking($booking, $data['bills'], $request->user());
+        } catch (RuntimeException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('bookings.show', $booking)
+            ->with('success', 'ออกใบขาย '.$sales->pluck('doc_number')->join(', ').' แล้ว ตัดสต๊อกและตั้งลูกหนี้เรียบร้อย');
+    }
+
+    /** ตอบแค่ว่าราคาต่ำกว่าทุนไหม ไม่ส่งตัวเลขทุนให้หน้าจอ */
+    public function priceCheck(Request $request, SaleBooking $booking, CreditSaleService $service): \Illuminate\Http\JsonResponse
+    {
+        abort_unless($request->user()->canAccessBranch((int) $booking->document->branch_id), 403);
+        $data = $request->validate(['prices' => ['required', 'array', 'max:500'], 'prices.*' => ['nullable', 'numeric', 'min:0']]);
+        // key = บรรทัดใบจอง (สินค้าเดียวกันอาจอยู่หลายบรรทัดราคาต่างกัน) ตอบกลับเป็น true/false ไม่มีตัวเลขทุน
+        $items = ($booking->document->stockDocument?->items ?? collect())->keyBy('id');
+        $flags = [];
+        foreach ($data['prices'] as $itemId => $price) {
+            $item = $items->get((int) $itemId);
+            if ($item) {
+                $flags[(int) $itemId] = $service->belowCostFlags([$item->product_id => $price])[(int) $item->product_id];
+            }
+        }
+
+        return response()->json(['below_cost' => $flags]);
+    }
+
+    public function closeRemainder(Request $request, SaleBooking $booking, CreditSaleService $service): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user->hasPermission('documents.void'), 403, 'เฉพาะผู้จัดการเท่านั้นที่ปิดยอดค้างได้');
+        abort_unless($user->canAccessBranch((int) $booking->document->branch_id), 403);
+        try {
+            $service->closeRemainder($booking, $user->id);
+        } catch (RuntimeException $e) {
+            return redirect()->route('bookings.show', $booking)->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('bookings.show', $booking)->with('success', 'ปิดยอดค้างแล้ว คืนสต๊อกที่กันไว้');
+    }
+
     public function convert(Request $request, SaleBooking $booking, CreditSaleService $service): RedirectResponse
     {
         $data = $request->validate([

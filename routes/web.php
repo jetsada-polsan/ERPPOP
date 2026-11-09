@@ -271,6 +271,10 @@ Route::prefix('bookings')->name('bookings.')->group(function () {
     Route::put('/{booking}', [BookingController::class, 'update'])->name('update');
     Route::get('/{booking}', [BookingController::class, 'show'])->name('show');
     Route::post('/{booking}/convert', [BookingController::class, 'convert'])->name('convert');
+    Route::get('/{booking}/bill', [BookingController::class, 'billForm'])->name('bill');
+    Route::post('/{booking}/bill', [BookingController::class, 'storeBill'])->name('bill.store');
+    Route::post('/{booking}/price-check', [BookingController::class, 'priceCheck'])->name('price-check');
+    Route::post('/{booking}/close-remainder', [BookingController::class, 'closeRemainder'])->name('close-remainder');
     Route::post('/{booking}/revert-confirm', [BookingController::class, 'revertConfirm'])->name('revert-confirm');
     Route::post('/{booking}/approve-stock-shortage', [BookingController::class, 'approveStockShortage'])->name('approve-stock-shortage');
     Route::post('/{booking}/cancel', [BookingController::class, 'cancel'])->name('cancel');
