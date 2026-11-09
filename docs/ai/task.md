@@ -5221,3 +5221,11 @@ pending
 - ทำอะไร: ขยายปุ่ม toolbar, ปุ่มแก้จำนวน/ลบ และปุ่มรับชำระ เพื่อรองรับหน้าจอสัมผัสโดยไม่ย้อนกลับไปใช้ UI legacy
 - ทดสอบ: `PYTHONPATH=apps/jet-pos-python python3 -m unittest discover -s apps/jet-pos-python/tests -v` ผ่าน 25 tests; UI smoke ผ่าน; `git diff --check` ผ่าน
 - งานถัดไป: Build/install UAT และให้เจ้าของกรอก PIN บนเครื่องจริงเพื่อเก็บ error เปิดกะจาก ERP หากยังไม่ผ่าน
+
+## Workflow Phase 2 (9 พ.ย. 2026, Claude) — branch claude/workflow-improvement
+- แปลงใบจองครั้งเดียวแยกเป็น DS (มี VAT) + DSN (ไม่มี VAT) ยอดรวมต้องเท่าใบจอง
+- ผู้จัดการถอย Confirm: void ใบขายทุกใบ คืนสต๊อก/ลูกหนี้/GL ใบจองกลับมากันของ (สิทธิ์ documents.void)
+- สต๊อกระบบไม่พอ: บันทึกใบจองได้ถ้าติ๊ก รอผู้จัดการยืนยันใน ERP (sales.stock_shortage.approve) แล้วติดลบชั่วคราวได้ แจ้งเตือนเฉพาะผู้มีสิทธิ์
+- ตรวจนับ: ไม่ได้นับไม่ปรับ, โหมดนับเต็มต้องผู้จัดการติ๊กยืนยัน
+- รายงานตัวหนังสือ 13–16px, พิมพ์หัวตารางไม่ทับ
+- PHPUnit 845 ผ่าน; mutation test ข้อ split/shortage/revert แดงจริง

@@ -379,6 +379,41 @@ class SalesDocumentEndToEndTest extends TestCase
         $this->assertSame(-3.0, (float) $balance->on_hand_qty, 'อนุมัติแล้วสต๊อกติดลบชั่วคราวได้');
     }
 
+    public function test_a_manager_can_revert_a_confirmed_booking_back_to_a_reservation(): void
+    {
+        [$branch, $location, $product, $customer] = $this->stockedBranch('REV', qty: 10, unitCost: 60, withCustomer: true);
+        $doc = app(BookingService::class)->create(['branch_id' => $branch->id, 'customer_id' => $customer->id,
+            'items' => [['product_id' => $product->id, 'qty' => 3, 'unit_price' => 100]]]);
+        $booking = SaleBooking::where('document_id', $doc->id)->sole();
+        $sale = app(CreditSaleService::class)->convertBookingToCreditSale($booking);
+
+        $clerk = User::factory()->create(['branch_id' => $branch->id, 'is_active' => true, 'must_change_password' => false]);
+        $clerkRole = Role::create(['code' => 'SALES_R', 'name' => 'ขาย']);
+        $clerkRole->permissions()->attach(Permission::firstOrCreate(['code' => 'sales.manage'], ['name' => 'sales']));
+        $clerk->roles()->attach($clerkRole);
+        $this->actingAs($clerk)->post(route('bookings.revert-confirm', $booking), ['reason' => 'x'])->assertForbidden();
+
+        $manager = User::factory()->create(['branch_id' => $branch->id, 'is_active' => true, 'must_change_password' => false]);
+        $role = Role::firstOrCreate(['code' => 'BRANCH_MGR'], ['name' => 'ผจก.']);
+        $role->permissions()->syncWithoutDetaching(Permission::firstOrCreate(['code' => 'sales.manage'], ['name' => 'sales']));
+        $manager->roles()->attach($role);
+        $this->actingAs($manager)->post(route('bookings.revert-confirm', $booking), ['reason' => 'ลูกค้าเปลี่ยนรายการ'])
+            ->assertSessionHas('success');
+
+        $this->assertSame('cancelled', $sale->fresh()->status);
+        $this->assertSame(SaleBooking::STATUS_PENDING, $booking->fresh()->status);
+        $balance = StockBalance::where('product_id', $product->id)->where('warehouse_location_id', $location->id)->sole();
+        $this->assertSame(10.0, (float) $balance->on_hand_qty, 'ต้องคืนสต๊อกในมือ');
+        $this->assertSame(3.0, (float) $balance->reserved_qty, 'ใบจองกลับมากันของไว้');
+        $this->assertSame(0.0, (float) CustomerOpenItem::where('document_id', $sale->id)->sole()->balance_amount);
+        foreach (GlJournal::where('document_id', $sale->id)->get()->groupBy('account_id') as $accountId => $rows) {
+            $this->assertSame(0.0, round((float) $rows->sum('debit') - (float) $rows->sum('credit'), 2), "บัญชี {$accountId} ต้องกลับรายการจนเป็นศูนย์");
+        }
+
+        app(CreditSaleService::class)->convertBookingToCreditSale($booking->fresh());
+        $this->assertSame(7.0, (float) $balance->fresh()->on_hand_qty, 'Confirm ใหม่ได้');
+    }
+
     private function stockedBranch(string $suffix, float $qty, float $unitCost, bool $withCustomer = false): array
     {
         DocumentType::firstOrCreate(['code' => 'PURCHASE'], ['name_th' => 'ใบซื้อ', 'stock_effect' => 'in']);

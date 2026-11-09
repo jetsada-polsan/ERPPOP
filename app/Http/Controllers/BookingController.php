@@ -346,6 +346,22 @@ class BookingController extends Controller
         return redirect()->route('bookings.show', $booking)->with('success', 'ยกเลิกใบจองแล้ว คืนยอดจองให้สต๊อก');
     }
 
+    /** ผู้จัดการถอย Confirm: ยกเลิกใบขายที่ออกแล้ว ใบจองกลับไปแก้ไขได้ */
+    public function revertConfirm(Request $request, SaleBooking $booking, BookingService $service): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user->hasPermission('documents.void'), 403, 'เฉพาะผู้จัดการเท่านั้นที่ถอย Confirm ได้');
+        abort_unless($user->canAccessBranch((int) $booking->document->branch_id), 403);
+        $data = $request->validate(['reason' => ['required', 'string', 'max:500']]);
+        try {
+            $service->revertConfirmation($booking, $data['reason'], $user->id);
+        } catch (RuntimeException $e) {
+            return redirect()->route('bookings.show', $booking)->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('bookings.show', $booking)->with('success', 'ถอย Confirm แล้ว ยกเลิกใบขาย คืนสต๊อก ปิดลูกหนี้ ใบจองกลับมากันของไว้');
+    }
+
     /** ผู้จัดการยืนยันใน ERP ว่าของจริงมี แม้สต๊อกในระบบไม่พอ */
     public function approveStockShortage(Request $request, SaleBooking $booking): RedirectResponse
     {

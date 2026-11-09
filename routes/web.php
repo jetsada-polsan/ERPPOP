@@ -271,6 +271,7 @@ Route::prefix('bookings')->name('bookings.')->group(function () {
     Route::put('/{booking}', [BookingController::class, 'update'])->name('update');
     Route::get('/{booking}', [BookingController::class, 'show'])->name('show');
     Route::post('/{booking}/convert', [BookingController::class, 'convert'])->name('convert');
+    Route::post('/{booking}/revert-confirm', [BookingController::class, 'revertConfirm'])->name('revert-confirm');
     Route::post('/{booking}/approve-stock-shortage', [BookingController::class, 'approveStockShortage'])->name('approve-stock-shortage');
     Route::post('/{booking}/cancel', [BookingController::class, 'cancel'])->name('cancel');
     Route::post('/{booking}/delivery', [BookingController::class, 'recordDelivery'])->name('delivery');

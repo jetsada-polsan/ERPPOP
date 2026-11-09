@@ -167,6 +167,41 @@ class BookingService
      * stock movements. The reservation is moved atomically with the document.
      */
     /** ยกเลิกใบจองที่ยังไม่ออกบิล คืนยอดจองให้สต๊อก ไม่แตะบัญชีเพราะใบจองไม่ลงบัญชี */
+    /**
+     * ถอย Confirm (ผู้จัดการ): ยกเลิกใบขาย DS/DSN ทุกใบที่ออกจากใบจองนี้ด้วย void เดิม
+     * (คืนสต๊อก ปิดลูกหนี้ กลับ GL) แล้วใบจองกลับไปกันของไว้เหมือนก่อน Confirm
+     */
+    public function revertConfirmation(SaleBooking $booking, string $reason, ?int $userId): void
+    {
+        DB::transaction(function () use ($booking, $reason, $userId) {
+            $locked = SaleBooking::whereKey($booking->id)->lockForUpdate()->firstOrFail();
+            if ($locked->status !== SaleBooking::STATUS_CONVERTED) {
+                throw new RuntimeException('ถอยได้เฉพาะใบจองที่ Confirm ออกใบขายแล้ว');
+            }
+            $sales = $locked->saleDocuments()->where('status', 'active')->get();
+            foreach ($sales as $sale) {
+                app(\App\Services\Accounting\DocumentVoidService::class)->void($sale, 'ถอย Confirm ใบจอง: '.$reason, $userId);
+            }
+
+            $items = $locked->document()->with('stockDocument.items')->firstOrFail()->stockDocument?->items ?? collect();
+            foreach ($items as $item) {
+                $balance = StockBalance::where('product_id', $item->product_id)
+                    ->where('warehouse_location_id', $item->warehouse_location_id)->lockForUpdate()->first()
+                    ?? StockBalance::create(['product_id' => $item->product_id, 'warehouse_location_id' => $item->warehouse_location_id, 'on_hand_qty' => 0, 'reserved_qty' => 0]);
+                $balance->increment('reserved_qty', $item->qty);
+            }
+
+            $locked->update(['status' => SaleBooking::STATUS_PENDING, 'confirmed_at' => null, 'confirmed_document_id' => null]);
+            DB::table('audit_logs')->insert([
+                'user_id' => $userId, 'branch_id' => $locked->document->branch_id, 'action' => 'revert_confirm',
+                'table_name' => 'sale_bookings', 'record_id' => $locked->id,
+                'old_values' => json_encode(['status' => SaleBooking::STATUS_CONVERTED, 'sales' => $sales->pluck('doc_number')], JSON_UNESCAPED_UNICODE),
+                'new_values' => json_encode(['status' => SaleBooking::STATUS_PENDING, 'reason' => $reason], JSON_UNESCAPED_UNICODE),
+                'created_at' => now(),
+            ]);
+        });
+    }
+
     public function cancel(SaleBooking $booking, ?string $reason, ?int $userId): void
     {
         DB::transaction(function () use ($booking, $reason, $userId) {
