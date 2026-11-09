@@ -220,6 +220,12 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
         </table>
     </div>
 </div>
+<div class="content-card p-3 mt-3">
+    <h2 class="h6">ใบขายอ้างอิงทั้งหมด</h2>
+    @foreach($booking->saleDocuments()->get() as $linkedSale)
+        <a class="btn btn-outline-success m-1" href="{{ route('sales.show', $linkedSale) }}">{{ $linkedSale->doc_number }} · {{ $linkedSale->status }}</a>
+    @endforeach
+</div>
 @endsection
 
 @push('head')

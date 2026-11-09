@@ -302,6 +302,42 @@ class SalesDocumentEndToEndTest extends TestCase
     }
 
     /** สาขาที่มีของในคลังจริงโดยซื้อเข้ามา ไม่ใช่ยัดตัวเลขลงตาราง */
+    public function test_one_booking_with_vat_and_non_vat_goods_splits_into_ds_and_dsn_bills(): void
+    {
+        [$branch, , $plain, $customer] = $this->stockedBranch('SPLIT', qty: 10, unitCost: 60, withCustomer: true);
+        $vatGoods = Product::create([
+            'sku_code' => 'SKUVAT', 'name_th' => 'สินค้ามี VAT', 'base_unit_id' => $plain->base_unit_id,
+            'default_price' => 50, 'average_cost' => 0, 'is_vat' => true, 'is_active' => true, 'negative_stock_policy' => 'block',
+        ]);
+        app(PurchaseService::class)->create([
+            'branch_id' => $branch->id, 'supplier_id' => Supplier::sole()->id, 'is_credit' => true, 'prices_include_vat' => false,
+            'items' => [['product_id' => $vatGoods->id, 'qty' => 10, 'unit_price' => 30]],
+        ]);
+        $typeId = DocumentType::where('code', 'CREDIT_SALE')->value('id');
+        $ds = \App\Models\DocumentBook::create(['code' => 'DS', 'name' => 'DS', 'prefix' => 'DS', 'document_type_id' => $typeId, 'is_default' => true, 'is_active' => true, 'no_vat' => false]);
+        $dsn = \App\Models\DocumentBook::create(['code' => 'DSN', 'name' => 'DSN', 'prefix' => 'DSN', 'document_type_id' => $typeId, 'is_default' => false, 'is_active' => true, 'no_vat' => true]);
+
+        $bookingDocument = app(BookingService::class)->create([
+            'branch_id' => $branch->id, 'customer_id' => $customer->id,
+            'items' => [
+                ['product_id' => $plain->id, 'qty' => 3, 'unit_price' => 100.25],
+                ['product_id' => $vatGoods->id, 'qty' => 2, 'unit_price' => 50.10],
+            ],
+        ]);
+        app(CreditSaleService::class)->convertBookingToCreditSale(SaleBooking::where('document_id', $bookingDocument->id)->sole());
+
+        $sales = Document::where('source_document_id', $bookingDocument->id)->orderBy('id')->get();
+        $this->assertCount(2, $sales, 'ใบจองเดียวต้องแยกเป็น DS + DSN');
+        $byBook = $sales->keyBy('document_book_id');
+        $this->assertSame(100.2, (float) $byBook[$ds->id]->total_amount, 'DS เก็บเฉพาะสินค้ามี VAT');
+        $this->assertSame(300.75, (float) $byBook[$dsn->id]->total_amount, 'DSN เก็บเฉพาะสินค้าไม่มี VAT');
+        $this->assertSame(round((float) $bookingDocument->total_amount, 2), round($sales->sum(fn ($d) => (float) $d->total_amount), 2));
+        $this->assertSame(2, CustomerOpenItem::whereIn('document_id', $sales->pluck('id'))->count());
+        foreach ($sales as $sale) {
+            $this->assertGlBalanced($sale);
+        }
+    }
+
     private function stockedBranch(string $suffix, float $qty, float $unitCost, bool $withCustomer = false): array
     {
         DocumentType::firstOrCreate(['code' => 'PURCHASE'], ['name_th' => 'ใบซื้อ', 'stock_effect' => 'in']);

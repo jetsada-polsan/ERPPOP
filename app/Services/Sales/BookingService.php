@@ -88,8 +88,8 @@ class BookingService
                 $balances[$productId] = $balance;
             }
 
-            $totalQty = $items->sum('qty');
-            $totalAmount = $items->sum(fn ($i) => $i['qty'] * $i['unit_price']);
+            $totalQty = DecimalMath::sum($items->pluck('qty'), DecimalMath::QUANTITY_SCALE);
+            $totalAmount = DecimalMath::sum($items->map(fn ($i) => DecimalMath::multiply($i['qty'], $i['unit_price'])));
 
             $document = Document::create([
                 'document_type_id' => $documentType->id,

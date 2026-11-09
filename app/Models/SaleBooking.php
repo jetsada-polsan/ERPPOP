@@ -61,6 +61,14 @@ class SaleBooking extends Model
         return $this->belongsTo(SalesArea::class);
     }
 
+    /** Includes the original single-document link for bookings created before tax splitting. */
+    public function saleDocuments()
+    {
+        return Document::whereHas('documentType', fn ($query) => $query->where('code', DocumentType::CREDIT_SALE))
+            ->where(fn ($query) => $query->where('source_document_id', $this->document_id)
+                ->orWhere('id', $this->confirmed_document_id));
+    }
+
     public function confirmedDocument(): BelongsTo
     {
         return $this->belongsTo(Document::class, 'confirmed_document_id');

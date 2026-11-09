@@ -47,7 +47,7 @@ class CreditSaleService
     public function convertBookingToCreditSale(SaleBooking $booking, ?DocumentBook $book = null): Document
     {
         $documentType = DocumentType::where('code', DocumentType::CREDIT_SALE)->firstOrFail();
-        $book ??= DocumentBook::defaultFor(DocumentType::CREDIT_SALE);
+        
 
         return DB::transaction(function () use ($booking, $documentType, $book) {
             $lockedBooking = SaleBooking::whereKey($booking->id)->lockForUpdate()->firstOrFail();
@@ -66,10 +66,42 @@ class CreditSaleService
             $saleDate = $lockedBooking->delivered_at?->toDateString() ?? now()->toDateString();
             $this->periods->assertOpen($saleDate, $bookingDocument->branch_id);
 
+            $groups = $sourceItems->sortBy('id')->groupBy(fn ($item) => $item->product->is_vat ? 'DS' : 'DSN');
+            $sales = collect();
+            foreach ($groups as $code => $groupItems) {
+                $noVat = $code === 'DSN';
+                // Prefer the book named DS/DSN; otherwise any active credit-sale book with the same tax setting.
+                $groupBook = DocumentBook::where('document_type_id', $documentType->id)->where('is_active', true)
+                    ->where('code', $code)->first()
+                    ?? DocumentBook::where('document_type_id', $documentType->id)->where('is_active', true)
+                        ->where('no_vat', $noVat)->orderByDesc('is_default')->orderBy('id')->first();
+                if ($groupBook && (bool) $groupBook->no_vat !== $noVat) {
+                    throw new RuntimeException("ตั้งค่าภาษีเล่ม {$code} ไม่ถูกต้อง");
+                }
+                if (! $groupBook && $groups->count() > 1) {
+                    throw new RuntimeException("ยังไม่มีเล่มขายเชื่อ {$code} ที่เปิดใช้งาน");
+                }
+                $groupBook ??= $book ?? DocumentBook::defaultFor(DocumentType::CREDIT_SALE);
+                $sales->push($this->createSale($lockedBooking, $bookingDocument, $groupItems, $groupBook, $saleDate));
+            }
+            if (DecimalMath::compare(DecimalMath::sum($sales->pluck('total_amount')), $bookingDocument->total_amount) !== 0) {
+                throw new RuntimeException('ยอดใบขายรวมไม่ตรงกับใบจอง กรุณาตรวจรายการต้นทาง');
+            }
+            $lockedBooking->update([
+                'status' => SaleBooking::STATUS_CONVERTED,
+                'confirmed_at' => now(),
+                'confirmed_document_id' => $sales->first()->id,
+            ]);
+
+            return $sales->first();
+        });
+    }
+
+    private function createSale(SaleBooking $booking, Document $bookingDocument, $sourceItems, ?DocumentBook $book, string $saleDate): Document
+    {
+            $documentType = DocumentType::where('code', DocumentType::CREDIT_SALE)->firstOrFail();
             $totalQty = DecimalMath::sum($sourceItems->pluck('qty'), DecimalMath::QUANTITY_SCALE);
-            $totalAmount = DecimalMath::sum(
-                $sourceItems->map(fn ($item) => DecimalMath::multiply($item->qty, $item->unit_price)),
-            );
+            $totalAmount = DecimalMath::sum($sourceItems->map(fn ($item) => DecimalMath::multiply($item->qty, $item->unit_price)));
 
             $saleDocument = Document::create([
                 'document_type_id' => $documentType->id,
@@ -84,6 +116,7 @@ class CreditSaleService
                 'sales_area_id' => $bookingDocument->sales_area_id,
                 'customer_id' => $bookingDocument->customer_id,
                 'reference' => $bookingDocument->doc_number,
+                'source_document_id' => $bookingDocument->id,
                 'status' => 'active',
                 'total_items' => $sourceItems->count(),
                 'total_amount' => $totalAmount,
@@ -147,15 +180,8 @@ class CreditSaleService
                 'status' => CustomerOpenItem::STATUS_OPEN,
             ]);
 
-            $lockedBooking->update([
-                'status' => SaleBooking::STATUS_CONVERTED,
-                'confirmed_at' => now(),
-                'confirmed_document_id' => $saleDocument->id,
-            ]);
-
             $this->glPosting->postCreditSale($saleDocument);
 
             return $saleDocument->fresh();
-        });
     }
 }
