@@ -276,8 +276,12 @@ class BookingService
                 throw new RuntimeException('ไม่พบรายการสินค้าเดิมของใบจองนี้');
             }
             $transportJob = TransportJob::where('booking_id', $lockedBooking->id)->lockForUpdate()->first();
-            if ($transportJob && ($transportJob->status !== 'booked' || $transportJob->loaded_at !== null)) {
-                throw new RuntimeException('ใบจองนี้ขึ้นรถแล้ว จึงแก้ไขรายการสินค้าไม่ได้');
+            // ขึ้นรถแล้วแต่ยังไม่ออกส่ง: คนขายแก้ได้เลย แล้วรถต้องตรวจขึ้นของใหม่ตามใบจองล่าสุด
+            if ($transportJob && ! in_array($transportJob->status, ['booked', 'loaded'], true)) {
+                throw new RuntimeException('ใบจองนี้ออกส่งแล้ว จึงแก้ไขรายการสินค้าไม่ได้');
+            }
+            if ($transportJob && ($transportJob->status === 'loaded' || $transportJob->loaded_at !== null)) {
+                $transportJob->update(['status' => 'booked', 'loaded_at' => null]);
             }
 
             $newItems = collect($data['items']);

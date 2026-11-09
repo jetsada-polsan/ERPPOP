@@ -209,7 +209,7 @@ class BookingController extends Controller
             : null;
         if ($booking->status !== SaleBooking::STATUS_PENDING
             || $booking->delivery_status !== SaleBooking::DELIVERY_PENDING
-            || ($transportJob && ($transportJob->status !== 'booked' || $transportJob->loaded_at !== null))) {
+            || ($transportJob && ! in_array($transportJob->status, ['booked', 'loaded'], true))) {
             return redirect()->route('bookings.show', $booking)
                 ->with('error', 'แก้ไขได้ก่อนยืนยันขึ้นรถเท่านั้น');
         }

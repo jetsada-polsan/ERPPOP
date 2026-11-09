@@ -22,7 +22,7 @@ $billedAny = $bookingLines->contains(fn ($i) => (float) ($i->billed_qty ?? 0) > 
 $remainingLines = $bookingLines->filter(fn ($i) => (float) $i->qty - (float) ($i->billed_qty ?? 0) > 0.00001);
 $activeSales = $booking->saleDocuments()->where('status', 'active')->get();
 $canEdit = $isPending && ! $billedAny && $booking->delivery_status === 'pending'
-    && (! $transportJob || ($transportJob->status === 'booked' && $transportJob->loaded_at === null));
+    && (! $transportJob || in_array($transportJob->status, ['booked', 'loaded'], true));
 @endphp
 
 @section('content')

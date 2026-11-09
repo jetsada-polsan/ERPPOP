@@ -413,7 +413,7 @@ class BookingSalesAreaTest extends TestCase
         ]);
     }
 
-    public function test_a_booking_can_be_adjusted_after_opening_a_load_sheet_but_not_after_loading_the_truck(): void
+    public function test_a_booking_can_be_adjusted_after_loading_but_not_after_dispatch(): void
     {
         [$branch, $customer, $product] = $this->masters('LOADEDIT');
         $user = User::factory()->create(['username' => 'booking_load_edit_uat', 'branch_id' => $branch->id]);
@@ -449,7 +449,23 @@ class BookingSalesAreaTest extends TestCase
         $this->assertSame('2.00000000', (string) $refreshedLine->planned_qty);
         $this->assertSame('pending', $refreshedLine->availability);
 
+        // เจ้าของ 9 พ.ย. 2026: ขึ้นรถแล้วคนขายแก้ได้เลย รถต้องตรวจขึ้นของใหม่
         TransportJob::where('booking_id', $booking->id)->update(['status' => 'loaded', 'loaded_at' => now()]);
+        $this->get(route('bookings.edit', $booking))->assertOk();
+        $this->put(route('bookings.update', $booking), [
+            'customer_id' => $customer->id,
+            'branch_id' => $branch->id,
+            'sales_user_id' => $user->id,
+            'fulfillment_type' => SaleBooking::FULFILLMENT_DELIVERY,
+            'delivery_due_at' => now()->addDay()->format('Y-m-d H:i:s'),
+            'items' => [['product_id' => $product->id, 'qty' => 3, 'unit_price' => 10]],
+        ])->assertRedirect(route('bookings.show', $booking));
+        $job = TransportJob::where('booking_id', $booking->id)->sole();
+        $this->assertSame('booked', $job->status, 'แก้หลังขึ้นรถ ต้องกลับไปรอตรวจขึ้นของใหม่');
+        $this->assertNull($job->loaded_at);
+
+        // ออกส่งแล้ว (delivered) แก้ไม่ได้
+        TransportJob::where('booking_id', $booking->id)->update(['status' => 'delivered', 'loaded_at' => now()]);
         $this->get(route('bookings.edit', $booking))->assertRedirect(route('bookings.show', $booking));
         $this->from(route('bookings.edit', $booking))->put(route('bookings.update', $booking), [
             'customer_id' => $customer->id,
@@ -460,7 +476,7 @@ class BookingSalesAreaTest extends TestCase
             'items' => [['product_id' => $product->id, 'qty' => 1, 'unit_price' => 10]],
         ])->assertRedirect(route('bookings.edit', $booking))->assertSessionHas('error');
 
-        $this->assertSame('2.00000000', (string) $booking->fresh()->document->stockDocument->items->sole()->qty);
+        $this->assertSame(3.0, (float) $booking->fresh()->document->stockDocument->items->sole()->qty, 'แก้หลังส่งแล้วต้องไม่เปลี่ยนรายการ');
     }
 
     /** @return array{Branch, Customer, Product} */
