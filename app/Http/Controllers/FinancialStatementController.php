@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\ChartOfAccount;
+use App\Services\Reports\ReportScope;
+use App\Support\DecimalMath;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -28,12 +30,14 @@ class FinancialStatementController extends Controller
             $sheet = 'trial_balance';
         }
 
+        $request->validate(['from' => 'nullable|date', 'to' => 'nullable|date|after_or_equal:from']);
+        $branchId = app(ReportScope::class)->branchId($request->input('branch_id'));
         $to = $request->filled('to') ? Carbon::parse($request->input('to')) : now();
         $from = $request->filled('from') ? Carbon::parse($request->input('from')) : $to->copy()->startOfYear();
 
         // ยอด debit/credit ต่อบัญชี ในช่วงวันที่ (Balance Sheet ใช้ยอดสะสมถึง $to)
         $balanceSheet = $sheet === 'balance_sheet';
-        $movements = DB::table('gl_journals')
+        $movements = app(ReportScope::class)->applyGl(DB::table('gl_journals'), 'gl_journals', $request->input('branch_id'))
             ->selectRaw('account_id, SUM(debit) AS total_debit, SUM(credit) AS total_credit')
             ->when(! $balanceSheet, fn ($q) => $q->whereBetween('entry_date', [$from->toDateString(), $to->toDateString()]))
             ->when($balanceSheet, fn ($q) => $q->where('entry_date', '<=', $to->toDateString()))
@@ -42,13 +46,13 @@ class FinancialStatementController extends Controller
 
         $accounts = ChartOfAccount::orderBy('code')->get()->map(function ($acc) use ($movements) {
             $m = $movements->get($acc->id);
-            $debit = (float) ($m->total_debit ?? 0);
-            $credit = (float) ($m->total_credit ?? 0);
+            $debit = DecimalMath::round($m->total_debit ?? 0, 2);
+            $credit = DecimalMath::round($m->total_credit ?? 0, 2);
             // ยอดคงเหลือตามธรรมชาติของบัญชี: asset/expense = debit-credit, อื่น = credit-debit
-            $natural = in_array($acc->account_type, ['asset', 'expense'], true) ? $debit - $credit : $credit - $debit;
+            $natural = in_array($acc->account_type, ['asset', 'expense'], true) ? DecimalMath::subtract($debit, $credit, 2) : DecimalMath::subtract($credit, $debit, 2);
             $acc->total_debit = $debit;
             $acc->total_credit = $credit;
-            $acc->balance = round($natural, 2);
+            $acc->balance = $natural;
 
             return $acc;
         });
@@ -61,6 +65,9 @@ class FinancialStatementController extends Controller
 
         return view('financial-statements.index', array_merge($data, [
             'sheets' => self::SHEETS,
+            'branchId' => $branchId,
+            'branches' => app(ReportScope::class)->apply(\App\Models\Branch::query(), 'id')->orderBy('code')->get(),
+            'allBranches' => auth()->user()?->canSeeAllReportBranches() ?? true,
             'sheet' => $sheet,
             'from' => $from->toDateString(),
             'to' => $to->toDateString(),
@@ -73,8 +80,8 @@ class FinancialStatementController extends Controller
 
         return [
             'rows' => $rows,
-            'totalDebit' => round($rows->sum('total_debit'), 2),
-            'totalCredit' => round($rows->sum('total_credit'), 2),
+            'totalDebit' => DecimalMath::sum($rows->pluck('total_debit'), 2),
+            'totalCredit' => DecimalMath::sum($rows->pluck('total_credit'), 2),
         ];
     }
 
@@ -82,34 +89,30 @@ class FinancialStatementController extends Controller
     {
         $revenue = $accounts->where('account_type', 'revenue');
         $expense = $accounts->where('account_type', 'expense');
-        $totalRevenue = round($revenue->sum('balance'), 2);
-        $totalExpense = round($expense->sum('balance'), 2);
+        $totalRevenue = DecimalMath::sum($revenue->pluck('balance'), 2);
+        $totalExpense = DecimalMath::sum($expense->pluck('balance'), 2);
 
         return [
             'revenue' => $revenue->filter(fn ($a) => abs($a->balance) > 0.001)->values(),
             'expense' => $expense->filter(fn ($a) => abs($a->balance) > 0.001)->values(),
             'totalRevenue' => $totalRevenue,
             'totalExpense' => $totalExpense,
-            'netProfit' => round($totalRevenue - $totalExpense, 2),
+            'netProfit' => DecimalMath::subtract($totalRevenue, $totalExpense, 2),
         ];
     }
 
     private function balanceSheet($accounts, Carbon $from, Carbon $to): array
     {
         // กำไร(ขาดทุน)สุทธิสะสมถึงวันที่ = รายได้สะสม - ค่าใช้จ่ายสะสม โอนเข้าส่วนของเจ้าของ
-        $netProfit = round(
-            $accounts->where('account_type', 'revenue')->sum('balance')
-            - $accounts->where('account_type', 'expense')->sum('balance'),
-            2
-        );
+        $netProfit = DecimalMath::subtract(DecimalMath::sum($accounts->where('account_type', 'revenue')->pluck('balance')), DecimalMath::sum($accounts->where('account_type', 'expense')->pluck('balance')), 2);
 
         $assets = $accounts->where('account_type', 'asset')->filter(fn ($a) => abs($a->balance) > 0.001)->values();
         $liabilities = $accounts->where('account_type', 'liability')->filter(fn ($a) => abs($a->balance) > 0.001)->values();
         $equity = $accounts->where('account_type', 'equity')->filter(fn ($a) => abs($a->balance) > 0.001)->values();
 
-        $totalAssets = round($assets->sum('balance'), 2);
-        $totalLiabilities = round($liabilities->sum('balance'), 2);
-        $totalEquity = round($equity->sum('balance') + $netProfit, 2);
+        $totalAssets = DecimalMath::sum($assets->pluck('balance'), 2);
+        $totalLiabilities = DecimalMath::sum($liabilities->pluck('balance'), 2);
+        $totalEquity = DecimalMath::add(DecimalMath::sum($equity->pluck('balance')), $netProfit, 2);
 
         return [
             'assets' => $assets,
@@ -119,7 +122,7 @@ class FinancialStatementController extends Controller
             'totalAssets' => $totalAssets,
             'totalLiabilities' => $totalLiabilities,
             'totalEquity' => $totalEquity,
-            'balanced' => abs($totalAssets - ($totalLiabilities + $totalEquity)) < 0.5,
+            'balanced' => DecimalMath::compare(DecimalMath::absoluteDifference($totalAssets, DecimalMath::add($totalLiabilities, $totalEquity)), '0.01') <= 0,
         ];
     }
 }

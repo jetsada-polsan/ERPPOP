@@ -136,8 +136,8 @@ class ReportGovernanceTest extends TestCase
             'IT_MGR' => ['reports.export' => true, 'reports.all_branches' => true],
             'ACC_MGR' => ['reports.export' => true, 'reports.all_branches' => true],
             'EXECUTIVE' => ['reports.export' => true, 'reports.all_branches' => true],
-            // พนักงานบัญชีส่งออกได้ แต่ดูเฉพาะสาขาตัวเอง
-            'ACC' => ['reports.export' => true, 'reports.all_branches' => false],
+            // เจ้าของอนุมัติ Phase 2: บัญชีเห็นทุกสาขา
+            'ACC' => ['reports.export' => true, 'reports.all_branches' => true],
             'BRANCH_MGR' => ['reports.export' => true, 'reports.all_branches' => false],
             // หน้าร้านและพนักงานส่งของไม่มีสิทธิ์รายงานเลย
             'CASHIER' => ['reports.view' => false, 'reports.export' => false, 'reports.all_branches' => false],

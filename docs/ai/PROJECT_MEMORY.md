@@ -1,5 +1,16 @@
 # POPSTAR ERP/POS - ความจำกลางของทีม AI
 
+## Reports Phase 2 — 2026-11-09 (workspace only, not deployed)
+
+- Branch codex/reports-phase2 base44f02b1; pull/stage ถูกปฏิเสธเพราะ Git metadata นอกworkspace ไม่ commit/push. ส่งมอบเต็มและผลทดสอบอยู่หัว docs/ai/task.md.
+- นโยบายล่าสุดเจ้าของ: Sales Admin ไม่เห็นต้นทุน/กำไร; Branch Manager เห็นกำไรเฉพาะสาขาที่มอบหมาย; บัญชี/Executive เห็นทั้งบริษัท; คง IT bypass. Migrationใหม่ให้ ACC management.view+reports.all_branches และ EXECUTIVE/BRANCH_MGR management.view โดยไม่เพิ่มสิทธิ์แก้เอกสาร. ยังไม่มีผลกับ production.
+- DailySalesReport อ่าน sales_postings กัน POS linked ซ้ำแล้วเติม active signed returns/credit/debit notes. กำไรไม่รวม VAT ใช้ cost_amount snapshotเท่านั้น; ขาดทุนแสดง unknown/coverage ไม่ใช้ product.average_cost ย้อนหลัง. ต้องตัด fieldsทั้ง rows/columns และ paginator collection ก่อน render/export.
+- ใบจอง A=DS/B=DSN ใช้วันที่จอง; source_document_id ผูกใบขายsplitสองใบ; confirmed_document_id fallbackเฉพาะใบเก่าไม่มีsource. Pendingหลังundo confirmไม่มียอดขายที่แปลง; ยอดจองแยกจากรายได้.
+- Stockหน่วยผสมใช้ qty_per_base_unitจริง/Decimal8; drill product/location มีbranch scope. Aging current-onlyใช้branchของinvoice; GL scopeผ่านdocument/payment document เพราะgl_journalsไม่มีbranch_id. Receiptนับmoney lines; รอพิสูจน์เป็นsubsetไม่บวกรับซ้ำ.
+- REPORTS_PHASE_TWO_ENABLED=false หยุดรายงานชุดใหม่ด้วย503 ไม่ปิดsecurity fixes. เพิ่มdelivery_status/role/report-definition migrationด้วยQuery Builder; SQLite suiteผ่าน, PostgreSQL grammar/pretendเท่านั้นยังไม่executeจริง.
+- Full suite863tests/7316assertions ไม่มีfailure/error (2skipped/6incompleteเดิม); mutation6จุดแดงจริงและคืนครบ. ไม่deploy/ไม่แก้POS/ไม่แตะproduction. เฟส7–8และproduction-scale benchmarkยังเป็นงานอนาคต.
+
+
 ## P0 money integrity — 2026-11-06 (workspace only)
 
 - งานบน `claude/p0-money-integrity` ยังไม่ commit/push เพราะ Git metadata นอก workspace เขียนไม่ได้; ไม่ deploy/ไม่แตะ production. รายละเอียดและตารางส่งมอบครบ 6 ข้ออยู่หัว `docs/ai/task.md`.

@@ -9,6 +9,7 @@ use App\Models\FleetVehicle;
 use App\Models\SaleBooking;
 use App\Models\TransportJob;
 use App\Models\TransportLoadItem;
+use App\Services\Reports\ReportScope;
 use App\Services\Sales\BookingDeliveryService;
 use App\Services\Sales\BookingLoadSheetValidator;
 use App\Services\Sales\CustomerPaymentService;
@@ -232,7 +233,7 @@ class FleetController extends Controller
         $data = $request->validate(['from' => 'nullable|date', 'to' => 'nullable|date|after_or_equal:from', 'vehicle_id' => 'nullable|exists:fleet_vehicles,id']);
         $from = Carbon::parse($data['from'] ?? now()->startOfMonth())->startOfDay();
         $to = Carbon::parse($data['to'] ?? now())->endOfDay();
-        $vehicles = FleetVehicle::with(['branch', 'trips' => fn ($q) => $q->whereBetween('trip_date', [$from->toDateString(), $to->toDateString()]), 'repairs' => fn ($q) => $q->whereBetween('repair_date', [$from->toDateString(), $to->toDateString()])])->when($data['vehicle_id'] ?? null, fn ($q, $id) => $q->whereKey($id))->orderBy('registration')->get();
+        $vehicles = app(ReportScope::class)->apply(FleetVehicle::query())->with(['branch', 'trips' => fn ($q) => $q->whereBetween('trip_date', [$from->toDateString(), $to->toDateString()]), 'repairs' => fn ($q) => $q->whereBetween('repair_date', [$from->toDateString(), $to->toDateString()])])->when($data['vehicle_id'] ?? null, fn ($q, $id) => $q->whereKey($id))->orderBy('registration')->get();
         $summary = ['distance' => $vehicles->sum(fn ($v) => $v->trips->sum(fn ($t) => $t->odometer_end - $t->odometer_start)), 'fuel_liters' => $vehicles->sum(fn ($v) => $v->trips->sum('fuel_liters')), 'fuel_cost' => $vehicles->sum(fn ($v) => $v->trips->sum('fuel_cost')), 'repair_cost' => $vehicles->sum(fn ($v) => $v->repairs->sum('cost'))];
 
         return view('fleet.report', compact('vehicles', 'summary', 'from', 'to'));

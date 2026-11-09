@@ -1,3 +1,45 @@
+# Handoff — 2026-11-09 (Reports Phase 2 — workspace only)
+
+## Commit
+- Branch `codex/reports-phase2`, base HEAD `44f02b1`. ทำตาม `docs/ai/codex-reports-phase2.md`.
+- Pull ถูกปฏิเสธที่ FETCH_HEAD; หลังทดสอบ git add ถูกปฏิเสธที่ index.lock เพราะ Git metadata นอก writable workspace. **ยังไม่ commit/push และแยก commit ต่อเฟสไม่ได้** เก็บงานตามข้อยกเว้นใน brief; ไม่ push main.
+- ก่อนเริ่มมี untracked brief เพียงไฟล์เดียว อ่านเป็น input ไม่ได้แก้. ไม่เรียก agent อื่น ไม่แตะ production ไม่ deploy ไม่เชื่อม MSSQL ไม่สร้าง PIN/password/token และไม่รัน migration บนฐานถาวร. ไม่แก้ POS/installer.
+
+## ทำอะไรไป
+- **เฟส0 เสร็จ:** เพิ่ม `app/Services/Reports/ReportScope.php`; แก้ ReportController, ExecutiveDashboardController, FinancialStatementController, ManagementControlController, MonthlyAccountingController, BplusOperationController, FleetController, PosOfflineSaleController. ตัด cost/profit จาก columns/rows และ paginator collection ก่อน render/export; ปิด alias กำไรสำหรับผู้ไม่มีสิทธิ์ คง IT bypass. Scope AR/AP/GL/งบ/monthly index-export-download/cashbook/fleet report/offline list-count-retry-resolve. GL ไม่มี branch_id จึง scope ผ่าน document/payment document. Report URL เดิม clamp สาขาปลอมกลับสาขาที่ได้รับมอบหมาย; ancillary endpoints ปฏิเสธ403; assignment หมดอายุไม่กลายเป็นทุกสาขา.
+- **เฟส0 สูตรเสร็จ:** ReportController และ `app/Services/Accounting/MonthlyAccountingExportService.php` ใช้ VAT snapshot ไม่ใช่อัตราปัจจุบัน; POS VAT0 คง0; รวม credit/debit notes แบบ signed; ซื้อเฉพาะ active+claim_input_vat. Gross margin/loss ใช้ cost_amount snapshot ไม่ใช้ product.average_cost. กำไรใช้รายได้ไม่รวม VAT, daily/margin แสดง unknown/coverage แทนทุนสมมติ; loss ครอบคลุมเฉพาะรายการมีทุนบันทึกไว้.
+- **เฟส1 เสร็จ:** เพิ่ม `DailySalesReport.php`, shared Blade `resources/views/components/reports/{filter-bar,kpi-card,report-table}.blade.php`; แก้ reports index/result-table และ executive index. sales_postings กัน POS linked ซ้ำแล้วเติม active signed returns/credit/debit notes ที่ document grain. COGS snapshot พร้อม coverage; สาขา/พนักงานใช้ dataset เดียวกัน (แคชเชียร์ salesman ก่อน user). Alias รายวันเดิมรองรับ. KPI ทั้งผลลัพธ์, pagination, CSV/XLSX filter เดียวกัน; ขวา/comma/14px; ถอดลูกศร sort ที่กดไม่ได้. Export แสดงไม่ทราบและแจ้ง cap50,000. Executive ยอดหลัก/trend/channel/branch ใช้ signed dataset.
+- **เฟส2 เสร็จ:** `StockBalanceReport.php`, `StockQuantityFormatter.php`, ReportController. ใช้ qty_per_base_unit ของหน่วย barcode active ที่ผูกสินค้า ไม่ใช้ factor ในชื่อหรือ barcode factor ที่ขัดกัน; Decimal8 รวมลบ/เศษ. แสดงฐาน+จำนวน+ที่เก็บ, drillด้วย product/location/วันที่/สาขา. Stock card มี pagination/opening ก่อนช่วง และ scope คลังหลักหรือ warehouse owner. ทุน Lot แยกสิทธิ์และระบุว่าเป็นทุนปัจจุบัน; ไม่มี Lot แสดงไม่ทราบ.
+- **เฟส3 เสร็จ:** เพิ่ม `BookingSalesReport.php`. ใช้วันที่จอง แยกยอดจองที่ไม่ใช่รายได้, DS/A, DSN/B, VAT snapshot, ยอดขายรวม, ส่วนต่าง, เล่มไม่ทราบประเภท, เลขขายทั้งหมด. source_document_id เป็นหลัก; confirmed_document_id fallbackเฉพาะใบเก่าไม่มี source. ไม่บวกจองกับขาย/ไม่ join items ให้คูณ/ไม่รวมยกเลิก; pending หลัง undo confirm ไม่มียอดขายที่แปลง. มี page/export.
+- **เฟส4 เสร็จ:** `ReceivableReport.php` Aging current-only ระบุวันที่ปัจจุบันชัดเจน, scope สาขา invoice ไม่ใช่ customer ที่ย้ายสาขาได้; Decimal buckets ขอบ30/60/90วัน, search/export scope เดียวกัน. ไม่สร้าง as-of ย้อนหลังจาก allocation history ที่ไม่พอ.
+- **เฟส5 เสร็จ:** `PaymentReport.php`, MonthlyAccountingController/ExportService รวม POS payments + active customer payment_lines ที่ money-line grain ไม่ join allocations/statement ให้เงินคูณ; void/bounced ไม่รวม. รอพิสูจน์เป็น subset ของรับแล้ว ไม่บวกรายรับซ้ำ; matched ใช้ exists(status=matched), KPI ไม่บวก subset ซ้ำ. ดาวน์โหลด run ตรวจสาขาก่อนเปิดไฟล์; ผู้ใช้เฉพาะสาขาเปิดไฟล์ ALL ไม่ได้.
+- **เฟส6 เสร็จ:** `DeliveryReport.php` และทะเบียน booking.delivery_status ที่ booking grain แสดงกำหนดส่ง/สถานะ/เวลาขึ้นรถและส่งจริง/late days/เงินปลายทาง. ตัดใบจองยกเลิก; scope/search/page/export ตรงกัน. เงินเก็บไม่สร้างรายได้ซ้ำ; ไม่เปลี่ยน state machine/posting.
+
+### Migration / เปิดปิด
+- เพิ่ม `database/migrations/2026_11_09_000003_apply_reports_phase_two_access.php` ใช้ Query Builder ไม่เปลี่ยนตารางธุรกรรม. ให้ ACC management.view+reports.all_branches; EXECUTIVE/BRANCH_MGR management.view ตามคำตอบเจ้าของล่าสุด. BRANCH_MGR ไม่มี all branches. ไม่เพิ่มสิทธิ์แก้เอกสารให้บัญชี/Executiveเพียงเพื่อดูรายงาน.
+- เปิดทะเบียนที่พิสูจน์ยอดรอบนี้: daily_by_channel, stock_card_detail, received_and_unidentified, vat_sales, vat_purchase; เพิ่ม delivery_status. P0 อื่นที่ยังไม่พิสูจน์คงปิดเดิม.
+- `config/reports.php`: REPORTS_PHASE_TWO_ENABLED=false เป็น emergency stop ให้รายงานชุดนี้ตอบ503 ไม่ย้อนสูตรผิด/ไม่ปิด security fixes; default=true. Registry enabled ยังคุมเมนู.
+- Migration down ปิดทะเบียนชุดนี้/ลบ delivery/ถอน grants ที่เพิ่ม; ก่อน rollback ต้องตรวจการตั้งค่าที่เจ้าของเปลี่ยนภายหลังเพื่อไม่ทับงานนั้น.
+
+## ทดสอบไปแล้วแค่ไหน
+- แยก vendor symlink ที่เคยชี้อีก workspace เป็นสำเนา vendor ใน workspace นี้ก่อนรับรองผล. ไม่แก้ composer.json/lock; vendor ถูก ignore.
+- **PHP_INI_SCAN_DIR=/tmp/reports-php-conf php artisan test --compact ผ่าน 863 tests / 7316 assertions; runner passed=861, skipped=2, incomplete=6 ไม่มี failure/error.** iniชั่วคราวให้ memory_limit=2G ถึง PHPUnit child; php -d ที่ Artisan อย่างเดียวเคยทำ child หมดmemory128M จึงไม่ใช้ผลรอบนั้นรับรอง.
+- เพิ่ม `tests/Feature/ReportsPhaseTwoTest.php` **18 tests** ครอบคลุมยอดเทียบเอกสาร, signed notes/POS linked, snapshot/masterเปลี่ยน, missing cost, historical loss, page/KPI/CSV/XLSX/print, seeded BRANCH_MGR/ACC/EXECUTIVE/IT, expired assignment, DS+DSN/undo confirm, qty305/25+เศษ/ลบ/หลายbarcode/ชื่อfactorผิด, stock opening+movements=balance/forged drill, customerย้ายสาขา, GL/งบ/monthly IDOR, VAT0/claim/active, payments allocations/matching/bounced, delivery/collection, emergency switch.
+- ปรับ test fixtures/assertions เดิมตาม contract ใหม่: profit permission/unknown cost, role matrix/governance, stock export schema, P0 payment มี figures test แล้ว, finance/offline manager ระบุสาขาหรือ all-branches ชัดเจน. ไม่เพิ่ม skipped/incomplete หลบ failure.
+- **Mutation6จุดแดงจาก assertionจริงและคืนครบ:** redaction, signed returns, invoice branch, barcode factor, GL source scope, booking confirmation. หลังคืน full suite ผ่านข้างต้น.
+- PHP lint29ไฟล์, git diff --check ผ่าน. Pint ผ่าน services/testใหม่/migration/config; ไม่ format controller เดิมทั้งไฟล์.
+- SQLite migration executeจริงผ่าน RefreshDatabase. PostgreSQL **compile-only** ด้วย Laravel PostgreSQL grammar+pretend สร้าง SQL up/down20คำสั่งรวม ON CONFLICT; PDO SQLiteใช้quoteเท่านั้น ไม่ execute SQL. **ยังไม่ได้ execute PostgreSQLจริง** ไม่มี binary/serviceทดสอบพร้อม; ไม่ใช้ productionทดสอบ.
+- ไม่รัน erp:health กับ default DB, ไม่แก้ POSจึงไม่ต้อง build/typecheck. UIตรวจผ่าน Blade rendering/feature responses; ไม่อ้าง browser pixel/Windows/เครื่องพิมพ์/production UAT ผ่าน.
+
+## ความเสี่ยง/งานถัดไป
+- ไม่ใช่คำสั่ง deploy. ก่อน deployตามคำสั่งเจ้าของในอนาคต ให้ตรวจ PostgreSQL integration/migration up-down, permission changes และ UAT/พิมพ์ข้อมูลจริง ตาม docs/OPERATIONS.md.
+- ไม่ backfill/เดา cost/VATที่ขาด. Daily/margin unknown+coverage; lossเฉพาะมีหลักฐาน. Stock cardเป็นทุน Lotปัจจุบัน ไม่ใช่ movement costย้อนหลัง; Aging current-only.
+- ไม่เปลี่ยน canonical sales_postings view; Phase2/Executiveยอดหลักใช้ signed read dataset ใหม่. เฟส7–8 (gap/จัดซื้อ/POS/metricsอื่น/official reconciliation) ยังเป็นงานอนาคต.
+- Daily/booking aggregate/pageใช้ Collection; fixturesถูกต้องแต่ยังไม่ได้ benchmark productionขนาดใหญ่. Export capไม่ใช่ database-scan cap; ต้องวัด SQL/index/query plans ก่อนขยาย.
+- ผู้รับช่วงตรวจ diffแล้ว commitแยกเฟสบน codex/reports-phase2 เมื่อเข้าถึง Git metadataได้ และ push branchนี้เท่านั้น. อย่า commit briefเดิม/.codex/.claude/vendor/stateทดสอบ.
+
+---
+
 # Handoff — 2026-11-09 (Workflow master A / B / C — workspace only)
 
 ## Commit / ขอบเขต

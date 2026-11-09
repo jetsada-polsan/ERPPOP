@@ -161,16 +161,13 @@
         'count' => 'จำนวน',
     ];
 
-    $displayColumns = collect($result['columns'])->map(function ($column) use ($columnLabels) {
-        $column['label'] = $columnLabels[$column['key']] ?? $column['label'];
-        return $column;
-    })->all();
+    $displayColumns = $result['columns'];
 
     // รายงานที่ใช้ประจำ: ชุดจำเป็นสำหรับงานขายส่งเนื้อสัตว์/แช่แข็ง - แก้ลิสต์นี้ที่เดียว
     $essentialReports = [
         ['sales', 'daily_sales', 'ยอดขายรายวัน'],
         ['sales', 'top_products', 'สินค้าขายดี'],
-        ['sales', 'gross_margin', 'กำไรขั้นต้น'],
+        ['management', 'gross_margin', 'กำไรขั้นต้น'],
         ['inventory', 'stock_balance', 'สินค้าคงเหลือ'],
         ['inventory', 'stock_alerts', 'สต็อกต่ำ / ติดลบ'],
         ['inventory', 'expiring_stock', 'Lot ใกล้หมดอายุ'],
@@ -240,7 +237,7 @@
             <div class="flow-report-head no-print">
                 <div>
                     <div class="flow-eyebrow">{{ $categoryMeta[$selectedCategory]['label'] ?? $catalog[$selectedCategory]['title'] ?? 'รายงาน' }}</div>
-                    <h1 style="font-size:20px;font-weight:700;margin:0">{{ $reportLabels[$selectedReport] ?? $result['title'] }}</h1>
+                    <h1 style="font-size:20px;font-weight:700;margin:0">{{ $result['title'] }}</h1>
                 </div>
                 <div class="flow-head-actions">
                     @if($canExport)
@@ -315,9 +312,11 @@
             @php
                 $moneyKeys = ['net_sales','sales_amount','total_amount','amount','balance_amount','vat_amount','gross_sales'];
                 $summaryMoneyKey = collect($moneyKeys)->first(fn ($key) => collect($result['columns'])->contains('key', $key));
-                $summaryMoney = $summaryMoneyKey ? collect($result['rows'])->sum(fn ($row) => (float) data_get($row, $summaryMoneyKey)) : 0;
-                $summaryVat = collect($result['rows'])->sum(fn ($row) => (float) data_get($row, 'vat_amount'));
+                $summaryMoney = $result['summary']['net_sales'] ?? ($summaryMoneyKey ? \App\Support\DecimalMath::sum(collect($result['rows'])->map(fn ($row) => data_get($row, $summaryMoneyKey)), 2) : 0);
+                $summaryVat = $result['summary']['vat_amount'] ?? \App\Support\DecimalMath::sum(collect($result['rows'])->map(fn ($row) => data_get($row, 'vat_amount')), 2);
             @endphp
+            @if(request('product_id'))<input type="hidden" name="product_id" value="{{ request('product_id') }}">@endif
+            @if(request('location_id'))<input type="hidden" name="location_id" value="{{ request('location_id') }}">@endif
             <div data-report-result>
             <div class="rpt-print-header">
                 <div class="d-flex gap-3 align-items-start">
@@ -334,7 +333,7 @@
                     </div>
                 </div>
                 <div class="rpt-print-meta">
-                    <div class="rpt-print-title">{{ $reportLabels[$selectedReport] ?? $result['title'] }}</div>
+                    <div class="rpt-print-title">{{ $result['title'] }}</div>
                     <div class="rpt-print-sub">ช่วงวันที่ {{ \Illuminate\Support\Carbon::parse($from)->thaiDate() }} ถึง {{ \Illuminate\Support\Carbon::parse($to)->thaiDate() }}</div>
                     <div class="rpt-print-sub">สาขา: {{ $printBranch->name_th ?? 'ทุกสาขา' }}</div>
                     <div class="rpt-print-sub">พิมพ์เมื่อ {{ now()->thaiDate(true) }} น.</div>
@@ -352,9 +351,9 @@
                         </dl>
                     </div>
                     <div class="flow-report-totals">
-                        @if($selectedReport !== 'stock_balance')
-                        <div><span>ยอดรวมทั้งสิ้น</span><strong>{{ number_format($summaryMoney, 2) }}</strong></div>
-                        <div><span>ภาษีมูลค่าเพิ่ม</span><strong>{{ number_format($summaryVat, 2) }}</strong></div>
+                        @if(!in_array($selectedReport, ['stock_balance', 'stock_card_detail', 'delivery_status'], true))
+                        <x-reports.kpi-card :label="($result['summary_scope'] ?? 'all') === 'all' ? 'ยอดรวมทั้งผลลัพธ์' : 'ยอดรวมรายการที่แสดง'" :value="$summaryMoney" />
+                        <x-reports.kpi-card label="ภาษีมูลค่าเพิ่ม" :value="$summaryVat" />
                         @endif
                         <div><span>สาขา</span><strong>{{ $printBranch->name_th ?? 'ทุกสาขา' }}</strong></div>
                     </div>
@@ -365,14 +364,14 @@
                 </div>
                 <div class="rpt-panel-title">
                     <div>
-                        <div class="fw-bold fs-5">{{ $reportLabels[$selectedReport] ?? $result['title'] }}</div>
+                        <div class="fw-bold fs-5">{{ $result['title'] }}</div>
                         <div class="text-muted small">
                             {{ \Illuminate\Support\Carbon::parse($from)->thaiDate() }}
                             @if($from !== $to) ถึง {{ \Illuminate\Support\Carbon::parse($to)->thaiDate() }} @endif
                             &middot; {{ $printBranch->name_th ?? 'ทุกสาขา' }}
                         </div>
                     </div>
-                    <div class="d-flex align-items-center gap-3 flex-wrap no-print">
+                    <x-reports.filter-bar class="gap-3 no-print">
                         <label class="d-flex align-items-center gap-2 small text-muted">
                             แสดง
                             <select name="per_page" class="form-select form-select-sm" style="width:78px" onchange="this.form.submit()">
@@ -388,7 +387,7 @@
                             <button type="submit" class="btn btn-sm btn-primary">ค้นหา</button>
                         </div>
                         <span class="badge text-bg-light border">{{ number_format($result['total']) }} รายการ</span>
-                    </div>
+                    </x-reports.filter-bar>
                 </div>
 
                 @if($selectedReport === 'stock_balance')
@@ -397,11 +396,7 @@
                     </div>
                 @endif
 
-                @include('reports.partials.result-table', [
-                    'columns' => $displayColumns,
-                    'rows' => $result['rows'],
-                    'empty' => 'ไม่พบข้อมูลตามเงื่อนไขที่เลือก',
-                ])
+                <x-reports.report-table :columns="$displayColumns" :rows="$result['rows']" empty="ไม่พบข้อมูลตามเงื่อนไขที่เลือก" />
                 @if($pagination = $result['pagination'] ?? null)
                     <div class="px-4 py-3 no-print" data-report-pagination>
                         <div class="small text-muted mb-2">

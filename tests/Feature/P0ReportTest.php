@@ -57,9 +57,11 @@ class P0ReportTest extends TestCase
     {
         $unproven = [
             'booking.outstanding', 'booking.due', 'booking.by_branch_seller',
-            'ap.outstanding_detail', 'cash.bank_summary', 'payment.received_and_unidentified',
+            'ap.outstanding_detail', 'cash.bank_summary',
         ];
 
+        $this->assertTrue(ReportDefinition::where('code', 'payment.received_and_unidentified')->sole()->enabled);
+        $this->assertStringContainsString('test_payment_lines_do_not_multiply_by_allocations_and_matching_does_not_create_receipts', file_get_contents(base_path('tests/Feature/ReportsPhaseTwoTest.php')));
         foreach ($unproven as $code) {
             $definition = ReportDefinition::where('code', $code)->sole();
             $this->assertSame('available', $definition->status, "{$code} ควรมีหน้าจอแล้ว");

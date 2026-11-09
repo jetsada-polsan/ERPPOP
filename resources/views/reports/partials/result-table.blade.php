@@ -5,7 +5,7 @@
                 @foreach($columns as $column)
                     <th class="{{ $column['class'] ?? '' }}">
                         {{ $column['label'] }}
-                        <span class="sort-mark">↕</span>
+
                     </th>
                 @endforeach
             </tr>
@@ -23,7 +23,7 @@
                                     {{ rtrim(rtrim(number_format((float) $value, \App\Support\DecimalMath::QUANTITY_SCALE), '0'), '.') }}
                                     @break
                                 @case('money')
-                                    {{ number_format((float) $value, 2) }}
+                                    {{ $value === null ? 'ไม่ทราบ' : number_format((float) $value, 2) }}
                                     @break
                                 @case('number')
                                     {{ number_format((float) $value, 0) }}
@@ -32,7 +32,11 @@
                                     <span class="badge rounded-pill text-bg-light border">{{ $value }}</span>
                                     @break
                                 @default
-                                    {{ $value }}
+                                    @if($column['key'] === 'name_th' && data_get($row, 'stock_card_url'))
+                                        <a href="{{ data_get($row, 'stock_card_url') }}">{{ $value }}</a>
+                                    @else
+                                        {{ $value }}
+                                    @endif
                             @endswitch
                         </td>
                     @endforeach

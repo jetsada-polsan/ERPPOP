@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\PosOfflineSale;
+use App\Services\Reports\ReportScope;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -55,7 +56,7 @@ class PosOfflineSaleController extends Controller
     public function index(Request $request): View
     {
         $status = $request->query('status', PosOfflineSale::NEEDS_REVIEW);
-        $sales = PosOfflineSale::with(['user:id,name', 'branch:id,code,name_th', 'resolver:id,name', 'device:id,name,terminal_code'])
+        $sales = app(ReportScope::class)->apply(PosOfflineSale::query())->with(['user:id,name', 'branch:id,code,name_th', 'resolver:id,name', 'device:id,name,terminal_code'])
             ->when($status !== 'all', fn ($q) => $q->where('status', $status))
             ->latest('sold_at')
             ->paginate(50)
@@ -64,13 +65,14 @@ class PosOfflineSaleController extends Controller
         return view('pos.offline-sales', [
             'sales' => $sales,
             'status' => $status,
-            'counts' => PosOfflineSale::selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status'),
+            'counts' => app(ReportScope::class)->apply(PosOfflineSale::query())->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status'),
         ]);
     }
 
     /** ส่งบิลที่ติดตรวจเข้า checkout อีกครั้ง หลังแก้ต้นเหตุ (เช่น เปิดกะ/แก้ราคา) */
     public function retry(Request $request, PosOfflineSale $offlineSale): RedirectResponse
     {
+        app(ReportScope::class)->authorize($offlineSale->branch_id);
         if ($offlineSale->status !== PosOfflineSale::NEEDS_REVIEW) {
             return back()->with('error', 'บิลนี้ไม่ได้อยู่ในสถานะต้องตรวจสอบ');
         }
@@ -106,6 +108,7 @@ class PosOfflineSaleController extends Controller
     /** ปิดรายการเมื่อผู้จัดการจัดการด้วยมือแล้ว (เช่น คีย์บิลใหม่ หรือยืนยันว่าเป็นบิลทดสอบ) */
     public function resolve(Request $request, PosOfflineSale $offlineSale): RedirectResponse
     {
+        app(ReportScope::class)->authorize($offlineSale->branch_id);
         $data = $request->validate(['note' => ['required', 'string', 'max:500']]);
         if ($offlineSale->status !== PosOfflineSale::NEEDS_REVIEW) {
             return back()->with('error', 'บิลนี้ไม่ได้อยู่ในสถานะต้องตรวจสอบ');

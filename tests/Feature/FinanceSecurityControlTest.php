@@ -86,7 +86,7 @@ class FinanceSecurityControlTest extends TestCase
         $receipt = PosReceipt::create(['pos_terminal_id' => $terminal->id, 'receipt_no' => 'R001', 'receipt_date' => '2026-07-15 10:00:00', 'net_sales' => 250, 'status' => 'completed']);
         $payment = PosPayment::create(['pos_receipt_id' => $receipt->id, 'method' => 'qr', 'amount' => 250]);
         $statement = BankStatement::create(['bank_account_id' => $bank->id, 'statement_date' => '2026-07-15', 'description' => 'QR R001', 'amount' => 250, 'reconciled' => false]);
-        $user = User::factory()->create(['username' => 'finance-user']);
+        $user = User::factory()->create(['username' => 'finance-user', 'branch_id' => $branch->id]);
         $this->actingAs($user);
         $request = Request::create('/monthly-accounting/statements/auto-reconcile', 'POST', ['period' => '2026-07', 'branch_id' => $branch->id]);
 
@@ -101,7 +101,7 @@ class FinanceSecurityControlTest extends TestCase
         $terminal = PosTerminal::create(['branch_id' => $branch->id, 'code' => 'POS01', 'name' => 'POS 1']);
         $receipt = PosReceipt::create(['pos_terminal_id' => $terminal->id, 'receipt_no' => 'R-REF-001', 'receipt_date' => '2026-07-15 10:00:00', 'net_sales' => 125, 'status' => 'completed']);
         PosPayment::create(['pos_receipt_id' => $receipt->id, 'method' => 'transfer', 'payment_reference' => 'REF-7788', 'amount' => 125]);
-        $user = User::factory()->create(['username' => 'finance-control-user', 'is_active' => true, 'must_change_password' => false]);
+        $user = User::factory()->create(['username' => 'finance-control-user', 'branch_id' => $branch->id, 'is_active' => true, 'must_change_password' => false]);
         $role = Role::create(['code' => 'FINANCE_CONTROL', 'name' => 'Finance Control']);
         $permission = Permission::firstOrCreate(['code' => 'finance.manage'], ['name' => 'finance.manage']);
         $role->permissions()->attach($permission->id);

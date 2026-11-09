@@ -88,7 +88,7 @@ class PosDesktopRejectedSaleReviewTest extends TestCase
         ]);
         $manager = User::factory()->create(['username' => 'mgr-desk', 'is_active' => true, 'must_change_password' => false]);
         $role = \App\Models\Role::create(['code' => 'MGR_D', 'name' => 'mgr']);
-        foreach (['pos.use', 'pos.void', 'reports.view'] as $code) {
+        foreach (['pos.use', 'pos.void', 'reports.view', 'reports.all_branches'] as $code) {
             $role->permissions()->attach(\App\Models\Permission::firstOrCreate(['code' => $code], ['name' => $code])->id);
         }
         $manager->roles()->attach($role->id);

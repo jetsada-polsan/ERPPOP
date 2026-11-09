@@ -59,7 +59,7 @@ class ExecutiveDashboardTest extends TestCase
     }
 
     /** @param  array<int, string>  $codes */
-    private function executive(array $codes = ['reports.view', 'reports.all_branches'], ?int $branchId = null): User
+    private function executive(array $codes = ['reports.view', 'reports.all_branches', 'management.view'], ?int $branchId = null): User
     {
         static $sequence = 0;
         $user = User::factory()->create([
