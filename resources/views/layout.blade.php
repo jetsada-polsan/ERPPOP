@@ -36,6 +36,9 @@
     <link rel="apple-touch-icon" href="{{ $faviconUrl }}">
     <title>{{ trim($__env->yieldContent('title', 'หน้าหลัก')) }} · JET ERP</title>
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     <link rel="stylesheet" href="{{ asset('vendor/adminlte/css/adminlte.min.css') }}">
     {{-- Tailwind แบบ build นิ่ง (แทน runtime compiler เดิมที่คอมไพล์สดทุกหน้า)
@@ -665,7 +668,7 @@
                ตัวนี้เป็นการ "ทับเฉพาะเครื่องนี้" ไม่กระทบคนอื่น */
             --ui-scale: 1;      /* ตัวคูณขนาดตัวอักษรและระยะห่าง */
             --menu-scale: 1;    /* ตัวคูณความกว้างและขนาดตัวอักษรของเมนู */
-            --erp-font-family: 'Leelawadee UI', 'Noto Sans Thai', Tahoma, 'Segoe UI', sans-serif;
+            --erp-font-family: 'IBM Plex Sans Thai', 'Noto Sans Thai', 'Leelawadee UI', Tahoma, sans-serif;
             /* rail 64px + subpanel 236px - adminlte ใช้ var นี้คำนวณ margin ของ main */
             --erp-rail-w: calc(68px * var(--menu-scale));
             --erp-subnav-w: calc(176px * var(--menu-scale));
@@ -722,7 +725,7 @@
         html[data-theme="emerald"] { --erp-primary-dark:#0f5138; --erp-primary-soft:#eaf5f0; --erp-border:#d8ebe3; --erp-ink:#28483c; --erp-bg:#eef7f3; --fa-blue:#23966c; --fa-blue-deep:#187653; --fa-blue-dark:#397563; --fa-green:#65a30d; --fa-green-deep:#4d7c0f; --accent-btn:linear-gradient(135deg,#34b986,#187653); --accent-btn-hover:linear-gradient(135deg,#49c99a,#23966c);  --erp-primary-ink:#187653; --erp-success-ink:#4d7c0f; --erp-success-on-soft:#4d7c0f;}
         html[data-theme="slate"] { --erp-primary-dark:#334155; --erp-primary-soft:#eef1f4; --erp-border:#e1e5e9; --erp-ink:#374151; --erp-bg:#f1f3f5; --fa-blue:#64748b; --fa-blue-deep:#475569; --fa-blue-dark:#596579; --fa-green:#4f8b72; --fa-green-deep:#3c6f59; --accent-btn:linear-gradient(135deg,#7b8798,#475569); --accent-btn-hover:linear-gradient(135deg,#909aaa,#64748b);  --erp-primary-ink:#475569; --erp-success-ink:#3c6f59; --erp-success-on-soft:#3c6f59;}
         html[data-theme="clear"] {
-            --erp-font-family:'Noto Sans Thai','Segoe UI','Leelawadee UI',Tahoma,sans-serif;
+            --erp-font-family: 'IBM Plex Sans Thai', 'Noto Sans Thai', 'Leelawadee UI', Tahoma, sans-serif;
             --erp-primary-dark:#1e3a8a; --erp-primary-soft:#eef2ff;
             --erp-primary-ink:#1d4ed8; --erp-success-ink:#115e59; --erp-success-on-soft:#115e59;
             --erp-border:#d7dde5; --erp-ink:#1f2937; --erp-bg:#f4f6f8;

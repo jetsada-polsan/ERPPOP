@@ -16,9 +16,11 @@
         --peak-field-h: 48px;
         --peak-label-color: #475569;
         --peak-active-tab-bg: #eaedf1;
-        --peak-table-head-bg: #f1f5f9;
-        --peak-table-head-text: #334155;
+        --peak-table-head-bg: #f8fafc;
+        --peak-table-head-text: #475569;
         --peak-table-border: #e2e8f0;
+        --peak-table-row-border: #eef2f6;
+        --peak-table-hover-bg: #f8fbff;
     }
 
     /* ── 1. แถบเมนูบนแบบการ์ด (Top Card-Style Menu Bar & Page Tabs) ─────────── */
@@ -563,28 +565,286 @@
         display: none !important;
     }
 
-    /* ── 6. ตารางหัวคอลัมน์เทาอ่อน & ปุ่มคำสั่งในแถวเป็นแคปซูลเล็ก ─────────────── */
-    .table thead th,
-    .table > thead > tr > th,
-    html[data-layout="odoo"] .table thead th,
-    .report-data-table thead th {
-        background: var(--peak-table-head-bg, #f1f5f9) !important;
-        color: var(--peak-table-head-text, #334155) !important;
-        border-bottom: 1px solid var(--peak-table-border, #e2e8f0) !important;
-        border-top: 0 !important;
-        font-weight: 700 !important;
-        font-size: 13.5px !important;
-        padding: 11px 12px !important;
-    }
-    .table > tbody > tr > td {
-        border-bottom: 1px solid #f1f5f9;
-        padding: 11px 12px;
-    }
-    .table > tbody > tr:nth-child(even) > td {
-        background: #ffffff;
-    }
-    .table > tbody > tr:hover > td {
-        background: #f8fafc !important;
+    /* ── 6. ตารางสไตล์ PEAK (Clean Accounting Table) ทั้งระบบ ยกเว้นหน้าพิมพ์ ── */
+    @media screen {
+        /* กรอบนอกตาราง: การ์ดขาว มุมโค้ง 10px เส้นขอบ #e2e8f0 เลื่อนแนวนอนเฉพาะในกรอบ */
+        body:not(.pos-body) .table-responsive {
+            border: 1px solid var(--peak-table-border, #e2e8f0);
+            border-radius: 10px;
+            background: #ffffff;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            max-width: 100%;
+        }
+        body:not(.pos-body) .table-responsive > .table {
+            margin-bottom: 0 !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+        }
+        body:not(.pos-body) *:not(.table-responsive) > .table {
+            border: 1px solid var(--peak-table-border, #e2e8f0);
+            border-radius: 10px;
+            background: #ffffff;
+            border-collapse: separate !important;
+            border-spacing: 0 !important;
+            overflow: hidden;
+        }
+
+        /* เนื้อตาราง: ฟอนต์ระบบ ขนาด 14px ไม่มีเส้นตั้งกั้นคอลัมน์ */
+        body:not(.pos-body) .table {
+            font-family: var(--erp-font-family) !important;
+            font-size: 14px !important;
+            color: #1e293b;
+            background-color: #ffffff;
+            width: 100%;
+        }
+        body:not(.pos-body) .table th,
+        body:not(.pos-body) .table td {
+            border-left: 0 !important;
+            border-right: 0 !important;
+        }
+
+        /* หัวตาราง (thead th): พื้นเทาอ่อน #f8fafc ตัวอักษร #475569 ขนาด 13px weight 600 ไม่ทำตัวพิมพ์ใหญ่ทั้งหมด */
+        body:not(.pos-body) .table thead th,
+        body:not(.pos-body) .table > thead > tr > th,
+        html[data-layout="odoo"] body:not(.pos-body) .table thead th,
+        body:not(.pos-body) .report-data-table thead th {
+            background: var(--peak-table-head-bg, #f8fafc) !important;
+            color: var(--peak-table-head-text, #475569) !important;
+            border-bottom: 1px solid var(--peak-table-border, #e2e8f0) !important;
+            border-top: 0 !important;
+            font-family: var(--erp-font-family) !important;
+            font-weight: 600 !important;
+            font-size: 13px !important;
+            text-transform: none !important;
+            letter-spacing: 0 !important;
+            padding: 12px 16px !important;
+            vertical-align: middle !important;
+            white-space: nowrap;
+        }
+
+        /* แถวข้อมูล (tbody tr / td): ความสูงขั้นต่ำ 48px padding 12px 16px เส้นคั่นบาง #eef2f6 ไม่สลับสีแถว */
+        body:not(.pos-body) .table > tbody > tr {
+            min-height: 48px;
+            background-color: #ffffff !important;
+        }
+        body:not(.pos-body) .table > tbody > tr:nth-child(odd) > td,
+        body:not(.pos-body) .table > tbody > tr:nth-child(even) > td,
+        body:not(.pos-body) .table-striped > tbody > tr:nth-of-type(odd) > * {
+            background-color: #ffffff !important;
+            --bs-table-accent-bg: transparent !important;
+            --bs-table-striped-bg: transparent !important;
+        }
+        body:not(.pos-body) .table > tbody > tr > td,
+        html[data-layout="odoo"] body:not(.pos-body) .table > tbody > tr > td {
+            font-family: var(--erp-font-family) !important;
+            font-size: 14px !important;
+            line-height: 1.45 !important;
+            color: #1e293b;
+            height: 48px;
+            padding: 12px 16px !important;
+            border-bottom: 1px solid var(--peak-table-row-border, #eef2f6) !important;
+            border-top: 0 !important;
+            vertical-align: middle !important;
+        }
+        body:not(.pos-body) .table > tbody > tr:last-child > td {
+            border-bottom: 0 !important;
+        }
+
+        /* Hover แถวเป็นฟ้าอ่อนจาง #f8fbff */
+        body:not(.pos-body) .table > tbody > tr:hover > td,
+        body:not(.pos-body) .table > tbody > tr:hover > th,
+        html[data-layout="odoo"] body:not(.pos-body) .table > tbody > tr:hover > td {
+            background-color: var(--peak-table-hover-bg, #f8fbff) !important;
+            --bs-table-hover-bg: #f8fbff !important;
+        }
+
+        /* คอลัมน์รหัส / เลขที่เอกสาร: ตัวแรกเป็นสีหลัก var(--erp-primary) ไม่ขีดเส้นใต้ */
+        body:not(.pos-body) .table > tbody > tr > td:first-child a:not(.btn),
+        body:not(.pos-body) .table > tbody > tr > td a.fw-semibold:not(.btn),
+        body:not(.pos-body) .table > tbody > tr > td a.fw-bold:not(.btn) {
+            color: var(--erp-primary, #1585c0) !important;
+            text-decoration: none !important;
+            font-weight: 600 !important;
+        }
+        body:not(.pos-body) .table > tbody > tr > td:first-child a:not(.btn):hover,
+        body:not(.pos-body) .table > tbody > tr > td a.fw-semibold:not(.btn):hover {
+            color: var(--erp-primary-dark, #0f4c75) !important;
+            text-decoration: none !important;
+        }
+        body:not(.pos-body) .table > tbody > tr > td:first-child.fw-semibold,
+        body:not(.pos-body) .table > tbody > tr > td:first-child.fw-bold,
+        body:not(.pos-body) .table > tbody > tr > td:first-child.font-monospace,
+        body:not(.pos-body) .table > tbody > tr > td.font-monospace.fw-semibold,
+        body:not(.pos-body) .table > tbody > tr > td:first-child > strong:only-child,
+        body:not(.pos-body) .table > tbody > tr > td > code {
+            color: var(--erp-primary, #1585c0) !important;
+            font-family: var(--erp-font-family) !important;
+            font-weight: 600 !important;
+            background: transparent !important;
+            padding: 0 !important;
+            font-size: 14px !important;
+        }
+
+        /* ตัวเลขในตาราง (ราคา/ยอดเงิน/จำนวน): tabular-nums เพื่อให้หลักตรงกันเวลาเรียงคอลัมน์ */
+        body:not(.pos-body) .table th.text-end,
+        body:not(.pos-body) .table td.text-end,
+        body:not(.pos-body) .table .text-end,
+        body:not(.pos-body) .table .tabular-nums,
+        body:not(.pos-body) .table td[class*="text-end"],
+        body:not(.pos-body) .table tfoot td,
+        body:not(.pos-body) .table tfoot th {
+            font-variant-numeric: tabular-nums !important;
+            font-feature-settings: "tnum" 1;
+        }
+
+        /* Badge สถานะในตาราง: ทรงแคปซูล ขนาดเล็ก 12px สีพาสเทลอ่อน ตัวอักษรเข้ม */
+        body:not(.pos-body) .table .badge {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            border-radius: 9999px !important;
+            font-family: var(--erp-font-family) !important;
+            font-size: 12px !important;
+            font-weight: 600 !important;
+            line-height: 1.3 !important;
+            padding: 3px 11px !important;
+            letter-spacing: 0 !important;
+            white-space: nowrap !important;
+            box-shadow: none !important;
+        }
+        /* ใช้งาน / Active: พื้นเขียวอ่อน ตัวเขียวเข้ม */
+        body:not(.pos-body) .table .badge.text-bg-success,
+        body:not(.pos-body) .table .badge.bg-success,
+        body:not(.pos-body) .table .badge.badge-success {
+            background-color: #dcfce7 !important;
+            color: #15803d !important;
+            border: 1px solid #bbf7d0 !important;
+        }
+        /* ปิดใช้งาน / Inactive: พื้นเทาอ่อน ตัวเทาเข้ม */
+        body:not(.pos-body) .table .badge.text-bg-secondary,
+        body:not(.pos-body) .table .badge.bg-secondary,
+        body:not(.pos-body) .table .badge.badge-secondary,
+        body:not(.pos-body) .table .badge.text-bg-light,
+        body:not(.pos-body) .table .badge.bg-light {
+            background-color: #f1f5f9 !important;
+            color: #475569 !important;
+            border: 1px solid #e2e8f0 !important;
+        }
+        /* สถานะอื่นๆ ในตารางให้เป็นโทนพาสเทลกลมกลืนกัน */
+        body:not(.pos-body) .table .badge.text-bg-primary,
+        body:not(.pos-body) .table .badge.bg-primary,
+        body:not(.pos-body) .table .badge.text-bg-info,
+        body:not(.pos-body) .table .badge.bg-info {
+            background-color: #e0f2fe !important;
+            color: #0369a1 !important;
+            border: 1px solid #bae6fd !important;
+        }
+        body:not(.pos-body) .table .badge.text-bg-warning,
+        body:not(.pos-body) .table .badge.bg-warning {
+            background-color: #fef3c7 !important;
+            color: #b45309 !important;
+            border: 1px solid #fde68a !important;
+        }
+        body:not(.pos-body) .table .badge.text-bg-danger,
+        body:not(.pos-body) .table .badge.bg-danger {
+            background-color: #fee2e2 !important;
+            color: #b91c1c !important;
+            border: 1px solid #fecaca !important;
+        }
+
+        /* คอลัมน์ปุ่มจัดการ (Action): ชิดขวา ปุ่มแคปซูลเล็ก ขอบบาง ระยะห่างเท่ากัน ไม่ตกบรรทัด */
+        body:not(.pos-body) .table > tbody > tr > td.text-end,
+        body:not(.pos-body) .table > tbody > tr > td:last-child {
+            white-space: nowrap;
+        }
+        body:not(.pos-body) .table > tbody > tr > td .btn {
+            min-height: 30px !important;
+            height: 30px !important;
+            padding: 0 12px !important;
+            font-size: 12.5px !important;
+            font-weight: 500 !important;
+            border-radius: 9999px !important;
+            white-space: nowrap !important;
+            vertical-align: middle;
+        }
+        body:not(.pos-body) .table > tbody > tr > td .btn + .btn,
+        body:not(.pos-body) .table > tbody > tr > td .btn + form,
+        body:not(.pos-body) .table > tbody > tr > td form + .btn,
+        body:not(.pos-body) .table > tbody > tr > td form + form {
+            margin-left: 6px !important;
+        }
+
+        /* ซ่อน inline form ในตารางที่ควบคุมด้วย Alpine x-show ตอนยังไม่กดแก้ไข (ป้องกัน .d-flex ทับ display:none) */
+        body:not(.pos-body) .table .d-flex[style*="display: none"],
+        body:not(.pos-body) .table [x-cloak] {
+            display: none !important;
+        }
+
+        /* ป้องกัน checkbox ในฟอร์มเพิ่มสมุดเอกสารเบียดทับปุ่มเพิ่มบนจอ 1366/1024 */
+        @media (min-width: 1280px) {
+            body:not(.pos-body) form[action*="document-books"] > .col-md-3:first-of-type {
+                width: 19%;
+            }
+            body:not(.pos-body) form[action*="document-books"] > .col-md-2 {
+                width: 14%;
+            }
+            body:not(.pos-body) form[action*="document-books"] > .col-md-3:nth-of-type(4) {
+                width: 20%;
+            }
+            body:not(.pos-body) form[action*="document-books"] > .col-md-1:has(.form-check) {
+                width: 21%;
+                white-space: nowrap;
+            }
+            body:not(.pos-body) form[action*="document-books"] > .col-md-1:last-of-type {
+                width: 12%;
+            }
+        }
+        @media (min-width: 768px) and (max-width: 1279.98px) {
+            body:not(.pos-body) form[action*="document-books"] > .col-md-3:first-of-type {
+                width: 26%;
+            }
+            body:not(.pos-body) form[action*="document-books"] > .col-md-2 {
+                width: 22%;
+            }
+            body:not(.pos-body) form[action*="document-books"] > .col-md-3:nth-of-type(4) {
+                width: 30%;
+            }
+            body:not(.pos-body) form[action*="document-books"] > .col-md-1:has(.form-check) {
+                width: auto;
+                white-space: nowrap;
+            }
+            body:not(.pos-body) form[action*="document-books"] > .col-md-1:last-of-type {
+                width: 140px;
+            }
+        }
+
+        /* ป้องกันคอลัมน์สาขาและวันที่ในตารางผู้ใช้ตัดคำกลางคำ */
+        body:not(.pos-body) .user-list-table td:nth-child(1),
+        body:not(.pos-body) .user-list-table td:nth-child(4),
+        body:not(.pos-body) .user-list-table td:nth-child(7),
+        body:not(.pos-body) .user-list-table td:nth-child(8) {
+            white-space: nowrap;
+        }
+
+        /* แถวว่าง ("ยังไม่มีข้อมูล"): กึ่งกลาง สีเทาอ่อน ไอคอนจางๆ */
+        body:not(.pos-body) .table > tbody > tr > td[colspan].text-center {
+            padding: 36px 16px !important;
+            color: #94a3b8 !important;
+            font-size: 14px !important;
+            font-weight: 400 !important;
+            text-align: center !important;
+            background-color: #ffffff !important;
+        }
+        body:not(.pos-body) .table > tbody > tr > td[colspan].text-center:not(:has(i, svg, .bi))::before {
+            content: "\F421";
+            font-family: "bootstrap-icons";
+            display: block;
+            font-size: 26px;
+            line-height: 1;
+            color: #cbd5e1;
+            margin-bottom: 8px;
+        }
     }
 
     @media (max-width: 991.98px) {
