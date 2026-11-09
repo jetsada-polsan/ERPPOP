@@ -55,9 +55,17 @@ $isPartial = $openItem && $openItem->status === 'partial';
             <a href="{{ route('documents.tax-invoice', $sale) }}" target="_blank" class="btn btn-primary px-3">
                 <i class="bi bi-receipt me-1"></i> ใบกำกับภาษี (A4)
             </a>
+            @php $bookingSource = $sale->sourceDocument?->documentType?->code === 'BOOKING' ? $sale->sourceDocument : null; @endphp
+            @if($bookingSource)
+                {{-- ขายเชื่อจากใบจอง: ส่งของก่อนคอนเฟิร์มบิล ใบส่งของจึงอ้างเลขใบจอง ไม่ใช่ DS/DSN --}}
+                <a href="{{ route('documents.delivery-note', $bookingSource) }}" target="_blank" class="btn btn-light border px-3" title="ใบส่งของอ้างเลขใบจอง {{ $bookingSource->doc_number }}">
+                    <i class="bi bi-truck me-1"></i> ใบส่งของ (ใบจอง {{ $bookingSource->doc_number }})
+                </a>
+            @else
             <a href="{{ route('documents.delivery-note', $sale) }}" target="_blank" class="btn btn-light border px-3">
                 <i class="bi bi-truck me-1"></i> ใบส่งของ (A5)
             </a>
+            @endif
             @include('documents._void-action', ['doc' => $sale])
             @if($openItem && !$isPaid)
             <button type="button" class="btn btn-success px-4" @click="payOpen = true">

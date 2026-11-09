@@ -114,7 +114,7 @@ class PaymentController extends Controller
             'supplier',
             'documentType',
             'paymentDocument.lines',
-            'paymentDocument.allocations.openItem.document',
+            'paymentDocument.allocations.openItem.document.stockDocument.items.product.baseUnit',
             'paymentDocument.allocations.supplierOpenItem.sourceDocument',
         ]);
 
@@ -133,6 +133,13 @@ class PaymentController extends Controller
 
         abort_unless(in_array($payment->documentType->code, ['RECEIPT', 'PAYMENT_VOUCHER'], true), 404);
 
-        return view('payments.print', compact('payment'));
+        // ใบเสร็จ: แสดงรายการสินค้าของบิลที่รับชำระ ลูกค้าจะเห็นว่าจ่ายค่าอะไร
+        $paidDocs = $payment->documentType->code === 'RECEIPT'
+            ? ($payment->paymentDocument?->allocations ?? collect())
+                ->map(fn ($allocation) => $allocation->openItem?->document)
+                ->filter()->unique('id')->values()
+            : collect();
+
+        return view('payments.print', compact('payment', 'paidDocs'));
     }
 }

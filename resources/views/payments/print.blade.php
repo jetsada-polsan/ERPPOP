@@ -61,6 +61,32 @@
     </table>
     @endif
 
+    {{-- รายการสินค้าในบิลที่รับชำระ (ใบเสร็จเท่านั้น) — ลูกค้าเห็นว่าจ่ายค่าอะไร --}}
+    @foreach($paidDocs as $paidDoc)
+        @if(($paidDoc->stockDocument?->items ?? collect())->isNotEmpty())
+        <table class="items">
+            <thead><tr>
+                <th class="c" style="width:40px">#</th>
+                <th>สินค้า ({{ $paidDoc->doc_number }})</th>
+                <th class="r" style="width:90px">จำนวน</th>
+                <th class="r" style="width:100px">ราคา/หน่วย</th>
+                <th class="r" style="width:120px">จำนวนเงิน</th>
+            </tr></thead>
+            <tbody>
+                @foreach($paidDoc->stockDocument->items as $n => $item)
+                <tr>
+                    <td class="c">{{ $n + 1 }}</td>
+                    <td>{{ $item->product?->name_th }}</td>
+                    <td class="r">{{ number_format((float) $item->qty, 2) }} {{ $item->product?->baseUnit?->name }}</td>
+                    <td class="r">{{ number_format((float) $item->unit_price, 2) }}</td>
+                    <td class="r">{{ number_format((float) $item->qty * (float) $item->unit_price, 2) }}</td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+        @endif
+    @endforeach
+
     <div class="totals">
         <div class="baht-text">({{ \App\Support\ThaiBaht::text((float) $payment->total_amount) }})</div>
         <div class="sum">
