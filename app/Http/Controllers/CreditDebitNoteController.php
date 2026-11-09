@@ -8,11 +8,13 @@ use App\Models\CustomerOpenItem;
 use App\Models\Document;
 use App\Services\Sales\CreditDebitNoteService;
 use App\Support\ThaiBaht;
+use App\Support\VoidedDocumentPrint;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 use RuntimeException;
 
 class CreditDebitNoteController extends Controller
@@ -43,8 +45,12 @@ class CreditDebitNoteController extends Controller
     }
 
     // ใบเพิ่มหนี้/ลดหนี้แบบพิมพ์ A4 (เอกสารภาษีตามมาตรา 86/9-10 ส่งให้ลูกค้า)
-    public function print(Document $note): View
+    public function print(Document $note): Response|View
     {
+        if (VoidedDocumentPrint::isVoided($note)) {
+            return VoidedDocumentPrint::deny($note);
+        }
+
         $note->load(['customer.addresses', 'branch', 'documentType']);
         abort_unless(in_array($note->documentType->code, ['CREDIT_NOTE', 'DEBIT_NOTE'], true), 404);
 
