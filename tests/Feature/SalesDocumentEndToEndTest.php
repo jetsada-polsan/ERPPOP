@@ -341,6 +341,25 @@ class SalesDocumentEndToEndTest extends TestCase
         foreach ($sales as $sale) {
             $this->assertGlBalanced($sale);
         }
+
+        // ใบส่งของของบิลที่มาจากใบจอง ต้องอ้างเลขใบจอง ไม่ใช่ DS/DSN (ส่งของก่อนคอนเฟิร์มบิล)
+        $viewer = $this->withoutMiddleware(\App\Http\Middleware\ErpAuthorize::class)->actingAs(User::factory()->create());
+        $dsnSale = $byBook[$dsn->id];
+        $viewer->get(route('sales.show', $dsnSale))->assertOk()
+            ->assertSee(route('documents.delivery-note', $bookingDocument), false)
+            ->assertDontSee(route('documents.delivery-note', $dsnSale), false);
+
+        // ใบเสร็จรับเงินต้องแสดงรายการสินค้าของบิลที่รับชำระ
+        DocumentType::firstOrCreate(['code' => 'RECEIPT'], ['name_th' => 'ใบเสร็จรับเงิน']);
+        $openItem = CustomerOpenItem::where('document_id', $dsnSale->id)->sole();
+        $receipt = app(\App\Services\Sales\CustomerPaymentService::class)->create([
+            'customer_id' => $customer->id, 'branch_id' => $branch->id, 'method' => 'cash',
+            'allocations' => [['customer_open_item_id' => $openItem->id, 'amount' => 300.75]],
+        ]);
+        $viewer->get(route('payments.print', $receipt))->assertOk()
+            ->assertSee($plain->name_th)
+            ->assertSee($dsnSale->doc_number)
+            ->assertDontSee($vatGoods->name_th);
     }
 
     public function test_a_short_booking_needs_a_manager_to_confirm_in_erp_before_billing_and_may_go_negative(): void
