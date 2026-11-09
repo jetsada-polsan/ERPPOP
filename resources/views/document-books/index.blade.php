@@ -17,7 +17,7 @@
         <div class="col-md-2"><label class="form-label small text-muted">รหัสเล่ม</label><input name="code" required class="form-control" placeholder="เช่น DSN"></div>
         <div class="col-md-2"><label class="form-label small text-muted">คำนำหน้าเลขที่</label><input name="prefix" required class="form-control" placeholder="เช่น DSN"></div>
         <div class="col-md-3"><label class="form-label small text-muted">ชื่อเล่ม</label><input name="name" required class="form-control" placeholder="เช่น ใบขายเชื่อ เล่ม N"></div>
-        <div class="col-md-1 d-flex align-items-end"><div class="form-check mb-2"><input type="checkbox" name="is_default" value="1" class="form-check-input" id="bkDefault"><label class="form-check-label small" for="bkDefault">เล่มหลัก</label></div></div>
+        <div class="col-md-1 d-flex align-items-end"><div class="form-check mb-2"><input type="checkbox" name="is_default" value="1" class="form-check-input" id="bkDefault"><label class="form-check-label small" for="bkDefault">เล่มหลัก</label></div><div class="form-check mb-2"><input type="checkbox" name="no_vat" value="1" class="form-check-input" id="bkNoVat"><label class="form-check-label small" for="bkNoVat">ไม่มีภาษี</label></div></div>
         <div class="col-md-1 d-flex align-items-end"><button class="btn btn-primary w-100">เพิ่ม</button></div>
     </form>
     <p class="text-muted small mb-0 mt-2">คำนำหน้าเลขที่จะประกอบเป็นเลขเอกสาร เช่น <code>DSN0001{{ now()->format('Ymd') }}001</code> — เอกสารเดิมไม่เปลี่ยน</p>
@@ -27,7 +27,7 @@
     <h2 class="h5 fw-bold mb-3">เล่มเอกสารทั้งหมด</h2>
     <div class="table-responsive">
         <table class="table align-middle">
-            <thead><tr><th>ประเภทเอกสาร</th><th>รหัสเล่ม</th><th>ชื่อเล่ม</th><th>คำนำหน้า</th><th class="text-end">เอกสาร</th><th>เล่มหลัก</th><th>สถานะ</th><th></th></tr></thead>
+            <thead><tr><th>ประเภทเอกสาร</th><th>รหัสเล่ม</th><th>ชื่อเล่ม</th><th>คำนำหน้า</th><th class="text-end">เอกสาร</th><th>ภาษี</th><th>เล่มหลัก</th><th>สถานะ</th><th></th></tr></thead>
             <tbody>
             @foreach($books as $book)
                 <tr x-data="{ edit: false }">
@@ -39,12 +39,16 @@
                             @csrf @method('PUT')
                             <input name="name" value="{{ $book->name }}" class="form-control form-control-sm" style="width:200px">
                             <label class="small text-nowrap"><input type="hidden" name="is_default" value="0"><input type="checkbox" name="is_default" value="1" @checked($book->is_default)> หลัก</label>
+                            @if($book->documents_count === 0)
+                            <label class="small text-nowrap"><input type="hidden" name="no_vat" value="0"><input type="checkbox" name="no_vat" value="1" @checked($book->no_vat)> ไม่มีภาษี</label>
+                            @endif
                             <label class="small text-nowrap"><input type="hidden" name="is_active" value="0"><input type="checkbox" name="is_active" value="1" @checked($book->is_active)> ใช้งาน</label>
                             <button class="btn btn-sm btn-success">บันทึก</button>
                         </form>
                     </td>
                     <td><code>{{ $book->prefix }}</code></td>
                     <td class="text-end">{{ number_format($book->documents_count) }}</td>
+                    <td>@if($book->no_vat)<span class="badge text-bg-secondary">ไม่มีภาษี</span>@else<span class="badge text-bg-light border">มีภาษี</span>@endif</td>
                     <td>@if($book->is_default)<span class="badge text-bg-primary">เล่มหลัก</span>@endif</td>
                     <td><span class="badge {{ $book->is_active ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $book->is_active ? 'ใช้งาน' : 'ปิด' }}</span></td>
                     <td class="text-end"><button type="button" class="btn btn-sm btn-light border" @click="edit = !edit"><span x-text="edit ? 'ยกเลิก' : 'แก้ไข'"></span></button>@include('partials.safe-delete', ['type' => 'document-books', 'id' => $book->id])</td>
