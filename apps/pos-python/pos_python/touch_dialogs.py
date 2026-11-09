@@ -98,15 +98,37 @@ class TouchDialog(QDialog):
 class NumPad(QWidget):
     def __init__(self, target, parent=None, pin=False):
         super().__init__(parent)
+        from .ui import PALETTE
         self.target = target
         self.pin = pin
         grid = QGridLayout(self)
         grid.setContentsMargins(0, 0, 0, 0)
+        grid.setSpacing(4)
         keys = ['1','2','3','4','5','6','7','8','9','ล้าง' if pin else '.','0','⌫']
         for i, key in enumerate(keys):
             button = QPushButton(key)
             button.setMinimumSize(64, 64)
-            button.setStyleSheet('font-size:24px; padding:0; min-height:64px; min-width:64px;')
+            if key == 'ล้าง':
+                button.setObjectName('keyBtnActionClear')
+                button.setStyleSheet(
+                    f"background:{PALETTE['danger_soft']}; color:{PALETTE['danger_btn']}; "
+                    f"border:1px solid {PALETTE['danger_light']}; border-radius:10px; "
+                    f"font-size:20px; font-weight:800; padding:0; min-height:62px; min-width:64px;"
+                )
+            elif key == '⌫':
+                button.setObjectName('keyBtnActionDel')
+                button.setStyleSheet(
+                    f"background:{PALETTE['warning_soft']}; color:{PALETTE['warning_ink']}; "
+                    f"border:1px solid {PALETTE['warning']}; border-radius:10px; "
+                    f"font-size:22px; font-weight:800; padding:0; min-height:62px; min-width:64px;"
+                )
+            else:
+                button.setObjectName('keyBtn')
+                button.setStyleSheet(
+                    f"background:{PALETTE['surface']}; color:{PALETTE['text']}; "
+                    f"border:1px solid {PALETTE['field']}; border-radius:10px; "
+                    f"font-size:24px; font-weight:800; padding:0; min-height:62px; min-width:64px;"
+                )
             button.setFocusPolicy(Qt.NoFocus)
             button.setAutoDefault(False)
             button.clicked.connect(lambda checked=False, k=key: self.press(k))
@@ -133,8 +155,15 @@ class PinPad(NumPad):
 class ValueDialog(TouchDialog):
     def __init__(self, parent=None, title='จำนวนเงิน', subtitle='แตะตัวเลข หรือพิมพ์ด้วยคีย์บอร์ด', value='', pin=False, auto_pin=False):
         super().__init__(parent, title, subtitle)
+        from .ui import PALETTE
         self.entry = QLineEdit(str(value))
         self.entry.setObjectName('touchValue')
+        self.entry.setAlignment(Qt.AlignCenter if pin else Qt.AlignRight)
+        self.entry.setMinimumHeight(52)
+        self.entry.setStyleSheet(
+            f"min-height:52px; font-size:26px; font-weight:800; color:{PALETTE['brand_navy']}; "
+            f"background:{PALETTE['surface']}; border:2px solid {PALETTE['field']}; border-radius:10px; padding:4px 12px;"
+        )
         self.entry.setValidator(QRegularExpressionValidator(QRegularExpression('[0-9]{0,20}' if pin else '[0-9]{0,12}(\\.[0-9]{0,3})?'), self.entry))
         if auto_pin:
             self.entry.setMaxLength(4)
@@ -146,10 +175,18 @@ class ValueDialog(TouchDialog):
         self.body.addWidget(self.entry)
         self.dots = QLabel('○ ○ ○ ○') if pin else None
         if self.dots:
+            self.dots.setObjectName('pinDotsDisplay')
+            self.dots.setAlignment(Qt.AlignCenter)
+            self.dots.setStyleSheet(
+                f"font-size:28px; font-weight:800; color:{PALETTE['brand_navy']}; "
+                f"background:{PALETTE['primary_soft']}; border:1px solid {PALETTE['border']}; "
+                f"border-radius:10px; padding:8px 16px;"
+            )
             self.body.addWidget(self.dots)
         self.pad = PinPad(self.entry) if pin else NumPad(self.entry)
         self.body.addWidget(self.pad)
         self.submit = self.confirm()
+        self.submit.setMinimumHeight(56)
         self.entry.textChanged.connect(self.validate)
         self.entry.returnPressed.connect(lambda: self.accept() if self.submit.isEnabled() else None)
         self.pin = pin

@@ -238,7 +238,7 @@ QLabel#pulseValue {
 
 /* 6. On-Screen Numeric Keypad & PIN Dots */
 QPushButton#keyBtn {
-    min-height: 64px;
+    min-height: 62px;
     min-width: 64px;
     background-color: $surface;
     border: 1px solid $field;
@@ -251,7 +251,7 @@ QPushButton#keyBtn:pressed {
     background-color: $primary_pressed;
 }
 QPushButton#keyBtnActionClear {
-    min-height: 64px;
+    min-height: 62px;
     min-width: 64px;
     background-color: $danger_soft;
     color: $danger_btn;
@@ -261,7 +261,7 @@ QPushButton#keyBtnActionClear {
     font-weight: 800;
 }
 QPushButton#keyBtnActionDel {
-    min-height: 64px;
+    min-height: 62px;
     min-width: 64px;
     background-color: $warning_soft;
     color: $warning_ink;
