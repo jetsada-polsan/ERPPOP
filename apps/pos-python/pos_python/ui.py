@@ -357,7 +357,7 @@ QLineEdit:focus, QComboBox:focus { border-color: $primary; }
    เพื่อเก็บพื้นที่ไว้ให้รายการสินค้าและบิล ไม่เปลี่ยนขนาดตัวเลขทางธุรกิจ */
 QMainWindow[compact="true"] #brandName { font-size: 16px; padding: 8px 0; }
 QMainWindow[compact="true"] #brandRight { font-size: 13px; }
-QMainWindow[compact="true"] QPushButton { padding: $compact_button_padding 10px; font-size: 16px; min-height: 48px; }
+QMainWindow[compact="true"] QPushButton { padding: $compact_button_padding 10px; font-size: 16px; }
 QMainWindow[compact="true"] QPushButton#payBtn { font-size: 20px; padding: $pay_padding 12px; min-height: 58px; }
 QMainWindow[compact="true"] QLineEdit, QComboBox { padding: 6px 10px; font-size: 16px; }
 QMainWindow[compact="true"] QToolButton#tile { padding: $tile_padding; font-size: $tile_font; }
@@ -872,7 +872,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.setWindowFlag(Qt.WindowCloseButtonHint, True)
             self.setMinimumSize(940, 660)
             self.resize(980, 744)
-            self.setStyleSheet(self.styleSheet() + f"QLabel {{ font-size:16px; padding:0px; }} QPushButton {{ min-height:56px; font-size:18px; }} QLineEdit {{ min-height:48px; font-size:22px; font-weight:700; }}")
+            self.setStyleSheet(self.styleSheet() + f"QLabel {{ font-size:16px; background:transparent; }} QPushButton {{ min-height:56px; font-size:18px; }} QLineEdit {{ min-height:48px; font-size:22px; font-weight:700; }}")
             outer = QHBoxLayout()
             outer.setSpacing(14)
             self.body.addLayout(outer)
@@ -886,15 +886,20 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             layout.setSpacing(8)
             outer.addLayout(layout, 1)
             subtotal_label = QLabel(f"ยอดสินค้า  {order.subtotal():,.2f} บาท")
-            subtotal_label.setStyleSheet(f"font-size:18px;font-weight:800;color:{PALETTE['text']};")
+            subtotal_label.setStyleSheet(f"background:transparent;font-size:18px;font-weight:800;color:{PALETTE['text']};")
             summary.addWidget(subtotal_label)
             self.promo_summary = QLabel()
             self.promo_summary.setObjectName("note")
             self.promo_summary.setWordWrap(True)
-            self.promo_summary.setMaximumHeight(48)
+            self.promo_summary.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            self.promo_summary.setMinimumHeight(44)
+            self.promo_summary.setStyleSheet(
+                f"background:{PALETTE['warning_soft']};color:{PALETTE['warning_ink']};"
+                f"border-left:4px solid {PALETTE['warning']};border-radius:6px;padding:8px 12px;font-size:15px;font-weight:700;"
+            )
             summary.addWidget(self.promo_summary)
             disc_label = QLabel("ส่วนลดท้ายบิล (บาท) · แตะเพื่อใช้แป้นตัวเลข")
-            disc_label.setStyleSheet(f"font-size:15px;font-weight:700;color:{PALETTE['muted']};")
+            disc_label.setStyleSheet(f"background:transparent;font-size:15px;font-weight:700;color:{PALETTE['muted']};")
             summary.addWidget(disc_label)
             self.bill_discount = QLineEdit(str(order.bill_discount))
             self.bill_discount.setObjectName("billDiscount")
@@ -910,7 +915,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             due_layout.setContentsMargins(14, 10, 14, 10)
             self.due = QLabel(f"ยอดชำระ {order.grand_total():,.2f} บาท")
             self.due.setObjectName("totalPayableAmount")
-            self.due.setStyleSheet(f"font-size:32px;font-weight:900;color:{PALETTE['payable_mint']};")
+            self.due.setStyleSheet(f"background:transparent;font-size:32px;font-weight:900;color:{PALETTE['payable_mint']};")
             due_layout.addWidget(self.due)
             summary.addWidget(due_box)
 
@@ -991,7 +996,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             change_layout = QVBoxLayout(change_box)
             change_layout.setContentsMargins(12, 8, 12, 8)
             self.change = QLabel()
-            self.change.setStyleSheet("font-size:24px;font-weight:800;color:%s;" % PALETTE["success_dark"])
+            self.change.setStyleSheet("background:transparent;font-size:24px;font-weight:800;color:%s;" % PALETTE["success_dark"])
             change_layout.addWidget(self.change)
             summary.addWidget(change_box)
 
@@ -1045,9 +1050,14 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             gift_names = {p.name or p.promo_type for p in self.order.promotions if p.promo_type in ("free_item", "bill_free_item")}
             names = [f"{name}  −{money(amount):,.2f}" for name, amount in self.order.pricing()[5] if name not in gift_names]
             gifts = [f"แถม {line.name} × {line.qty}  ฿0" for line in self.order.free_items()]
-            self.promo_summary.setText(f"ส่วนลดโปร  {self.order.promotion_total():,.2f} บาท\n" + " · ".join(names) + "\n" + "\n".join(gifts))
+            promo_lines = [f"ส่วนลดโปร  {self.order.promotion_total():,.2f} บาท"]
+            if names:
+                promo_lines.append(" · ".join(names))
+            if gifts:
+                promo_lines.extend(gifts)
+            self.promo_summary.setText("\n".join(promo_lines))
             self.due.setText(f"ยอดสุทธิ  {self.order.grand_total():,.2f} บาท")
-            self.due.setStyleSheet(f"font-size:32px;font-weight:900;color:{PALETTE['payable_mint']};")
+            self.due.setStyleSheet(f"background:transparent;font-size:32px;font-weight:900;color:{PALETTE['payable_mint']};")
 
         def discount_changed(self):
             try:
@@ -1071,7 +1081,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
         def set_payment_method(self, method: str) -> None:
             self.payment_method = method
-            self.method_buttons[method].setChecked(True)
+            if method in self.method_buttons:
+                self.method_buttons[method].setChecked(True)
             transfer = method == "transfer"
             cash = method == "cash"
             self.cash_label.setText("เงินที่รับมา")
@@ -2576,7 +2587,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             # them to fill the viewport made the product buttons dominate the
             # screen and left too little room for the customer-facing bill.
             # Extra products remain available by scrolling inside this panel.
-            row_height = max(96, layout_metrics["card"])
+            row_height = max(116, layout_metrics["card"])
             term = self.scan.text().strip()
             # ค้นได้ทั้งชื่อ รหัส และบาร์โค้ด ตัวเลขสั้นยังไม่กรอง กันตารางกระพริบระหว่างเริ่มยิงสแกน
             search = "" if term.isdigit() and len(term) < 4 else term

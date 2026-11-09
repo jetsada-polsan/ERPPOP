@@ -18,7 +18,7 @@ class TouchDialog(QDialog):
         self.setWindowTitle(title)
         self.setMinimumWidth(480)
         self.setStyleSheet(f'''QDialog {{ background:{p['surface']}; border:1px solid {p['border']}; border-radius:16px; }}
-            QLabel {{ font-size:16px; color:{p['text']}; }} QLineEdit {{ min-height:44px; font-size:24px; }}
+            QLabel {{ font-size:16px; color:{p['text']}; background:transparent; }} QLineEdit {{ min-height:44px; font-size:24px; }}
             QPushButton {{ min-height:56px; font-size:18px; font-weight:700; border-radius:10px; }}
             QPushButton#primary, QPushButton#btnTouchPrimary {{ background:{p['primary']}; color:{p['surface']}; border:1px solid {p['primary']}; font-weight:800; }}
             QPushButton#btnCheckoutPrimary {{ background:{p['success']}; color:{p['surface']}; border:1px solid {p['success']}; font-weight:800; }}

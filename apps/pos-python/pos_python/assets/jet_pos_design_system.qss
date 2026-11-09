@@ -157,10 +157,11 @@ QPushButton#catPill:checked {
 }
 
 /* 5. Product Cards & Cart Table (Readable >= 16px Content, Net Total >= 32px) */
-QPushButton#productTile, QFrame#prodCard {
+QPushButton#productTile, QMainWindow[compact="true"] QPushButton#productTile, QFrame#prodCard {
     background-color: $surface;
     border: 1px solid $border;
     border-radius: 10px;
+    padding: 0px;
     text-align: left;
 }
 QPushButton#productTile:hover, QFrame#prodCard:hover {
@@ -168,12 +169,12 @@ QPushButton#productTile:hover, QFrame#prodCard:hover {
     border: 2px solid $success;
 }
 QLabel#productName, QLabel#prodName {
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 700;
     color: $text;
 }
 QLabel#productPrice, QLabel#prodPrice {
-    font-size: 18px;
+    font-size: 17px;
     font-weight: 800;
     color: $brand_navy;
 }
