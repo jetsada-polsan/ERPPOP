@@ -2,13 +2,39 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\RoutePermissions;
+use Illuminate\Support\Facades\Route;
 use Illuminate\View\View;
 
 class ManualController extends Controller
 {
     public function index(): View
     {
+        $user = auth()->user();
+        $sections = $this->manualSections();
+        $allTopics = config('manual', []);
+
+        $topics = array_values(array_map(function (array $topic): array {
+            $topic['url'] = route($topic['route'], $topic['params'] ?? []);
+
+            return $topic;
+        }, array_filter($allTopics, function (array $topic) use ($user): bool {
+            $routeName = $topic['route'] ?? null;
+            if (! is_string($routeName) || $routeName === '' || ! Route::has($routeName)) {
+                return false;
+            }
+
+            $permission = RoutePermissions::resolve($routeName);
+            if ($permission === null) {
+                return true;
+            }
+
+            return $user !== null && $user->hasPermission($permission);
+        })));
+
         return view('core-modules.index', [
+            'sections' => $sections,
+            'topics' => $topics,
             'pillars' => $this->pillars(),
             'workflows' => $this->workflows(),
             'testSuites' => $this->testSuites(),
@@ -24,6 +50,18 @@ class ManualController extends Controller
             'calculationFormulas' => $this->calculationFormulas(),
             'moduleGuide' => $this->moduleGuide(),
         ]);
+    }
+
+    private function manualSections(): array
+    {
+        return [
+            ['key' => 'sales', 'label' => 'ขาย / เอกสาร', 'icon' => 'bi-receipt-cutoff'],
+            ['key' => 'pos', 'label' => 'POS / หน้าร้าน', 'icon' => 'bi-shop-window'],
+            ['key' => 'inventory', 'label' => 'สินค้า / คลัง', 'icon' => 'bi-box-seam-fill'],
+            ['key' => 'finance', 'label' => 'การเงิน / บัญชี', 'icon' => 'bi-calculator-fill'],
+            ['key' => 'reports', 'label' => 'รายงาน', 'icon' => 'bi-clipboard-data-fill'],
+            ['key' => 'settings', 'label' => 'ตั้งค่า', 'icon' => 'bi-gear-fill'],
+        ];
     }
 
     private function blueprintRoadmap(): array
