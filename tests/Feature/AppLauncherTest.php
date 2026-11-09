@@ -141,4 +141,30 @@ class AppLauncherTest extends TestCase
             $this->actingAs($user)->get(route('apps.launcher'))->assertOk();
         }
     }
+
+    public function test_master_data_and_integrations_are_consolidated_under_settings_and_legacy_menu_order_is_safe(): void
+    {
+        $all = ErpMenu::all();
+        $this->assertSame(
+            ['ภาพรวม', 'งานประจำวัน', 'POS / หน้าร้าน', 'คลัง / ผลิต / ซื้อ', 'การเงิน / บัญชี', 'รายงาน', 'ระบบ'],
+            array_column($all, 'label')
+        );
+
+        $settingsSection = collect($all)->firstWhere('label', 'ระบบ');
+        $this->assertSame('ตั้งค่า', $settingsSection['displayLabel']);
+
+        $groups = array_values(array_unique(array_filter(array_column($settingsSection['items'], 'group'))));
+        $this->assertSame(['ข้อมูลหลัก', 'เอกสาร', 'ผู้ใช้และสิทธิ์', 'เชื่อมต่อภายนอก', 'ระบบ'], $groups);
+
+        $labels = array_column($settingsSection['items'], 'label');
+        $this->assertContains('ค่าคงที่ระบบ', $labels);
+        $this->assertContains('สินค้า / บริการ', $labels);
+        $this->assertContains('LINE แจ้งเตือน', $labels);
+        $this->assertContains('สมุดเอกสาร', $labels);
+        $this->assertContains('ผู้ใช้และสิทธิ์', $labels);
+
+        AppSetting::set('menu_section_order', json_encode(['รายงาน', 'ข้อมูลตั้งต้น', 'เชื่อมต่อ', 'ภาพรวม'], JSON_UNESCAPED_UNICODE));
+        $ordered = ErpMenu::forUser($this->userWith(['reports.view', 'settings.manage', 'masterdata.manage']));
+        $this->assertSame('รายงาน', $ordered[0]['label']);
+    }
 }

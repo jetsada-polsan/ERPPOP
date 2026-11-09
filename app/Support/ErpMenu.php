@@ -15,17 +15,15 @@ use App\Models\User;
  */
 class ErpMenu
 {
-    /** ไอคอนประจำหมวด ใช้ทั้งบน rail และในหน้า App Launcher */
+    /** ไอคอนประจำหมวด ใช้ทั้งบนแถบบนและในหน้า App Launcher */
     public const SECTION_ICONS = [
         'ภาพรวม' => 'bi-house-door-fill',
         'งานประจำวัน' => 'bi-cash-coin',
         'POS / หน้าร้าน' => 'bi-shop-window',
         'คลัง / ผลิต / ซื้อ' => 'bi-box-seam-fill',
         'การเงิน / บัญชี' => 'bi-calculator-fill',
-        'ข้อมูลตั้งต้น' => 'bi-people-fill',
-        'เชื่อมต่อ' => 'bi-plug-fill',
-        'ระบบ' => 'bi-gear-fill',
         'รายงาน' => 'bi-clipboard-data-fill',
+        'ระบบ' => 'bi-gear-fill',
     ];
 
     /** @return array<int, array<string, mixed>> รายการดิบ ยังไม่กรองสิทธิ์ */
@@ -44,7 +42,7 @@ class ErpMenu
             ],
             [
                 'label' => 'งานประจำวัน',
-                'displayLabel' => 'ขาย / เอกสาร',
+                'displayLabel' => 'ขาย/เอกสาร',
                 'items' => [
                     ['label' => 'เอกสารย้อนหลัง', 'route' => 'documents.browser', 'pattern' => 'documents.browser', 'icon' => 'bi-archive-fill', 'tone' => 'indigo'],
                     ['label' => 'ใบเสนอราคา', 'route' => 'quotations.index', 'pattern' => 'quotations.*', 'icon' => 'bi-file-earmark-text', 'tone' => 'slate'],
@@ -70,7 +68,7 @@ class ErpMenu
             ],
             [
                 'label' => 'คลัง / ผลิต / ซื้อ',
-                'displayLabel' => 'สินค้า / คลัง / จัดซื้อ',
+                'displayLabel' => 'สินค้า/คลัง',
                 'items' => [
                     ['label' => 'โอนย้าย / ปรับยอดสต๊อก', 'route' => 'stock-transfers.index', 'pattern' => 'stock-transfers.index', 'extraPattern' => 'stock-adjustments.*', 'icon' => 'bi-box-seam-fill', 'tone' => 'teal'],
                     ['label' => 'ขอโอนสินค้า', 'route' => 'stock-transfers.request', 'pattern' => 'stock-transfers.request*', 'icon' => 'bi-box-arrow-in-down', 'tone' => 'cyan'],
@@ -88,7 +86,7 @@ class ErpMenu
             ],
             [
                 'label' => 'การเงิน / บัญชี',
-                'displayLabel' => 'การเงิน / บัญชี',
+                'displayLabel' => 'การเงิน/บัญชี',
                 'items' => [
                     ['label' => 'บัญชีครบวงจร', 'route' => 'accounting-automation.index', 'pattern' => 'accounting-automation.*', 'icon' => 'bi-cpu-fill', 'tone' => 'indigo'],
                     ['label' => 'ผังบัญชี / บันทึกบัญชี', 'route' => 'chart-of-accounts.index', 'pattern' => 'chart-of-accounts.*', 'extraPattern' => 'gl-journals.*', 'icon' => 'bi-calculator-fill', 'tone' => 'red'],
@@ -106,36 +104,6 @@ class ErpMenu
                 ],
             ],
             [
-                'label' => 'ข้อมูลตั้งต้น',
-                'displayLabel' => 'ข้อมูลหลัก',
-                'items' => [
-                    ['label' => 'ศูนย์ตั้งต้นระบบ', 'route' => 'master-data-setup.index', 'pattern' => 'master-data-setup.*', 'icon' => 'bi-file-earmark-spreadsheet-fill', 'tone' => 'blue'],
-                    ['label' => 'สินค้า / บริการ', 'route' => 'products.index', 'pattern' => 'products.*', 'extraPattern' => 'product-units.*', 'icon' => 'bi-box-seam-fill', 'tone' => 'brown'],
-                    ['label' => 'พนักงาน', 'route' => 'employees.index', 'pattern' => 'employees.*', 'icon' => 'bi-person-badge-fill', 'tone' => 'blue'],
-                    ['label' => 'ลูกค้า (รวมลูกหนี้)', 'route' => 'customers.index', 'pattern' => 'customers.*', 'icon' => 'bi-people-fill', 'tone' => 'indigo'],
-                    ['label' => 'ผู้จำหน่าย / เจ้าหนี้', 'route' => 'suppliers.index', 'pattern' => 'suppliers.*', 'icon' => 'bi-buildings-fill', 'tone' => 'pink'],
-                    ['label' => 'สมาชิก', 'route' => 'members.index', 'pattern' => 'members.*', 'icon' => 'bi-person-vcard-fill', 'tone' => 'indigo'],
-                    ['label' => 'คลังสินค้า', 'route' => 'warehouse-locations.index', 'pattern' => 'warehouse-locations.*', 'icon' => 'bi-archive-fill', 'tone' => 'teal'],
-                    ['label' => 'หมวดสินค้า / สาขา / คลัง', 'route' => 'basic-master.index', 'params' => ['type' => 'product-categories'], 'pattern' => 'basic-master.*', 'icon' => 'bi-diagram-3-fill', 'tone' => 'blue'],
-                    ['label' => 'ตารางราคา', 'route' => 'price-tables.index', 'pattern' => 'price-tables.*', 'icon' => 'bi-tags-fill', 'tone' => 'red'],
-                    ['label' => 'ราคาเครื่องชั่ง', 'route' => 'scale-prices.index', 'pattern' => 'scale-prices.*', 'icon' => 'bi-speedometer2', 'tone' => 'teal'],
-                    ['label' => 'โปรโมชั่น', 'route' => 'promotions.index', 'pattern' => 'promotions.*', 'icon' => 'bi-gift-fill', 'tone' => 'amber'],
-                    ['label' => 'ราคานาทีทอง', 'route' => 'flash-sales.index', 'pattern' => 'flash-sales.*', 'icon' => 'bi-lightning-charge-fill', 'tone' => 'red'],
-                    ['label' => 'ป้ายราคา', 'route' => 'price-tags.index', 'pattern' => 'price-tags.*', 'icon' => 'bi-tag-fill', 'tone' => 'cyan'],
-                    ['label' => 'บัตรส่วนลด', 'route' => 'discount-cards.index', 'pattern' => 'discount-cards.*', 'icon' => 'bi-credit-card-2-front-fill', 'tone' => 'pink'],
-                    ['label' => 'แต้มสมาชิก', 'route' => 'member-points.index', 'pattern' => 'member-points.*', 'icon' => 'bi-stars', 'tone' => 'amber'],
-                    ['label' => 'แคมเปญซื้อครบ', 'route' => 'qty-promotions.index', 'pattern' => 'qty-promotions.*', 'icon' => 'bi-gift-fill', 'tone' => 'orange'],
-                ],
-            ],
-            [
-                'label' => 'เชื่อมต่อ',
-                'displayLabel' => 'เชื่อมต่อภายนอก',
-                'items' => [
-                    ['label' => 'LINE แจ้งเตือน', 'route' => 'line-integrations.index', 'pattern' => 'line-integrations.*', 'icon' => 'bi-broadcast', 'tone' => 'teal'],
-                    ['label' => 'E-Commerce', 'route' => 'ecommerce-channels.index', 'pattern' => 'ecommerce-channels.*', 'icon' => 'bi-shop-window', 'tone' => 'cyan'],
-                ],
-            ],
-            [
                 'label' => 'รายงาน',
                 'displayLabel' => 'รายงาน',
                 'items' => [
@@ -150,17 +118,46 @@ class ErpMenu
             ],
             [
                 'label' => 'ระบบ',
-                'displayLabel' => 'ตั้งค่าระบบ',
+                'displayLabel' => 'ตั้งค่า',
                 'items' => [
-                    ['label' => 'ยานพาหนะ / ขนส่ง', 'route' => 'fleet.index', 'pattern' => 'fleet.*', 'icon' => 'bi-truck', 'tone' => 'orange'],
-                    ['label' => 'ตั้งค่าระบบ', 'route' => 'settings.index', 'pattern' => 'settings.*', 'icon' => 'bi-gear-fill', 'tone' => 'slate'],
-                    ['label' => 'ตั้งค่า Workflow เอกสาร', 'route' => 'settings.workflows', 'pattern' => 'settings.workflows*', 'icon' => 'bi-diagram-3-fill', 'tone' => 'red'],
-                    ['label' => 'นโยบายขายติดลบ', 'route' => 'settings.stock-policies', 'pattern' => 'settings.stock-policies', 'icon' => 'bi-sliders2-vertical', 'tone' => 'amber'],
-                    ['label' => 'Backup / Security', 'route' => 'operations.index', 'pattern' => 'operations.*', 'icon' => 'bi-shield-lock-fill', 'tone' => 'red'],
-                    ['label' => 'โครงสร้างฐานข้อมูล', 'route' => 'database-structure.index', 'pattern' => 'database-structure.*', 'icon' => 'bi-database-fill-gear', 'tone' => 'cyan'],
-                    ['label' => 'สมุดเอกสาร', 'route' => 'document-books.index', 'pattern' => 'document-books.*', 'icon' => 'bi-journals', 'tone' => 'indigo'],
-                    ['label' => 'ผู้ใช้และสิทธิ์', 'route' => 'users.index', 'pattern' => 'users.*', 'icon' => 'bi-people-fill', 'tone' => 'indigo'],
-                    ['label' => 'ผังองค์กร', 'route' => 'organizational-units.index', 'pattern' => 'organizational-units.*', 'icon' => 'bi-diagram-3-fill', 'tone' => 'indigo'],
+                    // กลุ่มย่อย: ข้อมูลหลัก
+                    ['group' => 'ข้อมูลหลัก', 'label' => 'ค่าคงที่ระบบ', 'route' => 'basic-master.index', 'params' => ['type' => 'product-categories'], 'pattern' => 'basic-master.*', 'icon' => 'bi-sliders', 'tone' => 'blue'],
+                    ['group' => 'ข้อมูลหลัก', 'label' => 'สินค้า / บริการ', 'route' => 'products.index', 'pattern' => 'products.*', 'icon' => 'bi-box-seam-fill', 'tone' => 'brown'],
+                    ['group' => 'ข้อมูลหลัก', 'label' => 'หน่วยนับสินค้า', 'route' => 'product-units.index', 'pattern' => 'product-units.*', 'icon' => 'bi-rulers', 'tone' => 'teal'],
+                    ['group' => 'ข้อมูลหลัก', 'label' => 'คลังสินค้า', 'route' => 'warehouse-locations.index', 'pattern' => 'warehouse-locations.*', 'icon' => 'bi-archive-fill', 'tone' => 'teal'],
+                    ['group' => 'ข้อมูลหลัก', 'label' => 'ลูกค้า (รวมลูกหนี้)', 'route' => 'customers.index', 'pattern' => 'customers.*', 'icon' => 'bi-people-fill', 'tone' => 'indigo'],
+                    ['group' => 'ข้อมูลหลัก', 'label' => 'ผู้จำหน่าย / เจ้าหนี้', 'route' => 'suppliers.index', 'pattern' => 'suppliers.*', 'icon' => 'bi-buildings-fill', 'tone' => 'pink'],
+                    ['group' => 'ข้อมูลหลัก', 'label' => 'สมาชิก', 'route' => 'members.index', 'pattern' => 'members.*', 'icon' => 'bi-person-vcard-fill', 'tone' => 'indigo'],
+                    ['group' => 'ข้อมูลหลัก', 'label' => 'พนักงาน', 'route' => 'employees.index', 'pattern' => 'employees.*', 'icon' => 'bi-person-badge-fill', 'tone' => 'blue'],
+                    ['group' => 'ข้อมูลหลัก', 'label' => 'ตารางราคา', 'route' => 'price-tables.index', 'pattern' => 'price-tables.*', 'icon' => 'bi-tags-fill', 'tone' => 'red'],
+                    ['group' => 'ข้อมูลหลัก', 'label' => 'ราคาเครื่องชั่ง', 'route' => 'scale-prices.index', 'pattern' => 'scale-prices.*', 'icon' => 'bi-speedometer2', 'tone' => 'teal'],
+                    ['group' => 'ข้อมูลหลัก', 'label' => 'โปรโมชั่น', 'route' => 'promotions.index', 'pattern' => 'promotions.*', 'icon' => 'bi-gift-fill', 'tone' => 'amber'],
+                    ['group' => 'ข้อมูลหลัก', 'label' => 'ราคานาทีทอง', 'route' => 'flash-sales.index', 'pattern' => 'flash-sales.*', 'icon' => 'bi-lightning-charge-fill', 'tone' => 'red'],
+                    ['group' => 'ข้อมูลหลัก', 'label' => 'ป้ายราคา', 'route' => 'price-tags.index', 'pattern' => 'price-tags.*', 'icon' => 'bi-tag-fill', 'tone' => 'cyan'],
+                    ['group' => 'ข้อมูลหลัก', 'label' => 'บัตรส่วนลด', 'route' => 'discount-cards.index', 'pattern' => 'discount-cards.*', 'icon' => 'bi-credit-card-2-front-fill', 'tone' => 'pink'],
+                    ['group' => 'ข้อมูลหลัก', 'label' => 'แต้มสมาชิก', 'route' => 'member-points.index', 'pattern' => 'member-points.*', 'icon' => 'bi-stars', 'tone' => 'amber'],
+                    ['group' => 'ข้อมูลหลัก', 'label' => 'แคมเปญซื้อครบ', 'route' => 'qty-promotions.index', 'pattern' => 'qty-promotions.*', 'icon' => 'bi-gift-fill', 'tone' => 'orange'],
+                    ['group' => 'ข้อมูลหลัก', 'label' => 'ยานพาหนะ / ขนส่ง', 'route' => 'fleet.index', 'pattern' => 'fleet.*', 'icon' => 'bi-truck', 'tone' => 'orange'],
+                    ['group' => 'ข้อมูลหลัก', 'label' => 'ศูนย์ตั้งต้นระบบ', 'route' => 'master-data-setup.index', 'pattern' => 'master-data-setup.*', 'icon' => 'bi-file-earmark-spreadsheet-fill', 'tone' => 'blue'],
+
+                    // กลุ่มย่อย: เอกสาร
+                    ['group' => 'เอกสาร', 'label' => 'สมุดเอกสาร', 'route' => 'document-books.index', 'pattern' => 'document-books.*', 'icon' => 'bi-journals', 'tone' => 'indigo'],
+                    ['group' => 'เอกสาร', 'label' => 'ตั้งค่า Workflow เอกสาร', 'route' => 'settings.workflows', 'pattern' => 'settings.workflows*', 'icon' => 'bi-diagram-3-fill', 'tone' => 'red'],
+                    ['group' => 'เอกสาร', 'label' => 'ศูนย์ควบคุมโมดูล', 'route' => 'settings.module-controls', 'pattern' => 'settings.module-controls*', 'icon' => 'bi-sliders2', 'tone' => 'blue'],
+
+                    // กลุ่มย่อย: ผู้ใช้และสิทธิ์
+                    ['group' => 'ผู้ใช้และสิทธิ์', 'label' => 'ผู้ใช้และสิทธิ์', 'route' => 'users.index', 'pattern' => 'users.*', 'icon' => 'bi-people-fill', 'tone' => 'indigo'],
+                    ['group' => 'ผู้ใช้และสิทธิ์', 'label' => 'ผังองค์กร', 'route' => 'organizational-units.index', 'pattern' => 'organizational-units.*', 'icon' => 'bi-diagram-3-fill', 'tone' => 'indigo'],
+
+                    // กลุ่มย่อย: เชื่อมต่อภายนอก
+                    ['group' => 'เชื่อมต่อภายนอก', 'label' => 'LINE แจ้งเตือน', 'route' => 'line-integrations.index', 'pattern' => 'line-integrations.*', 'icon' => 'bi-broadcast', 'tone' => 'teal'],
+                    ['group' => 'เชื่อมต่อภายนอก', 'label' => 'E-Commerce', 'route' => 'ecommerce-channels.index', 'pattern' => 'ecommerce-channels.*', 'icon' => 'bi-shop-window', 'tone' => 'cyan'],
+
+                    // กลุ่มย่อย: ระบบ
+                    ['group' => 'ระบบ', 'label' => 'ตั้งค่าระบบ', 'route' => 'settings.index', 'pattern' => 'settings.index', 'extraPattern' => 'settings.pos-*', 'icon' => 'bi-gear-fill', 'tone' => 'slate'],
+                    ['group' => 'ระบบ', 'label' => 'นโยบายขายติดลบ', 'route' => 'settings.stock-policies', 'pattern' => 'settings.stock-policies', 'icon' => 'bi-sliders2-vertical', 'tone' => 'amber'],
+                    ['group' => 'ระบบ', 'label' => 'Backup / Security', 'route' => 'operations.index', 'pattern' => 'operations.*', 'icon' => 'bi-shield-lock-fill', 'tone' => 'red'],
+                    ['group' => 'ระบบ', 'label' => 'โครงสร้างฐานข้อมูล', 'route' => 'database-structure.index', 'pattern' => 'database-structure.*', 'icon' => 'bi-database-fill-gear', 'tone' => 'cyan'],
                 ],
             ],
         ];
@@ -168,33 +165,42 @@ class ErpMenu
 
     /**
      * เรียงตามลำดับที่ตั้งไว้ในหน้าตั้งค่า แล้วกรองเมนูที่ผู้ใช้ไม่มีสิทธิ์ออก
+     * หมวดที่ถูกยุบไปแล้วใน menu_section_order จะถูกข้ามโดยไม่เกิด error
      *
      * @return array<int, array<string, mixed>>
      */
     public static function forUser(?User $user): array
     {
         $sections = self::all();
+        $validLabels = array_column($sections, 'label');
 
         $savedOrder = json_decode((string) AppSetting::get('menu_section_order', '[]'), true);
         if (is_array($savedOrder) && $savedOrder !== []) {
-            if (! in_array('POS / หน้าร้าน', $savedOrder, true)) {
-                $afterSales = array_search('งานประจำวัน', $savedOrder, true);
-                if ($afterSales !== false) {
-                    array_splice($savedOrder, $afterSales + 1, 0, ['POS / หน้าร้าน']);
-                } else {
-                    $savedOrder[] = 'POS / หน้าร้าน';
-                }
-            }
+            $savedOrder = array_values(array_filter(
+                $savedOrder,
+                fn ($label) => is_string($label) && in_array($label, $validLabels, true)
+            ));
 
-            $positions = array_flip($savedOrder);
-            $originalPositions = array_flip(array_column($sections, 'label'));
-            usort($sections, fn ($a, $b) => [
-                $positions[$a['label']] ?? 999,
-                $originalPositions[$a['label']] ?? 999,
-            ] <=> [
-                $positions[$b['label']] ?? 999,
-                $originalPositions[$b['label']] ?? 999,
-            ]);
+            if ($savedOrder !== []) {
+                if (! in_array('POS / หน้าร้าน', $savedOrder, true)) {
+                    $afterSales = array_search('งานประจำวัน', $savedOrder, true);
+                    if ($afterSales !== false) {
+                        array_splice($savedOrder, $afterSales + 1, 0, ['POS / หน้าร้าน']);
+                    } else {
+                        $savedOrder[] = 'POS / หน้าร้าน';
+                    }
+                }
+
+                $positions = array_flip($savedOrder);
+                $originalPositions = array_flip($validLabels);
+                usort($sections, fn ($a, $b) => [
+                    $positions[$a['label']] ?? 999,
+                    $originalPositions[$a['label']] ?? 999,
+                ] <=> [
+                    $positions[$b['label']] ?? 999,
+                    $originalPositions[$b['label']] ?? 999,
+                ]);
+            }
         }
 
         if (! $user) {

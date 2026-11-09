@@ -600,7 +600,7 @@ class SystemSettingController extends Controller
 
     private function defaultMenuOrder(): array
     {
-        return ['ภาพรวม', 'งานประจำวัน', 'POS / หน้าร้าน', 'คลัง / ผลิต / ซื้อ', 'การเงิน / บัญชี', 'ข้อมูลตั้งต้น', 'เชื่อมต่อ', 'รายงาน', 'ระบบ'];
+        return array_column(\App\Support\ErpMenu::all(), 'label');
     }
 
     private function menuOrder(): array
