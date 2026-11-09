@@ -324,7 +324,12 @@ class SalesDocumentEndToEndTest extends TestCase
                 ['product_id' => $vatGoods->id, 'qty' => 2, 'unit_price' => 50.10],
             ],
         ]);
-        app(CreditSaleService::class)->convertBookingToCreditSale(SaleBooking::where('document_id', $bookingDocument->id)->sole());
+        $booking = SaleBooking::where('document_id', $bookingDocument->id)->sole();
+        $this->withoutMiddleware(\App\Http\Middleware\ErpAuthorize::class)->actingAs(User::factory()->create())
+            ->get(route('bookings.show', $booking))->assertOk()
+            ->assertSee('DS มีภาษี 1 รายการ')->assertSee('DSN ไม่มีภาษี 1 รายการ')
+            ->assertDontSee('name="document_book_id"', false);
+        app(CreditSaleService::class)->convertBookingToCreditSale($booking);
 
         $sales = Document::where('source_document_id', $bookingDocument->id)->orderBy('id')->get();
         $this->assertCount(2, $sales, 'ใบจองเดียวต้องแยกเป็น DS + DSN');

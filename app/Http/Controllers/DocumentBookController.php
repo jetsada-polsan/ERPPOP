@@ -32,6 +32,7 @@ class DocumentBookController extends Controller
             'name' => ['required', 'string', 'max:150'],
             'prefix' => ['required', 'string', 'max:10', 'regex:/^[A-Za-z0-9]+$/'],
             'is_default' => ['nullable', 'boolean'],
+            'no_vat' => ['nullable', 'boolean'],
         ], [
             'prefix.regex' => 'คำนำหน้าเลขที่ใช้ได้เฉพาะ A-Z 0-9',
         ]);
@@ -45,6 +46,7 @@ class DocumentBookController extends Controller
         if ($data['is_default']) {
             DocumentBook::where('document_type_id', $data['document_type_id'])->update(['is_default' => false]);
         }
+        $data['no_vat'] = $request->boolean('no_vat');
         $data['is_active'] = true;
         DocumentBook::create($data);
 
@@ -57,7 +59,14 @@ class DocumentBookController extends Controller
             'name' => ['required', 'string', 'max:150'],
             'is_default' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
+            'no_vat' => ['nullable', 'boolean'],
         ]);
+
+        // เล่มที่มีเอกสารแล้ว ห้ามเปลี่ยนภาษี ไม่งั้นเอกสารเก่ากับใหม่ในเล่มเดียวกันคิดภาษีคนละแบบ
+        $noVat = $request->has('no_vat') ? $request->boolean('no_vat') : (bool) $documentBook->no_vat;
+        if ($noVat !== (bool) $documentBook->no_vat && $documentBook->documents()->exists()) {
+            return back()->withErrors(['no_vat' => "เล่ม {$documentBook->code} มีเอกสารแล้ว เปลี่ยนการตั้งค่าภาษีไม่ได้"]);
+        }
 
         if ($request->boolean('is_default') && ! $documentBook->is_default) {
             DocumentBook::where('document_type_id', $documentBook->document_type_id)->update(['is_default' => false]);
@@ -67,6 +76,7 @@ class DocumentBookController extends Controller
             'name' => $data['name'],
             'is_default' => $request->boolean('is_default'),
             'is_active' => $request->boolean('is_active', true),
+            'no_vat' => $noVat,
         ]);
 
         return redirect()->route('document-books.index')->with('success', 'บันทึกเล่มเอกสารแล้ว');

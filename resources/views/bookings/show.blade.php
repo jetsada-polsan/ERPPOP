@@ -133,16 +133,21 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
             @if($isPending && $canConvert)
             <form method="post" action="{{ route('bookings.convert', $booking) }}" id="convert-form" class="booking-convert d-flex flex-column gap-2 align-items-end">
                 @csrf
-                @if($creditSaleBooks->isNotEmpty())
-                <div class="doc-book-picker">
-                    <div class="doc-book-label">เล่มเอกสาร DS / DSN</div>
-                <select name="document_book_id" class="form-select" style="width:auto" title="เล่มเอกสารขายเชื่อ">
-                    @foreach($creditSaleBooks as $book)
-                        <option value="{{ $book->id }}" @selected($book->is_default)>{{ $book->code }} - {{ $book->no_vat ? 'ไม่มีภาษี' : 'มีภาษี' }} ({{ number_format($book->documents_count) }} ใบ)</option>
-                    @endforeach
-                </select>
+                @php
+                    $bookingItems = $booking->document->stockDocument?->items ?? collect();
+                    $vatCount = $bookingItems->filter(fn ($i) => $i->product?->is_vat)->count();
+                    $noVatCount = $bookingItems->count() - $vatCount;
+                    $dsBook = $creditSaleBooks->first(fn ($b) => $b->code === 'DS') ?? $creditSaleBooks->first(fn ($b) => ! $b->no_vat);
+                    $dsnBook = $creditSaleBooks->first(fn ($b) => $b->code === 'DSN') ?? $creditSaleBooks->first(fn ($b) => $b->no_vat);
+                @endphp
+                <div class="small text-muted text-end" data-testid="convert-preview">
+                    ระบบจะออกใบขายให้เอง:
+                    @if($vatCount > 0)<span class="badge text-bg-primary">{{ $dsBook?->code ?? 'DS' }} มีภาษี {{ $vatCount }} รายการ</span>@endif
+                    @if($noVatCount > 0)<span class="badge text-bg-secondary">{{ $dsnBook?->code ?? 'DSN' }} ไม่มีภาษี {{ $noVatCount }} รายการ</span>@endif
+                    @if(($vatCount > 0 && ! $dsBook) || ($noVatCount > 0 && ! $dsnBook))
+                        <div class="text-danger">ยังไม่มีเล่มขายเชื่อ{{ $vatCount > 0 && ! $dsBook ? 'มีภาษี' : 'ไม่มีภาษี' }} — ตั้งค่าที่ สมุดเอกสาร</div>
+                    @endif
                 </div>
-                @endif
                 <button type="button"
                     onclick="Swal.fire({ title:'แปลงเป็นใบขาย?', text:'จะตัดสต็อกและตั้งลูกหนี้ทันที{{ $isDelivery ? ' โดยใช้วันที่ส่งจริง' : '' }}', icon:'warning', showCancelButton:true, confirmButtonText:'ยืนยัน', cancelButtonText:'ยกเลิก', confirmButtonColor:'var(--erp-success-ink)' }).then(r => r.isConfirmed && document.getElementById('convert-form').submit())"
                     class="btn btn-success px-4">
