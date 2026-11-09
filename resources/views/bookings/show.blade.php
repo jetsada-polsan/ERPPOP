@@ -131,28 +131,74 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
                 </form>
             @endif
             @if($isPending && $canConvert)
-            <form method="post" action="{{ route('bookings.convert', $booking) }}" id="convert-form" class="booking-convert d-flex flex-column gap-2 align-items-end">
+            @php
+                $bookingItems = $booking->document->stockDocument?->items ?? collect();
+                $dsBook = $creditSaleBooks->first(fn ($b) => $b->code === 'DS') ?? $creditSaleBooks->first(fn ($b) => ! $b->no_vat);
+                $dsnBook = $creditSaleBooks->first(fn ($b) => $b->code === 'DSN') ?? $creditSaleBooks->first(fn ($b) => $b->no_vat);
+                $convertLines = $bookingItems->sortBy('id')->values()->map(fn ($i) => [
+                    'id' => $i->id,
+                    'name' => $i->product?->name_th ?? '-',
+                    'sku' => $i->product?->sku_code ?? '',
+                    'qty' => (float) $i->qty,
+                    'amount' => round((float) $i->qty * (float) $i->unit_price, 2),
+                    'isVat' => (bool) $i->product?->is_vat,
+                    'book' => $i->product?->is_vat ? 'DS' : 'DSN',
+                ]);
+            @endphp
+            <form method="post" action="{{ route('bookings.convert', $booking) }}" id="convert-form" class="booking-convert"
+                  x-data="{ open: false, lines: @js($convertLines), total(code) { return this.lines.filter(l => l.book === code).reduce((s, l) => s + l.amount, 0) }, count(code) { return this.lines.filter(l => l.book === code).length }, fmt(n) { return n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) } }">
                 @csrf
-                @php
-                    $bookingItems = $booking->document->stockDocument?->items ?? collect();
-                    $vatCount = $bookingItems->filter(fn ($i) => $i->product?->is_vat)->count();
-                    $noVatCount = $bookingItems->count() - $vatCount;
-                    $dsBook = $creditSaleBooks->first(fn ($b) => $b->code === 'DS') ?? $creditSaleBooks->first(fn ($b) => ! $b->no_vat);
-                    $dsnBook = $creditSaleBooks->first(fn ($b) => $b->code === 'DSN') ?? $creditSaleBooks->first(fn ($b) => $b->no_vat);
-                @endphp
-                <div class="small text-muted text-end" data-testid="convert-preview">
-                    ระบบจะออกใบขายให้เอง:
-                    @if($vatCount > 0)<span class="badge text-bg-primary">{{ $dsBook?->code ?? 'DS' }} มีภาษี {{ $vatCount }} รายการ</span>@endif
-                    @if($noVatCount > 0)<span class="badge text-bg-secondary">{{ $dsnBook?->code ?? 'DSN' }} ไม่มีภาษี {{ $noVatCount }} รายการ</span>@endif
-                    @if(($vatCount > 0 && ! $dsBook) || ($noVatCount > 0 && ! $dsnBook))
-                        <div class="text-danger">ยังไม่มีเล่มขายเชื่อ{{ $vatCount > 0 && ! $dsBook ? 'มีภาษี' : 'ไม่มีภาษี' }} — ตั้งค่าที่ สมุดเอกสาร</div>
-                    @endif
-                </div>
-                <button type="button"
-                    onclick="Swal.fire({ title:'แปลงเป็นใบขาย?', text:'จะตัดสต็อกและตั้งลูกหนี้ทันที{{ $isDelivery ? ' โดยใช้วันที่ส่งจริง' : '' }}', icon:'warning', showCancelButton:true, confirmButtonText:'ยืนยัน', cancelButtonText:'ยกเลิก', confirmButtonColor:'var(--erp-success-ink)' }).then(r => r.isConfirmed && document.getElementById('convert-form').submit())"
-                    class="btn btn-success px-4">
-                    <i class="bi bi-arrow-right-circle me-1"></i> แปลงเป็นใบขาย
+                <template x-for="line in lines" :key="line.id">
+                    <input type="hidden" :name="`lines[${line.id}]`" :value="line.book">
+                </template>
+                <button type="button" class="btn btn-success px-4" @click="open = true" data-testid="convert-open">
+                    <i class="bi bi-clipboard-check me-1"></i> ตรวจและแปลงเป็นใบขาย
                 </button>
+
+                <div class="booking-modal-backdrop" x-show="open" x-cloak x-transition.opacity @keydown.escape.window="open = false" style="z-index:3000">
+                    <div class="booking-modal" @click.outside="open = false" style="width:min(900px,100%)">
+                        <div class="modal-header border-0 px-4 pt-4 pb-2">
+                            <div>
+                                <h3 class="h4 fw-bold mb-1">ตรวจรายการก่อนออกใบขายเชื่อ</h3>
+                                <div class="text-muted">เลือกเล่มของแต่ละรายการ ระบบตั้งค่าเริ่มต้นจาก VAT ของสินค้า แก้ได้ก่อนกดยืนยัน</div>
+                            </div>
+                            <button type="button" class="btn btn-light rounded-circle" @click="open = false"><i class="bi bi-x-lg"></i></button>
+                        </div>
+                        <div class="modal-body px-4 pb-3">
+                            <table class="table align-middle mb-3">
+                                <thead><tr><th>สินค้า</th><th class="text-end">จำนวน</th><th class="text-end">จำนวนเงิน</th><th class="text-center" style="width:230px">ออกในเล่ม</th></tr></thead>
+                                <tbody>
+                                    <template x-for="line in lines" :key="line.id">
+                                        <tr>
+                                            <td><div class="fw-semibold" x-text="line.name"></div><div class="text-muted small"><span x-text="line.sku"></span> · <span x-text="line.isVat ? 'สินค้ามี VAT' : 'สินค้าไม่มี VAT'"></span></div></td>
+                                            <td class="text-end" x-text="fmt(line.qty)"></td>
+                                            <td class="text-end" x-text="fmt(line.amount)"></td>
+                                            <td class="text-center">
+                                                <div class="btn-group" role="group">
+                                                    <button type="button" class="btn" :class="line.book === 'DS' ? 'btn-primary' : 'btn-outline-primary'" @click="line.book = 'DS'">{{ $dsBook?->code ?? 'DS' }} มี VAT</button>
+                                                    <button type="button" class="btn" :class="line.book === 'DSN' ? 'btn-secondary' : 'btn-outline-secondary'" @click="line.book = 'DSN'">{{ $dsnBook?->code ?? 'DSN' }} ไม่มี VAT</button>
+                                                </div>
+                                                <div class="small text-warning-emphasis mt-1" x-show="line.isVat !== (line.book === 'DS')">ต่างจากค่าเริ่มต้นของสินค้า</div>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                            <div class="d-flex flex-wrap gap-3 justify-content-end fs-6">
+                                <div x-show="count('DS') > 0"><span class="badge text-bg-primary">{{ $dsBook?->code ?? 'DS' }}</span> <span x-text="count('DS')"></span> รายการ ฿<b x-text="fmt(total('DS'))"></b></div>
+                                <div x-show="count('DSN') > 0"><span class="badge text-bg-secondary">{{ $dsnBook?->code ?? 'DSN' }}</span> <span x-text="count('DSN')"></span> รายการ ฿<b x-text="fmt(total('DSN'))"></b></div>
+                            </div>
+                            @if(! $dsBook || ! $dsnBook)
+                                <div class="text-danger mt-2">ยังไม่มีเล่มขายเชื่อ{{ ! $dsBook ? 'มีภาษี' : 'ไม่มีภาษี' }} — ตั้งค่าที่ สมุดเอกสาร</div>
+                            @endif
+                            <div class="alert alert-warning mt-3 mb-0">กดยืนยันแล้ว ระบบจะ<b>ตัดสต็อกและตั้งลูกหนี้ทันที</b>{{ $isDelivery ? ' โดยใช้วันที่ส่งจริง' : '' }} ถ้าผิดต้องให้ผู้จัดการถอย Confirm</div>
+                        </div>
+                        <div class="modal-footer border-0 px-4 pb-4">
+                            <button type="button" class="btn btn-light border px-4" @click="open = false">กลับไปตรวจ</button>
+                            <button type="submit" class="btn btn-success px-4"><i class="bi bi-check2-circle me-1"></i> ยืนยันออกใบขาย</button>
+                        </div>
+                    </div>
+                </div>
             </form>
             @elseif($isPending && $isDelivery)
                 <button class="btn btn-outline-secondary px-4" disabled title="ต้องตรวจของ ขึ้นรถ และบันทึกส่งครบก่อน">

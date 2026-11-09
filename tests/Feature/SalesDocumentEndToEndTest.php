@@ -327,7 +327,7 @@ class SalesDocumentEndToEndTest extends TestCase
         $booking = SaleBooking::where('document_id', $bookingDocument->id)->sole();
         $this->withoutMiddleware(\App\Http\Middleware\ErpAuthorize::class)->actingAs(User::factory()->create())
             ->get(route('bookings.show', $booking))->assertOk()
-            ->assertSee('DS มีภาษี 1 รายการ')->assertSee('DSN ไม่มีภาษี 1 รายการ')
+            ->assertSee('ตรวจและแปลงเป็นใบขาย')
             ->assertDontSee('name="document_book_id"', false);
         app(CreditSaleService::class)->convertBookingToCreditSale($booking);
 
@@ -341,6 +341,51 @@ class SalesDocumentEndToEndTest extends TestCase
         foreach ($sales as $sale) {
             $this->assertGlBalanced($sale);
         }
+    }
+
+    public function test_staff_can_choose_ds_or_dsn_per_line_before_billing(): void
+    {
+        [$branch, , $plain, $customer] = $this->stockedBranch('PICK', qty: 10, unitCost: 60, withCustomer: true);
+        $vatGoods = Product::create([
+            'sku_code' => 'SKUVAT2', 'name_th' => 'สินค้ามี VAT', 'base_unit_id' => $plain->base_unit_id,
+            'default_price' => 50, 'average_cost' => 0, 'is_vat' => true, 'is_active' => true, 'negative_stock_policy' => 'block',
+        ]);
+        app(PurchaseService::class)->create([
+            'branch_id' => $branch->id, 'supplier_id' => Supplier::sole()->id, 'is_credit' => true, 'prices_include_vat' => false,
+            'items' => [['product_id' => $vatGoods->id, 'qty' => 10, 'unit_price' => 30]],
+        ]);
+        $typeId = DocumentType::where('code', 'CREDIT_SALE')->value('id');
+        \App\Models\DocumentBook::create(['code' => 'DS', 'name' => 'DS', 'prefix' => 'DS', 'document_type_id' => $typeId, 'is_default' => true, 'is_active' => true, 'no_vat' => false]);
+        $dsn = \App\Models\DocumentBook::create(['code' => 'DSN', 'name' => 'DSN', 'prefix' => 'DSN', 'document_type_id' => $typeId, 'is_default' => false, 'is_active' => true, 'no_vat' => true]);
+
+        $bookingDocument = app(BookingService::class)->create([
+            'branch_id' => $branch->id, 'customer_id' => $customer->id,
+            'items' => [
+                ['product_id' => $plain->id, 'qty' => 3, 'unit_price' => 100.25],
+                ['product_id' => $vatGoods->id, 'qty' => 2, 'unit_price' => 50.10],
+            ],
+        ]);
+        $booking = SaleBooking::where('document_id', $bookingDocument->id)->sole();
+        $itemIds = $bookingDocument->stockDocument->items()->orderBy('id')->pluck('id')->all();
+
+        // ส่งรายการไม่ครบ = ปฏิเสธ ไม่สร้างบิล
+        try {
+            app(CreditSaleService::class)->convertBookingToCreditSale($booking, null, [$itemIds[0] => 'DSN']);
+            $this->fail('ต้องปฏิเสธเมื่อรายการไม่ครบ');
+        } catch (\RuntimeException) {
+        }
+        $this->assertSame(0, Document::where('source_document_id', $bookingDocument->id)->count());
+
+        // พนักงานย้ายสินค้ามี VAT ไปลง DSN ด้วย → ได้บิล DSN ใบเดียว ยอดเท่าใบจอง ไม่มี VAT
+        $this->withoutMiddleware(\App\Http\Middleware\ErpAuthorize::class)->actingAs(User::factory()->create())
+            ->post(route('bookings.convert', $booking), ['lines' => [$itemIds[0] => 'DSN', $itemIds[1] => 'DSN']])
+            ->assertRedirect();
+
+        $sales = Document::where('source_document_id', $bookingDocument->id)->get();
+        $this->assertCount(1, $sales);
+        $this->assertSame($dsn->id, $sales->first()->document_book_id);
+        $this->assertSame(round((float) $bookingDocument->total_amount, 2), round((float) $sales->first()->total_amount, 2));
+        $this->assertGlBalanced($sales->first());
     }
 
     public function test_a_short_booking_needs_a_manager_to_confirm_in_erp_before_billing_and_may_go_negative(): void

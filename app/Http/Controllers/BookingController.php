@@ -385,6 +385,8 @@ class BookingController extends Controller
     {
         $data = $request->validate([
             'document_book_id' => ['nullable', 'integer', 'exists:document_books,id'],
+            'lines' => ['nullable', 'array'],
+            'lines.*' => ['required', 'in:DS,DSN'],
         ]);
 
         $book = null;
@@ -395,7 +397,7 @@ class BookingController extends Controller
         }
 
         try {
-            $saleDocument = $service->convertBookingToCreditSale($booking, $book);
+            $saleDocument = $service->convertBookingToCreditSale($booking, $book, $data['lines'] ?? null);
         } catch (RuntimeException $e) {
             return redirect()->route('bookings.show', $booking)->with('error', $e->getMessage());
         }
