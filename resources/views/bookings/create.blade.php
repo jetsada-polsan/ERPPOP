@@ -7,13 +7,13 @@
 
     <h1 class="text-2xl font-bold my-4">สร้างใบจอง</h1>
 
-    <form method="post" action="{{ route('bookings.store') }}" x-data="bookingForm()" @submit="onSubmit">
+    <form method="post" action="{{ route('bookings.store') }}" data-draft x-data="bookingForm()" @submit="onSubmit">
         @csrf
 
         <div class="bg-white rounded-xl shadow p-5 mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
                 <label class="block text-sm text-gray-500 mb-1">สาขา</label>
-                <select name="branch_id" required class="w-full border rounded px-2 py-1.5 text-sm">
+                <select name="branch_id" x-model="branchId" required class="w-full border rounded px-2 py-1.5 text-sm">
                     @foreach($branches as $br)
                     <option value="{{ $br->id }}">{{ $br->code }} - {{ $br->name_th }}</option>
                     @endforeach
@@ -21,7 +21,7 @@
             </div>
             <div>
                 <label class="block text-sm text-gray-500 mb-1">พนักงานขาย (ไม่บังคับ)</label>
-                <select name="salesman_id" class="w-full border rounded px-2 py-1.5 text-sm">
+                <select name="salesman_id" x-model="salesmanId" class="w-full border rounded px-2 py-1.5 text-sm">
                     <option value="">-- ไม่ระบุ --</option>
                     @foreach($salesmen as $s)
                     <option value="{{ $s->id }}">{{ $s->code }} - {{ $s->name }}</option>
@@ -30,19 +30,24 @@
             </div>
             <div class="relative">
                 <label class="block text-sm text-gray-500 mb-1">ลูกค้า</label>
-                <input type="text" x-model="customerQuery" @input.debounce.300ms="searchCustomers()"
+                <input type="text" x-model="customerQuery" @input.debounce.250ms="searchCustomers()"
+                    @keydown.arrow-down.prevent="moveCustomerActive(1)"
+                    @keydown.arrow-up.prevent="moveCustomerActive(-1)"
+                    @keydown.enter.prevent="selectActiveCustomer()"
                     placeholder="ค้นหารหัส/ชื่อลูกค้า..." required
                     class="w-full border rounded px-2 py-1.5 text-sm">
                 <input type="hidden" name="customer_id" x-model="customerId" required>
                 <div x-show="customerResults.length" x-cloak
                     class="absolute z-10 bg-white border rounded shadow mt-1 w-full max-h-60 overflow-auto">
-                    <template x-for="c in customerResults" :key="c.id">
-                        <div @click="selectCustomer(c)" class="px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer"
+                    <template x-for="(c, cIdx) in customerResults" :key="c.id">
+                        <div @click="selectCustomer(c)"
+                            :class="{ 'bg-blue-100 font-semibold': cIdx === customerActiveIndex, 'hover:bg-blue-50': cIdx !== customerActiveIndex }"
+                            class="px-3 py-2 text-sm cursor-pointer"
                             x-text="c.code + ' - ' + c.name_th"></div>
                     </template>
                 </div>
             </div>
-            <div x-data="{ fulfillment: 'pickup' }" class="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm text-gray-500 mb-1">วิธีรับสินค้า</label>
                     <select name="fulfillment_type" x-model="fulfillment" class="w-full border rounded px-2 py-1.5 text-sm">
@@ -54,7 +59,7 @@
                     <label class="block text-sm text-gray-500 mb-1">
                         กำหนดส่ง <span x-show="fulfillment === 'delivery'" class="text-red-500">*</span>
                     </label>
-                    <input type="datetime-local" name="delivery_due_at" :required="fulfillment === 'delivery'"
+                    <input type="datetime-local" name="delivery_due_at" x-model="deliveryDueAt" :required="fulfillment === 'delivery'"
                         :disabled="fulfillment !== 'delivery'" class="w-full border rounded px-2 py-1.5 text-sm disabled:bg-gray-100">
                     <p x-show="fulfillment === 'delivery'" class="text-xs text-gray-500 mt-1">
                         ใบจองแบบจัดส่งต้องมีกำหนดส่ง จึงจะยืนยันเป็นใบขายได้
@@ -63,7 +68,7 @@
             </div>
             <div class="md:col-span-3">
                 <label class="block text-sm text-gray-500 mb-1">หมายเหตุ</label>
-                <input type="text" name="remark" class="w-full border rounded px-2 py-1.5 text-sm">
+                <input type="text" name="remark" x-model="remark" class="w-full border rounded px-2 py-1.5 text-sm">
             </div>
         </div>
 
@@ -83,13 +88,18 @@
                     <template x-for="(item, idx) in items" :key="idx">
                         <tr class="border-b last:border-0">
                             <td class="py-2 relative">
-                                <input type="text" x-model="item.productQuery" @input.debounce.300ms="searchProducts(idx)"
+                                <input type="text" x-model="item.productQuery" @input.debounce.250ms="searchProducts(idx)"
+                                    @keydown.arrow-down.prevent="moveProductActive(idx, 1)"
+                                    @keydown.arrow-up.prevent="moveProductActive(idx, -1)"
+                                    @keydown.enter.prevent="selectActiveProduct(idx)"
                                     placeholder="ค้นหารหัส/ชื่อสินค้า..." class="w-full border rounded px-2 py-1.5">
                                 <input type="hidden" :name="`items[${idx}][product_id]`" x-model="item.product_id">
                                 <div x-show="item.results.length" x-cloak
                                     class="absolute z-10 bg-white border rounded shadow mt-1 w-full max-h-60 overflow-auto">
-                                    <template x-for="p in item.results" :key="p.id">
-                                        <div @click="selectProduct(idx, p)" class="px-3 py-2 hover:bg-blue-50 cursor-pointer"
+                                    <template x-for="(p, pIdx) in item.results" :key="p.id">
+                                        <div @click="selectProduct(idx, p)"
+                                            :class="{ 'bg-blue-100 font-semibold': pIdx === item.activeIndex, 'hover:bg-blue-50': pIdx !== item.activeIndex }"
+                                            class="px-3 py-2 cursor-pointer"
                                             x-text="p.sku_code + ' - ' + p.name_th"></div>
                                     </template>
                                 </div>
@@ -127,37 +137,187 @@
 @push('scripts')
 <script>
     function bookingForm() {
+        const STORAGE_KEY = 'erp:draft:booking_create:{{ auth()->id() }}';
         return {
-            customerQuery: '', customerId: '', customerResults: [],
-            items: [{ product_id: '', productQuery: '', qty: 1, unit_price: 0, results: [] }],
+            branchId: '{{ $branches->first()?->id ?? "" }}',
+            salesmanId: '',
+            fulfillment: 'pickup',
+            deliveryDueAt: '',
+            remark: '',
+            customerQuery: '',
+            customerId: '',
+            customerResults: [],
+            customerActiveIndex: 0,
+            customerController: null,
+            items: [{ product_id: '', productQuery: '', qty: 1, unit_price: 0, results: [], activeIndex: 0, controller: null }],
+            submitting: false,
+
+            init() {
+                try {
+                    const saved = localStorage.getItem(STORAGE_KEY);
+                    if (saved) {
+                        const parsed = JSON.parse(saved);
+                        if (parsed && Date.now() - parsed.time < 24 * 60 * 60 * 1000) {
+                            if (window.confirm('พบข้อมูลร่างใบจองที่ยังไม่ได้บันทึก ต้องการกู้คืนหรือไม่?')) {
+                                this.branchId = parsed.data.branchId || this.branchId;
+                                this.salesmanId = parsed.data.salesmanId || '';
+                                this.fulfillment = parsed.data.fulfillment || 'pickup';
+                                this.deliveryDueAt = parsed.data.deliveryDueAt || '';
+                                this.remark = parsed.data.remark || '';
+                                this.customerId = parsed.data.customerId || '';
+                                this.customerQuery = parsed.data.customerQuery || '';
+                                if (Array.isArray(parsed.data.items) && parsed.data.items.length) {
+                                    this.items = parsed.data.items.map(it => ({
+                                        product_id: it.product_id || '',
+                                        productQuery: it.productQuery || '',
+                                        qty: Number(it.qty) || 1,
+                                        unit_price: Number(it.unit_price) || 0,
+                                        results: [],
+                                        activeIndex: 0,
+                                        controller: null,
+                                    }));
+                                }
+                            } else {
+                                localStorage.removeItem(STORAGE_KEY);
+                            }
+                        }
+                    }
+                } catch (_) {}
+
+                this.$watch('items', () => this.saveToLocal(), { deep: true });
+                this.$watch('customerId', () => this.saveToLocal());
+                this.$watch('customerQuery', () => this.saveToLocal());
+                this.$watch('branchId', () => this.saveToLocal());
+                this.$watch('salesmanId', () => this.saveToLocal());
+                this.$watch('fulfillment', () => this.saveToLocal());
+                this.$watch('deliveryDueAt', () => this.saveToLocal());
+                this.$watch('remark', () => this.saveToLocal());
+
+                window.addEventListener('beforeunload', (e) => {
+                    if (this.submitting) return;
+                    if (this.hasUnsavedData()) {
+                        e.preventDefault();
+                        e.returnValue = '';
+                    }
+                });
+            },
+
+            hasUnsavedData() {
+                return Boolean(this.customerId || this.items.some(it => it.product_id || it.productQuery));
+            },
+
+            saveToLocal() {
+                if (this.submitting) return;
+                try {
+                    if (this.hasUnsavedData()) {
+                        const data = {
+                            branchId: this.branchId,
+                            salesmanId: this.salesmanId,
+                            fulfillment: this.fulfillment,
+                            deliveryDueAt: this.deliveryDueAt,
+                            remark: this.remark,
+                            customerId: this.customerId,
+                            customerQuery: this.customerQuery,
+                            items: this.items.map(it => ({
+                                product_id: it.product_id,
+                                productQuery: it.productQuery,
+                                qty: it.qty,
+                                unit_price: it.unit_price,
+                            })),
+                        };
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify({ time: Date.now(), data }));
+                    } else {
+                        localStorage.removeItem(STORAGE_KEY);
+                    }
+                } catch (_) {}
+            },
 
             async searchCustomers() {
-                if (this.customerQuery.length < 1) { this.customerResults = []; return; }
-                const res = await fetch(`{{ route('search.customers') }}?q=${encodeURIComponent(this.customerQuery)}`);
-                this.customerResults = await res.json();
+                const q = this.customerQuery.trim();
+                if (q.length < 1) {
+                    this.customerResults = [];
+                    this.customerId = '';
+                    return;
+                }
+                this.customerController?.abort();
+                this.customerController = new AbortController();
+                try {
+                    const res = await fetch(`{{ route('search.customers') }}?q=${encodeURIComponent(q)}`, {
+                        signal: this.customerController.signal
+                    });
+                    if (res.ok) {
+                        this.customerResults = await res.json();
+                        this.customerActiveIndex = 0;
+                    }
+                } catch (err) {
+                    if (err.name !== 'AbortError') this.customerResults = [];
+                }
+            },
+            moveCustomerActive(delta) {
+                if (!this.customerResults.length) return;
+                const next = this.customerActiveIndex + delta;
+                if (next >= 0 && next < this.customerResults.length) {
+                    this.customerActiveIndex = next;
+                }
+            },
+            selectActiveCustomer() {
+                const c = this.customerResults[this.customerActiveIndex];
+                if (c) this.selectCustomer(c);
             },
             selectCustomer(c) {
+                this.customerController?.abort();
                 this.customerId = c.id;
                 this.customerQuery = `${c.code} - ${c.name_th}`;
                 this.customerResults = [];
             },
             addItem() {
-                this.items.push({ product_id: '', productQuery: '', qty: 1, unit_price: 0, results: [] });
+                this.items.push({ product_id: '', productQuery: '', qty: 1, unit_price: 0, results: [], activeIndex: 0, controller: null });
             },
             removeItem(idx) {
                 this.items.splice(idx, 1);
             },
             async searchProducts(idx) {
-                const q = this.items[idx].productQuery;
-                if (q.length < 1) { this.items[idx].results = []; return; }
-                const res = await fetch(`{{ route('search.products') }}?q=${encodeURIComponent(q)}`);
-                this.items[idx].results = await res.json();
+                const item = this.items[idx];
+                const q = (item.productQuery || '').trim();
+                if (q.length < 1) {
+                    item.results = [];
+                    item.product_id = '';
+                    return;
+                }
+                item.controller?.abort();
+                item.controller = new AbortController();
+                try {
+                    const res = await fetch(`{{ route('search.products') }}?q=${encodeURIComponent(q)}`, {
+                        signal: item.controller.signal
+                    });
+                    if (res.ok) {
+                        item.results = await res.json();
+                        item.activeIndex = 0;
+                    }
+                } catch (err) {
+                    if (err.name !== 'AbortError') item.results = [];
+                }
+            },
+            moveProductActive(idx, delta) {
+                const item = this.items[idx];
+                if (!item.results.length) return;
+                const next = item.activeIndex + delta;
+                if (next >= 0 && next < item.results.length) {
+                    item.activeIndex = next;
+                }
+            },
+            selectActiveProduct(idx) {
+                const item = this.items[idx];
+                const p = item.results[item.activeIndex];
+                if (p) this.selectProduct(idx, p);
             },
             selectProduct(idx, p) {
-                this.items[idx].product_id = p.id;
-                this.items[idx].productQuery = `${p.sku_code} - ${p.name_th}`;
-                this.items[idx].unit_price = p.default_price ?? 0;
-                this.items[idx].results = [];
+                const item = this.items[idx];
+                item.controller?.abort();
+                item.product_id = p.id;
+                item.productQuery = `${p.sku_code} - ${p.name_th}`;
+                item.unit_price = Number(p.default_price ?? 0);
+                item.results = [];
             },
             get totalAmount() {
                 return this.items.reduce((sum, i) => sum + (parseFloat(i.qty) || 0) * (parseFloat(i.unit_price) || 0), 0);
@@ -171,7 +331,10 @@
                 if (this.items.some(i => !i.product_id)) {
                     e.preventDefault();
                     Swal.fire({ icon: 'warning', title: 'กรุณาเลือกสินค้าให้ครบทุกรายการ' });
+                    return;
                 }
+                this.submitting = true;
+                localStorage.removeItem(STORAGE_KEY);
             },
         };
     }

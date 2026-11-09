@@ -1801,7 +1801,7 @@
                 if (this.barcodeType === 'SCALE_PLU') {
                     return /^801\d{3}$/.test(value) ? 'PLU เครื่องชั่งถูกต้อง: ฉลาก EAN-13 จะอ้างอิงเลขนี้' : 'ต้องเป็นเลข 801 ตามด้วย 3 หลัก เช่น 801001';
                 }
-                if (this.barcodeType === 'LEGACY') return 'Legacy / BPlus: เก็บตามจริง ไม่ตรวจรูปแบบ';
+                if (this.barcodeType === 'LEGACY') return 'Legacy: เก็บตามจริง ไม่ตรวจรูปแบบ';
                 return 'รหัสภายใน: รับความยาวตามจริง ไม่บังคับกฎ EAN-13';
             },
         };
@@ -1861,6 +1861,9 @@
                     if (data.success) {
                         this.saveMsg = `บันทึกราคา ${Number(data.price).toLocaleString('th-TH', {minimumFractionDigits:2})} บาท แล้ว ✓`;
                         this.priceOpen = false;
+                        if (window.parent && window.parent !== window) {
+                            try { window.parent.postMessage('erp:product:saved', '*'); } catch (_) {}
+                        }
                         setTimeout(() => { this.saveMsg = ''; location.reload(); }, 600);
                     }
                 } finally {

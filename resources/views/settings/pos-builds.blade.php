@@ -107,22 +107,39 @@
 @php($activeBuild = $builds->first(fn ($build) => $build->isActive()))
 @if($activeBuild && $githubConfigured)
 <script>
-setTimeout(function checkPosBuild() {
-    fetch(@js(route('settings.pos-builds.refresh', $activeBuild)), {
-        method: 'POST',
-        headers: {
-            'Accept': 'application/json',
-            'X-CSRF-TOKEN': @js(csrf_token()),
-        },
-    }).then(function (response) {
-        if (!response.ok) throw new Error('status request failed');
-        return response.json();
-    }).then(function () {
-        window.location.reload();
-    }).catch(function () {
-        setTimeout(checkPosBuild, 30000);
+(function() {
+    let checkTimer = null;
+    function scheduleNext(ms) {
+        clearTimeout(checkTimer);
+        checkTimer = setTimeout(checkPosBuild, ms);
+    }
+    function checkPosBuild() {
+        if (document.hidden) {
+            scheduleNext(30000);
+            return;
+        }
+        fetch(@js(route('settings.pos-builds.refresh', $activeBuild)), {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': @js(csrf_token()),
+            },
+        }).then(function (response) {
+            if (!response.ok) throw new Error('status request failed');
+            return response.json();
+        }).then(function () {
+            window.location.reload();
+        }).catch(function () {
+            scheduleNext(30000);
+        });
+    }
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden && !checkTimer) {
+            scheduleNext(1000);
+        }
     });
-}, 15000);
+    scheduleNext(30000);
+})();
 </script>
 @endif
 @endsection

@@ -136,7 +136,7 @@
                 <div class="modal-header border-0 px-4 pt-4 pb-2">
                     <div>
                         <h3 class="h5 fw-bold mb-1">นำเข้าผังบัญชี</h3>
-                        <div class="text-muted small">รองรับไฟล์ Excel จาก BPlus: รหัสบัญชี, ชื่อบัญชีไทย, ชื่อบัญชีอังกฤษ, ประเภทบัญชี</div>
+                        <div class="text-muted small">รองรับไฟล์ Excel: รหัสบัญชี, ชื่อบัญชีไทย, ชื่อบัญชีอังกฤษ, ประเภทบัญชี</div>
                     </div>
                     <button type="button" class="btn btn-light rounded-circle" @click="importOpen = false"><i class="bi bi-x-lg"></i></button>
                 </div>

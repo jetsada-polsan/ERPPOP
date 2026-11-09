@@ -327,8 +327,11 @@
             height: 52px; min-height: 52px; max-height: 52px; box-sizing: border-box;
         }
         .odn-brand-slot {
-            width: 216px; min-width: 216px; max-width: 216px; height: 52px;
-            flex: 0 0 216px;
+            width: calc(216px * var(--menu-scale, 1));
+            min-width: calc(216px * var(--menu-scale, 1));
+            max-width: calc(216px * var(--menu-scale, 1));
+            height: 52px;
+            flex: 0 0 calc(216px * var(--menu-scale, 1));
             display: flex; align-items: center; gap: 8px;
             padding: 0 12px; box-sizing: border-box;
             border-right: 1px solid var(--erp-border, #dbe7ef);
@@ -347,8 +350,8 @@
         .odn-apps:focus-visible { outline: 2px solid var(--erp-primary, #1585c0); outline-offset: 2px; }
 
         .odn-brand {
-            display: inline-flex; align-items: center; gap: 8px;
-            height: 36px; min-width: 0; flex: 1;
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+            height: 100%; min-width: 0; flex: 1;
             font-weight: 800; font-size: 14.5px; color: var(--erp-primary-dark, #0f4c75);
             text-decoration: none; letter-spacing: .2px; white-space: nowrap;
             overflow: hidden;
@@ -356,19 +359,22 @@
         .odn-brand:hover { color: var(--erp-primary-dark, #0f4c75); }
         .odn-brand::after { content: none; display: none; }
         .odn-logo-box {
-            width: 48px; height: 34px; min-width: 48px; min-height: 34px; max-width: 48px; max-height: 34px;
-            flex: 0 0 48px;
+            width: auto; height: 38px; min-width: 0; min-height: 38px; max-height: 40px;
+            flex: 0 1 auto;
             display: inline-flex; align-items: center; justify-content: center;
             overflow: hidden;
         }
         .odn-logo-box img {
-            width: 48px !important; height: 34px !important;
-            max-width: 48px !important; max-height: 34px !important;
+            width: auto !important; height: 38px !important;
+            max-width: 150px !important; max-height: 40px !important;
             object-fit: contain; display: block;
         }
         .odn-sysname {
+            display: inline-flex; align-items: center; justify-content: center;
+            height: 52px; line-height: 52px;
             flex: none; padding: 0 16px; font-size: 12px; font-weight: 800; letter-spacing: .6px;
             color: #94a3b8; white-space: nowrap; user-select: none;
+            box-sizing: border-box;
         }
         @media (max-width: 1100px) { .odn-sysname { display: none; } }
         .odn-brand-text {
@@ -1802,7 +1808,7 @@
                                 <div class="py-1">
                                     <a href="{{ route('core-modules.index') }}" class="erp-user-dropdown-item">
                                         <i class="bi bi-book"></i>
-                                        <span>คู่มือ 4M</span>
+                                        <span>คู่มือการใช้งาน</span>
                                     </a>
                                     <button type="button" class="erp-user-dropdown-item"
                                             id="erp-display-btn" title="ปรับขนาดและสีหน้าจอ" aria-expanded="false" aria-controls="erp-display-panel"
@@ -2095,11 +2101,14 @@
     @if(session('document_draft_saved'))
     <script>
         try {
-            const pending = 'erp:draft:pending:' + @js((string) auth()->id());
-            const draft = JSON.parse(sessionStorage.getItem(pending) || 'null');
+            const pendingKey = 'erp:draft:pending:' + @js((string) auth()->id());
+            const raw = localStorage.getItem(pendingKey) || sessionStorage.getItem(pendingKey);
+            const draft = JSON.parse(raw || 'null');
             if (draft?.action === @js(session('document_draft_saved'))) {
+                localStorage.removeItem(draft.key);
                 sessionStorage.removeItem(draft.key);
-                sessionStorage.removeItem(pending);
+                localStorage.removeItem(pendingKey);
+                sessionStorage.removeItem(pendingKey);
             }
         } catch (_) {}
     </script>

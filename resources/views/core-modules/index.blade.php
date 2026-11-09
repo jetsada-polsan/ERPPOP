@@ -391,7 +391,7 @@
 
     <section class="manual-panel" id="blueprint-controls">
         <div class="manual-section-head">
-            <h2><i class="bi bi-diagram-3 me-2"></i>BPLUS Rebuild Blueprint: กติกาหลักของระบบใหม่</h2>
+            <h2><i class="bi bi-diagram-3 me-2"></i>พิมพ์เขียวสถาปัตยกรรมระบบ JET ERP: กติกาหลัก</h2>
             <span>{{ count($blueprintControls) }} control ที่ห้ามหลุด</span>
         </div>
         <div class="coverage-note"><strong>วิธีใช้:</strong> กติกาชุดนี้เป็น Definition of Done ของทุกโมดูล ไม่ใช่แค่เอกสาร POS ถ้าข้อใดตรวจไม่ผ่าน ให้หยุดการ post และเปิดรายการแก้ไขก่อนปิดงวด</div>
@@ -413,7 +413,7 @@
 
     <section class="manual-panel" id="blueprint-roadmap">
         <div class="manual-section-head">
-            <h2><i class="bi bi-list-check me-2"></i>ลำดับสร้างระบบตาม BplusBack Blueprint</h2>
+            <h2><i class="bi bi-list-check me-2"></i>ลำดับพัฒนาและควบคุมระบบ JET ERP</h2>
             <span>Phase 0–8</span>
         </div>
         <div class="manual-table-wrap">
@@ -550,17 +550,17 @@
         </div>
     </section>
 
-    <section class="manual-panel" id="bplusback-coverage">
+    <section class="manual-panel" id="workflow-coverage">
         <div class="manual-section-head">
-            <h2><i class="bi bi-arrow-repeat me-2"></i>BplusBack → PopStar 4M: แผนผังความสามารถครบวงจร</h2>
-            <span>{{ count($bplusBackCoverage) }} flow ที่ต้องตรวจ</span>
+            <h2><i class="bi bi-arrow-repeat me-2"></i>แผนผังขั้นตอนการทำงาน ERP ครบวงจร</h2>
+            <span>{{ count($erpWorkflows ?? $bplusBackCoverage) }} flow ที่ต้องตรวจ</span>
         </div>
-        <div class="coverage-note"><strong>หลักการของ PopStar:</strong> ใช้แนวคิดจาก BplusBack แต่ให้เอกสารทุกใบมีสถานะ, ผู้รับผิดชอบ, ผลกระทบ และลิงก์ต้นทาง/ปลายทางชัดเจน ยืนยันแล้วแก้ตรง ๆ ไม่ได้ ต้องกลับรายการ พร้อมเก็บ audit log และไม่แก้ฐานข้อมูล Bplus เดิม</div>
+        <div class="coverage-note"><strong>หลักการทำงานของ JET ERP:</strong> เอกสารทุกใบมีสถานะ ผู้รับผิดชอบ ผลกระทบ และลิงก์ต้นทาง/ปลายทางชัดเจน ยืนยันแล้วแก้ตรงๆ ไม่ได้ ต้องยกเลิกหรือกลับรายการ พร้อมบันทึกประวัติการแก้ไข (Audit log) เสมอ</div>
         <div class="manual-table-wrap">
             <table class="manual-table" style="min-width:1260px">
                 <thead><tr><th>หมวด</th><th>Flow การทำงาน</th><th>เอกสาร</th><th>ผลกระทบ</th><th>สถานะ</th><th>งานต่อ</th><th class="text-center">เปิด</th></tr></thead>
                 <tbody>
-                @foreach($bplusBackCoverage as $coverage)
+                @foreach(($erpWorkflows ?? $bplusBackCoverage) as $coverage)
                     <tr x-show="!query || $el.textContent.toLowerCase().includes(query.toLowerCase())">
                         <td><strong>{{ $coverage['group'] }}</strong></td>
                         <td>{{ $coverage['flow'] }}</td>
