@@ -565,6 +565,7 @@
         display: none !important;
     }
 
+    @media screen {
     /* ── 6. ตารางสไตล์ PEAK (Clean Accounting Table) ทั้งระบบ ยกเว้นหน้าพิมพ์ ── */
     @media screen {
         /* กรอบนอกตาราง: การ์ดขาว มุมโค้ง 10px เส้นขอบ #e2e8f0 เลื่อนแนวนอนเฉพาะในกรอบ */
@@ -684,6 +685,13 @@
             background: transparent !important;
             padding: 0 !important;
             font-size: 14px !important;
+        }
+        /* กฎข้างบนตั้ง padding:0 ให้ตัวช่อง td ด้วย ทำให้รหัสชิดขอบซ้าย: คืน padding ให้ช่อง */
+        body:not(.pos-body) .table > tbody > tr > td:first-child.fw-semibold,
+        body:not(.pos-body) .table > tbody > tr > td:first-child.fw-bold,
+        body:not(.pos-body) .table > tbody > tr > td:first-child.font-monospace,
+        body:not(.pos-body) .table > tbody > tr > td.font-monospace.fw-semibold {
+            padding: 12px 16px !important;
         }
 
         /* ตัวเลขในตาราง (ราคา/ยอดเงิน/จำนวน): tabular-nums เพื่อให้หลักตรงกันเวลาเรียงคอลัมน์ */
@@ -902,6 +910,7 @@
     .odn-topbar .odn-nav-link.on:hover i {
         color: var(--erp-primary, #1585c0);
     }
+    } /* end @media screen: ตารางสไตล์ใหม่ไม่ใช้ตอนพิมพ์ */
 </style>
 
 <script>
