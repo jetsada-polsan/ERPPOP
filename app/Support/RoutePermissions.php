@@ -26,8 +26,6 @@ class RoutePermissions
         'pos.offline-sales.index' => 'reports.view',
         'pos.offline-sales.retry' => 'pos.void',
         'pos.offline-sales.resolve' => 'pos.void',
-        'bplus.pos-preparation' => 'pos.use',
-        'bplus.pos-workbench' => 'pos.use',
 
         // งานขาย / เอกสารขาย / ลูกค้า
         'bookings.' => 'sales.manage',

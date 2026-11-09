@@ -6,9 +6,6 @@ use App\Models\ApprovalRequest;
 use App\Models\BankAccount;
 use App\Models\Branch;
 use App\Models\CashBook;
-use App\Models\PosPreparationJob;
-use App\Models\PosReceipt;
-use App\Models\PosTerminal;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
@@ -22,7 +19,6 @@ use App\Services\Accounting\CashBookPostingService;
 use App\Services\Purchasing\ReplenishmentService;
 use App\Services\Reports\ReportScope;
 use App\Services\Sales\DocumentNumberGenerator;
-use App\Support\PythonPosInstaller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -32,78 +28,6 @@ use Illuminate\View\View;
 
 class BplusOperationController extends Controller
 {
-    public function posPreparation(): View
-    {
-        return view('bplus-ops.pos-preparation', [
-            'jobs' => PosPreparationJob::with(['branch', 'terminal'])->latest()->paginate(30),
-            'branches' => Branch::orderBy('code')->get(),
-            'terminals' => PosTerminal::with('branch')->orderBy('code')->get(),
-        ]);
-    }
-
-    public function storePosPreparation(Request $request): RedirectResponse
-    {
-        $data = $request->validate([
-            'job_no' => ['required', 'string', 'max:40', 'unique:pos_preparation_jobs,job_no'],
-            'job_type' => ['required', 'string', 'max:40'],
-            'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
-            'pos_terminal_id' => ['nullable', 'integer', 'exists:pos_terminals,id'],
-            'from_date' => ['nullable', 'date'],
-            'to_date' => ['nullable', 'date', 'after_or_equal:from_date'],
-            'status' => ['required', 'string', 'max:30'],
-            'note' => ['nullable', 'string', 'max:2000'],
-        ]);
-        PosPreparationJob::create($data);
-
-        return redirect()->route('bplus.pos-preparation')->with('success', 'บันทึกงานเตรียมข้อมูล POS แล้ว');
-    }
-
-    public function posWorkbench(Request $request): View
-    {
-        $selectedDate = Carbon::parse(
-            $request->query('date', now('Asia/Bangkok')->toDateString()),
-            'Asia/Bangkok'
-        )->toDateString();
-        $user = $request->user();
-        $canSeeAllBranches = $user?->canSeeAllReportBranches() ?? false;
-        $lockedBranchId = $canSeeAllBranches ? null : $user?->resolveReportBranch($request->query('branch_id'));
-        $requestedBranchId = $request->query('branch_id');
-        if ($canSeeAllBranches && ! in_array($requestedBranchId, [null, '', 'all'], true)) {
-            $request->validate(['branch_id' => ['required', 'integer', 'exists:branches,id']]);
-        }
-        $selectedBranchId = $canSeeAllBranches
-            ? (in_array($requestedBranchId, [null, '', 'all'], true) ? null : $request->integer('branch_id'))
-            : $lockedBranchId;
-
-        $branches = Branch::query()
-            ->when(! $canSeeAllBranches, function ($query) use ($user) {
-                return $query->whereIn('id', $user?->reportBranchIds(null)->all() ?? []);
-            })
-            ->orderBy('code')
-            ->get();
-
-        $receipts = PosReceipt::with(['terminal.branch', 'shift.branch'])
-            ->whereDate('receipt_date', $selectedDate)
-            ->when($selectedBranchId !== null, fn ($query) => $query->where(function ($w) use ($selectedBranchId) {
-                $w->whereHas('terminal', fn ($terminal) => $terminal->where('branch_id', $selectedBranchId))
-                    ->orWhereHas('shift', fn ($shift) => $shift->where('branch_id', $selectedBranchId));
-            }))
-            ->when(! $canSeeAllBranches && ! $lockedBranchId, fn ($query) => $query->whereRaw('1 = 0'))
-            ->latest('receipt_date')
-            ->limit(20)
-            ->get();
-
-        return view('bplus-ops.pos-workbench', [
-            'receipts' => $receipts,
-            'branches' => $branches,
-            'selectedDate' => $selectedDate,
-            'selectedBranchId' => $selectedBranchId,
-            'lockedBranchId' => $lockedBranchId,
-            'canSeeAllBranches' => $canSeeAllBranches,
-            'pythonPosInstaller' => PythonPosInstaller::current(),
-        ]);
-    }
-
     public function purchasePlanning(Request $request, ReplenishmentService $replenishment): View
     {
         $lockedBranchId = auth()->user()?->branchScopeId();

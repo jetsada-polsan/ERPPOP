@@ -166,8 +166,6 @@ class PermissionMatrixTest extends TestCase
             'operations.index' => 'system.admin',
             'database-structure.index' => 'system.admin',
             'pos.control' => 'reports.view',
-            'bplus.pos-preparation' => 'pos.use',
-            'bplus.pos-workbench' => 'pos.use',
         ];
         foreach ($criticalRoutes as $routeName => $permission) {
             $this->assertSame($permission, RoutePermissions::resolve($routeName), "Incorrect permission for [{$routeName}].");

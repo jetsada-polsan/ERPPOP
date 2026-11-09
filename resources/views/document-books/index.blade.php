@@ -1,7 +1,7 @@
 @extends('layout')
 @section('title', 'สมุดเอกสาร - MPM Food Group')
 @section('page-title', 'สมุดเอกสาร')
-@section('page-subtitle', 'แยกเอกสารประเภทเดียวเป็นหลายเล่ม แต่ละเล่มมีเลขรันของตัวเอง (เช่น DS / DSN เหมือน BPlus)')
+@section('page-subtitle', 'แยกเอกสารประเภทเดียวเป็นหลายเล่ม แต่ละเล่มมีเลขรันของตัวเอง (เช่น DS / DSN แยกตามสาขาหรือประเภทงาน)')
 @section('content')
 
 <div class="content-card p-4 mb-3">

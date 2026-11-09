@@ -33,7 +33,7 @@
 </form>
 
 <div class="doc-browser">
-    {{-- ต้นไม้ ประเภท -> ปี -> เดือน แบบ BPlus --}}
+    {{-- แผนผังต้นไม้ ประเภท -> ปี -> เดือน --}}
     <div class="doc-tree-panel" x-data="{ openType: @js($filters['type'] ?? '') }">
         <div class="doc-tree-head"><i class="bi bi-diagram-3-fill me-1"></i>เอกสารทั้งหมด</div>
         <a href="{{ route('documents.browser', ['day' => now()->toDateString()]) }}"

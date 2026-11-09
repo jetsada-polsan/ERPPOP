@@ -1801,7 +1801,7 @@
                 if (this.barcodeType === 'SCALE_PLU') {
                     return /^801\d{3}$/.test(value) ? 'PLU เครื่องชั่งถูกต้อง: ฉลาก EAN-13 จะอ้างอิงเลขนี้' : 'ต้องเป็นเลข 801 ตามด้วย 3 หลัก เช่น 801001';
                 }
-                if (this.barcodeType === 'LEGACY') return 'Legacy / BPlus: เก็บตามจริง ไม่ตรวจรูปแบบ';
+                if (this.barcodeType === 'LEGACY') return 'Legacy: เก็บตามจริง ไม่ตรวจรูปแบบ';
                 return 'รหัสภายใน: รับความยาวตามจริง ไม่บังคับกฎ EAN-13';
             },
         };

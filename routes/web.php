@@ -791,9 +791,6 @@ Route::prefix('ecommerce-channels')->name('ecommerce-channels.')->group(function
 });
 
 Route::prefix('bplus')->name('bplus.')->group(function () {
-    Route::get('/pos-preparation', [BplusOperationController::class, 'posPreparation'])->name('pos-preparation');
-    Route::post('/pos-preparation', [BplusOperationController::class, 'storePosPreparation'])->name('pos-preparation.store');
-    Route::get('/pos-workbench', [BplusOperationController::class, 'posWorkbench'])->name('pos-workbench');
     Route::get('/purchase-planning', [BplusOperationController::class, 'purchasePlanning'])->name('purchase-planning');
     Route::post('/purchase-planning', [BplusOperationController::class, 'storePurchasePlan'])->name('purchase-planning.store');
     Route::post('/purchase-planning/generate-requisitions', [BplusOperationController::class, 'generatePurchaseRequisitions'])->name('purchase-planning.generate-requisitions');
