@@ -43,7 +43,7 @@ window.erpDocumentDraft = function (userId) {
                         sessionStorage.removeItem(key);
                     };
                     const bar = document.createElement('div');
-                    bar.className = 'erp-draft-bar';
+                    bar.className = 'erp-draft-bar no-print';
                     bar.setAttribute('role', 'status');
                     bar.innerHTML = '<span><i class="bi bi-journal-text me-1"></i>มีร่างเอกสารที่ยังไม่ได้บันทึก</span>'
                         + '<button type="button" class="btn btn-sm btn-primary" data-act="restore">เปิดร่าง</button>'
