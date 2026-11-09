@@ -71,16 +71,16 @@
         <h3 class="h6 fw-bold mb-3 text-danger"><i class="bi bi-box-arrow-up me-1"></i>วัตถุดิบ (ตัดออกจากสต๊อก)</h3>
         <div class="table-responsive">
             <table class="table align-middle">
-                <thead><tr><th>รหัส</th><th>ชื่อสินค้า</th><th>หน่วย</th><th class="text-end">จำนวน</th><th class="text-end">ทุน/หน่วย</th><th class="text-end">รวม</th></tr></thead>
+                <thead><tr><th>รหัสสินค้า</th><th>ชื่อสินค้า</th><th>หน่วยนับ</th><th class="text-end">จำนวนใช้จริง</th><th class="text-end">ทุนเฉลี่ย (บาท/หน่วย)</th><th class="text-end">รวมต้นทุน (บาท)</th></tr></thead>
                 <tbody>
                     @foreach($rawItems as $item)
                     <tr>
                         <td class="fw-semibold">{{ $item->product->sku_code }}</td>
                         <td>{{ $item->product->name_th }}</td>
                         <td class="text-muted">{{ $item->product->baseUnit?->cleanName() ?? '-' }}</td>
-                        <td class="text-end">{{ number_format(abs($item->qty), 2) }}</td>
+                        <td class="text-end fw-semibold">{{ number_format(abs($item->qty), 2) }} <small class="text-muted">{{ $item->product->baseUnit?->cleanName() }}</small></td>
                         <td class="text-end">{{ number_format($item->unit_price, 2) }}</td>
-                        <td class="text-end">{{ number_format(abs($item->qty) * $item->unit_price, 2) }}</td>
+                        <td class="text-end fw-semibold">{{ number_format(abs($item->qty) * $item->unit_price, 2) }} บ.</td>
                     </tr>
                     @endforeach
                 </tbody>
@@ -92,16 +92,16 @@
         <h3 class="h6 fw-bold mb-3 text-success"><i class="bi bi-box-arrow-in-down me-1"></i>ผลผลิต (รับเข้าสต๊อก)</h3>
         <div class="table-responsive">
             <table class="table align-middle">
-                <thead><tr><th>รหัส</th><th>ชื่อสินค้า</th><th>หน่วย</th><th class="text-end">จำนวน</th><th class="text-end">ทุนที่ได้/หน่วย</th><th class="text-end">มูลค่ารวม</th></tr></thead>
+                <thead><tr><th>รหัสสินค้า</th><th>ชื่อสินค้าผลผลิต</th><th>หน่วยนับ</th><th class="text-end">จำนวนที่ได้จริง</th><th class="text-end">ทุนที่ได้ (บาท/หน่วย)</th><th class="text-end">มูลค่ารวม (บาท)</th></tr></thead>
                 <tbody>
                     @foreach($outputItems as $item)
                     <tr>
                         <td class="fw-semibold">{{ $item->product->sku_code }}</td>
                         <td>{{ $item->product->name_th }}</td>
                         <td class="text-muted">{{ $item->product->baseUnit?->cleanName() ?? '-' }}</td>
-                        <td class="text-end">{{ number_format($item->qty, 2) }}</td>
-                        <td class="text-end">{{ number_format($item->unit_price, 2) }}</td>
-                        <td class="text-end">{{ number_format($item->qty * $item->unit_price, 2) }}</td>
+                        <td class="text-end fw-semibold">{{ number_format($item->qty, 2) }} <small class="text-muted">{{ $item->product->baseUnit?->cleanName() }}</small></td>
+                        <td class="text-end text-success fw-semibold">{{ number_format($item->unit_price, 2) }}</td>
+                        <td class="text-end fw-semibold text-success">{{ number_format($item->qty * $item->unit_price, 2) }} บ.</td>
                     </tr>
                     @endforeach
                 </tbody>

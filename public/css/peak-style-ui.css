@@ -317,9 +317,7 @@
         line-height: 1;
     }
     .erp-fl-counter {
-        color: #94a3b8;
-        font-weight: 500;
-        font-variant-numeric: tabular-nums;
+        display: none !important;
     }
     .erp-fl-req,
     .erp-has-float > label:first-child .text-danger,
@@ -490,37 +488,62 @@
         user-select: none;
     }
 
-    /* ── 5. Modal ฟอร์ม: หัวมีชื่อ + พื้นฐาน/ขั้นสูง + หัวข้อ Section ตัวหนา + ปุ่มแคปซูลขวาล่าง ── */
-    html body .booking-modal,
-    html body .po-modal {
+    /* ── 5. Modal ฟอร์ม: หัวมีชื่อ + พื้นฐาน/ขั้นสูง + หัวข้อ Section ตัวหนา + ปุ่มแคปซูลขวาล่าง ──
+       หัว sticky ไม่ทับเนื้อหาตอนเลื่อน มี scroll-padding และ scroll-margin ครบทุก modal ── */
+    html body :is(.booking-modal, .po-modal, .cd-modal, .doc-modal) {
         background: #ffffff !important;
         border: 1px solid #dbe3ef !important;
         border-radius: 14px !important;
         box-shadow: 0 24px 68px rgba(15, 23, 42, .22) !important;
         font-family: var(--erp-font-family) !important;
+        scroll-padding-top: 104px !important;
+        scroll-padding-bottom: 56px !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain !important;
     }
-    html body .booking-modal .modal-header,
-    html body .po-modal > div:first-child {
+    html body :is(.booking-modal, .po-modal, .cd-modal, .doc-modal) :is(.modal-header, > div:first-child, .doc-titlebar) {
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 50 !important;
         background: #ffffff !important;
         border-bottom: 1px solid #eef2f6 !important;
-        padding: 18px 24px 12px 24px !important;
+        padding: 16px 24px 12px 24px !important;
         border-radius: 14px 14px 0 0 !important;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, .05) !important;
     }
-    html body .booking-modal .modal-header :is(h1, h2, h3, h4, h5, .modal-title),
-    html body .po-modal h3 {
+    html body :is(.booking-modal, .po-modal, .cd-modal, .doc-modal) :is(h1, h2, h3, h4, h5, .modal-title, .doc-title) {
         font-size: 20px !important;
         font-weight: 800 !important;
         color: #0f172a !important;
+        line-height: 1.3 !important;
     }
-    html body .booking-modal .modal-body {
+    html body :is(.booking-modal, .po-modal, .cd-modal, .doc-modal) :is(.modal-body, .doc-body, form > div.px-4) {
         background: #ffffff !important;
         padding: 18px 24px !important;
     }
-    html body .booking-modal .modal-footer {
+    html body :is(.booking-modal, .po-modal, .cd-modal, .doc-modal) :is(
+        .form-control,
+        .form-select,
+        .row,
+        .loss-panel,
+        .erp-has-float,
+        [class*="col-"],
+        .table-responsive,
+        .booking-items-table,
+        .content-card,
+        fieldset
+    ) {
+        scroll-margin-top: 104px !important;
+    }
+    html body :is(.booking-modal, .po-modal, .cd-modal, .doc-modal) :is(.modal-footer, form > .modal-footer) {
+        position: sticky !important;
+        bottom: 0 !important;
+        z-index: 40 !important;
         background: #ffffff !important;
         border-top: 1px solid #eef2f6 !important;
         padding: 14px 24px 18px 24px !important;
         border-radius: 0 0 14px 14px !important;
+        display: flex !important;
         justify-content: flex-end !important;
         gap: 12px !important;
     }

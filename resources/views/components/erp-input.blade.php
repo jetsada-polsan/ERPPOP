@@ -20,9 +20,6 @@
         <label @if($fieldId) for="{{ $fieldId }}" @endif class="form-label erp-float-label">
             <span class="erp-fl-text">{{ $label }}</span>
             <span class="erp-fl-meta">
-                @if($maxlength)
-                    <span class="erp-fl-counter" x-text="Math.max(0, maxLen - charCount)">{{ max(0, (int) $maxlength - $initLen) }}</span>
-                @endif
                 @if($required)
                     <span class="erp-fl-req" aria-hidden="true">*</span>
                 @endif
