@@ -61,7 +61,9 @@ class BasicMasterTest extends TestCase
         $branch = Branch::create(['code' => 'T98', 'name_th' => 'มีคลัง', 'is_active' => true]);
         Warehouse::create(['code' => 'W98', 'name' => 'คลัง', 'branch_id' => $branch->id]);
 
-        $this->actingAs($user)->delete(route('master-data.destroy', ['branches', $branch->id]));
+        $this->actingAs($user)->delete(route('master-data.destroy', ['branches', $branch->id]))
+            ->assertSessionHas('success', fn ($message) => str_contains($message, 'ปิดใช้งานแทนการลบ'))
+            ->assertSessionMissing('error');
 
         $this->assertNotNull($branch->fresh());
         $this->assertFalse($branch->fresh()->is_active);
@@ -162,7 +164,7 @@ class BasicMasterTest extends TestCase
         ] as [$typeKey, $modelInstance]) {
             $this->actingAs($user)
                 ->delete(route('master-data.destroy', [$typeKey, $modelInstance->id]))
-                ->assertSessionHas('error');
+                ->assertSessionHas('success');
 
             $fresh = $modelInstance->fresh();
             $this->assertNotNull($fresh, "{$typeKey} should not be hard-deleted when referenced");

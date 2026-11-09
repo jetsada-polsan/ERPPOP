@@ -22,7 +22,7 @@ class SafeDeleteTest extends TestCase
         DB::table('customer_contacts')->insert(['customer_id' => $used->id, 'name' => 'c']);
 
         $this->actingAs($user)->delete(route('master-data.destroy', ['customers', $unused->id]))->assertSessionHas('success');
-        $this->actingAs($user)->delete(route('master-data.destroy', ['customers', $used->id]))->assertSessionHas('error');
+        $this->actingAs($user)->delete(route('master-data.destroy', ['customers', $used->id]))->assertSessionHas('success');
 
         $this->assertNull(Customer::find($unused->id));
         $this->assertNotNull(Customer::find($used->id));

@@ -14,11 +14,13 @@ class MasterDataDeleteController extends Controller
         abort_unless(isset(SafeDelete::TYPES[$type]), 404);
         abort_unless($request->user()?->hasPermission(SafeDelete::TYPES[$type][2]), 403);
         try {
-            $safeDelete->delete($type, $id, $request->user()->id);
+            $outcome = $safeDelete->delete($type, $id, $request->user()->id);
         } catch (RuntimeException $error) {
             return back()->with('error', $error->getMessage());
         }
 
-        return back()->with('success', 'ลบแล้ว');
+        return back()->with('success', $outcome === 'deactivated'
+            ? 'รายการนี้มีประวัติใช้งานแล้ว จึงปิดใช้งานแทนการลบ (เปิดกลับได้จากปุ่มแก้ไข)'
+            : 'ลบแล้ว');
     }
 }
