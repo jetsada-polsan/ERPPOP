@@ -2906,9 +2906,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
         def pin_login(self):
             """ใส่ PIN อย่างเดียว ระบบรู้เองว่าใคร ทั้งออนไลน์และออฟไลน์"""
-            pin, confirmed = ValueDialog.get_value(self, "เริ่มขาย", "ใส่รหัส PIN ของคุณ (4 หลัก)", pin=True)
+            pin, confirmed = ValueDialog.get_value(self, "เริ่มขาย", "ใส่รหัส PIN ของคุณ (4 หลัก)", pin=True, auto_pin=True)
             pin = pin.strip()
-            if not confirmed or not pin:
+            if not confirmed or len(pin) != 4 or not pin.isascii() or not pin.isdigit():
                 return None
             if online is None or not online.online:
                 cashier = service.find_cashier_by_pin(pin)
@@ -3028,7 +3028,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 (terminal_id,),
             ).fetchone()
             if existing_shift and int(existing_shift["cashier_id"]) != int(cashier["id"]):
-                TouchMessage.warning(self, "เริ่มขายไม่ได้", "เครื่องนี้มีกะของแคชเชียร์คนอื่นเปิดอยู่ ต้องปิดกะหรือส่งมอบกะก่อน")
+                owner = service.db.execute("SELECT name FROM local_cashiers WHERE id = ?", (existing_shift["cashier_id"],)).fetchone()
+                owner_name = str(owner["name"] or "ไม่ทราบชื่อ") if owner else "ไม่ทราบชื่อ"
+                TouchMessage.warning(self, "เริ่มขายไม่ได้", f"กะนี้เปิดโดย {owner_name}\nให้เจ้าของกะใช้ PIN ของตนเข้าเพื่อปิดกะก่อน หรือให้ผู้จัดการดำเนินการส่งมอบกะตามขั้นตอน")
                 return False
 
             if existing_shift:

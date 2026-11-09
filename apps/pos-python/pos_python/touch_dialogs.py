@@ -131,11 +131,13 @@ class PinPad(NumPad):
 
 
 class ValueDialog(TouchDialog):
-    def __init__(self, parent=None, title='จำนวนเงิน', subtitle='แตะตัวเลข หรือพิมพ์ด้วยคีย์บอร์ด', value='', pin=False):
+    def __init__(self, parent=None, title='จำนวนเงิน', subtitle='แตะตัวเลข หรือพิมพ์ด้วยคีย์บอร์ด', value='', pin=False, auto_pin=False):
         super().__init__(parent, title, subtitle)
         self.entry = QLineEdit(str(value))
         self.entry.setObjectName('touchValue')
         self.entry.setValidator(QRegularExpressionValidator(QRegularExpression('[0-9]{0,20}' if pin else '[0-9]{0,12}(\\.[0-9]{0,3})?'), self.entry))
+        if auto_pin:
+            self.entry.setMaxLength(4)
         if pin:
             self.entry.setEchoMode(QLineEdit.Password)
         if pin:
@@ -151,6 +153,8 @@ class ValueDialog(TouchDialog):
         self.entry.textChanged.connect(self.validate)
         self.entry.returnPressed.connect(lambda: self.accept() if self.submit.isEnabled() else None)
         self.pin = pin
+        if auto_pin:
+            self.entry.textChanged.connect(lambda text: self.accept() if len(text) == 4 and text.isascii() and text.isdigit() else None)
         self.validate()
         self.entry.selectAll()
 
@@ -165,8 +169,8 @@ class ValueDialog(TouchDialog):
         self.submit.setEnabled(valid)
 
     @classmethod
-    def get_value(cls, parent, title, subtitle, value='', pin=False):
-        dialog = cls(parent, title, subtitle, value, pin)
+    def get_value(cls, parent, title, subtitle, value='', pin=False, auto_pin=False):
+        dialog = cls(parent, title, subtitle, value, pin, auto_pin)
         accepted = dialog.exec() == QDialog.DialogCode.Accepted
         value = dialog.entry.text() if accepted else ''
         if pin:

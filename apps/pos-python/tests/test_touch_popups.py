@@ -11,6 +11,18 @@ from pos_python.database import connect
 from pos_python.services import PosService, now, CartLine
 from pos_python.provisioning import ProvisioningService
 from pos_python.touch_dialogs import ValueDialog, TextDialog
+
+
+def test_cashier_pin_auto_submits_only_after_four_digits():
+    dialog = ValueDialog(title='PIN', pin=True, auto_pin=True)
+    for digit in '123':
+        dialog.pad.press(digit)
+    assert dialog.result() != QDialog.DialogCode.Accepted
+    dialog.pad.press('4')
+    assert dialog.result() == QDialog.DialogCode.Accepted
+    assert dialog.entry.text() == '1234'
+    dialog.pad.press('5')
+    assert dialog.entry.text() == '1234'
 from pos_python.ui import run_ui
 
 _APP = QApplication.instance() or QApplication([])

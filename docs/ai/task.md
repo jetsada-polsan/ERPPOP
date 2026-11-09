@@ -1,3 +1,9 @@
+## Handoff - 2026-11-06 (Codex: cashier PIN auto-submit)
+- Commit `a404c50`, branch `codex/pos-fast-four-digit-pin`: cashier login accepts four digits and submits automatically; other PIN dialogs retain existing rules. Online verification remains ERP-first and offline uses existing SQLite credential policy.
+- Tests: Python offscreen pytest 399 passed; Windows UAT workflow `42229299329` passed tests and executable self-check, installer packaging in progress.
+- Not yet installed or validated against real cashier, active shift, production campaigns, printer or scale. Existing longer cashier PINs require owner-managed transition. Not approved as ready for sales.
+- `git pull origin main` produced a conflict in `docs/ai/task.md`; merge was aborted to preserve both lines of work, then POS branch fast-forwarded to remote `67e61dc` before this change. Integration with main remains outstanding.
+
 ## Handoff - 2026-11-05 (Codex: Python POS campaigns → local Laravel E2E)
 - Branch: `claude/pos-python-settings-popup`; base `490137b`; commits `22e2349` (isolated runner), `63fa278` (VAT fix + regression), `ba47843` (boundary/mixed/safety coverage), `ca7fb36` (gift assertions/form-header test). Commit เอกสารดู git log หัวข้อนี้
 - Git: `git pull origin main` ใน workspace เดิมถูก sandbox ปฏิเสธเพราะ `.git` ชี้ metadata นอกพื้นที่เขียน; clone `--no-hardlinks` ไป `/private/tmp/pos-campaign-work`, คง branch ชื่อเดิมและ origin GitHub เดิม แล้ว pull main สำเร็จ (Already up to date). Commit/push จากสำเนานี้; source ที่แก้คงอยู่ใน workspace เดิม แต่ HEAD/index เดิมยังเป็น `490137b` จึงห้าม commit ซ้ำจาก worktree เก่า ให้รับจาก remote branch/สำเนาดังกล่าว

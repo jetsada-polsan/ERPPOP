@@ -345,9 +345,16 @@ ADDED_INDEXES: list[str] = [
 
 def _add_missing_columns(connection: sqlite3.Connection) -> None:
     for table, column, definition in ADDED_COLUMNS:
-        existing = {row["name"] for row in connection.execute(f"PRAGMA table_info({table})")}
-        if column not in existing:
-            connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+        existing = {row["name"].casefold() for row in connection.execute(f"PRAGMA table_info({table})")}
+        if column.casefold() not in existing:
+            try:
+                connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+            except sqlite3.OperationalError:
+                # Another connection may have completed this additive migration
+                # between inspection and ALTER. Do not hide unrelated errors.
+                existing = {row["name"].casefold() for row in connection.execute(f"PRAGMA table_info({table})")}
+                if column.casefold() not in existing:
+                    raise
     for statement in ADDED_INDEXES:
         connection.execute(statement)
     # Preserve credentials issued before the new names were introduced.  A
