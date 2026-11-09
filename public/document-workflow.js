@@ -1,4 +1,4 @@
-/* Tab-local recovery only: never creates a business document or stores credentials. */
+/* Recovery: stored in localStorage so drafts survive accidental browser tab closes or full reloads. Never stores credentials. */
 window.erpDocumentDraft = function (userId) {
     let form, baseline, key, onChange, onLeave, onLink;
     const stateFields = ['items', 'partyId', 'partyQuery', 'branchId', 'salesAreaId', 'salesUserId', 'salesUserName'];
@@ -13,14 +13,15 @@ window.erpDocumentDraft = function (userId) {
         },
         startDraft() {
             if (!this.config?.draftEnabled) return;
-            form = this.$root.querySelector('.doc-modal form, .po-modal form');
+            form = this.$root.querySelector('.doc-modal form, .po-modal form, form[data-draft]');
             if (!form) return;
-            key = `erp:draft:v1:${userId}:${location.pathname}:${form.getAttribute('action')}`;
+            key = `erp:draft:v2:${userId}:${location.pathname}:${form.getAttribute('action')}`;
             baseline = this.draftSnapshot();
             try {
-                const stored = JSON.parse(sessionStorage.getItem(key) || 'null');
-                if (stored && Date.now() - stored.time < 8 * 60 * 60 * 1000) {
-                    if (window.confirm('พบร่างที่ยังไม่ได้บันทึกในแท็บนี้ ต้องการกู้คืนหรือไม่?')) {
+                const storedRaw = localStorage.getItem(key) || sessionStorage.getItem(key);
+                const stored = JSON.parse(storedRaw || 'null');
+                if (stored && Date.now() - stored.time < 24 * 60 * 60 * 1000) {
+                    if (window.confirm('พบร่างที่ยังไม่ได้บันทึก ต้องการกู้คืนหรือไม่?')) {
                         const draft = JSON.parse(stored.snapshot);
                         stateFields.forEach(name => { if (draft.state[name] !== undefined) this[name] = draft.state[name]; });
                         this.modalOpen = true;
@@ -35,8 +36,14 @@ window.erpDocumentDraft = function (userId) {
                             }
                             this.saveDraft();
                         });
-                    } else sessionStorage.removeItem(key);
-                } else if (stored && Date.now() - stored.time >= 8 * 60 * 60 * 1000) sessionStorage.removeItem(key);
+                    } else {
+                        localStorage.removeItem(key);
+                        sessionStorage.removeItem(key);
+                    }
+                } else if (stored && Date.now() - stored.time >= 24 * 60 * 60 * 1000) {
+                    localStorage.removeItem(key);
+                    sessionStorage.removeItem(key);
+                }
             } catch (_) { /* Storage unavailable: keep the in-memory form usable. */ }
             onChange = () => this.saveDraft();
             form.addEventListener('input', onChange);
@@ -59,14 +66,26 @@ window.erpDocumentDraft = function (userId) {
             const snapshot = this.draftSnapshot();
             this.draftDirty = snapshot !== baseline;
             try {
-                if (this.draftDirty) sessionStorage.setItem(key, JSON.stringify({ time: Date.now(), snapshot }));
-                else sessionStorage.removeItem(key);
+                if (this.draftDirty) {
+                    const record = JSON.stringify({ time: Date.now(), snapshot });
+                    localStorage.setItem(key, record);
+                    sessionStorage.setItem(key, record);
+                } else {
+                    localStorage.removeItem(key);
+                    sessionStorage.removeItem(key);
+                }
             } catch (_) {
                 window.erpToast?.('warning', 'เก็บร่างในเบราว์เซอร์ไม่ได้ กรุณาบันทึกเอกสารก่อนออกจากหน้า');
             }
         },
         markDraftSubmitted() {
-            try { if (key) sessionStorage.setItem(`erp:draft:pending:${userId}`, JSON.stringify({ key, action: form.getAttribute('action') })); } catch (_) {}
+            try {
+                if (key) {
+                    const payload = JSON.stringify({ key, action: form.getAttribute('action') });
+                    localStorage.setItem(`erp:draft:pending:${userId}`, payload);
+                    sessionStorage.setItem(`erp:draft:pending:${userId}`, payload);
+                }
+            } catch (_) {}
         },
         destroy() {
             this.saveDraft();

@@ -4626,10 +4626,9 @@ function posApp() {
                 this.refreshCatalog();
             }
             this.syncOfflineQueue();
-            // อัปเดตสินค้าทุก 10 นาที, เช็ก Host ทุก 20 วินาทีตอนล่มหรือมีคิวค้าง
+            // อัปเดตสินค้าทุก 10 นาที, เช็ก Host ทุก 30 วินาทีตอนออนไลน์ และหยุดเมื่อแท็บไม่ active (document.hidden)
             this.catalogTimer = setInterval(() => { if (this.hostOnline && !document.hidden) this.refreshCatalog(); }, 10 * 60 * 1000);
-            // ping ทุก 20 วินาทีเสมอ: Service Worker อาจตอบหน้าค้นสินค้าจาก cache จนดูเหมือนออนไลน์
-            this.hostTimer = setInterval(() => this.checkHost(), 20 * 1000);
+            this.hostTimer = setInterval(() => { if (!document.hidden) this.checkHost(); }, 30 * 1000);
         },
 
         async refreshOfflineStatus() {

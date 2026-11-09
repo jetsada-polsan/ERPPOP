@@ -2095,11 +2095,14 @@
     @if(session('document_draft_saved'))
     <script>
         try {
-            const pending = 'erp:draft:pending:' + @js((string) auth()->id());
-            const draft = JSON.parse(sessionStorage.getItem(pending) || 'null');
+            const pendingKey = 'erp:draft:pending:' + @js((string) auth()->id());
+            const raw = localStorage.getItem(pendingKey) || sessionStorage.getItem(pendingKey);
+            const draft = JSON.parse(raw || 'null');
             if (draft?.action === @js(session('document_draft_saved'))) {
+                localStorage.removeItem(draft.key);
                 sessionStorage.removeItem(draft.key);
-                sessionStorage.removeItem(pending);
+                localStorage.removeItem(pendingKey);
+                sessionStorage.removeItem(pendingKey);
             }
         } catch (_) {}
     </script>

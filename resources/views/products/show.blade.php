@@ -1861,6 +1861,9 @@
                     if (data.success) {
                         this.saveMsg = `บันทึกราคา ${Number(data.price).toLocaleString('th-TH', {minimumFractionDigits:2})} บาท แล้ว ✓`;
                         this.priceOpen = false;
+                        if (window.parent && window.parent !== window) {
+                            try { window.parent.postMessage('erp:product:saved', '*'); } catch (_) {}
+                        }
                         setTimeout(() => { this.saveMsg = ''; location.reload(); }, 600);
                     }
                 } finally {

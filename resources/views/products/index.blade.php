@@ -717,7 +717,16 @@
             modalOpen: false,
             productPopupOpen: false,
             productUrl: '',
+            hasUpdatedProduct: false,
+            init() {
+                window.addEventListener('message', (event) => {
+                    if (event.data === 'erp:product:saved') {
+                        this.hasUpdatedProduct = true;
+                    }
+                });
+            },
             openProduct(url) {
+                this.hasUpdatedProduct = false;
                 this.productUrl = url;
                 this.productPopupOpen = true;
                 document.body.style.overflow = 'hidden';
@@ -726,7 +735,9 @@
                 this.productPopupOpen = false;
                 this.productUrl = '';
                 document.body.style.overflow = '';
-                window.location.reload();
+                if (this.hasUpdatedProduct) {
+                    window.location.reload();
+                }
             }
         };
     }
