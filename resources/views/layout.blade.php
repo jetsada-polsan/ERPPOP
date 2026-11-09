@@ -148,10 +148,10 @@
             box-shadow: 0 0 0 3px rgba(21, 133, 192, .18);
         }
         html[data-layout="odoo"] .nav-pills .nav-link.active { background: var(--erp-primary); color: #fff; }
-        html[data-layout="odoo"] .odn-side { overflow-y: auto; }
-        html[data-layout="odoo"] .odn-grp { display: none; }
-        html[data-layout="odoo"] .odn-grp.is-visible { display: block; }
-        html[data-layout="odoo"] .odn-nav-link { white-space: nowrap; }
+        .odn-side { overflow-y: auto; }
+        .odn-grp { display: none; }
+        .odn-grp.is-visible { display: block; }
+        .odn-nav-link { white-space: nowrap; }
 
         /* ── ปุ่ม: ฟ้า = ทำต่อ, เขียว = ยืนยัน/สำเร็จ, แดง = ลบ/ผิดพลาด ──
            ธีม Odoo เดิมทำ .btn-success ให้เป็นม่วงชุดเดียวกับ .btn-primary
@@ -306,107 +306,181 @@
         .od-card .table { font-size:12.5px; }
 
         /* ══════════════════════════════════════════════════════════
-           โครงเปลือกแบบ Odoo — แถบบน + ค้นหาเมนู + เมนูข้างแบบกลุ่ม
-           ทุกกฎขึ้นต้นด้วย .odn- หรือ html[data-layout="odoo"]
-           layout Classic จึงไม่โดนผลกระทบเลย
+           โครงเปลือกหลักชุดเดียว — แถบบนเป็นหมวดหลัก + เมนูข้างเฉพาะหมวดที่เลือก
+           ล็อกตำแหน่งโลโก้ที่มุมซ้ายบนที่เดียว ขนาดคงที่ ไม่ขยับตอนเปลี่ยนหมวด/เลื่อนจอ/หุบเมนู
            ══════════════════════════════════════════════════════════ */
-        /* .app-wrapper ของ AdminLTE เป็น grid ที่ตั้งชื่อ area ไว้แล้ว
-           ถ้าไม่เพิ่มแถวให้แถบบน มันจะถูก auto-place ไปแถวล่างสุดของหน้า */
-        html[data-layout="odoo"] .app-wrapper {
+        body:not(.erp-popup-page) .app-wrapper {
             grid-template-areas:
                 "odn-top odn-top"
                 "lte-app-sidebar lte-app-header"
                 "lte-app-sidebar lte-app-main"
                 "lte-app-sidebar lte-app-footer";
-            grid-template-rows: 44px auto 1fr auto;
+            grid-template-rows: 52px auto 1fr auto;
         }
         .odn-topbar {
             grid-area: odn-top;
             position: sticky; top: 0; z-index: 1200;
-            background: var(--erp-primary-dark); color: #fff;
-            display: flex; align-items: center; gap: 6px; padding: 0 12px; height: 44px;
+            background: #ffffff; color: #334155;
+            border-bottom: 1px solid var(--erp-border, #dbe7ef);
+            box-shadow: 0 2px 10px rgba(15, 35, 52, .05);
+            display: flex; align-items: stretch; gap: 0; padding: 0;
+            height: 52px; min-height: 52px; max-height: 52px; box-sizing: border-box;
         }
-        .odn-apps { display:grid; place-items:center; width:30px; height:30px; border-radius:8px;
-            background:rgba(255,255,255,.13); color:#fff; flex:none; font-size:14px; text-decoration:none;
-            transition:background .13s; }
-        .odn-apps:hover { background:rgba(255,255,255,.28); color:#fff; }
-        .odn-apps:focus-visible { outline:2px solid #fff; outline-offset:2px; }
+        .odn-brand-slot {
+            width: 216px; min-width: 216px; max-width: 216px; height: 52px;
+            flex: 0 0 216px;
+            display: flex; align-items: center; gap: 8px;
+            padding: 0 12px; box-sizing: border-box;
+            border-right: 1px solid var(--erp-border, #dbe7ef);
+            background: #ffffff;
+            overflow: hidden;
+        }
+        .odn-apps {
+            display: grid; place-items: center;
+            width: 32px; height: 32px; min-width: 32px; min-height: 32px;
+            border-radius: 8px;
+            background: #eef4f8; color: var(--erp-primary-dark, #0f4c75);
+            flex: 0 0 32px; font-size: 14px; text-decoration: none;
+            transition: background-color 130ms ease, color 130ms ease;
+        }
+        .odn-apps:hover { background: #dfeaf2; color: var(--erp-primary-dark, #0f4c75); }
+        .odn-apps:focus-visible { outline: 2px solid var(--erp-primary, #1585c0); outline-offset: 2px; }
 
-        .odn-brand { font-weight:700; font-size:15px; color:#fff; text-decoration:none;
-            letter-spacing:.3px; white-space:nowrap; padding:0 4px; }
-        .odn-brand:hover { color:#fff; }
-        /* เส้นคั่นบาง ๆ แยก "ตัวระบบ" ออกจาก "เมนู" ให้ตาอ่านเป็นสองส่วน */
-        .odn-brand::after { content:""; display:inline-block; width:1px; height:16px;
-            background:rgba(255,255,255,.22); margin-left:12px; vertical-align:-3px; }
+        .odn-brand {
+            display: inline-flex; align-items: center; gap: 8px;
+            height: 36px; min-width: 0; flex: 1;
+            font-weight: 800; font-size: 14.5px; color: var(--erp-primary-dark, #0f4c75);
+            text-decoration: none; letter-spacing: .2px; white-space: nowrap;
+            overflow: hidden;
+        }
+        .odn-brand:hover { color: var(--erp-primary-dark, #0f4c75); }
+        .odn-brand::after { content: none; display: none; }
+        .odn-logo-box {
+            width: 48px; height: 34px; min-width: 48px; min-height: 34px; max-width: 48px; max-height: 34px;
+            flex: 0 0 48px;
+            display: inline-flex; align-items: center; justify-content: center;
+            overflow: hidden;
+        }
+        .odn-logo-box img {
+            width: 48px !important; height: 34px !important;
+            max-width: 48px !important; max-height: 34px !important;
+            object-fit: contain; display: block;
+        }
+        .odn-brand-text {
+            font-weight: 800; font-size: 14px; color: var(--erp-primary-dark, #0f4c75);
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
 
-        .odn-nav { display:flex; gap:2px; overflow-x:auto; scrollbar-width:none; min-width:0; margin-left:4px; }
-        .odn-nav::-webkit-scrollbar { display:none; }
-        .odn-nav-link { color:rgba(255,255,255,.86); text-decoration:none; padding:6px 12px;
-            border-radius:7px; font-size:13px; white-space:nowrap; transition:background .12s, color .12s; }
-        .odn-nav-link:hover { background:rgba(255,255,255,.14); color:#fff; }
-        .odn-nav-link:focus-visible { outline:2px solid #fff; outline-offset:-2px; }
-        /* ตัวที่เลือกเป็นพิลขาว ไม่ใช่ฟ้าบนฟ้า — ฟ้า #1585c0 บนแถบ #0f4c75 ได้แค่ 2.23:1
-           มองแทบไม่ออกว่าอันไหนถูกเลือก ส่วนพิลขาวได้ 9.09:1 ทั้งพื้นและตัวหนังสือ */
-        .odn-nav-link.on { background:#fff; color:var(--erp-primary-dark); font-weight:600;
-            box-shadow:0 1px 3px rgba(0,0,0,.18); }
-        .odn-nav-link.on:hover { background:#fff; color:var(--erp-primary-dark); }
+        .odn-nav {
+            display: flex; align-items: stretch; gap: 2px;
+            overflow-x: auto; scrollbar-width: none; min-width: 0;
+            padding: 0 8px; flex: 1; height: 52px;
+        }
+        .odn-nav::-webkit-scrollbar { display: none; }
+        .odn-nav-link {
+            display: inline-flex; align-items: center; gap: 7px;
+            height: 52px; padding: 0 13px;
+            border-radius: 0; border-bottom: 3px solid transparent;
+            color: #334155; text-decoration: none;
+            font-size: 14px; font-weight: 600; line-height: 1;
+            white-space: nowrap; box-sizing: border-box; flex: 0 0 auto;
+            transition: color 130ms ease, background-color 130ms ease, border-color 130ms ease;
+        }
+        .odn-nav-link i {
+            font-size: 16px; width: 16px; height: 16px;
+            display: inline-flex; align-items: center; justify-content: center;
+            flex: 0 0 16px; color: #64748b;
+            transition: color 130ms ease;
+        }
+        .odn-nav-link:hover {
+            background-color: #f8fafc;
+            color: var(--erp-primary-dark, #0f4c75);
+            border-bottom-color: #cbd5e1;
+        }
+        .odn-nav-link:hover i { color: var(--erp-primary, #1585c0); }
+        .odn-nav-link:focus-visible { outline: 2px solid var(--erp-primary, #1585c0); outline-offset: -2px; }
+        .odn-nav-link.on,
+        .odn-nav-link.on:hover {
+            background-color: rgba(21, 133, 192, .05);
+            color: var(--erp-primary-dark, #0f4c75);
+            font-weight: 600;
+            border-bottom-color: var(--erp-primary, #1585c0);
+            box-shadow: none;
+        }
+        .odn-nav-link.on i,
+        .odn-nav-link.on:hover i {
+            color: var(--erp-primary, #1585c0);
+        }
 
-        .odn-company { margin-left:auto; font-size:12.5px; color:rgba(255,255,255,.82);
-            white-space:nowrap; padding-left:14px; border-left:1px solid rgba(255,255,255,.18);
-            margin-right:2px; }
-
-        /* header เดิมยังทำหน้าที่แถบชื่อหน้า แต่ไม่ต้องเป็นสีเข้มซ้อนกันสองชั้น */
+        /* header แถบชื่อหน้า กระชับสะอาดตา */
+        .app-header,
         html[data-layout="odoo"] .app-header {
-            background: var(--erp-surface) !important;
+            background: var(--erp-surface, #ffffff) !important;
             color: var(--erp-text);
             border-bottom: 1px solid var(--erp-border);
-            box-shadow: 0 1px 3px rgba(29,59,82,.07);
+            box-shadow: 0 1px 3px rgba(29,59,82,.05);
+            min-height: 52px;
         }
-        html[data-layout="odoo"] .app-header h1 { color: var(--erp-primary-dark); }
+        .app-header h1,
+        html[data-layout="odoo"] .app-header h1 { color: var(--erp-primary-dark); font-size: 18px; }
+        .app-header .nav-link,
         html[data-layout="odoo"] .app-header .nav-link { color: var(--erp-muted); }
+        .app-header .text-muted,
         html[data-layout="odoo"] .app-header .text-muted { color: var(--erp-muted) !important; }
+        .app-header .page-title-icon,
         html[data-layout="odoo"] .app-header .page-title-icon { background: var(--erp-primary-soft); color: var(--erp-primary-ink); }
 
-        .odn-search { position:relative; flex:1; max-width:340px; margin:0 16px; }
+        .odn-search { position:relative; flex:0 1 260px; max-width:260px; margin:0 8px 0 auto; }
         .odn-search input { width:100%; border:1px solid var(--erp-border); background:var(--erp-surface-2, #f8fbfd);
-            border-radius:7px; padding:6px 30px 6px 11px; font-size:12.5px; color:var(--erp-text); }
+            border-radius:999px; padding:6px 32px 6px 14px; font-size:13px; color:var(--erp-text); min-height:36px; }
         .odn-search input::placeholder { color:var(--erp-muted); }
         .odn-search input:focus { outline:0; border-color:var(--erp-primary); background:#fff;
-            box-shadow:0 0 0 3px rgba(21,133,192,.16); }
-        .odn-search i { position:absolute; right:10px; top:50%; transform:translateY(-50%);
-            font-size:12px; color:var(--erp-muted); pointer-events:none; }
+            box-shadow:0 0 0 3px rgba(21,133,192,.14); }
+        .odn-search i { position:absolute; right:12px; top:50%; transform:translateY(-50%);
+            font-size:13px; color:var(--erp-muted); pointer-events:none; }
 
-        /* เมนูข้าง: คอลัมน์เดียว ไม่มี rail ไอคอน */
-        html[data-layout="odoo"] { --lte-sidebar-width: calc(216px * var(--menu-scale)); }
-        /* กฎ .app-sidebar ของธีมเดิมอยู่ท้ายไฟล์และใช้ !important
-           จึงต้องเจาะจงกว่า (0,3,1) ถึงจะเอาชนะได้ ไม่ใช่แค่ !important เท่ากัน */
-        html[data-layout="odoo"] .app-sidebar.odn-side {
+        /* เมนูข้าง: คอลัมน์เดียวเฉพาะเมนูย่อยของหมวดที่เลือก */
+        :root,
+        html[data-layout="odoo"],
+        html[data-layout="classic"] { --lte-sidebar-width: calc(216px * var(--menu-scale)); }
+        html.subnav-collapsed { --lte-sidebar-width: 0px !important; }
+        .app-sidebar.odn-side,
+        html[data-layout="odoo"] .app-sidebar.odn-side,
+        html[data-layout="classic"] .app-sidebar.odn-side {
             display: block !important;
             width: calc(216px * var(--menu-scale)) !important;
             min-width: calc(216px * var(--menu-scale)) !important;
             max-width: calc(216px * var(--menu-scale)) !important;
             background: var(--erp-surface) !important;
             border-right: 1px solid var(--erp-border);
-            height: calc(100vh - 44px); top: 44px;
+            height: calc(100vh - 52px); top: 52px;
             overflow-y: auto !important; overflow-x: hidden !important;
-            scrollbar-width: thin; padding: 0 0 24px;
+            scrollbar-width: thin; scrollbar-gutter: stable; padding: 4px 0 24px;
         }
-        /* ── แบรนด์บนสุดของเมนู ───────────────────────────────────── */
-        .odn-side-brand { display:flex; align-items:center; justify-content:center; height:76px; box-sizing:border-box; padding:8px 10px;
-            margin:0; overflow:hidden; text-decoration:none;
-            color:var(--erp-primary-dark); font-weight:700; font-size:13px;
-            border-bottom:1px solid var(--erp-border); background:var(--erp-surface); }
-        .odn-side-brand img { max-width:100%; max-height:58px; width:auto; height:auto; object-fit:contain; }
+        html.subnav-collapsed .app-sidebar.odn-side {
+            width: 0 !important;
+            min-width: 0 !important;
+            max-width: 0 !important;
+            border-right: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+        }
 
-        /* ── หัวหมวด ──────────────────────────────────────────────── */
+        /* ── หัวหมวด และหัวกลุ่มย่อยในเมนูข้าง ──────────────────────── */
         .odn-grp { border-bottom:0; }
         .odn-grp-head { display:flex; align-items:center; gap:8px; width:100%; background:none; border:0;
-            padding:14px 14px 7px; font-size:10.5px; font-weight:700; letter-spacing:.7px;
-            text-transform:uppercase; color:var(--erp-muted); text-align:left; cursor:default; }
-        .odn-grp-head:hover { background:none; color:var(--erp-muted); }
-        .odn-grp-head > i:first-child { font-size:12px; opacity:.6; }
+            padding:12px 14px 6px; font-size:11.5px; font-weight:800; letter-spacing:.4px;
+            text-transform:uppercase; color:var(--erp-primary-dark); text-align:left; cursor:default; }
+        .odn-grp-head:hover { background:none; color:var(--erp-primary-dark); }
+        .odn-grp-head > i:first-child { font-size:13px; color:var(--erp-primary); }
         .odn-caret { display:none; }
         .odn-grp-body { padding:0 8px 10px; }
+        .odn-subgrp-head {
+            font-size: 11px; font-weight: 800; color: #64748b;
+            letter-spacing: .03em; padding: 10px 8px 4px;
+            margin-top: 4px; border-top: 1px dashed #e2e8f0;
+        }
+        .odn-subgrp-head:first-child { margin-top: 0; border-top: 0; padding-top: 4px; }
 
         /* ── รายการเมนู ───────────────────────────────────────────
            ไอคอนใส่กล่องสีประจำโมดูล ใช้ค่า tone ชุดเดียวกับหน้า App Launcher
@@ -479,21 +553,63 @@
         .edp-reset { font:inherit; font-size:12px; background:none; border:0; color:#c62828; cursor:pointer; padding:0; }
         .edp-reset:hover { text-decoration:underline; }
         .edp-saved { font-size:11.5px; color:#158662; font-weight:600; }
-        .app-header > .container-fluid { flex-wrap: wrap; gap: 8px 16px; padding-top: 10px; padding-bottom: 10px; }
-        .app-header .erp-page-heading { flex: 1 1 320px; min-width: 0; }
+        .app-header > .container-fluid { flex-wrap: wrap; gap: 8px 16px; padding-top: 6px; padding-bottom: 6px; }
+        .app-header .erp-page-heading { flex: 1 1 280px; min-width: 0; }
         .app-header .erp-page-title { min-width: 0; flex: 1; }
         .app-header .erp-page-title > div > div { min-width: 0; }
         .app-header .erp-page-title h1, .app-header .erp-page-title .text-muted { overflow-wrap: anywhere; white-space: normal; }
         .app-header .page-title-icon { flex-shrink: 0; }
-        .app-header .odn-search { flex: 1 1 240px; min-width: 0; max-width: 100%; }
+        .app-header .odn-search { flex: 0 1 260px; min-width: 180px; max-width: 280px; }
         .app-main { min-width: 0; }
 
-        @media print { .erp-display-panel { display:none !important; } }
+        /* ── User Dropdown (รวมชื่อ ตำแหน่ง บริษัท คู่มือ 4M ปรับหน้าจอ และออกจากระบบ) ── */
+        .erp-user-trigger {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 3px 8px 3px 4px;
+            border-radius: 999px; border: 1px solid var(--erp-border, #dbe7ef);
+            background: #ffffff; color: var(--erp-text); cursor: pointer;
+            height: 38px; transition: border-color 130ms ease, background-color 130ms ease;
+        }
+        .erp-user-trigger:hover { border-color: var(--erp-primary, #1585c0); background: #f8fafc; }
+        .erp-user-dropdown {
+            position: absolute; right: 0; top: calc(100% + 8px); z-index: 3000;
+            width: 270px; background: #ffffff;
+            border: 1px solid var(--erp-border, #dbe7ef); border-radius: 14px;
+            box-shadow: 0 18px 48px rgba(15, 23, 42, .16);
+            overflow: hidden; text-align: left;
+        }
+        .erp-user-dropdown-head {
+            padding: 12px 16px;
+            background: #f8fafc;
+            border-bottom: 1px solid #eef2f6;
+        }
+        .erp-user-dropdown-name { font-size: 14px; font-weight: 800; color: #0f172a; line-height: 1.3; }
+        .erp-user-dropdown-role { font-size: 12px; color: #64748b; margin-top: 2px; }
+        .erp-user-dropdown-company {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 12px; font-weight: 600; color: var(--erp-primary-dark, #0f4c75);
+            margin-top: 6px; padding-top: 6px; border-top: 1px dashed #e2e8f0;
+        }
+        .erp-user-dropdown-item {
+            display: flex; align-items: center; gap: 10px;
+            width: 100%; padding: 9px 16px;
+            font-size: 13.5px; font-weight: 600; color: #334155;
+            text-decoration: none; background: transparent; border: 0;
+            cursor: pointer; text-align: left;
+            transition: background-color 120ms ease, color 120ms ease;
+        }
+        .erp-user-dropdown-item i { font-size: 15px; width: 18px; text-align: center; color: #64748b; }
+        .erp-user-dropdown-item:hover { background: var(--erp-primary-soft, #eef4f9); color: var(--erp-primary-dark, #0f4c75); }
+        .erp-user-dropdown-item:hover i { color: var(--erp-primary, #1585c0); }
+        .erp-user-dropdown-item.text-danger { color: #c62828 !important; }
+        .erp-user-dropdown-item.text-danger i { color: #c62828 !important; }
+        .erp-user-dropdown-item.text-danger:hover { background: #fff0f0; }
+        .erp-user-dropdown-divider { height: 1px; background: #eef2f6; margin: 2px 0; }
 
-        html[data-layout="odoo"] .fa-collapse-btn { display:none; }
+        @media print { .erp-display-panel, .erp-user-dropdown { display:none !important; } }
 
         @media (max-width: 991.98px) {
-            .odn-nav, .odn-company { display:none; }
+            .odn-brand-slot { width: auto; min-width: 0; max-width: none; flex: 0 0 auto; padding: 0 10px; }
             .odn-search { margin:0 8px; max-width:none; }
         }
         @media print { .odn-topbar, .odn-side, .odn-search { display:none !important; } }
@@ -1561,28 +1677,17 @@
 <body class="layout-fixed sidebar-expand-lg {{ request()->boolean('popup') ? 'erp-popup-page' : '' }} {{ request()->routeIs(['bookings.*','cash-sales.*','sales.*','purchases.*','purchase-orders.*','sale-returns.*','credit-debit-notes.*','stock-issues.*','stock-transfers.*','stock-transforms.*','stock-adjustments.*','stock-counts.*']) ? 'erp-classic-document-page' : '' }}">
     <div class="app-wrapper">
         @php
-            // ไอคอนโมดูลบน rail + หาโมดูลที่ active จาก route ปัจจุบัน
-            $railIcons = [
+            $railIcons = array_merge([
                 'ภาพรวม' => 'bi-house-door-fill',
                 'งานประจำวัน' => 'bi-cash-coin',
+                'POS / หน้าร้าน' => 'bi-shop-window',
                 'คลัง / ผลิต / ซื้อ' => 'bi-box-seam-fill',
                 'การเงิน / บัญชี' => 'bi-calculator-fill',
                 'ข้อมูลตั้งต้น' => 'bi-people-fill',
                 'เชื่อมต่อ' => 'bi-plug-fill',
                 'ระบบ' => 'bi-gear-fill',
                 'รายงาน' => 'bi-clipboard-data-fill',
-            ];
-            // ชื่อสั้นใต้ไอคอน (พื้นที่ ~60px) - ชื่อเต็มโชว์ใน tooltip ตอน hover
-            $railShort = [
-                'ภาพรวม' => 'หน้าหลัก',
-                'งานประจำวัน' => 'ขาย/เอกสาร',
-                'คลัง / ผลิต / ซื้อ' => 'สินค้า/คลัง',
-                'การเงิน / บัญชี' => 'การเงิน',
-                'ข้อมูลตั้งต้น' => 'ข้อมูลหลัก',
-                'เชื่อมต่อ' => 'เชื่อมต่อ',
-                'ระบบ' => 'ตั้งค่า',
-                'รายงาน' => 'รายงาน',
-            ];
+            ], \App\Support\ErpMenu::SECTION_ICONS);
             $activeSection = 0;
             foreach ($menuSections as $i => $section) {
                 foreach ($section['items'] as $item) {
@@ -1592,35 +1697,40 @@
                     }
                 }
             }
-            $appLogo = $companyLogo;
+            $appLogo = $companyLogo ?: (is_file(public_path('images/logos/mpm-food-group.jpg')) ? asset('images/logos/mpm-food-group.jpg') : null);
         @endphp
-@if ($erpLayout === 'odoo' && !request()->boolean('popup'))
-        {{-- แถบบนแบบ Odoo: ปุ่มโมดูล + ชื่อระบบ + เมนูหมวด
-             ใช้ $menuSections ชุดเดียวกับเมนูข้าง จะได้ไม่มีวันหลุดจากกัน --}}
+@if (!request()->boolean('popup'))
+        {{-- แถบบนชุดเดียวของระบบ: ล็อกโลโก้มุมซ้ายบน + หมวดเมนูหลัก --}}
         <div class="odn-topbar no-print">
-            <a href="{{ route('apps.launcher') }}" class="odn-apps" title="รวมโมดูลทั้งหมด" aria-label="รวมโมดูลทั้งหมด">
-                <i class="bi bi-grid-3x3-gap-fill"></i>
-            </a>
-            <a href="{{ route('dashboard') }}" class="odn-brand">{{ $systemName }}</a>
+            <div class="odn-brand-slot">
+                <a href="{{ route('apps.launcher') }}" class="odn-apps" title="รวมโมดูลทั้งหมด" aria-label="รวมโมดูลทั้งหมด">
+                    <i class="bi bi-grid-3x3-gap-fill"></i>
+                </a>
+                <a href="{{ route('dashboard') }}" class="odn-brand" id="erp-main-logo">
+                    @if($appLogo)
+                        <span class="odn-logo-box"><img src="{{ $appLogo }}" alt="{{ $systemName }}"></span>
+                    @endif
+                    <span class="odn-brand-text">{{ $systemName }}</span>
+                </a>
+            </div>
             <nav class="odn-nav" aria-label="หมวดเมนู">
                 @foreach ($menuSections as $i => $section)
                     <a href="#odn-grp-{{ $i }}" class="odn-nav-link {{ $i === $activeSection ? 'on' : '' }}"
                        data-sec="{{ $i }}"><i class="bi {{ $railIcons[$section['label']] ?? 'bi-grid-fill' }}"></i><span>{{ $section['displayLabel'] ?? $section['label'] }}</span></a>
                 @endforeach
             </nav>
-            <span class="odn-company">{{ $companyName }}</span>
         </div>
 @endif
         <nav class="app-header navbar navbar-expand bg-white">
-            <div class="container-fluid px-4">
+            <div class="container-fluid px-3">
                 <ul class="navbar-nav align-items-center erp-page-heading">
                     <li class="nav-item">
-                        <a class="nav-link fs-4" href="#" role="button" aria-label="Toggle sidebar"
+                        <a class="nav-link fs-5 px-2" href="#" role="button" aria-label="Toggle sidebar"
                             onclick="event.preventDefault(); document.documentElement.classList.toggle('mobile-sidebar-open')">
                             <i class="bi bi-list"></i>
                         </a>
                     </li>
-                    <li class="nav-item ms-2 erp-page-title">
+                    <li class="nav-item ms-1 erp-page-title">
                         <div class="d-flex align-items-center">
                             <span class="page-title-icon"><i class="bi bi-bar-chart-line-fill"></i></span>
                             <div>
@@ -1630,22 +1740,20 @@
                         </div>
                     </li>
                 </ul>
-@if ($erpLayout === 'odoo')
-                {{-- ค้นหาเมนู: กรองรายการในเมนูข้างแบบสด ๆ ไม่ได้ยิงหลังบ้าน
-                     เพราะระบบยังไม่มี endpoint ค้นหารวม การทำช่องที่กดแล้วเงียบ
-                     แย่กว่าการบอกตรง ๆ ว่ามันค้นอะไรได้ --}}
+
+                {{-- ค้นหาเมนู: กรองรายการในเมนูข้างแบบสด ๆ --}}
                 <div class="odn-search">
                     <label for="odn-q" class="visually-hidden">ค้นหาเมนู</label>
                     <input id="odn-q" type="search" autocomplete="off" placeholder="ค้นหาเมนู…"
                            aria-controls="odn-side">
                     <i class="bi bi-search" aria-hidden="true"></i>
                 </div>
-@endif
-                <ul class="navbar-nav ms-auto align-items-center gap-3">
-                    {{-- กระดิ่งแจ้งเตือน: แต่ละส่วนงานเห็นเฉพาะเรื่องตามหน้าที่ --}}
+
+                <ul class="navbar-nav align-items-center gap-2 ms-2">
+                    {{-- กระดิ่งแจ้งเตือน --}}
                     <li class="nav-item" x-data="notifyBell()" x-init="load()">
                         <div class="position-relative">
-                            <button type="button" class="btn btn-light border rounded-circle position-relative" style="width:42px;height:42px" @click="open = !open; if (open) load()">
+                            <button type="button" class="btn btn-light border rounded-circle position-relative" style="width:38px;height:38px;padding:0" @click="open = !open; if (open) load()" aria-label="แจ้งเตือน">
                                 <i class="bi bi-bell-fill" style="color:var(--erp-muted)"></i>
                                 <span x-show="total > 0" x-cloak class="notify-badge" x-text="total > 99 ? '99+' : total"></span>
                             </button>
@@ -1667,13 +1775,51 @@
                             </div>
                         </div>
                     </li>
-                    {{-- ปรับหน้าจอเฉพาะเครื่องนี้ --}}
-                    <li class="nav-item">
+
+                    {{-- ไอคอนผู้ใช้ + Dropdown รวมข้อมูลผู้ใช้ บริษัท คู่มือ 4M ปรับหน้าจอ และออกจากระบบ --}}
+                    <li class="nav-item" x-data="{ userOpen: false }">
                         <div class="position-relative">
-                            <button type="button" class="btn btn-light border rounded-circle" style="width:42px;height:42px"
-                                    id="erp-display-btn" title="ปรับขนาดและสีหน้าจอ" aria-expanded="false" aria-controls="erp-display-panel">
-                                <i class="bi bi-sliders" style="color:var(--erp-muted)"></i>
+                            <button type="button" class="erp-user-trigger" id="erp-user-menu-btn"
+                                    @click="userOpen = !userOpen" :aria-expanded="userOpen.toString()" aria-label="เมนูผู้ใช้">
+                                <span class="profile-avatar" style="width:30px;height:30px;border-radius:50%;font-size:12px">{{ mb_substr(auth()->user()?->name ?? 'ผู้ใช้', 0, 2) }}</span>
+                                <i class="bi bi-chevron-down small text-muted"></i>
                             </button>
+
+                            <div x-show="userOpen" x-cloak @click.outside="userOpen = false" class="erp-user-dropdown" id="erp-user-dropdown">
+                                <div class="erp-user-dropdown-head">
+                                    <div class="erp-user-dropdown-name">{{ auth()->user()?->name ?? '-' }}</div>
+                                    <div class="erp-user-dropdown-role">{{ auth()->user()?->roles?->first()?->name ?? 'ผู้ใช้งาน' }}</div>
+                                    <div class="erp-user-dropdown-company">
+                                        <i class="bi bi-building"></i>
+                                        <span>{{ $companyName }}</span>
+                                    </div>
+                                </div>
+                                <div class="py-1">
+                                    <a href="{{ route('core-modules.index') }}" class="erp-user-dropdown-item">
+                                        <i class="bi bi-book"></i>
+                                        <span>คู่มือ 4M</span>
+                                    </a>
+                                    <button type="button" class="erp-user-dropdown-item"
+                                            id="erp-display-btn" title="ปรับขนาดและสีหน้าจอ" aria-expanded="false" aria-controls="erp-display-panel"
+                                            @click="userOpen = false">
+                                        <i class="bi bi-sliders"></i>
+                                        <span>ปรับขนาดและสีหน้าจอ</span>
+                                    </button>
+                                </div>
+                                <div class="erp-user-dropdown-divider"></div>
+                                <div class="py-1">
+                                    <form method="post" action="{{ route('logout') }}" class="m-0"
+                                          data-confirm="ต้องการออกจากระบบใช่หรือไม่?" data-confirm-ok="ออกจากระบบ" data-confirm-icon="question">
+                                        @csrf
+                                        <button type="submit" class="erp-user-dropdown-item text-danger">
+                                            <i class="bi bi-box-arrow-right"></i>
+                                            <span>ออกจากระบบ</span>
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+
+                            {{-- แผงปรับหน้าจอเฉพาะเครื่องนี้ --}}
                             <div class="erp-display-panel" id="erp-display-panel" hidden>
                                 <div class="edp-head">
                                     <span class="fw-bold">ปรับหน้าจอ</span>
@@ -1731,38 +1877,12 @@
                             </div>
                         </div>
                     </li>
-                    <li class="nav-item d-none d-lg-block">
-                        <a href="{{ route('core-modules.index') }}" class="btn btn-light border rounded-pill px-3">
-                            <i class="bi bi-book me-2"></i>คู่มือ 4M
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <div class="profile-pill">
-                            <div class="profile-avatar">{{ mb_substr(auth()->user()?->name ?? 'ผู้ใช้', 0, 2) }}</div>
-                            <div class="d-none d-md-block">
-                                <div class="fw-bold">{{ auth()->user()?->name ?? '-' }}</div>
-                                <div class="text-muted small">{{ auth()->user()?->roles?->first()?->name ?? '-' }}</div>
-                            </div>
-                            <form method="post" action="{{ route('logout') }}" class="ms-1"
-                                  data-confirm="ต้องการออกจากระบบใช่หรือไม่?" data-confirm-ok="ออกจากระบบ" data-confirm-icon="question">
-                                @csrf
-                                <button type="submit" class="btn btn-sm btn-light border" title="ออกจากระบบ">
-                                    <i class="bi bi-box-arrow-right"></i>
-                                </button>
-                            </form>
-                        </div>
-                    </li>
                 </ul>
             </div>
         </nav>
 
-@if ($erpLayout === 'odoo')
-        {{-- เมนูข้างแบบ Odoo: ทุกหมวดกางพร้อมกัน พับได้ทีละหมวด --}}
+        {{-- เมนูข้างชุดเดียว: แสดงเฉพาะเมนูย่อยของหมวดที่เลือก (ไม่มีโลโก้ซ้ำและไม่มี rail ซ้อน) --}}
         <aside class="app-sidebar odn-side" id="odn-side">
-            <a href="{{ route('dashboard') }}" class="odn-side-brand">
-                @if($appLogo)<img src="{{ $appLogo }}" alt="{{ $systemName }}">
-                @else<span>{{ $systemName }}</span>@endif
-            </a>
             @foreach ($menuSections as $i => $section)
                 <div class="odn-grp {{ $i === $activeSection ? 'is-visible' : '' }}" id="odn-grp-{{ $i }}" data-sec="{{ $i }}">
                     <button type="button" class="odn-grp-head" aria-expanded="true">
@@ -1771,8 +1891,12 @@
                         <i class="bi bi-chevron-down odn-caret" aria-hidden="true"></i>
                     </button>
                     <div class="odn-grp-body">
+                        @php $lastGroup = null; @endphp
                         @foreach ($section['items'] as $item)
                             @php
+                                $itemGroup = $item['group'] ?? null;
+                                $showGroupHead = $itemGroup !== null && $itemGroup !== $lastGroup;
+                                $lastGroup = $itemGroup;
                                 $active = request()->routeIs($item['pattern']) || (isset($item['extraPattern']) && request()->routeIs($item['extraPattern']));
                                 if ($active && array_key_exists('queryCategory', $item)) {
                                     $active = request('category') === $item['queryCategory'];
@@ -1781,9 +1905,12 @@
                                 }
                                 $mark = \App\Support\AppMark::forItem($i, $loop->index, $item['tone'] ?? 'blue');
                             @endphp
+                            @if ($showGroupHead)
+                                <div class="odn-subgrp-head">{{ $itemGroup }}</div>
+                            @endif
                             <a href="{{ route($item['route'], $item['params'] ?? []) }}"
                                class="odn-item t-{{ $item['tone'] ?? 'blue' }} {{ $active ? 'active' : '' }}"
-                               data-s="{{ mb_strtolower($item['label']) }}"
+                               data-s="{{ mb_strtolower($item['label'].' '.($itemGroup ?? '')) }}"
                                @if(isset($item['target'])) target="{{ $item['target'] }}" @endif>
                                 <span class="odn-item-ico" style="--m1:{{ $mark['m1'] }};--m2:{{ $mark['m2'] }}">
                                     <svg viewBox="0 0 24 24" aria-hidden="true">{!! $mark['svg'] !!}</svg>
@@ -1795,58 +1922,6 @@
             @endforeach
             <p class="odn-noresult" hidden>ไม่พบเมนูที่ตรงกับคำค้น</p>
         </aside>
-@else
-        <aside class="app-sidebar" x-data="{ sec: {{ $activeSection }} }">
-            {{-- ชั้น 1: rail ไอคอนโมดูล --}}
-            <div class="fa-rail">
-                {{-- โลโก้ = ตรา MPM Food Group (เครื่องบินเจ็ท) — ตัว J แดงใช้เฉพาะ favicon --}}
-                <a href="{{ route('dashboard') }}" class="fa-rail-logo" title="หน้าแรก">
-                    @if($appLogo)
-                        <img src="{{ $appLogo }}" alt="logo">
-                    @elseif(is_file(public_path('images/logos/mpm-food-group.jpg')))
-                        <img src="{{ asset('images/logos/mpm-food-group.jpg') }}" alt="MPM Food Group logo">
-                    @else
-                        <span>ป</span>
-                    @endif
-                </a>
-                @foreach($menuSections as $i => $section)
-                    <button type="button" class="fa-rail-btn" :class="sec === {{ $i }} && 'active'"
-                        data-label="{{ $section['label'] }}"
-                        @click="sec = {{ $i }}; document.documentElement.classList.remove('subnav-collapsed'); localStorage.setItem('erp-subnav', 'open')">
-                        <i class="bi {{ $railIcons[$section['label']] ?? 'bi-grid-fill' }}"></i>
-                        <span class="fa-rail-btn-label">{{ $railShort[$section['label']] ?? $section['label'] }}</span>
-                    </button>
-                @endforeach
-            </div>
-
-            {{-- ชั้น 2: แผงเมนูย่อยของโมดูลที่เลือก --}}
-            <div class="fa-subnav">
-                <a href="{{ route('dashboard') }}" class="fa-subnav-brand text-decoration-none">
-                    @if($appLogo)<img src="{{ $appLogo }}" alt="{{ $systemName }}"><span class="fa-subnav-system-name">{{ $systemName }}</span>
-                    @else<div class="brand-logo" style="font-size:14px">{{ $systemName }}</div>@endif
-                </a>
-                @foreach($menuSections as $i => $section)
-                    <div x-show="sec === {{ $i }}" @if($i !== $activeSection) x-cloak @endif>
-                        <div class="fa-subnav-title">{{ $section['displayLabel'] ?? $section['label'] }}</div>
-                        @foreach($section['items'] as $item)
-                            @php
-                                $active = request()->routeIs($item['pattern']) || (isset($item['extraPattern']) && request()->routeIs($item['extraPattern']));
-                                if ($active && array_key_exists('queryCategory', $item)) {
-                                    $active = request('category') === $item['queryCategory'];
-                                } elseif ($active && $item['route'] === 'reports.index' && ($item['params'] ?? []) === []) {
-                                    $active = !request()->filled('category');
-                                }
-                            @endphp
-                            <a href="{{ route($item['route'], $item['params'] ?? []) }}" class="fa-subnav-link {{ $active ? 'active' : '' }}" @if(isset($item['target'])) target="{{ $item['target'] }}" @endif>
-                                <i class="bi {{ $item['icon'] }}"></i>
-                                <span>{{ $item['label'] }}</span>
-                            </a>
-                        @endforeach
-                    </div>
-                @endforeach
-            </div>
-        </aside>
-@endif
 
         {{-- เลื่อนแตะเพื่อปิด sidebar บนจอมือถือ (แสดงเฉพาะตอน sidebar เปิดอยู่) --}}
         <div class="mobile-sidebar-backdrop" onclick="document.documentElement.classList.remove('mobile-sidebar-open')"></div>
@@ -2125,7 +2200,7 @@
                 detail: { index: Number(target.dataset.sec) },
             }));
         } else {
-            target.scrollIntoView({ block: 'nearest' });
+            side.scrollTop = 0;
         }
     }
 
@@ -2139,12 +2214,14 @@
         });
     }
 
-    /* กดหมวดบนแถบบน = เลื่อนไปหมวดนั้นในเมนูข้าง แล้วกางให้ */
+    /* กดหมวดบนแถบบน = สลับหมวดในเมนูข้างโดยไม่เลื่อนหน้าจอ */
     navLinks.forEach(function (link) {
         link.addEventListener('click', function (event) {
             var target = document.getElementById('odn-grp-' + link.dataset.sec);
             if (!target) { return; }
             event.preventDefault();
+            document.documentElement.classList.remove('subnav-collapsed');
+            try { localStorage.setItem('erp-subnav', 'open'); } catch (e) {}
             showGroup(target, link);
         });
     });
