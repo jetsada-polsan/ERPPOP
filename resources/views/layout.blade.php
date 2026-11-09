@@ -1862,24 +1862,6 @@
                 <div>@if(\App\Models\AppSetting::logoUrl())<img src="{{ \App\Models\AppSetting::logoUrl() }}" alt="">@endif</div>
                 <div><strong>{{ \App\Models\AppSetting::company('name_th') }}</strong> · @yield('page-title') · {{ now()->format('d/m/Y H:i') }}</div>
             </div>
-            @if(!request()->boolean('popup') && !empty($menuSections))
-            <div class="erp-peak-topcard-wrap no-print">
-                <nav class="erp-peak-topcard" aria-label="แถบเมนูหลัก">
-                    @foreach($menuSections as $i => $section)
-                        @php
-                            $firstItem = $section['items'][0] ?? null;
-                            $tabHref = $firstItem ? route($firstItem['route'], $firstItem['params'] ?? []) : '#';
-                            $tabIcon = $railIcons[$section['label']] ?? 'bi-grid-fill';
-                            $tabLabel = $railShort[$section['label']] ?? ($section['displayLabel'] ?? $section['label']);
-                        @endphp
-                        <a href="{{ $tabHref }}" class="erp-peak-topcard-tab {{ $i === $activeSection ? 'is-active' : '' }}">
-                            <i class="bi {{ $tabIcon }}"></i>
-                            <span>{{ $tabLabel }}</span>
-                        </a>
-                    @endforeach
-                </nav>
-            </div>
-            @endif
             <div class="app-content">
                 <div class="container-fluid px-0">
                     @yield('content')
