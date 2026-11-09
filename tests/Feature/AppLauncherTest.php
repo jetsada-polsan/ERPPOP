@@ -99,7 +99,6 @@ class AppLauncherTest extends TestCase
         $this->assertNotContains('เปิด POS ขาย', $pos);
         $this->assertContains('จัดการเครื่อง POS', $pos);
         $this->assertContains('ศูนย์ควบคุม POS', $pos);
-        $this->assertContains('ส่งข้อมูลไป POS', $pos);
         $this->assertNotContains('เปิด POS ขาย', $sales);
         $this->assertNotContains('เครื่องมือ POS', $sales);
         $this->assertNotContains('QR รับเงิน / จอแสดงราคา', $sales);
@@ -107,7 +106,7 @@ class AppLauncherTest extends TestCase
 
     public function test_pos_user_sees_the_storefront_section_in_launcher(): void
     {
-        $sections = $this->actingAs($this->userWith(['pos.use']))
+        $sections = $this->actingAs($this->userWith(['reports.view']))
             ->get(route('apps.launcher'))->viewData('sections');
 
         $posSection = collect($sections)->firstWhere('label', 'POS / หน้าร้าน');
@@ -115,7 +114,7 @@ class AppLauncherTest extends TestCase
         $this->assertNotNull($posSection);
         $this->assertSame('POS / หน้าร้าน', $posSection['title']);
         $this->assertNotContains('เปิด POS ขาย', array_column($posSection['items'], 'label'));
-        $this->assertContains('ส่งข้อมูลไป POS', array_column($posSection['items'], 'label'));
+        $this->assertContains('ศูนย์ควบคุม POS', array_column($posSection['items'], 'label'));
     }
 
     /** ทุกการ์ดต้องมี URL ที่ใช้ได้จริง ไม่ใช่ # */

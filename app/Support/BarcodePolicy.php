@@ -47,7 +47,7 @@ class BarcodePolicy
         self::CODE128 => 'Code 128',
         self::CODE39 => 'Code 39',
         self::QR_CODE => 'QR Code',
-        self::LEGACY => 'Legacy / BPlus',
+        self::LEGACY => 'Legacy (เก็บตามจริง)',
     ];
 
     /** กลุ่มที่แสดงเป็น badge: internal, ean13, scale, legacy */
@@ -57,7 +57,7 @@ class BarcodePolicy
         self::SCALE_WEIGHT => 'scale', self::SCALE_PLU => 'scale', self::LEGACY => 'legacy',
     ];
 
-    public const GROUP_LABELS = ['internal' => 'Internal', 'ean13' => 'EAN-13', 'scale' => 'PLU เครื่องชั่ง', 'legacy' => 'Legacy / BPlus'];
+    public const GROUP_LABELS = ['internal' => 'Internal', 'ean13' => 'EAN-13', 'scale' => 'PLU เครื่องชั่ง', 'legacy' => 'Legacy'];
 
     /**
      * ตรวจบาร์โค้ดตามประเภท

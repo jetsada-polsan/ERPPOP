@@ -1,7 +1,7 @@
 @extends('layout')
 @section('title', 'ผู้ใช้และสิทธิ์ - MPM Food Group')
 @section('page-title', 'ผู้ใช้และสิทธิ์')
-@section('page-subtitle', 'จัดการผู้ใช้ บทบาท และสิทธิ์การใช้งานตามแบบฉบับ BPlus')
+@section('page-subtitle', 'จัดการผู้ใช้ บทบาท และสิทธิ์การใช้งาน')
 @section('content')
 @php($resetResult = session('reset_login_result') ?? session('reset_pos_pin_result') ?? session('reset_password_result'))
 <div x-data="userPage()" x-cloak>
@@ -343,7 +343,7 @@
     </div>
 
     <div class="content-card p-4">
-        <h2 class="h5 fw-bold mb-3"><i class="bi bi-diagram-3-fill me-2" style="color:var(--erp-primary)"></i>บทบาทและสิทธิ์ (ตามแบบ BPlus)</h2>
+        <h2 class="h5 fw-bold mb-3"><i class="bi bi-diagram-3-fill me-2" style="color:var(--erp-primary)"></i>บทบาทและสิทธิ์การใช้งาน</h2>
         <div class="table-responsive">
             <table class="table table-sm align-middle">
                 <thead><tr><th>บทบาท</th><th>สิทธิ์ที่ได้รับ</th></tr></thead>
