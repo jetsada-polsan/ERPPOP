@@ -201,8 +201,8 @@ $isPartial = $openItem && $openItem->status === 'partial';
                     <div class="d-flex justify-content-between fw-bold"><span>ค้างชำระ</span><span class="text-danger">฿{{ number_format($openItem->balance_amount, 2) }}</span></div>
                 </div>
                 <label class="form-label text-muted small">ยอดชำระ</label>
-                <input type="number" step="0.01" min="0.01" max="{{ $openItem->balance_amount }}"
-                    name="amount[]" value="{{ $openItem->balance_amount }}" required class="form-control form-control-lg fw-bold text-end">
+                <input type="number" step="0.01" min="0.01" max="{{ number_format((float) $openItem->balance_amount, 2, '.', '') }}"
+                    name="amount[]" value="{{ number_format((float) $openItem->balance_amount, 2, '.', '') }}" required class="form-control form-control-lg fw-bold text-end">
             </div>
             <div class="modal-footer border-0 px-4 pb-4 pt-0">
                 <button type="button" class="btn btn-light border px-4" @click="payOpen=false">ยกเลิก</button>

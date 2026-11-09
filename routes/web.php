@@ -300,6 +300,13 @@ Route::prefix('sale-returns')->name('sale-returns.')->group(function () {
 
 // Payment receipt / voucher show page.
 // จ่ายชำระเจ้าหนี้: เลือกใบซื้อค้างจ่ายได้หลายใบ เงินสด/โอน/เช็ค + หัก ณ ที่จ่าย
+// ใบเสร็จรับเงิน (รับชำระลูกหนี้) แบบ BPlus: เลือกลูกค้า → ดึงบิลค้าง → เลือกวิธีชำระ
+Route::prefix('ar-receipts')->name('ar-receipts.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\ArReceiptController::class, 'index'])->name('index');
+    Route::get('/create', [\App\Http\Controllers\ArReceiptController::class, 'create'])->name('create');
+    Route::post('/', [\App\Http\Controllers\ArReceiptController::class, 'store'])->name('store');
+});
+
 Route::prefix('ap-payments')->name('ap-payments.')->group(function () {
     Route::get('/', [ApPaymentController::class, 'index'])->name('index');
     Route::get('/create', [ApPaymentController::class, 'create'])->name('create');
