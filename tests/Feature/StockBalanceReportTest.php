@@ -127,8 +127,8 @@ class StockBalanceReportTest extends TestCase
             $this->assertSame(1, $result['total']);
         }
         $csv = $this->report($own, $parameters + ['export' => 'csv'])->assertOk()->streamedContent();
-        $this->assertStringContainsString('รหัส,ชื่อ,"คงเหลือ (หน่วยหลัก / ย่อย)"', $csv);
-        $this->assertStringNotContainsString('สาขา B001', $csv);
+        $this->assertStringContainsString('รหัส,ชื่อ,ที่เก็บ,จำนวนหน่วยฐาน,หน่วยฐาน,"คงเหลือ (หน่วยหลัก / ย่อย)"', $csv);
+        $this->assertStringContainsString('สาขา B001', $csv);
         $this->assertStringNotContainsString('สาขา HQ', $csv);
 
         $this->actingAs($this->viewer(null));

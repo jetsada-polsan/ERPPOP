@@ -8,7 +8,7 @@
     <input type="hidden" name="sheet" value="{{ $sheet }}">
     <div class="btn-group" role="group">
         @foreach($sheets as $key => $label)
-            <a href="{{ route('financial-statements.index', ['sheet' => $key, 'from' => $from, 'to' => $to]) }}"
+            <a href="{{ route('financial-statements.index', ['sheet' => $key, 'from' => $from, 'to' => $to, 'branch_id' => $branchId]) }}"
                class="btn btn-sm {{ $sheet === $key ? 'btn-primary' : 'btn-light border' }}">{{ $label }}</a>
         @endforeach
     </div>
@@ -18,6 +18,10 @@
         <span class="text-muted small">ถึง</span>
     @endif
     <input type="date" name="to" value="{{ $to }}" class="form-control form-control-sm" style="width:150px">
+    <select name="branch_id" class="form-select form-select-sm" style="width:180px" aria-label="สาขา">
+        @if($allBranches)<option value="all">ทุกสาขา</option>@endif
+        @foreach($branches as $branch)<option value="{{ $branch->id }}" @selected($branchId === $branch->id)>{{ $branch->name_th }}</option>@endforeach
+    </select>
     <button class="btn btn-sm btn-primary px-3"><i class="bi bi-arrow-repeat me-1"></i>แสดง</button>
     <button type="button" onclick="window.print()" class="btn btn-sm btn-light border"><i class="bi bi-printer me-1"></i>พิมพ์</button>
 </form>
@@ -57,8 +61,8 @@
                     <td class="text-end">{{ number_format($totalCredit, 2) }}</td>
                 </tr>
                 <tr>
-                    <td colspan="5" class="text-center small {{ abs($totalDebit - $totalCredit) < 0.5 ? 'text-success' : 'text-danger' }}">
-                        {{ abs($totalDebit - $totalCredit) < 0.5 ? '✓ เดบิตเท่ากับเครดิต — งบดุล' : '⚠ เดบิตไม่เท่ากับเครดิต ต่าง ' . number_format(abs($totalDebit - $totalCredit), 2) }}
+                    <td colspan="5" class="text-center small {{ \App\Support\DecimalMath::compare(\App\Support\DecimalMath::absoluteDifference($totalDebit, $totalCredit), '0.01') <= 0 ? 'text-success' : 'text-danger' }}">
+                        {{ \App\Support\DecimalMath::compare(\App\Support\DecimalMath::absoluteDifference($totalDebit, $totalCredit), '0.01') <= 0 ? '✓ เดบิตเท่ากับเครดิต — งบดุล' : '⚠ เดบิตไม่เท่ากับเครดิต ต่าง ' . number_format(abs($totalDebit - $totalCredit), 2) }}
                     </td>
                 </tr>
             </tfoot>

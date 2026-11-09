@@ -12,6 +12,8 @@ use App\Models\ChartOfAccount;
 use App\Models\Supplier;
 use App\Services\Accounting\BranchExpenseService;
 use App\Services\Accounting\MonthlyAccountingExportService;
+use App\Services\Reports\ReportScope;
+use App\Support\DecimalMath;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,7 +28,7 @@ class MonthlyAccountingController extends Controller
     public function index(Request $request): View
     {
         $period = preg_match('/^\d{4}-\d{2}$/', (string) $request->query('period')) ? $request->query('period') : now()->format('Y-m');
-        $branchId = $request->integer('branch_id') ?: null;
+        $branchId = app(ReportScope::class)->branchId($request->input('branch_id'));
         $from = Carbon::createFromFormat('!Y-m', $period)->startOfMonth();
         $to = $from->copy()->endOfMonth();
 
@@ -44,14 +46,11 @@ class MonthlyAccountingController extends Controller
         $posPayments = DB::table('pos_payments as pp')
             ->join('pos_receipts as pr', 'pr.id', '=', 'pp.pos_receipt_id')
             ->join('pos_terminals as pt', 'pt.id', '=', 'pr.pos_terminal_id')
-            ->leftJoin('bank_reconciliations as br', function ($join) {
-                $join->on('br.source_id', '=', 'pp.id')->where('br.source_type', '=', 'pos_payment');
-            })
             ->whereBetween('pr.receipt_date', [$from, $to])->where('pr.status', 'completed')
             ->when($branchId, fn ($q) => $q->where('pt.branch_id', $branchId))
-            ->get(['pp.id', 'pp.method', 'pp.amount', 'pp.payment_reference', 'pp.transfer_account_last4', 'pr.receipt_no', 'pr.receipt_date', 'pt.branch_id', 'br.status as reconciliation_status']);
+            ->selectRaw("pp.id, pp.method, pp.amount, pp.payment_reference, pp.transfer_account_last4, pr.receipt_no, pr.receipt_date, pt.branch_id, case when exists(select 1 from bank_reconciliations br where br.source_type = 'pos_payment' and br.source_id = pp.id and br.status = 'matched') then 'matched' else 'unmatched' end as reconciliation_status")->get();
         $posMethodTotals = $posPayments->groupBy('method')->map(fn ($rows) => [
-            'count' => $rows->count(), 'amount' => (float) $rows->sum('amount'),
+            'count' => $rows->count(), 'amount' => DecimalMath::sum($rows->pluck('amount'), 2),
         ]);
         $posTransferRows = $posPayments->filter(fn ($row) => in_array($row->method, ['transfer', 'qr', 'bank'], true));
         $posUnmatchedTransfers = $posTransferRows->filter(fn ($row) => $row->reconciliation_status !== 'matched');
@@ -61,17 +60,17 @@ class MonthlyAccountingController extends Controller
 
         return view('monthly-accounting.index', [
             'period' => $period, 'branchId' => $branchId, 'expenses' => $expenses, 'statements' => $statements,
-            'branches' => Branch::orderBy('code')->get(), 'bankAccounts' => BankAccount::orderBy('bank_name')->get(),
+            'branches' => app(ReportScope::class)->apply(Branch::query(), 'id')->orderBy('code')->get(), 'bankAccounts' => app(ReportScope::class)->apply(BankAccount::query())->orderBy('bank_name')->get(),
             'expenseAccounts' => ChartOfAccount::where('account_type', 'expense')->orderBy('code')->get(),
-            'costCenters' => DB::table('cost_centers')->where('is_active', true)->orderBy('code')->get(),
+            'costCenters' => app(ReportScope::class)->apply(DB::table('cost_centers'))->where('is_active', true)->orderBy('code')->get(),
             'suppliers' => Supplier::where('is_active', true)->orderBy('name_th')->get(['id', 'name_th', 'tax_id', 'tax_branch']),
             'exportRuns' => AccountingExportRun::where('period', $period)->when($branchId, fn ($q) => $q->where('branch_id', $branchId))->orderByDesc('exported_at')->limit(10)->get(),
             'posControl' => [
                 'receipt_count' => (int) ($posSales->receipt_count ?? 0), 'net_sales' => (float) ($posSales->net_sales ?? 0),
                 'vat_sales' => (float) ($posSales->vat_sales ?? 0), 'methods' => $posMethodTotals,
-                'transfer_unmatched_count' => $posUnmatchedTransfers->count(), 'transfer_unmatched_amount' => (float) $posUnmatchedTransfers->sum('amount'),
-                'statement_income_count' => $statementIncome->count(), 'statement_income_amount' => (float) $statementIncome->sum('amount'),
-                'matched_statement_income_amount' => (float) $matchedStatementIncome->sum(fn ($s) => (float) $s->amount),
+                'transfer_unmatched_count' => $posUnmatchedTransfers->count(), 'transfer_unmatched_amount' => DecimalMath::sum($posUnmatchedTransfers->pluck('amount'), 2),
+                'statement_income_count' => $statementIncome->count(), 'statement_income_amount' => DecimalMath::sum($statementIncome->pluck('amount'), 2),
+                'matched_statement_income_amount' => DecimalMath::sum($matchedStatementIncome->pluck('amount'), 2),
                 'unmatched_transfers' => $posUnmatchedTransfers->sortByDesc('receipt_date')->take(30)->values(),
             ],
             'stats' => [
@@ -95,6 +94,7 @@ class MonthlyAccountingController extends Controller
             'bank_account_id' => ['nullable', 'integer', 'exists:bank_accounts,id', 'required_if:payment_method,transfer'],
             'payment_reference' => ['nullable', 'string', 'max:100'], 'evidence' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:15360'],
         ]);
+        app(ReportScope::class)->authorize($data['branch_id']);
         $data['vat_amount'] = (float) ($data['vat_amount'] ?? 0);
         $data['withholding_rate'] = (float) ($data['withholding_rate'] ?? 0);
         $data['withholding_amount'] = round((float) $data['base_amount'] * $data['withholding_rate'] / 100, 2);
@@ -120,6 +120,7 @@ class MonthlyAccountingController extends Controller
     public function importStatement(Request $request): RedirectResponse
     {
         $data = $request->validate(['bank_account_id' => ['required', 'exists:bank_accounts,id'], 'statement_file' => ['required', 'file', 'mimes:csv,txt', 'max:10240']]);
+        app(ReportScope::class)->authorize(BankAccount::findOrFail($data['bank_account_id'])->branch_id);
         $handle = fopen($request->file('statement_file')->getRealPath(), 'r');
         $header = fgetcsv($handle);
         if (! $header) {
@@ -174,6 +175,7 @@ class MonthlyAccountingController extends Controller
             'reference' => ['nullable', 'string', 'max:120'], 'expected_amount' => ['required', 'numeric', 'min:0'], 'note' => ['nullable', 'string', 'max:2000'],
             'slip' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:15360'],
         ]);
+        app(ReportScope::class)->authorize($bankStatement->bankAccount?->branch_id);
         $difference = round(abs((float) $bankStatement->amount) - (float) $data['expected_amount'], 2);
         $data += ['difference_amount' => $difference, 'status' => abs($difference) <= 0.01 ? 'matched' : 'mismatch', 'checked_by' => auth()->id(), 'checked_at' => now()];
         $old = $bankStatement->reconciliation;
@@ -192,6 +194,7 @@ class MonthlyAccountingController extends Controller
     public function autoReconcile(Request $request): RedirectResponse
     {
         $data = $request->validate(['period' => ['required', 'date_format:Y-m'], 'branch_id' => ['nullable', 'exists:branches,id']]);
+        $data['branch_id'] = app(ReportScope::class)->branchId($data['branch_id'] ?? null);
         $from = Carbon::createFromFormat('!Y-m', $data['period'])->startOfMonth();
         $to = $from->copy()->endOfMonth();
         $statements = BankStatement::with('bankAccount')->whereBetween('statement_date', [$from, $to])
@@ -258,6 +261,7 @@ class MonthlyAccountingController extends Controller
     public function export(Request $request, MonthlyAccountingExportService $service): BinaryFileResponse
     {
         $data = $request->validate(['period' => ['required', 'date_format:Y-m'], 'branch_id' => ['nullable', 'exists:branches,id']]);
+        $data['branch_id'] = app(ReportScope::class)->branchId($data['branch_id'] ?? null);
         $from = Carbon::createFromFormat('!Y-m', $data['period'])->startOfMonth();
         $to = $from->copy()->endOfMonth();
         $hasUnreconciled = BankStatement::whereBetween('statement_date', [$from, $to])
@@ -274,6 +278,7 @@ class MonthlyAccountingController extends Controller
 
     public function downloadRun(AccountingExportRun $run): BinaryFileResponse
     {
+        app(ReportScope::class)->authorize($run->branch_id);
         abort_unless(Storage::disk('local')->exists($run->file_name), 404);
 
         return response()->download(Storage::disk('local')->path($run->file_name), basename($run->file_name));

@@ -24,11 +24,13 @@
             <strong class="exec-kpi-value" x-text="money(data.today.sales)"></strong>
             <span class="exec-kpi-foot" x-html="deltaLabel(data.compare.sales, 'เทียบเมื่อวาน')"></span>
         </div>
+        @if(app(\App\Services\Reports\ReportScope::class)->canSeeProfit())
         <div class="exec-kpi">
             <span class="exec-kpi-label">กำไรขั้นต้น</span>
-            <strong class="exec-kpi-value" x-text="money(data.today.profit)"></strong>
-            <span class="exec-kpi-foot"><b x-text="data.today.margin + '%'"></b> ของยอดขาย</span>
+            <strong class="exec-kpi-value" x-text="data.today.profit === null ? 'ไม่ทราบ' : money(data.today.profit)"></strong>
+            <span class="exec-kpi-foot"><b x-text="data.today.margin === null ? 'ไม่ทราบ' : data.today.margin + '%'"></b> ของยอดขาย</span>
         </div>
+        @endif
         <div class="exec-kpi">
             <span class="exec-kpi-label">จำนวนบิล</span>
             <strong class="exec-kpi-value" x-text="number(data.today.bills)"></strong>
@@ -113,6 +115,7 @@
             </ol>
         </section>
 
+        @if(app(\App\Services\Reports\ReportScope::class)->canSeeProfit())
         <section class="exec-card exec-card-wide">
             <h2>สินค้าที่ควรทบทวนกำไร</h2>
             <p class="exec-note">ยอดขายย้อนหลัง 30 วัน · แสดงสินค้าที่ margin ต่ำกว่า 10%</p>
@@ -124,6 +127,7 @@
             </div>
         </section>
 
+        @endif
         <section class="exec-card exec-card-wide">
             <h2>เรื่องที่ต้องตาม</h2>
             <p class="exec-note">ทุกช่องควรเป็นศูนย์ — ตัวไหนไม่เป็นศูนย์คือมีงานค้าง</p>

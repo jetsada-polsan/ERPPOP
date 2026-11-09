@@ -20,6 +20,7 @@ use App\Models\User;
 use App\Models\VatRate;
 use App\Services\Accounting\CashBookPostingService;
 use App\Services\Purchasing\ReplenishmentService;
+use App\Services\Reports\ReportScope;
 use App\Services\Sales\DocumentNumberGenerator;
 use App\Support\PythonPosInstaller;
 use Illuminate\Http\RedirectResponse;
@@ -211,9 +212,9 @@ class BplusOperationController extends Controller
     public function finance(): View
     {
         return view('bplus-ops.finance', [
-            'cashBooks' => CashBook::with('branch')->orderByDesc('entry_date')->orderByDesc('id')->paginate(40),
-            'bankAccounts' => BankAccount::orderBy('bank_name')->get(),
-            'branches' => Branch::orderBy('code')->get(),
+            'cashBooks' => app(ReportScope::class)->apply(CashBook::query())->with('branch')->orderByDesc('entry_date')->orderByDesc('id')->paginate(40),
+            'bankAccounts' => app(ReportScope::class)->apply(BankAccount::query())->orderBy('bank_name')->get(),
+            'branches' => app(ReportScope::class)->apply(Branch::query(), 'id')->orderBy('code')->get(),
             // ผู้อนุมัติรายการปรับเงินสด = คนที่ถือสิทธิ์การเงินจริงเท่านั้น
             'approvers' => User::where('is_active', true)
                 ->whereHas('roles.permissions', fn ($query) => $query->where('code', 'finance.manage'))

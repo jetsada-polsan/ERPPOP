@@ -23,7 +23,7 @@ class ManagementProfitReportTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_management_profit_report_uses_product_cost_when_legacy_cost_snapshot_is_missing(): void
+    public function test_management_profit_report_keeps_unknown_cost_when_legacy_snapshot_is_missing(): void
     {
         $user = User::factory()->create([
             'username' => 'management-profit-'.uniqid(),
@@ -37,6 +37,7 @@ class ManagementProfitReportTest extends TestCase
         $this->actingAs($user);
 
         $branch = Branch::create(['code' => 'MGT', 'name_th' => 'สาขาทดสอบรายงาน', 'is_active' => true]);
+        $user->update(['branch_id' => $branch->id]);
         $warehouse = Warehouse::create(['branch_id' => $branch->id, 'code' => 'WH-MGT', 'name' => 'คลังทดสอบ']);
         $location = WarehouseLocation::create(['warehouse_id' => $warehouse->id, 'code' => 'LOC-MGT', 'name' => 'พื้นที่ทดสอบ']);
         $unit = ProductUnit::create(['code' => 'EA-MGT', 'name' => 'ชิ้น', 'qty_per_base_unit' => 1]);
@@ -65,7 +66,7 @@ class ManagementProfitReportTest extends TestCase
         $row = $view->getData()['profit']->firstWhere('id', $branch->id);
 
         $this->assertSame(200.0, (float) $row->sales);
-        $this->assertSame(200.0, (float) $row->cogs);
-        $this->assertSame(0.0, (float) $row->net_profit);
+        $this->assertNull($row->cogs);
+        $this->assertNull($row->net_profit);
     }
 }

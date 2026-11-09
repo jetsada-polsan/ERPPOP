@@ -6,6 +6,8 @@ use App\Models\AccountingExportRun;
 use App\Models\AppSetting;
 use App\Models\BankStatement;
 use App\Models\BranchExpense;
+use App\Services\Reports\ReportScope;
+use App\Support\DecimalMath;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +25,7 @@ class MonthlyAccountingExportService
 
         $from = Carbon::createFromFormat('!Y-m', $period)->startOfMonth();
         $to = $from->copy()->endOfMonth();
+        app(ReportScope::class)->authorize($branchId);
         $scope = fn ($query, string $column) => $branchId ? $query->where($column, $branchId) : $query;
 
         $expenses = BranchExpense::with(['branch', 'expenseAccount', 'bankAccount', 'document'])
@@ -43,16 +46,16 @@ class MonthlyAccountingExportService
         $gl = DB::table('gl_journals as g')->join('chart_of_accounts as a', 'a.id', '=', 'g.account_id')
             ->leftJoin('documents as d', 'd.id', '=', 'g.document_id')
             ->whereBetween('g.entry_date', [$from->toDateString(), $to->toDateString()]);
-        $scope($gl, 'd.branch_id');
+        app(ReportScope::class)->applyGl($gl, 'g', $branchId);
         $glRows = $gl->orderBy('g.entry_date')->orderBy('g.id')->get(['g.entry_date', 'd.doc_number', 'a.code', 'a.name_th', 'g.debit', 'g.credit', 'g.remark']);
 
         $summary = [
-            'sales_total' => round($sales->sum(fn ($r) => $r[7]), 2),
-            'sales_vat' => round($sales->sum(fn ($r) => $r[6]), 2),
-            'purchase_total' => round($purchases->sum(fn ($r) => $r[7]), 2),
-            'purchase_vat' => round($purchases->sum(fn ($r) => $r[6]), 2),
-            'expenses_total' => round($expenses->sum('total_amount'), 2),
-            'withholding_tax' => round($expenses->sum('withholding_amount'), 2),
+            'sales_total' => DecimalMath::sum($sales->map(fn ($r) => $r[7]), 2),
+            'sales_vat' => DecimalMath::sum($sales->map(fn ($r) => $r[6]), 2),
+            'purchase_total' => DecimalMath::sum($purchases->map(fn ($r) => $r[7]), 2),
+            'purchase_vat' => DecimalMath::sum($purchases->map(fn ($r) => $r[6]), 2),
+            'expenses_total' => DecimalMath::sum($expenses->pluck('total_amount'), 2),
+            'withholding_tax' => DecimalMath::sum($expenses->pluck('withholding_amount'), 2),
             'statement_count' => $statements->count(),
             'unreconciled_count' => $statements->filter(fn ($s) => $s->reconciliation?->status !== 'matched')->count(),
         ];
@@ -108,19 +111,20 @@ class MonthlyAccountingExportService
     private function salesVat(Carbon $from, Carbon $to, ?int $branchId): Collection
     {
         $docs = DB::table('documents as d')->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')
-            ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN'])->whereNull('d.cancelled_at')
+            ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN', 'CREDIT_NOTE', 'DEBIT_NOTE'])->where('d.status', 'active')->whereNull('d.cancelled_at')
             ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('pos_receipts as pr')->whereColumn('pr.document_id', 'd.id'))
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()])->when($branchId, fn ($q) => $q->where('d.branch_id', $branchId))
-            ->get(['d.doc_date', 'd.doc_number', 'dt.code', 'c.name_th', 'c.tax_id', 'd.total_amount'])->map(function ($r) {
-                $sign = $r->code === 'SALE_RETURN' ? -1 : 1;
-                $total = $sign * (float) $r->total_amount;
-                $base = round($total * 100 / (100 + $this->vatRateAt($r->doc_date)), 2);
+            ->get(['d.doc_date', 'd.doc_number', 'dt.code', 'c.name_th', 'c.tax_id', 'd.total_amount', 'd.vat_amount'])->map(function ($r) {
+                $sign = in_array($r->code, ['SALE_RETURN', 'CREDIT_NOTE'], true) ? -1 : 1;
+                $total = DecimalMath::multiply($sign, $r->total_amount, 2);
+                $vat = DecimalMath::multiply($sign, $r->vat_amount, 2);
+                $base = DecimalMath::subtract($total, $vat, 2);
 
-                return [$r->doc_date, $r->doc_number, $r->name_th ?: 'ลูกค้าทั่วไป', $r->tax_id, null, $base, round($total - $base, 2), $total, $r->code];
+                return [$r->doc_date, $r->doc_number, $r->name_th ?: 'ลูกค้าทั่วไป', $r->tax_id, null, $base, $vat, $total, $r->code];
             });
         $pos = DB::table('pos_receipts as r')->join('pos_terminals as t', 't.id', '=', 'r.pos_terminal_id')->where('r.status', 'completed')
             ->whereBetween('r.receipt_date', [$from, $to])->when($branchId, fn ($q) => $q->where('t.branch_id', $branchId))->get(['r.receipt_date', 'r.receipt_no', 'r.net_sales', 'r.vat_amount'])
-            ->map(fn ($r) => [substr($r->receipt_date, 0, 10), $r->receipt_no, 'ขายปลีก POS', null, null, round((float) $r->net_sales - (float) $r->vat_amount, 2), (float) $r->vat_amount, (float) $r->net_sales, 'POS']);
+            ->map(fn ($r) => [substr($r->receipt_date, 0, 10), $r->receipt_no, 'ขายปลีก POS', null, null, DecimalMath::subtract($r->net_sales, $r->vat_amount, 2), DecimalMath::round($r->vat_amount, 2), DecimalMath::round($r->net_sales, 2), 'POS']);
 
         return $docs->concat($pos)->sortBy(fn ($r) => $r[0].$r[1])->values();
     }
@@ -128,22 +132,16 @@ class MonthlyAccountingExportService
     private function purchaseVat(Carbon $from, Carbon $to, ?int $branchId): Collection
     {
         return DB::table('documents as d')->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')->leftJoin('suppliers as s', 's.id', '=', 'd.supplier_id')
-            ->where('dt.code', 'PURCHASE')->whereNull('d.cancelled_at')->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()])
+            ->where('dt.code', 'PURCHASE')->where('d.status', 'active')->where('d.claim_input_vat', true)->whereNull('d.cancelled_at')->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()])
             ->when($branchId, fn ($q) => $q->where('d.branch_id', $branchId))->orderBy('d.doc_date')
-            ->get(['d.doc_date', 'd.doc_number', 'd.reference', 's.name_th', 's.tax_id', 's.tax_branch', 'd.total_amount'])
+            ->get(['d.doc_date', 'd.doc_number', 'd.reference', 's.name_th', 's.tax_id', 's.tax_branch', 'd.total_amount', 'd.vat_amount'])
             ->map(function ($r) {
-                $total = (float) $r->total_amount;
-                $base = round($total * 100 / (100 + $this->vatRateAt($r->doc_date)), 2);
+                $total = DecimalMath::round($r->total_amount, 2);
+                $vat = DecimalMath::round($r->vat_amount, 2);
+                $base = DecimalMath::subtract($total, $vat, 2);
 
-                return [$r->doc_date, $r->reference ?: $r->doc_number, $r->name_th, $r->tax_id, $r->tax_branch, $base, round($total - $base, 2), $total, 'ซื้อสินค้า'];
+                return [$r->doc_date, $r->reference ?: $r->doc_number, $r->name_th, $r->tax_id, $r->tax_branch, $base, $vat, $total, 'ซื้อสินค้า'];
             });
-    }
-
-    private function vatRateAt(string $date): float
-    {
-        return (float) (DB::table('vat_rates')->where('effective_from', '<=', $date)
-            ->where(fn ($q) => $q->whereNull('effective_to')->orWhere('effective_to', '>=', $date))
-            ->orderByDesc('effective_from')->value('rate_percent') ?? 7);
     }
 
     private function csv(array $headers, Collection $rows): string

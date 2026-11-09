@@ -112,7 +112,7 @@ class PosOfflineSaleTest extends TestCase
     public function test_manager_retry_posts_in_the_cashiers_name_and_restores_the_manager(): void
     {
         $cashier = $this->userWith(['pos.use', 'pos.sell']);
-        $manager = $this->userWith(['pos.use', 'pos.void', 'reports.view']);
+        $manager = $this->userWith(['pos.use', 'pos.void', 'reports.view', 'reports.all_branches']);
         $sale = PosOfflineSale::create([
             'offline_uuid' => (string) Str::uuid(), 'user_id' => $cashier->id, 'sold_at' => now(),
             'status' => PosOfflineSale::NEEDS_REVIEW, 'review_reason' => 'กะปิดแล้ว',
@@ -142,11 +142,11 @@ class PosOfflineSaleTest extends TestCase
             'status' => PosOfflineSale::NEEDS_REVIEW, 'payload' => ['items' => []],
         ]);
 
-        $this->actingAs($this->userWith(['pos.use', 'pos.void', 'reports.view']))
+        $this->actingAs($this->userWith(['pos.use', 'pos.void', 'reports.view', 'reports.all_branches']))
             ->post(route('pos.offline-sales.resolve', $sale), ['note' => 'คีย์บิลใหม่แล้ว'])->assertRedirect();
 
         $this->assertSame(PosOfflineSale::RESOLVED, $sale->fresh()->status);
-        $this->actingAs($this->userWith(['pos.use', 'reports.view']))->get(route('pos.offline-sales.index', ['status' => 'all']))
+        $this->actingAs($this->userWith(['pos.use', 'reports.view', 'reports.all_branches']))->get(route('pos.offline-sales.index', ['status' => 'all']))
             ->assertOk()->assertSee('ปิดด้วยมือ');
     }
 

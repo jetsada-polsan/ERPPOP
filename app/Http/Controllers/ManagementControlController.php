@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\PurchasePlan;
+use App\Services\Reports\ReportScope;
+use App\Support\DecimalMath;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,26 +23,16 @@ class ManagementControlController extends Controller
         $canPurchase = $user?->hasPermission('purchasing.manage');
         $period = $request->query('period', now()->format('Y-m'));
         [$from, $to] = $this->period($period);
-        $profit = DB::table('branches as b')->get(['b.id', 'b.code', 'b.name_th'])->map(function ($branch) use ($from, $to) {
-            $sales = (float) DB::table('documents as d')->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
-                ->where('d.branch_id', $branch->id)->where('d.status', 'active')->whereBetween('d.doc_date', [$from, $to])
-                ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN'])
-                ->selectRaw("coalesce(sum(case when dt.code='SALE_RETURN' then -d.total_amount else d.total_amount end),0) as amount")->value('amount');
-            $cogs = (float) DB::table('stock_document_items as i')->join('stock_documents as s', 's.id', '=', 'i.stock_document_id')
-                ->join('documents as d', 'd.id', '=', 's.document_id')->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
-                ->join('products as p', 'p.id', '=', 'i.product_id')
-                ->where('d.branch_id', $branch->id)->where('d.status', 'active')->whereBetween('d.doc_date', [$from, $to])
-                ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN'])
-                ->selectRaw("coalesce(sum(case when dt.code='SALE_RETURN' then -coalesce(i.cost_amount, i.qty * coalesce(i.unit_cost, p.average_cost, 0)) else coalesce(i.cost_amount, i.qty * coalesce(i.unit_cost, p.average_cost, 0)) end),0) as amount")->value('amount');
-            $expenses = (float) DB::table('branch_expenses')->where('branch_id', $branch->id)
-                ->whereBetween('expense_date', [$from, $to])->sum('total_amount');
-            $branch->sales = $sales;
-            $branch->cogs = $cogs;
-            $branch->expenses = $expenses;
-            $branch->net_profit = $sales - $cogs - $expenses;
+        $profit = app(ReportScope::class)->canSeeProfit()
+            ? app(ReportScope::class)->apply(DB::table('branches as b'), 'b.id')->get(['b.id', 'b.code', 'b.name_th'])->map(function ($branch) use ($from, $to) {
+                $rows = app(\App\Services\Reports\DailySalesReport::class)->source($from, $to, ['branch_id' => $branch->id, 'q' => '']);
+                $branch->sales = DecimalMath::sum($rows->pluck('revenue'), 2);
+                $branch->cogs = $rows->contains(fn ($r) => $r->cogs_amount === null) ? null : DecimalMath::sum($rows->pluck('cogs_amount'), 2);
+                $branch->expenses = DecimalMath::sum(DB::table('branch_expenses')->where('branch_id', $branch->id)->whereBetween('expense_date', [$from, $to])->pluck('base_amount'), 2);
+                $branch->net_profit = $branch->cogs === null ? null : DecimalMath::subtract(DecimalMath::subtract($branch->sales, $branch->cogs), $branch->expenses, 2);
 
-            return $branch;
-        });
+                return $branch;
+            }) : collect();
 
         return view('management-controls.index', [
             'period' => $period, 'profit' => $profit,

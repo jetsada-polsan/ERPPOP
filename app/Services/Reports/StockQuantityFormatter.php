@@ -2,6 +2,8 @@
 
 namespace App\Services\Reports;
 
+use App\Support\DecimalMath;
+use Brick\Math\RoundingMode;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -21,13 +23,13 @@ class StockQuantityFormatter
             ->leftJoin('product_units as pu', 'pu.id', '=', 'pb.unit_id')
             ->whereIn('pb.product_id', $rows->pluck('product_id')->filter()->unique())
             ->where('pb.is_active', true)
-            ->where('pb.unit_factor', '>', 1)
-            ->orderByDesc('pb.unit_factor')
-            ->get(['pb.product_id', 'pb.unit_factor', 'pu.name as large_unit_name'])
+            ->where('pu.qty_per_base_unit', '>', 1)
+            ->orderByDesc('pu.qty_per_base_unit')->orderBy('pb.id')
+            ->get(['pb.product_id', 'pu.qty_per_base_unit as unit_factor', 'pu.name as large_unit_name'])
             ->groupBy('product_id');
 
         return $rows->each(function ($row) use ($unitOptions): void {
-            $quantity = (float) ($row->on_hand_qty ?? 0);
+            $quantity = DecimalMath::of($row->on_hand_qty ?? 0);
             $option = $unitOptions->get($row->product_id)?->first();
             $smallLabel = $row->unit_name ?: 'หน่วยย่อย';
 
@@ -37,17 +39,17 @@ class StockQuantityFormatter
                 return;
             }
 
-            $factor = (float) $option->unit_factor;
-            $largeQuantity = $quantity >= 0 ? floor($quantity / $factor) : ceil($quantity / $factor);
-            $smallQuantity = $quantity - ($largeQuantity * $factor);
-            $largeLabel = $option->large_unit_name ?: 'หน่วยหลัก';
+            $factor = DecimalMath::of($option->unit_factor);
+            $largeQuantity = $quantity->dividedBy($factor, 0, RoundingMode::Down);
+            $smallQuantity = $quantity->minus($largeQuantity->multipliedBy($factor));
+            $largeLabel = trim(preg_replace('/\s*[x*×]\s*\d+(?:\.\d+)?$/u', '', (string) $option->large_unit_name)) ?: 'หน่วยหลัก';
             $row->quantity_display = $this->number($largeQuantity).' '.$largeLabel
                 .' '.$this->number($smallQuantity).' '.$smallLabel;
         });
     }
 
-    private function number(float $quantity): string
+    private function number($quantity): string
     {
-        return rtrim(rtrim(number_format($quantity, 8, '.', ''), '0'), '.');
+        return rtrim(rtrim(DecimalMath::round($quantity, 8), '0'), '.');
     }
 }

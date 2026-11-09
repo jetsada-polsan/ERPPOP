@@ -39,7 +39,7 @@ class StockBalanceReport
         }
 
         $query->orderBy('p.sku_code')->orderBy('p.id')->orderBy('wl.id')
-            ->selectRaw("p.id as product_id, p.sku_code, p.name_th, coalesce(u.name, '-') as unit_name,
+            ->selectRaw("p.id as product_id, wl.id as location_id, p.sku_code, p.name_th, coalesce(u.name, '-') as unit_name,
                 concat(coalesce(b.name_th, w.name), ' / ', coalesce(wl.name, wl.code)) as location_name,
                 coalesce(sb.on_hand_qty, 0) as on_hand_qty, coalesce(sb.reserved_qty, 0) as reserved_qty,
                 coalesce((select pb.price from product_barcodes pb
@@ -58,6 +58,7 @@ class StockBalanceReport
         $barcodes = DB::table('product_barcodes')->whereIn('product_id', $rows->pluck('product_id'))
             ->orderBy('id')->get(['product_id', 'barcode'])->groupBy('product_id');
         foreach ($rows as $row) {
+            $row->stock_card_url = route('reports.index', ['category' => 'inventory', 'report' => 'stock_card_detail', 'product_id' => $row->product_id, 'location_id' => $row->location_id, 'branch_id' => $filters['branch_id'] ?? 'all', 'from' => request('from'), 'to' => request('to')]);
             $row->barcodes = ($barcodes->get($row->product_id) ?? collect())->pluck('barcode')->unique()->implode(', ');
         }
         app(StockQuantityFormatter::class)->format($rows);
@@ -67,6 +68,9 @@ class StockBalanceReport
             'columns' => [
                 ['label' => 'รหัส', 'key' => 'sku_code'],
                 ['label' => 'ชื่อ', 'key' => 'name_th'],
+                ['label' => 'ที่เก็บ', 'key' => 'location_name'],
+                ['label' => 'จำนวนหน่วยฐาน', 'key' => 'on_hand_qty', 'type' => 'quantity', 'class' => 'text-end'],
+                ['label' => 'หน่วยฐาน', 'key' => 'unit_name'],
                 ['label' => 'คงเหลือ (หน่วยหลัก / ย่อย)', 'key' => 'quantity_display', 'class' => 'text-end'],
             ],
             'rows' => $rows,

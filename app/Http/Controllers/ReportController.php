@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\ReportDefinition;
+use App\Services\Reports\ReportScope;
 use App\Services\Reports\StockBalanceReport;
 use App\Services\Reports\StockQuantityFormatter;
+use App\Support\DecimalMath;
 use App\Support\SqlDialect;
 use App\Support\XlsxWriter;
 use Carbon\Carbon;
@@ -37,6 +39,8 @@ class ReportController extends Controller
             $report = array_key_first($catalog[$category]['reports']);
         }
 
+        $request->validate(['from' => 'nullable|date', 'to' => 'nullable|date|after_or_equal:from']);
+
         // ค่าเริ่มต้น = วันนี้ (งานหลักคือเช็ครายวัน) - เลือกช่วงย้อนหลังเองได้
         $to = $request->filled('to') ? Carbon::parse($request->input('to')) : now();
         $from = $request->filled('from') ? Carbon::parse($request->input('from')) : $to->copy()->startOfDay();
@@ -63,6 +67,8 @@ class ReportController extends Controller
             'per_page' => $perPage,
             'page' => max(1, $request->integer('page', 1)),
             'paginate' => true,
+            'product_id' => $request->integer('product_id') ?: null,
+            'location_id' => $request->integer('location_id') ?: null,
         ];
 
         // ส่งออกทั้งรายงาน ไม่ใช่เท่าที่แสดงบนจอ — per_page เป็น LIMIT ของ query
@@ -70,7 +76,7 @@ class ReportController extends Controller
         if (in_array($request->input('export'), ['csv', 'xlsx'], true)) {
             abort_unless($user === null || $user->hasPermission('reports.export'), 403, 'ไม่มีสิทธิ์ส่งออกรายงาน');
 
-            $result = $this->runReport($category, $report, $from, $to, ['per_page' => self::EXPORT_ROW_CAP, 'paginate' => false] + $filters);
+            $result = app(ReportScope::class)->redact($this->runReport($category, $report, $from, $to, ['per_page' => self::EXPORT_ROW_CAP, 'paginate' => false] + $filters));
 
             return $request->input('export') === 'xlsx'
                 ? $this->downloadXlsx($category, $report, $result)
@@ -93,7 +99,7 @@ class ReportController extends Controller
             'branches' => DB::table('branches')
                 ->when(! $canSeeAllBranches, fn ($query) => $query->whereIn('id', $user->reportBranchIds(null)->all()))
                 ->orderBy('code')->get(['id', 'code', 'name_th']),
-            'result' => $this->runReport($category, $report, $from, $to, $filters),
+            'result' => app(ReportScope::class)->redact($this->runReport($category, $report, $from, $to, $filters)),
         ]);
     }
 
@@ -118,12 +124,16 @@ class ReportController extends Controller
      */
     private function downloadXlsx(string $category, string $report, array $result): BinaryFileResponse
     {
-        $temporary = tempnam(sys_get_temp_dir(), 'report-').'.xlsx';
+        $temporary = tempnam(sys_get_temp_dir(), 'report-');
+        $exportRows = $this->exportRows($result);
+        if ($exportRows->count() >= self::EXPORT_ROW_CAP) {
+            $exportRows->push([(data_get($result, 'columns.0.key') ?? 'notice') => 'ถึงเพดาน 50,000 แถว — กรุณาแบ่งช่วงวันที่']);
+        }
         app(XlsxWriter::class)->write(
             $temporary,
             (string) ($result['title'] ?? $report),
             $result['columns'] ?? [],
-            $result['rows'] ?? [],
+            $exportRows,
         );
 
         return response()
@@ -135,7 +145,7 @@ class ReportController extends Controller
     private function streamCsv(string $category, string $report, array $result): StreamedResponse
     {
         $columns = $result['columns'] ?? [];
-        $rows = collect($result['rows'] ?? []);
+        $rows = $this->exportRows($result);
         $filename = sprintf('%s-%s-%s.csv', $category, $report, now()->format('Ymd-His'));
 
         return response()->streamDownload(function () use ($columns, $rows) {
@@ -161,6 +171,19 @@ class ReportController extends Controller
             'Content-Type' => 'text/csv; charset=UTF-8',
             'X-Report-Title' => rawurlencode((string) ($result['title'] ?? '')),
         ]);
+    }
+
+    private function exportRows(array $result): Collection
+    {
+        return collect($result['rows'] ?? [])->map(function ($row) use ($result) {
+            $values = (array) $row;
+            foreach ($result['columns'] as $column) {
+                if (($column['type'] ?? '') === 'money' && data_get($row, $column['key']) === null) {
+                    $values[$column['key']] = 'ไม่ทราบ';
+                }
+            }
+            return $values;
+        });
     }
 
     private function catalogForUser(array $catalog, Collection $definitions): array
@@ -189,6 +212,13 @@ class ReportController extends Controller
         $user = auth()->user();
         if (! $user) {
             return true;
+        }
+
+        if ($category === 'sales' && in_array($report, ['daily_sales', 'daily_by_channel', 'sales_by_branch', 'sales_by_staff'], true) && app(ReportScope::class)->canSeeProfit()) {
+            return true;
+        }
+        if ($category === 'management' || $report === 'legacy_sales_profit') {
+            return app(ReportScope::class)->canSeeProfit();
         }
 
         if ($user->hasPermission('settings.manage') || $user->hasPermission('users.manage')) {
@@ -253,24 +283,39 @@ class ReportController extends Controller
 
     private function runReport(string $category, string $report, Carbon $from, Carbon $to, array $filters): array
     {
+        if (in_array($report, ['daily_sales', 'daily_by_channel', 'legacy_daily_pos', 'legacy_daily_summary', 'sales_by_booking', 'stock_balance', 'stock_card_detail', 'ar_aging', 'received_and_unidentified', 'delivery_status'], true)) {
+            abort_unless(config('reports.phase_two_enabled'), 503, 'รายงาน Phase 2 ปิดชั่วคราว');
+        }
+        if (in_array($report, ['daily_sales', 'daily_by_channel', 'legacy_daily_pos', 'legacy_daily_summary'], true)) {
+            $data = app(\App\Services\Reports\DailySalesReport::class)->run($from, $to, $report === 'legacy_daily_pos' ? ['channel' => 'POS'] + $filters : $filters);
+            return $data + ['title' => 'ยอดขายรายวัน แยกช่องทาง (สุทธิหลังคืน)', 'columns' => [
+                ['label' => 'วันที่', 'key' => 'sale_date'],
+                ['label' => 'ช่องทาง', 'key' => 'channel_name'],
+                ['label' => 'บิล/รายการปรับ', 'key' => 'bill_count', 'type' => 'number', 'class' => 'text-end'],
+                ['label' => 'ยอดรวม VAT', 'key' => 'net_sales', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'VAT', 'key' => 'vat_amount', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'ต้นทุน', 'key' => 'cogs_amount', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'กำไรขั้นต้น (ไม่รวม VAT)', 'key' => 'gross_profit', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'ข้อมูลกำไรไม่ครบ (รายการ)', 'key' => 'missing_cost_count', 'type' => 'number', 'class' => 'text-end'],
+            ]];
+        }
+
         $fromStart = $from->copy()->startOfDay();
         $toEnd = $to->copy()->endOfDay();
 
         return match ($report) {
-            'legacy_daily_pos' => $this->tableResult('ตัวอย่างเดิม: ยอดขายรายวัน POS', [
-                ['label' => 'วันที่', 'key' => 'sale_date'],
-                ['label' => 'ช่องทาง', 'key' => 'channel', 'type' => 'badge'],
-                ['label' => 'บิล', 'key' => 'bill_count', 'type' => 'number', 'class' => 'text-end'],
-                ['label' => 'ยอดขาย', 'key' => 'amount', 'type' => 'money', 'class' => 'text-end'],
-            ], $this->dailySales($fromStart, $toEnd, $filters)->filter(fn ($row) => $row->channel === 'POS')->values()),
-
-            'legacy_daily_summary' => $this->tableResult('ตัวอย่างเดิม: สรุป POS + หลังบ้าน', [
-                ['label' => 'วันที่', 'key' => 'sale_date'],
-                ['label' => 'ช่องทาง', 'key' => 'channel', 'type' => 'badge'],
-                ['label' => 'บิล', 'key' => 'bill_count', 'type' => 'number', 'class' => 'text-end'],
-                ['label' => 'ยอดขาย', 'key' => 'amount', 'type' => 'money', 'class' => 'text-end'],
-            ], $this->dailySales($fromStart, $toEnd, $filters)),
-
+            'delivery_status' => $this->pagedResult('จัดส่งตามวันที่ใบจอง — เงินเก็บปลายทางไม่ใช่รายได้เพิ่ม', [
+                ['label' => 'ใบจอง', 'key' => 'doc_number'],
+                ['label' => 'วันที่จอง', 'key' => 'doc_date'],
+                ['label' => 'ลูกค้า', 'key' => 'customer_name'],
+                ['label' => 'กำหนดส่ง', 'key' => 'delivery_due_at'],
+                ['label' => 'สถานะขนส่ง', 'key' => 'transport_status'],
+                ['label' => 'สถานะส่ง', 'key' => 'delivery_status'],
+                ['label' => 'ขึ้นรถจริง', 'key' => 'loaded_at'],
+                ['label' => 'ส่งจริง', 'key' => 'delivered_at'],
+                ['label' => 'ช้า (วัน)', 'key' => 'late_days', 'type' => 'number', 'class' => 'text-end'],
+                ['label' => 'เก็บเงินปลายทาง', 'key' => 'paid_amount', 'type' => 'money', 'class' => 'text-end'],
+            ], app(\App\Services\Reports\DeliveryReport::class)->rows($from, $to, $filters), $filters),
             'legacy_salesman' => $this->tableResult('ตัวอย่างเดิม: ยอดขายตามพนักงาน', [
                 ['label' => 'พนักงาน', 'key' => 'staff_name'],
                 ['label' => 'ช่องทาง', 'key' => 'channel', 'type' => 'badge'],
@@ -285,6 +330,7 @@ class ReportController extends Controller
                 ['label' => 'ยอดขาย', 'key' => 'sales_amount', 'type' => 'money', 'class' => 'text-end'],
                 ['label' => 'ต้นทุน', 'key' => 'cost_amount', 'type' => 'money', 'class' => 'text-end'],
                 ['label' => 'กำไรขั้นต้น', 'key' => 'gross_profit', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'รายการไม่มีทุนบันทึกไว้', 'key' => 'missing_cost_count', 'type' => 'number', 'class' => 'text-end'],
             ], $this->grossMargin($fromStart, $toEnd, $filters)),
 
             'legacy_reorder' => $this->tableResult('ตัวอย่างเดิม: เติมเต็ม/แผนสต๊อก', [
@@ -324,15 +370,6 @@ class ReportController extends Controller
             ], $this->vatPurchase($fromStart, $toEnd, $filters)),
 
             // ---- รายงาน P0 ----
-            'daily_by_channel' => $this->tableResult('ยอดขายรายวัน แยกช่องทาง', [
-                ['label' => 'วันที่', 'key' => 'sale_date', 'type' => 'date'],
-                ['label' => 'ช่องทาง', 'key' => 'channel_name', 'type' => 'badge'],
-                ['label' => 'บิล', 'key' => 'bill_count', 'type' => 'number', 'class' => 'text-end'],
-                ['label' => 'ยอดขาย', 'key' => 'net_sales', 'type' => 'money', 'class' => 'text-end'],
-                ['label' => 'ต้นทุน', 'key' => 'cogs_amount', 'type' => 'money', 'class' => 'text-end'],
-                ['label' => 'กำไรขั้นต้น', 'key' => 'gross_profit', 'type' => 'money', 'class' => 'text-end'],
-            ], $this->dailyByChannel($fromStart, $toEnd, $filters)),
-
             'outstanding' => $this->tableResult('ใบจองคงค้างและสถานะส่งสินค้า', $this->bookingColumns(), $this->bookingsOutstanding($filters, dueOnly: false)),
             'due' => $this->tableResult('ใบจองครบกำหนด/เกินกำหนดส่ง', $this->bookingColumns(), $this->bookingsOutstanding($filters, dueOnly: true)),
 
@@ -397,19 +434,12 @@ class ReportController extends Controller
                 ['label' => 'อ้างอิง', 'key' => 'reference'],
             ], $this->bankReconciliationLines($fromStart, $toEnd, $filters)),
 
-            'received_and_unidentified' => $this->tableResult('การรับชำระและยอดเงินรอพิสูจน์', [
+            'received_and_unidentified' => $this->tableResult('การรับชำระ POS/หลังบ้าน — รอพิสูจน์เป็นยอดย่อย ห้ามบวกรวม', [
                 ['label' => 'กลุ่ม', 'key' => 'bucket', 'type' => 'badge'],
                 ['label' => 'ช่องทาง', 'key' => 'method'],
                 ['label' => 'รายการ', 'key' => 'line_count', 'type' => 'number', 'class' => 'text-end'],
                 ['label' => 'ยอดเงิน', 'key' => 'amount', 'type' => 'money', 'class' => 'text-end'],
             ], $this->receivedAndUnidentified($fromStart, $toEnd, $filters)),
-
-            'daily_sales' => $this->tableResult('ยอดขายรายวัน', [
-                ['label' => 'วันที่', 'key' => 'sale_date'],
-                ['label' => 'ช่องทาง', 'key' => 'channel', 'type' => 'badge'],
-                ['label' => 'บิล', 'key' => 'bill_count', 'type' => 'number', 'class' => 'text-end'],
-                ['label' => 'ยอดขาย', 'key' => 'amount', 'type' => 'money', 'class' => 'text-end'],
-            ], $this->dailySales($fromStart, $toEnd, $filters)),
 
             'sales_by_branch' => $this->tableResult('ยอดขายตามสาขา', [
                 ['label' => 'สาขา', 'key' => 'branch_name'],
@@ -471,6 +501,7 @@ class ReportController extends Controller
                 ['label' => 'ยอดขาย', 'key' => 'sales_amount', 'type' => 'money', 'class' => 'text-end'],
                 ['label' => 'ต้นทุนประมาณ', 'key' => 'cost_amount', 'type' => 'money', 'class' => 'text-end'],
                 ['label' => 'กำไรขั้นต้น', 'key' => 'gross_profit', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'รายการไม่มีทุนบันทึกไว้', 'key' => 'missing_cost_count', 'type' => 'number', 'class' => 'text-end'],
             ], $this->grossMargin($fromStart, $toEnd, $filters)),
 
             'credit_sales' => $this->tableResult('ใบขายเชื่อ', [
@@ -489,15 +520,21 @@ class ReportController extends Controller
                 ['label' => 'ยอดเงิน', 'key' => 'total_amount', 'type' => 'money', 'class' => 'text-end'],
             ], $this->pendingBookings($from, $to, $filters)),
 
-            'sales_by_booking' => $this->tableResult('ยอดขายตามใบจอง', [
+            'sales_by_booking' => $this->pagedResult('ยอดขายตามใบจอง', [
                 ['label' => 'ใบจอง', 'key' => 'booking_no'],
                 ['label' => 'วันที่จอง', 'key' => 'doc_date'],
                 ['label' => 'ลูกค้า', 'key' => 'customer_name'],
                 ['label' => 'พนักงาน', 'key' => 'salesman_name'],
                 ['label' => 'สถานะ', 'key' => 'status', 'type' => 'badge'],
                 ['label' => 'ใบขายที่แปลง', 'key' => 'sale_doc_no'],
-                ['label' => 'ยอดเงิน', 'key' => 'total_amount', 'type' => 'money', 'class' => 'text-end'],
-            ], $this->salesByBooking($from, $to, $filters)),
+                ['label' => 'ยอดขายที่แปลงรวม', 'key' => 'total_amount', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'ยอดใบจอง (ไม่ใช่รายได้)', 'key' => 'booking_amount', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'A / DS มี VAT', 'key' => 'ds_amount', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'B / DSN ไม่มี VAT', 'key' => 'dsn_amount', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'ขายไม่ทราบเล่ม A/B', 'key' => 'unclassified_amount', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'VAT บันทึกไว้', 'key' => 'vat_amount', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'จองลบขาย', 'key' => 'variance', 'type' => 'money', 'class' => 'text-end'],
+            ], $this->salesByBooking($from, $to, $filters), $filters),
 
             'sales_returns_by_document' => $this->tableResult('ใบขาย-รับคืน ตามเอกสาร', [
                 ['label' => 'วันที่', 'key' => 'doc_date'],
@@ -578,7 +615,7 @@ class ReportController extends Controller
                 ['label' => 'ยอดสุทธิ', 'key' => 'net_amount', 'type' => 'money', 'class' => 'text-end'],
             ], $this->salesSummary12Months($to, $filters, 'salesman_product')),
 
-            'loss_sales' => $this->tableResult('สินค้าขายต่ำกว่าทุน / ขาดทุน', [
+            'loss_sales' => $this->tableResult('สินค้าขายต่ำกว่าทุน / ขาดทุน (เฉพาะรายการมีต้นทุนบันทึกไว้)', [
                 ['label' => 'วันที่', 'key' => 'doc_date'],
                 ['label' => 'เลขที่', 'key' => 'doc_number'],
                 ['label' => 'รหัส', 'key' => 'sku_code'],
@@ -645,10 +682,10 @@ class ReportController extends Controller
                 ['label' => 'ยอดค้างรวม', 'key' => 'balance_amount', 'type' => 'money', 'class' => 'text-end'],
             ], $this->arSummary($filters)),
 
-            'ar_aging' => $this->tableResult('อายุหนี้ AR Aging', [
+            'ar_aging' => $this->tableResult('อายุหนี้ AR Aging — ยอดคงค้างปัจจุบัน ณ '.today()->toDateString(), [
                 ['label' => 'ช่วงอายุหนี้', 'key' => 'bucket'],
                 ['label' => 'จำนวนเงิน', 'key' => 'amount', 'type' => 'money', 'class' => 'text-end'],
-            ], $this->arAging()),
+            ], $this->arAging($filters)),
 
             'overdue_customers' => $this->tableResult('ลูกหนี้เกินกำหนด', [
                 ['label' => 'ลูกค้า', 'key' => 'customer_name'],
@@ -739,7 +776,7 @@ class ReportController extends Controller
                 ['label' => 'จำนวน', 'key' => 'qty', 'type' => 'number', 'class' => 'text-end'],
             ], $this->stockMovements($from, $to, $filters)),
 
-            'stock_card_detail' => $this->tableResult('Stock Card รายละเอียด', [
+            'stock_card_detail' => $this->pagedResult('Stock Card รายละเอียด', [
                 ['label' => 'วันที่', 'key' => 'movement_date'],
                 ['label' => 'เวลา', 'key' => 'movement_time'],
                 ['label' => 'สินค้า', 'key' => 'product_name'],
@@ -747,13 +784,13 @@ class ReportController extends Controller
                 ['label' => 'Lot', 'key' => 'lot_number'],
                 ['label' => 'เอกสาร', 'key' => 'doc_number'],
                 ['label' => 'ประเภท', 'key' => 'movement_type', 'type' => 'badge'],
-                ['label' => 'ยอดก่อน', 'key' => 'balance_before', 'type' => 'number', 'class' => 'text-end'],
-                ['label' => 'รับเข้า', 'key' => 'qty_in', 'type' => 'number', 'class' => 'text-end'],
-                ['label' => 'จ่ายออก', 'key' => 'qty_out', 'type' => 'number', 'class' => 'text-end'],
-                ['label' => 'ยอดหลัง', 'key' => 'balance_after', 'type' => 'number', 'class' => 'text-end'],
-                ['label' => 'ทุน/หน่วย', 'key' => 'unit_cost', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'ยอดก่อน', 'key' => 'balance_before', 'type' => 'quantity', 'class' => 'text-end'],
+                ['label' => 'รับเข้า', 'key' => 'qty_in', 'type' => 'quantity', 'class' => 'text-end'],
+                ['label' => 'จ่ายออก', 'key' => 'qty_out', 'type' => 'quantity', 'class' => 'text-end'],
+                ['label' => 'ยอดหลัง', 'key' => 'balance_after', 'type' => 'quantity', 'class' => 'text-end'],
+                ['label' => 'ทุน Lot ปัจจุบัน/หน่วย', 'key' => 'unit_cost', 'type' => 'money', 'class' => 'text-end'],
                 ['label' => 'ผู้ทำรายการ', 'key' => 'created_by_name'],
-            ], $this->stockCardDetail($from, $to, $filters)),
+            ], $this->stockCardDetail($from, $to, $filters), $filters),
 
             'documents_summary' => $this->tableResult('สรุปเอกสาร', [
                 ['label' => 'ประเภทเอกสาร', 'key' => 'document_type'],
@@ -933,27 +970,6 @@ class ReportController extends Controller
      * ยอดขายรายวันแยกช่องทาง — อ่านจาก `sales_postings` ซึ่งเป็นบัญชีขายฉบับจริง
      * ที่กันบิล POS กับเอกสารขายสดที่ผูกกันไม่ให้นับซ้ำอยู่แล้ว
      */
-    private function dailyByChannel(Carbon $from, Carbon $to, array $filters): Collection
-    {
-        $query = DB::table('sales_postings as s')
-            ->leftJoin('branches as b', 'b.id', '=', 's.branch_id')
-            ->whereBetween('s.sale_date', [$from->toDateString(), $to->toDateString()]);
-        $this->applyBranch($query, $filters, 's.branch_id');
-
-        return $query
-            ->groupBy('s.sale_date', 's.channel')
-            ->orderByDesc('s.sale_date')->orderBy('s.channel')
-            ->selectRaw("s.sale_date,
-                case s.channel when 'POS' then 'POS' when 'CASH_SALE' then 'ขายสดหลังบ้าน' when 'CREDIT_SALE' then 'ขายเชื่อ' else s.channel end as channel_name,
-                count(*) as bill_count,
-                sum(s.net_sales) as net_sales,
-                sum(coalesce(s.cogs_amount, 0)) as cogs_amount,
-                sum(coalesce(s.gross_profit, 0)) as gross_profit")
-            ->limit($filters['per_page'])
-            ->get();
-    }
-
-    /** @return array<int, array<string, string>> */
     private function bookingColumns(): array
     {
         return [
@@ -1042,6 +1058,7 @@ class ReportController extends Controller
         return DB::table('supplier_open_items as oi')
             ->join('suppliers as s', 's.id', '=', 'oi.supplier_id')
             ->whereIn('oi.status', ['open', 'partial'])
+            ->when(! empty($filters['branch_id']), fn ($q) => $q->whereIn('oi.source_document_id', DB::table('documents')->where('branch_id', $filters['branch_id'])->select('id')))
             ->orderBy('oi.due_date')->orderBy('oi.document_date')
             ->selectRaw('s.name_th as supplier_name, oi.document_no, oi.document_date, oi.due_date,
                 oi.original_amount, oi.paid_amount, oi.balance_amount')
@@ -1065,6 +1082,7 @@ class ReportController extends Controller
         return DB::table('supplier_open_items as oi')
             ->join('suppliers as s', 's.id', '=', 'oi.supplier_id')
             ->whereIn('oi.status', ['open', 'partial'])
+            ->when(! empty($filters['branch_id']), fn ($q) => $q->whereIn('oi.source_document_id', DB::table('documents')->where('branch_id', $filters['branch_id'])->select('id')))
             ->groupBy('s.name_th')
             ->orderByDesc(DB::raw('sum(oi.balance_amount)'))
             ->selectRaw("s.name_th as supplier_name,
@@ -1141,40 +1159,37 @@ class ReportController extends Controller
      */
     private function receivedAndUnidentified(Carbon $from, Carbon $to, array $filters): Collection
     {
-        $posQuery = DB::table('pos_payments as pp')
-            ->join('pos_receipts as pr', 'pr.id', '=', 'pp.pos_receipt_id')
-            ->join('pos_terminals as pt', 'pt.id', '=', 'pr.pos_terminal_id')
-            ->whereBetween('pr.receipt_date', [$from, $to])
-            ->where('pr.status', 'completed')
-            ->where('pr.is_legacy_import', false);
-        $this->applyBranch($posQuery, $filters, 'pt.branch_id');
+        return app(\App\Services\Reports\PaymentReport::class)->rows($from, $to, $filters);
+    }
 
-        $received = (clone $posQuery)
-            ->groupBy('pp.method')
-            ->selectRaw("'รับแล้ว' as bucket, pp.method, count(*) as line_count, sum(pp.amount) as amount")
-            ->get();
-
-        // โอน/QR ที่ยังไม่ถูกจับคู่กับ statement ใด = ยังพิสูจน์ไม่ได้ว่าเงินเข้าบัญชีจริง
-        $unidentified = (clone $posQuery)
-            ->whereIn('pp.method', ['transfer', 'qr', 'bank'])
-            ->whereNotExists(fn ($sub) => $sub->select(DB::raw(1))
-                ->from('bank_reconciliations as br')
-                ->where('br.source_type', 'pos_payment')
-                ->whereColumn('br.source_id', 'pp.id'))
-            ->groupBy('pp.method')
-            ->selectRaw("'รอพิสูจน์' as bucket, pp.method, count(*) as line_count, sum(pp.amount) as amount")
-            ->get();
-
-        return $received->concat($unidentified)->values();
+    private function pagedResult(string $title, array $columns, Collection $rows, array $filters): array
+    {
+        $total = $rows->count();
+        $summary = ['net_sales' => DecimalMath::sum($rows->pluck('total_amount'), 2), 'vat_amount' => DecimalMath::sum($rows->pluck('vat_amount'), 2)];
+        $pagination = null;
+        if ($filters['paginate'] ?? false) {
+            $pagination = new \Illuminate\Pagination\LengthAwarePaginator($rows->forPage($filters['page'], $filters['per_page'])->values(), $total, $filters['per_page'], $filters['page'], ['path' => request()->url(), 'query' => request()->query()]);
+            $rows = $pagination->getCollection();
+        } else {
+            $rows = $rows->take($filters['per_page']);
+        }
+        return compact('title', 'columns', 'rows', 'total', 'summary', 'pagination');
     }
 
     private function tableResult(string $title, array $columns, Collection $rows): array
     {
+        $summaryRows = $rows->reject(fn ($r) => data_get($r, 'party_name') === 'รวมทั้งสิ้น' || data_get($r, 'customer_name') === 'รวมทั้งสิ้น');
+        if ($rows->contains(fn ($r) => data_get($r, 'bucket') === 'รับแล้ว')) {
+            $summaryRows = $rows->filter(fn ($r) => data_get($r, 'bucket') === 'รับแล้ว');
+        }
+        $moneyKey = collect(['net_sales', 'sales_amount', 'total_amount', 'amount', 'balance_amount'])->first(fn ($key) => collect($columns)->contains('key', $key));
         return [
-            'title' => $title,
-            'columns' => $columns,
-            'rows' => $rows,
-            'total' => $rows->count(),
+            'title' => $title, 'columns' => $columns, 'rows' => $rows, 'total' => $rows->count(),
+            'summary_scope' => 'displayed',
+            'summary' => [
+                'net_sales' => $moneyKey ? DecimalMath::sum($summaryRows->map(fn ($r) => data_get($r, $moneyKey)), 2) : '0.00',
+                'vat_amount' => DecimalMath::sum($summaryRows->map(fn ($r) => data_get($r, 'vat_amount')), 2),
+            ],
         ];
     }
 
@@ -1217,30 +1232,16 @@ class ReportController extends Controller
         });
     }
 
-    // อัตรา VAT ปัจจุบันจากตาราง vat_rates (ไม่มี = 7%)
-    private function vatRatePercent(): float
-    {
-        $rate = DB::table('vat_rates')
-            ->where('effective_from', '<=', now()->toDateString())
-            ->where(fn ($w) => $w->whereNull('effective_to')->orWhere('effective_to', '>=', now()->toDateString()))
-            ->orderByDesc('effective_from')
-            ->value('rate_percent');
-
-        return $rate !== null ? (float) $rate : 7.0;
-    }
-
     /**
      * รายงานภาษีขาย (ภพ.30): ใบกำกับขายสด/ขายเชื่อ + บิล POS (ใบกำกับอย่างย่อ)
      * และใบรับคืน/ลดหนี้เป็นยอดติดลบ - ราคาในระบบถือเป็นราคารวม VAT
      */
     private function vatSales(Carbon $from, Carbon $to, array $filters): Collection
     {
-        $rate = $this->vatRatePercent();
-
         $docQuery = DB::table('documents as d')
             ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
             ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')
-            ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN'])
+            ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN', 'CREDIT_NOTE', 'DEBIT_NOTE'])
             ->where('d.status', 'active')
             ->whereNull('d.cancelled_at')
             ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('pos_receipts as linked_pos')->whereColumn('linked_pos.document_id', 'd.id'))
@@ -1250,11 +1251,12 @@ class ReportController extends Controller
 
         $docRows = $docQuery->selectRaw(
             "d.doc_date, d.doc_number, dt.code as doc_code,
-             COALESCE(c.name_th, 'ลูกค้าทั่วไป') as party_name, c.tax_id, d.total_amount"
-        )->get()->map(function ($r) use ($rate) {
-            $sign = $r->doc_code === 'SALE_RETURN' ? -1 : 1;
-            $total = $sign * (float) $r->total_amount;
-            $base = round($total * 100 / (100 + $rate), 2);
+             COALESCE(c.name_th, 'ลูกค้าทั่วไป') as party_name, c.tax_id, d.total_amount, d.vat_amount"
+        )->get()->map(function ($r) {
+            $sign = in_array($r->doc_code, ['SALE_RETURN', 'CREDIT_NOTE'], true) ? -1 : 1;
+            $total = DecimalMath::multiply($sign, $r->total_amount, 2);
+            $vat = DecimalMath::multiply($sign, $r->vat_amount, 2);
+            $base = DecimalMath::subtract($total, $vat, 2);
 
             return [
                 'doc_date' => \Illuminate\Support\Carbon::parse($r->doc_date)->thaiDate(),
@@ -1263,7 +1265,7 @@ class ReportController extends Controller
                 'party_name' => $r->party_name.($sign < 0 ? ' (รับคืน/ลดหนี้)' : ''),
                 'tax_id' => $r->tax_id ?? '-',
                 'base_amount' => $base,
-                'vat_amount' => round($total - $base, 2),
+                'vat_amount' => $vat,
                 'total_amount' => $total,
             ];
         });
@@ -1276,11 +1278,9 @@ class ReportController extends Controller
         $this->applySearch($posQuery, $filters, ['r.receipt_no']);
 
         $posRows = $posQuery->selectRaw('r.receipt_date, r.receipt_no, r.net_sales, r.vat_amount')
-            ->get()->map(function ($r) use ($rate) {
-                $total = (float) $r->net_sales;
-                $vat = $r->vat_amount !== null && (float) $r->vat_amount > 0
-                    ? (float) $r->vat_amount
-                    : round($total - ($total * 100 / (100 + $rate)), 2);
+            ->get()->map(function ($r) {
+                $total = DecimalMath::round($r->net_sales, 2);
+                $vat = $r->vat_amount === null ? null : DecimalMath::round($r->vat_amount, 2);
 
                 return [
                     'doc_date' => \Illuminate\Support\Carbon::parse($r->receipt_date)->thaiDate(),
@@ -1288,7 +1288,7 @@ class ReportController extends Controller
                     'doc_number' => $r->receipt_no,
                     'party_name' => 'ขายปลีก (POS - ใบกำกับอย่างย่อ)',
                     'tax_id' => '-',
-                    'base_amount' => round($total - $vat, 2),
+                    'base_amount' => $vat === null ? null : DecimalMath::subtract($total, $vat, 2),
                     'vat_amount' => $vat,
                     'total_amount' => $total,
                 ];
@@ -1300,22 +1300,21 @@ class ReportController extends Controller
     // รายงานภาษีซื้อ (ภพ.30): ใบซื้อจากซัพพลายเออร์
     private function vatPurchase(Carbon $from, Carbon $to, array $filters): Collection
     {
-        $rate = $this->vatRatePercent();
-
         $query = DB::table('documents as d')
             ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
             ->leftJoin('suppliers as s', 's.id', '=', 'd.supplier_id')
-            ->where('dt.code', 'PURCHASE')
+            ->where('dt.code', 'PURCHASE')->where('d.status', 'active')->where('d.claim_input_vat', true)
             ->whereNull('d.cancelled_at')
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
         $this->applyBranch($query, $filters, 'd.branch_id');
         $this->applySearch($query, $filters, ['d.doc_number', 's.name_th']);
 
         $rows = $query->selectRaw(
-            "d.doc_date, d.doc_number, COALESCE(s.name_th, '-') as party_name, s.tax_id, d.total_amount"
-        )->get()->map(function ($r) use ($rate) {
-            $total = (float) $r->total_amount;
-            $base = round($total * 100 / (100 + $rate), 2);
+            "d.doc_date, d.doc_number, COALESCE(s.name_th, '-') as party_name, s.tax_id, d.total_amount, d.vat_amount"
+        )->get()->map(function ($r) {
+            $total = DecimalMath::round($r->total_amount, 2);
+            $vat = DecimalMath::round($r->vat_amount, 2);
+            $base = DecimalMath::subtract($total, $vat, 2);
 
             return [
                 'doc_date' => \Illuminate\Support\Carbon::parse($r->doc_date)->thaiDate(),
@@ -1324,7 +1323,7 @@ class ReportController extends Controller
                 'party_name' => $r->party_name,
                 'tax_id' => $r->tax_id ?? '-',
                 'base_amount' => $base,
-                'vat_amount' => round($total - $base, 2),
+                'vat_amount' => $vat,
                 'total_amount' => $total,
             ];
         });
@@ -1347,84 +1346,40 @@ class ReportController extends Controller
                 'doc_number' => '',
                 'party_name' => 'รวมทั้งสิ้น',
                 'tax_id' => '',
-                'base_amount' => round($rows->sum('base_amount'), 2),
-                'vat_amount' => round($rows->sum('vat_amount'), 2),
-                'total_amount' => round($rows->sum('total_amount'), 2),
+                'base_amount' => DecimalMath::sum($rows->pluck('base_amount'), 2),
+                'vat_amount' => DecimalMath::sum($rows->pluck('vat_amount'), 2),
+                'total_amount' => DecimalMath::sum($rows->pluck('total_amount'), 2),
             ]);
         }
 
         return $rows;
     }
 
-    private function dailySales(Carbon $from, Carbon $to, array $filters): Collection
-    {
-        $query = DB::table('sales_postings')
-            ->whereBetween('sale_date', [$from->toDateString(), $to->toDateString()]);
-
-        $this->applyBranch($query, $filters, 'branch_id');
-        $this->applySearch($query, $filters, ['sale_number', 'channel']);
-
-        return $query
-            ->groupBy('sale_date', 'channel')
-            ->selectRaw('sale_date, channel, count(*) as bill_count, sum(net_sales) as amount')
-            ->get()
-            ->sortByDesc('sale_date')
-            ->take($filters['per_page'])
-            ->values();
-    }
-
     private function salesByBranch(Carbon $from, Carbon $to, array $filters): Collection
     {
-        $query = DB::table('pos_receipts as r')
-            ->join('pos_terminals as t', 't.id', '=', 'r.pos_terminal_id')
-            ->leftJoin('branches as b', 'b.id', '=', 't.branch_id')
-            ->whereBetween('r.receipt_date', [$from, $to]);
-
-        $this->applyBranch($query, $filters);
-
-        return $query
-            ->groupBy('b.id', 'b.code', 'b.name_th')
-            ->orderByDesc(DB::raw('sum(r.net_sales)'))
-            ->selectRaw("concat(coalesce(b.code, '-'), ' ', coalesce(b.name_th, 'ไม่ระบุสาขา')) as branch_name, count(*) as receipt_count, sum(r.net_sales) as amount")
-            ->limit($filters['per_page'])
-            ->get();
+        $branches = DB::table('branches')->get()->keyBy('id');
+        return app(\App\Services\Reports\DailySalesReport::class)->source($from, $to, $filters)
+            ->groupBy('branch_id')->map(function ($rows, $id) use ($branches) {
+                $branch = $branches->get($id);
+                return (object) ['branch_name' => trim(($branch->code ?? '').' '.($branch->name_th ?? '')), 'receipt_count' => $rows->count(), 'amount' => DecimalMath::sum($rows->pluck('net_sales'), 2)];
+            })->sortByDesc('amount')->take($filters['per_page'])->values();
     }
 
     private function salesByStaff(Carbon $from, Carbon $to, array $filters): Collection
     {
-        $posQuery = DB::table('pos_receipts as r')
-            ->join('pos_terminals as t', 't.id', '=', 'r.pos_terminal_id')
-            ->leftJoin('users as u', 'u.id', '=', 'r.cashier_id')
-            ->leftJoin('salesmen as sm', 'sm.id', '=', 'r.cashier_salesman_id')
-            ->whereBetween('r.receipt_date', [$from, $to]);
-
-        $this->applyBranch($posQuery, $filters, 't.branch_id');
-        $this->applySearch($posQuery, $filters, ['r.receipt_no', 'u.name', 'sm.name', 't.code', 't.name']);
-
-        $posRows = $posQuery
-            ->groupBy('u.id', 'u.name', 'sm.id', 'sm.name')
-            ->selectRaw("coalesce(u.name, sm.name, 'ขายเอง') as staff_name, 'POS' as channel, count(*) as bill_count, sum(r.net_sales) as amount")
-            ->get();
-
-        $docQuery = DB::table('documents as d')
-            ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
-            ->leftJoin('users as u', 'u.id', '=', 'd.sales_user_id')
-            ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE'])
-            ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
-
-        $this->applyBranch($docQuery, $filters, 'd.branch_id');
-        $this->applySearch($docQuery, $filters, ['d.doc_number', 'u.name']);
-
-        $docRows = $docQuery
-            ->groupBy('u.id', 'u.name', 'dt.code')
-            ->selectRaw("coalesce(u.name, 'ขายเอง') as staff_name, dt.code as channel, count(*) as bill_count, sum(d.total_amount) as amount")
-            ->get();
-
-        return $posRows
-            ->concat($docRows)
-            ->sortByDesc('amount')
-            ->take($filters['per_page'])
-            ->values();
+        $rows = app(\App\Services\Reports\DailySalesReport::class)->source($from, $to, $filters);
+        $receipts = DB::table('pos_receipts')->whereIn('id', $rows->where('channel', 'POS')->pluck('source_id'))->get()->keyBy('id');
+        $documents = DB::table('documents')->whereIn('id', $rows->pluck('document_id')->filter())->get()->keyBy('id');
+        $salesmen = DB::table('salesmen')->whereIn('id', $rows->pluck('salesman_id')->filter())->pluck('name', 'id');
+        $users = DB::table('users')->whereIn('id', $receipts->pluck('cashier_id')->merge($documents->pluck('sales_user_id'))->filter())->pluck('name', 'id');
+        return $rows->map(function ($row) use ($receipts, $documents, $salesmen, $users) {
+            $userId = $row->channel === 'POS' ? $receipts->get($row->source_id)?->cashier_id : $documents->get($row->document_id)?->sales_user_id;
+            $row->staff_name = $salesmen->get($row->salesman_id ?? null) ?? $users->get($userId) ?? 'ไม่ทราบผู้ขาย';
+            return $row;
+        })->groupBy(fn ($row) => $row->staff_name.'|'.$row->channel)->map(fn ($group) => (object) [
+            'staff_name' => $group->first()->staff_name, 'channel' => $group->first()->channel,
+            'bill_count' => $group->count(), 'amount' => DecimalMath::sum($group->pluck('net_sales'), 2),
+        ])->sortByDesc('amount')->take($filters['per_page'])->values();
     }
 
     private function topProducts(Carbon $from, Carbon $to, array $filters): Collection
@@ -1610,7 +1565,7 @@ class ReportController extends Controller
             ->join('pos_receipts as r', 'r.id', '=', 'i.pos_receipt_id')
             ->join('pos_terminals as t', 't.id', '=', 'r.pos_terminal_id')
             ->join('products as p', 'p.id', '=', 'i.product_id')
-            ->whereNull('r.document_id')
+            ->whereNull('r.document_id')->where('r.status', 'completed')->where('r.is_legacy_import', false)
             ->whereBetween('r.receipt_date', [$from, $to]);
 
         $this->applyBranch($posQuery, $filters, 't.branch_id');
@@ -1618,7 +1573,7 @@ class ReportController extends Controller
 
         $posRows = $posQuery
             ->groupBy('p.id', 'p.sku_code', 'p.name_th')
-            ->selectRaw('p.id as product_id, p.sku_code, p.name_th, sum(i.qty) as qty, sum(i.net_amount - i.vat_amount) as sales_amount, sum(i.qty * p.average_cost) as cost_amount')
+            ->selectRaw('p.id as product_id, p.sku_code, p.name_th, sum(i.qty) as qty, sum(i.net_amount - i.vat_amount) as sales_amount, NULL as cost_amount, count(*) as missing_cost_count')
             ->get();
 
         $docQuery = DB::table('stock_document_items as sdi')
@@ -1627,6 +1582,7 @@ class ReportController extends Controller
             ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
             ->join('products as p', 'p.id', '=', 'sdi.product_id')
             ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE'])
+            ->where('d.status', 'active')->whereNull('d.cancelled_at')
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
 
         $this->applyBranch($docQuery, $filters, 'd.branch_id');
@@ -1634,7 +1590,7 @@ class ReportController extends Controller
 
         $docRows = $docQuery
             ->groupBy('p.id', 'p.sku_code', 'p.name_th')
-            ->selectRaw('p.id as product_id, p.sku_code, p.name_th, sum(sdi.qty) as qty, sum((sdi.qty * sdi.unit_price) - sdi.vat_amount) as sales_amount, sum(coalesce(sdi.cost_amount, sdi.qty * p.average_cost)) as cost_amount')
+            ->selectRaw('p.id as product_id, p.sku_code, p.name_th, sum(sdi.qty) as qty, sum((sdi.qty * sdi.unit_price) - coalesce(sdi.vat_amount, 0)) as sales_amount, sum(sdi.cost_amount) as cost_amount, sum(case when sdi.cost_amount is null then 1 else 0 end) as missing_cost_count')
             ->get();
 
         return $posRows
@@ -1642,9 +1598,10 @@ class ReportController extends Controller
             ->groupBy('product_id')
             ->map(function (Collection $rows) {
                 $first = $rows->first();
-                $qty = (float) $rows->sum('qty');
-                $salesAmount = (float) $rows->sum('sales_amount');
-                $costAmount = (float) $rows->sum('cost_amount');
+                $qty = DecimalMath::sum($rows->pluck('qty'));
+                $salesAmount = DecimalMath::sum($rows->pluck('sales_amount'), 2);
+                $missing = $rows->sum('missing_cost_count');
+                $costAmount = $missing ? null : DecimalMath::sum($rows->pluck('cost_amount'), 2);
 
                 return (object) [
                     'sku_code' => $first->sku_code,
@@ -1652,7 +1609,8 @@ class ReportController extends Controller
                     'qty' => $qty,
                     'sales_amount' => $salesAmount,
                     'cost_amount' => $costAmount,
-                    'gross_profit' => $salesAmount - $costAmount,
+                    'gross_profit' => $missing ? null : DecimalMath::subtract($salesAmount, $costAmount, 2),
+                    'missing_cost_count' => $missing,
                 ];
             })
             ->sortByDesc('gross_profit')
@@ -1701,28 +1659,7 @@ class ReportController extends Controller
     // ยอดขายตามใบจอง: ทุกใบจองในช่วง + ใบขายเชื่อที่แปลงแล้ว (BPlus: รายงานใบจอง)
     private function salesByBooking(Carbon $from, Carbon $to, array $filters): Collection
     {
-        $query = DB::table('sale_bookings as sb')
-            ->join('documents as d', 'd.id', '=', 'sb.document_id')
-            ->leftJoin('documents as sd', 'sd.id', '=', 'sb.confirmed_document_id')
-            ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')
-            ->leftJoin('salesmen as s', 's.id', '=', 'd.salesman_id')
-            ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
-
-        $this->applyBranch($query, $filters, 'd.branch_id');
-        $this->applySearch($query, $filters, ['d.doc_number', 'sd.doc_number', 'c.code', 'c.name_th', 's.name']);
-
-        $statusLabels = ['pending' => 'รอแปลงขาย', 'converted_to_sale' => 'แปลงขายแล้ว', 'cancelled' => 'ยกเลิก'];
-
-        return $query
-            ->orderByDesc('d.doc_date')->orderByDesc('d.id')
-            ->selectRaw("d.doc_number as booking_no, d.doc_date, coalesce(c.name_th, '-') as customer_name, coalesce(s.name, '-') as salesman_name, sb.status, coalesce(sd.doc_number, '-') as sale_doc_no, coalesce(sd.total_amount, d.total_amount) as total_amount")
-            ->limit($filters['per_page'])
-            ->get()
-            ->map(function ($row) use ($statusLabels) {
-                $row->status = $statusLabels[$row->status] ?? $row->status;
-
-                return $row;
-            });
+        return app(\App\Services\Reports\BookingSalesReport::class)->rows($from, $to, $filters);
     }
 
     // ใบขาย-รับคืน ตามเอกสาร (BPlus G): ขายสด/ขายเชื่อ/รับคืนรวมตารางเดียว คืนติดลบ
@@ -1916,37 +1853,39 @@ class ReportController extends Controller
             ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
             ->join('products as p', 'p.id', '=', 'sdi.product_id')
             ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE'])
-            ->where('p.average_cost', '>', 0)
-            ->whereColumn('sdi.unit_price', '<', 'p.average_cost')
+            ->where('d.status', 'active')->whereNull('d.cancelled_at')
+            ->whereNotNull('sdi.cost_amount')
+            ->whereRaw('((sdi.qty * sdi.unit_price) - coalesce(sdi.vat_amount, 0)) < sdi.cost_amount')
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
 
         $this->applyBranch($query, $filters, 'd.branch_id');
         $this->applySearch($query, $filters, ['d.doc_number', 'p.sku_code', 'p.name_th']);
 
         return $query
-            ->orderByRaw('(p.average_cost - sdi.unit_price) * sdi.qty desc')
-            ->selectRaw('d.doc_date, d.doc_number, p.sku_code, p.name_th, sdi.qty as sold_qty, sdi.unit_price, p.average_cost as avg_cost, (p.average_cost - sdi.unit_price) * sdi.qty as loss_amount')
+            ->orderByRaw('(sdi.cost_amount - ((sdi.qty * sdi.unit_price) - coalesce(sdi.vat_amount, 0))) desc')
+            ->selectRaw('d.doc_date, d.doc_number, p.sku_code, p.name_th, sdi.qty as sold_qty, sdi.unit_price, sdi.unit_cost as avg_cost, (sdi.cost_amount - ((sdi.qty * sdi.unit_price) - coalesce(sdi.vat_amount, 0))) as loss_amount')
             ->limit($filters['per_page'])
             ->get();
     }
 
     private function lossSalesSixMonths(Carbon $to, array $filters): Collection
     {
+        $month = DB::getDriverName() === 'pgsql' ? "to_char(d.doc_date, 'YYYY-MM')" : "strftime('%Y-%m', d.doc_date)";
         $from = $to->copy()->subMonthsNoOverflow(5)->startOfMonth();
         $query = $this->lossSalesBase($from, $to, $filters);
 
         return $query
-            ->groupBy(DB::raw("date_trunc('month', d.doc_date)"), 'p.id', 'p.sku_code', 'p.name_th')
-            ->orderBy(DB::raw("date_trunc('month', d.doc_date)"))
+            ->groupBy(DB::raw($month), 'p.id', 'p.sku_code', 'p.name_th')
+            ->orderBy(DB::raw($month))
             ->orderByRaw('loss_amount desc')
             ->selectRaw("
-                to_char(date_trunc('month', d.doc_date), 'YYYY-MM') as sale_month,
+                {$month} as sale_month,
                 p.sku_code,
                 p.name_th,
                 sum(sdi.qty) as sold_qty,
-                sum(sdi.qty * sdi.unit_price) as sales_amount,
-                sum(sdi.qty * p.average_cost) as cost_amount,
-                sum((p.average_cost - sdi.unit_price) * sdi.qty) as loss_amount
+                sum(((sdi.qty * sdi.unit_price) - coalesce(sdi.vat_amount, 0))) as sales_amount,
+                sum(sdi.cost_amount) as cost_amount,
+                sum((sdi.cost_amount - ((sdi.qty * sdi.unit_price) - coalesce(sdi.vat_amount, 0)))) as loss_amount
             ")
             ->limit($filters['per_page'])
             ->get();
@@ -1967,6 +1906,7 @@ class ReportController extends Controller
 
     private function lossSalesGroupedSixMonths(Carbon $to, array $filters, string $mode): Collection
     {
+        $month = DB::getDriverName() === 'pgsql' ? "to_char(d.doc_date, 'YYYY-MM')" : "strftime('%Y-%m', d.doc_date)";
         $from = $to->copy()->subMonthsNoOverflow(5)->startOfMonth();
         $query = $this->lossSalesBase($from, $to, $filters)
             ->leftJoin('product_departments as pd', 'pd.id', '=', 'p.product_department_id')
@@ -1987,17 +1927,17 @@ class ReportController extends Controller
         };
 
         return $query
-            ->groupBy(DB::raw("date_trunc('month', d.doc_date)"), DB::raw($groupSql))
-            ->orderBy(DB::raw("date_trunc('month', d.doc_date)"))
+            ->groupBy(DB::raw($month), DB::raw($groupSql))
+            ->orderBy(DB::raw($month))
             ->orderByRaw('loss_amount desc')
             ->selectRaw("
-                to_char(date_trunc('month', d.doc_date), 'YYYY-MM') as sale_month,
+                {$month} as sale_month,
                 {$groupSql} as group_name,
                 count(distinct p.id) as product_count,
                 sum(sdi.qty) as sold_qty,
-                sum(sdi.qty * sdi.unit_price) as sales_amount,
-                sum(sdi.qty * p.average_cost) as cost_amount,
-                sum((p.average_cost - sdi.unit_price) * sdi.qty) as loss_amount
+                sum(((sdi.qty * sdi.unit_price) - coalesce(sdi.vat_amount, 0))) as sales_amount,
+                sum(sdi.cost_amount) as cost_amount,
+                sum((sdi.cost_amount - ((sdi.qty * sdi.unit_price) - coalesce(sdi.vat_amount, 0)))) as loss_amount
             ")
             ->limit($filters['per_page'])
             ->get();
@@ -2030,7 +1970,7 @@ class ReportController extends Controller
         if (! $summary) {
             return $query
                 ->orderByDesc('d.doc_date')
-                ->selectRaw('d.doc_date, d.doc_number, p.sku_code, p.name_th, sdi.qty as sold_qty, sdi.unit_price, p.average_cost as avg_cost, (p.average_cost - sdi.unit_price) * sdi.qty as loss_amount')
+                ->selectRaw('d.doc_date, d.doc_number, p.sku_code, p.name_th, sdi.qty as sold_qty, sdi.unit_price, sdi.unit_cost as avg_cost, (sdi.cost_amount - ((sdi.qty * sdi.unit_price) - coalesce(sdi.vat_amount, 0))) as loss_amount')
                 ->limit($filters['per_page'])
                 ->get();
         }
@@ -2043,7 +1983,7 @@ class ReportController extends Controller
                 d.doc_number,
                 concat(coalesce(c.code, '-'), ' ', coalesce(c.name_th, 'ลูกค้าทั่วไป')) as customer_name,
                 count(*) as line_count,
-                sum((p.average_cost - sdi.unit_price) * sdi.qty) as loss_amount
+                sum((sdi.cost_amount - ((sdi.qty * sdi.unit_price) - coalesce(sdi.vat_amount, 0)))) as loss_amount
             ")
             ->limit($filters['per_page'])
             ->get();
@@ -2057,8 +1997,9 @@ class ReportController extends Controller
             ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
             ->join('products as p', 'p.id', '=', 'sdi.product_id')
             ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE'])
-            ->where('p.average_cost', '>', 0)
-            ->whereColumn('sdi.unit_price', '<', 'p.average_cost')
+            ->where('d.status', 'active')->whereNull('d.cancelled_at')
+            ->whereNotNull('sdi.cost_amount')
+            ->whereRaw('((sdi.qty * sdi.unit_price) - coalesce(sdi.vat_amount, 0)) < sdi.cost_amount')
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
 
         $this->applyBranch($query, $filters, 'd.branch_id');
@@ -2072,9 +2013,10 @@ class ReportController extends Controller
     {
         $query = DB::table('customer_open_items as oi')
             ->join('customers as c', 'c.id', '=', 'oi.customer_id')
+            ->join('documents as d', 'd.id', '=', 'oi.document_id')
             ->whereIn('oi.status', ['open', 'partial']);
 
-        $this->applyBranch($query, $filters, 'c.branch_id');
+        $this->applyBranch($query, $filters, 'd.branch_id');
         $this->applySearch($query, $filters, ['c.code', 'c.name_th']);
 
         $rows = $query
@@ -2095,42 +2037,21 @@ class ReportController extends Controller
         return $rows;
     }
 
-    private function arAging(): Collection
+    private function arAging(array $filters): Collection
     {
-        $today = $this->dateMinusDays(0);
-        $d30 = $this->dateMinusDays(30);
-        $d60 = $this->dateMinusDays(60);
-        $d90 = $this->dateMinusDays(90);
-
-        $rows = DB::table('customer_open_items')
-            ->whereIn('status', ['open', 'partial'])
-            ->selectRaw("
-                sum(case when due_date is null or due_date >= {$today} then balance_amount else 0 end) as current_amount,
-                sum(case when due_date < {$today} and due_date >= {$d30} then balance_amount else 0 end) as days_1_30,
-                sum(case when due_date < {$d30} and due_date >= {$d60} then balance_amount else 0 end) as days_31_60,
-                sum(case when due_date < {$d60} and due_date >= {$d90} then balance_amount else 0 end) as days_61_90,
-                sum(case when due_date < {$d90} then balance_amount else 0 end) as over_90
-            ")
-            ->first();
-
-        return collect([
-            ['bucket' => 'ยังไม่ถึงกำหนด', 'amount' => (float) ($rows->current_amount ?? 0)],
-            ['bucket' => '1-30 วัน', 'amount' => (float) ($rows->days_1_30 ?? 0)],
-            ['bucket' => '31-60 วัน', 'amount' => (float) ($rows->days_31_60 ?? 0)],
-            ['bucket' => '61-90 วัน', 'amount' => (float) ($rows->days_61_90 ?? 0)],
-            ['bucket' => 'เกิน 90 วัน', 'amount' => (float) ($rows->over_90 ?? 0)],
-        ])->map(fn ($row) => (object) $row);
+        return app(\App\Services\Reports\ReceivableReport::class)->aging($filters);
     }
 
     private function overdueCustomers(array $filters): Collection
     {
         $query = DB::table('customer_open_items as oi')
             ->join('customers as c', 'c.id', '=', 'oi.customer_id')
+            ->join('documents as d', 'd.id', '=', 'oi.document_id')
             ->leftJoin('salesmen as s', 's.id', '=', 'oi.salesman_id')
             ->whereIn('oi.status', ['open', 'partial'])
             ->whereDate('oi.due_date', '<', now()->toDateString());
 
-        $this->applyBranch($query, $filters, 'c.branch_id');
+        $this->applyBranch($query, $filters, 'd.branch_id');
         $this->applySearch($query, $filters, ['c.code', 'c.name_th', 's.name']);
 
         return $query
@@ -2148,7 +2069,7 @@ class ReportController extends Controller
             ->join('documents as d', 'd.id', '=', 'oi.document_id')
             ->whereIn('oi.status', ['open', 'partial']);
 
-        $this->applyBranch($query, $filters, 'c.branch_id');
+        $this->applyBranch($query, $filters, 'd.branch_id');
         $this->applySearch($query, $filters, ['c.code', 'c.name_th', 'd.doc_number']);
 
         return $query
@@ -2166,7 +2087,7 @@ class ReportController extends Controller
             ->leftJoin('salesmen as s', 's.id', '=', 'oi.salesman_id')
             ->whereIn('oi.status', ['open', 'partial']);
 
-        $this->applyBranch($query, $filters, 'c.branch_id');
+        $this->applyBranch($query, $filters, 'd.branch_id');
         $this->applySearch($query, $filters, ['c.code', 'c.name_th', 'd.doc_number', 's.name']);
 
         $select = $full
@@ -2189,7 +2110,7 @@ class ReportController extends Controller
             ->whereIn('oi.status', ['open', 'partial'])
             ->whereDate('oi.due_date', '<', now()->toDateString());
 
-        $this->applyBranch($query, $filters, 'c.branch_id');
+        $this->applyBranch($query, $filters, 'd.branch_id');
         $this->applySearch($query, $filters, ['c.code', 'c.name_th', 'd.doc_number', 's.name']);
 
         return $query
@@ -2203,10 +2124,11 @@ class ReportController extends Controller
     {
         $query = DB::table('customer_open_items as oi')
             ->join('customers as c', 'c.id', '=', 'oi.customer_id')
+            ->join('documents as d', 'd.id', '=', 'oi.document_id')
             ->whereIn('oi.status', ['open', 'partial'])
             ->where('c.credit_limit', '>', 0);
 
-        $this->applyBranch($query, $filters, 'c.branch_id');
+        $this->applyBranch($query, $filters, 'd.branch_id');
         $this->applySearch($query, $filters, ['c.code', 'c.name_th']);
 
         return $query
@@ -2350,9 +2272,11 @@ class ReportController extends Controller
             ->leftJoin('stock_lots as sl', 'sl.id', '=', 'sm.stock_lot_id')
             ->leftJoin('documents as d', 'd.id', '=', 'sm.document_id')
             ->leftJoin('users as u', 'u.id', '=', 'd.created_by')
-            ->leftJoin('branches as b', 'b.id', '=', DB::raw($this->branchByLocationSub('sm.warehouse_location_id')))
+            ->leftJoin('branches as b', 'b.id', '=', DB::raw("coalesce(".$this->branchByLocationSub('sm.warehouse_location_id').", w.branch_id)"))
             ->whereBetween('sm.movement_date', [$from->toDateString(), $to->toDateString()]);
 
+        $query->when($filters['product_id'] ?? null, fn ($q, $id) => $q->where('sm.product_id', $id))
+            ->when($filters['location_id'] ?? null, fn ($q, $id) => $q->where('sm.warehouse_location_id', $id));
         $this->applyBranch($query, $filters, 'b.id');
         $this->applySearch($query, $filters, ['p.sku_code', 'p.name_th', 'sm.movement_type', 'd.doc_number', 'sl.lot_number']);
 
@@ -2377,16 +2301,15 @@ class ReportController extends Controller
                 case when sm.movement_type in {$inTypes} then sm.qty else 0 end as qty_in,
                 case when sm.movement_type in {$inTypes} then 0 else sm.qty end as qty_out,
                 {$priorBalance} + {$signedQty} as balance_after,
-                coalesce(sl.unit_cost, 0) as unit_cost,
+                sl.unit_cost as unit_cost,
                 coalesce(u.name, '-') as created_by_name")
-            ->limit($filters['per_page'])
             ->get()
             ->map(function ($row) {
-                $row->balance_before = (float) $row->balance_before;
-                $row->balance_after = (float) $row->balance_after;
-                $row->qty_in = (float) $row->qty_in;
-                $row->qty_out = (float) $row->qty_out;
-                $row->unit_cost = (float) $row->unit_cost;
+                $row->balance_before = DecimalMath::round($row->balance_before, 8);
+                $row->balance_after = DecimalMath::round($row->balance_after, 8);
+                $row->qty_in = DecimalMath::round($row->qty_in, 8);
+                $row->qty_out = DecimalMath::round($row->qty_out, 8);
+                $row->unit_cost = $row->unit_cost === null ? null : DecimalMath::round($row->unit_cost, 8);
 
                 return $row;
             });
@@ -2731,6 +2654,7 @@ class ReportController extends Controller
             ->join('chart_of_accounts as coa', 'coa.id', '=', 'gj.account_id')
             ->whereBetween('gj.entry_date', [$from->toDateString(), $to->toDateString()]);
 
+        app(ReportScope::class)->applyGl($query, 'gj', $filters['branch_id'] ?? null);
         $this->applySearch($query, $filters, ['coa.code', 'coa.name_th', 'gj.remark']);
 
         return $query
