@@ -2791,3 +2791,19 @@ pending
 - คงไว้: `resources/views/products/index.blade.php` ที่กู้จาก `HEAD` และตรวจแล้วไม่มี route `units.index`, `products.create` หรือ `scale.index`
 - ขอบเขต: ไม่ลบเหมารวมไฟล์ค้างอื่นประมาณ 784 รายการ เพราะไม่มีหลักฐานว่าเป็นของ Gemini/Antigravity และอาจเป็นงานของผู้ใช้อื่น; ไม่แตะฐานข้อมูล
 - Deploy: **ลบ artifacts ที่ระบุได้แล้ว**; หน้า Products ที่ใช้งานจริงยังคงอยู่
+
+## Handoff - 2026-11-09 (Codex Python POS 0.9.1)
+- Commit — ไม่มี commit/push ตามคำสั่งเจ้าของ งานอยู่ใน workspace branch `claude/pos-python-settings-popup` จาก HEAD `67e61dc`. `git pull origin main` ถูก sandbox ปฏิเสธการเขียน FETCH_HEAD ใน Git metadata ภายนอก writable roots จึงทำต่อจาก HEAD ตาม brief
+- ทำอะไร — ทำตาม `docs/ai/codex-pos-python-091.md` ทั้งสามข้อ แก้เฉพาะ Python และ handoff
+  - เพิ่ม `local_datetime_text` ใน time_service สำหรับแปลง ISO timestamp เป็น timezone ของเครื่องตอนแสดงผล รองรับ Z/offset และการข้ามวัน ค่ารุ่นเก่าที่ไม่มี offset ถือเป็น UTC ตาม clock ที่ใช้เก็บข้อมูลเดิม ค่าไม่ถูกต้องยังแสดงเป็นข้อความเดิม และค่าว่างแสดง `-`. ไม่มีการเปลี่ยน timestamp ในฐานข้อมูล
+  - ใช้ตัวแปลงเดียวกันในใบเสร็จ/สำเนา/พิมพ์ซ้ำ, รายการประวัติและรายละเอียดบิลที่ใช้ยกเลิก/คืน, หน้าพบกะเดิม, Z/ใบปิดกะ, เวลาบิลล่าสุดในยอดขายรายวัน, sync logs และสถานะซิงก์ชุดข้อมูล. การจัดกลุ่มวันธุรกิจและเงื่อนไขบิลวันนี้ยังอิงวันไทยตามกติกาเดิม
+  - กดรับชำระโอน/ผสมแล้วบันทึก `confirmed_at` จาก clock ของ checkout โดยอัตโนมัติ และ UI ส่ง payment_confirmed จากวิธีชำระหลังยืนยันรับเงิน ป้องกันการอิง checkbox ที่ซ่อนอยู่. sync payload โอน/ผสมส่ง `payment_confirmed=true` พร้อม `transfer_account_last4`. ไม่เพิ่ม checkbox หรือ migration
+  - ตรวจ lifecycle backdrop เดิมจาก 7ce2e28 ด้วย modal Qt จริงและ QTimer. ผ่านทั้งยกเลิก/คืนในกรณีสำเร็จ, PIN ผิด, ERP ปฏิเสธ, timeout, offline, ยกเลิกเหตุผล/เลือกหัวหน้า/PIN. เมื่อ popup จบ backdrop ถูกซ่อน หน้ารายละเอียดกลับมาได้ และปิดรายละเอียดแล้วไม่มี backdrop ค้าง จึงไม่มีการแก้ touch_dialogs เพิ่ม
+- ทดสอบ — Python 3.12.16 + PySide6 6.12.0 ใน `/private/tmp/pos-091-py312` ติดตั้งจาก requirements-test.txt. ทุก Qt invocation ตั้ง `QT_QPA_PLATFORM=offscreen`. เทสต์ใหม่ `test_pos_091.py` ผ่าน 28 เคส ใช้ tzinfo Bangkok แบบ fixed UTC+7 โดยตรง ไม่มี time.tzset และอ่านไฟล์ด้วย encoding="utf-8". ไม่มีการสร้าง/เขียน PIN หรือ token และไม่มี network ไป ERP ในเทสต์ใหม่
+- Suite เต็ม — `QT_QPA_PLATFORM=offscreen PYTHONPATH=apps/pos-python /private/tmp/pos-091-py312/bin/python -m pytest apps/pos-python/tests -q` ผ่าน **426 passed / 63.31s** ก่อน mutation
+- Mutation — ถอดตัวแก้ทีละจุดและคืน source ใน finally ทุกครั้ง เทสต์แดงจริง exit 1 ทั้งสี่จุด คือไม่แปลง timezone 4 failed, ไม่บันทึก confirmation อัตโนมัติ 2 failed, UI กลับไปอ่าน checkbox 1 failed, ปิดการซ่อน backdrop 16 failed. Mutation runner อยู่ใน /private/tmp ไม่เพิ่ม artifact ใน repo
+- ตรวจเพิ่มเติม — compileall ผ่าน และ git diff --check ผ่าน. `php artisan test` เริ่มไม่ได้ exit 255 เพราะ workspace ไม่มี vendor/autoload.php. ไม่มี PHP/Vue เปลี่ยน
+- ยังไม่ทดสอบ/ความเสี่ยง — ยังไม่มี Windows/เครื่องพิมพ์/จอสัมผัสจริง UAT หรือ HTTP integration กับ ERP จริง. ต้องตั้ง timezone ของเครื่อง POS ให้ถูกต้องเพื่อให้แสดงเวลาตามสถานที่ใช้งาน
+- Deploy — ยังไม่ deploy หรือ build release
+- งานถัดไป — UAT Windows ตรวจเวลาใบเสร็จ/พิมพ์ซ้ำ/Z และบิลโอนที่ส่ง ERP ตามการอนุญาตของเจ้าของ
+- ผลยืนยันหลังคืน mutation ทั้งหมด — suite เต็มรอบสุดท้ายผ่าน **426 passed / 62.28s**, exit 0. `git diff --check` รอบส่งมอบผ่าน

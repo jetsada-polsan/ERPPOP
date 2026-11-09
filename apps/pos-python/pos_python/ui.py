@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from string import Template
 
+from .time_service import local_datetime_text
 from .barcode import decode_scale_label, is_scale_product, load_scale_profiles, scale_cart_line
 from .build_info import APP_VERSION
 from .shift_float import cash, supports_float, FloatClose, z_float_text
@@ -793,7 +794,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             title = QLabel("เครื่องนี้มีกะเดิมที่ยังไม่ได้ปิด")
             title.setStyleSheet("font-size:19px;font-weight:800")
             detail = QLabel(
-                f"เปิดเมื่อ {str(shift['opened_at'])[:16].replace('T', ' ')}\n"
+                f"เปิดเมื่อ {local_datetime_text(shift['opened_at'])}\n"
                 f"เงินทอนต้นกะ {money(shift['opening_cash']):,.2f} บาท"
             )
             detail.setObjectName("shiftSummary")
@@ -1532,7 +1533,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 "SELECT direction, status, message, created_at FROM sync_logs ORDER BY id DESC LIMIT 20"
             ).fetchall()
             auth_pending = service.db.execute("SELECT count(*) FROM auth_events_outbox WHERE synced = 0").fetchone()[0]
-            text = "\n".join(f"{row['created_at']} · {row['direction']} · {row['status']} · {row['message'] or '-'}" for row in rows)
+            text = "\n".join(f"{local_datetime_text(row['created_at'])} · {row['direction']} · {row['status']} · {row['message'] or '-'}" for row in rows)
             TouchMessage.information(self, "บันทึกการเชื่อมต่อ", f"Audit รอส่ง: {auth_pending}\n\n{text or 'ยังไม่มีบันทึก'}")
 
         def save_pairing(self) -> None:
@@ -2553,8 +2554,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             authoritative = isinstance(saved, dict) and saved.get('id') is not None and row['server_id'] is not None and int(saved['id']) == int(row['server_id'])
             expected = money(str(saved['expected_cash'])) if authoritative and saved.get('expected_cash') is not None else report.expected_cash
             counted = money(str(saved['counted_cash'])) if authoritative and saved.get('counted_cash') is not None else report.counted_cash or Decimal(0)
-            opened = datetime.fromisoformat(row['opened_at']).astimezone().strftime('%d/%m/%Y %H:%M')
-            ended = datetime.fromisoformat(row['closed_at']).astimezone().strftime('%d/%m/%Y %H:%M')
+            opened = local_datetime_text(row['opened_at'], fmt='%d/%m/%Y %H:%M')
+            ended = local_datetime_text(row['closed_at'], fmt='%d/%m/%Y %H:%M')
             text = f"เปิด {opened}\nปิด {ended}\n" + ('ยืนยันจาก ERP\n' if authoritative else 'สรุปในเครื่อง\n')
             text += '\n'.join(f'{label} {value:,.2f} บาท' for label, value in [
                 ('เงินทอนต้นกะ', report.opening_cash), ('ขายเงินสด', report.cash_sales),
@@ -2845,7 +2846,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     payment_reference=dialog.payment_reference.text().strip() or None,
                     cash_amount=money(dialog.amount.text() or "0") if dialog.payment_method == "mixed" else None,
                     qr_payload=dialog.qr_payload,
-                    payment_confirmed=dialog.payment_method not in ("transfer", "mixed", "cash") or dialog.transfer_confirmed.isChecked(),
+                    payment_confirmed=dialog.payment_method != "cash",
                     transfer_account_last4=dialog.transfer_account_last4.text().strip() or None,
                     adjustment_approved_by=self.order.adjustment_approved_by,
                     clear_current_order=True,
@@ -3296,14 +3297,14 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             dialog.exec()
 
         def show_history(self):
-            rows = service.db.execute("SELECT id, document_no, server_receipt_no, grand_total, sync_status, is_void FROM sales ORDER BY id DESC").fetchall()
+            rows = service.db.execute("SELECT id, document_no, server_receipt_no, sale_datetime, grand_total, sync_status, is_void FROM sales ORDER BY id DESC").fetchall()
             choices = []
             for row in rows:
                 receipt_no = str(row['server_receipt_no'] or row['document_no'])
                 if len(receipt_no) > 32:
                     receipt_no = f"{receipt_no[:15]}…{receipt_no[-12:]}"
                 status = sale_status_label(row['sync_status']) + (' · ยกเลิกแล้ว' if row['is_void'] else '')
-                choices.append((f"{receipt_no}\nยอด {money(row['grand_total']):,.2f} บาท · {status}", row['id']))
+                choices.append((f"{receipt_no} · {local_datetime_text(row['sale_datetime'])}\nยอด {money(row['grand_total']):,.2f} บาท · {status}", row['id']))
             picker = ChoiceDialog(self, "ประวัติบิล · เลือกบิลเพื่อยกเลิก/รับคืน", choices, searchable=True)
             if picker.exec() != QDialog.DialogCode.Accepted:
                 return
@@ -3450,7 +3451,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             recent.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
             for row_number, sale in enumerate(rows):
                 for column, value in enumerate([
-                    sale["document_no"], str(sale["sale_datetime"])[11:16],
+                    sale["document_no"], local_datetime_text(sale["sale_datetime"], fmt="%H:%M"),
                     f"{Decimal(str(sale['grand_total'])):,.2f}", sale_status_label(sale["sync_status"]),
                 ]):
                     recent.setItem(row_number, column, QTableWidgetItem(str(value)))

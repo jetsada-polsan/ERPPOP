@@ -10,6 +10,7 @@ import json
 import sqlite3
 from dataclasses import dataclass, field
 from typing import Any
+from .time_service import local_datetime_text
 
 # ชุดข้อมูลที่ sync ตามลำดับที่หน้าร้านเข้าใจ
 DATASETS = [
@@ -95,7 +96,7 @@ def collect(db: sqlite3.Connection, *, server_url: str = "", online: bool = Fals
         if not row or row["status"] == "never":
             datasets.append(DatasetStatus(key, label, "never", "ยังไม่เคย sync"))
         elif row["status"] == "synced":
-            datasets.append(DatasetStatus(key, label, "ok", f"{row['item_count']} รายการ · {row['last_success_at'] or '-'}"))
+            datasets.append(DatasetStatus(key, label, "ok", f"{row['item_count']} รายการ · {local_datetime_text(row['last_success_at'])}"))
         elif row["status"] == "failed":
             datasets.append(DatasetStatus(key, label, "failed", row["last_error"] or "ผิดพลาด ดูบันทึก"))
         else:

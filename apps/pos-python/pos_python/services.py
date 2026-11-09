@@ -696,7 +696,7 @@ class PosService:
                         transfer_account_last4) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                     (sale_id, method, str(amount), str(change), payment_reference,
                      qr_payload if method == "transfer" else None,
-                     self._now() if payment_confirmed else None,
+                     self._now() if method == "transfer" or payment_confirmed else None,
                      transfer_account_last4 if method == "transfer" else None),
                 )
             self.db.execute("INSERT INTO print_jobs (sale_id, created_at) VALUES (?, ?)", (sale_id, self._now()))

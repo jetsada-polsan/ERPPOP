@@ -8,7 +8,25 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, tzinfo
+
+
+def local_datetime_text(value: str | None, *, tz: tzinfo | None = None,
+                        fmt: str = "%Y-%m-%d %H:%M") -> str:
+    """Format stored UTC timestamps in the terminal timezone without changing storage.
+
+    Older timestamps without an offset are UTC, like the POS persistence clock.
+    Unknown legacy values remain readable instead of preventing receipt printing.
+    """
+    if not value:
+        return "-"
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return str(value)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(tz).strftime(fmt)
 
 
 class TimeService:

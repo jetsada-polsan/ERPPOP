@@ -10,6 +10,7 @@ import sqlite3
 from decimal import Decimal
 
 from .services import money
+from .time_service import local_datetime_text
 from .promptpay import compact_qr_lines
 
 # สระบนล่างและวรรณยุกต์ไทยไม่กินความกว้างตอนพิมพ์ นับด้วย len() ตรง ๆ
@@ -91,7 +92,7 @@ def render(db: sqlite3.Connection, sale_id: int, *, company: dict | None = None,
 
     lines.append(centre("ใบเสร็จรับเงิน / ใบกำกับภาษีอย่างย่อ", width))
     lines.append(columns("เลขที่", sale["document_no"], width))
-    lines.append(columns("วันที่", str(sale["sale_datetime"])[:16].replace("T", " "), width))
+    lines.append(columns("วันที่", local_datetime_text(sale["sale_datetime"]), width))
     if cashier:
         lines.append(columns("แคชเชียร์", cashier["code"], width))
     lines.append(rule(width))
