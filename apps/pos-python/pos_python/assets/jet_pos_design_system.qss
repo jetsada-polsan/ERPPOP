@@ -1,0 +1,325 @@
+/* ==========================================================================
+   JET POS — PySide6 Qt Stylesheet (QSS) Design System (1024x768 & Responsive)
+   Loaded at startup by pos_python/ui.py using objectName selectors
+   ========================================================================== */
+
+/* 1. Base Surfaces & Scrollbars (Touch-Friendly 14px) */
+QMainWindow, QDialog#mainDialog {
+    background-color: $bg;
+}
+
+QScrollBar:vertical {
+    border: none;
+    background: $bg;
+    width: 14px;
+    margin: 0px;
+    border-radius: 7px;
+}
+QScrollBar::handle:vertical {
+    background: $field;
+    min-height: 44px;
+    border-radius: 7px;
+}
+QScrollBar::handle:vertical:hover {
+    background: $primary_dark;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+/* 2. Touch Button Hierarchy (Minimum >= 48px, Primary >= 56px) */
+QPushButton#btnPrimary, QPushButton#primary {
+    background-color: $primary_dark;
+    color: $surface;
+    border: 1px solid $primary_dark;
+    border-radius: 8px;
+    font-weight: 800;
+    font-size: 16px;
+    min-height: 48px;
+    padding: 8px 16px;
+}
+QPushButton#btnPrimary:hover, QPushButton#primary:hover {
+    background-color: $primary_ink;
+    border-color: $primary_ink;
+}
+
+QPushButton#btnCheckoutPrimary, QPushButton#btnSuccess, QPushButton#payBtn {
+    min-height: 56px;
+    background-color: $success;
+    color: $surface;
+    font-size: 20px;
+    font-weight: 800;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 18px;
+}
+QPushButton#btnCheckoutPrimary:hover, QPushButton#btnSuccess:hover, QPushButton#payBtn:hover {
+    background-color: $success_dark;
+}
+QPushButton#btnCheckoutPrimary:disabled, QPushButton#btnSuccess:disabled, QPushButton#payBtn:disabled {
+    background-color: $success_muted;
+    color: $surface;
+}
+
+QPushButton#btnDanger {
+    background-color: $danger_btn;
+    color: $surface;
+    border: none;
+    border-radius: 8px;
+    font-weight: 800;
+    font-size: 16px;
+    min-height: 48px;
+}
+QPushButton#btnDanger:hover {
+    background-color: $danger_dark;
+}
+
+QPushButton#btnCartTool, QPushButton#cartTitleButton {
+    min-height: 40px;
+    padding: 4px 12px;
+    font-size: 14px;
+    font-weight: 700;
+    border-radius: 7px;
+}
+
+/* 3. Top App Bar & Quick Action Toolbar */
+QWidget#jetTopbar, QFrame#mainTopBar {
+    background-color: $brand_navy;
+    border-bottom: 3px solid $success;
+}
+QWidget#jetToolStrip {
+    background-color: $primary_dark;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+}
+QPushButton#jetTopButton, QPushButton#btnTopbar {
+    min-height: 44px;
+    background-color: rgba(255, 255, 255, 0.12);
+    color: $surface;
+    border: 1px solid rgba(255, 255, 255, 0.30);
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 4px 12px;
+}
+QPushButton#jetTopButton:hover, QPushButton#btnTopbar:hover {
+    background-color: rgba(255, 255, 255, 0.24);
+    border-color: $surface;
+}
+
+/* 4. Search Bar, Clear Button (x), & Category Pills */
+QLineEdit#searchRow, QLineEdit#mainSearchInput {
+    background-color: $surface;
+    border: 2px solid $field;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    padding: 0 14px;
+    min-height: 48px;
+    color: $text;
+}
+QLineEdit#searchRow:focus, QLineEdit#mainSearchInput:focus {
+    border: 2px solid $primary;
+    background-color: $surface;
+}
+
+QPushButton#clearSearch, QPushButton#btnClearSearch {
+    min-width: 56px;
+    max-width: 56px;
+    min-height: 56px;
+    max-height: 56px;
+    border-radius: 10px;
+    border: 1px solid $border;
+    background-color: $primary_soft;
+    color: $text;
+    font-size: 26px;
+    font-weight: 800;
+    padding: 0;
+}
+QPushButton#clearSearch:hover, QPushButton#btnClearSearch:hover {
+    background-color: $primary_pressed;
+    border-color: $primary;
+}
+
+QPushButton#catPill {
+    min-height: 48px;
+    padding: 0 16px;
+    background-color: $surface;
+    border: 1px solid $border;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    color: $text;
+}
+QPushButton#catPill:checked {
+    background-color: $brand_navy;
+    color: $surface;
+    border-color: $brand_navy;
+}
+
+/* 5. Product Cards & Cart Table (Readable >= 16px Content, Net Total >= 32px) */
+QPushButton#productTile, QFrame#prodCard {
+    background-color: $surface;
+    border: 1px solid $border;
+    border-radius: 10px;
+    text-align: left;
+}
+QPushButton#productTile:hover, QFrame#prodCard:hover {
+    background-color: $primary_soft;
+    border: 2px solid $success;
+}
+QLabel#productName, QLabel#prodName {
+    font-size: 16px;
+    font-weight: 700;
+    color: $text;
+}
+QLabel#productPrice, QLabel#prodPrice {
+    font-size: 18px;
+    font-weight: 800;
+    color: $brand_navy;
+}
+
+QTableWidget#cartTable {
+    background-color: $surface;
+    alternate-background-color: $row_alt;
+    border: none;
+    font-size: 16px;
+}
+QTableWidget#cartTable QHeaderView::section {
+    background-color: $primary_soft;
+    color: $text;
+    font-size: 14px;
+    font-weight: 800;
+    padding: 6px 6px;
+    border: none;
+    border-bottom: 1px solid $border;
+}
+QTableWidget#cartTable::item {
+    padding: 4px 6px;
+    border-bottom: 1px solid $border;
+}
+
+QWidget#totalBox, QFrame#totalPayableBox {
+    background-color: $brand_navy;
+    border-radius: 8px;
+}
+#totalBox QLabel#grandTotal, QLabel#totalPayableAmount {
+    color: $payable_mint;
+    font-size: 34px;
+    font-weight: 900;
+}
+
+/* 6. On-Screen Numeric Keypad & PIN Dots */
+QPushButton#keyBtn {
+    min-height: 64px;
+    min-width: 64px;
+    background-color: $surface;
+    border: 1px solid $field;
+    border-radius: 8px;
+    font-size: 24px;
+    font-weight: 800;
+    color: $text;
+}
+QPushButton#keyBtn:pressed {
+    background-color: $primary_pressed;
+}
+QPushButton#keyBtnActionClear {
+    min-height: 64px;
+    min-width: 64px;
+    background-color: $danger_soft;
+    color: $danger_btn;
+    border: 1px solid $danger_light;
+    border-radius: 8px;
+    font-size: 20px;
+    font-weight: 800;
+}
+QPushButton#keyBtnActionDel {
+    min-height: 64px;
+    min-width: 64px;
+    background-color: $warning_soft;
+    color: $warning_ink;
+    border: 1px solid $warning;
+    border-radius: 8px;
+    font-size: 22px;
+    font-weight: 800;
+}
+
+QLabel#pinDotsDisplay {
+    font-size: 28px;
+    font-weight: 800;
+    color: $brand_navy;
+    background-color: $primary_soft;
+    border: 1px solid $border;
+    border-radius: 10px;
+    padding: 8px 16px;
+}
+
+/* 7. Payment Screen Quick Cash & Method Tabs */
+QPushButton#btnPayMethod {
+    min-height: 56px;
+    background-color: $surface;
+    border: 1px solid $field;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: 800;
+    color: $text;
+}
+QPushButton#btnPayMethod:checked {
+    background-color: $brand_navy;
+    color: $surface;
+    border-color: $brand_navy;
+}
+QPushButton#btnCashQuick {
+    min-height: 56px;
+    background-color: $success_soft;
+    border: 1px solid $success;
+    border-radius: 8px;
+    color: $success_dark;
+    font-size: 18px;
+    font-weight: 800;
+}
+QPushButton#btnCashQuick:hover {
+    background-color: $success_light;
+}
+
+/* 8. Shift Close Stepper & Dialog Banner Cards */
+QLabel#stepPill {
+    background-color: $primary_soft;
+    color: $muted;
+    border: 1px solid $border;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 14px;
+    font-weight: 700;
+}
+QLabel#stepPill[active="true"] {
+    background-color: $brand_navy;
+    color: $surface;
+    border-color: $brand_navy;
+    font-weight: 800;
+}
+QFrame#dialogNoticeBox {
+    background-color: $primary_soft;
+    border-left: 6px solid $primary;
+    border-radius: 8px;
+    padding: 12px 14px;
+}
+QFrame#dialogNoticeBox[tone="warning"] {
+    background-color: $warning_soft;
+    border-left: 6px solid $warning;
+}
+QFrame#dialogNoticeBox[tone="danger"] {
+    background-color: $danger_soft;
+    border-left: 6px solid $danger_btn;
+}
+QFrame#dialogNoticeBox[tone="success"] {
+    background-color: $success_soft;
+    border-left: 6px solid $success;
+}
+QWidget#sessionLock {
+    background-color: $brand_navy;
+}
+QFrame#lockCard {
+    background-color: $surface;
+    border: 1px solid $border;
+    border-radius: 16px;
+}

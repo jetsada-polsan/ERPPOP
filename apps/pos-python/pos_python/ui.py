@@ -10,6 +10,7 @@ import re
 import sqlite3
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from string import Template
 
 from .time_service import local_datetime_text
@@ -58,7 +59,20 @@ PALETTE = {
     "muted": "#627481",
     "preview": "#c6d4e0",       # พื้นรองใบเสร็จ ให้กระดาษขาวเด้งออกมา
     "paper_ink": "#1a1a1a",     # หมึกบนกระดาษ ไม่ใช่สีจอ
+    "brand_navy": "#0a2540",    # MPM Food Group Deep Navy
+    "payable_mint": "#57d9a3",  # สีเขียวนีออนสว่างสำหรับยอดสุทธิบนพื้นเข้ม
+    "danger_btn": "#b91c1c",    # สีปุ่มเตือน/ลบในชุด Design System
+    "danger_dark": "#991b1b",   # สีปุ่มเตือนเมื่อกด/วางเมาส์
 }
+
+DESIGN_SYSTEM_QSS_PATH = Path(__file__).resolve().parent / "assets" / "jet_pos_design_system.qss"
+
+
+def load_design_system_qss() -> str:
+    """Load the packaged QSS design system file so Qt applies it at startup."""
+    if not DESIGN_SYSTEM_QSS_PATH.exists():
+        return ""
+    return DESIGN_SYSTEM_QSS_PATH.read_text(encoding="utf-8")
 
 # ค่าเหล่านี้ใช้ชื่อเดียวกับ PosLayout::defaultRuntime() ของ Laravel
 # เพื่อให้ layout ที่ผู้ดูแล Build จากเว็บส่งผลกับเครื่อง Python ได้โดยไม่ต้อง build
@@ -491,7 +505,8 @@ def _style_for_layout(runtime: dict | None = None, css: dict | None = None) -> s
         "tile_padding": f'{metrics["padding"]}px',
         "tile_font": f'{metrics["font"]}px',
     }
-    return _STYLE_TEMPLATE.substitute(values)
+    design_qss = Template(load_design_system_qss()).safe_substitute(values)
+    return _STYLE_TEMPLATE.substitute(values) + "\n" + design_qss
 
 
 STYLE = _style_for_layout(POS_LAYOUT_DEFAULT_RUNTIME)
