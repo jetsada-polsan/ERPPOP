@@ -597,6 +597,24 @@
             font-size: 13px;
         }
     }
+
+    /* แถบเมนูบนสุดแบบการ์ดขาว (เจ้าของขอ 9 พ.ย. 2026) */
+    .odn-topbar { background:#fff !important; color:#334155 !important;
+        border-bottom:1px solid var(--erp-border, #dbe7ef); box-shadow:0 4px 14px rgba(15,35,52,.06); }
+    .odn-topbar .odn-apps { background:#eef4f8; color:var(--erp-primary-dark,#0f4c75); }
+    .odn-topbar .odn-apps:hover { background:#dfeaf2; color:var(--erp-primary-dark,#0f4c75); }
+    .odn-topbar .odn-brand, .odn-topbar .odn-brand:hover { color:var(--erp-primary-dark,#0f4c75); }
+    .odn-topbar .odn-brand::after { background:#dbe7ef; }
+    .odn-topbar .odn-nav { align-self:stretch; gap:0; }
+    .odn-topbar .odn-nav-link { display:inline-flex; align-items:center; gap:7px; color:#334155;
+        font-size:14px; font-weight:600; padding:0 14px; border-radius:0; box-shadow:none; }
+    .odn-topbar .odn-nav-link i { font-size:15px; color:var(--erp-primary,#1585c0); }
+    .odn-topbar .odn-nav-link:hover { background:#f8fafc; color:var(--erp-primary-dark,#0f4c75); }
+    .odn-topbar .odn-nav-link:focus-visible { outline:2px solid var(--erp-primary,#1585c0); }
+    .odn-topbar .odn-nav-link.on, .odn-topbar .odn-nav-link.on:hover { background:#eaedf1;
+        color:var(--erp-primary-dark,#0f4c75); font-weight:700; box-shadow:inset 0 -3px 0 var(--erp-primary,#1585c0); }
+    .odn-topbar .odn-nav-link.on i { color:var(--erp-primary-dark,#0f4c75); }
+    .odn-topbar .odn-company { color:#475569; border-left-color:#dbe7ef; }
 </style>
 
 <script>
