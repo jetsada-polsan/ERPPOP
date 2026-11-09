@@ -105,7 +105,8 @@
                     <div class="row g-3 mb-4">
                         <div class="col-md-4">
                             <label class="form-label text-muted small">น้ำหนักวัตถุดิบรวมจริง (กก.)</label>
-                            <input type="number" step="0.0001" min="0.0001" name="input_weight_qty" x-model.number="inputWeight" class="form-control text-end" readonly required>
+                            <input type="number" step="0.0001" min="0.0001" name="input_weight_qty" x-model.number="inputWeight" class="form-control text-end" :readonly="!needWeigh()" required>
+                            <div class="small fw-semibold text-danger mt-1" x-show="needWeigh()">วัตถุดิบไม่ได้นับเป็น กก. (เช่น กล่อง) กรุณาชั่งแล้วใส่น้ำหนักรวมจริงเป็น กก.</div>
                         </div>
                         <div class="col-md-8 d-flex align-items-end">
                             <div class="alert alert-light border py-2 px-3 mb-0 w-100 small">ส่วนต่างระหว่างน้ำหนักเข้าและผลผลิตคือตัวสูญเสีย ต้นทุนสูญเสียจะถูกดูดซับในต้นทุนผลผลิตจริงเพื่อให้มูลค่าสต๊อกไม่หาย</div>
@@ -244,7 +245,13 @@
             },
 
             addRaw() { this.rawItems.push({ product_id: '', productQuery: '', qty: 1, average_cost: 0, results: [] }); this.syncInputWeight(); },
-            syncInputWeight() { this.inputWeight = Math.round(this.rawItems.reduce((s, i) => s + (Number(i.qty) || 0), 0) * 10000) / 10000; },
+            isKg(unit) { return /^(กก\.?|กิโลกรัม|kg\.?|kgs?)$/i.test(String(unit || '').trim()); },
+            needWeigh() { return this.rawItems.some(i => i.product_id && !this.isKg(i.unit_name)); },
+            // หน่วยวัตถุดิบเป็น กก. ทั้งหมดจึงรวมให้เอง ถ้าเป็นกล่อง/ชิ้น ต้องชั่งจริง (เดิมเอาจำนวนกล่องมาเป็น กก. → Yield 1,000%)
+            syncInputWeight() {
+                if (this.needWeigh()) return;
+                this.inputWeight = Math.round(this.rawItems.reduce((s, i) => s + (Number(i.qty) || 0), 0) * 10000) / 10000;
+            },
 
             loadRecipe(recipeId) {
                 if (!recipeId) { this.selectedRecipeId = ''; this.selectedRecipe = null; return; }

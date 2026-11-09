@@ -168,6 +168,12 @@ class StockTransformService
             if ($batchMode) {
                 $output = $outputs->first();
                 $outputProduct = $products->get((int) $output['product_id']);
+                // วัตถุดิบที่หน่วยไม่ใช่ กก. (กล่อง/ชิ้น) เอาจำนวนมาเป็นน้ำหนักไม่ได้ ต้องชั่งจริง
+                $nonKg = \App\Models\Product::with('baseUnit')->whereIn('id', $raw->pluck('product_id'))->get()
+                    ->contains(fn ($p) => ! preg_match('/^(กก\.?|กิโลกรัม|kg\.?|kgs?)$/iu', trim((string) $p->baseUnit?->name)));
+                if ($nonKg && blank($data['input_weight_qty'] ?? null)) {
+                    throw new RuntimeException('วัตถุดิบไม่ได้นับเป็น กก. กรุณาชั่งแล้วใส่น้ำหนักวัตถุดิบรวมจริง (กก.)');
+                }
                 $inputWeight = DecimalMath::round($data['input_weight_qty'] ?? DecimalMath::sum($raw->pluck('qty'), DecimalMath::QUANTITY_SCALE), DecimalMath::QUANTITY_SCALE);
                 $outputWeight = DecimalMath::round($output['qty'], DecimalMath::QUANTITY_SCALE);
                 if (DecimalMath::compare($outputWeight, $inputWeight) > 0) {
