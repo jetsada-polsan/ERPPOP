@@ -968,6 +968,11 @@
         html body.erp-classic-document-page :is(.doc-modal,.booking-modal,.po-modal,.cd-modal) .doc-subtitle { font-size: 13px !important; }
         html body.erp-classic-document-page .doc-modal .doc-table .qty { width: 140px !important; }
     }
+
+    /* แถบแจ้งมีร่างเอกสาร (แทน window.confirm ที่บล็อกหน้าจอ) */
+    .erp-draft-bar { position: fixed; /* no-print ผ่าน class ด้านล่าง */ right: 20px; bottom: 20px; z-index: 5000; display: flex; align-items: center; gap: 10px;
+        background: #fff; border: 1px solid #cbd5e1; border-left: 4px solid var(--erp-primary, #1585c0); border-radius: 10px;
+        padding: 10px 14px; box-shadow: 0 10px 30px rgba(15,35,52,.15); font-size: 14px; color: #0f172a; }
 </style>
 
 <script>
