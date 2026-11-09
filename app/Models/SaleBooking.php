@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
+    'stock_shortage_status', 'stock_shortage_note', 'stock_shortage_approved_by', 'stock_shortage_approved_at',
     'document_id', 'salesman_id', 'sales_user_id', 'sales_area_id', 'status', 'confirmed_at', 'confirmed_document_id',
     'fulfillment_type', 'delivery_due_at', 'delivered_at', 'delivery_status', 'accounting_review_status',
     'accounting_reviewed_by', 'accounting_reviewed_at', 'accounting_review_note',
@@ -59,6 +60,14 @@ class SaleBooking extends Model
     public function salesArea(): BelongsTo
     {
         return $this->belongsTo(SalesArea::class);
+    }
+
+    /** Includes the original single-document link for bookings created before tax splitting. */
+    public function saleDocuments()
+    {
+        return Document::whereHas('documentType', fn ($query) => $query->where('code', DocumentType::CREDIT_SALE))
+            ->where(fn ($query) => $query->where('source_document_id', $this->document_id)
+                ->orWhere('id', $this->confirmed_document_id));
     }
 
     public function confirmedDocument(): BelongsTo

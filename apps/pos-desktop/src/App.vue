@@ -809,6 +809,7 @@ async function previewCloseShift() {
 }
 
 async function closeShift() {
+  if (busy.value) return
   if (!shift.value || countedCash.value === '') return
   if (shift.value.default_float !== undefined && !closePreview.value) { showError('ตรวจยอดก่อนยืนยันปิดกะ'); return }
   if (pendingCount.value) { showError('ต้องส่งบิลค้างขึ้น ERP ให้ครบก่อนปิดกะ'); return }
@@ -1063,7 +1064,7 @@ function handleShortcut(event: KeyboardEvent) {
     openPayment()
   }
   // ตั้งค่าครั้งแรกกับตั้ง PIN ใหม่ กด Escape ข้ามไม่ได้ ต้องทำให้จบก่อน
-  const locked = modal.value === 'changePin' || modal.value === 'cashier' || (modal.value === 'settings' && !profile.value)
+  const locked = (modal.value === 'closeShift' && busy.value) || modal.value === 'changePin' || modal.value === 'cashier' || (modal.value === 'settings' && !profile.value)
   if (event.key === 'Escape' && modal.value === 'closeApp') { event.preventDefault(); cancelCloseApp(); return }
   if (event.key === 'Escape' && modal.value && !locked) {
     modal.value = null
@@ -1276,8 +1277,9 @@ onUnmounted(() => {
         <button type="button" class="link-button" @click="printZReport">พิมพ์ Z Report กะล่าสุดซ้ำ</button>
       </form>
 
-      <form v-else-if="modal === 'closeShift'" class="modal compact" @submit.prevent="closeShift">
-        <div class="modal-head"><div><LogOut/><span><strong>ปิดกะขาย</strong><small>{{ shift?.shift_no }} · {{ pendingCount ? `มี ${pendingCount} บิลรอส่ง` : 'บิลส่งครบแล้ว' }}</small></span></div><button type="button" @click="modal = null"><X/></button></div>
+      <form v-else-if="modal === 'closeShift'" class="modal compact close-shift-dialog" @submit.prevent="closeShift">
+        <div class="modal-head"><div><LogOut/><span><strong>ปิดกะขาย</strong><small>{{ shift?.shift_no }} · {{ pendingCount ? `มี ${pendingCount} บิลรอส่ง` : 'บิลส่งครบแล้ว' }}</small></span></div><button type="button" :disabled="busy" @click="modal = null"><X/></button></div>
+        <div class="close-shift-body">
         <p v-if="shift?.cash_warning" class="error">เงินสดเกินเกณฑ์ ควรนำส่งเงิน</p>
         <p v-if="shift?.blind_count === false && shift?.expected_cash !== undefined">เงินที่ควรมี {{ money(shift.expected_cash) }}</p>
         <details><summary>ช่วยนับธนบัตร / เหรียญ</summary>
@@ -1300,7 +1302,8 @@ onUnmounted(() => {
         <label>นำส่งเงินระหว่างกะ<input v-model.number="cashDropAmount" type="number" min="0" step="0.01" placeholder="0.00"></label>
         <label v-if="cashDropAmount > 0">เลขอ้างอิง / ซองเงิน<input v-model="cashDropReference"></label>
         <button v-if="cashDropAmount > 0" type="button" class="secondary" :disabled="busy" @click="recordCashDrop">บันทึกนำส่งเงิน</button>
-        <button class="primary" :disabled="busy || pendingCount > 0 || (shift?.default_float !== undefined && !closePreview)">ยืนยันปิดกะ</button>
+        </div>
+        <div class="close-shift-footer"><button class="primary" :disabled="busy || countedCash === '' || pendingCount > 0 || (shift?.default_float !== undefined && !closePreview)">ยืนยันปิดกะ</button></div>
       </form>
 
       <section v-else-if="modal === 'closeApp'" class="modal compact">

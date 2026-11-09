@@ -302,6 +302,118 @@ class SalesDocumentEndToEndTest extends TestCase
     }
 
     /** สาขาที่มีของในคลังจริงโดยซื้อเข้ามา ไม่ใช่ยัดตัวเลขลงตาราง */
+    public function test_one_booking_with_vat_and_non_vat_goods_splits_into_ds_and_dsn_bills(): void
+    {
+        [$branch, , $plain, $customer] = $this->stockedBranch('SPLIT', qty: 10, unitCost: 60, withCustomer: true);
+        $vatGoods = Product::create([
+            'sku_code' => 'SKUVAT', 'name_th' => 'สินค้ามี VAT', 'base_unit_id' => $plain->base_unit_id,
+            'default_price' => 50, 'average_cost' => 0, 'is_vat' => true, 'is_active' => true, 'negative_stock_policy' => 'block',
+        ]);
+        app(PurchaseService::class)->create([
+            'branch_id' => $branch->id, 'supplier_id' => Supplier::sole()->id, 'is_credit' => true, 'prices_include_vat' => false,
+            'items' => [['product_id' => $vatGoods->id, 'qty' => 10, 'unit_price' => 30]],
+        ]);
+        $typeId = DocumentType::where('code', 'CREDIT_SALE')->value('id');
+        $ds = \App\Models\DocumentBook::create(['code' => 'DS', 'name' => 'DS', 'prefix' => 'DS', 'document_type_id' => $typeId, 'is_default' => true, 'is_active' => true, 'no_vat' => false]);
+        $dsn = \App\Models\DocumentBook::create(['code' => 'DSN', 'name' => 'DSN', 'prefix' => 'DSN', 'document_type_id' => $typeId, 'is_default' => false, 'is_active' => true, 'no_vat' => true]);
+
+        $bookingDocument = app(BookingService::class)->create([
+            'branch_id' => $branch->id, 'customer_id' => $customer->id,
+            'items' => [
+                ['product_id' => $plain->id, 'qty' => 3, 'unit_price' => 100.25],
+                ['product_id' => $vatGoods->id, 'qty' => 2, 'unit_price' => 50.10],
+            ],
+        ]);
+        app(CreditSaleService::class)->convertBookingToCreditSale(SaleBooking::where('document_id', $bookingDocument->id)->sole());
+
+        $sales = Document::where('source_document_id', $bookingDocument->id)->orderBy('id')->get();
+        $this->assertCount(2, $sales, 'ใบจองเดียวต้องแยกเป็น DS + DSN');
+        $byBook = $sales->keyBy('document_book_id');
+        $this->assertSame(100.2, (float) $byBook[$ds->id]->total_amount, 'DS เก็บเฉพาะสินค้ามี VAT');
+        $this->assertSame(300.75, (float) $byBook[$dsn->id]->total_amount, 'DSN เก็บเฉพาะสินค้าไม่มี VAT');
+        $this->assertSame(round((float) $bookingDocument->total_amount, 2), round($sales->sum(fn ($d) => (float) $d->total_amount), 2));
+        $this->assertSame(2, CustomerOpenItem::whereIn('document_id', $sales->pluck('id'))->count());
+        foreach ($sales as $sale) {
+            $this->assertGlBalanced($sale);
+        }
+    }
+
+    public function test_a_short_booking_needs_a_manager_to_confirm_in_erp_before_billing_and_may_go_negative(): void
+    {
+        [$branch, $location, $product, $customer] = $this->stockedBranch('SHORT', qty: 2, unitCost: 60, withCustomer: true);
+        $service = app(BookingService::class);
+        $items = [['product_id' => $product->id, 'qty' => 5, 'unit_price' => 100]];
+
+        try {
+            $service->create(['branch_id' => $branch->id, 'customer_id' => $customer->id, 'items' => $items]);
+            $this->fail('สต๊อกไม่พอและไม่ได้ขอ ต้องบันทึกไม่ได้');
+        } catch (\RuntimeException) {
+        }
+
+        $doc = $service->create(['branch_id' => $branch->id, 'customer_id' => $customer->id, 'items' => $items, 'allow_stock_shortage' => true]);
+        $booking = SaleBooking::where('document_id', $doc->id)->sole();
+        $this->assertSame('pending', $booking->stock_shortage_status);
+
+        try {
+            app(CreditSaleService::class)->convertBookingToCreditSale($booking);
+            $this->fail('ยังไม่ได้ยืนยัน ห้ามออกใบขาย');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('ผู้จัดการ', $e->getMessage());
+        }
+
+        $clerk = User::factory()->create(['branch_id' => $branch->id, 'is_active' => true, 'must_change_password' => false]);
+        $clerkRole = Role::create(['code' => 'SALES_T', 'name' => 'ขาย']);
+        $clerkRole->permissions()->attach(Permission::firstOrCreate(['code' => 'sales.manage'], ['name' => 'sales']));
+        $clerk->roles()->attach($clerkRole);
+        $this->actingAs($clerk)->post(route('bookings.approve-stock-shortage', $booking))->assertForbidden();
+
+        $manager = User::factory()->create(['branch_id' => $branch->id, 'is_active' => true, 'must_change_password' => false]);
+        $managerRole = Role::firstOrCreate(['code' => 'BRANCH_MGR'], ['name' => 'ผจก.']);
+        $managerRole->permissions()->syncWithoutDetaching(Permission::firstOrCreate(['code' => 'sales.manage'], ['name' => 'sales']));
+        $manager->roles()->attach($managerRole);
+        $this->actingAs($manager)->post(route('bookings.approve-stock-shortage', $booking))->assertRedirect();
+        $this->assertSame('approved', $booking->fresh()->stock_shortage_status);
+
+        app(CreditSaleService::class)->convertBookingToCreditSale($booking->fresh());
+        $balance = StockBalance::where('product_id', $product->id)->where('warehouse_location_id', $location->id)->sole();
+        $this->assertSame(-3.0, (float) $balance->on_hand_qty, 'อนุมัติแล้วสต๊อกติดลบชั่วคราวได้');
+    }
+
+    public function test_a_manager_can_revert_a_confirmed_booking_back_to_a_reservation(): void
+    {
+        [$branch, $location, $product, $customer] = $this->stockedBranch('REV', qty: 10, unitCost: 60, withCustomer: true);
+        $doc = app(BookingService::class)->create(['branch_id' => $branch->id, 'customer_id' => $customer->id,
+            'items' => [['product_id' => $product->id, 'qty' => 3, 'unit_price' => 100]]]);
+        $booking = SaleBooking::where('document_id', $doc->id)->sole();
+        $sale = app(CreditSaleService::class)->convertBookingToCreditSale($booking);
+
+        $clerk = User::factory()->create(['branch_id' => $branch->id, 'is_active' => true, 'must_change_password' => false]);
+        $clerkRole = Role::create(['code' => 'SALES_R', 'name' => 'ขาย']);
+        $clerkRole->permissions()->attach(Permission::firstOrCreate(['code' => 'sales.manage'], ['name' => 'sales']));
+        $clerk->roles()->attach($clerkRole);
+        $this->actingAs($clerk)->post(route('bookings.revert-confirm', $booking), ['reason' => 'x'])->assertForbidden();
+
+        $manager = User::factory()->create(['branch_id' => $branch->id, 'is_active' => true, 'must_change_password' => false]);
+        $role = Role::firstOrCreate(['code' => 'BRANCH_MGR'], ['name' => 'ผจก.']);
+        $role->permissions()->syncWithoutDetaching(Permission::firstOrCreate(['code' => 'sales.manage'], ['name' => 'sales']));
+        $manager->roles()->attach($role);
+        $this->actingAs($manager)->post(route('bookings.revert-confirm', $booking), ['reason' => 'ลูกค้าเปลี่ยนรายการ'])
+            ->assertSessionHas('success');
+
+        $this->assertSame('cancelled', $sale->fresh()->status);
+        $this->assertSame(SaleBooking::STATUS_PENDING, $booking->fresh()->status);
+        $balance = StockBalance::where('product_id', $product->id)->where('warehouse_location_id', $location->id)->sole();
+        $this->assertSame(10.0, (float) $balance->on_hand_qty, 'ต้องคืนสต๊อกในมือ');
+        $this->assertSame(3.0, (float) $balance->reserved_qty, 'ใบจองกลับมากันของไว้');
+        $this->assertSame(0.0, (float) CustomerOpenItem::where('document_id', $sale->id)->sole()->balance_amount);
+        foreach (GlJournal::where('document_id', $sale->id)->get()->groupBy('account_id') as $accountId => $rows) {
+            $this->assertSame(0.0, round((float) $rows->sum('debit') - (float) $rows->sum('credit'), 2), "บัญชี {$accountId} ต้องกลับรายการจนเป็นศูนย์");
+        }
+
+        app(CreditSaleService::class)->convertBookingToCreditSale($booking->fresh());
+        $this->assertSame(7.0, (float) $balance->fresh()->on_hand_qty, 'Confirm ใหม่ได้');
+    }
+
     private function stockedBranch(string $suffix, float $qty, float $unitCost, bool $withCustomer = false): array
     {
         DocumentType::firstOrCreate(['code' => 'PURCHASE'], ['name_th' => 'ใบซื้อ', 'stock_effect' => 'in']);

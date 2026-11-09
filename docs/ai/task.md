@@ -1,3 +1,81 @@
+# Handoff — 2026-11-09 (Workflow master A / B / C — workspace only)
+
+## Commit / ขอบเขต
+- Branch `claude/workflow-improvement`, base HEAD `1653b49` (`Merge pull request #6 ...`). **ไม่ commit ไม่ push ตามคำสั่งเจ้าของ**; เก็บไฟล์ใน workspace.
+- พยายาม `git pull origin main` ก่อนแก้แล้ว ถูกปฏิเสธ `FETCH_HEAD: Operation not permitted` เพราะ metadata ของ worktree อยู่นอก writable roots. ไม่เปลี่ยน branch/ไม่ checkout ทับงานใคร จึงยังยืนยันว่าเทียบ remote ล่าสุดไม่ได้.
+- ก่อนเริ่มมี untracked `docs/ai/codex-workflow-master.md` และ `docs/ai/reports-inventory.md` อยู่แล้ว อ่านเป็น input และไม่แก้ทั้งสองไฟล์.
+- **ไม่แตะ production ไม่ deploy ไม่เชื่อม MSSQL ไม่รัน migration บนฐานถาวร** ไม่มี migration ใหม่ ไม่แก้ Python POS/installer/release ไม่สร้าง PIN/password/device token ให้ใคร.
+
+## ทำอะไรไป — A
+- เพิ่ม `docs/ai/workflow-audit.md` ภาษาไทย ครบ executive summary, System Audit, Gap Analysis Existing/Incomplete/Missing/Bug แยก Phase 1–9, workflow แต่ละแผนก, DB/API impact, UI/UX, P0→P1→P2, 20 acceptance scenarios และ Open Questions พร้อมไฟล์:บรรทัด.
+- เทียบ Laravel/Blade/Alpine, routes/auth/permissions, services/FK/status/transactions/stock/GL และโมดูล Sales/Reservation/Purchasing/Inventory/Warehouse/Production/Delivery/Accounting/POS/Reports/Settings จาก source จริง ไม่รับรองข้อมูล production.
+- จุดที่ต้องเจ้าของยืนยัน: DS/DSN เป็น CREDIT_SALE books และ DSN ถูกตั้ง no_vat ใน migration เดิม แต่ไม่ใช่หลักฐานความหมายภาษีตามกฎหมาย; legacy source มี IB/IB-N ไม่ได้ยืนยัน alias IBN; A/B, Confirm/revision, tax priority, IT grants ยังไม่เดา.
+- พบความจำกลางขัดกับ source: BookingService กัน reserved_qty จริง และ CreditSaleService อนุญาต Confirm ระหว่างส่ง ไม่แก้กติกาส่วนนี้ใน Phase 1.
+
+## ทำอะไรไป — B (ลงมือเฉพาะ Phase 1.1–1.4)
+
+| ข้อ | ไฟล์ที่เพิ่ม/แก้ | ผล |
+|---|---|---|
+| 1.1 ฟอร์ม | `public/document-workflow.js` (ใหม่), `resources/views/bookings/index.blade.php`, `resources/views/bookings/edit.blade.php`, `resources/views/documents/partials/entry-assets.blade.php`, `resources/views/documents/partials/entry-modal.blade.php`, `resources/views/purchase-orders/index.blade.php` | ถอด click-outside ที่ปิดฟอร์ม; เตือนปิด/ออกเมื่อมีร่าง; กัน Enter submit ระหว่างคีย์และ submit ซ้ำ; native validation; เก็บรายการ+header/party ใน sessionStorage ต่อ user/path/action 8 ชั่วโมง; ถามก่อนกู้คืน; ไม่เพิ่ม auto-print |
+| 1.1 บันทึกสำเร็จ | `app/Http/Controllers/BookingController.php`, `app/Http/Controllers/PurchaseOrderController.php`, `resources/views/layout.blade.php` | flash `document_draft_saved` เฉพาะ store/update สำเร็จ และล้าง pending draft เฉพาะ action ที่ตรงกัน; validation failure ไม่ทำเหมือนบันทึกแล้ว; ไม่เปลี่ยน posting/ยอด/เลขเอกสาร |
+| 1.2 refresh | `resources/views/pos/index.blade.php`, `resources/views/executive/index.blade.php` | เว็บ POS เดิมมี Alpine auto-init + x-init=init() ซ้ำ: ถอด x-init เพิ่ม init guard, clear clock/catalog/host intervals, ยกเลิก listeners/background reads เมื่อ destroy และไม่ตั้ง timers หลัง async offline init ที่ถูก dispose; ping ไม่ซ้อน; Executive start ครั้งเดียว ≥30 วินาที/skip hidden/guard in-flight/timeout15วินาที/abort+cleanup; ไม่มี full reload ใหม่ |
+| 1.3 ค้นหา | `app/Http/Controllers/SearchController.php`, shared entry assets/modal และ web POS | customer/supplier/branch partial case-insensitive ใช้ LOWER LIKE; schema/limit/permission เดิม; ลูกค้า abort+sequence+clear selected id เมื่อพิมพ์ใหม่ และ keyboard เลือกผล; stock preview ไม่เอา branch/product เก่าทับใหม่; web POS product query/category/branch ตอบย้อนลำดับไม่ทับผลใหม่; ใช้ shared product picker ที่มี debounce/keyboard อยู่แล้ว |
+| 1.4 popup ปิดกะ | `resources/views/pos/index.blade.php`, `apps/pos-desktop/src/App.vue`, `apps/pos-desktop/src/styles.css` | web/Vue แยกหัว/เนื้อหาเลื่อน/ปุ่มท้ายใน viewport, จำกัด width/dvh; web เริ่มเงินนับว่าง ตรวจค่าก่อนส่ง กันส่งซ้ำรวมช่วง sync offline; busy ไม่ปิด popup; Vue guard busy และ Escape; API failure คงกะ/ยอดนับ |
+| เทสต์ | `tests/Feature/WorkflowPhaseOneTest.php`, `tests/browser/workflow-dom.cjs`, `tests/browser/workflow-phase-one.cjs` (ใหม่) | feature search+PR success/failure flash+render fixtures, DOM actual Blade/Alpine และ browser regression script สำหรับรันเมื่อ Chrome เปิดได้ |
+| C ส่งมอบ | `docs/ai/task.md` | สรุปไฟล์/ผลจริง/ข้อจำกัดและงาน Python ด้านล่าง; เก็บ handoff เก่าไว้ถัดจากรายการนี้ |
+
+## ทดสอบไปแล้วแค่ไหน — ผลจริง
+
+- `composer install --no-interaction --prefer-dist --no-scripts` สำเร็จ (เดิมไม่มี vendor). ไม่รัน composer setup/key generation/migrate; PHP tests ใช้ `phpunit.xml` SQLite `:memory:` + testing key เท่านั้น.
+- `php -d memory_limit=2G vendor/bin/phpunit`: **841 tests, 7,082 assertions; runner รายงาน passed=839, skipped=2, incomplete=6, ไม่มี failure/error**. skip/incomplete เดิมไม่ได้เพิ่มเพื่อหลบเทสต์. ก่อนเพิ่ม tests ชุดเดิม 837 tests / 7,051 assertions ไม่มี failure/error เช่นกัน.
+- `WF_BROWSER_FIXTURES=/tmp/wf-browser-fixtures php -d memory_limit=2G vendor/bin/phpunit tests/Feature/WorkflowPhaseOneTest.php`: **4 tests / 31 assertions ผ่าน**. ทดสอบ partial code/ชื่อไทย/barcode, active filters, supplier/branch search, PR invalid ไม่สร้างเอกสารหรือ flash saved, valid PR จำนวน2.5×25=62.50 และ render cleanup หลังสำเร็จ. HTML fixtures สร้างจาก SQLite memory ไม่มี HTTP ถึง ERP.
+- `NODE_PATH=/tmp/wf-browser/node_modules node tests/browser/workflow-dom.cjs`: **53 checks ผ่าน** ด้วย jsdom + Alpine ที่ repo ใช้จริง: 50รายการ, Enter/Escape/picker, decline/accept close, reloadกู้ qty+header, expired/user-isolated draft, beforeunload, party/product stale results, Executive timer/in-flight/destroy, success cleanup ตรง action, POS init/listener cleanup และ API close failure/duplicate click/empty count. **DOM tests ไม่พิสูจน์ pixel/layout หรือ browser engine**.
+- `cd apps/pos-desktop && ./node_modules/.bin/vue-tsc --noEmit`: **exit 0**. ติดตั้ง dependency ด้วย `npm install --ignore-scripts --package-lock=false --no-audit --no-fund --cache /tmp/wf-npm-cache` ก่อน; ไม่แก้ lock/package source. `npm ci` เคยลองแล้วใช้ไม่ได้เพราะโปรเจกต์ไม่มี package-lock.json จึงใช้ install แบบไม่สร้าง lock.
+- `APP_ENV=testing DB_CONNECTION=sqlite DB_DATABASE=:memory: DB_URL= CACHE_STORE=array php artisan view:cache`: **ผ่าน**.
+- `php -l` controllers ที่แก้ + test ใหม่, `node --check` public JS/DOM/browser scripts และ `git diff --check`: **ผ่าน**.
+- `php vendor/bin/pint tests/Feature/WorkflowPhaseOneTest.php`: สำเร็จ. เคยรัน Pint บน controllers ด้วย แล้วคืนเฉพาะ formatting ที่ไม่เกี่ยวข้องจาก HEAD ให้ diff เหลือ logic ของงานนี้ จึงไม่อ้างว่า controller เดิมทั้งไฟล์ผ่าน style check ใหม่.
+- `NODE_PATH=/tmp/wf-browser/node_modules node tests/browser/workflow-phase-one.cjs`: **รันไม่สำเร็จตั้งแต่ launch Chrome** (`Target page/context/browser closed`, โปรเซส `SIGABRT`; log มี kill `EPERM`). ไม่มี browser assertion หรือ screenshot ที่ยืนยันว่าผ่าน. ไม่พยายามข้าม sandbox. Script รองรับ `CHROMIUM_PATH`/`PLAYWRIGHT_MODULE` สำหรับเครื่องทดสอบที่เปิด browser ได้.
+- ไม่รัน `erp:health` กับ default config/ฐานจริง, ไม่ execute PostgreSQL หรือ Windows/Tauri/เครื่องพิมพ์/เครื่องชั่ง ไม่มีการอ้างว่าผ่านส่วนเหล่านี้.
+
+### Mutation checks — ถอดตัวแก้แล้วแดงจริงและคืนครบ
+
+| Mutation | ผลที่ตรวจพบ |
+|---|---|
+| ปิด draft recovery | DOM assertion `1 !== 50` หลัง reload |
+| เอา guard stale party response ออก | ผล OLD ทับ NEW ทำ assertion fail |
+| เอา guard stale web POS products ออก | product id1 ทับ id2 ทำ assertion fail |
+| เอา POS init guard ออก | timer starts `2 !== 1` |
+| เอา Executive start guard ออก | interval starts `2 !== 1` |
+
+ทั้ง 5 กรณี exit1 จาก assertion จริง ใช้สำเนา source/fixtures คืนใน finally ไม่เก็บ mutation ใน application; จากนั้น suite+DOM+typecheck สุดท้ายผ่านตามด้านบน. รายละเอียด log รอบนี้อยู่ `/tmp/wf-*.log` และ `/tmp/wf-mutations.json` (ไฟล์ชั่วคราว ไม่ใช่ artifact ถาวรของ repo).
+
+## ความเสี่ยง / งานถัดไป
+- ร่างเป็น **แท็บเดียว/เครื่องเดียว best effort**; ปิดแท็บ/พื้นที่เก็บ unavailable/เกิน8ชั่วโมงอาจกู้ไม่ได้ ไม่ใช่ server draft. ไม่เก็บ CSRF/password/PIN/token; ข้อมูลที่กู้ยังต้องผ่าน backend validation/permission เดิม. ยังต้อง UAT network failure/validation roundtrip ใน browser จริง รวม mobile/จอเตี้ย/ซูม/Windows touch.
+- UI ปุ่มปิดกะจัดโครงสร้างแล้ว แต่ **ยังไม่ยืนยันการเรนเดอร์จริงที่ 375×420/1024×600 หรือ Vue บน Windows** เพราะ Chrome launch ถูกปฏิเสธ; browser script เตรียมไว้ ต้องรันก่อนปล่อยจริง. ไม่แก้ installer/version.
+- Backend ปิดกะยังใช้ ownership/permission/transaction/locks/DecimalMath/preview เดิม; suites เดิม PosShiftFloat/PosWebCheckoutReal/PosTransactionSafety ยังคงรันใน full suite ครอบคลุมเงินสด/วิธีอื่น/ส่วนต่าง/rollback ไม่เปลี่ยน cashier identity หรือ payment contract.
+- ไม่มี DB migration รอบนี้ จึงไม่อ้าง PostgreSQL concurrency ผ่าน; Phase2–9/production rollout ยังต้อง policy และ tests ตาม audit. Open Questions ไม่ได้ขวาง Phase1 ที่ทำได้ และไม่ได้ถูกเดาคำตอบ.
+- Deploy: **ยังไม่ deploy และห้ามใช้ handoff นี้เป็นคำสั่ง deploy**.
+
+## งาน Python POS — จดไว้ ไม่แก้ใน branch นี้
+- ทำใน `claude/pos-python-settings-popup`: close-shift popup ต้องใช้ขนาดตาม available screen, body scroll และ footerยืนยันถึงได้เมื่อขยายตัวช่วยนับเงิน/จอเตี้ย; keyboard Escape ไม่ปิดระหว่าง request.
+- รองรับ ERP preview/float_kept/deposit_reference ตาม capability, เก็บ counted_cash เมื่อ APIล้ม, ป้องกัน double-click/closeซ้ำ, offline queue ต้องส่งครบก่อนปิด; เงินใช้ Decimal(str(...)) ไม่ใช้ float. ไม่เดา expected_cash/แคชเชียร์จาก user token.
+- ทดสอบเงินสด/โอน/mixed/เกิน/ขาด/timeout/retry/PIN-device ownership และพิมพ์ Z บน Windows จริง. งานโลโก้/น้ำหนักfont/สำเนาท้าย/ไม่พิมพ์ตามsetting อยู่ Phase7 แยก ห้ามปน production transaction ระหว่าง UAT.
+
+## รันซ้ำในเครื่องทดสอบ
+
+```bash
+npm install --prefix /tmp/wf-browser jsdom playwright --ignore-scripts --cache /tmp/wf-npm-cache
+WF_BROWSER_FIXTURES=/tmp/wf-browser-fixtures php -d memory_limit=2G vendor/bin/phpunit tests/Feature/WorkflowPhaseOneTest.php
+NODE_PATH=/tmp/wf-browser/node_modules node tests/browser/workflow-dom.cjs
+NODE_PATH=/tmp/wf-browser/node_modules node tests/browser/workflow-phase-one.cjs
+php -d memory_limit=2G vendor/bin/phpunit
+(cd apps/pos-desktop && ./node_modules/.bin/vue-tsc --noEmit)
+```
+
+Browser script intercepts network เพื่อใช้เฉพาะ fixtures/public assets และ mocked JSON ไม่ต่อ production; ต้องมี Chrome ที่ launch ได้ หรือส่ง `CHROMIUM_PATH` ของ test browser. ไม่ใช้ shell env/credentials production. ไฟล์ที่มีอยู่ก่อนเริ่ม (`codex-workflow-master.md`, `reports-inventory.md`) ยังเป็น untracked เดิม ไม่ใช่ไฟล์ที่สร้างในงานนี้.
+
+---
+
 # Handoff — 2026-11-06 (P0 money integrity — workspace only)
 
 ## Commit / ขอบเขต
@@ -5143,3 +5221,11 @@ pending
 - ทำอะไร: ขยายปุ่ม toolbar, ปุ่มแก้จำนวน/ลบ และปุ่มรับชำระ เพื่อรองรับหน้าจอสัมผัสโดยไม่ย้อนกลับไปใช้ UI legacy
 - ทดสอบ: `PYTHONPATH=apps/jet-pos-python python3 -m unittest discover -s apps/jet-pos-python/tests -v` ผ่าน 25 tests; UI smoke ผ่าน; `git diff --check` ผ่าน
 - งานถัดไป: Build/install UAT และให้เจ้าของกรอก PIN บนเครื่องจริงเพื่อเก็บ error เปิดกะจาก ERP หากยังไม่ผ่าน
+
+## Workflow Phase 2 (9 พ.ย. 2026, Claude) — branch claude/workflow-improvement
+- แปลงใบจองครั้งเดียวแยกเป็น DS (มี VAT) + DSN (ไม่มี VAT) ยอดรวมต้องเท่าใบจอง
+- ผู้จัดการถอย Confirm: void ใบขายทุกใบ คืนสต๊อก/ลูกหนี้/GL ใบจองกลับมากันของ (สิทธิ์ documents.void)
+- สต๊อกระบบไม่พอ: บันทึกใบจองได้ถ้าติ๊ก รอผู้จัดการยืนยันใน ERP (sales.stock_shortage.approve) แล้วติดลบชั่วคราวได้ แจ้งเตือนเฉพาะผู้มีสิทธิ์
+- ตรวจนับ: ไม่ได้นับไม่ปรับ, โหมดนับเต็มต้องผู้จัดการติ๊กยืนยัน
+- รายงานตัวหนังสือ 13–16px, พิมพ์หัวตารางไม่ทับ
+- PHPUnit 845 ผ่าน; mutation test ข้อ split/shortage/revert แดงจริง

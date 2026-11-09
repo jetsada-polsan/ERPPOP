@@ -1841,7 +1841,7 @@
     </style>
 @include('partials.select-arrow')
 </head>
-<body class="{{ $canSell ? 'sales-mode' : 'view-only' }}" x-data="posApp()" x-init="init()" x-effect="publishVueState()">
+<body class="{{ $canSell ? 'sales-mode' : 'view-only' }}" x-data="posApp()" x-effect="publishVueState()">
 <div class="pos-wrap">
 
     {{-- TOP BAR --}}
@@ -2330,12 +2330,18 @@
     </div>
 </div>
 
+<style>
+.close-shift-dialog { display:flex; flex-direction:column; max-height:calc(100dvh - 24px); width:min(640px, calc(100vw - 24px)); overflow:hidden; }
+.close-shift-dialog .modal-head { flex:none; }
+.close-shift-dialog .shift-modal-body { overflow:auto; min-height:0; max-height:none; flex:1 1 auto; }
+.close-shift-dialog > .modal-actions { flex:none; background:var(--pos-panel); padding:12px 16px; z-index:1; display:flex; flex-wrap:wrap; }
+</style>
 {{-- CLOSE SHIFT MODAL --}}
-<div class="modal-overlay" x-show="closeShiftModalOpen" @keydown.escape.window="closeShiftModalOpen = false" style="display:none">
-    <div class="modal-box" style="max-width:640px" @click.outside="closeShiftModalOpen = false" x-transition>
+<div class="modal-overlay" x-show="closeShiftModalOpen" @keydown.escape.window="if (!shiftProcessing) closeShiftModalOpen = false" style="display:none">
+    <div class="modal-box close-shift-dialog" style="max-width:640px" x-transition>
         <div class="modal-head">
             <div class="modal-title"><i class="bi bi-lock-fill me-2" style="color:#f59e0b"></i>ปิดกะขาย</div>
-            <button class="modal-close" type="button" @click="closeShiftModalOpen = false"><i class="bi bi-x-lg"></i></button>
+            <button class="modal-close" type="button" :disabled="shiftProcessing" @click="closeShiftModalOpen = false"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="shift-modal-body">
             <div class="pay-summary">
@@ -2361,15 +2367,15 @@
                 หมายเหตุปิดกะ
                 <input class="ref-input" type="text" x-model="closingNote" placeholder="ไม่บังคับ">
             </label>
+        </div>
             <div class="modal-actions">
                 <button class="btn-cancel" type="button" @click="recordCashDrop()"><i class="bi bi-box-arrow-up"></i> นำส่งเงิน</button>
-                <button class="btn-cancel" @click="closeShiftModalOpen = false">ยกเลิก</button>
+                <button class="btn-cancel" :disabled="shiftProcessing" @click="closeShiftModalOpen = false">ยกเลิก</button>
                 <button class="btn-confirm" :disabled="shiftProcessing || !activeShift" @click="submitCloseShift()">
                     <span x-show="!shiftProcessing"><i class="bi bi-lock me-1"></i> ปิดกะ</span>
                     <span x-show="shiftProcessing">กำลังปิดกะ...</span>
                 </button>
             </div>
-        </div>
     </div>
 </div>
 
@@ -3067,30 +3073,45 @@ function posApp() {
         offlinePanelOpen: false, offlineChecks: [], swActive: false, storagePersisted: false,
         lastOnlineAt: null, offlineTimer: null,
 
+        initialized: false, disposed: false, backgroundController: null,
+        clockTimer: null, catalogTimer: null, hostTimer: null, hostChecking: false,
+        productSearchController: null, productSearchSequence: 0,
         init() {
+            if (this.initialized) return;
+            this.initialized = true;
+            this.backgroundController = new AbortController();
+            const listenerOptions = { signal: this.backgroundController.signal };
             this.loadReceiptSettings();
             this.loadHeldBills();
             this.loadProducts();
             this.loadPromotions();
             this.loadActiveShift();
             this.tickClock();
-            setInterval(() => this.tickClock(), 1000);
+            this.clockTimer = setInterval(() => this.tickClock(), 1000);
             document.addEventListener('fullscreenchange', () => {
                 this.isFullscreen = Boolean(document.fullscreenElement);
-            });
+            }, listenerOptions);
             window.addEventListener('beforeinstallprompt', (event) => {
                 event.preventDefault();
                 this.installPrompt = event;
                 this.canInstall = true;
-            });
+            }, listenerOptions);
             window.addEventListener('appinstalled', () => {
                 this.installPrompt = null;
                 this.canInstall = false;
-            });
-            window.addEventListener('pos-vue-action', (event) => this.handleVueAction(event.detail || {}));
+            }, listenerOptions);
+            window.addEventListener('pos-vue-action', (event) => this.handleVueAction(event.detail || {}), listenerOptions);
             this.registerServiceWorker();
-            window.addEventListener('beforeunload', () => this.stopScanner());
+            window.addEventListener('beforeunload', () => this.destroy(), listenerOptions);
             this.initOffline();
+        },
+
+        destroy() {
+            this.disposed = true;
+            [this.clockTimer, this.catalogTimer, this.hostTimer].forEach(timer => clearInterval(timer));
+            this.backgroundController?.abort();
+            this.productSearchController?.abort();
+            this.stopScanner();
         },
 
         async openScanner() {
@@ -3281,7 +3302,7 @@ function posApp() {
             const qs = new URLSearchParams({ branch_id: this.branchId });
             if (this.cashierId) qs.set('cashier_id', this.cashierId);
             try {
-                const res = await fetch(`{{ route('pos.shift.active') }}?${qs.toString()}`);
+                const res = await fetch(`{{ route('pos.shift.active') }}?${qs.toString()}`, { signal: this.backgroundController?.signal });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
                 this.activeShift = data.shift || null;
@@ -3290,6 +3311,7 @@ function posApp() {
                     this.countedCash = Number(this.activeShift.expected_cash) || 0;
                 }
             } catch (e) {
+                if (e.name === 'AbortError') return;
                 // Host ล่ม: ใช้กะล่าสุดที่เครื่องนี้เห็น (บิลออฟไลน์ต้องผูกกะเดิม)
                 this.activeShift = this.readLocal('shift');
             }
@@ -3314,7 +3336,7 @@ function posApp() {
                 this.openShiftModal();
                 return;
             }
-            this.countedCash = Number(this.activeShift.expected_cash) || 0;
+            this.countedCash = '';
             this.closingNote = '';
             this.closeShiftModalOpen = true;
         },
@@ -3355,16 +3377,20 @@ function posApp() {
         },
 
         async submitCloseShift() {
-            if (!this.activeShift) return;
-            if (this.offlineQueueCount > 0) {
-                await this.syncOfflineQueue();
-                if (this.offlineQueueCount > 0) {
-                    erpPopup('warning', 'ยังปิดกะไม่ได้', 'มีบิลขายออฟไลน์รอส่งขึ้น Host ' + this.offlineQueueCount + ' บิล ต้องส่งให้ครบก่อนปิดกะ ยอดเงินจึงจะตรง');
-                    return;
-                }
+            if (!this.activeShift || this.shiftProcessing) return;
+            if (this.countedCash === '' || !Number.isFinite(Number(this.countedCash)) || Number(this.countedCash) < 0) {
+                erpPopup('warning', 'กรอกเงินสดที่นับจริงให้ถูกต้อง');
+                return;
             }
             this.shiftProcessing = true;
             try {
+                if (this.offlineQueueCount > 0) {
+                    await this.syncOfflineQueue();
+                    if (this.offlineQueueCount > 0) {
+                        erpPopup('warning', 'ยังปิดกะไม่ได้', 'มีบิลขายออฟไลน์รอส่งขึ้น Host ' + this.offlineQueueCount + ' บิล ต้องส่งให้ครบก่อนปิดกะ ยอดเงินจึงจะตรง');
+                        return;
+                    }
+                }
                 const res = await fetch('{{ route('pos.shift.close') }}', {
                     method: 'POST',
                     headers: {
@@ -3535,21 +3561,37 @@ function posApp() {
         },
 
         async loadProducts() {
+            if (this.disposed) return;
+            this.productSearchController?.abort();
+            const controller = new AbortController();
+            this.productSearchController = controller;
+            const sequence = ++this.productSearchSequence;
+            const query = this.searchQ;
+            const category = this.categoryId;
+            const branch = this.branchId;
+            const current = () => !this.disposed && sequence === this.productSearchSequence && query === this.searchQ && category === this.categoryId && branch === this.branchId;
             this.loading = true;
             const params = new URLSearchParams();
-            if (this.searchQ) params.set('q', this.searchQ);
-            if (this.categoryId) params.set('category_id', this.categoryId);
-            if (this.branchId) params.set('branch_id', this.branchId);
+            if (query) params.set('q', query);
+            if (category) params.set('category_id', category);
+            if (branch) params.set('branch_id', branch);
             try {
                 if (!this.hostOnline) throw new Error('offline');
-                const res = await fetch(`{{ route('pos.products') }}?${params}`);
+                const res = await fetch(`{{ route('pos.products') }}?${params}`, { signal: controller.signal });
                 if (!res.ok) throw Object.assign(new Error('HTTP ' + res.status), { status: res.status });
-                this.products = await res.json();
+                const products = await res.json();
+                if (current()) this.products = products;
             } catch (e) {
+                if (e.name === 'AbortError' || !current()) return;
                 if (this.isHostDownError(e)) this.markHostDown();
-                this.products = window.PosOffline ? await PosOffline.search(this.searchQ, this.categoryId).catch(() => []) : [];
+                const products = window.PosOffline ? await PosOffline.search(query, category).catch(() => []) : [];
+                if (current()) this.products = products;
+            } finally {
+                if (sequence === this.productSearchSequence) {
+                    this.loading = false;
+                    this.productSearchController = null;
+                }
             }
-            this.loading = false;
         },
 
         parseScaleBarcode(raw) {
@@ -3749,11 +3791,12 @@ function posApp() {
 
         async loadPromotions() {
             try {
-                const res = await fetch(`{{ route('pos.promotions') }}?branch_id=${this.branchId}`);
+                const res = await fetch(`{{ route('pos.promotions') }}?branch_id=${this.branchId}`, { signal: this.backgroundController?.signal });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 this.promotions = await res.json();
                 this.cacheLocal('promotions', this.promotions);
             } catch (e) {
+                if (e.name === 'AbortError') return;
                 this.promotions = this.readLocal('promotions') || [];
             }
             this.applyQtyPromotions();
@@ -3933,11 +3976,12 @@ function posApp() {
             try {
                 const qs = new URLSearchParams({ branch_id: this.branchId });
                 if (this.cashierId) qs.set('cashier_id', this.cashierId);
-                const res = await fetch(`{{ route('pos.held-bills.index') }}?${qs.toString()}`);
+                const res = await fetch(`{{ route('pos.held-bills.index') }}?${qs.toString()}`, { signal: this.backgroundController?.signal });
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.message || 'โหลดบิลพักไม่ได้');
                 this.heldBills = data.held_bills || [];
             } catch (e) {
+                if (e.name === 'AbortError') return;
                 this.heldBills = [];
             }
         },
@@ -4573,17 +4617,19 @@ function posApp() {
                 this.offlineError = e.message || 'เปิดฐานข้อมูลในเครื่องไม่ได้';
                 return;
             }
-            window.addEventListener('online', () => this.checkHost());
-            window.addEventListener('offline', () => this.markHostDown());
+            if (this.disposed) return;
+            const options = { signal: this.backgroundController.signal };
+            window.addEventListener('online', () => this.checkHost(), options);
+            window.addEventListener('offline', () => this.markHostDown(), options);
             if (this.hostOnline) {
                 this.markOnline();
                 this.refreshCatalog();
             }
             this.syncOfflineQueue();
             // อัปเดตสินค้าทุก 10 นาที, เช็ก Host ทุก 20 วินาทีตอนล่มหรือมีคิวค้าง
-            setInterval(() => { if (this.hostOnline) this.refreshCatalog(); }, 10 * 60 * 1000);
+            this.catalogTimer = setInterval(() => { if (this.hostOnline && !document.hidden) this.refreshCatalog(); }, 10 * 60 * 1000);
             // ping ทุก 20 วินาทีเสมอ: Service Worker อาจตอบหน้าค้นสินค้าจาก cache จนดูเหมือนออนไลน์
-            setInterval(() => this.checkHost(), 20 * 1000);
+            this.hostTimer = setInterval(() => this.checkHost(), 20 * 1000);
         },
 
         async refreshOfflineStatus() {
@@ -4627,18 +4673,19 @@ function posApp() {
         },
 
         async refreshCatalog() {
-            if (!window.PosOffline || this.catalogSyncing) return;
+            if (!window.PosOffline || this.catalogSyncing || this.disposed) return;
             this.catalogSyncing = true;
             try {
                 const params = new URLSearchParams({ all: '1' });
                 if (this.branchId) params.set('branch_id', this.branchId);
-                const res = await fetch(`{{ route('pos.products') }}?${params}`, { headers: { 'Accept': 'application/json' } });
+                const res = await fetch(`{{ route('pos.products') }}?${params}`, { headers: { 'Accept': 'application/json' }, signal: this.backgroundController?.signal });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const rows = await res.json();
+                if (this.disposed) return;
                 await PosOffline.saveCatalog(rows, this.branchId);
                 this.markOnline();
             } catch (e) {
-                this.offlineError = 'อัปเดตสินค้าลงเครื่องไม่สำเร็จ: ' + (e.message || e);
+                if (e.name !== 'AbortError') this.offlineError = 'อัปเดตสินค้าลงเครื่องไม่สำเร็จ: ' + (e.message || e);
             } finally {
                 this.catalogSyncing = false;
                 await this.refreshOfflineStatus();
@@ -4646,8 +4693,10 @@ function posApp() {
         },
 
         async checkHost() {
+            if (this.hostChecking || this.disposed) return false;
+            this.hostChecking = true;
             try {
-                const res = await fetch('{{ route('pos.ping') }}', { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
+                const res = await fetch('{{ route('pos.ping') }}', { headers: { 'Accept': 'application/json' }, cache: 'no-store', signal: this.backgroundController?.signal });
                 const contentType = res.headers.get('content-type') || '';
                 if (!res.ok || !contentType.includes('application/json')) {
                     // Host ตอบแต่ session หลุด: ต้องล็อกอินใหม่ก่อนส่งคิว
@@ -4666,8 +4715,10 @@ function posApp() {
                 await this.syncOfflineQueue();
                 return true;
             } catch (e) {
-                this.markHostDown();
+                if (e.name !== 'AbortError') this.markHostDown();
                 return false;
+            } finally {
+                this.hostChecking = false;
             }
         },
 

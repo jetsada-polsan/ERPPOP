@@ -241,14 +241,23 @@ function execBoard() {
         loading: false,
 
         start() {
-            setInterval(() => this.refresh(), {{ $refreshSeconds }} * 1000);
+            if (this.refreshTimer) return;
+            this.refreshTimer = setInterval(() => { if (!document.hidden) this.refresh(); }, Math.max(30, {{ $refreshSeconds }}) * 1000);
+        },
+        destroy() {
+            clearInterval(this.refreshTimer);
+            this.refreshController?.abort();
         },
 
         async refresh() {
+            if (this.loading) return;
+            this.refreshController = new AbortController();
             this.loading = true;
+            const timeout = setTimeout(() => this.refreshController.abort(), 15000);
             try {
                 const response = await fetch('{{ route('executive.data') }}' + window.location.search, {
                     headers: { 'Accept': 'application/json' },
+                    signal: this.refreshController.signal,
                 });
                 if (!response.ok) return;
                 const fresh = await response.json();
@@ -259,7 +268,10 @@ function execBoard() {
                     topProducts: fresh.topProducts, profitAlerts: fresh.profitAlerts, attention: fresh.attention,
                 };
                 this.stamp = fresh.refreshed_at;
+            } catch (error) {
+                if (error.name !== 'AbortError') console.warn('Dashboard refresh failed');
             } finally {
+                clearTimeout(timeout);
                 this.loading = false;
             }
         },

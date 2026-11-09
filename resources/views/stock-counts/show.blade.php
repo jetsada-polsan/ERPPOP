@@ -82,6 +82,9 @@
                 @else
                 @if($stockCount->status === 'review')
                 <form method="post" action="{{ route('stock-counts.post', $stockCount) }}" data-confirm="ยืนยันปรับสต็อกจริงตาม Scope นี้? การทำงานนี้ย้อนกลับอัตโนมัติไม่ได้">@csrf
+                    @if($stockCount->count_mode === 'full_zero_missing')
+                    <label class="form-check-label small me-2"><input type="checkbox" name="confirm_zero_missing" value="1" class="form-check-input me-1">ผู้จัดการยืนยัน: รายการที่ไม่ได้นับให้ปรับเป็น 0</label>
+                    @endif
                     <button class="btn btn-success btn-sm"><i class="bi bi-shield-check me-1"></i>Manager ยืนยันปรับสต็อกจริง</button>
                 </form>
                 @else

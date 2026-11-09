@@ -19,6 +19,7 @@
 
 @section('content')
 <div x-data="docEntryPage({
+    draftEnabled: true,
     partyType: 'customer',
     partyLabel: 'ลูกค้า',
     partyRequired: true,
@@ -185,6 +186,7 @@
         'itemTitle' => 'รายการจอง',
         'submitLabel' => 'บันทึกใบจอง',
         'remarkPlaceholder' => 'เงื่อนไขส่งของ / หมายเหตุการจอง',
+        'allowStockShortage' => true,
     ])
 </div>
 @endsection

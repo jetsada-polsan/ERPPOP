@@ -137,10 +137,13 @@
 @endpush
 
 @push('scripts')
+<script src="{{ asset('document-workflow.js') }}"></script>
 <script>
 function docEntryPage(config) {
+    const stockRequests = new Map();
     return {
         ...erpProductPicker(),
+        ...erpDocumentDraft(@js((string) auth()->id())),
         modalOpen: Boolean(config.openInitially),
         config,
         partyQuery: config.initialPartyQuery || '',
@@ -168,7 +171,10 @@ function docEntryPage(config) {
             source_stock_lot_id: '', return_disposition: 'quarantine', lots: [],
         })) : [{ product_id: '', sku_code: '', name_th: '', barcode: '', productQuery: '', qty: 1, unit_price: 0, unit_name: '', is_scale: false, scale_plu: '', lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, on_hand_qty: null, reserved_qty: null, available_qty: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [] }],
         init() {
-            if (this.config.openInitially) this.$nextTick(() => this.onBranchChanged());
+            this.$nextTick(() => {
+                this.startDraft();
+                if (this.config.openInitially) this.onBranchChanged();
+            });
         },
         openModal() {
             this.modalOpen = true;
@@ -183,7 +189,12 @@ function docEntryPage(config) {
                 this.onBranchChanged();
             });
         },
-        closeModal() { this.modalOpen = false; },
+        closeModal() {
+            if (this.pickerOpen) return;
+            if (this.submitting || (this.draftDirty && !window.confirm('ยังไม่ได้บันทึกเอกสาร ต้องการปิดฟอร์มหรือไม่? ร่างจะเก็บในแท็บนี้'))) return;
+            this.saveDraft();
+            this.modalOpen = false;
+        },
         // ใบรับคืน: ดึงลูกค้าและรายการจากใบขายต้นทาง จำนวนตั้งต้น = จำนวนที่ยังคืนได้
         async loadReturnSource() {
             const docNumber = this.sourceDocNumber.trim();
@@ -217,12 +228,29 @@ function docEntryPage(config) {
             if (!this.items.length) this.addItem();
         },
         async searchParty() {
-            if (this.partyQuery.length < 1) { this.partyResults = []; this.partyId = ''; return; }
+            this.partyId = '';
+            this.partySearchController?.abort();
+            const sequence = this.partySearchSequence = (this.partySearchSequence || 0) + 1;
+            this.partyResults = [];
+            if (!this.partyQuery.trim()) return;
+            const controller = new AbortController();
+            this.partySearchController = controller;
+            const query = this.partyQuery;
             const url = this.config.partyType === 'supplier' ? '{{ route('search.suppliers') }}' : '{{ route('search.customers') }}';
-            const response = await fetch(`${url}?q=${encodeURIComponent(this.partyQuery)}`);
-            this.partyResults = await response.json();
+            try {
+                const response = await fetch(`${url}?q=${encodeURIComponent(query)}`, { signal: controller.signal });
+                if (!response.ok) throw new Error('search');
+                const rows = await response.json();
+                if (sequence === this.partySearchSequence && query === this.partyQuery) this.partyResults = rows;
+            } catch (error) {
+                if (error.name !== 'AbortError' && sequence === this.partySearchSequence) {
+                    window.erpToast?.('warning', 'ค้นหาไม่สำเร็จ กรุณาลองใหม่');
+                }
+            }
         },
         selectParty(party) {
+            this.partySearchController?.abort();
+            this.partySearchSequence = (this.partySearchSequence || 0) + 1;
             this.partyId = party.id;
             this.partyQuery = `${party.code} - ${party.name_th}`;
             if (this.config.salesUserFromParty !== false) {
@@ -277,17 +305,33 @@ function docEntryPage(config) {
             params.set('include_lots', this.config.returnLots ? '1' : '0');
             params.set('branch_id', this.branchId || '');
         },
+        cancelStockRequests() {
+            stockRequests.forEach(controller => controller.abort());
+            stockRequests.clear();
+        },
         async refreshProductStock(index) {
             const item = this.items[index];
             if (!item?.product_id || !this.branchId || !this.config.showStock) return;
-            const response = await fetch(`{{ route('search.products') }}?product_id=${encodeURIComponent(item.product_id)}&branch_id=${encodeURIComponent(this.branchId)}`);
-            if (!response.ok) return;
-            const products = await response.json();
-            const product = products[0];
-            if (!product || String(product.id) !== String(item.product_id)) return;
-            item.on_hand_qty = product.on_hand_qty;
-            item.reserved_qty = product.reserved_qty;
-            item.available_qty = product.available_qty;
+            stockRequests.get(item)?.abort();
+            const controller = new AbortController();
+            stockRequests.set(item, controller);
+            const branch = this.branchId;
+            const productId = item.product_id;
+            try {
+                const response = await fetch(`{{ route('search.products') }}?product_id=${encodeURIComponent(productId)}&branch_id=${encodeURIComponent(branch)}`, { signal: controller.signal });
+                if (!response.ok) return;
+                const products = await response.json();
+                const product = products[0];
+                if (branch !== this.branchId || productId !== item.product_id || !this.items.includes(item)) return;
+                if (!product || String(product.id) !== String(item.product_id)) return;
+                item.on_hand_qty = product.on_hand_qty;
+                item.reserved_qty = product.reserved_qty;
+                item.available_qty = product.available_qty;
+            } catch (error) {
+                if (error.name !== 'AbortError') window.erpToast?.('warning', 'โหลดสต๊อกไม่สำเร็จ กรุณาลองใหม่');
+            } finally {
+                if (stockRequests.get(item) === controller) stockRequests.delete(item);
+            }
         },
         onProductPicked(index, product) {
             this.items[index].product_id = product.id;
@@ -334,6 +378,9 @@ function docEntryPage(config) {
                 return;
             }
             // จำนวนเกินสต๊อกให้ ERP ตัดสินตามนโยบายสาขา หน้าจอแค่แจ้งเตือน ไม่บล็อกปุ่มบันทึก
+            if (!event.target.reportValidity()) { event.preventDefault(); return; }
+            this.saveDraft();
+            this.markDraftSubmitted();
             this.submitting = true;
         },
     };

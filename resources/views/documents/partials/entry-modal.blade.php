@@ -13,7 +13,7 @@
 @endphp
 
 <div class="doc-modal-backdrop" x-show="modalOpen" x-transition.opacity @keydown.escape.window="closeModal()" x-cloak>
-    <div class="doc-modal" @click.outside="closeModal()" x-transition>
+    <div class="doc-modal"  x-transition>
         <div class="doc-titlebar">
             <div>
                 <div class="doc-title">{{ $title }}</div>
@@ -28,7 +28,7 @@
             <button type="button" @click="closeModal()"><i class="bi bi-x-circle"></i><span>ปิด</span></button>
         </div>
 
-        <form method="post" action="{{ $action }}" novalidate @submit="onSubmit">
+        <form method="post" action="{{ $action }}" novalidate @submit="onSubmit" @keydown.enter="if ($event.target.matches('input:not([type=submit])')) $event.preventDefault()">
             @csrf
             @if(($formMethod ?? 'POST') !== 'POST')
                 @method($formMethod)
@@ -111,12 +111,16 @@
                             @if($showParty)
                                 <div class="doc-field" style="grid-column: span {{ $showCreditType || $showSalesman ? 5 : 8 }};">
                                     <label>@if($partyRequired)<span class="required">*</span>@endif {{ $partyLabel }}</label>
-                                    <input type="text" x-model="partyQuery" @input.debounce.250ms="searchParty()"
+                                    <input type="text" x-model="partyQuery" @input="partyId = ''; partyResults = []; partySearchController?.abort()" @input.debounce.250ms="searchParty()"
+                                           @keydown.arrow-down.prevent="$el.parentElement.querySelector('.doc-option')?.focus()"
                                            placeholder="ค้นหารหัส / ชื่อ{{ $partyLabel }}" class="doc-input" autocomplete="off">
                                     <input type="hidden" name="{{ $partyType === 'supplier' ? 'supplier_id' : 'customer_id' }}" x-model="partyId" @if($partyRequired) required @endif>
                                     <div class="doc-typeahead" x-show="partyResults.length" x-transition>
                                         <template x-for="party in partyResults" :key="party.id">
-                                            <button type="button" class="doc-option" @click="selectParty(party)">
+                                            <button type="button" class="doc-option" @click="selectParty(party)"
+                                                    @keydown.arrow-down.prevent="$el.nextElementSibling?.focus()"
+                                                    @keydown.arrow-up.prevent="$el.previousElementSibling?.focus()"
+                                                    @keydown.escape.stop="partyResults = []">
                                                 <span class="doc-code" x-text="party.code"></span>
                                                 <span x-text="party.name_th"></span>
                                             </button>
@@ -151,6 +155,12 @@
                                 <input type="text" name="remark" value="{{ old('remark', $initialRemark ?? '') }}" class="doc-input" placeholder="{{ $remarkPlaceholder ?? 'เช่น เลขอ้างอิง เงื่อนไข หรือหมายเหตุภายใน' }}">
                             </div>
                         </details>
+                        @if(! empty($allowStockShortage))
+                        <label class="d-flex align-items-start gap-2 mt-2 small">
+                            <input type="checkbox" name="allow_stock_shortage" value="1" class="form-check-input mt-1" @checked(old('allow_stock_shortage'))>
+                            <span>สต๊อกในระบบไม่พอแต่ของจริงมี — บันทึกไว้ก่อน แล้วให้ผู้จัดการยืนยันใน ERP ก่อนออกใบขาย</span>
+                        </label>
+                        @endif
                     </div>
 
                     <div class="doc-card doc-card-pad">

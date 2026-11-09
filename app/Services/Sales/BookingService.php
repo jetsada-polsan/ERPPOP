@@ -62,6 +62,7 @@ class BookingService
                 fn ($rows) => DecimalMath::sum($rows->pluck('qty'), DecimalMath::QUANTITY_SCALE)
             );
             $balances = [];
+            $shortages = [];
 
             // Lock each balance before reserving so concurrent bookings cannot
             // consume the same available quantity. Duplicate rows are checked as
@@ -76,6 +77,13 @@ class BookingService
                 $availableRaw = DecimalMath::subtract($onHand, $reserved, DecimalMath::QUANTITY_SCALE);
                 $available = DecimalMath::compare($availableRaw, 0) < 0 ? '0' : $availableRaw;
                 if (DecimalMath::compare($requestedQty, $available) > 0) {
+                    // ของจริงมีแต่ระบบไม่พอ: บันทึกได้ถ้าผู้ขายขอ แต่ต้องรอผู้จัดการยืนยันก่อนออกใบขาย
+                    if (! empty($data['allow_stock_shortage'])) {
+                        $product = Product::find($productId);
+                        $shortages[] = ($product?->name_th ?? "#{$productId}")." ขาด ".DecimalMath::subtract($requestedQty, $available, DecimalMath::QUANTITY_SCALE);
+                        $balances[$productId] = $balance;
+                        continue;
+                    }
                     throw new RuntimeException($this->availabilityError(
                         Product::with('baseUnit')->find($productId),
                         $productId,
@@ -88,8 +96,8 @@ class BookingService
                 $balances[$productId] = $balance;
             }
 
-            $totalQty = $items->sum('qty');
-            $totalAmount = $items->sum(fn ($i) => $i['qty'] * $i['unit_price']);
+            $totalQty = DecimalMath::sum($items->pluck('qty'), DecimalMath::QUANTITY_SCALE);
+            $totalAmount = DecimalMath::sum($items->map(fn ($i) => DecimalMath::multiply($i['qty'], $i['unit_price'])));
 
             $document = Document::create([
                 'document_type_id' => $documentType->id,
@@ -116,6 +124,8 @@ class BookingService
                 'fulfillment_type' => $data['fulfillment_type'],
                 'delivery_due_at' => $data['delivery_due_at'] ?? null,
                 'delivery_status' => SaleBooking::DELIVERY_PENDING,
+                'stock_shortage_status' => $shortages ? 'pending' : null,
+                'stock_shortage_note' => $shortages ? implode("\n", $shortages) : null,
             ]);
 
             $stockDocument = StockDocument::create([
@@ -157,6 +167,41 @@ class BookingService
      * stock movements. The reservation is moved atomically with the document.
      */
     /** ยกเลิกใบจองที่ยังไม่ออกบิล คืนยอดจองให้สต๊อก ไม่แตะบัญชีเพราะใบจองไม่ลงบัญชี */
+    /**
+     * ถอย Confirm (ผู้จัดการ): ยกเลิกใบขาย DS/DSN ทุกใบที่ออกจากใบจองนี้ด้วย void เดิม
+     * (คืนสต๊อก ปิดลูกหนี้ กลับ GL) แล้วใบจองกลับไปกันของไว้เหมือนก่อน Confirm
+     */
+    public function revertConfirmation(SaleBooking $booking, string $reason, ?int $userId): void
+    {
+        DB::transaction(function () use ($booking, $reason, $userId) {
+            $locked = SaleBooking::whereKey($booking->id)->lockForUpdate()->firstOrFail();
+            if ($locked->status !== SaleBooking::STATUS_CONVERTED) {
+                throw new RuntimeException('ถอยได้เฉพาะใบจองที่ Confirm ออกใบขายแล้ว');
+            }
+            $sales = $locked->saleDocuments()->where('status', 'active')->get();
+            foreach ($sales as $sale) {
+                app(\App\Services\Accounting\DocumentVoidService::class)->void($sale, 'ถอย Confirm ใบจอง: '.$reason, $userId);
+            }
+
+            $items = $locked->document()->with('stockDocument.items')->firstOrFail()->stockDocument?->items ?? collect();
+            foreach ($items as $item) {
+                $balance = StockBalance::where('product_id', $item->product_id)
+                    ->where('warehouse_location_id', $item->warehouse_location_id)->lockForUpdate()->first()
+                    ?? StockBalance::create(['product_id' => $item->product_id, 'warehouse_location_id' => $item->warehouse_location_id, 'on_hand_qty' => 0, 'reserved_qty' => 0]);
+                $balance->increment('reserved_qty', $item->qty);
+            }
+
+            $locked->update(['status' => SaleBooking::STATUS_PENDING, 'confirmed_at' => null, 'confirmed_document_id' => null]);
+            DB::table('audit_logs')->insert([
+                'user_id' => $userId, 'branch_id' => $locked->document->branch_id, 'action' => 'revert_confirm',
+                'table_name' => 'sale_bookings', 'record_id' => $locked->id,
+                'old_values' => json_encode(['status' => SaleBooking::STATUS_CONVERTED, 'sales' => $sales->pluck('doc_number')], JSON_UNESCAPED_UNICODE),
+                'new_values' => json_encode(['status' => SaleBooking::STATUS_PENDING, 'reason' => $reason], JSON_UNESCAPED_UNICODE),
+                'created_at' => now(),
+            ]);
+        });
+    }
+
     public function cancel(SaleBooking $booking, ?string $reason, ?int $userId): void
     {
         DB::transaction(function () use ($booking, $reason, $userId) {
