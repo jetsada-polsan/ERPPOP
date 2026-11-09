@@ -620,8 +620,8 @@
         border-radius: 0;
         padding: 20px 12px;
         position: sticky;
-        top: 0;
-        max-height: calc(100vh - 90px);
+        top: 52px; /* ใต้แถบบนของระบบ (44px) ไม่ให้ถูกบัง */
+        max-height: calc(100vh - 110px);
         overflow: auto;
         scrollbar-width: thin;
         min-width: 0;
@@ -782,38 +782,38 @@
     .flow-report-shell { min-height:calc(100vh - 72px); background:var(--erp-surface-2); }
     .rpt-main { padding:12px 14px; }
     .flow-report-head { min-height:38px; margin-bottom:8px; gap:10px; flex-wrap:nowrap; }
-    .flow-eyebrow { margin-bottom:1px; font-size:10px; }
-    .flow-report-head h1 { font-size:19px; line-height:1.2; }
+    .flow-eyebrow { margin-bottom:1px; font-size:12px; }
+    .flow-report-head h1 { font-size:21px; line-height:1.3; }
     .flow-head-actions { gap:6px; flex-wrap:nowrap; }
-    .flow-action-btn { min-height:31px; padding:5px 9px; border-radius:5px; font-size:11px; font-weight:700; }
+    .flow-action-btn { min-height:31px; padding:5px 9px; border-radius:5px; font-size:14px; font-weight:700; }
     .flow-action-link { gap:5px; }
     .rpt-toolbar { gap:5px; padding:7px 8px; margin-bottom:8px!important; border-radius:6px; box-shadow:none; flex-wrap:nowrap; }
-    .rpt-report-picker { min-width:260px; flex:1 1 340px; gap:5px; font-size:10px; }
-    .rpt-date-input,.rpt-select { height:31px; padding:4px 7px; border-radius:4px; font-size:11px; }
+    .rpt-report-picker { min-width:260px; flex:1 1 340px; gap:5px; font-size:14px; }
+    .rpt-date-input,.rpt-select { height:36px; padding:4px 8px; border-radius:4px; font-size:14px; }
     .rpt-date-input { width:125px; }
     .rpt-select { min-width:115px; max-width:165px; }
     .rpt-report-select { min-width:210px; max-width:none; }
-    .rpt-shortcut { padding:3px 6px; border-radius:4px; font-size:9px; }
-    .rpt-btn-filter { min-width:66px; height:31px; padding:4px 9px; border-radius:4px; font-size:11px; }
+    .rpt-shortcut { padding:4px 8px; border-radius:4px; font-size:13px; }
+    .rpt-btn-filter { min-width:66px; height:36px; padding:4px 10px; border-radius:4px; font-size:14px; }
     .flow-report-summary { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:7px 12px; border-radius:5px 5px 0 0; background:var(--erp-surface-2); }
     .flow-dash { display:none; }
     .flow-report-meta dl { display:flex; align-items:center; gap:16px; margin:0; }
     .flow-report-meta dl div { display:flex; align-items:center; gap:5px; }
-    .flow-report-meta dt,.flow-report-meta dd { font-size:10px; line-height:1.2; }
+    .flow-report-meta dt,.flow-report-meta dd { font-size:13px; line-height:1.4; }
     .flow-report-meta dt { color:var(--erp-muted); font-weight:600; }
     .flow-report-totals { display:flex; align-items:center; gap:16px; padding:0; }
     .flow-report-totals div { display:flex; align-items:center; gap:5px; }
-    .flow-report-totals span { font-size:10px; color:var(--erp-muted); font-weight:600; }
-    .flow-report-totals strong { font-size:12px; }
+    .flow-report-totals span { font-size:13px; color:var(--erp-muted); font-weight:600; }
+    .flow-report-totals strong { font-size:16px; }
     .flow-tabs { display:none; }
     .flow-report-shell .content-card { border-radius:5px; box-shadow:0 3px 10px rgba(15,51,74,.05); }
     .rpt-panel-title { min-height:42px; padding:6px 10px; border-top-width:1px; }
-    .rpt-panel-title .fs-5 { font-size:13px!important; }
-    .rpt-panel-title .small { font-size:9px!important; }
-    .rpt-panel-title .form-select-sm,.rpt-panel-title .form-control-sm { min-height:28px; height:28px; font-size:10px; }
+    .rpt-panel-title .fs-5 { font-size:15px!important; }
+    .rpt-panel-title .small { font-size:12px!important; }
+    .rpt-panel-title .form-select-sm,.rpt-panel-title .form-control-sm { min-height:34px; height:34px; font-size:14px; }
     .erp-search { min-width:180px; }
-    .report-data-table { font-size:10px; }
-    .report-data-table th,.report-data-table td { padding:5px 7px!important; line-height:1.25; }
+    .report-data-table { font-size:14px; }
+    .report-data-table th,.report-data-table td { padding:8px 10px!important; line-height:1.4; font-size:14px; }
     @media(max-width:1300px){.rpt-shortcut{display:none}.rpt-report-picker span{display:none}.flow-action-btn{padding-left:7px;padding-right:7px}}
     @page {
         size: A4;
@@ -826,8 +826,10 @@
         .report-data-table thead { display: table-header-group; }
         .report-data-table tfoot { display: table-footer-group; }
         .report-data-table tr { page-break-inside: avoid; break-inside: avoid; }
-        .report-data-table { width: 100%; font-size: 10.5px; }
-        .report-data-table th, .report-data-table td { padding: 3px 5px; }
+        .report-data-table { width: 100%; font-size: 12px; }
+        .report-data-table th, .report-data-table td { padding: 4px 6px !important; font-size: 12px !important; line-height: 1.35; }
+        /* หัวตารางแบบ sticky จะลอยทับแถวแรกของทุกหน้าตอนพิมพ์ ต้องคืนเป็นปกติ */
+        .report-data-table thead th { position: static !important; }
         .rpt-print-header { page-break-after: avoid; }
         a[href]::after { content: none !important; }   /* ไม่ต้องพ่น URL ต่อท้ายลิงก์ */
         .flow-report-shell, .rpt-shell { display: block; min-height: 0 !important; margin: 0; }
