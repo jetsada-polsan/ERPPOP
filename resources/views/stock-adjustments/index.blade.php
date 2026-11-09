@@ -1,14 +1,14 @@
 @extends('layout')
 
-@section('title', 'ตรวจนับสต็อก - MPM Food Group')
-@section('page-title', 'ตรวจนับ / ปรับปรุงสต็อก')
-@section('page-subtitle', 'เทียบยอดนับจริงกับยอดในระบบ แล้วบันทึกส่วนต่างเป็นใบปรับปรุงสต็อก')
+@section('title', 'ปรับปรุงยอดสต็อก')
+@section('page-title', 'ปรับปรุงยอดสต็อก')
+@section('page-subtitle', 'แก้ยอดสต็อกในระบบเมื่อของจริงไม่ตรง (เสีย หาย เกิน) ส่วนการนับทั้งคลังใช้เมนู ตรวจนับสินค้า')
 
 @section('content')
     <div x-data="stockAdjustmentPage()" x-cloak>
         <ul class="nav nav-pills mb-4">
             <li class="nav-item"><a href="{{ route('stock-transfers.index') }}" class="nav-link">โอนย้ายสต็อก</a></li>
-            <li class="nav-item"><span class="nav-link active">ตรวจนับสต็อก</span></li>
+            <li class="nav-item"><span class="nav-link active">ปรับปรุงยอดสต็อก</span></li>
         </ul>
 
         <div class="list-toolbar">
@@ -17,7 +17,7 @@
                 @include('partials.search-bar', ['q' => $q, 'placeholder' => 'ค้นหาเลขที่เอกสาร'])
             </div>
             <button type="button" class="btn btn-primary rounded-pill px-4" @click="openModal()">
-                <i class="bi bi-plus-lg me-1"></i> ตรวจนับสต็อก
+                <i class="bi bi-plus-lg me-1"></i> สร้างใบปรับปรุงยอด
             </button>
         </div>
 
@@ -63,7 +63,7 @@
             <div class="booking-modal" @click.outside="closeModal()" x-transition>
                 <div class="modal-header border-0 px-4 pt-4 pb-2">
                     <div>
-                        <h3 class="h4 fw-bold mb-1">ตรวจนับสต็อก</h3>
+                        <h3 class="h4 fw-bold mb-1">สร้างใบปรับปรุงยอดสต็อก</h3>
                         <div class="text-muted small">เลือกคลัง แล้วใส่ยอดนับจริงของแต่ละสินค้า ระบบจะคำนวณส่วนต่างให้อัตโนมัติ</div>
                     </div>
                     <button type="button" class="btn btn-light rounded-circle" @click="closeModal()" aria-label="Close">
@@ -84,7 +84,7 @@
                                 </select>
                             </div>
                             <div class="col-lg-6">
-                                <label class="form-label text-muted small">คลัง / ตู้ที่ตรวจนับ</label>
+                                <label class="form-label text-muted small">คลัง / ตู้ที่ปรับยอด</label>
                                 <select name="warehouse_location_id" x-model="locationId" @change="onLocationChange()" required class="form-select">
                                     <option value="">-- เลือกคลัง --</option>
                                     @foreach($locations as $location)
@@ -237,7 +237,7 @@
                 }
                 if (!this.locationId) {
                     event.preventDefault();
-                    Swal.fire({ icon: 'warning', title: 'กรุณาเลือกคลังที่ตรวจนับ' });
+                    Swal.fire({ icon: 'warning', title: 'กรุณาเลือกคลังที่จะปรับยอด' });
                     return;
                 }
                 if (this.items.some(item => !item.product_id)) {
