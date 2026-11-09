@@ -2011,6 +2011,18 @@
         });
     </script>
     @endif
+    @if(session('document_draft_saved'))
+    <script>
+        try {
+            const pending = 'erp:draft:pending:' + @js((string) auth()->id());
+            const draft = JSON.parse(sessionStorage.getItem(pending) || 'null');
+            if (draft?.action === @js(session('document_draft_saved'))) {
+                sessionStorage.removeItem(draft.key);
+                sessionStorage.removeItem(pending);
+            }
+        } catch (_) {}
+    </script>
+    @endif
     @if(session('success'))
     <script>
         @if(session('success_popup'))

@@ -1,0 +1,38 @@
+# Codex: ERP & POS Workflow Improvement — MPM / Popstar Food Trading (จากที่ประชุม 7 พ.ย. 2026)
+
+Branch `claude/workflow-improvement` (จาก origin/main) **ห้าม deploy ห้ามแตะ production** migration ต้องรันได้ทั้ง SQLite/PostgreSQL ย้อนกลับได้ ห้ามแก้ข้อมูลเก่าใน migration
+ห้ามสร้าง/เขียน PIN/password/token เรื่องเงินใช้ DecimalMath ทุกการเปลี่ยนที่กระทบสินค้า/เงิน/ภาษีต้องมี audit log; เอกสาร posted แก้ด้วยเอกสารปรับปรุง/reversal เท่านั้น
+เทสต์ ERP: `php -d memory_limit=2G vendor/bin/phpunit` (รัน `composer install` ก่อนถ้าไม่มี vendor) ต้องผ่านทั้งหมด; ถอดตัวแก้แล้วเทสต์ต้องแดง
+อ่านประกอบ: `docs/ai/reports-inventory.md` (สำรวจรายงานเฟส 1 แล้ว), `docs/ai/PROJECT_MEMORY.md`, `docs/ai/task.md`, analysis บน branch `claude/bplus-erp-analysis`
+POS Python อยู่ branch `claude/pos-python-settings-popup` (ห้ามแก้ใน branch นี้ — จดสิ่งที่ POS ต้องเปลี่ยนไว้ใน task.md)
+
+## ข้อมูลจากที่ประชุม (สรุปโดยเจ้าของ)
+ภาพรวม: คลัง (ซื้อ/รับเข้า/แปรรูป/เบิก/โอน/ตัดชำรุด) → ฝ่ายขาย (คีย์ใบจอง → พิมพ์ใบขึ้นของ → แก้จำนวนจริง) → จัดส่ง (พิมพ์ใบส่งของ → สรุปใบจอง → ใบปะหน้า → ส่ง) → Sales Admin (Confirm → ตรวจยอดใบจองกับใบขาย) → บัญชีตรวจสอบ (ตรวจบิลและรายการแก้ไขทีละใบวันถัดไป) → บัญชีรับชำระ (รับเอกสารกลับ → ตรวจเงินสด/โอน → แนบสลิป → ตัดรับชำระ)
+- คลัง/แปรรูป: รับเป็นถุง/ลัง แปลงเป็น กก. ขายหน้าร้าน (1 ถุง 10 กก. 250 บาท → 25 บาท/กก.); ใบขอแปรรูประบุวัตถุดิบ/ผลผลิต; เบิกไปผลิตและรับกลับอาจคนละรหัส; ตัดชำรุดต้องผู้จัดการอนุมัติก่อนตัด; ตรวจนับ Export Excel → นับ → Import กลับ เก็บประวัติ
+- จัดซื้อ: เอกสารซื้อเดิมแยก IB / IBN; ราคาซื้อรวม VAT และไม่รวม VAT; Supplier มีข้อตกลงและการตั้งค่าภาษี ระบบคำนวณภาษีตามที่ตั้งไว้
+- ขาย/Sales Admin: คีย์ใบจองรายวัน พิมพ์ใบจองขึ้นของ ขึ้นของจริงแล้วแก้จำนวน/น้ำหนัก พิมพ์บิลหลังแก้ Confirm และกระทบยอดใบจองกับใบขาย หาเอกสาร Confirm/แก้ผิด
+- จัดส่ง: หลังขึ้นของพิมพ์ใบส่งของ, สรุปใบจองทำใบปะหน้า (ลำดับลูกค้า+รายการ), คนส่งนำเอกสารกลับให้บัญชีตรวจเงินสด/โอน
+- บัญชีตรวจ: เช้าตรวจยอดรวมใบจองเทียบ Confirm; วันถัดไปตรวจทีละใบ (ค่าขนส่ง, รายการที่ถูกลบ) ก่อนรับชำระ
+- บัญชีรับชำระ: ดึงเอกสารส่งของกลับตามลำดับลูกค้า เลือกเงินสด/โอน (โอนต้องมีสลิป) เงินไม่ตรงตามพนักงานส่ง; คืนสินค้าใช้เอกสารรับคืนและปรับสต๊อกตามสภาพจริง
+
+## MASTER PROMPT ของเจ้าของ (ทำตามทุกข้อ)
+กฎ: ตรวจโครงสร้างจริงก่อน (framework, API, DB, auth, permission), สำรวจทุกโมดูล (Sales, Reservation, Purchasing, Inventory, Warehouse, Production, Delivery, Accounting, POS, Reports, Settings), ตรวจตาราง FK, transaction, stock ledger, document status, แยก Existing / Incomplete / Missing / Bug, ห้ามสร้างโมดูล/ตารางซ้ำ, ห้ามลบข้อมูลธุรกิจหรือเปลี่ยนเลขเอกสารเดิม, ใช้ UI component/design system ร่วมกัน, ทำทีละ Phase ทดสอบก่อนไป Phase ถัดไป
+
+PHASE 1 Critical bugs:
+1.1 ใบจองและใบขอซื้อเด้งออกขณะกรอก (modal state, lifecycle, Enter submit, route navigation, reactive state) — กันปิดฟอร์มไม่ตั้งใจ, draft auto-save, unsaved changes warning, เก็บรายการเดิมเมื่อค้นหา/เปลี่ยนสินค้า, ห้ามเปิดหน้าพิมพ์อัตโนมัติระหว่างคีย์
+1.2 Refresh เร็วเกิน/browser โหลดไม่หยุด — ตรวจ polling, request loop, redirect loop, re-render, ยกเลิก full reload ไม่จำเป็น, background refresh เฉพาะที่เปลี่ยน, interval เหมาะสม, ยกเลิก request เมื่อออกหน้า, loading ไม่รบกวนการคีย์
+1.3 ค้นหา: รหัส/ชื่อสินค้า, บาร์โค้ด, ชื่อ/รหัสลูกค้า, เลขเอกสาร, partial match, keyboard navigation, debounce, server-side search
+1.4 Popup ปิดกะ POS (ฝั่ง ERP web POS + JET POS Vue `apps/pos-desktop`) ล้นจอ ปุ่มยืนยันอยู่นอกจอ ปิดกะไม่ได้ — responsive modal, max width/height, scroll เฉพาะเนื้อหา, ปุ่มตรึงล่าง, ตรวจ validation/API/permission/transaction, error บอกสาเหตุจริง, ทดสอบปิดกะเงินสด/โอน/ส่วนต่าง
+PHASE 2 ขาย/ใบจอง: workflow ใบจอง Draft→ยืนยัน→พิมพ์ขึ้นของ→คลังจัด→บันทึกจำนวน/น้ำหนักจริง (เก็บค่าก่อนแก้)→ตรวจ→ใบส่งของ→Confirm→ตรวจยอด; Convert Reservation to Sales Documents แยกตาม Tax Code ของสินค้า (preview, ครบทุกรายการ, กันสร้างซ้ำ/ตัดสต๊อกซ้ำ, ยอดรวมเท่าต้นทาง, รองรับรับชำระ/รับคืนตามเอกสารอ้างอิง) **ห้ามลบรายการจากใบจองต้นฉบับ ห้ามเปลี่ยนสินค้า VAT เป็น Non-VAT เก็บยอดขายจริงทั้งหมด แยก Tax Code จาก Payment Term**; Document Revision + Audit Trail สำหรับแก้หลัง Confirm (แก้เวลา, Confirm ผิดฝั่ง, แก้ราคา/จำนวน = ถอด Confirm แล้ว Confirm ใหม่; posted/ใบกำกับแล้ว = ยกเลิก/เอกสารปรับปรุง)
+PHASE 3 จัดส่ง: Delivery Route Management (วันที่, สาขา, สาย, รอบรถ, คนขับ, เลือกใบจอง, รวมลูกค้าตามสาย, พิมพ์ใบส่งของชั่วคราว/ใบขึ้นสินค้า/รวมสินค้าต่อสาย, เตือนพิมพ์ซ้ำ); ใบปะหน้า (โลโก้ MPM, วันที่, สาย, ลำดับจุดส่ง, ลูกค้า, ที่อยู่, เลขเอกสาร, หีบห่อ, ยอดเงิน, หมายเหตุ, QR); สถานะส่งของแยกจากสถานะรับชำระ
+PHASE 4 จัดซื้อ: PR→อนุมัติ→PO→รับ (สด/เชื่อ); Direct Goods Receipt ไม่มี PO (supplier, เลขใบส่งของผู้ขาย, จำนวนจริง, หน่วย, ทุน, ภาษี, คลัง, หลักฐาน, ผู้ตรวจรับ, อนุมัติตามสิทธิ์); UOM: base/purchase/sales unit, conversion, decimal qty, cost conversion, UOM snapshot (5 ลัง×10 กก.=50 กก. ขาย 2.5 กก.)
+PHASE 5 คลัง: โอน HQ→สาขา (ขอ→ตรวจ→อนุมัติ→จ่าย→ระหว่างทาง→ตรวจรับ, รับไม่ครบ) — มีส่วน in-transit แล้วจาก PR #6 ต่อยอด; ใบขอเบิก (ผลิต/แปรรูป/ตัวอย่าง/ใช้ภายใน) มีขออนุมัติ; แปรรูป 2 แบบ (เปลี่ยนหน่วย, A→B ภายใน/ภายนอก) บันทึกวัตถุดิบ ผลผลิต ใช้จริง ได้จริง ต้นทุน ค่าจ้าง ของเสีย ผู้รับผิดชอบ ใช้ WIP; ใบขอตัดชำรุด (น้ำหนัก, สาเหตุ, รูป, ผู้จัดการอนุมัติ, ตัดสต๊อก, รายงานสูญเสีย วัน/เดือน/สาขา); ตรวจนับ Excel (export template → นับ → import → ตรวจ → ส่วนต่าง → อนุมัติ → ปรับ; ห้ามปรับสินค้าที่ไม่ได้นับ, กัน import ซ้ำ, ตรวจรหัส/หน่วย, เก็บไฟล์ต้นฉบับ, แยกสาขา/คลัง/ตำแหน่ง)
+PHASE 6 บัญชี: ตรวจเอกสาร (ใบจองกับใบขาย, Confirm, ใบส่งของกลับ, รายการแก้ไข, คืน, ค่าขนส่ง/ส่วนลด, ยอดต้องรับ); Accounting Payment Collection จาก DS/DSN (ค้นเอกสาร, ยอดค้าง, เงินสด/โอน+บัญชีธนาคาร+แนบสลิป, ตรวจยอดจริง, เต็ม/บางส่วน/หลายครั้ง, เกิน/ขาด, audit, กันรับซ้ำ, **ห้ามถือว่าได้เงินเพราะเลือกวิธีชำระ**); master data ลูกค้า/ผู้ขาย payment terms, tax code, VAT inclusive/exclusive, credit limit, bank accounts, document mapping — VAT ตามข้อมูลสินค้า/กฎหมาย ไม่ใช่ชื่อประเภทลูกค้า
+PHASE 7 POS/ใบเสร็จ: ตัวอักษรบางลง, โลโก้ MPM จากไฟล์ต้นฉบับ, ระยะห่าง/ขนาด, "สำเนาร้าน/สำเนาลูกค้า" ไปด้านล่าง, ไม่แสดงรายละเอียดโอน/บัญชีบนใบลูกค้า, ไม่เปิดพิมพ์อัตโนมัติเมื่อกำหนดว่าไม่ต้องพิมพ์; ปิดกะตรวจครบ ห้ามปิดซ้ำหรือข้อมูลหายเมื่อ API ล้ม
+PHASE 8 Dashboard/Permission/Reports: Sales Admin (ยอดของตน, ใบจองที่รับผิดชอบ, สต๊อกต่ำ, ไม่เห็นทุน/กำไร), Branch Manager (สาขาตน, รออนุมัติ), Accounting, Owner/Executive (ทุน/กำไร), IT Admin (ไม่เห็นกำไรอัตโนมัติ) บังคับทั้ง frontend/backend; รายงานสต๊อกคงเหลือหน่วยหลัก+ย่อย+จุดสั่งซื้อ+สถานะต่ำ; รายงาน Enterprise style (KPI, filter, date, branch, search, sort, pagination, drill-down, Excel, PDF, print preview, empty/loading, permission) — ใช้ผล `docs/ai/reports-inventory.md`
+PHASE 9 E2E 20 scenarios (ใบจอง 50 รายการไม่เด้ง, แก้จำนวน/น้ำหนัก, แปลงตามภาษี, Confirm แก้เวลา/ผิดฝั่ง/revision, ใบส่งของตามสาย, ใบปะหน้า, รับไม่มี PO, 10 ลังขายเป็นกก., โอน HQ, A→B, ตัดชำรุด, ตรวจนับ Excel, รับชำระเงินสด/โอน+สลิป/บางส่วนกันซ้ำ, ใบเสร็จโลโก้, ปิดกะ POS, สิทธิ์ Sales Admin) ตรวจ stock ledger, status, tax, payment balance
+
+## งานรอบนี้
+A. เขียน `docs/ai/workflow-audit.md` (ภาษาไทย, หน้าแรกสรุปผู้บริหาร, อ้างไฟล์:บรรทัด): 1 System Audit, 2 Gap Analysis (Existing/Incomplete/Missing/Bug ต่อ phase), 3 Workflow แต่ละแผนก (ตามที่ประชุม เทียบของจริงในระบบ), 4 Database Impact, 5 API Impact, 6 UI/UX Plan, 7 Implementation Plan P0→P1→P2 แยก Phase, 8 Test Scenarios + Acceptance Criteria, 9 **Open Questions** (DS/DSN และ IB/IBN หมายถึงอะไรจริง ตรวจจาก DB/migration/BPlus import, กติกาแก้หลัง Confirm, การตั้งค่าภาษี, การเชื่อม POS, นิยามยอดใบจอง A/B, สิทธิ์ IT) — ห้ามเดา
+B. แล้ว**ลงมือ PHASE 1 (1.1–1.4) เท่านั้น** พร้อมเทสต์ (feature/browser test ที่เป็นไปได้ใน repo) — ส่วน Python POS ห้ามแก้ จดไว้
+C. สรุปไฟล์ที่แก้และผลเทสต์จริงลง `docs/ai/task.md` (ห้ามอ้างว่าผ่านถ้าไม่ได้รัน) ไม่ต้อง commit ให้เหลือไฟล์ไว้ใน workspace

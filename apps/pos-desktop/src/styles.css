@@ -618,3 +618,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .history-fix { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; margin-top: 10px; } .history-fix .primary { margin-top: 0; height: 42px; padding: 0 14px; width: auto; }
 .history-error { display: block; margin-top: 6px; padding: 8px 10px; border-left: 4px solid #c9212d; background: #fff1ef; color: #a23832; font-size: 14px; } .history-list { max-height: 240px; }
 .history-discard { margin-top: 8px; width: 100%; }
+
+/* Keep close-shift confirmation visible on short/touch screens. */
+.modal.close-shift-dialog { display:flex; flex-direction:column; width:min(520px, 100%); max-height:calc(100dvh - 24px); overflow:hidden; }
+.close-shift-dialog .modal-head, .close-shift-footer { flex-shrink:0; }
+.close-shift-body { min-height:0; overflow-y:auto; }
+.close-shift-footer { background:#fff; padding-top:12px; }

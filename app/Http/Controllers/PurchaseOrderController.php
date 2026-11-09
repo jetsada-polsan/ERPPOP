@@ -98,6 +98,7 @@ class PurchaseOrderController extends Controller
         });
 
         return redirect()->route('purchase-orders.show', $order)
+            ->with('document_draft_saved', $request->url())
             ->with('success', "สร้างใบขอซื้อ {$order->doc_number} แล้ว");
     }
 

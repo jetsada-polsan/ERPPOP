@@ -35,8 +35,8 @@ class SearchController extends Controller
             ->with(['salesUser:id,username,name', 'salesArea:id,code,name'])
             ->where('is_active', true)
             ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
-                ->where('code', 'ilike', "%{$q}%")
-                ->orWhere('name_th', 'ilike', "%{$q}%")
+                ->whereRaw('LOWER(code) LIKE ?', ['%'.mb_strtolower($q).'%'])
+                ->orWhereRaw('LOWER(name_th) LIKE ?', ['%'.mb_strtolower($q).'%'])
             ))
             ->orderBy('name_th')
             ->limit(20)
@@ -152,8 +152,8 @@ class SearchController extends Controller
         $suppliers = Supplier::query()
             ->where('is_active', true)
             ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
-                ->where('code', 'ilike', "%{$q}%")
-                ->orWhere('name_th', 'ilike', "%{$q}%")
+                ->whereRaw('LOWER(code) LIKE ?', ['%'.mb_strtolower($q).'%'])
+                ->orWhereRaw('LOWER(name_th) LIKE ?', ['%'.mb_strtolower($q).'%'])
             ))
             ->orderBy('name_th')
             ->limit(20)
@@ -184,8 +184,8 @@ class SearchController extends Controller
 
         $branches = Branch::where('is_active', true)
             ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
-                ->where('code', 'ilike', "%{$q}%")
-                ->orWhere('name_th', 'ilike', "%{$q}%")
+                ->whereRaw('LOWER(code) LIKE ?', ['%'.mb_strtolower($q).'%'])
+                ->orWhereRaw('LOWER(name_th) LIKE ?', ['%'.mb_strtolower($q).'%'])
             ))
             ->orderBy('code')
             ->limit(20)

@@ -61,17 +61,17 @@
     </div>
 
     {{-- Create modal --}}
-    <div class="po-backdrop" x-show="modalOpen" x-transition.opacity @keydown.escape.window="modalOpen = false">
-        <div class="po-modal" @click.outside="modalOpen = false" x-transition>
+    <div class="po-backdrop" x-show="modalOpen" x-transition.opacity @keydown.escape.window="closeModal()">
+        <div class="po-modal"  x-transition>
             <div class="d-flex justify-content-between align-items-center px-4 pt-4 pb-2">
                 <div>
                     <h3 class="h5 fw-bold mb-0">สร้างใบขอซื้อ</h3>
                     <div class="text-muted small">ระบุสินค้าที่ต้องการซื้อ — เลือกซัพพลายเออร์/ราคาทีหลังตอนสั่งซื้อได้</div>
                 </div>
-                <button type="button" class="btn btn-light rounded-circle" @click="modalOpen = false"><i class="bi bi-x-lg"></i></button>
+                <button type="button" class="btn btn-light rounded-circle" @click="closeModal()"><i class="bi bi-x-lg"></i></button>
             </div>
             {{-- novalidate: validate เองใน onSubmit เพื่อไม่ให้ browser บล็อก submit เงียบ ๆ --}}
-            <form method="post" action="{{ route('purchase-orders.store') }}" novalidate @submit="onSubmit">
+            <form method="post" action="{{ route('purchase-orders.store') }}" novalidate @submit="onSubmit" @keydown.enter="if ($event.target.matches('input:not([type=submit])')) $event.preventDefault()">
                 @csrf
                 <div class="px-4 pb-4">
                     <div class="row g-3 mb-3">
@@ -130,7 +130,7 @@
                     <input name="note" class="form-control mt-3" placeholder="หมายเหตุ">
                 </div>
                 <div class="d-flex justify-content-end gap-2 px-4 pb-4">
-                    <button type="button" class="btn btn-light border px-4" @click="modalOpen = false">ยกเลิก</button>
+                    <button type="button" class="btn btn-light border px-4" @click="closeModal()">ยกเลิก</button>
                     <button type="submit" class="btn btn-success px-5"><i class="bi bi-check2-circle me-1"></i>สร้างใบขอซื้อ</button>
                 </div>
             </form>
@@ -151,6 +151,7 @@
 @endpush
 
 @push('scripts')
+<script src="{{ asset('document-workflow.js') }}"></script>
 <script>
 function poItem() {
     return { product_id: '', sku_code: '', name_th: '', unit_name: '', barcode: '', qty: 1, unit_price: '' };
@@ -159,6 +160,16 @@ function poItem() {
 function poPage() {
     return {
         ...erpProductPicker(),
+        ...erpDocumentDraft(@js((string) auth()->id())),
+        config: { draftEnabled: true },
+        submitting: false,
+        init() { this.$nextTick(() => this.startDraft()); },
+        closeModal() {
+            if (this.pickerOpen || this.submitting) return;
+            if (this.draftDirty && !window.confirm('ยังไม่ได้บันทึกใบขอซื้อ ต้องการปิดฟอร์มหรือไม่?')) return;
+            this.saveDraft();
+            this.modalOpen = false;
+        },
 
         modalOpen: false,
         items: [poItem()],
@@ -167,6 +178,7 @@ function poPage() {
             this.openProductPicker(this.items.length - 1);
         },
         onSubmit(event) {
+            if (this.submitting) { event.preventDefault(); return; }
             const form = event.target;
             const problems = [];
 
@@ -182,6 +194,11 @@ function poPage() {
             });
 
             window.erpStopSubmit(event, problems);
+            if (problems.length || event.defaultPrevented) return;
+            if (!form.reportValidity()) { event.preventDefault(); return; }
+            this.saveDraft();
+            this.markDraftSubmitted();
+            this.submitting = true;
         },
     };
 }

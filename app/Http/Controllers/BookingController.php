@@ -197,6 +197,7 @@ class BookingController extends Controller
         }
 
         return redirect()->route('bookings.show', $document->saleBooking)
+            ->with('document_draft_saved', $request->url())
             ->with('success', "สร้างใบจอง {$document->doc_number} แล้ว กันสต๊อกเรียบร้อย");
     }
 
@@ -313,6 +314,7 @@ class BookingController extends Controller
         }
 
         return redirect()->route('bookings.show', $booking)
+            ->with('document_draft_saved', $request->url())
             ->with('success', "แก้ไขใบจอง {$document->doc_number} แล้ว อัปเดตยอดจองสต๊อกเรียบร้อย");
     }
 
