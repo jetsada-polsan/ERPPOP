@@ -373,6 +373,22 @@
         cursor: pointer;
     }
 
+    /* หน้าเอกสารแบบ classic (ใบเบิก ใบโอน ใบปรับยอด ฯลฯ) บีบช่องในหน้าต่างให้ padding 3px
+       ทำให้ป้ายลอยทับค่าที่เลือก: คืนระยะของช่องแบบป้ายลอยให้ชนะกฎนั้น */
+    body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .erp-has-float > :is(.form-control,.form-select) {
+        min-height: var(--peak-field-h, 48px) !important;
+        padding: 21px 12px 5px 12px !important;
+        font-size: 14px !important;
+        border-radius: var(--peak-field-radius, 8px) !important;
+    }
+    body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .erp-has-float > select.form-select {
+        padding-right: 34px !important;
+    }
+    body.erp-classic-document-page :is(.booking-modal,.po-modal,.cd-modal) .erp-has-float > textarea.form-control {
+        min-height: 76px !important;
+        padding-top: 24px !important;
+    }
+
     /* โฟกัสแล้วทั้งกรอบและป้ายชื่อเปลี่ยนสีรับกัน */
     .erp-has-float:focus-within > label:first-child .erp-fl-text,
     .erp-float-group:focus-within > .erp-float-label .erp-fl-text {
