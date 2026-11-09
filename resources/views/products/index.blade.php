@@ -7,41 +7,49 @@
 @section('content')
     <div x-data="productPage()" x-cloak class="product-page">
         <div class="product-toolbar mb-3">
-            <form method="get" class="product-filter-bar" x-ref="filterForm">
-                <div class="product-filter-field search-field">
-                    <label>ค้นหาสินค้า</label>
-                    <div class="input-group">
-                        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
-                        <input type="text" name="q" value="{{ $q }}" class="form-control" placeholder="รหัส ชื่อ หรือบาร์โค้ด" autocomplete="off" data-scan aria-describedby="product-search-hint" @input.debounce.1200ms="$refs.filterForm.requestSubmit()" @keydown.enter.prevent="$refs.filterForm.requestSubmit()">
-                        <button type="submit" class="btn btn-primary fw-semibold text-nowrap" aria-label="ค้นหาสินค้า">ค้นหา</button>
+            <form method="get" class="product-filter-form" x-ref="filterForm">
+                <div class="product-filter-bar">
+                    <div class="product-filter-field search-field">
+                        <label>ค้นหาสินค้า</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                            <input type="text" name="q" value="{{ $q }}" class="form-control" placeholder="รหัส ชื่อ หรือบาร์โค้ด" autocomplete="off" data-scan aria-describedby="product-search-hint" @input.debounce.1200ms="$refs.filterForm.requestSubmit()" @keydown.enter.prevent="$refs.filterForm.requestSubmit()">
+                            <button type="submit" class="btn btn-primary fw-semibold text-nowrap" aria-label="ค้นหาสินค้า">ค้นหา</button>
+                        </div>
                     </div>
-                    <small id="product-search-hint" class="text-muted">พิมพ์แล้วรอ 1 วินาที ระบบจะค้นให้เอง หรือกดปุ่มค้นหา</small>
+                    <div class="product-filter-field">
+                        <label>ประเภทสินค้า</label>
+                        <select name="category_id" class="form-select" @change="$refs.filterForm.requestSubmit()">
+                            <option value="">ทุกหมวดสินค้า</option>
+                            @foreach($categories as $category)
+                                <option value="{{ $category->id }}" @selected($categoryId === $category->id)>{{ $category->name_th }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="product-filter-field">
+                        <label>รูปแบบการขาย</label>
+                        <select name="product_type" class="form-select" @change="$refs.filterForm.requestSubmit()">
+                            <option value="">สินค้าทั้งหมด</option>
+                            <option value="scale" @selected($productType === 'scale')>สินค้าชั่งน้ำหนัก</option>
+                        </select>
+                    </div>
+                    <div class="product-filter-field">
+                        <label>สถานะสินค้า</label>
+                        <select name="status" class="form-select" @change="$refs.filterForm.requestSubmit()">
+                            <option value="all" @selected($status === 'all')>ทุกสถานะ</option>
+                            <option value="active" @selected($status === 'active')>ใช้งาน</option>
+                            <option value="inactive" @selected($status === 'inactive')>ไม่ใช้งาน / พักไว้</option>
+                        </select>
+                    </div>
+                    @if($q !== '' || $categoryId || $productType)
+                        <div class="product-filter-clear">
+                            <a href="{{ route('products.index') }}" class="btn btn-light border text-nowrap">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i>ล้าง
+                            </a>
+                        </div>
+                    @endif
                 </div>
-                <div class="product-filter-field">
-                    <label>ประเภทสินค้า</label>
-                <select name="category_id" class="form-select" @change="$refs.filterForm.requestSubmit()">
-                    <option value="">ทุกหมวดสินค้า</option>
-                    @foreach($categories as $category)
-                        <option value="{{ $category->id }}" @selected($categoryId === $category->id)>{{ $category->name_th }}</option>
-                    @endforeach
-                </select>
-                </div>
-                <div class="product-filter-field">
-                    <label>รูปแบบการขาย</label>
-                <select name="product_type" class="form-select" @change="$refs.filterForm.requestSubmit()">
-                        <option value="">สินค้าทั้งหมด</option>
-                        <option value="scale" @selected($productType === 'scale')>สินค้าชั่งน้ำหนัก</option>
-                </select>
-                </div>
-                <div class="product-filter-field">
-                    <label>สถานะสินค้า</label>
-                    <select name="status" class="form-select" @change="$refs.filterForm.requestSubmit()">
-                        <option value="all" @selected($status === 'all')>ทุกสถานะ</option>
-                        <option value="active" @selected($status === 'active')>ใช้งาน</option>
-                        <option value="inactive" @selected($status === 'inactive')>ไม่ใช้งาน / พักไว้</option>
-                    </select>
-                </div>
-                @if($q !== '' || $categoryId || $productType)<a href="{{ route('products.index') }}" class="btn btn-light border align-self-end">ล้าง</a>@endif
+                <small id="product-search-hint" class="product-search-hint">พิมพ์รหัส ชื่อสินค้า หรือยิงบาร์โค้ด แล้วรอ 1 วินาที ระบบจะค้นหาให้อัตโนมัติ หรือกดปุ่มค้นหา</small>
             </form>
             <div class="product-actions">
                 <a href="{{ route('product-units.index') }}" class="btn btn-light border px-3">
@@ -55,15 +63,23 @@
 
         <div class="row g-3 mb-3">
             @foreach([['key' => 'all', 'label' => 'สินค้าทั้งหมด', 'tone' => 'primary', 'icon' => 'bi-boxes'], ['key' => 'active', 'label' => 'กำลังใช้งาน', 'tone' => 'success', 'icon' => 'bi-box-seam'], ['key' => 'inactive', 'label' => 'ไม่ใช้งาน / พักไว้', 'tone' => 'secondary', 'icon' => 'bi-box']] as $summary)
-                <div class="col-md-4"><a href="{{ route('products.index', array_filter(['q' => $q, 'category_id' => $categoryId, 'product_type' => $productType, 'status' => $summary['key'] === 'all' ? null : $summary['key']])) }}" class="status-summary {{ $status === $summary['key'] ? 'is-selected' : '' }}"><span class="status-summary-icon text-{{ $summary['tone'] }}"><i class="bi {{ $summary['icon'] }}"></i></span><span><small>{{ $summary['label'] }}</small><strong>{{ number_format($counts[$summary['key']]) }}</strong></span></a></div>
+                <div class="col-md-4">
+                    <a href="{{ route('products.index', array_filter(['q' => $q, 'category_id' => $categoryId, 'product_type' => $productType, 'status' => $summary['key'] === 'all' ? null : $summary['key']])) }}" class="status-summary {{ $status === $summary['key'] ? 'is-selected' : '' }}">
+                        <span class="status-summary-icon text-{{ $summary['tone'] }}"><i class="bi {{ $summary['icon'] }}"></i></span>
+                        <span>
+                            <small>{{ $summary['label'] }}</small>
+                            <strong class="product-num">{{ number_format($counts[$summary['key']]) }}</strong>
+                        </span>
+                    </a>
+                </div>
             @endforeach
         </div>
 
         <div class="scale-plu-summary mb-3">
             <div class="scale-plu-icon"><i class="bi bi-upc-scan"></i></div>
-            <div><span>PLU สินค้าชั่งล่าสุด</span><strong>{{ $maxScalePlu }}</strong></div>
+            <div><span>PLU สินค้าชั่งล่าสุด</span><strong class="product-num">{{ $maxScalePlu }}</strong></div>
             <i class="bi bi-arrow-right text-muted"></i>
-            <div><span>เลขถัดไปที่ระบบจะใช้</span><strong class="text-success">{{ $nextScalePlu }}</strong></div>
+            <div><span>เลขถัดไปที่ระบบจะใช้</span><strong class="text-success product-num">{{ $nextScalePlu }}</strong></div>
             <a href="{{ route('scale-prices.index') }}" class="btn btn-outline-primary ms-auto"><i class="bi bi-speedometer2 me-1"></i>ทะเบียนสินค้าเครื่องชั่ง</a>
         </div>
 
@@ -73,13 +89,13 @@
                     <thead>
                         <tr>
                             <th>รหัส</th><th>บาร์โค้ด / หน่วย</th><th>ชื่อสินค้า</th><th>หมวด</th><th>ยี่ห้อ</th>
-                            <th>หน่วยหลัก</th><th class="text-end">ราคาเริ่มต้น</th><th>สถานะ</th><th></th>
+                            <th>หน่วยหลัก</th><th class="text-end">ราคาเริ่มต้น (บาท)</th><th class="text-center">สถานะ</th><th class="text-end">จัดการ</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse($products as $product)
                             <tr>
-                                <td class="fw-semibold">{{ $product->sku_code }}</td>
+                                <td class="fw-bold product-sku">{{ $product->sku_code }}</td>
                                 <td class="product-barcode-cell">
                                     @forelse($product->barcodes as $barcode)
                                         <div class="barcode-line">
@@ -90,12 +106,17 @@
                                         <span class="text-muted">-</span>
                                     @endforelse
                                 </td>
-                                <td>{{ $product->name_th }}</td>
+                                <td class="product-name-cell">
+                                    <div class="fw-semibold">{{ $product->name_th }}</div>
+                                    @if(!empty($product->name_en))
+                                        <div class="text-muted product-subname">{{ $product->name_en }}</div>
+                                    @endif
+                                </td>
                                 <td>{{ $product->category?->name_th ?? '-' }}</td>
                                 <td>{{ $product->brand?->name_th ?? '-' }}</td>
                                 <td>{{ $product->baseUnit?->displayLabel() ?? '-' }}</td>
-                                <td class="text-end">{{ number_format($product->default_price ?? 0, 2) }}</td>
-                                <td>
+                                <td class="text-end fw-bold product-num">{{ number_format($product->default_price ?? 0, 2) }}</td>
+                                <td class="text-center">
                                     <span class="badge {{ $product->is_active ? 'text-bg-success' : 'text-bg-secondary' }}">
                                         {{ $product->is_active ? 'ใช้งาน' : 'ปิดใช้งาน' }}
                                     </span>
@@ -126,7 +147,7 @@
         </div>
 
         <div class="booking-modal-backdrop" x-show="modalOpen" x-transition.opacity @keydown.escape.window="modalOpen = false">
-            <div class="booking-modal" style="width: min(720px, 100%);" @click.outside="modalOpen = false" x-transition>
+            <div class="booking-modal" style="width: min(760px, 100%);" @click.outside="modalOpen = false" x-transition>
                 <div class="modal-header border-0 px-4 pt-4 pb-2">
                     <h3 class="h4 fw-bold mb-0">เพิ่มสินค้าใหม่</h3>
                     <button type="button" class="btn btn-light rounded-circle" @click="modalOpen = false" aria-label="Close">
@@ -138,7 +159,7 @@
                     <div class="modal-body px-4 pb-4">
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label text-muted small">ประเภทสินค้า <span class="text-danger">*</span></label>
+                                <label class="form-label text-muted">ประเภทสินค้า <span class="text-danger">*</span></label>
                                 <select name="product_category_id" required class="form-select">
                                     <option value="">-- เลือกประเภทเพื่อรันรหัสอัตโนมัติ --</option>
                                     @foreach($categories as $category)
@@ -148,7 +169,7 @@
                                 <div class="form-text">ระบบจะรันรหัสตามประเภท เช่น 101001, 101002 โดยไม่ต้องกรอกเอง</div>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label text-muted small">หน่วยหลัก</label>
+                                <label class="form-label text-muted">หน่วยหลัก</label>
                                 <select name="base_unit_id" required class="form-select">
                                     @foreach($units as $unit)
                                         <option value="{{ $unit->id }}">{{ $unit->displayLabel() }}</option>
@@ -156,29 +177,29 @@
                                 </select>
                             </div>
                             <div class="col-12">
-                                <label class="form-label text-muted small">ชื่อสินค้า (ไทย)</label>
+                                <label class="form-label text-muted">ชื่อสินค้า (ไทย)</label>
                                 <input type="text" name="name_th" required class="form-control">
                             </div>
                             <div class="col-12">
-                                <label class="form-label text-muted small">ชื่อสินค้า (อังกฤษ)</label>
+                                <label class="form-label text-muted">ชื่อสินค้า (อังกฤษ)</label>
                                 <input type="text" name="name_en" class="form-control">
                             </div>
                             <div class="col-12">
-                                <label class="form-label text-muted small">หมายเหตุสินค้า / ข้อมูลช่วยจำ</label>
+                                <label class="form-label text-muted">หมายเหตุสินค้า / ข้อมูลช่วยจำ</label>
                                 <textarea name="note" rows="2" maxlength="2000" class="form-control" placeholder="เช่น วิธีเก็บรักษา รุ่น สี หรือเงื่อนไขที่พนักงานควรทราบ"></textarea>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label text-muted small">ขายเมื่อสต๊อกไม่พอ</label>
+                                <label class="form-label text-muted">ขายเมื่อสต๊อกไม่พอ</label>
                                 <select name="negative_stock_policy" class="form-select" required>
                                     <option value="allow">เตือนแล้วอนุญาต</option>
                                     <option value="block">ห้ามขายเกินสต๊อก</option>
                                 </select>
                             </div>
-                            <div class="col-md-3"><label class="form-label text-muted small">จุดสั่งซื้อ</label><input type="number" step="0.0001" min="0" name="reorder_point" class="form-control"></div>
-                            <div class="col-md-3"><label class="form-label text-muted small">สต๊อกขั้นต่ำ</label><input type="number" step="0.0001" min="0" name="minimum_stock" class="form-control"></div>
-                            <div class="col-md-3"><label class="form-label text-muted small">สต๊อกสูงสุด</label><input type="number" step="0.0001" min="0" name="maximum_stock" class="form-control"></div>
+                            <div class="col-md-3"><label class="form-label text-muted">จุดสั่งซื้อ</label><input type="number" step="0.0001" min="0" name="reorder_point" class="form-control text-end"></div>
+                            <div class="col-md-3"><label class="form-label text-muted">สต๊อกขั้นต่ำ</label><input type="number" step="0.0001" min="0" name="minimum_stock" class="form-control text-end"></div>
+                            <div class="col-md-3"><label class="form-label text-muted">สต๊อกสูงสุด</label><input type="number" step="0.0001" min="0" name="maximum_stock" class="form-control text-end"></div>
                             <div class="col-md-6">
-                                <label class="form-label text-muted small">แผนก</label>
+                                <label class="form-label text-muted">แผนก</label>
                                 <select name="product_department_id" class="form-select">
                                     <option value="">-- ไม่ระบุ --</option>
                                     @foreach($departments as $department)
@@ -187,7 +208,7 @@
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label text-muted small">ยี่ห้อ</label>
+                                <label class="form-label text-muted">ยี่ห้อ</label>
                                 <select name="product_brand_id" class="form-select">
                                     <option value="">-- ไม่ระบุ --</option>
                                     @foreach($brands as $brand)
@@ -196,8 +217,8 @@
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label text-muted small">ราคาเริ่มต้น</label>
-                                <input type="number" step="0.01" min="0" name="default_price" class="form-control">
+                                <label class="form-label text-muted">ราคาเริ่มต้น (บาท)</label>
+                                <input type="number" step="0.01" min="0" name="default_price" class="form-control text-end">
                                 <div class="form-check mt-2">
                                     <input type="checkbox" name="is_vat" value="1" checked class="form-check-input" id="newProductVat">
                                     <label class="form-check-label" for="newProductVat">คิด VAT</label>
@@ -208,35 +229,35 @@
                                 </div>
                             </div>
                             <div class="col-md-2">
-                                <label class="form-label text-muted small">ราคาขายสูงสุด/หน่วยฐาน</label>
-                                <input type="number" step="0.00000001" min="0" name="maximum_sale_price" class="form-control">
+                                <label class="form-label text-muted">ราคาขายสูงสุด/หน่วยฐาน</label>
+                                <input type="number" step="0.00000001" min="0" name="maximum_sale_price" class="form-control text-end">
                             </div>
                             <div class="col-md-2">
-                                <label class="form-label text-muted small">กำไรขั้นต่ำ (%)</label>
-                                <input type="number" step="0.00000001" max="100" name="minimum_margin_percent" class="form-control">
+                                <label class="form-label text-muted">กำไรขั้นต่ำ (%)</label>
+                                <input type="number" step="0.00000001" max="100" name="minimum_margin_percent" class="form-control text-end">
                             </div>
                             <div class="col-md-2">
-                                <label class="form-label text-muted small">ควบคุมกำไร</label>
+                                <label class="form-label text-muted">ควบคุมกำไร</label>
                                 <select name="margin_control_policy" class="form-select"><option value="warn">แจ้งเตือน</option><option value="block">บังคับขออนุมัติ</option></select>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label text-muted small">เตือนก่อนหมดอายุ (วัน)</label>
-                                <input type="number" min="0" max="3650" name="expiry_warning_days" value="30" class="form-control">
+                                <label class="form-label text-muted">เตือนก่อนหมดอายุ (วัน)</label>
+                                <input type="number" min="0" max="3650" name="expiry_warning_days" value="30" class="form-control text-end">
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label text-muted small">อายุสินค้านับจากวันผลิต (วัน)</label>
-                                <input type="number" min="1" max="36500" name="shelf_life_days" class="form-control">
+                                <label class="form-label text-muted">อายุสินค้านับจากวันผลิต (วัน)</label>
+                                <input type="number" min="1" max="36500" name="shelf_life_days" class="form-control text-end">
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label text-muted small">เริ่มระบายก่อนหมดอายุ (วัน)</label>
-                                <input type="number" min="0" max="3650" name="clearance_warning_days" value="7" class="form-control">
+                                <label class="form-label text-muted">เริ่มระบายก่อนหมดอายุ (วัน)</label>
+                                <input type="number" min="0" max="3650" name="clearance_warning_days" value="7" class="form-control text-end">
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label text-muted small">ส่วนลดระบายแนะนำ (%)</label>
-                                <input type="number" step="0.01" min="0" max="100" name="clearance_discount_percent" value="0" class="form-control">
+                                <label class="form-label text-muted">ส่วนลดระบายแนะนำ (%)</label>
+                                <input type="number" step="0.01" min="0" max="100" name="clearance_discount_percent" value="0" class="form-control text-end">
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label text-muted small">เมื่อ Lot หมดอายุ</label>
+                                <label class="form-label text-muted">เมื่อ Lot หมดอายุ</label>
                                 <select name="expiry_sale_policy" class="form-select" required>
                                     <option value="block">ห้ามขาย/ห้ามใช้</option>
                                     <option value="allow">เตือนแต่อนุญาต</option>
@@ -264,74 +285,428 @@
 
 @push('head')
 <style>
-    .status-summary { display:flex; align-items:center; gap:12px; height:72px; padding:12px 16px; background:#fff; border:1px solid var(--erp-border); border-radius:14px; color:inherit; text-decoration:none; transition:.15s ease; }
-    .status-summary:hover, .status-summary.is-selected { border-color:#93c5fd; box-shadow:0 6px 18px rgba(30,64,175,.10); transform:translateY(-1px); }
-    .status-summary-icon { width:38px; height:38px; display:grid; place-items:center; border-radius:11px; background:var(--erp-surface-2); font-size:19px; }
-    .status-summary small { display:block; color:var(--erp-muted); font-size:12px; }
-    .status-summary strong { display:block; color:var(--erp-text); font-size:21px; line-height:1.1; }
     [x-cloak] { display: none !important; }
+    .product-page { --product-border: var(--erp-border); --product-ink: var(--erp-text); font-size: 15px; }
+    .product-num { font-variant-numeric: tabular-nums; }
+
+    /* แถบค้นหาและตัวกรองสินค้า */
+    .product-toolbar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 14px 16px;
+        border: 1px solid var(--product-border);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, .95);
+        box-shadow: 0 4px 14px rgba(15, 51, 74, .05);
+    }
+    .product-filter-form {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    .product-filter-bar {
+        display: grid;
+        grid-template-columns: minmax(210px, 1.7fr) repeat(3, minmax(115px, 1fr)) auto;
+        gap: 10px;
+        align-items: end;
+    }
+    .product-filter-field {
+        display: grid;
+        gap: 5px;
+        min-width: 0;
+    }
+    .product-filter-field label {
+        margin: 0;
+        color: var(--erp-muted);
+        font-size: 14px;
+        line-height: 1.25;
+        font-weight: 700;
+    }
+    .product-filter-field .form-control,
+    .product-filter-field .form-select,
+    .product-filter-field .input-group-text,
+    .product-filter-bar .btn,
+    .product-actions .btn {
+        min-height: 42px;
+        height: 42px;
+        border-color: var(--erp-border);
+        font-size: 15px;
+        border-radius: 9px;
+    }
+    .search-field .input-group {
+        flex-wrap: nowrap;
+    }
+    .search-field .input-group .input-group-text {
+        border-top-right-radius: 0;
+        border-bottom-right-radius: 0;
+    }
+    .search-field .input-group .form-control {
+        min-width: 0;
+        border-radius: 0;
+    }
+    .search-field .input-group .btn {
+        flex: 0 0 auto;
+        padding: 0 16px;
+        margin-left: 0;
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
+        font-weight: 700;
+    }
+    .product-filter-field .form-select {
+        max-width: none !important;
+    }
+    .product-filter-clear {
+        display: flex;
+        align-items: flex-end;
+    }
+    .product-filter-clear .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 14px;
+        font-weight: 700;
+    }
+    .product-search-hint {
+        display: block;
+        margin-top: 6px;
+        color: var(--erp-muted);
+        font-size: 14px;
+    }
+    .product-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex: 0 0 auto;
+        padding-top: 23px;
+    }
+    .product-actions .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    /* การ์ดสรุปจำนวนตามสถานะ */
+    .status-summary {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        min-height: 78px;
+        padding: 14px 18px;
+        background: #fff;
+        border: 1px solid var(--erp-border);
+        border-radius: 14px;
+        color: inherit;
+        text-decoration: none;
+        transition: .15s ease;
+    }
+    .status-summary:hover,
+    .status-summary.is-selected {
+        border-color: #60a5fa;
+        box-shadow: 0 6px 18px rgba(30, 64, 175, .10);
+        transform: translateY(-1px);
+    }
+    .status-summary-icon {
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        border-radius: 12px;
+        background: var(--erp-surface-2);
+        font-size: 21px;
+        flex-shrink: 0;
+    }
+    .status-summary small {
+        display: block;
+        color: var(--erp-muted);
+        font-size: 14px;
+        font-weight: 600;
+    }
+    .status-summary strong {
+        display: block;
+        color: var(--erp-text);
+        font-size: 24px;
+        line-height: 1.15;
+    }
+
+    /* แถบสรุป PLU เครื่องชั่ง */
+    .scale-plu-summary {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 16px;
+        border: 1px solid var(--erp-border);
+        border-radius: 12px;
+        background: linear-gradient(100deg, var(--erp-surface-2), #fff 72%);
+        box-shadow: 0 2px 8px rgba(30, 64, 175, .04);
+    }
+    .scale-plu-summary > div:not(.scale-plu-icon) {
+        display: grid;
+        gap: 2px;
+    }
+    .scale-plu-summary span {
+        color: var(--erp-muted);
+        font-size: 14px;
+        font-weight: 700;
+    }
+    .scale-plu-summary strong {
+        color: var(--product-ink);
+        font-size: 18px;
+        line-height: 1.15;
+        letter-spacing: .03em;
+    }
+    .scale-plu-icon {
+        width: 40px;
+        height: 40px;
+        display: grid;
+        place-items: center;
+        border-radius: 10px;
+        color: #fff;
+        background: linear-gradient(145deg, var(--erp-primary-ink), var(--erp-primary-dark));
+        font-size: 18px;
+        box-shadow: 0 3px 8px rgba(22, 143, 202, .18);
+        flex-shrink: 0;
+    }
+    .scale-plu-summary .btn {
+        min-height: 40px;
+        display: inline-flex;
+        align-items: center;
+        border-radius: 9px;
+        font-size: 14px;
+        padding: 6px 14px;
+        font-weight: 700;
+    }
+
+    /* ตารางรายการสินค้า */
+    .product-table-card {
+        overflow: hidden;
+        padding: 0;
+        border: 1px solid var(--product-border);
+        border-radius: 14px;
+        box-shadow: 0 5px 18px rgba(15, 51, 74, .055);
+    }
+    .product-table {
+        font-size: 15px;
+    }
+    .product-table thead th {
+        padding: 12px 14px;
+        border: 0;
+        background: var(--erp-primary-soft);
+        color: var(--erp-primary-dark);
+        font-size: 14px;
+        font-weight: 800;
+        letter-spacing: .01em;
+        white-space: nowrap;
+    }
+    .product-table tbody td {
+        padding: 11px 14px;
+        border-color: var(--erp-surface-2);
+        color: var(--erp-text);
+        vertical-align: middle;
+        line-height: 1.35;
+        font-size: 15px;
+    }
+    .product-table tbody tr {
+        transition: background-color .15s ease;
+    }
+    .product-table tbody tr:hover {
+        background: var(--erp-surface-2);
+    }
+    .product-sku {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 15px;
+        white-space: nowrap;
+    }
+    .product-name-cell {
+        min-width: 200px;
+    }
+    .product-subname {
+        font-size: 14px;
+    }
+    .product-barcode-cell {
+        min-width: 240px;
+    }
+    .barcode-line {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 2px 0;
+    }
+    .barcode-chip {
+        display: inline-block;
+        padding: 4px 9px;
+        border: 1px solid #cbdcf5;
+        border-radius: 6px;
+        background: #f3f7ff;
+        color: #1e40af;
+        font: 600 14px/1.25 ui-monospace, SFMono-Regular, Menlo, monospace;
+        white-space: nowrap;
+    }
+    .barcode-chip.is-inactive {
+        border-color: #e5e7eb;
+        background: #f3f4f6;
+        color: #6b7280;
+        text-decoration: line-through;
+    }
+    .barcode-unit {
+        color: var(--erp-muted);
+        font-size: 14px;
+        white-space: nowrap;
+    }
+    .product-table .badge {
+        border-radius: 6px;
+        padding: 5px 10px;
+        font-size: 14px;
+        font-weight: 700;
+    }
+    .product-table tbody .btn-primary {
+        min-width: 82px;
+        min-height: 38px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 700;
+        padding: 6px 12px;
+        box-shadow: none;
+    }
+    .product-pagination {
+        padding: 14px 16px 6px;
+        border-top: 1px solid var(--erp-surface-2);
+        font-size: 14px;
+    }
+
+    /* หน้าต่างแก้ไขสินค้า (Popup) และเพิ่มสินค้า (Modal) */
     .booking-modal-backdrop {
-        position: fixed; inset: 0; z-index: 2000;
-        background: rgba(15, 23, 42, .42);
-        display: flex; align-items: center; justify-content: center; padding: 24px;
+        position: fixed;
+        inset: 0;
+        z-index: 2000;
+        background: rgba(15, 23, 42, .45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
     }
     .booking-modal {
-        width: min(1120px, 100%); max-height: calc(100vh - 48px); overflow: auto;
-        background: #fff; border-radius: 18px; box-shadow: 0 24px 80px rgba(15, 23, 42, .24);
+        width: min(1120px, 100%);
+        max-height: calc(100vh - 40px);
+        overflow: auto;
+        background: #fff;
+        border-radius: 18px;
+        box-shadow: 0 24px 80px rgba(15, 23, 42, .24);
     }
-    .product-popup-backdrop { position:fixed; inset:0; z-index:1950; display:flex; align-items:center; justify-content:center; padding:12px; background:rgba(15,23,42,.48); }
-    .product-popup-window { width:min(760px,calc(100vw - 24px)); height:min(540px,calc(100vh - 24px)); display:flex; flex-direction:column; overflow:hidden; border:1px solid #777d83; border-radius:2px; background:#ececec; box-shadow:0 18px 52px rgba(15,23,42,.3); }
-    .product-popup-titlebar { min-height:32px; display:flex; align-items:center; justify-content:space-between; padding:0 4px 0 9px; color:#111827; background:#f5f5f5; border-bottom:1px solid #9da2a7; font:700 12px Tahoma,"Noto Sans Thai",sans-serif; }
-    .product-popup-titlebar button { width:28px; height:27px; display:grid; place-items:center; border:0; border-radius:0; color:#374151; background:transparent; }
-    .product-popup-titlebar button:hover { color:#b91c1c; background:#fee2e2; }
-    .product-popup-window iframe { width:100%; height:100%; flex:1 1 auto; border:0; background:#eef5f9; }
-    .product-page { --product-border:var(--erp-border); --product-ink:var(--erp-text); }
-    .product-toolbar { display:flex; align-items:flex-end; justify-content:space-between; gap:9px; padding:9px 10px; border:1px solid var(--product-border); border-radius:10px; background:rgba(255,255,255,.88); box-shadow:0 3px 10px rgba(15,51,74,.04); }
-    .product-filter-bar { display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap; flex:1 1 auto; }
-    .product-filter-field { display:grid; gap:2px; min-width:150px; }
-    .product-filter-field.search-field { width:min(360px,100%); }
-    .search-field .input-group { flex-wrap:nowrap; }
-    .search-field .input-group .form-control { min-width:0; }
-    .search-field .input-group .btn { flex:0 0 auto; padding:0 14px; margin-left:0; }
-    .product-filter-field label { margin:0; color:var(--erp-muted); font-size:9px; line-height:1.1; font-weight:700; }
-    .product-filter-field .form-control,.product-filter-field .form-select,.product-filter-field .input-group-text { min-height:32px; height:32px; border-color:var(--erp-border); font-size:11px; padding-top:3px; padding-bottom:3px; }
-    .product-filter-field .form-select { max-width:none!important; }
-    .product-filter-bar .btn,.product-actions .btn { min-height:32px; height:32px; border-radius:7px; font-size:11px; padding:4px 10px; font-weight:700; white-space:nowrap; }
-    .product-actions { display:flex; gap:8px; align-items:center; flex:0 0 auto; }
-    .scale-plu-summary { display:flex; align-items:center; gap:10px; padding:7px 10px; border:1px solid var(--erp-border); border-radius:9px; background:linear-gradient(100deg,var(--erp-surface-2),#fff 72%); box-shadow:0 2px 8px rgba(30,64,175,.03); }
-    .scale-plu-summary>div:not(.scale-plu-icon) { display:grid; gap:2px; }
-    .scale-plu-summary span { color:var(--erp-muted); font-size:10px; font-weight:700; }
-    .scale-plu-summary strong { color:var(--product-ink); font-size:15px; line-height:1.05; letter-spacing:.035em; }
-    .scale-plu-icon { width:31px; height:31px; display:grid; place-items:center; border-radius:7px; color:#fff; background:linear-gradient(145deg,var(--erp-primary-ink),var(--erp-primary-ink)); font-size:14px; box-shadow:0 3px 8px rgba(22,143,202,.15); }
-    .scale-plu-summary .btn { min-height:30px; border-radius:7px; font-size:10px; padding:4px 9px; font-weight:700; }
-    .product-table-card { overflow:hidden; padding:0; border:1px solid var(--product-border); border-radius:14px; box-shadow:0 5px 18px rgba(15,51,74,.055); }
-    .product-table { font-size:11px; }
-    .product-table thead th { padding:8px 10px; border:0; background:var(--erp-primary-soft); color:var(--erp-primary-dark); font-size:9px; font-weight:800; letter-spacing:.01em; white-space:nowrap; }
-    .product-table tbody td { padding:7px 10px; border-color:var(--erp-success-soft); color:var(--erp-text); vertical-align:middle; line-height:1.2; }
-    .product-table tbody tr { transition:background-color .15s ease; }
-    .product-table tbody tr:hover { background:var(--erp-surface-2); }
-    .product-barcode-cell { min-width:140px; }
-    .barcode-chip { display:inline-block; margin:1px 3px 1px 0; padding:3px 6px; border:1px solid #cbdcf5; border-radius:5px; background:#f3f7ff; color:#234b88; font:600 10px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace; white-space:nowrap; }
-    .barcode-chip.is-inactive { border-color:#e5e7eb; background:#f3f4f6; color:#6b7280; text-decoration:line-through; }
-    .product-table .badge { border-radius:5px; padding:3px 6px; font-size:9px; font-weight:700; }
-    .product-table tbody .btn-primary { min-width:58px; min-height:27px; border-radius:6px; font-size:9px; font-weight:700; padding:3px 7px; box-shadow:none; }
-    .product-pagination { padding:12px 14px 4px; border-top:1px solid var(--erp-surface-2); }
-    .product-filter-bar { display:grid; grid-template-columns:minmax(300px,2fr) minmax(170px,1fr) minmax(170px,1fr) auto; }
-    .product-filter-field { min-width:0; }
-    .product-filter-field.search-field { width:100%; }
-    .product-filter-field label { font-size:12px; }
-    .product-filter-field .form-control,.product-filter-field .form-select,.product-filter-field .input-group-text,.product-filter-bar .btn,.product-actions .btn { min-height:40px; height:40px; font-size:14px; }
-    .product-filter-field small { font-size:11px; }
-    .product-table { font-size:14px; }
-    .product-table thead th { font-size:13px; }
-    .product-barcode-cell { min-width:250px; }
-    .barcode-line { display:flex; align-items:center; gap:8px; }
-    .barcode-unit { color:var(--erp-muted); font-size:13px; white-space:nowrap; }
-    .barcode-chip { display:block; width:max-content; margin:2px 0; padding:4px 8px; font-size:14px; }
-    .product-table tbody .btn-primary { min-width:72px; min-height:36px; font-size:14px; padding:6px 12px; }
-    @media(max-width:1200px){.product-filter-bar{grid-template-columns:1fr 1fr}.search-field{grid-column:1 / -1}.product-toolbar{align-items:stretch;flex-direction:column}.product-actions{justify-content:flex-end}.product-filter-field.search-field{width:min(280px,100%)}}
-    @media(max-width:720px){.product-toolbar{padding:10px}.product-filter-bar,.product-filter-field,.product-filter-field.search-field{width:100%}.product-filter-field{min-width:0}.product-filter-bar .btn{flex:1}.product-actions{display:grid;grid-template-columns:1fr 1fr}.product-actions .btn{display:flex;align-items:center;justify-content:center}.product-table thead th,.product-table tbody td{padding:9px 10px}.product-popup-backdrop{padding:0}.product-popup-window{width:100vw;height:100vh;border:0;border-radius:0}}
-    @media(max-width:720px){.scale-plu-summary{align-items:flex-start;flex-wrap:wrap}.scale-plu-summary .btn{width:100%;margin-left:0!important}}
+    .booking-modal .form-label,
+    .booking-modal .form-text,
+    .booking-modal .form-control,
+    .booking-modal .form-select,
+    .booking-modal .form-check-label,
+    .booking-modal .btn {
+        font-size: 14px;
+    }
+    .product-popup-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 1950;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        background: rgba(15, 23, 42, .48);
+    }
+    .product-popup-window {
+        width: min(1020px, calc(100vw - 32px));
+        height: min(740px, calc(100vh - 32px));
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid var(--erp-border);
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 20px 60px rgba(15, 23, 42, .30);
+    }
+    .product-popup-titlebar {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 12px 0 16px;
+        color: #111827;
+        background: #f8fafc;
+        border-bottom: 1px solid var(--erp-border);
+        font: 700 15px Tahoma, "Noto Sans Thai", sans-serif;
+    }
+    .product-popup-titlebar button {
+        width: 34px;
+        height: 34px;
+        display: grid;
+        place-items: center;
+        border: 0;
+        border-radius: 8px;
+        color: #374151;
+        background: transparent;
+    }
+    .product-popup-titlebar button:hover {
+        color: #b91c1c;
+        background: #fee2e2;
+    }
+    .product-popup-window iframe {
+        width: 100%;
+        height: 100%;
+        flex: 1 1 auto;
+        border: 0;
+        background: #eef5f9;
+    }
+
+    /* รองรับหน้าจอ Tablet และ Mobile */
+    @media (max-width: 1200px) {
+        .product-toolbar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .product-filter-bar {
+            grid-template-columns: 1fr 1fr;
+        }
+        .product-filter-field.search-field {
+            grid-column: 1 / -1;
+        }
+        .product-actions {
+            padding-top: 0;
+            justify-content: flex-end;
+        }
+    }
+    @media (max-width: 768px) {
+        .product-toolbar {
+            padding: 12px;
+        }
+        .product-filter-bar {
+            grid-template-columns: 1fr;
+        }
+        .product-filter-clear .btn {
+            width: 100%;
+        }
+        .product-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+        .scale-plu-summary {
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+        .scale-plu-summary .btn {
+            width: 100%;
+            justify-content: center;
+            margin-left: 0 !important;
+        }
+        .product-popup-backdrop {
+            padding: 0;
+        }
+        .product-popup-window {
+            width: 100vw;
+            height: 100vh;
+            border: 0;
+            border-radius: 0;
+        }
+    }
 </style>
 @endpush
 
