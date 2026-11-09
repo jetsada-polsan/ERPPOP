@@ -952,6 +952,22 @@
         body:not(.pos-body) .erp-fl-text { color: #334155 !important; }
         body:not(.pos-body) ::placeholder { color: #64748b; opacity: 1; }
     }
+
+    /* ── หน้าต่างเอกสาร (ใบจอง ใบขาย ใบซื้อ ใบเบิก ฯลฯ): ตัวหนังสือขั้นต่ำ 14px ──
+       สไตล์ classic เดิมบีบเหลือ 10.5–11.5px ทำให้อ่านยาก (เจ้าของบอกหลายรอบ)
+       ตรวจบนหน้าจริงแล้ว 9 พ.ย. 2026: ยอดรวมยังใหญ่ ช่องจำนวนกว้างพอไม่ตัดบรรทัด */
+    @media screen {
+        html body.erp-classic-document-page :is(.doc-modal,.booking-modal,.po-modal,.cd-modal) :is(td,th,label,span,strong,div,small,summary,p,a,button,input,select,textarea):not(.doc-total-value):not(.doc-total-value *) {
+            font-size: max(14px, 1em) !important;
+        }
+        html body.erp-classic-document-page :is(.doc-modal,.booking-modal,.po-modal,.cd-modal) :is(.doc-total-value, .doc-total-value *) { font-size: 22px !important; font-weight: 800 !important; }
+        html body.erp-classic-document-page :is(.doc-modal,.booking-modal,.po-modal,.cd-modal) .erp-fl-text { font-size: 12.5px !important; }
+        html body.erp-classic-document-page :is(.doc-modal,.booking-modal,.po-modal,.cd-modal) th { font-size: 13px !important; }
+        html body.erp-classic-document-page :is(.doc-modal,.booking-modal,.po-modal,.cd-modal) .doc-meta-line { font-size: 14px !important; line-height: 1.6 !important; }
+        html body.erp-classic-document-page :is(.doc-modal,.booking-modal,.po-modal,.cd-modal) .doc-total-label { font-size: 15px !important; font-weight: 700 !important; }
+        html body.erp-classic-document-page :is(.doc-modal,.booking-modal,.po-modal,.cd-modal) .doc-subtitle { font-size: 13px !important; }
+        html body.erp-classic-document-page .doc-modal .doc-table .qty { width: 140px !important; }
+    }
 </style>
 
 <script>
