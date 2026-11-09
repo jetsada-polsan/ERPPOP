@@ -1605,7 +1605,7 @@
             <nav class="odn-nav" aria-label="หมวดเมนู">
                 @foreach ($menuSections as $i => $section)
                     <a href="#odn-grp-{{ $i }}" class="odn-nav-link {{ $i === $activeSection ? 'on' : '' }}"
-                       data-sec="{{ $i }}">{{ $section['displayLabel'] ?? $section['label'] }}</a>
+                       data-sec="{{ $i }}"><i class="bi {{ $railIcons[$section['label']] ?? 'bi-grid-fill' }}"></i><span>{{ $section['displayLabel'] ?? $section['label'] }}</span></a>
                 @endforeach
             </nav>
             <span class="odn-company">{{ $companyName }}</span>
