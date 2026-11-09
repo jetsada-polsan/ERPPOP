@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'payment_document_id', 'seq', 'method', 'amount', 'card_no', 'cheque_no',
-    'cheque_due_date', 'bank_account_id',
+    'cheque_due_date', 'bank_account_id', 'transfer_ref', 'transfer_at',
 ])]
 class PaymentLine extends Model
 {

@@ -85,6 +85,8 @@ class CustomerPaymentService
                 'amount' => $totalAmount,
                 'cheque_no' => $data['cheque_no'] ?? null,
                 'cheque_due_date' => $data['cheque_due_date'] ?? null,
+                'transfer_ref' => ($data['method'] ?? null) === 'transfer' ? ($data['transfer_ref'] ?? null) : null,
+                'transfer_at' => ($data['method'] ?? null) === 'transfer' ? ($data['transfer_at'] ?? null) : null,
             ]);
 
             // รับชำระด้วยเช็ค -> ลงทะเบียนเช็ครับอัตโนมัติ (สถานะ: ในมือ รอนำฝาก)

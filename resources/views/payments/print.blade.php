@@ -35,6 +35,7 @@
                 <td>{{ $methodLabels[$line->method] ?? $line->method }}</td>
                 <td>
                     @if($line->method === 'cheque')เช็คเลขที่ {{ $line->cheque_no }} @if($line->cheque_bank)ธนาคาร{{ $line->cheque_bank }}@endif @if($line->cheque_due_date)ลงวันที่ {{ \Illuminate\Support\Carbon::parse($line->cheque_due_date)->thaiDate() }}@endif
+                    @elseif($line->method === 'transfer')@if($line->transfer_ref)อ้างอิง {{ $line->transfer_ref }}@endif @if($line->transfer_at)โอนเมื่อ {{ \Illuminate\Support\Carbon::parse($line->transfer_at)->format('d/m/Y H:i') }}@endif @if(! $line->transfer_ref && ! $line->transfer_at) - @endif
                     @else - @endif
                 </td>
                 <td class="r">{{ number_format((float) ($line->amount ?? 0), 2) }}</td>
