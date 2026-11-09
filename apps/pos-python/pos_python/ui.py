@@ -355,19 +355,18 @@ QLineEdit:focus, QComboBox:focus { border-color: $primary; }
 
 /* จอ POS 14-15 นิ้วมักเป็น 1366x768 — ลดเฉพาะ chrome ของหน้าจอ
    เพื่อเก็บพื้นที่ไว้ให้รายการสินค้าและบิล ไม่เปลี่ยนขนาดตัวเลขทางธุรกิจ */
-QMainWindow[compact="true"] #brandName { font-size: 15px; padding: 8px 0; }
-QMainWindow[compact="true"] #brandRight { font-size: 11px; }
-QMainWindow[compact="true"] QPushButton { padding: $compact_button_padding 8px; font-size: $compact_button_font; }
-QMainWindow[compact="true"] QPushButton#payBtn { font-size: $pay_font; padding: $pay_padding 8px; }
-QMainWindow[compact="true"] QLineEdit, QComboBox { padding: 6px 8px; font-size: 13px; }
+QMainWindow[compact="true"] #brandName { font-size: 16px; padding: 8px 0; }
+QMainWindow[compact="true"] #brandRight { font-size: 13px; }
+QMainWindow[compact="true"] QPushButton { padding: $compact_button_padding 10px; font-size: 16px; min-height: 48px; }
+QMainWindow[compact="true"] QPushButton#payBtn { font-size: 20px; padding: $pay_padding 12px; min-height: 58px; }
+QMainWindow[compact="true"] QLineEdit, QComboBox { padding: 6px 10px; font-size: 16px; }
 QMainWindow[compact="true"] QToolButton#tile { padding: $tile_padding; font-size: $tile_font; }
-QMainWindow[compact="true"] #grandTotal { font-size: 25px; }
-QMainWindow[compact="true"] #orderHead { padding: 5px 8px; }
-QMainWindow[compact="true"] #orderHead QLabel { font-size: 12px; }
-QMainWindow[compact="true"] QPushButton#headerAction { padding: 2px 5px; font-size: 11px; }
-QMainWindow[compact="true"] #totalBox { padding: 6px 10px; }
-QMainWindow[compact="true"] #grandTotal { font-size: 22px; }
-QMainWindow[compact="true"] #saleKeypad QPushButton { min-height: $keypad_height; padding: 2px 4px; font-size: 12px; }
+QMainWindow[compact="true"] #grandTotal { font-size: 34px; }
+QMainWindow[compact="true"] #orderHead { padding: 6px 10px; }
+QMainWindow[compact="true"] #orderHead QLabel { font-size: 14px; }
+QMainWindow[compact="true"] QPushButton#headerAction { padding: 4px 8px; font-size: 14px; }
+QMainWindow[compact="true"] #totalBox { padding: 8px 12px; }
+QMainWindow[compact="true"] #saleKeypad QPushButton { min-height: $keypad_height; padding: 4px 6px; font-size: 16px; }
 
 #orderPanel { background: $surface; border-right: 1px solid $border; }
 #orderHead { background: $primary_dark; color: $surface; padding: 6px 10px; font-weight: 700; }
@@ -1936,11 +1935,15 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             shell.setSpacing(0)
             shell.addWidget(self.build_runtime_topbar())
             tool_bar = QWidget()
-            tool_bar.setStyleSheet(f"background:{PALETTE['primary_dark']};")
+            tool_bar.setObjectName("jetToolStrip")
             tools = QHBoxLayout(tool_bar)
-            tools.setContentsMargins(8, 0, 8, 0)
-            for label, action in [("ประวัติบิล", self.show_history), ("เงินสดระหว่างกะ", self.record_cash_movement), ("ใบเสร็จล่าสุด", self.show_last_receipt)]:
-                tools.addWidget(self._top_button(label, label, action))
+            tools.setContentsMargins(12, 4, 12, 4)
+            tools.setSpacing(8)
+            for label, action in [("ประวัติบิล / คืนสินค้า", self.show_history), ("นำส่งเงินระหว่างกะ", self.record_cash_movement), ("พิมพ์ใบเสร็จล่าสุด", self.show_last_receipt)]:
+                btn = self._top_button(label, label, action)
+                btn.setMinimumHeight(48)
+                tools.addWidget(btn)
+            tools.addStretch(1)
             shell.addWidget(tool_bar)
             columns = QHBoxLayout()
             columns.setContentsMargins(0, 0, 0, 0)
@@ -2048,17 +2051,17 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             """แถบบนแบบ JET POS: ชื่อร้าน · สาขา/เครื่อง · กะ · ปุ่มลัดด้านขวา"""
             bar = QWidget()
             bar.setObjectName("jetTopbar")
-            bar.setFixedHeight(76)
+            bar.setFixedHeight(64)
             layout = QHBoxLayout(bar)
-            layout.setContentsMargins(14, 6, 10, 6)
-            layout.setSpacing(6)
+            layout.setContentsMargins(14, 6, 12, 6)
+            layout.setSpacing(8)
 
-            layout.addWidget(logo_label(height=48))
+            layout.addWidget(logo_label(height=44))
             brand = QVBoxLayout()
             brand.setSpacing(0)
             name = QLabel("JET POS")
             name.setObjectName("jetBrand")
-            tagline = QLabel("POINT OF SALE")
+            tagline = QLabel("MPM FOOD GROUP")
             tagline.setObjectName("jetTagline")
             brand.addWidget(name)
             brand.addWidget(tagline)
@@ -2073,7 +2076,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 block = QWidget()
                 block.setObjectName("jetContext")
                 block_layout = QVBoxLayout(block)
-                block_layout.setContentsMargins(14, 0, 14, 0)
+                block_layout.setContentsMargins(12, 0, 12, 0)
                 block_layout.setSpacing(0)
                 head = QLabel(caption)
                 head.setObjectName("jetContextCaption")
@@ -2081,7 +2084,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 main.setObjectName("jetContextValue")
                 block_layout.addWidget(head)
                 block_layout.addWidget(main)
-                block.setVisible(key == "show_shift")
+                block.setVisible(bool(self.layout_runtime.get(key, True)))
                 layout.addWidget(block)
                 self.runtime_context[key] = main
 
@@ -2095,7 +2098,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             layout.addWidget(self.auth_button)
             layout.addWidget(self._top_button("ปิดกะ", "นับเงิน ปิดกะ และพิมพ์ Z", self.close_current_shift))
             layout.addWidget(self._top_button("⏻ ปิดโปรแกรม", "เก็บตะกร้าก่อนปิด", self.close))
-            self.settings_button = self._top_button("⚙", "ตั้งค่าเครื่อง POS", self.open_settings)
+            self.settings_button = self._top_button("⚙ ตั้งค่า", "ตั้งค่าเครื่อง POS", self.open_settings)
             layout.addWidget(self.settings_button)
             return bar
 
@@ -2103,7 +2106,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             button = QPushButton(label)
             button.setObjectName("jetTopButton")
             button.setToolTip(tip)
-            button.setMinimumHeight(56)
+            button.setMinimumHeight(48)
             button.setCursor(Qt.PointingHandCursor)
             button.clicked.connect(action)
             return button
@@ -2138,9 +2141,10 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             layout.addWidget(self.cash_warning_label)
             head = QWidget()
             head.setObjectName("cartTitle")
-            head.setFixedHeight(48)
+            head.setFixedHeight(56)
             head_layout = QHBoxLayout(head)
             head_layout.setContentsMargins(14, 4, 10, 4)
+            head_layout.setSpacing(6)
             titles = QVBoxLayout()
             titles.setSpacing(0)
             small = QLabel("บิลปัจจุบัน")
@@ -2151,16 +2155,21 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             titles.addWidget(self.cart_title)
             head_layout.addLayout(titles)
             head_layout.addStretch(1)
+            hold = QPushButton("พักบิล")
+            hold.setObjectName("cartTitleButton")
+            hold.setMinimumHeight(48)
+            hold.clicked.connect(self.hold_order)
+            recall = QPushButton("เรียกบิล")
+            recall.setObjectName("cartTitleButton")
+            recall.setMinimumHeight(48)
+            recall.clicked.connect(self.recall_order)
             clear_header = QPushButton("ล้างบิล")
             clear_header.setObjectName("cartTitleButton")
+            clear_header.setMinimumHeight(48)
             clear_header.clicked.connect(self.clear_order)
-            head_layout.addWidget(clear_header)
-            hold = QPushButton("พัก")
-            hold.clicked.connect(self.hold_order)
-            recall = QPushButton("เรียก")
-            recall.clicked.connect(self.recall_order)
             head_layout.addWidget(hold)
             head_layout.addWidget(recall)
+            head_layout.addWidget(clear_header)
             layout.addWidget(head)
 
             pulse = QWidget()
@@ -2207,11 +2216,11 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             header.setSectionResizeMode(2, QHeaderView.Fixed)
             header.setSectionResizeMode(3, QHeaderView.Fixed)
             header.setSectionResizeMode(4, QHeaderView.Fixed)
-            self.table.setColumnWidth(0, 30)
-            self.table.setColumnWidth(2, 118)
-            self.table.setColumnWidth(3, 86)
-            self.table.setColumnWidth(4, 40)
-            self.table.verticalHeader().setDefaultSectionSize(54)
+            self.table.setColumnWidth(0, 32)
+            self.table.setColumnWidth(2, 136)
+            self.table.setColumnWidth(3, 96)
+            self.table.setColumnWidth(4, 48)
+            self.table.verticalHeader().setDefaultSectionSize(58)
             self.table.itemSelectionChanged.connect(self.on_line_selected)
             self.table.cellDoubleClicked.connect(lambda *_: self.open_line_editor())
             layout.addWidget(self.table, 1)
@@ -2226,6 +2235,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             edit_row.setSpacing(6)
             self.edit_line_button = QPushButton("แก้จำนวน / ราคา / ส่วนลด")
             self.edit_line_button.setObjectName("cartSecondary")
+            self.edit_line_button.setMinimumHeight(48)
             self.edit_line_button.clicked.connect(self.open_line_editor)
             edit_row.addWidget(self.edit_line_button, 1)
             layout.addLayout(edit_row)
@@ -2233,15 +2243,15 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             totals = QWidget()
             totals.setObjectName("totalBox")
             totals_layout = QVBoxLayout(totals)
-            totals_layout.setContentsMargins(16, 8, 16, 8)
-            totals_layout.setSpacing(2)
+            totals_layout.setContentsMargins(16, 10, 16, 10)
+            totals_layout.setSpacing(4)
             self.subtotal_label = QLabel()
             self.subtotal_label.setObjectName("totalLabel")
             self.vat_label = QLabel()
             self.vat_label.setObjectName("vatLine")
             grand_row = QHBoxLayout()
             grand_caption = QLabel("ยอดสุทธิ")
-            grand_caption.setObjectName("totalLabel")
+            grand_caption.setObjectName("totalPayableLabel")
             self.grand_label = QLabel()
             self.grand_label.setObjectName("grandTotal")
             self.grand_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
@@ -2255,7 +2265,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
             self.pay_button = QPushButton("รับชำระเงิน   F12")
             self.pay_button.setObjectName("payBtn")
-            self.pay_button.setMinimumHeight(54)
+            self.pay_button.setMinimumHeight(58)
             self.pay_button.clicked.connect(self.pay)
             pay_wrap = QHBoxLayout()
             pay_wrap.setContentsMargins(12, 8, 12, 6)
@@ -2371,16 +2381,16 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.scan = QLineEdit()
             self.scan.setObjectName("searchRow")
             self.scan.setPlaceholderText("⌕  สแกนบาร์โค้ด หรือค้นหาชื่อสินค้า")
-            self.scan.setMinimumHeight(46)
+            self.scan.setMinimumHeight(52)
             self.scan.returnPressed.connect(self.on_scan)
             self.scan.textChanged.connect(self.refresh_products)
             search_row = QHBoxLayout()
+            search_row.setSpacing(8)
             search_row.addWidget(self.scan, 1)
             self.clear_search = QPushButton("×")
             self.clear_search.setObjectName("clearSearch")
             self.clear_search.setAccessibleName("ล้างช่องค้นหาสินค้า")
             self.clear_search.setFixedSize(56, 56)
-            self.clear_search.setStyleSheet("font-size:28px;font-weight:800;")
             self.clear_search.clicked.connect(self.clear_product_search)
             search_row.addWidget(self.clear_search)
             layout.addLayout(search_row)
@@ -2391,8 +2401,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
             self.category_host = QWidget()
             self.category_bar = QHBoxLayout(self.category_host)
+            self.category_bar.setContentsMargins(0, 2, 0, 2)
             self.category_bar.setSpacing(8)
-            self.category_host.setVisible(False)
+            self.category_host.setVisible(True)
             layout.addWidget(self.category_host)
 
             self.grid_host = QWidget()
@@ -2427,6 +2438,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             group = QButtonGroup(self)
             for name in categories(service.db):
                 button = QPushButton(name)
+                button.setObjectName("catPill")
+                button.setMinimumHeight(48)
                 button.setCheckable(True)
                 button.setChecked(name == ALL_CATEGORIES)
                 button.clicked.connect(lambda _, value=name: self.set_category(value))
@@ -3517,7 +3530,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 qty_text.setAlignment(Qt.AlignCenter)
                 for button in (minus, plus):
                     button.setObjectName("qtyButton")
-                    button.setFixedSize(34, 34)
+                    button.setFixedSize(40, 40)
                     button.setEnabled(not line.locked_qty)
                 minus.clicked.connect(lambda _, i=index: self.change_line_qty(i, -1))
                 plus.clicked.connect(lambda _, i=index: self.change_line_qty(i, 1))
@@ -3530,7 +3543,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 self.table.setItem(row, 3, total)
                 delete = QPushButton("✕")
                 delete.setObjectName("voidBtn")
-                delete.setFixedSize(32, 32)
+                delete.setFixedSize(38, 38)
                 delete.setToolTip("ลบรายการ")
                 delete.clicked.connect(lambda _, i=index: self.delete_line(i))
                 self.table.setCellWidget(row, 4, delete)

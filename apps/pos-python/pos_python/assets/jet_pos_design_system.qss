@@ -202,10 +202,38 @@ QWidget#totalBox, QFrame#totalPayableBox {
     background-color: $brand_navy;
     border-radius: 8px;
 }
+#totalBox QLabel {
+    color: $surface;
+    font-size: 15px;
+    font-weight: 600;
+}
+#totalBox QLabel#totalPayableLabel {
+    color: $surface;
+    font-size: 18px;
+    font-weight: 800;
+}
 #totalBox QLabel#grandTotal, QLabel#totalPayableAmount {
     color: $payable_mint;
     font-size: 34px;
     font-weight: 900;
+}
+QLabel#qtyValue {
+    font-size: 16px;
+    font-weight: 800;
+}
+QPushButton#cartSecondary {
+    min-height: 48px;
+    font-size: 16px;
+    font-weight: 700;
+    border-radius: 8px;
+}
+QLabel#sectionTitle {
+    font-size: 17px;
+    font-weight: 800;
+}
+QLabel#pulseValue {
+    font-size: 16px;
+    font-weight: 800;
 }
 
 /* 6. On-Screen Numeric Keypad & PIN Dots */
