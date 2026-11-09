@@ -213,6 +213,13 @@ class StockCountController extends Controller
         $allowed = $request->user()?->roles()->whereIn('code', ['GM', 'BRANCH_MGR', 'IT_MGR'])->exists();
         abort_unless($allowed, 403, 'เฉพาะ Manager/Admin เท่านั้นที่ยืนยันปรับสต็อกได้');
         abort_unless($stockCount->status === 'review', 422, 'ต้องส่งตรวจสอบก่อนยืนยันปรับสต็อก');
+        // มาตรฐาน ERP: รายการที่ไม่ได้นับไม่ถูกปรับ ยกเว้นผู้จัดการติ๊กยืนยันให้ปรับเป็น 0 เองอย่างชัดเจน
+        if ($stockCount->count_mode === 'full_zero_missing') {
+            $uncounted = $stockCount->items()->whereNull('counted_qty')->count();
+            if ($uncounted > 0 && ! $request->boolean('confirm_zero_missing')) {
+                return back()->withErrors(['post' => "มี {$uncounted} รายการที่ยังไม่ได้นับ ถ้าจะให้ปรับเป็น 0 ผู้จัดการต้องติ๊กยืนยันก่อน"]);
+            }
+        }
         try {
             $document = $service->post($stockCount, $request->input('remark'));
         } catch (RuntimeException $e) {

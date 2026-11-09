@@ -300,6 +300,25 @@ class InventoryApprovalAndCloseTest extends TestCase
         }
     }
 
+    public function test_uncounted_items_are_zeroed_only_after_a_manager_ticks_to_confirm(): void
+    {
+        [$branch, $location, $product] = $this->masters();
+        DocumentType::create(['code' => 'STOCK_ADJUSTMENT', 'name_th' => 'ใบปรับสต๊อก']);
+        StockBalance::create(['product_id' => $product->id, 'warehouse_location_id' => $location->id, 'on_hand_qty' => 5, 'reserved_qty' => 0]);
+        $count = app(StockCountService::class)->create(['branch_id' => $branch->id, 'warehouse_location_id' => $location->id, 'count_mode' => 'full_zero_missing']);
+        $count->update(['status' => 'review']);
+        $manager = User::factory()->create(['branch_id' => $branch->id, 'is_active' => true, 'must_change_password' => false]);
+        $role = \App\Models\Role::firstOrCreate(['code' => 'BRANCH_MGR'], ['name' => 'ผจก.สาขา']);
+        $role->permissions()->syncWithoutDetaching(\App\Models\Permission::firstOrCreate(['code' => 'stock.manage'], ['name' => 'stock']));
+        $manager->roles()->attach($role);
+
+        $this->actingAs($manager)->post(route('stock-counts.post', $count))->assertSessionHasErrors('post');
+        $this->assertSame('review', $count->fresh()->status, 'ยังไม่ติ๊กยืนยัน ห้ามปรับรายการที่ไม่ได้นับ');
+
+        $this->actingAs($manager)->post(route('stock-counts.post', $count), ['confirm_zero_missing' => 1])->assertSessionHasNoErrors();
+        $this->assertNotSame('review', $count->fresh()->status);
+    }
+
     private function masters(): array
     {
         $branch = Branch::create(['code' => 'HQ', 'name_th' => 'สำนักงานใหญ่', 'is_active' => true]);
