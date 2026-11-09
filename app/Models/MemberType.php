@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['code', 'name', 'point_rate'])]
+#[Fillable(['code', 'name', 'point_rate', 'is_active'])]
 class MemberType extends Model
 {
     public $timestamps = false;
@@ -18,6 +18,9 @@ class MemberType extends Model
 
     protected function casts(): array
     {
-        return ['point_rate' => 'decimal:4'];
+        return [
+            'point_rate' => 'decimal:4',
+            'is_active' => 'boolean',
+        ];
     }
 }

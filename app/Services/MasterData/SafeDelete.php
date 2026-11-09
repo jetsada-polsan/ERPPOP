@@ -17,7 +17,7 @@ final class SafeDelete
     public const TYPES = [
         'customers' => ['customers', ['customer_id'], 'sales.manage'],
         'suppliers' => ['suppliers', ['supplier_id'], 'masterdata.manage'],
-        'product-units' => ['product_units', ['unit_id', 'base_unit_id'], 'masterdata.manage'],
+        'product-units' => ['product_units', ['unit_id', 'base_unit_id', 'matched_unit_id'], 'masterdata.manage'],
         'promotions' => ['promotions', ['promotion_id'], 'masterdata.manage'],
         'qty-promotions' => ['qty_promotions', ['qty_promotion_id'], 'masterdata.manage'],
         'price-tables' => ['price_tables', ['price_table_id'], 'masterdata.manage'],
@@ -28,6 +28,10 @@ final class SafeDelete
         'discount-cards' => ['discount_cards', ['discount_card_id'], 'masterdata.manage'],
         'member-points' => ['member_point_rules', ['member_point_rule_id'], 'masterdata.manage'],
         'product-categories' => ['product_categories', ['product_category_id'], 'masterdata.manage'],
+        'product-departments' => ['product_departments', ['product_department_id'], 'masterdata.manage'],
+        'product-brands' => ['product_brands', ['product_brand_id'], 'masterdata.manage'],
+        'sales-areas' => ['sales_areas', ['sales_area_id'], 'masterdata.manage'],
+        'member-types' => ['member_types', ['member_type_id'], 'masterdata.manage'],
         'branches' => ['branches', ['branch_id'], 'masterdata.manage'],
         'warehouses' => ['warehouses', ['warehouse_id'], 'masterdata.manage'],
     ];
@@ -57,7 +61,22 @@ final class SafeDelete
         [$table] = self::TYPES[$type] ?? throw new RuntimeException('ลบข้อมูลชนิดนี้ไม่ได้');
         $references = $this->references($type, $id);
         if ($references) {
-            throw new RuntimeException('มีประวัติใช้งานแล้ว ('.implode(', ', array_slice($references, 0, 3)).') ให้ปิดใช้งานแทนการลบ');
+            DB::transaction(function () use ($table, $id, $userId) {
+                $row = DB::table($table)->where('id', $id)->first();
+                if ($row && Schema::hasColumn($table, 'is_active')) {
+                    DB::table($table)->where('id', $id)->update(['is_active' => false]);
+                    AuditLog::create([
+                        'user_id' => $userId,
+                        'action' => 'master_deactivated',
+                        'table_name' => $table,
+                        'record_id' => $id,
+                        'old_values' => (array) $row,
+                        'new_values' => ['is_active' => false],
+                    ]);
+                }
+            });
+
+            throw new RuntimeException('มีประวัติใช้งานแล้ว ('.implode(', ', array_slice($references, 0, 3)).') ระบบจึงปิดใช้งานแทนการลบจริง');
         }
         DB::transaction(function () use ($table, $id, $userId) {
             $row = DB::table($table)->where('id', $id)->first();

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['code', 'name_th', 'name_en'])]
+#[Fillable(['code', 'name_th', 'name_en', 'is_active'])]
 class ProductDepartment extends Model
 {
     public $timestamps = false;
@@ -14,5 +14,10 @@ class ProductDepartment extends Model
     public function products(): HasMany
     {
         return $this->hasMany(Product::class, 'product_department_id');
+    }
+
+    protected function casts(): array
+    {
+        return ['is_active' => 'boolean'];
     }
 }
