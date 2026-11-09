@@ -56,14 +56,18 @@ final class SafeDelete
         return array_values(array_unique($found));
     }
 
-    public function delete(string $type, int $id, ?int $userId): void
+    /** @return string 'deleted' หรือ 'deactivated' (มีประวัติ จึงปิดใช้งานแทน) */
+    public function delete(string $type, int $id, ?int $userId): string
     {
         [$table] = self::TYPES[$type] ?? throw new RuntimeException('ลบข้อมูลชนิดนี้ไม่ได้');
         $references = $this->references($type, $id);
         if ($references) {
+            if (! Schema::hasColumn($table, 'is_active')) {
+                throw new RuntimeException('มีประวัติใช้งานแล้ว ('.implode(', ', array_slice($references, 0, 3)).') จึงลบไม่ได้');
+            }
             DB::transaction(function () use ($table, $id, $userId) {
                 $row = DB::table($table)->where('id', $id)->first();
-                if ($row && Schema::hasColumn($table, 'is_active')) {
+                if ($row) {
                     DB::table($table)->where('id', $id)->update(['is_active' => false]);
                     AuditLog::create([
                         'user_id' => $userId,
@@ -76,7 +80,7 @@ final class SafeDelete
                 }
             });
 
-            throw new RuntimeException('มีประวัติใช้งานแล้ว ('.implode(', ', array_slice($references, 0, 3)).') ระบบจึงปิดใช้งานแทนการลบจริง');
+            return 'deactivated';
         }
         DB::transaction(function () use ($table, $id, $userId) {
             $row = DB::table($table)->where('id', $id)->first();
@@ -86,5 +90,7 @@ final class SafeDelete
             DB::table($table)->where('id', $id)->delete();
             AuditLog::create(['user_id' => $userId, 'action' => 'master_deleted', 'table_name' => $table, 'record_id' => $id, 'old_values' => (array) $row]);
         });
+
+        return 'deleted';
     }
 }
