@@ -61,14 +61,14 @@ class PermissionMatrixTest extends TestCase
         $expected = [
             'ACC' => 'finance.manage reports.export reports.view',
             'ACC_MGR' => 'budget.manage documents.void finance.credit.approve finance.manage finance.note.approve management.view masterdata.manage reports.all_branches reports.export reports.view',
-            'BRANCH_MGR' => 'documents.void inventory.cost.close inventory.quality.manage pos.cash.manage pos.discount.override pos.sell_below_cost pos.use pos.void purchasing.approve purchasing.manage reports.export reports.view sales.assign sales.manage sales.return.unreferenced stock.adjust.approve stock.damage.approve stock.manage stock.request transport.manage',
+            'BRANCH_MGR' => 'documents.void inventory.cost.close inventory.quality.manage pos.cash.manage pos.discount.override pos.sell_below_cost pos.use pos.void purchasing.approve purchasing.manage reports.export reports.view sales.assign sales.manage sales.return.unreferenced sales.stock_shortage.approve stock.adjust.approve stock.damage.approve stock.manage stock.request transport.manage',
             'CASHIER' => 'pos.sell pos.use stock.request',
             'DELIVERY' => '',
             'EXECUTIVE' => 'reports.all_branches reports.export reports.view',
-            'GM' => 'budget.approve budget.manage documents.void ecommerce.sync finance.credit.approve finance.manage finance.note.approve inventory.cost.close inventory.quality.manage management.view masterdata.manage monitoring.manage payroll.approve payroll.manage pos.cash.manage pos.discount.override pos.sell pos.sell_below_cost pos.use pos.void purchasing.approve purchasing.manage reports.all_branches reports.export reports.view sales.assign sales.manage sales.return.unreferenced settings.manage stock.adjust.approve stock.damage.approve stock.manage transport.manage users.manage',
+            'GM' => 'budget.approve budget.manage documents.void ecommerce.sync finance.credit.approve finance.manage finance.note.approve inventory.cost.close inventory.quality.manage management.view masterdata.manage monitoring.manage payroll.approve payroll.manage pos.cash.manage pos.discount.override pos.sell pos.sell_below_cost pos.use pos.void purchasing.approve purchasing.manage reports.all_branches reports.export reports.view sales.assign sales.manage sales.return.unreferenced sales.stock_shortage.approve settings.manage stock.adjust.approve stock.damage.approve stock.manage transport.manage users.manage',
             'HR' => 'reports.view',
             'HR_MGR' => 'management.view payroll.manage reports.view users.manage',
-            'IT_MGR' => 'documents.void ecommerce.sync management.view masterdata.manage monitoring.manage pos.cash.manage pos.sell pos.use pos.void purchasing.manage reports.all_branches reports.export reports.view settings.manage transport.manage users.manage',
+            'IT_MGR' => 'documents.void ecommerce.sync management.view masterdata.manage monitoring.manage pos.cash.manage pos.sell pos.use pos.void purchasing.manage reports.all_branches reports.export reports.view sales.stock_shortage.approve settings.manage transport.manage users.manage',
             'MARKETING' => 'ecommerce.sync management.view masterdata.manage reports.view',
             'PURCHASING' => 'management.view masterdata.manage purchasing.manage reports.export reports.view',
             'SALES' => 'reports.view sales.manage stock.request',
@@ -83,7 +83,7 @@ class PermissionMatrixTest extends TestCase
         $this->assertSame($expected, $actual);
 
         $permissionCodes = Permission::query()->orderBy('code')->pluck('code')->all();
-        $this->assertCount(35, $permissionCodes);
+        $this->assertCount(36, $permissionCodes);
     }
 
     public function test_every_role_permission_pair_has_the_expected_effective_result(): void

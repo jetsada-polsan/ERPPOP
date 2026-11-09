@@ -55,6 +55,9 @@ class CreditSaleService
             if ($lockedBooking->status !== SaleBooking::STATUS_PENDING) {
                 throw new RuntimeException("ใบจองนี้ถูกใช้ไปแล้ว (สถานะปัจจุบัน: {$lockedBooking->status})");
             }
+            if ($lockedBooking->stock_shortage_status === 'pending') {
+                throw new RuntimeException('ใบจองนี้สต๊อกในระบบไม่พอ ต้องให้ผู้จัดการยืนยันใน ERP ก่อนออกใบขาย');
+            }
 
             $bookingDocument = $lockedBooking->document()->with('stockDocument.items')->firstOrFail();
             $sourceItems = $bookingDocument->stockDocument?->items ?? collect();
@@ -148,7 +151,8 @@ class CreditSaleService
                     (int) $item->warehouse_location_id,
                     $qty,
                     $saleDocument->id,
-                    allowNegative: $branch->allowsNegativeStock()
+                    // ผู้จัดการยืนยันแล้วว่าของจริงมี: ยอมให้สต๊อกติดลบชั่วคราวจนกว่าจะรับเข้า/ปรับยอด
+                    allowNegative: $booking->stock_shortage_status === 'approved' || $branch->allowsNegativeStock()
                         && $this->negativeStockPolicy->policyFor($products->get($productId)) === 'allow'
                         && ($products->get($productId)?->negative_stock_policy ?? 'allow') === 'allow',
                 );

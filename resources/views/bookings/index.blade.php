@@ -186,6 +186,7 @@
         'itemTitle' => 'รายการจอง',
         'submitLabel' => 'บันทึกใบจอง',
         'remarkPlaceholder' => 'เงื่อนไขส่งของ / หมายเหตุการจอง',
+        'allowStockShortage' => true,
     ])
 </div>
 @endsection

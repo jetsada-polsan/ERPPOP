@@ -338,6 +338,47 @@ class SalesDocumentEndToEndTest extends TestCase
         }
     }
 
+    public function test_a_short_booking_needs_a_manager_to_confirm_in_erp_before_billing_and_may_go_negative(): void
+    {
+        [$branch, $location, $product, $customer] = $this->stockedBranch('SHORT', qty: 2, unitCost: 60, withCustomer: true);
+        $service = app(BookingService::class);
+        $items = [['product_id' => $product->id, 'qty' => 5, 'unit_price' => 100]];
+
+        try {
+            $service->create(['branch_id' => $branch->id, 'customer_id' => $customer->id, 'items' => $items]);
+            $this->fail('สต๊อกไม่พอและไม่ได้ขอ ต้องบันทึกไม่ได้');
+        } catch (\RuntimeException) {
+        }
+
+        $doc = $service->create(['branch_id' => $branch->id, 'customer_id' => $customer->id, 'items' => $items, 'allow_stock_shortage' => true]);
+        $booking = SaleBooking::where('document_id', $doc->id)->sole();
+        $this->assertSame('pending', $booking->stock_shortage_status);
+
+        try {
+            app(CreditSaleService::class)->convertBookingToCreditSale($booking);
+            $this->fail('ยังไม่ได้ยืนยัน ห้ามออกใบขาย');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('ผู้จัดการ', $e->getMessage());
+        }
+
+        $clerk = User::factory()->create(['branch_id' => $branch->id, 'is_active' => true, 'must_change_password' => false]);
+        $clerkRole = Role::create(['code' => 'SALES_T', 'name' => 'ขาย']);
+        $clerkRole->permissions()->attach(Permission::firstOrCreate(['code' => 'sales.manage'], ['name' => 'sales']));
+        $clerk->roles()->attach($clerkRole);
+        $this->actingAs($clerk)->post(route('bookings.approve-stock-shortage', $booking))->assertForbidden();
+
+        $manager = User::factory()->create(['branch_id' => $branch->id, 'is_active' => true, 'must_change_password' => false]);
+        $managerRole = Role::firstOrCreate(['code' => 'BRANCH_MGR'], ['name' => 'ผจก.']);
+        $managerRole->permissions()->syncWithoutDetaching(Permission::firstOrCreate(['code' => 'sales.manage'], ['name' => 'sales']));
+        $manager->roles()->attach($managerRole);
+        $this->actingAs($manager)->post(route('bookings.approve-stock-shortage', $booking))->assertRedirect();
+        $this->assertSame('approved', $booking->fresh()->stock_shortage_status);
+
+        app(CreditSaleService::class)->convertBookingToCreditSale($booking->fresh());
+        $balance = StockBalance::where('product_id', $product->id)->where('warehouse_location_id', $location->id)->sole();
+        $this->assertSame(-3.0, (float) $balance->on_hand_qty, 'อนุมัติแล้วสต๊อกติดลบชั่วคราวได้');
+    }
+
     private function stockedBranch(string $suffix, float $qty, float $unitCost, bool $withCustomer = false): array
     {
         DocumentType::firstOrCreate(['code' => 'PURCHASE'], ['name_th' => 'ใบซื้อ', 'stock_effect' => 'in']);

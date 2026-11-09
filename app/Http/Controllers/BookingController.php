@@ -159,6 +159,7 @@ class BookingController extends Controller
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'items.*.qty' => ['required', 'numeric', 'min:0.0001'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'allow_stock_shortage' => ['nullable', 'boolean'],
         ]);
 
         $user = $request->user()->loadMissing('salesArea');
@@ -343,6 +344,25 @@ class BookingController extends Controller
         }
 
         return redirect()->route('bookings.show', $booking)->with('success', 'ยกเลิกใบจองแล้ว คืนยอดจองให้สต๊อก');
+    }
+
+    /** ผู้จัดการยืนยันใน ERP ว่าของจริงมี แม้สต๊อกในระบบไม่พอ */
+    public function approveStockShortage(Request $request, SaleBooking $booking): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user->hasPermission('sales.stock_shortage.approve'), 403, 'เฉพาะผู้จัดการที่มีสิทธิ์อนุมัติสต๊อกไม่พอเท่านั้น');
+        abort_unless($user->canAccessBranch((int) $booking->document->branch_id), 403);
+        if ($booking->stock_shortage_status !== 'pending') {
+            return redirect()->route('bookings.show', $booking)->with('error', 'ใบจองนี้ไม่ได้รออนุมัติสต๊อก');
+        }
+        $booking->update([
+            'stock_shortage_status' => 'approved',
+            'stock_shortage_approved_by' => $user->id,
+            'stock_shortage_approved_at' => now(),
+        ]);
+
+        return redirect()->route('bookings.show', $booking)
+            ->with('success', 'ยืนยันแล้ว ออกใบขายได้ สต๊อกจะติดลบชั่วคราวจนกว่าจะรับเข้าหรือปรับยอด');
     }
 
     public function convert(Request $request, SaleBooking $booking, CreditSaleService $service): RedirectResponse

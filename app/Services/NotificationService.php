@@ -64,6 +64,13 @@ class NotificationService
                 route('purchase-orders.index', ['status' => 'requested']));
         }
 
+        // เฉพาะผู้มีสิทธิ์อนุมัติ: ใบจองที่สต๊อกในระบบไม่พอ รอยืนยัน
+        if ($user->hasPermission('sales.stock_shortage.approve')) {
+            $this->push($items, 'bi-exclamation-triangle-fill', '#dc2626', 'ใบจองสต๊อกไม่พอ รอผู้จัดการยืนยัน',
+                DB::table('sale_bookings')->where('stock_shortage_status', 'pending')->count(),
+                route('bookings.index'));
+        }
+
         // งานขาย: ใบจองค้างแปลง / ใบเสนอราคารอลูกค้าตอบ
         if ($user->hasPermission('sales.manage')) {
             $this->push($items, 'bi-receipt-cutoff', '#2563eb', 'ใบจองค้างแปลงขาย',

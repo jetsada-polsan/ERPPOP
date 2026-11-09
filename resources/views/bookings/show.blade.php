@@ -26,6 +26,20 @@ $canEdit = $isPending && $booking->delivery_status === 'pending'
     <i class="bi bi-arrow-left me-1"></i> กลับรายการใบจอง
 </a>
 
+@if($booking->stock_shortage_status)
+<div class="alert {{ $booking->stock_shortage_status === 'pending' ? 'alert-danger' : 'alert-success' }} d-flex flex-wrap align-items-center gap-3">
+    <div class="flex-grow-1">
+        <b>{{ $booking->stock_shortage_status === 'pending' ? 'สต๊อกในระบบไม่พอ — รอผู้จัดการยืนยันว่าของจริงมี' : 'ผู้จัดการยืนยันสต๊อกแล้ว' }}</b>
+        <div class="small" style="white-space:pre-line">{{ $booking->stock_shortage_note }}</div>
+    </div>
+    @if($booking->stock_shortage_status === 'pending' && auth()->user()?->hasPermission('sales.stock_shortage.approve'))
+    <form method="post" action="{{ route('bookings.approve-stock-shortage', $booking) }}" data-confirm="ยืนยันว่าของจริงมีครบ? สต๊อกในระบบจะติดลบชั่วคราว">@csrf
+        <button class="btn btn-danger"><i class="bi bi-shield-check me-1"></i>ผู้จัดการยืนยัน ของจริงมี</button>
+    </form>
+    @endif
+</div>
+@endif
+
 {{-- Flow status bar --}}
 <div class="content-card p-4 mb-4">
     <div class="d-flex align-items-center gap-0 mb-4 flex-wrap">

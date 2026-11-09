@@ -155,6 +155,12 @@
                                 <input type="text" name="remark" value="{{ old('remark', $initialRemark ?? '') }}" class="doc-input" placeholder="{{ $remarkPlaceholder ?? 'เช่น เลขอ้างอิง เงื่อนไข หรือหมายเหตุภายใน' }}">
                             </div>
                         </details>
+                        @if(! empty($allowStockShortage))
+                        <label class="d-flex align-items-start gap-2 mt-2 small">
+                            <input type="checkbox" name="allow_stock_shortage" value="1" class="form-check-input mt-1" @checked(old('allow_stock_shortage'))>
+                            <span>สต๊อกในระบบไม่พอแต่ของจริงมี — บันทึกไว้ก่อน แล้วให้ผู้จัดการยืนยันใน ERP ก่อนออกใบขาย</span>
+                        </label>
+                        @endif
                     </div>
 
                     <div class="doc-card doc-card-pad">

@@ -62,6 +62,7 @@ class BookingService
                 fn ($rows) => DecimalMath::sum($rows->pluck('qty'), DecimalMath::QUANTITY_SCALE)
             );
             $balances = [];
+            $shortages = [];
 
             // Lock each balance before reserving so concurrent bookings cannot
             // consume the same available quantity. Duplicate rows are checked as
@@ -76,6 +77,13 @@ class BookingService
                 $availableRaw = DecimalMath::subtract($onHand, $reserved, DecimalMath::QUANTITY_SCALE);
                 $available = DecimalMath::compare($availableRaw, 0) < 0 ? '0' : $availableRaw;
                 if (DecimalMath::compare($requestedQty, $available) > 0) {
+                    // ของจริงมีแต่ระบบไม่พอ: บันทึกได้ถ้าผู้ขายขอ แต่ต้องรอผู้จัดการยืนยันก่อนออกใบขาย
+                    if (! empty($data['allow_stock_shortage'])) {
+                        $product = Product::find($productId);
+                        $shortages[] = ($product?->name_th ?? "#{$productId}")." ขาด ".DecimalMath::subtract($requestedQty, $available, DecimalMath::QUANTITY_SCALE);
+                        $balances[$productId] = $balance;
+                        continue;
+                    }
                     throw new RuntimeException($this->availabilityError(
                         Product::with('baseUnit')->find($productId),
                         $productId,
@@ -116,6 +124,8 @@ class BookingService
                 'fulfillment_type' => $data['fulfillment_type'],
                 'delivery_due_at' => $data['delivery_due_at'] ?? null,
                 'delivery_status' => SaleBooking::DELIVERY_PENDING,
+                'stock_shortage_status' => $shortages ? 'pending' : null,
+                'stock_shortage_note' => $shortages ? implode("\n", $shortages) : null,
             ]);
 
             $stockDocument = StockDocument::create([
