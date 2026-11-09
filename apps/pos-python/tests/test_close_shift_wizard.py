@@ -48,12 +48,13 @@ def test_wizard_steps_geometry_blind_and_repreview(scene):
     for index in range(4):
         assert d.steps.currentIndex() == index
         app.processEvents()
-        assert d.size().width() == 1024 and d.size().height() == 768
-        assert d.coins.verticalScrollBar().maximum() == 0
+        assert d.width() <= 900 and d.height() <= 680
+        assert all(d.coins.rowHeight(row) >= entry.minimumSizeHint().height()
+                   for row, entry in enumerate(d.coin_fields))
         for button in d.findChildren(QPushButton):
             if button.isVisible():
                 top = button.mapTo(d, QPoint(0, 0))
-                assert top.y() >= 0 and top.y() + button.height() <= 768
+                assert top.y() >= 0 and top.y() + button.height() <= d.height()
         if index < 3: d.advance()
     assert api.post.call_count == 2
     d.previous(); assert d.steps.currentIndex() == 2
@@ -72,4 +73,30 @@ def test_coin_keypad_returns_to_total(scene):
     assert d.pad.target is d.coin_fields[0]
     d.amount.setFocus(); app.processEvents()
     assert d.pad.target is d.amount
+    d.reject()
+
+
+def test_close_workspace_fits_screen_and_drop_navigation(scene):
+    app, _, _, w, api = scene
+    d = w.dialog_types['float_closing'](w, FloatClose(api, POLICY, 91), POLICY)
+    d.show(); app.processEvents()
+    available = d.screen().availableGeometry()
+    assert available.contains(d.frameGeometry())
+    d.navigate(1); app.processEvents()
+    for size in (0, 1, 4, 5):
+        d.drop_rows = [dict(amount='100', reference_no='BAG', reason='นำส่ง')] * size
+        d.drop_page = 0
+        d.show_drops(0); app.processEvents()
+        assert all(button.isVisible() == (size > 4) for button in d.drop_buttons)
+    assert not d.drop_buttons[0].isEnabled()
+    assert d.drop_buttons[1].isEnabled()
+    d.drop_buttons[1].click()
+    assert d.drop_page == 1
+    assert d.drop_buttons[0].isEnabled()
+    assert not d.drop_buttons[1].isEnabled()
+    for index in range(4):
+        d.navigate(index); app.processEvents()
+        for button in (d.back, d.submit if index == 3 else d.next):
+            assert d.rect().contains(button.mapTo(d, QPoint(0, 0)))
+            assert d.rect().contains(button.mapTo(d, button.rect().bottomRight()))
     d.reject()

@@ -1744,10 +1744,11 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 self.difference.setText(f"ต้องส่งบิลค้าง {pending} ใบขึ้น ERP ก่อนปิดกะ")
 
     class FloatCloseDialog(TouchDialog):
-        """One full-window workspace; all monetary previews remain server authoritative."""
+        """Resizable close workspace; monetary previews remain server authoritative."""
         def __init__(self, parent, protocol, policy):
             super().__init__(parent, "ปิดกะขาย", "ปิดกะ: นับเงินในลิ้นชักทั้งหมด → ตรวจยอด → แยกเงิน → ยืนยันและพิมพ์ใบปิดกะ")
-            self.setFixedSize(1024, 768)
+            self.setMinimumSize(0, 0)
+            self.resize(900, 680)
             self.body.setContentsMargins(12, 8, 12, 8)
             self.body.setSpacing(6)
             self.protocol = protocol
@@ -1769,12 +1770,18 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 pill = QLabel(step_title)
                 pill.setObjectName("stepPill")
                 pill.setAlignment(Qt.AlignCenter)
-                pill.setFixedHeight(32)
+                pill.setWordWrap(True)
+                pill.setMinimumHeight(32)
+                pill.setMinimumWidth(0)
                 self.step_pills.append(pill)
                 stepper_row.addWidget(pill, 1)
             self.body.addLayout(stepper_row)
             self.steps = QStackedWidget()
-            self.body.addWidget(self.steps, 1)
+            self.content_scroll = QScrollArea()
+            self.content_scroll.setWidgetResizable(True)
+            self.content_scroll.setFrameShape(QFrame.NoFrame)
+            self.content_scroll.setWidget(self.steps)
+            self.body.addWidget(self.content_scroll, 1)
             for _ in range(4):
                 page = QWidget()
                 page_layout = QVBoxLayout()
@@ -1790,17 +1797,18 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.coins.setHorizontalHeaderLabels(['ชนิด (บาท)', 'จำนวน', 'ยอด'])
             self.coins.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
             self.coins.verticalHeader().hide()
-            self.coins.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            self.coins.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            self.coins.setMinimumHeight(180)
             self.coin_fields = []
             for row, value in enumerate(('1000','500','100','50','20','10','5','2','1','0.50','0.25')):
                 self.coins.setItem(row, 0, QTableWidgetItem(value))
                 self.coins.item(row, 0).setFlags(Qt.ItemIsEnabled)
                 entry = QLineEdit('0')
-                entry.setStyleSheet('min-height:26px; font-size:17px;')
+                entry.setStyleSheet('min-height:28px; font-size:18px; padding:2px 4px;')
                 entry.installEventFilter(self)
                 self.coin_fields.append(entry)
                 self.coins.setCellWidget(row, 1, entry)
-                self.coins.setRowHeight(row, 34)
+                self.coins.setRowHeight(row, max(40, entry.minimumSizeHint().height() + 4))
                 entry.textChanged.connect(self.denominations)
             columns.addWidget(self.coins, 3)
             right = QVBoxLayout()
@@ -1833,9 +1841,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             review.addWidget(self.drop_list)
             drop_nav = QHBoxLayout()
             review.addLayout(drop_nav)
-            for caption, delta in [('รายการก่อนหน้า', -1), ('รายการถัดไป', 1)]:
+            self.drop_buttons = []
+            for caption, delta in [('◀ รายการนำส่งก่อนหน้า', -1), ('รายการนำส่งถัดไป ▶', 1)]:
                 button = QPushButton(caption)
                 button.setObjectName("btnTouchSecondary")
+                button.setStyleSheet("min-height:32px; font-size:14px; padding:2px 8px;")
+                self.drop_buttons.append(button)
                 button.clicked.connect(lambda checked=False, delta=delta: self.show_drops(delta))
                 drop_nav.addWidget(button)
             self.show_drops(0)
@@ -1858,6 +1869,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             split_page.addWidget(self.deposit)
             self.summary = QLabel()
             self.summary.setWordWrap(True)
+            self.summary.setStyleSheet("font-size:26px;")
             self.steps.widget(3).layout().addWidget(self.summary)
             self.steps.widget(3).layout().addStretch()
             actions = QHBoxLayout()
@@ -1883,8 +1895,23 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.invalidate()
             self.navigate(0)
 
+        def showEvent(self, event):
+            available = self.screen().availableGeometry().adjusted(16, 16, -16, -16)
+            self.setMaximumSize(available.size())
+            self.resize(min(900, available.width()), min(680, available.height()))
+            super().showEvent(event)
+            center = self.parentWidget().window().frameGeometry().center()
+            frame = self.frameGeometry()
+            frame.moveCenter(center)
+            frame.moveLeft(max(available.left(), min(frame.left(), available.right() - frame.width() + 1)))
+            frame.moveTop(max(available.top(), min(frame.top(), available.bottom() - frame.height() + 1)))
+            self.move(frame.topLeft())
+
         def show_drops(self, delta):
             self.drop_page = max(0, min(self.drop_page + delta, max(0, (len(self.drop_rows) - 1) // 4)))
+            for index, button in enumerate(self.drop_buttons):
+                button.setVisible(len(self.drop_rows) > 4)
+                button.setEnabled(self.drop_page > 0 if index == 0 else (self.drop_page + 1) * 4 < len(self.drop_rows))
             rows = self.drop_rows[self.drop_page * 4:self.drop_page * 4 + 4]
             self.drop_list.setText('\n'.join(
                 f"{cash(row['amount']):,.2f} บาท · ซอง {row['reference_no'] or '-'} · {row['reason'][:70]}"
@@ -1898,7 +1925,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         def set_pad_target(self, field):
             self.pad.target = field
             for entry in self.coin_fields:
-                entry.setStyleSheet('min-height:28px; font-size:18px;' + ('background:#dbeafe;' if entry is field else ''))
+                entry.setStyleSheet('min-height:28px; font-size:18px; padding:2px 4px;' + ('background:#dbeafe;' if entry is field else ''))
             field.selectAll()
 
         def default_kept(self):
@@ -1957,6 +1984,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
         def navigate(self, index):
             self.steps.setCurrentIndex(index)
+            self.content_scroll.verticalScrollBar().setValue(0)
             for idx, pill in enumerate(getattr(self, "step_pills", [])):
                 pill.setProperty("active", "true" if idx == index else "false")
                 pill.style().unpolish(pill)

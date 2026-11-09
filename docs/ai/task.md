@@ -2813,3 +2813,14 @@ pending
 - Deploy — ยังไม่ deploy หรือ build release
 - งานถัดไป — UAT Windows ตรวจเวลาใบเสร็จ/พิมพ์ซ้ำ/Z และบิลโอนที่ส่ง ERP ตามการอนุญาตของเจ้าของ
 - ผลยืนยันหลังคืน mutation ทั้งหมด — suite เต็มรอบสุดท้ายผ่าน **426 passed / 62.28s**, exit 0. `git diff --check` รอบส่งมอบผ่าน
+
+## Handoff - 2026-11-09 (Codex: close-shift UI)
+- Commit: ไม่มี commit/push ตาม `docs/ai/codex-close-shift-ui.md` ให้ Claude ทำต่อ; HEAD `2d10e63`. `git pull origin main` ถูก sandbox ปฏิเสธ FETCH_HEAD ใน Git metadata ภายนอก writable roots. รักษาไฟล์/ภาพที่เปลี่ยนค้างก่อนเริ่มงานไว้
+- ทำอะไร: แก้เฉพาะ presentation ของ FloatCloseDialog ใน `apps/pos-python/pos_python/ui.py`: ยกเลิก fixed 1024×768 เป็นหน้าต่างกลาง parent ขนาดไม่เกิน 900×680 และจำกัดตาม available screen พร้อม margin; step pills wrap ได้, เนื้อหาเลื่อนได้แยกจากปุ่มล่าง. แถวตารางอิง minimumSizeHint ของช่องกรอกและอนุญาตเลื่อนทั้ง 11 ชนิด; style ตอน focus ใช้ padding เดียวกัน. ปุ่มรายการนำส่งเป็น secondary ขนาดเล็กและข้อความตาม brief อยู่ใต้รายการ ซ่อนเมื่อไม่ต้องแบ่งหน้า (0–4 รายการ; pagination เดิมหน้าละ 4) พร้อม disable ปุ่มที่ถึงขอบ. สรุปขั้น 4 ใช้ 26px เท่าขั้น 2
+- ขอบเขต: ไม่แก้การคำนวณเงิน, protocol preview/close, กะ, sync หรือฐานข้อมูล; ไม่สร้าง PIN/token และไม่เรียก production
+- ทดสอบ: suite เต็ม `cd apps/pos-python && QT_QPA_PLATFORM=offscreen /private/tmp/pos-091-py312/bin/python -m pytest -q` ผ่าน **428 passed / 73.70s**. ปรับ geometry assertions เดิมตาม UI ใหม่; เพิ่ม regression เรื่อง fit screen/ปุ่มขั้นตอนทุกหน้า/รายการนำส่ง 0,1,4,5 และขอบ pagination หลังเริ่ม suite เต็ม แล้วรัน `QT_QPA_PLATFORM=offscreen QT_SCALE_FACTOR=1.25 PYTHONPATH=apps/pos-python /private/tmp/pos-091-py312/bin/python -m pytest apps/pos-python/tests/test_close_shift_wizard.py -q` ผ่าน **5 passed** รวมเคสใหม่
+- ภาพ: รัน `PYTHONPATH=apps/pos-python QT_QPA_PLATFORM=offscreen /private/tmp/pos-091-py312/bin/python apps/pos-python/tools/capture_shift_float.py` สำเร็จ อัปเดตชุด shift-float และตรวจภาพ closing ทั้งสี่ขั้นด้วยตา; ตารางเลื่อนได้ ปุ่มล่างอยู่ครบ และหน้าตรวจยอดไม่มีปุ่มรายการซ้ำใน fixture ที่ไม่มีนำส่ง
+- ตรวจเพิ่มเติม: `git diff --check` ผ่าน. `php artisan test` เริ่มไม่ได้ (exit 255) เพราะไม่มี vendor/autoload.php; ไม่มี PHP/Vue เปลี่ยน
+- ยังไม่ทดสอบ/ความเสี่ยง: scaling 125% ตรวจด้วย Qt offscreen; ยังต้อง UAT บน Windows จริง/จอสัมผัสจริง
+- Deploy: ยังไม่ deploy / ไม่ build release
+- งานถัดไป: Claude ตรวจ diff และ commit/push ตามคำสั่งเจ้าของ โดยแยกภาพ/brief ที่เปลี่ยนค้างก่อนเริ่มงานให้ถูกขอบเขต
