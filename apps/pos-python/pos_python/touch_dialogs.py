@@ -12,25 +12,39 @@ class TouchDialog(QDialog):
         super().__init__(parent)
         from .ui import PALETTE
         p = palette or PALETTE
+        navy = p.get('brand_navy', p['primary_dark'])
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
         self.setWindowModality(Qt.WindowModal)
         self.setWindowTitle(title)
         self.setMinimumWidth(480)
-        self.setStyleSheet(f'''QDialog {{ background:{p['surface']}; border:1px solid {p['border']}; border-radius:18px; }}
-            QLabel {{ font-size:16px; }} QLineEdit {{ min-height:44px; font-size:24px; }}
-            QPushButton {{ min-height:56px; font-size:18px; }}
-            QFrame#touchHeader {{ background:{p['primary_dark']}; border-radius:12px; }}
-            QFrame#touchHeader QLabel {{ color:{p['surface']}; background:transparent; }}''')
+        self.setStyleSheet(f'''QDialog {{ background:{p['surface']}; border:1px solid {p['border']}; border-radius:16px; }}
+            QLabel {{ font-size:16px; color:{p['text']}; }} QLineEdit {{ min-height:44px; font-size:24px; }}
+            QPushButton {{ min-height:56px; font-size:18px; font-weight:700; border-radius:10px; }}
+            QPushButton#primary, QPushButton#btnTouchPrimary {{ background:{p['primary']}; color:{p['surface']}; border:1px solid {p['primary']}; font-weight:800; }}
+            QPushButton#btnCheckoutPrimary {{ background:{p['success']}; color:{p['surface']}; border:1px solid {p['success']}; font-weight:800; }}
+            QPushButton#btnTouchSecondary {{ background:{p['surface']}; color:{p['text']}; border:1px solid {p['field']}; font-weight:700; }}
+            QPushButton#btnTouchDanger {{ background:{p['danger_soft']}; color:{p.get('danger_btn', p['danger'])}; border:1px solid {p['danger_light']}; font-weight:800; }}
+            QFrame#touchHeader {{ background:{navy}; border-radius:12px; }}
+            QFrame#touchHeader QLabel {{ color:{p['surface']}; background:transparent; font-size:17px; font-weight:800; }}
+            QFrame#touchHeader QPushButton {{ background:transparent; color:{p['surface']}; border:1px solid {p['primary']}; border-radius:10px; font-size:22px; font-weight:800; }}
+            QFrame#dialogNoticeBox {{ background:{p['primary_soft']}; border-left:6px solid {p['primary']}; border-radius:10px; padding:12px 14px; }}
+            QFrame#dialogNoticeBox[tone="warning"] {{ background:{p['warning_soft']}; border-left:6px solid {p['warning']}; }}
+            QFrame#dialogNoticeBox[tone="danger"] {{ background:{p['danger_soft']}; border-left:6px solid {p.get('danger_btn', p['danger'])}; }}
+            QFrame#dialogNoticeBox[tone="success"] {{ background:{p['success_soft']}; border-left:6px solid {p['success']}; }}''')
         self.body = QVBoxLayout(self)
         self.body.setSpacing(12)
         header = QFrame()
         header.setObjectName('touchHeader')
         row = QHBoxLayout(header)
+        row.setContentsMargins(14, 10, 10, 10)
         caption = QLabel(f'◆ {title}\n{subtitle}')
+        caption.setObjectName('touchHeaderTitle')
         caption.setWordWrap(True)
         row.addWidget(caption, 1)
         close = QPushButton('×')
-        close.setFixedWidth(64)
+        close.setObjectName('btnModalClose')
+        close.setFixedWidth(56)
+        close.setMinimumHeight(56)
         close.setAutoDefault(False)
         close.clicked.connect(self.reject)
         row.addWidget(close)
@@ -265,28 +279,55 @@ class TouchMessage:
     No = 0
 
     @staticmethod
-    def information(parent, title, text):
-        dialog = TouchDialog(parent, title)
+    def _notice(parent, title, text, subtitle='ข้อความแจ้งเตือนจากระบบ', tone='info'):
+        dialog = TouchDialog(parent, title, subtitle)
+        box = QFrame()
+        box.setObjectName('dialogNoticeBox')
+        box.setProperty('tone', tone)
+        box_layout = QVBoxLayout(box)
+        box_layout.setContentsMargins(14, 12, 14, 12)
         label = QLabel(text)
         label.setWordWrap(True)
         label.setMaximumWidth(700)
-        dialog.body.addWidget(label)
-        dialog.confirm('ตกลง').setDefault(True)
+        label.setStyleSheet('font-size:17px; font-weight:600;')
+        box_layout.addWidget(label)
+        dialog.body.addWidget(box)
+        ok_btn = dialog.confirm('ตกลง')
+        ok_btn.setObjectName('btnTouchPrimary')
+        ok_btn.setDefault(True)
         return dialog.exec()
 
-    warning = information
-    critical = information
+    @staticmethod
+    def information(parent, title, text):
+        return TouchMessage._notice(parent, title, text, 'ข้อมูลแจ้งเตือนจากระบบ', 'info')
+
+    @staticmethod
+    def warning(parent, title, text):
+        return TouchMessage._notice(parent, title, text, 'กรุณาตรวจสอบข้อมูลก่อนทำรายการต่อ', 'warning')
+
+    @staticmethod
+    def critical(parent, title, text):
+        return TouchMessage._notice(parent, title, text, 'พบข้อผิดพลาด กรุณาตรวจสอบ', 'danger')
 
     @staticmethod
     def question(parent, title, text):
-        dialog = TouchDialog(parent, title)
+        dialog = TouchDialog(parent, title, 'กรุณาตรวจสอบก่อนยืนยันรายการ')
+        box = QFrame()
+        box.setObjectName('dialogNoticeBox')
+        box.setProperty('tone', 'warning')
+        box_layout = QVBoxLayout(box)
+        box_layout.setContentsMargins(14, 12, 14, 12)
         label = QLabel(text)
         label.setWordWrap(True)
         label.setMaximumWidth(700)
-        dialog.body.addWidget(label)
+        label.setStyleSheet('font-size:17px; font-weight:700;')
+        box_layout.addWidget(label)
+        dialog.body.addWidget(box)
         cancel = dialog.confirm('กลับ', dialog.reject)
+        cancel.setObjectName('btnTouchSecondary')
         cancel.setDefault(True)
         cancel.setFocus()
         confirm = dialog.confirm('ยืนยัน')
+        confirm.setObjectName('btnTouchPrimary')
         confirm.setAutoDefault(False)
         return TouchMessage.Yes if dialog.exec() == QDialog.DialogCode.Accepted else TouchMessage.No
