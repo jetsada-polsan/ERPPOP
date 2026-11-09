@@ -72,6 +72,24 @@
             @endif
         </div>
 
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
+            <div class="doc-tabs">
+                <button type="button" class="doc-tab" :class="activeTab === 'overview' && 'active'" @click="activeTab = 'overview'">
+                    <i class="bi bi-person-lines-fill"></i> ภาพรวม & บัญชีลูกหนี้
+                </button>
+                <button type="button" class="doc-tab" :class="activeTab === 'terms' && 'active'" @click="activeTab = 'terms'">
+                    <i class="bi bi-file-earmark-text"></i> ข้อตกลง (Terms)
+                    <span class="badge rounded-pill bg-primary ms-1">{{ $customer->terms->count() }}</span>
+                </button>
+            </div>
+            <div x-show="activeTab === 'terms'" x-cloak>
+                <button type="button" class="btn btn-primary" @click="openAddTermModal()">
+                    <i class="bi bi-plus-lg me-1"></i> เพิ่มข้อตกลง
+                </button>
+            </div>
+        </div>
+
+        <div x-show="activeTab === 'overview'">
         <div class="customer-360-activity-grid mb-4">
             <section class="content-card p-4">
                 <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
@@ -189,6 +207,112 @@
                     @empty
                     <p class="text-muted small mb-0">ยังไม่มีผู้ติดต่อ</p>
                     @endforelse
+                </div>
+            </div>
+        </div>
+        </div>
+
+        {{-- ข้อตกลง (Terms) Tab --}}
+        <div x-show="activeTab === 'terms'" x-cloak>
+            <div class="content-card p-4 mb-4">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
+                    <div>
+                        <h3 class="h5 fw-bold mb-1"><i class="bi bi-file-earmark-ruled me-2 text-primary"></i>ข้อตกลงทางการค้า (Customer Terms)</h3>
+                        <p class="text-muted small mb-0">กำหนดเงื่อนไขการค้า ตารางราคา เครดิตเทอม และส่วนลดตามรูปแบบ BPlus (ชื่อขึ้นต้นด้วย <code>N-</code> หมายถึงไม่มีภาษีมูลค่าเพิ่ม No VAT)</p>
+                    </div>
+                    <button type="button" class="btn btn-primary" @click="openAddTermModal()">
+                        <i class="bi bi-plus-lg me-1"></i> เพิ่มข้อตกลง
+                    </button>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th style="width: 100px;">สถานะ</th>
+                                <th>ชื่อข้อตกลง</th>
+                                <th>ตารางราคา</th>
+                                <th class="text-end">เครดิต (วัน)</th>
+                                <th class="text-end">ส่วนลดการค้า (%)</th>
+                                <th class="text-end">ส่วนลดเงินสด (%)</th>
+                                <th>ระยะเวลาที่มีผล</th>
+                                <th>หมายเหตุ</th>
+                                <th class="text-end" style="width: 120px;">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($customer->terms as $term)
+                                <tr>
+                                    <td>
+                                        @if($term->is_default)
+                                            <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>ค่าเริ่มต้น</span>
+                                        @else
+                                            <span class="badge text-bg-light border text-muted">ทั่วไป</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <div class="fw-bold text-dark">{{ $term->name }}</div>
+                                        @if($term->isNoVat())
+                                            <span class="badge bg-secondary-subtle text-secondary border mt-1"><i class="bi bi-shield-x me-1"></i>No VAT (N-)</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @if($term->priceTable)
+                                            <span class="fw-semibold text-primary"><i class="bi bi-tag me-1"></i>{{ $term->priceTable->name }}</span>
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-end fw-semibold">
+                                        {{ number_format($term->credit_days) }} วัน
+                                    </td>
+                                    <td class="text-end fw-semibold {{ $term->trade_discount_percent > 0 ? 'text-danger' : 'text-muted' }}">
+                                        {{ number_format($term->trade_discount_percent, 2) }}%
+                                    </td>
+                                    <td class="text-end fw-semibold {{ $term->cash_discount_percent > 0 ? 'text-success' : 'text-muted' }}">
+                                        {{ number_format($term->cash_discount_percent, 2) }}%
+                                    </td>
+                                    <td class="small">
+                                        @if($term->start_date || $term->end_date)
+                                            <div>{{ $term->start_date?->thaiDate() ?? 'ไม่ระบุ' }} &rarr; {{ $term->end_date?->thaiDate() ?? 'ไม่มีกำหนด' }}</div>
+                                            @if($term->isActiveOn())
+                                                <span class="badge bg-success-subtle text-success border">มีผลใช้งาน</span>
+                                            @else
+                                                <span class="badge bg-warning-subtle text-warning border">อยู่นอกช่วงเวลา</span>
+                                            @endif
+                                        @else
+                                            <span class="text-muted">ใช้ได้ตลอด</span>
+                                        @endif
+                                    </td>
+                                    <td class="small text-muted" style="max-width: 200px;">
+                                        {{ $term->notes ?? '—' }}
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="d-inline-flex gap-1">
+                                            <button type="button" class="btn btn-sm btn-light border" title="แก้ไข"
+                                                    @click="openEditTermModal(@js($term))">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <form method="post" action="{{ route('customers.terms.destroy', [$customer, $term]) }}"
+                                                  data-confirm="ยืนยันลบข้อตกลง {{ $term->name }} หรือไม่?">
+                                                @csrf @method('DELETE')
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="ลบ">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="9" class="text-center py-4 text-muted">
+                                        <i class="bi bi-file-earmark-plus fs-3 d-block mb-2 text-secondary"></i>
+                                        ยังไม่มีข้อตกลงสำหรับลูกค้ารายนี้ คลิก <strong>"เพิ่มข้อตกลง"</strong> เพื่อเริ่มสร้าง
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -393,6 +517,80 @@
                 </form>
             </div>
         </div>
+        {{-- Term modal (Add / Edit) --}}
+        <div class="booking-modal-backdrop" x-show="termModalOpen" x-transition.opacity @keydown.escape.window="termModalOpen = false">
+            <div class="booking-modal" style="width: min(640px, 100%);" @click.outside="termModalOpen = false" x-transition>
+                <div class="modal-header border-0 px-4 pt-4 pb-2">
+                    <h3 class="h4 fw-bold mb-0" x-text="termForm.id ? 'แก้ไขข้อตกลงลูกค้า' : 'เพิ่มข้อตกลงลูกค้า'"></h3>
+                    <button type="button" class="btn btn-light rounded-circle" @click="termModalOpen = false"><i class="bi bi-x-lg"></i></button>
+                </div>
+                <form method="post" :action="termForm.action">
+                    @csrf
+                    <template x-if="termForm.id">
+                        <input type="hidden" name="_method" value="PUT">
+                    </template>
+                    <div class="modal-body px-4 pb-4">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label text-muted small fw-semibold">ชื่อข้อตกลง <span class="text-danger">*</span></label>
+                                <input type="text" name="name" x-model="termForm.name" required class="form-control" placeholder="เช่น เงินสด, N-เงินสด (N- = no VAT), เครดิต 30 วัน">
+                                <div class="form-text small text-muted">คำแนะนำ BPlus: หากขึ้นต้นด้วย <code>N-</code> หมายถึงไม่มีภาษีมูลค่าเพิ่ม (No VAT)</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small fw-semibold">ตารางราคา</label>
+                                <select name="price_table_id" x-model="termForm.price_table_id" class="form-select">
+                                    <option value="">-- ราคามาตรฐานระบบ --</option>
+                                    @foreach($priceTables as $pt)
+                                        <option value="{{ $pt->id }}">{{ $pt->code }} - {{ $pt->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small fw-semibold">จำนวนวันเครดิต (วัน)</label>
+                                <input type="number" name="credit_days" x-model.number="termForm.credit_days" min="0" max="9999" class="form-control text-end" placeholder="0">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small fw-semibold">ส่วนลดการค้า (%)</label>
+                                <div class="input-group">
+                                    <input type="number" step="0.01" min="0" max="100" name="trade_discount_percent" x-model="termForm.trade_discount_percent" class="form-control text-end" placeholder="0.00">
+                                    <span class="input-group-text bg-light">%</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small fw-semibold">ส่วนลดเงินสด (%)</label>
+                                <div class="input-group">
+                                    <input type="number" step="0.01" min="0" max="100" name="cash_discount_percent" x-model="termForm.cash_discount_percent" class="form-control text-end" placeholder="0.00">
+                                    <span class="input-group-text bg-light">%</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small fw-semibold">วันเริ่มต้น</label>
+                                <input type="date" name="start_date" x-model="termForm.start_date" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small fw-semibold">วันสิ้นสุด</label>
+                                <input type="date" name="end_date" x-model="termForm.end_date" class="form-control">
+                            </div>
+                            <div class="col-12">
+                                <div class="form-check form-switch mt-1">
+                                    <input class="form-check-input" type="checkbox" role="switch" name="is_default" value="1" id="custTermDefault" :checked="termForm.is_default" x-model="termForm.is_default">
+                                    <label class="form-check-label fw-semibold" for="custTermDefault">ตั้งเป็นข้อตกลงเริ่มต้น (Default Term)</label>
+                                </div>
+                                <div class="form-text small text-muted">ระบบอนุญาตให้มีข้อตกลงเริ่มต้นได้เพียง 1 รายการต่อลูกค้า 1 ราย</div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label text-muted small fw-semibold">หมายเหตุ</label>
+                                <textarea name="notes" x-model="termForm.notes" rows="2" class="form-control" placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 px-4 pb-4 pt-0">
+                        <button type="button" class="btn btn-light border px-4" @click="termModalOpen = false">ยกเลิก</button>
+                        <button type="submit" class="btn btn-primary px-4" x-text="termForm.id ? 'บันทึกการแก้ไข' : 'บันทึกข้อตกลง'"></button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 @endsection
 
@@ -414,10 +612,57 @@
 <script>
     function customerShow() {
         return {
+            activeTab: @js(request()->query('tab', 'overview')),
             editOpen: false,
             addressOpen: false,
             contactOpen: false,
             paymentOpen: false,
+            termModalOpen: false,
+            termForm: {
+                id: null,
+                action: '{{ route('customers.terms.store', $customer) }}',
+                name: '',
+                price_table_id: '',
+                credit_days: 0,
+                trade_discount_percent: 0,
+                cash_discount_percent: 0,
+                start_date: '',
+                end_date: '',
+                is_default: false,
+                notes: '',
+            },
+            openAddTermModal() {
+                this.termForm = {
+                    id: null,
+                    action: '{{ route('customers.terms.store', $customer) }}',
+                    name: '',
+                    price_table_id: '',
+                    credit_days: 0,
+                    trade_discount_percent: 0,
+                    cash_discount_percent: 0,
+                    start_date: '',
+                    end_date: '',
+                    is_default: @js($customer->terms->isEmpty()),
+                    notes: '',
+                };
+                this.termModalOpen = true;
+            },
+            openEditTermModal(term) {
+                this.termForm = {
+                    id: term.id,
+                    action: '{{ url('customers/' . $customer->id . '/terms') }}/' + term.id,
+                    name: term.name || '',
+                    price_table_id: term.price_table_id ? String(term.price_table_id) : '',
+                    credit_days: term.credit_days ?? 0,
+                    trade_discount_percent: term.trade_discount_percent ?? 0,
+                    cash_discount_percent: term.cash_discount_percent ?? 0,
+                    start_date: term.start_date ? term.start_date.substring(0, 10) : '',
+                    end_date: term.end_date ? term.end_date.substring(0, 10) : '',
+                    is_default: Boolean(term.is_default),
+                    notes: term.notes || '',
+                };
+                this.termModalOpen = true;
+            },
             salesUserId: @js((string) ($customer->sales_user_id ?? '')),
             salesAreaId: @js((string) ($customer->sales_area_id ?? '')),
             users: @js($salesUsers->map(fn ($user) => [

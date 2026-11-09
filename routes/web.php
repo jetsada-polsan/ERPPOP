@@ -19,6 +19,7 @@ use App\Http\Controllers\ChequeController;
 use App\Http\Controllers\CreditDebitNoteController;
 use App\Http\Controllers\CrmController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\CustomerTermController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DatabaseStructureController;
 use App\Http\Controllers\DeliveryNoteController;
@@ -87,6 +88,7 @@ use App\Http\Controllers\StockTransferReceiptController;
 use App\Http\Controllers\StockTransformController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SupplierNoteController;
+use App\Http\Controllers\SupplierTermController;
 use App\Http\Controllers\SystemSettingController;
 use App\Http\Controllers\TaxComplianceController;
 use App\Http\Controllers\UserController;
@@ -518,6 +520,9 @@ Route::prefix('customers')->name('customers.')->group(function () {
     Route::put('/{customer}', [CustomerController::class, 'update'])->name('update');
     Route::post('/{customer}/addresses', [CustomerController::class, 'addAddress'])->name('addresses.store');
     Route::post('/{customer}/contacts', [CustomerController::class, 'addContact'])->name('contacts.store');
+    Route::post('/{customer}/terms', [CustomerTermController::class, 'store'])->name('terms.store');
+    Route::put('/{customer}/terms/{term}', [CustomerTermController::class, 'update'])->name('terms.update');
+    Route::delete('/{customer}/terms/{term}', [CustomerTermController::class, 'destroy'])->name('terms.destroy');
     Route::post('/{customer}/payments', [PaymentController::class, 'storeCustomerPayment'])->name('payments.store');
     // เปลี่ยนวงเงินเครดิตต้องอนุมัติ (finance.credit.approve) - ผู้ขอกดเองไม่ได้
     Route::post('/{customer}/credit-limit/approve', [CustomerController::class, 'approveCreditLimit'])->name('credit-limit.approve');
@@ -532,6 +537,10 @@ Route::prefix('suppliers')->name('suppliers.')->group(function () {
     Route::get('/{supplier}', [SupplierController::class, 'show'])->name('show');
     Route::put('/{supplier}', [SupplierController::class, 'update'])->name('update');
     Route::post('/{supplier}/addresses', [SupplierController::class, 'addAddress'])->name('addresses.store');
+    Route::post('/{supplier}/terms', [SupplierTermController::class, 'store'])->name('terms.store');
+    Route::put('/{supplier}/terms/{term}', [SupplierTermController::class, 'update'])->name('terms.update');
+    Route::delete('/{supplier}/terms/{term}', [SupplierTermController::class, 'destroy'])->name('terms.destroy');
+    Route::put('/{supplier}/withholding', [SupplierTermController::class, 'updateWithholding'])->name('withholding.update');
     Route::post('/{supplier}/payments', [PaymentController::class, 'storeSupplierPayment'])->name('payments.store');
 });
 

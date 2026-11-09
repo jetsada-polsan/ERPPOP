@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\Customer;
+use App\Models\PriceTable;
 use App\Models\SalesArea;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -68,6 +69,7 @@ class CustomerController extends Controller
         $this->assertCustomerVisible($request->user(), $customer);
         $customer->load([
             'branch', 'salesUser', 'salesArea', 'addresses', 'contacts', 'creditLimitRequester',
+            'terms.priceTable',
             'openItems' => fn ($q) => $q->orderByDesc('id')->limit(20),
             'openItems.document',
             'crmActivities' => fn ($q) => $q->with('assignedTo')->orderByRaw('status = \'pending\' desc')->orderByRaw('due_at is null, due_at asc')->orderByDesc('id')->limit(20),
@@ -78,6 +80,7 @@ class CustomerController extends Controller
         return view('customers.show', [
             'customer' => $customer,
             'branches' => Branch::orderBy('code')->get(),
+            'priceTables' => PriceTable::where('is_active', true)->orderBy('name')->get(),
             'salesUsers' => $this->salesUsers(),
             'salesAreas' => $this->salesAreas(),
             'outstandingBalance' => $outstandingBalance,
