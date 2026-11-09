@@ -21,7 +21,8 @@ window.erpDocumentDraft = function (userId) {
                 const storedRaw = localStorage.getItem(key) || sessionStorage.getItem(key);
                 const stored = JSON.parse(storedRaw || 'null');
                 if (stored && Date.now() - stored.time < 24 * 60 * 60 * 1000) {
-                    if (window.confirm('พบร่างที่ยังไม่ได้บันทึก ต้องการกู้คืนหรือไม่?')) {
+                    // แถบเล็กในหน้า ไม่บล็อกหน้าจอ (เดิมใช้ window.confirm เด้งทุกครั้งที่เปิดหน้า)
+                    const restore = () => {
                         const draft = JSON.parse(stored.snapshot);
                         stateFields.forEach(name => { if (draft.state[name] !== undefined) this[name] = draft.state[name]; });
                         this.modalOpen = true;
@@ -36,10 +37,24 @@ window.erpDocumentDraft = function (userId) {
                             }
                             this.saveDraft();
                         });
-                    } else {
+                    };
+                    const discard = () => {
                         localStorage.removeItem(key);
                         sessionStorage.removeItem(key);
-                    }
+                    };
+                    const bar = document.createElement('div');
+                    bar.className = 'erp-draft-bar';
+                    bar.setAttribute('role', 'status');
+                    bar.innerHTML = '<span><i class="bi bi-journal-text me-1"></i>มีร่างเอกสารที่ยังไม่ได้บันทึก</span>'
+                        + '<button type="button" class="btn btn-sm btn-primary" data-act="restore">เปิดร่าง</button>'
+                        + '<button type="button" class="btn btn-sm btn-light border" data-act="discard">ทิ้งร่าง</button>';
+                    bar.addEventListener('click', (event) => {
+                        const act = event.target.closest('[data-act]')?.dataset.act;
+                        if (!act) return;
+                        if (act === 'restore') restore(); else discard();
+                        bar.remove();
+                    });
+                    if (!document.querySelector('.erp-draft-bar')) document.body.appendChild(bar);
                 } else if (stored && Date.now() - stored.time >= 24 * 60 * 60 * 1000) {
                     localStorage.removeItem(key);
                     sessionStorage.removeItem(key);
