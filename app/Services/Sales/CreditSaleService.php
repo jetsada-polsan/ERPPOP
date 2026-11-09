@@ -44,12 +44,16 @@ class CreditSaleService
         private readonly NegativeStockPolicyService $negativeStockPolicy,
     ) {}
 
-    public function convertBookingToCreditSale(SaleBooking $booking, ?DocumentBook $book = null): Document
+    /**
+     * @param  array<int|string, string>|null  $lineBooks  พนักงานเลือกเองรายบรรทัด [stock_document_item_id => 'DS'|'DSN']
+     *                                                     ไม่ส่งมา = ใช้ค่าเริ่มต้นจาก VAT ของสินค้า
+     */
+    public function convertBookingToCreditSale(SaleBooking $booking, ?DocumentBook $book = null, ?array $lineBooks = null): Document
     {
         $documentType = DocumentType::where('code', DocumentType::CREDIT_SALE)->firstOrFail();
         
 
-        return DB::transaction(function () use ($booking, $documentType, $book) {
+        return DB::transaction(function () use ($booking, $documentType, $book, $lineBooks) {
             $lockedBooking = SaleBooking::whereKey($booking->id)->lockForUpdate()->firstOrFail();
 
             if ($lockedBooking->status !== SaleBooking::STATUS_PENDING) {
@@ -69,7 +73,21 @@ class CreditSaleService
             $saleDate = $lockedBooking->delivered_at?->toDateString() ?? now()->toDateString();
             $this->periods->assertOpen($saleDate, $bookingDocument->branch_id);
 
-            $groups = $sourceItems->sortBy('id')->groupBy(fn ($item) => $item->product->is_vat ? 'DS' : 'DSN');
+            if ($lineBooks !== null) {
+                $itemIds = $sourceItems->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+                $chosenIds = collect(array_keys($lineBooks))->map(fn ($id) => (int) $id)->sort()->values()->all();
+                if ($itemIds !== $chosenIds) {
+                    throw new RuntimeException('รายการที่เลือกเล่มไม่ตรงกับรายการในใบจอง กรุณาเปิดหน้าตรวจใหม่');
+                }
+                foreach ($lineBooks as $code) {
+                    if (! in_array($code, ['DS', 'DSN'], true)) {
+                        throw new RuntimeException('เลือกเล่มได้เฉพาะ DS หรือ DSN');
+                    }
+                }
+            }
+            $groups = $sourceItems->sortBy('id')->groupBy(
+                fn ($item) => $lineBooks[$item->id] ?? ($item->product->is_vat ? 'DS' : 'DSN')
+            );
             $sales = collect();
             foreach ($groups as $code => $groupItems) {
                 $noVat = $code === 'DSN';
