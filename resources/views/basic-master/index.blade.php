@@ -28,6 +28,10 @@
                             {{ $tab }}
                         </a>
                     @endforeach
+                    {{-- เล่มเอกสาร (ใบจองแยกสาย B10–B39, DS/DSN, ใบเสร็จ ฯลฯ) จัดการที่หน้าสมุดเอกสาร --}}
+                    <a href="{{ route('document-books.index') }}" class="btn btn-sm btn-light border text-secondary">
+                        <i class="bi bi-journals me-1"></i>เล่มเอกสาร (ใบจอง / DS / DSN / ใบเสร็จ)
+                    </a>
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     @include('partials.search-bar', ['q' => $q, 'placeholder' => 'ค้นหารหัส / ชื่อ'])
