@@ -31,6 +31,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="view-transition" content="same-origin">
     <link rel="icon" href="{{ $faviconUrl }}">
     <link rel="shortcut icon" href="{{ $faviconUrl }}">
     <link rel="apple-touch-icon" href="{{ $faviconUrl }}">
@@ -47,6 +48,7 @@
     <script src="{{ asset('vendor/sweetalert2/sweetalert2.all.min.js') }}"></script>
     <script defer src="{{ asset('vendor/alpinejs/alpine.min.js') }}"></script>
     <style>
+        @view-transition { navigation: auto; }
         /* ══════════════════════════════════════════════════════════
            LAYOUT: Odoo — โครงการใช้งานแบบ Odoo แต่ใช้สีแบรนด์ JET/POPSTAR
            กติกาของบล็อกนี้: ทุกสีต้องอ้าง design token เท่านั้น ห้าม hardcode
