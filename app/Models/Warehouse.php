@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['branch_id', 'code', 'name'])]
+#[Fillable(['branch_id', 'code', 'name', 'is_active'])]
 class Warehouse extends Model
 {
     public $timestamps = false;
@@ -20,5 +20,10 @@ class Warehouse extends Model
     public function locations(): HasMany
     {
         return $this->hasMany(WarehouseLocation::class);
+    }
+
+    protected function casts(): array
+    {
+        return ['is_active' => 'boolean'];
     }
 }

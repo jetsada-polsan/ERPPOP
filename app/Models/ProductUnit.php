@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['code', 'name', 'qty_per_base_unit'])]
+#[Fillable(['code', 'name', 'qty_per_base_unit', 'is_active'])]
 class ProductUnit extends Model
 {
     private const CORRUPTED_NAMES = ['ǧ', 'ἧ', 'ἧ*10', 'ᾤ'];
@@ -60,6 +60,9 @@ class ProductUnit extends Model
 
     protected function casts(): array
     {
-        return ['qty_per_base_unit' => 'decimal:8'];
+        return [
+            'qty_per_base_unit' => 'decimal:8',
+            'is_active' => 'boolean',
+        ];
     }
 }

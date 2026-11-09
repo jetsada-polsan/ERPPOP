@@ -63,8 +63,12 @@ class ModuleControlController extends Controller
         /** @var ProductCategory|ProductDepartment|ProductBrand $record */
         $record = $modelClass::withCount('products')->findOrFail($id);
         if ($record->products_count > 0) {
+            $old = $record->toArray();
+            $record->update(['is_active' => false]);
+            $this->audit('deactivate', $record, $old, $record->fresh()->toArray());
+
             return back()->withErrors([
-                'taxonomy' => "ลบไม่ได้ เพราะมีสินค้า {$record->products_count} รายการใช้งานอยู่ ให้ย้ายสินค้าออกจากรายการนี้ก่อน",
+                'taxonomy' => "ลบไม่ได้ เพราะมีสินค้า {$record->products_count} รายการใช้งานอยู่ ระบบจึงเปลี่ยนเป็นปิดใช้งานแทนแล้ว",
             ]);
         }
 

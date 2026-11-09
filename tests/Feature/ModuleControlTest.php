@@ -59,7 +59,7 @@ class ModuleControlTest extends TestCase
         $this->delete(route('settings.module-controls.taxonomies.destroy', ['category', $category]))
             ->assertSessionHasErrors('taxonomy');
 
-        $this->assertDatabaseHas('product_categories', ['id' => $category->id]);
+        $this->assertDatabaseHas('product_categories', ['id' => $category->id, 'is_active' => 0]);
     }
 
     public function test_control_center_lists_master_and_document_lifecycle_rules(): void

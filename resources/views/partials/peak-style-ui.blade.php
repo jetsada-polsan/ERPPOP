@@ -598,23 +598,50 @@
         }
     }
 
-    /* แถบเมนูบนสุดแบบการ์ดขาว (เจ้าของขอ 9 พ.ย. 2026) */
-    .odn-topbar { background:#fff !important; color:#334155 !important;
-        border-bottom:1px solid var(--erp-border, #dbe7ef); box-shadow:0 4px 14px rgba(15,35,52,.06); }
-    .odn-topbar .odn-apps { background:#eef4f8; color:var(--erp-primary-dark,#0f4c75); }
-    .odn-topbar .odn-apps:hover { background:#dfeaf2; color:var(--erp-primary-dark,#0f4c75); }
-    .odn-topbar .odn-brand, .odn-topbar .odn-brand:hover { color:var(--erp-primary-dark,#0f4c75); }
-    .odn-topbar .odn-brand::after { background:#dbe7ef; }
-    .odn-topbar .odn-nav { align-self:stretch; gap:0; }
-    .odn-topbar .odn-nav-link { display:inline-flex; align-items:center; gap:7px; color:#334155;
-        font-size:14px; font-weight:600; padding:0 14px; border-radius:0; box-shadow:none; }
-    .odn-topbar .odn-nav-link i { font-size:15px; color:var(--erp-primary,#1585c0); }
-    .odn-topbar .odn-nav-link:hover { background:#f8fafc; color:var(--erp-primary-dark,#0f4c75); }
-    .odn-topbar .odn-nav-link:focus-visible { outline:2px solid var(--erp-primary,#1585c0); }
-    .odn-topbar .odn-nav-link.on, .odn-topbar .odn-nav-link.on:hover { background:#eaedf1;
-        color:var(--erp-primary-dark,#0f4c75); font-weight:700; box-shadow:inset 0 -3px 0 var(--erp-primary,#1585c0); }
-    .odn-topbar .odn-nav-link.on i { color:var(--erp-primary-dark,#0f4c75); }
-    .odn-topbar .odn-company { color:#475569; border-left-color:#dbe7ef; }
+    /* แถบเมนูบนสุดแบบการ์ดขาว: ความสูงคงที่ ตัวหนังสือ 14px ไอคอน 16px ขีดล่างสีหลัก ไม่ใช้กล่องเทาทึบ ไม่เปลี่ยน font-weight ตอน active */
+    .odn-topbar {
+        background: #ffffff !important;
+        color: #334155 !important;
+        border-bottom: 1px solid var(--erp-border, #dbe7ef);
+        box-shadow: 0 2px 10px rgba(15, 35, 52, .05);
+        height: 52px; min-height: 52px; max-height: 52px;
+    }
+    .odn-topbar .odn-apps { background: #eef4f8; color: var(--erp-primary-dark, #0f4c75); }
+    .odn-topbar .odn-apps:hover { background: #dfeaf2; color: var(--erp-primary-dark, #0f4c75); }
+    .odn-topbar .odn-brand, .odn-topbar .odn-brand:hover { color: var(--erp-primary-dark, #0f4c75); }
+    .odn-topbar .odn-brand::after { content: none; display: none; }
+    .odn-topbar .odn-nav { align-self: stretch; gap: 2px; height: 52px; }
+    .odn-topbar .odn-nav-link {
+        display: inline-flex; align-items: center; gap: 7px;
+        color: #334155; font-size: 14px; font-weight: 600;
+        height: 52px; padding: 0 13px; border-radius: 0;
+        border-bottom: 3px solid transparent; box-shadow: none;
+        transition: color 130ms ease, background-color 130ms ease, border-color 130ms ease;
+    }
+    .odn-topbar .odn-nav-link i {
+        font-size: 16px; width: 16px; height: 16px;
+        display: inline-flex; align-items: center; justify-content: center;
+        color: #64748b; transition: color 130ms ease;
+    }
+    .odn-topbar .odn-nav-link:hover {
+        background-color: #f8fafc;
+        color: var(--erp-primary-dark, #0f4c75);
+        border-bottom-color: #cbd5e1;
+    }
+    .odn-topbar .odn-nav-link:hover i { color: var(--erp-primary, #1585c0); }
+    .odn-topbar .odn-nav-link:focus-visible { outline: 2px solid var(--erp-primary, #1585c0); }
+    .odn-topbar .odn-nav-link.on,
+    .odn-topbar .odn-nav-link.on:hover {
+        background-color: rgba(21, 133, 192, .05);
+        color: var(--erp-primary-dark, #0f4c75);
+        font-weight: 600;
+        border-bottom-color: var(--erp-primary, #1585c0);
+        box-shadow: none;
+    }
+    .odn-topbar .odn-nav-link.on i,
+    .odn-topbar .odn-nav-link.on:hover i {
+        color: var(--erp-primary, #1585c0);
+    }
 </style>
 
 <script>

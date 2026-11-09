@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['warehouse_id', 'code', 'name'])]
+#[Fillable(['warehouse_id', 'code', 'name', 'is_active'])]
 class WarehouseLocation extends Model
 {
     public $timestamps = false;
@@ -14,5 +14,10 @@ class WarehouseLocation extends Model
     public function warehouse(): BelongsTo
     {
         return $this->belongsTo(Warehouse::class);
+    }
+
+    protected function casts(): array
+    {
+        return ['is_active' => 'boolean'];
     }
 }

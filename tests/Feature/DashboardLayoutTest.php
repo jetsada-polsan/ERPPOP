@@ -268,26 +268,22 @@ class DashboardLayoutTest extends TestCase
     }
 
     /**
-     * เปลือกของสอง layout ต้องไม่ปนกัน — Odoo ใช้แถบบน + เมนูแบบกลุ่ม
-     * ส่วน Classic ใช้ rail ไอคอนเหมือนเดิม ถ้า markup รั่วข้ามกันเมื่อไร
-     * หน้าจอจะเพี้ยนแบบที่มองไม่เห็นจาก unit test อื่น
+     * เปลือกเมนูรวมเป็นชุดเดียว (แถบบนเป็นหมวดหลัก + เมนูข้างเฉพาะหมวดที่เลือก)
+     * ไม่ว่าตั้งค่า erp_layout เป็น classic หรือ odoo จะต้องไม่มี rail ไอคอนซ้ายซ้ำซ้อน
      */
     public function test_each_layout_renders_only_its_own_shell(): void
     {
         $viewer = $this->viewer();
 
-        AppSetting::set('erp_layout', 'odoo');
-        $this->actingAs($viewer)->get(route('dashboard'))
-            ->assertSee('class="odn-topbar', false)
-            ->assertSee('class="odn-item', false)
-            ->assertSee('id="odn-q"', false)
-            ->assertDontSee('class="fa-rail-btn', false);
-
-        AppSetting::set('erp_layout', 'classic');
-        $this->actingAs($viewer)->get(route('dashboard'))
-            ->assertSee('class="fa-rail-btn', false)
-            ->assertDontSee('class="odn-topbar', false)
-            ->assertDontSee('class="odn-item', false);
+        foreach (['odoo', 'classic'] as $layout) {
+            AppSetting::set('erp_layout', $layout);
+            $this->actingAs($viewer)->get(route('dashboard'))
+                ->assertSee('class="odn-topbar', false)
+                ->assertSee('class="odn-item', false)
+                ->assertSee('id="odn-q"', false)
+                ->assertSee('id="erp-user-menu-btn"', false)
+                ->assertDontSee('class="fa-rail-btn', false);
+        }
     }
 
     /** เมนูหมวดบนต้องสลับกลุ่มใน sidebar ได้โดยตรง ไม่ผูกกับช่องค้นหา */
@@ -349,13 +345,12 @@ class DashboardLayoutTest extends TestCase
         AppSetting::set('erp_layout', 'classic');
         $classic = $this->actingAs($viewer)->get(route('dashboard'))->getContent();
 
-        /* นับด้วย 'odn-item t-' ไม่ใช่ 'odn-item' เฉย ๆ เพราะกล่องไอคอนข้างในใช้
-           คลาส odn-item-ico ซึ่งขึ้นต้นเหมือนกัน จะถูกนับซ้ำเป็นเมนูอีกตัว */
         $this->assertSame(
-            substr_count($classic, 'class="fa-subnav-link'),
+            substr_count($classic, 'class="odn-item t-'),
             substr_count($odoo, 'class="odn-item t-'),
             'จำนวนเมนูของสอง layout ไม่เท่ากัน'
         );
+        $this->assertGreaterThan(0, substr_count($odoo, 'class="odn-item t-'));
     }
 
     /** เมนูที่ผู้ใช้ไม่มีสิทธิ์ ต้องไม่โผล่ในทั้งสอง layout เท่า ๆ กัน */
