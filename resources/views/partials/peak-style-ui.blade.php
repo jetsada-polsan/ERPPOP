@@ -14,12 +14,12 @@
         --peak-field-bg: #ffffff;
         --peak-field-radius: 8px;
         --peak-field-h: 48px;
-        --peak-label-color: #475569;
+        --peak-label-color: #334155;
         --peak-active-tab-bg: #eaedf1;
         --peak-table-head-bg: #f8fafc;
-        --peak-table-head-text: #475569;
-        --peak-table-border: #e2e8f0;
-        --peak-table-row-border: #eef2f6;
+        --peak-table-head-text: #334155;
+        --peak-table-border: #d5dde7;
+        --peak-table-row-border: #e3e9f0;
         --peak-table-hover-bg: #f8fbff;
     }
 
@@ -927,6 +927,31 @@
         color: var(--erp-primary, #1585c0);
     }
     } /* end @media screen: ตารางสไตล์ใหม่ไม่ใช้ตอนพิมพ์ */
+
+    /* ── ความคมชัดของตัวหนังสือ (เจ้าของ: "สีจางๆ ต้องจ้อง ไม่คม") ──────────
+       ตัวหนังสือหลักเกือบดำ ตัวรองเทาเข้มพอ (คอนทราสต์ ≥ 7:1 บนขาว) ตัวในตารางหนาขึ้นเล็กน้อย */
+    @media screen {
+        :root {
+            --erp-ink: #0f172a;
+            --erp-text: #0f172a;
+            --erp-muted: #475569;
+        }
+        body:not(.pos-body) { color: #0f172a; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+        body:not(.pos-body) .app-main .text-muted,
+        body:not(.pos-body) .app-sidebar .text-muted,
+        body:not(.pos-body) .modal .text-muted,
+        body:not(.pos-body) .booking-modal .text-muted { color: #475569 !important; }
+        body:not(.pos-body) .table > tbody > tr > td { color: #0f172a; font-weight: 500; }
+        body:not(.pos-body) .table > thead > tr > th { color: #334155 !important; }
+        body:not(.pos-body) .fa-subnav-link,
+        body:not(.pos-body) .odn-item { color: #1e293b !important; font-weight: 500; }
+        body:not(.pos-body) .fa-subnav-link.active,
+        body:not(.pos-body) .odn-item.active { color: var(--erp-primary-dark, #0f4c75) !important; font-weight: 600; }
+        body:not(.pos-body) .odn-topbar .odn-nav-link { color: #1e293b; }
+        body:not(.pos-body) .form-label,
+        body:not(.pos-body) .erp-fl-text { color: #334155 !important; }
+        body:not(.pos-body) ::placeholder { color: #64748b; opacity: 1; }
+    }
 </style>
 
 <script>
