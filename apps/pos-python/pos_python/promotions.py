@@ -108,7 +108,14 @@ def promotion_discounts(lines: list[PromoLine], promotions: Iterable[QtyPromotio
                 continue
             gift = lines[gift_index]
             target = gift_index
-            amount = min(gift.qty, sets * promotion.free_qty) * _price(gift)
+            if promotion.free_product_id == promotion.product_id:
+                # 1 แถม 1 สินค้าตัวเดียวกัน: ของแถมอยู่ในจำนวนที่ซื้อด้วย ชุดละ (ซื้อ + แถม) ชิ้น
+                # ซื้อ 3 แบบ 1 แถม 1 = 1 ชุด (2 ชิ้น) แถม 1 ชิ้น ไม่ใช่แถม 3 ชิ้น
+                group = promotion.min_qty + promotion.free_qty
+                same_sets = (quantity / group).to_integral_value(rounding=ROUND_FLOOR) if group > 0 else Decimal("0")
+                amount = min(gift.qty, same_sets * promotion.free_qty) * _price(gift)
+            else:
+                amount = min(gift.qty, sets * promotion.free_qty) * _price(gift)
         if amount > 0:
             if breakdown is not None:
                 breakdown.append((promotion.name or promotion.promo_type, amount))
