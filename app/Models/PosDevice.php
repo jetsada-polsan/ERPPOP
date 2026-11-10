@@ -18,12 +18,17 @@ class PosDevice extends Model
         'name', 'user_id', 'branch_id', 'terminal_code',
         'token_hash', 'token_encrypted', 'last_seen_at', 'last_ip', 'revoked_at',
         'active_cashier_id', 'active_cashier_user_id', 'cashier_verified_at', 'pair_code',
+        'sync_reported_at', 'pending_bills', 'app_version', 'applied_versions', 'master_pulled_at',
     ];
 
     protected $casts = [
         'last_seen_at' => 'datetime',
         'revoked_at' => 'datetime',
         'cashier_verified_at' => 'datetime',
+        'sync_reported_at' => 'datetime',
+        'master_pulled_at' => 'datetime',
+        'pending_bills' => 'integer',
+        'applied_versions' => 'array',
         'token_encrypted' => 'encrypted',
     ];
 

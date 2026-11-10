@@ -24,6 +24,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -154,6 +155,94 @@ class PosApiController extends Controller
             ->map(fn (Salesman $cashier) => $this->cashierPayload($cashier));
 
         return response()->json(['success' => true, 'cashiers' => $cashiers]);
+    }
+
+    /**
+     * เครื่อง POS ถามทุก ~5 นาทีว่าข้อมูลหลังบ้านเปลี่ยนไหม (เบา: ไม่ส่งสินค้าทั้งชุด)
+     * คืนเลขเวอร์ชันของแต่ละชุด เครื่องดึงเฉพาะชุดที่เลขไม่ตรงกับที่ตัวเองใช้อยู่
+     * และบันทึกรายงานของเครื่อง (บิลค้างส่ง, เวอร์ชันโปรแกรม) ให้หน้า POS admin เห็น
+     */
+    public function syncCheck(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'applied' => ['nullable', 'array'],
+            'applied.*' => ['nullable', 'string', 'max:64'],
+            'pending_bills' => ['nullable', 'integer', 'min:0', 'max:1000000'],
+            'app_version' => ['nullable', 'string', 'max:40'],
+            'pulled' => ['nullable', 'boolean'],
+        ]);
+        $device = $request->attributes->get('pos_device');
+        $branchId = (int) ($device?->branch_id ?: $request->user()?->branch_id);
+        $versions = [
+            'catalog' => $this->catalogVersion(),
+            'promotions' => $this->promotionsVersion($request, $branchId),
+            'cashiers' => $this->cashiersVersion($request),
+        ];
+        $applied = array_intersect_key((array) ($data['applied'] ?? []), $versions);
+        $stale = array_values(array_keys(array_filter($versions, fn ($version, $key) => ($applied[$key] ?? null) !== $version, ARRAY_FILTER_USE_BOTH)));
+
+        if ($device) {
+            $device->forceFill(array_filter([
+                'sync_reported_at' => now(),
+                'pending_bills' => $data['pending_bills'] ?? null,
+                'app_version' => $data['app_version'] ?? null,
+                'applied_versions' => ['applied' => $applied, 'stale' => $stale],
+                'master_pulled_at' => ($data['pulled'] ?? false) ? now() : null,
+            ], fn ($value) => $value !== null))->save();
+        }
+
+        return response()->json([
+            'success' => true,
+            'versions' => $versions,
+            'stale' => $stale,
+        ]);
+    }
+
+    /** สินค้า/บาร์โค้ด/ราคา มีหลายพันแถว ใช้สรุปจำนวน+เวลาแก้ล่าสุดแทนการ hash ทั้งชุด */
+    private function catalogVersion(): string
+    {
+        $parts = [];
+        foreach (['products', 'product_barcodes', 'product_units', 'product_prices', 'price_tables', 'pos_price_schedules', 'branches'] as $table) {
+            if (! Schema::hasTable($table)) {
+                continue;
+            }
+            $select = 'count(*) as c, max(id) as m';
+            if (Schema::hasColumn($table, 'updated_at')) {
+                $select .= ', max(updated_at) as u';
+            }
+            $parts[$table] = (array) DB::table($table)->selectRaw($select)->first();
+        }
+
+        return sha1(json_encode($parts));
+    }
+
+    /** โปรมีไม่กี่สิบรายการ hash จากข้อมูลจริงที่เครื่องได้รับ ตรงเป๊ะ (รวมโปรที่หมดอายุแล้วหลุดออก) */
+    private function promotionsVersion(Request $request, int $branchId): string
+    {
+        $query = ['branch_id' => $branchId, 'include_upcoming' => 1, 'bill_promotions' => 1, 'mix_promotions' => 1];
+
+        return $this->hashInternal($request, '/api/pos/promotions', $query,
+            fn (Request $inner) => app(PosController::class)->promotions($inner));
+    }
+
+    private function cashiersVersion(Request $request): string
+    {
+        return $this->hashInternal($request, '/api/pos/cashiers', [], fn (Request $inner) => $this->cashiers($inner));
+    }
+
+    private function hashInternal(Request $request, string $uri, array $query, callable $call): string
+    {
+        $inner = Request::create($uri, 'GET', $query);
+        $inner->setUserResolver($request->getUserResolver());
+        $inner->attributes->replace($request->attributes->all());
+        $original = app('request');
+        // enforcedBranchId() อ่าน request() ตัวกลาง ต้องสลับให้ชี้คำขอภายในชั่วคราว
+        app()->instance('request', $inner);
+        try {
+            return sha1((string) $call($inner)->getContent());
+        } finally {
+            app()->instance('request', $original);
+        }
     }
 
     /** แลกรหัสประจำเครื่องเป็น Token ของเครื่องนั้น ไม่ต้องวาง Token เอง */

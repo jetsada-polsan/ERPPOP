@@ -325,7 +325,7 @@ class PermissionMatrixTest extends TestCase
             }
         }
 
-        $this->assertSame(25, $posCount);
+        $this->assertSame(26, $posCount); // +1 sync-check (pos.device)
         $this->assertSame(6, $memberCount);
         $this->assertSame(9, $ocrCount);
         $this->assertSame('api.line.webhook', Route::getRoutes()->getByName('api.line.webhook')->getName());

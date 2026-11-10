@@ -15,6 +15,7 @@ Route::post('/pos/pair', [PosApiController::class, 'pair'])->middleware('throttl
 
 Route::prefix('pos')->middleware('pos.device')->name('api.pos.')->group(function () {
     Route::get('/ping', [PosApiController::class, 'ping'])->name('ping');
+    Route::post('/sync-check', [PosApiController::class, 'syncCheck'])->name('sync-check');
     Route::get('/cashiers', [PosApiController::class, 'cashiers'])->name('cashiers');
     Route::post('/cashier/login', [PosApiController::class, 'cashierLogin'])->name('cashier.login');
     Route::post('/approver/verify', [PosApiController::class, 'verifyApprover'])->name('approver.verify');
