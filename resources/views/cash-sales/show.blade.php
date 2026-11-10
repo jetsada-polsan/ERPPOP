@@ -12,9 +12,11 @@
                 @if($sale->remark)<div class="text-muted small mt-1">หมายเหตุ: {{ $sale->remark }}</div>@endif
             </div>
             <div class="d-flex gap-2 align-items-center">
+                @if(! in_array($sale->status, ['cancelled', 'void'], true))
                 <a href="{{ route('documents.tax-invoice', $sale) }}" target="_blank" class="btn btn-primary px-3">
                     <i class="bi bi-receipt me-1"></i> ใบกำกับภาษี/ใบเสร็จ (A4)
                 </a>
+                @endif
                 <span class="badge text-bg-success fs-6 px-3 py-2">ขายสำเร็จ</span>
                 @include('documents._void-action', ['doc' => $sale])
             </div>

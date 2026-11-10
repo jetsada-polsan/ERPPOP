@@ -1,3 +1,5 @@
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap');
+
         :root {
             --doc-blue: #1f9bd1;
             --doc-blue-dark: #0d5d86;
@@ -11,7 +13,7 @@
         body {
             background: var(--doc-page-bg) !important;
             color: var(--doc-ink) !important;
-            font-family: 'Noto Sans Thai', 'Sarabun', 'Segoe UI', 'Leelawadee UI', sans-serif !important;
+            font-family: 'IBM Plex Sans Thai', 'Sarabun', Tahoma, sans-serif !important;
         }
 
         .toolbar,
@@ -65,42 +67,28 @@
             width: 210mm;
             min-height: 297mm;
             margin: 18px auto !important;
-            padding: 24mm 16mm 12mm !important;
+            padding: 16mm 14mm 12mm !important;
             background: #fff !important;
             color: var(--doc-ink) !important;
             position: relative;
             box-shadow: 0 18px 55px rgba(8,32,51,.10) !important;
             border-radius: 0 !important;
-            overflow: hidden !important;
+            overflow: visible !important;
         }
 
+        /* เอา ribbon และมุมสีฟ้าสามเหลี่ยมที่บังหัวเอกสารออกอย่างถาวร ทั้งบนจอและตอนสั่งพิมพ์ */
         .sheet::before,
-        .page::before,
-        .print-sheet::before {
-            content: "";
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 0;
-            height: 0;
-            border-top: 28mm solid var(--doc-blue);
-            border-left: 28mm solid transparent;
-        }
-
         .sheet::after,
+        .page::before,
         .page::after,
-        .print-sheet::after {
-            content: "1";
-            position: absolute;
-            top: 7mm;
-            right: 5mm;
-            color: #fff;
-            font-size: 20px;
-            font-weight: 900;
-        }
-
+        .print-sheet::before,
+        .print-sheet::after,
         .ribbon {
             display: none !important;
+            content: none !important;
+            border: none !important;
+            width: 0 !important;
+            height: 0 !important;
         }
 
         .head,
@@ -137,7 +125,7 @@
         .doc-title,
         .doc-title-block {
             text-align: right !important;
-            padding-right: 36px !important;
+            padding-right: 0 !important;
         }
 
         .doc-title h1,
@@ -423,6 +411,10 @@
                 width: auto !important;
                 height: auto !important;
                 background: #fff !important;
+                color: #000 !important;
+                font-family: 'IBM Plex Sans Thai', 'Sarabun', Tahoma, sans-serif !important;
+                font-size: 11pt !important;
+                line-height: 1.4 !important;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
@@ -437,9 +429,10 @@
                 height: auto !important;
                 box-sizing: border-box !important;
                 box-shadow: none !important;
-                padding: 14mm 13mm !important;
+                padding: 8mm 8mm !important;
                 overflow: visible !important;
                 zoom: 1 !important;
+                color: #000 !important;
             }
 
             /* Decorative screen-only corner must never consume printable area. */
@@ -448,7 +441,8 @@
             .page::before,
             .page::after,
             .print-sheet::before,
-            .print-sheet::after { display: none !important; }
+            .print-sheet::after,
+            .ribbon { display: none !important; content: none !important; }
 
             /* Bootstrap responsive tables clip overflowing rows unless reset for paper. */
             .table-responsive,
@@ -458,6 +452,123 @@
             .app-main {
                 max-height: none !important;
                 overflow: visible !important;
+            }
+
+            /* ── ข้อกำหนดการพิมพ์กระดาษ: สีดำคมชัด ≥ 11pt ไม่ใช้สีพื้นหลังเปลืองหมึก ── */
+            *, *::before, *::after {
+                color: #000 !important;
+                text-shadow: none !important;
+            }
+
+            .head, .doc-head, .doc-header, .bill-head {
+                border-bottom: 0.75pt solid #000 !important;
+                padding-bottom: 6pt !important;
+                margin-bottom: 8pt !important;
+            }
+
+            .co-name, .company .name, .company-block .company-name {
+                font-size: 13pt !important;
+                font-weight: 700 !important;
+                color: #000 !important;
+            }
+
+            .muted, .company .sub, .company-info, .party-info, .doc-type-sub, .orig,
+            .small, .footnote, .doc-footer, .text-muted, .doc-meta {
+                font-size: 11pt !important;
+                color: #000 !important;
+                line-height: 1.35 !important;
+            }
+
+            .doc-title h1, .doc-type, .doc-title-block .doc-type, .h4, .doc-title {
+                font-size: 18pt !important;
+                font-weight: 700 !important;
+                color: #000 !important;
+                line-height: 1.2 !important;
+            }
+
+            .box, .party-block, .info-box, .bill-customer {
+                border: 0.75pt solid #000 !important;
+                border-radius: 4px !important;
+                padding: 6pt 8pt !important;
+                background: transparent !important;
+            }
+
+            .box-label, .party-block h4 {
+                font-size: 10.5pt !important;
+                font-weight: 700 !important;
+                color: #000 !important;
+                margin-bottom: 2pt !important;
+            }
+
+            .meta-row {
+                font-size: 11pt !important;
+                padding: 1.5pt 0 !important;
+            }
+
+            /* ตารางพิมพ์: หัวตาราง 10.5pt ตัวหนา ไม่มีพื้นหลังเข้ม เส้นบาง 0.5-0.75pt */
+            table.items, .print-sheet table, .table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+                margin-top: 8pt !important;
+            }
+
+            table.items thead th, table.items th, .print-sheet table thead th, .table thead th,
+            table.items thead tr th, .summary-table th {
+                background: transparent !important;
+                color: #000 !important;
+                border-top: 0.75pt solid #000 !important;
+                border-bottom: 0.75pt solid #000 !important;
+                border-left: 0 !important;
+                border-right: 0 !important;
+                padding: 4pt 6pt !important;
+                font-size: 10.5pt !important;
+                font-weight: 700 !important;
+            }
+
+            table.items tbody td, table.items td, .print-sheet table td, .table tbody td {
+                background: transparent !important;
+                color: #000 !important;
+                border-bottom: 0.5pt solid #000 !important;
+                border-top: 0 !important;
+                border-left: 0 !important;
+                border-right: 0 !important;
+                padding: 4pt 6pt !important;
+                font-size: 11pt !important;
+            }
+
+            .table td.text-end, .table th.text-end, table.items td.r, table.items th.r,
+            .text-end, td.r, th.r {
+                text-align: right !important;
+                font-variant-numeric: tabular-nums !important;
+            }
+
+            /* ยอดรวมสุทธิ: ≥ 13pt ตัวหนา */
+            .sum-row.grand, .totals-table .grand-row td, .totals .val, .grand,
+            tfoot tr.fw-bold td, .totals .sum-row.grand {
+                background: transparent !important;
+                color: #000 !important;
+                font-size: 13.5pt !important;
+                font-weight: 700 !important;
+                border-top: 0.75pt solid #000 !important;
+                border-bottom: 1.5pt double #000 !important;
+                padding: 4pt 6pt !important;
+            }
+
+            .baht-text {
+                border: 0.75pt dashed #000 !important;
+                background: transparent !important;
+                color: #000 !important;
+                font-size: 11pt !important;
+                padding: 5pt 8pt !important;
+            }
+
+            .sign .line, .sig-line, .sign-box .line {
+                border-bottom: 0.75pt dotted #000 !important;
+            }
+
+            .sign, .sig-block, .sign-box {
+                color: #000 !important;
+                font-size: 11pt !important;
             }
 
             .sheet table thead,
@@ -486,5 +597,5 @@
             .doc-title-block { white-space: nowrap !important; }
 
             .doc-title h1,
-            .doc-title-block .doc-type { font-size: 22px !important; }
+            .doc-title-block .doc-type { font-size: 18pt !important; }
         }

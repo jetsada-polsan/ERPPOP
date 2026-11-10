@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Document;
+use App\Support\VoidedDocumentPrint;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * ใบส่งของ / ใบส่งของชั่วคราว (A5): printable delivery slip for the load-out
@@ -24,8 +26,12 @@ class DeliveryNoteController extends Controller
         'CREDIT_SALE' => 'เงินเชื่อ',
     ];
 
-    public function show(Document $document): View
+    public function show(Document $document): Response|View
     {
+        if (VoidedDocumentPrint::isVoided($document)) {
+            return VoidedDocumentPrint::deny($document);
+        }
+
         $document->load([
             'documentType', 'branch', 'salesman',
             'customer.addresses',
@@ -46,8 +52,12 @@ class DeliveryNoteController extends Controller
     }
 
     // ใบกำกับภาษีเต็มรูปแบบ A4 (ขายสด/ขายเชื่อ) - ?copy=1 พิมพ์ฉบับสำเนา
-    public function taxInvoice(Document $document): View
+    public function taxInvoice(Document $document): Response|View
     {
+        if (VoidedDocumentPrint::isVoided($document)) {
+            return VoidedDocumentPrint::deny($document);
+        }
+
         $document->load([
             'documentType', 'branch', 'salesman',
             'customer.addresses',
