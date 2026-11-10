@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
+use App\Models\PriceTable;
 use App\Models\Supplier;
 use App\Models\SupplierLedger;
 use Illuminate\Http\RedirectResponse;
@@ -58,14 +59,16 @@ class SupplierController extends Controller
     {
         $supplier->load([
             'addresses',
+            'terms.priceTable',
             'ledgerEntries' => fn ($q) => $q->orderByDesc('id')->limit(20),
             'ledgerEntries.document',
         ]);
 
         $currentBalance = (float) ($supplier->ledgerEntries()->orderByDesc('id')->value('balance_after') ?? 0);
         $branches = Branch::orderBy('code')->get();
+        $priceTables = PriceTable::where('is_active', true)->orderBy('name')->get();
 
-        return view('suppliers.show', compact('supplier', 'currentBalance', 'branches'));
+        return view('suppliers.show', compact('supplier', 'currentBalance', 'branches', 'priceTables'));
     }
 
     public function update(Request $request, Supplier $supplier): RedirectResponse
@@ -98,9 +101,23 @@ class SupplierController extends Controller
             'name_en' => ['nullable', 'string', 'max:250'],
             'tax_id' => ['nullable', 'string', 'max:20'],
             'tax_branch' => ['nullable', 'string', 'max:10'],
+            'withholding_tax_form' => ['nullable', 'string', 'in:none,pnd3,pnd53,PND3,PND53,ภ.ง.ด.3,ภ.ง.ด.53'],
             'is_active' => ['nullable', 'boolean'],
+        ], [
+            'code.required' => 'กรุณากรอกรหัสซัพพลายเออร์',
+            'code.unique' => 'รหัสซัพพลายเออร์นี้มีอยู่ในระบบแล้ว',
+            'name_th.required' => 'กรุณากรอกชื่อซัพพลายเออร์ (ไทย)',
+            'withholding_tax_form.in' => 'แบบภาษีหัก ณ ที่จ่ายต้องเป็น none, ภ.ง.ด.3 หรือ ภ.ง.ด.53',
         ]);
         $data['is_active'] = $request->boolean('is_active', true);
+
+        if (isset($data['withholding_tax_form'])) {
+            $data['withholding_tax_form'] = match (strtolower(trim($data['withholding_tax_form']))) {
+                'pnd3', 'ภ.ง.ด.3' => 'pnd3',
+                'pnd53', 'ภ.ง.ด.53' => 'pnd53',
+                default => 'none',
+            };
+        }
 
         return $data;
     }

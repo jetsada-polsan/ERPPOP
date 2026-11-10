@@ -78,6 +78,16 @@ class Customer extends Model
         return $this->hasMany(CrmOpportunity::class);
     }
 
+    public function terms(): HasMany
+    {
+        return $this->hasMany(CustomerTerm::class)->orderByDesc('is_default')->orderBy('id');
+    }
+
+    public function defaultTerm(): ?CustomerTerm
+    {
+        return $this->terms()->where('is_default', true)->first();
+    }
+
     protected function casts(): array
     {
         return [
