@@ -1,6 +1,8 @@
 storage/*.db
 storage/*.db-*
 storage/receipts/
+backups/
+storage/backups/
 __pycache__/
 *.pyc
 .venv/

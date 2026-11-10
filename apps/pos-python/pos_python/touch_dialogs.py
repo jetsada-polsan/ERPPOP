@@ -331,3 +331,52 @@ class TouchMessage:
         confirm.setObjectName('btnTouchPrimary')
         confirm.setAutoDefault(False)
         return TouchMessage.Yes if dialog.exec() == QDialog.DialogCode.Accepted else TouchMessage.No
+
+
+class BackupCopyPromptDialog(TouchDialog):
+    """Popup asking whether to save an extra backup copy to USB/another folder."""
+
+    def __init__(self, parent=None, title='สำรองข้อมูลเรียบร้อย',
+                 message='สำรองข้อมูลแล้ว ✓ ต้องการบันทึกสำเนาอีกไฟล์ไว้ที่อื่น (USB / โฟลเดอร์อื่น) ไหม?',
+                 confirm_text='บันทึกอีกไฟล์', skip_text='ข้าม ปิดกะต่อ'):
+        super().__init__(parent, title, 'สำรองข้อมูลอัตโนมัติสำเร็จแล้ว')
+        self.resize(520, 260)
+        from .ui import PALETTE
+
+        box = QFrame()
+        box.setObjectName('dialogNoticeBox')
+        box.setProperty('tone', 'success')
+        box_layout = QVBoxLayout(box)
+        box_layout.setContentsMargins(16, 14, 16, 14)
+
+        lbl = QLabel(message)
+        lbl.setWordWrap(True)
+        lbl.setStyleSheet(f"font-size:18px; font-weight:700; color:{PALETTE['text']};")
+        box_layout.addWidget(lbl)
+        self.body.addWidget(box)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(12)
+
+        self.btn_save_copy = QPushButton(confirm_text)
+        self.btn_save_copy.setObjectName('btnTouchPrimary')
+        self.btn_save_copy.setMinimumHeight(56)
+        self.btn_save_copy.setStyleSheet('font-size:18px; font-weight:800; min-height:56px;')
+
+        self.btn_skip = QPushButton(skip_text)
+        self.btn_skip.setObjectName('btnTouchSecondary')
+        self.btn_skip.setMinimumHeight(56)
+        self.btn_skip.setStyleSheet('font-size:18px; font-weight:700; min-height:56px;')
+
+        btn_layout.addWidget(self.btn_save_copy, 1)
+        btn_layout.addWidget(self.btn_skip, 1)
+        self.body.addLayout(btn_layout)
+
+        self.save_copy_chosen = False
+        self.btn_save_copy.clicked.connect(self._on_save_copy)
+        self.btn_skip.clicked.connect(self.reject)
+
+    def _on_save_copy(self):
+        self.save_copy_chosen = True
+        self.accept()
+
