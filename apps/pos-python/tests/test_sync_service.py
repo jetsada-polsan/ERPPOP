@@ -247,6 +247,52 @@ class SyncServiceTest(unittest.TestCase):
         self.assertEqual(self.db.execute("SELECT status FROM sync_outbox WHERE aggregate_uuid = ?", (sale_uuid,)).fetchone()[0], "synced")
         self.assertEqual(sync.review_sales(), [])
 
+    def test_a_bill_the_manager_closed_on_erp_leaves_the_review_list_and_frees_the_shift(self) -> None:
+        from pos_python.api_client import LaravelApiError
+        from pos_python.provisioning import ProvisioningService
+        review_uuid = self.sale()
+        self.pos.bind_server_shift(self.shift_id, 500)
+
+        class RejectingApi(FakeApi):
+            def post(self, path, payload, *, idempotency_key=None):
+                raise LaravelApiError('HTTP 422: {"success":false,"message":"ราคาต่ำกว่าทุน","needs_review":true}')
+
+        SyncService(self.db, RejectingApi()).sync_pending_sales()
+        self.pos.checkout(document_no="PY-0002", branch_id=1, terminal_id="HQ-01", shift_id=self.shift_id, cashier_id=77,
+            lines=[CartLine(1, Decimal("1"), Decimal("200"))], payment_method="cash", paid_amount=Decimal("200"),
+            sale_uuid="sale-waiting")
+        with self.assertRaises(ValueError):
+            self.pos.close_shift(shift_id=self.shift_id, counted_cash=Decimal("325.50"))
+
+        class CheckApi:
+            def __init__(self):
+                self.posts = []
+
+            def post(self, path, payload, *, idempotency_key=None):
+                self.posts.append(payload)
+                versions = payload.get("applied") or {}
+                # ERP ตอบบิลที่เครื่องไม่ได้ถามมาด้วย เครื่องต้องไม่แตะบิลนั้น
+                return {"success": True, "versions": versions, "resolved_sales": [review_uuid.upper(), "sale-waiting"]}
+
+        api = CheckApi()
+        out = ProvisioningService(self.db, api).check_master_versions(1)
+        self.assertEqual(api.posts[0]["review_uuids"], [review_uuid])
+        self.assertEqual(set(api.posts[0]["counts"]), {"catalog", "promotions", "cashiers"})
+        self.assertEqual(out["resolved"], 1)
+        status = lambda uuid: (
+            self.db.execute("SELECT status FROM sync_outbox WHERE aggregate_uuid = ?", (uuid,)).fetchone()[0],
+            self.db.execute("SELECT sync_status FROM sales WHERE sale_uuid = ?", (uuid,)).fetchone()[0])
+        self.assertEqual(status(review_uuid), ("resolved", "resolved"))
+        self.assertEqual(status("sale-waiting"), ("pending", "pending"), "บิลที่ยังรอส่งต้องไม่ถูกปิดตาม")
+
+        sync = SyncService(self.db, FakeApi())
+        self.assertEqual(sync.review_sales(), [])
+        self.assertEqual(sync.requeue_review_sales(), 0)
+        sync.sync_pending_sales()
+        self.assertEqual([key for _, _, key in sync.api.calls], ["sale-waiting"], "บิลที่ปิดแล้วต้องไม่ถูกส่งขึ้น ERP อีก")
+        self.assertEqual(self.db.execute("SELECT count(*) FROM sales").fetchone()[0], 2, "บิลยังอยู่ในเครื่อง ไม่ถูกลบ")
+        self.pos.close_shift(shift_id=self.shift_id, counted_cash=Decimal("325.50"))
+
     def test_a_422_without_review_flag_keeps_the_old_retry_behaviour(self) -> None:
         from pos_python.api_client import LaravelApiError
         sale_uuid = self.sale()

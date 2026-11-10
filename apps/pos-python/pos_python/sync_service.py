@@ -26,6 +26,8 @@ READY = "AND (next_attempt_at IS NULL OR next_attempt_at <= ?)"
 # ERP ปฏิเสธบิลด้วยเหตุทางธุรกิจ (ราคา/กะ/สินค้า) และเก็บบิลไว้ให้ผู้จัดการตรวจแล้ว
 # ยิงซ้ำก็ไม่ผ่าน จึงหยุดส่งเองจนกว่าคนจะกด "ส่งใหม่" หลังแก้ต้นเหตุ
 NEEDS_REVIEW = "needs_review"
+# ผู้จัดการปิดรายการบน ERP แล้ว: ไม่ส่งขึ้นอีก ไม่นับเป็นบิลค้าง แต่บิลยังอยู่ในเครื่อง
+RESOLVED = "resolved"
 
 
 class SaleNeedsReview(RuntimeError):
@@ -422,6 +424,26 @@ class SyncService:
                WHERE o.aggregate_type = 'sale' AND o.status = ? ORDER BY s.sale_datetime""",
             (NEEDS_REVIEW,),
         ).fetchall()
+
+    def mark_resolved(self, sale_uuids: list[str]) -> int:
+        """ERP แจ้งว่าผู้จัดการปิดรายการบิลเหล่านี้แล้ว เอาออกจากรายการรอตรวจ
+
+        แตะเฉพาะบิลที่ยังเป็น needs_review เท่านั้น บิลที่รอส่งหรือส่งแล้วไม่ถูกเปลี่ยน
+        """
+        done = 0
+        with self.db:
+            for sale_uuid in sale_uuids:
+                cursor = self.db.execute(
+                    "UPDATE sync_outbox SET status = ? WHERE aggregate_type = 'sale' AND status = ? AND lower(aggregate_uuid) = ?",
+                    (RESOLVED, NEEDS_REVIEW, str(sale_uuid).lower()),
+                )
+                if cursor.rowcount:
+                    self.db.execute(
+                        "UPDATE sales SET sync_status = ? WHERE lower(sale_uuid) = ? AND sync_status = ?",
+                        (RESOLVED, str(sale_uuid).lower(), NEEDS_REVIEW),
+                    )
+                    done += cursor.rowcount
+        return done
 
     def requeue_review_sales(self) -> int:
         """หลังแก้ต้นเหตุบน ERP (เปิดกะ/แก้ราคา) ให้ส่งบิลที่ติดตรวจใหม่ในรอบ sync ถัดไป"""

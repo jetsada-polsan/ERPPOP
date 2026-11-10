@@ -553,7 +553,8 @@ def cashier_error(error):
 
 
 def sale_status_label(status):
-    return {"synced": "ส่งแล้ว", "pending": "รอส่ง", "failed": "ส่งไม่สำเร็จ"}.get(status, "รอส่ง")
+    return {"synced": "ส่งแล้ว", "pending": "รอส่ง", "failed": "ส่งไม่สำเร็จ",
+            "needs_review": "ERP ไม่รับ รอตรวจ", "resolved": "ปิดรายการที่ ERP แล้ว"}.get(status, "รอส่ง")
 
 
 def receipt_action_problem(sale, shift, online):
@@ -1601,7 +1602,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     "เชื่อม ERP ได้",
                     f"สาขา: {profile.get('branch_name', '-')}\n"
                     f"อัปเดตคนขาย {result['upserted']} คน\n"
-                    "กำลังดึงสินค้า/ราคา และส่งบิลค้างในเบื้องหลัง",
+                    "กำลังดึงสินค้า/ราคา/โปรโมชัน และส่งบิลค้างในเบื้องหลัง\n"
+                    "ดูจำนวนที่ได้ในตาราง สถานะเครื่อง",
                 )
                 self.show_section("สถานะเครื่อง")
             except Exception as error:
@@ -1738,7 +1740,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 valid = counted.is_finite() and counted >= 0
             except (InvalidOperation, ValueError):
                 valid = False
-            pending = service.db.execute("SELECT count(*) FROM sales WHERE shift_id = ? AND sync_status != 'synced'", (self.parent().shift_id,)).fetchone()[0]
+            pending = service.db.execute("SELECT count(*) FROM sales WHERE shift_id = ? AND sync_status NOT IN ('synced', 'resolved')", (self.parent().shift_id,)).fetchone()[0]
             self.submit.setEnabled(valid and not pending)
             if pending:
                 self.difference.setText(f"ต้องส่งบิลค้าง {pending} ใบขึ้น ERP ก่อนปิดกะ")

@@ -582,9 +582,13 @@ class ProvisioningService:
         โปรที่ข้ามไปรอบก่อน (เครื่องยังไม่รู้จักสินค้า) ต้องได้ผูกใหม่
         """
         applied = self._get_setting(MASTER_VERSIONS_KEY) or {}
-        payload = {"applied": applied, "pending_bills": int(pending_bills)}
+        payload = {"applied": applied, "pending_bills": int(pending_bills), "counts": self.local_counts()}
         if app_version:
             payload["app_version"] = str(app_version)[:40]
+        review = [str(row[0]) for row in self.db.execute(
+            "SELECT aggregate_uuid FROM sync_outbox WHERE aggregate_type = 'sale' AND status = 'needs_review' LIMIT 500")]
+        if review:
+            payload["review_uuids"] = review
         try:
             response = self.api.post("/api/pos/sync-check", payload)
         except Exception as error:
@@ -594,6 +598,13 @@ class ProvisioningService:
         versions = response.get("versions") if isinstance(response, dict) else None
         if not isinstance(versions, dict):
             return None
+        resolved = 0
+        closed = response.get("resolved_sales")
+        if review and isinstance(closed, list):
+            # รับเฉพาะบิลที่เครื่องถามไปเอง กัน ERP ตอบ uuid อื่นมาแล้วไปแตะบิลผิดใบ
+            asked = {item.lower() for item in review}
+            from .sync_service import SyncService
+            resolved = SyncService(self.db, None).mark_resolved([str(u) for u in closed if str(u).lower() in asked])
         stale = [key for key in ("catalog", "cashiers", "promotions") if applied.get(key) != versions.get(key)]
         if "catalog" in stale and "promotions" not in stale:
             stale.append("promotions")
@@ -608,10 +619,25 @@ class ProvisioningService:
         if pulled:
             # รายงานซ้ำให้หลังบ้านเห็นทันทีว่าเครื่องได้ข้อมูลล่าสุดแล้ว
             try:
-                self.api.post("/api/pos/sync-check", {**payload, "applied": applied, "pulled": True})
+                again = {**payload, "applied": applied, "pulled": True, "counts": self.local_counts()}
+                again.pop("review_uuids", None)
+                self.api.post("/api/pos/sync-check", again)
             except Exception:
                 pass
-        return {"stale": stale, "pulled": pulled}
+        return {"stale": stale, "pulled": pulled, "resolved": resolved}
+
+    def local_counts(self) -> dict[str, int]:
+        """จำนวนข้อมูลที่เครื่องมีจริง ส่งให้ ERP เทียบว่าเครื่องได้ครบไหม"""
+        def count(sql: str) -> int:
+            try:
+                return int(self.db.execute(sql).fetchone()[0])
+            except sqlite3.Error:
+                return 0
+        return {
+            "catalog": count("SELECT count(*) FROM products WHERE active = 1"),
+            "promotions": count("SELECT count(*) FROM qty_promotions"),
+            "cashiers": count("SELECT count(*) FROM local_cashiers WHERE active = 1 AND revoked_at IS NULL"),
+        }
 
     def _fetch_versions(self) -> dict[str, Any] | None:
         try:

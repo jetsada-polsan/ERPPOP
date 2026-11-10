@@ -198,7 +198,7 @@ class PosService:
         ).fetchall()
         pending = self.db.execute(
             """SELECT count(*) FROM sales
-               WHERE sync_status != 'synced' AND sale_datetime >= ? AND sale_datetime <= ?""",
+               WHERE sync_status NOT IN ('synced', 'resolved') AND sale_datetime >= ? AND sale_datetime <= ?""",
             (start, end),
         ).fetchone()[0]
         by_method: dict[str, Decimal] = {}
@@ -476,7 +476,7 @@ class PosService:
         shift = self.db.execute("SELECT * FROM shifts WHERE id = ? AND status = 'open'", (shift_id,)).fetchone()
         if not shift:
             raise ValueError("ไม่พบกะที่เปิดอยู่")
-        if self.db.execute("SELECT count(*) FROM sales WHERE shift_id = ? AND sync_status != 'synced'", (shift_id,)).fetchone()[0]:
+        if self.db.execute("SELECT count(*) FROM sales WHERE shift_id = ? AND sync_status NOT IN ('synced', 'resolved')", (shift_id,)).fetchone()[0]:
             raise ValueError("ต้องส่งบิลค้างขึ้น ERP ให้ครบก่อนปิดกะ")
         summary = self.shift_cash_summary(shift_id)
         closed_at = self._now()

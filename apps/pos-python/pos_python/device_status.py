@@ -17,6 +17,7 @@ DATASETS = [
     ("device_profile", "โปรไฟล์เครื่อง"),
     ("catalog", "สินค้าและราคา"),
     ("cashiers", "คนขาย / PIN"),
+    ("promotions", "โปรโมชัน"),
     ("sales_outbox", "ส่งบิลขาย"),
     ("auth_events", "ประวัติการเข้าใช้"),
 ]
