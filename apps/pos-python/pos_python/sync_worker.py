@@ -91,7 +91,9 @@ class SyncWorker:
                     "SELECT last_error FROM sync_outbox WHERE status = 'failed' AND last_error IS NOT NULL "
                     "ORDER BY id DESC LIMIT 1").fetchone()
                 reason = str(latest[0]) if latest and latest[0] else ""
-                if not reason or "network:" in reason:
+                # ถือว่า "ERP ตอบกลับแต่ไม่รับ" เฉพาะ HTTP 4xx ที่มาจาก ERP จริง อย่างอื่นนับเป็นเน็ตมีปัญหา
+                rejected_by_erp = reason.startswith("HTTP 4")
+                if not rejected_by_erp:
                     self.online = False
                     self.last_error = f"มีรายการ sync ล้มเหลว {result['failed']} รายการ"
                 else:
