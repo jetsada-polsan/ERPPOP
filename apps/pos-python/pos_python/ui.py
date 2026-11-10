@@ -1868,14 +1868,14 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
                 btn_minus = QPushButton('−')
                 btn_minus.setObjectName(f'btnCoinMinus_{row}')
-                btn_minus.setMinimumSize(44, 44)
-                btn_minus.setMaximumSize(48, 44)
+                btn_minus.setMinimumSize(44, 40)
+                btn_minus.setMaximumSize(48, 40)
                 btn_minus.setAutoRepeat(True)
                 btn_minus.setAutoRepeatDelay(400)
                 btn_minus.setAutoRepeatInterval(80)
                 btn_minus.setFocusPolicy(Qt.NoFocus)
                 btn_minus.setStyleSheet(
-                    f"QPushButton {{ min-width:44px; max-width:48px; min-height:44px; font-size:22px; font-weight:800; "
+                    f"QPushButton {{ min-width:44px; max-width:48px; min-height:40px; max-height:40px; font-size:22px; font-weight:800; "
                     f"background:{PALETTE['surface']}; color:{PALETTE['primary_dark']}; "
                     f"border:1px solid {PALETTE['border']}; border-radius:8px; padding:0; }} "
                     f"QPushButton:pressed {{ background:{PALETTE['primary_soft']}; border-color:{PALETTE['primary']}; }}"
@@ -1889,14 +1889,14 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
                 btn_plus = QPushButton('+')
                 btn_plus.setObjectName(f'btnCoinPlus_{row}')
-                btn_plus.setMinimumSize(44, 44)
-                btn_plus.setMaximumSize(48, 44)
+                btn_plus.setMinimumSize(44, 40)
+                btn_plus.setMaximumSize(48, 40)
                 btn_plus.setAutoRepeat(True)
                 btn_plus.setAutoRepeatDelay(400)
                 btn_plus.setAutoRepeatInterval(80)
                 btn_plus.setFocusPolicy(Qt.NoFocus)
                 btn_plus.setStyleSheet(
-                    f"QPushButton {{ min-width:44px; max-width:48px; min-height:44px; font-size:22px; font-weight:800; "
+                    f"QPushButton {{ min-width:44px; max-width:48px; min-height:40px; max-height:40px; font-size:22px; font-weight:800; "
                     f"background:{PALETTE['surface']}; color:{PALETTE['primary_dark']}; "
                     f"border:1px solid {PALETTE['border']}; border-radius:8px; padding:0; }} "
                     f"QPushButton:pressed {{ background:{PALETTE['primary_soft']}; border-color:{PALETTE['primary']}; }}"
@@ -1913,7 +1913,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 cell_box.addWidget(btn_plus)
 
                 self.coins.setCellWidget(row, 1, container)
-                self.coins.setRowHeight(row, max(44, entry.minimumSizeHint().height() + 4))
+                self.coins.setRowHeight(row, 40)
                 entry.textChanged.connect(self.denominations)
 
             left_col.addWidget(self.coins, 1)

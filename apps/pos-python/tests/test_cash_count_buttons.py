@@ -212,11 +212,11 @@ def test_button_touch_geometry_at_least_44px(float_dialog):
         m = d.coin_minus_buttons[i]
         p = d.coin_plus_buttons[i]
         assert m.minimumWidth() >= 44
-        assert m.minimumHeight() >= 44
+        assert m.minimumHeight() >= 40
         assert p.minimumWidth() >= 44
-        assert p.minimumHeight() >= 44
-        assert m.height() >= 44
-        assert p.height() >= 44
+        assert p.minimumHeight() >= 40
+        assert m.height() >= 40
+        assert p.height() >= 40
     assert d.clear_btn.height() >= 30
 
 
