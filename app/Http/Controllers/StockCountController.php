@@ -11,6 +11,7 @@ use App\Services\Inventory\StockCountService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -158,7 +159,7 @@ class StockCountController extends Controller
     }
 
     // Import the filled CSV back: matches by รหัสสินค้า, fills counted qty
-    public function import(Request $request, StockCount $stockCount): RedirectResponse
+    public function import(Request $request, StockCount $stockCount): JsonResponse|RedirectResponse
     {
         abort_unless($stockCount->isEditable(), 422, 'ใบนี้ปรับปรุงแล้ว แก้ไขไม่ได้');
 
@@ -171,37 +172,88 @@ class StockCountController extends Controller
             ->join('products', 'products.id', '=', 'stock_count_items.product_id')
             ->pluck('stock_count_items.id', 'products.sku_code');
 
-        $updated = 0;
+        $itemsToUpdate = [];
         $skipped = [];
+        $countedCol = null;
         $fh = fopen($request->file('file')->getRealPath(), 'r');
         $rowNo = 0;
         while (($row = fgetcsv($fh)) !== false) {
             $rowNo++;
+            if ($rowNo === 1 && isset($row[0])) {
+                $row[0] = preg_replace('/^\xEF\xBB\xBF/', '', (string) $row[0]);
+            }
+
+            // Detect counted column from header if not yet detected
+            if ($countedCol === null && $rowNo <= 2) {
+                foreach ($row as $colIdx => $colVal) {
+                    $cleaned = mb_strtolower(trim((string) $colVal));
+                    if (in_array($cleaned, ['จำนวนนับจริง', 'ยอดนับ', 'ยอดนับจริง', 'counted', 'counted_qty', 'qty'], true)) {
+                        $countedCol = $colIdx;
+                        break;
+                    }
+                }
+            }
+
             $sku = trim((string) ($row[0] ?? ''));
             $sku = preg_replace('/^\xEF\xBB\xBF/', '', $sku);
-            $counted = trim((string) ($row[4] ?? ''));
-
-            // Skip header/meta rows and rows without a counted value
-            if ($sku === '' || ! isset($itemIdBySku[$sku])) {
-                if ($sku !== '' && $rowNo > 2) {
-                    $skipped[] = $sku;
-                }
-
+            $isHeader = in_array(mb_strtolower($sku), ['รหัสสินค้า', 'sku', 'ใบตรวจนับ'], true);
+            if ($sku === '' || $isHeader) {
                 continue;
             }
+
+            if (! isset($itemIdBySku[$sku])) {
+                $skipped[] = $sku;
+                continue;
+            }
+
+            $idx = $countedCol ?? (count($row) >= 5 ? 4 : (count($row) >= 3 ? 2 : 1));
+            $counted = trim((string) ($row[$idx] ?? ''));
+
             if ($counted === '' || ! is_numeric(str_replace(',', '', $counted))) {
                 continue;
             }
 
-            StockCountItem::whereKey($itemIdBySku[$sku])
-                ->update(['counted_qty' => (float) str_replace(',', '', $counted)]);
-            $updated++;
+            $itemsToUpdate[$itemIdBySku[$sku]] = (float) str_replace(',', '', $counted);
         }
         fclose($fh);
+
+        $updated = count($itemsToUpdate);
+
+        if ($updated > 0) {
+            DB::transaction(function () use ($itemsToUpdate, $stockCount) {
+                foreach (array_chunk($itemsToUpdate, 500, true) as $chunk) {
+                    $cases = [];
+                    $bindings = [];
+                    $ids = [];
+                    foreach ($chunk as $id => $qty) {
+                        $cases[] = 'WHEN ? THEN ?';
+                        $bindings[] = (int) $id;
+                        $bindings[] = $qty;
+                        $ids[] = (int) $id;
+                    }
+                    $caseSql = implode(' ', $cases);
+                    $inPlaceholders = implode(',', array_fill(0, count($ids), '?'));
+                    $bindings = array_merge($bindings, $ids);
+                    $bindings[] = (int) $stockCount->id;
+
+                    DB::update("UPDATE stock_count_items SET counted_qty = CASE id {$caseSql} END WHERE id IN ({$inPlaceholders}) AND stock_count_id = ?", $bindings);
+                }
+            });
+        }
 
         $msg = "Import สำเร็จ อัปเดตยอดนับ {$updated} รายการ";
         if ($skipped !== []) {
             $msg .= ' (ไม่พบรหัสในใบนี้ '.count($skipped).' รายการ เช่น '.implode(', ', array_slice($skipped, 0, 5)).')';
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $msg,
+                'updated' => $updated,
+                'skipped' => $skipped,
+                'skipped_count' => count($skipped),
+            ]);
         }
 
         return redirect()->route('stock-counts.show', $stockCount)->with('success', $msg);
