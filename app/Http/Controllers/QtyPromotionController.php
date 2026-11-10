@@ -13,7 +13,7 @@ class QtyPromotionController extends Controller
 {
     public function index(): View
     {
-        $promotions = QtyPromotion::with(['product', 'freeProduct', 'branch', 'groupProducts:id,sku_code,name_th'])
+        $promotions = QtyPromotion::with(['product.baseUnit', 'freeProduct.baseUnit', 'branch', 'groupProducts:id,sku_code,name_th'])
             ->orderByDesc('id')->paginate(50);
         $branches = Branch::orderBy('code')->get(['id', 'code', 'name_th']);
 
@@ -69,6 +69,29 @@ class QtyPromotionController extends Controller
             'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
             'note' => ['nullable', 'string', 'max:2000'],
             'is_active' => ['nullable', 'boolean'],
+        ], [
+            'name.required' => 'กรุณากรอกชื่อแคมเปญ',
+            'promo_type.required' => 'กรุณาเลือกประเภทโปรโมชัน',
+            'promo_type.in' => 'ประเภทโปรโมชันไม่ถูกต้อง',
+            'product_id.required_if' => 'กรุณาเลือกสินค้า',
+            'product_id.exists' => 'ไม่พบข้อมูลสินค้าที่เลือก',
+            'product_ids.required_if' => 'กรุณาเลือกสินค้าในกลุ่มอย่างน้อย 2 ตัว',
+            'product_ids.min' => 'กรุณาเลือกสินค้าในกลุ่มอย่างน้อย 2 ตัว',
+            'min_qty.required_unless' => 'กรุณาระบุจำนวนสินค้าขั้นต่ำ',
+            'min_qty.min' => 'จำนวนสินค้าขั้นต่ำต้องมากกว่า 0',
+            'min_amount.required_if' => 'กรุณาระบุยอดซื้อขั้นต่ำ',
+            'min_amount.min' => 'ยอดซื้อขั้นต่ำต้องมากกว่า 0',
+            'free_product_id.required_if' => 'กรุณาเลือกสินค้าของแถม',
+            'free_product_id.exists' => 'ไม่พบข้อมูลสินค้าของแถม',
+            'free_qty.required_if' => 'กรุณาระบุจำนวนของแถม',
+            'free_qty.min' => 'จำนวนของแถมต้องมากกว่า 0',
+            'discount_type.required_if' => 'กรุณาเลือกประเภทส่วนลด',
+            'discount_value.required_if' => 'กรุณาระบุมูลค่าส่วนลด',
+            'discount_value.min' => 'มูลค่าส่วนลดต้องมากกว่า 0',
+            'discount_value.max' => 'ส่วนลดเปอร์เซ็นต์ต้องไม่เกิน 100%',
+            'bundle_price.required_if' => 'กรุณาระบุราคาชุด/ราคาแลกซื้อ',
+            'bundle_price.min' => 'ราคาชุด/ราคาแลกซื้อต้องไม่ติดลบ',
+            'ends_at.after_or_equal' => 'เวลาสิ้นสุดต้องไม่ก่อนเวลาเริ่มต้น',
         ]);
         $data['is_active'] = $request->boolean('is_active', true);
 
