@@ -84,6 +84,19 @@ class PosPricingGuardTest extends TestCase
         $this->assertSame((float) $expected, app(PosPricingGuard::class)->validate($payload, $user));
     }
 
+    /** 1 แถม 1 สินค้าตัวเดียวกัน ซื้อ 3 ชิ้น ราคา 100: แถม 1 ชิ้น จ่าย 200 (บั๊กเดิมแถมทั้ง 3 ชิ้น จ่าย 0) */
+    public function test_buy_one_get_one_of_the_same_product_frees_one_unit_per_pair(): void
+    {
+        [$user, $branch, $product] = $this->masters();
+        QtyPromotion::create(['code' => 'P0-1F1', 'name' => '1 แถม 1', 'promo_type' => 'free_item',
+            'product_id' => $product->id, 'min_qty' => 1, 'free_product_id' => $product->id, 'free_qty' => 1,
+            'is_active' => true]);
+        // POS ส่งราคาสุทธิต่อชิ้นหลังกระจายส่วนลด: 200 / 3
+        $payload = $this->payload($branch, $product, 200 / 3);
+        $payload['items'][0]['qty'] = 3;
+        $this->assertSame(200.0, app(PosPricingGuard::class)->validate($payload, $user));
+    }
+
     public function test_server_rejects_a_client_price_that_does_not_match_master_price(): void
     {
         [$user, $branch, $product] = $this->masters();

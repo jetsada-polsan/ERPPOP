@@ -453,7 +453,11 @@ class PosPricingGuard
             } elseif ($promotion->promo_type === 'free_item') {
                 $gift = $lines->firstWhere('product_id', (int) $promotion->free_product_id);
                 if ($gift) {
-                    $freeQty = $min($gift['qty'], DecimalMath::multiply($sets, $promotion->free_qty));
+                    // 1 แถม 1 สินค้าตัวเดียวกัน: ของแถมอยู่ในจำนวนที่ซื้อ ชุดละ (ซื้อ + แถม) ชิ้น
+                    $giftSets = (int) $promotion->free_product_id === (int) $promotion->product_id
+                        ? $floor($trigger['qty'], DecimalMath::add($promotion->min_qty, $promotion->free_qty))
+                        : $sets;
+                    $freeQty = $min($gift['qty'], DecimalMath::multiply($giftSets, $promotion->free_qty));
                     $discount = DecimalMath::add($discount, DecimalMath::multiply($freeQty, $gift['unit_price']));
                 }
             }
