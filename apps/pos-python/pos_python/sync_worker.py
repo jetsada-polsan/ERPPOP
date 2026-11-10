@@ -11,6 +11,7 @@ connection) เพราะ sqlite3 connection ใช้ข้ามเธรด
 from __future__ import annotations
 
 import threading
+import time
 from pathlib import Path
 from typing import Callable
 
@@ -21,7 +22,9 @@ from .sync_service import SyncService
 class SyncWorker:
     def __init__(self, db_path: Path, api, *, idle_interval: float = 30.0,
                  retry_interval: float = 5.0, on_result: Callable[[dict], None] | None = None,
-                 refresh_down: Callable[[], dict] | None = None):
+                 refresh_down: Callable[[], dict] | None = None,
+                 check_master: Callable[[int], dict | None] | None = None,
+                 master_check_interval: float = 300.0):
         self.db_path = Path(db_path)
         self.api = api
         self.idle_interval = idle_interval
@@ -31,6 +34,11 @@ class SyncWorker:
         # The worker must never share the GUI connection across threads.
         self.refresh_down = refresh_down
         self.needs_down_sync = False
+        # เช็คเลขเวอร์ชันข้อมูลหลังบ้านทุก ~5 นาที ดึงเฉพาะชุดที่เปลี่ยน (โปรใหม่ถึงเครื่องเอง)
+        self.check_master = check_master
+        self.master_check_interval = master_check_interval
+        self._last_master_check: float | None = None
+        self.last_master_check: dict | None = None
         # สถานะนี้จะเป็น True ได้ต่อเมื่อ bootstrap/manual health check เรียก
         # /api/pos/ping ผ่านแล้วเท่านั้น ห้ามอนุมานจาก pending == 0 เพราะคิวว่าง
         # ไม่ได้แปลว่า Device Token ถูกยืนยันแล้ว
@@ -77,6 +85,7 @@ class SyncWorker:
                 self.last_error = ""
             service = SyncService(db, self.api)
             result = service.sync_pending_sales()
+            self._maybe_check_master(download, db)
             if download:
                 result = {**result, "download": download}
             self.pending = self._pending_count(db)
@@ -113,6 +122,23 @@ class SyncWorker:
     def next_interval(self) -> float:
         """ค้างอยู่ก็ถี่ ว่างก็ห่าง — คืนช่วงรอสำหรับรอบถัดไป"""
         return self.retry_interval if self.pending > 0 else self.idle_interval
+
+    def _maybe_check_master(self, download: dict, db) -> None:
+        if self.check_master is None or not self.online:
+            return
+        now_ = time.monotonic()
+        if download:
+            # เพิ่งดึงทั้งชุดตอนเน็ตกลับ นับรอบใหม่จากตอนนี้
+            self._last_master_check = now_
+            return
+        if self._last_master_check is not None and now_ - self._last_master_check < self.master_check_interval:
+            return
+        self._last_master_check = now_
+        try:
+            self.last_master_check = self.check_master(self._pending_count(db))
+        except Exception as error:
+            # เช็คไม่ผ่านไม่ใช่เหตุให้หยุดส่งบิล รอบหน้าลองใหม่
+            self.last_master_check = {"error": str(error)[:300]}
 
     def _pending_count(self, db) -> int:
         return int(db.execute(

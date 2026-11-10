@@ -19,6 +19,7 @@ from .config import DeviceConfig, load_device_config
 from .database import connect
 from .provisioning import ProvisioningService
 from .sync_worker import SyncWorker
+from .build_info import APP_VERSION
 
 
 @dataclass
@@ -61,7 +62,18 @@ def bootstrap(data_dir: Path, db: sqlite3.Connection, db_path: Path,
         finally:
             refresh_db.close()
 
-    worker = SyncWorker(db_path, api, refresh_down=refresh_down)
+    def check_master(pending_bills: int) -> dict[str, Any] | None:
+        check_db = connect(db_path)
+        try:
+            branch = ctx.branch_id or _cached_setting(check_db, "branch_id")
+            if not branch:
+                return None
+            return ProvisioningService(check_db, api).check_master_versions(
+                int(branch), pending_bills=pending_bills, app_version=APP_VERSION)
+        finally:
+            check_db.close()
+
+    worker = SyncWorker(db_path, api, refresh_down=refresh_down, check_master=check_master)
     ctx = OnlineContext(api=api, provisioning=prov, worker=worker)
 
     try:

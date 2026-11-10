@@ -27,6 +27,8 @@ class PosApiDown(Protocol):
     def post(self, path: str, payload: dict, *, idempotency_key: str | None = None) -> dict: ...
 
 
+MASTER_VERSIONS_KEY = "master_versions"
+
 # ค่าจาก ping ที่ต้องแคชไว้ให้ทำงานต่อได้ตอนออฟไลน์ (คีย์ device_settings -> ตำแหน่งใน payload)
 _PING_SETTINGS = {
     "branch_id": ("branch_id",),
@@ -503,10 +505,14 @@ class ProvisioningService:
         )
         self.db.commit()
         result: dict[str, Any] = {}
+        # ถามเลขเวอร์ชันก่อนดึง ถ้าดึงครบจะได้จำไว้ รอบเช็คถัดไปไม่ต้องดึงซ้ำทั้งชุด
+        versions = self._fetch_versions()
         try:
             result["catalog"] = self._sync_dataset("catalog", lambda: self.pull_catalog(branch_id))
             result["cashiers"] = self._sync_dataset("cashiers", lambda: self.pull_cashiers(branch_id))
             result["promotions"] = self._sync_dataset("promotions", lambda: self.pull_promotions(branch_id))
+            if versions:
+                self._put_setting(MASTER_VERSIONS_KEY, versions)
             with self.db:
                 self.db.execute(
                     "UPDATE sync_runs SET status = 'synced', finished_at = ?, datasets_json = ? WHERE run_uuid = ?",
@@ -565,6 +571,55 @@ class ProvisioningService:
                  updated_at = excluded.updated_at""",
             (entity, status, started_at, success_at, error, item_count, timestamp),
         )
+
+    # ── เช็คเวอร์ชันข้อมูลหลังบ้าน (เบา) ────────────────────────────
+    def check_master_versions(self, branch_id: int, *, pending_bills: int = 0,
+                              app_version: str | None = None) -> dict[str, Any] | None:
+        """ถาม ERP ว่าข้อมูลชุดไหนเปลี่ยน แล้วดึงเฉพาะชุดนั้น
+
+        คืน None ถ้า ERP ยังไม่มี endpoint นี้ (ERP รุ่นเก่า) เครื่องทำงานแบบเดิมต่อได้
+        ดึงสินค้าใหม่ต้องดึงโปรตามด้วย เพราะโปรอ้างสินค้า ถ้าสินค้าเพิ่งเข้ามา
+        โปรที่ข้ามไปรอบก่อน (เครื่องยังไม่รู้จักสินค้า) ต้องได้ผูกใหม่
+        """
+        applied = self._get_setting(MASTER_VERSIONS_KEY) or {}
+        payload = {"applied": applied, "pending_bills": int(pending_bills)}
+        if app_version:
+            payload["app_version"] = str(app_version)[:40]
+        try:
+            response = self.api.post("/api/pos/sync-check", payload)
+        except Exception as error:
+            if str(error).startswith("HTTP 404"):
+                return None
+            raise
+        versions = response.get("versions") if isinstance(response, dict) else None
+        if not isinstance(versions, dict):
+            return None
+        stale = [key for key in ("catalog", "cashiers", "promotions") if applied.get(key) != versions.get(key)]
+        if "catalog" in stale and "promotions" not in stale:
+            stale.append("promotions")
+        pulls = {"catalog": self.pull_catalog, "cashiers": self.pull_cashiers, "promotions": self.pull_promotions}
+        pulled: dict[str, Any] = {}
+        for key in stale:
+            pulled[key] = self._sync_dataset(key, lambda key=key: pulls[key](branch_id))
+            if versions.get(key):
+                applied[key] = versions[key]
+            with self.db:
+                self._put_setting(MASTER_VERSIONS_KEY, applied)
+        if pulled:
+            # รายงานซ้ำให้หลังบ้านเห็นทันทีว่าเครื่องได้ข้อมูลล่าสุดแล้ว
+            try:
+                self.api.post("/api/pos/sync-check", {**payload, "applied": applied, "pulled": True})
+            except Exception:
+                pass
+        return {"stale": stale, "pulled": pulled}
+
+    def _fetch_versions(self) -> dict[str, Any] | None:
+        try:
+            response = self.api.post("/api/pos/sync-check", {"applied": {}})
+        except Exception:
+            return None
+        versions = response.get("versions") if isinstance(response, dict) else None
+        return versions if isinstance(versions, dict) else None
 
     # ── helpers ──────────────────────────────────────────────────
     def _put_setting(self, key: str, value: Any) -> None:
