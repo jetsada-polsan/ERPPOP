@@ -613,7 +613,10 @@
                             <td>{{ $lot->warehouseLocation?->warehouse?->name_th ?? $lot->warehouseLocation?->code ?? '-' }}</td>
                             <td>{{ $lot->received_date?->format('d/m/Y') }}</td>
                             <td>{{ $lot->manufacture_date?->format('d/m/Y') ?? '-' }}</td>
-                            <td>{{ $lot->expiry_date?->format('d/m/Y') ?? '-' }}</td>
+                            <td>
+                                {{ $lot->expiry_date?->format('d/m/Y') ?? '-' }}
+                                <x-lot-expiry-badge :date="$lot->expiry_date" :compact="true" />
+                            </td>
                             <td class="text-end">{{ number_format($lot->remaining_qty, 4) }}</td>
                             <td>
                                 @if($lot->quality_status === 'hold')<span class="badge text-bg-warning">พักตรวจ</span>

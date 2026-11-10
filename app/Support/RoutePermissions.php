@@ -65,6 +65,7 @@ class RoutePermissions
         'stock-issues.approve' => 'stock.damage.approve',
         'stock-issues.reject' => 'stock.damage.approve',
         'stock-transforms.' => 'stock.manage',
+        'stock-expiry.' => 'stock.manage',
         'production.' => 'stock.manage',
         'warehouse-locations.' => 'stock.manage',
         'basic-master.' => 'masterdata.manage',

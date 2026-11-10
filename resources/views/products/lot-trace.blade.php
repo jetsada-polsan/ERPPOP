@@ -24,7 +24,11 @@
             <div class="col-md-3"><span class="text-muted d-block">เอกสารรับเข้า</span>{{ $stockLot->sourceDocument?->doc_number ?? 'ยอดยกมา' }}</div>
             <div class="col-md-2"><span class="text-muted d-block">วันรับ</span>{{ $stockLot->received_date?->format('d/m/Y') }}</div>
             <div class="col-md-2"><span class="text-muted d-block">วันผลิต</span>{{ $stockLot->manufacture_date?->format('d/m/Y') ?? '-' }}</div>
-            <div class="col-md-2"><span class="text-muted d-block">วันหมดอายุ</span>{{ $stockLot->expiry_date?->format('d/m/Y') ?? '-' }}</div>
+            <div class="col-md-2">
+                <span class="text-muted d-block">วันหมดอายุ</span>
+                {{ $stockLot->expiry_date?->format('d/m/Y') ?? '-' }}
+                <x-lot-expiry-badge :date="$stockLot->expiry_date" :compact="true" />
+            </div>
             <div class="col-md-3"><span class="text-muted d-block">รับเข้า / คงเหลือ</span>{{ number_format($stockLot->initial_qty, 4) }} / {{ number_format($stockLot->remaining_qty, 4) }}</div>
         </div>
         @if($stockLot->quality_reason)<div class="alert alert-warning mt-3 mb-0"><strong>เหตุผลควบคุม:</strong> {{ $stockLot->quality_reason }}</div>@endif

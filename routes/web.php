@@ -81,6 +81,7 @@ use App\Http\Controllers\ScalePriceController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\StockAdjustmentController;
 use App\Http\Controllers\StockCountController;
+use App\Http\Controllers\StockExpiryController;
 use App\Http\Controllers\StockIssueController;
 use App\Http\Controllers\StockTransferController;
 use App\Http\Controllers\StockTransferReceiptController;
@@ -483,6 +484,11 @@ Route::prefix('stock-counts')->name('stock-counts.')->group(function () {
     Route::get('/{stockCount}/export', [StockCountController::class, 'export'])->name('export');
     Route::post('/{stockCount}/import', [StockCountController::class, 'import'])->name('import');
     Route::post('/{stockCount}/post', [StockCountController::class, 'post'])->name('post');
+});
+
+// Stock expiry dashboard (สินค้าใกล้หมดอายุ & เฝ้าระวัง FEFO)
+Route::prefix('stock-expiry')->name('stock-expiry.')->group(function () {
+    Route::get('/', [StockExpiryController::class, 'index'])->name('index');
 });
 
 // Chart of accounts (ผังบัญชี): plain master data, not yet wired into any
