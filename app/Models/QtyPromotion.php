@@ -116,6 +116,31 @@ class QtyPromotion extends Model
         return 'ซื้อ '.$min.' ลด '.$value.($this->discount_type === 'percent' ? '%' : ' บาท');
     }
 
+    public function statusLabel(): string
+    {
+        if (! $this->is_active) {
+            return 'ปิด';
+        }
+        if ($this->starts_at && now()->lt($this->starts_at)) {
+            return 'ยังไม่เริ่ม';
+        }
+        if ($this->ends_at && now()->gt($this->ends_at)) {
+            return 'หมดเวลา';
+        }
+
+        return 'กำลังใช้';
+    }
+
+    public function statusBadgeClass(): string
+    {
+        return match ($this->statusLabel()) {
+            'กำลังใช้' => 'text-bg-success',
+            'ยังไม่เริ่ม' => 'text-bg-warning text-dark',
+            'หมดเวลา' => 'text-bg-secondary',
+            default => 'text-bg-light border text-muted',
+        };
+    }
+
     protected function casts(): array
     {
         return [

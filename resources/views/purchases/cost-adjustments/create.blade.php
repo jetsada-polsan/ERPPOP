@@ -42,7 +42,10 @@
                     </thead>
                     <tbody>
                         @foreach($rows as $i => $row)
-                            @php($item = $row['item']; $lot = $row['lot'])
+                            @php
+                                $item = $row['item'];
+                                $lot = $row['lot'];
+                            @endphp
                             <tr>
                                 <td>{{ $item->product->sku_code }}</td>
                                 <td>{{ $item->product->name_th }}</td>

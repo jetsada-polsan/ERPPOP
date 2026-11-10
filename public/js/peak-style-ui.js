@@ -51,20 +51,8 @@
             const metaSpan = document.createElement('span');
             metaSpan.className = 'erp-fl-meta';
 
-            if (maxAttr && control.tagName !== 'SELECT' && (control.type === 'text' || control.type === 'search' || control.tagName === 'TEXTAREA')) {
-                const maxNum = parseInt(maxAttr, 10);
-                if (!Number.isNaN(maxNum) && maxNum > 0) {
-                    const counterSpan = document.createElement('span');
-                    counterSpan.className = 'erp-fl-counter';
-                    const updateCount = function () {
-                        const len = (control.value || '').length;
-                        counterSpan.textContent = String(Math.max(0, maxNum - len));
-                    };
-                    updateCount();
-                    control.addEventListener('input', updateCount);
-                    metaSpan.appendChild(counterSpan);
-                }
-            }
+            // ตัวนับตัวอักษรสีฟ้า (.erp-fl-counter) ถูกนำออกทั้งระบบตามข้อกำหนดงานที่ 12
+            // โดยยังคงรักษาแอตทริบิวต์ maxlength ของ HTML ไว้ตามเดิม
 
             if (isRequired) {
                 const reqSpan = document.createElement('span');

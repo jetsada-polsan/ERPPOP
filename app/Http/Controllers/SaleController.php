@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Branch;
 use App\Models\Document;
 use App\Models\SaleBooking;
+use App\Support\VoidedDocumentPrint;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 
 class SaleController extends Controller
 {
@@ -22,8 +24,12 @@ class SaleController extends Controller
         return view('sales.show', ['sale' => $sale, 'booking' => $booking, 'branches' => $branches]);
     }
 
-    public function print(Document $sale): View
+    public function print(Document $sale): Response|View
     {
+        if (VoidedDocumentPrint::isVoided($sale)) {
+            return VoidedDocumentPrint::deny($sale);
+        }
+
         $sale->load([
             'customer', 'branch', 'salesman', 'documentType',
             'stockDocument.items.product.baseUnit', 'stockDocument.items.product.barcodes', 'openItem', 'posReceipt.payments',

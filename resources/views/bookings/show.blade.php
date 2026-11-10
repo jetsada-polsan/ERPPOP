@@ -141,9 +141,11 @@ $canEdit = $isPending && ! $billedAny && $booking->delivery_status === 'pending'
             <span class="badge {{ $statusColor[$booking->status] ?? 'text-bg-light' }} fs-6 px-3 py-2">
                 {{ $statusLabel[$booking->status] ?? \App\Support\DocumentStatus::label($booking->status) }}
             </span>
+            @if($booking->status !== 'cancelled' && ! in_array($booking->document->status, ['cancelled', 'void'], true))
             <a href="{{ route('documents.delivery-note', $booking->document) }}" target="_blank" class="btn btn-light border px-3" title="เอกสารประกอบการจัดของ ไม่ตัดสต๊อกและไม่ใช่ใบขาย">
                 <i class="bi bi-truck me-1"></i> ใบส่งของชั่วคราว 2 ใบ
             </a>
+            @endif
             @if($canEdit)
                 <a href="{{ route('bookings.edit', $booking) }}" class="btn btn-outline-primary px-3">
                     <i class="bi bi-pencil-square me-1"></i> แก้ไขใบจอง

@@ -11,6 +11,10 @@ use App\Observers\StockMovementObserver;
 use App\Services\OCR\MockOcrEngine;
 use App\Services\OCR\OcrEngineInterface;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Connection;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Database\Query\Grammars\SQLiteGrammar;
+use Illuminate\Database\SQLiteConnection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\ServiceProvider;
 
@@ -22,6 +26,25 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(OcrEngineInterface::class, MockOcrEngine::class);
+
+        // รองรับคำสั่งค้นหา 'ilike' (PostgreSQL) บนฐานข้อมูล SQLite ในโหมดทดสอบและพัฒนา
+        Connection::resolverFor('sqlite', function ($connection, $database, $prefix, $config) {
+            return new class($connection, $database, $prefix, $config) extends SQLiteConnection {
+                protected function getDefaultQueryGrammar()
+                {
+                    return new class($this) extends SQLiteGrammar {
+                        protected function whereBasic(Builder $query, $where)
+                        {
+                            if (isset($where['operator']) && strtolower((string) $where['operator']) === 'ilike') {
+                                $where['operator'] = 'like';
+                            }
+
+                            return parent::whereBasic($query, $where);
+                        }
+                    };
+                }
+            };
+        });
     }
 
     /**

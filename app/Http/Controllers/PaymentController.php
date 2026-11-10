@@ -8,8 +8,10 @@ use App\Models\Supplier;
 use App\Services\Purchasing\SupplierPaymentService;
 use App\Services\Sales\CustomerPaymentService;
 use Illuminate\Http\RedirectResponse;
+use App\Support\VoidedDocumentPrint;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 use RuntimeException;
 
 class PaymentController extends Controller
@@ -122,7 +124,7 @@ class PaymentController extends Controller
     }
 
     // ใบเสร็จรับเงิน (ลูกค้า) / ใบสำคัญจ่าย (ซัพพลายเออร์) แบบพิมพ์ A4 หัวบริษัทครบ
-    public function print(Document $payment): View
+    public function print(Document $payment): Response|View
     {
         $payment->load([
             'branch', 'customer', 'supplier', 'documentType',
@@ -132,6 +134,10 @@ class PaymentController extends Controller
         ]);
 
         abort_unless(in_array($payment->documentType->code, ['RECEIPT', 'PAYMENT_VOUCHER'], true), 404);
+
+        if (VoidedDocumentPrint::isVoided($payment)) {
+            return VoidedDocumentPrint::deny($payment);
+        }
 
         // ใบเสร็จ: แสดงรายการสินค้าของบิลที่รับชำระ ลูกค้าจะเห็นว่าจ่ายค่าอะไร
         $paidDocs = $payment->documentType->code === 'RECEIPT'

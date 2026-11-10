@@ -15,9 +15,11 @@
                 </div>
             </div>
             <div class="d-flex gap-2 align-items-center">
+                @if(! in_array($payment->status, ['cancelled', 'void'], true) && ! in_array($payment->paymentDocument?->status, ['cancelled', 'void'], true))
                 <a href="{{ route('payments.print', $payment) }}" target="_blank" class="btn btn-primary px-3">
                     <i class="bi bi-receipt me-1"></i> {{ $payment->documentType->code === 'RECEIPT' ? 'ใบเสร็จรับเงิน (A4)' : 'ใบสำคัญจ่าย (A4)' }}
                 </a>
+                @endif
                 <span class="badge text-bg-success fs-6 px-3 py-2">{{ \App\Support\DocumentStatus::label($payment->paymentDocument?->status) }}</span>
                 @include('documents._void-action', ['doc' => $payment])
             </div>
