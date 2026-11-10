@@ -441,3 +441,17 @@ def test_settings_dialog_backup_now(ui_scene):
     assert len(backups) >= 1
     settings_dlg.close()
     settings_dlg.deleteLater()
+
+
+def test_copy_to_a_user_chosen_folder_never_deletes_older_backups(test_db, tmp_path):
+    """โฟลเดอร์ที่ผู้ใช้เลือกเอง (USB) อาจมีไฟล์สำรองของเครื่องอื่น ต้องไม่ถูกลบ"""
+    usb = tmp_path / "usb"
+    usb.mkdir()
+    for index in range(20):
+        (usb / f"pos-backup-OTHER-202611{index:02d}-000000.sqlite").write_text("x")
+
+    db, _ = test_db
+    created = backup_database(db, usb, terminal_id="HQ-01", prune=False)
+
+    assert created.exists()
+    assert len(list(usb.glob("pos-backup-OTHER-*"))) == 20

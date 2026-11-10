@@ -82,6 +82,7 @@ def backup_database(
     db_source: Union[Path, str, sqlite3.Connection],
     dest_dir: Union[Path, str],
     terminal_id: str | None = None,
+    prune: bool = True,
 ) -> Path:
     """Create an online SQLite backup safely using sqlite3.Connection.backup().
 
@@ -137,8 +138,10 @@ def backup_database(
         finally:
             chk_conn.close()
 
-        # Prune to keep 14 latest backups in dest_dir
-        prune_backups(dest_path, keep_count=14)
+        # ลบไฟล์เก่าเฉพาะโฟลเดอร์สำรองอัตโนมัติของเครื่อง โฟลเดอร์ที่ผู้ใช้เลือกเอง (USB)
+        # อาจใช้ร่วมกันหลายเครื่อง ห้ามลบไฟล์สำรองของเครื่องอื่นหรือของวันก่อน
+        if prune:
+            prune_backups(dest_path, keep_count=14)
 
         return target_file
 

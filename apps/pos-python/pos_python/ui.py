@@ -1691,7 +1691,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 if selected_dir:
                     settings_svc.set_device_setting("last_backup_dir", selected_dir)
                     try:
-                        dest_path = backup_database(service.db, selected_dir, terminal_id=terminal_id)
+                        dest_path = backup_database(service.db, selected_dir, terminal_id=terminal_id, prune=False)
                         TouchMessage.information(
                             self,
                             "บันทึกสำเนาเรียบร้อย",
@@ -3666,7 +3666,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 if selected_dir:
                     settings_svc.set_device_setting("last_backup_dir", selected_dir)
                     try:
-                        dest_path = backup_database(service.db, selected_dir, terminal_id=terminal_id)
+                        dest_path = backup_database(service.db, selected_dir, terminal_id=terminal_id, prune=False)
                         TouchMessage.information(
                             self,
                             "บันทึกสำเนาเรียบร้อย",
