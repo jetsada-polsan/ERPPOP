@@ -4,7 +4,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QRegularExpressionValidator
 from PySide6.QtCore import QRegularExpression
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QFrame, QLabel, QPushButton, QLineEdit, QWidget, QApplication)
+    QFrame, QLabel, QPushButton, QLineEdit, QWidget, QApplication, QScrollArea)
 
 
 class TouchDialog(QDialog):
@@ -67,6 +67,18 @@ class TouchDialog(QDialog):
                 dialog.hide()
                 dialog._being_replaced = False
         parent = self.parentWidget()
+
+        # Enforce max 90% of screen bounds (max 921x691 on 1024x768 and 1229x691 on 1366x768)
+        screen = self.screen() or (parent.screen() if parent is not None else None) or QApplication.primaryScreen()
+        geo = screen.availableGeometry() if screen else None
+        sw = geo.width() if geo else (parent.window().width() if parent is not None else 1024)
+        sh = geo.height() if geo else (parent.window().height() if parent is not None else 768)
+        max_w = min(1200, max(420, int(sw * 0.90)))
+        max_h = min(680, max(360, int(sh * 0.90)))
+        self.setMaximumSize(max_w, max_h)
+        if self.width() > max_w or self.height() > max_h:
+            self.resize(min(self.width(), max_w), min(self.height(), max_h))
+
         if parent is not None and not hasattr(self, '_backdrop'):
             from .ui import PALETTE
             self._backdrop = QWidget(parent.window())
@@ -80,6 +92,12 @@ class TouchDialog(QDialog):
             self._backdrop.show()
             self._backdrop.raise_()
             self.raise_()
+
+        if parent is not None:
+            center = parent.window().frameGeometry().center()
+            frame = self.frameGeometry()
+            frame.moveCenter(center)
+            self.move(frame.topLeft())
 
     def hideEvent(self, event):
         self._hide_backdrop()
@@ -127,21 +145,21 @@ class NumPad(QWidget):
                 button.setStyleSheet(
                     f"background:{PALETTE['danger_soft']}; color:{PALETTE['danger_btn']}; "
                     f"border:1px solid {PALETTE['danger_light']}; border-radius:10px; "
-                    f"font-size:20px; font-weight:800; padding:0; min-height:62px; min-width:64px;"
+                    f"font-size:18px; font-weight:800; padding:0; min-height:64px; min-width:64px;"
                 )
             elif key == '⌫':
                 button.setObjectName('keyBtnActionDel')
                 button.setStyleSheet(
                     f"background:{PALETTE['warning_soft']}; color:{PALETTE['warning_ink']}; "
                     f"border:1px solid {PALETTE['warning']}; border-radius:10px; "
-                    f"font-size:22px; font-weight:800; padding:0; min-height:62px; min-width:64px;"
+                    f"font-size:20px; font-weight:800; padding:0; min-height:64px; min-width:64px;"
                 )
             else:
                 button.setObjectName('keyBtn')
                 button.setStyleSheet(
                     f"background:{PALETTE['surface']}; color:{PALETTE['text']}; "
                     f"border:1px solid {PALETTE['field']}; border-radius:10px; "
-                    f"font-size:24px; font-weight:800; padding:0; min-height:62px; min-width:64px;"
+                    f"font-size:22px; font-weight:800; padding:0; min-height:64px; min-width:64px;"
                 )
             button.setFocusPolicy(Qt.NoFocus)
             button.setAutoDefault(False)
@@ -243,17 +261,20 @@ class ChoiceDialog(TouchDialog):
         if searchable:
             self.search = QLineEdit()
             self.search.setPlaceholderText('ค้นเลขบิล')
+            self.search.setMinimumHeight(48)
+            self.search.setStyleSheet("min-height:48px; font-size:18px;")
             self.search.textChanged.connect(self.filter_choices)
             self.body.addWidget(self.search)
         for label, value in choices:
             button = QPushButton(str(label))
-            button.setMinimumHeight(72)
-            button.setStyleSheet('text-align:left; padding:10px 14px;')
+            button.setMinimumHeight(56)
+            button.setStyleSheet('text-align:left; padding:10px 14px; font-size:16px; font-weight:700;')
             button.clicked.connect(lambda checked=False, v=value: self.choose(v))
             rows.addWidget(button)
             self.choice_buttons.append(button)
         scroll.setWidget(host)
         self.body.addWidget(scroll)
+        self.setMaximumSize(900, 680)
         self.resize(520, 600)
 
     def filter_choices(self, text):
@@ -269,8 +290,12 @@ class TextDialog(TouchDialog):
     def __init__(self, parent, title, hint, value=''):
         super().__init__(parent, title, hint)
         self.entry = QLineEdit(value)
+        self.entry.setMinimumHeight(48)
+        self.entry.setStyleSheet("min-height:48px; font-size:18px;")
         self.body.addWidget(self.entry)
-        self.confirm()
+        btn = self.confirm()
+        btn.setMinimumHeight(52)
+        btn.setStyleSheet("min-height:52px; font-size:18px;")
 
 
 class TouchMessage:
@@ -291,9 +316,15 @@ class TouchMessage:
         label.setMaximumWidth(700)
         label.setStyleSheet('font-size:17px; font-weight:600;')
         box_layout.addWidget(label)
-        dialog.body.addWidget(box)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setWidget(box)
+        dialog.body.addWidget(scroll)
         ok_btn = dialog.confirm('ตกลง')
         ok_btn.setObjectName('btnTouchPrimary')
+        ok_btn.setMinimumHeight(48)
+        ok_btn.setStyleSheet('min-height:48px; font-size:16px;')
         ok_btn.setDefault(True)
         return dialog.exec()
 
@@ -322,12 +353,20 @@ class TouchMessage:
         label.setMaximumWidth(700)
         label.setStyleSheet('font-size:17px; font-weight:700;')
         box_layout.addWidget(label)
-        dialog.body.addWidget(box)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setWidget(box)
+        dialog.body.addWidget(scroll)
         cancel = dialog.confirm('กลับ', dialog.reject)
         cancel.setObjectName('btnTouchSecondary')
+        cancel.setMinimumHeight(48)
+        cancel.setStyleSheet('min-height:48px; font-size:16px;')
         cancel.setDefault(True)
         cancel.setFocus()
         confirm = dialog.confirm('ยืนยัน')
         confirm.setObjectName('btnTouchPrimary')
+        confirm.setMinimumHeight(48)
+        confirm.setStyleSheet('min-height:48px; font-size:16px;')
         confirm.setAutoDefault(False)
         return TouchMessage.Yes if dialog.exec() == QDialog.DialogCode.Accepted else TouchMessage.No

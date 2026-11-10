@@ -312,17 +312,17 @@ QDialog#settingsBackdrop { background: transparent; }
 QWidget#settingsBody { background: $surface; border-bottom-right-radius: 16px; }
 QWidget#settingsHeader { background: $primary_dark; border-top-left-radius: 16px; border-top-right-radius: 16px; }
 #settingsTitle { color: $surface; font-size: 18px; font-weight: 800; }
-#settingsSubtitle { color: rgba(255,255,255,.72); font-size: 12.5px; }
+#settingsSubtitle { color: rgba(255,255,255,.72); font-size: 14px; }
 QWidget#settingsMenu { background: $bg; border-right: 1px solid $border; border-bottom-left-radius: 16px; }
 #settingsPopup #card { background: $surface; }
-#settingsPopup QLineEdit, #settingsPopup QComboBox { background: $surface; }
-#settingsPopup QPushButton { background: $surface; }
-#settingsPopup QPushButton#navItem { background: transparent; }
+#settingsPopup QLineEdit, #settingsPopup QComboBox { background: $surface; min-height: 48px; font-size: 16px; }
+#settingsPopup QPushButton { background: $surface; min-height: 48px; font-size: 16px; }
+#settingsPopup QPushButton#navItem { background: transparent; min-height: 48px; font-size: 16px; }
 #settingsPopup QPushButton#navItem:checked { background: $surface; }
 
 /* เมนูซ้ายของหน้าตั้งค่า — ตัวที่เลือกอยู่มีขีดฟ้าหน้าเหมือนในภาพร่าง */
 #navItem { background: transparent; border: 0; border-left: 4px solid transparent; border-radius: 0;
-           text-align: left; padding: 12px 14px; color: $text; font-size: 14.5px; }
+           text-align: left; padding: 12px 14px; color: $text; min-height: 48px; font-size: 16px; }
 #navItem:hover { background: $primary_soft; }
 #navItem:checked { background: $primary_soft; color: $primary_dark; border-left: 4px solid $primary; font-weight: 700; }
 
@@ -633,6 +633,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
             self.setWindowModality(Qt.WindowModal)
             self.setMinimumWidth(480)
+            self.setMaximumSize(900, 680)
             form = QFormLayout()
             self.body.addLayout(form)
             hint = QLabel(
@@ -641,11 +642,14 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 else "เลือกชื่อคนขาย แล้วใส่เงินทอนเพื่อเปิดกะ\nไม่ต้องกรอกรหัสหรือ PIN"
             )
             hint.setObjectName("note")
+            hint.setStyleSheet("font-size:16px;")
             hint.setWordWrap(True)
             self.cashier_select = QComboBox()
             self.cashier_select.setMinimumHeight(48)
+            self.cashier_select.setStyleSheet("min-height:48px; font-size:18px;")
             self.connection_status = QLabel()
             self.connection_status.setObjectName("cardHint")
+            self.connection_status.setStyleSheet("font-size:16px;")
             self.connection_status.setWordWrap(True)
             refresh = QPushButton("อัปเดตรายชื่อ")
             refresh.setObjectName("btnTouchSecondary")
@@ -729,10 +733,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.setWindowModality(Qt.WindowModal)
             self.setMinimumWidth(400)
             self.resize(480, 700)
+            self.setMaximumSize(900, 680)
+            self.resize(480, 660)
 
             layout = self.body
-            layout.setContentsMargins(10, 10, 10, 10)
-            layout.setSpacing(6)
+            layout.setContentsMargins(10, 8, 10, 8)
+            layout.setSpacing(4)
             self.amount = QLineEdit()
             self.amount.setObjectName("shiftAmount")
             self.amount.setAlignment(Qt.AlignRight)
@@ -740,27 +746,42 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.amount.setInputMethodHints(Qt.ImhFormattedNumbersOnly)
             self.amount.textChanged.connect(self.refresh_summary)
             self.amount.returnPressed.connect(self.accept_value)
-            layout.addWidget(self.amount)
 
             self.summary = QLabel("เงินทอนตั้งต้น 0.00 บาท")
             self.summary.setObjectName("shiftSummary")
+            self.summary.setStyleSheet("font-size:16px; font-weight:700;")
             self.summary.setAlignment(Qt.AlignCenter)
-            layout.addWidget(self.summary)
 
             self.note = QLineEdit()
             self.note.setPlaceholderText("เหตุผลเมื่อยอดรับกะต่างจากเงินทอนยกมา")
             self.note.setMaxLength(500)
-            self.note.setStyleSheet("min-height:38px; font-size:15px;")
-            layout.addWidget(self.note)
+            self.note.setStyleSheet("min-height:48px; font-size:16px;")
+
             self.pad = NumPad(self.amount)
-            layout.addWidget(self.pad)
+
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setFrameShape(QFrame.NoFrame)
+            scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            content_host = QWidget()
+            content_lay = QVBoxLayout(content_host)
+            content_lay.setContentsMargins(0, 0, 0, 0)
+            content_lay.setSpacing(6)
+            content_lay.addWidget(self.amount)
+            content_lay.addWidget(self.summary)
+            content_lay.addWidget(self.note)
+            content_lay.addWidget(self.pad)
+            scroll.setWidget(content_host)
+            layout.addWidget(scroll, 1)
+
             initial = self.policy.get('carried_float')
             if initial is None:
                 initial = self.policy.get('default_float', '0')
             self.amount.setText(str(cash(initial)))
             open_btn = self.confirm("เปิดกะขาย", self.accept_value)
             open_btn.setObjectName("btnCheckoutPrimary")
-            open_btn.setMinimumHeight(52)
+            open_btn.setMinimumHeight(48)
+            open_btn.setStyleSheet("min-height:48px; font-size:18px;")
 
             # Put focus on the amount immediately so a touch keyboard or keypad
             # can be used without an extra click before opening the shift.
@@ -819,6 +840,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
             self.setWindowModality(Qt.WindowModal)
             self.setMinimumWidth(420)
+            self.setMaximumSize(900, 680)
+            self.resize(480, 480)
 
             layout = self.body
             title = QLabel("เครื่องนี้มีกะเดิมที่ยังไม่ได้ปิด")
@@ -831,6 +854,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             detail.setAlignment(Qt.AlignCenter)
             note = QLabel("ทำกะเดิมต่อได้ทันที หรือปิดกะเดิมก่อนเพื่อใส่เงินทอนตั้งต้นยอดใหม่")
             note.setObjectName("cardHint")
+            note.setStyleSheet("font-size:16px;")
             note.setWordWrap(True)
             layout.addWidget(title)
             layout.addWidget(detail)
@@ -870,20 +894,21 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.qr_config = _cached_json_setting(service.db, "qr_payment") or {}
             self.setWindowTitle("รับชำระเงิน")
             self.setWindowFlag(Qt.WindowCloseButtonHint, True)
-            self.setMinimumSize(940, 660)
-            self.resize(980, 744)
+            self.setMinimumSize(0, 0)
+            self.setMaximumSize(920, 680)
+            self.resize(900, 670)
             self.setStyleSheet(self.styleSheet() + f"QLabel {{ font-size:16px; background:transparent; }} QPushButton {{ min-height:56px; font-size:18px; }} QLineEdit {{ min-height:48px; font-size:22px; font-weight:700; }}")
             outer = QHBoxLayout()
-            outer.setSpacing(14)
+            outer.setSpacing(10)
             self.body.addLayout(outer)
             summary_card = QFrame()
             summary_card.setObjectName("card")
             summary = QVBoxLayout(summary_card)
-            summary.setContentsMargins(14, 14, 14, 14)
-            summary.setSpacing(8)
+            summary.setContentsMargins(12, 10, 12, 10)
+            summary.setSpacing(6)
             outer.addWidget(summary_card, 1)
             layout = QVBoxLayout()
-            layout.setSpacing(8)
+            layout.setSpacing(6)
             outer.addLayout(layout, 1)
             subtotal_label = QLabel(f"ยอดสินค้า  {order.subtotal():,.2f} บาท")
             subtotal_label.setStyleSheet(f"background:transparent;font-size:18px;font-weight:800;color:{PALETTE['text']};")
@@ -892,14 +917,14 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.promo_summary.setObjectName("note")
             self.promo_summary.setWordWrap(True)
             self.promo_summary.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-            self.promo_summary.setMinimumHeight(44)
+            self.promo_summary.setMinimumHeight(40)
             self.promo_summary.setStyleSheet(
                 f"background:{PALETTE['warning_soft']};color:{PALETTE['warning_ink']};"
-                f"border-left:4px solid {PALETTE['warning']};border-radius:6px;padding:8px 12px;font-size:15px;font-weight:700;"
+                f"border-left:4px solid {PALETTE['warning']};border-radius:6px;padding:6px 10px;font-size:16px;font-weight:700;"
             )
             summary.addWidget(self.promo_summary)
             disc_label = QLabel("ส่วนลดท้ายบิล (บาท) · แตะเพื่อใช้แป้นตัวเลข")
-            disc_label.setStyleSheet(f"background:transparent;font-size:15px;font-weight:700;color:{PALETTE['muted']};")
+            disc_label.setStyleSheet(f"background:transparent;font-size:16px;font-weight:700;color:{PALETTE['muted']};")
             summary.addWidget(disc_label)
             self.bill_discount = QLineEdit(str(order.bill_discount))
             self.bill_discount.setObjectName("billDiscount")
@@ -912,15 +937,15 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             due_box = QFrame()
             due_box.setObjectName("totalPayableBox")
             due_layout = QVBoxLayout(due_box)
-            due_layout.setContentsMargins(14, 10, 14, 10)
+            due_layout.setContentsMargins(12, 8, 12, 8)
             self.due = QLabel(f"ยอดชำระ {order.grand_total():,.2f} บาท")
             self.due.setObjectName("totalPayableAmount")
-            self.due.setStyleSheet(f"background:transparent;font-size:32px;font-weight:900;color:{PALETTE['payable_mint']};")
+            self.due.setStyleSheet(f"background:transparent;font-size:28px;font-weight:900;color:{PALETTE['payable_mint']};")
             due_layout.addWidget(self.due)
             summary.addWidget(due_box)
 
             methods = QHBoxLayout()
-            methods.setSpacing(10)
+            methods.setSpacing(8)
             self.method_buttons = {}
             method_group = QButtonGroup(self)
             method_group.setExclusive(True)
@@ -949,7 +974,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.cash_label.setStyleSheet(f"font-size:16px;font-weight:800;color:{PALETTE['text']};")
             self.amount = QLineEdit(str(order.grand_total()))
             self.amount.setAlignment(Qt.AlignRight)
-            self.amount.setStyleSheet(f"min-height:52px;font-size:26px;font-weight:800;color:{PALETTE['brand_navy']};")
+            self.amount.setStyleSheet(f"min-height:48px;font-size:24px;font-weight:800;color:{PALETTE['brand_navy']};")
             self.amount.textChanged.connect(self.refresh_change)
             layout.addWidget(self.cash_label)
             layout.addWidget(self.amount)
@@ -973,7 +998,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.quick_host = QWidget()
             quick = QHBoxLayout(self.quick_host)
             quick.setContentsMargins(0, 0, 0, 0)
-            quick.setSpacing(8)
+            quick.setSpacing(6)
             for note in (100, 500, 1000):
                 button = QPushButton(f"{note:,}")
                 button.setObjectName("btnCashQuick")
@@ -994,9 +1019,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             change_box.setObjectName("dialogNoticeBox")
             change_box.setProperty("tone", "success")
             change_layout = QVBoxLayout(change_box)
-            change_layout.setContentsMargins(12, 8, 12, 8)
+            change_layout.setContentsMargins(10, 6, 10, 6)
             self.change = QLabel()
-            self.change.setStyleSheet("background:transparent;font-size:24px;font-weight:800;color:%s;" % PALETTE["success_dark"])
+            self.change.setStyleSheet("background:transparent;font-size:22px;font-weight:800;color:%s;" % PALETTE["success_dark"])
             change_layout.addWidget(self.change)
             summary.addWidget(change_box)
 
@@ -1018,7 +1043,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
             submit = QPushButton("รับเงิน / ออกบิล")
             submit.setObjectName("btnCheckoutPrimary")
-            submit.setMinimumHeight(60)
+            submit.setMinimumHeight(56)
             submit.clicked.connect(self.confirm)
             layout.addWidget(submit)
             self.keypad_target = self.amount
@@ -1147,32 +1172,14 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             super().__init__(parent)
             self.sample_sale_id = sample_sale_id
             self.setWindowTitle("ตั้งค่า POS")
-            self.setObjectName("settingsBackdrop")
-            # popup ลอยกลางจอ: พื้นหลังโปร่งแสงทับหน้าขาย การ์ดขอบมนอยู่ตรงกลาง
+            self.setObjectName("settingsPopup")
+            self.setAttribute(Qt.WA_StyledBackground, True)
             self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
-            self.setAttribute(Qt.WA_TranslucentBackground)
             self.setModal(True)
-            host = parent.window() if parent is not None else None
-            if host is not None:
-                self.setGeometry(host.geometry())
-            else:
-                self.resize(1100, 720)
+            self.setMaximumSize(920, 680)
+            self.resize(900, 660)
 
-            backdrop = QVBoxLayout(self)
-            backdrop.setContentsMargins(32, 32, 32, 32)
-            card = QFrame()
-            card.setObjectName("settingsPopup")
-            width = min(980, max(720, self.width() - 64))
-            height = min(660, max(520, self.height() - 64))
-            card.setFixedSize(width, height)
-            shadow = QGraphicsDropShadowEffect(card)
-            shadow.setBlurRadius(48)
-            shadow.setOffset(0, 12)
-            shadow.setColor(QColor(15, 23, 42, 110))
-            card.setGraphicsEffect(shadow)
-            backdrop.addWidget(card, 0, Qt.AlignCenter)
-
-            outer = QVBoxLayout(card)
+            outer = QVBoxLayout(self)
             outer.setContentsMargins(0, 0, 0, 0)
             outer.setSpacing(0)
             outer.addWidget(self.brand_bar())
@@ -1260,11 +1267,30 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             layout.addWidget(close_button)
             return bar
 
-        def paintEvent(self, event) -> None:
-            # ทำให้หน้าขายด้านหลังมืดลง ให้รู้ว่ากำลังอยู่ในหน้าตั้งค่า
-            painter = QPainter(self)
-            painter.fillRect(self.rect(), QColor(15, 23, 42, 120))
-            painter.end()
+        def showEvent(self, event):
+            super().showEvent(event)
+            parent = self.parentWidget()
+            if parent is not None:
+                if not hasattr(self, '_backdrop'):
+                    self._backdrop = QWidget(parent.window())
+                    self._backdrop.setObjectName('touchBackdrop')
+                    rgb = tuple(int(PALETTE['text'][i:i+2], 16) for i in (1,3,5))
+                    self._backdrop.setStyleSheet('background:rgba(%d,%d,%d,150);' % rgb)
+                    self._backdrop.setGeometry(parent.window().rect())
+                    self._backdrop.show()
+                    self._backdrop.raise_()
+                    self.raise_()
+                center = parent.window().frameGeometry().center()
+                frame = self.frameGeometry()
+                frame.moveCenter(center)
+                self.move(frame.topLeft())
+
+        def hideEvent(self, event):
+            if hasattr(self, '_backdrop') and self._backdrop is not None:
+                self._backdrop.hide()
+                self._backdrop.deleteLater()
+                self._backdrop = None
+            super().hideEvent(event)
 
         def show_section(self, name: str) -> None:
             if name in getattr(self, "nav_buttons", {}):
@@ -1694,31 +1720,49 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
     class CloseShiftDialog(TouchDialog):
         def __init__(self, parent, expected):
             super().__init__(parent, "ปิดกะขาย", "ปิดกะ: นับเงินในลิ้นชักทั้งหมด แล้วส่งบิลค้างให้ครบ")
-            self.setMinimumWidth(480)
-            self.body.setContentsMargins(10, 10, 10, 10)
-            self.body.setSpacing(6)
+            self.setMinimumWidth(400)
+            self.setMaximumSize(900, 680)
+            self.resize(480, 660)
+            self.body.setContentsMargins(10, 8, 10, 8)
+            self.body.setSpacing(4)
             self.expected = expected
             self.expected_label = QLabel()
             self.expected_label.setObjectName("note")
-            self.body.addWidget(self.expected_label)
-            self.body.addWidget(QLabel("เงินสดที่นับได้จริง"))
+            self.expected_label.setStyleSheet("font-size:16px;")
+            lbl = QLabel("เงินสดที่นับได้จริง")
+            lbl.setStyleSheet("font-size:16px; font-weight:700;")
             self.amount = QLineEdit()
             self.amount.setObjectName("shiftAmount")
             self.amount.setAlignment(Qt.AlignRight)
-            self.body.addWidget(self.amount)
             self.difference = QLabel()
             self.difference.setObjectName("shiftSummary")
+            self.difference.setStyleSheet("font-size:16px; font-weight:700;")
             self.difference.setAlignment(Qt.AlignCenter)
-            self.body.addWidget(self.difference)
             self.note = QLineEdit()
             self.note.setPlaceholderText("หมายเหตุ")
-            self.note.setStyleSheet("min-height:38px; font-size:15px;")
-            self.body.addWidget(self.note)
+            self.note.setStyleSheet("min-height:48px; font-size:16px;")
             self.pad = NumPad(self.amount)
-            self.body.addWidget(self.pad)
+
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setFrameShape(QFrame.NoFrame)
+            scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            content_host = QWidget()
+            content_lay = QVBoxLayout(content_host)
+            content_lay.setContentsMargins(0, 0, 0, 0)
+            content_lay.setSpacing(6)
+            content_lay.addWidget(self.expected_label)
+            content_lay.addWidget(lbl)
+            content_lay.addWidget(self.amount)
+            content_lay.addWidget(self.difference)
+            content_lay.addWidget(self.note)
+            content_lay.addWidget(self.pad)
+            scroll.setWidget(content_host)
+            self.body.addWidget(scroll, 1)
             self.submit = self.confirm("ปิดกะขาย")
             self.submit.setObjectName("btnCheckoutPrimary")
-            self.submit.setMinimumHeight(52)
+            self.submit.setMinimumHeight(48)
+            self.submit.setStyleSheet("min-height:48px; font-size:18px;")
             self.amount.textChanged.connect(self.refresh)
             self.refresh()
             self.amount.selectAll()
@@ -1771,7 +1815,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 pill.setObjectName("stepPill")
                 pill.setAlignment(Qt.AlignCenter)
                 pill.setWordWrap(True)
-                pill.setMinimumHeight(32)
+                pill.setMinimumHeight(36)
+                pill.setStyleSheet("min-height:36px; font-size:16px; font-weight:700;")
                 pill.setMinimumWidth(0)
                 self.step_pills.append(pill)
                 stepper_row.addWidget(pill, 1)
@@ -1845,7 +1890,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             for caption, delta in [('◀ รายการนำส่งก่อนหน้า', -1), ('รายการนำส่งถัดไป ▶', 1)]:
                 button = QPushButton(caption)
                 button.setObjectName("btnTouchSecondary")
-                button.setStyleSheet("min-height:32px; font-size:14px; padding:2px 8px;")
+                button.setStyleSheet("min-height:48px; font-size:16px; padding:6px 12px;")
                 self.drop_buttons.append(button)
                 button.clicked.connect(lambda checked=False, delta=delta: self.show_drops(delta))
                 drop_nav.addWidget(button)
@@ -1862,6 +1907,10 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.keep_pad = NumPad(self.kept)
             split_columns.addWidget(self.keep_pad, 1)
             split.addWidget(QLabel('เลขซองเงินนำส่งปิดกะ / หมายเหตุ'))
+            self.reference.setMinimumHeight(48)
+            self.reference.setStyleSheet("min-height:48px; font-size:16px;")
+            self.note.setMinimumHeight(48)
+            self.note.setStyleSheet("min-height:48px; font-size:16px;")
             split.addWidget(self.reference)
             split.addWidget(self.note)
             self.deposit = QLabel('เงินนำส่งปิดกะ: รอตรวจยอดจาก ERP')
@@ -1877,14 +1926,20 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.body.addLayout(actions)
             self.back = QPushButton('ย้อนกลับ')
             self.back.setObjectName("btnTouchSecondary")
+            self.back.setMinimumHeight(48)
+            self.back.setStyleSheet("min-height:48px; font-size:16px;")
             self.back.clicked.connect(self.previous)
             actions.addWidget(self.back)
             self.next = QPushButton('ถัดไป')
             self.next.setObjectName("btnTouchPrimary")
+            self.next.setMinimumHeight(48)
+            self.next.setStyleSheet("min-height:48px; font-size:16px;")
             self.next.clicked.connect(self.advance)
             actions.addWidget(self.next)
             self.submit = QPushButton('ยืนยันปิดกะและพิมพ์ใบปิดกะ')
             self.submit.setObjectName("btnCheckoutPrimary")
+            self.submit.setMinimumHeight(48)
+            self.submit.setStyleSheet("min-height:48px; font-size:16px;")
             self.submit.clicked.connect(self.accept)
             actions.addWidget(self.submit)
             for field in self.fields:
@@ -1897,8 +1952,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
         def showEvent(self, event):
             available = self.screen().availableGeometry().adjusted(16, 16, -16, -16)
-            self.setMaximumSize(available.size())
-            self.resize(min(900, available.width()), min(680, available.height()))
+            self.setMaximumSize(min(920, available.width()), min(680, available.height()))
+            self.resize(min(900, available.width()), min(670, available.height()))
             super().showEvent(event)
             center = self.parentWidget().window().frameGeometry().center()
             frame = self.frameGeometry()
@@ -2015,21 +2070,34 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             super().__init__(parent)
             self.setWindowTitle("ยืนยันผู้ดูแลก่อนตั้งค่า POS")
             self.setMinimumWidth(390)
+            self.setMaximumSize(900, 680)
+            self.resize(440, 360)
             layout = self.body
             hint = QLabel("เมนูตั้งค่าใช้ได้เฉพาะผู้ดูแลที่มีสิทธิ์ตั้งค่า POS")
+            hint.setStyleSheet("font-size:16px;")
             hint.setWordWrap(True)
             layout.addWidget(hint)
             form = QFormLayout()
             self.username = QLineEdit()
             self.username.setPlaceholderText("username / email / เบอร์โทร")
+            self.username.setMinimumHeight(48)
+            self.username.setStyleSheet("min-height:48px; font-size:18px;")
             self.password = QLineEdit()
             self.password.setEchoMode(QLineEdit.Password)
             self.password.setPlaceholderText("รหัสผ่าน ERP")
-            form.addRow("ผู้ดูแล", self.username)
-            form.addRow("รหัสผ่าน", self.password)
+            self.password.setMinimumHeight(48)
+            self.password.setStyleSheet("min-height:48px; font-size:18px;")
+            u_lbl = QLabel("ผู้ดูแล")
+            u_lbl.setStyleSheet("font-size:16px; font-weight:700;")
+            p_lbl = QLabel("รหัสผ่าน")
+            p_lbl.setStyleSheet("font-size:16px; font-weight:700;")
+            form.addRow(u_lbl, self.username)
+            form.addRow(p_lbl, self.password)
             layout.addLayout(form)
             buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            buttons.setStyleSheet("QPushButton { min-height:48px; font-size:16px; }")
             buttons.button(QDialogButtonBox.Ok).setText("ยืนยัน")
+            buttons.button(QDialogButtonBox.Cancel).setText("ยกเลิก")
             buttons.accepted.connect(self.authorize)
             buttons.rejected.connect(self.reject)
             self.password.returnPressed.connect(self.authorize)
@@ -2431,15 +2499,18 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             # ปุ่มตัวเลขย้ายไปอยู่ใน popup แก้รายการ หน้าขายจะได้มีที่ให้รายการสินค้า
             self.line_editor = QDialog(self)
             self.line_editor.setWindowTitle("แก้รายการ")
+            self.line_editor.setMaximumSize(900, 680)
             editor_layout = QVBoxLayout(self.line_editor)
             self.line_editor_title = QLabel()
             self.line_editor_title.setObjectName("cardTitle")
+            self.line_editor_title.setStyleSheet("font-size:18px; font-weight:700;")
             self.line_editor_title.setWordWrap(True)
             editor_layout.addWidget(self.line_editor_title)
             editor_layout.addWidget(self.build_numpad())
             done = QPushButton("เสร็จ")
             done.setObjectName("payBtn")
-            done.setMinimumHeight(44)
+            done.setMinimumHeight(48)
+            done.setStyleSheet("min-height:48px; font-size:18px;")
             done.clicked.connect(self.line_editor.accept)
             editor_layout.addWidget(done)
             return panel
@@ -2451,6 +2522,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 return
             self.line_editor_title.setText(f"{line.name}\nเลือกโหมด แล้วกดตัวเลข")
             self.line_editor.setMinimumWidth(380)
+            self.line_editor.setMaximumSize(900, 680)
             self.line_editor.exec()
             self.refresh_order(keep_selection=True)
 
@@ -2487,7 +2559,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.mode_group = QButtonGroup(box)
             for column, (mode, label) in enumerate([(QTY, "จำนวน"), (PRICE, "ราคา"), (DISCOUNT, "ส่วนลด")]):
                 button = QPushButton(label)
-                button.setMinimumHeight(44)
+                button.setMinimumHeight(48)
+                button.setStyleSheet("min-height:48px; font-size:16px;")
                 button.setCheckable(True)
                 button.setChecked(mode == QTY)
                 button.clicked.connect(lambda _, value=mode: self.set_mode(value))
@@ -2694,13 +2767,23 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
         def build_close_dialog(self):
             dialog = TouchDialog(self, "ปิดโปรแกรม JET POS", "กะและบิลค้างจะเก็บไว้ในเครื่อง")
-            dialog.body.addWidget(QLabel(f"ตะกร้า {len(self.order.lines)} รายการ · คิวรอส่ง {service.pending_sync_count()} รายการ"))
-            dialog.body.addWidget(QLabel("มีกะเปิดอยู่" if service.db.execute("SELECT 1 FROM shifts WHERE terminal_id=? AND status='open'", (terminal_id,)).fetchone() else "ไม่มีกะเปิด"))
+            dialog.setMaximumSize(900, 680)
+            dialog.resize(480, 480)
+            lbl1 = QLabel(f"ตะกร้า {len(self.order.lines)} รายการ · คิวรอส่ง {service.pending_sync_count()} รายการ")
+            lbl1.setStyleSheet("font-size:16px;")
+            dialog.body.addWidget(lbl1)
+            lbl2 = QLabel("มีกะเปิดอยู่" if service.db.execute("SELECT 1 FROM shifts WHERE terminal_id=? AND status='open'", (terminal_id,)).fetchone() else "ไม่มีกะเปิด")
+            lbl2.setStyleSheet("font-size:16px;")
+            dialog.body.addWidget(lbl2)
             resume = dialog.confirm("กลับไปขายต่อ", dialog.reject)
             resume.setDefault(True)
             resume.setFocus()
-            dialog.confirm("ล็อกหน้าจอ", lambda: (self.lock_session(), dialog.reject()))
-            dialog.body.addSpacing(32)
+            resume.setMinimumHeight(48)
+            resume.setStyleSheet("min-height:48px; font-size:16px;")
+            lock_btn = dialog.confirm("ล็อกหน้าจอ", lambda: (self.lock_session(), dialog.reject()))
+            lock_btn.setMinimumHeight(48)
+            lock_btn.setStyleSheet("min-height:48px; font-size:16px;")
+            dialog.body.addSpacing(20)
             def request_exit():
                 if (self.order.lines or service.pending_sync_count()) and TouchMessage.question(
                     dialog, "ยืนยันปิดโปรแกรม", "มีตะกร้าค้างหรือบิลรอส่ง ยืนยันเก็บไว้แล้วปิดโปรแกรม?"
@@ -2709,7 +2792,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 dialog.accept()
             close = dialog.confirm("ปิดโปรแกรม", request_exit)
             close.setAutoDefault(False)
-            close.setStyleSheet("background:#b91c1c; color:white; min-height:64px;")
+            close.setMinimumHeight(48)
+            close.setStyleSheet("background:#b91c1c; color:white; min-height:48px; font-size:16px;")
             return dialog
 
         def closeEvent(self, event):
@@ -2751,10 +2835,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
             content = QLabel(text)
+            content.setStyleSheet("font-size:16px;")
             content.setWordWrap(True)
             scroll.setWidget(content)
             dialog.body.addWidget(scroll)
-            dialog.resize(880, 700)
+            dialog.setMaximumSize(920, 680)
+            dialog.resize(880, 660)
             def print_report():
                 from .printers import print_text_to_windows_queue
                 try:
@@ -2765,7 +2851,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                         print_text_to_windows_queue(f'Z Report · ใบที่ {copy}/2\n' + text, str(profile))
                 except Exception as error:
                     TouchMessage.warning(dialog, "พิมพ์ไม่ได้", cashier_error(error))
-            dialog.confirm("พิมพ์ Z Report ซ้ำ", print_report)
+            z_btn = dialog.confirm("พิมพ์ Z Report ซ้ำ", print_report)
+            z_btn.setMinimumHeight(48)
+            z_btn.setStyleSheet("min-height:48px; font-size:16px;")
             if auto_print and SettingsService(service.db).get_device_setting("windows_printer_queue", ""):
                 print_report()
             dialog.exec()
@@ -3287,7 +3375,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             labels = {"นำส่งเงินระหว่างกะ": "drop"}
             label = "นำส่งเงินระหว่างกะ"
             details = TouchDialog(self, label, "จำนวนเงิน · เลขซอง · เหตุผล")
-            details.resize(940, 700)
+            details.setMaximumSize(920, 680)
+            details.resize(900, 660)
             columns = QHBoxLayout()
             columns.setSpacing(14)
             details.body.addLayout(columns, 1)
@@ -3302,7 +3391,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             amount.setAlignment(Qt.AlignRight)
             reference = QLineEdit()
             reference.setMaxLength(80)
+            reference.setStyleSheet("min-height:48px; font-size:18px;")
             reason_field = QLineEdit('นำส่งเงินระหว่างกะ' if labels[label] == 'drop' else '')
+            reason_field.setStyleSheet("min-height:48px; font-size:18px;")
             for caption, field in [('จำนวนเงิน', amount), ('เลขซอง', reference), ('เหตุผล', reason_field)]:
                 cap_lbl = QLabel(caption)
                 cap_lbl.setStyleSheet(f"font-size:16px;font-weight:800;color:{PALETTE['text']};")
@@ -3322,6 +3413,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     error_label.setText(str(error))
             confirm_btn = details.confirm('ยืนยัน', confirm_movement)
             confirm_btn.setObjectName("btnCheckoutPrimary")
+            confirm_btn.setMinimumHeight(48)
             if details.exec() != QDialog.DialogCode.Accepted:
                 return
             value = str(cash(amount.text()))
@@ -3484,13 +3576,19 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             dialog = TouchDialog(self, "ใบเสร็จล่าสุด", "ตรวจสอบและพิมพ์ใบเสร็จ")
             dialog.setWindowFlag(Qt.WindowCloseButtonHint, True)
             dialog.setMinimumWidth(420)
+            dialog.setMaximumSize(900, 680)
+            dialog.resize(480, 660)
             layout = dialog.body
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setFrameShape(QFrame.NoFrame)
             body = QLabel(receipt_for(service.db, self.last_sale_id))
-            body.setStyleSheet("background:%s;padding:16px;font-family:'Menlo','Courier New';font-size:12px;" % PALETTE["surface"])
-            layout.addWidget(body)
-            close = QDialogButtonBox(QDialogButtonBox.Close)
-            close.rejected.connect(dialog.reject)
-            layout.addWidget(close)
+            body.setStyleSheet("background:%s;padding:16px;font-family:'Menlo','Courier New';font-size:14px;" % PALETTE["surface"])
+            scroll.setWidget(body)
+            layout.addWidget(scroll, 1)
+            close = dialog.confirm("ปิด", dialog.reject)
+            close.setMinimumHeight(48)
+            close.setStyleSheet("min-height:48px; font-size:16px;")
             dialog.exec()
 
         def show_history(self):
@@ -3517,10 +3615,14 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             scroll.setWidget(body)
             scroll.setWidgetResizable(True)
             dialog.body.addWidget(scroll)
-            dialog.resize(560, 700)
+            dialog.setMaximumSize(900, 680)
+            dialog.resize(560, 660)
             void_button = dialog.confirm("ยกเลิกบิล", lambda: self.receipt_action(sale_id, False))
-            void_button.setStyleSheet(f"background:{PALETTE['danger']};color:white;font-weight:800;")
-            dialog.confirm("รับคืนสินค้า", lambda: self.receipt_action(sale_id, True))
+            void_button.setMinimumHeight(48)
+            void_button.setStyleSheet(f"background:{PALETTE['danger']};color:white;font-weight:800;min-height:48px;font-size:16px;")
+            ret_btn = dialog.confirm("รับคืนสินค้า", lambda: self.receipt_action(sale_id, True))
+            ret_btn.setMinimumHeight(48)
+            ret_btn.setStyleSheet("min-height:48px;font-size:16px;")
             dialog.exec()
 
         def receipt_action(self, sale_id, is_return):
@@ -3606,18 +3708,29 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             dialog = TouchDialog(self, "ยอดขายวันนี้ · เครื่องนี้", "สรุปจากฐานข้อมูลในเครื่อง")
             dialog.setWindowFlag(Qt.WindowCloseButtonHint, True)
             dialog.setMinimumWidth(520)
-            dialog.resize(560, 560)
+            dialog.setMaximumSize(900, 680)
+            dialog.resize(580, 660)
             layout = dialog.body
+
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setFrameShape(QFrame.NoFrame)
+            content_host = QWidget()
+            content_layout = QVBoxLayout(content_host)
+            content_layout.setContentsMargins(0, 0, 0, 0)
+            content_layout.setSpacing(8)
 
             title = QLabel(f"สรุปยอดวันที่ {summary.report_date.strftime('%d/%m/%Y')} · ข้อมูลจาก SQLite เครื่องนี้")
             title.setObjectName("cardTitle")
-            layout.addWidget(title)
+            title.setStyleSheet("font-size:16px; font-weight:700;")
+            content_layout.addWidget(title)
             status = QLabel(
                 f"{summary.transaction_count} บิล · ยกเลิก {summary.void_count} บิล · "
                 f"บิลรอส่ง {summary.pending_sync_count} บิล"
             )
             status.setObjectName("cardHint")
-            layout.addWidget(status)
+            status.setStyleSheet("font-size:16px;")
+            content_layout.addWidget(status)
 
             totals = QTableWidget(4, 2)
             totals.setHorizontalHeaderLabels(["รายการ", "ยอด (บาท)"])
@@ -3633,13 +3746,14 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 item = QTableWidgetItem(values[1])
                 item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 totals.setItem(row, 1, item)
-            totals.setFixedHeight(190)
-            layout.addWidget(totals)
+            totals.setFixedHeight(180)
+            content_layout.addWidget(totals)
 
             payment_text = ", ".join(f"{method}: {amount:,.2f}" for method, amount in summary.payments) or "ยังไม่มีรายการรับชำระ"
             payments = QLabel(f"รับชำระตามประเภท: {payment_text}")
+            payments.setStyleSheet("font-size:16px;")
             payments.setWordWrap(True)
-            layout.addWidget(payments)
+            content_layout.addWidget(payments)
 
             rows = service.db.execute(
                 """SELECT document_no, sale_datetime, grand_total, sync_status
@@ -3657,13 +3771,18 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     f"{Decimal(str(sale['grand_total'])):,.2f}", sale_status_label(sale["sync_status"]),
                 ]):
                     recent.setItem(row_number, column, QTableWidgetItem(str(value)))
-            layout.addWidget(recent)
+            content_layout.addWidget(recent)
+            scroll.setWidget(content_host)
+            layout.addWidget(scroll, 1)
+
             receipt_actions = QPushButton("ยกเลิกบิล / รับคืนสินค้า")
-            receipt_actions.setMinimumHeight(56)
+            receipt_actions.setMinimumHeight(48)
+            receipt_actions.setStyleSheet("min-height:48px; font-size:16px;")
             receipt_actions.clicked.connect(self.show_history)
             layout.addWidget(receipt_actions)
 
             close = QDialogButtonBox(QDialogButtonBox.Close)
+            close.setStyleSheet("QPushButton { min-height:48px; font-size:16px; }")
             close.rejected.connect(dialog.reject)
             layout.addWidget(close)
             dialog.exec()
