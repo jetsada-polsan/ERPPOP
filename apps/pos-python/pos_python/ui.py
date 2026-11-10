@@ -1749,10 +1749,18 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         """Resizable close workspace; monetary previews remain server authoritative."""
         def __init__(self, parent, protocol, policy):
             super().__init__(parent, "ปิดกะขาย", "ปิดกะ: นับเงินในลิ้นชักทั้งหมด → ตรวจยอด → แยกเงิน → ยืนยันและพิมพ์ใบปิดกะ")
+            header = self.findChild(QFrame, 'touchHeader')
+            if header:
+                header.layout().setContentsMargins(8, 0, 8, 0)
+                for b in header.findChildren(QPushButton):
+                    b.setFixedSize(28, 28)
+                    b.setStyleSheet('font-size:18px; font-weight:800; min-height:0px; padding:0;')
+                for lbl in header.findChildren(QLabel):
+                    lbl.setStyleSheet('font-size:14px; font-weight:700;')
             self.setMinimumSize(0, 0)
             self.resize(900, 680)
-            self.body.setContentsMargins(12, 8, 12, 8)
-            self.body.setSpacing(6)
+            self.body.setContentsMargins(8, 2, 8, 2)
+            self.body.setSpacing(2)
             self.protocol = protocol
             self.kept_edited = False
             self.amount = QLineEdit()
@@ -1766,14 +1774,16 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.note.setMaxLength(500)
             self.fields = [self.amount, self.kept, self.reference, self.note]
             stepper_row = QHBoxLayout()
-            stepper_row.setSpacing(8)
+            stepper_row.setSpacing(6)
+            stepper_row.setContentsMargins(0, 0, 0, 0)
             self.step_pills = []
             for step_title in ("1. นับเงินสด", "2. ตรวจยอดขาด/เกิน", "3. แยกเงินทอน/นำส่ง", "4. ยืนยันและพิมพ์ Z 2 ใบ"):
                 pill = QLabel(step_title)
                 pill.setObjectName("stepPill")
                 pill.setAlignment(Qt.AlignCenter)
                 pill.setWordWrap(True)
-                pill.setMinimumHeight(32)
+                pill.setMinimumHeight(24)
+                pill.setStyleSheet("font-size:12px; font-weight:700; padding:2px 4px; border-radius:6px;")
                 pill.setMinimumWidth(0)
                 self.step_pills.append(pill)
                 stepper_row.addWidget(pill, 1)
@@ -1787,34 +1797,110 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             for _ in range(4):
                 page = QWidget()
                 page_layout = QVBoxLayout()
-                page_layout.setContentsMargins(4, 4, 4, 4)
-                page_layout.setSpacing(6)
+                page_layout.setContentsMargins(4, 2, 4, 2)
+                page_layout.setSpacing(4)
                 page.setLayout(page_layout)
                 self.steps.addWidget(page)
             count = self.steps.widget(0).layout()
             columns = QHBoxLayout()
-            columns.setSpacing(12)
+            columns.setSpacing(10)
+            columns.setContentsMargins(0, 0, 0, 0)
             count.addLayout(columns, 1)
+
+            left_col = QVBoxLayout()
+            left_col.setSpacing(4)
+            left_col.setContentsMargins(0, 0, 0, 0)
+
             self.coins = QTableWidget(11, 3)
             self.coins.setHorizontalHeaderLabels(['ชนิด (บาท)', 'จำนวน', 'ยอด'])
-            self.coins.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            self.coins.horizontalHeader().setFixedHeight(20)
+            self.coins.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+            self.coins.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+            self.coins.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
             self.coins.verticalHeader().hide()
             self.coins.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            self.coins.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
             self.coins.setMinimumHeight(180)
             self.coin_fields = []
+            self.coin_minus_buttons = []
+            self.coin_plus_buttons = []
             for row, value in enumerate(('1000','500','100','50','20','10','5','2','1','0.50','0.25')):
                 self.coins.setItem(row, 0, QTableWidgetItem(value))
                 self.coins.item(row, 0).setFlags(Qt.ItemIsEnabled)
+                self.coins.item(row, 0).setTextAlignment(Qt.AlignCenter)
+
+                container = QWidget()
+                cell_box = QHBoxLayout(container)
+                cell_box.setContentsMargins(2, 0, 2, 0)
+                cell_box.setSpacing(4)
+
+                btn_minus = QPushButton('−')
+                btn_minus.setObjectName(f'btnCoinMinus_{row}')
+                btn_minus.setMinimumSize(44, 44)
+                btn_minus.setMaximumSize(48, 44)
+                btn_minus.setAutoRepeat(True)
+                btn_minus.setAutoRepeatDelay(400)
+                btn_minus.setAutoRepeatInterval(80)
+                btn_minus.setFocusPolicy(Qt.NoFocus)
+                btn_minus.setStyleSheet(
+                    f"QPushButton {{ min-width:44px; max-width:48px; min-height:44px; font-size:22px; font-weight:800; "
+                    f"background:{PALETTE['surface']}; color:{PALETTE['primary_dark']}; "
+                    f"border:1px solid {PALETTE['border']}; border-radius:8px; padding:0; }} "
+                    f"QPushButton:pressed {{ background:{PALETTE['primary_soft']}; border-color:{PALETTE['primary']}; }}"
+                )
+
                 entry = QLineEdit('0')
+                entry.setAlignment(Qt.AlignCenter)
                 entry.setStyleSheet('min-height:28px; font-size:18px; padding:2px 4px;')
                 entry.installEventFilter(self)
                 self.coin_fields.append(entry)
-                self.coins.setCellWidget(row, 1, entry)
-                self.coins.setRowHeight(row, max(40, entry.minimumSizeHint().height() + 4))
+
+                btn_plus = QPushButton('+')
+                btn_plus.setObjectName(f'btnCoinPlus_{row}')
+                btn_plus.setMinimumSize(44, 44)
+                btn_plus.setMaximumSize(48, 44)
+                btn_plus.setAutoRepeat(True)
+                btn_plus.setAutoRepeatDelay(400)
+                btn_plus.setAutoRepeatInterval(80)
+                btn_plus.setFocusPolicy(Qt.NoFocus)
+                btn_plus.setStyleSheet(
+                    f"QPushButton {{ min-width:44px; max-width:48px; min-height:44px; font-size:22px; font-weight:800; "
+                    f"background:{PALETTE['surface']}; color:{PALETTE['primary_dark']}; "
+                    f"border:1px solid {PALETTE['border']}; border-radius:8px; padding:0; }} "
+                    f"QPushButton:pressed {{ background:{PALETTE['primary_soft']}; border-color:{PALETTE['primary']}; }}"
+                )
+
+                btn_minus.clicked.connect(lambda checked=False, e=entry: self._adjust_coin(e, -1))
+                btn_plus.clicked.connect(lambda checked=False, e=entry: self._adjust_coin(e, 1))
+
+                self.coin_minus_buttons.append(btn_minus)
+                self.coin_plus_buttons.append(btn_plus)
+
+                cell_box.addWidget(btn_minus)
+                cell_box.addWidget(entry, 1)
+                cell_box.addWidget(btn_plus)
+
+                self.coins.setCellWidget(row, 1, container)
+                self.coins.setRowHeight(row, max(44, entry.minimumSizeHint().height() + 4))
                 entry.textChanged.connect(self.denominations)
-            columns.addWidget(self.coins, 3)
+
+            left_col.addWidget(self.coins, 1)
+
+            self.clear_btn = QPushButton('ล้างทั้งหมด')
+            self.clear_btn.setObjectName('btnClearAllCoins')
+            self.clear_btn.setStyleSheet(
+                f"QPushButton {{ min-height:30px; max-height:30px; font-size:14px; font-weight:700; "
+                f"background:{PALETTE.get('danger_soft', '#fff1ef')}; color:{PALETTE.get('danger_btn', '#c53030')}; "
+                f"border:1px solid {PALETTE.get('danger_light', '#fecaca')}; border-radius:6px; padding:0px 14px; }} "
+                f"QPushButton:pressed {{ background:{PALETTE.get('danger_light', '#fecaca')}; }}"
+            )
+            self.clear_btn.clicked.connect(self.clear_all_coins)
+            left_col.addWidget(self.clear_btn)
+
+            columns.addLayout(left_col, 3)
+
             right = QVBoxLayout()
-            right.setSpacing(6)
+            right.setSpacing(4)
             columns.addLayout(right, 2)
             right.addWidget(QLabel('ยอดนับจริง / แตะจำนวนใบหรือเหรียญ'))
             right.addWidget(self.amount)
@@ -1822,10 +1908,11 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             right.addWidget(self.pad)
             right.addStretch()
             self.total = QLabel('รวม — บาท')
-            self.total.setStyleSheet('font-size:28px; font-weight:bold;')
-            count.addWidget(self.total)
+            self.total.setStyleSheet('font-size:26px; font-weight:bold;')
+            right.addWidget(self.total)
             self.error = QLabel('')
             self.error.setWordWrap(True)
+            self.error.setStyleSheet('font-size:13px; color:#c53030;')
             self.body.addWidget(self.error)
             self.result_label = QLabel('ยังไม่ได้ตรวจยอด')
             self.result_label.setWordWrap(True)
@@ -1875,18 +1962,22 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.steps.widget(3).layout().addWidget(self.summary)
             self.steps.widget(3).layout().addStretch()
             actions = QHBoxLayout()
-            actions.setSpacing(10)
+            actions.setSpacing(8)
+            actions.setContentsMargins(0, 0, 0, 0)
             self.body.addLayout(actions)
             self.back = QPushButton('ย้อนกลับ')
             self.back.setObjectName("btnTouchSecondary")
+            self.back.setStyleSheet("min-height:36px; max-height:36px; font-size:15px; padding:0;")
             self.back.clicked.connect(self.previous)
             actions.addWidget(self.back)
             self.next = QPushButton('ถัดไป')
             self.next.setObjectName("btnTouchPrimary")
+            self.next.setStyleSheet("min-height:36px; max-height:36px; font-size:15px; padding:0;")
             self.next.clicked.connect(self.advance)
             actions.addWidget(self.next)
             self.submit = QPushButton('ยืนยันปิดกะและพิมพ์ใบปิดกะ')
             self.submit.setObjectName("btnCheckoutPrimary")
+            self.submit.setStyleSheet("min-height:36px; max-height:36px; font-size:15px; padding:0;")
             self.submit.clicked.connect(self.accept)
             actions.addWidget(self.submit)
             for field in self.fields:
@@ -1929,6 +2020,32 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             for entry in self.coin_fields:
                 entry.setStyleSheet('min-height:28px; font-size:18px; padding:2px 4px;' + ('background:#dbeafe;' if entry is field else ''))
             field.selectAll()
+
+        def _adjust_coin(self, entry, delta):
+            raw = entry.text().strip()
+            try:
+                current = int(raw)
+            except ValueError:
+                current = 0
+            new_val = max(0, current + delta)
+            entry.setText(str(new_val))
+            self.set_pad_target(entry)
+
+        def clear_all_coins(self):
+            has_values = any(
+                (entry.text().strip() not in ('', '0'))
+                for entry in self.coin_fields
+            )
+            if has_values:
+                ans = TouchMessage.question(
+                    self,
+                    "ยืนยันการล้างข้อมูล",
+                    "ต้องการล้างจำนวนเงินที่นับไว้ทั้งหมดเป็น 0 หรือไม่?"
+                )
+                if ans != TouchMessage.Yes:
+                    return
+            for entry in self.coin_fields:
+                entry.setText('0')
 
         def default_kept(self):
             if not self.kept_edited:
