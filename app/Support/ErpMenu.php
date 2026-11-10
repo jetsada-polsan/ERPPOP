@@ -68,18 +68,29 @@ class ErpMenu
                 'label' => 'คลัง / ผลิต / ซื้อ',
                 'displayLabel' => 'สินค้า/คลัง',
                 'items' => [
-                    ['label' => 'โอนย้าย / ปรับยอดสต๊อก', 'route' => 'stock-transfers.index', 'pattern' => 'stock-transfers.index', 'extraPattern' => 'stock-adjustments.*', 'icon' => 'bi-box-seam-fill', 'tone' => 'teal'],
-                    ['label' => 'ขอโอนสินค้า', 'route' => 'stock-transfers.request', 'pattern' => 'stock-transfers.request*', 'icon' => 'bi-box-arrow-in-down', 'tone' => 'cyan'],
-                    ['label' => 'แนะนำเติมสินค้าสาขา', 'route' => 'stock-transfers.replenishment.index', 'pattern' => 'stock-transfers.replenishment.*', 'icon' => 'bi-signpost-split-fill', 'tone' => 'teal'],
-                    ['label' => 'ตรวจนับสินค้า', 'route' => 'stock-counts.index', 'pattern' => 'stock-counts.*', 'icon' => 'bi-clipboard-check-fill', 'tone' => 'cyan'],
-                    ['label' => 'เบิก / คืน / สูญเสีย / แปรรูป', 'route' => 'stock-issues.index', 'pattern' => 'stock-issues.*', 'extraPattern' => 'stock-transforms.*', 'icon' => 'bi-box-arrow-up', 'tone' => 'orange'],
-                    ['label' => 'การผลิต', 'route' => 'production.index', 'pattern' => 'production.*', 'icon' => 'bi-gear-wide-connected', 'tone' => 'slate'],
-                    ['label' => 'รายงานประสิทธิภาพผลิต', 'route' => 'production.efficiency', 'pattern' => 'production.efficiency', 'icon' => 'bi-graph-up-arrow', 'tone' => 'slate'],
-                    ['label' => 'ใบขอซื้อ / ใบสั่งซื้อ', 'route' => 'purchase-orders.index', 'pattern' => 'purchase-orders.*', 'icon' => 'bi-cart-plus-fill', 'tone' => 'orange'],
-                    ['label' => 'รับสินค้าเข้าจากผู้ขาย', 'route' => 'purchases.index', 'pattern' => 'purchases.*', 'icon' => 'bi-basket-fill', 'tone' => 'amber'],
-                    ['label' => 'OCR รับสินค้า (Draft)', 'route' => 'ocr.documents.index', 'pattern' => 'ocr.documents.*', 'icon' => 'bi-file-earmark-richtext-fill', 'tone' => 'indigo'],
-                    ['label' => 'คลังมือถือ (สแกน)', 'route' => 'wh.index', 'pattern' => 'wh.*', 'icon' => 'bi-phone-fill', 'tone' => 'cyan'],
-                    ['label' => 'เติมเต็ม / แผนจัดซื้อ', 'route' => 'bplus.purchase-planning', 'pattern' => 'bplus.purchase-planning', 'icon' => 'bi-clipboard2-check-fill', 'tone' => 'teal'],
+                    // 1. รับเข้า
+                    ['label' => 'รับสินค้าเข้าคลัง (ซื้อเข้า)', 'route' => 'purchases.index', 'pattern' => 'purchases.*', 'icon' => 'bi-basket-fill', 'tone' => 'amber'],
+                    ['label' => 'ใบขอซื้อ / สั่งซื้อ (PO)', 'route' => 'purchase-orders.index', 'pattern' => 'purchase-orders.*', 'icon' => 'bi-cart-plus-fill', 'tone' => 'orange'],
+                    ['label' => 'สแกนใบรับสินค้า OCR', 'route' => 'ocr.documents.index', 'pattern' => 'ocr.documents.*', 'icon' => 'bi-file-earmark-richtext-fill', 'tone' => 'indigo'],
+
+                    // 2. โอนย้าย
+                    ['label' => 'โอนย้ายสินค้าข้ามสาขา', 'route' => 'stock-transfers.index', 'pattern' => 'stock-transfers.index', 'extraPattern' => 'stock-adjustments.*', 'icon' => 'bi-box-seam-fill', 'tone' => 'teal'],
+                    ['label' => 'ขอโอนสินค้าข้ามสาขา', 'route' => 'stock-transfers.request', 'pattern' => 'stock-transfers.request*', 'icon' => 'bi-box-arrow-in-down', 'tone' => 'cyan'],
+                    ['label' => 'แนะนำเติมสต็อกสาขา', 'route' => 'stock-transfers.replenishment.index', 'pattern' => 'stock-transfers.replenishment.*', 'icon' => 'bi-signpost-split-fill', 'tone' => 'teal'],
+
+                    // 3. เบิกใช้
+                    ['label' => 'เบิกใช้ / ตัดชำรุด / คืนเบิก', 'route' => 'stock-issues.index', 'pattern' => 'stock-issues.*', 'extraPattern' => 'stock-transforms.*', 'icon' => 'bi-box-arrow-up', 'tone' => 'orange'],
+
+                    // 4. แปรรูป
+                    ['label' => 'แปรรูปสินค้า / สูตรผลิต', 'route' => 'production.index', 'pattern' => 'production.*', 'icon' => 'bi-gear-wide-connected', 'tone' => 'slate'],
+                    ['label' => 'รายงานผลผลิต & Yield', 'route' => 'production.efficiency', 'pattern' => 'production.efficiency', 'icon' => 'bi-graph-up-arrow', 'tone' => 'slate'],
+
+                    // 5. ตรวจนับ
+                    ['label' => 'ตรวจนับสต๊อกสินค้า', 'route' => 'stock-counts.index', 'pattern' => 'stock-counts.*', 'icon' => 'bi-clipboard-check-fill', 'tone' => 'cyan'],
+
+                    // 6. ปรับยอด / เครื่องมือช่วยงาน
+                    ['label' => 'คลังมือถือ (สแกนบาร์โค้ด)', 'route' => 'wh.index', 'pattern' => 'wh.*', 'icon' => 'bi-phone-fill', 'tone' => 'cyan'],
+                    ['label' => 'แผนจัดซื้อและเติมสต็อก', 'route' => 'bplus.purchase-planning', 'pattern' => 'bplus.purchase-planning', 'icon' => 'bi-clipboard2-check-fill', 'tone' => 'teal'],
                 ],
             ],
             [

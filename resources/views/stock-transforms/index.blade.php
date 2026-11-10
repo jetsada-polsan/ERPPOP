@@ -105,7 +105,10 @@
                     <div class="row g-3 mb-4">
                         <div class="col-md-4">
                             <label class="form-label text-muted small">น้ำหนักวัตถุดิบรวมจริง (กก.)</label>
-                            <input type="number" step="0.0001" min="0.0001" name="input_weight_qty" x-model.number="inputWeight" class="form-control text-end" :readonly="!needWeigh()" required>
+                            <div class="input-group">
+                                <input type="number" step="0.0001" min="0.0001" name="input_weight_qty" x-model.number="inputWeight" class="form-control text-end fw-bold" :readonly="!needWeigh()" required>
+                                <span class="input-group-text bg-light text-muted">กก.</span>
+                            </div>
                             <div class="small fw-semibold text-danger mt-1" x-show="needWeigh()">วัตถุดิบไม่ได้นับเป็น กก. (เช่น กล่อง) กรุณาชั่งแล้วใส่น้ำหนักรวมจริงเป็น กก.</div>
                         </div>
                         <div class="col-md-8 d-flex align-items-end">
@@ -145,7 +148,15 @@
                     </div>
                     <div class="table-responsive booking-items-table mb-2">
                         <table class="table align-middle">
-                            <thead><tr><th style="min-width:280px">สินค้า</th><th class="text-end" style="width:110px">ใช้จริง</th><th class="text-end" style="width:130px">ทุนเฉลี่ยระบบ</th><th class="text-end" style="width:120px">ต้นทุนรวม</th><th style="width:44px"></th></tr></thead>
+                            <thead>
+                                <tr>
+                                    <th style="min-width:280px">สินค้าวัตถุดิบ</th>
+                                    <th class="text-end" style="width:145px">จำนวนใช้จริง</th>
+                                    <th class="text-end" style="width:145px">ทุนเฉลี่ยระบบ</th>
+                                    <th class="text-end" style="width:130px">ต้นทุนรวม (บาท)</th>
+                                    <th style="width:44px"></th>
+                                </tr>
+                            </thead>
                             <tbody>
                                 <template x-for="(item, index) in rawItems" :key="'r' + index">
                                     <tr>
@@ -156,9 +167,14 @@
                                             </button>
                                             <input type="hidden" :name="`raw_items[${index}][product_id]`" x-model="item.product_id">
                                         </td>
-                                        <td><input type="number" step="0.0001" min="0.0001" :name="`raw_items[${index}][qty]`" x-model.number="item.qty" @input="syncInputWeight()" required class="form-control text-end"></td>
-                                        <td class="text-end" x-text="item.previewReady ? money(item.average_cost) : '—'"></td>
-                                        <td class="text-end fw-semibold" x-text="item.previewReady ? money(item.qty * item.average_cost) : '—'"></td>
+                                        <td>
+                                            <div class="input-group input-group-sm">
+                                                <input type="number" step="0.0001" min="0.0001" :name="`raw_items[${index}][qty]`" x-model.number="item.qty" @input="syncInputWeight()" required class="form-control text-end fw-semibold">
+                                                <span class="input-group-text bg-light text-muted small" x-text="item.unit_name || 'หน่วย'"></span>
+                                            </div>
+                                        </td>
+                                        <td class="text-end" x-text="item.previewReady ? (money(item.average_cost) + ' / ' + (item.unit_name || 'หน่วย')) : '—'"></td>
+                                        <td class="text-end fw-semibold" x-text="item.previewReady ? (money(item.qty * item.average_cost) + ' บ.') : '—'"></td>
                                         <td class="text-end"><button type="button" class="btn btn-sm btn-light text-danger" @click="rawItems.splice(index, 1); syncInputWeight()" x-show="rawItems.length > 1"><i class="bi bi-trash"></i></button></td>
                                     </tr>
                                 </template>
@@ -173,7 +189,14 @@
                     </div>
                     <div class="table-responsive booking-items-table">
                         <table class="table align-middle">
-                            <thead><tr><th style="min-width:280px">สินค้าผลผลิต</th><th class="text-end" style="width:150px">น้ำหนักชั่งได้ (กก.)</th><th class="text-end" style="width:150px">ต้นทุน/กก.</th><th class="text-end" style="width:130px">Yield</th></tr></thead>
+                            <thead>
+                                <tr>
+                                    <th style="min-width:280px">สินค้าผลผลิต</th>
+                                    <th class="text-end" style="width:160px">น้ำหนักชั่งได้จริง</th>
+                                    <th class="text-end" style="width:165px">ต้นทุนผลผลิต</th>
+                                    <th class="text-end" style="width:120px">Yield (%)</th>
+                                </tr>
+                            </thead>
                             <tbody>
                                 <template x-for="(item, index) in outputItems" :key="'o' + index">
                                     <tr>
@@ -184,8 +207,14 @@
                                             </button>
                                             <input type="hidden" :name="`output_items[${index}][product_id]`" x-model="item.product_id">
                                         </td>
-                                        <td><input type="number" step="0.0001" min="0.0001" :name="`output_items[${index}][qty]`" x-model.number="item.qty" required class="form-control text-end"><input type="hidden" :name="`output_items[${index}][percent]`" value="100"></td>
-                                        <td class="text-end fw-semibold text-success" x-text="outputUnitCost(item)"></td>
+                                        <td>
+                                            <div class="input-group input-group-sm">
+                                                <input type="number" step="0.0001" min="0.0001" :name="`output_items[${index}][qty]`" x-model.number="item.qty" required class="form-control text-end fw-semibold">
+                                                <span class="input-group-text bg-light text-muted small" x-text="item.unit_name || 'กก.'"></span>
+                                            </div>
+                                            <input type="hidden" :name="`output_items[${index}][percent]`" value="100">
+                                        </td>
+                                        <td class="text-end fw-semibold text-success" x-text="outputUnitCost(item) + (outputUnitCost(item) !== '—' ? (' / ' + (item.unit_name || 'กก.')) : '')"></td>
                                         <td class="text-end fw-semibold" x-text="yieldPercent(item)"></td>
                                     </tr>
                                 </template>
@@ -209,13 +238,15 @@
 <style>
     [x-cloak] { display: none !important; }
     .booking-modal-backdrop { position: fixed; inset: 0; z-index: 2000; background: rgba(15,23,42,.42); display: flex; align-items: center; justify-content: center; padding: 24px; }
-    .booking-modal { width: min(1020px, 100%); max-height: calc(100vh - 48px); overflow: auto; background: #fff; border-radius: 18px; box-shadow: 0 24px 80px rgba(15,23,42,.24); }
-    .booking-items-table { border: 1px solid var(--erp-border); border-radius: 14px; }
+    .booking-modal { width: min(1020px, 100%); max-height: calc(100vh - 48px); overflow: auto; background: #fff; border-radius: 18px; box-shadow: 0 24px 80px rgba(15,23,42,.24); scroll-padding-top: 104px; }
+    .booking-modal .modal-header { position: sticky; top: 0; z-index: 50; background: #fff; border-bottom: 1px solid #eef2f6; }
+    .booking-modal .modal-footer { position: sticky; bottom: 0; z-index: 40; background: #fff; border-top: 1px solid #eef2f6; }
+    .booking-items-table { border: 1px solid var(--erp-border); border-radius: 14px; scroll-margin-top: 104px; }
     .booking-items-table .table { margin-bottom: 0; }
     .typeahead-list { position: absolute; z-index: 2050; left: 0; right: 0; top: calc(100% + 4px); max-height: 260px; overflow: auto; background: #fff; border: 1px solid var(--erp-border); border-radius: 12px; box-shadow: 0 14px 36px rgba(15,23,42,.14); padding: 6px; }
     .typeahead-item { width: 100%; border: 0; background: transparent; border-radius: 9px; padding: 9px 10px; display: flex; align-items: center; gap: 10px; text-align: left; }
     .typeahead-item:hover { background: var(--erp-primary-soft); }
-    .loss-panel{padding:14px;border:1px solid #f3c7c7;border-radius:8px;background:var(--erp-surface-2)}
+    .loss-panel{padding:14px;border:1px solid #f3c7c7;border-radius:8px;background:var(--erp-surface-2);margin-left:0;margin-right:0;scroll-margin-top:104px;}
     .loss-summary{display:flex;gap:18px;flex-wrap:wrap;padding:10px 12px;border-radius:6px;background:#fff;color:var(--erp-muted);font-size:13px}
 </style>
 @endpush
@@ -227,8 +258,8 @@
             ...erpProductPicker(),
             ...erpStockPreview(@js($branches), '{{ route('search.stock-balance') }}'),
             modalOpen: false,
-            rawItems: [{ product_id: '', productQuery: '', qty: 1, average_cost: 0, results: [] }],
-            outputItems: [{ product_id: '', productQuery: '', qty: 1, percent: null, results: [] }],
+            rawItems: [{ product_id: '', productQuery: '', sku_code: '', name_th: '', unit_name: '', qty: 1, average_cost: 0, results: [] }],
+            outputItems: [{ product_id: '', productQuery: '', sku_code: '', name_th: '', unit_name: '', qty: 1, percent: null, results: [] }],
             inputWeight: 1,
             expectedLossPercent: 0,
             recipes: @json($recipes),
@@ -241,10 +272,13 @@
             onProductPicked(index, product, context) {
                 const item = context === 'output' ? this.outputItems[index] : this.rawItems[index];
                 item.productQuery = `${product.sku_code} - ${product.name_th}`;
+                item.sku_code = product.sku_code || '';
+                item.name_th = product.name_th || '';
+                item.unit_name = product.unit_name || product.base_unit_name || '';
                 if (context !== 'output') this.previewStock(item);
             },
 
-            addRaw() { this.rawItems.push({ product_id: '', productQuery: '', qty: 1, average_cost: 0, results: [] }); this.syncInputWeight(); },
+            addRaw() { this.rawItems.push({ product_id: '', productQuery: '', sku_code: '', name_th: '', unit_name: '', qty: 1, average_cost: 0, results: [] }); this.syncInputWeight(); },
             isKg(unit) { return /^(กก\.?|กิโลกรัม|kg\.?|kgs?)$/i.test(String(unit || '').trim()); },
             needWeigh() { return this.rawItems.some(i => i.product_id && !this.isKg(i.unit_name)); },
             // หน่วยวัตถุดิบเป็น กก. ทั้งหมดจึงรวมให้เอง ถ้าเป็นกล่อง/ชิ้น ต้องชั่งจริง (เดิมเอาจำนวนกล่องมาเป็น กก. → Yield 1,000%)
@@ -260,10 +294,10 @@
                 this.selectedRecipeId = recipe.id;
                 this.selectedRecipe = recipe;
                 this.rawItems = recipe.items.map(i => ({
-                    product_id: i.product_id, productQuery: i.label, qty: i.qty, average_cost: i.average_cost, results: [],
+                    product_id: i.product_id, productQuery: i.label, sku_code: i.sku_code || '', name_th: i.name_th || '', unit_name: i.unit_name || '', qty: i.qty, average_cost: i.average_cost, results: [],
                 }));
                 this.outputItems = [{
-                    product_id: recipe.finished_product_id, productQuery: recipe.finished_product_label,
+                    product_id: recipe.finished_product_id, productQuery: recipe.finished_product_label, sku_code: recipe.finished_sku_code || '', name_th: recipe.finished_name_th || '', unit_name: recipe.finished_unit_name || 'กก.',
                     qty: recipe.output_qty, percent: 100, results: [],
                 }];
                 this.rawItems.forEach(item => this.previewStock(item));
