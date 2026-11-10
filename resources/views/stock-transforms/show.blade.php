@@ -18,7 +18,10 @@
             </div>
             <div class="text-end">
                 <div class="text-muted small">มูลค่าวัตถุดิบ</div>
-                <div class="h4 fw-bold text-danger mb-0">{{ number_format($document->total_amount, 2) }}</div>
+                <div class="h4 fw-bold text-danger mb-2">{{ number_format($document->total_amount, 2) }}</div>
+                <a class="btn btn-sm btn-outline-primary" target="_blank" href="{{ route('stock-transforms.packing-labels', $document) }}">
+                    <i class="bi bi-printer me-1"></i> พิมพ์ป้ายสินค้า (Packing Labels)
+                </a>
             </div>
         </div>
     </div>
@@ -89,7 +92,12 @@
     </div>
 
     <div class="content-card p-4">
-        <h3 class="h6 fw-bold mb-3 text-success"><i class="bi bi-box-arrow-in-down me-1"></i>ผลผลิต (รับเข้าสต๊อก)</h3>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="h6 fw-bold mb-0 text-success"><i class="bi bi-box-arrow-in-down me-1"></i>ผลผลิต (รับเข้าสต๊อก)</h3>
+            <a class="btn btn-sm btn-outline-primary" target="_blank" href="{{ route('stock-transforms.packing-labels', $document) }}">
+                <i class="bi bi-printer me-1"></i> พิมพ์ป้ายสินค้า (Packing Labels)
+            </a>
+        </div>
         <div class="table-responsive">
             <table class="table align-middle">
                 <thead><tr><th>รหัส</th><th>ชื่อสินค้า</th><th>หน่วย</th><th class="text-end">จำนวน</th><th class="text-end">ทุนที่ได้/หน่วย</th><th class="text-end">มูลค่ารวม</th></tr></thead>

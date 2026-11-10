@@ -146,4 +146,24 @@ class StockTransformController extends Controller
             'barcodes' => $barcodes,
         ]);
     }
+
+    public function packingLabels(Document $stockTransform): View
+    {
+        $stockTransform->load([
+            'branch',
+            'stockDocument.items.product.baseUnit',
+            'stockDocument.items.warehouseLocation',
+            'stockDocument.items.sourceStockLot',
+            'productionBatch.outputProduct',
+        ]);
+
+        $outputItems = $stockTransform->stockDocument?->items
+            ?->where('qty', '>=', 0)
+            ->values() ?? collect();
+
+        return view('stock-transforms.packing-labels', [
+            'document' => $stockTransform,
+            'outputItems' => $outputItems,
+        ]);
+    }
 }

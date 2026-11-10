@@ -470,6 +470,7 @@ Route::prefix('stock-transforms')->name('stock-transforms.')->group(function () 
     Route::post('/', [StockTransformController::class, 'store'])->name('store');
     Route::post('/{stockTransform}/packages', [StockTransformController::class, 'addPackages'])->name('packages.store');
     Route::get('/{stockTransform}/labels', [StockTransformController::class, 'labels'])->name('labels');
+    Route::get('/{stockTransform}/packing-labels', [StockTransformController::class, 'packingLabels'])->name('packing-labels');
     Route::get('/{stockTransform}', [StockTransformController::class, 'show'])->name('show');
 });
 
