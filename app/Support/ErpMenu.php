@@ -166,7 +166,8 @@ class ErpMenu
                     // กลุ่มย่อย: ระบบ
                     ['group' => 'ระบบ', 'label' => 'ตั้งค่าระบบ', 'route' => 'settings.index', 'pattern' => 'settings.index', 'extraPattern' => 'settings.pos-*', 'icon' => 'bi-gear-fill', 'tone' => 'slate'],
                     ['group' => 'ระบบ', 'label' => 'นโยบายขายติดลบ', 'route' => 'settings.stock-policies', 'pattern' => 'settings.stock-policies', 'icon' => 'bi-sliders2-vertical', 'tone' => 'amber'],
-                    ['group' => 'ระบบ', 'label' => 'Backup / Security', 'route' => 'operations.index', 'pattern' => 'operations.*', 'icon' => 'bi-shield-lock-fill', 'tone' => 'red'],
+                    ['group' => 'ระบบ', 'label' => 'Backup / Security', 'route' => 'operations.index', 'pattern' => 'operations.index*', 'icon' => 'bi-shield-lock-fill', 'tone' => 'red'],
+                    ['group' => 'ระบบ', 'label' => 'สุขภาพระบบ', 'route' => 'operations.health', 'pattern' => 'operations.health*', 'icon' => 'bi-heart-pulse-fill', 'tone' => 'red'],
                     ['group' => 'ระบบ', 'label' => 'โครงสร้างฐานข้อมูล', 'route' => 'database-structure.index', 'pattern' => 'database-structure.*', 'icon' => 'bi-database-fill-gear', 'tone' => 'cyan'],
                 ],
             ],

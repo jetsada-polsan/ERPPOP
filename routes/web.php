@@ -621,6 +621,8 @@ Route::prefix('tax-compliance')->name('tax-compliance.')->group(function () {
 
 Route::prefix('operations')->name('operations.')->group(function () {
     Route::get('/', [OperationsController::class, 'index'])->name('index');
+    Route::get('/health', [\App\Http\Controllers\SystemHealthController::class, 'index'])->name('health');
+    Route::post('/health/errors/{systemError}/resolve', [\App\Http\Controllers\SystemHealthController::class, 'resolveError'])->name('health.resolve');
     Route::post('/backup', [OperationsController::class, 'backup'])->name('backup');
     Route::post('/restore-verify', [OperationsController::class, 'verifyRestore'])->name('restore-verify');
     Route::post('/users/{user}/mfa-reset', [OperationsController::class, 'resetMfa'])->name('mfa-reset');

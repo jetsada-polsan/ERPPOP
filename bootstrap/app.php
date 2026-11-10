@@ -20,9 +20,17 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         // ประตูเดียวของทั้ง ERP: guest -> หน้า login, ผู้ใช้ถูกปิด -> เตะออก,
         // แต่ละเมนูเช็คสิทธิ์ตาม App\Support\RoutePermissions
+        $middleware->appendToGroup('web', \App\Http\Middleware\RecordResponseMetrics::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\ErpAuthorize::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->report(function (\Throwable $e) {
+            try {
+                app(\App\Services\Monitoring\SystemErrorRecorder::class)->record($e);
+            } catch (\Throwable) {
+                // Monitoring must never interrupt exception reporting
+            }
+        });
         // A stale login tab should recover to a fresh CSRF token instead of
         // leaving the operator on the generic 419 page. CSRF remains enabled.
         $exceptions->render(function (TokenMismatchException $exception, Request $request) {

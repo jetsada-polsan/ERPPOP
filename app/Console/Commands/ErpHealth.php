@@ -11,7 +11,7 @@ use Throwable;
 
 class ErpHealth extends Command
 {
-    protected $signature = 'erp:health {--max-backup-age=26 : Maximum backup age in hours} {--stale-count-days=3 : วันที่ใบตรวจนับค้างได้ก่อนเตือน}';
+    protected $signature = 'erp:health {--max-backup-age=26 : Maximum backup age in hours} {--stale-count-days=3 : วันที่ใบตรวจนับค้างได้ก่อนเตือน} {--json : คืนผลลัพธ์เป็น JSON (สถานะ DB, queue, disk, error ล่าสุด)}';
 
     protected $description = 'Check ERP database, migrations, queue failures, storage, and backup freshness';
 
@@ -52,7 +52,60 @@ class ErpHealth extends Command
         $failedJobs = Schema::hasTable('failed_jobs') ? DB::table('failed_jobs')->count() : 0;
         $checks[] = ['Queue', $failedJobs === 0 ? 'ผ่าน' : 'เตือน', "งานล้มเหลว {$failedJobs} รายการ"];
 
-        $this->table(['รายการ', 'ผล', 'รายละเอียด'], $checks);
+        $hasFailure = collect($checks)->contains(fn (array $row) => $row[1] === 'ไม่ผ่าน');
+        $hasWarning = collect($checks)->contains(fn (array $row) => $row[1] === 'เตือน');
+
+        if ($this->option('json')) {
+            $storagePath = storage_path();
+            $diskFree = @disk_free_space($storagePath) ?: 0;
+            $diskTotal = @disk_total_space($storagePath) ?: 0;
+            $diskUsed = max(0, $diskTotal - $diskFree);
+            $diskUsedPercent = $diskTotal > 0 ? round(($diskUsed / $diskTotal) * 100, 1) : 0;
+
+            $latestErrors = [];
+            if (Schema::hasTable('system_errors')) {
+                $latestErrors = DB::table('system_errors')
+                    ->orderByDesc('occurred_at')
+                    ->limit(5)
+                    ->get(['id', 'occurred_at', 'status', 'url', 'route_name', 'message', 'exception_class', 'count'])
+                    ->toArray();
+            }
+
+            $dbCheck = collect($checks)->firstWhere(0, 'ฐานข้อมูล');
+            $queueCheck = collect($checks)->firstWhere(0, 'Queue');
+
+            $jsonData = [
+                'status' => $hasFailure ? 'error' : ($hasWarning ? 'warning' : 'ok'),
+                'db' => [
+                    'status' => ($dbCheck && $dbCheck[1] === 'ผ่าน') ? 'ok' : 'error',
+                    'message' => $dbCheck[2] ?? '',
+                ],
+                'queue' => [
+                    'status' => ($queueCheck && $queueCheck[1] === 'ผ่าน') ? 'ok' : 'warning',
+                    'failed_jobs' => $failedJobs,
+                    'message' => $queueCheck[2] ?? '',
+                ],
+                'disk' => [
+                    'status' => is_writable($storagePath) ? 'ok' : 'error',
+                    'free_bytes' => $diskFree,
+                    'total_bytes' => $diskTotal,
+                    'free_human' => round($diskFree / (1024 * 1024 * 1024), 2).' GB',
+                    'total_human' => round($diskTotal / (1024 * 1024 * 1024), 2).' GB',
+                    'used_percent' => $diskUsedPercent,
+                ],
+                'latest_errors' => $latestErrors,
+                'checks' => collect($checks)->map(fn ($c) => [
+                    'name' => $c[0],
+                    'status' => $c[1],
+                    'detail' => $c[2],
+                ])->values()->all(),
+                'checked_at' => now()->toIso8601String(),
+            ];
+
+            $this->line(json_encode($jsonData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        } else {
+            $this->table(['รายการ', 'ผล', 'รายละเอียด'], $checks);
+        }
         if (Schema::hasTable('monitor_events')) {
             foreach ($checks as [$code, $status, $detail]) {
                 if ($status === 'ผ่าน') {
