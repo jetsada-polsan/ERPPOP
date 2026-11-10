@@ -121,7 +121,7 @@
             <div class="small text-muted mb-2">ออนไลน์ = ติดต่อ ERP ภายใน {{ $onlineMinutes }} นาที · ตัวเลขผิดพลาดนับย้อนหลัง 24 ชม.</div>
             <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
-                    <thead><tr><th>เครื่อง</th><th>สาขา</th><th>ติดต่อล่าสุด</th><th>กะ</th><th class="text-end">บิลวันนี้</th><th>ปัญหา</th><th class="text-end"></th></tr></thead>
+                    <thead><tr><th>เครื่อง</th><th>สาขา</th><th>ติดต่อล่าสุด</th><th>กะ</th><th>ข้อมูลในเครื่อง</th><th class="text-end">บิลวันนี้</th><th>ปัญหา</th><th class="text-end"></th></tr></thead>
                     <tbody>
                     @forelse($devices as $row)
                         @php $d = $row['device']; $problems = $row['failed_requests'] + $row['login_failures'] + $row['offline_review']; @endphp
@@ -139,6 +139,22 @@
                                     <div class="small text-muted">{{ $row['shift']->shift_no }}</div>
                                 @else
                                     <span class="small text-muted">ไม่มีกะเปิด</span>
+                                @endif
+                            </td>
+                            <td class="small">
+                                @if($d->sync_reported_at)
+                                    @php $staleSets = $d->applied_versions['stale'] ?? []; $labels = ['catalog' => 'สินค้า/ราคา', 'promotions' => 'โปรโมชัน', 'cashiers' => 'พนักงาน']; @endphp
+                                    @if(empty($staleSets))
+                                        <span class="text-success">ล่าสุดแล้ว</span>
+                                    @else
+                                        <span class="text-warning">รอดึง: {{ collect($staleSets)->map(fn ($k) => $labels[$k] ?? $k)->join(', ') }}</span>
+                                    @endif
+                                    <div class="text-muted">รายงาน {{ $d->sync_reported_at->diffForHumans() }}@if($d->app_version) · v{{ $d->app_version }}@endif</div>
+                                    @if($d->pending_bills)
+                                        <div class="text-danger">บิลค้างส่ง {{ $d->pending_bills }} ใบ</div>
+                                    @endif
+                                @else
+                                    <span class="text-muted">เครื่องยังไม่รายงาน (โปรแกรมรุ่นเก่า)</span>
                                 @endif
                             </td>
                             <td class="text-end">{{ $row['receipts_today'] }} บิล<div class="small text-muted">{{ number_format($row['sales_today'], 2) }}</div></td>
@@ -174,7 +190,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="text-center text-muted py-4">ยังไม่มีเครื่อง — ไปที่แท็บ ภาพรวมสาขา แล้วกด เพิ่มเครื่อง</td></tr>
+                        <tr><td colspan="8" class="text-center text-muted py-4">ยังไม่มีเครื่อง — ไปที่แท็บ ภาพรวมสาขา แล้วกด เพิ่มเครื่อง</td></tr>
                     @endforelse
                     </tbody>
                 </table>
