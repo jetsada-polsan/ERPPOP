@@ -196,3 +196,20 @@ def test_central_hold_uses_server_ids_and_restores_discount(scene):
     assert api.post.call_args.args[0]=='/api/pos/held-bills/9/resume'
     assert window.order.lines[0].product_id==1 and window.order.bill_discount==3
     assert window.order.grand_total()==17
+
+
+def test_hold_falls_back_to_this_device_when_erp_refuses(scene):
+    """เจอที่ร้าน 10 พ.ย.: กะยังไม่ขึ้น ERP → พักบิลไม่ได้เลย ต้องพักไว้ในเครื่องแทน"""
+    from pos_python.order import OrderLine
+    from pos_python.settings_service import SettingsService
+    from pos_python.touch_dialogs import TouchMessage
+    app, db, service, window, api = scene
+    db.execute('UPDATE products SET server_id=42 WHERE id=1');db.commit()
+    api.post.side_effect = RuntimeError('พักบิลได้เฉพาะกะที่กำลังเปิดของตนเอง')
+    window.order.add_product(OrderLine(1,'สินค้า','ชิ้น',D(2),D(10)))
+    with patch.object(TextDialog,'exec',return_value=QDialog.Accepted), patch.object(TouchMessage,'information') as told:
+        window.hold_order()
+    assert not window.order.lines
+    held = SettingsService(db).get_device_setting('held_orders', [])
+    assert len(held) == 1 and 'snapshot' in held[0]
+    assert told.called

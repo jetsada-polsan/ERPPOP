@@ -2935,7 +2935,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     self.refresh_order()
                     return
                 except Exception as error:
-                    TouchMessage.warning(self, 'พักบิลไม่ได้', cashier_error(error))
+                    # ฝาก ERP ไม่ได้ (เช่น กะยังไม่ขึ้น ERP / เน็ตหลุด) → พักไว้ในเครื่องนี้แทน ไม่ให้แคชเชียร์ติด
+                    held.append(snapshot)
+                    settings.set_device_setting("held_orders", held)
+                    self.order.clear()
+                    self.refresh_order()
+                    TouchMessage.information(self, 'พักบิลไว้ในเครื่องนี้', 'ฝากบิลขึ้นระบบกลางไม่ได้ จึงพักไว้ในเครื่องนี้แทน\nเรียกบิลกลับได้จากเครื่องนี้ตามปกติ\n(' + cashier_error(error) + ')')
                     return
             held.append(snapshot)
             settings.set_device_setting("held_orders", held)
@@ -3489,14 +3494,19 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             dialog.exec()
 
         def show_history(self):
-            rows = service.db.execute("SELECT id, document_no, server_receipt_no, sale_datetime, grand_total, sync_status, is_void FROM sales ORDER BY id DESC").fetchall()
+            # บิลของกะนี้ขึ้นก่อน บิลกะก่อน (ของคนก่อนหน้า) ต่อท้ายพร้อมป้ายบอก จะได้ไม่สับสน
+            current_shift = self.shift_id or 0
+            rows = service.db.execute(
+                "SELECT id, document_no, server_receipt_no, sale_datetime, grand_total, sync_status, is_void, shift_id FROM sales "
+                "ORDER BY (shift_id = ?) DESC, id DESC LIMIT 300", (current_shift,)).fetchall()
             choices = []
             for row in rows:
                 receipt_no = str(row['server_receipt_no'] or row['document_no'])
                 if len(receipt_no) > 32:
                     receipt_no = f"{receipt_no[:15]}…{receipt_no[-12:]}"
                 status = sale_status_label(row['sync_status']) + (' · ยกเลิกแล้ว' if row['is_void'] else '')
-                choices.append((f"{receipt_no} · {local_datetime_text(row['sale_datetime'])}\nยอด {money(row['grand_total']):,.2f} บาท · {status}", row['id']))
+                prefix = '' if row['shift_id'] == current_shift else '[กะก่อน] '
+                choices.append((f"{prefix}{receipt_no} · {local_datetime_text(row['sale_datetime'])}\nยอด {money(row['grand_total']):,.2f} บาท · {status}", row['id']))
             picker = ChoiceDialog(self, "ประวัติบิล · เลือกบิลเพื่อยกเลิก/รับคืน", choices, searchable=True)
             if picker.exec() != QDialog.DialogCode.Accepted:
                 return
