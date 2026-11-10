@@ -149,6 +149,16 @@
                                     @else
                                         <span class="text-warning">รอดึง: {{ collect($staleSets)->map(fn ($k) => $labels[$k] ?? $k)->join(', ') }}</span>
                                     @endif
+                                    @php $devCounts = $d->applied_versions['device_counts'] ?? []; $srvCounts = $d->applied_versions['server_counts'] ?? []; @endphp
+                                    @if($devCounts)
+                                        <div>
+                                            @foreach(['catalog' => 'สินค้า', 'promotions' => 'โปร', 'cashiers' => 'พนักงาน'] as $key => $label)
+                                                @continue(! array_key_exists($key, $devCounts))
+                                                @php $mismatch = array_key_exists($key, $srvCounts) && (int) $srvCounts[$key] !== (int) $devCounts[$key]; @endphp
+                                                <span class="{{ $mismatch ? 'text-danger fw-semibold' : '' }}" @if($mismatch) title="ERP มี {{ $srvCounts[$key] }} รายการ" @endif>{{ $label }} {{ number_format((int) $devCounts[$key]) }}@if(array_key_exists($key, $srvCounts)) / ERP {{ number_format((int) $srvCounts[$key]) }}@endif</span>@if(! $loop->last) · @endif
+                                            @endforeach
+                                        </div>
+                                    @endif
                                     <div class="text-muted">รายงาน {{ $d->sync_reported_at->diffForHumans() }}@if($d->app_version) · v{{ $d->app_version }}@endif</div>
                                     @if($d->pending_bills)
                                         <div class="text-danger">บิลค้างส่ง {{ $d->pending_bills }} ใบ</div>

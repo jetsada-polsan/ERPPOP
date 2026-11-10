@@ -170,14 +170,23 @@ class PosApiController extends Controller
             'pending_bills' => ['nullable', 'integer', 'min:0', 'max:1000000'],
             'app_version' => ['nullable', 'string', 'max:40'],
             'pulled' => ['nullable', 'boolean'],
+            'counts' => ['nullable', 'array'],
+            'counts.*' => ['nullable', 'integer', 'min:0', 'max:10000000'],
+            'review_uuids' => ['nullable', 'array', 'max:500'],
+            'review_uuids.*' => ['string', 'max:64'],
         ]);
         $device = $request->attributes->get('pos_device');
         $branchId = (int) ($device?->branch_id ?: $request->user()?->branch_id);
+        [$promotionsVersion, $promotionsCount] = $this->promotionsVersion($request, $branchId);
+        [$cashiersVersion, $cashiersCount] = $this->cashiersVersion($request);
         $versions = [
             'catalog' => $this->catalogVersion(),
-            'promotions' => $this->promotionsVersion($request, $branchId),
-            'cashiers' => $this->cashiersVersion($request),
+            'promotions' => $promotionsVersion,
+            'cashiers' => $cashiersVersion,
         ];
+        // จำนวนที่ ERP ส่งให้เครื่อง ใช้เทียบกับจำนวนที่เครื่องมีจริงบนหน้า POS admin
+        $serverCounts = ['promotions' => $promotionsCount, 'cashiers' => $cashiersCount];
+        $deviceCounts = array_intersect_key((array) ($data['counts'] ?? []), $versions);
         $applied = array_intersect_key((array) ($data['applied'] ?? []), $versions);
         $stale = array_values(array_keys(array_filter($versions, fn ($version, $key) => ($applied[$key] ?? null) !== $version, ARRAY_FILTER_USE_BOTH)));
 
@@ -186,7 +195,8 @@ class PosApiController extends Controller
                 'sync_reported_at' => now(),
                 'pending_bills' => $data['pending_bills'] ?? null,
                 'app_version' => $data['app_version'] ?? null,
-                'applied_versions' => ['applied' => $applied, 'stale' => $stale],
+                'applied_versions' => ['applied' => $applied, 'stale' => $stale,
+                    'device_counts' => $deviceCounts, 'server_counts' => $serverCounts],
                 'master_pulled_at' => ($data['pulled'] ?? false) ? now() : null,
             ], fn ($value) => $value !== null))->save();
         }
@@ -195,7 +205,26 @@ class PosApiController extends Controller
             'success' => true,
             'versions' => $versions,
             'stale' => $stale,
+            'counts' => $serverCounts,
+            'resolved_sales' => $this->resolvedReviewSales($device, (array) ($data['review_uuids'] ?? [])),
         ]);
+    }
+
+    /**
+     * บิลที่ผู้จัดการกด "ปิดรายการ" บน ERP แล้ว ตอบเฉพาะบิลของเครื่องนี้ที่เครื่องถามมา
+     * เครื่องจะเลิกโชว์บิลนั้นเป็น "รอตรวจ" (ไม่ลบบิลในเครื่อง และไม่ส่งขึ้นใหม่)
+     */
+    private function resolvedReviewSales(?PosDevice $device, array $uuids): array
+    {
+        $uuids = array_values(array_filter(array_map(fn ($uuid) => strtolower((string) $uuid), $uuids), fn ($uuid) => Str::isUuid($uuid)));
+        if (! $device || $uuids === []) {
+            return [];
+        }
+
+        return PosOfflineSale::where('pos_device_id', $device->id)
+            ->where('status', PosOfflineSale::RESOLVED)
+            ->whereIn('offline_uuid', $uuids)
+            ->pluck('offline_uuid')->values()->all();
     }
 
     /** สินค้า/บาร์โค้ด/ราคา มีหลายพันแถว ใช้สรุปจำนวน+เวลาแก้ล่าสุดแทนการ hash ทั้งชุด */
@@ -217,20 +246,23 @@ class PosApiController extends Controller
     }
 
     /** โปรมีไม่กี่สิบรายการ hash จากข้อมูลจริงที่เครื่องได้รับ ตรงเป๊ะ (รวมโปรที่หมดอายุแล้วหลุดออก) */
-    private function promotionsVersion(Request $request, int $branchId): string
+    /** @return array{0: string, 1: int} */
+    private function promotionsVersion(Request $request, int $branchId): array
     {
         $query = ['branch_id' => $branchId, 'include_upcoming' => 1, 'bill_promotions' => 1, 'mix_promotions' => 1];
 
         return $this->hashInternal($request, '/api/pos/promotions', $query,
-            fn (Request $inner) => app(PosController::class)->promotions($inner));
+            fn (Request $inner) => app(PosController::class)->promotions($inner), 'promotions');
     }
 
-    private function cashiersVersion(Request $request): string
+    /** @return array{0: string, 1: int} */
+    private function cashiersVersion(Request $request): array
     {
-        return $this->hashInternal($request, '/api/pos/cashiers', [], fn (Request $inner) => $this->cashiers($inner));
+        return $this->hashInternal($request, '/api/pos/cashiers', [], fn (Request $inner) => $this->cashiers($inner), 'cashiers');
     }
 
-    private function hashInternal(Request $request, string $uri, array $query, callable $call): string
+    /** @return array{0: string, 1: int} hash ของข้อมูล และจำนวนแถวในรายการ $listKey */
+    private function hashInternal(Request $request, string $uri, array $query, callable $call, string $listKey): array
     {
         $inner = Request::create($uri, 'GET', $query);
         $inner->setUserResolver($request->getUserResolver());
@@ -239,7 +271,11 @@ class PosApiController extends Controller
         // enforcedBranchId() อ่าน request() ตัวกลาง ต้องสลับให้ชี้คำขอภายในชั่วคราว
         app()->instance('request', $inner);
         try {
-            return sha1((string) $call($inner)->getContent());
+            $content = (string) $call($inner)->getContent();
+            $body = json_decode($content, true);
+            $rows = is_array($body) ? ($body[$listKey] ?? (array_is_list($body) ? $body : [])) : [];
+
+            return [sha1($content), is_array($rows) ? count($rows) : 0];
         } finally {
             app()->instance('request', $original);
         }
