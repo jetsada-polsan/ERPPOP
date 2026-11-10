@@ -85,8 +85,18 @@ class SyncWorker:
             # ผล sync คิวอย่างเดียวไม่ใช่ health check: คิวว่างไม่เรียก API และ
             # จึงไม่มีสิทธิ์เปลี่ยนสถานะ Device Token ให้เป็นออนไลน์
             if result["failed"]:
-                self.online = False
-                self.last_error = f"มีรายการ sync ล้มเหลว {result['failed']} รายการ"
+                # แยก "เน็ตหลุด" กับ "ERP ตอบกลับแต่ไม่รับบิล": อย่างหลังเครื่องยังออนไลน์อยู่
+                # (เดิมขึ้น ออฟไลน์ ทั้งที่เน็ตดี แคชเชียร์เข้าใจผิด) ให้บอกเหตุผลจาก ERP แทน
+                latest = db.execute(
+                    "SELECT last_error FROM sync_outbox WHERE status = 'failed' AND last_error IS NOT NULL "
+                    "ORDER BY id DESC LIMIT 1").fetchone()
+                reason = str(latest[0]) if latest and latest[0] else ""
+                if not reason or "network:" in reason:
+                    self.online = False
+                    self.last_error = f"มีรายการ sync ล้มเหลว {result['failed']} รายการ"
+                else:
+                    self.online = True
+                    self.last_error = f"ERP ยังไม่รับ {result['failed']} รายการ: {reason[:200]}"
             return result
         except Exception as error:
             self.online = False

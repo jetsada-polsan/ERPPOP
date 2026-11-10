@@ -219,6 +219,23 @@ class SyncWorkerTest(unittest.TestCase):
         self.assertIn("/api/pos/checkout", ok.calls)
 
 
+    def test_erp_rejection_keeps_device_online_and_shows_reason(self) -> None:
+        """เจอที่ร้าน 10 พ.ย.: ขายแล้วขึ้น ออฟไลน์ ทั้งที่เน็ตดี เพราะ ERP ไม่รับบิล"""
+        from unittest.mock import patch
+        from pos_python.sync_service import SyncService
+        for reason, online in [("HTTP 422: พักบิลได้เฉพาะกะที่กำลังเปิดของตนเอง", True), ("network: timed out", False)]:
+            db, path = fresh_db()
+            db.execute("INSERT INTO sync_outbox (aggregate_type, aggregate_uuid, payload, status, last_error, created_at) "
+                       "VALUES ('sale', 'u-1', '{}', 'failed', ?, '2026-11-10T00:00:00Z')", (reason,))
+            db.commit()
+            worker = SyncWorker(path, object())
+            with patch.object(SyncService, "sync_pending_sales", return_value={"synced": 0, "failed": 1, "review": 0}):
+                worker.run_once()
+            self.assertEqual(worker.online, online, reason)
+            if online:
+                self.assertIn("ERP ยังไม่รับ", worker.last_error)
+                self.assertIn("กะที่กำลังเปิด", worker.last_error)
+
     def test_interval_is_fast_with_a_backlog_and_slow_when_idle(self) -> None:
         from pathlib import Path as P
         w = SyncWorker(P("/tmp/x.sqlite"), object(), idle_interval=30.0, retry_interval=5.0)
