@@ -468,4 +468,50 @@ class ScheduledPriceChangeTest extends TestCase
         $this->assertSame('failed', $failedRow->status);
         $this->assertNotNull($failedRow->error);
     }
+    /**
+     * POS และตัวตรวจราคาตอนรับบิลอ่านราคาจาก "ตารางราคาหลัก" ก่อน default_price
+     * ถ้าการนัดเปลี่ยนราคาแก้แค่ default_price แล้วปิดช่วงราคา POS ราคาที่เครื่องขายจะเด้งกลับเป็นราคาเดิม
+     */
+    public function test_pos_selling_price_follows_the_scheduled_price_when_the_product_has_a_price_table_row(): void
+    {
+        $user = $this->createMasterManager();
+        $branch = Branch::create(['code' => 'B-SPC', 'name_th' => 'สาขาทดสอบ', 'is_active' => true]);
+        $table = \App\Models\PriceTable::create(['code' => 'RETAIL', 'name' => 'ราคาปลีก', 'is_default' => true, 'is_active' => true]);
+        $withRow = $this->createProduct('SQ-100', 'คอหมึก 100/300', 50);
+        $smallestUnitOnly = $this->createProduct('SQ-300', 'คอหมึก 300/500', 55);
+        $noRow = $this->createProduct('SQ-500', 'คอหมึก 500up', 58);
+        \App\Models\ProductPrice::create(['product_id' => $withRow->id, 'price_table_id' => $table->id, 'unit_id' => null, 'price' => 50, 'is_active' => true]);
+        $pack = ProductUnit::create(['code' => 'PK', 'name' => 'แพ็ค', 'qty_per_base_unit' => 10]);
+        \App\Models\ProductPrice::create(['product_id' => $smallestUnitOnly->id, 'price_table_id' => $table->id, 'unit_id' => $smallestUnitOnly->base_unit_id, 'price' => 55, 'is_active' => true]);
+        \App\Models\ProductPrice::create(['product_id' => $smallestUnitOnly->id, 'price_table_id' => $table->id, 'unit_id' => $pack->id, 'price' => 540, 'is_active' => true]);
+
+        $service = app(ScheduledPriceChangeService::class);
+        $service->schedule([
+            ['product_id' => $withRow->id, 'new_price' => 54],
+            ['product_id' => $smallestUnitOnly->id, 'new_price' => 59],
+            ['product_id' => $noRow->id, 'new_price' => 62],
+        ], '2026-11-12 00:00:00', 'ซัพพลายเออร์ปรับราคา', $user->id);
+
+        $posPrices = function () use ($withRow, $smallestUnitOnly, $noRow, $branch): array {
+            $guard = app(\App\Services\Sales\PosPricingGuard::class);
+            $method = new \ReflectionMethod($guard, 'basePrices');
+            $method->setAccessible(true);
+            $prices = $method->invoke($guard, [$withRow->id, $smallestUnitOnly->id, $noRow->id], $branch->id);
+
+            return [$prices[$withRow->id], $prices[$smallestUnitOnly->id], $prices[$noRow->id]];
+        };
+
+        $this->assertSame([50.0, 55.0, 58.0], $posPrices(), 'ก่อนถึงเวลา ราคา POS ต้องยังเป็นราคาเดิม');
+
+        Carbon::setTestNow('2026-11-12 00:00:30');
+        $this->assertSame([54.0, 59.0, 62.0], $posPrices(), 'ถึงเวลาแล้วแต่ตัวทำงานยังไม่รัน ช่วงราคา POS ต้องให้ราคาใหม่');
+
+        $service->applyDue();
+        $this->assertSame(0, PosPriceSchedule::where('status', 'published')->count());
+        $this->assertSame([54.0, 59.0, 62.0], $posPrices(), 'หลังปิดช่วงราคา POS ราคาที่เครื่องขายต้องยังเป็นราคาใหม่');
+
+        $this->assertSame(0, DecimalMath::compare(\App\Models\ProductPrice::where('product_id', $withRow->id)->whereNull('unit_id')->value('price'), 54));
+        $this->assertSame(0, DecimalMath::compare(\App\Models\ProductPrice::where('product_id', $smallestUnitOnly->id)->where('unit_id', $pack->id)->value('price'), 540), 'ราคาหน่วยใหญ่ต้องไม่ถูกแตะ');
+        $this->assertSame(0, DecimalMath::compare($withRow->fresh()->default_price, 54));
+    }
 }

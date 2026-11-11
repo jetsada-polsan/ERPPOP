@@ -5,8 +5,10 @@ namespace App\Services\Pricing;
 use App\Models\AuditLog;
 use App\Models\PosPriceSchedule;
 use App\Models\PriceChange;
+use App\Models\PriceTable;
 use App\Models\Product;
 use App\Models\ProductPrice;
+use App\Models\ProductUnit;
 use App\Models\ScheduledPriceChange;
 use App\Services\Sales\PosPriceScheduleService;
 use App\Support\DecimalMath;
@@ -61,6 +63,10 @@ class ScheduledPriceChangeService
 
                 $priceTableId = !empty($item['price_table_id']) ? (int) $item['price_table_id'] : null;
                 $unitId = !empty($item['unit_id']) ? (int) $item['unit_id'] : null;
+                if ($priceTableId === null && $unitId !== null) {
+                    // ราคาหลัก (default_price) เป็นราคาของหน่วยฐานเท่านั้น ราคาหน่วยอื่นต้องระบุตารางราคา
+                    throw new InvalidArgumentException("ราคาหลักของสินค้า {$product->sku_code} ตั้งได้เฉพาะหน่วยฐาน");
+                }
 
                 // สร้างช่วงราคาขาย POS ล่วงหน้า (เฉพาะราคาหลัก default_price หรือราคาขายปลีก)
                 // เพื่อให้ POS ได้รับแถวราคาล่วงหน้าตอนซิงก์รอบ 5 นาที และขายได้ทันทีแม้เน็ตหลุด
@@ -162,13 +168,15 @@ class ScheduledPriceChangeService
                         'changed_by' => $locked->created_by,
                     ]);
 
+                    $tableRowOld = $this->syncPosBasePriceRow($product, $locked->new_price);
+
                     AuditLog::create([
                         'user_id' => $locked->created_by,
                         'action' => 'price_updated',
                         'table_name' => 'products',
                         'record_id' => $product->id,
-                        'old_values' => ['default_price' => (string) $oldPrice],
-                        'new_values' => ['default_price' => (string) $locked->new_price],
+                        'old_values' => ['default_price' => (string) $oldPrice, 'price_table_row' => $tableRowOld],
+                        'new_values' => ['default_price' => (string) $locked->new_price, 'price_table_row' => $tableRowOld === null ? null : (string) $locked->new_price],
                     ]);
                 } else {
                     // ปรับราคาในตารางราคา product_prices
@@ -232,6 +240,36 @@ class ScheduledPriceChangeService
 
             return false;
         }
+    }
+
+    /**
+     * เครื่อง POS และตัวตรวจราคาตอนรับบิลอ่านราคาจากตารางราคาหลักก่อน default_price
+     * (PosController::products และ PosPricingGuard::basePrices: แถวหน่วยฐาน -> ไม่มีก็แถวหน่วยเล็กสุด)
+     * ถ้าแก้แค่ default_price แล้วปิดช่วงราคา POS ราคาที่เครื่องขายจะเด้งกลับเป็นราคาเดิมในตาราง
+     * จึงแก้แถวเดียวกับที่ POS ใช้เป็นราคาฐานด้วย แถวหน่วยอื่น (แพ็ค/ลัง) ไม่ถูกแตะ
+     *
+     * @return string|null ราคาเดิมของแถวที่แก้ หรือ null ถ้าสินค้าไม่มีแถวในตารางราคาหลัก
+     */
+    private function syncPosBasePriceRow(Product $product, mixed $newPrice): ?string
+    {
+        $tableId = PriceTable::where('is_default', true)->value('id');
+        if (! $tableId) {
+            return null;
+        }
+        $rows = ProductPrice::where('product_id', $product->id)->where('price_table_id', $tableId)
+            ->where('is_active', true)->lockForUpdate()->get();
+        if ($rows->isEmpty()) {
+            return null;
+        }
+        $unitFactors = ProductUnit::pluck('qty_per_base_unit', 'id');
+        $row = $rows->firstWhere('unit_id', null)
+            ?? $rows->sortBy(fn ($r) => (float) ($unitFactors[$r->unit_id] ?? 1))->first();
+        $old = (string) $row->price;
+        if (DecimalMath::compare($row->price, $newPrice) !== 0) {
+            $row->update(['price' => $newPrice]);
+        }
+
+        return $old;
     }
 
     /**
