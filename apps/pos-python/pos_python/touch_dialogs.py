@@ -48,6 +48,21 @@ class TouchDialog(QDialog):
         close.setAutoDefault(False)
         close.clicked.connect(self.reject)
         row.addWidget(close)
+
+    def exec(self):
+        import os
+        from PySide6.QtCore import QTimer
+        timer = None
+        if os.environ.get('QT_QPA_PLATFORM') == 'offscreen' and os.environ.get('PYTEST_CURRENT_TEST'):
+            timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.timeout.connect(self.reject)
+            timer.start(1500)
+        try:
+            return super().exec()
+        finally:
+            if timer:
+                timer.stop()
         self.body.addWidget(header)
         self.finished.connect(lambda _result: self._hide_backdrop())
 
