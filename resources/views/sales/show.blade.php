@@ -68,6 +68,22 @@ $isPartial = $openItem && $openItem->status === 'partial';
             </a>
             @endif
             @endif
+            @if($sale->status === 'active' && $booking)
+            <button type="button" class="btn btn-light border px-3" @click="{{ auth()->user()?->hasPermission('documents.void') ? 'editOpen = true' : 'explainOpen = true' }}" id="btn-edit-sale">
+                <i class="bi bi-pencil me-1"></i> แก้ไขใบขาย
+            </button>
+            @elseif($sale->status !== 'active' && $booking)
+                @php
+                    $newSale = ($booking->confirmed_document_id && $booking->confirmed_document_id !== $sale->id)
+                        ? $booking->confirmedDocument
+                        : null;
+                @endphp
+                @if($newSale && $newSale->status === 'active')
+                <a href="{{ route('sales.show', $newSale) }}" class="btn btn-outline-primary px-3">
+                    <i class="bi bi-arrow-right-circle me-1"></i> ใบขายใหม่: {{ $newSale->doc_number }}
+                </a>
+                @endif
+            @endif
             @include('documents._void-action', ['doc' => $sale])
             @if($openItem && !$isPaid)
             <button type="button" class="btn btn-success px-4" @click="payOpen = true">
@@ -214,6 +230,69 @@ $isPartial = $openItem && $openItem->status === 'partial';
     </div>
 </div>
 @endif
+
+{{-- Modals สำหรับแก้ไขใบขาย --}}
+@if($sale->status === 'active' && $booking)
+    @if(auth()->user()?->hasPermission('documents.void'))
+    <div class="booking-modal-backdrop" x-show="editOpen" x-transition.opacity @keydown.escape.window="editOpen=false">
+        <div class="booking-modal" style="width:min(520px,100%)" @click.outside="editOpen=false" x-transition>
+            <div class="modal-header border-0 px-4 pt-4 pb-2 d-flex justify-content-between align-items-center">
+                <h3 class="h5 fw-bold mb-0 text-danger"><i class="bi bi-pencil-square me-2"></i>แก้ไขใบขาย {{ $sale->doc_number }}</h3>
+                <button type="button" class="btn btn-light rounded-circle" @click="editOpen=false"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <form method="post" action="{{ route('bookings.revert-confirm', $booking) }}" @submit="submittingEdit = true">
+                @csrf
+                <input type="hidden" name="return" value="edit">
+                <div class="modal-body px-4 pb-3">
+                    <div class="p-3 rounded-3 bg-light border mb-3 small">
+                        <div class="fw-bold mb-2 text-dark"><i class="bi bi-info-circle me-1 text-primary"></i>ขั้นตอนการทำงานของระบบ:</div>
+                        <ul class="mb-0 ps-3 text-muted" style="line-height: 1.6;">
+                            <li>ใบขายเลขนี้จะถูกยกเลิก (เก็บประวัติไว้ในระบบ)</li>
+                            <li>สต็อกจะถูกคืนกลับไปกันไว้ในใบจอง</li>
+                            <li>ยอดลูกหนี้ของใบนี้จะถูกปิด</li>
+                            <li>ระบบจะพาไปหน้าแก้ไขใบจอง เมื่อกด Confirm ใหม่จะได้ใบขายเลขใหม่</li>
+                        </ul>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold">เหตุผลในการแก้ไข <span class="text-danger">*</span></label>
+                        <textarea name="reason" class="form-control" rows="3" maxlength="500" required placeholder="เช่น ลูกค้าขอเปลี่ยนจำนวนสินค้า / แก้ไขราคา"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 px-4 pb-4 pt-0 d-flex justify-content-between">
+                    <button type="button" class="btn btn-light border px-4" @click="editOpen=false" :disabled="submittingEdit">ปิด</button>
+                    <button type="submit" class="btn btn-danger px-4" :disabled="submittingEdit">
+                        <span x-show="!submittingEdit"><i class="bi bi-arrow-repeat me-1"></i>ยกเลิกใบเดิมแล้วไปแก้ไข</span>
+                        <span x-show="submittingEdit"><span class="spinner-border spinner-border-sm me-1" role="status"></span>กำลังดำเนินการ…</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    @else
+    {{-- Modal อธิบายสำหรับคนขายทั่วไปที่ไม่มีสิทธิ์ --}}
+    <div class="booking-modal-backdrop" x-show="explainOpen" x-transition.opacity @keydown.escape.window="explainOpen=false">
+        <div class="booking-modal" style="width:min(480px,100%)" @click.outside="explainOpen=false" x-transition>
+            <div class="modal-header border-0 px-4 pt-4 pb-2 d-flex justify-content-between align-items-center">
+                <h3 class="h5 fw-bold mb-0 text-warning-emphasis"><i class="bi bi-shield-lock me-2 text-warning"></i>การแก้ไขใบขาย</h3>
+                <button type="button" class="btn btn-light rounded-circle" @click="explainOpen=false"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="modal-body px-4 pb-4">
+                <div class="p-3 rounded-3 bg-warning-subtle text-warning-emphasis border border-warning-subtle mb-3 small">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                    <strong>การแก้ใบขายที่ออกแล้วต้องให้ผู้จัดการยกเลิกใบเดิมก่อน</strong>
+                </div>
+                <p class="text-muted small mb-0">
+                    การแก้ใบขายที่ออกแล้วต้องให้ผู้จัดการยกเลิกใบเดิมก่อน แจ้งผู้จัดการพร้อมเลขใบ <strong>{{ $sale->doc_number }}</strong> เพื่อให้ผู้จัดการยกเลิกใบเดิมและเปิดให้แก้ไขใบจอง
+                </p>
+            </div>
+            <div class="modal-footer border-0 px-4 pb-4 pt-0">
+                <button type="button" class="btn btn-secondary px-4 w-100" @click="explainOpen=false">เข้าใจแล้ว</button>
+            </div>
+        </div>
+    </div>
+    @endif
+@endif
 </div>
 @endsection
 
@@ -235,5 +314,14 @@ $isPartial = $openItem && $openItem->status === 'partial';
 @endpush
 
 @push('scripts')
-<script>function saleShow() { return { payOpen: false }; }</script>
+<script>
+function saleShow() {
+    return {
+        payOpen: false,
+        editOpen: false,
+        explainOpen: false,
+        submittingEdit: false
+    };
+}
+</script>
 @endpush
