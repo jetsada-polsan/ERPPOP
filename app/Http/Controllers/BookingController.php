@@ -350,8 +350,7 @@ class BookingController extends Controller
     public function revertConfirm(Request $request, SaleBooking $booking, BookingService $service): RedirectResponse
     {
         $user = $request->user();
-        abort_unless($user->hasPermission('documents.void'), 403, 'เฉพาะผู้จัดการเท่านั้นที่ถอย Confirm ได้');
-        abort_unless($user->canAccessBranch((int) $booking->document->branch_id), 403);
+        abort_unless($service->canRevertConfirmation($user, $booking), 403, 'แก้ไขได้เฉพาะใบขายของตัวเอง หรือให้ผู้จัดการดำเนินการ');
         $data = $request->validate(['reason' => ['required', 'string', 'max:500']]);
         try {
             $service->revertConfirmation($booking, $data['reason'], $user->id);

@@ -68,8 +68,9 @@ $isPartial = $openItem && $openItem->status === 'partial';
             </a>
             @endif
             @endif
+            @php $canEditSale = $booking ? app(\App\Services\Sales\BookingService::class)->canRevertConfirmation(auth()->user(), $booking) : false; @endphp
             @if($sale->status === 'active' && $booking)
-            <button type="button" class="btn btn-light border px-3" @click="{{ auth()->user()?->hasPermission('documents.void') ? 'editOpen = true' : 'explainOpen = true' }}" id="btn-edit-sale">
+            <button type="button" class="btn btn-light border px-3" @click="{{ $canEditSale ? 'editOpen = true' : 'explainOpen = true' }}" id="btn-edit-sale">
                 <i class="bi bi-pencil me-1"></i> แก้ไขใบขาย
             </button>
             @elseif($sale->status !== 'active' && $booking)
@@ -233,7 +234,7 @@ $isPartial = $openItem && $openItem->status === 'partial';
 
 {{-- Modals สำหรับแก้ไขใบขาย --}}
 @if($sale->status === 'active' && $booking)
-    @if(auth()->user()?->hasPermission('documents.void'))
+    @if($canEditSale ?? false)
     <div class="booking-modal-backdrop" x-show="editOpen" x-transition.opacity @keydown.escape.window="editOpen=false">
         <div class="booking-modal" style="width:min(520px,100%)" @click.outside="editOpen=false" x-transition>
             <div class="modal-header border-0 px-4 pt-4 pb-2 d-flex justify-content-between align-items-center">
@@ -280,10 +281,10 @@ $isPartial = $openItem && $openItem->status === 'partial';
             <div class="modal-body px-4 pb-4">
                 <div class="p-3 rounded-3 bg-warning-subtle text-warning-emphasis border border-warning-subtle mb-3 small">
                     <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                    <strong>การแก้ใบขายที่ออกแล้วต้องให้ผู้จัดการยกเลิกใบเดิมก่อน</strong>
+                    <strong>ใบขายนี้ไม่ใช่ของคุณ จึงแก้เองไม่ได้</strong>
                 </div>
                 <p class="text-muted small mb-0">
-                    การแก้ใบขายที่ออกแล้วต้องให้ผู้จัดการยกเลิกใบเดิมก่อน แจ้งผู้จัดการพร้อมเลขใบ <strong>{{ $sale->doc_number }}</strong> เพื่อให้ผู้จัดการยกเลิกใบเดิมและเปิดให้แก้ไขใบจอง
+                    คนขายแก้ได้เฉพาะใบขายที่ตัวเองเป็นเจ้าของ ใบนี้ให้เจ้าของใบหรือผู้จัดการแก้ไข แจ้งพร้อมเลขใบ <strong>{{ $sale->doc_number }}</strong>
                 </p>
             </div>
             <div class="modal-footer border-0 px-4 pb-4 pt-0">
