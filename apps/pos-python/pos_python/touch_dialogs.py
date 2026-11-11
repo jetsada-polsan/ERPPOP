@@ -49,6 +49,9 @@ class TouchDialog(QDialog):
         close.clicked.connect(self.reject)
         row.addWidget(close)
 
+        self.body.addWidget(header)
+        self.finished.connect(lambda _result: self._hide_backdrop())
+
     def exec(self):
         import os
         from PySide6.QtCore import QTimer
@@ -63,8 +66,6 @@ class TouchDialog(QDialog):
         finally:
             if timer:
                 timer.stop()
-        self.body.addWidget(header)
-        self.finished.connect(lambda _result: self._hide_backdrop())
 
     def _hide_backdrop(self):
         backdrop = getattr(self, '_backdrop', None)
