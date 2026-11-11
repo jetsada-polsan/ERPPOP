@@ -47,6 +47,8 @@ class ErpMenu
                     ['label' => 'เอกสารย้อนหลัง', 'route' => 'documents.browser', 'pattern' => 'documents.browser', 'icon' => 'bi-archive-fill', 'tone' => 'indigo'],
                     ['label' => 'ใบเสนอราคา', 'route' => 'quotations.index', 'pattern' => 'quotations.*', 'icon' => 'bi-file-earmark-text', 'tone' => 'slate'],
                     ['label' => 'ใบจอง / ขายเชื่อ', 'route' => 'bookings.index', 'pattern' => 'bookings.*', 'extraPattern' => 'sales.*', 'icon' => 'bi-receipt-cutoff', 'tone' => 'orange'],
+                    ['label' => 'ใบรวมจอง', 'route' => 'bookings.summary', 'pattern' => 'bookings.summary', 'icon' => 'bi-clipboard2-check', 'tone' => 'teal'],
+                    ['label' => 'เทียบใบจองกับใบขาย', 'route' => 'bookings.comparison', 'pattern' => 'bookings.comparison', 'icon' => 'bi-arrow-left-right', 'tone' => 'indigo'],
                     ['label' => 'ใบขายสด', 'route' => 'cash-sales.index', 'pattern' => 'cash-sales.*', 'icon' => 'bi-cash-stack', 'tone' => 'teal'],
                     ['label' => 'ใบรับคืนสินค้า', 'route' => 'sale-returns.index', 'pattern' => 'sale-returns.*', 'icon' => 'bi-arrow-return-left', 'tone' => 'amber'],
                     ['label' => 'ใบวางบิล', 'route' => 'billing-notes.index', 'pattern' => 'billing-notes.*', 'icon' => 'bi-receipt', 'tone' => 'pink'],

@@ -52,7 +52,8 @@
                     <div class="text-muted small">คีย์ใบจองก่อน แล้วค่อยแปลงเป็นใบขายเชื่อ</div>
                 </div>
             </div>
-            <a href="{{ route('bookings.summary') }}" class="btn btn-light border rounded-pill px-4"><i class="bi bi-list-check me-1"></i> ใบรวมจอง</a>
+            <a href="{{ route('bookings.summary') }}" class="btn btn-light border rounded-pill px-3"><i class="bi bi-list-check me-1"></i> ใบรวมจอง</a>
+            <a href="{{ route('bookings.comparison') }}" class="btn btn-light border rounded-pill px-3"><i class="bi bi-arrow-left-right me-1"></i> เทียบใบจองกับใบขาย</a>
             <button type="button" class="btn btn-primary rounded-pill px-4" @click="openModal()">
                 <i class="bi bi-plus-lg me-1"></i> สร้างใบจอง
             </button>
