@@ -98,16 +98,37 @@ class SyncService:
             except RuntimeError:
                 result["failed"] += 1
         for row in self.db.execute(
-            """SELECT aggregate_uuid FROM sync_outbox
+            """SELECT aggregate_type, aggregate_uuid, payload FROM sync_outbox
                WHERE aggregate_type IN ('cash_movement', 'shift_close')
                  AND status IN ('pending', 'failed') """
                + READY + """
                ORDER BY priority ASC, created_at ASC, id ASC""", (now(),)
         ).fetchall():
             try:
-                if row["aggregate_uuid"].startswith("cash:"):
+                if row["aggregate_uuid"].startswith("cash:") or row["aggregate_type"] == "cash_movement":
                     self.sync_cash_movement(row["aggregate_uuid"])
                 else:
+                    try:
+                        event = json.loads(row["payload"] or "{}")
+                        shift_uuid = str(event.get("shift_uuid", ""))
+                    except Exception:
+                        shift_uuid = ""
+                    if not shift_uuid and row["aggregate_uuid"].startswith("shift:") and row["aggregate_uuid"].endswith(":close"):
+                        shift_uuid = row["aggregate_uuid"][len("shift:"): -len(":close")]
+                    if shift_uuid:
+                        shift = self.db.execute("SELECT id, server_id FROM shifts WHERE uuid = ?", (shift_uuid,)).fetchone()
+                        if shift:
+                            pending_sales = self.db.execute(
+                                "SELECT count(*) FROM sales WHERE shift_id = ? AND sync_status NOT IN ('synced', 'resolved')",
+                                (shift["id"],)
+                            ).fetchone()[0]
+                            if pending_sales > 0:
+                                # ห้ามส่ง shift_close จนกว่าบิลทุกใบของกะนั้นจะเป็น synced หรือ resolved
+                                # ถ้ายังมีค้าง ให้ข้ามรอบนี้ไป ไม่นับเป็น failed ไม่เพิ่ม attempts
+                                continue
+                            if not shift["server_id"]:
+                                # กะที่เปิดตอนออฟไลน์: shift_open ส่งก่อนเสมอ แล้วบิล แล้วค่อย shift_close
+                                continue
                     self.sync_shift_close(row["aggregate_uuid"])
                 result["synced"] += 1
             except RuntimeError:
@@ -260,6 +281,12 @@ class SyncService:
             return self._failed_outbox(aggregate_uuid, f"ข้อมูลปิดกะไม่ถูกต้อง: {error}")
         if not shift or not shift["server_id"]:
             return self._failed_outbox(aggregate_uuid, "ยังไม่ได้ผูกกะบน ERP")
+        pending_sales = self.db.execute(
+            "SELECT count(*) FROM sales WHERE shift_id = ? AND sync_status NOT IN ('synced', 'resolved')",
+            (shift["id"],)
+        ).fetchone()[0]
+        if pending_sales > 0:
+            return
         try:
             response = self.api.post("/api/pos/shift/close", {
                 "shift_id": int(shift["server_id"]), "counted_cash": str(money(event["counted_cash"])),

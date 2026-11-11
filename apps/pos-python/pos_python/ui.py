@@ -1726,12 +1726,21 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             return box
 
     class CloseShiftDialog(TouchDialog):
-        def __init__(self, parent, expected):
+        def __init__(self, parent, expected, offline_message=""):
             super().__init__(parent, "ปิดกะขาย", "ปิดกะ: นับเงินในลิ้นชักทั้งหมด แล้วส่งบิลค้างให้ครบ")
             self.setMinimumWidth(480)
             self.body.setContentsMargins(10, 10, 10, 10)
             self.body.setSpacing(6)
             self.expected = expected
+            self.offline_message = offline_message
+            if self.offline_message:
+                self.offline_banner = QLabel(self.offline_message)
+                self.offline_banner.setObjectName("offlineBanner")
+                self.offline_banner.setWordWrap(True)
+                self.offline_banner.setStyleSheet(
+                    "background:#fef3c7; color:#92400e; padding:8px; border-radius:6px; font-weight:bold; font-size:14px;"
+                )
+                self.body.addWidget(self.offline_banner)
             self.expected_label = QLabel()
             self.expected_label.setObjectName("note")
             self.body.addWidget(self.expected_label)
@@ -1744,6 +1753,11 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.difference.setObjectName("shiftSummary")
             self.difference.setAlignment(Qt.AlignCenter)
             self.body.addWidget(self.difference)
+            self.pending_warning = QLabel()
+            self.pending_warning.setObjectName("pendingWarning")
+            self.pending_warning.setWordWrap(True)
+            self.pending_warning.setAlignment(Qt.AlignCenter)
+            self.body.addWidget(self.pending_warning)
             self.note = QLineEdit()
             self.note.setPlaceholderText("หมายเหตุ")
             self.note.setStyleSheet("min-height:38px; font-size:15px;")
@@ -1772,10 +1786,31 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 valid = counted.is_finite() and counted >= 0
             except (InvalidOperation, ValueError):
                 valid = False
-            pending = service.db.execute("SELECT count(*) FROM sales WHERE shift_id = ? AND sync_status NOT IN ('synced', 'resolved')", (self.parent().shift_id,)).fetchone()[0]
-            self.submit.setEnabled(valid and not pending)
-            if pending:
-                self.difference.setText(f"ต้องส่งบิลค้าง {pending} ใบขึ้น ERP ก่อนปิดกะ")
+            self.submit.setEnabled(valid)
+            shift_id = getattr(self.parent(), "shift_id", None)
+            pending_count = 0
+            review_count = 0
+            if shift_id:
+                pending_count = service.db.execute(
+                    "SELECT count(*) FROM sales WHERE shift_id = ? AND sync_status NOT IN ('synced', 'resolved', 'needs_review')",
+                    (shift_id,)
+                ).fetchone()[0]
+                review_count = service.db.execute(
+                    "SELECT count(*) FROM sales WHERE shift_id = ? AND sync_status = 'needs_review'",
+                    (shift_id,)
+                ).fetchone()[0]
+            warning_lines = []
+            if pending_count:
+                warning_lines.append(f"มีบิลรอส่ง {pending_count} ใบ จะส่งขึ้น ERP ก่อนการปิดกะอัตโนมัติ")
+            if review_count:
+                warning_lines.append(f"มีบิลที่ ERP ไม่รับ {review_count} ใบ ผู้จัดการต้องตรวจที่ ERP")
+            if warning_lines:
+                self.pending_warning.setText("\n".join(warning_lines))
+                self.pending_warning.setStyleSheet(f"color:{PALETTE.get('warning', '#d97706')}; font-size:13px; font-weight:bold; padding:4px;")
+                self.pending_warning.show()
+            else:
+                self.pending_warning.setText("")
+                self.pending_warning.hide()
 
     class FloatCloseDialog(TouchDialog):
         """Resizable close workspace; monetary previews remain server authoritative."""
@@ -2936,7 +2971,10 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     for copy in (1, 2):
                         print_text_to_windows_queue(f'Z Report · ใบที่ {copy}/2\n' + text, str(profile))
                 except Exception as error:
-                    TouchMessage.warning(dialog, "พิมพ์ไม่ได้", cashier_error(error))
+                    msg = cashier_error(error)
+                    if not authoritative:
+                        msg = f"{msg}\nZ Report จาก ERP จะพร้อมหลังส่งข้อมูลครบ"
+                    TouchMessage.warning(dialog, "พิมพ์ไม่ได้", msg)
             dialog.confirm("พิมพ์ Z Report ซ้ำ", print_report)
             if auto_print and SettingsService(service.db).get_device_setting("windows_printer_queue", ""):
                 print_report()
@@ -3683,24 +3721,24 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             if self.shift_id is None:
                 TouchMessage.information(self, "ยังไม่มีกะขาย", "ยังไม่มีกะที่เปิดอยู่")
                 return
+            is_offline = (online is None or not getattr(online, "online", False))
             policy = getattr(self, 'shift_policy', {})
-            if online is not None and not online.online:
-                TouchMessage.warning(self, "ปิดกะไม่ได้", "ต้องต่อเน็ตเพื่อปิดกะและตรวจยอดจาก ERP")
-                return
-            if online is not None and online.online and self.cashier and self.cashier['server_id']:
+            if not is_offline and self.cashier and self.cashier['server_id']:
                 try:
                     policy = online.provisioning.api.get(f"/api/pos/shift?branch_id={branch_id}&cashier_id={int(self.cashier['server_id'])}")
                     self.shift_policy = policy
                 except Exception as error:
-                    TouchMessage.warning(self, "ปิดกะไม่ได้", f"ต้องต่อเน็ตและอ่านสถานะ ERP ก่อนปิดกะ: {cashier_error(error)}")
-                    return
+                    # ถ้าต่อ ERP ไม่ได้ขณะดึง policy ให้ปิดกะแบบออฟไลน์
+                    is_offline = True
             self.backup_before_close()
-            if supports_float(policy):
-                if online is None or not online.online:
-                    TouchMessage.warning(self, "ปิดกะไม่ได้", "ต้องต่อเน็ตเพื่อปิดกะและตรวจยอดจาก ERP")
-                    return
+            if supports_float(policy) and not is_offline:
                 return self.close_float_shift(policy)
-            dialog = CloseShiftDialog(self, self.expected_shift_cash())
+
+            offline_msg = ""
+            if is_offline:
+                offline_msg = "ออฟไลน์อยู่: ปิดกะด้วยยอดในเครื่อง ระบบจะส่งขึ้น ERP เมื่อเน็ตกลับมา"
+
+            dialog = CloseShiftDialog(self, self.expected_shift_cash(), offline_message=offline_msg)
             if dialog.exec() != QDialog.DialogCode.Accepted:
                 return
             counted = dialog.amount.text()
@@ -3711,7 +3749,13 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             except Exception as error:
                 TouchMessage.warning(self, "ปิดกะไม่ได้", cashier_error(error))
                 return
-            if online is not None and online.online and local_shift and local_shift["server_id"]:
+
+            pending_count = service.db.execute(
+                "SELECT count(*) FROM sales WHERE shift_id = ? AND sync_status NOT IN ('synced', 'resolved')",
+                (self.shift_id,)
+            ).fetchone()[0]
+
+            if not is_offline and local_shift and local_shift["server_id"] and not pending_count:
                 aggregate_uuid = f"shift:{local_shift['uuid']}:close"
                 try:
                     response = online.provisioning.close_server_shift(

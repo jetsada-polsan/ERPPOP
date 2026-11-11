@@ -41,6 +41,7 @@ class DeviceStatus:
     pending_sales: int
     review_sales: int
     pending_auth: int
+    pending_shift_close: int = 0
     datasets: list[DatasetStatus] = field(default_factory=list)
     error: str = ""
 
@@ -50,6 +51,8 @@ class DeviceStatus:
             return "ยังไม่ผูกกับ ERP — ไปที่ ผูกเครื่องกับ ERP แล้ววาง Token"
         if not self.online:
             return "ออฟไลน์ — ขายต่อได้ บิลจะส่งขึ้น ERP เองเมื่อเน็ตกลับมา"
+        if self.pending_shift_close and self.review_sales:
+            return f"ปิดกะรอส่ง: รอบิลที่ ERP ไม่รับ {self.review_sales} ใบ"
         if self.review_sales:
             return f"ERP ไม่รับบิล {self.review_sales} ใบ — แก้ที่ ERP แล้วกด ส่งบิลค้างใหม่"
         if any(d.state == "failed" for d in self.datasets):
@@ -113,6 +116,7 @@ def collect(db: sqlite3.Connection, *, server_url: str = "", online: bool = Fals
         pending_sales=_count(db, "SELECT count(*) FROM sync_outbox WHERE status = 'pending'"),
         review_sales=_count(db, "SELECT count(*) FROM sync_outbox WHERE aggregate_type = 'sale' AND status = 'needs_review'"),
         pending_auth=_count(db, "SELECT count(*) FROM auth_events_outbox WHERE synced = 0"),
+        pending_shift_close=_count(db, "SELECT count(*) FROM sync_outbox WHERE aggregate_type = 'shift_close' AND status IN ('pending', 'failed')"),
         datasets=datasets,
         error=error,
     )
