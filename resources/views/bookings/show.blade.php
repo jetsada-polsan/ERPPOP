@@ -48,7 +48,7 @@ $canEdit = $isPending && ! $billedAny && $booking->delivery_status === 'pending'
 <form method="post" action="{{ route('bookings.revert-confirm', $booking) }}" class="content-card p-3 mb-3 d-flex flex-wrap gap-2 align-items-center" data-confirm="ถอย Confirm? ใบขาย DS/DSN จะถูกยกเลิก คืนสต๊อก ปิดลูกหนี้ และใบจองกลับไปแก้ไขได้">@csrf
     <span class="fw-bold">ผู้จัดการ: ถอย Confirm</span>
     <input type="text" name="reason" required maxlength="500" class="form-control" style="max-width:360px" placeholder="เหตุผล เช่น ลูกค้าเปลี่ยนรายการ">
-    <button class="btn btn-outline-danger"><i class="bi bi-arrow-counterclockwise me-1"></i>ถอย Confirm</button>
+    <button class="btn btn-outline-danger"><i class="bi bi-arrow-counterclockwise me-1"></i>แก้ไขใบขาย (ถอย Confirm)</button>
 </form>
 @endif
 
