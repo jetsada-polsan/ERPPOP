@@ -49,6 +49,7 @@ class ErpMenu
                     ['label' => 'ใบจอง / ขายเชื่อ', 'route' => 'bookings.index', 'pattern' => 'bookings.*', 'extraPattern' => 'sales.*', 'icon' => 'bi-receipt-cutoff', 'tone' => 'orange'],
                     ['label' => 'ใบรวมจอง', 'route' => 'bookings.summary', 'pattern' => 'bookings.summary', 'icon' => 'bi-clipboard2-check', 'tone' => 'teal'],
                     ['label' => 'ใบปะหน้า (ขนส่ง)', 'route' => 'bookings.cover-sheet', 'pattern' => 'bookings.cover-sheet', 'icon' => 'bi-truck', 'tone' => 'cyan'],
+                    ['label' => 'เทียบใบจองกับใบขาย', 'route' => 'bookings.comparison', 'pattern' => 'bookings.comparison', 'icon' => 'bi-arrow-left-right', 'tone' => 'indigo'],
                     ['label' => 'ใบขายสด', 'route' => 'cash-sales.index', 'pattern' => 'cash-sales.*', 'icon' => 'bi-cash-stack', 'tone' => 'teal'],
                     ['label' => 'ใบรับคืนสินค้า', 'route' => 'sale-returns.index', 'pattern' => 'sale-returns.*', 'icon' => 'bi-arrow-return-left', 'tone' => 'amber'],
                     ['label' => 'ใบวางบิล', 'route' => 'billing-notes.index', 'pattern' => 'billing-notes.*', 'icon' => 'bi-receipt', 'tone' => 'pink'],

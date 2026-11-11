@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\Sales\BookingDeliveryService;
 use App\Services\Sales\BookingService;
 use App\Services\Sales\CreditSaleService;
+use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -40,8 +41,11 @@ class BookingController extends Controller
             'document.customer',
             'document.branch',
             'document.salesArea',
-            'document.stockDocument.items.product.baseUnit',
             'salesArea',
+            'document.stockDocument.items.product.baseUnit',
+            'document.stockDocument.items.product.barcodes',
+            'document.stockDocument.items.warehouseLocation.warehouse',
+            'document.stockDocument.items.unit',
         ])
             ->where('status', SaleBooking::STATUS_PENDING)
             ->when($salesAreaId, fn ($query) => $query->where('sales_area_id', $salesAreaId))
@@ -84,14 +88,74 @@ class BookingController extends Controller
                 ];
             })->values();
 
-        $items = $groups->flatMap(fn ($group) => $group->lines)
-            ->groupBy(fn ($line) => $line->product?->id)
-            ->map(fn ($lines) => (object) [
-                'sku_code' => $lines->first()->product?->sku_code,
-                'name_th' => $lines->first()->product?->name_th,
-                'total_qty' => $lines->sum('qty'),
-                'unit_name' => $lines->first()->product?->baseUnit?->name ?? '-',
-            ])->sortBy('sku_code')->values();
+        $itemMap = [];
+        $warehousesList = collect();
+
+        foreach ($bookings as $booking) {
+            $doc = $booking->document;
+            $stockDoc = $doc?->stockDocument;
+            if (! $stockDoc) {
+                continue;
+            }
+
+            foreach ($stockDoc->items as $stockItem) {
+                $product = $stockItem->product;
+                if (! $product) {
+                    continue;
+                }
+
+                $pid = $product->id;
+                $wh = $stockItem->warehouseLocation?->warehouse;
+                if ($wh) {
+                    $warehousesList->put($wh->id, (object) ['id' => $wh->id, 'name' => $wh->name]);
+                }
+
+                // Barcode of unit or first active barcode
+                $barcode = $product->barcodes->where('unit_id', $stockItem->unit_id)->where('is_active', true)->value('barcode')
+                    ?? $product->barcodes->where('is_active', true)->value('barcode')
+                    ?? '';
+
+                if (! isset($itemMap[$pid])) {
+                    $itemMap[$pid] = (object) [
+                        'id' => $pid,
+                        'sku_code' => $product->sku_code,
+                        'name_th' => $product->name_th,
+                        'unit_name' => $stockItem->unit?->name ?? $product->baseUnit?->name ?? '-',
+                        'barcode' => $barcode,
+                        'total_qty' => 0.0,
+                        'bookings' => collect(),
+                        'area_ids' => collect(),
+                        'warehouse_ids' => collect(),
+                    ];
+                }
+
+                $qty = (float) $stockItem->qty;
+                $itemMap[$pid]->total_qty += $qty;
+
+                $areaId = $booking->sales_area_id ?: ($doc?->sales_area_id ?: 0);
+                $whId = $wh?->id ?: 0;
+
+                $itemMap[$pid]->area_ids->push($areaId);
+                if ($whId) {
+                    $itemMap[$pid]->warehouse_ids->push($whId);
+                }
+
+                $itemMap[$pid]->bookings->push((object) [
+                    'booking_id' => $booking->id,
+                    'doc_number' => $doc?->doc_number ?? '-',
+                    'customer_name' => $doc?->customer?->name_th ?? $doc?->customer_name ?? '-',
+                    'sales_area_name' => $booking->salesArea?->name ?? ($doc?->salesArea?->name ?? 'ไม่ระบุสาย'),
+                    'sales_area_id' => $areaId,
+                    'warehouse_name' => $wh?->name ?? ($stockItem->warehouseLocation?->name ?? 'ไม่ระบุคลัง'),
+                    'warehouse_id' => $whId,
+                    'qty' => $qty,
+                ]);
+            }
+        }
+
+        $items = collect($itemMap)->sortBy('sku_code')->values();
+        $warehouses = $warehousesList->sortBy('name')->values();
+
         $bookingRows = $bookings->flatMap(fn ($booking) => [(object) [
             'doc_number' => $booking->document->doc_number,
             'customer_name' => $booking->document->customer?->name_th,
@@ -99,10 +163,250 @@ class BookingController extends Controller
         ]])->values();
 
         return view('bookings.summary', [
-            'date' => $date, 'items' => $items, 'bookings' => $bookingRows,
-            'bills' => $bookings->sortBy(fn (SaleBooking $booking) => $booking->document->doc_number)->values(), 'branchId' => $branchId, 'salesAreaId' => $salesAreaId,
+            'date' => $date,
+            'items' => $items,
+            'bookings' => $bookingRows,
+            'bills' => $bookings->sortBy(fn (SaleBooking $booking) => $booking->document->doc_number)->values(),
+            'branchId' => $branchId,
+            'salesAreaId' => $salesAreaId,
             'branches' => Branch::where('is_active', true)->when($user && $user->branch_id && ! $user->canSeeAllReportBranches(), fn ($q) => $q->where('id', $user->branch_id))->orderBy('code')->get(['id', 'code', 'name_th']),
             'salesAreas' => SalesArea::orderBy('code')->get(['id', 'code', 'name']),
+            'warehouses' => $warehouses,
+        ]);
+    }
+
+    /** รายงานเทียบใบจองกับใบขาย (Booking vs Credit Sale Comparison) */
+    public function comparison(Request $request): View|StreamedResponse
+    {
+        $user = $request->user();
+        $branchId = $request->integer('branch_id') ?: null;
+        if ($user && $user->branch_id && ! $user->canSeeAllReportBranches()) {
+            if ($request->has('branch_id') && $request->integer('branch_id') && $request->integer('branch_id') !== (int) $user->branch_id) {
+                abort(403, 'ไม่มีสิทธิ์เข้าถึงสาขานี้');
+            }
+            $branchId = (int) $user->branch_id;
+        }
+
+        $dateFrom = $request->input('date_from', now()->toDateString());
+        $dateTo = $request->input('date_to', now()->toDateString());
+        $salesAreaId = $request->integer('sales_area_id') ?: null;
+        $statusFilter = (string) $request->input('status', 'all');
+
+        $fromCarbon = Carbon::parse($dateFrom)->startOfDay();
+        $toCarbon = Carbon::parse($dateTo)->startOfDay();
+        if ($fromCarbon->gt($toCarbon)) {
+            [$fromCarbon, $toCarbon] = [$toCarbon, $fromCarbon];
+            $dateFrom = $fromCarbon->toDateString();
+            $dateTo = $toCarbon->toDateString();
+        }
+        $diffDays = $fromCarbon->diffInDays($toCarbon);
+        $dateRangeWarning = null;
+        if ($diffDays > 92) {
+            $dateRangeWarning = 'ช่วงวันที่ที่เลือกเกิน 92 วัน (เลือก '.($diffDays + 1).' วัน) กรุณาเลือกช่วงเวลาไม่เกิน 92 วัน เพื่อความรวดเร็วและแม่นยำในการดึงข้อมูล';
+        }
+
+        $branches = Branch::where('is_active', true)
+            ->when($user && $user->branch_id && ! $user->canSeeAllReportBranches(), fn ($q) => $q->where('id', $user->branch_id))
+            ->orderBy('code')
+            ->get(['id', 'code', 'name_th']);
+
+        $salesAreas = SalesArea::orderBy('code')->get(['id', 'code', 'name']);
+
+        if ($dateRangeWarning !== null) {
+            $rows = collect();
+            $totalBookingAmount = 0.0;
+            $totalSaleAmount = 0.0;
+            $totalVariance = 0.0;
+
+            if ($request->query('export') === 'csv' || $request->query('export') === 'excel') {
+                return response()->streamDownload(function () use ($dateRangeWarning) {
+                    $handle = fopen('php://output', 'wb');
+                    fwrite($handle, "\xEF\xBB\xBF");
+                    fputcsv($handle, ['ข้อผิดพลาด: '.$dateRangeWarning]);
+                    fclose($handle);
+                }, sprintf('booking-vs-sale-error-%s.csv', now()->format('YmdHis')), [
+                    'Content-Type' => 'text/csv; charset=UTF-8',
+                ]);
+            }
+
+            return view('bookings.comparison', [
+                'dateFrom' => $dateFrom,
+                'dateTo' => $dateTo,
+                'branchId' => $branchId,
+                'branches' => $branches,
+                'salesAreas' => $salesAreas,
+                'salesAreaId' => $salesAreaId,
+                'statusFilter' => $statusFilter,
+                'dateRangeWarning' => $dateRangeWarning,
+                'rows' => $rows,
+                'totalBookingAmount' => $totalBookingAmount,
+                'totalSaleAmount' => $totalSaleAmount,
+                'totalVariance' => $totalVariance,
+            ]);
+        }
+
+        $query = SaleBooking::with([
+            'document.customer',
+            'document.branch',
+            'document.salesArea',
+            'salesArea',
+            'sourceSaleDocuments' => fn ($q) => $q->whereNotIn('status', ['cancelled', 'voided']),
+            'confirmedDocument' => fn ($q) => $q->whereNotIn('status', ['cancelled', 'voided']),
+        ])
+            ->whereHas('document', fn ($d) => $d
+                ->whereDate('doc_date', '>=', $dateFrom)
+                ->whereDate('doc_date', '<=', $dateTo)
+                ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            )
+            ->when($salesAreaId, fn ($q) => $q->where('sales_area_id', $salesAreaId))
+            ->orderByDesc('id');
+
+        $rows = $query->get()->map(function (SaleBooking $booking) {
+            $doc = $booking->document;
+            $bookingSatang = (int) round(((float) ($doc?->total_amount ?? 0)) * 100);
+
+            // Fetch credit sales linked to this booking from eager loaded relations
+            $sales = collect();
+            if ($booking->relationLoaded('sourceSaleDocuments')) {
+                $sales = $sales->concat($booking->sourceSaleDocuments);
+            }
+            if ($booking->relationLoaded('confirmedDocument') && $booking->confirmedDocument) {
+                if (! $sales->contains('id', $booking->confirmedDocument->id)) {
+                    $sales->push($booking->confirmedDocument);
+                }
+            }
+            // Fallback for non-eager loaded calls / backward compatibility
+            if (! $booking->relationLoaded('sourceSaleDocuments') && ! $booking->relationLoaded('confirmedDocument')) {
+                $sales = $booking->saleDocuments()->whereNotIn('status', ['cancelled', 'voided'])->get();
+            }
+
+            $saleSatang = 0;
+            foreach ($sales as $s) {
+                $saleSatang += (int) round(((float) ($s->total_amount ?? 0)) * 100);
+            }
+
+            $varianceSatang = $bookingSatang - $saleSatang;
+            $bookingAmount = $bookingSatang / 100;
+            $saleAmount = $saleSatang / 100;
+            $variance = $varianceSatang / 100;
+            $hasVariance = abs($varianceSatang) > 0;
+
+            // สถานะตามโมเดล SaleBooking จริง
+            if ($booking->status === SaleBooking::STATUS_CANCELLED || $doc?->status === 'cancelled' || $doc?->status === 'voided') {
+                $statusKey = 'cancelled';
+                $statusLabel = 'ยกเลิก';
+                $statusBadge = 'bg-secondary';
+            } elseif ($booking->status === SaleBooking::STATUS_CONVERTED || $booking->status === 'confirmed') {
+                $statusKey = 'converted_to_sale';
+                $statusLabel = 'แปลงเป็นใบขายแล้ว';
+                $statusBadge = 'bg-success';
+            } elseif ($sales->isNotEmpty()) {
+                $statusKey = 'partial';
+                $statusLabel = 'ออกบางส่วน';
+                $statusBadge = 'bg-info text-dark';
+            } else {
+                $statusKey = 'pending';
+                $statusLabel = 'ยังไม่ออกบิล';
+                $statusBadge = 'bg-warning text-dark';
+            }
+
+            return (object) [
+                'booking' => $booking,
+                'doc_number' => $doc?->doc_number ?? '-',
+                'doc_date' => $doc?->doc_date ? Carbon::parse($doc->doc_date)->format('d/m/Y') : '-',
+                'customer_name' => $doc?->customer?->name_th ?? $doc?->customer_name ?? '-',
+                'sales_area_name' => $booking->salesArea?->name ?? ($doc?->salesArea?->name ?? '-'),
+                'booking_amount' => $bookingAmount,
+                'booking_satang' => $bookingSatang,
+                'sale_doc_numbers' => $sales->pluck('doc_number')->implode(', ') ?: '-',
+                'sale_amount' => $saleAmount,
+                'sale_satang' => $saleSatang,
+                'variance' => $variance,
+                'variance_satang' => $varianceSatang,
+                'has_variance' => $hasVariance,
+                'status_key' => $statusKey,
+                'status_label' => $statusLabel,
+                'status_badge' => $statusBadge,
+            ];
+        });
+
+        if ($statusFilter !== 'all' && $statusFilter !== '') {
+            if ($statusFilter === 'variance') {
+                $rows = $rows->where('has_variance', true)->values();
+            } else {
+                $rows = $rows->where('status_key', $statusFilter)->values();
+            }
+        }
+
+        // แถวรวม: ไม่นับแถวสถานะ "ยกเลิก" และรวมเป็นสตางค์จำนวนเต็ม
+        $totalBookingSatang = 0;
+        $totalSaleSatang = 0;
+        foreach ($rows as $row) {
+            if ($row->status_key !== 'cancelled') {
+                $totalBookingSatang += $row->booking_satang;
+                $totalSaleSatang += $row->sale_satang;
+            }
+        }
+        $totalVarianceSatang = $totalBookingSatang - $totalSaleSatang;
+        $totalBookingAmount = $totalBookingSatang / 100;
+        $totalSaleAmount = $totalSaleSatang / 100;
+        $totalVariance = $totalVarianceSatang / 100;
+
+        if ($request->query('export') === 'csv' || $request->query('export') === 'excel') {
+            return response()->streamDownload(function () use ($rows, $totalBookingAmount, $totalSaleAmount, $totalVariance) {
+                $handle = fopen('php://output', 'wb');
+                fwrite($handle, "\xEF\xBB\xBF");
+
+                fputcsv($handle, ['ลำดับ', 'เลขที่ใบจอง', 'วันที่จอง', 'ลูกค้า', 'สายขาย', 'ยอดใบจอง', 'เลขที่ใบขาย', 'ยอดใบขาย', 'ส่วนต่าง', 'สถานะ']);
+
+                $index = 1;
+                foreach ($rows as $row) {
+                    fputcsv($handle, [
+                        $index++,
+                        $row->doc_number,
+                        $row->doc_date,
+                        $row->customer_name,
+                        $row->sales_area_name,
+                        number_format($row->booking_amount, 2),
+                        $row->sale_doc_numbers,
+                        number_format($row->sale_amount, 2),
+                        number_format($row->variance, 2),
+                        $row->status_label,
+                    ]);
+                }
+
+                fputcsv($handle, [
+                    'รวมทั้งหมด (ไม่รวมใบยกเลิก)',
+                    '',
+                    '',
+                    '',
+                    '',
+                    number_format($totalBookingAmount, 2),
+                    '',
+                    number_format($totalSaleAmount, 2),
+                    number_format($totalVariance, 2),
+                    '',
+                ]);
+
+                fclose($handle);
+            }, sprintf('booking-vs-sale-%s.csv', now()->format('YmdHis')), [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+            ]);
+        }
+
+        return view('bookings.comparison', [
+            'dateFrom' => $dateFrom,
+            'dateTo' => $dateTo,
+            'branchId' => $branchId,
+            'branches' => $branches,
+            'salesAreas' => $salesAreas,
+            'salesAreaId' => $salesAreaId,
+            'statusFilter' => $statusFilter,
+            'dateRangeWarning' => null,
+            'rows' => $rows,
+            'totalBookingAmount' => $totalBookingAmount,
+            'totalSaleAmount' => $totalSaleAmount,
+            'totalVariance' => $totalVariance,
         ]);
     }
 
