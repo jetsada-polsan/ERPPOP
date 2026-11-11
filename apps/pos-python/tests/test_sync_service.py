@@ -261,8 +261,6 @@ class SyncServiceTest(unittest.TestCase):
         self.pos.checkout(document_no="PY-0002", branch_id=1, terminal_id="HQ-01", shift_id=self.shift_id, cashier_id=77,
             lines=[CartLine(1, Decimal("1"), Decimal("200"))], payment_method="cash", paid_amount=Decimal("200"),
             sale_uuid="sale-waiting")
-        with self.assertRaises(ValueError):
-            self.pos.close_shift(shift_id=self.shift_id, counted_cash=Decimal("325.50"))
 
         class CheckApi:
             def __init__(self):

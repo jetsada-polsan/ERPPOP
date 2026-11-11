@@ -3631,7 +3631,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             if not local['server_id']:
                 TouchMessage.warning(self, "ปิดกะไม่ได้", "รอส่งกะขึ้น ERP ก่อน")
                 return
-            pending = service.db.execute("SELECT count(*) FROM sync_outbox WHERE status != 'synced'").fetchone()[0]
+            pending = service.db.execute("SELECT count(*) FROM sync_outbox WHERE status NOT IN ('synced', 'resolved')").fetchone()[0]
             if pending:
                 TouchMessage.warning(self, "ปิดกะไม่ได้", "ต้องส่งบิลและรายการเงินสดค้างให้ครบก่อนปิดกะ")
                 return
@@ -3731,12 +3731,20 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     # ถ้าต่อ ERP ไม่ได้ขณะดึง policy ให้ปิดกะแบบออฟไลน์
                     is_offline = True
             self.backup_before_close()
-            if supports_float(policy) and not is_offline:
+            # รายการที่ส่งขึ้น ERP ไม่ผ่าน (ERP ไม่รับ หรือส่งพลาดซ้ำ) จะไม่หายเองในไม่กี่วินาที
+            # หน้าปิดกะแบบเงินทอนต้องให้ ERP ปิดกะทันที ซึ่งทำไม่ได้ถ้ายังมีรายการค้าง
+            # จึงปิดกะในเครื่องแทน แล้วให้คิวส่งตามลำดับเมื่อรายการค้างถูกเคลียร์
+            stuck = service.db.execute(
+                "SELECT count(*) FROM sync_outbox WHERE status IN ('needs_review', 'failed')"
+            ).fetchone()[0]
+            if supports_float(policy) and not is_offline and not stuck:
                 return self.close_float_shift(policy)
 
             offline_msg = ""
             if is_offline:
                 offline_msg = "ออฟไลน์อยู่: ปิดกะด้วยยอดในเครื่อง ระบบจะส่งขึ้น ERP เมื่อเน็ตกลับมา"
+            elif stuck:
+                offline_msg = f"มีรายการที่ยังส่งขึ้น ERP ไม่ได้ {stuck} รายการ: ปิดกะด้วยยอดในเครื่อง ระบบจะส่งขึ้น ERP เมื่อรายการค้างถูกเคลียร์"
 
             dialog = CloseShiftDialog(self, self.expected_shift_cash(), offline_message=offline_msg)
             if dialog.exec() != QDialog.DialogCode.Accepted:

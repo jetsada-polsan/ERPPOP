@@ -178,7 +178,7 @@ def test_legacy_ui_close_never_sends_preview(scene):
     assert db.execute('SELECT status FROM shifts').fetchone()[0]=='closed'
 
 
-def test_offline_new_flow_blocks_without_preview(scene):
+def test_offline_float_branch_falls_back_to_local_close_without_calling_erp(scene):
     app,db,service,w,api=scene
     w.shift_policy=POLICY
     # Closure captured online object is supplied by the existing fixture.
@@ -189,8 +189,17 @@ def test_offline_new_flow_blocks_without_preview(scene):
         provisioning=ProvisioningService(db,api),worker=SimpleNamespace(online=False,pending=0,stop=lambda:None))
     view=run_ui(service,online=offline,app=app)
     view.shift_id=w.shift_id;view.cashier=w.cashier;view.shift_policy=POLICY
-    with patch.object(TouchMessage,'warning') as warning:view.close_current_shift()
-    assert 'ต้องต่อเน็ต' in warning.call_args.args[2]
+    # ออฟไลน์: ไม่ขวางการปิดกะอีกแล้ว เปิดหน้าปิดกะแบบปกติ (ยอดในเครื่อง) แทนหน้าเงินทอนที่ต้องถาม ERP
+    from PySide6.QtWidgets import QDialog
+    seen=[]
+    def fake_exec(dialog):
+        seen.append((type(dialog).__name__, getattr(dialog,'offline_message','')))
+        return QDialog.Rejected
+    with patch.object(TouchMessage,'warning') as warning, patch.object(view.dialog_types['closing'],'exec',fake_exec), \
+            patch.object(view,'backup_before_close'):
+        view.close_current_shift()
+    assert not any('ต้องต่อเน็ต' in str(c.args) for c in warning.call_args_list)
+    assert seen and seen[0][0]=='CloseShiftDialog' and 'ออฟไลน์' in seen[0][1]
     api.post.assert_not_called()
     assert db.execute('SELECT status FROM shifts').fetchone()[0]=='open'
     view._allow_close=True;view.close();view.deleteLater()

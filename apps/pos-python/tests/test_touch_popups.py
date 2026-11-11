@@ -81,7 +81,7 @@ def test_numpad_decimal_and_selection():
     dialog.close()
 
 
-def test_closing_difference_blocks_pending_sale_and_uses_erp(scene):
+def test_closing_difference_warns_about_pending_sale_and_uses_erp(scene):
     app, db, service, window, api = scene
     assert window.expected_shift_cash() == D('125.50')
     api.get.assert_called_with('/api/pos/shift?branch_id=1&cashier_id=7')
@@ -90,12 +90,14 @@ def test_closing_difference_blocks_pending_sale_and_uses_erp(scene):
     dialog.amount.setText('130');assert 'เกิน 4.50' in dialog.difference.text()
     service.checkout(document_no='UI-1', branch_id=1, terminal_id='TEST', shift_id=window.shift_id,
         cashier_id=1, lines=[CartLine(1,D(1),D(10))],payment_method='cash',paid_amount=D(10))
-    dialog.refresh();assert not dialog.submit.isEnabled()
-    dialog.accept();assert dialog.result() != QDialog.Accepted
-    db.execute("UPDATE sales SET sync_status='failed'");db.commit()
-    dialog.refresh();assert not dialog.submit.isEnabled()
-    db.execute("UPDATE sales SET sync_status='synced'");db.commit()
+    # บิลค้างไม่ขวางการปิดกะแล้ว แต่ต้องเตือนให้เห็น
     dialog.refresh();assert dialog.submit.isEnabled()
+    assert 'มีบิลรอส่ง 1 ใบ' in dialog.pending_warning.text()
+    db.execute("UPDATE sales SET sync_status='needs_review'");db.commit()
+    dialog.refresh();assert dialog.submit.isEnabled()
+    assert 'ERP ไม่รับ 1 ใบ' in dialog.pending_warning.text()
+    db.execute("UPDATE sales SET sync_status='synced'");db.commit()
+    dialog.refresh();assert dialog.submit.isEnabled() and dialog.pending_warning.text() == ''
     dialog.show();app.processEvents()
     assert dialog.width() <= 1024 and dialog.height() <= 768
     dialog.close()
@@ -163,13 +165,14 @@ def test_return_sends_server_ids_and_approval_without_storing_pin(scene):
     assert not db.execute("SELECT 1 FROM sync_outbox WHERE payload LIKE '%9876%'").fetchone()
 
 
-def test_close_service_rechecks_pending_after_dialog(scene):
+def test_close_with_a_pending_sale_closes_locally_and_queues_the_close(scene):
     app, db, service, window, api = scene
     service.checkout(document_no='UI-RACE',branch_id=1,terminal_id='TEST',shift_id=window.shift_id,
         cashier_id=1,lines=[CartLine(1,D(1),D(10))],payment_method='cash',paid_amount=D(10))
-    with pytest.raises(ValueError,match='ต้องส่งบิลค้าง'):
-        service.close_shift(shift_id=window.shift_id,counted_cash=D(110))
-    assert db.execute('SELECT status FROM shifts WHERE id=?',(window.shift_id,)).fetchone()[0]=='open'
+    service.close_shift(shift_id=window.shift_id,counted_cash=D(110))
+    assert db.execute('SELECT status FROM shifts WHERE id=?',(window.shift_id,)).fetchone()[0]=='closed'
+    assert db.execute("SELECT status FROM sync_outbox WHERE aggregate_type='shift_close'").fetchone()[0]=='pending'
+    assert db.execute("SELECT sync_status FROM sales WHERE document_no='UI-RACE'").fetchone()[0]=='pending'
 
 
 def test_central_hold_uses_server_ids_and_restores_discount(scene):
