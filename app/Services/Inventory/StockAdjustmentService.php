@@ -148,9 +148,17 @@ class StockAdjustmentService
             $products = Product::whereIn('id', $productIds)->get()->keyBy('id');
 
             $valueChange = 0.0;   // บวก = ของเกิน มูลค่าสต๊อกเพิ่ม, ลบ = ของขาด
+            // ยอดและสินค้าที่โหลดล่วงหน้าจะเก่าทันทีที่รายการก่อนหน้าแตะสินค้าตัวเดียวกัน
+            // (ใบที่มีสินค้าซ้ำบรรทัด) กรณีนั้นต้องอ่านค่าปัจจุบันจากฐานข้อมูลเหมือนโค้ดเดิม
+            $touchedBalances = [];
+            $touchedProducts = [];
             foreach ($items as $item) {
                 $balanceKey = "{$item->product_id}_{$item->warehouse_location_id}";
-                $balance = $balances->get($balanceKey);
+                $balance = isset($touchedBalances[$balanceKey])
+                    ? StockBalance::where('product_id', $item->product_id)
+                        ->where('warehouse_location_id', $item->warehouse_location_id)
+                        ->lockForUpdate()->first()
+                    : $balances->get($balanceKey);
                 $current = $balance?->on_hand_qty ?? 0;
                 if (DecimalMath::compare($current, $item->system_qty) !== 0) {
                     throw new RuntimeException('ยอดสต๊อกเปลี่ยนหลังส่งอนุมัติ กรุณายกเลิกและตรวจนับใหม่');
@@ -163,7 +171,7 @@ class StockAdjustmentService
                     // เจอของเกิน: สร้าง Lot ใหม่รองรับจำนวนที่เพิ่ม ไม่งั้น stock_lots จะไม่ตรงกับ
                     // stock_balances และมูลค่าสต๊อกปลายงวดจะขาดหายไป (ใช้ average_cost ปัจจุบันประมาณ
                     // ต้นทุน เพราะของเกินไม่มี Lot ต้นทางจริงให้อ้างอิง)
-                    $product = $products->get($productId);
+                    $product = isset($touchedProducts[$productId]) ? Product::find($productId) : $products->get($productId);
                     $explicitCost = $item->unit_cost ?? 0;
                     $unitCost = DecimalMath::compare($explicitCost, 0) > 0 ? $explicitCost : ($product?->average_cost ?? 0);
                     $lot = $this->fifo->receive(
@@ -187,6 +195,10 @@ class StockAdjustmentService
                         $locked->id, 'adjust_out', allowNegative: true,
                     );
                     $valueChange -= $this->allocatedValue($allocations);
+                }
+                if (DecimalMath::compare($diff, 0) !== 0) {
+                    $touchedBalances[$balanceKey] = true;
+                    $touchedProducts[$productId] = true;
                 }
             }
             $locked->update([

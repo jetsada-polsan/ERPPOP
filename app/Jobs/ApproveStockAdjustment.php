@@ -46,9 +46,21 @@ class ApproveStockAdjustment implements ShouldQueue
             ]);
         } catch (Throwable $e) {
             // เมื่อล้มเหลว: ย้อนกลับเป็น pending_approval และเก็บ error message ไว้ใน Cache
-            Document::whereKey($this->documentId)->update(['status' => 'pending_approval']);
-            Cache::put("stock_adjustment_error_{$this->documentId}", $e->getMessage(), now()->addHours(24));
+            $this->releaseDocument($e->getMessage());
             throw $e;
         }
+    }
+
+    /** งานถูกตัดกลางทาง (หมดเวลา หรือ worker ถูกปิด): approve() ย้อนทั้งหมดแล้ว คืนสถานะให้กดใหม่ได้ */
+    public function failed(?Throwable $e): void
+    {
+        $this->releaseDocument($e?->getMessage() ?: 'การอนุมัติไม่เสร็จ กรุณากดอนุมัติใหม่');
+    }
+
+    private function releaseDocument(string $message): void
+    {
+        // คืนสถานะเฉพาะใบที่ยังค้าง "กำลังอนุมัติ" ใบที่อนุมัติสำเร็จไปแล้วห้ามแตะ
+        Document::whereKey($this->documentId)->where('status', 'approving')->update(['status' => 'pending_approval']);
+        Cache::put("stock_adjustment_error_{$this->documentId}", $message, now()->addHours(24));
     }
 }

@@ -84,6 +84,14 @@ class StockAdjustmentController extends Controller
             $locked = Document::whereKey($stockAdjustment->id)->lockForUpdate()->firstOrFail();
 
             if ($locked->status === 'approving') {
+                // งานเบื้องหลังมีเวลาสูงสุด 15 นาที ถ้าค้างเกิน 30 นาทีแปลว่างานหายไปโดยไม่ได้คืนสถานะ
+                // approve() ทำในรายการเดียว ถ้าสำเร็จสถานะจะเป็น active ไปแล้ว จึงคืนให้กดใหม่ได้อย่างปลอดภัย
+                if ($locked->updated_at && $locked->updated_at->lt(now()->subMinutes(30))) {
+                    $locked->update(['status' => 'pending_approval']);
+
+                    return back()->with('error', 'การอนุมัติรอบก่อนไม่เสร็จ ระบบคืนสถานะให้แล้ว กดอนุมัติใหม่ได้');
+                }
+
                 return back()->with('error', 'เอกสารนี้กำลังดำเนินการอนุมัติอยู่');
             }
             if ($locked->status !== 'pending_approval') {
