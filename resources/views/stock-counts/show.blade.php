@@ -5,6 +5,18 @@
 
 @section('content')
 <div x-data="stockCountSheet()" x-init="init()" x-cloak>
+    {{-- Loading Overlay for CSV Import --}}
+    <div x-show="importing" x-transition.opacity
+        style="position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);">
+        <div style="background:#fff;padding:28px 36px;border-radius:16px;box-shadow:0 20px 40px rgba(0,0,0,.25);text-align:center;max-width:380px;">
+            <div class="spinner-border text-primary mb-3" style="width:3rem;height:3rem;" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <h5 class="fw-bold mb-1" style="color:var(--erp-text)">กำลังนำเข้ายอดนับ…</h5>
+            <p class="text-muted small mb-0">ระบบกำลังประมวลผลไฟล์ อย่าปิดหน้านี้</p>
+        </div>
+    </div>
+
     <a href="{{ route('stock-counts.index') }}" class="text-decoration-none small d-inline-block mb-3">
         <i class="bi bi-arrow-left me-1"></i> กลับรายการใบตรวจนับ
     </a>
@@ -66,13 +78,20 @@
                     <i class="bi bi-file-earmark-excel me-1"></i>Export Excel (CSV)
                 </a>
                 @if($stockCount->isEditable())
-                <form method="post" action="{{ route('stock-counts.import', $stockCount) }}" enctype="multipart/form-data" class="d-flex gap-1">
+                <form method="post" action="{{ route('stock-counts.import', $stockCount) }}" enctype="multipart/form-data" class="d-flex gap-1"
+                    @submit.prevent="importCsv($el)">
                     @csrf
-                    <input type="file" name="file" accept=".csv" required class="form-control form-control-sm" style="max-width:220px">
-                    <button class="btn btn-outline-primary btn-sm text-nowrap"><i class="bi bi-upload me-1"></i>Import</button>
+                    <input type="file" x-ref="importFileInput" name="file" accept=".csv" class="form-control form-control-sm" style="max-width:220px">
+                    <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap" :disabled="importing">
+                        <i class="bi bi-upload me-1" x-show="!importing"></i>
+                        <span class="spinner-border spinner-border-sm me-1" x-show="importing"></span>
+                        <span x-text="importing ? 'กำลังนำเข้า...' : 'Import'"></span>
+                    </button>
                 </form>
                 <button type="button" class="btn btn-primary btn-sm" :disabled="!dirty || saving" @click="saveAll()">
-                    <i class="bi bi-check-lg me-1"></i><span x-text="saving ? 'กำลังบันทึก...' : 'บันทึกยอดนับ'"></span>
+                    <i class="bi bi-check-lg me-1" x-show="!saving"></i>
+                    <span class="spinner-border spinner-border-sm me-1" x-show="saving"></span>
+                    <span x-text="saving ? 'กำลังบันทึก...' : 'บันทึกยอดนับ'"></span>
                 </button>
                 <form method="post" action="{{ route('stock-counts.submit', $stockCount) }}"
                     @submit.prevent="finishCount($el)">
@@ -81,11 +100,13 @@
                 </form>
                 @else
                 @if($stockCount->status === 'review')
-                <form method="post" action="{{ route('stock-counts.post', $stockCount) }}" data-confirm="ยืนยันปรับสต็อกจริงตาม Scope นี้? การทำงานนี้ย้อนกลับอัตโนมัติไม่ได้">@csrf
+                <form method="post" action="{{ route('stock-counts.post', $stockCount) }}"
+                    @submit.prevent="confirmPostStock($el)">
+                    @csrf
                     @if($stockCount->count_mode === 'full_zero_missing')
                     <label class="form-check-label small me-2"><input type="checkbox" name="confirm_zero_missing" value="1" class="form-check-input me-1">ผู้จัดการยืนยัน: รายการที่ไม่ได้นับให้ปรับเป็น 0</label>
                     @endif
-                    <button class="btn btn-success btn-sm"><i class="bi bi-shield-check me-1"></i>Manager ยืนยันปรับสต็อกจริง</button>
+                    <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-shield-check me-1"></i>Manager ยืนยันปรับสต็อกจริง</button>
                 </form>
                 @else
                 <span class="badge text-bg-success align-self-center px-3 py-2">ปรับปรุงแล้ว
@@ -178,6 +199,7 @@ function stockCountSheet() {
         items: @json($itemsJson),
         q: '', scanCode: '', openDrop: false, activeId: null, lastRow: null, history: [], online: navigator.onLine,
         dirty: false, saving: false, changed: {},
+        importing: false,
         limit: 500,
 
         init() {
@@ -302,9 +324,121 @@ function stockCountSheet() {
             return success;
         },
 
+        async importCsv(form) {
+            const fileInput = this.$refs.importFileInput || form.querySelector('input[type="file"]');
+            if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+                if (window.erpToast) {
+                    window.erpToast('warning', 'กรุณาเลือกไฟล์ CSV ก่อนกด Import');
+                } else {
+                    Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title: 'กรุณาเลือกไฟล์ CSV ก่อนกด Import', showConfirmButton: false, timer: 2000 });
+                }
+                return;
+            }
+
+            this.importing = true;
+            const formData = new FormData(form);
+
+            try {
+                const res = await fetch(form.action, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || form.querySelector('input[name="_token"]')?.value || '',
+                    },
+                    body: formData,
+                });
+
+                const data = await res.json().catch(() => ({}));
+
+                if (res.ok && data.success) {
+                    let htmlContent = `<div class="text-start mt-2"><p class="mb-2">อัปเดตยอดนับสำเร็จ <strong>${Number(data.updated || 0).toLocaleString()}</strong> รายการ</p>`;
+                    if (data.skipped && data.skipped.length > 0) {
+                        const maxDisplay = 20;
+                        const displayList = data.skipped.slice(0, maxDisplay);
+                        htmlContent += `<div class="alert alert-warning py-2 px-3 small mb-0">`;
+                        htmlContent += `<div class="fw-bold mb-1">ไม่พบรหัสสินค้าในใบนี้ (${Number(data.skipped_count || data.skipped.length).toLocaleString()} รายการ):</div>`;
+                        htmlContent += `<div style="max-height: 140px; overflow-y: auto; font-family: monospace; font-size: 12px; background: rgba(0,0,0,0.04); padding: 6px; border-radius: 4px;">`;
+                        htmlContent += displayList.map(s => `<div>• ${s}</div>`).join('');
+                        if (data.skipped.length > maxDisplay) {
+                            htmlContent += `<div class="text-muted mt-1">...และอีก ${(data.skipped.length - maxDisplay).toLocaleString()} รายการ</div>`;
+                        }
+                        htmlContent += `</div></div>`;
+                    }
+                    htmlContent += `</div>`;
+
+                    await Swal.fire({
+                        icon: 'success',
+                        title: 'Import สำเร็จ',
+                        html: htmlContent,
+                        confirmButtonText: 'ตกลง',
+                        confirmButtonColor: '#0ea5e9',
+                    });
+
+                    window.location.reload();
+                } else {
+                    let errorText = data.message || 'เกิดข้อผิดพลาดในการนำเข้าไฟล์';
+                    if (data.errors) {
+                        errorText = Object.values(data.errors).flat().join('<br>');
+                    }
+                    await Swal.fire({
+                        icon: 'error',
+                        title: 'นำเข้าไม่สำเร็จ',
+                        html: errorText,
+                        confirmButtonText: 'ปิด',
+                        confirmButtonColor: '#0ea5e9',
+                    });
+                }
+            } catch (err) {
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'เกิดข้อผิดพลาด',
+                    text: 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง',
+                    confirmButtonText: 'ปิด',
+                    confirmButtonColor: '#0ea5e9',
+                });
+            } finally {
+                this.importing = false;
+            }
+        },
+
         async finishCount(form) {
             if (this.dirty && !(await this.saveAll())) return;
-            if (confirm('ส่งใบตรวจนับให้หัวหน้าตรวจสอบ? ขั้นตอนนี้ยังไม่ปรับสต็อกจริง')) {
+            const res = await Swal.fire({
+                title: 'ส่งใบตรวจนับให้หัวหน้าตรวจสอบ?',
+                text: 'ขั้นตอนนี้ยังไม่ปรับสต็อกจริง',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'ยืนยันส่งตรวจสอบ',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: '#0ea5e9',
+            });
+            if (res.isConfirmed) {
+                const btn = form.querySelector('button[type="submit"]');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> กำลังส่ง...';
+                }
+                form.submit();
+            }
+        },
+
+        async confirmPostStock(form) {
+            const res = await Swal.fire({
+                title: 'ยืนยันปรับสต็อกจริงตาม Scope นี้?',
+                text: 'การทำงานนี้ย้อนกลับอัตโนมัติไม่ได้',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'ยืนยันปรับสต็อก',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: '#16a34a',
+            });
+            if (res.isConfirmed) {
+                const btn = form.querySelector('button[type="submit"]');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> กำลังปรับสต็อก...';
+                }
                 form.submit();
             }
         },
