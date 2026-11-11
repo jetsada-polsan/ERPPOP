@@ -2,6 +2,7 @@
 
 namespace App\Services\Sales;
 
+use App\Models\ChartOfAccount;
 use App\Models\Cheque;
 use App\Models\CustomerOpenItem;
 use App\Models\Document;
@@ -47,22 +48,36 @@ class CustomerPaymentService
             throw new RuntimeException('ต้องระบุยอดชำระอย่างน้อย 1 รายการ');
         }
 
-        $openItems = CustomerOpenItem::whereIn('id', $allocations->pluck('customer_open_item_id'))
-            ->where('customer_id', $data['customer_id'])
-            ->get()
-            ->keyBy('id');
+        $itemIds = $allocations->pluck('customer_open_item_id');
+        $rawItems = CustomerOpenItem::whereIn('id', $itemIds)->get()->keyBy('id');
+        $openItems = collect();
 
         foreach ($allocations as $allocation) {
-            $item = $openItems->get($allocation['customer_open_item_id']);
+            $itemId = $allocation['customer_open_item_id'];
+            $item = $rawItems->get($itemId);
             if (! $item) {
                 throw new RuntimeException('ไม่พบรายการลูกหนี้ที่เลือก');
             }
-            if ((float) $allocation['amount'] > (float) $item->balance_amount + 0.01) {
-                throw new RuntimeException("ยอดชำระเกินยอดค้างของเอกสาร {$item->document->doc_number}");
+            if ((int) $item->customer_id !== (int) $data['customer_id']) {
+                throw new RuntimeException('มีรายการบิลที่ไม่ใช่ของลูกค้ารายนี้');
             }
+            $amount = round((float) ($allocation['amount'] ?? 0), 2);
+            $discount = round((float) ($allocation['discount_amount'] ?? 0), 2);
+            $wht = round((float) ($allocation['wht_amount'] ?? 0), 2);
+
+            if ($discount < 0 || $wht < 0 || round($discount + $wht, 2) > $amount + 0.001) {
+                throw new RuntimeException('ยอดหัก ณ ที่จ่ายหรือส่วนลดเกินยอดตัดหนี้');
+            }
+            if ($amount > (float) $item->balance_amount + 0.01) {
+                throw new RuntimeException("ยอดชำระเกินยอดค้างของเอกสาร {$item->document?->doc_number}");
+            }
+            $openItems->put($item->id, $item);
         }
 
-        $totalAllocated = round((float) $allocations->sum('amount'), 2);
+        $totalAllocated = round((float) $allocations->sum(fn ($a) => (float) ($a['amount'] ?? 0)), 2);
+        $totalDiscount = round((float) $allocations->sum(fn ($a) => (float) ($a['discount_amount'] ?? 0)), 2);
+        $totalWht = round((float) $allocations->sum(fn ($a) => (float) ($a['wht_amount'] ?? 0)), 2);
+        $totalNet = round($totalAllocated - $totalDiscount - $totalWht, 2);
 
         // Normalize payment lines: support multiple payments[] or legacy single method
         if (! empty($data['payments'])) {
@@ -87,7 +102,7 @@ class CustomerPaymentService
             $m = $data['method'] ?? 'cash';
             $payments = collect([[
                 'method' => $m,
-                'amount' => $totalAllocated,
+                'amount' => $totalNet,
                 'bank_account_id' => $this->bankAccountId($data),
                 'transfer_ref' => $m === 'transfer' ? ($data['transfer_ref'] ?? null) : null,
                 'transfer_at' => $m === 'transfer' ? ($data['transfer_at'] ?? null) : null,
@@ -103,13 +118,21 @@ class CustomerPaymentService
 
         $totalPaid = round((float) $payments->sum('amount'), 2);
 
-        if (abs($totalPaid - $totalAllocated) > 0.009) {
-            throw new RuntimeException('ยอดชำระรวม ('.number_format($totalPaid, 2).') ไม่เท่ากับยอดจัดสรร ('.number_format($totalAllocated, 2).')');
+        if (abs($totalPaid - $totalNet) > 0.009) {
+            throw new RuntimeException('ยอดชำระรวม ('.number_format($totalPaid, 2).') ไม่เท่ากับยอดจัดสรร ('.number_format($totalNet, 2).')');
+        }
+
+        if ($totalWht > 0 && ! $this->glPosting->role(ChartOfAccount::ROLE_WHT_RECEIVABLE)) {
+            throw new RuntimeException('ผังบัญชีภาษีหัก ณ ที่จ่าย (wht_receivable) ยังตั้งค่าไม่ครบ ไม่สามารถรับชำระโดยไม่ลง GL ได้');
+        }
+
+        if ($totalDiscount > 0 && ! $this->glPosting->role(ChartOfAccount::ROLE_SALES_RETURN)) {
+            throw new RuntimeException('ผังบัญชีส่วนลดจ่าย (sales_return) ยังตั้งค่าไม่ครบ ไม่สามารถรับชำระโดยไม่ลง GL ได้');
         }
 
         $documentType = DocumentType::where('code', 'RECEIPT')->firstOrFail();
 
-        return DB::transaction(function () use ($data, $documentType, $totalAllocated, $allocations, $openItems, $payments) {
+        return DB::transaction(function () use ($data, $documentType, $totalAllocated, $totalDiscount, $totalWht, $allocations, $openItems, $payments) {
             $document = Document::create([
                 'document_type_id' => $documentType->id,
                 'branch_id' => $data['branch_id'],
@@ -117,6 +140,7 @@ class CustomerPaymentService
                 'doc_date' => $data['doc_date'] ?? now()->toDateString(),
                 'customer_id' => $data['customer_id'],
                 'salesman_id' => ! empty($data['salesman_id']) ? (int) $data['salesman_id'] : null,
+                'reference' => $data['wht_cert_no'] ?? null,
                 'status' => 'active',
                 'total_items' => $allocations->count(),
                 'total_amount' => $totalAllocated,
@@ -127,7 +151,10 @@ class CustomerPaymentService
                 'party_type' => 'customer',
                 'customer_id' => $data['customer_id'],
                 'branch_id' => $data['branch_id'],
+                'salesman_id' => ! empty($data['salesman_id']) ? (int) $data['salesman_id'] : null,
                 'status' => 'active',
+                'wht_cert_no' => $data['wht_cert_no'] ?? null,
+                'wht_cert_date' => $data['wht_cert_date'] ?? null,
             ]);
 
             $seq = 1;
@@ -180,14 +207,37 @@ class CustomerPaymentService
                 }
             }
 
+            // บันทึกบัญชีหัก ณ ที่จ่าย และ ส่วนลดเงินสด (เดบิต WHT/Discount, เครดิต AR)
+            if ($totalWht > 0) {
+                $this->glPosting->postCustomerWhtDeduction(
+                    $paymentDocument,
+                    $totalWht,
+                    $document->doc_date->toDateString(),
+                    $document->doc_number
+                );
+            }
+
+            if ($totalDiscount > 0) {
+                $this->glPosting->postCustomerDiscount(
+                    $paymentDocument,
+                    $totalDiscount,
+                    $document->doc_date->toDateString(),
+                    $document->doc_number
+                );
+            }
+
             foreach ($allocations as $allocation) {
                 $item = $openItems->get($allocation['customer_open_item_id']);
-                $amount = (float) $allocation['amount'];
+                $amount = round((float) $allocation['amount'], 2);
+                $discount = round((float) ($allocation['discount_amount'] ?? 0), 2);
+                $wht = round((float) ($allocation['wht_amount'] ?? 0), 2);
 
                 PaymentAllocation::create([
                     'payment_document_id' => $paymentDocument->id,
                     'customer_open_item_id' => $item->id,
                     'allocated_amount' => $amount,
+                    'discount_amount' => $discount,
+                    'wht_amount' => $wht,
                 ]);
 
                 $newBalance = round((float) $item->balance_amount - $amount, 4);

@@ -5,6 +5,9 @@
 
 @section('content')
 <div class="d-flex justify-content-end mb-3">
+    <a href="{{ route('ar-receipts.daily-summary') }}" class="btn btn-outline-secondary me-2">
+        <i class="bi bi-file-earmark-bar-graph me-1"></i> รายงานสรุปรับเงินรายวัน
+    </a>
     <a href="{{ route('ar-receipts.create') }}" class="btn btn-primary px-4"><i class="bi bi-plus-lg me-1"></i> ออกใบเสร็จรับเงิน</a>
 </div>
 <div class="row g-3">

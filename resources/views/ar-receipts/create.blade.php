@@ -1,14 +1,14 @@
 @extends('layout')
 @section('title', 'ออกใบเสร็จรับเงิน (BPlus) - MPM Food Group')
 @section('page-title', 'ออกใบเสร็จรับเงิน')
-@section('page-subtitle', 'เลือกลูกค้า ติ๊กบิลค้างชำระ และระบุเงินสด/โอน/เช็ค จบในหน้าเดียว')
+@section('page-subtitle', 'เลือกลูกค้า ติ๊กบิลค้างชำระ ลดสด หัก ณ ที่จ่าย และระบุเงินสด/โอน/เช็ค จบในหน้าเดียว')
 
 @section('content')
 <div x-data="bplusReceipt()" x-cloak>
     <form id="arReceiptForm" method="post" action="{{ route('ar-receipts.store') }}" @submit="if (!canSave()) $event.preventDefault()">
         @csrf
 
-        {{-- แถบหัวข้อมูลเอกสาร (สาขา, ลูกค้า, วันที่, ผู้รับเงิน) --}}
+        {{-- แถบหัวข้อมูลเอกสาร (สาขา, ลูกค้า, วันที่, ผู้รับเงิน, หนังสือรับรองหัก ณ ที่จ่าย) --}}
         <div class="content-card p-3 mb-3">
             <div class="row g-3 align-items-end">
                 <div class="col-md-4">
@@ -52,6 +52,28 @@
                     </select>
                 </div>
             </div>
+
+            {{-- หนังสือรับรองหัก ณ ที่จ่าย (ถ้ามี) --}}
+            <div class="row g-3 align-items-center mt-1 pt-2 border-top">
+                <div class="col-md-4">
+                    <div class="text-muted small">
+                        <i class="bi bi-file-earmark-check text-warning me-1"></i> ข้อมูลหนังสือรับรองหัก ณ ที่จ่าย (ลูกค้าออกให้)
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light text-muted small">เลขที่หนังสือรับรอง</span>
+                        <input type="text" name="wht_cert_no" class="form-control form-control-sm"
+                               placeholder="เช่น WHT-2026/001 (ถ้ามี)">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light text-muted small">ลงวันที่</span>
+                        <input type="date" name="wht_cert_date" class="form-control form-control-sm">
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="row g-3">
@@ -80,30 +102,33 @@
                         </div>
                     </div>
 
-                    {{-- ตารางบิล --}}
+                    {{-- ตารางบิล BPlus --}}
                     <div class="table-responsive">
-                        <table class="table align-middle table-hover mb-0">
+                        <table class="table align-middle table-hover mb-0" style="min-width: 780px;">
                             <thead>
                                 <tr class="table-light">
-                                    <th style="width: 44px;" class="text-center">ชำระ</th>
+                                    <th style="width: 40px;" class="text-center">ชำระ</th>
                                     <th>เลขที่บิล</th>
                                     <th>วันที่</th>
                                     <th>ครบกำหนด</th>
-                                    <th class="text-end">ยอดหนี้ค้าง</th>
-                                    <th class="text-end" style="width: 170px;">ยอดที่ชำระ (บาท)</th>
+                                    <th class="text-end">ยอดค้าง</th>
+                                    <th class="text-end" style="width: 130px;">ยอดตัดหนี้</th>
+                                    <th class="text-end" style="width: 100px;">ลดสด</th>
+                                    <th style="width: 150px;">หัก ณ ที่จ่าย</th>
+                                    <th class="text-end" style="width: 110px;">รับจริง</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <template x-if="loadingItems">
                                     <tr>
-                                        <td colspan="6" class="text-center py-4 text-muted">
+                                        <td colspan="9" class="text-center py-4 text-muted">
                                             <div class="spinner-border spinner-border-sm text-primary me-1"></div> กำลังดึงรายการบิลค้าง...
                                         </td>
                                     </tr>
                                 </template>
                                 <template x-if="!loadingItems && openItems.length === 0">
                                     <tr>
-                                        <td colspan="6" class="text-center py-4 text-muted">
+                                        <td colspan="9" class="text-center py-4 text-muted">
                                             <i class="bi bi-inbox fs-4 d-block mb-1 text-secondary"></i>
                                             <span x-text="customerId ? 'ลูกค้ารายนี้ไม่มียอดหนี้ค้างชำระ' : 'กรุณาเลือกลูกหนี้ด้านบนเพื่อแสดงบิลค้าง'"></span>
                                         </td>
@@ -115,21 +140,61 @@
                                             <input type="checkbox" class="form-check-input"
                                                    x-model="item.checked"
                                                    @change="toggleItem(item)">
-                                            <input type="hidden" :name="'items[' + idx + '][customer_open_item_id]'" :value="item.id">
+                                            <input type="hidden" :name="'allocations[' + idx + '][customer_open_item_id]'" :value="item.id">
                                         </td>
-                                        <td class="fw-bold" :class="item.checked ? 'text-primary' : 'text-dark'" x-text="item.doc_number"></td>
+                                        <td class="fw-bold" :class="item.checked ? 'text-primary' : 'text-dark'">
+                                            <span x-text="item.doc_number"></span>
+                                            <template x-if="item.has_vat">
+                                                <span class="badge text-bg-light border text-muted small ms-1" style="font-size: 10px;">VAT</span>
+                                            </template>
+                                        </td>
                                         <td class="text-muted small" x-text="item.doc_date"></td>
                                         <td class="small" x-text="item.due_date"></td>
-                                        <td class="text-end fw-semibold" x-text="fmt(item.balance)"></td>
+                                        <td class="text-end fw-semibold text-secondary" x-text="fmt(item.balance)"></td>
+                                        {{-- ยอดตัดหนี้ --}}
                                         <td>
                                             <input type="number" step="0.01" min="0" :max="item.balance"
-                                                   :name="'items[' + idx + '][amount]'"
+                                                   :name="'allocations[' + idx + '][amount]'"
                                                    x-model.number="item.amount"
+                                                   @input="onAmountChange(item)"
                                                    :disabled="!item.checked"
                                                    class="form-control form-control-sm text-end fw-bold"
                                                    :class="{'is-invalid': item.checked && (item.amount > item.balance + 0.001 || item.amount <= 0)}"
                                                    placeholder="0.00">
                                         </td>
+                                        {{-- ลดสด --}}
+                                        <td>
+                                            <input type="number" step="0.01" min="0" :max="item.amount"
+                                                   :name="'allocations[' + idx + '][discount_amount]'"
+                                                   x-model.number="item.discount_amount"
+                                                   :disabled="!item.checked"
+                                                   class="form-control form-control-sm text-end text-danger"
+                                                   placeholder="0.00">
+                                        </td>
+                                        {{-- หัก ณ ที่จ่าย (% และเงิน) --}}
+                                        <td>
+                                            <div class="d-flex gap-1 align-items-center">
+                                                <select class="form-select form-select-sm p-1 text-center" style="width: 58px;"
+                                                        :name="'allocations[' + idx + '][wht_rate]'"
+                                                        x-model.number="item.wht_rate"
+                                                        @change="calcWht(item)"
+                                                        :disabled="!item.checked">
+                                                    <option value="0">0%</option>
+                                                    <option value="1">1%</option>
+                                                    <option value="2">2%</option>
+                                                    <option value="3">3%</option>
+                                                    <option value="5">5%</option>
+                                                </select>
+                                                <input type="number" step="0.01" min="0" :max="item.amount"
+                                                       :name="'allocations[' + idx + '][wht_amount]'"
+                                                       x-model.number="item.wht_amount"
+                                                       :disabled="!item.checked"
+                                                       class="form-control form-control-sm text-end text-warning-emphasis"
+                                                       placeholder="0.00">
+                                            </div>
+                                        </td>
+                                        {{-- รับจริงสุทธิของบิลนี้ --}}
+                                        <td class="text-end fw-bold text-success" x-text="fmt(itemNet(item))"></td>
                                     </tr>
                                 </template>
                             </tbody>
@@ -287,8 +352,23 @@
                     </div>
 
                     <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">ยอดหนี้ที่เลือกชำระ</span>
-                        <span class="fw-bold fs-6 text-dark" x-text="'฿' + fmt(selectedTotal())"></span>
+                        <span class="text-muted">ยอดหนี้ตัดชำระรวม</span>
+                        <span class="fw-bold fs-6 text-dark" x-text="'฿' + fmt(totalAllocated())"></span>
+                    </div>
+
+                    <div class="d-flex justify-content-between mb-1 text-danger small" x-show="totalDiscount() > 0">
+                        <span>- ส่วนลดเงินสดรวม</span>
+                        <span class="fw-bold" x-text="'-฿' + fmt(totalDiscount())"></span>
+                    </div>
+
+                    <div class="d-flex justify-content-between mb-2 text-warning-emphasis small" x-show="totalWht() > 0">
+                        <span>- ภาษีหัก ณ ที่จ่ายรวม</span>
+                        <span class="fw-bold" x-text="'-฿' + fmt(totalWht())"></span>
+                    </div>
+
+                    <div class="d-flex justify-content-between mb-2 border-top pt-2">
+                        <span class="fw-bold text-success">ยอดที่ต้องรับจริงสุทธิ</span>
+                        <span class="fw-bold fs-5 text-success" x-text="'฿' + fmt(totalNetToReceive())"></span>
                     </div>
 
                     <hr class="my-2">
@@ -309,29 +389,29 @@
                     </div>
 
                     <div class="d-flex justify-content-between mb-3 border-top pt-2">
-                        <span class="fw-bold">ยอดรับชำระรวม</span>
+                        <span class="fw-bold">ยอดรับชำระรวมทุกช่องทาง</span>
                         <span class="fw-bold fs-5 text-primary" x-text="'฿' + fmt(totalPaid())"></span>
                     </div>
 
                     {{-- กล่องแสดงสถานะส่วนต่าง --}}
                     <div class="p-3 rounded-3 mb-3 text-center"
                          :class="{
-                             'bg-success bg-opacity-10 text-success border border-success': selectedTotal() > 0 && Math.abs(difference()) <= 0.009,
-                             'bg-danger bg-opacity-10 text-danger border border-danger': selectedTotal() > 0 && Math.abs(difference()) > 0.009,
-                             'bg-secondary bg-opacity-10 text-muted border': selectedTotal() === 0
+                             'bg-success bg-opacity-10 text-success border border-success': totalNetToReceive() > 0 && Math.abs(difference()) <= 0.009,
+                             'bg-danger bg-opacity-10 text-danger border border-danger': totalNetToReceive() > 0 && Math.abs(difference()) > 0.009,
+                             'bg-secondary bg-opacity-10 text-muted border': totalNetToReceive() === 0
                          }">
-                        <template x-if="selectedTotal() === 0">
+                        <template x-if="totalNetToReceive() === 0">
                             <div><i class="bi bi-info-circle me-1"></i> กรุณาติ๊กเลือกบิลค้างชำระ</div>
                         </template>
-                        <template x-if="selectedTotal() > 0 && Math.abs(difference()) <= 0.009">
+                        <template x-if="totalNetToReceive() > 0 && Math.abs(difference()) <= 0.009">
                             <div class="fw-bold"><i class="bi bi-check-circle-fill me-1"></i> ยอดเงินถูกต้องลงตัว (0.00 บาท)</div>
                         </template>
-                        <template x-if="selectedTotal() > 0 && difference() < -0.009">
+                        <template x-if="totalNetToReceive() > 0 && difference() < -0.009">
                             <div class="fw-bold">
                                 <i class="bi bi-exclamation-triangle-fill me-1"></i> ยอดรับชำระ ขาดอีก ฿<span x-text="fmt(Math.abs(difference()))"></span>
                             </div>
                         </template>
-                        <template x-if="selectedTotal() > 0 && difference() > 0.009">
+                        <template x-if="totalNetToReceive() > 0 && difference() > 0.009">
                             <div class="fw-bold">
                                 <i class="bi bi-exclamation-triangle-fill me-1"></i> ยอดรับชำระ เกินมา ฿<span x-text="fmt(difference())"></span>
                             </div>
@@ -341,6 +421,9 @@
                     {{-- แจ้งเตือนข้อผิดพลาด --}}
                     <div class="text-danger small mb-3" x-show="hasOverpaidItem()">
                         <i class="bi bi-x-circle me-1"></i> มียอดชำระบางบิลเกินยอดหนี้คงค้าง
+                    </div>
+                    <div class="text-danger small mb-3" x-show="hasExcessiveDeduction()">
+                        <i class="bi bi-x-circle me-1"></i> ยอดส่วนลดหรือหัก ณ ที่จ่าย เกินยอดตัดหนี้
                     </div>
                     <div class="text-danger small mb-3" x-show="hasIncompleteCheque()">
                         <i class="bi bi-x-circle me-1"></i> กรุณากรอกเลขที่เช็คและวันที่ให้ครบ
@@ -352,10 +435,9 @@
                             @click="confirmAndSave()">
                         <i class="bi bi-check2-circle me-1"></i> บันทึกใบเสร็จรับเงิน
                     </button>
-
-                    <a href="{{ route('ar-receipts.index') }}" class="btn btn-link w-100 text-decoration-none text-muted small mt-2">
-                        ← กลับหน้ารายการใบเสร็จ
-                    </a>
+                    <div class="form-text text-center small mt-2 text-muted">
+                        ลงบัญชี Dr เงินสด/ธนาคาร/ภาษีหัก ณ ที่จ่าย/ส่วนลดจ่าย และ Cr ลูกหนี้การค้าอัตโนมัติ
+                    </div>
                 </div>
             </div>
         </div>
@@ -365,37 +447,54 @@
 <script>
 function bplusReceipt() {
     return {
-        customerId: '{{ $customer?->id ?? '' }}',
-        branchId: '{{ old('branch_id', auth()->user()?->branch_id ?? $branches->first()?->id) }}',
-        salesmanId: '{{ old('salesman_id') }}',
-        docDate: '{{ old('doc_date', now()->toDateString()) }}',
+        customerId: '{{ $customer?->id ?? "" }}',
+        branchId: '{{ $branches->first()?->id ?? "" }}',
+        docDate: '{{ now()->toDateString() }}',
+        salesmanId: '',
         onlySelected: false,
         loadingItems: false,
 
-        openItems: @js($openItems->map(fn ($item) => [
-            'id' => $item->id,
-            'doc_number' => $item->document?->doc_number ?? '-',
-            'doc_date' => $item->document?->doc_date?->thaiDate() ?? '-',
-            'due_date' => $item->due_date ? \Illuminate\Support\Carbon::parse($item->due_date)->thaiDate() : '-',
-            'balance' => round((float) $item->balance_amount, 2),
-            'amount' => round((float) $item->balance_amount, 2),
-            'checked' => false,
-        ])->values()),
+        openItems: [
+            @foreach($openItems as $item)
+            @php
+                $subtotal = $item->document ? (float) $item->document->subtotal_amount : (float) $item->gross_amount;
+                $vat = $item->document ? (float) $item->document->vat_amount : (float) $item->vat_amount;
+                $total = $item->document ? (float) $item->document->total_amount : (float) $item->net_amount;
+            @endphp
+            {
+                id: {{ $item->id }},
+                doc_number: '{{ $item->document?->doc_number ?? "-" }}',
+                doc_date: '{{ $item->document?->doc_date?->thaiDate() ?? "-" }}',
+                due_date: '{{ $item->due_date ? \Illuminate\Support\Carbon::parse($item->due_date)->thaiDate() : "-" }}',
+                balance: {{ (float) $item->balance_amount }},
+                amount: {{ (float) $item->balance_amount }},
+                discount_amount: 0,
+                wht_rate: 0,
+                wht_amount: 0,
+                subtotal_amount: {{ (float) $subtotal }},
+                vat_amount: {{ (float) $vat }},
+                total_amount: {{ (float) $total }},
+                has_vat: {{ $vat > 0 ? 'true' : 'false' }},
+                checked: false,
+            },
+            @endforeach
+        ],
 
-        cashAmount: {{ (float) old('cash_amount', 0) }},
-        transferAmount: {{ (float) old('transfer_amount', 0) }},
-        transferBankAccountId: '{{ old('transfer_bank_account_id', '') }}',
-        transferRef: '{{ old('transfer_ref', '') }}',
-        transferAt: '{{ old('transfer_at', now()->format('Y-m-d\TH:i')) }}',
+        cashAmount: 0,
+        transferAmount: 0,
+        transferBankAccountId: '',
+        transferRef: '',
+        transferAt: '',
 
         cheques: [
-            {
-                cheque_bank: '',
-                cheque_no: '',
-                cheque_due_date: '{{ now()->toDateString() }}',
-                amount: 0
-            }
+            { cheque_bank: '', cheque_no: '', cheque_due_date: '{{ now()->toDateString() }}', amount: 0 }
         ],
+
+        init() {
+            if (this.openItems.length > 0) {
+                this.openItems[0].checked = true;
+            }
+        },
 
         async onCustomerChange() {
             if (!this.customerId) {
@@ -414,6 +513,13 @@ function bplusReceipt() {
                     due_date: item.due_date,
                     balance: Number(item.balance) || 0,
                     amount: Number(item.balance) || 0,
+                    discount_amount: 0,
+                    wht_rate: 0,
+                    wht_amount: 0,
+                    subtotal_amount: Number(item.subtotal_amount) || 0,
+                    vat_amount: Number(item.vat_amount) || 0,
+                    total_amount: Number(item.total_amount) || 0,
+                    has_vat: !!item.has_vat,
                     checked: false,
                 }));
             } catch (err) {
@@ -428,13 +534,50 @@ function bplusReceipt() {
                 item.amount = item.balance;
             } else {
                 item.amount = 0;
+                item.discount_amount = 0;
+                item.wht_rate = 0;
+                item.wht_amount = 0;
             }
+        },
+
+        onAmountChange(item) {
+            if (item.wht_rate > 0) {
+                this.calcWht(item);
+            }
+        },
+
+        calcWht(item) {
+            const rate = Number(item.wht_rate) || 0;
+            if (rate <= 0) {
+                item.wht_amount = 0;
+                return;
+            }
+            const amt = Number(item.amount) || 0;
+            let base = amt;
+            if (item.has_vat && item.total_amount > 0) {
+                const preVatRatio = item.subtotal_amount / item.total_amount;
+                base = Math.round(amt * preVatRatio * 100) / 100;
+            }
+            item.wht_amount = Math.round(base * (rate / 100) * 100) / 100;
+        },
+
+        itemNet(item) {
+            if (!item.checked) return 0;
+            const amt = Number(item.amount) || 0;
+            const disc = Number(item.discount_amount) || 0;
+            const wht = Number(item.wht_amount) || 0;
+            return Math.max(0, Math.round((amt - disc - wht) * 100) / 100);
         },
 
         selectAll(check = true) {
             this.openItems.forEach(item => {
                 item.checked = check;
                 item.amount = check ? item.balance : 0;
+                if (!check) {
+                    item.discount_amount = 0;
+                    item.wht_rate = 0;
+                    item.wht_amount = 0;
+                }
             });
         },
 
@@ -457,10 +600,26 @@ function bplusReceipt() {
             }
         },
 
-        selectedTotal() {
+        totalAllocated() {
             return this.openItems
                 .filter(i => i.checked)
                 .reduce((s, i) => s + (Number(i.amount) || 0), 0);
+        },
+
+        totalDiscount() {
+            return this.openItems
+                .filter(i => i.checked)
+                .reduce((s, i) => s + (Number(i.discount_amount) || 0), 0);
+        },
+
+        totalWht() {
+            return this.openItems
+                .filter(i => i.checked)
+                .reduce((s, i) => s + (Number(i.wht_amount) || 0), 0);
+        },
+
+        totalNetToReceive() {
+            return Math.max(0, Math.round((this.totalAllocated() - this.totalDiscount() - this.totalWht()) * 100) / 100);
         },
 
         selectedCount() {
@@ -471,20 +630,20 @@ function bplusReceipt() {
             const cash = Number(this.cashAmount) || 0;
             const transfer = Number(this.transferAmount) || 0;
             const cheques = this.cheques.reduce((s, c) => s + (Number(c.amount) || 0), 0);
-            return cash + transfer + cheques;
+            return Math.round((cash + transfer + cheques) * 100) / 100;
         },
 
         difference() {
-            return Math.round((this.totalPaid() - this.selectedTotal()) * 100) / 100;
+            return Math.round((this.totalPaid() - this.totalNetToReceive()) * 100) / 100;
         },
 
         fillRemainingToCash() {
-            const rem = Math.max(0, this.selectedTotal() - ((Number(this.transferAmount) || 0) + this.cheques.reduce((s, c) => s + (Number(c.amount) || 0), 0)));
+            const rem = Math.max(0, this.totalNetToReceive() - ((Number(this.transferAmount) || 0) + this.cheques.reduce((s, c) => s + (Number(c.amount) || 0), 0)));
             this.cashAmount = Math.round(rem * 100) / 100;
         },
 
         fillRemainingToTransfer() {
-            const rem = Math.max(0, this.selectedTotal() - ((Number(this.cashAmount) || 0) + this.cheques.reduce((s, c) => s + (Number(c.amount) || 0), 0)));
+            const rem = Math.max(0, this.totalNetToReceive() - ((Number(this.cashAmount) || 0) + this.cheques.reduce((s, c) => s + (Number(c.amount) || 0), 0)));
             this.transferAmount = Math.round(rem * 100) / 100;
         },
 
@@ -492,15 +651,20 @@ function bplusReceipt() {
             return this.openItems.some(i => i.checked && (Number(i.amount) || 0) > i.balance + 0.001);
         },
 
+        hasExcessiveDeduction() {
+            return this.openItems.some(i => i.checked && (Number(i.discount_amount) || 0) + (Number(i.wht_amount) || 0) > (Number(i.amount) || 0) + 0.001);
+        },
+
         hasIncompleteCheque() {
             return this.cheques.some(c => (Number(c.amount) || 0) > 0 && (!c.cheque_no || !c.cheque_due_date));
         },
 
         canSave() {
-            const selTotal = this.selectedTotal();
-            if (selTotal <= 0) return false;
+            const net = this.totalNetToReceive();
+            if (net <= 0) return false;
             if (Math.abs(this.difference()) > 0.009) return false;
             if (this.hasOverpaidItem()) return false;
+            if (this.hasExcessiveDeduction()) return false;
             if (this.hasIncompleteCheque()) return false;
             if (!this.branchId) return false;
             return true;
@@ -512,9 +676,19 @@ function bplusReceipt() {
 
         confirmAndSave() {
             if (!this.canSave()) return;
+            let breakdownHtml = `<div class="text-start p-2 bg-light rounded small mt-2">
+                <div><b>ยอดตัดหนี้:</b> ฿${this.fmt(this.totalAllocated())}</div>`;
+            if (this.totalDiscount() > 0) {
+                breakdownHtml += `<div class="text-danger"><b>- ส่วนลดเงินสด:</b> ฿${this.fmt(this.totalDiscount())}</div>`;
+            }
+            if (this.totalWht() > 0) {
+                breakdownHtml += `<div class="text-warning-emphasis"><b>- ภาษีหัก ณ ที่จ่าย:</b> ฿${this.fmt(this.totalWht())}</div>`;
+            }
+            breakdownHtml += `<div class="text-success border-top pt-1 mt-1"><b>ยอดรับจริง:</b> ฿${this.fmt(this.totalNetToReceive())}</div></div>`;
+
             Swal.fire({
                 title: 'ยืนยันการบันทึกใบเสร็จรับเงิน',
-                html: `ยอดรับชำระรวม: <b>฿${this.fmt(this.totalPaid())}</b><br>จำนวนบิลที่ตัดชำระ: <b>${this.selectedCount()}</b> ใบ`,
+                html: `จำนวนบิลที่ตัดชำระ: <b>${this.selectedCount()}</b> ใบ<br>${breakdownHtml}`,
                 icon: 'question',
                 showCancelButton: true,
                 confirmButtonColor: '#16a34a',

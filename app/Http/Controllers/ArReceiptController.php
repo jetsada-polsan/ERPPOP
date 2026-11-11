@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * ใบเสร็จรับเงิน (รับชำระลูกหนี้) แบบ BPlus: เลือกลูกค้า → ดึงใบขายเชื่อค้าง (DS/DSN) มาติ๊กเลือก
@@ -39,6 +40,147 @@ class ArReceiptController extends Controller
             ->orderByDesc('id')->limit(30)->get();
 
         return view('ar-receipts.index', compact('outstanding', 'customers', 'receipts'));
+    }
+
+    public function dailySummary(Request $request): View|StreamedResponse
+    {
+        $startDate = $request->input('start_date', now()->toDateString());
+        $endDate = $request->input('end_date', now()->toDateString());
+        $branchId = $request->filled('branch_id') ? (int) $request->input('branch_id') : null;
+
+        $branches = Branch::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name_th']);
+
+        $receiptDocsQuery = Document::with(['salesman', 'paymentDocument.lines', 'paymentDocument.allocations'])
+            ->whereHas('documentType', fn ($q) => $q->where('code', 'RECEIPT'))
+            ->where('status', 'active')
+            ->whereDate('doc_date', '>=', $startDate)
+            ->whereDate('doc_date', '<=', $endDate);
+
+        if ($branchId) {
+            $receiptDocsQuery->where('branch_id', $branchId);
+        }
+
+        $receiptDocs = $receiptDocsQuery->get();
+
+        $methodLabels = [
+            'cash' => 'เงินสด',
+            'transfer' => 'โอนเงิน',
+            'cheque' => 'เช็ค',
+        ];
+
+        $groups = [];
+        $totals = [
+            'receipt_count' => 0,
+            'net_paid' => 0.0,
+            'discount' => 0.0,
+            'wht' => 0.0,
+            'allocated' => 0.0,
+        ];
+        $seenReceiptIds = [];
+
+        foreach ($receiptDocs as $doc) {
+            $payDoc = $doc->paymentDocument;
+            if (! $payDoc || $payDoc->status !== 'active') {
+                continue;
+            }
+
+            $salesmanName = $doc->salesman ? "{$doc->salesman->code} - {$doc->salesman->name}" : 'ไม่ระบุ / ส่วนกลาง';
+            $salesmanId = $doc->salesman_id ?? 0;
+
+            $docAllocated = (float) $payDoc->allocations->sum('allocated_amount');
+            $docDiscount = (float) $payDoc->allocations->sum('discount_amount');
+            $docWht = (float) $payDoc->allocations->sum('wht_amount');
+            $docNetPaid = (float) $payDoc->lines->sum('amount');
+
+            if (! in_array($doc->id, $seenReceiptIds, true)) {
+                $seenReceiptIds[] = $doc->id;
+                $totals['receipt_count']++;
+                $totals['net_paid'] += $docNetPaid;
+                $totals['discount'] += $docDiscount;
+                $totals['wht'] += $docWht;
+                $totals['allocated'] += $docAllocated;
+            }
+
+            foreach ($payDoc->lines as $line) {
+                $method = $line->method;
+                $lineAmt = (float) $line->amount;
+                $ratio = $docNetPaid > 0 ? ($lineAmt / $docNetPaid) : 0;
+                $lineDiscount = round($docDiscount * $ratio, 2);
+                $lineWht = round($docWht * $ratio, 2);
+                $lineAllocated = round($lineAmt + $lineDiscount + $lineWht, 2);
+
+                $key = "{$salesmanId}_{$method}";
+                if (! isset($groups[$key])) {
+                    $groups[$key] = [
+                        'salesman_id' => $salesmanId,
+                        'salesman_name' => $salesmanName,
+                        'method' => $method,
+                        'method_label' => $methodLabels[$method] ?? $method,
+                        'receipt_ids' => [],
+                        'net_paid' => 0.0,
+                        'discount' => 0.0,
+                        'wht' => 0.0,
+                        'allocated' => 0.0,
+                    ];
+                }
+                $groups[$key]['receipt_ids'][$doc->id] = true;
+                $groups[$key]['net_paid'] += $lineAmt;
+                $groups[$key]['discount'] += $lineDiscount;
+                $groups[$key]['wht'] += $lineWht;
+                $groups[$key]['allocated'] += $lineAllocated;
+            }
+        }
+
+        $rows = collect($groups)->map(function ($g) {
+            $g['receipt_count'] = count($g['receipt_ids']);
+
+            return $g;
+        })->sortBy(['salesman_name', 'method'])->values();
+
+        if ($request->input('export') === 'csv') {
+            $filename = "ar_receipt_daily_summary_{$startDate}_{$endDate}.csv";
+            $headers = [
+                'Content-Type' => 'text/csv; charset=utf-8',
+                'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            ];
+            $callback = function () use ($rows, $totals) {
+                $out = fopen('php://output', 'w');
+                fputs($out, "\xEF\xBB\xBF");
+                fputcsv($out, ['ผู้รับเงิน', 'วิธีชำระ', 'จำนวนใบ', 'ยอดรับจริง', 'ส่วนลดเงินสด', 'ภาษีหัก ณ ที่จ่าย', 'ยอดตัดหนี้']);
+                foreach ($rows as $r) {
+                    fputcsv($out, [
+                        $r['salesman_name'],
+                        $r['method_label'],
+                        $r['receipt_count'],
+                        number_format($r['net_paid'], 2, '.', ''),
+                        number_format($r['discount'], 2, '.', ''),
+                        number_format($r['wht'], 2, '.', ''),
+                        number_format($r['allocated'], 2, '.', ''),
+                    ]);
+                }
+                fputcsv($out, [
+                    'รวมทั้งสิ้น',
+                    '-',
+                    $totals['receipt_count'],
+                    number_format($totals['net_paid'], 2, '.', ''),
+                    number_format($totals['discount'], 2, '.', ''),
+                    number_format($totals['wht'], 2, '.', ''),
+                    number_format($totals['allocated'], 2, '.', ''),
+                ]);
+                fclose($out);
+            };
+
+            return response()->stream($callback, 200, $headers);
+        }
+
+        return view('ar-receipts.daily-summary', [
+            'startDate' => $startDate,
+            'endDate' => $endDate,
+            'branchId' => $branchId,
+            'branches' => $branches,
+            'rows' => $rows,
+            'totals' => $totals,
+        ]);
     }
 
     public function create(Request $request): View
@@ -80,13 +222,24 @@ class ArReceiptController extends Controller
             ->where('balance_amount', '>', 0)
             ->orderBy('due_date')->orderBy('id')
             ->get()
-            ->map(fn ($item) => [
-                'id' => $item->id,
-                'doc_number' => $item->document?->doc_number ?? '-',
-                'doc_date' => $item->document?->doc_date?->thaiDate() ?? '-',
-                'due_date' => $item->due_date ? Carbon::parse($item->due_date)->thaiDate() : '-',
-                'balance' => round((float) $item->balance_amount, 2),
-            ])
+            ->map(function ($item) {
+                $doc = $item->document;
+                $subtotal = $doc ? (float) $doc->subtotal_amount : (float) $item->gross_amount;
+                $vat = $doc ? (float) $doc->vat_amount : (float) $item->vat_amount;
+                $total = $doc ? (float) $doc->total_amount : (float) $item->net_amount;
+
+                return [
+                    'id' => $item->id,
+                    'doc_number' => $doc?->doc_number ?? '-',
+                    'doc_date' => $doc?->doc_date?->thaiDate() ?? '-',
+                    'due_date' => $item->due_date ? Carbon::parse($item->due_date)->thaiDate() : '-',
+                    'balance' => round((float) $item->balance_amount, 2),
+                    'subtotal_amount' => round($subtotal, 2),
+                    'vat_amount' => round($vat, 2),
+                    'total_amount' => round($total, 2),
+                    'has_vat' => $vat > 0,
+                ];
+            })
             ->values();
 
         return response()->json($openItems);
@@ -99,6 +252,8 @@ class ArReceiptController extends Controller
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
             'salesman_id' => ['nullable', 'integer', 'exists:salesmen,id'],
             'doc_date' => ['nullable', 'date'],
+            'wht_cert_no' => ['nullable', 'string', 'max:60'],
+            'wht_cert_date' => ['nullable', 'date'],
             // Support either mixed payments array OR single legacy method
             'payments' => ['nullable', 'array'],
             'payments.*.method' => ['required_with:payments', 'string', 'in:cash,transfer,cheque'],
@@ -130,16 +285,27 @@ class ArReceiptController extends Controller
             'items' => ['nullable', 'array'],
             'items.*.customer_open_item_id' => ['required_with:items', 'integer', 'exists:customer_open_items,id'],
             'items.*.amount' => ['nullable', 'numeric', 'min:0'],
+            'items.*.discount_amount' => ['nullable', 'numeric', 'min:0'],
+            'items.*.wht_amount' => ['nullable', 'numeric', 'min:0'],
+            'items.*.wht_rate' => ['nullable', 'numeric', 'min:0'],
             'allocations' => ['nullable', 'array'],
             'allocations.*.customer_open_item_id' => ['required_with:allocations', 'integer', 'exists:customer_open_items,id'],
             'allocations.*.amount' => ['nullable', 'numeric', 'min:0'],
+            'allocations.*.discount_amount' => ['nullable', 'numeric', 'min:0'],
+            'allocations.*.wht_amount' => ['nullable', 'numeric', 'min:0'],
+            'allocations.*.wht_rate' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $customerId = (int) $data['customer_id'];
         $rawAllocations = $data['allocations'] ?? $data['items'] ?? [];
         $allocations = collect($rawAllocations)
             ->filter(fn ($row) => (float) ($row['amount'] ?? 0) > 0)
-            ->map(fn ($row) => ['customer_open_item_id' => (int) $row['customer_open_item_id'], 'amount' => (float) $row['amount']])
+            ->map(fn ($row) => [
+                'customer_open_item_id' => (int) $row['customer_open_item_id'],
+                'amount' => round((float) $row['amount'], 2),
+                'discount_amount' => round((float) ($row['discount_amount'] ?? 0), 2),
+                'wht_amount' => round((float) ($row['wht_amount'] ?? 0), 2),
+            ])
             ->values()->all();
 
         if ($allocations === []) {
@@ -204,6 +370,8 @@ class ArReceiptController extends Controller
             'branch_id' => (int) $data['branch_id'],
             'salesman_id' => ! empty($data['salesman_id']) ? (int) $data['salesman_id'] : null,
             'doc_date' => $data['doc_date'] ?? now()->toDateString(),
+            'wht_cert_no' => $data['wht_cert_no'] ?? null,
+            'wht_cert_date' => $data['wht_cert_date'] ?? null,
             'allocations' => $allocations,
         ];
 

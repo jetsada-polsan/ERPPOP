@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'document_id', 'party_type', 'customer_id', 'supplier_id', 'branch_id', 'salesman_id', 'status',
+    'wht_cert_no', 'wht_cert_date',
 ])]
 class PaymentDocument extends Model
 {
