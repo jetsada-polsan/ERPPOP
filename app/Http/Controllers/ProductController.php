@@ -22,6 +22,7 @@ use App\Models\StockLotQualityCheck;
 use App\Models\StockMovement;
 use App\Models\Supplier;
 use App\Models\SupplierPriceSchedule;
+use App\Services\Sales\PosPriceScheduleService;
 use App\Services\Inventory\ProductCostHistoryService;
 use App\Services\ProductSkuAllocator;
 use App\Services\Inventory\InternalBarcodeGenerator;
@@ -197,7 +198,7 @@ class ProductController extends Controller
             : null;
     }
 
-    public function storePosPriceSchedule(Request $request, Product $product): RedirectResponse
+    public function storePosPriceSchedule(Request $request, Product $product, PosPriceScheduleService $service): RedirectResponse
     {
         $data = $request->validate([
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
@@ -208,21 +209,15 @@ class ProductController extends Controller
             'note' => ['nullable', 'string', 'max:500'],
         ]);
 
-        PosPriceSchedule::create([
-            ...$data,
-            'status' => 'published',
-            'created_by' => auth()->id(),
-            'published_by' => auth()->id(),
-            'published_at' => now(),
-        ]);
+        $service->publish($product, $data, auth()->id());
 
         return back()->with('success', 'เผยแพร่ราคาขาย POS ตามเวลาที่กำหนดแล้ว เครื่อง POS จะรับเมื่อ sync ครั้งถัดไป');
     }
 
-    public function cancelPosPriceSchedule(Product $product, PosPriceSchedule $schedule): RedirectResponse
+    public function cancelPosPriceSchedule(Product $product, PosPriceSchedule $schedule, PosPriceScheduleService $service): RedirectResponse
     {
         abort_unless((int) $schedule->product_id === (int) $product->id, 404);
-        $schedule->update(['status' => 'cancelled']);
+        $service->cancel($schedule);
 
         return back()->with('success', 'ยกเลิกช่วงราคาขาย POS แล้ว เครื่อง POS จะนำออกเมื่อ sync ครั้งถัดไป');
     }

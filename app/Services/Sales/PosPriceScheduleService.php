@@ -3,6 +3,7 @@
 namespace App\Services\Sales;
 
 use App\Models\PosPriceSchedule;
+use App\Models\Product;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 
@@ -46,5 +47,38 @@ class PosPriceScheduleService
             ->where(fn ($query) => $query->whereNull('branch_id')->orWhere('branch_id', $branchId))
             ->orderBy('effective_from')
             ->get();
+    }
+
+    /**
+     * Publish a POS price schedule override.
+     *
+     * @param Product|int $product
+     * @param array<string, mixed> $data
+     */
+    public function publish(Product|int $product, array $data, ?int $userId = null): PosPriceSchedule
+    {
+        $productId = $product instanceof \App\Models\Product ? $product->id : (int) $product;
+
+        return PosPriceSchedule::create([
+            'product_id' => $productId,
+            'branch_id' => $data['branch_id'] ?? null,
+            'unit_id' => $data['unit_id'] ?? null,
+            'price' => $data['price'],
+            'effective_from' => $data['effective_from'],
+            'effective_to' => $data['effective_to'] ?? null,
+            'note' => $data['note'] ?? null,
+            'status' => 'published',
+            'created_by' => $userId,
+            'published_by' => $userId,
+            'published_at' => now(),
+        ]);
+    }
+
+    /**
+     * Cancel an existing POS price schedule so it stops overriding prices.
+     */
+    public function cancel(PosPriceSchedule $schedule): void
+    {
+        $schedule->update(['status' => 'cancelled']);
     }
 }
