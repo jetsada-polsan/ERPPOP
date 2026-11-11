@@ -688,4 +688,26 @@ class ArReceiptMultiPaymentTest extends TestCase
         $resPrint->assertOk();
         $resPrint->assertSee($this->salesmanA->name);
     }
+    public function test_backdated_receipt_into_a_closed_accounting_period_is_rejected(): void
+    {
+        $bill = $this->createCreditSaleBill($this->customerA, 1000.00);
+        \App\Models\AccountingPeriod::create([
+            'name' => 'งวดปิด', 'starts_on' => now()->subMonthNoOverflow()->startOfMonth(), 'ends_on' => now()->subMonthNoOverflow()->endOfMonth(),
+            'status' => 'closed', 'closed_at' => now(),
+        ]);
+
+        try {
+            app(CustomerPaymentService::class)->create([
+                'branch_id' => $this->branch->id, 'customer_id' => $this->customerA->id,
+                'doc_date' => now()->subMonthNoOverflow()->startOfMonth()->addDays(4)->toDateString(),
+                'payments' => [['method' => 'transfer', 'amount' => 1000.00, 'bank_account_id' => $this->bankAccount->id]],
+                'allocations' => [['customer_open_item_id' => $bill->id, 'amount' => 1000.00]],
+            ]);
+            $this->fail('ใบเสร็จที่ลงวันที่ในงวดปิดแล้วต้องถูกปฏิเสธ');
+        } catch (\Illuminate\Validation\ValidationException) {
+        }
+
+        $this->assertSame(0, PaymentDocument::count());
+        $this->assertEquals(1000.00, (float) $bill->fresh()->balance_amount);
+    }
 }

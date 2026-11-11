@@ -122,6 +122,11 @@ class CustomerPaymentService
             throw new RuntimeException('ยอดชำระรวม ('.number_format($totalPaid, 2).') ไม่เท่ากับยอดจัดสรร ('.number_format($totalNet, 2).')');
         }
 
+        // วันที่ใบเสร็จเลือกย้อนหลังได้ ต้องไม่ตกในงวดบัญชีที่ปิดแล้ว (ตัวลงบัญชีเดิมตรวจแค่วันนี้)
+        if (! empty($data['doc_date'])) {
+            app(\App\Services\Accounting\AccountingPeriodGuard::class)->assertOpen((string) $data['doc_date'], (int) $data['branch_id']);
+        }
+
         if ($totalWht > 0 && ! $this->glPosting->role(ChartOfAccount::ROLE_WHT_RECEIVABLE)) {
             throw new RuntimeException('ผังบัญชีภาษีหัก ณ ที่จ่าย (wht_receivable) ยังตั้งค่าไม่ครบ ไม่สามารถรับชำระโดยไม่ลง GL ได้');
         }
