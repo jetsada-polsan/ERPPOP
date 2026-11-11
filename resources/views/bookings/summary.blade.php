@@ -7,7 +7,10 @@
         <label>วันที่<input type="date" name="date" value="{{ $date->toDateString() }}"></label>
         <label>สาขา<select name="branch_id"><option value="">ทุกสาขา</option>@foreach($branches as $branch)<option value="{{ $branch->id }}" @selected($branchId === $branch->id)>{{ $branch->code }} {{ $branch->name_th }}</option>@endforeach</select></label>
         <label>สายขาย<select name="sales_area_id"><option value="">ทุกสาย</option>@foreach($salesAreas as $area)<option value="{{ $area->id }}" @selected($salesAreaId === $area->id)>{{ $area->code }} {{ $area->name }}</option>@endforeach</select></label>
-        <button class="btn btn-primary"><i class="bi bi-search me-1"></i>แสดง</button><button type="button" class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>พิมพ์</button><a class="btn btn-link" href="{{ route('bookings.index') }}">กลับ</a>
+        <button class="btn btn-primary"><i class="bi bi-search me-1"></i>แสดง</button>
+        <button type="button" class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>พิมพ์ใบรวมจอง</button>
+        <a href="{{ route('documents.delivery-notes.batch', array_filter(['date' => $date->toDateString(), 'branch_id' => $branchId, 'sales_area_id' => $salesAreaId, 'type' => 'booking'])) }}" target="_blank" class="btn btn-success text-white"><i class="bi bi-truck me-1"></i>พิมพ์ใบส่งของทั้งหมดตามตัวกรองนี้</a>
+        <a class="btn btn-link" href="{{ route('bookings.index') }}">กลับ</a>
     </form>
     <div class="summary-meta"><div><strong>ใบรวมจอง: เช็คสินค้า</strong><span>{{ $date->format('d/m/Y') }} · {{ $branches->firstWhere('id', $branchId)?->name_th ?? 'ทุกสาขา' }} · {{ $salesAreas->firstWhere('id', $salesAreaId)?->name ?? 'ทุกสาย' }}</span></div><b>{{ $bookings->count() }} ใบจอง</b></div>
     <section class="summary-card">
