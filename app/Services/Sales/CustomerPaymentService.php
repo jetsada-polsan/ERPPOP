@@ -30,11 +30,19 @@ class CustomerPaymentService
     ) {}
 
     /**
-     * @param  array{customer_id:int, branch_id:int, method:string, allocations: array<int, array{customer_open_item_id:int, amount:float}>}  $data
+     * @param  array{
+     *     customer_id: int,
+     *     branch_id: int,
+     *     salesman_id?: ?int,
+     *     doc_date?: ?string,
+     *     method?: string,
+     *     payments?: array<int, array{method: string, amount: float, bank_account_id?: ?int, transfer_ref?: ?string, transfer_at?: ?string, cheque_no?: ?string, cheque_due_date?: ?string, cheque_bank?: ?string}>,
+     *     allocations: array<int, array{customer_open_item_id: int, amount: float}>
+     * }  $data
      */
     public function create(array $data): Document
     {
-        $allocations = collect($data['allocations'])->filter(fn ($a) => (float) $a['amount'] > 0);
+        $allocations = collect($data['allocations'] ?? [])->filter(fn ($a) => (float) ($a['amount'] ?? 0) > 0);
         if ($allocations->isEmpty()) {
             throw new RuntimeException('ต้องระบุยอดชำระอย่างน้อย 1 รายการ');
         }
@@ -54,19 +62,64 @@ class CustomerPaymentService
             }
         }
 
-        $documentType = DocumentType::where('code', 'RECEIPT')->firstOrFail();
-        $totalAmount = $allocations->sum('amount');
+        $totalAllocated = round((float) $allocations->sum('amount'), 2);
 
-        return DB::transaction(function () use ($data, $documentType, $totalAmount, $allocations, $openItems) {
+        // Normalize payment lines: support multiple payments[] or legacy single method
+        if (! empty($data['payments'])) {
+            $payments = collect($data['payments'])
+                ->filter(fn ($p) => (float) ($p['amount'] ?? 0) > 0)
+                ->map(function ($p) {
+                    $m = $p['method'] ?? 'cash';
+
+                    return [
+                        'method' => $m,
+                        'amount' => round((float) ($p['amount'] ?? 0), 2),
+                        'bank_account_id' => ($m !== 'cash' && ! empty($p['bank_account_id'])) ? (int) $p['bank_account_id'] : null,
+                        'transfer_ref' => $m === 'transfer' ? ($p['transfer_ref'] ?? null) : null,
+                        'transfer_at' => $m === 'transfer' ? ($p['transfer_at'] ?? null) : null,
+                        'cheque_no' => $m === 'cheque' ? ($p['cheque_no'] ?? null) : null,
+                        'cheque_due_date' => $m === 'cheque' ? ($p['cheque_due_date'] ?? null) : null,
+                        'cheque_bank' => $m === 'cheque' ? ($p['cheque_bank'] ?? null) : null,
+                    ];
+                })
+                ->values();
+        } else {
+            $m = $data['method'] ?? 'cash';
+            $payments = collect([[
+                'method' => $m,
+                'amount' => $totalAllocated,
+                'bank_account_id' => $this->bankAccountId($data),
+                'transfer_ref' => $m === 'transfer' ? ($data['transfer_ref'] ?? null) : null,
+                'transfer_at' => $m === 'transfer' ? ($data['transfer_at'] ?? null) : null,
+                'cheque_no' => $m === 'cheque' ? ($data['cheque_no'] ?? null) : null,
+                'cheque_due_date' => $m === 'cheque' ? ($data['cheque_due_date'] ?? null) : null,
+                'cheque_bank' => $m === 'cheque' ? ($data['cheque_bank'] ?? null) : null,
+            ]]);
+        }
+
+        if ($payments->isEmpty()) {
+            throw new RuntimeException('ต้องระบุยอดรับชำระอย่างน้อย 1 รายการ');
+        }
+
+        $totalPaid = round((float) $payments->sum('amount'), 2);
+
+        if (abs($totalPaid - $totalAllocated) > 0.009) {
+            throw new RuntimeException('ยอดชำระรวม ('.number_format($totalPaid, 2).') ไม่เท่ากับยอดจัดสรร ('.number_format($totalAllocated, 2).')');
+        }
+
+        $documentType = DocumentType::where('code', 'RECEIPT')->firstOrFail();
+
+        return DB::transaction(function () use ($data, $documentType, $totalAllocated, $allocations, $openItems, $payments) {
             $document = Document::create([
                 'document_type_id' => $documentType->id,
                 'branch_id' => $data['branch_id'],
                 'doc_number' => $this->numbers->next('RECEIPT', $data['branch_id']),
-                'doc_date' => now()->toDateString(),
+                'doc_date' => $data['doc_date'] ?? now()->toDateString(),
                 'customer_id' => $data['customer_id'],
+                'salesman_id' => ! empty($data['salesman_id']) ? (int) $data['salesman_id'] : null,
                 'status' => 'active',
                 'total_items' => $allocations->count(),
-                'total_amount' => $totalAmount,
+                'total_amount' => $totalAllocated,
             ]);
 
             $paymentDocument = PaymentDocument::create([
@@ -77,31 +130,54 @@ class CustomerPaymentService
                 'status' => 'active',
             ]);
 
-            PaymentLine::create([
-                'payment_document_id' => $paymentDocument->id,
-                'seq' => 1,
-                'method' => $data['method'],
-                'bank_account_id' => $this->bankAccountId($data),
-                'amount' => $totalAmount,
-                'cheque_no' => $data['cheque_no'] ?? null,
-                'cheque_due_date' => $data['cheque_due_date'] ?? null,
-                'transfer_ref' => ($data['method'] ?? null) === 'transfer' ? ($data['transfer_ref'] ?? null) : null,
-                'transfer_at' => ($data['method'] ?? null) === 'transfer' ? ($data['transfer_at'] ?? null) : null,
-            ]);
+            $seq = 1;
+            $totalCash = 0.0;
 
-            // รับชำระด้วยเช็ค -> ลงทะเบียนเช็ครับอัตโนมัติ (สถานะ: ในมือ รอนำฝาก)
-            if ($data['method'] === 'cheque') {
-                Cheque::create([
-                    'direction' => 'in',
-                    'cheque_no' => $data['cheque_no'] ?? $document->doc_number,
-                    'bank_name' => $data['cheque_bank'] ?? null,
-                    'branch_id' => $data['branch_id'],
-                    'amount' => $totalAmount,
-                    'cheque_date' => $data['cheque_due_date'] ?? now()->toDateString(),
-                    'customer_id' => $data['customer_id'],
+            foreach ($payments as $pay) {
+                $payMethod = $pay['method'];
+                $payAmount = (float) $pay['amount'];
+                $bankAccountId = $pay['bank_account_id'];
+
+                PaymentLine::create([
                     'payment_document_id' => $paymentDocument->id,
-                    'status' => 'on_hand',
+                    'seq' => $seq++,
+                    'method' => $payMethod,
+                    'bank_account_id' => $bankAccountId,
+                    'amount' => $payAmount,
+                    'cheque_no' => $pay['cheque_no'] ?? null,
+                    'cheque_due_date' => $pay['cheque_due_date'] ?? null,
+                    'transfer_ref' => $pay['transfer_ref'] ?? null,
+                    'transfer_at' => $pay['transfer_at'] ?? null,
                 ]);
+
+                // รับชำระด้วยเช็ค -> ลงทะเบียนเช็ครับอัตโนมัติ (สถานะ: ในมือ รอนำฝาก)
+                if ($payMethod === 'cheque') {
+                    Cheque::create([
+                        'direction' => 'in',
+                        'cheque_no' => $pay['cheque_no'] ?? $document->doc_number,
+                        'bank_name' => $pay['cheque_bank'] ?? null,
+                        'branch_id' => $data['branch_id'],
+                        'amount' => $payAmount,
+                        'cheque_date' => $pay['cheque_due_date'] ?? $document->doc_date->toDateString(),
+                        'customer_id' => $data['customer_id'],
+                        'payment_document_id' => $paymentDocument->id,
+                        'status' => 'on_hand',
+                    ]);
+                }
+
+                // เรียกตัวช่วยลงบัญชีเดิมต่อแถว: Dr เงินสด/ธนาคาร, Cr ลูกหนี้
+                $this->glPosting->postCustomerReceipt(
+                    $paymentDocument,
+                    $payAmount,
+                    $document->doc_date->toDateString(),
+                    $document->doc_number,
+                    $payMethod,
+                    $bankAccountId
+                );
+
+                if ($payMethod === 'cash') {
+                    $totalCash += $payAmount;
+                }
             }
 
             foreach ($allocations as $allocation) {
@@ -122,10 +198,8 @@ class CustomerPaymentService
                 ]);
             }
 
-            $this->glPosting->postCustomerReceipt($paymentDocument, (float) $totalAmount, $document->doc_date->toDateString(), $document->doc_number, $data['method'], $this->bankAccountId($data));
-
-            if ($data['method'] === 'cash') {
-                $this->cashBook->postCustomerPayment($document, (float) $totalAmount);
+            if ($totalCash > 0) {
+                $this->cashBook->postCustomerPayment($document, (float) $totalCash);
             }
 
             return $document->fresh();

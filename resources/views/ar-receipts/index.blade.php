@@ -34,18 +34,19 @@
         <div class="content-card p-3">
             <h2 class="h6 fw-bold mb-3">ใบเสร็จล่าสุด</h2>
             <div class="table-responsive"><table class="table align-middle mb-0">
-                <thead><tr><th>เลขที่</th><th>วันที่</th><th>ลูกค้า</th><th class="text-end">ยอด</th><th>สถานะ</th></tr></thead>
+                <thead><tr><th>เลขที่</th><th>วันที่</th><th>ลูกค้า</th><th>ผู้รับเงิน</th><th class="text-end">ยอด</th><th>สถานะ</th></tr></thead>
                 <tbody>
                 @forelse($receipts as $doc)
                     <tr>
                         <td><a href="{{ route('payments.show', $doc) }}">{{ $doc->doc_number }}</a></td>
                         <td>{{ $doc->doc_date?->thaiDate() }}</td>
                         <td>{{ $doc->customer?->name_th }}</td>
+                        <td class="text-muted small">{{ $doc->salesman?->name ?? '-' }}</td>
                         <td class="text-end">{{ number_format((float) $doc->total_amount, 2) }}</td>
                         <td>@if($doc->status === 'active')<span class="badge text-bg-success">ใช้งาน</span>@else<span class="badge text-bg-secondary">ยกเลิก</span>@endif</td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="text-center text-muted py-4">ยังไม่มีใบเสร็จ</td></tr>
+                    <tr><td colspan="6" class="text-center text-muted py-4">ยังไม่มีใบเสร็จ</td></tr>
                 @endforelse
                 </tbody>
             </table></div>
