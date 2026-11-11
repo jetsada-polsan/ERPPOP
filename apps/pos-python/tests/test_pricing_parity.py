@@ -260,3 +260,11 @@ def test_promotion_stays_active_on_its_last_local_day(tmp_path):
     assert len(active_promotions(db, datetime(2026, 11, 6, 23, 58, tzinfo=bangkok))) == 1
     assert len(active_promotions(db, datetime(2026, 11, 7, 0, 1, tzinfo=bangkok))) == 0
     db.close()
+
+
+def test_mix_promotion_sums_split_weighed_lines_like_erp():
+    # สินค้า 1 ชั่งแยกสองบรรทัด 0.6 + 0.6 = 1.2 ชิ้น ERP นับเป็น 1 ชิ้น POS ต้องนับเท่ากัน
+    lines = [line(1, 45, '0.6'), line(1, 45, '0.6'), line(2, 40, '1.5'), line(3, 35.5, 2)]
+    bundle = promo('mix_bundle', product_ids=(1, 2, 3), min_qty=3, bundle_price=100)
+    # ชิ้นเต็ม: สินค้า1 = 1, สินค้า2 = 1, สินค้า3 = 2 รวม 4 ชิ้น ชุดละ 3: (45+40+35.5) - 100 = 20.5
+    assert total(lines, [bundle]).promotion_total() == D('20.50')

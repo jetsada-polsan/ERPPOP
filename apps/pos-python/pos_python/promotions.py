@@ -66,9 +66,15 @@ def promotion_discounts(lines: list[PromoLine], promotions: Iterable[QtyPromotio
     promotions = list(promotions)
     for promotion in promotions:
         if promotion.promo_type in ("mix_bundle", "mix_free"):
-            units = sorted(( _price(line) for line in lines
-                if line.product_id in promotion.product_ids and _price(line) > 0
-                for _ in range(int(line.qty))), reverse=True)
+            # ERP รวมจำนวนของสินค้าตัวเดียวกันก่อนแล้วจึงปัดเป็นชิ้นเต็ม (ราคาใช้บรรทัดแรก)
+            # ถ้าปัดทีละบรรทัด สินค้าชั่งน้ำหนักที่ถูกแยกเป็นหลายบรรทัดจะหลุดจากโปร ลูกค้าจ่ายเกิน
+            totals: dict[int, Decimal] = {}
+            first_price: dict[int, Decimal] = {}
+            for line in lines:
+                if line.product_id in promotion.product_ids and _price(line) > 0:
+                    totals[line.product_id] = totals.get(line.product_id, Decimal("0")) + line.qty
+                    first_price.setdefault(line.product_id, _price(line))
+            units = sorted((first_price[pid] for pid, qty in totals.items() for _ in range(int(qty))), reverse=True)
             need, free = int(promotion.min_qty), int(promotion.free_qty)
             if need <= 0:
                 continue
