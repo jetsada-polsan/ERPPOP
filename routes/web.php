@@ -449,6 +449,7 @@ Route::prefix('stock-transfers')->name('stock-transfers.')->group(function () {
 Route::prefix('stock-adjustments')->name('stock-adjustments.')->group(function () {
     Route::get('/', [StockAdjustmentController::class, 'index'])->name('index');
     Route::post('/', [StockAdjustmentController::class, 'store'])->name('store');
+    Route::get('/{stockAdjustment}/status', [StockAdjustmentController::class, 'status'])->name('status');
     Route::get('/{stockAdjustment}', [StockAdjustmentController::class, 'show'])->name('show');
     Route::post('/{stockAdjustment}/approve', [StockAdjustmentController::class, 'approve'])->name('approve');
     Route::post('/{stockAdjustment}/reject', [StockAdjustmentController::class, 'reject'])->name('reject');

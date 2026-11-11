@@ -2,14 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\ApproveStockAdjustment;
 use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\Document;
 use App\Models\StockCount;
 use App\Models\WarehouseLocation;
 use App\Services\Inventory\StockAdjustmentService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use RuntimeException;
 
@@ -56,24 +60,72 @@ class StockAdjustmentController extends Controller
     public function show(Document $stockAdjustment): View
     {
         $stockAdjustment->load(['branch', 'stockDocument.items.product', 'stockDocument.items.warehouseLocation']);
+        $errorMessage = Cache::get("stock_adjustment_error_{$stockAdjustment->id}");
 
-        return view('stock-adjustments.show', ['adjustment' => $stockAdjustment]);
+        return view('stock-adjustments.show', [
+            'adjustment' => $stockAdjustment,
+            'errorMessage' => $errorMessage,
+        ]);
+    }
+
+    public function status(Document $stockAdjustment): JsonResponse
+    {
+        return response()->json([
+            'status' => $stockAdjustment->status,
+            'error' => Cache::get("stock_adjustment_error_{$stockAdjustment->id}"),
+        ]);
     }
 
     public function approve(Document $stockAdjustment, StockAdjustmentService $service): RedirectResponse
     {
-        try {
-            $service->approve($stockAdjustment);
-        } catch (RuntimeException $exception) {
-            return back()->with('error', $exception->getMessage());
-        }
-        AuditLog::create([
-            'user_id' => auth()->id(), 'branch_id' => $stockAdjustment->branch_id,
-            'action' => 'approve', 'table_name' => 'documents', 'record_id' => $stockAdjustment->id,
-            'old_values' => ['status' => 'pending_approval'], 'new_values' => ['status' => 'active'],
-        ]);
+        abort_unless(auth()->user()->hasPermission('stock.adjust.approve'), 403);
 
-        return back()->with('success', 'อนุมัติและปรับยอดสต๊อกแล้ว');
+        return DB::transaction(function () use ($stockAdjustment, $service) {
+            $locked = Document::whereKey($stockAdjustment->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->status === 'approving') {
+                // งานเบื้องหลังมีเวลาสูงสุด 15 นาที ถ้าค้างเกิน 30 นาทีแปลว่างานหายไปโดยไม่ได้คืนสถานะ
+                // approve() ทำในรายการเดียว ถ้าสำเร็จสถานะจะเป็น active ไปแล้ว จึงคืนให้กดใหม่ได้อย่างปลอดภัย
+                if ($locked->updated_at && $locked->updated_at->lt(now()->subMinutes(30))) {
+                    $locked->update(['status' => 'pending_approval']);
+
+                    return back()->with('error', 'การอนุมัติรอบก่อนไม่เสร็จ ระบบคืนสถานะให้แล้ว กดอนุมัติใหม่ได้');
+                }
+
+                return back()->with('error', 'เอกสารนี้กำลังดำเนินการอนุมัติอยู่');
+            }
+            if ($locked->status !== 'pending_approval') {
+                return back()->with('error', 'เอกสารนี้ไม่ได้อยู่ในสถานะรออนุมัติ');
+            }
+            if ($locked->created_by && $locked->created_by === auth()->id() && ! auth()->user()?->hasPermission('system.admin')) {
+                return back()->with('error', 'ผู้สร้างใบปรับสต๊อกไม่สามารถอนุมัติรายการของตนเอง');
+            }
+
+            $itemCount = (int) ($locked->total_items ?: ($locked->stockDocument?->items()->count() ?? 0));
+
+            if ($itemCount > 300) {
+                $locked->update(['status' => 'approving']);
+                Cache::forget("stock_adjustment_error_{$locked->id}");
+                ApproveStockAdjustment::dispatch($locked->id, auth()->id());
+
+                return back()->with('success', "กำลังอนุมัติ " . number_format($itemCount) . " รายการ ระบบจะแจ้งเมื่อเสร็จ");
+            }
+
+            try {
+                $service->approve($locked);
+                Cache::forget("stock_adjustment_error_{$locked->id}");
+            } catch (RuntimeException $exception) {
+                return back()->with('error', $exception->getMessage());
+            }
+
+            AuditLog::create([
+                'user_id' => auth()->id(), 'branch_id' => $stockAdjustment->branch_id,
+                'action' => 'approve', 'table_name' => 'documents', 'record_id' => $stockAdjustment->id,
+                'old_values' => ['status' => 'pending_approval'], 'new_values' => ['status' => 'active'],
+            ]);
+
+            return back()->with('success', 'อนุมัติและปรับยอดสต๊อกแล้ว');
+        });
     }
 
     public function reject(Request $request, Document $stockAdjustment): RedirectResponse

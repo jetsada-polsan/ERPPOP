@@ -13,6 +13,7 @@ final class DocumentStatus
         'prepared' => 'จัดทำแล้ว', 'reviewed' => 'ตรวจแล้ว', 'submitted' => 'ยื่นแล้ว',
         'accepted' => 'ตอบรับแล้ว', 'sent' => 'ส่งแล้ว', 'uploaded' => 'อัปโหลดแล้ว',
         'needs_review' => 'รอตรวจสอบ', 'matched' => 'จับคู่แล้ว', 'processing' => 'กำลังประมวลผล',
+        'approving' => 'กำลังอนุมัติ',
         'success' => 'สำเร็จ', 'failed' => 'ล้มเหลว', 'queued' => 'รอคิว', 'in_progress' => 'กำลังดำเนินการ',
         'running' => 'กำลังทำงาน', 'ready' => 'พร้อมใช้งาน', 'inactive' => 'ปิดใช้งาน',
         'online' => 'ออนไลน์', 'offline' => 'ออฟไลน์', 'expired' => 'หมดอายุ',

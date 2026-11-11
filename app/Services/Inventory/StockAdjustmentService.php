@@ -95,8 +95,9 @@ class StockAdjustmentService
             ]);
 
             $seq = 1;
+            $itemsToInsert = [];
             foreach ($diffs as $diff) {
-                StockDocumentItem::create([
+                $itemsToInsert[] = [
                     'stock_document_id' => $stockDocument->id,
                     'seq' => $seq++,
                     'product_id' => $diff['product_id'],
@@ -105,33 +106,59 @@ class StockAdjustmentService
                     'system_qty' => $diff['system_qty'],
                     'counted_qty' => $diff['counted_qty'],
                     'unit_cost' => $diff['unit_cost'],
-                ]);
+                ];
+            }
+            foreach (array_chunk($itemsToInsert, 500) as $chunk) {
+                StockDocumentItem::insert($chunk);
             }
 
             return $document->fresh();
         });
     }
 
-    public function approve(Document $document): Document
+    public function approve(Document $document, ?int $approvedByUserId = null): Document
     {
-        if ($document->status !== 'pending_approval') {
+        if ($document->status !== 'pending_approval' && $document->status !== 'approving') {
             throw new RuntimeException('เอกสารนี้ไม่ได้อยู่ในสถานะรออนุมัติ');
         }
-        if ($document->created_by && $document->created_by === auth()->id() && ! auth()->user()?->hasPermission('system.admin')) {
+        $userId = $approvedByUserId ?: auth()->id();
+        $user = $userId ? \App\Models\User::find($userId) : auth()->user();
+
+        if ($document->created_by && $document->created_by === $userId && ! $user?->hasPermission('system.admin')) {
             throw new RuntimeException('ผู้สร้างใบปรับสต๊อกไม่สามารถอนุมัติรายการของตนเอง');
         }
 
-        return DB::transaction(function () use ($document) {
+        return DB::transaction(function () use ($document, $userId, $user) {
             $locked = Document::whereKey($document->id)->lockForUpdate()->firstOrFail();
-            if ($locked->status !== 'pending_approval') {
+            if ($locked->status !== 'pending_approval' && $locked->status !== 'approving') {
                 throw new RuntimeException('เอกสารนี้ถูกดำเนินการไปแล้ว');
             }
             $locked->load('stockDocument.items');
+
+            $items = $locked->stockDocument->items;
+            $productIds = $items->pluck('product_id')->unique()->values()->all();
+            $locationIds = $items->pluck('warehouse_location_id')->unique()->values()->all();
+
+            $balances = StockBalance::whereIn('product_id', $productIds)
+                ->whereIn('warehouse_location_id', $locationIds)
+                ->lockForUpdate()
+                ->get()
+                ->keyBy(fn ($b) => "{$b->product_id}_{$b->warehouse_location_id}");
+
+            $products = Product::whereIn('id', $productIds)->get()->keyBy('id');
+
             $valueChange = 0.0;   // บวก = ของเกิน มูลค่าสต๊อกเพิ่ม, ลบ = ของขาด
-            foreach ($locked->stockDocument->items as $item) {
-                $balance = StockBalance::where('product_id', $item->product_id)
-                    ->where('warehouse_location_id', $item->warehouse_location_id)
-                    ->lockForUpdate()->first();
+            // ยอดและสินค้าที่โหลดล่วงหน้าจะเก่าทันทีที่รายการก่อนหน้าแตะสินค้าตัวเดียวกัน
+            // (ใบที่มีสินค้าซ้ำบรรทัด) กรณีนั้นต้องอ่านค่าปัจจุบันจากฐานข้อมูลเหมือนโค้ดเดิม
+            $touchedBalances = [];
+            $touchedProducts = [];
+            foreach ($items as $item) {
+                $balanceKey = "{$item->product_id}_{$item->warehouse_location_id}";
+                $balance = isset($touchedBalances[$balanceKey])
+                    ? StockBalance::where('product_id', $item->product_id)
+                        ->where('warehouse_location_id', $item->warehouse_location_id)
+                        ->lockForUpdate()->first()
+                    : $balances->get($balanceKey);
                 $current = $balance?->on_hand_qty ?? 0;
                 if (DecimalMath::compare($current, $item->system_qty) !== 0) {
                     throw new RuntimeException('ยอดสต๊อกเปลี่ยนหลังส่งอนุมัติ กรุณายกเลิกและตรวจนับใหม่');
@@ -144,7 +171,7 @@ class StockAdjustmentService
                     // เจอของเกิน: สร้าง Lot ใหม่รองรับจำนวนที่เพิ่ม ไม่งั้น stock_lots จะไม่ตรงกับ
                     // stock_balances และมูลค่าสต๊อกปลายงวดจะขาดหายไป (ใช้ average_cost ปัจจุบันประมาณ
                     // ต้นทุน เพราะของเกินไม่มี Lot ต้นทางจริงให้อ้างอิง)
-                    $product = Product::find($productId);
+                    $product = isset($touchedProducts[$productId]) ? Product::find($productId) : $products->get($productId);
                     $explicitCost = $item->unit_cost ?? 0;
                     $unitCost = DecimalMath::compare($explicitCost, 0) > 0 ? $explicitCost : ($product?->average_cost ?? 0);
                     $lot = $this->fifo->receive(
@@ -169,13 +196,17 @@ class StockAdjustmentService
                     );
                     $valueChange -= $this->allocatedValue($allocations);
                 }
+                if (DecimalMath::compare($diff, 0) !== 0) {
+                    $touchedBalances[$balanceKey] = true;
+                    $touchedProducts[$productId] = true;
+                }
             }
             $locked->update([
                 'status' => 'active',
-                'remark' => trim(($locked->remark ? $locked->remark.' | ' : '').'อนุมัติโดย '.auth()->user()?->name),
+                'remark' => trim(($locked->remark ? $locked->remark.' | ' : '').'อนุมัติโดย '.$user?->name),
             ]);
             DB::table('stock_counts')->where('posted_document_id', $locked->id)->update([
-                'status' => 'posted', 'confirmed_by' => auth()->id(), 'confirmed_at' => now(), 'updated_at' => now(),
+                'status' => 'posted', 'confirmed_by' => $userId, 'confirmed_at' => now(), 'updated_at' => now(),
             ]);
 
             // มูลค่าสต๊อกเปลี่ยนแล้วต้องสะท้อนในบัญชีทันที ไม่งั้นปิดงวดกระทบยอดไม่ได้

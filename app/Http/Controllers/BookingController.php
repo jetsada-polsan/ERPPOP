@@ -356,7 +356,15 @@ class BookingController extends Controller
         try {
             $service->revertConfirmation($booking, $data['reason'], $user->id);
         } catch (RuntimeException $e) {
+            if ($request->input('return') === 'edit') {
+                return back()->with('error', $e->getMessage());
+            }
+
             return redirect()->route('bookings.show', $booking)->with('error', $e->getMessage());
+        }
+
+        if ($request->input('return') === 'edit') {
+            return redirect()->route('bookings.edit', $booking)->with('success', 'ยกเลิกใบขายเดิมแล้ว แก้ไขรายการแล้วกด Confirm ใหม่');
         }
 
         return redirect()->route('bookings.show', $booking)->with('success', 'ถอย Confirm แล้ว ยกเลิกใบขาย คืนสต๊อก ปิดลูกหนี้ ใบจองกลับมากันของไว้');
