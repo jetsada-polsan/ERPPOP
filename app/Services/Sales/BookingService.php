@@ -171,6 +171,35 @@ class BookingService
      * ถอย Confirm (ผู้จัดการ): ยกเลิกใบขาย DS/DSN ทุกใบที่ออกจากใบจองนี้ด้วย void เดิม
      * (คืนสต๊อก ปิดลูกหนี้ กลับ GL) แล้วใบจองกลับไปกันของไว้เหมือนก่อน Confirm
      */
+    /**
+     * ใครแก้ใบขายที่ออกแล้วได้ (ยกเลิกใบขายแล้วกลับไปแก้ใบจอง)
+     *
+     * - ผู้ที่มีสิทธิ์ยกเลิกเอกสาร (ผู้จัดการ/แอดมิน) แก้ได้ทุกใบในสาขาที่เข้าถึง
+     * - คนขายแก้ได้เฉพาะใบจอง/ใบขายที่ตัวเองเป็นเจ้าของ และต้องมีสิทธิ์จัดการการขาย
+     * กติกาที่เหลือ (รับชำระแล้ว อยู่ในใบวางบิล มีใบลดหนี้อ้างอิง งวดปิดแล้ว) ยังบังคับที่
+     * DocumentVoidService เหมือนเดิม คนขายผ่านไม่ได้ถ้าติดกติกาเหล่านั้น
+     */
+    public function canRevertConfirmation(?\App\Models\User $user, SaleBooking $booking): bool
+    {
+        if (! $user || ! $booking->document || ! $user->canAccessBranch((int) $booking->document->branch_id)) {
+            return false;
+        }
+        if ($user->hasPermission('documents.void')) {
+            return true;
+        }
+        if (! $user->hasPermission('sales.manage')) {
+            return false;
+        }
+
+        $doc = $booking->document;
+        // เจ้าของใบ = ผู้สร้าง หรือคนขายที่ถูกมอบหมายให้ดูแลใบนี้ (sales_user_id) หรือคนขายตามรหัสพนักงานขายของใบจอง
+        $ownsDocument = ($doc->created_by !== null && (int) $doc->created_by === (int) $user->id)
+            || ($doc->sales_user_id !== null && (int) $doc->sales_user_id === (int) $user->id);
+        $isBookingSalesman = $booking->salesman?->user_id !== null && (int) $booking->salesman->user_id === (int) $user->id;
+
+        return $ownsDocument || $isBookingSalesman;
+    }
+
     public function revertConfirmation(SaleBooking $booking, string $reason, ?int $userId): void
     {
         DB::transaction(function () use ($booking, $reason, $userId) {

@@ -109,6 +109,7 @@ class SaleEditButtonTest extends TestCase
         $doc = app(BookingService::class)->create([
             'branch_id' => $this->branch->id,
             'customer_id' => $this->customer->id,
+            'sales_user_id' => $this->clerk->id,
             'items' => [['product_id' => $this->product->id, 'qty' => $qty, 'unit_price' => $unitPrice]],
         ]);
         $booking = SaleBooking::where('document_id', $doc->id)->sole();
@@ -144,28 +145,81 @@ class SaleEditButtonTest extends TestCase
     /**
      * 2. คนขายไม่มีสิทธิ์: เห็นปุ่มแบบอธิบาย และ POST ตรงไป bookings.revert-confirm ได้ 403
      */
-    public function test_salesperson_sees_explanation_and_cannot_revert_directly(): void
+    private function otherClerk(): User
+    {
+        $other = User::factory()->create([
+            'branch_id' => $this->branch->id, 'is_active' => true, 'must_change_password' => false,
+        ]);
+        $other->roles()->attach(Role::where('code', 'SALES_CLERK')->firstOrFail());
+
+        return $other;
+    }
+
+    public function test_salesperson_who_does_not_own_the_sale_sees_explanation_and_cannot_revert(): void
+    {
+        [$booking, $sale] = $this->createBookingAndSale();
+
+        $this->actingAs($this->otherClerk());
+        $response = $this->get(route('sales.show', $sale));
+
+        $response->assertOk();
+        $response->assertSee('แก้ไขใบขาย');
+        $response->assertSee('ใบขายนี้ไม่ใช่ของคุณ');
+        // ต้องไม่มี form ส่งไปถอย Confirm สำหรับคนที่ไม่ใช่เจ้าของใบ
+        $response->assertDontSee(route('bookings.revert-confirm', $booking), false);
+
+        $this->post(route('bookings.revert-confirm', $booking), [
+            'reason' => 'พยายามแก้ใบของคนอื่น',
+            'return' => 'edit',
+        ])->assertForbidden();
+        $this->assertSame('active', $sale->fresh()->status);
+    }
+
+    public function test_salesperson_can_edit_their_own_sale_and_lands_on_the_booking_edit_page(): void
     {
         [$booking, $sale] = $this->createBookingAndSale();
 
         $this->actingAs($this->clerk);
-        $response = $this->get(route('sales.show', $sale));
+        $this->get(route('sales.show', $sale))
+            ->assertOk()
+            ->assertSee(route('bookings.revert-confirm', $booking), false)
+            ->assertDontSee('ใบขายนี้ไม่ใช่ของคุณ');
 
-        $response->assertOk();
-        // เห็นปุ่มแก้ไขใบขาย
-        $response->assertSee('แก้ไขใบขาย');
-        // เห็น modal คำอธิบายสำหรับคนขาย
-        $response->assertSee('การแก้ใบขายที่ออกแล้วต้องให้ผู้จัดการยกเลิกใบเดิมก่อน');
-        $response->assertSee('แจ้งผู้จัดการพร้อมเลขใบ');
-        // ต้องไม่มี form submit ไปที่ bookings.revert-confirm สำหรับคนขาย
-        $response->assertDontSee(route('bookings.revert-confirm', $booking), false);
-
-        // POST ตรงไปที่ bookings.revert-confirm ต้องถูกปฏิเสธ 403 Forbidden
-        $postResponse = $this->post(route('bookings.revert-confirm', $booking), [
-            'reason' => 'พยายามถอยเอง',
+        $this->post(route('bookings.revert-confirm', $booking), [
+            'reason' => 'ลูกค้าขอเปลี่ยนจำนวน',
             'return' => 'edit',
+        ])->assertRedirect(route('bookings.edit', $booking));
+
+        $this->assertSame('cancelled', $sale->fresh()->status);
+        $this->assertSame(1, \DB::table('audit_logs')->where('action', 'revert_confirm')->where('user_id', $this->clerk->id)->count());
+    }
+
+    public function test_salesperson_cannot_edit_their_own_sale_once_it_is_paid(): void
+    {
+        [$booking, $sale] = $this->createBookingAndSale(5, 100);
+        $openItem = CustomerOpenItem::where('document_id', $sale->id)->sole();
+        app(CustomerPaymentService::class)->create([
+            'branch_id' => $this->branch->id, 'customer_id' => $this->customer->id, 'method' => 'cash',
+            'allocations' => [['customer_open_item_id' => $openItem->id, 'amount' => $sale->total_amount]],
         ]);
-        $postResponse->assertForbidden();
+
+        $this->actingAs($this->clerk);
+        $this->from(route('sales.show', $sale))->post(route('bookings.revert-confirm', $booking), [
+            'reason' => 'พยายามแก้บิลที่จ่ายแล้ว', 'return' => 'edit',
+        ])->assertSessionHas('error');
+
+        $this->assertSame('active', $sale->fresh()->status);
+    }
+
+    public function test_salesperson_in_another_branch_cannot_edit_even_their_own_document(): void
+    {
+        [$booking, $sale] = $this->createBookingAndSale();
+        $otherBranch = Branch::create(['code' => 'B-OTHER', 'name_th' => 'สาขาอื่น', 'is_active' => true]);
+        $this->clerk->update(['branch_id' => $otherBranch->id]);
+
+        $this->actingAs($this->clerk->fresh());
+        $this->post(route('bookings.revert-confirm', $booking), ['reason' => 'ข้ามสาขา', 'return' => 'edit'])->assertForbidden();
+        $this->assertSame('active', $sale->fresh()->status);
     }
 
     /**
