@@ -365,4 +365,33 @@ class BatchDeliveryNotesTest extends TestCase
         $response->assertSee('สำหรับลูกค้า');
         $response->assertSee('ไก่สดตัดแต่ง');
     }
+    public function test_summary_button_prints_the_same_bookings_the_summary_page_shows(): void
+    {
+        $pending = $this->createDoc('BOOKING', 'BK-PENDING', $this->branchA, $this->customerA);
+        $converted = $this->createDoc('BOOKING', 'BK-CONVERTED', $this->branchA, $this->customerA);
+        SaleBooking::where('document_id', $converted->id)->update(['status' => SaleBooking::STATUS_CONVERTED]);
+        // สายขายของใบจองต่างจากสายขายบนเอกสาร: หน้าใบรวมจองยึดสายของใบจอง
+        $otherArea = SalesArea::create(['code' => 'A-OTHER', 'name' => 'สายอื่น']);
+        $otherAreaBooking = $this->createDoc('BOOKING', 'BK-OTHERAREA', $this->branchA, $this->customerA);
+        SaleBooking::where('document_id', $otherAreaBooking->id)->update(['sales_area_id' => $otherArea->id]);
+
+        $this->actingAs($this->authorizedUser);
+        $params = ['date' => '2026-11-11', 'branch_id' => $this->branchA->id, 'sales_area_id' => $this->salesArea->id];
+
+        $this->get(route('bookings.summary', $params))->assertOk()
+            ->assertSee('BK-PENDING')->assertDontSee('BK-CONVERTED')->assertDontSee('BK-OTHERAREA');
+        $this->get(route('documents.delivery-notes.batch', $params + ['type' => 'booking']))->assertOk()
+            ->assertSee('BK-PENDING')->assertDontSee('BK-CONVERTED')->assertDontSee('BK-OTHERAREA');
+    }
+
+    public function test_ids_of_other_document_types_are_not_printed_as_delivery_notes(): void
+    {
+        DocumentType::firstOrCreate(['code' => 'PURCHASE'], ['name_th' => 'ใบซื้อ', 'stock_effect' => 'in']);
+        $purchase = $this->createDoc('PURCHASE', 'PO-NOT-A-DELIVERY', $this->branchA, $this->customerA);
+        $sale = $this->createDoc('CASH_SALE', 'CS-OK', $this->branchA, $this->customerA);
+
+        $this->actingAs($this->authorizedUser);
+        $this->get(route('documents.delivery-notes.batch', ['ids' => [$purchase->id, $sale->id]]))->assertOk()
+            ->assertSee('CS-OK')->assertDontSee('PO-NOT-A-DELIVERY');
+    }
 }

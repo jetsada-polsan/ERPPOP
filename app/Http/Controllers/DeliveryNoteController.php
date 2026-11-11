@@ -92,6 +92,8 @@ class DeliveryNoteController extends Controller
         }
 
         if (! empty($ids)) {
+            // ใบส่งของมีเฉพาะใบจองและใบขาย เลขเอกสารชนิดอื่น (ใบซื้อ ใบเสร็จ) ต้องไม่หลุดมาพิมพ์
+            $query->whereHas('documentType', fn ($q) => $q->whereIn('code', array_keys(self::TITLES)));
             $query->where(function ($q) use ($ids) {
                 $numericIds = array_filter($ids, fn ($v) => ctype_digit((string) $v));
                 if (! empty($numericIds)) {
@@ -113,13 +115,21 @@ class DeliveryNoteController extends Controller
             $query->whereDate('doc_date', $date);
 
             $salesAreaId = $request->integer('sales_area_id');
+            $type = strtolower((string) $request->query('type', ''));
+            if ($type === 'booking') {
+                // เกณฑ์เดียวกับหน้าใบรวมจอง (BookingController::summary): ใบจองที่ยังรอส่ง และสายขายของใบจอง
+                // ไม่งั้นปุ่ม "พิมพ์ทั้งหมดตามตัวกรองนี้" จะได้ชุดเอกสารไม่ตรงกับที่หน้านั้นแสดง
+                $query->whereHas('documentType', fn ($q) => $q->where('code', 'BOOKING'))
+                    ->whereHas('saleBooking', fn ($b) => $b->where('status', 'pending')
+                        ->when($salesAreaId, fn ($q) => $q->where('sales_area_id', $salesAreaId)));
+                $salesAreaId = 0;
+            }
             if ($salesAreaId) {
                 $query->where('sales_area_id', $salesAreaId);
             }
 
-            $type = strtolower((string) $request->query('type', ''));
             if ($type === 'booking') {
-                $query->whereHas('documentType', fn ($q) => $q->where('code', 'BOOKING'));
+                // กรองแล้วด้านบน
             } elseif ($type === 'sale') {
                 $query->whereHas('documentType', fn ($q) => $q->whereIn('code', ['CASH_SALE', 'CREDIT_SALE']));
             } else {
