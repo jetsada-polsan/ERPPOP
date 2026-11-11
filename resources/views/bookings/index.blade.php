@@ -53,6 +53,7 @@
                 </div>
             </div>
             <a href="{{ route('bookings.summary') }}" class="btn btn-light border rounded-pill px-4"><i class="bi bi-list-check me-1"></i> ใบรวมจอง</a>
+            <a href="{{ route('bookings.cover-sheet') }}" class="btn btn-light border rounded-pill px-4"><i class="bi bi-truck me-1"></i> ใบปะหน้า (ขนส่ง)</a>
             <button type="button" class="btn btn-primary rounded-pill px-4" @click="openModal()">
                 <i class="bi bi-plus-lg me-1"></i> สร้างใบจอง
             </button>

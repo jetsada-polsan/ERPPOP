@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AppSetting;
+use App\Models\BankAccount;
 use App\Models\Branch;
 use App\Models\DocumentBook;
 use App\Models\SaleBooking;
@@ -11,27 +13,62 @@ use App\Models\User;
 use App\Services\Sales\BookingDeliveryService;
 use App\Services\Sales\BookingService;
 use App\Services\Sales\CreditSaleService;
+use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use RuntimeException;
-use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class BookingController extends Controller
 {
+    /**
+     * ดึง query ใบจองที่รอดำเนินการ (เกณฑ์ร่วมระหว่างหน้าใบรวมจอง summary และใบปะหน้า cover-sheet)
+     */
+    public static function pendingBookingsQuery(
+        CarbonInterface|string|null $date = null,
+        ?int $branchId = null,
+        ?int $salesAreaId = null,
+        ?int $bookingId = null
+    ): Builder {
+        $dateStr = $date instanceof CarbonInterface ? $date->toDateString() : ($date ? (string) $date : null);
+
+        return SaleBooking::with([
+            'document.customer',
+            'document.branch',
+            'document.salesArea',
+            'document.stockDocument.items.product.baseUnit',
+            'salesArea',
+        ])
+            ->where('status', SaleBooking::STATUS_PENDING)
+            ->when($salesAreaId, fn ($query) => $query->where('sales_area_id', $salesAreaId))
+            ->when($bookingId, fn ($query) => $query->where('id', $bookingId))
+            ->whereHas('document', fn ($d) => $d
+                ->when($dateStr, fn ($q) => $q->whereDate('doc_date', $dateStr))
+                ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+                ->where('status', '!=', 'cancelled')
+                ->where('status', '!=', 'voided')
+            );
+    }
+
     /** ใบรวมจองต่อวัน แยกสาขาและสาย: หน้าแรกไว้จัดของ หน้าสองไว้ติ๊กส่งบัญชี */
     public function summary(Request $request): View
     {
         $date = $request->date('date') ?: now()->startOfDay();
+        $user = $request->user();
         $branchId = $request->integer('branch_id') ?: null;
+        if ($user && $user->branch_id && ! $user->canSeeAllReportBranches()) {
+            if ($request->has('branch_id') && $request->integer('branch_id') && $request->integer('branch_id') !== (int) $user->branch_id) {
+                abort(403, 'ไม่มีสิทธิ์เข้าถึงสาขานี้');
+            }
+            $branchId = (int) $user->branch_id;
+        }
         $salesAreaId = $request->integer('sales_area_id') ?: null;
 
-        $bookings = SaleBooking::with(['document.customer', 'document.branch', 'document.salesArea', 'document.stockDocument.items.product.baseUnit'])
-            ->where('status', 'pending')
-            ->when($salesAreaId, fn ($query) => $query->where('sales_area_id', $salesAreaId))
-            ->whereHas('document', fn ($d) => $d->whereDate('doc_date', $date->toDateString())
-                ->when($branchId, fn ($q) => $q->where('branch_id', $branchId)))
-            ->get();
+        $bookings = self::pendingBookingsQuery($date, $branchId, $salesAreaId)->get();
 
         $groups = $bookings->groupBy(fn (SaleBooking $booking) => $booking->document->branch_id.'-'.$booking->sales_area_id)
             ->map(function ($rows) {
@@ -64,8 +101,155 @@ class BookingController extends Controller
         return view('bookings.summary', [
             'date' => $date, 'items' => $items, 'bookings' => $bookingRows,
             'bills' => $bookings->sortBy(fn (SaleBooking $booking) => $booking->document->doc_number)->values(), 'branchId' => $branchId, 'salesAreaId' => $salesAreaId,
-            'branches' => Branch::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name_th']),
+            'branches' => Branch::where('is_active', true)->when($user && $user->branch_id && ! $user->canSeeAllReportBranches(), fn ($q) => $q->where('id', $user->branch_id))->orderBy('code')->get(['id', 'code', 'name_th']),
             'salesAreas' => SalesArea::orderBy('code')->get(['id', 'code', 'name']),
+        ]);
+    }
+
+    /** ใบปะหน้า (ใบจองรายวัน) สำหรับให้ขนส่งเช็คแล้วส่งบัญชี */
+    public function coverSheet(Request $request): View|StreamedResponse
+    {
+        $date = $request->date('date') ?: now()->startOfDay();
+        $user = $request->user();
+        $branchId = $request->integer('branch_id') ?: null;
+        if ($user && $user->branch_id && ! $user->canSeeAllReportBranches()) {
+            if ($request->has('branch_id') && $request->integer('branch_id') && $request->integer('branch_id') !== (int) $user->branch_id) {
+                abort(403, 'ไม่มีสิทธิ์เข้าถึงสาขานี้');
+            }
+            $branchId = (int) $user->branch_id;
+        }
+
+        $branches = Branch::where('is_active', true)
+            ->when($user && $user->branch_id && ! $user->canSeeAllReportBranches(), fn ($q) => $q->where('id', $user->branch_id))
+            ->orderBy('code')
+            ->get(['id', 'code', 'name_th']);
+
+        $salesAreas = SalesArea::orderBy('code')->get(['id', 'code', 'name']);
+
+        $hasSalesAreaParam = $request->has('sales_area_id');
+        $rawSalesArea = $request->input('sales_area_id');
+        if ($hasSalesAreaParam) {
+            if ($rawSalesArea === 'all' || $rawSalesArea === '' || $rawSalesArea === null) {
+                $salesAreaId = null;
+                $isAllRoutes = true;
+            } else {
+                $salesAreaId = (int) $rawSalesArea;
+                $isAllRoutes = false;
+            }
+        } else {
+            $defaultArea = ($user?->sales_area_id ? $salesAreas->firstWhere('id', $user->sales_area_id) : null) ?: $salesAreas->first();
+            $salesAreaId = $defaultArea?->id;
+            $isAllRoutes = false;
+        }
+
+        $bookingId = $request->integer('booking_id') ?: null;
+        $bankAccountId = $request->integer('bank_account_id') ?: null;
+
+        $bookings = self::pendingBookingsQuery($date, $branchId, $salesAreaId, $bookingId)
+            ->get()
+            ->sortBy(fn (SaleBooking $b) => $b->document?->doc_number ?? '')
+            ->values();
+
+        if ($request->query('export') === 'csv' || $request->query('export') === 'excel') {
+            return $this->exportCoverSheetCsv($bookings, $date);
+        }
+
+        $availableBookings = self::pendingBookingsQuery($date, $branchId, $salesAreaId, null)
+            ->get()
+            ->sortBy(fn (SaleBooking $b) => $b->document?->doc_number ?? '')
+            ->values();
+
+        $bankAccounts = BankAccount::orderBy('bank_name')->get();
+        $selectedBankAccount = $bankAccountId ? BankAccount::find($bankAccountId) : null;
+
+        if ($isAllRoutes) {
+            $groupedByRoute = $bookings->groupBy(fn (SaleBooking $b) => $b->sales_area_id ?: 0);
+            $routeSheets = collect();
+            foreach ($groupedByRoute as $routeId => $routeBookings) {
+                $area = $salesAreas->firstWhere('id', $routeId);
+                $routeSheets->push((object) [
+                    'area' => $area,
+                    'areaName' => $area ? "{$area->code} - {$area->name}" : ($routeId ? "สาย {$routeId}" : 'ไม่ระบุสาย'),
+                    'bookings' => $routeBookings->values(),
+                    'totalAmount' => $routeBookings->sum(fn ($b) => (float) ($b->document?->total_amount ?? 0)),
+                ]);
+            }
+            if ($routeSheets->isEmpty()) {
+                $routeSheets->push((object) [
+                    'area' => null,
+                    'areaName' => 'ทุกสาย',
+                    'bookings' => collect(),
+                    'totalAmount' => 0.0,
+                ]);
+            }
+        } else {
+            $selectedArea = $salesAreas->firstWhere('id', $salesAreaId);
+            $areaName = $selectedArea ? "{$selectedArea->code} - {$selectedArea->name}" : ($salesAreaId ? "สาย {$salesAreaId}" : 'ทุกสาย');
+            $routeSheets = collect([
+                (object) [
+                    'area' => $selectedArea,
+                    'areaName' => $areaName,
+                    'bookings' => $bookings,
+                    'totalAmount' => $bookings->sum(fn ($b) => (float) ($b->document?->total_amount ?? 0)),
+                ],
+            ]);
+        }
+
+        $senderName = (string) $request->input('sender_name', '');
+        $checkerName = (string) $request->input('checker_name', '');
+        $billerName = (string) $request->input('biller_name', '');
+
+        return view('bookings.cover-sheet', [
+            'date' => $date,
+            'branchId' => $branchId,
+            'branches' => $branches,
+            'salesAreas' => $salesAreas,
+            'salesAreaId' => $salesAreaId,
+            'isAllRoutes' => $isAllRoutes,
+            'bookingId' => $bookingId,
+            'availableBookings' => $availableBookings,
+            'bankAccounts' => $bankAccounts,
+            'bankAccountId' => $bankAccountId,
+            'selectedBankAccount' => $selectedBankAccount,
+            'senderName' => $senderName,
+            'checkerName' => $checkerName,
+            'billerName' => $billerName,
+            'routeSheets' => $routeSheets,
+            'companyName' => AppSetting::company('name_th') ?? 'บริษัท เอ็มพีเอ็ม ฟู้ด กรุ๊ป จำกัด',
+        ]);
+    }
+
+    private function exportCoverSheetCsv(Collection $bookings, CarbonInterface $date): StreamedResponse
+    {
+        $filename = sprintf('route-cover-sheet-%s.csv', $date->format('Ymd'));
+        $totalAmount = $bookings->sum(fn ($b) => (float) ($b->document?->total_amount ?? 0));
+
+        return response()->streamDownload(function () use ($bookings, $totalAmount) {
+            $handle = fopen('php://output', 'wb');
+            fwrite($handle, "\xEF\xBB\xBF");
+
+            fputcsv($handle, ['ลำดับ', 'ชื่อลูกค้า', 'เลขที่บิล', 'จำนวนเงิน']);
+
+            $index = 1;
+            foreach ($bookings as $booking) {
+                fputcsv($handle, [
+                    $index++,
+                    $booking->document?->customer?->name_th ?? $booking->document?->customer_name ?? '-',
+                    $booking->document?->doc_number ?? '-',
+                    number_format((float) ($booking->document?->total_amount ?? 0), 2),
+                ]);
+            }
+
+            fputcsv($handle, [
+                'รวม',
+                '',
+                '',
+                number_format((float) $totalAmount, 2),
+            ]);
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
 
