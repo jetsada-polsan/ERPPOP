@@ -133,6 +133,7 @@ class ErpMenu
                     // กลุ่มย่อย: ข้อมูลหลัก
                     ['group' => 'ข้อมูลหลัก', 'label' => 'ค่าคงที่ระบบ', 'route' => 'basic-master.index', 'params' => ['type' => 'product-categories'], 'pattern' => 'basic-master.*', 'icon' => 'bi-sliders', 'tone' => 'blue'],
                     ['group' => 'ข้อมูลหลัก', 'label' => 'สินค้า / บริการ', 'route' => 'products.index', 'pattern' => 'products.*', 'icon' => 'bi-box-seam-fill', 'tone' => 'brown'],
+                    ['group' => 'ข้อมูลหลัก', 'label' => 'นัดเปลี่ยนราคา', 'route' => 'products.scheduled-prices.index', 'pattern' => 'products.scheduled-prices.*', 'icon' => 'bi-clock-history', 'tone' => 'amber'],
                     ['group' => 'ข้อมูลหลัก', 'label' => 'หน่วยนับสินค้า', 'route' => 'product-units.index', 'pattern' => 'product-units.*', 'icon' => 'bi-rulers', 'tone' => 'teal'],
                     ['group' => 'ข้อมูลหลัก', 'label' => 'คลังสินค้า', 'route' => 'warehouse-locations.index', 'pattern' => 'warehouse-locations.*', 'icon' => 'bi-archive-fill', 'tone' => 'teal'],
                     ['group' => 'ข้อมูลหลัก', 'label' => 'ลูกค้า (รวมลูกหนี้)', 'route' => 'customers.index', 'pattern' => 'customers.*', 'icon' => 'bi-people-fill', 'tone' => 'indigo'],

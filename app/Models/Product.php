@@ -80,6 +80,11 @@ class Product extends Model
         return $this->hasMany(PosPriceSchedule::class);
     }
 
+    public function scheduledPriceChanges(): HasMany
+    {
+        return $this->hasMany(ScheduledPriceChange::class);
+    }
+
     protected function casts(): array
     {
         return [

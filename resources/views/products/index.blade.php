@@ -52,6 +52,9 @@
                 <small id="product-search-hint" class="product-search-hint">พิมพ์รหัส ชื่อสินค้า หรือยิงบาร์โค้ด แล้วรอ 1 วินาที ระบบจะค้นหาให้อัตโนมัติ หรือกดปุ่มค้นหา</small>
             </form>
             <div class="product-actions">
+                <a href="{{ route('products.scheduled-prices.index') }}" class="btn btn-light border px-3">
+                    <i class="bi bi-clock-history me-1"></i> นัดเปลี่ยนราคา
+                </a>
                 <a href="{{ route('product-units.index') }}" class="btn btn-light border px-3">
                     <i class="bi bi-rulers me-1"></i> จัดการหน่วยนับ
                 </a>

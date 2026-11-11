@@ -19,3 +19,9 @@ $queueWorker = Schedule::command('queue:work --stop-when-empty --max-time=55 --t
 if (function_exists('posix_getuid') && posix_getuid() === 0) {
     $queueWorker->user((string) env('QUEUE_WORKER_USER', 'www-data'));
 }
+
+$priceSchedule = Schedule::command('erp:apply-scheduled-prices')
+    ->everyMinute()->withoutOverlapping();
+if (function_exists('posix_getuid') && posix_getuid() === 0) {
+    $priceSchedule->user((string) env('QUEUE_WORKER_USER', 'www-data'));
+}

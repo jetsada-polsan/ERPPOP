@@ -73,6 +73,7 @@ use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\ReceiptTemplateController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReportGovernanceController;
+use App\Http\Controllers\ScheduledPriceChangeController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\SaleReturnController;
 use App\Http\Controllers\SalesAreaController;
@@ -406,6 +407,10 @@ Route::prefix('purchases')->name('purchases.')->group(function () {
 Route::prefix('products')->name('products.')->group(function () {
     Route::get('/', [ProductController::class, 'index'])->name('index');
     Route::post('/', [ProductController::class, 'store'])->name('store');
+    Route::get('/scheduled-prices', [ScheduledPriceChangeController::class, 'index'])->name('scheduled-prices.index');
+    Route::post('/scheduled-prices', [ScheduledPriceChangeController::class, 'store'])->name('scheduled-prices.store');
+    Route::delete('/scheduled-prices/{scheduledPriceChange}', [ScheduledPriceChangeController::class, 'cancel'])->name('scheduled-prices.cancel');
+    Route::post('/scheduled-prices/parse-paste', [ScheduledPriceChangeController::class, 'parsePaste'])->name('scheduled-prices.parse-paste');
     Route::get('/{product}', [ProductController::class, 'show'])->name('show');
     Route::put('/{product}', [ProductController::class, 'update'])->name('update');
     Route::get('/{product}/lots/{stockLot}/trace', [ProductController::class, 'lotTrace'])->name('lots.trace');

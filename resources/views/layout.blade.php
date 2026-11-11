@@ -1914,6 +1914,9 @@
                                 $showGroupHead = $itemGroup !== null && $itemGroup !== $lastGroup;
                                 $lastGroup = $itemGroup;
                                 $active = request()->routeIs($item['pattern']) || (isset($item['extraPattern']) && request()->routeIs($item['extraPattern']));
+                                if ($active && $item['route'] === 'products.index' && request()->routeIs('products.scheduled-prices.*')) {
+                                    $active = false;
+                                }
                                 if ($active && array_key_exists('queryCategory', $item)) {
                                     $active = request('category') === $item['queryCategory'];
                                 } elseif ($active && $item['route'] === 'reports.index' && ($item['params'] ?? []) === []) {
