@@ -95,6 +95,7 @@ OK (8 tests, 42 assertions)
 | 6 | `test_csv_export_has_utf8_bom_correct_headers_and_summary_row` | **PASSED** | ไฟล์ CSV มี UTF-8 BOM, หัวตารางภาษาไทยถูกต้อง, ข้อมูลครบ, และมีแถวสรุปผลรวม |
 | 7 | `test_other_branch_user_cannot_see_bookings_of_inaccessible_branch` | **PASSED** | ผู้ใช้ที่ถูกจำกัดสาขาจะไม่เห็นใบจองของสาขาอื่น และปฏิเสธ 403 เมื่อพยายามข้ามสาขา |
 | 8 | `test_cover_sheet_uses_existing_sales_manage_permission` | **PASSED** | บังคับใช้สิทธิ์เดิม `sales.manage` (ไม่มีสิทธิ์ได้ 403, มีสิทธิ์เข้าได้ปกติ) |
+| 9 | `test_bookings_grouped_by_sales_area_not_by_salesman_even_if_same_salesman` | **PASSED** | จัดกลุ่มตามสายขายที่คีย์ไว้ในใบจอง (`sale_bookings.sales_area_id`) เท่านั้น แม้พนักงานขายคนเดียวกันแต่คนละสายก็แยกชุดเอกสารถูกต้อง |
 
 ### การทดสอบถดถอยทั้งระบบ (Full ERP Regression)
 ```text

@@ -299,4 +299,46 @@ class RouteCoverSheetTest extends TestCase
             ->get(route('bookings.cover-sheet', ['date' => '2026-11-11']))
             ->assertOk();
     }
+
+    /** 9. จัดกลุ่มตามสายขายที่คีย์ในใบจอง (sale_bookings.sales_area_id) เท่านั้น ห้ามจัดกลุ่มตามชื่อพนักงานขาย */
+    public function test_bookings_grouped_by_sales_area_not_by_salesman_even_if_same_salesman(): void
+    {
+        $branch = Branch::create(['code' => 'B01', 'name_th' => 'สาขาใหญ่', 'is_active' => true]);
+        $area1 = SalesArea::create(['code' => '01', 'name' => 'สุพรรณบุรี', 'branch_id' => $branch->id]);
+        $area2 = SalesArea::create(['code' => '02', 'name' => 'กาญจนบุรี', 'branch_id' => $branch->id]);
+        $customer1 = Customer::create(['code' => 'C01', 'name_th' => 'ลูกค้า สุพรรณ', 'branch_id' => $branch->id]);
+        $customer2 = Customer::create(['code' => 'C02', 'name_th' => 'ลูกค้า กาญจน์', 'branch_id' => $branch->id]);
+
+        $sameSalesman = \App\Models\Salesman::create(['code' => 'SM01', 'name' => 'นายสมคิด ขายดี']);
+
+        // ใบจอง 2 ใบ ใช้พนักงานขายคนเดียวกัน แต่คนละสาย
+        $b1 = $this->createBooking($branch, $area1, $customer1, 'BK-SAME-SM-01', 1200.00, '2026-11-11');
+        $b1->update(['salesman_id' => $sameSalesman->id]);
+
+        $b2 = $this->createBooking($branch, $area2, $customer2, 'BK-SAME-SM-02', 3400.00, '2026-11-11');
+        $b2->update(['salesman_id' => $sameSalesman->id]);
+
+        $user = $this->userWithPermission('sales.manage');
+
+        $response = $this->actingAs($user)->get(route('bookings.cover-sheet', [
+            'date' => '2026-11-11',
+            'sales_area_id' => 'all',
+        ]));
+
+        $response->assertOk();
+        $routeSheets = $response->viewData('routeSheets');
+
+        // ต้องแยกเป็น 2 ชุดเอกสารตามสาย ไม่ยุบรวมกันตามพนักงานขาย
+        $this->assertCount(2, $routeSheets);
+
+        $sheet1 = $routeSheets->firstWhere('area.id', $area1->id);
+        $this->assertNotNull($sheet1);
+        $this->assertSame(['BK-SAME-SM-01'], $sheet1->bookings->pluck('document.doc_number')->all());
+        $this->assertSame('ลูกค้า สุพรรณ', $sheet1->bookings->first()->document->customer->name_th);
+
+        $sheet2 = $routeSheets->firstWhere('area.id', $area2->id);
+        $this->assertNotNull($sheet2);
+        $this->assertSame(['BK-SAME-SM-02'], $sheet2->bookings->pluck('document.doc_number')->all());
+        $this->assertSame('ลูกค้า กาญจน์', $sheet2->bookings->first()->document->customer->name_th);
+    }
 }
