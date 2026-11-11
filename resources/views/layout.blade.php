@@ -1684,6 +1684,14 @@
         }
         /* ขนาดกระดาษมาตรฐานของหน้าที่พิมพ์จากเว็บ (เอกสารที่มีขนาดเฉพาะประกาศ @page ของตัวเองทับได้) */
         @page { size: A4; margin: 10mm; }
+        /* เมนูข้างยังโผล่ตอนพิมพ์ เพราะกฎของจอ ".app-sidebar.odn-side{display:block!important}" มีน้ำหนัก (specificity) สูงกว่า
+           กฎซ่อนในส่วน @media print ด้านบน (ทั้งคู่ !important แล้วน้ำหนักตัดสิน) ผลคือเมนูกินหน้าแรกและเนื้อหาว่าง
+           จึงประกาศกฎซ่อนซ้ำท้ายสุดด้วยตัวเลือกที่หนักกว่า */
+        @media print {
+            html body .app-sidebar, html body .app-sidebar.odn-side, html[data-layout] body .app-sidebar.odn-side,
+            html body .odn-side, html body .odn-topbar, html body .odn-search, html body .fa-rail, html body .fa-collapse-btn,
+            html body .mobile-sidebar-backdrop { display:none !important; }
+        }
             /* แจ้งเตือนต้องอยู่เหนือหน้าต่างเอกสารเสมอ ไม่งั้นผู้ใช้เห็นเป็นกดแล้วนิ่ง */
         .swal2-container { z-index: 6000 !important; }
     </style>
