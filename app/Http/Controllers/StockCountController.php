@@ -187,7 +187,7 @@ class StockCountController extends Controller
             if ($countedCol === null && $rowNo <= 2) {
                 foreach ($row as $colIdx => $colVal) {
                     $cleaned = mb_strtolower(trim((string) $colVal));
-                    if (in_array($cleaned, ['จำนวนนับจริง', 'ยอดนับ', 'ยอดนับจริง', 'counted', 'counted_qty', 'qty'], true)) {
+                    if (in_array($cleaned, ['จำนวนนับจริง', 'ยอดนับ', 'ยอดนับจริง', 'counted', 'counted_qty'], true)) {
                         $countedCol = $colIdx;
                         break;
                     }
@@ -206,7 +206,9 @@ class StockCountController extends Controller
                 continue;
             }
 
-            $idx = $countedCol ?? (count($row) >= 5 ? 4 : (count($row) >= 3 ? 2 : 1));
+            // ไม่เจอหัวคอลัมน์ ใช้คอลัมน์ที่ 5 ตามไฟล์ที่ export ออกไปเท่านั้น
+            // ห้ามเดาคอลัมน์อื่น เพราะอาจหยิบ "จำนวนตามระบบ" มาเป็นยอดนับ
+            $idx = $countedCol ?? 4;
             $counted = trim((string) ($row[$idx] ?? ''));
 
             if ($counted === '' || ! is_numeric(str_replace(',', '', $counted))) {
@@ -226,7 +228,8 @@ class StockCountController extends Controller
                     $bindings = [];
                     $ids = [];
                     foreach ($chunk as $id => $qty) {
-                        $cases[] = 'WHEN ? THEN ?';
+                        // PostgreSQL มองพารามิเตอร์ใน THEN เป็น text ถ้าไม่ระบุชนิด แล้วจะเขียนลงคอลัมน์ decimal ไม่ได้
+                        $cases[] = 'WHEN ? THEN CAST(? AS DECIMAL(18,4))';
                         $bindings[] = (int) $id;
                         $bindings[] = $qty;
                         $ids[] = (int) $id;

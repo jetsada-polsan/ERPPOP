@@ -137,6 +137,19 @@ class StockCountImportTest extends TestCase
         $this->assertEquals(50.00, (float) $items[1]->fresh()->counted_qty);
     }
 
+    public function test_file_without_a_counted_header_never_imports_the_system_qty_column(): void
+    {
+        [$stockCount, $products, $items] = $this->createCountSheet(1);
+
+        // ไม่มีหัวคอลัมน์ และมีแค่ 4 คอลัมน์ (คอลัมน์สุดท้ายคือจำนวนตามระบบ) ต้องไม่ถูกนำไปเป็นยอดนับ
+        $csv = "{$products[0]->sku_code},สินค้าทดสอบ 1,ชิ้น,100\n";
+        $file = UploadedFile::fake()->createWithContent('counts.csv', $csv);
+
+        $this->postJson(route('stock-counts.import', $stockCount), ['file' => $file])
+            ->assertOk()->assertJson(['updated' => 0]);
+        $this->assertNull($items[0]->fresh()->counted_qty);
+    }
+
     public function test_import_handles_bom_commas_and_whitespace(): void
     {
         /** @var StockCount $stockCount */
