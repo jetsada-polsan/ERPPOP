@@ -50,6 +50,68 @@ class GlPostingService
     }
 
     /**
+     * หัก ณ ที่จ่าย (ฝั่งลูกหนี้ — ลูกค้าหักภาษีเรา): บันทึกเป็นสินทรัพย์ (Dr WHT Receivable / Cr AR)
+     */
+    public function postCustomerWhtDeduction(PaymentDocument $paymentDocument, float $whtAmount, string $entryDate, string $remark): void
+    {
+        if ($whtAmount <= 0) {
+            return;
+        }
+        $whtAccount = $this->role(ChartOfAccount::ROLE_WHT_RECEIVABLE);
+        $arAccount = $this->role(ChartOfAccount::ROLE_AR);
+        if (! $whtAccount || ! $arAccount) {
+            throw new RuntimeException('ผังบัญชีภาษีหัก ณ ที่จ่าย (wht_receivable) ยังตั้งค่าไม่ครบ ไม่สามารถรับชำระโดยไม่ลง GL ได้');
+        }
+        GlJournal::create([
+            'payment_document_id' => $paymentDocument->id,
+            'account_id' => $whtAccount->id,
+            'debit' => $whtAmount,
+            'credit' => 0,
+            'remark' => $remark,
+            'entry_date' => $entryDate,
+        ]);
+        GlJournal::create([
+            'payment_document_id' => $paymentDocument->id,
+            'account_id' => $arAccount->id,
+            'debit' => 0,
+            'credit' => $whtAmount,
+            'remark' => $remark,
+            'entry_date' => $entryDate,
+        ]);
+    }
+
+    /**
+     * ส่วนลดเงินสด (ส่วนลดจ่ายชำระเร็ว): ลงบัญชีรับคืน/ส่วนลดจ่าย (Dr Sales Return / Cr AR) ไม่ปรับ VAT
+     */
+    public function postCustomerDiscount(PaymentDocument $paymentDocument, float $discountAmount, string $entryDate, string $remark): void
+    {
+        if ($discountAmount <= 0) {
+            return;
+        }
+        $discountAccount = $this->role(ChartOfAccount::ROLE_SALES_RETURN);
+        $arAccount = $this->role(ChartOfAccount::ROLE_AR);
+        if (! $discountAccount || ! $arAccount) {
+            throw new RuntimeException('ผังบัญชีส่วนลดจ่าย (sales_return) ยังตั้งค่าไม่ครบ ไม่สามารถรับชำระโดยไม่ลง GL ได้');
+        }
+        GlJournal::create([
+            'payment_document_id' => $paymentDocument->id,
+            'account_id' => $discountAccount->id,
+            'debit' => $discountAmount,
+            'credit' => 0,
+            'remark' => $remark,
+            'entry_date' => $entryDate,
+        ]);
+        GlJournal::create([
+            'payment_document_id' => $paymentDocument->id,
+            'account_id' => $arAccount->id,
+            'debit' => 0,
+            'credit' => $discountAmount,
+            'remark' => $remark,
+            'entry_date' => $entryDate,
+        ]);
+    }
+
+    /**
      * เช็ครับเด้ง: กลับรายการรับชำระของใบนั้นทั้งชุด (Dr ลูกหนี้ / Cr ธนาคาร) ลงวันที่เช็คเด้ง
      * ไม่ลบรายการเดิม ประวัติว่าเคยรับและเคยเด้งต้องตรวจย้อนได้ เรียกซ้ำก็ไม่กลับซ้ำ
      */
@@ -181,7 +243,7 @@ class GlPostingService
         return ['subtotal' => $subtotal, 'vat' => DecimalMath::subtract($total, $subtotal, 2), 'total' => $total];
     }
 
-    private function role(string $role): ?ChartOfAccount
+    public function role(string $role): ?ChartOfAccount
     {
         return ChartOfAccount::where('default_role', $role)->first();
     }

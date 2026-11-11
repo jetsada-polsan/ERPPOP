@@ -307,6 +307,8 @@ Route::prefix('sale-returns')->name('sale-returns.')->group(function () {
 Route::prefix('ar-receipts')->name('ar-receipts.')->group(function () {
     Route::get('/', [\App\Http\Controllers\ArReceiptController::class, 'index'])->name('index');
     Route::get('/create', [\App\Http\Controllers\ArReceiptController::class, 'create'])->name('create');
+    Route::get('/daily-summary', [\App\Http\Controllers\ArReceiptController::class, 'dailySummary'])->name('daily-summary');
+    Route::get('/customers/{customer}/open-items', [\App\Http\Controllers\ArReceiptController::class, 'openItems'])->name('open-items');
     Route::post('/', [\App\Http\Controllers\ArReceiptController::class, 'store'])->name('store');
 });
 
