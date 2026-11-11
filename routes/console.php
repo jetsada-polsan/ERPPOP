@@ -12,4 +12,10 @@ Schedule::command('erp:backup --keep-days=30')->dailyAt('02:15')->withoutOverlap
 Schedule::command('erp:health')->hourly()->withoutOverlapping();
 Schedule::command('erp:restore-drill')->monthlyOn(1, '04:30')->withoutOverlapping();
 Schedule::command('erp:archive-inactive-customers --months=6 --apply')->monthlyOn(1, '03:15')->withoutOverlapping();
-Schedule::command('queue:work --stop-when-empty --max-time=55 --timeout=900')->everyMinute()->withoutOverlapping(20);
+// cron ของ server รันในนาม root แต่เว็บรันในนาม www-data ถ้างานคิวรันเป็น root ไฟล์ cache/log/view
+// ที่มันสร้างจะเป็นของ root แล้วหน้าเว็บเขียนทับไม่ได้ จึงสลับไปรันในนามผู้ใช้ของเว็บ
+$queueWorker = Schedule::command('queue:work --stop-when-empty --max-time=55 --timeout=900')
+    ->everyMinute()->withoutOverlapping(20);
+if (function_exists('posix_getuid') && posix_getuid() === 0) {
+    $queueWorker->user((string) env('QUEUE_WORKER_USER', 'www-data'));
+}
