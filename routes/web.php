@@ -659,6 +659,8 @@ Route::prefix('document-books')->name('document-books.')->group(function () {
 // ศูนย์เอกสารย้อนหลัง: ต้นไม้ ประเภท->ปี->เดือน + กรองรายวัน ทุกประเภทเอกสาร
 Route::get('/documents', [DocumentBrowserController::class, 'index'])->name('documents.browser');
 
+// ใบส่งของรวม (A5): พิมพ์ใบส่งของหลายใบในครั้งเดียว (ids[] หรือตัวกรอง)
+Route::get('/documents/delivery-notes/batch', [DeliveryNoteController::class, 'batch'])->name('documents.delivery-notes.batch');
 // ใบส่งของ/ใบส่งของชั่วคราว (A5): พิมพ์ได้จากใบจองและใบขายทุกชนิด
 Route::get('/documents/{document}/delivery-note', [DeliveryNoteController::class, 'show'])->name('documents.delivery-note');
 Route::post('/documents/{document}/submit', [DocumentLifecycleController::class, 'submit'])->name('documents.submit');
