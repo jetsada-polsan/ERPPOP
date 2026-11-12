@@ -16,6 +16,23 @@
     .page.delivery-note-page .totals .row { display: flex !important; justify-content: space-between !important; align-items: center !important; }
     .page.delivery-note-page .totals .val { font-size: 9.5px !important; font-weight: 700 !important; text-align: right !important; }
     .page.delivery-note-page .qc-row { grid-template-columns: minmax(0, 1fr) 58mm !important; }
+    /* ตัวหนังสือเดิม 8–8.5px (พิมพ์ออก ~6pt) เล็กเกินอ่าน — ขยายเป็น ~8pt */
+    .page.delivery-note-page .company .name { font-size: 14px !important; }
+    .page.delivery-note-page .company .sub,
+    .page.delivery-note-page .doc-meta { font-size: 10px !important; }
+    .page.delivery-note-page .info-box { font-size: 10.5px !important; }
+    .page.delivery-note-page table.items th,
+    .page.delivery-note-page table.items td { font-size: 10.5px !important; }
+    .page.delivery-note-page .qc-left,
+    .page.delivery-note-page .qc-item { font-size: 10px !important; }
+    .page.delivery-note-page .totals { font-size: 10px !important; }
+    .page.delivery-note-page .totals .val { font-size: 11px !important; }
+    .page.delivery-note-page .sign { font-size: 10px !important; }
+    /* กล่องยอดรวมกินที่แนวตั้งมาก — บีบระยะห่างให้ตัวหนังสือใหญ่ขึ้นได้โดยยังจบในแผ่นเดียว */
+    .page.delivery-note-page .totals .row { margin-bottom: .4mm !important; }
+    .page.delivery-note-page .totals .val { padding: .2mm 1.5mm !important; line-height: 1.25 !important; }
+    .page.delivery-note-page .qc-left > div:first-child { margin-bottom: 1.2mm !important; }
+    .page.delivery-note-page .qc-row { margin-top: 1mm !important; padding-top: 1mm !important; }
 </style>
 @endonce
 <div class="page delivery-note-page">
