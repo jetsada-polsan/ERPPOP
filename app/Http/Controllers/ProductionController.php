@@ -9,20 +9,33 @@ use App\Models\ProductionRecipe;
 use App\Models\ProductionRecipeItem;
 use App\Models\WarehouseLocation;
 use App\Services\Inventory\ProductionReceiptService;
+use App\Support\ListDateRange;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class ProductionController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $q = trim((string) $request->query('q', ''));
+        $dateRange = ListDateRange::fromRequest($request, 'doc_date');
+
         $recipes = ProductionRecipe::with(['finishedProduct', 'items.product'])->withCount('items')->orderBy('code')->paginate(25, ['*'], 'recipes_page');
-        $orders = ProductionOrder::with(['recipe', 'finishedProduct', 'branch', 'warehouseLocation'])->orderByDesc('doc_date')->paginate(25, ['*'], 'orders_page');
+        $orders = ProductionOrder::with(['recipe', 'finishedProduct', 'branch', 'warehouseLocation'])
+            ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
+                ->where('doc_no', 'ilike', "%{$q}%")
+                ->orWhereHas('finishedProduct', fn ($p) => $p->where('name_th', 'ilike', "%{$q}%")->orWhere('sku_code', 'ilike', "%{$q}%"))
+            ))
+            ->tap(fn ($query) => $dateRange->apply($query))
+            ->orderByDesc('doc_date')
+            ->paginate(25, ['*'], 'orders_page')
+            ->withQueryString();
+
         $branches = Branch::where('is_active', true)->orderBy('code')->get();
         $locations = WarehouseLocation::with('warehouse')->orderBy('code')->get();
 
-        return view('production.index', compact('recipes', 'orders', 'branches', 'locations'));
+        return view('production.index', compact('recipes', 'orders', 'branches', 'locations', 'dateRange', 'q'));
     }
 
     public function storeRecipe(Request $request): RedirectResponse

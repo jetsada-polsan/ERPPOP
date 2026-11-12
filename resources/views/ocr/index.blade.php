@@ -21,13 +21,14 @@
         </div>
         <div class="ocr-kpis">
             @foreach(['uploaded'=>'อัปโหลดแล้ว','processing'=>'กำลังอ่าน','needs_review'=>'รอตรวจ','approved'=>'อนุมัติแล้ว','posted'=>'โพสต์แล้ว'] as $key=>$label)
-                <a class="ocr-kpi text-decoration-none" href="{{ route('ocr.documents.index', ['status'=>$key]) }}"><span>{{ $label }}</span><strong>{{ number_format((int)($statusCounts[$key] ?? 0)) }}</strong></a>
+                <a class="ocr-kpi text-decoration-none" href="{{ route('ocr.documents.index', array_filter(['status'=>$key, 'date_from' => $dateRange->from, 'date_to' => $dateRange->to])) }}"><span>{{ $label }}</span><strong>{{ number_format((int)($statusCounts[$key] ?? 0)) }}</strong></a>
             @endforeach
         </div>
         <form class="ocr-filter" method="get">
             <div><label class="form-label small text-muted mb-1">สถานะ</label><select name="status" class="form-select form-select-sm"><option value="">ทุกสถานะ</option>@foreach(['uploaded'=>'อัปโหลดแล้ว','processing'=>'กำลังอ่าน','needs_review'=>'รอตรวจ','matched'=>'จับคู่แล้ว','approved'=>'อนุมัติแล้ว','rejected'=>'ตีกลับ','posted'=>'โพสต์แล้ว','failed'=>'ผิดพลาด'] as $key=>$label)<option value="{{ $key }}" @selected($status===$key)>{{ $label }}</option>@endforeach</select></div>
+            @include('partials.list-date-range', ['dateRange' => $dateRange])
             <button class="btn btn-sm btn-outline-primary">กรอง</button>
-            @if($status)<a class="btn btn-sm btn-light border" href="{{ route('ocr.documents.index') }}">ล้าง</a>@endif
+            @if($status || !$dateRange->isDefault)<a class="btn btn-sm btn-light border" href="{{ route('ocr.documents.index') }}">ล้าง</a>@endif
         </form>
         <div class="table-responsive"><table class="ocr-table"><thead><tr><th>ไฟล์ / ประเภท</th><th>ซัพพลายเออร์</th><th>สาขา</th><th>เลขที่เอกสาร</th><th>สถานะ</th><th>วันที่สร้าง</th><th></th></tr></thead><tbody>
             @forelse($documents as $document)

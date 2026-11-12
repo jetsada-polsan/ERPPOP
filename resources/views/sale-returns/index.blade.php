@@ -28,6 +28,15 @@
         </div>
 
         <div class="content-card p-4">
+            <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                <div></div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    @include('partials.list-date-range', ['dateRange' => $dateRange, 'wrapForm' => true])
+                    <div style="min-width: 240px;">
+                        @include('partials.search-bar', ['q' => $q, 'placeholder' => 'ค้นหาเลขที่ / ชื่อลูกค้า'])
+                    </div>
+                </div>
+            </div>
             <div class="table-responsive">
                 <table class="table align-middle">
                     <thead>

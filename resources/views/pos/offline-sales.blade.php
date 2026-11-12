@@ -7,13 +7,16 @@
 @php
     $labels = ['needs_review' => 'ต้องตรวจสอบ', 'posted' => 'ลงบิลแล้ว', 'resolved' => 'ปิดด้วยมือ', 'processing' => 'กำลังส่ง', 'all' => 'ทั้งหมด'];
 @endphp
-<div class="d-flex gap-2 flex-wrap mb-3">
-    @foreach($labels as $key => $label)
-        <a href="{{ route('pos.offline-sales.index', ['status' => $key]) }}"
-           class="btn btn-sm {{ $status === $key ? 'btn-primary' : 'btn-outline-secondary' }}">
-            {{ $label }} @if($key !== 'all')({{ $counts[$key] ?? 0 }})@endif
-        </a>
-    @endforeach
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div class="d-flex gap-2 flex-wrap">
+        @foreach($labels as $key => $label)
+            <a href="{{ route('pos.offline-sales.index', array_filter(['status' => $key, 'date_from' => $dateRange->from, 'date_to' => $dateRange->to])) }}"
+               class="btn btn-sm {{ $status === $key ? 'btn-primary' : 'btn-outline-secondary' }}">
+                {{ $label }} @if($key !== 'all')({{ $counts[$key] ?? 0 }})@endif
+            </a>
+        @endforeach
+    </div>
+    @include('partials.list-date-range', ['dateRange' => $dateRange, 'wrapForm' => true])
 </div>
 
 

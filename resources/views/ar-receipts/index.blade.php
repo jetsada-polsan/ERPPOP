@@ -31,11 +31,17 @@
                 @endforelse
                 </tbody>
             </table></div>
+            <div class="mt-3">{{ $receipts->links() }}</div>
         </div>
     </div>
     <div class="col-xl-6">
         <div class="content-card p-3">
-            <h2 class="h6 fw-bold mb-3">ใบเสร็จล่าสุด</h2>
+            <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                <h2 class="h6 fw-bold mb-0">ใบเสร็จรับเงิน</h2>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    @include('partials.list-date-range', ['dateRange' => $dateRange, 'wrapForm' => true])
+                </div>
+            </div>
             <div class="table-responsive"><table class="table align-middle mb-0">
                 <thead><tr><th>เลขที่</th><th>วันที่</th><th>ลูกค้า</th><th>ผู้รับเงิน</th><th class="text-end">ยอด</th><th>สถานะ</th></tr></thead>
                 <tbody>
@@ -53,6 +59,7 @@
                 @endforelse
                 </tbody>
             </table></div>
+            <div class="mt-3">{{ $receipts->links() }}</div>
         </div>
     </div>
 </div>

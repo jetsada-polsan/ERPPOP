@@ -3,9 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
-use App\Models\Customer;
 use App\Models\Document;
 use App\Services\Sales\CashSaleService;
+use App\Support\ListDateRange;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -16,6 +16,7 @@ class CashSaleController extends Controller
     public function index(Request $request): View
     {
         $q = trim((string) $request->query('q', ''));
+        $dateRange = ListDateRange::fromRequest($request, 'doc_date');
 
         $sales = Document::with(['branch', 'customer'])
             ->whereHas('documentType', fn ($query) => $query->where('code', 'CASH_SALE'))
@@ -23,13 +24,14 @@ class CashSaleController extends Controller
                 ->where('doc_number', 'ilike', "%{$q}%")
                 ->orWhereHas('customer', fn ($c) => $c->where('name_th', 'ilike', "%{$q}%"))
             ))
+            ->tap(fn ($query) => $dateRange->apply($query))
             ->orderByDesc('id')
             ->paginate(50)
             ->withQueryString();
 
         $branches = Branch::orderBy('code')->get();
 
-        return view('cash-sales.index', compact('sales', 'branches', 'q'));
+        return view('cash-sales.index', compact('sales', 'branches', 'q', 'dateRange'));
     }
 
     public function store(Request $request, CashSaleService $service): RedirectResponse

@@ -3,10 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\ChartOfAccount;
-use App\Support\FinanceBranches;
 use App\Models\Document;
 use App\Models\SupplierOpenItem;
 use App\Services\Purchasing\SupplierNoteService;
+use App\Support\FinanceBranches;
+use App\Support\ListDateRange;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -19,12 +20,30 @@ class SupplierNoteController extends Controller
         $branch = $request->integer('branch_id') ?: null;
         abort_if($branch && ! $branches->contains('id', $branch), 403);
         $allowedIds = $branch ? [$branch] : $branches->pluck('id')->all();
+
+        $q = trim((string) $request->query('q', ''));
+        $dateRange = ListDateRange::fromRequest($request, 'doc_date');
+
+        $notes = Document::with('supplier')
+            ->whereHas('documentType', fn ($qDoc) => $qDoc->whereIn('code', ['SUPPLIER_CREDIT_NOTE', 'SUPPLIER_DEBIT_NOTE']))
+            ->whereIn('branch_id', $allowedIds)
+            ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
+                ->where('doc_number', 'ilike', "%{$q}%")
+                ->orWhereHas('supplier', fn ($s) => $s->where('name_th', 'ilike', "%{$q}%"))
+            ))
+            ->tap(fn ($query) => $dateRange->apply($query))
+            ->latest('id')
+            ->paginate(30)
+            ->withQueryString();
+
         return view('supplier-notes.index', [
-            'notes' => Document::with('supplier')->whereHas('documentType', fn ($q) => $q->whereIn('code', ['SUPPLIER_CREDIT_NOTE', 'SUPPLIER_DEBIT_NOTE']))
-                ->whereIn('branch_id', $allowedIds)->latest('id')->paginate(30)->withQueryString(),
-            'items' => SupplierOpenItem::with('supplier')->whereHas('sourceDocument', fn ($q) => $q->where('status', 'active')->whereIn('branch_id', $allowedIds))->orderByDesc('id')->limit(500)->get(),
-            'branches' => $branches, 'selectedBranchId' => $branch,
+            'notes' => $notes,
+            'items' => SupplierOpenItem::with('supplier')->whereHas('sourceDocument', fn ($qDoc) => $qDoc->where('status', 'active')->whereIn('branch_id', $allowedIds))->orderByDesc('id')->limit(500)->get(),
+            'branches' => $branches,
+            'selectedBranchId' => $branch,
             'accounts' => ChartOfAccount::where('account_type', 'expense')->orderBy('code')->get(),
+            'dateRange' => $dateRange,
+            'q' => $q,
         ]);
     }
 
@@ -41,6 +60,7 @@ class SupplierNoteController extends Controller
         } catch (RuntimeException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
+
         return back()->with('success', 'บันทึกเอกสารรออนุมัติแล้ว');
     }
 
@@ -51,6 +71,7 @@ class SupplierNoteController extends Controller
         } catch (RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }
+
         return back()->with('success', 'อนุมัติและปรับเจ้าหนี้/บัญชีแล้ว');
     }
 
@@ -65,6 +86,7 @@ class SupplierNoteController extends Controller
             abort_unless(FinanceBranches::allows($request->user(), (int) $locked->branch_id, 'purchasing.manage'), 403);
             $locked->update(['status' => 'rejected', 'approval_note' => $data['reason'], 'approved_by' => $request->user()->id, 'approved_at' => now()]);
         });
+
         return back()->with('success', 'ปฏิเสธเอกสารแล้ว');
     }
 }

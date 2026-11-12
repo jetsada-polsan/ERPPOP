@@ -7,6 +7,7 @@ use App\Models\Document;
 use App\Models\SupplierLedger;
 use App\Models\SupplierOpenItem;
 use App\Services\Purchasing\PurchaseService;
+use App\Support\ListDateRange;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -14,16 +15,25 @@ use RuntimeException;
 
 class PurchaseController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $q = trim((string) $request->query('q', ''));
+        $dateRange = ListDateRange::fromRequest($request, 'doc_date');
+
         $purchases = Document::with(['supplier', 'branch'])
-            ->whereHas('documentType', fn ($q) => $q->where('code', 'PURCHASE'))
+            ->whereHas('documentType', fn ($qDoc) => $qDoc->where('code', 'PURCHASE'))
+            ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
+                ->where('doc_number', 'ilike', "%{$q}%")
+                ->orWhereHas('supplier', fn ($s) => $s->where('name_th', 'ilike', "%{$q}%"))
+            ))
+            ->tap(fn ($query) => $dateRange->apply($query))
             ->orderByDesc('id')
-            ->paginate(50);
+            ->paginate(50)
+            ->withQueryString();
 
         $branches = Branch::orderBy('code')->get();
 
-        return view('purchases.index', compact('purchases', 'branches'));
+        return view('purchases.index', compact('purchases', 'branches', 'q', 'dateRange'));
     }
 
     // Creation happens via the modal on index() - this just covers a direct link.

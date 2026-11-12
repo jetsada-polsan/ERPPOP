@@ -2,12 +2,14 @@
 @section('title', 'ใบเพิ่ม/ลดหนี้ผู้ขาย')
 @section('page-title', 'ใบเพิ่ม/ลดหนี้ผู้ขาย')
 @section('content')
-<form method="get" class="mb-3">
-    <label for="note-branch" class="form-label">สาขา</label>
-    <select id="note-branch" name="branch_id" class="form-select" onchange="this.form.submit()">
-        <option value="">ทุกสาขาที่มีสิทธิ์</option>
-        @foreach($branches as $branch)<option value="{{ $branch->id }}" @selected($selectedBranchId == $branch->id)>{{ $branch->code }} - {{ $branch->name_th }}</option>@endforeach
-    </select>
+<form method="get" class="d-flex align-items-center gap-2 flex-wrap mb-3">
+    <div style="width: 220px;">
+        <select id="note-branch" name="branch_id" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">ทุกสาขาที่มีสิทธิ์</option>
+            @foreach($branches as $branch)<option value="{{ $branch->id }}" @selected($selectedBranchId == $branch->id)>{{ $branch->code }} - {{ $branch->name_th }}</option>@endforeach
+        </select>
+    </div>
+    @include('partials.list-date-range', ['dateRange' => $dateRange])
 </form>
 <form method="post" action="{{ route('supplier-notes.store') }}" class="row g-3 mb-4">
     @csrf

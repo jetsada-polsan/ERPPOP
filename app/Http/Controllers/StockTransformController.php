@@ -8,6 +8,7 @@ use App\Models\ProductionRecipe;
 use App\Models\WarehouseLocation;
 use App\Services\Inventory\ScaleBarcodeService;
 use App\Services\Inventory\StockTransformService;
+use App\Support\ListDateRange;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -29,10 +30,12 @@ class StockTransformController extends Controller
     public function index(Request $request): View
     {
         $q = trim((string) $request->query('q', ''));
+        $dateRange = ListDateRange::fromRequest($request, 'doc_date');
 
         $documents = Document::with(['branch', 'stockDocument', 'productionBatch'])
             ->whereHas('documentType', fn ($query) => $query->where('code', 'STOCK_TRANSFORM'))
             ->when($q !== '', fn ($query) => $query->where('doc_number', 'ilike', "%{$q}%"))
+            ->tap(fn ($query) => $dateRange->apply($query))
             ->orderByDesc('id')
             ->paginate(50)
             ->withQueryString();
@@ -63,6 +66,7 @@ class StockTransformController extends Controller
             'recipes' => $recipes,
             'lossReasons' => self::LOSS_REASONS,
             'q' => $q,
+            'dateRange' => $dateRange,
         ]);
     }
 

@@ -4,10 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use App\Models\Document;
+use App\Services\Sales\SaleCreditLimit;
 use App\Services\Sales\SaleReturnService;
+use App\Support\ListDateRange;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use RuntimeException;
 
@@ -16,6 +19,7 @@ class SaleReturnController extends Controller
     public function index(Request $request): View
     {
         $q = trim((string) $request->query('q', ''));
+        $dateRange = ListDateRange::fromRequest($request, 'doc_date');
 
         $returns = Document::with(['branch', 'customer'])
             ->whereHas('documentType', fn ($query) => $query->where('code', 'SALE_RETURN'))
@@ -23,13 +27,14 @@ class SaleReturnController extends Controller
                 ->where('doc_number', 'ilike', "%{$q}%")
                 ->orWhereHas('customer', fn ($c) => $c->where('name_th', 'ilike', "%{$q}%"))
             ))
+            ->tap(fn ($query) => $dateRange->apply($query))
             ->orderByDesc('id')
             ->paginate(50)
             ->withQueryString();
 
         $branches = Branch::orderBy('code')->get();
 
-        return view('sale-returns.index', compact('returns', 'branches', 'q'));
+        return view('sale-returns.index', compact('returns', 'branches', 'q', 'dateRange'));
     }
 
     public function store(Request $request, SaleReturnService $service): RedirectResponse|JsonResponse
@@ -58,7 +63,7 @@ class SaleReturnController extends Controller
 
         try {
             $document = $service->create($data);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return response()->json(['message' => $e->getMessage(), 'errors' => $e->errors()], 422);
         } catch (RuntimeException $e) {
             return back()->withInput()->with('error', $e->getMessage());
@@ -84,7 +89,7 @@ class SaleReturnController extends Controller
             'branch_id' => $sale->branch_id,
             'customer_id' => $sale->customer_id,
             'customer_name' => $sale->customer?->name_th,
-            'refundable_amount' => app(\App\Services\Sales\SaleCreditLimit::class)->remaining($sale),
+            'refundable_amount' => app(SaleCreditLimit::class)->remaining($sale),
             'lines' => $service->returnableLines($sale)->values(),
         ]);
     }
@@ -100,11 +105,12 @@ class SaleReturnController extends Controller
     {
         try {
             $service->approve($saleReturn, (int) auth()->id());
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return response()->json(['message' => $e->getMessage(), 'errors' => $e->errors()], 422);
         } catch (RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }
+
         return back()->with('success', 'อนุมัติใบรับคืนและปรับสต๊อก/บัญชีแล้ว');
     }
 }

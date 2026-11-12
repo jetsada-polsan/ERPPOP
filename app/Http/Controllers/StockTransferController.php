@@ -7,6 +7,7 @@ use App\Models\Document;
 use App\Models\StockTransferReceipt;
 use App\Models\WarehouseLocation;
 use App\Services\Inventory\StockTransferService;
+use App\Support\ListDateRange;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -17,10 +18,12 @@ class StockTransferController extends Controller
     public function index(Request $request): View
     {
         $q = trim((string) $request->query('q', ''));
+        $dateRange = ListDateRange::fromRequest($request, 'doc_date');
 
         $transfers = Document::with(['branch', 'stockDocument.toWarehouseLocation', 'createdBy'])
             ->whereHas('documentType', fn ($query) => $query->where('code', 'STOCK_TRANSFER'))
             ->when($q !== '', fn ($query) => $query->where('doc_number', 'ilike', "%{$q}%"))
+            ->tap(fn ($query) => $dateRange->apply($query))
             ->orderByDesc('id')
             ->paginate(50)
             ->withQueryString();
@@ -28,7 +31,7 @@ class StockTransferController extends Controller
         $branches = Branch::orderBy('code')->get();
         $locations = WarehouseLocation::orderBy('code')->get();
 
-        return view('stock-transfers.index', compact('transfers', 'branches', 'locations', 'q'));
+        return view('stock-transfers.index', compact('transfers', 'branches', 'locations', 'q', 'dateRange'));
     }
 
     public function store(Request $request, StockTransferService $service): RedirectResponse

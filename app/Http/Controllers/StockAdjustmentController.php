@@ -9,6 +9,7 @@ use App\Models\Document;
 use App\Models\StockCount;
 use App\Models\WarehouseLocation;
 use App\Services\Inventory\StockAdjustmentService;
+use App\Support\ListDateRange;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,10 +23,12 @@ class StockAdjustmentController extends Controller
     public function index(Request $request): View
     {
         $q = trim((string) $request->query('q', ''));
+        $dateRange = ListDateRange::fromRequest($request, 'doc_date');
 
         $adjustments = Document::with(['branch', 'stockDocument.items'])
             ->whereHas('documentType', fn ($query) => $query->where('code', 'STOCK_ADJUSTMENT'))
             ->when($q !== '', fn ($query) => $query->where('doc_number', 'ilike', "%{$q}%"))
+            ->tap(fn ($query) => $dateRange->apply($query))
             ->orderByDesc('id')
             ->paginate(50)
             ->withQueryString();
@@ -33,7 +36,7 @@ class StockAdjustmentController extends Controller
         $branches = Branch::orderBy('code')->get();
         $locations = WarehouseLocation::orderBy('code')->get();
 
-        return view('stock-adjustments.index', compact('adjustments', 'branches', 'locations', 'q'));
+        return view('stock-adjustments.index', compact('adjustments', 'branches', 'locations', 'q', 'dateRange'));
     }
 
     public function store(Request $request, StockAdjustmentService $service): RedirectResponse
@@ -108,7 +111,7 @@ class StockAdjustmentController extends Controller
                 Cache::forget("stock_adjustment_error_{$locked->id}");
                 ApproveStockAdjustment::dispatch($locked->id, auth()->id());
 
-                return back()->with('success', "กำลังอนุมัติ " . number_format($itemCount) . " รายการ ระบบจะแจ้งเมื่อเสร็จ");
+                return back()->with('success', 'กำลังอนุมัติ '.number_format($itemCount).' รายการ ระบบจะแจ้งเมื่อเสร็จ');
             }
 
             try {
