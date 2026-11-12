@@ -268,6 +268,8 @@ Route::get('/search/stock-balance', [SearchController::class, 'stockBalance'])->
 Route::prefix('bookings')->name('bookings.')->group(function () {
     Route::get('/', [BookingController::class, 'index'])->name('index');
     Route::get('/summary', [BookingController::class, 'summary'])->name('summary');
+    Route::get('/cover-sheet', [BookingController::class, 'coverSheet'])->name('cover-sheet');
+    Route::get('/comparison', [BookingController::class, 'comparison'])->name('comparison');
     Route::get('/create', [BookingController::class, 'create'])->name('create');
     Route::post('/', [BookingController::class, 'store'])->name('store');
     Route::get('/{booking}/edit', [BookingController::class, 'edit'])->name('edit');

@@ -118,11 +118,15 @@ class DeliveryNoteController extends Controller
             $salesAreaId = $request->integer('sales_area_id');
             $type = strtolower((string) $request->query('type', ''));
             if ($type === 'booking') {
-                // เกณฑ์เดียวกับหน้าใบรวมจอง (BookingController::summary): ใบจองที่ยังรอส่ง และสายขายของใบจอง
-                // ไม่งั้นปุ่ม "พิมพ์ทั้งหมดตามตัวกรองนี้" จะได้ชุดเอกสารไม่ตรงกับที่หน้านั้นแสดง
-                $query->whereHas('documentType', fn ($q) => $q->where('code', 'BOOKING'))
-                    ->whereHas('saleBooking', fn ($b) => $b->where('status', 'pending')
-                        ->when($salesAreaId, fn ($q) => $q->where('sales_area_id', $salesAreaId)));
+                // เกณฑ์เดียวกับหน้าใบรวมจองและใบปะหน้า: ใช้ BookingController::pendingBookingsQuery() ร่วมกัน
+                // เอกสารที่ถูกยกเลิก/voided จะไม่ถูกนำมาพิมพ์
+                $bookingDocIds = BookingController::pendingBookingsQuery(
+                    $date,
+                    $requestedBranchId ?: null,
+                    $salesAreaId ?: null
+                )->select('sale_bookings.document_id');
+
+                $query->whereIn('id', $bookingDocIds);
                 $salesAreaId = 0;
             }
             if ($salesAreaId) {
