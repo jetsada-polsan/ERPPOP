@@ -95,7 +95,7 @@
                                 <td>{{ $item->product?->sku_code }} {{ $item->product?->name_th }}</td>
                                 <td class="barcode-col font-monospace" style="display: none;">{{ $bCode }}</td>
                                 <td>{{ $item->unit?->name ?? $item->product?->baseUnit?->name ?? '-' }}</td>
-                                <td class="text-end">{{ number_format((float) $item->qty, 2) }}</td>
+                                <td class="text-end"><x-unit-qty :item="$item" /></td>
                                 <td class="check-col">□</td>
                                 <td class="check-col">□</td>
                                 <td></td>
@@ -203,7 +203,17 @@
                                 <small class="text-muted no-print"><span id="booking-count-{{ $item->id }}">{{ $item->bookings->count() }}</span> ใบจอง (คลิกดูรายละเอียด)</small>
                             </td>
                             <td class="text-end fw-bold prep-qty-cell" id="qty-{{ $item->id }}">{{ number_format((float) $item->total_qty, 2) }}</td>
-                            <td>{{ $item->unit_name }}</td>
+                            <td>
+                                {{ $item->unit_name }}
+                                @php
+                                    $dualText = \App\Support\UnitQty::format($item->product, $item->total_qty);
+                                @endphp
+                                @if(str_contains($dualText, '('))
+                                    <small class="text-muted d-block font-monospace" style="font-size: 11px;">
+                                        {{ substr($dualText, strpos($dualText, '(')) }}
+                                    </small>
+                                @endif
+                            </td>
                             <td class="check-col">□</td>
                         </tr>
                         <tr class="prep-breakdown-row no-print" id="breakdown-{{ $item->id }}" style="display: none; background: #fbfdff;">
@@ -235,7 +245,14 @@
                                                         <td>{{ $b->customer_name }}</td>
                                                         <td>{{ $b->sales_area_name }}</td>
                                                         <td>{{ $b->warehouse_name }}</td>
-                                                        <td class="text-end fw-bold">{{ number_format($b->qty, 2) }} {{ $item->unit_name }}</td>
+                                                        <td class="text-end fw-bold">
+                                                            {{ number_format($b->qty, 2) }} {{ $item->unit_name }}
+                                                            @if($b->stock_item && $b->stock_item->unit_id && (int) $b->stock_item->unit_id !== (int) $b->product?->base_unit_id)
+                                                                <small class="text-muted d-block font-monospace" style="font-size: 11px;">
+                                                                    ({{ \App\Support\UnitQty::formatSingle($b->stock_item->unit, $b->stock_item->unit_qty) }})
+                                                                </small>
+                                                            @endif
+                                                        </td>
                                                     </tr>
                                                 @endforeach
                                             </tbody>
@@ -298,6 +315,7 @@
     </section>
 
     <div class="signatures">ผู้ส่งของ <span></span> ผู้ตรวจรับ (บัญชี) <span></span></div>
+>>>>>>> origin/main
 </div>
 
 <style>

@@ -53,7 +53,7 @@
                                                 <div class="fw-semibold"><span class="text-muted me-2" x-text="line.sku"></span><span x-text="line.name"></span></div>
                                                 <div class="fw-bold text-danger" x-show="line.belowCost && line.qty > 0"><i class="bi bi-exclamation-triangle-fill me-1"></i>ราคาที่ขายต่ำกว่าทุน</div>
                                             </td>
-                                            <td class="text-end text-muted text-nowrap"><span x-text="fmt(line.remaining)"></span> <span x-text="line.unit"></span></td>
+                                            <td class="text-end text-muted text-nowrap"><span x-text="line.remaining_display || (fmt(line.remaining) + ' ' + line.unit)"></span></td>
                                             <td>
                                                 <input type="number" step="0.0001" min="0" :max="line.remaining" class="form-control text-end" x-model.number="line.qty"
                                                        :class="line.qty > line.remaining ? 'is-invalid' : ''"

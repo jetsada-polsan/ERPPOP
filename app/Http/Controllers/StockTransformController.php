@@ -108,7 +108,7 @@ class StockTransformController extends Controller
     public function show(Document $stockTransform): View
     {
         $stockTransform->load([
-            'branch', 'stockDocument.items.product.baseUnit',
+            'branch', 'stockDocument.items.product.baseUnit', 'stockDocument.items.product.barcodes.unit', 'stockDocument.items.unit',
             'productionBatch.outputProduct', 'productionBatch.packages',
         ]);
 

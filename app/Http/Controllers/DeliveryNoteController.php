@@ -37,7 +37,8 @@ class DeliveryNoteController extends Controller
             'documentType', 'branch', 'salesman',
             'customer.addresses',
             'stockDocument.items.product.baseUnit',
-            'stockDocument.items.product.barcodes',
+            'stockDocument.items.product.barcodes.unit',
+            'stockDocument.items.unit',
         ]);
 
         abort_unless($document->stockDocument !== null, 404, 'เอกสารนี้ไม่มีรายการสินค้า');
@@ -167,7 +168,8 @@ class DeliveryNoteController extends Controller
             'salesArea',
             'customer.addresses',
             'stockDocument.items.product.baseUnit',
-            'stockDocument.items.product.barcodes',
+            'stockDocument.items.product.barcodes.unit',
+            'stockDocument.items.unit',
             'saleBooking.salesArea',
             'paymentDocument',
         ])->get();

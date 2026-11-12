@@ -145,7 +145,7 @@ class StockTransferController extends Controller
     public function show(Document $stockTransfer): View
     {
         $this->assertTransfer($stockTransfer);
-        $stockTransfer->load(['branch', 'createdBy', 'stockDocument.toWarehouseLocation', 'stockDocument.items.product', 'stockDocument.items.warehouseLocation']);
+        $stockTransfer->load(['branch', 'createdBy', 'stockDocument.toWarehouseLocation', 'stockDocument.items.product.baseUnit', 'stockDocument.items.product.barcodes.unit', 'stockDocument.items.unit', 'stockDocument.items.warehouseLocation']);
 
         // ผลตรวจรับด้วยสแกน (ถ้ามี) - แยกตารางต่างหาก ไม่ผูกเป็น relation บน Document
         // เพื่อลดจุดแก้ไขในโมเดลที่ใช้ร่วมกันหลายจุด

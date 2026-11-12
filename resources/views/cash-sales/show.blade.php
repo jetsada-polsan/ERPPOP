@@ -45,7 +45,7 @@
                     <tr>
                         <td>{{ $item->product->sku_code }}</td>
                         <td>{{ $item->product->name_th }}</td>
-                        <td class="text-end">{{ number_format($item->qty, 2) }}</td>
+                        <td class="text-end"><x-unit-qty :item="$item" /></td>
                         <td class="text-end">{{ number_format($item->unit_price, 2) }}</td>
                         <td class="text-end">{{ number_format($item->qty * $item->unit_price, 2) }}</td>
                     </tr>

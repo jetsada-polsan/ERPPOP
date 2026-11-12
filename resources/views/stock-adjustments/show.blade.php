@@ -84,10 +84,10 @@
                         <td>{{ $item->product->sku_code }}</td>
                         <td>{{ $item->product->name_th }}</td>
                         <td>{{ $item->warehouseLocation->name }}</td>
-                        <td class="text-end">{{ number_format($item->system_qty, 2) }}</td>
-                        <td class="text-end">{{ number_format($item->counted_qty, 2) }}</td>
+                        <td class="text-end"><x-unit-qty :product="$item->product" :qty="$item->system_qty" /></td>
+                        <td class="text-end"><x-unit-qty :product="$item->product" :qty="$item->counted_qty" /></td>
                         <td class="text-end fw-semibold {{ $item->qty > 0 ? 'text-success' : 'text-danger' }}">
-                            {{ $item->qty > 0 ? '+' : '' }}{{ number_format($item->qty, 2) }}
+                            {{ $item->qty > 0 ? '+' : '' }}<x-unit-qty :item="$item" />
                         </td>
                     </tr>
                     @endforeach

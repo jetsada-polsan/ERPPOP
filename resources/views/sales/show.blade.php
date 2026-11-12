@@ -131,7 +131,7 @@ $isPartial = $openItem && $openItem->status === 'partial';
                         <tr>
                             <td class="fw-semibold text-primary">{{ $item->product?->sku_code }}</td>
                             <td>{{ $item->product?->name_th }} @if($isScale)<span class="badge text-bg-success ms-1">ชั่ง</span>@endif</td>
-                            <td class="text-end">{{ number_format($item->qty, $isScale ? 4 : 2) }} @if($isScale)<small class="text-success fw-bold">{{ $item->product?->baseUnit?->cleanName() ?? 'หน่วยฐาน' }}</small>@endif</td>
+                            <td class="text-end"><x-unit-qty :item="$item" /></td>
                             <td class="text-end">{{ number_format($item->unit_price, 2) }} @if($isScale)<small class="text-success fw-bold">/หน่วย</small>@endif</td>
                             <td class="text-end fw-semibold">{{ number_format($item->qty * $item->unit_price, 2) }}</td>
                         </tr>

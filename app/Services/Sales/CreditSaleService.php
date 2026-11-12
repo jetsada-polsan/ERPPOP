@@ -137,6 +137,11 @@ class CreditSaleService
                         'warehouse_location_id' => $source->warehouse_location_id,
                         'qty' => (string) $qty,
                         'unit_price' => (string) $price,
+                        'unit_id' => $source->unit_id,
+                        'unit_factor' => $source->unit_factor,
+                        'unit_qty' => $source->unit_factor && (float) $source->unit_factor > 0
+                            ? (string) DecimalMath::divide((string) $qty, (string) $source->unit_factor, 4)
+                            : (string) $qty,
                     ];
                 }
             }
@@ -295,6 +300,9 @@ class CreditSaleService
                     'unit_price' => $item->unit_price,
                     'unit_cost' => $unitCost,
                     'cost_amount' => DecimalMath::multiply($qty, $unitCost),
+                    'unit_id' => $item->unit_id ?? null,
+                    'unit_qty' => $item->unit_qty ?? null,
+                    'unit_factor' => $item->unit_factor ?? null,
                 ]);
             }
 

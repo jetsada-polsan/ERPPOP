@@ -67,7 +67,7 @@ $canEdit = $isPending && ! $billedAny && $booking->delivery_status === 'pending'
     </div>
     @if($remainingLines->isNotEmpty() && $isPending)
     <div class="small text-muted mt-2">ค้าง:
-        @foreach($remainingLines as $line){{ $line->product?->name_th }} {{ rtrim(rtrim(number_format((float) $line->qty - (float) $line->billed_qty, 4), '0'), '.') }}@if(! $loop->last), @endif @endforeach
+        @foreach($remainingLines as $line){{ $line->product?->name_th }} {{ \App\Support\UnitQty::format($line->product, (float) $line->qty - (float) ($line->billed_qty ?? 0), $line->unit_id) }}@if(! $loop->last), @endif @endforeach
     </div>
     @endif
 </div>
@@ -245,7 +245,7 @@ $canEdit = $isPending && ! $billedAny && $booking->delivery_status === 'pending'
                 <tr>
                     <td class="fw-semibold text-primary">{{ $item->product->sku_code }}</td>
                     <td>{{ $item->product->name_th }} @if($isScale)<span class="badge text-bg-success ms-1">ชั่ง</span>@endif</td>
-                    <td class="text-end">{{ number_format($item->qty, $isScale ? 4 : 2) }} @if($isScale)<small class="text-success fw-bold">{{ $item->product->baseUnit?->cleanName() ?? 'หน่วยฐาน' }}</small>@endif</td>
+                    <td class="text-end"><x-unit-qty :item="$item" /></td>
                     <td class="text-end">{{ number_format($item->unit_price, 2) }} @if($isScale)<small class="text-success fw-bold">/หน่วย</small>@endif</td>
                     <td class="text-end fw-semibold">{{ number_format($item->qty * $item->unit_price, 2) }}</td>
                 </tr>

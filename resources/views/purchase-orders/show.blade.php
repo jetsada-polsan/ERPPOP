@@ -88,9 +88,9 @@
                     <td class="fw-semibold">{{ $item->product->sku_code }}</td>
                     <td>{{ $item->product->name_th }}</td>
                     <td class="text-muted">{{ $item->product->baseUnit?->cleanName() ?? '-' }}</td>
-                    <td class="text-end">{{ number_format($item->qty, 2) }}</td>
-                    <td class="text-end text-success">{{ number_format($item->received_qty, 2) }}</td>
-                    <td class="text-end {{ (float)$item->received_qty < (float)$item->qty ? 'text-warning fw-semibold' : 'text-muted' }}">{{ number_format(max(0, (float)$item->qty - (float)$item->received_qty), 2) }}</td>
+                    <td class="text-end"><x-unit-qty :product="$item->product" :qty="$item->qty" /></td>
+                    <td class="text-end text-success"><x-unit-qty :product="$item->product" :qty="$item->received_qty" /></td>
+                    <td class="text-end {{ (float)$item->received_qty < (float)$item->qty ? 'text-warning fw-semibold' : 'text-muted' }}"><x-unit-qty :product="$item->product" :qty="max(0, (float)$item->qty - (float)$item->received_qty)" /></td>
                     <td class="text-end">{{ $item->unit_price > 0 ? number_format($item->unit_price, 2) : '-' }}</td>
                     <td class="text-end fw-semibold">{{ $item->unit_price > 0 ? number_format($item->qty * $item->unit_price, 2) : '-' }}</td>
                 </tr>
