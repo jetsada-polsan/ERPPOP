@@ -34,6 +34,7 @@ class QtyPromotion:
     discount_value: Decimal = Decimal("0")
     bundle_price: Decimal = Decimal("0")
     name: str = ""
+    max_sets_per_bill: int | None = None
 
 
 def _dec(value) -> Decimal:
@@ -62,6 +63,8 @@ def promotion_discounts(lines: list[PromoLine], promotions: Iterable[QtyPromotio
         sets = (trigger.qty / promotion.min_qty).to_integral_value(rounding=ROUND_FLOOR)
         if sets <= 0:
             continue
+        if promotion.max_sets_per_bill is not None and promotion.max_sets_per_bill > 0:
+            sets = min(sets, Decimal(str(promotion.max_sets_per_bill)))
         target, amount = trigger_index, Decimal("0")
         if promotion.promo_type == "discount":
             if promotion.discount_type == "percent":
@@ -89,19 +92,32 @@ def replace_promotions(db: sqlite3.Connection, rows: list[dict]) -> int:
         "SELECT id, server_id FROM products WHERE server_id IS NOT NULL")}
     saved = 0
     db.execute("DELETE FROM qty_promotions")
+    has_max_sets = "max_sets_per_bill" in {r["name"] for r in db.execute("PRAGMA table_info(qty_promotions)")}
     for row in rows:
         product_id = local.get(int(row.get("product_id") or 0))
         if product_id is None:
             continue
         free_id = local.get(int(row.get("free_product_id") or 0)) if row.get("free_product_id") else None
-        db.execute(
-            """INSERT INTO qty_promotions (server_id, name, promo_type, product_id, min_qty, free_product_id, free_qty,
-               discount_type, discount_value, bundle_price, starts_date, ends_date)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (row.get("id"), row.get("name") or "", row.get("promo_type"), product_id, str(_dec(row.get("min_qty"))),
-             free_id, str(_dec(row.get("free_qty"))), row.get("discount_type"), str(_dec(row.get("discount_value"))),
-             str(_dec(row.get("bundle_price"))), row.get("starts_date"), row.get("ends_date")),
-        )
+        max_sets = row.get("max_sets_per_bill")
+        max_sets_val = int(max_sets) if max_sets not in (None, "", 0) else None
+        if has_max_sets:
+            db.execute(
+                """INSERT INTO qty_promotions (server_id, name, promo_type, product_id, min_qty, free_product_id, free_qty,
+                   discount_type, discount_value, bundle_price, starts_date, ends_date, max_sets_per_bill)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (row.get("id"), row.get("name") or "", row.get("promo_type"), product_id, str(_dec(row.get("min_qty"))),
+                 free_id, str(_dec(row.get("free_qty"))), row.get("discount_type"), str(_dec(row.get("discount_value"))),
+                 str(_dec(row.get("bundle_price"))), row.get("starts_date"), row.get("ends_date"), max_sets_val),
+            )
+        else:
+            db.execute(
+                """INSERT INTO qty_promotions (server_id, name, promo_type, product_id, min_qty, free_product_id, free_qty,
+                   discount_type, discount_value, bundle_price, starts_date, ends_date)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (row.get("id"), row.get("name") or "", row.get("promo_type"), product_id, str(_dec(row.get("min_qty"))),
+                 free_id, str(_dec(row.get("free_qty"))), row.get("discount_type"), str(_dec(row.get("discount_value"))),
+                 str(_dec(row.get("bundle_price"))), row.get("starts_date"), row.get("ends_date")),
+            )
         saved += 1
     return saved
 
@@ -117,4 +133,5 @@ def active_promotions(db: sqlite3.Connection, today: date | None = None) -> list
         product_id=int(row["product_id"]), promo_type=str(row["promo_type"]), min_qty=_dec(row["min_qty"]),
         free_product_id=row["free_product_id"], free_qty=_dec(row["free_qty"]), discount_type=row["discount_type"],
         discount_value=_dec(row["discount_value"]), bundle_price=_dec(row["bundle_price"]), name=str(row["name"] or ""),
+        max_sets_per_bill=int(row["max_sets_per_bill"]) if "max_sets_per_bill" in row.keys() and row["max_sets_per_bill"] is not None else None,
     ) for row in rows]

@@ -189,6 +189,16 @@
             </div>
         </div>
 
+        <!-- จำกัดจำนวนชุดต่อบิล (ซ่อนเมื่อเป็นโปรระดับบิล เพราะได้ 1 สิทธิ์ต่อบิลอยู่แล้ว) -->
+        <div class="col-md-3" x-show="!isBill()" x-cloak>
+            <label class="form-label small text-muted">จำกัดจำนวนชุดต่อบิล</label>
+            <div class="input-group">
+                <input type="number" step="1" min="1" name="max_sets_per_bill" x-model="form.max_sets_per_bill" :disabled="isBill()" class="form-control" placeholder="ไม่จำกัด (เว้นว่าง)">
+                <span class="input-group-text">ชุด / บิล</span>
+            </div>
+            <div class="form-text">เว้นว่าง = ไม่จำกัด (ชิ้นที่เกินคิดราคาปกติ)</div>
+        </div>
+
         <!-- คำอธิบายแม่แบบที่เลือก -->
         <div class="col-12">
             <div class="promo-preview">
@@ -231,6 +241,7 @@
                     <th>ชื่อแคมเปญ</th>
                     <th>ประเภท / สินค้า</th>
                     <th>เงื่อนไข</th>
+                    <th style="width: 110px;">จำกัดต่อบิล</th>
                     <th>ของแถม / แลกซื้อ</th>
                     <th>สาขา</th>
                     <th>ช่วงเวลาเริ่ม - สิ้นสุด</th>
@@ -275,6 +286,7 @@
                         'starts_at' => $promo->starts_at?->format('Y-m-d\TH:i'),
                         'ends_at' => $promo->ends_at?->format('Y-m-d\TH:i'),
                         'note' => $promo->note ?? '',
+                        'max_sets_per_bill' => $promo->max_sets_per_bill,
                     ];
                 @endphp
                 <tr>
@@ -303,6 +315,15 @@
                         </span>
                     </td>
                     <td class="small">
+                        @if($promo->isBillLevel())
+                            <span class="text-muted">1 สิทธิ์/บิล</span>
+                        @elseif($promo->max_sets_per_bill)
+                            <span class="badge text-bg-info text-dark font-monospace">{{ $promo->max_sets_per_bill }} ชุด/บิล</span>
+                        @else
+                            <span class="text-muted">ไม่จำกัด</span>
+                        @endif
+                    </td>
+                    <td class="small">
                         @if($promo->freeProduct)
                             <span class="text-success"><i class="bi bi-gift me-1"></i>{{ $promo->freeProduct->sku_code }} {{ $promo->freeProduct->name_th }}</span>
                         @else
@@ -327,7 +348,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="9" class="text-center text-muted py-5">ยังไม่มีแคมเปญโปรโมชัน</td></tr>
+                <tr><td colspan="10" class="text-center text-muted py-5">ยังไม่มีแคมเปญโปรโมชัน</td></tr>
             @endforelse
             </tbody>
         </table>
@@ -374,6 +395,7 @@ function qtyPromotionProductPage() {
             ends_at: '',
             note: '',
             is_active: true,
+            max_sets_per_bill: '',
         },
         promoCards: [
             { type: 'bundle_price', title: 'ซื้อครบ X ชิ้น ราคาเหลือ Y บาท', example: 'เช่น 3 แพ็ค 100 บาท', icon: 'bi-tags-fill', explain: 'ซื้อสินค้าเดียวกันครบ X ชิ้น จ่ายราคาชุดละ Y บาท ส่วนที่เกินคิดราคาปกติ' },
@@ -439,6 +461,7 @@ function qtyPromotionProductPage() {
             this.form.ends_at = data.ends_at || '';
             this.form.note = data.note || '';
             this.form.is_active = true;
+            this.form.max_sets_per_bill = data.max_sets_per_bill ?? '';
 
             this.items = [
                 data.product ? { product_id: data.product.id, sku_code: data.product.sku_code, name_th: data.product.name_th, unit_name: data.product.unit_name || '' } : { product_id: '', sku_code: '', name_th: '', unit_name: '' },

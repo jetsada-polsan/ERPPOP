@@ -166,7 +166,8 @@ CREATE TABLE IF NOT EXISTS qty_promotions (
     discount_value TEXT NOT NULL DEFAULT '0',
     bundle_price TEXT NOT NULL DEFAULT '0',
     starts_date TEXT,
-    ends_date TEXT
+    ends_date TEXT,
+    max_sets_per_bill INTEGER
 );
 CREATE TABLE IF NOT EXISTS sync_outbox (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -312,6 +313,8 @@ ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("sales", "adjustment_approved_by", "TEXT"),
     # ส่วนลดจากโปรซื้อครบจำนวน แยกจากส่วนลดที่คนกด เพราะ ERP คิดเองไม่ต้องมีผู้อนุมัติ
     ("sale_items", "promo_discount", "TEXT NOT NULL DEFAULT '0'"),
+    # จำกัดจำนวนชุดโปรต่อบิล ตั้งได้หลังบ้าน (ว่าง/NULL = ไม่จำกัด)
+    ("qty_promotions", "max_sets_per_bill", "INTEGER"),
 ]
 
 # ยูนีคเฉพาะแถวที่มี server_id — กันแคชเชียร์คนเดียวถูก sync ลงซ้ำสองแถว

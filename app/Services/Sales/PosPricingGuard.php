@@ -425,11 +425,17 @@ class PosPricingGuard
             $need = $floor($promotion->min_qty, 1);
             if ($promotion->promo_type === 'mix_bundle' && $need > 0) {
                 $sets = intdiv(count($units), $need);
+                if ($promotion->max_sets_per_bill !== null && (int) $promotion->max_sets_per_bill > 0) {
+                    $sets = min($sets, (int) $promotion->max_sets_per_bill);
+                }
                 $discount = DecimalMath::add($discount, $positive(DecimalMath::subtract(
                     DecimalMath::sum(array_slice($units, 0, $sets * $need)), DecimalMath::multiply($sets, $promotion->bundle_price))));
             } elseif ($promotion->promo_type === 'mix_free' && $need > 0) {
                 $free = $floor($promotion->free_qty, 1);
                 $sets = intdiv(count($units), $need + $free);
+                if ($promotion->max_sets_per_bill !== null && (int) $promotion->max_sets_per_bill > 0) {
+                    $sets = min($sets, (int) $promotion->max_sets_per_bill);
+                }
                 $discount = DecimalMath::add($discount, DecimalMath::sum(array_slice(array_reverse($units), 0, $sets * $free)));
             }
         }
@@ -441,6 +447,9 @@ class PosPricingGuard
             $sets = $floor($trigger['qty'], $promotion->min_qty);
             if ($sets <= 0) {
                 continue;
+            }
+            if ($promotion->max_sets_per_bill !== null && (int) $promotion->max_sets_per_bill > 0) {
+                $sets = min($sets, (int) $promotion->max_sets_per_bill);
             }
             if ($promotion->promo_type === 'discount') {
                 $amount = $promotion->discount_type === 'percent'
@@ -457,6 +466,9 @@ class PosPricingGuard
                     $giftSets = (int) $promotion->free_product_id === (int) $promotion->product_id
                         ? $floor($trigger['qty'], DecimalMath::add($promotion->min_qty, $promotion->free_qty))
                         : $sets;
+                    if ($promotion->max_sets_per_bill !== null && (int) $promotion->max_sets_per_bill > 0) {
+                        $giftSets = min($giftSets, (int) $promotion->max_sets_per_bill);
+                    }
                     $freeQty = $min($gift['qty'], DecimalMath::multiply($giftSets, $promotion->free_qty));
                     $discount = DecimalMath::add($discount, DecimalMath::multiply($freeQty, $gift['unit_price']));
                 }

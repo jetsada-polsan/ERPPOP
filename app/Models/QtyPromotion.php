@@ -6,11 +6,12 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 #[Fillable([
     'code', 'name', 'promo_type', 'product_id', 'min_qty', 'min_amount', 'free_product_id',
     'free_qty', 'discount_type', 'discount_value', 'max_discount', 'bundle_price', 'branch_id',
-    'starts_date', 'ends_date', 'starts_at', 'ends_at', 'note', 'is_active',
+    'starts_date', 'ends_date', 'starts_at', 'ends_at', 'note', 'is_active', 'max_sets_per_bill',
 ])]
 class QtyPromotion extends Model
 {
@@ -20,7 +21,7 @@ class QtyPromotion extends Model
     /** โปรซื้อคละ: หยิบสินค้าไหนในกลุ่มก็นับรวม */
     public const MIX_TYPES = ['mix_bundle', 'mix_free'];
 
-    public function groupProducts(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function groupProducts(): BelongsToMany
     {
         return $this->belongsToMany(Product::class, 'qty_promotion_products', 'qty_promotion_id', 'product_id');
     }
@@ -155,6 +156,7 @@ class QtyPromotion extends Model
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
             'is_active' => 'boolean',
+            'max_sets_per_bill' => 'integer',
         ];
     }
 }
