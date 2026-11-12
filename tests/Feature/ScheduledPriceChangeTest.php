@@ -514,4 +514,43 @@ class ScheduledPriceChangeTest extends TestCase
         $this->assertSame(0, DecimalMath::compare(\App\Models\ProductPrice::where('product_id', $smallestUnitOnly->id)->where('unit_id', $pack->id)->value('price'), 540), 'ราคาหน่วยใหญ่ต้องไม่ถูกแตะ');
         $this->assertSame(0, DecimalMath::compare($withRow->fresh()->default_price, 54));
     }
+
+    /**
+     * production 12 พ.ย.: สินค้าจาก BPlus มีราคาที่บาร์โค้ด (product_barcodes.price) ไม่มีแถวในตารางราคา
+     * นัดเปลี่ยน 20 -> 40 ต้องไปถึงเครื่อง POS ทั้งตอนยิงบาร์โค้ด ค้นรหัสสินค้า และตัวตรวจบิล ERP
+     */
+    public function test_scheduled_price_reaches_pos_for_products_priced_on_their_barcode(): void
+    {
+        $user = $this->createMasterManager();
+        $branch = Branch::create(['code' => 'B-SPB', 'name_th' => 'สาขาทดสอบ', 'is_active' => true]);
+        \App\Models\PriceTable::create(['code' => 'POS', 'name' => 'ราคาปลีก POS', 'is_default' => true, 'is_active' => true]);
+        $product = $this->createProduct('301261', '100พลัส เกรปเบอรี่ 370 มล.', 20);
+        \App\Models\ProductBarcode::create(['product_id' => $product->id, 'barcode' => '8850000301261', 'unit_id' => $product->base_unit_id,
+            'unit_factor' => 1, 'price' => 20, 'is_active' => true]);
+
+        app(ScheduledPriceChangeService::class)->schedule([['product_id' => $product->id, 'new_price' => 40]], '2026-11-12 00:00:00', 'TEST', $user->id);
+        $this->actingAs($user);
+
+        $pos = function (string $q, string $lookup) use ($branch): float {
+            $request = \Illuminate\Http\Request::create('/pos/products', 'GET', ['branch_id' => $branch->id, 'q' => $q, 'exact' => 1, 'lookup' => $lookup]);
+            $this->app->instance('request', $request);
+
+            return (float) app(\App\Http\Controllers\PosController::class)->products($request)->getData(true)[0]['pos_price'];
+        };
+        $guard = function () use ($product, $branch): float {
+            $method = new \ReflectionMethod(\App\Services\Sales\PosPricingGuard::class, 'basePrices');
+            $method->setAccessible(true);
+
+            return (float) $method->invoke(app(\App\Services\Sales\PosPricingGuard::class), [$product->id], $branch->id)[$product->id];
+        };
+
+        $this->assertSame([20.0, 20.0, 20.0], [$pos('8850000301261', 'barcode'), $pos('301261', 'sku'), $guard()], 'ก่อนถึงเวลา');
+
+        Carbon::setTestNow('2026-11-12 00:00:30');
+        $this->assertSame([40.0, 40.0, 40.0], [$pos('8850000301261', 'barcode'), $pos('301261', 'sku'), $guard()], 'ถึงเวลา ยังไม่รันตัวทำงาน');
+
+        app(ScheduledPriceChangeService::class)->applyDue();
+        $this->assertSame([40.0, 40.0, 40.0], [$pos('8850000301261', 'barcode'), $pos('301261', 'sku'), $guard()], 'หลังรันตัวทำงาน (ปิดช่วงราคา POS แล้ว)');
+        $this->assertSame(0, DecimalMath::compare($product->fresh()->default_price, 40), 'ราคาหลังบ้าน (default_price) ต้องเป็นราคาใหม่');
+    }
 }

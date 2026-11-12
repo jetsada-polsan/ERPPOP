@@ -47,7 +47,8 @@
                     <label class="form-label fw-semibold small">
                         วันที่และเวลาที่มีผล <span class="text-danger">*</span>
                     </label>
-                    <input type="datetime-local" name="effective_at" x-model="effectiveAt" required
+                    <input type="datetime-local" name="effective_at" x-model="effectiveAt" required min="{{ now()->addMinute()->format('Y-m-d\TH:i') }}"
+                           title="ต้องเป็นเวลาในอนาคต (หลังเวลานี้)"
                            class="form-control form-control-sm @error('effective_at') is-invalid @enderror">
                     <div class="form-text text-muted" style="font-size: 11px;">
                         ค่าเริ่มต้น 00:00 วันพรุ่งนี้ (เวลาไทย) ระบบจะเปลี่ยนราคาอัตโนมัติและส่งให้ POS ล่วงหน้า

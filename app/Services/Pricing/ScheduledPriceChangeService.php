@@ -7,6 +7,7 @@ use App\Models\PosPriceSchedule;
 use App\Models\PriceChange;
 use App\Models\PriceTable;
 use App\Models\Product;
+use App\Models\ProductBarcode;
 use App\Models\ProductPrice;
 use App\Models\ProductUnit;
 use App\Models\ScheduledPriceChange;
@@ -169,13 +170,14 @@ class ScheduledPriceChangeService
                     ]);
 
                     $tableRowOld = $this->syncPosBasePriceRow($product, $locked->new_price);
+                    $barcodeOld = $this->syncBaseBarcodePrices($product, $locked->new_price);
 
                     AuditLog::create([
                         'user_id' => $locked->created_by,
                         'action' => 'price_updated',
                         'table_name' => 'products',
                         'record_id' => $product->id,
-                        'old_values' => ['default_price' => (string) $oldPrice, 'price_table_row' => $tableRowOld],
+                        'old_values' => ['default_price' => (string) $oldPrice, 'price_table_row' => $tableRowOld, 'base_barcode_prices' => $barcodeOld],
                         'new_values' => ['default_price' => (string) $locked->new_price, 'price_table_row' => $tableRowOld === null ? null : (string) $locked->new_price],
                     ]);
                 } else {
@@ -250,6 +252,33 @@ class ScheduledPriceChangeService
      *
      * @return string|null ราคาเดิมของแถวที่แก้ หรือ null ถ้าสินค้าไม่มีแถวในตารางราคาหลัก
      */
+    /**
+     * เครื่อง POS ยิงบาร์โค้ดแล้วใช้ราคาที่บาร์โค้ด (product_barcodes.price) ก่อนตารางราคาและ default_price
+     * สินค้าที่โคลนจาก BPlus เก็บราคาปลีกไว้ที่บาร์โค้ด ถ้าไม่แก้ด้วย หลังตัวทำงานปิดช่วงราคา POS
+     * เครื่องจะกลับไปขายราคาเดิม ขณะที่ ERP รับบิลด้วยราคาใหม่ — แก้เฉพาะบาร์โค้ดหน่วยฐาน (ตัวคูณ 1)
+     * บาร์โค้ดหน่วยใหญ่ (แพ็ค/ลัง) ไม่แตะ เหมือนแถวตารางราคา
+     *
+     * @return array<string, string> บาร์โค้ด => ราคาเดิม (เฉพาะที่เปลี่ยน)
+     */
+    private function syncBaseBarcodePrices(Product $product, mixed $newPrice): array
+    {
+        $old = [];
+        $barcodes = ProductBarcode::where('product_id', $product->id)->where('is_active', true)->whereNotNull('price')
+            ->where(fn ($q) => $q->whereNull('unit_id')->orWhere('unit_id', $product->base_unit_id))
+            ->lockForUpdate()->get();
+        foreach ($barcodes as $barcode) {
+            if ($barcode->unit_factor !== null && DecimalMath::compare($barcode->unit_factor, 1) !== 0) {
+                continue;
+            }
+            if (DecimalMath::compare($barcode->price, $newPrice) !== 0) {
+                $old[$barcode->barcode] = (string) $barcode->price;
+                $barcode->update(['price' => $newPrice]);
+            }
+        }
+
+        return $old;
+    }
+
     private function syncPosBasePriceRow(Product $product, mixed $newPrice): ?string
     {
         $tableId = PriceTable::where('is_default', true)->value('id');
