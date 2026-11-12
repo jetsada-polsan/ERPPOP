@@ -9,15 +9,16 @@
     <ul class="nav nav-pills mb-4">
         @foreach($typeLabels as $key => $label)
             <li class="nav-item">
-                <a href="{{ route('stock-issues.index', ['type' => $key]) }}" class="nav-link {{ $type === $key ? 'active' : '' }}">{{ $label }}</a>
+                <a href="{{ route('stock-issues.index', array_filter(['type' => $key, 'date_from' => $dateRange->from, 'date_to' => $dateRange->to])) }}" class="nav-link {{ $type === $key ? 'active' : '' }}">{{ $label }}</a>
             </li>
         @endforeach
         <li class="nav-item"><a href="{{ route('stock-transforms.index') }}" class="nav-link">ใบแปรรูปสินค้า</a></li>
     </ul>
 
-    <div class="list-toolbar">
-        <div class="list-toolbar-left">
+    <div class="list-toolbar flex-wrap gap-2">
+        <div class="list-toolbar-left flex-wrap gap-2">
             <h2 class="h5 fw-bold mb-0">{{ $typeLabels[$type] }}</h2>
+            @include('partials.list-date-range', ['dateRange' => $dateRange, 'wrapForm' => true])
             @include('partials.search-bar', ['q' => $q, 'placeholder' => 'ค้นหาเลขที่เอกสาร'])
         </div>
         <button type="button" class="btn btn-primary rounded-pill px-4" @click="modalOpen = true">

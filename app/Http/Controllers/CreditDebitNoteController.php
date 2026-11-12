@@ -7,6 +7,7 @@ use App\Models\Customer;
 use App\Models\CustomerOpenItem;
 use App\Models\Document;
 use App\Services\Sales\CreditDebitNoteService;
+use App\Support\ListDateRange;
 use App\Support\ThaiBaht;
 use App\Support\VoidedDocumentPrint;
 use Illuminate\Http\JsonResponse;
@@ -14,8 +15,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
-use Symfony\Component\HttpFoundation\Response;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\Response;
 
 class CreditDebitNoteController extends Controller
 {
@@ -24,6 +25,7 @@ class CreditDebitNoteController extends Controller
         $type = $request->query('type', 'credit') === 'debit' ? 'debit' : 'credit';
         $typeCode = $type === 'credit' ? 'CREDIT_NOTE' : 'DEBIT_NOTE';
         $q = trim((string) $request->query('q', ''));
+        $dateRange = ListDateRange::fromRequest($request, 'doc_date');
 
         $notes = Document::with(['customer', 'branch'])
             ->whereHas('documentType', fn ($query) => $query->where('code', $typeCode))
@@ -32,6 +34,7 @@ class CreditDebitNoteController extends Controller
                 ->orWhere('reference', 'ilike', "%{$q}%")
                 ->orWhereHas('customer', fn ($c) => $c->where('name_th', 'ilike', "%{$q}%"))
             ))
+            ->tap(fn ($query) => $dateRange->apply($query))
             ->orderByDesc('id')
             ->paginate(50)->withQueryString();
 
@@ -39,6 +42,7 @@ class CreditDebitNoteController extends Controller
             'notes' => $notes,
             'type' => $type,
             'q' => $q,
+            'dateRange' => $dateRange,
             'customers' => Customer::where('is_active', true)->orderBy('code')->limit(500)->get(['id', 'code', 'name_th']),
             'branches' => Branch::orderBy('code')->get(['id', 'code', 'name_th']),
         ]);

@@ -5,15 +5,19 @@
 @section('content')
 <div x-data="cdNotePage()" x-cloak>
     <ul class="nav nav-pills mb-3">
-        <li class="nav-item"><a href="{{ route('credit-debit-notes.index', ['type' => 'credit']) }}" class="nav-link {{ $type === 'credit' ? 'active' : '' }}"><i class="bi bi-dash-circle me-1"></i>ใบลดหนี้</a></li>
-        <li class="nav-item"><a href="{{ route('credit-debit-notes.index', ['type' => 'debit']) }}" class="nav-link {{ $type === 'debit' ? 'active' : '' }}"><i class="bi bi-plus-circle me-1"></i>ใบเพิ่มหนี้</a></li>
+        <li class="nav-item"><a href="{{ route('credit-debit-notes.index', array_filter(['type' => 'credit', 'date_from' => $dateRange->from, 'date_to' => $dateRange->to])) }}" class="nav-link {{ $type === 'credit' ? 'active' : '' }}"><i class="bi bi-dash-circle me-1"></i>ใบลดหนี้</a></li>
+        <li class="nav-item"><a href="{{ route('credit-debit-notes.index', array_filter(['type' => 'debit', 'date_from' => $dateRange->from, 'date_to' => $dateRange->to])) }}" class="nav-link {{ $type === 'debit' ? 'active' : '' }}"><i class="bi bi-plus-circle me-1"></i>ใบเพิ่มหนี้</a></li>
     </ul>
 
     <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
-        <form method="get" class="d-flex gap-2">
+        <form method="get" class="d-flex gap-2 flex-wrap align-items-center">
             <input type="hidden" name="type" value="{{ $type }}">
-            <input type="text" name="q" value="{{ $q }}" class="form-control form-control-sm" style="width:260px" placeholder="เลขที่ / อ้างอิง / ลูกค้า">
+            @include('partials.list-date-range', ['dateRange' => $dateRange])
+            <input type="text" name="q" value="{{ $q }}" class="form-control form-control-sm" style="width:200px" placeholder="เลขที่ / อ้างอิง / ลูกค้า">
             <button class="btn btn-sm btn-primary px-3"><i class="bi bi-funnel-fill me-1"></i>กรอง</button>
+            @if($q || !$dateRange->isDefault)
+                <a href="{{ route('credit-debit-notes.index', ['type' => $type]) }}" class="btn btn-sm btn-light border px-2">ล้าง</a>
+            @endif
         </form>
         <button type="button" class="btn ms-auto {{ $type === 'credit' ? 'btn-warning' : 'btn-danger' }}" @click="modalOpen = true">
             <i class="bi bi-plus-lg me-1"></i>สร้าง{{ $type === 'credit' ? 'ใบลดหนี้' : 'ใบเพิ่มหนี้' }}

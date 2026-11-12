@@ -11,6 +11,7 @@ use App\Services\Sales\BookingService;
 use App\Services\Sales\CreditSaleService;
 use App\Services\Sales\DocumentNumberGenerator;
 use App\Support\DecimalMath;
+use App\Support\ListDateRange;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -28,6 +29,7 @@ class QuotationController extends Controller
 
         $status = $request->query('status');
         $q = trim((string) $request->query('q', ''));
+        $dateRange = ListDateRange::fromRequest($request, 'doc_date');
 
         $quotations = Quotation::with(['customer', 'branch', 'salesman'])->withCount('items')
             ->when($status, fn ($query) => $query->where('status', $status))
@@ -36,6 +38,7 @@ class QuotationController extends Controller
                 ->orWhere('customer_name', 'ilike', "%{$q}%")
                 ->orWhereHas('customer', fn ($c) => $c->where('name_th', 'ilike', "%{$q}%"))
             ))
+            ->tap(fn ($query) => $dateRange->apply($query))
             ->orderByDesc('id')
             ->paginate(50)->withQueryString();
 
@@ -43,6 +46,7 @@ class QuotationController extends Controller
             'quotations' => $quotations,
             'status' => $status,
             'q' => $q,
+            'dateRange' => $dateRange,
             'customers' => Customer::where('is_active', true)->orderBy('code')->limit(500)->get(['id', 'code', 'name_th']),
             'branches' => Branch::orderBy('code')->get(['id', 'code', 'name_th']),
             'salesmen' => Salesman::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']),

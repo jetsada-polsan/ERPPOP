@@ -98,7 +98,15 @@
     </div>
     <div class="col-12 col-xl-7">
         <div class="content-card p-4">
-            <h2 class="h5 fw-bold mb-3">ใบสั่งผลิต</h2>
+            <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                <h2 class="h5 fw-bold mb-0">ใบสั่งผลิต</h2>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    @include('partials.list-date-range', ['dateRange' => $dateRange, 'wrapForm' => true])
+                    <div style="min-width: 220px;">
+                        @include('partials.search-bar', ['q' => $q, 'placeholder' => 'ค้นหาเลขที่ / สินค้า'])
+                    </div>
+                </div>
+            </div>
             <div class="table-responsive">
                 <table class="table align-middle">
                     <thead><tr><th>เลขที่</th><th>วันที่</th><th>สินค้า</th><th class="text-end">แผน</th><th class="text-end">ผลิตแล้ว</th><th>สถานะ</th><th style="width:190px">รับเข้าคลัง (IP)</th></tr></thead>

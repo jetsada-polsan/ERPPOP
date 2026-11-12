@@ -7,6 +7,7 @@ use App\Models\OcrDocument;
 use App\Models\Supplier;
 use App\Services\OCR\GoodsReceiptDraftService;
 use App\Services\OCR\OcrDocumentService;
+use App\Support\ListDateRange;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -20,16 +21,26 @@ class OcrDocumentController extends Controller
     public function index(Request $request): View
     {
         $status = $request->query('status');
+        $dateRange = ListDateRange::fromRequest($request, 'created_at');
+
         $documents = OcrDocument::with(['supplier', 'branch'])
             ->when($status, fn ($query) => $query->where('status', $status))
+            ->tap(fn ($query) => $dateRange->apply($query))
             ->latest()
             ->paginate(30)
             ->withQueryString();
 
+        $statusCounts = OcrDocument::query()
+            ->tap(fn ($query) => $dateRange->apply($query))
+            ->selectRaw('status, count(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
         return view('ocr.index', [
             'documents' => $documents,
             'status' => $status,
-            'statusCounts' => OcrDocument::selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status'),
+            'statusCounts' => $statusCounts,
+            'dateRange' => $dateRange,
         ]);
     }
 

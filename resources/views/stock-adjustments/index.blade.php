@@ -11,9 +11,10 @@
             <li class="nav-item"><span class="nav-link active">ปรับปรุงยอดสต็อก</span></li>
         </ul>
 
-        <div class="list-toolbar">
-            <div class="list-toolbar-left">
+        <div class="list-toolbar flex-wrap gap-2">
+            <div class="list-toolbar-left flex-wrap gap-2">
                 <h2 class="h5 fw-bold mb-0">ปรับปรุงสต็อก</h2>
+                @include('partials.list-date-range', ['dateRange' => $dateRange, 'wrapForm' => true])
                 @include('partials.search-bar', ['q' => $q, 'placeholder' => 'ค้นหาเลขที่เอกสาร'])
             </div>
             <button type="button" class="btn btn-primary rounded-pill px-4" @click="openModal()">

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PosOfflineSale;
 use App\Services\Reports\ReportScope;
+use App\Support\ListDateRange;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -56,16 +57,26 @@ class PosOfflineSaleController extends Controller
     public function index(Request $request): View
     {
         $status = $request->query('status', PosOfflineSale::NEEDS_REVIEW);
+        $dateRange = ListDateRange::fromRequest($request, 'sold_at');
+
         $sales = app(ReportScope::class)->apply(PosOfflineSale::query())->with(['user:id,name', 'branch:id,code,name_th', 'resolver:id,name', 'device:id,name,terminal_code'])
             ->when($status !== 'all', fn ($q) => $q->where('status', $status))
+            ->tap(fn ($query) => $dateRange->apply($query))
             ->latest('sold_at')
             ->paginate(50)
             ->withQueryString();
 
+        $counts = app(ReportScope::class)->apply(PosOfflineSale::query())
+            ->tap(fn ($query) => $dateRange->apply($query))
+            ->selectRaw('status, count(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
         return view('pos.offline-sales', [
             'sales' => $sales,
             'status' => $status,
-            'counts' => app(ReportScope::class)->apply(PosOfflineSale::query())->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status'),
+            'counts' => $counts,
+            'dateRange' => $dateRange,
         ]);
     }
 

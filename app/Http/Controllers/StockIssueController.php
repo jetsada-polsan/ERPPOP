@@ -6,6 +6,7 @@ use App\Models\Branch;
 use App\Models\Document;
 use App\Models\WarehouseLocation;
 use App\Services\Inventory\StockIssueService;
+use App\Support\ListDateRange;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -26,10 +27,12 @@ class StockIssueController extends Controller
             $type = 'requisition';
         }
         $q = trim((string) $request->query('q', ''));
+        $dateRange = ListDateRange::fromRequest($request, 'doc_date');
 
         $documents = Document::with(['branch', 'stockDocument'])
             ->whereHas('documentType', fn ($query) => $query->where('code', StockIssueService::TYPES[$type]))
             ->when($q !== '', fn ($query) => $query->where('doc_number', 'ilike', "%{$q}%"))
+            ->tap(fn ($query) => $dateRange->apply($query))
             ->orderByDesc('id')
             ->paginate(50)
             ->withQueryString();
@@ -47,6 +50,7 @@ class StockIssueController extends Controller
             'locations' => WarehouseLocation::orderBy('code')->get(['id', 'code', 'name']),
             'recentRequisitions' => $recentRequisitions,
             'q' => $q,
+            'dateRange' => $dateRange,
         ]);
     }
 

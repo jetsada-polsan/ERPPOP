@@ -59,6 +59,12 @@
                     </button>
                     <span class="text-muted small" x-show="selectedIds.length > 0">เลือกแล้ว <b x-text="selectedIds.length"></b> รายการ</span>
                 </div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    @include('partials.list-date-range', ['dateRange' => $dateRange, 'wrapForm' => true])
+                    <div style="min-width: 240px;">
+                        @include('partials.search-bar', ['q' => $q, 'placeholder' => 'ค้นหาเลขที่ / ชื่อลูกค้า'])
+                    </div>
+                </div>
             </div>
             <div class="table-responsive">
                 <table class="table align-middle">

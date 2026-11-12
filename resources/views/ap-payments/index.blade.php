@@ -56,10 +56,16 @@
             </tbody>
         </table>
     </div>
+    <div class="mt-3">{{ $payments->links() }}</div>
 </div>
 
 <div class="content-card p-4">
-    <h2 class="h5 fw-bold mb-3">ใบจ่ายชำระล่าสุด</h2>
+    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+        <h2 class="h5 fw-bold mb-0">ใบจ่ายชำระเจ้าหนี้</h2>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            @include('partials.list-date-range', ['dateRange' => $dateRange, 'wrapForm' => true])
+        </div>
+    </div>
     <div class="table-responsive">
         <table class="table align-middle">
             <thead>
@@ -81,5 +87,6 @@
             </tbody>
         </table>
     </div>
+    <div class="mt-3">{{ $payments->links() }}</div>
 </div>
 @endsection

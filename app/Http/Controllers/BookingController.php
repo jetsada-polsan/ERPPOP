@@ -15,6 +15,7 @@ use App\Models\WarehouseLocation;
 use App\Services\Sales\BookingDeliveryService;
 use App\Services\Sales\BookingService;
 use App\Services\Sales\CreditSaleService;
+use App\Support\ListDateRange;
 use App\Support\UnitQty;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
@@ -657,6 +658,8 @@ class BookingController extends Controller
         $salesAreaId = $request->integer('sales_area_id') ?: null;
         $salesUserId = $request->integer('sales_user_id') ?: null;
 
+        $dateRange = ListDateRange::fromRequest($request, 'doc_date');
+
         $bookings = SaleBooking::with(['document.customer', 'document.branch', 'document.salesUser', 'document.salesArea', 'document.documentBook'])
             ->when($status !== '', fn ($query) => $query->where('status', $status))
             ->when($salesAreaId, fn ($query) => $query->where('sales_area_id', $salesAreaId))
@@ -667,14 +670,18 @@ class BookingController extends Controller
                 ->where('doc_number', 'ilike', "%{$q}%")
                 ->orWhereHas('customer', fn ($c) => $c->where('name_th', 'ilike', "%{$q}%"))
             ))
+            ->tap(fn ($query) => $dateRange->applyRelation($query, 'document', 'doc_date'))
             ->orderByDesc('id')
             ->paginate(50)
             ->withQueryString();
 
+        $countsQuery = SaleBooking::query()
+            ->tap(fn ($query) => $dateRange->applyRelation($query, 'document', 'doc_date'));
+
         $counts = [
-            'all' => SaleBooking::count(),
-            'pending' => SaleBooking::where('status', 'pending')->count(),
-            'converted_to_sale' => SaleBooking::where('status', 'converted_to_sale')->count(),
+            'all' => (clone $countsQuery)->count(),
+            'pending' => (clone $countsQuery)->where('status', 'pending')->count(),
+            'converted_to_sale' => (clone $countsQuery)->where('status', 'converted_to_sale')->count(),
         ];
 
         $branches = Branch::orderBy('code')->get();
@@ -713,7 +720,7 @@ class BookingController extends Controller
 
         return view('bookings.index', compact(
             'bookings', 'branches', 'salesUsers', 'salesAreas',
-            'documentBooks', 'bookingDefaults', 'q', 'status', 'bookId', 'branchId', 'salesAreaId', 'salesUserId', 'counts'
+            'documentBooks', 'bookingDefaults', 'q', 'status', 'bookId', 'branchId', 'salesAreaId', 'salesUserId', 'counts', 'dateRange'
         ));
     }
 

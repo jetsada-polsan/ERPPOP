@@ -63,15 +63,15 @@
         </div>
 
         <div class="d-flex gap-2 mb-3 flex-wrap">
-            <a href="{{ route('bookings.index', ['q' => $q, 'book' => $bookId, 'branch_id' => $branchId, 'sales_area_id' => $salesAreaId, 'sales_user_id' => $salesUserId]) }}"
+            <a href="{{ route('bookings.index', array_filter(['q' => $q, 'book' => $bookId, 'branch_id' => $branchId, 'sales_area_id' => $salesAreaId, 'sales_user_id' => $salesUserId, 'date_from' => $dateRange->from, 'date_to' => $dateRange->to])) }}"
                class="btn btn-sm {{ $status === '' ? 'btn-dark' : 'btn-light border' }} rounded-pill px-3">
                 ทั้งหมด <span class="badge text-bg-secondary ms-1">{{ number_format($counts['all']) }}</span>
             </a>
-            <a href="{{ route('bookings.index', ['q' => $q, 'status' => 'pending', 'book' => $bookId, 'branch_id' => $branchId, 'sales_area_id' => $salesAreaId, 'sales_user_id' => $salesUserId]) }}"
+            <a href="{{ route('bookings.index', array_filter(['q' => $q, 'status' => 'pending', 'book' => $bookId, 'branch_id' => $branchId, 'sales_area_id' => $salesAreaId, 'sales_user_id' => $salesUserId, 'date_from' => $dateRange->from, 'date_to' => $dateRange->to])) }}"
                class="btn btn-sm {{ $status === 'pending' ? 'btn-warning' : 'btn-light border' }} rounded-pill px-3">
                 รอดำเนินการ <span class="badge text-bg-warning ms-1">{{ number_format($counts['pending']) }}</span>
             </a>
-            <a href="{{ route('bookings.index', ['q' => $q, 'status' => 'converted_to_sale', 'book' => $bookId, 'branch_id' => $branchId, 'sales_area_id' => $salesAreaId, 'sales_user_id' => $salesUserId]) }}"
+            <a href="{{ route('bookings.index', array_filter(['q' => $q, 'status' => 'converted_to_sale', 'book' => $bookId, 'branch_id' => $branchId, 'sales_area_id' => $salesAreaId, 'sales_user_id' => $salesUserId, 'date_from' => $dateRange->from, 'date_to' => $dateRange->to])) }}"
                class="btn btn-sm {{ $status === 'converted_to_sale' ? 'btn-success' : 'btn-light border' }} rounded-pill px-3">
                 แปลงเป็นใบขายแล้ว <span class="badge text-bg-success ms-1">{{ number_format($counts['converted_to_sale']) }}</span>
             </a>
@@ -82,6 +82,10 @@
 
         <form method="get" class="doc-filter-strip mb-3">
             <input type="hidden" name="status" value="{{ $status }}">
+            <div class="filter-field">
+                <label>ช่วงวันที่</label>
+                @include('partials.list-date-range', ['dateRange' => $dateRange])
+            </div>
             <div class="filter-field">
                 <label>สมุดเอกสารใหม่</label>
                 <select name="book" class="form-select form-select-sm">

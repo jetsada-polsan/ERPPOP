@@ -3,11 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
+use App\Models\Product;
 use App\Models\ProductBarcode;
 use App\Models\StockCount;
 use App\Models\StockCountItem;
 use App\Models\WarehouseLocation;
 use App\Services\Inventory\StockCountService;
+use App\Support\ListDateRange;
+use App\Support\UnitQty;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,17 +21,23 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class StockCountController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $q = trim((string) $request->query('q', ''));
+        $dateRange = ListDateRange::fromRequest($request, 'created_at');
+
         $counts = StockCount::with(['branch', 'warehouseLocation', 'postedDocument'])
             ->withCount('items')
+            ->when($q !== '', fn ($query) => $query->where('doc_number', 'ilike', "%{$q}%"))
+            ->tap(fn ($query) => $dateRange->apply($query))
             ->latest('id')
-            ->paginate(30);
+            ->paginate(30)
+            ->withQueryString();
         $branches = Branch::orderBy('code')->get(['id', 'code', 'name_th']);
         $locations = WarehouseLocation::orderBy('code')->get(['id', 'code', 'name']);
         $staleCounts = StockCount::stale()->with('branch')->orderBy('created_at')->get();
 
-        return view('stock-counts.index', compact('counts', 'branches', 'locations', 'staleCounts'));
+        return view('stock-counts.index', compact('counts', 'branches', 'locations', 'staleCounts', 'q', 'dateRange'));
     }
 
     public function store(Request $request, StockCountService $service): RedirectResponse
@@ -81,13 +90,14 @@ class StockCountController extends Controller
             ->where('is_active', true)->get(['product_id', 'barcode', 'unit_factor'])
             ->groupBy('product_id');
 
-        $products = \App\Models\Product::whereIn('id', $items->pluck('product_id')->unique())
+        $products = Product::whereIn('id', $items->pluck('product_id')->unique())
             ->with(['baseUnit', 'barcodes.unit'])
             ->get()
             ->keyBy('id');
 
         $itemsJson = $items->map(function ($i) use ($barcodes, $products) {
             $product = $products->get($i->product_id);
+
             return [
                 'id' => $i->id,
                 'sku' => $i->sku_code,
@@ -98,10 +108,10 @@ class StockCountController extends Controller
                 'pack' => (float) (($barcodes[$i->product_id] ?? collect())->max('unit_factor') ?: 1),
                 'search' => mb_strtolower($i->sku_code.' '.$i->name_th.' '.($barcodes[$i->product_id] ?? collect())->pluck('barcode')->implode(' ')),
                 'system' => (float) $i->system_qty,
-                'system_display' => $product ? \App\Support\UnitQty::format($product, $i->system_qty) : (string) (float) $i->system_qty,
+                'system_display' => $product ? UnitQty::format($product, $i->system_qty) : (string) (float) $i->system_qty,
                 'counted' => $i->counted_qty !== null ? (float) $i->counted_qty : null,
                 'counted_display' => $i->counted_qty !== null
-                    ? ($product ? \App\Support\UnitQty::format($product, $i->counted_qty) : (string) (float) $i->counted_qty)
+                    ? ($product ? UnitQty::format($product, $i->counted_qty) : (string) (float) $i->counted_qty)
                     : null,
             ];
         })->values();
@@ -215,6 +225,7 @@ class StockCountController extends Controller
 
             if (! isset($itemIdBySku[$sku])) {
                 $skipped[] = $sku;
+
                 continue;
             }
 

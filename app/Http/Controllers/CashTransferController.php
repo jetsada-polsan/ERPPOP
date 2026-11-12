@@ -3,10 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\BankAccount;
-use App\Support\FinanceBranches;
-use App\Models\Branch;
 use App\Models\Document;
 use App\Services\Accounting\CashTransferService;
+use App\Support\FinanceBranches;
+use App\Support\ListDateRange;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -24,6 +24,8 @@ class CashTransferController extends Controller
     {
         $branches = FinanceBranches::available($request->user());
         $branchId = $branches->count() === 1 ? (int) $branches->first()->id : null;
+        $q = trim((string) $request->query('q', ''));
+        $dateRange = ListDateRange::fromRequest($request, 'doc_date');
 
         return view('cash-transfers.index', [
             'transfers' => Document::query()
@@ -31,11 +33,16 @@ class CashTransferController extends Controller
                 ->whereHas('documentType', fn ($query) => $query->whereIn('code', [CashTransferService::DEPOSIT, CashTransferService::WITHDRAWAL]))
                 // ผู้ใช้ที่สังกัดสาขาเห็นเฉพาะสาขาตัวเอง เหมือนกติกาของรายงาน
                 ->whereIn('branch_id', $branches->pluck('id'))
+                ->when($q !== '', fn ($query) => $query->where('doc_number', 'ilike', "%{$q}%"))
+                ->tap(fn ($query) => $dateRange->apply($query))
                 ->orderByDesc('doc_date')->orderByDesc('id')
-                ->paginate(25),
+                ->paginate(25)
+                ->withQueryString(),
             'branches' => $branches,
             'bankAccounts' => BankAccount::orderBy('bank_name')->get(),
             'defaultBranchId' => $branchId,
+            'dateRange' => $dateRange,
+            'q' => $q,
         ]);
     }
 

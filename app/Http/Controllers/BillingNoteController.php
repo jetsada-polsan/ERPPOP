@@ -8,6 +8,7 @@ use App\Models\Branch;
 use App\Models\Customer;
 use App\Models\CustomerOpenItem;
 use App\Services\Sales\DocumentNumberGenerator;
+use App\Support\ListDateRange;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,6 +21,7 @@ class BillingNoteController extends Controller
     {
         $status = $request->query('status');
         $q = trim((string) $request->query('q', ''));
+        $dateRange = ListDateRange::fromRequest($request, 'doc_date');
 
         $notes = BillingNote::with(['customer', 'branch'])->withCount('items')
             ->when($status, fn ($query) => $query->where('status', $status))
@@ -27,6 +29,7 @@ class BillingNoteController extends Controller
                 ->where('doc_number', 'ilike', "%{$q}%")
                 ->orWhereHas('customer', fn ($c) => $c->where('name_th', 'ilike', "%{$q}%")->orWhere('code', 'ilike', "%{$q}%"))
             ))
+            ->tap(fn ($query) => $dateRange->apply($query))
             ->orderByDesc('id')
             ->paginate(50)->withQueryString();
 
@@ -34,6 +37,7 @@ class BillingNoteController extends Controller
             'notes' => $notes,
             'status' => $status,
             'q' => $q,
+            'dateRange' => $dateRange,
             'customersWithDebt' => Customer::whereHas('openItems', fn ($query) => $query->where('balance_amount', '>', 0))
                 ->withCount(['openItems as unpaid_count' => fn ($query) => $query->where('balance_amount', '>', 0)])
                 ->orderBy('code')->limit(500)->get(['id', 'code', 'name_th']),

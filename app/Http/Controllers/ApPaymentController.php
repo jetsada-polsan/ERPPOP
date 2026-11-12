@@ -7,6 +7,7 @@ use App\Models\Document;
 use App\Models\Supplier;
 use App\Models\SupplierOpenItem;
 use App\Services\Purchasing\SupplierPaymentService;
+use App\Support\ListDateRange;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,8 +21,11 @@ use RuntimeException;
  */
 class ApPaymentController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $q = trim((string) $request->query('q', ''));
+        $dateRange = ListDateRange::fromRequest($request, 'doc_date');
+
         $outstanding = SupplierOpenItem::query()
             ->whereIn('status', ['open', 'partial'])
             ->where('balance_amount', '>', 0)
@@ -34,11 +38,16 @@ class ApPaymentController extends Controller
 
         $payments = Document::with(['supplier', 'branch'])
             ->whereHas('documentType', fn ($query) => $query->where('code', 'PAYMENT_VOUCHER'))
+            ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
+                ->where('doc_number', 'ilike', "%{$q}%")
+                ->orWhereHas('supplier', fn ($s) => $s->where('name_th', 'ilike', "%{$q}%"))
+            ))
+            ->tap(fn ($query) => $dateRange->apply($query))
             ->orderByDesc('id')
-            ->limit(30)
-            ->get();
+            ->paginate(50)
+            ->withQueryString();
 
-        return view('ap-payments.index', compact('outstanding', 'suppliers', 'payments'));
+        return view('ap-payments.index', compact('outstanding', 'suppliers', 'payments', 'dateRange', 'q'));
     }
 
     public function create(Request $request): View

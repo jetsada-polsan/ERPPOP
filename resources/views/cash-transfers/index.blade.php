@@ -89,7 +89,12 @@
 
     <div class="col-xl-7">
         <div class="content-card p-4">
-            <h2 class="h6 fw-bold mb-3">รายการล่าสุด</h2>
+            <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                <h2 class="h6 fw-bold mb-0">รายการโอนเงินสด</h2>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    @include('partials.list-date-range', ['dateRange' => $dateRange, 'wrapForm' => true])
+                </div>
+            </div>
             <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
                     <thead>

@@ -9,7 +9,7 @@
     <div class="row g-2 mb-3">
         @foreach(['requested' => ['ขอซื้อ (รออนุมัติ)', 'text-bg-warning'], 'approved' => ['อนุมัติแล้ว', 'text-bg-info'], 'ordered' => ['สั่งซื้อแล้ว', 'text-bg-primary'], 'received' => ['รับของแล้ว', 'text-bg-success']] as $st => $meta)
             <div class="col-6 col-lg-3">
-                <a href="{{ route('purchase-orders.index', ['status' => $st]) }}" class="text-decoration-none">
+                <a href="{{ route('purchase-orders.index', array_filter(['status' => $st, 'date_from' => $dateRange->from, 'date_to' => $dateRange->to])) }}" class="text-decoration-none">
                     <div class="content-card p-3 {{ $status === $st ? 'border border-primary' : '' }}">
                         <div class="d-flex justify-content-between align-items-center">
                             <span class="badge {{ $meta[1] }}">{{ $meta[0] }}</span>
@@ -22,11 +22,12 @@
     </div>
 
     <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
-        <form method="get" class="d-flex gap-2">
+        <form method="get" class="d-flex gap-2 flex-wrap align-items-center">
             @if($status)<input type="hidden" name="status" value="{{ $status }}">@endif
-            <input type="text" name="q" value="{{ $q }}" class="form-control form-control-sm" style="width:240px" placeholder="เลขที่ / ซัพพลายเออร์">
+            @include('partials.list-date-range', ['dateRange' => $dateRange])
+            <input type="text" name="q" value="{{ $q }}" class="form-control form-control-sm" style="width:200px" placeholder="เลขที่ / ซัพพลายเออร์">
             <button class="btn btn-sm btn-primary px-3"><i class="bi bi-funnel-fill me-1"></i>กรอง</button>
-            @if($status || $q)<a href="{{ route('purchase-orders.index') }}" class="btn btn-sm btn-light border">ล้าง</a>@endif
+            @if($status || $q || !$dateRange->isDefault)<a href="{{ route('purchase-orders.index') }}" class="btn btn-sm btn-light border px-2">ล้าง</a>@endif
         </form>
         <button type="button" class="btn btn-success ms-auto" @click="modalOpen = true"><i class="bi bi-plus-lg me-1"></i>สร้างใบขอซื้อ</button>
     </div>

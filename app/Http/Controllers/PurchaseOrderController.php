@@ -4,14 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use App\Models\PurchaseOrder;
-use App\Models\PurchaseQuote;
 use App\Models\PurchaseOrderItem;
+use App\Models\PurchaseQuote;
 use App\Models\Supplier;
 use App\Models\SupplierPriceSchedule;
+use App\Services\Documents\ApprovalPolicyService;
 use App\Services\Purchasing\PurchaseOrderReceivingService;
 use App\Services\Purchasing\PurchaseQuoteService;
 use App\Services\Sales\DocumentNumberGenerator;
 use App\Support\DecimalMath;
+use App\Support\ListDateRange;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,6 +28,7 @@ class PurchaseOrderController extends Controller
     {
         $status = $request->query('status');
         $q = trim((string) $request->query('q', ''));
+        $dateRange = ListDateRange::fromRequest($request, 'doc_date');
 
         $orders = PurchaseOrder::with(['supplier', 'branch', 'requester'])->withCount('items')
             ->when($status, fn ($query) => $query->where('status', $status))
@@ -33,15 +36,21 @@ class PurchaseOrderController extends Controller
                 ->where('doc_number', 'ilike', "%{$q}%")
                 ->orWhereHas('supplier', fn ($s) => $s->where('name_th', 'ilike', "%{$q}%"))
             ))
+            ->tap(fn ($query) => $dateRange->apply($query))
             ->orderByDesc('id')
             ->paginate(50)->withQueryString();
 
-        $statusCounts = PurchaseOrder::selectRaw('status, COUNT(*) AS c')->groupBy('status')->pluck('c', 'status');
+        $statusCounts = PurchaseOrder::query()
+            ->tap(fn ($query) => $dateRange->apply($query))
+            ->selectRaw('status, COUNT(*) AS c')
+            ->groupBy('status')
+            ->pluck('c', 'status');
 
         return view('purchase-orders.index', [
             'orders' => $orders,
             'status' => $status,
             'q' => $q,
+            'dateRange' => $dateRange,
             'statusCounts' => $statusCounts,
             'branches' => Branch::orderBy('code')->get(['id', 'code', 'name_th', 'default_warehouse_location_id']),
             'suppliers' => Supplier::where('is_active', true)->orderBy('code')->limit(500)->get(['id', 'code', 'name_th']),
@@ -127,11 +136,11 @@ class PurchaseOrderController extends Controller
             DB::transaction(function () use ($purchaseOrder) {
                 $locked = PurchaseOrder::whereKey($purchaseOrder->id)->lockForUpdate()->firstOrFail();
                 abort_unless($locked->status === 'requested', 422);
-                app(\App\Services\Documents\ApprovalPolicyService::class)->authorize('PURCHASE_ORDER', $locked->total_amount,
+                app(ApprovalPolicyService::class)->authorize('PURCHASE_ORDER', $locked->total_amount,
                     (int) $locked->branch_id, $locked->requested_by, Auth::user(), 'purchasing.approve');
                 $locked->update(['status' => 'approved', 'approved_by' => Auth::id(), 'approved_at' => now()]);
             });
-        } catch (\RuntimeException $e) {
+        } catch (RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }
 

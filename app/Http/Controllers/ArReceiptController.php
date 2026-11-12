@@ -9,6 +9,7 @@ use App\Models\CustomerOpenItem;
 use App\Models\Document;
 use App\Models\Salesman;
 use App\Services\Sales\CustomerPaymentService;
+use App\Support\ListDateRange;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,8 +24,11 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class ArReceiptController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $q = trim((string) $request->query('q', ''));
+        $dateRange = ListDateRange::fromRequest($request, 'doc_date');
+
         $outstanding = CustomerOpenItem::query()
             ->whereIn('status', [CustomerOpenItem::STATUS_OPEN, CustomerOpenItem::STATUS_PARTIAL])
             ->where('balance_amount', '>', 0)
@@ -36,10 +40,17 @@ class ArReceiptController extends Controller
         $customers = Customer::whereIn('id', $outstanding->pluck('customer_id'))->get()->keyBy('id');
 
         $receipts = Document::with(['customer', 'branch', 'salesman'])
-            ->whereHas('documentType', fn ($q) => $q->where('code', 'RECEIPT'))
-            ->orderByDesc('id')->limit(30)->get();
+            ->whereHas('documentType', fn ($query) => $query->where('code', 'RECEIPT'))
+            ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
+                ->where('doc_number', 'ilike', "%{$q}%")
+                ->orWhereHas('customer', fn ($c) => $c->where('name_th', 'ilike', "%{$q}%"))
+            ))
+            ->tap(fn ($query) => $dateRange->apply($query))
+            ->orderByDesc('id')
+            ->paginate(50)
+            ->withQueryString();
 
-        return view('ar-receipts.index', compact('outstanding', 'customers', 'receipts'));
+        return view('ar-receipts.index', compact('outstanding', 'customers', 'receipts', 'dateRange', 'q'));
     }
 
     public function dailySummary(Request $request): View|StreamedResponse

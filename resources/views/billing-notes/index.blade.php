@@ -6,15 +6,19 @@
 <div x-data="billingNotePage()" x-cloak>
 
     <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
-        <form method="get" class="d-flex gap-2 align-items-center">
+        <form method="get" class="d-flex gap-2 align-items-center flex-wrap">
             <select name="status" class="form-select form-select-sm" style="width:160px" onchange="this.form.submit()">
                 <option value="">ทุกสถานะ</option>
                 <option value="open" @selected($status === 'open')>รอเก็บเงิน</option>
                 <option value="collected" @selected($status === 'collected')>เก็บเงินแล้ว</option>
                 <option value="cancelled" @selected($status === 'cancelled')>ยกเลิก</option>
             </select>
-            <input type="text" name="q" value="{{ $q }}" class="form-control form-control-sm" style="width:240px" placeholder="เลขที่ใบวางบิล / ลูกค้า">
+            @include('partials.list-date-range', ['dateRange' => $dateRange])
+            <input type="text" name="q" value="{{ $q }}" class="form-control form-control-sm" style="width:200px" placeholder="เลขที่ใบวางบิล / ลูกค้า">
             <button class="btn btn-sm btn-primary px-3"><i class="bi bi-funnel-fill me-1"></i>กรอง</button>
+            @if($status || $q || !$dateRange->isDefault)
+                <a href="{{ route('billing-notes.index') }}" class="btn btn-sm btn-light border px-2">ล้าง</a>
+            @endif
         </form>
         <button type="button" class="btn btn-success ms-auto" @click="openCreate()">
             <i class="bi bi-plus-lg me-1"></i>สร้างใบวางบิล
