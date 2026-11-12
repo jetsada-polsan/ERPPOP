@@ -548,4 +548,37 @@ class LoadingSheetFeedbackTest extends TestCase
         $response->assertOk();
         $response->assertSee('ช่วงวันที่ที่เลือกเกิน 92 วัน');
     }
+
+    /**
+     * Review Point 2.4: Exact satang math without float drifting in comparison report
+     */
+    public function test_comparison_report_exact_satang_math_with_precision_prone_floats(): void
+    {
+        // 0.10 + 0.20 + 4487.55 + 1182.54 = 5,670.39
+        $amounts = [0.10, 0.20, 4487.55, 1182.54];
+        foreach ($amounts as $idx => $amt) {
+            $b = $this->createBooking($this->branchA, $this->areaA, $this->customerA, "BK-SATANG-{$idx}", $amt, '2026-11-12');
+            $this->createCreditSaleForBooking($b, "CS-SATANG-{$idx}", $amt, 'approved', '2026-11-12');
+        }
+
+        $response = $this->actingAs($this->adminUser)->get(route('bookings.comparison', [
+            'date_from' => '2026-11-12',
+            'date_to' => '2026-11-12',
+        ]));
+
+        $response->assertOk();
+        // Total booking amount and sale amount must be exact 5,670.39 and variance 0.00
+        $response->assertSee('5,670.39');
+        $response->assertSee('0.00');
+
+        // CSV export must also show exact satang
+        $csvResp = $this->actingAs($this->adminUser)->get(route('bookings.comparison', [
+            'date_from' => '2026-11-12',
+            'date_to' => '2026-11-12',
+            'export' => 'csv',
+        ]));
+        $csvResp->assertOk();
+        $csvContent = $csvResp->streamedContent();
+        $this->assertStringContainsString('5,670.39', $csvContent);
+    }
 }
