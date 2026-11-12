@@ -31,7 +31,7 @@ class NormalizePriceTables extends Command
 
     /** ตาราง/คอลัมน์ที่อ้าง price_table_id (นอกจาก product_prices ซึ่งต้องรวมแถวแบบกันชน unique) */
     private const REFERENCES = [
-        'branches', 'customer_terms', 'supplier_terms', 'price_tag_templates', 'scheduled_price_changes', 'production_orders',
+        'branches', 'customer_terms', 'supplier_terms', 'price_tag_templates', 'scheduled_price_changes',
     ];
 
     public function handle(): int
@@ -53,7 +53,13 @@ class NormalizePriceTables extends Command
                     if (! Schema::hasColumn($table, 'price_table_id')) {
                         continue;
                     }
-                    $count = DB::table($table)->where('price_table_id', $dup->id)->count();
+                    try {
+                        $count = DB::table($table)->where('price_table_id', $dup->id)->count();
+                    } catch (\Illuminate\Database\QueryException) {
+                        $this->warn("  ข้าม {$table}: อ่านคอลัมน์ price_table_id ไม่ได้");
+
+                        continue;
+                    }
                     if ($count) {
                         $this->line("  ย้าย {$table}: {$count} แถว");
                         if ($apply) {
