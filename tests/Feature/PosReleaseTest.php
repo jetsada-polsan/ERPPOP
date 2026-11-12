@@ -52,34 +52,30 @@ class PosReleaseTest extends TestCase
             ->assertDownload('PopCentral-POS-UAT-99.98.98-setup.exe');
     }
 
-    public function test_isolated_jet_python_uat_download_uses_its_own_release_channel(): void
+    // POS ตัวเดียวคือ JET POS Python (apps/pos-python) — ลิงก์ UAT เดิมพาไปตัวนี้
+    public function test_old_jet_python_uat_link_sends_people_to_the_current_python_pos(): void
     {
         File::put($this->jetPythonDirectory.'/JET-POS-Python-UAT-99.98.99.exe', 'jet python uat');
 
-        $this->get('/download/jet-pos-python')
-            ->assertOk()
-            ->assertDownload('JET-POS-Python-UAT-99.98.99.exe');
+        $this->get('/download/jet-pos-python')->assertRedirect(route('python-pos.download'));
+        $this->get('/download/pos')->assertRedirect(route('python-pos.download'));
     }
 
-    public function test_latest_manifest_is_public_and_not_cached(): void
+    // POS Vue/Tauri เลิกใช้: ไม่ประกาศรุ่นอัปเดตให้เครื่องเดิมอีก
+    public function test_retired_vue_tauri_update_manifest_is_gone(): void
     {
         File::put($this->directory.'/latest.json', json_encode([
             'version' => '1.2.3',
             'platforms' => ['windows-x86_64' => ['signature' => 'signed', 'url' => 'https://example.test/pos.zip']],
         ]));
 
-        $response = $this->get('/download/pos/latest.json')
-            ->assertOk()
-            ->assertJsonPath('version', config('pos_release.version'));
-
-        $this->assertStringContainsString('no-cache', (string) $response->headers->get('Cache-Control'));
+        $this->get('/download/pos/latest.json')->assertStatus(410);
     }
 
-    public function test_release_file_can_be_downloaded(): void
+    public function test_retired_vue_tauri_release_files_are_not_served(): void
     {
         File::put($this->directory.'/POPSTAR-POS-test.zip', 'signed updater');
 
-        $this->get('/download/pos/releases/POPSTAR-POS-test.zip')
-            ->assertDownload('POPSTAR-POS-test.zip');
+        $this->get('/download/pos/releases/POPSTAR-POS-test.zip')->assertStatus(410);
     }
 }
