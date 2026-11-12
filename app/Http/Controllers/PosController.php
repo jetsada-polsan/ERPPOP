@@ -295,8 +295,7 @@ class PosController extends Controller
         // ไม่ตกไป 1.00 บาท. ป้ายเครื่องชั่ง = ราคาขายปลีกตารางนี้เช่นกัน.
         $branch = $branchId ? Branch::find($branchId) : null;
         $defaultTableId = PriceTable::where('is_default', true)->value('id');
-        // ราคาปกติกลางใช้ร่วมกันทุก POS ทุกสาขา ราคาที่ต่างตามสาขาต้องทำผ่าน
-        // โปรโมชั่น/นาทีทองที่มีช่วงเวลาเท่านั้น เพื่อไม่ให้ราคาปกติแต่ละสาขาสับสนกัน.
+        // ตารางของสาขามาก่อน (BranchPriceTable) ส่วนที่ไม่มีในตารางสาขาใช้ราคาเดิม
         $branchTableId = null;
         $priceTableIds = array_values(array_filter([$defaultTableId]));
 
@@ -330,7 +329,11 @@ class PosController extends Controller
                 'minimum_margin_percent',
                 'margin_control_policy',
                 'product_category_id',
+                'base_unit_id',
             ]);
+
+        $branchPrices = app(\App\Services\Pricing\BranchPriceTable::class);
+        $branchRows = $branchPrices->rows($products->pluck('id')->all(), $branchId ? (int) $branchId : null);
 
         $priceRows = $priceTableIds === []
             ? collect()
@@ -343,7 +346,7 @@ class PosController extends Controller
         // ตัวคูณหน่วย (id -> qty_per_base_unit) ใช้เลือก "ราคาหน่วยฐาน" เมื่อไม่มีราคา unit_id=null
         $unitFactors = ProductUnit::pluck('qty_per_base_unit', 'id');
 
-        $products = $products->map(function ($p) use ($priceRows, $q, $exact, $lookup, $branchTableId, $defaultTableId, $unitFactors, $scanCodes) {
+        $products = $products->map(function ($p) use ($priceRows, $q, $exact, $lookup, $branchTableId, $defaultTableId, $unitFactors, $scanCodes, $branchPrices, $branchRows) {
             $matchedBarcode = null;
             if ($exact && $lookup !== 'sku' && $q !== '') {
                 foreach ($scanCodes as $code) {
@@ -385,7 +388,24 @@ class PosController extends Controller
                 return $smallest ? ['price' => (float) $smallest->price, 'source' => 'unit_price_table'] : null;
             };
 
-            if ($matchedBarcode && $matchedBarcode->price !== null && (float) $matchedBarcode->price > 0) {
+            $productBranchRows = $branchRows->get($p->id);
+            $branchHit = $matchedBarcode
+                ? $branchPrices->priceFor($productBranchRows, $matchedBarcode->unit_id, $matchedBarcode->unit_factor, $p->base_unit_id)
+                : $branchPrices->priceFor($productBranchRows, null, 1, $p->base_unit_id);
+            // ราคาบาร์โค้ดที่ส่งให้เครื่องเก็บออฟไลน์ต้องเป็นราคาของสาขานี้ด้วย ไม่งั้นยิงบาร์โค้ดได้ราคากลาง
+            if ($productBranchRows) {
+                foreach ($p->barcodes as $barcode) {
+                    $branchBarcodePrice = $branchPrices->priceFor($productBranchRows, $barcode->unit_id, $barcode->unit_factor, $p->base_unit_id);
+                    if ($branchBarcodePrice !== null) {
+                        $barcode->price = $branchBarcodePrice;
+                    }
+                }
+            }
+
+            if ($branchHit !== null) {
+                $p->pos_price = $branchHit;
+                $p->price_source = 'branch_price_table';
+            } elseif ($matchedBarcode && $matchedBarcode->price !== null && (float) $matchedBarcode->price > 0) {
                 $p->pos_price = (float) $matchedBarcode->price;
                 $p->price_source = 'barcode';
             } else {
