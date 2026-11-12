@@ -2826,6 +2826,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             shown = 0
             for index, product in enumerate(product_grid(service.db, category=self.category, search=search)):
                 price, _ = service.effective_price(int(product["id"]), product["price"] or 0)
+                price = service.campaign_price(int(product["id"]), price)
                 sku = str(product["sku"] or "").strip()
                 unit = str(product["unit_name"] or "หน่วย")
                 tile = QPushButton()
@@ -2999,6 +3000,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
         def add_product_row(self, product) -> None:
             price, price_version = service.effective_price(int(product["id"]), product["price"] or 0)
+            price = service.campaign_price(int(product["id"]), price)
             if price <= 0:
                 TouchMessage.warning(self, "ยังไม่ได้ตั้งราคา", f"{product['name']} ยังไม่มีราคาขาย")
                 return
