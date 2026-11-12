@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\PriceTable;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * ล้างตารางราคาซ้ำ (production 12 พ.ย.: 19 ตาราง ชื่อสาขาเดียวกันสองชุด รหัส 8–11/20 กับ 1006–1009/1003)
@@ -48,6 +49,10 @@ class NormalizePriceTables extends Command
                 }
                 $this->line("ตารางซ้ำ {$dup->code} {$dup->name} -> ใช้ {$keep->code} {$keep->name}");
                 foreach (self::REFERENCES as $table) {
+                    // ฐานจริงบางตารางไม่มีคอลัมน์นี้ (production_orders บน production 12 พ.ย.) ข้ามไป
+                    if (! Schema::hasColumn($table, 'price_table_id')) {
+                        continue;
+                    }
                     $count = DB::table($table)->where('price_table_id', $dup->id)->count();
                     if ($count) {
                         $this->line("  ย้าย {$table}: {$count} แถว");
