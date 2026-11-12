@@ -171,7 +171,7 @@ class BookingController extends Controller
                     'area' => $area,
                     'areaName' => $area ? "{$area->code} - {$area->name}" : ($routeId ? "สาย {$routeId}" : 'ไม่ระบุสาย'),
                     'bookings' => $routeBookings->values(),
-                    'totalAmount' => $routeBookings->sum(fn ($b) => (float) ($b->document?->total_amount ?? 0)),
+                    'totalAmount' => self::sumSatang($routeBookings),
                 ]);
             }
             if ($routeSheets->isEmpty()) {
@@ -190,7 +190,7 @@ class BookingController extends Controller
                     'area' => $selectedArea,
                     'areaName' => $areaName,
                     'bookings' => $bookings,
-                    'totalAmount' => $bookings->sum(fn ($b) => (float) ($b->document?->total_amount ?? 0)),
+                    'totalAmount' => self::sumSatang($bookings),
                 ],
             ]);
         }
@@ -219,10 +219,22 @@ class BookingController extends Controller
         ]);
     }
 
+    /** รวมยอดเงินเป็นสตางค์จำนวนเต็ม ป้องกัน float drifting */
+    public static function sumSatang(iterable $bookings): float
+    {
+        $satang = 0;
+        foreach ($bookings as $b) {
+            $amt = $b instanceof SaleBooking ? ($b->document?->total_amount ?? 0) : ($b->total_amount ?? 0);
+            $satang += (int) round(((float) $amt) * 100);
+        }
+
+        return $satang / 100;
+    }
+
     private function exportCoverSheetCsv(Collection $bookings, CarbonInterface $date): StreamedResponse
     {
         $filename = sprintf('route-cover-sheet-%s.csv', $date->format('Ymd'));
-        $totalAmount = $bookings->sum(fn ($b) => (float) ($b->document?->total_amount ?? 0));
+        $totalAmount = self::sumSatang($bookings);
 
         return response()->streamDownload(function () use ($bookings, $totalAmount) {
             $handle = fopen('php://output', 'wb');

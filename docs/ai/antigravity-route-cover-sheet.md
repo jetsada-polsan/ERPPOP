@@ -129,9 +129,9 @@ OK (963 tests, 8377 assertions)
 ```text
 modified:   app/Http/Controllers/BookingController.php
 modified:   app/Support/ErpMenu.php
-modified:   resources/views/bookings/index.blade.php
+resources/views/bookings/index.blade.php
 modified:   resources/views/bookings/summary.blade.php
-modified:   routes/web.php
+routes/web.php
 new file:   resources/views/bookings/cover-sheet.blade.php
 new file:   tests/Feature/RouteCoverSheetTest.php
 new file:   docs/ai/route-cover-sheet-shots/01_route_cover_sheet_web.png
@@ -139,3 +139,37 @@ new file:   docs/ai/route-cover-sheet-shots/02_route_cover_sheet_print.png
 new file:   docs/ai/route-cover-sheet-shots/03_route_cover_sheet_multi_route_print.png
 new file:   docs/ai/antigravity-route-cover-sheet.md
 ```
+
+---
+
+## 6. รายงานการแก้ไขตามผลตรวจ (Task 31 ส่วน A: Claude Review Fixes)
+
+1. **รวม `origin/main` และแก้ Conflict ใน Toolbar หน้าใบรวมจอง (`summary.blade.php`)**
+   - รวม commit ล่าสุดจาก `origin/main` สำเร็จ
+   - แถบเครื่องมือด้านบนมีครบทั้ง 3 ปุ่มตามที่กำหนด:
+     - ปุ่ม "ใบปะหน้า (ขนส่ง)"
+     - ปุ่ม "พิมพ์ใบรวมจอง" (ปุ่มเดิม)
+     - ปุ่ม "พิมพ์ใบส่งของทั้งหมดตามตัวกรองนี้" (ของ main ไม่สูญหาย)
+
+2. **แก้บั๊กปุ่ม "ใบปะหน้า (ขนส่ง)" เมื่อเลือก "ทุกสาย"**
+   - ในหน้า `summary.blade.php`: ส่งพารามิเตอร์ `'sales_area_id' => $salesAreaId ?: 'all'`
+   - แก้ปัญหาที่ `route()` ของ Laravel ทิ้งค่า `null` ทำให้ไม่มี `sales_area_id` ส่งไป จนหน้าใบปะหน้าเลือกสายแรกแทนที่จะแสดงทุกสาย
+   - ทดสอบผ่าน `test_summary_page_cover_sheet_button_passes_sales_area_all_when_unfiltered` ครอบคลุมการแสดงผลทุกสายข้อมูลไม่หาย
+
+3. **มาตรฐานเกณฑ์การเลือกใบจองตรงกันทุกหน้า (`pendingBookingsQuery`)**
+   - ปรับปรุง `DeliveryNoteController::batch` (`type=booking`) ให้ใช้ `BookingController::pendingBookingsQuery()` ร่วมกัน
+   - ส่งผลให้ใบจองที่เอกสารแม่ถูกยกเลิก (`status == 'cancelled'` หรือ `'voided'`) จะถูกกรองออกอย่างสม่ำเสมอทั้ง 3 หน้า:
+     1. หน้าใบรวมจอง (`bookings.summary`)
+     2. หน้าใบปะหน้า (`bookings.cover-sheet`)
+     3. หน้าพิมพ์ใบส่งของรวม (`documents.delivery-notes.batch?type=booking`)
+   - ทดสอบผ่าน `test_cancelled_documents_excluded_from_summary_cover_sheet_and_batch_delivery_notes`
+
+4. **คำนวณยอดรวมถึงสตางค์ ไม่ใช้ Float (`sumSatang`)**
+   - เพิ่มเมธอด `BookingController::sumSatang()` รวมยอดเงินด้วยสตางค์จำนวนเต็ม ป้องกันปัญหา Float precision drifting
+   - ใช้งานทั้งใน `coverSheet()` บนเว็บ และ `exportCoverSheetCsv()` สำหรับไฟล์ CSV
+   - ทดสอบผ่าน `test_cover_sheet_exact_satang_math_with_precision_prone_floats` ด้วยยอดที่มีโอกาสเพี้ยน เช่น `0.10 + 0.20 + 4,487.55 + 1,182.54 = 5,670.39` ตรงเป๊ะ 100%
+
+5. **ผลการทดสอบ**
+   - ชุดทดสอบเฉพาะ `RouteCoverSheetTest.php`: ผ่านครบ **12 เทสต์ (72 assertions)**
+   - ชุดทดสอบรวมทั้งระบบ: ผ่านครบ **990 เทสต์ (8,541 assertions)** 0 failures, 0 errors
+

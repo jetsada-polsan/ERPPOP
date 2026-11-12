@@ -341,4 +341,118 @@ class RouteCoverSheetTest extends TestCase
         $this->assertSame(['BK-SAME-SM-02'], $sheet2->bookings->pluck('document.doc_number')->all());
         $this->assertSame('ลูกค้า กาญจน์', $sheet2->bookings->first()->document->customer->name_th);
     }
+
+    /** 10. ปุ่มใบปะหน้าจากหน้าใบรวมจองเมื่อไม่เลือกสาย (ทุกสาย) ต้องส่ง sales_area_id=all และหน้าใบปะหน้าแสดงทุกสาย */
+    public function test_summary_page_cover_sheet_button_passes_sales_area_all_when_unfiltered(): void
+    {
+        $branch = Branch::create(['code' => 'B01', 'name_th' => 'สาขาใหญ่', 'is_active' => true]);
+        $area1 = SalesArea::create(['code' => '01', 'name' => 'สุพรรณบุรี', 'branch_id' => $branch->id]);
+        $area2 = SalesArea::create(['code' => '02', 'name' => 'กาญจนบุรี', 'branch_id' => $branch->id]);
+        $customer = Customer::create(['code' => 'C01', 'name_th' => 'ลูกค้า กาญจนา', 'branch_id' => $branch->id]);
+
+        $this->createBooking($branch, $area1, $customer, 'BK-ALL-ROUTE-01', 1000.00, '2026-11-11');
+        $this->createBooking($branch, $area2, $customer, 'BK-ALL-ROUTE-02', 2000.00, '2026-11-11');
+
+        $user = $this->userWithPermission('sales.manage');
+
+        // เข้าหน้าใบรวมจองโดยไม่ระบุ sales_area_id (คือ ทุกสาย)
+        $summaryResp = $this->actingAs($user)->get(route('bookings.summary', [
+            'date' => '2026-11-11',
+        ]));
+        $summaryResp->assertOk();
+
+        // ตรวจสอบว่าปุ่ม ใบปะหน้า (ขนส่ง) ส่ง sales_area_id=all
+        $summaryResp->assertSee('sales_area_id=all');
+
+        // เมื่อเรียกตามลิงก์ที่ส่ง sales_area_id=all
+        $coverResp = $this->actingAs($user)->get(route('bookings.cover-sheet', [
+            'date' => '2026-11-11',
+            'sales_area_id' => 'all',
+        ]));
+        $coverResp->assertOk();
+        $this->assertTrue($coverResp->viewData('isAllRoutes'));
+
+        // ตรวจสอบว่ามีข้อมูลครบทั้งสองสาย ไม่หายเงียบๆ
+        $routeSheets = $coverResp->viewData('routeSheets');
+        $this->assertCount(2, $routeSheets);
+    }
+
+    /** 11. เอกสารใบจองที่ถูกยกเลิก (cancelled/voided) ต้องไม่โผล่ทั้งใบรวมจอง ใบปะหน้า และพิมพ์ใบส่งของรวม */
+    public function test_cancelled_documents_excluded_from_summary_cover_sheet_and_batch_delivery_notes(): void
+    {
+        $branch = Branch::create(['code' => 'B01', 'name_th' => 'สาขาใหญ่', 'is_active' => true]);
+        $area = SalesArea::create(['code' => '01', 'name' => 'สุพรรณบุรี', 'branch_id' => $branch->id]);
+        $customer = Customer::create(['code' => 'C01', 'name_th' => 'ลูกค้า ทั่วไป', 'branch_id' => $branch->id]);
+
+        // ใบจองปกติ
+        $this->createBooking($branch, $area, $customer, 'BK-ACTIVE-01', 1500.00, '2026-11-11', SaleBooking::STATUS_PENDING, 'active');
+
+        // ใบจองที่เอกสารถูกยกเลิก (document.status = cancelled)
+        $this->createBooking($branch, $area, $customer, 'BK-CANCELLED-DOC', 2500.00, '2026-11-11', SaleBooking::STATUS_PENDING, 'cancelled');
+
+        // ใบจองที่เอกสารถูก voided
+        $this->createBooking($branch, $area, $customer, 'BK-VOIDED-DOC', 3500.00, '2026-11-11', SaleBooking::STATUS_PENDING, 'voided');
+
+        $user = $this->userWithPermission('sales.manage');
+
+        // 1. ตรวจหน้าใบรวมจอง
+        $summaryResp = $this->actingAs($user)->get(route('bookings.summary', ['date' => '2026-11-11']));
+        $summaryResp->assertOk();
+        $summaryResp->assertSee('BK-ACTIVE-01');
+        $summaryResp->assertDontSee('BK-CANCELLED-DOC');
+        $summaryResp->assertDontSee('BK-VOIDED-DOC');
+
+        // 2. ตรวจหน้าใบปะหน้า
+        $coverResp = $this->actingAs($user)->get(route('bookings.cover-sheet', ['date' => '2026-11-11', 'sales_area_id' => 'all']));
+        $coverResp->assertOk();
+        $coverResp->assertSee('BK-ACTIVE-01');
+        $coverResp->assertDontSee('BK-CANCELLED-DOC');
+        $coverResp->assertDontSee('BK-VOIDED-DOC');
+
+        // 3. ตรวจพิมพ์ใบส่งของรวม (DeliveryNoteController::batch type=booking)
+        $batchResp = $this->actingAs($user)->get(route('documents.delivery-notes.batch', [
+            'date' => '2026-11-11',
+            'type' => 'booking',
+        ]));
+        $batchResp->assertOk();
+        $batchResp->assertSee('BK-ACTIVE-01');
+        $batchResp->assertDontSee('BK-CANCELLED-DOC');
+        $batchResp->assertDontSee('BK-VOIDED-DOC');
+    }
+
+    /** 12. ยอดรวมเป็นสตางค์จำนวนเต็ม ไม่ใช้ float ป้องกันทศนิยมเพี้ยน */
+    public function test_cover_sheet_exact_satang_math_with_precision_prone_floats(): void
+    {
+        $branch = Branch::create(['code' => 'B01', 'name_th' => 'สาขาใหญ่', 'is_active' => true]);
+        $area = SalesArea::create(['code' => '01', 'name' => 'สุพรรณบุรี', 'branch_id' => $branch->id]);
+        $customer = Customer::create(['code' => 'C01', 'name_th' => 'ลูกค้า พิเศษ', 'branch_id' => $branch->id]);
+
+        // ยอดที่มีโอกาสทำให้ float เพี้ยน: 0.10 + 0.20 + 4,487.55 + 1,182.54 = 5,670.39
+        $this->createBooking($branch, $area, $customer, 'BK-FLOAT-01', 0.10, '2026-11-11');
+        $this->createBooking($branch, $area, $customer, 'BK-FLOAT-02', 0.20, '2026-11-11');
+        $this->createBooking($branch, $area, $customer, 'BK-FLOAT-03', 4487.55, '2026-11-11');
+        $this->createBooking($branch, $area, $customer, 'BK-FLOAT-04', 1182.54, '2026-11-11');
+
+        $user = $this->userWithPermission('sales.manage');
+
+        // 1. ตรวจหน้าเว็บ
+        $resp = $this->actingAs($user)->get(route('bookings.cover-sheet', [
+            'date' => '2026-11-11',
+            'sales_area_id' => $area->id,
+        ]));
+        $resp->assertOk();
+        $sheet = $resp->viewData('routeSheets')->first();
+        $this->assertSame(5670.39, $sheet->totalAmount);
+        $resp->assertSee('5,670.39');
+
+        // 2. ตรวจส่งออก CSV
+        $csvResp = $this->actingAs($user)->get(route('bookings.cover-sheet', [
+            'date' => '2026-11-11',
+            'sales_area_id' => $area->id,
+            'export' => 'csv',
+        ]));
+        $csvResp->assertOk();
+        $csvContent = $csvResp->streamedContent();
+        $this->assertStringContainsString('5,670.39', $csvContent);
+    }
 }
