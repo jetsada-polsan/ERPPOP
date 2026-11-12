@@ -166,7 +166,8 @@ CREATE TABLE IF NOT EXISTS qty_promotions (
     discount_value TEXT NOT NULL DEFAULT '0',
     bundle_price TEXT NOT NULL DEFAULT '0',
     starts_date TEXT,
-    ends_date TEXT
+    ends_date TEXT,
+    max_sets_per_bill INTEGER
 );
 CREATE TABLE IF NOT EXISTS sync_outbox (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -329,6 +330,7 @@ ADDED_COLUMNS.extend([
     ("qty_promotions", "free_price", "TEXT NOT NULL DEFAULT '0'"),
     ("qty_promotions", "starts_at", "TEXT"),
     ("qty_promotions", "ends_at", "TEXT"),
+    ("qty_promotions", "max_sets_per_bill", "INTEGER"),
 ])
 
 ADDED_INDEXES: list[str] = [
