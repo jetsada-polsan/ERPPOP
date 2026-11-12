@@ -59,11 +59,15 @@
                         </div>
                     @endif
                     <div class="col-md-2">
-                        <label class="form-label small fw-bold text-secondary mb-1">คลังตัดสต็อก</label>
-                        <select name="warehouse_id" id="comparisonWarehouseSelect" class="form-select form-select-sm">
-                            <option value="">ทุกคลัง</option>
-                            @foreach($warehouses as $w)
-                                <option value="{{ $w->id }}" @selected($warehouseId === $w->id)>{{ $w->code }} {{ $w->name }}</option>
+                        <label class="form-label small fw-bold text-secondary mb-1">ตำแหน่งจัดเก็บ</label>
+                        <select name="warehouse_location_id" id="comparisonLocationSelect" class="form-select form-select-sm">
+                            <option value="">ทุกตำแหน่ง</option>
+                            @foreach($groupedLocations as $whName => $locs)
+                                <optgroup label="{{ $whName }}">
+                                    @foreach($locs as $loc)
+                                        <option value="{{ $loc->id }}" @selected($warehouseLocationId === $loc->id)>{{ $loc->code }} - {{ $loc->name }}</option>
+                                    @endforeach
+                                </optgroup>
                             @endforeach
                         </select>
                     </div>
@@ -112,7 +116,7 @@
                             <th style="width: 100px;">วันที่จอง</th>
                             <th>ลูกค้า</th>
                             <th style="width: 130px;">สายขาย</th>
-                            <th style="width: 140px;">คลัง</th>
+                            <th style="width: 140px;">ตำแหน่ง</th>
                             <th style="width: 120px;" class="text-end">ยอดใบจอง</th>
                             <th style="width: 160px;">เลขที่ใบขาย</th>
                             <th style="width: 120px;" class="text-end">ยอดใบขายรวม</th>
@@ -128,7 +132,7 @@
                                 <td class="small">{{ $row->doc_date }}</td>
                                 <td class="fw-semibold">{{ $row->customer_name }}</td>
                                 <td class="small">{{ $row->sales_area_name }}</td>
-                                <td class="small">{{ $row->warehouse_names }}</td>
+                                <td class="small">{{ $row->location_names }}</td>
                                 <td class="text-end fw-bold">{{ number_format($row->booking_amount, 2) }}</td>
                                 <td class="font-monospace small">{{ $row->sale_doc_numbers }}</td>
                                 <td class="text-end fw-bold">{{ number_format($row->sale_amount, 2) }}</td>
@@ -173,12 +177,12 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     try {
-        var storageKey = 'booking_comparison_warehouse_id_{{ auth()->id() ?? 'guest' }}';
+        var storageKey = 'booking_comparison_warehouse_location_id_{{ auth()->id() ?? 'guest' }}';
         var urlParams = new URLSearchParams(window.location.search);
-        var selectElem = document.getElementById('comparisonWarehouseSelect');
+        var selectElem = document.getElementById('comparisonLocationSelect');
 
-        if (urlParams.has('warehouse_id')) {
-            var currentVal = urlParams.get('warehouse_id') || '';
+        if (urlParams.has('warehouse_location_id')) {
+            var currentVal = urlParams.get('warehouse_location_id') || '';
             localStorage.setItem(storageKey, currentVal);
         } else {
             var savedVal = localStorage.getItem(storageKey);
@@ -187,7 +191,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     return opt.value === savedVal;
                 });
                 if (optionExists && savedVal !== '') {
-                    urlParams.set('warehouse_id', savedVal);
+                    urlParams.set('warehouse_location_id', savedVal);
                     window.location.replace(window.location.pathname + '?' + urlParams.toString());
                 }
             }

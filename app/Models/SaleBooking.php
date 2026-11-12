@@ -94,6 +94,22 @@ class SaleBooking extends Model
         });
     }
 
+    public function scopeInWarehouseLocation(Builder $query, mixed $locationId): Builder
+    {
+        if (empty($locationId)) {
+            return $query;
+        }
+
+        $locationIds = is_array($locationId) ? array_filter($locationId) : [$locationId];
+        if (empty($locationIds)) {
+            return $query;
+        }
+
+        return $query->whereHas('document.stockDocument.items', function (Builder $q) use ($locationIds) {
+            $q->whereIn('warehouse_location_id', $locationIds);
+        });
+    }
+
     protected function casts(): array
     {
         return [
