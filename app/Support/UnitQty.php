@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Product;
 use App\Models\ProductBarcode;
+use App\Models\ProductUnit;
 use Illuminate\Support\Collection;
 
 class UnitQty
@@ -138,11 +139,8 @@ class UnitQty
         $baseBarcode = $barcodes->firstWhere('unit_id', $product->base_unit_id)
             ?? $barcodes->first();
 
-        $basePrice = $baseBarcode?->price !== null
-            ? (float) $baseBarcode->price
-            : ($productPrices?->get($product->id.':'.$product->base_unit_id)?->price !== null
-                ? (float) $productPrices->get($product->id.':'.$product->base_unit_id)->price
-                : ($product->default_price !== null ? (float) $product->default_price : null));
+        // 1. หน่วยหลัก (factor 1): ราคาหน่วยหลักต้องเป็น default_price เหมือนก่อนงาน 37 ทุกกรณี
+        $basePrice = $product->default_price !== null ? (float) $product->default_price : null;
 
         $units[] = [
             'unit_id' => $product->base_unit_id,
@@ -176,7 +174,7 @@ class UnitQty
                 ? (float) $barcode->price
                 : ($productPrices?->get($product->id.':'.$barcode->unit_id)?->price !== null
                     ? (float) $productPrices->get($product->id.':'.$barcode->unit_id)->price
-                    : null);
+                    : ($product->default_price !== null ? (float) ($product->default_price * $factor) : null));
 
             $units[] = [
                 'unit_id' => $barcode->unit_id,
@@ -190,5 +188,20 @@ class UnitQty
         }
 
         return $units;
+    }
+
+    /**
+     * จำนวนในหน่วยที่เลือกของบรรทัด เช่น "2 ลัง" (ใช้ในใบรวมจองหลังจำนวนหน่วยหลัก)
+     */
+    public static function formatSingle(?ProductUnit $unit, float|int|string|null $qty): string
+    {
+        if ($qty === null || $qty === '') {
+            return '-';
+        }
+
+        $formatted = rtrim(rtrim(number_format((float) $qty, 4), '0'), '.');
+        $name = ($unit && ! $unit->isCorrupted()) ? trim((string) $unit->cleanName()) : '';
+
+        return $name !== '' ? "{$formatted} {$name}" : $formatted;
     }
 }

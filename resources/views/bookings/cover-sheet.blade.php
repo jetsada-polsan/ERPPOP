@@ -149,20 +149,20 @@
                 <table class="cover-table">
                     <thead>
                         <tr>
-                            <th style="width: 45px;" class="text-center">ลำดับ</th>
-                            <th>ชื่อลูกค้า</th>
-                            <th style="width: 140px;">เลขที่บิล</th>
-                            <th style="width: 125px;" class="text-end">จำนวนเงิน</th>
-                            <th style="width: 110px;" class="text-center">ยอดค้าง</th>
-                            <th style="width: 110px;" class="text-center">รวม</th>
-                            <th style="width: 130px;" class="text-center">หมายเหตุ</th>
+                            <th style="width: 5%;" class="text-center">ลำดับ</th>
+                            <th style="width: 38%;">ชื่อลูกค้า</th>
+                            <th style="width: 17%;">เลขที่บิล</th>
+                            <th style="width: 12%;" class="text-end">จำนวนเงิน</th>
+                            <th style="width: 9%;" class="text-center">ยอดค้าง</th>
+                            <th style="width: 9%;" class="text-center">รวม</th>
+                            <th style="width: 10%;" class="text-center">หมายเหตุ</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse($sheet->bookings as $booking)
                             <tr>
                                 <td class="text-center">{{ $loop->iteration }}</td>
-                                <td>{{ $booking->document?->customer?->name_th ?? $booking->document?->customer_name ?? '-' }}</td>
+                                <td class="customer-cell">{{ $booking->document?->customer?->name_th ?? $booking->document?->customer_name ?? '-' }}</td>
                                 <td class="font-monospace fw-semibold">{{ $booking->document?->doc_number ?? '-' }}</td>
                                 <td class="text-end fw-bold">{{ number_format((float) ($booking->document?->total_amount ?? 0), 2) }}</td>
                                 <td class="write-box"></td>
@@ -337,9 +337,16 @@
 /* Table Styling */
 .cover-table {
     width: 100%;
+    table-layout: fixed;
     border-collapse: collapse;
     font-size: 12.5px;
     margin-bottom: 14px;
+}
+/* ชื่อลูกค้าอยู่บรรทัดเดียว (ยาวเกินช่องค่อยตัดด้วย …) */
+.cover-table .customer-cell {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .cover-table th, .cover-table td {
     border: 1px solid #64748b;
