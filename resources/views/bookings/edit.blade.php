@@ -7,6 +7,7 @@
 @section('content')
 <div class="doc-shell" x-data="docEntryPage({
     unitRows: true,
+    preferLargeUnit: true,
     draftEnabled: true,
     partyType: 'customer',
     partyLabel: 'ลูกค้า',
