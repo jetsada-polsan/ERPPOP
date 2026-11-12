@@ -19,6 +19,7 @@
 
 @section('content')
 <div x-data="docEntryPage({
+    unitRows: true,
     draftEnabled: true,
     partyType: 'customer',
     partyLabel: 'ลูกค้า',

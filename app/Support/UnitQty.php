@@ -5,7 +5,7 @@ namespace App\Support;
 use App\Models\Product;
 use App\Models\ProductBarcode;
 use App\Models\ProductUnit;
-use App\Models\StockDocumentItem;
+use Illuminate\Support\Collection;
 
 class UnitQty
 {
@@ -15,7 +15,6 @@ class UnitQty
      * @param  Product|null  $product  โมเดลสินค้า (ควร eager load 'baseUnit' และ 'barcodes.unit')
      * @param  float|int|string|null  $baseQty  จำนวนในหน่วยหลัก
      * @param  int|null  $unitId  หน่วยที่เลือกของบรรทัด (ถ้ามี ให้ใช้หน่วยนี้ก่อน)
-     * @return string
      */
     public static function format(?Product $product, float|int|string|null $baseQty, ?int $unitId = null): string
     {
@@ -122,27 +121,40 @@ class UnitQty
     /**
      * ดึงรายการหน่วยสำหรับให้ผู้ใช้เลือก (รวมหน่วยหลัก factor 1)
      * เฉพาะหน่วยที่มีตัวคูณเป็นจำนวนเต็มบวก และชื่อไม่เสีย
+     *
+     * @param  Collection<string, mixed>|null  $productPrices
+     * @return array<int, array{unit_id: int|null, unit_name: string, name: string, factor: string, barcode: string, price: float|null, is_base: bool}>
      */
-    public static function selectableUnits(Product $product): array
+    public static function selectableUnits(Product $product, ?Collection $productPrices = null): array
     {
         $units = [];
         $baseUnit = $product->baseUnit;
         $baseUnitName = ($baseUnit && ! $baseUnit->isCorrupted()) ? $baseUnit->cleanName() : 'หน่วยฐาน';
 
+        $barcodes = $product->relationLoaded('barcodes')
+            ? $product->barcodes
+            : $product->barcodes()->where('is_active', true)->with('unit')->get();
+
         // 1. หน่วยหลัก (factor 1)
+        $baseBarcode = $barcodes->firstWhere('unit_id', $product->base_unit_id)
+            ?? $barcodes->first();
+
+        // 1. หน่วยหลัก (factor 1): ราคาหน่วยหลักต้องเป็น default_price เหมือนก่อนงาน 37 ทุกกรณี
+        $basePrice = $product->default_price !== null ? (float) $product->default_price : null;
+
         $units[] = [
             'unit_id' => $product->base_unit_id,
+            'unit_name' => $baseUnitName,
             'name' => $baseUnitName,
-            'factor' => 1,
-            'barcode' => $product->barcodes->firstWhere('unit_id', $product->base_unit_id)?->barcode
-                ?? $product->barcodes->first()?->barcode
-                ?? '',
+            'factor' => '1',
+            'barcode' => (string) ($baseBarcode?->barcode ?? ''),
+            'price' => $basePrice,
             'is_base' => true,
         ];
 
         // 2. หน่วยอื่นจากบาร์โค้ด
-        $seenUnitIds = [$product->base_unit_id];
-        foreach ($product->barcodes as $barcode) {
+        $seenUnitIds = $product->base_unit_id ? [$product->base_unit_id] : [];
+        foreach ($barcodes as $barcode) {
             if (! $barcode->is_active || ! $barcode->unit_id || in_array($barcode->unit_id, $seenUnitIds, true)) {
                 continue;
             }
@@ -156,11 +168,21 @@ class UnitQty
                 continue;
             }
             $seenUnitIds[] = $barcode->unit_id;
+            $unitCleanName = $unit->cleanName();
+
+            $price = $barcode->price !== null
+                ? (float) $barcode->price
+                : ($productPrices?->get($product->id.':'.$barcode->unit_id)?->price !== null
+                    ? (float) $productPrices->get($product->id.':'.$barcode->unit_id)->price
+                    : null);
+
             $units[] = [
                 'unit_id' => $barcode->unit_id,
-                'name' => $unit->cleanName(),
-                'factor' => (int) $factor,
-                'barcode' => $barcode->barcode,
+                'unit_name' => $unitCleanName,
+                'name' => $unitCleanName,
+                'factor' => (string) ((int) $factor),
+                'barcode' => (string) ($barcode->barcode ?? ''),
+                'price' => $price,
                 'is_base' => false,
             ];
         }

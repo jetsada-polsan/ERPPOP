@@ -307,9 +307,13 @@ function docEntryPage(config) {
             if (selectedUnit) {
                 const oldFactor = item.unit_factor || 1;
                 const basePrice = (Number(item.unit_price) || 0) / oldFactor;
-                item.unit_name = selectedUnit.name;
+                item.unit_name = selectedUnit.unit_name || selectedUnit.name;
                 item.unit_factor = Number(selectedUnit.factor) || 1;
-                item.unit_price = Number((basePrice * item.unit_factor).toFixed(2));
+                if (selectedUnit.price !== null && selectedUnit.price !== undefined) {
+                    item.unit_price = Number(selectedUnit.price);
+                } else {
+                    item.unit_price = Number((basePrice * item.unit_factor).toFixed(2));
+                }
                 item.qty = (Number(item.unit_qty) || 0) * item.unit_factor;
             }
             this.checkPriceDivisibility(index);
@@ -371,13 +375,16 @@ function docEntryPage(config) {
                 if (stockRequests.get(item) === controller) stockRequests.delete(item);
             }
         },
-        onProductPicked(index, product) {
+        onProductPicked(index, product, context = null, unit = null) {
+            this.selectProduct(index, product, unit);
+        },
+        selectProduct(index, product, selectedUnit = null) {
             const item = this.items[index];
             item.product_id = product.id;
             item.productQuery = `${product.sku_code} - ${product.name_th}`;
             item.sku_code = product.sku_code || '';
             item.name_th = product.name_th || '';
-            item.barcode = product.barcode || '';
+            item.barcode = (selectedUnit && selectedUnit.barcode) ? selectedUnit.barcode : (product.barcode || '');
             item.base_unit_id = product.base_unit_id;
             item.base_unit_name = product.base_unit_name || product.unit_name || 'หน่วยฐาน';
             item.units = product.units || [];
@@ -390,19 +397,23 @@ function docEntryPage(config) {
             item.available_qty = product.available_qty;
             item.lots = product.lots || [];
 
-            let selectedUnit = null;
-            if (product.matched_unit_id && item.units.length) {
-                selectedUnit = item.units.find(u => Number(u.unit_id) === Number(product.matched_unit_id));
+            let unitToSelect = selectedUnit;
+            if (!unitToSelect && product.matched_unit_id && item.units.length) {
+                unitToSelect = item.units.find(u => Number(u.unit_id) === Number(product.matched_unit_id));
             }
-            if (!selectedUnit && item.units.length) {
-                selectedUnit = item.units.find(u => Number(u.unit_id) === Number(product.base_unit_id)) || item.units[0];
+            if (!unitToSelect && item.units.length) {
+                unitToSelect = item.units.find(u => Number(u.unit_id) === Number(product.base_unit_id)) || item.units[0];
             }
 
-            if (selectedUnit) {
-                item.unit_id = selectedUnit.unit_id;
-                item.unit_name = selectedUnit.name;
-                item.unit_factor = Number(selectedUnit.factor) || 1;
-                item.unit_price = Number((Number(product.default_price || 0) * item.unit_factor).toFixed(2));
+            if (unitToSelect) {
+                item.unit_id = unitToSelect.unit_id;
+                item.unit_name = unitToSelect.unit_name || unitToSelect.name;
+                item.unit_factor = Number(unitToSelect.factor) || 1;
+                if (unitToSelect.price !== null && unitToSelect.price !== undefined) {
+                    item.unit_price = Number(unitToSelect.price);
+                } else {
+                    item.unit_price = Number((Number(product.default_price || 0) * item.unit_factor).toFixed(2));
+                }
             } else {
                 item.unit_id = product.base_unit_id || '';
                 item.unit_name = product.unit_name || 'หน่วยฐาน';
@@ -413,6 +424,7 @@ function docEntryPage(config) {
             item.unit_qty = 1;
             item.qty = item.unit_qty * item.unit_factor;
             item.priceWarning = '';
+            this.checkPriceDivisibility(index);
         },
         calculateExpiry(index) {
             const item = this.items[index];
