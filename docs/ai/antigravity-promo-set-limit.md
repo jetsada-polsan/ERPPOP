@@ -206,3 +206,12 @@ cd apps/pos-python && QT_QPA_PLATFORM=offscreen python -m pytest -q tests/test_p
    - ถอดไฟล์ `apps/pos-python/**` ออกจาก branch นี้กลับคืนตาม `origin/main` 100%
    - ย้ายการพัฒนา POS ไปยัง branch `antigravity/promo-set-limit-pos` ที่แตกจาก `origin/claude/pos-free-item-fix` (POS v0.9.12+)
 
+
+---
+
+## 9. แก้ path ตัวพิมพ์ fixture (Task 40)
+
+- ปัญหา: `PromoParityFixtureTest` เรียก `base_path('tests/fixtures/promo-parity.json')` (ตัวเล็ก) แต่ไฟล์ใน git คือ `tests/Fixtures/promo-parity.json` → บน Mac ผ่านเพราะ filesystem ไม่สนตัวพิมพ์ แต่ phpunit ใน `deploy.yml` บน Linux จะหาไฟล์ไม่เจอ
+- แก้: ทุกที่ใช้ `tests/Fixtures/promo-parity.json` ตรงตัวอักษร · ฝั่ง pytest (branch `antigravity/promo-set-limit-pos`) เอา fallback ตัวเล็กออก เหลือ path เดียว
+- ตรวจ: `git ls-files | grep -Fx tests/Fixtures/promo-parity.json` ตรง · `git grep "tests/fixtures"` ไม่พบในไฟล์ที่ track ทั้งสอง branch
+- sha256 fixture ไม่เปลี่ยน: `ff5dc1ff967783f67cf3f17e33895fc4613a9dc07de9d4fbd5666c8f9eea4d1b`

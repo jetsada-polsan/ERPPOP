@@ -66,7 +66,7 @@ class PromoParityFixtureTest extends TestCase
 
     public function test_all_121_parity_fixture_scenarios_pass_against_pos_pricing_guard(): void
     {
-        $fixturePath = base_path('tests/fixtures/promo-parity.json');
+        $fixturePath = base_path('tests/Fixtures/promo-parity.json');
         $this->assertFileExists($fixturePath);
 
         $fixture = json_decode(file_get_contents($fixturePath), true);
