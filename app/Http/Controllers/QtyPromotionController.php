@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use App\Models\QtyPromotion;
-use Illuminate\Http\RedirectResponse;
 use App\Support\AutoCode;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -69,6 +69,7 @@ class QtyPromotionController extends Controller
             'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
             'note' => ['nullable', 'string', 'max:2000'],
             'is_active' => ['nullable', 'boolean'],
+            'max_sets_per_bill' => ['nullable', 'integer', 'min:1'],
         ], [
             'name.required' => 'กรุณากรอกชื่อแคมเปญ',
             'promo_type.required' => 'กรุณาเลือกประเภทโปรโมชัน',
@@ -92,12 +93,20 @@ class QtyPromotionController extends Controller
             'bundle_price.required_if' => 'กรุณาระบุราคาชุด/ราคาแลกซื้อ',
             'bundle_price.min' => 'ราคาชุด/ราคาแลกซื้อต้องไม่ติดลบ',
             'ends_at.after_or_equal' => 'เวลาสิ้นสุดต้องไม่ก่อนเวลาเริ่มต้น',
+            'max_sets_per_bill.integer' => 'จำนวนชุดสูงสุดต่อบิลต้องเป็นตัวเลขจำนวนเต็ม',
+            'max_sets_per_bill.min' => 'จำนวนชุดสูงสุดต่อบิลต้องไม่น้อยกว่า 1 ชุด',
         ]);
         $data['is_active'] = $request->boolean('is_active', true);
 
         $type = $data['promo_type'];
         $data['_group'] = in_array($type, QtyPromotion::MIX_TYPES, true) ? array_values(array_unique($data['product_ids'] ?? [])) : [];
         unset($data['product_ids']);
+        if (in_array($type, QtyPromotion::BILL_TYPES, true)) {
+            // โปรระดับบิล ซ่อนในฟอร์มและไม่มีผล จำกัด 1 สิทธิ์ต่อบิลอยู่แล้ว
+            $data['max_sets_per_bill'] = null;
+        } else {
+            $data['max_sets_per_bill'] = filled($data['max_sets_per_bill'] ?? null) ? (int) $data['max_sets_per_bill'] : null;
+        }
         if (in_array($type, QtyPromotion::MIX_TYPES, true)) {
             // ซื้อคละไม่ผูกสินค้าตัวเดียว ใช้กลุ่มสินค้าแทน
             $data['product_id'] = null;

@@ -241,7 +241,7 @@ class PosController extends Controller
             // วันเริ่ม/สิ้นสุดส่งไปด้วย เครื่อง POS ที่ออฟไลน์ข้ามวันจะได้ไม่ใช้โปรที่หมดแล้ว
             ->get(['id', 'code', 'name', 'promo_type', 'product_id', 'min_qty', 'min_amount',
                 'free_product_id', 'free_qty', 'discount_type', 'discount_value', 'max_discount', 'bundle_price',
-                'starts_date', 'ends_date', 'starts_at', 'ends_at']);
+                'starts_date', 'ends_date', 'starts_at', 'ends_at', 'max_sets_per_bill']);
 
         // ซื้อคละ: ส่งรหัสสินค้าในกลุ่มไปด้วย เครื่องจะได้นับรวมได้แม้ออฟไลน์
         return response()->json($promotions->map(function (QtyPromotion $promotion) {
