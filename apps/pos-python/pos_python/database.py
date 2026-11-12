@@ -72,6 +72,19 @@ CREATE TABLE IF NOT EXISTS price_versions (
     branch_id INTEGER,
     synced_at TEXT NOT NULL
 );
+-- กติกาแคมเปญจาก ERP (ราคาลดรายสินค้า / นาทีทอง) คิดตอนขายแบบเดียวกับ PosPricingGuard::campaignPrice
+CREATE TABLE IF NOT EXISTS campaign_prices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL REFERENCES products(id),
+    kind TEXT NOT NULL,
+    price TEXT,
+    discount_amount TEXT,
+    discount_percent TEXT,
+    starts_at TEXT,
+    ends_at TEXT,
+    synced_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_campaign_prices_product ON campaign_prices(product_id);
 CREATE TABLE IF NOT EXISTS shifts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     server_id INTEGER UNIQUE,

@@ -90,6 +90,7 @@ class ProvisioningService:
                 local_id = self._upsert_product(item, int(server_id), str(sku))
                 self._replace_barcodes(local_id, item.get("barcodes") or [])
                 self._record_price(local_id, item, branch_id)
+                self._replace_campaigns(local_id, item.get("campaigns"))
                 seen.append(int(server_id))
                 result["upserted"] += 1
             # สินค้าที่ ERP ไม่ส่งมาแล้ว (เลิกขาย) ปิดใช้งาน ไม่ลบ เพราะบิลเก่ายังอ้างอยู่
@@ -169,6 +170,27 @@ class ProvisioningService:
                  str(code.get("price")) if isinstance(code, dict) and code.get("price") is not None else None,
                  now(), code.get("unit_id") if isinstance(code, dict) else None,
                  ((code.get("unit") or {}).get("name") or code.get("unit_name")) if isinstance(code, dict) else None),
+            )
+
+    def _replace_campaigns(self, local_product_id: int, campaigns) -> None:
+        """ERP รุ่นเก่าไม่ส่ง campaigns (None) = คงของเดิมไว้ · ส่งมาแล้ว = แทนทั้งหมด"""
+        if not isinstance(campaigns, dict):
+            return
+        self.db.execute("DELETE FROM campaign_prices WHERE product_id = ?", (local_product_id,))
+        for promo in campaigns.get("promotions") or []:
+            self.db.execute(
+                """INSERT INTO campaign_prices (product_id, kind, discount_amount, discount_percent, starts_at, ends_at, synced_at)
+                   VALUES (?, 'promotion', ?, ?, ?, ?, ?)""",
+                (local_product_id, str(promo.get("discount_amount") or "0"), str(promo.get("discount_percent") or "0"),
+                 promo.get("starts_on"), promo.get("ends_on"), now()),
+            )
+        for window in campaigns.get("flash") or []:
+            if window.get("price") is None:
+                continue
+            self.db.execute(
+                """INSERT INTO campaign_prices (product_id, kind, price, starts_at, ends_at, synced_at)
+                   VALUES (?, 'flash', ?, ?, ?, ?)""",
+                (local_product_id, str(window.get("price")), self._utc_iso(window.get("from")), self._utc_iso(window.get("to")), now()),
             )
 
     def _record_price(self, local_product_id: int, item: dict, branch_id: int) -> None:

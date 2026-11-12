@@ -522,6 +522,45 @@ class PosService:
             return money(row["price"]), row["version"]
         return money(fallback_price), None
 
+    def campaign_price(self, product_id: int, base_price: Decimal | str | float) -> Decimal:
+        """ราคาขายหลังแคมเปญ = ต่ำสุดของ (ราคาฐานของบรรทัด, ลดบาท/ลด % ที่อยู่ในช่วงวันที่, นาทีทองที่กำลังเปิด)
+
+        ลอกจาก ERP PosPricingGuard::campaignPrice ทุกข้อ: ลดบาทมาก่อนลด % ในโปรเดียวกัน, ปัด 2 ตำแหน่ง,
+        ใช้กับทุกบรรทัดของสินค้านี้ (รวมหน่วยใหญ่) เพราะ ERP คิดแบบนั้น
+        """
+        base = money(base_price)
+        rows = self.db.execute(
+            "SELECT kind, price, discount_amount, discount_percent, starts_at, ends_at FROM campaign_prices WHERE product_id = ?",
+            (product_id,),
+        ).fetchall()
+        if not rows:
+            return base
+        now_utc = self.clock.now().astimezone(timezone.utc)
+        today = self.clock.now().astimezone(timezone(timedelta(hours=7), name="ICT")).date().isoformat()
+        best = base
+        for row in rows:
+            candidate = None
+            if row["kind"] == "promotion":
+                if (row["starts_at"] and today < row["starts_at"][:10]) or (row["ends_at"] and today > row["ends_at"][:10]):
+                    continue
+                amount = Decimal(str(row["discount_amount"] or "0"))
+                percent = Decimal(str(row["discount_percent"] or "0"))
+                if amount > 0:
+                    candidate = max(Decimal("0"), base - amount)
+                elif percent > 0:
+                    candidate = max(Decimal("0"), (base * (Decimal("1") - percent / Decimal("100"))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+            elif row["kind"] == "flash" and row["price"] is not None:
+                try:
+                    starts = datetime.fromisoformat(str(row["starts_at"]).replace("Z", "+00:00"))
+                    ends = datetime.fromisoformat(str(row["ends_at"]).replace("Z", "+00:00"))
+                except ValueError:
+                    continue
+                if starts <= now_utc <= ends:
+                    candidate = Decimal(str(row["price"]))
+            if candidate is not None and candidate < best:
+                best = candidate
+        return money(best)
+
     def vat_rate(self) -> Decimal:
         """อัตรา VAT ที่ sync มาจาก ERP — ยังไม่เคย sync ให้ใช้อัตราปัจจุบันของไทย
 
@@ -586,6 +625,7 @@ class PosService:
             raise ValueError("ยังไม่มีราคาหน่วยขายนี้ กรุณาโหลดข้อมูลสินค้า/ตรวจตารางราคา ERP")
         if price <= 0:
             raise ValueError("ยังไม่มีราคาหน่วยขายนี้")
+        price = self.campaign_price(int(product["id"]), price)
         return CartLine(
             product_id=int(product["id"]), qty=Decimal("1"), unit_price=price,
             barcode=product["barcode"], source_barcode=barcode, barcode_type=product["barcode_type"],
