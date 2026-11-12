@@ -22,6 +22,12 @@
             <div class="meta-row"><span class="muted">เลขที่</span><b>{{ $payment->doc_number }}</b></div>
             <div class="meta-row"><span class="muted">วันที่</span><b>{{ $payment->doc_date->thaiDate() }}</b></div>
             <div class="meta-row"><span class="muted">สาขา</span><b>{{ $payment->branch?->name_th ?? '-' }}</b></div>
+            @if($payment->salesman)
+                <div class="meta-row"><span class="muted">ผู้รับเงิน</span><b>{{ $payment->salesman->name }} ({{ $payment->salesman->code }})</b></div>
+            @endif
+            @if($payment->paymentDocument?->wht_cert_no)
+                <div class="meta-row"><span class="muted">หนังสือรับรอง หงด.</span><b>{{ $payment->paymentDocument->wht_cert_no }}</b></div>
+            @endif
         </div>
     </div>
 
@@ -46,8 +52,22 @@
 
     {{-- ตัดชำระเอกสารไหนบ้าง --}}
     @if(($payment->paymentDocument?->allocations ?? collect())->isNotEmpty())
+    <?php $hasDiscOrWht = $payment->paymentDocument->allocations->contains(fn($a) => (float)$a->discount_amount > 0 || (float)$a->wht_amount > 0); ?>
     <table class="items">
-        <thead><tr><th class="c" style="width:40px">#</th><th>ชำระค่าเอกสาร</th><th>ครบกำหนด</th><th class="r" style="width:120px">ยอดที่ชำระ</th><th class="r" style="width:120px">คงค้างหลังชำระ</th></tr></thead>
+        <thead>
+            <tr>
+                <th class="c" style="width:40px">#</th>
+                <th>ชำระค่าเอกสาร</th>
+                <th>ครบกำหนด</th>
+                <th class="r" style="width:110px">ยอดตัดหนี้</th>
+                @if($hasDiscOrWht)
+                    <th class="r" style="width:90px">ลดสด</th>
+                    <th class="r" style="width:90px">หัก ณ ที่จ่าย</th>
+                    <th class="r" style="width:110px">รับจริง</th>
+                @endif
+                <th class="r" style="width:110px">คงค้างหลังชำระ</th>
+            </tr>
+        </thead>
         <tbody>
             @foreach($payment->paymentDocument->allocations as $i => $alloc)
             <tr>
@@ -55,6 +75,11 @@
                 <td>{{ $alloc->referenceNumber() }}</td>
                 <td>{{ ($alloc->supplierOpenItem ?? $alloc->openItem)?->due_date ? \Illuminate\Support\Carbon::parse(($alloc->supplierOpenItem ?? $alloc->openItem)->due_date)->thaiDate() : '-' }}</td>
                 <td class="r">{{ number_format((float) ($alloc->allocated_amount ?? 0), 2) }}</td>
+                @if($hasDiscOrWht)
+                    <td class="r">{{ number_format((float) ($alloc->discount_amount ?? 0), 2) }}</td>
+                    <td class="r">{{ number_format((float) ($alloc->wht_amount ?? 0), 2) }}</td>
+                    <td class="r">{{ number_format((float) ($alloc->allocated_amount - $alloc->discount_amount - $alloc->wht_amount), 2) }}</td>
+                @endif
                 <td class="r">{{ number_format((float) (($alloc->supplierOpenItem ?? $alloc->openItem)?->balance_amount ?? 0), 2) }}</td>
             </tr>
             @endforeach
@@ -97,7 +122,14 @@
 
     <div class="signs">
         <div class="sign"><div class="line"></div>{{ $isReceipt ? 'ผู้ชำระเงิน' : 'ผู้รับเงิน' }} / วันที่</div>
-        <div class="sign"><div class="line"></div>{{ $isReceipt ? 'ผู้รับเงิน' : 'ผู้จ่ายเงิน' }} / วันที่</div>
+        <div class="sign">
+            <div class="line"></div>
+            {{ $isReceipt ? 'ผู้รับเงิน' : 'ผู้จ่ายเงิน' }}
+            @if($payment->salesman)
+                ({{ $payment->salesman->name }})
+            @endif
+            / วันที่
+        </div>
         <div class="sign"><div class="line"></div>ผู้มีอำนาจลงนาม / วันที่</div>
     </div>
 @endsection
