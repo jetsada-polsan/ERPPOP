@@ -581,4 +581,28 @@ class LoadingSheetFeedbackTest extends TestCase
         $csvContent = $csvResp->streamedContent();
         $this->assertStringContainsString('5,670.39', $csvContent);
     }
+
+    /**
+     * ใบรวมจองต้องเปิดได้เมื่อมีบรรทัดที่จองเป็นหน่วยใหญ่ (production 12 พ.ย. ล่มเพราะเรียก formatSingle ที่ไม่มีอยู่)
+     */
+    public function test_summary_opens_when_a_booking_line_is_in_a_larger_unit(): void
+    {
+        $carton = ProductUnit::firstOrCreate(['code' => 'CTN'], ['name' => 'ลัง', 'qty_per_base_unit' => 12]);
+        ProductBarcode::create([
+            'product_id' => $this->product1->id,
+            'unit_id' => $carton->id,
+            'unit_factor' => 12,
+            'barcode' => '885099900012',
+            'is_active' => true,
+        ]);
+        $booking = $this->createBooking($this->branchA, $this->areaA, $this->customerA, 'BK-202611-0099', 2880.00, '2026-11-12', 'pending',
+            [['product' => $this->product1, 'qty' => 24, 'location_id' => $this->locationA->id]]);
+        StockDocumentItem::where('stock_document_id', $booking->document->stockDocument->id)
+            ->update(['unit_id' => $carton->id, 'unit_qty' => 2, 'unit_factor' => 12]);
+
+        $this->actingAs($this->adminUser)->get(route('bookings.summary', ['date' => '2026-11-12']))
+            ->assertOk()
+            ->assertSee('BK-202611-0099')
+            ->assertSee('(2 ลัง)');
+    }
 }
