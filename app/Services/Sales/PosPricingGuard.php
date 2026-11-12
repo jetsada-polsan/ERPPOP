@@ -390,7 +390,7 @@ class PosPricingGuard
         );
     }
 
-    private function qtyPromotionDiscount($lines, int $branchId, bool $billPromotions = false, bool $mixPromotions = false, bool $aggregate = true): float
+    public function qtyPromotionDiscount($lines, int $branchId, bool $billPromotions = false, bool $mixPromotions = false, bool $aggregate = true): float
     {
         if ($aggregate) {
             // Prices originate from server masters, never submitted cashier prices.

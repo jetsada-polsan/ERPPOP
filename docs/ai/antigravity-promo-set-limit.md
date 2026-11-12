@@ -180,3 +180,29 @@ cd apps/pos-python && QT_QPA_PLATFORM=offscreen python -m pytest -q tests/test_p
 - ไม่มีการใช้ `confirm()` หรือ `alert()` ของเบราว์เซอร์
 - ไม่มีการ build / publish แพ็กเกจของ POS
 - ไม่มีการ push `main`, ไม่มีการ merge เข้า `main`, ไม่ deploy และไม่แตะต้องเซิร์ฟเวอร์จริง
+
+---
+
+## 8. ผลการปรับปรุงตามผลตรวจ Claude (Task 38)
+
+ตามข้อเสนอแนะในการตรวจงาน 36:
+1. **สร้าง Central Parity Fixture (`tests/Fixtures/promo-parity.json`):**
+   - บันทึกสถานการณ์ทดสอบ 121 กรณีที่ครอบคลุมโปรโมชันครบทั้ง 7 ประเภท:
+     1. `discount` (baht)
+     2. `discount` (percent)
+     3. `bundle_price`
+     4. `free_item` (ต่างสินค้า)
+     5. `free_item` (ซื้อ 2 แถม 1 สินค้าตัวเดิม ตามสูตร `floor(qty / (min + free))`)
+     6. `mix_bundle` (โปรคละราคาชุด)
+     7. `mix_free` (โปรคละแถมชิ้นถูกสุด)
+   - แต่ละประเภทครอบคลุม `max_sets_per_bill`: `null` (ไม่จำกัด), `1` ชุด, `5` ชุด, เกินจำนวนชุดจำกัด, และกรณีแยกบรรทัดสินค้าเดียวกัน (split lines)
+   - ทุกกรณีระบุผลลัพธ์ตายตัวเป็น literal string `expected_discount` ทศนิยม 2 ตำแหน่ง
+   - รันผ่าน `PosPricingGuard::qtyPromotionDiscount` ของจริงใน PHPUnit (`PromoParityFixtureTest`) ทั้ง 121 กรณี ตรงกับ `expected_discount` ครบถ้วน 100%
+   - **จำนวนกรณีทดสอบใน Fixture:** 121 กรณี
+   - **SHA256 Checksum:** `ff5dc1ff967783f67cf3f17e33895fc4613a9dc07de9d4fbd5666c8f9eea4d1b`
+
+2. **แยก Branch ฝั่ง ERP และ POS:**
+   - Branch `antigravity/promo-set-limit` นี้ คงไว้เฉพาะฝั่ง ERP (Migration, View, PosPricingGuard, PosController sync, Tests และ Fixture)
+   - ถอดไฟล์ `apps/pos-python/**` ออกจาก branch นี้กลับคืนตาม `origin/main` 100%
+   - ย้ายการพัฒนา POS ไปยัง branch `antigravity/promo-set-limit-pos` ที่แตกจาก `origin/claude/pos-free-item-fix` (POS v0.9.12+)
+
