@@ -10,6 +10,7 @@ use App\Models\DocumentType;
 use App\Models\PaymentAllocation;
 use App\Models\PaymentDocument;
 use App\Models\PaymentLine;
+use App\Services\Accounting\AccountingPeriodGuard;
 use App\Services\Accounting\CashBookPostingService;
 use App\Services\Accounting\GlPostingService;
 use Illuminate\Support\Facades\DB;
@@ -38,7 +39,8 @@ class CustomerPaymentService
      *     doc_date?: ?string,
      *     method?: string,
      *     payments?: array<int, array{method: string, amount: float, bank_account_id?: ?int, transfer_ref?: ?string, transfer_at?: ?string, cheque_no?: ?string, cheque_due_date?: ?string, cheque_bank?: ?string}>,
-     *     allocations: array<int, array{customer_open_item_id: int, amount: float}>
+     *     allocations: array<int, array{customer_open_item_id: int, amount: float}>,
+     *     rounding_amount?: ?float
      * }  $data
      */
     public function create(array $data): Document
@@ -116,15 +118,34 @@ class CustomerPaymentService
             throw new RuntimeException('ต้องระบุยอดรับชำระอย่างน้อย 1 รายการ');
         }
 
-        $totalPaid = round((float) $payments->sum('amount'), 2);
+        $rounding = isset($data['rounding_amount']) ? round((float) $data['rounding_amount'], 2) : 0.0;
+        if (abs($rounding) > 1.009) {
+            throw new RuntimeException('เศษขาด/เกินต้องไม่เกิน ±1.00 บาท');
+        }
 
-        if (abs($totalPaid - $totalNet) > 0.009) {
-            throw new RuntimeException('ยอดชำระรวม ('.number_format($totalPaid, 2).') ไม่เท่ากับยอดจัดสรร ('.number_format($totalNet, 2).')');
+        $totalPaid = round((float) $payments->sum('amount'), 2);
+        $diff = round($totalPaid - $totalNet, 2);
+
+        if (abs($diff) > 0.009) {
+            if (abs($diff) > 1.009) {
+                throw new RuntimeException('ยอดชำระรวม ('.number_format($totalPaid, 2).') ไม่เท่ากับยอดจัดสรร ('.number_format($totalNet, 2).')');
+            }
+            if ($rounding == 0.0) {
+                throw new RuntimeException('ยอดชำระรวม ('.number_format($totalPaid, 2).') ไม่เท่ากับยอดจัดสรร ('.number_format($totalNet, 2).')');
+            }
+            if (abs(abs($diff) - abs($rounding)) > 0.009) {
+                throw new RuntimeException('เศษขาด/เกิน ('.number_format($rounding, 2).') ไม่ตรงกับผลต่างระหว่างยอดชำระกับยอดจัดสรร ('.number_format($diff, 2).')');
+            }
+            $actualRounding = $diff;
+        } elseif (abs($rounding) > 0.009) {
+            throw new RuntimeException('ยอดชำระตรงกับยอดจัดสรรแล้ว ไม่ต้องระบุเศษขาด/เกิน');
+        } else {
+            $actualRounding = 0.0;
         }
 
         // วันที่ใบเสร็จเลือกย้อนหลังได้ ต้องไม่ตกในงวดบัญชีที่ปิดแล้ว (ตัวลงบัญชีเดิมตรวจแค่วันนี้)
         if (! empty($data['doc_date'])) {
-            app(\App\Services\Accounting\AccountingPeriodGuard::class)->assertOpen((string) $data['doc_date'], (int) $data['branch_id']);
+            app(AccountingPeriodGuard::class)->assertOpen((string) $data['doc_date'], (int) $data['branch_id']);
         }
 
         if ($totalWht > 0 && ! $this->glPosting->role(ChartOfAccount::ROLE_WHT_RECEIVABLE)) {
@@ -137,7 +158,7 @@ class CustomerPaymentService
 
         $documentType = DocumentType::where('code', 'RECEIPT')->firstOrFail();
 
-        return DB::transaction(function () use ($data, $documentType, $totalAllocated, $totalDiscount, $totalWht, $allocations, $openItems, $payments) {
+        return DB::transaction(function () use ($data, $documentType, $totalAllocated, $totalDiscount, $totalWht, $actualRounding, $allocations, $openItems, $payments) {
             $document = Document::create([
                 'document_type_id' => $documentType->id,
                 'branch_id' => $data['branch_id'],
@@ -160,6 +181,7 @@ class CustomerPaymentService
                 'status' => 'active',
                 'wht_cert_no' => $data['wht_cert_no'] ?? null,
                 'wht_cert_date' => $data['wht_cert_date'] ?? null,
+                'rounding_amount' => $actualRounding,
             ]);
 
             $seq = 1;
@@ -226,6 +248,15 @@ class CustomerPaymentService
                 $this->glPosting->postCustomerDiscount(
                     $paymentDocument,
                     $totalDiscount,
+                    $document->doc_date->toDateString(),
+                    $document->doc_number
+                );
+            }
+
+            if (abs($actualRounding) > 0.001) {
+                $this->glPosting->postCustomerRounding(
+                    $paymentDocument,
+                    $actualRounding,
                     $document->doc_date->toDateString(),
                     $document->doc_number
                 );

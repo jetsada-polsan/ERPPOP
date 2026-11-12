@@ -112,6 +112,69 @@ class GlPostingService
     }
 
     /**
+     * ผลต่างเศษสตางค์ขาด/เกิน: ลงบัญชีเศษสตางค์ (Dr หรือ Cr) คู่กับลูกหนี้การค้า (AR)
+     * - ขาด (Shortfall, roundingAmount < 0): Dr เศษสตางค์ / Cr ลูกหนี้
+     * - เกิน (Excess, roundingAmount > 0): Dr ลูกหนี้ / Cr เศษสตางค์
+     */
+    public function postCustomerRounding(PaymentDocument $paymentDocument, float $roundingAmount, string $entryDate, string $remark): void
+    {
+        if (abs($roundingAmount) < 0.001) {
+            return;
+        }
+
+        $roundingAccount = ChartOfAccount::where('name_th', 'like', '%เศษสตางค์%')
+            ->orWhere('name_en', 'like', '%rounding%')
+            ->orWhere('default_role', 'rounding_diff')
+            ->first()
+            ?? ChartOfAccount::where('default_role', ChartOfAccount::ROLE_EXPENSE)->first()
+            ?? ChartOfAccount::where('code', '5020')->first();
+
+        $arAccount = ChartOfAccount::where('default_role', ChartOfAccount::ROLE_AR)->first();
+
+        if (! $roundingAccount || ! $arAccount) {
+            throw new RuntimeException('ผังบัญชีสำหรับเศษสตางค์หรือลูกหนี้ยังไม่ครบ ไม่สามารถลง GL ได้');
+        }
+
+        $amount = round(abs($roundingAmount), 2);
+
+        if ($roundingAmount < 0) {
+            GlJournal::create([
+                'payment_document_id' => $paymentDocument->id,
+                'account_id' => $roundingAccount->id,
+                'debit' => $amount,
+                'credit' => 0,
+                'remark' => $remark.' (เศษสตางค์ขาด)',
+                'entry_date' => $entryDate,
+            ]);
+            GlJournal::create([
+                'payment_document_id' => $paymentDocument->id,
+                'account_id' => $arAccount->id,
+                'debit' => 0,
+                'credit' => $amount,
+                'remark' => $remark.' (เศษสตางค์ขาด)',
+                'entry_date' => $entryDate,
+            ]);
+        } else {
+            GlJournal::create([
+                'payment_document_id' => $paymentDocument->id,
+                'account_id' => $arAccount->id,
+                'debit' => $amount,
+                'credit' => 0,
+                'remark' => $remark.' (เศษสตางค์เกิน)',
+                'entry_date' => $entryDate,
+            ]);
+            GlJournal::create([
+                'payment_document_id' => $paymentDocument->id,
+                'account_id' => $roundingAccount->id,
+                'debit' => 0,
+                'credit' => $amount,
+                'remark' => $remark.' (เศษสตางค์เกิน)',
+                'entry_date' => $entryDate,
+            ]);
+        }
+    }
+
+    /**
      * เช็ครับเด้ง: กลับรายการรับชำระของใบนั้นทั้งชุด (Dr ลูกหนี้ / Cr ธนาคาร) ลงวันที่เช็คเด้ง
      * ไม่ลบรายการเดิม ประวัติว่าเคยรับและเคยเด้งต้องตรวจย้อนได้ เรียกซ้ำก็ไม่กลับซ้ำ
      */
