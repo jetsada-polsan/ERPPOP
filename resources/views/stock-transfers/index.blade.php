@@ -61,11 +61,11 @@
                                 </td>
                                 <td class="text-end text-nowrap">
                                     @if($transfer->status === 'pending')
-                                        <form method="post" action="{{ route('stock-transfers.approve', $transfer) }}" class="d-inline" data-confirm="อนุมัติและโอนสต็อกใบนี้?">
+                                        <form method="post" action="{{ route('stock-transfers.approve', $transfer) }}" class="d-inline" data-confirm="อนุมัติและโอนสต็อกใบนี้?" data-confirm-tone="warning">
                                             @csrf
                                             <button class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i> อนุมัติ</button>
                                         </form>
-                                        <form method="post" action="{{ route('stock-transfers.reject', $transfer) }}" class="d-inline" data-confirm="ปฏิเสธคำขอนี้?">
+                                        <form method="post" action="{{ route('stock-transfers.reject', $transfer) }}" class="d-inline" data-confirm="ปฏิเสธคำขอนี้?" data-confirm-tone="danger">
                                             @csrf
                                             <button class="btn btn-sm btn-light text-danger border">ปฏิเสธ</button>
                                         </form>

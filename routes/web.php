@@ -840,3 +840,9 @@ Route::prefix('bplus')->name('bplus.')->group(function () {
     Route::get('/show-price', [BplusOperationController::class, 'showPrice'])->name('show-price');
     Route::post('/show-price', [BplusOperationController::class, 'storeShowPrice'])->name('show-price.store');
 });
+
+if (app()->environment('local')) {
+    Route::get('/confirm-popups-preview', function () {
+        return view('dev.confirm-popups-preview');
+    })->name('confirm-popups-preview');
+}

@@ -1223,18 +1223,49 @@
             font-size: 14px !important;
             line-height: 1.55 !important;
         }
-        .erp-swal-actions { gap: 10px !important; padding: 18px 24px 24px !important; margin: 0 !important; }
+        .erp-swal-actions {
+            display: flex !important;
+            gap: 12px !important;
+            padding: 18px 24px 24px !important;
+            margin: 0 !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
         .erp-swal-confirm, .erp-swal-cancel {
-            min-width: 112px !important;
-            min-height: 40px !important;
-            padding: 9px 18px !important;
+            flex: 1 1 0 !important;
+            min-width: 120px !important;
+            min-height: 42px !important;
+            padding: 10px 18px !important;
             border: 0 !important;
             border-radius: 10px !important;
             font-weight: 800 !important;
+            font-size: 14.5px !important;
+            font-family: inherit !important;
+            text-align: center !important;
             box-shadow: none !important;
+            cursor: pointer !important;
+            transition: all .15s ease !important;
         }
-        .erp-swal-confirm { background: linear-gradient(135deg, var(--erp-success-ink), var(--erp-primary)) !important; color: #fff !important; }
-        .erp-swal-cancel { background: var(--erp-surface-2) !important; color: var(--erp-text) !important; }
+        /* 4 โทนสีตามความหนักของงาน */
+        .erp-swal-confirm,
+        .erp-swal-confirm-primary { background: #2563eb !important; color: #fff !important; }
+        .erp-swal-confirm-primary:hover { background: #1d4ed8 !important; }
+        .erp-swal-confirm-danger { background: #dc2626 !important; color: #fff !important; }
+        .erp-swal-confirm-danger:hover { background: #b91c1c !important; }
+        .erp-swal-confirm-warning { background: #d97706 !important; color: #fff !important; }
+        .erp-swal-confirm-warning:hover { background: #b45309 !important; }
+        .erp-swal-confirm-success { background: #16a34a !important; color: #fff !important; }
+        .erp-swal-confirm-success:hover { background: #15803d !important; }
+
+        .erp-swal-cancel {
+            background: var(--erp-surface-2, #f1f5f9) !important;
+            color: var(--erp-text, #334155) !important;
+            border: 1px solid rgba(148, 163, 184, .3) !important;
+        }
+        .erp-swal-cancel:hover {
+            background: #e2e8f0 !important;
+            color: #0f172a !important;
+        }
         .erp-swal-toast {
             width: min(380px, calc(100vw - 24px)) !important;
             padding: 12px 14px !important;
@@ -2049,15 +2080,56 @@
                 ...options,
             });
 
-            window.erpConfirm = (title, text, options = {}) => window.Swal.fire({
-                icon: 'warning',
-                title,
-                text,
-                showCancelButton: true,
-                confirmButtonText: options.confirmButtonText || 'ยืนยัน',
-                cancelButtonText: options.cancelButtonText || 'ยกเลิก',
-                ...options,
-            });
+            function detectTone(title, text, okText) {
+                const combined = `${title || ''} ${text || ''} ${okText || ''}`;
+                if (/ลบ|ยกเลิก|void|คืนเงิน|ปิดงวด|ล้างข้อมูล|ทำลาย|ปฏิเสธ|delete|destroy|cancel|remove|reject/i.test(combined)) {
+                    return 'danger';
+                }
+                if (/อนุมัติ|ปรับสต็อก|โอน|ปิดกะ|แทนที่|ยืนยันใบจอง|approve|transfer/i.test(combined)) {
+                    return 'warning';
+                }
+                if (/รับเงิน|รับของ|ตรวจรับ|complete|receive/i.test(combined)) {
+                    return 'success';
+                }
+                return 'primary';
+            }
+
+            window.erpConfirm = (title, text, options = {}) => {
+                if (typeof text === 'object' && text !== null && !Array.isArray(text)) {
+                    options = text;
+                    text = options.text || '';
+                }
+                const okText = options.confirmButtonText || 'ยืนยัน';
+                const tone = options.tone || detectTone(title, text, okText);
+                const defaultIcons = {
+                    danger: 'warning',
+                    warning: 'warning',
+                    primary: 'question',
+                    success: 'success',
+                };
+                const icon = options.icon || defaultIcons[tone] || 'question';
+                const isDanger = tone === 'danger';
+
+                return window.Swal.fire({
+                    title,
+                    text,
+                    icon,
+                    showCancelButton: true,
+                    confirmButtonText: okText,
+                    cancelButtonText: options.cancelButtonText || 'ยกเลิก',
+                    reverseButtons: true, // Cancel on left, Confirm on right
+                    allowOutsideClick: true,
+                    allowEscapeKey: true,
+                    focusCancel: options.focusCancel !== undefined ? options.focusCancel : isDanger,
+                    customClass: {
+                        popup: `erp-swal-popup erp-swal-tone-${tone}`,
+                        confirmButton: `erp-swal-confirm erp-swal-confirm-${tone}`,
+                        cancelButton: 'erp-swal-cancel',
+                        ...(options.customClass || {}),
+                    },
+                    ...options,
+                });
+            };
         })();
 
         // ── แจ้ง validation ฝั่งหน้าเว็บ ──

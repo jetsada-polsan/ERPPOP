@@ -523,7 +523,7 @@ function bplusReceipt() {
                     checked: false,
                 }));
             } catch (err) {
-                Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: err.message });
+                window.erpPopup('error', 'เกิดข้อผิดพลาด', err.message);
             } finally {
                 this.loadingItems = false;
             }
@@ -686,13 +686,9 @@ function bplusReceipt() {
             }
             breakdownHtml += `<div class="text-success border-top pt-1 mt-1"><b>ยอดรับจริง:</b> ฿${this.fmt(this.totalNetToReceive())}</div></div>`;
 
-            Swal.fire({
-                title: 'ยืนยันการบันทึกใบเสร็จรับเงิน',
+            window.erpConfirm('ยืนยันการบันทึกใบเสร็จรับเงิน', null, {
                 html: `จำนวนบิลที่ตัดชำระ: <b>${this.selectedCount()}</b> ใบ<br>${breakdownHtml}`,
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonColor: '#16a34a',
-                cancelButtonColor: '#64748b',
+                tone: 'success',
                 confirmButtonText: 'บันทึกใบเสร็จ',
                 cancelButtonText: 'ยกเลิก',
             }).then((result) => {

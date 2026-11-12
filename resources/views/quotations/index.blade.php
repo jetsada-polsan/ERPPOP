@@ -141,7 +141,7 @@ function quotationPage() {
             this.items[index].q = `${product.sku_code} - ${product.name_th}`;
             this.items[index].unit_price = Number(product.default_price) || 0;
         },
-        onSubmit(e) { if (this.items.some(i => !i.product_id)) { e.preventDefault(); Swal.fire({ icon: 'warning', title: 'กรุณาเลือกสินค้าให้ครบทุกแถว' }); } },
+        onSubmit(e) { if (this.items.some(i => !i.product_id)) { e.preventDefault(); window.erpPopup('warning', 'กรุณาเลือกสินค้าให้ครบทุกแถว'); } },
     };
 }
 </script>

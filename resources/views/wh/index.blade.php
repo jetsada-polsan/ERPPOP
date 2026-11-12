@@ -608,7 +608,7 @@ function whApp() {
                 this.submitError = 'สินค้าที่ควบคุมอายุต้องระบุวันหมดอายุ หรือวันผลิตของสินค้าที่ตั้งอายุไว้';
                 return;
             }
-            if (!this.poAllScanned() && !confirm('รับของบางส่วนตามจำนวนที่สแกน และเก็บยอดค้างไว้รับรอบถัดไป ใช่หรือไม่?')) return;
+            if (!this.poAllScanned() && !(await window.erpConfirm('รับของบางส่วน?', 'รับของบางส่วนตามจำนวนที่สแกน และเก็บยอดค้างไว้รับรอบถัดไป ใช่หรือไม่?', { tone: 'warning' })).isConfirmed) return;
             this.submitting = true; this.submitError = '';
             try {
                 const res = await jfetch(`{{ route('wh.purchase-orders') }}/${this.poCur.id}/receive`, {

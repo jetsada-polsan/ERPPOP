@@ -275,14 +275,9 @@ function qrPage() {
         },
 
         confirmDelete(id, name) {
-            Swal.fire({
-                title: 'ลบ QR นี้?',
-                text: `"${name}" จะถูกลบออกจากระบบ`,
-                icon: 'warning',
-                showCancelButton: true,
+            window.erpConfirm('ลบ QR นี้?', `"${name}" จะถูกลบออกจากระบบ`, {
+                tone: 'danger',
                 confirmButtonText: 'ลบ',
-                cancelButtonText: 'ยกเลิก',
-                confirmButtonColor: '#ef4444',
             }).then(r => {
                 if (r.isConfirmed) document.getElementById('del-' + id).submit();
             });

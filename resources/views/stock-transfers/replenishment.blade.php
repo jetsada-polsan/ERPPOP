@@ -141,7 +141,7 @@
             onSubmit(event) {
                 if (this.selected.length === 0) {
                     event.preventDefault();
-                    Swal.fire({ icon: 'warning', title: 'กรุณาเลือกอย่างน้อย 1 รายการ' });
+                    window.erpPopup('warning', 'กรุณาเลือกอย่างน้อย 1 รายการ');
                 }
             },
         };

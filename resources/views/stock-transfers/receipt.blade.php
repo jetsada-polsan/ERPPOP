@@ -159,7 +159,7 @@ function stockTransferReceiptSheet() {
             const code = this.scanCode.trim(); if (!code) return;
             const row = this.findScan(code); this.scanCode = '';
             if (!row) {
-                Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'ไม่พบบาร์โค้ดในใบโอนย้ายนี้', showConfirmButton: false, timer: 1800 });
+                window.erpToast('error', 'ไม่พบบาร์โค้ดในใบโอนย้ายนี้');
                 this.$refs.scanBox?.focus();
                 return;
             }
@@ -195,7 +195,7 @@ function stockTransferReceiptSheet() {
                 if (!res.ok || !data.success) throw new Error(data.message || 'บันทึกไม่สำเร็จ');
                 this.dirty = false;
             } catch (e) {
-                Swal.fire({ icon: 'error', title: 'Sync ไม่สำเร็จ', text: e.message });
+                window.erpPopup('error', 'Sync ไม่สำเร็จ', e.message);
             } finally {
                 this.saving = false;
             }
@@ -204,10 +204,11 @@ function stockTransferReceiptSheet() {
         async finish(formEl) {
             const missing = this.items.filter(i => i.scanned === null);
             if (missing.length > 0) {
-                const ok = await Swal.fire({
-                    icon: 'warning', title: 'ยังสแกน/กรอกไม่ครบ',
+                const ok = await window.erpConfirm('ยังสแกน/กรอกไม่ครบ', null, {
+                    tone: 'warning',
                     html: `ยังไม่ได้ตรวจ ${missing.length} รายการ: ` + missing.slice(0, 8).map(i => i.sku).join(', '),
-                    showCancelButton: true, confirmButtonText: 'กลับไปตรวจต่อ', cancelButtonText: 'ปิด', reverseButtons: true,
+                    confirmButtonText: 'กลับไปตรวจต่อ',
+                    cancelButtonText: 'ปิด',
                 });
                 return; // ปิดใบต้องครบทุกรายการ - ระบบฝั่งเซิร์ฟเวอร์บังคับเช่นกัน
             }
@@ -215,14 +216,16 @@ function stockTransferReceiptSheet() {
             if (this.dirty || this.saving) return;
             const diffs = this.items.filter(i => this.hasDiff(i));
             if (diffs.length > 0) {
-                const result = await Swal.fire({
-                    icon: 'warning', title: `พบยอดไม่ตรง ${diffs.length} รายการ`,
+                const result = await window.erpConfirm(`พบยอดไม่ตรง ${diffs.length} รายการ`, null, {
+                    tone: 'warning',
                     html: this.transitMode
                         ? 'ระบบย้ายจำนวนที่ตรวจรับเข้าปลายทาง ส่วนขาด/เสียหายสร้างใบตัดชำรุดรออนุมัติ โดยยังเก็บสต๊อกไว้ระหว่างทาง'
                         : 'ใบโอนเก่าลงสต๊อกแล้ว ระบบบันทึกผลตรวจเป็นหลักฐาน หากพบส่วนต่างจริงให้สร้างใบปรับสต๊อกตามขั้นตอน',
-                    input: 'textarea', inputLabel: 'เหตุผลและเลขอ้างอิงหลักฐานรับขาด/เสียหาย',
+                    input: 'textarea',
+                    inputLabel: 'เหตุผลและเลขอ้างอิงหลักฐานรับขาด/เสียหาย',
                     inputValidator: (value) => this.transitMode && !value?.trim() ? 'กรุณาระบุเหตุผลและหลักฐาน' : undefined,
-                    showCancelButton: true, confirmButtonText: 'ยืนยันปิด', cancelButtonText: 'ยกเลิก', reverseButtons: true,
+                    confirmButtonText: 'ยืนยันปิด',
+                    cancelButtonText: 'ยกเลิก',
                 });
                 if (!result.isConfirmed) return;
                 this.note = (result.value || '').trim();

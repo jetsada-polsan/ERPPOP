@@ -37,7 +37,7 @@ $canEdit = $isPending && ! $billedAny && $booking->delivery_status === 'pending'
         <div class="small" style="white-space:pre-line">{{ $booking->stock_shortage_note }}</div>
     </div>
     @if($booking->stock_shortage_status === 'pending' && auth()->user()?->hasPermission('sales.stock_shortage.approve'))
-    <form method="post" action="{{ route('bookings.approve-stock-shortage', $booking) }}" data-confirm="ยืนยันว่าของจริงมีครบ? สต๊อกในระบบจะติดลบชั่วคราว">@csrf
+    <form method="post" action="{{ route('bookings.approve-stock-shortage', $booking) }}" data-confirm="ยืนยันว่าของจริงมีครบ? สต๊อกในระบบจะติดลบชั่วคราว" data-confirm-tone="warning">@csrf
         <button class="btn btn-danger"><i class="bi bi-shield-check me-1"></i>ผู้จัดการยืนยัน ของจริงมี</button>
     </form>
     @endif
@@ -45,7 +45,7 @@ $canEdit = $isPending && ! $billedAny && $booking->delivery_status === 'pending'
 @endif
 
 @if($activeSales->isNotEmpty() && auth()->user()?->hasPermission('documents.void'))
-<form method="post" action="{{ route('bookings.revert-confirm', $booking) }}" class="content-card p-3 mb-3 d-flex flex-wrap gap-2 align-items-center" data-confirm="ถอย Confirm? ใบขาย DS/DSN จะถูกยกเลิก คืนสต๊อก ปิดลูกหนี้ และใบจองกลับไปแก้ไขได้">@csrf
+<form method="post" action="{{ route('bookings.revert-confirm', $booking) }}" class="content-card p-3 mb-3 d-flex flex-wrap gap-2 align-items-center" data-confirm="ถอย Confirm? ใบขาย DS/DSN จะถูกยกเลิก คืนสต๊อก ปิดลูกหนี้ และใบจองกลับไปแก้ไขได้" data-confirm-tone="danger">@csrf
     <span class="fw-bold">ผู้จัดการ: ถอย Confirm</span>
     <input type="text" name="reason" required maxlength="500" class="form-control" style="max-width:360px" placeholder="เหตุผล เช่น ลูกค้าเปลี่ยนรายการ">
     <button class="btn btn-outline-danger"><i class="bi bi-arrow-counterclockwise me-1"></i>แก้ไขใบขาย (ถอย Confirm)</button>
@@ -152,7 +152,7 @@ $canEdit = $isPending && ! $billedAny && $booking->delivery_status === 'pending'
                 </a>
             @endif
             @if($isPending)
-                <form method="post" action="{{ route('bookings.cancel', $booking) }}" data-confirm="ยกเลิกใบจองนี้? ยอดจองจะคืนให้สต๊อก">
+                <form method="post" action="{{ route('bookings.cancel', $booking) }}" data-confirm="ยกเลิกใบจองนี้? ยอดจองจะคืนให้สต๊อก" data-confirm-tone="danger">
                     @csrf
                     <button class="btn btn-outline-danger">ยกเลิกใบจอง</button>
                 </form>
@@ -162,7 +162,7 @@ $canEdit = $isPending && ! $billedAny && $booking->delivery_status === 'pending'
                 <i class="bi bi-receipt me-1"></i> {{ $billedAny ? 'ออกใบขายยอดค้าง' : 'ออกใบขาย' }}
             </a>
             @if($billedAny && auth()->user()?->hasPermission('documents.void'))
-            <form method="post" action="{{ route('bookings.close-remainder', $booking) }}" data-confirm="ปิดยอดค้าง? รายการที่ยังไม่ได้ออกบิลจะไม่ออกบิลแล้ว และคืนสต๊อกที่กันไว้">
+            <form method="post" action="{{ route('bookings.close-remainder', $booking) }}" data-confirm="ปิดยอดค้าง? รายการที่ยังไม่ได้ออกบิลจะไม่ออกบิลแล้ว และคืนสต๊อกที่กันไว้" data-confirm-tone="danger">
                 @csrf
                 <button class="btn btn-outline-secondary">ปิดยอดค้าง</button>
             </form>

@@ -61,8 +61,8 @@
                     {{ ['active' => 'ปรับปรุงสำเร็จ', 'pending_approval' => 'รออนุมัติ', 'approving' => 'กำลังอนุมัติ', 'rejected' => 'ไม่อนุมัติ'][$adjustment->status] ?? \App\Support\DocumentStatus::label($adjustment->status) }}
                 </span>
                 @if($adjustment->status === 'pending_approval' && auth()->user()->hasPermission('stock.adjust.approve') && ($adjustment->created_by !== auth()->id() || auth()->user()->hasPermission('system.admin')))
-                    <form method="post" action="{{ route('stock-adjustments.approve', $adjustment) }}">@csrf<button class="btn btn-success"><i class="bi bi-check2-circle me-1"></i>อนุมัติและปรับยอด</button></form>
-                    <form method="post" action="{{ route('stock-adjustments.reject', $adjustment) }}" class="d-flex gap-1">@csrf<input name="reason" required class="form-control form-control-sm" placeholder="เหตุผลไม่อนุมัติ"><button class="btn btn-outline-danger">ปฏิเสธ</button></form>
+                    <form method="post" action="{{ route('stock-adjustments.approve', $adjustment) }}" data-confirm="ยืนยันอนุมัติและปรับยอดสต็อก?" data-confirm-tone="warning">@csrf<button class="btn btn-success"><i class="bi bi-check2-circle me-1"></i>อนุมัติและปรับยอด</button></form>
+                    <form method="post" action="{{ route('stock-adjustments.reject', $adjustment) }}" class="d-flex gap-1" data-confirm="ยืนยันปฏิเสธใบปรับสต็อกนี้?" data-confirm-tone="danger">@csrf<input name="reason" required class="form-control form-control-sm" placeholder="เหตุผลไม่อนุมัติ"><button class="btn btn-outline-danger">ปฏิเสธ</button></form>
                 @endif
             </div>
         </div>

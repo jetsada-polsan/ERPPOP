@@ -241,7 +241,8 @@
                                     <td class="small text-muted" style="max-width: 180px;">{{ $item->note ?? '-' }}</td>
                                     <td class="text-end">
                                         <form method="post" action="{{ route('products.scheduled-prices.cancel', $item) }}"
-                                              data-confirm="ยืนยันยกเลิกการนัดเปลี่ยนราคานี้? แถวราคาล่วงหน้าของ POS จะถูกยกเลิกด้วย">
+                                              data-confirm="ยืนยันยกเลิกการนัดเปลี่ยนราคานี้? แถวราคาล่วงหน้าของ POS จะถูกยกเลิกด้วย"
+                                              data-confirm-tone="danger">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn btn-outline-danger btn-sm" title="ยกเลิกรายการ">

@@ -21,7 +21,7 @@
              :class="{ 'd-flex': voidOpen }"
              style="background: rgba(15,23,42,.45); z-index: 1060;" @click.self="voidOpen = false">
             <form method="post" action="{{ route('documents.void', $doc) }}" class="content-card p-4" style="width: min(480px, 92vw);"
-                  data-confirm="ยืนยันยกเลิก {{ $doc->doc_number }}? ระบบจะกลับรายการสต๊อกและบัญชี ย้อนไม่ได้" data-confirm-ok="ยกเลิกเอกสาร" data-confirm-icon="warning">
+                  data-confirm="ยืนยันยกเลิก {{ $doc->doc_number }}? ระบบจะกลับรายการสต๊อกและบัญชี ย้อนไม่ได้" data-confirm-ok="ยกเลิกเอกสาร" data-confirm-icon="warning" data-confirm-tone="danger">
                 @csrf
                 <h3 class="h6 fw-bold mb-1">ยกเลิก {{ $doc->doc_number }}</h3>
                 <div class="text-muted small mb-3">กลับรายการสต๊อก GL และลูกหนี้/เจ้าหนี้ เก็บประวัติไว้ตรวจย้อน</div>

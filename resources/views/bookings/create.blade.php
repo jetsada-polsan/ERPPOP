@@ -152,13 +152,18 @@
             items: [{ product_id: '', productQuery: '', qty: 1, unit_price: 0, results: [], activeIndex: 0, controller: null }],
             submitting: false,
 
-            init() {
+            async init() {
                 try {
                     const saved = localStorage.getItem(STORAGE_KEY);
                     if (saved) {
                         const parsed = JSON.parse(saved);
                         if (parsed && Date.now() - parsed.time < 24 * 60 * 60 * 1000) {
-                            if (window.confirm('พบข้อมูลร่างใบจองที่ยังไม่ได้บันทึก ต้องการกู้คืนหรือไม่?')) {
+                            const res = await window.erpConfirm('กู้คืนร่างใบจอง?', 'พบข้อมูลร่างใบจองที่ยังไม่ได้บันทึก ต้องการกู้คืนหรือไม่?', {
+                                tone: 'primary',
+                                confirmButtonText: 'กู้คืน',
+                                cancelButtonText: 'ไม่กู้คืน',
+                            });
+                            if (res.isConfirmed) {
                                 this.branchId = parsed.data.branchId || this.branchId;
                                 this.salesmanId = parsed.data.salesmanId || '';
                                 this.fulfillment = parsed.data.fulfillment || 'pickup';
@@ -325,12 +330,12 @@
             onSubmit(e) {
                 if (!this.customerId) {
                     e.preventDefault();
-                    Swal.fire({ icon: 'warning', title: 'กรุณาเลือกลูกค้า' });
+                    window.erpPopup('warning', 'กรุณาเลือกลูกค้า');
                     return;
                 }
                 if (this.items.some(i => !i.product_id)) {
                     e.preventDefault();
-                    Swal.fire({ icon: 'warning', title: 'กรุณาเลือกสินค้าให้ครบทุกรายการ' });
+                    window.erpPopup('warning', 'กรุณาเลือกสินค้าให้ครบทุกรายการ');
                     return;
                 }
                 this.submitting = true;
