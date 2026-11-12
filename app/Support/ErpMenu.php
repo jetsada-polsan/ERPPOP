@@ -145,12 +145,9 @@ class ErpMenu
                     ['group' => 'ข้อมูลหลัก', 'label' => 'พนักงาน', 'route' => 'employees.index', 'pattern' => 'employees.*', 'icon' => 'bi-person-badge-fill', 'tone' => 'blue'],
                     ['group' => 'ข้อมูลหลัก', 'label' => 'ตารางราคา', 'route' => 'price-tables.index', 'pattern' => 'price-tables.*', 'icon' => 'bi-tags-fill', 'tone' => 'red'],
                     ['group' => 'ข้อมูลหลัก', 'label' => 'ราคาเครื่องชั่ง', 'route' => 'scale-prices.index', 'pattern' => 'scale-prices.*', 'icon' => 'bi-speedometer2', 'tone' => 'teal'],
-                    ['group' => 'ข้อมูลหลัก', 'label' => 'ส่วนลดราคาสินค้า (แบบเดิม)', 'route' => 'promotions.index', 'pattern' => 'promotions.*', 'icon' => 'bi-gift-fill', 'tone' => 'amber'],
-                    ['group' => 'ข้อมูลหลัก', 'label' => 'ราคานาทีทอง', 'route' => 'flash-sales.index', 'pattern' => 'flash-sales.*', 'icon' => 'bi-lightning-charge-fill', 'tone' => 'red'],
+                    // รวมทุกอย่างที่ลดราคา/ให้สิทธิ์ลูกค้าไว้เมนูเดียว (เจ้าของ 12 พ.ย.) หน้าเดิมเข้าผ่านศูนย์นี้ URL เดิมยังใช้ได้
+                    ['group' => 'ข้อมูลหลัก', 'label' => 'ศูนย์โปรโมชั่น', 'route' => 'promotion-center.index', 'pattern' => 'promotion-center.*', 'extraPattern' => ['promotions.*', 'flash-sales.*', 'qty-promotions.*', 'discount-cards.*', 'member-points.*'], 'icon' => 'bi-gift-fill', 'tone' => 'orange'],
                     ['group' => 'ข้อมูลหลัก', 'label' => 'ป้ายราคา', 'route' => 'price-tags.index', 'pattern' => 'price-tags.*', 'icon' => 'bi-tag-fill', 'tone' => 'cyan'],
-                    ['group' => 'ข้อมูลหลัก', 'label' => 'บัตรส่วนลด', 'route' => 'discount-cards.index', 'pattern' => 'discount-cards.*', 'icon' => 'bi-credit-card-2-front-fill', 'tone' => 'pink'],
-                    ['group' => 'ข้อมูลหลัก', 'label' => 'แต้มสมาชิก', 'route' => 'member-points.index', 'pattern' => 'member-points.*', 'icon' => 'bi-stars', 'tone' => 'amber'],
-                    ['group' => 'ข้อมูลหลัก', 'label' => 'โปรโมชัน / แคมเปญ', 'route' => 'qty-promotions.index', 'pattern' => 'qty-promotions.*', 'icon' => 'bi-gift-fill', 'tone' => 'orange'],
                     ['group' => 'ข้อมูลหลัก', 'label' => 'ยานพาหนะ / ขนส่ง', 'route' => 'fleet.index', 'pattern' => 'fleet.*', 'icon' => 'bi-truck', 'tone' => 'orange'],
                     ['group' => 'ข้อมูลหลัก', 'label' => 'ศูนย์ตั้งต้นระบบ', 'route' => 'master-data-setup.index', 'pattern' => 'master-data-setup.*', 'icon' => 'bi-file-earmark-spreadsheet-fill', 'tone' => 'blue'],
 
