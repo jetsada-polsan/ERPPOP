@@ -157,7 +157,7 @@
                 <td style="text-align:center">{{ $i + 1 }}</td>
                 <td class="mono">{{ $item->product?->sku_code }}</td>
                 <td>{{ $item->product?->name_th }}</td>
-                <td class="right mono">{{ number_format($item->qty, 2) }}</td>
+                <td class="right mono"><x-unit-qty :item="$item" /></td>
                 <td class="right mono">{{ number_format($item->unit_price, 2) }}</td>
                 <td class="right mono">{{ number_format($item->qty * $item->unit_price, 2) }}</td>
             </tr>

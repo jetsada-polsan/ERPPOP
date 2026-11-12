@@ -62,7 +62,7 @@
                             @mouseenter="$el.style.background='var(--erp-primary-soft)'" @mouseleave="$el.style.background=''">
                             <span x-text="row.sku" style="color:var(--erp-primary);font-weight:700;min-width:90px"></span>
                             <span x-text="row.name" class="text-truncate"></span>
-                            <span x-text="money(row.system)" style="margin-left:auto;color:var(--erp-muted)"></span>
+                            <span x-text="row.system_display || money(row.system)" style="margin-left:auto;color:var(--erp-muted)"></span>
                         </div>
                     </template>
                     <div x-show="matches.length === 0" class="text-muted small p-3">ไม่พบสินค้าในใบนี้</div>
@@ -142,7 +142,7 @@
                             <td class="fw-semibold" style="color:var(--erp-primary)" x-text="row.sku"></td>
                             <td x-text="row.name"></td>
                             <td class="text-muted" x-text="row.unit"></td>
-                            <td class="text-end" x-text="money(row.system)"></td>
+                            <td class="text-end" x-text="row.system_display || money(row.system)"></td>
                             <td class="text-end">
                                 @if($stockCount->isEditable())
                                 <input type="number" step="0.0001" min="0" class="form-control form-control-sm text-end sc-input"
@@ -152,7 +152,7 @@
                                     @focus="activeId = row.id; $event.target.select()"
                                     @keydown.enter.prevent="focusNext(row)">
                                 @else
-                                <span x-text="row.counted !== null ? money(row.counted) : '-'"></span>
+                                <span x-text="row.counted_display ?? (row.counted !== null ? money(row.counted) : '-')"></span>
                                 @endif
                             </td>
                             <td class="text-end fw-bold" :style="diffStyle(row)" x-text="diffText(row)"></td>

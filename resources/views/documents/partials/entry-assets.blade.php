@@ -162,14 +162,21 @@ function docEntryPage(config) {
             barcode: item.barcode || '',
             productQuery: item.product_query || '',
             qty: Number(item.qty) || 1,
+            unit_qty: Number(item.unit_qty !== undefined ? item.unit_qty : (item.qty || 1)),
+            unit_id: item.unit_id || '',
+            unit_factor: Number(item.unit_factor) || 1,
             unit_price: Number(item.unit_price) || 0,
             unit_name: item.unit_name || 'หน่วยฐาน',
+            base_unit_id: item.base_unit_id || '',
+            base_unit_name: item.base_unit_name || item.unit_name || 'หน่วยฐาน',
+            units: item.units || [],
+            priceWarning: '',
             is_scale: Boolean(item.is_scale),
             scale_plu: item.scale_plu || '',
             lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false,
             shelf_life_days: null, on_hand_qty: null, reserved_qty: null, available_qty: null,
             source_stock_lot_id: '', return_disposition: 'quarantine', lots: [],
-        })) : [{ product_id: '', sku_code: '', name_th: '', barcode: '', productQuery: '', qty: 1, unit_price: 0, unit_name: '', is_scale: false, scale_plu: '', lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, on_hand_qty: null, reserved_qty: null, available_qty: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [] }],
+        })) : [{ product_id: '', sku_code: '', name_th: '', barcode: '', productQuery: '', qty: 1, unit_qty: 1, unit_id: '', unit_factor: 1, unit_price: 0, unit_name: '', base_unit_id: '', base_unit_name: '', units: [], priceWarning: '', is_scale: false, scale_plu: '', lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, on_hand_qty: null, reserved_qty: null, available_qty: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [] }],
         init() {
             this.$nextTick(() => {
                 this.startDraft();
@@ -286,14 +293,48 @@ function docEntryPage(config) {
                 this.onBranchChanged();
             }
         },
-        addItem() { this.items.push({ product_id: '', sku_code: '', name_th: '', barcode: '', productQuery: '', qty: 1, unit_price: 0, unit_name: '', is_scale: false, scale_plu: '', lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, on_hand_qty: null, reserved_qty: null, available_qty: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [] }); },
+        addItem() { this.items.push({ product_id: '', sku_code: '', name_th: '', barcode: '', productQuery: '', qty: 1, unit_qty: 1, unit_id: '', unit_factor: 1, unit_price: 0, unit_name: '', base_unit_id: '', base_unit_name: '', units: [], priceWarning: '', is_scale: false, scale_plu: '', lot_number: '', manufacture_date: '', expiry_date: '', tracks_expiry: false, shelf_life_days: null, on_hand_qty: null, reserved_qty: null, available_qty: null, source_stock_lot_id: '', return_disposition: 'quarantine', lots: [] }); },
         removeItem(index) { this.items.splice(index, 1); },
         quantityStep(item) { return item.is_scale ? 0.01 : 1; },
         adjustQty(index, direction) {
             const item = this.items[index];
             const step = this.quantityStep(item);
-            const next = Math.max(step, (Number(item.qty) || 0) + (step * direction));
-            item.qty = Number(next.toFixed(item.is_scale ? 2 : 0));
+            const current = Number(item.unit_qty !== undefined ? item.unit_qty : item.qty) || 0;
+            const next = Math.max(step, current + (step * direction));
+            item.unit_qty = Number(next.toFixed(item.is_scale ? 2 : 0));
+            item.qty = item.unit_qty * (item.unit_factor || 1);
+        },
+        onUnitChanged(index) {
+            const item = this.items[index];
+            const selectedUnit = (item.units || []).find(u => String(u.unit_id) === String(item.unit_id));
+            if (selectedUnit) {
+                const oldFactor = item.unit_factor || 1;
+                const basePrice = (Number(item.unit_price) || 0) / oldFactor;
+                item.unit_name = selectedUnit.name;
+                item.unit_factor = Number(selectedUnit.factor) || 1;
+                item.unit_price = Number((basePrice * item.unit_factor).toFixed(2));
+                item.qty = (Number(item.unit_qty) || 0) * item.unit_factor;
+            }
+            this.checkPriceDivisibility(index);
+        },
+        updateLineFromUnitQty(index) {
+            const item = this.items[index];
+            item.qty = (Number(item.unit_qty) || 0) * (item.unit_factor || 1);
+        },
+        checkPriceDivisibility(index) {
+            const item = this.items[index];
+            const factor = item.unit_factor || 1;
+            if (factor > 1) {
+                const typed = Number(item.unit_price) || 0;
+                const perBase = Math.round((typed / factor) * 10000) / 10000;
+                if (Math.abs((perBase * factor) - typed) > 0.0001) {
+                    item.priceWarning = `ราคาหาร ${factor} ไม่ลงตัวที่ 4 ทศนิยม`;
+                } else {
+                    item.priceWarning = '';
+                }
+            } else {
+                item.priceWarning = '';
+            }
         },
         formatQuantity(item, value) {
             const quantity = Number(value || 0);
@@ -334,21 +375,47 @@ function docEntryPage(config) {
             }
         },
         onProductPicked(index, product) {
-            this.items[index].product_id = product.id;
-            this.items[index].productQuery = `${product.sku_code} - ${product.name_th}`;
-            this.items[index].sku_code = product.sku_code || '';
-            this.items[index].name_th = product.name_th || '';
-            this.items[index].barcode = product.barcode || '';
-            this.items[index].unit_price = Number(product.default_price || 0);
-            this.items[index].unit_name = product.unit_name || 'หน่วยฐาน';
-            this.items[index].is_scale = Boolean(product.is_scale);
-            this.items[index].scale_plu = product.scale_plu || '';
-            this.items[index].tracks_expiry = Boolean(product.tracks_expiry);
-            this.items[index].shelf_life_days = product.shelf_life_days;
-            this.items[index].on_hand_qty = product.on_hand_qty;
-            this.items[index].reserved_qty = product.reserved_qty;
-            this.items[index].available_qty = product.available_qty;
-            this.items[index].lots = product.lots || [];
+            const item = this.items[index];
+            item.product_id = product.id;
+            item.productQuery = `${product.sku_code} - ${product.name_th}`;
+            item.sku_code = product.sku_code || '';
+            item.name_th = product.name_th || '';
+            item.barcode = product.barcode || '';
+            item.base_unit_id = product.base_unit_id;
+            item.base_unit_name = product.base_unit_name || product.unit_name || 'หน่วยฐาน';
+            item.units = product.units || [];
+            item.is_scale = Boolean(product.is_scale);
+            item.scale_plu = product.scale_plu || '';
+            item.tracks_expiry = Boolean(product.tracks_expiry);
+            item.shelf_life_days = product.shelf_life_days;
+            item.on_hand_qty = product.on_hand_qty;
+            item.reserved_qty = product.reserved_qty;
+            item.available_qty = product.available_qty;
+            item.lots = product.lots || [];
+
+            let selectedUnit = null;
+            if (product.matched_unit_id && item.units.length) {
+                selectedUnit = item.units.find(u => Number(u.unit_id) === Number(product.matched_unit_id));
+            }
+            if (!selectedUnit && item.units.length) {
+                selectedUnit = item.units.find(u => Number(u.unit_id) === Number(product.base_unit_id)) || item.units[0];
+            }
+
+            if (selectedUnit) {
+                item.unit_id = selectedUnit.unit_id;
+                item.unit_name = selectedUnit.name;
+                item.unit_factor = Number(selectedUnit.factor) || 1;
+                item.unit_price = Number((Number(product.default_price || 0) * item.unit_factor).toFixed(2));
+            } else {
+                item.unit_id = product.base_unit_id || '';
+                item.unit_name = product.unit_name || 'หน่วยฐาน';
+                item.unit_factor = 1;
+                item.unit_price = Number(product.default_price || 0);
+            }
+
+            item.unit_qty = 1;
+            item.qty = item.unit_qty * item.unit_factor;
+            item.priceWarning = '';
         },
         calculateExpiry(index) {
             const item = this.items[index];
@@ -358,11 +425,20 @@ function docEntryPage(config) {
             item.expiry_date = expiry.toISOString().slice(0, 10);
         },
         get totalQty() { return this.items.reduce((sum, item) => sum + (Number(item.qty) || 0), 0); },
-        get totalAmount() { return this.items.reduce((sum, item) => sum + (Number(item.qty) || 0) * (Number(item.unit_price) || 0), 0); },
+        get totalAmount() { return this.items.reduce((sum, item) => sum + (Number(item.unit_qty !== undefined ? item.unit_qty : item.qty) || 0) * (Number(item.unit_price) || 0), 0); },
         money(value) { return Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
         submitting: false,
         onSubmit(event) {
             if (this.submitting) { event.preventDefault(); return; }
+            if (this.items.some(item => item.priceWarning)) {
+                event.preventDefault();
+                if (window.erpToast) {
+                    window.erpToast('error', 'ราคาต่อหน่วยหารไม่ลงตัว', { text: 'กรุณาแก้ไขราคาต่อหน่วยให้หารลงตัวที่ 4 ทศนิยมก่อนบันทึก' });
+                } else {
+                    Swal.fire({ icon: 'error', title: 'ราคาต่อหน่วยหารไม่ลงตัว', text: 'กรุณาแก้ไขราคาต่อหน่วยให้หารลงตัวที่ 4 ทศนิยมก่อนบันทึก' });
+                }
+                return;
+            }
             if (this.config.partyRequired && !this.partyId) {
                 event.preventDefault();
                 const title = `เลือก${this.config.partyLabel}ก่อน`;

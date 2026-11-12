@@ -49,17 +49,29 @@ class StockTransferReceiptController extends Controller
             ->where('is_active', true)->get(['product_id', 'barcode', 'unit_factor'])
             ->groupBy('product_id');
 
-        $itemsJson = $items->map(fn ($i) => [
-            'id' => $i->id,
-            'sku' => $i->sku_code,
-            'name' => $i->name_th,
-            'unit' => $i->unit_name ?? '-',
-            'barcodes' => ($barcodes[$i->product_id] ?? collect())->pluck('barcode')->values()->all(),
-            'pack' => (float) (($barcodes[$i->product_id] ?? collect())->max('unit_factor') ?: 1),
-            'search' => mb_strtolower($i->sku_code.' '.$i->name_th.' '.($barcodes[$i->product_id] ?? collect())->pluck('barcode')->implode(' ')),
-            'expected' => (float) $i->expected_qty,
-            'scanned' => $i->scanned_qty !== null ? (float) $i->scanned_qty : null,
-        ])->values();
+        $products = \App\Models\Product::whereIn('id', $items->pluck('product_id')->unique())
+            ->with(['baseUnit', 'barcodes.unit'])
+            ->get()
+            ->keyBy('id');
+
+        $itemsJson = $items->map(function ($i) use ($barcodes, $products) {
+            $product = $products->get($i->product_id);
+            return [
+                'id' => $i->id,
+                'sku' => $i->sku_code,
+                'name' => $i->name_th,
+                'unit' => $i->unit_name ?? '-',
+                'barcodes' => ($barcodes[$i->product_id] ?? collect())->pluck('barcode')->values()->all(),
+                'pack' => (float) (($barcodes[$i->product_id] ?? collect())->max('unit_factor') ?: 1),
+                'search' => mb_strtolower($i->sku_code.' '.$i->name_th.' '.($barcodes[$i->product_id] ?? collect())->pluck('barcode')->implode(' ')),
+                'expected' => (float) $i->expected_qty,
+                'expected_display' => $product ? \App\Support\UnitQty::format($product, $i->expected_qty) : (string) (float) $i->expected_qty,
+                'scanned' => $i->scanned_qty !== null ? (float) $i->scanned_qty : null,
+                'scanned_display' => $i->scanned_qty !== null
+                    ? ($product ? \App\Support\UnitQty::format($product, $i->scanned_qty) : (string) (float) $i->scanned_qty)
+                    : null,
+            ];
+        })->values();
 
         return view('stock-transfers.receipt', [
             'transfer' => $stockTransfer,

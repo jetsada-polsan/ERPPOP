@@ -85,7 +85,7 @@ class StockIssueController extends Controller
 
     public function show(Document $stockIssue): View
     {
-        $stockIssue->load(['branch', 'documentType', 'stockDocument.items.product.baseUnit', 'stockDocument.items.warehouseLocation']);
+        $stockIssue->load(['branch', 'documentType', 'stockDocument.items.product.baseUnit', 'stockDocument.items.product.barcodes.unit', 'stockDocument.items.unit', 'stockDocument.items.warehouseLocation']);
 
         return view('stock-issues.show', ['document' => $stockIssue]);
     }

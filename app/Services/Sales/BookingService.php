@@ -57,7 +57,7 @@ class BookingService
         }
 
         return DB::transaction(function () use ($data, $branch, $documentType, $documentBook) {
-            $items = collect($data['items']);
+            $items = $this->normalizeBookingItems($data['items']);
             $requestedByProduct = $items->groupBy('product_id')->map(
                 fn ($rows) => DecimalMath::sum($rows->pluck('qty'), DecimalMath::QUANTITY_SCALE)
             );
@@ -143,6 +143,9 @@ class BookingService
                     'warehouse_location_id' => $branch->default_warehouse_location_id,
                     'qty' => $item['qty'],
                     'unit_price' => $item['unit_price'],
+                    'unit_id' => $item['unit_id'] ?? null,
+                    'unit_qty' => $item['unit_qty'] ?? null,
+                    'unit_factor' => $item['unit_factor'] ?? null,
                 ]);
 
                 $balance = $balances[$item['product_id']] ?? null;
@@ -313,7 +316,7 @@ class BookingService
                 $transportJob->update(['status' => 'booked', 'loaded_at' => null]);
             }
 
-            $newItems = collect($data['items']);
+            $newItems = $this->normalizeBookingItems($data['items']);
             $newByProduct = $newItems->groupBy('product_id')->map(
                 fn ($rows) => DecimalMath::sum($rows->pluck('qty'), DecimalMath::QUANTITY_SCALE)
             );
@@ -416,6 +419,9 @@ class BookingService
                     'warehouse_location_id' => $newLocationId,
                     'qty' => $item['qty'],
                     'unit_price' => $item['unit_price'],
+                    'unit_id' => $item['unit_id'] ?? null,
+                    'unit_qty' => $item['unit_qty'] ?? null,
+                    'unit_factor' => $item['unit_factor'] ?? null,
                 ]);
             }
 
@@ -477,5 +483,112 @@ class BookingService
         }
 
         return rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
+    }
+
+    /**
+     * ตรวจสอบและแปลงรายการสินค้าใบจอง: คำนวณ unit_factor และ qty ในหน่วยหลักจากฐานข้อมูล
+     * ห้ามเชื่อ factor หรือ qty ที่ client ส่งมา และตรวจสอบว่า unit_id เป็นของสินค้านั้นจริง
+     */
+    private function normalizeBookingItems(iterable $rawItems): \Illuminate\Support\Collection
+    {
+        $items = collect($rawItems);
+        $productIds = $items->pluck('product_id')->filter()->unique();
+        $products = Product::with(['baseUnit', 'barcodes.unit'])->whereIn('id', $productIds)->get()->keyBy('id');
+
+        return $items->map(function ($raw) use ($products) {
+            $productId = (int) ($raw['product_id'] ?? 0);
+            $product = $products->get($productId);
+            if (! $product) {
+                throw new RuntimeException("ไม่พบสินค้า #{$productId}");
+            }
+
+            $rawUnitId = isset($raw['unit_id']) && $raw['unit_id'] !== '' && $raw['unit_id'] !== null
+                ? (int) $raw['unit_id']
+                : null;
+
+            // 1. กรณีเป็นหน่วยหลัก หรือไม่ได้เลือกหน่วย
+            if ($rawUnitId === null || $rawUnitId === (int) $product->base_unit_id) {
+                $factor = 1.0;
+                $unitId = (int) $product->base_unit_id;
+                $unitQty = isset($raw['unit_qty']) && $raw['unit_qty'] !== '' && $raw['unit_qty'] !== null
+                    ? (float) $raw['unit_qty']
+                    : (float) ($raw['qty'] ?? 0);
+
+                if ($unitQty <= 0) {
+                    throw new RuntimeException("จำนวนสินค้า {$product->sku_code} ต้องมากกว่า 0");
+                }
+
+                $qty = (string) $unitQty;
+                $typedPrice = isset($raw['unit_price']) && $raw['unit_price'] !== '' && $raw['unit_price'] !== null
+                    ? (float) $raw['unit_price']
+                    : (float) ($product->default_price ?? 0);
+
+                $unitPrice = (string) round($typedPrice, 4);
+
+                return array_merge($raw, [
+                    'product_id' => $productId,
+                    'unit_id' => $unitId,
+                    'unit_qty' => $unitQty,
+                    'unit_factor' => $factor,
+                    'qty' => $qty,
+                    'unit_price' => $unitPrice,
+                ]);
+            }
+
+            // 2. กรณีเลือกหน่วยอื่น: ตรวจสอบว่าเป็นหน่วยของสินค้านั้นจริงจาก active barcode
+            $barcode = $product->barcodes->first(function ($b) use ($rawUnitId) {
+                return $b->is_active && (int) $b->unit_id === $rawUnitId;
+            });
+
+            if (! $barcode) {
+                throw new RuntimeException("หน่วยสินค้าที่เลือก (#{$rawUnitId}) ไม่ถูกต้องสำหรับสินค้า {$product->sku_code}");
+            }
+
+            $factor = (float) $barcode->unit_factor;
+            if ($factor <= 0 || floor($factor) != $factor) {
+                throw new RuntimeException("หน่วยสินค้า {$barcode->unit?->cleanName()} มีอัตราส่วนบรรจุไม่ถูกต้อง (ต้องเป็นจำนวนเต็มบวก)");
+            }
+
+            if ($barcode->unit && $barcode->unit->isCorrupted()) {
+                throw new RuntimeException("หน่วยสินค้า {$barcode->unit?->cleanName()} ไม่ถูกต้อง");
+            }
+
+            $factorInt = (int) $factor;
+
+            // จำนวนในหน่วยที่เลือก
+            $unitQty = isset($raw['unit_qty']) && $raw['unit_qty'] !== '' && $raw['unit_qty'] !== null
+                ? (float) $raw['unit_qty']
+                : ((float) ($raw['qty'] ?? 0) / $factorInt);
+
+            if ($unitQty <= 0) {
+                throw new RuntimeException("จำนวนสินค้า {$product->sku_code} ต้องมากกว่า 0");
+            }
+
+            // Server คำนวณ qty เป็นหน่วยหลักเอง: qty = unit_qty * unit_factor
+            $qty = (string) DecimalMath::multiply((string) $unitQty, (string) $factorInt, DecimalMath::QUANTITY_SCALE);
+
+            // ราคาต่อหน่วยที่เลือก: unit_price (ต่อหน่วยหลัก) = ราคาที่พิมพ์ ÷ factor
+            $typedPrice = isset($raw['unit_price']) && $raw['unit_price'] !== '' && $raw['unit_price'] !== null
+                ? (float) $raw['unit_price']
+                : ((float) ($product->default_price ?? 0) * $factorInt);
+
+            $unitPriceFloat = round($typedPrice / $factorInt, 4);
+
+            // ตรวจว่าหารลงตัวที่ทศนิยม 4 ตำแหน่งหรือไม่ (ป้องกันยอดเพี้ยนสตางค์)
+            if (abs(($unitPriceFloat * $factorInt) - $typedPrice) > 0.0001) {
+                throw new RuntimeException("ราคาต่อหน่วยที่พิมพ์ ({$typedPrice}) เมื่อหารด้วยอัตราส่วนบรรจุ ({$factorInt}) ไม่ลงตัวที่ทศนิยม 4 ตำแหน่ง กรุณาระบุราคาที่หารลงตัว");
+            }
+
+            $unitPrice = (string) $unitPriceFloat;
+
+            return array_merge($raw, [
+                'product_id' => $productId,
+                'unit_id' => $rawUnitId,
+                'unit_qty' => $unitQty,
+                'unit_factor' => (float) $factorInt,
+                'qty' => $qty,
+                'unit_price' => $unitPrice,
+            ]);
+        });
     }
 }

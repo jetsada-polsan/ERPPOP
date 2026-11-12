@@ -20,7 +20,7 @@
                 <div class="load-bill-head"><strong>{{ $booking->document->doc_number }}</strong><span>{{ $booking->document->customer?->code }} {{ $booking->document->customer?->name_th }}</span><strong>฿{{ number_format((float) $booking->document->total_amount, 2) }}</strong></div>
                 <table class="summary-table"><thead><tr><th>#</th><th>สินค้า</th><th>หน่วย</th><th class="text-end">จอง</th><th class="check-col">ขึ้นได้</th><th class="check-col">ไม่ได้</th><th>จำนวนจริง</th></tr></thead><tbody>
                     @foreach($booking->document->stockDocument?->items ?? [] as $item)
-                        <tr><td>{{ $loop->iteration }}</td><td>{{ $item->product?->sku_code }} {{ $item->product?->name_th }}</td><td>{{ $item->product?->baseUnit?->name }}</td><td class="text-end">{{ number_format((float) $item->qty, 2) }}</td><td>□</td><td>□</td><td></td></tr>
+                        <tr><td>{{ $loop->iteration }}</td><td>{{ $item->product?->sku_code }} {{ $item->product?->name_th }}</td><td>{{ $item->product?->baseUnit?->name }}</td><td class="text-end"><x-unit-qty :item="$item" /></td><td>□</td><td>□</td><td></td></tr>
                     @endforeach
                 </tbody></table>
             </div>
@@ -30,7 +30,7 @@
     </section>
     <section class="summary-card"><div class="section-title"><i class="bi bi-box-seam"></i><div><h2>รายการสินค้าที่ต้องเตรียม</h2><small>รวมจำนวนจากใบจองตามตัวกรอง</small></div><span>{{ $items->count() }} รายการ</span></div>
     <div class="table-wrap"><table class="summary-table"><thead><tr><th>รหัส</th><th>สินค้า</th><th class="text-end">รวม</th><th>หน่วย</th><th class="check-col">เช็ค</th></tr></thead><tbody>
-        @forelse($items as $item)<tr><td>{{ $item->sku_code }}</td><td>{{ $item->name_th }}</td><td class="text-end">{{ number_format((float) $item->total_qty, 2) }}</td><td>{{ $item->unit_name }}</td><td>□</td></tr>@empty<tr><td colspan="5" class="text-center">ไม่มีใบจองค้าง</td></tr>@endforelse
+        @forelse($items as $item)<tr><td>{{ $item->sku_code }}</td><td>{{ $item->name_th }}</td><td class="text-end"><x-unit-qty :product="$item->product" :qty="$item->total_qty" /></td><td>{{ $item->unit_name }}</td><td>□</td></tr>@empty<tr><td colspan="5" class="text-center">ไม่มีใบจองค้าง</td></tr>@endforelse
     </tbody></table></div></section>
     <section class="summary-card"><div class="section-title"><i class="bi bi-truck"></i><div><h2>ใบเช็คส่งของประจำสาย</h2><small>ส่งบัญชีตัดยอดหลังตรวจส่งสินค้า</small></div><span>{{ $bookings->count() }} รายการ</span></div><div class="table-wrap"><table class="summary-table"><thead><tr><th>เลขที่ใบจอง</th><th>ลูกค้า</th><th class="text-end">ยอด</th><th>ส่งครบ</th><th>ไม่ส่ง</th><th>หมายเหตุ</th></tr></thead><tbody>
         @forelse($bookings as $booking)<tr><td>{{ $booking->doc_number }}</td><td>{{ $booking->customer_name }}</td><td class="text-end">{{ number_format((float) $booking->total_amount, 2) }}</td><td>□</td><td>□</td><td></td></tr>@empty<tr><td colspan="6" class="text-center">ไม่พบใบจอง</td></tr>@endforelse
