@@ -24,12 +24,13 @@ class PriceTableController extends Controller
     {
         $q = trim((string) $request->query('q', ''));
 
-        $tables = PriceTable::withCount('productPrices')->where('is_default', true)
+        // แสดงทุกตาราง (เดิมแสดงแค่ตารางหลัก การ์ดบอก 19 แต่ตารางมี 1 จนงง) เรียงตารางหลัก -> ใช้งาน -> รหัส
+        $tables = PriceTable::withCount('productPrices')->with('branches:id,code,name_th,price_table_id')
             ->when($q, fn ($query) => $query->where(fn ($w) => $w
                 ->where('code', 'ilike', "%{$q}%")
                 ->orWhere('name', 'ilike', "%{$q}%")
             ))
-            ->orderBy('code')
+            ->orderByDesc('is_default')->orderByDesc('is_active')->orderBy('code')
             ->paginate(50)
             ->withQueryString();
 
@@ -37,7 +38,8 @@ class PriceTableController extends Controller
 
         $now = now();
         $pricingSummary = [
-            'normal_tables' => PriceTable::where('is_active', true)->count(),
+            'normal_tables' => PriceTable::where('is_active', true)->where('is_default', true)->count(),
+            'branch_tables' => PriceTable::where('is_active', true)->where('is_default', false)->whereHas('branches')->count(),
             'assigned_branches' => $branches->whereNotNull('price_table_id')->count(),
             'total_branches' => $branches->count(),
             'active_promotions' => Promotion::where('is_active', true)

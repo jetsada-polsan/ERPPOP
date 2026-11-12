@@ -126,7 +126,9 @@ class PosPricingGuard
         $scheduledUnitPrices = $this->priceSchedules
             ->active($products->keys()->all(), (int) $data['branch_id'], now())
             ->keyBy(fn ($schedule) => $schedule->product_id.':'.($schedule->unit_id ?? 'base'));
-        $serverLines = $items->map(function ($item) use ($prices, $data, $barcodes, $defaultTableId, $products, $scheduledUnitPrices) {
+        $branchPrices = app(\App\Services\Pricing\BranchPriceTable::class);
+        $branchRows = $branchPrices->rows($products->keys()->all(), (int) $data['branch_id']);
+        $serverLines = $items->map(function ($item) use ($prices, $data, $barcodes, $defaultTableId, $products, $scheduledUnitPrices, $branchPrices, $branchRows) {
             $productId = (int) $item['product_id'];
             $qty = (float) $item['qty'];
             $barcode = filled($item['barcode'] ?? null) ? $barcodes->get($item['barcode']) : null;
@@ -134,7 +136,12 @@ class PosPricingGuard
                 throw new RuntimeException('บาร์โค้ดไม่ตรงกับสินค้า กรุณาสแกนใหม่');
             }
             $basePrice = $prices[$productId] ?? 0;
-            if ($barcode && (float) $barcode->price > 0) {
+            $branchBarcodePrice = $barcode
+                ? $branchPrices->priceFor($branchRows->get($productId), $barcode->unit_id, $barcode->unit_factor, $products[$productId]->base_unit_id)
+                : null;
+            if ($branchBarcodePrice !== null) {
+                $basePrice = $branchBarcodePrice;
+            } elseif ($barcode && (float) $barcode->price > 0) {
                 $basePrice = (float) $barcode->price;
             } elseif ($barcode && $defaultTableId) {
                 $basePrice = (float) (ProductPrice::where('product_id', $productId)
@@ -335,7 +342,7 @@ class PosPricingGuard
     /** @param array<int,int> $productIds @return array<int,float> */
     private function basePrices(array $productIds, int $branchId): array
     {
-        $products = Product::whereIn('id', $productIds)->get(['id', 'default_price'])->keyBy('id');
+        $products = Product::whereIn('id', $productIds)->get(['id', 'default_price', 'base_unit_id'])->keyBy('id');
         $tableId = PriceTable::where('is_default', true)->value('id');
         $rows = $tableId ? ProductPrice::where('price_table_id', $tableId)
             ->whereIn('product_id', $productIds)->where('is_active', true)
@@ -346,7 +353,13 @@ class PosPricingGuard
         // ราคาหน่วยฐาน (unit_id ว่าง) -> ไม่มีก็ใช้ราคาหน่วยเล็กสุด -> ไม่มีก็ default_price
         // เดิมหยิบแถวแรกที่เจอ สินค้าที่มีแต่ราคาหลายหน่วย (เช่น ตับหมู 79 กับ 10 บาท)
         // จึงได้ราคาไม่ตรงกับที่เครื่องขาย บิลถูกปฏิเสธทุกใบ
-        $basePrices = collect($productIds)->mapWithKeys(function ($id) use ($products, $rows, $unitFactors) {
+        $branchPrices = app(\App\Services\Pricing\BranchPriceTable::class);
+        $branchRows = $branchPrices->rows($productIds, $branchId);
+        $basePrices = collect($productIds)->mapWithKeys(function ($id) use ($products, $rows, $unitFactors, $branchPrices, $branchRows) {
+            $branchPrice = $branchPrices->priceFor($branchRows->get($id), null, 1, $products[$id]?->base_unit_id);
+            if ($branchPrice !== null) {
+                return [$id => $branchPrice];
+            }
             $forProduct = $rows->get($id, collect());
             $row = $forProduct->firstWhere('unit_id', null)
                 ?? $forProduct->sortBy(fn ($r) => (float) ($unitFactors[$r->unit_id] ?? 1))->first();

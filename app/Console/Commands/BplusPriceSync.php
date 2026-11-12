@@ -39,7 +39,8 @@ class BplusPriceSync extends Command
         $createdTables = 0;
         foreach ($tabRows as $tab) {
             $code = (string) $tab['ARPRB_KEY'];
-            if (! PriceTable::where('code', $code)->exists()) {
+            // ตารางที่ผูก bplus_key แล้ว (prices:normalize-tables) ไม่สร้างซ้ำ แม้รหัส ERP ต่างจาก key BPlus
+            if (! PriceTable::where('bplus_key', $code)->exists() && ! PriceTable::where('code', $code)->exists()) {
                 if (! $dry) {
                     PriceTable::create([
                         'code' => $code,
@@ -62,7 +63,10 @@ class BplusPriceSync extends Command
         $this->info('อ่านราคาจาก MSSQL: '.count($rows).' แถว');
 
         // PG lookups (โหลดครั้งเดียว)
-        $tableIdByCode = PriceTable::pluck('id', 'code');
+        // แมปด้วย bplus_key ก่อน (ตั้งด้วย prices:normalize-tables) แล้วค่อยรหัสตาราง เฉพาะตารางที่เปิดใช้งาน
+        $tableIdByCode = PriceTable::where('is_active', true)->pluck('id', 'code')
+            ->merge(PriceTable::where('is_active', true)->whereNotNull('bplus_key')->pluck('id', 'bplus_key'));
+        $perTable = [];
         $barcodeRows = ProductBarcode::get(['barcode', 'product_id', 'unit_id', 'id'])->keyBy('barcode');
         $productIdBySku = Product::pluck('id', 'sku_code');
 
@@ -107,7 +111,16 @@ class BplusPriceSync extends Command
                 }
             }
             $synced++;
+            $perTable[(string) $row['ARPLU_ARPRB']] = ($perTable[(string) $row['ARPLU_ARPRB']] ?? 0) + 1;
         }
+
+        ksort($perTable);
+        $tableNames = PriceTable::whereIn('id', $tableIdByCode->values())->get(['id', 'code', 'name'])->keyBy('id');
+        $this->table(['ตาราง BPlus', 'ตาราง ERP ที่ลง', 'แถว'], collect($perTable)->map(function ($n, $key) use ($tableIdByCode, $tableNames) {
+            $table = $tableNames->get($tableIdByCode[$key] ?? 0);
+
+            return [$key, $table ? $table->code.' '.$table->name : '-', number_format($n)];
+        })->values()->all());
 
         $this->table(['ผลลัพธ์', 'จำนวน'], [
             ['sync ราคาเข้า product_prices'.($dry ? ' (dry-run)' : ''), number_format($synced)],

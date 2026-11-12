@@ -17,8 +17,8 @@
             <div class="price-work-grid">
                 <a href="#normal-price-tables" class="price-work-card blue">
                     <span class="price-work-icon"><i class="bi bi-shop"></i></span>
-                    <span><strong>ราคาปกติทุก POS</strong><small>ราคากลางหนึ่งชุด ใช้ทุกเครื่องและทุกสาขา</small></span>
-                    <b>{{ number_format($pricingSummary['normal_tables']) }} ตาราง</b>
+                    <span><strong>ราคาปกติ / ราคาสาขา</strong><small>ตารางหลักใช้ทุกเครื่อง สาขาที่ผูกตารางของตัวเองใช้ราคาสาขาก่อน</small></span>
+                    <b>หลัก {{ number_format($pricingSummary['normal_tables']) }} · สาขา {{ number_format($pricingSummary['branch_tables']) }}</b>
                 </a>
                 <a href="{{ route('promotions.index') }}" class="price-work-card violet">
                     <span class="price-work-icon"><i class="bi bi-tags-fill"></i></span>
@@ -89,7 +89,7 @@
             <div class="table-responsive">
                 <table class="table align-middle">
                     <thead>
-                        <tr><th>รหัส</th><th>ชื่อตาราง</th><th>คำอธิบาย</th><th class="text-end">จำนวนราคา</th><th>ค่าเริ่มต้น</th><th>สถานะ</th><th></th></tr>
+                        <tr><th>รหัส</th><th>ชื่อตาราง</th><th>คำอธิบาย</th><th class="text-end">จำนวนราคา</th><th>ใช้กับ</th><th>สถานะ</th><th></th></tr>
                     </thead>
                     <tbody>
                         @forelse($tables as $t)
@@ -98,7 +98,18 @@
                             <td><a href="{{ route('price-tables.show', $t) }}" class="text-decoration-none fw-semibold">{{ $t->name }}</a></td>
                             <td class="text-muted small">{{ $t->description }}</td>
                             <td class="text-end">{{ number_format($t->product_prices_count) }}</td>
-                            <td>@if($t->is_default)<span class="badge text-bg-warning">ค่าเริ่มต้น</span>@endif</td>
+                            <td>
+                                @if($t->is_default)
+                                    <span class="badge text-bg-warning">POS ทุกสาขา (หลัก)</span>
+                                @elseif($t->is_active && $t->branches->isNotEmpty())
+                                    @foreach($t->branches as $b)<span class="badge text-bg-info me-1">สาขา {{ $b->code }} {{ $b->name_th }}</span>@endforeach
+                                @elseif($t->vat_included === false || in_array($t->bplus_key, ['1', '2'], true))
+                                    <span class="badge text-bg-light border">หลังบ้าน{{ $t->vat_included === false ? ' (ไม่รวม VAT)' : '' }}</span>
+                                @else
+                                    <span class="badge text-bg-light border text-muted">ยังไม่ได้ใช้</span>
+                                @endif
+                                @if($t->bplus_key)<div class="small text-muted mt-1">BPlus {{ $t->bplus_key }}</div>@endif
+                            </td>
                             <td><span class="badge {{ $t->is_active ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $t->is_active ? 'ใช้งาน' : 'ปิด' }}</span></td>
                             <td class="text-end">
                                 <a href="{{ route('price-tables.show', $t) }}" class="btn btn-sm btn-light border me-1">จัดการราคา</a>
