@@ -172,3 +172,52 @@ Duration: 35.088s (Exit Code: 0)
 - ไม่มีการแก้ไขเทสต์เดิม
 - ไม่มีการใช้ `confirm()` หรือ `alert()` ของเบราว์เซอร์
 - ไม่มีการ push main, merge, deploy หรือแตะต้อง server ใดๆ
+
+---
+
+## 8. การแก้ไขตามผลตรวจงาน 32 (Task 35 / ANTIGRAVITY_TASK_REVIEW_32)
+
+### 8.1 การรวม `origin/main` และการแก้ Conflict
+ทำการรวม (Merge) commit ล่าสุดจาก `origin/main` (`c982557` - PR #49 จากงานที่ 29-31) เข้าสู่ branch `antigravity/units-both`:
+1. **`app/Http/Controllers/BookingController.php`:**
+   - คงโครงสร้างของ `origin/main` ไว้อย่างสมบูรณ์: เมธอด `pendingBookingsQuery($date, $branchId, $salesAreaId)` ซึ่งถูกใช้งานร่วมกันระหว่างหน้าใบรวมจองและพิมพ์ใบส่งของรวม
+   - เพิ่ม eager loading `product.barcodes.unit` และ `items.unit` เพื่อป้องกันปัญหา N+1 query
+   - คงการส่ง `'product' => $product` และ `'stock_item' => $stockItem` ใน collection ของรายการที่ต้องเตรียมสำหรับใช้งานใน Blade template
+2. **`resources/views/bookings/summary.blade.php`:**
+   - คงฟังก์ชันทั้งหมดจาก `origin/main`: แถบปุ่มพิมพ์ทั้ง 3 ปุ่ม (พิมพ์ใบขึ้นของ, พิมพ์ใบปะหน้า, พิมพ์ใบส่งของรวม), กล่องค้นหารายการที่ต้องเตรียม, ปุ่มสลับแสดง/ซ่อนคอลัมน์บาร์โค้ด, ตาราง Drilldown และตารางจัดสาย
+   - บูรณาการการแสดงผลสองหน่วย: ในส่วนบิลที่ต้องขึ้นของใช้ `<x-unit-qty :item="$item" />` และในตารางเตรียมสินค้าแสดงหน่วยหลักพร้อมกำกับ `(X ลัง)` สำหรับรายการที่คีย์มาเป็นหน่วยใหญ่ โดยไม่กระทบการจัดรูปแบบตัวเลขทศนิยม (`number_format($qty, 2)`) ของตารางสรุป
+
+### 8.2 การตรวจราคาหารลงตัวด้วย BCMath (แทน Float)
+ใน `app/Services/Sales/BookingService.php` (`normalizeBookingItems`):
+- ยกเลิกการใช้การคำนวณแบบ IEEE-754 float เดิม ซึ่งอาจมีความคลาดเคลื่อนของทศนิยม
+- เปลี่ยนมาใช้ฟังก์ชัน `bcmath` คำนวณแบบสตริงล้วนที่สเกล 4 ตำแหน่ง:
+  ```php
+  $perUnitPrice = bcdiv($typedPriceStr, (string) $factorInt, 4);
+  $recomposed = bcmul($perUnitPrice, (string) $factorInt, 4);
+  if (bccomp($recomposed, $typedPriceStr, 4) !== 0) {
+      throw new RuntimeException("ราคาต่อหน่วยที่เลือก ({$typedPriceStr}) เมื่อหารด้วย factor ({$factorInt}) ได้ผลลัพธ์ไม่ลงตัวที่ทศนิยม 4 ตำแหน่ง กรุณาระบุราคาที่หารลงตัว");
+  }
+  ```
+- เพิ่ม Automated Test ใน `tests/Feature/BookingUnitsTest.php` ครอบคลุม 4 เคสตามที่ระบุในใบตรวจ:
+  1. `540 ÷ 18 = 30.0000` -> **ผ่าน (Pass)**
+  2. `100 ÷ 3 = 33.3333...` -> **ปฏิเสธ (Fail with validation message)**
+  3. `10 ÷ 3 = 3.3333...` -> **ปฏิเสธ (Fail with validation message)**
+  4. `30.50 × 18 = 549.00 ÷ 18 = 30.5000` -> **ผ่าน (Pass)**
+
+### 8.3 กรณีหน่วยหลัก: ห้ามแปลงจำนวน/ราคาผ่าน Float
+- **หน่วยหลัก:** ส่งผ่านสตริงต้นฉบับ `$raw['qty']` และ `$raw['unit_price']` ที่ผ่านการ validate แล้วเข้าสู่ `StockDocumentItem` โดยตรง ไม่มีการแปลงผ่าน `(float)` หรือ `round(..., 4)` ใน PHP เพื่อรักษาความแม่นยำระดับสตริง
+- **หน่วยใหญ่:** รับ `$unit_qty` เป็นสตริง คำนวณ `bcmul($unitQtyStr, (string) $factorInt, DecimalMath::QUANTITY_SCALE)` และใช้ `$perUnitPrice` จาก bcdiv
+- เพิ่ม Benchmark Test:
+  - จองสินค้าชั่งน้ำหนัก `หมูเนื้อแดงชั่ง` จำนวน `1.235` กก. ราคา `89.75` บาท
+  - ตรวจสอบค่าที่บันทึก: `qty = 1.235`, `unit_price = 89.75`, `unit_qty = 1.235`, `unit_factor = 1.0`
+  - ยอดรวมเอกสารเท่ากับ `DecimalMath::multiply('1.235', '89.75')` = `110.84125` บาท ตรงเป๊ะ 100%
+
+### 8.4 ผลการทดสอบรวมหลังแก้ไข
+- รันชุดทดสอบ `tests/Feature/BookingUnitsTest.php`: **11 tests, 57 assertions (Passed 100%)**
+- รันชุดทดสอบ `tests/Feature/LoadingSheetFeedbackTest.php` และ `tests/Feature/RouteCoverSheetTest.php`: **22 tests, 163 assertions (Passed 100%)**
+- รันชุดทดสอบทั้งหมดของระบบ:
+  ```text
+  Tests: 1021, Assertions: 8705, Passed: 1019, Skipped: 2, Incomplete: 6
+  Exit Code: 0 (ผ่านหมดทุกเทสต์โดยไม่มี Regression)
+  ```
+

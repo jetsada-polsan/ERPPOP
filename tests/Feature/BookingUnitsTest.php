@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Http\Middleware\ErpAuthorize;
 use App\Models\Branch;
 use App\Models\Customer;
-use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\Permission;
 use App\Models\Product;
@@ -14,11 +13,11 @@ use App\Models\ProductUnit;
 use App\Models\Role;
 use App\Models\SaleBooking;
 use App\Models\StockBalance;
-use App\Models\StockDocumentItem;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseLocation;
 use App\Services\Sales\CreditSaleService;
+use App\Support\DecimalMath;
 use App\Support\UnitQty;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -29,10 +28,15 @@ class BookingUnitsTest extends TestCase
     use RefreshDatabase;
 
     private Branch $branch;
+
     private WarehouseLocation $location;
+
     private Customer $customer;
+
     private User $user;
+
     private ProductUnit $bagUnit;
+
     private ProductUnit $crateUnit;
 
     protected function setUp(): void
@@ -350,6 +354,138 @@ class BookingUnitsTest extends TestCase
             ]);
 
         $responseOk->assertRedirect();
+    }
+
+    /**
+     * ตรวจราคาหารลงตัวด้วย bcmath ตามผลตรวจงาน 32:
+     * - 540 ÷ 18 = 30.0000 ผ่าน
+     * - 100 ÷ 3 ไม่ผ่าน
+     * - 10 ÷ 3 ไม่ผ่าน
+     * - 30.50 × 18 = 549.00 ÷ 18 ผ่าน
+     */
+    public function test_divisibility_bcmath_rules_with_benchmark_cases(): void
+    {
+        $crate18 = $this->createProductWithCrate('SKU-DIV-18', 30.0, 18);
+
+        $box3Unit = ProductUnit::firstOrCreate(['code' => 'BOX3-DIV'], ['name' => 'กล่องx3', 'qty_per_base_unit' => 3]);
+        $product3 = Product::create([
+            'sku_code' => 'SKU-DIV-3',
+            'name_th' => 'สินค้ากล่อง 3 ตัวคัดกรอง',
+            'base_unit_id' => $this->bagUnit->id,
+            'default_price' => 10.0,
+            'is_active' => true,
+        ]);
+        ProductBarcode::create([
+            'product_id' => $product3->id,
+            'barcode' => 'BAR-DIV-3',
+            'unit_id' => $box3Unit->id,
+            'unit_factor' => 3,
+            'is_active' => true,
+        ]);
+        StockBalance::create([
+            'product_id' => $product3->id,
+            'warehouse_location_id' => $this->location->id,
+            'on_hand_qty' => 1000,
+            'reserved_qty' => 0,
+        ]);
+
+        // 1. 540 ÷ 18 ผ่าน
+        $res540 = $this->withoutMiddleware(ErpAuthorize::class)->actingAs($this->user)
+            ->post(route('bookings.store'), [
+                'branch_id' => $this->branch->id,
+                'customer_id' => $this->customer->id,
+                'items' => [['product_id' => $crate18->id, 'unit_id' => $this->crateUnit->id, 'unit_qty' => 1, 'unit_price' => 540.00]],
+            ]);
+        $res540->assertRedirect();
+        $this->assertEquals(30.0, (float) SaleBooking::latest('id')->first()->document->stockDocument->items->first()->unit_price);
+
+        // 2. 100 ÷ 3 ไม่ผ่าน
+        $res100 = $this->withoutMiddleware(ErpAuthorize::class)->actingAs($this->user)
+            ->post(route('bookings.store'), [
+                'branch_id' => $this->branch->id,
+                'customer_id' => $this->customer->id,
+                'items' => [['product_id' => $product3->id, 'unit_id' => $box3Unit->id, 'unit_qty' => 1, 'unit_price' => 100.00]],
+            ]);
+        $res100->assertSessionHas('error');
+        $this->assertStringContainsString('ไม่ลงตัวที่ทศนิยม 4 ตำแหน่ง', session('error'));
+
+        // 3. 10 ÷ 3 ไม่ผ่าน
+        $res10 = $this->withoutMiddleware(ErpAuthorize::class)->actingAs($this->user)
+            ->post(route('bookings.store'), [
+                'branch_id' => $this->branch->id,
+                'customer_id' => $this->customer->id,
+                'items' => [['product_id' => $product3->id, 'unit_id' => $box3Unit->id, 'unit_qty' => 1, 'unit_price' => 10.00]],
+            ]);
+        $res10->assertSessionHas('error');
+        $this->assertStringContainsString('ไม่ลงตัวที่ทศนิยม 4 ตำแหน่ง', session('error'));
+
+        // 4. 30.50 × 18 = 549.00 ÷ 18 ผ่าน
+        $res549 = $this->withoutMiddleware(ErpAuthorize::class)->actingAs($this->user)
+            ->post(route('bookings.store'), [
+                'branch_id' => $this->branch->id,
+                'customer_id' => $this->customer->id,
+                'items' => [['product_id' => $crate18->id, 'unit_id' => $this->crateUnit->id, 'unit_qty' => 1, 'unit_price' => 549.00]],
+            ]);
+        $res549->assertRedirect();
+        $this->assertEquals(30.50, (float) SaleBooking::latest('id')->first()->document->stockDocument->items->first()->unit_price);
+    }
+
+    /**
+     * กรณีหน่วยหลัก ห้ามแปลงจำนวน/ราคาผ่าน float:
+     * จองสินค้าชั่ง 1.235 กก. ราคา 89.75 ได้ qty/ราคาเท่าเดิมทุกหลัก และยอดตรงเป๊ะ
+     */
+    public function test_base_unit_preserves_exact_strings_without_float_casting_for_scale_item(): void
+    {
+        $kgUnit = ProductUnit::firstOrCreate(['code' => 'KG'], ['name' => 'กก.', 'qty_per_base_unit' => 1]);
+        $scaleProduct = Product::create([
+            'sku_code' => 'SCALE-PORK',
+            'name_th' => 'หมูเนื้อแดงชั่ง',
+            'base_unit_id' => $kgUnit->id,
+            'default_price' => 89.75,
+            'is_active' => true,
+        ]);
+        ProductBarcode::create([
+            'product_id' => $scaleProduct->id,
+            'barcode' => 'SCALE-BAR-1',
+            'unit_id' => $kgUnit->id,
+            'unit_factor' => 1,
+            'is_active' => true,
+        ]);
+        StockBalance::create([
+            'product_id' => $scaleProduct->id,
+            'warehouse_location_id' => $this->location->id,
+            'on_hand_qty' => 100,
+            'reserved_qty' => 0,
+        ]);
+
+        $response = $this->withoutMiddleware(ErpAuthorize::class)->actingAs($this->user)
+            ->post(route('bookings.store'), [
+                'branch_id' => $this->branch->id,
+                'customer_id' => $this->customer->id,
+                'items' => [
+                    [
+                        'product_id' => $scaleProduct->id,
+                        'qty' => '1.235',
+                        'unit_price' => '89.75',
+                    ],
+                ],
+            ]);
+
+        $response->assertRedirect();
+
+        $booking = SaleBooking::latest('id')->firstOrFail();
+        $item = $booking->document->stockDocument->items->sole();
+
+        // ตรวจสอบค่าที่เก็บว่าไม่ถูกแปลงเพี้ยน
+        $this->assertEquals(1.235, (float) $item->qty);
+        $this->assertEquals(89.75, (float) $item->unit_price);
+        $this->assertEquals($kgUnit->id, $item->unit_id);
+        $this->assertEquals(1.0, (float) $item->unit_factor);
+        $this->assertEquals(1.235, (float) $item->unit_qty);
+
+        // ยอดรวมเอกสารต้องเท่ากับ 1.235 * 89.75 = 110.84125
+        $expectedTotal = DecimalMath::multiply('1.235', '89.75');
+        $this->assertSame($expectedTotal, (string) $booking->document->total_amount);
     }
 
     /**

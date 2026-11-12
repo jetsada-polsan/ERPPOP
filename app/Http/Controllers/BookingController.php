@@ -13,13 +13,14 @@ use App\Models\User;
 use App\Services\Sales\BookingDeliveryService;
 use App\Services\Sales\BookingService;
 use App\Services\Sales\CreditSaleService;
+use App\Support\UnitQty;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -770,7 +771,7 @@ class BookingController extends Controller
                 'unit_name' => $unitName,
                 'base_unit_id' => $product->base_unit_id,
                 'base_unit_name' => $product->baseUnit?->cleanName() ?? 'หน่วยฐาน',
-                'units' => \App\Support\UnitQty::selectableUnits($product),
+                'units' => UnitQty::selectableUnits($product),
                 'is_scale' => $product->barcodes->contains(fn ($barcode) => preg_match('/^80[01][0-9]{3}$/', (string) $barcode->barcode) === 1)
                     || preg_match('/ชั่ง|ซั่ง/u', (string) $product->name_th) === 1,
             ];
@@ -872,7 +873,7 @@ class BookingController extends Controller
         $data = $request->validate(['reason' => ['nullable', 'string', 'max:200']]);
         try {
             $service->cancel($booking, $data['reason'] ?? null, $request->user()?->id);
-        } catch (\RuntimeException $error) {
+        } catch (RuntimeException $error) {
             return back()->with('error', $error->getMessage());
         }
 
@@ -946,14 +947,14 @@ class BookingController extends Controller
                     'isVat' => (bool) $item->product?->is_vat,
                     'booked' => (float) $item->qty,
                     'remaining' => $remaining,
-                    'remaining_display' => \App\Support\UnitQty::format($item->product, $remaining, $item->unit_id),
+                    'remaining_display' => UnitQty::format($item->product, $remaining, $item->unit_id),
                     'qty' => $remaining,
                     'price' => (float) $item->unit_price,
                     'book' => $item->product?->is_vat ? 'DS' : 'DSN',
                     'belowCost' => false,
                 ];
             })->filter(fn ($l) => $l['remaining'] > 0)->values();
-        $creditDays = (int) ($booking->document->customer?->credit_days ?? 0) ?: (int) (\App\Models\AppSetting::get('default_credit_days') ?: 30);
+        $creditDays = (int) ($booking->document->customer?->credit_days ?? 0) ?: (int) (AppSetting::get('default_credit_days') ?: 30);
 
         return view('bookings.bill', [
             'booking' => $booking,
@@ -986,7 +987,7 @@ class BookingController extends Controller
     }
 
     /** ตอบแค่ว่าราคาต่ำกว่าทุนไหม ไม่ส่งตัวเลขทุนให้หน้าจอ */
-    public function priceCheck(Request $request, SaleBooking $booking, CreditSaleService $service): \Illuminate\Http\JsonResponse
+    public function priceCheck(Request $request, SaleBooking $booking, CreditSaleService $service): JsonResponse
     {
         abort_unless($request->user()->canAccessBranch((int) $booking->document->branch_id), 403);
         $data = $request->validate(['prices' => ['required', 'array', 'max:500'], 'prices.*' => ['nullable', 'numeric', 'min:0']]);
@@ -1069,6 +1070,7 @@ class BookingController extends Controller
         abort_unless($booking->status === SaleBooking::STATUS_CONVERTED && $booking->confirmed_document_id, 422, 'ต้องแปลงเป็นใบขายก่อนจึงจะตรวจบัญชีได้');
         $data = $request->validate(['status' => ['required', 'in:approved,rejected'], 'note' => ['nullable', 'string', 'max:1000']]);
         $booking->update(['accounting_review_status' => $data['status'], 'accounting_reviewed_by' => $request->user()->id, 'accounting_reviewed_at' => now(), 'accounting_review_note' => $data['note'] ?? null]);
+
         return back()->with('success', $data['status'] === 'approved' ? 'ตรวจบัญชีผ่านแล้ว' : 'ตีกลับเอกสารให้แก้ไขแล้ว');
     }
 }

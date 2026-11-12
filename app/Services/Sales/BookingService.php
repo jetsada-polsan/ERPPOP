@@ -2,6 +2,7 @@
 
 namespace App\Services\Sales;
 
+use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\Document;
 use App\Models\DocumentBook;
@@ -12,7 +13,10 @@ use App\Models\StockBalance;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
 use App\Models\TransportJob;
+use App\Models\User;
+use App\Services\Accounting\DocumentVoidService;
 use App\Support\DecimalMath;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -80,8 +84,9 @@ class BookingService
                     // ของจริงมีแต่ระบบไม่พอ: บันทึกได้ถ้าผู้ขายขอ แต่ต้องรอผู้จัดการยืนยันก่อนออกใบขาย
                     if (! empty($data['allow_stock_shortage'])) {
                         $product = Product::find($productId);
-                        $shortages[] = ($product?->name_th ?? "#{$productId}")." ขาด ".DecimalMath::subtract($requestedQty, $available, DecimalMath::QUANTITY_SCALE);
+                        $shortages[] = ($product?->name_th ?? "#{$productId}").' ขาด '.DecimalMath::subtract($requestedQty, $available, DecimalMath::QUANTITY_SCALE);
                         $balances[$productId] = $balance;
+
                         continue;
                     }
                     throw new RuntimeException($this->availabilityError(
@@ -182,7 +187,7 @@ class BookingService
      * กติกาที่เหลือ (รับชำระแล้ว อยู่ในใบวางบิล มีใบลดหนี้อ้างอิง งวดปิดแล้ว) ยังบังคับที่
      * DocumentVoidService เหมือนเดิม คนขายผ่านไม่ได้ถ้าติดกติกาเหล่านั้น
      */
-    public function canRevertConfirmation(?\App\Models\User $user, SaleBooking $booking): bool
+    public function canRevertConfirmation(?User $user, SaleBooking $booking): bool
     {
         if (! $user || ! $booking->document || ! $user->canAccessBranch((int) $booking->document->branch_id)) {
             return false;
@@ -214,7 +219,7 @@ class BookingService
             $wasClosed = $locked->remainder_closed_at !== null;
             $oldStatus = $locked->status;
             foreach ($sales as $sale) {
-                app(\App\Services\Accounting\DocumentVoidService::class)->void($sale, 'ถอย Confirm ใบจอง: '.$reason, $userId);
+                app(DocumentVoidService::class)->void($sale, 'ถอย Confirm ใบจอง: '.$reason, $userId);
             }
 
             $items = $locked->document()->with('stockDocument.items')->firstOrFail()->stockDocument?->items ?? collect();
@@ -262,7 +267,7 @@ class BookingService
             $locked->update(['status' => SaleBooking::STATUS_CANCELLED]);
             $locked->document->update(['status' => 'cancelled']);
             TransportJob::where('booking_id', $locked->id)->update(['status' => 'cancelled']);
-            \App\Models\AuditLog::create(['user_id' => $userId, 'branch_id' => $locked->document->branch_id, 'action' => 'booking_cancelled',
+            AuditLog::create(['user_id' => $userId, 'branch_id' => $locked->document->branch_id, 'action' => 'booking_cancelled',
                 'table_name' => 'sale_bookings', 'record_id' => $locked->id, 'new_values' => ['reason' => $reason]]);
         });
     }
@@ -489,7 +494,7 @@ class BookingService
      * ตรวจสอบและแปลงรายการสินค้าใบจอง: คำนวณ unit_factor และ qty ในหน่วยหลักจากฐานข้อมูล
      * ห้ามเชื่อ factor หรือ qty ที่ client ส่งมา และตรวจสอบว่า unit_id เป็นของสินค้านั้นจริง
      */
-    private function normalizeBookingItems(iterable $rawItems): \Illuminate\Support\Collection
+    private function normalizeBookingItems(iterable $rawItems): Collection
     {
         $items = collect($rawItems);
         $productIds = $items->pluck('product_id')->filter()->unique();
@@ -507,29 +512,25 @@ class BookingService
                 : null;
 
             // 1. กรณีเป็นหน่วยหลัก หรือไม่ได้เลือกหน่วย
+            // ห้ามแปลงจำนวน/ราคาผ่าน float ให้ส่ง qty และ unit_price ตามที่ผ่าน validation เดิมทุกตัวอักษร (เหมือนก่อนงาน 32)
             if ($rawUnitId === null || $rawUnitId === (int) $product->base_unit_id) {
-                $factor = 1.0;
-                $unitId = (int) $product->base_unit_id;
-                $unitQty = isset($raw['unit_qty']) && $raw['unit_qty'] !== '' && $raw['unit_qty'] !== null
-                    ? (float) $raw['unit_qty']
-                    : (float) ($raw['qty'] ?? 0);
+                $qty = (string) (isset($raw['qty']) && $raw['qty'] !== '' && $raw['qty'] !== null
+                    ? $raw['qty']
+                    : ($raw['unit_qty'] ?? '0'));
 
-                if ($unitQty <= 0) {
+                if (bccomp($qty, '0', 4) <= 0) {
                     throw new RuntimeException("จำนวนสินค้า {$product->sku_code} ต้องมากกว่า 0");
                 }
 
-                $qty = (string) $unitQty;
-                $typedPrice = isset($raw['unit_price']) && $raw['unit_price'] !== '' && $raw['unit_price'] !== null
-                    ? (float) $raw['unit_price']
-                    : (float) ($product->default_price ?? 0);
-
-                $unitPrice = (string) round($typedPrice, 4);
+                $unitPrice = isset($raw['unit_price']) && $raw['unit_price'] !== '' && $raw['unit_price'] !== null
+                    ? (string) $raw['unit_price']
+                    : (string) ($product->default_price ?? '0');
 
                 return array_merge($raw, [
                     'product_id' => $productId,
-                    'unit_id' => $unitId,
-                    'unit_qty' => $unitQty,
-                    'unit_factor' => $factor,
+                    'unit_id' => (int) $product->base_unit_id,
+                    'unit_qty' => $qty,
+                    'unit_factor' => 1,
                     'qty' => $qty,
                     'unit_price' => $unitPrice,
                 ]);
@@ -544,8 +545,9 @@ class BookingService
                 throw new RuntimeException("หน่วยสินค้าที่เลือก (#{$rawUnitId}) ไม่ถูกต้องสำหรับสินค้า {$product->sku_code}");
             }
 
-            $factor = (float) $barcode->unit_factor;
-            if ($factor <= 0 || floor($factor) != $factor) {
+            $factorStr = (string) $barcode->unit_factor;
+            $factorInt = (int) $barcode->unit_factor;
+            if ($factorInt <= 0 || bccomp($factorStr, (string) $factorInt, 4) !== 0) {
                 throw new RuntimeException("หน่วยสินค้า {$barcode->unit?->cleanName()} มีอัตราส่วนบรรจุไม่ถูกต้อง (ต้องเป็นจำนวนเต็มบวก)");
             }
 
@@ -553,39 +555,39 @@ class BookingService
                 throw new RuntimeException("หน่วยสินค้า {$barcode->unit?->cleanName()} ไม่ถูกต้อง");
             }
 
-            $factorInt = (int) $factor;
+            $factor = (string) $factorInt;
 
-            // จำนวนในหน่วยที่เลือก
-            $unitQty = isset($raw['unit_qty']) && $raw['unit_qty'] !== '' && $raw['unit_qty'] !== null
-                ? (float) $raw['unit_qty']
-                : ((float) ($raw['qty'] ?? 0) / $factorInt);
+            // จำนวนในหน่วยที่เลือก (กรณีหน่วยใหญ่ใช้ string/bcmath ทั้งหมด)
+            $unitQtyStr = isset($raw['unit_qty']) && $raw['unit_qty'] !== '' && $raw['unit_qty'] !== null
+                ? trim((string) $raw['unit_qty'])
+                : bcdiv((string) ($raw['qty'] ?? '0'), $factor, 4);
 
-            if ($unitQty <= 0) {
+            if (bccomp($unitQtyStr, '0', 4) <= 0) {
                 throw new RuntimeException("จำนวนสินค้า {$product->sku_code} ต้องมากกว่า 0");
             }
 
-            // Server คำนวณ qty เป็นหน่วยหลักเอง: qty = unit_qty * unit_factor
-            $qty = (string) DecimalMath::multiply((string) $unitQty, (string) $factorInt, DecimalMath::QUANTITY_SCALE);
+            // Server คำนวณ qty เป็นหน่วยหลักเองด้วย bcmath: qty = unit_qty * unit_factor
+            $qty = bcmul($unitQtyStr, $factor, DecimalMath::QUANTITY_SCALE);
 
-            // ราคาต่อหน่วยที่เลือก: unit_price (ต่อหน่วยหลัก) = ราคาที่พิมพ์ ÷ factor
-            $typedPrice = isset($raw['unit_price']) && $raw['unit_price'] !== '' && $raw['unit_price'] !== null
-                ? (float) $raw['unit_price']
-                : ((float) ($product->default_price ?? 0) * $factorInt);
+            // ราคาต่อหน่วยที่เลือก: ตรวจสอบการหารลงตัวด้วย bcmath แบบ string ทั้งหมด
+            $typedPriceStr = isset($raw['unit_price']) && $raw['unit_price'] !== '' && $raw['unit_price'] !== null
+                ? trim((string) $raw['unit_price'])
+                : bcmul((string) ($product->default_price ?? '0'), $factor, 4);
 
-            $unitPriceFloat = round($typedPrice / $factorInt, 4);
+            $per = bcdiv($typedPriceStr, $factor, 4);
 
-            // ตรวจว่าหารลงตัวที่ทศนิยม 4 ตำแหน่งหรือไม่ (ป้องกันยอดเพี้ยนสตางค์)
-            if (abs(($unitPriceFloat * $factorInt) - $typedPrice) > 0.0001) {
-                throw new RuntimeException("ราคาต่อหน่วยที่พิมพ์ ({$typedPrice}) เมื่อหารด้วยอัตราส่วนบรรจุ ({$factorInt}) ไม่ลงตัวที่ทศนิยม 4 ตำแหน่ง กรุณาระบุราคาที่หารลงตัว");
+            // ตรวจว่าหารลงตัวที่ทศนิยม 4 ตำแหน่งหรือไม่ โดยคูณกลับแล้วเทียบด้วย bccomp
+            if (bccomp(bcmul($per, $factor, 4), $typedPriceStr, 4) !== 0) {
+                throw new RuntimeException("ราคาต่อหน่วยที่พิมพ์ ({$typedPriceStr}) เมื่อหารด้วยอัตราส่วนบรรจุ ({$factor}) ไม่ลงตัวที่ทศนิยม 4 ตำแหน่ง กรุณาระบุราคาที่หารลงตัว");
             }
 
-            $unitPrice = (string) $unitPriceFloat;
+            $unitPrice = $per;
 
             return array_merge($raw, [
                 'product_id' => $productId,
                 'unit_id' => $rawUnitId,
-                'unit_qty' => $unitQty,
-                'unit_factor' => (float) $factorInt,
+                'unit_qty' => $unitQtyStr,
+                'unit_factor' => $factorInt,
                 'qty' => $qty,
                 'unit_price' => $unitPrice,
             ]);
