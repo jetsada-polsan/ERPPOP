@@ -164,9 +164,9 @@ function poPage() {
         config: { draftEnabled: true },
         submitting: false,
         init() { this.$nextTick(() => this.startDraft()); },
-        closeModal() {
+        async closeModal() {
             if (this.pickerOpen || this.submitting) return;
-            if (this.draftDirty && !window.confirm('ยังไม่ได้บันทึกใบขอซื้อ ต้องการปิดฟอร์มหรือไม่?')) return;
+            if (this.draftDirty && !(await window.erpConfirm('ปิดฟอร์มขอซื้อ?', 'ยังไม่ได้บันทึกใบขอซื้อ ต้องการปิดฟอร์มหรือไม่?', { tone: 'warning' })).isConfirmed) return;
             this.saveDraft();
             this.modalOpen = false;
         },

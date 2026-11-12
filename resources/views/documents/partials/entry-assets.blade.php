@@ -189,9 +189,10 @@ function docEntryPage(config) {
                 this.onBranchChanged();
             });
         },
-        closeModal() {
+        async closeModal() {
             if (this.pickerOpen) return;
-            if (this.submitting || (this.draftDirty && !window.confirm('ยังไม่ได้บันทึกเอกสาร ต้องการปิดฟอร์มหรือไม่? ร่างจะเก็บในแท็บนี้'))) return;
+            if (this.submitting) return;
+            if (this.draftDirty && !(await window.erpConfirm('ปิดฟอร์มเอกสาร?', 'ยังไม่ได้บันทึกเอกสาร ต้องการปิดฟอร์มหรือไม่? ร่างจะเก็บในแท็บนี้', { tone: 'warning' })).isConfirmed) return;
             this.saveDraft();
             this.modalOpen = false;
         },
@@ -203,11 +204,7 @@ function docEntryPage(config) {
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
                 this.sourceInfo = '';
-                if (window.erpToast) {
-                    window.erpToast('warning', 'ไม่พบใบขาย', { text: data.message || `ไม่พบใบขายเลขที่ ${docNumber}`, timer: 4000 });
-                } else {
-                    Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title: 'ไม่พบใบขาย', text: data.message || `ไม่พบใบขายเลขที่ ${docNumber}`, timer: 4000, showConfirmButton: false });
-                }
+                window.erpToast('warning', 'ไม่พบใบขาย', { text: data.message || `ไม่พบใบขายเลขที่ ${docNumber}`, timer: 4000 });
                 return;
             }
             if (data.branch_id) { this.branchId = String(data.branch_id); }
@@ -366,15 +363,13 @@ function docEntryPage(config) {
             if (this.config.partyRequired && !this.partyId) {
                 event.preventDefault();
                 const title = `เลือก${this.config.partyLabel}ก่อน`;
-                if (window.erpToast) window.erpToast('warning', title);
-                else Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title, timer: 2200, showConfirmButton: false });
+                window.erpToast('warning', title);
                 return;
             }
             if (this.items.some(item => !item.product_id)) {
                 event.preventDefault();
                 const title = 'เลือกสินค้าให้ครบทุกแถว';
-                if (window.erpToast) window.erpToast('warning', title);
-                else Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title, timer: 2200, showConfirmButton: false });
+                window.erpToast('warning', title);
                 return;
             }
             // จำนวนเกินสต๊อกให้ ERP ตัดสินตามนโยบายสาขา หน้าจอแค่แจ้งเตือน ไม่บล็อกปุ่มบันทึก

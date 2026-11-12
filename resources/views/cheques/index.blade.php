@@ -128,12 +128,12 @@
                                 </form>
                             @endif
                             @if($cheque->direction === 'in' && ! $cheque->isFinal())
-                                <form method="post" action="{{ route('cheques.bounce', $cheque) }}" class="d-inline" data-confirm="บันทึกเช็คคืน/เด้ง? ต้องติดตามหนี้จากลูกค้าต่อ">
+                                <form method="post" action="{{ route('cheques.bounce', $cheque) }}" class="d-inline" data-confirm="บันทึกเช็คคืน/เด้ง? ต้องติดตามหนี้จากลูกค้าต่อ" data-confirm-tone="danger">
                                     @csrf<button class="btn btn-sm btn-outline-danger">เช็คคืน</button>
                                 </form>
                             @endif
                             @if(! $cheque->isFinal())
-                                <form method="post" action="{{ route('cheques.cancel', $cheque) }}" class="d-inline" data-confirm="ยกเลิกเช็คใบนี้?">
+                                <form method="post" action="{{ route('cheques.cancel', $cheque) }}" class="d-inline" data-confirm="ยกเลิกเช็คใบนี้?" data-confirm-tone="danger">
                                     @csrf<button class="btn btn-sm btn-light border text-muted">ยกเลิก</button>
                                 </form>
                             @endif

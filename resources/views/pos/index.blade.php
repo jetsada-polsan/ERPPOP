@@ -2895,15 +2895,40 @@
         ...options,
     });
 
-    window.erpConfirm = (title, text, options = {}) => window.Swal.fire({
-        icon: 'warning',
-        title,
-        text,
-        showCancelButton: true,
-        confirmButtonText: options.confirmButtonText || 'ยืนยัน',
-        cancelButtonText: options.cancelButtonText || 'ยกเลิก',
-        ...options,
-    });
+    function detectTone(title, text, okText) {
+        const combined = `${title || ''} ${text || ''} ${okText || ''}`;
+        if (/ลบ|ยกเลิก|void|คืนเงิน|ปิดงวด|ล้างข้อมูล|ทำลาย|delete|destroy|cancel|remove/i.test(combined)) return 'danger';
+        if (/อนุมัติ|ปรับสต็อก|โอน|ปิดกะ|แทนที่|approve|transfer/i.test(combined)) return 'warning';
+        if (/รับเงิน|รับของ|ตรวจรับ|complete|receive/i.test(combined)) return 'success';
+        return 'primary';
+    }
+
+    window.erpConfirm = (title, text, options = {}) => {
+        if (typeof text === 'object' && text !== null && !Array.isArray(text)) {
+            options = text;
+            text = options.text || '';
+        }
+        const okText = options.confirmButtonText || 'ยืนยัน';
+        const tone = options.tone || detectTone(title, text, okText);
+        const defaultIcons = { danger: 'warning', warning: 'warning', primary: 'question', success: 'success' };
+        const icon = options.icon || defaultIcons[tone] || 'question';
+
+        return window.Swal.fire({
+            title,
+            text,
+            icon,
+            showCancelButton: true,
+            confirmButtonText: okText,
+            cancelButtonText: options.cancelButtonText || 'ยกเลิก',
+            reverseButtons: true,
+            allowOutsideClick: true,
+            allowEscapeKey: true,
+            focusCancel: options.focusCancel !== undefined ? options.focusCancel : (tone === 'danger'),
+            background: options.background || '#1e293b',
+            color: options.color || '#f1f5f9',
+            ...options,
+        });
+    };
 })();
 
 /* ── Thai PromptPay QR (EMVCo) generator ── */
@@ -3423,19 +3448,16 @@ function posApp() {
 
         async recordCashDrop() {
             if (!this.activeShift) return;
-            const result = await Swal.fire({
-                title: 'นำส่งเงินระหว่างกะ',
+            const result = await erpConfirm('นำส่งเงินระหว่างกะ', null, {
                 html: '<label style="display:block;text-align:left;margin-bottom:6px">จำนวนเงิน</label>'
                     + '<input id="cash-drop-amount" type="number" min="0.01" step="0.01" class="swal2-input" style="margin:0 0 12px;width:100%">'
                     + '<label style="display:block;text-align:left;margin-bottom:6px">เลขอ้างอิง / ซองเงิน</label>'
                     + '<input id="cash-drop-ref" class="swal2-input" style="margin:0 0 12px;width:100%">'
                     + '<label style="display:block;text-align:left;margin-bottom:6px">เหตุผล</label>'
                     + '<input id="cash-drop-reason" class="swal2-input" value="นำส่งเงินระหว่างกะ" style="margin:0;width:100%">',
-                showCancelButton: true,
                 confirmButtonText: 'บันทึกนำส่ง',
                 cancelButtonText: 'ยกเลิก',
-                background: '#1e293b',
-                color: '#f1f5f9',
+                tone: 'primary',
                 preConfirm: () => {
                     const amount = Number(document.getElementById('cash-drop-amount')?.value || 0);
                     const reason = document.getElementById('cash-drop-reason')?.value?.trim() || '';
@@ -3502,8 +3524,7 @@ function posApp() {
         },
 
         async openReceiptSettings() {
-            const result = await Swal.fire({
-                title: 'ตั้งค่าใบเสร็จ',
+            const result = await erpConfirm('ตั้งค่าใบเสร็จ', null, {
                 input: 'select',
                 inputOptions: {
                     '80mm': 'กระดาษ 80 มม. (พื้นฐาน)',
@@ -3512,9 +3533,7 @@ function posApp() {
                 inputValue: this.receiptPaperWidth,
                 confirmButtonText: 'บันทึก',
                 cancelButtonText: 'ยกเลิก',
-                showCancelButton: true,
-                background: '#1e293b',
-                color: '#f1f5f9',
+                tone: 'primary',
             });
 
             if (!result.isConfirmed) return;
@@ -3909,16 +3928,10 @@ function posApp() {
                 return;
             }
 
-            const result = await Swal.fire({
-                title: 'ยกเลิกบิลนี้?',
-                text: 'รายการสินค้าที่กำลังขายจะถูกล้างออก',
-                icon: 'warning',
-                showCancelButton: true,
+            const result = await erpConfirm('ยกเลิกบิลนี้?', 'รายการสินค้าที่กำลังขายจะถูกล้างออก', {
                 confirmButtonText: 'ยกเลิกบิล',
                 cancelButtonText: 'กลับไปขายต่อ',
-                confirmButtonColor: '#dc2626',
-                background: '#1e293b',
-                color: '#f1f5f9',
+                tone: 'danger',
             });
 
             if (!result.isConfirmed) return;
@@ -3933,17 +3946,15 @@ function posApp() {
                 return;
             }
 
-            const result = await Swal.fire({
-                title: 'ยกเลิกบิลที่ออกแล้ว?',
+            const result = await erpConfirm('ยกเลิกบิลที่ออกแล้ว?', null, {
                 html: `<div style="font-size:13px;color:#cbd5e1">เลขที่ <b>${this.lastDocNumber}</b><br>ระบบจะ void บิล คืนสต็อก และบันทึก audit log</div>`,
                 input: 'textarea',
                 inputPlaceholder: 'ระบุเหตุผล เช่น ลูกค้าคืนสินค้า / ยิงผิดรายการ',
                 inputValidator: (value) => !value || !value.trim() ? 'กรุณาระบุเหตุผล' : undefined,
-                icon: 'warning',
-                showCancelButton: true,
                 confirmButtonText: 'ยืนยันยกเลิกบิล',
                 cancelButtonText: 'กลับ',
-                confirmButtonColor: '#dc2626',
+                tone: 'danger',
+            });
             });
 
             if (!result.isConfirmed) return;
@@ -3994,16 +4005,13 @@ function posApp() {
             }
 
             const defaultName = this.customerName || 'บิล ' + new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-            const result = await Swal.fire({
-                title: 'พักบิล',
+            const result = await erpConfirm('พักบิล', null, {
                 input: 'text',
                 inputLabel: 'ชื่อบิล / โต๊ะ / ลูกค้า',
                 inputValue: defaultName,
                 confirmButtonText: 'พักบิล',
                 cancelButtonText: 'ยกเลิก',
-                showCancelButton: true,
-                background: '#1e293b',
-                color: '#f1f5f9',
+                tone: 'primary',
             });
 
             if (!result.isConfirmed) return;
@@ -4065,29 +4073,21 @@ function posApp() {
                 inputOptions[bill.id] = `${bill.label} - ${bill.cart.length} รายการ / ${this.money(qty)} ชิ้น / ฿${this.money(total)}`;
             });
 
-            const result = await Swal.fire({
-                title: 'เรียกบิลที่พักไว้',
+            const result = await erpConfirm('เรียกบิลที่พักไว้', null, {
                 input: 'select',
                 inputOptions,
                 confirmButtonText: 'เรียกบิล',
                 cancelButtonText: 'ยกเลิก',
-                showCancelButton: true,
-                background: '#1e293b',
-                color: '#f1f5f9',
+                tone: 'primary',
             });
 
             if (!result.isConfirmed) return;
 
             if (this.cart.length > 0) {
-                const replace = await Swal.fire({
-                    title: 'แทนที่บิลปัจจุบัน?',
-                    text: 'บิลที่กำลังขายอยู่จะถูกยกเลิกและแทนด้วยบิลที่เรียกคืน',
-                    icon: 'warning',
-                    showCancelButton: true,
+                const replace = await erpConfirm('แทนที่บิลปัจจุบัน?', 'บิลที่กำลังขายอยู่จะถูกยกเลิกและแทนด้วยบิลที่เรียกคืน', {
+                    tone: 'warning',
                     confirmButtonText: 'แทนที่',
                     cancelButtonText: 'ยกเลิก',
-                    background: '#1e293b',
-                    color: '#f1f5f9',
                 });
                 if (!replace.isConfirmed) return;
             }

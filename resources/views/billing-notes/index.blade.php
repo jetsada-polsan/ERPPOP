@@ -160,7 +160,7 @@ function billingNotePage() {
         toggleAll(checked) { this.selected = checked ? this.openItems.map(i => i.id) : []; },
 
         onSubmit(e) {
-            if (this.selected.length === 0) { e.preventDefault(); Swal.fire({ icon: 'warning', title: 'กรุณาเลือกใบขายเชื่ออย่างน้อย 1 ใบ' }); }
+            if (this.selected.length === 0) { e.preventDefault(); window.erpPopup('warning', 'กรุณาเลือกใบขายเชื่ออย่างน้อย 1 ใบ'); }
         },
     };
 }

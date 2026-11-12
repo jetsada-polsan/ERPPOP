@@ -304,8 +304,7 @@
             validateProductForm(event, index) {
                 if (this.items[index].product_id) return;
                 event.preventDefault();
-                if (window.erpToast) window.erpToast('warning', 'กรุณาเลือกสินค้าก่อนบันทึก');
-                else Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title: 'กรุณาเลือกสินค้าก่อนบันทึก', timer: 2200, showConfirmButton: false });
+                window.erpToast('warning', 'กรุณาเลือกสินค้าก่อนบันทึก');
             },
         };
     }
@@ -318,8 +317,7 @@
             validateIngredient(event) {
                 if (this.items[0].product_id) return;
                 event.preventDefault();
-                if (window.erpToast) window.erpToast('warning', 'กรุณาเลือกวัตถุดิบก่อนเพิ่ม');
-                else Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title: 'กรุณาเลือกวัตถุดิบก่อนเพิ่ม', timer: 2200, showConfirmButton: false });
+                window.erpToast('warning', 'กรุณาเลือกวัตถุดิบก่อนเพิ่ม');
             },
         };
     }

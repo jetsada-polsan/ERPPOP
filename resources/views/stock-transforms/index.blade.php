@@ -336,10 +336,10 @@
                 }
                 if (this.rawItems.some(i => !i.product_id) || this.outputItems.some(i => !i.product_id)) {
                     event.preventDefault();
-                    Swal.fire({ icon: 'warning', title: 'กรุณาเลือกสินค้าให้ครบทุกแถว' });
+                    window.erpPopup('warning', 'กรุณาเลือกสินค้าให้ครบทุกแถว');
                 } else if (this.outputWeight > this.inputWeight) {
                     event.preventDefault();
-                    Swal.fire({ icon: 'warning', title: 'น้ำหนักผลผลิตมากกว่าวัตถุดิบ', text: 'กรุณาตรวจน้ำหนักที่ชั่งจริงก่อนบันทึก' });
+                    window.erpPopup('warning', 'น้ำหนักผลผลิตมากกว่าวัตถุดิบ', 'กรุณาตรวจน้ำหนักที่ชั่งจริงก่อนบันทึก');
                 }
             },
         };

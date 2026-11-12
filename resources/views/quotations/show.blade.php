@@ -18,7 +18,8 @@
             <i class="bi bi-arrow-right-circle me-1"></i>แปลงเป็นใบจอง / ใบขาย
         </button>
         <form method="post" action="{{ route('quotations.status', $quotation) }}" class="ms-auto"
-            data-confirm="ยกเลิกใบเสนอราคา {{ $quotation->doc_number }}? ยกเลิกแล้วจะแปลงเป็นใบจอง/ใบขายไม่ได้อีก">
+            data-confirm="ยกเลิกใบเสนอราคา {{ $quotation->doc_number }}? ยกเลิกแล้วจะแปลงเป็นใบจอง/ใบขายไม่ได้อีก"
+            data-confirm-tone="danger">
             @csrf <input type="hidden" name="status" value="cancelled">
             <button class="btn btn-light border text-danger">ยกเลิก</button>
         </form>
@@ -33,7 +34,8 @@
 {{-- แปลงเป็นเอกสารขาย: คัดลอกรายการและอ้างอิงเลขใบเสนอราคาลงในใบจอง --}}
 <div id="quotation-convert" class="content-card p-4 mb-3 no-print d-none" x-data="{ mode: '{{ $customerMatches->isNotEmpty() ? 'existing' : 'new' }}' }">
     <form method="post" action="{{ route('quotations.convert', $quotation) }}"
-        data-confirm="แปลงใบเสนอราคา {{ $quotation->doc_number }}? ระบบจะคัดลอกรายการทั้งหมดไปยังเอกสารใหม่">
+        data-confirm="แปลงใบเสนอราคา {{ $quotation->doc_number }}? ระบบจะคัดลอกรายการทั้งหมดไปยังเอกสารใหม่"
+        data-confirm-tone="primary">
         @csrf
         <h2 class="h6 fw-bold mb-3">แปลงใบเสนอราคา {{ $quotation->doc_number }}</h2>
         <div class="row g-3">

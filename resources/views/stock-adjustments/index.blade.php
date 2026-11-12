@@ -237,12 +237,12 @@
                 }
                 if (!this.locationId) {
                     event.preventDefault();
-                    Swal.fire({ icon: 'warning', title: 'กรุณาเลือกคลังที่จะปรับยอด' });
+                    window.erpPopup('warning', 'กรุณาเลือกคลังที่จะปรับยอด');
                     return;
                 }
                 if (this.items.some(item => !item.product_id)) {
                     event.preventDefault();
-                    Swal.fire({ icon: 'warning', title: 'กรุณาเลือกสินค้าให้ครบทุกแถว' });
+                    window.erpPopup('warning', 'กรุณาเลือกสินค้าให้ครบทุกแถว');
                     return;
                 }
             },

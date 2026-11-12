@@ -256,7 +256,7 @@ function stockCountSheet() {
         scanNow(){
             const code=this.scanCode.trim(); if(!code)return;
             const row=this.findScan(code); this.scanCode='';
-            if(!row){ Swal.fire({toast:true,position:'top-end',icon:'error',title:'ไม่พบบาร์โค้ดใน Scope นี้',showConfirmButton:false,timer:1800}); this.$refs.scanBox?.focus(); return; }
+            if(!row){ window.erpToast('error', 'ไม่พบบาร์โค้ดใน Scope นี้'); this.$refs.scanBox?.focus(); return; }
             let qty=1;
             if(/^\d{13}$/.test(code) && row.price>0 && row.sku===code.slice(0,6)){ const amount=Number(code.slice(6,12))/100; qty=amount/row.price; }
             this.applyQty(row,qty); this.$refs.scanBox?.focus();
@@ -313,12 +313,12 @@ function stockCountSheet() {
                     this.dirty = false;
                     localStorage.removeItem('stock-count-draft-{{ $stockCount->id }}');
                     success = true;
-                    Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'บันทึกยอดนับ ' + data.updated + ' รายการแล้ว', showConfirmButton: false, timer: 2200 });
+                    window.erpToast('success', 'บันทึกยอดนับ ' + data.updated + ' รายการแล้ว');
                 } else {
-                    Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ' });
+                    window.erpPopup('error', 'บันทึกไม่สำเร็จ');
                 }
             } catch (e) {
-                Swal.fire({ icon: 'error', title: 'เชื่อมต่อ server ไม่ได้' });
+                window.erpPopup('error', 'เชื่อมต่อ server ไม่ได้');
             }
             this.saving = false;
             return success;
@@ -327,11 +327,7 @@ function stockCountSheet() {
         async importCsv(form) {
             const fileInput = this.$refs.importFileInput || form.querySelector('input[type="file"]');
             if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-                if (window.erpToast) {
-                    window.erpToast('warning', 'กรุณาเลือกไฟล์ CSV ก่อนกด Import');
-                } else {
-                    Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title: 'กรุณาเลือกไฟล์ CSV ก่อนกด Import', showConfirmButton: false, timer: 2000 });
-                }
+                window.erpToast('warning', 'กรุณาเลือกไฟล์ CSV ก่อนกด Import');
                 return;
             }
 
@@ -367,12 +363,9 @@ function stockCountSheet() {
                     }
                     htmlContent += `</div>`;
 
-                    await Swal.fire({
-                        icon: 'success',
-                        title: 'Import สำเร็จ',
+                    await window.erpPopup('success', 'Import สำเร็จ', null, {
                         html: htmlContent,
                         confirmButtonText: 'ตกลง',
-                        confirmButtonColor: '#0ea5e9',
                     });
 
                     window.location.reload();
@@ -381,21 +374,14 @@ function stockCountSheet() {
                     if (data.errors) {
                         errorText = Object.values(data.errors).flat().join('<br>');
                     }
-                    await Swal.fire({
-                        icon: 'error',
-                        title: 'นำเข้าไม่สำเร็จ',
+                    await window.erpPopup('error', 'นำเข้าไม่สำเร็จ', null, {
                         html: errorText,
                         confirmButtonText: 'ปิด',
-                        confirmButtonColor: '#0ea5e9',
                     });
                 }
             } catch (err) {
-                await Swal.fire({
-                    icon: 'error',
-                    title: 'เกิดข้อผิดพลาด',
-                    text: 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง',
+                await window.erpPopup('error', 'เกิดข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง', {
                     confirmButtonText: 'ปิด',
-                    confirmButtonColor: '#0ea5e9',
                 });
             } finally {
                 this.importing = false;
@@ -404,14 +390,9 @@ function stockCountSheet() {
 
         async finishCount(form) {
             if (this.dirty && !(await this.saveAll())) return;
-            const res = await Swal.fire({
-                title: 'ส่งใบตรวจนับให้หัวหน้าตรวจสอบ?',
-                text: 'ขั้นตอนนี้ยังไม่ปรับสต็อกจริง',
-                icon: 'question',
-                showCancelButton: true,
+            const res = await window.erpConfirm('ส่งใบตรวจนับให้หัวหน้าตรวจสอบ?', 'ขั้นตอนนี้ยังไม่ปรับสต็อกจริง', {
+                tone: 'primary',
                 confirmButtonText: 'ยืนยันส่งตรวจสอบ',
-                cancelButtonText: 'ยกเลิก',
-                confirmButtonColor: '#0ea5e9',
             });
             if (res.isConfirmed) {
                 const btn = form.querySelector('button[type="submit"]');
@@ -424,14 +405,9 @@ function stockCountSheet() {
         },
 
         async confirmPostStock(form) {
-            const res = await Swal.fire({
-                title: 'ยืนยันปรับสต็อกจริงตาม Scope นี้?',
-                text: 'การทำงานนี้ย้อนกลับอัตโนมัติไม่ได้',
-                icon: 'warning',
-                showCancelButton: true,
+            const res = await window.erpConfirm('ยืนยันปรับสต็อกจริงตาม Scope นี้?', 'การทำงานนี้ย้อนกลับอัตโนมัติไม่ได้', {
+                tone: 'warning',
                 confirmButtonText: 'ยืนยันปรับสต็อก',
-                cancelButtonText: 'ยกเลิก',
-                confirmButtonColor: '#16a34a',
             });
             if (res.isConfirmed) {
                 const btn = form.querySelector('button[type="submit"]');

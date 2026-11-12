@@ -16,7 +16,8 @@
         try {
             result = await window.erpConfirm(trigger.dataset.confirm, trigger.dataset.confirmText || '', {
                 confirmButtonText: trigger.dataset.confirmOk || 'ยืนยัน',
-                icon: trigger.dataset.confirmIcon || 'warning',
+                icon: trigger.dataset.confirmIcon || undefined,
+                tone: trigger.dataset.confirmTone || undefined,
             });
         } finally { pending.delete(form); }
         if (!result.isConfirmed || !form.isConnected) return;
@@ -27,7 +28,11 @@
         const link = event.target.closest('a[data-confirm]');
         if (!link) return;
         event.preventDefault();
-        const result = await window.erpConfirm(link.dataset.confirm);
+        const result = await window.erpConfirm(link.dataset.confirm, link.dataset.confirmText || '', {
+            confirmButtonText: link.dataset.confirmOk || 'ยืนยัน',
+            icon: link.dataset.confirmIcon || undefined,
+            tone: link.dataset.confirmTone || undefined,
+        });
         if (result.isConfirmed) window.location.assign(link.href);
     });
 })();
