@@ -44,7 +44,7 @@
             <div class="picker-state" x-show="!pickerLoading && pickerResults.length === 0">ไม่พบสินค้า ลองเปลี่ยนคำค้นหา</div>
             <div class="product-picker-grid" x-show="!pickerLoading && pickerResults.length">
                 <div class="picker-table-head"><span>รหัสสินค้า</span><span>ชื่อสินค้า</span><span>หน่วยนับ</span><span>บาร์โค้ด</span><span>ราคา</span></div>
-                <template x-if="!unitRowsEnabled">
+                <template x-if="!unitRowsEnabled()">
                     <div class="picker-list">
                         <template x-for="(product, pickerRow) in pickerResults" :key="product.id">
                             <button type="button" class="picker-card" :class="{ 'is-active': pickerRow === pickerActiveIndex }"
@@ -58,9 +58,9 @@
                         </template>
                     </div>
                 </template>
-                <template x-if="unitRowsEnabled">
+                <template x-if="unitRowsEnabled()">
                     <div class="picker-list">
-                        <template x-for="(entry, entryIdx) in pickerNavItems" :key="entry.key">
+                        <template x-for="(entry, entryIdx) in pickerNavItems()" :key="entry.key">
                             <button type="button" class="picker-card" :class="{ 'picker-unit-card': entry.type === 'unit', 'is-active': entryIdx === pickerActiveIndex }"
                                 @click="selectPickerItem(entry)" @mouseenter="pickerActiveIndex = entryIdx">
                                 <span class="picker-code" :class="{ 'picker-unit-tree': entry.type === 'unit' }" x-text="entry.type === 'unit' ? '↳' : entry.product.sku_code"></span>
@@ -76,10 +76,10 @@
                                     </template>
                                 </span>
                                 <span class="picker-unit">
-                                    <span :class="{ 'picker-unit-tag': entry.type === 'unit' }" x-text="entry.type === 'unit' ? (entry.unit.unit_name || entry.unit.name) : entry.product.unit_name"></span>
+                                    <span :class="{ 'picker-unit-tag': entry.type === 'unit' }" x-text="entry.type === 'unit' ? (entry.unit.unit_name || entry.unit.name) : (pickerDefaultUnit(entry.product)?.unit_name || entry.product.unit_name)"></span>
                                 </span>
-                                <span class="picker-barcode" :class="{ 'font-monospace': entry.type === 'unit' }" x-text="(entry.type === 'unit' ? entry.unit.barcode : entry.product.barcode) || '-' "></span>
-                                <span class="picker-price" x-text="entry.type === 'unit' ? (entry.unit.price !== null ? '฿' + money(entry.unit.price) : '-') : ('฿' + money(entry.product.default_price))"></span>
+                                <span class="picker-barcode" :class="{ 'font-monospace': entry.type === 'unit' }" x-text="(entry.type === 'unit' ? entry.unit.barcode : (pickerDefaultUnit(entry.product)?.barcode || entry.product.barcode)) || '-' "></span>
+                                <span class="picker-price" x-text="entry.type === 'unit' ? (entry.unit.price !== null ? '฿' + money(entry.unit.price) : '-') : (pickerDefaultUnit(entry.product) ? (pickerDefaultUnit(entry.product).price !== null ? '฿' + money(pickerDefaultUnit(entry.product).price) : '-') : ('฿' + money(entry.product.default_price)))"></span>
                             </button>
                         </template>
                     </div>
@@ -169,8 +169,22 @@
 
         return {
             unitRows: Boolean(config && config.unitRows),
-            get unitRowsEnabled() {
+            // เป็นเมธอด ไม่ใช่ getter: หน้าที่เรียก spread mixin นี้ (...erpProductPicker()) ซึ่งจะแช่ค่า getter
+            // ไว้ตั้งแต่ตอน spread (ปิดแถวหน่วยใหญ่ตลอด) — เมธอดคิดใหม่ทุกครั้งจาก config ของหน้า
+            unitRowsEnabled() {
                 return Boolean(this.unitRows || (config && config.unitRows) || this.config?.unitRows);
+            },
+            // ใบจอง: หลังบ้านขายหน่วยใหญ่ เลือกสินค้า/ยิงรหัส 6 หลักแล้วได้หน่วยใหญ่สุดเลย
+            preferLargeUnit() {
+                return this.unitRowsEnabled() && Boolean((config && config.preferLargeUnit) || this.config?.preferLargeUnit);
+            },
+            pickerLargestUnit(product) {
+                const larger = (product.units || []).filter(u => ! u.is_base && Number(u.factor) > 1);
+                if (! larger.length) return null;
+                return larger.reduce((best, u) => Number(u.factor) > Number(best.factor) ? u : best, larger[0]);
+            },
+            pickerDefaultUnit(product) {
+                return this.preferLargeUnit() ? this.pickerLargestUnit(product) : null;
             },
             pickerOpen: false,
             pickerIndex: null,
@@ -182,8 +196,8 @@
             pickerSearchSequence: 0,
             pickerSearchController: null,
 
-            get pickerNavItems() {
-                if (! this.unitRowsEnabled) {
+            pickerNavItems() {
+                if (! this.unitRowsEnabled()) {
                     return this.pickerResults.map((product, idx) => ({
                         key: 'p-' + product.id,
                         index: idx,
@@ -201,8 +215,11 @@
                         product: product,
                         unit: null,
                     });
-                    const largerUnits = (product.units || []).filter(u => ! u.is_base && Number(u.factor) > 1);
-                    for (const u of largerUnits) {
+                    // โหมดหน่วยใหญ่: แถวสินค้า = หน่วยใหญ่สุด จึงแสดงทุกหน่วย (รวมหน่วยหลัก) ไว้ให้เลือกหน่วยอื่น
+                    const unitRows = this.preferLargeUnit()
+                        ? [...(product.units || [])].filter(u => Number(u.factor) >= 1).sort((a, b) => Number(b.factor) - Number(a.factor))
+                        : (product.units || []).filter(u => ! u.is_base && Number(u.factor) > 1);
+                    for (const u of unitRows) {
                         items.push({
                             key: 'u-' + product.id + '-' + u.unit_id,
                             index: items.length,
@@ -271,20 +288,22 @@
                         this.pickerLoading = false;
                         this.pickerActiveIndex = 0;
 
-                        if (this.unitRowsEnabled && this.pickerQuery.trim()) {
+                        if (this.unitRowsEnabled() && this.pickerQuery.trim()) {
                             const q = this.pickerQuery.trim().toLowerCase();
-                            const unitIdx = this.pickerNavItems.findIndex(entry =>
+                            const unitIdx = this.pickerNavItems().findIndex(entry =>
                                 entry.type === 'unit' && (entry.unit.barcode || '').trim().toLowerCase() === q
+                                && ! (this.preferLargeUnit() && entry.unit.is_base && String(entry.product.sku_code || '').toLowerCase() === q)
                             );
                             if (unitIdx !== -1) {
                                 this.pickerActiveIndex = unitIdx;
                             } else {
                                 const firstProd = this.pickerResults[0];
                                 if (firstProd && firstProd.matched_unit_id) {
-                                    const matchIdx = this.pickerNavItems.findIndex(entry =>
+                                    const matchIdx = this.pickerNavItems().findIndex(entry =>
                                         entry.type === 'unit' &&
                                         entry.product.id === firstProd.id &&
-                                        String(entry.unit.unit_id) === String(firstProd.matched_unit_id)
+                                        String(entry.unit.unit_id) === String(firstProd.matched_unit_id) &&
+                                        ! (this.preferLargeUnit() && entry.unit.is_base)
                                     );
                                     if (matchIdx !== -1) {
                                         this.pickerActiveIndex = matchIdx;
@@ -298,7 +317,7 @@
 
             // เลื่อนแถวที่โฟกัสด้วยคีย์บอร์ด (ค่า delta มาก ๆ = ไปหัว/ท้ายรายการ)
             movePickerActive(delta) {
-                const total = this.unitRowsEnabled ? this.pickerNavItems.length : this.pickerResults.length;
+                const total = this.unitRowsEnabled() ? this.pickerNavItems().length : this.pickerResults.length;
                 if (! total) return;
                 const last = total - 1;
                 this.pickerActiveIndex = Math.max(0, Math.min(last, this.pickerActiveIndex + delta));
@@ -309,18 +328,19 @@
             },
 
             selectActivePickerProduct() {
-                if (this.unitRowsEnabled) {
+                if (this.unitRowsEnabled()) {
                     const q = this.pickerQuery.trim().toLowerCase();
                     if (q) {
-                        const exactUnitItem = this.pickerNavItems.find(entry =>
+                        const exactUnitItem = this.pickerNavItems().find(entry =>
                             entry.type === 'unit' && (entry.unit.barcode || '').trim().toLowerCase() === q
+                                && ! (this.preferLargeUnit() && entry.unit.is_base && String(entry.product.sku_code || '').toLowerCase() === q)
                         );
                         if (exactUnitItem) {
                             this.selectPickerItem(exactUnitItem);
                             return;
                         }
                     }
-                    const activeItem = this.pickerNavItems[this.pickerActiveIndex];
+                    const activeItem = this.pickerNavItems()[this.pickerActiveIndex];
                     if (activeItem) this.selectPickerItem(activeItem);
                 } else {
                     const product = this.pickerResults[this.pickerActiveIndex];
@@ -333,7 +353,8 @@
                 if (entry.type === 'unit') {
                     this.selectPickerProduct(entry.product, entry.unit);
                 } else {
-                    this.selectPickerProduct(entry.product, null);
+                    // แถวสินค้าในโหมดหน่วยใหญ่ = หน่วยใหญ่สุด (null = หน่วยหลักเหมือนเดิม)
+                    this.selectPickerProduct(entry.product, this.pickerDefaultUnit(entry.product));
                 }
             },
 

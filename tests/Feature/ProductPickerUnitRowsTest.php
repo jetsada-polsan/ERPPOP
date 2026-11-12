@@ -499,4 +499,21 @@ class ProductPickerUnitRowsTest extends TestCase
         $this->assertNotNull($crateUnit);
         $this->assertSame(300.0, (float) $crateUnit['price'], 'หน่วยใหญ่ใช้ราคาบาร์โค้ดของหน่วยนั้น 300.00');
     }
+
+    /**
+     * production 12 พ.ย.: แถวยกหิ้วไม่ขึ้นเลย เพราะ getter ใน mixin ถูกแช่ค่าตอน ...erpProductPicker()
+     * และฝ่ายขายต้องการให้เลือกสินค้าแล้วได้หน่วยใหญ่ทันที (หลังบ้านขายหน่วยใหญ่)
+     */
+    public function test_booking_page_enables_large_unit_default_and_picker_uses_methods_not_getters(): void
+    {
+        $picker = file_get_contents(resource_path('views/partials/product-picker.blade.php'));
+        $this->assertStringContainsString('unitRowsEnabled() {', $picker);
+        $this->assertStringContainsString('in pickerNavItems()', $picker);
+        $this->assertStringNotContainsString('get unitRowsEnabled()', $picker);
+        $this->assertStringNotContainsString('get pickerNavItems()', $picker);
+
+        foreach (['index', 'edit'] as $view) {
+            $this->assertStringContainsString('preferLargeUnit: true', file_get_contents(resource_path("views/bookings/{$view}.blade.php")));
+        }
+    }
 }

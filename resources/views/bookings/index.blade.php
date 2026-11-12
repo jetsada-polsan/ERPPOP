@@ -20,6 +20,7 @@
 @section('content')
 <div x-data="docEntryPage({
     unitRows: true,
+    preferLargeUnit: true,
     draftEnabled: true,
     partyType: 'customer',
     partyLabel: 'ลูกค้า',
