@@ -1,3 +1,23 @@
+@once
+{{-- ใบส่งของ A5 ต้องจบในแผ่นเดียว: เดิมขอบ 8 มม. + แถว Final QC ซ้ำ ทำให้ 6 รายการขึ้นไปล้นลายเซ็นไปแผ่นใหม่ --}}
+<style>
+    @page { size: A5 landscape; margin: 5mm 6mm; }
+    @media print {
+        .page.delivery-note-page { padding: 1.5mm 2mm !important; }
+        .page.delivery-note-page .doc-head { margin-bottom: 4px !important; padding-bottom: 1.5mm !important; }
+        .page.delivery-note-page .logo-box img { max-height: 12mm !important; }
+        .page.delivery-note-page .info-row { margin: 1.5mm 0 !important; }
+        .page.delivery-note-page table.items th,
+        .page.delivery-note-page table.items td { padding: .6mm 1.2mm !important; line-height: 1.25 !important; }
+        .page.delivery-note-page .sign-row { margin-top: 6mm !important; break-inside: avoid; page-break-inside: avoid; }
+    }
+    /* กล่องยอดรวม: เดิมเรียงแนวนอนจนเกินกรอบ 50 มม. ตัด "ส่วนลด/รวมสุทธิ" หาย — ให้เรียงลงทีละบรรทัด */
+    .page.delivery-note-page .totals { display: block !important; width: 58mm !important; max-width: 58mm !important; }
+    .page.delivery-note-page .totals .row { display: flex !important; justify-content: space-between !important; align-items: center !important; }
+    .page.delivery-note-page .totals .val { font-size: 9.5px !important; font-weight: 700 !important; text-align: right !important; }
+    .page.delivery-note-page .qc-row { grid-template-columns: minmax(0, 1fr) 58mm !important; }
+</style>
+@endonce
 <div class="page delivery-note-page">
     @if($copyLabel)<div style="text-align:right;font-size:10px;font-weight:700">{{ $copyLabel }}</div>@endif
     <div class="doc-head">
@@ -82,9 +102,6 @@
         </div>
     </div>
 
-    @if($typeCode === 'BOOKING')
-    <div style="display:flex;gap:6mm;margin:2mm 0;font-size:10px"><b>Final QC</b><span>☐ ได้รับจำนวนตามที่สั่ง</span><span>☐ ชนิดสินค้าตรงตามที่สั่ง</span><span>☐ บรรจุภัณฑ์ไม่ชำรุด</span></div>
-    @endif
     <div class="sign-row">
         <div class="sign"><div class="line"></div>ผู้รับสินค้า</div>
         <div class="sign"><div class="line"></div>ผู้ส่งสินค้า</div>

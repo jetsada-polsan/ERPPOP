@@ -150,12 +150,12 @@
                     <thead>
                         <tr>
                             <th style="width: 5%;" class="text-center">ลำดับ</th>
-                            <th style="width: 38%;">ชื่อลูกค้า</th>
-                            <th style="width: 17%;">เลขที่บิล</th>
+                            <th style="width: 36%;">ชื่อลูกค้า</th>
+                            <th style="width: 16%;">เลขที่บิล</th>
                             <th style="width: 12%;" class="text-end">จำนวนเงิน</th>
-                            <th style="width: 9%;" class="text-center">ยอดค้าง</th>
-                            <th style="width: 9%;" class="text-center">รวม</th>
-                            <th style="width: 10%;" class="text-center">หมายเหตุ</th>
+                            <th style="width: 8%;" class="text-center">ยอดค้าง</th>
+                            <th style="width: 8%;" class="text-center">รวม</th>
+                            <th style="width: 15%;" class="text-center">หมายเหตุ</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -163,7 +163,7 @@
                             <tr>
                                 <td class="text-center">{{ $loop->iteration }}</td>
                                 <td class="customer-cell">{{ $booking->document?->customer?->name_th ?? $booking->document?->customer_name ?? '-' }}</td>
-                                <td class="font-monospace fw-semibold">{{ $booking->document?->doc_number ?? '-' }}</td>
+                                <td class="font-monospace fw-semibold doc-cell">{{ $booking->document?->doc_number ?? '-' }}</td>
                                 <td class="text-end fw-bold">{{ number_format((float) ($booking->document?->total_amount ?? 0), 2) }}</td>
                                 <td class="write-box"></td>
                                 <td class="write-box"></td>
@@ -343,10 +343,19 @@
     margin-bottom: 14px;
 }
 /* ชื่อลูกค้าอยู่บรรทัดเดียว (ยาวเกินช่องค่อยตัดด้วย …) */
+/* แถวสูงพอให้ขนส่งเขียนยอดค้าง/รวม/หมายเหตุด้วยมือ */
+.cover-table tbody td {
+    height: 8mm;
+}
+/* เลขที่บิลบรรทัดเดียว เพื่อเหลือที่ให้ช่องหมายเหตุ (ขนส่งเขียนบันทึก) */
+.cover-table .doc-cell {
+    white-space: nowrap !important;
+    font-size: 11px !important;
+}
 .cover-table .customer-cell {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
 }
 .cover-table th, .cover-table td {
     border: 1px solid #64748b;

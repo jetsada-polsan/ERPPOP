@@ -394,4 +394,19 @@ class BatchDeliveryNotesTest extends TestCase
         $this->get(route('documents.delivery-notes.batch', ['ids' => [$purchase->id, $sale->id]]))->assertOk()
             ->assertSee('CS-OK')->assertDontSee('PO-NOT-A-DELIVERY');
     }
+
+    /**
+     * ใบส่งของชั่วคราว A5 พิมพ์ล้นแผ่น (ฝ่ายขาย 12 พ.ย.): แถว Final QC เคยซ้ำสองครั้งต่อสำเนา และขอบกระดาษ 8 มม.
+     * ทดสอบความสูงจริงต้องใช้เครื่องพิมพ์ จึงตรวจสิ่งที่ทำให้ล้น: QC หนึ่งครั้งต่อสำเนา และใช้ขอบ A5 แบบแคบ
+     */
+    public function test_booking_delivery_note_prints_final_qc_once_per_copy_with_compact_a5_margins(): void
+    {
+        $booking = $this->createDoc('BOOKING', 'BK-QC-ONCE', $this->branchA, $this->customerA);
+        $this->actingAs($this->authorizedUser);
+
+        $html = $this->get(route('documents.delivery-note', $booking))->assertOk()->getContent();
+
+        $this->assertSame(2, substr_count($html, '<b>Final QC</b>'));
+        $this->assertStringContainsString('@page { size: A5 landscape; margin: 5mm 6mm; }', $html);
+    }
 }
