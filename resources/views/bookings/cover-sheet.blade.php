@@ -150,8 +150,8 @@
                     <thead>
                         <tr>
                             <th style="width: 5%;" class="text-center">ลำดับ</th>
-                            <th style="width: 36%;">ชื่อลูกค้า</th>
-                            <th style="width: 16%;">เลขที่บิล</th>
+                            <th style="width: 34%;">ชื่อลูกค้า</th>
+                            <th style="width: 18%;">เลขที่บิล</th>
                             <th style="width: 12%;" class="text-end">จำนวนเงิน</th>
                             <th style="width: 8%;" class="text-center">ยอดค้าง</th>
                             <th style="width: 8%;" class="text-center">รวม</th>
@@ -499,6 +499,15 @@
         page-break-inside: avoid;
     }
 }
+/* ตัวหนังสือใหญ่ขึ้นให้อ่านง่ายตอนพิมพ์ (เดิมตาราง 12.5px ช่องเขียน 11.5px) */
+.cover-table { font-size: 14px !important; }
+.cover-table .doc-cell { font-size: 12px !important; }
+.cover-table th { font-size: 13px !important; white-space: nowrap !important; }
+.sheet-head .meta-row { font-size: 14px !important; }
+.box-title { font-size: 14px !important; }
+.write-row, .write-row-split, .split-col { font-size: 13px !important; }
+.sign-name, .sign-role { font-size: 13px !important; }
+.sheet-footer { font-size: 13px !important; }
 @page {
     size: A4 portrait;
     margin: 8mm 10mm;
