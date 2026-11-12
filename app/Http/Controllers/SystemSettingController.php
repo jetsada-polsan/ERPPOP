@@ -328,13 +328,8 @@ class SystemSettingController extends Controller
     /** Download the isolated JET POS Python UAT installer after it has passed its UAT gate. */
     public function downloadJetPythonPos()
     {
-        $installer = JetPosPythonInstaller::current();
-        abort_unless($installer, 404, 'ยังไม่มีไฟล์ติดตั้ง JET POS Python UAT ที่ผ่านการทดสอบ');
-
-        return response()->download($installer['path'], $installer['filename'], [
-            'Content-Type' => 'application/vnd.microsoft.portable-executable',
-            'Cache-Control' => 'no-cache, must-revalidate',
-        ]);
+        // JET POS Python UAT (apps/jet-pos-python) เลิกใช้ — ใช้ตัว Python ที่ build ทุกวัน (apps/pos-python)
+        return redirect()->route('python-pos.download');
     }
 
     public function publishPosRelease(Request $request): RedirectResponse

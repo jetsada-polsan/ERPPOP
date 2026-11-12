@@ -9,37 +9,20 @@ use Symfony\Component\HttpFoundation\Response;
 
 class PosReleaseController extends Controller
 {
+    // ใช้ POS ตัวเดียวคือ JET POS Python (PopCentral POS) ที่ build จากโปรเจกต์นี้
+    // POS Vue/Tauri รุ่นเดิมปิดการดาวน์โหลดและการอัปเดตแล้ว ลิงก์เดิมพาไปตัว Python แทน
     public function downloadLatest(): Response
     {
-        $manifest = app(PosReleaseManifest::class)->current();
-        $url = data_get($manifest, 'platforms.windows-x86_64.url');
-        $filename = is_string($url) ? basename((string) parse_url($url, PHP_URL_PATH)) : '';
-
-        if ($filename === '' || $filename === 'latest.json' || ! is_file(storage_path('app/pos-releases/'.$filename))) {
-            return redirect()->route('python-pos.download');
-        }
-
-        return $this->download($filename);
+        return redirect()->route('python-pos.download');
     }
 
     public function latest(): JsonResponse
     {
-        $manifest = app(PosReleaseManifest::class)->current();
-        abort_unless(is_array($manifest), 404, 'ยังไม่มี POS รุ่นอัปเดต');
-
-        return response()->json($manifest)
-            ->header('Cache-Control', 'no-cache, must-revalidate');
+        abort(410, 'POS Vue/Tauri เลิกใช้แล้ว ติดตั้ง JET POS Python จาก /download/python-pos');
     }
 
     public function download(string $filename): BinaryFileResponse
     {
-        abort_unless(preg_match('/\A[A-Za-z0-9._-]+\z/', $filename), 404);
-        $path = storage_path('app/pos-releases/'.$filename);
-        abort_unless(is_file($path) && $filename !== 'latest.json', 404);
-
-        return response()->download($path, $filename, [
-            'Content-Type' => 'application/octet-stream',
-            'Cache-Control' => 'public, max-age=86400, immutable',
-        ]);
+        abort(410, 'POS Vue/Tauri เลิกใช้แล้ว ติดตั้ง JET POS Python จาก /download/python-pos');
     }
 }
