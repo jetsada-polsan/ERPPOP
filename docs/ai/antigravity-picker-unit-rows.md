@@ -193,3 +193,28 @@ vendor/bin/pint --test app/Support/UnitQty.php app/Http/Controllers/SearchContro
 - ไม่มีการแก้ไขเทสต์เดิมใดๆ ทั้งสิ้น
 - ไม่มีการใช้ `confirm()` หรือ `alert()` ของเบราว์เซอร์
 - ไม่มีการ push main / merge / deploy / แตะ server ใดๆ
+
+---
+
+## 7. ผลการปรับปรุงตามผลตรวจ Claude (Task 39)
+
+ตามข้อเสนอแนะในการตรวจงาน 37 ([`ANTIGRAVITY_TASK_REVIEW_37.md`](file:///Applications/MAMP/htdocs/erp/ANTIGRAVITY_TASK_REVIEW_37.md)):
+
+1. **รวม `origin/main` และใส่ `use App\Models\ProductUnit;` คืนใน `UnitQty.php`:**
+   - รวม commit ล่าสุดจาก `origin/main` (รวมถึง PR #53 hotfix `formatSingle`)
+   - ใส่ `use App\Models\ProductUnit;` คืนใน [`app/Support/UnitQty.php`](file:///Applications/MAMP/htdocs/erp/ERPPOP/app/Support/UnitQty.php) เพื่อให้ Type Hint `?ProductUnit` ใน namespace `App\Support` ทำงานได้ถูกต้อง
+   - รันทดสอบ [`LoadingSheetFeedbackTest::test_summary_opens_when_a_booking_line_is_in_a_larger_unit`](file:///Applications/MAMP/htdocs/erp/ERPPOP/tests/Feature/LoadingSheetFeedbackTest.php#L587) ผ่านสำเร็จ $100\%$ โดยไม่มีการแก้ไขไฟล์เทสต์เดิม
+
+2. **ราคาหน่วยหลักและลำดับราคาหน่วยใหญ่:**
+   - **หน่วยหลัก (Base Unit):** กำหนด `price` = `(float) $product->default_price` เสมอเหมือนก่อนงาน 37 ทุกกรณี ไม่นำราคาในบาร์โค้ดมาทับ เพื่อป้องกันปัญหาสินค้าจาก BPlus ที่ราคาในบาร์โค้ดไม่ตรงกับ `default_price`
+   - **หน่วยใหญ่ (Larger Units):** ลำดับการหาราคาเป็น:
+     1. ราคาบาร์โค้ดของหน่วยนั้น (`product_barcodes.price`)
+     2. ราคาจากตารางราคาหลัก (`ProductPrice` ในตารางราคาเริ่มต้น)
+     3. หากไม่มีทั้งสองค่า API จะส่ง `null` และฟอร์มหน้าบ้าน (Client) จะคิดราคาเริ่มต้นเป็น `default_price × factor` เมื่อเลือกหน่วย
+   - **เพิ่มเทสต์ยืนยัน:** `test_base_unit_price_always_uses_default_price_ignoring_barcode_price` (สินค้า `default_price` 20.00 บาท บาร์โค้ดหน่วยหลักมีราคา 25.00 บาท ยืนยันว่าแถวหน่วยหลักได้ราคา 20.00 บาท ไม่ใช่ 25.00 บาท)
+
+3. **ผลการทดสอบเต็มระบบ:**
+   - `ProductPickerUnitRowsTest`: ผ่านครบทั้ง 8 เทสต์ (72 assertions)
+   - `LoadingSheetFeedbackTest`: ผ่านครบทั้ง 11 เทสต์ (94 assertions)
+   - **Full Test Suite (`vendor/bin/phpunit`):** ผ่านครบทั้งหมด 1,050 เทสต์ (1,048 passed, 2 skipped, 6 incomplete, 0 failures, 0 errors)
+

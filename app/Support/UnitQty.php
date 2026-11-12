@@ -174,7 +174,7 @@ class UnitQty
                 ? (float) $barcode->price
                 : ($productPrices?->get($product->id.':'.$barcode->unit_id)?->price !== null
                     ? (float) $productPrices->get($product->id.':'.$barcode->unit_id)->price
-                    : ($product->default_price !== null ? (float) ($product->default_price * $factor) : null));
+                    : null);
 
             $units[] = [
                 'unit_id' => $barcode->unit_id,

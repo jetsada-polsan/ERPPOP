@@ -450,4 +450,53 @@ class ProductPickerUnitRowsTest extends TestCase
             ->first();
         $this->assertSame(36.0, (float) $balance->reserved_qty);
     }
+
+    /**
+     * 8. ราคาแถวหน่วยหลักต้องใช้ default_price เสมอ ไม่ใช้ราคาบาร์โค้ด
+     * (ตามผลตรวจงาน 37: default_price 20.00, บาร์โค้ดหน่วยหลักมี price 25.00 -> ต้องได้ 20.00)
+     */
+    public function test_base_unit_price_always_uses_default_price_ignoring_barcode_price(): void
+    {
+        $product = Product::create([
+            'sku_code' => 'DIFFPRICE-01',
+            'name_th' => 'สินค้าทดสอบราคาบาร์โค้ดไม่ตรง DIFFPRICE-01',
+            'base_unit_id' => $this->bagUnit->id,
+            'default_price' => 20.00,
+            'is_active' => true,
+        ]);
+        // บาร์โค้ดหน่วยหลักมี price 25.00 (ต่างจาก default_price 20.00)
+        ProductBarcode::create([
+            'product_id' => $product->id,
+            'barcode' => 'BAR-DIFF-BASE',
+            'unit_id' => $this->bagUnit->id,
+            'unit_factor' => 1,
+            'price' => 25.00,
+            'is_active' => true,
+        ]);
+        // บาร์โค้ดหน่วยใหญ่มี price 300.00
+        ProductBarcode::create([
+            'product_id' => $product->id,
+            'barcode' => 'BAR-DIFF-CRATE',
+            'unit_id' => $this->crateUnit->id,
+            'unit_factor' => 18,
+            'price' => 300.00,
+            'is_active' => true,
+        ]);
+
+        $response = $this->withoutMiddleware(ErpAuthorize::class)
+            ->actingAs($this->user)
+            ->get(route('search.products', ['q' => 'DIFFPRICE-01']));
+
+        $response->assertOk();
+        $row = collect($response->json())->firstWhere('id', $product->id);
+        $this->assertNotNull($row);
+
+        $baseUnit = collect($row['units'])->firstWhere('is_base', true);
+        $this->assertNotNull($baseUnit);
+        $this->assertSame(20.0, (float) $baseUnit['price'], 'แถวหน่วยหลักต้องได้ default_price 20.00 ห้ามใช้ราคาบาร์โค้ด 25.00');
+
+        $crateUnit = collect($row['units'])->firstWhere('unit_id', $this->crateUnit->id);
+        $this->assertNotNull($crateUnit);
+        $this->assertSame(300.0, (float) $crateUnit['price'], 'หน่วยใหญ่ใช้ราคาบาร์โค้ดของหน่วยนั้น 300.00');
+    }
 }
