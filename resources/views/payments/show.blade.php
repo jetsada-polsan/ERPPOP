@@ -10,6 +10,7 @@
                 <div class="text-muted small">
                     {{ $payment->doc_date->thaiDate() }} &middot;
                     {{ $payment->branch->name_th }} &middot;
+                    @if($payment->salesman) ผู้รับเงิน: {{ $payment->salesman->name }} &middot; @endif
                     @if($payment->customer) ลูกค้า: {{ $payment->customer->name_th }} @endif
                     @if($payment->supplier) ซัพพลายเออร์: {{ $payment->supplier->name_th }} @endif
                 </div>
@@ -51,12 +52,23 @@
                 <h3 class="h6 fw-bold mb-3">รายการหนี้ที่ตัดชำระ</h3>
                 <div class="table-responsive">
                 <table class="table align-middle table-sm">
-                    <thead><tr><th>เอกสารอ้างอิง</th><th class="text-end">ยอดตัดชำระ</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th>เอกสารอ้างอิง</th>
+                            <th class="text-end">ยอดตัดหนี้</th>
+                            <th class="text-end">ลดสด</th>
+                            <th class="text-end">หัก ณ ที่จ่าย</th>
+                            <th class="text-end">รับจริง</th>
+                        </tr>
+                    </thead>
                     <tbody>
                         @foreach($payment->paymentDocument->allocations as $alloc)
                         <tr>
                             <td>{{ $alloc->referenceNumber() }}</td>
                             <td class="text-end">{{ number_format($alloc->allocated_amount, 2) }}</td>
+                            <td class="text-end text-muted">{{ number_format($alloc->discount_amount, 2) }}</td>
+                            <td class="text-end text-muted">{{ number_format($alloc->wht_amount, 2) }}</td>
+                            <td class="text-end fw-bold">{{ number_format($alloc->allocated_amount - $alloc->discount_amount - $alloc->wht_amount, 2) }}</td>
                         </tr>
                         @endforeach
                     </tbody>

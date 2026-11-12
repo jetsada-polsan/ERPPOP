@@ -308,6 +308,8 @@ Route::prefix('sale-returns')->name('sale-returns.')->group(function () {
 Route::prefix('ar-receipts')->name('ar-receipts.')->group(function () {
     Route::get('/', [\App\Http\Controllers\ArReceiptController::class, 'index'])->name('index');
     Route::get('/create', [\App\Http\Controllers\ArReceiptController::class, 'create'])->name('create');
+    Route::get('/daily-summary', [\App\Http\Controllers\ArReceiptController::class, 'dailySummary'])->name('daily-summary');
+    Route::get('/customers/{customer}/open-items', [\App\Http\Controllers\ArReceiptController::class, 'openItems'])->name('open-items');
     Route::post('/', [\App\Http\Controllers\ArReceiptController::class, 'store'])->name('store');
 });
 
@@ -665,6 +667,8 @@ Route::prefix('document-books')->name('document-books.')->group(function () {
 // ศูนย์เอกสารย้อนหลัง: ต้นไม้ ประเภท->ปี->เดือน + กรองรายวัน ทุกประเภทเอกสาร
 Route::get('/documents', [DocumentBrowserController::class, 'index'])->name('documents.browser');
 
+// ใบส่งของรวม (A5): พิมพ์ใบส่งของหลายใบในครั้งเดียว (ids[] หรือตัวกรอง)
+Route::get('/documents/delivery-notes/batch', [DeliveryNoteController::class, 'batch'])->name('documents.delivery-notes.batch');
 // ใบส่งของ/ใบส่งของชั่วคราว (A5): พิมพ์ได้จากใบจองและใบขายทุกชนิด
 Route::get('/documents/{document}/delivery-note', [DeliveryNoteController::class, 'show'])->name('documents.delivery-note');
 Route::post('/documents/{document}/submit', [DocumentLifecycleController::class, 'submit'])->name('documents.submit');

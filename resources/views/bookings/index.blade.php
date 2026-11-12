@@ -123,11 +123,46 @@
             <a href="{{ route('bookings.index') }}" class="btn btn-sm btn-light border rounded-pill px-3">ล้าง</a>
         </form>
 
-        <div class="content-card p-4">
+        <div class="content-card p-4" x-data="{
+            selectedIds: [],
+            toggleAll(e) {
+                if (e.target.checked) {
+                    this.selectedIds = Array.from(document.querySelectorAll('.booking-row-check')).map(el => el.value);
+                } else {
+                    this.selectedIds = [];
+                }
+            },
+            updateSelectAll() {
+                const all = document.querySelectorAll('.booking-row-check');
+                const master = document.getElementById('bookingSelectAll');
+                if (master) {
+                    master.checked = all.length > 0 && this.selectedIds.length === all.length;
+                }
+            },
+            printSelected() {
+                if (this.selectedIds.length === 0) return;
+                const url = '{{ route('documents.delivery-notes.batch') }}?' + this.selectedIds.map(id => 'ids[]=' + encodeURIComponent(id)).join('&');
+                window.open(url, '_blank');
+            }
+        }">
+            <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button"
+                            class="btn btn-sm btn-outline-primary rounded-pill px-3"
+                            :disabled="selectedIds.length === 0"
+                            @click="printSelected()">
+                        <i class="bi bi-printer me-1"></i> พิมพ์ใบส่งของที่เลือก <span x-show="selectedIds.length > 0" x-text="'(' + selectedIds.length + ')'"></span>
+                    </button>
+                    <span class="text-muted small" x-show="selectedIds.length > 0">เลือกแล้ว <b x-text="selectedIds.length"></b> รายการ</span>
+                </div>
+            </div>
             <div class="table-responsive">
                 <table class="table align-middle">
                     <thead>
                         <tr>
+                            <th style="width: 40px;">
+                                <input type="checkbox" id="bookingSelectAll" class="form-check-input" @change="toggleAll($event)" title="เลือกทั้งหมดในหน้านี้">
+                            </th>
                             <th>เลขที่</th>
                             <th>วันที่</th>
                             <th>สาขา</th>
@@ -142,6 +177,9 @@
                     <tbody>
                         @forelse($bookings as $booking)
                             <tr>
+                                <td>
+                                    <input type="checkbox" class="form-check-input booking-row-check" value="{{ $booking->document->id }}" x-model="selectedIds" @change="updateSelectAll()">
+                                </td>
                                 <td class="fw-semibold">{{ $booking->document->doc_number }}</td>
                                 <td class="text-nowrap">{{ $booking->document->doc_date->thaiDate() }}</td>
                                 <td class="text-muted small">{{ $booking->document->branch->name_th }}</td>
@@ -162,7 +200,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="9" class="doc-empty">ยังไม่มีใบจอง</td></tr>
+                            <tr><td colspan="10" class="doc-empty">ยังไม่มีใบจอง</td></tr>
                         @endforelse
                     </tbody>
                 </table>

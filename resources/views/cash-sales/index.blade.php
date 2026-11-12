@@ -27,11 +27,46 @@
             </button>
         </div>
 
-        <div class="content-card p-4">
+        <div class="content-card p-4" x-data="{
+            selectedIds: [],
+            toggleAll(e) {
+                if (e.target.checked) {
+                    this.selectedIds = Array.from(document.querySelectorAll('.cash-sale-row-check')).map(el => el.value);
+                } else {
+                    this.selectedIds = [];
+                }
+            },
+            updateSelectAll() {
+                const all = document.querySelectorAll('.cash-sale-row-check');
+                const master = document.getElementById('cashSaleSelectAll');
+                if (master) {
+                    master.checked = all.length > 0 && this.selectedIds.length === all.length;
+                }
+            },
+            printSelected() {
+                if (this.selectedIds.length === 0) return;
+                const url = '{{ route('documents.delivery-notes.batch') }}?' + this.selectedIds.map(id => 'ids[]=' + encodeURIComponent(id)).join('&');
+                window.open(url, '_blank');
+            }
+        }">
+            <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button"
+                            class="btn btn-sm btn-outline-primary rounded-pill px-3"
+                            :disabled="selectedIds.length === 0"
+                            @click="printSelected()">
+                        <i class="bi bi-printer me-1"></i> พิมพ์ใบส่งของที่เลือก <span x-show="selectedIds.length > 0" x-text="'(' + selectedIds.length + ')'"></span>
+                    </button>
+                    <span class="text-muted small" x-show="selectedIds.length > 0">เลือกแล้ว <b x-text="selectedIds.length"></b> รายการ</span>
+                </div>
+            </div>
             <div class="table-responsive">
                 <table class="table align-middle">
                     <thead>
                         <tr>
+                            <th style="width: 40px;">
+                                <input type="checkbox" id="cashSaleSelectAll" class="form-check-input" @change="toggleAll($event)" title="เลือกทั้งหมดในหน้านี้">
+                            </th>
                             <th>เลขที่</th>
                             <th>วันที่</th>
                             <th>เวลา</th>
@@ -45,6 +80,9 @@
                     <tbody>
                         @forelse($sales as $sale)
                             <tr>
+                                <td>
+                                    <input type="checkbox" class="form-check-input cash-sale-row-check" value="{{ $sale->id }}" x-model="selectedIds" @change="updateSelectAll()">
+                                </td>
                                 <td class="fw-semibold">{{ $sale->doc_number }}</td>
                                 <td>{{ $sale->doc_date->thaiDate() }}</td>
                                 <td>{{ $sale->created_at?->format('H:i:s') ?? '-' }}</td>
@@ -57,7 +95,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="8" class="doc-empty">ยังไม่มีใบขายสด</td></tr>
+                            <tr><td colspan="9" class="doc-empty">ยังไม่มีใบขายสด</td></tr>
                         @endforelse
                     </tbody>
                 </table>

@@ -57,6 +57,8 @@ class ChartOfAccount extends Model
 
     public const ROLE_WHT_PAYABLE = 'wht_payable';
 
+    public const ROLE_WHT_RECEIVABLE = 'wht_receivable';
+
     public const ROLE_RETAINED_EARNINGS = 'retained_earnings';
 
     /** บัญชีพักสำหรับยอดยกมาตอนตั้งต้นระบบ */
@@ -86,6 +88,7 @@ class ChartOfAccount extends Model
         self::ROLE_COGS => 'บัญชีต้นทุนขาย',
         self::ROLE_EXPENSE => 'บัญชีค่าใช้จ่าย',
         self::ROLE_WHT_PAYABLE => 'บัญชีภาษีหัก ณ ที่จ่ายค้างจ่าย',
+        self::ROLE_WHT_RECEIVABLE => 'ภาษีเงินได้ถูกหัก ณ ที่จ่าย (สินทรัพย์)',
         self::ROLE_RETAINED_EARNINGS => 'บัญชีกำไรสะสม',
         self::ROLE_OPENING_BALANCE => 'บัญชีพักยอดยกมา',
         self::ROLE_DEPRECIATION_EXPENSE => 'บัญชีค่าเสื่อมราคา',
