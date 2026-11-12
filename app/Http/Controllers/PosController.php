@@ -517,6 +517,11 @@ class PosController extends Controller
             return $p;
         });
 
+        // กติกาแคมเปญให้เครื่องคิดเองตอนขาย (ออฟไลน์ได้) แบบเดียวกับ PosPricingGuard::campaignPrice:
+        // ราคาบรรทัด = ต่ำสุดของ (ราคาฐานของบรรทัด, ลดบาท, ลด %, ราคานาทีทองที่กำลังเปิด)
+        // pos_price ข้างบนเป็นแค่ภาพ ณ เวลาที่ sync; เครื่อง POS Python ใช้ campaigns ตัวนี้
+        $products = $this->attachCampaignRules($products, $discountsByProduct, $branchId);
+
         $vatRate = (float) (DB::table('vat_rates')
             ->where('effective_from', '<=', now()->toDateString())
             ->where(fn ($query) => $query->whereNull('effective_to')->orWhere('effective_to', '>=', now()->toDateString()))
@@ -1768,5 +1773,58 @@ class PosController extends Controller
         return $cashierId
             ? (Salesman::whereKey($cashierId)->value('user_id') ?: auth()->id())
             : auth()->id();
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, mixed>  $products
+     * @param  \Illuminate\Support\Collection<int, \Illuminate\Support\Collection<int, Promotion>>  $discountsByProduct
+     */
+    private function attachCampaignRules($products, $discountsByProduct, ?int $branchId)
+    {
+        $tz = config('app.timezone');
+        $today = now()->setTimezone($tz)->startOfDay();
+        $horizon = $today->copy()->addDays(7);
+        $flashItems = FlashSaleItem::with('flashSale')
+            ->whereIn('product_id', $products->pluck('id'))
+            ->whereHas('flashSale', fn ($query) => $query->where('is_active', true)
+                ->where('starts_date', '<=', $horizon->toDateString())
+                ->where(fn ($w) => $w->whereNull('ends_date')->orWhere('ends_date', '>=', $today->toDateString()))
+                ->where(fn ($w) => $w->whereNull('branch_id')->orWhere('branch_id', $branchId)))
+            ->get()
+            ->groupBy('product_id');
+
+        return $products->map(function ($p) use ($discountsByProduct, $flashItems, $today, $tz) {
+            $promotions = $discountsByProduct->get($p->id, collect())->map(fn (Promotion $promotion) => [
+                'discount_amount' => (string) ($promotion->discount_amount ?? '0'),
+                'discount_percent' => (string) ($promotion->discount_percent ?? '0'),
+                'starts_on' => $promotion->starts_at ? \Illuminate\Support\Carbon::parse($promotion->starts_at)->toDateString() : null,
+                'ends_on' => $promotion->ends_at ? \Illuminate\Support\Carbon::parse($promotion->ends_at)->toDateString() : null,
+            ])->values();
+
+            $flash = collect();
+            foreach ($flashItems->get($p->id, collect()) as $item) {
+                $sale = $item->flashSale;
+                $allowed = $sale->days_of_week ? explode(',', $sale->days_of_week) : null;
+                for ($d = 0; $d < 8; $d++) {
+                    $day = $today->copy()->addDays($d);
+                    if ($day->toDateString() < $sale->starts_date->toDateString()
+                        || ($sale->ends_date && $day->toDateString() > $sale->ends_date->toDateString())
+                        || ($allowed !== null && ! in_array((string) $day->dayOfWeek, $allowed, true))) {
+                        continue;
+                    }
+                    $from = $sale->start_time ? $day->copy()->setTimeFromTimeString($sale->start_time->format('H:i:s')) : $day->copy();
+                    $to = $sale->end_time ? $day->copy()->setTimeFromTimeString($sale->end_time->format('H:i:s')) : $day->copy()->setTime(23, 59, 59);
+                    $flash->push([
+                        'price' => (string) $item->flash_price,
+                        'from' => $from->toIso8601String(),
+                        'to' => $to->toIso8601String(),
+                    ]);
+                }
+            }
+
+            $p->campaigns = ['timezone' => $tz, 'promotions' => $promotions, 'flash' => $flash->values()];
+
+            return $p;
+        });
     }
 }
