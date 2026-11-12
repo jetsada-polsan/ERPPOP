@@ -213,5 +213,5 @@ cd apps/pos-python && QT_QPA_PLATFORM=offscreen python -m pytest -q tests/test_p
 
 - ปัญหา: `PromoParityFixtureTest` เรียก `base_path('tests/fixtures/promo-parity.json')` (ตัวเล็ก) แต่ไฟล์ใน git คือ `tests/Fixtures/promo-parity.json` → บน Mac ผ่านเพราะ filesystem ไม่สนตัวพิมพ์ แต่ phpunit ใน `deploy.yml` บน Linux จะหาไฟล์ไม่เจอ
 - แก้: ทุกที่ใช้ `tests/Fixtures/promo-parity.json` ตรงตัวอักษร · ฝั่ง pytest (branch `antigravity/promo-set-limit-pos`) เอา fallback ตัวเล็กออก เหลือ path เดียว
-- ตรวจ: `git ls-files | grep -Fx tests/Fixtures/promo-parity.json` ตรง · `git grep "tests/fixtures"` ไม่พบในไฟล์ที่ track ทั้งสอง branch
+- ตรวจ: `git ls-files | grep -Fx tests/Fixtures/promo-parity.json` ตรง · `git grep "tests/fixtures"` ไม่พบในโค้ด/เทสต์ทั้งสอง branch (เจอเฉพาะในรายงานนี้ที่อธิบายปัญหา)
 - sha256 fixture ไม่เปลี่ยน: `ff5dc1ff967783f67cf3f17e33895fc4613a9dc07de9d4fbd5666c8f9eea4d1b`
