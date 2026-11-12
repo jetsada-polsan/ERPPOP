@@ -102,9 +102,69 @@
                         </div>
                     </div>
 
+                    {{-- แถบเครื่องมือ: ยอดที่ลูกค้าจ่ายมา + ตัดบิลเก่าสุดก่อนอัตโนมัติ (แบบ BPlus) --}}
+                    <div class="p-3 mb-3 rounded-3 border bg-light bg-opacity-75">
+                        <div class="row g-2 align-items-center">
+                            <div class="col-md-3">
+                                <label class="form-label small fw-bold text-dark mb-0">
+                                    <i class="bi bi-cash me-1 text-success"></i> ยอดที่ลูกค้าจ่ายมา
+                                </label>
+                                <div class="text-muted" style="font-size: 11px;">ใส่ยอดจ่ายครั้งเดียว ระบบตัดบิลเก่าสุดก่อน</div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-white fw-bold">฿</span>
+                                    <input type="number" step="0.01" min="0" class="form-control text-end fw-bold fs-6"
+                                           placeholder="0.00" x-model.number="customerPaidInput"
+                                           @input="onCustomerPaidInput()">
+                                    <button type="button" class="btn btn-primary fw-semibold px-3" @click="autoDistribute()" :disabled="openItems.length === 0">
+                                        <i class="bi bi-lightning-charge-fill me-1"></i> ตัดอัตโนมัติ
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-5">
+                                <div class="d-flex flex-wrap align-items-center justify-content-md-end gap-2">
+                                    <div class="form-check form-switch mb-0">
+                                        <input class="form-check-input" type="checkbox" id="autoDistributeOnPayChange" x-model="autoDistributeOnPayChange">
+                                        <label class="form-check-label small fw-semibold" for="autoDistributeOnPayChange" title="เมื่อเปลี่ยนยอดเงินสด/โอน/เช็ค จะตัดหนี้บิลเก่าสุดให้อัตโนมัติ">
+                                            ตัดตามยอดที่รับอัตโนมัติ
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- แถบสรุป 3 ส่วนแบบ BPlus --}}
+                        <div class="row g-2 mt-2 pt-2 border-top align-items-center small">
+                            <div class="col-sm-4">
+                                <span class="text-muted">ยอดหนี้ที่เลือก:</span>
+                                <span class="fw-bold ms-1" x-text="'฿' + fmt(totalSelectedDebt())"></span>
+                            </div>
+                            <div class="col-sm-4 text-sm-center">
+                                <span class="text-muted">ยอดชำระรวม:</span>
+                                <span class="fw-bold text-primary ms-1" x-text="'฿' + fmt(totalAllocated())"></span>
+                            </div>
+                            <div class="col-sm-4 text-sm-end">
+                                <span class="text-muted">ชำระครั้งถัดไป (คงค้าง):</span>
+                                <span class="fw-bold text-danger fs-6 ms-1" x-text="'฿' + fmt(nextPaymentRemaining())"></span>
+                            </div>
+                        </div>
+
+                        {{-- เตือนถ้ายอดที่จ่าย > ยอดหนี้ที่เลือก --}}
+                        <template x-if="isPaidExceedingDebt()">
+                            <div class="alert alert-warning py-2 px-3 small mt-2 mb-0 d-flex align-items-center gap-2">
+                                <i class="bi bi-exclamation-triangle-fill text-warning fs-5"></i>
+                                <div>
+                                    <b>ยอดที่จ่ายเกินยอดหนี้ที่เลือก:</b>
+                                    ลูกค้าจ่ายมา ฿<span x-text="fmt(customerPaidInput)"></span> แต่หนี้ที่เลือกมีเพียง ฿<span x-text="fmt(totalSelectedDebt())"></span> (เกินมา ฿<span x-text="fmt(customerPaidInput - totalSelectedDebt())"></span>)
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
                     {{-- ตารางบิล BPlus --}}
                     <div class="table-responsive">
-                        <table class="table align-middle table-hover mb-0" style="min-width: 780px;">
+                        <table class="table align-middle table-hover mb-0" style="min-width: 860px;">
                             <thead>
                                 <tr class="table-light">
                                     <th style="width: 40px;" class="text-center">ชำระ</th>
@@ -112,23 +172,24 @@
                                     <th>วันที่</th>
                                     <th>ครบกำหนด</th>
                                     <th class="text-end">ยอดค้าง</th>
-                                    <th class="text-end" style="width: 130px;">ยอดตัดหนี้</th>
-                                    <th class="text-end" style="width: 100px;">ลดสด</th>
-                                    <th style="width: 150px;">หัก ณ ที่จ่าย</th>
-                                    <th class="text-end" style="width: 110px;">รับจริง</th>
+                                    <th class="text-end" style="width: 125px;">ยอดตัดหนี้</th>
+                                    <th class="text-end" style="width: 90px;">ลดสด</th>
+                                    <th style="width: 135px;">หัก ณ ที่จ่าย</th>
+                                    <th class="text-end" style="width: 100px;">รับจริง</th>
+                                    <th class="text-end text-danger" style="width: 110px;">คงค้างยกไป</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <template x-if="loadingItems">
                                     <tr>
-                                        <td colspan="9" class="text-center py-4 text-muted">
+                                        <td colspan="10" class="text-center py-4 text-muted">
                                             <div class="spinner-border spinner-border-sm text-primary me-1"></div> กำลังดึงรายการบิลค้าง...
                                         </td>
                                     </tr>
                                 </template>
                                 <template x-if="!loadingItems && openItems.length === 0">
                                     <tr>
-                                        <td colspan="9" class="text-center py-4 text-muted">
+                                        <td colspan="10" class="text-center py-4 text-muted">
                                             <i class="bi bi-inbox fs-4 d-block mb-1 text-secondary"></i>
                                             <span x-text="customerId ? 'ลูกค้ารายนี้ไม่มียอดหนี้ค้างชำระ' : 'กรุณาเลือกลูกหนี้ด้านบนเพื่อแสดงบิลค้าง'"></span>
                                         </td>
@@ -159,7 +220,7 @@
                                                    @input="onAmountChange(item)"
                                                    :disabled="!item.checked"
                                                    class="form-control form-control-sm text-end fw-bold"
-                                                   :class="{'is-invalid': item.checked && (item.amount > item.balance + 0.001 || item.amount <= 0)}"
+                                                   :class="{'is-invalid': item.checked && (item.amount > item.balance + 0.001 || item.amount < 0)}"
                                                    placeholder="0.00">
                                         </td>
                                         {{-- ลดสด --}}
@@ -175,10 +236,10 @@
                                         <td>
                                             <div class="d-flex gap-1 align-items-center">
                                                 <select class="form-select form-select-sm p-1 text-center" style="width: 58px;"
-                                                        :name="'allocations[' + idx + '][wht_rate]'"
-                                                        x-model.number="item.wht_rate"
-                                                        @change="calcWht(item)"
-                                                        :disabled="!item.checked">
+                                                         :name="'allocations[' + idx + '][wht_rate]'"
+                                                         x-model.number="item.wht_rate"
+                                                         @change="calcWht(item)"
+                                                         :disabled="!item.checked">
                                                     <option value="0">0%</option>
                                                     <option value="1">1%</option>
                                                     <option value="2">2%</option>
@@ -195,6 +256,8 @@
                                         </td>
                                         {{-- รับจริงสุทธิของบิลนี้ --}}
                                         <td class="text-end fw-bold text-success" x-text="fmt(itemNet(item))"></td>
+                                        {{-- คงค้างยกไป (ชำระครั้งถัดไปของบิลนี้) --}}
+                                        <td class="text-end fw-semibold text-danger" x-text="fmt(itemRemaining(item))"></td>
                                     </tr>
                                 </template>
                             </tbody>
@@ -219,7 +282,7 @@
                                     <span class="input-group-text">฿</span>
                                     <input type="number" step="0.01" min="0" name="cash_amount"
                                            class="form-control text-end fw-bold fs-6"
-                                           x-model.number="cashAmount" placeholder="0.00">
+                                           x-model.number="cashAmount" @input="onPaymentChange()" placeholder="0.00">
                                 </div>
                             </div>
                             <div class="col-md-3 text-end">
@@ -241,7 +304,7 @@
                                     <span class="input-group-text">฿</span>
                                     <input type="number" step="0.01" min="0" name="transfer_amount"
                                            class="form-control text-end fw-bold fs-6"
-                                           x-model.number="transferAmount" placeholder="0.00">
+                                           x-model.number="transferAmount" @input="onPaymentChange()" placeholder="0.00">
                                 </div>
                             </div>
                             <div class="col-md-3 text-end">
@@ -322,7 +385,7 @@
                                             <td>
                                                 <input type="number" step="0.01" min="0" :name="'cheques[' + cIdx + '][amount]'"
                                                        class="form-control form-control-sm text-end fw-bold"
-                                                       x-model.number="ch.amount" placeholder="0.00">
+                                                       x-model.number="ch.amount" @input="onPaymentChange()" placeholder="0.00">
                                             </td>
                                             <td class="text-end">
                                                 <button type="button" class="btn btn-sm btn-link text-danger p-0"
@@ -352,8 +415,18 @@
                     </div>
 
                     <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">ยอดหนี้ตัดชำระรวม</span>
-                        <span class="fw-bold fs-6 text-dark" x-text="'฿' + fmt(totalAllocated())"></span>
+                        <span class="text-muted">ยอดหนี้ที่เลือก (ทั้งหมด)</span>
+                        <span class="fw-bold fs-6 text-dark" x-text="'฿' + fmt(totalSelectedDebt())"></span>
+                    </div>
+
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">ยอดหนี้ตัดชำระรอบนี้</span>
+                        <span class="fw-bold fs-6 text-primary" x-text="'฿' + fmt(totalAllocated())"></span>
+                    </div>
+
+                    <div class="d-flex justify-content-between mb-2 text-danger">
+                        <span class="fw-semibold">ชำระครั้งถัดไป (คงค้าง)</span>
+                        <span class="fw-bold fs-6 text-danger" x-text="'฿' + fmt(nextPaymentRemaining())"></span>
                     </div>
 
                     <div class="d-flex justify-content-between mb-1 text-danger small" x-show="totalDiscount() > 0">
@@ -366,9 +439,37 @@
                         <span class="fw-bold" x-text="'-฿' + fmt(totalWht())"></span>
                     </div>
 
+                    {{-- ช่องเศษขาด/เกิน (±1.00 บาท) --}}
+                    <div class="p-2 mb-2 rounded border bg-light">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label small fw-bold mb-0 text-secondary">
+                                <i class="bi bi-plus-slash-minus me-1"></i> เศษขาด / เกิน (±1.00 ฿)
+                            </label>
+                            <template x-if="canAutoSetRounding()">
+                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 rounded-pill" style="font-size: 11px;" @click="applyRoundingDiff()">
+                                    ปัดเศษพอดี
+                                </button>
+                            </template>
+                        </div>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-white">฿</span>
+                            <input type="number" step="0.01" min="-1.00" max="1.00" name="rounding_amount"
+                                   class="form-control form-control-sm text-end fw-bold"
+                                   :class="{'text-danger': roundingAmount < 0, 'text-success': roundingAmount > 0}"
+                                   x-model.number="roundingAmount"
+                                   @input="onRoundingChange()"
+                                   placeholder="0.00">
+                        </div>
+                        <div class="form-text" style="font-size: 11px;">
+                            <span x-show="roundingAmount < 0" class="text-danger">เศษขาด ฿<span x-text="fmt(Math.abs(roundingAmount))"></span> (Dr เศษสตางค์)</span>
+                            <span x-show="roundingAmount > 0" class="text-success">เศษเกิน ฿<span x-text="fmt(roundingAmount)"></span> (Cr เศษสตางค์)</span>
+                            <span x-show="roundingAmount === 0" class="text-muted">ลงบัญชีเศษสตางค์ ไม่เกิน ±1.00 บาท</span>
+                        </div>
+                    </div>
+
                     <div class="d-flex justify-content-between mb-2 border-top pt-2">
                         <span class="fw-bold text-success">ยอดที่ต้องรับจริงสุทธิ</span>
-                        <span class="fw-bold fs-5 text-success" x-text="'฿' + fmt(totalNetToReceive())"></span>
+                        <span class="fw-bold fs-5 text-success" x-text="'฿' + fmt(targetNetToReceiveWithRounding())"></span>
                     </div>
 
                     <hr class="my-2">
@@ -419,6 +520,12 @@
                     </div>
 
                     {{-- แจ้งเตือนข้อผิดพลาด --}}
+                    <div class="text-danger small mb-3" x-show="isPaidExceedingDebt()">
+                        <i class="bi bi-x-circle me-1"></i> ยอดที่ลูกค้าจ่ายเกินยอดหนี้ที่เลือก
+                    </div>
+                    <div class="text-danger small mb-3" x-show="Math.abs(Number(roundingAmount) || 0) > 1.009">
+                        <i class="bi bi-x-circle me-1"></i> เศษขาด/เกิน ต้องไม่เกิน ±1.00 บาท
+                    </div>
                     <div class="text-danger small mb-3" x-show="hasOverpaidItem()">
                         <i class="bi bi-x-circle me-1"></i> มียอดชำระบางบิลเกินยอดหนี้คงค้าง
                     </div>
@@ -436,7 +543,7 @@
                         <i class="bi bi-check2-circle me-1"></i> บันทึกใบเสร็จรับเงิน
                     </button>
                     <div class="form-text text-center small mt-2 text-muted">
-                        ลงบัญชี Dr เงินสด/ธนาคาร/ภาษีหัก ณ ที่จ่าย/ส่วนลดจ่าย และ Cr ลูกหนี้การค้าอัตโนมัติ
+                        ลงบัญชี Dr เงินสด/ธนาคาร/ภาษีหัก ณ ที่จ่าย/ส่วนลดจ่าย/เศษสตางค์ และ Cr ลูกหนี้การค้าอัตโนมัติ
                     </div>
                 </div>
             </div>
@@ -465,6 +572,7 @@ function bplusReceipt() {
                 id: {{ $item->id }},
                 doc_number: '{{ $item->document?->doc_number ?? "-" }}',
                 doc_date: '{{ $item->document?->doc_date?->thaiDate() ?? "-" }}',
+                doc_date_raw: '{{ $item->document?->doc_date?->toDateString() ?? "" }}',
                 due_date: '{{ $item->due_date ? \Illuminate\Support\Carbon::parse($item->due_date)->thaiDate() : "-" }}',
                 balance: {{ (float) $item->balance_amount }},
                 amount: {{ (float) $item->balance_amount }},
@@ -480,6 +588,10 @@ function bplusReceipt() {
             @endforeach
         ],
 
+        customerPaidInput: '{{ request("paid_amount", "") }}',
+        autoDistributeOnPayChange: true,
+        roundingAmount: 0,
+
         cashAmount: 0,
         transferAmount: 0,
         transferBankAccountId: '',
@@ -491,9 +603,13 @@ function bplusReceipt() {
         ],
 
         init() {
-            if (this.openItems.length > 0) {
-                this.openItems[0].checked = true;
-            }
+            @if(request('paid_amount'))
+                this.autoDistribute('{{ request("paid_amount") }}');
+            @else
+                if (this.openItems.length > 0) {
+                    this.openItems[0].checked = true;
+                }
+            @endif
         },
 
         async onCustomerChange() {
@@ -510,6 +626,7 @@ function bplusReceipt() {
                     id: item.id,
                     doc_number: item.doc_number,
                     doc_date: item.doc_date,
+                    doc_date_raw: item.doc_date_raw || item.doc_date || '',
                     due_date: item.due_date,
                     balance: Number(item.balance) || 0,
                     amount: Number(item.balance) || 0,
@@ -600,6 +717,127 @@ function bplusReceipt() {
             }
         },
 
+        totalSelectedDebt() {
+            return Math.round(this.openItems
+                .filter(i => i.checked)
+                .reduce((s, i) => s + (Number(i.balance) || 0), 0) * 100) / 100;
+        },
+
+        nextPaymentRemaining() {
+            const debtSatang = Math.round(this.totalSelectedDebt() * 100);
+            const allocatedSatang = Math.round(this.totalAllocated() * 100);
+            const remSatang = Math.max(0, debtSatang - allocatedSatang);
+            return remSatang / 100;
+        },
+
+        itemRemaining(item) {
+            if (!item.checked) return Number(item.balance) || 0;
+            const balSatang = Math.round((Number(item.balance) || 0) * 100);
+            const amtSatang = Math.round((Number(item.amount) || 0) * 100);
+            return Math.max(0, (balSatang - amtSatang) / 100);
+        },
+
+        isPaidExceedingDebt() {
+            const debtSatang = Math.round(this.totalSelectedDebt() * 100);
+            if (debtSatang <= 0) return false;
+            const paidInputSatang = Math.round((Number(this.customerPaidInput) || 0) * 100);
+            const totalPaidSatang = Math.round(this.totalPaid() * 100);
+            return (paidInputSatang > debtSatang) || (totalPaidSatang > debtSatang);
+        },
+
+        targetNetToReceiveWithRounding() {
+            const netSatang = Math.round(this.totalNetToReceive() * 100);
+            const roundSatang = Math.round((Number(this.roundingAmount) || 0) * 100);
+            return Math.max(0, (netSatang + roundSatang) / 100);
+        },
+
+        canAutoSetRounding() {
+            const net = this.totalNetToReceive();
+            if (net <= 0) return false;
+            const rawDiff = Math.round((this.totalPaid() - net) * 100) / 100;
+            return Math.abs(rawDiff) <= 1.00 && Math.abs(rawDiff - (Number(this.roundingAmount) || 0)) > 0.009;
+        },
+
+        applyRoundingDiff() {
+            const net = this.totalNetToReceive();
+            const rawDiff = Math.round((this.totalPaid() - net) * 100) / 100;
+            if (Math.abs(rawDiff) <= 1.00) {
+                this.roundingAmount = rawDiff;
+            }
+        },
+
+        autoDistribute(explicitPaid = null) {
+            let paid = explicitPaid !== null ? Number(explicitPaid) : Number(this.customerPaidInput);
+            if (isNaN(paid) || paid < 0) paid = 0;
+
+            if (this.openItems.length === 0) return;
+
+            // If none checked, check all
+            const hasChecked = this.openItems.some(i => i.checked);
+            if (!hasChecked) {
+                this.openItems.forEach(i => i.checked = true);
+            }
+
+            // Create sorted list of checked items (oldest doc_date_raw first, then doc_number)
+            const sortedItems = [...this.openItems.filter(i => i.checked)].sort((a, b) => {
+                const dateA = a.doc_date_raw || a.doc_date || '';
+                const dateB = b.doc_date_raw || b.doc_date || '';
+                if (dateA !== dateB) return dateA.localeCompare(dateB);
+                return (a.doc_number || '').localeCompare(b.doc_number || '');
+            });
+
+            let remainingSatang = Math.round(paid * 100);
+
+            for (const item of sortedItems) {
+                const balanceSatang = Math.round((Number(item.balance) || 0) * 100);
+                if (remainingSatang >= balanceSatang) {
+                    item.amount = item.balance;
+                    remainingSatang -= balanceSatang;
+                } else if (remainingSatang > 0) {
+                    item.amount = remainingSatang / 100;
+                    remainingSatang = 0;
+                } else {
+                    item.amount = 0;
+                }
+                if (item.wht_rate > 0) {
+                    this.calcWht(item);
+                }
+            }
+
+            // Reset unchecked items
+            this.openItems.filter(i => !i.checked).forEach(i => {
+                i.amount = 0;
+            });
+
+            // If customerPaidInput is set and totalPaid is 0, auto-fill cash
+            if (explicitPaid === null && this.totalPaid() === 0 && paid > 0) {
+                this.cashAmount = paid;
+            }
+        },
+
+        onCustomerPaidInput() {
+            const paid = Number(this.customerPaidInput);
+            if (!isNaN(paid) && paid >= 0 && this.autoDistributeOnPayChange) {
+                this.cashAmount = paid;
+                this.transferAmount = 0;
+                this.cheques.forEach(c => c.amount = 0);
+                this.autoDistribute(paid);
+            }
+        },
+
+        onPaymentChange() {
+            if (!this.autoDistributeOnPayChange) return;
+            const total = this.totalPaid();
+            if (total > 0) {
+                this.customerPaidInput = total;
+                this.autoDistribute(total);
+            }
+        },
+
+        onRoundingChange() {
+            // Alpine reactivity updates automatically
+        },
+
         totalAllocated() {
             return this.openItems
                 .filter(i => i.checked)
@@ -634,16 +872,18 @@ function bplusReceipt() {
         },
 
         difference() {
-            return Math.round((this.totalPaid() - this.totalNetToReceive()) * 100) / 100;
+            const totalPaidSatang = Math.round(this.totalPaid() * 100);
+            const targetSatang = Math.round(this.targetNetToReceiveWithRounding() * 100);
+            return (totalPaidSatang - targetSatang) / 100;
         },
 
         fillRemainingToCash() {
-            const rem = Math.max(0, this.totalNetToReceive() - ((Number(this.transferAmount) || 0) + this.cheques.reduce((s, c) => s + (Number(c.amount) || 0), 0)));
+            const rem = Math.max(0, this.targetNetToReceiveWithRounding() - ((Number(this.transferAmount) || 0) + this.cheques.reduce((s, c) => s + (Number(c.amount) || 0), 0)));
             this.cashAmount = Math.round(rem * 100) / 100;
         },
 
         fillRemainingToTransfer() {
-            const rem = Math.max(0, this.totalNetToReceive() - ((Number(this.cashAmount) || 0) + this.cheques.reduce((s, c) => s + (Number(c.amount) || 0), 0)));
+            const rem = Math.max(0, this.targetNetToReceiveWithRounding() - ((Number(this.cashAmount) || 0) + this.cheques.reduce((s, c) => s + (Number(c.amount) || 0), 0)));
             this.transferAmount = Math.round(rem * 100) / 100;
         },
 
@@ -660,9 +900,11 @@ function bplusReceipt() {
         },
 
         canSave() {
-            const net = this.totalNetToReceive();
+            const net = this.targetNetToReceiveWithRounding();
             if (net <= 0) return false;
             if (Math.abs(this.difference()) > 0.009) return false;
+            if (this.isPaidExceedingDebt()) return false;
+            if (Math.abs(Number(this.roundingAmount) || 0) > 1.009) return false;
             if (this.hasOverpaidItem()) return false;
             if (this.hasExcessiveDeduction()) return false;
             if (this.hasIncompleteCheque()) return false;
@@ -684,7 +926,11 @@ function bplusReceipt() {
             if (this.totalWht() > 0) {
                 breakdownHtml += `<div class="text-warning-emphasis"><b>- ภาษีหัก ณ ที่จ่าย:</b> ฿${this.fmt(this.totalWht())}</div>`;
             }
-            breakdownHtml += `<div class="text-success border-top pt-1 mt-1"><b>ยอดรับจริง:</b> ฿${this.fmt(this.totalNetToReceive())}</div></div>`;
+            if (Math.abs(Number(this.roundingAmount) || 0) > 0.001) {
+                const isShort = Number(this.roundingAmount) < 0;
+                breakdownHtml += `<div class="${isShort ? 'text-danger' : 'text-success'}"><b>${isShort ? '- เศษขาด (ลดหย่อน):' : '+ เศษเกิน:'}</b> ฿${this.fmt(Math.abs(this.roundingAmount))}</div>`;
+            }
+            breakdownHtml += `<div class="text-success border-top pt-1 mt-1"><b>ยอดรับจริง:</b> ฿${this.fmt(this.targetNetToReceiveWithRounding())}</div></div>`;
 
             Swal.fire({
                 title: 'ยืนยันการบันทึกใบเสร็จรับเงิน',

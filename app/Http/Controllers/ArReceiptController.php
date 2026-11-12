@@ -145,7 +145,7 @@ class ArReceiptController extends Controller
             ];
             $callback = function () use ($rows, $totals) {
                 $out = fopen('php://output', 'w');
-                fputs($out, "\xEF\xBB\xBF");
+                fwrite($out, "\xEF\xBB\xBF");
                 fputcsv($out, ['ผู้รับเงิน', 'วิธีชำระ', 'จำนวนใบ', 'ยอดรับจริง', 'ส่วนลดเงินสด', 'ภาษีหัก ณ ที่จ่าย', 'ยอดตัดหนี้']);
                 foreach ($rows as $r) {
                     fputcsv($out, [
@@ -232,6 +232,7 @@ class ArReceiptController extends Controller
                     'id' => $item->id,
                     'doc_number' => $doc?->doc_number ?? '-',
                     'doc_date' => $doc?->doc_date?->thaiDate() ?? '-',
+                    'doc_date_raw' => $doc?->doc_date?->toDateString() ?? '',
                     'due_date' => $item->due_date ? Carbon::parse($item->due_date)->thaiDate() : '-',
                     'balance' => round((float) $item->balance_amount, 2),
                     'subtotal_amount' => round($subtotal, 2),
@@ -294,6 +295,8 @@ class ArReceiptController extends Controller
             'allocations.*.discount_amount' => ['nullable', 'numeric', 'min:0'],
             'allocations.*.wht_amount' => ['nullable', 'numeric', 'min:0'],
             'allocations.*.wht_rate' => ['nullable', 'numeric', 'min:0'],
+            // Rounding difference (เศษขาด/เกิน ±1.00 บาท)
+            'rounding_amount' => ['nullable', 'numeric', 'between:-1.00,1.00'],
         ]);
 
         $customerId = (int) $data['customer_id'];
@@ -372,6 +375,7 @@ class ArReceiptController extends Controller
             'doc_date' => $data['doc_date'] ?? now()->toDateString(),
             'wht_cert_no' => $data['wht_cert_no'] ?? null,
             'wht_cert_date' => $data['wht_cert_date'] ?? null,
+            'rounding_amount' => isset($data['rounding_amount']) && $data['rounding_amount'] !== '' ? (float) $data['rounding_amount'] : 0.0,
             'allocations' => $allocations,
         ];
 
@@ -395,7 +399,7 @@ class ArReceiptController extends Controller
 
         try {
             $document = $payments->create($payload);
-        } catch (RuntimeException $e) {
+        } catch (RuntimeException|\InvalidArgumentException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
 
