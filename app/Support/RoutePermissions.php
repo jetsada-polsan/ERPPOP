@@ -115,6 +115,7 @@ class RoutePermissions
         'product-units.' => 'masterdata.manage',
         'price-tables.' => 'masterdata.manage',
         'scale-prices.' => 'masterdata.manage',
+        'promotion-center.' => 'masterdata.manage',
         'promotions.' => 'masterdata.manage',
         'flash-sales.' => 'masterdata.manage',
         'price-tags.' => 'masterdata.manage',

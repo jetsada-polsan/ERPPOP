@@ -721,6 +721,9 @@ Route::prefix('scale-prices')->name('scale-prices.')->group(function () {
     Route::post('/test-label', [ScalePriceController::class, 'testLabel'])->name('test-label');
 });
 
+// ศูนย์โปรโมชั่น: ทางเข้าเดียวของราคาลด นาทีทอง โปรซื้อครบ/ทั้งบิล บัตรส่วนลด แต้มสมาชิก
+Route::get('/promotion-center', [\App\Http\Controllers\PromotionCenterController::class, 'index'])->name('promotion-center.index');
+
 Route::prefix('promotions')->name('promotions.')->group(function () {
     Route::get('/', [PromotionController::class, 'index'])->name('index');
     Route::post('/', [PromotionController::class, 'store'])->name('store');
