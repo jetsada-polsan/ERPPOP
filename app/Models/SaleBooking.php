@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'stock_shortage_status', 'stock_shortage_note', 'stock_shortage_approved_by', 'stock_shortage_approved_at', 'remainder_closed_at', 'remainder_closed_by',
@@ -68,6 +69,12 @@ class SaleBooking extends Model
         return Document::whereHas('documentType', fn ($query) => $query->where('code', DocumentType::CREDIT_SALE))
             ->where(fn ($query) => $query->where('source_document_id', $this->document_id)
                 ->orWhere('id', $this->confirmed_document_id));
+    }
+
+    public function sourceSaleDocuments(): HasMany
+    {
+        return $this->hasMany(Document::class, 'source_document_id', 'document_id')
+            ->whereHas('documentType', fn ($query) => $query->where('code', DocumentType::CREDIT_SALE));
     }
 
     public function confirmedDocument(): BelongsTo
