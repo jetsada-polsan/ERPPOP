@@ -10,6 +10,7 @@ use App\Models\SaleBooking;
 use App\Models\SalesArea;
 use App\Models\TransportJob;
 use App\Models\User;
+use App\Models\Warehouse;
 use App\Services\Sales\BookingDeliveryService;
 use App\Services\Sales\BookingService;
 use App\Services\Sales\CreditSaleService;
@@ -34,7 +35,8 @@ class BookingController extends Controller
         CarbonInterface|string|null $date = null,
         ?int $branchId = null,
         ?int $salesAreaId = null,
-        ?int $bookingId = null
+        ?int $bookingId = null,
+        ?int $warehouseId = null
     ): Builder {
         $dateStr = $date instanceof CarbonInterface ? $date->toDateString() : ($date ? (string) $date : null);
 
@@ -51,6 +53,7 @@ class BookingController extends Controller
             ->where('status', SaleBooking::STATUS_PENDING)
             ->when($salesAreaId, fn ($query) => $query->where('sales_area_id', $salesAreaId))
             ->when($bookingId, fn ($query) => $query->where('id', $bookingId))
+            ->inWarehouse($warehouseId)
             ->whereHas('document', fn ($d) => $d
                 ->when($dateStr, fn ($q) => $q->whereDate('doc_date', $dateStr))
                 ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
@@ -190,6 +193,16 @@ class BookingController extends Controller
             $branchId = (int) $user->branch_id;
         }
 
+        $warehouseId = $request->integer('warehouse_id') ?: null;
+        if ($warehouseId) {
+            $selectedWarehouse = Warehouse::find($warehouseId);
+            if ($selectedWarehouse && $user && $user->branch_id && ! $user->canSeeAllReportBranches()) {
+                if ($selectedWarehouse->branch_id && (int) $selectedWarehouse->branch_id !== (int) $user->branch_id) {
+                    abort(403, 'ไม่มีสิทธิ์เข้าถึงคลังของสาขาอื่น');
+                }
+            }
+        }
+
         $dateFrom = $request->input('date_from', now()->toDateString());
         $dateTo = $request->input('date_to', now()->toDateString());
         $salesAreaId = $request->integer('sales_area_id') ?: null;
@@ -212,6 +225,12 @@ class BookingController extends Controller
             ->when($user && $user->branch_id && ! $user->canSeeAllReportBranches(), fn ($q) => $q->where('id', $user->branch_id))
             ->orderBy('code')
             ->get(['id', 'code', 'name_th']);
+
+        $warehouses = Warehouse::where('is_active', true)
+            ->when($branchId, fn ($q) => $q->where(fn ($sub) => $sub->whereNull('branch_id')->orWhere('branch_id', $branchId)))
+            ->when($user && $user->branch_id && ! $user->canSeeAllReportBranches(), fn ($q) => $q->where(fn ($sub) => $sub->whereNull('branch_id')->orWhere('branch_id', $user->branch_id)))
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'branch_id']);
 
         $salesAreas = SalesArea::orderBy('code')->get(['id', 'code', 'name']);
 
@@ -237,6 +256,8 @@ class BookingController extends Controller
                 'dateTo' => $dateTo,
                 'branchId' => $branchId,
                 'branches' => $branches,
+                'warehouseId' => $warehouseId,
+                'warehouses' => $warehouses,
                 'salesAreas' => $salesAreas,
                 'salesAreaId' => $salesAreaId,
                 'statusFilter' => $statusFilter,
@@ -255,6 +276,7 @@ class BookingController extends Controller
             'salesArea',
             'sourceSaleDocuments' => fn ($q) => $q->whereNotIn('status', ['cancelled', 'voided']),
             'confirmedDocument' => fn ($q) => $q->whereNotIn('status', ['cancelled', 'voided']),
+            'document.stockDocument.items.warehouseLocation.warehouse',
         ])
             ->whereHas('document', fn ($d) => $d
                 ->whereDate('doc_date', '>=', $dateFrom)
@@ -262,6 +284,7 @@ class BookingController extends Controller
                 ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             )
             ->when($salesAreaId, fn ($q) => $q->where('sales_area_id', $salesAreaId))
+            ->inWarehouse($warehouseId)
             ->orderByDesc('id');
 
         $rows = $query->get()->map(function (SaleBooking $booking) {
@@ -313,12 +336,23 @@ class BookingController extends Controller
                 $statusBadge = 'bg-warning text-dark';
             }
 
+            $stockDoc = $doc?->stockDocument;
+            $warehouseNames = $stockDoc?->items
+                ->map(fn ($item) => $item->warehouseLocation?->warehouse?->name ?: $item->warehouseLocation?->name)
+                ->filter()
+                ->unique()
+                ->values();
+            $warehouseDisplay = ($warehouseNames && $warehouseNames->isNotEmpty())
+                ? $warehouseNames->implode(', ')
+                : '-';
+
             return (object) [
                 'booking' => $booking,
                 'doc_number' => $doc?->doc_number ?? '-',
                 'doc_date' => $doc?->doc_date ? Carbon::parse($doc->doc_date)->format('d/m/Y') : '-',
                 'customer_name' => $doc?->customer?->name_th ?? $doc?->customer_name ?? '-',
                 'sales_area_name' => $booking->salesArea?->name ?? ($doc?->salesArea?->name ?? '-'),
+                'warehouse_names' => $warehouseDisplay,
                 'booking_amount' => $bookingAmount,
                 'booking_satang' => $bookingSatang,
                 'sale_doc_numbers' => $sales->pluck('doc_number')->implode(', ') ?: '-',
@@ -360,7 +394,7 @@ class BookingController extends Controller
                 $handle = fopen('php://output', 'wb');
                 fwrite($handle, "\xEF\xBB\xBF");
 
-                fputcsv($handle, ['ลำดับ', 'เลขที่ใบจอง', 'วันที่จอง', 'ลูกค้า', 'สายขาย', 'ยอดใบจอง', 'เลขที่ใบขาย', 'ยอดใบขาย', 'ส่วนต่าง', 'สถานะ']);
+                fputcsv($handle, ['ลำดับ', 'เลขที่ใบจอง', 'วันที่จอง', 'ลูกค้า', 'สายขาย', 'ยอดใบจอง', 'เลขที่ใบขาย', 'ยอดใบขาย', 'ส่วนต่าง', 'สถานะ', 'คลัง']);
 
                 $index = 1;
                 foreach ($rows as $row) {
@@ -375,6 +409,7 @@ class BookingController extends Controller
                         number_format($row->sale_amount, 2),
                         number_format($row->variance, 2),
                         $row->status_label,
+                        $row->warehouse_names,
                     ]);
                 }
 
@@ -389,6 +424,7 @@ class BookingController extends Controller
                     number_format($totalSaleAmount, 2),
                     number_format($totalVariance, 2),
                     '',
+                    '',
                 ]);
 
                 fclose($handle);
@@ -402,6 +438,8 @@ class BookingController extends Controller
             'dateTo' => $dateTo,
             'branchId' => $branchId,
             'branches' => $branches,
+            'warehouseId' => $warehouseId,
+            'warehouses' => $warehouses,
             'salesAreas' => $salesAreas,
             'salesAreaId' => $salesAreaId,
             'statusFilter' => $statusFilter,

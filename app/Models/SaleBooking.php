@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -80,6 +81,17 @@ class SaleBooking extends Model
     public function confirmedDocument(): BelongsTo
     {
         return $this->belongsTo(Document::class, 'confirmed_document_id');
+    }
+
+    public function scopeInWarehouse(Builder $query, ?int $warehouseId): Builder
+    {
+        if (! $warehouseId) {
+            return $query;
+        }
+
+        return $query->whereHas('document.stockDocument.items.warehouseLocation', function (Builder $q) use ($warehouseId) {
+            $q->where('warehouse_id', $warehouseId);
+        });
     }
 
     protected function casts(): array

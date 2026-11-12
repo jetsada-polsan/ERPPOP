@@ -59,6 +59,15 @@
                         </div>
                     @endif
                     <div class="col-md-2">
+                        <label class="form-label small fw-bold text-secondary mb-1">คลังตัดสต็อก</label>
+                        <select name="warehouse_id" id="comparisonWarehouseSelect" class="form-select form-select-sm">
+                            <option value="">ทุกคลัง</option>
+                            @foreach($warehouses as $w)
+                                <option value="{{ $w->id }}" @selected($warehouseId === $w->id)>{{ $w->code }} {{ $w->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-2">
                         <label class="form-label small fw-bold text-secondary mb-1">สายขาย</label>
                         <select name="sales_area_id" class="form-select form-select-sm">
                             <option value="">ทุกสาย</option>
@@ -103,6 +112,7 @@
                             <th style="width: 100px;">วันที่จอง</th>
                             <th>ลูกค้า</th>
                             <th style="width: 130px;">สายขาย</th>
+                            <th style="width: 140px;">คลัง</th>
                             <th style="width: 120px;" class="text-end">ยอดใบจอง</th>
                             <th style="width: 160px;">เลขที่ใบขาย</th>
                             <th style="width: 120px;" class="text-end">ยอดใบขายรวม</th>
@@ -118,6 +128,7 @@
                                 <td class="small">{{ $row->doc_date }}</td>
                                 <td class="fw-semibold">{{ $row->customer_name }}</td>
                                 <td class="small">{{ $row->sales_area_name }}</td>
+                                <td class="small">{{ $row->warehouse_names }}</td>
                                 <td class="text-end fw-bold">{{ number_format($row->booking_amount, 2) }}</td>
                                 <td class="font-monospace small">{{ $row->sale_doc_numbers }}</td>
                                 <td class="text-end fw-bold">{{ number_format($row->sale_amount, 2) }}</td>
@@ -133,14 +144,14 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="10" class="text-center text-muted py-4">ไม่พบข้อมูลการจองตามเงื่อนไขที่เลือก</td>
+                                <td colspan="11" class="text-center text-muted py-4">ไม่พบข้อมูลการจองตามเงื่อนไขที่เลือก</td>
                             </tr>
                         @endforelse
                     </tbody>
                     @if(count($rows) > 0)
                         <tfoot class="table-light fw-bold border-top border-dark">
                             <tr>
-                                <td colspan="5" class="text-center">รวมทั้งหมด (ไม่รวมใบยกเลิก) ({{ $rows->where('status_key', '!=', 'cancelled')->count() }} รายการ)</td>
+                                <td colspan="6" class="text-center">รวมทั้งหมด (ไม่รวมใบยกเลิก) ({{ $rows->where('status_key', '!=', 'cancelled')->count() }} รายการ)</td>
                                 <td class="text-end text-primary fs-6">{{ number_format($totalBookingAmount, 2) }}</td>
                                 <td></td>
                                 <td class="text-end text-success fs-6">{{ number_format($totalSaleAmount, 2) }}</td>
@@ -157,3 +168,43 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    try {
+        var storageKey = 'booking_comparison_warehouse_id_{{ auth()->id() ?? 'guest' }}';
+        var urlParams = new URLSearchParams(window.location.search);
+        var selectElem = document.getElementById('comparisonWarehouseSelect');
+
+        if (urlParams.has('warehouse_id')) {
+            var currentVal = urlParams.get('warehouse_id') || '';
+            localStorage.setItem(storageKey, currentVal);
+        } else {
+            var savedVal = localStorage.getItem(storageKey);
+            if (savedVal && selectElem) {
+                var optionExists = Array.from(selectElem.options).some(function (opt) {
+                    return opt.value === savedVal;
+                });
+                if (optionExists && savedVal !== '') {
+                    urlParams.set('warehouse_id', savedVal);
+                    window.location.replace(window.location.pathname + '?' + urlParams.toString());
+                }
+            }
+        }
+
+        if (selectElem) {
+            selectElem.addEventListener('change', function () {
+                try {
+                    localStorage.setItem(storageKey, this.value || '');
+                } catch (e) {
+                    // Ignore localStorage errors
+                }
+            });
+        }
+    } catch (e) {
+        // Ignore localStorage errors
+    }
+});
+</script>
+@endpush
