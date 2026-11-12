@@ -4,11 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use App\Models\Customer;
+use App\Models\PriceTable;
 use App\Models\Product;
+use App\Models\ProductPrice;
 use App\Models\Salesman;
 use App\Models\StockBalance;
 use App\Models\Supplier;
 use App\Models\WarehouseLocation;
+use App\Support\UnitQty;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -112,7 +115,17 @@ class SearchController extends Controller
                 ->keyBy('product_id')
             : collect();
 
-        $products = $products->map(function (Product $product) use ($includeLots, $locationId, $stockByProduct, $search) {
+        $defaultTableId = PriceTable::where('is_default', true)->value('id');
+        $productPrices = $defaultTableId && $products->isNotEmpty()
+            ? ProductPrice::where('price_table_id', $defaultTableId)
+                ->whereIn('product_id', $products->pluck('id'))
+                ->where('is_active', true)
+                ->whereNotNull('unit_id')
+                ->get(['product_id', 'unit_id', 'price'])
+                ->keyBy(fn ($r) => $r->product_id.':'.$r->unit_id)
+            : collect();
+
+        $products = $products->map(function (Product $product) use ($includeLots, $locationId, $stockByProduct, $productPrices, $search) {
             $stock = $stockByProduct->get($product->id);
 
             $matchedBarcode = $search !== ''
@@ -130,7 +143,7 @@ class SearchController extends Controller
                 'base_unit_id' => $product->base_unit_id,
                 'base_unit_name' => $product->baseUnit?->cleanName() ?? '-',
                 'unit_name' => $product->baseUnit?->displayLabel() ?? '-',
-                'units' => \App\Support\UnitQty::selectableUnits($product),
+                'units' => UnitQty::selectableUnits($product, $productPrices),
                 'matched_unit_id' => $matchedUnitId,
                 'barcode' => $product->barcodes->first()?->barcode,
                 'scale_plu' => $product->barcodes
@@ -212,16 +225,17 @@ class SearchController extends Controller
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
             'warehouse_location_id' => ['nullable', 'integer', 'exists:warehouse_locations,id'],
         ]);
-        $branch = ! empty($data['branch_id']) ? \App\Models\Branch::findOrFail($data['branch_id']) : null;
+        $branch = ! empty($data['branch_id']) ? Branch::findOrFail($data['branch_id']) : null;
         $locationId = $data['warehouse_location_id'] ?? $branch?->default_warehouse_location_id;
         abort_unless($locationId, 422, 'กรุณาเลือกตำแหน่งเก็บหรือกำหนดคลังหลักของสาขา');
         $location = WarehouseLocation::with('warehouse:id,branch_id')->findOrFail($locationId);
-        $owner = \App\Models\Branch::where('default_warehouse_location_id', $location->id)->first();
+        $owner = Branch::where('default_warehouse_location_id', $location->id)->first();
         $branchId = $owner?->id ?? $location->warehouse?->branch_id;
         abort_if($branch && (int) $branchId !== (int) $branch->id, 422, 'ตำแหน่งเก็บไม่ตรงกับสาขา');
         $this->authorizeAny($request, ['stock.manage', 'stock.request'], $branchId ? (int) $branchId : null, $branchId === null);
         $balance = StockBalance::where('product_id', $data['product_id'])->where('warehouse_location_id', $location->id)->first();
         $product = Product::find($data['product_id']);
+
         return response()->json([
             'warehouse_location_id' => $location->id,
             'on_hand_qty' => (float) ($balance?->on_hand_qty ?? 0),

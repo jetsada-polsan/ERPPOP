@@ -44,15 +44,45 @@
             <div class="picker-state" x-show="!pickerLoading && pickerResults.length === 0">ไม่พบสินค้า ลองเปลี่ยนคำค้นหา</div>
             <div class="product-picker-grid" x-show="!pickerLoading && pickerResults.length">
                 <div class="picker-table-head"><span>รหัสสินค้า</span><span>ชื่อสินค้า</span><span>หน่วยนับ</span><span>บาร์โค้ด</span><span>ราคา</span></div>
-                <template x-for="(product, pickerRow) in pickerResults" :key="product.id">
-                    <button type="button" class="picker-card" :class="{ 'is-active': pickerRow === pickerActiveIndex }"
-                        @click="selectPickerProduct(product)" @mouseenter="pickerActiveIndex = pickerRow">
-                        <span class="picker-code" x-text="product.sku_code"></span>
-                        <span class="picker-copy"><strong x-text="product.name_th"></strong></span>
-                        <span class="picker-unit" x-text="product.unit_name"></span>
-                        <span class="picker-barcode" x-text="product.barcode || '-' "></span>
-                        <span class="picker-price" x-text="'฿' + money(product.default_price)"></span>
-                    </button>
+                <template x-if="!unitRowsEnabled">
+                    <div class="picker-list">
+                        <template x-for="(product, pickerRow) in pickerResults" :key="product.id">
+                            <button type="button" class="picker-card" :class="{ 'is-active': pickerRow === pickerActiveIndex }"
+                                @click="selectPickerProduct(product)" @mouseenter="pickerActiveIndex = pickerRow">
+                                <span class="picker-code" x-text="product.sku_code"></span>
+                                <span class="picker-copy"><strong x-text="product.name_th"></strong></span>
+                                <span class="picker-unit" x-text="product.unit_name"></span>
+                                <span class="picker-barcode" x-text="product.barcode || '-' "></span>
+                                <span class="picker-price" x-text="'฿' + money(product.default_price)"></span>
+                            </button>
+                        </template>
+                    </div>
+                </template>
+                <template x-if="unitRowsEnabled">
+                    <div class="picker-list">
+                        <template x-for="(entry, entryIdx) in pickerNavItems" :key="entry.key">
+                            <button type="button" class="picker-card" :class="{ 'picker-unit-card': entry.type === 'unit', 'is-active': entryIdx === pickerActiveIndex }"
+                                @click="selectPickerItem(entry)" @mouseenter="pickerActiveIndex = entryIdx">
+                                <span class="picker-code" :class="{ 'picker-unit-tree': entry.type === 'unit' }" x-text="entry.type === 'unit' ? '↳' : entry.product.sku_code"></span>
+                                <span class="picker-copy" :class="{ 'picker-unit-copy': entry.type === 'unit' }">
+                                    <template x-if="entry.type === 'product'">
+                                        <strong x-text="entry.product.name_th"></strong>
+                                    </template>
+                                    <template x-if="entry.type === 'unit'">
+                                        <span>
+                                            <strong x-text="entry.unit.unit_name || entry.unit.name"></strong>
+                                            <span class="picker-unit-factor-pill" x-text="'×' + entry.unit.factor"></span>
+                                        </span>
+                                    </template>
+                                </span>
+                                <span class="picker-unit">
+                                    <span :class="{ 'picker-unit-tag': entry.type === 'unit' }" x-text="entry.type === 'unit' ? (entry.unit.unit_name || entry.unit.name) : entry.product.unit_name"></span>
+                                </span>
+                                <span class="picker-barcode" :class="{ 'font-monospace': entry.type === 'unit' }" x-text="(entry.type === 'unit' ? entry.unit.barcode : entry.product.barcode) || '-' "></span>
+                                <span class="picker-price" x-text="entry.type === 'unit' ? (entry.unit.price !== null ? '฿' + money(entry.unit.price) : '-') : ('฿' + money(entry.product.default_price))"></span>
+                            </button>
+                        </template>
+                    </div>
                 </template>
             </div>
         </div>
@@ -109,6 +139,14 @@
     .picker-copy strong { font-weight:500; }
     .picker-unit,.picker-barcode { color:var(--erp-muted,#6b8294); }
     .picker-price { text-align:right; font-weight:600; font-variant-numeric:tabular-nums; }
+    .picker-list { display:contents; }
+    .picker-unit-card { background:var(--erp-soft,#f7fbfe); border-bottom:1px dashed var(--erp-border,#dbe7ef); font-size:13px; }
+    .picker-unit-tree { color:var(--erp-primary,#1a9bdc); font-weight:700; text-align:right; padding-right:18px !important; font-size:14px; }
+    .picker-unit-copy { display:inline-flex; align-items:center; gap:8px; }
+    .picker-unit-copy strong { color:var(--erp-ink,#1d3b52); font-weight:600; font-size:13px; }
+    .picker-unit-factor-pill { display:inline-flex; align-items:center; padding:1px 7px; border-radius:9999px; background:var(--erp-primary-soft,#eef7fd); color:var(--erp-primary-ink,var(--erp-primary,#1585c0)); font-size:11px; font-weight:700; }
+    .picker-unit-tag { display:inline-block; padding:1px 6px; border-radius:4px; background:#fff; border:1px solid var(--erp-border,#dbe7ef); color:var(--erp-muted,#64748b); font-size:11px; font-weight:600; }
+    .picker-card.picker-unit-card:hover,.picker-card.picker-unit-card:focus,.picker-card.picker-unit-card.is-active { background:var(--erp-primary-soft,#eef7fd); box-shadow:inset 3px 0 var(--erp-primary,#1a9bdc); }
     .picker-state { padding:70px 20px; text-align:center; color:var(--erp-muted,#6b8294); font-size:14px; }
     .picker-state i { margin-right:5px; }
     .product-picker-foot { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 20px 16px; color:var(--erp-muted,#6b8294); font-size:12.5px; }
@@ -130,6 +168,10 @@
         const searchUrl = (config && config.searchUrl) || @json(route('search.products'));
 
         return {
+            unitRows: Boolean(config && config.unitRows),
+            get unitRowsEnabled() {
+                return Boolean(this.unitRows || (config && config.unitRows) || this.config?.unitRows);
+            },
             pickerOpen: false,
             pickerIndex: null,
             pickerQuery: '',
@@ -139,6 +181,39 @@
             pickerContext: null,
             pickerSearchSequence: 0,
             pickerSearchController: null,
+
+            get pickerNavItems() {
+                if (! this.unitRowsEnabled) {
+                    return this.pickerResults.map((product, idx) => ({
+                        key: 'p-' + product.id,
+                        index: idx,
+                        type: 'product',
+                        product: product,
+                        unit: null,
+                    }));
+                }
+                const items = [];
+                for (const product of this.pickerResults) {
+                    items.push({
+                        key: 'p-' + product.id,
+                        index: items.length,
+                        type: 'product',
+                        product: product,
+                        unit: null,
+                    });
+                    const largerUnits = (product.units || []).filter(u => ! u.is_base && Number(u.factor) > 1);
+                    for (const u of largerUnits) {
+                        items.push({
+                            key: 'u-' + product.id + '-' + u.unit_id,
+                            index: items.length,
+                            type: 'unit',
+                            product: product,
+                            unit: u,
+                        });
+                    }
+                }
+                return items;
+            },
 
             money(value) {
                 return Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -195,14 +270,37 @@
                         this.pickerSearchController = null;
                         this.pickerLoading = false;
                         this.pickerActiveIndex = 0;
+
+                        if (this.unitRowsEnabled && this.pickerQuery.trim()) {
+                            const q = this.pickerQuery.trim().toLowerCase();
+                            const unitIdx = this.pickerNavItems.findIndex(entry =>
+                                entry.type === 'unit' && (entry.unit.barcode || '').trim().toLowerCase() === q
+                            );
+                            if (unitIdx !== -1) {
+                                this.pickerActiveIndex = unitIdx;
+                            } else {
+                                const firstProd = this.pickerResults[0];
+                                if (firstProd && firstProd.matched_unit_id) {
+                                    const matchIdx = this.pickerNavItems.findIndex(entry =>
+                                        entry.type === 'unit' &&
+                                        entry.product.id === firstProd.id &&
+                                        String(entry.unit.unit_id) === String(firstProd.matched_unit_id)
+                                    );
+                                    if (matchIdx !== -1) {
+                                        this.pickerActiveIndex = matchIdx;
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             },
 
             // เลื่อนแถวที่โฟกัสด้วยคีย์บอร์ด (ค่า delta มาก ๆ = ไปหัว/ท้ายรายการ)
             movePickerActive(delta) {
-                if (! this.pickerResults.length) return;
-                const last = this.pickerResults.length - 1;
+                const total = this.unitRowsEnabled ? this.pickerNavItems.length : this.pickerResults.length;
+                if (! total) return;
+                const last = total - 1;
                 this.pickerActiveIndex = Math.max(0, Math.min(last, this.pickerActiveIndex + delta));
                 this.$nextTick(() => {
                     this.$refs.productPickerBody?.querySelector('.picker-card.is-active')
@@ -211,11 +309,35 @@
             },
 
             selectActivePickerProduct() {
-                const product = this.pickerResults[this.pickerActiveIndex];
-                if (product) this.selectPickerProduct(product);
+                if (this.unitRowsEnabled) {
+                    const q = this.pickerQuery.trim().toLowerCase();
+                    if (q) {
+                        const exactUnitItem = this.pickerNavItems.find(entry =>
+                            entry.type === 'unit' && (entry.unit.barcode || '').trim().toLowerCase() === q
+                        );
+                        if (exactUnitItem) {
+                            this.selectPickerItem(exactUnitItem);
+                            return;
+                        }
+                    }
+                    const activeItem = this.pickerNavItems[this.pickerActiveIndex];
+                    if (activeItem) this.selectPickerItem(activeItem);
+                } else {
+                    const product = this.pickerResults[this.pickerActiveIndex];
+                    if (product) this.selectPickerProduct(product);
+                }
             },
 
-            selectPickerProduct(product) {
+            selectPickerItem(entry) {
+                if (! entry) return;
+                if (entry.type === 'unit') {
+                    this.selectPickerProduct(entry.product, entry.unit);
+                } else {
+                    this.selectPickerProduct(entry.product, null);
+                }
+            },
+
+            selectPickerProduct(product, unit = null) {
                 const index = this.pickerIndex;
                 const context = this.pickerContext;
                 if (index === null) return;
@@ -227,13 +349,13 @@
                 item.product_id = product.id;
                 item.sku_code = product.sku_code || '';
                 item.name_th = product.name_th || '';
-                item.unit_name = product.unit_name || 'ไม่ระบุหน่วย';
-                item.barcode = product.barcode || '';
+                item.unit_name = (unit && (unit.unit_name || unit.name)) || product.unit_name || 'ไม่ระบุหน่วย';
+                item.barcode = (unit && unit.barcode) || product.barcode || '';
 
                 this.closeProductPicker();
 
                 if (typeof this.onProductPicked === 'function') {
-                    this.onProductPicked(index, product, context);
+                    this.onProductPicked(index, product, context, unit);
                 }
             },
         };
