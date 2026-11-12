@@ -1,6 +1,6 @@
 """Tests exact deterministic parity between POS promotions.py and ERP PosPricingGuard.
 
-Reads the central shared fixture at tests/Fixtures/promo-parity.json.
+Reads the central shared fixture at tests/Fixtures/promo-parity.json (exact case).
 Both ERP and POS read the exact same fixture byte-for-byte.
 """
 from __future__ import annotations
@@ -23,20 +23,14 @@ class Line:
     list_price: Decimal | None = None
 
 
+# ไฟล์เดียวกับที่ phpunit ฝั่ง ERP ใช้ — path ต้องตรงตัวพิมพ์ (tests/Fixtures) เพราะ CI รันบน Linux
+# <repo>/apps/pos-python/tests/test_promo_parity_fixture.py -> parents[3] = <repo>
+FIXTURE_PATH = Path(__file__).resolve().parents[3] / "tests" / "Fixtures" / "promo-parity.json"
+
+
 def _load_fixture():
-    # Look for fixture relative to apps/pos-python or repo root
-    current = Path(__file__).resolve()
-    candidates = [
-        current.parents[3] / "tests" / "Fixtures" / "promo-parity.json",
-        current.parents[3] / "tests" / "fixtures" / "promo-parity.json",
-        current.parents[2] / "tests" / "Fixtures" / "promo-parity.json",
-        current.parents[2] / "tests" / "fixtures" / "promo-parity.json",
-    ]
-    for c in candidates:
-        if c.exists():
-            with open(c, encoding="utf-8") as f:
-                return json.load(f)
-    raise FileNotFoundError(f"promo-parity.json not found in candidates: {candidates}")
+    with open(FIXTURE_PATH, encoding="utf-8") as f:
+        return json.load(f)
 
 
 FIXTURE_DATA = _load_fixture()
