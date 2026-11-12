@@ -167,4 +167,19 @@ class UnitQty
 
         return $units;
     }
+
+    /**
+     * จำนวนในหน่วยที่เลือกของบรรทัด เช่น "2 ลัง" (ใช้ในใบรวมจองหลังจำนวนหน่วยหลัก)
+     */
+    public static function formatSingle(?ProductUnit $unit, float|int|string|null $qty): string
+    {
+        if ($qty === null || $qty === '') {
+            return '-';
+        }
+
+        $formatted = rtrim(rtrim(number_format((float) $qty, 4), '0'), '.');
+        $name = ($unit && ! $unit->isCorrupted()) ? trim((string) $unit->cleanName()) : '';
+
+        return $name !== '' ? "{$formatted} {$name}" : $formatted;
+    }
 }
