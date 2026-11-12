@@ -29,14 +29,16 @@
             </select>
         </label>
         <button type="submit" class="btn btn-primary"><i class="bi bi-search me-1"></i>แสดง</button>
-        <a class="btn btn-outline-primary" href="{{ route('bookings.cover-sheet', ['date' => $date->toDateString(), 'branch_id' => $branchId, 'sales_area_id' => $salesAreaId ?: 'all']) }}"><i class="bi bi-truck me-1"></i>ใบปะหน้า (ขนส่ง)</a>
-        <button type="button" class="btn btn-outline-secondary" onclick="printSection('all')"><i class="bi bi-printer me-1"></i>พิมพ์ใบรวมจอง</button>
-        <button type="button" class="btn btn-outline-primary" onclick="printSection('bills')"><i class="bi bi-receipt me-1"></i>พิมพ์ใบขึ้นของ (ทีละบิล)</button>
-        <button type="button" class="btn btn-outline-success" onclick="printSection('items')"><i class="bi bi-box-seam me-1"></i>พิมพ์รายการสินค้าที่ต้องเตรียม</button>
-        <button type="button" class="btn btn-outline-info" onclick="printSection('route')"><i class="bi bi-truck me-1"></i>พิมพ์ใบเช็คส่งของประจำสาย</button>
-        <a href="{{ route('documents.delivery-notes.batch', array_filter(['date' => $date->toDateString(), 'branch_id' => $branchId, 'sales_area_id' => $salesAreaId, 'type' => 'booking'])) }}" target="_blank" class="btn btn-success text-white"><i class="bi bi-truck me-1"></i>พิมพ์ใบส่งของทั้งหมดตามตัวกรองนี้</a>
-        <a href="{{ route('bookings.comparison') }}" class="btn btn-outline-dark"><i class="bi bi-arrow-left-right me-1"></i>เทียบใบจองกับใบขาย</a>
-        <a class="btn btn-link" href="{{ route('bookings.index') }}">กลับ</a>
+        <div class="summary-actions">
+            <a class="btn btn-outline-primary" href="{{ route('bookings.cover-sheet', ['date' => $date->toDateString(), 'branch_id' => $branchId, 'sales_area_id' => $salesAreaId ?: 'all']) }}"><i class="bi bi-truck me-1"></i>ใบปะหน้า (ขนส่ง)</a>
+            <button type="button" class="btn btn-outline-secondary" onclick="printSection('all')"><i class="bi bi-printer me-1"></i>พิมพ์ใบรวมจอง</button>
+            <button type="button" class="btn btn-outline-primary" onclick="printSection('bills')"><i class="bi bi-receipt me-1"></i>พิมพ์ใบขึ้นของ (ทีละบิล)</button>
+            <button type="button" class="btn btn-outline-success" onclick="printSection('items')"><i class="bi bi-box-seam me-1"></i>พิมพ์รายการสินค้าที่ต้องเตรียม</button>
+            <button type="button" class="btn btn-outline-info" onclick="printSection('route')"><i class="bi bi-truck me-1"></i>พิมพ์ใบเช็คส่งของประจำสาย</button>
+            <a href="{{ route('documents.delivery-notes.batch', array_filter(['date' => $date->toDateString(), 'branch_id' => $branchId, 'sales_area_id' => $salesAreaId, 'type' => 'booking'])) }}" target="_blank" class="btn btn-success text-white"><i class="bi bi-truck me-1"></i>พิมพ์ใบส่งของทั้งหมดตามตัวกรองนี้</a>
+            <a href="{{ route('bookings.comparison') }}" class="btn btn-outline-dark"><i class="bi bi-arrow-left-right me-1"></i>เทียบใบจองกับใบขาย</a>
+            <a class="btn btn-link" href="{{ route('bookings.index') }}">กลับ</a>
+        </div>
     </form>
 
     <div class="summary-meta">
@@ -327,7 +329,10 @@
 .summary-heading p, .section-title small { margin: 2px 0 0; color: #7a8b9b; font-size: 11px; }
 .summary-toolbar label { display: grid; gap: 4px; color: #63778a; font-size: 10px; font-weight: 700; }
 .summary-toolbar input, .summary-toolbar select { height: 36px; min-width: 140px; border: 1px solid #d4e0ea; border-radius: 8px; padding: 0 9px; color: #243447; background: #fbfdff; }
-.summary-toolbar .btn { height: 36px; border-radius: 8px; font-size: 12px; }
+.summary-toolbar .btn { height: 36px; border-radius: 8px; font-size: 12px; white-space: nowrap; display: inline-flex; align-items: center; }
+/* ปุ่มเพิ่มเป็น 9 ปุ่ม แถวเดียวบีบจนตัวหนังสือแตกหลายบรรทัดและล้นจอ — ให้ขึ้นบรรทัดใหม่: แถวแรกตัวกรอง แถวต่อไปปุ่มพิมพ์ */
+.summary-toolbar { flex-wrap: wrap; row-gap: 10px; }
+.summary-toolbar .summary-actions { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; padding-top: 10px; border-top: 1px dashed #dce7ef; }
 .summary-meta { display: flex; justify-content: space-between; align-items: center; padding: 22px 4px 12px; }
 .summary-meta strong { display: block; font-size: 20px; color: #123b63; }
 .summary-meta span { font-size: 12px; color: #76899a; }
