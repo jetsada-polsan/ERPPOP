@@ -43,6 +43,7 @@ class QtyPromotion:
     free_price: Decimal = Decimal("0")
     starts_at: str | None = None
     ends_at: str | None = None
+    max_sets_per_bill: int | None = None
 
 
 def _dec(value) -> Decimal:
@@ -80,9 +81,13 @@ def promotion_discounts(lines: list[PromoLine], promotions: Iterable[QtyPromotio
                 continue
             if promotion.promo_type == "mix_bundle":
                 sets = len(units) // need
+                if promotion.max_sets_per_bill is not None and promotion.max_sets_per_bill > 0:
+                    sets = min(sets, int(promotion.max_sets_per_bill))
                 amount = max(Decimal("0"), sum(units[:sets * need], Decimal("0")) - sets * promotion.bundle_price)
             else:
                 sets = len(units) // (need + free)
+                if promotion.max_sets_per_bill is not None and promotion.max_sets_per_bill > 0:
+                    sets = min(sets, int(promotion.max_sets_per_bill))
                 amount = sum(list(reversed(units))[:sets * free], Decimal("0"))
             if amount:
                 if breakdown is not None:
@@ -100,6 +105,8 @@ def promotion_discounts(lines: list[PromoLine], promotions: Iterable[QtyPromotio
         sets = (quantity / promotion.min_qty).to_integral_value(rounding=ROUND_FLOOR)
         if sets <= 0:
             continue
+        if promotion.max_sets_per_bill is not None and promotion.max_sets_per_bill > 0:
+            sets = min(sets, Decimal(promotion.max_sets_per_bill))
         target, amount = trigger_index, Decimal("0")
         if promotion.promo_type == "discount":
             if promotion.discount_type == "percent":
@@ -113,15 +120,18 @@ def promotion_discounts(lines: list[PromoLine], promotions: Iterable[QtyPromotio
             if gift_index is None:
                 continue
             gift = lines[gift_index]
+            gift_qty = sum((line.qty for line in lines if line.product_id == promotion.free_product_id), Decimal("0"))
             target = gift_index
             if promotion.free_product_id == promotion.product_id:
                 # 1 แถม 1 สินค้าตัวเดียวกัน: ของแถมอยู่ในจำนวนที่ซื้อด้วย ชุดละ (ซื้อ + แถม) ชิ้น
                 # ซื้อ 3 แบบ 1 แถม 1 = 1 ชุด (2 ชิ้น) แถม 1 ชิ้น ไม่ใช่แถม 3 ชิ้น
                 group = promotion.min_qty + promotion.free_qty
                 same_sets = (quantity / group).to_integral_value(rounding=ROUND_FLOOR) if group > 0 else Decimal("0")
-                amount = min(gift.qty, same_sets * promotion.free_qty) * _price(gift)
+                if promotion.max_sets_per_bill is not None and promotion.max_sets_per_bill > 0:
+                    same_sets = min(same_sets, Decimal(promotion.max_sets_per_bill))
+                amount = min(gift_qty, same_sets * promotion.free_qty) * _price(gift)
             else:
-                amount = min(gift.qty, sets * promotion.free_qty) * _price(gift)
+                amount = min(gift_qty, sets * promotion.free_qty) * _price(gift)
         if amount > 0:
             if breakdown is not None:
                 breakdown.append((promotion.name or promotion.promo_type, amount))
@@ -191,8 +201,8 @@ def replace_promotions(db: sqlite3.Connection, rows: list[dict]) -> int:
         db.execute(
             """INSERT INTO qty_promotions (server_id, name, promo_type, product_id, min_qty, free_product_id, free_qty,
                discount_type, discount_value, bundle_price, starts_date, ends_date,
-               product_ids, min_amount, max_discount, free_sku, free_name, free_price, starts_at, ends_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               product_ids, min_amount, max_discount, free_sku, free_name, free_price, starts_at, ends_at, max_sets_per_bill)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (row.get("id"), row.get("name") or "", kind, product["id"] if product else 0, str(_dec(row.get("min_qty"))),
              gift["id"] if gift else None, str(_dec(row.get("free_qty", 1 if kind == "bill_addon" else 0))),
              row.get("discount_type"), str(_dec(row.get("discount_value"))), str(_dec(row.get("bundle_price"))),
@@ -200,7 +210,8 @@ def replace_promotions(db: sqlite3.Connection, rows: list[dict]) -> int:
              str(row["max_discount"]) if row.get("max_discount") is not None else None,
              free.get("sku_code") or (gift["sku"] if gift else ""),
              free.get("name_th") or (gift["name"] if gift else ""), str(gift["price"] if gift else 0),
-             row.get("starts_at"), row.get("ends_at")),
+             row.get("starts_at"), row.get("ends_at"),
+             int(row["max_sets_per_bill"]) if row.get("max_sets_per_bill") is not None else None),
         )
         saved += 1
     return saved
@@ -234,5 +245,6 @@ def active_promotions(db: sqlite3.Connection, today: date | datetime | None = No
         max_discount=_dec(row["max_discount"]) if row["max_discount"] is not None else None,
         free_sku=row["free_sku"] or "", free_name=row["free_name"] or "", free_price=_dec(row["free_price"]),
         starts_at=row["starts_at"], ends_at=row["ends_at"],
+        max_sets_per_bill=int(row["max_sets_per_bill"]) if ("max_sets_per_bill" in row.keys() and row["max_sets_per_bill"] is not None) else None,
     ) for row in rows]
     return [promotion for promotion in result if promotion_active(promotion, moment)]
