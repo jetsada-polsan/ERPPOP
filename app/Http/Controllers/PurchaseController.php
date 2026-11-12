@@ -69,7 +69,7 @@ class PurchaseController extends Controller
 
     public function show(Document $purchase): View
     {
-        $purchase->load(['supplier', 'branch', 'stockDocument.items.product']);
+        $purchase->load(['supplier', 'branch', 'stockDocument.items.product.baseUnit', 'stockDocument.items.product.barcodes.unit', 'stockDocument.items.unit']);
 
         $ledgerEntry = SupplierLedger::where('document_id', $purchase->id)->first();
         // ยอดค้างจ่ายของใบนี้ (มีเฉพาะใบซื้อเชื่อ) ใช้แสดงปุ่ม "จ่ายชำระ"

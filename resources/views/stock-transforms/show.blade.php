@@ -78,7 +78,7 @@
                         <td class="fw-semibold">{{ $item->product->sku_code }}</td>
                         <td>{{ $item->product->name_th }}</td>
                         <td class="text-muted">{{ $item->product->baseUnit?->cleanName() ?? '-' }}</td>
-                        <td class="text-end fw-semibold">{{ number_format(abs($item->qty), 2) }} <small class="text-muted">{{ $item->product->baseUnit?->cleanName() }}</small></td>
+                        <td class="text-end fw-semibold"><x-unit-qty :product="$item->product" :qty="abs($item->qty)" /></td>
                         <td class="text-end">{{ number_format($item->unit_price, 2) }}</td>
                         <td class="text-end fw-semibold">{{ number_format(abs($item->qty) * $item->unit_price, 2) }} บ.</td>
                     </tr>
@@ -99,7 +99,7 @@
                         <td class="fw-semibold">{{ $item->product->sku_code }}</td>
                         <td>{{ $item->product->name_th }}</td>
                         <td class="text-muted">{{ $item->product->baseUnit?->cleanName() ?? '-' }}</td>
-                        <td class="text-end fw-semibold">{{ number_format($item->qty, 2) }} <small class="text-muted">{{ $item->product->baseUnit?->cleanName() }}</small></td>
+                        <td class="text-end fw-semibold"><x-unit-qty :item="$item" /></td>
                         <td class="text-end text-success fw-semibold">{{ number_format($item->unit_price, 2) }}</td>
                         <td class="text-end fw-semibold text-success">{{ number_format($item->qty * $item->unit_price, 2) }} บ.</td>
                     </tr>

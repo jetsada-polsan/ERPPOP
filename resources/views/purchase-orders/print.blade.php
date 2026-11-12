@@ -43,7 +43,7 @@
                 <td>{{ $item->product->sku_code }}</td>
                 <td>{{ $item->product->name_th }}</td>
                 <td class="c">{{ $item->product->baseUnit?->cleanName() ?? '-' }}</td>
-                <td class="r">{{ number_format($item->qty, 2) }}</td>
+                <td class="r"><x-unit-qty :product="$item->product" :qty="$item->qty" /></td>
                 <td class="r">{{ $item->unit_price > 0 ? number_format($item->unit_price, 2) : '-' }}</td>
                 <td class="r">{{ $item->unit_price > 0 ? number_format($item->qty * $item->unit_price, 2) : '-' }}</td>
             </tr>

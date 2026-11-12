@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'stock_document_id', 'seq', 'product_id', 'source_stock_lot_id', 'return_disposition',
-    'warehouse_location_id', 'qty', 'system_qty', 'counted_qty', 'unit_id',
+    'warehouse_location_id', 'qty', 'system_qty', 'counted_qty', 'unit_id', 'unit_qty', 'unit_factor',
     'unit_price', 'unit_cost', 'cost_amount', 'vat_amount', 'billed_qty', 'lot_no', 'serial_no', 'expire_date', 'manufacture_date',
 ])]
 class StockDocumentItem extends Model
@@ -44,6 +44,8 @@ class StockDocumentItem extends Model
     {
         return [
             'qty' => 'decimal:8',
+            'unit_qty' => 'decimal:4',
+            'unit_factor' => 'decimal:8',
             'system_qty' => 'decimal:8',
             'counted_qty' => 'decimal:8',
             'unit_price' => 'decimal:8',

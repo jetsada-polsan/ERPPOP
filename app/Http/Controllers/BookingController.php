@@ -13,13 +13,14 @@ use App\Models\User;
 use App\Services\Sales\BookingDeliveryService;
 use App\Services\Sales\BookingService;
 use App\Services\Sales\CreditSaleService;
+use App\Support\UnitQty;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -118,6 +119,7 @@ class BookingController extends Controller
                 if (! isset($itemMap[$pid])) {
                     $itemMap[$pid] = (object) [
                         'id' => $pid,
+                        'product' => $product,
                         'sku_code' => $product->sku_code,
                         'name_th' => $product->name_th,
                         'unit_name' => $stockItem->unit?->name ?? $product->baseUnit?->name ?? '-',
@@ -149,13 +151,14 @@ class BookingController extends Controller
                     'warehouse_name' => $wh?->name ?? ($stockItem->warehouseLocation?->name ?? 'ไม่ระบุคลัง'),
                     'warehouse_id' => $whId,
                     'qty' => $qty,
+                    'product' => $product,
+                    'stock_item' => $stockItem,
                 ]);
             }
         }
 
         $items = collect($itemMap)->sortBy('sku_code')->values();
         $warehouses = $warehousesList->sortBy('name')->values();
-
         $bookingRows = $bookings->flatMap(fn ($booking) => [(object) [
             'doc_number' => $booking->document->doc_number,
             'customer_name' => $booking->document->customer?->name_th,
@@ -657,8 +660,11 @@ class BookingController extends Controller
             'delivery_due_at' => ['nullable', 'required_if:fulfillment_type,delivery', 'date'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
-            'items.*.qty' => ['required', 'numeric', 'min:0.0001'],
-            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'items.*.qty' => ['nullable', 'numeric', 'min:0'],
+            'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
+            'items.*.unit_id' => ['nullable', 'integer'],
+            'items.*.unit_qty' => ['nullable', 'numeric', 'min:0'],
+            'items.*.unit_factor' => ['nullable', 'numeric'],
             'allow_stock_shortage' => ['nullable', 'boolean'],
         ]);
 
@@ -716,7 +722,8 @@ class BookingController extends Controller
 
         $booking->load([
             'document.customer', 'document.branch', 'document.salesUser', 'document.salesArea',
-            'document.stockDocument.items.product.baseUnit', 'document.stockDocument.items.product.barcodes',
+            'document.stockDocument.items.product.baseUnit', 'document.stockDocument.items.product.barcodes.unit',
+            'document.stockDocument.items.unit',
         ]);
         $currentUser = $request->user();
         $branches = Branch::orderBy('code')->get();
@@ -736,15 +743,39 @@ class BookingController extends Controller
             ->where('is_active', true)->where('area_type', 'route')->orderBy('code')->get();
 
         $document = $booking->document;
-        $initialItems = $document->stockDocument?->items->map(fn ($item) => [
-            'product_id' => $item->product_id,
-            'product_query' => $item->product->sku_code.' - '.$item->product->name_th,
-            'qty' => (float) $item->qty,
-            'unit_price' => (float) $item->unit_price,
-            'unit_name' => $item->product->baseUnit?->displayLabel() ?? 'หน่วยฐาน',
-            'is_scale' => $item->product->barcodes->contains(fn ($barcode) => preg_match('/^80[01][0-9]{3}$/', (string) $barcode->barcode) === 1)
-                || preg_match('/ชั่ง|ซั่ง/u', (string) $item->product->name_th) === 1,
-        ])->values() ?? collect();
+        $initialItems = $document->stockDocument?->items->map(function ($item) {
+            $product = $item->product;
+            $hasChosenUnit = $item->unit_id && $item->unit_qty !== null && $item->unit_factor !== null && (float) $item->unit_factor > 0;
+            $unitQty = $hasChosenUnit ? (float) $item->unit_qty : (float) $item->qty;
+            $factor = $hasChosenUnit ? (float) $item->unit_factor : 1.0;
+            $unitPrice = $hasChosenUnit
+                ? round((float) $item->unit_price * $factor, 4)
+                : (float) $item->unit_price;
+
+            $unitName = $hasChosenUnit && $item->unit
+                ? $item->unit->cleanName()
+                : ($product->baseUnit?->cleanName() ?? 'หน่วยฐาน');
+
+            return [
+                'product_id' => $item->product_id,
+                'product_query' => $product->sku_code.' - '.$product->name_th,
+                'sku_code' => $product->sku_code,
+                'name_th' => $product->name_th,
+                'barcode' => $product->barcodes->firstWhere('unit_id', $item->unit_id)?->barcode
+                    ?? $product->barcodes->first()?->barcode ?? '',
+                'unit_id' => $item->unit_id,
+                'unit_qty' => $unitQty,
+                'unit_factor' => $factor,
+                'qty' => $unitQty,
+                'unit_price' => $unitPrice,
+                'unit_name' => $unitName,
+                'base_unit_id' => $product->base_unit_id,
+                'base_unit_name' => $product->baseUnit?->cleanName() ?? 'หน่วยฐาน',
+                'units' => UnitQty::selectableUnits($product),
+                'is_scale' => $product->barcodes->contains(fn ($barcode) => preg_match('/^80[01][0-9]{3}$/', (string) $barcode->barcode) === 1)
+                    || preg_match('/ชั่ง|ซั่ง/u', (string) $product->name_th) === 1,
+            ];
+        })->values() ?? collect();
 
         $initialBooking = [
             'number' => $document->doc_number,
@@ -776,8 +807,11 @@ class BookingController extends Controller
             'delivery_due_at' => ['nullable', 'required_if:fulfillment_type,delivery', 'date'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
-            'items.*.qty' => ['required', 'numeric', 'min:0.0001'],
-            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'items.*.qty' => ['nullable', 'numeric', 'min:0'],
+            'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
+            'items.*.unit_id' => ['nullable', 'integer'],
+            'items.*.unit_qty' => ['nullable', 'numeric', 'min:0'],
+            'items.*.unit_factor' => ['nullable', 'numeric'],
         ]);
 
         $user = $request->user()->loadMissing('salesArea');
@@ -823,7 +857,7 @@ class BookingController extends Controller
     {
         $booking->load([
             'document.customer', 'document.branch', 'document.salesUser', 'document.salesArea',
-            'document.stockDocument.items.product.baseUnit', 'document.stockDocument.items.product.barcodes', 'confirmedDocument',
+            'document.stockDocument.items.product.baseUnit', 'document.stockDocument.items.product.barcodes.unit', 'document.stockDocument.items.unit', 'confirmedDocument',
         ]);
 
         $creditSaleBooks = DocumentBook::withCount('documents')
@@ -839,7 +873,7 @@ class BookingController extends Controller
         $data = $request->validate(['reason' => ['nullable', 'string', 'max:200']]);
         try {
             $service->cancel($booking, $data['reason'] ?? null, $request->user()?->id);
-        } catch (\RuntimeException $error) {
+        } catch (RuntimeException $error) {
             return back()->with('error', $error->getMessage());
         }
 
@@ -895,7 +929,11 @@ class BookingController extends Controller
         if ($booking->status !== SaleBooking::STATUS_PENDING) {
             return redirect()->route('bookings.show', $booking)->with('error', 'ใบจองนี้ออกบิลครบหรือปิดไปแล้ว');
         }
-        $booking->load(['document.customer', 'document.branch', 'document.salesUser', 'document.stockDocument.items.product.baseUnit']);
+        $booking->load([
+            'document.customer', 'document.branch', 'document.salesUser',
+            'document.stockDocument.items.product.baseUnit', 'document.stockDocument.items.product.barcodes.unit',
+            'document.stockDocument.items.unit',
+        ]);
         $lines = ($booking->document->stockDocument?->items ?? collect())->sortBy('id')->values()
             ->map(function ($item) {
                 $remaining = round((float) $item->qty - (float) ($item->billed_qty ?? 0), 4);
@@ -909,13 +947,14 @@ class BookingController extends Controller
                     'isVat' => (bool) $item->product?->is_vat,
                     'booked' => (float) $item->qty,
                     'remaining' => $remaining,
+                    'remaining_display' => UnitQty::format($item->product, $remaining, $item->unit_id),
                     'qty' => $remaining,
                     'price' => (float) $item->unit_price,
                     'book' => $item->product?->is_vat ? 'DS' : 'DSN',
                     'belowCost' => false,
                 ];
             })->filter(fn ($l) => $l['remaining'] > 0)->values();
-        $creditDays = (int) ($booking->document->customer?->credit_days ?? 0) ?: (int) (\App\Models\AppSetting::get('default_credit_days') ?: 30);
+        $creditDays = (int) ($booking->document->customer?->credit_days ?? 0) ?: (int) (AppSetting::get('default_credit_days') ?: 30);
 
         return view('bookings.bill', [
             'booking' => $booking,
@@ -948,7 +987,7 @@ class BookingController extends Controller
     }
 
     /** ตอบแค่ว่าราคาต่ำกว่าทุนไหม ไม่ส่งตัวเลขทุนให้หน้าจอ */
-    public function priceCheck(Request $request, SaleBooking $booking, CreditSaleService $service): \Illuminate\Http\JsonResponse
+    public function priceCheck(Request $request, SaleBooking $booking, CreditSaleService $service): JsonResponse
     {
         abort_unless($request->user()->canAccessBranch((int) $booking->document->branch_id), 403);
         $data = $request->validate(['prices' => ['required', 'array', 'max:500'], 'prices.*' => ['nullable', 'numeric', 'min:0']]);
@@ -1031,6 +1070,7 @@ class BookingController extends Controller
         abort_unless($booking->status === SaleBooking::STATUS_CONVERTED && $booking->confirmed_document_id, 422, 'ต้องแปลงเป็นใบขายก่อนจึงจะตรวจบัญชีได้');
         $data = $request->validate(['status' => ['required', 'in:approved,rejected'], 'note' => ['nullable', 'string', 'max:1000']]);
         $booking->update(['accounting_review_status' => $data['status'], 'accounting_reviewed_by' => $request->user()->id, 'accounting_reviewed_at' => now(), 'accounting_review_note' => $data['note'] ?? null]);
+
         return back()->with('success', $data['status'] === 'approved' ? 'ตรวจบัญชีผ่านแล้ว' : 'ตีกลับเอกสารให้แก้ไขแล้ว');
     }
 }

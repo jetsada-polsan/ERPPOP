@@ -239,17 +239,41 @@
                                             @endif
                                         </td>
                                         <td>
+                                            <template x-if="item.units && item.units.length > 1">
+                                                <select class="doc-select mb-1" style="height:26px; padding:1px 4px; font-size:11px;" x-model="item.unit_id" @change="onUnitChanged(index)">
+                                                    <template x-for="u in item.units" :key="u.unit_id">
+                                                        <option :value="u.unit_id" x-text="u.name + (u.factor > 1 ? ' (x' + u.factor + ')' : '')"></option>
+                                                    </template>
+                                                </select>
+                                            </template>
                                             <div class="qty-control">
                                                 <button type="button" class="qty-step" @click="adjustQty(index, -1)" :aria-label="'ลดจำนวน ' + (item.unit_name || '')">−</button>
-                                                <input type="number" :step="item.is_scale ? '0.01' : '1'" :min="item.is_scale ? '0.01' : '1'" :name="`items[${index}][qty]`" x-model.number="item.qty" required class="doc-input text-end" :title="item.is_scale ? 'น้ำหนักจริง เพิ่ม/ลดทีละ 0.01 เช่น 2.35 กก.' : 'จำนวนเต็มตามหน่วยขาย เพิ่ม/ลดทีละ 1 เช่น 1 แพ็ค'">
+                                                <input type="number" :step="item.is_scale ? '0.01' : '1'" :min="item.is_scale ? '0.01' : '1'" :name="`items[${index}][unit_qty]`" x-model.number="item.unit_qty" @input="updateLineFromUnitQty(index)" required class="doc-input text-end" :title="item.is_scale ? 'น้ำหนักจริง เพิ่ม/ลดทีละ 0.01 เช่น 2.35 กก.' : 'จำนวนเต็มตามหน่วยขาย เพิ่ม/ลดทีละ 1 เช่น 1 แพ็ค'">
                                                 <button type="button" class="qty-step" @click="adjustQty(index, 1)" :aria-label="'เพิ่มจำนวน ' + (item.unit_name || '')">+</button>
                                             </div>
-                                            <small class="d-block text-end text-success fw-bold" x-text="item.is_scale ? (item.unit_name || 'หน่วยชั่ง') + ' · ละ 0.01' : (item.unit_name || 'หน่วยขาย') + ' · ละ 1'"></small>
+                                            <input type="hidden" :name="`items[${index}][qty]`" :value="item.qty">
+                                            <input type="hidden" :name="`items[${index}][unit_id]`" :value="item.unit_id || ''">
+                                            <input type="hidden" :name="`items[${index}][unit_factor]`" :value="item.unit_factor || 1">
+                                            <template x-if="item.unit_factor > 1">
+                                                <small class="d-block text-end text-primary fw-bold" x-text="'= ' + (item.unit_qty * item.unit_factor) + ' ' + (item.base_unit_name || 'หน่วยหลัก')"></small>
+                                            </template>
+                                            <template x-if="!item.unit_factor || item.unit_factor <= 1">
+                                                <small class="d-block text-end text-success fw-bold" x-text="item.is_scale ? (item.unit_name || 'หน่วยชั่ง') + ' · ละ 0.01' : (item.unit_name || 'หน่วยขาย') + ' · ละ 1'"></small>
+                                            </template>
                                         </td>
                                         <td>
-                                            <input type="number" step="0.01" min="0" :name="`items[${index}][unit_price]`" x-model.number="item.unit_price" required class="doc-input text-end" :title="item.is_scale ? 'ราคาขายต่อ ' + (item.unit_name || 'หน่วยฐาน') : 'ราคาต่อหน่วย'"><small x-show="item.is_scale" class="d-block text-end text-success fw-bold">/หน่วยชั่ง</small>
+                                            <input type="number" step="0.01" min="0" :name="`items[${index}][unit_price]`" x-model.number="item.unit_price" @input="checkPriceDivisibility(index)" required class="doc-input text-end" :title="item.is_scale ? 'ราคาขายต่อ ' + (item.unit_name || 'หน่วยฐาน') : 'ราคาต่อหน่วย'">
+                                            <template x-if="item.priceWarning">
+                                                <small class="d-block text-end text-danger fw-bold" style="font-size:10px;" x-text="item.priceWarning"></small>
+                                            </template>
+                                            <template x-if="!item.priceWarning && item.is_scale">
+                                                <small class="d-block text-end text-success fw-bold">/หน่วยชั่ง</small>
+                                            </template>
+                                            <template x-if="!item.priceWarning && !item.is_scale && item.unit_factor > 1">
+                                                <small class="d-block text-end text-muted">ต่อ<span x-text="item.unit_name"></span></small>
+                                            </template>
                                         </td>
-                                        <td class="doc-line-total">฿<span x-text="money(item.qty * item.unit_price)"></span></td>
+                                        <td class="doc-line-total">฿<span x-text="money((item.unit_qty !== undefined ? item.unit_qty : item.qty) * item.unit_price)"></span></td>
                                         <td class="del">
                                             <button type="button" class="doc-delete" @click="removeItem(index)" x-show="items.length > 1">
                                                 <i class="bi bi-trash"></i>

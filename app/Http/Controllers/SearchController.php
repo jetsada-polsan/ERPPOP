@@ -77,7 +77,7 @@ class SearchController extends Controller
 
         $products = Product::query()
             ->with(['baseUnit:id,name,qty_per_base_unit', 'barcodes' => fn ($query) => $query
-                ->where('is_active', true)->orderBy('id')])
+                ->where('is_active', true)->with('unit')->orderBy('id')])
             ->when($includeLots, fn ($query) => $query->with(['stockLots' => fn ($lots) => $lots
                 ->whereHas('warehouseLocation.warehouse', fn ($warehouse) => $warehouse->where('branch_id', $branchId))
                 ->whereHas('movements', fn ($movement) => $movement->whereIn('movement_type', ['out', 'transfer_out']))
@@ -112,8 +112,13 @@ class SearchController extends Controller
                 ->keyBy('product_id')
             : collect();
 
-        $products = $products->map(function (Product $product) use ($includeLots, $locationId, $stockByProduct) {
+        $products = $products->map(function (Product $product) use ($includeLots, $locationId, $stockByProduct, $search) {
             $stock = $stockByProduct->get($product->id);
+
+            $matchedBarcode = $search !== ''
+                ? $product->barcodes->first(fn ($b) => mb_strtolower((string) $b->barcode) === $search)
+                : null;
+            $matchedUnitId = $matchedBarcode?->unit_id ?: null;
 
             return [
                 'id' => $product->id,
@@ -122,7 +127,11 @@ class SearchController extends Controller
                 'default_price' => (float) ($product->default_price ?? 0),
                 'tracks_expiry' => $product->tracks_expiry,
                 'shelf_life_days' => $product->shelf_life_days,
+                'base_unit_id' => $product->base_unit_id,
+                'base_unit_name' => $product->baseUnit?->cleanName() ?? '-',
                 'unit_name' => $product->baseUnit?->displayLabel() ?? '-',
+                'units' => \App\Support\UnitQty::selectableUnits($product),
+                'matched_unit_id' => $matchedUnitId,
                 'barcode' => $product->barcodes->first()?->barcode,
                 'scale_plu' => $product->barcodes
                     ->first(fn ($barcode) => preg_match('/^80[01][0-9]{3}$/', (string) $barcode->barcode) === 1)

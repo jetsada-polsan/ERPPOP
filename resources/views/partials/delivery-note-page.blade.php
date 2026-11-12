@@ -58,7 +58,7 @@
                 <td>{{ $item->product->name_th }}</td>
                 <td>{{ $item->product->baseUnit?->cleanName() ?? '-' }}</td>
                 <td class="text-end">{{ number_format($item->unit_price ?? 0, 2) }}</td>
-                <td class="text-end">{{ number_format($item->qty, 2) }}</td>
+                <td class="text-end"><x-unit-qty :item="$item" /></td>
                 <td class="text-end">{{ number_format(($item->unit_price ?? 0) * $item->qty, 2) }}</td>
             </tr>
             @endforeach

@@ -60,14 +60,14 @@
                             <td class="fw-semibold" style="color:var(--erp-primary)" x-text="row.sku"></td>
                             <td x-text="row.name"></td>
                             <td class="text-muted" x-text="row.unit"></td>
-                            <td class="text-end" x-text="money(row.expected)"></td>
+                            <td class="text-end" x-text="row.expected_display || money(row.expected)"></td>
                             <td class="text-end">
                                 @if($receipt->isEditable())
                                 <input type="number" step="0.0001" min="0" class="form-control form-control-sm text-end str-input"
                                     :value="row.scanned"
                                     @input="setScanned(row, $event.target.value)">
                                 @else
-                                <span x-text="row.scanned !== null ? money(row.scanned) : '-'"></span>
+                                <span x-text="row.scanned_display ?? (row.scanned !== null ? money(row.scanned) : '-')"></span>
                                 @endif
                             </td>
                             <td class="text-end fw-bold" :style="diffStyle(row)" x-text="diffText(row)"></td>

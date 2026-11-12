@@ -77,7 +77,8 @@
             <table class="w-full text-sm">
                 <thead>
                     <tr class="text-left text-gray-500 border-b">
-                        <th class="py-2 w-1/2">สินค้า</th>
+                        <th class="py-2 w-1/3">สินค้า</th>
+                        <th class="w-28">หน่วย</th>
                         <th class="text-right">จำนวน</th>
                         <th class="text-right">ราคา/หน่วย</th>
                         <th class="text-right">รวม</th>
@@ -104,15 +105,30 @@
                                     </template>
                                 </div>
                             </td>
+                            <td>
+                                <template x-if="item.units && item.units.length > 1">
+                                    <select class="w-full border rounded px-1 py-1 text-xs" x-model="item.unit_id" @change="onUnitChanged(idx)">
+                                        <template x-for="u in item.units" :key="u.unit_id">
+                                            <option :value="u.unit_id" x-text="u.name + (u.factor > 1 ? ' (x' + u.factor + ')' : '')"></option>
+                                        </template>
+                                    </select>
+                                </template>
+                                <span x-show="!item.units || item.units.length <= 1" class="text-xs text-gray-500" x-text="item.unit_name || '-'"></span>
+                            </td>
                             <td class="text-right">
-                                <input type="number" step="0.0001" min="0.0001" :name="`items[${idx}][qty]`"
-                                    x-model.number="item.qty" required class="w-20 border rounded px-2 py-1.5 text-right">
+                                <input type="number" step="0.0001" min="0.0001" :name="`items[${idx}][unit_qty]`"
+                                    x-model.number="item.unit_qty" @input="updateLine(idx)" required class="w-20 border rounded px-2 py-1.5 text-right">
+                                <input type="hidden" :name="`items[${idx}][qty]`" :value="item.qty">
+                                <input type="hidden" :name="`items[${idx}][unit_id]`" :value="item.unit_id || ''">
+                                <input type="hidden" :name="`items[${idx}][unit_factor]`" :value="item.unit_factor || 1">
+                                <div x-show="item.unit_factor > 1" class="text-xs text-blue-600 font-semibold" x-text="'= ' + (item.unit_qty * item.unit_factor) + ' ' + (item.base_unit_name || '')"></div>
                             </td>
                             <td class="text-right">
                                 <input type="number" step="0.01" min="0" :name="`items[${idx}][unit_price]`"
-                                    x-model.number="item.unit_price" required class="w-28 border rounded px-2 py-1.5 text-right">
+                                    x-model.number="item.unit_price" @input="checkPrice(idx)" required class="w-28 border rounded px-2 py-1.5 text-right">
+                                <div x-show="item.priceWarning" class="text-xs text-red-600 font-semibold" x-text="item.priceWarning"></div>
                             </td>
-                            <td class="text-right" x-text="(item.qty * item.unit_price).toFixed(2)"></td>
+                            <td class="text-right" x-text="((item.unit_qty !== undefined ? item.unit_qty : item.qty) * item.unit_price).toFixed(2)"></td>
                             <td class="text-center">
                                 <button type="button" @click="removeItem(idx)" class="text-red-500 hover:underline" x-show="items.length > 1">ลบ</button>
                             </td>
@@ -121,7 +137,7 @@
                 </tbody>
                 <tfoot>
                     <tr class="font-semibold">
-                        <td colspan="3" class="text-right py-2">รวมทั้งสิ้น</td>
+                        <td colspan="4" class="text-right py-2">รวมทั้งสิ้น</td>
                         <td class="text-right" x-text="totalAmount.toFixed(2)"></td>
                         <td></td>
                     </tr>
@@ -321,11 +337,68 @@
                 item.controller?.abort();
                 item.product_id = p.id;
                 item.productQuery = `${p.sku_code} - ${p.name_th}`;
-                item.unit_price = Number(p.default_price ?? 0);
+                item.units = p.units || [];
+                item.base_unit_name = p.base_unit_name || p.unit_name || '';
+
+                let selectedUnit = null;
+                if (p.matched_unit_id && item.units.length) {
+                    selectedUnit = item.units.find(u => Number(u.unit_id) === Number(p.matched_unit_id));
+                }
+                if (!selectedUnit && item.units.length) {
+                    selectedUnit = item.units.find(u => Number(u.unit_id) === Number(p.base_unit_id)) || item.units[0];
+                }
+
+                if (selectedUnit) {
+                    item.unit_id = selectedUnit.unit_id;
+                    item.unit_name = selectedUnit.name;
+                    item.unit_factor = Number(selectedUnit.factor) || 1;
+                    item.unit_price = Number((Number(p.default_price || 0) * item.unit_factor).toFixed(2));
+                } else {
+                    item.unit_id = p.base_unit_id || '';
+                    item.unit_name = p.unit_name || '';
+                    item.unit_factor = 1;
+                    item.unit_price = Number(p.default_price || 0);
+                }
+
+                item.unit_qty = 1;
+                item.qty = item.unit_qty * item.unit_factor;
+                item.priceWarning = '';
                 item.results = [];
             },
+            onUnitChanged(idx) {
+                const item = this.items[idx];
+                const selected = (item.units || []).find(u => String(u.unit_id) === String(item.unit_id));
+                if (selected) {
+                    const oldFactor = item.unit_factor || 1;
+                    const basePrice = (Number(item.unit_price) || 0) / oldFactor;
+                    item.unit_name = selected.name;
+                    item.unit_factor = Number(selected.factor) || 1;
+                    item.unit_price = Number((basePrice * item.unit_factor).toFixed(2));
+                    item.qty = (Number(item.unit_qty) || 0) * item.unit_factor;
+                }
+                this.checkPrice(idx);
+            },
+            updateLine(idx) {
+                const item = this.items[idx];
+                item.qty = (Number(item.unit_qty) || 0) * (item.unit_factor || 1);
+            },
+            checkPrice(idx) {
+                const item = this.items[idx];
+                const factor = item.unit_factor || 1;
+                if (factor > 1) {
+                    const typed = Number(item.unit_price) || 0;
+                    const perBase = Math.round((typed / factor) * 10000) / 10000;
+                    if (Math.abs((perBase * factor) - typed) > 0.0001) {
+                        item.priceWarning = `ราคาหาร ${factor} ไม่ลงตัวที่ 4 ทศนิยม`;
+                    } else {
+                        item.priceWarning = '';
+                    }
+                } else {
+                    item.priceWarning = '';
+                }
+            },
             get totalAmount() {
-                return this.items.reduce((sum, i) => sum + (parseFloat(i.qty) || 0) * (parseFloat(i.unit_price) || 0), 0);
+                return this.items.reduce((sum, i) => sum + (parseFloat(i.unit_qty !== undefined ? i.unit_qty : i.qty) || 0) * (parseFloat(i.unit_price) || 0), 0);
             },
             onSubmit(e) {
                 if (!this.customerId) {
@@ -336,6 +409,11 @@
                 if (this.items.some(i => !i.product_id)) {
                     e.preventDefault();
                     window.erpPopup('warning', 'กรุณาเลือกสินค้าให้ครบทุกรายการ');
+                    return;
+                }
+                if (this.items.some(i => i.priceWarning)) {
+                    e.preventDefault();
+                    Swal.fire({ icon: 'error', title: 'ราคาต่อหน่วยหารไม่ลงตัว', text: 'กรุณาแก้ไขราคาต่อหน่วยให้หารลงตัวที่ 4 ทศนิยมก่อนบันทึก' });
                     return;
                 }
                 this.submitting = true;

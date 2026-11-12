@@ -59,7 +59,7 @@ class StockAdjustmentController extends Controller
 
     public function show(Document $stockAdjustment): View
     {
-        $stockAdjustment->load(['branch', 'stockDocument.items.product', 'stockDocument.items.warehouseLocation']);
+        $stockAdjustment->load(['branch', 'stockDocument.items.product.baseUnit', 'stockDocument.items.product.barcodes.unit', 'stockDocument.items.warehouseLocation']);
         $errorMessage = Cache::get("stock_adjustment_error_{$stockAdjustment->id}");
 
         return view('stock-adjustments.show', [
