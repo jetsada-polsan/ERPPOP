@@ -427,10 +427,12 @@ class SalesDocumentEndToEndTest extends TestCase
         $this->assertTrue($check->json("below_cost.$itemId"));
         $this->assertStringNotContainsString('60', $check->getContent());
 
-        // พนักงานทั่วไปบันทึกราคาต่ำกว่าทุนไม่ได้
+        // พนักงานทั่วไปบันทึกราคาต่ำกว่าทุนได้ แต่ยังไม่ออกใบขาย — ส่งให้ผู้จัดการอนุมัติ (เจ้าของ 13 พ.ย.)
         $web->post(route('bookings.bill.store', $booking), ['bills' => ['DSN' => ['lines' => [['booking_item_id' => $itemId, 'qty' => 2, 'unit_price' => 50]]]]])
-            ->assertSessionHas('error');
+            ->assertRedirect(route('bookings.show', $booking))->assertSessionHas('success');
         $this->assertSame(0, Document::where('source_document_id', $bookingDocument->id)->count());
+        $this->assertSame('pending', $booking->fresh()->price_approval_status);
+        $booking->update(['price_approval_status' => 'rejected']);
 
         // จำนวนเกินยอดค้างไม่ได้
         $web->post(route('bookings.bill.store', $booking), ['bills' => ['DSN' => ['lines' => [['booking_item_id' => $itemId, 'qty' => 6, 'unit_price' => 120]]]]])
@@ -493,6 +495,42 @@ class SalesDocumentEndToEndTest extends TestCase
         $balance = StockBalance::where('product_id', $product->id)->where('warehouse_location_id', $location->id)->sole();
         $this->assertSame(0.0, (float) $balance->reserved_qty, 'ปิดยอดค้างแล้วต้องคืนสต๊อกที่กัน');
         $this->assertSame(9.0, (float) $balance->on_hand_qty);
+    }
+
+    public function test_staff_below_cost_bill_waits_for_a_manager_who_approves_and_bills_it(): void
+    {
+        [$branch, $location, $product, $customer] = $this->stockedBranch('APRV', qty: 10, unitCost: 60, withCustomer: true);
+        $bookingDocument = app(BookingService::class)->create([
+            'branch_id' => $branch->id, 'customer_id' => $customer->id,
+            'items' => [['product_id' => $product->id, 'qty' => 10, 'unit_price' => 100]],
+        ]);
+        $booking = SaleBooking::where('document_id', $bookingDocument->id)->sole();
+        $itemId = $bookingDocument->stockDocument->items()->value('id');
+        $staff = User::factory()->create(['is_active' => true, 'must_change_password' => false]);
+        $manager = User::factory()->create(['is_active' => true, 'must_change_password' => false]);
+        $manager->roles()->attach(\App\Models\Role::where('code', 'GM')->value('id'));
+        $this->withoutMiddleware(\App\Http\Middleware\ErpAuthorize::class);
+
+        // ฝ่ายขาย: ปีกบน 10 กก. ราคา 55 (ทุน 60) — บันทึกได้ เด้งไปรออนุมัติ
+        $this->actingAs($staff)->get(route('bookings.bill', $booking))->assertOk()->assertSee('ส่งให้ผู้จัดการอนุมัติราคา');
+        $this->actingAs($staff)->post(route('bookings.bill.store', $booking), ['bills' => ['DSN' => ['credit_days' => 7,
+            'lines' => [['booking_item_id' => $itemId, 'qty' => 10, 'unit_price' => 55]]]]])
+            ->assertRedirect(route('bookings.show', $booking));
+        $this->assertSame('pending', $booking->fresh()->price_approval_status);
+        $this->assertSame(0, Document::where('source_document_id', $bookingDocument->id)->count());
+        $this->actingAs($staff)->post(route('bookings.price-approval', $booking), ['decision' => 'approve'])->assertForbidden();
+
+        // ผู้จัดการเห็นในหน้าใบจองแล้วกดอนุมัติ → ออกใบขายตามราคาที่ขอ
+        $this->actingAs($manager)->get(route('bookings.show', $booking))->assertOk()->assertSee('รอผู้จัดการอนุมัติ')->assertSee('อนุมัติ ออกใบขาย');
+        $this->actingAs($manager)->post(route('bookings.price-approval', $booking), ['decision' => 'approve', 'note' => 'ลูกค้าประจำ'])
+            ->assertRedirect(route('bookings.show', $booking))->assertSessionHas('success');
+
+        $sale = Document::where('source_document_id', $bookingDocument->id)->sole();
+        $this->assertSame(550.0, (float) $sale->total_amount);
+        $this->assertGlBalanced($sale);
+        $this->assertSame('approved', $booking->fresh()->price_approval_status);
+        $this->assertSame($manager->id, (int) $booking->fresh()->price_approval_decided_by);
+        $this->assertSame(SaleBooking::STATUS_CONVERTED, $booking->fresh()->status);
     }
 
     private function expectsCancelToFail(SaleBooking $booking): void

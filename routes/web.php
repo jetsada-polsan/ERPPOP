@@ -282,6 +282,7 @@ Route::prefix('bookings')->name('bookings.')->group(function () {
     Route::post('/{booking}/close-remainder', [BookingController::class, 'closeRemainder'])->name('close-remainder');
     Route::post('/{booking}/revert-confirm', [BookingController::class, 'revertConfirm'])->name('revert-confirm');
     Route::post('/{booking}/approve-stock-shortage', [BookingController::class, 'approveStockShortage'])->name('approve-stock-shortage');
+    Route::post('/{booking}/price-approval', [BookingController::class, 'decidePriceApproval'])->name('price-approval');
     Route::post('/{booking}/cancel', [BookingController::class, 'cancel'])->name('cancel');
     Route::post('/{booking}/delivery', [BookingController::class, 'recordDelivery'])->name('delivery');
     Route::post('/{booking}/accounting-review', [BookingController::class, 'accountingReview'])->name('accounting-review');
