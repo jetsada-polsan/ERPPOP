@@ -826,6 +826,8 @@
         /* หัวตารางแบบ sticky จะลอยทับแถวแรกของทุกหน้าตอนพิมพ์ ต้องคืนเป็นปกติ */
         .report-data-table thead th { position: static !important; }
         .rpt-print-header { page-break-after: avoid; }
+        /* เจ้าของ 13 พ.ย. "หัวโลโก้ซ้อนกัน": รายงานมีหัวกระดาษของตัวเอง (โลโก้ ที่อยู่ ชื่อรายงาน) ซ่อนหัวกลางของ layout */
+        .erp-print-head { display: none !important; }
         a[href]::after { content: none !important; }   /* ไม่ต้องพ่น URL ต่อท้ายลิงก์ */
         .flow-report-shell, .rpt-shell { display: block; min-height: 0 !important; margin: 0; }
         .rpt-main { padding: 0 !important; }
