@@ -1949,7 +1949,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
                 self.coins.setCellWidget(row, 1, container)
                 # แถวต้องสูงกว่าปุ่ม 40 จุด + ขอบเซลล์ ไม่งั้นปุ่ม +/− ถูกตัด (เห็นจริงที่เครื่อง 13 พ.ย.)
-                self.coins.setRowHeight(row, 43)
+                self.coins.setRowHeight(row, 41)
                 entry.textChanged.connect(self.denominations)
 
             left_col.addWidget(self.coins, 1)
