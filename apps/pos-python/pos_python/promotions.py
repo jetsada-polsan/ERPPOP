@@ -92,8 +92,17 @@ def promotion_discounts(lines: list[PromoLine], promotions: Iterable[QtyPromotio
             if amount:
                 if breakdown is not None:
                     breakdown.append((promotion.name or promotion.promo_type, amount))
-                target = next(i for i, line in enumerate(lines) if line.product_id in promotion.product_ids)
-                result[target] = result.get(target, Decimal("0")) + amount
+                # เกลี่ยส่วนลดคละให้เฉพาะบรรทัดที่อยู่ในโปรนี้ ตามมูลค่า (เทส 13 พ.ย.: เดิมลงบรรทัดแรก
+                # แล้วเครื่องเกลี่ยทั้งบิล ส่วนลดไปโดนสินค้านอกโปร/ไม่มี VAT ทำให้ VAT และกำไรรายตัวเพี้ยน)
+                members = [i for i, line in enumerate(lines) if line.product_id in promotion.product_ids and _price(line) > 0]
+                weights = {i: lines[i].qty * _price(lines[i]) for i in members}
+                total_weight = sum(weights.values(), Decimal("0"))
+                left = amount
+                for n, i in enumerate(members):
+                    share = left if n == len(members) - 1 else (amount * weights[i] / total_weight if total_weight else Decimal("0"))
+                    share = min(share, left)
+                    result[i] = result.get(i, Decimal("0")) + share
+                    left -= share
             continue
         if promotion.promo_type.startswith("bill_"):
             continue

@@ -227,7 +227,18 @@ class Order:
                 result[i] += extra
                 remaining -= extra
             return result
-        allocation = allocate(promo, available)
+        # ส่วนลดที่รู้ว่าเป็นของบรรทัดไหน (ซื้อครบ/ราคาชุด/คละ/ลดรายตัว) ลงบรรทัดนั้นตรงๆ
+        # ที่เหลือ (ส่วนลดทั้งบิล เศษปัด) ค่อยเกลี่ยตามสัดส่วนเหมือนเดิม — VAT/กำไรรายสินค้าจะถูก
+        targeted_promos = [p for p in promotions if p.promo_type in ("discount", "bundle_price", "mix_bundle")]
+        targeted = promotion_discounts(self.lines, targeted_promos, rounded=False) if targeted_promos else {}
+        allocation = {}
+        left = promo
+        for i, cap in enumerate(available):
+            share = min(cap, left, money(targeted.get(i, Decimal("0"))))
+            allocation[i] = share
+            left -= share
+        rest = allocate(left, [v - allocation[i] for i, v in enumerate(available)])
+        allocation = {i: allocation[i] + rest[i] for i in allocation}
         manual_allocation = allocate(manual, [v - allocation[i] for i, v in enumerate(available)])
         return promo, manual, allocation, manual_allocation, gifts, breakdown
 

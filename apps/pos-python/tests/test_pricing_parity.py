@@ -106,7 +106,9 @@ def test_combined_product_bill_manual_proportional_and_approval():
     cart = order.to_cart_lines()
     assert sum(l.qty * l.unit_price - l.discount - l.promo_discount for l in cart) == 165
     assert all(l.discount + l.promo_discount <= l.qty * l.unit_price for l in cart)
-    assert cart[0].promo_discount == D('21.82')
+    # ราคาชุดลด 20 ลงบรรทัดตัวเอง + ส่วนลดทั้งบิล 20 เกลี่ยตามยอดหลังหัก (100/200) = 10 → 30
+    # (เดิมเกลี่ยทั้ง 40 ตามสัดส่วนได้ 21.82 ทำให้ราคาต่อสินค้าใน ERP เพี้ยน)
+    assert cart[0].promo_discount == D('30.00')
 
 
 def test_erp_aggregates_quantity_even_for_duplicate_scale_lines():
@@ -268,3 +270,18 @@ def test_mix_promotion_sums_split_weighed_lines_like_erp():
     bundle = promo('mix_bundle', product_ids=(1, 2, 3), min_qty=3, bundle_price=100)
     # ชิ้นเต็ม: สินค้า1 = 1, สินค้า2 = 1, สินค้า3 = 2 รวม 4 ชิ้น ชุดละ 3: (45+40+35.5) - 100 = 20.5
     assert total(lines, [bundle]).promotion_total() == D('20.50')
+
+
+def test_mix_discount_stays_on_its_own_lines_so_vat_and_margin_are_right():
+    """เทส production 13 พ.ย.: บิล 194 บาท โปรคละ 3 แพ็ค 100 ลด 19 ต้องลงแค่ 3 ตัวในโปร
+    เดิมเกลี่ยทั้งบิล น้ำหวาน/ไก่ยอที่ไม่ได้อยู่ในโปรโดนลดด้วย และไก่แดดเดียว (ไม่มี VAT) รับส่วนลดผิดสัดส่วน"""
+    syrup, bun1, bun2, chicken, roll = (line(301412, 59), line(204082, 35), line(204083, 35), line(204130, 49), line(501539, 35))
+    chicken.is_vat = False
+    order = total([syrup, bun1, bun2, chicken, roll],
+                  [promo('mix_bundle', product_ids=(204082, 204083, 204130), min_qty=3, bundle_price=100)])
+    assert order.grand_total() == 194
+    cart = {c.product_id: c for c in order.to_cart_lines()}
+    net = {pid: c.qty * c.unit_price - c.discount - c.promo_discount for pid, c in cart.items()}
+    assert net[301412] == 59 and net[501539] == 35, "สินค้านอกโปรต้องเต็มราคา"
+    assert net[204082] + net[204083] + net[204130] == 100
+    assert net[204082] == D("29.41") and net[204130] == D("41.18")
