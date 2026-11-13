@@ -1844,7 +1844,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.amount = QLineEdit()
             self.amount.setAlignment(Qt.AlignRight)
             self.amount.installEventFilter(self)
-            self.kept = QLineEdit(str(cash(policy['default_float'])))
+            opening = getattr(parent, 'opening_cash', None)
+            self.kept = QLineEdit(str(cash(opening) if opening is not None else cash(policy['default_float'])))
             self.kept.setAlignment(Qt.AlignRight)
             self.reference = QLineEdit()
             self.reference.setMaxLength(80)
@@ -2126,10 +2127,15 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             for entry in self.coin_fields:
                 entry.setText('0')
 
+        def keep_target(self):
+            # เจ้าของ 13 พ.ย.: เงินทอนที่เก็บไว้ = เงินทอนต้นกะ (เช่น 1,500) ที่เหลือนำส่งทั้งหมด
+            opening = getattr(self.parent(), 'opening_cash', None)
+            return cash(opening) if opening is not None else cash(self.protocol.policy['default_float'])
+
         def default_kept(self):
             if not self.kept_edited:
                 try:
-                    self.kept.setText(str(min(cash(self.amount.text()), cash(self.protocol.policy['default_float']))))
+                    self.kept.setText(str(min(cash(self.amount.text()), self.keep_target())))
                 except ValueError:
                     pass
 
@@ -3669,7 +3675,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 # Server close succeeded. Reconcile local state without creating a retry event.
                 with service.db:
                     service.db.execute("UPDATE shifts SET status='closed', closed_at=?, counted_cash=?, cash_difference=?, closing_note=? WHERE id=?",
-                        (saved.get('closed_at') or service._now(), str(cash(saved['counted_cash'])),
+                        (erp_local_to_utc(saved.get('closed_at')) or service._now(), str(cash(saved['counted_cash'])),
                          str(Decimal(str(saved['cash_difference']))), dialog.note.text(), self.shift_id))
                 SettingsService(service.db).set_device_setting('last_z_report', saved)
                 SettingsService(service.db).set_device_setting('uncertain_float_close', None)
@@ -4145,6 +4151,21 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
     if online is not None:
         app.aboutToQuit.connect(online.worker.stop)
     return window
+
+
+def erp_local_to_utc(value):
+    """ERP ส่ง closed_at เป็นเวลาไทยไม่มีเขตเวลา ('2026-11-13 22:13:05') เครื่องเก็บเป็น UTC
+    เดิมเก็บตรงๆ แล้วตอนแสดงบวก 7 ซ้ำ Z Report ขึ้น "ปิด 14/11 05:13" (เทสจริง 13 พ.ย.)"""
+    from datetime import datetime, timedelta, timezone
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone(timedelta(hours=7)))
+    return parsed.astimezone(timezone.utc).isoformat()
 
 
 def _cached_layout(db) -> dict:
