@@ -11,7 +11,6 @@ from decimal import Decimal
 
 from .services import money
 from .time_service import local_datetime_text
-from .promptpay import compact_qr_lines
 
 # สระบนล่างและวรรณยุกต์ไทยไม่กินความกว้างตอนพิมพ์ นับด้วย len() ตรง ๆ
 # แล้วคอลัมน์ขวาจะเยื้องทีละนิดจนตัวเลขไม่ตรงแถวกัน
@@ -122,13 +121,8 @@ def render(db: sqlite3.Connection, sale_id: int, *, company: dict | None = None,
             lines.append(columns("เลขอ้างอิง", str(payment["reference"]), width))
         if change > 0:
             lines.append(columns("เงินทอน", f"{change:,.2f}", width))
-        if payment["method"] == "transfer" and payment["qr_payload"]:
-            lines.append(rule(width))
-            lines.append(centre("สแกน QR เพื่อชำระยอดนี้", width))
-            for qr_line in compact_qr_lines(str(payment["qr_payload"])):
-                lines.append(centre(qr_line, width))
-            if payment["reference"]:
-                lines.append(centre(f"บัญชี {payment['reference']}", width))
+        # เจ้าของ 13 พ.ย.: "QR ท้ายบิลไม่เอามาแสดง" — ลูกค้าจ่ายแล้ว QR ให้สแกนบนใบเสร็จไม่จำเป็น
+        # (QR ยังแสดงบนจอตอนรับเงินเหมือนเดิม)
         if payment["method"] == "transfer" and payment["transfer_account_last4"]:
             lines.append(columns("เลขท้ายบัญชีผู้โอน", str(payment["transfer_account_last4"]), width))
 

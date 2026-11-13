@@ -125,7 +125,8 @@ class ReceiptContentTest(unittest.TestCase):
         self.assertIn("เงินทอน", text)
         self.assertIn("10.20", text)
 
-    def test_qr_transfer_prints_the_same_scannable_payload_on_the_receipt(self) -> None:
+    def test_qr_transfer_receipt_has_no_qr_code_at_the_bottom(self) -> None:
+        """เจ้าของ 13 พ.ย.: ไม่เอา QR ท้ายบิล — ใบเสร็จโอนแสดงยอดและเลขอ้างอิงพอ"""
         payload = promptpay_payload("0812345678", "25.00")
         sale_id = self.pos.checkout(
             document_no="PS-HQ-QR-0001", branch_id=1, terminal_id="POS-01", shift_id=self.shift_id,
@@ -136,13 +137,12 @@ class ReceiptContentTest(unittest.TestCase):
         lines = render(self.db, sale_id, company=COMPANY, paper_width_mm=58)
         text = "\n".join(lines)
         self.assertIn("โอนเงิน / QR", text)
-        self.assertIn("สแกน QR เพื่อชำระยอดนี้", text)
         self.assertIn("QR-HQ", text)
-        self.assertTrue(any(any(character in line for character in "█▀▄") for line in lines))
-        qr_lines = [line.strip() for line in lines if any(character in line for character in "█▀▄")]
-        self.assertLessEqual(max(map(len, qr_lines)), 35, "QR 35 modules ยังอยู่ในพื้นที่พิมพ์ 384 dots ของกระดาษ 58mm")
+        self.assertIn("4821", text)
+        self.assertNotIn("สแกน QR เพื่อชำระยอดนี้", text)
+        self.assertFalse(any(any(character in line for character in "█▀▄") for line in lines), "ไม่พิมพ์ QR")
         for line in lines:
-            if line.strip() and line.strip() not in qr_lines:
+            if line.strip():
                 self.assertLessEqual(display_width(line), 32, f"ข้อความล้น 58mm: {line!r}")
 
     def test_a_weighed_line_shows_its_weight_not_a_piece_count(self) -> None:
