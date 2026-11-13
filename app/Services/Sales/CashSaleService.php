@@ -104,6 +104,9 @@ class CashSaleService
                     'warehouse_location_id' => $branch->default_warehouse_location_id,
                     'qty' => $qty,
                     'unit_price' => $item['unit_price'],
+                    'unit_id' => $item['unit_id'] ?? null,
+                    'unit_qty' => $item['unit_qty'] ?? null,
+                    'unit_factor' => $item['unit_factor'] ?? null,
                     'unit_cost' => $unitCost,
                     'cost_amount' => DecimalMath::multiply($qty, $unitCost),
                 ]);
