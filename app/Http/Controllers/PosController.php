@@ -569,9 +569,10 @@ class PosController extends Controller
             $product->margin_percent = (float) DecimalMath::round($margin, 4);
             $product->margin_warning = $product->minimum_margin_percent !== null
                 && DecimalMath::compare($margin, $product->minimum_margin_percent) < 0;
+            // is_vat ต้องส่งให้เครื่อง POS ไม่งั้นเครื่องถือว่าทุกตัวเสีย VAT (ค่าเริ่มต้น)
+            // เทส 13 พ.ย.: บิลมีไก่แดดเดียว (ไม่มี VAT) ใบเสร็จขึ้น VAT 12.69 ทั้งที่จริง 9.77
             $product->makeHidden([
                 'average_cost',
-                'is_vat',
                 'minimum_margin_percent',
                 'margin_control_policy',
             ]);
