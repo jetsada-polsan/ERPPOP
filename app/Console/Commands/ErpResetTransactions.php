@@ -46,7 +46,7 @@ class ErpResetTransactions extends Command
         'stock_movements', 'stock_lots', 'stock_lot_quality_checks', 'stock_counts', 'stock_count_items',
         'pos_receipts', 'pos_receipt_items', 'pos_receipt_discounts', 'pos_payments', 'pos_shifts',
         'pos_cash_movements', 'pos_held_bills', 'pos_receipt_returns', 'pos_logs', 'pos_preparation_jobs',
-        'sale_bookings', 'customer_open_items', 'customer_ledger', 'billing_notes', 'billing_note_items',
+        'sale_bookings', 'sale_booking_documents', 'customer_open_items', 'customer_ledger', 'billing_notes', 'billing_note_items',
         'purchase_orders', 'purchase_order_items', 'purchase_order_receipts', 'purchase_quotes',
         'purchase_quote_items', 'supplier_ledger', 'supplier_open_items', 'quotations', 'quotation_items',
         'supplier_withholdings', 'supplier_notes', 'approval_rules',
@@ -57,7 +57,7 @@ class ErpResetTransactions extends Command
         'depreciation_records', 'tax_filing_runs', 'etax_documents', 'accounting_export_runs',
         'member_point_transactions', 'ecommerce_orders', 'ecommerce_order_items',
         'pos_coupons', 'pos_receipt_return_items', 'pos_offline_sales',
-        'stock_lot_lineages', 'recall_cases', 'recall_contacts',
+        'stock_lot_lineages', 'recall_cases', 'recall_contacts', 'pos_api_idempotency',
         'purchase_cost_adjustments',
         // staging ของท่อนำเข้า POS เก่าที่ถอดออกไปแล้ว
         'imported_payments', 'imported_receipt_items', 'imported_receipts',
