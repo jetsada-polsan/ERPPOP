@@ -58,6 +58,14 @@ class PosCampaignRulesPayloadTest extends TestCase
         $products = collect(app(PosController::class)->products($request)->getData(true));
         $payload = fn (string $sku) => $products->firstWhere('sku_code', $sku)['campaigns'];
 
+        // เครื่อง POS ต้องรู้ว่าสินค้าตัวไหนไม่มี VAT ไม่งั้นใบเสร็จคิด VAT ทั้งบิล (เทส 13 พ.ย.)
+        $exempt = Product::create(['sku_code' => '204130', 'name_th' => 'ไก่แดดเดียว', 'base_unit_id' => $unit->id,
+            'default_price' => 49, 'average_cost' => 30, 'is_vat' => false, 'is_active' => true]);
+        $all = collect(app(PosController::class)->products($request)->getData(true));
+        $this->assertFalse((bool) $all->firstWhere('sku_code', '204130')['is_vat']);
+        $this->assertTrue((bool) $all->firstWhere('sku_code', '202151')['is_vat']);
+        $this->assertArrayNotHasKey('average_cost', $all->firstWhere('sku_code', '204130'), 'ต้นทุนยังต้องซ่อน');
+
         $promotions = $payload('202151')['promotions'];
         $this->assertCount(1, $promotions);
         $this->assertSame(0, bccomp($promotions[0]['discount_percent'], '10', 2));
