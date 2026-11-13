@@ -242,7 +242,7 @@
                                             <template x-if="item.units && item.units.length > 1">
                                                 <select class="doc-select mb-1" style="height:26px; padding:1px 4px; font-size:11px;" x-model="item.unit_id" @change="onUnitChanged(index)">
                                                     <template x-for="u in item.units" :key="u.unit_id">
-                                                        <option :value="u.unit_id" x-text="u.name + (u.factor > 1 ? ' (x' + u.factor + ')' : '')"></option>
+                                                        <option :value="u.unit_id" :selected="String(u.unit_id) === String(item.unit_id)" x-text="u.name + (u.factor > 1 ? ' (x' + u.factor + ')' : '')"></option>
                                                     </template>
                                                 </select>
                                             </template>

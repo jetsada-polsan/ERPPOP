@@ -109,7 +109,7 @@
                                 <template x-if="item.units && item.units.length > 1">
                                     <select class="w-full border rounded px-1 py-1 text-xs" x-model="item.unit_id" @change="onUnitChanged(idx)">
                                         <template x-for="u in item.units" :key="u.unit_id">
-                                            <option :value="u.unit_id" x-text="u.name + (u.factor > 1 ? ' (x' + u.factor + ')' : '')"></option>
+                                            <option :value="u.unit_id" :selected="String(u.unit_id) === String(item.unit_id)" x-text="u.name + (u.factor > 1 ? ' (x' + u.factor + ')' : '')"></option>
                                         </template>
                                     </select>
                                 </template>
