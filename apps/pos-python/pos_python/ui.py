@@ -1883,7 +1883,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.coins.horizontalHeader().setFixedHeight(20)
             self.coins.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
             self.coins.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-            self.coins.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+            # หน้าจอ POS 1366x768: คอลัมน์ยอดถูกบีบจนมองไม่เห็น ล็อกความกว้างไว้ (เจ้าของ 13 พ.ย.)
+            self.coins.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
+            self.coins.setColumnWidth(2, 110)
             self.coins.verticalHeader().hide()
             self.coins.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
             self.coins.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -1903,14 +1905,13 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
                 btn_minus = QPushButton('−')
                 btn_minus.setObjectName(f'btnCoinMinus_{row}')
-                btn_minus.setMinimumSize(44, 40)
-                btn_minus.setMaximumSize(48, 40)
+                btn_minus.setFixedSize(44, 40)
                 btn_minus.setAutoRepeat(True)
                 btn_minus.setAutoRepeatDelay(400)
                 btn_minus.setAutoRepeatInterval(80)
                 btn_minus.setFocusPolicy(Qt.NoFocus)
                 btn_minus.setStyleSheet(
-                    f"QPushButton {{ min-width:44px; max-width:48px; min-height:40px; max-height:40px; font-size:22px; font-weight:800; "
+                    f"QPushButton {{ min-width:44px; max-width:44px; min-height:40px; max-height:40px; font-size:22px; font-weight:800; "
                     f"background:{PALETTE['surface']}; color:{PALETTE['primary_dark']}; "
                     f"border:1px solid {PALETTE['border']}; border-radius:8px; padding:0; }} "
                     f"QPushButton:pressed {{ background:{PALETTE['primary_soft']}; border-color:{PALETTE['primary']}; }}"
@@ -1918,20 +1919,19 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
 
                 entry = QLineEdit('0')
                 entry.setAlignment(Qt.AlignCenter)
-                entry.setStyleSheet('min-height:28px; font-size:18px; padding:2px 4px;')
+                entry.setStyleSheet('min-height:26px; max-height:30px; font-size:18px; padding:0px 4px;')
                 entry.installEventFilter(self)
                 self.coin_fields.append(entry)
 
                 btn_plus = QPushButton('+')
                 btn_plus.setObjectName(f'btnCoinPlus_{row}')
-                btn_plus.setMinimumSize(44, 40)
-                btn_plus.setMaximumSize(48, 40)
+                btn_plus.setFixedSize(44, 40)
                 btn_plus.setAutoRepeat(True)
                 btn_plus.setAutoRepeatDelay(400)
                 btn_plus.setAutoRepeatInterval(80)
                 btn_plus.setFocusPolicy(Qt.NoFocus)
                 btn_plus.setStyleSheet(
-                    f"QPushButton {{ min-width:44px; max-width:48px; min-height:40px; max-height:40px; font-size:22px; font-weight:800; "
+                    f"QPushButton {{ min-width:44px; max-width:44px; min-height:40px; max-height:40px; font-size:22px; font-weight:800; "
                     f"background:{PALETTE['surface']}; color:{PALETTE['primary_dark']}; "
                     f"border:1px solid {PALETTE['border']}; border-radius:8px; padding:0; }} "
                     f"QPushButton:pressed {{ background:{PALETTE['primary_soft']}; border-color:{PALETTE['primary']}; }}"
@@ -1948,7 +1948,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 cell_box.addWidget(btn_plus)
 
                 self.coins.setCellWidget(row, 1, container)
-                self.coins.setRowHeight(row, 40)
+                # แถวต้องสูงกว่าปุ่ม 40 จุด + ขอบเซลล์ ไม่งั้นปุ่ม +/− ถูกตัด (เห็นจริงที่เครื่อง 13 พ.ย.)
+                self.coins.setRowHeight(row, 43)
                 entry.textChanged.connect(self.denominations)
 
             left_col.addWidget(self.coins, 1)
@@ -2050,7 +2051,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             for field in self.fields:
                 field.textChanged.connect(self.invalidate)
             self.amount.textChanged.connect(self.default_kept)
-            self.amount.textChanged.connect(lambda: self.total.setText('รวม ' + self.amount.text() + ' บาท'))
+            self.amount.textChanged.connect(self._show_total)
             self.kept.textEdited.connect(lambda: setattr(self, 'kept_edited', True))
             self.invalidate()
             self.navigate(0)
@@ -2128,6 +2129,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.summary.clear()
             self.submit.setEnabled(False)
 
+        def _show_total(self, *_):
+            try:
+                self.total.setText(f'รวม {cash(self.amount.text() or "0"):,.2f} บาท')
+            except Exception:
+                self.total.setText('รวม ' + self.amount.text() + ' บาท')
+
         def denominations(self, *_):
             try:
                 total = Decimal('0')
@@ -2140,7 +2147,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     self.coins.item(row, 2).setFlags(Qt.ItemIsEnabled)
                     total += subtotal
                 self.error.clear()
-                self.amount.setText(str(total))
+                self.amount.setText(f'{total:.2f}')
                 self.next.setEnabled(True)
             except ValueError as error:
                 self.invalidate()
@@ -3280,6 +3287,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                             TouchMessage.warning(self, "เปิดลิ้นชักไม่สำเร็จ", cashier_error(error))
             detail = (f"เงินทอน {self.order.change_for(dialog.tendered()):,.2f} บาท"
                       if dialog.payment_method == "cash" else f"รับชำระ{dialog.method_buttons[dialog.payment_method].text()}แล้ว")
+            display = getattr(self, "customer_display", None)
+            if display is not None:
+                display.show_paid(self.order.change_for(dialog.tendered()) if dialog.payment_method == "cash" else None)
             TouchMessage.information(self, "รับชำระแล้ว", f"บิล {document_no}\n{detail}")
             self.order.clear()
             self.reset_mode_buttons()
@@ -3622,7 +3632,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 try:
                     response = online.provisioning.api.get(f"/api/pos/shift?branch_id={branch_id}&cashier_id={int(self.cashier['server_id'])}")
                     live = response.get('shift')
-                    if live and int(live['id']) == int(local['server_id']):
+                    # โหมดนับเงินแบบไม่เห็นยอด (blind count) ERP ไม่ส่ง expected_cash มา — ใช้ยอดในเครื่อง ไม่ใช่ error
+                    if live and int(live['id']) == int(local['server_id']) and live.get('expected_cash') is not None:
                         expected = money(str(live['expected_cash']))
                 except Exception as error:
                     self.status.setText(f"ใช้ยอดในเครื่อง · ดึงยอด ERP ไม่สำเร็จ: {error}")
@@ -4065,6 +4076,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             )
             self.vat_label.setText(f"รวม VAT {rate:g}% แล้ว ฿{self.order.vat_total(rate):,.2f}")
             self.grand_label.setText(f"฿{self.order.grand_total():,.2f}")
+            display = getattr(self, "customer_display", None)
+            if display is not None:
+                display.update_order(self.order)
             try:
                 summary = service.daily_sales_summary()
                 bills = summary.transaction_count - summary.void_count
@@ -4102,6 +4116,21 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
     window.setMinimumSize(960, 600)
     window.resize(1280, 820)
     window.showMaximized()
+    # จอลูกค้า: มีจอที่ 2 เปิดเต็มจอให้เอง ปิดได้ที่ตั้งค่า customer_display = 0 (เจ้าของ 13 พ.ย.)
+    try:
+        from PySide6.QtWidgets import QHeaderView as _QHeaderView, QTableWidget as _QTableWidget, QTableWidgetItem as _QTableWidgetItem
+        from .customer_display import build_customer_display, pick_customer_screen
+        screen = pick_customer_screen(app.screens())
+        if screen is not None and SettingsService(service.db).get_device_setting("customer_display", "1") != "0":
+            CustomerDisplay = build_customer_display(QWidget, QLabel, QVBoxLayout, QHBoxLayout, _QTableWidget, _QTableWidgetItem,
+                                                     _QHeaderView, Qt, SettingsService(service.db).get_device_setting("store_name", "ยินดีต้อนรับ"))
+            window.customer_display = CustomerDisplay()
+            window.customer_display.setGeometry(screen.geometry())
+            window.customer_display.showFullScreen()
+            window.customer_display.update_order(window.order)
+    except Exception as error:  # จอลูกค้าพังห้ามทำให้ขายไม่ได้
+        window.customer_display = None
+        print(f"customer display unavailable: {error}")
     if online is not None:
         app.aboutToQuit.connect(online.worker.stop)
     return window

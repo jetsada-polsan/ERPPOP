@@ -29,6 +29,8 @@ Source: "..\dist\PopCentral-POS\*"; DestDir: "{app}"; Flags: recursesubdirs igno
 [Icons]
 Name: "{autoprograms}\JET POS (UAT)"; Filename: "{app}\PopCentral-POS.exe"
 Name: "{autodesktop}\JET POS (UAT)"; Filename: "{app}\PopCentral-POS.exe"; Tasks: desktopicon
+; เจ้าของ 13 พ.ย.: เปิดเครื่องแล้ว POS ขึ้นเอง (จอลูกค้าเปิดตามเองถ้ามีจอที่ 2)
+Name: "{userstartup}\JET POS (UAT)"; Filename: "{app}\PopCentral-POS.exe"; Tasks: startupicon
 
 [InstallDelete]
 Type: files; Name: "{autodesktop}\POPSTAR Python POS.lnk"
@@ -36,6 +38,7 @@ Type: files; Name: "{autoprograms}\POPSTAR Python POS.lnk"
 
 [Tasks]
 Name: "desktopicon"; Description: "สร้างทางลัดบน Desktop"; GroupDescription: "ทางลัดเพิ่มเติม:"
+Name: "startupicon"; Description: "เปิด JET POS อัตโนมัติเมื่อเปิดเครื่อง"; GroupDescription: "ทางลัดเพิ่มเติม:"
 
 [Run]
 Filename: "{app}\PopCentral-POS.exe"; Description: "เปิด JET POS (UAT)"; Flags: nowait postinstall skipifsilent
