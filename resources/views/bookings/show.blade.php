@@ -183,10 +183,11 @@ $canEdit = $isPending && ! $billedAny && $booking->delivery_status === 'pending'
                     <i class="bi bi-pencil-square me-1"></i> แก้ไขใบจอง
                 </a>
             @endif
-            @if($isPending)
-                <form method="post" action="{{ route('bookings.cancel', $booking) }}" data-confirm="ยกเลิกใบจองนี้? ยอดจองจะคืนให้สต๊อก" data-confirm-tone="danger">
+            @if($isPending && auth()->user()?->hasPermission('documents.void'))
+                <form method="post" action="{{ route('bookings.cancel', $booking) }}" class="d-flex gap-2" data-confirm="ยกเลิกใบจองนี้? ยอดจองจะคืนให้สต๊อก" data-confirm-tone="danger">
                     @csrf
-                    <button class="btn btn-outline-danger">ยกเลิกใบจอง</button>
+                    <input type="text" name="reason" required maxlength="200" class="form-control" style="max-width:220px" placeholder="เหตุผลที่ยกเลิก">
+                    <button class="btn btn-outline-danger text-nowrap">ยกเลิกใบจอง (ผู้จัดการ)</button>
                 </form>
             @endif
             @if($isPending && $canConvert)

@@ -533,6 +533,29 @@ class SalesDocumentEndToEndTest extends TestCase
         $this->assertSame(SaleBooking::STATUS_CONVERTED, $booking->fresh()->status);
     }
 
+    public function test_only_a_manager_can_cancel_a_booking(): void
+    {
+        [$branch, $location, $product, $customer] = $this->stockedBranch('CXL', qty: 10, unitCost: 60, withCustomer: true);
+        $bookingDocument = app(BookingService::class)->create([
+            'branch_id' => $branch->id, 'customer_id' => $customer->id,
+            'items' => [['product_id' => $product->id, 'qty' => 3, 'unit_price' => 100]],
+        ]);
+        $booking = SaleBooking::where('document_id', $bookingDocument->id)->sole();
+        $staff = User::factory()->create(['is_active' => true, 'must_change_password' => false]);
+        $manager = User::factory()->create(['is_active' => true, 'must_change_password' => false]);
+        $manager->roles()->attach(\App\Models\Role::where('code', 'GM')->value('id'));
+        $this->withoutMiddleware(\App\Http\Middleware\ErpAuthorize::class);
+
+        // ฝ่ายขาย 13 พ.ย.: แอดมินยกเลิกบิลเองไม่ได้ (กันทุจริต)
+        $this->actingAs($staff)->get(route('bookings.show', $booking))->assertOk()->assertDontSee('ยกเลิกใบจอง (ผู้จัดการ)');
+        $this->actingAs($staff)->post(route('bookings.cancel', $booking), ['reason' => 'ลองยกเลิก'])->assertForbidden();
+        $this->assertSame(SaleBooking::STATUS_PENDING, $booking->fresh()->status);
+
+        $this->actingAs($manager)->post(route('bookings.cancel', $booking), ['reason' => 'ลูกค้ายกเลิก'])
+            ->assertRedirect(route('bookings.show', $booking));
+        $this->assertNotSame(SaleBooking::STATUS_PENDING, $booking->fresh()->status);
+    }
+
     private function expectsCancelToFail(SaleBooking $booking): void
     {
         try {
