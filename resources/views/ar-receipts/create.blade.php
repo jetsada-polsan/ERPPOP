@@ -4,6 +4,15 @@
 @section('page-subtitle', 'เลือกลูกค้า ติ๊กบิลค้างชำระ ลดสด หัก ณ ที่จ่าย และระบุเงินสด/โอน/เช็ค จบในหน้าเดียว')
 
 @section('content')
+<style>
+    /* ช่องกรอกในตารางบิลต้องกว้างพอเห็นยอดเต็ม (เดิม 7,068.40 ขึ้นแค่ "7068") */
+    .receipt-bills td input[type=number] { min-width: 96px; width: 100%; }
+    .receipt-bills td { white-space: nowrap; }
+    @media (min-width: 1800px) {
+        .receipt-main { flex: 0 0 auto; width: 66.666%; }
+        .receipt-side { flex: 0 0 auto; width: 33.333%; }
+    }
+</style>
 <div x-data="bplusReceipt()" x-cloak>
     <form id="arReceiptForm" method="post" action="{{ route('ar-receipts.store') }}" @submit="if (!canSave()) $event.preventDefault()">
         @csrf
@@ -78,7 +87,8 @@
 
         <div class="row g-3">
             {{-- ฝั่งซ้าย: ตารางบิลค้าง + รายละเอียดการชำระเงิน --}}
-            <div class="col-xl-8">
+            {{-- จอ 1440 ตารางบิล 10 คอลัมน์บีบจนช่องกรอกถูกตัด: แผงสรุปอยู่ข้างล่าง ยกเว้นจอกว้างมาก (≥1800) ค่อยวางคู่กัน --}}
+            <div class="col-12 receipt-main">
                 {{-- 1. บิลค้างชำระ (ยอดหนี้) --}}
                 <div class="content-card p-3 mb-3">
                     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
@@ -164,7 +174,7 @@
 
                     {{-- ตารางบิล BPlus --}}
                     <div class="table-responsive">
-                        <table class="table align-middle table-hover mb-0" style="min-width: 860px;">
+                        <table class="table align-middle table-hover mb-0 receipt-bills" style="min-width: 980px;">
                             <thead>
                                 <tr class="table-light">
                                     <th style="width: 40px;" class="text-center">ชำระ</th>
@@ -209,8 +219,8 @@
                                                 <span class="badge text-bg-light border text-muted small ms-1" style="font-size: 10px;">VAT</span>
                                             </template>
                                         </td>
-                                        <td class="text-muted small" x-text="item.doc_date"></td>
-                                        <td class="small" x-text="item.due_date"></td>
+                                        <td class="text-muted small text-nowrap" x-text="item.doc_date"></td>
+                                        <td class="small text-nowrap" x-text="item.due_date"></td>
                                         <td class="text-end fw-semibold text-secondary" x-text="fmt(item.balance)"></td>
                                         {{-- ยอดตัดหนี้ --}}
                                         <td>
@@ -403,7 +413,7 @@
             </div>
 
             {{-- ฝั่งขวา: แผงสรุปยอดเงินและปุ่มบันทึก (Sticky) --}}
-            <div class="col-xl-4">
+            <div class="col-12 receipt-side">
                 <div class="content-card p-4 position-sticky" style="top: 20px;">
                     <h3 class="h6 fw-bold mb-3 border-bottom pb-2">
                         <i class="bi bi-calculator me-1"></i> สรุปการรับชำระเงิน
