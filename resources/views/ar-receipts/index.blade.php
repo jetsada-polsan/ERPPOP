@@ -48,7 +48,7 @@
                 @forelse($receipts as $doc)
                     <tr>
                         <td><a href="{{ route('payments.show', $doc) }}">{{ $doc->doc_number }}</a></td>
-                        <td>{{ $doc->doc_date?->thaiDate() }}</td>
+                        <td>{{ $doc->doc_date?->thaiDate() }} <span class="text-muted small">{{ $doc->created_at?->format('H:i') }}</span></td>
                         <td>{{ $doc->customer?->name_th }}</td>
                         <td class="text-muted small">{{ $doc->salesman?->name ?? '-' }}</td>
                         <td class="text-end">{{ number_format((float) $doc->total_amount, 2) }}</td>

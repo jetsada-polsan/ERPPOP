@@ -106,7 +106,7 @@
                     <tbody>
                     @forelse($transfers as $transfer)
                         <tr>
-                            <td>{{ $transfer->doc_date->format('d/m/Y') }}</td>
+                            <td>{{ $transfer->doc_date->format("d/m/Y") }} <span class="text-muted small">{{ $transfer->created_at?->format("H:i") }}</span></td>
                             <td><code class="small">{{ $transfer->doc_number }}</code></td>
                             <td>
                                 @if($transfer->documentType->code === 'CASH_DEPOSIT')

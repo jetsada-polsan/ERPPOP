@@ -32,7 +32,7 @@
                     @forelse($documents as $doc)
                         <tr>
                             <td class="fw-semibold">{{ $doc->doc_number }}</td>
-                            <td>{{ $doc->doc_date->thaiDate() }}</td>
+                            <td>{{ $doc->doc_date->thaiDate() }} <span class="text-muted small">{{ $doc->created_at?->format('H:i') }}</span></td>
                             <td>{{ $doc->branch->name_th }}</td>
                             <td class="small text-muted">{{ $doc->productionBatch ? ($lossReasons[$doc->productionBatch->loss_reason_code] ?? '-') : '-' }}</td>
                             <td class="text-end">{{ $doc->productionBatch ? number_format($doc->productionBatch->loss_weight_qty,3) : '-' }}</td>

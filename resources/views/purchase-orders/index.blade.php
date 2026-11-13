@@ -40,7 +40,7 @@
                 @forelse($orders as $order)
                     <tr>
                         <td class="fw-semibold" style="color:var(--erp-primary)">{{ $order->doc_number }}</td>
-                        <td class="text-nowrap">{{ $order->doc_date->thaiDate() }}</td>
+                        <td class="text-nowrap">{{ $order->doc_date->thaiDate() }} <span class="text-muted small">{{ $order->created_at?->format('H:i') }}</span></td>
                         <td>{{ $order->supplier?->name_th ?? '-' }}</td>
                         <td class="small">{{ $order->requester?->name ?? '-' }}</td>
                         <td class="text-end">{{ $order->items_count }}</td>

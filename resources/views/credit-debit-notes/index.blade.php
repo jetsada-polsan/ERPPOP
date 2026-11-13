@@ -32,7 +32,7 @@
                 @forelse($notes as $note)
                     <tr>
                         <td class="fw-semibold" style="color:{{ $type === 'credit' ? '#d97706' : 'var(--erp-danger)' }}">{{ $note->doc_number }}</td>
-                        <td class="text-nowrap">{{ $note->doc_date->thaiDate() }}</td>
+                        <td class="text-nowrap">{{ $note->doc_date->thaiDate() }} <span class="text-muted small">{{ $note->created_at?->format('H:i') }}</span></td>
                         <td>{{ $note->customer->name_th }}</td>
                         <td class="small">{{ $note->reference ?? '-' }}</td>
                         <td class="small text-muted">{{ $note->remark }}</td>

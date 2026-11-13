@@ -40,7 +40,7 @@
                         @forelse($adjustments as $adjustment)
                             <tr>
                                 <td class="fw-semibold">{{ $adjustment->doc_number }}</td>
-                                <td>{{ $adjustment->doc_date->thaiDate() }}</td>
+                                <td>{{ $adjustment->doc_date->thaiDate() }} <span class="text-muted small">{{ $adjustment->created_at?->format('H:i') }}</span></td>
                                 <td>{{ $adjustment->branch->name_th }}</td>
                                 <td class="text-end">{{ $adjustment->stockDocument?->total_items ?? 0 }}</td>
                                 <td class="text-end">{{ number_format($adjustment->stockDocument?->total_qty ?? 0, 2) }}</td>
