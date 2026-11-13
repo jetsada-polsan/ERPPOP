@@ -223,3 +223,11 @@ def test_negative_expected_remains_signed_and_does_not_change_deposit():
     api.post.return_value=dict(preview=True,shift=shift)
     result=FloatClose(api,POLICY,91).inspect('0','0','BAG-001')
     assert result['cash_difference']=='0.25' and result['deposit_amount']=='0'
+
+
+def test_erp_close_time_without_offset_is_bangkok_time():
+    """ERP closed_at '2026-11-13 22:13:05' (เวลาไทย) ต้องเก็บเป็น 15:13 UTC ไม่ใช่ 22:13 UTC"""
+    from pos_python.ui import erp_local_to_utc
+    assert erp_local_to_utc("2026-11-13 22:13:05").startswith("2026-11-13T15:13:05")
+    assert erp_local_to_utc("2026-11-13T15:13:05+00:00").startswith("2026-11-13T15:13:05")
+    assert erp_local_to_utc(None) is None
