@@ -248,7 +248,7 @@
                                             </template>
                                             <div class="qty-control">
                                                 <button type="button" class="qty-step" @click="adjustQty(index, -1)" :aria-label="'ลดจำนวน ' + (item.unit_name || '')">−</button>
-                                                <input type="number" :step="item.is_scale ? '0.01' : '1'" :min="item.is_scale ? '0.01' : '1'" :name="`items[${index}][unit_qty]`" x-model.number="item.unit_qty" @input="updateLineFromUnitQty(index)" required class="doc-input text-end" :title="item.is_scale ? 'น้ำหนักจริง เพิ่ม/ลดทีละ 0.01 เช่น 2.35 กก.' : 'จำนวนเต็มตามหน่วยขาย เพิ่ม/ลดทีละ 1 เช่น 1 แพ็ค'">
+                                                <input type="number" step="any" min="0.0001" :name="`items[${index}][unit_qty]`" x-model.number="item.unit_qty" @input="updateLineFromUnitQty(index)" required class="doc-input text-end" :title="item.is_scale ? 'น้ำหนักจริง เพิ่ม/ลดทีละ 0.01 เช่น 2.35 กก.' : 'จำนวนเต็มตามหน่วยขาย เพิ่ม/ลดทีละ 1 เช่น 1 แพ็ค'">
                                                 <button type="button" class="qty-step" @click="adjustQty(index, 1)" :aria-label="'เพิ่มจำนวน ' + (item.unit_name || '')">+</button>
                                             </div>
                                             <input type="hidden" :name="`items[${index}][qty]`" :value="item.qty">
