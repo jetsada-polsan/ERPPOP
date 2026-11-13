@@ -41,7 +41,7 @@
                     @forelse($documents as $doc)
                         <tr>
                             <td class="fw-semibold">{{ $doc->doc_number }}</td>
-                            <td>{{ $doc->doc_date->thaiDate() }}</td>
+                            <td>{{ $doc->doc_date->thaiDate() }} <span class="text-muted small">{{ $doc->created_at?->format('H:i') }}</span></td>
                             <td>{{ $doc->branch->name_th }}</td>
                             @if($type === 'requisition_return')<td class="small">{{ $doc->reference ?? '-' }}</td>@endif
                             <td class="small text-muted">{{ $doc->remark ?? '-' }}</td>
@@ -109,7 +109,7 @@
                             <select name="reference" class="form-select">
                                 <option value="">-- ไม่ระบุ --</option>
                                 @foreach($recentRequisitions as $req)
-                                    <option value="{{ $req->doc_number }}">{{ $req->doc_number }} ({{ $req->doc_date->thaiDate() }})</option>
+                                    <option value="{{ $req->doc_number }}">{{ $req->doc_number }} ({{ $req->doc_date->thaiDate() }} <span class="text-muted small">{{ $req->created_at?->format('H:i') }}</span>)</option>
                                 @endforeach
                             </select>
                         </div>

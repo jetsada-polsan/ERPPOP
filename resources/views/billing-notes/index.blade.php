@@ -35,7 +35,7 @@
                 @forelse($notes as $note)
                     <tr>
                         <td class="fw-semibold" style="color:var(--erp-primary)">{{ $note->doc_number }}</td>
-                        <td class="text-nowrap">{{ $note->doc_date->thaiDate() }}</td>
+                        <td class="text-nowrap">{{ $note->doc_date->thaiDate() }} <span class="text-muted small">{{ $note->created_at?->format('H:i') }}</span></td>
                         <td>{{ $note->customer->name_th }}</td>
                         <td class="text-nowrap">{{ $note->due_date?->thaiDate() ?? '-' }}</td>
                         <td class="text-end">{{ $note->items_count }}</td>

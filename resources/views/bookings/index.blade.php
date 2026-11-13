@@ -188,7 +188,7 @@
                                     <input type="checkbox" class="form-check-input booking-row-check" value="{{ $booking->document->id }}" x-model="selectedIds" @change="updateSelectAll()">
                                 </td>
                                 <td class="fw-semibold">{{ $booking->document->doc_number }}</td>
-                                <td class="text-nowrap">{{ $booking->document->doc_date->thaiDate() }}</td>
+                                <td class="text-nowrap">{{ $booking->document->doc_date->thaiDate() }} <span class="text-muted small">{{ $booking->document->created_at?->format('H:i') }}</span></td>
                                 <td class="text-muted small">{{ $booking->document->branch->name_th }}</td>
                                 <td>{{ $booking->document->customer->name_th }}</td>
                                 <td class="text-muted small">{{ $booking->document->salesArea?->name ?? '-' }}</td>

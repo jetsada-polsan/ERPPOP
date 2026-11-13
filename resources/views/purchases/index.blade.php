@@ -55,7 +55,7 @@
                         @forelse($purchases as $purchase)
                             <tr>
                                 <td class="fw-semibold">{{ $purchase->doc_number }}</td>
-                                <td>{{ $purchase->doc_date->thaiDate() }}</td>
+                                <td>{{ $purchase->doc_date->thaiDate() }} <span class="text-muted small">{{ $purchase->created_at?->format('H:i') }}</span></td>
                                 <td>{{ $purchase->branch->name_th }}</td>
                                 <td>{{ $purchase->supplier->name_th }}</td>
                                 <td class="text-end">{{ number_format($purchase->total_amount, 2) }}</td>

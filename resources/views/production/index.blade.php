@@ -114,7 +114,7 @@
                     @forelse($orders as $order)
                         <tr>
                             <td class="fw-semibold">{{ $order->doc_no }}</td>
-                            <td>{{ $order->doc_date?->thaiDate() }}</td>
+                            <td>{{ $order->doc_date?->thaiDate() }} <span class="text-muted small">{{ $order->created_at?->format('H:i') }}</span></td>
                             <td>{{ $order->finishedProduct?->sku_code }} - {{ $order->finishedProduct?->name_th }}</td>
                             <td class="text-end">{{ number_format((float) $order->planned_qty, 4) }}</td>
                             <td class="text-end">{{ number_format((float) $order->produced_qty, 4) }}</td>

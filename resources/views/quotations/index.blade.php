@@ -31,7 +31,7 @@
                 @forelse($quotations as $qt)
                     <tr>
                         <td class="fw-semibold" style="color:var(--erp-primary)">{{ $qt->doc_number }}</td>
-                        <td class="text-nowrap">{{ $qt->doc_date->thaiDate() }}</td>
+                        <td class="text-nowrap">{{ $qt->doc_date->thaiDate() }} <span class="text-muted small">{{ $qt->created_at?->format('H:i') }}</span></td>
                         <td>{{ $qt->customerLabel() }}</td>
                         <td class="text-nowrap small {{ $qt->status === 'open' && $qt->valid_until && $qt->valid_until->isPast() ? 'text-danger' : '' }}">{{ $qt->valid_until?->thaiDate() ?? '-' }}</td>
                         <td class="text-end">{{ $qt->items_count }}</td>

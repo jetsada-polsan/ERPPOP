@@ -54,7 +54,7 @@
                         @forelse($returns as $ret)
                             <tr>
                                 <td class="fw-semibold">{{ $ret->doc_number }}</td>
-                                <td>{{ $ret->doc_date->thaiDate() }}</td>
+                                <td>{{ $ret->doc_date->thaiDate() }} <span class="text-muted small">{{ $ret->created_at?->format('H:i') }}</span></td>
                                 <td>{{ $ret->branch->name_th }}</td>
                                 <td>{{ $ret->customer?->name_th ?? '-' }}</td>
                                 <td class="text-end">{{ number_format($ret->total_amount, 2) }}</td>

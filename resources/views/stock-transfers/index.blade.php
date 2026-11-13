@@ -40,7 +40,7 @@
                         @forelse($transfers as $transfer)
                             <tr>
                                 <td class="fw-semibold">{{ $transfer->doc_number }}</td>
-                                <td>{{ $transfer->doc_date->thaiDate() }}</td>
+                                <td>{{ $transfer->doc_date->thaiDate() }} <span class="text-muted small">{{ $transfer->created_at?->format('H:i') }}</span></td>
                                 <td>{{ $transfer->branch->name_th }}</td>
                                 <td>{{ $transfer->stockDocument?->toWarehouseLocation?->name ?? '-' }}</td>
                                 <td class="text-end">{{ number_format($transfer->stockDocument?->total_qty ?? 0, 2) }}</td>
