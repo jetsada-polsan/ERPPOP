@@ -87,7 +87,7 @@ $isPartial = $openItem && $openItem->status === 'partial';
             @endif
             @include('documents._void-action', ['doc' => $sale])
             @if($openItem && !$isPaid)
-            <button type="button" class="btn btn-success px-4" @click="payOpen = true">
+            <button type="button" class="btn btn-success px-4 text-nowrap" @click="payOpen = true">
                 <i class="bi bi-cash-coin me-1"></i>
                 รับชำระ
                 @if($isPartial)
