@@ -954,9 +954,12 @@ class BookingController extends Controller
 
     public function cancel(Request $request, SaleBooking $booking, BookingService $service): RedirectResponse
     {
-        $data = $request->validate(['reason' => ['nullable', 'string', 'max:200']]);
+        // ฝ่ายขาย 13 พ.ย.: "หนูยกเลิกบิลเองได้ ปกติแอดมินยกเลิกบ่ได้ มันทุจริต" — ยกเลิกได้เฉพาะผู้จัดการ เหมือน BPlus
+        abort_unless($request->user()?->hasPermission('documents.void'), 403, 'ยกเลิกใบจองได้เฉพาะผู้จัดการ แจ้งผู้จัดการให้ยกเลิกให้');
+        abort_unless($request->user()->canAccessBranch((int) $booking->document->branch_id), 403);
+        $data = $request->validate(['reason' => ['required', 'string', 'max:200']]);
         try {
-            $service->cancel($booking, $data['reason'] ?? null, $request->user()?->id);
+            $service->cancel($booking, $data['reason'], $request->user()?->id);
         } catch (RuntimeException $error) {
             return back()->with('error', $error->getMessage());
         }
