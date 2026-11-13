@@ -1728,9 +1728,18 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
     class CloseShiftDialog(TouchDialog):
         def __init__(self, parent, expected, offline_message=""):
             super().__init__(parent, "ปิดกะขาย", "ปิดกะ: นับเงินในลิ้นชักทั้งหมด แล้วส่งบิลค้างให้ครบ")
-            self.setMinimumWidth(480)
-            self.body.setContentsMargins(10, 10, 10, 10)
+            # เจ้าของ 13 พ.ย.: จอเครื่อง 1366x768 ปุ่ม "ปิดกะขาย" ตกใต้ taskbar — วางแป้นตัวเลขไว้ขวา ฟอร์มไว้ซ้าย
+            self.setMinimumWidth(760)
+            self.body.setContentsMargins(10, 8, 10, 8)
             self.body.setSpacing(6)
+            outer_body = self.body
+            columns = QHBoxLayout()
+            columns.setSpacing(12)
+            outer_body.addLayout(columns)
+            left = QVBoxLayout()
+            left.setSpacing(6)
+            columns.addLayout(left, 1)
+            self.body = left
             self.expected = expected
             self.offline_message = offline_message
             if self.offline_message:
@@ -1762,8 +1771,10 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.note.setPlaceholderText("หมายเหตุ")
             self.note.setStyleSheet("min-height:38px; font-size:15px;")
             self.body.addWidget(self.note)
+            self.body.addStretch()
             self.pad = NumPad(self.amount)
-            self.body.addWidget(self.pad)
+            columns.addWidget(self.pad, 1)
+            self.body = outer_body
             self.submit = self.confirm("ปิดกะขาย")
             self.submit.setObjectName("btnCheckoutPrimary")
             self.submit.setMinimumHeight(52)

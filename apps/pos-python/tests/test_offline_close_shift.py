@@ -290,3 +290,12 @@ class OfflineCloseShiftTest(unittest.TestCase):
         # กรอกเงินสดจริง -> ปุ่มยืนยันปิดกะต้องกดได้ (ไม่ถูกบล็อกด้วยบิลค้าง)
         dialog.amount.setText("150.00")
         self.assertTrue(dialog.submit.isEnabled(), "ปุ่มปิดกะต้องเปิดใช้งานได้แม้มีบิลค้าง")
+
+        # เจ้าของ 13 พ.ย.: จอเครื่อง 1366x768 (ลบ taskbar ~720) ปุ่มปิดกะต้องอยู่ในจอ ไม่ตกใต้ taskbar
+        dialog.adjustSize()
+        dialog.show()
+        app.processEvents()
+        bottom = dialog.submit.mapTo(dialog, dialog.submit.rect().bottomLeft()).y()
+        self.assertLessEqual(dialog.sizeHint().height(), 680, "หน้าต่างปิดกะสูงเกินจอ")
+        self.assertLessEqual(bottom, dialog.height())
+        dialog.reject()
