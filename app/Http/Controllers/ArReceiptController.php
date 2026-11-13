@@ -209,7 +209,7 @@ class ArReceiptController extends Controller
 
         $bankAccounts = BankAccount::with('branch')
             ->whereNotNull('chart_of_account_id')
-            ->where('is_active', true)
+            // bank_accounts ไม่มีคอลัมน์ is_active (production 12 พ.ย.: หน้าสร้างใบเสร็จ 500)
             ->orderBy('bank_name')
             ->get();
 
