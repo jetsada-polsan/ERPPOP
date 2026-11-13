@@ -170,7 +170,10 @@ class UnitQtyFormatTest extends TestCase
         // ถ้าไม่ระบุ unit_id จะเลือกตัว factor มากสุด (ลัง 18): 18 ถุง = 1 ลัง
         $this->assertSame('18 ถุง (1 ลัง)', UnitQty::format($product, 18));
 
-        // ถ้าระบุ unit_id = boxUnit (6): 18 ถุง = 3 กล่อง
-        $this->assertSame('18 ถุง (3 กล่อง)', UnitQty::format($product, 18, $this->boxUnit->id));
+        // ฝ่ายขาย 13 พ.ย.: "เลือกตัวไหน ตัวนั้นต้องแสดง" — หน่วยที่เลือกขึ้นก่อน หน่วยหลักอยู่ในวงเล็บ
+        $this->assertSame('3 กล่อง (18 ถุง)', UnitQty::format($product, 18, $this->boxUnit->id));
+        $this->assertSame('3 กล่อง 2 ถุง (20 ถุง)', UnitQty::format($product, 20, $this->boxUnit->id));
+        // เลือกหน่วยหลัก (ถุง) ก็แสดงถุงอย่างเดียว ไม่แปลงเป็นลังให้เอง
+        $this->assertSame('18 ถุง', UnitQty::format($product, 18, $this->bagUnit->id));
     }
 }

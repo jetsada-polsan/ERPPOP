@@ -71,6 +71,27 @@ class UnitQty
             $largerBarcode = $validBarcodes->firstWhere('unit_id', (int) $unitId);
         }
 
+        // ฝ่ายขาย 13 พ.ย.: "เลือกตัวไหน ตัวนั้นต้องแสดง" — บรรทัดที่ระบุหน่วยไว้ ให้หน่วยนั้นขึ้นก่อน
+        if ($unitId !== null) {
+            if ((int) $unitId === (int) $product->base_unit_id || ! $largerBarcode) {
+                $text = trim("{$formattedBase} {$baseUnitName}");
+
+                return $text !== '' ? $text : $formattedBase;
+            }
+            $factor = (int) $largerBarcode->unit_factor;
+            $chosenName = $largerBarcode->unit?->cleanName() ?? '';
+            $chosenQty = intdiv($baseQtyInt, $factor);
+            $remainder = $baseQtyInt % $factor;
+            if ($chosenQty > 0 && $chosenName !== '') {
+                $text = number_format($chosenQty).' '.$chosenName;
+                if ($remainder > 0) {
+                    $text .= ' '.trim(number_format($remainder).' '.$baseUnitName);
+                }
+
+                return $baseUnitName !== '' ? "{$text} ({$formattedBase} {$baseUnitName})" : $text;
+            }
+        }
+
         if (! $largerBarcode) {
             $largerBarcode = $validBarcodes->sortByDesc(fn ($b) => (float) $b->unit_factor)->first();
         }
