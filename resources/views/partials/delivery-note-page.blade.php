@@ -79,12 +79,12 @@
         <thead>
             <tr>
                 <th style="width:10mm">ลำดับ</th>
-                <th style="width:30mm">รหัสสินค้า</th>
+                <th style="width:24mm">รหัสสินค้า</th>
                 <th>ชนิดสินค้า</th>
-                <th style="width:18mm">หน่วยนับ</th>
-                <th class="text-end" style="width:24mm">ราคาขาย/บาท</th>
-                <th class="text-end" style="width:16mm">จำนวน</th>
-                <th class="text-end" style="width:24mm">ราคารวม/บาท</th>
+                <th style="width:14mm">หน่วยนับ</th>
+                <th class="text-end" style="width:18mm">ราคาขาย/บาท</th>
+                <th class="text-end" style="width:30mm; white-space:nowrap">จำนวน</th>
+                <th class="text-end" style="width:20mm">ราคารวม/บาท</th>
             </tr>
         </thead>
         <tbody>
@@ -95,7 +95,7 @@
                 <td>{{ $item->product->name_th }}</td>
                 <td>{{ $item->product->baseUnit?->cleanName() ?? '-' }}</td>
                 <td class="text-end">{{ number_format($item->unit_price ?? 0, 2) }}</td>
-                <td class="text-end"><x-unit-qty :item="$item" /></td>
+                <td class="text-end" style="white-space:nowrap">{{-- ฝ่ายขาย 13 พ.ย.: "1 ถุง (10 กิโลกรัม)" ห้ามตกบรรทัด --}}<x-unit-qty :item="$item" /></td>
                 <td class="text-end">{{ number_format(($item->unit_price ?? 0) * $item->qty, 2) }}</td>
             </tr>
             @endforeach
