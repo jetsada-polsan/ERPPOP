@@ -89,7 +89,143 @@
             {{-- ฝั่งซ้าย: ตารางบิลค้าง + รายละเอียดการชำระเงิน --}}
             {{-- จอ 1440 ตารางบิล 10 คอลัมน์บีบจนช่องกรอกถูกตัด: แผงสรุปอยู่ข้างล่าง ยกเว้นจอกว้างมาก (≥1800) ค่อยวางคู่กัน --}}
             <div class="col-12 receipt-main">
-                {{-- 1. บิลค้างชำระ (ยอดหนี้) --}}
+                {{-- 1. วิธีรับเงิน อยู่บนสุดต่อจากหัวเอกสาร (เจ้าของ 13 พ.ย.: ใบเสร็จมาตรฐานต้องเห็นเงินสด/โอนก่อน) · เดิม: รายละเอียดการชำระเงิน (BPlus: เงินสด / โอน / เช็ค ในใบเดียว) --}}
+                <div class="content-card p-3 mb-3">
+                    <h2 class="h6 fw-bold mb-3 text-dark">
+                        <i class="bi bi-wallet2 text-success me-1"></i> รายละเอียดการชำระเงิน (ใส่ได้หลายวิธีในใบเดียว)
+                    </h2>
+
+                    {{-- 2.1 เงินสด --}}
+                    <div class="p-3 rounded-3 mb-3 border bg-light bg-opacity-50">
+                        <div class="row g-2 align-items-center">
+                            <div class="col-md-3">
+                                <span class="fw-bold text-success"><i class="bi bi-cash-stack me-1"></i> 1. เงินสด</span>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text">฿</span>
+                                    <input type="number" step="0.01" min="0" name="cash_amount"
+                                           class="form-control text-end fw-bold fs-6"
+                                           x-model.number="cashAmount" @input="onPaymentChange()" placeholder="0.00">
+                                </div>
+                            </div>
+                            <div class="col-md-3 text-end">
+                                <button type="button" class="btn btn-sm btn-outline-success w-100 rounded-pill" @click="fillRemainingToCash()">
+                                    ใส่ยอดคงเหลือ
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- 2.2 โอนเงิน --}}
+                    <div class="p-3 rounded-3 mb-3 border bg-light bg-opacity-50">
+                        <div class="row g-2 align-items-center mb-2">
+                            <div class="col-md-3">
+                                <span class="fw-bold text-primary"><i class="bi bi-bank me-1"></i> 2. ยอดโอน</span>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text">฿</span>
+                                    <input type="number" step="0.01" min="0" name="transfer_amount"
+                                           class="form-control text-end fw-bold fs-6"
+                                           x-model.number="transferAmount" @input="onPaymentChange()" placeholder="0.00">
+                                </div>
+                            </div>
+                            <div class="col-md-3 text-end">
+                                <button type="button" class="btn btn-sm btn-outline-primary w-100 rounded-pill" @click="fillRemainingToTransfer()">
+                                    ใส่ยอดคงเหลือ
+                                </button>
+                            </div>
+                        </div>
+
+                        {{-- รายละเอียดโอน (แสดงเมื่อมียอดโอน) --}}
+                        <div class="row g-2 pt-2 border-top" x-show="transferAmount > 0">
+                            <div class="col-md-5">
+                                <label class="form-label small text-muted mb-1">เข้าบัญชีธนาคาร</label>
+                                <select name="transfer_bank_account_id" class="form-select form-select-sm" x-model="transferBankAccountId">
+                                    <option value="">อัตโนมัติ — บัญชีของสาขา</option>
+                                    @foreach($bankAccounts as $bank)
+                                        <option value="{{ $bank->id }}">
+                                            {{ $bank->bank_name }} {{ $bank->account_no }} ({{ $bank->branch ? $bank->branch->code : 'ส่วนกลาง' }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted mb-1">เลขอ้างอิง / สลิปโอน</label>
+                                <input type="text" name="transfer_ref" class="form-control form-control-sm"
+                                       x-model="transferRef" placeholder="Ref / สลิป">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small text-muted mb-1">วันเวลาโอน</label>
+                                <input type="datetime-local" name="transfer_at" class="form-control form-control-sm"
+                                       x-model="transferAt">
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- 2.3 เช็ค (BPlus ใส่ได้หลายแถว) --}}
+                    <div class="p-3 rounded-3 border bg-light bg-opacity-50">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-bold text-dark"><i class="bi bi-card-checklist text-warning me-1"></i> 3. เช็ค</span>
+                            <button type="button" class="btn btn-sm btn-outline-warning text-dark rounded-pill px-3" @click="addCheque()">
+                                <i class="bi bi-plus-lg me-1"></i> เพิ่มเช็ค
+                            </button>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr class="small text-muted">
+                                        <th style="width: 30px;">#</th>
+                                        <th style="width: 25%;">ธนาคารบนเช็ค</th>
+                                        <th style="width: 25%;">เลขที่เช็ค</th>
+                                        <th style="width: 20%;">ลงวันที่</th>
+                                        <th style="width: 25%;" class="text-end">ยอดเงินเช็ค</th>
+                                        <th style="width: 40px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="(ch, cIdx) in cheques" :key="cIdx">
+                                        <tr>
+                                            <td class="small text-muted" x-text="cIdx + 1"></td>
+                                            <td>
+                                                <input type="text" :name="'cheques[' + cIdx + '][cheque_bank]'"
+                                                       class="form-control form-control-sm"
+                                                       x-model="ch.cheque_bank" placeholder="เช่น กสิกรไทย">
+                                            </td>
+                                            <td>
+                                                <input type="text" :name="'cheques[' + cIdx + '][cheque_no]'"
+                                                       class="form-control form-control-sm"
+                                                       x-model="ch.cheque_no" placeholder="เลขที่เช็ค"
+                                                       :required="ch.amount > 0">
+                                            </td>
+                                            <td>
+                                                <input type="date" :name="'cheques[' + cIdx + '][cheque_due_date]'"
+                                                       class="form-control form-control-sm"
+                                                       x-model="ch.cheque_due_date"
+                                                       :required="ch.amount > 0">
+                                            </td>
+                                            <td>
+                                                <input type="number" step="0.01" min="0" :name="'cheques[' + cIdx + '][amount]'"
+                                                       class="form-control form-control-sm text-end fw-bold"
+                                                       x-model.number="ch.amount" @input="onPaymentChange()" placeholder="0.00">
+                                            </td>
+                                            <td class="text-end">
+                                                <button type="button" class="btn btn-sm btn-link text-danger p-0"
+                                                        @click="removeCheque(cIdx)" title="ลบแถวนี้">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- 2. บิลค้างชำระ (ยอดหนี้) --}}
                 <div class="content-card p-3 mb-3">
                     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                         <div class="d-flex align-items-center gap-2">
@@ -275,141 +411,6 @@
                     </div>
                 </div>
 
-                {{-- 2. รายละเอียดการชำระเงิน (BPlus: เงินสด / โอน / เช็ค ในใบเดียว) --}}
-                <div class="content-card p-3 mb-3">
-                    <h2 class="h6 fw-bold mb-3 text-dark">
-                        <i class="bi bi-wallet2 text-success me-1"></i> รายละเอียดการชำระเงิน (ใส่ได้หลายวิธีในใบเดียว)
-                    </h2>
-
-                    {{-- 2.1 เงินสด --}}
-                    <div class="p-3 rounded-3 mb-3 border bg-light bg-opacity-50">
-                        <div class="row g-2 align-items-center">
-                            <div class="col-md-3">
-                                <span class="fw-bold text-success"><i class="bi bi-cash-stack me-1"></i> 1. เงินสด</span>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="input-group input-group-sm">
-                                    <span class="input-group-text">฿</span>
-                                    <input type="number" step="0.01" min="0" name="cash_amount"
-                                           class="form-control text-end fw-bold fs-6"
-                                           x-model.number="cashAmount" @input="onPaymentChange()" placeholder="0.00">
-                                </div>
-                            </div>
-                            <div class="col-md-3 text-end">
-                                <button type="button" class="btn btn-sm btn-outline-success w-100 rounded-pill" @click="fillRemainingToCash()">
-                                    ใส่ยอดคงเหลือ
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    {{-- 2.2 โอนเงิน --}}
-                    <div class="p-3 rounded-3 mb-3 border bg-light bg-opacity-50">
-                        <div class="row g-2 align-items-center mb-2">
-                            <div class="col-md-3">
-                                <span class="fw-bold text-primary"><i class="bi bi-bank me-1"></i> 2. ยอดโอน</span>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="input-group input-group-sm">
-                                    <span class="input-group-text">฿</span>
-                                    <input type="number" step="0.01" min="0" name="transfer_amount"
-                                           class="form-control text-end fw-bold fs-6"
-                                           x-model.number="transferAmount" @input="onPaymentChange()" placeholder="0.00">
-                                </div>
-                            </div>
-                            <div class="col-md-3 text-end">
-                                <button type="button" class="btn btn-sm btn-outline-primary w-100 rounded-pill" @click="fillRemainingToTransfer()">
-                                    ใส่ยอดคงเหลือ
-                                </button>
-                            </div>
-                        </div>
-
-                        {{-- รายละเอียดโอน (แสดงเมื่อมียอดโอน) --}}
-                        <div class="row g-2 pt-2 border-top" x-show="transferAmount > 0">
-                            <div class="col-md-5">
-                                <label class="form-label small text-muted mb-1">เข้าบัญชีธนาคาร</label>
-                                <select name="transfer_bank_account_id" class="form-select form-select-sm" x-model="transferBankAccountId">
-                                    <option value="">อัตโนมัติ — บัญชีของสาขา</option>
-                                    @foreach($bankAccounts as $bank)
-                                        <option value="{{ $bank->id }}">
-                                            {{ $bank->bank_name }} {{ $bank->account_no }} ({{ $bank->branch ? $bank->branch->code : 'ส่วนกลาง' }})
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label small text-muted mb-1">เลขอ้างอิง / สลิปโอน</label>
-                                <input type="text" name="transfer_ref" class="form-control form-control-sm"
-                                       x-model="transferRef" placeholder="Ref / สลิป">
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label small text-muted mb-1">วันเวลาโอน</label>
-                                <input type="datetime-local" name="transfer_at" class="form-control form-control-sm"
-                                       x-model="transferAt">
-                            </div>
-                        </div>
-                    </div>
-
-                    {{-- 2.3 เช็ค (BPlus ใส่ได้หลายแถว) --}}
-                    <div class="p-3 rounded-3 border bg-light bg-opacity-50">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="fw-bold text-dark"><i class="bi bi-card-checklist text-warning me-1"></i> 3. เช็ค</span>
-                            <button type="button" class="btn btn-sm btn-outline-warning text-dark rounded-pill px-3" @click="addCheque()">
-                                <i class="bi bi-plus-lg me-1"></i> เพิ่มเช็ค
-                            </button>
-                        </div>
-
-                        <div class="table-responsive">
-                            <table class="table table-sm align-middle mb-0">
-                                <thead>
-                                    <tr class="small text-muted">
-                                        <th style="width: 30px;">#</th>
-                                        <th style="width: 25%;">ธนาคารบนเช็ค</th>
-                                        <th style="width: 25%;">เลขที่เช็ค</th>
-                                        <th style="width: 20%;">ลงวันที่</th>
-                                        <th style="width: 25%;" class="text-end">ยอดเงินเช็ค</th>
-                                        <th style="width: 40px;"></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <template x-for="(ch, cIdx) in cheques" :key="cIdx">
-                                        <tr>
-                                            <td class="small text-muted" x-text="cIdx + 1"></td>
-                                            <td>
-                                                <input type="text" :name="'cheques[' + cIdx + '][cheque_bank]'"
-                                                       class="form-control form-control-sm"
-                                                       x-model="ch.cheque_bank" placeholder="เช่น กสิกรไทย">
-                                            </td>
-                                            <td>
-                                                <input type="text" :name="'cheques[' + cIdx + '][cheque_no]'"
-                                                       class="form-control form-control-sm"
-                                                       x-model="ch.cheque_no" placeholder="เลขที่เช็ค"
-                                                       :required="ch.amount > 0">
-                                            </td>
-                                            <td>
-                                                <input type="date" :name="'cheques[' + cIdx + '][cheque_due_date]'"
-                                                       class="form-control form-control-sm"
-                                                       x-model="ch.cheque_due_date"
-                                                       :required="ch.amount > 0">
-                                            </td>
-                                            <td>
-                                                <input type="number" step="0.01" min="0" :name="'cheques[' + cIdx + '][amount]'"
-                                                       class="form-control form-control-sm text-end fw-bold"
-                                                       x-model.number="ch.amount" @input="onPaymentChange()" placeholder="0.00">
-                                            </td>
-                                            <td class="text-end">
-                                                <button type="button" class="btn btn-sm btn-link text-danger p-0"
-                                                        @click="removeCheque(cIdx)" title="ลบแถวนี้">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    </template>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             {{-- ฝั่งขวา: แผงสรุปยอดเงินและปุ่มบันทึก (Sticky) --}}
