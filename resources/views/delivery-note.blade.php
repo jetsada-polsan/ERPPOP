@@ -46,28 +46,31 @@
 
         /* The shared print theme defaults .page to A4. Keep this slip A5 landscape on screen and paper. */
         .page.delivery-note-page .doc-head { gap: 4mm !important; margin-bottom: 8px !important; padding-bottom: 2mm !important; }
-        .page.delivery-note-page .company .name { font-size: 12px !important; }
-        .page.delivery-note-page .company .sub { font-size: 8.5px !important; line-height: 1.25 !important; }
-        .page.delivery-note-page .doc-meta { font-size: 8.5px !important; }
+        .page.delivery-note-page .company .name { font-size: 15px !important; }
+        .page.delivery-note-page .company .sub { font-size: 10.5px !important; line-height: 1.3 !important; }
+        .page.delivery-note-page .doc-meta { font-size: 12px !important; }
         .page.delivery-note-page .doc-meta b { min-width: 11mm !important; }
         .page.delivery-note-page .info-row { display: grid !important; grid-template-columns: 55mm minmax(0, 1fr) !important; gap: 2mm !important; margin: 2mm 0 !important; }
-        .page.delivery-note-page .info-box { padding: 1.5mm 2mm !important; border-radius: 2mm !important; font-size: 8.5px !important; }
+        .page.delivery-note-page .info-box { padding: 1.5mm 2.5mm !important; border-radius: 2mm !important; font-size: 12px !important; line-height: 1.45 !important; }
         .page.delivery-note-page .info-box.left { width: auto !important; min-width: 0 !important; }
         .page.delivery-note-page .info-box b { min-width: 16mm !important; }
         .page.delivery-note-page table.items { margin-top: 1mm !important; }
         .page.delivery-note-page table.items th,
-        .page.delivery-note-page table.items td { padding: 1mm 1.2mm !important; font-size: 8.5px !important; }
+        .page.delivery-note-page table.items td { padding: 1.8mm 1.5mm !important; font-size: 13px !important; line-height: 1.35 !important; }
+        /* ฝ่ายขาย 13 พ.ย. "พี่เอกบอกว่ามองไม่เห็น ขนส่งมีแต่คนแก่ๆ" — ตัวในตารางเดิม 8.5px */
+        .page.delivery-note-page table.items td { border-bottom: 1px solid #bbb !important; }
+        .page.delivery-note-page table.items th { font-weight: 800 !important; }
         .page.delivery-note-page .qc-row { display: grid !important; grid-template-columns: minmax(0, 1fr) 50mm !important; gap: 2mm !important; margin-top: 1.5mm !important; padding-top: 1.5mm !important; }
-        .page.delivery-note-page .qc-left { font-size: 8px !important; }
+        .page.delivery-note-page .qc-left { font-size: 11px !important; }
         .page.delivery-note-page .qc-left { min-width: 0 !important; overflow: hidden !important; }
-        .page.delivery-note-page .qc-item { gap: 1mm !important; margin-right: 1mm !important; font-size: 8px !important; }
+        .page.delivery-note-page .qc-item { gap: 1mm !important; margin-right: 1.5mm !important; font-size: 11px !important; }
         .page.delivery-note-page .qc-box { width: 3.5mm !important; height: 3.5mm !important; }
-        .page.delivery-note-page .totals { width: 50mm !important; max-width: 50mm !important; min-width: 0 !important; overflow: hidden !important; font-size: 8px !important; }
+        .page.delivery-note-page .totals { width: 50mm !important; max-width: 50mm !important; min-width: 0 !important; overflow: hidden !important; font-size: 12px !important; }
         .page.delivery-note-page .totals .row span:first-child { min-width: 0 !important; white-space: nowrap !important; }
         .page.delivery-note-page .totals .row { gap: 1mm !important; margin-bottom: 1mm !important; }
-        .page.delivery-note-page .totals .val { min-width: 17mm !important; padding: .5mm 1mm !important; }
+        .page.delivery-note-page .totals .val { min-width: 22mm !important; padding: .8mm 1.2mm !important; font-size: 13px !important; }
         .page.delivery-note-page .sign-row { gap: 4mm !important; margin-top: 8mm !important; }
-        .page.delivery-note-page .sign { width: auto !important; font-size: 8.5px !important; }
+        .page.delivery-note-page .sign { width: auto !important; font-size: 12px !important; }
         @media screen {
             body:not(.layout-fixed) .page.delivery-note-page {
                 width: min(210mm, calc(100vw - 32px)) !important;
