@@ -83,21 +83,30 @@
                 <th style="width:10mm">ลำดับ</th>
                 <th style="width:24mm">รหัสสินค้า</th>
                 <th>ชนิดสินค้า</th>
-                <th style="width:14mm">หน่วยนับ</th>
-                <th class="text-end" style="width:18mm">ราคาขาย/บาท</th>
-                <th class="text-end" style="width:30mm; white-space:nowrap">จำนวน</th>
-                <th class="text-end" style="width:20mm">ราคารวม/บาท</th>
+                <th style="width:24mm">หน่วยนับ</th>
+                <th class="text-end" style="width:20mm">ราคาขาย/หน่วย</th>
+                <th class="text-end" style="width:16mm">จำนวน</th>
+                <th class="text-end" style="width:22mm">ราคารวม/บาท</th>
             </tr>
         </thead>
         <tbody>
             @foreach($document->stockDocument->items as $i => $item)
+            @php
+                // ฝ่ายขาย 13 พ.ย.: ให้อ่านง่ายแบบใบส่งของ BPlus — หน่วยที่ขายจริง ราคาต่อหน่วยนั้น จำนวนเป็นตัวเลขล้วน
+                $factor = (float) ($item->unit_factor ?: 1);
+                $saleUnit = $item->unit ?? $item->product->baseUnit;
+                $unitLabel = ($saleUnit?->cleanName() ?? '-').($factor > 1 ? '*'.rtrim(rtrim(number_format($factor, 4, '.', ''), '0'), '.') : '');
+                $unitQty = $item->unit_qty !== null ? (float) $item->unit_qty : (float) $item->qty / $factor;
+                $code = $item->product->barcodes->firstWhere('unit_id', $item->unit_id)?->barcode
+                    ?? $item->product->barcodes->first()?->barcode ?? $item->product->sku_code;
+            @endphp
             <tr>
                 <td>{{ $i + 1 }}</td>
-                <td>{{ $item->product->barcodes->first()?->barcode ?? $item->product->sku_code }}</td>
+                <td>{{ $code }}</td>
                 <td>{{ $item->product->name_th }}</td>
-                <td>{{ $item->product->baseUnit?->cleanName() ?? '-' }}</td>
-                <td class="text-end">{{ number_format($item->unit_price ?? 0, 2) }}</td>
-                <td class="text-end" style="white-space:nowrap">{{-- ฝ่ายขาย 13 พ.ย.: "1 ถุง (10 กิโลกรัม)" ห้ามตกบรรทัด --}}<x-unit-qty :item="$item" /></td>
+                <td style="white-space:nowrap">{{ $unitLabel }}</td>
+                <td class="text-end">{{ number_format(($item->unit_price ?? 0) * $factor, 2) }}</td>
+                <td class="text-end">{{ rtrim(rtrim(number_format($unitQty, 2), '0'), '.') }}</td>
                 <td class="text-end">{{ number_format(($item->unit_price ?? 0) * $item->qty, 2) }}</td>
             </tr>
             @endforeach
