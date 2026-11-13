@@ -78,8 +78,8 @@
                             <th style="width: 40px;">#</th>
                             <th>สินค้า</th>
                             <th class="barcode-col" style="display: none; width: 140px;">บาร์โค้ดหน่วยที่จอง</th>
-                            <th style="width: 90px;">หน่วย</th>
-                            <th class="text-end" style="width: 80px;">จอง</th>
+                            <th style="width: 70px;">หน่วย</th>
+                            <th class="text-end" style="width: 140px; white-space: nowrap;">จอง</th>
                             <th class="check-col">ขึ้นได้</th>
                             <th class="check-col">ไม่ได้</th>
                             <th style="width: 100px;">จำนวนจริง</th>
@@ -97,7 +97,7 @@
                                 <td>{{ $item->product?->sku_code }} {{ $item->product?->name_th }}</td>
                                 <td class="barcode-col font-monospace" style="display: none;">{{ $bCode }}</td>
                                 <td>{{ $item->unit?->name ?? $item->product?->baseUnit?->name ?? '-' }}</td>
-                                <td class="text-end"><x-unit-qty :item="$item" /></td>
+                                <td class="text-end" style="white-space: nowrap;">{{-- ฝ่ายขาย 13 พ.ย.: จำนวนจองห้ามตกบรรทัด --}}<x-unit-qty :item="$item" /></td>
                                 <td class="check-col">□</td>
                                 <td class="check-col">□</td>
                                 <td></td>
