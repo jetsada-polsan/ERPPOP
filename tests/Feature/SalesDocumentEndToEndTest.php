@@ -556,6 +556,34 @@ class SalesDocumentEndToEndTest extends TestCase
         $this->assertNotSame(SaleBooking::STATUS_PENDING, $booking->fresh()->status);
     }
 
+    public function test_cash_sale_and_purchase_keep_the_chosen_large_unit_like_a_booking(): void
+    {
+        [$branch, $location, $product, $customer] = $this->stockedBranch('UNIT', qty: 100, unitCost: 20, withCustomer: true);
+        $bag = ProductUnit::firstOrCreate(['code' => 'BAG10'], ['name' => 'ถุง', 'qty_per_base_unit' => 10]);
+        \App\Models\ProductBarcode::create(['product_id' => $product->id, 'barcode' => 'BAG-'.$product->sku_code,
+            'unit_id' => $bag->id, 'unit_factor' => 10, 'is_active' => true]);
+        $supplier = Supplier::where('code', 'SUPUNIT')->sole();
+        $manager = User::factory()->create(['is_active' => true, 'must_change_password' => false]);
+        $manager->roles()->attach(\App\Models\Role::where('code', 'GM')->value('id'));
+        $web = $this->withoutMiddleware(\App\Http\Middleware\ErpAuthorize::class)->actingAs($manager);
+
+        // เจ้าของ 13 พ.ย.: ขายสด 2 ถุง ราคา 290/ถุง = 580 (เดิมเอา 290 ไปคูณ 20 กก. = 5,800)
+        $web->post(route('cash-sales.store'), ['branch_id' => $branch->id, 'customer_id' => $customer->id,
+            'items' => [['product_id' => $product->id, 'qty' => 20, 'unit_id' => $bag->id, 'unit_qty' => 2, 'unit_factor' => 10, 'unit_price' => 290]]])
+            ->assertSessionHasNoErrors()->assertRedirect();
+        $sale = Document::whereHas('documentType', fn ($q) => $q->where('code', 'CASH_SALE'))->latest('id')->firstOrFail();
+        $this->assertSame(580.0, (float) $sale->total_amount);
+        $line = $sale->stockDocument->items()->sole();
+        $this->assertSame([20.0, 29.0, $bag->id, 2.0], [(float) $line->qty, (float) $line->unit_price, (int) $line->unit_id, (float) $line->unit_qty]);
+
+        // ซื้อเข้า 3 ถุง ต้นทุน 200/ถุง = 600 · สต๊อกเข้า 30 กก.
+        $web->post(route('purchases.store'), ['branch_id' => $branch->id, 'supplier_id' => $supplier->id, 'is_credit' => 1, 'prices_include_vat' => 0,
+            'items' => [['product_id' => $product->id, 'qty' => 30, 'unit_id' => $bag->id, 'unit_qty' => 3, 'unit_factor' => 10, 'unit_price' => 200]]])
+            ->assertSessionHasNoErrors()->assertRedirect();
+        $purchaseLine = Document::whereHas('documentType', fn ($q) => $q->where('code', 'PURCHASE'))->latest('id')->firstOrFail()->stockDocument->items()->sole();
+        $this->assertSame([30.0, 20.0, $bag->id], [(float) $purchaseLine->qty, (float) $purchaseLine->unit_price, (int) $purchaseLine->unit_id]);
+    }
+
     private function expectsCancelToFail(SaleBooking $booking): void
     {
         try {

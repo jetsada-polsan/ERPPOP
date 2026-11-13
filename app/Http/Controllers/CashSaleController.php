@@ -44,9 +44,14 @@ class CashSaleController extends Controller
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'items.*.qty' => ['required', 'numeric', 'min:0.0001'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'items.*.unit_id' => ['nullable', 'integer'],
+            'items.*.unit_qty' => ['nullable', 'numeric', 'min:0'],
+            'items.*.unit_factor' => ['nullable', 'numeric'],
         ]);
 
         try {
+            // ราคาที่กรอกเป็นราคาต่อหน่วยที่เลือก (ถุง/ลัง) แปลงเป็นต่อหน่วยหลักแบบเดียวกับใบจอง
+            $data['items'] = app(\App\Services\Sales\BookingService::class)->normalizeUnitItems($data['items'])->values()->all();
             $document = $service->create($data);
         } catch (RuntimeException $e) {
             return back()->withInput()->with('error', $e->getMessage());

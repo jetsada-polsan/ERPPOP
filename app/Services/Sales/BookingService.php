@@ -494,6 +494,12 @@ class BookingService
      * ตรวจสอบและแปลงรายการสินค้าใบจอง: คำนวณ unit_factor และ qty ในหน่วยหลักจากฐานข้อมูล
      * ห้ามเชื่อ factor หรือ qty ที่ client ส่งมา และตรวจสอบว่า unit_id เป็นของสินค้านั้นจริง
      */
+    /** ใช้ร่วมกับขายสด/ซื้อเข้า (เจ้าของ 13 พ.ย.: เลือกหน่วยแบบใบจองได้ทุกหน้า) */
+    public function normalizeUnitItems(iterable $rawItems): Collection
+    {
+        return $this->normalizeBookingItems($rawItems);
+    }
+
     private function normalizeBookingItems(iterable $rawItems): Collection
     {
         $items = collect($rawItems);
