@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'document_id', 'salesman_id', 'sales_user_id', 'sales_area_id', 'status', 'confirmed_at', 'confirmed_document_id',
     'fulfillment_type', 'delivery_due_at', 'delivered_at', 'delivery_status', 'accounting_review_status',
     'accounting_reviewed_by', 'accounting_reviewed_at', 'accounting_review_note',
+    'price_approval_status', 'price_approval_request', 'price_approval_note', 'price_approval_requested_by',
+    'price_approval_requested_at', 'price_approval_decided_by', 'price_approval_decided_at',
 ])]
 class SaleBooking extends Model
 {

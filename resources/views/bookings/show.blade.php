@@ -44,6 +44,38 @@ $canEdit = $isPending && ! $billedAny && $booking->delivery_status === 'pending'
 </div>
 @endif
 
+@if($booking->price_approval_status)
+@php($priceRequest = json_decode((string) $booking->price_approval_request, true) ?: [])
+@php($bookingLines = $booking->document->stockDocument?->items?->keyBy('id') ?? collect())
+<div class="alert {{ $booking->price_approval_status === 'pending' ? 'alert-warning' : ($booking->price_approval_status === 'approved' ? 'alert-success' : 'alert-secondary') }}">
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+        <b class="flex-grow-1">
+            @if($booking->price_approval_status === 'pending') ราคาต่ำกว่าทุน — รอผู้จัดการอนุมัติก่อนออกใบขาย
+            @elseif($booking->price_approval_status === 'approved') ผู้จัดการอนุมัติราคาแล้ว ออกใบขายเรียบร้อย
+            @else ผู้จัดการไม่อนุมัติราคา — แก้ราคาแล้วออกบิลใหม่ @endif
+        </b>
+        <small class="text-muted">ขอโดย {{ \App\Models\User::find($booking->price_approval_requested_by)?->name ?? '-' }} · {{ optional($booking->price_approval_requested_at)->format('d/m/Y H:i') }}</small>
+    </div>
+    <div class="small">
+        @foreach($priceRequest as $code => $bill)
+            @foreach($bill['lines'] ?? [] as $line)
+                @continue((float) ($line['qty'] ?? 0) <= 0)
+                @php($bookingLine = $bookingLines->get((int) $line['booking_item_id']))
+                <div>{{ $code }} · {{ $bookingLine?->product?->sku_code }} {{ $bookingLine?->product?->name_th }} · จำนวน {{ rtrim(rtrim(number_format((float) $line['qty'], 4), '0'), '.') }} · ราคา {{ number_format((float) $line['unit_price'], 2) }}</div>
+            @endforeach
+        @endforeach
+        @if($booking->price_approval_note)<div class="mt-1">หมายเหตุผู้จัดการ: {{ $booking->price_approval_note }}</div>@endif
+    </div>
+    @if($booking->price_approval_status === 'pending' && auth()->user()?->hasPermission('sales.price_below_cost'))
+    <form method="post" action="{{ route('bookings.price-approval', $booking) }}" class="d-flex flex-wrap gap-2 mt-2">@csrf
+        <input type="text" name="note" maxlength="500" class="form-control form-control-sm" style="max-width:320px" placeholder="หมายเหตุ (ถ้ามี)">
+        <button name="decision" value="approve" class="btn btn-success btn-sm" data-confirm="อนุมัติขายราคานี้และออกใบขายทันที?"><i class="bi bi-check2-circle me-1"></i>อนุมัติ ออกใบขาย</button>
+        <button name="decision" value="reject" class="btn btn-outline-danger btn-sm"><i class="bi bi-x-circle me-1"></i>ไม่อนุมัติ</button>
+    </form>
+    @endif
+</div>
+@endif
+
 @if($activeSales->isNotEmpty() && auth()->user()?->hasPermission('documents.void'))
 <form method="post" action="{{ route('bookings.revert-confirm', $booking) }}" class="content-card p-3 mb-3 d-flex flex-wrap gap-2 align-items-center" data-confirm="ถอย Confirm? ใบขาย DS/DSN จะถูกยกเลิก คืนสต๊อก ปิดลูกหนี้ และใบจองกลับไปแก้ไขได้" data-confirm-tone="danger">@csrf
     <span class="fw-bold">ผู้จัดการ: ถอย Confirm</span>

@@ -87,7 +87,7 @@
             <div class="card-body d-flex flex-wrap gap-3 align-items-center justify-content-between">
                 <div>
                     <div class="text-muted">ใส่จำนวน 0 = ไม่ออกบิลรอบนี้ (ค้างในใบจอง) · จำนวนเกินยอดค้างไม่ได้ ถ้าลูกค้าเพิ่มให้แก้ใบจองก่อน</div>
-                    <div class="text-danger fw-semibold mt-1" x-show="hasBelowCost() && !canApprove">มีรายการราคาต่ำกว่าทุน ต้องให้ผู้จัดการ (ผู้มีสิทธิ์อนุมัติ) เป็นผู้บันทึก</div>
+                    <div class="text-danger fw-semibold mt-1" x-show="hasBelowCost() && !canApprove">มีรายการราคาต่ำกว่าทุน กดปุ่มด้านล่างเพื่อส่งให้ผู้จัดการอนุมัติ อนุมัติแล้วระบบออกใบขายให้เอง</div>
                     <div class="text-warning-emphasis fw-semibold mt-1" x-show="hasBelowCost() && canApprove">มีรายการราคาต่ำกว่าทุน คุณมีสิทธิ์อนุมัติ กดบันทึกถือว่าอนุมัติ</div>
                     <div class="text-danger fw-semibold mt-1" x-show="hasOverQty()">มีรายการจำนวนเกินยอดค้างในใบจอง</div>
                 </div>
@@ -95,7 +95,8 @@
                     <div class="fs-5 me-2">รวมทั้งหมด <b x-text="fmt(total('DS') + total('DSN'))"></b> บาท</div>
                     <a href="{{ route('bookings.show', $booking) }}" class="btn btn-light border px-4">ยกเลิก</a>
                     <button type="submit" class="btn btn-success px-4" :disabled="!canSave() || submitting">
-                        <i class="bi bi-check2-circle me-1"></i> บันทึกใบขาย
+                        <i class="bi bi-check2-circle me-1"></i>
+                        <span x-text="hasBelowCost() && !canApprove ? 'ส่งให้ผู้จัดการอนุมัติราคา' : 'บันทึกใบขาย'"></span>
                     </button>
                 </div>
             </div>
@@ -124,7 +125,8 @@ function bookingBill() {
         hasBelowCost() { return this.lines.some(l => l.belowCost && l.qty > 0); },
         hasOverQty() { return this.lines.some(l => l.qty > l.remaining + 0.00001); },
         canSave() {
-            return this.lines.some(l => l.qty > 0) && !this.hasOverQty() && (!this.hasBelowCost() || this.canApprove);
+            // ต่ำกว่าทุนกดได้ — คนไม่มีสิทธิ์จะถูกส่งไปให้ผู้จัดการอนุมัติ (เจ้าของ 13 พ.ย.)
+            return this.lines.some(l => l.qty > 0) && !this.hasOverQty();
         },
         async check(line) { await this.ask([line]); },
         async checkAll() { await this.ask(this.lines); },

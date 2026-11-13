@@ -71,6 +71,13 @@ class NotificationService
                 route('bookings.index'));
         }
 
+        // เฉพาะผู้มีสิทธิ์อนุมัติราคาต่ำกว่าทุน: บิลจากใบจองที่ฝ่ายขายส่งขออนุมัติ
+        if ($user->hasPermission('sales.price_below_cost')) {
+            $this->push($items, 'bi-cash-coin', '#dc2626', 'ราคาต่ำกว่าทุน รอผู้จัดการอนุมัติ',
+                DB::table('sale_bookings')->where('price_approval_status', 'pending')->count(),
+                route('bookings.index'));
+        }
+
         // งานขาย: ใบจองค้างแปลง / ใบเสนอราคารอลูกค้าตอบ
         if ($user->hasPermission('sales.manage')) {
             $this->push($items, 'bi-receipt-cutoff', '#2563eb', 'ใบจองค้างแปลงขาย',

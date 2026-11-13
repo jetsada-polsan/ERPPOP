@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
 use RuntimeException;
@@ -1059,14 +1060,81 @@ class BookingController extends Controller
             'bills.*.lines.*.qty' => ['required', 'numeric', 'min:0'],
             'bills.*.lines.*.unit_price' => ['required', 'numeric', 'min:0'],
         ]);
+        $user = $request->user();
+        // เจ้าของ 13 พ.ย.: ขายต่ำกว่าทุนให้บันทึกได้ แล้วส่งให้ผู้จัดการอนุมัติ แทนการบล็อก
+        if (! $user->hasPermission('sales.price_below_cost') && $this->billHasBelowCostLine($booking, $data['bills'], $service)) {
+            if ($booking->price_approval_status === 'pending') {
+                return back()->withInput()->with('error', 'ใบจองนี้ส่งขออนุมัติราคาไปแล้ว รอผู้จัดการอนุมัติก่อน');
+            }
+            $booking->update([
+                'price_approval_status' => 'pending',
+                'price_approval_request' => json_encode($data['bills'], JSON_UNESCAPED_UNICODE),
+                'price_approval_note' => null,
+                'price_approval_requested_by' => $user->id,
+                'price_approval_requested_at' => now(),
+                'price_approval_decided_by' => null,
+                'price_approval_decided_at' => null,
+            ]);
+
+            return redirect()->route('bookings.show', $booking)
+                ->with('success', 'มีราคาต่ำกว่าทุน ส่งให้ผู้จัดการอนุมัติแล้ว อนุมัติเมื่อไรระบบจะออกใบขายตามราคานี้ให้');
+        }
         try {
-            $sales = $service->billFromBooking($booking, $data['bills'], $request->user());
+            $sales = $service->billFromBooking($booking, $data['bills'], $user);
         } catch (RuntimeException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
 
         return redirect()->route('bookings.show', $booking)
             ->with('success', 'ออกใบขาย '.$sales->pluck('doc_number')->join(', ').' แล้ว ตัดสต๊อกและตั้งลูกหนี้เรียบร้อย');
+    }
+
+    /** ผู้จัดการอนุมัติ / ไม่อนุมัติ ราคาต่ำกว่าทุนที่ฝ่ายขายส่งมา — อนุมัติแล้วออกใบขายตามที่ขอทันที */
+    public function decidePriceApproval(Request $request, SaleBooking $booking, CreditSaleService $service): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user->hasPermission('sales.price_below_cost'), 403, 'เฉพาะผู้จัดการที่มีสิทธิ์อนุมัติราคาต่ำกว่าทุนเท่านั้น');
+        abort_unless($user->canAccessBranch((int) $booking->document->branch_id), 403);
+        $data = $request->validate(['decision' => ['required', 'in:approve,reject'], 'note' => ['nullable', 'string', 'max:500']]);
+        if ($booking->price_approval_status !== 'pending') {
+            return redirect()->route('bookings.show', $booking)->with('error', 'ใบจองนี้ไม่ได้รออนุมัติราคา');
+        }
+        if ($data['decision'] === 'reject') {
+            $booking->update(['price_approval_status' => 'rejected', 'price_approval_note' => $data['note'] ?? null,
+                'price_approval_decided_by' => $user->id, 'price_approval_decided_at' => now()]);
+
+            return redirect()->route('bookings.show', $booking)->with('success', 'ไม่อนุมัติ ฝ่ายขายต้องแก้ราคาแล้วออกบิลใหม่');
+        }
+        try {
+            $sales = DB::transaction(function () use ($booking, $service, $user, $data) {
+                $sales = $service->billFromBooking($booking, json_decode((string) $booking->price_approval_request, true) ?: [], $user, true);
+                $booking->update(['price_approval_status' => 'approved', 'price_approval_note' => $data['note'] ?? null,
+                    'price_approval_decided_by' => $user->id, 'price_approval_decided_at' => now()]);
+
+                return $sales;
+            });
+        } catch (RuntimeException $e) {
+            return redirect()->route('bookings.show', $booking)->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('bookings.show', $booking)
+            ->with('success', 'อนุมัติแล้ว ออกใบขาย '.$sales->pluck('doc_number')->join(', ').' เรียบร้อย');
+    }
+
+    private function billHasBelowCostLine(SaleBooking $booking, array $bills, CreditSaleService $service): bool
+    {
+        $items = $booking->document->stockDocument?->items?->keyBy('id') ?? collect();
+        foreach ($bills as $bill) {
+            foreach ($bill['lines'] ?? [] as $line) {
+                $item = $items->get((int) ($line['booking_item_id'] ?? 0));
+                if ($item && (float) ($line['qty'] ?? 0) > 0
+                    && ($service->belowCostFlags([$item->product_id => $line['unit_price']])[(int) $item->product_id] ?? false)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /** ตอบแค่ว่าราคาต่ำกว่าทุนไหม ไม่ส่งตัวเลขทุนให้หน้าจอ */
