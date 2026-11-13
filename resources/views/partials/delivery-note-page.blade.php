@@ -72,6 +72,8 @@
                 &nbsp;&nbsp;<b>ชื่อลูกค้า</b> {{ $document->customer?->name_th ?? 'ลูกค้าทั่วไป' }}
             </div>
             <div><b>ที่อยู่</b> {{ $document->customer?->addresses?->first()?->address_line ?? '-' }}</div>
+            {{-- ฝ่ายขาย 13 พ.ย.: ใบส่งของต้องมีเบอร์โทรลูกค้าให้คนส่งของโทรหาได้ --}}
+            <div><b>เบอร์โทร</b> {{ $document->customer?->contacts?->pluck('phone')->filter()->first() ?? '-' }}</div>
         </div>
     </div>
 
