@@ -263,4 +263,16 @@ class ErpResetTransactionsTest extends TestCase
 
         return $path;
     }
+
+    /** prod 14 พ.ย.: ตารางที่เก็บ document_id แต่ไม่อยู่ในรายการล้าง ทำให้เอกสารใหม่ (id เริ่ม 1) ชนข้อมูลเก่า */
+    public function test_every_table_holding_a_document_id_is_cleared(): void
+    {
+        $listed = \App\Console\Commands\ErpResetTransactions::TRANSACTIONAL;
+        foreach (\Illuminate\Support\Facades\Schema::getTableListing() as $table) {
+            $table = str_contains($table, '.') ? explode('.', $table, 2)[1] : $table;
+            if (\Illuminate\Support\Facades\Schema::hasColumn($table, 'document_id')) {
+                $this->assertContains($table, $listed, "{$table} มี document_id แต่ไม่ถูกล้าง");
+            }
+        }
+    }
 }
