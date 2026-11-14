@@ -40,7 +40,9 @@ class ErpResetTransactions extends Command
      * ตอนลบจะไล่ย้อนจากท้ายขึ้นต้น เพื่อให้ลบลูกก่อนแม่เสมอ
      */
     public const TRANSACTIONAL = [
-        'documents', 'ocr_documents', 'ocr_extracted_lines', 'ocr_match_results', 'ocr_review_logs', 'ocr_attachments',
+        // gl_posting_batches ต้องล้างด้วย: TRUNCATE ... RESTART IDENTITY ทำให้ documents.id เริ่มที่ 1 ใหม่
+        // ถ้าแถวเก่าค้าง เอกสารใหม่จะชน id เดิมที่เคย void → "เอกสารกลับรายการแล้ว ไม่สามารถลงบัญชีใหม่" (prod 14 พ.ย.)
+        'documents', 'gl_posting_batches', 'ocr_documents', 'ocr_extracted_lines', 'ocr_match_results', 'ocr_review_logs', 'ocr_attachments',
         'stock_documents', 'stock_document_items', 'gl_journals', 'document_sequences',
         'stock_transfer_receipts', 'stock_transfer_receipt_items',
         'stock_movements', 'stock_lots', 'stock_lot_quality_checks', 'stock_counts', 'stock_count_items',
