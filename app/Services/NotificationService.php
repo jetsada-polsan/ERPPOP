@@ -71,6 +71,27 @@ class NotificationService
                 route('bookings.index'));
         }
 
+        // เจ้าของ 14 พ.ย.: ใบตรวจนับ/ปรับสต๊อกรออนุมัติต้องเด้งที่กระดิ่ง (ผู้สร้างอนุมัติเองไม่ได้ จึงนับเฉพาะของคนอื่น)
+        if ($user->hasPermission('stock.adjust.approve')) {
+            $this->push($items, 'bi-clipboard-check-fill', '#d97706', 'ใบปรับสต๊อกรออนุมัติ',
+                DB::table('documents')
+                    ->join('document_types', 'document_types.id', '=', 'documents.document_type_id')
+                    ->where('document_types.code', 'STOCK_ADJUSTMENT')
+                    ->whereIn('documents.status', ['pending_approval', 'approving'])
+                    ->where(fn ($q) => $q->whereNull('documents.created_by')->orWhere('documents.created_by', '!=', $user->id))
+                    ->count(),
+                route('stock-adjustments.index'));
+        }
+        // ผู้สร้างก็ต้องเห็นว่าใบของตัวเองยังค้าง (อนุมัติเองไม่ได้ ต้องให้คนอื่นกด)
+        $this->push($items, 'bi-hourglass-split', '#64748b', 'ใบปรับสต๊อกของคุณ รอคนอื่นอนุมัติ',
+            DB::table('documents')
+                ->join('document_types', 'document_types.id', '=', 'documents.document_type_id')
+                ->where('document_types.code', 'STOCK_ADJUSTMENT')
+                ->whereIn('documents.status', ['pending_approval', 'approving'])
+                ->where('documents.created_by', $user->id)
+                ->count(),
+            route('stock-adjustments.index'));
+
         // เฉพาะผู้มีสิทธิ์อนุมัติราคาต่ำกว่าทุน: บิลจากใบจองที่ฝ่ายขายส่งขออนุมัติ
         if ($user->hasPermission('sales.price_below_cost')) {
             $this->push($items, 'bi-cash-coin', '#dc2626', 'ราคาต่ำกว่าทุน รอผู้จัดการอนุมัติ',
