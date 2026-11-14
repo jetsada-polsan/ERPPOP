@@ -7,10 +7,10 @@
     <title>{{ trim($__env->yieldContent('title', 'เอกสาร - MPM Food Group')) }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&family=TH+Sarabun+New&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'IBM Plex Sans Thai', 'Sarabun', Tahoma, sans-serif; font-size: 13px; color: #1a2b3a; background: #eef4f9; }
+        body { font-family: 'Sarabun', 'TH Sarabun New', 'IBM Plex Sans Thai', Tahoma, sans-serif; font-size: 13px; color: #1a2b3a; background: #eef4f9; }
         .sheet { width: 210mm; min-height: 285mm; margin: 12px auto; background: #fff; padding: 14mm 13mm; position: relative; box-shadow: 0 8px 30px rgba(15,23,42,.12); }
         .head { display: flex; justify-content: space-between; gap: 16px; }
         .co-name { font-size: 16px; font-weight: 800; }
@@ -61,9 +61,7 @@
     <div class="sheet">
         <div class="head">
             <div style="display:flex; gap:12px">
-                @if($printLogo = \App\Models\AppSetting::logoUrl())
-                    <img src="{{ $printLogo }}" alt="" style="max-height:58px;max-width:140px;object-fit:contain">
-                @endif
+                <img src="{{ \App\Models\AppSetting::logoUrl() ?: asset('images/logos/mpm-food-group.jpg') }}" alt="MPM Food Group" style="max-height:58px;max-width:140px;object-fit:contain">
                 <div>
                     <div class="co-name">{{ \App\Models\AppSetting::company('name_th') }} (สำนักงานใหญ่)</div>
                     <div class="muted">

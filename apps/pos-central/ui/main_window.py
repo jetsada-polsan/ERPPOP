@@ -1057,8 +1057,65 @@ class MainWindow(QMainWindow):
         if not query:
             return
 
-        # Ask ERP to resolve registered units and scale labels while online. The
-        # API returns the branch price, selling unit and server-approved scale qty.
+        # 1. ค้นหาจากฐานข้อมูลแคช SQLite ในเครื่องก่อนเสมอ เพื่อให้สแกนเร็ว <1ms ไม่สะดุดกับเครือข่าย
+        session = init_db(f'sqlite:///{self.db_path}')
+        try:
+            scale_data = ScaleBarcodeParser.parse(query, session)
+            if scale_data:
+                item_code = scale_data['item_code']
+                product = session.query(Product).filter(
+                    (Product.sku_code == item_code) |
+                    (Product.sku_code.endswith(item_code)) |
+                    (Product.barcode == item_code) |
+                    (ProductBarcode.barcode == item_code)
+                ).outerjoin(ProductBarcode, ProductBarcode.product_id == Product.id).first()
+                if product:
+                    self.add_to_cart(
+                        product, qty=scale_data['weight'], is_scale=True,
+                        source_barcode=scale_data['raw_barcode'], barcode_type=scale_data['barcode_type'],
+                        price_override=scale_data['price'] / scale_data['weight'] if scale_data['weight'] else None,
+                    )
+                    self.search_input.clear()
+                    return
+
+            cached_barcode = session.query(ProductBarcode).filter_by(barcode=query).first()
+            if cached_barcode:
+                product = session.query(Product).filter_by(id=cached_barcode.product_id).first()
+                if product:
+                    unit_factor = float(cached_barcode.unit_factor or 1)
+                    unit_price = cached_barcode.price
+                    if unit_price is None and unit_factor > 1:
+                        pass # ให้ fallback ไปถาม ERP ออนไลน์
+                    else:
+                        unit_price = float(unit_price if unit_price is not None else (product.pos_price or product.default_price or 0))
+                        self.add_to_cart(
+                            product, source_barcode=query,
+                            barcode_type=cached_barcode.barcode_type or 'CUSTOM',
+                            unit_factor=unit_factor, unit_name=cached_barcode.unit_name,
+                            price_override=unit_price,
+                        )
+                        self.search_input.clear()
+                        return
+
+            product = session.query(Product).filter(
+                (Product.sku_code == query) | (Product.name_th == query) | (Product.barcode == query)
+            ).first()
+            if product and getattr(product, 'is_scale_item', False):
+                weight, ok = QInputDialog.getDouble(self, 'สินค้าน้ำหนัก', f"ระบุน้ำหนักสำหรับ '{product.name_th}' (กก.):", 1.0, 0.00000001, 999999.99999999, 8)
+                if ok and weight > 0:
+                    self.add_to_cart(product, qty=weight, is_scale=True)
+                    self.search_input.clear()
+                    return
+            elif product:
+                self.add_to_cart(product, qty=1.0)
+                self.search_input.clear()
+                return
+        except Exception:
+            pass
+        finally:
+            session.close()
+
+        # 2. ถ้าในเครื่องยังไม่มี ให้ถาม ERP ออนไลน์ (สินค้าใหม่หรือป้ายชั่งที่ต้องการราคาเซิร์ฟเวอร์)
         token = self.config.get('pos_token')
         branch_id = self.config.get('branch_id')
         if token and branch_id:
@@ -1067,7 +1124,7 @@ class MainWindow(QMainWindow):
                     f"{self.config['api_url'].rstrip('/')}/api/pos/scan",
                     headers={'Authorization': f'Bearer {token}', 'Accept': 'application/json'},
                     json={'branch_id': branch_id, 'barcode': query, 'source': 'desktop'},
-                    timeout=4,
+                    timeout=2.5,
                 )
                 if response.status_code == 200:
                     data = response.json()
@@ -1096,75 +1153,14 @@ class MainWindow(QMainWindow):
                     self.search_input.selectAll()
                     return
             except requests.exceptions.RequestException:
-                # Network is unavailable: only use the local cache when its unit
-                # and price information is complete.
                 pass
             except Exception as error:
                 QMessageBox.warning(self, 'สแกนสินค้าไม่สำเร็จ', str(error))
                 self.search_input.selectAll()
                 return
 
-        session = init_db(f'sqlite:///{self.db_path}')
-        try:
-            scale_data = ScaleBarcodeParser.parse(query, session)
-            if scale_data:
-                item_code = scale_data['item_code']
-                product = session.query(Product).filter(
-                    (Product.sku_code == item_code) |
-                    (Product.sku_code.endswith(item_code)) |
-                    (Product.barcode == item_code) |
-                    (ProductBarcode.barcode == item_code)
-                ).outerjoin(ProductBarcode, ProductBarcode.product_id == Product.id).first()
-                if not product:
-                    QMessageBox.warning(self, 'ไม่พบสินค้า', f"ไม่พบสินค้าในระบบ (บาร์โค้ดเครื่องชั่ง: '{query}')")
-                    self.search_input.selectAll()
-                    return
-                self.add_to_cart(
-                    product, qty=scale_data['weight'], is_scale=True,
-                    source_barcode=scale_data['raw_barcode'], barcode_type=scale_data['barcode_type'],
-                    price_override=scale_data['price'] / scale_data['weight'] if scale_data['weight'] else None,
-                )
-                self.search_input.clear()
-                return
-
-            cached_barcode = session.query(ProductBarcode).filter_by(barcode=query).first()
-            if cached_barcode:
-                product = session.query(Product).filter_by(id=cached_barcode.product_id).first()
-                if product:
-                    unit_factor = float(cached_barcode.unit_factor or 1)
-                    unit_price = cached_barcode.price
-                    if unit_price is None and unit_factor > 1:
-                        QMessageBox.warning(self, 'ไม่มีราคาหน่วยขายในแคช', 'บาร์โค้ดนี้เป็นหน่วยบรรจุใหญ่ แต่ยังไม่มีราคาหน่วยนั้นที่บันทึกไว้ ขณะออฟไลน์ให้เชื่อม ERP ก่อนขาย')
-                        return
-                    unit_price = float(unit_price if unit_price is not None else (product.pos_price or product.default_price or 0))
-                    self.add_to_cart(
-                        product, source_barcode=query,
-                        barcode_type=cached_barcode.barcode_type or 'CUSTOM',
-                        unit_factor=unit_factor, unit_name=cached_barcode.unit_name,
-                        price_override=unit_price,
-                    )
-                    self.search_input.clear()
-                    return
-
-            product = session.query(Product).filter(
-                (Product.sku_code == query) | (Product.name_th == query) | (Product.barcode == query)
-            ).first()
-            if product and getattr(product, 'is_scale_item', False):
-                weight, ok = QInputDialog.getDouble(self, 'สินค้าน้ำหนัก', f"ระบุน้ำหนักสำหรับ '{product.name_th}' (กก.):", 1.0, 0.00000001, 999999.99999999, 8)
-                if ok and weight > 0:
-                    self.add_to_cart(product, qty=weight, is_scale=True)
-                    self.search_input.clear()
-            elif product:
-                self.add_to_cart(product, qty=1.0)
-                self.search_input.clear()
-            else:
-                QMessageBox.warning(self, 'ไม่พบสินค้า', f"ไม่พบบาร์โค้ดในแคตตาล็อก ERP: '{query}'")
-                self.search_input.selectAll()
-        except Exception as error:
-            import traceback
-            QMessageBox.critical(self, 'Error', f'Error scanning barcode: {traceback.format_exc()}')
-        finally:
-            session.close()
+        QMessageBox.warning(self, 'ไม่พบสินค้า', f"ไม่พบบาร์โค้ดในแคตตาล็อก: '{query}'")
+        self.search_input.selectAll()
 
     def add_quick_product(self, barcode):
 

@@ -474,6 +474,149 @@
         .cat-pill:nth-child(6n) { --cat-a:#eab308; --cat-b:#facc15; }
         .cat-pill.active { background: linear-gradient(135deg,var(--cat-a),var(--cat-b)); border-color: var(--cat-b); color: #fff; }
 
+        /* Compact Data Table per Phase 2 */
+        .pos-product-table-wrap {
+            flex: 1;
+            overflow-y: auto;
+            padding: 2px 4px;
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.06);
+            display: flex;
+            flex-direction: column;
+            min-height: 380px;
+        }
+        .pos-product-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 13px;
+            color: #1e293b;
+        }
+        .pos-product-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: #f1f5f9;
+            color: #475569;
+            font-weight: 700;
+            font-size: 12px;
+            padding: 8px 10px;
+            border-bottom: 2px solid #cbd5e1;
+            white-space: nowrap;
+        }
+        .pos-product-table tbody tr {
+            cursor: pointer;
+            transition: background 0.1s ease;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .pos-product-table tbody tr:hover {
+            background: #f0fdf4 !important;
+        }
+        .pos-product-table tbody tr.selected-row {
+            background: #e0f2fe !important;
+            outline: 2px solid #0284c7;
+        }
+        .pos-product-table tbody td {
+            padding: 7px 10px;
+            vertical-align: middle;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .pos-product-table .sku-cell {
+            font-family: monospace;
+            font-size: 12px;
+            font-weight: 700;
+            color: #0284c7;
+            white-space: nowrap;
+        }
+        .pos-product-table .barcode-cell {
+            font-family: monospace;
+            font-size: 11.5px;
+            color: #64748b;
+            white-space: nowrap;
+        }
+        .pos-product-table .name-cell {
+            font-weight: 600;
+            color: #0f172a;
+        }
+        .pos-product-table .name-wrap {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .pos-product-table .price-cell {
+            font-variant-numeric: tabular-nums;
+            font-size: 13.5px;
+            color: #0f172a;
+            white-space: nowrap;
+        }
+        .pos-product-table .orig-price {
+            font-size: 11px;
+            color: #94a3b8;
+            text-decoration: line-through;
+        }
+        .pos-product-table .stock-cell {
+            font-variant-numeric: tabular-nums;
+            font-weight: 700;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+        .stock-ok { color: #059669; }
+        .stock-low { color: #d97706; }
+        .stock-out { color: #dc2626; }
+        .badge-flash {
+            background: #fef3c7;
+            color: #d97706;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 1px 6px;
+            border-radius: 4px;
+        }
+        .badge-promo {
+            background: #dbeafe;
+            color: #1d4ed8;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 1px 6px;
+            border-radius: 4px;
+        }
+        .badge-warning-margin {
+            background: #fee2e2;
+            color: #b91c1c;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 1px 6px;
+            border-radius: 4px;
+        }
+        .btn-select-product {
+            padding: 4px 10px;
+            background: #0284c7;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.1s;
+        }
+        .btn-select-product:hover {
+            background: #0369a1;
+            transform: scale(1.05);
+        }
+        .receipt-copy-badge {
+            display: inline-block;
+            background: #fef2f2;
+            border: 1px dashed #ef4444;
+            color: #dc2626;
+            font-size: 11.5px;
+            font-weight: 800;
+            padding: 2px 10px;
+            border-radius: 4px;
+            margin: 4px auto;
+            letter-spacing: 1px;
+            text-align: center;
+        }
+
         .product-grid {
             flex: 1; overflow-y: auto; padding: 8px 10px;
             display: grid; grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); gap: 8px;
@@ -1905,6 +2048,10 @@
             <span x-text="isFullscreen ? 'ออกเต็มจอ' : 'เต็มจอ'"></span>
         </button>
 
+        <a href="{{ route('pos.customer-display') }}" target="_blank" class="topbar-btn" title="เปิดจอลูกค้า (Customer Display)">
+            <i class="bi bi-display"></i> จอลูกค้า
+        </a>
+
         <button class="topbar-btn" x-show="canInstall" @click="installApp()" style="display:none">
             <i class="bi bi-download"></i> ติดตั้งแอพ
         </button>
@@ -2219,8 +2366,11 @@
             <div class="pos-search-bar">
                 <div class="search-wrap">
                     <i class="bi bi-search"></i>
-                    <input class="pos-search-input" type="text" placeholder="พิมพ์รหัสหรือชื่อสินค้า..."
-                        x-model="searchQ" @input.debounce.180ms="loadProducts()" @keydown.enter.prevent="scanSearch()" autofocus>
+                    <input class="pos-search-input" type="text" placeholder="พิมพ์รหัส บาร์โค้ด หรือชื่อสินค้า (กด ↑/↓ เพื่อเลือก, Enter เพื่อเพิ่ม)..."
+                        x-model="searchQ" @input.debounce.180ms="loadProducts()"
+                        @keydown.enter.prevent="handleSearchEnter()"
+                        @keydown.arrow-down.prevent="navigateProduct(1)"
+                        @keydown.arrow-up.prevent="navigateProduct(-1)" autofocus>
                 </div>
                 <button type="button" class="btn btn-primary" @click="openScanner()" title="สแกน QR / Barcode">
                     <i class="bi bi-camera-fill"></i><span class="d-none d-md-inline"> สแกน</span>
@@ -2238,44 +2388,90 @@
                 @endforeach
             </div>
 
-            <div class="product-grid" id="productGrid">
-                <template x-if="loading">
-                    <div class="product-loading"><i class="bi bi-arrow-repeat" style="animation:spin .8s linear infinite"></i> กำลังโหลด...</div>
-                </template>
-                <template x-if="!loading && products.length === 0">
-                    <div class="product-loading" style="color:#64748b">ไม่พบสินค้า</div>
-                </template>
-                <template x-for="p in products" :key="p.id">
-                    <div class="product-card" :class="{ 'flash-sale': p.is_flash_sale, 'margin-low': p.margin_warning }" @click="addToCart(p)">
-                        <template x-if="p.is_flash_sale">
-                            <div class="flash-badge"><i class="bi bi-lightning-charge-fill"></i> นาทีทอง</div>
+            {{-- Compact Data Table per Phase 2 --}}
+            <div class="pos-product-table-wrap">
+                <table class="pos-product-table">
+                    <thead>
+                        <tr>
+                            <th style="width:38px; text-align:center;">#</th>
+                            <th style="width:95px;">รหัสสินค้า</th>
+                            <th style="width:115px;">บาร์โค้ด</th>
+                            <th>ชื่อสินค้า</th>
+                            <th style="width:65px; text-align:center;">หน่วย</th>
+                            <th style="width:90px; text-align:right;">ราคาขาย</th>
+                            <th style="width:80px; text-align:right;">สต๊อก</th>
+                            <th style="width:60px; text-align:center;">เลือก</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-if="loading">
+                            <tr>
+                                <td colspan="8" style="text-align:center; padding: 28px 0; color: #64748b;">
+                                    <i class="bi bi-arrow-repeat" style="font-size:18px;display:inline-block;animation:spin .8s linear infinite"></i>
+                                    <span class="ms-2">กำลังค้นหาและโหลดรายการสินค้า...</span>
+                                </td>
+                            </tr>
                         </template>
-                        <template x-if="p.is_promotion && !p.is_flash_sale">
-                            <div class="promo-badge"><i class="bi bi-tag-fill"></i> ราคาลดตามวันที่</div>
+                        <template x-if="!loading && products.length === 0">
+                            <tr>
+                                <td colspan="8" style="text-align:center; padding: 32px 0; color: #64748b;">
+                                    <i class="bi bi-inbox" style="font-size:24px;display:block;margin-bottom:6px"></i>
+                                    <span>ไม่พบสินค้าที่ตรงกับคำค้นหา</span>
+                                </td>
+                            </tr>
                         </template>
-                        <template x-if="productPromoLabel(p)">
-                            <div class="promo-badge"><i class="bi bi-gift-fill"></i> <span x-text="productPromoLabel(p)"></span></div>
+                        <template x-for="(p, idx) in products" :key="p.id">
+                            <tr :class="{ 'selected-row': selectedProductIdx === idx, 'flash-sale-row': p.is_flash_sale, 'promo-row': p.is_promotion }"
+                                @click="selectedProductIdx = idx; addToCart(p)">
+                                <td class="text-center text-muted" x-text="idx + 1"></td>
+                                <td class="sku-cell" x-text="p.sku_code"></td>
+                                <td class="barcode-cell" x-text="productBarcodeDisplay(p)"></td>
+                                <td class="name-cell">
+                                    <div class="name-wrap">
+                                        <span x-text="p.name_th"></span>
+                                        <template x-if="p.is_flash_sale">
+                                            <span class="badge-flash">⚡ นาทีทอง</span>
+                                        </template>
+                                        <template x-if="p.is_promotion && !p.is_flash_sale">
+                                            <span class="badge-promo">🏷️ ลดตามช่วง</span>
+                                        </template>
+                                        <template x-if="productPromoLabel(p)">
+                                            <span class="badge-promo" x-text="'🎁 ' + productPromoLabel(p)"></span>
+                                        </template>
+                                        <template x-if="p.margin_warning">
+                                            <span class="badge-warning-margin">กำไรต่ำ</span>
+                                        </template>
+                                    </div>
+                                </td>
+                                <td class="text-center text-muted" x-text="p.matched_barcode?.unit_name || 'ชิ้น'"></td>
+                                <td class="text-end price-cell">
+                                    <template x-if="p.is_flash_sale || p.is_promotion">
+                                        <div class="orig-price" x-text="'฿' + money(p.original_price)"></div>
+                                    </template>
+                                    <strong x-text="'฿' + money(p.pos_price ?? p.default_price)"></strong>
+                                </td>
+                                <td class="text-end stock-cell">
+                                    <span :class="p.stock_qty <= 0 ? 'stock-out' : (p.stock_qty < 10 ? 'stock-low' : 'stock-ok')"
+                                          x-text="p.stock_qty !== null && p.stock_qty !== undefined ? (p.stock_qty <= 0 ? 'หมด' : money(p.stock_qty)) : '-'"></span>
+                                </td>
+                                <td class="text-center">
+                                    <button type="button" class="btn-select-product" @click.stop="addToCart(p)" title="เพิ่มลงตะกร้า">
+                                        <i class="bi bi-cart-plus"></i>
+                                    </button>
+                                </td>
+                            </tr>
                         </template>
-                        <template x-if="p.stock_qty !== null && p.stock_qty !== undefined">
-                            <div class="stock-badge" :class="p.stock_qty <= 0 ? 'out' : (p.stock_qty < 10 ? 'low' : '')"
-                                 x-text="p.stock_qty <= 0 ? 'หมด' : 'คงเหลือ ' + money(p.stock_qty)"></div>
-                        </template>
-                        <div class="product-sku">
-                            <span x-text="p.sku_code"></span>
-                            <span class="margin-warning" x-show="p.margin_warning">กำไรต่ำ</span>
-                        </div>
-                        <div class="product-name" x-text="p.name_th"></div>
-                        <template x-if="p.is_flash_sale || p.is_promotion">
-                            <div class="product-price-orig" x-text="'฿' + money(p.original_price)"></div>
-                        </template>
-                        <div class="product-price" x-text="'฿' + money(p.pos_price ?? p.default_price)"></div>
-                    </div>
-                </template>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 
     <div class="pos-actionbar">
+        <button class="action-btn reprint" type="button" @click="openReceiptSearchModal()">
+            <i class="bi bi-clock-history"></i>
+            <span>ค้นหาบิล/พิมพ์ซ้ำ</span>
+        </button>
         <button class="action-btn hold" :disabled="cart.length === 0" @click="holdBill()">
             <i class="bi bi-pause-circle"></i>
             <span>พักบิล</span>
@@ -2540,19 +2736,20 @@
 {{-- RECEIPT MODAL --}}
 <div class="modal-overlay" x-show="receiptOpen" style="display:none">
     <div class="receipt-box" x-transition :style="'--receipt-screen-width:' + receiptScreenWidth + ';--receipt-print-width:' + receiptPaperWidth">
-        {{-- หัว: ชื่อ+เลขภาษีผู้ขาย (มาตรา 86/6 ข้อ 2) --}}
-        @if($logo = \App\Models\AppSetting::logoUrl())
-            <img src="{{ $logo }}" alt="" style="max-height:64px;max-width:190px;object-fit:contain;margin-bottom:4px">
-        @else
-            <div class="receipt-logo">pop<span>star</span></div>
-        @endif
-        <div style="font-size:12px;font-weight:800;line-height:1.35">{{ $company['name'] }}</div>
+        {{-- หัว: โลโก้ MPM Food Group + ชื่อ+เลขภาษีผู้ขาย (มาตรา 86/6 ข้อ 2) --}}
+        <div style="text-align:center;margin-bottom:6px">
+            <img src="{{ asset('images/logos/mpm-food-group.jpg') }}" alt="MPM Food Group" style="max-height:50px;max-width:170px;object-fit:contain;margin-bottom:4px">
+        </div>
+        <div style="font-size:12px;font-weight:800;line-height:1.35">{{ $company['name'] ?: 'บริษัท เอ็มพีเอ็ม ฟู้ด กรุ๊ป จำกัด' }}</div>
         <div style="font-size:10.5px;color:#64748b;line-height:1.4">
             @if($company['address']){{ Str::limit($company['address'], 70) }}<br>@endif
             เลขประจำตัวผู้เสียภาษี {{ $company['tax_id'] ?: '-' }}
             @if($company['phone'])<br>โทร {{ $company['phone'] }}@endif
         </div>
-        <div style="font-size:12.5px;font-weight:900;color:#0f172a;margin-top:6px">ใบกำกับภาษีอย่างย่อ</div>
+        <div style="font-size:12.5px;font-weight:900;color:#0f172a;margin-top:6px">ใบเสร็จรับเงิน / ใบกำกับภาษีอย่างย่อ</div>
+        <template x-if="isReprintCopy">
+            <div class="receipt-copy-badge">*** สำเนา / COPY ***</div>
+        </template>
         <div style="font-size:11px;color:#64748b">สาขา: <span x-text="branchName"></span> &middot; แคชเชียร์: <span x-text="lastCashierName || '-'"></span></div>
         <hr class="receipt-divider">
         <div class="receipt-doc" style="display:flex;justify-content:space-between">
@@ -2605,6 +2802,96 @@
             <button class="receipt-action-btn primary" type="button" @click="newBill()">
                 <i class="bi bi-plus-circle"></i> บิลใหม่
             </button>
+        </div>
+    </div>
+</div>
+
+{{-- SEARCH PAST BILLS & REPRINT MODAL (Phase 7) --}}
+<div class="modal-overlay" x-show="receiptSearchOpen" @keydown.escape.window="receiptSearchOpen = false" style="display:none">
+    <div class="modal-box" style="max-width:880px; width:95%; max-height:90vh; display:flex; flex-direction:column;" @click.outside="receiptSearchOpen = false" x-transition>
+        <div class="modal-head">
+            <div class="modal-title"><i class="bi bi-clock-history me-2" style="color:#0284c7"></i>ค้นหาบิลเก่า / พิมพ์ซ้ำ (Reprint Receipt)</div>
+            <button class="modal-close" type="button" @click="receiptSearchOpen = false"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div style="padding:14px 18px; border-bottom:1px solid rgba(255,255,255,0.08); display:flex; gap:10px; flex-wrap:wrap; align-items:center; background:rgba(0,0,0,0.15)">
+            <div style="flex:1; min-width:200px; position:relative">
+                <input type="text" class="form-control" style="background:#0f172a; border-color:#334155; color:#fff;" placeholder="ค้นหาเลขที่บิล หรือ เบอร์โทรลูกค้า..." x-model="receiptSearchQuery" @keydown.enter.prevent="searchReceipts()">
+            </div>
+            <div style="display:flex; gap:6px; align-items:center;">
+                <span style="font-size:12px; color:#94a3b8">วันที่:</span>
+                <input type="date" class="form-control form-control-sm" style="width:130px; background:#0f172a; border-color:#334155; color:#fff;" x-model="receiptSearchDateFrom">
+                <span style="font-size:12px; color:#94a3b8">ถึง</span>
+                <input type="date" class="form-control form-control-sm" style="width:130px; background:#0f172a; border-color:#334155; color:#fff;" x-model="receiptSearchDateTo">
+            </div>
+            <button type="button" class="btn btn-primary btn-sm" @click="searchReceipts()" :disabled="receiptSearchLoading">
+                <i class="bi bi-search me-1"></i> <span x-text="receiptSearchLoading ? 'กำลังค้นหา...' : 'ค้นหา'"></span>
+            </button>
+        </div>
+        <div style="flex:1; overflow-y:auto; padding:10px 18px;">
+            <table class="table table-dark table-hover" style="font-size:13px; margin:0; border-color:#334155">
+                <thead style="background:#1e293b; color:#94a3b8; position:sticky; top:0; z-index:2">
+                    <tr>
+                        <th style="width:40px">#</th>
+                        <th>เลขที่บิล</th>
+                        <th>วัน-เวลา</th>
+                        <th>สาขา / แคชเชียร์</th>
+                        <th>ลูกค้า / สมาชิก</th>
+                        <th style="text-align:right">ยอดรวมสุทธิ</th>
+                        <th style="text-align:center">ชำระด้วย</th>
+                        <th style="text-align:center; width:110px">พิมพ์ซ้ำ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="receiptSearchLoading">
+                        <tr>
+                            <td colspan="8" class="text-center py-4 text-muted">
+                                <i class="bi bi-arrow-repeat spin"></i> กำลังโหลดข้อมูลบิล...
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-if="!receiptSearchLoading && receiptSearchResults.length === 0">
+                        <tr>
+                            <td colspan="8" class="text-center py-4 text-muted">
+                                ไม่พบบิลขายที่ตรงกับเงื่อนไข
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-for="(r, idx) in receiptSearchResults" :key="r.id">
+                        <tr style="vertical-align:middle">
+                            <td class="text-muted" x-text="idx + 1"></td>
+                            <td>
+                                <strong class="text-info" x-text="r.receipt_no"></strong>
+                                <span v-if="r.status === 'void'" class="badge bg-danger ms-1">ยกเลิก</span>
+                            </td>
+                            <td>
+                                <div x-text="r.receipt_date"></div>
+                                <small class="text-muted" x-text="r.receipt_time || ''"></small>
+                            </td>
+                            <td>
+                                <div x-text="r.branch_name"></div>
+                                <small class="text-muted" x-text="r.cashier_name"></small>
+                            </td>
+                            <td>
+                                <span x-text="r.member_name || '-'"></span>
+                                <small class="d-block text-muted" x-text="r.member_phone || ''"></small>
+                            </td>
+                            <td style="text-align:right; font-weight:800; font-variant-numeric:tabular-nums; color:#38bdf8" x-text="'฿ ' + money(r.net_sales)"></td>
+                            <td style="text-align:center">
+                                <span class="badge bg-secondary" x-text="r.primary_payment_method === 'cash' ? 'เงินสด' : (r.primary_payment_method === 'transfer' ? 'QR/โอน' : r.primary_payment_method)"></span>
+                            </td>
+                            <td style="text-align:center">
+                                <button type="button" class="btn btn-sm btn-outline-info" @click="reprintReceipt(r.id)" title="พิมพ์ซ้ำพร้อมประทับตรา (สำเนา)">
+                                    <i class="bi bi-printer me-1"></i> พิมพ์สำเนา
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+        <div style="padding:10px 18px; border-top:1px solid rgba(255,255,255,0.08); background:#0f172a; font-size:12px; color:#94a3b8; display:flex; justify-content:space-between; align-items:center;">
+            <span><i class="bi bi-info-circle me-1"></i> การพิมพ์สำเนาจะไม่สร้างยอดขายใหม่ ไม่ตัดสต็อกซ้ำ และมีการบันทึก Audit Log</span>
+            <button type="button" class="btn btn-sm btn-secondary" @click="receiptSearchOpen = false">ปิด</button>
         </div>
     </div>
 </div>
@@ -3051,8 +3338,17 @@ function posApp() {
         countedCash: 0,
         closingNote: '',
 
-        // Products
+        // Products (Compact Data Table & In-Memory Fast Lookup)
         products: [], loading: false, searchQ: '', categoryId: null,
+        selectedProductIdx: 0, defaultCatalog: [], catalogBarcodeMap: new Map(),
+
+        // Reprint & Past bills (Phase 7)
+        isReprintCopy: false, receiptSearchOpen: false, receiptSearchQuery: '',
+        receiptSearchDateFrom: '', receiptSearchDateTo: '',
+        receiptSearchResults: [], receiptSearchLoading: false,
+
+        // Dual Screen Sync (Phase 3)
+        customerDisplayChannel: null,
 
         // Cart
         cart: [], selectedCartIdx: null,
@@ -3585,10 +3881,10 @@ function posApp() {
             const controller = new AbortController();
             this.productSearchController = controller;
             const sequence = ++this.productSearchSequence;
-            const query = this.searchQ;
+            const query = (this.searchQ || '').trim();
             const category = this.categoryId;
             const branch = this.branchId;
-            const current = () => !this.disposed && sequence === this.productSearchSequence && query === this.searchQ && category === this.categoryId && branch === this.branchId;
+            const current = () => !this.disposed && sequence === this.productSearchSequence && query === (this.searchQ || '').trim() && category === this.categoryId && branch === this.branchId;
             this.loading = true;
             const params = new URLSearchParams();
             if (query) params.set('q', query);
@@ -3599,12 +3895,22 @@ function posApp() {
                 const res = await fetch(`{{ route('pos.products') }}?${params}`, { signal: controller.signal });
                 if (!res.ok) throw Object.assign(new Error('HTTP ' + res.status), { status: res.status });
                 const products = await res.json();
-                if (current()) this.products = products;
+                if (current()) {
+                    this.products = products;
+                    this.selectedProductIdx = 0;
+                    if (!query && !category) {
+                        this.defaultCatalog = products;
+                        this.indexProducts(products);
+                    }
+                }
             } catch (e) {
                 if (e.name === 'AbortError' || !current()) return;
                 if (this.isHostDownError(e)) this.markHostDown();
                 const products = window.PosOffline ? await PosOffline.search(query, category).catch(() => []) : [];
-                if (current()) this.products = products;
+                if (current()) {
+                    this.products = products;
+                    this.selectedProductIdx = 0;
+                }
             } finally {
                 if (sequence === this.productSearchSequence) {
                     this.loading = false;
@@ -3664,19 +3970,174 @@ function posApp() {
             }
         },
 
+        navigateProduct(delta) {
+            if (!this.products.length) return;
+            this.selectedProductIdx = Math.max(0, Math.min(this.products.length - 1, this.selectedProductIdx + delta));
+            this.$nextTick(() => {
+                const rows = document.querySelectorAll('.pos-product-table tbody tr');
+                if (rows[this.selectedProductIdx]) {
+                    rows[this.selectedProductIdx].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                }
+            });
+        },
+
+        handleSearchEnter() {
+            const q = (this.searchQ || '').trim();
+            if (q) {
+                this.scanSearch();
+                return;
+            }
+            if (this.products.length > 0 && this.selectedProductIdx >= 0 && this.selectedProductIdx < this.products.length) {
+                this.addToCart(this.products[this.selectedProductIdx]);
+            }
+        },
+
+        indexProducts(list) {
+            if (!Array.isArray(list)) return;
+            for (const p of list) {
+                if (!p || !p.id) continue;
+                if (p.sku_code) this.catalogBarcodeMap.set(String(p.sku_code).trim(), p);
+                if (Array.isArray(p.barcodes)) {
+                    for (const b of p.barcodes) {
+                        if (b && b.barcode) this.catalogBarcodeMap.set(String(b.barcode).trim(), p);
+                    }
+                }
+            }
+        },
+
+        productBarcodeDisplay(p) {
+            if (p.matched_barcode?.barcode) return p.matched_barcode.barcode;
+            if (Array.isArray(p.barcodes) && p.barcodes.length > 0 && p.barcodes[0].barcode) {
+                return p.barcodes[0].barcode;
+            }
+            return p.barcode || '-';
+        },
+
+        broadcastCustomerDisplay(mode = null) {
+            try {
+                this.customerDisplayChannel ??= new BroadcastChannel('pos_customer_display');
+                const last = this.cart.length > 0 ? this.cart[this.cart.length - 1] : null;
+                const payload = {
+                    cart: this.cart,
+                    lastItem: last ? {
+                        id: last.id,
+                        name_th: last.name_th,
+                        sku_code: last.sku_code,
+                        qty: last.qty,
+                        unit_name: last.unit_name,
+                        unit_price: last.unit_price,
+                    } : null,
+                    totalAmount: this.totalAmount,
+                    subtotalAmount: this.subtotalAmount,
+                    vatAmount: this.vatAmount,
+                    totalQty: this.totalQty,
+                    totalDiscount: this.totalDiscount,
+                    mode: mode || (this.payModalOpen ? (this.method === 'transfer' ? 'qr' : 'cash') : 'idle'),
+                    qrPayload: window.lastQrPayload || null,
+                    cashReceived: this.cashReceived,
+                    changeAmount: this.changeAmount,
+                };
+                this.customerDisplayChannel.postMessage(payload);
+                localStorage.setItem('pos_customer_display_state', JSON.stringify(payload));
+            } catch (e) {}
+        },
+
+        async openReceiptSearchModal() {
+            this.receiptSearchOpen = true;
+            this.receiptSearchQuery = '';
+            const today = new Date().toISOString().slice(0, 10);
+            this.receiptSearchDateFrom = today;
+            this.receiptSearchDateTo = today;
+            await this.searchReceipts();
+        },
+
+        async searchReceipts() {
+            this.receiptSearchLoading = true;
+            try {
+                const params = new URLSearchParams();
+                if (this.receiptSearchQuery) params.set('q', this.receiptSearchQuery);
+                if (this.receiptSearchDateFrom) params.set('date_from', this.receiptSearchDateFrom);
+                if (this.receiptSearchDateTo) params.set('date_to', this.receiptSearchDateTo);
+                if (this.branchId) params.set('branch_id', this.branchId);
+
+                const res = await fetch(`{{ route('pos.receipts.search') }}?${params}`);
+                const data = await res.json();
+                this.receiptSearchResults = data.receipts || [];
+            } catch (e) {
+                erpToast('error', 'ค้นหาบิลไม่สำเร็จ: ' + e.message);
+            } finally {
+                this.receiptSearchLoading = false;
+            }
+        },
+
+        async reprintReceipt(receiptId) {
+            try {
+                const res = await fetch(`{{ url('/pos/receipts') }}/${receiptId}/reprint`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                    },
+                    body: JSON.stringify({ reason: 'พิมพ์สำเนาบิล' }),
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    throw new Error(data.message || 'ไม่สามารถพิมพ์ซ้ำได้');
+                }
+
+                // Populate receipt modal with reprint data
+                const r = data.receipt;
+                this.isReprintCopy = true;
+                this.lastDocNumber = r.receipt_no;
+                this.lastReceiptId = r.id;
+                this.lastDateTime = r.receipt_datetime || r.receipt_date;
+                this.lastCashierName = r.cashier_name;
+                this.lastItems = (r.items || []).map(i => ({
+                    id: i.id,
+                    name_th: i.name_th,
+                    qty: i.qty,
+                    unit_price: i.unit_price,
+                }));
+                this.lastTotal = r.net_sales;
+                this.lastMethod = r.payments?.[0]?.method || 'cash';
+                this.lastCashReceived = r.payments?.[0]?.cash_received || r.net_sales;
+                this.lastChangeAmount = r.payments?.[0]?.change_amount || 0;
+                this.lastEarnedPoints = 0;
+
+                this.receiptSearchOpen = false;
+                this.receiptOpen = true;
+                this.$nextTick(() => {
+                    window.print();
+                });
+            } catch (e) {
+                erpToast('error', e.message);
+            }
+        },
+
         async scanSearch(source = 'keyboard') {
             const scanned = String(this.searchQ || '').trim();
             if (!scanned) return;
 
+            this.productSearchController?.abort();
             this.loading = true;
             let loggedProductId = null;
 
             try {
+                let matches = [];
                 let scaleBarcode = null;
-                // A scanner is always barcode-first.  New category-led SKU
-                // values may equal an old barcode, so SKU is a manual fallback.
-                let matches = await this.fetchExactProducts(scanned, 'barcode');
 
+                // 1. In-memory fast catalog match (0ms!)
+                if (this.catalogBarcodeMap.has(scanned)) {
+                    matches = [this.catalogBarcodeMap.get(scanned)];
+                }
+
+                // 2. Fetch exact from server if not in memory
+                if (matches.length === 0) {
+                    matches = await this.fetchExactProducts(scanned, 'barcode');
+                }
+
+                // 3. Scale barcode check
                 if (matches.length === 0) {
                     const candidate = this.parseScaleBarcode(scanned);
                     const digits = scanned.replace(/\D/g, '');
@@ -3684,7 +4145,11 @@ function posApp() {
 
                     if (shouldTryScale) {
                         scaleBarcode = candidate;
-                        matches = await this.fetchExactProducts(scaleBarcode.productCode, 'barcode');
+                        if (this.catalogBarcodeMap.has(scaleBarcode.productCode)) {
+                            matches = [this.catalogBarcodeMap.get(scaleBarcode.productCode)];
+                        } else {
+                            matches = await this.fetchExactProducts(scaleBarcode.productCode, 'barcode');
+                        }
                     }
                 }
 
@@ -3692,10 +4157,8 @@ function posApp() {
                     matches = await this.fetchExactProducts(scanned, 'sku');
                 }
 
-                this.products = matches;
-
                 if (matches.length > 0) {
-                    // ป้ายชั่งฝัง "ราคารวม" — แปลงเป็นน้ำหนัก (กก.) ด้วยราคา/กก. เงินจึงตรงป้าย
+                    this.indexProducts(matches);
                     let scaleQty = 1;
                     if (scaleBarcode) {
                         const unitPrice = Number(matches[0].pos_price ?? matches[0].default_price ?? 0);
@@ -3711,8 +4174,15 @@ function posApp() {
                         const oscillator = window.posScanAudio.createOscillator(); oscillator.frequency.value = 880;
                         oscillator.connect(window.posScanAudio.destination); oscillator.start(); oscillator.stop(window.posScanAudio.currentTime + 0.06);
                     } catch (e) {}
+
+                    // Fast reset: Restore catalog in 0ms without server reload
                     this.searchQ = '';
-                    await this.loadProducts();
+                    if (this.defaultCatalog.length > 0) {
+                        this.products = this.defaultCatalog;
+                        this.selectedProductIdx = 0;
+                    } else {
+                        await this.loadProducts();
+                    }
                 } else {
                     erpToast('warning', 'ไม่พบสินค้า: ' + scanned, { timer: 1800 });
                 }

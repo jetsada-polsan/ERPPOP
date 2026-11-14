@@ -56,6 +56,21 @@ class CustomerDisplayWindow(QMainWindow):
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(0)
 
+        # แถบแสดงสินค้าล่าสุดสไตล์ร้านสะดวกซื้อ: สินค้า A — 2 × 35.00 = 70.00
+        self.last_scanned_frame = QFrame()
+        self.last_scanned_frame.setStyleSheet("QFrame { background: #0284c7; border-radius: 8px; margin: 8px 10px; padding: 6px 12px; }")
+        last_layout = QVBoxLayout(self.last_scanned_frame)
+        last_layout.setContentsMargins(2, 2, 2, 2)
+        last_layout.setSpacing(2)
+        self.last_scanned_tag = QLabel("สินค้าล่าสุด (Last Scanned):")
+        self.last_scanned_tag.setStyleSheet("color: #e0f2fe; font-size: 11px; font-weight: bold; border: none; background: transparent;")
+        self.last_scanned_text = QLabel("—")
+        self.last_scanned_text.setStyleSheet("color: #ffffff; font-size: 15px; font-weight: 800; border: none; background: transparent;")
+        last_layout.addWidget(self.last_scanned_tag)
+        last_layout.addWidget(self.last_scanned_text)
+        self.last_scanned_frame.hide()
+        left_layout.addWidget(self.last_scanned_frame)
+
         tbl_header_frame = QFrame()
         tbl_header_frame.setStyleSheet("QFrame { background-color: #147da8; border-top-left-radius: 10px; border-top-right-radius: 10px; border-bottom-left-radius: 0px; border-bottom-right-radius: 0px; }")
         tbl_header_layout = QHBoxLayout(tbl_header_frame)
@@ -267,6 +282,17 @@ class CustomerDisplayWindow(QMainWindow):
 
         self.table.setRowCount(0)
         rows = table_widget.rowCount()
+        if rows > 0:
+            last_idx = rows - 1
+            last_n = table_widget.item(last_idx, 0).text() if table_widget.item(last_idx, 0) else ""
+            last_q = table_widget.item(last_idx, 1).text() if table_widget.item(last_idx, 1) else "1"
+            last_p = table_widget.item(last_idx, 2).text() if table_widget.item(last_idx, 2) else "0"
+            last_t = table_widget.item(last_idx, 3).text() if table_widget.item(last_idx, 3) else "0"
+            self.last_scanned_text.setText(f"{last_n} — {last_q} × {last_p} = {last_t} ฿")
+            self.last_scanned_frame.show()
+        else:
+            self.last_scanned_frame.hide()
+
         for i in range(rows):
             self.table.insertRow(i)
             self.table.setRowHeight(i, 40)

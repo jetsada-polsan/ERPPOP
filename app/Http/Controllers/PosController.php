@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AppSetting;
+use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\DiscountCard;
 use App\Models\Document;
@@ -303,19 +304,56 @@ class PosController extends Controller
         // ค่าที่ตรงตัวยังมาก่อนเสมอ ดูตอนเลือก matchedBarcode ด้านล่าง
         $scanCodes = $q !== '' && ctype_digit($q) && strlen($q) === 12 ? [$q, '0'.$q] : [$q];
 
+        // เร่งความเร็วการยิงบาร์โค้ด / ค้นหา: ใช้ index ตรงจาก product_barcodes แทน whereHas คล้องหลัง
+        $targetProductIds = null;
+        if ($q !== '' && $exact && $lookup === 'barcode') {
+            $matchingProductIds = ProductBarcode::whereIn('barcode', $scanCodes)
+                ->where('is_active', true)
+                ->pluck('product_id')
+                ->unique()
+                ->values()
+                ->all();
+            if (empty($matchingProductIds)) {
+                return response()->json([]);
+            }
+            $targetProductIds = $matchingProductIds;
+        } elseif ($q !== '' && $exact && $lookup === 'sku') {
+            $matchingProductIds = Product::where('sku_code', $q)->where('is_active', true)->pluck('id')->all();
+            if (empty($matchingProductIds)) {
+                return response()->json([]);
+            }
+            $targetProductIds = $matchingProductIds;
+        } elseif ($q !== '' && $exact && $lookup === 'mixed') {
+            $bcProductIds = ProductBarcode::whereIn('barcode', $scanCodes)
+                ->where('is_active', true)
+                ->pluck('product_id')
+                ->all();
+            $skuProductIds = Product::where('sku_code', $q)->where('is_active', true)->pluck('id')->all();
+            $merged = array_values(array_unique(array_merge($bcProductIds, $skuProductIds)));
+            if (empty($merged)) {
+                return response()->json([]);
+            }
+            $targetProductIds = $merged;
+        }
+
+        $barcodeMatchProductIds = [];
+        if ($q !== '' && ! $exact) {
+            $barcodeMatchProductIds = ProductBarcode::where('barcode', 'like', "%{$q}%")
+                ->where('is_active', true)
+                ->limit(60)
+                ->pluck('product_id')
+                ->unique()
+                ->all();
+        }
+
         $products = Product::where('is_active', true)
             ->with(['barcodes' => fn ($query) => $query->where('is_active', true)->with('unit')])
             ->when($categoryId, fn ($query) => $query->where('product_category_id', $categoryId))
-            ->when($q !== '' && $exact && $lookup === 'barcode', fn ($query) => $query
-                ->whereHas('barcodes', fn ($barcodeQuery) => $barcodeQuery->where('is_active', true)->whereIn('barcode', $scanCodes)))
-            ->when($q !== '' && $exact && $lookup === 'sku', fn ($query) => $query->where('sku_code', $q))
-            ->when($q !== '' && $exact && $lookup === 'mixed', fn ($query) => $query->where(fn ($w) => $w
-                ->where('sku_code', $q)
-                ->orWhereHas('barcodes', fn ($barcodeQuery) => $barcodeQuery->where('is_active', true)->whereIn('barcode', $scanCodes))))
+            ->when($targetProductIds !== null, fn ($query) => $query->whereIn('id', $targetProductIds))
             ->when($q !== '' && ! $exact, fn ($query) => $query->where(fn ($w) => $w
                 ->where('sku_code', 'ilike', "%{$q}%")
                 ->orWhere('name_th', 'ilike', "%{$q}%")
-                ->orWhereHas('barcodes', fn ($barcodeQuery) => $barcodeQuery->where('is_active', true)->where('barcode', 'ilike', "%{$q}%"))
+                ->when(! empty($barcodeMatchProductIds), fn ($sub) => $sub->orWhereIn('id', $barcodeMatchProductIds))
             ))
             ->orderBy('name_th')
             ->when(! $all, fn ($query) => $query->limit(100))
@@ -1467,6 +1505,172 @@ class PosController extends Controller
         } catch (RuntimeException $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
+    }
+
+    public function customerDisplay(): View
+    {
+        $company = [
+            'name' => AppSetting::company('name_th') ?: 'บริษัท เอ็มพีเอ็ม ฟู้ด กรุ๊ป จำกัด',
+            'tax_id' => AppSetting::company('tax_id'),
+            'address' => AppSetting::company('address'),
+            'phone' => AppSetting::company('phone'),
+        ];
+        $qrConfig = QrPaymentConfig::where('is_active', true)->with('bankAccount')->first();
+
+        return view('pos.customer-display', compact('company', 'qrConfig'));
+    }
+
+    public function searchReceipts(Request $request): JsonResponse
+    {
+        $q = trim((string) $request->input('q', ''));
+        $dateFrom = $request->input('date_from');
+        $dateTo = $request->input('date_to');
+        $branchId = $request->input('branch_id');
+        $cashierId = $request->input('cashier_id');
+        $status = $request->input('status');
+
+        $query = PosReceipt::query()
+            ->with([
+                'terminal:id,code,name,branch_id',
+                'terminal.branch:id,code,name_th',
+                'cashier:id,username,name',
+                'items.product:id,sku_code,name_th',
+                'payments:id,pos_receipt_id,method,amount,cash_received,change_amount',
+                'member:id,name,phone',
+            ]);
+
+        if ($branchId) {
+            $query->whereHas('terminal', fn ($t) => $t->where('branch_id', (int) $branchId));
+        }
+
+        if ($cashierId) {
+            $query->where('cashier_id', (int) $cashierId);
+        }
+
+        if ($status) {
+            $query->where('status', $status);
+        }
+
+        if ($dateFrom) {
+            $query->whereDate('receipt_date', '>=', $dateFrom);
+        }
+        if ($dateTo) {
+            $query->whereDate('receipt_date', '<=', $dateTo);
+        }
+
+        if ($q !== '') {
+            $query->where(function ($w) use ($q) {
+                $w->where('receipt_no', 'like', "%{$q}%")
+                    ->orWhereHas('member', fn ($m) => $m->where('phone', 'like', "%{$q}%")->orWhere('name', 'like', "%{$q}%"));
+            });
+        }
+
+        $receipts = $query->orderByDesc('id')
+            ->limit(50)
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'receipts' => $receipts->map(fn ($r) => [
+                'id' => $r->id,
+                'receipt_no' => $r->receipt_no,
+                'receipt_date' => $r->receipt_date,
+                'receipt_time' => $r->created_at?->format('H:i:s'),
+                'status' => $r->status,
+                'branch_name' => $r->terminal?->branch?->name_th ?? '-',
+                'terminal_code' => $r->terminal?->code ?? '-',
+                'cashier_name' => $r->cashier?->name ?? $r->cashier?->username ?? '-',
+                'member_name' => $r->member?->name,
+                'member_phone' => $r->member?->phone,
+                'gross_sales' => (float) $r->gross_sales,
+                'discount_amount' => (float) $r->discount_amount,
+                'vat_amount' => (float) $r->vat_amount,
+                'net_sales' => (float) $r->net_sales,
+                'item_count' => $r->items->count(),
+                'primary_payment_method' => $r->payments->first()?->method ?? 'cash',
+            ]),
+        ]);
+    }
+
+    public function getReceiptDetails(PosReceipt $receipt): JsonResponse
+    {
+        $receipt->load([
+            'terminal:id,code,name,branch_id',
+            'terminal.branch:id,code,name_th',
+            'cashier:id,username,name',
+            'items.product:id,sku_code,name_th',
+            'payments',
+            'member:id,name,phone',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'receipt' => [
+                'id' => $receipt->id,
+                'receipt_no' => $receipt->receipt_no,
+                'receipt_date' => $receipt->receipt_date,
+                'receipt_datetime' => $receipt->created_at?->format('d/m/Y H:i:s'),
+                'status' => $receipt->status,
+                'branch_name' => $receipt->terminal?->branch?->name_th ?? '-',
+                'terminal_code' => $receipt->terminal?->code ?? '-',
+                'cashier_name' => $receipt->cashier?->name ?? $receipt->cashier?->username ?? '-',
+                'member_name' => $receipt->member?->name,
+                'member_phone' => $receipt->member?->phone,
+                'gross_sales' => (float) $receipt->gross_sales,
+                'discount_amount' => (float) $receipt->discount_amount,
+                'vat_amount' => (float) $receipt->vat_amount,
+                'net_sales' => (float) $receipt->net_sales,
+                'items' => $receipt->items->map(fn ($item) => [
+                    'id' => $item->id,
+                    'seq' => $item->seq,
+                    'sku_code' => $item->product?->sku_code ?? '-',
+                    'name_th' => $item->product?->name_th ?? "สินค้า #{$item->product_id}",
+                    'qty' => (float) $item->qty,
+                    'unit_price' => (float) $item->unit_price,
+                    'discount_amount' => (float) $item->discount_amount,
+                    'net_amount' => (float) $item->net_amount,
+                ]),
+                'payments' => $receipt->payments->map(fn ($p) => [
+                    'method' => $p->method,
+                    'amount' => (float) $p->amount,
+                    'cash_received' => (float) ($p->cash_received ?? 0),
+                    'change_amount' => (float) ($p->change_amount ?? 0),
+                    'payment_reference' => $p->payment_reference,
+                    'transfer_account_last4' => $p->transfer_account_last4,
+                ]),
+            ],
+        ]);
+    }
+
+    public function reprintReceipt(Request $request, PosReceipt $receipt): JsonResponse
+    {
+        // กฎเหล็ก Phase 7 (STRICT BUSINESS RULES):
+        // 1. ห้ามตัดสต็อกซ้ำ (เด็ดขาด)
+        // 2. ห้ามสร้างยอดขายใหม่
+        // 3. ห้ามบันทึกการรับเงินซ้ำ
+        // 4. ห้ามคำนวณโปรโมชั่นใหม่ (พิมพ์ตาม snapshot บิลเดิม)
+        // 5. บันทึก Audit Log
+        AuditLog::create([
+            'user_id' => auth()->id(),
+            'branch_id' => $receipt->terminal?->branch_id,
+            'action' => 'pos_receipt_reprinted',
+            'table_name' => 'pos_receipts',
+            'record_id' => $receipt->id,
+            'new_values' => [
+                'receipt_no' => $receipt->receipt_no,
+                'net_sales' => (float) $receipt->net_sales,
+                'reprinted_by' => auth()->user()?->username ?? 'cashier',
+                'reprinted_at' => now()->toIso8601String(),
+                'ip' => $request->ip(),
+                'reason' => $request->input('reason', 'ลูกค้าขอพิมพ์บิลซ้ำ'),
+            ],
+        ]);
+
+        $details = $this->getReceiptDetails($receipt)->getData(true);
+        $details['is_copy'] = true;
+        $details['watermark'] = '*** สำเนา / COPY ***';
+
+        return response()->json($details);
     }
 
     private function findOpenShift(int $branchId, ?int $cashierId = null): ?PosShift

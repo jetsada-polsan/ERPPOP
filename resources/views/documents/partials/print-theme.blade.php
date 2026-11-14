@@ -1,4 +1,4 @@
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&family=TH+Sarabun+New&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap');
 
         :root {
             --doc-blue: #1f9bd1;
@@ -13,7 +13,7 @@
         body {
             background: var(--doc-page-bg) !important;
             color: var(--doc-ink) !important;
-            font-family: 'IBM Plex Sans Thai', 'Sarabun', Tahoma, sans-serif !important;
+            font-family: 'Sarabun', 'TH Sarabun New', 'IBM Plex Sans Thai', Tahoma, sans-serif !important;
         }
 
         .toolbar,
@@ -412,7 +412,7 @@
                 height: auto !important;
                 background: #fff !important;
                 color: #000 !important;
-                font-family: 'IBM Plex Sans Thai', 'Sarabun', Tahoma, sans-serif !important;
+                font-family: 'Sarabun', 'TH Sarabun New', 'IBM Plex Sans Thai', Tahoma, sans-serif !important;
                 font-size: 11pt !important;
                 line-height: 1.4 !important;
                 -webkit-print-color-adjust: exact;

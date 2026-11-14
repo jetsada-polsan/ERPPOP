@@ -371,7 +371,11 @@ class PosApiController extends Controller
         if (blank($data['pin'] ?? null)) {
             return response()->json(['success' => false, 'message' => 'กรุณาระบุ PIN'], 422);
         }
-        $matches = $this->cashierCandidates($branchId, $data['code'] ?? null, $device?->user_id)
+        $candidatesQuery = $this->cashierCandidates($branchId, $data['code'] ?? null, $device?->user_id);
+        if (isset($data['cashier_id'])) {
+            $candidatesQuery->where('salesmen.id', (int) $data['cashier_id']);
+        }
+        $matches = $candidatesQuery
             ->get()
             ->filter(fn (Salesman $candidate) => $this->pinMatches($candidate, $data['pin']))
             ->values();

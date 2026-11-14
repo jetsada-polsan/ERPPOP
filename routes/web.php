@@ -214,6 +214,10 @@ Route::prefix('pos')->name('pos.')->group(function () {
     Route::post('/shift/close', [PosController::class, 'closeShift'])->name('shift.close');
     Route::post('/shift/cash-movement', [PosController::class, 'recordCashMovement'])->name('shift.cash-movement');
     Route::get('/shifts/{shift}/z-report', [PosController::class, 'zReport'])->name('shift.z-report');
+    Route::get('/customer-display', [PosController::class, 'customerDisplay'])->name('customer-display');
+    Route::get('/receipts/search', [PosController::class, 'searchReceipts'])->name('receipts.search');
+    Route::get('/receipts/{receipt}', [PosController::class, 'getReceiptDetails'])->name('receipts.show');
+    Route::post('/receipts/{receipt}/reprint', [PosController::class, 'reprintReceipt'])->name('receipts.reprint');
     Route::get('/held-bills', [PosController::class, 'heldBills'])->name('held-bills.index');
     Route::post('/held-bills', [PosController::class, 'holdBill'])->name('held-bills.store');
     Route::post('/held-bills/{heldBill}/resume', [PosController::class, 'resumeHeldBill'])->name('held-bills.resume');
