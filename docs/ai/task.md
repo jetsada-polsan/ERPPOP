@@ -1,3 +1,26 @@
+# Handoff — 2026-11-15 (POS revamp branch review)
+
+## Commit
+- Feature branch `antigravity/master-pos-erp-revamp`; upstream work `a728fcd` plus fix `a65101e` (`fix(pos): sync offline shift opening reasons`).
+
+## ทำอะไรไป
+- Reviewed the branch and its failed GitHub E2E run. The only failed scenario was offline shift opening: Python POS did not persist/send `opening_note`, so ERP rejected a carried-float variance and the dependent sale could not sync.
+- Added additive SQLite migration and UI reason capture, read the ERP carried float before online shift opening, and sync the saved reason with the shift. Updated E2E normal/offline shift setup and diagnostics.
+- No Laravel data migration or production data mutation in this fix.
+
+## ทดสอบไปแล้วแค่ไหน
+- `php -d memory_limit=1G vendor/bin/phpunit --no-progress`: 1,128 tests; 1,126 passed, 2 skipped, 6 incomplete; no failures/errors.
+- `apps/pos-python`: 256 unittest tests passed. SQLite upgrade test confirms existing shift rows survive the additive column migration.
+- `apps/pos-central`: 52 pytest tests passed with `QT_QPA_PLATFORM=offscreen` (disposable Python 3.9 venv plus SQLAlchemy and pytest-qt).
+- `node --test tests/js/report-search.test.cjs`: 5 passed.
+- Local disposable SQLite Laravel E2E: basic checkout passed; condition suite 10/10 passed including offline shift then bill sync; `php artisan uat:reconcile --branch="$POS_E2E_BRANCH"` passed GL, sales posting, cost, stock and duplicate-number checks.
+- Target branch's pre-existing GitHub `test-and-package` check passed; E2E failed only on scenario H before this fix. New push must pass CI before production deployment.
+
+## ความเสี่ยง/งานถัดไป
+- Production deploy is authorized by the owner, but has not run yet. Push this branch, wait for CI, then use `.github/workflows/deploy.yml` with `environment=production`; respect any GitHub production reviewer gate.
+- The ERP deploy does not install the Windows POS executable on tills. If the owner expects the Python client fix on terminals, also build the Windows UAT artifact from this branch and publish only through the documented POS UAT workflow.
+- No physical Windows till, printer, cash drawer, or live production sale was tested. Do not use a real production transaction as a smoke test.
+
 # Handoff — 2026-11-09 (Reports Phase 2 — workspace only)
 
 ## Commit
