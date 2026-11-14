@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS shifts (
     opened_at TEXT NOT NULL,
     closed_at TEXT,
     opening_cash TEXT NOT NULL DEFAULT '0',
+    opening_note TEXT,
     counted_cash TEXT,
     cash_difference TEXT,
     closing_note TEXT,
@@ -312,6 +313,8 @@ ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("sales", "adjustment_approved_by", "TEXT"),
     # ส่วนลดจากโปรซื้อครบจำนวน แยกจากส่วนลดที่คนกด เพราะ ERP คิดเองไม่ต้องมีผู้อนุมัติ
     ("sale_items", "promo_discount", "TEXT NOT NULL DEFAULT '0'"),
+    # เหตุผลกรณีเงินทอนต้นกะไม่ตรงยอดยกมาจาก ERP; additive for installed POS databases.
+    ("shifts", "opening_note", "TEXT"),
 ]
 
 # ยูนีคเฉพาะแถวที่มี server_id — กันแคชเชียร์คนเดียวถูก sync ลงซ้ำสองแถว

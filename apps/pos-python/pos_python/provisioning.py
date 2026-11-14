@@ -440,12 +440,27 @@ class ProvisioningService:
         return {"cashier": cashier, "local_cashier_id": local_id}
 
     # ── shift ────────────────────────────────────────────────────
-    def open_server_shift(self, *, branch_id: int, cashier_server_id: int, opening_cash, local_shift_id: int) -> int:
+    def opening_float(self, *, branch_id: int, cashier_server_id: int) -> dict[str, Any]:
+        """Read the server's carried drawer float before opening a new shift."""
+        response = self.api.get(
+            f"/api/pos/shift?branch_id={int(branch_id)}&cashier_id={int(cashier_server_id)}"
+        )
+        if not isinstance(response, dict):
+            raise RuntimeError("รูปแบบยอดยกมาต้นกะจาก ERP ไม่ถูกต้อง")
+        if response.get("success") is False:
+            raise RuntimeError(response.get("message", "อ่านยอดยกมาต้นกะจาก ERP ไม่สำเร็จ"))
+        return response
+
+    def open_server_shift(
+        self, *, branch_id: int, cashier_server_id: int, opening_cash,
+        local_shift_id: int, opening_note: str | None = None,
+    ) -> int:
         """เปิดกะฝั่ง ERP แล้วผูก server_id กลับเข้ากะ local — ต้องทำก่อนขายถึงจะ sync บิลได้"""
         response = self.api.post("/api/pos/shift/open", {
             "branch_id": int(branch_id),
             "cashier_id": int(cashier_server_id),
             "opening_cash": str(money(opening_cash)),
+            "opening_note": opening_note,
         })
         if not response.get("success", False):
             raise RuntimeError(response.get("message", "เปิดกะที่ ERP ไม่สำเร็จ"))

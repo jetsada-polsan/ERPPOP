@@ -141,15 +141,14 @@ class UiStyleTest(unittest.TestCase):
         session = source[start:source.index("def open_settings", start)]
         self.assertIn("class OpeningShiftDialog", source)
         self.assertIn('"ใส่เงินทอนก่อนเปิดกะ"', source)
-        self.assertIn("OpeningShiftDialog(self)", session)
+        self.assertIn("OpeningShiftDialog(\n                    self, carried_float=carried_float, require_note=require_opening_note", session)
         self.assertIn("service.open_shift(", session)
         self.assertIn("opening_dialog.opening_cash", session)
         self.assertNotIn('opening_cash=Decimal("0")', session)
         self.assertIn("ExistingShiftDialog(self, existing_shift)", session)
         self.assertIn("ทำกะเดิมต่อ", source)
         self.assertIn("ปิดกะเดิม", source)
-        self.assertIn("self.resize(440, 500)", source)
-        self.assertIn("self.resize(440, 500)", source)
+        self.assertIn("self.resize(440, 560)", source)
         self.assertIn("#shiftKeypad QPushButton { min-height: 40px", STYLE)
 
     def test_windows_font_is_selected_by_qt_and_build_version_is_visible(self) -> None:

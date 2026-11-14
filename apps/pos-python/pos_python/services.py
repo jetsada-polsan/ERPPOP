@@ -367,10 +367,16 @@ class PosService:
         except (TypeError, ValueError, json.JSONDecodeError):
             return str(row["value"])
 
-    def open_shift(self, branch_id: int, terminal_id: str, cashier_id: int, opening_cash: Decimal) -> int:
+    def open_shift(
+        self, branch_id: int, terminal_id: str, cashier_id: int, opening_cash: Decimal,
+        opening_note: str | None = None,
+    ) -> int:
         opening_cash = money(opening_cash)
         if opening_cash < 0:
             raise ValueError("เงินทอนตั้งต้นต้องไม่ติดลบ")
+        opening_note = str(opening_note or "").strip() or None
+        if opening_note and len(opening_note) > 500:
+            raise ValueError("เหตุผลเปิดกะต้องไม่เกิน 500 ตัวอักษร")
         existing = self.db.execute(
             "SELECT id, cashier_id FROM shifts WHERE terminal_id = ? AND status = 'open'", (terminal_id,)
         ).fetchone()
@@ -379,9 +385,11 @@ class PosService:
                 return int(existing["id"])
             raise ValueError("เครื่องนี้มีกะของแคชเชียร์คนอื่นเปิดอยู่ ต้องปิดหรือส่งมอบกะก่อน")
         cursor = self.db.execute(
-            """INSERT INTO shifts (uuid, branch_id, terminal_id, cashier_id, opened_at, opening_cash, status)
-            VALUES (?, ?, ?, ?, ?, ?, 'open')""",
-            (str(uuid.uuid4()), branch_id, terminal_id, cashier_id, self._now(), str(money(opening_cash))),
+            """INSERT INTO shifts
+               (uuid, branch_id, terminal_id, cashier_id, opened_at, opening_cash, opening_note, status)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 'open')""",
+            (str(uuid.uuid4()), branch_id, terminal_id, cashier_id, self._now(),
+             str(money(opening_cash)), opening_note),
         )
         self.db.commit()
         return int(cursor.lastrowid)
@@ -402,6 +410,7 @@ class PosService:
             "shift_uuid": shift["uuid"], "branch_id": shift["branch_id"],
             "cashier_server_id": shift["cashier_server_id"],
             "opening_cash": str(money(shift["opening_cash"])),
+            "opening_note": shift["opening_note"],
         }, ensure_ascii=False)
         with self.db:
             self.db.execute(

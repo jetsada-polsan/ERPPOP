@@ -78,7 +78,8 @@ def main() -> int:
     print("4) เปิดกะ local + ผูก server_shift_id")
     local_shift = pos.open_shift(branch, terminal, local_cashier, Decimal("1000"))
     server_shift = prov.open_server_shift(branch_id=branch, cashier_server_id=server_cashier,
-                                          opening_cash=Decimal("1000"), local_shift_id=local_shift)
+                                          opening_cash=Decimal("1000"), local_shift_id=local_shift,
+                                          opening_note="เงินทอนต้นกะสำหรับทดสอบ E2E")
     assert db.execute("SELECT server_id FROM shifts WHERE id=?", (local_shift,)).fetchone()["server_id"] == server_shift
     print(f"   local_shift={local_shift} → server_shift={server_shift}")
 

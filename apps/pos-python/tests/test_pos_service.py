@@ -46,6 +46,13 @@ class PosServiceTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "เงินทอนตั้งต้นต้องไม่ติดลบ"):
             self.service.open_shift(1, "TEST-02", 1, Decimal("-1"))
 
+    def test_open_shift_persists_reason_for_offline_float_variance(self) -> None:
+        shift_id = self.service.open_shift(
+            1, "TEST-02", 1, Decimal("500"), opening_note="ปรับเงินทอนต้นกะตอนออฟไลน์"
+        )
+        row = self.db.execute("SELECT opening_note FROM shifts WHERE id = ?", (shift_id,)).fetchone()
+        self.assertEqual(row["opening_note"], "ปรับเงินทอนต้นกะตอนออฟไลน์")
+
     def test_cash_movements_and_close_shift_reconcile_the_local_drawer(self) -> None:
         self.service.checkout(
             document_no="T-CASH-DRAWER", branch_id=1, terminal_id="TEST-01", shift_id=self.shift_id,

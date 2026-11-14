@@ -18,9 +18,11 @@ class FakeApi:
     """จำลอง Laravel API — ตอบตาม path ที่เรียก บันทึก payload ที่ POST เข้ามา"""
     def __init__(self, responses: dict):
         self.responses = responses
+        self.get_calls: list[str] = []
         self.posted: list[tuple[str, dict]] = []
 
     def get(self, path: str) -> dict:
+        self.get_calls.append(path)
         for key, value in self.responses.items():
             if path.startswith(key):
                 return value
@@ -66,9 +68,17 @@ class ProvisioningTest(unittest.TestCase):
             "/api/pos/products": PRODUCTS,
             "/api/pos/cashiers": CASHIERS,
             "/api/pos/promotions": [],
+            "/api/pos/shift?branch_id=3&cashier_id=42": {
+                "success": True, "shift": None, "carried_float": 1250.0, "default_float": 2000.0,
+            },
             "/api/pos/shift/open": {"success": True, "shift": {"id": 9001}},
         })
         self.svc = ProvisioningService(self.db, self.api)
+
+    def test_reads_server_carried_float_before_opening_a_shift(self) -> None:
+        state = self.svc.opening_float(branch_id=3, cashier_server_id=42)
+        self.assertEqual(self.api.get_calls, ["/api/pos/shift?branch_id=3&cashier_id=42"])
+        self.assertEqual(state["carried_float"], 1250.0)
 
     def test_ping_caches_the_device_profile_for_offline_use(self) -> None:
         self.svc.ping()
@@ -228,11 +238,15 @@ class ProvisioningTest(unittest.TestCase):
             "VALUES ('u1', 3, 'POS-0003-01', ?, 't', '1000', 'open')", (local_cashier,))
         self.db.commit()
         local_id = self.db.execute("SELECT id FROM shifts WHERE uuid = 'u1'").fetchone()["id"]
-        server_id = self.svc.open_server_shift(branch_id=3, cashier_server_id=42, opening_cash=1000, local_shift_id=local_id)
+        server_id = self.svc.open_server_shift(
+            branch_id=3, cashier_server_id=42, opening_cash=1000,
+            local_shift_id=local_id, opening_note="เหตุผลทดสอบเปิดกะ",
+        )
         self.assertEqual(server_id, 9001)
         self.assertEqual(self.db.execute("SELECT server_id FROM shifts WHERE id = ?", (local_id,)).fetchone()[0], 9001)
         # payload ที่ส่งไปต้องใช้ cashier_id ฝั่ง server
         self.assertEqual(self.api.posted[-1][1]["cashier_id"], 42)
+        self.assertEqual(self.api.posted[-1][1]["opening_note"], "เหตุผลทดสอบเปิดกะ")
 
     def test_sync_down_pulls_qty_promotions_with_local_product_ids(self) -> None:
         self.svc.pull_catalog(3)
