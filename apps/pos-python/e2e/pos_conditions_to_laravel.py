@@ -74,7 +74,8 @@ def main() -> int:
 
     shift = pos.open_shift(branch, terminal, cashier, Decimal("1000"))
     prov.open_server_shift(branch_id=branch, cashier_server_id=server_cashier,
-                           opening_cash=Decimal("1000"), local_shift_id=shift)
+                           opening_cash=Decimal("1000"), local_shift_id=shift,
+                           opening_note="เงินทอนต้นกะสำหรับทดสอบ E2E")
 
     def sell(tag: str, lines: list[CartLine], method: str = "cash", paid: Decimal | None = None, **extra) -> str:
         su = str(uuid.uuid4())
@@ -156,15 +157,18 @@ def main() -> int:
         record("J ขายเข้ากะที่ปิดแล้วถูกปฏิเสธ", True, str(error))
 
     # H เปิดกะตอนออฟไลน์ (ไม่ผูก server) ขาย แล้วค่อย sync
-    offline_shift = pos.open_shift(branch, terminal, cashier, Decimal("500"))
+    offline_shift = pos.open_shift(
+        branch, terminal, cashier, Decimal("500"),
+        opening_note="ปรับยอดเงินทอนสำหรับเปิดกะออฟไลน์ (E2E)",
+    )
     pos.queue_shift_open(offline_shift)
     shift = offline_shift
     h = sell("H", [CartLine(p2["id"], Decimal("1"), price(p2))])
-    sync.sync_pending_sales()
+    sync_result = sync.sync_pending_sales()
     status, receipt = synced(h)
     server_shift = db.execute("SELECT server_id FROM shifts WHERE id=?", (offline_shift,)).fetchone()["server_id"]
     record("H เปิดกะออฟไลน์แล้ว sync ภายหลัง", bool(server_shift) and status == "synced",
-           f"server_shift={server_shift} bill={status} {receipt or ''}")
+           f"server_shift={server_shift} bill={status} {receipt or ''} sync={sync_result}")
     receipts["H"] = receipt
 
     report = {

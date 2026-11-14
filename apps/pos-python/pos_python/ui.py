@@ -533,20 +533,28 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
     class OpeningShiftDialog(QDialog):
         """หน้าต่างเปิดกะที่ไม่ถูก On-Screen Keyboard บัง และกดยอดเงินทอนได้ง่าย"""
 
-        def __init__(self, parent):
+        def __init__(self, parent, *, carried_float: Decimal | None = None, require_note: bool = False):
             super().__init__(parent)
             self.opening_cash = Decimal("0.00")
+            self.opening_note: str | None = None
+            self.carried_float = money(carried_float) if carried_float is not None else None
+            self.require_note = require_note
             self.setWindowTitle("เปิดกะขาย")
             self.setWindowFlag(Qt.WindowCloseButtonHint, True)
             self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
             self.setWindowModality(Qt.WindowModal)
             self.setMinimumWidth(400)
-            self.resize(440, 500)
+            self.resize(440, 560)
 
             layout = QVBoxLayout(self)
             title = QLabel("ใส่เงินทอนก่อนเปิดกะ")
             title.setStyleSheet("font-size:24px;font-weight:800")
-            hint = QLabel("ใส่เงินสดที่เตรียมไว้ในลิ้นชักก่อนเริ่มขาย")
+            hint_text = "ใส่เงินสดที่เตรียมไว้ในลิ้นชักก่อนเริ่มขาย"
+            if self.carried_float is not None:
+                hint_text += f"\nยอดยกมาจากกะก่อน {self.carried_float:,.2f} บาท"
+            if self.require_note:
+                hint_text += "\nเปิดแบบออฟไลน์ กรุณาระบุเหตุผลเพื่อให้ซิงก์กะได้ครบ"
+            hint = QLabel(hint_text)
             hint.setObjectName("cardHint")
             hint.setWordWrap(True)
             layout.addWidget(title)
@@ -560,6 +568,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.amount.textChanged.connect(self.refresh_summary)
             self.amount.returnPressed.connect(self.accept_value)
             layout.addWidget(self.amount)
+
+            self.reason = QLineEdit()
+            self.reason.setObjectName("shiftOpeningNote")
+            self.reason.setMaxLength(500)
+            self.reason.setPlaceholderText("เหตุผลเมื่อเปิดออฟไลน์หรือยอดไม่ตรง")
+            layout.addWidget(self.reason)
 
             self.summary = QLabel("เงินทอนตั้งต้น 0.00 บาท")
             self.summary.setObjectName("shiftSummary")
@@ -634,7 +648,18 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             if value < 0:
                 QMessageBox.warning(self, "จำนวนเงินไม่ถูกต้อง", "เงินทอนตั้งต้นต้องไม่ติดลบ")
                 return
+            note = self.reason.text().strip()
+            variance = self.carried_float is not None and value != self.carried_float
+            if (self.require_note or variance) and not note:
+                QMessageBox.warning(
+                    self,
+                    "กรุณาระบุเหตุผล",
+                    "เมื่อเปิดกะออฟไลน์หรือยอดเงินทอนไม่ตรงกับยอดยกมา ต้องระบุเหตุผลก่อนเปิดกะ",
+                )
+                self.reason.setFocus()
+                return
             self.opening_cash = value
+            self.opening_note = note or None
             self.accept()
 
     class ExistingShiftDialog(QDialog):
@@ -4816,10 +4841,37 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                         return False
                     existing_shift = None
 
+            opening_note = None
             if not existing_shift:
                 # Use our own numeric dialog: Qt's static getDouble dialog can be
                 # covered by the Windows On-Screen Keyboard on touch POS devices.
-                opening_dialog = OpeningShiftDialog(self)
+                carried_float = None
+                require_opening_note = online is None or not online.online
+                if online is not None and online.online:
+                    cashier_server_id = cashier["server_id"]
+                    if not cashier_server_id:
+                        QMessageBox.warning(
+                            self,
+                            "คนขายยังไม่พร้อม",
+                            "คนขายรายนี้ยังไม่มีรหัสจาก ERP กรุณาอัปเดตรายชื่อคนขายก่อนเปิดกะ",
+                        )
+                        return False
+                    try:
+                        float_state = online.provisioning.opening_float(
+                            branch_id=branch_id,
+                            cashier_server_id=int(cashier_server_id),
+                        )
+                        if float_state.get("carried_float") is not None:
+                            carried_float = money(float_state["carried_float"])
+                    except Exception as error:
+                        if "network:" not in str(error):
+                            QMessageBox.warning(self, "อ่านยอดยกมาต้นกะไม่ได้", str(error))
+                            return False
+                        online.online = False
+                        require_opening_note = True
+                opening_dialog = OpeningShiftDialog(
+                    self, carried_float=carried_float, require_note=require_opening_note
+                )
                 opening_dialog.show()
                 opening_dialog.raise_()
                 opening_dialog.activateWindow()
@@ -4827,10 +4879,12 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 if opening_dialog.exec() != QDialog.Accepted:
                     return False
                 opening_cash = opening_dialog.opening_cash
+                opening_note = opening_dialog.opening_note
 
             try:
                 shift_id = service.open_shift(
-                    branch_id, terminal_id, int(cashier["id"]), opening_cash
+                    branch_id, terminal_id, int(cashier["id"]), opening_cash,
+                    opening_note=opening_note,
                 )
             except Exception as error:
                 QMessageBox.warning(self, "เริ่มขายไม่ได้", str(error))
