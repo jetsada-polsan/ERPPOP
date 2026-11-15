@@ -5279,3 +5279,8 @@ pending
 - ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ทดสอบกับเครื่องแคชเชียร์จริง, printer/scanner/scale หรือทำรายการขายเงินจริง; ผู้ใช้ที่มี PIN เกิน 4 หลักต้องเปลี่ยน PIN ผ่านหน้าผู้ดูแลก่อนใช้ flow ใหม่; health แจ้ง queue มี failed jobs 2 รายการ ควรตรวจต่อ
 - Deploy: ERP production deploy สำเร็จผ่าน workflow #369; JET POS Python 0.9.21 เผยแพร่แล้วผ่าน workflow #304 และดาวน์โหลดจาก `/download/python-pos` ได้
 - งานถัดไป: ติดตั้ง JET POS 0.9.21 บนเครื่อง POS จริงและ UAT เปิดกะ/สแกน/พิมพ์/ปิดกะโดยเจ้าของหรือผู้ปฏิบัติงาน; ตรวจ failed queue jobs 2 รายการแยกจาก deploy รอบนี้
+
+## Handoff - 2026-11-15 (JET POS SQLite migration)
+- ล็อก SQLite ตั้งแต่ตรวจ schema จนเพิ่มคอลัมน์และ commit เพื่อกัน UI กับ sync worker เพิ่มคอลัมน์เดียวกันพร้อมกัน และเทียบชื่อคอลัมน์ตามพฤติกรรม SQLite
+- pytest ผ่าน 268 ข้าม 3 และเปิดฐาน WAL พร้อมกัน 24 ครั้งผ่าน integrity_check
+- ยังไม่ build/publish รอบนี้ ต้องตรวจ startup-error.log และสถานะบิลของเครื่องที่มีปัญหาก่อนจัดการบิลจริง

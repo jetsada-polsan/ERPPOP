@@ -333,8 +333,8 @@ ADDED_INDEXES: list[str] = [
 
 def _add_missing_columns(connection: sqlite3.Connection) -> None:
     for table, column, definition in ADDED_COLUMNS:
-        existing = {row["name"] for row in connection.execute(f"PRAGMA table_info({table})")}
-        if column not in existing:
+        existing = {row["name"].casefold() for row in connection.execute(f"PRAGMA table_info({table})")}
+        if column.casefold() not in existing:
             connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
     for statement in ADDED_INDEXES:
         connection.execute(statement)
@@ -361,7 +361,13 @@ def connect(path: Path) -> sqlite3.Connection:
     connection.execute("PRAGMA synchronous = FULL")
     connection.execute("PRAGMA wal_autocheckpoint = 1000")
     connection.execute("PRAGMA temp_store = MEMORY")
-    connection.executescript(SCHEMA)
-    _add_missing_columns(connection)
-    connection.commit()
+    try:
+        # Hold the write lock across column discovery and ALTER TABLE so the
+        # UI and sync worker cannot both add the same column during startup.
+        connection.executescript("BEGIN IMMEDIATE;\n" + SCHEMA)
+        _add_missing_columns(connection)
+        connection.commit()
+    except BaseException:
+        connection.close()
+        raise
     return connection
