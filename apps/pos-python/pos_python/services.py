@@ -218,15 +218,20 @@ class PosService:
         )
 
     def requires_cashier_pin(self) -> bool:
-        """ERP สั่งโหมดเลือกชื่อไม่ใช้ PIN เท่านั้นถึงข้ามได้ ค่าอื่นหรือยังไม่รู้ค่าต้องถาม PIN"""
-        return self._setting("cashier_login_mode") != "selection"
+        """All sale sessions require a cashier PIN; the legacy mode flag is ignored."""
+        return True
 
-    def find_cashier_by_pin(self, pin: str) -> sqlite3.Row | None:
+    def find_cashier_by_pin(self, pin: str, *, record_success: bool = True) -> sqlite3.Row | None:
         """หาคนขายจาก PIN อย่างเดียวตอนออฟไลน์; ตรงหลายคนถือว่าไม่รู้ว่าใคร"""
+        pin = normalize_pin(pin)
+        if not pin.isascii() or not pin.isdigit() or len(pin) != 4:
+            return None
         rows = self.db.execute(
             "SELECT code FROM local_cashiers WHERE active = 1 AND revoked_at IS NULL AND is_seller = 1"
         ).fetchall()
-        matches = [r.cashier for r in (self.login_offline(row["code"], pin, audit=False) for row in rows) if r.cashier is not None]
+        matches = [r.cashier for r in (
+            self.login_offline(row["code"], pin, audit=False, record_success=record_success) for row in rows
+        ) if r.cashier is not None]
         return matches[0] if len(matches) == 1 else None
 
     def login(self, cashier_code: str, pin: str) -> sqlite3.Row | None:
@@ -234,7 +239,8 @@ class PosService:
         return self.login_offline(cashier_code, pin).cashier
 
     def login_offline(self, cashier_code: str, pin: str, *, terminal_code: str | None = None,
-                      branch_code: str | None = None, audit: bool = True) -> OfflineLoginResult:
+                      branch_code: str | None = None, audit: bool = True,
+                      record_success: bool = True) -> OfflineLoginResult:
         """Authenticate solely with SQLite, never requiring the ERP to be reachable.
 
         The last verified credential remains usable through offline_valid_until even
@@ -242,6 +248,11 @@ class PosService:
         prevents a remote PIN reset from taking a disconnected checkout offline.
         """
         pin = normalize_pin(pin)
+        if not pin.isascii() or not pin.isdigit() or len(pin) != 4:
+            result = OfflineLoginResult(None, "PIN ต้องเป็นตัวเลข 4 หลัก")
+            if audit:
+                self.record_auth_event(cashier_code, "offline_login", False, result.reason, terminal_code, branch_code)
+            return result
         row = self.db.execute("SELECT * FROM local_cashiers WHERE code = ?", (cashier_code,)).fetchone()
         terminal_code = terminal_code or self._setting("terminal_code")
         branch_code = branch_code or self._setting("branch_code") or self._setting("branch_name")
@@ -274,7 +285,7 @@ class PosService:
             result = OfflineLoginResult(row)
         else:
             result = OfflineLoginResult(None, "PIN ไม่ถูกต้อง")
-        if audit or result.success:
+        if audit or (result.success and record_success):
             self.record_auth_event(cashier_code, "offline_login", result.success, result.reason, terminal_code, branch_code)
         return result
 
@@ -318,8 +329,8 @@ class PosService:
         """Create a short-lived local recovery PIN after an offline supervisor check."""
         temporary_pin = normalize_pin(temporary_pin)
         manager_pin = normalize_pin(manager_pin)
-        if not temporary_pin.isdigit() or not 4 <= len(temporary_pin) <= 20:
-            raise ValueError("PIN ชั่วคราวต้องเป็นตัวเลข 4-20 หลัก")
+        if not temporary_pin.isascii() or not temporary_pin.isdigit() or len(temporary_pin) != 4:
+            raise ValueError("PIN ชั่วคราวต้องเป็นตัวเลข 4 หลัก")
         manager = self.login_offline(manager_code, manager_pin, terminal_code=terminal_code, branch_code=branch_code)
         if not manager.success or str(manager.cashier["role"]).lower() not in {"manager", "supervisor"}:
             self.record_auth_event(cashier_code, "manager_override_denied", False, "ผู้อนุมัติไม่มีสิทธิ์", terminal_code, branch_code)

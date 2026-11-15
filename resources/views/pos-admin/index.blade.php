@@ -107,9 +107,9 @@
                     </tbody>
                 </table>
             </div>
-            <div class="small {{ $pinMode === 'pin' ? 'text-success' : 'text-danger' }}">
-                <i class="bi {{ $pinMode === 'pin' ? 'bi-shield-lock-fill' : 'bi-exclamation-triangle-fill' }} me-1"></i>
-                {{ $pinMode === 'pin' ? 'เปิดกะต้องใส่ PIN ของคนขาย' : 'โหมดเลือกชื่อไม่ใช้ PIN เปิดอยู่ — ใครก็เปิดกะได้ (ปิดด้วย php artisan pos:passwordless disable)' }}
+            <div class="small text-success">
+                <i class="bi bi-shield-lock-fill me-1"></i>
+                เปิดกะต้องยืนยัน PIN คนขาย 4 หลัก
             </div>
         </div>
     </div>

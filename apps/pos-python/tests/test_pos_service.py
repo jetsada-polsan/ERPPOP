@@ -92,7 +92,7 @@ class PosServiceTest(unittest.TestCase):
 
     def test_offline_cashier_login_uses_server_issued_credential_and_expiry(self) -> None:
         salt = b"server-issued-salt"
-        verifier = hashlib.pbkdf2_hmac("sha256", b"860531", salt, 120000, dklen=32)
+        verifier = hashlib.pbkdf2_hmac("sha256", b"8605", salt, 120000, dklen=32)
         expires_at = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
         self.db.execute(
             """UPDATE local_cashiers
@@ -102,13 +102,13 @@ class PosServiceTest(unittest.TestCase):
         )
         self.db.commit()
 
-        self.assertIsNotNone(self.service.login("POP001", "860531"))
+        self.assertIsNotNone(self.service.login("POP001", "8605"))
         self.assertIsNone(self.service.login("POP001", "1234"))
 
         expired = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
         self.db.execute("UPDATE local_cashiers SET cred_expires_at = ?, offline_valid_until = ? WHERE code = 'POP001'", (expired, expired))
         self.db.commit()
-        self.assertIsNone(self.service.login("POP001", "860531"))
+        self.assertIsNone(self.service.login("POP001", "8605"))
 
     def test_checkout_is_atomic_idempotent_and_queues_sync(self) -> None:
         line = CartLine(1, Decimal("2"), Decimal("25"), barcode="8850000000003")

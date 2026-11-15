@@ -157,7 +157,7 @@ def run_pairing_wizard(data_dir, app) -> bool:
     if app is None:
         raise RuntimeError("POS ต้องเริ่ม QApplication จาก main.py ก่อนเปิดหน้าต่าง")
     dialog = QDialog()
-    dialog.setWindowTitle("เชื่อมต่อ PopCentral POS")
+    dialog.setWindowTitle("เชื่อมต่อ JET POS")
     dialog.setWindowFlag(Qt.WindowCloseButtonHint, True)
     dialog.setMinimumWidth(420)
     dialog.resize(460, 260)
@@ -410,8 +410,8 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
     layout_runtime = layout_config["runtime"]
     layout_metrics = _layout_metrics(layout_runtime, layout_config.get("css"))
     try:
-        from PySide6.QtCore import QTimer, QSize, Qt
-        from PySide6.QtGui import QColor, QFont, QFontDatabase, QImage, QKeySequence, QPainter, QPixmap, QShortcut
+        from PySide6.QtCore import QRegularExpression, QTimer, QSize, Qt
+        from PySide6.QtGui import QColor, QFont, QFontDatabase, QImage, QKeySequence, QPainter, QPixmap, QRegularExpressionValidator, QShortcut
         from PySide6.QtWidgets import (
             QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGridLayout, QInputDialog,
             QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton, QMenu,
@@ -448,87 +448,41 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
         painter.end()
         return QPixmap.fromImage(image)
 
-    class SellerSelectionDialog(QDialog):
-        def __init__(self):
-            super().__init__()
-            self.cashier = None
-            self.setWindowTitle(f"PopCentral POS v{APP_VERSION} — เลือกคนขาย")
+    class CashierPinDialog(QDialog):
+        """รับ PIN คนขาย 4 หลักและยืนยันอัตโนมัติเมื่อกรอกครบ"""
+
+        def __init__(self, parent=None):
+            super().__init__(parent)
+            self.setWindowTitle(f"JET POS v{APP_VERSION} — เข้าสู่ระบบคนขาย")
             self.setWindowFlag(Qt.WindowCloseButtonHint, True)
             self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
             self.setWindowModality(Qt.WindowModal)
-            self.setMinimumWidth(480)
-            form = QFormLayout(self)
-            hint = QLabel(
-                "เลือกชื่อคนขาย ใส่ PIN แล้วใส่เงินทอนเพื่อเปิดกะ"
-                if service.requires_cashier_pin()
-                else "เลือกชื่อคนขาย แล้วใส่เงินทอนเพื่อเปิดกะ\nไม่ต้องกรอกรหัสหรือ PIN"
-            )
-            hint.setWordWrap(True)
-            self.cashier_select = QComboBox()
-            self.connection_status = QLabel()
-            self.connection_status.setWordWrap(True)
-            refresh = QPushButton("อัปเดตรายชื่อ")
-            refresh.clicked.connect(self.refresh_cashiers)
-            submit = QPushButton("เลือกชื่อและเปิดกะ")
-            submit.setObjectName("primary")
-            submit.clicked.connect(self.choose)
-            cancel = QPushButton("ยกเลิก")
-            cancel.clicked.connect(self.reject)
-            self.refresh_cashiers()
-            form.addRow(hint)
-            form.addRow("ชื่อคนขาย", self.cashier_select)
-            form.addRow(self.connection_status)
-            actions = QHBoxLayout()
-            actions.addWidget(refresh)
-            actions.addStretch(1)
-            actions.addWidget(cancel)
-            actions.addWidget(submit)
-            form.addRow(actions)
+            self.setMinimumWidth(380)
+            layout = QVBoxLayout(self)
+            prompt = QLabel("ใส่ PIN คนขาย 4 หลัก")
+            prompt.setObjectName("sectionTitle")
+            self.pin_input = QLineEdit()
+            self.pin_input.setObjectName("cashierPin")
+            self.pin_input.setEchoMode(QLineEdit.Password)
+            self.pin_input.setInputMethodHints(Qt.ImhDigitsOnly)
+            # A validator rejects overlong paste/input as a whole; QLineEdit.maxLength
+            # would silently truncate a pasted 5–6 digit PIN to its first four digits.
+            self.pin_input.setValidator(QRegularExpressionValidator(QRegularExpression("[0-9]{0,4}"), self))
+            self.pin_input.setPlaceholderText("••••")
+            self.pin_input.setAlignment(Qt.AlignCenter)
+            self.pin_input.setMinimumHeight(52)
+            self.pin_input.textChanged.connect(self.accept_when_complete)
+            actions = QDialogButtonBox(QDialogButtonBox.Cancel)
+            actions.rejected.connect(self.reject)
+            layout.addWidget(prompt)
+            layout.addWidget(self.pin_input)
+            layout.addWidget(actions)
+            QTimer.singleShot(0, self.pin_input.setFocus)
 
-        def refresh_cashiers(self) -> None:
-            sync_error = None
-            if online is not None and online.online:
-                try:
-                    online.provisioning.pull_cashiers(online.branch_id)
-                except Exception as error:
-                    sync_error = str(error)
-
-            rows = service.db.execute(
-                """SELECT id, code, name, server_id FROM local_cashiers
-                   WHERE active = 1 AND revoked_at IS NULL AND is_seller = 1 ORDER BY name, code"""
-            ).fetchall()
-            self.cashier_select.clear()
-            self.cashier_select.addItem("เลือกชื่อคนขาย", None)
-            for cashier in rows:
-                # แสดงเฉพาะชื่อบนหน้าขาย ส่วน code/server_id ใช้ภายในเพื่อผูกยอดขายให้ถูกคน
-                self.cashier_select.addItem(str(cashier["name"] or cashier["code"]), int(cashier["id"]))
-            if len(rows) == 1:
-                self.cashier_select.setCurrentIndex(1)
-
-            if rows:
-                mode = "เชื่อมต่อ ERP แล้ว" if online is not None and online.online else "โหมดออฟไลน์"
-                message = f"{mode} · เลือกได้ {len(rows)} คน"
-                if sync_error:
-                    message += f"\nใช้รายชื่อที่แคชไว้: {sync_error}"
-            else:
-                message = "ยังไม่พบรายชื่อคนขาย · กดอัปเดตรายชื่อหรือตรวจการผูกเครื่องกับ ERP"
-                if sync_error:
-                    message += f"\n{sync_error}"
-            self.connection_status.setText(message)
-
-        def choose(self) -> None:
-            local_id = self.cashier_select.currentData()
-            if local_id is None:
-                QMessageBox.information(self, "เลือกคนขาย", "เลือกชื่อคนขายก่อนเปิดกะ")
-                return
-            self.cashier = service.db.execute(
-                "SELECT * FROM local_cashiers WHERE id = ? AND active = 1 AND revoked_at IS NULL",
-                (int(local_id),),
-            ).fetchone()
-            if self.cashier is None:
-                QMessageBox.warning(self, "เลือกคนขายไม่ได้", "รายชื่อคนขายนี้ถูกปิดใช้งานแล้ว กรุณาอัปเดตรายชื่อ")
-                return
-            self.accept()
+        def accept_when_complete(self, value: str) -> None:
+            if len(value) == 4 and value.isascii() and value.isdigit():
+                # Defer until the input event finishes so the fourth key is retained.
+                QTimer.singleShot(0, self.accept)
 
     class OpeningShiftDialog(QDialog):
         """หน้าต่างเปิดกะที่ไม่ถูก On-Screen Keyboard บัง และกดยอดเงินทอนได้ง่าย"""
@@ -952,7 +906,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             layout.setContentsMargins(18, 0, 18, 0)
             mark = QLabel("★")
             mark.setObjectName("brandMark")
-            name = QLabel("PopCentral POS")
+            name = QLabel("JET POS")
             name.setObjectName("brandName")
             current = self.current_status()
             right = QLabel(f"{current.branch} · {current.terminal} · ตั้งค่าเครื่องนี้")
@@ -1219,7 +1173,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             if not printer_name:
                 QMessageBox.warning(self, "ยังไม่ได้เลือกเครื่องพิมพ์", "เลือก printer ที่ Windows ติดตั้งก่อนทดสอบพิมพ์")
                 return
-            text = receipt_for(service.db, self.sample_sale_id) if self.sample_sale_id else "PopCentral POS\nทดสอบเครื่องพิมพ์\n"
+            text = receipt_for(service.db, self.sample_sale_id) if self.sample_sale_id else "JET POS\nทดสอบเครื่องพิมพ์\n"
             try:
                 print_text_to_windows_queue(
                     text, printer_name, paper_width_mm=active_paper_width(service.db)
@@ -1437,7 +1391,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self._product_columns: int | None = None
             self.layout_runtime = layout_runtime
             layout_version = layout_config.get("layout_version", layout_config.get("version", 1))
-            self.setWindowTitle(f"PopCentral POS v{APP_VERSION} — พร้อมใช้งาน · Layout {layout_version}")
+            self.setWindowTitle(f"JET POS v{APP_VERSION} — พร้อมใช้งาน · Layout {layout_version}")
             self.setStyleSheet(runtime_style)
             self.settings_shortcut = QShortcut(QKeySequence("Ctrl+Alt+S"), self)
             self.settings_shortcut.activated.connect(self.open_settings)
@@ -2276,7 +2230,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             layout.setContentsMargins(18, 0, 18, 0)
             mark = QLabel("★")
             mark.setObjectName("brandMark")
-            name = QLabel("PopCentral POS")
+            name = QLabel("JET POS")
             name.setObjectName("brandName")
             current = self.current_status()
             right = QLabel(f"{current.branch} · {current.terminal} · ตั้งค่าเครื่องนี้")
@@ -2543,7 +2497,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             if not printer_name:
                 QMessageBox.warning(self, "ยังไม่ได้เลือกเครื่องพิมพ์", "เลือก printer ที่ Windows ติดตั้งก่อนทดสอบพิมพ์")
                 return
-            text = receipt_for(service.db, self.sample_sale_id) if self.sample_sale_id else "PopCentral POS\nทดสอบเครื่องพิมพ์\n"
+            text = receipt_for(service.db, self.sample_sale_id) if self.sample_sale_id else "JET POS\nทดสอบเครื่องพิมพ์\n"
             try:
                 print_text_to_windows_queue(
                     text, printer_name, paper_width_mm=active_paper_width(service.db)
@@ -2761,7 +2715,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self._product_columns: int | None = None
             self.layout_runtime = layout_runtime
             layout_version = layout_config.get("layout_version", layout_config.get("version", 1))
-            self.setWindowTitle(f"PopCentral POS v{APP_VERSION} — พร้อมใช้งาน · Layout {layout_version}")
+            self.setWindowTitle(f"JET POS v{APP_VERSION} — พร้อมใช้งาน · Layout {layout_version}")
             self.setStyleSheet(runtime_style)
             self.settings_shortcut = QShortcut(QKeySequence("Ctrl+Alt+S"), self)
             self.settings_shortcut.activated.connect(self.open_settings)
@@ -3627,7 +3581,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             layout.setContentsMargins(18, 0, 18, 0)
             mark = QLabel("★")
             mark.setObjectName("brandMark")
-            name = QLabel("PopCentral POS")
+            name = QLabel("JET POS")
             name.setObjectName("brandName")
             current = self.current_status()
             right = QLabel(f"{current.branch} · {current.terminal} · ตั้งค่าเครื่องนี้")
@@ -3894,7 +3848,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             if not printer_name:
                 QMessageBox.warning(self, "ยังไม่ได้เลือกเครื่องพิมพ์", "เลือก printer ที่ Windows ติดตั้งก่อนทดสอบพิมพ์")
                 return
-            text = receipt_for(service.db, self.sample_sale_id) if self.sample_sale_id else "PopCentral POS\nทดสอบเครื่องพิมพ์\n"
+            text = receipt_for(service.db, self.sample_sale_id) if self.sample_sale_id else "JET POS\nทดสอบเครื่องพิมพ์\n"
             try:
                 print_text_to_windows_queue(
                     text, printer_name, paper_width_mm=active_paper_width(service.db)
@@ -4112,7 +4066,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self._product_columns: int | None = None
             self.layout_runtime = layout_runtime
             layout_version = layout_config.get("layout_version", layout_config.get("version", 1))
-            self.setWindowTitle(f"PopCentral POS v{APP_VERSION} — พร้อมใช้งาน · Layout {layout_version}")
+            self.setWindowTitle(f"JET POS v{APP_VERSION} — พร้อมใช้งาน · Layout {layout_version}")
             self.setStyleSheet(runtime_style)
             self.settings_shortcut = QShortcut(QKeySequence("Ctrl+Alt+S"), self)
             self.settings_shortcut.activated.connect(self.open_settings)
@@ -4698,10 +4652,16 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.refresh_order()
 
         def pin_login(self):
-            """ใส่ PIN อย่างเดียว ระบบรู้เองว่าใคร ทั้งออนไลน์และออฟไลน์"""
-            pin, confirmed = QInputDialog.getText(self, "เริ่มขาย", "ใส่ PIN คนขาย", QLineEdit.Password)
-            pin = pin.strip()
-            if not confirmed or not pin:
+            """รับ PIN 4 หลัก ยืนยันอัตโนมัติ แล้วค้นหา/ยืนยันแคชเชียร์"""
+            dialog = CashierPinDialog(self)
+            dialog.show()
+            dialog.raise_()
+            dialog.activateWindow()
+            app.processEvents()
+            if dialog.exec() != QDialog.Accepted:
+                return None
+            pin = dialog.pin_input.text()
+            if len(pin) != 4 or not pin.isascii() or not pin.isdigit():
                 return None
             if online is None or not online.online:
                 cashier = service.find_cashier_by_pin(pin)
@@ -4709,7 +4669,14 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                     QMessageBox.warning(self, "เข้าใช้งานไม่ได้", "PIN ไม่ถูกต้อง หรือคนนี้ยังไม่เคยล็อกอินออนไลน์ที่เครื่องนี้")
                 return cashier
             try:
-                selected = online.provisioning.online_cashier_login(pin)
+                # ใช้ credential ที่ตรวจใน SQLite เพื่อระบุตัวตนก่อน แล้วให้ ERP
+                # ตรวจ PIN ซ้ำกับคนขายคนนั้นโดยตรง แทน bcrypt check ทุกคนในสาขา.
+                cached_cashier = service.find_cashier_by_pin(pin, record_success=False)
+                cached_server_id = cached_cashier["server_id"] if cached_cashier else None
+                selected = online.provisioning.online_cashier_login(
+                    pin,
+                    cashier_server_id=int(cached_server_id) if cached_server_id else None,
+                )
                 if selected.get("selection_required"):
                     # PIN ซ้ำจากข้อมูลเก่า: ให้เลือกชื่อ กันบิลเข้าผิดคน
                     people = selected["cashiers"]
@@ -4731,33 +4698,6 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                 "SELECT * FROM local_cashiers WHERE id = ?", (int(selected["local_cashier_id"]),)
             ).fetchone()
 
-        def pick_seller(self):
-            try:
-                seller = SellerSelectionDialog()
-                # Some Windows POS setups keep the on-screen keyboard above the
-                # parent window. Show and raise the seller prompt before exec().
-                seller.show()
-                seller.raise_()
-                seller.activateWindow()
-                app.processEvents()
-                seller_result = seller.exec()
-            except Exception as error:
-                QMessageBox.critical(
-                    self,
-                    "เปิดหน้าต่างเลือกคนขายไม่ได้",
-                    f"POS เปิดหน้าต่างเริ่มขายไม่สำเร็จ: {error}\n\n"
-                    "กรุณาถ่ายภาพข้อความนี้ส่งให้ฝ่าย IT",
-                )
-                return None
-            if seller_result != QDialog.Accepted or seller.cashier is None:
-                QMessageBox.information(
-                    self,
-                    "ยังไม่ได้เปิดกะ",
-                    "กรุณาเลือกชื่อคนขายก่อน แล้วจึงใส่เงินทอนต้นกะเพื่อเปิดกะขาย",
-                )
-                return None
-            return seller.cashier
-
         def ensure_sale_session(self) -> bool:
             """เลือกคนขาย ยืนยัน PIN ตามโหมดของ ERP แล้วเปิดกะเมื่อเริ่มขาย"""
             if self.cashier is not None and self.shift_id is not None:
@@ -4775,40 +4715,9 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
                         return False
                 return True
 
-            cashier = self.pin_login() if service.requires_cashier_pin() else self.pick_seller()
+            cashier = self.pin_login()
             if cashier is None:
                 return False
-
-            if not service.requires_cashier_pin() and online is not None and online.online:
-                if not cashier["server_id"]:
-                    QMessageBox.warning(
-                        self,
-                        "คนขายยังไม่พร้อม",
-                        "รายชื่อนี้ยังไม่มีรหัสจาก ERP กรุณากดอัปเดตรายชื่อคนขายก่อน",
-                    )
-                    return False
-                try:
-                    selected = online.provisioning.select_cashier(
-                        str(cashier["code"]), int(cashier["server_id"])
-                    )
-                    local_id = selected.get("local_cashier_id")
-                    if local_id:
-                        cashier = service.db.execute(
-                            "SELECT * FROM local_cashiers WHERE id = ?", (int(local_id),)
-                        ).fetchone() or cashier
-                    online.worker.wake()
-                except Exception as error:
-                    message = str(error)
-                    if "network:" in message:
-                        online.online = False
-                    else:
-                        if "กรุณาระบุ PIN" in message:
-                            message = (
-                                "ERP ยังไม่เปิดโหมดเลือกชื่อคนขายโดยไม่ใช้ PIN\n"
-                                "ให้ผู้ดูแลรัน: php artisan pos:passwordless enable"
-                            )
-                        QMessageBox.warning(self, "เลือกคนขายไม่ได้", message)
-                        return False
 
             existing_shift = service.db.execute(
                 "SELECT id, cashier_id, opening_cash FROM shifts WHERE terminal_id = ? AND status = 'open'",
@@ -4915,7 +4824,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.auth_button.setText(f"คนขาย: {self.cashier['name']}")
             self.auth_button.setEnabled(False)
             layout_version = layout_config.get("layout_version", layout_config.get("version", 1))
-            self.setWindowTitle(f"PopCentral POS v{APP_VERSION} — {self.cashier['name']} · Layout {layout_version}")
+            self.setWindowTitle(f"JET POS v{APP_VERSION} — {self.cashier['name']} · Layout {layout_version}")
             self.refresh_order(keep_selection=True)
             return True
 
@@ -5008,7 +4917,7 @@ def run_ui(service: PosService, online=None, data_dir=None, app=None):
             self.cashier_label.setText(f"รายการขาย · ยังไม่ได้เริ่มขาย · v{APP_VERSION}")
             self.refresh_runtime_context()
             self.setWindowTitle(
-                f"PopCentral POS v{APP_VERSION} — พร้อมใช้งาน · Layout "
+                f"JET POS v{APP_VERSION} — พร้อมใช้งาน · Layout "
                 f"{layout_config.get('layout_version', layout_config.get('version', 1))}"
             )
 

@@ -424,7 +424,7 @@ class UserController extends Controller
             ->pluck('pos_pin_hash'))->all());
 
         for ($attempt = 0; $attempt < 100; $attempt++) {
-            $pin = (string) random_int(100000, 999999);
+            $pin = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
             if (! collect($hashes)->contains(fn (?string $hash) => $hash && Hash::check($pin, $hash))) {
                 return $pin;
             }

@@ -65,7 +65,7 @@ def main() -> int:
     print("3) cashier login (PIN)")
     login = prov.online_cashier_login(pin)
     if login.get("selection_required"):
-        login = prov.online_cashier_login(pin, int(login["cashiers"][0]["id"]))
+        login = prov.online_cashier_login(pin, cashier_server_id=int(login["cashiers"][0]["id"]))
     assert not login["selection_required"], "login ยังค้างที่ selection"
     server_cashier = login["cashier"]["id"]
     local_cashier = login["local_cashier_id"]

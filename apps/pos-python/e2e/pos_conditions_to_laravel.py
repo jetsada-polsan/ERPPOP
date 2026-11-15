@@ -69,7 +69,7 @@ def main() -> int:
 
     login = prov.online_cashier_login(pin)
     if login.get("selection_required"):
-        login = prov.online_cashier_login(pin, int(login["cashiers"][0]["id"]))
+        login = prov.online_cashier_login(pin, cashier_server_id=int(login["cashiers"][0]["id"]))
     server_cashier, cashier = login["cashier"]["id"], login["local_cashier_id"]
 
     shift = pos.open_shift(branch, terminal, cashier, Decimal("1000"))

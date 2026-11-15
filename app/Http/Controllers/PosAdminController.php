@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AppSetting;
 use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\PosDevice;
@@ -38,7 +37,6 @@ class PosAdminController extends Controller
             'installer' => PythonPosInstaller::current(),
             'jetPythonInstaller' => JetPosPythonInstaller::current(),
             'vueInstaller' => $releases->current(),
-            'pinMode' => AppSetting::get('pos_passwordless_login') === '1' ? 'selection' : 'pin',
             'onlineMinutes' => PosAdminOverview::ONLINE_MINUTES,
         ]);
     }

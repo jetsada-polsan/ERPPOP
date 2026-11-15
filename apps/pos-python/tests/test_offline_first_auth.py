@@ -62,6 +62,23 @@ class OfflineFirstAuthTest(unittest.TestCase):
         ).fetchone()
         self.assertEqual((queued["aggregate_type"], queued["priority"]), ("auth_event", 4))
 
+    def test_cached_pin_lookup_for_online_login_does_not_log_an_offline_auth_event(self) -> None:
+        self.cashier("C001", "4821")
+
+        cashier = self.service.find_cashier_by_pin("4821", record_success=False)
+
+        self.assertEqual(cashier["code"], "C001")
+        self.assertEqual(self.db.execute("SELECT count(*) FROM auth_events_outbox").fetchone()[0], 0)
+
+    def test_offline_login_rejects_pin_lengths_other_than_four(self) -> None:
+        self.cashier("C001", "4821")
+
+        for pin in ("123", "12345", "123456"):
+            with self.subTest(pin=pin):
+                result = self.service.login_offline("C001", pin)
+                self.assertFalse(result.success)
+                self.assertEqual(result.reason, "PIN ต้องเป็นตัวเลข 4 หลัก")
+
     def test_remote_pin_reset_metadata_does_not_delete_a_still_valid_local_pin(self) -> None:
         self.cashier("C001", "4821", credential_version="old", server_credential_version="new")
 
@@ -91,9 +108,9 @@ class OfflineFirstAuthTest(unittest.TestCase):
         self.cashier("C001", "4821")
 
         issued = self.service.manager_override_reset(
-            manager_code="M001", manager_pin="9999", cashier_code="C001", temporary_pin="123456", valid_minutes=30,
+            manager_code="M001", manager_pin="9999", cashier_code="C001", temporary_pin="1234", valid_minutes=30,
         )
-        logged_in = self.service.login_offline("C001", "123456")
+        logged_in = self.service.login_offline("C001", "1234")
 
         self.assertTrue(issued.success)
         self.assertTrue(logged_in.success)

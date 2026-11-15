@@ -305,7 +305,7 @@ class SystemSettingController extends Controller
         $hashes = Salesman::whereKeyNot($salesman->id)->whereNotNull('pos_pin_hash')->pluck('pos_pin_hash')
             ->merge(UserPosCredential::whereNotNull('pin_hash')->whereNull('revoked_at')->pluck('pin_hash'));
         for ($attempt = 0; $attempt < 100; $attempt++) {
-            $pin = (string) random_int(100000, 999999);
+            $pin = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
             if (! $hashes->contains(fn ($hash) => Hash::check($pin, $hash))) {
                 return $pin;
             }
@@ -317,7 +317,7 @@ class SystemSettingController extends Controller
     public function downloadPythonPos()
     {
         $installer = $this->currentPythonPosInstaller();
-        abort_unless($installer, 404, 'ยังไม่มีไฟล์ติดตั้ง JET POS รุ่นทดสอบ');
+        abort_unless($installer, 404, 'ยังไม่มีไฟล์ติดตั้ง JET POS');
 
         return response()->download($installer['path'], $installer['filename'], [
             'Content-Type' => 'application/vnd.microsoft.portable-executable',
