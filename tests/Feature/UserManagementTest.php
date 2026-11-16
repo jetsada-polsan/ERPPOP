@@ -238,8 +238,8 @@ class UserManagementTest extends TestCase
         $response->assertRedirect(route('users.index'));
         $response->assertSessionHas('reset_pos_pin_result');
         $temporary = session('reset_pos_pin_result')['password'];
-        $this->assertMatchesRegularExpression('/^\\d{6}$/', $temporary);
-        $this->assertNotSame('482165', $temporary);
+        $this->assertMatchesRegularExpression('/^\\d{4}$/', $temporary);
+        $this->assertNotSame('4821', $temporary);
         $this->assertTrue(Hash::check($temporary, $cashier->fresh()->pos_pin_hash));
         $this->assertFalse($cashier->fresh()->must_change_pin);
         $this->assertNotNull($cashier->fresh()->pin_changed_at);
@@ -289,7 +289,7 @@ class UserManagementTest extends TestCase
             'name' => $user->name,
             'is_active' => true,
         ]);
-        $cashier->setPin('482165', false);
+        $cashier->setPin('4821', false);
         $device = PosDevice::create([
             'name' => 'POS full reset',
             'user_id' => $user->id,
@@ -318,8 +318,8 @@ class UserManagementTest extends TestCase
         $this->assertTrue(Hash::check($password, $user->password));
         $this->assertFalse($user->must_change_password);
         $this->assertNotNull($user->password_changed_at);
-        $this->assertMatchesRegularExpression('/^\d{6}$/', $pin);
-        $this->assertNotSame('482165', $pin);
+        $this->assertMatchesRegularExpression('/^\d{4}$/', $pin);
+        $this->assertNotSame('4821', $pin);
         $this->assertTrue(Hash::check($pin, $credential->pin_hash));
         $this->assertFalse($credential->force_pin_change);
         $this->assertNotNull($credential->pin_changed_at);

@@ -34,7 +34,6 @@ _PING_SETTINGS = {
     "terminal_code": ("device", "terminal_code"),
     "device_user_id": ("device", "user_id"),
     "vat_rate": ("vat_rate",),
-    "cashier_login_mode": ("cashier_login_mode",),
     "qr_payment": ("qr_payment",),
     "company": ("company",),
     "receipt_template": ("receipt_template",),
@@ -330,7 +329,7 @@ class ProvisioningService:
             )
 
     # ── cashier login (ออนไลน์) ──────────────────────────────────
-    def online_cashier_login(self, pin: str | None, cashier_code: str | None = None,
+    def online_cashier_login(self, pin: str, cashier_code: str | None = None,
                              cashier_server_id: int | None = None) -> dict:
         """ยืนยัน PIN กับ ERP แล้วเก็บ credential ออฟไลน์ + ผูก local cashier row
 
@@ -338,12 +337,10 @@ class ProvisioningService:
         (UI ต้องให้เลือกชื่อ) หรือ {"cashier": {...}, "local_cashier_id": n} เมื่อสำเร็จ
         """
         payload: dict = {}
-        if pin is not None:
-            normalized_pin = normalize_pin(pin)
-            if normalized_pin and (not normalized_pin.isascii() or not normalized_pin.isdigit()):
-                raise ValueError("PIN ต้องเป็นตัวเลข 4-20 หลัก")
-            if normalized_pin:
-                payload["pin"] = normalized_pin
+        normalized_pin = normalize_pin(pin)
+        if not normalized_pin.isascii() or not normalized_pin.isdigit() or len(normalized_pin) != 4:
+            raise ValueError("PIN ต้องเป็นตัวเลข 4 หลัก")
+        payload["pin"] = normalized_pin
         if cashier_code:
             payload["code"] = cashier_code
         if cashier_server_id is not None:
@@ -378,14 +375,6 @@ class ProvisioningService:
             "must_change_pin": bool(response.get("must_change_pin")),
         }
 
-    def select_cashier(self, cashier_code: str, cashier_server_id: int) -> dict:
-        """ผูกชื่อคนขายกับเครื่องด้วย Device Token โดยไม่ถาม PIN จากหน้าจอ POS."""
-        return self.online_cashier_login(
-            None,
-            cashier_code=cashier_code,
-            cashier_server_id=cashier_server_id,
-        )
-
     def verify_approver(self, cashier_server_id: int, pin: str, reason: str) -> None:
         """ยืนยัน PIN หัวหน้ากับ ERP โดยไม่เปลี่ยนคนขายที่ล็อกอินบนเครื่อง"""
         response = self.api.post("/api/pos/approver/verify", {
@@ -409,8 +398,8 @@ class ProvisioningService:
         new_pin = normalize_pin(new_pin)
         if (not current_pin.isascii() or not current_pin.isdigit()
                 or not new_pin.isascii() or not new_pin.isdigit()
-                or not 4 <= len(current_pin) <= 20 or not 4 <= len(new_pin) <= 20):
-            raise ValueError("PIN ต้องเป็นตัวเลข 4-20 หลัก")
+                or len(current_pin) != 4 or len(new_pin) != 4):
+            raise ValueError("PIN ต้องเป็นตัวเลข 4 หลัก")
         response = self.api.post("/api/pos/cashier/pin", {
             "code": code,
             "current_pin": current_pin,
@@ -440,12 +429,27 @@ class ProvisioningService:
         return {"cashier": cashier, "local_cashier_id": local_id}
 
     # ── shift ────────────────────────────────────────────────────
-    def open_server_shift(self, *, branch_id: int, cashier_server_id: int, opening_cash, local_shift_id: int) -> int:
+    def opening_float(self, *, branch_id: int, cashier_server_id: int) -> dict[str, Any]:
+        """Read the server's carried drawer float before opening a new shift."""
+        response = self.api.get(
+            f"/api/pos/shift?branch_id={int(branch_id)}&cashier_id={int(cashier_server_id)}"
+        )
+        if not isinstance(response, dict):
+            raise RuntimeError("รูปแบบยอดยกมาต้นกะจาก ERP ไม่ถูกต้อง")
+        if response.get("success") is False:
+            raise RuntimeError(response.get("message", "อ่านยอดยกมาต้นกะจาก ERP ไม่สำเร็จ"))
+        return response
+
+    def open_server_shift(
+        self, *, branch_id: int, cashier_server_id: int, opening_cash,
+        local_shift_id: int, opening_note: str | None = None,
+    ) -> int:
         """เปิดกะฝั่ง ERP แล้วผูก server_id กลับเข้ากะ local — ต้องทำก่อนขายถึงจะ sync บิลได้"""
         response = self.api.post("/api/pos/shift/open", {
             "branch_id": int(branch_id),
             "cashier_id": int(cashier_server_id),
             "opening_cash": str(money(opening_cash)),
+            "opening_note": opening_note,
         })
         if not response.get("success", False):
             raise RuntimeError(response.get("message", "เปิดกะที่ ERP ไม่สำเร็จ"))

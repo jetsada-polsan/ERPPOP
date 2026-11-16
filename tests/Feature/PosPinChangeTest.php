@@ -12,6 +12,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class PosPinChangeTest extends TestCase
@@ -37,7 +38,7 @@ class PosPinChangeTest extends TestCase
         [$cashier, $device] = $this->cashierWithDevice('CHANGE');
         $this->artisan('pos:pin', ['salesman' => $cashier->code, 'pin' => '1234'])->assertSuccessful();
 
-        $response = $this->changePin($device, $cashier->code, '1234', '860531');
+        $response = $this->changePin($device, $cashier->code, '1234', '8605');
 
         $payload = $response->getData(true);
         $this->assertTrue($payload['success']);
@@ -54,11 +55,11 @@ class PosPinChangeTest extends TestCase
     {
         [$cashier, $device] = $this->cashierWithDevice('REPLACE');
         $this->artisan('pos:pin', ['salesman' => $cashier->code, 'pin' => '1234'])->assertSuccessful();
-        $this->changePin($device, $cashier->code, '1234', '860531');
+        $this->changePin($device, $cashier->code, '1234', '8605');
 
         $this->assertSame(422, $this->login($device, $cashier->code, '1234')->getStatusCode());
 
-        $result = $this->login($device, $cashier->code, '860531')->getData(true);
+        $result = $this->login($device, $cashier->code, '8605')->getData(true);
         $this->assertTrue($result['success']);
         $this->assertFalse($result['must_change_pin']);
         $this->assertNotEmpty($result['offline_credential']['credential_version']);
@@ -70,20 +71,43 @@ class PosPinChangeTest extends TestCase
         [$cashier, $device] = $this->cashierWithDevice('WRONG');
         $this->artisan('pos:pin', ['salesman' => $cashier->code, 'pin' => '1234'])->assertSuccessful();
 
-        $response = $this->changePin($device, $cashier->code, '9999', '860531');
+        $response = $this->changePin($device, $cashier->code, '9999', '8605');
 
         $this->assertSame(422, $response->getStatusCode());
         $this->assertTrue($cashier->fresh()->must_change_pin);
         $this->assertTrue(Hash::check('1234', $cashier->fresh()->pos_pin_hash));
     }
 
+    public function test_pin_change_rejects_a_new_pin_that_is_not_exactly_four_digits(): void
+    {
+        [$cashier, $device] = $this->cashierWithDevice('PINLEN');
+        $this->artisan('pos:pin', ['salesman' => $cashier->code, 'pin' => '1234'])->assertSuccessful();
+
+        try {
+            $this->changePin($device, $cashier->code, '1234', '12345');
+            $this->fail('A five-digit PIN must not be accepted.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('new_pin', $exception->errors());
+        }
+
+        $this->assertTrue(Hash::check('1234', $cashier->fresh()->pos_pin_hash));
+    }
+
+    public function test_admin_pin_command_rejects_six_digits(): void
+    {
+        [$cashier] = $this->cashierWithDevice('ADMINPINLEN');
+
+        $this->artisan('pos:pin', ['salesman' => $cashier->code, 'pin' => '123456'])->assertFailed();
+        $this->assertNull($cashier->fresh()->pos_pin_hash);
+    }
+
     public function test_permanent_flag_skips_the_forced_change(): void
     {
         [$cashier, $device] = $this->cashierWithDevice('PERM');
-        $this->artisan('pos:pin', ['salesman' => $cashier->code, 'pin' => '860531', '--permanent' => true])
+        $this->artisan('pos:pin', ['salesman' => $cashier->code, 'pin' => '8605', '--permanent' => true])
             ->assertSuccessful();
 
-        $result = $this->login($device, $cashier->code, '860531')->getData(true);
+        $result = $this->login($device, $cashier->code, '8605')->getData(true);
 
         $this->assertFalse($result['must_change_pin']);
         $this->assertSame($cashier->id, (int) $device->fresh()->active_cashier_id);
@@ -101,7 +125,7 @@ class PosPinChangeTest extends TestCase
     public function test_admin_cannot_assign_a_pin_already_used_in_the_branch(): void
     {
         [$first] = $this->cashierWithDevice('DUPLICATE');
-        $this->artisan('pos:pin', ['salesman' => $first->code, 'pin' => '482165', '--permanent' => true])
+        $this->artisan('pos:pin', ['salesman' => $first->code, 'pin' => '4821', '--permanent' => true])
             ->assertSuccessful();
 
         $second = Salesman::create([
@@ -111,7 +135,7 @@ class PosPinChangeTest extends TestCase
             'is_active' => true,
         ]);
 
-        $this->artisan('pos:pin', ['salesman' => $second->code, 'pin' => '482165'])
+        $this->artisan('pos:pin', ['salesman' => $second->code, 'pin' => '4821'])
             ->assertFailed();
 
         $this->assertNull($second->fresh()->pos_pin_hash);

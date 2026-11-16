@@ -54,6 +54,11 @@ class SyncServiceTest(unittest.TestCase):
 
     def test_syncs_an_offline_shift_before_sales_are_uploaded(self) -> None:
         api = FakeApi({"success": True, "shift": {"id": 501}})
+        self.db.execute(
+            "UPDATE shifts SET opening_note = ? WHERE id = ?",
+            ("ปรับยอดเงินทอนระหว่างเปิดกะออฟไลน์", self.shift_id),
+        )
+        self.db.commit()
         self.pos.queue_shift_open(self.shift_id)
 
         SyncService(self.db, api).sync_pending_sales()
@@ -65,6 +70,7 @@ class SyncServiceTest(unittest.TestCase):
         self.assertEqual(shift["server_id"], 501)
         self.assertEqual(queued["status"], "synced")
         self.assertEqual(api.calls[0][0], "/api/pos/shift/open")
+        self.assertEqual(api.calls[0][1]["opening_note"], "ปรับยอดเงินทอนระหว่างเปิดกะออฟไลน์")
 
     def test_keeps_sale_when_offline_shift_has_no_server_mapping(self) -> None:
         sale_uuid = self.sale()

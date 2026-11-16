@@ -20,6 +20,7 @@ use App\Models\User;
 use App\Models\UserPosCredential;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -56,10 +57,10 @@ class PosCashierIdentityTest extends TestCase
     public function test_pin_only_login_identifies_the_single_cashier_on_the_device_branch(): void
     {
         [$branch, $alice] = $this->branchWithCashier('PINONLY', 'ALICE');
-        $alice->forceFill(['pos_pin_hash' => Hash::make('482165')])->save();
+        $alice->forceFill(['pos_pin_hash' => Hash::make('4821')])->save();
         $device = $this->device($branch, $alice);
 
-        $request = Request::create('/api/pos/cashier/login', 'POST', ['pin' => '482165']);
+        $request = Request::create('/api/pos/cashier/login', 'POST', ['pin' => '4821']);
         $request->attributes->set('pos_device', $device);
 
         $response = app(PosApiController::class)->cashierLogin($request);
@@ -71,11 +72,11 @@ class PosCashierIdentityTest extends TestCase
     public function test_temporary_pin_requires_a_change_before_the_device_can_open_a_shift(): void
     {
         [$branch, $cashier, $user] = $this->branchWithCashier('TEMP-PIN', 'ALICE');
-        $cashier->setPin('654321', true);
-        UserPosCredential::firstOrCreate(['user_id' => $user->id])->setPin('654321', true);
+        $cashier->setPin('6543', true);
+        UserPosCredential::firstOrCreate(['user_id' => $user->id])->setPin('6543', true);
         $device = $this->device($branch, $cashier);
 
-        $login = Request::create('/api/pos/cashier/login', 'POST', ['pin' => '654321']);
+        $login = Request::create('/api/pos/cashier/login', 'POST', ['pin' => '6543']);
         $login->attributes->set('pos_device', $device);
         $payload = app(PosApiController::class)->cashierLogin($login)->getData(true);
 
@@ -85,8 +86,8 @@ class PosCashierIdentityTest extends TestCase
 
         $change = Request::create('/api/pos/cashier/pin', 'POST', [
             'code' => $user->username,
-            'current_pin' => '654321',
-            'new_pin' => '482165',
+            'current_pin' => '6543',
+            'new_pin' => '4821',
         ]);
         $change->attributes->set('pos_device', $device);
         $this->assertTrue(app(PosApiController::class)->changeCashierPin($change)->getData(true)['success']);
@@ -94,7 +95,7 @@ class PosCashierIdentityTest extends TestCase
         $this->assertFalse($cashier->fresh()->must_change_pin);
         $this->assertNotNull($device->fresh()->cashier_verified_at);
 
-        $relogin = Request::create('/api/pos/cashier/login', 'POST', ['pin' => '482165']);
+        $relogin = Request::create('/api/pos/cashier/login', 'POST', ['pin' => '4821']);
         $relogin->attributes->set('pos_device', $device->fresh());
         $result = app(PosApiController::class)->cashierLogin($relogin)->getData(true);
         $this->assertFalse($result['must_change_pin']);
@@ -167,27 +168,40 @@ class PosCashierIdentityTest extends TestCase
         $this->assertSame(0, AuditLog::where('action', 'pos_admin_settings_authorized')->count());
     }
 
-    public function test_passwordless_mode_still_limits_cashier_selection_to_the_device_branch(): void
+    public function test_passwordless_mode_cannot_bypass_the_four_digit_cashier_pin(): void
     {
         AppSetting::set('pos_passwordless_login', '1');
         [$branch, $alice] = $this->branchWithCashier('NOPIN', 'ALICE');
         $alice->forceFill(['must_change_pin' => true])->save();
-        $otherBranch = Branch::create(['code' => 'OTHER', 'name_th' => 'สาขาอื่น', 'is_active' => true]);
-        $otherCashier = Salesman::create(['branch_id' => $otherBranch->id, 'code' => 'OTHER-1', 'name' => 'คนอื่น', 'is_active' => true]);
         $device = $this->device($branch, $alice);
 
         $request = Request::create('/api/pos/cashier/login', 'POST', ['cashier_id' => $alice->id]);
         $request->attributes->set('pos_device', $device);
-        $response = app(PosApiController::class)->cashierLogin($request);
+        try {
+            app(PosApiController::class)->cashierLogin($request);
+            $this->fail('Passwordless cashier selection must not authenticate a POS user.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('pin', $exception->errors());
+        }
+        $this->assertNull($device->fresh()->active_cashier_id);
+        $this->assertSame(0, AuditLog::whereIn('action', ['cashier_login', 'cashier_selected'])->count());
+    }
 
-        $this->assertTrue($response->getData(true)['success']);
-        $this->assertSame($alice->id, (int) $device->fresh()->active_cashier_id);
-        $this->assertNotNull($device->fresh()->cashier_verified_at);
-        $this->assertSame('cashier_selected', AuditLog::where('action', 'cashier_selected')->sole()->action);
+    public function test_pin_login_rejects_five_and_six_digits(): void
+    {
+        [$branch, $alice] = $this->branchWithCashier('PINLEN', 'ALICE');
+        $device = $this->device($branch, $alice);
 
-        $otherRequest = Request::create('/api/pos/cashier/login', 'POST', ['cashier_id' => $otherCashier->id]);
-        $otherRequest->attributes->set('pos_device', $device);
-        $this->assertSame(422, app(PosApiController::class)->cashierLogin($otherRequest)->getStatusCode());
+        foreach (['123', '12345', '123456'] as $invalidPin) {
+            $request = Request::create('/api/pos/cashier/login', 'POST', ['pin' => $invalidPin]);
+            $request->attributes->set('pos_device', $device);
+            try {
+                app(PosApiController::class)->cashierLogin($request);
+                $this->fail('Only exactly four digits may authenticate POS cashiers.');
+            } catch (ValidationException $exception) {
+                $this->assertArrayHasKey('pin', $exception->errors());
+            }
+        }
     }
 
     public function test_shared_pin_on_a_device_asks_who_is_selling(): void
@@ -198,13 +212,13 @@ class PosCashierIdentityTest extends TestCase
             'code' => 'BOB-DUPPIN',
             'name' => 'แคชเชียร์ บ๊อบ',
             'is_active' => true,
-            'pos_pin_hash' => Hash::make('482165'),
+            'pos_pin_hash' => Hash::make('4821'),
         ]);
         $this->linkCashierUser($bob, $branch);
-        $alice->forceFill(['pos_pin_hash' => Hash::make('482165')])->save();
+        $alice->forceFill(['pos_pin_hash' => Hash::make('4821')])->save();
         $device = $this->device($branch, $alice);
 
-        $request = Request::create('/api/pos/cashier/login', 'POST', ['pin' => '482165']);
+        $request = Request::create('/api/pos/cashier/login', 'POST', ['pin' => '4821']);
         $request->attributes->set('pos_device', $device);
 
         $response = app(PosApiController::class)->cashierLogin($request);
@@ -212,7 +226,7 @@ class PosCashierIdentityTest extends TestCase
         $this->assertTrue($response->getData(true)['selection_required']);
         $this->assertNull($device->fresh()->active_cashier_id);
 
-        $chosen = Request::create('/api/pos/cashier/login', 'POST', ['pin' => '482165', 'cashier_id' => $bob->id]);
+        $chosen = Request::create('/api/pos/cashier/login', 'POST', ['pin' => '4821', 'cashier_id' => $bob->id]);
         $chosen->attributes->set('pos_device', $device);
         $this->assertTrue(app(PosApiController::class)->cashierLogin($chosen)->getData(true)['success']);
         $this->assertSame($bob->id, (int) $device->fresh()->active_cashier_id);

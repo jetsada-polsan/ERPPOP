@@ -101,6 +101,8 @@ class RoutePermissions
         'bplus.cash-books' => 'finance.manage',
         'bplus.vat-rates' => 'finance.manage',
         'bplus.approvals' => 'finance.manage',
+        'bplus.sync.' => 'reports.view',
+        'bplus.sync.import' => 'finance.manage',
 
         // ข้อมูลตั้งต้น / ราคา / โปรโมชั่น
         // หน้าผู้บริหารใช้สิทธิ์ดูรายงาน — คนที่ดูรายงานได้ก็ควรเห็นภาพรวมได้

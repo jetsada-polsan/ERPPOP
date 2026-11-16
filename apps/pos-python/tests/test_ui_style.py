@@ -122,17 +122,29 @@ class UiStyleTest(unittest.TestCase):
         self.assertIn("close_button.clicked.connect(self.reject)", source)
         self.assertIn("QToolButton#dialogClose", STYLE)
 
-    def test_seller_can_pick_a_synced_name_without_a_pin(self) -> None:
+    def test_cashier_login_requires_exactly_four_digits_and_auto_submits(self) -> None:
         source = inspect.getsource(run_ui)
-        self.assertIn("class SellerSelectionDialog", source)
-        self.assertIn('self.cashier_select.addItem(str(cashier["name"] or cashier["code"]), int(cashier["id"]))', source)
-        self.assertIn("ไม่ต้องกรอกรหัสหรือ PIN", source)
+        dialog = source[source.index("class CashierPinDialog"):source.index("class OpeningShiftDialog")]
+        self.assertIn('QRegularExpression("[0-9]{0,4}")', dialog)
+        self.assertNotIn("setMaxLength", dialog)
+        self.assertIn("silently truncate a pasted 5–6 digit PIN", dialog)
+        self.assertIn("QTimer.singleShot(0, self.accept)", dialog)
+        self.assertIn("service.find_cashier_by_pin(pin)", source)
 
-    def test_online_seller_selection_uses_the_device_bound_server_id(self) -> None:
+    def test_online_cashier_login_uses_cached_sqlite_identity_to_scope_erp_check(self) -> None:
         source = inspect.getsource(run_ui)
-        self.assertIn("online.provisioning.select_cashier(", source)
-        self.assertIn('int(cashier["server_id"])', source)
-        self.assertIn("service.requires_cashier_pin()", source)
+        start = source.index("def pin_login(self):")
+        flow = source[start:source.index("def ensure_sale_session", start)]
+        self.assertLess(flow.index("service.find_cashier_by_pin(pin)"), flow.index("online_cashier_login("))
+        self.assertIn("cashier_server_id=int(cached_server_id)", flow)
+
+    def test_every_new_sale_session_requires_the_pin_flow(self) -> None:
+        source = inspect.getsource(run_ui)
+        start = source.index("def ensure_sale_session")
+        session = source[start:source.index("def open_settings", start)]
+        self.assertIn("cashier = self.pin_login()", session)
+        self.assertNotIn("pick_seller", session)
+        self.assertNotIn("requires_cashier_pin", session)
         self.assertIn("online_cashier_login", source)
 
     def test_opening_shift_requests_and_reuses_opening_cash(self) -> None:
@@ -141,15 +153,14 @@ class UiStyleTest(unittest.TestCase):
         session = source[start:source.index("def open_settings", start)]
         self.assertIn("class OpeningShiftDialog", source)
         self.assertIn('"ใส่เงินทอนก่อนเปิดกะ"', source)
-        self.assertIn("OpeningShiftDialog(self)", session)
+        self.assertIn("OpeningShiftDialog(\n                    self, carried_float=carried_float, require_note=require_opening_note", session)
         self.assertIn("service.open_shift(", session)
         self.assertIn("opening_dialog.opening_cash", session)
         self.assertNotIn('opening_cash=Decimal("0")', session)
         self.assertIn("ExistingShiftDialog(self, existing_shift)", session)
         self.assertIn("ทำกะเดิมต่อ", source)
         self.assertIn("ปิดกะเดิม", source)
-        self.assertIn("self.resize(440, 500)", source)
-        self.assertIn("self.resize(440, 500)", source)
+        self.assertIn("self.resize(440, 560)", source)
         self.assertIn("#shiftKeypad QPushButton { min-height: 40px", STYLE)
 
     def test_windows_font_is_selected_by_qt_and_build_version_is_visible(self) -> None:
@@ -169,17 +180,16 @@ class UiStyleTest(unittest.TestCase):
         self.assertIn("กำลังยืนยันกะกับ ERP", session)
         self.assertIn("Qt.WindowStaysOnTopHint", source)
 
-    def test_seller_selection_dialog_is_raised_above_windows_osk(self) -> None:
+    def test_cashier_pin_dialog_is_raised_above_windows_osk(self) -> None:
         source = inspect.getsource(run_ui)
-        seller = source[source.index("class SellerSelectionDialog"):source.index("class PaymentDialog")]
-        self.assertIn("Qt.WindowStaysOnTopHint", seller)
-        self.assertIn("Qt.WindowModal", seller)
+        dialog = source[source.index("class CashierPinDialog"):source.index("class OpeningShiftDialog")]
+        self.assertIn("Qt.WindowStaysOnTopHint", dialog)
+        self.assertIn("Qt.WindowModal", dialog)
 
-    def test_seller_selection_does_not_render_a_login_form(self) -> None:
+    def test_passwordless_seller_picker_is_removed(self) -> None:
         source = inspect.getsource(run_ui)
-        self.assertNotIn("class LoginDialog", source)
-        self.assertNotIn("กรอก PIN", source)
-        self.assertNotIn("cashier_login_mode", source)
+        self.assertNotIn("class SellerSelectionDialog", source)
+        self.assertNotIn("def pick_seller", source)
 
     def test_transfer_requires_visible_money_received_confirmation(self) -> None:
         source = inspect.getsource(run_ui)

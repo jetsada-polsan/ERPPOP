@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS shifts (
     opened_at TEXT NOT NULL,
     closed_at TEXT,
     opening_cash TEXT NOT NULL DEFAULT '0',
+    opening_note TEXT,
     counted_cash TEXT,
     cash_difference TEXT,
     closing_note TEXT,
@@ -312,6 +313,8 @@ ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("sales", "adjustment_approved_by", "TEXT"),
     # ส่วนลดจากโปรซื้อครบจำนวน แยกจากส่วนลดที่คนกด เพราะ ERP คิดเองไม่ต้องมีผู้อนุมัติ
     ("sale_items", "promo_discount", "TEXT NOT NULL DEFAULT '0'"),
+    # เหตุผลกรณีเงินทอนต้นกะไม่ตรงยอดยกมาจาก ERP; additive for installed POS databases.
+    ("shifts", "opening_note", "TEXT"),
 ]
 
 # ยูนีคเฉพาะแถวที่มี server_id — กันแคชเชียร์คนเดียวถูก sync ลงซ้ำสองแถว
@@ -330,8 +333,8 @@ ADDED_INDEXES: list[str] = [
 
 def _add_missing_columns(connection: sqlite3.Connection) -> None:
     for table, column, definition in ADDED_COLUMNS:
-        existing = {row["name"] for row in connection.execute(f"PRAGMA table_info({table})")}
-        if column not in existing:
+        existing = {row["name"].casefold() for row in connection.execute(f"PRAGMA table_info({table})")}
+        if column.casefold() not in existing:
             connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
     for statement in ADDED_INDEXES:
         connection.execute(statement)
@@ -358,7 +361,13 @@ def connect(path: Path) -> sqlite3.Connection:
     connection.execute("PRAGMA synchronous = FULL")
     connection.execute("PRAGMA wal_autocheckpoint = 1000")
     connection.execute("PRAGMA temp_store = MEMORY")
-    connection.executescript(SCHEMA)
-    _add_missing_columns(connection)
-    connection.commit()
+    try:
+        # Hold the write lock across column discovery and ALTER TABLE so the
+        # UI and sync worker cannot both add the same column during startup.
+        connection.executescript("BEGIN IMMEDIATE;\n" + SCHEMA)
+        _add_missing_columns(connection)
+        connection.commit()
+    except BaseException:
+        connection.close()
+        raise
     return connection

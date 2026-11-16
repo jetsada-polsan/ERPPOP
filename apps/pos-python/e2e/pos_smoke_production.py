@@ -282,7 +282,8 @@ def main(argv: list[str] | None = None) -> int:
     verify_no_open_shift(api, branch, server_cashier)
     shift = pos.open_shift(branch, terminal, cashier, Decimal("1000"))
     shift_no = prov.open_server_shift(branch_id=branch, cashier_server_id=server_cashier,
-                                      opening_cash=Decimal("1000"), local_shift_id=shift)
+                                      opening_cash=Decimal("1000"), local_shift_id=shift,
+                                      opening_note="เงินทอนต้นกะสำหรับทดสอบ smoke POS")
     step(True, f"เปิดกะ server id={shift_no} เงินทอน 1,000")
 
     sales = []

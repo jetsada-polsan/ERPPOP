@@ -46,7 +46,7 @@ if __name__ == "__main__":
 
 
 class CashierPinModeTest(unittest.TestCase):
-    def test_pin_is_required_unless_erp_says_selection(self) -> None:
+    def test_pin_is_always_required_even_if_legacy_mode_flag_says_selection(self) -> None:
         import tempfile
         from pathlib import Path
 
@@ -56,9 +56,9 @@ class CashierPinModeTest(unittest.TestCase):
         db = connect(Path(tempfile.mkdtemp()) / "pin.db")
         pos = PosService(db)
         self.assertTrue(pos.requires_cashier_pin())
-        for mode, expected in (("pin", True), ("selection", False)):
+        for mode in ("pin", "selection"):
             db.execute("INSERT OR REPLACE INTO device_settings (key, value, updated_at) VALUES ('cashier_login_mode', ?, datetime('now'))", (f'"{mode}"',))
-            self.assertEqual(pos.requires_cashier_pin(), expected)
+            self.assertTrue(pos.requires_cashier_pin())
 
 
 class ProductGridBarcodeSearchTest(unittest.TestCase):

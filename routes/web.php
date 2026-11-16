@@ -11,6 +11,7 @@ use App\Http\Controllers\BasicMasterController;
 use App\Http\Controllers\BillingNoteController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\BplusOperationController;
+use App\Http\Controllers\BplusSyncController;
 use App\Http\Controllers\BranchReplenishmentController;
 use App\Http\Controllers\CashSaleController;
 use App\Http\Controllers\CashTransferController;
@@ -843,6 +844,11 @@ Route::prefix('bplus')->name('bplus.')->group(function () {
     Route::delete('/qr-payments/{qrPaymentConfig}', [BplusOperationController::class, 'destroyQrPayment'])->name('qr-payments.destroy');
     Route::get('/show-price', [BplusOperationController::class, 'showPrice'])->name('show-price');
     Route::post('/show-price', [BplusOperationController::class, 'storeShowPrice'])->name('show-price.store');
+    // เอกสารสายขายที่ซิงค์จาก BPlus (ดูอย่างเดียว ไม่ตัดสต๊อก ไม่ลง GL)
+    Route::get('/sync', [BplusSyncController::class, 'index'])->name('sync.index');
+    Route::get('/sync/documents/{document}', [BplusSyncController::class, 'show'])->whereNumber('document')->name('sync.show');
+    Route::post('/sync/preview', [BplusSyncController::class, 'preview'])->name('sync.import.preview');
+    Route::post('/sync/import', [BplusSyncController::class, 'import'])->name('sync.import.store');
 });
 
 if (app()->environment('local')) {
