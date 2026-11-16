@@ -159,6 +159,22 @@ class BplusDocumentsTest extends TestCase
         $this->assertSame($byName->id, Document::where('doc_number', 'DSN256911/4861')->value('customer_id'));
     }
 
+    public function test_customer_names_match_when_only_spacing_differs(): void
+    {
+        $spaced = Customer::create(['code' => '6503', 'name_th' => 'พี่ แดง  ร้านค้า', 'branch_id' => $this->branch->id, 'is_active' => true]);
+        Customer::create(['code' => '7001', 'name_th' => 'ร้าน คู่', 'branch_id' => $this->branch->id, 'is_active' => true]);
+        Customer::create(['code' => '7002', 'name_th' => 'ร้านคู่ ', 'branch_id' => $this->branch->id, 'is_active' => true]);
+        $export = $this->export();
+        $export['documents'][2]['customer_code'] = '34140-0091';
+        $export['documents'][2]['customer_name'] = "พี่แดง\u{00A0}ร้านค้า ";
+        $export['documents'][3]['customer_code'] = '35120-0099';
+        $export['documents'][3]['customer_name'] = 'ร้านคู่';
+        $this->importFile($export);
+
+        $this->assertSame($spaced->id, Document::where('doc_number', 'DS256911/06364')->value('customer_id'));
+        $this->assertNull(Document::where('doc_number', 'DSN256911/4861')->value('customer_id'), 'ชื่อที่ตัดช่องว่างแล้วซ้ำสองรายต้องไม่เดา');
+    }
+
     public function test_resync_updates_in_place_and_cancels_follow_bplus(): void
     {
         $this->importFile($this->export());
