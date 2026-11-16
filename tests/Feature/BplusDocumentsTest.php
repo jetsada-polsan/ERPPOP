@@ -143,6 +143,22 @@ class BplusDocumentsTest extends TestCase
         $this->get(route('ar-receipts.index', ['date_from' => '2026-11-01', 'date_to' => '2026-11-30']))->assertOk()->assertSee('RR26911/000800')->assertSee('837.00');
     }
 
+    public function test_customers_match_by_bplus_key_then_unique_name(): void
+    {
+        // ใน ERP จริง รหัสลูกค้าคือ AR_KEY ของ BPlus เช่น 8049 ไม่ใช่ AR_CODE
+        $byKey = Customer::create(['code' => '8049', 'name_th' => 'ร้านคีย์', 'branch_id' => $this->branch->id, 'is_active' => true]);
+        $byName = Customer::create(['code' => '5412', 'name_th' => 'ร้านชื่อตรง', 'branch_id' => $this->branch->id, 'is_active' => true]);
+        $export = $this->export();
+        $export['documents'][2]['customer_code'] = '34140-0121';
+        $export['documents'][2]['customer_key'] = 8049;
+        $export['documents'][3]['customer_code'] = '35120-0045';
+        $export['documents'][3]['customer_name'] = 'ร้านชื่อตรง';
+        $this->importFile($export);
+
+        $this->assertSame($byKey->id, Document::where('doc_number', 'DS256911/06364')->value('customer_id'));
+        $this->assertSame($byName->id, Document::where('doc_number', 'DSN256911/4861')->value('customer_id'));
+    }
+
     public function test_resync_updates_in_place_and_cancels_follow_bplus(): void
     {
         $this->importFile($this->export());
