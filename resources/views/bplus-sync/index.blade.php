@@ -64,7 +64,7 @@
 <div class="content-card p-4">
     <h2 class="h6 fw-bold">เอกสาร</h2>
     <div class="table-responsive"><table class="table table-sm align-middle">
-        <thead><tr><th>วันที่</th><th>ประเภท</th><th>เลขที่</th><th>อ้างใบจอง</th><th>ลูกค้า</th><th class="text-end">ยอด</th><th>สถานะ</th></tr></thead>
+        <thead><tr><th>วันที่</th><th>ประเภท</th><th>เลขที่</th><th>อ้างใบจอง</th><th>ลูกค้า</th><th class="text-end">ยอด</th><th>สถานะ</th><th>ใน ERP</th></tr></thead>
         <tbody>
         @forelse ($documents as $doc)
             <tr>
@@ -75,9 +75,10 @@
                 <td>{{ $doc->customer_code }} {{ $doc->customer_name }}</td>
                 <td class="text-end">{{ $m($doc->total_amount) }}</td>
                 <td>@if ($doc->is_cancelled)<span class="badge text-bg-danger">ยกเลิก</span>@else<span class="badge text-bg-light border">ปกติ</span>@endif</td>
+                <td>@if ($doc->problem)<span class="text-danger small">{{ $doc->problem }}</span>@elseif ($doc->document_id)<span class="text-success small">สร้างแล้ว</span>@else<span class="text-muted small">-</span>@endif</td>
             </tr>
         @empty
-            <tr><td colspan="7" class="text-center text-muted py-4">ยังไม่มีเอกสาร</td></tr>
+            <tr><td colspan="8" class="text-center text-muted py-4">ยังไม่มีเอกสาร</td></tr>
         @endforelse
         </tbody>
     </table></div>

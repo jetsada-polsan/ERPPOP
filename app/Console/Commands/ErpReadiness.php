@@ -102,6 +102,8 @@ class ErpReadiness extends Command
             ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
             ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE'])
             ->where('d.status', 'active')
+            // ใบขายที่สร้างจาก BPlus ไม่ลง GL โดยตั้งใจ (บัญชีทำจาก BPlus)
+            ->where(fn ($q) => $q->whereNull('d.source_system')->orWhere('d.source_system', '<>', 'bplus'))
             ->whereNotExists(fn ($q) => $q->select(DB::raw(1))->from('gl_journals as g')->whereColumn('g.document_id', 'd.id'))
             ->count();
         $checks[] = ['ขาย-GL', $missing === 0 ? 'ผ่าน' : 'ไม่ผ่าน', $missing === 0 ? 'เอกสารขายลง GL ครบ' : "ขาด GL {$missing} ใบ"];

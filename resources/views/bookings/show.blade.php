@@ -1,7 +1,7 @@
 @extends('layout')
 @section('title', "ใบจอง {$booking->document->doc_number} - MPM Food Group")
 @section('page-title', 'ใบจอง')
-@section('page-subtitle', $booking->document->doc_number)
+@section('page-subtitle', $booking->document->doc_number.($booking->document->source_system === 'bplus' ? ' · มาจาก BPlus (แก้ไขที่ BPlus)' : ''))
 
 @php
 $statusLabel = ['pending' => 'รอดำเนินการ', 'converted_to_sale' => 'แปลงเป็นใบขายแล้ว', 'cancelled' => 'ยกเลิกแล้ว'];

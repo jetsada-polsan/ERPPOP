@@ -18,6 +18,18 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 ])]
 class SaleBooking extends Model
 {
+    /** ใบจองจาก BPlus: เปลี่ยนสถานะ/ยืนยัน/ยกเลิกใน ERP ไม่ได้ */
+    protected static function booted(): void
+    {
+        $guard = function (SaleBooking $booking): void {
+            if (\Illuminate\Support\Facades\DB::table('documents')->where('id', $booking->document_id)->value('source_system') === 'bplus') {
+                throw new \RuntimeException('ใบจองนี้มาจาก BPlus แก้ไขหรือยกเลิกได้ที่ BPlus เท่านั้น แล้วซิงค์ใหม่');
+            }
+        };
+        static::updating($guard);
+        static::deleting($guard);
+    }
+
     public $timestamps = false;
 
     public const STATUS_PENDING = 'pending';
