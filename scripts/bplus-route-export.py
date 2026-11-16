@@ -171,7 +171,7 @@ if customer_keys:
     customer_rows = rows(f"""
         SELECT ar.AR_KEY, ar.AR_CODE, ar.AR_NAME, ar.AR_ENABLE,
                ara.ARA_DEFAULT,
-               addb.ADDB_TAX_ID, addb.ADDB_PHONE,
+               addb.ADDB_PHONE,
                addb.ADDB_ADDB_1, addb.ADDB_ADDB_2, addb.ADDB_ADDB_3,
                addb.ADDB_PROVINCE, addb.ADDB_POST
         FROM ARFILE ar
@@ -197,7 +197,7 @@ if customer_keys:
             "ar_key": ar_key,
             "ar_code": text(cr["AR_CODE"]),
             "ar_name": text(cr["AR_NAME"]),
-            "tax_id": text(cr["ADDB_TAX_ID"]) or None,
+            # เลขผู้เสียภาษียังไม่ส่ง: ยังไม่ได้ยืนยันชื่อคอลัมน์ใน BPlus (ETL เดิมก็ไม่ได้ดึง)
             "address": address or None,
             "phone": text(cr["ADDB_PHONE"]) or None,
             "is_active": cr["AR_ENABLE"] == "Y",
