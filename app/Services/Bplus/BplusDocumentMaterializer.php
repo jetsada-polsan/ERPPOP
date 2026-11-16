@@ -425,8 +425,22 @@ class BplusDocumentMaterializer
         }
         if ($name && trim($name) !== '') {
             $ids = DB::table('customers')->where('name_th', trim($name))->limit(2)->pluck('id');
-            if ($ids->count() === 1) {
-                return $ids->first();
+            if ($ids->count() > 0) {
+                return $ids->count() === 1 ? $ids->first() : null;
+            }
+
+            // BPlus กับ ERP เว้นวรรคชื่อไม่เหมือนกัน เช่น "ร้าน  ก" กับ "ร้าน ก" ถ้าตัดช่องว่างแล้วเหลือรายเดียวถือว่าคนเดียวกัน
+            $spaces = [' ', "\t", "\u{00A0}", "\u{200B}"];
+            $squeezed = str_replace($spaces, '', $name);
+            if ($squeezed !== '') {
+                $column = 'name_th';
+                foreach ($spaces as $ignored) {
+                    $column = "REPLACE({$column}, ?, '')";
+                }
+                $ids = DB::table('customers')->whereRaw("{$column} = ?", [...$spaces, $squeezed])->limit(2)->pluck('id');
+                if ($ids->count() === 1) {
+                    return $ids->first();
+                }
             }
         }
 
