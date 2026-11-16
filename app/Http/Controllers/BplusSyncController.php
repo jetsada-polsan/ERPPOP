@@ -6,6 +6,7 @@ use App\Services\Bplus\BplusDocumentMaterializer;
 use App\Services\Bplus\BplusSyncImporter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -86,7 +87,13 @@ class BplusSyncController extends Controller
             'token' => $token,
             'route' => $parsed['route'],
             'summary' => $importer->preview($parsed),
-            'check' => $materializer->check($parsed['route'], $parsed['documents']),
+            'masterSummary' => $importer->previewMaster($parsed),
+            'check' => $materializer->check(
+                $parsed['route'],
+                $parsed['documents'],
+                $parsed['customers'] ?? [],
+                $parsed['products'] ?? []
+            ),
             'kindLabels' => self::KIND_LABELS,
             'range' => [
                 collect($parsed['documents'])->min('doc_date'),
@@ -120,7 +127,7 @@ class BplusSyncController extends Controller
         return redirect()->route('bplus.sync.index')->with('success', $message);
     }
 
-    private function related(object $doc): \Illuminate\Support\Collection
+    private function related(object $doc): Collection
     {
         $query = DB::table('bplus_sync_documents')->where('id', '!=', $doc->id);
         if ($doc->kind === 'booking') {

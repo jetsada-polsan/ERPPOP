@@ -16,7 +16,6 @@ use App\Models\SaleBooking;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseLocation;
-use App\Services\Bplus\BplusDocumentMaterializer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
@@ -214,6 +213,177 @@ class BplusDocumentsTest extends TestCase
         $this->post(route('bplus.sync.import.store'), ['token' => $preview->viewData('token')]);
         $this->assertNull(Document::where('doc_number', 'DS256911/06364')->first(), 'ไม่มีลูกค้าใน ERP ต้องไม่สร้างใบขาย');
         $this->assertStringContainsString('99999-0001', (string) DB::table('bplus_sync_documents')->where('ref', 'DS256911/06364')->value('problem'));
+    }
+
+    public function test_new_customer_from_bplus_is_created_with_ar_key_as_code_and_linked_to_sale(): void
+    {
+        $export = $this->export();
+        $export['documents'][2]['customer_code'] = '34140-9999';
+        $export['documents'][2]['customer_key'] = 9001;
+        $export['documents'][2]['customer_name'] = 'ลูกค้ารายใหม่';
+        $export['customers'] = [
+            [
+                'ar_key' => 9001,
+                'ar_code' => '34140-9999',
+                'ar_name' => 'ลูกค้ารายใหม่',
+                'tax_id' => '1234567890123',
+                'address' => '123 ถ.ชยางกูร อุบลราชธานี 34000',
+                'phone' => '0812345678',
+                'is_active' => true,
+            ],
+        ];
+
+        $preview = $this->post(route('bplus.sync.import.preview'), ['file' => $this->upload($export)]);
+        $preview->assertOk()
+            ->assertSee('จะสร้างลูกค้าใหม่ 1 ราย')
+            ->assertDontSee('ไม่พบลูกค้า');
+
+        $this->post(route('bplus.sync.import.store'), ['token' => $preview->viewData('token')])->assertRedirect();
+
+        $customer = Customer::where('code', '9001')->firstOrFail();
+        $this->assertSame('ลูกค้ารายใหม่', $customer->name_th);
+        $this->assertSame('1234567890123', $customer->tax_id);
+        $this->assertSame($this->branch->id, $customer->branch_id);
+        $this->assertTrue($customer->is_active);
+
+        $this->assertDatabaseHas('customer_addresses', [
+            'customer_id' => $customer->id,
+            'address_line' => '123 ถ.ชยางกูร อุบลราชธานี 34000',
+            'is_default' => 1,
+        ]);
+        $this->assertDatabaseHas('customer_contacts', [
+            'customer_id' => $customer->id,
+            'phone' => '0812345678',
+        ]);
+
+        $ds = Document::where('doc_number', 'DS256911/06364')->firstOrFail();
+        $this->assertSame($customer->id, $ds->customer_id);
+    }
+
+    public function test_existing_customer_updates_name_and_tax_while_preserving_credit_limit_and_terms(): void
+    {
+        $customer = Customer::create([
+            'code' => '8049',
+            'name_th' => 'ชื่อเดิมในระบบ',
+            'branch_id' => $this->branch->id,
+            'credit_limit' => 50000.00,
+            'is_active' => true,
+        ]);
+        DB::table('customer_terms')->insert([
+            'customer_id' => $customer->id,
+            'name' => 'เครดิต 30 วัน',
+            'credit_days' => 30,
+            'trade_discount_percent' => 5.0,
+            'cash_discount_percent' => 2.0,
+            'is_default' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $export = $this->export();
+        $export['documents'][2]['customer_code'] = '34140-0121';
+        $export['documents'][2]['customer_key'] = 8049;
+        $export['documents'][2]['customer_name'] = 'ชื่อใหม่จาก BPlus';
+        $export['customers'] = [
+            [
+                'ar_key' => 8049,
+                'ar_code' => '34140-0121',
+                'ar_name' => 'ชื่อใหม่จาก BPlus',
+                'tax_id' => '9876543210987',
+                'address' => '999 ถ.แจ้งสนิท อุบลราชธานี 34000',
+                'phone' => '0898765432',
+                'is_active' => true,
+            ],
+        ];
+
+        $preview = $this->post(route('bplus.sync.import.preview'), ['file' => $this->upload($export)]);
+        $preview->assertOk()
+            ->assertSee('อัปเดตชื่อ 1 ราย');
+
+        $this->post(route('bplus.sync.import.store'), ['token' => $preview->viewData('token')])->assertRedirect();
+
+        $customer->refresh();
+        $this->assertSame('ชื่อใหม่จาก BPlus', $customer->name_th);
+        $this->assertSame('9876543210987', $customer->tax_id);
+
+        $this->assertSame('50000.0000', (string) $customer->credit_limit);
+        $this->assertSame($this->branch->id, $customer->branch_id);
+
+        $term = DB::table('customer_terms')->where('customer_id', $customer->id)->first();
+        $this->assertNotNull($term);
+        $this->assertSame('เครดิต 30 วัน', $term->name);
+        $this->assertSame(30, (int) $term->credit_days);
+        $this->assertEquals(5.0, (float) $term->trade_discount_percent);
+
+        $this->assertDatabaseHas('customer_addresses', [
+            'customer_id' => $customer->id,
+            'address_line' => '999 ถ.แจ้งสนิท อุบลราชธานี 34000',
+        ]);
+        $this->assertDatabaseHas('customer_contacts', [
+            'customer_id' => $customer->id,
+            'phone' => '0898765432',
+        ]);
+    }
+
+    public function test_missing_product_co8110_is_created_and_shown_in_document_lines(): void
+    {
+        $this->assertDatabaseMissing('products', ['sku_code' => 'CO8110']);
+
+        $export = $this->export();
+        $export['documents'][2]['lines'][] = [
+            'seq' => 2,
+            'sku_code' => 'CO8110',
+            'unit_name' => 'ถุง',
+            'unit_factor' => 1,
+            'qty' => 3,
+            'unit_price' => 150,
+            'amount' => 450,
+        ];
+        $export['products'] = [
+            [
+                'sku_code' => 'CO8110',
+                'name' => 'ปุ๋ยสูตร CO8110',
+                'unit_name' => 'ถุง',
+            ],
+        ];
+
+        $preview = $this->post(route('bplus.sync.import.preview'), ['file' => $this->upload($export)]);
+        $preview->assertOk()
+            ->assertSee('สร้างสินค้าใหม่ 1 รายการ')
+            ->assertDontSee('ไม่พบสินค้า');
+
+        $this->post(route('bplus.sync.import.store'), ['token' => $preview->viewData('token')])->assertRedirect();
+
+        $product = Product::where('sku_code', 'CO8110')->firstOrFail();
+        $this->assertSame('ปุ๋ยสูตร CO8110', $product->name_th);
+        $this->assertFalse($product->is_active, 'ปิดการขายหน้าร้าน POS ไว้ก่อน');
+
+        $ds = Document::where('doc_number', 'DS256911/06364')->firstOrFail();
+        $items = DB::table('stock_document_items as i')
+            ->join('stock_documents as s', 's.id', '=', 'i.stock_document_id')
+            ->where('s.document_id', $ds->id)
+            ->where('i.product_id', $product->id)
+            ->first();
+        $this->assertNotNull($items, 'บรรทัด CO8110 ต้องถูกสร้างใน stock_document_items');
+        $this->assertEquals(3.0, (float) $items->qty);
+        $this->assertNull(DB::table('bplus_sync_documents')->where('ref', 'DS256911/06364')->value('problem'));
+    }
+
+    public function test_legacy_export_file_without_customers_or_products_works_identically(): void
+    {
+        $export = $this->export();
+        $this->assertArrayNotHasKey('customers', $export);
+        $this->assertArrayNotHasKey('products', $export);
+
+        $preview = $this->post(route('bplus.sync.import.preview'), ['file' => $this->upload($export)]);
+        $preview->assertOk()
+            ->assertSee('จะสร้างลูกค้าใหม่ 0 ราย · อัปเดตชื่อ 0 ราย · สร้างสินค้าใหม่ 0 รายการ');
+
+        $this->post(route('bplus.sync.import.store'), ['token' => $preview->viewData('token')])->assertRedirect();
+
+        $booking = Document::where('doc_number', 'B18-6911/00382')->firstOrFail();
+        $ds = Document::where('doc_number', 'DS256911/06364')->firstOrFail();
+        $this->assertSame($booking->id, $ds->source_document_id);
     }
 
     private function openItem(Document $document): array

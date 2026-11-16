@@ -163,13 +163,85 @@ for key, doc in receipts.items():
         doc[field] = round(doc[field] + rest, 2)
 documents.extend(receipts.values())
 
+# ลูกค้าที่มีเอกสารในไฟล์นี้
+customer_keys = sorted({d["customer_key"] for d in documents if d.get("customer_key") is not None})
+customer_data = []
+if customer_keys:
+    keys_placeholder = ",".join(str(int(k)) for k in customer_keys)
+    customer_rows = rows(f"""
+        SELECT ar.AR_KEY, ar.AR_CODE, ar.AR_NAME, ar.AR_ENABLE,
+               ara.ARA_DEFAULT,
+               addb.ADDB_TAX_ID, addb.ADDB_PHONE,
+               addb.ADDB_ADDB_1, addb.ADDB_ADDB_2, addb.ADDB_ADDB_3,
+               addb.ADDB_PROVINCE, addb.ADDB_POST
+        FROM ARFILE ar
+        LEFT JOIN ARADDRESS ara ON ara.ARA_AR = ar.AR_KEY
+        LEFT JOIN ADDRBOOK addb ON addb.ADDB_KEY = ara.ARA_ADDB
+        WHERE ar.AR_KEY IN ({keys_placeholder})
+        ORDER BY ar.AR_KEY, CASE WHEN ara.ARA_DEFAULT = 'Y' THEN 0 ELSE 1 END, ara.ARA_KEY""")
+
+    seen_ar_keys = set()
+    for cr in customer_rows:
+        ar_key = cr["AR_KEY"]
+        if ar_key in seen_ar_keys:
+            continue
+        seen_ar_keys.add(ar_key)
+
+        addr_parts = [
+            text(cr["ADDB_ADDB_1"]), text(cr["ADDB_ADDB_2"]), text(cr["ADDB_ADDB_3"]),
+            text(cr["ADDB_PROVINCE"]), text(cr["ADDB_POST"])
+        ]
+        address = " ".join(p for p in addr_parts if p)
+
+        customer_data.append({
+            "ar_key": ar_key,
+            "ar_code": text(cr["AR_CODE"]),
+            "ar_name": text(cr["AR_NAME"]),
+            "tax_id": text(cr["ADDB_TAX_ID"]) or None,
+            "address": address or None,
+            "phone": text(cr["ADDB_PHONE"]) or None,
+            "is_active": cr["AR_ENABLE"] == "Y",
+        })
+
+# สินค้าที่อยู่ในบรรทัดเอกสาร
+sku_codes = sorted({line["sku_code"] for d in documents for line in d.get("lines", []) if line.get("sku_code")})
+product_data = []
+if sku_codes:
+    placeholders = ",".join("%s" for _ in sku_codes)
+    product_rows = rows(f"""
+        SELECT sm.SKU_CODE, sm.SKU_NAME, u.UTQ_NAME
+        FROM SKUMASTER sm
+        LEFT JOIN UOFQTY u ON u.UTQ_KEY = sm.SKU_S_UTQ
+        WHERE sm.SKU_CODE IN ({placeholders})
+        ORDER BY sm.SKU_CODE""", tuple(sku_codes))
+
+    found_skus = set()
+    for pr in product_rows:
+        sku = text(pr["SKU_CODE"])
+        found_skus.add(sku)
+        product_data.append({
+            "sku_code": sku,
+            "name": text(pr["SKU_NAME"]),
+            "unit_name": text(pr["UTQ_NAME"]),
+        })
+
+    for sku in sku_codes:
+        if sku not in found_skus:
+            line_unit = next((l.get("unit_name") for d in documents for l in d.get("lines", []) if l.get("sku_code") == sku and l.get("unit_name")), None)
+            product_data.append({
+                "sku_code": sku,
+                "name": sku,
+                "unit_name": line_unit or "ชิ้น",
+            })
+
 connection.close()
 name = f"bplus-{route}-{datetime.date.today().isoformat()}.json"
 with open(name, "w", encoding="utf-8") as handle:
     json.dump({"route": route, "exported_at": datetime.datetime.now().isoformat(timespec="seconds"),
-               "since": since, "documents": documents}, handle, ensure_ascii=False, indent=1,
+               "since": since, "documents": documents,
+               "customers": customer_data, "products": product_data}, handle, ensure_ascii=False, indent=1,
               default=lambda v: float(v) if isinstance(v, decimal.Decimal) else str(v))
 
 count = {k: sum(1 for d in documents if d["kind"] == k) for k in ("booking", "credit_sale", "receipt")}
-print(f"เสร็จ บันทึกที่ {name}: ใบจอง {count['booking']} · ใบขายเชื่อ {count['credit_sale']} · ใบเสร็จ {count['receipt']}")
+print(f"เสร็จ บันทึกที่ {name}: ใบจอง {count['booking']} · ใบขายเชื่อ {count['credit_sale']} · ใบเสร็จ {count['receipt']} · ลูกค้า {len(customer_data)} · สินค้า {len(product_data)}")
 print("อัปโหลดไฟล์นี้ที่ ERP เมนู เอกสารสายขาย (ระบบเดิม)")

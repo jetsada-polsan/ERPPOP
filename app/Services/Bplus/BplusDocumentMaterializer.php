@@ -23,21 +23,61 @@ class BplusDocumentMaterializer
     private array $problems = [];
 
     /** ตรวจก่อนบันทึก: ลูกค้า/สินค้าที่ ERP ยังไม่มี และสาขา/เล่มที่จะใช้ */
-    public function check(string $route, array $documents): array
+    public function check(string $route, array $documents, array $incomingCustomers = [], array $incomingProducts = []): array
     {
         $ctx = $this->context($route, false);
+
+        $incomingCustomerKeys = collect($incomingCustomers)
+            ->flatMap(fn ($c) => array_filter([
+                isset($c['ar_key']) ? (string) $c['ar_key'] : null,
+                isset($c['customer_key']) ? (string) $c['customer_key'] : null,
+                isset($c['code']) ? (string) $c['code'] : null,
+                isset($c['ar_code']) ? (string) $c['ar_code'] : null,
+                isset($c['customer_code']) ? (string) $c['customer_code'] : null,
+            ]))
+            ->map('strval')
+            ->flip();
+
+        $incomingProductSkus = collect($incomingProducts)
+            ->map(fn ($p) => (string) ($p['sku_code'] ?? ''))
+            ->filter()
+            ->flip();
+
         $missingCustomers = collect($documents)->whereIn('kind', ['credit_sale', 'receipt'])
             ->unique(fn ($d) => ($d['customer_key'] ?? '').'|'.($d['customer_code'] ?? ''))
-            ->reject(fn ($d) => self::matchCustomer(isset($d['customer_key']) ? (string) $d['customer_key'] : null, $d['customer_code'] ?? null, $d['customer_name'] ?? null))
+            ->reject(function ($d) use ($incomingCustomerKeys) {
+                $key = isset($d['customer_key']) ? (string) $d['customer_key'] : null;
+                $code = isset($d['customer_code']) ? (string) $d['customer_code'] : null;
+                $name = $d['customer_name'] ?? null;
+
+                if (self::matchCustomer($key, $code, $name)) {
+                    return true;
+                }
+                if ($key !== null && isset($incomingCustomerKeys[$key])) {
+                    return true;
+                }
+                if ($code !== null && isset($incomingCustomerKeys[$code])) {
+                    return true;
+                }
+
+                return false;
+            })
             ->map(fn ($d) => ($d['customer_code'] ?? '-'))->unique()->values();
+
         $skus = collect($documents)->flatMap(fn ($d) => collect($d['lines'] ?? [])->pluck('sku_code'))->filter()->unique()->values();
-        $knownSkus = DB::table('products')->whereIn('sku_code', $skus)->pluck('sku_code')->all();
+        $knownSkus = DB::table('products')->whereIn('sku_code', $skus)->pluck('sku_code')->flip();
+
+        $missingProducts = $skus->reject(function ($sku) use ($knownSkus, $incomingProductSkus) {
+            $skuStr = (string) $sku;
+
+            return isset($knownSkus[$skuStr]) || isset($incomingProductSkus[$skuStr]);
+        })->values();
 
         return [
             'branch' => $ctx['branch_name'] ?? null,
             'errors' => $ctx['errors'],
             'missing_customers' => $missingCustomers->all(),
-            'missing_products' => $skus->diff($knownSkus)->values()->all(),
+            'missing_products' => $missingProducts->all(),
         ];
     }
 

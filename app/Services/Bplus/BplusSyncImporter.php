@@ -3,6 +3,7 @@
 namespace App\Services\Bplus;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 /**
@@ -14,7 +15,7 @@ class BplusSyncImporter
 {
     private const KINDS = ['booking', 'credit_sale', 'receipt'];
 
-    /** @return array{route: string, documents: array<int, array>} */
+    /** @return array{route: string, documents: array<int, array>, customers?: array<int, array>, products?: array<int, array>} */
     public function parse(string $json): array
     {
         $data = json_decode($json, true);
@@ -25,7 +26,7 @@ class BplusSyncImporter
         foreach ($data['documents'] as $index => $doc) {
             foreach (['bplus_key', 'kind', 'book_code', 'ref', 'doc_date'] as $field) {
                 if (! isset($doc[$field]) || $doc[$field] === '') {
-                    throw new InvalidArgumentException("เอกสารแถว ".($index + 1)." ไม่มี {$field}");
+                    throw new InvalidArgumentException('เอกสารแถว '.($index + 1)." ไม่มี {$field}");
                 }
             }
             if (! in_array($doc['kind'], self::KINDS, true)) {
@@ -33,7 +34,64 @@ class BplusSyncImporter
             }
         }
 
-        return ['route' => $route, 'documents' => $data['documents']];
+        return [
+            'route' => $route,
+            'documents' => $data['documents'],
+            'customers' => $data['customers'] ?? [],
+            'products' => $data['products'] ?? [],
+        ];
+    }
+
+    /** สรุปจำนวนลูกค้าที่จะสร้างใหม่/อัปเดตชื่อ และสินค้าที่จะสร้างใหม่ */
+    public function previewMaster(array $parsed): array
+    {
+        $customers = $parsed['customers'] ?? [];
+        $products = $parsed['products'] ?? [];
+
+        $newCustomers = 0;
+        $updatedCustomers = 0;
+        $newProducts = 0;
+
+        $uniqueCustomers = collect($customers)
+            ->unique(fn ($c) => (string) ($c['ar_key'] ?? $c['customer_key'] ?? $c['code'] ?? ''))
+            ->filter(fn ($c) => (string) ($c['ar_key'] ?? $c['customer_key'] ?? $c['code'] ?? '') !== '');
+
+        if ($uniqueCustomers->isNotEmpty()) {
+            $codes = $uniqueCustomers->map(fn ($c) => (string) ($c['ar_key'] ?? $c['customer_key'] ?? $c['code']))->all();
+            $existingCustomers = DB::table('customers')->whereIn('code', $codes)->pluck('name_th', 'code');
+
+            foreach ($uniqueCustomers as $c) {
+                $code = (string) ($c['ar_key'] ?? $c['customer_key'] ?? $c['code']);
+                $incomingName = trim((string) ($c['ar_name'] ?? $c['name'] ?? $c['customer_name'] ?? ''));
+                if (! $existingCustomers->has($code)) {
+                    $newCustomers++;
+                } elseif ($incomingName !== '' && trim((string) $existingCustomers[$code]) !== $incomingName) {
+                    $updatedCustomers++;
+                }
+            }
+        }
+
+        $uniqueProducts = collect($products)
+            ->unique(fn ($p) => (string) ($p['sku_code'] ?? ''))
+            ->filter(fn ($p) => (string) ($p['sku_code'] ?? '') !== '');
+
+        if ($uniqueProducts->isNotEmpty()) {
+            $skuCodes = $uniqueProducts->map(fn ($p) => (string) $p['sku_code'])->all();
+            $existingSkus = DB::table('products')->whereIn('sku_code', $skuCodes)->pluck('sku_code')->flip();
+
+            foreach ($uniqueProducts as $p) {
+                $sku = (string) $p['sku_code'];
+                if (! isset($existingSkus[$sku])) {
+                    $newProducts++;
+                }
+            }
+        }
+
+        return [
+            'new_customers' => $newCustomers,
+            'updated_customers' => $updatedCustomers,
+            'new_products' => $newProducts,
+        ];
     }
 
     /** สรุปว่าไฟล์นี้จะเพิ่ม/อัปเดตอะไร โดยยังไม่บันทึก */
@@ -72,6 +130,12 @@ class BplusSyncImporter
         $route = $parsed['route'];
 
         return DB::transaction(function () use ($parsed, $route) {
+            $area = DB::table('sales_areas')->where('code', $route)->first();
+            $branchId = $area?->branch_id ?? DB::table('branches')->where('is_active', true)->orderBy('id')->value('id');
+
+            $this->upsertCustomers($parsed['customers'] ?? [], $branchId);
+            $this->upsertProducts($parsed['products'] ?? []);
+
             $count = 0;
             foreach ($parsed['documents'] as $doc) {
                 $now = now();
@@ -146,6 +210,160 @@ class BplusSyncImporter
 
             return $count;
         });
+    }
+
+    private function upsertCustomers(array $customers, ?int $branchId): void
+    {
+        $uniqueCustomers = collect($customers)
+            ->unique(fn ($c) => (string) ($c['ar_key'] ?? $c['customer_key'] ?? $c['code'] ?? ''))
+            ->filter(fn ($c) => (string) ($c['ar_key'] ?? $c['customer_key'] ?? $c['code'] ?? '') !== '');
+
+        foreach ($uniqueCustomers as $c) {
+            $arKey = (string) ($c['ar_key'] ?? $c['customer_key'] ?? $c['code']);
+            $name = trim((string) ($c['ar_name'] ?? $c['name'] ?? $c['customer_name'] ?? ''));
+            $taxId = isset($c['tax_id']) && trim((string) $c['tax_id']) !== '' ? trim((string) $c['tax_id']) : null;
+            $address = isset($c['address']) && trim((string) $c['address']) !== '' ? trim((string) $c['address']) : null;
+            $phone = isset($c['phone']) && trim((string) $c['phone']) !== '' ? trim((string) $c['phone']) : null;
+
+            $existing = DB::table('customers')->where('code', $arKey)->first();
+
+            if (! $existing) {
+                $customerId = DB::table('customers')->insertGetId([
+                    'code' => $arKey,
+                    'name_th' => $name ?: $arKey,
+                    'name_en' => null,
+                    'tax_id' => $taxId,
+                    'branch_id' => $branchId,
+                    'credit_limit' => 0,
+                    'is_active' => true,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                if ($address !== null) {
+                    DB::table('customer_addresses')->insert([
+                        'customer_id' => $customerId,
+                        'address_line' => $address,
+                        'is_default' => true,
+                    ]);
+                }
+
+                if ($phone !== null) {
+                    DB::table('customer_contacts')->insert([
+                        'customer_id' => $customerId,
+                        'name' => $name ?: $arKey,
+                        'phone' => $phone,
+                        'email' => null,
+                    ]);
+                }
+            } else {
+                $customerId = $existing->id;
+                $updateValues = ['updated_at' => now()];
+                if ($name !== '') {
+                    $updateValues['name_th'] = $name;
+                }
+                if ($taxId !== null) {
+                    $updateValues['tax_id'] = $taxId;
+                }
+                DB::table('customers')->where('id', $customerId)->update($updateValues);
+
+                if ($address !== null) {
+                    $addr = DB::table('customer_addresses')
+                        ->where('customer_id', $customerId)
+                        ->orderByDesc('is_default')
+                        ->orderBy('id')
+                        ->first();
+                    if ($addr) {
+                        DB::table('customer_addresses')->where('id', $addr->id)->update([
+                            'address_line' => $address,
+                            'is_default' => true,
+                        ]);
+                    } else {
+                        DB::table('customer_addresses')->insert([
+                            'customer_id' => $customerId,
+                            'address_line' => $address,
+                            'is_default' => true,
+                        ]);
+                    }
+                }
+
+                if ($phone !== null) {
+                    $contact = DB::table('customer_contacts')
+                        ->where('customer_id', $customerId)
+                        ->orderBy('id')
+                        ->first();
+                    if ($contact) {
+                        DB::table('customer_contacts')->where('id', $contact->id)->update([
+                            'phone' => $phone,
+                        ]);
+                    } else {
+                        DB::table('customer_contacts')->insert([
+                            'customer_id' => $customerId,
+                            'name' => $name ?: $existing->name_th,
+                            'phone' => $phone,
+                            'email' => null,
+                        ]);
+                    }
+                }
+            }
+        }
+    }
+
+    private function upsertProducts(array $products): void
+    {
+        $uniqueProducts = collect($products)
+            ->unique(fn ($p) => (string) ($p['sku_code'] ?? ''))
+            ->filter(fn ($p) => (string) ($p['sku_code'] ?? '') !== '');
+
+        foreach ($uniqueProducts as $p) {
+            $skuCode = trim((string) $p['sku_code']);
+            $existing = DB::table('products')->where('sku_code', $skuCode)->first();
+
+            if ($existing) {
+                continue;
+            }
+
+            $unitName = trim((string) ($p['unit_name'] ?? ''));
+            $unitId = null;
+            if ($unitName !== '') {
+                $unitId = DB::table('product_units')->where('name', $unitName)->value('id')
+                    ?? DB::table('product_units')->where('code', $unitName)->value('id');
+            }
+            if (! $unitId) {
+                if ($unitName !== '') {
+                    $code = Str::upper(Str::substr(preg_replace('/[^A-Za-z0-9]/', '', $unitName) ?: 'UNIT', 0, 10));
+                    if (DB::table('product_units')->where('code', $code)->exists()) {
+                        $code = 'U_'.Str::upper(Str::random(6));
+                    }
+                    $unitId = DB::table('product_units')->insertGetId([
+                        'code' => $code,
+                        'name' => $unitName,
+                        'qty_per_base_unit' => 1,
+                        'is_active' => true,
+                    ]);
+                } else {
+                    $unitId = DB::table('product_units')->orderBy('id')->value('id');
+                }
+            }
+            if (! $unitId) {
+                $unitId = DB::table('product_units')->insertGetId([
+                    'code' => 'EA',
+                    'name' => 'ชิ้น',
+                    'qty_per_base_unit' => 1,
+                    'is_active' => true,
+                ]);
+            }
+
+            DB::table('products')->insert([
+                'sku_code' => $skuCode,
+                'name_th' => trim((string) ($p['name'] ?? $skuCode)) ?: $skuCode,
+                'name_en' => null,
+                'base_unit_id' => $unitId,
+                'is_active' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
     }
 
     private function money(mixed $value): string
