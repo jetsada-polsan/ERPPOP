@@ -26,6 +26,25 @@
         <div class="col-md-2"><button class="btn btn-outline-primary w-100">แสดง</button></div>
     </form>
 
+    <div class="row g-2 mb-3">
+        @foreach ([
+            ['ยอดขายรวม', $m($daily->sum('sales_total')), $daily->sum('sales').' ใบขายเชื่อ', 'primary'],
+            ['VAT', $m($daily->sum('vat')), 'มี VAT '.$m($daily->sum('vatable')), 'secondary'],
+            ['ยกเว้น VAT', $m($daily->sum('exempt')), '', 'secondary'],
+            ['ยอดจอง', $m($daily->sum('booking_total')), $daily->sum('bookings').' ใบจอง', 'secondary'],
+            ['รับเงินสด', $m($daily->sum('cash')), '', 'success'],
+            ['รับเงินโอน', $m($daily->sum('transfer')), '', 'success'],
+        ] as [$label, $value, $note, $tone])
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="border rounded-3 p-3 h-100 border-{{ $tone }}">
+                    <div class="small text-muted">{{ $label }}</div>
+                    <div class="fs-5 fw-bold text-{{ $tone === 'secondary' ? 'body' : $tone }}">{{ $value }}</div>
+                    @if ($note)<div class="small text-muted">{{ $note }}</div>@endif
+                </div>
+            </div>
+        @endforeach
+    </div>
+
     <h2 class="h6 fw-bold">ยอดขายรายวัน (ไม่รวมใบยกเลิก)</h2>
     <div class="table-responsive"><table class="table table-sm align-middle">
         <thead><tr><th>วันที่</th><th class="text-end">ใบจอง</th><th class="text-end">ยอดจอง</th><th class="text-end">ใบขายเชื่อ</th><th class="text-end">มูลค่ามี VAT</th><th class="text-end">ยกเว้น VAT</th><th class="text-end">VAT</th><th class="text-end">ยอดขายรวม</th><th class="text-end">รับเงินสด</th><th class="text-end">รับเงินโอน</th></tr></thead>
@@ -62,6 +81,6 @@
         @endforelse
         </tbody>
     </table></div>
-    {{ $documents->links() }}
+    {{ $documents->links('pagination::bootstrap-5') }}
 </div>
 @endsection
