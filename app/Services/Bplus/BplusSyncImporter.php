@@ -83,6 +83,7 @@ class BplusSyncImporter
                     'doc_date' => substr((string) $doc['doc_date'], 0, 10),
                     'is_cancelled' => ! empty($doc['is_cancelled']),
                     'customer_code' => $doc['customer_code'] ?? null,
+                    'customer_key' => isset($doc['customer_key']) ? (string) $doc['customer_key'] : null,
                     'customer_name' => $doc['customer_name'] ?? null,
                     'created_by' => $doc['created_by'] ?? null,
                     'booking_ref' => $doc['booking_ref'] ?? null,

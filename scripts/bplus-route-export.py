@@ -98,7 +98,7 @@ for b in bookings:
 # ใบขายเชื่อ
 sales = rows(f"""
     SELECT d.DI_KEY, d.DI_REF, d.DI_DATE, d.DI_ACTIVE, d.DI_AMOUNT, d.DI_CRE_BY, d.DI_UPD_DATE, d.DI_CRE_DATE,
-           t.DT_DOCCODE, x.ARD_G_SV, x.ARD_G_SNV, x.ARD_G_VAT, x.ARD_B_AMT, x.ARD_DUE_DA, a.AR_CODE, a.AR_NAME
+           t.DT_DOCCODE, x.ARD_G_SV, x.ARD_G_SNV, x.ARD_G_VAT, x.ARD_B_AMT, x.ARD_DUE_DA, a.AR_KEY, a.AR_CODE, a.AR_NAME
     FROM DOCINFO d JOIN DOCTYPE t ON t.DT_KEY = d.DI_DT
     LEFT JOIN ARDETAIL x ON x.ARD_DI = d.DI_KEY LEFT JOIN ARFILE a ON a.AR_KEY = x.ARD_AR
     WHERE d.DI_DATE >= %s AND d.DI_KEY IN ({ROUTE_SALES}) ORDER BY d.DI_KEY""", (since, route))
@@ -107,12 +107,12 @@ for s in sales:
     lines = lines_of(s["DI_KEY"])
     booking_ref = next((l["_refer"] for l in lines if l["_refer"]), None)
     if booking_ref and s["AR_CODE"]:
-        customer_by_booking[booking_ref] = (text(s["AR_CODE"]), text(s["AR_NAME"]))
+        customer_by_booking[booking_ref] = (s["AR_KEY"], text(s["AR_CODE"]), text(s["AR_NAME"]))
     documents.append({
         "bplus_key": s["DI_KEY"], "kind": "credit_sale", "book_code": text(s["DT_DOCCODE"]), "ref": text(s["DI_REF"]),
         "doc_date": s["DI_DATE"].date().isoformat(), "is_cancelled": s["DI_ACTIVE"] != 0,
-        "customer_code": text(s["AR_CODE"]), "customer_name": text(s["AR_NAME"]), "created_by": text(s["DI_CRE_BY"]),
-        "booking_ref": booking_ref,
+        "customer_key": s["AR_KEY"], "customer_code": text(s["AR_CODE"]), "customer_name": text(s["AR_NAME"]),
+        "created_by": text(s["DI_CRE_BY"]), "booking_ref": booking_ref,
         "vatable_amount": num(s["ARD_G_SV"]), "exempt_amount": num(s["ARD_G_SNV"]), "vat_amount": num(s["ARD_G_VAT"]),
         "total_amount": num(s["DI_AMOUNT"]),
         "due_date": s["ARD_DUE_DA"].date().isoformat() if s["ARD_DUE_DA"] else None,
@@ -123,13 +123,13 @@ for s in sales:
 # ใบจองไม่มีรหัสลูกค้าใน BPlus: ใช้ลูกค้าจากใบขายเชื่อที่เปิดจากใบจองนั้น
 for doc in documents:
     if doc["kind"] == "booking" and doc["ref"] in customer_by_booking:
-        doc["customer_code"], doc["customer_name"] = customer_by_booking[doc["ref"]]
+        doc["customer_key"], doc["customer_code"], doc["customer_name"] = customer_by_booking[doc["ref"]]
 
 # ใบเสร็จ: เก็บเฉพาะบรรทัดที่ตัดชำระใบขายเชื่อของสายนี้
 receipt_rows = rows(f"""
     SELECT d.DI_KEY, d.DI_REF, d.DI_DATE, d.DI_ACTIVE, d.DI_CRE_BY, d.DI_UPD_DATE, d.DI_CRE_DATE, t.DT_DOCCODE, t.DT_THAIDESC,
            a.TPA_REFER_REF, a.TPA_PAY_A, a.TPA_CASH_A, a.TPA_TRFR_A, a.TPA_CHEQ_A, a.TPA_OTHR_A, a.TPA_NOTE_A,
-           a.TPA_DISC_A, a.TPA_WHTX_A, a.TPA_SHRT_A, r.AR_CODE, r.AR_NAME
+           a.TPA_DISC_A, a.TPA_WHTX_A, a.TPA_SHRT_A, r.AR_KEY, r.AR_CODE, r.AR_NAME
     FROM TRANPAYA a JOIN TRANPAYH p ON p.TPH_KEY = a.TPA_TPH JOIN DOCINFO d ON d.DI_KEY = p.TPH_DI
     JOIN DOCTYPE t ON t.DT_KEY = d.DI_DT LEFT JOIN ARFILE r ON r.AR_KEY = p.TPH_AR
     WHERE d.DI_DATE >= %s AND a.TPA_REFER_DI IN ({ROUTE_SALES}) ORDER BY d.DI_KEY, a.TPA_KEY""", (since, route))
@@ -138,8 +138,8 @@ for r in receipt_rows:
     doc = receipts.setdefault(r["DI_KEY"], {
         "bplus_key": r["DI_KEY"], "kind": "receipt", "book_code": text(r["DT_DOCCODE"]), "ref": text(r["DI_REF"]),
         "doc_date": r["DI_DATE"].date().isoformat(), "is_cancelled": r["DI_ACTIVE"] != 0,
-        "customer_code": text(r["AR_CODE"]), "customer_name": text(r["AR_NAME"]), "created_by": text(r["DI_CRE_BY"]),
-        "total_amount": 0.0, "cash_amount": 0.0, "transfer_amount": 0.0, "other_amount": 0.0, "short_amount": 0.0,
+        "customer_key": r["AR_KEY"], "customer_code": text(r["AR_CODE"]), "customer_name": text(r["AR_NAME"]),
+        "created_by": text(r["DI_CRE_BY"]), "total_amount": 0.0, "cash_amount": 0.0, "transfer_amount": 0.0, "other_amount": 0.0, "short_amount": 0.0,
         "bplus_updated_at": stamp(r["DI_UPD_DATE"] or r["DI_CRE_DATE"]), "allocations": [],
     })
     other = num(r["TPA_CHEQ_A"]) + num(r["TPA_OTHR_A"]) + num(r["TPA_NOTE_A"])

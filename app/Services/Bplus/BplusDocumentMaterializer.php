@@ -26,16 +26,17 @@ class BplusDocumentMaterializer
     public function check(string $route, array $documents): array
     {
         $ctx = $this->context($route, false);
-        $customerCodes = collect($documents)->whereIn('kind', ['credit_sale', 'receipt'])
-            ->pluck('customer_code')->filter()->unique()->values();
-        $known = DB::table('customers')->whereIn('code', $customerCodes)->pluck('code')->all();
+        $missingCustomers = collect($documents)->whereIn('kind', ['credit_sale', 'receipt'])
+            ->unique(fn ($d) => ($d['customer_key'] ?? '').'|'.($d['customer_code'] ?? ''))
+            ->reject(fn ($d) => self::matchCustomer(isset($d['customer_key']) ? (string) $d['customer_key'] : null, $d['customer_code'] ?? null, $d['customer_name'] ?? null))
+            ->map(fn ($d) => ($d['customer_code'] ?? '-'))->unique()->values();
         $skus = collect($documents)->flatMap(fn ($d) => collect($d['lines'] ?? [])->pluck('sku_code'))->filter()->unique()->values();
         $knownSkus = DB::table('products')->whereIn('sku_code', $skus)->pluck('sku_code')->all();
 
         return [
             'branch' => $ctx['branch_name'] ?? null,
             'errors' => $ctx['errors'],
-            'missing_customers' => $customerCodes->diff($known)->values()->all(),
+            'missing_customers' => $missingCustomers->all(),
             'missing_products' => $skus->diff($knownSkus)->values()->all(),
         ];
     }
@@ -113,11 +114,11 @@ class BplusDocumentMaterializer
 
     private function booking(object $row): ?int
     {
-        $customerId = $this->customerId($row->customer_code);
+        $customerId = $this->customerId($row);
         if (! $customerId) {
             // BPlus เก็บลูกค้าไว้ที่ใบขาย ใบจองที่ยังไม่เปิดขายจึงยังไม่รู้ลูกค้า ซิงค์รอบหน้าจะสร้างให้
             $this->problems[$row->ref] = $row->customer_code
-                ? 'ไม่พบลูกค้ารหัส '.$row->customer_code.' ใน ERP'
+                ? 'ไม่พบลูกค้ารหัส '.$row->customer_code.($row->customer_key ? " (เลข {$row->customer_key})" : '').' ใน ERP'
                 : 'ยังไม่รู้ลูกค้า (ยังไม่ได้เปิดขายใน BPlus)';
 
             return DB::table('documents')->where('source_system', self::SOURCE)->where('source_key', $row->bplus_key)->value('id');
@@ -150,9 +151,9 @@ class BplusDocumentMaterializer
 
     private function creditSale(object $row): ?int
     {
-        $customerId = $this->customerId($row->customer_code);
+        $customerId = $this->customerId($row);
         if (! $customerId) {
-            $this->problems[$row->ref] = 'ไม่พบลูกค้ารหัส '.($row->customer_code ?: '-').' ใน ERP';
+            $this->problems[$row->ref] = 'ไม่พบลูกค้ารหัส '.($row->customer_code ?: '-').($row->customer_key ? " (เลข {$row->customer_key})" : '').' ใน ERP';
 
             return null;
         }
@@ -196,9 +197,9 @@ class BplusDocumentMaterializer
 
     private function receipt(object $row): ?int
     {
-        $customerId = $this->customerId($row->customer_code);
+        $customerId = $this->customerId($row);
         if (! $customerId) {
-            $this->problems[$row->ref] = 'ไม่พบลูกค้ารหัส '.($row->customer_code ?: '-').' ใน ERP';
+            $this->problems[$row->ref] = 'ไม่พบลูกค้ารหัส '.($row->customer_code ?: '-').($row->customer_key ? " (เลข {$row->customer_key})" : '').' ใน ERP';
 
             return null;
         }
@@ -400,13 +401,36 @@ class BplusDocumentMaterializer
         }
     }
 
-    private function customerId(?string $code): ?int
+    /**
+     * ลูกค้าใน ERP ใช้ AR_KEY ของ BPlus เป็นรหัส (เช่น 8049) ไม่ใช่ AR_CODE (34140-0121)
+     * จับคู่ตามลำดับ: AR_KEY -> AR_CODE -> ชื่อที่ตรงกันเพียงรายเดียว
+     */
+    private function customerId(object $row): ?int
     {
-        if (! $code) {
-            return null;
+        $cacheKey = ($row->customer_key ?? '').'|'.($row->customer_code ?? '');
+        if (array_key_exists($cacheKey, $this->ctx['customers'])) {
+            return $this->ctx['customers'][$cacheKey];
         }
 
-        return $this->ctx['customers'][$code] ??= DB::table('customers')->where('code', $code)->value('id');
+        return $this->ctx['customers'][$cacheKey] = self::matchCustomer($row->customer_key ?? null, $row->customer_code ?? null, $row->customer_name ?? null);
+    }
+
+    public static function matchCustomer(?string $key, ?string $code, ?string $name): ?int
+    {
+        foreach (array_filter([$key, $code]) as $candidate) {
+            $id = DB::table('customers')->where('code', $candidate)->value('id');
+            if ($id) {
+                return $id;
+            }
+        }
+        if ($name && trim($name) !== '') {
+            $ids = DB::table('customers')->where('name_th', trim($name))->limit(2)->pluck('id');
+            if ($ids->count() === 1) {
+                return $ids->first();
+            }
+        }
+
+        return null;
     }
 
     private function documentIdByNumber(string $number): ?int
