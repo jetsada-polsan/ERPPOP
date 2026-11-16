@@ -2,8 +2,13 @@
 
 namespace App\Services\Bplus;
 
+use App\Models\ChartOfAccount;
+use App\Models\Document;
+use App\Services\Accounting\GlPostingService;
+use App\Support\DecimalMath;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
+use Throwable;
 
 /**
  * สร้างเอกสาร ERP จริงจากสำเนา BPlus (bplus_sync_documents) ของสายขายหนึ่งสาย
@@ -21,6 +26,13 @@ class BplusDocumentMaterializer
 
     /** @var array<string, string> ref => ปัญหา */
     private array $problems = [];
+
+    private GlPostingService $glPostingService;
+
+    public function __construct(?GlPostingService $glPostingService = null)
+    {
+        $this->glPostingService = $glPostingService ?? app(GlPostingService::class);
+    }
 
     /** ตรวจก่อนบันทึก: ลูกค้า/สินค้าที่ ERP ยังไม่มี และสาขา/เล่มที่จะใช้ */
     public function check(string $route, array $documents, array $incomingCustomers = [], array $incomingProducts = []): array
@@ -232,6 +244,8 @@ class BplusDocumentMaterializer
             ]);
         }
 
+        $this->materializeCreditSaleGl($id, $row);
+
         return $id;
     }
 
@@ -300,6 +314,8 @@ class BplusDocumentMaterializer
         if ($missing) {
             $this->problems[$row->ref] = 'บิลที่รับชำระไม่อยู่ใน ERP (ก่อนช่วงที่ดึง): '.implode(', ', $missing);
         }
+
+        $this->materializeReceiptGl($id, $row);
 
         return $id;
     }
@@ -490,5 +506,337 @@ class BplusDocumentMaterializer
     private function documentIdByNumber(string $number): ?int
     {
         return DB::table('documents')->where('source_system', self::SOURCE)->where('doc_number', $number)->value('id');
+    }
+
+    private function materializeCreditSaleGl(int $documentId, object $row): void
+    {
+        $document = Document::find($documentId);
+        if (! $document) {
+            return;
+        }
+
+        if ($row->is_cancelled) {
+            $this->glPostingService->reverseDocument($document, 'ยกเลิกจาก BPlus '.$row->ref);
+
+            return;
+        }
+
+        $total = round((float) $row->total_amount, 2);
+        $vat = round((float) $row->vat_amount, 2);
+        $subtotal = DecimalMath::subtract($total, $vat, 2);
+
+        $arAccount = $this->glPostingService->role(ChartOfAccount::ROLE_AR);
+        $revAccount = $this->glPostingService->role(ChartOfAccount::ROLE_SALES_REVENUE);
+        $vatAccount = DecimalMath::compare($vat, 0) > 0
+            ? $this->glPostingService->role(ChartOfAccount::ROLE_VAT_OUTPUT)
+            : null;
+
+        if (! $arAccount) {
+            $this->problems[$row->ref] = 'ยังไม่ผูกบัญชี ar';
+
+            return;
+        }
+        if (! $revAccount) {
+            $this->problems[$row->ref] = 'ยังไม่ผูกบัญชี sales_revenue';
+
+            return;
+        }
+        if (DecimalMath::compare($vat, 0) > 0 && ! $vatAccount) {
+            $this->problems[$row->ref] = 'ยังไม่ผูกบัญชี vat_output';
+
+            return;
+        }
+
+        $resolved = [
+            [$arAccount->id, $total, 0],
+            [$revAccount->id, 0, $subtotal],
+        ];
+        if (DecimalMath::compare($vat, 0) > 0 && $vatAccount) {
+            $resolved[] = [$vatAccount->id, 0, $vat];
+        }
+
+        try {
+            $this->glPostingService->postResolved($document, $resolved, 'ขายเชื่อ '.$document->doc_number);
+        } catch (Throwable $e) {
+            $this->problems[$row->ref] = $e->getMessage();
+        }
+    }
+
+    private function materializeReceiptGl(int $documentId, object $row): void
+    {
+        $document = Document::find($documentId);
+        if (! $document) {
+            return;
+        }
+
+        if ($row->is_cancelled) {
+            $this->glPostingService->reverseDocument($document, 'ยกเลิกจาก BPlus '.$row->ref);
+
+            return;
+        }
+
+        $totalAmount = round((float) ($row->total_amount ?? 0), 2);
+        $cashAmount = round((float) ($row->cash_amount ?? 0), 2);
+        $otherAmount = round((float) ($row->other_amount ?? 0), 2);
+        $transferAmount = round((float) ($row->transfer_amount ?? 0), 2);
+        $shortAmount = round((float) ($row->short_amount ?? 0), 2);
+
+        $totalCash = DecimalMath::add($cashAmount, $otherAmount, 2);
+
+        $arAccount = $this->glPostingService->role(ChartOfAccount::ROLE_AR);
+        if (! $arAccount) {
+            $this->problems[$row->ref] = 'ยังไม่ผูกบัญชี ar';
+
+            return;
+        }
+
+        $cashAccount = null;
+        if (DecimalMath::compare($totalCash, 0) > 0) {
+            $cashAccount = $this->glPostingService->role(ChartOfAccount::ROLE_CASH);
+            if (! $cashAccount) {
+                $this->problems[$row->ref] = 'ยังไม่ผูกบัญชี cash';
+
+                return;
+            }
+        }
+
+        $bankAccount = null;
+        if (DecimalMath::compare($transferAmount, 0) > 0) {
+            $bankAccount = $this->glPostingService->bankAccountFor($this->ctx['branch_id'] ?? $document->branch_id);
+            if (! $bankAccount) {
+                $this->problems[$row->ref] = 'ยังไม่ผูกบัญชี bank';
+
+                return;
+            }
+        }
+
+        $roundingAccount = null;
+        if (DecimalMath::compare($shortAmount, 0) > 0) {
+            $roundingAccount = $this->roundingAccount();
+            if (! $roundingAccount) {
+                $this->problems[$row->ref] = 'ยังไม่ผูกบัญชี rounding';
+
+                return;
+            }
+        }
+
+        $resolved = [];
+        if (DecimalMath::compare($totalCash, 0) > 0) {
+            $resolved[] = [$cashAccount->id, $totalCash, 0];
+        }
+        if (DecimalMath::compare($transferAmount, 0) > 0) {
+            $resolved[] = [$bankAccount->id, $transferAmount, 0];
+        }
+        if (DecimalMath::compare($shortAmount, 0) > 0) {
+            $resolved[] = [$roundingAccount->id, $shortAmount, 0];
+        }
+        $resolved[] = [$arAccount->id, 0, $totalAmount];
+
+        $sumDr = DecimalMath::sum(array_column($resolved, 1), 2);
+        $sumCr = DecimalMath::sum(array_column($resolved, 2), 2);
+        if (DecimalMath::compare($sumDr, $sumCr) !== 0) {
+            $this->problems[$row->ref] = "ยอดเดบิต ({$sumDr}) ไม่เท่ากับเครดิต ({$sumCr})";
+
+            return;
+        }
+
+        $remark = 'ใบเสร็จรับเงิน '.$document->doc_number;
+        if (DecimalMath::compare($otherAmount, 0) > 0) {
+            $remark .= ' (รวมยอดอื่น '.number_format((float) $otherAmount, 2).' เข้าเงินสด)';
+        }
+
+        try {
+            $this->glPostingService->postResolved($document, $resolved, $remark);
+        } catch (Throwable $e) {
+            $this->problems[$row->ref] = $e->getMessage();
+        }
+    }
+
+    private function roundingAccount(): ?ChartOfAccount
+    {
+        return ChartOfAccount::where('name_th', 'like', '%เศษสตางค์%')
+            ->orWhere('name_en', 'like', '%rounding%')
+            ->orWhere('default_role', 'rounding_diff')
+            ->first()
+            ?? $this->glPostingService->role(ChartOfAccount::ROLE_EXPENSE)
+            ?? ChartOfAccount::where('code', '5020')->first();
+    }
+
+    /**
+     * คำนวณหรือลงบัญชี GL ใหม่สำหรับเอกสาร BPlus ทั้งสาย
+     * ใช้เมื่อสำนักงานบัญชีเปลี่ยนเลขบัญชีของแต่ละ role
+     *
+     * @return array{count: int, accounts: array<int, array{account_id: int, code: string, name: string, debit: string, credit: string}>, total_debit: string, total_credit: string, problems: array<string, string>}
+     */
+    public function repostGl(string $route, bool $dryRun = false): array
+    {
+        $rows = DB::table('bplus_sync_documents')
+            ->where('route_code', $route)
+            ->whereNotNull('document_id')
+            ->whereIn('kind', ['credit_sale', 'receipt'])
+            ->orderBy('doc_date')
+            ->orderBy('id')
+            ->get();
+
+        $accounts = ChartOfAccount::all()->keyBy('id');
+        $arAccount = $this->glPostingService->role(ChartOfAccount::ROLE_AR);
+        $revAccount = $this->glPostingService->role(ChartOfAccount::ROLE_SALES_REVENUE);
+        $vatAccount = $this->glPostingService->role(ChartOfAccount::ROLE_VAT_OUTPUT);
+        $cashAccount = $this->glPostingService->role(ChartOfAccount::ROLE_CASH);
+        $roundingAccount = $this->roundingAccount();
+
+        $area = DB::table('sales_areas')->where('code', $route)->first();
+        $branchId = $area?->branch_id ?? DB::table('branches')->where('is_active', true)->orderBy('id')->value('id');
+        $bankAccount = $this->glPostingService->bankAccountFor($branchId);
+
+        $summary = [];
+        $totalDebit = '0';
+        $totalCredit = '0';
+        $processedCount = 0;
+        $problems = [];
+
+        foreach ($rows as $row) {
+            $document = Document::find($row->document_id);
+            if (! $document) {
+                continue;
+            }
+
+            if ($row->is_cancelled || $document->status === 'cancelled') {
+                if (! $dryRun) {
+                    $this->glPostingService->reverseDocument($document, 'ยกเลิกจาก BPlus '.$document->doc_number);
+                }
+
+                continue;
+            }
+
+            $resolved = [];
+            $remark = '';
+
+            if ($row->kind === 'credit_sale') {
+                $total = round((float) $row->total_amount, 2);
+                $vat = round((float) $row->vat_amount, 2);
+                $subtotal = DecimalMath::subtract($total, $vat, 2);
+
+                if (! $arAccount) {
+                    $problems[$row->ref] = 'ยังไม่ผูกบัญชี ar';
+
+                    continue;
+                }
+                if (! $revAccount) {
+                    $problems[$row->ref] = 'ยังไม่ผูกบัญชี sales_revenue';
+
+                    continue;
+                }
+                if (DecimalMath::compare($vat, 0) > 0 && ! $vatAccount) {
+                    $problems[$row->ref] = 'ยังไม่ผูกบัญชี vat_output';
+
+                    continue;
+                }
+
+                $resolved = [
+                    [$arAccount->id, $total, 0],
+                    [$revAccount->id, 0, $subtotal],
+                ];
+                if (DecimalMath::compare($vat, 0) > 0 && $vatAccount) {
+                    $resolved[] = [$vatAccount->id, 0, $vat];
+                }
+                $remark = 'ขายเชื่อ '.$document->doc_number;
+            } elseif ($row->kind === 'receipt') {
+                $totalAmount = round((float) ($row->total_amount ?? 0), 2);
+                $cashAmount = round((float) ($row->cash_amount ?? 0), 2);
+                $otherAmount = round((float) ($row->other_amount ?? 0), 2);
+                $transferAmount = round((float) ($row->transfer_amount ?? 0), 2);
+                $shortAmount = round((float) ($row->short_amount ?? 0), 2);
+
+                $totalCash = DecimalMath::add($cashAmount, $otherAmount, 2);
+
+                if (! $arAccount) {
+                    $problems[$row->ref] = 'ยังไม่ผูกบัญชี ar';
+
+                    continue;
+                }
+                if (DecimalMath::compare($totalCash, 0) > 0 && ! $cashAccount) {
+                    $problems[$row->ref] = 'ยังไม่ผูกบัญชี cash';
+
+                    continue;
+                }
+                if (DecimalMath::compare($transferAmount, 0) > 0 && ! $bankAccount) {
+                    $problems[$row->ref] = 'ยังไม่ผูกบัญชี bank';
+
+                    continue;
+                }
+                if (DecimalMath::compare($shortAmount, 0) > 0 && ! $roundingAccount) {
+                    $problems[$row->ref] = 'ยังไม่ผูกบัญชี rounding';
+
+                    continue;
+                }
+
+                if (DecimalMath::compare($totalCash, 0) > 0) {
+                    $resolved[] = [$cashAccount->id, $totalCash, 0];
+                }
+                if (DecimalMath::compare($transferAmount, 0) > 0) {
+                    $resolved[] = [$bankAccount->id, $transferAmount, 0];
+                }
+                if (DecimalMath::compare($shortAmount, 0) > 0) {
+                    $resolved[] = [$roundingAccount->id, $shortAmount, 0];
+                }
+                $resolved[] = [$arAccount->id, 0, $totalAmount];
+
+                $sumDr = DecimalMath::sum(array_column($resolved, 1), 2);
+                $sumCr = DecimalMath::sum(array_column($resolved, 2), 2);
+                if (DecimalMath::compare($sumDr, $sumCr) !== 0) {
+                    $problems[$row->ref] = "ยอดเดบิต ({$sumDr}) ไม่เท่ากับเครดิต ({$sumCr})";
+
+                    continue;
+                }
+
+                $remark = 'ใบเสร็จรับเงิน '.$document->doc_number;
+                if (DecimalMath::compare($otherAmount, 0) > 0) {
+                    $remark .= ' (รวมยอดอื่น '.number_format((float) $otherAmount, 2).' เข้าเงินสด)';
+                }
+            }
+
+            if (! empty($resolved)) {
+                $processedCount++;
+                foreach ($resolved as [$accId, $dr, $cr]) {
+                    if (! isset($summary[$accId])) {
+                        $acc = $accounts[$accId] ?? ChartOfAccount::find($accId);
+                        $summary[$accId] = [
+                            'account_id' => $accId,
+                            'code' => $acc?->code ?? (string) $accId,
+                            'name' => $acc?->name_th ?? $acc?->name_en ?? '-',
+                            'debit' => '0',
+                            'credit' => '0',
+                        ];
+                    }
+                    $summary[$accId]['debit'] = DecimalMath::add($summary[$accId]['debit'], $dr, 2);
+                    $summary[$accId]['credit'] = DecimalMath::add($summary[$accId]['credit'], $cr, 2);
+                    $totalDebit = DecimalMath::add($totalDebit, $dr, 2);
+                    $totalCredit = DecimalMath::add($totalCredit, $cr, 2);
+                }
+
+                if (! $dryRun) {
+                    try {
+                        $this->glPostingService->postResolved($document, $resolved, $remark);
+                    } catch (Throwable $e) {
+                        $problems[$row->ref] = $e->getMessage();
+                    }
+
+                    DB::table('bplus_sync_documents')->where('id', $row->id)->update([
+                        'problem' => $problems[$row->ref] ?? null,
+                    ]);
+                }
+            }
+        }
+
+        uasort($summary, fn ($a, $b) => strcmp($a['code'], $b['code']));
+
+        return [
+            'count' => $processedCount,
+            'accounts' => array_values($summary),
+            'total_debit' => $totalDebit,
+            'total_credit' => $totalCredit,
+            'problems' => $problems,
+        ];
     }
 }
