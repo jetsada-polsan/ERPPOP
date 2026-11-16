@@ -1497,6 +1497,8 @@ class ReportController extends Controller
             ->join('products as p', 'p.id', '=', 'sdi.product_id')
             ->leftJoin('product_categories as pc', 'pc.id', '=', 'p.product_category_id')
             ->leftJoin('users as u', 'u.id', '=', 'd.sales_user_id')
+            // พนักงานขายของเอกสาร (เช่น ใบขายสายที่มาจาก BPlus) มาก่อนผู้ใช้ที่คีย์ เหมือนรายงานยอดขายตามพนักงาน
+            ->leftJoin('salesmen as sm', 'sm.id', '=', 'd.salesman_id')
             ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN'])
             // เอกสารที่ถูกยกเลิกไม่ใช่ยอดขาย — เดิมไม่กรองสถานะเลย บิลที่ void แล้วจึงยังโผล่
             ->where('d.status', 'active')
@@ -1510,7 +1512,7 @@ class ReportController extends Controller
                 ->where('pr.status', 'completed'));
 
         $this->applyBranch($query, $filters, 'd.branch_id');
-        $this->applySearch($query, $filters, ['d.doc_number', 'p.sku_code', 'p.name_th', 'pc.name_th', 'u.name']);
+        $this->applySearch($query, $filters, ['d.doc_number', 'p.sku_code', 'p.name_th', 'pc.name_th', 'u.name', 'sm.name']);
 
         $selects = [
             "'เอกสาร' as channel",
@@ -1525,8 +1527,8 @@ class ReportController extends Controller
             $groups[] = DB::raw("coalesce(pc.name_th, 'ไม่ระบุหมวดสินค้า')");
         }
         if (in_array('seller', $dimensions, true)) {
-            $selects[] = "coalesce(u.name, 'ไม่ระบุผู้ขายหลังบ้าน') as seller_name";
-            $groups[] = DB::raw("coalesce(u.name, 'ไม่ระบุผู้ขายหลังบ้าน')");
+            $selects[] = "coalesce(sm.name, u.name, 'ไม่ระบุผู้ขายหลังบ้าน') as seller_name";
+            $groups[] = DB::raw("coalesce(sm.name, u.name, 'ไม่ระบุผู้ขายหลังบ้าน')");
         }
 
         return $query

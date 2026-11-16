@@ -144,6 +144,19 @@ class BplusDocumentsTest extends TestCase
         $this->get(route('ar-receipts.index', ['date_from' => '2026-11-01', 'date_to' => '2026-11-30']))->assertOk()->assertSee('RR26911/000800')->assertSee('837.00');
     }
 
+    public function test_reports_by_seller_credit_the_route_salesman(): void
+    {
+        $this->importFile($this->export());
+        // รายงานตัวนี้ต้องมีสิทธิ์ตามทะเบียนรายงาน ไม่งั้นหน้าจะเด้งไปรายงานแรกที่เห็นได้
+        Role::where('code', 'BPLUS_DOCS')->first()->permissions()->sync(Permission::pluck('id')->all());
+        $this->actingAs(User::where('username', 'bplus_docs')->first()->fresh()->forceFill(['branch_id' => $this->branch->id]));
+
+        foreach (['sales_by_seller', 'sales_by_category_seller'] as $report) {
+            $this->get(route('reports.index', ['category' => 'sales', 'report' => $report, 'from' => '2026-11-01', 'to' => '2026-11-30']))
+                ->assertOk()->assertSee('แบงค์')->assertDontSee('ไม่ระบุผู้ขายหลังบ้าน');
+        }
+    }
+
     public function test_customers_match_by_bplus_key_then_unique_name(): void
     {
         // ใน ERP จริง รหัสลูกค้าคือ AR_KEY ของ BPlus เช่น 8049 ไม่ใช่ AR_CODE
