@@ -516,7 +516,11 @@ class BplusDocumentMaterializer
         }
 
         if ($row->is_cancelled) {
-            $this->glPostingService->reverseDocument($document, 'ยกเลิกจาก BPlus '.$row->ref);
+            try {
+                $this->glPostingService->reverseDocument($document, 'ยกเลิกจาก BPlus '.$row->ref);
+            } catch (Throwable $e) {
+                $this->problems[$row->ref] = $e->getMessage();
+            }
 
             return;
         }
@@ -570,7 +574,11 @@ class BplusDocumentMaterializer
         }
 
         if ($row->is_cancelled) {
-            $this->glPostingService->reverseDocument($document, 'ยกเลิกจาก BPlus '.$row->ref);
+            try {
+                $this->glPostingService->reverseDocument($document, 'ยกเลิกจาก BPlus '.$row->ref);
+            } catch (Throwable $e) {
+                $this->problems[$row->ref] = $e->getMessage();
+            }
 
             return;
         }
@@ -703,7 +711,11 @@ class BplusDocumentMaterializer
 
             if ($row->is_cancelled || $document->status === 'cancelled') {
                 if (! $dryRun) {
-                    $this->glPostingService->reverseDocument($document, 'ยกเลิกจาก BPlus '.$document->doc_number);
+                    try {
+                        $this->glPostingService->reverseDocument($document, 'ยกเลิกจาก BPlus '.$document->doc_number);
+                    } catch (Throwable $e) {
+                        $problems[$row->ref] = $e->getMessage();
+                    }
                 }
 
                 continue;
