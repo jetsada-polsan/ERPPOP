@@ -16,6 +16,7 @@
         <div class="alert alert-danger">ตั้งค่ายังไม่ครบ จะบันทึกสำเนาได้แต่ยังสร้างเป็นเอกสาร ERP ไม่ได้: {{ implode(' · ', $check['errors']) }}</div>
     @endif
     <p class="mb-1">จะสร้างเป็นใบจอง / ใบขายเชื่อ / ใบเสร็จ ของ ERP ที่สาขา <b>{{ $check['branch'] ?? '-' }}</b></p>
+    <p class="mb-2 text-muted">จะสร้างลูกค้าใหม่ {{ $masterSummary['new_customers'] ?? 0 }} ราย · อัปเดตชื่อ {{ $masterSummary['updated_customers'] ?? 0 }} ราย · สร้างสินค้าใหม่ {{ $masterSummary['new_products'] ?? 0 }} รายการ</p>
     @if ($check['missing_customers'])
         <div class="alert alert-warning">ไม่พบลูกค้า {{ count($check['missing_customers']) }} รหัสใน ERP ใบขาย/ใบเสร็จของลูกค้าเหล่านี้จะยังไม่ถูกสร้าง: {{ implode(', ', array_slice($check['missing_customers'], 0, 30)) }}</div>
     @endif

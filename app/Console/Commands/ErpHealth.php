@@ -117,8 +117,6 @@ class ErpHealth extends Command
                 ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
                 ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE'])
                 ->where('d.status', 'active')
-                // ใบขายที่สร้างจาก BPlus ไม่ลง GL โดยตั้งใจ (บัญชีทำจาก BPlus)
-                ->where(fn ($q) => $q->whereNull('d.source_system')->orWhere('d.source_system', '<>', 'bplus'))
                 ->whereNotExists(fn ($query) => $query->select(DB::raw(1))
                     ->from('gl_journals as g')->whereColumn('g.document_id', 'd.id'))
                 ->selectRaw('count(*) as n, coalesce(sum(d.total_amount), 0) as amount')
