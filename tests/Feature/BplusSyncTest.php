@@ -40,7 +40,8 @@ class BplusSyncTest extends TestCase
         $this->assertSame(0, DB::table('stock_movements')->count(), 'ต้องไม่ตัดสต๊อก');
 
         $page = $this->get(route('bplus.sync.index', ['from' => '2026-11-15', 'to' => '2026-11-15']));
-        $page->assertOk()->assertSee('B18-6911/00382')->assertSee('DS256911/06364');
+        $page->assertOk()->assertSee('B18-6911/00382')->assertSee('DS256911/06364')
+            ->assertSeeInOrder(['ยอดขายรวม', '1,886.00', 'ยอดขายรายวัน']);
         $day = $page->viewData('daily')->first();
         $this->assertSame(1, (int) $day->bookings, 'ใบจองยกเลิกไม่นับ');
         $this->assertSame('1886.00', number_format((float) $day->booking_total, 2, '.', ''));
@@ -74,6 +75,21 @@ class BplusSyncTest extends TestCase
         $booking = DB::table('bplus_sync_documents')->where('ref', 'B18-6911/00382')->first();
         $this->assertSame('2000.00', number_format((float) $booking->total_amount, 2, '.', ''));
         $this->assertSame(1, DB::table('bplus_sync_lines')->where('bplus_sync_document_id', $booking->id)->count());
+    }
+
+    public function test_document_list_shows_page_numbers(): void
+    {
+        Storage::fake('local');
+        $this->signIn();
+        $export = ['route' => 'B18', 'documents' => []];
+        for ($i = 1; $i <= 120; $i++) {
+            $export['documents'][] = ['bplus_key' => $i, 'kind' => 'booking', 'book_code' => 'B18', 'ref' => sprintf('B18-6911/%05d', $i),
+                'doc_date' => '2026-11-15', 'total_amount' => 10];
+        }
+        $this->importFile($export);
+
+        $this->get(route('bplus.sync.index', ['from' => '2026-11-15', 'to' => '2026-11-15']))
+            ->assertOk()->assertSee('page=3', false)->assertSee('class="page-link"', false);
     }
 
     public function test_rejects_a_file_that_is_not_a_bplus_export(): void
