@@ -1,7 +1,7 @@
 @extends('layout')
 @section('title', "{$sale->doc_number} - ใบขาย/ใบส่งของ - MPM Food Group")
 @section('page-title', 'ใบขาย / ใบส่งของ / ใบกำกับภาษี')
-@section('page-subtitle', $sale->doc_number)
+@section('page-subtitle', $sale->doc_number.($sale->source_system === 'bplus' ? ' · มาจาก BPlus (แก้ไขที่ BPlus)' : ''))
 
 @php
 $openItem = $sale->openItem;

@@ -61,6 +61,8 @@ class ErpResetTransactions extends Command
         'pos_coupons', 'pos_receipt_return_items', 'pos_offline_sales',
         'stock_lot_lineages', 'recall_cases', 'recall_contacts', 'pos_api_idempotency',
         'purchase_cost_adjustments',
+        // สำเนาเอกสารจาก BPlus ผูก document_id กับเอกสาร ERP ถ้าเหลือไว้จะชี้ id ที่เริ่มนับใหม่ ล้างแล้วอัปโหลดไฟล์ใหม่
+        'bplus_sync_documents', 'bplus_sync_lines', 'bplus_sync_allocations',
         // staging ของท่อนำเข้า POS เก่าที่ถอดออกไปแล้ว
         'imported_payments', 'imported_receipt_items', 'imported_receipts',
         'import_errors', 'import_files', 'import_batches',

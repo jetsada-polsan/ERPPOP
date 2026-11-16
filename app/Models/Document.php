@@ -15,6 +15,23 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 ])]
 class Document extends Model
 {
+    /** เอกสารที่สร้างจาก BPlus แก้หรือลบใน ERP ไม่ได้ ต้องแก้ที่ BPlus แล้วซิงค์ใหม่ */
+    protected static function booted(): void
+    {
+        $guard = function (Document $document): void {
+            if ($document->getOriginal('source_system') === 'bplus') {
+                throw new \RuntimeException('เอกสาร '.$document->doc_number.' มาจาก BPlus แก้ไขหรือยกเลิกได้ที่ BPlus เท่านั้น แล้วซิงค์ใหม่');
+            }
+        };
+        static::updating($guard);
+        static::deleting($guard);
+    }
+
+    public function isFromBplus(): bool
+    {
+        return $this->source_system === 'bplus';
+    }
+
     public function documentType(): BelongsTo
     {
         return $this->belongsTo(DocumentType::class);

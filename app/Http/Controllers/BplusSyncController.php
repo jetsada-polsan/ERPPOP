@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Bplus\BplusDocumentMaterializer;
 use App\Services\Bplus\BplusSyncImporter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -68,7 +69,7 @@ class BplusSyncController extends Controller
         ]);
     }
 
-    public function preview(Request $request, BplusSyncImporter $importer): View|RedirectResponse
+    public function preview(Request $request, BplusSyncImporter $importer, BplusDocumentMaterializer $materializer): View|RedirectResponse
     {
         $request->validate(['file' => ['required', 'file', 'max:20480']]);
         $json = (string) file_get_contents($request->file('file')->getRealPath());
@@ -85,6 +86,7 @@ class BplusSyncController extends Controller
             'token' => $token,
             'route' => $parsed['route'],
             'summary' => $importer->preview($parsed),
+            'check' => $materializer->check($parsed['route'], $parsed['documents']),
             'kindLabels' => self::KIND_LABELS,
             'range' => [
                 collect($parsed['documents'])->min('doc_date'),
@@ -93,17 +95,29 @@ class BplusSyncController extends Controller
         ]);
     }
 
-    public function import(Request $request, BplusSyncImporter $importer): RedirectResponse
+    public function import(Request $request, BplusSyncImporter $importer, BplusDocumentMaterializer $materializer): RedirectResponse
     {
         $token = (string) $request->validate(['token' => ['required', 'uuid']])['token'];
         $path = "bplus-sync/{$token}.json";
         if (! Storage::disk('local')->exists($path)) {
             return redirect()->route('bplus.sync.index')->withErrors(['file' => 'ไม่พบไฟล์ที่ตรวจไว้ กรุณาอัปโหลดใหม่']);
         }
-        $count = $importer->import($importer->parse(Storage::disk('local')->get($path)));
+        $parsed = $importer->parse(Storage::disk('local')->get($path));
+        $count = $importer->import($parsed);
         Storage::disk('local')->delete($path);
+        // สร้างเป็นใบจอง / ใบขายเชื่อ / ใบเสร็จของ ERP ให้เห็นในเมนูและรายงานปกติ (ไม่ตัดสต๊อก ไม่ลง GL)
+        $message = "บันทึกเอกสารจาก BPlus แล้ว {$count} ใบ";
+        try {
+            $result = $materializer->run($parsed['route']);
+            $message .= " · เป็นเอกสาร ERP {$result['documents']} ใบ";
+            if ($result['problems']) {
+                $message .= ' · มีปัญหา '.count($result['problems']).' ใบ (ดูคอลัมน์ "ใน ERP")';
+            }
+        } catch (\RuntimeException $e) {
+            $message .= ' · ยังสร้างเป็นเอกสาร ERP ไม่ได้: '.$e->getMessage();
+        }
 
-        return redirect()->route('bplus.sync.index')->with('success', "บันทึกเอกสารจาก BPlus แล้ว {$count} ใบ");
+        return redirect()->route('bplus.sync.index')->with('success', $message);
     }
 
     private function related(object $doc): \Illuminate\Support\Collection

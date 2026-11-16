@@ -12,7 +12,17 @@
         @endforeach
         </tbody>
     </table></div>
-    <p class="small text-muted">บันทึกเป็นสำเนาเอกสารไว้ดูเท่านั้น ไม่ตัดสต๊อก ไม่สร้างลูกหนี้ ไม่ลงบัญชี ใบเดิมที่ถูกแก้ใน BPlus จะถูกอัปเดตทับ</p>
+    @if ($check['errors'])
+        <div class="alert alert-danger">ตั้งค่ายังไม่ครบ จะบันทึกสำเนาได้แต่ยังสร้างเป็นเอกสาร ERP ไม่ได้: {{ implode(' · ', $check['errors']) }}</div>
+    @endif
+    <p class="mb-1">จะสร้างเป็นใบจอง / ใบขายเชื่อ / ใบเสร็จ ของ ERP ที่สาขา <b>{{ $check['branch'] ?? '-' }}</b></p>
+    @if ($check['missing_customers'])
+        <div class="alert alert-warning">ไม่พบลูกค้า {{ count($check['missing_customers']) }} รหัสใน ERP ใบขาย/ใบเสร็จของลูกค้าเหล่านี้จะยังไม่ถูกสร้าง: {{ implode(', ', array_slice($check['missing_customers'], 0, 30)) }}</div>
+    @endif
+    @if ($check['missing_products'])
+        <div class="alert alert-warning">ไม่พบสินค้า {{ count($check['missing_products']) }} รหัสใน ERP บรรทัดเหล่านี้จะไม่แสดงในเอกสาร (ยอดรวมยังตรงกับ BPlus): {{ implode(', ', array_slice($check['missing_products'], 0, 30)) }}</div>
+    @endif
+    <p class="small text-muted">เอกสารที่สร้างจะไม่ตัดสต๊อก ไม่ลงบัญชี GL และแก้ไขใน ERP ไม่ได้ (แก้ที่ BPlus แล้วซิงค์ใหม่) ใบเดิมที่ถูกแก้ใน BPlus จะถูกอัปเดตทับ</p>
     <form method="post" action="{{ route('bplus.sync.import.store') }}" class="d-flex gap-2">@csrf
         <input type="hidden" name="token" value="{{ $token }}">
         <button class="btn btn-primary">ยืนยันบันทึก</button>
