@@ -4,10 +4,12 @@ namespace App\Support;
 
 final class PythonPosInstaller
 {
-    /** Find the latest Windows installer published by the build pipeline. */
+    /** Find the latest JET POS Python installer, with compatibility for older names. */
     public static function current(): ?array
     {
         $files = collect(array_merge(
+            glob(storage_path('app/pos-releases/JET-POS-*-setup.exe')) ?: [],
+            glob(storage_path('app/pos-python-releases/JET-POS-*-setup.exe')) ?: [],
             glob(storage_path('app/pos-releases/PopCentral-POS-UAT-*-setup.exe')) ?: [],
             glob(storage_path('app/pos-python-releases/PopCentral-POS-UAT-*-setup.exe')) ?: [],
         ))

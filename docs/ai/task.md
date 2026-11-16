@@ -5271,3 +5271,16 @@ pending
 - ตรวจนับ: ไม่ได้นับไม่ปรับ, โหมดนับเต็มต้องผู้จัดการติ๊กยืนยัน
 - รายงานตัวหนังสือ 13–16px, พิมพ์หัวตารางไม่ทับ
 - PHPUnit 845 ผ่าน; mutation test ข้อ split/shortage/revert แดงจริง
+
+## Handoff - 2026-11-15 (JET POS Python 0.9.21 release and ERP deploy)
+- Commit: `2454798` (`fix(pos): enforce fast four-digit JET POS cashier login`) and `d829013` (`fix(pos): include timezone data in Windows test build`)
+- ทำอะไร: บังคับ PIN แคชเชียร์ 4 หลักทั้งหน้า POS และ API; ครบ 4 หลักแล้วตรวจ SQLite ก่อนและยืนยันผู้ใช้กับ ERP โดยไม่รอปุ่มเข้าสู่ระบบ; จัดการ candidate PIN ซ้ำและลด false offline audit; สร้าง PIN ชั่วคราวแบบ 4 หลัก; เปลี่ยนชื่อ installer/หน้าดาวน์โหลดให้เป็น JET POS และคง install identity/path เดิมเพื่ออัปเกรดเครื่องเดิม
+- ทดสอบ: `apps/pos-python`: pytest 268 passed, 3 skipped; GitHub Actions POS Windows #304 ผ่าน build, smoke test, installer verification และ upload artifact; artifact `JET-POS-0.9.21` (SHA-256 zip `cadad27afec3e6d35ad041fb271a0cf57af4b6e7c2272094a0b683ca08425ffd`); publish ตรวจ SFTP size ตรงและ `HEAD /download/python-pos` ได้ HTTP 200. ERP Deploy #369 ผ่าน route/workflow tests, frontend build และ deploy production; `erp:health` ยืนยัน DB, migrations, backup, sales-to-GL และ storage ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่ได้ทดสอบกับเครื่องแคชเชียร์จริง, printer/scanner/scale หรือทำรายการขายเงินจริง; ผู้ใช้ที่มี PIN เกิน 4 หลักต้องเปลี่ยน PIN ผ่านหน้าผู้ดูแลก่อนใช้ flow ใหม่; health แจ้ง queue มี failed jobs 2 รายการ ควรตรวจต่อ
+- Deploy: ERP production deploy สำเร็จผ่าน workflow #369; JET POS Python 0.9.21 เผยแพร่แล้วผ่าน workflow #304 และดาวน์โหลดจาก `/download/python-pos` ได้
+- งานถัดไป: ติดตั้ง JET POS 0.9.21 บนเครื่อง POS จริงและ UAT เปิดกะ/สแกน/พิมพ์/ปิดกะโดยเจ้าของหรือผู้ปฏิบัติงาน; ตรวจ failed queue jobs 2 รายการแยกจาก deploy รอบนี้
+
+## Handoff - 2026-11-15 (JET POS SQLite migration)
+- ล็อก SQLite ตั้งแต่ตรวจ schema จนเพิ่มคอลัมน์และ commit เพื่อกัน UI กับ sync worker เพิ่มคอลัมน์เดียวกันพร้อมกัน และเทียบชื่อคอลัมน์ตามพฤติกรรม SQLite
+- pytest ผ่าน 268 ข้าม 3 และเปิดฐาน WAL พร้อมกัน 24 ครั้งผ่าน integrity_check
+- ยังไม่ build/publish รอบนี้ ต้องตรวจ startup-error.log และสถานะบิลของเครื่องที่มีปัญหาก่อนจัดการบิลจริง

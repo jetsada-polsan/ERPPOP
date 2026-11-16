@@ -7,15 +7,15 @@ use Illuminate\Console\Command;
 
 class SetPosSharedPin extends Command
 {
-    protected $signature = 'pos:shared-pin {pin=1234 : PIN กลาง 4-20 หลัก} {--branch= : จำกัดเฉพาะรหัสสาขา}';
+    protected $signature = 'pos:shared-pin {pin=1234 : PIN กลาง 4 หลัก} {--branch= : จำกัดเฉพาะรหัสสาขา}';
 
     protected $description = 'Set a temporary shared POS PIN for active cashiers; POS will require selecting the cashier name afterwards';
 
     public function handle(): int
     {
         $pin = (string) $this->argument('pin');
-        if (! preg_match('/^\d{4,20}$/', $pin)) {
-            $this->error('PIN ต้องเป็นตัวเลข 4-20 หลัก');
+        if (! preg_match('/^\d{4}$/', $pin)) {
+            $this->error('PIN ต้องเป็นตัวเลข 4 หลัก');
             return self::FAILURE;
         }
 

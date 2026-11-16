@@ -29,7 +29,7 @@ use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
- * ทางเข้า API สำหรับ POS desktop (Tauri). auth ผ่าน AuthenticatePosDevice
+ * ทางเข้า API สำหรับ JET POS Python desktop. auth ผ่าน AuthenticatePosDevice
  * (Bearer token → login แทน cashier user) แล้ว delegate ไปตรรกะเดิมใน PosController
  * ส่วน checkout ห่อ idempotency: บิลเดิม (idempotency key เดิม) จะได้ response เดิมเป๊ะ
  * ไม่สร้างซ้ำ — จำเป็นสำหรับ offline-first ที่ client retry ได้
@@ -81,7 +81,7 @@ class PosApiController extends Controller
             'branch_id' => $branchId,
             'branch_name' => $branchName,
             'device_user' => $user?->name,
-            'cashier_login_mode' => AppSetting::get('pos_passwordless_login') === '1' ? 'selection' : 'pin',
+            'cashier_login_mode' => 'pin',
             'qr_payment' => $qrPayment ? [
                 'code' => $qrPayment->code,
                 'name' => $qrPayment->name,
@@ -351,27 +351,21 @@ class PosApiController extends Controller
     public function cashierLogin(Request $request): JsonResponse
     {
         $data = $request->validate([
-            // code ยังรับได้เพื่อรองรับ POS รุ่นเก่า แต่ desktop รุ่นใหม่ใช้ PIN อย่างเดียว
+            // code ยังรับได้เพื่อรองรับ POS รุ่นเก่า แต่การยืนยันคนขายต้องใช้ PIN 4 หลัก
             'code' => ['nullable', 'string', 'max:40'],
             'cashier_id' => ['nullable', 'integer'],
-            'pin' => ['nullable', 'string', 'regex:/^\d{4,20}$/'],
+            'pin' => ['required', 'string', 'regex:/^\d{4}$/'],
         ]);
 
         $device = $request->attributes->get('pos_device');
         $branchId = $device?->branch_id ?: $request->user()?->branch_id;
-        $passwordless = AppSetting::get('pos_passwordless_login') === '1';
-        if ($passwordless && isset($data['cashier_id']) && blank($data['pin'] ?? null)) {
-            $cashier = $this->cashierCandidates($branchId, null, $device?->user_id)->find($data['cashier_id']);
-            if (! $cashier) {
-                return response()->json(['success' => false, 'message' => 'ไม่พบพนักงานในสาขานี้'], 422);
-            }
-
-            return $this->authenticatedCashierResponse($request, $cashier, $device, $branchId, null);
+        $candidates = $this->cashierCandidates($branchId, $data['code'] ?? null, $device?->user_id);
+        if (isset($data['cashier_id'])) {
+            // Python POS may already know the local cashier from its SQLite credential check.
+            // Restrict bcrypt verification to that identity instead of checking every user.
+            $candidates->whereKey((int) $data['cashier_id']);
         }
-        if (blank($data['pin'] ?? null)) {
-            return response()->json(['success' => false, 'message' => 'กรุณาระบุ PIN'], 422);
-        }
-        $matches = $this->cashierCandidates($branchId, $data['code'] ?? null, $device?->user_id)
+        $matches = $candidates
             ->get()
             ->filter(fn (Salesman $candidate) => $this->pinMatches($candidate, $data['pin']))
             ->values();
@@ -662,8 +656,8 @@ class PosApiController extends Controller
     {
         $data = $request->validate([
             'code' => ['required', 'string', 'max:40'],
-            'current_pin' => ['required', 'string', 'min:4', 'max:20'],
-            'new_pin' => ['required', 'string', 'regex:/^\d{4,20}$/', 'different:current_pin'],
+            'current_pin' => ['required', 'string', 'regex:/^\d{4}$/'],
+            'new_pin' => ['required', 'string', 'regex:/^\d{4}$/', 'different:current_pin'],
         ]);
 
         $device = $request->attributes->get('pos_device');

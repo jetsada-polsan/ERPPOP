@@ -53,12 +53,12 @@ class PosInstallPageTest extends TestCase
         $this->page()->assertSee('พร้อมขาย');
     }
 
-    public function test_the_page_warns_when_shifts_open_without_a_pin(): void
+    public function test_the_page_states_that_four_digit_pin_is_always_required(): void
     {
         $this->branch();
         AppSetting::updateOrCreate(['key' => 'pos_passwordless_login'], ['value' => '1']);
 
-        $this->page()->assertSee('โหมดเลือกชื่อไม่ใช้ PIN เปิดอยู่');
+        $this->page()->assertSee('เปิดกะต้องยืนยัน PIN คนขาย 4 หลัก');
     }
 
     public function test_back_office_issues_a_temporary_pin_for_a_till_cashier_shown_once(): void
@@ -72,7 +72,7 @@ class PosInstallPageTest extends TestCase
         $pin = session('cashier_pin_result')['pin'];
 
         $cashier->refresh();
-        $this->assertMatchesRegularExpression('/^\d{6}$/', $pin);
+        $this->assertMatchesRegularExpression('/^\d{4}$/', $pin);
         $this->assertTrue(Hash::check($pin, $cashier->pos_pin_hash));
         $this->assertTrue((bool) $cashier->must_change_pin);
         $this->assertTrue(AuditLog::where('action', 'cashier_pin_reset')->where('record_id', $cashier->id)->exists());

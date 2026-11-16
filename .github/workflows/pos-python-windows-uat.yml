@@ -1,13 +1,13 @@
-name: Build PopCentral POS UAT for Windows
+name: Build JET POS Python for Windows
 run-name: POS Python ${{ inputs.version || 'dev' }} · ${{ inputs.build_id || github.sha }}
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: UAT version, e.g. 0.1.0
+        description: JET POS Python version, e.g. 0.9.21
         required: true
-        default: 0.1.0
+        default: 0.9.21
         type: string
       publish:
         description: Publish installer to ERP /download/python-pos
@@ -49,18 +49,18 @@ jobs:
           cache-dependency-path: apps/pos-python/requirements-build.txt
       - name: Install dependencies
         run: python -m pip install --upgrade pip -r requirements-build.txt
-      - name: Run core and scale tests
-        run: python -m unittest discover -s tests -v
+      - name: Run Python POS tests
+        run: python -m pytest -q
       - name: Stamp application version
         shell: pwsh
         env:
-          UAT_VERSION: ${{ inputs.version || '0.1.0-dev' }}
+          POS_VERSION: ${{ inputs.version || '0.9.21-dev' }}
         run: |
-          if ($env:UAT_VERSION -notmatch '^\d+\.\d+\.\d+([.-][0-9A-Za-z.-]+)?$') {
-            throw "UAT_VERSION ไม่ถูกต้อง: $env:UAT_VERSION"
+          if ($env:POS_VERSION -notmatch '^\d+\.\d+\.\d+([.-][0-9A-Za-z.-]+)?$') {
+            throw "POS_VERSION ไม่ถูกต้อง: $env:POS_VERSION"
           }
           $versionPath = Join-Path $PWD 'pos_python/build_info.py'
-          $content = "APP_VERSION = `"$env:UAT_VERSION`"`r`n"
+          $content = "APP_VERSION = `"$env:POS_VERSION`"`r`n"
           [System.IO.File]::WriteAllText(
             $versionPath,
             $content,
@@ -88,15 +88,15 @@ jobs:
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --no-progress --yes
-      - name: Build UAT installer
+      - name: Build JET POS installer
         shell: pwsh
         env:
-          UAT_VERSION: ${{ inputs.version || '0.1.0-dev' }}
-        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$env:UAT_VERSION" installer\PopCentral-POS.iss'
+          POS_VERSION: ${{ inputs.version || '0.9.21-dev' }}
+        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$env:POS_VERSION" installer\PopCentral-POS.iss'
       - name: Verify installer artifact
         shell: pwsh
         run: |
-          $installers = @(Get-ChildItem -File 'dist-installer\PopCentral-POS-UAT-*-setup.exe')
+          $installers = @(Get-ChildItem -File 'dist-installer\JET-POS-*-setup.exe')
           if ($installers.Count -ne 1) {
             throw "ต้องมี installer 1 ไฟล์ แต่พบ $($installers.Count) ไฟล์"
           }
@@ -117,7 +117,7 @@ jobs:
           Write-Host "Installer ผ่านการตรวจสอบ: $($installer.Name), $($installer.Length) ไบต์"
       - uses: actions/upload-artifact@v4
         with:
-          name: PopCentral-POS-UAT-${{ inputs.version || '0.1.0-dev' }}
+          name: JET-POS-${{ inputs.version || '0.9.21-dev' }}
           path: apps/pos-python/dist-installer/*.exe
           if-no-files-found: error
 
@@ -129,7 +129,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: PopCentral-POS-UAT-${{ inputs.version }}
+          name: JET-POS-${{ inputs.version }}
           path: release
       - uses: webfactory/ssh-agent@v0.9.0
         with:
@@ -148,7 +148,7 @@ jobs:
             echo "No installer artifact found" >&2
             exit 1
           fi
-          target="PopCentral-POS-UAT-${{ inputs.version }}-setup.exe"
+          target="JET-POS-${{ inputs.version }}-setup.exe"
           if [ "$installer" != "release/$target" ]; then
             mv "$installer" "release/$target"
           fi

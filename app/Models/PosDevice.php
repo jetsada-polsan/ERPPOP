@@ -7,9 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
 /**
- * Token ต่อเครื่องสำหรับ POS desktop (Tauri). device ล็อก "สาขา" ไว้ ส่วน "คนขาย"
- * มาจากการยืนยัน PIN หรือการเลือกชื่อในโหมด passwordless ที่ /api/pos/cashier/login
- * ซึ่งบันทึกไว้ที่ active_cashier_id
+ * Token ต่อเครื่องสำหรับ JET POS Python. device ล็อก "สาขา" ไว้ ส่วน "คนขาย"
+ * มาจากการยืนยัน PIN ที่ /api/pos/cashier/login ซึ่งบันทึกไว้ที่ active_cashier_id
  * ทำให้ client ปลอม cashier_id ของคนอื่นในสาขาไม่ได้
  */
 class PosDevice extends Model

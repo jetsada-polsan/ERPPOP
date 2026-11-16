@@ -1,1 +1,1 @@
-"""Offline-first PopCentral POS prototype. Not connected to production ERP."""
+"""Offline-first JET POS Python client for the production ERP POS API."""

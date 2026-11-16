@@ -115,7 +115,7 @@ class OnlineLoginTest(unittest.TestCase):
                                    "expires_at": "2026-09-09T00:00:00Z",
                                    "credential_version": "2026-09-02T00:00:00Z"},
         }})
-        result = ProvisioningService(db, api).change_cashier_pin("C001", "1234", "860531")
+        result = ProvisioningService(db, api).change_cashier_pin("C001", "1234", "8605")
 
         self.assertEqual(result["cashier"]["id"], 42)
         row = db.execute("SELECT cred_salt, cred_verifier, credential_version FROM local_cashiers WHERE id = ?", (result["local_cashier_id"],)).fetchone()
@@ -132,16 +132,15 @@ class OnlineLoginTest(unittest.TestCase):
         self.assertTrue(result["selection_required"])
         self.assertEqual(len(result["cashiers"]), 2)
 
-    def test_passwordless_login_sends_only_the_bound_cashier_id(self) -> None:
+    def test_online_login_rejects_non_four_digit_pins_without_calling_erp(self) -> None:
         db, _ = fresh_db()
-        api = FakeApi({"/api/pos/cashier/login": {
-            "success": True, "cashier": {"id": 42, "code": "C001", "name": "สมชาย",
-                                         "user_id": 501, "credential_version": "v1"}}})
+        api = FakeApi({})
+        service = ProvisioningService(db, api)
 
-        result = ProvisioningService(db, api).select_cashier("C001", 42)
-
-        self.assertFalse(result["selection_required"])
-        self.assertEqual(api.posted[0][1], {"cashier_id": 42, "code": "C001"})
+        for pin in ("", "123", "12345", "123456"):
+            with self.subTest(pin=pin), self.assertRaisesRegex(ValueError, "PIN ต้องเป็นตัวเลข 4 หลัก"):
+                service.online_cashier_login(pin)
+        self.assertEqual(api.posted, [])
 
 
 class SyncWorkerTest(unittest.TestCase):

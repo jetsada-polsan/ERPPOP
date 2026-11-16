@@ -33,6 +33,7 @@ class PosReleaseTest extends TestCase
         File::delete($this->directory.'/POPSTAR-POS-test.zip');
         File::delete($this->directory.'/PopCentral-POS-UAT-99.98.97-setup.exe');
         File::delete($this->pythonDirectory.'/PopCentral-POS-UAT-99.98.98-setup.exe');
+        File::delete($this->pythonDirectory.'/JET-POS-99.98.99-setup.exe');
         File::delete($this->jetPythonDirectory.'/JET-POS-Python-UAT-99.98.99.exe');
         if ($this->originalManifest === null) {
             File::delete($this->directory.'/latest.json');
@@ -50,6 +51,16 @@ class PosReleaseTest extends TestCase
         $this->get('/download/python-pos')
             ->assertOk()
             ->assertDownload('PopCentral-POS-UAT-99.98.98-setup.exe');
+    }
+
+    public function test_python_download_prefers_the_current_jet_pos_python_installer(): void
+    {
+        File::put($this->pythonDirectory.'/PopCentral-POS-UAT-99.98.98-setup.exe', 'legacy');
+        File::put($this->pythonDirectory.'/JET-POS-99.98.99-setup.exe', 'current');
+
+        $this->get('/download/python-pos')
+            ->assertOk()
+            ->assertDownload('JET-POS-99.98.99-setup.exe');
     }
 
     // POS ตัวเดียวคือ JET POS Python (apps/pos-python) — ลิงก์ UAT เดิมพาไปตัวนี้
