@@ -113,6 +113,7 @@ class ErpMenu
                     ['label' => 'บัญชีธนาคาร', 'route' => 'bank-accounts.index', 'pattern' => 'bank-accounts.*', 'icon' => 'bi-bank2', 'tone' => 'blue'],
                     ['label' => 'ฝาก/ถอนเงินสด', 'route' => 'cash-transfers.index', 'pattern' => 'cash-transfers.*', 'icon' => 'bi-cash-stack', 'tone' => 'teal'],
                     ['label' => 'ทะเบียนเช็ค', 'route' => 'cheques.index', 'pattern' => 'cheques.*', 'icon' => 'bi-journal-check', 'tone' => 'teal'],
+                    ['label' => 'เอกสารสายขาย (ระบบเดิม)', 'route' => 'bplus.sync.index', 'pattern' => 'bplus.sync.*', 'icon' => 'bi-arrow-repeat', 'tone' => 'indigo'],
                     ['label' => 'อนุมัติเอกสาร', 'route' => 'bplus.approvals', 'pattern' => 'bplus.approvals', 'icon' => 'bi-shield-check', 'tone' => 'indigo'],
                 ],
             ],
