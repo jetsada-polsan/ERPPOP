@@ -4,7 +4,7 @@
 อ่านอย่างเดียว: SELECT เท่านั้น (read_only=True) ไม่แก้ข้อมูล BPlus
 ถามรหัสผ่านแบบซ่อนตัวอักษร ไม่บันทึกรหัสผ่านลงไฟล์
 
-ใช้: python3 scripts/bplus-route-export.py [จำนวนวันย้อนหลัง=3] [สาย=B18]
+ใช้: python3 scripts/bplus-route-export.py [จำนวนวันย้อนหลัง=3 หรือ month=ตั้งแต่วันที่ 1 ของเดือนนี้] [สาย=B18]
 ได้ไฟล์ bplus-<สาย>-<วันที่>.json
 
 ขอบเขต:
@@ -20,17 +20,20 @@ import sys
 
 import pymssql
 
-days = int(sys.argv[1]) if len(sys.argv) > 1 else 3
+period = sys.argv[1] if len(sys.argv) > 1 else "3"
 route = sys.argv[2] if len(sys.argv) > 2 else "B18"
 host = "192.168.88.200"
 database = "BPLUSERP_POPSTAR_2021"
-print(f"ดึงสาย {route} ย้อนหลัง {days} วัน จาก {database}")
+if period == "month":
+    since = datetime.date.today().replace(day=1).isoformat()
+else:
+    since = (datetime.date.today() - datetime.timedelta(days=int(period))).isoformat()
+print(f"ดึงสาย {route} ตั้งแต่ {since} จาก {database}")
 user = input("user: ").strip()
 password = getpass.getpass("password (ไม่แสดงตัวอักษร): ")
 
 connection = pymssql.connect(host, user, password, database, as_dict=True, read_only=True)
 cursor = connection.cursor()
-since = (datetime.date.today() - datetime.timedelta(days=days)).isoformat()
 
 
 def rows(sql: str, params: tuple = ()) -> list[dict]:
@@ -124,7 +127,7 @@ for doc in documents:
 
 # ใบเสร็จ: เก็บเฉพาะบรรทัดที่ตัดชำระใบขายเชื่อของสายนี้
 receipt_rows = rows(f"""
-    SELECT d.DI_KEY, d.DI_REF, d.DI_DATE, d.DI_ACTIVE, d.DI_CRE_BY, d.DI_UPD_DATE, d.DI_CRE_DATE, t.DT_DOCCODE,
+    SELECT d.DI_KEY, d.DI_REF, d.DI_DATE, d.DI_ACTIVE, d.DI_CRE_BY, d.DI_UPD_DATE, d.DI_CRE_DATE, t.DT_DOCCODE, t.DT_THAIDESC,
            a.TPA_REFER_REF, a.TPA_PAY_A, a.TPA_CASH_A, a.TPA_TRFR_A, a.TPA_CHEQ_A, a.TPA_OTHR_A, a.TPA_NOTE_A,
            a.TPA_DISC_A, a.TPA_WHTX_A, a.TPA_SHRT_A, r.AR_CODE, r.AR_NAME
     FROM TRANPAYA a JOIN TRANPAYH p ON p.TPH_KEY = a.TPA_TPH JOIN DOCINFO d ON d.DI_KEY = p.TPH_DI
@@ -150,6 +153,14 @@ for r in receipt_rows:
         "cash_amount": num(r["TPA_CASH_A"]), "transfer_amount": num(r["TPA_TRFR_A"]),
         "discount_amount": num(r["TPA_DISC_A"]), "wht_amount": num(r["TPA_WHTX_A"]), "short_amount": num(r["TPA_SHRT_A"]),
     })
+# บางใบเสร็จ BPlus ไม่ได้แยกช่องเงินสด/โอนรายบรรทัด ส่วนที่เหลือ (ไม่นับเงินขาด)
+# ถือเป็นวิธีรับเงินของเล่มนั้น: เล่มชื่อ "เงินสด" = เงินสด, "เงินโอน" = โอน
+book_names = {r["DI_KEY"]: text(r["DT_THAIDESC"]) or "" for r in receipt_rows}
+for key, doc in receipts.items():
+    rest = round(doc["total_amount"] - doc["short_amount"] - doc["cash_amount"] - doc["transfer_amount"] - doc["other_amount"], 2)
+    if rest > 0:
+        field = "cash_amount" if "เงินสด" in book_names[key] else "transfer_amount" if "โอน" in book_names[key] else "other_amount"
+        doc[field] = round(doc[field] + rest, 2)
 documents.extend(receipts.values())
 
 connection.close()
