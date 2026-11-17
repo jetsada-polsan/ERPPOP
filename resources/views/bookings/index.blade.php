@@ -162,6 +162,11 @@
                     </button>
                     <span class="text-muted small" x-show="selectedIds.length > 0">เลือกแล้ว <b x-text="selectedIds.length"></b> รายการ</span>
                 </div>
+                <div class="text-end" data-testid="bookings-total">
+                    <span class="text-muted small">ยอดรวมตามตัวกรอง (ไม่รวมใบยกเลิก)</span>
+                    <span class="fw-semibold ms-2">{{ number_format((int) $totals->bills) }} ใบ</span>
+                    <span class="fs-5 fw-bold text-primary ms-2">{{ number_format((float) $totals->amount, 2) }}</span>
+                </div>
             </div>
             <div class="table-responsive">
                 <table class="table align-middle">

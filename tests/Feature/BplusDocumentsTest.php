@@ -136,7 +136,9 @@ class BplusDocumentsTest extends TestCase
         $this->importFile($this->export());
         $this->actingAs(User::where('username', 'bplus_docs')->first()->forceFill(['branch_id' => $this->branch->id]));
 
-        $this->get(route('bookings.index', ['date_from' => '2026-11-01', 'date_to' => '2026-11-30']))->assertOk()->assertSee('B18-6911/00382');
+        $html = $this->get(route('bookings.index', ['date_from' => '2026-11-01', 'date_to' => '2026-11-30']))->assertOk()->assertSee('B18-6911/00382')->getContent();
+        $total = strip_tags(substr($html, strpos($html, 'data-testid="bookings-total"'), 600));
+        $this->assertMatchesRegularExpression('/1 ใบ\s+1,886\.00/u', preg_replace('/\s+/u', ' ', $total), 'ยอดรวมใบจองตามตัวกรอง');
         $booking = Document::where('doc_number', 'B18-6911/00382')->firstOrFail();
         $sale = Document::where('doc_number', 'DS256911/06364')->firstOrFail();
         $this->get(route('bookings.show', $booking))->assertOk()->assertSee('DS256911/06364')->assertSee('มาจาก BPlus');
