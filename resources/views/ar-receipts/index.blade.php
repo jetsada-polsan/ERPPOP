@@ -13,7 +13,11 @@
 <div class="row g-3">
     <div class="col-xl-6">
         <div class="content-card p-3">
-            <h2 class="h6 fw-bold mb-3">ลูกค้าที่มียอดค้าง</h2>
+            <div class="d-flex align-items-baseline justify-content-between mb-3 flex-wrap gap-2">
+                <h2 class="h6 fw-bold mb-0">ลูกค้าที่มียอดค้าง</h2>
+                <div data-testid="outstanding-total"><span class="text-muted small">{{ number_format($outstandingTotals['customers']) }} ราย · {{ number_format($outstandingTotals['items']) }} บิล · รวม</span>
+                    <span class="fs-5 fw-bold text-danger ms-1">{{ number_format($outstandingTotals['amount'], 2) }}</span></div>
+            </div>
             <div class="table-responsive"><table class="table align-middle mb-0">
                 <thead><tr><th>ลูกค้า</th><th class="text-end">บิลค้าง</th><th class="text-end">ยอดค้าง</th><th>ครบกำหนดเก่าสุด</th><th></th></tr></thead>
                 <tbody>
@@ -37,7 +41,11 @@
     <div class="col-xl-6">
         <div class="content-card p-3">
             <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-                <h2 class="h6 fw-bold mb-0">ใบเสร็จรับเงิน</h2>
+                <div>
+                    <h2 class="h6 fw-bold mb-0">ใบเสร็จรับเงิน</h2>
+                    <div class="small" data-testid="receipts-total"><span class="text-muted">ตามช่วงวันที่ (ไม่รวมใบยกเลิก)</span>
+                        <b class="ms-1">{{ number_format((int) $receiptTotals->bills) }} ใบ</b> <b class="text-primary ms-1">{{ number_format((float) $receiptTotals->amount, 2) }}</b></div>
+                </div>
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     @include('partials.list-date-range', ['dateRange' => $dateRange, 'wrapForm' => true])
                 </div>

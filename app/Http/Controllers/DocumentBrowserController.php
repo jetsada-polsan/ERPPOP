@@ -93,7 +93,8 @@ class DocumentBrowserController extends Controller
 
         $summary = [
             'count' => (clone $base)->count(),
-            'amount' => (float) (clone $base)->sum('total_amount'),
+            // ยอดเงินไม่รวมใบยกเลิก ให้เทียบกับระบบเดิมได้ตรง
+            'amount' => (float) (clone $base)->where('status', '!=', 'cancelled')->sum('total_amount'),
         ];
 
         $documents = $base->with(['documentType', 'documentBook', 'branch', 'customer', 'supplier', 'saleBooking'])

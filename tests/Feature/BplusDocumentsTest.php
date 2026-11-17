@@ -143,7 +143,10 @@ class BplusDocumentsTest extends TestCase
         $sale = Document::where('doc_number', 'DS256911/06364')->firstOrFail();
         $this->get(route('bookings.show', $booking))->assertOk()->assertSee('DS256911/06364')->assertSee('มาจาก BPlus');
         $this->get(route('sales.show', $sale))->assertOk()->assertSee('DS256911/06364')->assertSee('1,837.00');
-        $this->get(route('ar-receipts.index', ['date_from' => '2026-11-01', 'date_to' => '2026-11-30']))->assertOk()->assertSee('RR26911/000800')->assertSee('837.00');
+        $html = $this->get(route('ar-receipts.index', ['date_from' => '2026-11-01', 'date_to' => '2026-11-30']))->assertOk()->assertSee('RR26911/000800')->assertSee('837.00')->getContent();
+        $block = fn (string $id) => preg_replace('/\s+/u', ' ', strip_tags(substr($html, strpos($html, 'data-testid="'.$id.'"'), 500)));
+        $this->assertMatchesRegularExpression('/1 ใบ\s*1,049\.00/u', $block('receipts-total'), 'ยอดรวมใบเสร็จตามช่วง');
+        $this->assertMatchesRegularExpression('/1 ราย · 1 บิล · รวม\s*837\.00/u', $block('outstanding-total'), 'ลูกหนี้ค้างรวม');
     }
 
     public function test_reports_by_seller_credit_the_route_salesman(): void

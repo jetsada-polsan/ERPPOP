@@ -39,18 +39,29 @@ class ArReceiptController extends Controller
             ->get();
         $customers = Customer::whereIn('id', $outstanding->pluck('customer_id'))->get()->keyBy('id');
 
-        $receipts = Document::with(['customer', 'branch', 'salesman'])
+        $receiptBase = Document::query()
             ->whereHas('documentType', fn ($query) => $query->where('code', 'RECEIPT'))
             ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
                 ->where('doc_number', 'ilike', "%{$q}%")
                 ->orWhereHas('customer', fn ($c) => $c->where('name_th', 'ilike', "%{$q}%"))
             ))
-            ->tap(fn ($query) => $dateRange->apply($query))
+            ->tap(fn ($query) => $dateRange->apply($query));
+
+        $receipts = (clone $receiptBase)->with(['customer', 'branch', 'salesman'])
             ->orderByDesc('id')
             ->paginate(50)
             ->withQueryString();
 
-        return view('ar-receipts.index', compact('outstanding', 'customers', 'receipts', 'dateRange', 'q'));
+        // ยอดรวมไว้เทียบกับระบบเดิม: ใบเสร็จทุกใบตามตัวกรอง (ไม่รวมใบยกเลิก) และลูกหนี้ค้างทั้งหมด ณ ตอนนี้
+        $receiptTotals = (clone $receiptBase)->where('status', '!=', 'cancelled')
+            ->selectRaw('count(*) as bills, coalesce(sum(total_amount), 0) as amount')->first();
+        $outstandingTotals = [
+            'customers' => $outstanding->count(),
+            'items' => (int) $outstanding->sum('item_count'),
+            'amount' => round((float) $outstanding->sum('balance'), 2),
+        ];
+
+        return view('ar-receipts.index', compact('outstanding', 'customers', 'receipts', 'dateRange', 'q', 'receiptTotals', 'outstandingTotals'));
     }
 
     public function dailySummary(Request $request): View|StreamedResponse
