@@ -4,7 +4,7 @@
 อ่านอย่างเดียว: SELECT เท่านั้น (read_only=True) ไม่แก้ข้อมูล BPlus
 ถามรหัสผ่านแบบซ่อนตัวอักษร ไม่บันทึกรหัสผ่านลงไฟล์
 
-ใช้: python3 scripts/bplus-route-export.py [จำนวนวันย้อนหลัง=3 หรือ month=ตั้งแต่วันที่ 1 ของเดือนนี้] [สาย=B18]
+ใช้: python3 scripts/bplus-route-export.py [จำนวนวันย้อนหลัง=3 | month=ตั้งแต่วันที่ 1 ของเดือนนี้ | YYYY-MM-DD] [สาย=B18]
 ได้ไฟล์ bplus-<สาย>-<วันที่>.json
 
 ขอบเขต:
@@ -16,6 +16,7 @@ import datetime
 import decimal
 import getpass
 import json
+import os
 import sys
 
 import pymssql
@@ -26,6 +27,8 @@ host = "192.168.88.200"
 database = "BPLUSERP_POPSTAR_2021"
 if period == "month":
     since = datetime.date.today().replace(day=1).isoformat()
+elif len(period) == 10 and period[4] == "-":
+    since = datetime.date.fromisoformat(period).isoformat()  # วันที่ตายตัว เช่น 2026-11-01 (ซิงค์อัตโนมัติใช้แบบนี้)
 else:
     since = (datetime.date.today() - datetime.timedelta(days=int(period))).isoformat()
 print(f"ดึงสาย {route} ตั้งแต่ {since} จาก {database}")
@@ -33,7 +36,11 @@ def bplus_login():
     """user/รหัส BPlus: อ่านรหัสจาก Keychain ของ Mac ก่อน (service bplus-mssql) ถ้าไม่มีค่อยถาม
     ตั้งครั้งเดียว: security add-generic-password -s bplus-mssql -a jetsada -w
     (คำสั่งจะถามรหัสแบบไม่แสดงตัวอักษร รหัสเก็บเข้ารหัสใน Keychain ไม่อยู่ในไฟล์)"""
+    import os
     import subprocess
+    # ซิงค์อัตโนมัติบน Windows: bplus-auto-sync.py ส่ง user/รหัสมาทาง environment ไม่ถาม
+    if os.environ.get("BPLUS_USER") and os.environ.get("BPLUS_PASSWORD"):
+        return os.environ["BPLUS_USER"], os.environ["BPLUS_PASSWORD"]
     login = "jetsada"
     try:
         secret = subprocess.run(["security", "find-generic-password", "-s", "bplus-mssql", "-a", login, "-w"],
@@ -51,6 +58,8 @@ user, password = bplus_login()
 try:
     connection = pymssql.connect(host, user, password, database, as_dict=True, read_only=True)
 except pymssql.Error:
+    if os.environ.get("BPLUS_PASSWORD"):
+        raise  # รันอัตโนมัติ ไม่มีคนพิมพ์รหัส ให้ล้มพร้อมข้อความเลย
     # รหัสใน Keychain ใช้ไม่ได้ (ตั้งผิดหรือเปลี่ยนรหัสแล้ว) ให้ถามรหัสแทน
     print("รหัสใน Keychain เข้า BPlus ไม่ได้ พิมพ์รหัสเอง (แก้ Keychain: security delete-generic-password -s bplus-mssql -a jetsada)")
     password = getpass.getpass("password (ไม่แสดงตัวอักษร): ")

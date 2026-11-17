@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\BplusSyncApiController;
 use App\Http\Controllers\Api\MemberApiController;
 use App\Http\Controllers\Api\OcrDocumentController;
 use App\Http\Controllers\Api\PosApiController;
@@ -8,6 +9,9 @@ use App\Http\Controllers\MemberPortalController;
 use App\Http\Controllers\PosController;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
+
+// เครื่องในร้านส่งเอกสาร BPlus ขึ้นมาเอง (Bearer token จาก bplus:sync-token) แทนการอัปโหลดไฟล์
+Route::post('/bplus/sync', [BplusSyncApiController::class, 'store'])->middleware('throttle:10,1')->name('api.bplus.sync');
 
 // API สำหรับ POS desktop (Tauri) — auth ด้วย Bearer device token (AuthenticatePosDevice)
 // ไม่ใช้ session/CSRF. ตรรกะขาย/กะ ใช้ร่วมกับ PosController เดิม (device login แทน cashier user)

@@ -53,6 +53,7 @@ class BplusSyncController extends Controller
             'from' => $from, 'to' => $to, 'kind' => $kind, 'search' => $search,
             'daily' => $daily, 'documents' => $documents, 'kindLabels' => self::KIND_LABELS,
             'lastSync' => DB::table('bplus_sync_documents')->max('updated_at'),
+            'lastAutoSync' => DB::table('bplus_sync_runs')->latest('id')->first(),
         ]);
     }
 

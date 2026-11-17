@@ -1,0 +1,16 @@
+; คัดลอกเป็น bplus-sync.ini (ไว้ข้าง bplus-auto-sync.py) แล้วใส่ค่าจริงบนเครื่องในร้านเท่านั้น
+; ห้ามส่งไฟล์จริงทางแชท อีเมล หรือ git
+[bplus]
+user = <user SQL ที่อ่านได้อย่างเดียว>
+password = <รหัสของ user นั้น>
+route = B18
+; วันเริ่มซิงค์ ห้ามเลื่อน: ข้อมูลใน ERP ตอนนี้เริ่มที่ 2026-11-01
+since = 2026-11-01
+
+[erp]
+url = https://erp.popstarcenter.com/api/bplus/sync
+token = <token จาก php artisan bplus:sync-token --issue --route=B18>
+
+[sync]
+; โฟลเดอร์เก็บไฟล์ที่ดึงและ log (เว้นไว้ = bplus-sync-work ข้างสคริปต์)
+; work_dir = C:\BplusSync\work

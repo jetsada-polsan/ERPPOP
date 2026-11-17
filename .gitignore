@@ -44,3 +44,7 @@ Thumbs.db
 *.Zip
 *.7z
 /LegacyAnalysis/
+
+# ซิงค์ BPlus อัตโนมัติ: ไฟล์ตั้งค่าที่มีรหัส และไฟล์ที่ดึงมา
+scripts/bplus-sync.ini
+scripts/bplus-sync-work/
