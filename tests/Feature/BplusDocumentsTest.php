@@ -820,6 +820,67 @@ class BplusDocumentsTest extends TestCase
             ->expectsOutputToContain('เอกสารขายลง GL ครบ');
     }
 
+    public function test_sync_token_is_stored_hashed_and_shown_once(): void
+    {
+        $token = $this->issueSyncToken('B18');
+
+        $this->assertStringStartsWith('bps_', $token);
+        $this->assertSame(hash('sha256', $token), DB::table('bplus_sync_tokens')->value('token_hash'));
+        $this->assertStringNotContainsString($token, json_encode(DB::table('bplus_sync_tokens')->get()));
+    }
+
+    public function test_sync_api_refuses_missing_wrong_and_revoked_tokens(): void
+    {
+        $this->postJson(route('api.bplus.sync'), $this->export())->assertStatus(401);
+        $this->postJson(route('api.bplus.sync'), $this->export(), ['Authorization' => 'Bearer bps_wrong'])->assertStatus(401);
+
+        $token = $this->issueSyncToken('B18');
+        Artisan::call('bplus:sync-token', ['--revoke' => DB::table('bplus_sync_tokens')->value('id')]);
+        $this->postJson(route('api.bplus.sync'), $this->export(), ['Authorization' => "Bearer {$token}"])->assertStatus(401);
+
+        $this->assertSame(0, DB::table('bplus_sync_documents')->count());
+    }
+
+    public function test_sync_token_cannot_send_another_route(): void
+    {
+        DB::table('sales_areas')->insert(['code' => 'B20', 'name' => 'B20', 'branch_id' => $this->branch->id, 'is_active' => true]);
+        $token = $this->issueSyncToken('B20');
+
+        $this->postJson(route('api.bplus.sync'), $this->export(), ['Authorization' => "Bearer {$token}"])
+            ->assertStatus(403)->assertJson(['ok' => false]);
+
+        $this->assertSame(0, DB::table('bplus_sync_documents')->count());
+        $this->assertSame('rejected', DB::table('bplus_sync_runs')->value('status'));
+    }
+
+    public function test_sync_api_imports_gzip_upload_like_the_upload_page_and_records_the_run(): void
+    {
+        $token = $this->issueSyncToken('B18');
+        $export = $this->export();
+
+        $response = $this->call('POST', route('api.bplus.sync'), [], [], [], [
+            'HTTP_AUTHORIZATION' => "Bearer {$token}", 'HTTP_CONTENT_ENCODING' => 'gzip',
+            'CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json',
+        ], gzencode(json_encode($export, JSON_UNESCAPED_UNICODE)));
+
+        $response->assertOk()->assertJson(['ok' => true, 'received' => count($export['documents'])]);
+        $this->assertSame(count($export['documents']), DB::table('bplus_sync_documents')->count());
+        $sale = Document::where('doc_number', 'DS256911/06364')->firstOrFail();
+        $this->assertSame('1837.00', number_format((float) $sale->total_amount, 2, '.', ''));
+        $run = DB::table('bplus_sync_runs')->first();
+        $this->assertSame('ok', $run->status);
+        $this->assertNotNull(DB::table('bplus_sync_tokens')->value('last_used_at'));
+        $this->get(route('bplus.sync.index'))->assertOk()->assertSee('สำเร็จ');
+    }
+
+    private function issueSyncToken(string $route): string
+    {
+        Artisan::call('bplus:sync-token', ['--issue' => true, '--route' => $route, '--name' => 'BK Server']);
+        preg_match('/bps_\w+/', Artisan::output(), $match);
+
+        return $match[0];
+    }
+
     private function openItem(Document $document): array
     {
         $item = DB::table('customer_open_items')->where('document_id', $document->id)->first();

@@ -12,7 +12,20 @@
     <form method="post" action="{{ route('bplus.sync.import.preview') }}" enctype="multipart/form-data" class="row g-2 align-items-end">@csrf
         <div class="col-md-6"><label class="form-label small text-muted">ไฟล์จากสคริปต์ดึงระบบเดิม (.json)</label><input type="file" name="file" accept=".json,application/json" required class="form-control"></div>
         <div class="col-md-2"><button class="btn btn-primary w-100">ตรวจไฟล์ก่อนบันทึก</button></div>
-        <div class="col-md-4 small text-muted">ซิงค์ล่าสุด: {{ $lastSync ? \Illuminate\Support\Carbon::parse($lastSync)->format('d/m/Y H:i') : 'ยังไม่เคย' }}</div>
+        <div class="col-md-4 small text-muted">ซิงค์ล่าสุด: {{ $lastSync ? \Illuminate\Support\Carbon::parse($lastSync)->format('d/m/Y H:i') : 'ยังไม่เคย' }}
+            <div data-testid="last-auto-sync">ส่งอัตโนมัติล่าสุด:
+                @if($lastAutoSync)
+                    {{ \Illuminate\Support\Carbon::parse($lastAutoSync->created_at)->format('d/m/Y H:i') }}
+                    @if($lastAutoSync->status === 'ok')
+                        <span class="text-success">สำเร็จ</span> รับ {{ number_format($lastAutoSync->received) }} ใบ@if($lastAutoSync->problems) · <span class="text-danger">มีปัญหา {{ $lastAutoSync->problems }} ใบ</span>@endif
+                    @else
+                        <span class="text-danger">ไม่สำเร็จ</span> {{ $lastAutoSync->message }}
+                    @endif
+                @else
+                    ยังไม่เคย
+                @endif
+            </div>
+        </div>
     </form>
 </div>
 @endif
