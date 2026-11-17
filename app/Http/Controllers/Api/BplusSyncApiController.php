@@ -50,18 +50,47 @@ class BplusSyncApiController extends Controller
         if (! $lock->get()) {
             return $this->finish($token, $parsed['route'], 'busy', 409, 'มีการซิงค์สายนี้อยู่ ลองใหม่ภายหลัง');
         }
-        try {
-            $received = $importer->import($parsed);
-            $result = $materializer->run($parsed['route']);
-        } catch (Throwable $e) {
-            report($e);
+        // ทำงานหลังตอบกลับแล้ว: ทั้งสายใช้เวลาเกิน 60 วินาที (504 จาก gateway) เครื่องในร้านไม่ต้องรอ
+        // ผลจริงดูที่ bplus_sync_runs (processing -> ok/failed) หน้า "เอกสารสายขาย" แสดงรอบล่าสุด
+        $runId = $this->record($token, $parsed['route'], 'processing', null, count($parsed['documents']));
+        \Illuminate\Support\defer(function () use ($importer, $materializer, $parsed, $lock, $runId) {
+            @set_time_limit(900);
+            try {
+                $received = $importer->import($parsed);
+                $result = $materializer->run($parsed['route']);
+                DB::table('bplus_sync_runs')->where('id', $runId)->update([
+                    'status' => 'ok', 'received' => $received, 'erp_documents' => $result['documents'],
+                    'problems' => count($result['problems']), 'updated_at' => now(),
+                ]);
+            } catch (Throwable $e) {
+                report($e);
+                DB::table('bplus_sync_runs')->where('id', $runId)->update([
+                    'status' => 'failed', 'message' => mb_substr($e->getMessage(), 0, 1000), 'updated_at' => now(),
+                ]);
+            } finally {
+                $lock->release();
+            }
+        });
 
-            return $this->finish($token, $parsed['route'], 'failed', 500, $e->getMessage());
-        } finally {
-            $lock->release();
-        }
+        return response()->json([
+            'ok' => true, 'status' => 'processing', 'run_id' => $runId, 'received' => count($parsed['documents']),
+            'message' => 'ERP รับข้อมูลแล้ว กำลังบันทึกเบื้องหลัง ดูผลที่หน้าเอกสารสายขาย',
+        ], 202);
+    }
 
-        return $this->finish($token, $parsed['route'], 'ok', 200, null, $received, $result['documents'], $result['problems']);
+    private function record(object $token, string $route, string $status, ?string $message, int $received = 0): int
+    {
+        return DB::table('bplus_sync_runs')->insertGetId([
+            'bplus_sync_token_id' => $token->id,
+            'route_code' => mb_substr($route, 0, 20),
+            'status' => $status,
+            'received' => $received,
+            'erp_documents' => 0,
+            'problems' => 0,
+            'message' => $message ? mb_substr($message, 0, 1000) : null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     private function finish(object $token, string $route, string $status, int $http, ?string $message,

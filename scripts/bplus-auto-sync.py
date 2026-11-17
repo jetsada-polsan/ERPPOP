@@ -100,6 +100,10 @@ def main() -> int:
         log(work, f"ล้ม: ต่อ ERP ไม่ได้ {error}")
         return 1
 
+    if result.get("status") == "processing":
+        # ERP ตอบรับทันทีแล้วบันทึกเบื้องหลัง (ทั้งสายใช้เวลาเกิน 60 วินาที) ผลจริงดูที่หน้าเอกสารสายขาย
+        log(work, f"ส่งขึ้น ERP แล้ว {len(body) // 1024} KB: {result.get('received')} ใบ · ERP กำลังบันทึกเบื้องหลัง (รอบ #{result.get('run_id')})")
+        return 0
     problems = result.get("problems") or {}
     log(work, f"ส่งขึ้น ERP แล้ว {len(body) // 1024} KB: รับ {result.get('received')} ใบ · เป็นเอกสาร ERP {result.get('erp_documents')} ใบ"
               + (f" · มีปัญหา {len(problems)} ใบ: " + ", ".join(list(problems)[:10]) if problems else ""))
