@@ -1003,6 +1003,72 @@ class BplusDocumentsTest extends TestCase
         $this->assertStringNotContainsString($token, json_encode(DB::table('bplus_sync_tokens')->get()));
     }
 
+    public function test_all_routes_sync_token_can_be_issued_without_a_route_and_is_listed_as_unscoped(): void
+    {
+        Artisan::call('bplus:sync-token', ['--issue' => true, '--all-routes' => true]);
+        preg_match('/bps_\w+/', Artisan::output(), $match);
+
+        $this->assertNotEmpty($match[0] ?? null);
+        $token = DB::table('bplus_sync_tokens')->first();
+        $this->assertNull($token->route_code);
+        $this->assertSame('เครื่องซิงค์ทุกสาย', $token->name);
+
+        Artisan::call('bplus:sync-token', ['--list' => true]);
+        $this->assertStringContainsString('ทุกสาย', Artisan::output());
+    }
+
+    public function test_all_routes_token_provisions_missing_route_and_booking_book_on_hq(): void
+    {
+        $bookingTypeId = DB::table('document_types')->where('code', 'BOOKING')->value('id');
+        DB::table('sales_areas')->where('code', 'B20')->delete();
+        DB::table('document_books')->where('document_type_id', $bookingTypeId)->where('code', 'B20')->delete();
+        Artisan::call('bplus:sync-token', ['--issue' => true, '--all-routes' => true]);
+        preg_match('/bps_\w+/', Artisan::output(), $match);
+        $export = ['route' => 'B20', 'documents' => []];
+
+        $this->postJson(route('api.bplus.sync'), $export, ['Authorization' => 'Bearer '.$match[0]])
+            ->assertStatus(202)->assertJson(['ok' => true, 'status' => 'processing', 'received' => 0]);
+
+        $area = DB::table('sales_areas')->where('code', 'B20')->first();
+        $book = DB::table('document_books')->where('id', $area->document_book_id)->first();
+        $this->assertSame((int) $this->branch->id, (int) $area->branch_id);
+        $this->assertSame('B20', $area->code);
+        $this->assertSame('route', $area->area_type);
+        $this->assertSame('B20', $book->code);
+        $this->assertSame('B20', $book->prefix);
+        $this->assertSame((int) $bookingTypeId, (int) $book->document_type_id);
+        $this->assertSame('ok', DB::table('bplus_sync_runs')->value('status'));
+    }
+
+    public function test_b18_scoped_token_still_cannot_send_b20(): void
+    {
+        $bookingTypeId = DB::table('document_types')->where('code', 'BOOKING')->value('id');
+        DB::table('sales_areas')->where('code', 'B20')->delete();
+        DB::table('document_books')->where('document_type_id', $bookingTypeId)->where('code', 'B20')->delete();
+        $token = $this->issueSyncToken('B18');
+
+        $this->postJson(route('api.bplus.sync'), ['route' => 'B20', 'documents' => []], ['Authorization' => "Bearer {$token}"])
+            ->assertStatus(403)->assertJson(['ok' => false]);
+
+        $this->assertDatabaseMissing('sales_areas', ['code' => 'B20']);
+        $this->assertSame('rejected', DB::table('bplus_sync_runs')->value('status'));
+    }
+
+    public function test_sync_ping_accepts_valid_token_and_rejects_invalid_token_without_updating_usage(): void
+    {
+        $token = $this->issueSyncToken('B18');
+
+        $this->getJson(route('api.bplus.sync.ping'), ['Authorization' => "Bearer {$token}"])
+            ->assertOk()->assertJson(['ok' => true]);
+        $this->getJson(route('api.bplus.sync.ping'), ['Authorization' => 'Bearer bps_invalid'])
+            ->assertUnauthorized()->assertJson(['ok' => false]);
+        DB::table('bplus_sync_tokens')->where('token_hash', hash('sha256', $token))->update(['revoked_at' => now()]);
+        $this->getJson(route('api.bplus.sync.ping'), ['Authorization' => "Bearer {$token}"])
+            ->assertUnauthorized()->assertJson(['ok' => false]);
+
+        $this->assertNull(DB::table('bplus_sync_tokens')->value('last_used_at'));
+    }
+
     public function test_sync_api_refuses_missing_wrong_and_revoked_tokens(): void
     {
         $this->postJson(route('api.bplus.sync'), $this->export())->assertStatus(401);
