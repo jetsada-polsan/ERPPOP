@@ -23,7 +23,7 @@
     @if ($check['missing_products'])
         <div class="alert alert-warning">ไม่พบสินค้า {{ count($check['missing_products']) }} รหัสใน ERP บรรทัดเหล่านี้จะไม่แสดงในเอกสาร (ยอดรวมยังตรงกับ BPlus): {{ implode(', ', array_slice($check['missing_products'], 0, 30)) }}</div>
     @endif
-    <p class="small text-muted">เอกสารที่สร้างจะไม่ตัดสต๊อก ไม่ลงบัญชี GL และแก้ไขใน ERP ไม่ได้ (แก้ที่ BPlus แล้วซิงค์ใหม่) ใบเดิมที่ถูกแก้ใน BPlus จะถูกอัปเดตทับ</p>
+    <p class="small text-muted">เอกสารที่สร้างจะลงบัญชี GL ตามยอดเอกสาร ไม่ตัดสต๊อก และแก้ไขใน ERP ไม่ได้ (แก้ที่ BPlus แล้วซิงค์ใหม่) ใบเดิมที่ถูกแก้ใน BPlus จะถูกอัปเดตทับ</p>
     <form method="post" action="{{ route('bplus.sync.import.store') }}" class="d-flex gap-2">@csrf
         <input type="hidden" name="token" value="{{ $token }}">
         <button class="btn btn-primary">ยืนยันบันทึก</button>

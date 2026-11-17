@@ -100,7 +100,7 @@ class BplusDocumentsTest extends TestCase
         $this->assertSame('converted_to_sale', $sale->status);
         $this->assertSame($ds->id, $sale->confirmed_document_id);
         $this->assertNull(Document::where('doc_number', 'B18-6911/00383')->first(), 'ใบจองที่ยังไม่รู้ลูกค้ายังไม่สร้าง');
-        $this->assertStringContainsString('ยังไม่รู้ลูกค้า', (string) DB::table('bplus_sync_documents')->where('ref', 'B18-6911/00383')->value('problem'));
+        $this->assertNull(DB::table('bplus_sync_documents')->where('ref', 'B18-6911/00383')->value('problem'), 'ใบจองที่ยกเลิกก่อนเปิดขายไม่นับเป็นปัญหา');
 
         // หน่วยใหญ่: 2 ถุง*10 = 20 ถุง ราคาต่อถุง 83 รวม 1,660
         $line = DB::table('stock_document_items as i')->join('stock_documents as s', 's.id', '=', 'i.stock_document_id')
@@ -192,6 +192,16 @@ class BplusDocumentsTest extends TestCase
         $this->assertSame(0.0, round((float) ($net['opening_balance'] ?? 0), 2), 'ยอดยกมาถูกกลับรายการ');
         $this->assertSame(500.0, round((float) $net['ar'], 2));
         $this->assertSame(-500.0, round((float) $net['sales_revenue'], 2));
+    }
+
+    public function test_open_booking_without_a_sale_is_reported_until_billed(): void
+    {
+        $export = $this->export();
+        $export['documents'][1]['is_cancelled'] = false;
+        $this->importFile($export);
+
+        $this->assertNull(Document::where('doc_number', 'B18-6911/00383')->first());
+        $this->assertStringContainsString('ยังไม่รู้ลูกค้า', (string) DB::table('bplus_sync_documents')->where('ref', 'B18-6911/00383')->value('problem'));
     }
 
     public function test_customers_match_by_bplus_key_then_unique_name(): void
