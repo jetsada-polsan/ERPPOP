@@ -48,6 +48,10 @@ def log(work: pathlib.Path, message: str) -> None:
 
 
 def main() -> int:
+    # Task Scheduler บน Windows ภาษาอังกฤษใช้ code page ที่พิมพ์ภาษาไทยไม่ได้ อย่าให้ print ภาษาไทยทำสคริปต์ล้ม
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default=str(HERE / "bplus-sync.ini"))
     parser.add_argument("--dry-run", action="store_true")
