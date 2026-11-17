@@ -48,13 +48,17 @@ def log(work: pathlib.Path, message: str) -> None:
 
 
 def main() -> int:
+    # Task Scheduler บน Windows ภาษาอังกฤษใช้ code page ที่พิมพ์ภาษาไทยไม่ได้ อย่าให้ print ภาษาไทยทำสคริปต์ล้ม
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default=str(HERE / "bplus-sync.ini"))
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
     config = configparser.ConfigParser()
-    if not config.read(args.config, encoding="utf-8"):
+    if not config.read(args.config, encoding="utf-8-sig")  # Notepad บันทึกแบบมี BOM:
         print(f"ไม่พบไฟล์ตั้งค่า {args.config}")
         return 2
     route = config.get("bplus", "route", fallback="B18")
