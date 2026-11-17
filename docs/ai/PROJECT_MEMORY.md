@@ -1,5 +1,12 @@
 # POPSTAR ERP/POS - ความจำกลางของทีม AI
 
+## BPlus route synchronization — 2026-11-17
+
+- เจ้าของเลือกให้หน้าตั้งค่า/ตารางเวลา BPlus อยู่ในโปรแกรมแยก `bplusAPI` บนเครื่องในร้าน ไม่ทำ UI ตั้งค่าใน ERP. เว็บและ scheduler ใช้ process เดียว; scheduler ตรวจทุก 30 วินาที. โปรแกรมอ่าน BPlus แบบ `SELECT` และส่ง gzip/Bearer ไป ERP; ห้ามติดตั้งหรือเชื่อมเครื่องจริงโดยไม่มีคำสั่งเจ้าของ.
+- ค่า secret ของ `bplusAPI` ใช้ Windows DPAPI LocalMachine และไฟล์ data จำกัดสิทธิ์ SYSTEM/Administrators; secret fields เป็น write-only. Firewall พอร์ต 8765 จำกัด `LocalSubnet`; ห้าม port-forward/เปิดสู่อินเทอร์เน็ต.
+- ERP token เดิม B18 ยังคง scoped; token ที่ `route_code=NULL` เท่านั้นจึงส่งทุกสายและสร้าง route/book ใบจองบน HQ เมื่อไม่มี sales area. ผู้ดูแล ERP เป็นคนรัน `bplus:sync-token --issue --all-routes` และกรอก token เอง.
+- implementation และ handoff อยู่ใน branch `codex/bplusapi-erp`; รายงาน/ผลเทสต์ล่าสุดอยู่ `docs/ai/codex-bplusapi.md` และหัว `docs/ai/task.md`.
+
 ## Reports Phase 2 — 2026-11-09 (workspace only, not deployed)
 
 - Branch codex/reports-phase2 base44f02b1; pull/stage ถูกปฏิเสธเพราะ Git metadata นอกworkspace ไม่ commit/push. ส่งมอบเต็มและผลทดสอบอยู่หัว docs/ai/task.md.

@@ -11,6 +11,7 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
 
 // เครื่องในร้านส่งเอกสาร BPlus ขึ้นมาเอง (Bearer token จาก bplus:sync-token) แทนการอัปโหลดไฟล์
+Route::get('/bplus/sync/ping', [BplusSyncApiController::class, 'ping'])->middleware('throttle:30,1')->name('api.bplus.sync.ping');
 Route::post('/bplus/sync', [BplusSyncApiController::class, 'store'])->middleware('throttle:10,1')->name('api.bplus.sync');
 
 // API สำหรับ POS desktop (Tauri) — auth ด้วย Bearer device token (AuthenticatePosDevice)
