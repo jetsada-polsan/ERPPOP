@@ -63,6 +63,7 @@ class ReportController extends Controller
         }
         $filters = [
             'branch_id' => $requestedBranch,
+            'sales_area_id' => $request->integer('sales_area_id') ?: null,
             'q' => trim((string) $request->input('q', '')),
             'per_page' => $perPage,
             'page' => max(1, $request->integer('page', 1)),
@@ -102,9 +103,26 @@ class ReportController extends Controller
             'branches' => DB::table('branches')
                 ->when(! $canSeeAllBranches, fn ($query) => $query->whereIn('id', $user->reportBranchIds(null)->all()))
                 ->orderBy('code')->get(['id', 'code', 'name_th']),
+            'salesAreas' => DB::table('sales_areas')
+                ->where('is_active', true)
+                ->when($requestedBranch !== null, fn ($query) => $query->where('branch_id', $requestedBranch))
+                ->when(! $canSeeAllBranches, fn ($query) => $query->whereIn('branch_id', $user->reportBranchIds(null)->all()))
+                ->orderBy('code')->get(['id', 'code', 'name']),
             'bplusReportFilters' => in_array($report, ['bplus_credit_sales_by_document', 'bplus_credit_sales_by_product'], true)
                 ? $this->bplusReportFilterOptions($filters)
                 : ['salesmen' => collect(), 'customers' => collect()],
+            'statementCustomers' => $report === 'ar_statement'
+                ? DB::table('customers')
+                    ->whereExists(function ($query) use ($requestedBranch, $canSeeAllBranches, $user) {
+                        $query->selectRaw('1')->from('documents as sd')
+                            ->join('document_types as sdt', 'sdt.id', '=', 'sd.document_type_id')
+                            ->whereColumn('sd.customer_id', 'customers.id')
+                            ->whereIn('sdt.code', ['OPENING_AR', 'CREDIT_SALE', 'RECEIPT'])
+                            ->where('sd.status', 'active')->whereNull('sd.cancelled_at')
+                            ->when($requestedBranch !== null, fn ($q) => $q->where('sd.branch_id', $requestedBranch))
+                            ->when(! $canSeeAllBranches, fn ($q) => $q->whereIn('sd.branch_id', $user->reportBranchIds(null)->all()));
+                    })->orderBy('code')->get(['id', 'code', 'name_th'])
+                : collect(),
             'result' => app(ReportScope::class)->redact($this->runReport($category, $report, $from, $to, $filters)),
         ]);
     }
@@ -392,6 +410,7 @@ class ReportController extends Controller
                 ['label' => 'มูลค่าฐานภาษี', 'key' => 'base_amount', 'type' => 'money', 'class' => 'text-end'],
                 ['label' => 'ภาษีมูลค่าเพิ่ม', 'key' => 'vat_amount', 'type' => 'money', 'class' => 'text-end'],
                 ['label' => 'รวม', 'key' => 'total_amount', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'สายขาย', 'key' => 'sales_area_name'],
             ], $this->vatSales($fromStart, $toEnd, $filters)),
 
             'vat_purchase' => $this->tableResult('รายงานภาษีซื้อ', [
@@ -491,6 +510,7 @@ class ReportController extends Controller
 
             'sales_by_category' => $this->tableResult('ยอดขายตามหมวดสินค้า', [
                 ['label' => 'หมวดสินค้า', 'key' => 'category_name'],
+                ['label' => 'สายขาย', 'key' => 'sales_area_name'],
                 ['label' => 'ช่องทาง', 'key' => 'channel', 'type' => 'badge'],
                 ['label' => 'บิล', 'key' => 'bill_count', 'type' => 'number', 'class' => 'text-end'],
                 ['label' => 'จำนวน', 'key' => 'qty', 'type' => 'number', 'class' => 'text-end'],
@@ -499,6 +519,7 @@ class ReportController extends Controller
 
             'sales_by_seller' => $this->tableResult('ยอดขายตามคนขาย', [
                 ['label' => 'คนขาย', 'key' => 'seller_name'],
+                ['label' => 'สายขาย', 'key' => 'sales_area_name'],
                 ['label' => 'ช่องทาง', 'key' => 'channel', 'type' => 'badge'],
                 ['label' => 'บิล', 'key' => 'bill_count', 'type' => 'number', 'class' => 'text-end'],
                 ['label' => 'จำนวน', 'key' => 'qty', 'type' => 'number', 'class' => 'text-end'],
@@ -517,6 +538,7 @@ class ReportController extends Controller
             'top_products' => $this->tableResult('สินค้าขายดี', [
                 ['label' => 'รหัส', 'key' => 'sku_code'],
                 ['label' => 'สินค้า', 'key' => 'name_th'],
+                ['label' => 'สายขาย', 'key' => 'sales_area_name'],
                 ['label' => 'จำนวน', 'key' => 'qty', 'type' => 'number', 'class' => 'text-end'],
                 ['label' => 'ยอดขาย', 'key' => 'amount', 'type' => 'money', 'class' => 'text-end'],
             ], $this->topProducts($fromStart, $toEnd, $filters)),
@@ -544,6 +566,7 @@ class ReportController extends Controller
                 ['label' => 'วันที่', 'key' => 'doc_date'],
                 ['label' => 'ลูกค้า', 'key' => 'customer_name'],
                 ['label' => 'พนักงาน', 'key' => 'salesman_name'],
+                ['label' => 'สายขาย', 'key' => 'sales_area_name'],
                 ['label' => 'ยอดเงิน', 'key' => 'total_amount', 'type' => 'money', 'class' => 'text-end'],
             ], $this->creditSales($from, $to, $filters)),
 
@@ -551,11 +574,14 @@ class ReportController extends Controller
 
             'bplus_credit_sales_by_product' => $this->bplusCreditSalesByProduct($from, $to, $filters),
 
+            'bplus_daily_sales_summary' => $this->bplusDailySalesSummary($from, $to, $filters),
+
             'pending_bookings' => $this->tableResult('ใบจองค้างแปลงขาย', [
                 ['label' => 'เลขที่', 'key' => 'doc_number'],
                 ['label' => 'วันที่', 'key' => 'doc_date'],
                 ['label' => 'ลูกค้า', 'key' => 'customer_name'],
                 ['label' => 'พนักงาน', 'key' => 'salesman_name'],
+                ['label' => 'สายขาย', 'key' => 'sales_area_name'],
                 ['label' => 'ยอดเงิน', 'key' => 'total_amount', 'type' => 'money', 'class' => 'text-end'],
             ], $this->pendingBookings($from, $to, $filters)),
 
@@ -615,6 +641,7 @@ class ReportController extends Controller
 
             'sales_summary_by_customer' => $this->tableResult('รายงานสรุปยอดขายตามลูกค้า', [
                 ['label' => 'ลูกค้า', 'key' => 'customer_name'],
+                ['label' => 'สายขาย', 'key' => 'sales_area_name'],
                 ['label' => 'บิล', 'key' => 'bill_count', 'type' => 'number', 'class' => 'text-end'],
                 ['label' => 'จำนวน', 'key' => 'qty', 'type' => 'number', 'class' => 'text-end'],
                 ['label' => 'ยอดขาย', 'key' => 'sales_amount', 'type' => 'money', 'class' => 'text-end'],
@@ -707,6 +734,7 @@ class ReportController extends Controller
 
             'ar_summary' => $this->tableResult('สรุปยอดลูกหนี้', [
                 ['label' => 'ลูกค้า', 'key' => 'customer_name'],
+                ['label' => 'สายขาย', 'key' => 'sales_area_name'],
                 ['label' => 'ใบค้าง', 'key' => 'bill_count', 'type' => 'number', 'class' => 'text-end'],
                 ['label' => 'ครบกำหนดเก่าสุด', 'key' => 'oldest_due_date'],
                 ['label' => 'ยอดเกินกำหนด', 'key' => 'overdue_amount', 'type' => 'money', 'class' => 'text-end'],
@@ -715,6 +743,7 @@ class ReportController extends Controller
 
             'ar_summary_bplus' => $this->tableResult('รายงานสรุปยอดลูกหนี้', [
                 ['label' => 'ลูกค้า', 'key' => 'customer_name'],
+                ['label' => 'สายขาย', 'key' => 'sales_area_name'],
                 ['label' => 'ใบค้าง', 'key' => 'bill_count', 'type' => 'number', 'class' => 'text-end'],
                 ['label' => 'ครบกำหนดเก่าสุด', 'key' => 'oldest_due_date'],
                 ['label' => 'ยอดเกินกำหนด', 'key' => 'overdue_amount', 'type' => 'money', 'class' => 'text-end'],
@@ -723,12 +752,14 @@ class ReportController extends Controller
 
             'ar_aging' => $this->tableResult('อายุหนี้ AR Aging — ยอดคงค้างปัจจุบัน ณ '.today()->toDateString(), [
                 ['label' => 'ช่วงอายุหนี้', 'key' => 'bucket'],
+                ['label' => 'สายขาย', 'key' => 'sales_area_name'],
                 ['label' => 'จำนวนเงิน', 'key' => 'amount', 'type' => 'money', 'class' => 'text-end'],
             ], $this->arAging($filters)),
 
             'overdue_customers' => $this->tableResult('ลูกหนี้เกินกำหนด', [
                 ['label' => 'ลูกค้า', 'key' => 'customer_name'],
                 ['label' => 'พนักงาน', 'key' => 'salesman_name'],
+                ['label' => 'สายขาย', 'key' => 'sales_area_name'],
                 ['label' => 'บิล', 'key' => 'bill_count', 'type' => 'number', 'class' => 'text-end'],
                 ['label' => 'ครบกำหนดเก่าสุด', 'key' => 'oldest_due_date'],
                 ['label' => 'ยอดค้าง', 'key' => 'balance_amount', 'type' => 'money', 'class' => 'text-end'],
@@ -737,6 +768,8 @@ class ReportController extends Controller
             'open_items' => $this->tableResult('ลูกหนี้คงค้าง', [
                 ['label' => 'ลูกค้า', 'key' => 'customer_name'],
                 ['label' => 'เอกสาร', 'key' => 'doc_number'],
+                ['label' => 'พนักงานขาย', 'key' => 'salesman_name'],
+                ['label' => 'สายขาย', 'key' => 'sales_area_name'],
                 ['label' => 'ครบกำหนด', 'key' => 'due_date'],
                 ['label' => 'สถานะ', 'key' => 'status', 'type' => 'badge'],
                 ['label' => 'ยอดค้าง', 'key' => 'balance_amount', 'type' => 'money', 'class' => 'text-end'],
@@ -745,6 +778,7 @@ class ReportController extends Controller
             'ar_detail_short' => $this->tableResult('รายงานรายละเอียดยอดลูกหนี้ แบบย่อ', [
                 ['label' => 'ลูกค้า', 'key' => 'customer_name'],
                 ['label' => 'เอกสาร', 'key' => 'doc_number'],
+                ['label' => 'สายขาย', 'key' => 'sales_area_name'],
                 ['label' => 'ครบกำหนด', 'key' => 'due_date'],
                 ['label' => 'ยอดค้าง', 'key' => 'balance_amount', 'type' => 'money', 'class' => 'text-end'],
             ], $this->arDetails($filters, false)),
@@ -752,6 +786,7 @@ class ReportController extends Controller
             'ar_detail_full' => $this->tableResult('รายงานรายละเอียดยอดลูกหนี้ แบบละเอียด', [
                 ['label' => 'ลูกค้า', 'key' => 'customer_name'],
                 ['label' => 'พนักงานขาย', 'key' => 'salesman_name'],
+                ['label' => 'สายขาย', 'key' => 'sales_area_name'],
                 ['label' => 'เอกสาร', 'key' => 'doc_number'],
                 ['label' => 'วันที่เอกสาร', 'key' => 'doc_date'],
                 ['label' => 'ครบกำหนด', 'key' => 'due_date'],
@@ -763,11 +798,14 @@ class ReportController extends Controller
             'ar_overdue_detail' => $this->tableResult('รายงานรายละเอียดลูกหนี้เกินกำหนดชำระ', [
                 ['label' => 'ลูกค้า', 'key' => 'customer_name'],
                 ['label' => 'พนักงานขาย', 'key' => 'salesman_name'],
+                ['label' => 'สายขาย', 'key' => 'sales_area_name'],
                 ['label' => 'เอกสาร', 'key' => 'doc_number'],
                 ['label' => 'ครบกำหนด', 'key' => 'due_date'],
                 ['label' => 'เกินกำหนด', 'key' => 'overdue_days', 'type' => 'number', 'class' => 'text-end'],
                 ['label' => 'ยอดค้าง', 'key' => 'balance_amount', 'type' => 'money', 'class' => 'text-end'],
             ], $this->arOverdueDetails($filters)),
+
+            'ar_statement' => $this->arStatement($from, $to, $filters),
 
             'ar_over_credit_limit' => $this->tableResult('รายงานรายละเอียดลูกหนี้เกินวงเงินเครดิต', [
                 ['label' => 'ลูกค้า', 'key' => 'customer_name'],
@@ -833,6 +871,7 @@ class ReportController extends Controller
 
             'documents_summary' => $this->tableResult('สรุปเอกสาร', [
                 ['label' => 'ประเภทเอกสาร', 'key' => 'document_type'],
+                ['label' => 'สายขาย', 'key' => 'sales_area_name'],
                 ['label' => 'จำนวนเอกสาร', 'key' => 'document_count', 'type' => 'number', 'class' => 'text-end'],
                 ['label' => 'จำนวนรายการ', 'key' => 'item_count', 'type' => 'number', 'class' => 'text-end'],
                 ['label' => 'ยอดเงิน', 'key' => 'amount', 'type' => 'money', 'class' => 'text-end'],
@@ -843,6 +882,7 @@ class ReportController extends Controller
                 ['label' => 'ประเภทเอกสาร', 'key' => 'document_type'],
                 ['label' => 'เลขที่', 'key' => 'doc_number'],
                 ['label' => 'สาขา', 'key' => 'branch_name'],
+                ['label' => 'สายขาย', 'key' => 'sales_area_name'],
                 ['label' => 'คู่ค้า/ลูกค้า', 'key' => 'party_name'],
                 ['label' => 'พนักงานขาย', 'key' => 'salesman_name'],
                 ['label' => 'สถานะ', 'key' => 'status', 'type' => 'badge'],
@@ -955,20 +995,25 @@ class ReportController extends Controller
                 ['label' => 'วันที่', 'key' => 'doc_date'],
                 ['label' => 'ประเภทคู่ค้า', 'key' => 'party_type', 'type' => 'badge'],
                 ['label' => 'คู่ค้า', 'key' => 'party_name'],
+                ['label' => 'สายขาย', 'key' => 'sales_area_name'],
                 ['label' => 'สถานะ', 'key' => 'status', 'type' => 'badge'],
             ], $this->paymentDocuments($from, $to, $filters)),
 
             'payment_allocations' => $this->tableResult('ตัดหนี้ / จัดสรรยอด', [
                 ['label' => 'เอกสารรับชำระ', 'key' => 'doc_number'],
                 ['label' => 'ลูกค้า', 'key' => 'customer_name'],
+                ['label' => 'สายขาย', 'key' => 'sales_area_name'],
                 ['label' => 'ยอดจัดสรร', 'key' => 'allocated_amount', 'type' => 'money', 'class' => 'text-end'],
                 ['label' => 'ส่วนลด', 'key' => 'discount_amount', 'type' => 'money', 'class' => 'text-end'],
                 ['label' => 'หัก ณ ที่จ่าย', 'key' => 'wht_amount', 'type' => 'money', 'class' => 'text-end'],
             ], $this->paymentAllocations($from, $to, $filters)),
 
+            'bplus_receipt_allocations' => $this->bplusReceiptAllocations($from, $to, $filters),
+
             'gl_journals' => $this->tableResult('GL Journal', [
                 ['label' => 'วันที่', 'key' => 'entry_date'],
                 ['label' => 'บัญชี', 'key' => 'account_name'],
+                ['label' => 'สายขาย', 'key' => 'sales_area_name'],
                 ['label' => 'เดบิต', 'key' => 'debit', 'type' => 'money', 'class' => 'text-end'],
                 ['label' => 'เครดิต', 'key' => 'credit', 'type' => 'money', 'class' => 'text-end'],
                 ['label' => 'หมายเหตุ', 'key' => 'remark'],
@@ -1072,18 +1117,20 @@ class ReportController extends Controller
         $query = DB::table('sale_bookings as sb')
             ->join('documents as d', 'd.id', '=', 'sb.document_id')
             ->leftJoin('branches as b', 'b.id', '=', 'd.branch_id')
-            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'sb.sales_area_id')
-            ->leftJoin('salesmen as sm', 'sm.id', '=', 'sb.salesman_id')
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
+            ->leftJoin('salesmen as sm', 'sm.id', '=', 'd.salesman_id')
+            ->where('d.status', 'active')->whereNull('d.cancelled_at')
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
 
         $this->applyBranch($query, $filters, 'd.branch_id');
+        $this->applySalesArea($query, $filters, 'd.sales_area_id');
 
         return $query
-            ->groupBy('b.name_th', 'sa.name', 'sm.name')
+            ->groupBy('b.name_th', 'sa.code', 'sa.name', 'd.salesman_id', 'sm.name')
             ->orderByDesc(DB::raw('sum(d.total_amount)'))
             ->selectRaw("coalesce(b.name_th, 'ไม่ระบุสาขา') as branch_name,
-                coalesce(sa.name, 'ไม่ระบุสายขาย') as sales_area_name,
-                coalesce(sm.name, 'ไม่ระบุพนักงานขาย') as salesman_name,
+                coalesce(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') as sales_area_name,
+                coalesce(sm.name, 'ไม่ระบุ') as salesman_name,
                 count(*) as booking_count,
                 sum(case when sb.fulfillment_type = 'delivery' and sb.delivery_status in ('pending', 'partial') then 1 else 0 end) as outstanding_count,
                 sum(d.total_amount) as amount")
@@ -1217,11 +1264,12 @@ class ReportController extends Controller
 
     private function tableResult(string $title, array $columns, Collection $rows): array
     {
-        $summaryRows = $rows->reject(fn ($r) => data_get($r, 'party_name') === 'รวมทั้งสิ้น' || data_get($r, 'customer_name') === 'รวมทั้งสิ้น');
+        $summaryRows = $rows->reject(fn ($r) => data_get($r, 'party_name') === 'รวมทั้งสิ้น' || data_get($r, 'customer_name') === 'รวมทั้งสิ้น'
+            || in_array(data_get($r, 'status'), ['cancelled', 'void'], true));
         if ($rows->contains(fn ($r) => data_get($r, 'bucket') === 'รับแล้ว')) {
             $summaryRows = $rows->filter(fn ($r) => data_get($r, 'bucket') === 'รับแล้ว');
         }
-        $moneyKey = collect(['net_sales', 'sales_amount', 'total_amount', 'amount', 'balance_amount'])->first(fn ($key) => collect($columns)->contains('key', $key));
+        $moneyKey = collect(['net_sales', 'sales_amount', 'total_amount', 'amount', 'balance_amount', 'applied_total'])->first(fn ($key) => collect($columns)->contains('key', $key));
         return [
             'title' => $title, 'columns' => $columns, 'rows' => $rows, 'total' => $rows->count(),
             'summary_scope' => 'displayed',
@@ -1258,6 +1306,15 @@ class ReportController extends Controller
         return $query;
     }
 
+    private function applySalesArea($query, array $filters, string $column = 'd.sales_area_id')
+    {
+        if (! empty($filters['sales_area_id'])) {
+            $query->where($column, $filters['sales_area_id']);
+        }
+
+        return $query;
+    }
+
     private function applySearch($query, array $filters, array $columns)
     {
         if ($filters['q'] === '') {
@@ -1280,22 +1337,25 @@ class ReportController extends Controller
         $docQuery = DB::table('documents as d')
             ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
             ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
             ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN', 'CREDIT_NOTE', 'DEBIT_NOTE'])
             ->where('d.status', 'active')
             ->whereNull('d.cancelled_at')
             ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('pos_receipts as linked_pos')->whereColumn('linked_pos.document_id', 'd.id'))
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
         $this->applyBranch($docQuery, $filters, 'd.branch_id');
+        $this->applySalesArea($docQuery, $filters, 'd.sales_area_id');
         $this->applySearch($docQuery, $filters, ['d.doc_number', 'c.name_th']);
 
         $docRows = $docQuery->selectRaw(
             "d.doc_date, d.doc_number, dt.code as doc_code,
-             COALESCE(c.name_th, 'ลูกค้าทั่วไป') as party_name, c.tax_id, d.total_amount, d.vat_amount"
+             COALESCE(c.name_th, 'ลูกค้าทั่วไป') as party_name, c.tax_id, d.subtotal_amount, d.total_amount, d.vat_amount,
+             COALESCE(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') as sales_area_name"
         )->get()->map(function ($r) {
             $sign = in_array($r->doc_code, ['SALE_RETURN', 'CREDIT_NOTE'], true) ? -1 : 1;
             $total = DecimalMath::multiply($sign, $r->total_amount, 2);
             $vat = DecimalMath::multiply($sign, $r->vat_amount, 2);
-            $base = DecimalMath::subtract($total, $vat, 2);
+            $base = DecimalMath::multiply($sign, $r->subtotal_amount ?? DecimalMath::subtract($r->total_amount, $r->vat_amount, 2), 2);
 
             return [
                 'doc_date' => \Illuminate\Support\Carbon::parse($r->doc_date)->thaiDate(),
@@ -1306,17 +1366,21 @@ class ReportController extends Controller
                 'base_amount' => $base,
                 'vat_amount' => $vat,
                 'total_amount' => $total,
+                'sales_area_name' => $r->sales_area_name,
             ];
         });
 
         $posQuery = DB::table('pos_receipts as r')
             ->join('pos_terminals as t', 't.id', '=', 'r.pos_terminal_id')
+            ->leftJoin('documents as pd', 'pd.id', '=', 'r.document_id')
+            ->leftJoin('sales_areas as psa', 'psa.id', '=', 'pd.sales_area_id')
             ->whereBetween('r.receipt_date', [$from, $to])
             ->where('r.status', 'completed');
         $this->applyBranch($posQuery, $filters, 't.branch_id');
+        $this->applySalesArea($posQuery, $filters, 'pd.sales_area_id');
         $this->applySearch($posQuery, $filters, ['r.receipt_no']);
 
-        $posRows = $posQuery->selectRaw('r.receipt_date, r.receipt_no, r.net_sales, r.vat_amount')
+        $posRows = $posQuery->selectRaw("r.receipt_date, r.receipt_no, r.net_sales, r.vat_amount, COALESCE(psa.code || ' - ' || psa.name, 'ไม่ระบุสายขาย') as sales_area_name")
             ->get()->map(function ($r) {
                 $total = DecimalMath::round($r->net_sales, 2);
                 $vat = $r->vat_amount === null ? null : DecimalMath::round($r->vat_amount, 2);
@@ -1330,6 +1394,7 @@ class ReportController extends Controller
                     'base_amount' => $vat === null ? null : DecimalMath::subtract($total, $vat, 2),
                     'vat_amount' => $vat,
                     'total_amount' => $total,
+                    'sales_area_name' => $r->sales_area_name,
                 ];
             });
 
@@ -1426,16 +1491,22 @@ class ReportController extends Controller
         $query = DB::table('pos_receipt_items as i')
             ->join('pos_receipts as r', 'r.id', '=', 'i.pos_receipt_id')
             ->join('pos_terminals as t', 't.id', '=', 'r.pos_terminal_id')
+            ->leftJoin('documents as d', 'd.id', '=', 'r.document_id')
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
             ->join('products as p', 'p.id', '=', 'i.product_id')
-            ->whereBetween('r.receipt_date', [$from, $to]);
+            ->whereBetween('r.receipt_date', [$from, $to])
+            ->where('r.status', 'completed')
+            ->where('r.is_legacy_import', false);
 
         $this->applyBranch($query, $filters, 't.branch_id');
+        $this->applySalesArea($query, $filters, 'd.sales_area_id');
         $this->applySearch($query, $filters, ['p.sku_code', 'p.name_th']);
 
         return $query
-            ->groupBy('p.id', 'p.sku_code', 'p.name_th')
+            ->groupBy('p.id', 'p.sku_code', 'p.name_th', 'sa.code', 'sa.name')
             ->orderByDesc(DB::raw('sum(i.net_amount)'))
-            ->selectRaw('p.sku_code, p.name_th, sum(i.qty) as qty, sum(i.net_amount) as amount')
+            ->selectRaw("p.sku_code, p.name_th, COALESCE(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') as sales_area_name,
+                sum(i.qty) as qty, sum(i.net_amount) as amount")
             ->limit($filters['per_page'])
             ->get();
     }
@@ -1464,9 +1535,9 @@ class ReportController extends Controller
     private function salesByCategory(Carbon $from, Carbon $to, array $filters): Collection
     {
         return $this->mergeSalesSlices(
-            $this->posSalesSlice($from, $to, $filters, ['category']),
-            $this->documentSalesSlice($from, $to, $filters, ['category']),
-            ['category_name', 'channel'],
+            $this->posSalesSlice($from, $to, $filters, ['category', 'sales_area']),
+            $this->documentSalesSlice($from, $to, $filters, ['category', 'sales_area']),
+            ['category_name', 'sales_area_name', 'channel'],
             $filters
         );
     }
@@ -1474,9 +1545,9 @@ class ReportController extends Controller
     private function salesBySeller(Carbon $from, Carbon $to, array $filters): Collection
     {
         return $this->mergeSalesSlices(
-            $this->posSalesSlice($from, $to, $filters, ['seller']),
-            $this->documentSalesSlice($from, $to, $filters, ['seller']),
-            ['seller_name', 'channel'],
+            $this->posSalesSlice($from, $to, $filters, ['seller', 'sales_area']),
+            $this->documentSalesSlice($from, $to, $filters, ['seller', 'sales_area']),
+            ['seller_name', 'sales_area_name', 'channel'],
             $filters
         );
     }
@@ -1496,6 +1567,8 @@ class ReportController extends Controller
         $query = DB::table('pos_receipt_items as i')
             ->join('pos_receipts as r', 'r.id', '=', 'i.pos_receipt_id')
             ->join('pos_terminals as t', 't.id', '=', 'r.pos_terminal_id')
+            ->leftJoin('documents as d', 'd.id', '=', 'r.document_id')
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
             ->join('products as p', 'p.id', '=', 'i.product_id')
             ->leftJoin('product_categories as pc', 'pc.id', '=', 'p.product_category_id')
             ->leftJoin('users as u', 'u.id', '=', 'r.cashier_id')
@@ -1507,6 +1580,7 @@ class ReportController extends Controller
             ->where('r.is_legacy_import', false);
 
         $this->applyBranch($query, $filters, 't.branch_id');
+        $this->applySalesArea($query, $filters, 'd.sales_area_id');
         $this->applySearch($query, $filters, ['p.sku_code', 'p.name_th', 'pc.name_th', 'u.name']);
 
         $selects = ["'POS' as channel", 'count(distinct r.id) as bill_count', 'sum(i.qty) as qty', 'sum(i.net_amount) as amount'];
@@ -1515,6 +1589,10 @@ class ReportController extends Controller
         if (in_array('category', $dimensions, true)) {
             $selects[] = "coalesce(pc.name_th, 'ไม่ระบุหมวดสินค้า') as category_name";
             $groups[] = DB::raw("coalesce(pc.name_th, 'ไม่ระบุหมวดสินค้า')");
+        }
+        if (in_array('sales_area', $dimensions, true)) {
+            $selects[] = "coalesce(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') as sales_area_name";
+            $groups[] = DB::raw("coalesce(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย')");
         }
         if (in_array('seller', $dimensions, true)) {
             $selects[] = "coalesce(u.name, 'ไม่ระบุคนขาย') as seller_name";
@@ -1538,9 +1616,11 @@ class ReportController extends Controller
             ->leftJoin('users as u', 'u.id', '=', 'd.sales_user_id')
             // พนักงานขายของเอกสาร (เช่น ใบขายสายที่มาจาก BPlus) มาก่อนผู้ใช้ที่คีย์ เหมือนรายงานยอดขายตามพนักงาน
             ->leftJoin('salesmen as sm', 'sm.id', '=', 'd.salesman_id')
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
             ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN'])
             // เอกสารที่ถูกยกเลิกไม่ใช่ยอดขาย — เดิมไม่กรองสถานะเลย บิลที่ void แล้วจึงยังโผล่
             ->where('d.status', 'active')
+            ->whereNull('d.cancelled_at')
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()])
             // ทุกบิล POS สร้างเอกสารขายสดผูกไว้เสมอ ถ้าไม่กันออกจะถูกนับซ้ำกับฝั่ง POS
             // กติกาเดียวกับ view `sales_postings` ซึ่งเป็นบัญชีขายฉบับจริงของระบบ
@@ -1551,6 +1631,7 @@ class ReportController extends Controller
                 ->where('pr.status', 'completed'));
 
         $this->applyBranch($query, $filters, 'd.branch_id');
+        $this->applySalesArea($query, $filters, 'd.sales_area_id');
         $this->applySearch($query, $filters, ['d.doc_number', 'p.sku_code', 'p.name_th', 'pc.name_th', 'u.name', 'sm.name']);
 
         $selects = [
@@ -1565,15 +1646,97 @@ class ReportController extends Controller
             $selects[] = "coalesce(pc.name_th, 'ไม่ระบุหมวดสินค้า') as category_name";
             $groups[] = DB::raw("coalesce(pc.name_th, 'ไม่ระบุหมวดสินค้า')");
         }
+        if (in_array('sales_area', $dimensions, true)) {
+            $selects[] = "coalesce(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') as sales_area_name";
+            $groups[] = DB::raw("coalesce(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย')");
+        }
         if (in_array('seller', $dimensions, true)) {
-            $selects[] = "coalesce(sm.name, u.name, 'ไม่ระบุผู้ขายหลังบ้าน') as seller_name";
-            $groups[] = DB::raw("coalesce(sm.name, u.name, 'ไม่ระบุผู้ขายหลังบ้าน')");
+            $selects[] = "coalesce(sm.name, 'ไม่ระบุ') as seller_name";
+            $groups[] = DB::raw("coalesce(sm.name, 'ไม่ระบุ')");
         }
 
-        return $query
+        $lineRows = $query
             ->groupBy(...$groups)
             ->selectRaw(implode(",\n", $selects))
             ->get();
+
+        $lineTotals = DB::table('stock_documents as sd')
+            ->join('stock_document_items as sdi', 'sdi.stock_document_id', '=', 'sd.id')
+            ->groupBy('sd.document_id')
+            ->selectRaw('sd.document_id, sum(sdi.qty * sdi.unit_price) as line_amount');
+        $headerQuery = DB::table('documents as d')
+            ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
+            ->leftJoinSub($lineTotals, 'line_totals', 'line_totals.document_id', '=', 'd.id')
+            ->leftJoin('salesmen as sm', 'sm.id', '=', 'd.salesman_id')
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
+            ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')
+            ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN'])
+            ->where('d.status', 'active')->whereNull('d.cancelled_at')
+            ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()])
+            ->whereNotExists(fn ($sub) => $sub->select(DB::raw(1))->from('pos_receipts as pr')
+                ->whereColumn('pr.document_id', 'd.id')->where('pr.status', 'completed'));
+        $this->applyBranch($headerQuery, $filters, 'd.branch_id');
+        $this->applySalesArea($headerQuery, $filters, 'd.sales_area_id');
+        if (($filters['q'] ?? '') !== '') {
+            $search = '%'.$filters['q'].'%';
+            $headerQuery->where(function ($searchQuery) use ($search) {
+                $searchQuery->where('d.doc_number', 'like', $search)
+                    ->orWhere('c.code', 'like', $search)->orWhere('c.name_th', 'like', $search)
+                    ->orWhere('sm.name', 'like', $search)->orWhere('sa.code', 'like', $search)->orWhere('sa.name', 'like', $search)
+                    ->orWhereExists(function ($lineQuery) use ($search) {
+                        $lineQuery->selectRaw('1')->from('stock_documents as qsd')
+                            ->join('stock_document_items as qsdi', 'qsdi.stock_document_id', '=', 'qsd.id')
+                            ->join('products as qp', 'qp.id', '=', 'qsdi.product_id')
+                            ->leftJoin('product_categories as qpc', 'qpc.id', '=', 'qp.product_category_id')
+                            ->whereColumn('qsd.document_id', 'd.id')
+                            ->where(function ($productSearch) use ($search) {
+                                $productSearch->where('qp.sku_code', 'like', $search)
+                                    ->orWhere('qp.name_th', 'like', $search)->orWhere('qpc.name_th', 'like', $search);
+                            });
+                    });
+            });
+        }
+
+        $residualDocuments = $headerQuery->get(['d.total_amount', 'dt.code as document_code',
+            DB::raw('COALESCE(line_totals.line_amount, 0) as line_amount'), 'sm.name as salesman_name', 'sa.code as area_code', 'sa.name as area_name'])
+            ->map(function ($document) use ($dimensions) {
+                $sign = $document->document_code === 'SALE_RETURN' ? -1 : 1;
+                $documentAmount = DecimalMath::multiply($sign, $document->total_amount, 2);
+                $lineAmount = DecimalMath::multiply($sign, $document->line_amount, 2);
+                $difference = DecimalMath::subtract($documentAmount, $lineAmount, 2);
+                if (DecimalMath::compare($difference, 0) === 0) {
+                    return null;
+                }
+
+                $row = ['channel' => 'เอกสาร', 'bill_count' => 0, 'qty' => '0.0000', 'amount' => $difference];
+                if (in_array('category', $dimensions, true)) {
+                    $row['category_name'] = 'ส่วนต่าง/ภาษีตามเอกสาร';
+                }
+                if (in_array('seller', $dimensions, true)) {
+                    $row['seller_name'] = $document->salesman_name ?? 'ไม่ระบุ';
+                }
+                if (in_array('sales_area', $dimensions, true)) {
+                    $row['sales_area_name'] = $document->area_code && $document->area_name
+                        ? $document->area_code.' - '.$document->area_name
+                        : 'ไม่ระบุสายขาย';
+                }
+
+                return (object) $row;
+            })->filter();
+
+        $dimensionKeys = [];
+        foreach (['category' => 'category_name', 'seller' => 'seller_name', 'sales_area' => 'sales_area_name'] as $dimension => $key) {
+            if (in_array($dimension, $dimensions, true)) {
+                $dimensionKeys[] = $key;
+            }
+        }
+        $residualRows = $residualDocuments->groupBy(fn ($row) => implode('|', array_map(fn ($key) => (string) $row->{$key}, $dimensionKeys)))
+            ->map(function (Collection $rows) {
+                $first = $rows->first();
+                return (object) array_merge((array) $first, ['amount' => DecimalMath::sum($rows->pluck('amount'), 2)]);
+            })->values();
+
+        return $lineRows->concat($residualRows)->values();
     }
 
     private function mergeSalesSlices(Collection $posRows, Collection $docRows, array $keys, array $filters): Collection
@@ -1589,7 +1752,7 @@ class ReportController extends Controller
                 }
                 $payload['bill_count'] = (int) $rows->sum('bill_count');
                 $payload['qty'] = (float) $rows->sum('qty');
-                $payload['amount'] = (float) $rows->sum('amount');
+                $payload['amount'] = DecimalMath::sum($rows->pluck('amount'), 2);
 
                 return (object) $payload;
             })
@@ -1665,15 +1828,19 @@ class ReportController extends Controller
             ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
             ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')
             ->leftJoin('salesmen as s', 's.id', '=', 'd.salesman_id')
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
             ->where('dt.code', 'CREDIT_SALE')
+            ->where('d.status', 'active')
+            ->whereNull('d.cancelled_at')
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
 
         $this->applyBranch($query, $filters, 'd.branch_id');
+        $this->applySalesArea($query, $filters, 'd.sales_area_id');
         $this->applySearch($query, $filters, ['d.doc_number', 'c.code', 'c.name_th', 's.name']);
 
         return $query
             ->orderByDesc('d.doc_date')
-            ->selectRaw("d.doc_number, d.doc_date, coalesce(c.name_th, '-') as customer_name, coalesce(s.name, '-') as salesman_name, d.total_amount")
+            ->selectRaw("d.doc_number, d.doc_date, coalesce(c.name_th, '-') as customer_name, coalesce(s.name, 'ไม่ระบุ') as salesman_name, coalesce(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') as sales_area_name, d.total_amount")
             ->limit($filters['per_page'])
             ->get();
     }
@@ -1690,6 +1857,7 @@ class ReportController extends Controller
             ->join('document_books as db', 'db.id', '=', 'd.document_book_id')
             ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')
             ->leftJoin('salesmen as s', 's.id', '=', 'd.salesman_id')
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
             ->leftJoin('branches as b', 'b.id', '=', 'd.branch_id')
             ->leftJoinSub($itemTotals, 'item_totals', 'item_totals.document_id', '=', 'd.id')
             ->where('d.source_system', 'bplus')
@@ -1700,6 +1868,7 @@ class ReportController extends Controller
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
 
         $this->applyBranch($query, $filters, 'd.branch_id');
+        $this->applySalesArea($query, $filters, 'd.sales_area_id');
         $this->applySearch($query, $filters, array_merge(['d.doc_number', 'c.code', 'c.name_th', 's.name', 'db.code'], $extraSearchColumns));
 
         if (($filters['salesman_id'] ?? null) === 'unassigned') {
@@ -1731,6 +1900,7 @@ class ReportController extends Controller
             ['label' => 'จำนวนรายการ', 'key' => 'item_count', 'type' => 'number', 'class' => 'text-end'],
             ['label' => 'รหัสสาขา', 'key' => 'branch_code'],
             ['label' => 'สาขา', 'key' => 'branch_name'],
+            ['label' => 'สายขาย', 'key' => 'sales_area_name'],
             ['label' => 'พนักงานขาย', 'key' => 'salesman_name'],
         ];
         $rows = $this->bplusCreditSaleQuery($from, $to, $filters)
@@ -1739,7 +1909,8 @@ class ReportController extends Controller
                 COALESCE(d.subtotal_amount, d.total_amount - COALESCE(d.vat_amount, 0)) AS subtotal_amount,
                 COALESCE(d.vat_amount, 0) AS vat_amount, d.total_amount,
                 COALESCE(item_totals.item_count, 0) AS item_count, COALESCE(b.code, '-') AS branch_code,
-                COALESCE(b.name_th, '-') AS branch_name, COALESCE(s.name, 'ไม่ระบุ') AS salesman_name")
+                COALESCE(b.name_th, '-') AS branch_name, COALESCE(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') AS sales_area_name,
+                COALESCE(s.name, 'ไม่ระบุ') AS salesman_name")
             ->orderBy('d.doc_date')->orderBy('d.doc_number')->get();
 
         $summary = [
@@ -1772,6 +1943,7 @@ class ReportController extends Controller
             ['label' => 'เลขที่อ้างอิง', 'key' => 'doc_number'],
             ['label' => 'รหัสลูกค้า', 'key' => 'customer_code'],
             ['label' => 'ลูกหนี้', 'key' => 'customer_name'],
+            ['label' => 'สายขาย', 'key' => 'sales_area_name'],
             ['label' => 'หน่วย', 'key' => 'unit_name'],
             ['label' => 'จำนวน', 'key' => 'qty', 'type' => 'number', 'class' => 'text-end'],
             ['label' => 'ของแถม', 'key' => 'free_qty', 'type' => 'number', 'class' => 'text-end'],
@@ -1788,14 +1960,15 @@ class ReportController extends Controller
                 $join->on('bpl.bplus_sync_document_id', '=', 'bsd.id')->on('bpl.seq', '=', 'sdi.seq');
             })
             ->selectRaw("p.sku_code, p.name_th, d.doc_date, d.doc_number, COALESCE(c.code, '-') AS customer_code,
-                COALESCE(c.name_th, '-') AS customer_name, COALESCE(bpl.unit_name, u.name, '-') AS unit_name,
+                COALESCE(c.name_th, '-') AS customer_name, COALESCE(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') AS sales_area_name,
+                COALESCE(bpl.unit_name, u.name, '-') AS unit_name,
                 COALESCE(sdi.unit_qty, sdi.qty) AS qty, sdi.qty AS base_qty, COALESCE(bpl.free_qty, 0) AS free_qty,
                 sdi.unit_price * COALESCE(sdi.unit_factor, 1) AS unit_price, sdi.qty * sdi.unit_price AS amount")
             ->orderBy('p.sku_code')->orderBy('p.name_th')->orderBy('d.doc_date')->orderBy('d.doc_number')->orderBy('sdi.seq')
             ->get();
 
         $rows = collect();
-        foreach ($lines->groupBy(fn ($line) => $line->sku_code.'|'.$line->name_th) as $productLines) {
+        foreach ($lines->groupBy(fn ($line) => $line->sku_code.'|'.$line->name_th.'|'.$line->sales_area_name) as $productLines) {
             $first = $productLines->first();
             $product = trim($first->sku_code.' - '.$first->name_th, ' -');
             foreach ($productLines as $line) {
@@ -1803,7 +1976,8 @@ class ReportController extends Controller
                 $rows->push($line);
             }
             $rows->push((object) [
-                'product' => 'รวมสินค้า '.$product, 'doc_date' => '', 'doc_number' => '', 'customer_code' => '', 'customer_name' => '', 'unit_name' => '',
+                'product' => 'รวมสินค้า '.$product, 'doc_date' => '', 'doc_number' => '', 'customer_code' => '', 'customer_name' => '',
+                'sales_area_name' => $first->sales_area_name, 'unit_name' => '',
                 'qty' => DecimalMath::sum($productLines->pluck('qty'), 4),
                 'free_qty' => DecimalMath::sum($productLines->pluck('free_qty'), 4), 'unit_price' => null,
                 'amount' => DecimalMath::sum($productLines->pluck('amount'), 2),
@@ -1811,22 +1985,94 @@ class ReportController extends Controller
         }
 
         // BPlus รวมต่อสินค้าเป็นหน่วยที่ขาย แต่บรรทัด "รวมทั้งหมด" เป็นหน่วยฐาน (16/11 สาย 09: 318.9 หน่วยขาย = 1,706.9 หน่วยฐาน)
+        $summaryDocuments = $this->bplusCreditSaleQuery($from, $to, $filters)->get(['d.total_amount', 'd.subtotal_amount', 'd.vat_amount']);
         $summary = [
             'qty' => DecimalMath::sum($lines->pluck('base_qty'), 4),
             'free_qty' => DecimalMath::sum($lines->pluck('free_qty'), 4),
-            'net_sales' => DecimalMath::sum($lines->pluck('amount'), 2),
+            'subtotal_amount' => DecimalMath::sum($summaryDocuments->pluck('subtotal_amount'), 2),
+            'vat_amount' => DecimalMath::sum($summaryDocuments->pluck('vat_amount'), 2),
+            'net_sales' => DecimalMath::sum($summaryDocuments->pluck('total_amount'), 2),
         ];
+        $lineAmount = DecimalMath::sum($lines->pluck('amount'), 2);
         $rows->push((object) [
-            'product' => 'รวมทั้งสิ้น', 'doc_date' => '', 'doc_number' => '', 'customer_code' => '', 'customer_name' => '', 'unit_name' => '',
-            'qty' => $summary['qty'], 'free_qty' => $summary['free_qty'], 'unit_price' => null, 'amount' => $summary['net_sales'],
+            'product' => 'รวมมูลค่าบรรทัดสินค้า', 'doc_date' => '', 'doc_number' => '', 'customer_code' => '', 'customer_name' => '', 'sales_area_name' => '', 'unit_name' => '',
+            'qty' => $summary['qty'], 'free_qty' => $summary['free_qty'], 'unit_price' => null, 'amount' => $lineAmount,
         ]);
 
         return [
             'title' => 'BPlus ใบขายเชื่อแยกตามสินค้า', 'columns' => $columns, 'rows' => $rows,
             'total' => $lines->count(), 'summary_scope' => 'all',
-            'summary' => ['net_sales' => $summary['net_sales'], 'vat_amount' => '0.00'] + $summary,
+            'summary' => ['net_sales' => $summary['net_sales'], 'vat_amount' => $summary['vat_amount']] + $summary,
             'pagination' => null,
         ];
+    }
+
+    /** Daily BPlus credit sales, with cash and transfer collected on each receipt date. */
+    private function bplusDailySalesSummary(Carbon $from, Carbon $to, array $filters): array
+    {
+        $salesQuery = DB::table('documents as d')
+            ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
+            ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
+            ->where('d.source_system', 'bplus')->where('dt.code', 'CREDIT_SALE')
+            ->where('d.status', 'active')->whereNull('d.cancelled_at')
+            ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
+        $this->applyBranch($salesQuery, $filters, 'd.branch_id');
+        $this->applySalesArea($salesQuery, $filters, 'd.sales_area_id');
+        $this->applySearch($salesQuery, $filters, ['d.doc_number', 'c.code', 'c.name_th']);
+
+        $sales = $salesQuery->groupBy('d.doc_date', 'sa.code', 'sa.name')
+            ->selectRaw("d.doc_date, COALESCE(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') as sales_area_name,
+                count(d.id) as bill_count, sum(d.subtotal_amount) as subtotal_amount,
+                sum(d.vat_amount) as vat_amount, sum(d.total_amount) as net_sales")
+            ->get()->keyBy(fn ($row) => $row->doc_date.'|'.$row->sales_area_name);
+
+        $receiptsQuery = DB::table('documents as d')
+            ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
+            ->join('payment_documents as pd', 'pd.document_id', '=', 'd.id')
+            ->join('payment_lines as pl', 'pl.payment_document_id', '=', 'pd.id')
+            ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
+            ->where('d.source_system', 'bplus')->where('dt.code', 'RECEIPT')
+            ->where('d.status', 'active')->whereNull('d.cancelled_at')->where('pd.status', 'active')
+            ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
+        $this->applyBranch($receiptsQuery, $filters, 'd.branch_id');
+        $this->applySalesArea($receiptsQuery, $filters, 'd.sales_area_id');
+        $this->applySearch($receiptsQuery, $filters, ['d.doc_number', 'c.code', 'c.name_th']);
+
+        $receipts = $receiptsQuery->groupBy('d.doc_date', 'sa.code', 'sa.name')
+            ->selectRaw("d.doc_date, COALESCE(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') as sales_area_name,
+                sum(case when pl.method = 'cash' then pl.amount else 0 end) as cash_amount,
+                sum(case when pl.method = 'transfer' then pl.amount else 0 end) as transfer_amount")
+            ->get()->keyBy(fn ($row) => $row->doc_date.'|'.$row->sales_area_name);
+
+        $rows = $sales->keys()->merge($receipts->keys())->unique()->sort()->map(function ($key) use ($sales, $receipts) {
+            [$date, $areaName] = explode('|', $key, 2);
+            $sale = $sales->get($key);
+            $receipt = $receipts->get($key);
+
+            return (object) [
+                'sale_date' => $date,
+                'sales_area_name' => $areaName,
+                'bill_count' => (int) ($sale->bill_count ?? 0),
+                'subtotal_amount' => $sale->subtotal_amount ?? '0.00',
+                'vat_amount' => $sale->vat_amount ?? '0.00',
+                'net_sales' => $sale->net_sales ?? '0.00',
+                'cash_amount' => $receipt->cash_amount ?? '0.00',
+                'transfer_amount' => $receipt->transfer_amount ?? '0.00',
+            ];
+        })->take($filters['per_page'] ?? 25)->values();
+
+        return $this->tableResult('BPlus สรุปขายเชื่อรายวัน (รับชำระตามวันที่ใบเสร็จ)', [
+            ['label' => 'วันที่', 'key' => 'sale_date'],
+            ['label' => 'สายขาย', 'key' => 'sales_area_name'],
+            ['label' => 'จำนวนบิล', 'key' => 'bill_count', 'type' => 'number', 'class' => 'text-end'],
+            ['label' => 'มูลค่าก่อนภาษี', 'key' => 'subtotal_amount', 'type' => 'money', 'class' => 'text-end'],
+            ['label' => 'ภาษี', 'key' => 'vat_amount', 'type' => 'money', 'class' => 'text-end'],
+            ['label' => 'สุทธิ', 'key' => 'net_sales', 'type' => 'money', 'class' => 'text-end'],
+            ['label' => 'รับเงินสด', 'key' => 'cash_amount', 'type' => 'money', 'class' => 'text-end'],
+            ['label' => 'รับโอน', 'key' => 'transfer_amount', 'type' => 'money', 'class' => 'text-end'],
+        ], $rows);
     }
 
     private function pendingBookings(Carbon $from, Carbon $to, array $filters): Collection
@@ -1835,15 +2081,19 @@ class ReportController extends Controller
             ->join('documents as d', 'd.id', '=', 'sb.document_id')
             ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')
             ->leftJoin('salesmen as s', 's.id', '=', 'd.salesman_id')
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
             ->where('sb.status', 'pending')
+            ->where('d.status', 'active')
+            ->whereNull('d.cancelled_at')
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
 
         $this->applyBranch($query, $filters, 'd.branch_id');
+        $this->applySalesArea($query, $filters, 'd.sales_area_id');
         $this->applySearch($query, $filters, ['d.doc_number', 'c.code', 'c.name_th', 's.name']);
 
         return $query
             ->orderByDesc('d.doc_date')
-            ->selectRaw("d.doc_number, d.doc_date, coalesce(c.name_th, '-') as customer_name, coalesce(s.name, '-') as salesman_name, d.total_amount")
+            ->selectRaw("d.doc_number, d.doc_date, coalesce(c.name_th, '-') as customer_name, coalesce(s.name, 'ไม่ระบุ') as salesman_name, coalesce(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') as sales_area_name, d.total_amount")
             ->limit($filters['per_page'])
             ->get();
     }
@@ -1938,14 +2188,18 @@ class ReportController extends Controller
 
     private function salesSummaryByCustomer(Carbon $from, Carbon $to, array $filters): Collection
     {
-        $query = DB::table('stock_document_items as sdi')
-            ->join('stock_documents as sd', 'sd.id', '=', 'sdi.stock_document_id')
-            ->join('documents as d', 'd.id', '=', 'sd.document_id')
+        $itemTotals = DB::table('stock_documents as sd')
+            ->join('stock_document_items as sdi', 'sdi.stock_document_id', '=', 'sd.id')
+            ->groupBy('sd.document_id')
+            ->selectRaw('sd.document_id, sum(sdi.qty) as qty');
+
+        $query = DB::table('documents as d')
             ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
             ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
+            ->leftJoinSub($itemTotals, 'item_totals', 'item_totals.document_id', '=', 'd.id')
             ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN'])
-            // เอกสารที่ถูกยกเลิกไม่ใช่ยอดขาย — เดิมไม่กรองสถานะเลย บิลที่ void แล้วจึงยังโผล่
-            ->where('d.status', 'active')
+            ->where('d.status', 'active')->whereNull('d.cancelled_at')
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()])
             // ทุกบิล POS สร้างเอกสารขายสดผูกไว้เสมอ ถ้าไม่กันออกจะถูกนับซ้ำกับฝั่ง POS
             // กติกาเดียวกับ view `sales_postings` ซึ่งเป็นบัญชีขายฉบับจริงของระบบ
@@ -1956,18 +2210,20 @@ class ReportController extends Controller
                 ->where('pr.status', 'completed'));
 
         $this->applyBranch($query, $filters, 'd.branch_id');
+        $this->applySalesArea($query, $filters, 'd.sales_area_id');
         $this->applySearch($query, $filters, ['c.code', 'c.name_th', 'd.doc_number']);
 
         return $query
-            ->groupBy('c.id', 'c.code', 'c.name_th')
-            ->orderByRaw("sum(case when dt.code = 'SALE_RETURN' then -sdi.qty * sdi.unit_price else sdi.qty * sdi.unit_price end) desc")
+            ->groupBy('c.id', 'c.code', 'c.name_th', 'sa.code', 'sa.name')
+            ->orderByRaw("sum(case when dt.code = 'SALE_RETURN' then -d.total_amount else d.total_amount end) desc")
             ->selectRaw("
                 concat(coalesce(c.code, '-'), ' ', coalesce(c.name_th, 'ลูกค้าทั่วไป')) as customer_name,
+                coalesce(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') as sales_area_name,
                 count(distinct d.id) as bill_count,
-                sum(case when dt.code = 'SALE_RETURN' then -sdi.qty else sdi.qty end) as qty,
-                sum(case when dt.code <> 'SALE_RETURN' then sdi.qty * sdi.unit_price else 0 end) as sales_amount,
-                sum(case when dt.code = 'SALE_RETURN' then sdi.qty * sdi.unit_price else 0 end) as return_amount,
-                sum(case when dt.code = 'SALE_RETURN' then -sdi.qty * sdi.unit_price else sdi.qty * sdi.unit_price end) as net_amount
+                sum(case when dt.code = 'SALE_RETURN' then -coalesce(item_totals.qty, 0) else coalesce(item_totals.qty, 0) end) as qty,
+                sum(case when dt.code <> 'SALE_RETURN' then d.total_amount else 0 end) as sales_amount,
+                sum(case when dt.code = 'SALE_RETURN' then d.total_amount else 0 end) as return_amount,
+                sum(case when dt.code = 'SALE_RETURN' then -d.total_amount else d.total_amount end) as net_amount
             ")
             ->limit($filters['per_page'])
             ->get();
@@ -2206,14 +2462,19 @@ class ReportController extends Controller
         $query = DB::table('customer_open_items as oi')
             ->join('customers as c', 'c.id', '=', 'oi.customer_id')
             ->join('documents as d', 'd.id', '=', 'oi.document_id')
-            ->whereIn('oi.status', ['open', 'partial']);
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
+            ->whereIn('oi.status', ['open', 'partial'])
+            ->where('d.status', 'active')->whereNull('d.cancelled_at');
 
         $this->applyBranch($query, $filters, 'd.branch_id');
+        $this->applySalesArea($query, $filters, 'd.sales_area_id');
         $this->applySearch($query, $filters, ['c.code', 'c.name_th']);
 
         $rows = $query
-            ->groupBy('c.id', 'c.code', 'c.name_th')
-            ->selectRaw("concat(c.code, ' ', c.name_th) as customer_name, count(*) as bill_count, min(oi.due_date) as oldest_due_date, sum(case when oi.due_date < current_date then oi.balance_amount else 0 end) as overdue_amount, sum(oi.balance_amount) as balance_amount")
+            ->groupBy('c.id', 'c.code', 'c.name_th', 'sa.code', 'sa.name')
+            ->selectRaw("concat(c.code, ' ', c.name_th) as customer_name, coalesce(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') as sales_area_name,
+                count(*) as bill_count, min(oi.due_date) as oldest_due_date,
+                sum(case when oi.due_date < current_date then oi.balance_amount else 0 end) as overdue_amount, sum(oi.balance_amount) as balance_amount")
             ->orderByRaw('balance_amount desc')
             ->limit($filters['per_page'])
             ->get();
@@ -2239,17 +2500,22 @@ class ReportController extends Controller
         $query = DB::table('customer_open_items as oi')
             ->join('customers as c', 'c.id', '=', 'oi.customer_id')
             ->join('documents as d', 'd.id', '=', 'oi.document_id')
-            ->leftJoin('salesmen as s', 's.id', '=', 'oi.salesman_id')
+            ->leftJoin('salesmen as s', 's.id', '=', 'd.salesman_id')
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
             ->whereIn('oi.status', ['open', 'partial'])
+            ->where('d.status', 'active')->whereNull('d.cancelled_at')
             ->whereDate('oi.due_date', '<', now()->toDateString());
 
         $this->applyBranch($query, $filters, 'd.branch_id');
+        $this->applySalesArea($query, $filters, 'd.sales_area_id');
         $this->applySearch($query, $filters, ['c.code', 'c.name_th', 's.name']);
 
         return $query
-            ->groupBy('c.id', 'c.code', 'c.name_th', 's.name')
+            ->groupBy('c.id', 'c.code', 'c.name_th', 's.name', 'sa.code', 'sa.name')
             ->orderByDesc(DB::raw('sum(oi.balance_amount)'))
-            ->selectRaw("concat(c.code, ' ', c.name_th) as customer_name, coalesce(s.name, '-') as salesman_name, count(*) as bill_count, sum(oi.balance_amount) as balance_amount, min(oi.due_date) as oldest_due_date")
+            ->selectRaw("concat(c.code, ' ', c.name_th) as customer_name, coalesce(s.name, 'ไม่ระบุ') as salesman_name,
+                coalesce(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') as sales_area_name,
+                count(*) as bill_count, sum(oi.balance_amount) as balance_amount, min(oi.due_date) as oldest_due_date")
             ->limit($filters['per_page'])
             ->get();
     }
@@ -2259,14 +2525,19 @@ class ReportController extends Controller
         $query = DB::table('customer_open_items as oi')
             ->join('customers as c', 'c.id', '=', 'oi.customer_id')
             ->join('documents as d', 'd.id', '=', 'oi.document_id')
-            ->whereIn('oi.status', ['open', 'partial']);
+            ->leftJoin('salesmen as sm', 'sm.id', '=', 'd.salesman_id')
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
+            ->whereIn('oi.status', ['open', 'partial'])
+            ->where('d.status', 'active')->whereNull('d.cancelled_at');
 
         $this->applyBranch($query, $filters, 'd.branch_id');
-        $this->applySearch($query, $filters, ['c.code', 'c.name_th', 'd.doc_number']);
+        $this->applySalesArea($query, $filters, 'd.sales_area_id');
+        $this->applySearch($query, $filters, ['c.code', 'c.name_th', 'd.doc_number', 'sm.name']);
 
         return $query
             ->orderBy('oi.due_date')
-            ->selectRaw("concat(c.code, ' ', c.name_th) as customer_name, d.doc_number, oi.due_date, oi.status, oi.balance_amount")
+            ->selectRaw("concat(c.code, ' ', c.name_th) as customer_name, d.doc_number, coalesce(sm.name, 'ไม่ระบุ') as salesman_name,
+                coalesce(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') as sales_area_name, oi.due_date, oi.status, oi.balance_amount")
             ->limit($filters['per_page'])
             ->get();
     }
@@ -2276,15 +2547,18 @@ class ReportController extends Controller
         $query = DB::table('customer_open_items as oi')
             ->join('customers as c', 'c.id', '=', 'oi.customer_id')
             ->join('documents as d', 'd.id', '=', 'oi.document_id')
-            ->leftJoin('salesmen as s', 's.id', '=', 'oi.salesman_id')
-            ->whereIn('oi.status', ['open', 'partial']);
+            ->leftJoin('salesmen as s', 's.id', '=', 'd.salesman_id')
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
+            ->whereIn('oi.status', ['open', 'partial'])
+            ->where('d.status', 'active')->whereNull('d.cancelled_at');
 
         $this->applyBranch($query, $filters, 'd.branch_id');
+        $this->applySalesArea($query, $filters, 'd.sales_area_id');
         $this->applySearch($query, $filters, ['c.code', 'c.name_th', 'd.doc_number', 's.name']);
 
         $select = $full
-            ? "concat(c.code, ' ', c.name_th) as customer_name, coalesce(s.name, '-') as salesman_name, d.doc_number, d.doc_date, oi.due_date, oi.net_amount, oi.paid_amount, oi.balance_amount"
-            : "concat(c.code, ' ', c.name_th) as customer_name, d.doc_number, oi.due_date, oi.balance_amount";
+            ? "concat(c.code, ' ', c.name_th) as customer_name, coalesce(s.name, 'ไม่ระบุ') as salesman_name, coalesce(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') as sales_area_name, d.doc_number, d.doc_date, oi.due_date, oi.net_amount, oi.paid_amount, oi.balance_amount"
+            : "concat(c.code, ' ', c.name_th) as customer_name, coalesce(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') as sales_area_name, d.doc_number, oi.due_date, oi.balance_amount";
 
         return $query
             ->orderBy('oi.due_date')
@@ -2298,18 +2572,110 @@ class ReportController extends Controller
         $query = DB::table('customer_open_items as oi')
             ->join('customers as c', 'c.id', '=', 'oi.customer_id')
             ->join('documents as d', 'd.id', '=', 'oi.document_id')
-            ->leftJoin('salesmen as s', 's.id', '=', 'oi.salesman_id')
+            ->leftJoin('salesmen as s', 's.id', '=', 'd.salesman_id')
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
             ->whereIn('oi.status', ['open', 'partial'])
+            ->where('d.status', 'active')->whereNull('d.cancelled_at')
             ->whereDate('oi.due_date', '<', now()->toDateString());
 
         $this->applyBranch($query, $filters, 'd.branch_id');
+        $this->applySalesArea($query, $filters, 'd.sales_area_id');
         $this->applySearch($query, $filters, ['c.code', 'c.name_th', 'd.doc_number', 's.name']);
 
         return $query
             ->orderBy('oi.due_date')
-            ->selectRaw("concat(c.code, ' ', c.name_th) as customer_name, coalesce(s.name, '-') as salesman_name, d.doc_number, oi.due_date, (current_date - oi.due_date) as overdue_days, oi.balance_amount")
+            ->selectRaw("concat(c.code, ' ', c.name_th) as customer_name, coalesce(s.name, 'ไม่ระบุ') as salesman_name,
+                coalesce(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') as sales_area_name, d.doc_number, oi.due_date,
+                (current_date - oi.due_date) as overdue_days, oi.balance_amount")
             ->limit($filters['per_page'])
             ->get();
+    }
+
+    private function arStatement(Carbon $from, Carbon $to, array $filters): array
+    {
+        $columns = [
+            ['label' => 'วันที่', 'key' => 'doc_date'],
+            ['label' => 'ประเภท', 'key' => 'document_type'],
+            ['label' => 'เลขที่เอกสาร', 'key' => 'doc_number'],
+            ['label' => 'ยอดเพิ่มหนี้', 'key' => 'debit_amount', 'type' => 'money', 'class' => 'text-end'],
+            ['label' => 'ยอดรับชำระ', 'key' => 'credit_amount', 'type' => 'money', 'class' => 'text-end'],
+            ['label' => 'คงเหลือ', 'key' => 'balance_amount', 'type' => 'money', 'class' => 'text-end'],
+            ['label' => 'สายขาย', 'key' => 'sales_area_name'],
+        ];
+        if (empty($filters['customer_id'])) {
+            return [
+                'title' => 'Statement ลูกหนี้รายตัว — เลือกลูกค้าก่อน', 'columns' => $columns, 'rows' => collect(), 'total' => 0,
+                'summary_scope' => 'all', 'summary' => ['opening_balance' => '0.00', 'sales_amount' => '0.00', 'receipt_amount' => '0.00', 'closing_balance' => '0.00'],
+                'pagination' => null,
+            ];
+        }
+
+        $query = DB::table('documents as d')
+            ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
+            ->where('d.customer_id', $filters['customer_id'])
+            ->whereIn('dt.code', ['OPENING_AR', 'CREDIT_SALE', 'RECEIPT'])
+            ->where('d.status', 'active')->whereNull('d.cancelled_at')
+            ->whereDate('d.doc_date', '<=', $to->toDateString());
+        $this->applyBranch($query, $filters, 'd.branch_id');
+        $this->applySalesArea($query, $filters, 'd.sales_area_id');
+        $this->applySearch($query, $filters, ['d.doc_number']);
+
+        $events = $query->orderBy('d.doc_date')->orderByRaw("case dt.code when 'OPENING_AR' then 0 when 'CREDIT_SALE' then 1 else 2 end")
+            ->orderBy('d.id')
+            ->get(['d.doc_date', 'd.doc_number', 'd.total_amount', 'dt.code as document_code', 'sa.code as area_code', 'sa.name as area_name']);
+
+        $openingBalance = '0.00';
+        $periodEvents = collect();
+        foreach ($events as $event) {
+            $signed = $event->document_code === 'RECEIPT'
+                ? DecimalMath::multiply(-1, $event->total_amount, 2)
+                : DecimalMath::round($event->total_amount, 2);
+            if ($event->doc_date < $from->toDateString()) {
+                $openingBalance = DecimalMath::add($openingBalance, $signed, 2);
+            } else {
+                $periodEvents->push([$event, $signed]);
+            }
+        }
+
+        $balance = $openingBalance;
+        $rows = collect([(object) [
+            'doc_date' => 'ก่อน '.$from->toDateString(), 'document_type' => 'ยอดยกมา', 'doc_number' => '-',
+            'debit_amount' => DecimalMath::compare($openingBalance, 0) > 0 ? $openingBalance : '0.00',
+            'credit_amount' => DecimalMath::compare($openingBalance, 0) < 0 ? DecimalMath::multiply(-1, $openingBalance, 2) : '0.00',
+            'balance_amount' => $openingBalance, 'sales_area_name' => '',
+        ]]);
+        $salesAmount = '0.00';
+        $openingDocumentAmount = '0.00';
+        $receiptAmount = '0.00';
+        foreach ($periodEvents as [$event, $signed]) {
+            $isReceipt = $event->document_code === 'RECEIPT';
+            $balance = DecimalMath::add($balance, $signed, 2);
+            if ($isReceipt) {
+                $receiptAmount = DecimalMath::add($receiptAmount, $event->total_amount, 2);
+            } elseif ($event->document_code === 'OPENING_AR') {
+                $openingDocumentAmount = DecimalMath::add($openingDocumentAmount, $event->total_amount, 2);
+            } else {
+                $salesAmount = DecimalMath::add($salesAmount, $event->total_amount, 2);
+            }
+            $rows->push((object) [
+                'doc_date' => $event->doc_date,
+                'document_type' => ['OPENING_AR' => 'ลูกหนี้ยกมา', 'CREDIT_SALE' => 'ขายเชื่อ', 'RECEIPT' => 'ใบเสร็จรับเงิน'][$event->document_code],
+                'doc_number' => $event->doc_number,
+                'debit_amount' => ! $isReceipt ? $event->total_amount : '0.00',
+                'credit_amount' => $isReceipt ? $event->total_amount : '0.00',
+                'balance_amount' => $balance,
+                'sales_area_name' => trim(($event->area_code ?? '').' '.($event->area_name ?? '')) ?: 'ไม่ระบุสายขาย',
+            ]);
+        }
+
+        return [
+            'title' => 'Statement ลูกหนี้รายตัว', 'columns' => $columns, 'rows' => $rows, 'total' => $rows->count(),
+            'summary_scope' => 'all',
+            'summary' => ['net_sales' => $balance, 'opening_balance' => $openingBalance, 'opening_document_amount' => $openingDocumentAmount, 'sales_amount' => $salesAmount,
+                'receipt_amount' => $receiptAmount, 'closing_balance' => $balance],
+            'pagination' => null,
+        ];
     }
 
     private function arOverCreditLimit(array $filters): Collection
@@ -2513,6 +2879,7 @@ class ReportController extends Controller
             ['label' => 'วันที่', 'key' => 'doc_date'],
             ['label' => 'เลขที่', 'key' => 'doc_number'],
             ['label' => 'สาขา', 'key' => 'branch_name'],
+            ['label' => 'สายขาย', 'key' => 'sales_area_name'],
             ['label' => 'คู่ค้า/ลูกค้า', 'key' => 'party_name'],
             ['label' => 'พนักงานขาย', 'key' => 'salesman_name'],
             ['label' => 'สถานะ', 'key' => 'status', 'type' => 'badge'],
@@ -2525,15 +2892,19 @@ class ReportController extends Controller
     {
         $query = DB::table('documents as d')
             ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
+            ->where('d.status', 'active')->whereNull('d.cancelled_at')
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
 
         $this->applyBranch($query, $filters, 'd.branch_id');
+        $this->applySalesArea($query, $filters, 'd.sales_area_id');
         $this->applySearch($query, $filters, ['dt.code', 'dt.name_th']);
 
         return $query
-            ->groupBy('dt.id', 'dt.code', 'dt.name_th')
+            ->groupBy('dt.id', 'dt.code', 'dt.name_th', 'sa.code', 'sa.name')
             ->orderBy('dt.code')
-            ->selectRaw("concat(dt.code, ' - ', dt.name_th) as document_type, count(*) as document_count, sum(d.total_items) as item_count, sum(d.total_amount) as amount")
+            ->selectRaw("concat(dt.code, ' - ', dt.name_th) as document_type, coalesce(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') as sales_area_name,
+                count(*) as document_count, sum(d.total_items) as item_count, sum(d.total_amount) as amount")
             ->limit($filters['per_page'])
             ->get();
     }
@@ -2546,19 +2917,28 @@ class ReportController extends Controller
             ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')
             ->leftJoin('suppliers as s', 's.id', '=', 'd.supplier_id')
             ->leftJoin('salesmen as sm', 'sm.id', '=', 'd.salesman_id')
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
 
         if ($codes !== []) {
             $query->whereIn('dt.code', $codes);
+            if (array_intersect($codes, ['CREDIT_SALE', 'RECEIPT', 'BOOKING']) !== []) {
+                $query->where('d.status', 'active')->whereNull('d.cancelled_at');
+            }
         }
 
         $this->applyBranch($query, $filters, 'd.branch_id');
+        $this->applySalesArea($query, $filters, 'd.sales_area_id');
         $this->applySearch($query, $filters, ['d.doc_number', 'dt.code', 'dt.name_th', 'b.code', 'b.name_th', 'c.code', 'c.name_th', 's.code', 's.name_th', 'sm.name']);
 
         return $query
             ->orderByDesc('d.doc_date')
             ->orderByDesc('d.id')
-            ->selectRaw("d.doc_date, concat(dt.code, ' - ', dt.name_th) as document_type, d.doc_number, concat(coalesce(b.code, '-'), ' ', coalesce(b.name_th, 'ไม่ระบุสาขา')) as branch_name, coalesce(c.name_th, s.name_th, '-') as party_name, coalesce(sm.name, '-') as salesman_name, d.status, d.total_items, d.total_amount")
+            ->selectRaw("d.doc_date, concat(dt.code, ' - ', dt.name_th) as document_type, d.doc_number,
+                concat(coalesce(b.code, '-'), ' ', coalesce(b.name_th, 'ไม่ระบุสาขา')) as branch_name,
+                coalesce(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') as sales_area_name,
+                coalesce(c.name_th, s.name_th, '-') as party_name, coalesce(sm.name, 'ไม่ระบุ') as salesman_name,
+                d.status, d.total_items, d.total_amount")
             ->limit($filters['per_page'])
             ->get();
     }
@@ -2807,16 +3187,20 @@ class ReportController extends Controller
     {
         $query = DB::table('payment_documents as pd')
             ->join('documents as d', 'd.id', '=', 'pd.document_id')
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
             ->leftJoin('customers as c', 'c.id', '=', 'pd.customer_id')
             ->leftJoin('suppliers as s', 's.id', '=', 'pd.supplier_id')
+            ->where('pd.status', 'active')->where('d.status', 'active')->whereNull('d.cancelled_at')
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
 
         $this->applyBranch($query, $filters, 'pd.branch_id');
+        $this->applySalesArea($query, $filters, 'd.sales_area_id');
         $this->applySearch($query, $filters, ['d.doc_number', 'c.name_th', 's.name_th']);
 
         return $query
             ->orderByDesc('d.doc_date')
-            ->selectRaw("d.doc_number, d.doc_date, pd.party_type, coalesce(c.name_th, s.name_th, '-') as party_name, pd.status")
+            ->selectRaw("d.doc_number, d.doc_date, pd.party_type, coalesce(c.name_th, s.name_th, '-') as party_name,
+                coalesce(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') as sales_area_name, pd.status")
             ->limit($filters['per_page'])
             ->get();
     }
@@ -2826,32 +3210,103 @@ class ReportController extends Controller
         $query = DB::table('payment_allocations as pa')
             ->join('payment_documents as pd', 'pd.id', '=', 'pa.payment_document_id')
             ->join('documents as d', 'd.id', '=', 'pd.document_id')
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
             ->leftJoin('customer_open_items as oi', 'oi.id', '=', 'pa.customer_open_item_id')
             ->leftJoin('customers as c', 'c.id', '=', 'oi.customer_id')
+            ->where('pd.status', 'active')->where('d.status', 'active')->whereNull('d.cancelled_at')
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
 
         $this->applyBranch($query, $filters, 'pd.branch_id');
+        $this->applySalesArea($query, $filters, 'd.sales_area_id');
         $this->applySearch($query, $filters, ['d.doc_number', 'c.name_th']);
 
         return $query
             ->orderByDesc('d.doc_date')
-            ->selectRaw("d.doc_number, coalesce(c.name_th, '-') as customer_name, pa.allocated_amount, pa.discount_amount, pa.wht_amount")
+            ->selectRaw("d.doc_number, coalesce(c.name_th, '-') as customer_name, coalesce(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') as sales_area_name,
+                pa.allocated_amount, pa.discount_amount, pa.wht_amount")
             ->limit($filters['per_page'])
             ->get();
+    }
+
+    private function bplusReceiptAllocations(Carbon $from, Carbon $to, array $filters): array
+    {
+        $query = DB::table('documents as d')
+            ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
+            ->join('payment_documents as pd', 'pd.document_id', '=', 'd.id')
+            ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
+            ->leftJoin('bplus_sync_documents as bsd', 'bsd.document_id', '=', 'd.id')
+            ->where('d.source_system', 'bplus')->where('dt.code', 'RECEIPT')
+            ->where('d.status', 'active')->whereNull('d.cancelled_at')->where('pd.status', 'active')
+            ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
+        $this->applyBranch($query, $filters, 'd.branch_id');
+        $this->applySalesArea($query, $filters, 'd.sales_area_id');
+        $this->applySearch($query, $filters, ['d.doc_number', 'c.code', 'c.name_th']);
+
+        $receipts = $query->orderBy('d.doc_date')->orderBy('d.doc_number')
+            ->select(['pd.id as payment_document_id', 'd.doc_number', 'd.doc_date', 'd.total_amount', 'c.name_th as customer_name',
+                'sa.code as area_code', 'sa.name as area_name', 'bsd.short_amount'])
+            ->limit($filters['per_page'] ?? 25)->get();
+        $paymentIds = $receipts->pluck('payment_document_id');
+        $lines = DB::table('payment_lines')->whereIn('payment_document_id', $paymentIds)->get()->groupBy('payment_document_id');
+        $allocations = DB::table('payment_allocations as pa')
+            ->leftJoin('customer_open_items as oi', 'oi.id', '=', 'pa.customer_open_item_id')
+            ->leftJoin('documents as sd', 'sd.id', '=', 'oi.document_id')
+            ->whereIn('pa.payment_document_id', $paymentIds)
+            ->get(['pa.payment_document_id', 'sd.doc_number', 'pa.allocated_amount', 'pa.discount_amount', 'pa.wht_amount'])
+            ->groupBy('payment_document_id');
+
+        $rows = $receipts->map(function ($receipt) use ($lines, $allocations) {
+            $receiptLines = $lines->get($receipt->payment_document_id, collect());
+            $receiptAllocations = $allocations->get($receipt->payment_document_id, collect());
+            return (object) [
+                'receipt_no' => $receipt->doc_number,
+                'receipt_date' => $receipt->doc_date,
+                'customer_name' => $receipt->customer_name ?? '-',
+                'applied_documents' => $receiptAllocations->pluck('doc_number')->filter()->unique()->implode(', ') ?: '-',
+                'applied_total' => DecimalMath::sum($receiptAllocations->pluck('allocated_amount'), 2),
+                'discount_amount' => DecimalMath::sum($receiptAllocations->pluck('discount_amount'), 2),
+                'wht_amount' => DecimalMath::sum($receiptAllocations->pluck('wht_amount'), 2),
+                'short_amount' => $receipt->short_amount ?? '0.00',
+                'cash_amount' => DecimalMath::sum($receiptLines->where('method', 'cash')->pluck('amount'), 2),
+                'transfer_amount' => DecimalMath::sum($receiptLines->where('method', 'transfer')->pluck('amount'), 2),
+                'other_amount' => DecimalMath::sum($receiptLines->where('method', 'other')->pluck('amount'), 2),
+                'sales_area_name' => trim(($receipt->area_code ?? '').' '.($receipt->area_name ?? '')) ?: 'ไม่ระบุสายขาย',
+            ];
+        })->values();
+
+        return $this->tableResult('BPlus ใบเสร็จรับเงินตัดหนี้ตามเอกสาร', [
+            ['label' => 'เลขที่ใบเสร็จ', 'key' => 'receipt_no'],
+            ['label' => 'วันที่', 'key' => 'receipt_date'],
+            ['label' => 'ลูกค้า', 'key' => 'customer_name'],
+            ['label' => 'บิลที่ตัด', 'key' => 'applied_documents'],
+            ['label' => 'ยอดตัด', 'key' => 'applied_total', 'type' => 'money', 'class' => 'text-end'],
+            ['label' => 'ส่วนลด', 'key' => 'discount_amount', 'type' => 'money', 'class' => 'text-end'],
+            ['label' => 'หัก ณ ที่จ่าย', 'key' => 'wht_amount', 'type' => 'money', 'class' => 'text-end'],
+            ['label' => 'เงินขาด', 'key' => 'short_amount', 'type' => 'money', 'class' => 'text-end'],
+            ['label' => 'เงินสด', 'key' => 'cash_amount', 'type' => 'money', 'class' => 'text-end'],
+            ['label' => 'โอน', 'key' => 'transfer_amount', 'type' => 'money', 'class' => 'text-end'],
+            ['label' => 'อื่นๆ', 'key' => 'other_amount', 'type' => 'money', 'class' => 'text-end'],
+            ['label' => 'สายขาย', 'key' => 'sales_area_name'],
+        ], $rows);
     }
 
     private function glJournals(Carbon $from, Carbon $to, array $filters): Collection
     {
         $query = DB::table('gl_journals as gj')
             ->join('chart_of_accounts as coa', 'coa.id', '=', 'gj.account_id')
+            ->leftJoin('documents as d', 'd.id', '=', 'gj.document_id')
+            ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
             ->whereBetween('gj.entry_date', [$from->toDateString(), $to->toDateString()]);
 
         app(ReportScope::class)->applyGl($query, 'gj', $filters['branch_id'] ?? null);
+        $this->applySalesArea($query, $filters, 'd.sales_area_id');
         $this->applySearch($query, $filters, ['coa.code', 'coa.name_th', 'gj.remark']);
 
         return $query
             ->orderByDesc('gj.entry_date')
-            ->selectRaw("gj.entry_date, concat(coa.code, ' ', coa.name_th) as account_name, gj.debit, gj.credit, gj.remark")
+            ->selectRaw("gj.entry_date, concat(coa.code, ' ', coa.name_th) as account_name,
+                coalesce(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') as sales_area_name, gj.debit, gj.credit, gj.remark")
             ->limit($filters['per_page'])
             ->get();
     }

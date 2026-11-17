@@ -881,6 +881,210 @@ class BplusDocumentsTest extends TestCase
         return $match[0];
     }
 
+    public function test_bplus_report_catalog_and_totals_match_one_imported_fixture(): void
+    {
+        config(['reports.phase_two_enabled' => true]);
+        $export = $this->withOpeningBill($this->export());
+        $export['documents'][] = [
+            'bplus_key' => 9002715001, 'kind' => 'opening_ar', 'book_code' => 'DS', 'ref' => 'DS256911/10001',
+            'doc_date' => '2026-11-10', 'customer_code' => '37120-0005', 'total_amount' => 20, 'original_amount' => 20,
+            'due_date' => '2026-12-10',
+        ];
+        $export['documents'][] = [
+            'bplus_key' => 2715002, 'kind' => 'booking', 'book_code' => 'B18', 'ref' => 'B18-6911/00384',
+            'doc_date' => '2026-11-16', 'customer_code' => '37120-0005', 'total_amount' => 250, 'salesman_code' => '09',
+        ];
+        $export['documents'][2]['due_date'] = '2020-01-01';
+        $export['documents'][3]['due_date'] = '2020-01-01';
+        $export['documents'][3]['salesman_code'] = null;
+        $export['documents'][4]['cash_amount'] = 150;
+        $export['documents'][4]['transfer_amount'] = 1178.63;
+        $export['documents'][4]['other_amount'] = 20;
+        $export['documents'][4]['short_amount'] = 0.37;
+        $export['documents'][] = [
+            'bplus_key' => 2720001, 'kind' => 'credit_sale', 'book_code' => 'DS', 'ref' => 'DS256911/99998',
+            'doc_date' => '2026-11-15', 'customer_code' => '37120-0005', 'exempt_amount' => 100,
+            'total_amount' => 100, 'due_date' => '2020-01-01', 'salesman_code' => '09',
+            'lines' => [['seq' => 1, 'sku_code' => '501035', 'unit_name' => 'ถุง', 'unit_factor' => 1, 'qty' => 1, 'unit_price' => 100, 'amount' => 100]],
+        ];
+        $export['documents'][] = [
+            'bplus_key' => 2715003, 'kind' => 'receipt', 'book_code' => 'RR2', 'ref' => 'RR26911/000801',
+            'doc_date' => '2026-11-17', 'customer_code' => '37120-0005', 'total_amount' => 1,
+            'cash_amount' => 1, 'allocations' => [['sale_ref' => 'DS256911/99998', 'paid_amount' => 1, 'cash_amount' => 1]],
+        ];
+        $cancelledSale = $export['documents'][2];
+        $cancelledSale['bplus_key'] = 2719999;
+        $cancelledSale['ref'] = 'DS256911/99999';
+        $cancelledSale['is_cancelled'] = true;
+        $cancelledSale['total_amount'] = 900;
+        $export['documents'][] = $cancelledSale;
+        $this->importFile($export);
+
+        // ทำให้ subtotal ต่างจาก total - VAT เพื่อยืนยันว่ารายงานภาษีอ่าน field ตามเอกสารโดยตรง
+        DB::table('documents')->where('doc_number', 'DS256911/06364')->update(['subtotal_amount' => 1800]);
+        $otherAreaId = DB::table('sales_areas')->insertGetId([
+            'code' => 'B17', 'name' => 'สายทดสอบอื่น', 'branch_id' => $this->branch->id,
+            'default_salesman_id' => null, 'is_active' => true,
+        ]);
+        DB::table('documents')->where('doc_number', 'DS256911/99998')->update(['sales_area_id' => $otherAreaId]);
+        DB::table('documents')->where('doc_number', 'RR26911/000801')->update(['sales_area_id' => $otherAreaId]);
+        DB::table('documents')->where('doc_number', 'DSN256911/4861')->update([
+            'sales_user_id' => User::where('username', 'bplus_docs')->value('id'),
+        ]);
+        $bookingNumbers = ['B18-6911/00382', 'B18-6911/00384'];
+        $bookingDocumentIds = Document::whereIn('doc_number', $bookingNumbers)->pluck('id');
+        $salesmanId = DB::table('salesmen')->where('code', '09')->value('id');
+        DB::table('documents')->whereIn('id', $bookingDocumentIds)->update(['salesman_id' => $salesmanId]);
+        DB::table('sale_bookings')->whereIn('document_id', $bookingDocumentIds)->update([
+            'salesman_id' => null,
+            'sales_area_id' => $otherAreaId,
+        ]);
+        $bookingSalesmanName = DB::table('salesmen')->where('id', $salesmanId)->value('name');
+        $role = Role::where('code', 'BPLUS_DOCS')->firstOrFail();
+        $role->permissions()->sync(Permission::pluck('id')->all());
+        DB::table('report_definitions')->whereIn('code', ['sales.sales_summary_by_customer'])->update(['enabled' => true]);
+        $user = User::where('username', 'bplus_docs')->firstOrFail();
+        $user->branch_id = $this->branch->id;
+        $user->save();
+        $this->actingAs($user->fresh());
+
+        $customerId = (int) Customer::where('code', '37120-0005')->value('id');
+        $areaId = (int) DB::table('sales_areas')->where('code', 'B18')->value('id');
+        $openReport = function (string $category, string $report, array $extra = []) use ($areaId) {
+            $response = $this->get(route('reports.index', ['category' => $category, 'report' => $report,
+                'from' => '2026-11-01', 'to' => '2026-11-30', 'branch_id' => $this->branch->id,
+                'sales_area_id' => $areaId] + $extra))->assertOk()->assertViewHas('selectedReport', $report);
+            return $response->viewData('result');
+        };
+        $rows = fn (array $result) => collect($result['rows']);
+        $sum = fn (array $result, string $field) => DecimalMath::sum($rows($result)->pluck($field), 2);
+
+        $reports = [
+            'credit_sales' => ['sales', 'credit_sales'],
+            'credit_sale_documents' => ['documents', 'credit_sale_documents'],
+            'sales_by_seller' => ['sales', 'sales_by_seller'],
+            'sales_summary_by_customer' => ['sales', 'sales_summary_by_customer'],
+            'top_products' => ['sales', 'top_products'],
+            'sales_by_category' => ['sales', 'sales_by_category'],
+            'booking_documents' => ['documents', 'booking_documents'],
+            'pending_bookings' => ['sales', 'pending_bookings'],
+            'by_branch_seller' => ['booking', 'by_branch_seller'],
+            'bplus_credit_sales_by_document' => ['sales', 'bplus_credit_sales_by_document'],
+            'bplus_credit_sales_by_product' => ['sales', 'bplus_credit_sales_by_product'],
+            'ar_summary' => ['ar', 'ar_summary'],
+            'ar_summary_bplus' => ['ar', 'ar_summary_bplus'],
+            'ar_aging' => ['ar', 'ar_aging'],
+            'open_items' => ['ar', 'open_items'],
+            'overdue_customers' => ['ar', 'overdue_customers'],
+            'ar_detail_short' => ['ar', 'ar_detail_short'],
+            'ar_detail_full' => ['ar', 'ar_detail_full'],
+            'ar_overdue_detail' => ['ar', 'ar_overdue_detail'],
+            'receipt_documents' => ['documents', 'receipt_documents'],
+            'payment_documents' => ['payment', 'payment_documents'],
+            'payment_allocations' => ['payment', 'payment_allocations'],
+            'vat_sales' => ['tax', 'vat_sales'],
+            'gl_journals' => ['payment', 'gl_journals'],
+            'document_list' => ['documents', 'document_list'],
+            'documents_summary' => ['documents', 'documents_summary'],
+            'bplus_daily_sales_summary' => ['sales', 'bplus_daily_sales_summary'],
+            'bplus_receipt_allocations' => ['payment', 'bplus_receipt_allocations'],
+        ];
+        $reportCodes = collect($reports)->map(fn ($report, $key) => $report[0].'.'.$key)
+            ->push('ar.ar_statement')->all();
+        DB::table('report_definitions')->whereIn('code', $reportCodes)->update(['enabled' => true, 'status' => 'available']);
+        $results = [];
+        foreach ($reports as $key => [$category, $report]) {
+            $results[$key] = $openReport($category, $report);
+        }
+        $results['ar_statement'] = $openReport('ar', 'ar_statement', ['customer_id' => $customerId]);
+        $areaColumnReports = [
+            'credit_sales', 'credit_sale_documents', 'sales_by_seller', 'sales_summary_by_customer', 'sales_by_category',
+            'booking_documents', 'pending_bookings', 'by_branch_seller', 'bplus_credit_sales_by_document',
+            'bplus_credit_sales_by_product', 'ar_summary', 'ar_summary_bplus', 'ar_aging', 'open_items',
+            'overdue_customers', 'ar_detail_short', 'ar_detail_full', 'ar_overdue_detail', 'ar_statement',
+            'receipt_documents', 'payment_documents', 'payment_allocations', 'vat_sales', 'gl_journals',
+            'document_list', 'documents_summary', 'bplus_daily_sales_summary', 'bplus_receipt_allocations',
+        ];
+        foreach ($areaColumnReports as $reportCode) {
+            $this->assertTrue(
+                collect($results[$reportCode]['columns'])->contains('key', 'sales_area_name'),
+                $reportCode.' ต้องแสดงสายขาย',
+            );
+        }
+
+        $this->assertSame(1886.0, (float) $sum($results['credit_sales'], 'total_amount'), 'credit_sales');
+        $this->assertSame(1886.0, (float) $sum($results['credit_sale_documents'], 'total_amount'), 'credit_sale_documents');
+        $this->assertSame(1886.0, (float) $sum($results['sales_by_seller'], 'amount'), 'sales_by_seller');
+        $this->assertSame(1886.0, (float) $sum($results['sales_summary_by_customer'], 'net_amount'), 'sales_summary_by_customer '.json_encode($results['sales_summary_by_customer']['rows']));
+        $this->assertSame(1886.0, (float) $sum($results['sales_by_category'], 'amount'), 'sales_by_category');
+        $this->assertSame(0, $results['top_products']['total'], 'สินค้าขายดีเป็นรายงาน POS โดยเฉพาะ ไม่มีเอกสาร BPlus');
+        $this->assertSame(2136.0, (float) $sum($results['booking_documents'], 'total_amount'), 'ใบจองแสดงแยกและไม่นำไปรวมยอดขาย');
+        $this->assertSame(1, $results['pending_bookings']['total'], 'ใบจองที่ยังไม่แปลงขายแสดงแยกจากยอดขาย');
+        $this->assertSame(250.0, (float) $sum($results['pending_bookings'], 'total_amount'));
+        $pendingBooking = $rows($results['pending_bookings'])->first();
+        $this->assertSame('B18 - ม่วง-เลิง-อำนาจ-มุก', $pendingBooking->sales_area_name);
+        $this->assertSame($bookingSalesmanName, $pendingBooking->salesman_name);
+        $branchSellerRows = $rows($results['by_branch_seller']);
+        $this->assertSame(2136.0, (float) $sum($results['by_branch_seller'], 'amount'));
+        $this->assertTrue($branchSellerRows->every(fn ($row) => $row->sales_area_name === 'B18 - ม่วง-เลิง-อำนาจ-มุก'));
+        $this->assertSame(2136.0, (float) DecimalMath::sum($branchSellerRows->where('salesman_name', $bookingSalesmanName)->pluck('amount'), 2));
+        $this->assertSame('1886.00', $results['bplus_credit_sales_by_document']['summary']['net_sales']);
+        $this->assertSame('1886.00', $results['bplus_credit_sales_by_product']['summary']['net_sales']);
+        $this->assertSame('1849.00', $results['bplus_credit_sales_by_product']['summary']['subtotal_amount']);
+        $this->assertSame('22.57', $results['bplus_credit_sales_by_product']['summary']['vat_amount']);
+        $this->assertTrue($rows($results['sales_by_seller'])->contains(fn ($row) => $row->seller_name === 'ไม่ระบุ'));
+        $this->assertSame(1057.0, (float) $results['ar_summary']['summary']['net_sales']);
+        $this->assertSame(1057.0, (float) $results['ar_summary_bplus']['summary']['net_sales']);
+        $this->assertSame(1057.0, (float) $sum($results['ar_aging'], 'amount'));
+        $this->assertSame(1057.0, (float) $sum($results['open_items'], 'balance_amount'));
+        $this->assertSame(1037.0, (float) $sum($results['overdue_customers'], 'balance_amount'));
+        $this->assertSame(1057.0, (float) $sum($results['ar_detail_short'], 'balance_amount'));
+        $this->assertSame(1057.0, (float) $sum($results['ar_detail_full'], 'balance_amount'));
+        $this->assertSame(1037.0, (float) $sum($results['ar_overdue_detail'], 'balance_amount'));
+        $this->assertSame('500.00', $results['ar_statement']['summary']['opening_balance']);
+        $this->assertSame('20.00', $results['ar_statement']['summary']['opening_document_amount']);
+        $this->assertSame('1886.00', $results['ar_statement']['summary']['sales_amount']);
+        $this->assertSame('1349.00', $results['ar_statement']['summary']['receipt_amount']);
+        $this->assertSame('1057.00', $results['ar_statement']['summary']['closing_balance']);
+        $this->assertSame(1349.0, (float) $sum($results['receipt_documents'], 'total_amount'));
+        $this->assertSame(1, $results['payment_documents']['total']);
+        $this->assertSame(1349.0, (float) $sum($results['payment_allocations'], 'allocated_amount'));
+        $this->assertSame(1800.0, (float) data_get($rows($results['vat_sales'])->firstWhere('doc_number', 'DS256911/06364'), 'base_amount'));
+        $vatDocuments = $rows($results['vat_sales'])->reject(fn ($row) => data_get($row, 'party_name') === 'รวมทั้งสิ้น');
+        $this->assertSame(22.57, (float) DecimalMath::sum($vatDocuments->pluck('vat_amount'), 2));
+        $this->assertSame(1849.0, (float) DecimalMath::sum($vatDocuments->pluck('base_amount'), 2));
+        $creditSummary = $rows($results['documents_summary'])->first(fn ($row) => str_starts_with($row->document_type, 'CREDIT_SALE -'));
+        $this->assertSame(1886.0, (float) $creditSummary->amount);
+        $this->assertTrue($rows($results['document_list'])->contains(fn ($row) => $row->doc_number === 'DS256911/99999' && $row->status === 'cancelled'));
+        $this->assertFalse($rows($results['document_list'])->contains(fn ($row) => $row->doc_number === 'DS256911/99998'));
+        $this->assertSame(1, $results['bplus_daily_sales_summary']['total']);
+
+        $daily = $rows($results['bplus_daily_sales_summary'])->first();
+        $this->assertSame(2, (int) $daily->bill_count);
+        $this->assertSame('1849.00', number_format((float) $daily->subtotal_amount, 2, '.', ''));
+        $this->assertSame('22.57', number_format((float) $daily->vat_amount, 2, '.', ''));
+        $this->assertSame('1886.00', number_format((float) $daily->net_sales, 2, '.', ''));
+        $this->assertSame('150.00', number_format((float) $daily->cash_amount, 2, '.', ''));
+        $this->assertSame('1178.63', number_format((float) $daily->transfer_amount, 2, '.', ''));
+
+        $receipt = $rows($results['bplus_receipt_allocations'])->first();
+        $this->assertSame('RR26911/000800', $receipt->receipt_no);
+        $this->assertSame(1, $results['bplus_receipt_allocations']['total']);
+        $this->assertSame('1349.00', number_format((float) $receipt->applied_total, 2, '.', ''));
+        $this->assertSame('150.00', number_format((float) $receipt->cash_amount, 2, '.', ''));
+        $this->assertSame('1178.63', number_format((float) $receipt->transfer_amount, 2, '.', ''));
+        $this->assertSame('0.00', number_format((float) $receipt->discount_amount, 2, '.', ''));
+        $this->assertSame('0.00', number_format((float) $receipt->wht_amount, 2, '.', ''));
+        $this->assertSame('20.00', number_format((float) $receipt->other_amount, 2, '.', ''));
+        $this->assertSame('0.37', number_format((float) $receipt->short_amount, 2, '.', ''));
+
+        $glDebits = DecimalMath::sum($rows($results['gl_journals'])->pluck('debit'), 2);
+        $glCredits = DecimalMath::sum($rows($results['gl_journals'])->pluck('credit'), 2);
+        $this->assertSame('3255.00', $glDebits);
+        $this->assertSame($glDebits, $glCredits);
+        $this->assertTrue($rows($results['credit_sales'])->every(fn ($row) => $row->sales_area_name === 'B18 - ม่วง-เลิง-อำนาจ-มุก'));
+    }
+
     private function openItem(Document $document): array
     {
         $item = DB::table('customer_open_items')->where('document_id', $document->id)->first();

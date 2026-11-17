@@ -28,6 +28,7 @@
         'credit_sales' => 'ใบขายเชื่อ',
         'bplus_credit_sales_by_document' => 'BPlus ขายเชื่อ แยกเอกสาร',
         'bplus_credit_sales_by_product' => 'BPlus ขายเชื่อ แยกสินค้า',
+        'bplus_daily_sales_summary' => 'BPlus สรุปขายเชื่อรายวัน',
         'pending_bookings' => 'ใบจองค้างแปลงขาย',
         'sales_by_booking' => 'ยอดขายตามใบจอง',
         'sales_returns_by_document' => 'ใบขาย-รับคืน ตามเอกสาร',
@@ -56,6 +57,7 @@
         'ar_detail_short' => 'รายงานรายละเอียดยอดลูกหนี้ แบบย่อ',
         'ar_detail_full' => 'รายงานรายละเอียดยอดลูกหนี้ แบบละเอียด',
         'ar_overdue_detail' => 'รายงานรายละเอียดลูกหนี้เกินกำหนดชำระ',
+        'ar_statement' => 'Statement ลูกหนี้รายตัว',
         'ar_over_credit_limit' => 'รายงานรายละเอียดลูกหนี้เกินวงเงินเครดิต',
         'stock_balance' => 'สินค้าคงเหลือ',
         'stock_by_branch' => 'สต็อกตามสาขา',
@@ -85,6 +87,7 @@
         'vat_purchase' => 'รายงานภาษีซื้อ',
         'payment_documents' => 'เอกสารรับชำระ',
         'payment_allocations' => 'ตัดหนี้ / จัดสรรยอด',
+        'bplus_receipt_allocations' => 'BPlus ใบเสร็จตัดหนี้ตามเอกสาร',
         'gl_journals' => 'GL Journal',
         'void_bill_history' => 'ประวัติลบบิล / ยกเลิกบิลย้อนหลัง',
         'deleted_bill_audit' => 'ตรวจสอบเอกสารที่ถูกยกเลิก',
@@ -181,6 +184,7 @@
 
     $dateParams = [
         'from' => $from, 'to' => $to, 'branch_id' => $filters['branch_id'],
+        'sales_area_id' => $filters['sales_area_id'],
         'salesman_id' => $filters['salesman_id'], 'customer_id' => $filters['customer_id'],
         'document_book' => $filters['document_book'],
     ];
@@ -311,6 +315,17 @@
                     </select>
                 @endif
 
+                @if($selectedReport === 'ar_statement')
+                    <select name="customer_id" class="rpt-select" aria-label="ลูกค้า">
+                        <option value="">เลือกลูกค้า</option>
+                        @foreach($statementCustomers as $customer)
+                            <option value="{{ $customer->id }}" @selected((string) $filters['customer_id'] === (string) $customer->id)>
+                                {{ $customer->code }} - {{ $customer->name_th }}
+                            </option>
+                        @endforeach
+                    </select>
+                @endif
+
                 <a href="{{ request()->fullUrlWithQuery(['from'=>now()->toDateString(),'to'=>now()->toDateString()]) }}" class="rpt-shortcut">วันนี้</a>
                 <a href="{{ request()->fullUrlWithQuery(['from'=>now()->subDays(6)->toDateString(),'to'=>now()->toDateString()]) }}" class="rpt-shortcut">7 วัน</a>
                 <a href="{{ request()->fullUrlWithQuery(['from'=>now()->startOfMonth()->toDateString(),'to'=>now()->toDateString()]) }}" class="rpt-shortcut">เดือนนี้</a>
@@ -322,6 +337,14 @@
                     @endif
                     @foreach($branches as $b)
                         <option value="{{ $b->id }}" @selected((string) $filters['branch_id'] === (string) $b->id)>{{ $b->code }} - {{ $b->name_th }}</option>
+                    @endforeach
+                </select>
+                <select name="sales_area_id" class="rpt-select" aria-label="สายขาย">
+                    <option value="">ทุกสายขาย</option>
+                    @foreach($salesAreas as $salesArea)
+                        <option value="{{ $salesArea->id }}" @selected((string) $filters['sales_area_id'] === (string) $salesArea->id)>
+                            {{ $salesArea->code }} - {{ $salesArea->name }}
+                        </option>
                     @endforeach
                 </select>
                 <button type="submit" class="rpt-btn-filter"><i class="bi bi-funnel-fill me-1"></i>กรอง</button>
