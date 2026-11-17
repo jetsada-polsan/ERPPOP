@@ -131,6 +131,180 @@ class BplusDocumentsTest extends TestCase
         $this->assertSame('22.57', number_format((float) $daily->sum('vat_amount'), 2, '.', ''));
     }
 
+    public function test_bplus_credit_note_reduces_ar_posts_reverse_gl_and_nets_reports(): void
+    {
+        config(['reports.phase_two_enabled' => true]);
+        $export = $this->withOpeningBill($this->export());
+        $note = [
+            'bplus_key' => 2716001, 'kind' => 'credit_note', 'book_code' => 'IS', 'ref' => 'IS256911/00001',
+            'doc_date' => '2026-11-16', 'customer_code' => '37120-0005', 'sale_ref' => 'DS256911/06364',
+            'vatable_amount' => 100, 'exempt_amount' => 0, 'vat_amount' => 7, 'total_amount' => 107,
+            'salesman_code' => '09', 'bplus_updated_at' => '2026-11-16 12:00:00',
+            'lines' => [['seq' => 1, 'sku_code' => '104032', 'unit_name' => 'ถุง*10', 'unit_factor' => 10, 'qty' => 1, 'unit_price' => 107, 'amount' => 107]],
+        ];
+        $export['documents'][] = $note;
+        $this->importFile($export);
+
+        $noteDocument = Document::where('doc_number', $note['ref'])->firstOrFail();
+        $sale = Document::where('doc_number', $note['sale_ref'])->firstOrFail();
+        $this->assertSame('CREDIT_NOTE', $noteDocument->documentType->code);
+        $this->assertSame('IS', $noteDocument->documentBook->code);
+        $this->assertSame($sale->id, $noteDocument->source_document_id);
+        $this->assertSame($sale->doc_number, $noteDocument->reference);
+        $this->assertSame('100.00', number_format((float) $noteDocument->subtotal_amount, 2, '.', ''));
+        $this->assertSame('7.00', number_format((float) $noteDocument->vat_amount, 2, '.', ''));
+        $this->assertSame('DS256911/06364', DB::table('bplus_sync_documents')->where('ref', $note['ref'])->value('sale_ref'));
+        $this->actingAs(User::where('username', 'bplus_docs')->first()->forceFill(['branch_id' => $this->branch->id]));
+        $this->get(\App\Http\Controllers\DocumentBrowserController::detailUrl($noteDocument->fresh(['documentType'])))
+            ->assertOk()->assertSee($note['ref']);
+        $syncNoteId = DB::table('bplus_sync_documents')->where('ref', $note['ref'])->value('id');
+        $this->get(route('bplus.sync.show', $syncNoteId))->assertOk()->assertSee('ใบลดหนี้')->assertSee($note['sale_ref']);
+        $this->assertSame('1837.00', number_format((float) DB::table('customer_open_items')->where('document_id', $sale->id)->value('gross_amount'), 2, '.', ''), 'ไม่แก้ยอดบิลขายเดิม');
+        $this->assertSame('1730.00', number_format((float) DB::table('customer_open_items')->where('document_id', $sale->id)->value('net_amount'), 2, '.', ''), 'ยอดบิลสุทธิหลังลดหนี้');
+        $this->assertSame(['partial', '730.00'], $this->openItem($sale));
+        $this->assertSame('930.00', number_format((float) DB::table('customer_open_items')->sum('balance_amount'), 2, '.', ''), 'ยกมา + ขาย - ลดหนี้ - รับชำระ');
+
+        $ar = ChartOfAccount::where('default_role', ChartOfAccount::ROLE_AR)->firstOrFail();
+        $revenue = ChartOfAccount::where('default_role', ChartOfAccount::ROLE_SALES_REVENUE)->firstOrFail();
+        $vat = ChartOfAccount::where('default_role', ChartOfAccount::ROLE_VAT_OUTPUT)->firstOrFail();
+        $journals = DB::table('gl_journals')->where('document_id', $noteDocument->id)->get();
+        $this->assertCount(3, $journals);
+        $this->assertSame('107.00', number_format((float) $journals->firstWhere('account_id', $ar->id)->credit, 2, '.', ''));
+        $this->assertSame('100.00', number_format((float) $journals->firstWhere('account_id', $revenue->id)->debit, 2, '.', ''));
+        $this->assertSame('7.00', number_format((float) $journals->firstWhere('account_id', $vat->id)->debit, 2, '.', ''));
+        $this->assertSame('107.00', DecimalMath::sum($journals->pluck('debit'), 2));
+        $this->assertSame('107.00', DecimalMath::sum($journals->pluck('credit'), 2));
+        $this->assertSame(0, DB::table('stock_movements')->count(), 'ใบลดหนี้ BPlus ไม่ตัดหรือคืนสต๊อก');
+        $this->assertSame(0, DB::table('stock_documents')->where('document_id', $noteDocument->id)->count(), 'ใบลดหนี้เป็นเอกสารการเงิน');
+
+        // ซิงค์ซ้ำ: เอกสาร/GL ใช้รายการเดิม ไม่สร้างรายการซ้ำ
+        $this->importFile($export);
+        $this->assertSame(3, DB::table('gl_journals')->where('document_id', $noteDocument->id)->count());
+
+        $role = Role::where('code', 'BPLUS_DOCS')->firstOrFail();
+        $role->permissions()->sync(Permission::pluck('id')->all());
+        DB::table('report_definitions')->whereIn('code', [
+            'sales.sales_summary_by_customer', 'sales.sales_returns_by_document', 'sales.bplus_daily_sales_summary',
+            'sales.bplus_credit_sales_by_document', 'sales.bplus_credit_sales_by_product',
+            'tax.vat_sales', 'ar.ar_statement',
+        ])->update(['enabled' => true, 'status' => 'available']);
+        $user = User::where('username', 'bplus_docs')->firstOrFail();
+        $user->branch_id = $this->branch->id;
+        $user->save();
+        $this->actingAs($user->fresh());
+        $areaId = (int) DB::table('sales_areas')->where('code', 'B18')->value('id');
+        $openReport = function (string $category, string $report, array $extra = []) use ($areaId) {
+            $response = $this->get(route('reports.index', [
+                'category' => $category, 'report' => $report, 'from' => '2026-11-01', 'to' => '2026-11-30',
+                'branch_id' => $this->branch->id, 'sales_area_id' => $areaId,
+            ] + $extra))->assertOk()->assertViewHas('selectedReport', $report);
+
+            return $response->viewData('result');
+        };
+        $rows = fn (array $result) => collect($result['rows']);
+        $salesSummary = $openReport('sales', 'sales_summary_by_customer');
+        $documentSales = $openReport('sales', 'sales_returns_by_document');
+        $dailySummary = $openReport('sales', 'bplus_daily_sales_summary');
+        $bplusDocuments = $openReport('sales', 'bplus_credit_sales_by_document');
+        $bplusProducts = $openReport('sales', 'bplus_credit_sales_by_product');
+        $vatSales = $openReport('tax', 'vat_sales');
+        $statement = $openReport('ar', 'ar_statement', ['customer_id' => Customer::where('code', '37120-0005')->value('id')]);
+
+        $this->assertSame('1779.00', DecimalMath::sum($rows($salesSummary)->pluck('net_amount'), 2));
+        $this->assertSame('107.00', DecimalMath::sum($rows($salesSummary)->pluck('return_amount'), 2));
+        $this->assertSame('1779.00', number_format((float) $rows($documentSales)->firstWhere('salesman_name', 'รวมทั้งสิ้น')->total_amount, 2, '.', ''));
+        $dailyRows = $rows($dailySummary);
+        $this->assertSame('1763.43', DecimalMath::sum($dailyRows->pluck('subtotal_amount'), 2));
+        $this->assertSame('15.57', DecimalMath::sum($dailyRows->pluck('vat_amount'), 2));
+        $this->assertSame('1779.00', DecimalMath::sum($dailyRows->pluck('net_sales'), 2));
+        $this->assertSame('1886.00', $bplusDocuments['summary']['net_sales'], 'รายงานใบขายเชื่อคงเป็นยอดขายขั้นต้น');
+        $this->assertSame('1886.00', $bplusProducts['summary']['net_sales'], 'รายงานขายเชื่อแยกสินค้าไม่หักใบลดหนี้');
+        $vatRows = $rows($vatSales)->reject(fn ($row) => data_get($row, 'party_name') === 'รวมทั้งสิ้น');
+        $this->assertSame('15.57', DecimalMath::sum($vatRows->pluck('vat_amount'), 2));
+        $creditRow = $rows($statement)->firstWhere('doc_number', $note['ref']);
+        $this->assertSame('ใบลดหนี้', data_get($creditRow, 'document_type'));
+        $this->assertSame('107.00', number_format((float) data_get($creditRow, 'credit_amount'), 2, '.', ''));
+        $this->assertSame('107.00', $statement['summary']['credit_note_amount']);
+        $this->assertSame('930.00', $statement['summary']['closing_balance']);
+
+        $dailyService = app(\App\Services\Reports\DailySalesReport::class)->run('2026-11-01', '2026-11-30', [
+            'branch_id' => $this->branch->id, 'q' => '', 'paginate' => false, 'per_page' => 50, 'page' => 1,
+        ]);
+        $this->assertSame('1779.00', $dailyService['summary']['net_sales']);
+
+        // ยกเลิกจาก BPlus: ลูกหนี้และรายงานกลับเป็นยอดก่อนมีใบลดหนี้ และ GL กลับสุทธิเป็นศูนย์
+        $cancelled = $export;
+        $cancelled['documents'][count($cancelled['documents']) - 1]['is_cancelled'] = true;
+        $cancelled['documents'][count($cancelled['documents']) - 1]['bplus_updated_at'] = '2026-11-17 09:00:00';
+        $this->importFile($cancelled);
+        $this->assertSame('cancelled', $noteDocument->fresh()->status);
+        $this->assertSame(['partial', '837.00'], $this->openItem($sale));
+        $this->assertSame('1037.00', number_format((float) DB::table('customer_open_items')->sum('balance_amount'), 2, '.', ''));
+        $netByAccount = DB::table('gl_journals')->where('document_id', $noteDocument->id)
+            ->selectRaw('account_id, sum(debit) - sum(credit) as net')->groupBy('account_id')->pluck('net');
+        $this->assertTrue($netByAccount->every(fn ($net) => round((float) $net, 2) === 0.0));
+        $this->assertSame(6, DB::table('gl_journals')->where('document_id', $noteDocument->id)->count());
+        $this->importFile($cancelled);
+        $this->assertSame(6, DB::table('gl_journals')->where('document_id', $noteDocument->id)->count(), 'ซิงค์ยกเลิกซ้ำไม่สร้างรายการกลับบัญชีซ้ำ');
+        $this->assertSame('1886.00', DecimalMath::sum($rows($openReport('sales', 'sales_summary_by_customer'))->pluck('net_amount'), 2));
+        $this->assertSame('22.57', DecimalMath::sum($rows($openReport('tax', 'vat_sales'))->reject(fn ($row) => data_get($row, 'party_name') === 'รวมทั้งสิ้น')->pluck('vat_amount'), 2));
+    }
+
+    public function test_credit_note_import_requires_a_sale_reference(): void
+    {
+        $export = $this->export();
+        $export['documents'][] = ['bplus_key' => 2716002, 'kind' => 'credit_note', 'book_code' => 'IS', 'ref' => 'IS256911/00002', 'doc_date' => '2026-11-16'];
+
+        $response = $this->post(route('bplus.sync.import.preview'), ['file' => $this->upload($export)]);
+
+        $response->assertRedirect()->assertSessionHasErrors('file');
+        $this->assertStringContainsString('ไม่มี sale_ref', session('errors')->first('file'));
+    }
+
+    public function test_bplus_isn_credit_note_preserves_zero_vat_in_gl_and_print(): void
+    {
+        $export = $this->export();
+        $export['documents'][] = [
+            'bplus_key' => 2716003, 'kind' => 'credit_note', 'book_code' => 'IS-N', 'ref' => 'ISN256911/00001',
+            'doc_date' => '2026-11-16', 'customer_code' => '37120-0005', 'sale_ref' => 'DSN256911/4861',
+            'vatable_amount' => 0, 'exempt_amount' => 49, 'vat_amount' => 0, 'total_amount' => 49,
+            'lines' => [['seq' => 1, 'sku_code' => '501035', 'unit_name' => 'ถุง', 'unit_factor' => 1, 'qty' => 1, 'unit_price' => 49, 'amount' => 49, 'has_vat' => false]],
+        ];
+        $this->importFile($export);
+
+        $note = Document::where('doc_number', 'ISN256911/00001')->firstOrFail();
+        $this->assertSame('IS-N', $note->documentBook->code);
+        $this->assertTrue((bool) $note->documentBook->no_vat);
+        $this->assertSame('49.00', number_format((float) $note->subtotal_amount, 2, '.', ''));
+        $this->assertSame('0.00', number_format((float) $note->vat_amount, 2, '.', ''));
+        $journals = DB::table('gl_journals')->where('document_id', $note->id)->get();
+        $this->assertCount(2, $journals, 'เล่ม IS-N ไม่มีรายการ VAT');
+        $this->assertSame('49.00', number_format((float) $journals->sum('debit'), 2, '.', ''));
+        $this->assertSame('49.00', number_format((float) $journals->sum('credit'), 2, '.', ''));
+
+        $this->get(route('credit-debit-notes.print', $note))->assertOk()
+            ->assertViewHas('baseAmount', 49.0)->assertViewHas('vatAmount', 0.0)->assertViewHas('vatRate', 0.0);
+    }
+
+    public function test_credit_note_exporter_keeps_bplus_reference_and_positive_amount_contract(): void
+    {
+        // ตรวจสัญญาแบบ offline เพราะ exporter นี้อ่าน BPlus จริงและห้ามรันระหว่างงานพัฒนา
+        $exporter = file_get_contents(base_path('scripts/bplus-route-export.py'));
+        foreach ([
+            "t.DT_DOCCODE IN ('IS', 'IS-N')",
+            'l.TRD_REFER_DI IN ({ROUTE_SALES})',
+            '"sale_ref": sale_refs[0]',
+            '"total_amount": abs(raw_total)',
+            '"vat_amount": abs(num(note["ARD_B_VAT"]))',
+            '"is_cancelled": note["DI_ACTIVE"] != 0',
+            '"bplus_updated_at": stamp(note["DI_UPD_DATE"] or note["DI_CRE_DATE"])',
+            '"lines": positive_lines',
+            'if raw_total < 0:',
+        ] as $contract) {
+            $this->assertStringContainsString($contract, $exporter, 'exporter ต้องรักษาสัญญาใบลดหนี้: '.$contract);
+        }
+    }
+
     public function test_documents_show_in_the_normal_erp_lists(): void
     {
         $this->importFile($this->export());

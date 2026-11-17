@@ -2014,7 +2014,7 @@ class ReportController extends Controller
             ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
             ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')
             ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
-            ->where('d.source_system', 'bplus')->where('dt.code', 'CREDIT_SALE')
+            ->where('d.source_system', 'bplus')->whereIn('dt.code', ['CREDIT_SALE', 'CREDIT_NOTE'])
             ->where('d.status', 'active')->whereNull('d.cancelled_at')
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
         $this->applyBranch($salesQuery, $filters, 'd.branch_id');
@@ -2023,8 +2023,10 @@ class ReportController extends Controller
 
         $sales = $salesQuery->groupBy('d.doc_date', 'sa.code', 'sa.name')
             ->selectRaw("d.doc_date, COALESCE(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') as sales_area_name,
-                count(d.id) as bill_count, sum(d.subtotal_amount) as subtotal_amount,
-                sum(d.vat_amount) as vat_amount, sum(d.total_amount) as net_sales")
+                sum(case when dt.code = 'CREDIT_SALE' then 1 else 0 end) as bill_count,
+                sum(case when dt.code = 'CREDIT_NOTE' then -d.subtotal_amount else d.subtotal_amount end) as subtotal_amount,
+                sum(case when dt.code = 'CREDIT_NOTE' then -d.vat_amount else d.vat_amount end) as vat_amount,
+                sum(case when dt.code = 'CREDIT_NOTE' then -d.total_amount else d.total_amount end) as net_sales")
             ->get()->keyBy(fn ($row) => $row->doc_date.'|'.$row->sales_area_name);
 
         $receiptsQuery = DB::table('documents as d')
@@ -2111,7 +2113,7 @@ class ReportController extends Controller
             ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
             ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')
             ->leftJoin('salesmen as s', 's.id', '=', 'd.salesman_id')
-            ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN'])
+            ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN', 'CREDIT_NOTE'])
             // เอกสารที่ถูกยกเลิกไม่ใช่ยอดขาย — เดิมไม่กรองสถานะเลย บิลที่ void แล้วจึงยังโผล่
             ->where('d.status', 'active')
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()])
@@ -2128,7 +2130,7 @@ class ReportController extends Controller
 
         $rows = $query
             ->orderByDesc('d.doc_date')->orderByDesc('d.id')
-            ->selectRaw("d.doc_date, d.doc_number, dt.name_th as document_type, coalesce(c.name_th, '-') as customer_name, coalesce(s.name, '-') as salesman_name, case when dt.code = 'SALE_RETURN' then -d.total_amount else d.total_amount end as total_amount")
+            ->selectRaw("d.doc_date, d.doc_number, dt.name_th as document_type, coalesce(c.name_th, '-') as customer_name, coalesce(s.name, '-') as salesman_name, case when dt.code in ('SALE_RETURN', 'CREDIT_NOTE') then -d.total_amount else d.total_amount end as total_amount")
             ->limit($filters['per_page'])
             ->get();
 
@@ -2198,7 +2200,7 @@ class ReportController extends Controller
             ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')
             ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
             ->leftJoinSub($itemTotals, 'item_totals', 'item_totals.document_id', '=', 'd.id')
-            ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN'])
+            ->whereIn('dt.code', ['CASH_SALE', 'CREDIT_SALE', 'SALE_RETURN', 'CREDIT_NOTE'])
             ->where('d.status', 'active')->whereNull('d.cancelled_at')
             ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()])
             // ทุกบิล POS สร้างเอกสารขายสดผูกไว้เสมอ ถ้าไม่กันออกจะถูกนับซ้ำกับฝั่ง POS
@@ -2215,15 +2217,15 @@ class ReportController extends Controller
 
         return $query
             ->groupBy('c.id', 'c.code', 'c.name_th', 'sa.code', 'sa.name')
-            ->orderByRaw("sum(case when dt.code = 'SALE_RETURN' then -d.total_amount else d.total_amount end) desc")
+            ->orderByRaw("sum(case when dt.code in ('SALE_RETURN', 'CREDIT_NOTE') then -d.total_amount else d.total_amount end) desc")
             ->selectRaw("
                 concat(coalesce(c.code, '-'), ' ', coalesce(c.name_th, 'ลูกค้าทั่วไป')) as customer_name,
                 coalesce(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') as sales_area_name,
                 count(distinct d.id) as bill_count,
-                sum(case when dt.code = 'SALE_RETURN' then -coalesce(item_totals.qty, 0) else coalesce(item_totals.qty, 0) end) as qty,
-                sum(case when dt.code <> 'SALE_RETURN' then d.total_amount else 0 end) as sales_amount,
-                sum(case when dt.code = 'SALE_RETURN' then d.total_amount else 0 end) as return_amount,
-                sum(case when dt.code = 'SALE_RETURN' then -d.total_amount else d.total_amount end) as net_amount
+                sum(case when dt.code in ('SALE_RETURN', 'CREDIT_NOTE') then -coalesce(item_totals.qty, 0) else coalesce(item_totals.qty, 0) end) as qty,
+                sum(case when dt.code not in ('SALE_RETURN', 'CREDIT_NOTE') then d.total_amount else 0 end) as sales_amount,
+                sum(case when dt.code in ('SALE_RETURN', 'CREDIT_NOTE') then d.total_amount else 0 end) as return_amount,
+                sum(case when dt.code in ('SALE_RETURN', 'CREDIT_NOTE') then -d.total_amount else d.total_amount end) as net_amount
             ")
             ->limit($filters['per_page'])
             ->get();
@@ -2598,14 +2600,14 @@ class ReportController extends Controller
             ['label' => 'ประเภท', 'key' => 'document_type'],
             ['label' => 'เลขที่เอกสาร', 'key' => 'doc_number'],
             ['label' => 'ยอดเพิ่มหนี้', 'key' => 'debit_amount', 'type' => 'money', 'class' => 'text-end'],
-            ['label' => 'ยอดรับชำระ', 'key' => 'credit_amount', 'type' => 'money', 'class' => 'text-end'],
+            ['label' => 'ยอดรับชำระ/ลดหนี้', 'key' => 'credit_amount', 'type' => 'money', 'class' => 'text-end'],
             ['label' => 'คงเหลือ', 'key' => 'balance_amount', 'type' => 'money', 'class' => 'text-end'],
             ['label' => 'สายขาย', 'key' => 'sales_area_name'],
         ];
         if (empty($filters['customer_id'])) {
             return [
                 'title' => 'Statement ลูกหนี้รายตัว — เลือกลูกค้าก่อน', 'columns' => $columns, 'rows' => collect(), 'total' => 0,
-                'summary_scope' => 'all', 'summary' => ['opening_balance' => '0.00', 'sales_amount' => '0.00', 'receipt_amount' => '0.00', 'closing_balance' => '0.00'],
+                'summary_scope' => 'all', 'summary' => ['opening_balance' => '0.00', 'sales_amount' => '0.00', 'credit_note_amount' => '0.00', 'receipt_amount' => '0.00', 'closing_balance' => '0.00'],
                 'pagination' => null,
             ];
         }
@@ -2614,21 +2616,21 @@ class ReportController extends Controller
             ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
             ->leftJoin('sales_areas as sa', 'sa.id', '=', 'd.sales_area_id')
             ->where('d.customer_id', $filters['customer_id'])
-            ->whereIn('dt.code', ['OPENING_AR', 'CREDIT_SALE', 'RECEIPT'])
+            ->whereIn('dt.code', ['OPENING_AR', 'CREDIT_SALE', 'CREDIT_NOTE', 'RECEIPT'])
             ->where('d.status', 'active')->whereNull('d.cancelled_at')
             ->whereDate('d.doc_date', '<=', $to->toDateString());
         $this->applyBranch($query, $filters, 'd.branch_id');
         $this->applySalesArea($query, $filters, 'd.sales_area_id');
         $this->applySearch($query, $filters, ['d.doc_number']);
 
-        $events = $query->orderBy('d.doc_date')->orderByRaw("case dt.code when 'OPENING_AR' then 0 when 'CREDIT_SALE' then 1 else 2 end")
+        $events = $query->orderBy('d.doc_date')->orderByRaw("case dt.code when 'OPENING_AR' then 0 when 'CREDIT_SALE' then 1 when 'CREDIT_NOTE' then 2 else 3 end")
             ->orderBy('d.id')
             ->get(['d.doc_date', 'd.doc_number', 'd.total_amount', 'dt.code as document_code', 'sa.code as area_code', 'sa.name as area_name']);
 
         $openingBalance = '0.00';
         $periodEvents = collect();
         foreach ($events as $event) {
-            $signed = $event->document_code === 'RECEIPT'
+            $signed = in_array($event->document_code, ['RECEIPT', 'CREDIT_NOTE'], true)
                 ? DecimalMath::multiply(-1, $event->total_amount, 2)
                 : DecimalMath::round($event->total_amount, 2);
             if ($event->doc_date < $from->toDateString()) {
@@ -2646,13 +2648,17 @@ class ReportController extends Controller
             'balance_amount' => $openingBalance, 'sales_area_name' => '',
         ]]);
         $salesAmount = '0.00';
+        $creditNoteAmount = '0.00';
         $openingDocumentAmount = '0.00';
         $receiptAmount = '0.00';
         foreach ($periodEvents as [$event, $signed]) {
             $isReceipt = $event->document_code === 'RECEIPT';
+            $isCreditNote = $event->document_code === 'CREDIT_NOTE';
             $balance = DecimalMath::add($balance, $signed, 2);
             if ($isReceipt) {
                 $receiptAmount = DecimalMath::add($receiptAmount, $event->total_amount, 2);
+            } elseif ($isCreditNote) {
+                $creditNoteAmount = DecimalMath::add($creditNoteAmount, $event->total_amount, 2);
             } elseif ($event->document_code === 'OPENING_AR') {
                 $openingDocumentAmount = DecimalMath::add($openingDocumentAmount, $event->total_amount, 2);
             } else {
@@ -2660,10 +2666,10 @@ class ReportController extends Controller
             }
             $rows->push((object) [
                 'doc_date' => $event->doc_date,
-                'document_type' => ['OPENING_AR' => 'ลูกหนี้ยกมา', 'CREDIT_SALE' => 'ขายเชื่อ', 'RECEIPT' => 'ใบเสร็จรับเงิน'][$event->document_code],
+                'document_type' => ['OPENING_AR' => 'ลูกหนี้ยกมา', 'CREDIT_SALE' => 'ขายเชื่อ', 'CREDIT_NOTE' => 'ใบลดหนี้', 'RECEIPT' => 'ใบเสร็จรับเงิน'][$event->document_code],
                 'doc_number' => $event->doc_number,
-                'debit_amount' => ! $isReceipt ? $event->total_amount : '0.00',
-                'credit_amount' => $isReceipt ? $event->total_amount : '0.00',
+                'debit_amount' => ! $isReceipt && ! $isCreditNote ? $event->total_amount : '0.00',
+                'credit_amount' => $isReceipt || $isCreditNote ? $event->total_amount : '0.00',
                 'balance_amount' => $balance,
                 'sales_area_name' => trim(($event->area_code ?? '').' '.($event->area_name ?? '')) ?: 'ไม่ระบุสายขาย',
             ]);
@@ -2673,6 +2679,7 @@ class ReportController extends Controller
             'title' => 'Statement ลูกหนี้รายตัว', 'columns' => $columns, 'rows' => $rows, 'total' => $rows->count(),
             'summary_scope' => 'all',
             'summary' => ['net_sales' => $balance, 'opening_balance' => $openingBalance, 'opening_document_amount' => $openingDocumentAmount, 'sales_amount' => $salesAmount,
+                'credit_note_amount' => $creditNoteAmount,
                 'receipt_amount' => $receiptAmount, 'closing_balance' => $balance],
             'pagination' => null,
         ];

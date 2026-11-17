@@ -13,7 +13,7 @@ use InvalidArgumentException;
  */
 class BplusSyncImporter
 {
-    private const KINDS = ['booking', 'credit_sale', 'opening_ar', 'receipt'];
+    private const KINDS = ['booking', 'credit_sale', 'opening_ar', 'credit_note', 'receipt'];
 
     /** @return array{route: string, documents: array<int, array>, customers?: array<int, array>, products?: array<int, array>} */
     public function parse(string $json): array
@@ -31,6 +31,9 @@ class BplusSyncImporter
             }
             if (! in_array($doc['kind'], self::KINDS, true)) {
                 throw new InvalidArgumentException("เอกสาร {$doc['ref']} ประเภทไม่รู้จัก");
+            }
+            if ($doc['kind'] === 'credit_note' && trim((string) ($doc['sale_ref'] ?? '')) === '') {
+                throw new InvalidArgumentException('เอกสาร '.$doc['ref'].' ไม่มี sale_ref');
             }
         }
 
@@ -154,6 +157,7 @@ class BplusSyncImporter
                         ? trim((string) $doc['salesman_code'])
                         : null,
                     'booking_ref' => $doc['booking_ref'] ?? null,
+                    'sale_ref' => $doc['sale_ref'] ?? null,
                     'vatable_amount' => $this->money($doc['vatable_amount'] ?? 0),
                     'exempt_amount' => $this->money($doc['exempt_amount'] ?? 0),
                     'vat_amount' => $this->money($doc['vat_amount'] ?? 0),

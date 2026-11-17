@@ -16,7 +16,7 @@ use InvalidArgumentException;
 /** เอกสารสายขายที่ซิงค์มาจาก BPlus: ดูเอกสาร ยอดขายรายวัน และนำเข้าไฟล์ */
 class BplusSyncController extends Controller
 {
-    private const KIND_LABELS = ['booking' => 'ใบจอง', 'credit_sale' => 'ใบขายเชื่อ', 'opening_ar' => 'ลูกหนี้ยกมา', 'receipt' => 'ใบเสร็จรับเงิน'];
+    private const KIND_LABELS = ['booking' => 'ใบจอง', 'credit_sale' => 'ใบขายเชื่อ', 'opening_ar' => 'ลูกหนี้ยกมา', 'credit_note' => 'ใบลดหนี้', 'receipt' => 'ใบเสร็จรับเงิน'];
 
     public function index(Request $request): View
     {
@@ -44,6 +44,7 @@ class BplusSyncController extends Controller
             ->when($kind, fn ($q) => $q->where('kind', $kind))
             ->when($search !== '', fn ($q) => $q->where(fn ($w) => $w->where('ref', 'like', "%{$search}%")
                 ->orWhere('booking_ref', 'like', "%{$search}%")
+                ->orWhere('sale_ref', 'like', "%{$search}%")
                 ->orWhere('customer_code', 'like', "%{$search}%")
                 ->orWhere('customer_name', 'like', "%{$search}%")))
             ->orderByDesc('doc_date')->orderByDesc('bplus_key')
@@ -138,6 +139,9 @@ class BplusSyncController extends Controller
             $receiptIds = DB::table('bplus_sync_allocations')->where('sale_ref', $doc->ref)->pluck('bplus_sync_document_id');
 
             return $query->where(fn ($q) => $q->where('ref', $doc->booking_ref)->orWhereIn('id', $receiptIds))->get();
+        }
+        if ($doc->kind === 'credit_note') {
+            return $query->where('ref', $doc->sale_ref)->get();
         }
         $saleRefs = DB::table('bplus_sync_allocations')->where('bplus_sync_document_id', $doc->id)->pluck('sale_ref');
 
