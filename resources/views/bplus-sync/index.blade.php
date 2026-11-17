@@ -1,7 +1,7 @@
 @extends('layout')
 @section('title', 'เอกสารสายขาย (ระบบเดิม)')
 @section('page-title', 'เอกสารสายขาย (ระบบเดิม)')
-@section('page-subtitle', 'ใบจอง ใบขายเชื่อ ใบเสร็จ ที่คีย์ในระบบเดิม แล้วซิงค์มาดู · ไม่ตัดสต๊อก ไม่ลงบัญชี')
+@section('page-subtitle', 'ใบจอง ใบขายเชื่อ ใบเสร็จ และลูกหนี้ยกมา ที่คีย์ในระบบเดิม แล้วซิงค์มา · ลงบัญชีตามยอดเอกสาร ไม่ตัดสต๊อก')
 @section('content')
 @php($m = fn ($v) => number_format((float) $v, 2))
 @if (session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif

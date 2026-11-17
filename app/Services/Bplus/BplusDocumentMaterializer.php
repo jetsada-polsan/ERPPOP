@@ -168,6 +168,10 @@ class BplusDocumentMaterializer
     private function booking(object $row): ?int
     {
         $customerId = $this->customerId($row);
+        if (! $customerId && $row->is_cancelled && ! $row->customer_code) {
+            // ใบจองที่ยกเลิกใน BPlus ก่อนเปิดขาย ไม่มีลูกค้าและไม่ต้องสร้าง ไม่นับเป็นปัญหา
+            return DB::table('documents')->where('source_system', self::SOURCE)->where('source_key', $row->bplus_key)->value('id');
+        }
         if (! $customerId) {
             // BPlus เก็บลูกค้าไว้ที่ใบขาย ใบจองที่ยังไม่เปิดขายจึงยังไม่รู้ลูกค้า ซิงค์รอบหน้าจะสร้างให้
             $this->problems[$row->ref] = $row->customer_code

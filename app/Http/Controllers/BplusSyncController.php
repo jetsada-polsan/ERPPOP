@@ -112,7 +112,7 @@ class BplusSyncController extends Controller
         $parsed = $importer->parse(Storage::disk('local')->get($path));
         $count = $importer->import($parsed);
         Storage::disk('local')->delete($path);
-        // สร้างเป็นใบจอง / ใบขายเชื่อ / ใบเสร็จของ ERP ให้เห็นในเมนูและรายงานปกติ (ไม่ตัดสต๊อก ไม่ลง GL)
+        // สร้างเป็นใบจอง / ใบขายเชื่อ / ใบเสร็จของ ERP ให้เห็นในเมนูและรายงานปกติ (ลง GL ตามยอดเอกสาร ไม่ตัดสต๊อก)
         $message = "บันทึกเอกสารจาก BPlus แล้ว {$count} ใบ";
         try {
             $result = $materializer->run($parsed['route']);
