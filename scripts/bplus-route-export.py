@@ -206,13 +206,13 @@ OPENING_KEY_OFFSET = 9_000_000_000
 opening_rows = rows(f"""
     SELECT d.DI_KEY, d.DI_REF, d.DI_DATE, d.DI_AMOUNT, d.DI_UPD_DATE, d.DI_CRE_DATE, t.DT_DOCCODE, x.ARD_DUE_DA,
            a.AR_KEY, a.AR_CODE, a.AR_NAME,
-           (SELECT COALESCE(SUM(pa.TPA_DISC_A + pa.TPA_WHTX_A + CASE
-                WHEN pa.TPA_CASH_A + pa.TPA_TRFR_A + pa.TPA_CHEQ_A + pa.TPA_OTHR_A + pa.TPA_NOTE_A > 0
+           (SELECT COALESCE(SUM(pa.TPA_DISC_A + pa.TPA_WHTX_A + CASE WHEN tg.HAS_TAG = 1
                     THEN pa.TPA_CASH_A + pa.TPA_TRFR_A + pa.TPA_CHEQ_A + pa.TPA_OTHR_A + pa.TPA_NOTE_A + pa.TPA_SHRT_A
-                WHEN EXISTS (SELECT 1 FROM TRANPAYA q WHERE q.TPA_TPH = pa.TPA_TPH
-                    AND q.TPA_CASH_A + q.TPA_TRFR_A + q.TPA_CHEQ_A + q.TPA_OTHR_A + q.TPA_NOTE_A > 0) THEN 0
-                ELSE pa.TPA_PAY_A END), 0)
+                    ELSE pa.TPA_PAY_A END), 0)
             FROM TRANPAYA pa JOIN TRANPAYH ph ON ph.TPH_KEY = pa.TPA_TPH JOIN DOCINFO pd ON pd.DI_KEY = ph.TPH_DI
+            -- SQL Server ไม่ยอมให้มี subquery อยู่ใน SUM จึงหาว่าใบเสร็จแยกช่องเงินไหมด้วย CROSS APPLY
+            CROSS APPLY (SELECT CASE WHEN EXISTS (SELECT 1 FROM TRANPAYA q WHERE q.TPA_TPH = pa.TPA_TPH
+                AND q.TPA_CASH_A + q.TPA_TRFR_A + q.TPA_CHEQ_A + q.TPA_OTHR_A + q.TPA_NOTE_A > 0) THEN 1 ELSE 0 END AS HAS_TAG) tg
             WHERE pa.TPA_REFER_DI = d.DI_KEY AND pd.DI_ACTIVE = 0 AND pd.DI_DATE < %s) AS PAID_BEFORE
     FROM DOCINFO d JOIN DOCTYPE t ON t.DT_KEY = d.DI_DT
     LEFT JOIN ARDETAIL x ON x.ARD_DI = d.DI_KEY LEFT JOIN ARFILE a ON a.AR_KEY = x.ARD_AR
