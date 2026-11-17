@@ -1,3 +1,28 @@
+# Handoff — 2026-11-17 (bplusAPI and ERP sync settings)
+
+## Commit
+- ERP implementation + report: `a01d2628579052f7e2a60d35036224b128351217`, pushed to `origin/codex/bplusapi-erp`; branch starts from `codex/b18-credit-notes` HEAD `7317407db5a1691f5fbff3bad09c2a9f38b1b4cc`.
+- Standalone `bplusAPI`: local commit `d91bb8706dd90072348f1b0709f55bbc863ebc4d` on `codex/bplusapi`, no remote; copied with `.git` to `/Users/jetsadapolsan/Documents/Codex/2026-07-18/sites-plugin-sites-openai-bundled/outputs/bplusAPI`.
+- This handoff is committed after the implementation on `codex/bplusapi-erp` and pushed only to that branch.
+
+## ทำอะไรไป
+- ปรับ ERP token ให้ `route_code=NULL` ใช้ทุกสาย, เพิ่ม `--all-routes` และ GET ping แบบอ่านอย่างเดียว; B18 scoped token เดิมยังจำกัดสาย และ all-route token เท่านั้นที่สร้าง `sales_areas` + เล่ม BOOKING บน HQ เมื่อ route หาย.
+- ทำโปรแกรม Python แยก `bplusAPI`: เว็บไทยตั้งสาย/วันเริ่ม/ตารางเวลา/การเชื่อมต่อ, background scheduler ทุก 30 วินาที, ซิงค์รายสาย/ทุกสาย, ประวัติ/log, secret fields แบบเขียนอย่างเดียว, PBKDF2 admin password, CSRF/session, DPAPI LocalMachine บน Windows, import ini เก่า, install/uninstall PowerShell.
+- คัดลอก exporter ล่าสุดจาก ERP branch งานใบลดหนี้; เปลี่ยนเฉพาะการรับ host/database จาก environment, ไม่เปลี่ยน SQL/query extraction. ไฟล์ภาพรวมอยู่ `docs/ai/codex-bplusapi.md`.
+
+## ทดสอบไปแล้วแค่ไหน
+- Python: `PYTHONPYCACHEPREFIX=/private/tmp/bplusapi-pycache python3 -m compileall -q .` ผ่าน; `python3 -m pytest -q` **15 passed**; loopback `http.server` mock สำเร็จ/401/409, exporter และ `pymssql` ถูก mock. Mutation 6 จุด (secret HTML, CSRF, since lock, duplicate sync, scheduler marker, ERP 401) expected red และคืนครบ.
+- Python runtime ที่ทดสอบใน dev คือ 3.9.6; target/install script คือ Python 3.12. ยังไม่ได้ทดสอบ DPAPI หรือ PowerShell บน Windows.
+- ERP: `php artisan test --filter=BplusDocumentsTest` **42 passed / 528 assertions**; `php artisan test` **1,172 tests, 1,170 passed, 10,423 assertions, 2 skipped, 6 incomplete**, ไม่มี failure/error. PHP lint และ `git diff --check` ผ่าน. Mutation ERP 4 จุด (all-route scope, provision, nullable scope, ping/revoked) expected red แล้วคืน source.
+- Migration รันผ่าน SQLite in-memory; ยังไม่ได้ execute PostgreSQL จริง. ไม่มีการเชื่อม BPlus/ERP จริง, ไม่ได้ออก token, ไม่ได้รัน installer, ไม่ได้แตะเครื่อง `.201`.
+
+## ความเสี่ยง/งานถัดไป
+- ให้ Claude/ผู้ตรวจทบทวน report, Python app, `install.ps1` และตรวจการรัน Python 3.12/DPAPI/Task Scheduler/firewall บนเครื่อง Windows ที่ไม่ใช่ production ก่อน; `install.ps1` ยังไม่ได้ execute.
+- หลังผู้ดูแล ERP ออก token ด้วยตัวเองและกรอกบนหน้า settings ให้ตรวจ BPlus `SELECT 1`, ERP ping, ตั้งวันเริ่ม/เวลา และดู history. ห้ามส่ง token หรือรหัสจริงใน repo/แชท.
+- ห้าม port-forward TCP 8765; installer จำกัด firewall ที่ `LocalSubnet`. ยังไม่ merge/deploy และไม่ push `main`.
+
+---
+
 # Handoff — 2026-11-17 (B18 credit notes)
 
 ## Commit
