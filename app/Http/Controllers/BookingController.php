@@ -661,7 +661,7 @@ class BookingController extends Controller
 
         $dateRange = ListDateRange::fromRequest($request, 'doc_date');
 
-        $bookings = SaleBooking::with(['document.customer', 'document.branch', 'document.salesUser', 'document.salesArea', 'document.documentBook'])
+        $filtered = SaleBooking::query()
             ->when($status !== '', fn ($query) => $query->where('status', $status))
             ->when($salesAreaId, fn ($query) => $query->where('sales_area_id', $salesAreaId))
             ->when($salesUserId, fn ($query) => $query->where('sales_user_id', $salesUserId))
@@ -671,10 +671,20 @@ class BookingController extends Controller
                 ->where('doc_number', 'ilike', "%{$q}%")
                 ->orWhereHas('customer', fn ($c) => $c->where('name_th', 'ilike', "%{$q}%"))
             ))
-            ->tap(fn ($query) => $dateRange->applyRelation($query, 'document', 'doc_date'))
+            ->tap(fn ($query) => $dateRange->applyRelation($query, 'document', 'doc_date'));
+
+        $bookings = (clone $filtered)
+            ->with(['document.customer', 'document.branch', 'document.salesUser', 'document.salesArea', 'document.documentBook'])
             ->orderByDesc('id')
             ->paginate(50)
             ->withQueryString();
+
+        // ยอดรวมทุกใบตามตัวกรอง (ไม่ใช่แค่หน้านี้) ไว้เทียบกับระบบเดิม ไม่รวมใบยกเลิก
+        $totals = (clone $filtered)
+            ->join('documents as total_doc', 'total_doc.id', '=', 'sale_bookings.document_id')
+            ->where('sale_bookings.status', '!=', 'cancelled')
+            ->selectRaw('count(*) as bills, coalesce(sum(total_doc.total_amount), 0) as amount')
+            ->first();
 
         $countsQuery = SaleBooking::query()
             ->tap(fn ($query) => $dateRange->applyRelation($query, 'document', 'doc_date'));
@@ -721,7 +731,7 @@ class BookingController extends Controller
 
         return view('bookings.index', compact(
             'bookings', 'branches', 'salesUsers', 'salesAreas',
-            'documentBooks', 'bookingDefaults', 'q', 'status', 'bookId', 'branchId', 'salesAreaId', 'salesUserId', 'counts', 'dateRange'
+            'documentBooks', 'bookingDefaults', 'q', 'status', 'bookId', 'branchId', 'salesAreaId', 'salesUserId', 'counts', 'dateRange', 'totals'
         ));
     }
 
