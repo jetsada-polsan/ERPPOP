@@ -126,41 +126,77 @@ for doc in documents:
         doc["customer_key"], doc["customer_code"], doc["customer_name"] = customer_by_booking[doc["ref"]]
 
 # ใบเสร็จ: เก็บเฉพาะบรรทัดที่ตัดชำระใบขายเชื่อของสายนี้
-receipt_rows = rows(f"""
-    SELECT d.DI_KEY, d.DI_REF, d.DI_DATE, d.DI_ACTIVE, d.DI_CRE_BY, d.DI_UPD_DATE, d.DI_CRE_DATE, t.DT_DOCCODE, t.DT_THAIDESC,
-           a.TPA_REFER_REF, a.TPA_PAY_A, a.TPA_CASH_A, a.TPA_TRFR_A, a.TPA_CHEQ_A, a.TPA_OTHR_A, a.TPA_NOTE_A,
-           a.TPA_DISC_A, a.TPA_WHTX_A, a.TPA_SHRT_A, r.AR_KEY, r.AR_CODE, r.AR_NAME
-    FROM TRANPAYA a JOIN TRANPAYH p ON p.TPH_KEY = a.TPA_TPH JOIN DOCINFO d ON d.DI_KEY = p.TPH_DI
-    JOIN DOCTYPE t ON t.DT_KEY = d.DI_DT LEFT JOIN ARFILE r ON r.AR_KEY = p.TPH_AR
-    WHERE d.DI_DATE >= %s AND a.TPA_REFER_DI IN ({ROUTE_SALES}) ORDER BY d.DI_KEY, a.TPA_KEY""", (since, route))
-receipts = {}
+# TPA_PAY_A ไม่ใช่เงินที่รับจริงเสมอไป: ใบที่รับชำระบางส่วน BPlus ใส่ยอดเต็มบิลไว้ในช่องนี้
+# เงินที่รับจริงของบรรทัด = เงินสด + โอน + เช็ค + อื่นๆ + ตั๋ว ส่วน TPA_SHRT_A คือเงินขาดที่ตัดทิ้ง
+# ใบเสร็จที่ไม่ได้แยกช่องเงินเลยสักบรรทัด ใช้ TPA_PAY_A (หักเงินขาด) เป็นเงินที่รับ ตามวิธีรับของเล่ม
+# ตรวจทุกใบ: เงินที่รับรวมทุกบรรทัด (รวมบรรทัดของสายอื่น) ต้องเท่ากับยอดใบเสร็จ DI_AMOUNT
+route_sale_keys = {r["TRH_DI"] for r in rows(ROUTE_SALES, (route,))}
+receipt_keys = [r["TPH_DI"] for r in rows(f"""
+    SELECT DISTINCT p.TPH_DI FROM TRANPAYA a JOIN TRANPAYH p ON p.TPH_KEY = a.TPA_TPH JOIN DOCINFO d ON d.DI_KEY = p.TPH_DI
+    WHERE d.DI_DATE >= %s AND a.TPA_REFER_DI IN ({ROUTE_SALES})""", (since, route))]
+receipt_rows = []
+for start in range(0, len(receipt_keys), 500):
+    chunk = ",".join(str(int(k)) for k in receipt_keys[start:start + 500])
+    receipt_rows += rows(f"""
+        SELECT d.DI_KEY, d.DI_REF, d.DI_DATE, d.DI_ACTIVE, d.DI_AMOUNT, d.DI_CRE_BY, d.DI_UPD_DATE, d.DI_CRE_DATE,
+               t.DT_DOCCODE, t.DT_THAIDESC, a.TPA_REFER_DI, a.TPA_REFER_REF, a.TPA_PAY_A, a.TPA_CASH_A, a.TPA_TRFR_A,
+               a.TPA_CHEQ_A, a.TPA_OTHR_A, a.TPA_NOTE_A, a.TPA_DISC_A, a.TPA_WHTX_A, a.TPA_SHRT_A, r.AR_KEY, r.AR_CODE, r.AR_NAME
+        FROM TRANPAYA a JOIN TRANPAYH p ON p.TPH_KEY = a.TPA_TPH JOIN DOCINFO d ON d.DI_KEY = p.TPH_DI
+        JOIN DOCTYPE t ON t.DT_KEY = d.DI_DT LEFT JOIN ARFILE r ON r.AR_KEY = p.TPH_AR
+        WHERE d.DI_KEY IN ({chunk}) ORDER BY d.DI_KEY, a.TPA_KEY""")
+
+
+def tagged(line) -> float:
+    return num(line["TPA_CASH_A"]) + num(line["TPA_TRFR_A"]) + num(line["TPA_CHEQ_A"]) + num(line["TPA_OTHR_A"]) + num(line["TPA_NOTE_A"])
+
+
+lines_by_receipt = {}
 for r in receipt_rows:
-    doc = receipts.setdefault(r["DI_KEY"], {
-        "bplus_key": r["DI_KEY"], "kind": "receipt", "book_code": text(r["DT_DOCCODE"]), "ref": text(r["DI_REF"]),
-        "doc_date": r["DI_DATE"].date().isoformat(), "is_cancelled": r["DI_ACTIVE"] != 0,
-        "customer_key": r["AR_KEY"], "customer_code": text(r["AR_CODE"]), "customer_name": text(r["AR_NAME"]),
-        "created_by": text(r["DI_CRE_BY"]), "total_amount": 0.0, "cash_amount": 0.0, "transfer_amount": 0.0, "other_amount": 0.0, "short_amount": 0.0,
-        "bplus_updated_at": stamp(r["DI_UPD_DATE"] or r["DI_CRE_DATE"]), "allocations": [],
-    })
-    other = num(r["TPA_CHEQ_A"]) + num(r["TPA_OTHR_A"]) + num(r["TPA_NOTE_A"])
-    doc["total_amount"] = round(doc["total_amount"] + num(r["TPA_PAY_A"]), 2)
-    doc["cash_amount"] = round(doc["cash_amount"] + num(r["TPA_CASH_A"]), 2)
-    doc["transfer_amount"] = round(doc["transfer_amount"] + num(r["TPA_TRFR_A"]), 2)
-    doc["other_amount"] = round(doc["other_amount"] + other, 2)
-    doc["short_amount"] = round(doc["short_amount"] + num(r["TPA_SHRT_A"]), 2)
-    doc["allocations"].append({
-        "sale_ref": text(r["TPA_REFER_REF"]), "paid_amount": num(r["TPA_PAY_A"]),
-        "cash_amount": num(r["TPA_CASH_A"]), "transfer_amount": num(r["TPA_TRFR_A"]),
-        "discount_amount": num(r["TPA_DISC_A"]), "wht_amount": num(r["TPA_WHTX_A"]), "short_amount": num(r["TPA_SHRT_A"]),
-    })
-# บางใบเสร็จ BPlus ไม่ได้แยกช่องเงินสด/โอนรายบรรทัด ส่วนที่เหลือ (ไม่นับเงินขาด)
-# ถือเป็นวิธีรับเงินของเล่มนั้น: เล่มชื่อ "เงินสด" = เงินสด, "เงินโอน" = โอน
-book_names = {r["DI_KEY"]: text(r["DT_THAIDESC"]) or "" for r in receipt_rows}
-for key, doc in receipts.items():
-    rest = round(doc["total_amount"] - doc["short_amount"] - doc["cash_amount"] - doc["transfer_amount"] - doc["other_amount"], 2)
-    if rest > 0:
-        field = "cash_amount" if "เงินสด" in book_names[key] else "transfer_amount" if "โอน" in book_names[key] else "other_amount"
-        doc[field] = round(doc[field] + rest, 2)
+    lines_by_receipt.setdefault(r["DI_KEY"], []).append(r)
+receipts = {}
+receipt_mismatch = []
+for key, lines in lines_by_receipt.items():
+    head = lines[0]
+    book = text(head["DT_THAIDESC"]) or ""
+    untagged_field = "cash_amount" if "เงินสด" in book else "transfer_amount" if "โอน" in book else "other_amount"
+    any_tagged = any(tagged(l) > 0 for l in lines)
+    money_all = 0.0
+    doc = {
+        "bplus_key": key, "kind": "receipt", "book_code": text(head["DT_DOCCODE"]), "ref": text(head["DI_REF"]),
+        "doc_date": head["DI_DATE"].date().isoformat(), "is_cancelled": head["DI_ACTIVE"] != 0,
+        "customer_key": head["AR_KEY"], "customer_code": text(head["AR_CODE"]), "customer_name": text(head["AR_NAME"]),
+        "created_by": text(head["DI_CRE_BY"]), "total_amount": 0.0, "cash_amount": 0.0, "transfer_amount": 0.0,
+        "other_amount": 0.0, "short_amount": 0.0, "bplus_amount": num(head["DI_AMOUNT"]),
+        "bplus_updated_at": stamp(head["DI_UPD_DATE"] or head["DI_CRE_DATE"]), "allocations": [],
+    }
+    for l in lines:
+        short = num(l["TPA_SHRT_A"])
+        if any_tagged:
+            money = tagged(l)
+            parts = {"cash_amount": num(l["TPA_CASH_A"]), "transfer_amount": num(l["TPA_TRFR_A"]),
+                     "other_amount": num(l["TPA_CHEQ_A"]) + num(l["TPA_OTHR_A"]) + num(l["TPA_NOTE_A"])}
+        else:
+            money = round(num(l["TPA_PAY_A"]) - short, 2)
+            parts = {"cash_amount": 0.0, "transfer_amount": 0.0, "other_amount": 0.0}
+            parts[untagged_field] = money
+        money_all += money
+        if l["TPA_REFER_DI"] not in route_sale_keys:
+            continue
+        for field, value in parts.items():
+            doc[field] = round(doc[field] + value, 2)
+        doc["short_amount"] = round(doc["short_amount"] + short, 2)
+        doc["total_amount"] = round(doc["total_amount"] + money + short, 2)
+        if money + short == 0 and num(l["TPA_DISC_A"]) == 0 and num(l["TPA_WHTX_A"]) == 0:
+            continue  # บรรทัดที่ใบนี้ไม่ได้รับเงินจริง (บิลถูกชำระในใบอื่น)
+        doc["allocations"].append({
+            "sale_ref": text(l["TPA_REFER_REF"]), "paid_amount": round(money + short, 2),
+            "cash_amount": parts["cash_amount"], "transfer_amount": parts["transfer_amount"],
+            "discount_amount": num(l["TPA_DISC_A"]), "wht_amount": num(l["TPA_WHTX_A"]), "short_amount": short,
+        })
+    if doc["allocations"]:
+        receipts[key] = doc
+        if not doc["is_cancelled"] and abs(round(money_all, 2) - num(head["DI_AMOUNT"])) > 0.005:
+            receipt_mismatch.append(f'{doc["ref"]} รับจริง {money_all:,.2f} / ยอดใบ {num(head["DI_AMOUNT"]):,.2f}')
 documents.extend(receipts.values())
 
 # ลูกหนี้ยกมา: บิลของสายนี้ที่ออกก่อนช่วงที่ดึงและยังค้าง ณ วันเริ่มช่วง ยอด = ยอดบิล - ที่รับชำระก่อนวันนั้น
@@ -170,8 +206,13 @@ OPENING_KEY_OFFSET = 9_000_000_000
 opening_rows = rows(f"""
     SELECT d.DI_KEY, d.DI_REF, d.DI_DATE, d.DI_AMOUNT, d.DI_UPD_DATE, d.DI_CRE_DATE, t.DT_DOCCODE, x.ARD_DUE_DA,
            a.AR_KEY, a.AR_CODE, a.AR_NAME,
-           (SELECT COALESCE(SUM(pa.TPA_PAY_A + pa.TPA_DISC_A + pa.TPA_WHTX_A), 0)
+           (SELECT COALESCE(SUM(pa.TPA_DISC_A + pa.TPA_WHTX_A + CASE WHEN tg.HAS_TAG = 1
+                    THEN pa.TPA_CASH_A + pa.TPA_TRFR_A + pa.TPA_CHEQ_A + pa.TPA_OTHR_A + pa.TPA_NOTE_A + pa.TPA_SHRT_A
+                    ELSE pa.TPA_PAY_A END), 0)
             FROM TRANPAYA pa JOIN TRANPAYH ph ON ph.TPH_KEY = pa.TPA_TPH JOIN DOCINFO pd ON pd.DI_KEY = ph.TPH_DI
+            -- SQL Server ไม่ยอมให้มี subquery อยู่ใน SUM จึงหาว่าใบเสร็จแยกช่องเงินไหมด้วย CROSS APPLY
+            CROSS APPLY (SELECT CASE WHEN EXISTS (SELECT 1 FROM TRANPAYA q WHERE q.TPA_TPH = pa.TPA_TPH
+                AND q.TPA_CASH_A + q.TPA_TRFR_A + q.TPA_CHEQ_A + q.TPA_OTHR_A + q.TPA_NOTE_A > 0) THEN 1 ELSE 0 END AS HAS_TAG) tg
             WHERE pa.TPA_REFER_DI = d.DI_KEY AND pd.DI_ACTIVE = 0 AND pd.DI_DATE < %s) AS PAID_BEFORE
     FROM DOCINFO d JOIN DOCTYPE t ON t.DT_KEY = d.DI_DT
     LEFT JOIN ARDETAIL x ON x.ARD_DI = d.DI_KEY LEFT JOIN ARFILE a ON a.AR_KEY = x.ARD_AR
@@ -273,4 +314,10 @@ with open(name, "w", encoding="utf-8") as handle:
 count = {k: sum(1 for d in documents if d["kind"] == k) for k in ("booking", "credit_sale", "opening_ar", "receipt")}
 print(f"เสร็จ บันทึกที่ {name}: ใบจอง {count['booking']} · ใบขายเชื่อ {count['credit_sale']} · ใบเสร็จ {count['receipt']}"
       f" · ลูกหนี้ยกมา {count['opening_ar']} บิล ({opening_total:,.2f}) · ลูกค้า {len(customer_data)} · สินค้า {len(product_data)}")
+if receipt_mismatch:
+    print(f"เตือน: ใบเสร็จ {len(receipt_mismatch)} ใบ เงินที่รับรวมไม่เท่ายอดใบใน BPlus (ส่งรายการนี้ให้ Claude ดู):")
+    for item in receipt_mismatch[:20]:
+        print("  " + item)
+else:
+    print("ตรวจแล้ว: เงินที่รับของใบเสร็จทุกใบเท่ากับยอดใบใน BPlus")
 print("อัปโหลดไฟล์นี้ที่ ERP เมนู เอกสารสายขาย (ระบบเดิม)")
