@@ -241,6 +241,7 @@ class BplusDocumentsTest extends TestCase
         $this->assertSame('3', rtrim(rtrim(number_format((float) $product['rows'][2]->qty, 4, '.', ''), '0'), '.'));
         $this->assertSame('1760.00', number_format((float) $product['rows'][2]->amount, 2, '.', ''));
         $this->assertSame('1760.00', number_format((float) $product['rows'][3]->amount, 2, '.', ''));
+        $this->assertSame('21', rtrim(rtrim(number_format((float) $product['rows'][3]->qty, 4, '.', ''), '0'), '.'), 'รวมทั้งหมดเป็นหน่วยฐานแบบ BPlus: 2 ถุง*10 + 1 ถุง');
 
         Document::where('doc_number', 'DSN256911/4861')->update(['status' => 'cancelled', 'cancelled_at' => now()]);
         $withoutCancelled = $this->get(route('reports.index', [

@@ -1789,7 +1789,7 @@ class ReportController extends Controller
             })
             ->selectRaw("p.sku_code, p.name_th, d.doc_date, d.doc_number, COALESCE(c.code, '-') AS customer_code,
                 COALESCE(c.name_th, '-') AS customer_name, COALESCE(bpl.unit_name, u.name, '-') AS unit_name,
-                COALESCE(sdi.unit_qty, sdi.qty) AS qty, COALESCE(bpl.free_qty, 0) AS free_qty,
+                COALESCE(sdi.unit_qty, sdi.qty) AS qty, sdi.qty AS base_qty, COALESCE(bpl.free_qty, 0) AS free_qty,
                 sdi.unit_price * COALESCE(sdi.unit_factor, 1) AS unit_price, sdi.qty * sdi.unit_price AS amount")
             ->orderBy('p.sku_code')->orderBy('p.name_th')->orderBy('d.doc_date')->orderBy('d.doc_number')->orderBy('sdi.seq')
             ->get();
@@ -1810,8 +1810,9 @@ class ReportController extends Controller
             ]);
         }
 
+        // BPlus รวมต่อสินค้าเป็นหน่วยที่ขาย แต่บรรทัด "รวมทั้งหมด" เป็นหน่วยฐาน (16/11 สาย 09: 318.9 หน่วยขาย = 1,706.9 หน่วยฐาน)
         $summary = [
-            'qty' => DecimalMath::sum($lines->pluck('qty'), 4),
+            'qty' => DecimalMath::sum($lines->pluck('base_qty'), 4),
             'free_qty' => DecimalMath::sum($lines->pluck('free_qty'), 4),
             'net_sales' => DecimalMath::sum($lines->pluck('amount'), 2),
         ];
