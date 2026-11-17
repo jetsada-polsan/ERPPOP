@@ -30,6 +30,8 @@ class DocumentBrowserController extends Controller
         'PRODUCTION_RECEIPT' => 'stock-issues.show',
         'PAYMENT_VOUCHER' => 'payments.show',
         'RECEIPT' => 'payments.show',
+        // ลูกหนี้ยกมาจาก BPlus เป็นบิลค้างเก่า ใช้หน้าบิลขายแสดงลูกค้า ยอด และการรับชำระ
+        'OPENING_AR' => 'sales.show',
     ];
 
     public function index(Request $request): View

@@ -209,6 +209,22 @@ class BplusDocumentsTest extends TestCase
         $this->assertStringContainsString('ยังไม่รู้ลูกค้า', (string) DB::table('bplus_sync_documents')->where('ref', 'B18-6911/00383')->value('problem'));
     }
 
+    public function test_every_synced_document_opens_from_the_document_browser(): void
+    {
+        $this->importFile($this->withOpeningBill($this->export()));
+        $this->actingAs(User::where('username', 'bplus_docs')->first()->forceFill(['branch_id' => $this->branch->id]));
+
+        $docs = Document::where('source_system', 'bplus')->with(['documentType', 'saleBooking'])->get();
+        $this->assertSame(['BOOKING', 'CREDIT_SALE', 'OPENING_AR', 'RECEIPT'], $docs->map(fn ($d) => $d->documentType->code)->unique()->sort()->values()->all());
+        foreach ($docs as $doc) {
+            $url = \App\Http\Controllers\DocumentBrowserController::detailUrl($doc);
+            $this->assertNotNull($url, $doc->documentType->code.' '.$doc->doc_number.' ต้องเปิดดูได้');
+            $this->get($url)->assertOk()->assertSee($doc->doc_number);
+        }
+        $opening = $docs->first(fn ($d) => $d->documentType->code === 'OPENING_AR');
+        $this->get(\App\Http\Controllers\DocumentBrowserController::detailUrl($opening))->assertSee('ลูกหนี้ยกมา');
+    }
+
     public function test_customers_match_by_bplus_key_then_unique_name(): void
     {
         // ใน ERP จริง รหัสลูกค้าคือ AR_KEY ของ BPlus เช่น 8049 ไม่ใช่ AR_CODE
