@@ -8,7 +8,7 @@
     <div class="row g-3">
         <div class="col-md-3"><div class="small text-muted">วันที่</div>{{ \Illuminate\Support\Carbon::parse($doc->doc_date)->format('d/m/Y') }}</div>
         <div class="col-md-3"><div class="small text-muted">ลูกค้า</div>{{ $doc->customer_code ?? '-' }} {{ $doc->customer_name }}</div>
-        <div class="col-md-2"><div class="small text-muted">อ้างใบจอง</div>{{ $doc->booking_ref ?? '-' }}</div>
+        <div class="col-md-2"><div class="small text-muted">{{ $doc->kind === 'credit_note' ? 'อ้างใบขายเชื่อ' : 'อ้างใบจอง' }}</div>{{ $doc->sale_ref ?? $doc->booking_ref ?? '-' }}</div>
         <div class="col-md-2"><div class="small text-muted">ครบกำหนด</div>{{ $doc->due_date ? \Illuminate\Support\Carbon::parse($doc->due_date)->format('d/m/Y') : '-' }}</div>
         <div class="col-md-2"><div class="small text-muted">ผู้คีย์</div>{{ $doc->created_by ?? '-' }}</div>
     </div>
