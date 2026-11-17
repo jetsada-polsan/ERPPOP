@@ -5292,3 +5292,11 @@ pending
 - ล็อก SQLite ตั้งแต่ตรวจ schema จนเพิ่มคอลัมน์และ commit เพื่อกัน UI กับ sync worker เพิ่มคอลัมน์เดียวกันพร้อมกัน และเทียบชื่อคอลัมน์ตามพฤติกรรม SQLite
 - pytest ผ่าน 268 ข้าม 3 และเปิดฐาน WAL พร้อมกัน 24 ครั้งผ่าน integrity_check
 - ยังไม่ build/publish รอบนี้ ต้องตรวจ startup-error.log และสถานะบิลของเครื่องที่มีปัญหาก่อนจัดการบิลจริง
+
+## Handoff - 2026-11-17 (B18 BPlus report audit)
+- Commit: `a8ba4b0` (`audit B18 BPlus reports`)
+- ทำอะไร: ตรวจรายงาน 26 ตัวและเพิ่มรายงาน BPlus สรุปขายเชื่อรายวัน, ใบเสร็จตัดหนี้ตามเอกสาร, และ Statement ลูกหนี้รายตัว; เพิ่มตัวกรอง/คอลัมน์สายขาย, แก้ยอดตามหัวเอกสารและยอดคงค้างจริง, ตัดเอกสารยกเลิก และใช้พนักงานขายจากเอกสาร; ตารางตรวจครบรายงานและผล mutation อยู่ `docs/ai/codex-b18-report-audit.md`
+- ทดสอบ: fixture test ผ่าน 1 test / 147 assertions; `php artisan test --no-coverage` ผ่าน 1,164 tests (1,162 passed, 2 skipped, 6 incomplete), 10,304 assertions; mutation 27 จุดแดงตามที่คาดแล้วคืนโค้ด; `git diff --check` ผ่าน
+- ยังไม่ทดสอบ/ความเสี่ยง: ยอดทั้งหมดที่ตรวจเป็น fixture; ไม่ได้อ่าน BPlus หรือ production. PostgreSQL production ไม่ได้เชื่อมต่อ
+- Deploy: ยังไม่ deploy
+- งานถัดไป: push branch `codex/b18-report-audit` แล้วให้ Claude ตรวจ ก่อนเจ้าของพิจารณา merge/deploy
