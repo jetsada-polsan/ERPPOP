@@ -31,6 +31,10 @@ if (-not (Test-Path $ini)) { Copy-Item (Join-Path $dest 'bplus-sync.ini.example'
 # ไฟล์ตั้งค่ามีรหัส: ให้ Administrators กับ SYSTEM อ่านได้เท่านั้น
 icacls $ini /inheritance:r /grant:r 'Administrators:F' 'SYSTEM:F' | Out-Null
 
+# ปุ่มกดซิงค์ทันทีบน Desktop ของทุก user
+Copy-Item "$here\bplus-sync-now.cmd" $dest -Force
+Copy-Item "$here\bplus-sync-now.cmd" 'C:\Users\Public\Desktop\BPlus Sync Now.cmd' -Force
+
 $action = New-ScheduledTaskAction -Execute $python -Argument "`"$dest\bplus-auto-sync.py`"" -WorkingDirectory $dest
 $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Hours 1) -MultipleInstances IgnoreNew
