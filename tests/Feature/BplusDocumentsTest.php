@@ -1037,7 +1037,8 @@ class BplusDocumentsTest extends TestCase
             'CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json',
         ], gzencode(json_encode($export, JSON_UNESCAPED_UNICODE)));
 
-        $response->assertOk()->assertJson(['ok' => true, 'received' => count($export['documents'])]);
+        // ตอบ 202 ทันที แล้วบันทึกหลังตอบกลับ (ทั้งสายใช้เวลาเกิน timeout 60 วินาทีของ gateway)
+        $response->assertStatus(202)->assertJson(['ok' => true, 'status' => 'processing', 'received' => count($export['documents'])]);
         $this->assertSame(count($export['documents']), DB::table('bplus_sync_documents')->count());
         $sale = Document::where('doc_number', 'DS256911/06364')->firstOrFail();
         $this->assertSame('1837.00', number_format((float) $sale->total_amount, 2, '.', ''));

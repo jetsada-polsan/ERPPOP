@@ -16,7 +16,9 @@
             <div data-testid="last-auto-sync">ส่งอัตโนมัติล่าสุด:
                 @if($lastAutoSync)
                     {{ \Illuminate\Support\Carbon::parse($lastAutoSync->created_at)->format('d/m/Y H:i') }}
-                    @if($lastAutoSync->status === 'ok')
+                    @if($lastAutoSync->status === 'processing')
+                        <span class="text-warning">กำลังบันทึก</span> {{ number_format($lastAutoSync->received) }} ใบ
+                    @elseif($lastAutoSync->status === 'ok')
                         <span class="text-success">สำเร็จ</span> รับ {{ number_format($lastAutoSync->received) }} ใบ@if($lastAutoSync->problems) · <span class="text-danger">มีปัญหา {{ $lastAutoSync->problems }} ใบ</span>@endif
                     @else
                         <span class="text-danger">ไม่สำเร็จ</span> {{ $lastAutoSync->message }}
