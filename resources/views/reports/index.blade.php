@@ -26,6 +26,8 @@
         'products_by_branch' => 'สินค้าขายตามสาขา',
         'gross_margin' => 'กำไรขั้นต้นเบื้องต้น',
         'credit_sales' => 'ใบขายเชื่อ',
+        'bplus_credit_sales_by_document' => 'BPlus ขายเชื่อ แยกเอกสาร',
+        'bplus_credit_sales_by_product' => 'BPlus ขายเชื่อ แยกสินค้า',
         'pending_bookings' => 'ใบจองค้างแปลงขาย',
         'sales_by_booking' => 'ยอดขายตามใบจอง',
         'sales_returns_by_document' => 'ใบขาย-รับคืน ตามเอกสาร',
@@ -177,7 +179,11 @@
         ['purchasing', 'purchase_by_supplier', 'ยอดซื้อตามผู้ขาย'],
     ];
 
-    $dateParams = ['from' => $from, 'to' => $to, 'branch_id' => $filters['branch_id']];
+    $dateParams = [
+        'from' => $from, 'to' => $to, 'branch_id' => $filters['branch_id'],
+        'salesman_id' => $filters['salesman_id'], 'customer_id' => $filters['customer_id'],
+        'document_book' => $filters['document_book'],
+    ];
 @endphp
 
 @section('title', 'รายงาน - MPM Food Group')
@@ -280,6 +286,31 @@
                 <span style="color:var(--erp-muted);font-size:13px">ถึง</span>
                 <input type="date" name="to" value="{{ $to }}" class="rpt-date-input">
 
+                @if(in_array($selectedReport, ['bplus_credit_sales_by_document', 'bplus_credit_sales_by_product'], true))
+                    <select name="salesman_id" class="rpt-select" aria-label="พนักงานขาย">
+                        <option value="">พนักงานขายทั้งหมด</option>
+                        <option value="unassigned" @selected($filters['salesman_id'] === 'unassigned')>ไม่ระบุพนักงาน</option>
+                        @foreach($bplusReportFilters['salesmen'] as $salesman)
+                            <option value="{{ $salesman->id }}" @selected((string) $filters['salesman_id'] === (string) $salesman->id)>
+                                {{ $salesman->code }} - {{ $salesman->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <select name="customer_id" class="rpt-select" aria-label="ลูกค้า">
+                        <option value="">ลูกค้าทั้งหมด</option>
+                        @foreach($bplusReportFilters['customers'] as $customer)
+                            <option value="{{ $customer->id }}" @selected((string) $filters['customer_id'] === (string) $customer->id)>
+                                {{ $customer->code }} - {{ $customer->name_th }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <select name="document_book" class="rpt-select" aria-label="เล่มเอกสาร">
+                        <option value="">เล่ม DS และ DSN</option>
+                        <option value="DS" @selected($filters['document_book'] === 'DS')>DS</option>
+                        <option value="DSN" @selected($filters['document_book'] === 'DSN')>DSN</option>
+                    </select>
+                @endif
+
                 <a href="{{ request()->fullUrlWithQuery(['from'=>now()->toDateString(),'to'=>now()->toDateString()]) }}" class="rpt-shortcut">วันนี้</a>
                 <a href="{{ request()->fullUrlWithQuery(['from'=>now()->subDays(6)->toDateString(),'to'=>now()->toDateString()]) }}" class="rpt-shortcut">7 วัน</a>
                 <a href="{{ request()->fullUrlWithQuery(['from'=>now()->startOfMonth()->toDateString(),'to'=>now()->toDateString()]) }}" class="rpt-shortcut">เดือนนี้</a>
@@ -347,11 +378,11 @@
                         <dl>
                             <div><dt>ณ วันที่</dt><dd>{{ \Illuminate\Support\Carbon::parse($to)->thaiDate() }}</dd></div>
                             <div><dt>ช่วงเวลา</dt><dd>{{ \Illuminate\Support\Carbon::parse($from)->thaiDate() }} @if($from !== $to) - {{ \Illuminate\Support\Carbon::parse($to)->thaiDate() }} @endif</dd></div>
-                            <div><dt>จำนวนทั้งหมด</dt><dd>{{ number_format($result['total']) }} รายการ</dd></div>
+                            <div><dt>จำนวนทั้งหมด</dt><dd>{{ number_format($result['total']) }} {{ $selectedReport === 'bplus_credit_sales_by_document' ? 'เอกสาร' : 'รายการ' }}</dd></div>
                         </dl>
                     </div>
                     <div class="flow-report-totals">
-                        @if(!in_array($selectedReport, ['stock_balance', 'stock_card_detail', 'delivery_status'], true))
+                        @if(!in_array($selectedReport, ['stock_balance', 'stock_card_detail', 'delivery_status', 'bplus_credit_sales_by_product'], true))
                         <x-reports.kpi-card :label="($result['summary_scope'] ?? 'all') === 'all' ? 'ยอดรวมทั้งผลลัพธ์' : 'ยอดรวมรายการที่แสดง'" :value="$summaryMoney" />
                         <x-reports.kpi-card label="ภาษีมูลค่าเพิ่ม" :value="$summaryVat" />
                         @endif
@@ -372,6 +403,7 @@
                         </div>
                     </div>
                     <x-reports.filter-bar class="gap-3 no-print">
+                        @if(!in_array($selectedReport, ['bplus_credit_sales_by_document', 'bplus_credit_sales_by_product'], true))
                         <label class="d-flex align-items-center gap-2 small text-muted">
                             แสดง
                             <select name="per_page" class="form-select form-select-sm" style="width:78px" onchange="this.form.submit()">
@@ -381,12 +413,13 @@
                             </select>
                             แถว
                         </label>
+                        @endif
                         <div class="erp-search d-flex align-items-center gap-2">
                             <i class="bi bi-search erp-search-icon"></i>
                             <input type="text" name="q" value="{{ $filters['q'] }}" placeholder="{{ $selectedReport === 'stock_balance' ? 'ชื่อ รหัส หรือบาร์โค้ด' : 'ค้นหา...' }}" aria-label="ค้นหาในรายงาน" autocomplete="off" class="form-control form-control-sm ps-5">
                             <button type="submit" class="btn btn-sm btn-primary">ค้นหา</button>
                         </div>
-                        <span class="badge text-bg-light border">{{ number_format($result['total']) }} รายการ</span>
+                        <span class="badge text-bg-light border">{{ number_format($result['total']) }} {{ $selectedReport === 'bplus_credit_sales_by_document' ? 'เอกสาร' : 'รายการ' }}</span>
                     </x-reports.filter-bar>
                 </div>
 

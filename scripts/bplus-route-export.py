@@ -121,9 +121,11 @@ for b in bookings:
 # ยอดภาษีใช้ช่อง ARD_B_* (หลังปรับยอดท้ายบิล) ตรงกับรายงานของ BPlus ช่อง ARD_G_* อาจต่าง 1 สตางค์
 sales = rows(f"""
     SELECT d.DI_KEY, d.DI_REF, d.DI_DATE, d.DI_ACTIVE, d.DI_AMOUNT, d.DI_CRE_BY, d.DI_UPD_DATE, d.DI_CRE_DATE,
-           t.DT_DOCCODE, x.ARD_B_SV, x.ARD_B_SNV, x.ARD_B_VAT, x.ARD_B_AMT, x.ARD_DUE_DA, a.AR_KEY, a.AR_CODE, a.AR_NAME
+           t.DT_DOCCODE, x.ARD_B_SV, x.ARD_B_SNV, x.ARD_B_VAT, x.ARD_B_AMT, x.ARD_DUE_DA, a.AR_KEY, a.AR_CODE, a.AR_NAME,
+           CASE WHEN COALESCE(sl.SLD_SLMN, 0) = 0 THEN NULL ELSE sm.SLMN_CODE END AS SLMN_CODE
     FROM DOCINFO d JOIN DOCTYPE t ON t.DT_KEY = d.DI_DT
     LEFT JOIN ARDETAIL x ON x.ARD_DI = d.DI_KEY LEFT JOIN ARFILE a ON a.AR_KEY = x.ARD_AR
+    LEFT JOIN SLDETAIL sl ON sl.SLD_DI = d.DI_KEY LEFT JOIN SALESMAN sm ON sm.SLMN_KEY = sl.SLD_SLMN
     WHERE d.DI_DATE >= %s AND d.DI_KEY IN ({ROUTE_SALES}) ORDER BY d.DI_KEY""", (since, route))
 customer_by_booking = {}
 for s in sales:
@@ -135,7 +137,7 @@ for s in sales:
         "bplus_key": s["DI_KEY"], "kind": "credit_sale", "book_code": text(s["DT_DOCCODE"]), "ref": text(s["DI_REF"]),
         "doc_date": s["DI_DATE"].date().isoformat(), "is_cancelled": s["DI_ACTIVE"] != 0,
         "customer_key": s["AR_KEY"], "customer_code": text(s["AR_CODE"]), "customer_name": text(s["AR_NAME"]),
-        "created_by": text(s["DI_CRE_BY"]), "booking_ref": booking_ref,
+        "created_by": text(s["DI_CRE_BY"]), "booking_ref": booking_ref, "salesman_code": text(s["SLMN_CODE"]),
         "vatable_amount": num(s["ARD_B_SV"]), "exempt_amount": num(s["ARD_B_SNV"]), "vat_amount": num(s["ARD_B_VAT"]),
         "total_amount": num(s["DI_AMOUNT"]),
         "due_date": s["ARD_DUE_DA"].date().isoformat() if s["ARD_DUE_DA"] else None,

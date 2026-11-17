@@ -150,6 +150,9 @@ class BplusSyncImporter
                     'customer_key' => isset($doc['customer_key']) ? (string) $doc['customer_key'] : null,
                     'customer_name' => $doc['customer_name'] ?? null,
                     'created_by' => $doc['created_by'] ?? null,
+                    'salesman_code' => isset($doc['salesman_code']) && trim((string) $doc['salesman_code']) !== ''
+                        ? trim((string) $doc['salesman_code'])
+                        : null,
                     'booking_ref' => $doc['booking_ref'] ?? null,
                     'vatable_amount' => $this->money($doc['vatable_amount'] ?? 0),
                     'exempt_amount' => $this->money($doc['exempt_amount'] ?? 0),
