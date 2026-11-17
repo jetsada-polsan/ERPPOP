@@ -10,7 +10,8 @@ use Illuminate\Support\Str;
  * token สำหรับเครื่องในร้านที่ส่งเอกสาร BPlus ขึ้น ERP เอง (POST /api/bplus/sync)
  * token ใช้ได้แค่ส่งเอกสารของสายที่ระบุ ทำอย่างอื่นในระบบไม่ได้
  *
- *   php artisan bplus:sync-token --issue --route=B18 --name="BK Server"
+   *   php artisan bplus:sync-token --issue --route=B18 --name="BK Server"
+ *   php artisan bplus:sync-token --issue --all-routes --name="bplusAPI"
  *   php artisan bplus:sync-token --list
  *   php artisan bplus:sync-token --revoke=1
  *
@@ -23,6 +24,7 @@ class BplusSyncToken extends Command
         {--list : แสดง token ทั้งหมด}
         {--revoke= : เพิกถอนตาม id}
         {--route=B18 : สายขายที่ token นี้ส่งได้}
+        {--all-routes : อนุญาตทุกสาย รวมสายที่ยังไม่มีใน ERP}
         {--name= : ชื่อเครื่องที่ใช้ token}';
 
     protected $description = 'จัดการ token ของเครื่องที่ส่งเอกสาร BPlus ขึ้น ERP อัตโนมัติ';
@@ -31,7 +33,7 @@ class BplusSyncToken extends Command
     {
         if ($this->option('list')) {
             $rows = DB::table('bplus_sync_tokens')->orderBy('id')->get()->map(fn ($t) => [
-                $t->id, $t->name, $t->route_code, $t->last_used_at ?? '-', $t->last_ip ?? '-', $t->revoked_at ? 'เพิกถอนแล้ว' : 'ใช้งาน',
+                $t->id, $t->name, $t->route_code ?? 'ทุกสาย', $t->last_used_at ?? '-', $t->last_ip ?? '-', $t->revoked_at ? 'เพิกถอนแล้ว' : 'ใช้งาน',
             ]);
             $this->table(['id', 'ชื่อ', 'สาย', 'ใช้ล่าสุด', 'IP ล่าสุด', 'สถานะ'], $rows->all());
 
@@ -50,22 +52,24 @@ class BplusSyncToken extends Command
             return self::FAILURE;
         }
 
+        $allRoutes = (bool) $this->option('all-routes');
         $route = trim((string) $this->option('route'));
-        if (! DB::table('sales_areas')->where('code', $route)->exists()) {
+        if (! $allRoutes && ! DB::table('sales_areas')->where('code', $route)->exists()) {
             $this->error("ไม่พบสายขาย {$route}");
 
             return self::FAILURE;
         }
         $token = 'bps_'.Str::random(48);
+        $scope = $allRoutes ? null : $route;
         $id = DB::table('bplus_sync_tokens')->insertGetId([
-            'name' => (string) ($this->option('name') ?: 'เครื่องซิงค์ '.$route),
-            'route_code' => $route,
+            'name' => (string) ($this->option('name') ?: ($allRoutes ? 'เครื่องซิงค์ทุกสาย' : 'เครื่องซิงค์ '.$route)),
+            'route_code' => $scope,
             'token_hash' => hash('sha256', $token),
             'created_at' => now(),
             'updated_at' => now(),
         ]);
 
-        $this->info("ออก token #{$id} สำหรับสาย {$route} แล้ว");
+        $this->info($allRoutes ? "ออก token #{$id} สำหรับทุกสายแล้ว" : "ออก token #{$id} สำหรับสาย {$route} แล้ว");
         $this->line('token (แสดงครั้งเดียว ใส่ในไฟล์ตั้งค่าของเครื่องในร้าน ห้ามส่งทางแชท):');
         $this->line($token);
 
