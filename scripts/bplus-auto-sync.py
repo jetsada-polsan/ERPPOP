@@ -58,7 +58,7 @@ def main() -> int:
     args = parser.parse_args()
 
     config = configparser.ConfigParser()
-    if not config.read(args.config, encoding="utf-8"):
+    if not config.read(args.config, encoding="utf-8-sig")  # Notepad บันทึกแบบมี BOM:
         print(f"ไม่พบไฟล์ตั้งค่า {args.config}")
         return 2
     route = config.get("bplus", "route", fallback="B18")
