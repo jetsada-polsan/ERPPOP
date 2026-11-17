@@ -55,7 +55,7 @@ class BplusDocumentMaterializer
             ->filter()
             ->flip();
 
-        $missingCustomers = collect($documents)->whereIn('kind', ['credit_sale', 'receipt'])
+        $missingCustomers = collect($documents)->whereIn('kind', ['credit_sale', 'opening_ar', 'receipt'])
             ->unique(fn ($d) => ($d['customer_key'] ?? '').'|'.($d['customer_code'] ?? ''))
             ->reject(function ($d) use ($incomingCustomerKeys) {
                 $key = isset($d['customer_key']) ? (string) $d['customer_key'] : null;
@@ -100,7 +100,7 @@ class BplusDocumentMaterializer
         $this->ctx = $this->context($route, true);
 
         $rows = DB::table('bplus_sync_documents')->where('route_code', $route)
-            ->orderByRaw("CASE kind WHEN 'booking' THEN 1 WHEN 'credit_sale' THEN 2 ELSE 3 END")
+            ->orderByRaw("CASE kind WHEN 'booking' THEN 1 WHEN 'credit_sale' THEN 2 WHEN 'opening_ar' THEN 3 ELSE 4 END")
             ->orderBy('doc_date')->orderBy('bplus_key')->get();
 
         $count = DB::transaction(function () use ($rows) {
@@ -109,6 +109,7 @@ class BplusDocumentMaterializer
                 $documentId = match ($row->kind) {
                     'booking' => $this->booking($row),
                     'credit_sale' => $this->creditSale($row),
+                    'opening_ar' => $this->openingAr($row),
                     'receipt' => $this->receipt($row),
                     default => null,
                 };
@@ -129,7 +130,7 @@ class BplusDocumentMaterializer
 
     private function context(string $route, bool $strict): array
     {
-        $types = DB::table('document_types')->whereIn('code', ['BOOKING', 'CREDIT_SALE', 'RECEIPT'])->pluck('id', 'code');
+        $types = DB::table('document_types')->whereIn('code', ['BOOKING', 'CREDIT_SALE', 'RECEIPT', 'OPENING_AR'])->pluck('id', 'code');
         $area = DB::table('sales_areas')->where('code', $route)->first();
         $branchId = $area?->branch_id ?? DB::table('branches')->where('is_active', true)->orderBy('id')->value('id');
         $branch = $branchId ? DB::table('branches')->where('id', $branchId)->first() : null;
@@ -210,6 +211,7 @@ class BplusDocumentMaterializer
             return null;
         }
         $bookingId = $row->booking_ref ? $this->documentIdByNumber($row->booking_ref) : null;
+        $this->adoptOpening($row);
         $total = (float) $row->total_amount;
         $vat = (float) $row->vat_amount;
 
@@ -505,7 +507,104 @@ class BplusDocumentMaterializer
 
     private function documentIdByNumber(string $number): ?int
     {
-        return DB::table('documents')->where('source_system', self::SOURCE)->where('doc_number', $number)->value('id');
+        // เลขเดียวกันอาจมีทั้งลูกหนี้ยกมาที่เลิกใช้แล้วและบิลตัวจริง ให้ใบที่ยังใช้งานมาก่อน
+        return DB::table('documents')->where('source_system', self::SOURCE)->where('doc_number', $number)
+            ->orderByRaw("CASE WHEN status = 'active' THEN 0 ELSE 1 END")->orderBy('id')->value('id');
+    }
+
+    /**
+     * ลูกหนี้ยกมา: บิลของสายนี้ที่ออกก่อนช่วงที่ดึง และยังค้าง ณ วันเริ่มช่วง (ยอด = ยอดค้าง ณ วันนั้น)
+     * ไม่ใช่ยอดขาย จึงเป็นเอกสาร OPENING_AR ไม่เข้ารายงานขาย/ภาษีขาย
+     * ลง GL: Dr ลูกหนี้ / Cr บัญชีพักยอดยกมา เพื่อให้ใบเสร็จในช่วงตัดหนี้ได้โดยลูกหนี้ไม่ติดลบ
+     */
+    private function openingAr(object $row): ?int
+    {
+        $existingId = DB::table('documents')->where('source_system', self::SOURCE)->where('source_key', $row->bplus_key)->value('id');
+        // บิลตัวจริงซิงค์ไว้แล้ว (เช่น เดือนก่อน) ไม่ต้องตั้งยอดยกมาซ้ำ
+        $saleTypeId = $this->ctx['types']['CREDIT_SALE'] ?? null;
+        if ($saleTypeId && DB::table('documents')->where('source_system', self::SOURCE)->where('document_type_id', $saleTypeId)
+            ->where('doc_number', $row->ref)->exists()) {
+            return null;
+        }
+        if (! isset($this->ctx['types']['OPENING_AR'])) {
+            $this->problems[$row->ref] = 'ไม่พบประเภทเอกสาร OPENING_AR (ลูกหนี้ยกมา)';
+
+            return $existingId;
+        }
+        $customerId = $this->customerId($row);
+        if (! $customerId) {
+            $this->problems[$row->ref] = 'ไม่พบลูกค้ารหัส '.($row->customer_code ?: '-').($row->customer_key ? " (เลข {$row->customer_key})" : '').' ใน ERP';
+
+            return $existingId;
+        }
+        $total = round((float) $row->total_amount, 2);
+        $id = $this->upsertDocument($row, 'OPENING_AR', null, [
+            'customer_id' => $customerId,
+            'reference' => 'ลูกหนี้ยกมา',
+            'total_amount' => $total,
+            'subtotal_amount' => $total,
+            'vat_amount' => 0,
+        ]);
+
+        $item = [
+            'customer_id' => $customerId,
+            'salesman_id' => $this->ctx['salesman_id'],
+            'gross_amount' => $total,
+            'vat_amount' => 0,
+            'discount_amount' => 0,
+            'net_amount' => $total,
+            'due_date' => $row->due_date,
+        ];
+        if (DB::table('customer_open_items')->where('document_id', $id)->exists()) {
+            DB::table('customer_open_items')->where('document_id', $id)->update($item);
+        } else {
+            DB::table('customer_open_items')->insert($item + [
+                'document_id' => $id,
+                'paid_amount' => 0,
+                'balance_amount' => $total,
+                'status' => 'open',
+                'created_at' => now(),
+            ]);
+        }
+
+        $document = Document::find($id);
+        $ar = $this->glPostingService->role(ChartOfAccount::ROLE_AR);
+        $opening = $this->glPostingService->role(ChartOfAccount::ROLE_OPENING_BALANCE);
+        if (! $ar || ! $opening) {
+            $this->problems[$row->ref] = 'ยังไม่ผูกบัญชี '.(! $ar ? 'ar' : 'opening_balance');
+        } elseif ($document && DecimalMath::compare($total, 0) > 0) {
+            try {
+                $this->glPostingService->postResolved($document, [[$ar->id, $total, 0], [$opening->id, 0, $total]], 'ลูกหนี้ยกมา '.$row->ref);
+            } catch (Throwable $e) {
+                $this->problems[$row->ref] = $e->getMessage();
+            }
+        }
+
+        return $id;
+    }
+
+    /**
+     * บิลตัวจริงเข้ามาแทนลูกหนี้ยกมาของบิลเดียวกัน (เลขเอกสารซ้ำในสาขาเดียวกันไม่ได้)
+     * ใช้เอกสารเดิมต่อ: เปลี่ยนเป็นใบขายเชื่อของบิลนั้น การตัดหนี้เดิมยังอยู่
+     * GL ใช้ postResolved ชุดเดิม ระบบกลับรายการยอดยกมาแล้วลงรายการขายให้เอง
+     */
+    private function adoptOpening(object $row): void
+    {
+        $openingTypeId = $this->ctx['types']['OPENING_AR'] ?? null;
+        if (! $openingTypeId || DB::table('documents')->where('source_system', self::SOURCE)->where('source_key', $row->bplus_key)->exists()) {
+            return;
+        }
+        $openingId = DB::table('documents')->where('source_system', self::SOURCE)->where('document_type_id', $openingTypeId)
+            ->where('doc_number', $row->ref)->value('id');
+        if (! $openingId) {
+            return;
+        }
+        DB::table('documents')->where('id', $openingId)->update([
+            'source_key' => $row->bplus_key,
+            'document_type_id' => $this->ctx['types']['CREDIT_SALE'],
+            'updated_at' => now(),
+        ]);
+        DB::table('bplus_sync_documents')->where('document_id', $openingId)->where('kind', 'opening_ar')->update(['document_id' => null]);
     }
 
     private function materializeCreditSaleGl(int $documentId, object $row): void
