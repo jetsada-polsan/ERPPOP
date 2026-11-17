@@ -99,7 +99,7 @@
                     @else ทั้งหมด @endif
                 </span>
                 <span class="badge text-bg-light border">{{ number_format($summary['count']) }} ใบ</span>
-                <span class="badge text-bg-success">รวม ฿{{ number_format($summary['amount'], 2) }}</span>
+                <span class="badge text-bg-success">รวม ฿{{ number_format($summary['amount'], 2) }} (ไม่รวมใบยกเลิก)</span>
             </div>
             <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0 doc-grid">
