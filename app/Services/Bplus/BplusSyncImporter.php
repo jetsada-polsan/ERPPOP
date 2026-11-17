@@ -13,7 +13,7 @@ use InvalidArgumentException;
  */
 class BplusSyncImporter
 {
-    private const KINDS = ['booking', 'credit_sale', 'receipt'];
+    private const KINDS = ['booking', 'credit_sale', 'opening_ar', 'receipt'];
 
     /** @return array{route: string, documents: array<int, array>, customers?: array<int, array>, products?: array<int, array>} */
     public function parse(string $json): array

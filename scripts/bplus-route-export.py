@@ -163,6 +163,34 @@ for key, doc in receipts.items():
         doc[field] = round(doc[field] + rest, 2)
 documents.extend(receipts.values())
 
+# ลูกหนี้ยกมา: บิลของสายนี้ที่ออกก่อนช่วงที่ดึงและยังค้าง ณ วันเริ่มช่วง ยอด = ยอดบิล - ที่รับชำระก่อนวันนั้น
+# ใบเสร็จในช่วงจะได้ตัดหนี้บิลเก่าได้ และลูกหนี้ใน ERP ตรงกับ BPlus (ไม่ใช่ยอดขาย ERP จึงไม่นับเป็นยอดขายซ้ำ)
+# bplus_key ของยอดยกมา = 9,000,000,000 + DI_KEY ของบิล เพื่อไม่ชนกับตัวบิลเองถ้าวันหลังดึงย้อนไปถึงบิลนั้น
+OPENING_KEY_OFFSET = 9_000_000_000
+opening_rows = rows(f"""
+    SELECT d.DI_KEY, d.DI_REF, d.DI_DATE, d.DI_AMOUNT, d.DI_UPD_DATE, d.DI_CRE_DATE, t.DT_DOCCODE, x.ARD_DUE_DA,
+           a.AR_KEY, a.AR_CODE, a.AR_NAME,
+           (SELECT COALESCE(SUM(pa.TPA_PAY_A + pa.TPA_DISC_A + pa.TPA_WHTX_A), 0)
+            FROM TRANPAYA pa JOIN TRANPAYH ph ON ph.TPH_KEY = pa.TPA_TPH JOIN DOCINFO pd ON pd.DI_KEY = ph.TPH_DI
+            WHERE pa.TPA_REFER_DI = d.DI_KEY AND pd.DI_ACTIVE = 0 AND pd.DI_DATE < %s) AS PAID_BEFORE
+    FROM DOCINFO d JOIN DOCTYPE t ON t.DT_KEY = d.DI_DT
+    LEFT JOIN ARDETAIL x ON x.ARD_DI = d.DI_KEY LEFT JOIN ARFILE a ON a.AR_KEY = x.ARD_AR
+    WHERE d.DI_DATE < %s AND d.DI_ACTIVE = 0 AND d.DI_KEY IN ({ROUTE_SALES}) ORDER BY d.DI_KEY""", (since, since, route))
+opening_total = 0.0
+for o in opening_rows:
+    outstanding = round(num(o["DI_AMOUNT"]) - num(o["PAID_BEFORE"]), 2)
+    if outstanding <= 0:
+        continue
+    opening_total += outstanding
+    documents.append({
+        "bplus_key": OPENING_KEY_OFFSET + o["DI_KEY"], "kind": "opening_ar", "book_code": text(o["DT_DOCCODE"]),
+        "ref": text(o["DI_REF"]), "doc_date": o["DI_DATE"].date().isoformat(), "is_cancelled": False,
+        "customer_key": o["AR_KEY"], "customer_code": text(o["AR_CODE"]), "customer_name": text(o["AR_NAME"]),
+        "total_amount": outstanding, "original_amount": num(o["DI_AMOUNT"]),
+        "due_date": o["ARD_DUE_DA"].date().isoformat() if o["ARD_DUE_DA"] else None,
+        "bplus_updated_at": stamp(o["DI_UPD_DATE"] or o["DI_CRE_DATE"]),
+    })
+
 # ลูกค้าที่มีเอกสารในไฟล์นี้
 customer_keys = sorted({d["customer_key"] for d in documents if d.get("customer_key") is not None})
 customer_data = []
@@ -242,6 +270,7 @@ with open(name, "w", encoding="utf-8") as handle:
                "customers": customer_data, "products": product_data}, handle, ensure_ascii=False, indent=1,
               default=lambda v: float(v) if isinstance(v, decimal.Decimal) else str(v))
 
-count = {k: sum(1 for d in documents if d["kind"] == k) for k in ("booking", "credit_sale", "receipt")}
-print(f"เสร็จ บันทึกที่ {name}: ใบจอง {count['booking']} · ใบขายเชื่อ {count['credit_sale']} · ใบเสร็จ {count['receipt']} · ลูกค้า {len(customer_data)} · สินค้า {len(product_data)}")
+count = {k: sum(1 for d in documents if d["kind"] == k) for k in ("booking", "credit_sale", "opening_ar", "receipt")}
+print(f"เสร็จ บันทึกที่ {name}: ใบจอง {count['booking']} · ใบขายเชื่อ {count['credit_sale']} · ใบเสร็จ {count['receipt']}"
+      f" · ลูกหนี้ยกมา {count['opening_ar']} บิล ({opening_total:,.2f}) · ลูกค้า {len(customer_data)} · สินค้า {len(product_data)}")
 print("อัปโหลดไฟล์นี้ที่ ERP เมนู เอกสารสายขาย (ระบบเดิม)")

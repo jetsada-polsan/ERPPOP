@@ -157,6 +157,43 @@ class BplusDocumentsTest extends TestCase
         }
     }
 
+    public function test_opening_receivable_lets_receipts_settle_bills_from_before_the_period(): void
+    {
+        $this->importFile($this->withOpeningBill($this->export()));
+
+        $opening = Document::where('doc_number', 'DS256910/16576')->firstOrFail();
+        $this->assertSame('OPENING_AR', $opening->documentType->code);
+        $this->assertSame(['partial', '200.00'], $this->openItem($opening), 'ยอดยกมา 500 รับชำระในช่วง 300 เหลือ 200');
+        $this->assertNull(DB::table('bplus_sync_documents')->where('ref', 'RR26911/000800')->value('problem'), 'ใบเสร็จตัดหนี้บิลเก่าได้ครบ');
+        $this->assertSame(0.0, (float) DB::table('sales_postings')->where('sale_date', '2026-10-20')->sum('net_sales'), 'ยอดยกมาไม่ใช่ยอดขาย');
+
+        $gl = DB::table('gl_journals as g')->join('chart_of_accounts as a', 'a.id', '=', 'g.account_id')->where('g.document_id', $opening->id)
+            ->selectRaw('a.default_role as role, sum(g.debit) as dr, sum(g.credit) as cr')->groupBy('a.default_role')->get()->keyBy('role');
+        $this->assertSame('500.00', number_format((float) $gl['ar']->dr, 2, '.', ''));
+        $this->assertSame('500.00', number_format((float) $gl['opening_balance']->cr, 2, '.', ''));
+    }
+
+    public function test_real_bill_replaces_its_opening_receivable(): void
+    {
+        $this->importFile($this->withOpeningBill($this->export()));
+        $export = $this->withOpeningBill($this->export());
+        // วันหลังดึงย้อนไปถึงบิลตัวจริง: ยอดยกมาต้องถูกเลิกใช้ และใบเสร็จไปตัดที่บิลตัวจริงแทน
+        $export['documents'][] = ['bplus_key' => 2700000, 'kind' => 'credit_sale', 'book_code' => 'DS', 'ref' => 'DS256910/16576', 'doc_date' => '2026-10-20',
+            'customer_code' => '37120-0005', 'exempt_amount' => 500, 'total_amount' => 500, 'due_date' => '2026-11-10'];
+        $this->importFile($export);
+
+        $docs = Document::where('doc_number', 'DS256910/16576')->get();
+        $this->assertCount(1, $docs, 'บิลตัวจริงใช้เอกสารเดิมของยอดยกมา ไม่สร้างซ้ำ');
+        $sale = $docs->first();
+        $this->assertSame('CREDIT_SALE', $sale->documentType->code);
+        $this->assertSame(['partial', '200.00'], $this->openItem($sale), 'การตัดหนี้ 300 จากใบเสร็จยังอยู่');
+        $net = DB::table('gl_journals as g')->join('chart_of_accounts as a', 'a.id', '=', 'g.account_id')->where('g.document_id', $sale->id)
+            ->selectRaw('a.default_role as role, sum(g.debit) - sum(g.credit) as net')->groupBy('a.default_role')->pluck('net', 'role');
+        $this->assertSame(0.0, round((float) ($net['opening_balance'] ?? 0), 2), 'ยอดยกมาถูกกลับรายการ');
+        $this->assertSame(500.0, round((float) $net['ar'], 2));
+        $this->assertSame(-500.0, round((float) $net['sales_revenue'], 2));
+    }
+
     public function test_customers_match_by_bplus_key_then_unique_name(): void
     {
         // ใน ERP จริง รหัสลูกค้าคือ AR_KEY ของ BPlus เช่น 8049 ไม่ใช่ AR_CODE
@@ -677,6 +714,21 @@ class BplusDocumentsTest extends TestCase
     private function upload(array $data): UploadedFile
     {
         return UploadedFile::fake()->createWithContent('b18.json', json_encode($data, JSON_UNESCAPED_UNICODE));
+    }
+
+    private function withOpeningBill(array $export): array
+    {
+        $export['documents'][] = ['bplus_key' => 9000000000 + 2700000, 'kind' => 'opening_ar', 'book_code' => 'DS', 'ref' => 'DS256910/16576',
+            'doc_date' => '2026-10-20', 'customer_code' => '37120-0005', 'total_amount' => 500, 'original_amount' => 800, 'due_date' => '2026-11-10'];
+        foreach ($export['documents'] as &$doc) {
+            if ($doc['ref'] === 'RR26911/000800') {
+                $doc['total_amount'] += 300;
+                $doc['transfer_amount'] += 300;
+                $doc['allocations'][] = ['sale_ref' => 'DS256910/16576', 'paid_amount' => 300, 'transfer_amount' => 300];
+            }
+        }
+
+        return $export;
     }
 
     private function export(): array

@@ -16,7 +16,7 @@ use InvalidArgumentException;
 /** เอกสารสายขายที่ซิงค์มาจาก BPlus: ดูเอกสาร ยอดขายรายวัน และนำเข้าไฟล์ */
 class BplusSyncController extends Controller
 {
-    private const KIND_LABELS = ['booking' => 'ใบจอง', 'credit_sale' => 'ใบขายเชื่อ', 'receipt' => 'ใบเสร็จรับเงิน'];
+    private const KIND_LABELS = ['booking' => 'ใบจอง', 'credit_sale' => 'ใบขายเชื่อ', 'opening_ar' => 'ลูกหนี้ยกมา', 'receipt' => 'ใบเสร็จรับเงิน'];
 
     public function index(Request $request): View
     {
