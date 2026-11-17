@@ -20,10 +20,32 @@ import pymssql
 host = "192.168.88.200"
 database = "BPLUSERP_POPSTAR_2021"
 print(f"ดึงข้อมูลสินค้าทั้งหมดจาก {database}")
-user = input("user: ").strip()
-password = getpass.getpass("password (ไม่แสดงตัวอักษร): ")
+def bplus_login():
+    """user/รหัส BPlus: อ่านรหัสจาก Keychain ของ Mac ก่อน (service bplus-mssql) ถ้าไม่มีค่อยถาม
+    ตั้งครั้งเดียว: security add-generic-password -s bplus-mssql -a jetsada -w
+    (คำสั่งจะถามรหัสแบบไม่แสดงตัวอักษร รหัสเก็บเข้ารหัสใน Keychain ไม่อยู่ในไฟล์)"""
+    import subprocess
+    login = "jetsada"
+    try:
+        secret = subprocess.run(["security", "find-generic-password", "-s", "bplus-mssql", "-a", login, "-w"],
+                                capture_output=True, text=True, check=True).stdout.strip()
+        if secret:
+            print(f"user: {login} (ใช้รหัสจาก Keychain)")
+            return login, secret
+    except Exception:
+        pass
+    entered = input(f"user [{login}]: ").strip() or login
+    return entered, getpass.getpass("password (ไม่แสดงตัวอักษร): ")
 
-connection = pymssql.connect(host, user, password, database, as_dict=True, read_only=True)
+user, password = bplus_login()
+
+try:
+    connection = pymssql.connect(host, user, password, database, as_dict=True, read_only=True)
+except pymssql.Error:
+    # รหัสใน Keychain ใช้ไม่ได้ (ตั้งผิดหรือเปลี่ยนรหัสแล้ว) ให้ถามรหัสแทน
+    print("รหัสใน Keychain เข้า BPlus ไม่ได้ พิมพ์รหัสเอง (แก้ Keychain: security delete-generic-password -s bplus-mssql -a jetsada)")
+    password = getpass.getpass("password (ไม่แสดงตัวอักษร): ")
+    connection = pymssql.connect(host, user, password, database, as_dict=True, read_only=True)
 cursor = connection.cursor()
 
 # คอลัมน์ที่ MasterDataEtlService อ่าน (ถ้า BPlus ไม่มีคอลัมน์ไหน ก็ข้ามไป เพราะ SELECT * ไม่ล้ม)

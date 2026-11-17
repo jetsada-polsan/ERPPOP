@@ -216,6 +216,7 @@ class BplusDocumentMaterializer
         }
         $bookingId = $row->booking_ref ? $this->documentIdByNumber($row->booking_ref) : null;
         $this->adoptOpening($row);
+        $salesmanId = $this->salesmanId($row->salesman_code);
         $total = (float) $row->total_amount;
         $vat = (float) $row->vat_amount;
 
@@ -223,6 +224,7 @@ class BplusDocumentMaterializer
             'customer_id' => $customerId,
             'reference' => $row->booking_ref,
             'source_document_id' => $bookingId,
+            'salesman_id' => $salesmanId,
             'total_amount' => $total,
             'subtotal_amount' => round($total - $vat, 2),
             'vat_amount' => $vat,
@@ -231,7 +233,7 @@ class BplusDocumentMaterializer
 
         $item = [
             'customer_id' => $customerId,
-            'salesman_id' => $this->ctx['salesman_id'],
+            'salesman_id' => $salesmanId,
             'gross_amount' => $total,
             'vat_amount' => $vat,
             'discount_amount' => 0,
@@ -475,6 +477,16 @@ class BplusDocumentMaterializer
         }
 
         return $this->ctx['customers'][$cacheKey] = self::matchCustomer($row->customer_key ?? null, $row->customer_code ?? null, $row->customer_name ?? null);
+    }
+
+    private function salesmanId(?string $code): ?int
+    {
+        $code = trim((string) $code);
+        if ($code === '') {
+            return null;
+        }
+
+        return DB::table('salesmen')->where('code', $code)->value('id');
     }
 
     public static function matchCustomer(?string $key, ?string $code, ?string $name): ?int

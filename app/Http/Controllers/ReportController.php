@@ -69,6 +69,9 @@ class ReportController extends Controller
             'paginate' => true,
             'product_id' => $request->integer('product_id') ?: null,
             'location_id' => $request->integer('location_id') ?: null,
+            'salesman_id' => $this->reportSalesmanFilter($request->input('salesman_id')),
+            'customer_id' => $request->integer('customer_id') ?: null,
+            'document_book' => in_array($request->input('document_book'), ['DS', 'DSN'], true) ? $request->input('document_book') : null,
         ];
 
         // ส่งออกทั้งรายงาน ไม่ใช่เท่าที่แสดงบนจอ — per_page เป็น LIMIT ของ query
@@ -99,8 +102,40 @@ class ReportController extends Controller
             'branches' => DB::table('branches')
                 ->when(! $canSeeAllBranches, fn ($query) => $query->whereIn('id', $user->reportBranchIds(null)->all()))
                 ->orderBy('code')->get(['id', 'code', 'name_th']),
+            'bplusReportFilters' => in_array($report, ['bplus_credit_sales_by_document', 'bplus_credit_sales_by_product'], true)
+                ? $this->bplusReportFilterOptions($filters)
+                : ['salesmen' => collect(), 'customers' => collect()],
             'result' => app(ReportScope::class)->redact($this->runReport($category, $report, $from, $to, $filters)),
         ]);
+    }
+
+    private function reportSalesmanFilter(mixed $value): int|string|null
+    {
+        if ($value === 'unassigned') {
+            return 'unassigned';
+        }
+
+        return is_scalar($value) && ctype_digit((string) $value) && (int) $value > 0 ? (int) $value : null;
+    }
+
+    private function bplusReportFilterOptions(array $filters): array
+    {
+        $creditSaleIds = DB::table('documents as d')
+            ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
+            ->where('d.source_system', 'bplus')
+            ->where('dt.code', 'CREDIT_SALE')
+            ->where('d.status', 'active')
+            ->whereNull('d.cancelled_at');
+        $this->applyBranch($creditSaleIds, $filters, 'd.branch_id');
+
+        return [
+            'salesmen' => DB::table('salesmen as s')
+                ->whereIn('s.id', (clone $creditSaleIds)->whereNotNull('d.salesman_id')->select('d.salesman_id'))
+                ->orderBy('s.name')->get(['s.id', 's.code', 's.name']),
+            'customers' => DB::table('customers as c')
+                ->whereIn('c.id', (clone $creditSaleIds)->whereNotNull('d.customer_id')->select('d.customer_id'))
+                ->orderBy('c.code')->get(['c.id', 'c.code', 'c.name_th']),
+        ];
     }
 
     /**
@@ -511,6 +546,10 @@ class ReportController extends Controller
                 ['label' => 'พนักงาน', 'key' => 'salesman_name'],
                 ['label' => 'ยอดเงิน', 'key' => 'total_amount', 'type' => 'money', 'class' => 'text-end'],
             ], $this->creditSales($from, $to, $filters)),
+
+            'bplus_credit_sales_by_document' => $this->bplusCreditSalesByDocument($from, $to, $filters),
+
+            'bplus_credit_sales_by_product' => $this->bplusCreditSalesByProduct($from, $to, $filters),
 
             'pending_bookings' => $this->tableResult('ใบจองค้างแปลงขาย', [
                 ['label' => 'เลขที่', 'key' => 'doc_number'],
@@ -1637,6 +1676,157 @@ class ReportController extends Controller
             ->selectRaw("d.doc_number, d.doc_date, coalesce(c.name_th, '-') as customer_name, coalesce(s.name, '-') as salesman_name, d.total_amount")
             ->limit($filters['per_page'])
             ->get();
+    }
+
+    private function bplusCreditSaleQuery(Carbon $from, Carbon $to, array $filters, array $extraSearchColumns = [])
+    {
+        $itemTotals = DB::table('stock_documents as sd')
+            ->join('stock_document_items as sdi', 'sdi.stock_document_id', '=', 'sd.id')
+            ->groupBy('sd.document_id')
+            ->selectRaw('sd.document_id, SUM(COALESCE(sdi.unit_qty, sdi.qty)) AS qty, COUNT(sdi.id) AS item_count');
+
+        $query = DB::table('documents as d')
+            ->join('document_types as dt', 'dt.id', '=', 'd.document_type_id')
+            ->join('document_books as db', 'db.id', '=', 'd.document_book_id')
+            ->leftJoin('customers as c', 'c.id', '=', 'd.customer_id')
+            ->leftJoin('salesmen as s', 's.id', '=', 'd.salesman_id')
+            ->leftJoin('branches as b', 'b.id', '=', 'd.branch_id')
+            ->leftJoinSub($itemTotals, 'item_totals', 'item_totals.document_id', '=', 'd.id')
+            ->where('d.source_system', 'bplus')
+            ->where('dt.code', 'CREDIT_SALE')
+            ->where('d.status', 'active')
+            ->whereNull('d.cancelled_at')
+            ->whereIn('db.code', ['DS', 'DSN'])
+            ->whereBetween('d.doc_date', [$from->toDateString(), $to->toDateString()]);
+
+        $this->applyBranch($query, $filters, 'd.branch_id');
+        $this->applySearch($query, $filters, array_merge(['d.doc_number', 'c.code', 'c.name_th', 's.name', 'db.code'], $extraSearchColumns));
+
+        if (($filters['salesman_id'] ?? null) === 'unassigned') {
+            $query->whereNull('d.salesman_id');
+        } elseif (! empty($filters['salesman_id'])) {
+            $query->where('d.salesman_id', $filters['salesman_id']);
+        }
+        if (! empty($filters['customer_id'])) {
+            $query->where('d.customer_id', $filters['customer_id']);
+        }
+        if (! empty($filters['document_book'])) {
+            $query->where('db.code', $filters['document_book']);
+        }
+
+        return $query;
+    }
+
+    private function bplusCreditSalesByDocument(Carbon $from, Carbon $to, array $filters): array
+    {
+        $columns = [
+            ['label' => 'วันที่', 'key' => 'doc_date'],
+            ['label' => 'เลขที่เอกสาร', 'key' => 'doc_number'],
+            ['label' => 'รหัสลูกค้า', 'key' => 'customer_code'],
+            ['label' => 'ชื่อลูกค้า', 'key' => 'customer_name'],
+            ['label' => 'จำนวน', 'key' => 'qty', 'type' => 'number', 'class' => 'text-end'],
+            ['label' => 'ยอดก่อน VAT', 'key' => 'subtotal_amount', 'type' => 'money', 'class' => 'text-end'],
+            ['label' => 'VAT', 'key' => 'vat_amount', 'type' => 'money', 'class' => 'text-end'],
+            ['label' => 'สุทธิ', 'key' => 'total_amount', 'type' => 'money', 'class' => 'text-end'],
+            ['label' => 'จำนวนรายการ', 'key' => 'item_count', 'type' => 'number', 'class' => 'text-end'],
+            ['label' => 'รหัสสาขา', 'key' => 'branch_code'],
+            ['label' => 'สาขา', 'key' => 'branch_name'],
+            ['label' => 'พนักงานขาย', 'key' => 'salesman_name'],
+        ];
+        $rows = $this->bplusCreditSaleQuery($from, $to, $filters)
+            ->selectRaw("d.doc_date, d.doc_number, COALESCE(c.code, '-') AS customer_code, COALESCE(c.name_th, '-') AS customer_name,
+                COALESCE(item_totals.qty, 0) AS qty,
+                COALESCE(d.subtotal_amount, d.total_amount - COALESCE(d.vat_amount, 0)) AS subtotal_amount,
+                COALESCE(d.vat_amount, 0) AS vat_amount, d.total_amount,
+                COALESCE(item_totals.item_count, 0) AS item_count, COALESCE(b.code, '-') AS branch_code,
+                COALESCE(b.name_th, '-') AS branch_name, COALESCE(s.name, 'ไม่ระบุ') AS salesman_name")
+            ->orderBy('d.doc_date')->orderBy('d.doc_number')->get();
+
+        $summary = [
+            'document_count' => $rows->count(),
+            'qty' => DecimalMath::sum($rows->pluck('qty'), 4),
+            'subtotal_amount' => DecimalMath::sum($rows->pluck('subtotal_amount'), 2),
+            'vat_amount' => DecimalMath::sum($rows->pluck('vat_amount'), 2),
+            'net_sales' => DecimalMath::sum($rows->pluck('total_amount'), 2),
+        ];
+        $rows->push((object) [
+            'doc_date' => '', 'doc_number' => 'รวมทั้งสิ้น '.$summary['document_count'].' เอกสาร', 'customer_code' => '', 'customer_name' => '',
+            'qty' => $summary['qty'], 'subtotal_amount' => $summary['subtotal_amount'],
+            'vat_amount' => $summary['vat_amount'], 'total_amount' => $summary['net_sales'],
+            'item_count' => null, 'branch_code' => '', 'branch_name' => '', 'salesman_name' => '',
+        ]);
+
+        return [
+            'title' => 'BPlus ใบขายเชื่อแยกตามเอกสาร', 'columns' => $columns, 'rows' => $rows,
+            'total' => $summary['document_count'], 'summary_scope' => 'all',
+            'summary' => ['net_sales' => $summary['net_sales'], 'vat_amount' => $summary['vat_amount']] + $summary,
+            'pagination' => null,
+        ];
+    }
+
+    private function bplusCreditSalesByProduct(Carbon $from, Carbon $to, array $filters): array
+    {
+        $columns = [
+            ['label' => 'สินค้า', 'key' => 'product'],
+            ['label' => 'วันที่', 'key' => 'doc_date'],
+            ['label' => 'เลขที่อ้างอิง', 'key' => 'doc_number'],
+            ['label' => 'รหัสลูกค้า', 'key' => 'customer_code'],
+            ['label' => 'ลูกหนี้', 'key' => 'customer_name'],
+            ['label' => 'หน่วย', 'key' => 'unit_name'],
+            ['label' => 'จำนวน', 'key' => 'qty', 'type' => 'number', 'class' => 'text-end'],
+            ['label' => 'ของแถม', 'key' => 'free_qty', 'type' => 'number', 'class' => 'text-end'],
+            ['label' => 'ราคา/หน่วย', 'key' => 'unit_price', 'type' => 'money', 'class' => 'text-end'],
+            ['label' => 'จำนวนเงิน', 'key' => 'amount', 'type' => 'money', 'class' => 'text-end'],
+        ];
+        $lines = $this->bplusCreditSaleQuery($from, $to, $filters, ['p.sku_code', 'p.name_th'])
+            ->join('stock_documents as sd', 'sd.document_id', '=', 'd.id')
+            ->join('stock_document_items as sdi', 'sdi.stock_document_id', '=', 'sd.id')
+            ->join('products as p', 'p.id', '=', 'sdi.product_id')
+            ->leftJoin('product_units as u', 'u.id', '=', 'sdi.unit_id')
+            ->leftJoin('bplus_sync_documents as bsd', 'bsd.document_id', '=', 'd.id')
+            ->leftJoin('bplus_sync_lines as bpl', function ($join) {
+                $join->on('bpl.bplus_sync_document_id', '=', 'bsd.id')->on('bpl.seq', '=', 'sdi.seq');
+            })
+            ->selectRaw("p.sku_code, p.name_th, d.doc_date, d.doc_number, COALESCE(c.code, '-') AS customer_code,
+                COALESCE(c.name_th, '-') AS customer_name, COALESCE(bpl.unit_name, u.name, '-') AS unit_name,
+                COALESCE(sdi.unit_qty, sdi.qty) AS qty, sdi.qty AS base_qty, COALESCE(bpl.free_qty, 0) AS free_qty,
+                sdi.unit_price * COALESCE(sdi.unit_factor, 1) AS unit_price, sdi.qty * sdi.unit_price AS amount")
+            ->orderBy('p.sku_code')->orderBy('p.name_th')->orderBy('d.doc_date')->orderBy('d.doc_number')->orderBy('sdi.seq')
+            ->get();
+
+        $rows = collect();
+        foreach ($lines->groupBy(fn ($line) => $line->sku_code.'|'.$line->name_th) as $productLines) {
+            $first = $productLines->first();
+            $product = trim($first->sku_code.' - '.$first->name_th, ' -');
+            foreach ($productLines as $line) {
+                $line->product = $product;
+                $rows->push($line);
+            }
+            $rows->push((object) [
+                'product' => 'รวมสินค้า '.$product, 'doc_date' => '', 'doc_number' => '', 'customer_code' => '', 'customer_name' => '', 'unit_name' => '',
+                'qty' => DecimalMath::sum($productLines->pluck('qty'), 4),
+                'free_qty' => DecimalMath::sum($productLines->pluck('free_qty'), 4), 'unit_price' => null,
+                'amount' => DecimalMath::sum($productLines->pluck('amount'), 2),
+            ]);
+        }
+
+        // BPlus รวมต่อสินค้าเป็นหน่วยที่ขาย แต่บรรทัด "รวมทั้งหมด" เป็นหน่วยฐาน (16/11 สาย 09: 318.9 หน่วยขาย = 1,706.9 หน่วยฐาน)
+        $summary = [
+            'qty' => DecimalMath::sum($lines->pluck('base_qty'), 4),
+            'free_qty' => DecimalMath::sum($lines->pluck('free_qty'), 4),
+            'net_sales' => DecimalMath::sum($lines->pluck('amount'), 2),
+        ];
+        $rows->push((object) [
+            'product' => 'รวมทั้งสิ้น', 'doc_date' => '', 'doc_number' => '', 'customer_code' => '', 'customer_name' => '', 'unit_name' => '',
+            'qty' => $summary['qty'], 'free_qty' => $summary['free_qty'], 'unit_price' => null, 'amount' => $summary['net_sales'],
+        ]);
+
+        return [
+            'title' => 'BPlus ใบขายเชื่อแยกตามสินค้า', 'columns' => $columns, 'rows' => $rows,
+            'total' => $lines->count(), 'summary_scope' => 'all',
+            'summary' => ['net_sales' => $summary['net_sales'], 'vat_amount' => '0.00'] + $summary,
+            'pagination' => null,
+        ];
     }
 
     private function pendingBookings(Carbon $from, Carbon $to, array $filters): Collection

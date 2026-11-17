@@ -1,3 +1,11 @@
+# Handoff - 2026-11-17
+- Commit: `18c62c5` — branch `codex/b18-bplus-reports`, based on `origin/claude/b18-exporter-vat-login`.
+- ทำอะไร: ส่ง `salesman_code` จาก BPlus, ผูกพนักงานขายเฉพาะใบขายเชื่อโดยไม่ fallback สายขาย, เพิ่มรายงานขายเชื่อ BPlus แยกเอกสาร/สินค้าและตัวกรองวันที่-พนักงาน-ลูกค้า-เล่ม DS/DSN; รายละเอียดอยู่ใน `docs/ai/codex-b18-bplus-reports.md`.
+- ทดสอบ: BplusDocumentsTest ผ่าน 29 tests/245 assertions; `php artisan test` ผ่าน 1,159 tests (1,157 passed), 10,137 assertions, 2 skipped, 6 incomplete. Mutation ถอด salesperson filter ทำให้เทสต์แดง: คาด 1 ใบ แต่ได้ 3; คืนโค้ดและรัน suite สุดท้ายผ่าน.
+- ยังไม่ทดสอบ/ความเสี่ยง: ยังไม่เทียบข้อมูลหลัง B18 sync รอบใหม่กับ `.xls`; ไม่มี `xlrd` ใน runtime นี้. SQLite ผ่าน แต่ยังไม่ได้ execute migration บน PostgreSQL จริง. PHP lint, Python AST parse และ `git diff --check` ผ่าน.
+- Deploy: ยังไม่ deploy, ไม่เชื่อม/เขียน BPlus, ไม่แตะ production, ไม่ merge และไม่ push `main`.
+- งานถัดไป: push เฉพาะ `codex/b18-bplus-reports`; หลังเจ้าของ sync ข้อมูลใหม่ เทียบ 16/11/2569 พนักงาน 09 กับ `b18.xls` / `18.xls` ตามยอดในรายงานส่งมอบ แล้วตรวจ PostgreSQL migration ก่อนอนุมัติ deploy.
+
 # Handoff — 2026-11-09 (Reports Phase 2 — workspace only)
 
 ## Commit

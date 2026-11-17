@@ -162,6 +162,97 @@ class BplusDocumentsTest extends TestCase
         }
     }
 
+    public function test_bplus_salesman_code_maps_to_credit_sale_and_open_item_without_route_fallback(): void
+    {
+        $export = $this->export();
+        $export['documents'][2]['salesman_code'] = '09';
+        $export['documents'][3]['salesman_code'] = null;
+        $this->importFile($export);
+
+        $salesmanId = (int) DB::table('salesmen')->where('code', '09')->value('id');
+        $ds = Document::where('doc_number', 'DS256911/06364')->firstOrFail();
+        $dsn = Document::where('doc_number', 'DSN256911/4861')->firstOrFail();
+        $this->assertSame($salesmanId, (int) $ds->salesman_id);
+        $this->assertSame($salesmanId, (int) DB::table('customer_open_items')->where('document_id', $ds->id)->value('salesman_id'));
+        $this->assertNull($dsn->salesman_id, 'รหัสว่างต้องไม่รับพนักงานขายตั้งต้นจากสายขาย');
+        $this->assertNull(DB::table('customer_open_items')->where('document_id', $dsn->id)->value('salesman_id'));
+
+        $export['documents'][2]['salesman_code'] = 'UNKNOWN';
+        $this->importFile($export);
+        $this->assertNull(Document::where('doc_number', 'DS256911/06364')->value('salesman_id'), 'รหัสที่จับคู่ไม่ได้ต้องเป็นค่าว่าง');
+        $this->assertNull(DB::table('customer_open_items')->where('document_id', $ds->id)->value('salesman_id'));
+    }
+
+    public function test_bplus_credit_sale_reports_filter_and_total_by_seller_customer_and_book(): void
+    {
+        $export = $this->export();
+        $export['documents'][2]['salesman_code'] = '09';
+        $export['documents'][3]['salesman_code'] = null;
+        $export['documents'][] = [
+            'bplus_key' => 2714606, 'kind' => 'credit_sale', 'book_code' => 'DS', 'ref' => 'DS256911/06365', 'doc_date' => '2026-11-15',
+            'customer_code' => '37120-0005', 'booking_ref' => 'B18-6911/00382', 'exempt_amount' => 100, 'total_amount' => 100,
+            'due_date' => '2026-12-15', 'salesman_code' => '09',
+            'lines' => [['seq' => 1, 'sku_code' => '104032', 'unit_name' => 'ถุง', 'unit_factor' => 1, 'qty' => 1, 'unit_price' => 100, 'amount' => 100]],
+        ];
+        $this->importFile($export);
+
+        Role::where('code', 'BPLUS_DOCS')->first()->permissions()->sync(Permission::pluck('id')->all());
+        $this->actingAs(User::where('username', 'bplus_docs')->first()->fresh()->forceFill(['branch_id' => $this->branch->id]));
+        $customerId = (int) Customer::where('code', '37120-0005')->value('id');
+
+        $unassigned = $this->get(route('reports.index', [
+            'category' => 'sales', 'report' => 'bplus_credit_sales_by_document',
+            'from' => '2026-11-15', 'to' => '2026-11-15', 'salesman_id' => 'unassigned',
+            'customer_id' => $customerId,
+        ]))->assertOk()->viewData('result');
+        $this->assertSame(1, $unassigned['total']);
+        $this->assertSame('DSN256911/4861', $unassigned['rows'][0]->doc_number);
+        $this->assertSame('49.00', number_format((float) $unassigned['summary']['net_sales'], 2, '.', ''));
+
+        $document = $this->get(route('reports.index', [
+            'category' => 'sales', 'report' => 'bplus_credit_sales_by_document',
+            'from' => '2026-11-15', 'to' => '2026-11-15', 'salesman_id' => (string) DB::table('salesmen')->where('code', '09')->value('id'),
+            'customer_id' => $customerId, 'document_book' => 'DS',
+        ]))->assertOk()->viewData('result');
+        $this->assertSame(2, $document['total']);
+        $this->assertSame('DS256911/06364', $document['rows'][0]->doc_number);
+        $this->assertSame('2', rtrim(rtrim(number_format((float) $document['rows'][0]->qty, 4, '.', ''), '0'), '.'));
+        $this->assertSame('1814.43', number_format((float) $document['rows'][0]->subtotal_amount, 2, '.', ''));
+        $this->assertSame('22.57', number_format((float) $document['rows'][0]->vat_amount, 2, '.', ''));
+        $this->assertSame('1837.00', number_format((float) $document['rows'][0]->total_amount, 2, '.', ''));
+        $this->assertSame('DS256911/06365', $document['rows'][1]->doc_number);
+        $this->assertSame('3', rtrim(rtrim(number_format((float) $document['rows'][2]->qty, 4, '.', ''), '0'), '.'));
+        $this->assertSame('1914.43', number_format((float) $document['rows'][2]->subtotal_amount, 2, '.', ''), 'บรรทัดรวมท้ายรายงาน');
+        $this->assertSame('1937.00', number_format((float) $document['rows'][2]->total_amount, 2, '.', ''));
+
+        $product = $this->get(route('reports.index', [
+            'category' => 'sales', 'report' => 'bplus_credit_sales_by_product',
+            'from' => '2026-11-15', 'to' => '2026-11-15', 'salesman_id' => (string) DB::table('salesmen')->where('code', '09')->value('id'),
+            'customer_id' => $customerId, 'document_book' => 'DS',
+        ]))->assertOk()->viewData('result');
+        $this->assertSame(2, $product['total']);
+        $this->assertCount(4, $product['rows'], 'สองบรรทัดสินค้า + subtotal สินค้า + grand total');
+        $this->assertSame('104032 - สินค้า 104032', $product['rows'][0]->product);
+        $this->assertSame('2', rtrim(rtrim(number_format((float) $product['rows'][0]->qty, 4, '.', ''), '0'), '.'));
+        $this->assertSame('830.00', number_format((float) $product['rows'][0]->unit_price, 2, '.', ''));
+        $this->assertSame('1660.00', number_format((float) $product['rows'][0]->amount, 2, '.', ''));
+        $this->assertSame('DS256911/06365', $product['rows'][1]->doc_number);
+        $this->assertSame('รวมสินค้า 104032 - สินค้า 104032', $product['rows'][2]->product);
+        $this->assertSame('3', rtrim(rtrim(number_format((float) $product['rows'][2]->qty, 4, '.', ''), '0'), '.'));
+        $this->assertSame('1760.00', number_format((float) $product['rows'][2]->amount, 2, '.', ''));
+        $this->assertSame('1760.00', number_format((float) $product['rows'][3]->amount, 2, '.', ''));
+        $this->assertSame('21', rtrim(rtrim(number_format((float) $product['rows'][3]->qty, 4, '.', ''), '0'), '.'), 'รวมทั้งหมดเป็นหน่วยฐานแบบ BPlus: 2 ถุง*10 + 1 ถุง');
+
+        Document::where('doc_number', 'DSN256911/4861')->update(['status' => 'cancelled', 'cancelled_at' => now()]);
+        $withoutCancelled = $this->get(route('reports.index', [
+            'category' => 'sales', 'report' => 'bplus_credit_sales_by_document',
+            'from' => '2026-11-15', 'to' => '2026-11-15',
+        ]))->assertOk()->viewData('result');
+        $this->assertSame(2, $withoutCancelled['total'], 'รายงานไม่นับใบขายเชื่อที่ยกเลิก');
+        $this->assertSame('DS256911/06364', $withoutCancelled['rows'][0]->doc_number);
+        $this->assertSame('DS256911/06365', $withoutCancelled['rows'][1]->doc_number);
+    }
+
     public function test_opening_receivable_lets_receipts_settle_bills_from_before_the_period(): void
     {
         $this->importFile($this->withOpeningBill($this->export()));
@@ -773,10 +864,11 @@ class BplusDocumentsTest extends TestCase
                 'is_cancelled' => true, 'total_amount' => 500],
             ['bplus_key' => 2714599, 'kind' => 'credit_sale', 'book_code' => 'DS', 'ref' => 'DS256911/06364', 'doc_date' => '2026-11-15',
                 'customer_code' => '37120-0005', 'booking_ref' => 'B18-6911/00382', 'vatable_amount' => 322.43, 'exempt_amount' => 1492,
-                'vat_amount' => 22.57, 'total_amount' => 1837, 'due_date' => '2026-12-15',
+                'vat_amount' => 22.57, 'total_amount' => 1837, 'due_date' => '2026-12-15', 'salesman_code' => '09',
                 'lines' => [['seq' => 1, 'sku_code' => '104032', 'unit_name' => 'ถุง*10', 'unit_factor' => 10, 'qty' => 2, 'unit_price' => 830, 'amount' => 1660]]],
             ['bplus_key' => 2714605, 'kind' => 'credit_sale', 'book_code' => 'DSN', 'ref' => 'DSN256911/4861', 'doc_date' => '2026-11-15',
                 'customer_code' => '37120-0005', 'booking_ref' => 'B18-6911/00382', 'exempt_amount' => 49, 'total_amount' => 49, 'due_date' => '2026-12-15',
+                'salesman_code' => '09',
                 'lines' => [['seq' => 1, 'sku_code' => '501035', 'unit_name' => 'ถุง', 'unit_factor' => 1, 'qty' => 1, 'unit_price' => 49, 'amount' => 49]]],
             ['bplus_key' => 2715000, 'kind' => 'receipt', 'book_code' => 'RR2', 'ref' => 'RR26911/000800', 'doc_date' => '2026-11-15',
                 'customer_code' => '37120-0005', 'total_amount' => 1049, 'transfer_amount' => 1049,
