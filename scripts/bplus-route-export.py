@@ -29,10 +29,32 @@ if period == "month":
 else:
     since = (datetime.date.today() - datetime.timedelta(days=int(period))).isoformat()
 print(f"ดึงสาย {route} ตั้งแต่ {since} จาก {database}")
-user = input("user: ").strip()
-password = getpass.getpass("password (ไม่แสดงตัวอักษร): ")
+def bplus_login():
+    """user/รหัส BPlus: อ่านรหัสจาก Keychain ของ Mac ก่อน (service bplus-mssql) ถ้าไม่มีค่อยถาม
+    ตั้งครั้งเดียว: security add-generic-password -s bplus-mssql -a jetsada -w
+    (คำสั่งจะถามรหัสแบบไม่แสดงตัวอักษร รหัสเก็บเข้ารหัสใน Keychain ไม่อยู่ในไฟล์)"""
+    import subprocess
+    login = "jetsada"
+    try:
+        secret = subprocess.run(["security", "find-generic-password", "-s", "bplus-mssql", "-a", login, "-w"],
+                                capture_output=True, text=True, check=True).stdout.strip()
+        if secret:
+            print(f"user: {login} (ใช้รหัสจาก Keychain)")
+            return login, secret
+    except Exception:
+        pass
+    entered = input(f"user [{login}]: ").strip() or login
+    return entered, getpass.getpass("password (ไม่แสดงตัวอักษร): ")
 
-connection = pymssql.connect(host, user, password, database, as_dict=True, read_only=True)
+user, password = bplus_login()
+
+try:
+    connection = pymssql.connect(host, user, password, database, as_dict=True, read_only=True)
+except pymssql.Error:
+    # รหัสใน Keychain ใช้ไม่ได้ (ตั้งผิดหรือเปลี่ยนรหัสแล้ว) ให้ถามรหัสแทน
+    print("รหัสใน Keychain เข้า BPlus ไม่ได้ พิมพ์รหัสเอง (แก้ Keychain: security delete-generic-password -s bplus-mssql -a jetsada)")
+    password = getpass.getpass("password (ไม่แสดงตัวอักษร): ")
+    connection = pymssql.connect(host, user, password, database, as_dict=True, read_only=True)
 cursor = connection.cursor()
 
 
@@ -96,9 +118,10 @@ for b in bookings:
     })
 
 # ใบขายเชื่อ
+# ยอดภาษีใช้ช่อง ARD_B_* (หลังปรับยอดท้ายบิล) ตรงกับรายงานของ BPlus ช่อง ARD_G_* อาจต่าง 1 สตางค์
 sales = rows(f"""
     SELECT d.DI_KEY, d.DI_REF, d.DI_DATE, d.DI_ACTIVE, d.DI_AMOUNT, d.DI_CRE_BY, d.DI_UPD_DATE, d.DI_CRE_DATE,
-           t.DT_DOCCODE, x.ARD_G_SV, x.ARD_G_SNV, x.ARD_G_VAT, x.ARD_B_AMT, x.ARD_DUE_DA, a.AR_KEY, a.AR_CODE, a.AR_NAME
+           t.DT_DOCCODE, x.ARD_B_SV, x.ARD_B_SNV, x.ARD_B_VAT, x.ARD_B_AMT, x.ARD_DUE_DA, a.AR_KEY, a.AR_CODE, a.AR_NAME
     FROM DOCINFO d JOIN DOCTYPE t ON t.DT_KEY = d.DI_DT
     LEFT JOIN ARDETAIL x ON x.ARD_DI = d.DI_KEY LEFT JOIN ARFILE a ON a.AR_KEY = x.ARD_AR
     WHERE d.DI_DATE >= %s AND d.DI_KEY IN ({ROUTE_SALES}) ORDER BY d.DI_KEY""", (since, route))
@@ -113,7 +136,7 @@ for s in sales:
         "doc_date": s["DI_DATE"].date().isoformat(), "is_cancelled": s["DI_ACTIVE"] != 0,
         "customer_key": s["AR_KEY"], "customer_code": text(s["AR_CODE"]), "customer_name": text(s["AR_NAME"]),
         "created_by": text(s["DI_CRE_BY"]), "booking_ref": booking_ref,
-        "vatable_amount": num(s["ARD_G_SV"]), "exempt_amount": num(s["ARD_G_SNV"]), "vat_amount": num(s["ARD_G_VAT"]),
+        "vatable_amount": num(s["ARD_B_SV"]), "exempt_amount": num(s["ARD_B_SNV"]), "vat_amount": num(s["ARD_B_VAT"]),
         "total_amount": num(s["DI_AMOUNT"]),
         "due_date": s["ARD_DUE_DA"].date().isoformat() if s["ARD_DUE_DA"] else None,
         "bplus_updated_at": stamp(s["DI_UPD_DATE"] or s["DI_CRE_DATE"]),
