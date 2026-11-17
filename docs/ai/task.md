@@ -1,3 +1,24 @@
+# Handoff — 2026-11-17 (B18 credit notes)
+
+## Commit
+- Implementation/report commit: `c727d1e` (`feat(bplus): sync B18 credit notes`), branch `codex/b18-credit-notes`, base `codex/b18-report-audit` HEAD `f1bcbec`.
+- Handoff นี้ commit แยกหลัง implementation; push เฉพาะ `codex/b18-credit-notes` หลัง commit นี้. ไม่ push `main`, ไม่ merge และไม่ deploy.
+
+## ทำอะไรไป
+- เพิ่ม export/import/materialize ใบลดหนี้ IS/IS-N ของสาย B18 โดยใช้ `TRD_REFER_DI` กรองใบขายเชื่อของสาย และ `TRD_REFER_REF` เก็บเลขบิลต้นทาง. ERP ผูก `source_document_id`, ลด `customer_open_items` จากยอด gross เดิมแบบทำซ้ำได้ และลง GL Dr รายได้/VAT, Cr ลูกหนี้ตาม role เดียวกับใบขายเชื่อ.
+- ยกเลิกใบลดหนี้แล้วกลับ GL และคืนยอดลูกหนี้; ไม่สร้าง stock document/movement. รายงานสรุปขาย, ขายรายวัน, VAT และ Statement หักใบลดหนี้; BPlus credit-sales reports คงยอด gross. เปิดใบลดหนี้จากเอกสารย้อนหลังและแสดงเลขบิลอ้างอิงบนหน้าซิงค์.
+- รายละเอียดไฟล์และคอลัมน์/สมมติฐาน BPlus อยู่ที่ `docs/ai/codex-b18-credit-notes.md`.
+
+## ทดสอบไปแล้วแค่ไหน
+- `php artisan test --no-coverage`: 1,168 tests, 1,166 passed, 10,398 assertions, 2 skipped, 6 incomplete; ไม่มี failure/error.
+- PHP lint ไฟล์ที่แก้, `python3 -m py_compile scripts/bplus-route-export.py` และ `git diff --check` ผ่าน.
+- Mutation checks ถอด kind/validation/dispatch/link, AR reduction, GL direction/idempotency/cancellation, report signs, IS-N VAT rate, browser route และ exporter route/sign normalization แล้วเทสต์แดงตามคาด; คืน source เดิมก่อน suite สุดท้าย.
+
+## ความเสี่ยง/งานถัดไป
+- ไม่ได้เชื่อม BPlus หรือรัน exporter; ต้องให้เจ้าของตรวจเครื่องหมายจริงของ `DI_AMOUNT`, กรณีเอกสารอ้างหลาย `TRD_REFER_REF`, และเทียบจำนวน/ยอดจริงกับค่าคาด IS 9 ใบ 8,265.00 และ IS-N 4 ใบ 442.00 หลัง export.
+- Migration ผ่าน SQLite in-memory จาก full suite แต่ยังไม่ได้ execute บน PostgreSQL จริง. ไม่มีการ deploy หรือเขียนข้อมูล BPlus.
+- หลัง push branch นี้แล้ว จึงเริ่มงานคิวถัดไป `/Applications/MAMP/htdocs/erp/CODEX_TASK_BPLUS_SYNC_SETTINGS.md` บน branch `codex/bplus-sync-settings` ตามคำสั่งเจ้าของ.
+
 # Handoff - 2026-11-17
 - Commit: `18c62c5` — branch `codex/b18-bplus-reports`, based on `origin/claude/b18-exporter-vat-login`.
 - ทำอะไร: ส่ง `salesman_code` จาก BPlus, ผูกพนักงานขายเฉพาะใบขายเชื่อโดยไม่ fallback สายขาย, เพิ่มรายงานขายเชื่อ BPlus แยกเอกสาร/สินค้าและตัวกรองวันที่-พนักงาน-ลูกค้า-เล่ม DS/DSN; รายละเอียดอยู่ใน `docs/ai/codex-b18-bplus-reports.md`.

@@ -20,6 +20,7 @@ class DocumentBrowserController extends Controller
         'CREDIT_SALE' => 'sales.show',
         'CASH_SALE' => 'cash-sales.show',
         'SALE_RETURN' => 'sale-returns.show',
+        'CREDIT_NOTE' => 'credit-debit-notes.print',
         'PURCHASE' => 'purchases.show',
         'STOCK_TRANSFER' => 'stock-transfers.show',
         'STOCK_ADJUSTMENT' => 'stock-adjustments.show',

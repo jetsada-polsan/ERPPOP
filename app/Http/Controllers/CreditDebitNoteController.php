@@ -55,7 +55,7 @@ class CreditDebitNoteController extends Controller
             return VoidedDocumentPrint::deny($note);
         }
 
-        $note->load(['customer.addresses', 'branch', 'documentType']);
+        $note->load(['customer.addresses', 'branch', 'documentType', 'documentBook']);
         abort_unless(in_array($note->documentType->code, ['CREDIT_NOTE', 'DEBIT_NOTE'], true), 404);
 
         $isCredit = $note->documentType->code === 'CREDIT_NOTE';
@@ -65,16 +65,26 @@ class CreditDebitNoteController extends Controller
             ->where('effective_from', '<=', $note->doc_date->toDateString())
             ->where(fn ($w) => $w->whereNull('effective_to')->orWhere('effective_to', '>=', $note->doc_date->toDateString()))
             ->orderByDesc('effective_from')->value('rate_percent') ?? 7.0);
+        if ($note->documentBook?->no_vat) {
+            $vatRate = 0.0;
+        }
 
         $total = (float) $note->total_amount;
-        $base = round($total * 100 / (100 + $vatRate), 2);
+        $hasImportedTaxBreakdown = $note->source_system === 'bplus'
+            && $note->subtotal_amount !== null && $note->vat_amount !== null;
+        $base = $hasImportedTaxBreakdown
+            ? round((float) $note->subtotal_amount, 2)
+            : round($total * 100 / (100 + $vatRate), 2);
+        $vatAmount = $hasImportedTaxBreakdown
+            ? round((float) $note->vat_amount, 2)
+            : round($total - $base, 2);
 
         return view('credit-debit-notes.print', [
             'note' => $note,
             'isCredit' => $isCredit,
             'vatRate' => $vatRate,
             'baseAmount' => $base,
-            'vatAmount' => round($total - $base, 2),
+            'vatAmount' => $vatAmount,
             'total' => $total,
             'totalText' => ThaiBaht::text($total),
         ]);

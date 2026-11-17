@@ -12,9 +12,9 @@ use Throwable;
 
 /**
  * สร้างเอกสาร ERP จริงจากสำเนา BPlus (bplus_sync_documents) ของสายขายหนึ่งสาย
- * ใบจอง -> ใบจอง, DS/DSN -> ใบขายเชื่อ + ลูกหนี้, RR -> ใบเสร็จรับเงิน + ตัดชำระ
+ * ใบจอง -> ใบจอง, DS/DSN -> ใบขายเชื่อ + ลูกหนี้, IS/IS-N -> ใบลดหนี้, RR -> ใบเสร็จรับเงิน
  *
- * ตั้งใจ: ไม่ตัดสต๊อก ไม่จองสต๊อก ไม่ลง GL (บัญชีทำจาก BPlus)
+ * ตั้งใจ: ไม่ตัดสต๊อก/จองสต๊อก และใช้ GL ตามบทบาทบัญชีที่กำหนดใน ERP
  * ยอดเงินและ VAT ใช้ตัวเลขจากบิล BPlus ตรงๆ
  * รันซ้ำได้: เอกสารผูกกับ documents.source_key = DI_KEY ของ BPlus ใบเดิมถูกอัปเดต ไม่สร้างซ้ำ
  */
@@ -55,7 +55,7 @@ class BplusDocumentMaterializer
             ->filter()
             ->flip();
 
-        $missingCustomers = collect($documents)->whereIn('kind', ['credit_sale', 'opening_ar', 'receipt'])
+        $missingCustomers = collect($documents)->whereIn('kind', ['credit_sale', 'opening_ar', 'credit_note', 'receipt'])
             ->unique(fn ($d) => ($d['customer_key'] ?? '').'|'.($d['customer_code'] ?? ''))
             ->reject(function ($d) use ($incomingCustomerKeys) {
                 $key = isset($d['customer_key']) ? (string) $d['customer_key'] : null;
@@ -100,7 +100,7 @@ class BplusDocumentMaterializer
         $this->ctx = $this->context($route, true);
 
         $rows = DB::table('bplus_sync_documents')->where('route_code', $route)
-            ->orderByRaw("CASE kind WHEN 'booking' THEN 1 WHEN 'credit_sale' THEN 2 WHEN 'opening_ar' THEN 3 ELSE 4 END")
+            ->orderByRaw("CASE kind WHEN 'booking' THEN 1 WHEN 'credit_sale' THEN 2 WHEN 'opening_ar' THEN 3 WHEN 'credit_note' THEN 4 ELSE 5 END")
             ->orderBy('doc_date')->orderBy('bplus_key')->get();
 
         $count = DB::transaction(function () use ($rows) {
@@ -110,6 +110,7 @@ class BplusDocumentMaterializer
                     'booking' => $this->booking($row),
                     'credit_sale' => $this->creditSale($row),
                     'opening_ar' => $this->openingAr($row),
+                    'credit_note' => $this->creditNote($row),
                     'receipt' => $this->receipt($row),
                     default => null,
                 };
@@ -130,7 +131,7 @@ class BplusDocumentMaterializer
 
     private function context(string $route, bool $strict): array
     {
-        $types = DB::table('document_types')->whereIn('code', ['BOOKING', 'CREDIT_SALE', 'RECEIPT', 'OPENING_AR'])->pluck('id', 'code');
+        $types = DB::table('document_types')->whereIn('code', ['BOOKING', 'CREDIT_SALE', 'RECEIPT', 'OPENING_AR', 'CREDIT_NOTE'])->pluck('id', 'code');
         $area = DB::table('sales_areas')->where('code', $route)->first();
         $branchId = $area?->branch_id ?? DB::table('branches')->where('is_active', true)->orderBy('id')->value('id');
         $branch = $branchId ? DB::table('branches')->where('id', $branchId)->first() : null;
@@ -138,7 +139,7 @@ class BplusDocumentMaterializer
             ->mapWithKeys(fn ($b) => [$b->document_type_id.':'.$b->code => $b->id]);
 
         $errors = [];
-        foreach (['BOOKING', 'CREDIT_SALE', 'RECEIPT'] as $code) {
+        foreach (['BOOKING', 'CREDIT_SALE', 'RECEIPT', 'CREDIT_NOTE'] as $code) {
             if (! isset($types[$code])) {
                 $errors[] = "ไม่พบประเภทเอกสาร {$code}";
             }
@@ -328,6 +329,49 @@ class BplusDocumentMaterializer
         return $id;
     }
 
+    /** ใบลดหนี้ BPlus อ้างใบขายเชื่อเดิม ลดลูกหนี้และกลับด้าน GL โดยไม่ทำ stock document */
+    private function creditNote(object $row): ?int
+    {
+        $customerId = $this->customerId($row);
+        if (! $customerId) {
+            $this->problems[$row->ref] = 'ไม่พบลูกค้ารหัส '.($row->customer_code ?: '-').($row->customer_key ? " (เลข {$row->customer_key})" : '').' ใน ERP';
+
+            return null;
+        }
+
+        $saleTypeId = $this->ctx['types']['CREDIT_SALE'] ?? null;
+        $sale = $saleTypeId
+            ? DB::table('documents')->where('source_system', self::SOURCE)->where('document_type_id', $saleTypeId)
+                ->where('doc_number', $row->sale_ref)->orderByRaw("CASE WHEN status = 'active' THEN 0 ELSE 1 END")->first()
+            : null;
+        if (! $sale) {
+            $this->problems[$row->ref] = 'ไม่พบบิลขายเชื่อ '.$row->sale_ref.' ที่ใบลดหนี้อ้างถึงใน ERP';
+
+            return null;
+        }
+        if ((int) $sale->customer_id !== $customerId) {
+            $this->problems[$row->ref] = 'ลูกค้าไม่ตรงกับบิลขายเชื่อ '.$row->sale_ref;
+
+            return null;
+        }
+
+        $total = round(abs((float) $row->total_amount), 2);
+        $vat = round(abs((float) $row->vat_amount), 2);
+        $id = $this->upsertDocument($row, 'CREDIT_NOTE', $row->book_code, [
+            'customer_id' => $customerId,
+            'reference' => $sale->doc_number,
+            'source_document_id' => $sale->id,
+            'salesman_id' => $this->salesmanId($row->salesman_code),
+            'total_amount' => $total,
+            'subtotal_amount' => round($total - $vat, 2),
+            'vat_amount' => $vat,
+        ]);
+
+        $this->materializeCreditNoteGl($id, $row);
+
+        return $id;
+    }
+
     private function upsertDocument(object $row, string $type, ?string $bookCode, array $values): int
     {
         $typeId = $this->ctx['types'][$type];
@@ -425,17 +469,25 @@ class BplusDocumentMaterializer
         $items = DB::table('customer_open_items as o')
             ->join('documents as d', 'd.id', '=', 'o.document_id')
             ->where('d.source_system', self::SOURCE)
-            ->get(['o.id', 'o.net_amount', 'd.status']);
+            ->get(['o.id', 'o.customer_id', 'o.gross_amount', 'o.net_amount', 'd.id as document_id', 'd.doc_number', 'd.status']);
         foreach ($items as $item) {
+            $noteCredit = (float) DB::table('documents as n')
+                ->join('document_types as nt', 'nt.id', '=', 'n.document_type_id')
+                ->where('nt.code', 'CREDIT_NOTE')->where('n.customer_id', $item->customer_id)
+                ->where('n.status', 'active')->whereNull('n.cancelled_at')
+                ->where(fn ($q) => $q->where('n.source_document_id', $item->document_id)->orWhere('n.reference', $item->doc_number))
+                ->sum('n.total_amount');
+            $net = max(round((float) $item->gross_amount - $noteCredit, 2), 0);
             $paid = (float) DB::table('payment_allocations as a')
                 ->join('payment_documents as p', 'p.id', '=', 'a.payment_document_id')
                 ->where('a.customer_open_item_id', $item->id)->where('p.status', 'active')
                 ->sum(DB::raw('a.allocated_amount + a.discount_amount + a.wht_amount'));
             $paid = round($paid, 2);
-            $balance = round((float) $item->net_amount - $paid, 2);
+            $balance = round($net - $paid, 2);
             $status = $item->status === 'cancelled' ? 'cancelled' : ($balance <= 0 ? 'paid' : ($paid > 0 ? 'partial' : 'open'));
             DB::table('customer_open_items')->where('id', $item->id)->update([
                 'paid_amount' => $paid,
+                'net_amount' => $net,
                 'balance_amount' => max($balance, 0),
                 'status' => $status,
             ]);
@@ -676,6 +728,65 @@ class BplusDocumentMaterializer
 
         try {
             $this->glPostingService->postResolved($document, $resolved, 'ขายเชื่อ '.$document->doc_number);
+        } catch (Throwable $e) {
+            $this->problems[$row->ref] = $e->getMessage();
+        }
+    }
+
+    /** ใบลดหนี้กลับด้านรายการขายเชื่อ: Dr รายได้/VAT, Cr ลูกหนี้ */
+    private function materializeCreditNoteGl(int $documentId, object $row): void
+    {
+        $document = Document::find($documentId);
+        if (! $document) {
+            return;
+        }
+
+        if ($row->is_cancelled) {
+            try {
+                $this->glPostingService->reverseDocument($document, 'ยกเลิกจาก BPlus '.$row->ref);
+            } catch (Throwable $e) {
+                $this->problems[$row->ref] = $e->getMessage();
+            }
+
+            return;
+        }
+
+        $total = round(abs((float) $row->total_amount), 2);
+        $vat = round(abs((float) $row->vat_amount), 2);
+        $subtotal = DecimalMath::subtract($total, $vat, 2);
+
+        $arAccount = $this->glPostingService->role(ChartOfAccount::ROLE_AR);
+        $revAccount = $this->glPostingService->role(ChartOfAccount::ROLE_SALES_REVENUE);
+        $vatAccount = DecimalMath::compare($vat, 0) > 0
+            ? $this->glPostingService->role(ChartOfAccount::ROLE_VAT_OUTPUT)
+            : null;
+
+        if (! $arAccount) {
+            $this->problems[$row->ref] = 'ยังไม่ผูกบัญชี ar';
+
+            return;
+        }
+        if (! $revAccount) {
+            $this->problems[$row->ref] = 'ยังไม่ผูกบัญชี sales_revenue';
+
+            return;
+        }
+        if (DecimalMath::compare($vat, 0) > 0 && ! $vatAccount) {
+            $this->problems[$row->ref] = 'ยังไม่ผูกบัญชี vat_output';
+
+            return;
+        }
+
+        $resolved = [
+            [$revAccount->id, $subtotal, 0],
+            [$arAccount->id, 0, $total],
+        ];
+        if (DecimalMath::compare($vat, 0) > 0 && $vatAccount) {
+            array_splice($resolved, 1, 0, [[$vatAccount->id, $vat, 0]]);
+        }
+
+        try {
+            $this->glPostingService->postResolved($document, $resolved, 'ใบลดหนี้ '.$document->doc_number);
         } catch (Throwable $e) {
             $this->problems[$row->ref] = $e->getMessage();
         }

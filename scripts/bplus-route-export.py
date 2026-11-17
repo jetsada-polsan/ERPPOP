@@ -10,6 +10,7 @@
 ขอบเขต:
 - ใบจอง: เล่มของสาย ตามวันที่เอกสารในช่วง
 - ใบขายเชื่อ (DS/DSN): วันที่ในช่วง และมีรายการอ้างใบจองของสายนี้
+- ใบลดหนี้ (IS/IS-N): วันที่ในช่วง และมีรายการอ้างใบขายเชื่อของสายนี้
 - ใบเสร็จ: วันที่ในช่วง และตัดชำระใบขายเชื่อของสายนี้ (เก็บเฉพาะบรรทัดที่เป็นของสายนี้)
 """
 import datetime
@@ -158,6 +159,54 @@ for s in sales:
 for doc in documents:
     if doc["kind"] == "booking" and doc["ref"] in customer_by_booking:
         doc["customer_key"], doc["customer_code"], doc["customer_name"] = customer_by_booking[doc["ref"]]
+
+# ใบลดหนี้: ต้องมีบรรทัดอ้างใบขายเชื่อของสายนี้ และส่งยอดเป็นบวกให้ ERP หักเอง
+# ยังไม่ได้ตรวจ DI_AMOUNT กับ BPlus จริงในงานนี้ จึงเก็บ abs() ไว้และพิมพ์เลขที่
+# เอกสารที่ต้นทางเป็นค่าลบทุกครั้งที่รัน เพื่อให้เจ้าของยืนยันเครื่องหมายจากระบบจริง
+credit_note_rows = rows(f"""
+    SELECT DISTINCT d.DI_KEY, d.DI_REF, d.DI_DATE, d.DI_ACTIVE, d.DI_AMOUNT, d.DI_CRE_BY, d.DI_UPD_DATE, d.DI_CRE_DATE,
+           t.DT_DOCCODE, x.ARD_B_SV, x.ARD_B_SNV, x.ARD_B_VAT, x.ARD_B_AMT, a.AR_KEY, a.AR_CODE, a.AR_NAME,
+           CASE WHEN COALESCE(sl.SLD_SLMN, 0) = 0 THEN NULL ELSE sm.SLMN_CODE END AS SLMN_CODE
+    FROM DOCINFO d JOIN DOCTYPE t ON t.DT_KEY = d.DI_DT
+    JOIN TRANSTKH h ON h.TRH_DI = d.DI_KEY JOIN TRANSTKD l ON l.TRD_TRH = h.TRH_KEY
+    LEFT JOIN ARDETAIL x ON x.ARD_DI = d.DI_KEY LEFT JOIN ARFILE a ON a.AR_KEY = x.ARD_AR
+    LEFT JOIN SLDETAIL sl ON sl.SLD_DI = d.DI_KEY LEFT JOIN SALESMAN sm ON sm.SLMN_KEY = sl.SLD_SLMN
+    WHERE d.DI_DATE >= %s AND t.DT_DOCCODE IN ('IS', 'IS-N')
+      AND l.TRD_REFER_DI IN ({ROUTE_SALES}) ORDER BY d.DI_KEY""", (since, route))
+negative_credit_note_refs = []
+ambiguous_credit_note_refs = []
+seen_credit_note_keys = set()
+for note in credit_note_rows:
+    if note["DI_KEY"] in seen_credit_note_keys:
+        continue
+    seen_credit_note_keys.add(note["DI_KEY"])
+    note_ref = text(note["DI_REF"])
+    lines = lines_of(note["DI_KEY"])
+    sale_refs = sorted({line["_refer"] for line in lines if line["_refer"]})
+    if len(sale_refs) != 1:
+        ambiguous_credit_note_refs.append(f"{note_ref} อ้างบิล {', '.join(sale_refs) if sale_refs else 'ไม่พบเลขอ้างอิง'}")
+        continue
+
+    raw_total = num(note["DI_AMOUNT"])
+    if raw_total < 0:
+        negative_credit_note_refs.append(note_ref)
+    # บรรทัดของใบลดหนี้อาจเก็บเครื่องหมายลบ จึงปรับเป็นบวกตามยอดหัวเอกสาร
+    positive_lines = []
+    for line in lines:
+        positive_lines.append({
+            **{k: v for k, v in line.items() if k != "_refer"},
+            "qty": abs(line["qty"]), "free_qty": abs(line["free_qty"]),
+            "unit_price": abs(line["unit_price"]), "discount": abs(line["discount"]), "amount": abs(line["amount"]),
+        })
+    documents.append({
+        "bplus_key": note["DI_KEY"], "kind": "credit_note", "book_code": text(note["DT_DOCCODE"]), "ref": note_ref,
+        "doc_date": note["DI_DATE"].date().isoformat(), "is_cancelled": note["DI_ACTIVE"] != 0,
+        "customer_key": note["AR_KEY"], "customer_code": text(note["AR_CODE"]), "customer_name": text(note["AR_NAME"]),
+        "created_by": text(note["DI_CRE_BY"]), "sale_ref": sale_refs[0], "salesman_code": text(note["SLMN_CODE"]),
+        "vatable_amount": abs(num(note["ARD_B_SV"])), "exempt_amount": abs(num(note["ARD_B_SNV"])),
+        "vat_amount": abs(num(note["ARD_B_VAT"])), "total_amount": abs(raw_total),
+        "bplus_updated_at": stamp(note["DI_UPD_DATE"] or note["DI_CRE_DATE"]), "lines": positive_lines,
+    })
 
 # ใบเสร็จ: เก็บเฉพาะบรรทัดที่ตัดชำระใบขายเชื่อของสายนี้
 # TPA_PAY_A ไม่ใช่เงินที่รับจริงเสมอไป: ใบที่รับชำระบางส่วน BPlus ใส่ยอดเต็มบิลไว้ในช่องนี้
@@ -345,9 +394,17 @@ with open(name, "w", encoding="utf-8") as handle:
                "customers": customer_data, "products": product_data}, handle, ensure_ascii=False, indent=1,
               default=lambda v: float(v) if isinstance(v, decimal.Decimal) else str(v))
 
-count = {k: sum(1 for d in documents if d["kind"] == k) for k in ("booking", "credit_sale", "opening_ar", "receipt")}
+count = {k: sum(1 for d in documents if d["kind"] == k) for k in ("booking", "credit_sale", "opening_ar", "credit_note", "receipt")}
 print(f"เสร็จ บันทึกที่ {name}: ใบจอง {count['booking']} · ใบขายเชื่อ {count['credit_sale']} · ใบเสร็จ {count['receipt']}"
-      f" · ลูกหนี้ยกมา {count['opening_ar']} บิล ({opening_total:,.2f}) · ลูกค้า {len(customer_data)} · สินค้า {len(product_data)}")
+      f" · ใบลดหนี้ {count['credit_note']} · ลูกหนี้ยกมา {count['opening_ar']} บิล ({opening_total:,.2f}) · ลูกค้า {len(customer_data)} · สินค้า {len(product_data)}")
+if negative_credit_note_refs:
+    print("พบ DI_AMOUNT ติดลบในใบลดหนี้ต้นทาง (ส่งค่าบวกหลัง abs): " + ", ".join(negative_credit_note_refs))
+else:
+    print("ไม่พบ DI_AMOUNT ติดลบในใบลดหนี้ที่ส่งออก — โปรดยืนยันเครื่องหมายกับ BPlus จริง")
+if ambiguous_credit_note_refs:
+    print("เตือน: ข้ามใบลดหนี้ที่อ้างบิลไม่ได้แบบหนึ่งต่อหนึ่ง:")
+    for item in ambiguous_credit_note_refs:
+        print("  " + item)
 if receipt_mismatch:
     print(f"เตือน: ใบเสร็จ {len(receipt_mismatch)} ใบ เงินที่รับรวมไม่เท่ายอดใบใน BPlus (ส่งรายการนี้ให้ Claude ดู):")
     for item in receipt_mismatch[:20]:
