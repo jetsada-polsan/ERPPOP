@@ -256,6 +256,10 @@ Route::post('/crm/opportunities', [CrmController::class, 'storeOpportunity'])->n
 Route::patch('/crm/opportunities/{opportunity}/stage', [CrmController::class, 'updateOpportunityStage'])->name('crm.opportunities.stage');
 Route::get('/features', [FeatureController::class, 'index'])->name('features.index');
 Route::get('/core-modules', [ManualController::class, 'index'])->name('core-modules.index');
+Route::get('/accounting-package', [\App\Http\Controllers\AccountingPackageController::class, 'index'])->name('accounting-package.index');
+Route::get('/accounting-package/download', [\App\Http\Controllers\AccountingPackageController::class, 'download'])->name('accounting-package.download');
+Route::get('/settings/menus', [\App\Http\Controllers\MenuSettingsController::class, 'index'])->name('settings.menus');
+Route::post('/settings/menus', [\App\Http\Controllers\MenuSettingsController::class, 'save'])->name('settings.menus.save');
 Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
 
 // Typeahead search (Alpine.js pickers on the booking/sale/purchase forms).

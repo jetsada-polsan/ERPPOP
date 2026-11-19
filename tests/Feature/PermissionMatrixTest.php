@@ -59,6 +59,7 @@ class PermissionMatrixTest extends TestCase
     public function test_seeded_roles_match_the_intended_permission_matrix_exactly(): void
     {
         $expected = [
+            'ACCOUNTING_FIRM' => 'reports.export reports.view',
             'ACC' => 'finance.manage management.view reports.all_branches reports.export reports.view',
             'ACC_MGR' => 'budget.manage documents.void finance.credit.approve finance.manage finance.note.approve management.view masterdata.manage reports.all_branches reports.export reports.view',
             'BRANCH_MGR' => 'documents.void inventory.cost.close inventory.quality.manage management.view pos.cash.manage pos.discount.override pos.sell_below_cost pos.use pos.void purchasing.approve purchasing.manage reports.export reports.view sales.assign sales.manage sales.price_below_cost sales.return.unreferenced sales.stock_shortage.approve stock.adjust.approve stock.damage.approve stock.manage stock.request transport.manage',

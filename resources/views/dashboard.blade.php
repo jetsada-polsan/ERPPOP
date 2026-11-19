@@ -65,12 +65,15 @@
                 <div class="fw-bold"><i class="bi bi-calendar-x-fill me-2"></i>Lot ต้องจัดการ {{ $expiryAlerts->count() }} รายการ</div>
                 <div class="small">รวม Lot หมดอายุ ใกล้ถึงวันที่เตือน และ Lot ที่ยังไม่ได้ระบุวันหมดอายุ</div>
             </div>
+            @unless(\App\Support\MenuVisibility::blocked('reports.index', ['category' => 'inventory']))
             <a href="{{ route('reports.index', ['category' => 'inventory', 'report' => 'expiring_stock']) }}" class="btn btn-sm btn-danger">เปิดรายงาน Lot</a>
+            @endunless
         </div>
     @endif
 
     <div class="row g-3 mb-3">
         <div class="col-md-6 col-xl-3">
+            @unless(\App\Support\MenuVisibility::blocked('reports.index', ['category' => 'sales']))
             <a href="{{ route('reports.index', ['category' => 'sales', 'report' => 'daily_sales', 'from' => $from, 'to' => $to]) }}" class="metric-card metric-card-sales metric-link">
                 <div class="metric-icon metric-icon-sales"><i class="bi bi-cash-coin"></i></div>
                 <div class="metric-label">ยอดขายสุทธิ</div>
@@ -80,8 +83,10 @@
                     <div class="metric-mini-row"><span>เฉลี่ยต่อบิล</span><strong>฿{{ number_format($summary->average_bill, 2) }}</strong></div>
                 </div>
             </a>
+            @endunless
         </div>
         <div class="col-md-6 col-xl-3">
+            @unless(\App\Support\MenuVisibility::blocked('reports.index', ['category' => 'sales']))
             <a href="{{ route('reports.index', ['category' => 'sales', 'report' => 'gross_margin', 'from' => $from, 'to' => $to]) }}" class="metric-card metric-card-profit metric-link">
                 <div class="metric-icon metric-icon-profit"><i class="bi bi-graph-up-arrow"></i></div>
                 <div class="metric-label">กำไรขั้นต้นที่คำนวณได้</div>
@@ -91,8 +96,10 @@
                     <div class="metric-mini-row"><span>Gross margin</span><strong>{{ $summary->gross_margin_percent === null ? '-' : number_format($summary->gross_margin_percent, 1).'%' }}</strong></div>
                 </div>
             </a>
+            @endunless
         </div>
         <div class="col-md-6 col-xl-3">
+            @unless(\App\Support\MenuVisibility::blocked('reports.index', ['category' => 'finance']))
             <a href="{{ route('reports.index', ['category' => 'finance', 'report' => 'ar_aging', 'from' => $from, 'to' => $to]) }}" class="metric-card metric-card-ar metric-link">
                 <div class="metric-icon metric-icon-ar"><i class="bi bi-person-vcard"></i></div>
                 <div class="metric-label">ลูกหนี้คงค้าง</div>
@@ -102,8 +109,10 @@
                     <div class="metric-mini-row"><span>เกินกำหนดชำระ</span><strong class="{{ $receivables->overdue_amount > 0 ? 'text-danger' : '' }}">฿{{ number_format($receivables->overdue_amount, 2) }}</strong></div>
                 </div>
             </a>
+            @endunless
         </div>
         <div class="col-md-6 col-xl-3">
+            @unless(\App\Support\MenuVisibility::blocked('reports.index', ['category' => 'pos']))
             <a href="{{ route('reports.index', ['category' => 'pos', 'report' => 'pos_by_terminal', 'from' => $from, 'to' => $to]) }}" class="metric-card metric-card-pos metric-link">
                 <div class="metric-icon metric-icon-pos"><i class="bi bi-display"></i></div>
                 <div class="metric-label">ยอดขาย POS</div>
@@ -113,6 +122,7 @@
                     <div class="metric-mini-row"><span>สถานะซิงก์ POS</span><strong class="text-success">พร้อมใช้งาน</strong></div>
                 </div>
             </a>
+            @endunless
         </div>
     </div>
 

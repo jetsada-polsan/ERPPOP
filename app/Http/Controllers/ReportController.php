@@ -25,6 +25,9 @@ class ReportController extends Controller
     {
         $definitions = $this->definitions();
         $catalog = $this->catalogForUser($this->catalog($definitions), $definitions);
+        if (! $request->attributes->get('closed_menu') && \App\Support\MenuVisibility::hidden()) {
+            $catalog = array_filter($catalog, fn ($key) => !\App\Support\MenuVisibility::blocked('reports.index', ['category' => $key]), ARRAY_FILTER_USE_KEY);
+        }
         if (empty($catalog)) {
             abort(403, 'ไม่มีสิทธิ์ดูรายงาน');
         }
@@ -182,16 +185,23 @@ class ReportController extends Controller
         if ($exportRows->count() >= self::EXPORT_ROW_CAP) {
             $exportRows->push([(data_get($result, 'columns.0.key') ?? 'notice') => 'ถึงเพดาน 50,000 แถว — กรุณาแบ่งช่วงวันที่']);
         }
-        app(XlsxWriter::class)->write(
-            $temporary,
-            (string) ($result['title'] ?? $report),
-            $result['columns'] ?? [],
-            $exportRows,
-        );
+        $this->writeWorkbook($temporary, $result, $exportRows);
 
         return response()
             ->download($temporary, sprintf('%s-%s-%s.xlsx', $category, $report, now()->format('Ymd-His')))
             ->deleteFileAfterSend();
+    }
+
+    public function packageReport(string $key, Carbon $from, Carbon $end, object $area): array
+    {
+        $filters = ['branch_id' => $area->branch_id, 'sales_area_id' => $area->id, 'q' => '', 'per_page' => PHP_INT_MAX,
+            'paginate' => false, 'returns_only' => $key === 'sales_returns_by_document'];
+        return app(ReportScope::class)->redact($this->runReport('', $key, $from, $end, $filters));
+    }
+
+    public function writeWorkbook(string $path, array $result, ?Collection $rows = null): void
+    {
+        app(XlsxWriter::class)->write($path, $result['title'], $result['columns'], $rows ?? $this->exportRows($result));
     }
 
     /** @param  array<string, mixed>  $result */
@@ -2125,6 +2135,10 @@ class ReportController extends Controller
                 ->whereColumn('pr.document_id', 'd.id')
                 ->where('pr.status', 'completed'));
 
+        if ($filters['returns_only'] ?? false) {
+            $query->whereIn('dt.code', ['SALE_RETURN', 'CREDIT_NOTE'])->whereNull('d.cancelled_at');
+            $this->applySalesArea($query, $filters, 'd.sales_area_id');
+        }
         $this->applyBranch($query, $filters, 'd.branch_id');
         $this->applySearch($query, $filters, ['d.doc_number', 'c.code', 'c.name_th', 's.name']);
 
@@ -3312,7 +3326,7 @@ class ReportController extends Controller
 
         return $query
             ->orderByDesc('gj.entry_date')
-            ->selectRaw("gj.entry_date, concat(coa.code, ' ', coa.name_th) as account_name,
+            ->selectRaw("gj.document_id, gj.entry_date, concat(coa.code, ' ', coa.name_th) as account_name,
                 coalesce(sa.code || ' - ' || sa.name, 'ไม่ระบุสายขาย') as sales_area_name, gj.debit, gj.credit, gj.remark")
             ->limit($filters['per_page'])
             ->get();
