@@ -34,6 +34,35 @@ class BplusSyncApiController extends Controller
         return response()->json(['ok' => true, 'message' => 'เชื่อมต่อ ERP สำเร็จ']);
     }
 
+    /** ผลการบันทึกของรอบที่ token นี้ส่งมา: processing / ok / failed */
+    public function showRun(Request $request, int $run): JsonResponse
+    {
+        $plain = (string) $request->bearerToken();
+        $token = $plain === '' ? null : DB::table('bplus_sync_tokens')
+            ->where('token_hash', hash('sha256', $plain))->whereNull('revoked_at')->first(['id']);
+        if (! $token) {
+            return response()->json(['ok' => false, 'message' => 'token ไม่ถูกต้องหรือถูกเพิกถอน'], 401);
+        }
+
+        $row = DB::table('bplus_sync_runs')->where('id', $run)->where('bplus_sync_token_id', $token->id)->first();
+        if (! $row) {
+            return response()->json(['ok' => false, 'message' => 'ไม่พบรอบนี้'], 404);
+        }
+
+        return response()->json([
+            'ok' => $row->status !== 'failed',
+            'id' => $row->id,
+            'status' => $row->status,
+            'route' => $row->route_code,
+            'received' => (int) $row->received,
+            'erp_documents' => (int) $row->erp_documents,
+            'problems' => (int) $row->problems,
+            'message' => $row->message,
+            'started_at' => $row->created_at,
+            'finished_at' => $row->status === 'processing' ? null : $row->updated_at,
+        ]);
+    }
+
     public function store(Request $request, BplusSyncImporter $importer, BplusDocumentMaterializer $materializer): JsonResponse
     {
         $plain = (string) $request->bearerToken();

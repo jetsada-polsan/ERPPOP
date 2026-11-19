@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Route;
 
 // เครื่องในร้านส่งเอกสาร BPlus ขึ้นมาเอง (Bearer token จาก bplus:sync-token) แทนการอัปโหลดไฟล์
 Route::get('/bplus/sync/ping', [BplusSyncApiController::class, 'ping'])->middleware('throttle:30,1')->name('api.bplus.sync.ping');
+// เครื่องในร้านถามผลการบันทึกของรอบที่ส่งไป (ERP ตอบ 202 แล้วบันทึกเบื้องหลัง) เห็นได้เฉพาะรอบของ token ตัวเอง
+Route::get('/bplus/sync/runs/{run}', [BplusSyncApiController::class, 'showRun'])->whereNumber('run')->middleware('throttle:60,1')->name('api.bplus.sync.run');
 Route::post('/bplus/sync', [BplusSyncApiController::class, 'store'])->middleware('throttle:10,1')->name('api.bplus.sync');
 
 // API สำหรับ POS desktop (Tauri) — auth ด้วย Bearer device token (AuthenticatePosDevice)
