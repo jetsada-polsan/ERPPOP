@@ -1114,6 +1114,26 @@ class BplusDocumentsTest extends TestCase
         $this->get(route('bplus.sync.index'))->assertOk()->assertSee('สำเร็จ');
     }
 
+    public function test_sync_run_status_is_readable_only_with_the_token_that_sent_it(): void
+    {
+        $token = $this->issueSyncToken('B18');
+        $response = $this->postJson(route('api.bplus.sync'), $this->export(), ['Authorization' => "Bearer {$token}"]);
+        $response->assertStatus(202);
+        $runId = $response->json('run_id');
+
+        $this->getJson(route('api.bplus.sync.run', $runId), ['Authorization' => "Bearer {$token}"])
+            ->assertOk()->assertJson(['id' => $runId, 'status' => 'ok', 'ok' => true])
+            ->assertJsonPath('erp_documents', DB::table('bplus_sync_runs')->where('id', $runId)->value('erp_documents'));
+
+        $other = $this->issueSyncToken('B18');
+        $this->getJson(route('api.bplus.sync.run', $runId), ['Authorization' => "Bearer {$other}"])->assertNotFound();
+        $this->getJson(route('api.bplus.sync.run', $runId))->assertUnauthorized();
+
+        DB::table('bplus_sync_runs')->where('id', $runId)->update(['status' => 'failed', 'message' => 'ทดสอบล้ม']);
+        $this->getJson(route('api.bplus.sync.run', $runId), ['Authorization' => "Bearer {$token}"])
+            ->assertOk()->assertJson(['status' => 'failed', 'ok' => false, 'message' => 'ทดสอบล้ม']);
+    }
+
     private function issueSyncToken(string $route): string
     {
         Artisan::call('bplus:sync-token', ['--issue' => true, '--route' => $route, '--name' => 'BK Server']);
