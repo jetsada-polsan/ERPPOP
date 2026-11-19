@@ -10,6 +10,7 @@ Artisan::command('inspire', function () {
 
 Schedule::command('erp:backup --keep-days=30')->dailyAt('02:15')->withoutOverlapping();
 Schedule::command('erp:health')->hourly()->withoutOverlapping();
+Schedule::command('pos:prune-releases')->dailyAt('03:30')->withoutOverlapping();
 Schedule::command('erp:restore-drill')->monthlyOn(1, '04:30')->withoutOverlapping();
 Schedule::command('erp:archive-inactive-customers --months=6 --apply')->monthlyOn(1, '03:15')->withoutOverlapping();
 // cron ของ server รันในนาม root แต่เว็บรันในนาม www-data ถ้างานคิวรันเป็น root ไฟล์ cache/log/view

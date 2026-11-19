@@ -1,3 +1,26 @@
+# Handoff — 2026-11-19 (System status page)
+
+## Commit
+- Implementation/report: `2dab6d7` (`feat: add system status dashboard and POS release pruning`), branch `codex/system-status-page`, based on `origin/main` at `e315113`.
+- Branch implementation pushed to `origin/codex/system-status-page`; this handoff will be committed separately on the same branch.
+
+## ทำอะไรไป
+- เพิ่มหน้าอ่านอย่างเดียว `GET /system/status` (route `system.status`) จำกัด `settings.manage`, ลิงก์ในเมนูตั้งค่า และการ์ดสถานะ 9 ส่วนแบบ responsive พร้อมข้อมูล B18/GL.
+- เพิ่ม `pos:prune-releases`, `--dry-run`, เรียกหลัง publish ผ่าน Settings และตั้ง schedule รายวัน 03:30. รุ่นล่าสุดและไฟล์ที่ `latest.json` อ้างถูกเก็บไว้; ลบรุ่นเก่า `.previous.exe` และ `.sig` กำพร้า.
+- รายงานรายละเอียดอยู่ `docs/ai/codex-system-status-page.md`. Workflow อัปโหลด SFTP-only เรียก Artisan ปลายทางไม่ได้โดยไม่ใช้ SSH/endpoint ลบไฟล์ จึงใช้ daily prune สำหรับไฟล์จาก SFTP.
+
+## ทดสอบไปแล้วแค่ไหน
+- `php artisan test`: 1,177 tests; 1,175 passed, 10,475 assertions, 2 skipped, 6 incomplete; ไม่มี failure/error.
+- `php artisan test --filter=SystemStatusPageTest`: 5 passed / 48 assertions; `pint --test` สำหรับไฟล์ PHP ใหม่และส่วนที่เกี่ยวข้องผ่าน, PHP lint และ `git diff --check` ผ่าน.
+- Mutation สิทธิ์, การแสดง token hash, และการลบไฟล์ prune ทำให้เทสต์แดงตามคาด แล้วคืนโค้ดเดิมก่อน suite สุดท้าย.
+- ตรวจจากโค้ด uploader/workflow เท่านั้น; ไม่ SSH, ไม่ deploy, ไม่ merge, ไม่แตะ production/.201. เทสต์ใช้ SQLite; ยังไม่ได้ทดสอบ PostgreSQL จริง.
+
+## ความเสี่ยง/งานถัดไป
+- ให้ Claude ตรวจ branch `codex/system-status-page` ก่อน merge. ไม่มีการ deploy ในงานนี้.
+- Installer ที่เข้าผ่าน SFTP จะถูก prune ตาม schedule รายวัน; upload ผ่านหน้า Settings prune ทันทีหลัง publish.
+
+---
+
 # Handoff — 2026-11-17 (bplusAPI and ERP sync settings)
 
 ## Commit

@@ -14,6 +14,7 @@ use App\Services\Accounting\OpeningBalanceService;
 use App\Services\Inventory\NegativeStockPolicyService;
 use App\Support\PosLayout;
 use App\Support\PosReleaseManifest;
+use App\Support\PosReleasePruner;
 use App\Support\PosTerminalCode;
 use App\Support\JetPosPythonInstaller;
 use App\Support\PythonPosInstaller;
@@ -22,6 +23,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -370,6 +372,14 @@ class SystemSettingController extends Controller
         $temporary = $directory.'/latest-'.Str::random(8).'.json';
         File::put($temporary, json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
         File::move($temporary, $directory.'/latest.json');
+
+        try {
+            app(PosReleasePruner::class)->prune();
+        } catch (\Throwable $exception) {
+            // The published installer and manifest are already in place. Leave the
+            // scheduled daily prune as a fallback if this best-effort cleanup fails.
+            Log::warning('POS release cleanup after publish failed', ['message' => $exception->getMessage()]);
+        }
 
         return redirect()->route('settings.index')->with('success', 'เผยแพร่ JET POS รุ่น '.$data['pos_version'].' แล้ว เครื่องสาขาจะตรวจพบอัตโนมัติ');
     }
