@@ -1326,6 +1326,40 @@ class BplusDocumentsTest extends TestCase
         $this->assertTrue($rows($results['credit_sales'])->every(fn ($row) => $row->sales_area_name === 'B18 - ม่วง-เลิง-อำนาจ-มุก'));
     }
 
+    public function test_resync_skips_unchanged_documents_but_reprocesses_changed_problem_and_full_runs(): void
+    {
+        $export = $this->export();
+        $this->importFile($export);
+        $materializer = app(\App\Services\Bplus\BplusDocumentMaterializer::class);
+        $total = DB::table('bplus_sync_documents')->where('route_code', 'B18')->count();
+        $glBefore = DB::table('gl_journals')->count();
+        $balanceBefore = DB::table('customer_open_items')->sum('balance_amount');
+
+        $again = $materializer->run('B18');
+        $this->assertSame(0, $again['processed'], 'ส่งไฟล์เดิมซ้ำ ไม่ต้องประมวลผลใบไหนใหม่');
+        $this->assertSame($glBefore, DB::table('gl_journals')->count());
+        $this->assertEquals($balanceBefore, DB::table('customer_open_items')->sum('balance_amount'));
+
+        foreach ($export['documents'] as &$doc) {
+            if ($doc['ref'] === 'DS256911/06364') {
+                $doc['total_amount'] = 1900;
+                $doc['bplus_updated_at'] = '2026-11-16 09:00:00';
+            }
+        }
+        unset($doc);
+        $this->importFile($export);
+        $this->assertSame('1900.00', number_format((float) Document::where('doc_number', 'DS256911/06364')->value('total_amount'), 2, '.', ''));
+        $changed = $materializer->run('B18');
+        $this->assertSame(0, $changed['processed'], 'หลังนำเข้าใบที่แก้แล้ว รอบถัดไปไม่ต้องทำซ้ำอีก');
+
+        DB::table('bplus_sync_documents')->where('ref', 'DSN256911/4861')->update(['problem' => 'ทดสอบปัญหาค้าง']);
+        $retry = $materializer->run('B18');
+        $this->assertSame(1, $retry['processed'], 'ใบที่มีปัญหาค้างต้องลองใหม่ทุกรอบ');
+
+        $full = $materializer->run('B18', true);
+        $this->assertSame($total, $full['processed']);
+    }
+
     private function openItem(Document $document): array
     {
         $item = DB::table('customer_open_items')->where('document_id', $document->id)->first();
