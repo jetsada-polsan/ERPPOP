@@ -181,7 +181,7 @@ class SystemStatusService
             'status' => $hours === null || $hours > 26 ? 'danger' : 'good',
             'summary' => $latest ? basename($latest) : 'ยังไม่พบไฟล์ Backup',
             'details' => [
-                ['label' => 'ไฟล์ล่าสุด', 'value' => $latest ? Carbon::createFromTimestamp(filemtime($latest))->format('d/m/Y H:i:s') : 'ไม่มีข้อมูล'],
+                ['label' => 'ไฟล์ล่าสุด', 'value' => $latest ? Carbon::createFromTimestamp(filemtime($latest), config('app.timezone'))->format('d/m/Y H:i:s') : 'ไม่มีข้อมูล'],
                 ['label' => 'ขนาดไฟล์ล่าสุด', 'value' => $latest ? $this->formatBytes((int) filesize($latest)) : 'ไม่มีข้อมูล'],
                 ['label' => 'จำนวนไฟล์', 'value' => (string) count($files)],
                 ['label' => 'ขนาดรวม', 'value' => $this->formatBytes($total)],
