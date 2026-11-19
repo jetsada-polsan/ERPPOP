@@ -78,7 +78,18 @@ def num(value) -> float:
 
 
 def text(value):
-    return value.strip() if isinstance(value, str) else value
+    """ข้อความจาก BPlus: บน Windows pymssql/FreeTDS คืนภาษาไทย (cp874) มาเป็นตัวอักษร latin-1
+    เช่น "à·¤ÍÔ¹" แทน "เทคนิค" ถ้าทุกตัวอยู่ในช่วง 0-255 และมีตัวอักษรช่วงไทยของ cp874 ให้แปลงกลับ
+    บน Mac ได้ภาษาไทยถูกอยู่แล้ว (มีตัวอักษร > 255) จึงไม่แตะ"""
+    if not isinstance(value, str):
+        return value
+    value = value.strip()
+    if value and all(ord(c) < 256 for c in value) and any(0xA1 <= ord(c) <= 0xFB for c in value):
+        try:
+            return value.encode("latin-1").decode("cp874")
+        except UnicodeError:
+            return value
+    return value
 
 
 def stamp(value):
@@ -114,15 +125,20 @@ def lines_of(di_key: int) -> list[dict]:
 documents = []
 
 # ใบจอง
+# ลูกค้าของใบจองอยู่ที่ AROE (AROE_DI = ใบจอง, AROE_AR = ลูกค้า) ใบจองจึงขึ้นใน ERP ได้ตั้งแต่ยังไม่เปิดบิล
 bookings = rows("""
-    SELECT d.DI_KEY, d.DI_REF, d.DI_DATE, d.DI_ACTIVE, d.DI_AMOUNT, d.DI_CRE_BY, d.DI_UPD_DATE, d.DI_CRE_DATE
+    SELECT d.DI_KEY, d.DI_REF, d.DI_DATE, d.DI_ACTIVE, d.DI_AMOUNT, d.DI_CRE_BY, d.DI_UPD_DATE, d.DI_CRE_DATE,
+           a.AR_KEY, a.AR_CODE, a.AR_NAME
     FROM DOCINFO d JOIN DOCTYPE t ON t.DT_KEY = d.DI_DT
+    OUTER APPLY (SELECT TOP 1 o.AROE_AR FROM AROE o WHERE o.AROE_DI = d.DI_KEY AND o.AROE_AR > 0) oe
+    LEFT JOIN ARFILE a ON a.AR_KEY = oe.AROE_AR
     WHERE t.DT_DOCCODE = %s AND d.DI_DATE >= %s ORDER BY d.DI_KEY""", (route, since))
 for b in bookings:
     documents.append({
         "bplus_key": b["DI_KEY"], "kind": "booking", "book_code": route, "ref": text(b["DI_REF"]),
         "doc_date": b["DI_DATE"].date().isoformat(), "is_cancelled": b["DI_ACTIVE"] != 0,
         "created_by": text(b["DI_CRE_BY"]), "total_amount": num(b["DI_AMOUNT"]),
+        "customer_key": b["AR_KEY"], "customer_code": text(b["AR_CODE"]), "customer_name": text(b["AR_NAME"]),
         "bplus_updated_at": stamp(b["DI_UPD_DATE"] or b["DI_CRE_DATE"]),
         "lines": [{k: v for k, v in l.items() if k != "_refer"} for l in lines_of(b["DI_KEY"])],
     })
@@ -155,9 +171,9 @@ for s in sales:
         "lines": [{k: v for k, v in l.items() if k != "_refer"} for l in lines],
     })
 
-# ใบจองไม่มีรหัสลูกค้าใน BPlus: ใช้ลูกค้าจากใบขายเชื่อที่เปิดจากใบจองนั้น
+# ใบจองที่ AROE ไม่มีลูกค้า: ใช้ลูกค้าจากใบขายเชื่อที่เปิดจากใบจองนั้น
 for doc in documents:
-    if doc["kind"] == "booking" and doc["ref"] in customer_by_booking:
+    if doc["kind"] == "booking" and not doc.get("customer_code") and doc["ref"] in customer_by_booking:
         doc["customer_key"], doc["customer_code"], doc["customer_name"] = customer_by_booking[doc["ref"]]
 
 # ใบลดหนี้: ต้องมีบรรทัดอ้างใบขายเชื่อของสายนี้ และส่งยอดเป็นบวกให้ ERP หักเอง
