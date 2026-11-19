@@ -144,6 +144,7 @@ class RoutePermissions
         'management-controls.ecommerce' => 'ecommerce.sync',
 
         // ระบบ
+        'system.status' => 'settings.manage',
         'users.' => 'users.manage',
         'employees.' => 'users.manage',
         'organizational-units.' => 'users.manage',

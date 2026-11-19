@@ -92,6 +92,7 @@ use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SupplierNoteController;
 use App\Http\Controllers\SupplierTermController;
 use App\Http\Controllers\SystemSettingController;
+use App\Http\Controllers\SystemStatusController;
 use App\Http\Controllers\TaxComplianceController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WarehouseLocationController;
@@ -122,6 +123,7 @@ Route::post('/password/change', [AuthController::class, 'updatePassword'])->name
 Route::get('/security/mfa', [AuthController::class, 'showMfaSetup'])->name('mfa.setup');
 Route::post('/security/mfa', [AuthController::class, 'enableMfa'])->name('mfa.enable');
 Route::delete('/security/mfa', [AuthController::class, 'disableMfa'])->name('mfa.disable');
+Route::get('/system/status', [SystemStatusController::class, 'index'])->name('system.status');
 
 Route::get('/', function () {
     if (request()->getHost() === 'pos.popstarcenter.com') {
