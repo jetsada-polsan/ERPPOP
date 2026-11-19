@@ -822,6 +822,9 @@ Route::prefix('settings')->name('settings.')->group(function () {
 
 Route::prefix('line-integrations')->name('line-integrations.')->group(function () {
     Route::get('/', [LineIntegrationController::class, 'index'])->name('index');
+    // เปิดดูค่า LINE OA เต็มจาก .env: เฉพาะผู้ดูแลระบบ ใส่รหัสผ่านซ้ำ และบันทึก audit ทุกครั้ง
+    Route::post('/credentials/reveal', [LineIntegrationController::class, 'revealCredentials'])
+        ->middleware('throttle:5,1')->name('credentials.reveal');
     Route::delete('/members/{memberLineAccount}', [LineIntegrationController::class, 'unlinkMember'])->name('members.unlink');
     Route::post('/', [LineIntegrationController::class, 'store'])->name('store');
     Route::put('/{lineIntegration}', [LineIntegrationController::class, 'update'])->name('update');
