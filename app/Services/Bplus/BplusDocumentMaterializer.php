@@ -93,8 +93,15 @@ class BplusDocumentMaterializer
         ];
     }
 
-    /** @return array{documents: int, problems: array<string, string>} */
-    public function run(string $route): array
+    /**
+     * สร้าง/อัปเดตเอกสาร ERP จากสำเนา BPlus ของสาย
+     * ใบที่เนื้อหาไม่เปลี่ยนตั้งแต่รอบที่แล้ว (hash เท่าเดิม มีเอกสาร ERP อยู่ และไม่มีปัญหาค้าง) จะข้าม
+     * ส่วนการคำนวณยอดค้างลูกหนี้และสถานะใบจองยังทำทั้งสายทุกรอบ
+     * $full = true ประมวลผลทุกใบ (คำสั่ง bplus:materialize --full และรอบตี 4 ทุกวัน)
+     *
+     * @return array{documents: int, processed: int, problems: array<string, string>}
+     */
+    public function run(string $route, bool $full = false): array
     {
         $this->problems = [];
         $this->ctx = $this->context($route, true);
@@ -103,9 +110,23 @@ class BplusDocumentMaterializer
             ->orderByRaw("CASE kind WHEN 'booking' THEN 1 WHEN 'credit_sale' THEN 2 WHEN 'opening_ar' THEN 3 WHEN 'credit_note' THEN 4 ELSE 5 END")
             ->orderBy('doc_date')->orderBy('bplus_key')->get();
 
-        $count = DB::transaction(function () use ($rows) {
+        $hashes = $this->contentHashes($rows);
+        $existing = DB::table('documents')->where('source_system', self::SOURCE)
+            ->whereIn('id', $rows->pluck('document_id')->filter()->all())->pluck('id')->flip();
+        $processed = 0;
+
+        $count = DB::transaction(function () use ($rows, $hashes, $existing, $full, &$processed) {
             $count = 0;
             foreach ($rows as $row) {
+                $hash = $hashes[$row->id];
+                // ข้ามได้เมื่อเนื้อหาเท่าเดิม ไม่มีปัญหาค้าง และเอกสาร ERP ยังอยู่ (หรือตั้งใจไม่สร้าง เช่น ใบจองยกเลิกที่ไม่มีลูกค้า)
+                if (! $full && $row->materialized_hash === $hash && $row->problem === null
+                    && (! $row->document_id || isset($existing[$row->document_id]))) {
+                    $count += $row->document_id ? 1 : 0;
+
+                    continue;
+                }
+                $processed++;
                 $documentId = match ($row->kind) {
                     'booking' => $this->booking($row),
                     'credit_sale' => $this->creditSale($row),
@@ -117,6 +138,7 @@ class BplusDocumentMaterializer
                 DB::table('bplus_sync_documents')->where('id', $row->id)->update([
                     'document_id' => $documentId,
                     'problem' => $this->problems[$row->ref] ?? null,
+                    'materialized_hash' => $hash,
                 ]);
                 $count += $documentId ? 1 : 0;
             }
@@ -126,7 +148,33 @@ class BplusDocumentMaterializer
             return $count;
         });
 
-        return ['documents' => $count, 'problems' => $this->problems];
+        return ['documents' => $count, 'processed' => $processed, 'problems' => $this->problems];
+    }
+
+    /**
+     * hash เนื้อหาของแต่ละแถว (หัว + บรรทัดสินค้า + การตัดชำระ) ไม่รวมคอลัมน์ที่ ERP เขียนเอง
+     *
+     * @return array<int, string>
+     */
+    private function contentHashes(\Illuminate\Support\Collection $rows): array
+    {
+        $ids = $rows->pluck('id')->all();
+        $lines = DB::table('bplus_sync_lines')->whereIn('bplus_sync_document_id', $ids)->orderBy('seq')->orderBy('id')->get()
+            ->groupBy('bplus_sync_document_id');
+        $allocations = DB::table('bplus_sync_allocations')->whereIn('bplus_sync_document_id', $ids)->orderBy('id')->get()
+            ->groupBy('bplus_sync_document_id');
+        $strip = fn ($r) => collect((array) $r)->except(['id', 'bplus_sync_document_id', 'document_id', 'problem',
+            'materialized_hash', 'created_at', 'updated_at'])->all();
+        $hashes = [];
+        foreach ($rows as $row) {
+            $hashes[$row->id] = sha1(json_encode([
+                $strip($row),
+                ($lines[$row->id] ?? collect())->map($strip)->values()->all(),
+                ($allocations[$row->id] ?? collect())->map($strip)->values()->all(),
+            ]));
+        }
+
+        return $hashes;
     }
 
     private function context(string $route, bool $strict): array
