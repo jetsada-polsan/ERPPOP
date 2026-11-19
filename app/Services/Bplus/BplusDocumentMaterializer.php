@@ -99,7 +99,7 @@ class BplusDocumentMaterializer
      * ส่วนการคำนวณยอดค้างลูกหนี้และสถานะใบจองยังทำทั้งสายทุกรอบ
      * $full = true ประมวลผลทุกใบ (คำสั่ง bplus:materialize --full และรอบตี 4 ทุกวัน)
      *
-     * @return array{documents: int, processed: int, problems: array<string, string>}
+     * @return array{documents: int, processed: int, processed_keys: array<int, int>, problems: array<string, string>}
      */
     public function run(string $route, bool $full = false): array
     {
@@ -114,8 +114,9 @@ class BplusDocumentMaterializer
         $existing = DB::table('documents')->where('source_system', self::SOURCE)
             ->whereIn('id', $rows->pluck('document_id')->filter()->all())->pluck('id')->flip();
         $processed = 0;
+        $processedKeys = [];
 
-        $count = DB::transaction(function () use ($rows, $hashes, $existing, $full, &$processed) {
+        $count = DB::transaction(function () use ($rows, $hashes, $existing, $full, &$processed, &$processedKeys) {
             $count = 0;
             foreach ($rows as $row) {
                 $hash = $hashes[$row->id];
@@ -127,6 +128,7 @@ class BplusDocumentMaterializer
                     continue;
                 }
                 $processed++;
+                $processedKeys[] = (int) $row->bplus_key;
                 $documentId = match ($row->kind) {
                     'booking' => $this->booking($row),
                     'credit_sale' => $this->creditSale($row),
@@ -148,7 +150,7 @@ class BplusDocumentMaterializer
             return $count;
         });
 
-        return ['documents' => $count, 'processed' => $processed, 'problems' => $this->problems];
+        return ['documents' => $count, 'processed' => $processed, 'processed_keys' => $processedKeys, 'problems' => $this->problems];
     }
 
     /**

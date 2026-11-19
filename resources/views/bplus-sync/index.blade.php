@@ -19,7 +19,7 @@
                     @if($lastAutoSync->status === 'processing')
                         <span class="text-warning">กำลังบันทึก</span> {{ number_format($lastAutoSync->received) }} ใบ
                     @elseif($lastAutoSync->status === 'ok')
-                        <span class="text-success">สำเร็จ</span> รับ {{ number_format($lastAutoSync->received) }} ใบ@if($lastAutoSync->problems) · <span class="text-danger">มีปัญหา {{ $lastAutoSync->problems }} ใบ</span>@endif
+                        <span class="text-success">สำเร็จ</span> รับ {{ number_format($lastAutoSync->received) }} ใบ@if($lastAutoSync->new_documents !== null) (ใหม่ {{ number_format($lastAutoSync->new_documents) }} · แก้ไข {{ number_format($lastAutoSync->changed_documents) }} · เหมือนเดิม {{ number_format($lastAutoSync->unchanged_documents) }})@endif · เอกสารในระบบ {{ number_format($lastAutoSync->erp_documents) }} ใบ@if($lastAutoSync->problems) · <span class="text-danger">มีปัญหา {{ $lastAutoSync->problems }} ใบ</span>@endif
                     @else
                         <span class="text-danger">ไม่สำเร็จ</span> {{ $lastAutoSync->message }}
                     @endif

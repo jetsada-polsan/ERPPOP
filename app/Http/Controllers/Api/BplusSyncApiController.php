@@ -57,6 +57,9 @@ class BplusSyncApiController extends Controller
             'received' => (int) $row->received,
             'erp_documents' => (int) $row->erp_documents,
             'problems' => (int) $row->problems,
+            'new_documents' => $row->new_documents === null ? null : (int) $row->new_documents,
+            'changed_documents' => $row->changed_documents === null ? null : (int) $row->changed_documents,
+            'unchanged_documents' => $row->unchanged_documents === null ? null : (int) $row->unchanged_documents,
             'message' => $row->message,
             'started_at' => $row->created_at,
             'finished_at' => $row->status === 'processing' ? null : $row->updated_at,
@@ -103,17 +106,21 @@ class BplusSyncApiController extends Controller
         \Illuminate\Support\defer(function () use ($token, $importer, $materializer, $parsed, $lock, $runId) {
             @set_time_limit(900);
             try {
-                [$received, $result] = DB::transaction(function () use ($token, $parsed, $importer, $materializer) {
+                [$received, $result, $breakdown] = DB::transaction(function () use ($token, $parsed, $importer, $materializer) {
                     if ($token->route_code === null) {
                         $this->ensureSalesRoute($parsed['route']);
                     }
+                    $keys = array_values(array_unique(array_map(fn ($d) => (int) $d['bplus_key'], $parsed['documents'])));
+                    $known = DB::table('bplus_sync_documents')->whereIn('bplus_key', $keys)->pluck('bplus_key')->map(fn ($k) => (int) $k)->all();
+                    $received = $importer->import($parsed);
+                    $result = $materializer->run($parsed['route']);
 
-                    return [$importer->import($parsed), $materializer->run($parsed['route'])];
+                    return [$received, $result, $this->breakdown($keys, $known, $result['processed_keys'])];
                 });
                 DB::table('bplus_sync_runs')->where('id', $runId)->update([
                     'status' => 'ok', 'received' => $received, 'erp_documents' => $result['documents'],
                     'problems' => count($result['problems']), 'updated_at' => now(),
-                ]);
+                ] + $breakdown);
             } catch (Throwable $e) {
                 report($e);
                 DB::table('bplus_sync_runs')->where('id', $runId)->update([
@@ -128,6 +135,30 @@ class BplusSyncApiController extends Controller
             'ok' => true, 'status' => 'processing', 'run_id' => $runId, 'received' => count($parsed['documents']),
             'message' => 'ERP รับข้อมูลแล้ว กำลังบันทึกเบื้องหลัง ดูผลที่หน้าเอกสารสายขาย',
         ], 202);
+    }
+
+    /**
+     * แยกใบที่ได้รับรอบนี้: ใหม่ = ยังไม่เคยมีใน ERP, แก้ไข = มีแล้วแต่เนื้อหาเปลี่ยน (ERP บันทึกซ้ำ), เหมือนเดิม = ข้าม
+     *
+     * @param  array<int, int>  $keys
+     * @param  array<int, int>  $known
+     * @param  array<int, int>  $processed
+     * @return array{new_documents: int, changed_documents: int, unchanged_documents: int}
+     */
+    private function breakdown(array $keys, array $known, array $processed): array
+    {
+        $known = array_flip($known);
+        $processed = array_flip($processed);
+        $new = $changed = 0;
+        foreach ($keys as $key) {
+            if (! isset($known[$key])) {
+                $new++;
+            } elseif (isset($processed[$key])) {
+                $changed++;
+            }
+        }
+
+        return ['new_documents' => $new, 'changed_documents' => $changed, 'unchanged_documents' => count($keys) - $new - $changed];
     }
 
     /** Provision only routes missing from sales_areas, and only for an all-routes token. */

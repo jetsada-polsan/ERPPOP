@@ -1134,6 +1134,33 @@ class BplusDocumentsTest extends TestCase
             ->assertOk()->assertJson(['status' => 'failed', 'ok' => false, 'message' => 'ทดสอบล้ม']);
     }
 
+    public function test_sync_run_counts_new_changed_and_unchanged_documents(): void
+    {
+        $token = $this->issueSyncToken('B18');
+        $send = fn (array $export) => $this->getJson(route('api.bplus.sync.run',
+            $this->postJson(route('api.bplus.sync'), $export, ['Authorization' => "Bearer {$token}"])->assertStatus(202)->json('run_id')),
+            ['Authorization' => "Bearer {$token}"])->assertOk();
+
+        // รอบแรก: ทุกใบใหม่
+        $send($this->export())->assertJson(['status' => 'ok', 'received' => 5, 'new_documents' => 5, 'changed_documents' => 0, 'unchanged_documents' => 0]);
+
+        // ส่งไฟล์เดิมซ้ำ (แบบที่โปรแกรมในร้านส่งใบ 1-2 วันล่าสุดซ้ำทุกรอบ): ไม่มีอะไรเปลี่ยน
+        $send($this->export())->assertJson(['received' => 5, 'new_documents' => 0, 'changed_documents' => 0, 'unchanged_documents' => 5]);
+
+        // แก้ยอดใบจอง 1 ใบ + ใบจองใหม่ 1 ใบ
+        $edited = $this->export();
+        $edited['documents'][0]['total_amount'] = 2000;
+        $edited['documents'][0]['lines'] = [['seq' => 1, 'sku_code' => '501035', 'unit_name' => 'ถุง', 'qty' => 1, 'unit_price' => 2000, 'amount' => 2000]];
+        $edited['documents'][] = ['bplus_key' => 2713600, 'kind' => 'booking', 'book_code' => 'B18', 'ref' => 'B18-6911/00390', 'doc_date' => '2026-11-16',
+            'customer_code' => '37120-0005', 'total_amount' => 226, 'created_by' => 'BANKKY',
+            'lines' => [['seq' => 1, 'sku_code' => '501035', 'unit_name' => 'ถุง', 'unit_factor' => 1, 'qty' => 1, 'unit_price' => 226, 'amount' => 226]]];
+        $run = $send($edited)->assertJson(['received' => 6, 'new_documents' => 1, 'changed_documents' => 1, 'unchanged_documents' => 4]);
+
+        $this->get(route('bplus.sync.index'))->assertOk()
+            ->assertSee('ใหม่ 1 · แก้ไข 1 · เหมือนเดิม 4')
+            ->assertSee('เอกสารในระบบ '.number_format($run->json('erp_documents')).' ใบ');
+    }
+
     private function issueSyncToken(string $route): string
     {
         Artisan::call('bplus:sync-token', ['--issue' => true, '--route' => $route, '--name' => 'BK Server']);
