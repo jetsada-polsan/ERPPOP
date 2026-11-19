@@ -40,9 +40,10 @@ if changed_since:
     print(f"ดึงสาย {route} เฉพาะใบที่ใหม่หรือแก้ตั้งแต่ {changed_since} (เอกสารตั้งแต่ {since}) จาก {database}")
 else:
     print(f"ดึงสาย {route} ทุกใบตั้งแต่ {since} จาก {database}")
-# ใบที่สร้างหรือแก้หลัง changed_since (ใบที่ DI_UPD_DATE ว่าง ใช้ DI_CRE_DATE) หรือวันที่เอกสารตั้งแต่วันของ changed_since
-CHANGED = " AND (COALESCE(d.DI_UPD_DATE, d.DI_CRE_DATE) >= %s OR d.DI_DATE >= %s)" if changed_since else ""
-CHANGED_ARGS = (changed_since, changed_since[:10]) if changed_since else ()
+# ใบที่สร้างหรือแก้หลัง changed_since (ใบที่ DI_UPD_DATE ว่าง ใช้ DI_CRE_DATE)
+# ใบยกเลิกบางใบที่ BPlus ไม่ขยับ DI_UPD_DATE จะตามมาในรอบส่งเต็มตอนกลางคืน
+CHANGED = " AND COALESCE(d.DI_UPD_DATE, d.DI_CRE_DATE) >= %s" if changed_since else ""
+CHANGED_ARGS = (changed_since,) if changed_since else ()
 def bplus_login():
     """user/รหัส BPlus: อ่านรหัสจาก Keychain ของ Mac ก่อน (service bplus-mssql) ถ้าไม่มีค่อยถาม
     ตั้งครั้งเดียว: security add-generic-password -s bplus-mssql -a jetsada -w
