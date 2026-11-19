@@ -32,7 +32,17 @@ elif len(period) == 10 and period[4] == "-":
     since = datetime.date.fromisoformat(period).isoformat()  # วันที่ตายตัว เช่น 2026-11-01 (ซิงค์อัตโนมัติใช้แบบนี้)
 else:
     since = (datetime.date.today() - datetime.timedelta(days=int(period))).isoformat()
-print(f"ดึงสาย {route} ตั้งแต่ {since} จาก {database}")
+# BPLUS_CHANGED_SINCE (YYYY-MM-DDTHH:MM:SS): ส่งเฉพาะใบที่สร้างหรือแก้หลังเวลานี้ (bplusAPI ส่งมาเองทุกรอบ)
+# ไม่ตั้ง = ส่งทุกใบตั้งแต่ since เหมือนเดิม (รอบเต็ม) และรอบเต็มเท่านั้นที่ส่งลูกหนี้ยกมา
+changed_since = (os.environ.get("BPLUS_CHANGED_SINCE") or "").strip() or None
+if changed_since:
+    changed_since = datetime.datetime.fromisoformat(changed_since).strftime("%Y-%m-%d %H:%M:%S")
+    print(f"ดึงสาย {route} เฉพาะใบที่ใหม่หรือแก้ตั้งแต่ {changed_since} (เอกสารตั้งแต่ {since}) จาก {database}")
+else:
+    print(f"ดึงสาย {route} ทุกใบตั้งแต่ {since} จาก {database}")
+# ใบที่สร้างหรือแก้หลัง changed_since (ใบที่ DI_UPD_DATE ว่าง ใช้ DI_CRE_DATE) หรือวันที่เอกสารตั้งแต่วันของ changed_since
+CHANGED = " AND (COALESCE(d.DI_UPD_DATE, d.DI_CRE_DATE) >= %s OR d.DI_DATE >= %s)" if changed_since else ""
+CHANGED_ARGS = (changed_since, changed_since[:10]) if changed_since else ()
 def bplus_login():
     """user/รหัส BPlus: อ่านรหัสจาก Keychain ของ Mac ก่อน (service bplus-mssql) ถ้าไม่มีค่อยถาม
     ตั้งครั้งเดียว: security add-generic-password -s bplus-mssql -a jetsada -w
@@ -126,13 +136,13 @@ documents = []
 
 # ใบจอง
 # ลูกค้าของใบจองอยู่ที่ AROE (AROE_DI = ใบจอง, AROE_AR = ลูกค้า) ใบจองจึงขึ้นใน ERP ได้ตั้งแต่ยังไม่เปิดบิล
-bookings = rows("""
+bookings = rows(f"""
     SELECT d.DI_KEY, d.DI_REF, d.DI_DATE, d.DI_ACTIVE, d.DI_AMOUNT, d.DI_CRE_BY, d.DI_UPD_DATE, d.DI_CRE_DATE,
            a.AR_KEY, a.AR_CODE, a.AR_NAME
     FROM DOCINFO d JOIN DOCTYPE t ON t.DT_KEY = d.DI_DT
     OUTER APPLY (SELECT TOP 1 o.AROE_AR FROM AROE o WHERE o.AROE_DI = d.DI_KEY AND o.AROE_AR > 0) oe
     LEFT JOIN ARFILE a ON a.AR_KEY = oe.AROE_AR
-    WHERE t.DT_DOCCODE = %s AND d.DI_DATE >= %s ORDER BY d.DI_KEY""", (route, since))
+    WHERE t.DT_DOCCODE = %s AND d.DI_DATE >= %s{CHANGED} ORDER BY d.DI_KEY""", (route, since) + CHANGED_ARGS)
 for b in bookings:
     documents.append({
         "bplus_key": b["DI_KEY"], "kind": "booking", "book_code": route, "ref": text(b["DI_REF"]),
@@ -152,7 +162,7 @@ sales = rows(f"""
     FROM DOCINFO d JOIN DOCTYPE t ON t.DT_KEY = d.DI_DT
     LEFT JOIN ARDETAIL x ON x.ARD_DI = d.DI_KEY LEFT JOIN ARFILE a ON a.AR_KEY = x.ARD_AR
     LEFT JOIN SLDETAIL sl ON sl.SLD_DI = d.DI_KEY LEFT JOIN SALESMAN sm ON sm.SLMN_KEY = sl.SLD_SLMN
-    WHERE d.DI_DATE >= %s AND d.DI_KEY IN ({ROUTE_SALES}) ORDER BY d.DI_KEY""", (since, route))
+    WHERE d.DI_DATE >= %s AND d.DI_KEY IN ({ROUTE_SALES}){CHANGED} ORDER BY d.DI_KEY""", (since, route) + CHANGED_ARGS)
 customer_by_booking = {}
 for s in sales:
     lines = lines_of(s["DI_KEY"])
@@ -188,7 +198,7 @@ credit_note_rows = rows(f"""
     LEFT JOIN ARDETAIL x ON x.ARD_DI = d.DI_KEY LEFT JOIN ARFILE a ON a.AR_KEY = x.ARD_AR
     LEFT JOIN SLDETAIL sl ON sl.SLD_DI = d.DI_KEY LEFT JOIN SALESMAN sm ON sm.SLMN_KEY = sl.SLD_SLMN
     WHERE d.DI_DATE >= %s AND t.DT_DOCCODE IN ('IS', 'IS-N')
-      AND l.TRD_REFER_DI IN ({ROUTE_SALES}) ORDER BY d.DI_KEY""", (since, route))
+      AND l.TRD_REFER_DI IN ({ROUTE_SALES}){CHANGED} ORDER BY d.DI_KEY""", (since, route) + CHANGED_ARGS)
 negative_credit_note_refs = []
 ambiguous_credit_note_refs = []
 seen_credit_note_keys = set()
@@ -232,7 +242,7 @@ for note in credit_note_rows:
 route_sale_keys = {r["TRH_DI"] for r in rows(ROUTE_SALES, (route,))}
 receipt_keys = [r["TPH_DI"] for r in rows(f"""
     SELECT DISTINCT p.TPH_DI FROM TRANPAYA a JOIN TRANPAYH p ON p.TPH_KEY = a.TPA_TPH JOIN DOCINFO d ON d.DI_KEY = p.TPH_DI
-    WHERE d.DI_DATE >= %s AND a.TPA_REFER_DI IN ({ROUTE_SALES})""", (since, route))]
+    WHERE d.DI_DATE >= %s AND a.TPA_REFER_DI IN ({ROUTE_SALES}){CHANGED}""", (since, route) + CHANGED_ARGS)]
 receipt_rows = []
 for start in range(0, len(receipt_keys), 500):
     chunk = ",".join(str(int(k)) for k in receipt_keys[start:start + 500])
@@ -302,7 +312,7 @@ documents.extend(receipts.values())
 # ใบเสร็จในช่วงจะได้ตัดหนี้บิลเก่าได้ และลูกหนี้ใน ERP ตรงกับ BPlus (ไม่ใช่ยอดขาย ERP จึงไม่นับเป็นยอดขายซ้ำ)
 # bplus_key ของยอดยกมา = 9,000,000,000 + DI_KEY ของบิล เพื่อไม่ชนกับตัวบิลเองถ้าวันหลังดึงย้อนไปถึงบิลนั้น
 OPENING_KEY_OFFSET = 9_000_000_000
-opening_rows = rows(f"""
+opening_rows = [] if changed_since else rows(f"""
     SELECT d.DI_KEY, d.DI_REF, d.DI_DATE, d.DI_AMOUNT, d.DI_UPD_DATE, d.DI_CRE_DATE, t.DT_DOCCODE, x.ARD_DUE_DA,
            a.AR_KEY, a.AR_CODE, a.AR_NAME,
            (SELECT COALESCE(SUM(pa.TPA_DISC_A + pa.TPA_WHTX_A + CASE WHEN tg.HAS_TAG = 1
@@ -406,7 +416,8 @@ connection.close()
 name = f"bplus-{route}-{datetime.date.today().isoformat()}.json"
 with open(name, "w", encoding="utf-8") as handle:
     json.dump({"route": route, "exported_at": datetime.datetime.now().isoformat(timespec="seconds"),
-               "since": since, "documents": documents,
+               "since": since, "mode": "changed" if changed_since else "full", "changed_since": changed_since,
+               "documents": documents,
                "customers": customer_data, "products": product_data}, handle, ensure_ascii=False, indent=1,
               default=lambda v: float(v) if isinstance(v, decimal.Decimal) else str(v))
 
