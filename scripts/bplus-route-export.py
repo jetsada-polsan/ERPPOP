@@ -78,7 +78,18 @@ def num(value) -> float:
 
 
 def text(value):
-    return value.strip() if isinstance(value, str) else value
+    """ข้อความจาก BPlus: บน Windows pymssql/FreeTDS คืนภาษาไทย (cp874) มาเป็นตัวอักษร latin-1
+    เช่น "à·¤ÍÔ¹" แทน "เทคนิค" ถ้าทุกตัวอยู่ในช่วง 0-255 และมีตัวอักษรช่วงไทยของ cp874 ให้แปลงกลับ
+    บน Mac ได้ภาษาไทยถูกอยู่แล้ว (มีตัวอักษร > 255) จึงไม่แตะ"""
+    if not isinstance(value, str):
+        return value
+    value = value.strip()
+    if value and all(ord(c) < 256 for c in value) and any(0xA1 <= ord(c) <= 0xFB for c in value):
+        try:
+            return value.encode("latin-1").decode("cp874")
+        except UnicodeError:
+            return value
+    return value
 
 
 def stamp(value):
