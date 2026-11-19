@@ -50,6 +50,8 @@ class ErpAuthorize
             return redirect()->route('password.change');
         }
 
+        abort_unless($user->accountingFirmCanOpen($routeName), 403);
+
         $permission = RoutePermissions::resolve($routeName);
         if ($permission && ! $user->hasPermission($permission)) {
             abort(403, 'บัญชีของคุณไม่มีสิทธิ์ใช้เมนูนี้ ติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์เพิ่ม');

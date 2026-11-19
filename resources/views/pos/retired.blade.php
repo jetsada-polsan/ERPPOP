@@ -24,6 +24,7 @@
     </style>
 </head>
 <body>
+@if(request()->attributes->get('closed_menu'))<div role="status">เมนูนี้ปิดอยู่</div>@endif
     <div class="card">
         <div class="mark">★</div>
         <h1>หน้าขายย้ายไปแอปเดสก์ท็อปแล้ว</h1>

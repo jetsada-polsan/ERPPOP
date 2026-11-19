@@ -62,7 +62,7 @@ class ErpMenu
                 'label' => 'POS / หน้าร้าน',
                 'displayLabel' => 'POS / หน้าร้าน',
                 'items' => [
-                    ['label' => 'ศูนย์ควบคุม POS', 'route' => 'pos.control', 'pattern' => 'pos.control', 'icon' => 'bi-cash-coin', 'tone' => 'red'],
+                    ['label' => 'ศูนย์ควบคุม POS', 'route' => 'pos.control', 'pattern' => 'pos.control', 'extraPattern' => 'pos.*', 'icon' => 'bi-cash-coin', 'tone' => 'red'],
                     ['label' => 'จัดการเครื่อง POS', 'route' => 'pos-admin.index', 'pattern' => 'pos-admin.*', 'icon' => 'bi-pc-display', 'tone' => 'blue'],
                     ['label' => 'QR รับเงิน / จอแสดงราคา', 'route' => 'bplus.qr-payments', 'pattern' => 'bplus.qr-payments', 'extraPattern' => 'bplus.show-price', 'icon' => 'bi-qr-code', 'tone' => 'slate'],
                 ],
@@ -77,7 +77,7 @@ class ErpMenu
                     ['label' => 'สแกนใบรับสินค้า OCR', 'route' => 'ocr.documents.index', 'pattern' => 'ocr.documents.*', 'icon' => 'bi-file-earmark-richtext-fill', 'tone' => 'indigo'],
 
                     // 2. โอนย้าย
-                    ['label' => 'โอนย้ายสินค้าข้ามสาขา', 'route' => 'stock-transfers.index', 'pattern' => 'stock-transfers.index', 'extraPattern' => 'stock-adjustments.*', 'icon' => 'bi-box-seam-fill', 'tone' => 'teal'],
+                    ['label' => 'โอนย้ายสินค้าข้ามสาขา', 'route' => 'stock-transfers.index', 'pattern' => 'stock-transfers.*', 'extraPattern' => 'stock-adjustments.*', 'icon' => 'bi-box-seam-fill', 'tone' => 'teal'],
                     ['label' => 'ขอโอนสินค้าข้ามสาขา', 'route' => 'stock-transfers.request', 'pattern' => 'stock-transfers.request*', 'icon' => 'bi-box-arrow-in-down', 'tone' => 'cyan'],
                     ['label' => 'แนะนำเติมสต็อกสาขา', 'route' => 'stock-transfers.replenishment.index', 'pattern' => 'stock-transfers.replenishment.*', 'icon' => 'bi-signpost-split-fill', 'tone' => 'teal'],
 
@@ -122,6 +122,7 @@ class ErpMenu
                 'displayLabel' => 'รายงาน',
                 'items' => [
                     ['label' => 'ภาพรวมผู้บริหาร', 'route' => 'executive.index', 'pattern' => 'executive.*', 'icon' => 'bi-speedometer2', 'tone' => 'teal', 'params' => []],
+                    ['label' => 'ชุดส่งสำนักงานบัญชี', 'route' => 'accounting-package.index', 'pattern' => 'accounting-package.*', 'icon' => 'bi-file-earmark-zip', 'tone' => 'blue'],
                     ['label' => 'ศูนย์รวมรายงาน', 'route' => 'reports.index', 'pattern' => 'reports.*', 'icon' => 'bi-clipboard-data-fill', 'tone' => 'blue', 'params' => []],
                     ['label' => 'รายงานขาย', 'route' => 'reports.index', 'pattern' => 'reports.*', 'icon' => 'bi-receipt-cutoff', 'tone' => 'teal', 'params' => ['category' => 'sales'], 'queryCategory' => 'sales'],
                     ['label' => 'รายงานซื้อ', 'route' => 'reports.index', 'pattern' => 'reports.*', 'icon' => 'bi-basket-fill', 'tone' => 'amber', 'params' => ['category' => 'purchasing'], 'queryCategory' => 'purchasing'],
@@ -165,6 +166,8 @@ class ErpMenu
                     ['group' => 'เชื่อมต่อภายนอก', 'label' => 'LINE แจ้งเตือน', 'route' => 'line-integrations.index', 'pattern' => 'line-integrations.*', 'icon' => 'bi-broadcast', 'tone' => 'teal'],
                     ['group' => 'เชื่อมต่อภายนอก', 'label' => 'E-Commerce', 'route' => 'ecommerce-channels.index', 'pattern' => 'ecommerce-channels.*', 'icon' => 'bi-shop-window', 'tone' => 'cyan'],
 
+                    ['label' => 'เปิด/ปิดเมนู', 'route' => 'settings.menus', 'pattern' => 'settings.menus*', 'icon' => 'bi-toggles', 'tone' => 'blue'],
+                    ['label' => 'สถานะระบบ', 'route' => 'system.status', 'pattern' => 'system.status', 'icon' => 'bi-activity', 'tone' => 'blue'],
                     // กลุ่มย่อย: ระบบ
                     ['group' => 'ระบบ', 'label' => 'ตั้งค่าระบบ', 'route' => 'settings.index', 'pattern' => 'settings.index', 'extraPattern' => 'settings.pos-*', 'icon' => 'bi-gear-fill', 'tone' => 'slate'],
                     ['group' => 'ระบบ', 'label' => 'นโยบายขายติดลบ', 'route' => 'settings.stock-policies', 'pattern' => 'settings.stock-policies', 'icon' => 'bi-sliders2-vertical', 'tone' => 'amber'],
@@ -184,6 +187,13 @@ class ErpMenu
     public static function forUser(?User $user): array
     {
         $sections = self::all();
+        if (MenuVisibility::hidden()) {
+            foreach ($sections as &$section) {
+                $section['items'] = array_values(array_filter($section['items'], fn ($item) => !MenuVisibility::blocked($item['route'], $item['params'] ?? [])));
+            }
+            unset($section);
+            $sections = array_values(array_filter($sections, fn ($section) => $section['items'] !== []));
+        }
         $validLabels = array_column($sections, 'label');
 
         $savedOrder = json_decode((string) AppSetting::get('menu_section_order', '[]'), true);
@@ -223,7 +233,9 @@ class ErpMenu
             $section['items'] = array_values(array_filter($section['items'], function ($item) use ($user) {
                 $permission = RoutePermissions::resolve($item['route']);
 
-                return $permission === null || $user->hasPermission($permission);
+                return ($permission === null || $user->hasPermission($permission))
+                    && ($item['route'] !== 'accounting-package.index' || $user->hasPermission('reports.export'))
+                    && $user->accountingFirmCanOpen($item['route']);
             }));
 
             return $section;

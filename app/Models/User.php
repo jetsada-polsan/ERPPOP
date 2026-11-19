@@ -215,6 +215,19 @@ class User extends Authenticatable
         'management.view', 'budget.manage', 'payroll.manage', 'ecommerce.sync', 'monitoring.manage',
     ];
 
+    private ?bool $accountingFirm = null;
+
+    public function accountingFirmCanOpen(?string $route): bool
+    {
+        $this->accountingFirm ??= $this->roles->contains('code', 'ACCOUNTING_FIRM')
+            || $this->activeBranchRoles()->contains('code', 'ACCOUNTING_FIRM');
+
+        return !$this->accountingFirm || \Illuminate\Support\Str::is([
+            'dashboard', 'apps.launcher', 'reports.index', 'accounting-package.*', 'notifications.index',
+            'bplus.sync.index', 'bplus.sync.show', 'password.*', 'mfa.*', 'logout',
+        ], (string) $route);
+    }
+
     public function hasPermission(string $code): bool
     {
         $codes = $this->permissionCodes();

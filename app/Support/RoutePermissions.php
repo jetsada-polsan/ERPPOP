@@ -129,6 +129,7 @@ class RoutePermissions
         'sales-areas.' => 'masterdata.manage',
 
         // รายงาน
+        'accounting-package.' => 'reports.view',
         'reports.' => 'reports.view',
         'core-modules.' => 'reports.view',
         'features.' => 'reports.view',

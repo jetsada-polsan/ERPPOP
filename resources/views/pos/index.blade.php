@@ -1842,6 +1842,7 @@
 @include('partials.select-arrow')
 </head>
 <body class="{{ $canSell ? 'sales-mode' : 'view-only' }}" x-data="posApp()" x-effect="publishVueState()">
+@if(request()->attributes->get('closed_menu'))<div role="status">เมนูนี้ปิดอยู่</div>@endif
 <div class="pos-wrap">
 
     {{-- TOP BAR --}}

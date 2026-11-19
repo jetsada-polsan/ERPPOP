@@ -31,6 +31,7 @@
     </style>
 </head>
 <body>
+@if(request()->attributes->get('closed_menu'))<div role="status">เมนูนี้ปิดอยู่</div>@endif
 <div class="toolbar">
     <button type="button" onclick="window.print()">พิมพ์ Z Report</button>
     <button type="button" onclick="window.close()">ปิด</button>

@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         // ประตูเดียวของทั้ง ERP: guest -> หน้า login, ผู้ใช้ถูกปิด -> เตะออก,
         // แต่ละเมนูเช็คสิทธิ์ตาม App\Support\RoutePermissions
+        $middleware->appendToGroup('web', \App\Http\Middleware\CheckMenuVisibility::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\ErpAuthorize::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

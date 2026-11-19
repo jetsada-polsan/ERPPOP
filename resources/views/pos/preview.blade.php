@@ -101,6 +101,7 @@
     </style>
 </head>
 <body>
+@if(request()->attributes->get('closed_menu'))<div role="status">เมนูนี้ปิดอยู่</div>@endif
 @php
     $products = $previewProducts->values();
     $cartProducts = $products->take(3);

@@ -387,7 +387,7 @@
             'summary' => $module['summary'],
             'role' => $module['role'] ?? null,
             'workflow' => $module['workflow'] ?? [],
-            'items' => collect($module['items'])->values()->map(function ($item, $itemIndex) use ($user) {
+            'items' => collect($module['items'])->reject(fn ($item) => isset($item['route'][0]) && \App\Support\MenuVisibility::blocked($item['route'][0], $item['route'][1] ?? []))->values()->map(function ($item, $itemIndex) use ($user) {
                 $routeName = ! empty($item['route']) ? $item['route'][0] : null;
                 $permission = $routeName ? \App\Support\RoutePermissions::resolve($routeName) : null;
                 $accessible = $permission === null || ($user?->hasPermission($permission) ?? false);

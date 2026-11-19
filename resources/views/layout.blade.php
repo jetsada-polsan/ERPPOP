@@ -1850,10 +1850,12 @@
                                     </div>
                                 </div>
                                 <div class="py-1">
+                                    @if(!\App\Support\MenuVisibility::blocked('core-modules.index') && auth()->user()?->accountingFirmCanOpen('core-modules.index'))
                                     <a href="{{ route('core-modules.index') }}" class="erp-user-dropdown-item">
                                         <i class="bi bi-book"></i>
                                         <span>คู่มือการใช้งาน</span>
                                     </a>
+                                    @endif
                                     <button type="button" class="erp-user-dropdown-item"
                                             id="erp-display-btn" title="ปรับขนาดและสีหน้าจอ" aria-expanded="false" aria-controls="erp-display-panel"
                                             @click="userOpen = false">
@@ -1997,6 +1999,7 @@
             </div>
             <div class="app-content">
                 <div class="container-fluid px-0">
+                    @if(request()->attributes->get('closed_menu'))<div class="alert alert-warning" role="status">เมนูนี้ปิดอยู่</div>@endif
                     @yield('content')
                 </div>
             </div>

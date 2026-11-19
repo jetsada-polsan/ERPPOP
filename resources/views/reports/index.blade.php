@@ -195,6 +195,9 @@
 @section('page-subtitle', 'เลือกรายงานจากแผงซ้าย - ค่าเริ่มต้นแสดงข้อมูลของวันนี้')
 
 @section('content')
+@if($canExport && !\App\Support\MenuVisibility::blocked('accounting-package.index'))
+<a class="btn btn-outline-primary mb-3" href="{{ route('accounting-package.index') }}">ชุดส่งสำนักงานบัญชี</a>
+@endif
 <div class="flow-report-shell">
     <aside class="flow-rail no-print">
         <a href="{{ route('dashboard') }}" class="flow-rail-icon" title="แดชบอร์ด"><i class="bi bi-speedometer2"></i></a>
@@ -210,6 +213,7 @@
         <div class="flow-nav-title">รายงาน</div>
         <div class="rpt-nav-head"><i class="bi bi-star-fill" style="color:var(--erp-warning-ink)"></i> ใช้ประจำ</div>
         @foreach($essentialReports as [$favCat, $favReport, $favLabel])
+            @continue(!isset($catalog[$favCat]['reports'][$favReport]))
             <a href="{{ route('reports.index', array_merge($dateParams, ['category' => $favCat, 'report' => $favReport])) }}"
                class="rpt-nav-link {{ $selectedCategory === $favCat && $selectedReport === $favReport ? 'active' : '' }}">
                 {{ $favLabel }}
