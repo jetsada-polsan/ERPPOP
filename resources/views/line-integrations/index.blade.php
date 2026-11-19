@@ -23,7 +23,41 @@
     </div>
     <div class="alert alert-info mt-3 mb-0 py-2 small">การสมัครสมาชิกให้สร้างสมาชิกใน ERP ก่อน แล้วให้ลูกค้ากดผูกสมาชิกและยืนยันด้วยเบอร์โทรศัพท์</div>
 </div>
-<div class="alert alert-warning border-0 shadow-sm">LINE Notify ปิดบริการแล้ว ช่องนี้ใช้สำหรับเก็บทะเบียนช่องทางแจ้งเตือนเดิม ส่วน Channel Secret และ Access Token ให้เก็บใน Environment ของเซิร์ฟเวอร์และไม่แสดงบนหน้าเว็บ</div>
+<div class="content-card p-4 mb-3" id="line-credentials" data-testid="line-credentials">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-2">
+        <div>
+            <h2 class="h5 fw-bold mb-1">ค่า LINE OA ที่ระบบใช้อยู่</h2>
+            <div class="text-muted small">อ่านจาก Environment ของเซิร์ฟเวอร์ (.env) แก้ค่าที่นี่ไม่ได้ Channel secret และ Access token ปิดบังไว้ เห็นแค่ 4 ตัวท้าย</div>
+        </div>
+        @if($revealed)<span class="badge text-bg-warning px-3 py-2">กำลังแสดงค่าเต็ม · รีโหลดหน้าแล้วจะซ่อน</span>@endif
+    </div>
+    <div class="table-responsive"><table class="table align-middle mb-2">
+        <thead><tr><th>ค่า</th><th>ชื่อใน .env</th><th>ค่าที่ใช้อยู่</th><th></th></tr></thead>
+        <tbody>
+        @foreach($credentials as $item)
+            <tr>
+                <td class="fw-semibold">{{ $item['label'] }}</td>
+                <td><code>{{ $item['env'] }}</code></td>
+                <td class="text-break font-monospace small" data-credential="{{ $item['key'] }}">{{ $item['shown'] }}</td>
+                <td class="text-end">@if($item['is_set'] && ($revealed || ! $item['secret']))<button type="button" class="btn btn-sm btn-outline-secondary" onclick="navigator.clipboard.writeText(@js($item['full'] ?? $item['shown']))">คัดลอก</button>@endif</td>
+            </tr>
+        @endforeach
+        </tbody>
+    </table></div>
+    @unless($revealed)
+        @if(auth()->user()?->hasPermission('system.admin'))
+            <form method="post" action="{{ route('line-integrations.credentials.reveal') }}" class="row g-2 align-items-end" autocomplete="off">
+                @csrf
+                <div class="col-md-4"><label class="form-label small text-muted mb-1" for="reveal-password">ยืนยันรหัสผ่านของคุณเพื่อดูค่าเต็ม</label><input id="reveal-password" type="password" name="password" required class="form-control" autocomplete="current-password"></div>
+                <div class="col-md-3"><button class="btn btn-warning">แสดงค่าเต็ม</button></div>
+                <div class="col-12 small text-muted">ระบบบันทึกทุกครั้งที่มีการกดดู (ผู้ใช้ เวลา IP) อย่าเผลอส่งค่าเหล่านี้ในแชทหรืออีเมล ถ้าออก Access token ใหม่ใน LINE Developers ตัวที่ ERP ใช้อยู่จะใช้ไม่ได้</div>
+            </form>
+        @else
+            <div class="small text-muted">ดูค่าเต็มได้เฉพาะผู้ดูแลระบบ</div>
+        @endif
+    @endunless
+</div>
+<div class="alert alert-warning border-0 shadow-sm">LINE Notify ปิดบริการแล้ว ช่องด้านล่างใช้สำหรับเก็บทะเบียนช่องทางแจ้งเตือนเดิม ค่าที่ระบบใช้ส่ง LINE จริงคือค่าในกล่อง "ค่า LINE OA ที่ระบบใช้อยู่" ด้านบน</div>
 <div class="content-card p-4 mb-3">
     <h2 class="h5 fw-bold mb-3">สมาชิกที่ผูก LINE แล้ว</h2>
     <div class="table-responsive"><table class="table align-middle mb-0">
