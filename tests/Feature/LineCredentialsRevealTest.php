@@ -53,6 +53,10 @@ class LineCredentialsRevealTest extends TestCase
         $this->assertStringNotContainsString(self::SECRET, $html);
         $this->assertStringContainsString('ยังไม่ตั้งค่า', $html);
         $this->assertStringContainsString('แสดงค่าเต็ม', $html);
+        // ค่าที่ไม่ใช่ความลับอยู่ในกล่องที่เลือกแล้วคัดลอกได้ ส่วน secret/token ยังไม่มีกล่อง
+        $this->assertMatchesRegularExpression('/<textarea[^>]*data-line-copy-source[^>]*>2001234567-AbCdEfGh<\/textarea>/', $html);
+        $this->assertSame(2, preg_match_all('/<textarea[^>]*data-line-copy-source/', $html));
+        $this->assertSame(2, substr_count($html, 'data-line-copy>'));
     }
 
     public function test_admin_sees_full_values_only_after_reentering_password_and_it_is_audited(): void
@@ -70,6 +74,13 @@ class LineCredentialsRevealTest extends TestCase
         $this->assertStringContainsString(self::TOKEN, $html);
         $this->assertStringContainsString(self::SECRET, $html);
         $this->assertStringContainsString('กำลังแสดงค่าเต็ม', $html);
+        // ค่าเต็มอยู่ในกล่องที่คลิกแล้วเลือกทั้งหมด มีปุ่มคัดลอกที่ใช้ตัวสำรองเมื่อ browser ไม่ยอมให้ใช้ clipboard
+        $this->assertMatchesRegularExpression('/<textarea[^>]*data-line-copy-source[^>]*>'.preg_quote(self::TOKEN, '/').'<\/textarea>/', $html);
+        $this->assertMatchesRegularExpression('/<textarea[^>]*data-line-copy-source[^>]*>'.preg_quote(self::SECRET, '/').'<\/textarea>/', $html);
+        $this->assertSame(4, substr_count($html, 'data-line-copy>'));
+        $this->assertStringContainsString("document.execCommand('copy')", $html);
+        $this->assertStringContainsString('กด Ctrl+C หรือ ⌘C', $html);
+        $this->assertStringContainsString('คัดลอกแล้ว ✓', $html);
 
         $log = AuditLog::where('action', 'line_credentials_reveal')->sole();
         $this->assertSame($admin->id, $log->user_id);
