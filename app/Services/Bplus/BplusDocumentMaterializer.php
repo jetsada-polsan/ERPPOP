@@ -144,8 +144,11 @@ class BplusDocumentMaterializer
                 ]);
                 $count += $documentId ? 1 : 0;
             }
-            $this->settleOpenItems();
-            $this->settleBookings();
+            // รอบที่ไม่มีใบไหนเปลี่ยน (ส่วนใหญ่ของรอบทุก 15 นาที) ยอดค้างและสถานะใบจองเท่าเดิม ไม่ต้องไล่คำนวณทุกใบ
+            if ($full || $processed > 0) {
+                $this->settleOpenItems();
+                $this->settleBookings();
+            }
 
             return $count;
         });
@@ -538,7 +541,8 @@ class BplusDocumentMaterializer
             DB::table('customer_open_items')->where('id', $item->id)->update([
                 'paid_amount' => $paid,
                 'net_amount' => $net,
-                'balance_amount' => max($balance, 0),
+                // บิลที่ยกเลิกไม่เหลือหนี้ (แบบเดียวกับ DocumentVoidService) ไม่งั้นไปโผล่ในหน้าใบวางบิล
+                'balance_amount' => $status === 'cancelled' ? 0 : max($balance, 0),
                 'status' => $status,
             ]);
         }

@@ -105,6 +105,8 @@ class BplusSyncApiController extends Controller
         $runId = $this->record($token, $parsed['route'], 'processing', null, count($parsed['documents']));
         \Illuminate\Support\defer(function () use ($token, $importer, $materializer, $parsed, $lock, $runId) {
             @set_time_limit(900);
+            // รอบเต็มกลางคืนส่งทุกใบตั้งแต่วันเริ่มสาย ไฟล์โตขึ้นทุกเดือน ค่าเริ่มต้น 128M ของ php-fpm จะไม่พอ (เครื่องมี RAM 2GB)
+            @ini_set('memory_limit', '512M');
             try {
                 [$received, $result, $breakdown] = DB::transaction(function () use ($token, $parsed, $importer, $materializer) {
                     if ($token->route_code === null) {
