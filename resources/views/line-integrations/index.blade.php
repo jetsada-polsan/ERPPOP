@@ -38,8 +38,15 @@
             <tr>
                 <td class="fw-semibold">{{ $item['label'] }}</td>
                 <td><code>{{ $item['env'] }}</code></td>
-                <td class="text-break font-monospace small" data-credential="{{ $item['key'] }}">{{ $item['shown'] }}</td>
-                <td class="text-end">@if($item['is_set'] && ($revealed || ! $item['secret']))<button type="button" class="btn btn-sm btn-outline-secondary" onclick="navigator.clipboard.writeText(@js($item['full'] ?? $item['shown']))">คัดลอก</button>@endif</td>
+                <td class="text-break font-monospace small" data-credential="{{ $item['key'] }}">
+                    @if($item['is_set'] && ($revealed || ! $item['secret']))
+                        {{-- กล่องนี้คลิกแล้วเลือกทั้งหมด ใช้ Ctrl+C / ⌘C เองได้ถ้า browser ไม่ยอมให้ปุ่มคัดลอก --}}
+                        <textarea readonly rows="{{ mb_strlen($item['full'] ?? $item['shown']) > 60 ? 3 : 1 }}" class="form-control form-control-sm font-monospace" data-line-copy-source onclick="this.select()" onfocus="this.select()">{{ $item['full'] ?? $item['shown'] }}</textarea>
+                    @else
+                        {{ $item['shown'] }}
+                    @endif
+                </td>
+                <td class="text-end">@if($item['is_set'] && ($revealed || ! $item['secret']))<button type="button" class="btn btn-sm btn-outline-secondary" data-line-copy>คัดลอก</button>@endif</td>
             </tr>
         @endforeach
         </tbody>
@@ -126,3 +133,37 @@
     {{ $integrations->links() }}
 </div>
 @endsection
+@push('scripts')
+<script>
+// คัดลอกจากกล่องข้อความในแถวเดียวกัน: ลอง Clipboard API ก่อน ถ้า browser ไม่ยอม (เช่นปิดสิทธิ์ clipboard) ใช้ execCommand แทน
+document.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-line-copy]');
+    if (!button) return;
+    const box = button.closest('tr')?.querySelector('[data-line-copy-source]');
+    if (!box) return;
+    // บอกผลทั้งบนปุ่มเอง (ใช้ได้เสมอ) และ toast ของระบบ (ถ้าโหลดแล้ว)
+    const notify = (ok) => {
+        const label = button.dataset.label || (button.dataset.label = button.textContent);
+        button.textContent = ok ? 'คัดลอกแล้ว ✓' : 'กด Ctrl+C / ⌘C';
+        setTimeout(() => { button.textContent = label; }, ok ? 2000 : 5000);
+        if (window.erpToast) {
+            window.erpToast(ok ? 'success' : 'warning', ok ? 'คัดลอกแล้ว' : 'คัดลอกอัตโนมัติไม่ได้ ข้อความถูกเลือกไว้แล้ว กด Ctrl+C หรือ ⌘C', ok ? {} : { timer: 4000 });
+        }
+    };
+    let ok = false;
+    try {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(box.value);
+            ok = true;
+        }
+    } catch (error) { ok = false; }
+    if (!ok) {
+        box.focus();
+        box.select();
+        box.setSelectionRange(0, box.value.length);
+        try { ok = document.execCommand('copy'); } catch (error) { ok = false; }
+    }
+    notify(ok);
+});
+</script>
+@endpush
