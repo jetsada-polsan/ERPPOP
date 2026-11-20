@@ -1161,6 +1161,30 @@ class BplusDocumentsTest extends TestCase
             ->assertSee('เอกสารในระบบ '.number_format($run->json('erp_documents')).' ใบ');
     }
 
+    public function test_cancelled_unpaid_bplus_sale_leaves_no_debt_and_idle_runs_skip_settling(): void
+    {
+        $export = $this->export();
+        $cancelled = $export['documents'][2];
+        $cancelled['bplus_key'] = 2719999;
+        $cancelled['ref'] = 'DS256911/99999';
+        $cancelled['is_cancelled'] = true;
+        $cancelled['total_amount'] = 900;
+        $export['documents'][] = $cancelled;
+        $this->importFile($export);
+
+        $item = DB::table('customer_open_items')->where('document_id', Document::where('doc_number', 'DS256911/99999')->value('id'))->first();
+        $this->assertSame('cancelled', $item->status);
+        $this->assertSame(0.0, (float) $item->balance_amount, 'บิลยกเลิกต้องไม่เหลือหนี้ ไม่งั้นโผล่ในหน้าใบวางบิล');
+
+        // รอบที่ไม่มีใบไหนเปลี่ยน ต้องไม่ไล่คำนวณยอดค้างทุกใบ (รอบทุก 15 นาทีส่วนใหญ่เป็นแบบนี้)
+        DB::enableQueryLog();
+        $idle = app(\App\Services\Bplus\BplusDocumentMaterializer::class)->run('B18');
+        $writes = collect(DB::getQueryLog())->pluck('query')->filter(fn ($q) => str_contains($q, 'update "customer_open_items"') || str_contains($q, 'update "sale_bookings"'));
+        DB::disableQueryLog();
+        $this->assertSame(0, $idle['processed']);
+        $this->assertCount(0, $writes);
+    }
+
     private function issueSyncToken(string $route): string
     {
         Artisan::call('bplus:sync-token', ['--issue' => true, '--route' => $route, '--name' => 'BK Server']);
