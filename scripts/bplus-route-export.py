@@ -50,7 +50,7 @@ def bplus_login():
     (คำสั่งจะถามรหัสแบบไม่แสดงตัวอักษร รหัสเก็บเข้ารหัสใน Keychain ไม่อยู่ในไฟล์)"""
     import os
     import subprocess
-    # ซิงค์อัตโนมัติบน Windows: bplus-auto-sync.py ส่ง user/รหัสมาทาง environment ไม่ถาม
+    # ซิงค์อัตโนมัติ (bplusAPI) ส่ง user/รหัสมาทาง environment ไม่ถาม
     if os.environ.get("BPLUS_USER") and os.environ.get("BPLUS_PASSWORD"):
         return os.environ["BPLUS_USER"], os.environ["BPLUS_PASSWORD"]
     login = "jetsada"

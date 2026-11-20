@@ -14,7 +14,7 @@ use InvalidArgumentException;
 use Throwable;
 
 /**
- * รับเอกสาร BPlus จากเครื่องในร้าน (scripts/bplus-auto-sync.py) แทนการอัปโหลดไฟล์ที่หน้า /bplus/sync
+ * รับเอกสาร BPlus จากเครื่องในร้าน (โปรแกรม bplusAPI บนเครื่อง .201 repo jetsada-polsan/bplusAPI) แทนการอัปโหลดไฟล์ที่หน้า /bplus/sync
  * ใช้ token จาก `php artisan bplus:sync-token` ส่งได้เฉพาะสายของ token นั้น
  * ตัวไฟล์รูปแบบเดียวกับที่อัปโหลด บีบอัด gzip ได้ (Content-Encoding: gzip)
  */
