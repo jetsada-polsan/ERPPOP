@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Services\Bplus\BplusDocumentMaterializer;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class BplusMaterialize extends Command
@@ -23,7 +24,8 @@ class BplusMaterialize extends Command
 
         foreach ($routes as $route) {
             $started = microtime(true);
-            $result = $materializer->run($route, (bool) $this->option('full'));
+            // ล็อกเดียวกับ API ซิงค์ กันรอบตี 4 กับรอบที่เครื่องร้านส่งมาทำสายเดียวกันพร้อมกัน
+            $result = Cache::lock('bplus-sync:'.$route, 600)->block(300, fn () => $materializer->run($route, (bool) $this->option('full')));
             $this->info(sprintf('สาย %s: เอกสาร ERP %d ใบ · ประมวลผลใหม่ %d ใบ · %.1f วินาที',
                 $route, $result['documents'], $result['processed'], microtime(true) - $started));
             foreach ($result['problems'] as $ref => $problem) {

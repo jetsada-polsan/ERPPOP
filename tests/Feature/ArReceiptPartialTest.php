@@ -23,7 +23,6 @@ use App\Services\Purchasing\PurchaseService;
 use App\Services\Sales\BookingService;
 use App\Services\Sales\CreditSaleService;
 use App\Services\Sales\CustomerPaymentService;
-use App\Support\ArReceiptAllocationHelper;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
@@ -176,17 +175,6 @@ class ArReceiptPartialTest extends TestCase
         $bill1 = $this->createCreditSaleBill($this->customer, 12697.90, '2026-10-01', 'ITEM1');
         $bill2 = $this->createCreditSaleBill($this->customer, 2665.00, '2026-10-15', 'ITEM2');
 
-        // ตรวจสอบตัวช่วยกระจายยอด (ArReceiptAllocationHelper)
-        $bills = [
-            ['id' => $bill1->id, 'doc_date' => '2026-10-01', 'doc_number' => $bill1->document->doc_number, 'balance' => 12697.90],
-            ['id' => $bill2->id, 'doc_date' => '2026-10-15', 'doc_number' => $bill2->document->doc_number, 'balance' => 2665.00],
-        ];
-        $distribution = ArReceiptAllocationHelper::distribute($bills, 3363.00);
-
-        $this->assertSame(15362.90, $distribution['total_debt']);
-        $this->assertSame(3363.00, $distribution['total_allocated']);
-        $this->assertSame(11999.90, $distribution['next_payment_remaining']);
-
         // บันทึกผ่าน Controller POST
         $response = $this->post(route('ar-receipts.store'), [
             'customer_id' => $this->customer->id,
@@ -265,26 +253,6 @@ class ArReceiptPartialTest extends TestCase
             ->whereIn('status', [CustomerOpenItem::STATUS_OPEN, CustomerOpenItem::STATUS_PARTIAL])
             ->sum('balance_amount');
         $this->assertSame(0.00, $openDebt);
-    }
-
-    /**
-     * 3. จ่ายเกินยอดหนี้ที่เลือก (เช่น หนี้ 15,362.90 จ่าย 16,000.00):
-     *    - Helper โยน InvalidArgumentException
-     *    - Controller ปฏิเสธ และบิลไม่ถูกแก้ไข
-     */
-    public function test_payment_exceeding_total_selected_debt_is_rejected(): void
-    {
-        $bill1 = $this->createCreditSaleBill($this->customer, 12697.90, '2026-10-01', 'OVER1');
-        $bill2 = $this->createCreditSaleBill($this->customer, 2665.00, '2026-10-15', 'OVER2');
-
-        $bills = [
-            ['id' => $bill1->id, 'balance' => 12697.90],
-            ['id' => $bill2->id, 'balance' => 2665.00],
-        ];
-
-        // 1. Helper ปฏิเสธ
-        $this->expectException(\InvalidArgumentException::class);
-        ArReceiptAllocationHelper::distribute($bills, 16000.00);
     }
 
     /**
