@@ -20,7 +20,7 @@ class LayoutPrintHidesSidebarTest extends TestCase
         $this->withoutMiddleware(ErpAuthorize::class);
         $this->actingAs(User::factory()->create());
 
-        $html = $this->get('/bookings/summary')->assertOk()->getContent();
+        $html = $this->withLayoutCss($this->get('/bookings/summary')->assertOk()->getContent());
 
         $screenRule = strpos($html, 'html[data-layout="classic"] .app-sidebar.odn-side {');
         $this->assertNotFalse($screenRule, 'กฎของจอที่บังคับแสดงเมนูต้องยังอยู่ (ถ้าเปลี่ยนชื่อ ให้ปรับเทสต์นี้)');
