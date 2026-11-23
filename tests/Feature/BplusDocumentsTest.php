@@ -1185,6 +1185,34 @@ class BplusDocumentsTest extends TestCase
         $this->assertCount(0, $writes);
     }
 
+    public function test_pos_daily_sales_sync_into_their_own_report_without_creating_a_sales_route(): void
+    {
+        Artisan::call('bplus:sync-token', ['--issue' => true, '--all-routes' => true, '--name' => 'BK Server']);
+        preg_match('/bps_\w+/', Artisan::output(), $match);
+        $areasBefore = DB::table('sales_areas')->count();
+        $pos = ['route' => 'PS3', 'documents' => [
+            ['bplus_key' => 2614827, 'kind' => 'pos_sale', 'book_code' => 'PS3', 'ref' => '691001/100030001', 'doc_date' => '2026-10-01',
+                'total_amount' => 56795.12, 'vatable_amount' => 21937.26, 'vat_amount' => 1535.61, 'exempt_amount' => 33322.25],
+            ['bplus_key' => 2614900, 'kind' => 'pos_sale', 'book_code' => 'PS3', 'ref' => '691002/100030001', 'doc_date' => '2026-10-02',
+                'total_amount' => 76795.45, 'vatable_amount' => 31615.78, 'vat_amount' => 2213.10, 'exempt_amount' => 42966.57],
+        ]];
+
+        $this->postJson(route('api.bplus.sync'), $pos, ['Authorization' => "Bearer {$match[0]}"])->assertStatus(202);
+
+        $this->assertSame(2, DB::table('bplus_sync_documents')->where('kind', 'pos_sale')->count());
+        $this->assertSame($areasBefore, DB::table('sales_areas')->count(), 'เครื่อง POS ไม่ใช่สายขาย');
+        $this->assertSame(0, DB::table('documents')->where('source_system', 'bplus')->count(), 'ยอด POS ไม่สร้างใบขายเชื่อ');
+        $this->assertSame('ok', DB::table('bplus_sync_runs')->value('status'));
+
+        Role::where('code', 'BPLUS_DOCS')->firstOrFail()->permissions()->sync(Permission::pluck('id')->all());
+        $this->actingAs(User::where('username', 'bplus_docs')->firstOrFail()->fresh());
+        $result = $this->get(route('reports.index', ['category' => 'sales', 'report' => 'bplus_pos_daily_sales', 'from' => '2026-10-01', 'to' => '2026-10-31']))
+            ->assertOk()->assertViewHas('selectedReport', 'bplus_pos_daily_sales')->viewData('result');
+        $this->assertCount(2, $result['rows']);
+        $this->assertSame('133590.57', $result['summary']['net_sales']);
+        $this->assertSame('PS3', $result['rows'][0]->book_code);
+    }
+
     private function issueSyncToken(string $route): string
     {
         Artisan::call('bplus:sync-token', ['--issue' => true, '--route' => $route, '--name' => 'BK Server']);

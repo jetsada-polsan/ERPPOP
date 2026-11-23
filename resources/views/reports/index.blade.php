@@ -29,6 +29,7 @@
         'bplus_credit_sales_by_document' => 'BPlus ขายเชื่อ แยกเอกสาร',
         'bplus_credit_sales_by_product' => 'BPlus ขายเชื่อ แยกสินค้า',
         'bplus_daily_sales_summary' => 'BPlus สรุปขายเชื่อรายวัน',
+        'bplus_pos_daily_sales' => 'BPlus ภาษีขาย POS รายวัน',
         'pending_bookings' => 'ใบจองค้างแปลงขาย',
         'sales_by_booking' => 'ยอดขายตามใบจอง',
         'sales_returns_by_document' => 'ใบขาย-รับคืน ตามเอกสาร',

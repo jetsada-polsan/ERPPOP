@@ -109,7 +109,8 @@ class BplusSyncApiController extends Controller
             @ini_set('memory_limit', '512M');
             try {
                 [$received, $result, $breakdown] = DB::transaction(function () use ($token, $parsed, $importer, $materializer) {
-                    if ($token->route_code === null) {
+                    // เครื่อง POS (PS1..) ไม่ใช่สายขาย ไม่ต้องสร้างสายและเล่มใบจอง
+                    if ($token->route_code === null && ! str_starts_with($parsed['route'], 'PS')) {
                         $this->ensureSalesRoute($parsed['route']);
                     }
                     $keys = array_values(array_unique(array_map(fn ($d) => (int) $d['bplus_key'], $parsed['documents'])));

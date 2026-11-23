@@ -586,6 +586,20 @@ class ReportController extends Controller
 
             'bplus_daily_sales_summary' => $this->bplusDailySalesSummary($from, $to, $filters),
 
+            'bplus_pos_daily_sales' => $this->tableResult('BPlus ภาษีขาย POS รายวัน', [
+                ['label' => 'วันที่', 'key' => 'doc_date', 'type' => 'date'],
+                ['label' => 'เครื่อง POS', 'key' => 'book_code'],
+                ['label' => 'เลขที่เอกสาร', 'key' => 'ref'],
+                ['label' => 'ขายรวมภาษี', 'key' => 'total_amount', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'มูลค่าสินค้า', 'key' => 'vatable_amount', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'ภาษีมูลค่าเพิ่ม', 'key' => 'vat_amount', 'type' => 'money', 'class' => 'text-end'],
+                ['label' => 'มูลค่ายกเว้น', 'key' => 'exempt_amount', 'type' => 'money', 'class' => 'text-end'],
+            ], tap(DB::table('bplus_sync_documents')->where('kind', 'pos_sale')->where('is_cancelled', false)
+                ->whereBetween('doc_date', [$from->toDateString(), $to->toDateString()])
+                ->select('doc_date', 'book_code', 'ref', 'total_amount', 'vatable_amount', 'vat_amount', 'exempt_amount')
+                ->orderBy('doc_date')->orderBy('book_code'), fn ($q) => $this->applySearch($q, $filters, ['book_code', 'ref']))->get()),
+
+
             'pending_bookings' => $this->tableResult('ใบจองค้างแปลงขาย', [
                 ['label' => 'เลขที่', 'key' => 'doc_number'],
                 ['label' => 'วันที่', 'key' => 'doc_date'],
