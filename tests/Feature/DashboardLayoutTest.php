@@ -55,6 +55,7 @@ class DashboardLayoutTest extends TestCase
             ->get(route('dashboard'))
             ->assertOk()
             ->getContent();
+        $html = $this->withLayoutCss($html);
 
         $this->assertStringContainsString("position: 'top-end'", $html);
         $this->assertStringContainsString('{ timer: 1200 }', $html);

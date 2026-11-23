@@ -172,7 +172,7 @@ class ConfirmPopupConsistencyTest extends TestCase
      */
     public function test_layout_defines_unified_popup_styling_and_ergonomics(): void
     {
-        $layout = file_get_contents(resource_path('views/layout.blade.php'));
+        $layout = self::layoutSourceWithCss();
 
         // คลาส CSS 4 โทน
         $this->assertStringContainsString('.erp-swal-confirm-danger', $layout);

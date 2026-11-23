@@ -8,7 +8,7 @@ class UatResponsiveLayoutTest extends TestCase
 {
     public function test_shared_header_reserves_space_and_wraps_the_title_and_tools(): void
     {
-        $layout = file_get_contents(resource_path('views/layout.blade.php'));
+        $layout = self::layoutSourceWithCss();
         $this->assertStringContainsString('navbar-nav align-items-center erp-page-heading', $layout);
         $this->assertStringContainsString('flex-wrap: wrap; gap: 8px 16px', $layout);
         $this->assertStringContainsString('overflow-wrap: anywhere; white-space: normal', $layout);
