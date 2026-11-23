@@ -1,8 +1,8 @@
     /* มาตรฐาน UI กลาง: อ่านได้ชัดบนจอ 13–15 นิ้ว และขยายเป็นขั้นบนจอใหญ่ */
     :root {
-        --ui-font-xs: calc(13px * var(--ui-scale));
-        --ui-font-sm: calc(14px * var(--ui-scale));
-        --ui-font-md: calc(15px * var(--ui-scale));
+        --ui-font-xs: max(12.5px, calc(13px * var(--ui-scale)));
+        --ui-font-sm: max(13px, calc(14px * var(--ui-scale)));
+        --ui-font-md: max(14px, calc(15px * var(--ui-scale)));
         --ui-font-lg: calc(18px * var(--ui-scale));
         --ui-font-xl: calc(24px * var(--ui-scale));
         --ui-control-h: calc(40px * var(--ui-scale));
@@ -10,7 +10,7 @@
         --ui-card-radius: 10px;
         --ui-space: calc(16px * var(--ui-scale));
     }
-    body:not(.erp-popup-page) { font-size:var(--ui-font-md); line-height:1.4; }
+    body:not(.erp-popup-page) { font-size:var(--ui-font-md); line-height:1.55; }
     .app-header { min-height:52px; }
     .app-header h1 { font-size:var(--ui-font-xl); line-height:1.2; }
     .app-header .text-muted { font-size:var(--ui-font-sm)!important; }
@@ -65,7 +65,9 @@
     .badge { padding:4px 7px; border-radius:6px; font-size:var(--ui-font-xs); line-height:1.15; }
     /* อ่านง่าย: ตัวหนังสือรองไม่เล็กกว่า 12px และไม่จางจนอ่านไม่ออกบนจอหน้าร้าน */
     .text-muted { color:#5b6b78 !important; }
-    body:not(.erp-popup-page) .table > tbody > tr > td { line-height:1.45; }
+    /* ภาษาไทยเล็กกว่า ~12.5px สระบน-ล่างเบียดกันจนอ่านไม่ออก แม้ผู้ใช้เลือกขนาด "เล็กมาก" */
+    small, .small { font-size:max(12.5px, .875em); }
+    body:not(.erp-popup-page) .table > tbody > tr > td { line-height:1.5; }
 
     .alert { padding:9px 11px; border-radius:10px; font-size:var(--ui-font-md); border:1px solid rgba(148,163,184,.2); }
     .pagination { --bs-pagination-padding-x:.6rem; --bs-pagination-padding-y:.28rem; --bs-pagination-font-size:var(--ui-font-sm); }
@@ -74,9 +76,9 @@
 
     @media (max-width: 991.98px) {
         :root {
-            --ui-font-xs: calc(12px * var(--ui-scale));
-            --ui-font-sm: calc(13px * var(--ui-scale));
-            --ui-font-md: calc(14px * var(--ui-scale));
+            --ui-font-xs: max(12.5px, calc(12px * var(--ui-scale)));
+            --ui-font-sm: max(13px, calc(13px * var(--ui-scale)));
+            --ui-font-md: max(14px, calc(14px * var(--ui-scale)));
             --ui-font-lg: calc(16px * var(--ui-scale));
             --ui-font-xl: calc(20px * var(--ui-scale));
             --ui-control-h: calc(34px * var(--ui-scale));
@@ -129,9 +131,9 @@
     /* ERP web responsive tiers: fixed readable sizes for small, standard and large monitors. */
     @media (min-width: 1366px) and (min-height: 720px) {
         :root {
-            --ui-font-xs: calc(13px * var(--ui-scale));
-            --ui-font-sm: calc(14px * var(--ui-scale));
-            --ui-font-md: calc(15px * var(--ui-scale));
+            --ui-font-xs: max(12.5px, calc(13px * var(--ui-scale)));
+            --ui-font-sm: max(13px, calc(14px * var(--ui-scale)));
+            --ui-font-md: max(14px, calc(15px * var(--ui-scale)));
             --ui-font-lg: calc(19px * var(--ui-scale));
             --ui-font-xl: calc(25px * var(--ui-scale));
             --ui-control-h: calc(42px * var(--ui-scale));
@@ -171,9 +173,9 @@
         :root {
             --erp-rail-w: 74px;
             --erp-subnav-w: 202px;
-            --ui-font-xs: calc(14px * var(--ui-scale));
-            --ui-font-sm: calc(15px * var(--ui-scale));
-            --ui-font-md: calc(17px * var(--ui-scale));
+            --ui-font-xs: max(12.5px, calc(14px * var(--ui-scale)));
+            --ui-font-sm: max(13px, calc(15px * var(--ui-scale)));
+            --ui-font-md: max(14px, calc(17px * var(--ui-scale)));
             --ui-font-lg: calc(21px * var(--ui-scale));
             --ui-font-xl: calc(27px * var(--ui-scale));
             --ui-control-h: calc(46px * var(--ui-scale));
@@ -202,9 +204,9 @@
         :root {
             --erp-rail-w: 80px;
             --erp-subnav-w: 220px;
-            --ui-font-xs: calc(14px * var(--ui-scale));
-            --ui-font-sm: calc(16px * var(--ui-scale));
-            --ui-font-md: calc(18px * var(--ui-scale));
+            --ui-font-xs: max(12.5px, calc(14px * var(--ui-scale)));
+            --ui-font-sm: max(13px, calc(16px * var(--ui-scale)));
+            --ui-font-md: max(14px, calc(18px * var(--ui-scale)));
             --ui-font-lg: calc(22px * var(--ui-scale));
             --ui-font-xl: calc(29px * var(--ui-scale));
             --ui-control-h: calc(50px * var(--ui-scale));
