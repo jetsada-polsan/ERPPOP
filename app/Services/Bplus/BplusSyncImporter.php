@@ -13,7 +13,8 @@ use InvalidArgumentException;
  */
 class BplusSyncImporter
 {
-    private const KINDS = ['booking', 'credit_sale', 'opening_ar', 'credit_note', 'receipt'];
+    // pos_sale = ใบสรุปขายหน้าร้านรายวันต่อเครื่อง (PS1..) แยกจากขายหลังบ้าน ไม่สร้างเอกสาร ERP ใช้ทำรายงานภาษีขาย POS
+    private const KINDS = ['booking', 'credit_sale', 'opening_ar', 'credit_note', 'receipt', 'pos_sale'];
 
     /** @return array{route: string, documents: array<int, array>, customers?: array<int, array>, products?: array<int, array>} */
     public function parse(string $json): array
