@@ -117,6 +117,10 @@ class BplusSyncApiController extends Controller
                     $known = DB::table('bplus_sync_documents')->whereIn('bplus_key', $keys)->pluck('bplus_key')->map(fn ($k) => (int) $k)->all();
                     $received = $importer->import($parsed);
                     $result = $materializer->run($parsed['route']);
+                    if (str_starts_with($parsed['route'], 'PS')) {
+                        // เครื่อง POS ไม่สร้างเอกสารขาย นับยอดรายวันที่เก็บไว้แทน ไม่งั้น bplusAPI เห็น 0 แล้วบอกว่ายังบันทึกไม่เสร็จ
+                        $result['documents'] = DB::table('bplus_sync_documents')->where('kind', 'pos_sale')->where('book_code', $parsed['route'])->count();
+                    }
 
                     return [$received, $result, $this->breakdown($keys, $known, $result['processed_keys'])];
                 });

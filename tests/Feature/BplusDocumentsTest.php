@@ -1203,6 +1203,7 @@ class BplusDocumentsTest extends TestCase
         $this->assertSame($areasBefore, DB::table('sales_areas')->count(), 'เครื่อง POS ไม่ใช่สายขาย');
         $this->assertSame(0, DB::table('documents')->where('source_system', 'bplus')->count(), 'ยอด POS ไม่สร้างใบขายเชื่อ');
         $this->assertSame('ok', DB::table('bplus_sync_runs')->value('status'));
+        $this->assertGreaterThan(0, (int) DB::table('bplus_sync_runs')->value('erp_documents'));
 
         Role::where('code', 'BPLUS_DOCS')->firstOrFail()->permissions()->sync(Permission::pluck('id')->all());
         $this->actingAs(User::where('username', 'bplus_docs')->firstOrFail()->fresh());
