@@ -4,7 +4,9 @@
 
 - Production uses its own database, `.env`, storage and domain.
 - Staging must use a separate database, storage path and LINE test target. Never point staging at production data.
-- Create GitHub environments named `staging` and `production`. Add `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY` secrets and an `APP_DIR` variable to each environment.
+- Create GitHub environments named `staging` and `production`. Add `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS` secrets and an `APP_DIR` variable to each environment.
+- `DEPLOY_KNOWN_HOSTS` holds the server's SSH host key line(s); the deploy refuses to connect without it (no `ssh-keyscan` trust-on-first-use). Build it from the server's own key files, with `<DEPLOY_HOST>` replaced by the exact value of the `DEPLOY_HOST` secret: `for f in /etc/ssh/ssh_host_*_key.pub; do echo "<DEPLOY_HOST> $(cut -d' ' -f1,2 "$f")"; done`
+- Deploy ERP puts the site into maintenance mode before uploading. If upload, migrate or `erp:health` fails, the site stays in maintenance mode on purpose (there is no rollback); fix and redeploy, or check the site and run `php artisan up` in `APP_DIR`.
 - Production deployment should require an environment reviewer in GitHub.
 
 ## Scheduled jobs

@@ -1,3 +1,26 @@
+# Handoff — 2026-11-24 (Deploy ERP safety, Claude)
+
+## Commit
+- branch `fix/deploy-safety` from `origin/main` at `b1cbd3d`
+
+## ทำอะไรไป
+- `deploy.yml`: ปิดเว็บ (`artisan down --retry=30`) ผ่าน ssh **ก่อน** rsync ข้ามได้ถ้ายังไม่มีแอปติดตั้ง (deploy ครั้งแรก)
+- `deploy.sh`: เลิกใช้ `trap 'php artisan up' EXIT` — เปิดเว็บกลับเฉพาะเมื่อทุกขั้นผ่านรวม `erp:health` ถ้าพังจะปิดค้างไว้ พิมพ์ `::error::` แล้ว exit non-zero ให้ workflow แดง
+- เลิก `ssh-keyscan` ใช้ secret ใหม่ `DEPLOY_KNOWN_HOSTS` + `StrictHostKeyChecking yes`; pin `webfactory/ssh-agent` เป็น SHA ของ v0.9.0
+- `docs/OPERATIONS.md`: เพิ่มวิธีสร้าง `DEPLOY_KNOWN_HOSTS` และพฤติกรรมเมื่อ deploy พัง
+
+## ทดสอบไปแล้วแค่ไหน
+- `bash -n scripts/deploy.sh` ผ่าน, parse YAML ด้วย js-yaml ผ่าน
+- รัน `deploy.sh` จริงกับ stub `php`/`composer`: สำเร็จ→up, migrate พัง→ค้าง down exit 1, health พัง→ค้าง down exit 3, กู้ด้วย deploy ซ้ำ→up; สคริปต์ปิดเว็บก่อน upload ทดสอบทั้งกรณีไม่มีแอปและมีแอป/ปิดอยู่แล้ว
+- ยังไม่ได้รันบน GitHub Actions/เครื่องจริง (ห้าม deploy)
+
+## ความเสี่ยง/งานถัดไป
+- **ต้องเพิ่ม secret `DEPLOY_KNOWN_HOSTS` ใน environment `production` (และ `staging`) ก่อน merge** ไม่งั้น deploy จะล้มที่ขั้น host key
+- ตั้ง Required reviewers ให้ environment `production` (Settings → Environments)
+- workflow อื่นอีก ~12 ไฟล์ยังใช้ `ssh-keyscan` อยู่
+
+---
+
 # ส่งต่องานชุดส่งสำนักงานบัญชีและการเปิด/ปิดเมนู — 19 พฤศจิกายน 2569
 
 ## Commit
