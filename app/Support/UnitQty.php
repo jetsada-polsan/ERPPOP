@@ -139,13 +139,6 @@ class UnitQty
     }
 
     /**
-     * ดึงรายการหน่วยสำหรับให้ผู้ใช้เลือก (รวมหน่วยหลัก factor 1)
-     * เฉพาะหน่วยที่มีตัวคูณเป็นจำนวนเต็มบวก และชื่อไม่เสีย
-     *
-     * @param  Collection<string, mixed>|null  $productPrices
-     * @return array<int, array{unit_id: int|null, unit_name: string, name: string, factor: string, barcode: string, price: float|null, is_base: bool}>
-     */
-    /**
      * Load baseUnit and barcodes.unit once per product per request. Document
      * pages call format() for every line, often with products that were not
      * eager loaded, which used to cost two queries per line (N+1).
@@ -177,6 +170,13 @@ class UnitQty
         }
     }
 
+    /**
+     * ดึงรายการหน่วยสำหรับให้ผู้ใช้เลือก (รวมหน่วยหลัก factor 1)
+     * เฉพาะหน่วยที่มีตัวคูณเป็นจำนวนเต็มบวก และชื่อไม่เสีย
+     *
+     * @param  Collection<string, mixed>|null  $productPrices
+     * @return array<int, array{unit_id: int|null, unit_name: string, name: string, factor: string, barcode: string, price: float|null, is_base: bool}>
+     */
     public static function selectableUnits(Product $product, ?Collection $productPrices = null): array
     {
         $units = [];
