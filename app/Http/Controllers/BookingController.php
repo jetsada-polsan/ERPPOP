@@ -55,7 +55,7 @@ class BookingController extends Controller
             'document.stockDocument.items.unit',
         ])
             ->where('status', SaleBooking::STATUS_PENDING)
-            ->when($salesAreaId, fn ($query) => $query->where('sales_area_id', $salesAreaId))
+            ->when($salesAreaId, fn ($query) => $query->where('sale_bookings.sales_area_id', $salesAreaId))
             ->when($bookingId, fn ($query) => $query->where('id', $bookingId))
             ->inWarehouse($warehouseId)
             ->inWarehouseLocation($warehouseLocationId)
@@ -662,9 +662,9 @@ class BookingController extends Controller
         $dateRange = ListDateRange::fromRequest($request, 'doc_date');
 
         $filtered = SaleBooking::query()
-            ->when($status !== '', fn ($query) => $query->where('status', $status))
-            ->when($salesAreaId, fn ($query) => $query->where('sales_area_id', $salesAreaId))
-            ->when($salesUserId, fn ($query) => $query->where('sales_user_id', $salesUserId))
+            ->when($status !== '', fn ($query) => $query->where('sale_bookings.status', $status))
+            ->when($salesAreaId, fn ($query) => $query->where('sale_bookings.sales_area_id', $salesAreaId))
+            ->when($salesUserId, fn ($query) => $query->where('sale_bookings.sales_user_id', $salesUserId))
             ->when($branchId, fn ($query) => $query->whereHas('document', fn ($d) => $d->where('branch_id', $branchId)))
             ->when($bookId, fn ($query) => $query->whereHas('document', fn ($d) => $d->where('document_book_id', $bookId)))
             ->when($q !== '', fn ($query) => $query->whereHas('document', fn ($d) => $d

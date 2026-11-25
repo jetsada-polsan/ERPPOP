@@ -170,6 +170,12 @@ class ListDefaultTodayTest extends TestCase
         $resRange->assertDontSee('BK-TODAY-01');
         $this->assertEquals(1, $resRange->viewData('counts')['all']);
 
+        // 2b. Status filter with the totals join (documents also has status / sales_area_id / sales_user_id)
+        $resStatus = $this->withoutMiddleware(ErpAuthorize::class)->actingAs($this->admin)->get(route('bookings.index', [
+            'status' => 'pending', 'sales_area_id' => 1, 'sales_user_id' => $this->admin->id,
+        ]));
+        $resStatus->assertOk();
+
         // 3. Search q without date -> finds yesterday doc across all dates
         $resQ = $this->withoutMiddleware(ErpAuthorize::class)->actingAs($this->admin)->get(route('bookings.index', [
             'q' => 'BK-YESTERDAY',
