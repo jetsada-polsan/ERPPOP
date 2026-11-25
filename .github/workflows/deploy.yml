@@ -78,18 +78,28 @@ jobs:
       # Put the live site into maintenance mode BEFORE any file is uploaded, so
       # nobody is served a mix of old and new code, or new code running on the old
       # vendor/ and database schema before deploy.sh runs composer and migrate.
+      # It then takes a database backup (erp:backup); if that fails the site goes
+      # back up untouched and the deploy stops.
       # If anything after this fails, the site stays down on purpose (see deploy.sh).
-      - name: Maintenance mode before upload
+      - name: Maintenance mode and backup before upload
         id: maintenance
         run: |
           ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "APP_DIR='${{ vars.APP_DIR }}' bash -s" <<'REMOTE'
           set -euo pipefail
           if [ -f "$APP_DIR/artisan" ] && [ -f "$APP_DIR/vendor/autoload.php" ]; then
             cd "$APP_DIR"
+            WE_TOOK_IT_DOWN=0
             if [ -f storage/framework/down ]; then
               echo "Site is already in maintenance mode."
             else
               php artisan down --retry=30
+              WE_TOOK_IT_DOWN=1
+            fi
+            # Back up the database while nothing can write to it, before any code or schema changes.
+            if ! php artisan erp:backup; then
+              echo "::error::erp:backup failed - nothing was uploaded and the deploy stops here."
+              if [ "$WE_TOOK_IT_DOWN" = 1 ]; then php artisan up; fi
+              exit 1
             fi
           else
             echo "No installed app in $APP_DIR yet (first deploy) - skipping maintenance mode."

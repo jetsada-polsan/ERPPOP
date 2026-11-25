@@ -4,7 +4,7 @@
 - branch `fix/deploy-safety` from `origin/main` at `b1cbd3d`
 
 ## ทำอะไรไป
-- `deploy.yml`: ปิดเว็บ (`artisan down --retry=30`) ผ่าน ssh **ก่อน** rsync ข้ามได้ถ้ายังไม่มีแอปติดตั้ง (deploy ครั้งแรก)
+- `deploy.yml`: ปิดเว็บ (`artisan down --retry=30`) แล้ว `erp:backup` ผ่าน ssh **ก่อน** rsync (backup พัง → เปิดเว็บคืน หยุด deploy) ข้ามได้ถ้ายังไม่มีแอปติดตั้ง (deploy ครั้งแรก)
 - `deploy.sh`: เลิกใช้ `trap 'php artisan up' EXIT` — เปิดเว็บกลับเฉพาะเมื่อทุกขั้นผ่านรวม `erp:health` ถ้าพังจะปิดค้างไว้ พิมพ์ `::error::` แล้ว exit non-zero ให้ workflow แดง
 - เลิก `ssh-keyscan` ใช้ secret ใหม่ `DEPLOY_KNOWN_HOSTS` + `StrictHostKeyChecking yes`; pin `webfactory/ssh-agent` เป็น SHA ของ v0.9.0
 - `docs/OPERATIONS.md`: เพิ่มวิธีสร้าง `DEPLOY_KNOWN_HOSTS` และพฤติกรรมเมื่อ deploy พัง
