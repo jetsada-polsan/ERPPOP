@@ -28,6 +28,7 @@ class UnitQty
             return (string) $baseQty;
         }
 
+        self::loadUnits($product);
         $baseUnit = $product->baseUnit;
         $baseUnitName = ($baseUnit && ! $baseUnit->isCorrupted()) ? $baseUnit->cleanName() : '';
 
@@ -43,9 +44,7 @@ class UnitQty
         $formattedBase = number_format($baseQtyInt);
 
         // หาหน่วยใหญ่ที่มีคุณสมบัติ: active, factor จำนวนเต็ม > 1, ชื่อไม่เสีย
-        $barcodes = $product->relationLoaded('barcodes')
-            ? $product->barcodes
-            : $product->barcodes()->with('unit')->get();
+        $barcodes = $product->barcodes;
 
         $validBarcodes = $barcodes->filter(function (ProductBarcode $b) use ($product) {
             if (! $b->is_active) {
@@ -146,6 +145,38 @@ class UnitQty
      * @param  Collection<string, mixed>|null  $productPrices
      * @return array<int, array{unit_id: int|null, unit_name: string, name: string, factor: string, barcode: string, price: float|null, is_base: bool}>
      */
+    /**
+     * Load baseUnit and barcodes.unit once per product per request. Document
+     * pages call format() for every line, often with products that were not
+     * eager loaded, which used to cost two queries per line (N+1).
+     */
+    private static function loadUnits(Product $product): void
+    {
+        if ($product->relationLoaded('baseUnit') && $product->relationLoaded('barcodes')) {
+            return;
+        }
+
+        $attributes = request()->attributes;
+        $cache = $attributes->get('unit_qty_units', []);
+        $key = (int) $product->getKey();
+
+        if (! isset($cache[$key])) {
+            $loaded = Product::query()->whereKey($key)->with(['baseUnit', 'barcodes.unit'])->first();
+            $cache[$key] = [
+                'baseUnit' => $loaded?->baseUnit,
+                'barcodes' => $loaded?->barcodes ?? new \Illuminate\Database\Eloquent\Collection,
+            ];
+            $attributes->set('unit_qty_units', $cache);
+        }
+
+        if (! $product->relationLoaded('baseUnit')) {
+            $product->setRelation('baseUnit', $cache[$key]['baseUnit']);
+        }
+        if (! $product->relationLoaded('barcodes')) {
+            $product->setRelation('barcodes', $cache[$key]['barcodes']);
+        }
+    }
+
     public static function selectableUnits(Product $product, ?Collection $productPrices = null): array
     {
         $units = [];
