@@ -15,9 +15,36 @@
 - ยังไม่ได้รันบน GitHub Actions/เครื่องจริง (ห้าม deploy)
 
 ## ความเสี่ยง/งานถัดไป
-- **ต้องเพิ่ม secret `DEPLOY_KNOWN_HOSTS` ใน environment `production` (และ `staging`) ก่อน merge** ไม่งั้น deploy จะล้มที่ขั้น host key
+- เพิ่ม secret `DEPLOY_KNOWN_HOSTS` ใน environment `production` แล้ว (25 พ.ย. เทียบ fingerprint ED25519 `SHA256:Uqi6RRXT…` ตรงกับเครื่องจริง) — `staging` ยังไม่มี secret ใดๆ
 - ตั้ง Required reviewers ให้ environment `production` (Settings → Environments)
 - workflow อื่นอีก ~12 ไฟล์ยังใช้ `ssh-keyscan` อยู่
+
+---
+
+# Handoff — 2026-11-25 (ความเร็วทั้งระบบ, Claude)
+
+## Commit
+- branch `perf/system-speed` จาก `origin/main` (`b1cbd3dc`)
+
+## วัดอะไรไป
+- เปิด GET ทุกหน้าที่ไม่ต้องใส่รหัส (137 หน้า) ด้วย admin บน SQLite ว่าง: รอบแรกเฉลี่ย 280 ms (คอมไพล์ view), รอบสองเฉลี่ย 8 ms, 13 query/หน้า → โค้ดเปล่าไม่ช้า ความช้าบน production มาจากข้อมูลจริง/เซิร์ฟเวอร์
+- เปิด `preventLazyLoading` ชั่วคราวแล้วรันเทสต์ทั้งชุด: lazy load 53 ครั้ง เกือบทั้งหมดคือ `UnitQty::format` (แสดงจำนวนสองหน่วยทุกบรรทัดเอกสาร) → หลังแก้เหลือ 1
+- ไล่ foreign key ทุกตัวหลัง migrate: 276 คอลัมน์ไม่มี index (PostgreSQL ไม่สร้างให้เอง) เช่น `stock_movements.document_id`, `customer_ledger.document_id`, `pos_receipts.document_id`, `payment_lines.payment_document_id`
+
+## ทำอะไรไป
+- `UnitQty::format`: โหลด baseUnit + barcodes.unit ครั้งเดียวต่อสินค้าต่อ request (30 บรรทัด: 90 → 4 query) + เทสต์ `UnitQtyQueryCountTest` (ถอดโค้ดที่แก้ออกแล้วเทสต์แดงจริง)
+- `PaymentController::print`: eager load รายการสินค้าของบิลที่รับชำระ
+- migration `2026_11_25_100000_add_foreign_key_indexes_for_speed`: index 71 คอลัมน์ FK ที่ชี้ไปตารางเอกสาร/สินค้า/ลูกค้า/ซัพพลายเออร์/บิล POS แบบเดียวกับ migration 2026_11_20 (เช็ค hasTable/hasColumn/hasIndex, rollback ได้)
+- `layout.blade.php`: ฟอนต์ Google ไม่บล็อกการวาดหน้าแล้ว
+
+## ทดสอบไปแล้วแค่ไหน
+- เทสต์ทั้งชุด 1183: ผ่าน 1175, ล้ม 6 ตัวเดิมที่ล้มบน main อยู่แล้วบน Windows (เทสต์สแกนไฟล์/path) ไม่เกี่ยวกับงานนี้
+- migrate / rollback / migrate บน SQLite ผ่าน; **ยังไม่ได้รันบน PostgreSQL** (เครื่องนี้ไม่มี) — `postgres-uat` จะรันเมื่อเปิด PR
+
+## ความเสี่ยง/งานถัดไป
+- สร้าง index บนตารางใหญ่จะล็อกการเขียนระหว่าง migrate — deploy ปิดเว็บก่อน migrate อยู่แล้ว
+- ยังไม่ได้วัดบน production: ให้เจ้าของเช็ค opcache, `CACHE_STORE`/`SESSION_DRIVER` (ถ้าเป็น `database` ควรเปลี่ยนเป็น `redis` หรือ `file`), gzip ของ nginx, `pg_stat_statements` หา query ที่ช้าสุด
+- ทุกหน้าส่ง HTML ~116 KB (เมนูทั้งชุด ~76 KB) ถ้า nginx ไม่ gzip จะช้าบนเน็ตร้าน
 
 ---
 
