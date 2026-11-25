@@ -145,6 +145,9 @@ class PaymentController extends Controller
                 ->map(fn ($allocation) => $allocation->openItem?->document)
                 ->filter()->unique('id')->values()
             : collect();
+        // one query per relation instead of per paid bill and per line
+        (new \Illuminate\Database\Eloquent\Collection($paidDocs->all()))
+            ->load('stockDocument.items.product.baseUnit');
 
         return view('payments.print', compact('payment', 'paidDocs'));
     }
