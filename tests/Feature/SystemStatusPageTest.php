@@ -98,7 +98,7 @@ class SystemStatusPageTest extends TestCase
             'document_type_id' => $bookingTypeId, 'branch_id' => $branchId, 'doc_number' => 'STAT-B18-001',
             'doc_date' => now()->toDateString(), 'status' => 'active', 'total_items' => 1,
             'total_amount' => 47.50, 'created_at' => now(), 'updated_at' => now(),
-            'source_system' => 'bplus', 'source_key' => 'STAT-B18-001',
+            'source_system' => 'bplus', 'source_key' => 918001,
         ]);
         $debitAccount = DB::table('chart_of_accounts')->insertGetId(['code' => 'STAT-D', 'name_th' => 'เดบิตทดสอบ', 'account_type' => 'asset']);
         $creditAccount = DB::table('chart_of_accounts')->insertGetId(['code' => 'STAT-C', 'name_th' => 'เครดิตทดสอบ', 'account_type' => 'revenue']);

@@ -80,7 +80,10 @@ class PermissionMatrixTest extends TestCase
             fn (Role $role) => [$role->code => $role->permissions->pluck('code')->sort()->implode(' ')],
         )->all();
 
+        // เรียงใน PHP ทั้งสองฝั่ง: ORDER BY ของ PostgreSQL (en_US.UTF-8) ข้ามเครื่องหมาย _
+        // จึงได้ ACC, ACC_MGR, ACCOUNTING_FIRM ขณะที่ SQLite/ksort เรียงแบบไบต์
         ksort($expected);
+        ksort($actual);
         $this->assertSame($expected, $actual);
 
         $permissionCodes = Permission::query()->orderBy('code')->pluck('code')->all();

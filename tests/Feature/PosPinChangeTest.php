@@ -95,7 +95,7 @@ class PosPinChangeTest extends TestCase
 
     public function test_admin_pin_command_rejects_six_digits(): void
     {
-        [$cashier] = $this->cashierWithDevice('ADMINPINLEN');
+        [$cashier] = $this->cashierWithDevice('ADMPINLEN');
 
         $this->artisan('pos:pin', ['salesman' => $cashier->code, 'pin' => '123456'])->assertFailed();
         $this->assertNull($cashier->fresh()->pos_pin_hash);

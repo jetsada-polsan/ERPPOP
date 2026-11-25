@@ -460,7 +460,7 @@ class EveryRecordPageOpensTest extends TestCase
 
         // 3.21 OCR Document
         $ocrDoc = OcrDocument::create([
-            'uuid' => 'qa-ocr-'.uniqid(),
+            'uuid' => (string) \Illuminate\Support\Str::uuid(),
             'document_type' => 'tax_invoice',
             'source_module' => 'purchasing',
             'original_file_path' => 'dummy/path.pdf',
