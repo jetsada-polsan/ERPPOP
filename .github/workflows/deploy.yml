@@ -51,10 +51,60 @@ jobs:
         run: pnpm run build
       - name: Fail if the build produced no manifest
         run: test -f public/build/manifest.json
-      - uses: webfactory/ssh-agent@v0.9.0
+      - uses: webfactory/ssh-agent@dc588b651fe13675774614f8e6a936a468676387 # v0.9.0
         with:
           ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
-      - run: ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+      # Trust only the server host key stored in the DEPLOY_KNOWN_HOSTS secret.
+      # ssh-keyscan at deploy time would trust whatever key answers (no MITM protection).
+      - name: Trust the pinned server host key
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$DEPLOY_KNOWN_HOSTS" ]; then
+            echo "::error::Secret DEPLOY_KNOWN_HOSTS is not set for this environment. Add the server's known_hosts line(s) (see docs/OPERATIONS.md)."
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          if ! ssh-keygen -F "$DEPLOY_HOST" -f ~/.ssh/known_hosts > /dev/null; then
+            echo "::error::DEPLOY_KNOWN_HOSTS has no entry for DEPLOY_HOST. The host name/IP in the known_hosts line must match DEPLOY_HOST exactly."
+            exit 1
+          fi
+          printf 'Host *\n  StrictHostKeyChecking yes\n' >> ~/.ssh/config
+          chmod 600 ~/.ssh/config
+      # Put the live site into maintenance mode BEFORE any file is uploaded, so
+      # nobody is served a mix of old and new code, or new code running on the old
+      # vendor/ and database schema before deploy.sh runs composer and migrate.
+      # It then takes a database backup (erp:backup); if that fails the site goes
+      # back up untouched and the deploy stops.
+      # If anything after this fails, the site stays down on purpose (see deploy.sh).
+      - name: Maintenance mode and backup before upload
+        id: maintenance
+        run: |
+          ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "APP_DIR='${{ vars.APP_DIR }}' bash -s" <<'REMOTE'
+          set -euo pipefail
+          if [ -f "$APP_DIR/artisan" ] && [ -f "$APP_DIR/vendor/autoload.php" ]; then
+            cd "$APP_DIR"
+            WE_TOOK_IT_DOWN=0
+            if [ -f storage/framework/down ]; then
+              echo "Site is already in maintenance mode."
+            else
+              php artisan down --retry=30
+              WE_TOOK_IT_DOWN=1
+            fi
+            # Back up the database while nothing can write to it, before any code or schema changes.
+            if ! php artisan erp:backup; then
+              echo "::error::erp:backup failed - nothing was uploaded and the deploy stops here."
+              if [ "$WE_TOOK_IT_DOWN" = 1 ]; then php artisan up; fi
+              exit 1
+            fi
+          else
+            echo "No installed app in $APP_DIR yet (first deploy) - skipping maintenance mode."
+          fi
+          REMOTE
       - name: Upload release
         run: >-
           rsync -az --chmod=F644,D755
@@ -63,4 +113,11 @@ jobs:
           --exclude=node_modules/ --exclude=storage/ --exclude=bootstrap/cache/
           --exclude=database/database.sqlite
           ./ "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ vars.APP_DIR }}/"
-      - run: ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "APP_DIR='${{ vars.APP_DIR }}' SKIP_GIT=1 bash '${{ vars.APP_DIR }}/scripts/deploy.sh'"
+      # ssh returns deploy.sh's exit code, so a failed migrate/health check fails this step.
+      - name: Install release on the server (deploy.sh)
+        run: ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "APP_DIR='${{ vars.APP_DIR }}' SKIP_GIT=1 bash '${{ vars.APP_DIR }}/scripts/deploy.sh'"
+      - name: Site is still in maintenance mode
+        if: failure() && steps.maintenance.outcome == 'success'
+        run: |
+          echo "::error::Deploy failed after the site was put into maintenance mode. The site is still DOWN on purpose so users never get half-deployed code. Fix the cause and run Deploy ERP again, or check the site on the server and run 'php artisan up' in ${{ vars.APP_DIR }}."
+          exit 1
