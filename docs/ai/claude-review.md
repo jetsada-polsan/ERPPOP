@@ -1,97 +1,112 @@
-# ผลตรวจ — 2026-07-29
+# ผลตรวจ — 2026-11-26 (ตรวจทั้งระบบหลัง deploy #423)
 
 ## ช่วง commit ที่ตรวจ
 
-`fd72fb0..85184a3` — 7 commit ของ Codex (bundle promotion, POS local SQLite, ประวัติขาย 90 วัน)
+ทั้ง repo ที่ `55cf0e14` (main หลัง merge #145 และ #144) และ production `https://erp.popstarcenter.com` ตรวจจากภายนอก (ไม่ได้ login)
 
 ## สรุป
 
-**ผ่าน หลังแก้ 2 จุด** เจอบั๊กที่ทำให้หน้า POS บนเว็บพังหนึ่งจุด แก้ให้แล้วในรอบนี้
-ตามที่เจ้าของโปรเจกต์สั่ง (ปกติ Claude จะไม่แก้โค้ดของ Codex ดู `WORKFLOW.md`)
+ผ่าน — ระบบใช้งานได้ ไม่พบเรื่องที่ทำให้ข้อมูลเสียหรือเปิดช่องให้เข้าระบบโดยไม่ login
+มีเรื่อง **ควรแก้** ด้านความปลอดภัย (library มีช่องโหว่ 37 รายการ, ไม่มี security headers, session cookie ไม่ Secure)
+และด้านความเร็ว (CSS/JS ไม่ถูก gzip และไม่มี cache header)
 
 ## สิ่งที่รันจริง
 
-| คำสั่ง | ผล |
-|---|---|
-| `php artisan test` | ผ่าน 110 ตัว 1,834 assertions |
-| `vue-tsc --noEmit` (แอป POS) | ผ่าน ไม่มี error |
-| `migrate --pretend --force` บน PostgreSQL จริง | `alter table "qty_promotions" add column "bundle_price" decimal(18, 4) null` |
-| ถอด logic `bundle_price` ออกแล้วรันเทสต์ | แดงจริง — เทสต์ของ Codex จับ regression ได้ |
-
-migration รันบน PostgreSQL ได้ปลอดภัย `after()` ถูกละทิ้งตามที่ควรเป็น ไม่กระทบข้อมูลเดิม
-(ทดสอบด้วย `--pretend` เท่านั้น ไม่ได้รันจริงบน production)
+- `php -d memory_limit=2G vendor/bin/phpunit` (Windows, PHP 8.5.12, SQLite): 1,183 tests, 10,642 assertions,
+  **6 failures**, 7 skipped/incomplete, 243 วินาที. ทั้ง 6 ตัวเป็นปัญหาเฉพาะ Windows (ข้อ 5);
+  บน Linux job `test` ของ Deploy ERP #423 ผ่าน
+- `node --test tests/js/`: 5/5 ผ่าน
+- `composer audit --locked`: 37 advisories ใน 9 แพ็กเกจ (ข้อ 1)
+- `curl` production: header, gzip, cache ของหน้าและไฟล์ static, ไฟล์ที่ไม่ควรเปิดได้
 
 ## สิ่งที่พบ
 
-### 1. หน้า POS บนเว็บพังทันทีที่มีแคมเปญราคาชุด — ต้องแก้ (แก้แล้ว)
+### 1. library ที่ล็อกไว้มีช่องโหว่ 37 รายการ — ควรแก้ (ทำก่อนข้ออื่น)
+- ไฟล์: `composer.lock` (แก้ล่าสุด `b80c5c31` 2026-07-18)
+- อาการ:
+  - `laravel/framework` v13.17.0: critical CVE-2026-114509 (TokenGuard authentication bypass) และอีก 3 รายการ
+  - `guzzlehttp/guzzle` 7.13.1: high CVE-2026-69246 และ medium อีก 5
+  - `league/commonmark` 2.8.2: high หลายรายการ (DoS, XSS)
+  - `symfony/http-foundation`, `symfony/http-kernel`, `symfony/routing`, `symfony/mailer` และ `symfony/mime` (v7.4.13–14) รวมกับ `league/flysystem` 3.35.1 อีก 15 รายการ
+- เสนอ: เพิ่ม `config.platform.php = "8.3.0"` ใน `composer.json` (server เป็น 8.3 แต่เครื่อง dev เป็น 8.5)
+  แล้วรัน `composer update --with-all-dependencies` โดยไม่ข้าม major version และรันเทสต์ทั้งชุด
 
-- ไฟล์: `resources/views/pos/index.blade.php:3116`
-- อาการ: โค้ดอ้าง `Number(trigger.unit_price)` แต่ **ไม่มีตัวแปรชื่อ `trigger` ในขอบเขตนั้น**
-  ชื่อนี้ถูกลอกมาจากฝั่ง PHP (`PosPricingGuard` ใช้ `$trigger['unit_price']`) แต่ในไฟล์นี้
-  ตัวแปรที่ถูกต้องคือ `unitPrice` ซึ่งคำนวณไว้บรรทัดก่อนหน้าพอดี
-  ผลคือ getter `promoDiscountTotal` โยน `ReferenceError` ทุกครั้งที่ตะกร้ามีสินค้าที่ตรงกับ
-  แคมเปญประเภทราคาชุด ทำให้ยอดรวมบนหน้าจอคำนวณไม่ได้
-- ทำไมเทสต์ไม่จับ: โค้ด Alpine ในไฟล์ blade ไม่มีเทสต์ครอบเลย PHPUnit ตรวจไม่ถึง
-  และ `vue-tsc` ตรวจเฉพาะแอป desktop ไม่ได้ตรวจไฟล์ blade
-- แก้เป็น `unitPrice` แล้ว ตรวจแล้วว่าสูตรตรงกับฝั่งเซิร์ฟเวอร์เป๊ะ
-  `max(0, sets × min_qty × unitPrice − sets × bundle_price)`
+### 2. ไม่มี security headers — ควรแก้
+- อาการ: `/login` ไม่ส่ง `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` และ `Strict-Transport-Security`
+  และ `Server: nginx/1.24.0 (Ubuntu)` บอกเวอร์ชัน
+- เสนอ: เพิ่ม middleware ต่อท้ายกลุ่ม `web` (แบบเดียวกับ `ErpAuthorize` ใน `bootstrap/app.php`)
+  - iframe ในระบบอยู่ในโดเมนเดียวกันทั้งหมด (products, OCR) จึงใช้ `SAMEORIGIN` ได้
+  - ส่วน `server_tokens off` เป็นค่าใน nginx
 
-### 2. ประวัติการขายที่ยังส่งไม่สำเร็จถูกลบทิ้งเมื่อครบ 90 วัน — ควรแก้ (แก้แล้ว)
+### 3. session cookie ไม่มี Secure flag — ควรแก้ (เจ้าของแก้บน server)
+- อาการ: `popstar-erp-session` และ `XSRF-TOKEN` ไม่มี `secure` เพราะ `config/session.php` ใช้ค่า default `SESSION_SECURE_COOKIE=false`
+- เสนอ: ใน `.env` ของ production ตั้ง `SESSION_SECURE_COOKIE=true` แล้วรัน `php artisan config:cache`
+  - เว็บ redirect http → https อยู่แล้ว จึงไม่กระทบการ login
 
-- ไฟล์: `apps/pos-desktop/src/lib/db.ts:22`
-- อาการ: คำสั่งลบข้อมูลเก่ารันทุกครั้งที่เปิดแอป และลบตามอายุอย่างเดียวโดยไม่ดูสถานะ
-  บิลที่ยังส่งขึ้นเซิร์ฟเวอร์ไม่สำเร็จ (เครื่องออฟไลน์ยาว หรือ sync ค้าง) จะหายจากประวัติในเครื่อง
-  ทั้งที่ยังค้างอยู่ใน `checkout_queue` — พนักงานจะมองไม่เห็นว่ามีบิลตกค้าง
-- อีกจุดในคำสั่งเดียวกัน: เทียบ `printed_at` แบบสตริงตรงๆ ขณะที่ฟังก์ชัน `saleHistory()`
-  เทียบผ่าน `datetime()` ค่าที่เก็บเป็น ISO-8601 (`2026-07-29T04:12:33.123Z`) รูปแบบไม่ตรงกับ
-  ผลลัพธ์ของ `datetime('now',...)` ที่ใช้เว้นวรรค ทำให้เส้นแบ่งวันเพี้ยนได้ถึงหนึ่งวัน
-- แก้เป็น `WHERE status = 'synced' AND datetime(printed_at) < datetime('now','-90 days')`
-  ลบเฉพาะบิลที่ส่งสำเร็จแล้ว และเทียบเวลาแบบเดียวกันทั้งสองที่
+### 4. CSS/JS ไม่ถูก gzip และไม่มี cache header — ควรแก้ (ความเร็ว)
+- อาการ: หน้า HTML ถูก gzip แล้ว แต่ไฟล์ static ส่งแบบไม่บีบอัด และไม่มี `Cache-Control`/`Expires`
+  - ขนาด: `adminlte.min.css` 340 KB, `bootstrap-icons.min.css` 87 KB, `sweetalert2.all.min.js` 79 KB, `css/erp-layout.css` 77 KB, `alpine.min.js` 46 KB (รวม ~630 KB ต่อการเข้าครั้งแรก)
+  - เบราว์เซอร์ต้องถาม server ซ้ำทุกหน้า
+- ต้นเหตุฝั่งโค้ด: ไฟล์ CSS/JS 22 จุดเรียกผ่าน `asset()` โดยไม่มี `?v=` จึงเปิด cache ยาวไม่ได้ (หลัง deploy ผู้ใช้จะได้ไฟล์เก่า)
+  - `layout.blade.php` 6 จุด, `pos/index` 5, `wh/index` 2, `auth/mfa-challenge` 2 และที่อื่น
+- เสนอ: ใส่ `?v=` ให้ครบก่อน แล้วเจ้าของเปิด `gzip_types` และ `expires` ใน nginx **หลัง** deploy โค้ดนั้น
 
-### 3. Backup ฝั่งเครื่อง POS พึ่งพาการปิดคอนเนกชันอย่างเดียว — ข้อสังเกต
+### 5. เทสต์ 6 ตัวล้มบน Windows — ควรแก้
+- ไฟล์:
+  - `tests/Feature/ConfirmPopupConsistencyTest.php` (2 ตัว)
+  - `tests/Feature/ErpStructuralGapsTest.php`
+  - `tests/Feature/LegacyPosImportQuarantineTest.php`
+  - `tests/Feature/PrintablePageSizeTest.php`
+  - `tests/Feature/FinanceSecurityControlTest.php:160`
+- อาการ: เทสต์เอา `resource_path('views/layout.blade.php')` (ใช้ `/`) ไปเทียบกับ path จาก filesystem ที่ใช้ `\`
+  - รายการยกเว้นจึงไม่ทำงาน และไฟล์ที่ได้รับอนุญาตถูกนับว่าผิด
+  - ตัวสุดท้ายใช้ `chmod(0000)` ซึ่ง Windows ไม่บล็อกการอ่าน
+  - agent ที่รันบน Windows จะเห็นแดงแล้วอาจไปแก้โค้ดผิดจุด
+- เสนอ: normalize path ทั้งสองฝั่งเป็น `/` ก่อนเทียบ และให้เทสต์ chmod ข้ามเฉพาะบน Windows
 
-- ไฟล์: `apps/pos-desktop/src-tauri/src/lib.rs:38-70`
-- `backup_local_database` คัดลอกเฉพาะไฟล์ `popstar-pos.db` ไม่ได้แตะ `-wal` กับ `-shm`
-  ซึ่งปลอดภัยได้เพราะ `App.vue:210,229` เรียก `closeLocalDb()` ก่อนทุกครั้ง ทำให้ SQLite
-  checkpoint แล้วลบ WAL ทิ้ง — Codex คิดเรื่องนี้ไว้แล้ว ตรงนี้ถูกต้อง
-- แต่ถ้าวันใด `closeLocalDb()` ล้มเหลว หรือมีคอนเนกชันอื่นค้าง ไฟล์ที่ copy ไปจะไม่ครบ
-  และตอน restore ไฟล์ `-wal` เก่าที่ค้างอยู่อาจถูกนำมาใช้ทับฐานข้อมูลที่เพิ่งกู้คืน
-- เสนอ: ใช้ `VACUUM INTO` แทนการ copy ไฟล์ (SQLite การันตีว่าได้ snapshot ที่สมบูรณ์
-  โดยไม่ต้องปิดคอนเนกชัน) หรืออย่างน้อยลบ `-wal`/`-shm` ทิ้งตอน restore
-  ไม่ใช่เรื่องด่วน เพราะเส้นทางปกติปลอดภัยอยู่แล้ว
+### 6. CI ทดสอบด้วย PHP 8.5.10 แต่ production เป็น 8.3 — ควรแก้
+- ไฟล์: `.github/workflows/deploy.yml:24`
+- อาการ: syntax ของ PHP 8.4+ จะผ่าน gate ของ deploy แต่ไปพังบน server
+  - `postgres-uat.yml` ใช้ 8.3 อยู่แล้ว แต่ยังแดงจนกว่า PR #146 จะ merge
+- เสนอ: เปลี่ยนเป็น `'8.3'`
 
-### 4. `saveSaleHistory` ที่ล้มเหลวทำให้บิลที่บันทึกคิวสำเร็จแล้วถูกมาร์คว่า failed — ข้อสังเกต
+### 7. backup อยู่บน server เครื่องเดียวกับฐานข้อมูล — ควรแก้ (เจ้าของ)
+- อาการ: `erp:backup` เขียนลง `storage/app/backups` บน server เดียวกัน ถ้าเครื่องเสียจะเสียทั้งข้อมูลและ backup
+  - `docs/ai/backup-dr-uat.md` บันทึกว่ารอบ Google Drive (`rclone crypt`) และการกู้ `jeterp_dr` ยังไม่ได้ทำ
+- เสนอ: ทำตาม `docs/BACKUP-DR-RUNBOOK.md` ให้ครบ แล้วจึงติดตั้ง cron
 
-- ไฟล์: `apps/pos-desktop/src/App.vue:407-408`
-- `enqueue()` สำเร็จไปแล้ว แต่ถ้า `saveSaleHistory()` โยน error บล็อก `catch` จะไป
-  `markQueue(id, 'failed')` ทั้งที่ตัวบิลเข้าคิวเรียบร้อย
-- ไม่ถึงขั้นเสียหาย เพราะ `syncCheckoutQueue()` หยิบทุกอย่างที่ `status !== 'synced'` มาลองใหม่
-  บิลจึงยังถูกส่งอยู่ดี แค่ขึ้นสถานะน่าตกใจชั่วคราวและไม่มีแถวในประวัติ
-- เสนอ: ครอบ `saveSaleHistory` ด้วย try/catch ของตัวเอง เพราะประวัติเป็นข้อมูลเสริม
-  ไม่ควรมีอำนาจทำให้บิลจริงดูเหมือนล้มเหลว
+### 8. workflow ที่แก้หรือล้างข้อมูล production กดได้คลิกเดียว — ข้อสังเกต
+- ไฟล์: `erp-reset-transactions.yml` (ถ้าเลือก `apply` จะล้างรายการธุรกรรมทั้งหมดหลัง backup), `void-pos-test-sales.yml`, `uat-receive-all-products.yml`, `add-large-unit-stock.yml`
+- อาการ: environment `production` ยังไม่ตั้ง required reviewer ใครก็ตามที่มีสิทธิ์ write กดได้ทันที
+- เสนอ: เจ้าของตั้ง required reviewer ใน GitHub และพิจารณาลบ workflow สมัย UAT ที่ไม่ใช้แล้ว
 
-**สถานะ:** แก้แล้วหลังรอบตรวจ โดยให้ `checkout_queue` เป็นข้อมูลหลักของการขาย และจับ error ของ
-`saveSaleHistory()` แยกต่างหาก บิลที่เข้าคิวสำเร็จจึงยังส่ง ERP ต่อได้แม้บันทึกประวัติในเครื่องล้มเหลว
+### 9. งานค้าง — ข้อสังเกต
+- PR #146 (ทำให้ `postgres-uat` เขียว) รอ merge
+- branch `fix/pin-host-keys` (เลิกใช้ `ssh-keyscan` ใน workflow อีก 9 ไฟล์) ทำเสร็จแล้วแต่ยังไม่ได้ push
+- opcache, `CACHE_STORE`/`SESSION_DRIVER` และ query ช้าบน PostgreSQL ยังไม่ได้ยืนยัน เพราะดูจากภายนอกไม่ได้
 
 ## ที่ตรวจแล้วไม่มีปัญหา
 
-- **migration** `add_bundle_price_to_qty_promotions` — รันได้ทั้ง SQLite และ PostgreSQL
-- **`PosPricingGuard::qtyPromotionDiscount()`** — สูตรราคาชุดถูกต้อง และวางตามแบบเดียวกับ
-  ประเภท `discount` ที่มีอยู่เดิม (ข้อสังเกตเรื่องการปนกันระหว่างหน่วยขายกับหน่วยฐานมีอยู่เดิม
-  ในประเภท `discount` อยู่แล้ว ไม่ใช่ของใหม่ที่ commit ชุดนี้ทำให้เกิด)
-- **`QtyPromotionController::validatePromotion()`** — ล้างค่าฟิลด์ที่ไม่เกี่ยวกับ promo_type
-  ที่เลือกไว้ครบทั้งสองทิศทาง ไม่มีค่าค้างข้ามประเภท
-- **`QtyPromotion::label()`** และหน้าจัดการแคมเปญ — แสดงผลถูกต้องทั้งสามประเภท
-- **`localDbHealth()`** — คำสั่ง PRAGMA และการนับสถานะคิวถูกต้อง
-- **`restore_latest_database`** — กรองไฟล์ `pos-pre-restore-*` ออกจากรายการกู้คืนถูกต้องแล้ว
-  และสำรองไฟล์ปัจจุบันก่อนเขียนทับ
+- ทุก route ฝั่ง web ผ่าน `ErpAuthorize`: guest ถูกส่งไปหน้า login และตรวจสิทธิ์ตามเมนู ส่วน public route มี 12 ชื่อตามที่ระบุไว้
+- route ของ `api.php` แต่ละกลุ่มมี guard:
+  - `pos.device`, `member.portal` และ `auth`
+  - `throttle` ที่ `pair` และ `bplus/sync`
+  - ตรวจ signature ที่ LINE webhook
+- login จำกัด 5 ครั้งต่อนาที (`RateLimiter`) และมี MFA
+- LINE webhook ตรวจ `x-line-signature` ด้วย `hash_equals`
+- raw SQL ที่ประกอบจากตัวแปรใช้ค่าภายในทั้งหมด ไม่รับ input ผู้ใช้:
+  - `ReportController::branchByLocationSub`
+  - `REPLACE()` ใน `BplusDocumentMaterializer`
+- `{!! !!}` 6 จุดส่ง SVG/HTML ที่ระบบสร้างเอง
+- production:
+  - หน้า 404 ไม่โชว์ debug
+  - `.env` และ `.git/config` ได้ 403, `storage/logs/laravel.log` และ `composer.lock` ได้ 404
+  - http redirect ไป https (301) และ HTML ถูก gzip
+  - TTFB ของ `/login` ประมาณ 0.29 วินาที
+- `composer.lock` ไม่มีแพ็กเกจที่ต้องใช้ PHP 8.4+ (`platform.php = ^8.3`)
 
-## ที่ยังไม่ได้ตรวจ
+## ยังไม่ได้ดู
 
-- **ไม่ได้ build แอป POS desktop จริง** เครื่องนี้ `vite build` รันไม่ได้ (native module ของ
-  rollup คนละ Team ID) ตรวจได้แค่ระดับ typecheck โค้ด Rust ใน `lib.rs` ยังไม่ได้ compile เลย
-  ต้อง build บนเครื่อง Windows หรือผ่าน workflow `pos-desktop-release.yml` ก่อนปล่อยจริง
-- **ไม่ได้ทดสอบ UI จริงบนหน้า POS เว็บ** บั๊กข้อ 1 พบจากการอ่านโค้ด แก้แล้วแต่ยังไม่ได้กดใช้จริง
-  ควรลองเปิดแคมเปญราคาชุดหนึ่งตัวแล้วยิงสินค้าเข้าตะกร้าเพื่อยืนยัน
-- **เอกสาร** `docs/POS-LOCAL-SQLITE-STRUCTURE.md` และ ERD อ่านผ่านๆ ไม่ได้ตรวจทีละบรรทัด
-  ว่าตรงกับ schema จริงทุกคอลัมน์
+- เวลาโหลดหน้าจริงหลัง login (Chrome ไม่ได้ login ไว้ และไม่กรอกรหัสผ่านแทน)
+- `pg_stat_statements`, opcache และ log บน server (เครื่องนี้ไม่มี SSH key)
+- logic บัญชี สต๊อก และราคาเชิงลึก (รอบนี้ไม่ได้ไล่)
