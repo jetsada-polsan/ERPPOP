@@ -12,10 +12,30 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
-      - uses: webfactory/ssh-agent@v0.9.0
+      - uses: webfactory/ssh-agent@dc588b651fe13675774614f8e6a936a468676387 # v0.9.0
         with:
           ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
-      - run: ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+      # Trust only the server host key stored in the DEPLOY_KNOWN_HOSTS secret.
+      # ssh-keyscan at run time would trust whatever key answers (no MITM protection).
+      - name: Trust the pinned server host key
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$DEPLOY_KNOWN_HOSTS" ]; then
+            echo "::error::Secret DEPLOY_KNOWN_HOSTS is not set. Add the server's known_hosts line(s) (see docs/OPERATIONS.md)."
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          if ! ssh-keygen -F "$DEPLOY_HOST" -f ~/.ssh/known_hosts > /dev/null; then
+            echo "::error::DEPLOY_KNOWN_HOSTS has no entry for DEPLOY_HOST. The host name/IP in the known_hosts line must match DEPLOY_HOST exactly."
+            exit 1
+          fi
+          printf 'Host *\n  StrictHostKeyChecking yes\n' >> ~/.ssh/config
+          chmod 600 ~/.ssh/config
       - name: Inspect backup readiness
         run: |
           ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "APP_DIR='${{ vars.APP_DIR }}' bash -s" < scripts/ops/backup-inspect.sh | tee result.txt
