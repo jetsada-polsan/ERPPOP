@@ -1,112 +1,75 @@
-# ผลตรวจ — 2026-11-26 (ตรวจทั้งระบบหลัง deploy #423)
+# ผลตรวจ — 2026-11-26 รอบ 2 (PR #148 ของ Antigravity)
 
 ## ช่วง commit ที่ตรวจ
 
-ทั้ง repo ที่ `55cf0e14` (main หลัง merge #145 และ #144) และ production `https://erp.popstarcenter.com` ตรวจจากภายนอก (ไม่ได้ login)
+`1e780b1f..fc7057c6` (branch `antigravity/system-hardening`, PR #148) — 7 commit ทำตาม `docs/ai/ANTIGRAVITY_SYSTEM_HARDENING_PROMPT.md`
+
+รอบก่อน (ตรวจทั้งระบบหลัง deploy #423) ดูได้จาก git history ของไฟล์นี้ที่ `a0ef5713`
 
 ## สรุป
 
-ผ่าน — ระบบใช้งานได้ ไม่พบเรื่องที่ทำให้ข้อมูลเสียหรือเปิดช่องให้เข้าระบบโดยไม่ login
-มีเรื่อง **ควรแก้** ด้านความปลอดภัย (library มีช่องโหว่ 37 รายการ, ไม่มี security headers, session cookie ไม่ Secure)
-และด้านความเร็ว (CSS/JS ไม่ถูก gzip และไม่มี cache header)
+ต้องแก้ก่อน merge 2 ข้อ: Guzzle ข้าม major version และ security headers ไม่ติดหน้า redirect, 404 และ 403
+งานที่เหลือของ PR ใช้ได้
 
 ## สิ่งที่รันจริง
 
-- `php -d memory_limit=2G vendor/bin/phpunit` (Windows, PHP 8.5.12, SQLite): 1,183 tests, 10,642 assertions,
-  **6 failures**, 7 skipped/incomplete, 243 วินาที. ทั้ง 6 ตัวเป็นปัญหาเฉพาะ Windows (ข้อ 5);
-  บน Linux job `test` ของ Deploy ERP #423 ผ่าน
-- `node --test tests/js/`: 5/5 ผ่าน
-- `composer audit --locked`: 37 advisories ใน 9 แพ็กเกจ (ข้อ 1)
-- `curl` production: header, gzip, cache ของหน้าและไฟล์ static, ไฟล์ที่ไม่ควรเปิดได้
+- อ่าน diff ของโค้ด เทสต์ และ `composer.json` ทุกไฟล์ (ไม่รวม `composer.lock` ทั้งไฟล์ ดูเฉพาะเวอร์ชันที่เปลี่ยน)
+- PR #148 บน GitHub: check ผ่าน 2/2 (รวม PostgreSQL UAT บน PHP 8.3) และไม่มี conflict
+- `composer show guzzlehttp/guzzle --all`: มี 7.17.0 และ advisory ของ Guzzle ทุกตัวโดนเฉพาะ `<7.15.2` หรือ `>=8.0.0,<8.0.1`
+- เทสต์ probe นอก repo วัด query ต่อหน้า โดยใช้ cache และ session แบบ database ตาม default ของ `config/` และ `.env.example`
+  - admin เปิด 6 หน้า หน้าละ 1 ครั้งหลัง warm-up
+  - ตรวจ header ของ 302, 404 และ `/up`
+- `php -d memory_limit=2G vendor/bin/phpunit` บน `fc7057c6` (Windows, PHP 8.5.12, หลัง `composer install` จาก lock ใหม่): 1,189 tests, 1,186 passed, 0 failed, 3 skipped, 6 incomplete, 10,688 assertions
 
 ## สิ่งที่พบ
 
-### 1. library ที่ล็อกไว้มีช่องโหว่ 37 รายการ — ควรแก้ (ทำก่อนข้ออื่น)
-- ไฟล์: `composer.lock` (แก้ล่าสุด `b80c5c31` 2026-07-18)
+### 1. Guzzle ข้าม major version — ต้องแก้
+- ไฟล์: `composer.lock`
 - อาการ:
-  - `laravel/framework` v13.17.0: critical CVE-2026-114509 (TokenGuard authentication bypass) และอีก 3 รายการ
-  - `guzzlehttp/guzzle` 7.13.1: high CVE-2026-69246 และ medium อีก 5
-  - `league/commonmark` 2.8.2: high หลายรายการ (DoS, XSS)
-  - `symfony/http-foundation`, `symfony/http-kernel`, `symfony/routing`, `symfony/mailer` และ `symfony/mime` (v7.4.13–14) รวมกับ `league/flysystem` 3.35.1 อีก 15 รายการ
-- เสนอ: เพิ่ม `config.platform.php = "8.3.0"` ใน `composer.json` (server เป็น 8.3 แต่เครื่อง dev เป็น 8.5)
-  แล้วรัน `composer update --with-all-dependencies` โดยไม่ข้าม major version และรันเทสต์ทั้งชุด
+  - `guzzlehttp/guzzle` 7.13.1→8.6.0, `psr7` 2→3, `promises` 2→3 และ `uri-template` 1→2 ทั้งที่พร็อมป์ห้ามข้าม major
+  - Laravel 13.44 ยอมรับ `^7.8.2 || ^8.0` ทำให้ composer เลือก 8
+  - ระบบยิง LINE ผ่าน `Http::` (`AlertDispatchService`, `LineWebhookController`, `MemberPortalController`) แต่เทสต์ใช้ `Http::fake()` จึงไม่ได้ทดสอบการยิงจริงบน Guzzle 8
+- เสนอ: require `guzzlehttp/guzzle: ^7.17` ซึ่งปิดช่องโหว่ครบแล้ว และอัปเดตเฉพาะตระกูล guzzle
 
-### 2. ไม่มี security headers — ควรแก้
-- อาการ: `/login` ไม่ส่ง `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` และ `Strict-Transport-Security`
-  และ `Server: nginx/1.24.0 (Ubuntu)` บอกเวอร์ชัน
-- เสนอ: เพิ่ม middleware ต่อท้ายกลุ่ม `web` (แบบเดียวกับ `ErpAuthorize` ใน `bootstrap/app.php`)
-  - iframe ในระบบอยู่ในโดเมนเดียวกันทั้งหมด (products, OCR) จึงใช้ `SAMEORIGIN` ได้
-  - ส่วน `server_tokens off` เป็นค่าใน nginx
+### 2. security headers ไม่ติดหน้า redirect, 404, 403 และ `/up` — ต้องแก้
+- ไฟล์: `bootstrap/app.php`
+- อาการ: `SecurityHeaders` ถูกต่อท้ายกลุ่ม `web` หลัง `ErpAuthorize`
+  - เมื่อ `ErpAuthorize` redirect guest หรือ abort 403 และกรณี URL ไม่มี route ตัว middleware นี้ไม่ได้ทำงาน
+  - probe ยืนยัน: `/dashboard` (302), `/no-such-page-xyz` (404) และ `/up` (200) ไม่มี `X-Content-Type-Options` และ `X-Frame-Options`
+  - เทสต์ของ PR ตรวจแค่ `/login` จึงไม่จับกรณีนี้
+- เสนอ: ย้ายไปเป็น global middleware (`$middleware->append`) และเพิ่มเทสต์ให้ครอบคลุม response เหล่านี้
 
-### 3. session cookie ไม่มี Secure flag — ควรแก้ (เจ้าของแก้บน server)
-- อาการ: `popstar-erp-session` และ `XSRF-TOKEN` ไม่มี `secure` เพราะ `config/session.php` ใช้ค่า default `SESSION_SECURE_COOKIE=false`
-- เสนอ: ใน `.env` ของ production ตั้ง `SESSION_SECURE_COOKIE=true` แล้วรัน `php artisan config:cache`
-  - เว็บ redirect http → https อยู่แล้ว จึงไม่กระทบการ login
+### 3. layout อ่าน cache ซ้ำ 13 ครั้งต่อหน้า — ควรแก้ (ความเร็ว ไม่ได้มาจาก PR นี้)
+- ไฟล์: `app/Models/AppSetting.php:15`, `app/Models/User.php:189`
+- อาการ (cache แบบ database):
 
-### 4. CSS/JS ไม่ถูก gzip และไม่มี cache header — ควรแก้ (ความเร็ว)
-- อาการ: หน้า HTML ถูก gzip แล้ว แต่ไฟล์ static ส่งแบบไม่บีบอัด และไม่มี `Cache-Control`/`Expires`
-  - ขนาด: `adminlte.min.css` 340 KB, `bootstrap-icons.min.css` 87 KB, `sweetalert2.all.min.js` 79 KB, `css/erp-layout.css` 77 KB, `alpine.min.js` 46 KB (รวม ~630 KB ต่อการเข้าครั้งแรก)
-  - เบราว์เซอร์ต้องถาม server ซ้ำทุกหน้า
-- ต้นเหตุฝั่งโค้ด: ไฟล์ CSS/JS 22 จุดเรียกผ่าน `asset()` โดยไม่มี `?v=` จึงเปิด cache ยาวไม่ได้ (หลัง deploy ผู้ใช้จะได้ไฟล์เก่า)
-  - `layout.blade.php` 6 จุด, `pos/index` 5, `wh/index` 2, `auth/mfa-challenge` 2 และที่อื่น
-- เสนอ: ใส่ `?v=` ให้ครบก่อน แล้วเจ้าของเปิด `gzip_types` และ `expires` ใน nginx **หลัง** deploy โค้ดนั้น
+  | หน้า | queries | ไม่ซ้ำ |
+  |---|---|---|
+  | `/dashboard` | 31 | 14 |
+  | `/bookings` | 29 | 13 |
+  | `/products` | 27 | 11 |
+  | `/reports` | 31 | 10 |
+  | `/settings` | 34 | 8 |
+  | `/customers` | 26 | 10 |
 
-### 5. เทสต์ 6 ตัวล้มบน Windows — ควรแก้
-- ไฟล์:
-  - `tests/Feature/ConfirmPopupConsistencyTest.php` (2 ตัว)
-  - `tests/Feature/ErpStructuralGapsTest.php`
-  - `tests/Feature/LegacyPosImportQuarantineTest.php`
-  - `tests/Feature/PrintablePageSizeTest.php`
-  - `tests/Feature/FinanceSecurityControlTest.php:160`
-- อาการ: เทสต์เอา `resource_path('views/layout.blade.php')` (ใช้ `/`) ไปเทียบกับ path จาก filesystem ที่ใช้ `\`
-  - รายการยกเว้นจึงไม่ทำงาน และไฟล์ที่ได้รับอนุญาตถูกนับว่าผิด
-  - ตัวสุดท้ายใช้ `chmod(0000)` ซึ่ง Windows ไม่บล็อกการอ่าน
-  - agent ที่รันบน Windows จะเห็นแดงแล้วอาจไปแก้โค้ดผิดจุด
-- เสนอ: normalize path ทั้งสองฝั่งเป็น `/` ก่อนเทียบ และให้เทสต์ chmod ข้ามเฉพาะบน Windows
+  - ตัวซ้ำบน `/dashboard`: `select * from "cache" where "key" in (?)` 13 ครั้ง เพราะ `AppSetting::get()` เรียก `Cache::rememberForever` ใหม่ทุกครั้งโดยไม่มี memo ต่อ request
+  - และ `select exists(... roles ... permissions ...)` 5 ครั้งจาก `User::hasGlobalPermission()`
+  - เทสต์ปกติใช้ `CACHE_STORE=array` จึงมองไม่เห็นปัญหานี้
+- เสนอ: memo settings ใน `request()->attributes`, memo สิทธิ์ global ต่อ user instance และเพิ่มเทสต์นับ query ต่อหน้า
 
-### 6. CI ทดสอบด้วย PHP 8.5.10 แต่ production เป็น 8.3 — ควรแก้
-- ไฟล์: `.github/workflows/deploy.yml:24`
-- อาการ: syntax ของ PHP 8.4+ จะผ่าน gate ของ deploy แต่ไปพังบน server
-  - `postgres-uat.yml` ใช้ 8.3 อยู่แล้ว แต่ยังแดงจนกว่า PR #146 จะ merge
-- เสนอ: เปลี่ยนเป็น `'8.3'`
-
-### 7. backup อยู่บน server เครื่องเดียวกับฐานข้อมูล — ควรแก้ (เจ้าของ)
-- อาการ: `erp:backup` เขียนลง `storage/app/backups` บน server เดียวกัน ถ้าเครื่องเสียจะเสียทั้งข้อมูลและ backup
-  - `docs/ai/backup-dr-uat.md` บันทึกว่ารอบ Google Drive (`rclone crypt`) และการกู้ `jeterp_dr` ยังไม่ได้ทำ
-- เสนอ: ทำตาม `docs/BACKUP-DR-RUNBOOK.md` ให้ครบ แล้วจึงติดตั้ง cron
-
-### 8. workflow ที่แก้หรือล้างข้อมูล production กดได้คลิกเดียว — ข้อสังเกต
-- ไฟล์: `erp-reset-transactions.yml` (ถ้าเลือก `apply` จะล้างรายการธุรกรรมทั้งหมดหลัง backup), `void-pos-test-sales.yml`, `uat-receive-all-products.yml`, `add-large-unit-stock.yml`
-- อาการ: environment `production` ยังไม่ตั้ง required reviewer ใครก็ตามที่มีสิทธิ์ write กดได้ทันที
-- เสนอ: เจ้าของตั้ง required reviewer ใน GitHub และพิจารณาลบ workflow สมัย UAT ที่ไม่ใช้แล้ว
-
-### 9. งานค้าง — ข้อสังเกต
-- PR #146 (ทำให้ `postgres-uat` เขียว) รอ merge
-- branch `fix/pin-host-keys` (เลิกใช้ `ssh-keyscan` ใน workflow อีก 9 ไฟล์) ทำเสร็จแล้วแต่ยังไม่ได้ push
-- opcache, `CACHE_STORE`/`SESSION_DRIVER` และ query ช้าบน PostgreSQL ยังไม่ได้ยืนยัน เพราะดูจากภายนอกไม่ได้
+### 4. คู่มือ nginx ใส่ `Cache-Control` ซ้ำ — ข้อสังเกต
+- ไฟล์: `docs/OPERATIONS.md` หัวข้อ nginx
+- อาการ:
+  - `expires 30d` สร้าง `Cache-Control: max-age=...` อยู่แล้ว และ `add_header Cache-Control "public"` จะเพิ่ม header ตัวที่สอง (เบราว์เซอร์รวมให้ ใช้งานได้)
+  - `add_header` ใน `location` ทำให้ `add_header` ระดับ `server` ไม่ถูกสืบทอดมาที่ไฟล์ static
+- เสนอ: ตอนเจ้าของใส่จริงให้ดูว่า server block มี `add_header` อื่นไหม
 
 ## ที่ตรวจแล้วไม่มีปัญหา
 
-- ทุก route ฝั่ง web ผ่าน `ErpAuthorize`: guest ถูกส่งไปหน้า login และตรวจสิทธิ์ตามเมนู ส่วน public route มี 12 ชื่อตามที่ระบุไว้
-- route ของ `api.php` แต่ละกลุ่มมี guard:
-  - `pos.device`, `member.portal` และ `auth`
-  - `throttle` ที่ `pair` และ `bplus/sync`
-  - ตรวจ signature ที่ LINE webhook
-- login จำกัด 5 ครั้งต่อนาที (`RateLimiter`) และมี MFA
-- LINE webhook ตรวจ `x-line-signature` ด้วย `hash_equals`
-- raw SQL ที่ประกอบจากตัวแปรใช้ค่าภายในทั้งหมด ไม่รับ input ผู้ใช้:
-  - `ReportController::branchByLocationSub`
-  - `REPLACE()` ใน `BplusDocumentMaterializer`
-- `{!! !!}` 6 จุดส่ง SVG/HTML ที่ระบบสร้างเอง
-- production:
-  - หน้า 404 ไม่โชว์ debug
-  - `.env` และ `.git/config` ได้ 403, `storage/logs/laravel.log` และ `composer.lock` ได้ 404
-  - http redirect ไป https (301) และ HTML ถูก gzip
-  - TTFB ของ `/login` ประมาณ 0.29 วินาที
-- `composer.lock` ไม่มีแพ็กเกจที่ต้องใช้ PHP 8.4+ (`platform.php = ^8.3`)
-
-## ยังไม่ได้ดู
-
-- เวลาโหลดหน้าจริงหลัง login (Chrome ไม่ได้ login ไว้ และไม่กรอกรหัสผ่านแทน)
-- `pg_stat_statements`, opcache และ log บน server (เครื่องนี้ไม่มี SSH key)
-- logic บัญชี สต๊อก และราคาเชิงลึก (รอบนี้ไม่ได้ไล่)
+- งานที่ 1: เทสต์ทั้ง 5 ไฟล์แก้เฉพาะการแปลง path และข้ามเทสต์ chmod บน Windows เท่านั้น ไม่ได้ลดสิ่งที่ตรวจ
+- `AssetVersion::url()` ไม่ throw เมื่อไฟล์ไม่มี
+  - rsync `-a` ทำให้ mtime เปลี่ยนทุก deploy (checkout ใหม่) ค่า `?v=` จึงเปลี่ยนทุก deploy ซึ่งปลอดภัย
+  - ไม่มี route ไหนลงท้ายด้วยนามสกุลไฟล์ static จึงไม่ชน `try_files $uri =404`
+- `SecurityHeaders` ไม่เขียนทับ header ที่มีแล้ว และส่ง HSTS เฉพาะ https โดยไม่มี `includeSubDomains`
+- `composer.json` เพิ่มแค่ `config.platform.php = 8.3.0` และ `deploy.yml` แก้แค่บรรทัด PHP version
+- `bootstrap/app.php` นอกจากเพิ่ม middleware แล้ว เปลี่ยนแค่รูปแบบ `use` (pint)
