@@ -152,7 +152,7 @@
 @endpush
 
 @push('scripts')
-<script src="{{ asset('document-workflow.js') }}"></script>
+<script src="{{ \App\Support\AssetVersion::url('document-workflow.js') }}"></script>
 <script>
 function poItem() {
     return { product_id: '', sku_code: '', name_th: '', unit_name: '', barcode: '', qty: 1, unit_price: '' };

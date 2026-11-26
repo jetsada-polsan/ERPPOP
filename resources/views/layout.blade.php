@@ -14,12 +14,13 @@
         'slate' => 'menu-icon-slate',
         'amber' => 'menu-icon-amber',
     ];
-    $fallbackFavicon = asset('images/logos/mpm-food-group.jpg').'?v='.filemtime(public_path('images/logos/mpm-food-group.jpg'));
+    $fallbackFavicon = \App\Support\AssetVersion::url('images/logos/mpm-food-group.jpg');
     $companyName = \App\Models\AppSetting::company('name_th') ?: 'กิจการของคุณ';
     $systemName = 'JET ERP';
     $companyLogo = \App\Models\AppSetting::logoUrl();
-    $faviconUrl = \App\Models\AppSetting::get('favicon_path')
-        ? asset(\App\Models\AppSetting::get('favicon_path')).'?v='.filemtime(public_path(\App\Models\AppSetting::get('favicon_path')))
+    $faviconPath = \App\Models\AppSetting::get('favicon_path');
+    $faviconUrl = $faviconPath
+        ? \App\Support\AssetVersion::url($faviconPath)
         : ($companyLogo ?: $fallbackFavicon);
     $erpTheme = in_array(\App\Models\AppSetting::get('erp_theme', 'ocean'), ['ocean', 'navy', 'emerald', 'slate', 'clear'], true)
         ? \App\Models\AppSetting::get('erp_theme', 'ocean') : 'ocean';
@@ -42,14 +43,14 @@
     {{-- โหลดฟอนต์แบบไม่บล็อกการวาดหน้า: หน้าแสดงด้วยฟอนต์ระบบก่อน แล้วสลับเมื่อฟอนต์มาถึง --}}
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <noscript><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
-    <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('vendor/adminlte/css/adminlte.min.css') }}">
+    <link rel="stylesheet" href="{{ \App\Support\AssetVersion::url('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
+    <link rel="stylesheet" href="{{ \App\Support\AssetVersion::url('vendor/adminlte/css/adminlte.min.css') }}">
     {{-- Tailwind แบบ build นิ่ง (แทน runtime compiler เดิมที่คอมไพล์สดทุกหน้า)
          เพิ่มคลาสใหม่แล้วให้ rebuild: ดูคำสั่งใน tailwind.config.js --}}
-    <link rel="stylesheet" href="{{ asset('vendor/tailwindcss/tailwind.min.css') }}?v={{ filemtime(public_path('vendor/tailwindcss/tailwind.min.css')) }}">
-    <script src="{{ asset('vendor/sweetalert2/sweetalert2.all.min.js') }}"></script>
-    <script defer src="{{ asset('vendor/alpinejs/alpine.min.js') }}"></script>
-    <link rel="stylesheet" href="{{ asset('css/erp-layout.css') }}?v={{ filemtime(public_path('css/erp-layout.css')) }}">
+    <link rel="stylesheet" href="{{ \App\Support\AssetVersion::url('vendor/tailwindcss/tailwind.min.css') }}">
+    <script src="{{ \App\Support\AssetVersion::url('vendor/sweetalert2/sweetalert2.all.min.js') }}"></script>
+    <script defer src="{{ \App\Support\AssetVersion::url('vendor/alpinejs/alpine.min.js') }}"></script>
+    <link rel="stylesheet" href="{{ \App\Support\AssetVersion::url('css/erp-layout.css') }}">
     @stack('head')
     {{-- Page-specific styles must be emitted in the document head. --}}
     @stack('styles')
@@ -66,7 +67,7 @@
         } catch (e) { /* localStorage ปิดอยู่ก็ใช้ค่ากลางของบริษัทไป */ }
     })();
     </script>
-    <link id="erp-ui-standard" rel="stylesheet" href="{{ asset('css/erp-ui-standard.css') }}?v={{ filemtime(public_path('css/erp-ui-standard.css')) }}">
+    <link id="erp-ui-standard" rel="stylesheet" href="{{ \App\Support\AssetVersion::url('css/erp-ui-standard.css') }}">
 @include('partials.select-arrow')
 @include('partials.peak-style-ui')
 </head>
@@ -93,7 +94,7 @@
                     }
                 }
             }
-            $appLogo = $companyLogo ?: (is_file(public_path('images/logos/mpm-food-group.jpg')) ? asset('images/logos/mpm-food-group.jpg') : null);
+            $appLogo = $companyLogo ?: (is_file(public_path('images/logos/mpm-food-group.jpg')) ? \App\Support\AssetVersion::url('images/logos/mpm-food-group.jpg') : null);
         @endphp
 @if (!request()->boolean('popup'))
         {{-- แถบบนชุดเดียวของระบบ: ล็อกโลโก้มุมซ้ายบน + หมวดเมนูหลัก --}}
@@ -347,7 +348,7 @@
         </main>
     </div>
 
-    <script src="{{ asset('vendor/adminlte/js/adminlte.min.js') }}"></script>
+    <script src="{{ \App\Support\AssetVersion::url('vendor/adminlte/js/adminlte.min.js') }}"></script>
     <script>
         // ── จำสถานะพับ/กางแผงเมนูย่อย + อัปเดตทิศลูกศร ─────────────────
         (function() {
@@ -518,7 +519,7 @@
             };
         }
     </script>
-    <script src="{{ asset('stock-preview.js') }}"></script>
+    <script src="{{ \App\Support\AssetVersion::url('stock-preview.js') }}"></script>
     <x-confirm-action />
     @stack('scripts')
 

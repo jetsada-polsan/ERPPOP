@@ -180,7 +180,7 @@
                         @foreach($presets as $preset)
                             <label class="logo-option" :class="{ active: choice === '{{ $preset }}' }">
                                 <input type="radio" name="logo_choice" value="{{ $preset }}" x-model="choice" class="d-none">
-                                <div class="logo-thumb"><img src="{{ asset($preset) }}" alt=""></div>
+                                <div class="logo-thumb"><img src="{{ \App\Support\AssetVersion::url($preset) }}" alt=""></div>
                                 <div class="logo-caption">{{ basename($preset) }}</div>
                             </label>
                         @endforeach
