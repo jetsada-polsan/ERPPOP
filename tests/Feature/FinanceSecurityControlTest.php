@@ -159,6 +159,10 @@ class FinanceSecurityControlTest extends TestCase
 
     public function test_operations_page_stays_available_when_a_backup_checksum_is_unreadable(): void
     {
+        if (PHP_OS_FAMILY === 'Windows') {
+            $this->markTestSkipped('Windows does not block file reads via chmod(0000).');
+        }
+
         $user = User::factory()->create(['username' => 'backup-admin', 'is_active' => true, 'must_change_password' => false]);
         $role = Role::create(['code' => 'BACKUP_ADMIN', 'name' => 'Backup Admin']);
         $permission = Permission::firstOrCreate(['code' => 'settings.manage'], ['name' => 'settings.manage']);

@@ -8,6 +8,11 @@ use Tests\TestCase;
 
 class ConfirmPopupConsistencyTest extends TestCase
 {
+    private function normalizePath(string $path): string
+    {
+        return str_replace('\\', '/', $path);
+    }
+
     /**
      * ดึงไฟล์ blade ทั้งหมดใน resources/views
      *
@@ -21,7 +26,7 @@ class ConfirmPopupConsistencyTest extends TestCase
 
         foreach ($iterator as $file) {
             if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')) {
-                $files[$file->getPathname()] = file_get_contents($file->getPathname());
+                $files[$this->normalizePath($file->getPathname())] = file_get_contents($file->getPathname());
             }
         }
 
@@ -52,11 +57,15 @@ class ConfirmPopupConsistencyTest extends TestCase
     {
         $bladeFiles = $this->getBladeFiles();
         $violations = [];
-        $allowedFiles = [
-            resource_path('views/layout.blade.php'),
-            resource_path('views/pos/index.blade.php'),
-            resource_path('views/components/confirm-action.blade.php'),
-        ];
+        $allowedFiles = array_map(
+            fn (string $file) => $this->normalizePath($file),
+            [
+                resource_path('views/layout.blade.php'),
+                resource_path('views/pos/index.blade.php'),
+                resource_path('views/components/confirm-action.blade.php'),
+            ]
+        );
+        $basePrefix = $this->normalizePath(base_path()).'/';
 
         foreach ($bladeFiles as $path => $content) {
             if (in_array($path, $allowedFiles, true)) {
@@ -64,7 +73,7 @@ class ConfirmPopupConsistencyTest extends TestCase
             }
 
             $code = $this->stripComments($content);
-            $relPath = str_replace(base_path() . '/', '', $path);
+            $relPath = str_replace($basePrefix, '', $path);
 
             if (preg_match('/\b(?:window\.)?confirm\s*\(/i', $code)) {
                 $violations[] = "{$relPath} contains native confirm()";
@@ -75,7 +84,7 @@ class ConfirmPopupConsistencyTest extends TestCase
             }
         }
 
-        $this->assertEmpty($violations, "พบการเรียก confirm() หรือ alert() ดั้งเดิมของเบราว์เซอร์นอก layout:\n" . implode("\n", $violations));
+        $this->assertEmpty($violations, "พบการเรียก confirm() หรือ alert() ดั้งเดิมของเบราว์เซอร์นอก layout:\n".implode("\n", $violations));
     }
 
     /**
@@ -85,10 +94,14 @@ class ConfirmPopupConsistencyTest extends TestCase
     {
         $bladeFiles = $this->getBladeFiles();
         $violations = [];
-        $allowedFiles = [
-            resource_path('views/layout.blade.php'),
-            resource_path('views/pos/index.blade.php'),
-        ];
+        $allowedFiles = array_map(
+            fn (string $file) => $this->normalizePath($file),
+            [
+                resource_path('views/layout.blade.php'),
+                resource_path('views/pos/index.blade.php'),
+            ]
+        );
+        $basePrefix = $this->normalizePath(base_path()).'/';
 
         foreach ($bladeFiles as $path => $content) {
             if (in_array($path, $allowedFiles, true)) {
@@ -96,14 +109,14 @@ class ConfirmPopupConsistencyTest extends TestCase
             }
 
             $code = $this->stripComments($content);
-            $relPath = str_replace(base_path() . '/', '', $path);
+            $relPath = str_replace($basePrefix, '', $path);
 
             if (preg_match('/Swal\.fire\s*\(\s*\{[^}]*showCancelButton\s*:\s*true/s', $code)) {
                 $violations[] = "{$relPath} contains direct Swal.fire with showCancelButton";
             }
         }
 
-        $this->assertEmpty($violations, "พบ Swal.fire() ที่สร้าง popup ยืนยันเองนอก layout/pos helper:\n" . implode("\n", $violations));
+        $this->assertEmpty($violations, "พบ Swal.fire() ที่สร้าง popup ยืนยันเองนอก layout/pos helper:\n".implode("\n", $violations));
     }
 
     /**

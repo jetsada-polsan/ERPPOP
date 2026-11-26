@@ -101,7 +101,8 @@ class PrintablePageSizeTest extends TestCase
             if (! $file->isFile() || ! str_ends_with($file->getFilename(), '.blade.php')) {
                 continue;
             }
-            $files[str_replace($root.'/', '', $file->getPathname())] = (string) file_get_contents($file->getPathname());
+            $normalizedPath = str_replace('\\', '/', $file->getPathname());
+            $files[str_replace($root.'/', '', $normalizedPath)] = (string) file_get_contents($file->getPathname());
         }
 
         return $files;
@@ -109,6 +110,6 @@ class PrintablePageSizeTest extends TestCase
 
     private function viewPath(): string
     {
-        return dirname(__DIR__, 2).'/resources/views';
+        return str_replace('\\', '/', dirname(__DIR__, 2)).'/resources/views';
     }
 }
