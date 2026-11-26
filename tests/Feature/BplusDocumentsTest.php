@@ -315,7 +315,8 @@ class BplusDocumentsTest extends TestCase
         $this->assertMatchesRegularExpression('/1 ใบ\s+1,886\.00/u', preg_replace('/\s+/u', ' ', $total), 'ยอดรวมใบจองตามตัวกรอง');
         $booking = Document::where('doc_number', 'B18-6911/00382')->firstOrFail();
         $sale = Document::where('doc_number', 'DS256911/06364')->firstOrFail();
-        $this->get(route('bookings.show', $booking))->assertOk()->assertSee('DS256911/06364')->assertSee('มาจาก BPlus');
+        // bookings.show ผูกกับ SaleBooking ไม่ใช่ Document — บน SQLite id บังเอิญตรงกัน บน PostgreSQL ไม่ตรง
+        $this->get(route('bookings.show', $booking->saleBooking))->assertOk()->assertSee('DS256911/06364')->assertSee('มาจาก BPlus');
         $this->get(route('sales.show', $sale))->assertOk()->assertSee('DS256911/06364')->assertSee('1,837.00');
         $html = $this->get(route('ar-receipts.index', ['date_from' => '2026-11-01', 'date_to' => '2026-11-30']))->assertOk()->assertSee('RR26911/000800')->assertSee('837.00')->getContent();
         $block = fn (string $id) => preg_replace('/\s+/u', ' ', strip_tags(substr($html, strpos($html, 'data-testid="'.$id.'"'), 500)));

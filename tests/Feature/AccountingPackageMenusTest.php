@@ -61,13 +61,16 @@ class AccountingPackageMenusTest extends TestCase
         $this->get('/accounting-package/download')->assertForbidden();
     }
 
+    // documents.source_key คือ DI_KEY ของ BPlus (bigint) ต้องเป็นตัวเลข ไม่ใช่เลขเอกสาร
+    private int $sourceKey = 900000;
+
     private function document(int $branch, int $area, string $type, string $number, string $date, array $extra = []): int
     {
         DB::table('document_types')->insertOrIgnore(['code' => $type, 'name_th' => $type]);
 
         return DB::table('documents')->insertGetId($extra + [
             'document_type_id' => DB::table('document_types')->where('code', $type)->value('id'),
-            'branch_id' => $branch, 'sales_area_id' => $area, 'source_system' => 'bplus', 'source_key' => $number,
+            'branch_id' => $branch, 'sales_area_id' => $area, 'source_system' => 'bplus', 'source_key' => ++$this->sourceKey,
             'doc_number' => $number, 'doc_date' => $date, 'total_amount' => 100, 'status' => 'active',
         ]);
     }

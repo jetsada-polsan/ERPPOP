@@ -82,13 +82,16 @@ class StockAdjustmentApproveBackgroundTest extends TestCase
         $snapshotPath = base_path('tests/Fixtures/stock_adjustment_golden.json');
         $this->assertFileExists($snapshotPath, 'ต้องมี golden_snapshot.json');
         $expected = json_decode(file_get_contents($snapshotPath), true);
+        // snapshot เก็บ product_id เป็นลำดับ 1..35 แต่ PostgreSQL ไม่ย้อน sequence ตอน rollback
+        // id จริงจึงเลื่อนไปตามเทสต์ก่อนหน้า เทียบกันด้วยลำดับสินค้าแทน
+        $ord = collect($products)->mapWithKeys(fn ($p, $i) => [$p->id => $i])->all();
 
         // 1. ตรวจสอบ stock_balances
         $actualBalances = StockBalance::where('warehouse_location_id', $location->id)
             ->orderBy('product_id')
             ->get(['product_id', 'on_hand_qty', 'reserved_qty'])
             ->map(fn ($b) => [
-                'product_id' => (int) $b->product_id,
+                'product_id' => $ord[$b->product_id],
                 'on_hand_qty' => (float) $b->on_hand_qty,
                 'reserved_qty' => (float) $b->reserved_qty,
             ])
@@ -100,7 +103,7 @@ class StockAdjustmentApproveBackgroundTest extends TestCase
             ->orderBy('id')
             ->get(['product_id', 'unit_cost', 'remaining_qty'])
             ->map(fn ($l) => [
-                'product_id' => (int) $l->product_id,
+                'product_id' => $ord[$l->product_id],
                 'unit_cost' => (float) $l->unit_cost,
                 'remaining_qty' => (float) $l->remaining_qty,
             ])
@@ -112,7 +115,7 @@ class StockAdjustmentApproveBackgroundTest extends TestCase
             ->orderBy('id')
             ->get(['product_id', 'movement_type', 'qty'])
             ->map(fn ($m) => [
-                'product_id' => (int) $m->product_id,
+                'product_id' => $ord[$m->product_id],
                 'movement_type' => $m->movement_type,
                 'qty' => (float) $m->qty,
             ])
@@ -124,7 +127,7 @@ class StockAdjustmentApproveBackgroundTest extends TestCase
             ->orderBy('id')
             ->get(['id', 'average_cost', 'last_purchase_cost'])
             ->map(fn ($p) => [
-                'id' => (int) $p->id,
+                'id' => $ord[$p->id],
                 'average_cost' => (float) $p->average_cost,
                 'last_purchase_cost' => (float) $p->last_purchase_cost,
             ])
@@ -341,7 +344,7 @@ class StockAdjustmentApproveBackgroundTest extends TestCase
     private function createAdjustmentWithItems(int $count): array
     {
         DocumentType::firstOrCreate(['code' => 'STOCK_ADJUSTMENT'], ['name_th' => 'ใบปรับปรุงสต็อก']);
-        $branch = Branch::create(['code' => 'B-'.uniqid(), 'name_th' => 'สาขา', 'is_active' => true]);
+        $branch = Branch::create(['code' => 'B'.substr(uniqid(), -8), 'name_th' => 'สาขา', 'is_active' => true]);
         $warehouse = Warehouse::create(['branch_id' => $branch->id, 'code' => 'WH-'.uniqid(), 'name' => 'คลัง']);
         $location = WarehouseLocation::create(['warehouse_id' => $warehouse->id, 'code' => 'LOC-'.uniqid(), 'name' => 'ช่อง']);
         $unit = ProductUnit::firstOrCreate(['code' => 'EA'], ['name' => 'ชิ้น', 'qty_per_base_unit' => 1]);
