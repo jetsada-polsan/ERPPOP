@@ -1,3 +1,24 @@
+# Handoff — 2026-11-26 (Pin SSH host keys in the other server workflows, Claude)
+
+## Commit
+- branch `fix/pin-ssh-host-keys` จาก `origin/main` ที่ `55cf0e14` (งานเดิมของ `fix/pin-host-keys` ที่ทำไว้ 24 พ.ย. ยกมาวางบน main ใหม่)
+
+## ทำอะไรไป
+- workflow 9 ไฟล์ที่ต่อ `DEPLOY_HOST` เลิก `ssh-keyscan` ใช้ขั้น `Trust the pinned server host key` แบบเดียวกับ `deploy.yml` (secret `DEPLOY_KNOWN_HOSTS` ใน environment `production`) และ pin `webfactory/ssh-agent` เป็น SHA ของ v0.9.0: add-large-unit-stock, classify-barcodes, erp-reset-transactions, import-bplus-barcodes, pos-cashier-check, production-check, production-inspect, uat-receive-all-products, void-pos-test-sales
+- **ไม่แตะ** workflow build/publish POS (pos-desktop-release, pos-python-windows-uat, jet-pos-python-uat) เพราะเจ้าของเลิก build POS เองแล้ว ไฟล์พวกนี้ยังใช้ `ssh-keyscan` แต่ไม่ควรถูกรัน
+- `docs/OPERATIONS.md`: เพิ่มว่า workflow ที่ใช้ `DEPLOY_HOST` ทุกตัวใช้ `DEPLOY_KNOWN_HOSTS`
+
+## ทดสอบไปแล้วแค่ไหน
+- ทั้ง 9 ไฟล์ใน main ไม่เปลี่ยนตั้งแต่ทำงานนี้ (diff กับฐานเดิมว่าง) จึงยกไฟล์มาทั้งไฟล์ ไม่มีของ main หาย
+- ทั้ง 9 job ใช้ `environment: production` ซึ่งมี `DEPLOY_KNOWN_HOSTS` แล้ว (Deploy ERP #423 ผ่านขั้นนี้บน production เมื่อ 25 พ.ย.)
+- parse YAML ทุกไฟล์ใน `.github/workflows` ผ่าน; ขั้น pin key เหมือนของ `deploy.yml` ทุกบรรทัด (เคยรันสคริปต์ด้วย bash: key ตรง→ผ่าน, host ไม่ตรง→exit 1, secret ว่าง→exit 1)
+- ยังไม่ได้รัน workflow เหล่านี้บน GitHub Actions (ทุกตัวต่อ server production)
+
+## ความเสี่ยง/งานถัดไป
+- ถ้า workflow ไหนล้มที่ขั้น host key ให้ดูว่า `DEPLOY_KNOWN_HOSTS` ยังตรงกับ `DEPLOY_HOST` (เช่น server เปลี่ยน host key)
+
+---
+
 # Handoff — 2026-11-24 (Deploy ERP safety, Claude)
 
 ## Commit
@@ -17,7 +38,7 @@
 ## ความเสี่ยง/งานถัดไป
 - เพิ่ม secret `DEPLOY_KNOWN_HOSTS` ใน environment `production` แล้ว (25 พ.ย. เทียบ fingerprint ED25519 `SHA256:Uqi6RRXT…` ตรงกับเครื่องจริง) — `staging` ยังไม่มี secret ใดๆ
 - ตั้ง Required reviewers ให้ environment `production` (Settings → Environments)
-- workflow อื่นอีก ~12 ไฟล์ยังใช้ `ssh-keyscan` อยู่
+- workflow อื่นอีก ~12 ไฟล์ยังใช้ `ssh-keyscan` อยู่ (แก้ 9 ไฟล์ของ `DEPLOY_HOST` แล้วใน `fix/pin-ssh-host-keys`; ไฟล์ build POS ไม่แตะเพราะเลิก build POS เอง)
 
 ---
 
