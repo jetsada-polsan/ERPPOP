@@ -1,7 +1,7 @@
 # รายงานงานปิดช่องโหว่และเพิ่มความเร็ว POPSTAR ERP (`antigravity/system-hardening`)
 
-วันที่: 2026-11-26
-Branch: `antigravity/system-hardening` (แตกจาก `origin/main` ที่ `1e780b1f` หลัง merge PR #146 และ PR #147, และ merge `origin/claude/system-review-2026-11-26` ที่ `93532500`)
+วันที่: 2026-11-26 (อัปเดตรอบ 2 ตามผลตรวจ PR #148: 2026-11-27)
+Branch: `antigravity/system-hardening` (แตกจาก `origin/main` ที่ `1e780b1f` หลัง merge PR #146 และ PR #147, และ merge `origin/claude/system-review-2026-11-26`)
 
 ## สภาพแวดล้อมเครื่องที่ใช้ทำงาน
 
@@ -19,25 +19,42 @@ Branch: `antigravity/system-hardening` (แตกจาก `origin/main` ที�
 | งานที่ 2 | `eb10592f` | เพิ่ม `config.platform.php = "8.3.0"` และอัปเดตแพ็กเกจทั้งหมดด้วย `composer update --with-all-dependencies` |
 | งานที่ 3 | `225ee81e` | เพิ่ม `SecurityHeaders` middleware, `AssetVersion::url()`, ใส่ `?v=` ใน view นอก `pos/` และเพิ่มคู่มือ nginx ใน `docs/OPERATIONS.md` |
 | งานที่ 4 | `b3aa4c4d` | แก้บรรทัดเดียวใน `.github/workflows/deploy.yml` (`php-version: '8.5.10'` → `'8.3'`) |
+| แก้รอบ 2 — A1 | `40213072` | ล็อก `"guzzlehttp/guzzle": "^7.17"` และ `"guzzlehttp/uri-template": "^1.0"` ใน `composer.json` ดึงตระกูล Guzzle กลับเป็น 7.17.0 / 2.13.6 / 2.6.2 / 1.0.11 |
+| แก้รอบ 2 — A2 | `d563834d` | ย้าย `SecurityHeaders` เป็น global middleware (`$middleware->append(SecurityHeaders::class)`) และเพิ่มเทสต์ 302, 404, `/up`, 403 และ `api/*` JSON |
 
 *(ไม่ได้แตะ `apps/pos-*`, `resources/views/pos/*`, `.github/workflows/*` อื่นๆ หรือเซิร์ฟเวอร์ production และยังไม่ได้ deploy)*
 
 ---
 
-## งานที่ 2: ผล `composer audit --locked` ก่อน/หลัง และเวอร์ชันแพ็กเกจที่เปลี่ยน
+## งานที่ 2 + รอบ 2 (A1): ผล `composer audit --locked` ก่อน/หลัง และเวอร์ชันแพ็กเกจที่เปลี่ยน
 
 ### จำนวน Advisory ก่อน/หลัง
 
 - **ก่อนอัปเดต**: **37 advisories** ใน **9 แพ็กเกจ** (`laravel/framework`, `guzzlehttp/guzzle`, `league/commonmark`, `league/flysystem`, `symfony/http-foundation`, `symfony/http-kernel`, `symfony/routing`, `symfony/mailer`, `symfony/mime`)
-- **หลังอัปเดต**: **0 advisories** (`No security vulnerability advisories found.`, exit code `0`)
-- **หมายเหตุการ pin PHP platform**: เพิ่ม `"platform": { "php": "8.3.0" }` ใต้ `config` ใน `composer.json` โดยไม่แก้ constraint ของแพ็กเกจใดๆ ใน `require` / `require-dev`
+- **หลังอัปเดต (รวม A1 ล็อก Guzzle 7.x)**: **0 advisories** (`No security vulnerability advisories found.`, exit code `0`)
+- **หมายเหตุใน `composer.json`**:
+  - เพิ่ม `"platform": { "php": "8.3.0" }` ใต้ `config` เพื่อล็อกให้ทุกแพ็กเกจรองรับ PHP 8.3 ของ production
+  - เพิ่ม `"guzzlehttp/guzzle": "^7.17"` และ `"guzzlehttp/uri-template": "^1.0"` ใน `require` (เนื่องจาก `laravel/framework` 13.44 ยอมรับ `^1.0 || ^2.0` สำหรับ `guzzlehttp/uri-template` โดยตรง) เพื่อไม่ให้ตระกูล Guzzle ข้าม major version
+
+### การตรวจสอบแพ็กเกจ transitive ที่ข้าม major version (`brick/math`, `hamcrest/hamcrest-php`)
+
+- **`hamcrest/hamcrest-php` (`v2.1.1` → `v3.0.0`)**: เป็น `require-dev` ของ Mockery เท่านั้น ไม่ได้ใช้งานใน production และผ่านชุดเทสต์ทั้งหมด
+- **`brick/math` (`0.18.0` → `1.0.0`)**:
+  - ตรวจด้วยคำสั่งค้นหา `Brick\Math` ใน `app/` **พบว่าโค้ดแอปมีการเรียก `Brick\Math` ตรงอยู่ 5 ไฟล์** (ต่างจากสมมติฐานเดิมว่าไม่ได้เรียกตรง):
+    - `app/Support/DecimalMath.php` (`BigDecimal`, `RoundingMode::HalfUp`)
+    - `app/Services/Reports/StockQuantityFormatter.php` (`RoundingMode::Down`)
+    - `app/Services/Sales/CreditSaleService.php` (`RoundingMode::HalfUp`)
+    - `app/Services/Sales/PosPricingGuard.php` (`RoundingMode::Down`)
+    - `app/Services/Sales/SaleReturnService.php` (`RoundingMode::Down`)
+  - ตรวจ `vendor/brick/math/CHANGELOG.md` ตั้งแต่ `0.18.0` → `0.19.0` → `0.19.1` → `0.20.0` → `1.0.0`: เวอร์ชัน `1.0.0` ไม่มีการเปลี่ยนแปลงจาก `0.20.0` และ breaking changes เดียวที่มีคือ (1) ลบ `UnsupportedPlatformException` ที่ deprecated แล้ว และ (2) `of()` เปลี่ยนไปโยน `NumberFormatException` แทน `DivisionByZeroException` เมื่อรับสตริงเศษส่วนส่วนศูนย์เช่น `'2/0'`
+  - ตรวจทั้ง `app/` และ `tests/` แล้ว **ไม่พบการอ้างอิง `UnsupportedPlatformException` หรือ `DivisionByZeroException` เลย**, `brick/math` 1.0.0 รองรับ PHP `^8.2` และโค้ดทั้ง 5 ไฟล์ถูกรันจริงโดยชุดเทสต์ทั้งหมด (ไม่ได้ mock เหมือน Guzzle) จึงคงไว้ที่ `1.0.0` ได้อย่างปลอดภัย
 
 ### แพ็กเกจที่เคยมี Advisory (9 แพ็กเกจ)
 
 | แพ็กเกจ | เวอร์ชันเดิม | เวอร์ชันใหม่ | หมายเหตุ |
 |---|---|---|---|
 | `laravel/framework` | `v13.17.0` | `v13.44.1` | ปิด critical CVE-2026-114509 และอีก 3 รายการ |
-| `guzzlehttp/guzzle` | `7.13.1` | `8.6.0` | อัปเดตแบบ transitive ภายใต้ constraint ของ `laravel/framework` (ปิด high CVE-2026-69246 และ medium อีก 5) |
+| `guzzlehttp/guzzle` | `7.13.1` | `7.17.0` | คงสาย 7.x ไม่ข้าม major; ปิด high CVE-2026-69246 และ medium อีก 5 (affected `<7.15.2`) |
 | `league/commonmark` | `2.8.2` | `2.10.9` | ปิด high DoS/XSS หลายรายการ |
 | `league/flysystem` | `3.35.1` | `3.36.0` | ปิด advisory |
 | `symfony/http-foundation` | `v7.4.14` | `v7.4.24` | ปิด advisory |
@@ -46,7 +63,7 @@ Branch: `antigravity/system-hardening` (แตกจาก `origin/main` ที�
 | `symfony/mailer` | `v7.4.14` | `v7.4.24` | ปิด advisory |
 | `symfony/mime` | `v7.4.13` | `v7.4.24` | ปิด advisory |
 
-### รายการแพ็กเกจทั้งหมดที่เปลี่ยนใน `composer.lock` (อัปเกรด 75, เพิ่ม 2, ลบ 1)
+### รายการแพ็กเกจทั้งหมดที่เปลี่ยนใน `composer.lock` เทียบกับ `origin/main` (อัปเกรด 75, เพิ่ม 1, ลบ 0)
 
 | แพ็กเกจ | เดิม | ใหม่ | Scope |
 |---|---|---|---|
@@ -58,10 +75,10 @@ Branch: `antigravity/system-hardening` (แตกจาก `origin/main` ที�
 | `egulias/email-validator` | `4.0.4` | `4.0.5` | prod |
 | `filp/whoops` | `2.18.4` | `2.19.3` | dev |
 | `graham-campbell/result-type` | `v1.1.4` | `v1.2.0` | prod |
-| `guzzlehttp/guzzle` | `7.13.1` | `8.6.0` | prod |
-| `guzzlehttp/promises` | `2.5.0` | `3.2.0` | prod |
-| `guzzlehttp/psr7` | `2.12.3` | `3.6.0` | prod |
-| `guzzlehttp/uri-template` | `v1.0.8` | `v2.0.1` | prod |
+| `guzzlehttp/guzzle` | `7.13.1` | `7.17.0` | prod |
+| `guzzlehttp/promises` | `2.5.0` | `2.6.2` | prod |
+| `guzzlehttp/psr7` | `2.12.3` | `2.13.6` | prod |
+| `guzzlehttp/uri-template` | `v1.0.8` | `v1.0.11` | prod |
 | `hamcrest/hamcrest-php` | `v2.1.1` | `v3.0.0` | dev |
 | `laravel/agent-detector` | `v2.0.2` | `v2.0.5` | dev |
 | `laravel/framework` | `v13.17.0` | `v13.44.1` | prod |
@@ -111,7 +128,6 @@ Branch: `antigravity/system-hardening` (แตกจาก `origin/main` ที�
 | `symfony/polyfill-intl-normalizer` | `v1.38.0` | `v1.43.0` | prod |
 | `symfony/polyfill-mbstring` | `v1.38.2` | `v1.43.3` | prod |
 | `symfony/polyfill-php80` | `v1.37.0` | `v1.43.0` | prod |
-| `symfony/polyfill-php82` | *(เพิ่มใหม่)* | `v1.43.0` | prod |
 | `symfony/polyfill-php83` | `v1.38.2` | `v1.43.0` | prod |
 | `symfony/polyfill-php84` | `v1.38.1` | `v1.43.0` | prod |
 | `symfony/polyfill-php85` | `v1.38.1` | `v1.44.0` | prod |
@@ -127,17 +143,16 @@ Branch: `antigravity/system-hardening` (แตกจาก `origin/main` ที�
 | `symfony/uid` | `v7.4.9` | `v7.4.21` | prod |
 | `symfony/var-dumper` | `v7.4.14` | `v7.4.24` | prod |
 | `vlucas/phpdotenv` | `v5.6.3` | `v5.8.1` | prod |
-| `ralouphie/getallheaders` | `3.0.3` | *(ลบออก)* | prod |
 
 ---
 
-## งานที่ 3: Security Headers, Asset Versioning (`?v=`) และคู่มือ nginx
+## งานที่ 3 + รอบ 2 (A2): Security Headers, Asset Versioning (`?v=`) และคู่มือ nginx
 
 ### 3.1 Security Headers ที่ได้ (`app/Http/Middleware/SecurityHeaders.php`)
 
-ลงทะเบียนต่อท้ายกลุ่ม `web` ใน `bootstrap/app.php` ไม่เขียนทับ header ที่ response ตั้งไว้เอง และไม่เพิ่ม `Content-Security-Policy` หรือ `Permissions-Policy`:
+ลงทะเบียนเป็น **global middleware** ใน `bootstrap/app.php` ด้วย `$middleware->append(SecurityHeaders::class)` (เอาออกจากกลุ่ม `web`) เพื่อให้ติดครบทุก response รวม redirect, 404, 403, `/up` และ `api/*` ไม่เขียนทับ header ที่ response ตั้งไว้เอง และไม่เพิ่ม `Content-Security-Policy` หรือ `Permissions-Policy`:
 
-| Header | `GET http://.../login` | `GET https://.../login` |
+| Header | HTTP (`GET /login`, 302 `/dashboard`, 404, `/up`, 403 `/settings`, JSON `/api/pos/ping`) | HTTPS (`GET https://.../login`) |
 |---|---|---|
 | `X-Content-Type-Options` | `nosniff` | `nosniff` |
 | `X-Frame-Options` | `SAMEORIGIN` | `SAMEORIGIN` |
@@ -212,17 +227,19 @@ Helper กลาง: `app/Support/AssetVersion.php` (`AssetVersion::url(string $
 - `php artisan test`: **1,183 tests**, **1,180 passed**, **0 failed**, 3 skipped *(รวม `FinanceSecurityControlTest::test_operations_page_stays_available_when_a_backup_checksum_is_unreadable` ที่ข้ามเฉพาะ Windows)*, 6 incomplete, 10,639 assertions, 145.28 s
 - Mutation check: เพิ่ม `<script>alert('x');</script>` ใน `resources/views/auth/login.blade.php` ชั่วคราว → `ConfirmPopupConsistencyTest::test_no_browser_confirm_or_alert_in_views` **แดงจริง** (`resources/views/auth/login.blade.php contains native alert()`) แล้วลบออก
 
-### 3. รอบหลังงานที่ 2 (อัปเดต Composer)
+### 3. รอบหลังงานที่ 2 + รอบ 2 A1 (อัปเดต Composer และล็อก Guzzle 7.x)
 - `composer audit --locked`: **0 advisories** (exit code `0`)
-- `php artisan test`: **1,183 tests**, **1,180 passed**, **0 failed**, 3 skipped, 6 incomplete, 10,639 assertions, 161.03 s
+- `composer show "guzzlehttp/*"`: `guzzle 7.17.0`, `promises 2.6.2`, `psr7 2.13.6`, `uri-template 1.0.11`
+- `php artisan test`: **1,189 tests**, **1,186 passed**, **0 failed**, 3 skipped, 6 incomplete, 10,688 assertions, 203.24 s
 
-### 4. รอบหลังงานที่ 3 (SecurityHeaders + AssetVersion + nginx docs)
-- `php artisan test tests/Feature/SecurityHeadersAndAssetVersioningTest.php`: **6/6 passed**, 49 assertions
-- Mutation check: ถอด `SecurityHeaders` ออกจาก `bootstrap/app.php` ชั่วคราว → `SecurityHeadersAndAssetVersioningTest` **แดงจริง 2 ตัว** (`Header [X-Content-Type-Options] not present on response.` ทั้ง HTTP และ HTTPS) แล้วคืนกลับ
+### 4. รอบหลังงานที่ 3 + รอบ 2 A2 (Global SecurityHeaders + AssetVersion + nginx docs)
+- `php artisan test tests/Feature/SecurityHeadersAndAssetVersioningTest.php`: **7/7 passed**, 100 assertions
+- Mutation check รอบแรก: ถอด `SecurityHeaders` ออกจาก `bootstrap/app.php` ชั่วคราว → แดงจริง 2 ตัว (`Header [X-Content-Type-Options] not present on response.` ทั้ง HTTP และ HTTPS) แล้วคืนกลับ
+- Mutation check รอบ 2 (A2): ย้าย `SecurityHeaders` กลับไปไว้ท้ายกลุ่ม `web` ชั่วคราว → `test_security_headers_apply_to_redirects_404_up_403_and_api_json_responses` **แดงจริง** (`Header [X-Content-Type-Options] not present on response.` บน 302 `/dashboard`) แล้วคืนกลับเป็น global middleware
 
-### 5. รอบหลังงานที่ 4 และตรวจส่งงานทั้งหมด (Final Verification)
-- `php artisan test`: **1,189 tests**, **1,186 passed**, **0 failed**, 3 skipped, 6 incomplete, 10,688 assertions, 148.40 s
-- `node --test tests/js/`: **5/5 passed** (121.2 ms)
+### 5. รอบตรวจส่งงานสุดท้ายของ PR #148 (หลัง A1 + A2)
+- `php artisan test`: **1,190 tests**, **1,187 passed**, **0 failed**, 3 skipped, 6 incomplete, 10,739 assertions, 196.57 s
+- `node --test tests/js/`: **5/5 passed** (175.7 ms)
 - `composer audit --locked`: **0 advisories** (exit code `0`)
 - `vendor/bin/pint --test` บนไฟล์ PHP ที่แก้และสร้างใหม่ทั้งหมด 9 ไฟล์: **passed** (exit code `0`)
 - ตรวจ PHP 8.3 grammar ด้วย `nikic/php-parser` (`PhpVersion::fromComponents(8, 3)`) ทุกไฟล์ใน `app/`, `bootstrap/`, `config/`, `database/`, `routes/`, `tests/`: **987 ไฟล์, 0 errors** และไม่พบการเรียกฟังก์ชันเฉพาะ PHP 8.4+
