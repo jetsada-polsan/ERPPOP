@@ -48,6 +48,43 @@ class SecurityHeadersAndAssetVersioningTest extends TestCase
         );
     }
 
+    public function test_security_headers_apply_to_redirects_404_up_403_and_api_json_responses(): void
+    {
+        $assertHeaders = function ($response): void {
+            $response->assertHeader('X-Content-Type-Options', 'nosniff')
+                ->assertHeader('X-Frame-Options', 'SAMEORIGIN')
+                ->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+                ->assertHeaderMissing('Strict-Transport-Security')
+                ->assertHeaderMissing('Content-Security-Policy')
+                ->assertHeaderMissing('Permissions-Policy');
+        };
+
+        // 302 guest redirect from ErpAuthorize
+        $redirectResponse = $this->get('/dashboard')->assertRedirect(route('login'));
+        $assertHeaders($redirectResponse);
+
+        // 404 non-existent URL
+        $notFoundResponse = $this->get('/no-such-page-xyz')->assertNotFound();
+        $assertHeaders($notFoundResponse);
+
+        // /up health endpoint
+        $healthResponse = $this->get('/up')->assertOk();
+        $assertHeaders($healthResponse);
+
+        // 403 aborted by ErpAuthorize for user without permission
+        $user = User::factory()->create([
+            'is_active' => true,
+            'must_change_password' => false,
+        ]);
+        $forbiddenResponse = $this->actingAs($user)->get('/settings')->assertForbidden();
+        $assertHeaders($forbiddenResponse);
+
+        // JSON response under api/*
+        $apiResponse = $this->getJson('/api/pos/ping');
+        $this->assertStringContainsString('application/json', (string) $apiResponse->headers->get('Content-Type'));
+        $assertHeaders($apiResponse);
+    }
+
     public function test_security_headers_middleware_does_not_overwrite_existing_response_headers(): void
     {
         $request = Request::create('https://localhost/custom', 'GET');

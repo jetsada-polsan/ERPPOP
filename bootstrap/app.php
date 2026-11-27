@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->append(SecurityHeaders::class);
         $middleware->alias([
             'pos.device' => AuthenticatePosDevice::class,
             'member.portal' => MemberPortalAuth::class,
@@ -28,7 +29,6 @@ return Application::configure(basePath: dirname(__DIR__))
         // แต่ละเมนูเช็คสิทธิ์ตาม App\Support\RoutePermissions
         $middleware->appendToGroup('web', CheckMenuVisibility::class);
         $middleware->appendToGroup('web', ErpAuthorize::class);
-        $middleware->appendToGroup('web', SecurityHeaders::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // A stale login tab should recover to a fresh CSRF token instead of
