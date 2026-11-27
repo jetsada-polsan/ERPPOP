@@ -7,5 +7,5 @@
    - Top card-style navigation bar (icon + label, light-gray active tab)
    - Soft light-gray table headers & compact capsule row action buttons
    ══════════════════════════════════════════════════════════════════════════ --}}
-<link id="erp-peak-style-system" rel="stylesheet" href="{{ asset('css/peak-style-ui.css') }}?v={{ filemtime(public_path('css/peak-style-ui.css')) }}">
-<script defer src="{{ asset('js/peak-style-ui.js') }}?v={{ filemtime(public_path('js/peak-style-ui.js')) }}"></script>
+<link id="erp-peak-style-system" rel="stylesheet" href="{{ \App\Support\AssetVersion::url('css/peak-style-ui.css') }}">
+<script defer src="{{ \App\Support\AssetVersion::url('js/peak-style-ui.js') }}"></script>

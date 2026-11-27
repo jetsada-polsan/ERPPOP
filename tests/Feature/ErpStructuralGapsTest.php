@@ -82,10 +82,11 @@ class ErpStructuralGapsTest extends TestCase
     /** ช่องว่างข้อ 3 — ไม่มี approval engine กลาง */
     public function test_gap_approval_requests_are_not_wired_into_any_business_flow(): void
     {
+        $basePrefix = str_replace('\\', '/', base_path()).'/';
         $users = [];
         foreach ($this->applicationFiles() as $file) {
             if (str_contains(file_get_contents($file), 'ApprovalRequest')) {
-                $users[] = str_replace(base_path().'/', '', $file);
+                $users[] = str_replace($basePrefix, '', str_replace('\\', '/', $file));
             }
         }
         $users = array_values(array_filter($users, fn ($f) => ! str_contains($f, 'app/Models/ApprovalRequest.php')));
@@ -226,7 +227,7 @@ class ErpStructuralGapsTest extends TestCase
         $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(base_path('app')));
         foreach ($iterator as $file) {
             if ($file->isFile() && $file->getExtension() === 'php') {
-                $files[] = $file->getPathname();
+                $files[] = str_replace('\\', '/', $file->getPathname());
             }
         }
         sort($files);

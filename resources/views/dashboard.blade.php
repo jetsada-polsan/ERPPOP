@@ -226,7 +226,7 @@
 @endsection
 
 @push('head')
-<script src="{{ asset('vendor/chartjs/chart.umd.js') }}"></script>
+<script src="{{ \App\Support\AssetVersion::url('vendor/chartjs/chart.umd.js') }}"></script>
 <style>
     .executive-hero { min-height:108px; display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:18px; padding:16px 18px; background:#fff; border:1px solid var(--erp-border); border-top:3px solid var(--erp-text); border-radius:8px; box-shadow:0 6px 20px rgba(15,23,42,.06); }
     .executive-mark { width:46px; height:46px; display:grid; place-items:center; color:#fff; background:var(--erp-text); border-radius:7px; font-size:20px; }

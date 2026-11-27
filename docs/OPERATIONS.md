@@ -53,3 +53,34 @@ Run the `Deploy ERP` GitHub workflow and choose staging or production. The job t
 - Stock adjustments remain pending and do not affect stock until a different authorized user approves them.
 - POS recalculates prices, promotions, discounts, points, VAT, and quantity promotions on the server.
 - Manual discount and below-cost sale exceptions require manager permissions.
+
+## nginx: gzip และ cache ไฟล์ static
+
+> **คำเตือน: เปิด `expires 30d` ได้หลัง deploy งานข้อ 3.2 (ใส่ `?v=` บนไฟล์ CSS/JS ผ่าน `AssetVersion::url`) แล้วเท่านั้น มิฉะนั้นผู้ใช้จะค้างอยู่กับไฟล์ CSS/JS เวอร์ชันเก่าที่เบราว์เซอร์แคชไว้**
+
+เพิ่มค่าต่อไปนี้ใน nginx (ระดับ `http` หรือ `server` ตามโครงสร้างไฟล์บนเซิร์ฟเวอร์) เพื่อซ่อนเวอร์ชัน nginx, บีบอัดไฟล์ static และให้เบราว์เซอร์แคชไฟล์ที่มี `?v=`:
+
+```nginx
+server_tokens off;
+
+gzip on;
+gzip_vary on;
+gzip_min_length 1024;
+gzip_types text/css application/javascript application/json image/svg+xml;
+```
+
+และเพิ่ม `location` block ต่อไปนี้ใน `server` block ของ ERP:
+
+```nginx
+location ~* \.(css|js|woff2?|svg|png|jpg|jpeg|ico)$ {
+    expires 30d;
+    add_header Cache-Control "public";
+    try_files $uri =404;
+}
+```
+
+หลังแก้ไขคอนฟิก ให้ตรวจไวยากรณ์และโหลด nginx ใหม่ด้วยคำสั่ง:
+
+```bash
+nginx -t && systemctl reload nginx
+```

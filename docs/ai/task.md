@@ -1,3 +1,40 @@
+# Handoff — 2026-11-27 (System hardening PR #148 updated: Guzzle 7.x pin & global SecurityHeaders, Antigravity)
+
+## Commit
+- branch `antigravity/system-hardening` จาก `origin/main` ที่ `1e780b1f` (หลัง merge PR #146 และ PR #147 ตามคำสั่งเจ้าของ) และ merge `origin/claude/system-review-2026-11-26` (`93532500`, `db2fd132`)
+- คอมมิตงานแยกตามหัวข้อ:
+  - `8ab5f71a` งานที่ 1: normalize path เป็น `/` และข้ามเทสต์ `chmod(0000)` เฉพาะ Windows ในเทสต์ 5 ไฟล์
+  - `eb10592f` งานที่ 2: pin `config.platform.php = "8.3.0"` และ `composer update --with-all-dependencies` ปิด 37 advisories เหลือ 0
+  - `225ee81e` งานที่ 3: เพิ่ม `SecurityHeaders` middleware, `AssetVersion::url()`, ใส่ `?v=` ทุก view นอก `resources/views/pos/*`, เพิ่มเทสต์ และเพิ่มคู่มือ nginx ใน `docs/OPERATIONS.md`
+  - `b3aa4c4d` งานที่ 4: แก้บรรทัดเดียวใน `.github/workflows/deploy.yml` (`php-version: '8.5.10'` → `'8.3'`)
+  - `40213072` รอบ 2 A1: เพิ่ม `"guzzlehttp/guzzle": "^7.17"` และ `"guzzlehttp/uri-template": "^1.0"` ดึงตระกูล Guzzle กลับเป็น 7.17.0 / 2.13.6 / 2.6.2 / 1.0.11 (`composer audit --locked` = 0)
+  - `d563834d` รอบ 2 A2: ย้าย `SecurityHeaders` เป็น global middleware (`$middleware->append(SecurityHeaders::class)`) และเพิ่มเทสต์ 302, 404, `/up`, 403 และ `api/*` JSON
+- รายงานละเอียด: `docs/ai/antigravity-system-hardening.md`
+
+## ทำอะไรไป
+- **งานที่ 1**: แก้ `ConfirmPopupConsistencyTest`, `ErpStructuralGapsTest`, `LegacyPosImportQuarantineTest`, `PrintablePageSizeTest` ให้ normalize path เป็น `/` ก่อนเทียบ/แสดงชื่อไฟล์ และให้ `FinanceSecurityControlTest::test_operations_page_stays_available_when_a_backup_checksum_is_unreadable` `markTestSkipped` เฉพาะ `PHP_OS_FAMILY === 'Windows'`
+- **งานที่ 2 + A1**: เพิ่ม `"platform": {"php": "8.3.0"}` ใต้ `config` และล็อก `"guzzlehttp/guzzle": "^7.17"`, `"guzzlehttp/uri-template": "^1.0"` ใน `composer.json` ลด advisory จาก 37 เหลือ 0 (`laravel/framework` `v13.17.0` → `v13.44.1`, `guzzlehttp/guzzle` `7.13.1` → `7.17.0`, `guzzlehttp/psr7` `2.12.3` → `2.13.6`, `guzzlehttp/promises` `2.5.0` → `2.6.2`, `guzzlehttp/uri-template` `v1.0.8` → `v1.0.11`, `league/commonmark` `2.8.2` → `2.10.9`, `league/flysystem` `3.35.1` → `3.36.0`, `symfony/*` `v7.4.13-14` → `v7.4.24`) พร้อมตรวจ `brick/math` `0.18.0` → `1.0.0` (พบเรียกตรง 5 ไฟล์ใน `app/` แต่ไม่มีจุดใดโดน breaking change)
+- **งานที่ 3 + A2**:
+  - เพิ่ม `app/Http/Middleware/SecurityHeaders.php` เป็น global middleware ใน `bootstrap/app.php` (`$middleware->append(SecurityHeaders::class)`) ให้ติดครบทั้ง `/login`, 302 guest redirect, 404, `/up`, 403 และ `api/*` JSON (ไม่เขียนทับ header ที่ response ตั้งไว้, HSTS เฉพาะ HTTPS ไม่มี `includeSubDomains` และไม่ใส่ CSP/Permissions-Policy)
+  - เพิ่ม `app/Support/AssetVersion.php` และอัปเดต view นอก `resources/views/pos/*` ครบ 12 ไฟล์ (31 จุด) ให้ใช้ `AssetVersion::url()` แทน `asset()` เปล่าและแทน `filemtime(public_path(...))` ซ้ำๆ
+  - เพิ่มหัวข้อ `nginx: gzip และ cache ไฟล์ static` ใน `docs/OPERATIONS.md` พร้อมคำเตือนตัวหนาให้เปิด `expires 30d` หลัง deploy งานข้อ 3.2 แล้วเท่านั้น
+- **งานที่ 4**: เปลี่ยน `php-version: '8.5.10'` เป็น `'8.3'` ใน `.github/workflows/deploy.yml` บรรทัดเดียว และตรวจ syntax PHP 8.3 ทั้ง 987 ไฟล์ผ่านไม่มี error
+
+## ทดสอบไปแล้วแค่ไหน
+- `php artisan test` (Windows, PHP 8.4.27, SQLite): **1,190 tests, 1,187 passed, 10,739 assertions, 0 failed, 3 skipped, 6 incomplete** (196.6 s)
+- `node --test tests/js/`: **5/5 passed** (175.7 ms)
+- `composer audit --locked`: **0 advisories** (exit code 0)
+- `vendor/bin/pint --test` บนไฟล์ PHP ที่แก้และเพิ่มใหม่ทั้ง 9 ไฟล์: **passed**
+- Mutation checks 3 จุด: เพิ่ม `alert('x')` ชั่วคราวใน `login.blade.php` → แดงจริง; ถอด `SecurityHeaders` ชั่วคราว → แดงจริง 2 ตัว; ย้าย `SecurityHeaders` กลับไปท้ายกลุ่ม `web` ชั่วคราว → แดงจริงบน 302 `/dashboard` (คืนโค้ดครบทั้งหมด)
+- ตรวจ 987 ไฟล์ PHP ด้วย `nikic/php-parser` grammar PHP 8.3: **0 errors**
+
+## ความเสี่ยง/งานถัดไป
+- **PR #148 พร้อม merge** (ยังไม่ได้ deploy — เจ้าของจะ review/merge และสั่ง deploy เอง)
+- หลัง merge และ deploy โค้ดชุดนี้ขึ้น production แล้ว เจ้าของจึงคัดคอนฟิก nginx (`gzip`, `expires 30d`, `server_tokens off;`) จาก `docs/OPERATIONS.md` ไปใส่เซิร์ฟเวอร์และรัน `nginx -t && systemctl reload nginx` พร้อมตั้ง `SESSION_SECURE_COOKIE=true` ใน `.env` ของ production (ตามข้อ 3 ใน `docs/ai/claude-review.md`)
+- งานต่อยอดลด query ต่อหน้าอยู่ใน branch แยก `antigravity/fewer-queries-per-page` (ต่อจาก #148)
+
+---
+
 # Handoff — 2026-11-26 (Pin SSH host keys in the other server workflows, Claude)
 
 ## Commit

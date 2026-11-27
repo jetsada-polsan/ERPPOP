@@ -33,10 +33,12 @@ class LegacyPosImportQuarantineTest extends TestCase
 
     public function test_no_application_code_reads_the_quarantined_import_tables(): void
     {
+        $basePrefix = str_replace('\\', '/', base_path()).'/';
         $offenders = [];
 
         foreach ($this->applicationFiles() as $file) {
-            if (in_array(str_replace(base_path().'/', '', $file), self::DISPOSAL_ALLOWED, true)) {
+            $relativePath = str_replace($basePrefix, '', str_replace('\\', '/', $file));
+            if (in_array($relativePath, self::DISPOSAL_ALLOWED, true)) {
                 continue;
             }
             $contents = file_get_contents($file);
@@ -45,7 +47,7 @@ class LegacyPosImportQuarantineTest extends TestCase
                 // accounting_import_batches with the quarantined legacy table.
                 $pattern = '/(?<![A-Za-z0-9_])'.preg_quote($table, '/').'(?!(?:[A-Za-z0-9_]))/';
                 if (preg_match($pattern, $contents) === 1) {
-                    $offenders[] = str_replace(base_path().'/', '', $file).' -> '.$table;
+                    $offenders[] = $relativePath.' -> '.$table;
                 }
             }
         }
@@ -69,7 +71,7 @@ class LegacyPosImportQuarantineTest extends TestCase
             $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($path));
             foreach ($iterator as $file) {
                 if ($file->isFile() && in_array($file->getExtension(), ['php'], true)) {
-                    $files[] = $file->getPathname();
+                    $files[] = str_replace('\\', '/', $file->getPathname());
                 }
             }
         }

@@ -1,10 +1,16 @@
 <?php
 
+use App\Http\Middleware\AuthenticatePosDevice;
+use App\Http\Middleware\CheckMenuVisibility;
+use App\Http\Middleware\ErpAuthorize;
+use App\Http\Middleware\MemberPortalAuth;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Session\TokenMismatchException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -14,14 +20,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->append(SecurityHeaders::class);
         $middleware->alias([
-            'pos.device' => \App\Http\Middleware\AuthenticatePosDevice::class,
-            'member.portal' => \App\Http\Middleware\MemberPortalAuth::class,
+            'pos.device' => AuthenticatePosDevice::class,
+            'member.portal' => MemberPortalAuth::class,
         ]);
         // ประตูเดียวของทั้ง ERP: guest -> หน้า login, ผู้ใช้ถูกปิด -> เตะออก,
         // แต่ละเมนูเช็คสิทธิ์ตาม App\Support\RoutePermissions
-        $middleware->appendToGroup('web', \App\Http\Middleware\CheckMenuVisibility::class);
-        $middleware->appendToGroup('web', \App\Http\Middleware\ErpAuthorize::class);
+        $middleware->appendToGroup('web', CheckMenuVisibility::class);
+        $middleware->appendToGroup('web', ErpAuthorize::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // A stale login tab should recover to a fresh CSRF token instead of
@@ -37,7 +44,7 @@ return Application::configure(basePath: dirname(__DIR__))
         });
         // abort(422/409/400, 'ข้อความไทย') ในฟอร์มหน้าเว็บ: บน production หน้า error มาตรฐานไม่แสดงข้อความ
         // ผู้ใช้เห็นแค่ "422 Unprocessable Content" ภาษาอังกฤษ → พากลับหน้าเดิมพร้อมแถบแจ้งเหตุผลภาษาไทยแทน
-        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $exception, Request $request) {
+        $exceptions->render(function (HttpExceptionInterface $exception, Request $request) {
             $status = $exception->getStatusCode();
             $referer = (string) $request->headers->get('referer', '');
             if (! in_array($status, [400, 409, 422], true) || $request->expectsJson() || $request->is('api/*')

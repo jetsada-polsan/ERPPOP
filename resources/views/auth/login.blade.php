@@ -4,14 +4,14 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f4f7fb">
-    @php($faviconUrl = \App\Models\AppSetting::logoUrl() ?: asset('images/logos/mpm-food-group.jpg').'?v='.filemtime(public_path('images/logos/mpm-food-group.jpg')))
+    @php($faviconUrl = \App\Models\AppSetting::logoUrl() ?: \App\Support\AssetVersion::url('images/logos/mpm-food-group.jpg'))
     @php($companyName = \App\Models\AppSetting::company('name_th') ?: 'MPM Food Group')
-    @php($logo = \App\Models\AppSetting::logoUrl() ?: asset('images/logos/mpm-food-group.jpg'))
+    @php($logo = \App\Models\AppSetting::logoUrl() ?: \App\Support\AssetVersion::url('images/logos/mpm-food-group.jpg'))
     <link rel="icon" href="{{ $faviconUrl }}">
     <link rel="shortcut icon" href="{{ $faviconUrl }}">
     <link rel="apple-touch-icon" href="{{ $faviconUrl }}">
     <title>เข้าสู่ระบบ JET ERP - {{ $companyName }}</title>
-    <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
+    <link rel="stylesheet" href="{{ \App\Support\AssetVersion::url('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">

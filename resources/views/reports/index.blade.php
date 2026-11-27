@@ -984,6 +984,6 @@ window.addEventListener('load', () => window.print());
 @endif
 </script>
 @if($selectedReport === 'stock_balance' && ! $printMode)
-<script src="{{ asset('report-search.js') }}"></script>
+<script src="{{ \App\Support\AssetVersion::url('report-search.js') }}"></script>
 @endif
 @endpush

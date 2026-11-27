@@ -137,7 +137,7 @@
 @endpush
 
 @push('scripts')
-<script src="{{ asset('document-workflow.js') }}"></script>
+<script src="{{ \App\Support\AssetVersion::url('document-workflow.js') }}"></script>
 <script>
 function docEntryPage(config) {
     const stockRequests = new Map();
