@@ -1,3 +1,33 @@
+# Handoff — 2026-11-27 (Fewer queries per page: AppSetting request memo & User global permission memo, Antigravity)
+
+## Commit
+- branch `antigravity/fewer-queries-per-page` ต่อจาก `antigravity/system-hardening` (`99a5f9ce` / PR #148 — **ให้ merge PR #148 ก่อน**)
+- คอมมิตงานแยกตามหัวข้อ:
+  - `d5c1ce99` B1: memo `AppSetting` ต่อ request ใน `request()->attributes`, เพิ่ม `AppSetting::clearCache()` + model events `saved`/`deleted`, และล้าง cache/memo ใน `PurgeLegacyMasters` กับ migration `2026_11_01_000004_activate_meaw_foods_brand`
+  - `0ef7c43d` B2: memo สิทธิ์ global ต่อ `User` instance (`globalPermissionCodes()` ใช้ `??=`) ใน `app/Models/User.php` โดยไม่รวม branch roles และให้ `permissionCodes()` ใช้ต่อไม่โหลดซ้ำ
+  - `528780ed` B3: เพิ่ม `tests/Feature/LayoutQueryBudgetTest.php` คุมเพดาน query ใต้ `CACHE_STORE=database` พร้อมตรวจการล้าง memo และขอบเขต branch role
+- รายงานละเอียดพร้อมตารางก่อน/หลัง 6 หน้า: `docs/ai/antigravity-fewer-queries-per-page.md`
+
+## ทำอะไรไป
+- **B1 (`app/Models/AppSetting.php`, `app/Console/Commands/PurgeLegacyMasters.php`, `database/migrations/2026_11_01_000004_activate_meaw_foods_brand.php`)**: เก็บ settings ที่อ่านจาก cache ไว้ใน `request()->attributes` ต่อ request (ไม่ใช้ static property ล้วน), ล้างทั้ง cache และ memo ใน `set()`, `booted()` (`saved`/`deleted`) และจุดที่เขียนตาราง `app_settings` ตรง โดยคงค่าที่ `get()`, `company()` และ `logoUrl()` คืนไว้เหมือนเดิมทุกประการ
+- **B2 (`app/Models/User.php`)**: เพิ่ม `globalPermissionCodes()` ที่โหลด global roles + permissions ครั้งเดียวต่อ instance ด้วย `??=` ให้ `hasGlobalPermission()` เช็กจาก array แทนการยิง `exists(...)` ซ้ำทุกครั้ง และให้ `permissionCodes()` นำมาใช้ต่อร่วมกับ `activeBranchRoles()`
+- **B3 (`tests/Feature/LayoutQueryBudgetTest.php`)**: ตั้ง `config(['cache.default' => 'database'])` + `Cache::setDefaultDriver('database')`, warm-up `/dashboard` และ `/settings` แล้วตรวจด้วย `DB::listen` ว่าอ่าน `cache` key `app_settings.all` 1 ครั้ง, `exists` ของ roles/permissions ≤ 1 ครั้ง และ query รวม ≤ 20 (`/dashboard`) / ≤ 13 (`/settings`)
+- ผลลด query (database cache): `GM` ลดจาก 31–39 → **10–17 queries/หน้า** (-50% ถึง -74%); `IT_MGR` ลดจาก 102–109 → **10–17 queries/หน้า** (-84% ถึง -91%); `cache(app_settings.all)` เหลือ **1** และ `role/perm exists` เหลือ **0** ทุกหน้า
+
+## ทดสอบไปแล้วแค่ไหน
+- `php artisan test` (Windows, PHP 8.4.27, SQLite): **1,193 tests, 1,190 passed, 10,778 assertions, 0 failed, 3 skipped, 6 incomplete** (113.7 s)
+- `node --test tests/js/`: **5/5 passed** (110.5 ms)
+- `composer audit --locked`: **0 advisories** (exit code 0)
+- `vendor/bin/pint --test` บนไฟล์ PHP ที่แก้และเพิ่มใหม่ทั้ง 5 ไฟล์ในส่วน B: **passed**
+- ตรวจ PHP 8.3 grammar ด้วย `nikic/php-parser` ทั้งโปรเจกต์: **988 ไฟล์, 0 errors**
+- Mutation check: ถอด memo ใน `AppSetting::allCached()` ชั่วคราว → `LayoutQueryBudgetTest` แดงจริง (`/dashboard อ่าน cache key app_settings.all ซ้ำ 13 ครั้ง`) แล้วคืนกลับ
+
+## ความเสี่ยง/งานถัดไป
+- **ยังไม่ได้ deploy** — ให้ merge **PR #148** (`antigravity/system-hardening`) ก่อน แล้วจึง review/merge PR ของ `antigravity/fewer-queries-per-page` และสั่ง deploy เอง
+- ไม่มี migration ใหม่เพิ่ม (แก้เฉพาะการเรียก `AppSetting::clearCache()` ใน migration เดิม `2026_11_01_000004_activate_meaw_foods_brand` ซึ่งรันบน production ไปแล้ว)
+
+---
+
 # Handoff — 2026-11-27 (System hardening PR #148 updated: Guzzle 7.x pin & global SecurityHeaders, Antigravity)
 
 ## Commit
