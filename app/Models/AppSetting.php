@@ -12,9 +12,43 @@ class AppSetting extends Model
 {
     private const CACHE_KEY = 'app_settings.all';
 
+    private const REQUEST_ATTR = 'app_settings.all';
+
+    protected static function booted(): void
+    {
+        static::saved(static fn () => static::clearCache());
+        static::deleted(static fn () => static::clearCache());
+    }
+
+    /**
+     * @return array<string, ?string>
+     */
+    private static function allCached(): array
+    {
+        $attributes = app()->bound('request') ? request()->attributes : null;
+        if ($attributes !== null && $attributes->has(self::REQUEST_ATTR)) {
+            return $attributes->get(self::REQUEST_ATTR);
+        }
+
+        $all = Cache::rememberForever(self::CACHE_KEY, fn () => static::query()->pluck('value', 'key')->all());
+
+        $attributes?->set(self::REQUEST_ATTR, $all);
+
+        return $all;
+    }
+
+    public static function clearCache(): void
+    {
+        Cache::forget(self::CACHE_KEY);
+
+        if (app()->bound('request')) {
+            request()->attributes->remove(self::REQUEST_ATTR);
+        }
+    }
+
     public static function get(string $key, ?string $default = null): ?string
     {
-        $all = Cache::rememberForever(self::CACHE_KEY, fn () => static::query()->pluck('value', 'key')->all());
+        $all = static::allCached();
 
         $value = $all[$key] ?? null;
 
@@ -24,7 +58,7 @@ class AppSetting extends Model
     public static function set(string $key, ?string $value): void
     {
         static::updateOrCreate(['key' => $key], ['value' => $value]);
-        Cache::forget(self::CACHE_KEY);
+        static::clearCache();
     }
 
     // Company info helpers: settings win, config/company.php is the fallback.

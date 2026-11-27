@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Console\Concerns\RequiresFreshBackup;
+use App\Models\AppSetting;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -149,6 +150,7 @@ class PurgeLegacyMasters extends Command
                 }
                 DB::table('app_settings')->where('key', 'like', self::LEGACY_SETTINGS)->delete();
             });
+            AppSetting::clearCache();
         } catch (Throwable $exception) {
             $this->error('ล้มเหลว ไม่มีข้อมูลถูกลบ (rollback แล้ว): '.$exception->getMessage());
 

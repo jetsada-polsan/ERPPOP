@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 #[Fillable(['branch_id', 'salesman_id', 'sales_area_id', 'username', 'name', 'email', 'phone', 'position', 'password', 'is_active', 'must_change_password', 'mfa_secret', 'mfa_enabled_at', 'password_changed_at'])]
 #[Hidden(['password', 'remember_token', 'mfa_secret'])]
@@ -171,6 +172,9 @@ class User extends Authenticatable
     /** @var array<int, string>|null per-request cache of permission codes */
     private ?array $permissionCodes = null;
 
+    /** @var array<int, string>|null per-instance cache of global-role permission codes */
+    private ?array $globalPermissionCodes = null;
+
     /**
      * Return permissions from the user's global roles plus active branch roles.
      * Branch roles grant access to the assigned branch; controllers and POS
@@ -180,15 +184,26 @@ class User extends Authenticatable
      */
     public function permissionCodes(): array
     {
-        return $this->permissionCodes ??= $this->roles()->with('permissions')->get()
-            ->merge($this->activeBranchRoles())
+        return $this->permissionCodes ??= collect($this->globalPermissionCodes())
+            ->merge($this->activeBranchRoles()->flatMap(fn ($role) => $role->permissions->pluck('code')))
+            ->unique()->values()->all();
+    }
+
+    /**
+     * Return permissions from the user's global roles only (excluding branch roles).
+     *
+     * @return array<int, string>
+     */
+    private function globalPermissionCodes(): array
+    {
+        return $this->globalPermissionCodes ??= $this->roles()->with('permissions')->get()
             ->flatMap(fn ($role) => $role->permissions->pluck('code'))
             ->unique()->values()->all();
     }
 
     public function hasGlobalPermission(string $code): bool
     {
-        return $this->roles()->whereHas('permissions', fn ($permissions) => $permissions->where('code', $code))->exists();
+        return in_array($code, $this->globalPermissionCodes(), true);
     }
 
     /** @return Collection<int, Role> */
@@ -222,7 +237,7 @@ class User extends Authenticatable
         $this->accountingFirm ??= $this->roles->contains('code', 'ACCOUNTING_FIRM')
             || $this->activeBranchRoles()->contains('code', 'ACCOUNTING_FIRM');
 
-        return !$this->accountingFirm || \Illuminate\Support\Str::is([
+        return ! $this->accountingFirm || Str::is([
             'dashboard', 'apps.launcher', 'reports.index', 'accounting-package.*', 'notifications.index',
             'bplus.sync.index', 'bplus.sync.show', 'password.*', 'mfa.*', 'logout',
         ], (string) $route);
